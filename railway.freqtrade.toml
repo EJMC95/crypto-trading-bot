@@ -1,0 +1,10 @@
+# Service-specific Railway config for the Freqtrade bots service ONLY.
+# Pointed at via the crypto-trading-bot (feisty-delight) service's
+# Config-as-code "Railway Config File" setting, so it does NOT affect the
+# separate custom-bot services that deploy from this same repo.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.freqtrade"
+
+[deploy]
+restartPolicyType = "always"
