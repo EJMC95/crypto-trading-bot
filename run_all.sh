@@ -22,5 +22,8 @@ run_bot user_data/config_v6_swing.json   v6swing  &
 run_bot user_data/config_v7_momo.json    v7momo   &
 run_bot user_data/config_v8_momo.json    v8momo   &
 
+# Combined P&L + trades dashboard, served on $PORT (Railway exposes it).
+python3 /freqtrade/dashboard_server.py &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait

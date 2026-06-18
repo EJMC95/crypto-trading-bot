@@ -6,7 +6,8 @@ USER root
 # Bake in the bot configs + strategies (built locally in user_data/)
 COPY user_data /freqtrade/user_data
 COPY run_all.sh /freqtrade/run_all.sh
-RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh
+COPY dashboard_server.py /freqtrade/dashboard_server.py
+RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh /freqtrade/dashboard_server.py
 USER ftuser
 
 WORKDIR /freqtrade
