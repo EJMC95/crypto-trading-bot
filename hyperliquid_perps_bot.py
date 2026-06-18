@@ -37,8 +37,8 @@ import numpy as np
 # --------------------------- configuration -------------------------------
 COINS = ["BTC", "ETH", "SOL"]     # top perps to trade
 RSI_PERIOD = 14
-OVERSOLD = 30
-OVERBOUGHT = 70
+OVERSOLD = 40
+OVERBOUGHT = 60
 LOOP_SECONDS = 60
 CANDLE_INTERVAL = "1h"            # indicator timeframe
 ORDER_USD = 50.0                 # notional per position (position sizing)

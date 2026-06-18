@@ -10,10 +10,10 @@ This is the live counterpart to perps_strategy_backtest.py — same rules, so wh
 you run matches what you measured.
 
 Strategy (per market, on closed 4h candles):
-  LONG  entry : close > highest high of last 30 bars  AND  close > 200-EMA.
-  LONG  exit  : close < lowest low of last 15 bars  OR  price <= entry*(1-12%).
-  SHORT (only if ALLOW_SHORT): mirror — close < 30-bar low AND close < 200-EMA;
-        cover on close > 15-bar high OR price >= entry*(1+12%).
+  LONG  entry : close > highest high of last 15 bars  AND  close > 100-EMA.
+  LONG  exit  : close < lowest low of last 8 bars  OR  price <= entry*(1-8%).
+  SHORT (only if ALLOW_SHORT): mirror — close < 15-bar low AND close < 100-EMA;
+        cover on close > 8-bar high OR price >= entry*(1+8%).
 
 Operational:
   - Polls every LOOP_SECONDS; acts on the latest CLOSED 4h candle (no churn).
@@ -41,12 +41,12 @@ import numpy as np
 
 # --------------------------- configuration -------------------------------
 COINS = ["BTC", "ETH", "SOL"]
-ENTRY_LOOKBACK = 30
-EXIT_LOOKBACK = 15
-TREND_EMA = 200
-HARD_STOP = 0.12
+ENTRY_LOOKBACK = 15
+EXIT_LOOKBACK = 8
+TREND_EMA = 100
+HARD_STOP = 0.08
 CANDLE_INTERVAL = "4h"
-ALLOW_SHORT = False              # backtest: shorts help ETH, hurt BTC -> off by default
+ALLOW_SHORT = True               # loosened: shorts enabled for more frequent trading
 ORDER_USD = 50.0                 # notional per position
 LEVERAGE = 1                     # 1x baseline; 2x doubled drawdown in backtest
 DAILY_LOSS_LIMIT = 0.05
