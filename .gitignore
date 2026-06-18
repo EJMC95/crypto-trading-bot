@@ -30,3 +30,8 @@ untitled folder/
 
 # ---- macOS launchd service file (not used on Railway) ----
 com.eamon.tri-arb.plist
+
+# SQLite sidecar files
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-*

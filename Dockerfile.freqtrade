@@ -1,0 +1,15 @@
+# Freqtrade image for Railway — runs all 4 dry-run bots in one container.
+# Build target for the Railway service (set Dockerfile path = Dockerfile.freqtrade).
+FROM freqtradeorg/freqtrade:stable
+
+USER root
+# Bake in the bot configs + strategies (built locally in user_data/)
+COPY user_data /freqtrade/user_data
+COPY run_all.sh /freqtrade/run_all.sh
+RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh
+USER ftuser
+
+WORKDIR /freqtrade
+# Clear freqtrade's default entrypoint so our supervisor script runs instead.
+ENTRYPOINT []
+CMD ["sh", "/freqtrade/run_all.sh"]
