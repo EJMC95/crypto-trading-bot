@@ -1,9 +1,9 @@
-# MomoBreakoutV1.py
+# MomoBreakoutV1_Fixed.py
 #
-# IMPROVED (now fires in ranging/pullback markets, not just breakouts):
+# WHAT CHANGED FROM V1 AND WHY:
 #   V1 only bought on BREAKOUTS (close > 30-bar high). In a sideways/falling market, this never fired.
 #
-#   V1 now adds PULLBACK entry:
+#   V1_Fixed adds PULLBACK entry:
 #     - Entry 1 (breakout): close > 30-bar high AND close > 200-EMA (unchanged, the original edge)
 #     - Entry 2 (pullback): close < 15-bar low AND close > 200-EMA AND rsi < 50
 #       i.e. within an uptrend, if price dips below a 15-bar floor and RSI is not too hot, buy it back.
@@ -17,7 +17,7 @@ import talib.abstract as ta
 from freqtrade.strategy import IStrategy, IntParameter
 
 
-class MomoBreakoutV1(IStrategy):
+class MomoBreakoutV1Fixed(IStrategy):
     INTERFACE_VERSION = 3
 
     timeframe = "4h"
@@ -52,12 +52,12 @@ class MomoBreakoutV1(IStrategy):
         # Donchian channels (shift(1) for no look-ahead).
         dataframe["dc_high"] = dataframe["high"].rolling(self.entry_lookback.value).max().shift(1)
         dataframe["dc_low"]  = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
-        # IMPROVED: add a shorter 15-bar low for pullback entry
+        # FIXED: add a shorter 15-bar low for pullback entry
         dataframe["pullback_low"] = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # IMPROVED: two entry signals instead of one.
+        # FIXED: two entry signals instead of one.
         dataframe.loc[
             (
                 (

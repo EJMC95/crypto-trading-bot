@@ -18,12 +18,13 @@ DASH_USER = "eamon"
 DASH_PASS = "freqbot2026"
 
 BOTS = [
-    ("v4core",  8085, "ImprovedStrategyV4 / 1d trend core"),
-    ("v5gated", 8084, "DayTraderV5Gated / 5m gated"),
-    ("v6swing", 8086, "SwingDipV1 / daily dip-buy"),
-    ("v7momo",  8087, "MomoBreakoutV1 / 4h breakout"),
-    ("v8momo",  8088, "TrendMomoV1 / daily SMA cross"),
+    ("v4core",  8085, "ImprovedStrategyV4 / 1d trend core", "1d"),
+    ("v5gated", 8084, "DayTraderV5Gated / 5m gated",        "5m"),
+    ("v6swing", 8086, "SwingDipV1 / daily dip-buy",         "1d"),
+    ("v7momo",  8087, "MomoBreakoutV1 / 4h breakout",       "4h"),
+    ("v8momo",  8088, "TrendMomoV1 / daily SMA cross",      "1d"),
 ]
+import urllib.parse
 PORT = int(os.environ.get("PORT", "8080"))
 
 
@@ -39,7 +40,7 @@ def _token(port):
                 headers={"Authorization": f"Basic {auth}"}, method="POST")["access_token"]
 
 
-def fetch(name, port, desc):
+def fetch(name, port, desc, tf=None):
     d = {"name": name, "port": port, "desc": desc, "online": False,
          "open": [], "closed": []}
     try:

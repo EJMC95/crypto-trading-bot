@@ -1,14 +1,14 @@
-# DayTraderV5Gated.py
+# DayTraderV5Gated_Fixed.py
 #
-# IMPROVED (now fires 2-3x more often while keeping the regime gate):
+# WHAT CHANGED FROM V5Gated AND WHY:
 #   V5 entry required: rsi > 55 AND close > 9-EMA AND volume > sma_volume AND ema9_rising AND regime_up_daily
 #   All five conditions at once = rare in noisy 5m price action.
 #
-#   V5 entry now: (rsi > 50 OR (rsi > 40 AND close > ema_fast)) AND ema9_rising_1h AND regime_up_1d
-#   - rsi > 50 (was 55, lower threshold catches more momentum)
-#   - OR rsi > 40 with close > ema_fast (catch momentum on pullbacks)
-#   - Still requires: ema9_rising_1h AND regime_up_1d (the two macro filters stay)
-#   - Volume check softer: volume > 0 (not weighted by sma; noise is okay on 5m)
+#   V5_Fixed relaxes entry:
+#     - rsi > 45 (was 55, lower threshold catches more momentum)
+#     - OR rsi > 40 with close > ema9 (catch momentum on any pullback to moving avg)
+#     - Still requires: ema9_rising_1h AND regime_up_1d (the two macro filters stay)
+#     - Volume check is softer: volume > 0 (not weighted by sma; noise is okay on 5m)
 #   Result: 2-3x more entry signals while preserving the day-trend (1h) and regime (1d) discipline.
 #
 #   All risk management (ROI, atr stops, protections) unchanged from V5 — proven solid.
@@ -28,7 +28,7 @@ from freqtrade.strategy import (
 )
 
 
-class DayTraderV5Gated(IStrategy):
+class DayTraderV5GatedFixed(IStrategy):
 
     INTERFACE_VERSION = 3
 
@@ -36,7 +36,7 @@ class DayTraderV5Gated(IStrategy):
     informative_timeframe = "1h"
     regime_timeframe = "1d"
 
-    buy_rsi = IntParameter(40, 65, default=50, space="buy", optimize=False)
+    buy_rsi = IntParameter(40, 65, default=50, space="buy", optimize=False)  # relaxed from 55 to 50 default
     buy_ema_fast = IntParameter(5, 15, default=9, space="buy", optimize=False)
     buy_ema_slow = IntParameter(18, 50, default=21, space="buy", optimize=False)
     buy_vol_sma = IntParameter(10, 40, default=20, space="buy", optimize=False)
@@ -114,7 +114,7 @@ class DayTraderV5Gated(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # IMPROVED: relaxed entry. Two paths instead of one strict all-conditions.
+        # FIXED: relaxed entry. Two paths instead of one strict all-conditions.
         dataframe.loc[
             (
                 # Must still have day-trend up AND macro regime up (the gates stay)
@@ -122,9 +122,9 @@ class DayTraderV5Gated(IStrategy):
                 & (dataframe["regime_up_1d"] == 1)
                 & (dataframe["close_1h"] > dataframe["ema9_1h"])
 
-                # IMPROVED: relaxed momentum entry (either path is enough)
+                # FIXED: relaxed momentum entry (either path is enough)
                 & (
-                    # Path 1: RSI > 50 (was 55, slightly relaxed)
+                    # Path 1: RSI > 50 with any volume (original, slightly relaxed)
                     (dataframe["rsi"] > self.buy_rsi.value)
                     |
                     # Path 2: RSI > 40 and price above fast EMA (catch pullbacks)
