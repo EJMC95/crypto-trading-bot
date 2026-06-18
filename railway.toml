@@ -1,0 +1,8 @@
+# Tells Railway to build the Freqtrade image (all 4 dry-run bots in one service)
+# instead of the default ./Dockerfile (which is for the separate custom bots).
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.freqtrade"
+
+[deploy]
+restartPolicyType = "always"
