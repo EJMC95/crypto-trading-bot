@@ -1,0 +1,5 @@
+# Consolidated deps for all four Railway bot services
+hyperliquid-python-sdk>=0.9.0
+eth-account>=0.10.0
+numpy>=1.24
+ccxt>=4.2.0

@@ -1,0 +1,69 @@
+---
+# Freqtrade — two dry-run bots, the cleaned-up setup (16 June 2026).
+#
+#   v4core  : ImprovedStrategyV4 (daily 50/200 trend filter) — the validated core.
+#   v5gated : DayTraderV5Gated  (5m day-trader gated by the daily 50/200 regime).
+#
+# Both: Kraken, BTC/USD + ETH/USD, dry_run, restart on crash/reboot.
+# The old 4 scalper/USDT services were removed (see IMPROVEMENTS_2026-06-16.md).
+#
+# Security note: each api_server binds 0.0.0.0 INSIDE its container, but the
+# "127.0.0.1:PORT:PORT" mapping below means it is only reachable from THIS Mac's
+# localhost — never the network. Change the placeholder passwords before going live.
+
+services:
+  v4core:
+    image: freqtradeorg/freqtrade:stable
+    restart: unless-stopped
+    container_name: v4core
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8085:8085"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/v4core.log
+      --config /freqtrade/user_data/config_v4_core.json
+
+  v5gated:
+    image: freqtradeorg/freqtrade:stable
+    restart: unless-stopped
+    container_name: v5gated
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8084:8084"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/v5gated.log
+      --config /freqtrade/user_data/config_v5_kraken.json
+
+  # v6swing: SwingDipV1 — daily dip-buyer, holds ~1-2 weeks. Buys oversold dips
+  # only in an uptrend, sells into strength. Low-drawdown diversifier. Dry-run.
+  v6swing:
+    image: freqtradeorg/freqtrade:stable
+    restart: unless-stopped
+    container_name: v6swing
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8086:8086"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/v6swing.log
+      --config /freqtrade/user_data/config_v6_swing.json
+
+  # v7momo: MomoBreakoutV1 — 4h breakout/momentum swing. Buys breakouts above the
+  # 30-bar high (in an uptrend), trails out on a 15-bar low breakdown. ~weekly. Dry-run.
+  v7momo:
+    image: freqtradeorg/freqtrade:stable
+    restart: unless-stopped
+    container_name: v7momo
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8087:8087"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/v7momo.log
+      --config /freqtrade/user_data/config_v7_momo.json

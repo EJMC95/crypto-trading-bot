@@ -1,0 +1,32 @@
+# ---- Secrets: NEVER commit these ----
+.env
+.env.*
+!.env.perps.example
+*.key
+*.pem
+secrets.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---- Logs & runtime data ----
+*.log
+*.csv
+data/
+*.sqlite
+*.db
+
+# ---- Backups / editor / OS cruft ----
+*.bak
+*.~*
+.DS_Store
+.fuse_hidden*
+untitled folder/
+
+# ---- macOS launchd service file (not used on Railway) ----
+com.eamon.tri-arb.plist
