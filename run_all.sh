@@ -20,6 +20,7 @@ run_bot user_data/config_v4_core.json   v4core   &
 run_bot user_data/config_v5_kraken.json  v5gated  &
 run_bot user_data/config_v6_swing.json   v6swing  &
 run_bot user_data/config_v7_momo.json    v7momo   &
+run_bot user_data/config_v8_momo.json    v8momo   &
 
 # Keep the container alive as long as any supervisor loop is running.
 wait
