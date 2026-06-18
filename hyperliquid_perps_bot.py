@@ -37,8 +37,8 @@ import numpy as np
 # --------------------------- configuration -------------------------------
 COINS = ["BTC", "ETH", "SOL"]     # top perps to trade
 RSI_PERIOD = 14
-OVERSOLD = 30
-OVERBOUGHT = 70
+OVERSOLD = 40                    # LOOSENED: was 30, now 40 (more long entries)
+OVERBOUGHT = 60                  # LOOSENED: was 70, now 60 (more short entries)
 LOOP_SECONDS = 60
 CANDLE_INTERVAL = "1h"            # indicator timeframe
 ORDER_USD = 50.0                 # notional per position (position sizing)
@@ -219,3 +219,4 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         log.info("stopped by user.")
+

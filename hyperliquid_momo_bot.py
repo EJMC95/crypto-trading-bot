@@ -41,12 +41,12 @@ import numpy as np
 
 # --------------------------- configuration -------------------------------
 COINS = ["BTC", "ETH", "SOL"]
-ENTRY_LOOKBACK = 30
-EXIT_LOOKBACK = 15
-TREND_EMA = 200
-HARD_STOP = 0.12
+ENTRY_LOOKBACK = 15              # LOOSENED: was 30, now 15 (more breakouts)
+EXIT_LOOKBACK = 8                # LOOSENED: was 15, now 8 (exit faster)
+TREND_EMA = 100                  # LOOSENED: was 200, now 100 (less strict trend filter)
+HARD_STOP = 0.08                 # LOOSENED: was 0.12, now 0.08 (tighter stops)
 CANDLE_INTERVAL = "4h"
-ALLOW_SHORT = False              # backtest: shorts help ETH, hurt BTC -> off by default
+ALLOW_SHORT = True               # LOOSENED: was False, now True (more opportunities)
 ORDER_USD = 50.0                 # notional per position
 LEVERAGE = 1                     # 1x baseline; 2x doubled drawdown in backtest
 DAILY_LOSS_LIMIT = 0.05
@@ -319,3 +319,4 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         log.info("stopped by user.")
+
