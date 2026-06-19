@@ -39,6 +39,8 @@ from datetime import datetime, timezone
 
 import numpy as np
 
+import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
+
 # --------------------------- configuration -------------------------------
 COINS = ["BTC", "ETH", "SOL"]
 ENTRY_LOOKBACK = 15
@@ -311,6 +313,16 @@ def main():
                 notify(f":warning: MomoBot ORDER FAILED {decision} {coin}: {e}",
                        coin=coin, decision=decision, mode="error")
 
+        # Publish a snapshot for the live dashboard (guarded; never raises).
+        store.publish(
+            "momo-bot",
+            status="paper" if PAPER else ("halted" if halted_today else "online"),
+            equity=equity,
+            open_trades=sum(1 for v in pos.values()
+                            if (v.get("size") if isinstance(v, dict) else v)),
+            extra={"mode": "paper" if PAPER else ("dry-run" if DRY_RUN else "live-testnet"),
+                   "coins": COINS},
+        )
         time.sleep(LOOP_SECONDS)
 
 

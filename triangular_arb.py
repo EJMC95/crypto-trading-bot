@@ -39,6 +39,8 @@ import csv
 import os
 import time
 import traceback
+
+import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
 from datetime import datetime, timezone
 
 # ----------------------------------------------------------------------------
@@ -357,6 +359,14 @@ def run_live(once=False):
             # Log full traceback but keep the scan loop alive.
             print(f"[{now_iso()}] scan error (skipping cycle): {e!r}")
             traceback.print_exc()
+
+        # Publish a snapshot for the live dashboard (guarded; never raises).
+        store.publish(
+            "triangular-arb", status="online",
+            pnl_abs=virtual_balance,
+            extra={"cycles": len(cycles),
+                   "best_depth_pct": round(best_depth_seen * 100, 4)},
+        )
         if once:
             print(f"\n[{now_iso()}] --once smoke test complete. The engine is "
                   f"live against Kraken and the math ran end-to-end.")

@@ -57,6 +57,8 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
 
+import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
+
 KRAKEN_BASE = "https://api.kraken.com/0/public"
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sniper_data")
 KNOWN_FILE = os.path.join(DATA_DIR, "known_pairs.json")
@@ -346,6 +348,26 @@ def monitor(cfg):
         pend_n = len(pending)
         print(f"[{ts()}] ok — {len(current_ids)} pairs | "
               f"open paper trades: {open_n} | pending: {pend_n}", flush=True)
+
+        # Publish a snapshot for the live dashboard (guarded; never raises).
+        realized, nclosed, wins = 0.0, 0, 0
+        try:
+            if os.path.exists(TRADES_CSV):
+                with open(TRADES_CSV) as _f:
+                    for _r in csv.DictReader(_f):
+                        try:
+                            _pnl = float(_r.get("pnl_quote") or 0)
+                        except (TypeError, ValueError):
+                            continue
+                        realized += _pnl
+                        nclosed += 1
+                        wins += 1 if _pnl > 0 else 0
+        except Exception:
+            pass
+        store.publish("listing-sniper", status="online",
+                      pnl_abs=realized, open_trades=open_n,
+                      closed_trades=nclosed, wins=wins, losses=nclosed - wins,
+                      extra={"pending": pend_n})
 
         # Sleep the remainder of the interval
         elapsed = time.time() - cycle_start

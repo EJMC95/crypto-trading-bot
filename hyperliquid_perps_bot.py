@@ -34,6 +34,8 @@ from datetime import datetime, timezone
 
 import numpy as np
 
+import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
+
 # --------------------------- configuration -------------------------------
 COINS = ["BTC", "ETH", "SOL"]     # top perps to trade
 RSI_PERIOD = 14
@@ -211,6 +213,15 @@ def main():
             except Exception as e:
                 log.error("order failed %s %s: %s", decision, coin, e)
 
+        # Publish a snapshot for the live dashboard (guarded; never raises).
+        store.publish(
+            "perps-bot",
+            status="halted" if halted_today else "online",
+            equity=equity,
+            open_trades=sum(1 for v in pos.values() if v),
+            extra={"mode": "dry-run" if DRY_RUN else "live-testnet",
+                   "coins": COINS},
+        )
         time.sleep(LOOP_SECONDS)
 
 

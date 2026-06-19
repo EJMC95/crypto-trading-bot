@@ -1,5 +1,6 @@
-# Consolidated deps for all four Railway bot services
+# Consolidated deps for all four Railway bot services + the pnl_dashboard service
 hyperliquid-python-sdk>=0.9.0
 eth-account>=0.10.0
 numpy>=1.24
 ccxt>=4.2.0
+psycopg2-binary>=2.9   # shared P&L publisher (bot_pnl_store) + pnl_dashboard
