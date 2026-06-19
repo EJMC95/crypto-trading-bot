@@ -29,14 +29,20 @@ def load_rows():
     with open(CSV_PATH, newline="") as f:
         for r in csv.DictReader(f):
             try:
+                # HEARTBEAT rows record the best top-of-book edge on a scan that
+                # booked nothing. They have an empty depth field and are kept
+                # separate so they never count as fills or pollute slippage.
+                is_hb = str(r.get("cycle", "")).strip().upper() == "HEARTBEAT"
                 rows.append({
                     "t": r["timestamp"],
                     "cycle": r["cycle"],
                     "top": float(r["top_of_book_net_pct"]),
-                    "depth": float(r["depth_net_pct"]),
-                    "pnl": float(r["paper_pnl"]),
-                    "filled": str(r["filled"]).strip().lower() == "true",
+                    "depth": None if is_hb else float(r["depth_net_pct"]),
+                    "pnl": 0.0 if is_hb else float(r["paper_pnl"]),
+                    "filled": False if is_hb else
+                              (str(r["filled"]).strip().lower() == "true"),
                     "bal": float(r["virtual_balance"]),
+                    "hb": is_hb,
                 })
             except (KeyError, ValueError):
                 continue
@@ -46,11 +52,14 @@ def load_rows():
 def summarize(rows):
     if not rows:
         return {"count": 0}
-    fills = [r for r in rows if r["filled"] and r["depth"] >= 0]
-    slip = [r["top"] - r["depth"] for r in rows]
-    # frequency + avg depth edge per cycle
+    # Real depth-confirmed opportunity rows vs. heartbeat trend rows.
+    opps = [r for r in rows if not r["hb"]]
+    hbs = [r for r in rows if r["hb"]]
+    fills = [r for r in opps if r["filled"] and r["depth"] >= 0]
+    slip = [r["top"] - r["depth"] for r in opps]
+    # frequency + avg depth edge per cycle (opportunities only)
     by_cycle = {}
-    for r in rows:
+    for r in opps:
         c = by_cycle.setdefault(r["cycle"], {"n": 0, "depth_sum": 0.0, "best": -1e9})
         c["n"] += 1
         c["depth_sum"] += r["depth"]
@@ -60,12 +69,16 @@ def summarize(rows):
          for k, v in by_cycle.items()),
         key=lambda x: x["n"], reverse=True,
     )[:12]
+    # Best top-of-book edge ever seen (across opportunities + heartbeats).
+    best_top = max((r["top"] for r in rows), default=None)
     return {
-        "count": len(rows),
+        "count": len(opps),
+        "heartbeats": len(hbs),
         "fills": len(fills),
         "balance": rows[-1]["bal"],
-        "best_depth": max(r["depth"] for r in rows),
-        "avg_slip": sum(slip) / len(slip),
+        "best_depth": max((r["depth"] for r in opps), default=None),
+        "best_top": best_top,
+        "avg_slip": (sum(slip) / len(slip)) if slip else None,
         "first": rows[0]["t"],
         "last": rows[-1]["t"],
         "top_cycles": top_cycles,
@@ -74,13 +87,18 @@ def summarize(rows):
 
 def render(rows, s):
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    opps = [r for r in rows if not r["hb"]]
     bal_series = [{"x": r["t"], "y": round(r["bal"], 4)} for r in rows]
-    scatter = [{"x": round(r["top"], 4), "y": round(r["depth"], 4)} for r in rows]
-    recent = rows[-25:][::-1]
+    top_series = [{"x": r["t"], "y": round(r["top"], 4)} for r in rows]
+    scatter = [{"x": round(r["top"], 4), "y": round(r["depth"], 4)} for r in opps]
+    recent = opps[-25:][::-1]
 
     def card(label, value, sub=""):
         return (f'<div class="card"><div class="lbl">{label}</div>'
                 f'<div class="val">{value}</div><div class="sub">{sub}</div></div>')
+
+    def pct(v, suffix="%"):
+        return "—" if v is None else f"{v:+.3f}{suffix}"
 
     if not rows:
         cards = card("Status", "No data yet",
@@ -90,11 +108,15 @@ def render(rows, s):
         top_html = '<tr><td colspan="4" class="muted">—</td></tr>'
     else:
         cards = "".join([
-            card("Loops logged", f"{s['count']:,}", f"{s['first']} → {s['last']}"),
+            card("Opportunities logged", f"{s['count']:,}",
+                 f"{s['first']} → {s['last']}"),
             card("Paper fills", f"{s['fills']:,}", "profitable & fully filled"),
             card("Virtual balance", f"{s['balance']:+.2f}", "cumulative paper P&L"),
-            card("Best depth edge", f"{s['best_depth']:+.3f}%", "after fees + slippage"),
-            card("Avg slippage", f"{s['avg_slip']:.3f}%", "top-of-book minus depth"),
+            card("Best depth edge", pct(s['best_depth']), "after fees + slippage"),
+            card("Best top-of-book", pct(s['best_top']),
+                 "best apparent edge (pre-slippage)"),
+            card("Avg slippage", pct(s['avg_slip']), "top-of-book minus depth"),
+            card("Heartbeats", f"{s['heartbeats']:,}", "trend samples, no fill"),
         ])
         rows_html = "".join(
             f'<tr><td>{r["t"]}</td><td>{r["cycle"]}</td>'
@@ -102,12 +124,13 @@ def render(rows, s):
             f'<td class="{"pos" if r["pnl"]>=0 else "neg"}">{r["pnl"]:+.2f}</td>'
             f'<td>{"✓" if r["filled"] else "✗"}</td></tr>'
             for r in recent
-        )
+        ) or ('<tr><td colspan="6" class="muted">No depth-confirmed loops yet — '
+              'heartbeats only. Best apparent edge is shown above.</td></tr>')
         top_html = "".join(
             f'<tr><td>{c["cycle"]}</td><td>{c["n"]}</td>'
             f'<td>{c["avg_depth"]:+.3f}</td><td>{c["best"]:+.3f}</td></tr>'
             for c in s["top_cycles"]
-        )
+        ) or '<tr><td colspan="4" class="muted">—</td></tr>'
 
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -152,6 +175,12 @@ def render(rows, s):
   <div class="panel"><h2>Virtual balance over time (cumulative paper P&L)</h2>
     <canvas id="bal"></canvas></div>
 
+  <div class="panel"><h2>Best top-of-book edge over time (%)</h2>
+    <p class="note">How close the best loop got each sample, before slippage.
+       At Kraken's ~1.2% fee floor this normally sits well below zero — that is
+       the honest picture of why nothing books.</p>
+    <canvas id="tops"></canvas></div>
+
   <div class="panel"><h2>Top-of-book edge vs depth-confirmed edge (%)</h2>
     <p class="note">Points far below the diagonal = slippage eating the edge.
        The further a dot sits under the line y = x, the more the mirage shrank
@@ -174,12 +203,21 @@ def render(rows, s):
 </div>
 <script>
 const BAL = {json.dumps(bal_series)};
+const TOPS = {json.dumps(top_series)};
 const SCAT = {json.dumps(scatter)};
 const grid = {{ color:'#1c222d' }}, ticks = {{ color:'#7c8698' }};
 if (BAL.length) new Chart(document.getElementById('bal'), {{
   type:'line',
   data:{{ datasets:[{{ label:'Virtual balance', data:BAL, parsing:false,
     borderColor:'#46d39a', backgroundColor:'rgba(70,211,154,.12)',
+    fill:true, tension:.15, pointRadius:0, borderWidth:2 }}] }},
+  options:{{ scales:{{ x:{{ type:'category', grid, ticks:{{...ticks, maxTicksLimit:8}} }},
+    y:{{ grid, ticks }} }}, plugins:{{ legend:{{ display:false }} }} }}
+}});
+if (TOPS.length) new Chart(document.getElementById('tops'), {{
+  type:'line',
+  data:{{ datasets:[{{ label:'Best top-of-book edge %', data:TOPS, parsing:false,
+    borderColor:'#78aaff', backgroundColor:'rgba(120,170,255,.12)',
     fill:true, tension:.15, pointRadius:0, borderWidth:2 }}] }},
   options:{{ scales:{{ x:{{ type:'category', grid, ticks:{{...ticks, maxTicksLimit:8}} }},
     y:{{ grid, ticks }} }}, plugins:{{ legend:{{ display:false }} }} }}
@@ -210,8 +248,11 @@ def main():
     with open(OUT_PATH, "w") as f:
         f.write(html)
     if rows:
-        print(f"Wrote {OUT_PATH} — {s['count']} loops, {s['fills']} paper fills, "
-              f"balance {s['balance']:+.2f}, best depth {s['best_depth']:+.3f}%.")
+        bd = "—" if s["best_depth"] is None else f"{s['best_depth']:+.3f}%"
+        bt = "—" if s["best_top"] is None else f"{s['best_top']:+.3f}%"
+        print(f"Wrote {OUT_PATH} — {s['count']} opportunities, "
+              f"{s['heartbeats']} heartbeats, {s['fills']} paper fills, "
+              f"balance {s['balance']:+.2f}, best depth {bd}, best top {bt}.")
     else:
         print(f"Wrote {OUT_PATH} — no data yet (start the bot to populate it).")
 

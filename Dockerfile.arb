@@ -1,0 +1,18 @@
+# Triangular-arb image for Railway — runs the depth-aware paper-trading engine
+# 24/7 in the cloud, independent of the local Mac/launchd job.
+# Select per-service via Railway "Railway Config File" = railway.arb.toml.
+FROM python:3.11-slim
+
+WORKDIR /app
+# ccxt = Kraken public market data; psycopg2 = publish P&L to the shared table
+# so the arb bot shows on the unified pnl_dashboard. Both already in requirements.
+RUN pip install --no-cache-dir "ccxt>=4.2.0" "psycopg2-binary>=2.9"
+
+COPY triangular_arb.py /app/triangular_arb.py
+COPY bot_pnl_store.py /app/bot_pnl_store.py
+
+ENV PYTHONUNBUFFERED=1
+# Detection + paper trading only. NO API keys, places NO real orders.
+# Set DATABASE_URL (reference the Postgres service) so it publishes to the
+# unified dashboard; without it, store.publish is a guarded no-op.
+CMD ["python", "triangular_arb.py"]

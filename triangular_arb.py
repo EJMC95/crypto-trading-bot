@@ -69,7 +69,15 @@ UNIVERSE_HINT = {
 # Stage-1 -> Stage-2 gate. Only loops whose TOP-OF-BOOK net edge is at least
 # this get a (costly) depth-aware order-book confirmation. Keeps book fetches
 # bounded. Set lower (more negative) to depth-check more near-misses.
-PREFILTER_EDGE = -0.010   # -1.0%
+# DIAGNOSTIC WINDOW: widened from -1.0% to -3.0% so Stage 2 actually confirms
+# the best near-misses each scan and we capture the real depth-aware edge
+# distribution. Tighten back toward -0.010 once the economics are understood.
+PREFILTER_EDGE = -0.030   # -3.0%
+
+# Heartbeat: even when nothing is profitable, write one row to the CSV every
+# this many seconds recording the best TOP-OF-BOOK edge seen, so the dashboard
+# and daily digest always have trend data instead of an empty file. 0 disables.
+HEARTBEAT_SECONDS = 900.0   # 15 min
 
 # Hard cap on unique order books fetched per scan (rate-limit guard).
 MAX_BOOK_FETCHES = 24
@@ -275,6 +283,7 @@ def run_live(once=False):
     ensure_log()
     virtual_balance = 0.0
     best_depth_seen = -1.0
+    last_heartbeat = 0.0  # 0 => emit a heartbeat on the first eligible scan
 
     while True:
         t0 = time.time()
@@ -290,11 +299,20 @@ def run_live(once=False):
         # killing the process (which the KeepAlive supervisor would then
         # respawn into an endless crash loop).
         try:
-            # Stage 1: rank every cycle on top-of-book.
+            # Stage 1: rank every cycle on top-of-book. Track the single best
+            # top-of-book edge across ALL cycles (even ones that fail the
+            # prefilter) so we always have a meaningful "how close did we get"
+            # number to log, instead of the -100% no-book sentinel.
             ranked = []
+            best_top_this_scan = None
+            best_top_cycle = None
             for cycle in cycles:
                 net = evaluate_cycle_top(cycle, markets_by_pair, tickers, TAKER_FEE)
-                if net is not None and net >= PREFILTER_EDGE:
+                if net is None:
+                    continue
+                if best_top_this_scan is None or net > best_top_this_scan:
+                    best_top_this_scan, best_top_cycle = net, cycle
+                if net >= PREFILTER_EDGE:
                     ranked.append((net, cycle))
             ranked.sort(reverse=True)
 
@@ -347,14 +365,34 @@ def run_live(once=False):
                 )
 
             best = confirmed[0] if confirmed else None
-            summary = (
-                f"best depth {best[0]*100:+.3f}% ({'->'.join(best[4])})" if best
-                else f"best depth seen {best_depth_seen*100:+.3f}%"
-            )
+            if best:
+                summary = f"best depth {best[0]*100:+.3f}% ({'->'.join(best[4])})"
+            elif best_top_this_scan is not None:
+                # No depth confirmation this scan — report how close the best
+                # loop got on top-of-book, which is the real diagnostic signal.
+                summary = (f"no depth confirm; best top-of-book "
+                           f"{best_top_this_scan*100:+.3f}% "
+                           f"({'->'.join(best_top_cycle)})")
+            else:
+                summary = "no priceable cycles"
             print(
                 f"[{now_iso()}] {len(cycles)} cycles | {len(ranked)} passed prefilter "
                 f"| {len(books)} books pulled | {summary} | {time.time()-t0:.1f}s"
             )
+
+            # Heartbeat: even on a scan that books nothing, periodically write a
+            # row recording the best top-of-book edge so the dashboard/digest
+            # always has trend data instead of an empty CSV. Marked cycle
+            # "HEARTBEAT" with an empty depth field so it is excluded from
+            # fills, slippage and depth-edge stats downstream.
+            if (HEARTBEAT_SECONDS and best_top_this_scan is not None
+                    and time.time() - last_heartbeat >= HEARTBEAT_SECONDS):
+                log_opp([
+                    now_iso(), "HEARTBEAT",
+                    f"{best_top_this_scan*100:.4f}", "",
+                    "0.0000", False, f"{virtual_balance:.4f}",
+                ])
+                last_heartbeat = time.time()
         except Exception as e:
             # Log full traceback but keep the scan loop alive.
             print(f"[{now_iso()}] scan error (skipping cycle): {e!r}")

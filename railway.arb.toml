@@ -1,0 +1,11 @@
+# Service-specific Railway config for the triangular-arb bot service ONLY.
+# Point the arb service's Config-as-code "Railway Config File" setting at this
+# file so it does NOT affect the freqtrade or dashboard services that deploy
+# from this same repo.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.arb"
+
+[deploy]
+# Keep the paper-trading engine running; restart on any crash.
+restartPolicyType = "always"
