@@ -14,8 +14,11 @@
 #   All risk management (ROI, atr stops, protections) unchanged from V5 — proven solid.
 #   The gate still prevents trading in daily downtrends.
 
+import logging
 from datetime import datetime
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import talib.abstract as ta
 import freqtrade.vendor.qtpylib.indicators as qtpylib
@@ -61,7 +64,8 @@ class DayTraderV5Gated(IStrategy):
     use_exit_signal = True
     exit_profit_only = False
     ignore_roi_if_entry_signal = False
-    can_short = False
+    can_short = True   # [OPTION 1] trades BOTH directions — longs in up-regime, shorts in down-regime.
+                       # Requires the config to run trading_mode=futures on a futures-capable market.
 
     @property
     def protections(self):
@@ -120,40 +124,69 @@ class DayTraderV5Gated(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # IMPROVED: relaxed entry. Two paths instead of one strict all-conditions.
+        # [LOOSENED v2] regime gate is now advisory: regime_up_1d OR the 1h trend
+        # is up. Still mostly sits out a broad downtrend, but no longer demands
+        # daily 50>200, which was blocking every entry.
+        regime_ok = (dataframe["regime_up_1d"] == 1) | (dataframe["ema9_rising_1h"])
+        momentum_ok = (
+            (dataframe["rsi"] > self.buy_rsi.value)
+            | ((dataframe["rsi"] > 40) & (dataframe["close"] > dataframe["ema_fast"]))
+        )
         dataframe.loc[
-            (
-                # Macro regime gate stays (softened at the indicator level above).
-                # [SOFTENED GATE] 1h day-trend filter now passes on EITHER a rising
-                # 1h EMA OR price above the 1h EMA (was: both required).
-                (dataframe["regime_up_1d"] == 1)
-                & (
-                    (dataframe["ema9_rising_1h"])
-                    | (dataframe["close_1h"] > dataframe["ema9_1h"])
-                )
-
-                # IMPROVED: relaxed momentum entry (either path is enough)
-                & (
-                    # Path 1: RSI > 50 (was 55, slightly relaxed)
-                    (dataframe["rsi"] > self.buy_rsi.value)
-                    |
-                    # Path 2: RSI > 40 and price above fast EMA (catch pullbacks)
-                    ((dataframe["rsi"] > 40) & (dataframe["close"] > dataframe["ema_fast"]))
-                )
-
-                & (dataframe["volume"] > 0)
-            ),
+            regime_ok & momentum_ok & (dataframe["volume"] > 0),
             "enter_long",
         ] = 1
+
+        # [OPTION 1 — SHORT SIDE] mirror logic: when the regime is DOWN and
+        # momentum is weak, open shorts so the bot profits in falling markets.
+        # (Only takes effect when the bot runs trading_mode=futures.)
+        regime_down = (dataframe["regime_up_1d"] == 0) & (~dataframe["ema9_rising_1h"].astype(bool))
+        momentum_down = (
+            (dataframe["rsi"] < (100 - self.buy_rsi.value))
+            | ((dataframe["rsi"] < 60) & (dataframe["close"] < dataframe["ema_fast"]))
+        )
+        dataframe.loc[
+            regime_down & momentum_down & (dataframe["volume"] > 0),
+            "enter_short",
+        ] = 1
+
+        self._entry_diag(dataframe, metadata, {
+            "regime_up_1d": dataframe["regime_up_1d"],
+            "ema9_rising_1h": dataframe["ema9_rising_1h"],
+            "rsi": dataframe["rsi"],
+            "regime_ok": regime_ok,
+            "momentum_ok": momentum_ok,
+            "regime_down": regime_down,
+        })
         return dataframe
 
+    def _entry_diag(self, dataframe, metadata, gates):
+        """Log latest-candle gate states so live logs reveal why we (don't) enter."""
+        try:
+            if dataframe is None or len(dataframe) == 0:
+                return
+            sig = int(dataframe["enter_long"].tail(50).sum()) if "enter_long" in dataframe else 0
+            parts = []
+            for k, col in gates.items():
+                try:
+                    parts.append(f"{k}={col.iloc[-1]}")
+                except Exception:
+                    pass
+            logger.info("ENTRY-DIAG %s enter_long_last50=%d %s",
+                        metadata.get("pair"), sig, " ".join(parts))
+        except Exception as e:
+            logger.info("ENTRY-DIAG error %s: %s", metadata.get("pair"), e)
+
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # Close longs when the fast EMA crosses below the slow EMA.
         dataframe.loc[
-            (
-                (dataframe["ema_fast"] < dataframe["ema_slow"])
-                & (dataframe["volume"] > 0)
-            ),
+            (dataframe["ema_fast"] < dataframe["ema_slow"]) & (dataframe["volume"] > 0),
             "exit_long",
+        ] = 1
+        # Cover shorts when the trend flips back up (fast EMA above slow EMA).
+        dataframe.loc[
+            (dataframe["ema_fast"] > dataframe["ema_slow"]) & (dataframe["volume"] > 0),
+            "exit_short",
         ] = 1
         return dataframe
 

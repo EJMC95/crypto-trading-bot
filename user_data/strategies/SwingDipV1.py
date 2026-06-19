@@ -29,10 +29,13 @@
 #     not tuned for max backtest return. Hyperopt them later if you want, but
 #     beware the V3 lesson (a great backtest is easy to fake).
 
+import logging
 from pandas import DataFrame
 import talib.abstract as ta
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 from freqtrade.strategy import IStrategy, IntParameter
+
+logger = logging.getLogger(__name__)
 
 
 class SwingDipV1(IStrategy):
@@ -92,23 +95,39 @@ class SwingDipV1(IStrategy):
         #   New: ema50>ema200 AND ( (rsi<45 AND close<bb_lower) OR rsi<30 )
         # Keeps the macro uptrend gate; fires on a BB dip with RSI not-too-hot,
         # OR on any deep-oversold reading even if the band isn't touched.
+        # [LOOSENED v2] macro gate: 50>200 OR price above the 200d.
+        trend_ok = (dataframe["ema50"] > dataframe["ema200"]) | (dataframe["close"] > dataframe["ema200"])
+        # [LOOSENED v2] dip paths widened (daily = naturally few signals):
+        dip_ok = (
+            ((dataframe["rsi"] < 50) & (dataframe["close"] < dataframe["bb_lower"]))   # BB dip
+            | (dataframe["rsi"] < 35)                                                  # deep oversold
+            | ((dataframe["close"] < dataframe["ema50"]) & (dataframe["rsi"] < 45))    # ordinary pullback in uptrend
+        )
         dataframe.loc[
-            (
-                # [SOFTENED GATE] macro trend up: 50>200 OR price back above the 200d
-                # (early recovery). Still refuses falling-knife dips below the 200d
-                # while 50<200 — the rule that kept it out of the V2 disaster.
-                ((dataframe["ema50"] > dataframe["ema200"]) | (dataframe["close"] > dataframe["ema200"]))
-                & (
-                    # Path 1: genuine dip below lower BB, RSI under the (relaxed) threshold
-                    ((dataframe["rsi"] < self.buy_rsi.value) & (dataframe["close"] < dataframe["bb_lower"]))
-                    # Path 2: deep oversold even without touching the band
-                    | (dataframe["rsi"] < 30)
-                )
-                & (dataframe["volume"] > 0)
-            ),
+            trend_ok & dip_ok & (dataframe["volume"] > 0),
             "enter_long",
         ] = 1
+        self._entry_diag(dataframe, metadata, {
+            "trend_ok": trend_ok, "dip_ok": dip_ok, "rsi": dataframe["rsi"],
+        })
         return dataframe
+
+    def _entry_diag(self, dataframe, metadata, gates):
+        """Log latest-candle gate states so live logs reveal why we (don't) enter."""
+        try:
+            if dataframe is None or len(dataframe) == 0:
+                return
+            sig = int(dataframe["enter_long"].tail(50).sum()) if "enter_long" in dataframe else 0
+            parts = []
+            for k, col in gates.items():
+                try:
+                    parts.append(f"{k}={col.iloc[-1]}")
+                except Exception:
+                    pass
+            logger.info("ENTRY-DIAG %s enter_long_last50=%d %s",
+                        metadata.get("pair"), sig, " ".join(parts))
+        except Exception as e:
+            logger.info("ENTRY-DIAG error %s: %s", metadata.get("pair"), e)
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # SELL into strength: overbought RSI or price pokes above the upper band.

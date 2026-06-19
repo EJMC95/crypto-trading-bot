@@ -12,9 +12,12 @@
 #
 #   Exit logic: unchanged (Donchian breakdown + -12% stop).
 
+import logging
 from pandas import DataFrame
 import talib.abstract as ta
 from freqtrade.strategy import IStrategy, IntParameter
+
+logger = logging.getLogger(__name__)
 
 
 class MomoBreakoutV1(IStrategy):
@@ -37,7 +40,10 @@ class MomoBreakoutV1(IStrategy):
     exit_lookback  = IntParameter(8,  25, default=15, space="sell", optimize=False)
     trend_ema      = IntParameter(100, 250, default=200, space="buy", optimize=False)
 
-    minimal_roi = {"0": 100}
+    # [SIDEWAYS v2] loose ROI ladder so range trades actually BANK profit while
+    # breakouts still get room to run: take 15% any time, easing to break-even
+    # after ~1 week.
+    minimal_roi = {"0": 0.15, "1440": 0.08, "4320": 0.03, "10080": 0.0}
     stoploss = -0.12
 
     trailing_stop = False
@@ -61,35 +67,49 @@ class MomoBreakoutV1(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # IMPROVED: two entry signals instead of one.
+        # [LOOSENED v2] trend filter: price above 200-EMA OR 200-EMA rising.
+        trend_ok = (dataframe["close"] > dataframe["ema_trend"]) | (dataframe["ema_trend_rising"])
+        # [LOOSENED v2] three entry paths (breakout / pullback / momentum-continuation).
+        setup_ok = (
+            (dataframe["close"] > dataframe["dc_high"])                                      # breakout
+            | ((dataframe["close"] < dataframe["pullback_low"]) & (dataframe["rsi"] < 55))   # pullback
+            | ((dataframe["close"] > dataframe["ema_trend"]) & (dataframe["rsi"] > 52))      # momentum continuation
+        )
+        # [SIDEWAYS v2] range mean-reversion path: buy oversold REGARDLESS of trend,
+        # so the bot works choppy/sideways markets (buy the dip, sell the rip below).
+        range_buy = (dataframe["rsi"] < 40)
         dataframe.loc[
-            (
-                (
-                    # [SOFTENED GATE] trend filter passes if price is above the
-                    # 200-EMA OR the 200-EMA is rising (trend forming).
-                    (
-                        (dataframe["close"] > dataframe["ema_trend"])
-                        | (dataframe["ema_trend_rising"])
-                    )
-                    & (
-                        # Entry 1: breakout above 30-bar high (original edge)
-                        (dataframe["close"] > dataframe["dc_high"])
-                        |
-                        # Entry 2: pullback below 15-bar low, RSI not too hot (new)
-                        ((dataframe["close"] < dataframe["pullback_low"]) & (dataframe["rsi"] < 50))
-                    )
-                )
-                & (dataframe["volume"] > 0)
-            ),
+            ((trend_ok & setup_ok) | range_buy) & (dataframe["volume"] > 0),
             "enter_long",
         ] = 1
+        self._entry_diag(dataframe, metadata, {
+            "trend_ok": trend_ok, "setup_ok": setup_ok,
+            "range_buy": range_buy, "rsi": dataframe["rsi"],
+        })
         return dataframe
 
+    def _entry_diag(self, dataframe, metadata, gates):
+        """Log latest-candle gate states so live logs reveal why we (don't) enter."""
+        try:
+            if dataframe is None or len(dataframe) == 0:
+                return
+            sig = int(dataframe["enter_long"].tail(50).sum()) if "enter_long" in dataframe else 0
+            parts = []
+            for k, col in gates.items():
+                try:
+                    parts.append(f"{k}={col.iloc[-1]}")
+                except Exception:
+                    pass
+            logger.info("ENTRY-DIAG %s enter_long_last50=%d %s",
+                        metadata.get("pair"), sig, " ".join(parts))
+        except Exception as e:
+            logger.info("ENTRY-DIAG error %s: %s", metadata.get("pair"), e)
+
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # Exit: unchanged from V1
+        # [SIDEWAYS v2] exit on Donchian breakdown OR overbought (sell the rip).
         dataframe.loc[
             (
-                (dataframe["close"] < dataframe["dc_low"])
+                ((dataframe["close"] < dataframe["dc_low"]) | (dataframe["rsi"] > 65))
                 & (dataframe["volume"] > 0)
             ),
             "exit_long",
