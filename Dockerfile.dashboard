@@ -1,0 +1,13 @@
+# Dashboard image for Railway — serves the unified live P&L page (pnl_dashboard.py).
+# Selected per-service via the RAILWAY_DOCKERFILE_PATH variable (set by deploy).
+FROM python:3.11-slim
+
+WORKDIR /app
+RUN pip install --no-cache-dir psycopg2-binary
+
+COPY pnl_dashboard.py /app/pnl_dashboard.py
+COPY bot_pnl_store.py /app/bot_pnl_store.py
+
+ENV PYTHONUNBUFFERED=1
+# Reads $PORT (Railway sets it) and DATABASE_URL (reference the Postgres service).
+CMD ["python", "pnl_dashboard.py"]
