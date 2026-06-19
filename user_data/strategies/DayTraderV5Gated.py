@@ -64,8 +64,9 @@ class DayTraderV5Gated(IStrategy):
     use_exit_signal = True
     exit_profit_only = False
     ignore_roi_if_entry_signal = False
-    can_short = True   # [OPTION 1] trades BOTH directions — longs in up-regime, shorts in down-regime.
-                       # Requires the config to run trading_mode=futures on a futures-capable market.
+    can_short = False  # Kraken+freqtrade does NOT support futures, so v5 runs spot/long-only.
+                       # (Down-market shorting is handled by the Hyperliquid perps-bot.)
+                       # The enter_short rules below are simply ignored in spot mode.
 
     @property
     def protections(self):
