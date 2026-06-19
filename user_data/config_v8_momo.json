@@ -62,7 +62,8 @@
             "INJ/USD",
             "FIL/USD"
         ],
-        "pair_blacklist": []
+        "pair_blacklist": [],
+        "enable_ws": true
     },
     "pairlists": [
         {

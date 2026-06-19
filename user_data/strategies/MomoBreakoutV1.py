@@ -48,6 +48,10 @@ class MomoBreakoutV1(IStrategy):
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["ema_trend"] = ta.EMA(dataframe, timeperiod=self.trend_ema.value)
+        # [SOFTENED GATE] is the long-term trend turning up? (200-EMA higher than
+        # 5 bars ago). Lets entries fire as a trend forms, not only once price is
+        # already extended above the EMA.
+        dataframe["ema_trend_rising"] = dataframe["ema_trend"] > dataframe["ema_trend"].shift(5)
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
         # Donchian channels (shift(1) for no look-ahead).
         dataframe["dc_high"] = dataframe["high"].rolling(self.entry_lookback.value).max().shift(1)
@@ -61,11 +65,19 @@ class MomoBreakoutV1(IStrategy):
         dataframe.loc[
             (
                 (
-                    # Entry 1: breakout above 30-bar high (original, unchanged)
-                    ((dataframe["close"] > dataframe["dc_high"]) & (dataframe["close"] > dataframe["ema_trend"]))
-                    |
-                    # Entry 2: pullback below 15-bar low, but STILL above 200-EMA, RSI not too hot (NEW)
-                    ((dataframe["close"] < dataframe["pullback_low"]) & (dataframe["close"] > dataframe["ema_trend"]) & (dataframe["rsi"] < 50))
+                    # [SOFTENED GATE] trend filter passes if price is above the
+                    # 200-EMA OR the 200-EMA is rising (trend forming).
+                    (
+                        (dataframe["close"] > dataframe["ema_trend"])
+                        | (dataframe["ema_trend_rising"])
+                    )
+                    & (
+                        # Entry 1: breakout above 30-bar high (original edge)
+                        (dataframe["close"] > dataframe["dc_high"])
+                        |
+                        # Entry 2: pullback below 15-bar low, RSI not too hot (new)
+                        ((dataframe["close"] < dataframe["pullback_low"]) & (dataframe["rsi"] < 50))
+                    )
                 )
                 & (dataframe["volume"] > 0)
             ),

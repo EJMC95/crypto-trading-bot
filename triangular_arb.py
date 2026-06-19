@@ -38,6 +38,7 @@ import argparse
 import csv
 import os
 import time
+import traceback
 from datetime import datetime, timezone
 
 # ----------------------------------------------------------------------------
@@ -116,7 +117,10 @@ def walk_book(amount, cur_from, cur_to, market, order_book, fee):
     if cur_to == base and cur_from == quote:
         # buying base, spend `amount` of quote up the asks
         spent, got = 0.0, 0.0
-        for price, size in order_book.get("asks", []):
+        for level in order_book.get("asks", []):
+            # ccxt levels are [price, size]; some exchanges (e.g. Kraken)
+            # append a 3rd element (timestamp). Unpack defensively.
+            price, size = level[0], level[1]
             take = min(amount - spent, price * size)
             if take <= 0:
                 break
@@ -128,7 +132,10 @@ def walk_book(amount, cur_from, cur_to, market, order_book, fee):
     if cur_from == base and cur_to == quote:
         # selling `amount` of base down the bids
         sold, got = 0.0, 0.0
-        for price, size in order_book.get("bids", []):
+        for level in order_book.get("bids", []):
+            # ccxt levels are [price, size]; some exchanges (e.g. Kraken)
+            # append a 3rd element (timestamp). Unpack defensively.
+            price, size = level[0], level[1]
             take = min(amount - sold, size)
             if take <= 0:
                 break
@@ -276,71 +283,80 @@ def run_live(once=False):
             time.sleep(POLL_SECONDS)
             continue
 
-        # Stage 1: rank every cycle on top-of-book.
-        ranked = []
-        for cycle in cycles:
-            net = evaluate_cycle_top(cycle, markets_by_pair, tickers, TAKER_FEE)
-            if net is not None and net >= PREFILTER_EDGE:
-                ranked.append((net, cycle))
-        ranked.sort(reverse=True)
+        # Everything below is wrapped so that a single malformed book/ticker
+        # or an unexpected arithmetic error logs and is skipped, instead of
+        # killing the process (which the KeepAlive supervisor would then
+        # respawn into an endless crash loop).
+        try:
+            # Stage 1: rank every cycle on top-of-book.
+            ranked = []
+            for cycle in cycles:
+                net = evaluate_cycle_top(cycle, markets_by_pair, tickers, TAKER_FEE)
+                if net is not None and net >= PREFILTER_EDGE:
+                    ranked.append((net, cycle))
+            ranked.sort(reverse=True)
 
-        # Stage 2: gather deduped books for the top candidates (capped), then
-        # confirm depth-aware at trade size.
-        books, confirmed = {}, []
-        for net_top, cycle in ranked:
-            symbols = [markets_by_pair[frozenset((f, t))]["symbol"]
-                       for f, t in zip(cycle, cycle[1:] + cycle[:1])]
-            need = [s for s in symbols if s not in books]
-            if len(books) + len(need) > MAX_BOOK_FETCHES:
-                break  # respect the per-scan fetch budget
-            ok = True
-            for s in need:
-                try:
-                    books[s] = ex.fetch_order_book(s, limit=BOOK_LEVELS)
-                except Exception:
-                    ok = False
-                    break
-            if not ok:
-                continue
-            net_depth, pnl, filled = evaluate_cycle_depth(
-                cycle, markets_by_pair, books, TAKER_FEE, PAPER_TRADE_SIZE
+            # Stage 2: gather deduped books for the top candidates (capped), then
+            # confirm depth-aware at trade size.
+            books, confirmed = {}, []
+            for net_top, cycle in ranked:
+                symbols = [markets_by_pair[frozenset((f, t))]["symbol"]
+                           for f, t in zip(cycle, cycle[1:] + cycle[:1])]
+                need = [s for s in symbols if s not in books]
+                if len(books) + len(need) > MAX_BOOK_FETCHES:
+                    break  # respect the per-scan fetch budget
+                ok = True
+                for s in need:
+                    try:
+                        books[s] = ex.fetch_order_book(s, limit=BOOK_LEVELS)
+                    except Exception:
+                        ok = False
+                        break
+                if not ok:
+                    continue
+                net_depth, pnl, filled = evaluate_cycle_depth(
+                    cycle, markets_by_pair, books, TAKER_FEE, PAPER_TRADE_SIZE
+                )
+                if net_depth is None:
+                    continue
+                best_depth_seen = max(best_depth_seen, net_depth)
+                confirmed.append((net_depth, net_top, pnl, filled, cycle))
+
+            confirmed.sort(reverse=True)
+
+            # Book any loop that is break-even-or-better AFTER depth+fees as a
+            # paper trade; log anything down to MIN_NET_EDGE for the record.
+            for net_depth, net_top, pnl, filled, cycle in confirmed:
+                if net_depth < MIN_NET_EDGE:
+                    continue
+                booked = net_depth >= 0.0 and filled
+                if booked:
+                    virtual_balance += pnl
+                log_opp([
+                    now_iso(), "->".join(cycle + [cycle[0]]),
+                    f"{net_top*100:.4f}", f"{net_depth*100:.4f}",
+                    f"{pnl:.4f}", filled, f"{virtual_balance:.4f}",
+                ])
+                tag = "PAPER-FILL" if booked else "seen"
+                print(
+                    f"[{now_iso()}] {tag} {'->'.join(cycle)} | top {net_top*100:+.3f}% "
+                    f"| depth {net_depth*100:+.3f}% | P&L {pnl:+.2f} {cycle[0]} "
+                    f"| filled={filled} | bal {virtual_balance:+.2f}"
+                )
+
+            best = confirmed[0] if confirmed else None
+            summary = (
+                f"best depth {best[0]*100:+.3f}% ({'->'.join(best[4])})" if best
+                else f"best depth seen {best_depth_seen*100:+.3f}%"
             )
-            if net_depth is None:
-                continue
-            best_depth_seen = max(best_depth_seen, net_depth)
-            confirmed.append((net_depth, net_top, pnl, filled, cycle))
-
-        confirmed.sort(reverse=True)
-
-        # Book any loop that is break-even-or-better AFTER depth+fees as a paper
-        # trade; log anything down to MIN_NET_EDGE for the record.
-        for net_depth, net_top, pnl, filled, cycle in confirmed:
-            if net_depth < MIN_NET_EDGE:
-                continue
-            booked = net_depth >= 0.0 and filled
-            if booked:
-                virtual_balance += pnl
-            log_opp([
-                now_iso(), "->".join(cycle + [cycle[0]]),
-                f"{net_top*100:.4f}", f"{net_depth*100:.4f}",
-                f"{pnl:.4f}", filled, f"{virtual_balance:.4f}",
-            ])
-            tag = "PAPER-FILL" if booked else "seen"
             print(
-                f"[{now_iso()}] {tag} {'->'.join(cycle)} | top {net_top*100:+.3f}% "
-                f"| depth {net_depth*100:+.3f}% | P&L {pnl:+.2f} {cycle[0]} "
-                f"| filled={filled} | bal {virtual_balance:+.2f}"
+                f"[{now_iso()}] {len(cycles)} cycles | {len(ranked)} passed prefilter "
+                f"| {len(books)} books pulled | {summary} | {time.time()-t0:.1f}s"
             )
-
-        best = confirmed[0] if confirmed else None
-        summary = (
-            f"best depth {best[0]*100:+.3f}% ({'->'.join(best[4])})" if best
-            else f"best depth seen {best_depth_seen*100:+.3f}%"
-        )
-        print(
-            f"[{now_iso()}] {len(cycles)} cycles | {len(ranked)} passed prefilter "
-            f"| {len(books)} books pulled | {summary} | {time.time()-t0:.1f}s"
-        )
+        except Exception as e:
+            # Log full traceback but keep the scan loop alive.
+            print(f"[{now_iso()}] scan error (skipping cycle): {e!r}")
+            traceback.print_exc()
         if once:
             print(f"\n[{now_iso()}] --once smoke test complete. The engine is "
                   f"live against Kraken and the math ran end-to-end.")

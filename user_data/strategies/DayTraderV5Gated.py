@@ -105,7 +105,13 @@ class DayTraderV5Gated(IStrategy):
         )
         daily["r_fast"] = ta.EMA(daily, timeperiod=self.regime_ema_fast.value)
         daily["r_slow"] = ta.EMA(daily, timeperiod=self.regime_ema_slow.value)
-        daily["regime_up"] = (daily["r_fast"] > daily["r_slow"]).astype(int)
+        # [SOFTENED GATE] Allow early-recovery regimes, not only strict 50>200.
+        # Regime counts as "up" if 50EMA>200EMA OR price is back above the 200EMA
+        # (price reclaiming the 200d is the classic first sign of a turn). Still
+        # blocks the real downtrend case: price below the 200d AND 50<200.
+        daily["regime_up"] = (
+            (daily["r_fast"] > daily["r_slow"]) | (daily["close"] > daily["r_slow"])
+        ).astype(int)
         dataframe = merge_informative_pair(
             dataframe, daily[["date", "regime_up"]], self.timeframe,
             self.regime_timeframe, ffill=True
@@ -117,10 +123,14 @@ class DayTraderV5Gated(IStrategy):
         # IMPROVED: relaxed entry. Two paths instead of one strict all-conditions.
         dataframe.loc[
             (
-                # Must still have day-trend up AND macro regime up (the gates stay)
-                (dataframe["ema9_rising_1h"])
-                & (dataframe["regime_up_1d"] == 1)
-                & (dataframe["close_1h"] > dataframe["ema9_1h"])
+                # Macro regime gate stays (softened at the indicator level above).
+                # [SOFTENED GATE] 1h day-trend filter now passes on EITHER a rising
+                # 1h EMA OR price above the 1h EMA (was: both required).
+                (dataframe["regime_up_1d"] == 1)
+                & (
+                    (dataframe["ema9_rising_1h"])
+                    | (dataframe["close_1h"] > dataframe["ema9_1h"])
+                )
 
                 # IMPROVED: relaxed momentum entry (either path is enough)
                 & (

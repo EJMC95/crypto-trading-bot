@@ -94,7 +94,10 @@ class SwingDipV1(IStrategy):
         # OR on any deep-oversold reading even if the band isn't touched.
         dataframe.loc[
             (
-                (dataframe["ema50"] > dataframe["ema200"])             # macro trend up (gate stays)
+                # [SOFTENED GATE] macro trend up: 50>200 OR price back above the 200d
+                # (early recovery). Still refuses falling-knife dips below the 200d
+                # while 50<200 — the rule that kept it out of the V2 disaster.
+                ((dataframe["ema50"] > dataframe["ema200"]) | (dataframe["close"] > dataframe["ema200"]))
                 & (
                     # Path 1: genuine dip below lower BB, RSI under the (relaxed) threshold
                     ((dataframe["rsi"] < self.buy_rsi.value) & (dataframe["close"] < dataframe["bb_lower"]))
