@@ -65,10 +65,14 @@ class TrendMomoV1(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # BUY when fast SMA crosses up through slow SMA (momentum turns up).
+        # RELAXED: was crossed_above(sma_fast, sma_slow) -> fired on a SINGLE candle
+        # per trend, so missing that one daily crossover meant no entry for the whole
+        # uptrend. Now: long whenever sma_fast > sma_slow (momentum is up). Freqtrade
+        # won't double-enter an already-open pair; exit still triggers on the
+        # down-cross below, so the trend-follow behaviour is preserved.
         dataframe.loc[
             (
-                qtpylib.crossed_above(dataframe["sma_fast"], dataframe["sma_slow"])
+                (dataframe["sma_fast"] > dataframe["sma_slow"])
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",

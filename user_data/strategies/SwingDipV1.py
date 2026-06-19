@@ -55,7 +55,7 @@ class SwingDipV1(IStrategy):
         ]
 
     # Hyperopt-tunable, but defaults are deliberately round (anti-overfit).
-    buy_rsi  = IntParameter(20, 45, default=35, space="buy",  optimize=False)
+    buy_rsi  = IntParameter(20, 50, default=45, space="buy",  optimize=False)  # RELAXED 35->45
     sell_rsi = IntParameter(55, 80, default=65, space="sell", optimize=False)
 
     # Take-profit ladder in MINUTES (1 day = 1440). Read in days:
@@ -87,12 +87,20 @@ class SwingDipV1(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # BUY a real dip, but only inside an uptrend (no falling knives).
+        # RELAXED entry (still gated to an uptrend, no falling knives):
+        #   Old: ema50>ema200 AND rsi<35 AND close<bb_lower  (all three -> rare on daily)
+        #   New: ema50>ema200 AND ( (rsi<45 AND close<bb_lower) OR rsi<30 )
+        # Keeps the macro uptrend gate; fires on a BB dip with RSI not-too-hot,
+        # OR on any deep-oversold reading even if the band isn't touched.
         dataframe.loc[
             (
-                (dataframe["ema50"] > dataframe["ema200"])         # macro trend up
-                & (dataframe["rsi"] < self.buy_rsi.value)          # oversold
-                & (dataframe["close"] < dataframe["bb_lower"])     # genuine dip
+                (dataframe["ema50"] > dataframe["ema200"])             # macro trend up (gate stays)
+                & (
+                    # Path 1: genuine dip below lower BB, RSI under the (relaxed) threshold
+                    ((dataframe["rsi"] < self.buy_rsi.value) & (dataframe["close"] < dataframe["bb_lower"]))
+                    # Path 2: deep oversold even without touching the band
+                    | (dataframe["rsi"] < 30)
+                )
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",
