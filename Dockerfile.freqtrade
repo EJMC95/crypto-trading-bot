@@ -3,11 +3,15 @@
 FROM freqtradeorg/freqtrade:stable
 
 USER root
+# psycopg2 for the P&L poller that publishes to the shared Postgres table.
+RUN pip install --no-cache-dir psycopg2-binary
 # Bake in the bot configs + strategies (built locally in user_data/)
 COPY user_data /freqtrade/user_data
 COPY run_all.sh /freqtrade/run_all.sh
 COPY dashboard_server.py /freqtrade/dashboard_server.py
-RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh /freqtrade/dashboard_server.py
+COPY bot_pnl_store.py /freqtrade/bot_pnl_store.py
+COPY freqtrade_pnl_poller.py /freqtrade/freqtrade_pnl_poller.py
+RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh /freqtrade/dashboard_server.py /freqtrade/bot_pnl_store.py /freqtrade/freqtrade_pnl_poller.py
 USER ftuser
 
 WORKDIR /freqtrade

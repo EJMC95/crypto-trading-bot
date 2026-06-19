@@ -25,5 +25,15 @@ run_bot user_data/config_v8_momo.json    v8momo   &
 # Combined P&L + trades dashboard, served on $PORT (Railway exposes it).
 python3 /freqtrade/dashboard_server.py &
 
+# Publish each freqtrade bot's P&L to the shared Postgres table so they show on
+# the unified pnl_dashboard alongside perps/momo/arb/sniper. Guarded: no-op if
+# DATABASE_URL is unset. Restart-looped so a transient error can't kill it.
+while true; do
+  echo "[supervisor] starting freqtrade pnl poller"
+  python3 /freqtrade/freqtrade_pnl_poller.py
+  echo "[supervisor] pnl poller exited — restarting in 15s"
+  sleep 15
+done &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait
