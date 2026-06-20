@@ -14,6 +14,7 @@ Deps: psycopg2-binary (see requirements.txt). Falls back to a clear message if
 the DB is unreachable so the page never hard-crashes.
 """
 import os
+import json
 import base64
 import html
 import datetime as dt
