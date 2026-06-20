@@ -258,6 +258,8 @@ def open_position(exid, client, sym, market, cfg, detected_at):
         "stake_quote": cfg["stake"],
         "quote": quote_ccy,
         "peak": entry,
+        "remaining_frac": 1.0,   # scale-out / trailing-stop state
+        "tp1_done": False,
     }
     sl_txt = "none" if cfg["sl"] <= 0 else f"-{cfg['sl']*100:.0f}%"
     print(f"  >> PAPER BUY [{exid}] {sym} @ {entry:.8g}  "
@@ -265,44 +267,104 @@ def open_position(exid, client, sym, market, cfg, detected_at):
     return pos
 
 
+def _exit_row(pos, exit_price, reason, sold_stake, held_min):
+    """Build a CSV row for a (partial or full) exit of `sold_stake` of quote."""
+    entry = pos["entry"]
+    pnl_pct = (exit_price / entry) - 1.0
+    pnl_quote = sold_stake * pnl_pct
+    peak_pct = (pos["peak"] / entry) - 1.0
+    return [
+        pos["detected_at"], pos["opened_at"], ts(), pos["exchange"],
+        pos["pair_id"], pos["wsname"],
+        f"{entry:.10g}", f"{exit_price:.10g}", f"{sold_stake:.2f}",
+        f"{pnl_pct*100:.2f}", f"{pnl_quote:.2f}", reason,
+        f"{held_min:.1f}", f"{peak_pct*100:.2f}",
+    ], pnl_pct, pnl_quote
+
+
 def maybe_close(pos, client, cfg):
-    """Return (closed_bool, row_or_None)."""
+    """Manage an open paper position. Returns (fully_closed_bool, rows_list).
+
+    EXPERT EXIT MODEL (2026-06-21) — replaces the old all-or-nothing "sell at 5x
+    or stop at -50%". New listings typically spike then bleed out, so a single
+    far take-profit gives the whole gain back. Instead we:
+      1. SCALE OUT: sell `tp1_frac` (default 50%) at `tp1_mult` (default 2x = +100%)
+         to bank the spike and move the rest to house money.
+      2. TRAIL THE RUNNER: once the trade is up `trail_arm` (default +50%) or the
+         partial has fired, exit the remainder if price falls `trail_from_peak`
+         (default 30%) from its peak — captures the move instead of round-tripping.
+      3. Hard stop from entry, a far runner take-profit (`tp_mult`), and max-hold
+         all still apply as backstops.
+    Tunables read from cfg with safe defaults so existing CLI/config still works.
+    """
     px = get_price(client, pos["pair_id"])
     if px is None:
-        return False, None
+        return False, []
     last = px["last"]
     entry = pos["entry"]
     pos["peak"] = max(pos["peak"], last)
     held_min = (time.time() - pos["opened_ts"]) / 60.0
 
-    tp_price = entry * cfg["tp_mult"]  # e.g. 5x = sell at entry * 5
-    reason = None
-    exit_price = last
+    # Backward-compatible state for positions opened before this change.
+    pos.setdefault("remaining_frac", 1.0)
+    pos.setdefault("tp1_done", False)
+    full_stake = pos["stake_quote"]
+    remaining_stake = full_stake * pos["remaining_frac"]
+
+    tp1_mult = cfg.get("tp1_mult", 2.0)        # first scale-out target (x entry)
+    tp1_frac = cfg.get("tp1_frac", 0.5)        # fraction of ORIGINAL to sell there
+    trail_arm = cfg.get("trail_arm", 0.5)      # arm trail once +50% from entry
+    trail_gap = cfg.get("trail_from_peak", 0.30)  # exit if 30% below peak
+    tp_price = entry * cfg["tp_mult"]          # far runner target (full exit)
+    peak = pos["peak"]
+    rows = []
+
+    # --- 1) Hard stop-loss from entry (close everything still held) ---
+    if cfg["sl"] > 0 and last <= entry * (1 - cfg["sl"]):
+        row, pp, pq = _exit_row(pos, entry * (1 - cfg["sl"]), "stop_loss",
+                                remaining_stake, held_min)
+        _print_sell(pos, row[7], pp, pq, "stop_loss", cfg)
+        return True, [row]
+
+    # --- 2) Partial take-profit (scale out) — fires once ---
+    if (not pos["tp1_done"]) and tp1_frac > 0 and last >= entry * tp1_mult:
+        sold = full_stake * tp1_frac
+        row, pp, pq = _exit_row(pos, last, "take_profit_partial", sold, held_min)
+        _print_sell(pos, row[7], pp, pq, "take_profit_partial", cfg)
+        pos["tp1_done"] = True
+        pos["remaining_frac"] = max(0.0, pos["remaining_frac"] - tp1_frac)
+        rows.append(row)
+        remaining_stake = full_stake * pos["remaining_frac"]
+        if pos["remaining_frac"] <= 1e-9:
+            return True, rows  # nothing left to ride
+
+    # --- 3) Trailing stop on the runner (only once armed) ---
+    armed = pos["tp1_done"] or (peak >= entry * (1 + trail_arm))
+    if armed and trail_gap > 0 and last <= peak * (1 - trail_gap):
+        row, pp, pq = _exit_row(pos, last, "trail_stop", remaining_stake, held_min)
+        _print_sell(pos, row[7], pp, pq, "trail_stop", cfg)
+        return True, rows + [row]
+
+    # --- 4) Far runner take-profit (full exit of remainder) ---
     if last >= tp_price:
-        reason, exit_price = "take_profit", tp_price
-    elif cfg["sl"] > 0 and last <= entry * (1 - cfg["sl"]):
-        reason, exit_price = "stop_loss", entry * (1 - cfg["sl"])
-    elif cfg["max_hold"] > 0 and held_min >= cfg["max_hold"]:
-        reason, exit_price = "max_hold", last
+        row, pp, pq = _exit_row(pos, tp_price, "take_profit", remaining_stake, held_min)
+        _print_sell(pos, row[7], pp, pq, "take_profit", cfg)
+        return True, rows + [row]
 
-    if reason is None:
-        return False, None
+    # --- 5) Max hold (full exit of remainder) ---
+    if cfg["max_hold"] > 0 and held_min >= cfg["max_hold"]:
+        row, pp, pq = _exit_row(pos, last, "max_hold", remaining_stake, held_min)
+        _print_sell(pos, row[7], pp, pq, "max_hold", cfg)
+        return True, rows + [row]
 
-    pnl_pct = (exit_price / entry) - 1.0
-    pnl_quote = pos["stake_quote"] * pnl_pct
-    peak_pct = (pos["peak"] / entry) - 1.0
-    row = [
-        pos["detected_at"], pos["opened_at"], ts(), pos["exchange"],
-        pos["pair_id"], pos["wsname"],
-        f"{entry:.10g}", f"{exit_price:.10g}", f"{pos['stake_quote']:.2f}",
-        f"{pnl_pct*100:.2f}", f"{pnl_quote:.2f}", reason,
-        f"{held_min:.1f}", f"{peak_pct*100:.2f}",
-    ]
+    return False, rows  # still open (rows may hold a partial fill this cycle)
+
+
+def _print_sell(pos, exit_price_str, pnl_pct, pnl_quote, reason, cfg):
     emoji = "✅" if pnl_pct >= 0 else "❌"
     quote_ccy = pos.get("quote", cfg["quotes"][0])
-    print(f"  << PAPER SELL [{pos['exchange']}] {pos['wsname']} @ {exit_price:.8g}  "
+    print(f"  << PAPER SELL [{pos['exchange']}] {pos['wsname']} @ {float(exit_price_str):.8g}  "
           f"{emoji} {pnl_pct*100:+.2f}% ({pnl_quote:+.2f} {quote_ccy})  [{reason}]")
-    return True, row
 
 
 # ----------------------------- concurrency helper ---------------------------
@@ -456,16 +518,16 @@ def monitor(cfg, exchange_ids):
                 remaining.append(pos)  # exchange not in this run; hold position
                 continue
             try:
-                closed, row = maybe_close(pos, client, cfg)
+                closed, rows = maybe_close(pos, client, cfg)
             except Exception as e:
                 print(f"  ! error managing [{pos.get('exchange')}] "
                       f"{pos.get('wsname')}: {e}")
                 remaining.append(pos)
                 continue
-            if closed:
+            for row in rows:          # may include a partial scale-out fill
                 log_trade(row)
-            else:
-                remaining.append(pos)
+            if not closed:
+                remaining.append(pos)  # runner still riding (possibly reduced)
         positions = remaining
 
         # Persist state every cycle so restarts are safe
