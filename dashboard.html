@@ -1,43 +1,30 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Crypto Bots — Unified Dashboard</title>
+<title>Triangular Arb — Paper Trading Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root { color-scheme: dark; }
-  body { font-family:-apple-system,system-ui,sans-serif; margin:0;
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0;
          background:#0e1116; color:#e6e9ef; }
   header { padding:20px 28px; border-bottom:1px solid #222834; }
   h1 { font-size:18px; margin:0; }
   .gen { color:#7c8698; font-size:12px; margin-top:4px; }
-  .wrap { padding:22px 28px; max-width:1180px; margin:0 auto; }
-  h2.sec { font-size:13px; text-transform:uppercase; letter-spacing:.05em;
-            color:#9aa4b5; margin:30px 0 12px; }
-  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-            gap:14px; margin-bottom:8px; }
-  .card { background:#161b24; border:1px solid #222834; border-radius:12px; padding:16px; }
-  .lbl { color:#7c8698; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
-  .val { font-size:23px; font-weight:650; margin-top:6px; }
+  .wrap { padding:22px 28px; max-width:1100px; margin:0 auto; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+            gap:14px; margin-bottom:26px; }
+  .card { background:#161b24; border:1px solid #222834; border-radius:12px;
+           padding:16px; }
+  .lbl { color:#7c8698; font-size:12px; text-transform:uppercase;
+          letter-spacing:.04em; }
+  .val { font-size:24px; font-weight:650; margin-top:6px; }
   .sub { color:#7c8698; font-size:11px; margin-top:4px; }
   .panel { background:#161b24; border:1px solid #222834; border-radius:12px;
-            padding:18px; margin-bottom:22px; overflow-x:auto; }
+            padding:18px; margin-bottom:22px; }
+  .panel h2 { font-size:14px; margin:0 0 14px; color:#c7cedb; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #1c222d;
-            white-space:nowrap; }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid #1c222d; }
   th { color:#7c8698; font-weight:550; }
-  td.b { font-weight:600; }
-  td.mut { color:#7c8698; }
-  .pill { font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; }
-  .pill.dry { background:rgba(70,211,154,.14); color:#46d39a; }
-  .pill.live { background:rgba(239,111,123,.16); color:#ef6f7b; }
-  .egrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px; }
-  .ecard { background:#161b24; border:1px solid #222834; border-radius:12px; padding:16px; }
-  .etop { display:flex; justify-content:space-between; align-items:center; }
-  .ename { font-weight:650; font-size:15px; }
-  .emeta { color:#9aa4b5; font-size:12px; margin:6px 0 8px; }
-  .edesc { font-size:13px; line-height:1.5; color:#cdd4e0; }
-  .efile { color:#7c8698; font-size:11px; margin-top:10px; font-family:ui-monospace,monospace; }
-  .panel h3 { font-size:14px; margin:0 0 14px; color:#c7cedb; }
   .pos { color:#46d39a; } .neg { color:#ef6f7b; }
   .muted { color:#7c8698; text-align:center; padding:18px; }
   .note { color:#7c8698; font-size:12px; line-height:1.5; }
@@ -45,44 +32,58 @@
 </style></head>
 <body>
 <header>
-  <h1>Crypto Bots — Unified Dashboard</h1>
-  <div class="gen">Generated 2026-06-19 23:42 UTC · 9 bots · paper/dry-run unless flagged LIVE</div>
+  <h1>Triangular Arbitrage — Paper Trading Dashboard</h1>
+  <div class="gen">Generated 2026-06-20 23:05 UTC · source: arb_opportunities.csv · paper only, no real orders</div>
 </header>
 <div class="wrap">
-  <div class="cards"><div class="card"><div class="lbl">Bots configured</div><div class="val">9</div><div class="sub">6 strategies · 3 engines</div></div><div class="card"><div class="lbl">Mode</div><div class="val">9 paper</div><div class="sub">all dry-run = no real orders</div></div><div class="card"><div class="lbl">Exchanges</div><div class="val">hyperliquid (testnet), kraken, top ~100 (CCXT)</div><div class="sub">venues in use</div></div><div class="card"><div class="lbl">Arb loops logged</div><div class="val">0</div><div class="sub">paper balance no data yet</div></div></div>
+  <div class="cards"><div class="card"><div class="lbl">Status</div><div class="val">No data yet</div><div class="sub">Start the bot — opportunities will appear here.</div></div></div>
 
-  <h2 class="sec">Strategy bots (Freqtrade)</h2>
-  <div class="panel">
-    <table><thead><tr>
-      <th>Strategy</th><th>Exchange</th><th>TF</th><th>Pairs</th>
-      <th>Stoploss</th><th>Max trades</th><th>Stake</th><th>Mode</th><th>Config</th>
-    </tr></thead><tbody><tr><td class="b">DayTraderV1Aggro</td><td>kraken</td><td>5m</td><td>BTC/USDT</td><td>-0.12</td><td>1</td><td>USDT</td><td><span class="pill dry">paper</span></td><td class="mut">config_daytrader_binance.json</td></tr><tr><td class="b">DayTraderV1</td><td>kraken</td><td>5m</td><td>BTC/USDT</td><td>-0.02</td><td>1</td><td>USDT</td><td><span class="pill dry">paper</span></td><td class="mut">config_daytrader_kraken.json</td></tr><tr><td class="b">ImprovedStrategyV4</td><td>kraken</td><td>1d</td><td>BTC/USD, ETH/USD</td><td>-0.35</td><td>2</td><td>USD</td><td><span class="pill dry">paper</span></td><td class="mut">config_v4_core.json</td></tr><tr><td class="b">DayTraderV5Gated</td><td>kraken</td><td>5m</td><td>BTC/USD, ETH/USD</td><td>-0.12</td><td>2</td><td>USD</td><td><span class="pill dry">paper</span></td><td class="mut">config_v5_kraken.json</td></tr><tr><td class="b">SwingDipV1</td><td>kraken</td><td>1d</td><td>BTC/USD, ETH/USD</td><td>-0.15</td><td>2</td><td>USD</td><td><span class="pill dry">paper</span></td><td class="mut">config_v6_swing.json</td></tr><tr><td class="b">MomoBreakoutV1</td><td>kraken</td><td>4h</td><td>BTC/USD, ETH/USD</td><td>-0.12</td><td>2</td><td>USD</td><td><span class="pill dry">paper</span></td><td class="mut">config_v7_momo.json</td></tr></tbody></table>
-  </div>
-
-  <h2 class="sec">Standalone engines</h2>
-  <div class="egrid"><div class="ecard"><div class="etop"><span class="ename">Triangular Arbitrage</span><span class="pill dry">paper</span></div><div class="emeta">kraken · 3-leg depth-aware arb scan · full liquid spot universe</div><div class="edesc">Scans Kraken for 3-leg loops profitable after fees + real order-book slippage. Public data only, no API keys, paper P&L.</div><div class="efile">triangular_arb.py → arb_opportunities.csv</div></div><div class="ecard"><div class="etop"><span class="ename">Listing Sniper</span><span class="pill dry">paper</span></div><div class="emeta">top ~100 (CCXT) · new-listing paper sniper · new USD/USDT/USDC/EUR pairs</div><div class="edesc">Detects brand-new spot pairs across the top ~100 exchanges (via CCXT, polled concurrently, best-effort skip) and opens paper positions with TP 5x / SL / max-hold. 100% dry-run, public endpoints only.</div><div class="efile">listing_sniper.py → sniper trades CSV</div></div><div class="ecard"><div class="etop"><span class="ename">Hyperliquid Perps (MomoBreakout)</span><span class="pill dry">paper</span></div><div class="emeta">hyperliquid (testnet) · 4h Donchian 30/15 breakout + EMA200, 12% stop · BTC / ETH / SOL perps</div><div class="edesc">Perpetuals momentum bot ported from MomoBreakoutV1. Backtest: +90% (BTC) / +127% (ETH) at 1x, beats buy & hold on ETH with ~20-25% drawdown. Testnet only; paper/dry-run by default. Posts trade events to Slack via Zapier webhook.</div><div class="efile">hyperliquid_momo_bot.py → momo_bot.log</div></div></div>
-
-  <h2 class="sec">Triangular arbitrage — paper performance</h2>
-  <div class="cards"><div class="card"><div class="lbl">Status</div><div class="val">No data yet</div><div class="sub">Start triangular_arb.py — loops will appear here.</div></div></div>
-  <p class="note">arb_opportunities.csv is empty so far, so the charts below stay blank until the arb engine logs its first scans.</p>
-  <div class="panel"><h3>Virtual balance over time (cumulative paper P&amp;L)</h3>
+  <div class="panel"><h2>Virtual balance over time (cumulative paper P&L)</h2>
     <canvas id="bal"></canvas></div>
-  <div class="panel"><h3>Top-of-book edge vs depth-confirmed edge (%)</h3>
-    <p class="note">Points far below the diagonal = slippage eating the edge.</p>
+
+  <div class="panel"><h2>Best top-of-book edge over time (%)</h2>
+    <p class="note">How close the best loop got each sample, before slippage.
+       At Kraken's ~1.2% fee floor this normally sits well below zero — that is
+       the honest picture of why nothing books.</p>
+    <canvas id="tops"></canvas></div>
+
+  <div class="panel"><h2>Top-of-book edge vs depth-confirmed edge (%)</h2>
+    <p class="note">Points far below the diagonal = slippage eating the edge.
+       The further a dot sits under the line y = x, the more the mirage shrank
+       once real size hit the book.</p>
     <canvas id="scatter"></canvas></div>
 
-  <p class="note">Reminder: every bot here is dry-run / paper. A profitable
-     backtest or paper run is not proof of live profit — fees, slippage and
-     overfitting quietly eat returns. This is not financial advice.</p>
+  <div class="panel"><h2>Most frequent loops</h2>
+    <table><thead><tr><th>Cycle</th><th>Times seen</th>
+      <th>Avg depth edge %</th><th>Best %</th></tr></thead>
+      <tbody><tr><td colspan="4" class="muted">—</td></tr></tbody></table></div>
+
+  <div class="panel"><h2>Recent opportunities (latest 25)</h2>
+    <table><thead><tr><th>Time (UTC)</th><th>Cycle</th><th>Top %</th>
+      <th>Depth %</th><th>Paper P&L</th><th>Filled</th></tr></thead>
+      <tbody><tr><td colspan="6" class="muted">arb_opportunities.csv is empty so far.</td></tr></tbody></table></div>
+
+  <p class="note">Reminder: at Kraken's 0.40%/leg taker fee a loop must clear
+     ~1.2% in fees plus spread plus slippage before it books a positive paper
+     trade. A flat-or-empty balance is a real, useful result.</p>
 </div>
 <script>
 const BAL = [];
+const TOPS = [];
 const SCAT = [];
 const grid = { color:'#1c222d' }, ticks = { color:'#7c8698' };
 if (BAL.length) new Chart(document.getElementById('bal'), {
   type:'line',
   data:{ datasets:[{ label:'Virtual balance', data:BAL, parsing:false,
     borderColor:'#46d39a', backgroundColor:'rgba(70,211,154,.12)',
+    fill:true, tension:.15, pointRadius:0, borderWidth:2 }] },
+  options:{ scales:{ x:{ type:'category', grid, ticks:{...ticks, maxTicksLimit:8} },
+    y:{ grid, ticks } }, plugins:{ legend:{ display:false } } }
+});
+if (TOPS.length) new Chart(document.getElementById('tops'), {
+  type:'line',
+  data:{ datasets:[{ label:'Best top-of-book edge %', data:TOPS, parsing:false,
+    borderColor:'#78aaff', backgroundColor:'rgba(120,170,255,.12)',
     fill:true, tension:.15, pointRadius:0, borderWidth:2 }] },
   options:{ scales:{ x:{ type:'category', grid, ticks:{...ticks, maxTicksLimit:8} },
     y:{ grid, ticks } }, plugins:{ legend:{ display:false } } }
