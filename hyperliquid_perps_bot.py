@@ -37,10 +37,17 @@ import numpy as np
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
 
 # --------------------------- configuration -------------------------------
-COINS = ["BTC", "ETH", "SOL"]     # top perps to trade
+# Widened from BTC/ETH/SOL to a broad set of liquid Hyperliquid perps.
+# Per-coin loop is guarded; unavailable symbols are skipped. For a true live
+# "top 100 by volume", rank info.meta_and_asset_ctxs() by dayNtlVlm at startup.
+COINS = [
+    "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "ARB", "OP",
+    "SUI", "SEI", "TIA", "APT", "NEAR", "INJ", "LTC", "BCH", "ATOM", "DOT",
+    "ADA", "AAVE", "PEPE", "WIF", "kBONK", "ENA", "ORDI", "JUP", "TON", "kSHIB",
+]
 RSI_PERIOD = 14
-OVERSOLD = 40
-OVERBOUGHT = 60
+OVERSOLD = 45      # RELAXED 40->45: enters long sooner (more frequent trades)
+OVERBOUGHT = 55   # RELAXED 60->55: enters short sooner
 LOOP_SECONDS = 60
 CANDLE_INTERVAL = "1h"            # indicator timeframe
 ORDER_USD = 50.0                 # notional per position (position sizing)
@@ -56,7 +63,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler(sys.stdout)],
 )
-log = logging.getLogger("perps-bot")
+log = logging.getLogger("hl-perps-rsi")
 
 
 def load_env(path=".env.perps"):
@@ -215,7 +222,7 @@ def main():
 
         # Publish a snapshot for the live dashboard (guarded; never raises).
         store.publish(
-            "perps-bot",
+            "hl-perps-rsi",
             status="halted" if halted_today else "online",
             equity=equity,
             open_trades=sum(1 for v in pos.values() if v),

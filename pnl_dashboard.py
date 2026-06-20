@@ -27,8 +27,9 @@ DASH_USER = os.environ.get("DASH_USER", "eamon")
 DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 
 # Expected bots — so the grid shows a bot even before its first publish.
-EXPECTED = ["perps-bot", "momo-bot", "triangular-arb", "listing-sniper",
-            "v4core", "v5gated", "v6swing", "v7momo", "v8momo"]
+EXPECTED = ["hl-perps-rsi", "hl-momo-breakout", "triangular-arb", "listing-sniper",
+            "trend-golden-cross", "intraday-daytrader-5m", "swing-dip-buyer",
+            "momo-breakout-4h", "momo-breakout-alt"]
 
 STALE_SECONDS = 180  # snapshots older than this are flagged "stale"
 
@@ -198,6 +199,24 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/health"):
             self.send_response(200); self.end_headers(); self.wfile.write(b"ok"); return
+        if self.path.startswith("/pnl.json"):
+            # Read-only JSON of every bot's latest snapshot, for the scheduled
+            # daily/weekly breakdowns. Dry-run paper P&L only — no secrets.
+            try:
+                rows = fetch_rows()
+                def _ser(v):
+                    return v.isoformat() if hasattr(v, "isoformat") else v
+                data = [{k: _ser(v) for k, v in r.items()} for r in rows.values()]
+                payload = json.dumps({"bots": data}).encode()
+                code = 200
+            except Exception as e:
+                payload = json.dumps({"error": str(e)}).encode()
+                code = 500
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         if not self._auth_ok():
             self.send_response(401)
             self.send_header("WWW-Authenticate", 'Basic realm="Crypto Bots"')

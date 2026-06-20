@@ -77,7 +77,7 @@ class MomoBreakoutV1(IStrategy):
         )
         # [SIDEWAYS v2] range mean-reversion path: buy oversold REGARDLESS of trend,
         # so the bot works choppy/sideways markets (buy the dip, sell the rip below).
-        range_buy = (dataframe["rsi"] < 40)
+        range_buy = (dataframe["rsi"] < 45)   # RELAXED 40->45: more oversold dips qualify
         dataframe.loc[
             ((trend_ok & setup_ok) | range_buy) & (dataframe["volume"] > 0),
             "enter_long",

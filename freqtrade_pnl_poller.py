@@ -24,11 +24,11 @@ BOT_PASS = "freqbot2026"
 
 # (publish-name, REST port) — names match pnl_dashboard's EXPECTED list.
 BOTS = [
-    ("v4core", 8085),
-    ("v5gated", 8084),
-    ("v6swing", 8086),
-    ("v7momo", 8087),
-    ("v8momo", 8088),
+    ("trend-golden-cross", 8085),
+    ("intraday-daytrader-5m", 8084),
+    ("swing-dip-buyer", 8086),
+    ("momo-breakout-4h", 8087),
+    ("momo-breakout-alt", 8088),
 ]
 
 POLL_SECONDS = 30
@@ -56,9 +56,18 @@ def poll_one(name, port):
         except Exception:
             open_n = profit.get("open_trade_count")
         pct = profit.get("profit_closed_percent")
+        # Read current wallet value so the dashboard shows real (paper) equity.
+        # Freqtrade's /balance returns "total" in the stake currency; guard it
+        # so a missing/!=200 endpoint never breaks the publish.
+        try:
+            bal = _req(f"http://127.0.0.1:{port}/api/v1/balance", headers=h)
+            equity = bal.get("total")
+        except Exception:
+            equity = None
         store.publish(
             name,
             status="online",
+            equity=equity,
             pnl_abs=profit.get("profit_closed_coin"),
             pnl_pct=(pct / 100.0) if isinstance(pct, (int, float)) else None,
             open_trades=open_n,

@@ -42,8 +42,16 @@ import numpy as np
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
 
 # --------------------------- configuration -------------------------------
-COINS = ["BTC", "ETH", "SOL"]
-ENTRY_LOOKBACK = 15
+# Widened from BTC/ETH/SOL to a broad set of liquid Hyperliquid perps.
+# The per-coin loop is guarded, so any symbol not listed on the venue is
+# skipped without affecting the others. For a true live "top 100 by volume",
+# swap this for info.meta_and_asset_ctxs() ranked by dayNtlVlm at startup.
+COINS = [
+    "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "ARB", "OP",
+    "SUI", "SEI", "TIA", "APT", "NEAR", "INJ", "LTC", "BCH", "ATOM", "DOT",
+    "ADA", "AAVE", "PEPE", "WIF", "kBONK", "ENA", "ORDI", "JUP", "TON", "kSHIB",
+]
+ENTRY_LOOKBACK = 12      # RELAXED 15->12: shorter breakout window = fires more often
 EXIT_LOOKBACK = 8
 TREND_EMA = 100
 HARD_STOP = 0.08
@@ -63,7 +71,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler(sys.stdout)],
 )
-log = logging.getLogger("momo-bot")
+log = logging.getLogger("hl-momo-breakout")
 
 
 def load_env(path=".env.perps"):
@@ -315,7 +323,7 @@ def main():
 
         # Publish a snapshot for the live dashboard (guarded; never raises).
         store.publish(
-            "momo-bot",
+            "hl-momo-breakout",
             status="paper" if PAPER else ("halted" if halted_today else "online"),
             equity=equity,
             open_trades=sum(1 for v in pos.values()

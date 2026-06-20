@@ -2,7 +2,7 @@
     "$schema": "https://schema.freqtrade.io/schema.json",
     "strategy": "DayTraderV1",
     "db_url": "sqlite:///user_data/tradesv3_daytrader_kraken.sqlite",
-    "max_open_trades": 1,
+    "max_open_trades": 5,
     "stake_currency": "USDT",
     "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.99,
@@ -47,7 +47,14 @@
     },
     "pairlists": [
         {
-            "method": "StaticPairList"
+            "method": "VolumePairList",
+            "number_assets": 100,
+            "sort_key": "quoteVolume",
+            "refresh_period": 1800
+        },
+        {
+            "method": "AgeFilter",
+            "min_days_listed": 7
         }
     ],
     "telegram": {

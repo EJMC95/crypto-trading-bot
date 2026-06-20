@@ -48,7 +48,14 @@
     },
     "pairlists": [
         {
-            "method": "StaticPairList"
+            "method": "VolumePairList",
+            "number_assets": 100,
+            "sort_key": "quoteVolume",
+            "refresh_period": 1800
+        },
+        {
+            "method": "AgeFilter",
+            "min_days_listed": 7
         }
     ],
     "telegram": {
@@ -79,7 +86,7 @@
         "username": "freqtrader",
         "password": "CHANGE_ME_use_a_strong_unique_password"
     },
-    "bot_name": "v6_swing_kraken",
+    "bot_name": "swing_dip_buyer",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {

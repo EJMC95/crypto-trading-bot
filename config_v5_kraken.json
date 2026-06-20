@@ -2,7 +2,7 @@
     "$schema": "https://schema.freqtrade.io/schema.json",
     "strategy": "DayTraderV5Gated",
     "db_url": "sqlite:///user_data/tradesv3_v5_kraken.sqlite",
-    "max_open_trades": 2,
+    "max_open_trades": 5,
     "stake_currency": "USD",
     "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.1,
@@ -48,7 +48,14 @@
     },
     "pairlists": [
         {
-            "method": "StaticPairList"
+            "method": "VolumePairList",
+            "number_assets": 100,
+            "sort_key": "quoteVolume",
+            "refresh_period": 1800
+        },
+        {
+            "method": "AgeFilter",
+            "min_days_listed": 7
         }
     ],
     "telegram": {
@@ -79,7 +86,7 @@
         "username": "freqtrader",
         "password": "CHANGE_ME_use_a_strong_unique_password"
     },
-    "bot_name": "v5_gated_kraken",
+    "bot_name": "intraday_daytrader_5m",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {

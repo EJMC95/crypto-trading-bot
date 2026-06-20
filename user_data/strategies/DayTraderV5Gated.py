@@ -49,11 +49,16 @@ class DayTraderV5Gated(IStrategy):
     regime_ema_fast = IntParameter(30, 80, default=50, space="buy", optimize=False)
     regime_ema_slow = IntParameter(150, 250, default=200, space="buy", optimize=False)
 
+    # [v5 FIX — 0/10 losing streak] The old ladder demanded a 4% move on a 5m
+    # chart before banking profit; price almost always reverted first, so winners
+    # never closed green while the ATR/EMA-cross stop kept clipping small losses.
+    # Take profit much sooner so weak-momentum entries can still resolve positive.
     minimal_roi = {
-        "0": 0.04,
-        "30": 0.025,
-        "60": 0.015,
-        "120": 0.008,
+        "0": 0.02,    # was 0.04 — bank ~2% immediately
+        "20": 0.012,  # was 0.025@30
+        "45": 0.006,  # was 0.015@60
+        "90": 0.003,  # was 0.008@120
+        "180": 0.0,   # after 3h, exit at break-even rather than round-trip to a loss
     }
 
     stoploss = -0.12
