@@ -52,16 +52,20 @@ import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATAB
 # ----------------------------------------------------------------------------
 
 # Exchanges to compare. ccxt ids. Public data only.
-EXCHANGES = ["kraken", "binance", "coinbase"]
+# NOTE: US-region-friendly set. Binance.com is NOT used because it returns
+# HTTP 451 ("restricted location") from Railway's region. We use
+# `coinbaseexchange` (Coinbase Exchange / ex-Pro) rather than `coinbase`
+# (Advanced Trade) because the former exposes a working fetch_tickers.
+EXCHANGES = ["kraken", "coinbaseexchange", "gemini"]
 
 # Base-tier TAKER fee per exchange (fraction). Arb fills must be taker. These
 # are conservative public defaults; the engine uses each market's own ccxt
 # 'taker' fee when ccxt reports one, and falls back to these otherwise. Lower
 # only if your real 30-day volume earns a better tier on that venue.
 TAKER_FEE = {
-    "kraken": 0.0026,    # Kraken Pro spot taker, base tier
-    "binance": 0.0010,   # Binance spot taker, base tier
-    "coinbase": 0.0060,  # Coinbase Advanced taker, base tier (consumer is higher)
+    "kraken": 0.0026,           # Kraken Pro spot taker, base tier
+    "coinbaseexchange": 0.0060, # Coinbase Exchange taker, base tier
+    "gemini": 0.0040,           # Gemini ActiveTrader taker, base tier
 }
 DEFAULT_TAKER = 0.0040   # used for any exchange not listed above
 
