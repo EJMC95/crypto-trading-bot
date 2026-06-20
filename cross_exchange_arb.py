@@ -75,10 +75,14 @@ DEFAULT_TAKER = 0.0040   # used for any exchange not listed above
 # the same asset, and pretending so invents fake edges on a stablecoin wobble.
 QUOTE_WHITELIST = {"USD", "USDT", "USDC", "EUR"}
 
-# Stage-1 -> Stage-2 gate. Only pairs whose TOP-OF-BOOK cross edge is at least
-# this get a (costly) depth-aware order-book confirmation. Negative = also
-# depth-check near-misses so we can see how close the market gets.
-PREFILTER_EDGE = -0.005   # -0.5%
+# Stage-1 -> Stage-2 gate. Stage 1 ranks venues on a REFERENCE price (mid of
+# bid/ask when a venue reports it, else last trade) because several exchanges
+# (Coinbase Exchange, Gemini) do not return bid/ask in their bulk fetch_tickers
+# — only `last`. A pair whose raw cross-venue reference gap is at least this
+# gets a (costly) depth-aware order-book confirmation in Stage 2, where the real
+# bid/ask + slippage are computed from order books. Keep it low enough to catch
+# near-misses but high enough to bound book fetches.
+PREFILTER_GAP = 0.0020   # 0.20% raw last/mid price gap between venues
 
 # Hard cap on order books fetched per scan (2 per confirmed pair). Rate guard.
 MAX_BOOK_FETCHES = 30
@@ -232,16 +236,24 @@ def log_opp(row):
         csv.writer(f).writerow(row)
 
 
-def best_quotes(symbol, exmarkets, tickers_by_ex):
-    """Return per-exchange (bid, ask) for a symbol, skipping missing data."""
+def ref_prices(symbol, exmarkets, tickers_by_ex):
+    """Per-exchange reference price for Stage-1 ranking.
+
+    Uses the bid/ask mid when a venue reports both, else the last trade price.
+    This is necessary because some venues (Coinbase Exchange, Gemini) return
+    bid=ask=None in bulk fetch_tickers and only populate `last`. The real
+    bid/ask + slippage are recovered from order books in Stage 2.
+    """
     out = {}
     for ex_id in exmarkets:
         t = tickers_by_ex.get(ex_id, {}).get(symbol)
         if not t:
             continue
-        bid, ask = t.get("bid"), t.get("ask")
+        bid, ask, last = t.get("bid"), t.get("ask"), t.get("last")
         if bid and ask:
-            out[ex_id] = (bid, ask)
+            out[ex_id] = (bid + ask) / 2.0
+        elif last:
+            out[ex_id] = last
     return out
 
 
@@ -296,26 +308,25 @@ def run_live(once=False):
             continue
 
         try:
-            # Stage 1: rank every cross-venue pair on top-of-book.
+            # Stage 1: rank every cross-venue pair on a reference price (mid
+            # when bid/ask present, else last). The number here is the RAW
+            # cross-venue price gap (no fees yet) — fees + real bid/ask +
+            # slippage are applied in Stage 2 from order books.
             ranked = []
-            best_top = None  # (net, symbol, buy_ex, sell_ex)
+            best_top = None  # (gap, symbol, buy_ex, sell_ex)
             for symbol, exmarkets in sym_map.items():
-                q = best_quotes(symbol, exmarkets, tickers_by_ex)
-                if len(q) < 2:
+                refs = ref_prices(symbol, exmarkets, tickers_by_ex)
+                if len(refs) < 2:
                     continue
-                buy_ex = min(q, key=lambda e: q[e][1])   # lowest ask
-                sell_ex = max(q, key=lambda e: q[e][0])  # highest bid
-                if buy_ex == sell_ex:
+                buy_ex = min(refs, key=refs.get)    # cheapest reference price
+                sell_ex = max(refs, key=refs.get)   # dearest reference price
+                if buy_ex == sell_ex or refs[buy_ex] <= 0:
                     continue
-                fee_b = fee_for(buy_ex, exmarkets.get(buy_ex))
-                fee_s = fee_for(sell_ex, exmarkets.get(sell_ex))
-                net = top_of_book_edge(q[buy_ex][1], q[sell_ex][0], fee_b, fee_s)
-                if net is None:
-                    continue
-                if best_top is None or net > best_top[0]:
-                    best_top = (net, symbol, buy_ex, sell_ex)
-                if net >= PREFILTER_EDGE:
-                    ranked.append((net, symbol, buy_ex, sell_ex))
+                gap = refs[sell_ex] / refs[buy_ex] - 1.0
+                if best_top is None or gap > best_top[0]:
+                    best_top = (gap, symbol, buy_ex, sell_ex)
+                if gap >= PREFILTER_GAP:
+                    ranked.append((gap, symbol, buy_ex, sell_ex))
             ranked.sort(reverse=True)
 
             # Stage 2: confirm the top candidates depth-aware at trade size.
