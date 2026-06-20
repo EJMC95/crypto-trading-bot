@@ -214,7 +214,12 @@ class H(BaseHTTPRequestHandler):
                 payload = json.dumps({"error": str(e)}).encode()
                 code = 500
             self.send_response(code)
-            self.send_header("Content-Type", "application/json")
+            # Serve the JSON as text/plain (still valid JSON for any parser).
+            # Some fetchers (incl. the scheduled-task web_fetch) drop
+            # application/json bodies; text/plain + Content-Length is read
+            # reliably while curl/browsers/json.loads are unaffected.
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
             return
