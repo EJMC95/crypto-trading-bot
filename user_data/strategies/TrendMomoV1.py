@@ -32,7 +32,7 @@ from freqtrade.strategy import IStrategy, IntParameter
 class TrendMomoV1(IStrategy):
     INTERFACE_VERSION = 3
 
-    timeframe = "1d"                 # daily candles -> swing trend-follow
+    timeframe = "4h"                 # [SPED UP] was 1d; 4h = 6x more evaluations
     can_short = False
 
     @property

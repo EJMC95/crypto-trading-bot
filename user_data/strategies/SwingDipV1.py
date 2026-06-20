@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 class SwingDipV1(IStrategy):
     INTERFACE_VERSION = 3
 
-    timeframe = "1d"                 # daily candles -> swing, not scalping
+    timeframe = "4h"                 # [SPED UP] was 1d; 4h = 6x more evaluations
     can_short = False
 
     # Circuit breakers (research-driven risk guards). Candle counts scale with

@@ -48,7 +48,8 @@ from freqtrade.strategy import IStrategy
 class ImprovedStrategyV4(IStrategy):
     INTERFACE_VERSION = 3
 
-    timeframe = '1d'                 # daily trend filter — slow and robust
+    timeframe = '4h'                 # [SPED UP] was 1d; 4h = 6x more evaluations
+                                     # (50/200 EMA now ~8d/33d trend, not 50d/200d)
     can_short = False
 
     # Circuit breakers (research-driven risk guards). Candle counts scale with
