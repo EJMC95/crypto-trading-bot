@@ -138,8 +138,13 @@ class DayTraderV5Gated(IStrategy):
             (dataframe["rsi"] > self.buy_rsi.value)
             | ((dataframe["rsi"] > 40) & (dataframe["close"] > dataframe["ema_fast"]))
         )
+        # [LOOSENED v3 — REGIME GATE OFF] enter on momentum alone (5m), regardless
+        # of daily regime, to maximise paper-trade activity for observation.
+        # WARNING: this is the ungated-scalper pattern that lost ~-99% live in a
+        # downtrend. Acceptable ONLY because this is dry-run. RE-ADD `regime_ok &`
+        # before ever going live.
         dataframe.loc[
-            regime_ok & momentum_ok & (dataframe["volume"] > 0),
+            momentum_ok & (dataframe["volume"] > 0),
             "enter_long",
         ] = 1
 

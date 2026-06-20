@@ -88,10 +88,14 @@ class ImprovedStrategyV4(IStrategy):
         # Be long whenever the trend is up (50d EMA above 200d EMA).
         # Freqtrade enters on the first up-day and simply holds until the exit
         # signal fires, so this captures an uptrend that's already underway too.
+        # [LOOSENED] long when 50d>200d (golden cross) OR price has reclaimed the
+        # 200d EMA (early uptrend) — fires on more pairs. Still daily timeframe,
+        # so cadence is inherently slow.
         dataframe.loc[
             (
-                (dataframe['ema_fast'] > dataframe['ema_slow']) &
-                (dataframe['volume'] > 0)
+                ((dataframe['ema_fast'] > dataframe['ema_slow'])
+                 | (dataframe['close'] > dataframe['ema_slow']))
+                & (dataframe['volume'] > 0)
             ),
             'enter_long'] = 1
         return dataframe

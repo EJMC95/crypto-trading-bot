@@ -72,8 +72,8 @@ class MomoBreakoutV1(IStrategy):
         # [LOOSENED v2] three entry paths (breakout / pullback / momentum-continuation).
         setup_ok = (
             (dataframe["close"] > dataframe["dc_high"])                                      # breakout
-            | ((dataframe["close"] < dataframe["pullback_low"]) & (dataframe["rsi"] < 55))   # pullback
-            | ((dataframe["close"] > dataframe["ema_trend"]) & (dataframe["rsi"] > 52))      # momentum continuation
+            | ((dataframe["close"] < dataframe["pullback_low"]) & (dataframe["rsi"] < 60))   # pullback (wider)
+            | ((dataframe["close"] > dataframe["ema_trend"]) & (dataframe["rsi"] > 50))      # momentum continuation
         )
         # [SIDEWAYS v2] range mean-reversion path: buy oversold REGARDLESS of trend,
         # so the bot works choppy/sideways markets (buy the dip, sell the rip below).

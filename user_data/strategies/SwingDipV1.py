@@ -98,10 +98,11 @@ class SwingDipV1(IStrategy):
         # [LOOSENED v2] macro gate: 50>200 OR price above the 200d.
         trend_ok = (dataframe["ema50"] > dataframe["ema200"]) | (dataframe["close"] > dataframe["ema200"])
         # [LOOSENED v2] dip paths widened (daily = naturally few signals):
+        # [LOOSENED] wider dip triggers (still daily timeframe = slow cadence).
         dip_ok = (
-            ((dataframe["rsi"] < 50) & (dataframe["close"] < dataframe["bb_lower"]))   # BB dip
-            | (dataframe["rsi"] < 35)                                                  # deep oversold
-            | ((dataframe["close"] < dataframe["ema50"]) & (dataframe["rsi"] < 45))    # ordinary pullback in uptrend
+            (dataframe["close"] < dataframe["bb_lower"])                               # any BB dip
+            | (dataframe["rsi"] < 45)                                                  # oversold-ish
+            | ((dataframe["close"] < dataframe["ema50"]) & (dataframe["rsi"] < 55))    # pullback below 50d
         )
         dataframe.loc[
             trend_ok & dip_ok & (dataframe["volume"] > 0),

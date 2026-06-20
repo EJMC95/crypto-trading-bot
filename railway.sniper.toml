@@ -1,0 +1,11 @@
+# Service-specific Railway config for the listing-sniper service ONLY.
+# Point the listing-sniper service's Config-as-code "Railway Config File"
+# setting at this file so it does NOT affect the other services in this repo.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python listing_sniper.py"
+# Always restart on any exit (crash or otherwise), with no retry cap.
+restartPolicyType = "always"

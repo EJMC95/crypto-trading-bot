@@ -135,11 +135,13 @@ def engine_bots():
     if os.path.exists(os.path.join(HERE, "listing_sniper.py")):
         engines.append({
             "kind": "engine", "name": "Listing Sniper",
-            "config": "listing_sniper.py", "exchange": "kraken",
-            "style": "new-listing paper sniper", "pairs_desc": "new USD pairs",
+            "config": "listing_sniper.py", "exchange": "top ~100 (CCXT)",
+            "style": "new-listing paper sniper", "pairs_desc": "new USD/USDT/USDC/EUR pairs",
             "dry_run": True, "data": "sniper trades CSV",
-            "desc": "Detects brand-new Kraken pairs and opens paper positions "
-                    "with TP/SL/max-hold. 100% dry-run, public endpoints only.",
+            "desc": "Detects brand-new spot pairs across the top ~100 exchanges "
+                    "(via CCXT, polled concurrently, best-effort skip) and opens "
+                    "paper positions with TP 5x / SL / max-hold. 100% dry-run, "
+                    "public endpoints only.",
         })
     if os.path.exists(os.path.join(HERE, "hyperliquid_momo_bot.py")):
         engines.append({

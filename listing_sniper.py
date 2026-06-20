@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
 """
-listing_sniper.py — DRY-RUN Kraken new-listing sniper / paper-trader.
+listing_sniper.py — DRY-RUN multi-exchange new-listing sniper / paper-trader.
 
 What it does
 ------------
-1. Snapshots every tradable pair on Kraken (public AssetPairs endpoint).
+1. Snapshots every tradable SPOT pair on each selected exchange (via the unified
+   CCXT public API — no keys, public endpoints only).
 2. Polls on an interval and detects pairs that did NOT exist in the snapshot
-   (i.e. brand-new listings) and become tradable ("online").
+   (i.e. brand-new listings) and are tradable ("active").
 3. On detection it opens a *paper* position at the current ask price and then
    tracks the price, closing the paper trade on take-profit, stop-loss, or a
    max-hold timeout. Every simulated trade is logged to a CSV.
 
+Exchanges are polled CONCURRENTLY and on a *best-effort* basis: any exchange
+whose public API is unreachable, geo-blocked, rate-limited, or otherwise errors
+is logged and skipped for that cycle — it never crashes the run. This is what
+lets us widen the search to the top ~100 exchanges at once.
+
 SAFETY
 ------
-This script is 100% DRY-RUN. It only ever calls Kraken PUBLIC endpoints
-(AssetPairs, Ticker). It NEVER reads an API key, NEVER authenticates, and
+This script is 100% DRY-RUN. It only ever calls PUBLIC endpoints (markets /
+tickers) through CCXT. It NEVER reads an API key, NEVER authenticates, and
 NEVER places a real order. You cannot lose money running it. Its only purpose
 is to find out whether a "buy the new listing" idea would have made or lost
 money on *live* future listings — the only honest way to test this, because a
@@ -29,47 +35,67 @@ Then run the monitor (leave it running; new listings are rare):
     python3 listing_sniper.py
 
 Useful flags:
-    --interval 30        seconds between polls (default 30; be polite to the API)
-    --quote USD          only snipe pairs quoted in this currency (default USD)
-    --tp-mult 10         take-profit as a MULTIPLE of entry; 10 = sell at 10x (default 10)
-    --sl 0.50            stop-loss, -50% (default); set 0 to disable and ride to 10x or zero
-    --max-hold 0         max minutes to hold; 0 = no time limit (default), so a 10x can run
+    --exchanges top100   which exchanges to search. "topN" = the N highest-volume
+                         exchanges CCXT supports (default top100), "all" = every
+                         CCXT exchange, or a comma list of CCXT ids
+                         (e.g. binance,coinbase,kraken).
+    --workers 12         how many exchanges to poll in parallel (default 12).
+    --interval 60        seconds between polls (default 60; be polite to the APIs)
+    --quote USD,USDT,USDC,EUR
+                         comma-separated quote currencies to snipe (default
+                         USD,USDT,USDC,EUR — a wider net than USD-only)
+    --tp-mult 5          take-profit as a MULTIPLE of entry; 5 = sell at 5x (default 5)
+    --sl 0.50            stop-loss, -50% (default); set 0 to disable and ride to 5x or zero
+    --max-hold 0         max minutes to hold; 0 = no time limit (default), so a 5x can run
     --stake 100          paper stake per trade in quote currency (default 100)
     --slippage-bps 30    simulated buy slippage in basis points (default 30)
     --any-status         open a paper trade as soon as the pair appears, even
-                         before Kraken flips it to "online" (more aggressive,
-                         less realistic).
+                         before the exchange flips it to "active" (more
+                         aggressive, less realistic).
 
 Files written (in ./sniper_data/):
-    known_pairs.json     baseline + every pair ever seen (so it never re-fires)
+    known_pairs.json     per-exchange baseline + every pair ever seen
     open_positions.json  currently-open paper trades (survives restarts)
-    sniper_trades.csv    closed paper-trade log (your results)
+    sniper_trades.csv     closed paper-trade log (your results)
 """
 
 import argparse
 import csv
-import json
 import os
+import re
+import json
 import signal
-import sys
 import time
-import urllib.request
-import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+
+import ccxt  # unified multi-exchange public API
 
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
 
-KRAKEN_BASE = "https://api.kraken.com/0/public"
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sniper_data")
 KNOWN_FILE = os.path.join(DATA_DIR, "known_pairs.json")
 OPEN_FILE = os.path.join(DATA_DIR, "open_positions.json")
+PENDING_FILE = os.path.join(DATA_DIR, "pending.json")
 TRADES_CSV = os.path.join(DATA_DIR, "sniper_trades.csv")
 
 # Bases we never want to "snipe" (stablecoins / wrapped fiat — not real launches)
 SKIP_BASES = {
     "USDT", "USDC", "DAI", "PYUSD", "USD", "EUR", "GBP", "AUD", "CAD", "CHF",
     "JPY", "ZUSD", "ZEUR", "ZGBP", "ZAUD", "ZCAD", "ZJPY", "USDG", "RLUSD",
+    "TUSD", "FDUSD", "USDD", "USDP", "GUSD", "EURT", "EURS", "BUSD",
 }
+
+# Rough global spot-volume ranking of major exchanges (CCXT ids). Anything not
+# in this list is appended in CCXT's own order to fill out "topN"/"all".
+CURATED = [
+    "binance", "bybit", "okx", "upbit", "coinbase", "kraken", "bitget", "gate",
+    "mexc", "htx", "kucoin", "cryptocom", "bitmart", "bingx", "bitfinex",
+    "gemini", "bitstamp", "binanceus", "poloniex", "bithumb", "bitvavo",
+    "whitebit", "coinex", "xt", "lbank", "ascendex", "bitrue", "probit",
+    "hitbtc", "digifinex", "latoken", "p2b", "bigone", "bitso", "bitbank",
+    "bitflyer", "woo", "phemex", "deribit", "kucoinfutures",
+]
 
 
 def now_utc():
@@ -80,42 +106,92 @@ def ts():
     return now_utc().strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-def http_get_json(url, timeout=20):
-    req = urllib.request.Request(url, headers={"User-Agent": "listing-sniper-dryrun/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
+# ----------------------------- exchange universe ----------------------------
+
+def build_universe():
+    """Ordered list of CCXT exchange ids: curated majors first, then the rest."""
+    seen = []
+    for e in CURATED:
+        if e in ccxt.exchanges and e not in seen:
+            seen.append(e)
+    for e in ccxt.exchanges:
+        if e not in seen:
+            seen.append(e)
+    return seen
 
 
-def kraken_asset_pairs():
-    """Return {pair_id: info_dict}. Raises on API error."""
-    d = http_get_json(f"{KRAKEN_BASE}/AssetPairs")
-    if d.get("error"):
-        raise RuntimeError(f"Kraken AssetPairs error: {d['error']}")
-    return d.get("result", {})
+def resolve_exchanges(spec):
+    """Resolve --exchanges into a concrete list of CCXT ids.
+
+    Accepts "topN" (e.g. top100), "all", or a comma-separated list of ids.
+    Unknown ids are warned about and dropped.
+    """
+    universe = build_universe()
+    spec = str(spec).strip().lower()
+    m = re.fullmatch(r"top\s*(\d+)", spec)
+    if m:
+        n = max(1, int(m.group(1)))
+        return universe[:n]
+    if spec in ("all", "*"):
+        return universe
+    ids, unknown = [], []
+    for part in spec.split(","):
+        e = part.strip().lower()
+        if not e:
+            continue
+        if e in ccxt.exchanges:
+            if e not in ids:
+                ids.append(e)
+        else:
+            unknown.append(e)
+    if unknown:
+        print(f"[warn] ignoring unknown exchange id(s): {', '.join(unknown)}")
+    return ids or universe[:10]
 
 
-def kraken_ticker(pair_id):
-    """Return ask/last as floats, or None if unavailable."""
-    url = f"{KRAKEN_BASE}/Ticker?pair={urllib.parse.quote(pair_id)}"
+def make_client(exid, cfg):
+    klass = getattr(ccxt, exid)
+    return klass({
+        "enableRateLimit": True,
+        "timeout": int(cfg["http_timeout"] * 1000),
+    })
+
+
+def fetch_spot_symbols(client):
+    """Return {symbol: market} for active SPOT markets on this exchange.
+
+    Forces a market reload so brand-new listings are seen. Raises on failure;
+    the caller treats any exception as "skip this exchange this cycle".
+    """
+    markets = client.load_markets(True)
+    out = {}
+    for sym, m in markets.items():
+        if not m.get("spot"):
+            continue
+        if m.get("active") is False:
+            continue
+        out[sym] = m
+    return out
+
+
+def get_price(client, sym):
+    """Return {'ask':float,'last':float} or None if no usable price yet."""
     try:
-        d = http_get_json(url)
-    except Exception as e:
-        print(f"  ! ticker fetch failed for {pair_id}: {e}")
+        t = client.fetch_ticker(sym)
+    except Exception:
         return None
-    if d.get("error"):
-        # New pairs sometimes 404 from Ticker for a few seconds; treat as "no data yet"
-        return None
-    res = d.get("result", {})
-    if not res:
-        return None
-    info = next(iter(res.values()))
+    ask = t.get("ask") or t.get("last") or t.get("close")
+    last = t.get("last") or t.get("close") or t.get("ask")
     try:
-        ask = float(info["a"][0])
-        last = float(info["c"][0])
-        return {"ask": ask, "last": last}
-    except (KeyError, IndexError, ValueError, TypeError):
+        ask, last = float(ask), float(last)
+    except (TypeError, ValueError):
         return None
+    if ask <= 0 or last <= 0:
+        return None
+    return {"ask": ask, "last": last}
 
+
+# ----------------------------- persistence ----------------------------------
 
 def load_json(path, default):
     if os.path.exists(path):
@@ -140,8 +216,8 @@ def ensure_csv_header():
     if not os.path.exists(TRADES_CSV):
         with open(TRADES_CSV, "w", newline="") as f:
             csv.writer(f).writerow([
-                "detected_at", "opened_at", "closed_at", "pair_id", "wsname",
-                "entry", "exit", "stake_quote", "pnl_pct", "pnl_quote",
+                "detected_at", "opened_at", "closed_at", "exchange", "pair_id",
+                "wsname", "entry", "exit", "stake_quote", "pnl_pct", "pnl_quote",
                 "reason", "hold_minutes", "peak_pct",
             ])
 
@@ -152,85 +228,54 @@ def log_trade(row):
         csv.writer(f).writerow(row)
 
 
-def pair_matches_quote(info, quote):
-    """Kraken quotes USD as 'ZUSD' (legacy) or 'USD' (newer). Match via wsname too."""
-    q = quote.upper()
-    quote_field = str(info.get("quote", "")).upper()
-    wsname = str(info.get("wsname", "")).upper()
-    altname = str(info.get("altname", "")).upper()
-    if quote_field in (q, "Z" + q):
-        return True
-    if wsname.endswith("/" + q):
-        return True
-    if altname.endswith(q):
-        return True
-    return False
+# ----------------------------- pair filters ---------------------------------
+
+def quote_matches(market, quotes):
+    return str(market.get("quote", "")).upper() in quotes
 
 
-def base_symbol(info):
-    ws = str(info.get("wsname", ""))
-    if "/" in ws:
-        return ws.split("/")[0].upper()
-    base = str(info.get("base", "")).upper()
-    # strip Kraken's legacy X/Z prefix on 4-char codes like XXBT, ZUSD
-    if len(base) == 4 and base[0] in ("X", "Z"):
-        return base[1:]
-    return base
+def base_skipped(market):
+    return str(market.get("base", "")).upper() in SKIP_BASES
 
 
-# ----------------------------- core loop ------------------------------------
+# ----------------------------- paper trading --------------------------------
 
-STOP = False
-
-
-def handle_sigint(signum, frame):
-    global STOP
-    STOP = True
-    print("\n[stop] finishing current cycle then exiting…")
-
-
-def seed_baseline():
-    pairs = kraken_asset_pairs()
-    known = {"ids": sorted(pairs.keys()), "seeded_at": ts()}
-    save_json(KNOWN_FILE, known)
-    print(f"[seed] baseline saved: {len(pairs)} pairs known as of {known['seeded_at']}")
-    print(f"[seed] file: {KNOWN_FILE}")
-    print("[seed] now run:  python3 listing_sniper.py")
-
-
-def open_position(pair_id, info, cfg, detected_at):
-    tk = kraken_ticker(pair_id)
-    if tk is None or tk["ask"] <= 0:
+def open_position(exid, client, sym, market, cfg, detected_at):
+    px = get_price(client, sym)
+    if px is None:
         return None  # no price yet; try again next cycle
     slip = cfg["slippage_bps"] / 10_000.0
-    entry = tk["ask"] * (1 + slip)  # simulate paying a bit above ask
+    entry = px["ask"] * (1 + slip)  # simulate paying a bit above ask
+    quote_ccy = str(market.get("quote", "")).upper() or cfg["quotes"][0]
     pos = {
-        "pair_id": pair_id,
-        "wsname": info.get("wsname", pair_id),
+        "exchange": exid,
+        "pair_id": sym,
+        "wsname": sym,
         "detected_at": detected_at,
         "opened_at": ts(),
         "opened_ts": time.time(),
         "entry": entry,
         "stake_quote": cfg["stake"],
+        "quote": quote_ccy,
         "peak": entry,
     }
     sl_txt = "none" if cfg["sl"] <= 0 else f"-{cfg['sl']*100:.0f}%"
-    print(f"  >> PAPER BUY {pos['wsname']} @ {entry:.8g}  "
-          f"(stake {cfg['stake']} {cfg['quote']}, tp {cfg['tp_mult']:.0f}x / sl {sl_txt})")
+    print(f"  >> PAPER BUY [{exid}] {sym} @ {entry:.8g}  "
+          f"(stake {cfg['stake']} {quote_ccy}, tp {cfg['tp_mult']:.0f}x / sl {sl_txt})")
     return pos
 
 
-def maybe_close(pos, cfg):
+def maybe_close(pos, client, cfg):
     """Return (closed_bool, row_or_None)."""
-    tk = kraken_ticker(pos["pair_id"])
-    if tk is None:
+    px = get_price(client, pos["pair_id"])
+    if px is None:
         return False, None
-    last = tk["last"]
+    last = px["last"]
     entry = pos["entry"]
     pos["peak"] = max(pos["peak"], last)
     held_min = (time.time() - pos["opened_ts"]) / 60.0
 
-    tp_price = entry * cfg["tp_mult"]  # e.g. 10x = sell at entry * 10
+    tp_price = entry * cfg["tp_mult"]  # e.g. 5x = sell at entry * 5
     reason = None
     exit_price = last
     if last >= tp_price:
@@ -247,88 +292,174 @@ def maybe_close(pos, cfg):
     pnl_quote = pos["stake_quote"] * pnl_pct
     peak_pct = (pos["peak"] / entry) - 1.0
     row = [
-        pos["detected_at"], pos["opened_at"], ts(), pos["pair_id"], pos["wsname"],
+        pos["detected_at"], pos["opened_at"], ts(), pos["exchange"],
+        pos["pair_id"], pos["wsname"],
         f"{entry:.10g}", f"{exit_price:.10g}", f"{pos['stake_quote']:.2f}",
         f"{pnl_pct*100:.2f}", f"{pnl_quote:.2f}", reason,
         f"{held_min:.1f}", f"{peak_pct*100:.2f}",
     ]
     emoji = "✅" if pnl_pct >= 0 else "❌"
-    print(f"  << PAPER SELL {pos['wsname']} @ {exit_price:.8g}  "
-          f"{emoji} {pnl_pct*100:+.2f}% ({pnl_quote:+.2f} {cfg['quote']})  [{reason}]")
+    quote_ccy = pos.get("quote", cfg["quotes"][0])
+    print(f"  << PAPER SELL [{pos['exchange']}] {pos['wsname']} @ {exit_price:.8g}  "
+          f"{emoji} {pnl_pct*100:+.2f}% ({pnl_quote:+.2f} {quote_ccy})  [{reason}]")
     return True, row
 
 
-def monitor(cfg):
+# ----------------------------- concurrency helper ---------------------------
+
+def poll_all(clients, cfg):
+    """Concurrently fetch {exid: {symbol: market}} for every client.
+
+    Returns (results, skipped) where skipped maps exid -> error string.
+    """
+    results, skipped = {}, {}
+    with ThreadPoolExecutor(max_workers=cfg["workers"]) as ex:
+        futs = {ex.submit(fetch_spot_symbols, c): exid for exid, c in clients.items()}
+        for fut in as_completed(futs):
+            exid = futs[fut]
+            try:
+                results[exid] = fut.result()
+            except Exception as e:
+                skipped[exid] = type(e).__name__
+    return results, skipped
+
+
+# ----------------------------- seed / monitor -------------------------------
+
+STOP = False
+
+
+def handle_sigint(signum, frame):
+    global STOP
+    STOP = True
+    print("\n[stop] finishing current cycle then exiting…")
+
+
+def build_clients(exchange_ids, cfg):
+    clients = {}
+    for exid in exchange_ids:
+        try:
+            clients[exid] = make_client(exid, cfg)
+        except Exception as e:
+            print(f"[warn] could not init {exid}: {type(e).__name__} — skipping")
+    return clients
+
+
+def seed_baseline(cfg, exchange_ids):
+    clients = build_clients(exchange_ids, cfg)
+    print(f"[seed] snapshotting {len(clients)} exchanges (concurrency {cfg['workers']})…")
+    results, skipped = poll_all(clients, cfg)
+    per_ex = {exid: sorted(syms.keys()) for exid, syms in results.items()}
+    known = {"exchanges": per_ex, "seeded_at": ts()}
+    save_json(KNOWN_FILE, known)
+    total = sum(len(v) for v in per_ex.values())
+    print(f"[seed] baseline saved: {total} spot pairs across {len(per_ex)} exchanges "
+          f"as of {known['seeded_at']}")
+    if skipped:
+        print(f"[seed] skipped {len(skipped)} unreachable/errored: "
+              f"{', '.join(sorted(skipped)[:15])}{' …' if len(skipped) > 15 else ''}")
+    print(f"[seed] file: {KNOWN_FILE}")
+    print("[seed] now run:  python3 listing_sniper.py")
+
+
+def monitor(cfg, exchange_ids):
     known = load_json(KNOWN_FILE, None)
-    if not known or "ids" not in known:
+    if not known or "exchanges" not in known:
         print("[!] No baseline found. Seeding now so we don't fire on every existing pair…")
-        seed_baseline()
+        seed_baseline(cfg, exchange_ids)
         return
-    known_ids = set(known["ids"])
-    print(f"[start] DRY-RUN monitor. {len(known_ids)} pairs in baseline "
-          f"(seeded {known.get('seeded_at','?')}).")
+
+    baseline = {exid: set(syms) for exid, syms in known["exchanges"].items()}
+    clients = build_clients(exchange_ids, cfg)
+    # Make sure every selected exchange has a baseline entry (new ones get seeded
+    # on first sight rather than firing on their whole existing pair list).
+    newly_tracked = [e for e in clients if e not in baseline]
+
     sl_txt = "none" if cfg["sl"] <= 0 else f"-{cfg['sl']*100:.0f}%"
     hold_txt = "none" if cfg["max_hold"] <= 0 else f"{cfg['max_hold']}m"
-    print(f"[start] quote={cfg['quote']}  interval={cfg['interval']}s  "
-          f"tp={cfg['tp_mult']:.0f}x  sl={sl_txt}  "
+    print(f"[start] DRY-RUN multi-exchange monitor. {len(clients)} exchanges, "
+          f"baseline seeded {known.get('seeded_at','?')}.")
+    print(f"[start] quotes={','.join(cfg['quotes'])}  interval={cfg['interval']}s  "
+          f"workers={cfg['workers']}  tp={cfg['tp_mult']:.0f}x  sl={sl_txt}  "
           f"max_hold={hold_txt}  stake={cfg['stake']}")
+    if newly_tracked:
+        print(f"[start] {len(newly_tracked)} newly-added exchange(s) will be "
+              f"baselined on first poll (no fire on existing pairs).")
     print("[start] No real orders are ever placed. Ctrl-C to stop.\n")
 
-    pending = load_json(os.path.join(DATA_DIR, "pending.json"), {})  # id -> first_seen
+    pending = load_json(PENDING_FILE, {})   # "exid|symbol" -> first_seen
     positions = load_json(OPEN_FILE, [])
 
     while not STOP:
         cycle_start = time.time()
-        try:
-            pairs = kraken_asset_pairs()
-        except Exception as e:
-            print(f"[{ts()}] AssetPairs fetch failed: {e} — retrying next cycle")
+        results, skipped = poll_all(clients, cfg)
+        if not results:
+            print(f"[{ts()}] all {len(clients)} exchanges unreachable this cycle — "
+                  f"retrying in {cfg['interval']}s")
             time.sleep(cfg["interval"])
             continue
 
-        current_ids = set(pairs.keys())
-        new_ids = current_ids - known_ids
-
-        for pid in sorted(new_ids):
-            info = pairs[pid]
-            ws = info.get("wsname", pid)
-            if not pair_matches_quote(info, cfg["quote"]):
-                known_ids.add(pid)  # not our quote; remember and ignore
+        total_pairs = 0
+        new_detected = 0
+        for exid, syms in results.items():
+            total_pairs += len(syms)
+            base = baseline.get(exid)
+            if base is None:
+                # First time we see this exchange: baseline it, don't fire.
+                baseline[exid] = set(syms.keys())
                 continue
-            if base_symbol(info) in SKIP_BASES:
-                known_ids.add(pid)
-                continue
-            if pid not in pending:
-                pending[pid] = ts()
-                print(f"[{ts()}] 🆕 NEW PAIR DETECTED: {ws} "
-                      f"(status={info.get('status','?')})")
+            for sym in set(syms.keys()) - base:
+                market = syms[sym]
+                if not quote_matches(market, set(cfg["quotes"])):
+                    base.add(sym)  # not our quote; remember and ignore
+                    continue
+                if base_skipped(market):
+                    base.add(sym)
+                    continue
+                key = f"{exid}|{sym}"
+                if key not in pending:
+                    pending[key] = ts()
+                    new_detected += 1
+                    print(f"[{ts()}] 🆕 NEW PAIR: [{exid}] {sym} "
+                          f"(status={market.get('active')})")
 
         # Promote pending -> open paper position when tradable
         still_pending = {}
-        for pid, first_seen in pending.items():
-            info = pairs.get(pid)
-            if info is None:
+        for key, first_seen in pending.items():
+            exid, sym = key.split("|", 1)
+            syms = results.get(exid)
+            client = clients.get(exid)
+            if syms is None or client is None:
+                # exchange unreachable this cycle; keep pending for later
+                still_pending[key] = first_seen
+                continue
+            market = syms.get(sym)
+            if market is None:
                 continue  # vanished; drop it
-            status = str(info.get("status", "")).lower()
-            tradable = status == "online" or cfg["any_status"]
-            if tradable:
-                pos = open_position(pid, info, cfg, first_seen)
-                if pos:
-                    positions.append(pos)
-                    known_ids.add(pid)  # done with detection for this pair
-                else:
-                    still_pending[pid] = first_seen  # no price yet, keep trying
+            tradable = (market.get("active") is not False) or cfg["any_status"]
+            if not tradable:
+                still_pending[key] = first_seen
+                continue
+            pos = open_position(exid, client, sym, market, cfg, first_seen)
+            if pos:
+                positions.append(pos)
+                baseline.setdefault(exid, set()).add(sym)  # done detecting this pair
             else:
-                still_pending[pid] = first_seen
+                still_pending[key] = first_seen  # no price yet, keep trying
         pending = still_pending
 
         # Manage open paper trades
         remaining = []
         for pos in positions:
+            client = clients.get(pos["exchange"])
+            if client is None:
+                remaining.append(pos)  # exchange not in this run; hold position
+                continue
             try:
-                closed, row = maybe_close(pos, cfg)
+                closed, row = maybe_close(pos, client, cfg)
             except Exception as e:
-                print(f"  ! error managing {pos.get('wsname')}: {e}")
+                print(f"  ! error managing [{pos.get('exchange')}] "
+                      f"{pos.get('wsname')}: {e}")
                 remaining.append(pos)
                 continue
             if closed:
@@ -338,16 +469,20 @@ def monitor(cfg):
         positions = remaining
 
         # Persist state every cycle so restarts are safe
-        save_json(KNOWN_FILE, {"ids": sorted(known_ids),
-                               "seeded_at": known.get("seeded_at", ts())})
+        save_json(KNOWN_FILE, {
+            "exchanges": {e: sorted(s) for e, s in baseline.items()},
+            "seeded_at": known.get("seeded_at", ts()),
+        })
         save_json(OPEN_FILE, positions)
-        save_json(os.path.join(DATA_DIR, "pending.json"), pending)
+        save_json(PENDING_FILE, pending)
 
         # Heartbeat
-        open_n = len(positions)
-        pend_n = len(pending)
-        print(f"[{ts()}] ok — {len(current_ids)} pairs | "
-              f"open paper trades: {open_n} | pending: {pend_n}", flush=True)
+        ok_n = len(results)
+        skip_n = len(skipped)
+        print(f"[{ts()}] ok — {ok_n}/{len(clients)} exchanges | "
+              f"{total_pairs} pairs | new this cycle: {new_detected} | "
+              f"open: {len(positions)} | pending: {len(pending)} | "
+              f"skipped: {skip_n}", flush=True)
 
         # Publish a snapshot for the live dashboard (guarded; never raises).
         realized, nclosed, wins = 0.0, 0, 0
@@ -365,9 +500,10 @@ def monitor(cfg):
         except Exception:
             pass
         store.publish("listing-sniper", status="online",
-                      pnl_abs=realized, open_trades=open_n,
+                      pnl_abs=realized, open_trades=len(positions),
                       closed_trades=nclosed, wins=wins, losses=nclosed - wins,
-                      extra={"pending": pend_n})
+                      extra={"pending": len(pending), "exchanges_ok": ok_n,
+                             "exchanges_skipped": skip_n})
 
         # Sleep the remainder of the interval
         elapsed = time.time() - cycle_start
@@ -377,40 +513,59 @@ def monitor(cfg):
 
 
 def main():
-    p = argparse.ArgumentParser(description="DRY-RUN Kraken new-listing paper-trader")
+    p = argparse.ArgumentParser(description="DRY-RUN multi-exchange new-listing paper-trader")
     p.add_argument("--seed", action="store_true",
                    help="Snapshot current pairs as baseline, then exit.")
-    p.add_argument("--interval", type=float, default=30, help="Seconds between polls.")
-    p.add_argument("--quote", default="USD", help="Quote currency to snipe (default USD).")
-    p.add_argument("--tp-mult", type=float, default=10.0,
-                   help="Take-profit as a MULTIPLE of entry (10.0 = sell at 10x). Default 10x.")
+    p.add_argument("--exchanges", default="top100",
+                   help='Which exchanges to search: "topN" (default top100), '
+                        '"all", or a comma list of CCXT ids.')
+    p.add_argument("--workers", type=int, default=12,
+                   help="How many exchanges to poll in parallel (default 12).")
+    p.add_argument("--interval", type=float, default=60, help="Seconds between polls.")
+    p.add_argument("--http-timeout", type=float, default=20,
+                   help="Per-request timeout in seconds (default 20).")
+    p.add_argument("--quote", default="USD,USDT,USDC,EUR",
+                   help="Comma-separated quote currencies to snipe "
+                        "(default USD,USDT,USDC,EUR — wider than USD-only).")
+    p.add_argument("--tp-mult", type=float, default=5.0,
+                   help="Take-profit as a MULTIPLE of entry (5.0 = sell at 5x). Default 5x.")
     p.add_argument("--sl", type=float, default=0.50,
-                   help="Stop-loss fraction (0.50=-50%%). Set 0 to disable (ride to 10x or zero).")
+                   help="Stop-loss fraction (0.50=-50%%). Set 0 to disable (ride to 5x or zero).")
     p.add_argument("--max-hold", type=float, default=0,
-                   help="Max hold in minutes; 0 = no time limit (default), so a 10x can run.")
+                   help="Max hold in minutes; 0 = no time limit (default), so a 5x can run.")
     p.add_argument("--stake", type=float, default=100, help="Paper stake per trade (quote ccy).")
     p.add_argument("--slippage-bps", type=float, default=30,
                    help="Simulated buy slippage in basis points (30=0.30%%).")
     p.add_argument("--any-status", action="store_true",
-                   help="Open paper trade as soon as pair appears (not just when 'online').")
+                   help="Open paper trade as soon as pair appears (not just when active).")
     args = p.parse_args()
 
     print("=" * 64)
-    print(" KRAKEN LISTING SNIPER — DRY-RUN (no keys, no real orders)")
+    print(" MULTI-EXCHANGE LISTING SNIPER — DRY-RUN (no keys, no real orders)")
     print("=" * 64)
 
-    if args.seed:
-        seed_baseline()
-        return
-
+    quotes = [q.strip().upper() for q in str(args.quote).split(",") if q.strip()]
+    if not quotes:
+        quotes = ["USD"]
     cfg = {
-        "interval": args.interval, "quote": args.quote,
+        "exchanges": args.exchanges, "workers": max(1, args.workers),
+        "interval": args.interval, "http_timeout": args.http_timeout,
+        "quotes": quotes,
         "tp_mult": args.tp_mult, "sl": args.sl,
         "max_hold": args.max_hold, "stake": args.stake,
         "slippage_bps": args.slippage_bps, "any_status": args.any_status,
     }
+
+    exchange_ids = resolve_exchanges(args.exchanges)
+    print(f"[cfg] searching {len(exchange_ids)} exchanges: "
+          f"{', '.join(exchange_ids[:12])}{' …' if len(exchange_ids) > 12 else ''}")
+
+    if args.seed:
+        seed_baseline(cfg, exchange_ids)
+        return
+
     signal.signal(signal.SIGINT, handle_sigint)
-    monitor(cfg)
+    monitor(cfg, exchange_ids)
 
 
 if __name__ == "__main__":

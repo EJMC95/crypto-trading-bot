@@ -1,9 +1,20 @@
-# Kraken Listing Sniper (DRY-RUN)
+# Multi-Exchange Listing Sniper (DRY-RUN)
 
-A standalone paper-trader that watches Kraken for **brand-new coin listings** and
-simulates buying them, to find out whether a "buy the new listing" strategy
-would make or lose money. It is **100% dry-run**: public endpoints only, no API
-keys, no real orders. You cannot lose money running it.
+A standalone paper-trader that watches the **top ~100 exchanges** (via CCXT) for
+**brand-new coin listings** and simulates buying them, to find out whether a
+"buy the new listing" strategy would make or lose money. It is **100% dry-run**:
+public endpoints only, no API keys, no real orders. You cannot lose money running
+it.
+
+Exchanges are polled **concurrently** and on a **best-effort** basis — any
+exchange that is unreachable, geo-blocked, or rate-limited is logged and skipped
+for that cycle rather than crashing the run. Requires `ccxt` (already in
+`requirements.txt`).
+
+> **Geo note:** several top-volume exchanges (Binance, Bybit, OKX, MEXC, HTX)
+> block US IPs on their main domains. Run from a non-US region for full coverage,
+> or pass a custom `--exchanges` list of ones reachable from your location. Blocked
+> exchanges simply get skipped — they won't break the run.
 
 ## Why this isn't a Freqtrade strategy
 
@@ -19,12 +30,13 @@ trade them as they happen. That's what this script does.
 ```bash
 cd "~/Claude/Projects/Crypto Trading Bot"
 
-# 1. Snapshot everything currently listed (run once). Without this it would
-#    "detect" every existing pair as new and fire hundreds of paper trades.
+# 1. Snapshot everything currently listed across all selected exchanges (run
+#    once). Without this it would "detect" every existing pair as new and fire
+#    thousands of paper trades.
 python3 listing_sniper.py --seed
 
-# 2. Leave the monitor running. New Kraken listings are rare (days/weeks apart),
-#    so this is a long-running watch.
+# 2. Leave the monitor running. New listings are rare per-exchange, but across
+#    ~100 exchanges they show up more often. This is a long-running watch.
 python3 listing_sniper.py
 ```
 
@@ -33,44 +45,52 @@ picks up where it left off.
 
 ## What it does each cycle
 
-1. Pulls the full list of Kraken pairs (`AssetPairs`).
-2. Flags any pair not in your baseline as a **new listing**.
-3. Waits until Kraken marks it tradable (`status: online`), then records a
+1. Pulls the full spot-pair list from each selected exchange **in parallel**
+   (via CCXT `load_markets`), skipping any exchange that errors this cycle.
+2. Flags any pair not in that exchange's baseline as a **new listing**.
+3. Waits until the exchange marks it tradable (`active`), then records a
    **paper buy** at the current ask (+ simulated slippage).
 4. Tracks the price and closes the paper trade on:
-   - **take-profit: sells automatically at 10x entry** (default `--tp-mult 10`)
-   - **stop-loss** (default −50%; set `--sl 0` to ride all the way to 10x or zero)
-   - **max-hold** timeout (default **off** — no time limit, so a 10x can run)
-5. Logs every closed trade to `sniper_data/sniper_trades.csv`.
+   - **take-profit: sells automatically at 5x entry** (default `--tp-mult 5`)
+   - **stop-loss** (default −50%; set `--sl 0` to ride all the way to 5x or zero)
+   - **max-hold** timeout (default **off** — no time limit, so a 5x can run)
+5. Logs every closed trade (with its source exchange) to
+   `sniper_data/sniper_trades.csv`.
 
 ## Tuning
 
 ```bash
 python3 listing_sniper.py \
-  --interval 30 \      # seconds between polls
-  --quote USD \        # only snipe USD-quoted pairs
-  --tp-mult 10 \       # SELL AT 10x entry (default)
+  --exchanges top100 \ # topN, "all", or a comma list of CCXT ids
+  --workers 12 \       # exchanges polled in parallel
+  --interval 60 \      # seconds between polls
+  --quote USD,USDT,USDC,EUR \  # quote currencies to snipe
+  --tp-mult 5 \        # SELL AT 5x entry (default)
   --sl 0.50 \          # -50% stop-loss; use 0 to disable
-  --max-hold 0 \       # 0 = no time limit (let a 10x run); set minutes to cap
+  --max-hold 0 \       # 0 = no time limit (let a 5x run); set minutes to cap
   --stake 100 \        # paper money per trade
   --slippage-bps 30    # assume you pay 0.30% above ask
 ```
 
-`--any-status` opens the paper trade the instant a pair appears, before Kraken
-flips it to "online" — more aggressive, less realistic. Leave it off to start.
+Narrow to specific exchanges with e.g. `--exchanges binance,coinbase,kraken`.
+`--any-status` opens the paper trade the instant a pair appears, before the
+exchange flips it to active — more aggressive, less realistic. Leave it off to
+start.
 
-### About the 10x target — read this
+### About the 5x target — read this
 
-Selling at 10x is a **lottery-ticket / venture strategy**, not a steady one.
-The overwhelming majority of new listings never 10x; many fade or go to near-
-zero. The whole bet is that one rare 10x pays for many losers. That only works
+Selling at 5x is still a **lottery-ticket / venture strategy**, not a steady one.
+The overwhelming majority of new listings never 5x; many fade or go to near-
+zero. The whole bet is that one rare 5x pays for many losers. That only works
 if you *let losers run* somewhat (hence the wide −50% default stop and no time
-limit) **and** if 10x's actually happen often enough — which is exactly the
+limit) **and** if 5x's actually happen often enough — which is exactly the
 unknown this paper-trader exists to measure. Concretely: at a −50% stop and a
-100-unit stake, one 10x (+900) covers ~18 full losers (−50 each). If fewer than
-~1 in 18 of your detected listings 10x, this loses money. Watch the CSV before
-believing in it. Want fewer-but-bigger or more-but-smaller exits? Lower
-`--tp-mult` (e.g. 3 = sell at 3x) to bank gains more often.
+100-unit stake, one 5x (+400) covers ~8 full losers (−50 each). If fewer than
+~1 in 8 of your detected listings 5x, this loses money. A 5x target should hit
+more often than the old 10x, banking gains sooner. Watch the CSV before
+believing in it. Want fewer-but-bigger or more-but-smaller exits? Raise
+`--tp-mult` (e.g. 10 = sell at 10x) for rarer/bigger wins, or lower it (e.g. 3 =
+sell at 3x) to bank gains more often.
 
 ## Reading your results
 
@@ -89,7 +109,7 @@ too early; if most trades hit `stop_loss`, the idea likely has no edge.
 
 ## Honest limitations — read before trusting this
 
-- **Latency.** This polls a public REST endpoint every ~30s. Real listing
+- **Latency.** This polls public REST endpoints every ~60s. Real listing
   snipers use websockets, pre-listing announcement scraping, and co-located
   servers, and still get front-run. By the time REST shows the pair, the first
   move may be over. Treat the paper fills as **optimistic**.

@@ -7,5 +7,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile.arb"
 
 [deploy]
-# Keep the paper-trading engine running; restart on any crash.
+# Always restart the paper-trading engine on any exit (crash or otherwise),
+# with no retry cap — keep it running indefinitely.
 restartPolicyType = "always"

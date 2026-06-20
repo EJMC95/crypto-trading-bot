@@ -1,0 +1,11 @@
+# Service-specific Railway config for the momo-bot service ONLY.
+# Point the momo-bot service's Config-as-code "Railway Config File" setting at
+# this file so it does NOT affect the other services sharing this repo.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python hyperliquid_momo_bot.py"
+# Always restart on any exit (crash or otherwise), with no retry cap.
+restartPolicyType = "always"

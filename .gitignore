@@ -5,6 +5,7 @@
 *.key
 *.pem
 secrets.json
+CREDENTIALS_REFERENCE.md
 
 # ---- Python ----
 __pycache__/
@@ -20,6 +21,10 @@ env/
 data/
 *.sqlite
 *.db
+
+# ---- Sniper / digest runtime state (machine-local; Railway seeds its own) ----
+sniper_data/
+reports/
 
 # ---- Backups / editor / OS cruft ----
 *.bak

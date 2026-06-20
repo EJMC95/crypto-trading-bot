@@ -70,9 +70,12 @@ class TrendMomoV1(IStrategy):
         # uptrend. Now: long whenever sma_fast > sma_slow (momentum is up). Freqtrade
         # won't double-enter an already-open pair; exit still triggers on the
         # down-cross below, so the trend-follow behaviour is preserved.
+        # [LOOSENED] long when 20>50 SMA (momentum up) OR price above the slow SMA
+        # (early momentum) — fires on more pairs. Daily timeframe = slow cadence.
         dataframe.loc[
             (
-                (dataframe["sma_fast"] > dataframe["sma_slow"])
+                ((dataframe["sma_fast"] > dataframe["sma_slow"])
+                 | (dataframe["close"] > dataframe["sma_slow"]))
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",
