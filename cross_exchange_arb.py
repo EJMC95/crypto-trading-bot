@@ -84,6 +84,14 @@ QUOTE_WHITELIST = {"USD", "USDT", "USDC", "EUR"}
 # near-misses but high enough to bound book fetches.
 PREFILTER_GAP = 0.0020   # 0.20% raw last/mid price gap between venues
 
+# Cross-venue gaps larger than this are treated as DATA ARTIFACTS, not real
+# arbitrage, and are skipped entirely (never book-checked, never booked). On a
+# widest-net scan the big "edges" are almost always a ticker-symbol collision
+# (the same string is a DIFFERENT asset on each venue, e.g. an obscure "VELO"
+# or "SUP") or a stale/illiquid last price. Genuine cross-exchange edges on the
+# same real asset are sub-1%; anything above this ceiling is noise.
+MAX_PLAUSIBLE_GAP = 0.05   # 5%
+
 # Hard cap on order books fetched per scan (2 per confirmed pair). Rate guard.
 MAX_BOOK_FETCHES = 30
 
@@ -314,6 +322,7 @@ def run_live(once=False):
             # slippage are applied in Stage 2 from order books.
             ranked = []
             best_top = None  # (gap, symbol, buy_ex, sell_ex)
+            artifacts = 0    # implausible gaps skipped as data noise
             for symbol, exmarkets in sym_map.items():
                 refs = ref_prices(symbol, exmarkets, tickers_by_ex)
                 if len(refs) < 2:
@@ -323,6 +332,9 @@ def run_live(once=False):
                 if buy_ex == sell_ex or refs[buy_ex] <= 0:
                     continue
                 gap = refs[sell_ex] / refs[buy_ex] - 1.0
+                if gap > MAX_PLAUSIBLE_GAP:
+                    artifacts += 1   # symbol collision / stale price — ignore
+                    continue
                 if best_top is None or gap > best_top[0]:
                     best_top = (gap, symbol, buy_ex, sell_ex)
                 if gap >= PREFILTER_GAP:
@@ -381,7 +393,8 @@ def run_live(once=False):
                 summary = "no priceable pairs"
             print(
                 f"[{now_iso()}] {len(sym_map)} pairs | {len(ranked)} passed prefilter "
-                f"| {fetches} books pulled | {summary} | {time.time()-t0:.1f}s"
+                f"| {artifacts} artifacts skipped | {fetches} books pulled "
+                f"| {summary} | {time.time()-t0:.1f}s"
             )
 
             # Heartbeat row so the CSV/dashboard always has trend data.
