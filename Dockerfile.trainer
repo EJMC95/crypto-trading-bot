@@ -9,12 +9,15 @@ USER root
 # git is needed so the trainer can pull the latest strategies and push promoted params.
 RUN apt-get update && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
+# psycopg2 so the trainer's trade analyzer can read per-trade history from Postgres.
+RUN pip install --no-cache-dir psycopg2-binary
 
 # Bake in configs + strategies + the trainer (used in SHADOW mode when no token;
 # when GITHUB_TOKEN is set the trainer clones a fresh copy at runtime instead).
 COPY user_data /app/user_data
 COPY config_v5_kraken.json config_v6_swing.json config_v7_momo.json /app/
 COPY freqtrade_retrain.py /app/freqtrade_retrain.py
+COPY trade_analyzer.py bot_pnl_store.py /app/
 COPY trainer_entry.sh /app/trainer_entry.sh
 RUN chown -R ftuser:ftuser /app && chmod +x /app/trainer_entry.sh
 

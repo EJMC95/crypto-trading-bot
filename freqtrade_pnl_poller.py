@@ -76,6 +76,15 @@ def poll_one(name, port):
             losses=profit.get("losing_trades"),
             extra={"src": "freqtrade", "port": port},
         )
+        # Persist per-trade history (durable in Postgres so it survives redeploys;
+        # the trainer's analyzer reads this for the win/loss deep dive).
+        try:
+            tr = _req(f"http://127.0.0.1:{port}/api/v1/trades?limit=500", headers=h)
+            trades = tr.get("trades", tr) if isinstance(tr, dict) else tr
+            if isinstance(trades, list):
+                store.publish_trades(name, trades)
+        except Exception:
+            pass
         return True
     except Exception as e:
         # Bot not up yet / API not ready — record as starting, keep going.

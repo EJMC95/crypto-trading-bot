@@ -170,8 +170,12 @@ def better(cand, inc):
     """Out-of-sample promotion rule."""
     if cand is None or cand["trades"] < MIN_TRADES:
         return False, f"candidate has too few trades ({cand['trades'] if cand else 'n/a'} < {MIN_TRADES})"
+    # Hard rule: never adopt a config that isn't actually profitable out-of-sample,
+    # even if it "loses less" than the incumbent. We only switch to winners.
+    if cand["profit_total"] <= 0:
+        return False, f"candidate not profitable out-of-sample ({cand['profit_total']:.4f}); not adopting"
     if inc is None:
-        return cand["profit_total"] > 0, "no incumbent metrics; promote only if candidate is profitable"
+        return True, "no incumbent metrics; candidate is profitable out-of-sample"
     if cand["profit_total"] <= inc["profit_total"]:
         return False, (f"candidate profit {cand['profit_total']:.4f} "
                        f"not above incumbent {inc['profit_total']:.4f}")
@@ -288,6 +292,14 @@ def _git_push(wd, strat, pfile, cand, inc):
 
 
 def cycle():
+    # In-depth win/loss post-mortem of the bots' real (paper) trades first — it
+    # informs what we're tuning and surfaces recommendations in the logs.
+    try:
+        import trade_analyzer
+        trade_analyzer.run_analysis(log=log)
+    except Exception as e:  # noqa: BLE001
+        log(f"trade analysis skipped: {e}")
+
     wd, can_push = workdir_setup()
     train, holdout = timeranges()
     log(f"workdir={wd} push={'on' if (can_push and PROMOTE) else 'SHADOW'} "
