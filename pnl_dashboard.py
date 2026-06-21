@@ -51,6 +51,23 @@ def fetch_rows():
         conn.close()
 
 
+def fetch_analysis():
+    """Return {strategy: {updated_at, analysis}} from bot_trade_analysis."""
+    import psycopg2
+    import psycopg2.extras
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('public.bot_trade_analysis') AS t")
+            if cur.fetchone()["t"] is None:
+                return {}
+            cur.execute("SELECT strategy, updated_at, analysis FROM bot_trade_analysis "
+                        "ORDER BY strategy")
+            return {r["strategy"]: r for r in cur.fetchall()}
+    finally:
+        conn.close()
+
+
 def money(x):
     try:
         return f"{float(x):+,.2f}"
@@ -171,7 +188,7 @@ def render():
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
 <header>
- <h1>Crypto Bots — live P&amp;L</h1>
+ <h1>Crypto Bots — live P&amp;L &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">what they're learning →</a></h1>
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
    <span>Total P&amp;L <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b></span>
@@ -183,6 +200,104 @@ def render():
 <div class="grid">{"".join(cards)}</div>
 <footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
+</body></html>'''
+
+
+def _slice_table(title, sl):
+    if not sl:
+        return ""
+    # show the few best and worst rows by total_ratio
+    items = list(sl.items())
+    rowshtml = []
+    for k, v in items:
+        rowshtml.append(
+            f'<tr><td>{html.escape(str(k))}</td><td>{v.get("n")}</td>'
+            f'<td>{float(v.get("win_rate",0))*100:.0f}%</td>'
+            f'<td class="{cls(v.get("total_ratio"))}">{float(v.get("total_ratio",0))*100:+.2f}%</td></tr>')
+    return (f'<div class="sub">{html.escape(title)}</div>'
+            f'<table class="tbl"><tr><th>bucket</th><th>n</th><th>win</th><th>total</th></tr>'
+            f'{"".join(rowshtml)}</table>')
+
+
+def learning_card(strategy, rec):
+    a = rec.get("analysis") or {}
+    age, stale = age_str(rec.get("updated_at"))
+    bots = ", ".join(a.get("bots", []))
+    if not a or a.get("n", 0) == 0:
+        return (f'<div class="card"><h2>{html.escape(strategy)}</h2>'
+                f'<div class="muted">{html.escape(bots)} · updated {html.escape(age)}</div>'
+                f'<div class="muted" style="margin-top:8px">No closed trades analysed yet — '
+                f'history accrues as the bots trade (4h strategies are slow).</div></div>')
+    pf = a.get("profit_factor")
+    pf_s = "∞" if pf in (None, float("inf")) else f'{pf}'
+    headline = (
+        f'<div class="row"><span>Trades</span><b>{a.get("n")}</b></div>'
+        f'<div class="row"><span>Win rate</span><b>{float(a.get("win_rate",0))*100:.0f}%</b></div>'
+        f'<div class="row"><span>Expectancy / trade</span>'
+        f'<b class="{cls(a.get("expectancy"))}">{float(a.get("expectancy",0))*100:+.2f}%</b></div>'
+        f'<div class="row"><span>Profit factor</span><b>{pf_s}</b></div>'
+        f'<div class="row"><span>Total return</span>'
+        f'<b class="{cls(a.get("total_return_ratio"))}">{float(a.get("total_return_ratio",0))*100:+.2f}%</b></div>'
+        f'<div class="row"><span>Best / worst</span>'
+        f'<b>{float(a.get("best",0))*100:+.1f}% / {float(a.get("worst",0))*100:+.1f}%</b></div>'
+    )
+    recs = "".join(f'<li>{html.escape(r)}</li>' for r in a.get("recommendations", []))
+    recs_html = f'<div class="sub">What it learned</div><ul class="recs">{recs}</ul>' if recs else ""
+    return f'''<div class="card">
+      <h2>{html.escape(strategy)}</h2>
+      <div class="muted">{html.escape(bots)} · updated {html.escape(age)}{" · STALE" if stale else ""}</div>
+      {headline}
+      {recs_html}
+      {_slice_table("By exit reason", a.get("by_exit_reason"))}
+      {_slice_table("By pair", a.get("by_pair"))}
+    </div>'''
+
+
+def render_learning():
+    try:
+        data = fetch_analysis()
+        db_err = None
+    except Exception as e:
+        data, db_err = {}, f"{type(e).__name__}: {e}"
+    banner = ""
+    if db_err:
+        banner = f'<div class="banner">Database unreachable: {html.escape(db_err)}.</div>'
+    elif not data:
+        banner = ('<div class="banner">No analysis yet. The trainer writes this once a day '
+                  'after the bots have closed some trades.</div>')
+    cards = "".join(learning_card(s, r) for s, r in data.items())
+    return f'''<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+<title>Crypto Bots — Learning</title>
+<style>
+ body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
+ header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
+ h1{{margin:0 0 6px;font-size:18px}}
+ a{{color:#58a6ff;text-decoration:none;font-size:13px}}
+ .banner{{margin:12px 14px 0;padding:10px 12px;background:#3d2b12;border:1px solid #6b4a16;border-radius:8px;color:#f0c674;font-size:13px}}
+ .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;padding:14px}}
+ .card{{background:#161b22;border:1px solid #222;border-radius:10px;padding:14px}}
+ .card h2{{margin:0 0 2px;font-size:15px}}
+ .row{{display:flex;justify-content:space-between;margin:5px 0;font-size:13px}}
+ .sub{{margin:12px 0 4px;font-size:12px;color:#8b949e;font-weight:600}}
+ .muted{{color:#8b949e;font-size:12px}}
+ .pos{{color:#3fb950}} .neg{{color:#f85149}}
+ ul.recs{{margin:4px 0 0;padding-left:18px}} ul.recs li{{font-size:12px;margin:4px 0;color:#cdd9e5}}
+ table.tbl{{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0 2px}}
+ table.tbl th,table.tbl td{{text-align:left;padding:3px 6px;border-bottom:1px solid #21262d}}
+ table.tbl th{{color:#8b949e;font-weight:600}}
+ footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
+</style></head><body>
+<header>
+ <h1>Crypto Bots — what they're learning</h1>
+ <a href="/">← back to live P&amp;L</a>
+</header>
+{banner}
+<div class="grid">{cards}</div>
+<footer>Win/loss post-mortem written daily by the auto-retrainer. Returns are paper
+(dry-run). Recommendations marked for review are NOT auto-applied; only out-of-sample-
+validated parameter changes are. Auto-refreshes every 2 min. Times UTC.</footer>
 </body></html>'''
 
 
@@ -227,7 +342,8 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(b"Auth required")
             return
         try:
-            body = render().encode()
+            body = (render_learning() if self.path.startswith("/learning")
+                    else render()).encode()
         except Exception as e:
             body = f"<pre>dashboard error: {html.escape(str(e))}</pre>".encode()
         self.send_response(200)

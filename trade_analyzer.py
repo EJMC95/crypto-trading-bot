@@ -193,9 +193,15 @@ def run_analysis(log=print):
             f"best={s['best']:+.4f} worst={s['worst']:+.4f}")
         log(f"  by exit_reason: {s['by_exit_reason']}")
         log(f"  by pair: {s['by_pair']}")
-        for r in recommendations(s):
+        recs = recommendations(s)
+        for r in recs:
             log(f"  • {r}")
-        store.store_analysis(strat, s)
+        # Persist stats + recommendations + the bots covered, so the dashboard
+        # 'Learning' page can render them without recomputing.
+        payload = dict(s)
+        payload["recommendations"] = recs
+        payload["bots"] = bots
+        store.store_analysis(strat, payload)
     return results
 
 
