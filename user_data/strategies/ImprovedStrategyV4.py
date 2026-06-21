@@ -48,11 +48,8 @@ from freqtrade.strategy import IStrategy
 class ImprovedStrategyV4(IStrategy):
     INTERFACE_VERSION = 3
 
-    timeframe = '1d'                 # [REVERTED 2026-06-21] The '4h speed-up' turned the
-                                     # 50/200-DAY cross into an ~8d/33d cross and churned the
-                                     # account (-95% in backtest). On true daily candles this
-                                     # is the validated winner: BTC +447% full-cycle vs +296%
-                                     # buy&hold at HALF the drawdown, and only -0.8% in the bear.
+    timeframe = '4h'                 # [SPED UP] was 1d; 4h = 6x more evaluations
+                                     # (50/200 EMA now ~8d/33d trend, not 50d/200d)
     can_short = False
 
     # Circuit breakers (research-driven risk guards). Candle counts scale with

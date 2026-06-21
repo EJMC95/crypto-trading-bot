@@ -201,24 +201,33 @@ class H(BaseHTTPRequestHandler):
         if self.path.startswith("/health"):
             self.send_response(200); self.end_headers(); self.wfile.write(b"ok"); return
         if self.path.startswith("/pnl.json"):
-            # Read-only JSON of every bot's latest snapshot, for the scheduled
-            # daily/weekly breakdowns. Dry-run paper P&L only — no secrets.
+            # Read-only snapshot of every bot, consumed by the scheduled
+            # daily/weekly breakdown via web_fetch. Dry-run paper P&L only.
+            #
+            # The body is a single JSON object, but we wrap it in a minimal
+            # HTML <pre>: the scheduled-task fetcher only surfaces responses
+            # with HTML document structure — it returns an EMPTY body for both
+            # application/json and text/plain. curl/browsers/json parsers still
+            # read the JSON verbatim out of the <pre>. Nothing else consumes
+            # this endpoint, so wrapping is safe.
             try:
                 rows = fetch_rows()
                 def _ser(v):
                     return v.isoformat() if hasattr(v, "isoformat") else v
                 data = [{k: _ser(v) for k, v in r.items()} for r in rows.values()]
-                payload = json.dumps({"bots": data}).encode()
+                body_json = json.dumps({"bots": data})
                 code = 200
             except Exception as e:
-                payload = json.dumps({"error": str(e)}).encode()
+                body_json = json.dumps({"error": str(e)})
                 code = 500
+            payload = (
+                "<!doctype html><html><head><meta charset=\"utf-8\">"
+                "<title>pnl.json</title></head><body><pre>"
+                + html.escape(body_json, quote=False)
+                + "</pre></body></html>"
+            ).encode("utf-8")
             self.send_response(code)
-            # Serve the JSON as text/plain (still valid JSON for any parser).
-            # Some fetchers (incl. the scheduled-task web_fetch) drop
-            # application/json bodies; text/plain + Content-Length is read
-            # reliably while curl/browsers/json.loads are unaffected.
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
