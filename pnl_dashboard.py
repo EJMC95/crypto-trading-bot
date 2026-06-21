@@ -201,33 +201,21 @@ class H(BaseHTTPRequestHandler):
         if self.path.startswith("/health"):
             self.send_response(200); self.end_headers(); self.wfile.write(b"ok"); return
         if self.path.startswith("/pnl.json"):
-            # Read-only snapshot of every bot, consumed by the scheduled
-            # daily/weekly breakdown via web_fetch. Dry-run paper P&L only.
-            #
-            # The body is a single JSON object, but we wrap it in a minimal
-            # HTML <pre>: the scheduled-task fetcher only surfaces responses
-            # with HTML document structure — it returns an EMPTY body for both
-            # application/json and text/plain. curl/browsers/json parsers still
-            # read the JSON verbatim out of the <pre>. Nothing else consumes
-            # this endpoint, so wrapping is safe.
+            # Read-only JSON snapshot of every bot, for the scheduled
+            # daily/weekly breakdowns. Dry-run paper P&L only — no secrets.
+            # No auth on this path so the scheduled fetcher can read it.
             try:
                 rows = fetch_rows()
                 def _ser(v):
                     return v.isoformat() if hasattr(v, "isoformat") else v
                 data = [{k: _ser(v) for k, v in r.items()} for r in rows.values()]
-                body_json = json.dumps({"bots": data})
+                payload = json.dumps({"bots": data}).encode("utf-8")
                 code = 200
             except Exception as e:
-                body_json = json.dumps({"error": str(e)})
+                payload = json.dumps({"error": str(e)}).encode("utf-8")
                 code = 500
-            payload = (
-                "<!doctype html><html><head><meta charset=\"utf-8\">"
-                "<title>pnl.json</title></head><body><pre>"
-                + html.escape(body_json, quote=False)
-                + "</pre></body></html>"
-            ).encode("utf-8")
             self.send_response(code)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
