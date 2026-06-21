@@ -39,6 +39,9 @@ class DayTraderV5Gated(IStrategy):
     informative_timeframe = "1h"
     regime_timeframe = "1d"
 
+    # NOTE: not auto-retrained — the 1d EMA200 regime filter needs ~200 days of
+    # daily candles, which Kraken can't serve as OHLCV (trades-only history), so
+    # hyperopt on Kraken isn't feasible for this strategy. Kept optimize=False.
     buy_rsi = IntParameter(40, 65, default=50, space="buy", optimize=False)
     buy_ema_fast = IntParameter(5, 15, default=9, space="buy", optimize=False)
     buy_ema_slow = IntParameter(18, 50, default=21, space="buy", optimize=False)

@@ -1,0 +1,10 @@
+# Service-specific Railway config for the freqtrade-trainer service ONLY.
+# Point the trainer service's Config-as-code "Railway Config File" setting at this
+# file so it does NOT affect the other services sharing this repo.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.trainer"
+
+[deploy]
+# Long-running scheduler loop; restart on any exit so the learning loop stays up.
+restartPolicyType = "always"

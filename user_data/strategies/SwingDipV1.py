@@ -58,8 +58,8 @@ class SwingDipV1(IStrategy):
         ]
 
     # Hyperopt-tunable, but defaults are deliberately round (anti-overfit).
-    buy_rsi  = IntParameter(20, 50, default=45, space="buy",  optimize=False)  # RELAXED 35->45
-    sell_rsi = IntParameter(55, 80, default=65, space="sell", optimize=False)
+    buy_rsi  = IntParameter(20, 50, default=45, space="buy",  optimize=True)  # RELAXED 35->45; [optimize=True 2026-06-21] auto-retrainer tunes from live data
+    sell_rsi = IntParameter(55, 80, default=65, space="sell", optimize=True)
 
     # Take-profit ladder in MINUTES (1 day = 1440). Read in days:
     #   grab +20% any time; after 4 days accept +12%; after 8 days +6%;

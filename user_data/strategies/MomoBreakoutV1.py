@@ -36,8 +36,10 @@ class MomoBreakoutV1(IStrategy):
              "stop_duration_candles": 18, "max_allowed_drawdown": 0.25},
         ]
 
-    entry_lookback = IntParameter(20, 45, default=30, space="buy",  optimize=False)
-    exit_lookback  = IntParameter(8,  25, default=15, space="sell", optimize=False)
+    # [optimize=True 2026-06-21] entry/exit lookbacks tunable by the auto-retrainer;
+    # trend_ema (the trend filter / safety element) stays fixed to bound the search.
+    entry_lookback = IntParameter(20, 45, default=30, space="buy",  optimize=True)
+    exit_lookback  = IntParameter(8,  25, default=15, space="sell", optimize=True)
     trend_ema      = IntParameter(100, 250, default=200, space="buy", optimize=False)
 
     # [SIDEWAYS v2] loose ROI ladder so range trades actually BANK profit while
