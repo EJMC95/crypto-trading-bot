@@ -79,9 +79,13 @@ class DayTraderV5Gated(IStrategy):
     @property
     def protections(self):
         return [
-            {"method": "CooldownPeriod", "stop_duration_candles": 3},
+            # [CHURN FIX 2026-06-22] cooldown 3 -> 12 candles (~1h). Live behaviour
+            # was 1 win / 26 losses — fee bleed from re-entering the same chop
+            # minutes after an exit. A longer cooldown stops the immediate buy-back.
+            {"method": "CooldownPeriod", "stop_duration_candles": 12},
+            # trip the stop-loss guard one stop sooner (3 -> 2).
             {"method": "StoplossGuard", "lookback_period_candles": 72,
-             "trade_limit": 3, "stop_duration_candles": 36, "only_per_pair": False},
+             "trade_limit": 2, "stop_duration_candles": 36, "only_per_pair": False},
             {"method": "MaxDrawdown", "lookback_period_candles": 288, "trade_limit": 10,
              "stop_duration_candles": 72, "max_allowed_drawdown": 0.15},
         ]
@@ -137,9 +141,15 @@ class DayTraderV5Gated(IStrategy):
         # is up. Still mostly sits out a broad downtrend, but no longer demands
         # daily 50>200, which was blocking every entry.
         regime_ok = (dataframe["regime_up_1d"] == 1) | (dataframe["ema9_rising_1h"])
+        # [CHURN FIX 2026-06-22] Fire on the candle momentum TURNS UP, not on every
+        # candle it stays up. The old level test (rsi > thresh OR close > ema_fast)
+        # re-armed entry every bar while elevated, so after any shakeout the bot
+        # bought straight back into the same move and bled fees (the 1W/26L pattern).
+        # Using fresh crosses gates to roughly one entry per momentum impulse while
+        # keeping both original triggers (RSI breakout, and pullback-reclaim).
         momentum_ok = (
-            (dataframe["rsi"] > self.buy_rsi.value)
-            | ((dataframe["rsi"] > 40) & (dataframe["close"] > dataframe["ema_fast"]))
+            qtpylib.crossed_above(dataframe["rsi"], self.buy_rsi.value)
+            | qtpylib.crossed_above(dataframe["close"], dataframe["ema_fast"])
         )
         # [REGIME GATE RE-ENABLED 2026-06-21] The ungated v3 logic (momentum alone)
         # is the exact pattern that lost ~-99% live in a downtrend and went 0/10 on

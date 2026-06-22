@@ -370,16 +370,22 @@ def run_live(once=False):
                 booked = net_d >= 0.0 and filled
                 if booked:
                     virtual_balance += pnl
+                # `filled` column = actual paper booking (profitable-after-depth
+                # AND both legs fully fillable). A fillable-but-negative spread is
+                # only "seen", never a fill, so write `booked` here. `had_depth`
+                # keeps the liquidity diagnostic in the console log.
+                had_depth = filled
                 log_opp([
                     now_iso(), symbol, buy_ex, sell_ex,
                     f"{net_top*100:.4f}", f"{net_d*100:.4f}",
-                    f"{pnl:.4f}", filled, f"{virtual_balance:.4f}",
+                    f"{pnl:.4f}", booked, f"{virtual_balance:.4f}",
                 ])
                 tag = "PAPER-FILL" if booked else "seen"
                 print(
                     f"[{now_iso()}] {tag} {symbol} buy {buy_ex}->sell {sell_ex} "
                     f"| top {net_top*100:+.3f}% | depth {net_d*100:+.3f}% "
-                    f"| P&L {pnl:+.2f} | filled={filled} | bal {virtual_balance:+.2f}"
+                    f"| P&L {pnl:+.2f} | booked={booked} | had_depth={had_depth} "
+                    f"| bal {virtual_balance:+.2f}"
                 )
 
             best = confirmed[0] if confirmed else None
@@ -413,7 +419,8 @@ def run_live(once=False):
         store.publish(
             "cross-exchange-arb", status="online",
             pnl_abs=virtual_balance,
-            extra={"pairs": len(sym_map),
+            extra={"kind": "scanner",  # optimistic paper-arb booking, not realized P&L
+                   "pairs": len(sym_map),
                    "best_top_pct": round(best_top[0] * 100, 4) if best_top else None},
         )
         if once:

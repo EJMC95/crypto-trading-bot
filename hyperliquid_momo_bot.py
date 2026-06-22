@@ -40,6 +40,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
+from paper_broker import PaperBroker  # dry-run simulated account (no funded wallet needed)
 
 # --------------------------- configuration -------------------------------
 # Widened from BTC/ETH/SOL to a broad set of liquid Hyperliquid perps.
@@ -62,6 +63,7 @@ LEVERAGE = 1                     # 1x baseline; 2x doubled drawdown in backtest
 DAILY_LOSS_LIMIT = 0.05
 LOOP_SECONDS = 300               # 5 min; 4h candles don't need a 60s loop
 LOG_FILE = "momo_bot.log"
+PAPER_START = 1000.0             # dry-run simulated starting equity
 
 PAPER = "--paper" in sys.argv      # watch live testnet prices, no account/keys needed
 DRY_RUN = PAPER or ("--live" not in sys.argv)
@@ -156,7 +158,10 @@ def main():
     account_address = os.environ.get("HL_ACCOUNT_ADDRESS", "").strip()
     exchange = None
     addr = None
-    paper_pos = {}                                # in-memory positions for PAPER mode
+    # Dry-run uses a self-contained paper account so it never depends on a funded
+    # testnet wallet (an unfunded wallet reads accountValue=0 -> no trades ever).
+    # Covers both --paper and default dry-run (DRY_RUN is true in both).
+    broker = PaperBroker(PAPER_START) if DRY_RUN else None
     if PAPER:
         log.info("PAPER mode: no account or keys needed. Reading LIVE testnet prices and "
                  "simulating fills in memory. No orders sent, no real balances.")
@@ -178,10 +183,14 @@ def main():
     log.info("=" * 64)
 
     def account_value():
+        if DRY_RUN:
+            return broker.equity()
         st = info.user_state(addr)
         return float(st["marginSummary"]["accountValue"])
 
     def positions():
+        if DRY_RUN:
+            return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
         st = info.user_state(addr)
         out = {}
         for p in st.get("assetPositions", []):
@@ -192,14 +201,11 @@ def main():
             }
         return out
 
-    if PAPER:
-        day_start_equity = None                  # no balance to read; loss-limit disabled
-    else:
-        try:
-            day_start_equity = account_value()
-        except Exception as e:
-            log.warning("account value unreadable (%s); loss-limit waits until reachable.", e)
-            day_start_equity = None
+    try:
+        day_start_equity = account_value()
+    except Exception as e:
+        log.warning("account value unreadable (%s); loss-limit waits until reachable.", e)
+        day_start_equity = None
     cur_day = datetime.now(timezone.utc).date()
     halted_today = False
 
@@ -207,20 +213,16 @@ def main():
         now = datetime.now(timezone.utc)
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False
-            if not PAPER:
-                try:
-                    day_start_equity = account_value()
-                except Exception:
-                    pass
-
-        if PAPER:
-            equity = None
-        else:
             try:
-                equity = account_value()
-            except Exception as e:
-                log.warning("account value unavailable: %s", e)
-                equity = None
+                day_start_equity = account_value()
+            except Exception:
+                pass
+
+        try:
+            equity = account_value()
+        except Exception as e:
+            log.warning("account value unavailable: %s", e)
+            equity = None
 
         if (not halted_today and equity is not None and day_start_equity
                 and equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT)):
@@ -239,14 +241,11 @@ def main():
             time.sleep(LOOP_SECONDS)
             continue
 
-        if PAPER:
-            pos = paper_pos
-        else:
-            try:
-                pos = positions()
-            except Exception as e:
-                log.warning("positions unreadable: %s", e)
-                pos = {}
+        try:
+            pos = positions()
+        except Exception as e:
+            log.warning("positions unreadable: %s", e)
+            pos = {}
 
         end = int(time.time() * 1000)
         # ~3x the EMA period of warmup so the live 200-EMA matches the backtest
@@ -287,23 +286,27 @@ def main():
             log.info("%-4s px=%.2f ema200=%.2f dcHi=%.2f dcLo=%.2f held=%.4f -> %s",
                      coin, px, s["ema"], s["dc_high_entry"], s["dc_low_exit"], held, decision)
 
-            if PAPER:
-                # simulate the fill in memory so exits/stops show on later loops
-                if decision == "OPEN_LONG":
-                    paper_pos[coin] = {"size": ORDER_USD * LEVERAGE / px, "entry": px}
-                elif decision == "OPEN_SHORT":
-                    paper_pos[coin] = {"size": -ORDER_USD * LEVERAGE / px, "entry": px}
-                elif decision in ("EXIT_LONG", "STOP_LONG", "COVER_SHORT", "STOP_SHORT"):
-                    paper_pos.pop(coin, None)
-                if decision != "HOLD":
-                    notify(f":test_tube: MomoBot [PAPER] {decision} {coin} @ {px:,.2f}",
-                           coin=coin, decision=decision, price=round(px, 2), mode="paper")
-                continue
-
-            if decision == "HOLD" or DRY_RUN:
-                continue
-
             size = round(ORDER_USD * LEVERAGE / px, 4)
+
+            if DRY_RUN:
+                # Book the fill in the paper account and mark to the live price,
+                # so exits/stops and an equity curve show up on later loops.
+                broker.mark(coin, px)
+                if decision == "OPEN_LONG":
+                    broker.open(coin, True, size, px)
+                elif decision == "OPEN_SHORT":
+                    broker.open(coin, False, size, px)
+                elif decision in ("EXIT_LONG", "STOP_LONG", "COVER_SHORT", "STOP_SHORT"):
+                    broker.close(coin, px)
+                if decision != "HOLD":
+                    mode = "paper" if PAPER else "dry-run"
+                    notify(f":test_tube: MomoBot [{mode.upper()}] {decision} {coin} @ {px:,.2f}",
+                           coin=coin, decision=decision, price=round(px, 2), mode=mode)
+                continue
+
+            if decision == "HOLD":
+                continue
+
             try:
                 if decision in ("EXIT_LONG", "STOP_LONG", "COVER_SHORT", "STOP_SHORT"):
                     exchange.market_close(coin)
@@ -322,12 +325,21 @@ def main():
                        coin=coin, decision=decision, mode="error")
 
         # Publish a snapshot for the live dashboard (guarded; never raises).
+        if DRY_RUN:
+            pub_equity = broker.equity()
+            pub_open = broker.open_count()
+            pub_pnl = pub_equity - PAPER_START
+        else:
+            pub_equity = equity
+            pub_open = sum(1 for v in pos.values()
+                           if (v.get("size") if isinstance(v, dict) else v))
+            pub_pnl = None
         store.publish(
             "hl-momo-breakout",
             status="paper" if PAPER else ("halted" if halted_today else "online"),
-            equity=equity,
-            open_trades=sum(1 for v in pos.values()
-                            if (v.get("size") if isinstance(v, dict) else v)),
+            equity=pub_equity,
+            pnl_abs=pub_pnl,
+            open_trades=pub_open,
             extra={"mode": "paper" if PAPER else ("dry-run" if DRY_RUN else "live-testnet"),
                    "coins": COINS},
         )

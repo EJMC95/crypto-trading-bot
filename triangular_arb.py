@@ -352,16 +352,25 @@ def run_live(once=False):
                 booked = net_depth >= 0.0 and filled
                 if booked:
                     virtual_balance += pnl
+                # The `filled` column records an actual paper booking, i.e. the
+                # loop was profitable-after-depth AND the book had the liquidity
+                # to fill every leg. A loop whose legs were fillable but whose
+                # net edge was negative is NOT a fill — it is only "seen", so it
+                # must never show True here (that previously inflated the fill
+                # count and the dashboard's ✓/✗ column). `had_depth` keeps the
+                # liquidity diagnostic in the console log.
+                had_depth = filled
                 log_opp([
                     now_iso(), "->".join(cycle + [cycle[0]]),
                     f"{net_top*100:.4f}", f"{net_depth*100:.4f}",
-                    f"{pnl:.4f}", filled, f"{virtual_balance:.4f}",
+                    f"{pnl:.4f}", booked, f"{virtual_balance:.4f}",
                 ])
                 tag = "PAPER-FILL" if booked else "seen"
                 print(
                     f"[{now_iso()}] {tag} {'->'.join(cycle)} | top {net_top*100:+.3f}% "
                     f"| depth {net_depth*100:+.3f}% | P&L {pnl:+.2f} {cycle[0]} "
-                    f"| filled={filled} | bal {virtual_balance:+.2f}"
+                    f"| booked={booked} | had_depth={had_depth} "
+                    f"| bal {virtual_balance:+.2f}"
                 )
 
             best = confirmed[0] if confirmed else None
@@ -402,7 +411,8 @@ def run_live(once=False):
         store.publish(
             "triangular-arb", status="online",
             pnl_abs=virtual_balance,
-            extra={"cycles": len(cycles),
+            extra={"kind": "scanner",  # optimistic paper-arb booking, not realized P&L
+                   "cycles": len(cycles),
                    "best_depth_pct": round(best_depth_seen * 100, 4)},
         )
         if once:

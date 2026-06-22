@@ -18,6 +18,7 @@ import json
 import base64
 import html
 import datetime as dt
+from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get("PORT", "8080"))
@@ -31,6 +32,18 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 EXPECTED = ["hl-perps-rsi", "hl-momo-breakout", "triangular-arb", "listing-sniper",
             "trend-golden-cross", "intraday-daytrader-5m", "swing-dip-buyer",
             "momo-breakout-4h", "momo-breakout-alt"]
+
+# Scanners book OPTIMISTIC paper-arb fills (observed spreads, no slippage/latency).
+# Their pnl_abs is real paper P&L but on a rosier basis than the freqtrade bots'
+# simulated fills — so it is reported as a SEPARATE subtotal and never folded
+# into the trading-bot P&L headline.
+SCANNERS = {"triangular-arb", "cross-exchange-arb"}
+
+# The only bots that should appear. Anything else in the table (e.g. legacy
+# pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
+# stale duplicate and is filtered out here so it can never skew totals or the
+# grid — independent of whether the Postgres table has been pruned yet.
+CURRENT_BOTS = set(EXPECTED) | SCANNERS
 
 STALE_SECONDS = 180  # snapshots older than this are flagged "stale"
 
@@ -46,7 +59,10 @@ def fetch_rows():
             if cur.fetchone()["t"] is None:
                 return {}  # table not created yet (no bot has published)
             cur.execute("SELECT * FROM bot_pnl")
-            return {r["bot"]: r for r in cur.fetchall()}
+            # Drop legacy pre-rename rows so stale duplicates never reach the
+            # grid, totals, or the /pnl.json feed.
+            return {r["bot"]: r for r in cur.fetchall()
+                    if r["bot"] in CURRENT_BOTS}
     finally:
         conn.close()
 
@@ -64,6 +80,40 @@ def fetch_analysis():
             cur.execute("SELECT strategy, updated_at, analysis FROM bot_trade_analysis "
                         "ORDER BY strategy")
             return {r["strategy"]: r for r in cur.fetchall()}
+    finally:
+        conn.close()
+
+
+def fetch_trades(bot=None, limit=500, include_open=False):
+    """Return per-trade history rows from bot_trades (newest close first).
+
+    Read-only; used by the no-auth /trades.json endpoint for the scheduled
+    breakdowns and the win/loss deep dive. Dry-run paper trades only."""
+    import psycopg2
+    import psycopg2.extras
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('public.bot_trades') AS t")
+            if cur.fetchone()["t"] is None:
+                return []  # no bot has published trades yet
+            clauses, params = [], []
+            if not include_open:
+                clauses.append("is_open = FALSE")
+            if bot:
+                clauses.append("bot = %s")
+                params.append(bot)
+            where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+            params.append(int(limit))
+            cur.execute(
+                "SELECT bot, open_ts, close_ts, pair, is_open, profit_ratio, "
+                "profit_abs, open_rate, close_rate, amount, stake_amount, "
+                "duration_min, enter_tag, exit_reason, leverage "
+                f"FROM bot_trades {where} "
+                "ORDER BY close_ts DESC NULLS LAST, open_ts DESC LIMIT %s",
+                params,
+            )
+            return list(cur.fetchall())
     finally:
         conn.close()
 
@@ -121,7 +171,8 @@ def card(bot, row):
     if row.get("equity") is not None:
         rows.append(f'<div class="row"><span>Equity</span><b>{money(row.get("equity"))}</b></div>')
     if row.get("pnl_abs") is not None:
-        rows.append(f'<div class="row"><span>P&amp;L</span>'
+        pnl_label = "Paper (arb)" if bot in SCANNERS else "P&amp;L"
+        rows.append(f'<div class="row"><span>{pnl_label}</span>'
                     f'<b class="{cls(row.get("pnl_abs"))}">{money(row.get("pnl_abs"))}'
                     f'{" (" + pct(row.get("pnl_pct")) + ")" if row.get("pnl_pct") is not None else ""}</b></div>')
     if row.get("closed_trades") is not None or row.get("open_trades") is not None:
@@ -150,7 +201,12 @@ def render():
     cards = [card(b, rows.get(b)) for b in names]
 
     live = [r for r in rows.values() if r]
-    tot_pnl = sum((r.get("pnl_abs") or 0) for r in live)
+    # Trading-bot P&L (the real headline) excludes scanners; scanners' optimistic
+    # paper-arb booking is shown as its own subtotal so it can't flatter the total.
+    tot_pnl = sum((r.get("pnl_abs") or 0) for r in live
+                  if r.get("bot") not in SCANNERS)
+    scan_pnl = sum((r.get("pnl_abs") or 0) for r in live
+                   if r.get("bot") in SCANNERS)
     tot_equity = sum((r.get("equity") or 0) for r in live if r.get("equity") is not None)
     n_open = sum((r.get("open_trades") or 0) for r in live)
     n_closed = sum((r.get("closed_trades") or 0) for r in live)
@@ -191,7 +247,8 @@ def render():
  <h1>Crypto Bots — live P&amp;L &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">what they're learning →</a></h1>
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
-   <span>Total P&amp;L <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b></span>
+   <span>Trading P&amp;L <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b></span>
+   <span>Scanner paper <b class="{cls(scan_pnl)}">{money(scan_pnl)}</b></span>
    <span>Total equity <b>{money(tot_equity)}</b></span>
    <span>Trades <b>{n_closed} closed · {n_open} open</b></span>
  </div>
@@ -323,8 +380,42 @@ class H(BaseHTTPRequestHandler):
                 rows = fetch_rows()
                 def _ser(v):
                     return v.isoformat() if hasattr(v, "isoformat") else v
-                data = [{k: _ser(v) for k, v in r.items()} for r in rows.values()]
+                data = []
+                for r in rows.values():
+                    d = {k: _ser(v) for k, v in r.items()}
+                    # Tag so downstream reports never blend scanner paper-arb
+                    # P&L with the trading bots' realized P&L.
+                    d["kind"] = "scanner" if r.get("bot") in SCANNERS else "trading"
+                    data.append(d)
                 payload = json.dumps({"bots": data}).encode("utf-8")
+                code = 200
+            except Exception as e:
+                payload = json.dumps({"error": str(e)}).encode("utf-8")
+                code = 500
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+        if self.path.startswith("/trades.json"):
+            # Read-only per-trade history for the scheduled daily/weekly
+            # breakdowns and the win/loss deep dive. Dry-run paper trades only —
+            # no secrets. No auth on this path (like /pnl.json) so the scheduled
+            # fetcher can read it. Query params: ?bot=<name>&limit=<n>&include_open=1
+            q = parse_qs(urlparse(self.path).query)
+            bot = q.get("bot", [None])[0]
+            include_open = q.get("include_open", ["0"])[0] in ("1", "true", "yes")
+            try:
+                limit = min(max(int(q.get("limit", ["500"])[0]), 1), 5000)
+            except (ValueError, TypeError):
+                limit = 500
+            try:
+                rows = fetch_trades(bot=bot, limit=limit, include_open=include_open)
+                def _ser(v):
+                    return v.isoformat() if hasattr(v, "isoformat") else v
+                data = [{k: _ser(v) for k, v in r.items()} for r in rows]
+                payload = json.dumps({"trades": data}).encode("utf-8")
                 code = 200
             except Exception as e:
                 payload = json.dumps({"error": str(e)}).encode("utf-8")

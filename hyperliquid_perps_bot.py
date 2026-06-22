@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
+from paper_broker import PaperBroker  # dry-run simulated account (no funded wallet needed)
 
 # --------------------------- configuration -------------------------------
 # Widened from BTC/ETH/SOL to a broad set of liquid Hyperliquid perps.
@@ -54,6 +55,7 @@ ORDER_USD = 50.0                 # notional per position (position sizing)
 LEVERAGE = 1                     # keep low; 3x+ liquidated fast in backtest
 DAILY_LOSS_LIMIT = 0.05          # 5% — halts trading for the day
 LOG_FILE = "perps_bot.log"
+PAPER_START = 1000.0             # dry-run simulated starting equity
 
 DRY_RUN = "--live" not in sys.argv
 
@@ -125,7 +127,13 @@ def main():
              base_url, ORDER_USD, LEVERAGE, LOOP_SECONDS, DAILY_LOSS_LIMIT * 100)
     log.info("=" * 60)
 
+    # Dry-run uses a self-contained paper account so it never depends on a funded
+    # testnet wallet (an unfunded wallet reads accountValue=0 -> no trades ever).
+    broker = PaperBroker(PAPER_START) if DRY_RUN else None
+
     def account_value():
+        if DRY_RUN:
+            return broker.equity()
         st = info.user_state(account_address or wallet.address)
         return float(st["marginSummary"]["accountValue"])
 
@@ -173,13 +181,16 @@ def main():
             continue
 
         # current open positions keyed by coin -> signed size
-        try:
-            state = info.user_state(account_address or wallet.address)
-            pos = {p["position"]["coin"]: float(p["position"]["szi"])
-                   for p in state.get("assetPositions", [])}
-        except Exception as e:
-            log.warning("could not read positions: %s", e)
-            pos = {}
+        if DRY_RUN:
+            pos = broker.szi()
+        else:
+            try:
+                state = info.user_state(account_address or wallet.address)
+                pos = {p["position"]["coin"]: float(p["position"]["szi"])
+                       for p in state.get("assetPositions", [])}
+            except Exception as e:
+                log.warning("could not read positions: %s", e)
+                pos = {}
 
         end = int(time.time() * 1000)
         start = end - 60 * 24 * 3600 * 1000      # ~60 days of 1h candles
@@ -203,10 +214,20 @@ def main():
             log.info("%-4s price=%.2f RSI=%.1f held=%.4f -> %s",
                      coin, price, r, held, decision)
 
-            if decision == "HOLD" or DRY_RUN:
+            size = round(ORDER_USD * LEVERAGE / price, 4)
+
+            if DRY_RUN:
+                # Book the fill in the paper account and mark to the live price.
+                broker.mark(coin, price)
+                if decision == "OPEN_LONG":
+                    broker.open(coin, True, size, price)
+                elif decision == "OPEN_SHORT":
+                    broker.open(coin, False, size, price)
                 continue
 
-            size = round(ORDER_USD * LEVERAGE / price, 4)
+            if decision == "HOLD":
+                continue
+
             try:
                 if decision == "OPEN_LONG":
                     if held < 0:
@@ -221,11 +242,20 @@ def main():
                 log.error("order failed %s %s: %s", decision, coin, e)
 
         # Publish a snapshot for the live dashboard (guarded; never raises).
+        if DRY_RUN:
+            pub_equity = broker.equity()
+            pub_open = broker.open_count()
+            pub_pnl = pub_equity - PAPER_START
+        else:
+            pub_equity = equity
+            pub_open = sum(1 for v in pos.values() if v)
+            pub_pnl = None
         store.publish(
             "hl-perps-rsi",
             status="halted" if halted_today else "online",
-            equity=equity,
-            open_trades=sum(1 for v in pos.values() if v),
+            equity=pub_equity,
+            pnl_abs=pub_pnl,
+            open_trades=pub_open,
             extra={"mode": "dry-run" if DRY_RUN else "live-testnet",
                    "coins": COINS},
         )
