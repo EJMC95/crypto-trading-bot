@@ -1,0 +1,33 @@
+{
+    "$schema": "https://schema.freqtrade.io/schema.json",
+    "_comment": "Backtest-only override: forces StaticPairList over the widened basket and points at Binance data (deepest history). Merged on top of the live config_*.json via a second --config. Does NOT touch live behaviour.",
+    "exchange": {
+        "name": "binance",
+        "pair_whitelist": [
+            "BTC/USDT",
+            "ETH/USDT",
+            "SOL/USDT",
+            "BNB/USDT",
+            "XRP/USDT",
+            "ADA/USDT",
+            "DOGE/USDT",
+            "AVAX/USDT",
+            "LINK/USDT",
+            "DOT/USDT",
+            "LTC/USDT",
+            "BCH/USDT",
+            "ATOM/USDT",
+            "XLM/USDT",
+            "TRX/USDT"
+        ],
+        "pair_blacklist": []
+    },
+    "pairlists": [
+        {
+            "method": "StaticPairList"
+        }
+    ],
+    "stake_currency": "USDT",
+    "dry_run": true,
+    "max_open_trades": 15
+}

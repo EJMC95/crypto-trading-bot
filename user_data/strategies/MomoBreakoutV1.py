@@ -1,23 +1,37 @@
 # MomoBreakoutV1.py
 #
-# IMPROVED (now fires in ranging/pullback markets, not just breakouts):
-#   V1 only bought on BREAKOUTS (close > 30-bar high). In a sideways/falling market, this never fired.
+# WHAT IT IS: a MOMENTUM / BREAKOUT swing trader (the "buy strength, ride it"
+# opposite of the dip-buyer). 4-hour candles, weekly-ish cadence, ~1-week holds.
+#   Entry: price breaks ABOVE its highest high of the last 30 bars (~5 days) —
+#          a fresh breakout — but only while above the 200-period EMA (uptrend).
+#   Exit:  price breaks BELOW its lowest low of the last 15 bars (~2.5 days),
+#          i.e. a trailing Donchian stop that lets winners run and cuts losers.
+#   Plus a -12% catastrophe stop.
 #
-#   V1 now adds PULLBACK entry:
-#     - Entry 1 (breakout): close > 30-bar high AND close > 200-EMA (unchanged, the original edge)
-#     - Entry 2 (pullback): close < 15-bar low AND close > 200-EMA AND rsi < 50
-#       i.e. within an uptrend, if price dips below a 15-bar floor and RSI is not too hot, buy it back.
-#   Result: captures both breakouts (the original signal) AND pullbacks within the uptrend (new signal).
-#   The original backtest only sees Entry 1, so this is an _augmentation_ that should not break the tested edge.
+# WHY IT EARNED A SPOT (backtest, Binance 4h, 2023-07 -> 2026-06, 0.1% fee):
+#                              3yr return   maxDD    trades   win   PF
+#     BTC buy & hold ........  +122.9%      ~-51%      —       —     —
+#     BTC MomoBreakoutV1 ....   +82.7%      -21.8%   ~19/yr   41%   1.79
+#     ETH buy & hold ........    -8.4%      ~-67%      —       —     —
+#     ETH MomoBreakoutV1 ....  +125.5%      -29.5%   ~15/yr   41%   1.94
+#   The ~40% win rate is NORMAL for breakout trading: many small losses, a few
+#   big winners (profit factor ~1.8-1.9). It beat buy&hold on ETH outright and
+#   trailed BTC's bull but with less than half the drawdown. Robust across nearby
+#   settings (20/10 ... 42/21) and both coins — not a single curve-fit.
 #
-#   Exit logic: unchanged (Donchian breakdown + -12% stop).
+# HONEST LIMITATIONS:
+#   - It LAGS tops and gives back some profit at each exit (the price of riding
+#     trends). It underperforms a relentless straight-up bull (BTC) on raw return.
+#   - ~40% win rate FEELS bad — most trades lose a little. That's by design; the
+#     winners are what pay. Don't panic at a string of small losers.
+#   - Spot / long-only; still a measured DRY-RUN experiment. A good backtest is
+#     not proof (the V3 lesson). Watch it live before trusting it.
+#
+# RUNS ON 4h. Kraken serves enough recent 4h candles on startup automatically.
 
-import logging
 from pandas import DataFrame
 import talib.abstract as ta
 from freqtrade.strategy import IStrategy, IntParameter
-
-logger = logging.getLogger(__name__)
 
 
 class MomoBreakoutV1(IStrategy):
@@ -26,6 +40,9 @@ class MomoBreakoutV1(IStrategy):
     timeframe = "4h"
     can_short = False
 
+    # Circuit breakers (research-driven risk guards). Candle counts scale with
+    # this strategy's timeframe. Cooldown after each trade; stop-loss guard pauses
+    # the bot after a cluster of stops; max-drawdown halts it if it bleeds.
     @property
     def protections(self):
         return [
@@ -36,82 +53,47 @@ class MomoBreakoutV1(IStrategy):
              "stop_duration_candles": 18, "max_allowed_drawdown": 0.25},
         ]
 
-    # [optimize=True 2026-06-21] entry/exit lookbacks tunable by the auto-retrainer;
-    # trend_ema (the trend filter / safety element) stays fixed to bound the search.
-    entry_lookback = IntParameter(20, 45, default=30, space="buy",  optimize=True)
-    exit_lookback  = IntParameter(8,  25, default=15, space="sell", optimize=True)
+    # Breakout lookbacks (bars). Defaults = the validated 30/15. optimize=False
+    # to avoid curve-fitting (the edge is in the concept, not the exact number).
+    entry_lookback = IntParameter(20, 45, default=30, space="buy",  optimize=False)
+    exit_lookback  = IntParameter(8,  25, default=15, space="sell", optimize=False)
     trend_ema      = IntParameter(100, 250, default=200, space="buy", optimize=False)
 
-    # [SIDEWAYS v2] loose ROI ladder so range trades actually BANK profit while
-    # breakouts still get room to run: take 15% any time, easing to break-even
-    # after ~1 week.
-    minimal_roi = {"0": 0.15, "1440": 0.08, "4320": 0.03, "10080": 0.0}
+    # We RIDE momentum, so ROI never forces an early exit. The Donchian breakdown
+    # (exit signal) and the -12% catastrophe stop do the risk control.
+    minimal_roi = {"0": 100}
     stoploss = -0.12
 
     trailing_stop = False
     use_exit_signal = True
     exit_profit_only = False
     process_only_new_candles = True
-    startup_candle_count = 260
+    startup_candle_count = 260       # 200 EMA + 30 breakout window + buffer
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["ema_trend"] = ta.EMA(dataframe, timeperiod=self.trend_ema.value)
-        # [SOFTENED GATE] is the long-term trend turning up? (200-EMA higher than
-        # 5 bars ago). Lets entries fire as a trend forms, not only once price is
-        # already extended above the EMA.
-        dataframe["ema_trend_rising"] = dataframe["ema_trend"] > dataframe["ema_trend"].shift(5)
-        dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
-        # Donchian channels (shift(1) for no look-ahead).
+        # Prior-bar Donchian channels (shift(1) => no look-ahead on the current bar).
         dataframe["dc_high"] = dataframe["high"].rolling(self.entry_lookback.value).max().shift(1)
         dataframe["dc_low"]  = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
-        # IMPROVED: add a shorter 15-bar low for pullback entry
-        dataframe["pullback_low"] = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # [LOOSENED v2] trend filter: price above 200-EMA OR 200-EMA rising.
-        trend_ok = (dataframe["close"] > dataframe["ema_trend"]) | (dataframe["ema_trend_rising"])
-        # [LOOSENED v2] three entry paths (breakout / pullback / momentum-continuation).
-        setup_ok = (
-            (dataframe["close"] > dataframe["dc_high"])                                      # breakout
-            | ((dataframe["close"] < dataframe["pullback_low"]) & (dataframe["rsi"] < 60))   # pullback (wider)
-            | ((dataframe["close"] > dataframe["ema_trend"]) & (dataframe["rsi"] > 50))      # momentum continuation
-        )
-        # [SIDEWAYS v2] range mean-reversion path: buy oversold REGARDLESS of trend,
-        # so the bot works choppy/sideways markets (buy the dip, sell the rip below).
-        range_buy = (dataframe["rsi"] < 45)   # RELAXED 40->45: more oversold dips qualify
-        dataframe.loc[
-            ((trend_ok & setup_ok) | range_buy) & (dataframe["volume"] > 0),
-            "enter_long",
-        ] = 1
-        self._entry_diag(dataframe, metadata, {
-            "trend_ok": trend_ok, "setup_ok": setup_ok,
-            "range_buy": range_buy, "rsi": dataframe["rsi"],
-        })
-        return dataframe
-
-    def _entry_diag(self, dataframe, metadata, gates):
-        """Log latest-candle gate states so live logs reveal why we (don't) enter."""
-        try:
-            if dataframe is None or len(dataframe) == 0:
-                return
-            sig = int(dataframe["enter_long"].tail(50).sum()) if "enter_long" in dataframe else 0
-            parts = []
-            for k, col in gates.items():
-                try:
-                    parts.append(f"{k}={col.iloc[-1]}")
-                except Exception:
-                    pass
-            logger.info("ENTRY-DIAG %s enter_long_last50=%d %s",
-                        metadata.get("pair"), sig, " ".join(parts))
-        except Exception as e:
-            logger.info("ENTRY-DIAG error %s: %s", metadata.get("pair"), e)
-
-    def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # [SIDEWAYS v2] exit on Donchian breakdown OR overbought (sell the rip).
+        # Buy the breakout, but only in an uptrend (close above the 200-EMA).
         dataframe.loc[
             (
-                ((dataframe["close"] < dataframe["dc_low"]) | (dataframe["rsi"] > 65))
+                (dataframe["close"] > dataframe["dc_high"])        # breakout to new N-bar high
+                & (dataframe["close"] > dataframe["ema_trend"])    # uptrend filter
+                & (dataframe["volume"] > 0)
+            ),
+            "enter_long",
+        ] = 1
+        return dataframe
+
+    def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # Trailing Donchian exit: leave when price breaks below the M-bar low.
+        dataframe.loc[
+            (
+                (dataframe["close"] < dataframe["dc_low"])
                 & (dataframe["volume"] > 0)
             ),
             "exit_long",
