@@ -1,6 +1,6 @@
 {
     "$schema": "https://schema.freqtrade.io/schema.json",
-    "strategy": "DayTraderV5Gated",
+    "strategy": "DayTraderV5GatedFixed",
     "db_url": "sqlite:///user_data/tradesv3_v5_kraken.sqlite",
     "max_open_trades": 2,
     "stake_currency": "USD",
