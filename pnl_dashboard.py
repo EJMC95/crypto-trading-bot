@@ -244,7 +244,7 @@ def render():
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
 <header>
- <h1>Crypto Bots — live P&amp;L &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">what they're learning →</a></h1>
+ <h1>Crypto Bots — live P&amp;L &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">what they're learning →</a></h1>
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
    <span>Trading P&amp;L <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b></span>
@@ -358,6 +358,129 @@ validated parameter changes are. Auto-refreshes every 2 min. Times UTC.</footer>
 </body></html>'''
 
 
+TRADING_BOTS_ORDER = ["trend-golden-cross", "intraday-daytrader-5m",
+                      "swing-dip-buyer", "momo-breakout-4h", "momo-breakout-alt"]
+
+
+def fetch_period_pnl(period, limit_periods):
+    """Realized P&L per calendar {period} from the durable bot_trades table
+    (closed paper trades; survives redeploys). period is 'day'|'week'|'month'.
+    Returns (periods_newest_first, ordered_bots, grid[(period,bot)] -> {pnl,n}).
+    Scanners are excluded (they book no per-trade rows). Raises on DB error."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.bot_trades') AS t")
+            if cur.fetchone()[0] is None:
+                return [], [], {}
+            cur.execute(
+                """
+                SELECT date_trunc(%s, close_ts) AS p, bot,
+                       COALESCE(SUM(profit_abs), 0), COUNT(*)
+                FROM bot_trades
+                WHERE is_open = FALSE AND close_ts IS NOT NULL
+                GROUP BY 1, 2
+                ORDER BY 1 DESC
+                """,
+                (period,),
+            )
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    grid, periods, bots = {}, [], set()
+    for p, bot, pnl, n in rows:
+        if bot not in CURRENT_BOTS or bot in SCANNERS:
+            continue
+        key = p.date().isoformat()
+        if key not in periods:
+            periods.append(key)
+        grid[(key, bot)] = {"pnl": float(pnl), "n": int(n)}
+        bots.add(bot)
+    periods = periods[:limit_periods]
+    ordered = ([b for b in TRADING_BOTS_ORDER if b in bots]
+               + sorted(b for b in bots if b not in TRADING_BOTS_ORDER))
+    return periods, ordered, grid
+
+
+def periods_payload():
+    """Structured daily/weekly/monthly realized P&L for /periods.json."""
+    out = {}
+    for label, period, n in (("daily", "day", 31), ("weekly", "week", 13),
+                             ("monthly", "month", 13)):
+        periods, bots, grid = fetch_period_pnl(period, n)
+        out[label] = [
+            {"period": key,
+             "total": round(sum(grid[(key, b)]["pnl"] for b in bots
+                                if (key, b) in grid), 2),
+             "trades": sum(grid[(key, b)]["n"] for b in bots if (key, b) in grid),
+             "by_bot": {b: round(grid[(key, b)]["pnl"], 2) for b in bots
+                        if (key, b) in grid}}
+            for key in periods]
+    return out
+
+
+def _period_table(title, period, n):
+    try:
+        periods, bots, grid = fetch_period_pnl(period, n)
+    except Exception as e:
+        return (f'<div class="sub">{html.escape(title)}</div>'
+                f'<div class="muted">unavailable: {html.escape(str(e))}</div>')
+    if not periods:
+        return (f'<div class="sub">{html.escape(title)}</div>'
+                f'<div class="muted">no closed paper trades yet — check back as the bots trade</div>')
+    head = "".join(f"<th>{html.escape(b.replace('-', ' '))}</th>" for b in bots)
+    body = []
+    for key in periods:
+        cells, row_total = [], 0.0
+        for b in bots:
+            c = grid.get((key, b))
+            if c:
+                row_total += c["pnl"]
+                cells.append(f'<td class="{cls(c["pnl"])}">{money(c["pnl"])}'
+                             f'<span class="n"> ({c["n"]})</span></td>')
+            else:
+                cells.append('<td class="muted">—</td>')
+        body.append(f'<tr><td class="pk">{html.escape(key)}</td>{"".join(cells)}'
+                    f'<td class="{cls(row_total)}"><b>{money(row_total)}</b></td></tr>')
+    return (f'<div class="sub">{html.escape(title)}</div>'
+            f'<table class="pt"><tr><th>Period</th>{head}<th>Total</th></tr>'
+            f'{"".join(body)}</table>')
+
+
+def render_periods():
+    daily = _period_table("Daily — last 14 days", "day", 14)
+    weekly = _period_table("Weekly — last 8 weeks (week starts Mon)", "week", 8)
+    monthly = _period_table("Monthly — last 6 months", "month", 6)
+    return f'''<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="120">
+<title>Crypto Bots — P&amp;L by period</title>
+<style>
+ body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
+ header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
+ h1{{margin:0;font-size:18px}}
+ a{{color:#58a6ff;text-decoration:none}}
+ .wrap{{padding:14px}}
+ .sub{{margin:18px 4px 6px;font-size:14px;color:#c9d1d9;font-weight:600}}
+ .muted{{color:#8b949e;font-size:12px;margin:0 4px}}
+ table.pt{{width:100%;border-collapse:collapse;font-size:12px;background:#161b22;
+   border:1px solid #222;border-radius:8px;overflow:hidden}}
+ table.pt th,table.pt td{{padding:7px 9px;text-align:right;border-bottom:1px solid #21262d;white-space:nowrap}}
+ table.pt th{{background:#1b2230;color:#8b949e;font-weight:600;text-align:right}}
+ table.pt td.pk,table.pt th:first-child{{text-align:left;color:#c9d1d9}}
+ .pos{{color:#3fb950}} .neg{{color:#f85149}}
+ .n{{color:#6e7681;font-size:11px}}
+ footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
+</style></head><body>
+<header><h1>Crypto Bots — P&amp;L by period &nbsp;·&nbsp;
+ <a href="/">← live</a> &nbsp; <a href="/learning">learning →</a></h1></header>
+<div class="wrap">{daily}{weekly}{monthly}</div>
+<footer>Realized P&amp;L from closed paper trades (durable bot_trades table; survives redeploys).
+Cells show P&amp;L and (trade count). Dry-run only. Times UTC. Auto-refreshes every 120s.</footer>
+</body></html>'''
+
+
 class H(BaseHTTPRequestHandler):
     def _auth_ok(self):
         hdr = self.headers.get("Authorization", "")
@@ -388,6 +511,21 @@ class H(BaseHTTPRequestHandler):
                     d["kind"] = "scanner" if r.get("bot") in SCANNERS else "trading"
                     data.append(d)
                 payload = json.dumps({"bots": data}).encode("utf-8")
+                code = 200
+            except Exception as e:
+                payload = json.dumps({"error": str(e)}).encode("utf-8")
+                code = 500
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+        if self.path.startswith("/periods.json"):
+            # Realized daily/weekly/monthly P&L (no auth, like /pnl.json) so a
+            # scheduled fetcher can read it. Dry-run paper P&L only.
+            try:
+                payload = json.dumps(periods_payload()).encode("utf-8")
                 code = 200
             except Exception as e:
                 payload = json.dumps({"error": str(e)}).encode("utf-8")
@@ -433,8 +571,12 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(b"Auth required")
             return
         try:
-            body = (render_learning() if self.path.startswith("/learning")
-                    else render()).encode()
+            if self.path.startswith("/periods"):
+                body = render_periods().encode()
+            elif self.path.startswith("/learning"):
+                body = render_learning().encode()
+            else:
+                body = render().encode()
         except Exception as e:
             body = f"<pre>dashboard error: {html.escape(str(e))}</pre>".encode()
         self.send_response(200)
