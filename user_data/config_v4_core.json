@@ -44,27 +44,14 @@
             "BTC/USD",
             "ETH/USD",
             "SOL/USD",
+            "BNB/USD",
             "XRP/USD",
-            "ADA/USD",
-            "DOGE/USD",
-            "AVAX/USD",
-            "LINK/USD",
-            "DOT/USD",
-            "LTC/USD",
-            "BCH/USD",
-            "XLM/USD",
-            "ATOM/USD",
-            "UNI/USD",
-            "APT/USD",
-            "ARB/USD",
-            "OP/USD",
-            "NEAR/USD",
-            "INJ/USD",
-            "FIL/USD"
+            "TRX/USD"
         ],
         "pair_blacklist": [],
         "enable_ws": true
     },
+    "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over liquid majors. Re-validation (REVALIDATION_2026-06-22.md) showed V4's daily 50/200 trend edge holds on majors (+33% full-cycle, 4.6% chop drawdown) but is whipsawed by laggard alts on the full top-100 (chop drawdown 22%). StaticPairList also fixes the prior bug where VolumePairList ignored pair_whitelist and silently traded ~100 untested coins.",
     "pairlists": [
         {
             "method": "StaticPairList"
@@ -98,7 +85,7 @@
         "username": "freqtrader",
         "password": "freqbot2026"
     },
-    "bot_name": "v4_core_kraken",
+    "bot_name": "trend_golden_cross",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {

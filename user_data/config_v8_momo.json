@@ -100,7 +100,7 @@
         "username": "freqtrader",
         "password": "freqbot2026"
     },
-    "bot_name": "v8_momo_kraken",
+    "bot_name": "momo_breakout_alt",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {

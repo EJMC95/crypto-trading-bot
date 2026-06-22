@@ -44,7 +44,8 @@
             "BTC/USD",
             "ETH/USD"
         ],
-        "pair_blacklist": []
+        "pair_blacklist": [],
+        "enable_ws": true
     },
     "pairlists": [
         {
@@ -84,7 +85,7 @@
             "http://127.0.0.1:8087"
         ],
         "username": "freqtrader",
-        "password": "CHANGE_ME_use_a_strong_unique_password"
+        "password": "freqbot2026"
     },
     "bot_name": "intraday_daytrader_5m",
     "initial_state": "running",

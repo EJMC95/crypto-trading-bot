@@ -57,7 +57,8 @@
             "XLM/USD",
             "TRX/USD"
         ],
-        "pair_blacklist": []
+        "pair_blacklist": [],
+        "enable_ws": true
     },
     "pairlists": [
         {
@@ -90,7 +91,7 @@
             "http://127.0.0.1:8087"
         ],
         "username": "freqtrader",
-        "password": "CHANGE_ME_use_a_strong_unique_password"
+        "password": "freqbot2026"
     },
     "bot_name": "momo_breakout_4h",
     "initial_state": "running",

@@ -44,6 +44,7 @@
             "BTC/USD",
             "ETH/USD",
             "SOL/USD",
+            "BNB/USD",
             "XRP/USD",
             "ADA/USD",
             "DOGE/USD",
@@ -52,15 +53,9 @@
             "DOT/USD",
             "LTC/USD",
             "BCH/USD",
-            "XLM/USD",
             "ATOM/USD",
-            "UNI/USD",
-            "APT/USD",
-            "ARB/USD",
-            "OP/USD",
-            "NEAR/USD",
-            "INJ/USD",
-            "FIL/USD"
+            "XLM/USD",
+            "TRX/USD"
         ],
         "pair_blacklist": [],
         "enable_ws": true
@@ -98,10 +93,11 @@
         "username": "freqtrader",
         "password": "freqbot2026"
     },
-    "bot_name": "v6_swing_kraken",
+    "bot_name": "swing_dip_buyer",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {
         "process_throttle_secs": 5
-    }
+    },
+    "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over the validated 15-coin basket. Re-validation showed the wide net HELPS this strategy (see REVALIDATION_2026-06-22.md). Replaces VolumePairList, which ignored the whitelist and silently traded ~100 untested coins."
 }
