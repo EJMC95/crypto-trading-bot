@@ -114,24 +114,32 @@ class DayTraderV5GatedFixed(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # FIXED: relaxed entry. Two paths instead of one strict all-conditions.
+        # QUALITY FILTER (2026-06-22): the previous two-path entry — RSI>50 OR
+        # (RSI>40 AND close>ema_fast) with only volume>0 — was so loose it fired on
+        # nearly every 5m wiggle inside an up-regime, then got whipsawed straight
+        # back out on the ema_fast/ema_slow exit cross for a small fee-laden loss.
+        # That churn is what produced the 1-win / 26-loss run (-7.1%). Replaced with
+        # a single higher-conviction path that must be TREND-ALIGNED at entry so the
+        # exit cross isn't already pending:
+        #   * RSI above the midline (real momentum, not a dead-cat tick), AND
+        #   * price above the fast EMA, AND
+        #   * fast EMA already above slow EMA (9>21 — aligned, so we don't enter
+        #     one candle before the 9<21 exit fires), AND
+        #   * volume above its SMA (genuine participation, not volume>0 noise).
+        # The macro gates (1h day-trend, 1d regime) and all risk management
+        # (ROI ladder, ATR custom stop, protections) are unchanged.
         dataframe.loc[
             (
-                # Must still have day-trend up AND macro regime up (the gates stay)
+                # Macro gates unchanged: 1h day-trend up AND 1d regime up.
                 (dataframe["ema9_rising_1h"])
                 & (dataframe["regime_up_1d"] == 1)
                 & (dataframe["close_1h"] > dataframe["ema9_1h"])
 
-                # FIXED: relaxed momentum entry (either path is enough)
-                & (
-                    # Path 1: RSI > 50 with any volume (original, slightly relaxed)
-                    (dataframe["rsi"] > self.buy_rsi.value)
-                    |
-                    # Path 2: RSI > 40 and price above fast EMA (catch pullbacks)
-                    ((dataframe["rsi"] > 40) & (dataframe["close"] > dataframe["ema_fast"]))
-                )
-
-                & (dataframe["volume"] > 0)
+                # Trend-aligned momentum (single, selective path).
+                & (dataframe["rsi"] > self.buy_rsi.value)
+                & (dataframe["close"] > dataframe["ema_fast"])
+                & (dataframe["ema_fast"] > dataframe["ema_slow"])
+                & (dataframe["volume"] > dataframe["volume_sma"])
             ),
             "enter_long",
         ] = 1
