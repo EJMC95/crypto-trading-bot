@@ -66,9 +66,13 @@ class DayTraderV5GatedFixed(IStrategy):
     @property
     def protections(self):
         return [
-            {"method": "CooldownPeriod", "stop_duration_candles": 3},
+            # [CHURN FIX 2026-06-22] cooldown 3 -> 12 candles (~1h). Complements the
+            # trend-aligned entry filter: after an exit, don't immediately re-buy the
+            # same chop. Pairs with the entry quality filter to kill the 1W/26L bleed.
+            {"method": "CooldownPeriod", "stop_duration_candles": 12},
+            # Trip the stop-loss guard one stop sooner (3 -> 2).
             {"method": "StoplossGuard", "lookback_period_candles": 72,
-             "trade_limit": 3, "stop_duration_candles": 36, "only_per_pair": False},
+             "trade_limit": 2, "stop_duration_candles": 36, "only_per_pair": False},
             {"method": "MaxDrawdown", "lookback_period_candles": 288, "trade_limit": 10,
              "stop_duration_candles": 72, "max_allowed_drawdown": 0.15},
         ]
