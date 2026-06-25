@@ -89,10 +89,14 @@ class DayTraderV5Gated(IStrategy):
     # the bot after a cluster of stops; max-drawdown halts it if it bleeds.
     @property
     def protections(self):
+        # [CHURN-FIX 2026-06-25] Cooldown 3->12 candles (~1h) and StoplossGuard
+        # trips one stop sooner (3->2). The live bot's losses were fee-bleed from
+        # re-buying into the same chop, not a directional blowup; these throttle
+        # re-entry. See FIXES_2026-06-22.md and REVALIDATION_2026-06-22.md.
         return [
-            {"method": "CooldownPeriod", "stop_duration_candles": 3},
+            {"method": "CooldownPeriod", "stop_duration_candles": 12},
             {"method": "StoplossGuard", "lookback_period_candles": 72,
-             "trade_limit": 3, "stop_duration_candles": 36, "only_per_pair": False},
+             "trade_limit": 2, "stop_duration_candles": 36, "only_per_pair": False},
             {"method": "MaxDrawdown", "lookback_period_candles": 288, "trade_limit": 10,
              "stop_duration_candles": 72, "max_allowed_drawdown": 0.15},
         ]
@@ -143,15 +147,23 @@ class DayTraderV5Gated(IStrategy):
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[
             (
-                (dataframe["ema_fast"] > dataframe["ema_slow"])
-                & (dataframe["rsi"] > self.buy_rsi.value)
+                # [CHURN-FIX 2026-06-25] Fire on a FRESH momentum cross, not a
+                # sustained level. The old test (rsi > level) was true on every
+                # candle momentum stayed elevated, so after each shakeout the bot
+                # bought straight back into the same chop and bled fees. A cross
+                # fires ~once per impulse.
+                (
+                    qtpylib.crossed_above(dataframe["rsi"], self.buy_rsi.value)
+                    | qtpylib.crossed_above(dataframe["close"], dataframe["ema_fast"])
+                )
+                & (dataframe["ema_fast"] > dataframe["ema_slow"])
                 & (dataframe["volume"] > dataframe["volume_sma"])
                 & (dataframe["close_1h"] > dataframe["ema9_1h"])
                 & (dataframe["ema9_rising_1h"])
 
-                # [V5 GATE] the one new line: only buy when the daily 50/200
-                # macro trend is UP. In a daily downtrend this is False on every
-                # candle, so the bot takes zero trades and sits in cash.
+                # [V5 GATE] only buy when the daily 50/200 macro trend is UP. In a
+                # daily downtrend this is False on every candle, so the bot takes
+                # zero trades and sits in cash.
                 & (dataframe["regime_up_1d"] == 1)
 
                 & (dataframe["volume"] > 0)

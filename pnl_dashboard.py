@@ -15,8 +15,10 @@ the DB is unreachable so the page never hard-crashes.
 """
 import os
 import json
+import time
 import base64
 import html
+import threading
 import datetime as dt
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -39,13 +41,20 @@ EXPECTED = ["hl-perps-rsi", "hl-momo-breakout", "triangular-arb", "listing-snipe
 # into the trading-bot P&L headline.
 SCANNERS = {"triangular-arb", "cross-exchange-arb"}
 
+# Stock/brokerage bots (IBKR + Alpaca). Shown as their own cards with a SEPARATE
+# subtotal so their large $ equity never swamps the crypto headline.
+STOCKS = {"ikbr-stock-bot", "alpaca-momentum"}
+
 # The only bots that should appear. Anything else in the table (e.g. legacy
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
 # stale duplicate and is filtered out here so it can never skew totals or the
 # grid — independent of whether the Postgres table has been pruned yet.
-CURRENT_BOTS = set(EXPECTED) | SCANNERS
+CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS
 
-STALE_SECONDS = 180  # snapshots older than this are flagged "stale"
+STALE_SECONDS = 180  # crypto bots loop fast; older than this = "stale"
+# Stock bots publish far less often (IKBR every 2h, Alpaca daily), so they need a
+# much longer window before they should be considered stale.
+STOCK_STALE_SECONDS = 26 * 3600
 
 
 def fetch_rows():
@@ -139,14 +148,82 @@ def cls(x):
         return ""
 
 
-def age_str(updated_at):
+def _ensure_history_table(conn):
+    with conn.cursor() as cur:
+        cur.execute("""CREATE TABLE IF NOT EXISTS bot_equity_history (
+            bot TEXT NOT NULL, ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+            equity DOUBLE PRECISION, pnl_abs DOUBLE PRECISION,
+            PRIMARY KEY (bot, ts))""")
+
+
+def snapshot_history_once():
+    """Append the current bot_pnl equity/P&L for every bot into the history table.
+    Run on a timer so EVERY bot gets an equity time-series with no bot changes."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    conn.autocommit = True
+    try:
+        _ensure_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO bot_equity_history (bot, ts, equity, pnl_abs) "
+                        "SELECT bot, now(), equity, pnl_abs FROM bot_pnl "
+                        "ON CONFLICT DO NOTHING")
+    finally:
+        conn.close()
+
+
+def history_loop(interval=300):
+    while True:
+        try:
+            snapshot_history_once()
+        except Exception as e:  # noqa: BLE001
+            print(f"[history] snapshot failed: {e}", flush=True)
+        time.sleep(interval)
+
+
+def fetch_history(hours=168):
+    """(ts, bot, equity, pnl_abs) rows for the last N hours, oldest first."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.bot_equity_history') AS t")
+            if cur.fetchone()[0] is None:
+                return []
+            cur.execute("SELECT ts, bot, equity, pnl_abs FROM bot_equity_history "
+                        f"WHERE ts > now() - interval '{int(hours)} hours' ORDER BY ts")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def fetch_open_trades():
+    """{bot: [trade dicts]} for currently-open trades (crypto holdings)."""
+    import psycopg2, psycopg2.extras
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('public.bot_trades') AS t")
+            if cur.fetchone()["t"] is None:
+                return {}
+            cur.execute("SELECT bot, pair, profit_abs, profit_ratio, open_rate "
+                        "FROM bot_trades WHERE is_open = TRUE ORDER BY bot, pair")
+            out = {}
+            for r in cur.fetchall():
+                out.setdefault(r["bot"], []).append(dict(r))
+            return out
+    finally:
+        conn.close()
+
+
+def age_str(updated_at, threshold=STALE_SECONDS):
     if updated_at is None:
         return "never", True
     now = dt.datetime.now(dt.timezone.utc)
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=dt.timezone.utc)
     secs = (now - updated_at).total_seconds()
-    stale = secs > STALE_SECONDS
+    stale = secs > threshold
     if secs < 90:
         return f"{int(secs)}s ago", stale
     if secs < 5400:
@@ -154,19 +231,51 @@ def age_str(updated_at):
     return f"{int(secs // 3600)}h ago", stale
 
 
-def card(bot, row):
+def _holdings_html(bot, extra, open_trades):
+    """Current holdings: stock bots from extra['positions']; crypto from open bot_trades."""
+    items = []
+    if isinstance(extra, dict):
+        for p in (extra.get("positions") or []):
+            up = p.get("upnl")
+            up_html = f' <span class="{cls(up)}">{money(up)}</span>' if up is not None else ""
+            items.append(f'<div class="row"><span>{html.escape(str(p.get("symbol")))} ×{p.get("qty")}</span>'
+                         f'<b>{money(p.get("value"))}{up_html}</b></div>')
+    for t in (open_trades.get(bot) or []):
+        pr = t.get("profit_ratio")
+        pr_html = f' <span class="{cls(pr)}">{pct(pr)}</span>' if pr is not None else ""
+        items.append(f'<div class="row"><span>{html.escape(str(t.get("pair")))}</span>'
+                     f'<b>{money(t.get("profit_abs"))}{pr_html}</b></div>')
+    return f'<div class="sub">Holdings ({len(items)})</div>{"".join(items)}' if items else ""
+
+
+def _orders_html(extra):
+    if not (isinstance(extra, dict) and extra.get("open_orders")):
+        return ""
+    items = [f'<div class="row"><span>{html.escape(str(o.get("action")))} '
+             f'{html.escape(str(o.get("symbol")))} ×{o.get("qty")}</span>'
+             f'<b class="muted">{html.escape(str(o.get("status")))}</b></div>'
+             for o in extra["open_orders"]]
+    return f'<div class="sub">Open orders ({len(items)})</div>{"".join(items)}'
+
+
+def card(bot, row, open_trades=None):
+    open_trades = open_trades or {}
     if row is None:
         return (f'<div class="card"><h2>{html.escape(bot)} '
                 f'<span class="dot off"></span></h2>'
                 f'<div class="muted">no data yet — bot has not published</div></div>')
-    age, stale = age_str(row.get("updated_at"))
+    thr = STOCK_STALE_SECONDS if bot in STOCKS else STALE_SECONDS
+    age, stale = age_str(row.get("updated_at"), thr)
     status = (row.get("status") or "?")
     dot = "warn" if stale else ("off" if status in ("halted", "error") else "on")
     extra = row.get("extra") or {}
     if isinstance(extra, dict):
-        extra_bits = " · ".join(f"{k}: {html.escape(str(v))}" for k, v in extra.items())
+        _bits = {k: v for k, v in extra.items() if k not in ("positions", "open_orders")}
+        extra_bits = " · ".join(f"{k}: {html.escape(str(v))}" for k, v in _bits.items())
     else:
         extra_bits = html.escape(str(extra))
+    holdings_html = _holdings_html(bot, extra, open_trades)
+    orders_html = _orders_html(extra)
     rows = []
     if row.get("equity") is not None:
         rows.append(f'<div class="row"><span>Equity</span><b>{money(row.get("equity"))}</b></div>')
@@ -185,6 +294,8 @@ def card(bot, row):
       <h2>{html.escape(bot)} <span class="dot {dot}"></span></h2>
       <div class="muted">{html.escape(str(status))} · updated {html.escape(age)}{" · STALE" if stale else ""}</div>
       {"".join(rows)}
+      {holdings_html}
+      {orders_html}
       {f'<div class="sub">{extra_bits}</div>' if extra_bits else ''}
     </div>'''
 
@@ -196,22 +307,59 @@ def render():
     except Exception as e:
         rows, db_err = {}, f"{type(e).__name__}: {e}"
 
+    try:
+        open_trades = fetch_open_trades()
+    except Exception:  # noqa: BLE001
+        open_trades = {}
+
     # union of expected + whatever actually published
     names = list(EXPECTED) + [b for b in rows if b not in EXPECTED]
-    cards = [card(b, rows.get(b)) for b in names]
+    cards = [card(b, rows.get(b), open_trades) for b in names]
 
     live = [r for r in rows.values() if r]
-    # Trading-bot P&L (the real headline) excludes scanners; scanners' optimistic
-    # paper-arb booking is shown as its own subtotal so it can't flatter the total.
-    tot_pnl = sum((r.get("pnl_abs") or 0) for r in live
+    _crypto = [r for r in live if r.get("bot") not in STOCKS]
+    # Crypto trading-bot P&L (the real headline) excludes scanners AND stocks;
+    # each of those is shown as its own subtotal so it can't distort the total.
+    tot_pnl = sum((r.get("pnl_abs") or 0) for r in _crypto
                   if r.get("bot") not in SCANNERS)
     scan_pnl = sum((r.get("pnl_abs") or 0) for r in live
                    if r.get("bot") in SCANNERS)
-    tot_equity = sum((r.get("equity") or 0) for r in live if r.get("equity") is not None)
-    n_open = sum((r.get("open_trades") or 0) for r in live)
-    n_closed = sum((r.get("closed_trades") or 0) for r in live)
+    stock_pnl = sum((r.get("pnl_abs") or 0) for r in live if r.get("bot") in STOCKS)
+    tot_equity = sum((r.get("equity") or 0) for r in _crypto if r.get("equity") is not None)
+    stock_equity = sum((r.get("equity") or 0) for r in live
+                       if r.get("bot") in STOCKS and r.get("equity") is not None)
+    n_open = sum((r.get("open_trades") or 0) for r in _crypto)
+    n_closed = sum((r.get("closed_trades") or 0) for r in _crypto)
     online = sum(1 for r in live
-                 if not age_str(r.get("updated_at"))[1] and r.get("status") not in ("halted", "error"))
+                 if not age_str(r.get("updated_at"),
+                                STOCK_STALE_SECONDS if r.get("bot") in STOCKS else STALE_SECONDS)[1]
+                 and r.get("status") not in ("halted", "error"))
+
+    # Grand total across EVERYTHING (the full picture). Equity is a clean sum of
+    # all account balances; P&L sums all bots' pnl_abs (mixed bases — see subtotals).
+    grand_equity = sum((r.get("equity") or 0) for r in live if r.get("equity") is not None)
+    grand_pnl = tot_pnl + scan_pnl + stock_pnl
+
+    # Whole-feed staleness. The DB can be reachable and rows can exist, yet every
+    # row is old because the bots lost their write path (the exact failure mode on
+    # 2026-06-22: bots alive, hardcoded DATABASE_URL went stale, no fresh writes).
+    # A frozen feed must NOT look like "all bots flat", so flag it loudly here and
+    # in /pnl.json.
+    def _age_secs(r):
+        ua = r.get("updated_at")
+        if ua is None:
+            return None
+        if ua.tzinfo is None:
+            ua = ua.replace(tzinfo=dt.timezone.utc)
+        return (dt.datetime.now(dt.timezone.utc) - ua).total_seconds()
+
+    _ages = [s for s in (_age_secs(r) for r in live) if s is not None]
+    freshest = min(_ages) if _ages else None
+    n_stale_live = sum(1 for r in live
+                       if age_str(r.get("updated_at"),
+                                  STOCK_STALE_SECONDS if r.get("bot") in STOCKS
+                                  else STALE_SECONDS)[1])
+    feed_stale = bool(live) and freshest is not None and n_stale_live == len(live)
 
     banner = ""
     if db_err:
@@ -220,11 +368,18 @@ def render():
     elif not live:
         banner = ('<div class="banner">Connected to Postgres, but no bot has published yet. '
                   'Make sure each bot has DATABASE_URL set and has run at least one loop.</div>')
+    elif feed_stale:
+        _m = int(freshest // 60)
+        _age = f"{_m} min" if _m < 120 else f"{_m // 60}h {_m % 60}m"
+        banner = (f'<div class="banner crit">FEED STALE — no bot has published in {_age}. '
+                  f'Showing last-known values, not live P&amp;L. The bots may be running '
+                  f'but unable to write to Postgres — check the DATABASE_URL reference on '
+                  f'each bot service and redeploy.</div>')
 
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="30">
-<title>Crypto Bots — Live P&amp;L</title>
+<title>All Bots — Live P&amp;L</title>
 <style>
  body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
  header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
@@ -232,6 +387,7 @@ def render():
  .totals{{display:flex;gap:18px;flex-wrap:wrap;font-size:14px}}
  .totals b{{font-size:16px}}
  .banner{{margin:12px 14px 0;padding:10px 12px;background:#3d2b12;border:1px solid #6b4a16;border-radius:8px;color:#f0c674;font-size:13px}}
+ .banner.crit{{background:#3d1218;border-color:#6b1620;color:#f85149;font-weight:600}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:14px}}
  .card{{background:#161b22;border:1px solid #222;border-radius:10px;padding:14px}}
  .card h2{{margin:0 0 2px;font-size:15px}}
@@ -244,12 +400,13 @@ def render():
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
 <header>
- <h1>Crypto Bots — live P&amp;L &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">what they're learning →</a></h1>
+ <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a></h1>
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
-   <span>Trading P&amp;L <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b></span>
+   <span style="border-right:1px solid #30363d;padding-right:18px">GRAND TOTAL <b>{money(grand_equity)}</b> eq · <b class="{cls(grand_pnl)}">{money(grand_pnl)}</b> P&amp;L</span>
+   <span>Crypto P&amp;L <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b> · eq {money(tot_equity)}</span>
    <span>Scanner paper <b class="{cls(scan_pnl)}">{money(scan_pnl)}</b></span>
-   <span>Total equity <b>{money(tot_equity)}</b></span>
+   <span>Stocks (paper) <b class="{cls(stock_pnl)}">{money(stock_pnl)}</b> · eq {money(stock_equity)}</span>
    <span>Trades <b>{n_closed} closed · {n_open} open</b></span>
  </div>
 </header>
@@ -257,6 +414,98 @@ def render():
 <div class="grid">{"".join(cards)}</div>
 <footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
+</body></html>'''
+
+
+def _svg_chart(series, color, label, height=170, width=760):
+    """series: list of (datetime, value) oldest-first. Returns an SVG line chart."""
+    series = [(t, v) for t, v in series if v is not None]
+    if len(series) < 2:
+        return (f'<div class="sub">{label}</div>'
+                '<div class="muted">Not enough history yet — the chart fills in as '
+                'snapshots accrue (one every 5 min).</div>')
+    vals = [v for _, v in series]
+    lo, hi = min(vals), max(vals)
+    if hi == lo:
+        hi = lo + 1
+    n = len(series)
+    pts = " ".join(
+        f"{(i/(n-1))*width:.1f},{height - (v-lo)/(hi-lo)*height:.1f}"
+        for i, (_, v) in enumerate(series))
+    last = vals[-1]
+    return (f'<div class="sub">{label} · now <b>{money(last)}</b> '
+            f'<span class="muted">(min {money(lo)} / max {money(hi)})</span></div>'
+            f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
+            f'preserveAspectRatio="none" style="background:#0d1117;border:1px solid #222;'
+            f'border-radius:8px;margin-bottom:8px">'
+            f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/></svg>')
+
+
+def render_history():
+    try:
+        rows = fetch_history(hours=168)  # last 7 days
+        db_err = None
+    except Exception as e:  # noqa: BLE001
+        rows, db_err = [], f"{type(e).__name__}: {e}"
+
+    # Each snapshot batch shares one ts (INSERT ... SELECT now()). Aggregate per
+    # group (Total / Crypto / Stocks / Scanner) at each point in time. Each chart
+    # is auto-scaled so small crypto balances aren't flattened by big stock ones.
+    ts_axis = sorted({ts for ts, _, _, _ in rows})
+    GROUPS = ["Total", "Crypto", "Stocks", "Scanner"]
+    agg = {g: {ts: {"eq": 0.0, "pnl": 0.0} for ts in ts_axis} for g in GROUPS}
+    for ts, bot, eq, pnl in rows:
+        g = "Stocks" if bot in STOCKS else ("Scanner" if bot in SCANNERS else "Crypto")
+        for gg in (g, "Total"):
+            if eq is not None:
+                agg[gg][ts]["eq"] += eq
+            if pnl is not None:
+                agg[gg][ts]["pnl"] += pnl
+
+    def series(group, key):
+        return [(ts, agg[group][ts][key]) for ts in ts_axis]
+
+    banner = ""
+    if db_err:
+        banner = f'<div class="banner">Database unreachable: {html.escape(db_err)}.</div>'
+    elif not ts_axis:
+        banner = ('<div class="banner">No history captured yet. The dashboard snapshots '
+                  'every bot\'s equity every 5 minutes — check back shortly.</div>')
+
+    # Whole operation, then per group. Scanners book no equity, so equity charts
+    # cover Total/Crypto/Stocks; P&L charts cover all four.
+    charts = (
+        '<h2 style="font-size:15px;margin:18px 4px 2px">Whole operation</h2>'
+        + _svg_chart(series("Total", "eq"), "#e6e6e6", "Total equity")
+        + _svg_chart(series("Total", "pnl"), "#3fb950", "Total P&amp;L")
+        + '<h2 style="font-size:15px;margin:18px 4px 2px">Crypto bots</h2>'
+        + _svg_chart(series("Crypto", "eq"), "#58a6ff", "Crypto equity")
+        + _svg_chart(series("Crypto", "pnl"), "#58a6ff", "Crypto P&amp;L")
+        + '<h2 style="font-size:15px;margin:18px 4px 2px">Stock bots (IKBR + Alpaca)</h2>'
+        + _svg_chart(series("Stocks", "eq"), "#d29922", "Stocks equity")
+        + _svg_chart(series("Stocks", "pnl"), "#d29922", "Stocks P&amp;L")
+        + '<h2 style="font-size:15px;margin:18px 4px 2px">Scanners</h2>'
+        + _svg_chart(series("Scanner", "pnl"), "#a371f7", "Scanner paper P&amp;L")
+    )
+    return f'''<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<title>All Bots — History</title>
+<style>
+ body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
+ header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
+ h1{{margin:0;font-size:18px}} a{{color:#58a6ff;text-decoration:none;font-size:14px}}
+ .wrap{{padding:14px}}
+ .sub{{margin:14px 4px 6px;font-size:14px;color:#c9d1d9;font-weight:600}}
+ .muted{{color:#8b949e;font-size:12px}}
+ .banner{{margin:12px 4px;padding:10px 12px;background:#3d2b12;border:1px solid #6b4a16;border-radius:8px;color:#f0c674;font-size:13px}}
+ .pos{{color:#3fb950}} .neg{{color:#f85149}}
+ footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
+</style></head><body>
+<header><h1>All Bots — history &nbsp;·&nbsp; <a href="/">← live</a> &nbsp; <a href="/periods">P&amp;L by period →</a></h1></header>
+<div class="wrap">{banner}{charts}</div>
+<footer>Equity/P&amp;L sampled every 5 min from the shared bot_pnl table (last 7 days).
+Auto-refreshes every 60s. Times UTC.</footer>
 </body></html>'''
 
 
@@ -333,6 +582,7 @@ def render_learning():
  h1{{margin:0 0 6px;font-size:18px}}
  a{{color:#58a6ff;text-decoration:none;font-size:13px}}
  .banner{{margin:12px 14px 0;padding:10px 12px;background:#3d2b12;border:1px solid #6b4a16;border-radius:8px;color:#f0c674;font-size:13px}}
+ .banner.crit{{background:#3d1218;border-color:#6b1620;color:#f85149;font-weight:600}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;padding:14px}}
  .card{{background:#161b22;border:1px solid #222;border-radius:10px;padding:14px}}
  .card h2{{margin:0 0 2px;font-size:15px}}
@@ -504,13 +754,48 @@ class H(BaseHTTPRequestHandler):
                 def _ser(v):
                     return v.isoformat() if hasattr(v, "isoformat") else v
                 data = []
+                _now = dt.datetime.now(dt.timezone.utc)
+                _age_secs = []   # raw ages, for the freshest-update figure
+                _stale_flags = []  # per-bot stale booleans, threshold-aware
                 for r in rows.values():
                     d = {k: _ser(v) for k, v in r.items()}
                     # Tag so downstream reports never blend scanner paper-arb
                     # P&L with the trading bots' realized P&L.
                     d["kind"] = "scanner" if r.get("bot") in SCANNERS else "trading"
+                    # Per-bot heartbeat (2026-06-25): expose each bot's age and a
+                    # threshold-aware stale flag so the scheduled report can flag a
+                    # single laggard (e.g. ikbr-stock-bot running ~85m behind the
+                    # fleet) without recomputing thresholds itself.
+                    thr = STOCK_STALE_SECONDS if r.get("bot") in STOCKS else STALE_SECONDS
+                    ua = r.get("updated_at")
+                    if ua is not None:
+                        if ua.tzinfo is None:
+                            ua = ua.replace(tzinfo=dt.timezone.utc)
+                        secs = (_now - ua).total_seconds()
+                        d["age_sec"] = int(secs)
+                        d["stale"] = bool(secs > thr)
+                        _age_secs.append(secs)
+                        _stale_flags.append(d["stale"])
+                    else:
+                        d["age_sec"] = None
+                        d["stale"] = None
                     data.append(d)
-                payload = json.dumps({"bots": data}).encode("utf-8")
+                # Top-level meta so the scheduled report can detect a frozen feed
+                # directly instead of inferring it. feed_stale = EVERY published bot
+                # is past ITS OWN threshold (stock bots get the longer window), so a
+                # single lagging stock bot no longer trips a false whole-feed alarm
+                # — while a truly frozen feed (the 2026-06-22 failure) still does.
+                freshest = min(_age_secs) if _age_secs else None
+                meta = {
+                    "generated_at": _now.isoformat(),
+                    "stale_threshold_sec": STALE_SECONDS,
+                    "stock_stale_threshold_sec": STOCK_STALE_SECONDS,
+                    "freshest_update_age_sec": (int(freshest) if freshest is not None else None),
+                    "feed_stale": bool(_stale_flags) and all(_stale_flags),
+                    "n_stale": sum(1 for s in _stale_flags if s),
+                    "n_live": len(_stale_flags),
+                }
+                payload = json.dumps({"meta": meta, "bots": data}).encode("utf-8")
                 code = 200
             except Exception as e:
                 payload = json.dumps({"error": str(e)}).encode("utf-8")
@@ -575,6 +860,8 @@ class H(BaseHTTPRequestHandler):
                 body = render_periods().encode()
             elif self.path.startswith("/learning"):
                 body = render_learning().encode()
+            elif self.path.startswith("/history"):
+                body = render_history().encode()
             else:
                 body = render().encode()
         except Exception as e:
@@ -591,4 +878,8 @@ class H(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"[pnl_dashboard] serving live P&L on :{PORT} "
           f"({'DB set' if DATABASE_URL else 'NO DATABASE_URL'})", flush=True)
+    # Background: snapshot every bot's equity into history every 5 min so the
+    # /history charts build up over time (no changes needed in any bot).
+    if DATABASE_URL:
+        threading.Thread(target=history_loop, args=(300,), daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()

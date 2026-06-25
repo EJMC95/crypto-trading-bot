@@ -307,6 +307,107 @@ def store_analysis(strategy, payload):
         return False
 
 
+# --------------------------------------------------------------------------- #
+# Durable paper-trade ledger (2026-06-25)
+#
+# Bots that compute their cumulative P&L by re-reading a LOCAL csv each loop
+# (e.g. listing_sniper.py reading sniper_trades.csv) silently reset to $0 / 0
+# closed whenever that ephemeral file is wiped on a Railway redeploy — which is
+# exactly what happened on 2026-06-24/25 (listing-sniper: -$300/6 closed -> 0/0).
+# This table persists each closed paper trade in Postgres, keyed by a caller-
+# supplied stable id, so the cumulative aggregate survives restarts. Idempotent.
+# --------------------------------------------------------------------------- #
+_paper_trades_table_ready = False
+
+
+def _ensure_paper_trades_table(conn):
+    global _paper_trades_table_ready
+    if _paper_trades_table_ready:
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS paper_trades (
+                bot        TEXT NOT NULL,
+                trade_id   TEXT NOT NULL,
+                pair       TEXT,
+                pnl_abs    DOUBLE PRECISION,
+                pnl_pct    DOUBLE PRECISION,
+                opened_at  TEXT,
+                closed_at  TEXT,
+                reason     TEXT,
+                seen_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (bot, trade_id)
+            )
+            """
+        )
+    _paper_trades_table_ready = True
+
+
+def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
+                        opened_at=None, closed_at=None, reason=None):
+    """Idempotently record one closed paper trade so cumulative P&L survives a
+    redeploy. `trade_id` must be stable+unique for the trade. Never raises."""
+    conn = _get_conn()
+    if conn is None or trade_id is None:
+        return False
+    try:
+        _ensure_paper_trades_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO paper_trades (bot, trade_id, pair, pnl_abs, pnl_pct,
+                    opened_at, closed_at, reason, seen_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
+                ON CONFLICT (bot, trade_id) DO UPDATE SET
+                    pnl_abs=EXCLUDED.pnl_abs, pnl_pct=EXCLUDED.pnl_pct,
+                    closed_at=EXCLUDED.closed_at, reason=EXCLUDED.reason,
+                    seen_at=now()
+                """,
+                (bot, str(trade_id), pair, pnl_abs, pnl_pct,
+                 opened_at, closed_at, reason),
+            )
+        return True
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"paper-trade write failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return False
+
+
+def fetch_paper_aggregate(bot):
+    """Return {'realized','closed','wins','losses'} from the durable ledger, or
+    None if the DB is unavailable. Lets a bot recover its cumulative totals after
+    a local-file wipe."""
+    conn = _get_conn()
+    if conn is None:
+        return None
+    try:
+        _ensure_paper_trades_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COALESCE(SUM(pnl_abs), 0.0),
+                       COUNT(*),
+                       COUNT(*) FILTER (WHERE pnl_abs > 0)
+                FROM paper_trades WHERE bot = %s
+                """,
+                (bot,),
+            )
+            realized, closed, wins = cur.fetchone()
+        closed = int(closed or 0)
+        wins = int(wins or 0)
+        return {"realized": float(realized or 0.0), "closed": closed,
+                "wins": wins, "losses": closed - wins}
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"paper-trade read failed ({e})")
+        return None
+
+
 if __name__ == "__main__":
     # quick self-test: writes a dummy row if DATABASE_URL is set, else no-ops.
     ok = publish("selftest", status="online", pnl_abs=1.23, pnl_pct=0.0123,

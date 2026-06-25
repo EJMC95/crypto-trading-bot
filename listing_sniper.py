@@ -53,10 +53,32 @@ Useful flags:
                          before the exchange flips it to "active" (more
                          aggressive, less realistic).
 
+PRE-TRADE RESEARCH GATE (2026-06-25)
+------------------------------------
+A brand-new pair has no history to backtest, so before committing paper capital
+the sniper now inspects its LIVE microstructure on public endpoints (ticker +
+order book) and only buys if it clears a quality gate:
+    * OBSERVATION WINDOW — wait `--min-observe-sec` (120s) after first sight so we
+      skip the opening-print spike instead of buying the top tick.
+    * SPREAD — reject if bid/ask spread exceeds `--max-spread-bps` (500 = 5%).
+    * EXIT LIQUIDITY — require resting bid-side depth within `--depth-band-pct`
+      (5%) of touch to be >= `--min-depth-mult` x stake (3x), so the paper exit
+      is realistic, not fiction.
+    * ANTI-CHASE — skip if price already ran > `--max-launch-pump` (+150%) above
+      where we first saw it (don't buy the blow-off top).
+    * VOLUME FLOOR — optional `--min-quote-vol` (off by default; new pairs have
+      little 24h history).
+Candidates that fail are re-checked each cycle until they pass or age out after
+`--max-pending-min` (30m). Rejections are logged to sniper_skips.csv so the gate
+is auditable. Disable the whole gate with `--no-research` to restore the old
+buy-the-first-print behaviour. This directly targets the 6-losses/6-trades run,
+which came from buying illiquid, wide-spread, already-spiking first prints.
+
 Files written (in ./sniper_data/):
     known_pairs.json     per-exchange baseline + every pair ever seen
     open_positions.json  currently-open paper trades (survives restarts)
     sniper_trades.csv     closed paper-trade log (your results)
+    sniper_skips.csv      pairs the research gate rejected (+ why), for review
 """
 
 import argparse
@@ -78,6 +100,7 @@ KNOWN_FILE = os.path.join(DATA_DIR, "known_pairs.json")
 OPEN_FILE = os.path.join(DATA_DIR, "open_positions.json")
 PENDING_FILE = os.path.join(DATA_DIR, "pending.json")
 TRADES_CSV = os.path.join(DATA_DIR, "sniper_trades.csv")
+SKIPS_CSV = os.path.join(DATA_DIR, "sniper_skips.csv")
 
 # Bases we never want to "snipe" (stablecoins / wrapped fiat — not real launches)
 SKIP_BASES = {
@@ -228,6 +251,25 @@ def log_trade(row):
         csv.writer(f).writerow(row)
 
 
+def log_skip(exid, sym, reason, m):
+    """Record a pair the research gate rejected, so rejections are auditable
+    (did the filter save us from a rug, or skip a winner?)."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    new = not os.path.exists(SKIPS_CSV)
+    with open(SKIPS_CSV, "a", newline="") as f:
+        w = csv.writer(f)
+        if new:
+            w.writerow(["skipped_at", "exchange", "pair", "reason", "last",
+                        "quote_vol_24h", "spread_bps", "bid_depth_quote"])
+        w.writerow([
+            ts(), exid, sym, reason,
+            f"{m.get('last'):.10g}" if m.get("last") is not None else "",
+            f"{m.get('quote_vol_24h'):.2f}" if m.get("quote_vol_24h") is not None else "",
+            f"{m.get('spread_bps'):.1f}" if m.get("spread_bps") is not None else "",
+            f"{m.get('bid_depth_quote'):.2f}" if m.get("bid_depth_quote") is not None else "",
+        ])
+
+
 # ----------------------------- pair filters ---------------------------------
 
 def quote_matches(market, quotes):
@@ -238,15 +280,171 @@ def base_skipped(market):
     return str(market.get("base", "")).upper() in SKIP_BASES
 
 
+# ----------------------------- pre-trade research ---------------------------
+# A brand-new listing has NO price history to backtest, so "research" here means
+# inspecting its LIVE microstructure on public endpoints (ticker + order book)
+# before committing paper capital. This is what was missing when the sniper went
+# 6 losses / 6 trades: it bought the very first print of every new pair, spread
+# and liquidity unchecked, and rode the open-candle spike straight back down.
+#
+# All calls below are PUBLIC (fetch_ticker / fetch_order_book) — no keys, no
+# orders, still 100% dry-run.
+
+def research_market(client, sym, cfg):
+    """Pull live microstructure for a candidate pair. Returns a metrics dict.
+
+    Keys: ok(bool), reason(str on failure), last, quote_vol_24h, spread_bps,
+    best_bid, best_ask, bid_depth_quote, ask_depth_quote. Never raises.
+    """
+    m = {"ok": False, "reason": "", "last": None, "quote_vol_24h": None,
+         "spread_bps": None, "best_bid": None, "best_ask": None,
+         "bid_depth_quote": None, "ask_depth_quote": None}
+
+    # --- ticker: last price + 24h volume (volume is a SOFT signal for new pairs,
+    #     which legitimately have tiny 24h history right after listing) ---
+    try:
+        t = client.fetch_ticker(sym)
+    except Exception as e:  # noqa: BLE001
+        m["reason"] = f"no_ticker:{type(e).__name__}"
+        return m
+    last = t.get("last") or t.get("close") or t.get("ask")
+    try:
+        m["last"] = float(last) if last is not None else None
+    except (TypeError, ValueError):
+        m["last"] = None
+    qv = t.get("quoteVolume")
+    bv = t.get("baseVolume")
+    if qv is None and bv is not None and m["last"]:
+        try:
+            qv = float(bv) * m["last"]
+        except (TypeError, ValueError):
+            qv = None
+    try:
+        m["quote_vol_24h"] = float(qv) if qv is not None else None
+    except (TypeError, ValueError):
+        m["quote_vol_24h"] = None
+
+    # --- order book: spread + resting depth (the real test of "can I exit?") ---
+    try:
+        ob = client.fetch_order_book(sym, limit=int(cfg.get("book_levels", 25)))
+    except Exception as e:  # noqa: BLE001
+        m["reason"] = f"no_book:{type(e).__name__}"
+        return m
+    bids = ob.get("bids") or []
+    asks = ob.get("asks") or []
+    if not bids or not asks:
+        m["reason"] = "one_sided_book"  # cannot exit a one-sided market
+        return m
+    try:
+        best_bid = float(bids[0][0]); best_ask = float(asks[0][0])
+    except (TypeError, ValueError, IndexError):
+        m["reason"] = "bad_book"
+        return m
+    if best_bid <= 0 or best_ask <= 0 or best_ask < best_bid:
+        m["reason"] = "bad_book"
+        return m
+    m["best_bid"], m["best_ask"] = best_bid, best_ask
+    mid = (best_bid + best_ask) / 2.0
+    m["spread_bps"] = (best_ask - best_bid) / mid * 10_000.0
+    band = float(cfg.get("depth_band_pct", 0.05))
+    bid_floor = best_bid * (1 - band)
+    ask_ceil = best_ask * (1 + band)
+
+    def _depth(levels, keep):
+        tot = 0.0
+        for lvl in levels:
+            try:
+                px, amt = float(lvl[0]), float(lvl[1])
+            except (TypeError, ValueError, IndexError):
+                continue
+            if keep(px):
+                tot += px * amt  # quote-currency value resting at this level
+        return tot
+
+    m["bid_depth_quote"] = _depth(bids, lambda px: px >= bid_floor)
+    m["ask_depth_quote"] = _depth(asks, lambda px: px <= ask_ceil)
+    m["ok"] = True
+    m["reason"] = "ok"
+    return m
+
+
+def research_gate(client, sym, cfg, state):
+    """Decide whether a candidate passes the pre-trade research gate.
+
+    `state` is the per-candidate pending dict (carries first-seen time + the
+    earliest observed price, so we can enforce an observation window and an
+    anti-chase check). Returns (passed: bool, reason: str, metrics: dict).
+
+    Disable the whole gate with cfg['research']=False to restore the old
+    buy-the-first-print behaviour.
+    """
+    if not cfg.get("research", True):
+        return True, "research_off", {}
+
+    age = max(0.0, time.time() - state.get("ts", time.time()))
+
+    # 1) OBSERVATION WINDOW — never buy the opening print. Let the launch candle
+    #    settle so we're not handed the top tick.
+    min_obs = float(cfg.get("min_observe_sec", 0))
+    if age < min_obs:
+        return False, f"observing({age:.0f}/{min_obs:.0f}s)", {}
+
+    m = research_market(client, sym, cfg)
+    if not m.get("ok"):
+        return False, m.get("reason", "research_fail"), m
+
+    # Capture the earliest price we ever saw for the anti-chase check.
+    if state.get("first_px") is None and m.get("last"):
+        state["first_px"] = m["last"]
+
+    fails = []
+
+    # 2) SPREAD — a blown-out spread means you pay the top and sell the bottom.
+    sp = m.get("spread_bps")
+    max_sp = float(cfg.get("max_spread_bps", 0))
+    if max_sp > 0 and sp is not None and sp > max_sp:
+        fails.append(f"wide_spread({sp:.0f}>{max_sp:.0f}bps)")
+
+    # 3) EXIT LIQUIDITY — the bid side within `depth_band_pct` of touch must be
+    #    able to absorb our stake several times over, or the paper exit is fiction.
+    bd = m.get("bid_depth_quote") or 0.0
+    need = float(cfg.get("min_depth_mult", 0)) * float(cfg.get("stake", 0))
+    if need > 0 and bd < need:
+        fails.append(f"thin_book({bd:.0f}<{need:.0f})")
+
+    # 4) VOLUME FLOOR — soft, off by default (new pairs have little 24h history).
+    qv = m.get("quote_vol_24h")
+    min_qv = float(cfg.get("min_quote_vol", 0))
+    if min_qv > 0:
+        if qv is None:
+            fails.append("vol_unknown")
+        elif qv < min_qv:
+            fails.append(f"low_vol({qv:.0f}<{min_qv:.0f})")
+
+    # 5) ANTI-CHASE — if it already ran far past where we first saw it, the easy
+    #    move is gone and we'd be buying the blow-off top.
+    fp = state.get("first_px")
+    max_pump = float(cfg.get("max_launch_pump", 0))
+    if max_pump > 0 and fp and m.get("last"):
+        run = (m["last"] / fp) - 1.0
+        if run > max_pump:
+            fails.append(f"already_pumped(+{run*100:.0f}%)")
+
+    if fails:
+        return False, ";".join(fails), m
+    return True, "pass", m
+
+
 # ----------------------------- paper trading --------------------------------
 
-def open_position(exid, client, sym, market, cfg, detected_at):
+def open_position(exid, client, sym, market, cfg, detected_at, research=None):
     px = get_price(client, sym)
     if px is None:
         return None  # no price yet; try again next cycle
     slip = cfg["slippage_bps"] / 10_000.0
     entry = px["ask"] * (1 + slip)  # simulate paying a bit above ask
     quote_ccy = str(market.get("quote", "")).upper() or cfg["quotes"][0]
+    research = research or {}
     pos = {
         "exchange": exid,
         "pair_id": sym,
@@ -258,51 +456,124 @@ def open_position(exid, client, sym, market, cfg, detected_at):
         "stake_quote": cfg["stake"],
         "quote": quote_ccy,
         "peak": entry,
+        "remaining_frac": 1.0,   # scale-out / trailing-stop state
+        "tp1_done": False,
+        # snapshot of the microstructure that cleared the research gate, so a
+        # post-mortem can ask "what did liquidity look like when we bought?"
+        "entry_spread_bps": research.get("spread_bps"),
+        "entry_bid_depth_quote": research.get("bid_depth_quote"),
+        "entry_quote_vol_24h": research.get("quote_vol_24h"),
     }
     sl_txt = "none" if cfg["sl"] <= 0 else f"-{cfg['sl']*100:.0f}%"
+    sp = research.get("spread_bps")
+    bd = research.get("bid_depth_quote")
+    rtxt = ""
+    if sp is not None or bd is not None:
+        rtxt = (f"  [spread {sp:.0f}bps, bid-depth "
+                f"{(bd or 0):.0f} {quote_ccy}]")
     print(f"  >> PAPER BUY [{exid}] {sym} @ {entry:.8g}  "
-          f"(stake {cfg['stake']} {quote_ccy}, tp {cfg['tp_mult']:.0f}x / sl {sl_txt})")
+          f"(stake {cfg['stake']} {quote_ccy}, tp {cfg['tp_mult']:.0f}x / sl {sl_txt}){rtxt}")
     return pos
 
 
+def _exit_row(pos, exit_price, reason, sold_stake, held_min):
+    """Build a CSV row for a (partial or full) exit of `sold_stake` of quote."""
+    entry = pos["entry"]
+    pnl_pct = (exit_price / entry) - 1.0
+    pnl_quote = sold_stake * pnl_pct
+    peak_pct = (pos["peak"] / entry) - 1.0
+    return [
+        pos["detected_at"], pos["opened_at"], ts(), pos["exchange"],
+        pos["pair_id"], pos["wsname"],
+        f"{entry:.10g}", f"{exit_price:.10g}", f"{sold_stake:.2f}",
+        f"{pnl_pct*100:.2f}", f"{pnl_quote:.2f}", reason,
+        f"{held_min:.1f}", f"{peak_pct*100:.2f}",
+    ], pnl_pct, pnl_quote
+
+
 def maybe_close(pos, client, cfg):
-    """Return (closed_bool, row_or_None)."""
+    """Manage an open paper position. Returns (fully_closed_bool, rows_list).
+
+    EXPERT EXIT MODEL (2026-06-21) — replaces the old all-or-nothing "sell at 5x
+    or stop at -50%". New listings typically spike then bleed out, so a single
+    far take-profit gives the whole gain back. Instead we:
+      1. SCALE OUT: sell `tp1_frac` (default 50%) at `tp1_mult` (default 2x = +100%)
+         to bank the spike and move the rest to house money.
+      2. TRAIL THE RUNNER: once the trade is up `trail_arm` (default +50%) or the
+         partial has fired, exit the remainder if price falls `trail_from_peak`
+         (default 30%) from its peak — captures the move instead of round-tripping.
+      3. Hard stop from entry, a far runner take-profit (`tp_mult`), and max-hold
+         all still apply as backstops.
+    Tunables read from cfg with safe defaults so existing CLI/config still works.
+    """
     px = get_price(client, pos["pair_id"])
     if px is None:
-        return False, None
+        return False, []
     last = px["last"]
     entry = pos["entry"]
     pos["peak"] = max(pos["peak"], last)
     held_min = (time.time() - pos["opened_ts"]) / 60.0
 
-    tp_price = entry * cfg["tp_mult"]  # e.g. 5x = sell at entry * 5
-    reason = None
-    exit_price = last
+    # Backward-compatible state for positions opened before this change.
+    pos.setdefault("remaining_frac", 1.0)
+    pos.setdefault("tp1_done", False)
+    full_stake = pos["stake_quote"]
+    remaining_stake = full_stake * pos["remaining_frac"]
+
+    tp1_mult = cfg.get("tp1_mult", 2.0)        # first scale-out target (x entry)
+    tp1_frac = cfg.get("tp1_frac", 0.5)        # fraction of ORIGINAL to sell there
+    trail_arm = cfg.get("trail_arm", 0.5)      # arm trail once +50% from entry
+    trail_gap = cfg.get("trail_from_peak", 0.30)  # exit if 30% below peak
+    tp_price = entry * cfg["tp_mult"]          # far runner target (full exit)
+    peak = pos["peak"]
+    rows = []
+
+    # --- 1) Hard stop-loss from entry (close everything still held) ---
+    if cfg["sl"] > 0 and last <= entry * (1 - cfg["sl"]):
+        row, pp, pq = _exit_row(pos, entry * (1 - cfg["sl"]), "stop_loss",
+                                remaining_stake, held_min)
+        _print_sell(pos, row[7], pp, pq, "stop_loss", cfg)
+        return True, [row]
+
+    # --- 2) Partial take-profit (scale out) — fires once ---
+    if (not pos["tp1_done"]) and tp1_frac > 0 and last >= entry * tp1_mult:
+        sold = full_stake * tp1_frac
+        row, pp, pq = _exit_row(pos, last, "take_profit_partial", sold, held_min)
+        _print_sell(pos, row[7], pp, pq, "take_profit_partial", cfg)
+        pos["tp1_done"] = True
+        pos["remaining_frac"] = max(0.0, pos["remaining_frac"] - tp1_frac)
+        rows.append(row)
+        remaining_stake = full_stake * pos["remaining_frac"]
+        if pos["remaining_frac"] <= 1e-9:
+            return True, rows  # nothing left to ride
+
+    # --- 3) Trailing stop on the runner (only once armed) ---
+    armed = pos["tp1_done"] or (peak >= entry * (1 + trail_arm))
+    if armed and trail_gap > 0 and last <= peak * (1 - trail_gap):
+        row, pp, pq = _exit_row(pos, last, "trail_stop", remaining_stake, held_min)
+        _print_sell(pos, row[7], pp, pq, "trail_stop", cfg)
+        return True, rows + [row]
+
+    # --- 4) Far runner take-profit (full exit of remainder) ---
     if last >= tp_price:
-        reason, exit_price = "take_profit", tp_price
-    elif cfg["sl"] > 0 and last <= entry * (1 - cfg["sl"]):
-        reason, exit_price = "stop_loss", entry * (1 - cfg["sl"])
-    elif cfg["max_hold"] > 0 and held_min >= cfg["max_hold"]:
-        reason, exit_price = "max_hold", last
+        row, pp, pq = _exit_row(pos, tp_price, "take_profit", remaining_stake, held_min)
+        _print_sell(pos, row[7], pp, pq, "take_profit", cfg)
+        return True, rows + [row]
 
-    if reason is None:
-        return False, None
+    # --- 5) Max hold (full exit of remainder) ---
+    if cfg["max_hold"] > 0 and held_min >= cfg["max_hold"]:
+        row, pp, pq = _exit_row(pos, last, "max_hold", remaining_stake, held_min)
+        _print_sell(pos, row[7], pp, pq, "max_hold", cfg)
+        return True, rows + [row]
 
-    pnl_pct = (exit_price / entry) - 1.0
-    pnl_quote = pos["stake_quote"] * pnl_pct
-    peak_pct = (pos["peak"] / entry) - 1.0
-    row = [
-        pos["detected_at"], pos["opened_at"], ts(), pos["exchange"],
-        pos["pair_id"], pos["wsname"],
-        f"{entry:.10g}", f"{exit_price:.10g}", f"{pos['stake_quote']:.2f}",
-        f"{pnl_pct*100:.2f}", f"{pnl_quote:.2f}", reason,
-        f"{held_min:.1f}", f"{peak_pct*100:.2f}",
-    ]
+    return False, rows  # still open (rows may hold a partial fill this cycle)
+
+
+def _print_sell(pos, exit_price_str, pnl_pct, pnl_quote, reason, cfg):
     emoji = "✅" if pnl_pct >= 0 else "❌"
     quote_ccy = pos.get("quote", cfg["quotes"][0])
-    print(f"  << PAPER SELL [{pos['exchange']}] {pos['wsname']} @ {exit_price:.8g}  "
+    print(f"  << PAPER SELL [{pos['exchange']}] {pos['wsname']} @ {float(exit_price_str):.8g}  "
           f"{emoji} {pnl_pct*100:+.2f}% ({pnl_quote:+.2f} {quote_ccy})  [{reason}]")
-    return True, row
 
 
 # ----------------------------- concurrency helper ---------------------------
@@ -382,6 +653,16 @@ def monitor(cfg, exchange_ids):
     print(f"[start] quotes={','.join(cfg['quotes'])}  interval={cfg['interval']}s  "
           f"workers={cfg['workers']}  tp={cfg['tp_mult']:.0f}x  sl={sl_txt}  "
           f"max_hold={hold_txt}  stake={cfg['stake']}")
+    if cfg.get("research", True):
+        print(f"[start] research gate ON — observe {cfg['min_observe_sec']:.0f}s, "
+              f"max spread {cfg['max_spread_bps']:.0f}bps, "
+              f"min bid-depth {cfg['min_depth_mult']:.1f}x stake within "
+              f"{cfg['depth_band_pct']*100:.0f}%, "
+              f"anti-chase +{cfg['max_launch_pump']*100:.0f}%, "
+              f"give up after {cfg['max_pending_min']:.0f}m"
+              + (f", min 24h vol {cfg['min_quote_vol']:.0f}" if cfg['min_quote_vol'] > 0 else ""))
+    else:
+        print("[start] research gate OFF — buying first print (legacy behaviour).")
     if newly_tracked:
         print(f"[start] {len(newly_tracked)} newly-added exchange(s) will be "
               f"baselined on first poll (no fire on existing pairs).")
@@ -418,34 +699,64 @@ def monitor(cfg, exchange_ids):
                     continue
                 key = f"{exid}|{sym}"
                 if key not in pending:
-                    pending[key] = ts()
+                    pending[key] = {"first_seen": ts(), "ts": time.time(),
+                                    "first_px": None, "checks": 0,
+                                    "last_reason": ""}
                     new_detected += 1
                     print(f"[{ts()}] 🆕 NEW PAIR: [{exid}] {sym} "
                           f"(status={market.get('active')})")
 
-        # Promote pending -> open paper position when tradable
+        # Promote pending -> open paper position, but only after the pre-trade
+        # research gate clears (observation window + spread + exit liquidity +
+        # anti-chase). Rejected candidates stay pending and are re-checked until
+        # they either pass or age out, so a pair that's illiquid at launch can
+        # still qualify once a real market forms.
         still_pending = {}
-        for key, first_seen in pending.items():
+        gate_pass = gate_wait = gate_drop = 0
+        max_pending_sec = float(cfg.get("max_pending_min", 0)) * 60.0
+        for key, st in pending.items():
+            # Back-compat: older pending.json stored a bare timestamp string.
+            if not isinstance(st, dict):
+                st = {"first_seen": st, "ts": time.time(), "first_px": None,
+                      "checks": 0, "last_reason": ""}
             exid, sym = key.split("|", 1)
             syms = results.get(exid)
             client = clients.get(exid)
             if syms is None or client is None:
-                # exchange unreachable this cycle; keep pending for later
-                still_pending[key] = first_seen
+                still_pending[key] = st  # exchange unreachable this cycle
                 continue
             market = syms.get(sym)
             if market is None:
                 continue  # vanished; drop it
             tradable = (market.get("active") is not False) or cfg["any_status"]
             if not tradable:
-                still_pending[key] = first_seen
+                still_pending[key] = st
                 continue
-            pos = open_position(exid, client, sym, market, cfg, first_seen)
+
+            st["checks"] = st.get("checks", 0) + 1
+            passed, reason, metrics = research_gate(client, sym, cfg, st)
+            st["last_reason"] = reason
+            if not passed:
+                age = time.time() - st.get("ts", time.time())
+                if max_pending_sec > 0 and age >= max_pending_sec:
+                    gate_drop += 1
+                    log_skip(exid, sym, f"aged_out:{reason}", metrics)
+                    print(f"  SKIP [{exid}] {sym} — gave up after "
+                          f"{age/60:.0f}m ({reason})")
+                    baseline.setdefault(exid, set()).add(sym)  # stop re-detecting
+                    continue
+                gate_wait += 1
+                still_pending[key] = st  # keep observing / re-checking
+                continue
+
+            pos = open_position(exid, client, sym, market, cfg,
+                                st.get("first_seen", ts()), metrics)
             if pos:
+                gate_pass += 1
                 positions.append(pos)
-                baseline.setdefault(exid, set()).add(sym)  # done detecting this pair
+                baseline.setdefault(exid, set()).add(sym)
             else:
-                still_pending[key] = first_seen  # no price yet, keep trying
+                still_pending[key] = st  # no fill price yet, keep trying
         pending = still_pending
 
         # Manage open paper trades
@@ -456,16 +767,30 @@ def monitor(cfg, exchange_ids):
                 remaining.append(pos)  # exchange not in this run; hold position
                 continue
             try:
-                closed, row = maybe_close(pos, client, cfg)
+                closed, rows = maybe_close(pos, client, cfg)
             except Exception as e:
                 print(f"  ! error managing [{pos.get('exchange')}] "
                       f"{pos.get('wsname')}: {e}")
                 remaining.append(pos)
                 continue
-            if closed:
+            for row in rows:          # may include a partial scale-out fill
                 log_trade(row)
-            else:
-                remaining.append(pos)
+                # Mirror each closed fill into the durable Postgres ledger so the
+                # cumulative P&L survives a Railway redeploy that wipes the local
+                # CSV (the cause of the 2026-06-25 reset to $0 / 0 closed).
+                try:
+                    store.publish_paper_trade(
+                        "listing-sniper",
+                        trade_id=f"{row[3]}:{row[4]}:{row[1]}:{row[2]}",
+                        pnl_abs=float(row[10]),
+                        pnl_pct=float(row[9]) / 100.0,
+                        pair=row[5], opened_at=row[1], closed_at=row[2],
+                        reason=row[11],
+                    )
+                except Exception:
+                    pass
+            if not closed:
+                remaining.append(pos)  # runner still riding (possibly reduced)
         positions = remaining
 
         # Persist state every cycle so restarts are safe
@@ -482,9 +807,11 @@ def monitor(cfg, exchange_ids):
         print(f"[{ts()}] ok — {ok_n}/{len(clients)} exchanges | "
               f"{total_pairs} pairs | new this cycle: {new_detected} | "
               f"open: {len(positions)} | pending: {len(pending)} | "
+              f"gate(passed {gate_pass}/waiting {gate_wait}/dropped {gate_drop}) | "
               f"skipped: {skip_n}", flush=True)
 
         # Publish a snapshot for the live dashboard (guarded; never raises).
+        # Fast path: aggregate the local CSV.
         realized, nclosed, wins = 0.0, 0, 0
         try:
             if os.path.exists(TRADES_CSV):
@@ -499,11 +826,24 @@ def monitor(cfg, exchange_ids):
                         wins += 1 if _pnl > 0 else 0
         except Exception:
             pass
+        # Reconcile with the durable Postgres ledger. After a redeploy the local
+        # CSV is empty, so the DB (which has every closed fill) carries the real
+        # cumulative totals — take whichever source has more closed trades so the
+        # figures can only move forward, never silently reset to zero.
+        try:
+            _agg = store.fetch_paper_aggregate("listing-sniper")
+            if _agg and _agg["closed"] >= nclosed:
+                realized, nclosed, wins = _agg["realized"], _agg["closed"], _agg["wins"]
+        except Exception:
+            pass
         store.publish("listing-sniper", status="online",
                       pnl_abs=realized, open_trades=len(positions),
                       closed_trades=nclosed, wins=wins, losses=nclosed - wins,
                       extra={"pending": len(pending), "exchanges_ok": ok_n,
-                             "exchanges_skipped": skip_n})
+                             "exchanges_skipped": skip_n,
+                             "gate_passed": gate_pass, "gate_waiting": gate_wait,
+                             "gate_dropped": gate_drop,
+                             "research": bool(cfg.get("research", True))})
 
         # Sleep the remainder of the interval
         elapsed = time.time() - cycle_start
@@ -538,6 +878,36 @@ def main():
                    help="Simulated buy slippage in basis points (30=0.30%%).")
     p.add_argument("--any-status", action="store_true",
                    help="Open paper trade as soon as pair appears (not just when active).")
+
+    # --- pre-trade research gate (Balanced defaults) -----------------------
+    # The sniper now inspects each new pair's LIVE order book + ticker before
+    # buying, instead of taking the first print blind. Disable with --no-research.
+    g = p.add_argument_group("research gate (pre-trade quality checks)")
+    g.add_argument("--no-research", dest="research", action="store_false",
+                   help="Disable the research gate (revert to buy-the-first-print).")
+    p.set_defaults(research=True)
+    g.add_argument("--min-observe-sec", type=float, default=120,
+                   help="Observation window: wait this long after first sight "
+                        "before buying, to skip the opening spike (default 120s).")
+    g.add_argument("--max-spread-bps", type=float, default=500,
+                   help="Reject if bid/ask spread exceeds this (default 500 = 5%%). 0 disables.")
+    g.add_argument("--min-depth-mult", type=float, default=3.0,
+                   help="Require resting bid-side depth within --depth-band-pct of "
+                        "touch to be >= this multiple of --stake (default 3x). 0 disables.")
+    g.add_argument("--depth-band-pct", type=float, default=0.05,
+                   help="Price band around touch used to measure book depth (default 0.05 = 5%%).")
+    g.add_argument("--min-quote-vol", type=float, default=0,
+                   help="Optional 24h quote-volume floor. Off by default — a "
+                        "just-listed pair has little 24h history (set e.g. 50000 to use).")
+    g.add_argument("--max-launch-pump", type=float, default=1.5,
+                   help="Anti-chase: skip if price already ran more than this "
+                        "fraction above where we first saw it (default 1.5 = +150%%). 0 disables.")
+    g.add_argument("--max-pending-min", type=float, default=30,
+                   help="Give up on a candidate that never passes the gate after "
+                        "this many minutes (default 30). 0 = wait forever.")
+    g.add_argument("--book-levels", type=int, default=25,
+                   help="Order-book levels to pull for depth analysis (default 25).")
+
     args = p.parse_args()
 
     print("=" * 64)
@@ -554,6 +924,16 @@ def main():
         "tp_mult": args.tp_mult, "sl": args.sl,
         "max_hold": args.max_hold, "stake": args.stake,
         "slippage_bps": args.slippage_bps, "any_status": args.any_status,
+        # research gate
+        "research": args.research,
+        "min_observe_sec": args.min_observe_sec,
+        "max_spread_bps": args.max_spread_bps,
+        "min_depth_mult": args.min_depth_mult,
+        "depth_band_pct": args.depth_band_pct,
+        "min_quote_vol": args.min_quote_vol,
+        "max_launch_pump": args.max_launch_pump,
+        "max_pending_min": args.max_pending_min,
+        "book_levels": args.book_levels,
     }
 
     exchange_ids = resolve_exchanges(args.exchanges)

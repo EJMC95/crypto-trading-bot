@@ -122,6 +122,28 @@ too early; if most trades hit `stop_loss`, the idea likely has no edge.
   pressure your own (and others') buying creates. A positive paper record is
   necessary but *not sufficient* before risking real money.
 
+## Pre-trade research gate (2026-06-25)
+
+Earlier the sniper bought the **first print** of every new pair, blind. That
+produced a 6-losses/6-trades run: it kept buying illiquid, wide-spread pairs at
+the top of the opening spike. The sniper now **researches each pair's live order
+book and ticker before buying** and only enters if it clears a quality gate:
+
+| Check | Default | Flag | Why |
+|---|---|---|---|
+| Observation window | 120s | `--min-observe-sec` | Skip the opening-print spike |
+| Max spread | 500 bps (5%) | `--max-spread-bps` | Don't buy a market you can't sell into |
+| Min exit liquidity | 3x stake within 5% of bid | `--min-depth-mult`, `--depth-band-pct` | Make the paper exit realistic |
+| Anti-chase | +150% | `--max-launch-pump` | Don't buy the blow-off top |
+| Min 24h volume | off | `--min-quote-vol` | Optional; new pairs have little history |
+| Give-up timeout | 30 min | `--max-pending-min` | Re-check until it qualifies, then drop |
+
+Rejected candidates are re-checked each cycle until they pass or age out, and
+every rejection is logged (with the metrics behind it) to `sniper_skips.csv` so
+you can audit whether the filter saved you from a rug or skipped a winner. The
+live heartbeat shows `gate(passed/waiting/dropped)`. Turn the gate off with
+`--no-research` to restore the old buy-the-first-print behaviour.
+
 ## Files
 
 ```
@@ -132,4 +154,5 @@ sniper_data/
   open_positions.json        live paper trades (survives restarts)
   pending.json               detected-but-not-yet-online pairs
   sniper_trades.csv          your closed-trade results
+  sniper_skips.csv           pairs the research gate rejected, and why
 ```

@@ -4,7 +4,9 @@ hyperliquid_perps_bot.py
 ------------------------
 Live (testnet) perpetuals trading bot that mirrors the Torin video setup:
   - Connects to the Hyperliquid TESTNET via the official Python SDK.
-  - RSI(14) placeholder strategy: long when RSI < 30, short when RSI > 70.
+  - RSI(14) mean-reversion, but trend-gated (2026-06-25): long oversold dips only
+    while price is ABOVE the 50-EMA, short overbought rips only while BELOW it.
+  - Per-trade 3% stop-loss + a 4h per-coin re-entry cooldown to stop fee churn.
   - Loops every LOOP_SECONDS (default 60s) and logs every decision.
   - Position sizing per trade + a 5% daily loss limit that halts trading.
 
@@ -47,8 +49,23 @@ COINS = [
     "ADA", "AAVE", "PEPE", "WIF", "kBONK", "ENA", "ORDI", "JUP", "TON", "kSHIB",
 ]
 RSI_PERIOD = 14
-OVERSOLD = 45      # RELAXED 40->45: enters long sooner (more frequent trades)
-OVERBOUGHT = 55   # RELAXED 60->55: enters short sooner
+# REVERTED 45->30 / 55->70 (2026-06-25). The 45/55 relaxation 6x'd the trade
+# count and made the bot WORSE in backtest (-93.1% vs -89.8% at 30/70; the chop
+# window flipped from +9.4% to -56.6%) — it was pure fee bleed. See
+# REVALIDATION_2026-06-22.md "Why the losers lose".
+OVERSOLD = 30      # long only when deeply oversold
+OVERBOUGHT = 70    # short only when deeply overbought
+# TREND FILTER (2026-06-25). Root cause of the structural loss was mean-reversion
+# with NO trend filter: it longed falling knives and shorted bull rallies. Now we
+# only buy oversold dips that are still ABOVE the trend EMA, and only short
+# overbought rips that are BELOW it — i.e. trade WITH the tide.
+TREND_EMA = 50                   # EMA period on the 1h candles used as regime gate
+# PER-TRADE STOP (2026-06-25). The bot previously had NO stop-loss — only a 5%
+# daily ACCOUNT limit — so a single bad position could ride all the way down.
+STOP_PCT = 0.03                  # 3% adverse move closes the position
+# COOLDOWN (2026-06-25). After closing/opening a coin, wait before re-entering it
+# to stop the bot churning the same coin every loop.
+REENTRY_COOLDOWN_SEC = 4 * 3600  # 4h between actions on the same coin
 LOOP_SECONDS = 60
 CANDLE_INTERVAL = "1h"            # indicator timeframe
 ORDER_USD = 50.0                 # notional per position (position sizing)
@@ -94,6 +111,20 @@ def rsi(closes, period=14):
         return 100.0
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
+
+
+def ema(closes, period):
+    """Last value of an exponential moving average over `closes`."""
+    closes = np.asarray(closes, dtype=float)
+    if len(closes) == 0:
+        return None
+    if len(closes) < period:
+        return float(closes.mean())
+    k = 2.0 / (period + 1.0)
+    e = float(closes[0])
+    for c in closes[1:]:
+        e = c * k + e * (1 - k)
+    return e
 
 
 def main():
@@ -144,6 +175,11 @@ def main():
         day_start_equity = None
     cur_day = datetime.now(timezone.utc).date()
     halted_today = False
+
+    # Per-trade risk state (2026-06-25): entry price per coin for stop-loss, and
+    # the unix time of the last open/close per coin for the re-entry cooldown.
+    entries: dict[str, float] = {}
+    last_action: dict[str, float] = {}
 
     while True:
         now = datetime.now(timezone.utc)
@@ -205,39 +241,82 @@ def main():
                 continue
 
             held = pos.get(coin, 0.0)
-            decision = "HOLD"
-            if r < OVERSOLD and held <= 0:
-                decision = "OPEN_LONG"
-            elif r > OVERBOUGHT and held >= 0:
-                decision = "OPEN_SHORT"
+            ema_trend = ema(closes, TREND_EMA)
+            uptrend = ema_trend is not None and price > ema_trend
+            downtrend = ema_trend is not None and price < ema_trend
+            now_ts = now.timestamp()
 
-            log.info("%-4s price=%.2f RSI=%.1f held=%.4f -> %s",
-                     coin, price, r, held, decision)
+            decision = "HOLD"
+
+            # 1) Per-trade stop-loss: close any held position whose adverse move
+            #    exceeds STOP_PCT. This is the downside protection the bot never
+            #    had — previously only a 5% daily ACCOUNT limit existed, so one
+            #    position could ride all the way down.
+            entry = entries.get(coin)
+            if held != 0 and entry:
+                adverse = ((price - entry) / entry) if held > 0 else ((entry - price) / entry)
+                if adverse <= -STOP_PCT:
+                    decision = "STOP_CLOSE"
+
+            # 2) Entries only WITH the trend, and only after the per-coin cooldown.
+            #    Long oversold dips ABOVE the trend EMA; short overbought rips
+            #    BELOW it. This is the trend filter that turns "long falling
+            #    knives / short rallies" into "trade with the tide".
+            if decision == "HOLD":
+                cooling = (now_ts - last_action.get(coin, 0.0)) < REENTRY_COOLDOWN_SEC
+                if not cooling:
+                    if r < OVERSOLD and held <= 0 and uptrend:
+                        decision = "OPEN_LONG"
+                    elif r > OVERBOUGHT and held >= 0 and downtrend:
+                        decision = "OPEN_SHORT"
+
+            log.info("%-4s price=%.2f RSI=%.1f ema%d=%s held=%.4f -> %s",
+                     coin, price, r, TREND_EMA,
+                     f"{ema_trend:.2f}" if ema_trend is not None else "na",
+                     held, decision)
 
             size = round(ORDER_USD * LEVERAGE / price, 4)
 
             if DRY_RUN:
                 # Book the fill in the paper account and mark to the live price.
                 broker.mark(coin, price)
-                if decision == "OPEN_LONG":
+                if decision == "STOP_CLOSE":
+                    broker.close(coin, price)
+                    entries.pop(coin, None)
+                    last_action[coin] = now_ts
+                elif decision == "OPEN_LONG":
                     broker.open(coin, True, size, price)
+                    entries[coin] = price
+                    last_action[coin] = now_ts
                 elif decision == "OPEN_SHORT":
                     broker.open(coin, False, size, price)
+                    entries[coin] = price
+                    last_action[coin] = now_ts
                 continue
 
             if decision == "HOLD":
                 continue
 
             try:
-                if decision == "OPEN_LONG":
+                if decision == "STOP_CLOSE":
+                    exchange.market_close(coin)
+                    entries.pop(coin, None)
+                    last_action[coin] = now_ts
+                    log.info("STOP-LOSS CLOSE %s @ %.2f", coin, price)
+                elif decision == "OPEN_LONG":
                     if held < 0:
                         exchange.market_close(coin)
                     exchange.market_open(coin, True, size)
+                    entries[coin] = price
+                    last_action[coin] = now_ts
+                    log.info("ORDER SENT %s %s size=%s", decision, coin, size)
                 elif decision == "OPEN_SHORT":
                     if held > 0:
                         exchange.market_close(coin)
                     exchange.market_open(coin, False, size)
-                log.info("ORDER SENT %s %s size=%s", decision, coin, size)
+                    entries[coin] = price
+                    last_action[coin] = now_ts
+                    log.info("ORDER SENT %s %s size=%s", decision, coin, size)
             except Exception as e:
                 log.error("order failed %s %s: %s", decision, coin, e)
 
