@@ -925,4 +925,11 @@ if __name__ == "__main__":
     # /history charts build up over time (no changes needed in any bot).
     if DATABASE_URL:
         threading.Thread(target=history_loop, args=(300,), daemon=True).start()
+    # Background: cloud-side scheduled P&L emails (dormant until SMTP_* env vars set).
+    try:
+        import report_emailer, sys as _sys
+        threading.Thread(target=report_emailer.run_loop, args=(_sys.modules[__name__],),
+                         daemon=True).start()
+    except Exception as _e:
+        print(f"[pnl_dashboard] emailer not started: {_e}", flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()

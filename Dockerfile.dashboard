@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir psycopg2-binary
 COPY pnl_dashboard.py /app/pnl_dashboard.py
 COPY bot_pnl_store.py /app/bot_pnl_store.py
 COPY compile_market_data.py /app/compile_market_data.py
+COPY report_emailer.py /app/report_emailer.py
 
 ENV PYTHONUNBUFFERED=1
 # Reads $PORT (Railway sets it) and DATABASE_URL (reference the Postgres service).
