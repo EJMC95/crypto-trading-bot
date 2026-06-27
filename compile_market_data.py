@@ -32,25 +32,49 @@ def sma(vals, n):
     return sum(vals[-n:]) / n if len(vals) >= n else None
 
 
-def coin_trend(sym):
-    """Return dict of trend metrics for SYM via Binance daily klines, or None."""
-    try:
-        kl = _get(f"https://api.binance.com/api/v3/klines?symbol={sym}USDT&interval=1d&limit=250")
-        closes = [float(k[4]) for k in kl]
-        if len(closes) < 60:
-            return None
-        price = closes[-1]
-        s200 = sma(closes, 200)
-        s50 = sma(closes, 50)
-        rets = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes))]
-        vol30 = statistics.pstdev(rets[-30:]) * (365 ** 0.5) if len(rets) >= 30 else None
-        r7 = price / closes[-8] - 1 if len(closes) >= 8 else None
-        r30 = price / closes[-31] - 1 if len(closes) >= 31 else None
-        return {"price": price, "above_200d": (s200 is not None and price > s200),
-                "golden": (s50 is not None and s200 is not None and s50 > s200),
-                "r7": r7, "r30": r30, "vol30_annual": vol30}
-    except Exception:
+KRAKEN_MAP = {"BTC": "XBT"}  # Kraken uses XBT for Bitcoin
+
+
+def _binance_closes(sym):
+    kl = _get(f"https://api.binance.com/api/v3/klines?symbol={sym}USDT&interval=1d&limit=250")
+    return [float(k[4]) for k in kl]
+
+
+def _kraken_closes(sym):
+    """Daily closes via Kraken public OHLC — reachable from US/Railway where
+    Binance is geo-blocked. Returns up to ~720 daily candles."""
+    ks = KRAKEN_MAP.get(sym, sym)
+    r = _get(f"https://api.kraken.com/0/public/OHLC?pair={ks}USD&interval=1440")
+    res = r.get("result", {})
+    key = next((k for k in res if k != "last"), None)
+    return [float(row[4]) for row in res[key]] if key else []
+
+
+def _metrics(closes):
+    if len(closes) < 60:
         return None
+    price = closes[-1]
+    s200, s50 = sma(closes, 200), sma(closes, 50)
+    rets = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes))]
+    vol30 = statistics.pstdev(rets[-30:]) * (365 ** 0.5) if len(rets) >= 30 else None
+    return {"price": price, "above_200d": (s200 is not None and price > s200),
+            "golden": (s50 is not None and s200 is not None and s50 > s200),
+            "r7": price / closes[-8] - 1 if len(closes) >= 8 else None,
+            "r30": price / closes[-31] - 1 if len(closes) >= 31 else None,
+            "vol30_annual": vol30}
+
+
+def coin_trend(sym):
+    """Trend metrics for SYM. Tries Binance (works locally), falls back to Kraken
+    (works from US/Railway). Returns None if neither yields enough history."""
+    for fetch in (_binance_closes, _kraken_closes):
+        try:
+            m = _metrics(fetch(sym))
+            if m:
+                return m
+        except Exception:
+            continue
+    return None
 
 
 def pct(x):
@@ -78,8 +102,14 @@ def snapshot_markdown():
         tot = g["total_market_cap"]["usd"]
         lines.append(f"- **BTC dominance:** {btc_dom:.1f}%  ·  **Total mcap:** ${tot/1e12:.2f}T "
                      f"({mcap_chg:+.1f}% 24h)")
-    except Exception as e:
-        notes.append(f"coingecko global unavailable ({type(e).__name__})")
+    except Exception:
+        try:  # coinpaprika fallback (reachable where CoinGecko is blocked)
+            gp = _get("https://api.coinpaprika.com/v1/global")
+            lines.append(f"- **BTC dominance:** {gp['bitcoin_dominance_percentage']:.1f}%  ·  "
+                         f"**Total mcap:** ${gp['market_cap_usd']/1e12:.2f}T "
+                         f"({gp.get('market_cap_change_24h', 0):+.1f}% 24h)")
+        except Exception as e:
+            notes.append(f"global mcap/dominance unavailable ({type(e).__name__})")
 
     # --- Per-coin trend + breadth ---
     trends = {}
