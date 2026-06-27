@@ -57,7 +57,8 @@ def pct(x):
     return "n/a" if x is None else f"{x * 100:+.1f}%"
 
 
-def main():
+def snapshot_markdown():
+    """Build and RETURN the market snapshot as a markdown string (no I/O)."""
     now = datetime.now(timezone.utc)
     lines = [f"## Market snapshot — {now:%Y-%m-%d %H:%M UTC}", ""]
     notes = []
@@ -117,7 +118,11 @@ def main():
     if notes:
         lines += ["", "_source notes: " + "; ".join(notes) + "_"]
 
-    out = "\n".join(lines)
+    return "\n".join(lines)
+
+
+def main():
+    out = snapshot_markdown()
     print(out)
     try:
         os.makedirs(os.path.join(HERE, "reports"), exist_ok=True)

@@ -400,7 +400,7 @@ def render():
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
 <header>
- <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a></h1>
+ <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a></h1>
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
    <span style="border-right:1px solid #30363d;padding-right:18px">GRAND TOTAL <b>{money(grand_equity)}</b> eq · <b class="{cls(grand_pnl)}">{money(grand_pnl)}</b> P&amp;L</span>
@@ -731,6 +731,47 @@ Cells show P&amp;L and (trade count). Dry-run only. Times UTC. Auto-refreshes ev
 </body></html>'''
 
 
+_MKT_CACHE = {"md": None, "ts": 0.0}
+
+
+def market_md_cached(ttl=1800):
+    """Live market-regime snapshot (Fear&Greed, dominance, breadth, per-coin trend),
+    cached ~30 min so page loads don't hammer the source APIs."""
+    import time as _t
+    now = _t.time()
+    if _MKT_CACHE["md"] is None or now - _MKT_CACHE["ts"] > ttl:
+        try:
+            import compile_market_data as _cmd
+            _MKT_CACHE["md"] = _cmd.snapshot_markdown()
+            _MKT_CACHE["ts"] = now
+        except Exception as e:
+            if _MKT_CACHE["md"] is None:
+                return f"Market snapshot unavailable: {type(e).__name__}: {e}"
+    return _MKT_CACHE["md"]
+
+
+def render_market():
+    md = market_md_cached()
+    return f'''<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="600">
+<title>Crypto Bots — market regime</title>
+<style>
+ body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
+ header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
+ h1{{margin:0;font-size:18px}} a{{color:#58a6ff;text-decoration:none}}
+ pre{{margin:14px;padding:14px;background:#161b22;border:1px solid #222;border-radius:10px;
+   font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-x:auto}}
+ footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
+</style></head><body>
+<header><h1>Crypto Bots — market regime &nbsp;·&nbsp;
+ <a href="/">← live</a> &nbsp; <a href="/periods">P&amp;L by period</a> &nbsp; <a href="/learning">learning</a></h1></header>
+<pre>{html.escape(md)}</pre>
+<footer>Sources: Binance (trend/vol/breadth), alternative.me (Fear&amp;Greed), CoinGecko (dominance/mcap).
+Cached ~30 min. The trend bots (V4/V6/V7) are designed to sit out risk-off regimes. Not financial advice.</footer>
+</body></html>'''
+
+
 class H(BaseHTTPRequestHandler):
     def _auth_ok(self):
         hdr = self.headers.get("Authorization", "")
@@ -856,7 +897,9 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(b"Auth required")
             return
         try:
-            if self.path.startswith("/periods"):
+            if self.path.startswith("/market"):
+                body = render_market().encode()
+            elif self.path.startswith("/periods"):
                 body = render_periods().encode()
             elif self.path.startswith("/learning"):
                 body = render_learning().encode()
