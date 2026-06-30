@@ -59,7 +59,10 @@ class DayTraderV5Gated(IStrategy):
     buy_ema_fast = IntParameter(5, 15, default=9, space="buy", optimize=False)
     buy_ema_slow = IntParameter(18, 50, default=21, space="buy", optimize=False)
     buy_vol_sma = IntParameter(10, 40, default=20, space="buy", optimize=False)
-    atr_stop_mult = DecimalParameter(0.8, 3.0, default=1.5, decimals=1,
+    # [R:R FIX 2026-06-30] 1.5 -> 2.5: the 1.5x-ATR stop was tripping on routine
+    # 5m noise (90/111 live exits, 7 wins). A wider stop lets a trade reach the
+    # (now lower) ROI ladder instead of being shaken out at a small loss.
+    atr_stop_mult = DecimalParameter(0.8, 3.5, default=2.5, decimals=1,
                                      space="sell", optimize=True)
 
     # [V5 GATE] daily regime EMAs. Kept optimize=False on purpose: this is the
@@ -67,11 +70,17 @@ class DayTraderV5Gated(IStrategy):
     regime_ema_fast = IntParameter(30, 80, default=50, space="buy", optimize=False)
     regime_ema_slow = IntParameter(150, 250, default=200, space="buy", optimize=False)
 
+    # [R:R FIX 2026-06-30] Live paper data over the last month: 90 of 111 trades
+    # exited on the tight ATR stop (only 7 winners) while every trade that REACHED
+    # roi won (4/4). The 4% first rung was unreachable on a 5m scalp before the
+    # stop fired — an inverted risk/reward that bled the bot to a ~10% win rate.
+    # Lower the ladder so winners bank before noise reverses them, and widen the
+    # ATR stop (atr_stop_mult 1.5 -> 2.5 below) so trades get room to work.
     minimal_roi = {
-        "0": 0.04,
-        "30": 0.025,
-        "60": 0.015,
-        "120": 0.008,
+        "0": 0.02,
+        "30": 0.015,
+        "60": 0.01,
+        "120": 0.006,
     }
 
     stoploss = -0.12
@@ -170,6 +179,9 @@ class DayTraderV5Gated(IStrategy):
             ),
             "enter_long",
         ] = 1
+        # [OBSERVABILITY 2026-06-30] Tag entries so the next P&L review can
+        # attribute results to the signal instead of seeing every trade as 'NA'.
+        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "rsi_ema_cross"
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
