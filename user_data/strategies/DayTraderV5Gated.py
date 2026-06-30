@@ -59,10 +59,13 @@ class DayTraderV5Gated(IStrategy):
     buy_ema_fast = IntParameter(5, 15, default=9, space="buy", optimize=False)
     buy_ema_slow = IntParameter(18, 50, default=21, space="buy", optimize=False)
     buy_vol_sma = IntParameter(10, 40, default=20, space="buy", optimize=False)
-    # [R:R FIX 2026-06-30] 1.5 -> 2.5: the 1.5x-ATR stop was tripping on routine
-    # 5m noise (90/111 live exits, 7 wins). A wider stop lets a trade reach the
-    # (now lower) ROI ladder instead of being shaken out at a small loss.
-    atr_stop_mult = DecimalParameter(0.8, 3.5, default=2.5, decimals=1,
+    # [2026-06-30] Kept at 1.5 (NOT widened). Post-exit market analysis (FMP 5m
+    # bars, NEAR+TRX, 19 losing trades) showed that after the stop fired price kept
+    # FALLING (pooled -0.9% at +1h; only 1/19 recovered) — the stop was protecting
+    # capital, not cutting winners short. The losses came from bad ENTRIES on the
+    # wrong universe (microcaps/stablecoins), now fixed by the StaticPairList change
+    # in config_v5. Widening the stop would have deepened those losses.
+    atr_stop_mult = DecimalParameter(0.8, 3.0, default=1.5, decimals=1,
                                      space="sell", optimize=True)
 
     # [V5 GATE] daily regime EMAs. Kept optimize=False on purpose: this is the
@@ -70,12 +73,12 @@ class DayTraderV5Gated(IStrategy):
     regime_ema_fast = IntParameter(30, 80, default=50, space="buy", optimize=False)
     regime_ema_slow = IntParameter(150, 250, default=200, space="buy", optimize=False)
 
-    # [R:R FIX 2026-06-30] Live paper data over the last month: 90 of 111 trades
-    # exited on the tight ATR stop (only 7 winners) while every trade that REACHED
-    # roi won (4/4). The 4% first rung was unreachable on a 5m scalp before the
-    # stop fired — an inverted risk/reward that bled the bot to a ~10% win rate.
-    # Lower the ladder so winners bank before noise reverses them, and widen the
-    # ATR stop (atr_stop_mult 1.5 -> 2.5 below) so trades get room to work.
+    # [2026-06-30] Lower, faster ROI ladder. Every trade that reached the old 4%
+    # first rung won (4/4), but post-exit analysis shows these names reverse fast,
+    # so taking a smaller profit quickly banks more of the move before it gives
+    # back. The ATR stop is deliberately UNCHANGED (see atr_stop_mult): post-exit
+    # data showed losers kept falling after we exited, so the stop was protecting
+    # capital — the real fix is entry quality + the liquid-majors universe.
     minimal_roi = {
         "0": 0.02,
         "30": 0.015,
