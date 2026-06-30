@@ -97,6 +97,8 @@ class SwingDipV1(IStrategy):
             ),
             "enter_long",
         ] = 1
+        # [OBSERVABILITY 2026-06-30] Tag entries for per-signal P&L attribution.
+        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "dip_in_uptrend"
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:

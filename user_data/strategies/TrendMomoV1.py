@@ -65,21 +65,25 @@ class TrendMomoV1(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # RELAXED: was crossed_above(sma_fast, sma_slow) -> fired on a SINGLE candle
-        # per trend, so missing that one daily crossover meant no entry for the whole
-        # uptrend. Now: long whenever sma_fast > sma_slow (momentum is up). Freqtrade
-        # won't double-enter an already-open pair; exit still triggers on the
-        # down-cross below, so the trend-follow behaviour is preserved.
-        # [LOOSENED] long when 20>50 SMA (momentum up) OR price above the slow SMA
-        # (early momentum) — fires on more pairs. Daily timeframe = slow cadence.
+        # Long whenever sma_fast > sma_slow (momentum is up). Freqtrade won't
+        # double-enter an already-open pair; the exit triggers on the down-cross
+        # below, so the trend-follow behaviour is preserved.
+        #
+        # [ENTRY-QUALITY FIX 2026-06-30] Dropped the experimental
+        # `OR close > sma_slow` clause. Live paper data: this bot's only 2 trades
+        # last month both LOST (-$11.33 total), entering on that weak early-momentum
+        # condition and then exiting on the trend flip. Requiring the real momentum
+        # condition (fast SMA above slow SMA) keeps it from buying setups that
+        # haven't actually turned up yet — exactly the validated rule the docstring
+        # describes, and the anti-overfit middle pair the robustness check passed.
         dataframe.loc[
             (
-                ((dataframe["sma_fast"] > dataframe["sma_slow"])
-                 | (dataframe["close"] > dataframe["sma_slow"]))
+                (dataframe["sma_fast"] > dataframe["sma_slow"])
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",
         ] = 1
+        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "sma_fast_above_slow"
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
