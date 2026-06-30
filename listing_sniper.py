@@ -83,6 +83,7 @@ Files written (in ./sniper_data/):
 
 import argparse
 import csv
+import gc
 import os
 import re
 import json
@@ -180,13 +181,16 @@ def make_client(exid, cfg):
     })
 
 
-def fetch_spot_symbols(client):
+def fetch_spot_symbols(client, force=True):
     """Return {symbol: market} for active SPOT markets on this exchange.
 
-    Forces a market reload so brand-new listings are seen. Raises on failure;
-    the caller treats any exception as "skip this exchange this cycle".
+    When force=True the market list is fully reloaded so brand-new listings are
+    seen; force=False uses CCXT's cached markets (cheap — no network/parse). This
+    lets the caller reload on a cadence instead of rebuilding ~100 exchanges
+    every cycle, which was the memory spike that OOM-killed the container. Raises
+    on failure; the caller treats any exception as "skip this exchange this cycle".
     """
-    markets = client.load_markets(True)
+    markets = client.load_markets(force)
     out = {}
     for sym, m in markets.items():
         if not m.get("spot"):
@@ -578,20 +582,33 @@ def _print_sell(pos, exit_price_str, pnl_pct, pnl_quote, reason, cfg):
 
 # ----------------------------- concurrency helper ---------------------------
 
-def poll_all(clients, cfg):
+def poll_all(clients, cfg, force=True):
     """Concurrently fetch {exid: {symbol: market}} for every client.
+
+    Exchanges are processed in BATCHES of cfg["batch_size"] rather than all at
+    once. Reloading ~100 exchanges' full market lists simultaneously spikes
+    memory hard (each response parses into thousands of market dicts) and was
+    OOM-killing the container; batching bounds the peak to one batch's worth and
+    we gc between batches to release the transient parse buffers. `force` is
+    passed through to control full-reload vs cached markets.
 
     Returns (results, skipped) where skipped maps exid -> error string.
     """
     results, skipped = {}, {}
-    with ThreadPoolExecutor(max_workers=cfg["workers"]) as ex:
-        futs = {ex.submit(fetch_spot_symbols, c): exid for exid, c in clients.items()}
-        for fut in as_completed(futs):
-            exid = futs[fut]
-            try:
-                results[exid] = fut.result()
-            except Exception as e:
-                skipped[exid] = type(e).__name__
+    items = list(clients.items())
+    batch = max(1, int(cfg.get("batch_size", cfg["workers"])))
+    workers = max(1, min(cfg["workers"], batch))
+    for i in range(0, len(items), batch):
+        chunk = items[i:i + batch]
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = {ex.submit(fetch_spot_symbols, c, force): exid for exid, c in chunk}
+            for fut in as_completed(futs):
+                exid = futs[fut]
+                try:
+                    results[exid] = fut.result()
+                except Exception as e:
+                    skipped[exid] = type(e).__name__
+        gc.collect()  # release this batch's transient market-parse buffers
     return results, skipped
 
 
@@ -619,7 +636,7 @@ def build_clients(exchange_ids, cfg):
 def seed_baseline(cfg, exchange_ids):
     clients = build_clients(exchange_ids, cfg)
     print(f"[seed] snapshotting {len(clients)} exchanges (concurrency {cfg['workers']})…")
-    results, skipped = poll_all(clients, cfg)
+    results, skipped = poll_all(clients, cfg, force=True)
     per_ex = {exid: sorted(syms.keys()) for exid, syms in results.items()}
     known = {"exchanges": per_ex, "seeded_at": ts()}
     save_json(KNOWN_FILE, known)
@@ -671,9 +688,16 @@ def monitor(cfg, exchange_ids):
     pending = load_json(PENDING_FILE, {})   # "exid|symbol" -> first_seen
     positions = load_json(OPEN_FILE, [])
 
+    cycle = 0
     while not STOP:
         cycle_start = time.time()
-        results, skipped = poll_all(clients, cfg)
+        # Reload full market lists only every `reload_every` cycles; use CCXT's
+        # cached markets in between. New listings are rare and the research gate
+        # waits 120s+ before acting, so detecting them on a few-minute cadence
+        # (instead of rebuilding ~100 exchanges every 60s) costs nothing real but
+        # removes the per-cycle memory spike that was OOM-killing the bot.
+        force = (cycle % max(1, cfg.get("reload_every", 5)) == 0)
+        results, skipped = poll_all(clients, cfg, force=force)
         if not results:
             print(f"[{ts()}] all {len(clients)} exchanges unreachable this cycle — "
                   f"retrying in {cfg['interval']}s")
@@ -845,6 +869,12 @@ def monitor(cfg, exchange_ids):
                              "gate_dropped": gate_drop,
                              "research": bool(cfg.get("research", True))})
 
+        # Drop this cycle's market maps before sleeping so they don't sit
+        # resident across the interval; gc reclaims them promptly.
+        del results
+        gc.collect()
+        cycle += 1
+
         # Sleep the remainder of the interval
         elapsed = time.time() - cycle_start
         time.sleep(max(1.0, cfg["interval"] - elapsed))
@@ -861,6 +891,13 @@ def main():
                         '"all", or a comma list of CCXT ids.')
     p.add_argument("--workers", type=int, default=12,
                    help="How many exchanges to poll in parallel (default 12).")
+    p.add_argument("--batch-size", type=int, default=8,
+                   help="Reload markets in batches of this many exchanges to cap "
+                        "peak memory (default 8). Lower if the container OOMs.")
+    p.add_argument("--reload-every", type=int, default=5,
+                   help="Force a full market reload every N cycles; use cached "
+                        "markets in between (default 5). New-listing detection "
+                        "latency is about N*interval seconds.")
     p.add_argument("--interval", type=float, default=60, help="Seconds between polls.")
     p.add_argument("--http-timeout", type=float, default=20,
                    help="Per-request timeout in seconds (default 20).")
@@ -919,6 +956,8 @@ def main():
         quotes = ["USD"]
     cfg = {
         "exchanges": args.exchanges, "workers": max(1, args.workers),
+        "batch_size": max(1, args.batch_size),
+        "reload_every": max(1, args.reload_every),
         "interval": args.interval, "http_timeout": args.http_timeout,
         "quotes": quotes,
         "tp_mult": args.tp_mult, "sl": args.sl,
