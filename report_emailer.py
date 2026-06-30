@@ -11,7 +11,7 @@ Enable by setting these on the pnl-dashboard Railway service:
   SMTP_USER   your full email address
   SMTP_PASS   an APP PASSWORD (Gmail: Account>Security>App passwords;
                                 iCloud: appleid.apple.com app-specific password)
-  REPORT_TO   where to send (default: SMTP_USER)
+  REPORT_TO   where to send (default: e.j.m.c@icloud.com — received in Spark)
   REPORT_FROM optional (default: SMTP_USER)
   REPORT_HOUR_UTC  hour to send the daily/weekly/monthly mail (default 22)
 
@@ -39,7 +39,7 @@ def send_email(subject, body):
         msg = EmailMessage()
         msg["Subject"] = subject
         msg["From"] = _env("REPORT_FROM") or _env("SMTP_USER")
-        msg["To"] = _env("REPORT_TO") or _env("SMTP_USER")
+        msg["To"] = _env("REPORT_TO") or "e.j.m.c@icloud.com"
         msg.set_content(body)
         host, port = _env("SMTP_HOST"), int(_env("SMTP_PORT", "587"))
         ctx = ssl.create_default_context()
