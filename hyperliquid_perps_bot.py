@@ -85,6 +85,22 @@ logging.basicConfig(
 log = logging.getLogger("hl-perps-rsi")
 
 
+def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason):
+    """Record one closed paper trade to the durable ledger so the dashboard shows
+    per-trade long/short P&L — previously only a net equity snapshot was published,
+    so we were blind to whether the SHORT side actually earns in a downtrend.
+    Guarded: store.publish_paper_trade never raises into the trading loop."""
+    pnl_pct = None
+    if ent_px:
+        pnl_pct = ((exit_px - ent_px) / ent_px) if was_long else ((ent_px - exit_px) / ent_px)
+    oa = datetime.fromtimestamp(ent_ts, tz=timezone.utc).isoformat() if ent_ts else None
+    store.publish_paper_trade(
+        bot, trade_id=f"{coin}:{ent_ts}", pnl_abs=float(pnl), pnl_pct=pnl_pct,
+        pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
+        reason=("long_" if was_long else "short_") + reason,
+    )
+
+
 def load_env(path=".env.perps"):
     if os.path.exists(path):
         for line in open(path):
@@ -179,6 +195,7 @@ def main():
     # Per-trade risk state (2026-06-25): entry price per coin for stop-loss, and
     # the unix time of the last open/close per coin for the re-entry cooldown.
     entries: dict[str, float] = {}
+    entry_ts: dict[str, float] = {}   # unix time each position was opened (trade id)
     last_action: dict[str, float] = {}
 
     while True:
@@ -281,16 +298,21 @@ def main():
                 # Book the fill in the paper account and mark to the live price.
                 broker.mark(coin, price)
                 if decision == "STOP_CLOSE":
-                    broker.close(coin, price)
-                    entries.pop(coin, None)
+                    _sz = broker.pos.get(coin, (0.0,))[0]
+                    _pnl = broker.close(coin, price)
+                    _record_close("hl-perps-rsi", coin, entries.get(coin),
+                                  entry_ts.get(coin), price, _pnl, _sz > 0, "stop")
+                    entries.pop(coin, None); entry_ts.pop(coin, None)
                     last_action[coin] = now_ts
-                elif decision == "OPEN_LONG":
-                    broker.open(coin, True, size, price)
-                    entries[coin] = price
-                    last_action[coin] = now_ts
-                elif decision == "OPEN_SHORT":
-                    broker.open(coin, False, size, price)
-                    entries[coin] = price
+                elif decision in ("OPEN_LONG", "OPEN_SHORT"):
+                    # If flipping an existing position, realise + record it first.
+                    if coin in broker.pos:
+                        _sz = broker.pos.get(coin, (0.0,))[0]
+                        _pnl = broker.close(coin, price)
+                        _record_close("hl-perps-rsi", coin, entries.get(coin),
+                                      entry_ts.get(coin), price, _pnl, _sz > 0, "flip")
+                    broker.open(coin, decision == "OPEN_LONG", size, price)
+                    entries[coin] = price; entry_ts[coin] = now_ts
                     last_action[coin] = now_ts
                 continue
 
@@ -329,6 +351,7 @@ def main():
             pub_equity = equity
             pub_open = sum(1 for v in pos.values() if v)
             pub_pnl = None
+        _szi = broker.szi() if DRY_RUN else {}
         store.publish(
             "hl-perps-rsi",
             status="halted" if halted_today else "online",
@@ -336,6 +359,8 @@ def main():
             pnl_abs=pub_pnl,
             open_trades=pub_open,
             extra={"mode": "dry-run" if DRY_RUN else "live-testnet",
+                   "longs": sum(1 for v in _szi.values() if v > 0),
+                   "shorts": sum(1 for v in _szi.values() if v < 0),
                    "coins": COINS},
         )
         time.sleep(LOOP_SECONDS)

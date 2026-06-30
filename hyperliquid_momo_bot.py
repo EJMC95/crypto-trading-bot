@@ -76,6 +76,21 @@ logging.basicConfig(
 log = logging.getLogger("hl-momo-breakout")
 
 
+def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason):
+    """Record one closed paper trade to the durable ledger so the dashboard shows
+    per-trade long/short P&L instead of only a net equity snapshot. Guarded:
+    store.publish_paper_trade never raises into the trading loop."""
+    pnl_pct = None
+    if ent_px:
+        pnl_pct = ((exit_px - ent_px) / ent_px) if was_long else ((ent_px - exit_px) / ent_px)
+    oa = datetime.fromtimestamp(ent_ts, tz=timezone.utc).isoformat() if ent_ts else None
+    store.publish_paper_trade(
+        bot, trade_id=f"{coin}:{ent_ts}", pnl_abs=float(pnl), pnl_pct=pnl_pct,
+        pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
+        reason=("long_" if was_long else "short_") + reason,
+    )
+
+
 def load_env(path=".env.perps"):
     if os.path.exists(path):
         for line in open(path):
@@ -208,6 +223,7 @@ def main():
         day_start_equity = None
     cur_day = datetime.now(timezone.utc).date()
     halted_today = False
+    entry_ts: dict[str, float] = {}   # unix time each position was opened (trade id)
 
     while True:
         now = datetime.now(timezone.utc)
@@ -293,11 +309,14 @@ def main():
                 # so exits/stops and an equity curve show up on later loops.
                 broker.mark(coin, px)
                 if decision == "OPEN_LONG":
-                    broker.open(coin, True, size, px)
+                    broker.open(coin, True, size, px); entry_ts[coin] = now.timestamp()
                 elif decision == "OPEN_SHORT":
-                    broker.open(coin, False, size, px)
+                    broker.open(coin, False, size, px); entry_ts[coin] = now.timestamp()
                 elif decision in ("EXIT_LONG", "STOP_LONG", "COVER_SHORT", "STOP_SHORT"):
-                    broker.close(coin, px)
+                    _sz, _ent = broker.pos.get(coin, (0.0, 0.0))
+                    _pnl = broker.close(coin, px)
+                    _record_close("hl-momo-breakout", coin, _ent, entry_ts.pop(coin, None),
+                                  px, _pnl, _sz > 0, decision.lower())
                 if decision != "HOLD":
                     mode = "paper" if PAPER else "dry-run"
                     notify(f":test_tube: MomoBot [{mode.upper()}] {decision} {coin} @ {px:,.2f}",
@@ -334,6 +353,7 @@ def main():
             pub_open = sum(1 for v in pos.values()
                            if (v.get("size") if isinstance(v, dict) else v))
             pub_pnl = None
+        _szi = broker.szi() if DRY_RUN else {}
         store.publish(
             "hl-momo-breakout",
             status="paper" if PAPER else ("halted" if halted_today else "online"),
@@ -341,6 +361,8 @@ def main():
             pnl_abs=pub_pnl,
             open_trades=pub_open,
             extra={"mode": "paper" if PAPER else ("dry-run" if DRY_RUN else "live-testnet"),
+                   "longs": sum(1 for v in _szi.values() if v > 0),
+                   "shorts": sum(1 for v in _szi.values() if v < 0),
                    "coins": COINS},
         )
         time.sleep(LOOP_SECONDS)
