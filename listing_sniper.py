@@ -89,7 +89,9 @@ import re
 import json
 import signal
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import math
+from concurrent.futures import (
+    ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError)
 from datetime import datetime, timezone
 
 import ccxt  # unified multi-exchange public API
@@ -593,22 +595,51 @@ def poll_all(clients, cfg, force=True):
     passed through to control full-reload vs cached markets.
 
     Returns (results, skipped) where skipped maps exid -> error string.
+
+    A single exchange whose request hangs past ccxt's own per-request timeout
+    must NOT be able to freeze the whole monitor loop. ThreadPoolExecutor's
+    context manager waits for *every* worker on exit, and Future.result() blocks
+    with no timeout, so one stuck socket would otherwise stall the bot
+    indefinitely — the process stays alive (status still "online") but never
+    loops or publishes again. That is the one failure mode the Railway
+    `restartPolicyType = "always"` policy can NOT recover from, because the
+    process never exits to be restarted. So we bound the whole cycle with a
+    deadline and abandon any laggards (recorded as "timeout") so the loop always
+    makes forward progress.
     """
     results, skipped = {}, {}
     items = list(clients.items())
     batch = max(1, int(cfg.get("batch_size", cfg["workers"])))
     workers = max(1, min(cfg["workers"], batch))
+    # Per-batch deadline so one exchange whose request hangs past ccxt's own
+    # per-request timeout can't freeze the loop. Each batch runs in at most
+    # ceil(batch/workers) concurrent waves; allow that many http_timeouts plus
+    # one wave of slack before we declare a hang and abandon the laggards.
+    waves = math.ceil(batch / workers)
+    deadline = max(60.0, cfg["http_timeout"] * (waves + 1))
     for i in range(0, len(items), batch):
         chunk = items[i:i + batch]
-        with ThreadPoolExecutor(max_workers=workers) as ex:
-            futs = {ex.submit(fetch_spot_symbols, c, force): exid for exid, c in chunk}
-            for fut in as_completed(futs):
-                exid = futs[fut]
-                try:
-                    results[exid] = fut.result()
-                except Exception as e:
-                    skipped[exid] = type(e).__name__
-        gc.collect()  # release this batch's transient market-parse buffers
+        ex = ThreadPoolExecutor(max_workers=workers)
+        try:
+            futs = {ex.submit(fetch_spot_symbols, c, force): exid
+                    for exid, c in chunk}
+            try:
+                for fut in as_completed(futs, timeout=deadline):
+                    exid = futs[fut]
+                    try:
+                        results[exid] = fut.result()
+                    except Exception as e:
+                        skipped[exid] = type(e).__name__
+            except FuturesTimeoutError:
+                for fut, exid in futs.items():
+                    if exid not in results and exid not in skipped:
+                        skipped[exid] = "timeout"
+                        fut.cancel()
+        finally:
+            # Never block the loop on stuck workers: abandon them and carry on,
+            # then gc to release this batch's transient market-parse buffers.
+            ex.shutdown(wait=False, cancel_futures=True)
+            gc.collect()
     return results, skipped
 
 
