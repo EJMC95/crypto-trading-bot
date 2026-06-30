@@ -783,9 +783,20 @@ class H(BaseHTTPRequestHandler):
             return False
         return u == DASH_USER and p == DASH_PASS
 
+    def _no_cache(self):
+        """Forbid any browser/proxy caching. The snapshot is regenerated on every
+        request (generated_at = now()), so a cached copy reads as a FROZEN feed:
+        a stale JSON gets served with a day-old generated_at and every delta is
+        $0.00, which is indistinguishable from genuine zero activity. Railway's
+        edge and browsers may cache a 200 with no cache directives, so be explicit
+        on every response."""
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+
     def do_GET(self):
         if self.path.startswith("/health"):
-            self.send_response(200); self.end_headers(); self.wfile.write(b"ok"); return
+            self.send_response(200); self._no_cache(); self.end_headers(); self.wfile.write(b"ok"); return
         if self.path.startswith("/pnl.json"):
             # Read-only JSON snapshot of every bot, for the scheduled
             # daily/weekly breakdowns. Dry-run paper P&L only — no secrets.
@@ -844,6 +855,7 @@ class H(BaseHTTPRequestHandler):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
+            self._no_cache()
             self.end_headers()
             self.wfile.write(payload)
             return
@@ -859,6 +871,7 @@ class H(BaseHTTPRequestHandler):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
+            self._no_cache()
             self.end_headers()
             self.wfile.write(payload)
             return
@@ -887,6 +900,7 @@ class H(BaseHTTPRequestHandler):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(payload)))
+            self._no_cache()
             self.end_headers()
             self.wfile.write(payload)
             return
@@ -911,6 +925,7 @@ class H(BaseHTTPRequestHandler):
             body = f"<pre>dashboard error: {html.escape(str(e))}</pre>".encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self._no_cache()
         self.end_headers()
         self.wfile.write(body)
 
