@@ -41,22 +41,18 @@
         "ccxt_config": {},
         "ccxt_async_config": {},
         "pair_whitelist": [
-            "BTC/USD",
-            "ETH/USD"
+            "BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "ADA/USD",
+            "DOGE/USD", "AVAX/USD", "LINK/USD", "LTC/USD", "DOT/USD"
         ],
-        "pair_blacklist": [],
+        "pair_blacklist": [
+            ".*USDT/USD", ".*USDC/USD", "USDE/USD", "RLUSD/USD", "DAI/USD",
+            "PYUSD/USD", "TUSD/USD", "EUR/USD", "GBP/USD", "AUD/USD"
+        ],
         "enable_ws": true
     },
     "pairlists": [
         {
-            "method": "VolumePairList",
-            "number_assets": 100,
-            "sort_key": "quoteVolume",
-            "refresh_period": 1800
-        },
-        {
-            "method": "AgeFilter",
-            "min_days_listed": 7
+            "method": "StaticPairList"
         }
     ],
     "telegram": {
