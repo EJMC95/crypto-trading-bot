@@ -1,67 +1,80 @@
 name: Railway Redeploy
 
-# Manually (or programmatically) redeploy Railway services that don't auto-deploy
-# on a push to main. Some services in this project have "Auto Deploy" turned off,
-# so a merge to main updates the repo but the running container keeps old code.
-# This workflow force-redeploys the named services via the Railway CLI.
+# Deploy the LATEST main code to Railway services that don't auto-deploy.
 #
-# SETUP (one time):
-#   1. Create a Railway *project token*:
-#        Railway -> your project -> Settings -> Tokens -> Create Token
-#        (a PROJECT token is environment-scoped and is what CI should use)
-#   2. Add it to GitHub:
-#        repo -> Settings -> Secrets and variables -> Actions -> New repository secret
-#        Name: RAILWAY_TOKEN   Value: <the project token>
-#   3. Confirm the service NAMES below match what Railway shows (case-sensitive).
-#        You can list them from any machine with the CLI: `railway status`.
+# Note: `railway redeploy` only re-runs a service's CURRENT (possibly old)
+# deployment, so it does NOT ship newly-merged code. This workflow instead checks
+# out the latest main and runs `railway up`, which uploads the current source and
+# builds a fresh deployment — shipping the new code even when Auto Deploy is off.
 #
-# USAGE:
-#   - GitHub UI: Actions tab -> "Railway Redeploy" -> Run workflow (optionally
-#     override the comma-separated service list).
-#   - Programmatically (e.g. by Claude via the GitHub API): dispatch this workflow.
+# It also prints `railway status` so the exact service names in the token's
+# project are visible in the logs (service names are case-sensitive and often
+# differ from the tile label).
+#
+# SETUP (one time): add a Railway PROJECT token as the RAILWAY_TOKEN repo secret
+# (repo Settings -> Secrets and variables -> Actions). A project token is scoped
+# to one project+environment, which is what CI should use.
+#
+# USAGE: Actions tab -> "Railway Redeploy" -> Run workflow (optionally override
+# the comma-separated service list), or dispatch it via the GitHub API.
 
 on:
   workflow_dispatch:
     inputs:
       services:
-        description: "Comma-separated Railway service names to redeploy"
+        description: "Comma-separated Railway service names to deploy (see the 'List services' step output for exact names)"
         required: true
-        default: "freqtrade,pnl-dashboard"
+        default: "pnl-dashboard"
 
 jobs:
-  redeploy:
+  deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Redeploy services
+      - name: List services in the project (for exact names)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          set +e
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set (Settings > Secrets and variables > Actions, use a Railway PROJECT token)."
+            exit 1
+          fi
+          echo "Railway CLI version: $(railway --version || echo unknown)"
+          echo "----- railway status -----"
+          railway status || true
+          echo "----- railway status --json -----"
+          railway status --json || true
+
+      - name: Deploy latest code to services
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           SERVICES: ${{ github.event.inputs.services }}
         run: |
-          set -euo pipefail
-          if [ -z "${RAILWAY_TOKEN:-}" ]; then
-            echo "::error::RAILWAY_TOKEN secret is not set. Add it under Settings > Secrets and variables > Actions (use a Railway PROJECT token)."
-            exit 1
-          fi
-          echo "Railway CLI version: $(railway --version || echo 'unknown')"
+          set -uo pipefail
           fail=0
           IFS=',' read -ra SVCS <<< "$SERVICES"
           for raw in "${SVCS[@]}"; do
             svc="$(echo "$raw" | xargs)"   # trim whitespace
             [ -z "$svc" ] && continue
-            echo "::group::Redeploying '$svc'"
-            if railway redeploy --service "$svc" --yes; then
-              echo "OK: '$svc' redeploy triggered"
+            echo "::group::railway up --service '$svc'"
+            if railway up --service "$svc" --ci; then
+              echo "OK: '$svc' deployed (latest main)"
             else
-              echo "::error::redeploy failed for '$svc' — check the service name matches Railway exactly (see 'railway status')."
+              echo "::error::deploy failed for '$svc' — check the exact name in the 'List services' step above."
               fail=1
             fi
             echo "::endgroup::"
           done
           if [ "$fail" -ne 0 ]; then
-            echo "::error::One or more services failed to redeploy."
+            echo "::error::One or more services failed to deploy."
             exit 1
           fi
-          echo "All requested services redeployed."
+          echo "All requested services deployed from latest main."
