@@ -96,7 +96,40 @@ from datetime import datetime, timezone
 
 import ccxt  # unified multi-exchange public API
 
+import threading
+
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
+
+# bot_pnl_store shares ONE module-global Postgres connection, so every store.*
+# call in this process must hold this lock — the heartbeat thread below would
+# otherwise race the main loop's publish/fetch calls on that connection.
+_store_lock = threading.Lock()
+
+# Last successful end-of-cycle publish: (kwargs, monotonic_ts). The heartbeat
+# thread re-publishes this snapshot while a long cycle is still running.
+_last_publish = {"kwargs": None, "ts": 0.0}
+
+# Cycles are normally ~60s, but every `reload_every`th cycle rebuilds ~100
+# exchanges' market lists and can run 8-9 minutes when slow exchanges hit their
+# HTTP timeouts. Without a mid-cycle write the dashboard sees >180s of silence
+# and flags a healthy sniper stale. The heartbeat re-upserts the last snapshot
+# (same figures, fresh updated_at) every HEARTBEAT_SECONDS — but only while the
+# main loop has published within HEARTBEAT_GIVE_UP_SECONDS, so a genuinely hung
+# process still goes stale on the dashboard instead of being masked forever.
+HEARTBEAT_SECONDS = 60
+HEARTBEAT_GIVE_UP_SECONDS = 30 * 60
+
+
+def _heartbeat_loop():
+    while True:
+        time.sleep(HEARTBEAT_SECONDS)
+        kwargs, ts = _last_publish["kwargs"], _last_publish["ts"]
+        if kwargs is None:
+            continue
+        since = time.monotonic() - ts
+        if HEARTBEAT_SECONDS < since < HEARTBEAT_GIVE_UP_SECONDS:
+            with _store_lock:
+                store.publish("event-listing-sniper", **kwargs)
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sniper_data")
 KNOWN_FILE = os.path.join(DATA_DIR, "known_pairs.json")
@@ -728,6 +761,9 @@ def monitor(cfg, exchange_ids):
     pending = load_json(PENDING_FILE, {})   # "exid|symbol" -> first_seen
     positions = load_json(OPEN_FILE, [])
 
+    threading.Thread(target=_heartbeat_loop, daemon=True,
+                     name="dashboard-heartbeat").start()
+
     cycle = 0
     while not STOP:
         cycle_start = time.time()
@@ -843,14 +879,15 @@ def monitor(cfg, exchange_ids):
                 # cumulative P&L survives a Railway redeploy that wipes the local
                 # CSV (the cause of the 2026-06-25 reset to $0 / 0 closed).
                 try:
-                    store.publish_paper_trade(
-                        "event-listing-sniper",
-                        trade_id=f"{row[3]}:{row[4]}:{row[1]}:{row[2]}",
-                        pnl_abs=float(row[10]),
-                        pnl_pct=float(row[9]) / 100.0,
-                        pair=row[5], opened_at=row[1], closed_at=row[2],
-                        reason=row[11],
-                    )
+                    with _store_lock:
+                        store.publish_paper_trade(
+                            "event-listing-sniper",
+                            trade_id=f"{row[3]}:{row[4]}:{row[1]}:{row[2]}",
+                            pnl_abs=float(row[10]),
+                            pnl_pct=float(row[9]) / 100.0,
+                            pair=row[5], opened_at=row[1], closed_at=row[2],
+                            reason=row[11],
+                        )
                 except Exception:
                     pass
             if not closed:
@@ -895,19 +932,26 @@ def monitor(cfg, exchange_ids):
         # cumulative totals — take whichever source has more closed trades so the
         # figures can only move forward, never silently reset to zero.
         try:
-            _agg = store.fetch_paper_aggregate("event-listing-sniper")
+            with _store_lock:
+                _agg = store.fetch_paper_aggregate("event-listing-sniper")
             if _agg and _agg["closed"] >= nclosed:
                 realized, nclosed, wins = _agg["realized"], _agg["closed"], _agg["wins"]
         except Exception:
             pass
-        store.publish("event-listing-sniper", status="online",
-                      pnl_abs=realized, open_trades=len(positions),
-                      closed_trades=nclosed, wins=wins, losses=nclosed - wins,
-                      extra={"pending": len(pending), "exchanges_ok": ok_n,
-                             "exchanges_skipped": skip_n,
-                             "gate_passed": gate_pass, "gate_waiting": gate_wait,
-                             "gate_dropped": gate_drop,
-                             "research": bool(cfg.get("research", True))})
+        _pub_kwargs = dict(status="online",
+                           pnl_abs=realized, open_trades=len(positions),
+                           closed_trades=nclosed, wins=wins, losses=nclosed - wins,
+                           extra={"pending": len(pending), "exchanges_ok": ok_n,
+                                  "exchanges_skipped": skip_n,
+                                  "gate_passed": gate_pass, "gate_waiting": gate_wait,
+                                  "gate_dropped": gate_drop,
+                                  "research": bool(cfg.get("research", True))})
+        with _store_lock:
+            store.publish("event-listing-sniper", **_pub_kwargs)
+        # Hand the snapshot to the heartbeat thread so it can keep the
+        # dashboard's updated_at fresh through the next long reload cycle.
+        _last_publish["kwargs"] = _pub_kwargs
+        _last_publish["ts"] = time.monotonic()
 
         # Drop this cycle's market maps before sleeping so they don't sit
         # resident across the interval; gc reclaims them promptly.

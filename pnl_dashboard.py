@@ -83,14 +83,22 @@ STOCK_STALE_SECONDS = 26 * 3600
 # outage still shows, but a normal 5-min cadence does not read as "down".
 SLOW_LOOP = {"perps-donchian-breakout"}
 SLOW_LOOP_STALE_SECONDS = 15 * 60
+# The listing sniper publishes once per scan cycle, and every ~5th cycle is a
+# full exchange-list reload that can run 8-9 minutes when slow exchanges hit
+# their HTTP timeouts — a healthy sniper regularly goes >180s between writes.
+# Give it its own window so those reload cycles stop tripping a false stale
+# flag (the sniper also heartbeats mid-cycle now, but keep this as the backstop).
+SNIPER_STALE_SECONDS = 900
 
 
 def stale_secs_for(bot):
-    """Per-bot stale threshold: stocks (very slow) > slow-loop perps > fast crypto."""
+    """Per-bot stale threshold: each bot family has its own publish cadence."""
     if bot in STOCKS:
         return STOCK_STALE_SECONDS
     if bot in SLOW_LOOP:
         return SLOW_LOOP_STALE_SECONDS
+    if bot == "event-listing-sniper":
+        return SNIPER_STALE_SECONDS
     return STALE_SECONDS
 
 
@@ -876,6 +884,7 @@ class H(BaseHTTPRequestHandler):
                     "generated_at": _now.isoformat(),
                     "stale_threshold_sec": STALE_SECONDS,
                     "stock_stale_threshold_sec": STOCK_STALE_SECONDS,
+                    "sniper_stale_threshold_sec": SNIPER_STALE_SECONDS,
                     "freshest_update_age_sec": (int(freshest) if freshest is not None else None),
                     "feed_stale": bool(_stale_flags) and all(_stale_flags),
                     "n_stale": sum(1 for s in _stale_flags if s),
