@@ -118,50 +118,23 @@ class DayTraderV5Gated(IStrategy):
              "stop_duration_candles": 72, "max_allowed_drawdown": 0.15},
         ]
 
-    # Base-timeframe startup. The 1d regime needs ~200 DAILY candles of history,
-    # so make sure 1d data is downloaded for each pair (the merge handles alignment).
-    startup_candle_count = 200
-
-    def informative_pairs(self):
-        pairs = self.dp.current_whitelist()
-        inf = [(p, self.informative_timeframe) for p in pairs]
-        inf += [(p, self.regime_timeframe) for p in pairs]   # [V5 GATE]
-        return inf
+    # [2026-07-01 FIX] Only the 20-candle range (+ ATR14) needs warmup now, so
+    # 40 base candles is plenty. Was 200 (for the removed 1d regime), which — with
+    # its informative-data requirement — was starving the bot of any signals.
+    startup_candle_count = 40
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # ---- 5m indicators (unchanged) ----
-        dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
-        dataframe["ema_fast"] = ta.EMA(dataframe, timeperiod=self.buy_ema_fast.value)
-        dataframe["ema_slow"] = ta.EMA(dataframe, timeperiod=self.buy_ema_slow.value)
-        dataframe["volume_sma"] = ta.SMA(dataframe["volume"], timeperiod=self.buy_vol_sma.value)
+        # [2026-07-01 FIX] Base-timeframe indicators ONLY. The old 1h/1d
+        # informative merges (regime gate + 1h trend) required ~200 daily candles
+        # per pair; on the broadened 24-pair basket that data isn't always present,
+        # so populate_indicators raised and the bot produced NO signals at all
+        # (heartbeat online, 0 trades). The 20-candle range entry never used those
+        # columns, so they are removed. Keep ATR (for the custom stop) + the range.
         dataframe["atr"] = ta.ATR(dataframe, timeperiod=14)
 
-        # ---- 1h informative trend filter (unchanged) ----
-        informative = self.dp.get_pair_dataframe(
-            pair=metadata["pair"], timeframe=self.informative_timeframe
-        )
-        informative["ema9"] = ta.EMA(informative, timeperiod=9)
-        informative["ema9_rising"] = informative["ema9"] > informative["ema9"].shift(1)
-        dataframe = merge_informative_pair(
-            dataframe, informative, self.timeframe, self.informative_timeframe, ffill=True
-        )
-
-        # ---- [V5 GATE] 1d macro regime: 50d EMA above 200d EMA = "uptrend" ----
-        daily = self.dp.get_pair_dataframe(
-            pair=metadata["pair"], timeframe=self.regime_timeframe
-        )
-        daily["r_fast"] = ta.EMA(daily, timeperiod=self.regime_ema_fast.value)
-        daily["r_slow"] = ta.EMA(daily, timeperiod=self.regime_ema_slow.value)
-        daily["regime_up"] = (daily["r_fast"] > daily["r_slow"]).astype(int)
-        dataframe = merge_informative_pair(
-            dataframe, daily[["date", "regime_up"]], self.timeframe,
-            self.regime_timeframe, ffill=True
-        )
-        # merge suffixes the column -> "regime_up_1d"
-
-        # [20-CANDLE RANGE 2026-07-01] Adaptive support/resistance: buy near the
-        # rolling 20-candle low, sell near the rolling 20-candle high. shift(1) keeps
-        # the current forming bar out of its own band (no look-ahead).
+        # [20-CANDLE RANGE] Adaptive support/resistance from the base timeframe:
+        # buy near the rolling 20-candle low, sell near the rolling 20-candle high.
+        # shift(1) keeps the current forming bar out of its own band (no look-ahead).
         dataframe["rng_low20"] = dataframe["low"].rolling(20).min().shift(1)
         dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
         _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
