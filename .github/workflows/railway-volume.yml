@@ -73,32 +73,26 @@ jobs:
           ENVIRONMENT="${ENVIRONMENT:-production}"
           echo "CLI: $(railway --version || echo unknown)"
 
-          # ---- token probe (non-destructive): identify what the provided token is ----
-          # whoami only prints the account name, never the token, so this is safe.
-          if [ -n "${RAILWAY_API_TOKEN:-}" ]; then
-            tok="$RAILWAY_API_TOKEN"
-            echo "===== probe: token as ACCOUNT (RAILWAY_API_TOKEN) ====="
-            ( unset RAILWAY_TOKEN; RAILWAY_API_TOKEN="$tok" railway whoami 2>&1 ) || true
-            echo "===== probe: same token as PROJECT (RAILWAY_TOKEN) ====="
-            ( unset RAILWAY_API_TOKEN; RAILWAY_TOKEN="$tok" railway whoami 2>&1; \
-              echo "-- status --"; RAILWAY_TOKEN="$tok" railway status 2>&1 ) || true
-            echo "===== end probe ====="
-          fi
-
-          # Auth selection: for `add` we NEED the account token (link/create scope).
-          # The Railway CLI reads RAILWAY_API_TOKEN for account/team auth and
-          # RAILWAY_TOKEN for project auth; if both are set the project token wins and
-          # stays scoped, so when using the account token we must NOT export
-          # RAILWAY_TOKEN.
-          if [ -n "${RAILWAY_API_TOKEN:-}" ]; then
+          # Auth selection by action:
+          #  - list  → PROJECT token (read ops work and auto-scope to its project;
+          #            the account token is unreliable/optional, so prefer project).
+          #  - add   → ACCOUNT token (needs link/create scope a project token lacks).
+          # The Railway CLI reads RAILWAY_TOKEN (project) and RAILWAY_API_TOKEN
+          # (account); if both are present the project token wins, so we unset the
+          # one we are not using.
+          if [ "${ACTION:-list}" = "add" ] && [ -n "${RAILWAY_API_TOKEN:-}" ]; then
             echo "Auth: account token (RAILWAY_API_TOKEN)"
             unset RAILWAY_TOKEN || true
             echo "whoami: $(railway whoami 2>&1 || echo '?')"
           elif [ -n "${RAILWAY_PROJECT_TOKEN:-}" ]; then
-            echo "Auth: project token (read-only ops only)"
+            echo "Auth: project token"
+            unset RAILWAY_API_TOKEN || true
             export RAILWAY_TOKEN="$RAILWAY_PROJECT_TOKEN"
+          elif [ -n "${RAILWAY_API_TOKEN:-}" ]; then
+            echo "Auth: account token (no project token available)"
+            unset RAILWAY_TOKEN || true
           else
-            echo "::error::No token set. Add secret RAILWAY_ACCOUNT_TOKEN (account token) for add."; exit 1
+            echo "::error::No token set."; exit 1
           fi
 
           echo "===== railway volume add --help ====="; railway volume add --help 2>&1 || true
