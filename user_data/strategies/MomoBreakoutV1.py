@@ -28,6 +28,10 @@
 #     not proof (the V3 lesson). Watch it live before trusting it.
 #
 # RUNS ON 4h. Kraken serves enough recent 4h candles on startup automatically.
+#
+# [2026-07-01] Switched entry/exit to a 20-candle RANGE strategy: buy near the
+# rolling 20-candle low (bottom 15% of the band), sell near the rolling 20-candle
+# high (top 15%). Long-only; stop-loss/ROI/protections kept as guardrails.
 
 from pandas import DataFrame
 import talib.abstract as ta
@@ -75,27 +79,31 @@ class MomoBreakoutV1(IStrategy):
         # Prior-bar Donchian channels (shift(1) => no look-ahead on the current bar).
         dataframe["dc_high"] = dataframe["high"].rolling(self.entry_lookback.value).max().shift(1)
         dataframe["dc_low"]  = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
+        # [20-CANDLE RANGE 2026-07-01] Adaptive support/resistance: buy near the
+        # rolling 20-candle low, sell near the rolling 20-candle high. shift(1) keeps
+        # the current forming bar out of its own band (no look-ahead).
+        dataframe["rng_low20"] = dataframe["low"].rolling(20).min().shift(1)
+        dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
+        _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
+        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.15 * _rng_band
+        dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.15 * _rng_band
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # Buy the breakout, but only in an uptrend (close above the 200-EMA).
         dataframe.loc[
             (
-                (dataframe["close"] > dataframe["dc_high"])        # breakout to new N-bar high
-                & (dataframe["close"] > dataframe["ema_trend"])    # uptrend filter
+                (dataframe["close"] <= dataframe["rng_buy_zone"])
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",
         ] = 1
-        # [OBSERVABILITY 2026-06-30] Tag entries for per-signal P&L attribution.
-        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "donchian_breakout"
+        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range20_buy_low"
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # Trailing Donchian exit: leave when price breaks below the M-bar low.
         dataframe.loc[
             (
-                (dataframe["close"] < dataframe["dc_low"])
+                (dataframe["close"] >= dataframe["rng_sell_zone"])
                 & (dataframe["volume"] > 0)
             ),
             "exit_long",

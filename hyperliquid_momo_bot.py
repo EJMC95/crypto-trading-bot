@@ -10,10 +10,12 @@ This is the live counterpart to perps_strategy_backtest.py — same rules, so wh
 you run matches what you measured.
 
 Strategy (per market, on closed 4h candles):
-  LONG  entry : close > highest high of last 15 bars  AND  close > 100-EMA.
-  LONG  exit  : close < lowest low of last 8 bars  OR  price <= entry*(1-8%).
-  SHORT (only if ALLOW_SHORT): mirror — close < 15-bar low AND close < 100-EMA;
-        cover on close > 8-bar high OR price >= entry*(1+8%).
+  [2026-07-01] 20-CANDLE RANGE (long-only):
+  LONG  entry : price near the rolling 20-candle low (<= low20 + 15% of the band).
+  LONG  exit  : price near the rolling 20-candle high (>= high20 - 15% of band),
+                OR the 8% HARD_STOP fires (price <= entry*(1-8%)).
+  Shorts are disabled. The Donchian/EMA fields are still computed for logging and
+  legacy short-close paths, but no new shorts are opened.
 
 Operational:
   - Polls every LOOP_SECONDS; acts on the latest CLOSED 4h candle (no churn).
@@ -148,10 +150,21 @@ def signals_from_candles(candles):
     dc_high_exit = max(highs[-1 - EXIT_LOOKBACK:-1])
     ema_trend = ema_last(closes, TREND_EMA)
 
+    # [20-CANDLE RANGE 2026-07-01] rolling 20-candle low/high over the PRIOR 20
+    # candles (exclude the decision bar itself -> no look-ahead). buy_zone is the
+    # bottom 15% of the band ("near the live low"), sell_zone the top 15%.
+    low20 = min(lows[-21:-1])
+    high20 = max(highs[-21:-1])
+    band = max(high20 - low20, 1e-9)
+    buy_zone = low20 + 0.15 * band
+    sell_zone = high20 - 0.15 * band
+
     return {
         "close": close, "ema": ema_trend,
         "dc_high_entry": dc_high_entry, "dc_low_entry": dc_low_entry,
         "dc_low_exit": dc_low_exit, "dc_high_exit": dc_high_exit,
+        "low20": low20, "high20": high20,
+        "buy_zone": buy_zone, "sell_zone": sell_zone,
     }
 
 
@@ -192,9 +205,8 @@ def main():
     log.info("=" * 64)
     log.info("MomoBreakout PERPS bot | %s | coins=%s",
              "DRY-RUN" if DRY_RUN else "LIVE-TESTNET", COINS)
-    log.info("Donchian %d/%d + EMA%d + %.0f%% stop | shorts=%s | %dx | $%.0f/trade | loop=%ds",
-             ENTRY_LOOKBACK, EXIT_LOOKBACK, TREND_EMA, HARD_STOP * 100,
-             ALLOW_SHORT, LEVERAGE, ORDER_USD, LOOP_SECONDS)
+    log.info("20-candle RANGE (long-only) + %.0f%% hard stop | %dx | $%.0f/trade | loop=%ds",
+             HARD_STOP * 100, LEVERAGE, ORDER_USD, LOOP_SECONDS)
     log.info("=" * 64)
 
     def account_value():
@@ -283,24 +295,27 @@ def main():
             decision = "HOLD"
 
             # ----- manage existing position first -----
+            # [20-CANDLE RANGE 2026-07-01] Long-only range trading: take profit
+            # near the rolling 20-candle high; keep the 8% HARD_STOP guardrail.
+            # Shorts are disabled (no new OPEN_SHORT); any pre-existing short is
+            # still closed harmlessly by its stop / cover path.
             if held > 0:  # long
                 if entry and px <= entry * (1 - HARD_STOP):
                     decision = "STOP_LONG"
-                elif px < s["dc_low_exit"]:
-                    decision = "EXIT_LONG"
-            elif held < 0:  # short
+                elif px >= s["sell_zone"]:
+                    decision = "EXIT_LONG"          # take profit at the range high
+            elif held < 0:  # short (legacy; never opened by the range logic)
                 if entry and px >= entry * (1 + HARD_STOP):
                     decision = "STOP_SHORT"
                 elif px > s["dc_high_exit"]:
                     decision = "COVER_SHORT"
-            else:  # flat -> look for entries
-                if px > s["dc_high_entry"] and px > s["ema"]:
-                    decision = "OPEN_LONG"
-                elif ALLOW_SHORT and px < s["dc_low_entry"] and px < s["ema"]:
-                    decision = "OPEN_SHORT"
+            else:  # flat -> long-only range entry
+                if px <= s["buy_zone"]:
+                    decision = "OPEN_LONG"          # buy near the range low
 
-            log.info("%-4s px=%.2f ema200=%.2f dcHi=%.2f dcLo=%.2f held=%.4f -> %s",
-                     coin, px, s["ema"], s["dc_high_entry"], s["dc_low_exit"], held, decision)
+            log.info("%-4s px=%.2f ema200=%.2f low20=%.4f high20=%.4f buy<=%.4f sell>=%.4f held=%.4f -> %s",
+                     coin, px, s["ema"], s["low20"], s["high20"],
+                     s["buy_zone"], s["sell_zone"], held, decision)
 
             size = round(ORDER_USD * LEVERAGE / px, 4)
 

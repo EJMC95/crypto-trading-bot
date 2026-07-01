@@ -31,6 +31,11 @@
 #
 # Diff vs DayTraderV1Aggro is intentionally tiny (search "[V5 GATE]"): everything
 # else is preserved so any edge you tune on the Aggro carries straight over.
+#
+# [2026-07-01] Entry/exit switched to a 20-candle RANGE strategy: buy near the
+# rolling 20-candle low (bottom 15% of the band), sell near the rolling 20-candle
+# high (top 15%). Long-only; custom ATR stop / ROI / protections kept as guardrails.
+# The 1h/1d regime indicators are left intact (harmless) though unused by the new entry.
 
 from datetime import datetime
 from typing import Optional
@@ -154,43 +159,32 @@ class DayTraderV5Gated(IStrategy):
         )
         # merge suffixes the column -> "regime_up_1d"
 
+        # [20-CANDLE RANGE 2026-07-01] Adaptive support/resistance: buy near the
+        # rolling 20-candle low, sell near the rolling 20-candle high. shift(1) keeps
+        # the current forming bar out of its own band (no look-ahead).
+        dataframe["rng_low20"] = dataframe["low"].rolling(20).min().shift(1)
+        dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
+        _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
+        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.15 * _rng_band
+        dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.15 * _rng_band
+
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[
             (
-                # [CHURN-FIX 2026-06-25] Fire on a FRESH momentum cross, not a
-                # sustained level. The old test (rsi > level) was true on every
-                # candle momentum stayed elevated, so after each shakeout the bot
-                # bought straight back into the same chop and bled fees. A cross
-                # fires ~once per impulse.
-                (
-                    qtpylib.crossed_above(dataframe["rsi"], self.buy_rsi.value)
-                    | qtpylib.crossed_above(dataframe["close"], dataframe["ema_fast"])
-                )
-                & (dataframe["ema_fast"] > dataframe["ema_slow"])
-                & (dataframe["volume"] > dataframe["volume_sma"])
-                & (dataframe["close_1h"] > dataframe["ema9_1h"])
-                & (dataframe["ema9_rising_1h"])
-
-                # [V5 GATE] only buy when the daily 50/200 macro trend is UP. In a
-                # daily downtrend this is False on every candle, so the bot takes
-                # zero trades and sits in cash.
-                & (dataframe["regime_up_1d"] == 1)
-
+                (dataframe["close"] <= dataframe["rng_buy_zone"])
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",
         ] = 1
-        # [OBSERVABILITY 2026-06-30] Tag entries so the next P&L review can
-        # attribute results to the signal instead of seeing every trade as 'NA'.
-        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "rsi_ema_cross"
+        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range20_buy_low"
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[
             (
-                (dataframe["ema_fast"] < dataframe["ema_slow"])
+                (dataframe["close"] >= dataframe["rng_sell_zone"])
                 & (dataframe["volume"] > 0)
             ),
             "exit_long",

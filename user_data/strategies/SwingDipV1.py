@@ -28,6 +28,10 @@
 #   - Spot / long-only. Settings are round numbers chosen to AVOID overfitting,
 #     not tuned for max backtest return. Hyperopt them later if you want, but
 #     beware the V3 lesson (a great backtest is easy to fake).
+#
+# [2026-07-01] Switched entry/exit to a 20-candle RANGE strategy: buy near the
+# rolling 20-candle low (bottom 15% of the band), sell near the rolling 20-candle
+# high (top 15%). Long-only; stop-loss/ROI/protections kept as guardrails.
 
 from pandas import DataFrame
 import talib.abstract as ta
@@ -84,32 +88,31 @@ class SwingDipV1(IStrategy):
         bb = qtpylib.bollinger_bands(qtpylib.typical_price(dataframe), window=20, stds=2)
         dataframe["bb_lower"] = bb["lower"]
         dataframe["bb_upper"] = bb["upper"]
+        # [20-CANDLE RANGE 2026-07-01] Adaptive support/resistance: buy near the
+        # rolling 20-candle low, sell near the rolling 20-candle high. shift(1) keeps
+        # the current forming bar out of its own band (no look-ahead).
+        dataframe["rng_low20"] = dataframe["low"].rolling(20).min().shift(1)
+        dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
+        _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
+        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.15 * _rng_band
+        dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.15 * _rng_band
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # BUY a real dip, but only inside an uptrend (no falling knives).
         dataframe.loc[
             (
-                (dataframe["ema50"] > dataframe["ema200"])         # macro trend up
-                & (dataframe["rsi"] < self.buy_rsi.value)          # oversold
-                & (dataframe["close"] < dataframe["bb_lower"])     # genuine dip
+                (dataframe["close"] <= dataframe["rng_buy_zone"])
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",
         ] = 1
-        # [OBSERVABILITY 2026-06-30] Tag entries for per-signal P&L attribution.
-        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "dip_in_uptrend"
+        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range20_buy_low"
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # SELL into strength: overbought RSI or price pokes above the upper band.
-        # (ROI ladder and stop-loss also exit; whichever fires first.)
         dataframe.loc[
             (
-                (
-                    (dataframe["rsi"] > self.sell_rsi.value)
-                    | (dataframe["close"] > dataframe["bb_upper"])
-                )
+                (dataframe["close"] >= dataframe["rng_sell_zone"])
                 & (dataframe["volume"] > 0)
             ),
             "exit_long",

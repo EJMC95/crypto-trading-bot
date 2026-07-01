@@ -4,8 +4,10 @@ hyperliquid_perps_bot.py
 ------------------------
 Live (testnet) perpetuals trading bot that mirrors the Torin video setup:
   - Connects to the Hyperliquid TESTNET via the official Python SDK.
-  - RSI(14) mean-reversion, but trend-gated (2026-06-25): long oversold dips only
-    while price is ABOVE the 50-EMA, short overbought rips only while BELOW it.
+  - [2026-07-01] 20-CANDLE RANGE strategy (long-only): buy when price is near the
+    rolling 20-candle low (bottom 15% of the band), take profit when price reaches
+    the rolling 20-candle high (top 15%). Shorts are disabled. RSI/EMA are still
+    computed for logging but no longer drive the decision.
   - Per-trade 3% stop-loss + a 4h per-coin re-entry cooldown to stop fee churn.
   - Loops every LOOP_SECONDS (default 60s) and logs every decision.
   - Position sizing per trade + a 5% daily loss limit that halts trading.
@@ -251,67 +253,75 @@ def main():
             try:
                 candles = info.candles_snapshot(coin, CANDLE_INTERVAL, start, end)
                 closes = [float(c["c"]) for c in candles]
+                highs = [float(c["h"]) for c in candles]
+                lows = [float(c["l"]) for c in candles]
                 price = closes[-1]
                 r = rsi(closes, RSI_PERIOD)
             except Exception as e:
                 log.error("%s data error: %s", coin, e)
                 continue
 
+            # [20-CANDLE RANGE 2026-07-01] Long-only range trading: buy near the
+            # rolling 20-candle low, take profit near the rolling 20-candle high.
+            # Exclude the current/forming bar (index -1) so the band has no
+            # look-ahead. Need >=21 candles (20 prior + the current) to compute it.
+            if len(candles) < 21:
+                log.info("%-4s insufficient candle history; skipping.", coin)
+                continue
+            low20 = min(lows[-21:-1])
+            high20 = max(highs[-21:-1])
+            band = max(high20 - low20, 1e-9)
+            buy_zone = low20 + 0.15 * band
+            sell_zone = high20 - 0.15 * band
+
             held = pos.get(coin, 0.0)
-            ema_trend = ema(closes, TREND_EMA)
-            uptrend = ema_trend is not None and price > ema_trend
-            downtrend = ema_trend is not None and price < ema_trend
             now_ts = now.timestamp()
 
             decision = "HOLD"
 
-            # 1) Per-trade stop-loss: close any held position whose adverse move
-            #    exceeds STOP_PCT. This is the downside protection the bot never
-            #    had — previously only a 5% daily ACCOUNT limit existed, so one
-            #    position could ride all the way down.
+            # 1) Per-trade stop-loss (UNCHANGED): close any held position whose
+            #    adverse move exceeds STOP_PCT. Downside protection guardrail.
             entry = entries.get(coin)
             if held != 0 and entry:
                 adverse = ((price - entry) / entry) if held > 0 else ((entry - price) / entry)
                 if adverse <= -STOP_PCT:
                     decision = "STOP_CLOSE"
 
-            # 2) Entries only WITH the trend, and only after the per-coin cooldown.
-            #    Long oversold dips ABOVE the trend EMA; short overbought rips
-            #    BELOW it. This is the trend filter that turns "long falling
-            #    knives / short rallies" into "trade with the tide".
+            # 2) Range decisions (long-only), after the per-coin cooldown:
+            #    FLAT + price <= buy_zone  -> OPEN_LONG (buy near the live low)
+            #    LONG + price >= sell_zone -> RANGE_CLOSE (take profit at the high)
+            #    Shorts are disabled (long-only range strategy).
             if decision == "HOLD":
                 cooling = (now_ts - last_action.get(coin, 0.0)) < REENTRY_COOLDOWN_SEC
-                if not cooling:
-                    if r < OVERSOLD and held <= 0 and uptrend:
-                        decision = "OPEN_LONG"
-                    elif r > OVERBOUGHT and held >= 0 and downtrend:
-                        decision = "OPEN_SHORT"
+                if held > 0 and price >= sell_zone:
+                    decision = "RANGE_CLOSE"
+                elif not cooling and held == 0 and price <= buy_zone:
+                    decision = "OPEN_LONG"
 
-            log.info("%-4s price=%.2f RSI=%.1f ema%d=%s held=%.4f -> %s",
-                     coin, price, r, TREND_EMA,
-                     f"{ema_trend:.2f}" if ema_trend is not None else "na",
-                     held, decision)
+            log.info("%-4s price=%.2f RSI=%.1f low20=%.4f high20=%.4f buy<=%.4f sell>=%.4f held=%.4f -> %s",
+                     coin, price, r, low20, high20, buy_zone, sell_zone, held, decision)
 
             size = round(ORDER_USD * LEVERAGE / price, 4)
 
             if DRY_RUN:
                 # Book the fill in the paper account and mark to the live price.
                 broker.mark(coin, price)
-                if decision == "STOP_CLOSE":
+                if decision in ("STOP_CLOSE", "RANGE_CLOSE"):
                     _sz = broker.pos.get(coin, (0.0,))[0]
                     _pnl = broker.close(coin, price)
                     _record_close("perps-rsi-meanrev", coin, entries.get(coin),
-                                  entry_ts.get(coin), price, _pnl, _sz > 0, "stop")
+                                  entry_ts.get(coin), price, _pnl, _sz > 0,
+                                  "stop" if decision == "STOP_CLOSE" else "range_high")
                     entries.pop(coin, None); entry_ts.pop(coin, None)
                     last_action[coin] = now_ts
-                elif decision in ("OPEN_LONG", "OPEN_SHORT"):
+                elif decision == "OPEN_LONG":
                     # If flipping an existing position, realise + record it first.
                     if coin in broker.pos:
                         _sz = broker.pos.get(coin, (0.0,))[0]
                         _pnl = broker.close(coin, price)
                         _record_close("perps-rsi-meanrev", coin, entries.get(coin),
                                       entry_ts.get(coin), price, _pnl, _sz > 0, "flip")
-                    broker.open(coin, decision == "OPEN_LONG", size, price)
+                    broker.open(coin, True, size, price)
                     entries[coin] = price; entry_ts[coin] = now_ts
                     last_action[coin] = now_ts
                 continue
@@ -320,22 +330,17 @@ def main():
                 continue
 
             try:
-                if decision == "STOP_CLOSE":
+                if decision in ("STOP_CLOSE", "RANGE_CLOSE"):
                     exchange.market_close(coin)
                     entries.pop(coin, None)
                     last_action[coin] = now_ts
-                    log.info("STOP-LOSS CLOSE %s @ %.2f", coin, price)
+                    log.info("%s %s @ %.2f",
+                             "STOP-LOSS CLOSE" if decision == "STOP_CLOSE" else "RANGE-HIGH CLOSE",
+                             coin, price)
                 elif decision == "OPEN_LONG":
                     if held < 0:
                         exchange.market_close(coin)
                     exchange.market_open(coin, True, size)
-                    entries[coin] = price
-                    last_action[coin] = now_ts
-                    log.info("ORDER SENT %s %s size=%s", decision, coin, size)
-                elif decision == "OPEN_SHORT":
-                    if held > 0:
-                        exchange.market_close(coin)
-                    exchange.market_open(coin, False, size)
                     entries[coin] = price
                     last_action[coin] = now_ts
                     log.info("ORDER SENT %s %s size=%s", decision, coin, size)
