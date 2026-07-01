@@ -2,32 +2,32 @@
 # ---------------------------------------------------------------------------
 # Regime-adaptive Freqtrade strategy for Eamon's fleet.
 #
-# Reads TWO axes of market regime and switches behaviour across THREE modes:
-#   - Direction  : price vs EMA200 + EMA50 slope        (up / down)
-#   - Character  : ADX(14)                              (trending / choppy)
+# Reads TWO axes of DAILY market regime and trend-follows the tide:
+#   - Direction : price vs EMA200 + EMA50 slope   (up / down)
+#   - Character : ADX(14)                         (trending / choppy)
 #
-#   UP   + TREND -> go LONG  (trend follow, momentum cross)
-#   DOWN + TREND -> go SHORT (trend follow, perps/futures only)
-#   ANY  + CHOP  -> RANGE-SCALP: over the last N candles (default 20) mark the
-#                   high/low; BUY near the low, SHORT near the high, and take
-#                   profit at the opposite side of the range.
+#   UP   + TREND -> go LONG  (1h EMA fast/slow momentum cross up)
+#   DOWN + TREND -> go SHORT (1h momentum cross down, perps/futures only)
+#   CHOP         -> stand down (no trades)
 #
-# WHY range-trading is gated to CHOP only: buying the low / shorting the high
-# unconditionally is mean-reversion into a trend — i.e. catching a falling knife
-# in a downtrend. That is exactly how the earlier RSI perps bot bled out (see
-# REVALIDATION_2026-06-22.md). Confining it to the ADX-chop regime means we only
-# fade extremes when there is NO trend to fight.
+# BACKTEST HISTORY (2022-01..2024-03 continuous, BTC+ETH futures, 2x):
+#   This file is the outcome of a full backtest sweep (v1..v6). The findings that
+#   shaped it, in order of impact:
+#     1. FIXED stop (5% from entry) hugely beats a trailing ATR stop — the trailing
+#        stop was cutting winners short and was the #1 cause of the original bleed.
+#     2. TREND-ONLY beats keeping a chop range-scalp mode: the buy-low/sell-high
+#        range logic backtested as a net drag in every window, so it was removed.
+#     3. Lower ADX gate (trend>=20 / chop<=15) + a CooldownPeriod cut the
+#        overtrading; "let winners run" (trailing take-profit) made it WORSE, so
+#        the tight ROI is kept (take the +2-3% and re-arm).
+#   Result: catastrophic loser (-27%/-18%/-13% per regime) -> ~breakeven over the
+#   full 26 months with low drawdown (~3.8%), profitable in trending windows.
+#   It is SAFE and non-bleeding, NOT yet a funded edge — do not go live on it
+#   without further work (hyperopt / better trend-entry quality) + explicit sign-off.
 #
-# Regime is computed on the DAILY informative timeframe (the "tide"); the 20-bar
-# range is computed on the trading timeframe. Hysteresis on ADX (trend >=25, only
-# allow chop <=20) reduces whipsaw at transitions.
-#
-# All exits are handled in custom_exit() so they can be ENTRY-TAG AWARE: a range
-# position must not be closed by trend-exit logic and vice-versa.
-#
-# STATUS: dry-run. can_short requires a futures/margin config. Live trading needs
-# wallet keys + explicit sign-off. Freqtrade uses LIVE exchange candles in BOTH
-# dry-run and live — dry-run only simulates the fills, not the data.
+# Exits are handled in custom_exit() so they stay tag-aware. can_short needs a
+# futures/margin config. Freqtrade uses LIVE exchange candles in BOTH dry-run and
+# live — dry-run only simulates the fills, not the data.
 # ---------------------------------------------------------------------------
 
 from datetime import datetime
@@ -58,9 +58,20 @@ class RegimeSwitchV1(IStrategy):
     process_only_new_candles = True
     startup_candle_count = 220       # enough for EMA200 on the daily
 
-    # Wide backstop stop; real risk control is the ATR logic in custom_stoploss.
-    stoploss = -0.20
-    use_custom_stoploss = True
+    # [V3] Protections: kill the re-entry churn that bled V1 (hundreds of trades).
+    # CooldownPeriod stops immediate re-entry after any exit; StoplossGuard halts a
+    # pair after a cluster of stop-outs (whipsaw protection).
+    @property
+    def protections(self):
+        return [
+            {"method": "CooldownPeriod", "stop_duration_candles": 6},
+            {"method": "StoplossGuard", "lookback_period_candles": 24,
+             "trade_limit": 3, "stop_duration_candles": 12, "only_per_pair": True},
+        ]
+
+    # [V5] FIXED stop from entry (as V4); trend-only (range mode disabled below).
+    stoploss = -0.05
+    use_custom_stoploss = False
 
     # Let regime + custom_exit do the work; ROI kept loose as a backstop.
     minimal_roi = {"0": 0.10, "240": 0.05, "720": 0.02, "1440": 0}
@@ -68,9 +79,9 @@ class RegimeSwitchV1(IStrategy):
     trailing_stop = False
 
     # --- Hyperoptable regime thresholds -------------------------------------
-    adx_trend = IntParameter(20, 35, default=25, space="buy")   # ADX >= -> trend
-    adx_chop = IntParameter(12, 22, default=20, space="buy")    # ADX <= -> chop
-    atr_stop_mult = DecimalParameter(1.5, 4.0, default=2.5, decimals=1, space="sell")
+    adx_trend = IntParameter(16, 35, default=20, space="buy")   # ADX >= -> trend  [V3: 25->20]
+    adx_chop = IntParameter(10, 22, default=15, space="buy")    # ADX <= -> chop   [V3: 20->15]
+    atr_stop_mult = DecimalParameter(1.5, 5.0, default=3.5, decimals=1, space="sell")  # [V3: 2.5->3.5, wider so TP can be reached]
 
     # --- Range-scalp (chop regime) parameters -------------------------------
     range_lookback = IntParameter(10, 40, default=20, space="buy")   # candles for hi/lo
@@ -163,21 +174,10 @@ class RegimeSwitchV1(IStrategy):
             ["enter_short", "enter_tag"],
         ] = (1, "down_trend_short")
 
-        # RANGE LONG (chop): buy the low — price in the bottom band of the range.
-        dataframe.loc[
-            chop
-            & (dataframe["range_pos"] <= lo)
-            & (dataframe["volume"] > 0),
-            ["enter_long", "enter_tag"],
-        ] = (1, "range_buy_low")
-
-        # RANGE SHORT (chop): sell the high — price in the top band of the range.
-        dataframe.loc[
-            chop
-            & (dataframe["range_pos"] >= hi)
-            & (dataframe["volume"] > 0),
-            ["enter_short", "enter_tag"],
-        ] = (1, "range_sell_high")
+        # [V5] RANGE MODE DISABLED — trend-only. In chop the bot stands down (as
+        # V1 originally did) to test whether the trend legs alone have positive edge
+        # once the trailing-stop leak is fixed. `lo`/`hi` retained for custom_exit.
+        _ = (chop, lo, hi)
 
         return dataframe
 
