@@ -1,0 +1,20 @@
+# Freqtrade image for the dedicated perps-regime-switch Railway service.
+# Runs ONE dry-run futures bot (RegimeSwitchV1) + the shared P&L poller.
+# Build target: set this service's Railway Dockerfile path = Dockerfile.regime.
+FROM freqtradeorg/freqtrade:stable
+
+USER root
+# psycopg2 for the P&L poller that publishes to the shared Postgres table.
+RUN pip install --no-cache-dir psycopg2-binary
+# Bake in the configs + strategies + supervisor + P&L plumbing.
+COPY user_data /freqtrade/user_data
+COPY run_regime.sh /freqtrade/run_regime.sh
+COPY bot_pnl_store.py /freqtrade/bot_pnl_store.py
+COPY freqtrade_pnl_poller.py /freqtrade/freqtrade_pnl_poller.py
+RUN chmod +x /freqtrade/run_regime.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_regime.sh /freqtrade/bot_pnl_store.py /freqtrade/freqtrade_pnl_poller.py
+USER ftuser
+
+WORKDIR /freqtrade
+# Clear freqtrade's default entrypoint so our supervisor script runs instead.
+ENTRYPOINT []
+CMD ["sh", "/freqtrade/run_regime.sh"]

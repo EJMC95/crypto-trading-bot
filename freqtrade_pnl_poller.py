@@ -13,6 +13,7 @@ Postgres service). Without it, bot_pnl_store just no-ops.
 """
 import base64
 import json
+import os
 import time
 import urllib.request
 
@@ -23,13 +24,22 @@ BOT_USER = "freqtrader"
 BOT_PASS = "freqbot2026"
 
 # (publish-name, REST port) — names match pnl_dashboard's EXPECTED list.
-BOTS = [
+# Default = the 5 spot bots in the freqtrade-bots container. A dedicated
+# single-bot container (e.g. perps-regime-switch) overrides this via the
+# FT_POLLER_BOTS env var — a JSON list of [name, port] pairs — so the same
+# poller code drives any freqtrade service without editing this list.
+_DEFAULT_BOTS = [
     ("crypto-trend-daily", 8085),
     ("crypto-intraday-15m", 8084),
     ("crypto-swing-daily", 8086),
     ("crypto-breakout-4h", 8087),
     ("crypto-trendmomo-4h", 8088),
 ]
+_env_bots = os.environ.get("FT_POLLER_BOTS", "").strip()
+if _env_bots:
+    BOTS = [(str(n), int(p)) for n, p in json.loads(_env_bots)]
+else:
+    BOTS = _DEFAULT_BOTS
 
 POLL_SECONDS = 30
 

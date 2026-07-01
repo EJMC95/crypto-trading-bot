@@ -31,7 +31,8 @@ DASH_USER = os.environ.get("DASH_USER", "eamon")
 DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 
 # Expected bots — so the grid shows a bot even before its first publish.
-EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "scanner-triangular-arb", "event-listing-sniper",
+EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
+            "scanner-triangular-arb", "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h", "crypto-trendmomo-4h"]
 
@@ -61,6 +62,7 @@ LABELS = {
     "crypto-trendmomo-4h":         "Crypto · Trend Momentum (SMA, 4H)",
     "perps-rsi-meanrev":           "Perps · RSI Mean-Reversion (Hyperliquid)",
     "perps-donchian-breakout":     "Perps · Donchian Breakout (Hyperliquid)",
+    "perps-regime-switch":         "Perps · Regime-Adaptive (ADX+EMA, Hyperliquid)",
     "scanner-triangular-arb":      "Scanner · Triangular Arbitrage",
     "scanner-cross-exchange-arb":  "Scanner · Cross-Exchange Arbitrage",
     "event-listing-sniper":        "Event · New-Listing Sniper",
