@@ -409,7 +409,7 @@ def run_live(once=False):
 
         # Publish a snapshot for the live dashboard (guarded; never raises).
         store.publish(
-            "triangular-arb", status="online",
+            "scanner-triangular-arb", status="online",
             pnl_abs=virtual_balance,
             extra={"kind": "scanner",  # optimistic paper-arb booking, not realized P&L
                    "cycles": len(cycles),

@@ -2,7 +2,7 @@
 """
 Build ONE self-contained dashboard.html covering every bot in this folder.
 
-Unlike dashboard.py (which only covered the triangular-arb engine), this scans:
+Unlike dashboard.py (which only covered the scanner-triangular-arb engine), this scans:
   * every Freqtrade config_*.json  -> a bot row (strategy, exchange, pairs,
     stake, dry-run) enriched with timeframe / stoploss / ROI read straight
     from the matching strategies/<Strategy>.py file.

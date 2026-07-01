@@ -31,25 +31,44 @@ DASH_USER = os.environ.get("DASH_USER", "eamon")
 DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 
 # Expected bots — so the grid shows a bot even before its first publish.
-EXPECTED = ["hl-perps-rsi", "hl-momo-breakout", "triangular-arb", "listing-sniper",
-            "trend-golden-cross", "intraday-daytrader-5m", "swing-dip-buyer",
-            "momo-breakout-4h", "momo-breakout-alt"]
+EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "scanner-triangular-arb", "event-listing-sniper",
+            "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
+            "crypto-breakout-4h", "crypto-trendmomo-4h"]
 
 # Scanners book OPTIMISTIC paper-arb fills (observed spreads, no slippage/latency).
 # Their pnl_abs is real paper P&L but on a rosier basis than the freqtrade bots'
 # simulated fills — so it is reported as a SEPARATE subtotal and never folded
 # into the trading-bot P&L headline.
-SCANNERS = {"triangular-arb", "cross-exchange-arb"}
+SCANNERS = {"scanner-triangular-arb", "scanner-cross-exchange-arb"}
 
 # Stock/brokerage bots (IBKR + Alpaca). Shown as their own cards with a SEPARATE
 # subtotal so their large $ equity never swamps the crypto headline.
-STOCKS = {"ikbr-stock-bot", "alpaca-momentum"}
+STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca"}
 
 # The only bots that should appear. Anything else in the table (e.g. legacy
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
 # stale duplicate and is filtered out here so it can never skew totals or the
 # grid — independent of whether the Postgres table has been pruned yet.
 CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS
+
+# [2026-07-01] Professional display names. Keys stay machine-safe; the dashboard
+# shows the descriptive label. label_for() falls back to the raw key if unmapped.
+LABELS = {
+    "crypto-trend-daily":          "Crypto · Trend Follower (50/200, Daily)",
+    "crypto-intraday-15m":         "Crypto · Intraday Breakout (15M)",
+    "crypto-swing-daily":          "Crypto · Mean-Reversion Swing (Daily)",
+    "crypto-breakout-4h":          "Crypto · Breakout Momentum (4H)",
+    "crypto-trendmomo-4h":         "Crypto · Trend Momentum (SMA, 4H)",
+    "perps-rsi-meanrev":           "Perps · RSI Mean-Reversion (Hyperliquid)",
+    "perps-donchian-breakout":     "Perps · Donchian Breakout (Hyperliquid)",
+    "scanner-triangular-arb":      "Scanner · Triangular Arbitrage",
+    "scanner-cross-exchange-arb":  "Scanner · Cross-Exchange Arbitrage",
+    "event-listing-sniper":        "Event · New-Listing Sniper",
+    "equities-regime-ibkr":        "Equities · SPY/QQQ Regime (IBKR)",
+    "equities-momentum-alpaca":    "Equities · Momentum Rank (Alpaca)",
+}
+def label_for(bot):
+    return LABELS.get(bot, bot)
 
 STALE_SECONDS = 180  # crypto bots loop fast; older than this = "stale"
 # Stock bots publish far less often (IKBR every 2h, Alpaca daily), so they need a
@@ -261,7 +280,7 @@ def _orders_html(extra):
 def card(bot, row, open_trades=None):
     open_trades = open_trades or {}
     if row is None:
-        return (f'<div class="card"><h2>{html.escape(bot)} '
+        return (f'<div class="card"><h2>{html.escape(label_for(bot))} '
                 f'<span class="dot off"></span></h2>'
                 f'<div class="muted">no data yet — bot has not published</div></div>')
     thr = STOCK_STALE_SECONDS if bot in STOCKS else STALE_SECONDS
@@ -291,7 +310,7 @@ def card(bot, row, open_trades=None):
         rows.append(f'<div class="row"><span>Win / Loss</span>'
                     f'<b>{row.get("wins") or 0} / {row.get("losses") or 0}</b></div>')
     return f'''<div class="card">
-      <h2>{html.escape(bot)} <span class="dot {dot}"></span></h2>
+      <h2>{html.escape(label_for(bot))} <span class="dot {dot}"></span></h2>
       <div class="muted">{html.escape(str(status))} · updated {html.escape(age)}{" · STALE" if stale else ""}</div>
       {"".join(rows)}
       {holdings_html}
@@ -608,8 +627,8 @@ validated parameter changes are. Auto-refreshes every 2 min. Times UTC.</footer>
 </body></html>'''
 
 
-TRADING_BOTS_ORDER = ["trend-golden-cross", "intraday-daytrader-5m",
-                      "swing-dip-buyer", "momo-breakout-4h", "momo-breakout-alt"]
+TRADING_BOTS_ORDER = ["crypto-trend-daily", "crypto-intraday-15m",
+                      "crypto-swing-daily", "crypto-breakout-4h", "crypto-trendmomo-4h"]
 
 
 def fetch_period_pnl(period, limit_periods):
@@ -816,7 +835,7 @@ class H(BaseHTTPRequestHandler):
                     d["kind"] = "scanner" if r.get("bot") in SCANNERS else "trading"
                     # Per-bot heartbeat (2026-06-25): expose each bot's age and a
                     # threshold-aware stale flag so the scheduled report can flag a
-                    # single laggard (e.g. ikbr-stock-bot running ~85m behind the
+                    # single laggard (e.g. equities-regime-ibkr running ~85m behind the
                     # fleet) without recomputing thresholds itself.
                     thr = STOCK_STALE_SECONDS if r.get("bot") in STOCKS else STALE_SECONDS
                     ua = r.get("updated_at")

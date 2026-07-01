@@ -24,11 +24,11 @@ BOT_PASS = "freqbot2026"
 
 # (publish-name, REST port) — names match pnl_dashboard's EXPECTED list.
 BOTS = [
-    ("trend-golden-cross", 8085),
-    ("intraday-daytrader-5m", 8084),
-    ("swing-dip-buyer", 8086),
-    ("momo-breakout-4h", 8087),
-    ("momo-breakout-alt", 8088),
+    ("crypto-trend-daily", 8085),
+    ("crypto-intraday-15m", 8084),
+    ("crypto-swing-daily", 8086),
+    ("crypto-breakout-4h", 8087),
+    ("crypto-trendmomo-4h", 8088),
 ]
 
 POLL_SECONDS = 30

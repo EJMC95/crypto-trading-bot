@@ -24,11 +24,11 @@ import bot_pnl_store as store
 
 # live bot publish-name -> strategy class
 BOT_TO_STRATEGY = {
-    "swing-dip-buyer":       "SwingDipV1",
-    "momo-breakout-4h":      "MomoBreakoutV1",
-    "momo-breakout-alt":     "MomoBreakoutV1",
-    "intraday-daytrader-5m": "DayTraderV5Gated",
-    "trend-golden-cross":    "ImprovedStrategyV4",
+    "crypto-swing-daily":       "SwingDipV1",
+    "crypto-breakout-4h":      "MomoBreakoutV1",
+    "crypto-trendmomo-4h":     "MomoBreakoutV1",
+    "crypto-intraday-15m": "DayTraderV5Gated",
+    "crypto-trend-daily":    "ImprovedStrategyV4",
 }
 MIN_GROUP = 5  # don't draw conclusions from a slice with fewer trades than this
 

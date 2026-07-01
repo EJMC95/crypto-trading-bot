@@ -57,7 +57,7 @@ EXIT_LOOKBACK = 8
 TREND_EMA = 100
 HARD_STOP = 0.08
 CANDLE_INTERVAL = "4h"
-ALLOW_SHORT = False              # [2026-07-01] disabled: validated backtest was long-only; shorts added whipsaw in chop
+ALLOW_SHORT = True               # [2026-07-01] shorts ON for downtrend turnover — already tide-gated (shorts only when px < 100-EMA), so it trades WITH the bear, not chop-whipsaw
 ORDER_USD = 50.0                 # notional per position
 LEVERAGE = 1                     # 1x baseline; 2x doubled drawdown in backtest
 DAILY_LOSS_LIMIT = 0.05
@@ -73,7 +73,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler(sys.stdout)],
 )
-log = logging.getLogger("hl-momo-breakout")
+log = logging.getLogger("perps-donchian-breakout")
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason):
@@ -315,7 +315,7 @@ def main():
                 elif decision in ("EXIT_LONG", "STOP_LONG", "COVER_SHORT", "STOP_SHORT"):
                     _sz, _ent = broker.pos.get(coin, (0.0, 0.0))
                     _pnl = broker.close(coin, px)
-                    _record_close("hl-momo-breakout", coin, _ent, entry_ts.pop(coin, None),
+                    _record_close("perps-donchian-breakout", coin, _ent, entry_ts.pop(coin, None),
                                   px, _pnl, _sz > 0, decision.lower())
                 if decision != "HOLD":
                     mode = "paper" if PAPER else "dry-run"
@@ -355,7 +355,7 @@ def main():
             pub_pnl = None
         _szi = broker.szi() if DRY_RUN else {}
         store.publish(
-            "hl-momo-breakout",
+            "perps-donchian-breakout",
             status="paper" if PAPER else ("halted" if halted_today else "online"),
             equity=pub_equity,
             pnl_abs=pub_pnl,

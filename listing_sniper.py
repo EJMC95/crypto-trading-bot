@@ -844,7 +844,7 @@ def monitor(cfg, exchange_ids):
                 # CSV (the cause of the 2026-06-25 reset to $0 / 0 closed).
                 try:
                     store.publish_paper_trade(
-                        "listing-sniper",
+                        "event-listing-sniper",
                         trade_id=f"{row[3]}:{row[4]}:{row[1]}:{row[2]}",
                         pnl_abs=float(row[10]),
                         pnl_pct=float(row[9]) / 100.0,
@@ -895,12 +895,12 @@ def monitor(cfg, exchange_ids):
         # cumulative totals — take whichever source has more closed trades so the
         # figures can only move forward, never silently reset to zero.
         try:
-            _agg = store.fetch_paper_aggregate("listing-sniper")
+            _agg = store.fetch_paper_aggregate("event-listing-sniper")
             if _agg and _agg["closed"] >= nclosed:
                 realized, nclosed, wins = _agg["realized"], _agg["closed"], _agg["wins"]
         except Exception:
             pass
-        store.publish("listing-sniper", status="online",
+        store.publish("event-listing-sniper", status="online",
                       pnl_abs=realized, open_trades=len(positions),
                       closed_trades=nclosed, wins=wins, losses=nclosed - wins,
                       extra={"pending": len(pending), "exchanges_ok": ok_n,

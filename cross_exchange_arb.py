@@ -417,7 +417,7 @@ def run_live(once=False):
             traceback.print_exc()
 
         store.publish(
-            "cross-exchange-arb", status="online",
+            "scanner-cross-exchange-arb", status="online",
             pnl_abs=virtual_balance,
             extra={"kind": "scanner",  # optimistic paper-arb booking, not realized P&L
                    "pairs": len(sym_map),

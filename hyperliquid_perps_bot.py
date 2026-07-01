@@ -53,8 +53,8 @@ RSI_PERIOD = 14
 # count and made the bot WORSE in backtest (-93.1% vs -89.8% at 30/70; the chop
 # window flipped from +9.4% to -56.6%) — it was pure fee bleed. See
 # REVALIDATION_2026-06-22.md "Why the losers lose".
-OVERSOLD = 30      # long only when deeply oversold
-OVERBOUGHT = 70    # short only when deeply overbought
+OVERSOLD = 30      # long only when deeply oversold (kept strict — longs stay rare in a bear)
+OVERBOUGHT = 60    # [2026-07-01] 70->60: short rallies in a downtrend for turnover. Still tide-gated (shorts only fire when price is BELOW the 50-EMA), with 3% stop + 4h cooldown to limit fee churn.
 # TREND FILTER (2026-06-25). Root cause of the structural loss was mean-reversion
 # with NO trend filter: it longed falling knives and shorted bull rallies. Now we
 # only buy oversold dips that are still ABOVE the trend EMA, and only short
@@ -82,7 +82,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler(sys.stdout)],
 )
-log = logging.getLogger("hl-perps-rsi")
+log = logging.getLogger("perps-rsi-meanrev")
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason):
@@ -300,7 +300,7 @@ def main():
                 if decision == "STOP_CLOSE":
                     _sz = broker.pos.get(coin, (0.0,))[0]
                     _pnl = broker.close(coin, price)
-                    _record_close("hl-perps-rsi", coin, entries.get(coin),
+                    _record_close("perps-rsi-meanrev", coin, entries.get(coin),
                                   entry_ts.get(coin), price, _pnl, _sz > 0, "stop")
                     entries.pop(coin, None); entry_ts.pop(coin, None)
                     last_action[coin] = now_ts
@@ -309,7 +309,7 @@ def main():
                     if coin in broker.pos:
                         _sz = broker.pos.get(coin, (0.0,))[0]
                         _pnl = broker.close(coin, price)
-                        _record_close("hl-perps-rsi", coin, entries.get(coin),
+                        _record_close("perps-rsi-meanrev", coin, entries.get(coin),
                                       entry_ts.get(coin), price, _pnl, _sz > 0, "flip")
                     broker.open(coin, decision == "OPEN_LONG", size, price)
                     entries[coin] = price; entry_ts[coin] = now_ts
@@ -353,7 +353,7 @@ def main():
             pub_pnl = None
         _szi = broker.szi() if DRY_RUN else {}
         store.publish(
-            "hl-perps-rsi",
+            "perps-rsi-meanrev",
             status="halted" if halted_today else "online",
             equity=pub_equity,
             pnl_abs=pub_pnl,
