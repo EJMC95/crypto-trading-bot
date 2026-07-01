@@ -1,0 +1,10 @@
+# Keep dev/backtest artifacts out of every service image build context.
+.git/
+.venv/
+__pycache__/
+**/__pycache__/
+user_data/data/
+user_data/backtest_results/
+user_data/config_backtest.json
+analysis_2026-07-01/
+*.log

@@ -1,0 +1,40 @@
+{
+    "$schema": "https://schema.freqtrade.io/schema.json",
+    "strategy": "RegimeSwitchV1",
+    "max_open_trades": 3,
+    "stake_currency": "USDT",
+    "stake_amount": "unlimited",
+    "tradable_balance_ratio": 0.2,
+    "dry_run": true,
+    "dry_run_wallet": 1000,
+    "trading_mode": "futures",
+    "margin_mode": "isolated",
+    "entry_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "exit_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "exchange": {
+        "name": "binance",
+        "key": "",
+        "secret": "",
+        "ccxt_config": {},
+        "ccxt_async_config": {},
+        "pair_whitelist": [
+            "BTC/USDT:USDT",
+            "ETH/USDT:USDT"
+        ],
+        "pair_blacklist": []
+    },
+    "pairlists": [
+        {
+            "method": "StaticPairList"
+        }
+    ],
+    "_comment": "LOCAL backtest only (not deployed, not committed). Binance USDT-M futures as a downloadable price proxy for the Hyperliquid BTC/ETH the live bot trades — Hyperliquid blocks freqtrade bulk download. Same strategy (RegimeSwitchV1)."
+}
