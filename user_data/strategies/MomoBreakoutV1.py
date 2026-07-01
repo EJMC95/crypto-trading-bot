@@ -50,7 +50,7 @@ class MomoBreakoutV1(IStrategy):
     @property
     def protections(self):
         return [
-            {"method": "CooldownPeriod", "stop_duration_candles": 2},
+            {"method": "CooldownPeriod", "stop_duration_candles": 1},
             {"method": "StoplossGuard", "lookback_period_candles": 42,
              "trade_limit": 3, "stop_duration_candles": 12, "only_per_pair": False},
             {"method": "MaxDrawdown", "lookback_period_candles": 90, "trade_limit": 8,

@@ -111,7 +111,7 @@ class DayTraderV5Gated(IStrategy):
         # re-buying into the same chop, not a directional blowup; these throttle
         # re-entry. See FIXES_2026-06-22.md and REVALIDATION_2026-06-22.md.
         return [
-            {"method": "CooldownPeriod", "stop_duration_candles": 12},
+            {"method": "CooldownPeriod", "stop_duration_candles": 3},
             {"method": "StoplossGuard", "lookback_period_candles": 72,
              "trade_limit": 2, "stop_duration_candles": 36, "only_per_pair": False},
             {"method": "MaxDrawdown", "lookback_period_candles": 288, "trade_limit": 10,
