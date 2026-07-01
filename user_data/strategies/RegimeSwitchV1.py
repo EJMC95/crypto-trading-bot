@@ -1,28 +1,39 @@
 # RegimeSwitchV1.py
 # ---------------------------------------------------------------------------
-# Prototype regime-adaptive Freqtrade strategy for Eamon's fleet.
+# Regime-adaptive Freqtrade strategy for Eamon's fleet.
 #
-# Idea: read TWO axes of market regime and switch behaviour:
+# Reads TWO axes of market regime and switches behaviour across THREE modes:
 #   - Direction  : price vs EMA200 + EMA50 slope        (up / down)
 #   - Character  : ADX(14)                              (trending / choppy)
 #
-#   UP + TREND   -> go LONG  (trend follow)
-#   DOWN + TREND -> go SHORT (perps/futures only)
-#   *_ CHOP      -> stand down (no new trend trades)
+#   UP   + TREND -> go LONG  (trend follow, momentum cross)
+#   DOWN + TREND -> go SHORT (trend follow, perps/futures only)
+#   ANY  + CHOP  -> RANGE-SCALP: over the last N candles (default 20) mark the
+#                   high/low; BUY near the low, SHORT near the high, and take
+#                   profit at the opposite side of the range.
 #
-# Regime is computed on the DAILY informative timeframe (the "tide") and used
-# to gate entries on the trading timeframe. Hysteresis on ADX (enter >=25,
-# only allow chop <=20) reduces whipsaw at transitions.
+# WHY range-trading is gated to CHOP only: buying the low / shorting the high
+# unconditionally is mean-reversion into a trend — i.e. catching a falling knife
+# in a downtrend. That is exactly how the earlier RSI perps bot bled out (see
+# REVALIDATION_2026-06-22.md). Confining it to the ADX-chop regime means we only
+# fade extremes when there is NO trend to fight.
 #
-# STATUS: dry-run backtest prototype. Requires a futures/margin config for the
-# short side (can_short). Backtest locally in ~/freqtrade over a window that
-# contains BOTH an uptrend and a downtrend before trusting it. Do NOT ship to
-# Railway or go live without explicit sign-off.
+# Regime is computed on the DAILY informative timeframe (the "tide"); the 20-bar
+# range is computed on the trading timeframe. Hysteresis on ADX (trend >=25, only
+# allow chop <=20) reduces whipsaw at transitions.
+#
+# All exits are handled in custom_exit() so they can be ENTRY-TAG AWARE: a range
+# position must not be closed by trend-exit logic and vice-versa.
+#
+# STATUS: dry-run. can_short requires a futures/margin config. Live trading needs
+# wallet keys + explicit sign-off. Freqtrade uses LIVE exchange candles in BOTH
+# dry-run and live — dry-run only simulates the fills, not the data.
 # ---------------------------------------------------------------------------
 
 from datetime import datetime
 from typing import Optional
 
+import numpy as np
 import talib.abstract as ta
 from pandas import DataFrame
 
@@ -51,7 +62,7 @@ class RegimeSwitchV1(IStrategy):
     stoploss = -0.20
     use_custom_stoploss = True
 
-    # Let regime + exit signals do the work; ROI kept loose.
+    # Let regime + custom_exit do the work; ROI kept loose as a backstop.
     minimal_roi = {"0": 0.10, "240": 0.05, "720": 0.02, "1440": 0}
 
     trailing_stop = False
@@ -61,9 +72,16 @@ class RegimeSwitchV1(IStrategy):
     adx_chop = IntParameter(12, 22, default=20, space="buy")    # ADX <= -> chop
     atr_stop_mult = DecimalParameter(1.5, 4.0, default=2.5, decimals=1, space="sell")
 
+    # --- Range-scalp (chop regime) parameters -------------------------------
+    range_lookback = IntParameter(10, 40, default=20, space="buy")   # candles for hi/lo
+    # Enter within the bottom/top X of the range; also the take-profit band on
+    # the opposite side. 0.20 = buy the lower 20%, short the upper 20%.
+    range_entry_pct = DecimalParameter(0.10, 0.35, default=0.20, decimals=2, space="buy")
+
     plot_config = {
-        "main_plot": {"ema50": {}, "ema200": {}},
-        "subplots": {"ADX": {"adx": {}}, "REGIME": {"regime_dir": {}}},
+        "main_plot": {"ema50": {}, "ema200": {}, "range_high": {}, "range_low": {}},
+        "subplots": {"ADX": {"adx": {}}, "REGIME": {"regime_dir": {}},
+                     "RANGE_POS": {"range_pos": {}}},
     }
 
     # --- Daily informative: compute the fleet "regime" ----------------------
@@ -104,6 +122,17 @@ class RegimeSwitchV1(IStrategy):
         dataframe["ema_slow"] = ta.EMA(dataframe, timeperiod=50)
         dataframe["atr"] = ta.ATR(dataframe, timeperiod=14)
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
+
+        # 20-candle price range (Donchian-style) for the chop-regime range-scalp.
+        # rolling().max()/min() include the current (closed) candle only — causal,
+        # no lookahead, because process_only_new_candles acts at candle close.
+        window = int(self.range_lookback.value)
+        dataframe["range_high"] = dataframe["high"].rolling(window).max()
+        dataframe["range_low"] = dataframe["low"].rolling(window).min()
+        span = (dataframe["range_high"] - dataframe["range_low"]).replace(0, np.nan)
+        # 0.0 = at the range low, 1.0 = at the range high.
+        dataframe["range_pos"] = (dataframe["close"] - dataframe["range_low"]) / span
+
         return dataframe
 
     # --- Entries -------------------------------------------------------------
@@ -111,8 +140,12 @@ class RegimeSwitchV1(IStrategy):
         # Regime columns are merged with the '_1d' suffix by @informative.
         up_trend = (dataframe["regime_dir_1d"] == 1) & (dataframe["regime_trend_1d"] == 1)
         down_trend = (dataframe["regime_dir_1d"] == -1) & (dataframe["regime_trend_1d"] == 1)
+        chop = (dataframe["regime_trend_1d"] == 0)
 
-        # LONG: only in an up-trend regime, on a fast/slow momentum cross up.
+        lo = self.range_entry_pct.value
+        hi = 1.0 - self.range_entry_pct.value
+
+        # TREND LONG: up-trend regime, fast/slow momentum cross up.
         dataframe.loc[
             up_trend
             & qtpylib.crossed_above(dataframe["ema_fast"], dataframe["ema_slow"])
@@ -121,7 +154,7 @@ class RegimeSwitchV1(IStrategy):
             ["enter_long", "enter_tag"],
         ] = (1, "up_trend_long")
 
-        # SHORT: only in a down-trend regime, on a momentum cross down (perps).
+        # TREND SHORT: down-trend regime, momentum cross down (perps).
         dataframe.loc[
             down_trend
             & qtpylib.crossed_below(dataframe["ema_fast"], dataframe["ema_slow"])
@@ -130,25 +163,76 @@ class RegimeSwitchV1(IStrategy):
             ["enter_short", "enter_tag"],
         ] = (1, "down_trend_short")
 
+        # RANGE LONG (chop): buy the low — price in the bottom band of the range.
+        dataframe.loc[
+            chop
+            & (dataframe["range_pos"] <= lo)
+            & (dataframe["volume"] > 0),
+            ["enter_long", "enter_tag"],
+        ] = (1, "range_buy_low")
+
+        # RANGE SHORT (chop): sell the high — price in the top band of the range.
+        dataframe.loc[
+            chop
+            & (dataframe["range_pos"] >= hi)
+            & (dataframe["volume"] > 0),
+            ["enter_short", "enter_tag"],
+        ] = (1, "range_sell_high")
+
         return dataframe
 
-    # --- Exits ---------------------------------------------------------------
+    # --- Exits: none here; handled in custom_exit so they are tag-aware ------
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # Exit long when regime leaves up-trend OR momentum crosses back down.
-        left_up = (dataframe["regime_dir_1d"] != 1) | (dataframe["regime_trend_1d"] == 0)
-        dataframe.loc[
-            left_up | qtpylib.crossed_below(dataframe["ema_fast"], dataframe["ema_slow"]),
-            ["exit_long", "exit_tag"],
-        ] = (1, "exit_long_regime")
-
-        # Exit short when regime leaves down-trend OR momentum crosses back up.
-        left_down = (dataframe["regime_dir_1d"] != -1) | (dataframe["regime_trend_1d"] == 0)
-        dataframe.loc[
-            left_down | qtpylib.crossed_above(dataframe["ema_fast"], dataframe["ema_slow"]),
-            ["exit_short", "exit_tag"],
-        ] = (1, "exit_short_regime")
-
         return dataframe
+
+    def custom_exit(
+        self,
+        pair: str,
+        trade,
+        current_time: datetime,
+        current_rate: float,
+        current_profit: float,
+        **kwargs,
+    ) -> Optional[str]:
+        df, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
+        if df is None or len(df) == 0:
+            return None
+        last = df.iloc[-1]
+
+        tag = trade.enter_tag or ""
+        rp = last.get("range_pos")
+        rp_valid = rp is not None and rp == rp          # rp == rp is False for NaN
+        dir1d = last.get("regime_dir_1d")
+        trend1d = last.get("regime_trend_1d")
+        ef = last.get("ema_fast")
+        es = last.get("ema_slow")
+
+        lo = self.range_entry_pct.value
+        hi = 1.0 - self.range_entry_pct.value
+
+        if tag.startswith("range_"):
+            # Mean-reversion take-profit at the opposite side of the range.
+            if not trade.is_short and rp_valid and rp >= hi:
+                return "range_tp_high"
+            if trade.is_short and rp_valid and rp <= lo:
+                return "range_tp_low"
+            # A real trend has formed — abandon the range assumption.
+            if trend1d == 1:
+                return "range_to_trend"
+            return None
+
+        # Trend trades: exit when the trend regime ends or momentum flips.
+        if not trade.is_short:
+            if dir1d != 1 or trend1d == 0:
+                return "trend_long_regime_end"
+            if ef is not None and es is not None and ef < es:
+                return "trend_long_momentum"
+        else:
+            if dir1d != -1 or trend1d == 0:
+                return "trend_short_regime_end"
+            if ef is not None and es is not None and ef > es:
+                return "trend_short_momentum"
+        return None
 
     # --- ATR-based dynamic stop ---------------------------------------------
     def custom_stoploss(
