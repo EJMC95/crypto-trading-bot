@@ -46,7 +46,10 @@ Useful flags:
                          USD,USDT,USDC,EUR — a wider net than USD-only)
     --tp-mult 5          take-profit as a MULTIPLE of entry; 5 = sell at 5x (default 5)
     --sl 0.50            stop-loss, -50% (default); set 0 to disable and ride to 5x or zero
-    --max-hold 0         max minutes to hold; 0 = no time limit (default), so a 5x can run
+    --max-hold 2880      max minutes to hold (default 48h; 0 = no limit)
+    --max-open 25        max concurrent open positions (default 25; 0 = no cap)
+    --no-price-give-up-min 60
+                         close at last known price after this long unpriceable
     --stake 100          paper stake per trade in quote currency (default 100)
     --slippage-bps 30    simulated buy slippage in basis points (default 30)
     --any-status         open a paper trade as soon as the pair appears, even
@@ -555,12 +558,30 @@ def maybe_close(pos, client, cfg):
     Tunables read from cfg with safe defaults so existing CLI/config still works.
     """
     px = get_price(client, pos["pair_id"])
+    held_min = (time.time() - pos["opened_ts"]) / 60.0
     if px is None:
+        # ZOMBIE GUARD (2026-07-02): fresh listings get pulled/delisted often,
+        # and "no usable price" used to mean "keep holding forever" — the main
+        # way 85 open positions accumulated with zero exits. If the ticker has
+        # been continuously unpriceable for `no_price_give_up_min`, close at the
+        # last price we ever saw (entry if we never saw one). Last-known is the
+        # least-biased estimate available; a true rug reads too rosy, but
+        # holding a phantom position forever reads as exactly $0 risk, which
+        # is worse.
+        first = pos.setdefault("no_price_since", time.time())
+        no_px_min = (time.time() - first) / 60.0
+        if no_px_min >= cfg.get("no_price_give_up_min", 60):
+            exit_px = pos.get("last_px") or pos["entry"]
+            remaining_stake = pos["stake_quote"] * pos.get("remaining_frac", 1.0)
+            row, pp, pq = _exit_row(pos, exit_px, "delisted", remaining_stake, held_min)
+            _print_sell(pos, row[7], pp, pq, "delisted", cfg)
+            return True, [row]
         return False, []
+    pos.pop("no_price_since", None)  # priceable again — reset the give-up clock
     last = px["last"]
+    pos["last_px"] = last  # remembered for zombie exits + unrealized P&L
     entry = pos["entry"]
     pos["peak"] = max(pos["peak"], last)
-    held_min = (time.time() - pos["opened_ts"]) / 60.0
 
     # Backward-compatible state for positions opened before this change.
     pos.setdefault("remaining_frac", 1.0)
@@ -833,6 +854,18 @@ def monitor(cfg, exchange_ids):
                 still_pending[key] = st
                 continue
 
+            # INVENTORY CAP (2026-07-02): with max_hold formerly unlimited the
+            # book grew monotonically (85 open at the worst). Bound how much
+            # paper capital can be tied up at once; a full book means the next
+            # listing is skipped and baselined, not queued.
+            if cfg.get("max_open", 0) > 0 and len(positions) >= cfg["max_open"]:
+                gate_drop += 1
+                log_skip(exid, sym, f"inventory_cap:{cfg['max_open']}", {})
+                print(f"  SKIP [{exid}] {sym} — open-position cap "
+                      f"({cfg['max_open']}) reached")
+                baseline.setdefault(exid, set()).add(sym)  # stop re-detecting
+                continue
+
             st["checks"] = st.get("checks", 0) + 1
             passed, reason, metrics = research_gate(client, sym, cfg, st)
             st["last_reason"] = reason
@@ -938,6 +971,16 @@ def monitor(cfg, exchange_ids):
                 realized, nclosed, wins = _agg["realized"], _agg["closed"], _agg["wins"]
         except Exception:
             pass
+        # Mark the open book to market so the dashboard stops hiding it: pnl_abs
+        # is realized-only, and 85 quietly bleeding positions used to read as a
+        # healthy +$272.89. last_px is refreshed by every maybe_close price hit;
+        # positions not yet priced this run are counted separately.
+        unrealized, n_priced = 0.0, 0
+        for _p in positions:
+            _lp = _p.get("last_px")
+            if _lp:
+                unrealized += ((_lp / _p["entry"]) - 1.0) * _p["stake_quote"] * _p.get("remaining_frac", 1.0)
+                n_priced += 1
         _pub_kwargs = dict(status="online",
                            pnl_abs=realized, open_trades=len(positions),
                            closed_trades=nclosed, wins=wins, losses=nclosed - wins,
@@ -945,6 +988,8 @@ def monitor(cfg, exchange_ids):
                                   "exchanges_skipped": skip_n,
                                   "gate_passed": gate_pass, "gate_waiting": gate_wait,
                                   "gate_dropped": gate_drop,
+                                  "unrealized": round(unrealized, 2),
+                                  "open_priced": n_priced,
                                   "research": bool(cfg.get("research", True))})
         with _store_lock:
             store.publish("event-listing-sniper", **_pub_kwargs)
@@ -992,8 +1037,17 @@ def main():
                    help="Take-profit as a MULTIPLE of entry (5.0 = sell at 5x). Default 5x.")
     p.add_argument("--sl", type=float, default=0.50,
                    help="Stop-loss fraction (0.50=-50%%). Set 0 to disable (ride to 5x or zero).")
-    p.add_argument("--max-hold", type=float, default=0,
-                   help="Max hold in minutes; 0 = no time limit (default), so a 5x can run.")
+    p.add_argument("--max-hold", type=float, default=2880,
+                   help="Max hold in minutes; 0 = no limit. Default 2880 (48h): "
+                        "listings spike then bleed, and the old no-limit default "
+                        "quietly accumulated 85 never-exiting positions.")
+    p.add_argument("--max-open", type=int, default=25,
+                   help="Max concurrent open paper positions; new detections are "
+                        "dropped (logged) while at the cap. 0 = no cap. Default 25.")
+    p.add_argument("--no-price-give-up-min", type=float, default=60,
+                   help="Close a position at its last known price after this many "
+                        "minutes of continuously unpriceable ticker (delisted/"
+                        "vanished pair). Default 60.")
     p.add_argument("--stake", type=float, default=100, help="Paper stake per trade (quote ccy).")
     p.add_argument("--slippage-bps", type=float, default=30,
                    help="Simulated buy slippage in basis points (30=0.30%%).")
@@ -1046,6 +1100,8 @@ def main():
         "quotes": quotes,
         "tp_mult": args.tp_mult, "sl": args.sl,
         "max_hold": args.max_hold, "stake": args.stake,
+        "max_open": max(0, args.max_open),
+        "no_price_give_up_min": args.no_price_give_up_min,
         "slippage_bps": args.slippage_bps, "any_status": args.any_status,
         # research gate
         "research": args.research,
