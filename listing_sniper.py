@@ -283,7 +283,16 @@ def quote_matches(market, quotes):
 
 
 def base_skipped(market):
-    return str(market.get("base", "")).upper() in SKIP_BASES
+    b = str(market.get("base", "")).upper()
+    if b in SKIP_BASES:
+        return True
+    # [2026-07-01] Exclude leveraged / ETF tokens. The sniper bought SOXL3L (a 3x
+    # leveraged token) and stopped out -$50; these decay/gap and don't belong in a
+    # fresh-listing snipe. Covers e.g. SOXL3L/BTC3L/ETH5S/XRP2L and UP/DOWN/BULL/BEAR.
+    if b.endswith(("2L", "2S", "3L", "3S", "4L", "4S", "5L", "5S",
+                   "UP", "DOWN", "BULL", "BEAR")):
+        return True
+    return False
 
 
 # ----------------------------- pre-trade research ---------------------------

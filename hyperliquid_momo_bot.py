@@ -52,12 +52,12 @@ COINS = [
     "SUI", "SEI", "TIA", "APT", "NEAR", "INJ", "LTC", "BCH", "ATOM", "DOT",
     "ADA", "AAVE", "PEPE", "WIF", "kBONK", "ENA", "ORDI", "JUP", "TON", "kSHIB",
 ]
-ENTRY_LOOKBACK = 12      # RELAXED 15->12: shorter breakout window = fires more often
+ENTRY_LOOKBACK = 15      # [2026-07-01] reverted 12->15 to the validated backtest window
 EXIT_LOOKBACK = 8
 TREND_EMA = 100
 HARD_STOP = 0.08
 CANDLE_INTERVAL = "4h"
-ALLOW_SHORT = True               # loosened: shorts enabled for more frequent trading
+ALLOW_SHORT = False              # [2026-07-01] disabled: validated backtest was long-only; shorts added whipsaw in chop
 ORDER_USD = 50.0                 # notional per position
 LEVERAGE = 1                     # 1x baseline; 2x doubled drawdown in backtest
 DAILY_LOSS_LIMIT = 0.05

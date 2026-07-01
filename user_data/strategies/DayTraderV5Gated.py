@@ -50,7 +50,7 @@ class DayTraderV5Gated(IStrategy):
 
     INTERFACE_VERSION = 3
 
-    timeframe = "5m"
+    timeframe = "15m"                 # [2026-07-01] 5m -> 15m: cut fee churn & 5m noise; the 1.5x-ATR stop is naturally wider on 15m, giving winners room without deepening the (evidence-backed) tight-stop protection
     informative_timeframe = "1h"      # short-term trend filter (unchanged from Aggro)
     regime_timeframe = "1d"           # [V5 GATE] macro regime filter
 

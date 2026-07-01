@@ -51,7 +51,7 @@ class TrendMomoV1(IStrategy):
     minimal_roi = {"0": 100}
 
     # Wide backstop only. The MA-cross exit is the primary risk control.
-    stoploss = -0.15
+    stoploss = -0.12   # [2026-07-01] -0.15 -> -0.12 on 4h: tighter catastrophe stop after the SOL -9.5% giveback
 
     trailing_stop = False
     use_exit_signal = True
