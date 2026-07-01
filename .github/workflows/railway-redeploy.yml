@@ -1,30 +1,38 @@
 name: Railway Redeploy
 
-# Deploy the LATEST main code to Railway services that don't auto-deploy.
+# Auto-deploy the LATEST main code to the Railway services whose Railway-side
+# "Auto Deploy" is OFF (freqtrade-bots, pnl-dashboard). Every push to main runs
+# this and `railway up`s those services, so merges deploy themselves — the same
+# effect as Railway Auto Deploy, driven from GitHub (which the CLI/token can do,
+# whereas toggling Railway's own Auto Deploy is a dashboard-only setting).
 #
-# Note: `railway redeploy` only re-runs a service's CURRENT (possibly old)
-# deployment, so it does NOT ship newly-merged code. This workflow instead checks
-# out the latest main and runs `railway up`, which uploads the current source and
-# builds a fresh deployment — shipping the new code even when Auto Deploy is off.
+# The other services (perps-bot, momo-bot, arbs, sniper) already auto-deploy via
+# Railway's native GitHub integration, so they are intentionally NOT listed here
+# to avoid double-deploys.
 #
-# It also prints `railway status` so the exact service names in the token's
-# project are visible in the logs (service names are case-sensitive and often
-# differ from the tile label).
+# Note: `railway redeploy` only re-runs a service's CURRENT (old) deployment, so
+# it does NOT ship new code — we use checkout + `railway up` (fresh build) instead.
+# The `railway status` step prints exact service names for reference.
 #
-# SETUP (one time): add a Railway PROJECT token as the RAILWAY_TOKEN repo secret
-# (repo Settings -> Secrets and variables -> Actions). A project token is scoped
-# to one project+environment, which is what CI should use.
+# SETUP (one time, already done): RAILWAY_TOKEN repo secret = a Railway PROJECT
+# token (repo Settings -> Secrets and variables -> Actions).
 #
-# USAGE: Actions tab -> "Railway Redeploy" -> Run workflow (optionally override
-# the comma-separated service list), or dispatch it via the GitHub API.
+# USAGE: automatic on every push to main; or Actions tab -> Run workflow to deploy
+# a custom service list; or dispatch via the GitHub API.
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       services:
         description: "Comma-separated Railway service names to deploy (see the 'List services' step output for exact names)"
-        required: true
-        default: "pnl-dashboard"
+        required: false
+        default: "freqtrade-bots,pnl-dashboard"
+
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -56,7 +64,9 @@ jobs:
       - name: Deploy latest code to services
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          SERVICES: ${{ github.event.inputs.services }}
+          # On push (auto-deploy) inputs.services is empty -> fall back to the two
+          # services that lack Railway-side Auto Deploy.
+          SERVICES: ${{ github.event.inputs.services || 'freqtrade-bots,pnl-dashboard' }}
         run: |
           set -uo pipefail
           fail=0
