@@ -1,7 +1,7 @@
 {
     "$schema": "https://schema.freqtrade.io/schema.json",
     "strategy": "SwingDipV1",
-    "db_url": "sqlite:///user_data/tradesv3_v6_swing.sqlite",
+    "db_url": "sqlite:////freqtrade/persist/tradesv3_v6_swing.sqlite",
     "max_open_trades": 8,
     "stake_currency": "USD",
     "stake_amount": "unlimited",
