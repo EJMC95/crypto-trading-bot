@@ -12,6 +12,10 @@ COPY dashboard_server.py /freqtrade/dashboard_server.py
 COPY bot_pnl_store.py /freqtrade/bot_pnl_store.py
 COPY freqtrade_pnl_poller.py /freqtrade/freqtrade_pnl_poller.py
 RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh /freqtrade/dashboard_server.py /freqtrade/bot_pnl_store.py /freqtrade/freqtrade_pnl_poller.py
+# Persistent DB dir for the freqtrade sqlite files. Mount a Railway VOLUME at
+# /freqtrade/persist so open paper trades survive redeploys; without a volume
+# it still works (ephemeral). Created + owned by ftuser so freqtrade can write.
+RUN mkdir -p /freqtrade/persist && chown ftuser:ftuser /freqtrade/persist
 USER ftuser
 
 WORKDIR /freqtrade

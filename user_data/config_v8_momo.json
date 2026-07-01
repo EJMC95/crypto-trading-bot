@@ -1,7 +1,7 @@
 {
     "$schema": "https://schema.freqtrade.io/schema.json",
     "strategy": "TrendMomoV1",
-    "db_url": "sqlite:///user_data/tradesv3_v8_momo.sqlite",
+    "db_url": "sqlite:////freqtrade/persist/tradesv3_v8_momo.sqlite",
     "max_open_trades": 2,
     "stake_currency": "USD",
     "stake_amount": "unlimited",
