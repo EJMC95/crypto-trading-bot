@@ -3,7 +3,7 @@
     "strategy": "RegimeSwitchV1",
     "db_url": "sqlite:///user_data/tradesv3_regimeswitch.sqlite",
     "max_open_trades": 3,
-    "stake_currency": "USDT",
+    "stake_currency": "USDC",
     "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.2,
     "fiat_display_currency": "AUD",
@@ -35,15 +35,17 @@
     },
     "download_trades": false,
     "exchange": {
-        "name": "binance",
+        "name": "hyperliquid",
         "key": "",
         "secret": "",
+        "walletAddress": "",
+        "privateKey": "",
         "ccxt_config": {},
         "ccxt_async_config": {},
         "pair_whitelist": [
-            "BTC/USDT:USDT",
-            "ETH/USDT:USDT",
-            "SOL/USDT:USDT"
+            "BTC/USDC:USDC",
+            "ETH/USDC:USDC",
+            "SOL/USDC:USDC"
         ],
         "pair_blacklist": [],
         "enable_ws": true
@@ -81,5 +83,5 @@
     "internals": {
         "process_throttle_secs": 5
     },
-    "_comment": "[2026-07-01] Regime-adaptive dry-run bot (RegimeSwitchV1). Binance USDT-M futures so can_short works. Dual-axis regime gate: EMA direction + ADX character, computed on the 1d informative, gates 1h entries. dry_run:true — forward-test only, never live without sign-off. Pairlist deliberately small (BTC/ETH/SOL majors) while the regime switch is being validated."
+    "_comment": "[2026-07-01] Regime-adaptive dry-run bot (RegimeSwitchV1). Hyperliquid USDC-margined perps so can_short works — chosen over Binance because Binance/Bybit/OKX geoblock Railway's US IPs (HTTP 451), while Hyperliquid is reachable (the fleet's live perps bots already run there). Dual-axis regime gate: EMA direction + ADX character on the 1d informative gates 1h entries. dry_run:true — forward-test only, never live without sign-off. Pairlist deliberately small (BTC/ETH/SOL majors) while the regime switch is being validated. walletAddress/privateKey left blank: dry-run uses Hyperliquid's public data; both must be set to go live."
 }

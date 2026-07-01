@@ -62,7 +62,7 @@ LABELS = {
     "crypto-trendmomo-4h":         "Crypto · Trend Momentum (SMA, 4H)",
     "perps-rsi-meanrev":           "Perps · RSI Mean-Reversion (Hyperliquid)",
     "perps-donchian-breakout":     "Perps · Donchian Breakout (Hyperliquid)",
-    "perps-regime-switch":         "Perps · Regime-Adaptive (ADX+EMA, Binance Fut)",
+    "perps-regime-switch":         "Perps · Regime-Adaptive (ADX+EMA, Hyperliquid)",
     "scanner-triangular-arb":      "Scanner · Triangular Arbitrage",
     "scanner-cross-exchange-arb":  "Scanner · Cross-Exchange Arbitrage",
     "event-listing-sniper":        "Event · New-Listing Sniper",
