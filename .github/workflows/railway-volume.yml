@@ -1,0 +1,49 @@
+name: Railway Volume
+
+# One-off helper to create/list a Railway volume via the CLI, so the persistent
+# freqtrade DB dir (/freqtrade/persist) can be attached without the dashboard.
+# action=list (default) is safe: prints CLI help + existing volumes.
+# action=add: creates the volume on the given service at the mount path.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "list (safe) or add"
+        required: false
+        default: "list"
+      service:
+        description: "Railway service to attach the volume to"
+        required: false
+        default: "freqtrade-bots"
+      mount_path:
+        description: "Mount path inside the container"
+        required: false
+        default: "/freqtrade/persist"
+
+jobs:
+  volume:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Volume op
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          ACTION: ${{ github.event.inputs.action }}
+          SERVICE: ${{ github.event.inputs.service }}
+          MOUNT: ${{ github.event.inputs.mount_path }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then echo "::error::RAILWAY_TOKEN not set"; exit 1; fi
+          echo "CLI: $(railway --version || echo unknown)"
+          echo "===== railway volume --help ====="; railway volume --help 2>&1 || true
+          echo "===== railway volume add --help ====="; railway volume add --help 2>&1 || true
+          echo "===== existing volumes ====="; railway volume list 2>&1 || railway volume 2>&1 || true
+          if [ "${ACTION:-list}" = "add" ]; then
+            echo "===== adding volume '$MOUNT' on service '$SERVICE' ====="
+            railway volume add --service "$SERVICE" --mount-path "$MOUNT" 2>&1 \
+              || railway volume add -s "$SERVICE" -m "$MOUNT" 2>&1 \
+              || { echo "::error::volume add failed — see help output above for correct flags"; exit 1; }
+            echo "===== volumes after ====="; railway volume list 2>&1 || true
+          fi
