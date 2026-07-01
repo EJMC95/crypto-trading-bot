@@ -26,7 +26,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        run: |
+          set -uo pipefail
+          # The npm postinstall downloads a signed GitHub-release binary whose URL
+          # can expire mid-flight ("Failed fetching the binary: jwt:expired").
+          # Retry a few times with backoff so a transient fetch miss self-heals.
+          n=0
+          until [ "$n" -ge 5 ]; do
+            if npm install -g @railway/cli; then
+              echo "Railway CLI installed"; exit 0
+            fi
+            n=$((n+1))
+            echo "install attempt $n failed; retrying in $((n*3))s..."
+            sleep $((n*3))
+          done
+          echo "::error::Railway CLI install failed after retries"; exit 1
       - name: Volume op
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
