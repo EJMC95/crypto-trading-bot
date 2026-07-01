@@ -73,6 +73,18 @@ jobs:
           ENVIRONMENT="${ENVIRONMENT:-production}"
           echo "CLI: $(railway --version || echo unknown)"
 
+          # ---- token probe (non-destructive): identify what the provided token is ----
+          # whoami only prints the account name, never the token, so this is safe.
+          if [ -n "${RAILWAY_API_TOKEN:-}" ]; then
+            tok="$RAILWAY_API_TOKEN"
+            echo "===== probe: token as ACCOUNT (RAILWAY_API_TOKEN) ====="
+            ( unset RAILWAY_TOKEN; RAILWAY_API_TOKEN="$tok" railway whoami 2>&1 ) || true
+            echo "===== probe: same token as PROJECT (RAILWAY_TOKEN) ====="
+            ( unset RAILWAY_API_TOKEN; RAILWAY_TOKEN="$tok" railway whoami 2>&1; \
+              echo "-- status --"; RAILWAY_TOKEN="$tok" railway status 2>&1 ) || true
+            echo "===== end probe ====="
+          fi
+
           # Auth selection: for `add` we NEED the account token (link/create scope).
           # The Railway CLI reads RAILWAY_API_TOKEN for account/team auth and
           # RAILWAY_TOKEN for project auth; if both are set the project token wins and
