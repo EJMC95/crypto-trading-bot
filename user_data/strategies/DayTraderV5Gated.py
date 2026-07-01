@@ -132,14 +132,17 @@ class DayTraderV5Gated(IStrategy):
         # columns, so they are removed. Keep ATR (for the custom stop) + the range.
         dataframe["atr"] = ta.ATR(dataframe, timeperiod=14)
 
-        # [20-CANDLE RANGE] Adaptive support/resistance from the base timeframe:
-        # buy near the rolling 20-candle low, sell near the rolling 20-candle high.
-        # shift(1) keeps the current forming bar out of its own band (no look-ahead).
-        dataframe["rng_low20"] = dataframe["low"].rolling(20).min().shift(1)
-        dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
+        # [2026-07-01 INTRADAY RETUNE] The 20-candle / bottom-15% range never fired
+        # on 15m (5h window, too tight) — the bot took zero trades. Faster + wider
+        # for an intraday scalper: 10-candle (2.5h) window, buy in the bottom third
+        # of the range, sell in the top third (34% dead zone in the middle so a
+        # fresh buy isn't instantly in the sell zone). shift(1) = no look-ahead.
+        _N = 10
+        dataframe["rng_low20"] = dataframe["low"].rolling(_N).min().shift(1)
+        dataframe["rng_high20"] = dataframe["high"].rolling(_N).max().shift(1)
         _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
-        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.15 * _rng_band
-        dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.15 * _rng_band
+        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.33 * _rng_band
+        dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.33 * _rng_band
 
         return dataframe
 
