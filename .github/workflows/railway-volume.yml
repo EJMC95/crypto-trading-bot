@@ -113,6 +113,27 @@ jobs:
             if [ "$ok" -ne 1 ]; then echo "::error::volume add failed even with account token — see output above."; exit 1; fi
             echo "===== volumes after ====="; railway volume list 2>&1 || true
             echo "Volume created. freqtrade-bots will redeploy; its trade DBs at $MOUNT now persist across redeploys."
+          elif [ "${ACTION:-list}" = "addp" ]; then
+            # PROJECT-TOKEN create path (no account token needed). The upgraded CLI's
+            # `railway volume` group exposes -s/--service (Service ID), so a project
+            # token — which is authorized for its own project's resources — can add a
+            # volume directly. Discover the freqtrade-bots service ID from status.
+            export RAILWAY_TOKEN="$RAILWAY_PROJECT_TOKEN"; unset RAILWAY_API_TOKEN || true
+            echo "===== railway status --json (discover service id) ====="
+            railway status --json > /tmp/st.json 2>/tmp/st.err || cat /tmp/st.err || true
+            head -c 3000 /tmp/st.json 2>/dev/null; echo
+            SVC_ID="$(jq -r --arg s "$SERVICE" '[.. | objects | select((.name?=="")|not) | select(.name?==$s) | (.id? // .serviceId? // empty)] | .[0] // empty' /tmp/st.json 2>/dev/null || true)"
+            echo "discovered service id: '${SVC_ID:-<none>}'"
+            ok=0
+            if [ -n "${SVC_ID:-}" ]; then
+              railway volume -s "$SVC_ID" add -m "$MOUNT" </dev/null 2>&1 && ok=1
+              if [ "$ok" -ne 1 ]; then railway volume -s "$SVC_ID" -p "$PROJECT" add -m "$MOUNT" </dev/null 2>&1 && ok=1; fi
+            fi
+            if [ "$ok" -ne 1 ]; then railway volume -s "$SERVICE" add -m "$MOUNT" </dev/null 2>&1 && ok=1; fi
+            if [ "$ok" -ne 1 ]; then railway volume -s "$SERVICE" -p "$PROJECT" add -m "$MOUNT" </dev/null 2>&1 && ok=1; fi
+            if [ "$ok" -ne 1 ]; then echo "::error::project-token volume add failed — see output above."; exit 1; fi
+            echo "===== volumes after ====="; railway volume list 2>&1 || true
+            echo "Volume created via project token. freqtrade-bots will redeploy; DBs at $MOUNT now persist across redeploys."
           else
             echo "===== existing volumes ====="; railway volume list 2>&1 || railway volume 2>&1 || true
           fi
