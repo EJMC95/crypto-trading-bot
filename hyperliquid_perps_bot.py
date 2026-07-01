@@ -65,6 +65,14 @@ TREND_EMA = 50                   # EMA period on the 1h candles used as regime g
 # PER-TRADE STOP (2026-06-25). The bot previously had NO stop-loss — only a 5%
 # daily ACCOUNT limit — so a single bad position could ride all the way down.
 STOP_PCT = 0.03                  # 3% adverse move closes the position
+# [2026-07-01 CLOSE FIX] The only take-profit was "price >= 20-candle high" which,
+# after buying near the low in a flat/down tape, is never reached — so positions
+# sat open indefinitely (0 closes). This entry-relative TP guarantees a close on
+# any real bounce and clears the ~0.05-0.09% perp round-trip fee with wide margin.
+TAKE_PROFIT_PCT = 0.02           # +2% from entry -> take profit
+# Hard time stop: close anything held longer than this so capital recycles instead
+# of dead-holding a position that neither hits TP nor the stop.
+MAX_HOLD_SEC = 24 * 3600         # 24h max hold
 # COOLDOWN (2026-06-25). After closing/opening a coin, wait before re-entering it
 # to stop the bot churning the same coin every loop.
 REENTRY_COOLDOWN_SEC = 4 * 3600  # 4h between actions on the same coin
@@ -286,6 +294,17 @@ def main():
                 adverse = ((price - entry) / entry) if held > 0 else ((entry - price) / entry)
                 if adverse <= -STOP_PCT:
                     decision = "STOP_CLOSE"
+
+            # 1b) [2026-07-01] Entry-relative take-profit + time stop so longs
+            #     actually close. The 20-candle-high target below is often never
+            #     reached in a flat/down tape; these guarantee the trade recycles.
+            if decision == "HOLD" and held > 0 and entry:
+                gain = (price - entry) / entry
+                held_sec = now_ts - entry_ts.get(coin, now_ts)
+                if gain >= TAKE_PROFIT_PCT:
+                    decision = "RANGE_CLOSE"          # booked as a take-profit win
+                elif held_sec >= MAX_HOLD_SEC:
+                    decision = "STOP_CLOSE"           # time stop: recycle capital
 
             # 2) Range decisions (long-only), after the per-coin cooldown:
             #    FLAT + price <= buy_zone  -> OPEN_LONG (buy near the live low)
