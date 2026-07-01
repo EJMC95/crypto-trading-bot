@@ -76,6 +76,22 @@ STALE_SECONDS = 180  # crypto bots loop fast; older than this = "stale"
 # Stock bots publish far less often (IKBR every 2h, Alpaca daily), so they need a
 # much longer window before they should be considered stale.
 STOCK_STALE_SECONDS = 26 * 3600
+# Some perps bots run on slow candle loops and publish far less often than the
+# fast crypto bots: perps-donchian-breakout loops every 5 min (4h candles), so a
+# 180s threshold flags it STALE every cycle even when it is perfectly healthy.
+# Give slow-loop bots a wider window (~15 min = 3 missed publishes) so a real
+# outage still shows, but a normal 5-min cadence does not read as "down".
+SLOW_LOOP = {"perps-donchian-breakout"}
+SLOW_LOOP_STALE_SECONDS = 15 * 60
+
+
+def stale_secs_for(bot):
+    """Per-bot stale threshold: stocks (very slow) > slow-loop perps > fast crypto."""
+    if bot in STOCKS:
+        return STOCK_STALE_SECONDS
+    if bot in SLOW_LOOP:
+        return SLOW_LOOP_STALE_SECONDS
+    return STALE_SECONDS
 
 
 def fetch_rows():
@@ -285,7 +301,7 @@ def card(bot, row, open_trades=None):
         return (f'<div class="card"><h2>{html.escape(label_for(bot))} '
                 f'<span class="dot off"></span></h2>'
                 f'<div class="muted">no data yet — bot has not published</div></div>')
-    thr = STOCK_STALE_SECONDS if bot in STOCKS else STALE_SECONDS
+    thr = stale_secs_for(bot)
     age, stale = age_str(row.get("updated_at"), thr)
     status = (row.get("status") or "?")
     dot = "warn" if stale else ("off" if status in ("halted", "error") else "on")
@@ -352,8 +368,7 @@ def render():
     n_open = sum((r.get("open_trades") or 0) for r in _crypto)
     n_closed = sum((r.get("closed_trades") or 0) for r in _crypto)
     online = sum(1 for r in live
-                 if not age_str(r.get("updated_at"),
-                                STOCK_STALE_SECONDS if r.get("bot") in STOCKS else STALE_SECONDS)[1]
+                 if not age_str(r.get("updated_at"), stale_secs_for(r.get("bot")))[1]
                  and r.get("status") not in ("halted", "error"))
 
     # Grand total across EVERYTHING (the full picture). Equity is a clean sum of
@@ -377,9 +392,7 @@ def render():
     _ages = [s for s in (_age_secs(r) for r in live) if s is not None]
     freshest = min(_ages) if _ages else None
     n_stale_live = sum(1 for r in live
-                       if age_str(r.get("updated_at"),
-                                  STOCK_STALE_SECONDS if r.get("bot") in STOCKS
-                                  else STALE_SECONDS)[1])
+                       if age_str(r.get("updated_at"), stale_secs_for(r.get("bot")))[1])
     feed_stale = bool(live) and freshest is not None and n_stale_live == len(live)
 
     banner = ""
@@ -839,7 +852,7 @@ class H(BaseHTTPRequestHandler):
                     # threshold-aware stale flag so the scheduled report can flag a
                     # single laggard (e.g. equities-regime-ibkr running ~85m behind the
                     # fleet) without recomputing thresholds itself.
-                    thr = STOCK_STALE_SECONDS if r.get("bot") in STOCKS else STALE_SECONDS
+                    thr = stale_secs_for(r.get("bot"))
                     ua = r.get("updated_at")
                     if ua is not None:
                         if ua.tzinfo is None:
