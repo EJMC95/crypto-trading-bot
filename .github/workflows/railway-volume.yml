@@ -20,6 +20,10 @@ on:
         description: "Mount path inside the container"
         required: false
         default: "/freqtrade/persist"
+      environment:
+        description: "Railway environment"
+        required: false
+        default: "production"
 
 jobs:
   volume:
@@ -47,20 +51,36 @@ jobs:
           ACTION: ${{ github.event.inputs.action }}
           SERVICE: ${{ github.event.inputs.service }}
           MOUNT: ${{ github.event.inputs.mount_path }}
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
           set -uo pipefail
           if [ -z "${RAILWAY_TOKEN:-}" ]; then echo "::error::RAILWAY_TOKEN not set"; exit 1; fi
+          ENVIRONMENT="${ENVIRONMENT:-production}"
           echo "CLI: $(railway --version || echo unknown)"
-          echo "===== railway volume --help ====="; railway volume --help 2>&1 || true
+          echo "===== railway --help (global flags) ====="; railway --help 2>&1 | head -80 || true
+          echo "===== railway link --help ====="; railway link --help 2>&1 || true
           echo "===== railway volume add --help ====="; railway volume add --help 2>&1 || true
           echo "===== existing volumes ====="; railway volume list 2>&1 || railway volume 2>&1 || true
           if [ "${ACTION:-list}" = "add" ]; then
-            echo "===== adding volume '$MOUNT' on service '$SERVICE' ====="
-            # NOTE: `-s/--service` is a GROUP-level option on `railway volume`, NOT on
-            # the `add` subcommand (which only accepts -m/--mount-path and --json). The
-            # service therefore has to be given BEFORE the `add` verb.
-            railway volume --service "$SERVICE" add --mount-path "$MOUNT" 2>&1 \
-              || railway volume -s "$SERVICE" add -m "$MOUNT" 2>&1 \
-              || { echo "::error::volume add failed — see help output above for correct flags"; exit 1; }
-            echo "===== volumes after ====="; railway volume --service "$SERVICE" list 2>&1 || railway volume list 2>&1 || true
+            # `railway volume add` (help) only accepts -m/--mount-path + --json; earlier
+            # runs proved that passing --service via the group flag still panics
+            # (Option::unwrap on None at volume.rs:836) because in a project-token
+            # context no service is linked, so add can't resolve which service to
+            # attach to. Fix: link the project/service/environment first (non-
+            # interactively), THEN add the volume against the linked context.
+            echo "===== linking project -> service '$SERVICE' / env '$ENVIRONMENT' ====="
+            railway link --service "$SERVICE" --environment "$ENVIRONMENT" </dev/null 2>&1 \
+              || railway link -s "$SERVICE" -e "$ENVIRONMENT" </dev/null 2>&1 \
+              || railway link --service "$SERVICE" </dev/null 2>&1 \
+              || echo "(link step non-fatal; continuing)"
+            echo "===== status after link ====="; railway status 2>&1 || true
+            echo "===== adding volume '$MOUNT' ====="
+            ok=0
+            # Try the documented forms in order; each fed /dev/null so any interactive
+            # prompt gets EOF and fails fast instead of hanging.
+            railway volume add --service "$SERVICE" --environment "$ENVIRONMENT" --mount-path "$MOUNT" </dev/null 2>&1 && ok=1
+            if [ "$ok" -ne 1 ]; then railway volume add --service "$SERVICE" --mount-path "$MOUNT" </dev/null 2>&1 && ok=1; fi
+            if [ "$ok" -ne 1 ]; then railway volume add --mount-path "$MOUNT" </dev/null 2>&1 && ok=1; fi
+            if [ "$ok" -ne 1 ]; then echo "::error::volume add failed — see help + status output above"; exit 1; fi
+            echo "===== volumes after ====="; railway volume list 2>&1 || true
           fi
