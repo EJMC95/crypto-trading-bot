@@ -58,6 +58,11 @@ ENTRY_LOOKBACK = 15      # [2026-07-01] reverted 12->15 to the validated backtes
 EXIT_LOOKBACK = 8
 TREND_EMA = 100
 HARD_STOP = 0.08
+# [2026-07-01 CLOSE FIX] Take-profit was only "price >= 20-candle high", never
+# reached in a flat/down tape -> positions dead-held (0 closes). Add an
+# entry-relative TP + a time stop (on 4h candles, 3 days) so trades recycle.
+TAKE_PROFIT_PCT = 0.03           # +3% from entry -> take profit (4h bot, bigger swings)
+MAX_HOLD_SEC = 3 * 24 * 3600     # 72h max hold
 CANDLE_INTERVAL = "4h"
 ALLOW_SHORT = True               # [2026-07-01] shorts ON for downtrend turnover — already tide-gated (shorts only when px < 100-EMA), so it trades WITH the bear, not chop-whipsaw
 ORDER_USD = 50.0                 # notional per position
@@ -300,10 +305,15 @@ def main():
             # Shorts are disabled (no new OPEN_SHORT); any pre-existing short is
             # still closed harmlessly by its stop / cover path.
             if held > 0:  # long
+                _held_sec = now.timestamp() - entry_ts.get(coin, now.timestamp())
                 if entry and px <= entry * (1 - HARD_STOP):
                     decision = "STOP_LONG"
+                elif entry and px >= entry * (1 + TAKE_PROFIT_PCT):
+                    decision = "EXIT_LONG"          # entry-relative take profit
                 elif px >= s["sell_zone"]:
                     decision = "EXIT_LONG"          # take profit at the range high
+                elif _held_sec >= MAX_HOLD_SEC:
+                    decision = "STOP_LONG"          # time stop: recycle capital
             elif held < 0:  # short (legacy; never opened by the range logic)
                 if entry and px >= entry * (1 + HARD_STOP):
                     decision = "STOP_SHORT"

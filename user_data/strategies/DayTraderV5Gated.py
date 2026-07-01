@@ -84,11 +84,16 @@ class DayTraderV5Gated(IStrategy):
     # back. The ATR stop is deliberately UNCHANGED (see atr_stop_mult): post-exit
     # data showed losers kept falling after we exited, so the stop was protecting
     # capital — the real fix is entry quality + the liquid-majors universe.
+    # [2026-07-01 FEE-BLEED FIX] Live result was 0 wins / 11 losses at ~-0.11 ea —
+    # not directional losses, but fee scratches: the old range captured only
+    # ~0.34*band, smaller than the ~0.52% Kraken round-trip fee, so winners were
+    # impossible. ROI rungs are now all set ABOVE the round-trip fee so any bounce
+    # that hits a rung is a REAL net win. First rung 1.2% (= +0.68% after fees).
     minimal_roi = {
-        "0": 0.02,
-        "30": 0.015,
-        "60": 0.01,
-        "120": 0.006,
+        "0": 0.012,
+        "30": 0.008,
+        "60": 0.005,
+        "120": 0.003,
     }
 
     stoploss = -0.12
@@ -137,24 +142,44 @@ class DayTraderV5Gated(IStrategy):
         # for an intraday scalper: 10-candle (2.5h) window, buy in the bottom third
         # of the range, sell in the top third (34% dead zone in the middle so a
         # fresh buy isn't instantly in the sell zone). shift(1) = no look-ahead.
-        _N = 10
+        # [2026-07-01 FEE-BLEED FIX] The prior 10-candle / 0.33-zone range captured
+        # only ~0.34*band between entry and exit — below the ~0.52% round-trip fee,
+        # so the bot went 0/11 (all tiny fee losses). Three changes:
+        #   1) Wider window (14 candles, ~3.5h) for a steadier, larger band.
+        #   2) Buy/sell zones tightened to 0.22 -> capture ~0.56*band per round trip.
+        #   3) A FEE GATE (rng_band_pct) so we only take trades where the captured
+        #      move can realistically clear fees + leave profit.
+        # shift(1) = no look-ahead.
+        _N = 14
         dataframe["rng_low20"] = dataframe["low"].rolling(_N).min().shift(1)
         dataframe["rng_high20"] = dataframe["high"].rolling(_N).max().shift(1)
         _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
-        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.33 * _rng_band
-        dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.33 * _rng_band
+        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.22 * _rng_band
+        dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.22 * _rng_band
+        # band width as a fraction of price — used to skip low-vol chop where the
+        # captured move (~0.56*band) would be eaten by the ~0.52% round-trip fee.
+        dataframe["rng_band_pct"] = _rng_band / dataframe["close"].clip(lower=1e-9)
 
         return dataframe
+
+    # Minimum band width (fraction of price) to bother trading. 0.56*band must beat
+    # the ~0.52% round-trip fee with margin: at 0.016, captured ~0.9% -> ~+0.4% net.
+    MIN_BAND_PCT = 0.016
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[
             (
                 (dataframe["close"] <= dataframe["rng_buy_zone"])
+                # fee gate: only trade when the range is wide enough to profit
+                & (dataframe["rng_band_pct"] >= self.MIN_BAND_PCT)
+                # momentum tick: buy on an up-close within the dip zone, not while
+                # still falling — cuts knife-catches that were dragging the win rate.
+                & (dataframe["close"] > dataframe["close"].shift(1))
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",
         ] = 1
-        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range20_buy_low"
+        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range_buy_low_feegated"
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
