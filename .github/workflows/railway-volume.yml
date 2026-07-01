@@ -24,6 +24,10 @@ on:
         description: "Railway environment"
         required: false
         default: "production"
+      project:
+        description: "Railway project (id or name)"
+        required: false
+        default: "9b3b7d3c-28db-417b-b864-ebc065df851f"
 
 jobs:
   volume:
@@ -54,32 +58,55 @@ jobs:
           echo "::error::Railway CLI install failed after retries"; exit 1
       - name: Volume op
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          # ACCOUNT/team token (broad scope) — required for `railway link` + creating
+          # a service-attached volume. A project token (RAILWAY_TOKEN) cannot do it.
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_ACCOUNT_TOKEN }}
+          # project token — fine for read-only ops (volume list) as a fallback.
+          RAILWAY_PROJECT_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           ACTION: ${{ github.event.inputs.action }}
           SERVICE: ${{ github.event.inputs.service }}
           MOUNT: ${{ github.event.inputs.mount_path }}
           ENVIRONMENT: ${{ github.event.inputs.environment }}
+          PROJECT: ${{ github.event.inputs.project }}
         run: |
           set -uo pipefail
-          if [ -z "${RAILWAY_TOKEN:-}" ]; then echo "::error::RAILWAY_TOKEN not set"; exit 1; fi
           ENVIRONMENT="${ENVIRONMENT:-production}"
           echo "CLI: $(railway --version || echo unknown)"
-          echo "===== railway --help (global flags) ====="; railway --help 2>&1 | head -80 || true
-          echo "===== railway link --help ====="; railway link --help 2>&1 || true
+
+          # Auth selection: for `add` we NEED the account token (link/create scope).
+          # The Railway CLI reads RAILWAY_API_TOKEN for account/team auth and
+          # RAILWAY_TOKEN for project auth; if both are set the project token wins and
+          # stays scoped, so when using the account token we must NOT export
+          # RAILWAY_TOKEN.
+          if [ -n "${RAILWAY_API_TOKEN:-}" ]; then
+            echo "Auth: account token (RAILWAY_API_TOKEN)"
+            unset RAILWAY_TOKEN || true
+            echo "whoami: $(railway whoami 2>&1 || echo '?')"
+          elif [ -n "${RAILWAY_PROJECT_TOKEN:-}" ]; then
+            echo "Auth: project token (read-only ops only)"
+            export RAILWAY_TOKEN="$RAILWAY_PROJECT_TOKEN"
+          else
+            echo "::error::No token set. Add secret RAILWAY_ACCOUNT_TOKEN (account token) for add."; exit 1
+          fi
+
           echo "===== railway volume add --help ====="; railway volume add --help 2>&1 || true
-          echo "===== existing volumes ====="; railway volume list 2>&1 || railway volume 2>&1 || true
+
           if [ "${ACTION:-list}" = "add" ]; then
-            # A PROJECT token can deploy (`up`) and read (`volume list`) but CANNOT
-            # `railway link` a service (that needs account/workspace scope → returns
-            # "Unauthorized"). So we must name the service directly on `volume add`.
-            # The npm build's `add` rejected --service; the upgraded build should
-            # accept it (its own runtime error points you to the --service flag).
-            echo "===== status ====="; railway status 2>&1 || true
-            echo "===== adding volume '$MOUNT' on service '$SERVICE' ====="
+            if [ -z "${RAILWAY_API_TOKEN:-}" ]; then
+              echo "::error::action=add needs an ACCOUNT token. Create one (Railway > Account Settings > Tokens) and add it as repo secret RAILWAY_ACCOUNT_TOKEN."; exit 1
+            fi
+            echo "===== linking project '$PROJECT' / env '$ENVIRONMENT' / service '$SERVICE' ====="
+            railway link --project "$PROJECT" --environment "$ENVIRONMENT" --service "$SERVICE" </dev/null 2>&1 \
+              || railway link -p "$PROJECT" -e "$ENVIRONMENT" -s "$SERVICE" </dev/null 2>&1 \
+              || { echo "::error::railway link failed — check the account token has access to project $PROJECT."; exit 1; }
+            echo "===== status after link ====="; railway status 2>&1 || true
+            echo "===== adding volume '$MOUNT' (linked service) ====="
             ok=0
-            railway volume add --service "$SERVICE" --environment "$ENVIRONMENT" --mount-path "$MOUNT" </dev/null 2>&1 && ok=1
-            if [ "$ok" -ne 1 ]; then railway volume add --service "$SERVICE" --mount-path "$MOUNT" </dev/null 2>&1 && ok=1; fi
-            if [ "$ok" -ne 1 ]; then railway volume add -s "$SERVICE" -m "$MOUNT" </dev/null 2>&1 && ok=1; fi
-            if [ "$ok" -ne 1 ]; then echo "::error::volume add failed — a project token likely cannot create a service-attached volume via CLI; create it in the Railway dashboard instead (freqtrade-bots > Volume > mount $MOUNT)."; exit 1; fi
+            railway volume add --mount-path "$MOUNT" </dev/null 2>&1 && ok=1
+            if [ "$ok" -ne 1 ]; then railway volume add -m "$MOUNT" </dev/null 2>&1 && ok=1; fi
+            if [ "$ok" -ne 1 ]; then echo "::error::volume add failed even with account token — see output above."; exit 1; fi
             echo "===== volumes after ====="; railway volume list 2>&1 || true
+            echo "Volume created. freqtrade-bots will redeploy; its trade DBs at $MOUNT now persist across redeploys."
+          else
+            echo "===== existing volumes ====="; railway volume list 2>&1 || railway volume 2>&1 || true
           fi
