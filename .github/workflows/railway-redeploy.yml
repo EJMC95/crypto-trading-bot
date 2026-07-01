@@ -1,0 +1,67 @@
+name: Railway Redeploy
+
+# Manually (or programmatically) redeploy Railway services that don't auto-deploy
+# on a push to main. Some services in this project have "Auto Deploy" turned off,
+# so a merge to main updates the repo but the running container keeps old code.
+# This workflow force-redeploys the named services via the Railway CLI.
+#
+# SETUP (one time):
+#   1. Create a Railway *project token*:
+#        Railway -> your project -> Settings -> Tokens -> Create Token
+#        (a PROJECT token is environment-scoped and is what CI should use)
+#   2. Add it to GitHub:
+#        repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#        Name: RAILWAY_TOKEN   Value: <the project token>
+#   3. Confirm the service NAMES below match what Railway shows (case-sensitive).
+#        You can list them from any machine with the CLI: `railway status`.
+#
+# USAGE:
+#   - GitHub UI: Actions tab -> "Railway Redeploy" -> Run workflow (optionally
+#     override the comma-separated service list).
+#   - Programmatically (e.g. by Claude via the GitHub API): dispatch this workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: "Comma-separated Railway service names to redeploy"
+        required: true
+        default: "freqtrade,pnl-dashboard"
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Redeploy services
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SERVICES: ${{ github.event.inputs.services }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set. Add it under Settings > Secrets and variables > Actions (use a Railway PROJECT token)."
+            exit 1
+          fi
+          echo "Railway CLI version: $(railway --version || echo 'unknown')"
+          fail=0
+          IFS=',' read -ra SVCS <<< "$SERVICES"
+          for raw in "${SVCS[@]}"; do
+            svc="$(echo "$raw" | xargs)"   # trim whitespace
+            [ -z "$svc" ] && continue
+            echo "::group::Redeploying '$svc'"
+            if railway redeploy --service "$svc" --yes; then
+              echo "OK: '$svc' redeploy triggered"
+            else
+              echo "::error::redeploy failed for '$svc' — check the service name matches Railway exactly (see 'railway status')."
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::One or more services failed to redeploy."
+            exit 1
+          fi
+          echo "All requested services redeployed."
