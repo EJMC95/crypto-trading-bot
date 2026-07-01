@@ -38,7 +38,14 @@ jobs:
           n=0
           until [ "$n" -ge 5 ]; do
             if npm install -g @railway/cli; then
-              echo "Railway CLI installed"; exit 0
+              echo "Railway CLI installed (npm): $(railway --version || echo unknown)"
+              # `volume add` in the npm build only exposes -m/--mount-path, but its
+              # runtime error tells you to "specify one via the --service flag" — that
+              # flag exists in the current upstream build. Upgrade to it so we can name
+              # the service directly (a project token can't `railway link` a service).
+              railway upgrade --yes 2>&1 || echo "(railway upgrade skipped/failed; continuing on npm build)"
+              echo "Railway CLI now: $(railway --version || echo unknown)"
+              exit 0
             fi
             n=$((n+1))
             echo "install attempt $n failed; retrying in $((n*3))s..."
@@ -62,25 +69,17 @@ jobs:
           echo "===== railway volume add --help ====="; railway volume add --help 2>&1 || true
           echo "===== existing volumes ====="; railway volume list 2>&1 || railway volume 2>&1 || true
           if [ "${ACTION:-list}" = "add" ]; then
-            # `railway volume add` (help) only accepts -m/--mount-path + --json; earlier
-            # runs proved that passing --service via the group flag still panics
-            # (Option::unwrap on None at volume.rs:836) because in a project-token
-            # context no service is linked, so add can't resolve which service to
-            # attach to. Fix: link the project/service/environment first (non-
-            # interactively), THEN add the volume against the linked context.
-            echo "===== linking project -> service '$SERVICE' / env '$ENVIRONMENT' ====="
-            railway link --service "$SERVICE" --environment "$ENVIRONMENT" </dev/null 2>&1 \
-              || railway link -s "$SERVICE" -e "$ENVIRONMENT" </dev/null 2>&1 \
-              || railway link --service "$SERVICE" </dev/null 2>&1 \
-              || echo "(link step non-fatal; continuing)"
-            echo "===== status after link ====="; railway status 2>&1 || true
-            echo "===== adding volume '$MOUNT' ====="
+            # A PROJECT token can deploy (`up`) and read (`volume list`) but CANNOT
+            # `railway link` a service (that needs account/workspace scope → returns
+            # "Unauthorized"). So we must name the service directly on `volume add`.
+            # The npm build's `add` rejected --service; the upgraded build should
+            # accept it (its own runtime error points you to the --service flag).
+            echo "===== status ====="; railway status 2>&1 || true
+            echo "===== adding volume '$MOUNT' on service '$SERVICE' ====="
             ok=0
-            # Try the documented forms in order; each fed /dev/null so any interactive
-            # prompt gets EOF and fails fast instead of hanging.
             railway volume add --service "$SERVICE" --environment "$ENVIRONMENT" --mount-path "$MOUNT" </dev/null 2>&1 && ok=1
             if [ "$ok" -ne 1 ]; then railway volume add --service "$SERVICE" --mount-path "$MOUNT" </dev/null 2>&1 && ok=1; fi
-            if [ "$ok" -ne 1 ]; then railway volume add --mount-path "$MOUNT" </dev/null 2>&1 && ok=1; fi
-            if [ "$ok" -ne 1 ]; then echo "::error::volume add failed — see help + status output above"; exit 1; fi
+            if [ "$ok" -ne 1 ]; then railway volume add -s "$SERVICE" -m "$MOUNT" </dev/null 2>&1 && ok=1; fi
+            if [ "$ok" -ne 1 ]; then echo "::error::volume add failed — a project token likely cannot create a service-attached volume via CLI; create it in the Railway dashboard instead (freqtrade-bots > Volume > mount $MOUNT)."; exit 1; fi
             echo "===== volumes after ====="; railway volume list 2>&1 || true
           fi
