@@ -1,0 +1,54 @@
+name: Railway Logs
+
+# Read-only: dump recent logs for a Railway service so bot-level failures that
+# heartbeats can't show (e.g. a strategy raising inside populate_indicators while
+# freqtrade keeps serving its API) can be diagnosed without dashboard access.
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Railway service name"
+        required: false
+        default: "perps-regime-switch"
+      lines:
+        description: "How many recent log lines"
+        required: false
+        default: "400"
+      grep:
+        description: "Optional case-insensitive filter (extended regex); blank = all lines"
+        required: false
+        default: ""
+
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: |
+          set -uo pipefail
+          n=0
+          until [ "$n" -ge 5 ]; do
+            if npm install -g @railway/cli; then exit 0; fi
+            n=$((n+1)); echo "retry $n"; sleep $((n*3))
+          done
+          echo "::error::Railway CLI install failed"; exit 1
+      - name: Dump logs
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SERVICE: ${{ github.event.inputs.service }}
+          LINES: ${{ github.event.inputs.lines }}
+          FILTER: ${{ github.event.inputs.grep }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then echo "::error::RAILWAY_TOKEN not set"; exit 1; fi
+          echo "===== railway logs --help ====="; railway logs --help 2>&1 || true
+          echo "===== logs for '$SERVICE' (last $LINES lines) ====="
+          # deployment logs (runtime stdout/stderr); fall back through flag shapes
+          out="$(railway logs --service "$SERVICE" 2>&1 || railway logs -s "$SERVICE" 2>&1 || true)"
+          if [ -z "$out" ]; then echo "(no output — see help above for correct flags)"; fi
+          if [ -n "${FILTER:-}" ]; then
+            echo "$out" | tail -n "$LINES" | grep -iE "$FILTER" || echo "(no lines matched filter '$FILTER')"
+          else
+            echo "$out" | tail -n "$LINES"
+          fi
