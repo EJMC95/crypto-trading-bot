@@ -284,6 +284,12 @@ def _holdings_html(bot, extra, open_trades):
     items = []
     if isinstance(extra, dict):
         for p in (extra.get("positions") or []):
+            # Stock bots publish a LIST of dicts here. Guard against any other
+            # shape (a bot publishing {coin: "desc"} took the whole page down on
+            # 2026-07-03 — a str has no .get). Non-dict entries render as text.
+            if not isinstance(p, dict):
+                items.append(f'<div class="row"><span>{html.escape(str(p))}</span></div>')
+                continue
             up = p.get("upnl")
             up_html = f' <span class="{cls(up)}">{money(up)}</span>' if up is not None else ""
             items.append(f'<div class="row"><span>{html.escape(str(p.get("symbol")))} ×{p.get("qty")}</span>'

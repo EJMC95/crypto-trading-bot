@@ -204,8 +204,10 @@ def main():
                     open_trades=len(positions),
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": "dry-run", "open_pnl": round(open_pnl, 2),
-                           "positions": {c: f"{p['side']}@{p['entry_apr']:+.0%}"
-                                         for c, p in positions.items()},
+                           # NOT "positions": the dashboard reserves that key for
+                           # the stock bots' list-of-dicts holdings format.
+                           "carries": {c: f"{p['side']}@{p['entry_apr']:+.0%}"
+                                       for c, p in positions.items()},
                            "hottest_funding_apr": {
                                c: f"{f['rate']*HOURS_PER_YEAR:+.1%}" for c, f in top}},
                 )
