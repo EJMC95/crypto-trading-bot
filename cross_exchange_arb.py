@@ -98,6 +98,20 @@ MAX_BOOK_FETCHES = 30
 # Log a confirmed (depth-aware) opportunity if its net edge is at least this.
 MIN_NET_EDGE = -0.005
 
+# ---- Execution-reality haircuts (2026-07-03) --------------------------------
+# Fees + book-walking slippage were always modelled, but fills were booked
+# INSTANTLY at snapshot prices. That hides two real costs:
+#   LATENCY: you cross the spread hundreds of ms after observing the gap,
+#   racing market makers; cross-venue edges on majors decay within ~1s. Treat
+#   as an adverse move between observation and fill.
+#   REBALANCE: the pre-funded model accumulates inventory skew (base piles up
+#   where you buy, quote where you sell); moving it back costs withdrawal fees
+#   + spread, amortized here per fill.
+# The REAL balance (published as pnl_abs) subtracts both; the old optimistic
+# number is kept in parallel (extra.gross_balance) so the bases can be compared.
+LATENCY_HAIRCUT = 0.0010    # 10 bps adverse move between snapshot and fill
+REBALANCE_HAIRCUT = 0.0005  # 5 bps amortized inventory-rebalancing cost
+
 # Notional size of each simulated trade, in the pair's quote currency. The
 # depth-aware edge is computed for THIS size, so slippage scales with it.
 PAPER_TRADE_SIZE = 1000.0
@@ -299,7 +313,8 @@ def run_live(once=False):
     )
 
     ensure_log()
-    virtual_balance = 0.0
+    virtual_balance = 0.0        # REAL basis: net of fees, slippage, haircuts
+    gross_balance = 0.0          # legacy optimistic basis (no haircuts), for comparison
     last_heartbeat = 0.0
 
     while True:
@@ -367,9 +382,16 @@ def run_live(once=False):
             for net_d, net_top, pnl, filled, symbol, buy_ex, sell_ex in confirmed:
                 if net_d < MIN_NET_EDGE:
                     continue
-                booked = net_d >= 0.0 and filled
+                # Effective edge after execution-reality haircuts. Book on the
+                # REAL basis; keep the legacy optimistic booking in parallel so
+                # the dashboard can show how much of the "edge" was fiction.
+                net_eff = net_d - LATENCY_HAIRCUT - REBALANCE_HAIRCUT
+                pnl_eff = pnl - PAPER_TRADE_SIZE * (LATENCY_HAIRCUT + REBALANCE_HAIRCUT)
+                booked = net_eff >= 0.0 and filled
                 if booked:
-                    virtual_balance += pnl
+                    virtual_balance += pnl_eff
+                if net_d >= 0.0 and filled:
+                    gross_balance += pnl   # what the old rule would have booked
                 # `filled` column = actual paper booking (profitable-after-depth
                 # AND both legs fully fillable). A fillable-but-negative spread is
                 # only "seen", never a fill, so write `booked` here. `had_depth`
@@ -378,14 +400,15 @@ def run_live(once=False):
                 log_opp([
                     now_iso(), symbol, buy_ex, sell_ex,
                     f"{net_top*100:.4f}", f"{net_d*100:.4f}",
-                    f"{pnl:.4f}", booked, f"{virtual_balance:.4f}",
+                    f"{pnl_eff:.4f}", booked, f"{virtual_balance:.4f}",
                 ])
                 tag = "PAPER-FILL" if booked else "seen"
                 print(
                     f"[{now_iso()}] {tag} {symbol} buy {buy_ex}->sell {sell_ex} "
                     f"| top {net_top*100:+.3f}% | depth {net_d*100:+.3f}% "
-                    f"| P&L {pnl:+.2f} | booked={booked} | had_depth={had_depth} "
-                    f"| bal {virtual_balance:+.2f}"
+                    f"| eff {net_eff*100:+.3f}% | P&L {pnl_eff:+.2f} | booked={booked} "
+                    f"| had_depth={had_depth} | real {virtual_balance:+.2f} "
+                    f"| gross {gross_balance:+.2f}"
                 )
 
             best = confirmed[0] if confirmed else None
@@ -418,8 +441,10 @@ def run_live(once=False):
 
         store.publish(
             "scanner-cross-exchange-arb", status="online",
-            pnl_abs=virtual_balance,
-            extra={"kind": "scanner",  # optimistic paper-arb booking, not realized P&L
+            pnl_abs=virtual_balance,   # REAL basis: fees+slippage+latency+rebalance
+            extra={"kind": "scanner",
+                   "basis": "real (fees+slippage+10bps latency+5bps rebalance)",
+                   "gross_balance": round(gross_balance, 2),  # old optimistic rule
                    "pairs": len(sym_map),
                    "best_top_pct": round(best_top[0] * 100, 4) if best_top else None},
         )
