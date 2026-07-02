@@ -148,6 +148,26 @@ SKIP_BASES = {
     "TUSD", "FDUSD", "USDD", "USDP", "GUSD", "EURT", "EURS", "BUSD",
 }
 
+# [2026-07-03] Tokenized equities / ETFs / commodities are NOT crypto listings.
+# WhiteBIT rolled out a tokenized-stocks section on 2026-07-02 and the sniper
+# bought 46 of them in two waves (MSTR, NVDA, AAPL, SOXL, XAG, NATGAS, ...);
+# they then went unpriceable and were flushed by the zombie guard at ~-0.5%
+# each. A stock IPO'd as a token has no listing-pop microstructure to snipe —
+# it tracks the underlying. Curated set of observed + common tickers; extend
+# when a new tokenized section slips through.
+TOKENIZED_BASES = {
+    # observed in the 2026-07-02 whitebit flood
+    "MSTR", "NVDA", "AAPL", "SOXL", "XLE", "XAG", "XPT", "XAU", "XPD",
+    "NATGAS", "SAMSUNG", "HOOD", "IREN", "CRWV", "URNM", "EWT", "NOW",
+    # common tokenized equities / ETFs likely in the same product lines
+    "TSLA", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "NFLX", "AMD", "INTC",
+    "COIN", "GME", "AMC", "PLTR", "SPY", "QQQ", "GLD", "SLV", "USO", "TLT",
+    "VOO", "IWM", "DIA", "ARKK", "MCD", "NKE", "DIS", "BABA", "V", "MA",
+    "JPM", "BRK", "PFE", "JNJ", "KO", "PEP", "WMT", "CRCL", "RBLX", "UBER",
+    "ABNB", "SHOP", "SQ", "PYPL", "ORCL", "CRM", "AVGO", "QCOM", "MU",
+    "SMCI", "ASML", "TSM", "WTI", "BRENT", "COPPER", "WHEAT", "CORN",
+}
+
 # Rough global spot-volume ranking of major exchanges (CCXT ids). Anything not
 # in this list is appended in CCXT's own order to fill out "topN"/"all".
 CURATED = [
@@ -320,7 +340,11 @@ def quote_matches(market, quotes):
 
 def base_skipped(market):
     b = str(market.get("base", "")).upper()
-    if b in SKIP_BASES:
+    if b in SKIP_BASES or b in TOKENIZED_BASES:
+        return True
+    # Tokenized-stock sections often suffix the underlying ticker (Kraken
+    # xStocks style: AAPLX/TSLAX). Catch TICKER+X variants of the known set.
+    if b.endswith("X") and b[:-1] in TOKENIZED_BASES:
         return True
     # [2026-07-01] Exclude leveraged / ETF tokens. The sniper bought SOXL3L (a 3x
     # leveraged token) and stopped out -$50; these decay/gap and don't belong in a
