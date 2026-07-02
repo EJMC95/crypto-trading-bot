@@ -25,7 +25,7 @@
 set -u
 
 PROJECT_ID="9b3b7d3c-28db-417b-b864-ebc065df851f"   # "Trading Bots" project
-ALL_SERVICES="freqtrade-bots perps-bot momo-bot triangular-arb cross-exchange-arb listing-sniper freqtrade-trainer pnl-dashboard perps-regime-switch"
+ALL_SERVICES="freqtrade-bots perps-bot momo-bot triangular-arb cross-exchange-arb listing-sniper freqtrade-trainer pnl-dashboard perps-regime-switch funding-carry"
 
 command -v railway >/dev/null 2>&1 || { echo "Railway CLI not found (npm i -g @railway/cli)"; exit 1; }
 railway whoami >/dev/null 2>&1 || { echo "Not logged in — run: railway login"; exit 1; }

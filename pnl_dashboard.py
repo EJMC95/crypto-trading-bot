@@ -32,6 +32,7 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 
 # Expected bots — so the grid shows a bot even before its first publish.
 EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
+            "perps-funding-carry",
             "scanner-triangular-arb", "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h", "crypto-trendmomo-4h"]
@@ -63,6 +64,7 @@ LABELS = {
     "perps-rsi-meanrev":           "Perps · RSI Mean-Reversion (Hyperliquid)",
     "perps-donchian-breakout":     "Perps · Donchian Breakout (Hyperliquid)",
     "perps-regime-switch":         "Perps · Regime-Adaptive (ADX+EMA, Hyperliquid)",
+    "perps-funding-carry":         "Perps · Funding-Rate Carry (Hyperliquid)",
     "scanner-triangular-arb":      "Scanner · Triangular Arbitrage",
     "scanner-cross-exchange-arb":  "Scanner · Cross-Exchange Arbitrage",
     "event-listing-sniper":        "Event · New-Listing Sniper",
@@ -81,7 +83,8 @@ STOCK_STALE_SECONDS = 26 * 3600
 # 180s threshold flags it STALE every cycle even when it is perfectly healthy.
 # Give slow-loop bots a wider window (~15 min = 3 missed publishes) so a real
 # outage still shows, but a normal 5-min cadence does not read as "down".
-SLOW_LOOP = {"perps-donchian-breakout"}
+SLOW_LOOP = {"perps-donchian-breakout",
+             "perps-funding-carry"}  # 5-min loop: funding only changes hourly
 SLOW_LOOP_STALE_SECONDS = 15 * 60
 # The listing sniper publishes once per scan cycle, and every ~5th cycle is a
 # full exchange-list reload that can run 8-9 minutes when slow exchanges hit

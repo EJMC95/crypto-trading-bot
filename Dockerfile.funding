@@ -1,0 +1,15 @@
+# Image for the perps-funding-carry Railway service.
+# Set the service variable RAILWAY_DOCKERFILE_PATH=Dockerfile.funding — the CMD
+# is baked in here so the service needs no dashboard Start Command.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY funding_carry_bot.py bot_pnl_store.py ./
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "funding_carry_bot.py"]
