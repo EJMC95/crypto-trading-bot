@@ -12,6 +12,9 @@ COPY run_regime.sh /freqtrade/run_regime.sh
 COPY bot_pnl_store.py /freqtrade/bot_pnl_store.py
 COPY freqtrade_pnl_poller.py /freqtrade/freqtrade_pnl_poller.py
 RUN chmod +x /freqtrade/run_regime.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_regime.sh /freqtrade/bot_pnl_store.py /freqtrade/freqtrade_pnl_poller.py
+# Persistent DB dir — mount a Railway VOLUME at /freqtrade/persist so the
+# dry-run trade DB survives restarts/redeploys (same scheme as freqtrade-bots).
+RUN mkdir -p /freqtrade/persist && chown ftuser:ftuser /freqtrade/persist
 USER ftuser
 
 WORKDIR /freqtrade
