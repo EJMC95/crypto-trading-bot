@@ -123,10 +123,11 @@ class DayTraderV5Gated(IStrategy):
              "stop_duration_candles": 72, "max_allowed_drawdown": 0.15},
         ]
 
-    # [2026-07-01 FIX] Only the 20-candle range (+ ATR14) needs warmup now, so
-    # 40 base candles is plenty. Was 200 (for the removed 1d regime), which — with
-    # its informative-data requirement — was starving the bot of any signals.
-    startup_candle_count = 40
+    # [2026-07-01 FIX] Base-timeframe warmup only. Was 200 (for the removed 1d
+    # regime), which starved the bot of signals. [2026-07-02] 40 -> 110 for the
+    # new own-pair EMA50 trend gate (needs ~2x its period to converge; 110 x 15m
+    # is well within Kraken's 720-candle OHLC window, so no starvation risk).
+    startup_candle_count = 110
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # [2026-07-01 FIX] Base-timeframe indicators ONLY. The old 1h/1d
@@ -136,6 +137,15 @@ class DayTraderV5Gated(IStrategy):
         # (heartbeat online, 0 trades). The 20-candle range entry never used those
         # columns, so they are removed. Keep ATR (for the custom stop) + the range.
         dataframe["atr"] = ta.ATR(dataframe, timeperiod=14)
+
+        # [2026-07-02 DIP-CLUSTER FIX] Own-pair 15m EMA50 trend gate. Live losses
+        # arrived in clusters: market-wide dips hit all 24 pairs at once, the bot
+        # bought several "separate" dips that were the same dip, and every one
+        # stopped out together (11 ATR-stop losses, all in two such windows).
+        # When the whole market slides, pairs sit BELOW their EMA50 — requiring
+        # close > EMA50 blocks exactly those entries while still allowing normal
+        # pullback-buys inside an intact uptrend.
+        dataframe["ema50"] = ta.EMA(dataframe, timeperiod=50)
 
         # [2026-07-01 INTRADAY RETUNE] The 20-candle / bottom-15% range never fired
         # on 15m (5h window, too tight) — the bot took zero trades. Faster + wider
@@ -175,12 +185,37 @@ class DayTraderV5Gated(IStrategy):
                 # momentum tick: buy on an up-close within the dip zone, not while
                 # still falling — cuts knife-catches that were dragging the win rate.
                 & (dataframe["close"] > dataframe["close"].shift(1))
+                # [2026-07-02 DIP-CLUSTER FIX] trend gate: dip must be a pullback
+                # in an intact uptrend, not part of a market-wide slide.
+                & (dataframe["close"] > dataframe["ema50"])
                 & (dataframe["volume"] > 0)
             ),
             "enter_long",
         ] = 1
-        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range_buy_low_feegated"
+        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range_buy_low_trendgated"
         return dataframe
+
+    # [2026-07-02 DIP-CLUSTER FIX] Correlated-entry throttle. The 24 pairs are one
+    # beta in a dip: on 2026-07-01/02 the bot opened 4 positions inside a single
+    # 15m window and all four stopped out together. Cap how many NEW positions can
+    # be opened per candle so one market move can't load up the whole book at once.
+    MAX_ENTRIES_PER_CANDLE = 3
+    _entry_throttle_ts = None
+    _entry_throttle_n = 0
+
+    def confirm_trade_entry(self, pair: str, order_type: str, amount: float,
+                            rate: float, time_in_force: str, current_time: datetime,
+                            entry_tag: Optional[str], side: str, **kwargs) -> bool:
+        # Bucket entries by 15m candle; reject beyond the per-candle cap.
+        bucket = current_time.replace(minute=(current_time.minute // 15) * 15,
+                                      second=0, microsecond=0)
+        if self._entry_throttle_ts != bucket:
+            self._entry_throttle_ts = bucket
+            self._entry_throttle_n = 0
+        if self._entry_throttle_n >= self.MAX_ENTRIES_PER_CANDLE:
+            return False
+        self._entry_throttle_n += 1
+        return True
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[
