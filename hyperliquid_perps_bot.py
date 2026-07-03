@@ -188,6 +188,14 @@ def main():
     # testnet wallet (an unfunded wallet reads accountValue=0 -> no trades ever).
     broker = PaperBroker(PAPER_START) if DRY_RUN else None
 
+    # [2026-07-03 PERSIST] Restore the paper account from Postgres so a redeploy
+    # or restart continues the SAME equity curve instead of resetting to $1000.
+    # (Saved at the end of every loop; table bot_state via bot_pnl_store.)
+    _saved_state = store.load_state("perps-rsi-meanrev") if DRY_RUN else None
+    if _saved_state and broker.restore_state(_saved_state.get("broker") or {}):
+        log.info("restored paper state: equity $%.2f, %d open position(s)",
+                 broker.equity(), broker.open_count())
+
     def account_value():
         if DRY_RUN:
             return broker.equity()
@@ -207,6 +215,13 @@ def main():
     entries: dict[str, float] = {}
     entry_ts: dict[str, float] = {}   # unix time each position was opened (trade id)
     last_action: dict[str, float] = {}
+
+    # [2026-07-03 PERSIST] Rehydrate per-trade risk state alongside the account
+    # (stops need entry prices; re-entry cooldowns need last-action times).
+    if _saved_state:
+        entries.update({str(k): float(v) for k, v in (_saved_state.get("entries") or {}).items()})
+        entry_ts.update({str(k): float(v) for k, v in (_saved_state.get("entry_ts") or {}).items()})
+        last_action.update({str(k): float(v) for k, v in (_saved_state.get("last_action") or {}).items()})
 
     while True:
         now = datetime.now(timezone.utc)
@@ -387,6 +402,15 @@ def main():
                    "shorts": sum(1 for v in _szi.values() if v < 0),
                    "coins": COINS},
         )
+        # [2026-07-03 PERSIST] Durable paper state -> Postgres (guarded, cheap:
+        # one small JSONB upsert per loop) so redeploys continue this curve.
+        if DRY_RUN:
+            store.save_state("perps-rsi-meanrev", {
+                "broker": broker.to_state(),
+                "entries": entries,
+                "entry_ts": entry_ts,
+                "last_action": last_action,
+            })
         time.sleep(LOOP_SECONDS)
 
 

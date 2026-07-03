@@ -770,6 +770,22 @@ def seed_baseline(cfg, exchange_ids):
 
 def monitor(cfg, exchange_ids):
     known = load_json(KNOWN_FILE, None)
+    # [2026-07-03 PERSIST] sniper_data/ is container-local and wiped by every
+    # redeploy. Fall back to the durable Postgres copy (mirrored each cycle
+    # below) so the baseline and the open book survive deploys — the open
+    # snipes are where the fat-tail winners live, and re-seeding also used to
+    # blind us to listings that fired while the container was rebuilding.
+    _db_state = None
+    if not known or "exchanges" not in known:
+        try:
+            _db_state = store.load_state("event-listing-sniper")
+        except Exception:
+            _db_state = None
+        if _db_state and (_db_state.get("known") or {}).get("exchanges"):
+            known = _db_state["known"]
+            print(f"[start] restored baseline from Postgres "
+                  f"({len(known['exchanges'])} exchanges, "
+                  f"seeded {known.get('seeded_at', '?')}).")
     if not known or "exchanges" not in known:
         print("[!] No baseline found. Seeding now so we don't fire on every existing pair…")
         seed_baseline(cfg, exchange_ids)
@@ -805,6 +821,20 @@ def monitor(cfg, exchange_ids):
 
     pending = load_json(PENDING_FILE, {})   # "exid|symbol" -> first_seen
     positions = load_json(OPEN_FILE, [])
+    # [2026-07-03 PERSIST] Same Postgres fallback for the open book + pending
+    # watchlist when the local files were wiped by a redeploy.
+    if not positions and not pending:
+        if _db_state is None:
+            try:
+                _db_state = store.load_state("event-listing-sniper")
+            except Exception:
+                _db_state = None
+        if _db_state:
+            if _db_state.get("positions"):
+                positions = _db_state["positions"]
+                print(f"[start] restored {len(positions)} open position(s) from Postgres.")
+            if _db_state.get("pending"):
+                pending = _db_state["pending"]
 
     threading.Thread(target=_heartbeat_loop, daemon=True,
                      name="dashboard-heartbeat").start()
@@ -952,12 +982,24 @@ def monitor(cfg, exchange_ids):
         positions = remaining
 
         # Persist state every cycle so restarts are safe
-        save_json(KNOWN_FILE, {
+        _known_blob = {
             "exchanges": {e: sorted(s) for e, s in baseline.items()},
             "seeded_at": known.get("seeded_at", ts()),
-        })
+        }
+        save_json(KNOWN_FILE, _known_blob)
         save_json(OPEN_FILE, positions)
         save_json(PENDING_FILE, pending)
+        # [2026-07-03 PERSIST] Mirror the same three blobs to Postgres so a
+        # redeploy restores them (local sniper_data/ does not survive deploys).
+        try:
+            with _store_lock:
+                store.save_state("event-listing-sniper", {
+                    "known": _known_blob,
+                    "positions": positions,
+                    "pending": pending,
+                })
+        except Exception:
+            pass
 
         # Heartbeat
         ok_n = len(results)

@@ -195,6 +195,12 @@ def main():
     # testnet wallet (an unfunded wallet reads accountValue=0 -> no trades ever).
     # Covers both --paper and default dry-run (DRY_RUN is true in both).
     broker = PaperBroker(PAPER_START) if DRY_RUN else None
+    # [2026-07-03 PERSIST] Restore the paper account from Postgres so a redeploy
+    # or restart continues the SAME equity curve instead of resetting to $1000.
+    _saved_state = store.load_state("perps-donchian-breakout") if DRY_RUN else None
+    if _saved_state and broker.restore_state(_saved_state.get("broker") or {}):
+        log.info("restored paper state: equity $%.2f, %d open position(s)",
+                 broker.equity(), broker.open_count())
     if PAPER:
         log.info("PAPER mode: no account or keys needed. Reading LIVE testnet prices and "
                  "simulating fills in memory. No orders sent, no real balances.")
@@ -241,6 +247,9 @@ def main():
     cur_day = datetime.now(timezone.utc).date()
     halted_today = False
     entry_ts: dict[str, float] = {}   # unix time each position was opened (trade id)
+    # [2026-07-03 PERSIST] Rehydrate open-trade timestamps with the account.
+    if _saved_state:
+        entry_ts.update({str(k): float(v) for k, v in (_saved_state.get("entry_ts") or {}).items()})
 
     while True:
         now = datetime.now(timezone.utc)
@@ -390,6 +399,13 @@ def main():
                    "shorts": sum(1 for v in _szi.values() if v < 0),
                    "coins": COINS},
         )
+        # [2026-07-03 PERSIST] Durable paper state -> Postgres (guarded, cheap)
+        # so redeploys continue this equity curve.
+        if DRY_RUN:
+            store.save_state("perps-donchian-breakout", {
+                "broker": broker.to_state(),
+                "entry_ts": entry_ts,
+            })
         time.sleep(LOOP_SECONDS)
 
 

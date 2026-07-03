@@ -66,6 +66,35 @@ class PaperBroker:
         self.fees += abs(signed) * price * self.fee
         self.marks[coin] = price
 
+    # -- persistence ---------------------------------------------------------
+    def to_state(self) -> dict:
+        """JSON-safe snapshot of the whole account (for bot_pnl_store.save_state),
+        so a redeploy/restart continues the SAME equity curve instead of
+        resetting to start_equity."""
+        return {
+            "start": self.start,
+            "realized": self.realized,
+            "fees": self.fees,
+            "pos": {c: [s, e] for c, (s, e) in self.pos.items()},
+            "marks": dict(self.marks),
+        }
+
+    def restore_state(self, state: dict) -> bool:
+        """Rehydrate from a to_state() snapshot. Returns True if applied.
+        Defensive: a malformed/missing snapshot leaves the account untouched."""
+        try:
+            start = float(state["start"])
+            realized = float(state.get("realized", 0.0))
+            fees = float(state.get("fees", 0.0))
+            pos = {str(c): (float(v[0]), float(v[1]))
+                   for c, v in (state.get("pos") or {}).items()}
+            marks = {str(c): float(p) for c, p in (state.get("marks") or {}).items()}
+        except Exception:
+            return False
+        self.start, self.realized, self.fees = start, realized, fees
+        self.pos, self.marks = pos, marks
+        return True
+
     # -- reporting ----------------------------------------------------------
     def unrealized(self) -> float:
         tot = 0.0

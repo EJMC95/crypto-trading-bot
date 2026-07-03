@@ -115,6 +115,18 @@ def main():
 
     positions = {}  # coin -> dict(side, notional, opened_ts, accrued, fees, entry_apr)
 
+    # [2026-07-03 PERSIST] Restore open carries from Postgres so a redeploy keeps
+    # accrued funding + entry levels (realized already restores from the ledger
+    # above). Saved after every published loop below.
+    try:
+        _saved = store.load_state(BOT)
+        if _saved and isinstance(_saved.get("positions"), dict) and _saved["positions"]:
+            positions = _saved["positions"]
+            print(f"[{now_iso()}] restored {len(positions)} open carry position(s) "
+                  f"from saved state")
+    except Exception:
+        pass
+
     print(f"[{now_iso()}] funding-carry DRY-RUN start | enter>={ENTER_APR:.0%} APR "
           f"exit<{EXIT_APR:.0%} | ${NOTIONAL:.0f} x max {MAX_POSITIONS} | "
           f"friction {2*OPEN_COST*1e4:.0f}bps round-trip | realized so far "
@@ -211,6 +223,12 @@ def main():
                            "hottest_funding_apr": {
                                c: f"{f['rate']*HOURS_PER_YEAR:+.1%}" for c, f in top}},
                 )
+            except Exception:
+                pass
+
+            # [2026-07-03 PERSIST] Durable open-carry state -> Postgres.
+            try:
+                store.save_state(BOT, {"positions": positions})
             except Exception:
                 pass
 

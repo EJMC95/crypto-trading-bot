@@ -145,6 +145,85 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
         return False
 
 
+# ---------------------------------------------------------------------------
+# Durable bot state (one JSON blob per bot). Lets the dry-run bots restore
+# their paper account (equity, open positions, risk state) after a redeploy or
+# restart, so equity curves GROW across deploys instead of resetting to $1000.
+
+_state_table_ready = False
+
+
+def _ensure_state_table(conn):
+    global _state_table_ready
+    if _state_table_ready:
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bot_state (
+                bot        TEXT PRIMARY KEY,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                state      JSONB
+            )
+            """
+        )
+    _state_table_ready = True
+
+
+def save_state(bot, state):
+    """Upsert this bot's durable state blob. Safe to call every loop. Never raises."""
+    conn = _get_conn()
+    if conn is None:
+        return False
+    try:
+        _ensure_state_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO bot_state (bot, updated_at, state)
+                VALUES (%s, now(), %s)
+                ON CONFLICT (bot) DO UPDATE SET
+                    updated_at = now(),
+                    state      = EXCLUDED.state
+                """,
+                (bot, json.dumps(state)),
+            )
+        return True
+    except Exception as e:
+        _warn_once(f"state write failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return False
+
+
+def load_state(bot):
+    """Return the bot's saved state dict (from save_state), or None. Never raises."""
+    conn = _get_conn()
+    if conn is None:
+        return None
+    try:
+        _ensure_state_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT state FROM bot_state WHERE bot = %s", (bot,))
+            row = cur.fetchone()
+        if row and row[0] is not None:
+            return row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        return None
+    except Exception as e:
+        _warn_once(f"state read failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return None
+
+
 _trades_table_ready = False
 
 

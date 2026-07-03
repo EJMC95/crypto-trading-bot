@@ -32,6 +32,14 @@
 # [2026-07-01] Switched entry/exit to a 20-candle RANGE strategy: buy near the
 # rolling 20-candle low (bottom 15% of the band), sell near the rolling 20-candle
 # high (top 15%). Long-only; stop-loss/ROI/protections kept as guardrails.
+#
+# [2026-07-03 ADAPTIVE DUAL-MODE] The 07-01 rewrite silently DROPPED the 50/200
+# uptrend gate this bot was validated with — it was buying every 20d-low approach
+# in a bear market (the exact V2 knife-catch failure the docstring warns about).
+# Restored the gate for normal dip-buys, and added an explicit half-stake
+# capitulation-bounce mode (daily RSI<30 at the range bottom, up-close confirmed)
+# so the bot still trades the bear regime — deliberately, at reduced size, with
+# fast exits — instead of either churning or sitting dead.
 
 from pandas import DataFrame
 import talib.abstract as ta
@@ -72,8 +80,12 @@ class SwingDipV1(IStrategy):
         "20160": 0.0,
     }
 
-    # Wide stop: daily swings need room, and the uptrend filter limits downside.
-    stoploss = -0.15
+    # Stop: daily swings need room, and the uptrend filter limits downside.
+    # [2026-07-03] -0.15 -> -0.10. Backtest 2024-01->2025-12 (15-pair basket):
+    # 58% win rate yet -29% net — winners exit at the range top (~+5-8%) while
+    # losers rode all the way to -15%, an unbeatable ratio. -10% keeps the
+    # asymmetry survivable without clipping ordinary daily noise.
+    stoploss = -0.10
 
     trailing_stop = False
     use_exit_signal = True           # the "sell into strength" exit below
@@ -94,25 +106,81 @@ class SwingDipV1(IStrategy):
         dataframe["rng_low20"] = dataframe["low"].rolling(20).min().shift(1)
         dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
         _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
-        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.15 * _rng_band
+        # [2026-07-03 ADAPTIVE] Buy zone widened 0.15 -> 0.20 (more dip entries in
+        # the friendly regime); bounce zone is deeper (bottom 10%) for bear use.
+        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.20 * _rng_band
         dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.15 * _rng_band
+        dataframe["rng_bounce_zone"] = dataframe["rng_low20"] + 0.10 * _rng_band
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # [2026-07-03 ADAPTIVE] Two regime modes (own-pair daily 50/200 EMA):
+        uptick = dataframe["close"] > dataframe["close"].shift(1)
+        live_vol = dataframe["volume"] > 0
+
+        # UPTREND: the ORIGINAL VALIDATED entry — a genuine oversold dip (RSI<35
+        # AND close under the lower Bollinger) inside an uptrend. [2026-07-03]
+        # Backtests showed the 07-01 "buy near the 20d range low" replacement lost
+        # -29% even in the 2024-25 up-window; the Bollinger dip demands real
+        # capitulation, not every drift to the bottom of a drifting range.
         dataframe.loc[
             (
-                (dataframe["close"] <= dataframe["rng_buy_zone"])
-                & (dataframe["volume"] > 0)
+                (dataframe["ema50"] > dataframe["ema200"])
+                & (dataframe["rsi"] < self.buy_rsi.value)
+                & (dataframe["close"] < dataframe["bb_lower"])
+                & live_vol
             ),
-            "enter_long",
-        ] = 1
-        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range20_buy_low"
+            ["enter_long", "enter_tag"],
+        ] = (1, "dip_in_uptrend")
+
+        # DOWNTREND: capitulation bounce only — daily RSI<30 at the very bottom
+        # of the 20d range, AFTER the low has held ~5 days (a stabilized base,
+        # not a rolling waterfall), confirmed by an up-close. Half stake, fast
+        # exit via the custom_* methods below.
+        dataframe.loc[
+            (
+                (dataframe["ema50"] <= dataframe["ema200"])
+                & (dataframe["rsi"] < 30)
+                & (dataframe["rng_low20"] == dataframe["rng_low20"].shift(5))
+                & (dataframe["close"] <= dataframe["rng_bounce_zone"])
+                & uptick & live_vol
+            ),
+            ["enter_long", "enter_tag"],
+        ] = (1, "bear_bounce")
         return dataframe
 
+    # [2026-07-03 ADAPTIVE] Bear bounces run half stake — counter-trend swings
+    # don't earn full conviction sizing.
+    def custom_stake_amount(self, pair, current_time, current_rate, proposed_stake,
+                            min_stake, max_stake, leverage, entry_tag, side, **kwargs):
+        if entry_tag == "bear_bounce":
+            half = proposed_stake * 0.5
+            if min_stake is None or half >= min_stake:
+                return half
+        return proposed_stake
+
+    # [2026-07-03 ADAPTIVE] Bear bounces bank +6% into the first rally or time out
+    # after 10 days — they must not become hopeful bear-market bagholds. Uptrend
+    # dips keep the normal ROI ladder / range-high exit.
+    def custom_exit(self, pair, trade, current_time, current_rate, current_profit,
+                    **kwargs):
+        if trade.enter_tag == "bear_bounce":
+            if current_profit >= 0.06:
+                return "bounce_take"
+            if (current_time - trade.open_date_utc).total_seconds() >= 10 * 86400:
+                return "bounce_timeout"
+        return None
+
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # [2026-07-03] Sell into strength, two ways: the validated RSI>65 exit OR
+        # price reaching the top of the 20d range — whichever comes first. More
+        # closes, and winners are banked into rallies instead of round-tripping.
         dataframe.loc[
             (
-                (dataframe["close"] >= dataframe["rng_sell_zone"])
+                (
+                    (dataframe["rsi"] > self.sell_rsi.value)
+                    | (dataframe["close"] >= dataframe["rng_sell_zone"])
+                )
                 & (dataframe["volume"] > 0)
             ),
             "exit_long",

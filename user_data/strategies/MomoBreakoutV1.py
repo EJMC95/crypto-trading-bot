@@ -32,6 +32,13 @@
 # [2026-07-01] Switched entry/exit to a 20-candle RANGE strategy: buy near the
 # rolling 20-candle low (bottom 15% of the band), sell near the rolling 20-candle
 # high (top 15%). Long-only; stop-loss/ROI/protections kept as guardrails.
+#
+# [2026-07-03 RESTORE + ADAPT] The 07-01 rewrite replaced the validated Donchian
+# breakout above (PF ~1.8-1.9 over 3yr) with an ungated buy-the-20-bar-low — the
+# OPPOSITE trade, with no trend filter, live in a bear market. Restored the
+# validated breakout as the uptrend mode, and made the dip-buy an explicit
+# half-stake bear-bounce mode (4h RSI<28 at the range bottom, up-tick confirmed)
+# with fast exits — so the bot trades BOTH regimes, each with a designed edge.
 
 from pandas import DataFrame
 import talib.abstract as ta
@@ -76,6 +83,8 @@ class MomoBreakoutV1(IStrategy):
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["ema_trend"] = ta.EMA(dataframe, timeperiod=self.trend_ema.value)
+        # [2026-07-03] RSI for the bear-bounce mode.
+        dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
         # Prior-bar Donchian channels (shift(1) => no look-ahead on the current bar).
         dataframe["dc_high"] = dataframe["high"].rolling(self.entry_lookback.value).max().shift(1)
         dataframe["dc_low"]  = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
@@ -90,20 +99,67 @@ class MomoBreakoutV1(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # [2026-07-03 RESTORE + ADAPT] Two regime modes:
+        uptick = dataframe["close"] > dataframe["close"].shift(1)
+        live_vol = dataframe["volume"] > 0
+
+        # UPTREND (above 200-EMA): fresh breakout over the 30-bar high — the
+        # validated momentum edge (let winners run, Donchian-trail out).
         dataframe.loc[
             (
-                (dataframe["close"] <= dataframe["rng_buy_zone"])
-                & (dataframe["volume"] > 0)
+                (dataframe["close"] > dataframe["dc_high"])
+                & (dataframe["close"] > dataframe["ema_trend"])
+                & live_vol
             ),
-            "enter_long",
-        ] = 1
-        dataframe.loc[dataframe["enter_long"] == 1, "enter_tag"] = "range20_buy_low"
+            ["enter_long", "enter_tag"],
+        ] = (1, "breakout")
+
+        # DOWNTREND (below 200-EMA): stabilized sweep-and-reclaim bounce — the
+        # 20-bar low must have HELD ~24h (6 bars), then a candle flushes below it
+        # and closes back above (failed breakdown), with 4h RSI<30. Half stake,
+        # +2.5% take / 72h out via the custom_* methods below. The plain
+        # "RSI low near the range bottom" version knife-caught (-21.6% over the
+        # bear window); demanding the flush-and-reclaim structure is the fix.
+        dataframe.loc[
+            (
+                (dataframe["close"] <= dataframe["ema_trend"])
+                & (dataframe["rsi"] < 30)
+                & (dataframe["rng_low20"] == dataframe["rng_low20"].shift(6))
+                & (dataframe["low"] < dataframe["rng_low20"])
+                & (dataframe["close"] > dataframe["rng_low20"])
+                & uptick & live_vol
+            ),
+            ["enter_long", "enter_tag"],
+        ] = (1, "bear_bounce")
         return dataframe
 
+    # [2026-07-03 ADAPTIVE] Half stake on counter-trend bounces.
+    def custom_stake_amount(self, pair, current_time, current_rate, proposed_stake,
+                            min_stake, max_stake, leverage, entry_tag, side, **kwargs):
+        if entry_tag == "bear_bounce":
+            half = proposed_stake * 0.5
+            if min_stake is None or half >= min_stake:
+                return half
+        return proposed_stake
+
+    # [2026-07-03 ADAPTIVE] Bounces bank +2.5% or time out after 72h; breakout
+    # trades are untouched (they ride until the Donchian breakdown below).
+    def custom_exit(self, pair, trade, current_time, current_rate, current_profit,
+                    **kwargs):
+        if trade.enter_tag == "bear_bounce":
+            if current_profit >= 0.025:
+                return "bounce_take"
+            if (current_time - trade.open_date_utc).total_seconds() >= 72 * 3600:
+                return "bounce_timeout"
+        return None
+
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # [2026-07-03 RESTORE] Trailing Donchian breakdown — the validated "let
+        # winners run, cut on structure break" exit. Bounce trades usually leave
+        # earlier via custom_exit; this (and the -12% stop) is their backstop.
         dataframe.loc[
             (
-                (dataframe["close"] >= dataframe["rng_sell_zone"])
+                (dataframe["close"] < dataframe["dc_low"])
                 & (dataframe["volume"] > 0)
             ),
             "exit_long",
