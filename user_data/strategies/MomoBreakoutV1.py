@@ -85,6 +85,8 @@ class MomoBreakoutV1(IStrategy):
         dataframe["ema_trend"] = ta.EMA(dataframe, timeperiod=self.trend_ema.value)
         # [2026-07-03] RSI for the bear-bounce mode.
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
+        # [2026-07-03 VOL-TARGET] ATR feeds inverse-volatility sizing below.
+        dataframe["atr"] = ta.ATR(dataframe, timeperiod=14)
         # Prior-bar Donchian channels (shift(1) => no look-ahead on the current bar).
         dataframe["dc_high"] = dataframe["high"].rolling(self.entry_lookback.value).max().shift(1)
         dataframe["dc_low"]  = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
@@ -133,14 +135,29 @@ class MomoBreakoutV1(IStrategy):
         ] = (1, "bear_bounce")
         return dataframe
 
-    # [2026-07-03 ADAPTIVE] Half stake on counter-trend bounces.
+    # [2026-07-03 VOL-TARGET] Inverse-volatility sizing — equal RISK per trade,
+    # not equal dollars (the most-replicated portfolio improvement in the trend-
+    # following literature, and it holds here: backtest 2024-01->2026-06 on the
+    # 15-pair basket went +56.8% -> +75.9% with DD 32.8% -> 28.3%, identical
+    # trades). High-ATR names get proportionally smaller stakes (ref 2% 4h-ATR,
+    # floored at 0.3x). Tested and REJECTED for v8 (BTC+ETH only: no dispersion
+    # to exploit) and V6 (its best trades ARE the high-vol capitulation days).
+    # Bounces still run half stake on top.
     def custom_stake_amount(self, pair, current_time, current_rate, proposed_stake,
                             min_stake, max_stake, leverage, entry_tag, side, **kwargs):
+        stake = proposed_stake
+        try:
+            df, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
+            atr_pct = float(df["atr"].iat[-1]) / float(df["close"].iat[-1])
+            if atr_pct > 0:
+                stake *= max(0.3, min(1.0, 0.02 / atr_pct))
+        except Exception:
+            pass
         if entry_tag == "bear_bounce":
-            half = proposed_stake * 0.5
-            if min_stake is None or half >= min_stake:
-                return half
-        return proposed_stake
+            stake *= 0.5
+        if stake < proposed_stake and min_stake is not None and stake < min_stake:
+            stake = min_stake
+        return stake
 
     # [2026-07-03 ADAPTIVE] Bounces bank +2.5% or time out after 72h; breakout
     # trades are untouched (they ride until the Donchian breakdown below).
