@@ -5,6 +5,15 @@
 # Mirrors run_all.sh, but one bot instead of five. Logs go to stdout (Railway).
 set -u
 
+# VOLUME OWNERSHIP SHIM (2026-07-03) — see run_all.sh for the full story:
+# Railway mounts /freqtrade/persist root-owned; start as root (RAILWAY_RUN_UID=0),
+# chown to ftuser, then drop privileges and re-exec.
+if [ "$(id -u)" = "0" ]; then
+  chown -R ftuser:ftuser /freqtrade/persist
+  exec su ftuser -s /bin/sh -c \
+    'export PATH="/home/ftuser/.local/bin:$PATH"; exec sh /freqtrade/run_regime.sh'
+fi
+
 # Point the shared poller at just this bot (name must match pnl_dashboard EXPECTED,
 # port must match api_server.listen_port in config_regimeswitch.json).
 export FT_POLLER_BOTS='[["perps-regime-switch", 8089]]'

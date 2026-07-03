@@ -4,6 +4,17 @@
 # Logs go to stdout (captured by Railway). No --logfile on purpose.
 set -u
 
+# VOLUME OWNERSHIP SHIM (2026-07-03). Railway mounts the /freqtrade/persist
+# volume owned by root, but freqtrade is installed for (and must run as)
+# ftuser. The service sets RAILWAY_RUN_UID=0 so we start as root, fix the
+# mount's ownership, then re-exec this script as ftuser. su resets PATH, so
+# re-add ftuser's pip-install bin dir where the freqtrade CLI lives.
+if [ "$(id -u)" = "0" ]; then
+  chown -R ftuser:ftuser /freqtrade/persist
+  exec su ftuser -s /bin/sh -c \
+    'export PATH="/home/ftuser/.local/bin:$PATH"; exec sh /freqtrade/run_all.sh'
+fi
+
 run_bot() {
   cfg="$1"
   name="$2"
