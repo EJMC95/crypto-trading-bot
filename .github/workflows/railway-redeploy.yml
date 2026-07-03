@@ -63,15 +63,13 @@ jobs:
             changed="$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo '')"
             echo "Changed files:"; echo "$changed"
             svcs=""
-            # [2026-07-01 DEPLOY FREEZE] freqtrade-bots is NO LONGER auto-deployed on
-            # push. Without a persistence volume, every redeploy wipes the dry-run
-            # paper-trade DBs (open trades + history reset to $1000), which repeatedly
-            # looked like an outage. Strategy changes now require a MANUAL dispatch
-            # (workflow_dispatch with services=freqtrade-bots) so a reset is always a
-            # deliberate choice, never a surprise from an unrelated push.
-            # if echo "$changed" | grep -qE '^(user_data/|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$)'; then
-            #   svcs="freqtrade-bots"
-            # fi
+            # [2026-07-03 UNFROZEN] freqtrade-bots auto-deploy is back on: the
+            # service now has a Railway volume at /freqtrade/persist and every
+            # bot's db_url points into it, so redeploys/restarts no longer wipe
+            # the dry-run paper DBs (the reason for the 2026-07-01 freeze).
+            if echo "$changed" | grep -qE '^(user_data/|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$)'; then
+              svcs="freqtrade-bots"
+            fi
             if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$)'; then
               svcs="${svcs:+$svcs,}pnl-dashboard"
             fi
