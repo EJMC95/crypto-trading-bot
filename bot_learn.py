@@ -334,9 +334,9 @@ def main():
 
     saved = _save_state(state)
     print(f"[bot_learn] run {run_no}: {len(trades)} closed trades, "
-          f"{len(actionable)} actionable, {len(candidates)} candidates "
+          f"{len(live_act)} actionable, {len(live_cand)} candidates (current-era) "
           f"-> {LESSONS_MD} (state: {'+'.join(saved) or 'NOT SAVED'})")
-    for k, e in sorted(actionable.items()):
+    for k, e in sorted(live_act.items()):
         print(f"  ACTIONABLE: {e['proposal']}")
     return 0
 
