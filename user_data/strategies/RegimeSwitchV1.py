@@ -156,19 +156,27 @@ class RegimeSwitchV1(IStrategy):
         lo = self.range_entry_pct.value
         hi = 1.0 - self.range_entry_pct.value
 
-        # TREND LONG: up-trend regime, fast/slow momentum cross up.
+        # [2026-07-03 DONCHIAN ENTRIES] EMA-cross entries replaced with regime-
+        # aligned 20-bar breakouts/breakdowns (the fleet's proven V7 pattern,
+        # mirrored for shorts). Backtest Aug-2024->Jun-2026 BTC+ETH futures,
+        # protections on: cross entries 199 trades -32% / DD 37%; persistent-
+        # state entries 716 trades -31% / DD 55% (docstring churn warning was
+        # right); Donchian 484 trades -20% / DD 36% — strictly best of the
+        # three, though STILL net negative: this bot remains an EXPERIMENT,
+        # not a funded edge. Do not go live without a green walk-forward.
+        # TREND LONG: up-trend regime, breakout above the prior 20-bar high.
         dataframe.loc[
             up_trend
-            & qtpylib.crossed_above(dataframe["ema_fast"], dataframe["ema_slow"])
+            & (dataframe["close"] > dataframe["range_high"].shift(1))
             & (dataframe["rsi"] > 50)
             & (dataframe["volume"] > 0),
             ["enter_long", "enter_tag"],
         ] = (1, "up_trend_long")
 
-        # TREND SHORT: down-trend regime, momentum cross down (perps).
+        # TREND SHORT: down-trend regime, breakdown below the prior 20-bar low.
         dataframe.loc[
             down_trend
-            & qtpylib.crossed_below(dataframe["ema_fast"], dataframe["ema_slow"])
+            & (dataframe["close"] < dataframe["range_low"].shift(1))
             & (dataframe["rsi"] < 50)
             & (dataframe["volume"] > 0),
             ["enter_short", "enter_tag"],

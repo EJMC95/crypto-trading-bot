@@ -112,7 +112,47 @@ def _session(t):
     return f"UTC{h - h % 3:02d}-{h - h % 3 + 2:02d}"
 
 
-def analyse_bot(bot, trades):
+def _load_pulse_history():
+    """Rolling mood snapshots from market_pulse.py — local file first, then the
+    dashboard's /pulse.json. Returns [] when unavailable (correlation skipped)."""
+    try:
+        with open(os.path.join(REPORTS_DIR, "market_pulse_state.json")) as f:
+            h = json.load(f).get("history", [])
+            if h:
+                return h
+    except Exception:
+        pass
+    try:
+        url = os.environ.get(
+            "LEARN_PULSE_URL",
+            "https://pnl-dashboard-production-858c.up.railway.app/pulse.json")
+        with urllib.request.urlopen(url, timeout=15) as r:
+            return json.loads(r.read().decode()).get("history", [])
+    except Exception:
+        return []
+
+
+def _mood_at(history, open_ts):
+    """Nearest mood snapshot within 2h of a trade's open, else None."""
+    if not history or not open_ts:
+        return None
+    try:
+        t = datetime.fromisoformat(str(open_ts).replace("Z", "+00:00"))
+    except Exception:
+        return None
+    best, best_dt = None, 7200.0
+    for h in history:
+        try:
+            ht = datetime.fromisoformat(h["ts"])
+        except Exception:
+            continue
+        d = abs((ht - t).total_seconds())
+        if d < best_dt:
+            best, best_dt = h, d
+    return best
+
+
+def analyse_bot(bot, trades, pulse_hist=None):
     """Return (scorecard dict, list of candidate hypotheses)."""
     n = len(trades)
     wins = sum(1 for t in trades if (t.get("profit_abs") or 0) > 0)
@@ -166,6 +206,34 @@ def analyse_bot(bot, trades):
                 hyp(f"session:{sess}:hot", "session_hot_zone",
                     f"{sess}: {b['n']} trades at {b['w']/b['n']*100:.0f}% win vs {wr*100:.0f}% overall",
                     f"{sess} is {bot}'s best session — a future tweak could size up there")
+    # Mood correlation (news/social pulse) — only meaningful once market_pulse
+    # history overlaps enough trades; accumulates value from 2026-07-03 onward.
+    if pulse_hist and n >= 30:
+        buckets = {"neg": [0, 0], "mid": [0, 0], "pos": [0, 0]}
+        matched = 0
+        for t in trades:
+            m = _mood_at(pulse_hist, t.get("open_ts"))
+            if not m:
+                continue
+            matched += 1
+            mood = m.get("mood") or 0.0
+            k = "neg" if mood <= -0.15 else ("pos" if mood >= 0.15 else "mid")
+            buckets[k][0] += 1
+            if (t.get("profit_abs") or 0) > 0:
+                buckets[k][1] += 1
+        card["mood_matched"] = matched
+        card["by_mood"] = {k: {"n": v[0], "w": v[1]} for k, v in buckets.items()}
+        for k, v in buckets.items():
+            if v[0] >= 10 and wr > 0:
+                bwr = v[1] / v[0]
+                if bwr <= wr * 0.5:
+                    hyp(f"mood:{k}", "mood_dead_zone",
+                        f"'{k}' mood: {v[0]} trades at {bwr*100:.0f}% win vs {wr*100:.0f}% overall",
+                        f"consider halving/blocking {bot} entries when market mood is '{k}'")
+                elif bwr >= min(0.95, wr * 1.7) and v[1] > 0:
+                    hyp(f"mood:{k}:hot", "mood_hot_zone",
+                        f"'{k}' mood: {v[0]} trades at {bwr*100:.0f}% win vs {wr*100:.0f}% overall",
+                        f"{bot} performs best in '{k}' mood — candidate for informed size-up")
     return card, hyps
 
 
@@ -180,9 +248,10 @@ def main():
     for t in trades:
         by_bot[t.get("bot", "?")].append(t)
 
+    pulse_hist = _load_pulse_history()
     cards, all_hyps = {}, []
     for bot, trs in sorted(by_bot.items()):
-        cards[bot], hyps = analyse_bot(bot, trs)
+        cards[bot], hyps = analyse_bot(bot, trs, pulse_hist)
         all_hyps.extend(hyps)
 
     # Reconcile hypotheses with cumulative state: persistence -> promotion.
@@ -233,6 +302,11 @@ def main():
         durs = sorted(c["by_dur"].items())
         L.append("  holds: " + "; ".join(
             f"{k} n={v['n']} wr={v['w']/v['n']*100:.0f}%" for k, v in durs))
+        if c.get("by_mood"):
+            L.append("  mood: " + "; ".join(
+                f"{k} n={v['n']} wr={(v['w']/v['n']*100 if v['n'] else 0):.0f}%"
+                for k, v in c["by_mood"].items()) +
+                f" (matched {c.get('mood_matched', 0)}/{c['n']})")
     with open(LESSONS_MD, "w") as f:
         f.write("\n".join(L) + "\n")
 

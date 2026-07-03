@@ -36,6 +36,15 @@ run_bot user_data/config_v8_momo.json    v8momo   &
 # Combined P&L + trades dashboard, served on $PORT (Railway exposes it).
 python3 /freqtrade/dashboard_server.py &
 
+# Market pulse collector (news/social/funding mood) -> Postgres bot_state
+# every 10 min. Strategies read it for informed SIZING (never entries), the
+# brain correlates trades with the mood they were opened in, and the
+# pnl-dashboard serves it at /pulse.json. Guarded: a failed cycle just retries.
+while true; do
+  python3 /freqtrade/market_pulse.py || true
+  sleep 600
+done &
+
 # Publish each freqtrade bot's P&L to the shared Postgres table so they show on
 # the unified pnl_dashboard alongside perps/momo/arb/sniper. Guarded: no-op if
 # DATABASE_URL is unset. Restart-looped so a transient error can't kill it.

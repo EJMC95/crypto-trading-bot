@@ -848,6 +848,35 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/health"):
             self.send_response(200); self._no_cache(); self.end_headers(); self.wfile.write(b"ok"); return
+        if self.path.startswith("/pulse.json"):
+            # Market pulse (news/social/funding mood) written by market_pulse.py
+            # into bot_state. Read-only, no auth — no secrets inside. Serves the
+            # laptop brain/scans and anything else that wants the mood feed.
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                        if cur.fetchone()[0] is None:
+                            raise LookupError("bot_state table not created yet")
+                        cur.execute("SELECT state, updated_at FROM bot_state WHERE bot = 'market-pulse'")
+                        row = cur.fetchone()
+                finally:
+                    conn.close()
+                if not row:
+                    payload = {"error": "no pulse published yet"}
+                else:
+                    st = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                    payload = {"updated_at": row[1].isoformat() if row[1] else None}
+                    payload.update(st)
+                body = json.dumps(payload, default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
         if self.path.startswith("/pnl.json"):
             # Read-only JSON snapshot of every bot, for the scheduled
             # daily/weekly breakdowns. Dry-run paper P&L only — no secrets.

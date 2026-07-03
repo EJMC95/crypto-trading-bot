@@ -313,6 +313,26 @@ class DayTraderV5Gated(IStrategy):
         self._entry_throttle_n += 1
         return True
 
+    # [2026-07-03 PULSE] Informed sizing v1: the market_pulse collector (news /
+    # social / funding mood, bot_state key 'market-pulse') can HALVE new stakes
+    # during a PANIC news cluster (>=3 hack/exploit/regulatory-shock headlines).
+    # Entries are deliberately untouched — a signal only earns entry-gate power
+    # once the brain (bot_learn) shows a persistent edge. Fail-safe: no DB /
+    # import error / stale data -> neutral 1.0x. Cached 15 min per process.
+    _pulse_cache = {"ts": None, "panic": False}
+
+    def _pulse_panic(self, current_time: datetime) -> bool:
+        c = type(self)._pulse_cache
+        try:
+            if c["ts"] is not None and (current_time - c["ts"]).total_seconds() < 900:
+                return c["panic"]
+            import bot_pnl_store as store          # available in the Railway image
+            latest = (store.load_state("market-pulse") or {}).get("latest") or {}
+            c["ts"], c["panic"] = current_time, bool(latest.get("panic"))
+        except Exception:
+            c["ts"], c["panic"] = current_time, False
+        return c["panic"]
+
     # [2026-07-03 ADAPTIVE] Half stake on risk-off bounces: counter-trend scalps
     # only earn conviction sizing in the friendly regime.
     def custom_stake_amount(self, pair: str, current_time: datetime,
@@ -320,11 +340,14 @@ class DayTraderV5Gated(IStrategy):
                             min_stake: Optional[float], max_stake: float,
                             leverage: float, entry_tag: Optional[str], side: str,
                             **kwargs) -> float:
+        stake = proposed_stake
         if entry_tag == "bear_bounce":
-            half = proposed_stake * 0.5
-            if min_stake is None or half >= min_stake:
-                return half
-        return proposed_stake
+            stake *= 0.5
+        if self._pulse_panic(current_time):
+            stake *= 0.5
+        if stake < proposed_stake and min_stake is not None and stake < min_stake:
+            stake = min_stake                       # never breach exchange minimums
+        return stake
 
     # [2026-07-03 ADAPTIVE] Faster exits = more closes, more re-armed slots.
     # Bounces bank +1.2% (sweep-reclaims either work quickly or not at all) or
