@@ -48,9 +48,14 @@ class TrendMomoV1(IStrategy):
              "stop_duration_candles": 5, "max_allowed_drawdown": 0.25},
         ]
 
-    # Tunable later, but defaults are the robustness-checked middle pair.
-    fast_ma = IntParameter(10, 30, default=20, space="buy", optimize=False)
-    slow_ma = IntParameter(40, 70, default=50, space="buy", optimize=False)
+    # [2026-07-03b] 20/50 -> 10/40, still inside the validated robustness sweep
+    # (10/30..30/70 all profitable on 3yr BTC+ETH). Split-window backtest vs
+    # 20/50 on BTC+ETH 1d: bull 2024-01->2025-12 +94.5% vs +71.2% (22 vs 15
+    # trades); bear 2025-12->2026-06 -9.8% vs -16.0% (the faster cross exits
+    # crashes sooner). More trades, more profit, LESS bear bleed. DD 26% vs 18%
+    # full-window is the accepted cost.
+    fast_ma = IntParameter(10, 30, default=10, space="buy", optimize=False)
+    slow_ma = IntParameter(40, 70, default=40, space="buy", optimize=False)
 
     # Let winners run: ROI effectively disabled. Exit comes from the trend flip.
     minimal_roi = {"0": 100}

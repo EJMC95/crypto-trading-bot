@@ -90,9 +90,13 @@ class DayTraderV5Gated(IStrategy):
     # sat BELOW the first ROI target (1.2%), so trades died to ordinary noise
     # before any winner could mature. The 06-30 "keep it tight" call was made
     # when entries were knife-catches; entries are now regime-gated + up-tick
-    # confirmed, so the stop's job is disasters, not noise. Bounce entries use
-    # 2.4x at half stake (see custom_stoploss / custom_stake_amount).
-    atr_stop_mult = DecimalParameter(0.8, 3.0, default=2.0, decimals=1,
+    # confirmed, so the stop's job is disasters, not noise.
+    # [2026-07-03b LEARNED 2.0 -> 2.5] Full 157-trade live dissection: every ROI
+    # exit won (13/13); 122 stop exits at 6% win = -$17.68 of the -$20.96 total;
+    # the ONLY net-positive holds were 90-240min (50% win) while <30min holds
+    # went 2%. Winners need room+time to reach the ladder. Backtest confirm on
+    # 1h: win rate 30.4% -> 41.3%, better P&L, lower DD.
+    atr_stop_mult = DecimalParameter(0.8, 3.0, default=2.5, decimals=1,
                                      space="sell", optimize=True)
 
     # [V5 GATE] daily regime EMAs. Kept optimize=False on purpose: this is the
