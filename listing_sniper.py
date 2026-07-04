@@ -1132,20 +1132,25 @@ def main():
                         "(default USD,USDT,USDC,EUR — wider than USD-only).")
     p.add_argument("--tp-mult", type=float, default=5.0,
                    help="Take-profit as a MULTIPLE of entry (5.0 = sell at 5x). Default 5x.")
-    p.add_argument("--sl", type=float, default=0.50,
-                   help="Stop-loss fraction (0.50=-50%%). Set 0 to disable (ride to 5x or zero).")
-    p.add_argument("--max-hold", type=float, default=2880,
-                   help="Max hold in minutes; 0 = no limit. Default 2880 (48h): "
-                        "listings spike then bleed, and the old no-limit default "
-                        "quietly accumulated 85 never-exiting positions.")
-    p.add_argument("--max-open", type=int, default=25,
+    # [2026-07-04 THROTTLE] Live record hit 13W/90L and realized P&L bled from
+    # +$263 to +$194 in ~3 days — the drip of small losing tickets was outpacing
+    # the occasional winner. Defaults tightened (the Railway service runs with no
+    # flags, so these ARE the live settings): smaller stake, tighter stop, fewer
+    # concurrent tickets, shorter max hold, and a stricter research gate below.
+    p.add_argument("--sl", type=float, default=0.35,
+                   help="Stop-loss fraction (0.35=-35%%). Set 0 to disable (ride to 5x or zero).")
+    p.add_argument("--max-hold", type=float, default=1440,
+                   help="Max hold in minutes; 0 = no limit. Default 1440 (24h): "
+                        "listings spike then bleed; anything not working within a "
+                        "day is dead capital.")
+    p.add_argument("--max-open", type=int, default=10,
                    help="Max concurrent open paper positions; new detections are "
-                        "dropped (logged) while at the cap. 0 = no cap. Default 25.")
+                        "dropped (logged) while at the cap. 0 = no cap. Default 10.")
     p.add_argument("--no-price-give-up-min", type=float, default=60,
                    help="Close a position at its last known price after this many "
                         "minutes of continuously unpriceable ticker (delisted/"
                         "vanished pair). Default 60.")
-    p.add_argument("--stake", type=float, default=100, help="Paper stake per trade (quote ccy).")
+    p.add_argument("--stake", type=float, default=50, help="Paper stake per trade (quote ccy).")
     p.add_argument("--slippage-bps", type=float, default=30,
                    help="Simulated buy slippage in basis points (30=0.30%%).")
     p.add_argument("--any-status", action="store_true",
@@ -1161,19 +1166,22 @@ def main():
     g.add_argument("--min-observe-sec", type=float, default=120,
                    help="Observation window: wait this long after first sight "
                         "before buying, to skip the opening spike (default 120s).")
-    g.add_argument("--max-spread-bps", type=float, default=500,
-                   help="Reject if bid/ask spread exceeds this (default 500 = 5%%). 0 disables.")
-    g.add_argument("--min-depth-mult", type=float, default=3.0,
+    # [2026-07-04 THROTTLE] Gate tightened with the sizing cut above: the skips
+    # log showed the 500bps spread + 3x depth gate still let through thin books
+    # that drifted straight down. Fewer, better tickets.
+    g.add_argument("--max-spread-bps", type=float, default=250,
+                   help="Reject if bid/ask spread exceeds this (default 250 = 2.5%%). 0 disables.")
+    g.add_argument("--min-depth-mult", type=float, default=5.0,
                    help="Require resting bid-side depth within --depth-band-pct of "
-                        "touch to be >= this multiple of --stake (default 3x). 0 disables.")
+                        "touch to be >= this multiple of --stake (default 5x). 0 disables.")
     g.add_argument("--depth-band-pct", type=float, default=0.05,
                    help="Price band around touch used to measure book depth (default 0.05 = 5%%).")
-    g.add_argument("--min-quote-vol", type=float, default=0,
-                   help="Optional 24h quote-volume floor. Off by default — a "
-                        "just-listed pair has little 24h history (set e.g. 50000 to use).")
-    g.add_argument("--max-launch-pump", type=float, default=1.5,
+    g.add_argument("--min-quote-vol", type=float, default=25000,
+                   help="24h quote-volume floor (default 25000). Just-listed pairs "
+                        "build volume fast when real; set 0 to disable.")
+    g.add_argument("--max-launch-pump", type=float, default=1.0,
                    help="Anti-chase: skip if price already ran more than this "
-                        "fraction above where we first saw it (default 1.5 = +150%%). 0 disables.")
+                        "fraction above where we first saw it (default 1.0 = +100%%). 0 disables.")
     g.add_argument("--max-pending-min", type=float, default=30,
                    help="Give up on a candidate that never passes the gate after "
                         "this many minutes (default 30). 0 = wait forever.")
