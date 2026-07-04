@@ -202,7 +202,10 @@ def save(pulse):
         prev = store.load_state("market-pulse") or {}
         hist = prev.get("history", [])
         hist.append({"ts": pulse["ts"], "mood": pulse["mood"],
-                     "fng": pulse["fear_greed"], "panic": pulse["panic"]})
+                     "fng": pulse["fear_greed"], "panic": pulse["panic"],
+                     # funding APRs per coin: lets the brain correlate perps
+                     # trades with crowd positioning at open (squeeze evidence)
+                     "funding": {k: v["apr"] for k, v in pulse["funding"].items() if v}})
         state = {"latest": pulse, "history": hist[-200:]}   # ~7d at 1/h, capped
         if store.save_state("market-pulse", state):
             saved.append("postgres")
@@ -220,7 +223,8 @@ def save(pulse):
                 prev = {}
         hist = prev.get("history", [])
         hist.append({"ts": pulse["ts"], "mood": pulse["mood"],
-                     "fng": pulse["fear_greed"], "panic": pulse["panic"]})
+                     "fng": pulse["fear_greed"], "panic": pulse["panic"],
+                     "funding": {k: v["apr"] for k, v in pulse["funding"].items() if v}})
         json.dump({"latest": pulse, "history": hist[-200:]}, open(loc, "w"), indent=1)
         md = [f"# Market pulse — {pulse['ts']}",
               f"- **Mood: {pulse['mood']:+.2f}**  (F&G {pulse['fear_greed']}, "

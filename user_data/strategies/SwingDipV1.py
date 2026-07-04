@@ -149,15 +149,36 @@ class SwingDipV1(IStrategy):
         ] = (1, "bear_bounce")
         return dataframe
 
+    # [2026-07-04 PULSE] Panic-cluster check (news shocks: hacks/SEC/depegs).
+    # Mirrors DayTraderV5Gated: sizing only, fail-safe neutral, 15-min cache.
+    _pulse_cache = {"ts": None, "panic": False}
+
+    def _pulse_panic(self, current_time):
+        c = type(self)._pulse_cache
+        try:
+            if c["ts"] is not None and (current_time - c["ts"]).total_seconds() < 900:
+                return c["panic"]
+            import bot_pnl_store as store
+            latest = (store.load_state("market-pulse") or {}).get("latest") or {}
+            c["ts"], c["panic"] = current_time, bool(latest.get("panic"))
+        except Exception:
+            c["ts"], c["panic"] = current_time, False
+        return c["panic"]
+
     # [2026-07-03 ADAPTIVE] Bear bounces run half stake — counter-trend swings
-    # don't earn full conviction sizing.
+    # don't earn full conviction sizing. [2026-07-04] During an active PANIC news
+    # cluster all new stakes halve again: dip-buying into a live hack/regulatory
+    # shock is the one knife the stabilized-low gate can't see coming.
     def custom_stake_amount(self, pair, current_time, current_rate, proposed_stake,
                             min_stake, max_stake, leverage, entry_tag, side, **kwargs):
+        stake = proposed_stake
         if entry_tag == "bear_bounce":
-            half = proposed_stake * 0.5
-            if min_stake is None or half >= min_stake:
-                return half
-        return proposed_stake
+            stake *= 0.5
+        if self._pulse_panic(current_time):
+            stake *= 0.5
+        if stake < proposed_stake and min_stake is not None and stake < min_stake:
+            stake = min_stake
+        return stake
 
     # [2026-07-03 ADAPTIVE] Bear bounces bank +6% into the first rally or time out
     # after 10 days — they must not become hopeful bear-market bagholds. Uptrend

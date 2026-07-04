@@ -143,6 +143,21 @@ class MomoBreakoutV1(IStrategy):
     # floored at 0.3x). Tested and REJECTED for v8 (BTC+ETH only: no dispersion
     # to exploit) and V6 (its best trades ARE the high-vol capitulation days).
     # Bounces still run half stake on top.
+    # [2026-07-04 PULSE] Panic-cluster check — sizing only, fail-safe neutral.
+    _pulse_cache = {"ts": None, "panic": False}
+
+    def _pulse_panic(self, current_time):
+        c = type(self)._pulse_cache
+        try:
+            if c["ts"] is not None and (current_time - c["ts"]).total_seconds() < 900:
+                return c["panic"]
+            import bot_pnl_store as store
+            latest = (store.load_state("market-pulse") or {}).get("latest") or {}
+            c["ts"], c["panic"] = current_time, bool(latest.get("panic"))
+        except Exception:
+            c["ts"], c["panic"] = current_time, False
+        return c["panic"]
+
     def custom_stake_amount(self, pair, current_time, current_rate, proposed_stake,
                             min_stake, max_stake, leverage, entry_tag, side, **kwargs):
         stake = proposed_stake
@@ -154,6 +169,10 @@ class MomoBreakoutV1(IStrategy):
         except Exception:
             pass
         if entry_tag == "bear_bounce":
+            stake *= 0.5
+        # [2026-07-04] halve again during an active panic news cluster — bounce
+        # entries into a live hack/regulatory shock are the knife-catch case.
+        if self._pulse_panic(current_time):
             stake *= 0.5
         if stake < proposed_stake and min_stake is not None and stake < min_stake:
             stake = min_stake
