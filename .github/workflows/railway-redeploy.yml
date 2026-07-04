@@ -26,8 +26,14 @@ on:
       - 'report_emailer.py'
       - 'compile_market_data.py'
       - 'Dockerfile.dashboard'
-      # shared by both (freqtrade poller + dashboard)
+      # perps-regime-switch service (no Railway-native auto-deploy — [2026-07-04]
+      # its Donchian-entry ship sat undeployed for 15h before this was added)
+      - 'run_regime.sh'
+      - 'Dockerfile.regime'
+      # shared (freqtrade poller + dashboard + regime supervisor)
       - 'bot_pnl_store.py'
+      - 'freqtrade_pnl_poller.py'
+      - 'market_pulse.py'
   workflow_dispatch:
     inputs:
       services:
@@ -67,11 +73,16 @@ jobs:
             # service now has a Railway volume at /freqtrade/persist and every
             # bot's db_url points into it, so redeploys/restarts no longer wipe
             # the dry-run paper DBs (the reason for the 2026-07-01 freeze).
-            if echo "$changed" | grep -qE '^(user_data/|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$)'; then
+            if echo "$changed" | grep -qE '^(user_data/|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$)'; then
               svcs="freqtrade-bots"
             fi
             if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$)'; then
               svcs="${svcs:+$svcs,}pnl-dashboard"
+            fi
+            # perps-regime-switch: surgical filter (its own files only) so a V5
+            # tweak doesn't churn this service; its volume keeps trades safe anyway.
+            if echo "$changed" | grep -qE '^(user_data/strategies/RegimeSwitchV1\.py$|user_data/config_regimeswitch\.json$|run_regime\.sh$|Dockerfile\.regime$|bot_pnl_store\.py$|freqtrade_pnl_poller\.py$)'; then
+              svcs="${svcs:+$svcs,}perps-regime-switch"
             fi
           fi
           echo "services=$svcs" >> "$GITHUB_OUTPUT"
