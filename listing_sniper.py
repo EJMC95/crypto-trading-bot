@@ -103,6 +103,15 @@ import threading
 
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
 
+# [2026-07-04 INTEL] External listing intelligence (exchange announcement feeds
+# + CoinGecko footprint). Stake modulation ONLY: junk tickets (no announcement,
+# no CoinGecko page) get half stake; everything else full. Guarded import —
+# missing module or dead APIs degrade to neutral.
+try:
+    import listing_intel as intel
+except Exception:
+    intel = None
+
 # bot_pnl_store shares ONE module-global Postgres connection, so every store.*
 # call in this process must hold this lock — the heartbeat thread below would
 # otherwise race the main loop's publish/fetch calls on that connection.
@@ -303,7 +312,7 @@ def ensure_csv_header():
             csv.writer(f).writerow([
                 "detected_at", "opened_at", "closed_at", "exchange", "pair_id",
                 "wsname", "entry", "exit", "stake_quote", "pnl_pct", "pnl_quote",
-                "reason", "hold_minutes", "peak_pct",
+                "reason", "hold_minutes", "peak_pct", "intel",
             ])
 
 
@@ -520,6 +529,15 @@ def open_position(exid, client, sym, market, cfg, detected_at, research=None):
     entry = px["ask"] * (1 + slip)  # simulate paying a bit above ask
     quote_ccy = str(market.get("quote", "")).upper() or cfg["quotes"][0]
     research = research or {}
+    # [2026-07-04 INTEL] Classify the ticket: pre-announced by a major exchange
+    # or CoinGecko-known -> full stake; provably unknown junk -> half stake.
+    # Fail-safe neutral (1.0x) on any intel failure.
+    intel_tag, intel_mult, intel_detail = ("unknown", 1.0, "intel off")
+    if intel is not None:
+        try:
+            intel_tag, intel_mult, intel_detail = intel.classify(sym)
+        except Exception:
+            pass
     pos = {
         "exchange": exid,
         "pair_id": sym,
@@ -528,7 +546,9 @@ def open_position(exid, client, sym, market, cfg, detected_at, research=None):
         "opened_at": ts(),
         "opened_ts": time.time(),
         "entry": entry,
-        "stake_quote": cfg["stake"],
+        "stake_quote": cfg["stake"] * intel_mult,
+        "intel": intel_tag,
+        "intel_detail": intel_detail,
         "quote": quote_ccy,
         "peak": entry,
         "remaining_frac": 1.0,   # scale-out / trailing-stop state
@@ -547,7 +567,8 @@ def open_position(exid, client, sym, market, cfg, detected_at, research=None):
         rtxt = (f"  [spread {sp:.0f}bps, bid-depth "
                 f"{(bd or 0):.0f} {quote_ccy}]")
     print(f"  >> PAPER BUY [{exid}] {sym} @ {entry:.8g}  "
-          f"(stake {cfg['stake']} {quote_ccy}, tp {cfg['tp_mult']:.0f}x / sl {sl_txt}){rtxt}")
+          f"(stake {pos['stake_quote']:.0f} {quote_ccy}, tp {cfg['tp_mult']:.0f}x / sl {sl_txt})"
+          f"{rtxt}  [intel: {intel_tag} — {intel_detail}]")
     return pos
 
 
@@ -563,6 +584,7 @@ def _exit_row(pos, exit_price, reason, sold_stake, held_min):
         f"{entry:.10g}", f"{exit_price:.10g}", f"{sold_stake:.2f}",
         f"{pnl_pct*100:.2f}", f"{pnl_quote:.2f}", reason,
         f"{held_min:.1f}", f"{peak_pct*100:.2f}",
+        pos.get("intel", "?"),
     ], pnl_pct, pnl_quote
 
 
