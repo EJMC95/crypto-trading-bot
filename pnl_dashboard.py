@@ -175,6 +175,132 @@ def fetch_trades(bot=None, limit=500, include_open=False):
         conn.close()
 
 
+# [2026-07-05 INSIGHT] Bots whose strategies were reworked 2026-07-03 — their
+# cards split "since rework" stats from lifetime so the NEW code is judged on
+# its own trades (same era map as bot_learn.py).
+ERA_START = {
+    "crypto-intraday-15m": "2026-07-03T06:00Z",
+    "crypto-swing-daily": "2026-07-03T06:00Z",
+    "crypto-breakout-4h": "2026-07-03T06:00Z",
+    "crypto-trendmomo-4h": "2026-07-03T06:00Z",
+    "perps-regime-switch": "2026-07-03T10:00Z",
+}
+# Standing status labels so the dashboard tells you how to READ each bot.
+BADGES = {
+    "crypto-intraday-15m": ("PROBATION", "#d29922"),
+    "perps-regime-switch": ("EXPERIMENT", "#d29922"),
+    "crypto-trend-daily": ("CONTROL", "#58a6ff"),
+    "crypto-trendmomo-4h": ("SLOW BY DESIGN", "#8b949e"),
+}
+
+
+def fetch_bot_quality():
+    """{bot: quality dict} from closed bot_trades — win rate, profit factor,
+    expectancy and last-close age (the numbers raw W/L counts hide), plus
+    'since rework' era stats for the 2026-07-03 strategy changes."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.bot_trades') AS t")
+            if cur.fetchone()[0] is None:
+                return {}
+            cur.execute("""
+                SELECT bot, COUNT(*) AS n,
+                       COUNT(*) FILTER (WHERE profit_abs > 0) AS w,
+                       COALESCE(SUM(profit_abs) FILTER (WHERE profit_abs > 0), 0) AS gw,
+                       COALESCE(SUM(profit_abs) FILTER (WHERE profit_abs < 0), 0) AS gl,
+                       COALESCE(SUM(profit_abs), 0) AS pnl,
+                       MAX(close_ts) AS last_close
+                FROM bot_trades WHERE is_open = FALSE GROUP BY bot""")
+            life = {r[0]: r[1:] for r in cur.fetchall()}
+            era = {}
+            for bot, start in ERA_START.items():
+                cur.execute(
+                    "SELECT COUNT(*), COUNT(*) FILTER (WHERE profit_abs > 0), "
+                    "COALESCE(SUM(profit_abs), 0) FROM bot_trades "
+                    "WHERE bot=%s AND is_open=FALSE AND open_ts >= %s",
+                    (bot, start))
+                era[bot] = cur.fetchone()
+        out = {}
+        for bot, (n, w, gw, gl, pnl, last_close) in life.items():
+            q = {"n": n, "w": w, "wr": (100.0 * w / n if n else None),
+                 "pf": (float(gw) / abs(float(gl)) if float(gl) else None),
+                 "exp": (float(pnl) / n if n else None), "last_close": last_close}
+            if bot in era and era[bot]:
+                en, ew, epnl = era[bot]
+                q["era"] = {"n": en, "w": ew, "pnl": float(epnl)}
+            out[bot] = q
+        return out
+    finally:
+        conn.close()
+
+
+def _sparkline(series):
+    """Tiny inline SVG equity sparkline (green if up over the window)."""
+    if len(series) < 2:
+        return ""
+    lo, hi = min(series), max(series)
+    span = (hi - lo) or 1.0
+    W, H = 130, 26
+    pts = " ".join(f"{i * W / (len(series) - 1):.1f},{H - 2 - ((v - lo) / span) * (H - 4):.1f}"
+                   for i, v in enumerate(series))
+    color = "#3fb950" if series[-1] >= series[0] else "#f85149"
+    return (f'<svg width="{W}" height="{H}" style="display:block">'
+            f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="1.5"/></svg>')
+
+
+def build_sparks(hours=168):
+    """{bot: (sparkline_svg, drawdown_pct_from_window_peak)} from equity history."""
+    out = {}
+    try:
+        series = {}
+        for ts_, bot, eq, _pnl in fetch_history(hours):
+            if eq is not None:
+                series.setdefault(bot, []).append(float(eq))
+        for bot, vals in series.items():
+            if len(vals) < 2:
+                continue
+            peak = max(vals)
+            dd = (vals[-1] / peak - 1.0) * 100 if peak else 0.0
+            out[bot] = (_sparkline(vals), dd)
+    except Exception:
+        pass
+    return out
+
+
+def fetch_pulse_strip():
+    """Header strip from the market_pulse collector (mood / F&G / panic / funding)."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                if cur.fetchone()[0] is None:
+                    return ""
+                cur.execute("SELECT state FROM bot_state WHERE bot = 'market-pulse'")
+                row = cur.fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return ""
+        st = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        latest = st.get("latest") or {}
+        mood = latest.get("mood")
+        if mood is None:
+            return ""
+        col = "#3fb950" if mood > 0.1 else ("#f85149" if mood < -0.1 else "#d29922")
+        ptxt = '<b style="color:#f85149">PANIC</b>' if latest.get("panic") else "calm"
+        fund = latest.get("funding") or {}
+        ftxt = " ".join(f"{k} {v['apr']:+.0f}%" for k, v in fund.items() if v)
+        return (f'<span>Pulse <b style="color:{col}">{mood:+.2f}</b> · '
+                f'F&amp;G <b>{latest.get("fear_greed")}</b> · {ptxt}'
+                f'{" · funding " + html.escape(ftxt) if ftxt else ""}</span>')
+    except Exception:
+        return ""
+
+
 def money(x):
     try:
         return f"{float(x):+,.2f}"
@@ -312,10 +438,15 @@ def _orders_html(extra):
     return f'<div class="sub">Open orders ({len(items)})</div>{"".join(items)}'
 
 
-def card(bot, row, open_trades=None):
+def card(bot, row, open_trades=None, quality=None, spark=None):
     open_trades = open_trades or {}
+    badge = ""
+    if bot in BADGES:
+        _t, _c = BADGES[bot]
+        badge = (f' <span style="font-size:10px;border:1px solid {_c};color:{_c};'
+                 f'border-radius:6px;padding:1px 5px;vertical-align:middle">{_t}</span>')
     if row is None:
-        return (f'<div class="card"><h2>{html.escape(label_for(bot))} '
+        return (f'<div class="card"><h2>{html.escape(label_for(bot))}{badge} '
                 f'<span class="dot off"></span></h2>'
                 f'<div class="muted">no data yet — bot has not published</div></div>')
     thr = stale_secs_for(bot)
@@ -324,7 +455,8 @@ def card(bot, row, open_trades=None):
     dot = "warn" if stale else ("off" if status in ("halted", "error") else "on")
     extra = row.get("extra") or {}
     if isinstance(extra, dict):
-        _bits = {k: v for k, v in extra.items() if k not in ("positions", "open_orders")}
+        _bits = {k: v for k, v in extra.items()
+                 if k not in ("positions", "open_orders", "open_pos")}
         extra_bits = " · ".join(f"{k}: {html.escape(str(v))}" for k, v in _bits.items())
     else:
         extra_bits = html.escape(str(extra))
@@ -344,10 +476,43 @@ def card(bot, row, open_trades=None):
     if row.get("wins") is not None:
         rows.append(f'<div class="row"><span>Win / Loss</span>'
                     f'<b>{row.get("wins") or 0} / {row.get("losses") or 0}</b></div>')
+    # [2026-07-05 INSIGHT] quality metrics from the durable trade ledger
+    q = quality or {}
+    if q.get("n"):
+        pf = q.get("pf")
+        pf_txt = f"{pf:.2f}" if pf is not None else ("∞" if q.get("w") else "—")
+        rows.append(f'<div class="row"><span>Quality (ledger)</span>'
+                    f'<b>{q["wr"]:.0f}% win · PF {pf_txt} · {money(q["exp"])}/trade</b></div>')
+        if q.get("last_close") is not None:
+            la, _ls = age_str(q["last_close"], 10 ** 12)
+            rows.append(f'<div class="row"><span>Last close</span><b>{html.escape(la)}</b></div>')
+    e = q.get("era") if q else None
+    if e is not None:
+        _en, _ew = e.get("n") or 0, e.get("w") or 0
+        rows.append(f'<div class="row"><span>Since 3 Jul rework</span>'
+                    f'<b class="{cls(e.get("pnl"))}">{_en} trades · {_ew}W/{_en - _ew}L · '
+                    f'{money(e.get("pnl"))}</b></div>')
+    if spark:
+        _svg, _dd = spark
+        rows.append(f'<div class="row"><span>7d equity · DD {_dd:+.1f}%</span><b>{_svg}</b></div>')
+    # live open positions passed through by the freqtrade poller
+    open_pos_html = ""
+    _op = extra.get("open_pos") if isinstance(extra, dict) else None
+    if _op:
+        _lines = "".join(
+            f'<div class="row"><span>{html.escape(str(p.get("pair")))}'
+            f'{" · " + html.escape(str(p.get("tag"))) if p.get("tag") else ""}'
+            f'{" · " + str(p.get("h")) + "h" if p.get("h") is not None else ""}</span>'
+            f'<b class="{cls(p.get("pnl"))}">'
+            f'{p.get("pnl"):+.2f}%</b></div>'
+            for p in _op[:6] if isinstance(p, dict) and p.get("pnl") is not None)
+        if _lines:
+            open_pos_html = f'<div class="sub">open positions</div>{_lines}'
     return f'''<div class="card">
-      <h2>{html.escape(label_for(bot))} <span class="dot {dot}"></span></h2>
+      <h2>{html.escape(label_for(bot))}{badge} <span class="dot {dot}"></span></h2>
       <div class="muted">{html.escape(str(status))} · updated {html.escape(age)}{" · STALE" if stale else ""}</div>
       {"".join(rows)}
+      {open_pos_html}
       {holdings_html}
       {orders_html}
       {f'<div class="sub">{extra_bits}</div>' if extra_bits else ''}
@@ -365,10 +530,17 @@ def render():
         open_trades = fetch_open_trades()
     except Exception:  # noqa: BLE001
         open_trades = {}
+    try:
+        quality = fetch_bot_quality()
+    except Exception:  # noqa: BLE001
+        quality = {}
+    sparks = build_sparks()
+    pulse_strip = fetch_pulse_strip()
 
     # union of expected + whatever actually published
     names = list(EXPECTED) + [b for b in rows if b not in EXPECTED]
-    cards = [card(b, rows.get(b), open_trades) for b in names]
+    cards = [card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b))
+             for b in names]
 
     live = [r for r in rows.values() if r]
     _crypto = [r for r in live if r.get("bot") not in STOCKS]
@@ -459,6 +631,7 @@ def render():
    <span>Scanner paper <b class="{cls(scan_pnl)}">{money(scan_pnl)}</b></span>
    <span>Stocks (paper) <b class="{cls(stock_pnl)}">{money(stock_pnl)}</b> · eq {money(stock_equity)}</span>
    <span>Trades <b>{n_closed} closed · {n_open} open</b></span>
+   {pulse_strip}
  </div>
 </header>
 {banner}

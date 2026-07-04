@@ -64,7 +64,22 @@ def poll_one(name, port):
             status = _req(f"http://127.0.0.1:{port}/api/v1/status", headers=h) or []
             open_n = len(status) if isinstance(status, list) else 0
         except Exception:
-            open_n = profit.get("open_trade_count")
+            status, open_n = [], profit.get("open_trade_count")
+        # [2026-07-05 INSIGHT] pass live open-position detail through to the
+        # dashboard card (pair, current %, entry mode, hours held).
+        open_pos = []
+        try:
+            for t in (status if isinstance(status, list) else [])[:6]:
+                pr = t.get("profit_ratio")
+                ots = t.get("open_timestamp")
+                open_pos.append({
+                    "pair": t.get("pair"),
+                    "pnl": round(pr * 100, 2) if isinstance(pr, (int, float)) else None,
+                    "tag": t.get("enter_tag"),
+                    "h": round((time.time() * 1000 - ots) / 3.6e6, 1) if ots else None,
+                })
+        except Exception:
+            open_pos = []
         pct = profit.get("profit_closed_percent")
         # Read current wallet value so the dashboard shows real (paper) equity.
         # Freqtrade's /balance returns "total" in the stake currency; guard it
@@ -84,7 +99,8 @@ def poll_one(name, port):
             closed_trades=profit.get("closed_trade_count"),
             wins=profit.get("winning_trades"),
             losses=profit.get("losing_trades"),
-            extra={"src": "freqtrade", "port": port},
+            extra={"src": "freqtrade", "port": port,
+                   **({"open_pos": open_pos} if open_pos else {})},
         )
         # Persist per-trade history (durable in Postgres so it survives redeploys;
         # the trainer's analyzer reads this for the win/loss deep dive).
