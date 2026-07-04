@@ -124,6 +124,21 @@ def fetch_rss():
     return heads
 
 
+def fetch_btc_regime():
+    """BTC 4h EMA50 vs EMA200 — the fleet's risk switch (same rule V5 trades)."""
+    d = json.loads(_get("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=250"))
+    closes = [float(c[4]) for c in d]
+    def ema(vals, n):
+        k = 2 / (n + 1)
+        e = vals[0]
+        for v in vals[1:]:
+            e = v * k + e * (1 - k)
+        return e
+    e50, e200 = ema(closes, 50), ema(closes, 200)
+    return {"risk_on": e50 > e200, "ema50": round(e50), "ema200": round(e200),
+            "last": round(closes[-1])}
+
+
 def fetch_funding():
     out = {}
     for sym in ("BTCUSDT", "ETHUSDT", "SOLUSDT"):
@@ -149,6 +164,12 @@ def build_pulse():
     sources_ok["rss"] = not all(h.get("err") for h in rss) if rss else False
     funding = fetch_funding()
     sources_ok["funding"] = any(v for v in funding.values())
+    try:
+        btc_regime = fetch_btc_regime()
+        sources_ok["btc_regime"] = True
+    except Exception:
+        btc_regime = None
+        sources_ok["btc_regime"] = False
 
     texts = [(t["title"], max(1, t.get("score", 1))) for t in reddit if not t.get("err")]
     texts += [(h["title"], 5) for h in rss if not h.get("err")]  # editorial weight
@@ -187,6 +208,7 @@ def build_pulse():
         "fear_greed": (fng or {}).get("value"),
         "text_sentiment": round(text_sent, 3),
         "funding": funding,
+        "btc_regime": btc_regime,
         "panic_headlines": panic_heads[:6],
         "coin_mentions": top_mentions,
         "headlines": [h["title"][:120] for h in rss if not h.get("err")][:10],

@@ -222,11 +222,37 @@ def fetch_bot_quality():
                     "WHERE bot=%s AND is_open=FALSE AND open_ts >= %s",
                     (bot, start))
                 era[bot] = cur.fetchone()
+            # closed-in-last-24h per bot (over-trading health check)
+            cur.execute("SELECT bot, COUNT(*) FROM bot_trades WHERE is_open=FALSE "
+                        "AND close_ts > now() - interval '24 hours' GROUP BY bot")
+            n24 = dict(cur.fetchall())
+            # per-mode (enter_tag) breakdown — era-scoped for reworked bots so
+            # the dual-mode design is judged on current-code trades only
+            tags = {}
+            cur.execute("SELECT bot, COALESCE(enter_tag,'?') , COUNT(*), "
+                        "COUNT(*) FILTER (WHERE profit_abs > 0), "
+                        "COALESCE(SUM(profit_abs),0) FROM bot_trades "
+                        "WHERE is_open=FALSE GROUP BY bot, enter_tag")
+            for bot, tag, tn, tw, tpnl in cur.fetchall():
+                if bot not in ERA_START:
+                    tags.setdefault(bot, []).append(
+                        {"tag": tag, "n": tn, "w": tw, "pnl": float(tpnl)})
+            for bot, start in ERA_START.items():
+                cur.execute("SELECT COALESCE(enter_tag,'?'), COUNT(*), "
+                            "COUNT(*) FILTER (WHERE profit_abs > 0), "
+                            "COALESCE(SUM(profit_abs),0) FROM bot_trades "
+                            "WHERE bot=%s AND is_open=FALSE AND open_ts >= %s "
+                            "GROUP BY enter_tag", (bot, start))
+                for tag, tn, tw, tpnl in cur.fetchall():
+                    tags.setdefault(bot, []).append(
+                        {"tag": tag, "n": tn, "w": tw, "pnl": float(tpnl)})
         out = {}
         for bot, (n, w, gw, gl, pnl, last_close) in life.items():
             q = {"n": n, "w": w, "wr": (100.0 * w / n if n else None),
                  "pf": (float(gw) / abs(float(gl)) if float(gl) else None),
-                 "exp": (float(pnl) / n if n else None), "last_close": last_close}
+                 "exp": (float(pnl) / n if n else None), "last_close": last_close,
+                 "n24": int(n24.get(bot) or 0),
+                 "tags": sorted(tags.get(bot, []), key=lambda t: -t["n"])}
             if bot in era and era[bot]:
                 en, ew, epnl = era[bot]
                 q["era"] = {"n": en, "w": ew, "pnl": float(epnl)}
@@ -269,34 +295,71 @@ def build_sparks(hours=168):
     return out
 
 
-def fetch_pulse_strip():
-    """Header strip from the market_pulse collector (mood / F&G / panic / funding)."""
+def _fetch_state(key):
+    """One bot_state blob (market-pulse, learning-brain, ...) or None."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
     try:
-        import psycopg2
-        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT to_regclass('public.bot_state') AS t")
-                if cur.fetchone()[0] is None:
-                    return ""
-                cur.execute("SELECT state FROM bot_state WHERE bot = 'market-pulse'")
-                row = cur.fetchone()
-        finally:
-            conn.close()
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.bot_state') AS t")
+            if cur.fetchone()[0] is None:
+                return None
+            cur.execute("SELECT state FROM bot_state WHERE bot = %s", (key,))
+            row = cur.fetchone()
         if not row:
-            return ""
-        st = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-        latest = st.get("latest") or {}
+            return None
+        return row[0] if isinstance(row[0], dict) else json.loads(row[0])
+    finally:
+        conn.close()
+
+
+def fetch_pulse_strip():
+    """(header_html, latest_dict) from the market_pulse collector."""
+    try:
+        st = _fetch_state("market-pulse")
+        latest = (st or {}).get("latest") or {}
         mood = latest.get("mood")
         if mood is None:
-            return ""
+            return "", {}
         col = "#3fb950" if mood > 0.1 else ("#f85149" if mood < -0.1 else "#d29922")
         ptxt = '<b style="color:#f85149">PANIC</b>' if latest.get("panic") else "calm"
         fund = latest.get("funding") or {}
         ftxt = " ".join(f"{k} {v['apr']:+.0f}%" for k, v in fund.items() if v)
+        reg = latest.get("btc_regime") or {}
+        rtxt = ""
+        if reg:
+            on = reg.get("risk_on")
+            rc = "#3fb950" if on else "#f85149"
+            rtxt = f' · BTC 4h <b style="color:{rc}">{"RISK-ON" if on else "RISK-OFF"}</b>'
         return (f'<span>Pulse <b style="color:{col}">{mood:+.2f}</b> · '
-                f'F&amp;G <b>{latest.get("fear_greed")}</b> · {ptxt}'
-                f'{" · funding " + html.escape(ftxt) if ftxt else ""}</span>')
+                f'F&amp;G <b>{latest.get("fear_greed")}</b> · {ptxt}{rtxt}'
+                f'{" · funding " + html.escape(ftxt) if ftxt else ""}</span>', latest)
+    except Exception:
+        return "", {}
+
+
+def brain_card_html():
+    """Compact card for the learning loop's current state (bot_state 'learning-brain')."""
+    try:
+        st = _fetch_state("learning-brain")
+        if not st:
+            return ""
+        runs = st.get("runs")
+        hyp = st.get("hypotheses") or {}
+        act = [e for e in hyp.values()
+               if e.get("status") == "ACTIONABLE" and e.get("last_run") == runs]
+        cand = [e for e in hyp.values()
+                if e.get("status") == "candidate" and e.get("last_run") == runs]
+        items = "".join(
+            f'<div class="row"><span style="max-width:78%">'
+            f'{html.escape((e.get("proposal") or "")[:95])}</span>'
+            f'<b>{e.get("seen")}✓</b></div>' for e in (act + cand)[:4])
+        if not items:
+            items = ('<div class="muted">no current-era hypotheses yet — '
+                     'evidence accumulating from the new code\'s trades</div>')
+        return (f'<div class="card"><h2>🧠 Brain (bot_learn) <span class="dot on"></span></h2>'
+                f'<div class="muted">run {runs} · {len(act)} actionable · '
+                f'{len(cand)} candidates (proposals only — humans ship)</div>{items}</div>')
     except Exception:
         return ""
 
@@ -438,7 +501,7 @@ def _orders_html(extra):
     return f'<div class="sub">Open orders ({len(items)})</div>{"".join(items)}'
 
 
-def card(bot, row, open_trades=None, quality=None, spark=None):
+def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
     open_trades = open_trades or {}
     badge = ""
     if bot in BADGES:
@@ -492,6 +555,10 @@ def card(bot, row, open_trades=None, quality=None, spark=None):
         rows.append(f'<div class="row"><span>Since 3 Jul rework</span>'
                     f'<b class="{cls(e.get("pnl"))}">{_en} trades · {_ew}W/{_en - _ew}L · '
                     f'{money(e.get("pnl"))}</b></div>')
+    for _t in (q.get("tags") or [])[:3]:
+        rows.append(f'<div class="row"><span>&nbsp;&nbsp;↳ {html.escape(str(_t["tag"]))}</span>'
+                    f'<b class="{cls(_t["pnl"])}">{_t["n"]} · {_t["w"]}W/{_t["n"] - _t["w"]}L · '
+                    f'{money(_t["pnl"])}</b></div>')
     if spark:
         _svg, _dd = spark
         rows.append(f'<div class="row"><span>7d equity · DD {_dd:+.1f}%</span><b>{_svg}</b></div>')
@@ -511,6 +578,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None):
     return f'''<div class="card">
       <h2>{html.escape(label_for(bot))}{badge} <span class="dot {dot}"></span></h2>
       <div class="muted">{html.escape(str(status))} · updated {html.escape(age)}{" · STALE" if stale else ""}</div>
+      {f'<div class="muted" style="color:#d29922">{html.escape(mode_note)}</div>' if mode_note else ''}
       {"".join(rows)}
       {open_pos_html}
       {holdings_html}
@@ -535,12 +603,43 @@ def render():
     except Exception:  # noqa: BLE001
         quality = {}
     sparks = build_sparks()
-    pulse_strip = fetch_pulse_strip()
+    pulse_strip, pulse_latest = fetch_pulse_strip()
+    brain_html = brain_card_html()
+
+    # V5's regime-driven mode, so its card explains its own quietness/activity
+    mode_notes = {}
+    _reg = (pulse_latest or {}).get("btc_regime") or {}
+    if _reg:
+        mode_notes["crypto-intraday-15m"] = (
+            "mode: range_on pullback buys (BTC 4h RISK-ON)" if _reg.get("risk_on")
+            else "mode: bear_bounce only — sweep-reclaim setups (BTC 4h RISK-OFF)")
 
     # union of expected + whatever actually published
     names = list(EXPECTED) + [b for b in rows if b not in EXPECTED]
-    cards = [card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b))
-             for b in names]
+    cards = [card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
+                  mode_notes.get(b)) for b in names]
+    if brain_html:
+        cards.append(brain_html)
+
+    # [2026-07-05] Ambient health checks — the silent-failure classes we have
+    # actually hit (persistence resets, over-trading) surfaced on every load.
+    checks = []
+    for b, r in rows.items():
+        if b in SCANNERS or b in STOCKS:
+            continue
+        q = quality.get(b) or {}
+        eq = r.get("equity")
+        if (isinstance(eq, (int, float)) and abs(eq - 1000.0) < 1e-9
+                and (q.get("n") or 0) > 0 and (r.get("closed_trades") or 0) == 0):
+            checks.append(f"{label_for(b)}: equity exactly $1000 with ledger history — possible persistence reset")
+        if (q.get("n24") or 0) > 15:
+            checks.append(f"{label_for(b)}: {q['n24']} closed trades in 24h — over-trading vs design")
+    _era5 = (quality.get("crypto-intraday-15m") or {}).get("era") or {}
+    if (_era5.get("pnl") or 0) < -5:
+        checks.append(f"V5 probation breach: since-rework P&L {money(_era5.get('pnl'))}")
+    health_html = ('<div class="banner">HEALTH: ' + " · ".join(html.escape(c) for c in checks) + "</div>"
+                   if checks else
+                   '<div class="okline">Health ✓ persistence intact · no over-trading · probation within bounds</div>')
 
     live = [r for r in rows.values() if r]
     _crypto = [r for r in live if r.get("bot") not in STOCKS]
@@ -611,6 +710,7 @@ def render():
  .totals b{{font-size:16px}}
  .banner{{margin:12px 14px 0;padding:10px 12px;background:#3d2b12;border:1px solid #6b4a16;border-radius:8px;color:#f0c674;font-size:13px}}
  .banner.crit{{background:#3d1218;border-color:#6b1620;color:#f85149;font-weight:600}}
+ .okline{{margin:12px 14px 0;padding:8px 12px;background:#122117;border:1px solid #1f4428;border-radius:8px;color:#3fb950;font-size:12px}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:14px}}
  .card{{background:#161b22;border:1px solid #222;border-radius:10px;padding:14px}}
  .card h2{{margin:0 0 2px;font-size:15px}}
@@ -635,6 +735,7 @@ def render():
  </div>
 </header>
 {banner}
+{health_html}
 <div class="grid">{"".join(cards)}</div>
 <footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
