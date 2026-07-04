@@ -790,19 +790,31 @@ def seed_baseline(cfg, exchange_ids):
     print("[seed] now run:  python3 listing_sniper.py")
 
 
+def _load_db_state(retries=3, wait_s=5):
+    """Postgres state read with retries: a cold container's FIRST connection can
+    flake (observed 2026-07-04: baseline restore missed at boot, the very next
+    read 60s later succeeded and restored 25 positions). Never raises."""
+    for i in range(retries):
+        try:
+            st = store.load_state("event-listing-sniper")
+            if st:
+                return st
+        except Exception:
+            pass
+        if i < retries - 1:
+            time.sleep(wait_s)
+    return None
+
+
 def monitor(cfg, exchange_ids):
     known = load_json(KNOWN_FILE, None)
-    # [2026-07-03 PERSIST] sniper_data/ is container-local and wiped by every
-    # redeploy. Fall back to the durable Postgres copy (mirrored each cycle
-    # below) so the baseline and the open book survive deploys — the open
-    # snipes are where the fat-tail winners live, and re-seeding also used to
-    # blind us to listings that fired while the container was rebuilding.
+    # [2026-07-03 PERSIST] Local sniper_data/ now lives on a Railway volume, but
+    # keep the durable Postgres fallback (mirrored each cycle below) for volume
+    # loss / first mounts — the open snipes are where the fat-tail winners live,
+    # and re-seeding also blinds us to listings that fired during a rebuild.
     _db_state = None
     if not known or "exchanges" not in known:
-        try:
-            _db_state = store.load_state("event-listing-sniper")
-        except Exception:
-            _db_state = None
+        _db_state = _load_db_state()
         if _db_state and (_db_state.get("known") or {}).get("exchanges"):
             known = _db_state["known"]
             print(f"[start] restored baseline from Postgres "
@@ -847,10 +859,7 @@ def monitor(cfg, exchange_ids):
     # watchlist when the local files were wiped by a redeploy.
     if not positions and not pending:
         if _db_state is None:
-            try:
-                _db_state = store.load_state("event-listing-sniper")
-            except Exception:
-                _db_state = None
+            _db_state = _load_db_state()
         if _db_state:
             if _db_state.get("positions"):
                 positions = _db_state["positions"]
