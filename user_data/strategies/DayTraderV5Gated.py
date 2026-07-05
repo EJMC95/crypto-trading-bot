@@ -203,7 +203,12 @@ class DayTraderV5Gated(IStrategy):
         dataframe["rng_low20"] = dataframe["low"].rolling(_N).min().shift(1)
         dataframe["rng_high20"] = dataframe["high"].rolling(_N).max().shift(1)
         _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
-        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.22 * _rng_band
+        # [2026-07-05] Buy zone 0.22 -> 0.37: enter higher up the pullback (bottom
+        # 37% of the range, not just 22%) for materially more fills. Sell zone kept
+        # at 0.22 so captured move = ~0.41*band (entry 0.37 -> exit 0.78); at the
+        # 2.0% band floor that's ~0.82% captured vs ~0.52% fee = ~+0.3% net — still
+        # fee-positive, but thinner, so win rate matters more (watch it).
+        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.37 * _rng_band
         dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.22 * _rng_band
         # band width as a fraction of price — used to skip low-vol chop where the
         # captured move (~0.56*band) would be eaten by the ~0.52% round-trip fee.

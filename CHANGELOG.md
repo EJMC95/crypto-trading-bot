@@ -7,6 +7,7 @@ a config) you MUST add a dated entry here in the same commit (a CI check enforce
 it). Newest first. Keep entries one line; link the commit if useful.
 
 ## 2026-07-05
+- day trader (`DayTraderV5Gated`): widen buy zone 0.22 → 0.37 (enter higher up the pullback for materially more fills; captured move thinner ~0.41×band, still fee-positive). Doubled live bounce eligibility 0→2 pairs.
 - day trader (`DayTraderV5Gated`): loosen risk-off band gate 2.2% → 2.0% (more relief-rally pairs, still above fee floor).
 - day trader: add third entry mode `bounce_pullback` — trades the relief rally in a risk-off regime when the pair's own 1h EMA50 is above price AND rising; half stake, fast exits. Fixes the "idle in a bounce" gap.
 - perps `rsi-meanrev`: global position cap (`MAX_OPEN_POSITIONS=6`, `MAX_NEW_PER_LOOP=2`) gated on a live open count — was holding 14 longs (70% of book) in one correlated dip with no cap.
