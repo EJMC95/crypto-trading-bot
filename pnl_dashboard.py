@@ -35,7 +35,8 @@ EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch
             "perps-funding-carry",
             "scanner-triangular-arb", "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
-            "crypto-breakout-4h", "crypto-trendmomo-4h"]
+            "crypto-breakout-4h", "crypto-trendmomo-4h",
+            "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"]
 
 # Scanners book OPTIMISTIC paper-arb fills (observed spreads, no slippage/latency).
 # Their pnl_abs is real paper P&L but on a rosier basis than the freqtrade bots'
@@ -51,7 +52,9 @@ STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca"}
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
 # stale duplicate and is filtered out here so it can never skew totals or the
 # grid — independent of whether the Postgres table has been pruned yet.
-CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS
+# Freqtrade fleet bots (July 2026)
+FREQTRADE = {"freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"}
+CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS | FREQTRADE
 
 # [2026-07-01] Professional display names. Keys stay machine-safe; the dashboard
 # shows the descriptive label. label_for() falls back to the raw key if unmapped.
@@ -72,6 +75,11 @@ LABELS = {
     "event-listing-sniper":        "🎯 Launch Sniper · new-listing buyer",
     "equities-regime-ibkr":        "📊 Index Pilot · SPY/QQQ regime (IBKR)",
     "equities-momentum-alpaca":    "🏆 Stock Leaders · momentum rank (Alpaca)",
+    # Freqtrade fleet — new bots July 2026
+    "freqtrade-mum":               "👩 Mum · NFI X7 · 5m trend (Binance)",
+    "freqtrade-dad":               "👨 Dad · E0V1E · 5m breakout (Binance/Kraken)",
+    "freqtrade-avo-maria":         "🙏 Avo Maria · BinH+Cluc · 5m mean reversion",
+    "freqtrade-georgia":           "🔮 Georgia · FreqAI LightGBM · 1H ML adaptive",
 }
 def label_for(bot):
     return LABELS.get(bot, bot)
@@ -90,7 +98,8 @@ STOCK_STALE_SECONDS = 26 * 3600
 # Give slow-loop bots a wider window (~15 min = 3 missed publishes) so a real
 # outage still shows, but a normal 5-min cadence does not read as "down".
 SLOW_LOOP = {"perps-donchian-breakout",
-             "perps-funding-carry"}  # 5-min loop: funding only changes hourly
+             "perps-funding-carry",  # 5-min loop: funding only changes hourly
+             "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria"}  # freqtrade 5m bots
 SLOW_LOOP_STALE_SECONDS = 15 * 60
 # The listing sniper publishes once per scan cycle, and every ~5th cycle is a
 # full exchange-list reload that can run 8-9 minutes when slow exchanges hit
@@ -556,6 +565,28 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
     if row.get("wins") is not None:
         rows.append(f'<div class="row"><span>Win / Loss</span>'
                     f'<b>{row.get("wins") or 0} / {row.get("losses") or 0}</b></div>')
+    # Daily / Weekly / Monthly P&L (published by bots that support it)
+    pnl_daily   = row.get("pnl_daily")
+    pnl_weekly  = row.get("pnl_weekly")
+    pnl_monthly = row.get("pnl_monthly")
+    if pnl_daily is not None:
+        rows.append(f'<div class="row"><span>Today P&L</span>'
+                    f'<b class="{cls(pnl_daily)}">{money(pnl_daily)}</b></div>')
+    if pnl_weekly is not None:
+        rows.append(f'<div class="row"><span>7d P&L</span>'
+                    f'<b class="{cls(pnl_weekly)}">{money(pnl_weekly)}</b></div>')
+    if pnl_monthly is not None:
+        rows.append(f'<div class="row"><span>30d P&L</span>'
+                    f'<b class="{cls(pnl_monthly)}">{money(pnl_monthly)}</b></div>')
+    max_dd = row.get("max_drawdown")
+    if max_dd is not None:
+        rows.append(f'<div class="row"><span>Max Drawdown</span>'
+                    f'<b style="color:#f85149">{pct(max_dd)}</b></div>')
+    best_trade  = row.get("best_trade")
+    worst_trade = row.get("worst_trade")
+    if best_trade is not None or worst_trade is not None:
+        rows.append(f'<div class="row"><span>Best / Worst trade</span>'
+                    f'<b>{money(best_trade)} / {money(worst_trade)}</b></div>')
     # [2026-07-05 INSIGHT] quality metrics from the durable trade ledger
     q = quality or {}
     if q.get("n"):
