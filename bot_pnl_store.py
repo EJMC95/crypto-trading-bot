@@ -487,6 +487,63 @@ def fetch_paper_aggregate(bot):
         return None
 
 
+def fetch_paper_trades(limit=2000):
+    """Per-trade rows from the durable paper_trades ledger (perps + sniper),
+    normalized to the SAME shape bot_learn expects from the freqtrade /trades.json
+    feed — so the learning brain can analyse the whole fleet, not just the
+    freqtrade bots. The stored `reason` is '<direction>_<exit>' (e.g.
+    'long_range_high', 'short_stop'); we split it so the brain gets enter_tag
+    (long/short) AND exit_reason. Returns [] if the DB is unavailable."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        _ensure_paper_trades_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason "
+                "FROM paper_trades ORDER BY closed_at DESC NULLS LAST LIMIT %s",
+                (int(limit),),
+            )
+            rows = cur.fetchall()
+        from datetime import datetime
+        out = []
+        for bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason in rows:
+            reason = reason or ""
+            if "_" in reason:
+                direction, _sep, exit_reason = reason.partition("_")
+            else:
+                direction, exit_reason = (reason or "trade"), (reason or "trade")
+            dur = None
+            try:
+                if opened_at and closed_at:
+                    o = datetime.fromisoformat(str(opened_at).replace("Z", "+00:00"))
+                    c = datetime.fromisoformat(str(closed_at).replace("Z", "+00:00"))
+                    dur = max(0.0, (c - o).total_seconds() / 60.0)
+            except Exception:
+                dur = None
+            out.append({
+                "bot": bot, "pair": pair,
+                "profit_abs": float(pnl_abs) if pnl_abs is not None else 0.0,
+                "profit_ratio": pnl_pct,
+                "enter_tag": direction or "trade",
+                "exit_reason": exit_reason or "trade",
+                "duration_min": dur,
+                "open_ts": opened_at, "close_ts": closed_at,
+                "is_open": False,
+            })
+        return out
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"paper-trade fetch failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return []
+
+
 if __name__ == "__main__":
     # quick self-test: writes a dummy row if DATABASE_URL is set, else no-ops.
     ok = publish("selftest", status="online", pnl_abs=1.23, pnl_pct=0.0123,

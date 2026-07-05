@@ -90,10 +90,24 @@ def _save_state(state):
 
 
 def _fetch_trades():
+    # Freqtrade bots: the durable bot_trades ledger via the dashboard's HTTP feed.
     with urllib.request.urlopen(TRADES_URL, timeout=30) as r:
         d = json.loads(r.read().decode())
     trades = d if isinstance(d, list) else d.get("trades", d.get("data", []))
-    return [t for t in trades if isinstance(t, dict) and not t.get("is_open")]
+    trades = [t for t in trades if isinstance(t, dict) and not t.get("is_open")]
+    # [2026-07-05 ALL-BOTS] Perps + sniper close to the paper_trades table, NOT
+    # bot_trades, so they were invisible to the brain. Pull them directly (works
+    # when DATABASE_URL is set — always true in the cloud container the brain now
+    # runs in) and merge, so the fleet's learning covers EVERY bot, not just
+    # freqtrade. Guarded: no DB / import error -> just the freqtrade set.
+    try:
+        import bot_pnl_store as store
+        paper = store.fetch_paper_trades(limit=5000)
+        if paper:
+            trades.extend(t for t in paper if not t.get("is_open"))
+    except Exception:
+        pass
+    return trades
 
 
 def _bucketize(trades, key):

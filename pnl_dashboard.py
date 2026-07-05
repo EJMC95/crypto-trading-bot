@@ -74,6 +74,10 @@ LABELS = {
 def label_for(bot):
     return LABELS.get(bot, bot)
 
+# Paper bots (freqtrade + perps) all start with a $1,000 simulated balance, so
+# total P&L = equity - this. Stocks/scanners report on their own basis.
+PAPER_START_EQUITY = 1000.0
+
 STALE_SECONDS = 180  # crypto bots loop fast; older than this = "stale"
 # Stock bots publish far less often (IKBR every 2h, Alpaca daily), so they need a
 # much longer window before they should be considered stale.
@@ -528,11 +532,22 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
     rows = []
     if row.get("equity") is not None:
         rows.append(f'<div class="row"><span>Equity</span><b>{money(row.get("equity"))}</b></div>')
-    if row.get("pnl_abs") is not None:
-        pnl_label = "Paper (arb)" if bot in SCANNERS else "P&amp;L"
+    # [2026-07-05] Total P&L on EVERY bot card. The freqtrade bots publish
+    # pnl_abs=None (their gain is equity - $1000 paper start), so they used to
+    # show no P&L line at all — only Equity. Compute a total from whichever
+    # source the bot exposes so every card states its number explicitly.
+    _pnl_abs = row.get("pnl_abs")
+    _eq = row.get("equity")
+    if _pnl_abs is None and _eq is not None and bot not in STOCKS and bot not in SCANNERS:
+        _pnl_abs = _eq - PAPER_START_EQUITY          # paper bots start at $1,000
+    if _pnl_abs is not None:
+        pnl_label = "Paper (arb)" if bot in SCANNERS else "Total P&amp;L"
+        _pct = row.get("pnl_pct")
+        if _pct is None and _eq not in (None, 0) and bot not in STOCKS and bot not in SCANNERS:
+            _pct = _pnl_abs / PAPER_START_EQUITY
         rows.append(f'<div class="row"><span>{pnl_label}</span>'
-                    f'<b class="{cls(row.get("pnl_abs"))}">{money(row.get("pnl_abs"))}'
-                    f'{" (" + pct(row.get("pnl_pct")) + ")" if row.get("pnl_pct") is not None else ""}</b></div>')
+                    f'<b class="{cls(_pnl_abs)}">{money(_pnl_abs)}'
+                    f'{" (" + pct(_pct) + ")" if _pct is not None else ""}</b></div>')
     if row.get("closed_trades") is not None or row.get("open_trades") is not None:
         rows.append(f'<div class="row"><span>Trades</span>'
                     f'<b>{row.get("closed_trades") or 0} closed · {row.get("open_trades") or 0} open</b></div>')
