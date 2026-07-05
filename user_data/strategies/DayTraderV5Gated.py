@@ -289,6 +289,30 @@ class DayTraderV5Gated(IStrategy):
             ),
             ["enter_long", "enter_tag"],
         ] = (1, "bear_bounce")
+
+        # [2026-07-05 BOUNCE PARTICIPATION] Third mode. The two modes above leave a
+        # gap: in risk-off the bot ONLY buys the exact capitulation bottom
+        # (RSI<30 sweep-reclaim) and never participates in the multi-day RELIEF
+        # RALLY that follows — so through a +8-12% bear bounce (exactly now) it
+        # sat idle and booked $0. This adds pullback buys DURING a confirmed bounce
+        # even while BTC's daily regime is down, but ONLY when the pair's own 1h
+        # trend is objectively UP and RISING (close>EMA50 AND EMA50 climbing over
+        # ~6h). That own-pair rising-trend requirement is the anti-knife-catch: the
+        # -19% failure was buying dips with NO trend confirmation in a waterfall;
+        # a rising EMA50 cannot be a waterfall. Half stake (counter-daily-trend) +
+        # wide fee-band + fast exits (custom_exit/stop below) bound the downside.
+        ema50_rising = dataframe["ema50"] > dataframe["ema50"].shift(6)
+        dataframe.loc[
+            (
+                (dataframe["btc_regime_up"] == 0)
+                & (dataframe["close"] <= dataframe["rng_buy_zone"])
+                & (dataframe["close"] > dataframe["ema50"])
+                & ema50_rising
+                & (dataframe["rng_band_pct"] >= self.BAND_PCT_OFF)
+                & uptick & live_vol
+            ),
+            ["enter_long", "enter_tag"],
+        ] = (1, "bounce_pullback")
         return dataframe
 
     # [2026-07-02 DIP-CLUSTER FIX, rebalanced 2026-07-03] Correlated-entry throttle.
@@ -341,8 +365,8 @@ class DayTraderV5Gated(IStrategy):
                             leverage: float, entry_tag: Optional[str], side: str,
                             **kwargs) -> float:
         stake = proposed_stake
-        if entry_tag == "bear_bounce":
-            stake *= 0.5
+        if entry_tag in ("bear_bounce", "bounce_pullback"):
+            stake *= 0.5                             # counter-daily-trend scalps size down
         if self._pulse_panic(current_time):
             stake *= 0.5
         if stake < proposed_stake and min_stake is not None and stake < min_stake:
@@ -356,7 +380,8 @@ class DayTraderV5Gated(IStrategy):
     def custom_exit(self, pair: str, trade, current_time: datetime,
                     current_rate: float, current_profit: float, **kwargs):
         age_min = (current_time - trade.open_date_utc).total_seconds() / 60.0
-        if trade.enter_tag == "bear_bounce":
+        if trade.enter_tag in ("bear_bounce", "bounce_pullback"):
+            # bank quick relief-rally profit; bear bounces fade fast, don't overstay
             if current_profit >= 0.012:
                 return "bounce_take"
             if age_min >= 720:
@@ -382,7 +407,7 @@ class DayTraderV5Gated(IStrategy):
         # [2026-07-03 ADAPTIVE] Bounce stop 2.0x: tested 1.2x and it was shredded
         # by ordinary 15m noise (7% win rate, avg hold 32min) — reclaims need room
         # to wobble. Half stake keeps the $ risk in line.
-        atr_multiplier = 2.0 if trade.enter_tag == "bear_bounce" else self.atr_stop_mult.value
+        atr_multiplier = 2.0 if trade.enter_tag in ("bear_bounce", "bounce_pullback") else self.atr_stop_mult.value
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
         if dataframe is None or len(dataframe) == 0:
             return None
