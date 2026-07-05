@@ -1,52 +1,90 @@
-# CLAUDE.md — working agreement for this repo
+# CLAUDE.md — crypto-trading-bot Fleet
 
-Multiple Claude sessions develop this crypto-bot fleet **in parallel**. Read this
-before making changes so sessions don't clobber or duplicate each other's work.
+## What This Repo Is
+Eamon's full crypto trading bot fleet. Multiple strategies running on paper (dry run) with $1,000 starting balance each, no top-ups. Dashboard lives at https://pnl-dashboard-production-858c.up.railway.app/
 
-> **START HERE.** This repo is the durable anchor for the crypto-bot workspace.
-> On any new session, read in this order: **`SESSION_LOG.md`** (narrative state +
-> what to watch for) → **`CHANGELOG.md`** (line-by-line recent changes) → this
-> file. The live dashboard + Railway services are the running truth; the chat
-> session is ephemeral, but the workspace state lives here in git and in the
-> always-on cloud. Append to `SESSION_LOG.md` at the end of each major session.
+## Fleet Overview
 
-## The #1 rule: log every bot-affecting change
-If your diff touches a running bot (`*.py`, `*.sh`, a strategy in
-`user_data/strategies/`, a `user_data/config_*.json`, or a workflow), add a dated
-one-line entry to `CHANGELOG.md` **in the same commit**. A CI check
-(`.github/workflows/changelog-check.yml`) fails the build if you don't. This is
-the single source of truth for "what did the other session just change" — it is
-why we stopped tuning code another session had already replaced.
+### Freqtrade Bots (new July 2026 — paper trading, $1,000 each)
+| Bot ID | Name | Strategy | Exchange | Timeframe |
+|--------|------|----------|----------|-----------|
+| freqtrade-mum | 👩 Mum | NFI X7 | Binance | 5m |
+| freqtrade-dad | 👨 Dad | E0V1E | Binance/Kraken | 5m |
+| freqtrade-avo-maria | 🙏 Avo Maria | CombinedBinHAndCluc | Binance/Kraken | 5m |
+| freqtrade-georgia | 🔮 Georgia | FreqAI LightGBM | Binance | 1H |
 
-## Ground truth
-- `main` is the only source of truth. All sessions push here (directly or via a
-  quick fast-forward from a feature branch). There is no long-lived divergence.
-- Before editing a strategy/bot, `git log --oneline -20 <file>` and skim the file
-  header — this repo documents prior failed tweaks inline (e.g. "relaxing RSI 6×'d
-  trades and made losses WORSE"). Don't re-try a documented failure.
+### Existing Bots (already running)
+| Bot ID | Strategy | Type |
+|--------|----------|------|
+| crypto-trend-daily | 50/200 EMA trend | Crypto spot |
+| crypto-intraday-15m | Adaptive range bounce | Crypto spot |
+| crypto-swing-daily | BB/RSI dip buyer | Crypto spot |
+| crypto-breakout-4h | Donchian breakout | Crypto spot |
+| crypto-trendmomo-4h | SMA momentum | Crypto spot |
+| perps-rsi-meanrev | RSI mean reversion | Perps |
+| perps-donchian-breakout | 4h breakout | Perps |
+| perps-regime-switch | Long/short trend | Perps |
+| perps-funding-carry | Funding rate carry | Perps |
+| scanner-triangular-arb | Triangular arb | Scanner |
+| event-listing-sniper | New listing buyer | Scanner |
+| equities-regime-ibkr | SPY/QQQ regime | Stocks (IBKR) |
+| equities-momentum-alpaca | Momentum rank | Stocks (Alpaca) |
 
-## Deploy model (Railway)
-- `freqtrade-bots` service: 5 freqtrade dry-run bots via `run_all.sh`. Auto-deploys
-  on push to `main` when `user_data/**`, `Dockerfile.freqtrade`, `run_all.sh`, or
-  the shared pollers change. Paper DBs persist on the `/freqtrade/persist` volume —
-  **redeploys are safe** (no reset).
-- `perps-*`, `pnl-dashboard`, scanners, sniper: separate Railway services, native
-  auto-deploy on push to `main`. Perps/sniper persist state to Postgres.
-- Nothing here is real money — all bots are dry-run/paper. Keep it that way unless
-  the human explicitly flips a bot to live.
+## Dashboard
+- **File:** `pnl_dashboard.py` — Postgres-backed, auto-refreshes every 30s
+- **DB:** Each bot publishes to `bot_pnl` table via `bot_pnl_store.py`
+- **Auth:** DASH_USER / DASH_PASS env vars on Railway
 
-## Suggested ownership split (avoid collisions)
-To reduce two sessions editing the same file, prefer these lanes; if you must
-cross a lane, say so in the CHANGELOG entry.
-- **Strategy/trading logic** — `user_data/strategies/*`, `hyperliquid_*_bot.py`,
-  `funding_carry_bot.py`, `listing_sniper.py`, configs.
-- **Dashboard & visualisation** — `pnl_dashboard.py`, `dashboard_*.py`.
-- **Learning/analytics** — `bot_learn.py`, `trade_analyzer.py`, `market_pulse.py`,
-  `listing_intel.py`, `freqtrade_retrain.py`.
-- **Ops/infra** — `.github/workflows/*`, `run_all.sh`, `Dockerfile*`,
-  `bot_pnl_store.py` (shared — coordinate; changing its schema affects everyone).
+## Key Files
+- `pnl_dashboard.py` — main dashboard server
+- `bot_pnl_store.py` — shared Postgres publisher (all bots import this)
+- `hyperliquid_momo_bot.py` — Hyperliquid momentum bot
+- `funding_carry_bot.py` — funding carry strategy
+- `user_data/` — Freqtrade user data directory
 
-## Live dashboard
-`https://pnl-dashboard-production-858c.up.railway.app` — `/pnl.json` (fleet
-snapshot, no auth), `/trades.json?bot=&limit=` (per-trade, no auth). Use these to
-verify behaviour instead of guessing.
+## How Bots Publish to Dashboard
+Each bot calls `bot_pnl_store.publish(...)` with:
+```python
+{
+  "bot": "freqtrade-mum",          # bot ID — must match CURRENT_BOTS in dashboard
+  "status": "running",
+  "equity": 1023.50,
+  "pnl_abs": 23.50,
+  "pnl_pct": 0.0235,
+  "closed_trades": 12,
+  "open_trades": 2,
+  "wins": 8,
+  "losses": 4,
+  "pnl_daily": 5.20,               # optional — today's P&L
+  "pnl_weekly": 18.40,             # optional — 7d P&L
+  "pnl_monthly": 23.50,            # optional — 30d P&L
+  "max_drawdown": -0.045,          # optional — max drawdown %
+  "best_trade": 12.30,             # optional — best single trade $
+  "worst_trade": -8.10,            # optional — worst single trade $
+}
+```
+
+## Freqtrade Bot Configs (new bots)
+All new bots:
+- `dry_run: true`
+- `dry_run_wallet: 1000`
+- API server enabled on ports 8080–8083
+- Logs to `logs/freqtrade.log`
+- SQLite DB at `logs/tradesv3.sqlite`
+
+## Claude Code Instructions
+- Ask Claude to backtest any bot: `freqtrade backtesting --config <bot>/config.json --strategy <Name>`
+- Ask Claude to tune via Hyperopt: `freqtrade hyperopt --config <bot>/config.json --strategy <Name> --hyperopt-loss SharpeHyperOptLoss`
+- Ask Claude to check logs: `tail -f <bot>/logs/freqtrade.log`
+- Ask Claude to deploy: push to main branch → Railway auto-deploys
+
+## Railway Setup
+- Each bot is a separate Railway service
+- All services share the same Postgres plugin via DATABASE_URL
+- Deploy trigger: push to main branch
+- Dashboard service: `pnl-dashboard`
+
+## Rules
+- $1,000 starting balance per bot, NO top-ups
+- Paper trading only until 30-day win rate > 55% AND max drawdown < 15%
+- Never modify bot logic without backtesting first
