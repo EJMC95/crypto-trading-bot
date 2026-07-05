@@ -1,0 +1,45 @@
+name: Changelog check
+
+# Parallel Claude sessions edit this repo; CHANGELOG.md is how they stay in sync.
+# Fail the build if a PR/push changes bot-affecting code without logging it.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # need the previous commit to diff
+      - name: Require a CHANGELOG.md entry for bot-affecting changes
+        run: |
+          set -uo pipefail
+          # Compare against the parent commit (push) or the PR base.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+            git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
+            range="$base...HEAD"
+          else
+            range="HEAD^ HEAD"
+          fi
+          changed="$(git diff --name-only $range 2>/dev/null || echo '')"
+          echo "Changed files:"; echo "$changed"
+          # Bot-affecting paths that require a changelog note.
+          bot_touched="$(echo "$changed" | grep -E '^(user_data/|.*\.py$|.*\.sh$|Dockerfile.*)$' | grep -vE '^(CHANGELOG\.md|CLAUDE\.md|.*_test\.py|test_.*\.py)$' || true)"
+          if [ -z "$bot_touched" ]; then
+            echo "No bot-affecting files changed — changelog not required."
+            exit 0
+          fi
+          if echo "$changed" | grep -qx 'CHANGELOG.md'; then
+            echo "OK: bot-affecting change includes a CHANGELOG.md entry."
+            exit 0
+          fi
+          echo "::error::This change touches bot code but does not update CHANGELOG.md."
+          echo "Bot-affecting files without a changelog entry:"; echo "$bot_touched"
+          echo "Add a dated one-line entry to CHANGELOG.md in this commit (see CLAUDE.md)."
+          exit 1
