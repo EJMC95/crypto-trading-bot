@@ -245,7 +245,12 @@ class DayTraderV5Gated(IStrategy):
     # wide, washed-out bands (0.022 -> captured ~1.2%, ~+0.7% net) because bear
     # rallies fade fast and entry quality is everything there.
     BAND_PCT_ON = 0.015
-    BAND_PCT_OFF = 0.022
+    # [2026-07-05] 0.022 -> 0.020 to loosen risk-off participation (bear_bounce +
+    # bounce_pullback). At 2.0% the captured move (~0.56*band = ~1.12%) still clears
+    # the ~0.52% round-trip fee with ~+0.6% net margin, so it stays above the
+    # fee-bleed floor the 0/11 scratch run established — just admits more of the
+    # current relief-rally pairs that were sitting a hair under the old 2.2% gate.
+    BAND_PCT_OFF = 0.020
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # [2026-07-03 ADAPTIVE] Two regime modes instead of one on/off gate — the
