@@ -79,6 +79,13 @@ REENTRY_COOLDOWN_SEC = 4 * 3600  # 4h between actions on the same coin
 LOOP_SECONDS = 60
 CANDLE_INTERVAL = "1h"            # indicator timeframe
 ORDER_USD = 50.0                 # notional per position (position sizing)
+# [2026-07-05 CONCENTRATION CAP] The bot had NO global position limit — only a
+# per-coin 4h cooldown — so a single market-wide dip let it open 14 concurrent
+# longs ($700 = 70% of the $1,000 book) in one correlated direction, then give
+# back ~$6 of a +$17 gain. Cap total open positions and the per-loop open rate.
+# 6 x $50 = $300 = 30% of book; 4h per-coin cooldown still spaces re-entries.
+MAX_OPEN_POSITIONS = 6           # global cap on concurrent open positions
+MAX_NEW_PER_LOOP = 2             # smooth one-loop bursts into a correlated dip
 LEVERAGE = 1                     # keep low; 3x+ liquidated fast in backtest
 DAILY_LOSS_LIMIT = 0.05          # 5% — halts trading for the day
 LOG_FILE = "perps_bot.log"
@@ -272,6 +279,11 @@ def main():
 
         end = int(time.time() * 1000)
         start = end - 60 * 24 * 3600 * 1000      # ~60 days of 1h candles
+        # [2026-07-05 CONCENTRATION CAP] count how many NEW opens this loop has
+        # booked so one correlated dip can't fill the book in a single pass. The
+        # global cap is checked against a LIVE open count at each entry (below),
+        # not the once-per-loop `pos` snapshot which goes stale mid-scan.
+        opened_this_loop = 0
         for coin in COINS:
             try:
                 candles = info.candles_snapshot(coin, CANDLE_INTERVAL, start, end)
@@ -327,10 +339,18 @@ def main():
             #    Shorts are disabled (long-only range strategy).
             if decision == "HOLD":
                 cooling = (now_ts - last_action.get(coin, 0.0)) < REENTRY_COOLDOWN_SEC
+                # [2026-07-05 CONCENTRATION CAP] Live open count (broker in dry-run;
+                # the fetched `pos` snapshot + this loop's opens in live). `broker`
+                # is None when not DRY_RUN, so never call it there.
+                open_now = (broker.open_count() if DRY_RUN
+                            else sum(1 for v in pos.values() if v) + opened_this_loop)
                 if held > 0 and price >= sell_zone:
                     decision = "RANGE_CLOSE"
                 elif not cooling and held == 0 and price <= buy_zone:
-                    decision = "OPEN_LONG"
+                    if open_now >= MAX_OPEN_POSITIONS or opened_this_loop >= MAX_NEW_PER_LOOP:
+                        decision = "CAP_SKIP"        # valid buy blocked by the risk cap
+                    else:
+                        decision = "OPEN_LONG"
 
             log.info("%-4s price=%.2f RSI=%.1f low20=%.4f high20=%.4f buy<=%.4f sell>=%.4f held=%.4f -> %s",
                      coin, price, r, low20, high20, buy_zone, sell_zone, held, decision)
@@ -358,9 +378,10 @@ def main():
                     broker.open(coin, True, size, price)
                     entries[coin] = price; entry_ts[coin] = now_ts
                     last_action[coin] = now_ts
+                    opened_this_loop += 1
                 continue
 
-            if decision == "HOLD":
+            if decision in ("HOLD", "CAP_SKIP"):
                 continue
 
             try:
@@ -377,6 +398,7 @@ def main():
                     exchange.market_open(coin, True, size)
                     entries[coin] = price
                     last_action[coin] = now_ts
+                    opened_this_loop += 1
                     log.info("ORDER SENT %s %s size=%s", decision, coin, size)
             except Exception as e:
                 log.error("order failed %s %s: %s", decision, coin, e)
