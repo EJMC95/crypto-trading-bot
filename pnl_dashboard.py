@@ -55,21 +55,23 @@ CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS
 
 # [2026-07-01] Professional display names. Keys stay machine-safe; the dashboard
 # shows the descriptive label. label_for() falls back to the raw key if unmapped.
+# [2026-07-05] Trendy names + a plain "what it does" tail so a glance tells you
+# both the personality and the mechanism. Leading emoji = fast visual scanning.
 LABELS = {
-    "crypto-trend-daily":          "Crypto · Trend Follower (50/200, Daily)",
-    "crypto-intraday-15m":         "Crypto · Intraday Breakout (15M)",
-    "crypto-swing-daily":          "Crypto · Mean-Reversion Swing (Daily)",
-    "crypto-breakout-4h":          "Crypto · Breakout Momentum (4H)",
-    "crypto-trendmomo-4h":         "Crypto · Trend Momentum (SMA, 4H)",
-    "perps-rsi-meanrev":           "Perps · RSI Mean-Reversion (Hyperliquid)",
-    "perps-donchian-breakout":     "Perps · Donchian Breakout (Hyperliquid)",
-    "perps-regime-switch":         "Perps · Regime-Adaptive (ADX+EMA, Hyperliquid)",
-    "perps-funding-carry":         "Perps · Funding-Rate Carry (Hyperliquid)",
-    "scanner-triangular-arb":      "Scanner · Triangular Arbitrage",
-    "scanner-cross-exchange-arb":  "Scanner · Cross-Exchange Arbitrage",
-    "event-listing-sniper":        "Event · New-Listing Sniper",
-    "equities-regime-ibkr":        "Equities · SPY/QQQ Regime (IBKR)",
-    "equities-momentum-alpaca":    "Equities · Momentum Rank (Alpaca)",
+    "crypto-trend-daily":          "🌊 Tide Rider · daily 50/200 trend (long)",
+    "crypto-intraday-15m":         "⚡ Range Raider · 1h adaptive range + bounce",
+    "crypto-swing-daily":          "🩸 Dip Buyer · daily oversold dip (BB/RSI)",
+    "crypto-breakout-4h":          "🚀 Breakout Hunter · 4h Donchian breakout",
+    "crypto-trendmomo-4h":         "🏄 Momentum Surfer · daily SMA trend",
+    "perps-rsi-meanrev":           "🪃 Bounce Catcher · perps range reversion",
+    "perps-donchian-breakout":     "🧭 Trail Blazer · perps 4h breakout",
+    "perps-regime-switch":         "⚖️ Two-Way Tide · long/short trend engine (perps)",
+    "perps-funding-carry":         "🌾 Yield Harvester · perps funding carry",
+    "scanner-triangular-arb":      "🔺 Loop Scout · triangular arb (scanner)",
+    "scanner-cross-exchange-arb":  "🔀 Gap Scout · cross-exchange arb (scanner)",
+    "event-listing-sniper":        "🎯 Launch Sniper · new-listing buyer",
+    "equities-regime-ibkr":        "📊 Index Pilot · SPY/QQQ regime (IBKR)",
+    "equities-momentum-alpaca":    "🏆 Stock Leaders · momentum rank (Alpaca)",
 }
 def label_for(bot):
     return LABELS.get(bot, bot)

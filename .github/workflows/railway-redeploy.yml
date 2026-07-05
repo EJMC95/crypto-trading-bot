@@ -81,7 +81,7 @@ jobs:
             fi
             # perps-regime-switch: surgical filter (its own files only) so a V5
             # tweak doesn't churn this service; its volume keeps trades safe anyway.
-            if echo "$changed" | grep -qE '^(user_data/strategies/RegimeSwitchV1\.py$|user_data/config_regimeswitch\.json$|run_regime\.sh$|Dockerfile\.regime$|bot_pnl_store\.py$|freqtrade_pnl_poller\.py$)'; then
+            if echo "$changed" | grep -qE '^(user_data/strategies/RegimeSwitchV[0-9]+\.py$|user_data/config_regimeswitch\.json$|run_regime\.sh$|Dockerfile\.regime$|bot_pnl_store\.py$|freqtrade_pnl_poller\.py$)'; then
               svcs="${svcs:+$svcs,}perps-regime-switch"
             fi
           fi

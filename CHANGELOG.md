@@ -7,6 +7,10 @@ a config) you MUST add a dated entry here in the same commit (a CI check enforce
 it). Newest first. Keep entries one line; link the commit if useful.
 
 ## 2026-07-05
+- **NEW bot: `RegimeSwitchV2`** (⚖️ Two-Way Tide) — rebuilt `perps-regime-switch` from the fleet's combined lessons + evidenced public practice (AQR trend-following, Hyperliquid docs). The fleet's only dual-direction engine: 4h Donchian breakout LONG in up-regime / SHORT in down-regime (mirrors the proven V7 PF~1.8 edge to finally profit from a downtrend). Per-pair daily regime (EMA200+slope, ADX gate w/ hysteresis), structure-break exits (let winners run — not trailing/ROI cap), wide ATR disaster stop, inverse-vol sizing, low leverage, correlation-aware global cap, pulse half-stake, Postgres persist. UNVALIDATED (no OHLCV to backtest) — dry-run, robust-by-construction, brain-watched.
+- `RegimeSwitchV2`: tuned for more frequency — Donchian 20/10→15/8, ADX gate 22/16→20/14, universe 2→10 liquid majors, max_open 3→6 (still <60% of book). Stays on fee-viable 4h (not 1h churn).
+- dashboard: **trendy + descriptive bot names** (emoji + plain "what it does") replacing the technical labels.
+- ci: deploy path-filter tracks `RegimeSwitchV[0-9]+.py` so future V-bumps auto-deploy the regime service.
 - dashboard: **Total P&L on every bot card** — freqtrade bots publish `pnl_abs=None` (gain is `equity−$1000`), so they showed no P&L line; now computed from equity for all paper bots.
 - learning: **brain now covers ALL bots** — `bot_learn.py` read only `bot_trades` (freqtrade); added `bot_pnl_store.fetch_paper_trades()` and merged it so perps + sniper closes (in `paper_trades`) are analysed too. The `reason` field splits into long/short enter_tag + exit_reason, giving the brain long-vs-short expectancy.
 - day trader (`DayTraderV5Gated`): widen buy zone 0.22 → 0.37 (enter higher up the pullback for materially more fills; captured move thinner ~0.41×band, still fee-positive). Doubled live bounce eligibility 0→2 pairs.
