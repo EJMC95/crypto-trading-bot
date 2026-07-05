@@ -55,5 +55,19 @@ while true; do
   sleep 15
 done &
 
+# [2026-07-05 LEARNING TRACTION] Run the brain (bot_learn.py) every 2h in the
+# always-on container so its cumulative state ACTUALLY accumulates. It was only
+# ever run ad-hoc from a chat session, so it never survived the PROMOTE_RUNS=3
+# persistence needed to promote a hypothesis to actionable — the learning loop
+# existed but never looped. Read-only/advisory: writes bot_state 'learning-brain'
+# + reports/lessons_latest.md, never touches a config or trade. Guarded; a slow
+# start (first run waits 5 min for the ledger to have fresh closes) is fine.
+( sleep 300
+  while true; do
+    echo "[supervisor] running learning brain (bot_learn.py)"
+    python3 /freqtrade/bot_learn.py || true
+    sleep 7200
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait
