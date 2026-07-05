@@ -3,6 +3,13 @@
 Multiple Claude sessions develop this crypto-bot fleet **in parallel**. Read this
 before making changes so sessions don't clobber or duplicate each other's work.
 
+> **START HERE.** This repo is the durable anchor for the crypto-bot workspace.
+> On any new session, read in this order: **`SESSION_LOG.md`** (narrative state +
+> what to watch for) → **`CHANGELOG.md`** (line-by-line recent changes) → this
+> file. The live dashboard + Railway services are the running truth; the chat
+> session is ephemeral, but the workspace state lives here in git and in the
+> always-on cloud. Append to `SESSION_LOG.md` at the end of each major session.
+
 ## The #1 rule: log every bot-affecting change
 If your diff touches a running bot (`*.py`, `*.sh`, a strategy in
 `user_data/strategies/`, a `user_data/config_*.json`, or a workflow), add a dated
