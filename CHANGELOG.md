@@ -6,6 +6,9 @@ how they stay in sync. If your diff touches bot code (`*.py`, `*.sh`, a strategy
 a config) you MUST add a dated entry here in the same commit (a CI check enforces
 it). Newest first. Keep entries one line; link the commit if useful.
 
+## 2026-07-05 (later)
+- ⚡ Range Raider (`DayTraderV5Gated`): DIAGNOSED the "no trades since rework" — not a bug (logs show a clean load, no populate_indicators error); it was OVER-GATED: every mode needed a pullback AND an uptrend on the same 1h candle, a rare confluence, so it sat idle in this choppy market. FIX = two new regime-covering legs so it operates regularly: `trend_breakout` (ADX≥25 + close>EMA50 + break of 20-bar high — trades RISING phases; grounded in V7's Donchian edge; `confirm_trade_exit` vetoes the range-top sell so breakouts run) and `range_meanrev` (ADX<20 chop + buy the range low, no uptrend requirement — the engine for a choppy market; low-ADX gate is the research-backed guard against knife-catching). Both fee-band gated; range_meanrev half-stake + 2.0×ATR stop. Distinct tags so the brain measures each.
+
 ## 2026-07-05
 - **NEW bot: `RegimeSwitchV2`** (⚖️ Two-Way Tide) — rebuilt `perps-regime-switch` from the fleet's combined lessons + evidenced public practice (AQR trend-following, Hyperliquid docs). The fleet's only dual-direction engine: 4h Donchian breakout LONG in up-regime / SHORT in down-regime (mirrors the proven V7 PF~1.8 edge to finally profit from a downtrend). Per-pair daily regime (EMA200+slope, ADX gate w/ hysteresis), structure-break exits (let winners run — not trailing/ROI cap), wide ATR disaster stop, inverse-vol sizing, low leverage, correlation-aware global cap, pulse half-stake, Postgres persist. UNVALIDATED (no OHLCV to backtest) — dry-run, robust-by-construction, brain-watched.
 - `RegimeSwitchV2`: tuned for more frequency — Donchian 20/10→15/8, ADX gate 22/16→20/14, universe 2→10 liquid majors, max_open 3→6 (still <60% of book). Stays on fee-viable 4h (not 1h churn).

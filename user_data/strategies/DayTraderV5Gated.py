@@ -186,6 +186,12 @@ class DayTraderV5Gated(IStrategy):
         # pullback-buys inside an intact uptrend.
         dataframe["ema50"] = ta.EMA(dataframe, timeperiod=50)
 
+        # [2026-07-05 REGULAR-OPERATION FIX] ADX (trend strength) + 20-bar Donchian
+        # high, for a momentum-breakout leg that fires on RISING phases — the
+        # missing half that left the bot idle (every prior mode needed a pullback).
+        dataframe["adx"] = ta.ADX(dataframe, timeperiod=14)
+        dataframe["dc_high20"] = dataframe["high"].rolling(20).max()
+
         # [2026-07-01 INTRADAY RETUNE] The 20-candle / bottom-15% range never fired
         # on 15m (5h window, too tight) — the bot took zero trades. Faster + wider
         # for an intraday scalper: 10-candle (2.5h) window, buy in the bottom third
@@ -323,6 +329,46 @@ class DayTraderV5Gated(IStrategy):
             ),
             ["enter_long", "enter_tag"],
         ] = (1, "bounce_pullback")
+
+        # [2026-07-05 REGULAR-OPERATION FIX] MOMENTUM-BREAKOUT leg — the missing
+        # half. Every mode above needs a PULLBACK (bottom 37% of range) AND an
+        # uptrend on the same 1h candle: a rare confluence that left the bot idle
+        # for days. This fires on the RISING phase instead: a pair in a confirmed
+        # 1h uptrend (close>EMA50) with real trend strength (ADX>=25) that BREAKS
+        # its prior 20-bar high. Regime-agnostic (breakouts are valid in either
+        # BTC regime), fee-band gated so it stays viable, and the ROI ladder + ATR
+        # stop cap the churn 1h breakouts are prone to. Grounded in V7's proven
+        # Donchian-breakout edge (PF~1.8), applied to 1h with guardrails. Distinct
+        # tag so the brain measures it separately from the pullback modes.
+        dataframe.loc[
+            (
+                (dataframe["adx"] >= 25)
+                & (dataframe["close"] > dataframe["ema50"])
+                & (dataframe["close"] > dataframe["dc_high20"].shift(1))
+                & (dataframe["rng_band_pct"] >= self.BAND_PCT_ON)
+                & live_vol
+            ),
+            ["enter_long", "enter_tag"],
+        ] = (1, "trend_breakout")
+
+        # [2026-07-05 REGULAR-OPERATION FIX] RANGE mean-reversion leg — the engine
+        # for a CHOPPY market (which is what we're in). Every mode above needs an
+        # uptrend (close>EMA50), so none fire in chop where price oscillates around
+        # the mean — that's why the bot sat idle. Public evidence: mean-reversion
+        # works in LOW-ADX (range) regimes and fails in trends; gating it to ADX<20
+        # is precisely the guard against the knife-catching this repo documents (a
+        # strong downtrend has HIGH ADX, so this leg stays OFF in a waterfall).
+        # Buy the range low in chop; half stake; exits at the range top via
+        # populate_exit_trend (unlike trend_breakout, this one SHOULD sell there).
+        dataframe.loc[
+            (
+                (dataframe["adx"] < 20)                       # chop / range regime
+                & (dataframe["close"] <= dataframe["rng_buy_zone"])
+                & (dataframe["rng_band_pct"] >= self.BAND_PCT_ON)
+                & uptick & live_vol
+            ),
+            ["enter_long", "enter_tag"],
+        ] = (1, "range_meanrev")
         return dataframe
 
     # [2026-07-02 DIP-CLUSTER FIX, rebalanced 2026-07-03] Correlated-entry throttle.
@@ -375,7 +421,7 @@ class DayTraderV5Gated(IStrategy):
                             leverage: float, entry_tag: Optional[str], side: str,
                             **kwargs) -> float:
         stake = proposed_stake
-        if entry_tag in ("bear_bounce", "bounce_pullback"):
+        if entry_tag in ("bear_bounce", "bounce_pullback", "range_meanrev"):
             stake *= 0.5                             # counter-daily-trend scalps size down
         if self._pulse_panic(current_time):
             stake *= 0.5
@@ -400,6 +446,17 @@ class DayTraderV5Gated(IStrategy):
             return "max_hold_timeout"
         return None
 
+    def confirm_trade_exit(self, pair: str, trade, order_type: str, amount: float,
+                           rate: float, time_in_force: str, exit_reason: str,
+                           current_time: datetime, **kwargs) -> bool:
+        # [2026-07-05] A trend_breakout enters ABOVE the range top, so the range-top
+        # 'exit_signal' from populate_exit_trend would sell it the instant it breaks
+        # out — defeating the whole point. Veto that one exit for breakout trades;
+        # they still exit via the ROI ladder, the ATR stop, or the 24h max-hold.
+        if trade.enter_tag == "trend_breakout" and exit_reason == "exit_signal":
+            return False
+        return True
+
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # Sell into strength at the top of the range.
         dataframe.loc[
@@ -417,7 +474,7 @@ class DayTraderV5Gated(IStrategy):
         # [2026-07-03 ADAPTIVE] Bounce stop 2.0x: tested 1.2x and it was shredded
         # by ordinary 15m noise (7% win rate, avg hold 32min) — reclaims need room
         # to wobble. Half stake keeps the $ risk in line.
-        atr_multiplier = 2.0 if trade.enter_tag in ("bear_bounce", "bounce_pullback") else self.atr_stop_mult.value
+        atr_multiplier = 2.0 if trade.enter_tag in ("bear_bounce", "bounce_pullback", "range_meanrev") else self.atr_stop_mult.value
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
         if dataframe is None or len(dataframe) == 0:
             return None
