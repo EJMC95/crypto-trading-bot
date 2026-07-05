@@ -1,5 +1,5 @@
 #!/bin/sh
-# Supervisor: run all 4 freqtrade dry-run bots in one container.
+# Supervisor: run all freqtrade dry-run bots in one container.
 # Each runs in its own restart loop so a crash of one doesn't take down the rest.
 # Logs go to stdout (captured by Railway). No --logfile on purpose.
 set -u
@@ -27,19 +27,24 @@ run_bot() {
   done
 }
 
+# === Original fleet ===
 run_bot user_data/config_v4_core.json   v4core   &
 run_bot user_data/config_v5_kraken.json  v5gated  &
 run_bot user_data/config_v6_swing.json   v6swing  &
 run_bot user_data/config_v7_momo.json    v7momo   &
 run_bot user_data/config_v8_momo.json    v8momo   &
 
+# === New fleet — July 2026 (paper, $1000 each, no top-ups) ===
+run_bot user_data/config_mum.json        mum        &   # 👩 NFI X7 · 5m trend
+run_bot user_data/config_dad.json        dad        &   # 👨 E0V1E · 5m breakout
+run_bot user_data/config_avo_maria.json  avo-maria  &   # 🙏 BinH+Cluc · 5m mean reversion
+run_bot user_data/config_georgia.json    georgia    &   # 🔮 FreqAI LightGBM · 1H ML
+
 # Combined P&L + trades dashboard, served on $PORT (Railway exposes it).
 python3 /freqtrade/dashboard_server.py &
 
 # Market pulse collector (news/social/funding mood) -> Postgres bot_state
-# every 10 min. Strategies read it for informed SIZING (never entries), the
-# brain correlates trades with the mood they were opened in, and the
-# pnl-dashboard serves it at /pulse.json. Guarded: a failed cycle just retries.
+# every 10 min. All bots feed from this for sizing decisions.
 while true; do
   python3 /freqtrade/market_pulse.py || true
   sleep 600
@@ -55,13 +60,9 @@ while true; do
   sleep 15
 done &
 
-# [2026-07-05 LEARNING TRACTION] Run the brain (bot_learn.py) every 2h in the
-# always-on container so its cumulative state ACTUALLY accumulates. It was only
-# ever run ad-hoc from a chat session, so it never survived the PROMOTE_RUNS=3
-# persistence needed to promote a hypothesis to actionable — the learning loop
-# existed but never looped. Read-only/advisory: writes bot_state 'learning-brain'
-# + reports/lessons_latest.md, never touches a config or trade. Guarded; a slow
-# start (first run waits 5 min for the ledger to have fresh closes) is fine.
+# [2026-07-05] Run the learning brain every 2h. Reads the trade ledger across
+# ALL bots (original + new fleet), correlates with market_pulse signals, and
+# writes lessons to bot_state 'learning-brain'. Read-only / advisory.
 ( sleep 300
   while true; do
     echo "[supervisor] running learning brain (bot_learn.py)"
