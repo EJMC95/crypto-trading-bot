@@ -228,13 +228,40 @@ _trades_table_ready = False
 
 
 def _ensure_trades_table(conn):
-    """Per-trade history table. Keyed by (bot, open_ts) so it SURVIVES container
-    redeploys — freqtrade's integer trade_id resets to 1 each time the ephemeral
-    sqlite is recreated, but each trade's open timestamp is stable and unique."""
+    """Per-trade history table. Keyed by (bot, open_ts, pair) — stable across
+    redeploys. Pair is included so two bots entering the same coin at the same
+    candle time never collide on the PK."""
     global _trades_table_ready
     if _trades_table_ready:
         return
     with conn.cursor() as cur:
+        # [2026-07-06] Migrate old (bot, open_ts) PK -> (bot, open_ts, pair).
+        # Recreate the table if the old constraint exists to fix cross-bot collisions.
+        cur.execute("""
+            DO \$\$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.table_constraints
+                    WHERE table_name = 'bot_trades'
+                    AND constraint_type = 'PRIMARY KEY'
+                ) THEN
+                    -- Check if pair is NOT already in the PK
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.key_column_usage
+                        WHERE table_name = 'bot_trades'
+                        AND constraint_name = (
+                            SELECT constraint_name FROM information_schema.table_constraints
+                            WHERE table_name = 'bot_trades' AND constraint_type = 'PRIMARY KEY'
+                        )
+                        AND column_name = 'pair'
+                    ) THEN
+                        DROP TABLE bot_trades;
+                    END IF;
+                END IF;
+            END
+            \$\$;
+        """)
+        conn.commit()
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS bot_trades (
@@ -254,7 +281,7 @@ def _ensure_trades_table(conn):
                 exit_reason   TEXT,
                 leverage      DOUBLE PRECISION,
                 seen_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-                PRIMARY KEY (bot, open_ts)
+                PRIMARY KEY (bot, open_ts, pair)
             )
             """
         )
@@ -282,7 +309,7 @@ def publish_trades(bot, trades):
                         amount, stake_amount, duration_min, enter_tag, exit_reason,
                         leverage, seen_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
-                    ON CONFLICT (bot, open_ts) DO UPDATE SET
+                    ON CONFLICT (bot, open_ts, pair) DO UPDATE SET
                         is_open=EXCLUDED.is_open, profit_ratio=EXCLUDED.profit_ratio,
                         profit_abs=EXCLUDED.profit_abs, close_ts=EXCLUDED.close_ts,
                         close_rate=EXCLUDED.close_rate, duration_min=EXCLUDED.duration_min,
