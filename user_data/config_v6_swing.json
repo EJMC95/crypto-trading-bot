@@ -118,5 +118,6 @@
   "internals": {
     "process_throttle_secs": 5
   },
-  "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over the validated 15-coin basket. Re-validation showed the wide net HELPS this strategy (see REVALIDATION_2026-06-22.md). Replaces VolumePairList, which ignored the whitelist and silently traded ~100 untested coins."
+  "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over the validated 15-coin basket. Re-validation showed the wide net HELPS this strategy (see REVALIDATION_2026-06-22.md). Replaces VolumePairList, which ignored the whitelist and silently traded ~100 untested coins.",
+  "buy_rsi": 42
 }
