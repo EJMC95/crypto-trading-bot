@@ -1,123 +1,122 @@
 {
-    "$schema": "https://schema.freqtrade.io/schema.json",
-    "strategy": "MomoBreakoutV1",
-    "db_url": "sqlite:////freqtrade/persist/tradesv3_v7_momo.sqlite",
-    "max_open_trades": 10,
-    "stake_currency": "USD",
-    "stake_amount": "unlimited",
-    "tradable_balance_ratio": 0.2,
-    "fiat_display_currency": "USD",
-    "dry_run": true,
-    "dry_run_wallet": 1000,
-    "cancel_open_orders_on_exit": false,
-    "trading_mode": "spot",
-    "margin_mode": "",
-    "unfilledtimeout": {
-        "entry": 10,
-        "exit": 10,
-        "exit_timeout_count": 0,
-        "unit": "minutes"
-    },
-    "entry_pricing": {
-        "price_side": "same",
-        "use_order_book": true,
-        "order_book_top": 1,
-        "price_last_balance": 0.0,
-        "check_depth_of_market": {
-            "enabled": false,
-            "bids_to_ask_delta": 1
-        }
-    },
-    "exit_pricing": {
-        "price_side": "same",
-        "use_order_book": true,
-        "order_book_top": 1
-    },
-    "download_trades": false,
-    "exchange": {
-        "name": "kraken",
-        "key": "",
-        "secret": "",
-        "ccxt_config": {},
-        "ccxt_async_config": {},
-        "pair_whitelist": [
-            "BTC/USD",
-            "ETH/USD",
-            "SOL/USD",
-            "XRP/USD",
-            "ADA/USD",
-            "DOGE/USD",
-            "AVAX/USD",
-            "LINK/USD",
-            "DOT/USD",
-            "LTC/USD",
-            "BCH/USD",
-            "ATOM/USD",
-            "XLM/USD",
-            "TRX/USD",
-            "UNI/USD",
-            "ETC/USD",
-            "FIL/USD",
-            "AAVE/USD",
-            "ALGO/USD",
-            "NEAR/USD",
-            "APT/USD",
-            "SUI/USD",
-            "INJ/USD",
-            "OP/USD"
-        ],
-        "pair_blacklist": [
-            ".*USDT/USD",
-            ".*USDC/USD",
-            "USDE/USD",
-            "RLUSD/USD",
-            "DAI/USD",
-            "PYUSD/USD",
-            "TUSD/USD",
-            "EUR/USD",
-            "GBP/USD",
-            "AUD/USD"
-        ],
-        "enable_ws": true
-    },
-    "pairlists": [
-        {
-            "method": "StaticPairList"
-        }
+  "$schema": "https://schema.freqtrade.io/schema.json",
+  "strategy": "MomoBreakoutV1",
+  "db_url": "sqlite:////freqtrade/persist/tradesv3_v7_momo.sqlite",
+  "max_open_trades": 10,
+  "stake_currency": "USD",
+  "stake_amount": "unlimited",
+  "tradable_balance_ratio": 0.2,
+  "fiat_display_currency": "USD",
+  "dry_run": true,
+  "cancel_open_orders_on_exit": false,
+  "trading_mode": "spot",
+  "margin_mode": "",
+  "unfilledtimeout": {
+    "entry": 10,
+    "exit": 10,
+    "exit_timeout_count": 0,
+    "unit": "minutes"
+  },
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1,
+    "price_last_balance": 0.0,
+    "check_depth_of_market": {
+      "enabled": false,
+      "bids_to_ask_delta": 1
+    }
+  },
+  "exit_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "download_trades": false,
+  "exchange": {
+    "name": "kraken",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": [
+      "BTC/USD",
+      "ETH/USD",
+      "SOL/USD",
+      "XRP/USD",
+      "ADA/USD",
+      "DOGE/USD",
+      "AVAX/USD",
+      "LINK/USD",
+      "DOT/USD",
+      "LTC/USD",
+      "BCH/USD",
+      "ATOM/USD",
+      "XLM/USD",
+      "TRX/USD",
+      "UNI/USD",
+      "ETC/USD",
+      "FIL/USD",
+      "AAVE/USD",
+      "ALGO/USD",
+      "NEAR/USD",
+      "APT/USD",
+      "SUI/USD",
+      "INJ/USD",
+      "OP/USD"
     ],
-    "telegram": {
-        "enabled": false,
-        "token": "",
-        "chat_id": ""
-    },
-    "api_server": {
-        "enabled": true,
-        "listen_ip_address": "0.0.0.0",
-        "listen_port": 8087,
-        "verbosity": "error",
-        "enable_openapi": false,
-        "jwt_secret_key": "41fbfb70d6b542effc85519ba623bd668f6da84dd6cb3d670ea9ae60dd2e2bd8",
-        "ws_token": "yWHP4nxykkbi1kZTG7JXV92kYhrFL7LM",
-        "CORS_origins": [
-            "http://localhost:8080",
-            "http://127.0.0.1:8080",
-            "http://localhost:8084",
-            "http://127.0.0.1:8084",
-            "http://localhost:8085",
-            "http://127.0.0.1:8085",
-            "http://localhost:8086",
-            "http://127.0.0.1:8086",
-            "http://localhost:8087",
-            "http://127.0.0.1:8087"
-        ],
-        "username": "freqtrader",
-        "password": "freqbot2026"
-    },
-    "bot_name": "momo_breakout_4h",
-    "initial_state": "running",
-    "force_entry_enable": false,
-    "internals": {
-        "process_throttle_secs": 5
-    },
-    "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over the validated 15-coin basket. Re-validation showed the wide net HELPS this strategy (see REVALIDATION_2026-06-22.md). Replaces VolumePairList, which ignored the whitelist and silently traded ~100 untested coins."
+    "pair_blacklist": [
+      ".*USDT/USD",
+      ".*USDC/USD",
+      "USDE/USD",
+      "RLUSD/USD",
+      "DAI/USD",
+      "PYUSD/USD",
+      "TUSD/USD",
+      "EUR/USD",
+      "GBP/USD",
+      "AUD/USD"
+    ],
+    "enable_ws": true
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "telegram": {
+    "enabled": false,
+    "token": "",
+    "chat_id": ""
+  },
+  "api_server": {
+    "enabled": true,
+    "listen_ip_address": "0.0.0.0",
+    "listen_port": 8087,
+    "verbosity": "error",
+    "enable_openapi": false,
+    "jwt_secret_key": "41fbfb70d6b542effc85519ba623bd668f6da84dd6cb3d670ea9ae60dd2e2bd8",
+    "ws_token": "yWHP4nxykkbi1kZTG7JXV92kYhrFL7LM",
+    "CORS_origins": [
+      "http://localhost:8080",
+      "http://127.0.0.1:8080",
+      "http://localhost:8084",
+      "http://127.0.0.1:8084",
+      "http://localhost:8085",
+      "http://127.0.0.1:8085",
+      "http://localhost:8086",
+      "http://127.0.0.1:8086",
+      "http://localhost:8087",
+      "http://127.0.0.1:8087"
+    ],
+    "username": "freqtrader",
+    "password": "freqbot2026"
+  },
+  "bot_name": "momo_breakout_4h",
+  "initial_state": "running",
+  "force_entry_enable": false,
+  "internals": {
+    "process_throttle_secs": 5
+  },
+  "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over the validated 15-coin basket. Re-validation showed the wide net HELPS this strategy (see REVALIDATION_2026-06-22.md). Replaces VolumePairList, which ignored the whitelist and silently traded ~100 untested coins."
 }
