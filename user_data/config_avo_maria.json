@@ -100,5 +100,6 @@
     "process_throttle_secs": 5
   },
   "timeframe": "4h",
-  "stoploss": -0.1
+  "stoploss": -0.1,
+  "buy_rsi": 42
 }
