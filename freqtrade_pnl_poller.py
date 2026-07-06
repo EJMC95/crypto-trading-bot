@@ -29,11 +29,16 @@ BOT_PASS = "freqbot2026"
 # FT_POLLER_BOTS env var — a JSON list of [name, port] pairs — so the same
 # poller code drives any freqtrade service without editing this list.
 _DEFAULT_BOTS = [
-    ("crypto-trend-daily", 8085),
-    ("crypto-intraday-15m", 8084),
-    ("crypto-swing-daily", 8086),
-    ("crypto-breakout-4h", 8087),
-    ("crypto-trendmomo-4h", 8088),
+    ("crypto-trend-daily",   8085),
+    ("crypto-intraday-15m",  8084),
+    ("crypto-swing-daily",   8086),
+    ("crypto-breakout-4h",   8087),
+    ("crypto-trendmomo-4h",  8088),
+    # New fleet July 2026 — paper \$1000, same container
+    ("freqtrade-mum",        8089),
+    ("freqtrade-dad",        8090),
+    ("freqtrade-avo-maria",  8091),
+    ("freqtrade-georgia",    8092),
 ]
 _env_bots = os.environ.get("FT_POLLER_BOTS", "").strip()
 if _env_bots:
