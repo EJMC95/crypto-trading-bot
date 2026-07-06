@@ -1,3 +1,10 @@
+## 2026-07-06
+- **funding_carry_bot**: raise ENTER_APR 20%→40%, EXIT_APR 8%→15%, lower MIN_DAY_VOLUME $5M→$2M, extend MAX_HOLD 7→14d — fix fee bleed on fast-decaying carries
+- **funding_carry_bot**: raise MAX_POSITIONS 5→8, NOTIONAL $200→$300 — expand reach and earning capacity
+- **SwingDipV1**: buy_rsi default 35→42 in strategy code (config key was silently ignored)
+- **MomoBreakoutV1**: entry_lookback default 30→20 (shorter Donchian for more frequent signals)
+- **RegimeSwitchV2**: ADX trend gate 20→17, chop gate 14→11 (admit weaker trends)
+
 # Changelog
 
 Shared log of every change that affects a running bot, the dashboard, or deploy
