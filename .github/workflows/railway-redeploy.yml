@@ -30,6 +30,9 @@ on:
       # its Donchian-entry ship sat undeployed for 15h before this was added)
       - 'run_regime.sh'
       - 'Dockerfile.regime'
+      # funding-carry service
+      - 'funding_carry_bot.py'
+      - 'Dockerfile.funding'
       # shared (freqtrade poller + dashboard + regime supervisor)
       - 'bot_pnl_store.py'
       - 'freqtrade_pnl_poller.py'
@@ -83,6 +86,10 @@ jobs:
             # tweak doesn't churn this service; its volume keeps trades safe anyway.
             if echo "$changed" | grep -qE '^(user_data/strategies/RegimeSwitchV[0-9]+\.py$|user_data/config_regimeswitch\.json$|run_regime\.sh$|Dockerfile\.regime$|bot_pnl_store\.py$|freqtrade_pnl_poller\.py$)'; then
               svcs="${svcs:+$svcs,}perps-regime-switch"
+            fi
+            # funding-carry service
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$)'; then
+              svcs="${svcs:+$svcs,}funding-carry"
             fi
           fi
           echo "services=$svcs" >> "$GITHUB_OUTPUT"
