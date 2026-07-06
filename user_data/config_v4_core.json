@@ -1,94 +1,93 @@
 {
-    "$schema": "https://schema.freqtrade.io/schema.json",
-    "strategy": "ImprovedStrategyV4",
-    "db_url": "sqlite:////freqtrade/persist/tradesv3_v4_core.sqlite",
-    "max_open_trades": 3,
-    "stake_currency": "USD",
-    "stake_amount": "unlimited",
-    "tradable_balance_ratio": 0.4,
-    "fiat_display_currency": "USD",
-    "dry_run": true,
-    "dry_run_wallet": 1000,
-    "cancel_open_orders_on_exit": false,
-    "trading_mode": "spot",
-    "margin_mode": "",
-    "unfilledtimeout": {
-        "entry": 10,
-        "exit": 10,
-        "exit_timeout_count": 0,
-        "unit": "minutes"
-    },
-    "entry_pricing": {
-        "price_side": "same",
-        "use_order_book": true,
-        "order_book_top": 1,
-        "price_last_balance": 0.0,
-        "check_depth_of_market": {
-            "enabled": false,
-            "bids_to_ask_delta": 1
-        }
-    },
-    "exit_pricing": {
-        "price_side": "same",
-        "use_order_book": true,
-        "order_book_top": 1
-    },
-    "download_trades": false,
-    "exchange": {
-        "name": "kraken",
-        "key": "",
-        "secret": "",
-        "ccxt_config": {},
-        "ccxt_async_config": {},
-        "pair_whitelist": [
-            "BTC/USD",
-            "ETH/USD",
-            "SOL/USD",
-            "BNB/USD",
-            "XRP/USD",
-            "TRX/USD"
-        ],
-        "pair_blacklist": [],
-        "enable_ws": true
-    },
-    "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over liquid majors. Re-validation (REVALIDATION_2026-06-22.md) showed V4's daily 50/200 trend edge holds on majors (+33% full-cycle, 4.6% chop drawdown) but is whipsawed by laggard alts on the full top-100 (chop drawdown 22%). StaticPairList also fixes the prior bug where VolumePairList ignored pair_whitelist and silently traded ~100 untested coins.",
-    "pairlists": [
-        {
-            "method": "StaticPairList"
-        }
-    ],
-    "telegram": {
-        "enabled": false,
-        "token": "",
-        "chat_id": ""
-    },
-    "api_server": {
-        "enabled": true,
-        "listen_ip_address": "0.0.0.0",
-        "listen_port": 8085,
-        "verbosity": "error",
-        "enable_openapi": false,
-        "jwt_secret_key": "0e3219c6e9064e9d0ae8e6d2abc87a16c28ad124a8879892d2270cae7e00bc3e",
-        "ws_token": "ATqugJPMzeWsNocwspwJO0wbOn8NsbS5",
-        "CORS_origins": [
-            "http://localhost:8080",
-            "http://127.0.0.1:8080",
-            "http://localhost:8084",
-            "http://127.0.0.1:8084",
-            "http://localhost:8085",
-            "http://127.0.0.1:8085",
-            "http://localhost:8086",
-            "http://127.0.0.1:8086",
-            "http://localhost:8087",
-            "http://127.0.0.1:8087"
-        ],
-        "username": "freqtrader",
-        "password": "freqbot2026"
-    },
-    "bot_name": "trend_golden_cross",
-    "initial_state": "running",
-    "force_entry_enable": false,
-    "internals": {
-        "process_throttle_secs": 5
+  "$schema": "https://schema.freqtrade.io/schema.json",
+  "strategy": "ImprovedStrategyV4",
+  "db_url": "sqlite:////freqtrade/persist/tradesv3_v4_core.sqlite",
+  "max_open_trades": 3,
+  "stake_currency": "USD",
+  "stake_amount": "unlimited",
+  "tradable_balance_ratio": 0.4,
+  "fiat_display_currency": "USD",
+  "dry_run": true,
+  "cancel_open_orders_on_exit": false,
+  "trading_mode": "spot",
+  "margin_mode": "",
+  "unfilledtimeout": {
+    "entry": 10,
+    "exit": 10,
+    "exit_timeout_count": 0,
+    "unit": "minutes"
+  },
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1,
+    "price_last_balance": 0.0,
+    "check_depth_of_market": {
+      "enabled": false,
+      "bids_to_ask_delta": 1
     }
+  },
+  "exit_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "download_trades": false,
+  "exchange": {
+    "name": "kraken",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": [
+      "BTC/USD",
+      "ETH/USD",
+      "SOL/USD",
+      "BNB/USD",
+      "XRP/USD",
+      "TRX/USD"
+    ],
+    "pair_blacklist": [],
+    "enable_ws": true
+  },
+  "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over liquid majors. Re-validation (REVALIDATION_2026-06-22.md) showed V4's daily 50/200 trend edge holds on majors (+33% full-cycle, 4.6% chop drawdown) but is whipsawed by laggard alts on the full top-100 (chop drawdown 22%). StaticPairList also fixes the prior bug where VolumePairList ignored pair_whitelist and silently traded ~100 untested coins.",
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "telegram": {
+    "enabled": false,
+    "token": "",
+    "chat_id": ""
+  },
+  "api_server": {
+    "enabled": true,
+    "listen_ip_address": "0.0.0.0",
+    "listen_port": 8085,
+    "verbosity": "error",
+    "enable_openapi": false,
+    "jwt_secret_key": "0e3219c6e9064e9d0ae8e6d2abc87a16c28ad124a8879892d2270cae7e00bc3e",
+    "ws_token": "ATqugJPMzeWsNocwspwJO0wbOn8NsbS5",
+    "CORS_origins": [
+      "http://localhost:8080",
+      "http://127.0.0.1:8080",
+      "http://localhost:8084",
+      "http://127.0.0.1:8084",
+      "http://localhost:8085",
+      "http://127.0.0.1:8085",
+      "http://localhost:8086",
+      "http://127.0.0.1:8086",
+      "http://localhost:8087",
+      "http://127.0.0.1:8087"
+    ],
+    "username": "freqtrader",
+    "password": "freqbot2026"
+  },
+  "bot_name": "trend_golden_cross",
+  "initial_state": "running",
+  "force_entry_enable": false,
+  "internals": {
+    "process_throttle_secs": 5
+  }
 }
