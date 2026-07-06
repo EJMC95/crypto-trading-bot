@@ -100,8 +100,8 @@ class RegimeSwitchV2(IStrategy):
     # [2026-07-05 MORE FREQUENT] Trend gate 22->20, chop 16->14: admit slightly
     # less-strong trends so the bot participates in more windows. ADX stays a real
     # trade/no-trade gate (chop is still skipped — that's what stops fee bleed).
-    adx_trend = IntParameter(16, 30, default=20, space="buy", optimize=False)  # >= -> trending
-    adx_chop = IntParameter(10, 20, default=14, space="buy", optimize=False)   # <= -> chop, stand down
+    adx_trend = IntParameter(12, 30, default=17, space="buy", optimize=False)  # >= -> trending
+    adx_chop = IntParameter(8, 20, default=11, space="buy", optimize=False)   # <= -> chop, stand down
     regime_ema_fast = IntParameter(30, 80, default=50, space="buy", optimize=False)
     regime_ema_slow = IntParameter(150, 250, default=200, space="buy", optimize=False)
 
