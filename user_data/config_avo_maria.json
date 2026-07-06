@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.freqtrade.io/schema.json",
-  "strategy": "CombinedBinHAndClucV8",
-  "db_url": "sqlite:////freqtrade/persist/tradesv3_avo_maria.sqlite",
+  "strategy": "SwingDipV1",
+  "db_url": "sqlite:////freqtrade/persist/tradesv3_v4_core.sqlite",
   "max_open_trades": 4,
   "stake_currency": "USD",
   "stake_amount": 50,
-  "tradable_balance_ratio": 0.25,
+  "tradable_balance_ratio": 0.4,
   "fiat_display_currency": "USD",
   "dry_run": true,
   "dry_run_wallet": 1000,
@@ -33,6 +33,7 @@
     "use_order_book": true,
     "order_book_top": 1
   },
+  "download_trades": false,
   "exchange": {
     "name": "kraken",
     "key": "",
@@ -46,46 +47,23 @@
       "XRP/USD",
       "ADA/USD",
       "DOT/USD",
-      "MATIC/USD",
       "AVAX/USD",
       "LINK/USD",
       "LTC/USD",
-      "UNI/USD",
       "ATOM/USD",
-      "ALGO/USD",
-      "FIL/USD",
-      "AAVE/USD",
       "NEAR/USD",
       "TRX/USD",
       "DOGE/USD",
-      "SHIB/USD",
-      "BCH/USD"
+      "ALGO/USD",
+      "AAVE/USD"
     ],
     "pair_blacklist": [],
     "enable_ws": true
   },
+  "_comment_pairlist": "[CURATED 2026-06-22] StaticPairList over liquid majors. Re-validation (REVALIDATION_2026-06-22.md) showed V4's daily 50/200 trend edge holds on majors (+33% full-cycle, 4.6% chop drawdown) but is whipsawed by laggard alts on the full top-100 (chop drawdown 22%). StaticPairList also fixes the prior bug where VolumePairList ignored pair_whitelist and silently traded ~100 untested coins.",
   "pairlists": [
     {
-      "method": "VolumePairList",
-      "number_assets": 20,
-      "sort_key": "quoteVolume",
-      "min_value": 0,
-      "refresh_period": 1800
-    },
-    {
-      "method": "AgeFilter",
-      "min_days_listed": 30
-    },
-    {
-      "method": "PrecisionFilter"
-    },
-    {
-      "method": "PriceFilter",
-      "low_price_ratio": 0.01
-    },
-    {
-      "method": "SpreadFilter",
-      "max_spread_ratio": 0.005
+      "method": "StaticPairList"
     }
   ],
   "telegram": {
@@ -100,16 +78,28 @@
     "verbosity": "error",
     "enable_openapi": false,
     "jwt_secret_key": "freqbot2026secret",
-    "ws_token": "avomaria_ws_token_2026",
-    "CORS_origins": [],
+    "ws_token": "ATqugJPMzeWsNocwspwJO0wbOn8NsbS5",
+    "CORS_origins": [
+      "http://localhost:8080",
+      "http://127.0.0.1:8080",
+      "http://localhost:8084",
+      "http://127.0.0.1:8084",
+      "http://localhost:8085",
+      "http://127.0.0.1:8085",
+      "http://localhost:8086",
+      "http://127.0.0.1:8086",
+      "http://localhost:8087",
+      "http://127.0.0.1:8087"
+    ],
     "username": "freqtrader",
     "password": "freqbot2026"
   },
-  "bot_name": "Avo Maria",
+  "bot_name": "trend_golden_cross",
   "initial_state": "running",
   "force_entry_enable": false,
   "internals": {
     "process_throttle_secs": 5
   },
-  "timeframe": "5m"
+  "timeframe": "4h",
+  "stoploss": -0.1
 }
