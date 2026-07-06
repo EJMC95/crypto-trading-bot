@@ -533,8 +533,8 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
     dot = "warn" if stale else ("off" if status in ("halted", "error") else "on")
     extra = row.get("extra") or {}
     if isinstance(extra, dict):
-        _bits = {k: v for k, v in extra.items()
-                 if k not in ("positions", "open_orders", "open_pos")}
+        _HIDE = {"positions", "open_orders", "open_pos", "err", "src", "port"}
+        _bits = {k: v for k, v in extra.items() if k not in _HIDE}
         extra_bits = " · ".join(f"{k}: {html.escape(str(v))}" for k, v in _bits.items())
     else:
         extra_bits = html.escape(str(extra))
