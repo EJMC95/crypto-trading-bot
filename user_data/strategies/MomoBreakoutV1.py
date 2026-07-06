@@ -66,7 +66,7 @@ class MomoBreakoutV1(IStrategy):
 
     # Breakout lookbacks (bars). Defaults = the validated 30/15. optimize=False
     # to avoid curve-fitting (the edge is in the concept, not the exact number).
-    entry_lookback = IntParameter(20, 45, default=30, space="buy",  optimize=False)
+    entry_lookback = IntParameter(10, 45, default=20, space="buy",  optimize=False)
     exit_lookback  = IntParameter(8,  25, default=15, space="sell", optimize=False)
     trend_ema      = IntParameter(100, 250, default=200, space="buy", optimize=False)
 
