@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.freqtrade.io/schema.json",
   "strategy": "MomoBreakoutV1",
-  "db_url": "sqlite:////freqtrade/persist/tradesv3_v4_core.sqlite",
+  "db_url": "sqlite:////freqtrade/persist/tradesv3_dad.sqlite",
   "max_open_trades": 4,
   "stake_currency": "USD",
   "stake_amount": 50,
