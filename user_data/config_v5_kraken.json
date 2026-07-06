@@ -1,122 +1,121 @@
 {
-    "$schema": "https://schema.freqtrade.io/schema.json",
-    "strategy": "DayTraderV5Gated",
-    "db_url": "sqlite:////freqtrade/persist/tradesv3_v5_kraken.sqlite",
-    "max_open_trades": 5,
-    "stake_currency": "USD",
-    "stake_amount": "unlimited",
-    "tradable_balance_ratio": 0.5,
-    "fiat_display_currency": "USD",
-    "dry_run": true,
-    "dry_run_wallet": 1000,
-    "cancel_open_orders_on_exit": false,
-    "trading_mode": "spot",
-    "margin_mode": "",
-    "unfilledtimeout": {
-        "entry": 10,
-        "exit": 10,
-        "exit_timeout_count": 0,
-        "unit": "minutes"
-    },
-    "entry_pricing": {
-        "price_side": "other",
-        "use_order_book": true,
-        "order_book_top": 1,
-        "price_last_balance": 0.0,
-        "check_depth_of_market": {
-            "enabled": false,
-            "bids_to_ask_delta": 1
-        }
-    },
-    "exit_pricing": {
-        "price_side": "same",
-        "use_order_book": true,
-        "order_book_top": 1
-    },
-    "download_trades": false,
-    "exchange": {
-        "name": "kraken",
-        "key": "",
-        "secret": "",
-        "ccxt_config": {},
-        "ccxt_async_config": {},
-        "pair_whitelist": [
-            "BTC/USD",
-            "ETH/USD",
-            "SOL/USD",
-            "XRP/USD",
-            "ADA/USD",
-            "DOGE/USD",
-            "AVAX/USD",
-            "LINK/USD",
-            "DOT/USD",
-            "LTC/USD",
-            "BCH/USD",
-            "ATOM/USD",
-            "XLM/USD",
-            "TRX/USD",
-            "UNI/USD",
-            "ETC/USD",
-            "FIL/USD",
-            "AAVE/USD",
-            "ALGO/USD",
-            "NEAR/USD",
-            "APT/USD",
-            "SUI/USD",
-            "INJ/USD",
-            "OP/USD"
-        ],
-        "pair_blacklist": [
-            ".*USDT/USD",
-            ".*USDC/USD",
-            "USDE/USD",
-            "RLUSD/USD",
-            "DAI/USD",
-            "PYUSD/USD",
-            "TUSD/USD",
-            "EUR/USD",
-            "GBP/USD",
-            "AUD/USD"
-        ],
-        "enable_ws": true
-    },
-    "pairlists": [
-        {
-            "method": "StaticPairList"
-        }
-    ],
-    "telegram": {
-        "enabled": false,
-        "token": "",
-        "chat_id": ""
-    },
-    "api_server": {
-        "enabled": true,
-        "listen_ip_address": "0.0.0.0",
-        "listen_port": 8084,
-        "verbosity": "error",
-        "enable_openapi": false,
-        "jwt_secret_key": "2413a41d2e9c6231285e2b393fb5e0381f174774558ec791e56d2b09f3f05402",
-        "ws_token": "U4NSwHNPrusqCsXp8DzodT8ZKN6VwOF3",
-        "CORS_origins": [
-            "http://localhost:8080",
-            "http://127.0.0.1:8080",
-            "http://localhost:8084",
-            "http://127.0.0.1:8084",
-            "http://localhost:8085",
-            "http://127.0.0.1:8085",
-            "http://localhost:8086",
-            "http://127.0.0.1:8086",
-            "http://localhost:8087",
-            "http://127.0.0.1:8087"
-        ],
-        "username": "freqtrader",
-        "password": "freqbot2026"
-    },
-    "bot_name": "intraday_daytrader_5m",
-    "initial_state": "running",
-    "force_entry_enable": false,
-    "internals": {
-        "process_throttle_secs": 5
+  "$schema": "https://schema.freqtrade.io/schema.json",
+  "strategy": "DayTraderV5Gated",
+  "db_url": "sqlite:////freqtrade/persist/tradesv3_v5_kraken.sqlite",
+  "max_open_trades": 5,
+  "stake_currency": "USD",
+  "stake_amount": "unlimited",
+  "tradable_balance_ratio": 0.5,
+  "fiat_display_currency": "USD",
+  "dry_run": true,
+  "cancel_open_orders_on_exit": false,
+  "trading_mode": "spot",
+  "margin_mode": "",
+  "unfilledtimeout": {
+    "entry": 10,
+    "exit": 10,
+    "exit_timeout_count": 0,
+    "unit": "minutes"
+  },
+  "entry_pricing": {
+    "price_side": "other",
+    "use_order_book": true,
+    "order_book_top": 1,
+    "price_last_balance": 0.0,
+    "check_depth_of_market": {
+      "enabled": false,
+      "bids_to_ask_delta": 1
     }
+  },
+  "exit_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "download_trades": false,
+  "exchange": {
+    "name": "kraken",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": [
+      "BTC/USD",
+      "ETH/USD",
+      "SOL/USD",
+      "XRP/USD",
+      "ADA/USD",
+      "DOGE/USD",
+      "AVAX/USD",
+      "LINK/USD",
+      "DOT/USD",
+      "LTC/USD",
+      "BCH/USD",
+      "ATOM/USD",
+      "XLM/USD",
+      "TRX/USD",
+      "UNI/USD",
+      "ETC/USD",
+      "FIL/USD",
+      "AAVE/USD",
+      "ALGO/USD",
+      "NEAR/USD",
+      "APT/USD",
+      "SUI/USD",
+      "INJ/USD",
+      "OP/USD"
+    ],
+    "pair_blacklist": [
+      ".*USDT/USD",
+      ".*USDC/USD",
+      "USDE/USD",
+      "RLUSD/USD",
+      "DAI/USD",
+      "PYUSD/USD",
+      "TUSD/USD",
+      "EUR/USD",
+      "GBP/USD",
+      "AUD/USD"
+    ],
+    "enable_ws": true
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "telegram": {
+    "enabled": false,
+    "token": "",
+    "chat_id": ""
+  },
+  "api_server": {
+    "enabled": true,
+    "listen_ip_address": "0.0.0.0",
+    "listen_port": 8084,
+    "verbosity": "error",
+    "enable_openapi": false,
+    "jwt_secret_key": "2413a41d2e9c6231285e2b393fb5e0381f174774558ec791e56d2b09f3f05402",
+    "ws_token": "U4NSwHNPrusqCsXp8DzodT8ZKN6VwOF3",
+    "CORS_origins": [
+      "http://localhost:8080",
+      "http://127.0.0.1:8080",
+      "http://localhost:8084",
+      "http://127.0.0.1:8084",
+      "http://localhost:8085",
+      "http://127.0.0.1:8085",
+      "http://localhost:8086",
+      "http://127.0.0.1:8086",
+      "http://localhost:8087",
+      "http://127.0.0.1:8087"
+    ],
+    "username": "freqtrader",
+    "password": "freqbot2026"
+  },
+  "bot_name": "intraday_daytrader_5m",
+  "initial_state": "running",
+  "force_entry_enable": false,
+  "internals": {
+    "process_throttle_secs": 5
+  }
 }
