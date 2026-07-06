@@ -47,8 +47,8 @@ BOT = "perps-funding-carry"
 
 # --------------------------- configuration ----------------------------------
 START_EQUITY = 1000.0
-NOTIONAL = 200.0          # quote notional per carry position
-MAX_POSITIONS = 5         # at most 5 concurrent carries (=$1000 fully deployed)
+NOTIONAL = 300.0          # quote notional per carry position [2026-07-06 raised from $200]
+MAX_POSITIONS = 8         # at most 8 concurrent carries [2026-07-06 raised from 5]
 MIN_DAY_VOLUME = 2e6      # only coins with >= $2M 24h notional volume [2026-07-06 lowered from $5M to capture hot-rate coins like ME/MINA]
 
 # Funding thresholds, ANNUALIZED (hourly rate * 24 * 365). Hyperliquid's
