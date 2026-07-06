@@ -49,13 +49,13 @@ BOT = "perps-funding-carry"
 START_EQUITY = 1000.0
 NOTIONAL = 200.0          # quote notional per carry position
 MAX_POSITIONS = 5         # at most 5 concurrent carries (=$1000 fully deployed)
-MIN_DAY_VOLUME = 5e6      # only coins with >= $5M 24h notional volume
+MIN_DAY_VOLUME = 2e6      # only coins with >= $2M 24h notional volume [2026-07-06 lowered from $5M to capture hot-rate coins like ME/MINA]
 
 # Funding thresholds, ANNUALIZED (hourly rate * 24 * 365). Hyperliquid's
 # baseline funding is ~0.0000125/h ~= 11%/yr; we want clearly-hot funding.
-ENTER_APR = 0.20          # open when |annualized funding| >= 20%
-EXIT_APR = 0.08           # close when it decays below 8% (or flips sign)
-MAX_HOLD_H = 7 * 24       # recycle capital after a week regardless
+ENTER_APR = 0.40          # open when |annualized funding| >= 40% [2026-07-06 raised from 20% to avoid fee bleed on fast-decaying rates]
+EXIT_APR = 0.15           # close when it decays below 15% [2026-07-06 raised from 8% to exit before fees eat accrual]
+MAX_HOLD_H = 14 * 24      # recycle capital after 2 weeks [2026-07-06 extended from 7d to let high-rate carries compound]
 
 # Round-trip friction, as fractions of notional per SIDE of the round trip.
 PERP_FEE = 0.00045        # HL taker per perp fill (conservative base tier)
