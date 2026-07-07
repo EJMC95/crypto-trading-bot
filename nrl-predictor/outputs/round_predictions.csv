@@ -1,8 +1,8 @@
-round,date,venue,home,away,elo_home,elo_away,p_home_raw,p_home_cal
-Round 19,2026-07-10 20:00:00,Campbelltown Sports Stadium,Wests Tigers,New Zealand Warriors,1420.9,1560.9,0.3869,0.4053
-Round 19,2026-07-11 15:00:00,Kayo Stadium,Dolphins,Cronulla-Sutherland Sharks,1573.5,1563.9,0.5989,0.5974
-Round 19,2026-07-11 17:30:00,Accor Stadium,Canterbury-Bankstown Bulldogs,Canberra Raiders,1480.2,1466.4,0.6046,0.6026
-Round 19,2026-07-11 19:35:00,Allianz Stadium,Sydney Roosters,Parramatta Eels,1586.0,1431.9,0.7742,0.7587
-Round 19,2026-07-12 14:00:00,Accor Stadium,South Sydney Rabbitohs,Newcastle Knights,1488.0,1488.8,0.5844,0.5844
-Round 19,2026-07-12 16:05:00,4 Pines Park,Manly-Warringah Sea Eagles,North Queensland Cowboys,1542.5,1505.4,0.6362,0.6312
-Round 19,2026-07-12 18:15:00,AAMI Park,Melbourne Storm,Gold Coast Titans,1539.3,1371.6,0.7877,0.7716
+round,date,venue,home,away,p_home_elo,p_home_poisson,p_home_gbm,p_home_blend,exp_margin_home,exp_total_points
+Round 19,2026-07-10 20:00:00,Campbelltown Sports Stadium,Wests Tigers,New Zealand Warriors,0.4053,0.4202,0.2877,0.3812,-3.3,47.5
+Round 19,2026-07-11 15:00:00,Kayo Stadium,Dolphins,Cronulla-Sutherland Sharks,0.5974,0.5411,0.66,0.5859,1.7,48.7
+Round 19,2026-07-11 17:30:00,Accor Stadium,Canterbury-Bankstown Bulldogs,Canberra Raiders,0.6026,0.5241,0.636,0.5839,1.1,44.7
+Round 19,2026-07-11 19:35:00,Allianz Stadium,Sydney Roosters,Parramatta Eels,0.7587,0.6156,0.8282,0.7478,4.9,48.4
+Round 19,2026-07-12 14:00:00,Accor Stadium,South Sydney Rabbitohs,Newcastle Knights,0.5844,0.5801,0.5194,0.5897,3.3,49.0
+Round 19,2026-07-12 16:05:00,4 Pines Park,Manly-Warringah Sea Eagles,North Queensland Cowboys,0.6312,0.5874,0.7146,0.6311,3.7,48.2
+Round 19,2026-07-12 18:15:00,AAMI Park,Melbourne Storm,Gold Coast Titans,0.7716,0.6085,0.6384,0.7567,4.5,48.1

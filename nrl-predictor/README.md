@@ -24,5 +24,21 @@ Walk-forward 2015–2025, Brier / log loss (draws = 0.5):
 | de-vigged closing line | 0.2075 | 0.6036 |
 
 Elo beats the naive baseline in every season 2015–2025 → phase-1 gate **passed**.
-The closing line stays ahead of Elo (as it should) — that gap is what tiers 2–3
-(Poisson/Skellam, GBM) go after. See `outputs/phase1_report.md`.
+The closing line stays ahead of Elo (as it should). See `outputs/phase1_report.md`.
+
+## Phase 3 result (2026-07-07)
+
+Tier 2 (Dixon–Coles-decayed try Poisson → Monte Carlo scores, margins, totals) and
+tier 3 (LightGBM stack) added, walk-forward with all choices made pre-2015:
+
+| model | Brier | log loss |
+|---|---|---|
+| Elo (calibrated) | 0.2194 | 0.6304 |
+| Poisson (tier 2) | 0.2287 | 0.6514 |
+| GBM (tier 3, experimental) | 0.2287 | 0.6510 |
+| **blend (Elo+Poisson stack)** | **0.2188** | **0.6293** |
+| de-vigged closing line | 0.2075 | 0.6036 |
+
+The blend is the new champion and adds margin/total distributions. GBM does not
+beat Elo yet (features mostly re-encode Elo) and stays out of the blend until
+lineup/weather features arrive. See `outputs/phase3_report.md`.

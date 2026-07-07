@@ -10,9 +10,14 @@ fair prices for SGM leg combos. **Paper-track only** — never suggest staking r
 ## Status
 - Phase 1 (Elo + walk-forward backtest) — DONE, see `outputs/phase1_report.md`
 - Phase 2 (2026 season review) — DONE, see `outputs/season_review_2026.xlsx`
-- Phase 3 (Poisson/Skellam + GBM + CLV tracking) — not started
+- Phase 3 (Poisson/Skellam + GBM) — DONE, see `outputs/phase3_report.md`.
+  Champion = Elo+Poisson logistic stack ("blend", Brier 0.2188 vs Elo 0.2194,
+  market 0.2075). GBM is experimental only — it does not beat Elo yet and is NOT
+  in the blend; revisit with lineup/weather features. CLV tracking blocked on an
+  odds API key in `.env`.
 - Phase 4 (player props + SGM simulator) — not started
-- Phase 5 (automation: Tue team lists, Thu previews) — not started
+- Phase 5 (automation: Tue team lists, Thu previews; Railway nrl.json service) —
+  not started; `src/publish/` already emits `outputs/nrl.json` + `round_preview.md`
 
 ## Note on repo location
 This project was specced as its own private repo `nrl-predictor`. The Claude Code
@@ -45,3 +50,7 @@ directory there wholesale — nothing in here imports from the trading fleet.
 - `python scripts/run_phase1.py` — ingest → Elo fit → 2015–2025 walk-forward
   backtest → current ratings + upcoming-round probabilities → `outputs/`.
 - `python scripts/build_season_review.py` — Phase 2: 2026 season review workbook.
+- `python scripts/run_phase3.py` — Poisson + GBM walk-forward, blend, upgraded
+  round predictions (win/margin/total). Run phase 1 first (needs its parquets).
+- `python -m src.publish.dashboard_feed` / `python -m src.publish.notion_preview`
+  — regenerate `outputs/nrl.json` and `outputs/round_preview.md`.

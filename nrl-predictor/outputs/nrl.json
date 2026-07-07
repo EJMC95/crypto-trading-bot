@@ -1,0 +1,218 @@
+{
+ "generated_at": "2026-07-07T11:48:00+00:00",
+ "source": "nrl-predictor",
+ "disclaimer": "Paper-track model output. Not betting advice.",
+ "round": "Round 19",
+ "predictions": [
+  {
+   "round": "Round 19",
+   "date": "2026-07-10 20:00:00",
+   "venue": "Campbelltown Sports Stadium",
+   "home": "Wests Tigers",
+   "away": "New Zealand Warriors",
+   "p_home_elo": 0.4053,
+   "p_home_poisson": 0.4202,
+   "p_home_gbm": 0.2877,
+   "p_home_blend": 0.3812,
+   "exp_margin_home": -3.3,
+   "exp_total_points": 47.5
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-11 15:00:00",
+   "venue": "Kayo Stadium",
+   "home": "Dolphins",
+   "away": "Cronulla-Sutherland Sharks",
+   "p_home_elo": 0.5974,
+   "p_home_poisson": 0.5411,
+   "p_home_gbm": 0.66,
+   "p_home_blend": 0.5859,
+   "exp_margin_home": 1.7,
+   "exp_total_points": 48.7
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-11 17:30:00",
+   "venue": "Accor Stadium",
+   "home": "Canterbury-Bankstown Bulldogs",
+   "away": "Canberra Raiders",
+   "p_home_elo": 0.6026,
+   "p_home_poisson": 0.5241,
+   "p_home_gbm": 0.636,
+   "p_home_blend": 0.5839,
+   "exp_margin_home": 1.1,
+   "exp_total_points": 44.7
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-11 19:35:00",
+   "venue": "Allianz Stadium",
+   "home": "Sydney Roosters",
+   "away": "Parramatta Eels",
+   "p_home_elo": 0.7587,
+   "p_home_poisson": 0.6156,
+   "p_home_gbm": 0.8282,
+   "p_home_blend": 0.7478,
+   "exp_margin_home": 4.9,
+   "exp_total_points": 48.4
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-12 14:00:00",
+   "venue": "Accor Stadium",
+   "home": "South Sydney Rabbitohs",
+   "away": "Newcastle Knights",
+   "p_home_elo": 0.5844,
+   "p_home_poisson": 0.5801,
+   "p_home_gbm": 0.5194,
+   "p_home_blend": 0.5897,
+   "exp_margin_home": 3.3,
+   "exp_total_points": 49.0
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-12 16:05:00",
+   "venue": "4 Pines Park",
+   "home": "Manly-Warringah Sea Eagles",
+   "away": "North Queensland Cowboys",
+   "p_home_elo": 0.6312,
+   "p_home_poisson": 0.5874,
+   "p_home_gbm": 0.7146,
+   "p_home_blend": 0.6311,
+   "exp_margin_home": 3.7,
+   "exp_total_points": 48.2
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-12 18:15:00",
+   "venue": "AAMI Park",
+   "home": "Melbourne Storm",
+   "away": "Gold Coast Titans",
+   "p_home_elo": 0.7716,
+   "p_home_poisson": 0.6085,
+   "p_home_gbm": 0.6384,
+   "p_home_blend": 0.7567,
+   "exp_margin_home": 4.5,
+   "exp_total_points": 48.1
+  }
+ ],
+ "ratings": [
+  {
+   "rank": 1,
+   "team_id": "PEN",
+   "elo": 1642.7217005435514,
+   "team": "Penrith Panthers"
+  },
+  {
+   "rank": 2,
+   "team_id": "SYD",
+   "elo": 1585.9578228613457,
+   "team": "Sydney Roosters"
+  },
+  {
+   "rank": 3,
+   "team_id": "DOL",
+   "elo": 1573.5123244536574,
+   "team": "Dolphins"
+  },
+  {
+   "rank": 4,
+   "team_id": "CRO",
+   "elo": 1563.8865025909445,
+   "team": "Cronulla-Sutherland Sharks"
+  },
+  {
+   "rank": 5,
+   "team_id": "NZW",
+   "elo": 1560.9316502227812,
+   "team": "New Zealand Warriors"
+  },
+  {
+   "rank": 6,
+   "team_id": "MAN",
+   "elo": 1542.5166942378298,
+   "team": "Manly-Warringah Sea Eagles"
+  },
+  {
+   "rank": 7,
+   "team_id": "MEL",
+   "elo": 1539.3319623317211,
+   "team": "Melbourne Storm"
+  },
+  {
+   "rank": 8,
+   "team_id": "NQL",
+   "elo": 1505.4267515439387,
+   "team": "North Queensland Cowboys"
+  },
+  {
+   "rank": 9,
+   "team_id": "NEW",
+   "elo": 1488.761224229049,
+   "team": "Newcastle Knights"
+  },
+  {
+   "rank": 10,
+   "team_id": "SOU",
+   "elo": 1488.009919659744,
+   "team": "South Sydney Rabbitohs"
+  },
+  {
+   "rank": 11,
+   "team_id": "CBY",
+   "elo": 1480.1847881184488,
+   "team": "Canterbury-Bankstown Bulldogs"
+  },
+  {
+   "rank": 12,
+   "team_id": "CAN",
+   "elo": 1466.4186627974948,
+   "team": "Canberra Raiders"
+  },
+  {
+   "rank": 13,
+   "team_id": "BRI",
+   "elo": 1461.66980099013,
+   "team": "Brisbane Broncos"
+  },
+  {
+   "rank": 14,
+   "team_id": "PAR",
+   "elo": 1431.8959591512782,
+   "team": "Parramatta Eels"
+  },
+  {
+   "rank": 15,
+   "team_id": "WST",
+   "elo": 1420.9363528261902,
+   "team": "Wests Tigers"
+  },
+  {
+   "rank": 16,
+   "team_id": "GLD",
+   "elo": 1371.5592577439422,
+   "team": "Gold Coast Titans"
+  },
+  {
+   "rank": 17,
+   "team_id": "SGI",
+   "elo": 1358.113147749035,
+   "team": "St George Illawarra Dragons"
+  }
+ ],
+ "models": {
+  "elo": "tier 1 \u2014 K=10 (MOV-scaled), home adv 60, Platt-calibrated",
+  "poisson": "tier 2 \u2014 DC-decay try Poisson (xi=1.4), MC scores",
+  "gbm": "tier 3 \u2014 LightGBM stack (experimental, not in blend)",
+  "blend": "logistic stack of elo+poisson, weights fit 2010-2014"
+ },
+ "validation": {
+  "window": "walk-forward 2015-2025",
+  "brier": {
+   "naive": 0.2456,
+   "elo_cal": 0.2194,
+   "blend": 0.2188,
+   "market_devig_close": 0.2075
+  }
+ }
+}
