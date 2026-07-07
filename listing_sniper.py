@@ -519,6 +519,8 @@ def research_gate(client, sym, cfg, state):
     return True, "pass", m
 
 
+_GHOST_SKIPPED = set()  # [2026-07-07] symbols dropped by the delisting-risk gate (log once)
+
 # ----------------------------- paper trading --------------------------------
 
 def open_position(exid, client, sym, market, cfg, detected_at, research=None):
@@ -538,6 +540,17 @@ def open_position(exid, client, sym, market, cfg, detected_at, research=None):
             intel_tag, intel_mult, intel_detail = intel.classify(sym)
         except Exception:
             pass
+    # [2026-07-07 DELISTING GATE] 80% of lifetime exits were `delisted` (−$47):
+    # tickets on tokens that die on the vine. The killable subclass is the
+    # "ghost": junk intel (no announcement, no CoinGecko page) AND first seen
+    # on a minor venue. Skip those outright; junk on a top-15 venue still gets
+    # a quarter ticket so the ANSEM-class tail stays reachable.
+    if intel_tag == "junk" and exid not in CURATED[:15]:
+        if sym not in _GHOST_SKIPPED:
+            _GHOST_SKIPPED.add(sym)
+            print(f"[{ts()}] GHOST-SKIP {sym} on {exid}: junk intel + minor venue "
+                  f"(delisting-risk gate; {intel_detail})")
+        return None
     pos = {
         "exchange": exid,
         "pair_id": sym,

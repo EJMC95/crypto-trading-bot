@@ -15,7 +15,7 @@ WHAT IT KNOWS (two axes):
 HOW IT'S USED (deliberately conservative, mirrors the pulse policy):
   Stake modulation ONLY — never entry creation, never stake increases.
     announced or has-footprint  -> 1.0x stake (normal)
-    provably unknown everywhere -> 0.5x stake (half a ticket for lottery junk)
+    provably unknown everywhere -> 0.25x stake (quarter-ticket lottery junk) [2026-07-07, was 0.5]
     intel unavailable / errors  -> 1.0x (never punish for our own API failures)
   Every position is tagged so the ledger accumulates evidence; harder gating
   (or skip-entirely) gets promoted only if the tags prove out.
@@ -127,7 +127,7 @@ def classify(pair_symbol, now=None):
         if fp:
             rank = fp.get("rank")
             return "footprint", 1.0, f"coingecko:{fp.get('id')}" + (f" rank {rank}" if rank else "")
-        return "junk", 0.5, "no announcement, no coingecko page"
+        return "junk", 0.25, "no announcement, no coingecko page"  # [2026-07-07] was 0.5 — the junk class is 80% of tickets and dies by delisting
     except Exception:
         return "unknown", 1.0, "intel error (neutral)"
 
