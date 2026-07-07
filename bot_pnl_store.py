@@ -577,3 +577,93 @@ if __name__ == "__main__":
                  extra={"note": "self-test"})
     print("publish ->", ok, "(DATABASE_URL set)" if _DATABASE_URL else "(no DATABASE_URL; no-op)")
     time.sleep(0.1)
+
+
+# ---------------------------------------------------------------------------
+# [2026-07-07 CROSS-BOT] Fleet-level reader + append-only history for the
+# shared layers (regime oracle, fleet risk, signal bus). Same guarded,
+# never-raise pattern as everything above.
+
+
+def fetch_bot_pnl():
+    """Return every bot's latest bot_pnl row as a list of dicts, or None if
+    the DB is unavailable. Read-only; used by fleet_risk.py."""
+    conn = _get_conn()
+    if conn is None:
+        return None
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT bot, updated_at, status, equity, pnl_abs, open_trades, "
+                "closed_trades, wins, losses, extra FROM bot_pnl")
+            cols = [d[0] for d in cur.description]
+            out = []
+            for row in cur.fetchall():
+                d = dict(zip(cols, row))
+                if isinstance(d.get("extra"), str):
+                    try:
+                        d["extra"] = json.loads(d["extra"])
+                    except Exception:
+                        d["extra"] = {}
+                if d.get("updated_at") is not None:
+                    d["updated_at"] = d["updated_at"].isoformat()
+                out.append(d)
+        return out
+    except Exception as e:
+        _warn_once(f"bot_pnl read failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return None
+
+
+_history_table_ready = False
+
+
+def _ensure_history_table(conn):
+    global _history_table_ready
+    if _history_table_ready:
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bot_state_history (
+                key     TEXT NOT NULL,
+                ts      TIMESTAMPTZ NOT NULL DEFAULT now(),
+                payload JSONB
+            )
+            """
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS bot_state_history_key_ts "
+            "ON bot_state_history (key, ts)")
+    _history_table_ready = True
+
+
+def save_history(key, payload):
+    """Append one snapshot to bot_state_history (oracle calls, risk lights) so
+    the shared layers become backtestable. Safe every loop. Never raises."""
+    conn = _get_conn()
+    if conn is None:
+        return False
+    try:
+        _ensure_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO bot_state_history (key, ts, payload) "
+                "VALUES (%s, now(), %s)",
+                (key, json.dumps(payload)))
+        return True
+    except Exception as e:
+        _warn_once(f"history write failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return False

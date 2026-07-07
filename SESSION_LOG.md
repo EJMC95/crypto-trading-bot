@@ -19,6 +19,16 @@ watch for next. Everything here is DRY-RUN / paper unless explicitly stated.
 ### What shipped today (one push, commits per fix, changelog per commit)
 Option-B isolation (run_all `ONLY_BOT` mode; poller back to 5; family services each get a /freqtrade/persist volume + ONLY_BOT env and run exactly one bot); Dockerfile COPY bot_learn.py; funding-carry exit rebuild (flip-grace ≥1h / decay-only-after-fee-payback / 14d expiry / −2% bleed stop) + 6h funding-persistence entry filter; sniper ghost-gate (junk intel + minor venue = skip; junk elsewhere quarter-stake); V7 max_open 10→6; RegimeSwitchV2 per-loop diagnostics. Family Postgres rows quarantined + purged post-cutover (see analysis_2026-07-07/).
 
+### Evening — cross-bot intelligence build (Phases 1-3, publish-side)
+Built and deployed the first three layers of the cross-bot design, advisory mode:
+`regime_oracle.py` (L1: one shared regime read, 12 majors, published + historized),
+`fleet_risk.py` (L2: fleet-wide exposure traffic light with pair-pileup detection;
+L3: signal bus mirroring funding/dislocation/pulse into bot_state). Nothing
+consumes these yet by design — after ~7 days of `bot_state_history` we compare
+oracle calls + risk lights against what bots actually did, then wire enforcement
+(confirm_trade_entry veto on RED, oracle-gated sizing) from evidence. A scheduled
+review task exists for this.
+
 ### Watchlist
 - Family bots restart at $1000 era-zero in isolated services — judge after 2 clean weeks, not before.
 - funding-carry: expect FAR fewer closes; first `decay_paid` win = the rebuild working. All-`flip` closes = universe still too spiky → tighten to majors.

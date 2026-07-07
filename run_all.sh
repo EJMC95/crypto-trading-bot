@@ -98,5 +98,24 @@ run_poller &
     sleep 7200
   done ) &
 
+# [2026-07-07 CROSS-BOT L1] Regime oracle — ONE shared read of the tape
+# (per-major direction + ADX character) -> bot_state 'regime-oracle' +
+# bot_state_history. ADVISORY week one: nothing consumes it yet.
+( sleep 120
+  while true; do
+    python3 /freqtrade/regime_oracle.py || true
+    sleep 1800
+  done ) &
+
+# [2026-07-07 CROSS-BOT L2/L3] Fleet risk traffic light + signal bus —
+# fleet-wide directional exposure vs budgets + scanner exhaust ->
+# bot_state 'fleet-risk' / 'signal-bus'. ADVISORY: enforcement wiring is
+# decided from ~7 days of this history, not vibes.
+( sleep 90
+  while true; do
+    python3 /freqtrade/fleet_risk.py || true
+    sleep 300
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait
