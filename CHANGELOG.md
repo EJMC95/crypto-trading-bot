@@ -1,4 +1,5 @@
 ## 2026-07-07
+- **Dockerfile.freqtrade**: COPY bot_learn.py — the learning brain has been dead in deploy since Jul-5 (run_all.sh runs it 2-hourly; the file was never in the image: `can't open file '/freqtrade/bot_learn.py'`).
 - **OPTION-B ISOLATION**: family bots (mum/dad/avo-maria/georgia) removed from the freqtrade-bots container; each runs ONLY in its dedicated Railway service via run_all.sh `ONLY_BOT` mode (one bot + FT_POLLER_BOTS-scoped poller). Root cause fixed: the 4 services built from Dockerfile.freqtrade were EACH running all nine bots (fresh $1000, no volume) + a 9-name poller — five pollers race-writing bot_pnl (the Jul 5-7 "counter resets"/equity flapping; Jul-6 trade contamination). Poller _DEFAULT_BOTS back to the 5 originals; stale family comments fixed.
 
 ## 2026-07-06
