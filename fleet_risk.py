@@ -149,6 +149,9 @@ def main():
     except Exception:
         pass
     store.save_state(BUS_KEY, bus)
+    # [2026-07-07 day-zero review catch] historize the bus too — without this,
+    # the Jul-14 enforcement review cannot judge Layer 3 against outcomes.
+    store.save_history(BUS_KEY, bus)
 
     hp = ",".join(f"{k}x{v}" for k, v in list(hot_pairs.items())[:4]) or "none"
     print(f"[fleet-risk] {now_iso()} light={light.upper()} "
