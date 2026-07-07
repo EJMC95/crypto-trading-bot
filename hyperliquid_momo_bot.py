@@ -53,6 +53,9 @@ COINS = [
     "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "ARB", "OP",
     "SUI", "SEI", "TIA", "APT", "NEAR", "INJ", "LTC", "BCH", "ATOM", "DOT",
     "ADA", "AAVE", "PEPE", "WIF", "kBONK", "ENA", "ORDI", "JUP", "TON", "kSHIB",
+    # [2026-07-07 COVERAGE] HL top-30 liquidity the web lacked: HYPE was the
+    # #4 perp by 24h notional ($359M, SOL-tier) with zero fleet coverage.
+    "HYPE", "ZEC", "TAO",
 ]
 ENTRY_LOOKBACK = 15      # [2026-07-01] reverted 12->15 to the validated backtest window
 EXIT_LOOKBACK = 8

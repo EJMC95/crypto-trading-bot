@@ -52,7 +52,9 @@
       "AVAX/USDC:USDC",
       "DOGE/USDC:USDC",
       "LTC/USDC:USDC",
-      "ADA/USDC:USDC"
+      "ADA/USDC:USDC",
+      "HYPE/USDC:USDC",
+      "ZEC/USDC:USDC"
     ],
     "pair_blacklist": [],
     "enable_ws": true

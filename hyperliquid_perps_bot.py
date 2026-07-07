@@ -49,6 +49,9 @@ COINS = [
     "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "AVAX", "LINK", "ARB", "OP",
     "SUI", "SEI", "TIA", "APT", "NEAR", "INJ", "LTC", "BCH", "ATOM", "DOT",
     "ADA", "AAVE", "PEPE", "WIF", "kBONK", "ENA", "ORDI", "JUP", "TON", "kSHIB",
+    # [2026-07-07 COVERAGE] HL top-30 liquidity the web lacked: HYPE was the
+    # #4 perp by 24h notional ($359M, SOL-tier) with zero fleet coverage.
+    "HYPE", "ZEC", "TAO",
 ]
 RSI_PERIOD = 14
 # REVERTED 45->30 / 55->70 (2026-06-25). The 45/55 relaxation 6x'd the trade

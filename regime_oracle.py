@@ -45,7 +45,8 @@ TTL_SEC = 7200          # consumers must ignore anything older than 2h
 
 # The fleet's shared majors: RegimeSwitchV2's 10 + DOT/NEAR for spot coverage.
 UNIVERSE = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX",
-            "LINK", "LTC", "DOT", "NEAR", "SUI"]  # SUI added — fleet holds it (day-zero review catch)
+            "LINK", "LTC", "DOT", "NEAR", "SUI",  # SUI: day-zero review catch
+            "HYPE", "ZEC", "TAO"]  # [2026-07-07] coverage adds with the perps web
 
 ADX_TREND = 17          # >= trending (matches RegimeSwitchV2 after Jul-6 cut)
 ADX_CHOP = 11           # <= chop; between = hysteresis (hold previous)

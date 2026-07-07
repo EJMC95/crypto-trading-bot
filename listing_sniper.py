@@ -175,6 +175,11 @@ TOKENIZED_BASES = {
     "JPM", "BRK", "PFE", "JNJ", "KO", "PEP", "WMT", "CRCL", "RBLX", "UBER",
     "ABNB", "SHOP", "SQ", "PYPL", "ORCL", "CRM", "AVGO", "QCOM", "MU",
     "SMCI", "ASML", "TSM", "WTI", "BRENT", "COPPER", "WHEAT", "CORN",
+    # [2026-07-07] second tokenized wave observed in the ledger (0 wins, ≈-$7:
+    # CSCO/DELL/ADBE/GLW/COHR/CRDO/SNDK/ADI/PLAY all bled to max_hold/stop):
+    "CSCO", "DELL", "ADBE", "GLW", "COHR", "CRDO", "SNDK", "ADI", "PLAY",
+    "LRCX", "KLAC", "TXN", "IBM", "GE", "CAT", "BA", "XOM", "CVX", "UNH",
+    "LLY", "ABBV", "MRK", "TMO", "COST", "HD", "PG", "VZ", "T", "CMCSA",
 }
 
 # Rough global spot-volume ranking of major exchanges (CCXT ids). Anything not

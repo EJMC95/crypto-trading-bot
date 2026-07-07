@@ -63,7 +63,12 @@
       "APT/USD",
       "SUI/USD",
       "INJ/USD",
-      "OP/USD"
+      "OP/USD",
+      "TIA/USD",
+      "ARB/USD",
+      "WIF/USD",
+      "BONK/USD",
+      "PEPE/USD"
     ],
     "pair_blacklist": [
       ".*USDT/USD",
