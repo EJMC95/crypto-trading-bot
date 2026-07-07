@@ -265,6 +265,10 @@ def fetch_bot_quality():
         for bot, (n, w, gw, gl, pnl, last_close) in life.items():
             q = {"n": n, "w": w, "wr": (100.0 * w / n if n else None),
                  "pf": (float(gw) / abs(float(gl)) if float(gl) else None),
+                 # [2026-07-07 RESET-PROOF] lifetime ledger P&L — the durable sum
+                 # that survives any live-counter wipe (the July-6 reset made the
+                 # dashboard show $1000/0 while the ledger held 8 real trades).
+                 "pnl": float(pnl),
                  "exp": (float(pnl) / n if n else None), "last_close": last_close,
                  "n24": int(n24.get(bot) or 0),
                  "tags": sorted(tags.get(bot, []), key=lambda t: -t["n"])}
@@ -731,6 +735,13 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
         rows.append(f'<div class="row"><span>Quality (ledger)</span>'
                     f'<b>{q["wr"]:.0f}% win · PF {pf_txt} · {money(q["exp"])}/trade</b></div>')
         pass  # last-close now rendered for EVERY bot below (2026-07-07)
+        # [2026-07-07 RESET-PROOF] All-time P&L from the durable trade ledger —
+        # cannot be zeroed by a live-DB wipe, so a reset can never again hide a
+        # bot's true history (July-6: card showed $1000/0 while the ledger held
+        # 8 real trades). If this row and 'Total P&L' disagree, a reset happened.
+        if q.get("pnl") is not None:
+            rows.append(f'<div class="row"><span>All-time Σ (ledger, {q["n"]} closed)</span>'
+                        f'<b class="{cls(q["pnl"])}">{money(q["pnl"])}</b></div>')
     e = q.get("era") if q else None
     if e is not None:
         _en, _ew = e.get("n") or 0, e.get("w") or 0

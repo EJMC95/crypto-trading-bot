@@ -19,6 +19,10 @@
 
 # Changelog
 
+## 2026-07-07
+- dashboard: **reset-proof "All-time Σ (ledger)" row on every bot card** — lifetime P&L + closed count straight from the durable `bot_trades` ledger, so a live-DB wipe can never again masquerade as "no trades" (July-6: Range Raider's card showed $1000/0 while the ledger held 8 real post-rework trades, 3W/5L −$2.47). If this row and Total P&L disagree, a reset happened.
+- investigated Range Raider "no trades since rework": logs CLEAN (no errors/OOM/crash-loop); the regime-legs fix DID trade (8 closes 07-05→07-06 03:00); live counter wiped ~July-6 during the family-bot restructure deploys (exact mechanism aged out of the log window). Retracted the suspected mum/8089 port collision — regime-switch polls in its own container via FT_POLLER_BOTS.
+
 Shared log of every change that affects a running bot, the dashboard, or deploy
 behaviour. **Multiple Claude sessions work this repo in parallel** — this file is
 how they stay in sync. If your diff touches bot code (`*.py`, `*.sh`, a strategy,
