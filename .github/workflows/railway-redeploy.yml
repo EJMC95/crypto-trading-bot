@@ -56,7 +56,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 2   # need the previous commit to diff which files changed
+          fetch-depth: 0   # full history: push events diff the whole before..after range
 
       - name: Decide which services to deploy
         id: decide
@@ -69,7 +69,16 @@ jobs:
             # we intentionally ship a strategy change and accept one paper-DB reset).
             svcs="${DISPATCH_SVCS:-freqtrade-bots,pnl-dashboard}"
           else
-            changed="$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo '')"
+            # Diff the WHOLE push (before..after), not just the last commit —
+            # a multi-commit push ending in a docs commit was deploying nothing.
+            before='${{ github.event.before }}'
+            if [ -n "$before" ] && [ "$before" != "0000000000000000000000000000000000000000" ] \
+               && git cat-file -e "$before^{commit}" 2>/dev/null; then
+              range="$before HEAD"
+            else
+              range="HEAD^ HEAD"   # fallback: first push to branch / force push
+            fi
+            changed="$(git diff --name-only $range 2>/dev/null || echo '')"
             echo "Changed files:"; echo "$changed"
             svcs=""
             # [2026-07-03 UNFROZEN] freqtrade-bots auto-deploy is back on: the
@@ -116,10 +125,16 @@ jobs:
             svc="$(echo "$raw" | xargs)"
             [ -z "$svc" ] && continue
             echo "::group::railway up --service '$svc'"
-            if railway up --service "$svc" --ci; then
+            ok=0
+            for attempt in 1 2 3; do
+              if railway up --service "$svc" --ci; then ok=1; break; fi
+              echo "attempt $attempt for '$svc' failed (transient Railway API error); retrying in $((attempt*15))s..."
+              sleep $((attempt*15))
+            done
+            if [ "$ok" -eq 1 ]; then
               echo "OK: '$svc' deployed (latest main)"
             else
-              echo "::error::deploy failed for '$svc' — check the exact service name."
+              echo "::error::deploy failed for '$svc' after 3 attempts — transient API error or wrong service name."
               fail=1
             fi
             echo "::endgroup::"
