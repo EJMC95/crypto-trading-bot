@@ -1,3 +1,6 @@
+## 2026-07-07
+- **OPTION-B ISOLATION**: family bots (mum/dad/avo-maria/georgia) removed from the freqtrade-bots container; each runs ONLY in its dedicated Railway service via run_all.sh `ONLY_BOT` mode (one bot + FT_POLLER_BOTS-scoped poller). Root cause fixed: the 4 services built from Dockerfile.freqtrade were EACH running all nine bots (fresh $1000, no volume) + a 9-name poller — five pollers race-writing bot_pnl (the Jul 5-7 "counter resets"/equity flapping; Jul-6 trade contamination). Poller _DEFAULT_BOTS back to the 5 originals; stale family comments fixed.
+
 ## 2026-07-06
 - **funding_carry_bot**: raise ENTER_APR 20%→40%, EXIT_APR 8%→15%, lower MIN_DAY_VOLUME $5M→$2M, extend MAX_HOLD 7→14d — fix fee bleed on fast-decaying carries
 - **funding_carry_bot**: raise MAX_POSITIONS 5→8, NOTIONAL $200→$300 — expand reach and earning capacity

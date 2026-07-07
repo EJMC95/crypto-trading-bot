@@ -1,5 +1,16 @@
 #!/bin/sh
-# Supervisor: run all freqtrade dry-run bots in one container.
+# Supervisor for the freqtrade fleet.
+# Two modes:
+#   default   — the freqtrade-bots container: the 5 ORIGINAL spot bots +
+#               dashboard + market pulse + poller + learning brain.
+#   ONLY_BOT  — a dedicated single-bot Railway service (family bots): runs
+#               exactly one bot + a poller scoped to it via FT_POLLER_BOTS.
+#               No dashboard/pulse/brain here (those live in the main container).
+# [2026-07-07 OPTION-B] Family bots (mum/dad/avo-maria/georgia) were REMOVED
+# from this container: their dedicated services had been building from this
+# same Dockerfile and therefore each ran ALL NINE bots with fresh $1000 wallets
+# plus a 9-name poller — five pollers race-writing bot_pnl (the "counter reset"
+# flapping of Jul 5-7). One bot, one home, one writer.
 # Each runs in its own restart loop so a crash of one doesn't take down the rest.
 # Logs go to stdout (captured by Railway). No --logfile on purpose.
 set -u
@@ -27,18 +38,40 @@ run_bot() {
   done
 }
 
-# === Original fleet ===
-run_bot user_data/config_v4_core.json   v4core   &
-run_bot user_data/config_v5_kraken.json  v5gated  &
-run_bot user_data/config_v6_swing.json   v6swing  &
-run_bot user_data/config_v7_momo.json    v7momo   &
-run_bot user_data/config_v8_momo.json    v8momo   &
+run_poller() {
+  while true; do
+    echo "[supervisor] starting freqtrade pnl poller"
+    python3 /freqtrade/freqtrade_pnl_poller.py
+    echo "[supervisor] pnl poller exited — restarting in 15s"
+    sleep 15
+  done
+}
 
-# === New fleet — July 2026 (paper, $1000 each, no top-ups) ===
-run_bot user_data/config_mum.json        mum        &   # 👩 NFI X7 · 5m trend
-run_bot user_data/config_dad.json        dad        &   # 👨 E0V1E · 5m breakout
-run_bot user_data/config_avo_maria.json  avo-maria  &   # 🙏 BinH+Cluc · 5m mean reversion
-run_bot user_data/config_georgia.json    georgia    &   # 🔮 FreqAI LightGBM · 1H ML
+# --- Dedicated single-bot service mode (family bots) -------------------------
+if [ -n "${ONLY_BOT:-}" ]; then
+  cfg="user_data/config_${ONLY_BOT}.json"
+  if [ ! -f "$cfg" ]; then
+    echo "[supervisor] FATAL: ONLY_BOT=${ONLY_BOT} but $cfg not found"; exit 1
+  fi
+  port=$(python3 -c "import json;print(json.load(open('$cfg'))['api_server']['listen_port'])")
+  pub_name="freqtrade-$(echo "$ONLY_BOT" | tr '_' '-')"
+  export FT_POLLER_BOTS="[[\"${pub_name}\", ${port}]]"
+  echo "[supervisor] ONLY_BOT mode: ${pub_name} on :${port} (poller scoped)"
+  run_poller &
+  run_bot "$cfg" "$ONLY_BOT" &
+  wait
+  exit 0
+fi
+
+# --- Main container: the 5 original spot bots --------------------------------
+run_bot user_data/config_v4_core.json   v4core   &   # crypto-trend-daily   · ImprovedStrategyV4 · daily trend
+run_bot user_data/config_v5_kraken.json  v5gated  &   # crypto-intraday-15m  · DayTraderV5Gated  · 15m
+run_bot user_data/config_v6_swing.json   v6swing  &   # crypto-swing-daily   · SwingDipV1        · dip buyer
+run_bot user_data/config_v7_momo.json    v7momo   &   # crypto-breakout-4h   · MomoBreakoutV1    · 4h breakout
+run_bot user_data/config_v8_momo.json    v8momo   &   # crypto-trendmomo-4h  · TrendMomoV1       · 4h momo
+
+# Family bots (mum/dad/avo-maria/georgia) run in their OWN Railway services
+# via ONLY_BOT mode above — do NOT re-add them here (see CHANGELOG 2026-07-07).
 
 # Combined P&L + trades dashboard, served on $PORT (Railway exposes it).
 python3 /freqtrade/dashboard_server.py &
@@ -53,12 +86,7 @@ done &
 # Publish each freqtrade bot's P&L to the shared Postgres table so they show on
 # the unified pnl_dashboard alongside perps/momo/arb/sniper. Guarded: no-op if
 # DATABASE_URL is unset. Restart-looped so a transient error can't kill it.
-while true; do
-  echo "[supervisor] starting freqtrade pnl poller"
-  python3 /freqtrade/freqtrade_pnl_poller.py
-  echo "[supervisor] pnl poller exited — restarting in 15s"
-  sleep 15
-done &
+run_poller &
 
 # [2026-07-05] Run the learning brain every 2h. Reads the trade ledger across
 # ALL bots (original + new fleet), correlates with market_pulse signals, and
