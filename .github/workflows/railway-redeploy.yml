@@ -37,6 +37,10 @@ on:
       - 'bot_pnl_store.py'
       - 'freqtrade_pnl_poller.py'
       - 'market_pulse.py'
+      # cross-bot layer (runs inside freqtrade-bots via run_all.sh) — added
+      # 2026-07-07 after 9cedf08 (SUI + historize) silently didn't deploy
+      - 'regime_oracle.py'
+      - 'fleet_risk.py'
   workflow_dispatch:
     inputs:
       services:
@@ -85,7 +89,7 @@ jobs:
             # service now has a Railway volume at /freqtrade/persist and every
             # bot's db_url points into it, so redeploys/restarts no longer wipe
             # the dry-run paper DBs (the reason for the 2026-07-01 freeze).
-            if echo "$changed" | grep -qE '^(user_data/|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$)'; then
+            if echo "$changed" | grep -qE '^(user_data/|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$)'; then
               svcs="freqtrade-bots"
             fi
             if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$)'; then
