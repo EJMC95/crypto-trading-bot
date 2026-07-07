@@ -1,4 +1,5 @@
 ## 2026-07-07
+- **funding_carry_bot**: EXIT REBUILD (0W/28L — every close realized ≈ round-trip fees): decay alone no longer closes; closes only on flip persisting ≥1h, decay AFTER fee payback (net ≥ +$0.10), 14d expiry, or a −2%-of-notional bleed stop. NEW 6h persistence entry filter (|APR| must hold ≥ ENTER_APR for 6h — spike-and-revert funding never passes). hot_since persisted to bot_state.
 - **Dockerfile.freqtrade**: COPY bot_learn.py — the learning brain has been dead in deploy since Jul-5 (run_all.sh runs it 2-hourly; the file was never in the image: `can't open file '/freqtrade/bot_learn.py'`).
 - **OPTION-B ISOLATION**: family bots (mum/dad/avo-maria/georgia) removed from the freqtrade-bots container; each runs ONLY in its dedicated Railway service via run_all.sh `ONLY_BOT` mode (one bot + FT_POLLER_BOTS-scoped poller). Root cause fixed: the 4 services built from Dockerfile.freqtrade were EACH running all nine bots (fresh $1000, no volume) + a 9-name poller — five pollers race-writing bot_pnl (the Jul 5-7 "counter resets"/equity flapping; Jul-6 trade contamination). Poller _DEFAULT_BOTS back to the 5 originals; stale family comments fixed.
 

@@ -57,6 +57,20 @@ ENTER_APR = 0.40          # open when |annualized funding| >= 40% [2026-07-06 ra
 EXIT_APR = 0.15           # close when it decays below 15% [2026-07-06 raised from 8% to exit before fees eat accrual]
 MAX_HOLD_H = 14 * 24      # recycle capital after 2 weeks [2026-07-06 extended from 7d to let high-rate carries compound]
 
+# [2026-07-07 EXIT REBUILD] 0W/28L root cause: decay-exits realized fees before
+# funding could pay them back (round-trip 29bps needs ~64h at 40% APR; spiky alt
+# funding mean-reverts in hours). Decay alone NO LONGER closes a position:
+#   * flip persisting >= FLIP_GRACE_H  (we are now PAYING funding — get out)
+#   * decay only AFTER fee payback     (net after all fees >= FEE_PAYBACK_MARGIN)
+#   * MAX_HOLD_H expiry                (capital recycling, unchanged)
+#   * bleed stop                       (catastrophic guard on adverse holds)
+# Entries additionally require the rate to have stayed hot >= PERSIST_H — the
+# research-backed filter: persistent funding pays carries, spikes pay fees.
+PERSIST_H = 6.0            # hours a coin must hold >= ENTER_APR before entry
+FLIP_GRACE_H = 1.0         # hours of adverse funding before a flip-close
+FEE_PAYBACK_MARGIN = 0.10  # $ net (after ALL fees incl. close) for a decay-close
+BLEED_STOP_FRAC = 0.02     # close if net drops below -2% of notional
+
 # Round-trip friction, as fractions of notional per SIDE of the round trip.
 PERP_FEE = 0.00045        # HL taker per perp fill (conservative base tier)
 HEDGE_COST = 0.0010       # hedge-leg fee + spread per fill (other venue/spot)
@@ -114,6 +128,7 @@ def main():
         pass
 
     positions = {}  # coin -> dict(side, notional, opened_ts, accrued, fees, entry_apr)
+    hot_since = {}  # coin -> ts when |APR| first held >= ENTER_APR [2026-07-07]
 
     # [2026-07-03 PERSIST] Restore open carries from Postgres so a redeploy keeps
     # accrued funding + entry levels (realized already restores from the ledger
@@ -122,6 +137,8 @@ def main():
         _saved = store.load_state(BOT)
         if _saved and isinstance(_saved.get("positions"), dict) and _saved["positions"]:
             positions = _saved["positions"]
+        if _saved and isinstance(_saved.get("hot_since"), dict):
+            hot_since = {str(k): float(v) for k, v in _saved["hot_since"].items()}
             print(f"[{now_iso()}] restored {len(positions)} open carry position(s) "
                   f"from saved state")
     except Exception:
@@ -159,16 +176,27 @@ def main():
                 pos["accrued"] += (-sign) * rate * dt_h * pos["notional"]
                 held_h = (t0 - pos["opened_ts"]) / 3600.0
 
-                flipped = (pos["side"] == "short_perp" and apr < 0) or \
-                          (pos["side"] == "long_perp" and apr > 0)
-                decayed = abs(apr) < EXIT_APR
+                flipped_now = (pos["side"] == "short_perp" and apr < 0) or \
+                              (pos["side"] == "long_perp" and apr > 0)
+                # [2026-07-07 EXIT REBUILD] flip grace + fee-payback decay + bleed stop.
+                if flipped_now:
+                    pos.setdefault("flipped_since", t0)
+                else:
+                    pos.pop("flipped_since", None)
+                close_fee = OPEN_COST * pos["notional"]
+                net_if_closed = pos["accrued"] - (pos["fees"] + close_fee)
+                flipped = flipped_now and \
+                    (t0 - pos["flipped_since"]) / 3600.0 >= FLIP_GRACE_H
+                decayed = abs(apr) < EXIT_APR and net_if_closed >= FEE_PAYBACK_MARGIN
                 expired = held_h >= MAX_HOLD_H
-                if not (flipped or decayed or expired):
+                bleeding = net_if_closed <= -BLEED_STOP_FRAC * pos["notional"]
+                if not (flipped or decayed or expired or bleeding):
                     continue
 
-                pos["fees"] += OPEN_COST * pos["notional"]  # closing friction
+                pos["fees"] += close_fee  # closing friction
                 pnl = pos["accrued"] - pos["fees"]
-                reason = "flip" if flipped else ("decay" if decayed else "max_hold")
+                reason = ("flip" if flipped else "decay_paid" if decayed
+                          else "max_hold" if expired else "bleed_stop")
                 realized += pnl
                 n_closed += 1
                 n_wins += 1 if pnl > 0 else 0
@@ -187,12 +215,22 @@ def main():
                     pass
                 del positions[coin]
 
+            # ---- persistence bookkeeping [2026-07-07] --------------------
+            # Track how long each coin has held >= ENTER_APR. First-seen coins
+            # start their clock now, so nothing enters before PERSIST_H.
+            for c, f in fund.items():
+                if abs(f["rate"] * HOURS_PER_YEAR) >= ENTER_APR:
+                    hot_since.setdefault(c, t0)
+                else:
+                    hot_since.pop(c, None)
+
             # ---- scan for new carries ------------------------------------
             if len(positions) < MAX_POSITIONS:
                 candidates = sorted(
                     ((c, f) for c, f in fund.items()
                      if c not in positions and f["vol"] >= MIN_DAY_VOLUME
-                     and abs(f["rate"] * HOURS_PER_YEAR) >= ENTER_APR),
+                     and abs(f["rate"] * HOURS_PER_YEAR) >= ENTER_APR
+                     and (t0 - hot_since.get(c, t0)) >= PERSIST_H * 3600.0),
                     key=lambda cf: -abs(cf[1]["rate"]))
                 for coin, f in candidates[:MAX_POSITIONS - len(positions)]:
                     apr = f["rate"] * HOURS_PER_YEAR
@@ -203,7 +241,9 @@ def main():
                         "entry_apr": apr,
                     }
                     print(f"[{now_iso()}] OPEN {coin} {side} ${NOTIONAL:.0f} "
-                          f"| funding {apr:+.1%} APR (hedged delta-neutral)")
+                          f"| funding {apr:+.1%} APR "
+                          f"| hot {(t0 - hot_since.get(coin, t0)) / 3600.0:.1f}h "
+                          f"(hedged delta-neutral)")
 
             # ---- publish snapshot ----------------------------------------
             open_pnl = sum(p["accrued"] - p["fees"] for p in positions.values())
@@ -228,7 +268,7 @@ def main():
 
             # [2026-07-03 PERSIST] Durable open-carry state -> Postgres.
             try:
-                store.save_state(BOT, {"positions": positions})
+                store.save_state(BOT, {"positions": positions, "hot_since": hot_since})
             except Exception:
                 pass
 
