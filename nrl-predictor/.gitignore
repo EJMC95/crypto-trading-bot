@@ -1,3 +1,7 @@
+# The parent crypto-trading-bot .gitignore excludes `data/` and `*.csv` globally;
+# re-include ours first, then carve raw/processed back out (order matters).
+!data/
+!*.csv
 data/raw/
 data/processed/*
 !data/processed/.gitkeep
