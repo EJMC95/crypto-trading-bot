@@ -468,6 +468,122 @@ def fetch_open_trades():
         conn.close()
 
 
+_ENRICH_CACHE = {"ts": 0.0, "data": {}}
+
+
+def fetch_ledger_enrich():
+    """[2026-07-07 UNIFORM CARDS] One cached ledger pass so EVERY bot's card
+    carries the same fields regardless of what its publisher sends:
+      * lifetime record + total P&L from the union ledger
+        (bot_trades + paper_trades — the perps bots publish NULL wins/losses
+        to bot_pnl even though the ledger knows their whole history),
+      * TODAY's P&L: equity-curve delta since UTC midnight where the bot has
+        an equity history (captures unrealized), else trades closed today,
+      * last-close detail (pair, P&L, reason, when),
+      * open positions for bots whose live book sits in bot_state (perps
+        broker positions, funding carries) rather than bot_pnl.extra.
+    Guarded: any failure degrades to {} and cards render as before."""
+    import time as _time
+    if _time.time() - _ENRICH_CACHE["ts"] < 20:
+        return _ENRICH_CACHE["data"]
+    import psycopg2
+    import psycopg2.extras
+    out = {}
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('public.bot_trades') t1, "
+                        "to_regclass('public.paper_trades') t2, "
+                        "to_regclass('public.bot_equity_history') t3, "
+                        "to_regclass('public.bot_state') t4")
+            g = cur.fetchone()
+            parts = []
+            if g["t1"]:
+                parts.append("SELECT bot, pair, profit_abs AS pnl, "
+                             "exit_reason AS reason, close_ts "
+                             "FROM bot_trades WHERE close_ts IS NOT NULL")
+            if g["t2"]:
+                parts.append("SELECT bot, pair, pnl_abs, reason, "
+                             "COALESCE(NULLIF(closed_at,'')::timestamptz, seen_at) "
+                             "FROM paper_trades")
+            if parts:
+                union = " UNION ALL ".join(parts)
+                cur.execute(
+                    f"WITH t AS ({union}) "
+                    "SELECT bot, COUNT(*) n, SUM((pnl>0)::int) w, SUM(pnl) total, "
+                    "COALESCE(SUM(pnl) FILTER (WHERE close_ts >= date_trunc('day', now())),0) today_closed, "
+                    "COUNT(*) FILTER (WHERE close_ts >= date_trunc('day', now())) today_n "
+                    "FROM t GROUP BY bot")
+                for r in cur.fetchall():
+                    b = out.setdefault(r["bot"], {})
+                    n, w = int(r["n"]), int(r["w"] or 0)
+                    b["record"] = {"n": n, "w": w, "l": n - w,
+                                   "total": round(float(r["total"] or 0), 2)}
+                    b["today_closed"] = round(float(r["today_closed"] or 0), 2)
+                    b["today_n"] = int(r["today_n"] or 0)
+                cur.execute(
+                    f"WITH t AS ({union}) "
+                    "SELECT DISTINCT ON (bot) bot, pair, pnl, reason, close_ts "
+                    "FROM t ORDER BY bot, close_ts DESC")
+                for r in cur.fetchall():
+                    out.setdefault(r["bot"], {})["last_close"] = {
+                        "pair": r["pair"],
+                        "pnl": (round(float(r["pnl"]), 2) if r["pnl"] is not None else None),
+                        "reason": r["reason"],
+                        "ts": r["close_ts"].isoformat() if r["close_ts"] else None}
+            if g["t3"]:
+                cur.execute(
+                    "SELECT bot, (array_agg(equity ORDER BY ts DESC))[1] "
+                    "- (array_agg(equity ORDER BY ts))[1] AS delta "
+                    "FROM bot_equity_history "
+                    "WHERE ts >= date_trunc('day', now()) GROUP BY bot")
+                for r in cur.fetchall():
+                    if r["delta"] is not None:
+                        out.setdefault(r["bot"], {})["today_equity_delta"] = \
+                            round(float(r["delta"]), 2)
+            if g["t4"]:
+                cur.execute("SELECT bot, state FROM bot_state WHERE bot IN "
+                            "('perps-rsi-meanrev','perps-donchian-breakout',"
+                            "'perps-funding-carry')")
+                for r in cur.fetchall():
+                    st = r["state"] if isinstance(r["state"], dict) else \
+                        json.loads(r["state"] or "{}")
+                    poss = []
+                    br = st.get("broker") or {}
+                    marks = br.get("marks") or {}
+                    for coin, v in (br.get("pos") or {}).items():
+                        try:
+                            qty, entry = float(v[0]), float(v[1])
+                            mark = marks.get(coin)
+                            upnl = (round((float(mark) - entry) * qty, 2)
+                                    if mark is not None else None)
+                            poss.append({"pair": str(coin),
+                                         "side": "long" if qty > 0 else "short",
+                                         "qty": qty, "entry": entry, "upnl": upnl})
+                        except Exception:
+                            poss.append({"pair": str(coin), "side": "?",
+                                         "qty": None, "entry": None, "upnl": None})
+                    for coin, p in (st.get("positions") or {}).items():
+                        if isinstance(p, dict) and "side" in p:
+                            try:
+                                net = round(float(p.get("accrued", 0))
+                                            - float(p.get("fees", 0)), 2)
+                            except Exception:
+                                net = None
+                            poss.append({"pair": str(coin),
+                                         "side": ("short" if "short" in str(p.get("side"))
+                                                  else "long"),
+                                         "qty": p.get("notional"), "entry": None,
+                                         "upnl": net})
+                    if poss:
+                        out.setdefault(r["bot"], {})["positions"] = poss
+    finally:
+        conn.close()
+    _ENRICH_CACHE["ts"] = _time.time()
+    _ENRICH_CACHE["data"] = out
+    return out
+
+
 def age_str(updated_at, threshold=STALE_SECONDS):
     if updated_at is None:
         return "never", True
@@ -516,8 +632,10 @@ def _orders_html(extra):
     return f'<div class="sub">Open orders ({len(items)})</div>{"".join(items)}'
 
 
-def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
+def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
+         enrich=None):
     open_trades = open_trades or {}
+    en = enrich or {}
     badge = ""
     if bot in BADGES:
         _t, _c = BADGES[bot]
@@ -559,18 +677,36 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
         rows.append(f'<div class="row"><span>{pnl_label}</span>'
                     f'<b class="{cls(_pnl_abs)}">{money(_pnl_abs)}'
                     f'{" (" + pct(_pct) + ")" if _pct is not None else ""}</b></div>')
-    if row.get("closed_trades") is not None or row.get("open_trades") is not None:
+    # [2026-07-07 UNIFORM CARDS] Perps bots publish NULL closed/wins/losses to
+    # bot_pnl even though the paper ledger has every close — fall back to the
+    # ledger so every card shows a real record.
+    _closed = row.get("closed_trades")
+    if _closed is None and (en.get("record") or {}).get("n"):
+        _closed = en["record"]["n"]
+    if _closed is not None or row.get("open_trades") is not None:
         rows.append(f'<div class="row"><span>Trades</span>'
-                    f'<b>{row.get("closed_trades") or 0} closed · {row.get("open_trades") or 0} open</b></div>')
+                    f'<b>{_closed or 0} closed · {row.get("open_trades") or 0} open</b></div>')
     if row.get("wins") is not None:
         rows.append(f'<div class="row"><span>Win / Loss</span>'
                     f'<b>{row.get("wins") or 0} / {row.get("losses") or 0}</b></div>')
-    # Daily / Weekly / Monthly P&L (published by bots that support it)
+    elif (en.get("record") or {}).get("n"):
+        _r = en["record"]
+        rows.append(f'<div class="row"><span>Win / Loss (ledger)</span>'
+                    f'<b>{_r["w"]} / {_r["l"]} · {money(_r["total"])} lifetime</b></div>')
+    # Daily / Weekly / Monthly P&L. [2026-07-07 UNIFORM CARDS] Today's figure
+    # is computed server-side for EVERY bot: equity-curve delta since UTC
+    # midnight where an equity history exists (captures unrealized moves),
+    # else the sum of trades closed today from the ledger. A publisher-sent
+    # pnl_daily still wins if a bot ever supplies one.
     pnl_daily   = row.get("pnl_daily")
+    if pnl_daily is None:
+        pnl_daily = en.get("today_equity_delta")
+        if pnl_daily is None and en.get("today_n"):
+            pnl_daily = en.get("today_closed")
     pnl_weekly  = row.get("pnl_weekly")
     pnl_monthly = row.get("pnl_monthly")
     if pnl_daily is not None:
-        rows.append(f'<div class="row"><span>Today P&L</span>'
+        rows.append(f'<div class="row"><span>Today P&amp;L (UTC)</span>'
                     f'<b class="{cls(pnl_daily)}">{money(pnl_daily)}</b></div>')
     if pnl_weekly is not None:
         rows.append(f'<div class="row"><span>7d P&L</span>'
@@ -594,9 +730,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
         pf_txt = f"{pf:.2f}" if pf is not None else ("∞" if q.get("w") else "—")
         rows.append(f'<div class="row"><span>Quality (ledger)</span>'
                     f'<b>{q["wr"]:.0f}% win · PF {pf_txt} · {money(q["exp"])}/trade</b></div>')
-        if q.get("last_close") is not None:
-            la, _ls = age_str(q["last_close"], 10 ** 12)
-            rows.append(f'<div class="row"><span>Last close</span><b>{html.escape(la)}</b></div>')
+        pass  # last-close now rendered for EVERY bot below (2026-07-07)
     e = q.get("era") if q else None
     if e is not None:
         _en, _ew = e.get("n") or 0, e.get("w") or 0
@@ -607,6 +741,20 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
         rows.append(f'<div class="row"><span>&nbsp;&nbsp;↳ {html.escape(str(_t["tag"]))}</span>'
                     f'<b class="{cls(_t["pnl"])}">{_t["n"]} · {_t["w"]}W/{_t["n"] - _t["w"]}L · '
                     f'{money(_t["pnl"])}</b></div>')
+    # [2026-07-07 UNIFORM CARDS] Last close with detail for EVERY bot, from
+    # the union ledger (bot_trades + paper_trades).
+    _lc = en.get("last_close")
+    if _lc and _lc.get("ts"):
+        try:
+            _la, _ = age_str(dt.datetime.fromisoformat(_lc["ts"]), 10 ** 12)
+        except Exception:
+            _la = ""
+        _lp = _lc.get("pnl")
+        rows.append(f'<div class="row"><span>Last close</span>'
+                    f'<b>{html.escape(str(_lc.get("pair")))} '
+                    f'<span class="{cls(_lp)}">{money(_lp)}</span>'
+                    f'{" · " + html.escape(str(_lc.get("reason"))) if _lc.get("reason") else ""}'
+                    f'{" · " + html.escape(_la) if _la else ""}</b></div>')
     if spark:
         _svg, _dd = spark
         rows.append(f'<div class="row"><span>7d equity · DD {_dd:+.1f}%</span><b>{_svg}</b></div>')
@@ -623,6 +771,19 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None):
             for p in _op[:6] if isinstance(p, dict) and p.get("pnl") is not None)
         if _lines:
             open_pos_html = f'<div class="sub">open positions</div>{_lines}'
+    # [2026-07-07 UNIFORM CARDS] Perps + funding books live in bot_state, not
+    # in bot_pnl.extra — render them the same way the freqtrade bots render.
+    if not open_pos_html and en.get("positions"):
+        _lines = "".join(
+            f'<div class="row"><span>{html.escape(str(p.get("pair")))}'
+            f' · {html.escape(str(p.get("side")))}'
+            f'{" · $" + format(p["qty"], ".0f") if p.get("side") and isinstance(p.get("qty"), (int, float)) and p.get("entry") is None else ""}'
+            f'{" @ " + format(p["entry"], ".4g") if isinstance(p.get("entry"), (int, float)) else ""}</span>'
+            f'<b class="{cls(p.get("upnl"))}">'
+            f'{money(p.get("upnl")) if p.get("upnl") is not None else "—"}</b></div>'
+            for p in en["positions"][:8])
+        open_pos_html = (f'<div class="sub">open positions '
+                         f'({len(en["positions"])})</div>{_lines}')
     return f'''<div class="card">
       <h2>{html.escape(label_for(bot))}{badge} <span class="dot {dot}"></span></h2>
       <div class="muted">{html.escape(str(status))} · updated {html.escape(age)}{" · STALE" if stale else ""}</div>
@@ -650,6 +811,10 @@ def render():
         quality = fetch_bot_quality()
     except Exception:  # noqa: BLE001
         quality = {}
+    try:
+        enrich = fetch_ledger_enrich()
+    except Exception:  # noqa: BLE001
+        enrich = {}
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
     brain_html = brain_card_html()
@@ -665,7 +830,7 @@ def render():
     # union of expected + whatever actually published
     names = list(EXPECTED) + [b for b in rows if b not in EXPECTED]
     cards = [card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
-                  mode_notes.get(b)) for b in names]
+                  mode_notes.get(b), enrich.get(b)) for b in names]
     if brain_html:
         cards.append(brain_html)
 
@@ -1205,6 +1370,10 @@ class H(BaseHTTPRequestHandler):
             # No auth on this path so the scheduled fetcher can read it.
             try:
                 rows = fetch_rows()
+                try:
+                    _enr = fetch_ledger_enrich()
+                except Exception:  # noqa: BLE001
+                    _enr = {}
                 def _ser(v):
                     return v.isoformat() if hasattr(v, "isoformat") else v
                 data = []
@@ -1216,6 +1385,17 @@ class H(BaseHTTPRequestHandler):
                     # Tag so downstream reports never blend scanner paper-arb
                     # P&L with the trading bots' realized P&L.
                     d["kind"] = "scanner" if r.get("bot") in SCANNERS else "trading"
+                    # [2026-07-07 UNIFORM CARDS] same server-side enrichment the
+                    # cards use, for feed consumers (artifact, reports).
+                    _en = _enr.get(r.get("bot")) or {}
+                    if _en:
+                        _td = _en.get("today_equity_delta")
+                        if _td is None and _en.get("today_n"):
+                            _td = _en.get("today_closed")
+                        d["enrich"] = {"today_pnl": _td,
+                                       "record": _en.get("record"),
+                                       "last_close": _en.get("last_close"),
+                                       "positions": _en.get("positions")}
                     # Per-bot heartbeat (2026-06-25): expose each bot's age and a
                     # threshold-aware stale flag so the scheduled report can flag a
                     # single laggard (e.g. equities-regime-ibkr running ~85m behind the
