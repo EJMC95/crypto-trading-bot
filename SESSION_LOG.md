@@ -6,6 +6,28 @@ watch for next. Everything here is DRY-RUN / paper unless explicitly stated.
 
 ---
 
+## 2026-07-07 — Full-fleet audit → Option-B isolation, brain revival, exit rebuilds
+
+### What the audit found (live Postgres, 352 trades + 285 fills + 52k equity pts, plus code audit)
+- **Winners:** perps-rsi-meanrev +$41.47 closed (87% WR, PF 5.5; the Jul-5 cap contains its correlated-dip risk) and perps-donchian-breakout +$37.96 (25W/1L). Day-trader 15m rework **VERIFIED** (11% → ~45-50% WR, bleed stopped). Crypto fleet ledger-clean: **+$181.68**.
+- **Sniper truth:** +$155.94 = ANSEM +$325 minus a −$169 junk tax; **80% of exits were `delisted`**.
+- **ROOT CAUSE of the Jul 5-7 "balance resets":** the four family-bot services pointed at Dockerfile.freqtrade → each ran ALL NINE bots (fresh $1000, no volume) + a 9-name poller; five pollers race-wrote bot_pnl. 51 reset events; 142 contaminated bot_trades rows (Jul-6 05:05-05:17 shared-SQLite window). Their FREQTRADE_* env vars were inert.
+- **Brain dead since Jul-5 06:19:** bot_learn.py was never COPY'd into the image (`can't open file`).
+- **funding-carry 0W/28L structural:** decay-exits realize 29bps round-trip fees hours before the ~64h@40%APR payback point. Jul-6 tune didn't touch the exit logic.
+- **Alpaca (NOT yet fixed, separate repo):** unexplained −$19.9k on Jul-2 then a 3-day freeze; feed pnl_abs measures from the post-crash baseline (true ≈ −$8k from first record).
+
+### What shipped today (one push, commits per fix, changelog per commit)
+Option-B isolation (run_all `ONLY_BOT` mode; poller back to 5; family services each get a /freqtrade/persist volume + ONLY_BOT env and run exactly one bot); Dockerfile COPY bot_learn.py; funding-carry exit rebuild (flip-grace ≥1h / decay-only-after-fee-payback / 14d expiry / −2% bleed stop) + 6h funding-persistence entry filter; sniper ghost-gate (junk intel + minor venue = skip; junk elsewhere quarter-stake); V7 max_open 10→6; RegimeSwitchV2 per-loop diagnostics. Family Postgres rows quarantined + purged post-cutover (see analysis_2026-07-07/).
+
+### Watchlist
+- Family bots restart at $1000 era-zero in isolated services — judge after 2 clean weeks, not before.
+- funding-carry: expect FAR fewer closes; first `decay_paid` win = the rebuild working. All-`flip` closes = universe still too spiky → tighten to majors.
+- Sniper: `delisted` share should collapse from 80%; ticket count drops (ghost class skipped).
+- RegimeSwitchV2: read `[regime-diag]` lines before touching gates again.
+- Local Mac clone reconciled: WIP stashed (`pre-OptionB WIP 2026-07-07`), reader-api commit preserved on `stash/reader-api-b82c5aa` — re-apply later as the HTTPS ledger endpoint (the right cross-surface DB access fix).
+
+---
+
 ## 2026-07-05 — Persistence, participation, the brain, and a new short engine
 
 ### What we achieved
