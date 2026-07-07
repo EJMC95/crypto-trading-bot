@@ -52,6 +52,8 @@
 #      strings in chop. That is the correct signature, not a malfunction.
 # ---------------------------------------------------------------------------
 
+import logging
+
 from datetime import datetime
 from typing import Optional
 
@@ -64,6 +66,8 @@ from freqtrade.strategy import (
     DecimalParameter,
     informative,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RegimeSwitchV2(IStrategy):
@@ -186,6 +190,27 @@ class RegimeSwitchV2(IStrategy):
             & (dataframe["volume"] > 0),
             ["enter_short", "enter_tag"],
         ] = (1, "trend_break_short")
+
+        # [2026-07-07 DIAGNOSTIC] One line per pair per 4h candle stating what
+        # the gates see and the verdict — so "why is it idle" is answerable
+        # from `railway logs` instead of another blind gate-lowering (two of
+        # those preceded this line).
+        try:
+            r = dataframe.iloc[-1]
+            verdict = ("LONG-window" if bool(up_trend.iloc[-1])
+                       else "SHORT-window" if bool(down_trend.iloc[-1])
+                       else ("chop-gated" if int(r.get("regime_dir_1d", 0)) != 0
+                             else "dir-flat"))
+            logger.info(
+                "[regime-diag] %s dir=%+d trend=%d adx1d=%.1f close=%.5g "
+                "dcH=%.5g dcL=%.5g -> %s",
+                metadata.get("pair"), int(r.get("regime_dir_1d", 0)),
+                int(r.get("regime_trend_1d", 0)),
+                float(r.get("adx_1d") if r.get("adx_1d") == r.get("adx_1d") else -1.0),
+                float(r["close"]), float(r["dc_high_entry"]),
+                float(r["dc_low_entry"]), verdict)
+        except Exception:
+            pass
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:

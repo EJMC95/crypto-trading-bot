@@ -1,4 +1,6 @@
 ## 2026-07-07
+- **config_v7_momo (crypto-breakout-4h)**: max_open_trades 10→6 — held 10 correlated longs in one bounce with no cap (same risk class rsi-meanrev was capped for Jul-5).
+- **RegimeSwitchV2**: per-pair per-4h regime diagnostic log (dir/trend/ADX/close/channels → verdict). Idle 6 days through two blind gate cuts; now the logs say why.
 - **listing sniper**: DELISTING-RISK GATE — 'ghost' listings (junk intel AND first venue outside the top-15) skipped entirely; junk elsewhere quarter-stake (was half). Targets the 142/177 `delisted` exits (−$47 lifetime) while keeping the lottery tail reachable.
 - **funding_carry_bot**: EXIT REBUILD (0W/28L — every close realized ≈ round-trip fees): decay alone no longer closes; closes only on flip persisting ≥1h, decay AFTER fee payback (net ≥ +$0.10), 14d expiry, or a −2%-of-notional bleed stop. NEW 6h persistence entry filter (|APR| must hold ≥ ENTER_APR for 6h — spike-and-revert funding never passes). hot_since persisted to bot_state.
 - **Dockerfile.freqtrade**: COPY bot_learn.py — the learning brain has been dead in deploy since Jul-5 (run_all.sh runs it 2-hourly; the file was never in the image: `can't open file '/freqtrade/bot_learn.py'`).
