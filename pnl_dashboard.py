@@ -1356,6 +1356,19 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/health"):
             self.send_response(200); self._no_cache(); self.end_headers(); self.wfile.write(b"ok"); return
+        if self.path.startswith("/watchdog.json"):
+            # In-service fleet watchdog state (fleet_watchdog_svc daemon thread).
+            # Read-only, no auth — no secrets inside. The GH-Actions watchdog and
+            # humans read this to see problems/warnings + whether email is armed.
+            try:
+                import fleet_watchdog_svc
+                body = json.dumps(fleet_watchdog_svc.get_state(), default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
         if self.path.startswith("/pulse.json"):
             # Market pulse (news/social/funding mood) written by market_pulse.py
             # into bot_state. Read-only, no auth — no secrets inside. Serves the
@@ -1551,4 +1564,13 @@ if __name__ == "__main__":
                          daemon=True).start()
     except Exception as _e:
         print(f"[pnl_dashboard] emailer not started: {_e}", flush=True)
+    # Background: in-service fleet watchdog — 5-min probes of our own /pnl.json,
+    # transition-based alert emails (dormant until SMTP_* env vars are set, same
+    # opt-in as the emailer). Live state served at /watchdog.json.
+    try:
+        import fleet_watchdog_svc, sys as _sys2
+        threading.Thread(target=fleet_watchdog_svc.run_loop, args=(_sys2.modules[__name__],),
+                         daemon=True).start()
+    except Exception as _e:
+        print(f"[pnl_dashboard] fleet watchdog not started: {_e}", flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()
