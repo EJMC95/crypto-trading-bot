@@ -95,12 +95,19 @@ def _ensure_table(conn):
             )
             """
         )
+        # [2026-07-08] bot-supplied daily P&L. The dashboard prefers this over
+        # its server-side equity-curve delta when present — lets bots with an
+        # authoritative broker daily figure (Alpaca equity vs last_equity)
+        # override the glitch-prone cross-snapshot estimate.
+        cur.execute(
+            "ALTER TABLE bot_pnl ADD COLUMN IF NOT EXISTS pnl_daily DOUBLE PRECISION"
+        )
     _table_ready = True
 
 
 def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
             open_trades=None, closed_trades=None, wins=None, losses=None,
-            extra=None):
+            extra=None, pnl_daily=None):
     """Upsert this bot's current snapshot. Returns True on success, else False.
 
     Safe to call every loop. Never raises.
@@ -114,8 +121,9 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
             cur.execute(
                 """
                 INSERT INTO bot_pnl (bot, updated_at, status, equity, pnl_abs,
-                    pnl_pct, open_trades, closed_trades, wins, losses, extra)
-                VALUES (%s, now(), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    pnl_pct, open_trades, closed_trades, wins, losses, extra,
+                    pnl_daily)
+                VALUES (%s, now(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (bot) DO UPDATE SET
                     updated_at    = now(),
                     status        = EXCLUDED.status,
@@ -126,11 +134,13 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
                     closed_trades = EXCLUDED.closed_trades,
                     wins          = EXCLUDED.wins,
                     losses        = EXCLUDED.losses,
-                    extra         = EXCLUDED.extra
+                    extra         = EXCLUDED.extra,
+                    pnl_daily     = EXCLUDED.pnl_daily
                 """,
                 (bot, status, equity, pnl_abs, pnl_pct, open_trades,
                  closed_trades, wins, losses,
-                 json.dumps(extra) if extra is not None else None),
+                 json.dumps(extra) if extra is not None else None,
+                 pnl_daily),
             )
         return True
     except Exception as e:

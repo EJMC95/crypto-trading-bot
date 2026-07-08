@@ -180,6 +180,17 @@ TOKENIZED_BASES = {
     "CSCO", "DELL", "ADBE", "GLW", "COHR", "CRDO", "SNDK", "ADI", "PLAY",
     "LRCX", "KLAC", "TXN", "IBM", "GE", "CAT", "BA", "XOM", "CVX", "UNH",
     "LLY", "ABBV", "MRK", "TMO", "COST", "HD", "PG", "VZ", "T", "CMCSA",
+    # [2026-07-08] third wave — every one of these was bought on Jul-7 AFTER
+    # the wave-2 blocklist deployed (06:23 UTC) and force-closed `delisted`
+    # within hours (48 churn closes, −$11.56 on the day). Equities (RKLB,
+    # MRVL, SONY, HYUNDAI, HIMS, ASTS, NBIS…), ETFs (TQQQ, EWZ, SPCX) and
+    # tokenized commodities (XCU copper). The curated list keeps leaking a
+    # tail of unlisted tickers — if a FOURTH wave appears, stop extending
+    # this set and build the structural fix (per-exchange listing-flood
+    # quarantine) instead.
+    "RKLB", "AXTI", "SONY", "MRVL", "HYUNDAI", "TQQQ", "FLNC", "ONDS",
+    "NBIS", "SPCX", "DRAM", "HIMS", "EWZ", "ASTS", "XCU", "BBX", "CBRS",
+    "AAOI", "CIEN",
 }
 
 # Rough global spot-volume ranking of major exchanges (CCXT ids). Anything not

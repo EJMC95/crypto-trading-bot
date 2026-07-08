@@ -703,6 +703,16 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     # else the sum of trades closed today from the ledger. A publisher-sent
     # pnl_daily still wins if a bot ever supplies one.
     pnl_daily   = row.get("pnl_daily")
+    # [2026-07-08] a publisher-sent daily figure only counts as "today" while
+    # its row was written today (UTC) — a once-a-day publisher (alpaca 22:00
+    # cron) must not show yesterday's number all through the next day.
+    _upd = row.get("updated_at")
+    if pnl_daily is not None and _upd is not None:
+        try:
+            if _upd.astimezone(dt.timezone.utc).date() != dt.datetime.now(dt.timezone.utc).date():
+                pnl_daily = None
+        except Exception:
+            pass
     if pnl_daily is None:
         pnl_daily = en.get("today_equity_delta")
         if pnl_daily is None and en.get("today_n"):

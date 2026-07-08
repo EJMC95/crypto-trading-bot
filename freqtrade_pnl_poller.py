@@ -71,9 +71,12 @@ def poll_one(name, port):
             status, open_n = [], profit.get("open_trade_count")
         # [2026-07-05 INSIGHT] pass live open-position detail through to the
         # dashboard card (pair, current %, entry mode, hours held).
+        # [2026-07-08] cap 6->12: breakout-4h held 7 and the card listed 6 —
+        # worse, fleet_risk.py counts longs from THIS list, so a truncated
+        # list silently under-reports fleet exposure to the Jul-14 review.
         open_pos = []
         try:
-            for t in (status if isinstance(status, list) else [])[:6]:
+            for t in (status if isinstance(status, list) else [])[:12]:
                 pr = t.get("profit_ratio")
                 ots = t.get("open_timestamp")
                 open_pos.append({
