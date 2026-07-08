@@ -38,7 +38,9 @@
       "Bash(./send_report_email.sh \"emcmpg@gmail.com\" \"Crypto bots — email test ✅\" /tmp/crypto_mail_test.txt)",
       "Bash(python3 compile_market_data.py)",
       "Bash(date -v+1H \"+plus1h_iso: %Y-%m-%dT%H:%M:00%z\")",
-      "Bash(railway variables *)"
+      "Bash(railway variables *)",
+      "mcp__Claude_Code_Remote__add_repo",
+      "mcp__Claude_Code_Remote__register_repo_root"
     ]
   }
 }
