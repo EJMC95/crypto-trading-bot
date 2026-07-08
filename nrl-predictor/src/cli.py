@@ -51,12 +51,29 @@ def cmd_odds(_: argparse.Namespace) -> None:
 
 
 def cmd_grade(args: argparse.Namespace) -> None:
+    import re
+
     import pandas as pd
     from src.eval import backtest as bt
     from src.eval import ledger
     from src.ingest import nrl_stats, teams
 
     season = args.season or date.today().year
+    if args.auto:
+        led = ledger.load()
+        open_rounds = sorted(
+            int(m.group(1)) for m in
+            (re.match(r"Round (\d+)", r) for r in
+             led.loc[led["settled_at"].isna(), "round"].unique())
+            if m)
+        if not open_rounds:
+            print("grade --auto: no unsettled rounds in the ledger")
+            return
+        for rnd in open_rounds:
+            args.round = rnd
+            args.auto = False
+            cmd_grade(args)
+        return
     label = f"Round {args.round}"
     draw = nrl_stats._parse_draw_fixtures(
         nrl_stats.fetch_nrl_draw(season, args.round, refresh=True), season)
@@ -106,10 +123,14 @@ def main() -> None:
     sub.add_parser("feed").set_defaults(fn=cmd_feed)
     sub.add_parser("odds").set_defaults(fn=cmd_odds)
     g = sub.add_parser("grade")
-    g.add_argument("--round", type=int, required=True)
+    g.add_argument("--round", type=int)
     g.add_argument("--season", type=int, default=None)
+    g.add_argument("--auto", action="store_true",
+                   help="settle every round with unsettled ledger bets")
     g.set_defaults(fn=cmd_grade)
     args = ap.parse_args()
+    if args.cmd == "grade" and not args.auto and args.round is None:
+        ap.error("grade requires --round N or --auto")
     args.fn(args)
 
 
