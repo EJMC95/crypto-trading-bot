@@ -19,6 +19,9 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
+import tempfile
 import time
 from datetime import date
 from pathlib import Path
@@ -46,11 +49,32 @@ HEADERS = {"User-Agent": "nrl-predictor research (contact: repo owner)", "Accept
 FINALS_PAT = re.compile(r"final", re.IGNORECASE)
 
 
+USELESS_REPO = "https://github.com/uselessnrlstats/uselessnrlstats.git"
+
+
+def ensure_raw() -> Path:
+    """Bootstrap data/raw/uselessnrlstats on a fresh checkout (CI runners, new
+    clones): sparse-clone the public dataset repo and copy cleaned_data/nrl in."""
+    if (RAW / "match_data.csv").exists():
+        return RAW
+    print("bootstrapping uselessnrlstats raw data (sparse clone)...")
+    with tempfile.TemporaryDirectory() as td:
+        subprocess.run(
+            ["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse",
+             USELESS_REPO, td], check=True, capture_output=True)
+        subprocess.run(["git", "-C", td, "sparse-checkout", "set", "cleaned_data/nrl"],
+                       check=True, capture_output=True)
+        RAW.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(Path(td) / "cleaned_data" / "nrl", RAW, dirs_exist_ok=True)
+    return RAW
+
+
 def _round_number(s: pd.Series) -> pd.Series:
     return pd.to_numeric(s.astype(str).str.extract(r"Round (\d+)")[0], errors="coerce")
 
 
 def load_history() -> pd.DataFrame:
+    ensure_raw()
     m = pd.read_csv(RAW / "match_data.csv", low_memory=False)
     m["date"] = pd.to_datetime(m["date"])
     m["year"] = m["date"].dt.year
