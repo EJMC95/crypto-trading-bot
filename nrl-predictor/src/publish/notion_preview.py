@@ -23,26 +23,47 @@ def confidence(p: float) -> str:
 
 def build() -> Path:
     preds = pd.read_csv(OUT / "round_predictions.csv")
+    market_path = OUT / "round_market.csv"
+    market = pd.read_csv(market_path) if market_path.exists() else None
     rnd = preds["round"].iloc[0]
     lines = [
         f"# 🏉 {rnd} preview — model probabilities",
         "",
         f"_Blend = Elo+Poisson logistic stack (validated 2015–2025: Brier 0.2188 vs "
-        "market 0.2075). Margins/totals from the tier-2 Monte Carlo. Paper only — "
-        "no quoted-odds comparison until the odds API key lands (Phase 5)._",
+        "market 0.2075). Margins/totals from the tier-2 Monte Carlo. Market = "
+        "de-vigged median across keyless book feeds (see src/ingest/odds_live.py). "
+        "Paper only._",
         "",
-        "| fixture | kickoff | blend P(home) | margin | total | call |",
-        "|---|---|---|---|---|---|",
+        "| fixture | kickoff | blend P(home) | market P(home) | margin | total | call |",
+        "|---|---|---|---|---|---|---|",
     ]
+    mk = {}
+    if market is not None:
+        mk = {(r.home, r.away): r for r in market.itertuples(index=False)}
     for r in preds.itertuples(index=False):
         p = r.p_home_blend
         pick = r.home if p >= 0.5 else r.away
         pp = p if p >= 0.5 else 1 - p
+        mrow = mk.get((r.home, r.away))
+        mcol = f"{mrow.market_p_home:.1%}" if mrow is not None else "—"
         lines.append(
             f"| {r.home} v {r.away} | {pd.Timestamp(r.date):%a %d %b %H:%M} "
-            f"| {p:.1%} | {r.exp_margin_home:+.1f} | {r.exp_total_points:.0f} "
+            f"| {p:.1%} | {mcol} | {r.exp_margin_home:+.1f} | {r.exp_total_points:.0f} "
             f"| {pick} ({pp:.0%}, {confidence(pp)}) |"
         )
+    if market is not None:
+        flags = market[market["value_ev_pct"] > 0].sort_values("value_ev_pct", ascending=False)
+        lines += ["", "**Value flags (model vs best available price, paper only):**"]
+        for r in flags.itertuples(index=False):
+            lines.append(
+                f"- {r.value_side} in {r.home} v {r.away}: model edge "
+                f"{abs(r.edge_home):+.1%} vs consensus, EV {r.value_ev_pct:+.1f}% at "
+                f"best price ({r.books} books)")
+        if flags.empty:
+            lines.append("- none this round")
+        lines.append(
+            "- _Caveat: on a fresh model most 'edges' are model error, not market "
+            "error — the paper ledger exists to measure which. No real money._")
     lines += [
         "",
         "**Model spread this round:** games where the tiers disagree by >10% are the "

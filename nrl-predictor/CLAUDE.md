@@ -13,8 +13,15 @@ fair prices for SGM leg combos. **Paper-track only** — never suggest staking r
 - Phase 3 (Poisson/Skellam + GBM) — DONE, see `outputs/phase3_report.md`.
   Champion = Elo+Poisson logistic stack ("blend", Brier 0.2188 vs Elo 0.2194,
   market 0.2075). GBM is experimental only — it does not beat Elo yet and is NOT
-  in the blend; revisit with lineup/weather features. CLV tracking blocked on an
-  odds API key in `.env`.
+  in the blend; revisit with lineup/weather features. CLV tracking is LIVE without
+  an API key: `src/ingest/odds_live.py` pulls keyless public JSON feeds from four
+  AU books (Ladbrokes/Neds Entain API, Pointsbet, Unibet Kambi CDN — probed
+  2026-07-07; TAB geo-blocks non-AU IPs, Sportsbet is Akamai-protected, neither is
+  bypassed). `scripts/capture_odds.py` snapshots prices, de-vigs a consensus,
+  writes value flags + the paper ledger (`src/eval/ledger.py`,
+  `outputs/paper_ledger.csv`). A near-kickoff snapshot proxies the closing line;
+  the weekly aussportsbetting Wayback refresh grades CLV properly. A real Odds
+  API/Betfair key remains a nice-to-have, not a blocker.
 - Phase 4 (player props + SGM simulator) — not started
 - Phase 5 (automation: Tue team lists, Thu previews; Railway nrl.json service) —
   not started; `src/publish/` already emits `outputs/nrl.json` + `round_preview.md`
@@ -54,3 +61,5 @@ directory there wholesale — nothing in here imports from the trading fleet.
   round predictions (win/margin/total). Run phase 1 first (needs its parquets).
 - `python -m src.publish.dashboard_feed` / `python -m src.publish.notion_preview`
   — regenerate `outputs/nrl.json` and `outputs/round_preview.md`.
+- `python scripts/capture_odds.py` — live 4-book odds snapshot → consensus,
+  value flags, paper-ledger entries, market-aware preview + feed.

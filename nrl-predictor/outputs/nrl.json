@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-07-07T11:48:00+00:00",
+ "generated_at": "2026-07-08T00:28:45+00:00",
  "source": "nrl-predictor",
  "disclaimer": "Paper-track model output. Not betting advice.",
  "round": "Round 19",
@@ -94,6 +94,106 @@
    "p_home_blend": 0.7567,
    "exp_margin_home": 4.5,
    "exp_total_points": 48.1
+  }
+ ],
+ "market": [
+  {
+   "round": "Round 19",
+   "date": "2026-07-10 20:00:00",
+   "home": "Wests Tigers",
+   "away": "New Zealand Warriors",
+   "p_home_blend": 0.3812,
+   "market_p_home": 0.2946,
+   "edge_home": 0.0866,
+   "books": 4,
+   "best_odds_home": 3.35,
+   "best_odds_away": 1.36,
+   "value_side": "Wests Tigers",
+   "value_ev_pct": 27.702
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-11 15:00:00",
+   "home": "Dolphins",
+   "away": "Cronulla-Sutherland Sharks",
+   "p_home_blend": 0.5859,
+   "market_p_home": 0.6124,
+   "edge_home": -0.0265,
+   "books": 4,
+   "best_odds_home": 1.58,
+   "best_odds_away": 2.5,
+   "value_side": "Cronulla-Sutherland Sharks",
+   "value_ev_pct": 3.525
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-11 17:30:00",
+   "home": "Canterbury-Bankstown Bulldogs",
+   "away": "Canberra Raiders",
+   "p_home_blend": 0.5839,
+   "market_p_home": 0.6125,
+   "edge_home": -0.0286,
+   "books": 4,
+   "best_odds_home": 1.55,
+   "best_odds_away": 2.48,
+   "value_side": "Canberra Raiders",
+   "value_ev_pct": 3.1928
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-11 19:35:00",
+   "home": "Sydney Roosters",
+   "away": "Parramatta Eels",
+   "p_home_blend": 0.7478,
+   "market_p_home": 0.7894,
+   "edge_home": -0.0416,
+   "books": 4,
+   "best_odds_home": 1.2,
+   "best_odds_away": 4.6,
+   "value_side": "Parramatta Eels",
+   "value_ev_pct": 16.012
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-12 14:00:00",
+   "home": "South Sydney Rabbitohs",
+   "away": "Newcastle Knights",
+   "p_home_blend": 0.5897,
+   "market_p_home": 0.4816,
+   "edge_home": 0.1081,
+   "books": 4,
+   "best_odds_home": 2.0,
+   "best_odds_away": 1.85,
+   "value_side": "South Sydney Rabbitohs",
+   "value_ev_pct": 17.94
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-12 16:05:00",
+   "home": "Manly-Warringah Sea Eagles",
+   "away": "North Queensland Cowboys",
+   "p_home_blend": 0.6311,
+   "market_p_home": 0.6133,
+   "edge_home": 0.0178,
+   "books": 4,
+   "best_odds_home": 1.55,
+   "best_odds_away": 2.55,
+   "value_side": "Manly-Warringah Sea Eagles",
+   "value_ev_pct": -2.1795
+  },
+  {
+   "round": "Round 19",
+   "date": "2026-07-12 18:15:00",
+   "home": "Melbourne Storm",
+   "away": "Gold Coast Titans",
+   "p_home_blend": 0.7567,
+   "market_p_home": 0.7033,
+   "edge_home": 0.0534,
+   "books": 4,
+   "best_odds_home": 1.36,
+   "best_odds_away": 3.25,
+   "value_side": "Melbourne Storm",
+   "value_ev_pct": 2.9112
   }
  ],
  "ratings": [
