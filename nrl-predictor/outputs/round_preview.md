@@ -24,18 +24,3 @@ _Blend = Elo+Poisson logistic stack (validated 2015–2025: Brier 0.2188 vs mark
 **Model spread this round:** games where the tiers disagree by >10% are the ones to watch for team-list news — that disagreement is usually roster signal one model has and the other hasn't.
 - Wests Tigers v New Zealand Warriors: Elo 41% vs GBM 29%
 - Melbourne Storm v Gold Coast Titans: Elo 77% vs GBM 64%
-
-**Top tryscorer per match (model fair price):**
-- Wests Tigers v New Zealand Warriors: Alofiana Khan-Pereira (W, New Zealand Warriors) — 55% ATS, fair 1.82
-- Dolphins v Cronulla-Sutherland Sharks: Jamayne Isaako (W, Dolphins) — 48% ATS, fair 2.07
-- Canterbury-Bankstown Bulldogs v Canberra Raiders: Jacob Kiraz (W, Canterbury-Bankstown Bulldogs) — 51% ATS, fair 1.97
-- Sydney Roosters v Parramatta Eels: Rex Bassingthwaighte (W, Sydney Roosters) — 46% ATS, fair 2.18
-- South Sydney Rabbitohs v Newcastle Knights: Alex Johnston (W, South Sydney Rabbitohs) — 67% ATS, fair 1.49
-- Manly-Warringah Sea Eagles v North Queensland Cowboys: Murray Taulagi (W, North Queensland Cowboys) — 50% ATS, fair 2.00
-- Melbourne Storm v Gold Coast Titans: Will Warbrick (W, Melbourne Storm) — 53% ATS, fair 1.87
-
-**Top-3 SGM candidates by correlation lift** (fair price vs independence price — the gap is the mispriced correlation):
-- Canberra Raiders win × ATS Xavier Savage × ATS Kaeo Weekes: joint 12.6% → fair 7.92 (independent 11.78, lift ×1.49)
-- Canberra Raiders win × ATS Xavier Savage × total over 40.5: joint 16.6% → fair 6.02 (independent 8.64, lift ×1.44)
-- Dolphins win × ATS Jamayne Isaako × ATS Tevita Naufahu: joint 16.0% → fair 6.24 (independent 8.57, lift ×1.38)
-- _Paste bookie SGM quotes into data/manual_odds/roundNN.csv and re-run scripts/run_phase4.py for EV vs quoted._
