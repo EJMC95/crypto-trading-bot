@@ -27,10 +27,13 @@ fair prices for SGM leg combos. **Paper-track only** — never suggest staking r
   not started; `src/publish/` already emits `outputs/nrl.json` + `round_preview.md`
 
 ## Note on repo location
-This project was specced as its own private repo `nrl-predictor`. The Claude Code
-GitHub App cannot create repositories (403), so it currently lives as a top-level
-directory on a branch of `crypto-trading-bot`. Once the private repo exists, move this
-directory there wholesale — nothing in here imports from the trading fleet.
+This is the standalone private repo `github.com/EJMC95/nrl-predictor` (canonical as
+of 2026-07-07). The project was originally built on the crypto-trading-bot branch
+`claude/nrl-predictor-phases-1-2-vtb133` while repo creation was blocked; history
+was migrated here via `git subtree split` (see scripts/migrate_to_standalone.sh).
+That branch is now frozen — all new work happens here. Data is not in git: run
+`pip install -r requirements.txt && python scripts/run_phase1.py` to re-download
+and rebuild data/raw + data/processed.
 
 ## Conventions
 - Python 3.11, deps in `requirements.txt`.
