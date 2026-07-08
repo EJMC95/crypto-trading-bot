@@ -22,9 +22,19 @@ fair prices for SGM leg combos. **Paper-track only** — never suggest staking r
   `outputs/paper_ledger.csv`). A near-kickoff snapshot proxies the closing line;
   the weekly aussportsbetting Wayback refresh grades CLV properly. A real Odds
   API/Betfair key remains a nice-to-have, not a blocker.
-- Phase 4 (player props + SGM simulator) — not started
-- Phase 5 (automation: Tue team lists, Thu previews; Railway nrl.json service) —
-  not started; `src/publish/` already emits `outputs/nrl.json` + `round_preview.md`
+- Phase 4 (player props + SGM simulator) — DONE, see `outputs/phase4_report.md`.
+  ATS = hierarchical Poisson-gamma try rates × tier-2 team try expectation
+  (Poisson thinning). Gates passed: walk-forward ATS backtest 2022–25 beats
+  positional base rates (Brier 0.1401 vs 0.1408 — thin; minutes/lineup data is
+  the upgrade path); joint-sim consistency within MC error. SGM = 50k player-level
+  joint sims (`src/sgm/`), correlation lifts 1.17–1.49× on R19 candidates.
+  Quoted-SGM grading via `data/manual_odds/roundNN.csv` (no public SGM feed).
+- Phase 5 (automation) — CLI + service DONE, deploy + team-list ingest remain.
+  `python -m src.cli {refresh,predict,preview,feed,odds,grade}` is the weekly
+  rhythm (Cowork owns scheduling). `service/` + `railway.json` serve
+  `outputs/nrl.json` (pnl-dashboard pattern) — deploy from the Mac per
+  `service/README.md`. Tuesday team-list ingest (nrlR fetch_lineups port) and
+  weather are still open.
 
 ## Note on repo location
 This is the standalone private repo `github.com/EJMC95/nrl-predictor` (canonical as
@@ -66,3 +76,7 @@ and rebuild data/raw + data/processed.
   — regenerate `outputs/nrl.json` and `outputs/round_preview.md`.
 - `python scripts/capture_odds.py` — live 4-book odds snapshot → consensus,
   value flags, paper-ledger entries, market-aware preview + feed.
+- `python scripts/run_phase4.py` — props backtest gates + 50k SGM sims + candidates.
+- `python -m src.cli grade --round N` — Monday grading: settles the ledger,
+  prints a Notion-ready block. Ledger lives in `data/ledger.db` (committed;
+  mirrors in outputs/paper_ledger.csv + data/processed/ledger.parquet).

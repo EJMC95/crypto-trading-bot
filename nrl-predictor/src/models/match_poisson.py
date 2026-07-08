@@ -139,7 +139,7 @@ def walk_forward(matches: pd.DataFrame, long_rows: pd.DataFrame,
     Returns matches with p_pois / exp_margin / exp_total columns (NaN pre-start).
     """
     out = matches.copy()
-    for col in ("p_pois", "pois_margin", "pois_total"):
+    for col in ("p_pois", "pois_margin", "pois_total", "lam_tries_home", "lam_tries_away"):
         out[col] = np.nan
     target = out[out["year"] >= start_year]
     for (yr, rnd), grp in target.groupby(["year", "round"], sort=False):
@@ -150,6 +150,8 @@ def walk_forward(matches: pd.DataFrame, long_rows: pd.DataFrame,
         for idx, row in grp.iterrows():
             pred = model.predict_match(row["home_id"], row["away_id"])
             if pred:
-                out.loc[idx, ["p_pois", "pois_margin", "pois_total"]] = (
-                    pred["p_home"], pred["exp_margin"], pred["exp_total"])
+                out.loc[idx, ["p_pois", "pois_margin", "pois_total",
+                              "lam_tries_home", "lam_tries_away"]] = (
+                    pred["p_home"], pred["exp_margin"], pred["exp_total"],
+                    pred["lam_tries_home"], pred["lam_tries_away"])
     return out

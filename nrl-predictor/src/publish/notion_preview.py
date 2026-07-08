@@ -73,6 +73,22 @@ def build() -> Path:
     disagree = preds[(preds["p_home_elo"] - preds["p_home_gbm"]).abs() > 0.10]
     for r in disagree.itertuples(index=False):
         lines.append(f"- {r.home} v {r.away}: Elo {r.p_home_elo:.0%} vs GBM {r.p_home_gbm:.0%}")
+    props_path, sgm_path = OUT / "round_props.csv", OUT / "round_sgm.csv"
+    if props_path.exists() and sgm_path.exists():
+        props = pd.read_csv(props_path)
+        sgm = pd.read_csv(sgm_path).sort_values("correlation_lift", ascending=False)
+        lines += ["", "**Top tryscorer per match (model fair price):**"]
+        for match, grp in props.groupby("match", sort=False):
+            t0 = grp.sort_values("p_ats", ascending=False).iloc[0]
+            lines.append(f"- {match}: {t0.player} ({t0.position}, {t0.team}) — "
+                         f"{t0.p_ats:.0%} ATS, fair {t0.fair_price:.2f}")
+        lines += ["", "**Top-3 SGM candidates by correlation lift** "
+                  "(fair price vs independence price — the gap is the mispriced correlation):"]
+        for r in sgm.head(3).itertuples(index=False):
+            lines.append(f"- {r.combo}: joint {r.p_joint:.1%} → fair {r.fair_price:.2f} "
+                         f"(independent {1/r.p_independent:.2f}, lift ×{r.correlation_lift:.2f})")
+        lines.append("- _Paste bookie SGM quotes into data/manual_odds/roundNN.csv "
+                     "and re-run scripts/run_phase4.py for EV vs quoted._")
     path = OUT / "round_preview.md"
     path.write_text("\n".join(lines))
     return path

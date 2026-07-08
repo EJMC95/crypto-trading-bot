@@ -52,12 +52,23 @@ def main() -> None:
     market.to_csv(OUT / "round_market.csv", index=False)
     print(market.to_string(index=False))
 
-    led_odds = cons.rename(columns={"median_odds_home": "odds_home",
-                                    "median_odds_away": "odds_away"})
-    led_odds["book"] = "consensus(" + led_odds["books"].astype(str) + ")"
-    entries = ledger.log_round(
-        preds.rename(columns={"p_home_blend": "p_home_blend"}), led_odds, model="blend")
-    print(f"ledger: {len(entries)} rows logged -> {ledger.LEDGER}")
+    rows = []
+    for r in m.itertuples(index=False):
+        if pd.isna(r.market_p_home):
+            continue
+        pick_home = r.edge_home >= 0
+        sel = r.home_id if pick_home else r.away_id
+        prob = r.p_home_blend if pick_home else 1 - r.p_home_blend
+        price = r.median_odds_home if pick_home else r.median_odds_away
+        rows.append({
+            "round": r.round, "date": str(r.date), "home_id": r.home_id,
+            "away_id": r.away_id, "market": "h2h", "selection": sel,
+            "model": "blend", "model_prob": round(float(prob), 4),
+            "model_fair_price": round(1 / float(prob), 3),
+            "market_price_at_log": float(price),
+        })
+    n = ledger.log_bets(rows)
+    print(f"ledger: {n} h2h rows logged -> {ledger.DB}")
 
     notion_preview.build()
     dashboard_feed.build()

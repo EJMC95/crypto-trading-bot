@@ -21,6 +21,9 @@ def build() -> Path:
     ratings = pd.read_csv(OUT / "ratings_2026.csv")
     market_path = OUT / "round_market.csv"
     market = pd.read_csv(market_path).to_dict(orient="records") if market_path.exists() else []
+    props_path, sgm_path = OUT / "round_props.csv", OUT / "round_sgm.csv"
+    props = pd.read_csv(props_path).to_dict(orient="records") if props_path.exists() else []
+    sgm = pd.read_csv(sgm_path).to_dict(orient="records") if sgm_path.exists() else []
     feed = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": "nrl-predictor",
@@ -28,6 +31,8 @@ def build() -> Path:
         "round": preds["round"].iloc[0] if len(preds) else None,
         "predictions": preds.to_dict(orient="records"),
         "market": market,
+        "props": props,
+        "sgm_candidates": sgm,
         "ratings": ratings.to_dict(orient="records"),
         "models": {
             "elo": "tier 1 — K=10 (MOV-scaled), home adv 60, Platt-calibrated",

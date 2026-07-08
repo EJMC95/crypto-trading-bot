@@ -1,0 +1,187 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
+<title>NRL Predictor — Round 19</title>
+<style>
+  :root {
+    --surface: #fcfcfb; --plane: #f9f9f7; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --grid: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --model: #2a78d6; --market: #1baf7a; --track: #eceae4;
+    --chip-bg: #e8f0fb; --good: #006300;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --surface: #1a1a19; --plane: #0d0d0d; --ink: #ffffff; --ink-2: #c3c2b7;
+    --muted: #898781; --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
+    --model: #3987e5; --market: #199e70; --track: #262624;
+    --chip-bg: #14273f; --good: #0ca30c;
+  } }
+  :root[data-theme="dark"] {
+    --surface: #1a1a19; --plane: #0d0d0d; --ink: #ffffff; --ink-2: #c3c2b7;
+    --muted: #898781; --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
+    --model: #3987e5; --market: #199e70; --track: #262624;
+    --chip-bg: #14273f; --good: #0ca30c;
+  }
+  :root[data-theme="light"] {
+    --surface: #fcfcfb; --plane: #f9f9f7; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --grid: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --model: #2a78d6; --market: #1baf7a; --track: #eceae4;
+    --chip-bg: #e8f0fb; --good: #006300;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--plane); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+         padding: 20px 16px 40px; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header .sub { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; margin: 18px 0 12px;
+          padding-bottom: 4px; }
+  .tab { border: 1px solid var(--border); background: var(--surface);
+         color: var(--ink-2); border-radius: 9px; padding: 8px 12px;
+         font: 600 13px/1 system-ui, sans-serif; cursor: pointer;
+         white-space: nowrap; }
+  .tab[aria-selected="true"] { color: var(--ink); border-color: var(--model);
+         box-shadow: inset 0 -2px 0 var(--model); }
+  .card { background: var(--surface); border: 1px solid var(--border);
+          border-radius: 12px; padding: 18px; }
+  .matchhead { display: flex; justify-content: space-between; gap: 12px;
+               flex-wrap: wrap; align-items: baseline; }
+  .matchhead h2 { font-size: 17px; }
+  .matchhead .when { color: var(--muted); font-size: 12.5px; }
+  .tiles { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 4px; }
+  .tile { flex: 1 1 130px; border: 1px solid var(--border); border-radius: 10px;
+          padding: 10px 12px; }
+  .tile .k { color: var(--muted); font-size: 11.5px; text-transform: uppercase;
+             letter-spacing: .04em; }
+  .tile .v { font-size: 19px; font-weight: 700; margin-top: 2px; }
+  .tile .v small { font-size: 12px; font-weight: 500; color: var(--ink-2); }
+  .valuechip { display: inline-block; background: var(--chip-bg);
+               color: var(--ink); border-radius: 999px; padding: 3px 10px;
+               font-size: 12px; font-weight: 600; margin-top: 6px; }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em;
+       color: var(--ink-2); margin: 18px 0 8px; }
+  .bar-row { margin: 10px 0 14px; }
+  .bar-row .lbl { display: flex; justify-content: space-between;
+                  font-size: 12.5px; color: var(--ink-2); margin-bottom: 4px; }
+  .bar-row .lbl b { color: var(--ink); }
+  .track { height: 22px; background: var(--track); border-radius: 4px;
+           position: relative; overflow: hidden; }
+  .fill { height: 100%; border-radius: 4px 0 0 4px; }
+  .fill.model { background: var(--model); }
+  .fill.market { background: var(--market); }
+  .track .pct { position: absolute; top: 0; line-height: 22px; font-size: 12px;
+                font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pct.in { color: #fff; left: 8px; } .pct.out { color: var(--ink); left: 8px; }
+  .pct.right { right: 8px; left: auto; color: var(--ink-2); font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11.5px;
+       text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px;
+       border-bottom: 1px solid var(--grid); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--grid);
+       font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .multi { border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+           margin-bottom: 8px; }
+  .multi .legs { font-weight: 600; font-size: 14px; }
+  .multi .nums { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px;
+                 color: var(--ink-2); font-size: 12.5px;
+                 font-variant-numeric: tabular-nums; }
+  .multi .nums b { color: var(--ink); }
+  .lift { background: var(--chip-bg); border-radius: 999px; padding: 2px 9px;
+          font-weight: 700; color: var(--ink); }
+  footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
+  footer .warn { margin-top: 4px; }
+</style>
+<div class="wrap">
+  <header>
+    <h1>🏉 NRL Predictor — <span id="round"></span></h1>
+    <div class="sub">Paper-track model output — not betting advice. Generated <span id="gen"></span>.</div>
+  </header>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="card" id="panel" role="tabpanel"></div>
+  <footer>
+    <div id="validation"></div>
+    <div class="warn">Fair prices are model outputs with uncertainty. Bookmaker SGM engines stack 20–40% margin — a fair price below the quote is not an instruction to bet. Paper only.</div>
+  </footer>
+</div>
+<script>
+const DATA = {"round": "Round 19", "generated": "2026-07-08 01:36 UTC", "validation": "Match model: walk-forward 2015\u20132025 Brier 0.2188 (naive 0.2456, closing line 0.2075). Tryscorer model: 2022\u201325 Brier 0.1401 vs positional base 0.1408 \u2014 gates passed.", "games": [{"home": "Wests Tigers", "away": "New Zealand Warriors", "kickoff": "Fri 10 Jul, 20:00", "venue": "Campbelltown Sports Stadium", "p": {"elo": 0.4053, "poisson": 0.4202, "gbm": 0.2877, "blend": 0.3812, "market": 0.2946}, "margin": -3.3, "total": 47.5, "value": {"side": "Wests Tigers", "ev": 27.702, "best_home": 3.35, "best_away": 1.36}, "tries": {"match": "Wests Tigers v New Zealand Warriors", "exp_tries_home": 3.87, "exp_tries_away": 4.42, "exp_tries_total": 8.29, "median_tries_total": 8.0, "p_over_line": 0.587, "tries_line": 7.5}, "props": [{"player": "Alofiana Khan-Pereira", "position": "W", "team": "New Zealand Warriors", "exp_tries": 0.8, "p_ats": 0.55, "fair_price": 1.82, "p_2plus": 0.191, "fair_2plus": 5.2}, {"player": "Dallin Watene-Zelezniak", "position": "W", "team": "New Zealand Warriors", "exp_tries": 0.75, "p_ats": 0.529, "fair_price": 1.89, "p_2plus": 0.174, "fair_2plus": 5.7}, {"player": "Taylan May", "position": "C", "team": "Wests Tigers", "exp_tries": 0.61, "p_ats": 0.458, "fair_price": 2.18, "p_2plus": 0.126, "fair_2plus": 7.9}, {"player": "Jahream Bula", "position": "FB", "team": "Wests Tigers", "exp_tries": 0.55, "p_ats": 0.423, "fair_price": 2.36, "p_2plus": 0.106, "fair_2plus": 9.5}, {"player": "Sunia Turuva", "position": "W", "team": "Wests Tigers", "exp_tries": 0.5, "p_ats": 0.395, "fair_price": 2.53, "p_2plus": 0.091, "fair_2plus": 11.0}, {"player": "Ali Leiataua", "position": "C", "team": "New Zealand Warriors", "exp_tries": 0.35, "p_ats": 0.294, "fair_price": 3.4, "p_2plus": 0.048, "fair_2plus": 20.7}], "multis": [{"combo": "New Zealand Warriors win \u00d7 Alofiana Khan-Pereira 2+ tries", "p_joint": 0.1436, "fair_price": 6.96, "p_independent": 0.1054, "correlation_lift": 1.362}, {"combo": "New Zealand Warriors win \u00d7 ATS Alofiana Khan-Pereira \u00d7 ATS Dallin Watene-Zelezniak", "p_joint": 0.215, "fair_price": 4.65, "p_independent": 0.161, "correlation_lift": 1.336}, {"combo": "New Zealand Warriors win \u00d7 ATS Alofiana Khan-Pereira \u00d7 match tries over 7.5", "p_joint": 0.2358, "fair_price": 4.24, "p_independent": 0.178, "correlation_lift": 1.325}, {"combo": "New Zealand Warriors win \u00d7 ATS Alofiana Khan-Pereira \u00d7 total over 42.5", "p_joint": 0.2361, "fair_price": 4.23, "p_independent": 0.1785, "correlation_lift": 1.323}, {"combo": "New Zealand Warriors -3.5 \u00d7 ATS Alofiana Khan-Pereira", "p_joint": 0.3248, "fair_price": 3.08, "p_independent": 0.274, "correlation_lift": 1.185}]}, {"home": "Dolphins", "away": "Cronulla-Sutherland Sharks", "kickoff": "Sat 11 Jul, 15:00", "venue": "Kayo Stadium", "p": {"elo": 0.5974, "poisson": 0.5411, "gbm": 0.66, "blend": 0.5859, "market": 0.6124}, "margin": 1.7, "total": 48.7, "value": {"side": "Cronulla-Sutherland Sharks", "ev": 3.525, "best_home": 1.58, "best_away": 2.5}, "tries": {"match": "Dolphins v Cronulla-Sutherland Sharks", "exp_tries_home": 4.4, "exp_tries_away": 4.12, "exp_tries_total": 8.53, "median_tries_total": 8.0, "p_over_line": 0.618, "tries_line": 7.5}, "props": [{"player": "Jamayne Isaako", "position": "W", "team": "Dolphins", "exp_tries": 0.66, "p_ats": 0.483, "fair_price": 2.07, "p_2plus": 0.142, "fair_2plus": 7.0}, {"player": "Ronaldo Mulitalo", "position": "W", "team": "Cronulla-Sutherland Sharks", "exp_tries": 0.65, "p_ats": 0.479, "fair_price": 2.09, "p_2plus": 0.139, "fair_2plus": 7.2}, {"player": "Tevita Naufahu", "position": "W", "team": "Dolphins", "exp_tries": 0.64, "p_ats": 0.47, "fair_price": 2.13, "p_2plus": 0.134, "fair_2plus": 7.5}, {"player": "KL Iro", "position": "C", "team": "Cronulla-Sutherland Sharks", "exp_tries": 0.53, "p_ats": 0.411, "fair_price": 2.43, "p_2plus": 0.099, "fair_2plus": 10.1}, {"player": "Jack Bostock", "position": "C", "team": "Dolphins", "exp_tries": 0.51, "p_ats": 0.398, "fair_price": 2.51, "p_2plus": 0.093, "fair_2plus": 10.8}, {"player": "Sione Katoa", "position": "W", "team": "Cronulla-Sutherland Sharks", "exp_tries": 0.46, "p_ats": 0.369, "fair_price": 2.71, "p_2plus": 0.078, "fair_2plus": 12.8}], "multis": [{"combo": "Dolphins win \u00d7 Jamayne Isaako 2+ tries", "p_joint": 0.1027, "fair_price": 9.74, "p_independent": 0.0726, "correlation_lift": 1.415}, {"combo": "Dolphins win \u00d7 ATS Jamayne Isaako \u00d7 ATS Tevita Naufahu", "p_joint": 0.1604, "fair_price": 6.24, "p_independent": 0.1167, "correlation_lift": 1.375}, {"combo": "Dolphins win \u00d7 ATS Jamayne Isaako \u00d7 total over 44.5", "p_joint": 0.195, "fair_price": 5.13, "p_independent": 0.1427, "correlation_lift": 1.366}, {"combo": "Dolphins win \u00d7 ATS Jamayne Isaako \u00d7 match tries over 7.5", "p_joint": 0.2073, "fair_price": 4.82, "p_independent": 0.1536, "correlation_lift": 1.349}, {"combo": "Dolphins -2.5 \u00d7 ATS Jamayne Isaako", "p_joint": 0.2725, "fair_price": 3.67, "p_independent": 0.2256, "correlation_lift": 1.208}]}, {"home": "Canterbury-Bankstown Bulldogs", "away": "Canberra Raiders", "kickoff": "Sat 11 Jul, 17:30", "venue": "Accor Stadium", "p": {"elo": 0.6026, "poisson": 0.5241, "gbm": 0.636, "blend": 0.5839, "market": 0.6125}, "margin": 1.1, "total": 44.7, "value": {"side": "Canberra Raiders", "ev": 3.1928, "best_home": 1.55, "best_away": 2.48}, "tries": {"match": "Canterbury-Bankstown Bulldogs v Canberra Raiders", "exp_tries_home": 4.0, "exp_tries_away": 3.82, "exp_tries_total": 7.81, "median_tries_total": 8.0, "p_over_line": 0.52, "tries_line": 7.5}, "props": [{"player": "Jacob Kiraz", "position": "W", "team": "Canterbury-Bankstown Bulldogs", "exp_tries": 0.71, "p_ats": 0.507, "fair_price": 1.97, "p_2plus": 0.159, "fair_2plus": 6.3}, {"player": "Xavier Savage", "position": "W", "team": "Canberra Raiders", "exp_tries": 0.6, "p_ats": 0.451, "fair_price": 2.22, "p_2plus": 0.122, "fair_2plus": 8.2}, {"player": "Kaeo Weekes", "position": "FB", "team": "Canberra Raiders", "exp_tries": 0.55, "p_ats": 0.425, "fair_price": 2.35, "p_2plus": 0.107, "fair_2plus": 9.3}, {"player": "Enari Tuala", "position": "W", "team": "Canterbury-Bankstown Bulldogs", "exp_tries": 0.53, "p_ats": 0.409, "fair_price": 2.45, "p_2plus": 0.098, "fair_2plus": 10.2}, {"player": "Jed Stuart", "position": "W", "team": "Canberra Raiders", "exp_tries": 0.45, "p_ats": 0.363, "fair_price": 2.75, "p_2plus": 0.076, "fair_2plus": 13.2}, {"player": "Stephen Crichton", "position": "C", "team": "Canterbury-Bankstown Bulldogs", "exp_tries": 0.39, "p_ats": 0.325, "fair_price": 3.07, "p_2plus": 0.06, "fair_2plus": 16.7}], "multis": [{"combo": "Canberra Raiders win \u00d7 Xavier Savage 2+ tries", "p_joint": 0.081, "fair_price": 12.34, "p_independent": 0.0533, "correlation_lift": 1.52}, {"combo": "Canberra Raiders win \u00d7 ATS Xavier Savage \u00d7 ATS Kaeo Weekes", "p_joint": 0.1263, "fair_price": 7.92, "p_independent": 0.0849, "correlation_lift": 1.489}, {"combo": "Canberra Raiders win \u00d7 ATS Xavier Savage \u00d7 match tries over 7.5", "p_joint": 0.1512, "fair_price": 6.62, "p_independent": 0.1046, "correlation_lift": 1.446}, {"combo": "Canberra Raiders win \u00d7 ATS Xavier Savage \u00d7 total over 40.5", "p_joint": 0.166, "fair_price": 6.02, "p_independent": 0.1157, "correlation_lift": 1.435}, {"combo": "Canberra Raiders -0.5 \u00d7 ATS Xavier Savage", "p_joint": 0.2516, "fair_price": 3.97, "p_independent": 0.201, "correlation_lift": 1.252}]}, {"home": "Sydney Roosters", "away": "Parramatta Eels", "kickoff": "Sat 11 Jul, 19:35", "venue": "Allianz Stadium", "p": {"elo": 0.7587, "poisson": 0.6156, "gbm": 0.8282, "blend": 0.7478, "market": 0.7894}, "margin": 4.9, "total": 48.4, "value": {"side": "Parramatta Eels", "ev": 16.012, "best_home": 1.2, "best_away": 4.6}, "tries": {"match": "Sydney Roosters v Parramatta Eels", "exp_tries_home": 4.66, "exp_tries_away": 3.78, "exp_tries_total": 8.44, "median_tries_total": 8.0, "p_over_line": 0.606, "tries_line": 7.5}, "props": [{"player": "Rex Bassingthwaighte", "position": "W", "team": "Sydney Roosters", "exp_tries": 0.61, "p_ats": 0.458, "fair_price": 2.18, "p_2plus": 0.126, "fair_2plus": 7.9}, {"player": "Josh Addo-Carr", "position": "W", "team": "Parramatta Eels", "exp_tries": 0.59, "p_ats": 0.448, "fair_price": 2.23, "p_2plus": 0.12, "fair_2plus": 8.3}, {"player": "Junior Tupou", "position": "B", "team": "Sydney Roosters", "exp_tries": 0.5, "p_ats": 0.395, "fair_price": 2.53, "p_2plus": 0.091, "fair_2plus": 11.0}, {"player": "Tommy Talau", "position": "W", "team": "Sydney Roosters", "exp_tries": 0.5, "p_ats": 0.395, "fair_price": 2.53, "p_2plus": 0.091, "fair_2plus": 11.0}, {"player": "Isaiah Iongi", "position": "FB", "team": "Parramatta Eels", "exp_tries": 0.4, "p_ats": 0.331, "fair_price": 3.02, "p_2plus": 0.062, "fair_2plus": 16.1}, {"player": "Jordan Samrani", "position": "C", "team": "Parramatta Eels", "exp_tries": 0.4, "p_ats": 0.326, "fair_price": 3.06, "p_2plus": 0.06, "fair_2plus": 16.6}], "multis": [{"combo": "Sydney Roosters win \u00d7 ATS Rex Bassingthwaighte \u00d7 total over 44.5", "p_joint": 0.2096, "fair_price": 4.77, "p_independent": 0.1527, "correlation_lift": 1.373}, {"combo": "Sydney Roosters win \u00d7 ATS Rex Bassingthwaighte \u00d7 match tries over 7.5", "p_joint": 0.2236, "fair_price": 4.47, "p_independent": 0.165, "correlation_lift": 1.355}, {"combo": "Sydney Roosters win \u00d7 Rex Bassingthwaighte 2+ tries", "p_joint": 0.1002, "fair_price": 9.98, "p_independent": 0.0747, "correlation_lift": 1.342}, {"combo": "Sydney Roosters win \u00d7 ATS Rex Bassingthwaighte \u00d7 ATS Tommy Talau", "p_joint": 0.1433, "fair_price": 6.98, "p_independent": 0.1078, "correlation_lift": 1.33}, {"combo": "Sydney Roosters -4.5 \u00d7 ATS Rex Bassingthwaighte", "p_joint": 0.2757, "fair_price": 3.63, "p_independent": 0.2293, "correlation_lift": 1.203}]}, {"home": "South Sydney Rabbitohs", "away": "Newcastle Knights", "kickoff": "Sun 12 Jul, 14:00", "venue": "Accor Stadium", "p": {"elo": 0.5844, "poisson": 0.5801, "gbm": 0.5194, "blend": 0.5897, "market": 0.4816}, "margin": 3.3, "total": 49.0, "value": {"side": "South Sydney Rabbitohs", "ev": 17.94, "best_home": 2.0, "best_away": 1.85}, "tries": {"match": "South Sydney Rabbitohs v Newcastle Knights", "exp_tries_home": 4.56, "exp_tries_away": 3.99, "exp_tries_total": 8.55, "median_tries_total": 8.0, "p_over_line": 0.622, "tries_line": 7.5}, "props": [{"player": "Alex Johnston", "position": "W", "team": "South Sydney Rabbitohs", "exp_tries": 1.11, "p_ats": 0.671, "fair_price": 1.49, "p_2plus": 0.306, "fair_2plus": 3.3}, {"player": "Greg Marzhew", "position": "W", "team": "Newcastle Knights", "exp_tries": 0.77, "p_ats": 0.538, "fair_price": 1.86, "p_2plus": 0.181, "fair_2plus": 5.5}, {"player": "Dominic Young", "position": "W", "team": "Newcastle Knights", "exp_tries": 0.75, "p_ats": 0.526, "fair_price": 1.9, "p_2plus": 0.172, "fair_2plus": 5.8}, {"player": "Edward Kosi", "position": "W", "team": "South Sydney Rabbitohs", "exp_tries": 0.55, "p_ats": 0.421, "fair_price": 2.37, "p_2plus": 0.105, "fair_2plus": 9.5}, {"player": "Fletcher Sharpe", "position": "FB", "team": "Newcastle Knights", "exp_tries": 0.5, "p_ats": 0.393, "fair_price": 2.55, "p_2plus": 0.09, "fair_2plus": 11.1}, {"player": "Jye Gray", "position": "FB", "team": "South Sydney Rabbitohs", "exp_tries": 0.36, "p_ats": 0.299, "fair_price": 3.34, "p_2plus": 0.05, "fair_2plus": 20.0}], "multis": [{"combo": "South Sydney Rabbitohs win \u00d7 ATS Alex Johnston \u00d7 ATS Edward Kosi", "p_joint": 0.2072, "fair_price": 4.83, "p_independent": 0.1572, "correlation_lift": 1.318}, {"combo": "South Sydney Rabbitohs win \u00d7 Alex Johnston 2+ tries", "p_joint": 0.2198, "fair_price": 4.55, "p_independent": 0.1674, "correlation_lift": 1.313}, {"combo": "South Sydney Rabbitohs win \u00d7 ATS Alex Johnston \u00d7 total over 44.5", "p_joint": 0.2721, "fair_price": 3.67, "p_independent": 0.2133, "correlation_lift": 1.276}, {"combo": "South Sydney Rabbitohs win \u00d7 ATS Alex Johnston \u00d7 match tries over 7.5", "p_joint": 0.2908, "fair_price": 3.44, "p_independent": 0.2305, "correlation_lift": 1.262}, {"combo": "South Sydney Rabbitohs -4.5 \u00d7 ATS Alex Johnston", "p_joint": 0.3594, "fair_price": 2.78, "p_independent": 0.3073, "correlation_lift": 1.169}]}, {"home": "Manly-Warringah Sea Eagles", "away": "North Queensland Cowboys", "kickoff": "Sun 12 Jul, 16:05", "venue": "4 Pines Park", "p": {"elo": 0.6312, "poisson": 0.5874, "gbm": 0.7146, "blend": 0.6311, "market": 0.6133}, "margin": 3.7, "total": 48.2, "value": null, "tries": {"match": "Manly-Warringah Sea Eagles v North Queensland Cowboys", "exp_tries_home": 4.54, "exp_tries_away": 3.88, "exp_tries_total": 8.42, "median_tries_total": 8.0, "p_over_line": 0.603, "tries_line": 7.5}, "props": [{"player": "Murray Taulagi", "position": "W", "team": "North Queensland Cowboys", "exp_tries": 0.7, "p_ats": 0.501, "fair_price": 2.0, "p_2plus": 0.154, "fair_2plus": 6.5}, {"player": "Lehi Hopoate", "position": "W", "team": "Manly-Warringah Sea Eagles", "exp_tries": 0.65, "p_ats": 0.478, "fair_price": 2.09, "p_2plus": 0.139, "fair_2plus": 7.2}, {"player": "Jason Saab", "position": "W", "team": "Manly-Warringah Sea Eagles", "exp_tries": 0.59, "p_ats": 0.447, "fair_price": 2.24, "p_2plus": 0.119, "fair_2plus": 8.4}, {"player": "Clayton Faulalo", "position": "FB", "team": "Manly-Warringah Sea Eagles", "exp_tries": 0.53, "p_ats": 0.409, "fair_price": 2.44, "p_2plus": 0.098, "fair_2plus": 10.2}, {"player": "Scott Drinkwater", "position": "FB", "team": "North Queensland Cowboys", "exp_tries": 0.42, "p_ats": 0.342, "fair_price": 2.92, "p_2plus": 0.067, "fair_2plus": 15.0}, {"player": "Tom Chester", "position": "C", "team": "North Queensland Cowboys", "exp_tries": 0.39, "p_ats": 0.325, "fair_price": 3.07, "p_2plus": 0.06, "fair_2plus": 16.7}], "multis": [{"combo": "Manly-Warringah Sea Eagles win \u00d7 ATS Lehi Hopoate \u00d7 total over 44.5", "p_joint": 0.2044, "fair_price": 4.89, "p_independent": 0.1494, "correlation_lift": 1.368}, {"combo": "Manly-Warringah Sea Eagles win \u00d7 ATS Lehi Hopoate \u00d7 match tries over 7.5", "p_joint": 0.218, "fair_price": 4.59, "p_independent": 0.1615, "correlation_lift": 1.35}, {"combo": "Manly-Warringah Sea Eagles win \u00d7 Lehi Hopoate 2+ tries", "p_joint": 0.1048, "fair_price": 9.54, "p_independent": 0.0778, "correlation_lift": 1.347}, {"combo": "Manly-Warringah Sea Eagles win \u00d7 ATS Lehi Hopoate \u00d7 ATS Jason Saab", "p_joint": 0.1588, "fair_price": 6.3, "p_independent": 0.1195, "correlation_lift": 1.33}, {"combo": "Manly-Warringah Sea Eagles -4.5 \u00d7 ATS Lehi Hopoate", "p_joint": 0.268, "fair_price": 3.73, "p_independent": 0.2224, "correlation_lift": 1.205}]}, {"home": "Melbourne Storm", "away": "Gold Coast Titans", "kickoff": "Sun 12 Jul, 18:15", "venue": "AAMI Park", "p": {"elo": 0.7716, "poisson": 0.6085, "gbm": 0.6384, "blend": 0.7567, "market": 0.7033}, "margin": 4.5, "total": 48.1, "value": {"side": "Melbourne Storm", "ev": 2.9112, "best_home": 1.36, "best_away": 3.25}, "tries": {"match": "Melbourne Storm v Gold Coast Titans", "exp_tries_home": 4.6, "exp_tries_away": 3.8, "exp_tries_total": 8.39, "median_tries_total": 8.0, "p_over_line": 0.601, "tries_line": 7.5}, "props": [{"player": "Will Warbrick", "position": "W", "team": "Melbourne Storm", "exp_tries": 0.76, "p_ats": 0.534, "fair_price": 1.87, "p_2plus": 0.178, "fair_2plus": 5.6}, {"player": "Moses Leo", "position": "W", "team": "Melbourne Storm", "exp_tries": 0.73, "p_ats": 0.518, "fair_price": 1.93, "p_2plus": 0.166, "fair_2plus": 6.0}, {"player": "Sualauvi Fa'alogo", "position": "FB", "team": "Melbourne Storm", "exp_tries": 0.67, "p_ats": 0.489, "fair_price": 2.04, "p_2plus": 0.146, "fair_2plus": 6.8}, {"player": "Phillip Sami", "position": "W", "team": "Gold Coast Titans", "exp_tries": 0.6, "p_ats": 0.449, "fair_price": 2.23, "p_2plus": 0.121, "fair_2plus": 8.3}, {"player": "Jaylan De Groot", "position": "C", "team": "Gold Coast Titans", "exp_tries": 0.44, "p_ats": 0.357, "fair_price": 2.8, "p_2plus": 0.073, "fair_2plus": 13.7}, {"player": "Jensen Taumoepeau", "position": "W", "team": "Gold Coast Titans", "exp_tries": 0.41, "p_ats": 0.337, "fair_price": 2.97, "p_2plus": 0.064, "fair_2plus": 15.5}], "multis": [{"combo": "Melbourne Storm win \u00d7 ATS Will Warbrick \u00d7 total over 44.5", "p_joint": 0.2289, "fair_price": 4.37, "p_independent": 0.1709, "correlation_lift": 1.339}, {"combo": "Melbourne Storm win \u00d7 Will Warbrick 2+ tries", "p_joint": 0.1364, "fair_price": 7.33, "p_independent": 0.1022, "correlation_lift": 1.335}, {"combo": "Melbourne Storm win \u00d7 ATS Will Warbrick \u00d7 match tries over 7.5", "p_joint": 0.2445, "fair_price": 4.09, "p_independent": 0.1846, "correlation_lift": 1.324}, {"combo": "Melbourne Storm win \u00d7 ATS Will Warbrick \u00d7 ATS Moses Leo", "p_joint": 0.2062, "fair_price": 4.85, "p_independent": 0.1596, "correlation_lift": 1.292}, {"combo": "Melbourne Storm -4.5 \u00d7 ATS Will Warbrick", "p_joint": 0.3084, "fair_price": 3.24, "p_independent": 0.2577, "correlation_lift": 1.197}]}]};
+const nick = n => n.split(" ").pop();
+const pc = x => (100 * x).toFixed(1) + "%";
+const tabs = document.getElementById("tabs");
+const panel = document.getElementById("panel");
+document.getElementById("round").textContent = DATA.round;
+document.getElementById("gen").textContent = DATA.generated;
+document.getElementById("validation").textContent = DATA.validation;
+
+function bar(label, p, cls, homeName, awayName) {
+  if (p == null || isNaN(p)) return "";
+  const w = Math.max(2, Math.min(98, 100 * p));
+  const inFill = w > 18;
+  return `<div class="bar-row">
+    <div class="lbl"><span><b>${label}</b> — ${homeName} ${pc(p)}</span>
+    <span>${awayName} ${pc(1 - p)}</span></div>
+    <div class="track"><div class="fill ${cls}" style="width:${w}%"></div>
+      <span class="pct ${inFill ? "in" : "out"}">${pc(p)}</span>
+      <span class="pct right">${pc(1 - p)}</span></div></div>`;
+}
+
+function render(i) {
+  const g = DATA.games[i];
+  [...tabs.children].forEach((t, j) => t.setAttribute("aria-selected", j === i));
+  const p = g.p;
+  const marginSide = g.margin >= 0 ? nick(g.home) : nick(g.away);
+  let h = `<div class="matchhead"><h2>${g.home} v ${g.away}</h2>
+    <span class="when">${g.kickoff} · ${g.venue}</span></div>
+    <div class="tiles">
+      <div class="tile"><div class="k">Model call</div>
+        <div class="v">${p.blend >= 0.5 ? nick(g.home) : nick(g.away)}
+          <small>${pc(Math.max(p.blend, 1 - p.blend))} blend</small></div></div>
+      <div class="tile"><div class="k">Expected margin</div>
+        <div class="v">${marginSide} <small>by</small> ${Math.abs(g.margin).toFixed(1)}</div></div>
+      <div class="tile"><div class="k">Expected total</div>
+        <div class="v">${g.total.toFixed(0)} <small>pts</small></div></div>
+      ${g.tries ? `<div class="tile"><div class="k">Expected tries</div>
+        <div class="v">${g.tries.exp_tries_home.toFixed(1)}<small> ${nick(g.home)}</small>
+        &nbsp;${g.tries.exp_tries_away.toFixed(1)}<small> ${nick(g.away)}</small></div>
+        <div class="k" style="margin-top:4px">over ${g.tries.tries_line} tries: ${(100*g.tries.p_over_line).toFixed(0)}%</div></div>` : ""}
+    </div>`;
+  if (g.value) h += `<span class="valuechip">Model value (paper): ${g.value.side} ` +
+    `${g.value.ev > 0 ? "+" : ""}${g.value.ev.toFixed(1)}% EV at best price</span>`;
+  h += `<h3>Win probability — home side</h3>`;
+  h += bar("Model (blend)", p.blend, "model", nick(g.home), nick(g.away));
+  h += bar("Market (4-book de-vig)", p.market, "market", nick(g.home), nick(g.away));
+  h += `<table><thead><tr><th>Elo</th><th>Poisson</th><th>GBM</th><th>Blend</th><th>Market</th></tr></thead>
+    <tbody><tr>${["elo", "poisson", "gbm", "blend", "market"].map(k =>
+      `<td>${p[k] == null || isNaN(p[k]) ? "—" : pc(p[k])}</td>`).join("")}</tr></tbody></table>`;
+  if (g.multis.length) {
+    h += `<h3>Multi suggestions (same-game, model fair prices)</h3>`;
+    for (const m of g.multis) {
+      h += `<div class="multi"><div class="legs">${m.combo.replaceAll(" × ", " &nbsp;×&nbsp; ")}</div>
+        <div class="nums"><span>joint <b>${pc(m.p_joint)}</b></span>
+        <span>fair <b>$${m.fair_price.toFixed(2)}</b></span>
+        <span>priced independently <b>$${(1 / m.p_independent).toFixed(2)}</b></span>
+        <span class="lift">×${m.correlation_lift.toFixed(2)} correlation</span></div></div>`;
+    }
+  }
+  if (g.props.length) {
+    h += `<h3>Tryscorers — how many tries the model expects</h3>
+      <table><thead><tr><th>Player</th><th>Pos</th><th>Team</th><th>E(tries)</th>
+      <th>P(1+)</th><th>Fair 1+</th><th>P(2+)</th><th>Fair 2+</th></tr></thead><tbody>`;
+    for (const t of g.props)
+      h += `<tr><td>${t.player}</td><td>${t.position}</td><td>${nick(t.team)}</td>
+        <td>${t.exp_tries.toFixed(2)}</td><td>${pc(t.p_ats)}</td><td>$${t.fair_price.toFixed(2)}</td>
+        <td>${pc(t.p_2plus)}</td><td>${t.fair_2plus ? "$" + t.fair_2plus.toFixed(1) : "—"}</td></tr>`;
+    h += `</tbody></table>`;
+  }
+  panel.innerHTML = h;
+}
+
+DATA.games.forEach((g, i) => {
+  const b = document.createElement("button");
+  b.className = "tab"; b.role = "tab";
+  b.textContent = `${nick(g.home)} v ${nick(g.away)}`;
+  b.onclick = () => render(i);
+  tabs.appendChild(b);
+});
+render(0);
+</script>
+</body></html>
