@@ -1,0 +1,86 @@
+name: NRL Pipeline
+
+# Fully-automatic weekly rhythm for the NRL predictor (Build Spec §9 Phase 5):
+# refresh data -> settle any finished rounds -> re-predict -> live odds ->
+# props/SGM sims -> rebuild dashboard/feed -> commit outputs to the mirror
+# branch -> redeploy the nrl-feed Railway service.
+#
+# Schedule (UTC; AEST = UTC+10):
+#   Mon 02:00 UTC = Mon 12:00 AEST — grade the weekend's round (paper ledger)
+#   Tue 07:30 UTC = Tue 17:30 AEST — post-team-list refresh
+#   Thu 00:00 UTC = Thu 10:00 AEST — pre-round predictions + preview data
+# Code home: EJMC95/nrl-predictor (canonical); this runs on the mirror branch.
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+    - cron: '30 7 * * 2'
+    - cron: '0 0 * * 4'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout the nrl-predictor mirror branch
+        uses: actions/checkout@v4
+        with:
+          ref: claude/nrl-predictor-phases-1-2-vtb133
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: nrl-predictor/requirements.txt
+
+      - name: Install deps
+        working-directory: nrl-predictor
+        run: pip install -q -r requirements.txt
+
+      - name: Run pipeline (refresh -> grade -> predict -> odds -> props/SGM -> feed)
+        working-directory: nrl-predictor
+        run: |
+          set -uo pipefail
+          python -m src.cli refresh
+          python -m src.cli grade --auto || echo "::warning::grading failed (non-fatal)"
+          python -m src.cli predict
+          python -m src.cli odds || echo "::warning::odds capture failed (books unreachable from runner?) — continuing without market columns"
+          python scripts/run_phase4.py
+          python -m src.cli feed
+          echo "--- outputs ---"; ls -la outputs/ | head -20
+
+      - name: Commit refreshed outputs to the mirror branch
+        run: |
+          set -uo pipefail
+          git config user.name "nrl-pipeline[bot]"
+          git config user.email "nrl-pipeline@users.noreply.github.com"
+          git add nrl-predictor/outputs nrl-predictor/data/ledger.db 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no output changes to commit"
+          else
+            git commit -m "nrl-pipeline: automated refresh $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push origin HEAD:claude/nrl-predictor-phases-1-2-vtb133
+          fi
+
+      - name: Deploy nrl-feed
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        working-directory: nrl-predictor
+        run: |
+          set -uo pipefail
+          npm install -g @railway/cli
+          ok=0
+          for attempt in 1 2 3; do
+            if railway up --service nrl-feed --ci; then ok=1; break; fi
+            echo "attempt $attempt failed; retrying in $((attempt*15))s..."; sleep $((attempt*15))
+          done
+          [ "$ok" -eq 1 ] || { echo "::error::deploy failed after 3 attempts"; exit 1; }
+          echo "OK: dashboard refreshed at https://nrl-feed-production.up.railway.app"
