@@ -1,0 +1,62 @@
+name: fleet-watchdog
+# Deterministic, zero-token fleet monitor. Curls the public pnl.json feed and
+# fails (-> GitHub failure email) when the feed or any bot is stale/offline.
+# Warnings (non-fatal) for exposure over budget and outsized daily losses.
+# Added 2026-07-08 alongside the weekly Claude fleet assessment; per-bot "stale"
+# flags come from the dashboard's own per-kind thresholds, so new services
+# (e.g. lighter-*) are covered automatically once they publish to the feed.
+on:
+  schedule:
+    - cron: '7,37 * * * *'   # ~every 30 min, off-peak minutes to reduce GH cron jitter
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe fleet feed
+        shell: bash
+        run: |
+          set -uo pipefail
+          URL="https://pnl-dashboard-production-858c.up.railway.app/pnl.json?nc=$(date +%s)"
+          RESP=""
+          for i in 1 2 3; do
+            if RESP=$(curl -fsS -m 20 "$URL"); then break; fi
+            echo "fetch attempt $i failed"; sleep 15
+            if [ "$i" = "3" ]; then
+              echo "::error::pnl.json unreachable after 3 attempts - dashboard or Railway may be DOWN"
+              exit 1
+            fi
+          done
+          printf '%s' "$RESP" > pnl.json
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open('pnl.json'))
+          meta = d.get('meta', {})
+          bots = d.get('bots', [])
+          problems = []
+          if meta.get('feed_stale'):
+              problems.append(f"FEED STALE (freshest={meta.get('freshest_update_age_sec')}s)")
+          if not bots:
+              problems.append("NO BOTS in feed")
+          stale = [b.get('bot','?') for b in bots if b.get('stale')]
+          off   = [b.get('bot','?') for b in bots if b.get('status') not in (None, 'online')]
+          if stale: problems.append("STALE: " + ", ".join(stale))
+          if off:   problems.append("NOT ONLINE: " + ", ".join(off))
+          opens = sum(int(b.get('open_trades') or 0) for b in bots)
+          print(f"bots={len(bots)} open_positions={opens}")
+          if opens > 20:
+              print(f"::warning::fleet open positions {opens} exceed the 20-position budget")
+          big_loss = [f"{b.get('bot')} ({b.get('pnl_daily'):+.1f})" for b in bots
+                      if isinstance(b.get('pnl_daily'), (int, float)) and b['pnl_daily'] < -100]
+          if big_loss:
+              print("::warning::daily P&L below -$100: " + ", ".join(big_loss))
+          if problems:
+              print("::error::" + " | ".join(problems))
+              sys.exit(1)
+          print("fleet OK")
+          PY
