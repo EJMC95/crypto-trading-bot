@@ -32,7 +32,7 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 
 # Expected bots — so the grid shows a bot even before its first publish.
 EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
-            "perps-funding-carry",
+            "perps-funding-carry", "lighter-perp-sniper",
             "scanner-triangular-arb", "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h", "crypto-trendmomo-4h",
@@ -56,6 +56,34 @@ STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca"}
 FREQTRADE = {"freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"}
 CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS | FREQTRADE
 
+# [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows. When a bot trades on Lighter
+# its publisher suffixes the bot id by mode (venues/__init__._SUFFIX):
+#   -lighter  = REAL MONEY live   (each on its own Lighter sub-account)
+#   -ltest    = Lighter testnet   (real order lifecycle, faucet funds)
+#   -lshadow  = shadow            (modelled fills on live books, NEVER sends)
+# These are SEPARATE dashboard rows from the paper (hl_paper) bot so the paper
+# equity curve is never contaminated. They are detected dynamically (not a fixed
+# list) so whichever bots the user brings live just appear, each badged with its
+# mode, and the LIVE fleet is reported as its own P&L subtotal.
+VENUE_SUFFIXES = {
+    "-lighter": ("LIVE", "#f85149", "lighter_live"),
+    "-ltest":   ("TESTNET", "#d29922", "lighter_testnet"),
+    "-lshadow": ("SHADOW", "#58a6ff", "lighter_shadow"),
+}
+
+
+def venue_variant(bot):
+    """(base_bot, suffix_key) if `bot` is a venue-variant row, else (bot, None)."""
+    for suf in VENUE_SUFFIXES:
+        if bot.endswith(suf):
+            return bot[:-len(suf)], suf
+    return bot, None
+
+
+def is_live_bot(bot):
+    """True only for REAL-money Lighter rows (not shadow/testnet)."""
+    return bot.endswith("-lighter")
+
 # [2026-07-01] Professional display names. Keys stay machine-safe; the dashboard
 # shows the descriptive label. label_for() falls back to the raw key if unmapped.
 # [2026-07-05] Trendy names + a plain "what it does" tail so a glance tells you
@@ -70,6 +98,7 @@ LABELS = {
     "perps-donchian-breakout":     "🧭 Trail Blazer · perps 4h breakout",
     "perps-regime-switch":         "⚖️ Two-Way Tide · long/short trend engine (perps)",
     "perps-funding-carry":         "🌾 Yield Harvester · perps funding carry",
+    "lighter-perp-sniper":         "🎯 Perp Sniper · new Lighter-listing snipe",
     "scanner-triangular-arb":      "🔺 Loop Scout · triangular arb (scanner)",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout · cross-exchange arb (scanner)",
     "event-listing-sniper":        "🎯 Launch Sniper · new-listing buyer",
@@ -82,6 +111,10 @@ LABELS = {
     "freqtrade-georgia":           "🔮 Georgia · FreqAI LightGBM · 1H ML adaptive",
 }
 def label_for(bot):
+    base, suf = venue_variant(bot)
+    if suf:
+        tag = VENUE_SUFFIXES[suf][0]
+        return f"{LABELS.get(base, base)} — {tag} · Lighter"
     return LABELS.get(bot, bot)
 
 # Paper bots (freqtrade + perps) all start with a $1,000 simulated balance, so
@@ -111,6 +144,7 @@ SNIPER_STALE_SECONDS = 900
 
 def stale_secs_for(bot):
     """Per-bot stale threshold: each bot family has its own publish cadence."""
+    bot, _ = venue_variant(bot)   # a -lighter/-lshadow row keeps its base cadence
     if bot in STOCKS:
         return STOCK_STALE_SECONDS
     if bot in SLOW_LOOP:
@@ -132,9 +166,12 @@ def fetch_rows():
                 return {}  # table not created yet (no bot has published)
             cur.execute("SELECT * FROM bot_pnl")
             # Drop legacy pre-rename rows so stale duplicates never reach the
-            # grid, totals, or the /pnl.json feed.
+            # grid, totals, or the /pnl.json feed. Venue-variant rows
+            # (<base>-lighter/-ltest/-lshadow) pass when their base is a current
+            # bot, so a live/shadow Lighter bot shows up automatically.
             return {r["bot"]: r for r in cur.fetchall()
-                    if r["bot"] in CURRENT_BOTS}
+                    if r["bot"] in CURRENT_BOTS
+                    or venue_variant(r["bot"])[0] in CURRENT_BOTS}
     finally:
         conn.close()
 
@@ -641,10 +678,18 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     open_trades = open_trades or {}
     en = enrich or {}
     badge = ""
-    if bot in BADGES:
-        _t, _c = BADGES[bot]
+    _base_bot, _suf = venue_variant(bot)
+    if _base_bot in BADGES:
+        _t, _c = BADGES[_base_bot]
         badge = (f' <span style="font-size:10px;border:1px solid {_c};color:{_c};'
                  f'border-radius:6px;padding:1px 5px;vertical-align:middle">{_t}</span>')
+    # [2026-07-09 LIGHTER GO-LIVE] mode badge — LIVE (real money) stands out in
+    # red-filled, TESTNET amber, SHADOW blue, so a live bot is unmistakable.
+    if _suf:
+        _vt, _vc, _ = VENUE_SUFFIXES[_suf]
+        badge += (f' <span style="font-size:10px;border:1px solid {_vc};color:#fff;'
+                  f'background:{_vc};border-radius:6px;padding:1px 6px;'
+                  f'vertical-align:middle;font-weight:700;letter-spacing:.3px">{_vt}</span>')
     if row is None:
         return (f'<div class="card"><h2>{html.escape(label_for(bot))}{badge} '
                 f'<span class="dot off"></span></h2>'
@@ -876,14 +921,28 @@ def render():
                    '<div class="okline">Health ✓ persistence intact · no over-trading · probation within bounds</div>')
 
     live = [r for r in rows.values() if r]
-    _crypto = [r for r in live if r.get("bot") not in STOCKS]
-    # Crypto trading-bot P&L (the real headline) excludes scanners AND stocks;
-    # each of those is shown as its own subtotal so it can't distort the total.
+    # [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows (live/testnet/shadow on
+    # Lighter) are their OWN groups — never folded into the paper headline, so
+    # the paper curve stays clean and the LIVE fleet gets its own P&L line.
+    def _variant_kind(r):
+        return venue_variant(r.get("bot") or "")[1]
+    live_rows = [r for r in live if is_live_bot(r.get("bot") or "")]
+    shadow_rows = [r for r in live if _variant_kind(r) in ("-lshadow", "-ltest")]
+    _crypto = [r for r in live if r.get("bot") not in STOCKS and not _variant_kind(r)]
+    # Crypto trading-bot P&L (the real headline) excludes scanners AND stocks AND
+    # venue variants; each of those is shown as its own subtotal so it can't
+    # distort the paper total.
     tot_pnl = sum((r.get("pnl_abs") or 0) for r in _crypto
                   if r.get("bot") not in SCANNERS)
     scan_pnl = sum((r.get("pnl_abs") or 0) for r in live
                    if r.get("bot") in SCANNERS)
     stock_pnl = sum((r.get("pnl_abs") or 0) for r in live if r.get("bot") in STOCKS)
+    # LIVE (real money on Lighter) — the number that actually matters once funded.
+    live_pnl = sum((r.get("pnl_abs") or 0) for r in live_rows)
+    live_equity = sum((r.get("equity") or 0) for r in live_rows if r.get("equity") is not None)
+    n_live_bots = len(live_rows)
+    shadow_pnl = sum((r.get("pnl_abs") or 0) for r in shadow_rows)
+    n_shadow_bots = len(shadow_rows)
     tot_equity = sum((r.get("equity") or 0) for r in _crypto if r.get("equity") is not None)
     stock_equity = sum((r.get("equity") or 0) for r in live
                        if r.get("bot") in STOCKS and r.get("equity") is not None)
@@ -896,7 +955,9 @@ def render():
     # Grand total across EVERYTHING (the full picture). Equity is a clean sum of
     # all account balances; P&L sums all bots' pnl_abs (mixed bases — see subtotals).
     grand_equity = sum((r.get("equity") or 0) for r in live if r.get("equity") is not None)
-    grand_pnl = tot_pnl + scan_pnl + stock_pnl
+    # Real-money live P&L IS part of the grand total; shadow is modelled (not real)
+    # so it stays out of the headline and only shows on its own muted line.
+    grand_pnl = tot_pnl + scan_pnl + stock_pnl + live_pnl
 
     # Whole-feed staleness. The DB can be reachable and rows can exist, yet every
     # row is old because the bots lost their write path (the exact failure mode on
@@ -932,6 +993,24 @@ def render():
                   f'but unable to write to Postgres — check the DATABASE_URL reference on '
                   f'each bot service and redeploy.</div>')
 
+    # [2026-07-09 LIGHTER GO-LIVE] The LIVE fleet gets its own prominent P&L line
+    # (real money on Lighter, separate from every paper number). Shadow/testnet
+    # get a muted line so the compressed gate ladder is visible at a glance.
+    live_total_line = ""
+    if n_live_bots:
+        live_total_line += (
+            f'<span style="border:1px solid #f85149;border-radius:6px;padding:2px 9px;'
+            f'background:#f8514918;font-weight:600">🔴 LIVE · Lighter '
+            f'<b>{money(live_equity)}</b> eq · '
+            f'<b class="{cls(live_pnl)}">{money(live_pnl)}</b> P&amp;L · '
+            f'{n_live_bots} bot{"s" if n_live_bots != 1 else ""}</span>')
+    if n_shadow_bots:
+        live_total_line += (
+            f'<span class="muted" style="border:1px solid #30363d;border-radius:6px;'
+            f'padding:2px 9px">shadow/testnet <b class="{cls(shadow_pnl)}">'
+            f'{money(shadow_pnl)}</b> · {n_shadow_bots} bot'
+            f'{"s" if n_shadow_bots != 1 else ""} (modelled)</span>')
+
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="30">
@@ -961,7 +1040,8 @@ def render():
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
    <span style="border-right:1px solid #30363d;padding-right:18px">GRAND TOTAL <b>{money(grand_equity)}</b> eq · <b class="{cls(grand_pnl)}">{money(grand_pnl)}</b> P&amp;L</span>
-   <span>Crypto P&amp;L <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b> · eq {money(tot_equity)}</span>
+   {live_total_line}
+   <span>Crypto (paper) <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b> · eq {money(tot_equity)}</span>
    <span>Scanner paper <b class="{cls(scan_pnl)}">{money(scan_pnl)}</b></span>
    <span>Stocks (paper) <b class="{cls(stock_pnl)}">{money(stock_pnl)}</b> · eq {money(stock_equity)}</span>
    <span>Trades <b>{n_closed} closed · {n_open} open</b></span>
@@ -1406,6 +1486,13 @@ class H(BaseHTTPRequestHandler):
                     # Tag so downstream reports never blend scanner paper-arb
                     # P&L with the trading bots' realized P&L.
                     d["kind"] = "scanner" if r.get("bot") in SCANNERS else "trading"
+                    # [2026-07-09 LIGHTER GO-LIVE] venue provenance for the feed:
+                    # which bots are real-money live vs shadow/testnet vs paper.
+                    _vbase, _vsuf = venue_variant(r.get("bot") or "")
+                    d["venue_mode"] = (VENUE_SUFFIXES[_vsuf][2] if _vsuf
+                                       else (r.get("extra") or {}).get("venue"))
+                    d["live"] = bool(_vsuf == "-lighter")
+                    d["base_bot"] = _vbase
                     # [2026-07-07 UNIFORM CARDS] same server-side enrichment the
                     # cards use, for feed consumers (artifact, reports).
                     _en = _enr.get(r.get("bot")) or {}
@@ -1441,6 +1528,16 @@ class H(BaseHTTPRequestHandler):
                 # single lagging stock bot no longer trips a false whole-feed alarm
                 # — while a truly frozen feed (the 2026-06-22 failure) still does.
                 freshest = min(_age_secs) if _age_secs else None
+                # [2026-07-09 LIGHTER GO-LIVE] real-money live-fleet subtotal so
+                # the scheduled daily/weekly reports can headline it separately.
+                _live_rows = [d for d in data if d.get("live")]
+                live_meta = {
+                    "n_live_bots": len(_live_rows),
+                    "live_pnl": round(sum((d.get("pnl_abs") or 0) for d in _live_rows), 2),
+                    "live_equity": round(sum((d.get("equity") or 0) for d in _live_rows
+                                             if d.get("equity") is not None), 2),
+                    "live_bots": [d.get("bot") for d in _live_rows],
+                }
                 meta = {
                     "generated_at": _now.isoformat(),
                     "stale_threshold_sec": STALE_SECONDS,
@@ -1450,6 +1547,7 @@ class H(BaseHTTPRequestHandler):
                     "feed_stale": bool(_stale_flags) and all(_stale_flags),
                     "n_stale": sum(1 for s in _stale_flags if s),
                     "n_live": len(_stale_flags),
+                    "live_fleet": live_meta,
                 }
                 payload = json.dumps({"meta": meta, "bots": data}).encode("utf-8")
                 code = 200

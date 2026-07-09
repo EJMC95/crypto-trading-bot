@@ -457,11 +457,16 @@ def _ensure_paper_trades_table(conn):
             )
             """
         )
+        # [2026-07-09 LIGHTER GATE-0] venue provenance so shadow/testnet/live
+        # rows are queryable apart from the HL paper era (venue NULL = hl paper).
+        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS venue TEXT")
+        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS shadow BOOLEAN")
     _paper_trades_table_ready = True
 
 
 def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
-                        opened_at=None, closed_at=None, reason=None):
+                        opened_at=None, closed_at=None, reason=None,
+                        venue=None, shadow=None):
     """Idempotently record one closed paper trade so cumulative P&L survives a
     redeploy. `trade_id` must be stable+unique for the trade. Never raises."""
     conn = _get_conn()
@@ -473,15 +478,16 @@ def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
             cur.execute(
                 """
                 INSERT INTO paper_trades (bot, trade_id, pair, pnl_abs, pnl_pct,
-                    opened_at, closed_at, reason, seen_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
+                    opened_at, closed_at, reason, venue, shadow, seen_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
                 ON CONFLICT (bot, trade_id) DO UPDATE SET
                     pnl_abs=EXCLUDED.pnl_abs, pnl_pct=EXCLUDED.pnl_pct,
                     closed_at=EXCLUDED.closed_at, reason=EXCLUDED.reason,
+                    venue=EXCLUDED.venue, shadow=EXCLUDED.shadow,
                     seen_at=now()
                 """,
                 (bot, str(trade_id), pair, pnl_abs, pnl_pct,
-                 opened_at, closed_at, reason),
+                 opened_at, closed_at, reason, venue, shadow),
             )
         return True
     except Exception as e:  # noqa: BLE001
@@ -670,6 +676,77 @@ def save_history(key, payload):
         return True
     except Exception as e:
         _warn_once(f"history write failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return False
+
+
+# --------------------------------------------------------------------------
+# venue order log [2026-07-09 LIGHTER GATE-0]
+# Order-level provenance for the Lighter migration: every shadow-modelled fill
+# AND (later) every live order lands here with the raw exchange response, so
+# Gate-3 can price realizable spread/slippage per market from real evidence.
+_venue_orders_table_ready = False
+
+
+def _ensure_venue_orders_table(conn):
+    global _venue_orders_table_ready
+    if _venue_orders_table_ready:
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS venue_orders (
+                id            BIGSERIAL PRIMARY KEY,
+                at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+                bot           TEXT NOT NULL,
+                venue         TEXT NOT NULL,
+                shadow        BOOLEAN NOT NULL DEFAULT TRUE,
+                coin          TEXT,
+                side          TEXT,
+                size          DOUBLE PRECISION,
+                px_decision   DOUBLE PRECISION,
+                px_fill       DOUBLE PRECISION,
+                spread_bps    DOUBLE PRECISION,
+                slippage_bps  DOUBLE PRECISION,
+                raw           JSONB
+            )
+            """
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS venue_orders_bot_at "
+            "ON venue_orders (bot, at)")
+    _venue_orders_table_ready = True
+
+
+def publish_venue_order(bot, venue, shadow, coin, side, size,
+                        px_decision=None, px_fill=None, spread_bps=None,
+                        slippage_bps=None, raw=None):
+    """Append one venue order (shadow or live) to the durable order log.
+    Guarded like every publisher here: never raises into a trading loop."""
+    conn = _get_conn()
+    if conn is None:
+        return False
+    try:
+        _ensure_venue_orders_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO venue_orders (bot, venue, shadow, coin, side, size,
+                    px_decision, px_fill, spread_bps, slippage_bps, raw)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (bot, venue, bool(shadow), coin, side, size, px_decision,
+                 px_fill, spread_bps, slippage_bps,
+                 json.dumps(raw) if raw is not None else None),
+            )
+        return True
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"venue-order write failed ({e})")
         global _conn
         try:
             conn.close()

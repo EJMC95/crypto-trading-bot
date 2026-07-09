@@ -6,6 +6,56 @@ watch for next. Everything here is DRY-RUN / paper unless explicitly stated.
 
 ---
 
+## 2026-07-09 — Lighter.xyz venue layer (Gate 0) + go-live-on-Lighter prep
+
+### What shipped (all still paper/shadow — no real money moved)
+Built the `venues/` abstraction from the Cowork "Lighter Gate-0 kickoff v2":
+`VenueClient` interface + `HyperliquidClient` (exact passthrough of the old
+inline HL calls) + `LighterClient` (lighter-sdk 1.1.1, ws-first book cache,
+weighted tx-budget governor for the 60/min standard tier, symbol-map for
+kBONK↔1000BONK / PEPE↔1000PEPE). `VENUE` env picks
+hl_paper|lighter_shadow|lighter_testnet|lighter_live. Trail Blazer, Bounce
+Catcher, Yield Harvester refactored onto it; the other 3 HL-facing bots
+(regime-switch is freqtrade, sniper is spot-CCXT, cross-arb needs 2 venues) are
+NOT directional-perps live candidates and were left for later.
+
+### Proven
+- **Data parity**: HL candles byte-identical old-vs-new; funding map 231/231.
+- **Decision parity**: one-cycle diff = 0 for Bounce Catcher; Trail Blazer diff =
+  exactly the 2 intended cap-clips (HYPE/JUP OPEN_LONG→CAP_SKIP) from its new
+  global position cap (the pre-live blocker — it was running 15 open alone).
+- **Shadow**: both pilots ran a clean cycle on LIVE Lighter mainnet books;
+  ShadowBroker crosses the real spread and logs to the new `venue_orders` ledger.
+- **Day-1** (`docs/lighter.md`): 215 markets, ZERO fees, $10/order min (clips fine
+  at $25-35), ETH/ADA/HYPE listed, BLUR/ATOM/INJ/ORDI/TON not; signer binaries
+  load on linux/amd64 AND Mac arm64; native cross-venue funding endpoint.
+- **Testnet smoke** read-only layer 6/6 pass (market list, candles, funding, ws
+  forced-reconnect, kill-switch-blocks-live); auth layer skips w/o env keys.
+
+### Go-live-on-Lighter (Eamon's call, this session): top perps bots live, each on
+its OWN Lighter sub-account (isolated margin). Dashboard now distinguishes live
+bots (red LIVE badge, `<bot>-lighter` rows) and carries a separate **🔴 LIVE ·
+Lighter** P&L total line + `/pnl.json meta.live_fleet`. `GO_LIVE_LIGHTER.md`
+written = the user-only checklist (Ledger acct, N sub-accounts, 1 trade-key each,
+fund, per-service Railway env, PG-password rotation, one-at-a-time kill-switch
+disarm). Ledger ranking of Lighter-capable directional perps: 🧭 Trail Blazer
++$173 (89% WR) and 🪃 Bounce Catcher +$64 (75% WR) are the confirmed live-ready pair, sized $50–100/bot with
+$15–25 clips (his call). **Sniper resolution:** the spot Launch Sniper can't run
+on a perps DEX, so Eamon chose to build a NEW Lighter-native sniper —
+`lighter_perp_sniper.py` (🎯 Perp Sniper) snipes freshly-*listed Lighter perp
+markets* (active-set diff vs a seeded baseline; AnnouncementApi as context). It's
+UNVALIDATED so it runs **shadow-first** and is not in the funded set. **I did not
+create the account, touch keys, fund, or disarm anything — those stay with Eamon
+(`REAL_MONEY_KILL` ARMED).**
+
+### Watchlist
+- Testnet smoke's AUTHENTICATED layer + overnight burn-in still need Eamon's
+  testnet keys (env only).
+- Bots 3–4 selection + capital are the open go-live decisions.
+- Rotate the Postgres password BEFORE any real key lands in Railway.
+
+---
+
 ## 2026-07-07 — Full-fleet audit → Option-B isolation, brain revival, exit rebuilds
 
 ### What the audit found (live Postgres, 352 trades + 285 fills + 52k equity pts, plus code audit)

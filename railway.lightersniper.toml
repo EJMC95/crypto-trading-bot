@@ -1,0 +1,17 @@
+# Service-specific Railway config for the lighter-perp-sniper service ONLY.
+# Point that service's Config-as-code "Railway Config File" setting at this file
+# so it does NOT affect the other services sharing this repo.
+#
+# The base Dockerfile (COPY . . + requirements.txt) bundles the venues/ layer AND
+# lighter-sdk, so this service can run any Lighter mode. Set VENUE on the service:
+#   VENUE=lighter_shadow  (default here) — live books, modelled fills, no orders
+#   VENUE=lighter_live    — real money; also needs REAL_MONEY_KILL=DISARMED_I_UNDERSTAND
+#                           + LIGHTER_ACCOUNT_INDEX / LIGHTER_API_KEY_INDEX /
+#                           LIGHTER_API_PRIVATE_KEY on its own sub-account.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python lighter_perp_sniper.py"
+restartPolicyType = "always"

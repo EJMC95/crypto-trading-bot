@@ -1,0 +1,405 @@
+#!/usr/bin/env python3
+"""
+venues/lighter_client.py — Lighter.xyz venue client (zk perps, zero fees).
+
+Built on lighter-sdk (verified 1.1.1: signer binaries load on BOTH our deploy
+target linux/amd64 python:3.11-slim AND the dev Mac arm64 — docs/lighter.md).
+The SDK is asyncio; the bots are synchronous, so this client runs one event
+loop in a daemon thread and bridges calls with run_coroutine_threadsafe.
+
+Design constraints it encodes (all empirically verified 2026-07-09):
+  * Standard tier = 60 WEIGHTED req/min per L1 address shared REST+tx (order
+    tx weight 6) -> ALL REST goes through venues.governor.TxBudgetGovernor;
+    market data is websocket-first (free: 200 conns/IP, 500 subs/conn).
+  * Fleet symbols are HL-style; venues/symbol_map.py translates (kBONK ↔
+    1000BONK 1:1, PEPE ↔ 1000PEPE ×0.001). INJ/ATOM/ORDI/TON are unlisted —
+    supports() lets bots skip them.
+  * Auth model: L1 key NEVER touches this code. Trading uses an API key
+    (index 2-254) created from Eamon's Ledger on the Mac; env only:
+        LIGHTER_API_PRIVATE_KEY   (api key private key, env/Railway secret)
+        LIGHTER_ACCOUNT_INDEX     (from accounts_by_l1_address)
+        LIGHTER_API_KEY_INDEX     (default 2)
+  * Candle dicts come back as {t,o,h,l,c,v} (t in ms) — same keys the HL
+    path yields, so strategy code is venue-blind.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import threading
+import time
+
+from .base import VenueClient, VenueError
+from .governor import TxBudgetGovernor, WEIGHT_INFO, WEIGHT_ORDER_TX
+from .symbol_map import to_lighter
+
+log = logging.getLogger("venues.lighter")
+
+MAINNET_URL = "https://mainnet.zklighter.elliot.ai"
+TESTNET_URL = "https://testnet.zklighter.elliot.ai"   # verified live 2026-07-09
+BOOK_STALE_SEC = 30.0    # ws book older than this -> REST fallback
+
+
+class _BookCache(threading.Thread):
+    """One ws connection streaming order_book/{id} for every subscribed market,
+    with automatic reconnect + resubscribe. Book state mirrors the SDK's merge
+    semantics (price-keyed upsert, size-0 removal)."""
+
+    def __init__(self, host: str):
+        super().__init__(daemon=True, name="lighter-book-ws")
+        self.url = "wss://" + host.replace("https://", "") + "/stream"
+        self.market_ids: set[int] = set()
+        self.books: dict[int, dict] = {}
+        self.updated: dict[int, float] = {}
+        self._lock = threading.Lock()
+        self._wake = threading.Event()
+        self.started_ok = threading.Event()
+
+    def subscribe(self, market_id: int):
+        with self._lock:
+            if market_id in self.market_ids:
+                return
+            self.market_ids.add(market_id)
+        self._wake.set()  # force a reconnect that picks up the new subscription
+
+    def get(self, market_id: int):
+        with self._lock:
+            book = self.books.get(market_id)
+            ts = self.updated.get(market_id, 0.0)
+        if book is None or (time.time() - ts) > BOOK_STALE_SEC:
+            return None
+        bids = sorted(((float(o["price"]), float(o["size"])) for o in book["bids"]),
+                      key=lambda x: -x[0])
+        asks = sorted(((float(o["price"]), float(o["size"])) for o in book["asks"]),
+                      key=lambda x: x[0])
+        return {"bids": bids, "asks": asks}
+
+    def _merge(self, side_new, side_state):
+        for new in side_new:
+            for old in side_state[:]:
+                if new["price"] == old["price"]:
+                    old["size"] = new["size"]
+                    break
+            else:
+                side_state.append(new)
+        side_state[:] = [o for o in side_state if float(o["size"]) > 0]
+
+    def run(self):
+        from websockets.sync.client import connect
+        backoff = 1.0
+        while True:
+            try:
+                with self._lock:
+                    wanted = set(self.market_ids)
+                if not wanted:
+                    time.sleep(1.0)
+                    continue
+                self._wake.clear()
+                with connect(self.url, open_timeout=15) as ws:
+                    for mid in wanted:
+                        ws.send(json.dumps({"type": "subscribe",
+                                            "channel": f"order_book/{mid}"}))
+                    self.started_ok.set()
+                    backoff = 1.0
+                    while not self._wake.is_set():
+                        msg = json.loads(ws.recv(timeout=30))
+                        mt = msg.get("type")
+                        if mt == "ping":
+                            ws.send(json.dumps({"type": "pong"}))
+                        elif mt in ("subscribed/order_book", "update/order_book"):
+                            mid = int(msg["channel"].split(":")[1].split("/")[-1])
+                            with self._lock:
+                                if mt == "subscribed/order_book":
+                                    self.books[mid] = msg["order_book"]
+                                elif mid in self.books:
+                                    self._merge(msg["order_book"]["asks"],
+                                                self.books[mid]["asks"])
+                                    self._merge(msg["order_book"]["bids"],
+                                                self.books[mid]["bids"])
+                                self.updated[mid] = time.time()
+            except Exception as e:  # noqa: BLE001 — reconnect forever
+                log.warning("book ws dropped (%s); reconnecting in %.0fs", e, backoff)
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60.0)
+
+
+class LighterClient(VenueClient):
+    name = "lighter"
+
+    def __init__(self, net: str = "mainnet", with_signer: bool = False,
+                 governor: TxBudgetGovernor | None = None):
+        try:
+            import lighter  # lazy: only lighter modes need the SDK installed
+        except ImportError as e:
+            raise VenueError(f"lighter-sdk missing (pip install lighter-sdk): {e}")
+        self._lighter = lighter
+        self.net = net
+        self.host = MAINNET_URL if net == "mainnet" else TESTNET_URL
+        self.gov = governor or TxBudgetGovernor()
+
+        # one asyncio loop thread for the whole client. aiohttp requires its
+        # session objects to be created INSIDE a running loop, so the ApiClient
+        # is built by a coroutine on that loop, not here.
+        self._loop = asyncio.new_event_loop()
+        threading.Thread(target=self._loop.run_forever, daemon=True,
+                         name="lighter-async").start()
+
+        async def _build():
+            cfg = lighter.Configuration(host=self.host)
+            api = lighter.ApiClient(configuration=cfg)
+            return (api, lighter.OrderApi(api), lighter.CandlestickApi(api),
+                    lighter.FundingApi(api), lighter.AccountApi(api),
+                    lighter.AnnouncementApi(api))
+
+        (self._api, self._order_api, self._candle_api, self._funding_api,
+         self._account_api, self._announcement_api) = asyncio.run_coroutine_threadsafe(
+            _build(), self._loop).result(timeout=30)
+
+        # market metadata (symbol -> id, decimals, mins) — one governed call
+        self.markets = self._load_markets()
+        self._books = _BookCache(self.host)
+        self._books.start()
+
+        self.signer = None
+        self.account_index = None
+        if with_signer:
+            self._init_signer()
+            self.sends_orders = True
+
+        # tidy shutdown for short-lived uses (scripts) — the long-running bots
+        # never exit, so this just silences aiohttp "Unclosed session" on exit.
+        import atexit
+        atexit.register(self.close)
+
+    def close(self):
+        try:
+            asyncio.run_coroutine_threadsafe(self._api.close(), self._loop).result(timeout=5)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # ---- plumbing -----------------------------------------------------------
+    def _run(self, coro, timeout=30.0, weight=WEIGHT_INFO):
+        if not self.gov.acquire(weight=weight):
+            raise VenueError("lighter tx budget exhausted; skipping")
+        fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        try:
+            out = fut.result(timeout=timeout)
+            self.gov.reward()
+            return out
+        except Exception as e:
+            msg = repr(e)
+            if "429" in msg or "405" in msg:
+                self.gov.punish()
+                log.warning("lighter rate-limited (%s); backing off", msg[:120])
+            raise
+
+    def _load_markets(self):
+        r = self._run(self._order_api.order_book_details())
+        out = {}
+        for d in r.order_book_details:
+            dd = d.to_dict()
+            out[dd["symbol"]] = {
+                "id": int(dd["market_id"]),
+                "status": dd.get("status"),
+                "price_decimals": int(dd.get("supported_price_decimals",
+                                             dd.get("price_decimals", 2))),
+                "size_decimals": int(dd.get("supported_size_decimals",
+                                            dd.get("size_decimals", 4))),
+                "min_base": float(dd.get("min_base_amount") or 0.0),
+                "min_quote": float(dd.get("min_quote_amount") or 0.0),
+                "last": float(dd.get("last_trade_price") or 0.0),
+                "day_vol": float(dd.get("daily_quote_token_volume") or 0.0),
+            }
+        log.info("lighter %s: %d markets loaded", self.net, len(out))
+        return out
+
+    def refresh_markets(self):
+        """Re-fetch the market list (governed) and update self.markets. Returns
+        the current {symbol: meta} dict — the new-perp sniper diffs this to spot
+        freshly-listed markets."""
+        self.markets = self._load_markets()
+        return self.markets
+
+    def announcements(self):
+        """Recent Lighter announcements (list of {title, content, created_at,...}).
+        Freeform text — used only as CONTEXT for a new listing, never as the
+        detection source of truth. Returns [] on any error."""
+        try:
+            r = self._run(self._announcement_api.announcement())
+            return r.to_dict().get("announcements") or []
+        except Exception:  # noqa: BLE001
+            return []
+
+    def _resolve(self, coin: str):
+        sym, mult = to_lighter(coin)
+        m = self.markets.get(sym)
+        if m is None or m.get("status") != "active":
+            raise VenueError(f"{coin} ({sym}) not listed/active on lighter {self.net}")
+        return sym, mult, m
+
+    def supports(self, coin: str) -> bool:
+        try:
+            self._resolve(coin)
+            return True
+        except VenueError:
+            return False
+
+    # ---- market data ---------------------------------------------------------
+    def candles(self, coin, interval, start_ms, end_ms):
+        _, _, m = self._resolve(coin)
+        n = max(2, min(1500, int((end_ms - start_ms) / self._interval_ms(interval)) + 2))
+        r = self._run(self._candle_api.candles(
+            market_id=m["id"], resolution=interval,
+            start_timestamp=int(start_ms / 1000), end_timestamp=int(end_ms / 1000),
+            count_back=n))
+        d = r.to_dict()
+        if d.get("code") != 200:
+            raise VenueError(f"candles {coin} code={d.get('code')}")
+        return d.get("c") or []
+
+    @staticmethod
+    def _interval_ms(interval):
+        unit = interval[-1]
+        n = int(interval[:-1])
+        return n * {"m": 60, "h": 3600, "d": 86400}[unit] * 1000
+
+    def funding_map(self):
+        """Lighter's own funding per market, in fleet symbols. The same endpoint
+        also carries binance/bybit/hyperliquid benchmark rows — surfaced under
+        '_bench' so the carry bot can do cross-venue math without extra calls."""
+        from .symbol_map import from_lighter
+        r = self._run(self._funding_api.funding_rates())
+        rows = r.to_dict().get("funding_rates") or []
+        out = {}
+        for row in rows:
+            sym = row.get("symbol")
+            fleet, _ = from_lighter(sym)
+            rec = out.setdefault(fleet, {"rate": 0.0, "mark": 0.0, "vol": 0.0,
+                                         "_bench": {}})
+            if row.get("exchange") == "lighter":
+                rec["rate"] = float(row.get("rate") or 0.0)
+            else:
+                rec["_bench"][row.get("exchange")] = float(row.get("rate") or 0.0)
+        for fleet, rec in out.items():
+            sym, _ = to_lighter(fleet)
+            m = self.markets.get(sym)
+            if m:
+                rec["mark"] = m["last"]
+                rec["vol"] = m["day_vol"]
+        return out
+
+    def orderbook(self, coin):
+        _, _, m = self._resolve(coin)
+        self._books.subscribe(m["id"])
+        book = self._books.get(m["id"])
+        if book is not None:
+            return book
+        # ws not warm yet -> one governed REST snapshot
+        r = self._run(self._order_api.order_book_orders(market_id=m["id"], limit=25))
+        d = r.to_dict()
+        bids = [(float(o["price"]), float(o["remaining_base_amount"]))
+                for o in (d.get("bids") or [])]
+        asks = [(float(o["price"]), float(o["remaining_base_amount"]))
+                for o in (d.get("asks") or [])]
+        return {"bids": bids, "asks": asks}
+
+    # ---- account / orders (testnet + live only) ------------------------------
+    def _init_signer(self):
+        key = os.environ.get("LIGHTER_API_PRIVATE_KEY", "").strip()
+        acct = os.environ.get("LIGHTER_ACCOUNT_INDEX", "").strip()
+        if not key or not acct:
+            raise VenueError("LIGHTER_API_PRIVATE_KEY / LIGHTER_ACCOUNT_INDEX not set "
+                             "(env only — never in the repo)")
+        self.account_index = int(acct)
+        self.api_key_index = int(os.environ.get("LIGHTER_API_KEY_INDEX", "2"))
+        self.signer = self._lighter.SignerClient(
+            url=self.host, account_index=self.account_index,
+            api_private_keys={self.api_key_index: key})
+        err = self.signer.check_client()   # sync in sdk 1.1.x
+        if err:
+            raise VenueError(f"lighter signer check failed: {err}")
+        log.info("lighter signer ready (account %d, key index %d)",
+                 self.account_index, self.api_key_index)
+
+    def _run_signer(self, coro, timeout=30.0):
+        return self._run(coro, timeout=timeout, weight=WEIGHT_ORDER_TX)
+
+    def account_value(self):
+        r = self._run(self._account_api.account(by="index",
+                                                value=str(self.account_index)))
+        d = r.to_dict()
+        accts = d.get("accounts") or []
+        if not accts:
+            raise VenueError("account not found")
+        a = accts[0]
+        for k in ("total_asset_value", "collateral"):
+            if a.get(k) is not None:
+                return float(a[k])
+        raise VenueError("no account value field in response")
+
+    def positions(self):
+        from .symbol_map import from_lighter
+        r = self._run(self._account_api.account(by="index",
+                                                value=str(self.account_index)))
+        d = r.to_dict()
+        accts = d.get("accounts") or []
+        out = {}
+        for p in (accts[0].get("positions") or []) if accts else []:
+            sym = p.get("symbol") or ""
+            fleet, _ = from_lighter(sym)
+            sign = -1.0 if int(p.get("sign", 1)) < 0 else 1.0
+            size = float(p.get("position") or 0.0) * sign
+            if size:
+                out[fleet] = {"size": size,
+                              "entry": float(p.get("avg_entry_price") or 0.0)}
+        return out
+
+    def _scaled(self, m, size, price):
+        base = int(round(size * (10 ** m["size_decimals"])))
+        px = int(round(price * (10 ** m["price_decimals"])))
+        return base, px
+
+    def market_open(self, coin, is_long, size):
+        sym, mult, m = self._resolve(coin)
+        book = self.orderbook(coin)
+        side = book["asks"] if is_long else book["bids"]
+        if not side:
+            raise VenueError(f"{coin}: empty book")
+        # worst acceptable = top of book +/- 2% (market-with-slippage-guard)
+        worst = side[0][0] * (1.02 if is_long else 0.98)
+        base, px = self._scaled(m, size * mult, worst)
+        if base <= 0:
+            raise VenueError(f"{coin}: size {size} scales to 0")
+        tx, resp, err = self._run_signer(self.signer.create_market_order(
+            market_index=m["id"],
+            client_order_index=int(time.time() * 1000) % (2 ** 48),
+            base_amount=base, avg_execution_price=px, is_ask=not is_long,
+            api_key_index=self.api_key_index))
+        if err:
+            raise VenueError(f"order failed {coin}: {err}")
+        return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
+                "resp": getattr(resp, "to_dict", lambda: str(resp))()}
+
+    def market_close(self, coin):
+        pos = self.positions().get(coin)
+        if not pos or not pos["size"]:
+            return None
+        sym, mult, m = self._resolve(coin)
+        is_long = pos["size"] > 0
+        book = self.orderbook(coin)
+        side = book["bids"] if is_long else book["asks"]
+        if not side:
+            raise VenueError(f"{coin}: empty book")
+        worst = side[0][0] * (0.98 if is_long else 1.02)
+        base, px = self._scaled(m, abs(pos["size"]) * mult, worst)
+        tx, resp, err = self._run_signer(self.signer.create_market_order(
+            market_index=m["id"],
+            client_order_index=int(time.time() * 1000) % (2 ** 48),
+            base_amount=base, avg_execution_price=px, is_ask=is_long,
+            reduce_only=True, api_key_index=self.api_key_index))
+        if err:
+            raise VenueError(f"close failed {coin}: {err}")
+        return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
+                "resp": getattr(resp, "to_dict", lambda: str(resp))()}

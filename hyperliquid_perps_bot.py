@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
-from paper_broker import PaperBroker  # dry-run simulated account (no funded wallet needed)
+from venues import venue_context  # [2026-07-09 LIGHTER GATE-0] venue abstraction
 
 # --------------------------- configuration -------------------------------
 # Widened from BTC/ETH/SOL to a broad set of liquid Hyperliquid perps.
@@ -105,7 +105,8 @@ logging.basicConfig(
 log = logging.getLogger("perps-rsi-meanrev")
 
 
-def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason):
+def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason,
+                  venue=None, shadow=None):
     """Record one closed paper trade to the durable ledger so the dashboard shows
     per-trade long/short P&L — previously only a net equity snapshot was published,
     so we were blind to whether the SHORT side actually earns in a downtrend.
@@ -118,6 +119,7 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason):
         bot, trade_id=f"{coin}:{ent_ts}", pnl_abs=float(pnl), pnl_pct=pnl_pct,
         pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
         reason=("long_" if was_long else "short_") + reason,
+        venue=venue, shadow=shadow,
     )
 
 
@@ -165,52 +167,43 @@ def ema(closes, period):
 
 def main():
     load_env()
-    try:
-        from hyperliquid.info import Info
-        from hyperliquid.exchange import Exchange
-        from hyperliquid.utils import constants
-        import eth_account
-    except ImportError:
-        log.error("Missing deps. Run: pip install -r requirements_perps.txt")
-        sys.exit(1)
-
-    secret = os.environ.get("HL_API_PRIVATE_KEY", "").strip()
-    account_address = os.environ.get("HL_ACCOUNT_ADDRESS", "").strip()
-    if not secret:
-        log.error("HL_API_PRIVATE_KEY not set. Copy .env.perps.example -> .env.perps "
-                  "and add your TESTNET API wallet key.")
-        sys.exit(1)
-
-    wallet = eth_account.Account.from_key(secret)
-    base_url = constants.TESTNET_API_URL          # TESTNET ONLY
-    info = Info(base_url, skip_ws=True)
-    exchange = Exchange(wallet, base_url, account_address=account_address or None)
+    # [2026-07-09 LIGHTER GATE-0] Venue plumbing (HL info/exchange, Lighter
+    # client, paper vs shadow broker, kill switch, notional rails) moved to
+    # venues/. VENUE unset -> hl_paper -> exactly the pre-refactor behaviour:
+    # HL testnet market data + PaperBroker fills. NOTE: the old code exited
+    # without HL_API_PRIVATE_KEY even in dry-run (it built an Exchange it
+    # never used); dry-run now runs keyless, same as the momo bot.
+    ctx = venue_context(bot="perps-rsi-meanrev", default_hl_net="testnet",
+                        paper_start=PAPER_START, live_flag=not DRY_RUN)
+    bot_id = ctx.bot_id
+    broker = ctx.broker
+    dry_run = ctx.dry_run
+    order_usd = ctx.order_usd(ORDER_USD)
+    max_open = ctx.max_open_positions(MAX_OPEN_POSITIONS)
+    venue_tag = None if ctx.mode == "hl_paper" else "lighter"
+    shadow_tag = ctx.mode == "lighter_shadow"
 
     log.info("=" * 60)
-    log.info("Hyperliquid PERPS bot starting | %s | coins=%s | %s",
-             "DRY-RUN" if DRY_RUN else "LIVE-TESTNET", COINS,
+    log.info("Hyperliquid PERPS bot starting | venue=%s (%s) | coins=%s | %s",
+             ctx.mode, "modelled fills" if dry_run else "SENDS ORDERS", COINS,
              f"RSI({RSI_PERIOD}) {OVERSOLD}/{OVERBOUGHT}")
-    log.info("base_url=%s  order=$%.0f  lev=%dx  loop=%ds  loss-limit=%.0f%%",
-             base_url, ORDER_USD, LEVERAGE, LOOP_SECONDS, DAILY_LOSS_LIMIT * 100)
+    log.info("order=$%.0f  lev=%dx  loop=%ds  loss-limit=%.0f%%  cap=%d/%d-per-loop",
+             order_usd, LEVERAGE, LOOP_SECONDS, DAILY_LOSS_LIMIT * 100,
+             max_open, MAX_NEW_PER_LOOP)
     log.info("=" * 60)
-
-    # Dry-run uses a self-contained paper account so it never depends on a funded
-    # testnet wallet (an unfunded wallet reads accountValue=0 -> no trades ever).
-    broker = PaperBroker(PAPER_START) if DRY_RUN else None
 
     # [2026-07-03 PERSIST] Restore the paper account from Postgres so a redeploy
     # or restart continues the SAME equity curve instead of resetting to $1000.
     # (Saved at the end of every loop; table bot_state via bot_pnl_store.)
-    _saved_state = store.load_state("perps-rsi-meanrev") if DRY_RUN else None
+    _saved_state = store.load_state(bot_id) if dry_run else None
     if _saved_state and broker.restore_state(_saved_state.get("broker") or {}):
         log.info("restored paper state: equity $%.2f, %d open position(s)",
                  broker.equity(), broker.open_count())
 
     def account_value():
-        if DRY_RUN:
+        if dry_run:
             return broker.equity()
-        st = info.user_state(account_address or wallet.address)
-        return float(st["marginSummary"]["accountValue"])
+        return ctx.venue.account_value()
 
     try:
         day_start_equity = account_value()
@@ -251,15 +244,28 @@ def main():
             log.warning("account value unavailable: %s", e)
             equity = None
 
-        if (not halted_today and equity is not None and day_start_equity
-                and equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT)):
-            log.warning("DAILY LOSS LIMIT HIT (equity %.2f <= %.2f). Halting new trades, "
-                        "flattening. No revenge trades.", equity, day_start_equity)
+        # [2026-07-09 GATE-0 RAIL] kill switch re-checked EVERY loop in funded
+        # modes — flipping it mid-run flattens and halts, not just at boot.
+        if not dry_run and ctx.rails.kill_check():
+            log.error("REAL_MONEY_KILL armed mid-run — flatten + halt.")
             halted_today = True
-            if not DRY_RUN:
+            for c in COINS:
+                try:
+                    ctx.venue.market_close(c)
+                except Exception as e:
+                    log.error("flatten %s failed: %s", c, e)
+
+        _fleet_loss = (not dry_run and ctx.rails.daily_loss_hit(day_start_equity, equity))
+        if (not halted_today and equity is not None and day_start_equity
+                and (equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT) or _fleet_loss)):
+            log.warning("DAILY LOSS LIMIT HIT (equity %.2f <= %.2f%s). Halting new trades, "
+                        "flattening. No revenge trades.", equity, day_start_equity,
+                        ", $-rail" if _fleet_loss else "")
+            halted_today = True
+            if not dry_run:
                 for c in COINS:
                     try:
-                        exchange.market_close(c)
+                        ctx.venue.market_close(c)
                     except Exception as e:
                         log.error("flatten %s failed: %s", c, e)
 
@@ -269,13 +275,11 @@ def main():
             continue
 
         # current open positions keyed by coin -> signed size
-        if DRY_RUN:
+        if dry_run:
             pos = broker.szi()
         else:
             try:
-                state = info.user_state(account_address or wallet.address)
-                pos = {p["position"]["coin"]: float(p["position"]["szi"])
-                       for p in state.get("assetPositions", [])}
+                pos = {c: v["size"] for c, v in ctx.venue.positions().items()}
             except Exception as e:
                 log.warning("could not read positions: %s", e)
                 pos = {}
@@ -288,8 +292,10 @@ def main():
         # not the once-per-loop `pos` snapshot which goes stale mid-scan.
         opened_this_loop = 0
         for coin in COINS:
+            if not ctx.supports(coin):
+                continue  # not listed on this venue (logged once)
             try:
-                candles = info.candles_snapshot(coin, CANDLE_INTERVAL, start, end)
+                candles = ctx.venue.candles(coin, CANDLE_INTERVAL, start, end)
                 closes = [float(c["c"]) for c in candles]
                 highs = [float(c["h"]) for c in candles]
                 lows = [float(c["l"]) for c in candles]
@@ -345,12 +351,12 @@ def main():
                 # [2026-07-05 CONCENTRATION CAP] Live open count (broker in dry-run;
                 # the fetched `pos` snapshot + this loop's opens in live). `broker`
                 # is None when not DRY_RUN, so never call it there.
-                open_now = (broker.open_count() if DRY_RUN
+                open_now = (broker.open_count() if dry_run
                             else sum(1 for v in pos.values() if v) + opened_this_loop)
                 if held > 0 and price >= sell_zone:
                     decision = "RANGE_CLOSE"
                 elif not cooling and held == 0 and price <= buy_zone:
-                    if open_now >= MAX_OPEN_POSITIONS or opened_this_loop >= MAX_NEW_PER_LOOP:
+                    if open_now >= max_open or opened_this_loop >= MAX_NEW_PER_LOOP:
                         decision = "CAP_SKIP"        # valid buy blocked by the risk cap
                     else:
                         decision = "OPEN_LONG"
@@ -358,17 +364,20 @@ def main():
             log.info("%-4s price=%.2f RSI=%.1f low20=%.4f high20=%.4f buy<=%.4f sell>=%.4f held=%.4f -> %s",
                      coin, price, r, low20, high20, buy_zone, sell_zone, held, decision)
 
-            size = round(ORDER_USD * LEVERAGE / price, 4)
+            size = round(order_usd * LEVERAGE / price, 4)
 
-            if DRY_RUN:
+            if dry_run:
                 # Book the fill in the paper account and mark to the live price.
+                # (ShadowBroker fills these against the live Lighter book and
+                # logs every order to the venue_orders ledger.)
                 broker.mark(coin, price)
                 if decision in ("STOP_CLOSE", "RANGE_CLOSE"):
                     _sz = broker.pos.get(coin, (0.0,))[0]
                     _pnl = broker.close(coin, price)
-                    _record_close("perps-rsi-meanrev", coin, entries.get(coin),
+                    _record_close(bot_id, coin, entries.get(coin),
                                   entry_ts.get(coin), price, _pnl, _sz > 0,
-                                  "stop" if decision == "STOP_CLOSE" else "range_high")
+                                  "stop" if decision == "STOP_CLOSE" else "range_high",
+                                  venue=venue_tag, shadow=shadow_tag)
                     entries.pop(coin, None); entry_ts.pop(coin, None)
                     last_action[coin] = now_ts
                 elif decision == "OPEN_LONG":
@@ -376,8 +385,9 @@ def main():
                     if coin in broker.pos:
                         _sz = broker.pos.get(coin, (0.0,))[0]
                         _pnl = broker.close(coin, price)
-                        _record_close("perps-rsi-meanrev", coin, entries.get(coin),
-                                      entry_ts.get(coin), price, _pnl, _sz > 0, "flip")
+                        _record_close(bot_id, coin, entries.get(coin),
+                                      entry_ts.get(coin), price, _pnl, _sz > 0, "flip",
+                                      venue=venue_tag, shadow=shadow_tag)
                     broker.open(coin, True, size, price)
                     entries[coin] = price; entry_ts[coin] = now_ts
                     last_action[coin] = now_ts
@@ -389,16 +399,23 @@ def main():
 
             try:
                 if decision in ("STOP_CLOSE", "RANGE_CLOSE"):
-                    exchange.market_close(coin)
+                    ctx.venue.market_close(coin)
                     entries.pop(coin, None)
                     last_action[coin] = now_ts
                     log.info("%s %s @ %.2f",
                              "STOP-LOSS CLOSE" if decision == "STOP_CLOSE" else "RANGE-HIGH CLOSE",
                              coin, price)
                 elif decision == "OPEN_LONG":
+                    # [2026-07-09 GATE-0 RAIL] adapter-level notional cap: the
+                    # live book may never exceed the per-bot env cap.
+                    open_notional = sum(1 for v in pos.values() if v) * order_usd
+                    if not ctx.rails.notional_ok(open_notional, order_usd):
+                        log.info("%s NOTIONAL_CAP_SKIP (open ~$%.0f + $%.0f > cap)",
+                                 coin, open_notional, order_usd)
+                        continue
                     if held < 0:
-                        exchange.market_close(coin)
-                    exchange.market_open(coin, True, size)
+                        ctx.venue.market_close(coin)
+                    ctx.venue.market_open(coin, True, size)
                     entries[coin] = price
                     last_action[coin] = now_ts
                     opened_this_loop += 1
@@ -407,7 +424,7 @@ def main():
                 log.error("order failed %s %s: %s", decision, coin, e)
 
         # Publish a snapshot for the live dashboard (guarded; never raises).
-        if DRY_RUN:
+        if dry_run:
             pub_equity = broker.equity()
             pub_open = broker.open_count()
             pub_pnl = pub_equity - PAPER_START
@@ -415,27 +432,33 @@ def main():
             pub_equity = equity
             pub_open = sum(1 for v in pos.values() if v)
             pub_pnl = None
-        _szi = broker.szi() if DRY_RUN else {}
+        _szi = broker.szi() if dry_run else {}
         store.publish(
-            "perps-rsi-meanrev",
+            bot_id,
             status="halted" if halted_today else "online",
             equity=pub_equity,
             pnl_abs=pub_pnl,
             open_trades=pub_open,
-            extra={"mode": "dry-run" if DRY_RUN else "live-testnet",
+            extra={"mode": ctx.mode if ctx.mode != "hl_paper"
+                   else ("dry-run" if dry_run else "live-testnet"),
+                   "venue": ctx.mode,
                    "longs": sum(1 for v in _szi.values() if v > 0),
                    "shorts": sum(1 for v in _szi.values() if v < 0),
                    "coins": COINS},
         )
         # [2026-07-03 PERSIST] Durable paper state -> Postgres (guarded, cheap:
         # one small JSONB upsert per loop) so redeploys continue this curve.
-        if DRY_RUN:
-            store.save_state("perps-rsi-meanrev", {
+        if dry_run:
+            store.save_state(bot_id, {
                 "broker": broker.to_state(),
                 "entries": entries,
                 "entry_ts": entry_ts,
                 "last_action": last_action,
             })
+        if os.environ.get("ONE_CYCLE"):
+            # parity/smoke harness: one full decision pass then exit cleanly
+            log.info("ONE_CYCLE set — exiting after one pass.")
+            break
         time.sleep(LOOP_SECONDS)
 
 

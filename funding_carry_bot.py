@@ -42,6 +42,7 @@ import time
 from datetime import datetime, timezone
 
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
+from venues import venue_context  # [2026-07-09 LIGHTER GATE-0] venue abstraction
 
 BOT = "perps-funding-carry"
 
@@ -85,43 +86,26 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-def fetch_funding(info):
-    """Return {coin: {"rate": hourly_funding, "mark": mark_px, "vol": day_ntl_vol}}
-    for every perp on Hyperliquid mainnet. Public data, no keys."""
-    meta, ctxs = info.meta_and_asset_ctxs()
-    out = {}
-    for asset, ctx in zip(meta["universe"], ctxs):
-        try:
-            out[asset["name"]] = {
-                "rate": float(ctx.get("funding") or 0.0),
-                "mark": float(ctx.get("markPx") or 0.0),
-                "vol": float(ctx.get("dayNtlVlm") or 0.0),
-            }
-        except (TypeError, ValueError):
-            continue
-    return out
-
-
 def main():
-    p = argparse.ArgumentParser(description="DRY-RUN Hyperliquid funding-carry harvester")
+    p = argparse.ArgumentParser(description="DRY-RUN funding-carry harvester")
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
     args = p.parse_args()
 
-    try:
-        from hyperliquid.info import Info
-        from hyperliquid.utils import constants
-    except ImportError:
-        print("Missing hyperliquid-python-sdk (see requirements.txt)")
-        sys.exit(1)
-
-    # MAINNET public info for REAL funding rates. Read-only — this bot never
-    # constructs an Exchange object and cannot place orders.
-    info = Info(constants.MAINNET_API_URL, skip_ws=True)
+    # [2026-07-09 LIGHTER GATE-0] Funding reads go through the venue layer.
+    # VENUE unset -> hl_paper -> Hyperliquid MAINNET meta_and_asset_ctxs, the
+    # exact pre-refactor source. VENUE=lighter_shadow reads Lighter's own
+    # funding (which natively carries binance/bybit/hyperliquid benchmark rows
+    # per market — the cross-venue carry evidence for wave 2). This bot never
+    # constructs an order path and cannot place orders on ANY venue.
+    ctx = venue_context(bot=BOT, default_hl_net="mainnet", paper_start=START_EQUITY)
+    bot_id = ctx.bot_id
+    venue_tag = None if ctx.mode == "hl_paper" else "lighter"
+    shadow_tag = ctx.mode == "lighter_shadow"
 
     # Cumulative realized P&L survives restarts via the Postgres ledger.
     realized, n_closed, n_wins = 0.0, 0, 0
     try:
-        agg = store.fetch_paper_aggregate(BOT)
+        agg = store.fetch_paper_aggregate(bot_id)
         if agg:
             realized, n_closed, n_wins = agg["realized"], agg["closed"], agg["wins"]
     except Exception:
@@ -134,7 +118,7 @@ def main():
     # accrued funding + entry levels (realized already restores from the ledger
     # above). Saved after every published loop below.
     try:
-        _saved = store.load_state(BOT)
+        _saved = store.load_state(bot_id)
         if _saved and isinstance(_saved.get("positions"), dict) and _saved["positions"]:
             positions = _saved["positions"]
         if _saved and isinstance(_saved.get("hot_since"), dict):
@@ -153,7 +137,7 @@ def main():
     while True:
         t0 = time.time()
         try:
-            fund = fetch_funding(info)
+            fund = ctx.venue.funding_map()
         except Exception as e:
             print(f"[{now_iso()}] funding fetch failed ({e!r}); retrying next loop")
             fund = None
@@ -205,12 +189,12 @@ def main():
                       f"| pnl {pnl:+.2f} [{reason}] | realized {realized:+.2f}")
                 try:
                     store.publish_paper_trade(
-                        BOT, trade_id=f"{coin}:{pos['opened_ts']:.0f}",
+                        bot_id, trade_id=f"{coin}:{pos['opened_ts']:.0f}",
                         pnl_abs=pnl, pnl_pct=pnl / pos["notional"], pair=coin,
                         opened_at=datetime.fromtimestamp(
                             pos["opened_ts"], timezone.utc).isoformat(),
                         closed_at=datetime.now(timezone.utc).isoformat(),
-                        reason=reason)
+                        reason=reason, venue=venue_tag, shadow=shadow_tag)
                 except Exception:
                     pass
                 del positions[coin]
@@ -250,7 +234,7 @@ def main():
             top = sorted(fund.items(), key=lambda cf: -abs(cf[1]["rate"]))[:3]
             try:
                 store.publish(
-                    BOT, status="online",
+                    bot_id, status="online",
                     equity=START_EQUITY + realized + open_pnl,
                     pnl_abs=realized,
                     open_trades=len(positions),
@@ -268,7 +252,7 @@ def main():
 
             # [2026-07-03 PERSIST] Durable open-carry state -> Postgres.
             try:
-                store.save_state(BOT, {"positions": positions, "hot_since": hot_since})
+                store.save_state(bot_id, {"positions": positions, "hot_since": hot_since})
             except Exception:
                 pass
 

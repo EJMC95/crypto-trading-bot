@@ -8,7 +8,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY funding_carry_bot.py bot_pnl_store.py ./
+# [2026-07-09 LIGHTER GATE-0] funding_carry_bot now imports the venues/ layer
+# (+ paper_broker for the hl_paper path); copy them or the image ImportErrors.
+COPY funding_carry_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
 
 ENV PYTHONUNBUFFERED=1
 
