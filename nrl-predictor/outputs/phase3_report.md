@@ -1,6 +1,6 @@
 # Phase 3 report — Poisson + GBM vs Elo and the closing line
 
-_Generated 2026-07-08. Walk-forward 2015–2025; Poisson refits before every round (Dixon–Coles decay ξ=1.0, 5y window); GBM retrains before every season on strictly-prior matches; stacked probability features are themselves walk-forward outputs. Draws score 0.5._
+_Generated 2026-07-09. Walk-forward 2015–2025; Poisson refits before every round (Dixon–Coles decay ξ=1.0, 5y window); GBM retrains before every season on strictly-prior matches; stacked probability features are themselves walk-forward outputs. Draws score 0.5._
 
 ## Overall 2015–2025 (Brier / log loss)
 
@@ -49,10 +49,10 @@ _Generated 2026-07-08. Walk-forward 2015–2025; Poisson refits before every rou
 |:---------|:--------------------|:----------------------------|:------------------------------|:---------------------------|-------------:|-----------------:|-------------:|---------------:|------------------:|-------------------:|
 | Round 19 | 2026-07-10 20:00:00 | Campbelltown Sports Stadium | Wests Tigers                  | New Zealand Warriors       |       0.4053 |           0.4202 |       0.2877 |         0.3812 |              -3.3 |               47.5 |
 | Round 19 | 2026-07-11 15:00:00 | Kayo Stadium                | Dolphins                      | Cronulla-Sutherland Sharks |       0.5974 |           0.5411 |       0.66   |         0.5859 |               1.7 |               48.7 |
-| Round 19 | 2026-07-11 17:30:00 | Accor Stadium               | Canterbury-Bankstown Bulldogs | Canberra Raiders           |       0.6026 |           0.5241 |       0.636  |         0.5839 |               1.1 |               44.7 |
+| Round 19 | 2026-07-11 17:30:00 | Accor Stadium               | Canterbury-Bankstown Bulldogs | Canberra Raiders           |       0.6026 |           0.524  |       0.636  |         0.5838 |               1.1 |               44.7 |
 | Round 19 | 2026-07-11 19:35:00 | Allianz Stadium             | Sydney Roosters               | Parramatta Eels            |       0.7587 |           0.6156 |       0.8282 |         0.7478 |               4.9 |               48.4 |
 | Round 19 | 2026-07-12 14:00:00 | Accor Stadium               | South Sydney Rabbitohs        | Newcastle Knights          |       0.5844 |           0.5801 |       0.5194 |         0.5897 |               3.3 |               49   |
-| Round 19 | 2026-07-12 16:05:00 | 4 Pines Park                | Manly-Warringah Sea Eagles    | North Queensland Cowboys   |       0.6312 |           0.5874 |       0.7146 |         0.6311 |               3.7 |               48.2 |
+| Round 19 | 2026-07-12 16:05:00 | 4 Pines Park                | Manly-Warringah Sea Eagles    | North Queensland Cowboys   |       0.6312 |           0.5873 |       0.7146 |         0.6311 |               3.7 |               48.2 |
 | Round 19 | 2026-07-12 18:15:00 | AAMI Park                   | Melbourne Storm               | Gold Coast Titans          |       0.7716 |           0.6085 |       0.6384 |         0.7567 |               4.5 |               48.1 |
 
 _Margin/total expectations come from the tier-2 Monte Carlo; the blend is a logistic stack of Elo+Poisson with weights learned on 2010–2014 only. GBM is reported but not blended (no pre-2015 out-of-sample output to learn a weight from) — revisit when lineup/weather features land in Phase 5._

@@ -1,6 +1,6 @@
 # Phase 4 report — player props + SGM simulator
 
-_Generated 2026-07-08. ATS model: hierarchical Poisson-gamma try rates (positional pooling, ξ=1.4 decay) × tier-2 team try expectation via Poisson thinning. Squads in backtest = the 17 who played (Tuesday-list proxy — applies equally to model and baseline)._
+_Generated 2026-07-09. ATS model: hierarchical Poisson-gamma try rates (positional pooling, ξ=1.4 decay) × tier-2 team try expectation via Poisson thinning. Squads in backtest = the 17 who played (Tuesday-list proxy — applies equally to model and baseline)._
 
 ## Gate 1 — walk-forward ATS backtest 2022–2025 (Brier / log loss)
 
