@@ -6,6 +6,20 @@ watch for next. Everything here is DRY-RUN / paper unless explicitly stated.
 
 ---
 
+## 2026-07-09 — H100 opportunity scout → NO TRADE
+
+Scouted "H100" across every fleet venue on request. Finding: **no H100 crypto
+token exists** (zero CoinGecko footprint; nothing on Kraken/Binance/Crypto.com/
+Hyperliquid; not in the Binance/Bybit/KuCoin/Upbit announcement feeds via a live
+`listing_intel` run). The real H100 is **H100 Group AB**, a Stockholm-listed
+BTC-treasury micro-cap (~1,046 BTC) whose OTC line (HOGPF) trades at $0.082,
+−45% on the month, ~$400/day dollar volume — untradeable for $1,000 accounts
+and out of scope for both equity bots. Verdict: no config changes; if an H100
+token ever lists, the sniper catches it automatically. Full write-up:
+`H100_OPPORTUNITY_SCOUT_2026-07-09.md`.
+
+---
+
 ## 2026-07-07 — Full-fleet audit → Option-B isolation, brain revival, exit rebuilds
 
 ### What the audit found (live Postgres, 352 trades + 285 fills + 52k equity pts, plus code audit)
