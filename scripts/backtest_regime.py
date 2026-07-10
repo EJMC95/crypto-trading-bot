@@ -63,6 +63,8 @@ def replay(cs, gate):
             if close <= buy_zone:
                 ok = True
                 if gate == "above_ema200": ok = close > e200[i]
+                elif gate == "loose(-3%)": ok = close > e200[i] * 0.97   # dips up to 3% below trend
+                elif gate == "loose(-5%)": ok = close > e200[i] * 0.95
                 elif gate == "ema200_rising": ok = e200[i] > e200[i - 3]
                 elif gate == "both": ok = close > e200[i] and e200[i] > e200[i - 3]
                 if ok:

@@ -82,6 +82,10 @@ PAPER_START = 1000.0             # dry-run simulated starting equity
 # the per-bot notional cap instead (venues/safety.py).
 MAX_OPEN_POSITIONS = 8           # global cap on concurrent open positions
 MAX_NEW_PER_LOOP = 2             # smooth one-loop bursts into a correlated dip
+# [2026-07-10 REGIME GATE] Only enter dips within this fraction of the 200-EMA
+# (0.97 = allow dips up to 3% below trend). Backtest-tuned: the loose -3% gate
+# ~halves the out-of-sample loss vs no gate. Set to 0.0 to disable the gate.
+REGIME_GATE_FRAC = float(os.environ.get("REGIME_GATE_FRAC", "0.97"))
 
 PAPER = "--paper" in sys.argv      # watch live testnet prices, no account/keys needed
 DRY_RUN = PAPER or ("--live" not in sys.argv)
@@ -343,7 +347,16 @@ def main():
                 elif px > s["dc_high_exit"]:
                     decision = "COVER_SHORT"
             else:  # flat -> long-only range entry
-                if px <= s["buy_zone"]:
+                # [2026-07-10 REGIME GATE] Only buy the dip when price is within
+                # REGIME_GATE_FRAC of the 200-EMA — i.e. a pullback in an uptrend,
+                # not a falling knife below trend. Backtest (scripts/backtest_regime.py):
+                # the loose -3% gate roughly HALVES the out-of-sample loss vs no
+                # gate (−7.7% → −3.3%). It reduces the bleed; it does not make the
+                # strategy net-positive — this is risk control, not an edge.
+                _regime_ok = s["ema"] and px > s["ema"] * REGIME_GATE_FRAC
+                if px <= s["buy_zone"] and not _regime_ok:
+                    decision = "REGIME_SKIP"        # dip is below trend — skip it
+                elif px <= s["buy_zone"]:
                     # [2026-07-09 CONCENTRATION CAP] live open count, like
                     # Bounce Catcher: broker in dry-run, else the fetched
                     # snapshot + this loop's opens (snapshot goes stale mid-scan).
@@ -378,13 +391,13 @@ def main():
                     _record_close(bot_id, coin, _ent, entry_ts.pop(coin, None),
                                   px, _pnl, _sz > 0, decision.lower(),
                                   venue=venue_tag, shadow=shadow_tag)
-                if decision not in ("HOLD", "CAP_SKIP"):
+                if decision not in ("HOLD", "CAP_SKIP", "REGIME_SKIP"):
                     mode = "shadow" if shadow_tag else ("paper" if PAPER else "dry-run")
                     notify(f":test_tube: MomoBot [{mode.upper()}] {decision} {coin} @ {px:,.2f}",
                            coin=coin, decision=decision, price=round(px, 2), mode=mode)
                 continue
 
-            if decision in ("HOLD", "CAP_SKIP"):
+            if decision in ("HOLD", "CAP_SKIP", "REGIME_SKIP"):
                 continue
 
             try:
