@@ -243,6 +243,12 @@ def main():
     if _saved_state:
         entry_ts.update({str(k): float(v) for k, v in (_saved_state.get("entry_ts") or {}).items()})
 
+    # [2026-07-10] Live P&L baseline: measure live-account P&L from the STARTING
+    # collateral (recorded once, persisted), not the $1000 paper start — so an
+    # untraded live account reads $0, not -$935. Restore any saved baseline.
+    live_baseline = (store.load_state(bot_id + ":live") or {}).get("initial_equity") \
+        if not dry_run else None
+
     while True:
         now = datetime.now(timezone.utc)
         if now.date() != cur_day:
@@ -414,7 +420,13 @@ def main():
             pub_equity = equity
             pub_open = sum(1 for v in pos.values()
                            if (v.get("size") if isinstance(v, dict) else v))
-            pub_pnl = None
+            # [2026-07-10] record the starting collateral once, then P&L = equity
+            # - baseline (0 until the first trade moves the account).
+            if live_baseline is None and equity is not None:
+                live_baseline = equity
+                store.save_state(bot_id + ":live", {"initial_equity": equity})
+            pub_pnl = (equity - live_baseline) if (equity is not None
+                                                   and live_baseline is not None) else None
         _szi = broker.szi() if dry_run else {}
         store.publish(
             bot_id,

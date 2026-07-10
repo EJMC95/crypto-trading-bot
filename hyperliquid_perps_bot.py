@@ -226,6 +226,11 @@ def main():
         entry_ts.update({str(k): float(v) for k, v in (_saved_state.get("entry_ts") or {}).items()})
         last_action.update({str(k): float(v) for k, v in (_saved_state.get("last_action") or {}).items()})
 
+    # [2026-07-10] Live P&L baseline — measure from starting collateral, not the
+    # $1000 paper start (see hyperliquid_momo_bot.py). Untraded live acct = $0.
+    live_baseline = (store.load_state(bot_id + ":live") or {}).get("initial_equity") \
+        if not dry_run else None
+
     while True:
         now = datetime.now(timezone.utc)
 
@@ -431,7 +436,11 @@ def main():
         else:
             pub_equity = equity
             pub_open = sum(1 for v in pos.values() if v)
-            pub_pnl = None
+            if live_baseline is None and equity is not None:
+                live_baseline = equity
+                store.save_state(bot_id + ":live", {"initial_equity": equity})
+            pub_pnl = (equity - live_baseline) if (equity is not None
+                                                   and live_baseline is not None) else None
         _szi = broker.szi() if dry_run else {}
         store.publish(
             bot_id,

@@ -716,12 +716,19 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     # source the bot exposes so every card states its number explicitly.
     _pnl_abs = row.get("pnl_abs")
     _eq = row.get("equity")
-    if _pnl_abs is None and _eq is not None and bot not in STOCKS and bot not in SCANNERS:
+    # [2026-07-10] Live Lighter bots fund from real collateral (e.g. $65), NOT
+    # the $1000 paper start — so NEVER apply the paper baseline to them, or an
+    # untraded live account reads a phantom -$935. Their publisher sends real
+    # pnl_abs (equity - starting collateral); if it's ever None, show nothing.
+    _is_live = is_live_bot(bot)
+    if (_pnl_abs is None and _eq is not None and bot not in STOCKS
+            and bot not in SCANNERS and not _is_live):
         _pnl_abs = _eq - PAPER_START_EQUITY          # paper bots start at $1,000
     if _pnl_abs is not None:
         pnl_label = "Paper (arb)" if bot in SCANNERS else "Total P&amp;L"
         _pct = row.get("pnl_pct")
-        if _pct is None and _eq not in (None, 0) and bot not in STOCKS and bot not in SCANNERS:
+        if (_pct is None and _eq not in (None, 0) and bot not in STOCKS
+                and bot not in SCANNERS and not _is_live):
             _pct = _pnl_abs / PAPER_START_EQUITY
         rows.append(f'<div class="row"><span>{pnl_label}</span>'
                     f'<b class="{cls(_pnl_abs)}">{money(_pnl_abs)}'
