@@ -143,3 +143,36 @@ in. Mitigations baked in: tiny clips, hard per-bot notional caps, a $30/day
 flatten-and-halt, isolated sub-account margin, and one-at-a-time rollout. Treat
 it as a small-capital live experiment and scale only after live P&L matches the
 paper behaviour. Keep the paper twins running as the control.
+
+---
+
+## 💸 Funding Farmer (Lighter directional funding) — go-live (added 2026-07-10)
+`lighter_funding_bot.py` / bot id `perps-funding-lighter`. **Read this first:** unlike
+the other bots this one is **DIRECTIONAL, not delta-neutral** — a single perp-only
+venue has no same-coin hedge, so it takes the funding-receiving side and carries
+real PRICE RISK bounded by a hard stop, *not* a hedge. Treat it as the highest-risk
+bot in the fleet and size it smallest.
+
+**What the code guarantees (proven in shadow):**
+- `VENUE=lighter_live` refuses to boot unless `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND`
+  AND `PERPS_FUNDING_LIGHTER_MAX_NOTIONAL` are both set (venues/safety.py).
+- Every position has a hard price stop evaluated against a FRESH live-book mid
+  (never a stale mark); if the book is unreadable it will NOT guess — it fail-safe
+  flattens after a few blind loops. Post-stop cooldown prevents trend churn. A
+  book-spread gate keeps thin traps (WEN ~870bps) out.
+
+**Env for the live service** (its own Railway service + Lighter sub-account):
+```
+VENUE=lighter_live
+LIGHTER_API_PRIVATE_KEY=<trade-only key for THIS sub-account>   # you paste, never me
+LIGHTER_ACCOUNT_INDEX=<sub-account index>
+PERPS_FUNDING_LIGHTER_MAX_NOTIONAL=60      # small — directional; ~2-3 slots at $25
+FUNDING_ORDER_USD=25                        # optional (default 25)
+FUNDING_HARD_STOP=0.05                      # optional 5% stop
+FUNDING_MAX_SPREAD_BPS=50                   # optional liquidity gate
+# REAL_MONEY_KILL intentionally NOT set yet -> boots ARMED (no orders)
+```
+Then: watch `funding-farmer-shadow` for a few days of real slippage/behaviour →
+testnet smoke → set `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` on the live service to
+arm it. Instant stop: set `REAL_MONEY_KILL=ARMED` (or delete it) + redeploy — it
+flattens and halts. Keys/disarm/deposit are yours; I never touch them.
