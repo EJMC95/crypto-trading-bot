@@ -98,5 +98,19 @@ def venue_context(bot: str, default_hl_net: str = "testnet",
         return VenueContext(mode, venue, broker, bot, rails)
 
     net = "testnet" if mode == "lighter_testnet" else "mainnet"
-    venue = LighterClient(net=net, with_signer=True)
+    try:
+        venue = LighterClient(net=net, with_signer=True)
+    except Exception as e:
+        # [2026-07-10] A live bot that can't authenticate used to die SILENTLY —
+        # the dashboard row just went stale with no explanation. Publish an
+        # explicit error row (guarded) so the card shows WHY it is down
+        # (e.g. "private key does not match the one on Lighter").
+        try:
+            import bot_pnl_store as store
+            store.publish(bot + _SUFFIX[mode], status="error",
+                          extra={"mode": mode, "venue": mode,
+                                 "error": str(e)[:220]})
+        except Exception:  # noqa: BLE001 — never mask the real failure
+            pass
+        raise
     return VenueContext(mode, venue, None, bot, rails)
