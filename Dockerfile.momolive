@@ -1,0 +1,21 @@
+# Image for the trail-blazer-live Railway service (Trail Blazer on Lighter).
+# Set the service variable RAILWAY_DOCKERFILE_PATH=Dockerfile.momolive — the CMD
+# is baked in here so the service needs no dashboard Start Command.
+#
+# SAFETY: this image is inert until the user supplies LIGHTER_API_PRIVATE_KEY
+# and explicitly sets REAL_MONEY_KILL=DISARMED_I_UNDERSTAND on the service.
+# With VENUE=lighter_live and the kill switch armed (default), boot REFUSES
+# (venues/safety.py) — the restart loop just re-prints what is missing.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY hyperliquid_momo_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "hyperliquid_momo_bot.py"]
