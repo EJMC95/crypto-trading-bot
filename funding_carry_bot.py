@@ -37,6 +37,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -86,10 +87,100 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
+def _perp_leg_fill(ctx, bot_id, coin, is_buy, notional, mark, publish=True):
+    """Cost ($) of executing the Lighter perp leg of a carry (+ the fill price).
+
+    [2026-07-10 SHADOW EXEC] The whole reason funding-carry belongs on Lighter is
+    that the perp fee is ZERO — so the only perp-leg cost is the crossed-spread
+    SLIPPAGE. In shadow mode we MEASURE it against the real live book instead of
+    guessing, and write one venue_orders evidence row per fill (shadow=True). That
+    accumulating evidence is what tells us whether real slippage on hot-funding
+    coins lands near the backtest's optimistic 3bps (both-perp) or the 20bps
+    (CEX-hedge) assumption — the number the go-live decision hinges on.
+
+    The slippage reference is the LIVE-BOOK MID from the same snapshot as the
+    fill — NOT the funding-map `mark`, which is a last-trade price frozen at
+    LighterClient construction and never refreshed (it would inject unbounded
+    drift into the evidence over a long run). `mark` is used only to seed the
+    fallback when no book is available.
+
+    Modes:
+      hl_paper       : no venue/order path — model the leg with the flat PERP_FEE
+                       constant exactly as before (zero behaviour change).
+      lighter_shadow : walk the LIVE Lighter book via the same fill model the
+                       ShadowBroker uses; ADVERSE slippage only (a fill worse than
+                       the mid) is charged — price improvement is floored to 0
+                       (conservative). A thin/absent book -> zero measured slippage
+                       and a levels_used=0 row that flags the illiquidity for
+                       later analysis rather than silently pretending we filled.
+    `publish=False` measures without writing an evidence row — used by the decay
+    close-gate to check the MEASURED exit cost before committing to a close.
+    Funded modes never reach here (main() refuses them — no naked-perp path).
+    """
+    if ctx.mode == "hl_paper":
+        return PERP_FEE * notional, mark
+    from venues.shadow import fill_from_book  # local import: only lighter modes need it
+    try:
+        book = ctx.venue.orderbook(coin)
+    except Exception:
+        book = None
+    # Reference = live book mid (fresh); fall back to the funding-map mark only
+    # when the book is unavailable (illiquidity — measured cost is then 0).
+    ref = mark or 0.0
+    spread_bps = None
+    if book and book.get("bids") and book.get("asks"):
+        bid, ask = book["bids"][0][0], book["asks"][0][0]
+        mid = (bid + ask) / 2.0
+        if mid:
+            ref, spread_bps = mid, (ask - bid) / mid * 1e4
+    if not ref or ref <= 0:
+        return PERP_FEE * notional, mark   # no price to size/measure -> model it
+    size = notional / ref
+    fill = fill_from_book(book, is_buy, size) if book else None
+    fill_px = fill[0] if fill else ref
+    levels = fill[1] if fill else 0
+    slip = (fill_px - ref) * (1.0 if is_buy else -1.0)   # >0 == adverse
+    cost = max(0.0, slip) * size
+    slip_bps = (slip / ref * 1e4) if ref else None
+    if publish:
+        try:
+            store.publish_venue_order(
+                bot_id, venue="lighter", shadow=True, coin=coin,
+                side="buy" if is_buy else "sell", size=size,
+                px_decision=ref, px_fill=fill_px,
+                spread_bps=spread_bps, slippage_bps=slip_bps,
+                raw={"leg": "perp", "levels_used": levels,
+                     "notional": round(notional, 2), "ts": time.time()})
+        except Exception:
+            pass
+    return cost, fill_px
+
+
 def main():
     p = argparse.ArgumentParser(description="DRY-RUN funding-carry harvester")
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
     args = p.parse_args()
+
+    # [2026-07-10 SHADOW EXEC] Funded modes are REFUSED. Funding-carry is
+    # delta-neutral by construction (perp leg + hedge leg); a perp-only venue
+    # like Lighter has no automated hedge, so a funded run would place a NAKED
+    # perp and silently book its price P&L as if it were neutral — the opposite
+    # of the strategy. Shadow is the supported live mode: it runs the full loop
+    # on real Lighter data and MEASURES perp-leg slippage without sending orders.
+    # A live harvest needs a hedge venue (CEX spot, or a correlated Lighter perp)
+    # built + backtested first. See docs/lighter.md and memory
+    # funding-carry-structural-edge-lighter.
+    # Fail-safe ALLOWLIST (not a blocklist): only the two order-less modes are
+    # permitted. Any other / future / unknown VENUE refuses, so a new funded mode
+    # added to venues.MODES can never silently run this hedge-less bot naked.
+    _mode = os.environ.get("VENUE", "hl_paper").strip() or "hl_paper"
+    if _mode not in ("hl_paper", "lighter_shadow"):
+        raise SystemExit(
+            f"VENUE={_mode}: funding-carry (Yield Harvester) has NO automated "
+            "delta-neutral hedge leg yet — refusing to run in any order-sending "
+            "mode (would place a naked Lighter perp). Only hl_paper and "
+            "lighter_shadow are allowed; the latter accumulates live-book "
+            "slippage evidence without sending orders.")
 
     # [2026-07-09 LIGHTER GATE-0] Funding reads go through the venue layer.
     # VENUE unset -> hl_paper -> Hyperliquid MAINNET meta_and_asset_ctxs, the
@@ -167,17 +258,39 @@ def main():
                     pos.setdefault("flipped_since", t0)
                 else:
                     pos.pop("flipped_since", None)
-                close_fee = OPEN_COST * pos["notional"]
-                net_if_closed = pos["accrued"] - (pos["fees"] + close_fee)
+                # Cheap MODELLED estimate first (no per-loop book read): drives
+                # the flip/expire/bleed backstops and the decay pre-filter.
+                close_fee_est = OPEN_COST * pos["notional"]
+                net_if_closed = pos["accrued"] - (pos["fees"] + close_fee_est)
                 flipped = flipped_now and \
                     (t0 - pos["flipped_since"]) / 3600.0 >= FLIP_GRACE_H
-                decayed = abs(apr) < EXIT_APR and net_if_closed >= FEE_PAYBACK_MARGIN
                 expired = held_h >= MAX_HOLD_H
                 bleeding = net_if_closed <= -BLEED_STOP_FRAC * pos["notional"]
+                # Decay-close only when funding has cooled AND closing still nets
+                # positive after the MEASURED (not modelled) exit cost — else a
+                # thin-book exit could realize a loss the fee-payback gate treated
+                # as a win. Measured lazily: only once the cheap modelled gate
+                # already wants to close (no book read every loop for every pos).
+                closing_short = pos["side"] == "short_perp"
+                decayed = False
+                if abs(apr) < EXIT_APR and net_if_closed >= FEE_PAYBACK_MARGIN:
+                    _pc, _ = _perp_leg_fill(
+                        ctx, bot_id, coin, is_buy=closing_short,
+                        notional=pos["notional"], mark=(f.get("mark") or 0.0),
+                        publish=False)
+                    net_meas = pos["accrued"] - (
+                        pos["fees"] + _pc + HEDGE_COST * pos["notional"])
+                    decayed = net_meas >= FEE_PAYBACK_MARGIN
                 if not (flipped or decayed or expired or bleeding):
                     continue
 
-                pos["fees"] += close_fee  # closing friction
+                # Realized closing friction: MEASURE the perp exit leg on the live
+                # book (closing a short_perp is a BUY-back, a long_perp a SELL) +
+                # the modelled hedge leg. Publishes the evidence row.
+                perp_close_cost, _ = _perp_leg_fill(
+                    ctx, bot_id, coin, is_buy=closing_short,
+                    notional=pos["notional"], mark=(f.get("mark") or 0.0))
+                pos["fees"] += perp_close_cost + HEDGE_COST * pos["notional"]
                 pnl = pos["accrued"] - pos["fees"]
                 reason = ("flip" if flipped else "decay_paid" if decayed
                           else "max_hold" if expired else "bleed_stop")
@@ -219,15 +332,24 @@ def main():
                 for coin, f in candidates[:MAX_POSITIONS - len(positions)]:
                     apr = f["rate"] * HOURS_PER_YEAR
                     side = "short_perp" if f["rate"] > 0 else "long_perp"
+                    # Perp leg: short_perp opens with a SELL, long_perp with a BUY.
+                    # In shadow this MEASURES the real book slippage (+logs it); in
+                    # hl_paper it returns the modelled PERP_FEE. The hedge leg is
+                    # always the modelled HEDGE_COST (it lives off-venue).
+                    perp_open_cost, _ = _perp_leg_fill(
+                        ctx, bot_id, coin, is_buy=(side == "long_perp"),
+                        notional=NOTIONAL, mark=(f.get("mark") or 0.0))
                     positions[coin] = {
                         "side": side, "notional": NOTIONAL, "opened_ts": t0,
-                        "accrued": 0.0, "fees": OPEN_COST * NOTIONAL,
+                        "accrued": 0.0,
+                        "fees": perp_open_cost + HEDGE_COST * NOTIONAL,
                         "entry_apr": apr,
                     }
                     print(f"[{now_iso()}] OPEN {coin} {side} ${NOTIONAL:.0f} "
                           f"| funding {apr:+.1%} APR "
                           f"| hot {(t0 - hot_since.get(coin, t0)) / 3600.0:.1f}h "
-                          f"(hedged delta-neutral)")
+                          f"| perp-leg cost ${perp_open_cost:.3f} "
+                          f"({'measured' if ctx.mode != 'hl_paper' else 'modelled'})")
 
             # ---- publish snapshot ----------------------------------------
             open_pnl = sum(p["accrued"] - p["fees"] for p in positions.values())

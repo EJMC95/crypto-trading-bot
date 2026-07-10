@@ -101,3 +101,27 @@ Lighter app rewards tab day-1 of funding.
 authenticated layer (place/modify/cancel, market open+reduce-only close, nonce
 recovery on 2 markets) is **SKIPPED until `LIGHTER_API_PRIVATE_KEY` /
 `LIGHTER_ACCOUNT_INDEX` are set in env** — no keys ever live in the repo.
+
+## Yield Harvester (funding-carry) — shadow execution (2026-07-10)
+`funding_carry_bot.py` gained a venue-aware perp-leg execution path,
+`_perp_leg_fill(...)`:
+- **hl_paper** (default): models the leg with the flat `PERP_FEE` constant —
+  zero behaviour change from the pre-Lighter paper bot.
+- **lighter_shadow**: MEASURES the real crossed-spread cost by walking the live
+  Lighter book (referenced to the book **mid**, adverse-slippage-only /
+  conservative) and writes one `venue_orders` evidence row per fill
+  (`shadow=true`). Lighter is zero-fee, so this slippage IS the entire perp cost.
+- **lighter_testnet / lighter_live** (and any unknown VENUE): **REFUSED at boot**
+  via a fail-safe allowlist. Funding-carry is delta-neutral (perp leg + hedge
+  leg); a perp-only venue has no automated hedge, so a funded run would place a
+  *naked* perp and mis-account its price P&L as neutral. A live harvest needs a
+  hedge venue (CEX spot, or a correlated Lighter perp) built + backtested first.
+
+**First live-book slippage read (round-trip @ $300, mid-referenced):** liquid hot
+coins are cheap — ZEC 3.0 bps, COIN 4.4 bps, BB 6.9 bps, NBIS 7.0 bps — validating
+the backtest's optimistic ~3 bps both-perp assumption. Thin/exotic perps are
+traps — HYUNDAIUSD 29 bps, RAIL 23 bps, **WEN 870 bps**. ~120 coins were ≥40% APR
+at once (many tokenized-equity perps with 5000%+ funding). **Implication:** a live
+Yield Harvester needs a **liquidity / max-slippage gate** on top of the funding
+filter (`MIN_DAY_VOLUME=$2M` is not enough). The shadow `venue_orders` ledger is
+the evidence to calibrate that gate — accumulate before adding the filter.
