@@ -40,3 +40,4 @@ com.eamon.tri-arb.plist
 *.sqlite-shm
 *.sqlite-wal
 *.sqlite-*
+scripts/.funding_cache.json
