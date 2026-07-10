@@ -176,3 +176,37 @@ Then: watch `funding-farmer-shadow` for a few days of real slippage/behaviour �
 testnet smoke → set `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` on the live service to
 arm it. Instant stop: set `REAL_MONEY_KILL=ARMED` (or delete it) + redeploy — it
 flattens and halts. Keys/disarm/deposit are yours; I never touch them.
+
+---
+
+## 🌊 Tide Rider on Lighter (crypto-trend-daily, 1x long perp) — go-live (added 2026-07-10)
+`lighter_trend_bot.py`. The daily 50/200 golden-cross trend follower, validated
+long-only on **Kraken SPOT** (+52% basket / 2.7yr), re-expressed as a **1x LONG
+PERP** on Lighter. **Honest trade-off:** a long perp PAYS funding, and this bot
+holds for weeks in uptrends — re-validation (`scripts/backtest_tide_rider_perp.py`)
+shows **+52% spot → +40% perp** over 2.7yr (funding drag −13pp), and the drag
+**erases the down-trend protection** (ETH perp ≈ buy-and-hold). It is viable on
+Lighter but weaker than the Kraken original; the drag is modelled in shadow so the
+P&L you watch is honest.
+
+**What the code guarantees:** `lighter_live` refuses to boot unless
+`REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` and `CRYPTO_TREND_DAILY_MAX_NOTIONAL` are
+set; 1x only (no leverage); death-cross exit + 35% catastrophic seatbelt (fires
+even if candles fail); signal on closed daily bars only.
+
+**Env for the live service** (own Railway service + Lighter sub-account):
+```
+VENUE=lighter_live
+LIGHTER_API_PRIVATE_KEY=<trade-only key for THIS sub-account>   # you paste, never me
+LIGHTER_ACCOUNT_INDEX=<sub-account index>
+CRYPTO_TREND_DAILY_MAX_NOTIONAL=300        # 6 majors x ~$50 clips
+TREND_ORDER_USD=50                          # optional (default 50)
+# REAL_MONEY_KILL intentionally NOT set -> boots ARMED (no orders)
+```
+Watch `tide-rider-lighter-shadow` first (it should mirror the ~+40% perp path incl.
+funding drag), then testnet, then set `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` to arm.
+Instant stop: `REAL_MONEY_KILL=ARMED` + redeploy. Keys/disarm/deposit are yours.
+
+**Alternative:** the strategy is *stronger* on Kraken spot (no funding drag, keeps the
+down-trend protection). If you'd rather the full validated edge, the Freqtrade/Kraken
+live path (real Kraken keys + dry_run:false) delivers +52% vs this +40%.
