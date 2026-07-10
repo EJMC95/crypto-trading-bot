@@ -14,10 +14,11 @@ WHAT THIS IS — AND HONESTLY IS NOT (2026-07-10)
   could break it: a strong trend runs the position over before funding pays.
 
   Because it is directional, the NON-NEGOTIABLE risk control is a HARD PRICE STOP
-  on every position (HARD_STOP), plus a liquidity filter (thin Lighter perps —
-  WEN cost 870bps round-trip in the shadow evidence — are excluded), small clips,
-  a funding-decay exit (leave when the reason to be there is gone), and the
-  fleet's standard notional / daily-loss / kill-switch rails.
+  on every position (HARD_STOP), evaluated against a FRESH live-book mid (never a
+  stale mark). Supporting controls: a book-spread liquidity gate at entry (thin
+  Lighter perps — WEN cost 870bps round-trip in the shadow evidence — are kept
+  out), a post-stop cooldown (no instant re-entry in a trend), small clips, a
+  funding-decay exit, and the fleet's notional / daily-loss / kill-switch rails.
 
 EXECUTION / SAFETY — reuses the venue layer (venues/), same path Trail Blazer and
 Bounce Catcher go live on:
@@ -57,12 +58,15 @@ ENTER_APR = float(os.environ.get("FUNDING_ENTER_APR", "0.40"))  # enter when |ap
 EXIT_APR = float(os.environ.get("FUNDING_EXIT_APR", "0.15"))    # leave when it cools
 PERSIST_H = float(os.environ.get("FUNDING_PERSIST_H", "4"))     # hot this long first
 MAX_HOLD_H = float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))  # recycle after 3d
-MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "5e6"))       # liquidity floor
+MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "5e6"))       # 24h turnover floor
+MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "50"))  # book-spread gate
 
 # Directional risk controls — the hard price stop is the load-bearing one.
 HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.05"))      # 5% adverse -> out
 TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% favourable -> lock
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDING_DAILY_LOSS", "0.05"))
+STOP_COOLDOWN_H = float(os.environ.get("FUNDING_STOP_COOLDOWN_H", "12"))  # quarantine after a stop
+BLIND_STOP_MISSES = int(os.environ.get("FUNDING_BLIND_STOP_MISSES", "3"))  # live fail-safe
 
 LOOP_SECONDS = int(os.environ.get("FUNDING_LOOP_SECONDS", "300"))
 
@@ -77,29 +81,42 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-def fresh_mid(ctx, coin, fallback):
-    """Current mid from the LIVE book (fresh) — the funding-map mark is a
-    last-trade price frozen at client construction, unsafe for a stop. Falls
-    back to `fallback` (the map mark) when the book is unavailable."""
+def fresh_mid(ctx, coin):
+    """Current mid from the LIVE book, or None if unavailable. NEVER falls back to
+    the funding-map mark — that is a last-trade price frozen at client construction
+    and using it on the stop path would silently freeze the stop while the real
+    price runs away. Callers MUST treat None as 'cannot evaluate risk here'."""
     try:
         book = ctx.venue.orderbook(coin)
     except Exception:
-        book = None
+        return None
     if book and book.get("bids") and book.get("asks"):
         bid, ask = book["bids"][0][0], book["asks"][0][0]
         if bid and ask:
             return (bid + ask) / 2.0
-    return fallback or 0.0
+    return None
+
+
+def book_spread_bps(ctx, coin):
+    """Top-of-book spread in bps from the live book, or None if unavailable."""
+    try:
+        book = ctx.venue.orderbook(coin)
+    except Exception:
+        return None
+    if book and book.get("bids") and book.get("asks"):
+        bid, ask = book["bids"][0][0], book["asks"][0][0]
+        mid = (bid + ask) / 2.0 if (bid and ask) else 0.0
+        if mid:
+            return (ask - bid) / mid * 1e4
+    return None
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
-                  reason, venue=None, shadow=None):
+                  reason, order_usd=ORDER_USD, venue=None, shadow=None):
     """Mirror a realized directional funding trade to the paper_trades ledger.
-    pnl_abs = price P&L + funding accrued; reason carries the direction."""
+    pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip."""
     pnl = float(price_pnl) + float(fund_pnl)
-    pnl_pct = None
-    if ent_px:
-        pnl_pct = pnl / (ORDER_USD or 1.0)
+    pnl_pct = (pnl / (order_usd or 1.0)) if ent_px else None
     oa = datetime.fromtimestamp(ent_ts, tz=timezone.utc).isoformat() if ent_ts else None
     try:
         store.publish_paper_trade(
@@ -136,19 +153,25 @@ def main():
         pass
 
     # Per-open bookkeeping the venue doesn't hold: is_short, entry, opened_ts,
-    # and (paper/shadow only) accrued funding + entry price for the broker.
+    # accrued funding. Persisted so a redeploy doesn't reset the max-hold clock.
     meta = {}          # coin -> {is_short, entry, opened_ts, accrued}
     hot_since = {}     # coin -> ts |apr| first >= ENTER_APR
-    fund_realized = 0.0  # paper/shadow: cumulative realized funding (price P&L is in broker)
+    cooldown = {}      # coin -> ts until which re-entry is blocked (post-stop)
+    miss = {}          # coin -> consecutive fresh-price misses (live fail-safe)
+    fund_realized = 0.0  # dry_run only: cumulative realized funding (price P&L is in broker)
 
-    # Restore paper state + open-trade metadata across restarts.
-    _saved = store.load_state(bot_id) if dry_run else None
-    if _saved and broker is not None and broker.restore_state(_saved.get("broker") or {}):
-        meta = {str(k): v for k, v in (_saved.get("meta") or {}).items()}
-        fund_realized = float(_saved.get("fund_realized") or 0.0)
-        log.info("restored paper state: equity $%.2f, %d open", broker.equity(),
-                 broker.open_count())
-
+    if dry_run:
+        _saved = store.load_state(bot_id)
+        if _saved and broker is not None and broker.restore_state(_saved.get("broker") or {}):
+            meta = {str(k): v for k, v in (_saved.get("meta") or {}).items()}
+            fund_realized = float(_saved.get("fund_realized") or 0.0)
+            log.info("restored paper state: equity $%.2f, %d open", broker.equity(),
+                     broker.open_count())
+    else:
+        # Live: restore open-position meta so opened_ts (max-hold clock) survives
+        # a redeploy instead of resetting to now.
+        _live = store.load_state(bot_id + ":live") or {}
+        meta = {str(k): v for k, v in (_live.get("meta") or {}).items()}
     live_baseline = (store.load_state(bot_id + ":live") or {}).get("initial_equity") \
         if not dry_run else None
 
@@ -156,9 +179,9 @@ def main():
     log.info("Yield Harvester (Lighter DIRECTIONAL funding) | venue=%s (%s)",
              ctx.mode, "modelled fills" if dry_run else "SENDS ORDERS")
     log.info("enter |apr|>=%.0f%% persist %.0fh, exit<%.0f%% | HARD STOP %.0f%% / TP %.0f%% "
-             "| $%.0f x max %d | vol>=$%.0fM | loop=%ds", ENTER_APR * 100, PERSIST_H,
-             EXIT_APR * 100, HARD_STOP * 100, TAKE_PROFIT * 100, order_usd, max_open,
-             MIN_VOL / 1e6, LOOP_SECONDS)
+             "| $%.0f x max %d | vol>=$%.0fM spread<=%.0fbps | loop=%ds", ENTER_APR * 100,
+             PERSIST_H, EXIT_APR * 100, HARD_STOP * 100, TAKE_PROFIT * 100, order_usd,
+             max_open, MIN_VOL / 1e6, MAX_SPREAD_BPS, LOOP_SECONDS)
     log.info("DIRECTIONAL — not delta-neutral; price risk bounded by the hard stop.")
     log.info("=" * 64)
 
@@ -169,6 +192,45 @@ def main():
         if dry_run:
             return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
         return ctx.venue.positions()
+
+    def _flatten_all(reason):
+        """Emergency flatten that MIRRORS normal-close bookkeeping (ledger + counters
+        + meta pop) so forensic reconstruction stays consistent with account equity."""
+        nonlocal n_closed, n_wins
+        try:
+            live_pos = ctx.venue.positions()
+        except Exception as e:
+            log.error("flatten scan failed: %s", e)
+            return
+        for c in list(live_pos):
+            held = (live_pos.get(c, {}) or {}).get("size", 0.0) or 0.0
+            if not held:
+                continue
+            m = meta.get(c) or {}
+            is_short = m.get("is_short", held < 0)
+            entry = m.get("entry") or (live_pos.get(c, {}) or {}).get("entry") or 0.0
+            opened_ts = m.get("opened_ts") or time.time()
+            px = fresh_mid(ctx, c) or entry
+            try:
+                ctx.venue.market_close(c)
+            except Exception as e:
+                log.error("flatten %s: %s", c, e)
+                continue
+            price_pnl = abs(held) * ((px - entry) if not is_short else (entry - px))
+            n_closed += 1
+            n_wins += 1 if price_pnl > 0 else 0
+            _record_close(bot_id, c, entry, opened_ts, px, price_pnl, m.get("accrued", 0.0),
+                          was_long=not is_short, reason=reason, order_usd=order_usd,
+                          venue=venue_tag, shadow=shadow_tag)
+            try:
+                store.publish_venue_order(
+                    bot_id, venue=("lighter" if venue_tag else "hl"), shadow=shadow_tag,
+                    coin=c, side=("buy" if is_short else "sell"), size=abs(held),
+                    px_decision=px, px_fill=px, raw={"reason": reason, "leg": "close"})
+            except Exception:
+                pass
+            meta.pop(c, None)
+            hot_since.pop(c, None)
 
     try:
         day_start_equity = account_value()
@@ -193,14 +255,7 @@ def main():
         if not dry_run and ctx.rails.kill_check():
             log.error("REAL_MONEY_KILL armed mid-run — flatten + halt.")
             halted_today = True
-            try:
-                for c in list(ctx.venue.positions()):
-                    try:
-                        ctx.venue.market_close(c)
-                    except Exception as e:
-                        log.error("flatten %s: %s", c, e)
-            except Exception as e:
-                log.error("flatten scan failed: %s", e)
+            _flatten_all("kill_switch")
 
         try:
             equity = account_value()
@@ -215,14 +270,7 @@ def main():
                         equity, day_start_equity)
             halted_today = True
             if not dry_run:
-                try:
-                    for c in list(ctx.venue.positions()):
-                        try:
-                            ctx.venue.market_close(c)
-                        except Exception as e:
-                            log.error("flatten %s: %s", c, e)
-                except Exception:
-                    pass
+                _flatten_all("daily_loss")
 
         if halted_today:
             log.info("halted for today; sleeping.")
@@ -244,6 +292,13 @@ def main():
             pos = positions()
         except Exception as e:
             log.warning("positions unreadable: %s", e)
+            if not dry_run:
+                # Acting on a phantom-empty set would zero open_now AND the cap
+                # input, defeating max_open and the notional cap — skip the loop.
+                if args.once:
+                    break
+                time.sleep(LOOP_SECONDS)
+                continue
             pos = {}
 
         dt_h = (t0 - last_ts) / 3600.0
@@ -264,24 +319,48 @@ def main():
             is_short = m.get("is_short", held < 0)
             entry = m.get("entry") or pos.get(coin, {}).get("entry") or 0.0
             opened_ts = m.get("opened_ts") or t0
-            px = fresh_mid(ctx, coin, f.get("mark"))
-            if not px:
+
+            px = fresh_mid(ctx, coin)
+            if px is None:
+                # No live book -> the hard stop cannot be evaluated. Never pretend
+                # with a stale mark. Log; in live, fail-safe flatten after N misses.
+                miss[coin] = miss.get(coin, 0) + 1
+                log.warning("%s: no live book (%d) — hard stop unverifiable", coin, miss[coin])
+                if not dry_run and miss[coin] >= BLIND_STOP_MISSES:
+                    log.error("%s: stop unverifiable %dx — fail-safe flatten", coin, miss[coin])
+                    try:
+                        ctx.venue.market_close(coin)
+                        _record_close(bot_id, coin, entry, opened_ts, entry, 0.0,
+                                      m.get("accrued", 0.0), was_long=not is_short,
+                                      reason="stop_blind", order_usd=order_usd,
+                                      venue=venue_tag, shadow=shadow_tag)
+                        n_closed += 1
+                        meta.pop(coin, None)
+                        hot_since.pop(coin, None)
+                        miss.pop(coin, None)
+                    except Exception as e:
+                        log.error("fail-safe close %s: %s", coin, e)
                 continue
+            miss.pop(coin, None)
+            if dry_run:
+                broker.mark(coin, px)   # feed the live mid so paper equity tracks open P&L
             notional = abs(held) * px
 
-            # accrue funding (paper/shadow only; live account_value already has it)
-            if dry_run and rate is not None:
+            if rate is not None:
+                # Accrue modeled funding in BOTH modes: dry_run adds it to equity;
+                # live uses it only for the per-trade ledger + win count (the real
+                # funding is already in account_value, so open_fund/realized stay
+                # dry_run-guarded to avoid double-counting).
                 accr = (1.0 if is_short else -1.0) * rate * notional * dt_h
                 m["accrued"] = m.get("accrued", 0.0) + accr
-                meta[coin] = {**m, "is_short": is_short, "entry": entry,
-                              "opened_ts": opened_ts}
+            meta[coin] = {**m, "is_short": is_short, "entry": entry, "opened_ts": opened_ts}
 
             held_h = (t0 - opened_ts) / 3600.0
             raw = (px - entry) / entry if entry else 0.0        # +ve = price rose
             # A SHORT loses when price rises (+raw is against us); a LONG loses
             # when price falls (so its adverse is -raw). +ve adverse == against us.
             adverse = raw if is_short else -raw
-            favour = -adverse                                   # +ve = in our favour
+            favour = -adverse
             flipped = (apr is not None) and ((is_short and apr < 0) or (not is_short and apr > 0))
 
             decision = None
@@ -303,7 +382,6 @@ def main():
                 price_pnl = broker.close(coin, px)   # realizes price P&L in broker
                 fund_realized += fund_pnl
             else:
-                # live: realize on the venue; price+funding both land in account equity
                 try:
                     ctx.venue.market_close(coin)
                 except Exception as e:
@@ -318,7 +396,7 @@ def main():
                      coin, "short" if is_short else "long", held_h, price_pnl,
                      fund_pnl, decision)
             _record_close(bot_id, coin, entry, opened_ts, px, price_pnl, fund_pnl,
-                          was_long=not is_short, reason=decision,
+                          was_long=not is_short, reason=decision, order_usd=order_usd,
                           venue=venue_tag, shadow=shadow_tag)
             try:
                 store.publish_venue_order(
@@ -329,6 +407,9 @@ def main():
             except Exception:
                 pass
             meta.pop(coin, None)
+            hot_since.pop(coin, None)      # force a fresh persistence wait — no instant re-entry
+            if decision == "stop":
+                cooldown[coin] = t0 + STOP_COOLDOWN_H * 3600.0   # quarantine after a stop
 
         # ---- persistence clock over the whole funding map ----
         for c, f in fund.items():
@@ -345,6 +426,8 @@ def main():
             for c, f in fund.items():
                 if c in meta or c in pos:
                     continue
+                if c in cooldown and t0 < cooldown[c]:
+                    continue
                 r = f.get("rate")
                 if r is None:
                     continue
@@ -360,12 +443,16 @@ def main():
             for coin, f, apr in cands:
                 if open_now >= max_open or opened_this_loop >= MAX_NEW_PER_LOOP:
                     break
+                # book-spread liquidity gate — keeps thin traps (WEN 870bps) out.
+                sp = book_spread_bps(ctx, coin)
+                if sp is None or sp > MAX_SPREAD_BPS:
+                    log.info("%s SPREAD_SKIP (%.0fbps)", coin, sp if sp is not None else -1)
+                    continue
                 is_short = apr > 0                 # funding>0 -> longs pay -> we SHORT
-                px = fresh_mid(ctx, coin, f.get("mark"))
-                if not px:
+                px = fresh_mid(ctx, coin)
+                if px is None:
                     continue
                 size = round(order_usd / px, 6)
-                # live notional cap (adapter rail)
                 if not dry_run:
                     open_ntl = sum(1 for v in pos.values()
                                    if (v.get("size") if isinstance(v, dict) else v)) * order_usd
@@ -384,15 +471,15 @@ def main():
                               "accrued": 0.0}
                 open_now += 1
                 opened_this_loop += 1
-                log.info("OPEN %s %s $%.0f | funding %+.1f%% APR | px %.6g",
-                         coin, "short" if is_short else "long", order_usd, apr, px)
+                log.info("OPEN %s %s $%.0f | funding %+.1f%% APR | px %.6g | spread %.0fbps",
+                         coin, "short" if is_short else "long", order_usd, apr, px, sp)
                 try:
                     store.publish_venue_order(
                         bot_id, venue=("lighter" if venue_tag else "hl"),
                         shadow=shadow_tag, coin=coin,
                         side=("sell" if is_short else "buy"), size=size,
                         px_decision=px, px_fill=px,
-                        raw={"apr": round(apr, 3), "leg": "open"})
+                        raw={"apr": round(apr, 3), "spread_bps": round(sp, 1), "leg": "open"})
                 except Exception:
                     pass
 
@@ -408,7 +495,6 @@ def main():
                            if (v.get("size") if isinstance(v, dict) else v))
             if live_baseline is None and equity is not None:
                 live_baseline = equity
-                store.save_state(bot_id + ":live", {"initial_equity": equity})
             pub_pnl = (equity - live_baseline) if (equity is not None
                                                    and live_baseline is not None) else None
         top = sorted(((c, f.get("rate") or 0.0) for c, f in fund.items()),
@@ -425,12 +511,16 @@ def main():
                        "hottest_apr": {c: f"{r*H:+.0%}" for c, r in top}})
         except Exception:
             pass
-        if dry_run:
-            try:
+        # persist state (dry_run: full paper account; live: baseline + open meta)
+        try:
+            if dry_run:
                 store.save_state(bot_id, {"broker": broker.to_state(), "meta": meta,
                                           "fund_realized": fund_realized})
-            except Exception:
-                pass
+            elif live_baseline is not None:
+                store.save_state(bot_id + ":live", {"initial_equity": live_baseline,
+                                                    "meta": meta})
+        except Exception:
+            pass
 
         held = ", ".join(f"{c}({'S' if (meta.get(c) or {}).get('is_short') else 'L'})"
                          for c in meta) or "none"
