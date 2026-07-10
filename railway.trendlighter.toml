@@ -1,0 +1,19 @@
+# Service-specific Railway config for the Tide Rider on Lighter service ONLY
+# (lighter_trend_bot.py; bot id crypto-trend-daily -> suffixed -lshadow / -lighter).
+# Point that service's Config-as-code "Railway Config File" setting at this file so
+# it does NOT affect the other services deploying from this same repo. Selecting the
+# image here also removes the manual RAILWAY_DOCKERFILE_PATH env step.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.trendlighter"
+# Dockerfile.trendlighter bakes CMD ["python","lighter_trend_bot.py"], so no
+# [deploy].startCommand is needed — just image + restart policy below.
+
+[deploy]
+# Restart on any exit (crash or otherwise), no retry cap. Every Tide Rider safety
+# rail — catastrophic stop, death-cross exit, daily-loss flatten, kill-switch
+# flatten — runs IN-PROCESS each loop, and a live 1x long perp has NO resting stop
+# on Lighter's book. The running process IS the position manager; keep it alive so
+# it auto-resumes managing real positions after a crash. (Railway's default policy
+# is ON_FAILURE with a retry cap — a crash-loop would abandon a funded position.)
+restartPolicyType = "always"

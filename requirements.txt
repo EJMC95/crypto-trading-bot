@@ -6,3 +6,5 @@ ccxt>=4.2.0
 psycopg2-binary>=2.9   # shared P&L publisher (bot_pnl_store) + pnl_dashboard
 lighter-sdk>=1.1.1     # Lighter venue layer (venues/) — signer binaries verified
                        # on linux/amd64 (python:3.11-slim) AND Mac arm64, docs/lighter.md
+websockets>=12.0.0     # direct: venues/lighter_client.py uses websockets.sync.client
+                       # (also a lighter-sdk transitive; pin it so it can't be dropped)

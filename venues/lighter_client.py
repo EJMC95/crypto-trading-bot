@@ -15,10 +15,11 @@ Design constraints it encodes (all empirically verified 2026-07-09):
     1000BONK 1:1, PEPE ↔ 1000PEPE ×0.001). INJ/ATOM/ORDI/TON are unlisted —
     supports() lets bots skip them.
   * Auth model: L1 key NEVER touches this code. Trading uses an API key
-    (index 2-254) created from Eamon's Ledger on the Mac; env only:
+    (index 4-254; 0-3 reserved for Lighter's own UI) created from Eamon's
+    Ledger on the Mac; env only:
         LIGHTER_API_PRIVATE_KEY   (api key private key, env/Railway secret)
         LIGHTER_ACCOUNT_INDEX     (from accounts_by_l1_address)
-        LIGHTER_API_KEY_INDEX     (default 2)
+        LIGHTER_API_KEY_INDEX     (default 4)
   * Candle dicts come back as {t,o,h,l,c,v} (t in ms) — same keys the HL
     path yields, so strategy code is venue-blind.
 """

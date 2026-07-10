@@ -168,14 +168,30 @@ LIGHTER_API_PRIVATE_KEY=<trade-only key for THIS sub-account>   # you paste, nev
 LIGHTER_ACCOUNT_INDEX=<sub-account index>
 PERPS_FUNDING_LIGHTER_MAX_NOTIONAL=60      # small — directional; ~2-3 slots at $25
 FUNDING_ORDER_USD=25                        # optional (default 25)
-FUNDING_HARD_STOP=0.05                      # optional 5% stop
-FUNDING_MAX_SPREAD_BPS=50                   # optional liquidity gate
+# The risk knobs below are OPTIONAL — the code defaults ARE the tuned values
+# (backtest_directional_funding.py: a 5% stop whipsaws out and LOSES; 10% is the
+# least-bad). Only set them to OVERRIDE; do NOT copy the old 5%/50 values.
+FUNDING_HARD_STOP=0.10                      # optional (default 0.10 — tuned; don't lower)
+FUNDING_TAKE_PROFIT=0.04                    # optional (default 0.04)
+FUNDING_MAX_SPREAD_BPS=20                   # optional (default 20 — live hot coins <=3.5bps)
+FUNDING_MIN_VOL=10e6                        # optional (default $10M 24h turnover)
 # REAL_MONEY_KILL intentionally NOT set yet -> boots ARMED (no orders)
 ```
-Then: watch `funding-farmer-shadow` for a few days of real slippage/behaviour →
-testnet smoke → set `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` on the live service to
-arm it. Instant stop: set `REAL_MONEY_KILL=ARMED` (or delete it) + redeploy — it
-flattens and halts. Keys/disarm/deposit are yours; I never touch them.
+Then: watch the shadow row (`perps-funding-lighter-lshadow` on the dashboard) for a
+few days of real slippage/behaviour → testnet smoke (`scripts/lighter_testnet_smoke.py`)
+→ set `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` on the live service to arm it. Instant
+stop: set `REAL_MONEY_KILL=ARMED` (or delete it) + redeploy — it flattens and halts.
+Keys/disarm/deposit are yours; I never touch them.
+
+**Shadow readiness (checked 2026-07-11):** the shadow service is deployed and running
+live against Lighter mainnet books. Measured perp-leg slippage on the coins it actually
+trades is **sub-1bps** (ETH 0.3–0.5bps, SOL 0.13bps, BTC 0.36bps, HYPE 0.92bps) — the
+zero-fee + ≤20bps-spread-gate thesis holds and thin traps are excluded. Code + guards
+re-validated: `--once` runs clean; `lighter_live` REFUSES to boot without BOTH
+`REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` and `PERPS_FUNDING_LIGHTER_MAX_NOTIONAL`.
+**Still thin:** only ~2 closed round-trips so far (~net flat) — execution is proven,
+the P&L track record is not. Honest expectation stands: directional funding capture is
+~break-even (funding is real but price risk ≈ offsets it); size it smallest in the fleet.
 
 ---
 
@@ -194,18 +210,33 @@ P&L you watch is honest.
 set; 1x only (no leverage); death-cross exit + 35% catastrophic seatbelt (fires
 even if candles fail); signal on closed daily bars only.
 
-**Env for the live service** (own Railway service + Lighter sub-account):
+**Deploy:** point the service's Config-as-code "Railway Config File" at
+`railway.trendlighter.toml` — it selects `Dockerfile.trendlighter` **and** pins
+`restartPolicyType="always"`. That auto-restart is safety-critical: every rail
+(catastrophic stop, death-cross exit, daily-loss + kill-switch flatten) runs
+IN-PROCESS each loop, and a live 1x long perp has **no resting stop on Lighter's
+book** — the running process *is* the position manager, so it must come back after
+any crash. (Do NOT rely on Railway's default restart policy; it caps retries and can
+leave a funded position unmanaged.)
+
+**Env for the live service** (its own Railway service + its own Lighter sub-account):
 ```
 VENUE=lighter_live
 LIGHTER_API_PRIVATE_KEY=<trade-only key for THIS sub-account>   # you paste, never me
-LIGHTER_ACCOUNT_INDEX=<sub-account index>
-CRYPTO_TREND_DAILY_MAX_NOTIONAL=300        # 6 majors x ~$50 clips
-TREND_ORDER_USD=50                          # optional (default 50)
+LIGHTER_ACCOUNT_INDEX=<this bot's sub-account index>
+LIGHTER_API_KEY_INDEX=4                     # MUST match the key index you registered (0-3 reserved for Lighter's UI; code default 4)
+LIGHTER_ORDER_USD=15                        # $ per clip — the knob live/shadow ACTUALLY read (default 30). $15 clears Lighter's $10/order min. TREND_ORDER_USD is a NO-OP outside the offline hl_paper smoke.
+CRYPTO_TREND_DAILY_MAX_NOTIONAL=90         # 6 majors x $15 = $90 -> floor(90/15)=6 slots
+LIGHTER_MAX_DAILY_LOSS=15                   # catastrophic daily flatten+halt, $/UTC-day (default 30). At $15 on a $90 book that's ~-17%/day — clear of normal dips, so it won't prematurely flatten this weeks-holding trend follower.
+LIGHTER_BUDGET_SHARE=0.25                   # this process's share of the 60/min per-L1 request budget (keep all live Lighter services' shares summing <=1.0)
 # REAL_MONEY_KILL intentionally NOT set -> boots ARMED (no orders)
 ```
-Watch `tide-rider-lighter-shadow` first (it should mirror the ~+40% perp path incl.
-funding drag), then testnet, then set `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` to arm.
-Instant stop: `REAL_MONEY_KILL=ARMED` + redeploy. Keys/disarm/deposit are yours.
+Watch `crypto-trend-daily-lshadow` first (the 🌊 Tide Rider card with a blue SHADOW
+badge; the live row will be `crypto-trend-daily-lighter` with a red LIVE badge) — it
+should mirror the ~+40% perp path incl. funding drag. Then testnet
+(`scripts/lighter_testnet_smoke.py`), then set `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND`
+on the live service to arm. Instant stop: `REAL_MONEY_KILL=ARMED` + redeploy.
+Keys/disarm/deposit are yours.
 
 **Alternative:** the strategy is *stronger* on Kraken spot (no funding drag, keeps the
 down-trend protection). If you'd rather the full validated edge, the Freqtrade/Kraken

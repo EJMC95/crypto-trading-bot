@@ -212,6 +212,17 @@ def main():
             n_wins += 1 if price_pnl > 0 else 0
             _record_close(bot_id, c, entry, opened_ts, px, price_pnl, m.get("accrued", 0.0),
                           reason, order_usd=order_usd, venue=venue_tag, shadow=shadow_tag)
+            # Mirror the emergency exit into venue_orders (close_long does this for
+            # normal exits). _flatten_all only runs in funded modes, so this row is
+            # the real forced-close leg; keep it non-fatal to the flatten loop.
+            if venue_tag and not shadow_tag:
+                try:
+                    store.publish_venue_order(
+                        bot_id, venue="lighter", shadow=shadow_tag, coin=c,
+                        side="sell", size=abs(held), px_decision=px, px_fill=px,
+                        raw={"reason": reason, "leg": "close"})
+                except Exception:
+                    pass
             meta.pop(c, None)
 
     def close_long(coin, reason, px, held, entry, opened_ts, m):
@@ -236,13 +247,16 @@ def main():
                  coin, price_pnl, fund_pnl, reason)
         _record_close(bot_id, coin, entry, opened_ts, px, price_pnl, fund_pnl,
                       reason, order_usd=order_usd, venue=venue_tag, shadow=shadow_tag)
-        try:
-            store.publish_venue_order(
-                bot_id, venue=("lighter" if venue_tag else "hl"), shadow=shadow_tag,
-                coin=coin, side="sell", size=abs(held), px_decision=px, px_fill=px,
-                raw={"reason": reason, "leg": "close"})
-        except Exception:
-            pass
+        # Funded lighter modes only (shadow's ShadowBroker already logged the honest
+        # fill; hl_paper must not write the live-id ledger).
+        if venue_tag and not shadow_tag:
+            try:
+                store.publish_venue_order(
+                    bot_id, venue="lighter", shadow=shadow_tag, coin=coin,
+                    side="sell", size=abs(held), px_decision=px, px_fill=px,
+                    raw={"reason": reason, "leg": "close"})
+            except Exception:
+                pass
         meta.pop(coin, None)
         return True
 
@@ -377,8 +391,10 @@ def main():
             if is_golden and open_now < max_open:
                 size = round(order_usd / px, 6)
                 if not dry_run:
-                    open_ntl = sum(1 for v in pos.values()
-                                   if (v.get("size") if isinstance(v, dict) else v)) * order_usd
+                    # open_now is the live counter (grows with same-loop opens); the
+                    # once-captured `pos` snapshot would miss them. max_open=floor(cap/
+                    # clip) is the primary cap — notional_ok is the belt-and-suspenders.
+                    open_ntl = open_now * order_usd
                     if not ctx.rails.notional_ok(open_ntl, order_usd):
                         log.info("%s NOTIONAL_CAP_SKIP", coin)
                         continue
@@ -394,13 +410,18 @@ def main():
                 open_now += 1
                 log.info("OPEN %s long $%.0f | ema%d %.4g > ema%d %.4g | px %.6g",
                          coin, order_usd, EMA_FAST, ef, EMA_SLOW, es, px)
-                try:
-                    store.publish_venue_order(
-                        bot_id, venue=("lighter" if venue_tag else "hl"),
-                        shadow=shadow_tag, coin=coin, side="buy", size=size,
-                        px_decision=px, px_fill=px, raw={"signal": "golden_cross", "leg": "open"})
-                except Exception:
-                    pass
+                # Funded lighter modes (live/testnet) only: the main loop is the sole
+                # venue_orders writer there. In shadow the ShadowBroker already logs the
+                # honest crossed-spread fill — a px_fill=px row here would corrupt the
+                # slippage evidence; in hl_paper we don't touch the live-id ledger.
+                if venue_tag and not shadow_tag:
+                    try:
+                        store.publish_venue_order(
+                            bot_id, venue="lighter", shadow=shadow_tag, coin=coin,
+                            side="buy", size=size, px_decision=px, px_fill=px,
+                            raw={"signal": "golden_cross", "leg": "open"})
+                    except Exception:
+                        pass
 
         # ---- publish ----
         if dry_run:
@@ -416,16 +437,19 @@ def main():
                 live_baseline = equity
             pub_pnl = (equity - live_baseline) if (equity is not None
                                                    and live_baseline is not None) else None
-        try:
-            store.publish(
-                bot_id, status="paper" if ctx.mode == "hl_paper" and dry_run
-                else ("halted" if halted_today else "online"),
-                equity=pub_equity, pnl_abs=pub_pnl, open_trades=pub_open,
-                closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
-                extra={"mode": ctx.mode, "venue": ctx.mode, "style": "trend-1x-long",
-                       "held": sorted(meta.keys()), "coins": COINS})
-        except Exception:
-            pass
+        # hl_paper is offline-smoke-only for this bot and its UNSUFFIXED id collides
+        # with the live Freqtrade Tide Rider row — never publish it. shadow/live use
+        # suffixed ids (-lshadow/-lighter) and publish normally.
+        if ctx.mode != "hl_paper":
+            try:
+                store.publish(
+                    bot_id, status="halted" if halted_today else "online",
+                    equity=pub_equity, pnl_abs=pub_pnl, open_trades=pub_open,
+                    closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
+                    extra={"mode": ctx.mode, "venue": ctx.mode, "style": "trend-1x-long",
+                           "held": sorted(meta.keys()), "coins": COINS})
+            except Exception:
+                pass
         try:
             if dry_run:
                 store.save_state(bot_id, {"broker": broker.to_state(), "meta": meta,
