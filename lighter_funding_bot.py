@@ -58,12 +58,16 @@ ENTER_APR = float(os.environ.get("FUNDING_ENTER_APR", "0.40"))  # enter when |ap
 EXIT_APR = float(os.environ.get("FUNDING_EXIT_APR", "0.15"))    # leave when it cools
 PERSIST_H = float(os.environ.get("FUNDING_PERSIST_H", "4"))     # hot this long first
 MAX_HOLD_H = float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))  # recycle after 3d
-MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "5e6"))       # 24h turnover floor
-MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "50"))  # book-spread gate
+MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "10e6"))      # 24h turnover floor
+MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-spread gate
 
-# Directional risk controls — the hard price stop is the load-bearing one.
-HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.05"))      # 5% adverse -> out
-TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% favourable -> lock
+# Directional risk controls, TUNED on scripts/backtest_directional_funding.py
+# (real HL funding+price, 150d, 30 coins). Key finding: funding capture is real
+# (+) but directional price risk eats it (-), so the strategy is only ~break-even.
+# A WIDE stop + TIGHT take-profit was the least-bad / most robust config — a tight
+# stop whipsaws out on noise before funding + mean-reversion pay, LOSING more.
+HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — wide (anti-whipsaw)
+TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% — lock the reversion pop
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDING_DAILY_LOSS", "0.05"))
 STOP_COOLDOWN_H = float(os.environ.get("FUNDING_STOP_COOLDOWN_H", "12"))  # quarantine after a stop
 BLIND_STOP_MISSES = int(os.environ.get("FUNDING_BLIND_STOP_MISSES", "3"))  # live fail-safe

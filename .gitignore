@@ -41,3 +41,4 @@ com.eamon.tri-arb.plist
 *.sqlite-wal
 *.sqlite-*
 scripts/.funding_cache.json
+scripts/.dirfund_cache.json
