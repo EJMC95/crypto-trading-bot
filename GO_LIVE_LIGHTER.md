@@ -76,12 +76,20 @@ pre-live rule; a leaked shared DB creds is the one thing that spans all bots.)
   `python3 scripts/lighter_accounts.py 0xYOUR_L1_ADDRESS`
   → lists every sub-account index + collateral + registered API-key indices.
 
-### 3. Register one trade-only API key per sub-account (in the app)
-- For each sub-account, create an **API key** (index 2–254). Lighter API keys can
-  trade but can only secure-withdraw to the **originating L1 address** — a leaked
-  key can grief, not steal.
-- Copy each sub-account's **API private key** straight into Railway (step 5).
-  Never paste it into a file, a chat, or the repo.
+### 3. Register one trade-only API key per sub-account (in the app — Ledger-signed)
+- Tradeable keys are **created in the Lighter app / app.lighter.xyz/apikeys with
+  your wallet connected** — the Ledger signs the registration. They are NOT made
+  in a script for a Ledger account (the SDK's `change_api_key` needs a raw L1 key,
+  which a Ledger won't give up — that's by design, and why the app is the path).
+- For each sub-account, create an **API key at index 4–254** (0–3 are reserved for
+  Lighter's own desktop/mobile UI — don't use them). The key's **private key is
+  shown ONCE** — copy it straight into that bot's Railway `LIGHTER_API_PRIVATE_KEY`
+  (step 5). Never into a file, a chat, or the repo.
+- Lighter API keys can trade but can only secure-withdraw to the **originating L1
+  address** — a leaked key can grief, not steal.
+- Verify it registered (read-only, public address only):
+  `python3 scripts/lighter_accounts.py 0xYOUR_L1_ADDRESS` → shows each
+  sub-account's registered API-key indices.
 
 ### 4. Fund each sub-account with USDC
 - On-ramp USDC (Arbitrum/Base) and deposit into **each** sub-account per your
@@ -94,7 +102,7 @@ twin keeps running as the control (the dashboard shows both). Per live service:
 ```
 VENUE=lighter_live
 LIGHTER_ACCOUNT_INDEX=<that bot's sub-account index>
-LIGHTER_API_KEY_INDEX=2
+LIGHTER_API_KEY_INDEX=4                # 0-3 reserved for Lighter's UI; bots use 4+
 LIGHTER_API_PRIVATE_KEY=<that sub-account's API key private key>   # secret
 LIGHTER_ORDER_USD=30
 <BOT>_MAX_NOTIONAL=<cap>              # e.g. TRAIL_BLAZER_MAX_NOTIONAL=200

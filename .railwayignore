@@ -1,0 +1,14 @@
+.git
+__pycache__
+*.pyc
+*.log
+user_data
+analysis_*
+*.sqlite
+*.sqlite-journal
+*.csv
+*.xlsx
+node_modules
+.venv
+venv
+reports

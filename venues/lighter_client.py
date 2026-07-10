@@ -313,7 +313,9 @@ class LighterClient(VenueClient):
             raise VenueError("LIGHTER_API_PRIVATE_KEY / LIGHTER_ACCOUNT_INDEX not set "
                              "(env only — never in the repo)")
         self.account_index = int(acct)
-        self.api_key_index = int(os.environ.get("LIGHTER_API_KEY_INDEX", "2"))
+        # Indices 0-3 are reserved for Lighter's own desktop/mobile UI; bots use
+        # 4-254 (docs.lighter.xyz). Default 4 so a bot key never collides with UI.
+        self.api_key_index = int(os.environ.get("LIGHTER_API_KEY_INDEX", "4"))
         self.signer = self._lighter.SignerClient(
             url=self.host, account_index=self.account_index,
             api_private_keys={self.api_key_index: key})

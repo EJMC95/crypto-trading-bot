@@ -79,7 +79,10 @@ drive the integer scaling in `LighterClient._scaled`.
 
 ## API / SDK surface (lighter-sdk 1.1.1, verified)
 - Account index: `AccountApi.accounts_by_l1_address(l1_address)` → account_index.
-  API key indices **2–254** usable (0–1 reserved for UI, 255 = query-all).
+  API key indices **4–254** usable (**0–3 reserved** for Lighter's own desktop/
+  mobile UI per docs.lighter.xyz; 255 = query-all). Tradeable keys are registered
+  by the wallet (Ledger-signed in the app), or via SDK `change_api_key` which
+  needs the raw L1 key — so a Ledger account uses the app, not a script.
 - Candles: `CandlestickApi.candles(market_id, resolution, start_ts, end_ts,
   count_back)` → `.c` list of `{t,o,h,l,c,v,V,i}` (t in ms). `resolution` uses
   HL-style strings (`1h`, `4h`, `1d`). **Data-layer parity with HL confirmed
