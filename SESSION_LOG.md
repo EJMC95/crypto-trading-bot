@@ -160,3 +160,10 @@ Grounded expectations, not promises. Horizon in brackets.
 - **SMTP env vars** on pnl-dashboard → activates the dormant email reports.
 - **Alpaca −$19.9k** equities anomaly → its source is off-repo (your Mac); can't
   review it from here.
+
+## 2026-07-10 — Yield Harvester (funding-carry) shadow execution
+- Backtested funding-carry on 180d real HL hourly funding × 39 coins (`scripts/backtest_funding.py`): win rate 28→40→81→98% as round-trip fee falls 29→20→3→0bps — friction-bound REAL edge (opposite of Trail Blazer). Zero perp fee flips it net-positive (+1.9% deployed @ 20bps CEX-hedge, 40% gate). Gate-lowering to 20% only safe on both-perp hedge (goes negative at 20bps).
+- Built shadow EXECUTION path: `funding_carry_bot._perp_leg_fill` measures real Lighter perp-leg slippage (mid-referenced, adverse-only) in `lighter_shadow` and logs `venue_orders`; hl_paper unchanged. Funded modes HARD-REFUSED (fail-safe allowlist) — no automated hedge => no naked perp.
+- Adversarially reviewed via workflow (6 dims → verify): 3 findings fixed (mid vs stale-mark reference, decay-gate on measured cost, allowlist guard); 2 nits refuted.
+- Deployed `yield-harvester-shadow` Railway service (Dockerfile.funding, VENUE=lighter_shadow, shared Postgres) → publishes `perps-funding-carry-lshadow`, Online, reading 211 live Lighter perps. Dashboard shows it as SHADOW variant automatically.
+- First live-book slippage read: liquid hot coins 3–7bps round-trip (ZEC/COIN/BB), thin/exotic traps (WEN 870bps) → a live harvester needs a liquidity/slippage gate the shadow venue_orders ledger will calibrate.
