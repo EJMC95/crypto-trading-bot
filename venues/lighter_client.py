@@ -316,10 +316,17 @@ class LighterClient(VenueClient):
         # Indices 0-3 are reserved for Lighter's own desktop/mobile UI; bots use
         # 4-254 (docs.lighter.xyz). Default 4 so a bot key never collides with UI.
         self.api_key_index = int(os.environ.get("LIGHTER_API_KEY_INDEX", "4"))
-        self.signer = self._lighter.SignerClient(
-            url=self.host, account_index=self.account_index,
-            api_private_keys={self.api_key_index: key})
-        err = self.signer.check_client()   # sync in sdk 1.1.x
+        # SignerClient.__init__ builds an aiohttp ApiClient internally, which calls
+        # asyncio.get_running_loop() — so it MUST be constructed ON the loop thread
+        # (like ApiClient in _build), not in this synchronous __init__ context, or
+        # it raises RuntimeError('no running event loop'). [live-path fix 2026-07-10]
+        async def _mk_signer():
+            return self._lighter.SignerClient(
+                url=self.host, account_index=self.account_index,
+                api_private_keys={self.api_key_index: key})
+        self.signer = asyncio.run_coroutine_threadsafe(
+            _mk_signer(), self._loop).result(timeout=30)
+        err = self.signer.check_client()   # local Go-binary validation (no loop)
         if err:
             raise VenueError(f"lighter signer check failed: {err}")
         log.info("lighter signer ready (account %d, key index %d)",
