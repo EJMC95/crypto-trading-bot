@@ -1,0 +1,13 @@
+# Image for Tide Rider on Lighter (crypto-trend-daily, 1x long perp trend).
+# Set RAILWAY_DOCKERFILE_PATH=Dockerfile.trendlighter.
+# SAFETY: inert until the operator sets LIGHTER_API_PRIVATE_KEY/LIGHTER_ACCOUNT_INDEX,
+# a CRYPTO_TREND_DAILY_MAX_NOTIONAL cap, and REAL_MONEY_KILL=DISARMED_I_UNDERSTAND.
+# VENUE=lighter_live boots ARMED (refuses) by default; VENUE=lighter_shadow validates.
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY lighter_trend_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+ENV PYTHONUNBUFFERED=1
+CMD ["python", "lighter_trend_bot.py"]
