@@ -388,8 +388,13 @@ def main():
                 continue
 
             try:
+                _raw = None                 # exchange response, for the ledger
+                _closed = None              # (coin, entry, signed_size, was_long, reason)
                 if decision in ("EXIT_LONG", "STOP_LONG", "COVER_SHORT", "STOP_SHORT"):
-                    ctx.venue.market_close(coin)
+                    _ent = pos.get(coin, {}).get("entry") or 0.0
+                    _sz = pos.get(coin, {}).get("size") or 0.0
+                    _raw = ctx.venue.market_close(coin)
+                    _closed = (coin, _ent, _sz, _sz > 0, decision)
                 elif decision in ("OPEN_LONG", "OPEN_SHORT"):
                     # [2026-07-09 GATE-0 RAIL] adapter-level notional cap: the
                     # live book may never exceed the per-bot env cap.
@@ -399,13 +404,37 @@ def main():
                         log.info("%s NOTIONAL_CAP_SKIP (open ~$%.0f + $%.0f > cap)",
                                  coin, open_notional, order_usd)
                         continue
-                    ctx.venue.market_open(coin, decision == "OPEN_LONG", size)
+                    _raw = ctx.venue.market_open(coin, decision == "OPEN_LONG", size)
+                    entry_ts[coin] = now.timestamp()   # [fix] live time-stop needs this
                     opened_this_loop += 1
                 log.info("ORDER SENT %s %s", decision, coin)
                 notify(f":chart_with_upwards_trend: MomoBot [{ctx.mode.upper()}] {decision} "
                        f"{coin} @ {px:,.2f} (size {size})",
                        coin=coin, decision=decision, price=round(px, 2),
                        size=size, mode=ctx.mode)
+                # [2026-07-10] LIVE trade ledger — record every real open/close to
+                # venue_orders (+ paper_trades on close) so the live card shows
+                # trade history, win/loss and per-trade P&L, same as the paper
+                # bots. Guarded SEPARATELY so a ledger hiccup never looks like a
+                # failed order.
+                try:
+                    if _closed is not None:
+                        _c, _e, _s, _wl, _dec = _closed
+                        _pnl = (abs(_s) * (px - _e)) if _wl else (abs(_s) * (_e - px))
+                        _record_close(bot_id, _c, _e, entry_ts.pop(_c, None), px,
+                                      (_pnl if _e else 0.0), _wl, _dec.lower(),
+                                      venue="lighter", shadow=False)
+                        store.publish_venue_order(
+                            bot_id, venue="lighter", shadow=False, coin=_c,
+                            side=("sell" if _wl else "buy"), size=abs(_s),
+                            px_decision=px, px_fill=px, raw=_raw)
+                    elif decision in ("OPEN_LONG", "OPEN_SHORT"):
+                        store.publish_venue_order(
+                            bot_id, venue="lighter", shadow=False, coin=coin,
+                            side=("buy" if decision == "OPEN_LONG" else "sell"),
+                            size=size, px_decision=px, px_fill=px, raw=_raw)
+                except Exception as _le:  # noqa: BLE001
+                    log.warning("live-order ledger write failed %s: %s", coin, _le)
             except Exception as e:
                 log.error("order failed %s %s: %s", decision, coin, e)
                 notify(f":warning: MomoBot ORDER FAILED {decision} {coin}: {e}",
