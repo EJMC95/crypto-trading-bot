@@ -32,7 +32,7 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 
 # Expected bots — so the grid shows a bot even before its first publish.
 EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
-            "perps-funding-carry", "lighter-perp-sniper",
+            "perps-funding-carry", "perps-funding-lighter", "lighter-perp-sniper",
             "scanner-triangular-arb", "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h", "crypto-trendmomo-4h",
@@ -98,6 +98,7 @@ LABELS = {
     "perps-donchian-breakout":     "🧭 Trail Blazer · perps 4h breakout",
     "perps-regime-switch":         "⚖️ Two-Way Tide · long/short trend engine (perps)",
     "perps-funding-carry":         "🌾 Yield Harvester · perps funding carry",
+    "perps-funding-lighter":       "💸 Funding Farmer · Lighter directional funding (stop-guarded)",
     "lighter-perp-sniper":         "🎯 Perp Sniper · new Lighter-listing snipe",
     "scanner-triangular-arb":      "🔺 Loop Scout · triangular arb (scanner)",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout · cross-exchange arb (scanner)",

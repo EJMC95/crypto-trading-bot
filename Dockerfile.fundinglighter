@@ -1,0 +1,22 @@
+# Image for the Yield Harvester (Lighter directional funding) service.
+# Set the service variable RAILWAY_DOCKERFILE_PATH=Dockerfile.fundinglighter.
+#
+# SAFETY: inert until the operator supplies LIGHTER_API_PRIVATE_KEY /
+# LIGHTER_ACCOUNT_INDEX, sets a per-bot notional cap
+# (PERPS_FUNDING_LIGHTER_MAX_NOTIONAL), and explicitly sets
+# REAL_MONEY_KILL=DISARMED_I_UNDERSTAND. With VENUE=lighter_live and the kill
+# switch armed (default), boot REFUSES (venues/safety.py). Run VENUE=lighter_shadow
+# to validate against live books without ever sending an order.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_funding_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_funding_bot.py"]
