@@ -1,4 +1,5 @@
 ## 2026-07-10
+- **dashboard: dedicated "⚡ Lighter Live" section** — real-money `<bot>-lighter` rows are pulled out of the paper grid into their own bordered, red-accented section at the top of the page (header shows live equity · P&L · bot count + a REAL MONEY tag), so live money is never lost among the paper cards. Render-tested. `perps-donchian-breakout-lighter` went live this session ($64.93, Trail Blazer on Lighter).
 - **venues/lighter_client.py — live-path fix**: `SignerClient.__init__` builds an aiohttp `ApiClient` internally (→ `asyncio.get_running_loop()`), so constructing it in the synchronous `LighterClient.__init__` crashed the LIVE/testnet path with `RuntimeError: no running event loop` (never hit before because the signer path can't be tested without a key). Now the signer is constructed ON the client's loop thread via `run_coroutine_threadsafe`, same as the read-only ApiClient in `_build()`. Verified with a dummy key: construction now reaches auth (fails cleanly on key validation, not the loop). Shadow/paper paths unaffected.
 
 ## 2026-07-09

@@ -895,8 +895,12 @@ def render():
 
     # union of expected + whatever actually published
     names = list(EXPECTED) + [b for b in rows if b not in EXPECTED]
-    cards = [card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
-                  mode_notes.get(b), enrich.get(b)) for b in names]
+    # [2026-07-10] Real-money Lighter bots get their OWN section at the top of the
+    # page, not interspersed with the paper fleet. is_live_bot = <bot>-lighter rows.
+    _mk = lambda b: card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
+                         mode_notes.get(b), enrich.get(b))
+    live_cards = [_mk(b) for b in names if is_live_bot(b)]
+    cards = [_mk(b) for b in names if not is_live_bot(b)]
     if brain_html:
         cards.append(brain_html)
 
@@ -1011,6 +1015,18 @@ def render():
             f'{money(shadow_pnl)}</b> · {n_shadow_bots} bot'
             f'{"s" if n_shadow_bots != 1 else ""} (modelled)</span>')
 
+    # [2026-07-10] Dedicated "Lighter Live" section — real-money bots grouped at
+    # the top in their own bordered block so live money is never lost in the grid.
+    live_section = ""
+    if live_cards:
+        live_section = (
+            f'<section class="livewrap">'
+            f'<div class="livehdr">⚡ Lighter Live <span class="livetag">REAL MONEY</span>'
+            f'<span class="livesum">{money(live_equity)} eq · '
+            f'<b class="{cls(live_pnl)}">{money(live_pnl)}</b> P&amp;L · '
+            f'{n_live_bots} bot{"s" if n_live_bots != 1 else ""}</span></div>'
+            f'<div class="grid">{"".join(live_cards)}</div></section>')
+
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="30">
@@ -1025,6 +1041,16 @@ def render():
  .banner.crit{{background:#3d1218;border-color:#6b1620;color:#f85149;font-weight:600}}
  .okline{{margin:12px 14px 0;padding:8px 12px;background:#122117;border:1px solid #1f4428;border-radius:8px;color:#3fb950;font-size:12px}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:14px}}
+ /* [2026-07-10] Lighter Live section — real money, visually set apart */
+ .livewrap{{margin:14px 14px 4px;border:1px solid #f85149;border-radius:12px;
+   background:linear-gradient(180deg,#f851490f,#f8514905);overflow:hidden}}
+ .livewrap .grid{{padding:12px}}
+ .livehdr{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+   padding:11px 14px;background:#f8514914;border-bottom:1px solid #f8514933;
+   font-size:15px;font-weight:700;color:#ffb4ac}}
+ .livetag{{font-size:10px;font-weight:800;letter-spacing:.5px;color:#fff;
+   background:#f85149;border-radius:6px;padding:2px 7px}}
+ .livesum{{margin-left:auto;font-size:13px;font-weight:500;color:#e6e6e6}}
  .card{{background:#161b22;border:1px solid #222;border-radius:10px;padding:14px}}
  .card h2{{margin:0 0 2px;font-size:15px}}
  .row{{display:flex;justify-content:space-between;margin:5px 0;font-size:13px}}
@@ -1050,6 +1076,7 @@ def render():
 </header>
 {banner}
 {health_html}
+{live_section}
 <div class="grid">{"".join(cards)}</div>
 <footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
