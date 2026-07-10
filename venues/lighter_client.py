@@ -86,9 +86,19 @@ class _BookCache(threading.Thread):
                 side_state.append(new)
         side_state[:] = [o for o in side_state if float(o["size"]) > 0]
 
+    # Browser-like handshake — Lighter's CDN 400s a bare ws upgrade from cloud
+    # (datacenter) IPs even though its REST works from the same host, so present
+    # as a browser. Best-effort: if the CDN blocks by IP anyway, the client falls
+    # back to REST orderbook snapshots (which work) — see the graceful backoff.
+    _WS_ORIGIN = "https://app.lighter.xyz"
+    _WS_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
     def run(self):
         from websockets.sync.client import connect
         backoff = 1.0
+        fails = 0
+        degraded_logged = False
         while True:
             try:
                 with self._lock:
@@ -97,12 +107,17 @@ class _BookCache(threading.Thread):
                     time.sleep(1.0)
                     continue
                 self._wake.clear()
-                with connect(self.url, open_timeout=15) as ws:
+                with connect(self.url, open_timeout=15,
+                             origin=self._WS_ORIGIN,
+                             user_agent_header=self._WS_UA,
+                             additional_headers={"Origin": self._WS_ORIGIN}) as ws:
                     for mid in wanted:
                         ws.send(json.dumps({"type": "subscribe",
                                             "channel": f"order_book/{mid}"}))
                     self.started_ok.set()
-                    backoff = 1.0
+                    if fails:
+                        log.info("book ws reconnected after %d failure(s)", fails)
+                    fails, backoff, degraded_logged = 0, 1.0, False
                     while not self._wake.is_set():
                         msg = json.loads(ws.recv(timeout=30))
                         mt = msg.get("type")
@@ -120,9 +135,21 @@ class _BookCache(threading.Thread):
                                                 self.books[mid]["bids"])
                                 self.updated[mid] = time.time()
             except Exception as e:  # noqa: BLE001 — reconnect forever
-                log.warning("book ws dropped (%s); reconnecting in %.0fs", e, backoff)
-                time.sleep(backoff)
-                backoff = min(backoff * 2, 60.0)
+                fails += 1
+                # A few quick retries; then assume the venue ws is blocked from
+                # this host (cloud-IP CDN 400) and go QUIET — orderbook() falls
+                # back to governed REST snapshots, which work. Retry every 10 min
+                # in case the block lifts, without spamming the log every cycle.
+                if fails <= 3:
+                    log.warning("book ws dropped (%s); retry in %.0fs", e, backoff)
+                    time.sleep(backoff)
+                    backoff = min(backoff * 2, 60.0)
+                else:
+                    if not degraded_logged:
+                        log.warning("book ws unavailable after %d tries (%s) — using "
+                                    "REST orderbook snapshots; retrying every 10 min", fails, e)
+                        degraded_logged = True
+                    time.sleep(600.0)
 
 
 class LighterClient(VenueClient):
