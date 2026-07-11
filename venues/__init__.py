@@ -99,7 +99,11 @@ def venue_context(bot: str, default_hl_net: str = "testnet",
 
     net = "testnet" if mode == "lighter_testnet" else "mainnet"
     try:
-        venue = LighterClient(net=net, with_signer=True)
+        # guard_state_key: the equity guard's last-accepted read persists under
+        # the suffixed bot id (like the durable daily-loss halt) so a redeploy
+        # cannot re-anchor equity validation on a dislocated print.
+        venue = LighterClient(net=net, with_signer=True,
+                              guard_state_key=bot + _SUFFIX[mode] + ":eqguard")
     except Exception as e:
         # [2026-07-10] A live bot that can't authenticate used to die SILENTLY —
         # the dashboard row just went stale with no explanation. Publish an

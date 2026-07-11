@@ -331,6 +331,12 @@ def main():
         except Exception as e:
             log.warning("account value unavailable: %s", e)
             equity = None
+        # [2026-07-11 LATE BASELINE] if the boot/day-roll capture failed (venue
+        # down, or the equity guard vetoed a dislocated print) the rail used to
+        # stay OFF all day. Adopt the first credible read instead.
+        if day_start_equity is None and equity is not None:
+            day_start_equity = equity
+            log.warning("day-start equity adopted late: %.2f", equity)
 
         _fleet_loss = (not dry_run and ctx.rails.daily_loss_hit(day_start_equity, equity))
         if (not halted_today and equity is not None and day_start_equity

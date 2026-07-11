@@ -33,6 +33,7 @@ import threading
 import time
 
 from .base import VenueClient, VenueError
+from .equity_guard import EquityGuard, EquityRejected, vet_account_read
 from .governor import TxBudgetGovernor, WEIGHT_INFO, WEIGHT_ORDER_TX
 from .symbol_map import to_lighter
 
@@ -41,6 +42,11 @@ log = logging.getLogger("venues.lighter")
 MAINNET_URL = "https://mainnet.zklighter.elliot.ai"
 TESTNET_URL = "https://testnet.zklighter.elliot.ai"   # verified live 2026-07-09
 BOOK_STALE_SEC = 30.0    # ws book older than this -> REST fallback
+# REST book snapshots are cached this long. The ws path already serves books up
+# to BOOK_STALE_SEC old, so a <=20s snapshot is no staler than the accepted
+# norm — and it stops the equity guard and the strategy's fresh_mid calls from
+# double-paying the governor for the same book within one loop.
+REST_BOOK_TTL = float(os.environ.get("LIGHTER_REST_BOOK_TTL", "20"))
 
 
 class _BookCache(threading.Thread):
@@ -157,7 +163,8 @@ class LighterClient(VenueClient):
     name = "lighter"
 
     def __init__(self, net: str = "mainnet", with_signer: bool = False,
-                 governor: TxBudgetGovernor | None = None):
+                 governor: TxBudgetGovernor | None = None,
+                 guard_state_key: str | None = None):
         try:
             import lighter  # lazy: only lighter modes need the SDK installed
         except ImportError as e:
@@ -189,12 +196,15 @@ class LighterClient(VenueClient):
         self.markets = self._load_markets()
         self._books = _BookCache(self.host)
         self._books.start()
+        self._rest_books: dict[int, tuple[float, dict]] = {}   # market_id -> (ts, book)
 
         self.signer = None
         self.account_index = None
+        self._guard = None
         if with_signer:
             self._init_signer()
             self.sends_orders = True
+            self._guard = self._make_guard(guard_state_key)
 
         # tidy shutdown for short-lived uses (scripts) — the long-running bots
         # never exit, so this just silences aiohttp "Unclosed session" on exit.
@@ -324,14 +334,27 @@ class LighterClient(VenueClient):
         book = self._books.get(m["id"])
         if book is not None:
             return book
-        # ws not warm yet -> one governed REST snapshot
-        r = self._run(self._order_api.order_book_orders(market_id=m["id"], limit=25))
+        # ws not warm (the Railway norm — CDN blocks cloud-IP ws) -> governed
+        # REST snapshot, TTL-cached so guard + strategy don't double-pay
+        return self._rest_book(m["id"])
+
+    def _rest_book(self, market_id, force=False):
+        now = time.time()
+        if not force:
+            hit = self._rest_books.get(market_id)
+            if hit and (now - hit[0]) <= REST_BOOK_TTL:
+                return hit[1]
+        r = self._run(self._order_api.order_book_orders(market_id=market_id, limit=25))
         d = r.to_dict()
-        bids = [(float(o["price"]), float(o["remaining_base_amount"]))
-                for o in (d.get("bids") or [])]
-        asks = [(float(o["price"]), float(o["remaining_base_amount"]))
-                for o in (d.get("asks") or [])]
-        return {"bids": bids, "asks": asks}
+        # REST snapshots come back UNSORTED (the ws cache sorts in _BookCache
+        # .get) and every consumer takes [0] as top-of-book — sort here once.
+        bids = sorted(((float(o["price"]), float(o["remaining_base_amount"]))
+                       for o in (d.get("bids") or [])), key=lambda x: -x[0])
+        asks = sorted(((float(o["price"]), float(o["remaining_base_amount"]))
+                       for o in (d.get("asks") or [])), key=lambda x: x[0])
+        book = {"bids": bids, "asks": asks}
+        self._rest_books[market_id] = (now, book)
+        return book
 
     # ---- account / orders (testnet + live only) ------------------------------
     def _init_signer(self):
@@ -363,35 +386,100 @@ class LighterClient(VenueClient):
     def _run_signer(self, coro, timeout=30.0):
         return self._run(coro, timeout=timeout, weight=WEIGHT_ORDER_TX)
 
-    def account_value(self):
+    def _make_guard(self, state_key):
+        """EquityGuard wiring: cached mids ride the ws/TTL-REST book path (what
+        the bots already pay for); fresh mids force new REST snapshots and are
+        only fetched on a SUSPECTED dislocation. The last accepted read is
+        persisted (bot_pnl_store bot_state, like the durable daily-loss halt)
+        so a redeploy can't re-anchor the guard on a dislocated print."""
+        from .marks import mid_map
+        load = save = None
+        if state_key:
+            try:
+                import bot_pnl_store as _store
+                load = lambda: _store.load_state(state_key)          # noqa: E731
+                save = lambda st: _store.save_state(state_key, st)   # noqa: E731
+            except Exception as e:  # noqa: BLE001 — guard works memory-only too
+                log.warning("equity guard: no state persistence (%s)", e)
+        return EquityGuard(
+            mids_cached=lambda coins: mid_map(self, coins),
+            mids_fresh=lambda coins: {c: m for c in coins
+                                      if (m := self._mid_fresh(c))},
+            load_state=load, save_state=save)
+
+    def _mid_fresh(self, coin):
+        """Force-fresh REST book mid (bypasses ws + TTL caches) — dislocation
+        re-check evidence only. Governed weight-1 per coin."""
+        try:
+            _, _, m = self._resolve(coin)
+            book = self._rest_book(m["id"], force=True)
+        except Exception:  # noqa: BLE001
+            return None
+        bids = [px for px, _ in book["bids"] if px > 0]
+        asks = [px for px, _ in book["asks"] if px > 0]
+        if bids and asks:
+            return (max(bids) + min(asks)) / 2.0
+        return None
+
+    def _account_payload(self):
         r = self._run(self._account_api.account(by="index",
                                                 value=str(self.account_index)))
         d = r.to_dict()
         accts = d.get("accounts") or []
         if not accts:
             raise VenueError("account not found")
-        a = accts[0]
-        for k in ("total_asset_value", "collateral"):
-            if a.get(k) is not None:
-                return float(a[k])
-        raise VenueError("no account value field in response")
+        return accts[0]
 
-    def positions(self):
+    @staticmethod
+    def _positions_from(acct):
         from .symbol_map import from_lighter
-        r = self._run(self._account_api.account(by="index",
-                                                value=str(self.account_index)))
-        d = r.to_dict()
-        accts = d.get("accounts") or []
         out = {}
-        for p in (accts[0].get("positions") or []) if accts else []:
+        for p in (acct.get("positions") or []):
             sym = p.get("symbol") or ""
             fleet, _ = from_lighter(sym)
             sign = -1.0 if int(p.get("sign", 1)) < 0 else 1.0
             size = float(p.get("position") or 0.0) * sign
             if size:
-                out[fleet] = {"size": size,
-                              "entry": float(p.get("avg_entry_price") or 0.0)}
+                rec = {"size": size,
+                       "entry": float(p.get("avg_entry_price") or 0.0)}
+                # venue's own mark-to-market — the equity guard cross-checks it
+                # against live book mids (extra key is harmless to strategy code)
+                try:
+                    if p.get("unrealized_pnl") is not None:
+                        rec["upnl"] = float(p["unrealized_pnl"])
+                except (TypeError, ValueError):
+                    pass
+                out[fleet] = rec
         return out
+
+    def _equity_fields(self, acct):
+        total = None
+        for k in ("total_asset_value", "collateral"):
+            if acct.get(k) is not None:
+                total = float(acct[k])
+                break
+        if total is None:
+            raise VenueError("no account value field in response")
+        coll = float(acct["collateral"]) if acct.get("collateral") is not None else None
+        return total, coll, self._positions_from(acct)
+
+    def account_value(self):
+        """Venue equity, vetted by the EquityGuard: the print is cross-checked
+        against live book mids and the previous ACCEPTED read, and rejected
+        (VenueError) on positive evidence of dislocation. [2026-07-11: one
+        dislocated total_asset_value print tripped the daily-loss rail and the
+        flatten sold into it — see venues/equity_guard.py.] Callers already
+        treat a raise as 'equity unreadable this loop'; the day-start baseline
+        is captured through this same path, so a dislocated-HIGH baseline is
+        vetoed too (cold boots take two agreeing reads)."""
+        try:
+            return vet_account_read(
+                self._guard, lambda: self._equity_fields(self._account_payload()))
+        except EquityRejected as e:
+            raise VenueError(str(e))
+
+    def positions(self):
+        return self._positions_from(self._account_payload())
 
     def _scaled(self, m, size, price):
         base = int(round(size * (10 ** m["size_decimals"])))

@@ -44,7 +44,7 @@ import time
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
-from venues import venue_context
+from venues import marks, venue_context
 
 BOT = "perps-funding-lighter"
 H = 24 * 365
@@ -128,16 +128,10 @@ def fresh_mid(ctx, coin):
     """Current mid from the LIVE book, or None if unavailable. NEVER falls back to
     the funding-map mark — that is a last-trade price frozen at client construction
     and using it on the stop path would silently freeze the stop while the real
-    price runs away. Callers MUST treat None as 'cannot evaluate risk here'."""
-    try:
-        book = ctx.venue.orderbook(coin)
-    except Exception:
-        return None
-    if book and book.get("bids") and book.get("asks"):
-        bid, ask = book["bids"][0][0], book["asks"][0][0]
-        if bid and ask:
-            return (bid + ask) / 2.0
-    return None
+    price runs away. Callers MUST treat None as 'cannot evaluate risk here'.
+    Shared impl: venues/marks.py (also sorts the unsorted REST-snapshot
+    fallback, which this local copy did not)."""
+    return marks.fresh_mid(ctx.venue, coin)
 
 
 def book_spread_bps(ctx, coin):
@@ -517,6 +511,12 @@ def main():
         except Exception as e:
             log.warning("account value unavailable: %s", e)
             equity = None
+        # [2026-07-11 LATE BASELINE] if the boot/day-roll capture failed (venue
+        # down, or the equity guard vetoed a dislocated print) the rail used to
+        # stay OFF all day. Adopt the first credible read instead.
+        if day_start_equity is None and equity is not None:
+            day_start_equity = equity
+            log.warning("day-start equity adopted late: %.2f", equity)
 
         _fleet_loss = (not dry_run and ctx.rails.daily_loss_hit(day_start_equity, equity))
         if (not halted_today and equity is not None and day_start_equity

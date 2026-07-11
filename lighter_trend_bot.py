@@ -36,7 +36,7 @@ import time
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
-from venues import venue_context
+from venues import marks, venue_context
 
 BOT = "crypto-trend-daily"          # venue layer suffixes -lshadow / -lighter
 H = 24 * 365
@@ -100,16 +100,9 @@ def golden(closes):
 
 def fresh_mid(ctx, coin):
     """Live-book mid, or None. Never a stale funding-map mark (the catastrophic
-    stop must see a real price)."""
-    try:
-        book = ctx.venue.orderbook(coin)
-    except Exception:
-        return None
-    if book and book.get("bids") and book.get("asks"):
-        bid, ask = book["bids"][0][0], book["asks"][0][0]
-        if bid and ask:
-            return (bid + ask) / 2.0
-    return None
+    stop must see a real price). Shared impl: venues/marks.py (also sorts the
+    unsorted REST-snapshot fallback, which this local copy did not)."""
+    return marks.fresh_mid(ctx.venue, coin)
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, reason,
@@ -301,6 +294,12 @@ def main():
         except Exception as e:
             log.warning("account value unavailable: %s", e)
             equity = None
+        # [2026-07-11 LATE BASELINE] if the boot/day-roll capture failed (venue
+        # down, or the equity guard vetoed a dislocated print) the rail used to
+        # stay OFF all day. Adopt the first credible read instead.
+        if day_start_equity is None and equity is not None:
+            day_start_equity = equity
+            log.warning("day-start equity adopted late: %.2f", equity)
 
         _fleet_loss = (not dry_run and ctx.rails.daily_loss_hit(day_start_equity, equity))
         if (not halted_today and equity is not None and day_start_equity

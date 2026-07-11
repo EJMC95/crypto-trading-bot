@@ -125,3 +125,39 @@ at once (many tokenized-equity perps with 5000%+ funding). **Implication:** a li
 Yield Harvester needs a **liquidity / max-slippage gate** on top of the funding
 filter (`MIN_DAY_VOLUME=$2M` is not enough). The shadow `venue_orders` ledger is
 the evidence to calibrate that gate — accumulate before adding the filter.
+
+## Robust-equity guard (2026-07-11, after the dislocated-print incident)
+
+`/account` `total_asset_value` printed a dislocated equity (~ -25% of deployed
+notional while every held coin's book moved <1%) and one bad print tripped
+Trail Blazer's daily-loss rail; the flatten sold into the dislocation. The 60s
+rail debounce (`SafetyRails.confirm_daily_loss`) only survives dislocations
+shorter than its window, so the adapter now vets every equity read
+(`venues/equity_guard.py`, wired in `LighterClient.account_value`):
+
+* venue per-position `unrealized_pnl` is cross-checked against LIVE book mids
+  (entry cancels, so the check is semantics-robust); a print whose marks
+  disagree with the venue's own book is REJECTED (`VenueError` — callers
+  already treat that as "equity unreadable this loop", the rail just waits);
+* venue total must also be continuous with the last ACCEPTED read (mid-implied
+  P&L delta + funding allowance), position set unchanged; the last accepted
+  read persists in `bot_state` (`<bot_id>:eqguard`) across redeploys;
+* cold boots take TWO agreeing reads (a dislocated-HIGH day-start baseline
+  would make every later correct read look like a breach), and all four bots
+  adopt the first credible read late if the boot capture was vetoed;
+* suspected dislocations trigger ONE forced-fresh REST book re-read, so
+  30s-stale ws mids in a fast real crash never cause a false reject; rejects
+  self-heal by rebase (venue's number margins the account, it can't be
+  ignored forever — continuity: 3 consistent prints, mark-gap: 12).
+
+Budget: the account payload already carries positions+upnl (no extra call);
+mids ride the ws cache or the new 20s-TTL REST snapshot cache
+(`LIGHTER_REST_BOOK_TTL`); REST snapshots are now SORTED at the adapter
+(previously unsorted — top-of-book indexing in shadow fills / slippage guards
+/ fresh_mid was wrong whenever the ws was CDN-blocked, i.e. the Railway norm).
+Knobs: `LIGHTER_EQUITY_GUARD` (1), `LIGHTER_EQUITY_TOL_ABS` (1.0),
+`LIGHTER_EQUITY_TOL_NTL_PCT` (0.01), `LIGHTER_EQUITY_TOL_EQ_PCT` (0.002),
+`LIGHTER_EQUITY_REBASE_AFTER` (3), `LIGHTER_EQUITY_BOOT_CONFIRM_S` (5).
+Evidence: `python3 scripts/sim_equity_guard.py` (drives the exact production
+read path through the 11 Jul replay, real-crash, boot-baseline, deposit,
+persistent-dislocation and Monte Carlo scenarios).
