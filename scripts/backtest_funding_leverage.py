@@ -37,6 +37,14 @@ VERDICT (2026-07-11, live config $61.13 / $10 x 4 / gate 0.40):
     (-13.3%) = causal. 1h lookback chosen over the higher-scoring 3h (+24.6%)
     because the effect FLIPS SIGN at 4h — sweet-spot overfit risk; 1h is the
     robust setting. Stable under slot-count perturbation.
+  * PREMIUM FACTORS (binance premiumIndexKlines, 150d): REJECTED — redundant.
+    Sign-confirm on top of the slope gate is WORSE (+5.9% vs +8.4%) and both
+    mirrors score positive (no causal separation). Mechanically expected:
+    funding is computed FROM premium, so the funding-slope gate already
+    encodes it. Do not re-test.
+  * OI (binance openInterestHist, ~20d max free history): INCONCLUSIVE —
+    16 baseline trades in-window; gate and mirror within noise. Verdict waits
+    on the market-context collector's accumulating history (weeks).
 """
 import sys
 from datetime import datetime, timezone
