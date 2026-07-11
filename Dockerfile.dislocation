@@ -1,0 +1,18 @@
+# Image for 🧲 Snap Back (Lighter dislocation harvester) — SHADOW ONLY in v1.
+# Set the service variable RAILWAY_DOCKERFILE_PATH=Dockerfile.dislocation and
+# VENUE=lighter_shadow. The bot itself REFUSES lighter_live in v1: it is
+# UNVALIDATED — its job is the dislocation census + honest modelled fills that
+# earn (or kill) a separate go-live decision. No keys are needed for shadow.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_dislocation_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_dislocation_bot.py"]

@@ -40,6 +40,7 @@ RETIRED_ROWS = {"perps-donchian-breakout-lighter"}
 # Expected bots — so the grid shows a bot even before its first publish.
 EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
             "perps-funding-carry", "perps-funding-lighter", "lighter-perp-sniper",
+            "lighter-dislocation",
             "scanner-triangular-arb", "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h", "crypto-trendmomo-4h",
@@ -107,6 +108,7 @@ LABELS = {
     "perps-funding-carry":         "🌾 Yield Harvester · perps funding carry",
     "perps-funding-lighter":       "💸 Funding Farmer · Lighter directional funding (stop-guarded)",
     "lighter-perp-sniper":         "🎯 Perp Sniper · new Lighter-listing snipe",
+    "lighter-dislocation":         "🧲 Snap Back · Lighter dislocation harvester",
     "scanner-triangular-arb":      "🔺 Loop Scout · triangular arb (scanner)",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout · cross-exchange arb (scanner)",
     "event-listing-sniper":        "🎯 Launch Sniper · new-listing buyer",
