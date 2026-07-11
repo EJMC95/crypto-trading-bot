@@ -150,11 +150,25 @@ SLOW_LOOP_STALE_SECONDS = 15 * 60
 # Give it its own window so those reload cycles stop tripping a false stale
 # flag (the sniper also heartbeats mid-cycle now, but keep this as the backstop).
 SNIPER_STALE_SECONDS = 900
+# [2026-07-12] Venue-variant rows do NOT always share their base's cadence —
+# the Lighter Tide Rider loops HOURLY (its base row is fed by the fast
+# freqtrade poller) and the Funding Farmer loops 300s (its base was never in
+# SLOW_LOOP after it took over the live slot). Both healthy LIVE bots were
+# flapping "stale" on the dashboard most of every cycle. Explicit per-ROW
+# windows sized ~2 missed publishes, so a real outage still shows fast.
+VARIANT_STALE_SECONDS = {
+    "crypto-trend-daily-lighter":    2 * 3600 + 600,   # hourly loop + debounce slack
+    "crypto-trend-daily-lshadow":    2 * 3600 + 600,
+    "perps-funding-lighter-lighter": 15 * 60,          # 300s loop
+    "perps-funding-lighter-lshadow": 15 * 60,
+}
 
 
 def stale_secs_for(bot):
     """Per-bot stale threshold: each bot family has its own publish cadence."""
-    bot, _ = venue_variant(bot)   # a -lighter/-lshadow row keeps its base cadence
+    if bot in VARIANT_STALE_SECONDS:   # variant cadence differs from its base
+        return VARIANT_STALE_SECONDS[bot]
+    bot, _ = venue_variant(bot)   # other -lighter/-lshadow rows keep base cadence
     if bot in STOCKS:
         return STOCK_STALE_SECONDS
     if bot in SLOW_LOOP:
