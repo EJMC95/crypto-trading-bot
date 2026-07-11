@@ -125,6 +125,15 @@ SLOPE_GATE = os.environ.get("FUNDING_SLOPE_GATE", "on").strip().lower() \
     not in ("off", "0", "false", "no")
 SLOPE_LOOKBACK_H = float(os.environ.get("FUNDING_SLOPE_LOOKBACK_H", "1"))
 
+# ---- coin-quality VETO (2026-07-11 SELF-CORRECT, RESTRICT-ONLY) — skip entry
+# on coins the fleet's OWN measured evidence flags as toxic (slip > 15bps or
+# stop-rate >= 50%, computed by market_context.py from venue_orders /
+# paper_trades). HARD PRINCIPLE: automated evidence only ever REMOVES
+# candidates — it can never widen a gate, raise size, or add leverage. Fails
+# open (no veto state -> no vetoes). Toggle: FUNDING_QUALITY_VETO=off.
+QUALITY_VETO = os.environ.get("FUNDING_QUALITY_VETO", "on").strip().lower() \
+    not in ("off", "0", "false", "no")
+
 LOOP_SECONDS = int(os.environ.get("FUNDING_LOOP_SECONDS", "300"))
 
 LOG_FILE = os.environ.get("FUNDING_LOG_FILE", "funding_lighter_bot.log")
@@ -643,6 +652,11 @@ def main():
             _mctx = store.load_state("market-context") or {}
         except Exception:  # noqa: BLE001
             _mctx = {}
+        try:
+            _vetoes = ((store.load_state("coin-vetoes") or {}).get("coins") or {}) \
+                if QUALITY_VETO else {}
+        except Exception:  # noqa: BLE001
+            _vetoes = {}
 
         # [2026-07-11 SLOPE GATE] rolling in-process funding history (apr units)
         # feeding the building-vs-rolling-over entry gate. Restart loses ~1h of
@@ -808,6 +822,10 @@ def main():
             for coin, f, apr, is_short, bm, ev in ranked:
                 if open_now >= max_open or opened_this_loop >= MAX_NEW_PER_LOOP:
                     break
+                # [2026-07-11 QUALITY VETO] fleet-measured toxicity, restrict-only
+                if coin in _vetoes:
+                    log.info("%s VETO_SKIP (%s)", coin, _vetoes[coin])
+                    continue
                 # [2026-07-11 SLOPE GATE] only enter while crowding still builds
                 # (validated: see config block). Fails open with no history.
                 _slope_prev = (_slope_ref(rate_hist.get(coin), t0,

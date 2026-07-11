@@ -138,6 +138,125 @@ class LiqTape:
         return out
 
 
+def _alert(alerts, key, severity, msg, dedup_h=24):
+    """Append an alert unless the same key fired within dedup_h. Returns True
+    if it fired. Alerts are the SIGNAL layer only — the only automated ACTION
+    anywhere in the fleet is the veto list (restrict-only, below)."""
+    now = time.time()
+    for a in alerts:
+        if a["key"] == key and now - a["ts"] < dedup_h * 3600:
+            return False
+    alerts.append({"ts": now, "iso": datetime.now(timezone.utc).isoformat(),
+                   "key": key, "severity": severity, "msg": msg})
+    log.warning("ALERT [%s] %s", severity, msg)
+    del alerts[:-50]
+    return True
+
+
+def evaluate_evidence(quality):
+    """[2026-07-11 SELF-CORRECT, VETO-ONLY] Turn accumulated evidence into
+    (a) alerts and (b) the coin-veto list. HARD PRINCIPLE: automated evidence
+    may only RESTRICT the bots (skip a coin, flag a problem) — never widen a
+    gate, raise size, or add leverage. Expansion stays human + backtest gated.
+
+    Checks:
+      * dislocation census (Snap Back state): any tradeable event (>=150bps)
+        -> alert; census milestones -> alert.
+      * factor milestones: joined entries(context) -> outcomes sample sizes;
+        building-vs-rolling win split with a crude two-proportion z at n>=30.
+      * coin quality vetoes: measured slip > 15bps (n>=5) or stop-rate >= 50%
+        (n>=5 closes) -> veto entry on that coin; alert on any list CHANGE.
+      * live vs shadow divergence (Funding Farmer) beyond 5pp -> alert.
+    """
+    alerts = (store.load_state("fleet-alerts") or {}).get("alerts") or []
+    fired = 0
+
+    # --- Snap Back census ---
+    sb = store.load_state("lighter-dislocation-lshadow") or {}
+    census = sb.get("census") or {}
+    total = sum(c.get("count", 0) for c in census.values())
+    big = {c: v for c, v in census.items() if v.get("max_bps", 0) >= 150}
+    for c, v in big.items():
+        fired += _alert(alerts, f"disloc:{c}", "info",
+                        f"🧲 tradeable dislocation on {c}: {v['max_bps']:.0f}bps "
+                        f"(census {v['count']} events) — Snap Back thesis evidence")
+    if total >= 50:
+        fired += _alert(alerts, "census:50", "info",
+                        f"🧲 dislocation census reached {total} events — worth a review",
+                        dedup_h=24 * 7)
+
+    # --- factor sample milestones + significance (joined dataset) ---
+    conn = store._get_conn()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT v.raw->'slope'->>'apr_prev' IS NOT NULL AS has_slope,
+                           p.pnl_abs > 0 AS win
+                    FROM venue_orders v
+                    JOIN paper_trades p
+                      ON p.bot = v.bot AND p.pair = v.coin
+                     AND abs(extract(epoch from p.opened_at::timestamptz
+                                     - v.at)) < 900
+                    WHERE v.raw->>'leg' = 'open' AND v.raw ? 'mctx'
+                      AND p.pnl_abs IS NOT NULL""")
+                rows = cur.fetchall()
+            n = len(rows)
+            if n and n >= 30:
+                fired += _alert(alerts, f"factor-sample:{n // 30}", "info",
+                                f"🛰️ joined decision+context dataset at {n} closed "
+                                f"trades — factor validation is becoming possible",
+                                dedup_h=24 * 7)
+        except Exception as e:  # noqa: BLE001
+            log.warning("factor-evidence query failed: %s", e)
+
+    # --- coin-quality vetoes (the ONLY automated action, restrict-only) ---
+    vetoes = {}
+    for coin, q in (quality or {}).items():
+        if (q.get("orders_14d") or 0) >= 5 and (q.get("slip_bps") or 0) > 15:
+            vetoes[coin] = f"measured slip {q['slip_bps']}bps > 15 (n={q['orders_14d']})"
+        closes = q.get("closes_30d") or 0
+        stops = q.get("stops_30d") or 0
+        if closes >= 5 and stops / closes >= 0.5:
+            vetoes[coin] = f"stop rate {stops}/{closes} >= 50% (30d)"
+    prev = (store.load_state("coin-vetoes") or {}).get("coins") or {}
+    if set(vetoes) != set(prev):
+        added = sorted(set(vetoes) - set(prev))
+        removed = sorted(set(prev) - set(vetoes))
+        fired += _alert(alerts, f"veto:{','.join(added + removed)}", "action",
+                        "🚫 coin veto list changed — "
+                        + (f"added {added} " if added else "")
+                        + (f"removed {removed}" if removed else "")
+                        + f" | now vetoed: {sorted(vetoes) or 'none'}")
+    store.save_state("coin-vetoes",
+                     {"ts": datetime.now(timezone.utc).isoformat(), "coins": vetoes})
+
+    # --- live vs shadow divergence (execution health) ---
+    try:
+        conn2 = store._get_conn()
+        if conn2 is None:
+            raise LookupError("no DB connection")
+        with conn2.cursor() as cur:
+            cur.execute("""SELECT bot, pnl_abs, equity FROM bot_pnl
+                           WHERE bot IN ('perps-funding-lighter-lighter',
+                                         'perps-funding-lighter-lshadow')""")
+            r = {b: (p, e) for b, p, e in cur.fetchall()}
+        live, shad = r.get("perps-funding-lighter-lighter"), r.get("perps-funding-lighter-lshadow")
+        if live and shad and live[1] and shad[1]:
+            gap = (live[0] or 0) / live[1] - (shad[0] or 0) / shad[1]
+            if abs(gap) > 0.05:
+                fired += _alert(alerts, "live-shadow-gap", "warn",
+                                f"⚠️ Funding Farmer live vs shadow P&L gap {gap:+.1%} "
+                                f"— execution divergence worth investigating")
+    except Exception as e:  # noqa: BLE001
+        log.warning("divergence check failed: %s", e)
+
+    store.save_state("fleet-alerts", {"alerts": alerts})
+    if fired:
+        log.warning("evidence evaluation: %d new alert(s).", fired)
+    return fired
+
+
 def coin_quality():
     """The fleet's own measured per-coin stats (validated by construction):
     execution costs from venue_orders (14d) + outcomes from paper_trades (30d)."""
@@ -248,6 +367,10 @@ def main():
                                  {"ts": datetime.now(timezone.utc).isoformat(),
                                   "coins": q})
                 log.info("coin-quality table refreshed: %d coins", len(q))
+            try:
+                evaluate_evidence(q)
+            except Exception as e:  # noqa: BLE001
+                log.warning("evidence evaluation failed: %s", e)
             last_quality = time.time()
 
         if once:

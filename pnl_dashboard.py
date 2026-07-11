@@ -187,6 +187,30 @@ def fetch_rows():
         conn.close()
 
 
+def fetch_fleet_alerts(hours=48):
+    """Recent evidence alerts written by market_context.evaluate_evidence into
+    bot_state('fleet-alerts'). Guarded — no alerts is an answer, not an error."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                if cur.fetchone()[0] is None:
+                    return []
+                cur.execute("SELECT state FROM bot_state WHERE bot = 'fleet-alerts'")
+                row = cur.fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return []
+        st = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        cut = time.time() - hours * 3600
+        return [a for a in (st.get("alerts") or []) if (a.get("ts") or 0) >= cut]
+    except Exception:
+        return []
+
+
 def fetch_analysis():
     """Return {strategy: {updated_at, analysis}} from bot_trade_analysis."""
     import psycopg2
@@ -942,6 +966,16 @@ def render():
                    if checks else
                    '<div class="okline">Health ✓ persistence intact · no over-trading · probation within bounds</div>')
 
+    # [2026-07-11 EVIDENCE ALERTS] recent alerts from market_context's evidence
+    # evaluator (dislocation census hits, factor-sample milestones, coin-veto
+    # changes, live-vs-shadow divergence). Signal layer only — the sole
+    # automated ACTION in the fleet is the restrict-only coin-veto list.
+    _fa = fetch_fleet_alerts()
+    if _fa:
+        health_html += ('<div class="banner">🔔 EVIDENCE: '
+                        + " · ".join(html.escape(a.get("msg") or "")
+                                     for a in _fa[-6:]) + "</div>")
+
     live = [r for r in rows.values() if r]
     # [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows (live/testnet/shadow on
     # Lighter) are their OWN groups — never folded into the paper headline, so
@@ -1504,6 +1538,35 @@ class H(BaseHTTPRequestHandler):
                     payload = {"updated_at": row[1].isoformat() if row[1] else None}
                     payload.update(st)
                 body = json.dumps(payload, default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
+        if self.path.startswith("/alerts.json"):
+            # [2026-07-11] Evidence alerts + the restrict-only coin-veto list
+            # (market_context.py). Read-only, no secrets, no auth — so the
+            # scheduled report sessions and any external watchdog can consume.
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT bot, state, updated_at FROM bot_state "
+                                    "WHERE bot IN ('fleet-alerts', 'coin-vetoes')")
+                        rows_ = {b: (s if isinstance(s, dict) else json.loads(s), u)
+                                 for b, s, u in cur.fetchall()}
+                finally:
+                    conn.close()
+                fa = rows_.get("fleet-alerts", ({}, None))
+                cv = rows_.get("coin-vetoes", ({}, None))
+                body = json.dumps({
+                    "alerts": (fa[0].get("alerts") or [])[-25:],
+                    "alerts_updated_at": fa[1].isoformat() if fa[1] else None,
+                    "coin_vetoes": cv[0].get("coins") or {},
+                    "vetoes_updated_at": cv[1].isoformat() if cv[1] else None,
+                }, default=str).encode()
             except Exception as e:
                 body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
             self.send_response(200); self._no_cache()
