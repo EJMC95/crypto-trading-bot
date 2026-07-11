@@ -49,6 +49,11 @@ EMA_SLOW = int(os.environ.get("TREND_EMA_SLOW", "200"))
 CANDLE_INTERVAL = os.environ.get("TREND_INTERVAL", "1d")
 ORDER_USD = float(os.environ.get("TREND_ORDER_USD", "50"))
 MAX_OPEN_POSITIONS = int(os.environ.get("TREND_MAX_OPEN", "6"))
+# When slots/margin can't hold every golden major, admit ENTRIES lowest-funding
+# first (a long pays funding; high funding = crowded, frothy, prone to dump).
+# Walk-forward validated to beat first-come list order at 2-3 slots. OFF by default:
+# with 6 coins / 6 slots (or ample margin) it never binds and behaviour is identical.
+RANK_BY_FUNDING = os.environ.get("TREND_RANK_BY_FUNDING", "0").lower() in ("1", "true", "yes")
 CATASTROPHIC_STOP = float(os.environ.get("TREND_CATASTROPHIC_STOP", "0.35"))  # seatbelt
 DAILY_LOSS_LIMIT = float(os.environ.get("TREND_DAILY_LOSS", "0.10"))
 LOOP_SECONDS = int(os.environ.get("TREND_LOOP_SECONDS", "3600"))  # daily signal, hourly poll
@@ -327,7 +332,17 @@ def main():
         start = end - (EMA_SLOW * 3 + 5) * 86400 * 1000
         open_now = sum(1 for v in pos.values() if (v.get("size") if isinstance(v, dict) else v))
 
-        for coin in COINS:
+        # Entry-admission order. Default = COINS list order (byte-identical to before).
+        # RANK_BY_FUNDING sorts lowest-funding-first so that when open_now hits the cap
+        # / margin runs out, the cheapest-to-carry golden majors get the slots. Only the
+        # admission order changes; per-coin management (stops/exits) is order-independent.
+        scan_coins = COINS
+        if RANK_BY_FUNDING:
+            scan_coins = sorted(
+                COINS, key=lambda c: (fund.get(c) or {}).get("rate")
+                if (fund.get(c) or {}).get("rate") is not None else 1e9)
+
+        for coin in scan_coins:
             if not ctx.supports(coin):
                 continue
             # State FIRST so the catastrophic-stop seatbelt works even if candles fail.
