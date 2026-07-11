@@ -144,14 +144,53 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
             )
         return True
     except Exception as e:
-        _warn_once(f"write failed ({e})")
-        # drop the connection so the next call reconnects
+        # [2026-07-12 GO-GREEN] one immediate reconnect+retry so a transient
+        # Postgres blip doesn't cost a whole publish cycle. Second failure
+        # falls through to the original guarded behaviour.
         global _conn
         try:
             conn.close()
         except Exception:
             pass
         _conn = None
+        try:
+            conn2 = _get_conn()
+            if conn2 is not None:
+                with conn2.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO bot_pnl (bot, updated_at, status, equity, pnl_abs,
+                            pnl_pct, open_trades, closed_trades, wins, losses, extra,
+                            pnl_daily)
+                        VALUES (%s, now(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (bot) DO UPDATE SET
+                            updated_at    = now(),
+                            status        = EXCLUDED.status,
+                            equity        = EXCLUDED.equity,
+                            pnl_abs       = EXCLUDED.pnl_abs,
+                            pnl_pct       = EXCLUDED.pnl_pct,
+                            open_trades   = EXCLUDED.open_trades,
+                            closed_trades = EXCLUDED.closed_trades,
+                            wins          = EXCLUDED.wins,
+                            losses        = EXCLUDED.losses,
+                            extra         = EXCLUDED.extra,
+                            pnl_daily     = EXCLUDED.pnl_daily
+                        """,
+                        (bot, status, equity, pnl_abs, pnl_pct, open_trades,
+                         closed_trades, wins, losses,
+                         json.dumps(extra) if extra is not None else None,
+                         pnl_daily),
+                    )
+                return True
+        except Exception as e2:
+            _warn_once(f"write failed twice ({e}; retry: {e2})")
+            try:
+                _conn.close()  # type: ignore[union-attr]
+            except Exception:
+                pass
+            _conn = None
+            return False
+        _warn_once(f"write failed ({e})")
         return False
 
 
@@ -201,6 +240,57 @@ def save_state(bot, state):
         return True
     except Exception as e:
         _warn_once(f"state write failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return False
+
+
+def heartbeat(bot):
+    """[2026-07-12 GO-GREEN] Touch ONLY updated_at on the bot's existing row —
+    a liveness proof that never clobbers the last good snapshot. Cheap enough
+    to call at the TOP of every loop, so slow scans, venue outages and
+    skip-paths that never reach the full publish can't read as a dead bot."""
+    conn = _get_conn()
+    if conn is None:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE bot_pnl SET updated_at = now() WHERE bot = %s", (bot,))
+        return True
+    except Exception as e:
+        _warn_once(f"heartbeat failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return False
+
+
+def set_status(bot, status):
+    """[2026-07-12 GO-GREEN] Update ONLY status+updated_at (keeps the last
+    equity/P&L intact). Used by boot-refusal paths so an ARMED/misconfigured
+    bot shows as ERROR on the dashboard instead of silently going stale."""
+    conn = _get_conn()
+    if conn is None:
+        return False
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO bot_pnl (bot, updated_at, status)
+                   VALUES (%s, now(), %s)
+                   ON CONFLICT (bot) DO UPDATE SET
+                       updated_at = now(), status = EXCLUDED.status""",
+                (bot, status))
+        return True
+    except Exception as e:
+        _warn_once(f"set_status failed ({e})")
         global _conn
         try:
             conn.close()

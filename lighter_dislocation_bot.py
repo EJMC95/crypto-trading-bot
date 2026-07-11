@@ -212,6 +212,8 @@ def main():
     while True:
         now = datetime.now(timezone.utc)
         t0 = time.time()
+        # [2026-07-12 GO-GREEN] loop-top liveness touch — see bot_pnl_store.heartbeat
+        store.heartbeat(bot_id)
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False
             day_start_equity = account_value()
@@ -407,8 +409,26 @@ def main():
         time.sleep(max(1.0, LOOP_SECONDS - (time.time() - t0)))
 
 
+def _supervised():
+    """[2026-07-12 GO-GREEN] unhandled exception -> log, mark row ERROR,
+    restart in 60s (state re-hydrates). SystemExit/Ctrl-C pass through."""
+    while True:
+        try:
+            main()
+            return
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("unhandled exception — marking row ERROR, restarting in 60s")
+            try:
+                store.set_status(BOT + "-lshadow", "error")
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(60)
+
+
 if __name__ == "__main__":
     try:
-        main()
+        _supervised()
     except KeyboardInterrupt:
         log.info("stopped by user.")

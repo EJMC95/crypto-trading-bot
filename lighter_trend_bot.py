@@ -124,9 +124,11 @@ def main():
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
     args = p.parse_args()
 
+    global _SUPERVISOR_BOT_ID
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=("--live" in sys.argv))
     bot_id = ctx.bot_id
+    _SUPERVISOR_BOT_ID = bot_id
     broker = ctx.broker
     dry_run = ctx.dry_run
     order_usd = ctx.order_usd(ORDER_USD)
@@ -276,6 +278,8 @@ def main():
 
     while True:
         t0 = time.time()
+        # [2026-07-12 GO-GREEN] loop-top liveness touch — see bot_pnl_store.heartbeat
+        store.heartbeat(bot_id)
         now = datetime.now(timezone.utc)
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False
@@ -522,5 +526,31 @@ def main():
         time.sleep(max(1.0, LOOP_SECONDS - (time.time() - t0)))
 
 
+_SUPERVISOR_BOT_ID = None
+
+
+def _supervised():
+    """[2026-07-12 GO-GREEN] an unhandled exception used to crash-loop the
+    container silently (stale row, no explanation). Log it, mark the row
+    ERROR, back off, restart — state re-hydrates from Postgres on re-init.
+    SystemExit (boot refusals) and Ctrl-C pass through untouched."""
+    while True:
+        try:
+            main()
+            return
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("unhandled exception — marking row ERROR, restarting in 60s")
+            try:
+                store.set_status(_SUPERVISOR_BOT_ID or BOT, "error")
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(60)
+
+
 if __name__ == "__main__":
-    main()
+    try:
+        _supervised()
+    except KeyboardInterrupt:
+        log.info("stopped by user.")

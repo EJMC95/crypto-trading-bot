@@ -59,13 +59,25 @@ class SafetyRails:
         self.halted_day = None
 
     # -- start-up gate --------------------------------------------------------
+    def _publish_refusal(self, why):
+        """[2026-07-12 GO-GREEN] a refused boot used to look identical to a
+        dead bot (row just went stale). Mark the row ERROR (status-only update
+        — the last good equity/P&L stays intact) so the dashboard says WHY."""
+        try:
+            import bot_pnl_store as store
+            store.set_status(f"{self.bot}-lighter", "error")
+        except Exception:  # noqa: BLE001 — never let telemetry block the gate
+            pass
+
     def assert_can_start(self):
         if self.live:
             if kill_switch_armed():
+                self._publish_refusal("kill switch armed")
                 raise SystemExit(
                     f"{KILL_ENV} is ARMED — lighter_live refuses to start. "
                     f"(Gate-4 sign-off + explicit {KILL_ENV}={DISARM_TOKEN} required.)")
             if self.max_notional is None:
+                self._publish_refusal("missing notional cap")
                 raise SystemExit(
                     "lighter_live requires an explicit per-bot notional cap env "
                     f"({env_prefix(self.bot)}_MAX_NOTIONAL) — refusing to start.")

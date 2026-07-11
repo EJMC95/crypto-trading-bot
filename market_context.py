@@ -257,6 +257,42 @@ def evaluate_evidence(quality):
     return fired
 
 
+# [2026-07-12 GO-GREEN] cross-region live-bot watchdog: this collector runs in
+# sfo while the LIVE bots run in Southeast Asia — independent failure domains,
+# so a region outage that silences the bots can't silence THIS alert. Limits
+# sized ~4 missed publishes (the dashboard's stale windows are ~2).
+LIVE_FRESHNESS_LIMITS = {
+    "perps-funding-lighter-lighter": 1200,    # 300s loop
+    "crypto-trend-daily-lighter":    9000,    # hourly loop
+}
+
+
+def check_live_freshness():
+    conn = store._get_conn()
+    if conn is None:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT bot, extract(epoch from now()-updated_at) "
+                        "FROM bot_pnl WHERE bot = ANY(%s)",
+                        (list(LIVE_FRESHNESS_LIMITS),))
+            ages = dict(cur.fetchall())
+    except Exception as e:  # noqa: BLE001
+        log.warning("live-freshness check failed: %s", e)
+        return
+    alerts = (store.load_state("fleet-alerts") or {}).get("alerts") or []
+    fired = 0
+    for b, limit in LIVE_FRESHNESS_LIMITS.items():
+        age = ages.get(b)
+        if age is not None and age > limit:
+            fired += _alert(alerts, f"stale-live:{b}", "warn",
+                            f"⚠️ LIVE bot {b} last published {age / 60:.0f} min ago "
+                            f"(limit {limit / 60:.0f}) — check the Railway service",
+                            dedup_h=6)
+    if fired:
+        store.save_state("fleet-alerts", {"alerts": alerts})
+
+
 def coin_quality():
     """The fleet's own measured per-coin stats (validated by construction):
     execution costs from venue_orders (14d) + outcomes from paper_trades (30d)."""
@@ -359,6 +395,11 @@ def main():
             store.publish(BOT, status="online",
                           extra={"coins": len(coins), "liq_tape": tape.connected,
                                  "heat_mean_apr": snapshot["heat_mean_apr"]})
+
+        try:
+            check_live_freshness()
+        except Exception as e:  # noqa: BLE001
+            log.warning("live-freshness wrapper failed: %s", e)
 
         if time.time() - last_quality >= QUALITY_EVERY_H * 3600:
             q = coin_quality()
