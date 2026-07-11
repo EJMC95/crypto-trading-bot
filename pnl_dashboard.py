@@ -30,6 +30,13 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 DASH_USER = os.environ.get("DASH_USER", "eamon")
 DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 
+# [2026-07-11 SWAP] Decommissioned venue rows — hidden from the grid and every
+# feed so a retired bot can't sit next to its replacement and confuse the LIVE
+# section. History stays in bot_equity_history / paper_trades / venue_orders.
+# Trail Blazer live retired 11 Jul; its sub-account + Railway service now run
+# the Funding Farmer (publishes as perps-funding-lighter-lighter).
+RETIRED_ROWS = {"perps-donchian-breakout-lighter"}
+
 # Expected bots — so the grid shows a bot even before its first publish.
 EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
             "perps-funding-carry", "perps-funding-lighter", "lighter-perp-sniper",
@@ -171,8 +178,9 @@ def fetch_rows():
             # (<base>-lighter/-ltest/-lshadow) pass when their base is a current
             # bot, so a live/shadow Lighter bot shows up automatically.
             return {r["bot"]: r for r in cur.fetchall()
-                    if r["bot"] in CURRENT_BOTS
-                    or venue_variant(r["bot"])[0] in CURRENT_BOTS}
+                    if r["bot"] not in RETIRED_ROWS
+                    and (r["bot"] in CURRENT_BOTS
+                         or venue_variant(r["bot"])[0] in CURRENT_BOTS)}
     finally:
         conn.close()
 
