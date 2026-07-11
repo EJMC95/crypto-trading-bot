@@ -28,6 +28,15 @@ VERDICT (2026-07-11, live config $61.13 / $10 x 4 / gate 0.40):
     (-1.0% first 60d / +7.3% last 90d, and the win is price luck not funding)
     — regime-dependent mean reversion, NOT a robust optimisation. Live config
     (4 x 0.40) is the only setting positive in BOTH halves. Keep it.
+  * REGIME GATES (same-day follow-up runs): market-heat>75pct and btc-vol>75pct
+    entry blocks both FAIL both-halves. REJECTED.
+  * FUNDING-SLOPE GATE: VALIDATED and SHIPPED (FUNDING_SLOPE_GATE, default on).
+    Enter only while |apr| >= its level 1h ago: at the live 2x config baseline
+    +1.3% -> +8.4% with lower maxDD (16.5%->12.5%), positive in BOTH halves
+    (+6.9%/+2.6%); mirror rule (enter on rollover) symmetrically negative
+    (-13.3%) = causal. 1h lookback chosen over the higher-scoring 3h (+24.6%)
+    because the effect FLIPS SIGN at 4h — sweet-spot overfit risk; 1h is the
+    robust setting. Stable under slot-count perturbation.
 """
 import sys
 from datetime import datetime, timezone

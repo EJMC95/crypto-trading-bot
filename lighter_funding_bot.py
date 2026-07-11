@@ -41,6 +41,7 @@ import math
 import os
 import sys
 import time
+from collections import deque
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
@@ -111,6 +112,19 @@ SCAN_MOM_LOOKBACK_H = int(os.environ.get("SCAN_MOM_LOOKBACK_H", "6"))
 SCAN_ENTER = float(os.environ.get("SCAN_ENTER", str(ENTER_APR)))
 ENTER_GATE = SCAN_ENTER if SCAN_ENABLED else ENTER_APR
 
+# ---- funding-SLOPE entry gate (2026-07-11) — only enter while the rate is
+# still BUILDING (|apr| >= |apr LOOKBACK_H ago|). Backtested on the 150d
+# portfolio sim (scripts/backtest_funding_leverage.py): at the live 2x config
+# baseline +1.3% -> +8.4% with LOWER maxDD (16.5% -> 12.5%), positive in BOTH
+# halves; the mirror rule (enter only on rollover) is symmetrically negative
+# (-13.3%) — the effect is causal, not noise. 1h lookback chosen for
+# ROBUSTNESS: 3h scores higher in-cache (+24.6%) but sits next to a sign FLIP
+# at 4h — a sweet-spot overfit trap. FAIL-OPEN when history is missing
+# (restart gap ~1h) — matches the backtest's handling exactly.
+SLOPE_GATE = os.environ.get("FUNDING_SLOPE_GATE", "on").strip().lower() \
+    not in ("off", "0", "false", "no")
+SLOPE_LOOKBACK_H = float(os.environ.get("FUNDING_SLOPE_LOOKBACK_H", "1"))
+
 LOOP_SECONDS = int(os.environ.get("FUNDING_LOOP_SECONDS", "300"))
 
 LOG_FILE = os.environ.get("FUNDING_LOG_FILE", "funding_lighter_bot.log")
@@ -122,6 +136,21 @@ log = logging.getLogger(BOT)
 
 def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _slope_ref(hist, now_ts, lookback_s):
+    """Newest funding-apr sample at least lookback_s old (staleness-bounded to
+    3x lookback). None = not enough history -> the gate FAILS OPEN."""
+    if not hist:
+        return None
+    ref = None
+    for ts, apr in hist:                      # oldest -> newest
+        age = now_ts - ts
+        if lookback_s <= age <= 3 * lookback_s:
+            ref = apr                          # keep the newest qualifying
+        elif age < lookback_s:
+            break
+    return ref
 
 
 def _mctx_slice(mctx, coin):
@@ -396,6 +425,7 @@ def main():
     # Per-open bookkeeping the venue doesn't hold: is_short, entry, opened_ts,
     # accrued funding. Persisted so a redeploy doesn't reset the max-hold clock.
     meta = {}          # coin -> {is_short, entry, opened_ts, accrued}
+    rate_hist = {}     # coin -> deque[(ts, apr)] — slope-gate memory (in-process)
     hot_since = {}     # coin -> ts |apr| first >= ENTER_APR
     cooldown = {}      # coin -> ts until which re-entry is blocked (post-stop)
     miss = {}          # coin -> consecutive fresh-price misses (live fail-safe)
@@ -435,6 +465,10 @@ def main():
     else:
         log.info("SCANNER off (SCAN=off): legacy raw-|apr| selection.")
     log.info("DIRECTIONAL — not delta-neutral; price risk bounded by the hard stop.")
+    log.info("SLOPE GATE %s: enter only while |apr| still >= its level %gh ago "
+             "(building, not rolling over) — validated both-halves on the 150d "
+             "portfolio sim; fails open for ~1h after restart.",
+             "on" if SLOPE_GATE else "OFF", SLOPE_LOOKBACK_H)
     log.info("=" * 64)
 
     def account_value():
@@ -610,6 +644,14 @@ def main():
         except Exception:  # noqa: BLE001
             _mctx = {}
 
+        # [2026-07-11 SLOPE GATE] rolling in-process funding history (apr units)
+        # feeding the building-vs-rolling-over entry gate. Restart loses ~1h of
+        # history -> gate fails open, exactly as backtested.
+        for _c, _f in fund.items():
+            _r = _f.get("rate")
+            if _r is not None:
+                rate_hist.setdefault(_c, deque(maxlen=64)).append((t0, _r * H))
+
         # ---- manage open positions (held coins may no longer be hot) ----
         held_coins = set(pos) | set(meta)
         opened_this_loop = 0
@@ -766,6 +808,15 @@ def main():
             for coin, f, apr, is_short, bm, ev in ranked:
                 if open_now >= max_open or opened_this_loop >= MAX_NEW_PER_LOOP:
                     break
+                # [2026-07-11 SLOPE GATE] only enter while crowding still builds
+                # (validated: see config block). Fails open with no history.
+                _slope_prev = (_slope_ref(rate_hist.get(coin), t0,
+                                          SLOPE_LOOKBACK_H * 3600)
+                               if SLOPE_GATE else None)
+                if _slope_prev is not None and abs(apr) < abs(_slope_prev):
+                    log.info("%s SLOPE_SKIP (apr %+.1f%% < %+.1f%% %gh ago — rolling over)",
+                             coin, apr * 100, _slope_prev * 100, SLOPE_LOOKBACK_H)
+                    continue
                 if bm is None:
                     # legacy / scanner-off: spread gate + fresh mid (own book fetch)
                     sp = book_spread_bps(ctx, coin)
@@ -801,7 +852,11 @@ def main():
                          (" | " + " ".join(f"{k}={v}" for k, v in ev.items())) if ev else "")
                 try:
                     raw = {"apr": round(apr, 3), "spread_bps": round(spread_bps, 1),
-                           "leg": "open", "mctx": _mctx_slice(_mctx, coin)}
+                           "leg": "open", "mctx": _mctx_slice(_mctx, coin),
+                           "slope": {"apr_prev": (round(_slope_prev, 4)
+                                                  if _slope_prev is not None else None),
+                                     "lookback_h": SLOPE_LOOKBACK_H,
+                                     "gate": SLOPE_GATE}}
                     if ev:
                         raw["scan"] = ev      # vol/adverse/slip/xv/score -> shadow ledger
                     store.publish_venue_order(
