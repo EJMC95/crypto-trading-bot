@@ -305,12 +305,21 @@ def main():
         _fleet_loss = (not dry_run and ctx.rails.daily_loss_hit(day_start_equity, equity))
         if (not halted_today and equity is not None and day_start_equity
                 and (equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT) or _fleet_loss)):
-            log.warning("DAILY LOSS LIMIT HIT (%.2f <= %.2f). Flatten + halt.",
-                        equity, day_start_equity)
-            halted_today = True
-            store.save_daily_halt(bot_id, cur_day.isoformat(), day_start_equity)
-            if not dry_run:
-                _flatten_all("daily_loss")
+            # [2026-07-11 RAIL DEBOUNCE] one dislocated equity print sold the
+            # book into the dislocation (-5.9% real). Confirm on a second read
+            # (SafetyRails.confirm_daily_loss — shared, FAIL-SAFE: unreadable
+            # confirm counts as confirmed). Adopt the fresher read either way
+            # so a phantom print can't leak into published equity or the
+            # persisted live P&L baseline.
+            _confirmed, equity = ctx.rails.confirm_daily_loss(
+                day_start_equity, equity, DAILY_LOSS_LIMIT, account_value)
+            if _confirmed:
+                log.warning("DAILY LOSS LIMIT HIT (%.2f <= %.2f). Flatten + halt.",
+                            equity, day_start_equity)
+                halted_today = True
+                store.save_daily_halt(bot_id, cur_day.isoformat(), day_start_equity)
+                if not dry_run:
+                    _flatten_all("daily_loss")
 
         if halted_today:
             log.info("halted for today; sleeping.")

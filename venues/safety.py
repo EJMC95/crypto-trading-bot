@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import datetime, timezone
 
 log = logging.getLogger("venues.safety")
@@ -85,3 +86,41 @@ class SafetyRails:
         if not self.live or not day_start_equity or equity is None:
             return False
         return (day_start_equity - equity) >= self.max_daily_loss
+
+    def confirm_daily_loss(self, day_start_equity, first_equity, pct_limit,
+                           read_equity, delay_s=60):
+        """One-print glitch guard for the daily-loss rails: re-read equity
+        delay_s later and only stand down when the second read POSITIVELY
+        shows the breach was transient.
+
+        [2026-07-11] a single dislocated account_value print (-25% on deployed
+        notional while every held coin moved <1%) tripped Trail Blazer's 5%
+        rail and the flatten sold into the dislocation — a phantom drawdown
+        became a real -5.9%. ONE shared implementation so the four bots'
+        semantics cannot drift.
+
+        FAIL-SAFE: if the confirm read raises or returns None the breach
+        counts as CONFIRMED — a real crash is exactly when the venue API
+        degrades, and the old immediate-flatten guarantee must survive that.
+
+        Returns (confirmed, equity). `equity` is the freshest credible read;
+        callers must adopt it on BOTH paths so a dislocated first print never
+        leaks into published equity or a persisted P&L baseline.
+        """
+        log.warning("daily-loss breach read (%.2f vs day start %.2f) — "
+                    "confirming in %ds.", first_equity, day_start_equity, delay_s)
+        time.sleep(delay_s)
+        try:
+            eq2 = read_equity()
+        except Exception as e:
+            log.warning("confirm read failed (%s) — breach CONFIRMED (fail-safe).", e)
+            return True, first_equity
+        if eq2 is None:
+            log.warning("confirm read returned None — breach CONFIRMED (fail-safe).")
+            return True, first_equity
+        if (eq2 <= day_start_equity * (1 - pct_limit)
+                or self.daily_loss_hit(day_start_equity, eq2)):
+            return True, eq2
+        log.warning("breach NOT confirmed (second read %.2f) — transient print; "
+                    "continuing.", eq2)
+        return False, eq2

@@ -235,6 +235,55 @@ def main():
             return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
         return ctx.venue.positions()
 
+    def _flatten_live(reason):
+        """Emergency flatten + venue_orders row per forced close.
+        [2026-07-11] the 06:19 daily-loss flatten left NO ledger rows (forced
+        closes bypassed venue_orders), so a -5.9% equity event on the live
+        account was undiagnosable. Closes only the coins the scan shows held
+        (each market_close costs a weighted venue call — closing all COINS
+        blind can exhaust the tx budget mid-crisis); if the scan FAILS, close
+        everything blind (capital first) and write a marker row saying so.
+        Fill px / realized P&L are NOT captured here — market_close is
+        fire-and-forget; real-fill capture is the fill-forensics follow-up."""
+        if dry_run:   # self-guard: never touch the venue from a paper loop
+            return
+        try:
+            _fpos = positions()
+            _scan_ok = True
+        except Exception as e:
+            log.error("flatten scan failed (%s) — closing all %d coins blind.",
+                      e, len(COINS))
+            _fpos, _scan_ok = {}, False
+        for c in COINS:
+            _held = (_fpos.get(c) or {}).get("size", 0.0) or 0.0
+            if _scan_ok and not _held:
+                continue
+            try:
+                ctx.venue.market_close(c)
+            except Exception as e:
+                log.error("flatten %s: %s", c, e)
+                continue
+            if _held:
+                _entry = (_fpos.get(c) or {}).get("entry", 0.0) or 0.0
+                log.warning("flatten close %s size=%s entry=%s [%s]",
+                            c, _held, _entry, reason)
+                try:
+                    store.publish_venue_order(
+                        bot_id, venue="lighter", shadow=False, coin=c,
+                        side=("sell" if _held > 0 else "buy"), size=abs(_held),
+                        raw={"reason": reason, "leg": "close", "entry": _entry})
+                except Exception:
+                    pass
+        if not _scan_ok:
+            try:
+                store.publish_venue_order(
+                    bot_id, venue="lighter", shadow=False, coin="*", side="sell",
+                    size=0, raw={"reason": reason, "leg": "close",
+                                 "note": "position scan failed — flatten fired "
+                                         "blind for all coins"})
+            except Exception:
+                pass
+
     try:
         day_start_equity = account_value()
     except Exception as e:
@@ -275,11 +324,7 @@ def main():
         if not dry_run and ctx.rails.kill_check():
             log.error("REAL_MONEY_KILL armed mid-run — flatten + halt.")
             halted_today = True
-            for c in COINS:
-                try:
-                    ctx.venue.market_close(c)
-                except Exception as e:
-                    log.error("flatten %s: %s", c, e)
+            _flatten_live("kill_switch")
 
         try:
             equity = account_value()
@@ -290,17 +335,22 @@ def main():
         _fleet_loss = (not dry_run and ctx.rails.daily_loss_hit(day_start_equity, equity))
         if (not halted_today and equity is not None and day_start_equity
                 and (equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT) or _fleet_loss)):
-            log.warning("DAILY LOSS LIMIT HIT (%.2f <= %.2f%s). Flatten + halt for today.",
-                        equity, day_start_equity,
-                        ", $-rail" if _fleet_loss else "")
-            halted_today = True
-            store.save_daily_halt(bot_id, cur_day.isoformat(), day_start_equity)
-            if not dry_run:
-                for c in COINS:
-                    try:
-                        ctx.venue.market_close(c)
-                    except Exception as e:
-                        log.error("flatten %s: %s", c, e)
+            # [2026-07-11 RAIL DEBOUNCE] one dislocated equity print sold the
+            # book into the dislocation (-5.9% real). Confirm on a second read
+            # (SafetyRails.confirm_daily_loss — shared, FAIL-SAFE: unreadable
+            # confirm counts as confirmed). Adopt the fresher read either way
+            # so a phantom print can't leak into published equity or the
+            # persisted live P&L baseline.
+            _confirmed, equity = ctx.rails.confirm_daily_loss(
+                day_start_equity, equity, DAILY_LOSS_LIMIT, account_value)
+            if _confirmed:
+                log.warning("DAILY LOSS LIMIT HIT (%.2f <= %.2f%s). Flatten + halt for today.",
+                            equity, day_start_equity,
+                            ", $-rail" if _fleet_loss else "")
+                halted_today = True
+                store.save_daily_halt(bot_id, cur_day.isoformat(), day_start_equity)
+                if not dry_run:
+                    _flatten_live("daily_loss")
 
         if halted_today:
             log.info("halted for today; sleeping.")
