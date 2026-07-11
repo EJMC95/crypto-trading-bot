@@ -272,6 +272,13 @@ def main():
         day_start_equity = None
     cur_day = datetime.now(timezone.utc).date()
     halted_today = False
+    # [2026-07-11 DURABLE HALT] a tripped daily-loss halt survives restarts —
+    # the memory-only flag meant a same-day redeploy silently resumed trading.
+    _halt = store.load_daily_halt(bot_id, cur_day.isoformat())
+    if _halt:
+        halted_today = True
+        day_start_equity = _halt.get("day_start_equity") or day_start_equity
+        log.warning("daily-loss halt restored from state — halted for the rest of today.")
     last_ts = time.time()
 
     while True:
@@ -301,11 +308,35 @@ def main():
             log.warning("DAILY LOSS LIMIT HIT (%.2f <= %.2f). Flatten + halt.",
                         equity, day_start_equity)
             halted_today = True
+            store.save_daily_halt(bot_id, cur_day.isoformat(), day_start_equity)
             if not dry_run:
                 _flatten_all("daily_loss")
 
         if halted_today:
             log.info("halted for today; sleeping.")
+            # [2026-07-11 HALT HEARTBEAT] keep the dashboard row fresh while
+            # halted — the early `continue` skipped the publish below, so a
+            # halted bot looked DEAD (stale row) instead of HALTED.
+            if ctx.mode != "hl_paper":
+                try:
+                    if dry_run:
+                        _open_fund = sum((meta.get(c) or {}).get("accrued", 0.0)
+                                         for c in meta)
+                        _hb_eq = broker.equity() + fund_realized + _open_fund
+                        _hb_pnl = _hb_eq - START_EQUITY
+                    else:
+                        _hb_eq = equity
+                        _hb_pnl = (equity - live_baseline) if (equity is not None
+                                                               and live_baseline is not None) else None
+                    store.publish(
+                        bot_id, status="halted",
+                        equity=_hb_eq, pnl_abs=_hb_pnl,
+                        closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
+                        extra={"mode": ctx.mode, "venue": ctx.mode,
+                               "style": "trend-1x-long",
+                               "held": sorted(meta.keys()), "coins": COINS})
+                except Exception:
+                    pass
             if args.once:
                 break
             time.sleep(LOOP_SECONDS)

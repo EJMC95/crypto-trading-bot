@@ -212,6 +212,13 @@ def main():
         day_start_equity = None
     cur_day = datetime.now(timezone.utc).date()
     halted_today = False
+    # [2026-07-11 DURABLE HALT] a tripped daily-loss halt survives restarts —
+    # the memory-only flag meant a same-day redeploy silently resumed trading.
+    _halt = store.load_daily_halt(bot_id, cur_day.isoformat())
+    if _halt:
+        halted_today = True
+        day_start_equity = _halt.get("day_start_equity") or day_start_equity
+        log.warning("daily-loss halt restored from state — halted for the rest of today.")
 
     # Per-trade risk state (2026-06-25): entry price per coin for stop-loss, and
     # the unix time of the last open/close per coin for the re-entry cooldown.
@@ -267,6 +274,7 @@ def main():
                         "flattening. No revenge trades.", equity, day_start_equity,
                         ", $-rail" if _fleet_loss else "")
             halted_today = True
+            store.save_daily_halt(bot_id, cur_day.isoformat(), day_start_equity)
             if not dry_run:
                 for c in COINS:
                     try:
@@ -276,6 +284,33 @@ def main():
 
         if halted_today:
             log.info("halted for today; sleeping.")
+            # [2026-07-11 HALT HEARTBEAT] keep the dashboard row fresh while
+            # halted — the early `continue` skipped the publish below, so a
+            # halted bot looked DEAD (stale row) instead of HALTED.
+            if dry_run:
+                _hb_eq = broker.equity()
+                _hb_pnl = _hb_eq - PAPER_START
+            else:
+                _hb_eq = equity
+                _hb_pnl = (equity - live_baseline) if (equity is not None
+                                                       and live_baseline is not None) else None
+            try:
+                _hb_open = (broker.open_count() if dry_run
+                            else sum(1 for v in ctx.venue.positions().values()
+                                     if v.get("size")))
+            except Exception:
+                _hb_open = None   # unreadable ≠ flat; don't report 0
+            store.publish(
+                bot_id,
+                status="halted",
+                equity=_hb_eq,
+                pnl_abs=_hb_pnl,
+                open_trades=_hb_open,
+                extra={"mode": ctx.mode if ctx.mode != "hl_paper"
+                       else ("dry-run" if dry_run else "live-testnet"),
+                       "venue": ctx.mode,
+                       "coins": COINS},
+            )
             time.sleep(LOOP_SECONDS)
             continue
 

@@ -210,6 +210,23 @@ def save_state(bot, state):
         return False
 
 
+def save_daily_halt(bot, day_iso, day_start_equity=None):
+    """Persist a tripped daily-loss halt under <bot>:halt. Never raises.
+
+    [2026-07-11 DURABLE HALT] halted_today was memory-only in every perps bot,
+    so a restart/redeploy on the same UTC day silently resumed trading after
+    the loss rail fired. Bots call load_daily_halt at boot to stay halted.
+    """
+    return save_state(bot + ":halt", {"halted_date": day_iso,
+                                      "day_start_equity": day_start_equity})
+
+
+def load_daily_halt(bot, day_iso):
+    """Return the halt state saved for day_iso (UTC 'YYYY-MM-DD'), else None."""
+    st = load_state(bot + ":halt") or {}
+    return st if st.get("halted_date") == day_iso else None
+
+
 def load_state(bot):
     """Return the bot's saved state dict (from save_state), or None. Never raises."""
     conn = _get_conn()
