@@ -193,6 +193,27 @@ re-validated: `--once` runs clean; `lighter_live` REFUSES to boot without BOTH
 the P&L track record is not. Honest expectation stands: directional funding capture is
 ~break-even (funding is real but price risk ≈ offsets it); size it smallest in the fleet.
 
+**Position SCANNER (added 2026-07-11) — picks the best RISK-ADJUSTED positions, not just
+the hottest funder.** Replaces the raw-|APR| sort with: cheap funding prefilter → candle-
+scan the top 15 (cached ~50min) with a realized-vol + adverse-trend VETO (skip stop-out
+traps) and an |APR|-backbone risk-discounted rank → book-probe only the top 5 (spread +
+clip-slippage gate + cross-venue `_bench` tilt). Backtested (`scripts/backtest_scanner.py`,
+150d, 6-slot portfolio): at the **default 0.40 gate** the veto lifts net **+52%** and
+ret/DD **2.0→5.3** with **lower drawdown and fewer trades** (both halves + OOS). HONEST:
+much of the gain is directional mean-reversion (regime-dependent) — the **vol veto** is
+the durable piece. On by default; env knobs (all optional):
+```
+SCAN=off                        # restore legacy raw-|APR| selection (rollback / A-B)
+SCAN_ENTER=0.25                 # OPT-IN widen the gate (in-cache +155% but partly a
+                                #   slippage artifact + 2x churn — shadow-validate FIRST)
+SCAN_VETO_VOL=0.015             # skip 1h realized vol > 1.5%/hr (the durable win)
+SCAN_VETO_ADVERSE=0.05          # skip a fresh >5% move into our stop
+SCAN_MAX_SLIP_BPS=25            # clip VWAP-slippage gate (thin-trap killer)
+```
+Every scanned entry logs its scan evidence (vol/adverse/slip/cross-venue/score) to the
+`venue_orders` ledger — watch the shadow row to validate the live-only layer (cross-venue
++ book depth) before trusting it, then decide on the opt-in gate widening.
+
 ---
 
 ## 🌊 Tide Rider on Lighter (crypto-trend-daily, 1x long perp) — go-live (added 2026-07-10)

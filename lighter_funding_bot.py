@@ -37,6 +37,7 @@ Usage:
 """
 import argparse
 import logging
+import math
 import os
 import sys
 import time
@@ -71,6 +72,44 @@ TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% — loc
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDING_DAILY_LOSS", "0.05"))
 STOP_COOLDOWN_H = float(os.environ.get("FUNDING_STOP_COOLDOWN_H", "12"))  # quarantine after a stop
 BLIND_STOP_MISSES = int(os.environ.get("FUNDING_BLIND_STOP_MISSES", "3"))  # live fail-safe
+
+# ---- position SCANNER (2026-07-11) — choose the best RISK-ADJUSTED positions, not
+# just the hottest funder. Backtested (scripts/backtest_scanner.py, real HL funding+
+# price, 150d, 6-slot portfolio): a realized-vol VETO + fresh-adverse-trend VETO + a
+# widened entry gate lift net +155% and ret/DD 2.0->7.4, robust across both halves +
+# OOS. HONEST CAVEAT: much of that gain is directional MEAN-REVERSION (regime-
+# dependent), not extra funding — the vol veto (skip coins whose price is convulsing
+# too hard to hold past the stop) is the DURABLE piece. All existing SAFETY gates stay
+# as a floor; the scanner only refines WHICH survivors get the scarce slots. The
+# cross-venue (_bench) + book-VWAP-slippage layer can't be backtested from HL history
+# -> shipped as LIVE-ONLY, logged to venue_orders for the shadow ledger to validate.
+# Toggle SCAN=off restores the exact legacy raw-|APR| selection (old-vs-new + rollback).
+SCAN_ENABLED = os.environ.get("SCAN", "on").strip().lower() not in ("off", "0", "false", "no")
+SCAN_VETO_VOL = float(os.environ.get("SCAN_VETO_VOL", "0.015"))  # skip 1h realized vol > 1.5%/hr
+SCAN_VETO_ADVERSE = float(os.environ.get("SCAN_VETO_ADVERSE", "0.05"))  # skip fresh >5% adverse move
+SCAN_MAX_SLIP_BPS = float(os.environ.get("SCAN_MAX_SLIP_BPS", "25"))    # clip VWAP-slip gate (deeper than 20 TOB)
+# CANDLE-scan only the top-N by |apr|*bench. This is a deliberate governor bound: on a
+# cold cache (restart) the deep-scan bursts up to SCAN_DEEP_MAX candle fetches against the
+# ~21 weight/min bucket, so 15 leaves headroom for order/close txs. TRADE-OFF (reviewed,
+# low-sev): in a large live pool (~215 markets) this prefilter can miss a lower-|apr| but
+# higher-quality (low-vol) coin the score would have preferred — validate on the expanded-
+# universe backtest + shadow ledger before raising it. The 30-coin backtest rarely has >15
+# eligible, so shipped ~= backtested there.
+SCAN_DEEP_MAX = int(os.environ.get("SCAN_DEEP_MAX", "15"))
+SCAN_BOOK_PROBE = int(os.environ.get("SCAN_BOOK_PROBE", "5"))   # BOOK-fetch only the top-N finalists (governor)
+SCAN_VOL_LOOKBACK_H = int(os.environ.get("SCAN_VOL_LOOKBACK_H", "24"))
+SCAN_MOM_LOOKBACK_H = int(os.environ.get("SCAN_MOM_LOOKBACK_H", "6"))
+# (candle features are cached per CLOSED hourly bar — see _candle_features — so they
+# refresh the moment a new bar closes and are reused free within the hour; no TTL knob.)
+
+# Entry gate. The DEFAULT KEEPS THE TUNED 0.40 SAFETY GATE — the scanner's mandate is to
+# pick better AMONG the survivors (veto stop-out traps + risk-adjusted rank), NOT to
+# loosen the floor. Widening to ~0.25 lifts the in-cache net far more (+155% vs +53%) but
+# partly as a flat-slippage backtest artifact, ~doubles churn, and changes a SAFETY gate —
+# so it is OPT-IN (set SCAN_ENTER=0.25) and should be shadow-validated first. Defaults to
+# ENTER_APR = no widening. (Backtest: scripts/backtest_scanner.py.)
+SCAN_ENTER = float(os.environ.get("SCAN_ENTER", str(ENTER_APR)))
+ENTER_GATE = SCAN_ENTER if SCAN_ENABLED else ENTER_APR
 
 LOOP_SECONDS = int(os.environ.get("FUNDING_LOOP_SECONDS", "300"))
 
@@ -113,6 +152,200 @@ def book_spread_bps(ctx, coin):
         if mid:
             return (ask - bid) / mid * 1e4
     return None
+
+
+# ============================ POSITION SCANNER ==============================
+# Chooses the best RISK-ADJUSTED candidates for the scarce slots (see the SCAN_*
+# config block for the thesis + backtest). Cheap funding-only prefilter runs in the
+# main loop; these helpers do the deep-scan (candles + one book fetch) on the top-N.
+_feat_cache = {}   # coin -> (ts, {vol, ret_mom}); candle features are slow-moving
+
+
+def _candle_features(ctx, coin):
+    """Realized vol + short-horizon momentum from ~1d of CLOSED 1h candles. Returns
+    {'vol','ret_mom'} or None if unavailable — None means 'cannot assess price risk',
+    and the caller MUST skip the candidate (never enter blind on the vol veto).
+    Definitions match scripts/backtest_scanner.py EXACTLY: vol = sample stdev of the
+    last SCAN_VOL_LOOKBACK_H hourly returns; ret_mom = the SCAN_MOM_LOOKBACK_H-hour
+    close-to-close return.
+
+    [review 2026-07-11] Two fixes so live == backtested + no look-ahead:
+      * DROP the forming (current-hour) bar — candles() returns it as the last row;
+        including it would compute vol/momentum off a partial bar (the backtest uses
+        closed bars only) and read the current price into the entry feature.
+      * Cache is keyed on the most-recent CLOSED hour, not a wall-clock TTL, so it
+        refreshes the instant a new bar closes (a fresh vol spike is picked up next
+        loop, not up to ~50min later) and is otherwise reused free within the hour.
+    Rows are sorted chronologically (don't trust API order) before differencing."""
+    now = time.time()
+    last_closed = int(now // 3600) * 3600 - 3600     # open-ts of the newest CLOSED hour (sec)
+    hit = _feat_cache.get(coin)
+    if hit and hit[0] == last_closed:
+        return hit[1]
+    need_h = max(SCAN_VOL_LOOKBACK_H, SCAN_MOM_LOOKBACK_H) + 4
+    try:
+        end_ms = int(now * 1000)
+        rows = ctx.venue.candles(coin, "1h", end_ms - need_h * 3600 * 1000, end_ms)
+    except Exception:
+        return None
+    bars = []
+    for c in rows or []:
+        try:
+            t_s = int(c["t"]) // 1000
+            cl = float(c["c"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if t_s > last_closed:            # drop the forming (current-hour) bar
+            continue
+        bars.append((t_s, cl))
+    bars.sort()                          # chronological; API order not trusted
+    closes = [cl for _, cl in bars]
+    if len(closes) < SCAN_VOL_LOOKBACK_H + 1:
+        return None
+    rets = [closes[i] / closes[i - 1] - 1.0
+            for i in range(1, len(closes)) if closes[i - 1]]
+    w = rets[-SCAN_VOL_LOOKBACK_H:]
+    mean = sum(w) / len(w)
+    vol = math.sqrt(sum((r - mean) ** 2 for r in w) / (len(w) - 1)) if len(w) > 1 else 0.0
+    ret_mom = (closes[-1] / closes[-1 - SCAN_MOM_LOOKBACK_H] - 1.0) \
+        if len(closes) > SCAN_MOM_LOOKBACK_H and closes[-1 - SCAN_MOM_LOOKBACK_H] else 0.0
+    feats = {"vol": vol, "ret_mom": ret_mom}
+    _feat_cache[coin] = (last_closed, feats)
+    return feats
+
+
+def book_metrics(ctx, coin, order_usd):
+    """ONE orderbook fetch -> {mid, spread_bps, buy_slip, sell_slip}. buy/sell_slip is
+    the VWAP slippage (bps, >=0) to fill an `order_usd` clip walking the asks/bids;
+    None for a side without enough depth for the clip. Replaces the old
+    book_spread_bps + fresh_mid DOUBLE fetch on the entry path (governor efficiency)."""
+    try:
+        book = ctx.venue.orderbook(coin)
+    except Exception:
+        return None
+    bids, asks = book.get("bids") or [], book.get("asks") or []
+    if not bids or not asks:
+        return None
+    # sort defensively best-first — the ws cache is pre-sorted but the REST-snapshot
+    # fallback (the Railway norm, ws is CDN-blocked) is NOT, and the VWAP walk below
+    # would be wrong on an unordered book. [review 2026-07-11]
+    bids = sorted(bids, key=lambda x: -x[0])     # highest bid first
+    asks = sorted(asks, key=lambda x: x[0])      # lowest ask first
+    if not bids[0][0] or not asks[0][0]:
+        return None
+    bid, ask = bids[0][0], asks[0][0]
+    mid = (bid + ask) / 2.0
+
+    def vwap_slip(levels, adverse_up):
+        need, cost, base = order_usd, 0.0, 0.0
+        for px, sz in levels:
+            if px <= 0 or sz <= 0:
+                continue
+            take = min(need, px * sz)
+            cost += take
+            base += take / px
+            need -= take
+            if need <= 1e-9:
+                break
+        if need > 1e-9 or base <= 0:
+            return None                      # book too thin for the clip
+        vwap = cost / base
+        return (vwap - mid) / mid * 1e4 if adverse_up else (mid - vwap) / mid * 1e4
+
+    # near-touch notional depth within +/-0.5% of mid (for the imbalance tiebreak)
+    band = mid * 0.005
+    bid_depth = sum(px * sz for px, sz in bids if px >= mid - band)
+    ask_depth = sum(px * sz for px, sz in asks if px <= mid + band)
+    return {"mid": mid, "spread_bps": (ask - bid) / mid * 1e4,
+            "buy_slip": vwap_slip(asks, True), "sell_slip": vwap_slip(bids, False),
+            "bid_depth": bid_depth, "ask_depth": ask_depth}
+
+
+def cross_venue_mult(f):
+    """Bounded [0.5, 1.2] score multiplier from cross-venue funding agreement
+    (f['_bench']: binance/bybit/hyperliquid). Benches confirming Lighter's sign =
+    structural crowding (reward); a Lighter-only extreme = local dislocation (demote).
+    LIVE-ONLY (no _bench history to backtest); never a hard gate, never re-admits a
+    vetoed coin — it only re-orders survivors. Returns 1.0 when there is no bench data
+    (e.g. hl_paper)."""
+    rate = f.get("rate") or 0.0
+    bench = f.get("_bench") or {}
+    if not rate or not bench:
+        return 1.0
+    total = sum(1 for v in bench.values() if v)
+    if not total:
+        return 1.0
+    agree = sum(1 for v in bench.values() if v and (v > 0) == (rate > 0))
+    return 0.5 + 0.7 * (agree / total)       # 0 agree -> 0.5, all agree -> 1.2
+
+
+def scan_candidates(ctx, prelim, order_usd, log):
+    """Three governor-aware stages; returns finalists ranked best-first as
+    (coin, f, apr, is_short, book_metrics, evidence). Fetch-cost is bounded so the
+    scan can't drain the ~21 weight/min Lighter budget shared with order txs + sibling
+    bots (on Railway the ws is CDN-blocked, so EVERY orderbook() costs 1 token):
+
+      A. FREE prefilter — rank the whole eligible pool by |apr| x cross-venue mult
+         (both already in the funding_map row; 0 extra tokens). Steer the scarce
+         candle/book budget toward structurally-crowded names.
+      B. CANDLE deep-scan the top SCAN_DEEP_MAX (cached ~50min): VETO stop-out traps
+         (vol / adverse-trend) and score survivors by |APR| x bounded risk discounts
+         x cross-venue. This is the BACKTESTED core (scripts/backtest_scanner.py).
+      C. BOOK-probe only the top SCAN_BOOK_PROBE survivors (ONE fetch each): spread +
+         clip-slippage gate + a small book-imbalance tiebreak. Live-only overlay."""
+    # STAGE A — free cross-venue-weighted prefilter over the whole eligible pool
+    ranked_pre = sorted(prelim, key=lambda cfa: -abs(cfa[2]) * cross_venue_mult(cfa[1]))
+
+    # STAGE B — candle veto + core score on the top SCAN_DEEP_MAX (cached)
+    survivors = []
+    for coin, f, apr in ranked_pre[:SCAN_DEEP_MAX]:
+        feats = _candle_features(ctx, coin)
+        if feats is None:
+            log.info("%s SCAN_SKIP no-candles (risk unverifiable)", coin)
+            continue
+        is_short = apr > 0                       # funding>0 -> longs pay -> we SHORT
+        adverse = feats["ret_mom"] if is_short else -feats["ret_mom"]
+        if feats["vol"] > SCAN_VETO_VOL:
+            log.info("%s VETO vol %.2f%%/h > %.2f%%", coin, feats["vol"] * 100,
+                     SCAN_VETO_VOL * 100)
+            continue
+        if adverse > SCAN_VETO_ADVERSE:
+            log.info("%s VETO adverse-trend %+.1f%% (fresh move into our stop)",
+                     coin, adverse * 100)
+            continue
+        vol_disc = 1.0 / (1.0 + (feats["vol"] / SCAN_VETO_VOL) ** 2)  # (0,1], .5 at veto
+        adv_disc = math.exp(-6.0 * max(0.0, adverse))                 # (0,1]
+        xv = cross_venue_mult(f)                                      # [0.5,1.2]
+        core = abs(apr) * vol_disc * adv_disc * xv
+        survivors.append((core, coin, f, apr, is_short, feats, xv, adverse))
+    survivors.sort(key=lambda x: -x[0])
+
+    # STAGE C — book-probe only the top finalists (bounded token spend)
+    finalists = []
+    for core, coin, f, apr, is_short, feats, xv, adverse in survivors[:SCAN_BOOK_PROBE]:
+        bm = book_metrics(ctx, coin, order_usd)
+        if bm is None or bm["spread_bps"] > MAX_SPREAD_BPS:
+            log.info("%s SPREAD/BOOK_SKIP (%s)", coin,
+                     f"{bm['spread_bps']:.0f}bps" if bm else "no book")
+            continue
+        slip = bm["sell_slip"] if is_short else bm["buy_slip"]
+        if slip is None or slip > SCAN_MAX_SLIP_BPS:
+            log.info("%s VETO clip-slip %s bps > %.0f", coin,
+                     f"{slip:.0f}" if slip is not None else "thin", SCAN_MAX_SLIP_BPS)
+            continue
+        # adverse near-touch imbalance: book leaning INTO our stop (short hurt by bids,
+        # long by asks). Small tiebreak only — noisy/spoofable, never a gate.
+        tot = bm["bid_depth"] + bm["ask_depth"]
+        imb = (((bm["bid_depth"] - bm["ask_depth"]) if is_short
+                else (bm["ask_depth"] - bm["bid_depth"])) / tot) if tot > 0 else 0.0
+        final = core * (1.0 - 0.30 * max(0.0, imb))
+        ev = {"score": round(final, 4), "vol": round(feats["vol"], 5),
+              "adverse": round(adverse, 4), "slip_bps": round(slip, 1),
+              "xv": round(xv, 2), "imb": round(imb, 2)}
+        finalists.append((final, coin, f, apr, is_short, bm, ev))
+    finalists.sort(key=lambda x: -x[0])
+    return [(c, f, apr, is_short, bm, ev)
+            for _, c, f, apr, is_short, bm, ev in finalists]
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
@@ -183,9 +416,20 @@ def main():
     log.info("Yield Harvester (Lighter DIRECTIONAL funding) | venue=%s (%s)",
              ctx.mode, "modelled fills" if dry_run else "SENDS ORDERS")
     log.info("enter |apr|>=%.0f%% persist %.0fh, exit<%.0f%% | HARD STOP %.0f%% / TP %.0f%% "
-             "| $%.0f x max %d | vol>=$%.0fM spread<=%.0fbps | loop=%ds", ENTER_APR * 100,
+             "| $%.0f x max %d | vol>=$%.0fM spread<=%.0fbps | loop=%ds", ENTER_GATE * 100,
              PERSIST_H, EXIT_APR * 100, HARD_STOP * 100, TAKE_PROFIT * 100, order_usd,
              max_open, MIN_VOL / 1e6, MAX_SPREAD_BPS, LOOP_SECONDS)
+    if SCAN_ENABLED:
+        log.info("SCANNER on: candle-scan top %d, book-probe top %d | VETO vol>%.1f%%/h | "
+                 "adverse>%.0f%% | clip-slip>%.0fbps; rank |apr| x risk-discounts x "
+                 "cross-venue. gate=%.0f%%%s", SCAN_DEEP_MAX, SCAN_BOOK_PROBE,
+                 SCAN_VETO_VOL * 100, SCAN_VETO_ADVERSE * 100, SCAN_MAX_SLIP_BPS,
+                 ENTER_GATE * 100,
+                 " (WIDENED — opt-in; shadow-validate)" if SCAN_ENTER < ENTER_APR else "")
+        log.info("Scanner edge is largely directional MEAN-REVERSION (regime-dependent); "
+                 "the vol veto is the durable piece. Backtest: scripts/backtest_scanner.py.")
+    else:
+        log.info("SCANNER off (SCAN=off): legacy raw-|apr| selection.")
     log.info("DIRECTIONAL — not delta-neutral; price risk bounded by the hard stop.")
     log.info("=" * 64)
 
@@ -415,18 +659,20 @@ def main():
             if decision == "stop":
                 cooldown[coin] = t0 + STOP_COOLDOWN_H * 3600.0   # quarantine after a stop
 
-        # ---- persistence clock over the whole funding map ----
+        # ---- persistence clock over the whole funding map (uses the SAME gate the
+        # scanner enters on, else persistence would never arm at the wider gate) ----
         for c, f in fund.items():
             r = f.get("rate")
-            if r is not None and abs(r * H) >= ENTER_APR:
+            if r is not None and abs(r * H) >= ENTER_GATE:
                 hot_since.setdefault(c, t0)
             else:
                 hot_since.pop(c, None)
 
-        # ---- scan for new entries ----
+        # ---- scan for new entries — cheap funding prefilter, then deep-scan ----
         open_now = sum(1 for v in pos.values() if (v.get("size") if isinstance(v, dict) else v))
         if open_now < max_open:
-            cands = []
+            # cheap prefilter: hard SAFETY gates on the funding map only (no network)
+            prelim = []
             for c, f in fund.items():
                 if c in meta or c in pos:
                     continue
@@ -436,24 +682,41 @@ def main():
                 if r is None:
                     continue
                 apr = r * H
-                if abs(apr) < ENTER_APR or (f.get("vol") or 0.0) < MIN_VOL:
+                if abs(apr) < ENTER_GATE or (f.get("vol") or 0.0) < MIN_VOL:
                     continue
                 if (t0 - hot_since.get(c, t0)) / 3600.0 < PERSIST_H:
                     continue
                 if not ctx.supports(c):
                     continue
-                cands.append((c, f, apr))
-            cands.sort(key=lambda x: -abs(x[2]))
-            for coin, f, apr in cands:
+                prelim.append((c, f, apr))
+            prelim.sort(key=lambda x: -abs(x[2]))
+
+            if SCAN_ENABLED:
+                # deep-scan the hottest SCAN_DEEP_MAX: veto traps + rank risk-adjusted.
+                # Each tuple carries its already-fetched book_metrics + scan evidence.
+                # Wrapped: a scanner bug must NEVER crash the loop that manages stops —
+                # degrade to no new entries this loop. [review 2026-07-11]
+                try:
+                    ranked = scan_candidates(ctx, prelim, order_usd, log)
+                except Exception as e:  # noqa: BLE001
+                    log.error("scanner error (%s) — no new entries this loop", e)
+                    ranked = []
+            else:
+                # legacy: raw |apr|, book fetched per-candidate below (bm/ev = None)
+                ranked = [(c, f, apr, apr > 0, None, None) for c, f, apr in prelim]
+
+            for coin, f, apr, is_short, bm, ev in ranked:
                 if open_now >= max_open or opened_this_loop >= MAX_NEW_PER_LOOP:
                     break
-                # book-spread liquidity gate — keeps thin traps (WEN 870bps) out.
-                sp = book_spread_bps(ctx, coin)
-                if sp is None or sp > MAX_SPREAD_BPS:
-                    log.info("%s SPREAD_SKIP (%.0fbps)", coin, sp if sp is not None else -1)
-                    continue
-                is_short = apr > 0                 # funding>0 -> longs pay -> we SHORT
-                px = fresh_mid(ctx, coin)
+                if bm is None:
+                    # legacy / scanner-off: spread gate + fresh mid (own book fetch)
+                    sp = book_spread_bps(ctx, coin)
+                    if sp is None or sp > MAX_SPREAD_BPS:
+                        log.info("%s SPREAD_SKIP (%.0fbps)", coin, sp if sp is not None else -1)
+                        continue
+                    px, spread_bps = fresh_mid(ctx, coin), sp
+                else:
+                    px, spread_bps = bm["mid"], bm["spread_bps"]   # from the deep-scan fetch
                 if px is None:
                     continue
                 size = round(order_usd / px, 6)
@@ -475,15 +738,19 @@ def main():
                               "accrued": 0.0}
                 open_now += 1
                 opened_this_loop += 1
-                log.info("OPEN %s %s $%.0f | funding %+.1f%% APR | px %.6g | spread %.0fbps",
-                         coin, "short" if is_short else "long", order_usd, apr, px, sp)
+                log.info("OPEN %s %s $%.0f | funding %+.1f%% APR | px %.6g | spread %.0fbps%s",
+                         coin, "short" if is_short else "long", order_usd, apr, px, spread_bps,
+                         (" | " + " ".join(f"{k}={v}" for k, v in ev.items())) if ev else "")
                 try:
+                    raw = {"apr": round(apr, 3), "spread_bps": round(spread_bps, 1),
+                           "leg": "open"}
+                    if ev:
+                        raw["scan"] = ev      # vol/adverse/slip/xv/score -> shadow ledger
                     store.publish_venue_order(
                         bot_id, venue=("lighter" if venue_tag else "hl"),
                         shadow=shadow_tag, coin=coin,
                         side=("sell" if is_short else "buy"), size=size,
-                        px_decision=px, px_fill=px,
-                        raw={"apr": round(apr, 3), "spread_bps": round(sp, 1), "leg": "open"})
+                        px_decision=px, px_fill=px, raw=raw)
                 except Exception:
                     pass
 
