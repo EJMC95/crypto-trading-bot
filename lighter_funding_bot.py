@@ -124,6 +124,16 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
+def _mctx_slice(mctx, coin):
+    """[2026-07-11 INSTRUMENT-FIRST] Compact market-context snapshot attached to
+    every ledgered ENTRY (see market_context.py). Validation dataset only —
+    nothing here gates a trade until a factor passes the both-halves bar."""
+    c = (mctx.get("coins") or {}).get(coin) or {}
+    return {"heat": mctx.get("heat_mean_apr"), "btc_vol": mctx.get("btc_vol_1h"),
+            "oi_chg_1h": c.get("oi_chg_1h"), "oi_chg_24h": c.get("oi_chg_24h"),
+            "premium_bps": c.get("premium_bps"), "liq_1h": c.get("liq_1h")}
+
+
 def fresh_mid(ctx, coin):
     """Current mid from the LIVE book, or None if unavailable. NEVER falls back to
     the funding-map mark — that is a last-trade price frozen at client construction
@@ -593,6 +603,13 @@ def main():
         dt_h = (t0 - last_ts) / 3600.0
         last_ts = t0
 
+        # [2026-07-11 INSTRUMENT-FIRST] one cheap state read per loop; the
+        # snapshot rides along on every entry's ledger row via _mctx_slice.
+        try:
+            _mctx = store.load_state("market-context") or {}
+        except Exception:  # noqa: BLE001
+            _mctx = {}
+
         # ---- manage open positions (held coins may no longer be hot) ----
         held_coins = set(pos) | set(meta)
         opened_this_loop = 0
@@ -784,7 +801,7 @@ def main():
                          (" | " + " ".join(f"{k}={v}" for k, v in ev.items())) if ev else "")
                 try:
                     raw = {"apr": round(apr, 3), "spread_bps": round(spread_bps, 1),
-                           "leg": "open"}
+                           "leg": "open", "mctx": _mctx_slice(_mctx, coin)}
                     if ev:
                         raw["scan"] = ev      # vol/adverse/slip/xv/score -> shadow ledger
                     store.publish_venue_order(

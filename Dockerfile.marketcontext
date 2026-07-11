@@ -1,0 +1,17 @@
+# Image for 🛰️ market-context (fleet instrumentation collector).
+# Set RAILWAY_DOCKERFILE_PATH=Dockerfile.marketcontext. INSTRUMENT-ONLY: this
+# service never trades — it collects OI / funding dispersion / liquidation-tape
+# / heat into bot_state("market-context") + a per-coin quality table, which the
+# trading bots attach to their entry ledger rows for later validation.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY market_context.py bot_pnl_store.py ./
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "market_context.py"]

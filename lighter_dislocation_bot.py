@@ -256,6 +256,21 @@ def main():
             continue
 
         ref = hl_mids()
+        # [2026-07-11 INSTRUMENT-FIRST] market-context snapshot (market_context.py)
+        # rides along on census events + entry ledger rows — the dislocation<->
+        # liquidation correlation is this bot's core hypothesis to validate.
+        try:
+            _mctx = store.load_state("market-context") or {}
+        except Exception:  # noqa: BLE001
+            _mctx = {}
+
+        def _mctx_slice(coin):
+            c = (_mctx.get("coins") or {}).get(coin) or {}
+            return {"heat": _mctx.get("heat_mean_apr"),
+                    "btc_vol": _mctx.get("btc_vol_1h"),
+                    "oi_chg_1h": c.get("oi_chg_1h"),
+                    "liq_5m": c.get("liq_5m"), "liq_1h": c.get("liq_1h")}
+
         events_this_loop = 0
         if ref:
             for coin in COINS:
@@ -276,6 +291,7 @@ def main():
                     rec["count"] += 1
                     rec["max_bps"] = max(rec["max_bps"], abs(dev_bps))
                     rec["last_iso"] = now.isoformat()
+                    rec["last_mctx"] = _mctx_slice(coin)
                     log.info("DISLOC %-5s %+7.1fbps mid=%.6g ref=%.6g "
                              "spread=%.0fbps slip(b/s)=%s/%s%s",
                              coin, dev_bps, bv["mid"], r, bv["spread_bps"],
@@ -353,7 +369,8 @@ def main():
                         px_decision=bv["mid"], px_fill=fill,
                         spread_bps=bv["spread_bps"], slippage_bps=slip,
                         raw={"leg": "open", "dev_bps": dev_bps,
-                             "ref": r, "confirms": CONFIRM_LOOPS})
+                             "ref": r, "confirms": CONFIRM_LOOPS,
+                             "mctx": _mctx_slice(coin)})
                 except Exception:  # noqa: BLE001
                     pass
         else:
