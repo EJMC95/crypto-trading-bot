@@ -68,7 +68,9 @@ run_bot user_data/config_v4_core.json   v4core   &   # crypto-trend-daily   · I
 run_bot user_data/config_v5_kraken.json  v5gated  &   # crypto-intraday-15m  · DayTraderV5Gated  · 15m
 run_bot user_data/config_v6_swing.json   v6swing  &   # crypto-swing-daily   · SwingDipV1        · dip buyer
 run_bot user_data/config_v7_momo.json    v7momo   &   # crypto-breakout-4h   · MomoBreakoutV1    · 4h breakout
-run_bot user_data/config_v8_momo.json    v8momo   &   # crypto-trendmomo-4h  · TrendMomoV1       · 4h momo
+# [2026-07-12 RETIRED] v8momo (crypto-trendmomo-4h · TrendMomoV1) — core leg
+# backtests -29%/4.5y (26.5% win) on the bear_bounce audit replay and bled
+# live (-$11.33); user-approved retirement. Row moved to dashboard RETIRED_ROWS.
 
 # Family bots (mum/dad/avo-maria/georgia) run in their OWN Railway services
 # via ONLY_BOT mode above — do NOT re-add them here (see CHANGELOG 2026-07-07).
