@@ -20,7 +20,7 @@ import base64
 import html
 import threading
 import datetime as dt
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get("PORT", "8080"))
@@ -30,7 +30,8 @@ PORT = int(os.environ.get("PORT", "8080"))
 # overspray speckle, paint drips). Kept faint — purely decorative, must never
 # compete with card text for legibility.
 _WATERMARK_TILE_SVG = (
-    "<svg xmlns='http://www.w3.org/2000/svg' width='900' height='360'>"
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 360' "
+    "preserveAspectRatio='xMidYMid meet'>"
     "<defs>"
     "<filter id='spray' x='-30%' y='-30%' width='160%' height='160%'>"
     "<feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' result='n'/>"
@@ -61,52 +62,59 @@ _WATERMARK_TILE_SVG = (
     "<stop offset='70%' stop-color='#ffffff' stop-opacity='0'/>"
     "</linearGradient>"
     "</defs>"
-    "<g opacity='0.72'>"
-    # Flowing handstyle tag — slanted italic script (leaning graffiti "throw"),
-    # not block letters. Font falls back through common script faces to cursive.
-    f"<g transform='rotate(-7 450 200) skewX(-9)' "
-    f"font-family=\"'Brush Script MT','Segoe Script','Snell Roundhand','Bradley Hand',cursive\" "
-    f"font-size='168' font-style='italic' font-weight='700' text-anchor='middle'>"
+    "<g opacity='0.78'>"
+    # Graffiti marker handstyle — 'Permanent Marker' web font (loaded on the page;
+    # this SVG is inline so it inherits it), skewed for the aggressive tag slant.
+    # Falls back to other marker/handwritten faces, then cursive.
+    f"<g transform='rotate(-5 450 200) skewX(-11)' "
+    f"font-family=\"'Permanent Marker','Rock Salt','Bradley Hand',cursive\" "
+    f"font-size='150' font-weight='400' text-anchor='middle'>"
     # molten glow halo behind the whole piece
-    "<text x='450' y='232' fill='#ff5a00' opacity='0.4' filter='url(#halo)'>$ EJMC $</text>"
+    "<text x='450' y='228' fill='#ff5a00' opacity='0.4' filter='url(#halo)'>$ EJMC $</text>"
     # drop shadow, offset down-right for depth
-    "<text x='458' y='242' fill='#2a0a00' opacity='0.55'>$ EJMC $</text>"
+    "<text x='457' y='237' fill='#2a0a00' opacity='0.5'>$ EJMC $</text>"
     # charred outline + spray-grained lava fill, in one pass
-    "<text x='450' y='232' fill='url(#lavagrad)' stroke='#3a1000' stroke-width='6' "
+    "<text x='450' y='228' fill='url(#lavagrad)' stroke='#3a1000' stroke-width='5' "
     "stroke-linejoin='round' paint-order='stroke fill' filter='url(#spray)'>$ EJMC $</text>"
     # glossy highlight streak across the top of the strokes
-    "<text x='450' y='232' fill='url(#hlgrad)' style='mix-blend-mode:screen'>$ EJMC $</text>"
+    "<text x='450' y='228' fill='url(#hlgrad)' style='mix-blend-mode:screen'>$ EJMC $</text>"
     "</g>"
-    # paint drips — running down from the letters, tapering to a pooled blob at
-    # each tip. Scattered along the baseline like fresh wet spraypaint runs.
-    "<g opacity='0.92'>"
-    "<path d='M174 238 C174 289 178 320 180 330 C182 320 186 289 186 238 Z' fill='url(#dripfade)'/>"
-    "<circle cx='180' cy='330' r='6.5' fill='#ff3d00' opacity='0.7'/>"
-    "<path d='M295 242 C295 274 298 292 300 300 C302 292 305 274 305 242 Z' fill='url(#dripfade)'/>"
-    "<circle cx='300' cy='300' r='5' fill='#ff3d00' opacity='0.62'/>"
-    "<path d='M394 240 C394 285 398 314 400 322 C402 314 406 285 406 240 Z' fill='url(#dripfade)'/>"
-    "<circle cx='400' cy='322' r='6' fill='#ff3d00' opacity='0.68'/>"
-    "<path d='M475 244 C475 269 478 283 480 290 C482 283 485 269 485 244 Z' fill='url(#dripfade)'/>"
-    "<circle cx='480' cy='290' r='4.5' fill='#ff3d00' opacity='0.58'/>"
-    "<path d='M554 240 C554 287 558 318 560 326 C562 318 566 287 566 240 Z' fill='url(#dripfade)'/>"
-    "<circle cx='560' cy='326' r='6.5' fill='#ff3d00' opacity='0.7'/>"
-    "<path d='M655 242 C655 273 658 291 660 298 C662 291 665 273 665 242 Z' fill='url(#dripfade)'/>"
-    "<circle cx='660' cy='298' r='5' fill='#ff3d00' opacity='0.6'/>"
-    "<path d='M734 240 C734 282 738 308 740 316 C742 308 746 282 746 240 Z' fill='url(#dripfade)'/>"
-    "<circle cx='740' cy='316' r='5.5' fill='#ff3d00' opacity='0.64'/>"
+    # paint drips — thin near-straight runs with a small drop at the tip, the way
+    # a marker/spray tag bleeds down. Scattered along the baseline.
+    "<g opacity='0.9'>"
+    "<rect x='178' y='232' width='3.4' height='96' rx='1.7' fill='url(#dripfade)'/>"
+    "<circle cx='179.7' cy='330' r='4' fill='#ff3d00' opacity='0.7'/>"
+    "<rect x='262' y='236' width='2.8' height='60' rx='1.4' fill='url(#dripfade)'/>"
+    "<circle cx='263.4' cy='298' r='3.2' fill='#ff3d00' opacity='0.62'/>"
+    "<rect x='330' y='234' width='3.2' height='82' rx='1.6' fill='url(#dripfade)'/>"
+    "<circle cx='331.6' cy='318' r='3.8' fill='#ff3d00' opacity='0.66'/>"
+    "<rect x='404' y='238' width='2.6' height='46' rx='1.3' fill='url(#dripfade)'/>"
+    "<circle cx='405.3' cy='286' r='3' fill='#ff3d00' opacity='0.58'/>"
+    "<rect x='474' y='234' width='3.4' height='92' rx='1.7' fill='url(#dripfade)'/>"
+    "<circle cx='475.7' cy='328' r='4' fill='#ff3d00' opacity='0.7'/>"
+    "<rect x='560' y='236' width='2.8' height='56' rx='1.4' fill='url(#dripfade)'/>"
+    "<circle cx='561.4' cy='294' r='3.2' fill='#ff3d00' opacity='0.6'/>"
+    "<rect x='648' y='234' width='3' height='72' rx='1.5' fill='url(#dripfade)'/>"
+    "<circle cx='649.5' cy='308' r='3.6' fill='#ff3d00' opacity='0.64'/>"
+    "<rect x='736' y='236' width='2.8' height='50' rx='1.4' fill='url(#dripfade)'/>"
+    "<circle cx='737.4' cy='288' r='3.2' fill='#ff3d00' opacity='0.6'/>"
     "</g>"
     # overspray speckle + faint spray-ring flourish, like a tag finished with the can
     "<circle cx='150' cy='150' r='4' fill='#ff5a00' opacity='0.4' filter='url(#soft)'/>"
     "<circle cx='176' cy='128' r='2.2' fill='#ff5a00' opacity='0.55'/>"
     "<circle cx='690' cy='150' r='3.6' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
     "<circle cx='664' cy='170' r='2' fill='#ff5a00' opacity='0.5'/>"
-    "<circle cx='450' cy='96' r='3' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='450' cy='92' r='3' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
     "<circle cx='800' cy='196' r='13' fill='none' stroke='#ff5a00' stroke-width='1.6' "
     "opacity='0.3' filter='url(#soft)'/>"
     "</g>"
     "</svg>"
 )
-WATERMARK_BG_URL = f"data:image/svg+xml,{quote(_WATERMARK_TILE_SVG)}"
+# Rendered as an INLINE svg (fixed, behind the cards) rather than a CSS
+# background-image, so it can use the 'Permanent Marker' web font — background
+# SVGs are sandboxed and can't load page fonts, which is why a font swap needs
+# this. The <link> for the font is added in the page <head>.
+WATERMARK_HTML = f'<div class="wm" aria-hidden="true">{_WATERMARK_TILE_SVG}</div>'
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 # Login for THIS dashboard page (override via env on Railway).
@@ -1199,16 +1207,20 @@ def render():
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="30">
 <title>All Bots — Live P&amp;L</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&amp;display=swap" rel="stylesheet">
 <style>
  @keyframes gradientshift{{0%{{background-position:0% 50%}}50%{{background-position:100% 50%}}100%{{background-position:0% 50%}}}}
  body{{font-family:-apple-system,system-ui,sans-serif;margin:0;color:#16232c;
    background-color:#eef7fd;
-   background-image:url("{WATERMARK_BG_URL}"),
-     repeating-linear-gradient(180deg,#ffffff 0 70px,#aed8f6 70px 140px);
-   background-repeat:no-repeat,repeat;
-   background-position:center center,0 0;
-   background-size:min(97vw,2000px) auto,auto;
-   background-attachment:fixed,fixed}}
+   background-image:repeating-linear-gradient(180deg,#ffffff 0 70px,#aed8f6 70px 140px);
+   background-attachment:fixed}}
+ /* the "$ EJMC $" graffiti piece — fixed behind the cards (z-index:-1 so the
+    striped body shows behind it and the cards sit on top). */
+ .wm{{position:fixed;inset:0;z-index:-1;display:flex;align-items:center;
+   justify-content:center;pointer-events:none;overflow:hidden}}
+ .wm svg{{width:min(97vw,2000px);height:auto}}
  header{{padding:16px 18px;background:#ffffffd9;backdrop-filter:blur(2px);
    border-bottom:3px solid #caa227;position:relative}}
  header::after{{content:"";position:absolute;left:0;right:0;bottom:-6px;height:2px;
@@ -1249,6 +1261,7 @@ def render():
  .dot.on{{background:#1a7f37;box-shadow:0 0 6px #1a7f37}} .dot.off{{background:#d1242f;box-shadow:0 0 6px #d1242f}} .dot.warn{{background:#b8860b;box-shadow:0 0 6px #b8860b}}
  footer{{padding:10px 18px;color:#5b7184;font-size:11px}}
 </style></head><body>
+{WATERMARK_HTML}
 <header>
  <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a></h1>
  <div class="totals">
