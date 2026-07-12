@@ -29,9 +29,8 @@ PORT = int(os.environ.get("PORT", "8080"))
 # spraycan tag (grainy fill via feTurbulence, jittered per-glyph rotation,
 # overspray speckle, paint drips). Kept faint — purely decorative, must never
 # compete with card text for legibility.
-_G = "-8 0 5 -4 6 -5 0 7"  # per-glyph rotation jitter, shared across every text layer below
 _WATERMARK_TILE_SVG = (
-    "<svg xmlns='http://www.w3.org/2000/svg' width='520' height='280'>"
+    "<svg xmlns='http://www.w3.org/2000/svg' width='900' height='360'>"
     "<defs>"
     "<filter id='spray' x='-30%' y='-30%' width='160%' height='160%'>"
     "<feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' result='n'/>"
@@ -63,46 +62,46 @@ _WATERMARK_TILE_SVG = (
     "</linearGradient>"
     "</defs>"
     "<g opacity='0.72'>"
-    f"<g transform='rotate(-14 230 115)' font-family=\"'Arial Black',Impact,-apple-system,sans-serif\" "
-    f"font-size='64' font-weight='900' text-anchor='middle'>"
+    # Flowing handstyle tag — slanted italic script (leaning graffiti "throw"),
+    # not block letters. Font falls back through common script faces to cursive.
+    f"<g transform='rotate(-7 450 200) skewX(-9)' "
+    f"font-family=\"'Brush Script MT','Segoe Script','Snell Roundhand','Bradley Hand',cursive\" "
+    f"font-size='168' font-style='italic' font-weight='700' text-anchor='middle'>"
     # molten glow halo behind the whole piece
-    f"<text x='230' y='128' fill='#ff5a00' opacity='0.4' filter='url(#halo)' rotate='{_G}'>$ EJMC $</text>"
-    # drop shadow, offset down-right for a chunky 3D block letter feel
-    f"<text x='236' y='136' fill='#2a0a00' opacity='0.6' rotate='{_G}'>$ EJMC $</text>"
-    # thick charred outline + spray-grained lava fill, in one pass
-    f"<text x='230' y='128' fill='url(#lavagrad)' stroke='#3a1000' stroke-width='7' "
-    f"stroke-linejoin='round' paint-order='stroke fill' filter='url(#spray)' "
-    f"rotate='{_G}'>$ EJMC $</text>"
-    # glossy highlight streak across the top third of the letters
-    f"<text x='230' y='128' fill='url(#hlgrad)' style='mix-blend-mode:screen' "
-    f"rotate='{_G}'>$ EJMC $</text>"
+    "<text x='450' y='232' fill='#ff5a00' opacity='0.4' filter='url(#halo)'>$ EJMC $</text>"
+    # drop shadow, offset down-right for depth
+    "<text x='458' y='242' fill='#2a0a00' opacity='0.55'>$ EJMC $</text>"
+    # charred outline + spray-grained lava fill, in one pass
+    "<text x='450' y='232' fill='url(#lavagrad)' stroke='#3a1000' stroke-width='6' "
+    "stroke-linejoin='round' paint-order='stroke fill' filter='url(#spray)'>$ EJMC $</text>"
+    # glossy highlight streak across the top of the strokes
+    "<text x='450' y='232' fill='url(#hlgrad)' style='mix-blend-mode:screen'>$ EJMC $</text>"
     "</g>"
     # paint drips — running down from the letters, tapering to a pooled blob at
-    # each tip. Longer + wider than a subtle watermark would use, so the tag
-    # reads unmistakably as fresh wet spraypaint.
+    # each tip. Scattered along the baseline like fresh wet spraypaint runs.
     "<g opacity='0.92'>"
-    "<path d='M106 150 C106 200 110 240 112 252 C114 240 118 200 118 150 Z' fill='url(#dripfade)'/>"
-    "<circle cx='112' cy='252' r='6.5' fill='#ff3d00' opacity='0.7'/>"
-    "<path d='M161 152 C161 186 164 209 166 216 C168 209 171 186 171 152 Z' fill='url(#dripfade)'/>"
-    "<circle cx='166' cy='216' r='5' fill='#ff3d00' opacity='0.65'/>"
-    "<path d='M206 150 C206 196 210 230 212 240 C214 230 218 196 218 150 Z' fill='url(#dripfade)'/>"
-    "<circle cx='212' cy='240' r='6' fill='#ff3d00' opacity='0.68'/>"
-    "<path d='M257 152 C257 178 260 196 262 202 C264 196 267 178 267 152 Z' fill='url(#dripfade)'/>"
-    "<circle cx='262' cy='202' r='4.5' fill='#ff3d00' opacity='0.6'/>"
-    "<path d='M306 150 C306 200 310 238 312 248 C314 238 318 200 318 150 Z' fill='url(#dripfade)'/>"
-    "<circle cx='312' cy='248' r='6.5' fill='#ff3d00' opacity='0.7'/>"
-    "<path d='M355 152 C355 184 358 205 360 212 C362 205 365 184 365 152 Z' fill='url(#dripfade)'/>"
-    "<circle cx='360' cy='212' r='5' fill='#ff3d00' opacity='0.62'/>"
-    "<path d='M393 150 C393 190 396 222 398 231 C400 222 403 190 403 150 Z' fill='url(#dripfade)'/>"
-    "<circle cx='398' cy='231' r='5.5' fill='#ff3d00' opacity='0.65'/>"
+    "<path d='M174 238 C174 289 178 320 180 330 C182 320 186 289 186 238 Z' fill='url(#dripfade)'/>"
+    "<circle cx='180' cy='330' r='6.5' fill='#ff3d00' opacity='0.7'/>"
+    "<path d='M295 242 C295 274 298 292 300 300 C302 292 305 274 305 242 Z' fill='url(#dripfade)'/>"
+    "<circle cx='300' cy='300' r='5' fill='#ff3d00' opacity='0.62'/>"
+    "<path d='M394 240 C394 285 398 314 400 322 C402 314 406 285 406 240 Z' fill='url(#dripfade)'/>"
+    "<circle cx='400' cy='322' r='6' fill='#ff3d00' opacity='0.68'/>"
+    "<path d='M475 244 C475 269 478 283 480 290 C482 283 485 269 485 244 Z' fill='url(#dripfade)'/>"
+    "<circle cx='480' cy='290' r='4.5' fill='#ff3d00' opacity='0.58'/>"
+    "<path d='M554 240 C554 287 558 318 560 326 C562 318 566 287 566 240 Z' fill='url(#dripfade)'/>"
+    "<circle cx='560' cy='326' r='6.5' fill='#ff3d00' opacity='0.7'/>"
+    "<path d='M655 242 C655 273 658 291 660 298 C662 291 665 273 665 242 Z' fill='url(#dripfade)'/>"
+    "<circle cx='660' cy='298' r='5' fill='#ff3d00' opacity='0.6'/>"
+    "<path d='M734 240 C734 282 738 308 740 316 C742 308 746 282 746 240 Z' fill='url(#dripfade)'/>"
+    "<circle cx='740' cy='316' r='5.5' fill='#ff3d00' opacity='0.64'/>"
     "</g>"
-    # overspray speckle + faint spray-ring flourish, like a tag finished off with the can
-    "<circle cx='118' cy='104' r='3.6' fill='#ff5a00' opacity='0.4' filter='url(#soft)'/>"
-    "<circle cx='134' cy='90' r='1.8' fill='#ff5a00' opacity='0.55'/>"
-    "<circle cx='348' cy='116' r='3.2' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
-    "<circle cx='332' cy='132' r='1.6' fill='#ff5a00' opacity='0.5'/>"
-    "<circle cx='226' cy='60' r='2.6' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
-    "<circle cx='404' cy='148' r='11' fill='none' stroke='#ff5a00' stroke-width='1.4' "
+    # overspray speckle + faint spray-ring flourish, like a tag finished with the can
+    "<circle cx='150' cy='150' r='4' fill='#ff5a00' opacity='0.4' filter='url(#soft)'/>"
+    "<circle cx='176' cy='128' r='2.2' fill='#ff5a00' opacity='0.55'/>"
+    "<circle cx='690' cy='150' r='3.6' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='664' cy='170' r='2' fill='#ff5a00' opacity='0.5'/>"
+    "<circle cx='450' cy='96' r='3' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='800' cy='196' r='13' fill='none' stroke='#ff5a00' stroke-width='1.6' "
     "opacity='0.3' filter='url(#soft)'/>"
     "</g>"
     "</svg>"
@@ -1201,7 +1200,6 @@ def render():
 <meta http-equiv="refresh" content="30">
 <title>All Bots — Live P&amp;L</title>
 <style>
- @keyframes glowpulse{{0%,100%{{opacity:.55}}50%{{opacity:1}}}}
  @keyframes gradientshift{{0%{{background-position:0% 50%}}50%{{background-position:100% 50%}}100%{{background-position:0% 50%}}}}
  body{{font-family:-apple-system,system-ui,sans-serif;margin:0;color:#16232c;
    background-color:#eef7fd;
@@ -1209,7 +1207,7 @@ def render():
      repeating-linear-gradient(180deg,#ffffff 0 70px,#aed8f6 70px 140px);
    background-repeat:no-repeat,repeat;
    background-position:center center,0 0;
-   background-size:min(90vw,1150px) auto,auto;
+   background-size:min(97vw,2000px) auto,auto;
    background-attachment:fixed,fixed}}
  header{{padding:16px 18px;background:#ffffffd9;backdrop-filter:blur(2px);
    border-bottom:3px solid #caa227;position:relative}}
@@ -1230,8 +1228,7 @@ def render():
  /* [2026-07-10] Lighter Live section — real money, visually set apart */
  .livewrap{{margin:14px 14px 4px;border:2px solid #d1242f;border-radius:12px;
    box-shadow:0 0 0 1px #caa227 inset,0 0 22px -6px #d1242f66;
-   background:linear-gradient(180deg,#ffecec,#fff6f6);overflow:hidden;
-   animation:glowpulse 3.2s ease-in-out infinite}}
+   background:linear-gradient(180deg,#ffecec,#fff6f6);overflow:hidden}}
  .livewrap .grid{{padding:12px}}
  .livehdr{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
    padding:11px 14px;background:#d1242f14;border-bottom:1px solid #d1242f33;
