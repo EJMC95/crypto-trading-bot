@@ -33,7 +33,9 @@ _DEFAULT_BOTS = [
     ("crypto-intraday-15m",  8084),
     ("crypto-swing-daily",   8086),
     ("crypto-breakout-4h",   8087),
-    ("crypto-trendmomo-4h",  8088),
+    # [2026-07-12 RETIRED] crypto-trendmomo-4h (8088) removed with its bot —
+    # leaving it here kept publishing a frozen "online" row for a dead API
+    # after the run_all.sh retirement (caught in the same-day fleet sweep).
     # [2026-07-07 OPTION-B] Family bots are NOT polled from this container any
     # more — each dedicated service polls itself via FT_POLLER_BOTS (run_all.sh
     # ONLY_BOT mode). Re-adding them here recreates the 5-writer race that
