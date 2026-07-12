@@ -72,12 +72,6 @@ class TrendMomoV1(IStrategy):
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["sma_fast"] = ta.SMA(dataframe, timeperiod=self.fast_ma.value)
         dataframe["sma_slow"] = ta.SMA(dataframe, timeperiod=self.slow_ma.value)
-        # [2026-07-03 ADAPTIVE] Bear-bounce mode inputs: RSI + 20-bar range low.
-        dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
-        dataframe["rng_low20"] = dataframe["low"].rolling(20).min().shift(1)
-        dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
-        _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
-        dataframe["rng_bounce_zone"] = dataframe["rng_low20"] + 0.15 * _rng_band
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -104,45 +98,13 @@ class TrendMomoV1(IStrategy):
             ["enter_long", "enter_tag"],
         ] = (1, "sma_fast_above_slow")
 
-        # [2026-07-03 ADAPTIVE] Bear-regime bounce: when momentum is DOWN
-        # (fast<slow) this bot used to sit 100% in cash — its known whipsaw/dead
-        # zone. Half-stake daily RSI<32 stabilized bounce at the 20-day range
-        # low, up-close confirmed, exiting via custom_exit (+5% / 7 days). The
-        # validated trend edge above is untouched.
-        dataframe.loc[
-            (
-                (dataframe["sma_fast"] <= dataframe["sma_slow"])
-                & (dataframe["rsi"] < 32)
-                # the 20d low must have held ~5 days (a base, not a waterfall)
-                & (dataframe["rng_low20"] == dataframe["rng_low20"].shift(5))
-                & (dataframe["close"] <= dataframe["rng_bounce_zone"])
-                & (dataframe["close"] > dataframe["close"].shift(1))
-                & (dataframe["volume"] > 0)
-            ),
-            ["enter_long", "enter_tag"],
-        ] = (1, "bear_bounce")
+        # [2026-07-12 SLEEVE RETIRED] The bear_bounce leg (downtrend half-stake
+        # capitulation bounce, shipped 07-03 to all four spot bots) is gone
+        # fleet-wide: tagged Binance replay 2022-2026 scored it negative in ALL
+        # FOUR carriers (19 entries, -$7.27 aggregate, 26% win; here 5 entries,
+        # -$5.74, the worst of the four) and it never fired once in live paper.
+        # When momentum is down this bot sits in cash — the validated rule.
         return dataframe
-
-    # [2026-07-03 ADAPTIVE] Half stake on counter-trend bounces.
-    def custom_stake_amount(self, pair, current_time, current_rate, proposed_stake,
-                            min_stake, max_stake, leverage, entry_tag, side, **kwargs):
-        if entry_tag == "bear_bounce":
-            half = proposed_stake * 0.5
-            if min_stake is None or half >= min_stake:
-                return half
-        return proposed_stake
-
-    # [2026-07-03 ADAPTIVE] Bounce exits: +5% take or 7-day timeout (daily scale).
-    # The MA-cross exit below won't fire for bounces (no cross event mid-bear),
-    # so this is their primary exit; the -15% stop is the backstop.
-    def custom_exit(self, pair, trade, current_time, current_rate, current_profit,
-                    **kwargs):
-        if trade.enter_tag == "bear_bounce":
-            if current_profit >= 0.05:
-                return "bounce_take"
-            if (current_time - trade.open_date_utc).total_seconds() >= 7 * 86400:
-                return "bounce_timeout"
-        return None
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # SELL when fast SMA crosses back below slow SMA (momentum rolls over).

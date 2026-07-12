@@ -83,26 +83,14 @@ class MomoBreakoutV1(IStrategy):
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["ema_trend"] = ta.EMA(dataframe, timeperiod=self.trend_ema.value)
-        # [2026-07-03] RSI for the bear-bounce mode.
-        dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
         # [2026-07-03 VOL-TARGET] ATR feeds inverse-volatility sizing below.
         dataframe["atr"] = ta.ATR(dataframe, timeperiod=14)
         # Prior-bar Donchian channels (shift(1) => no look-ahead on the current bar).
         dataframe["dc_high"] = dataframe["high"].rolling(self.entry_lookback.value).max().shift(1)
         dataframe["dc_low"]  = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
-        # [20-CANDLE RANGE 2026-07-01] Adaptive support/resistance: buy near the
-        # rolling 20-candle low, sell near the rolling 20-candle high. shift(1) keeps
-        # the current forming bar out of its own band (no look-ahead).
-        dataframe["rng_low20"] = dataframe["low"].rolling(20).min().shift(1)
-        dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
-        _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
-        dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.15 * _rng_band
-        dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.15 * _rng_band
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # [2026-07-03 RESTORE + ADAPT] Two regime modes:
-        uptick = dataframe["close"] > dataframe["close"].shift(1)
         live_vol = dataframe["volume"] > 0
 
         # UPTREND (above 200-EMA): fresh breakout over the 30-bar high — the
@@ -116,23 +104,13 @@ class MomoBreakoutV1(IStrategy):
             ["enter_long", "enter_tag"],
         ] = (1, "breakout")
 
-        # DOWNTREND (below 200-EMA): stabilized sweep-and-reclaim bounce — the
-        # 20-bar low must have HELD ~24h (6 bars), then a candle flushes below it
-        # and closes back above (failed breakdown), with 4h RSI<30. Half stake,
-        # +2.5% take / 72h out via the custom_* methods below. The plain
-        # "RSI low near the range bottom" version knife-caught (-21.6% over the
-        # bear window); demanding the flush-and-reclaim structure is the fix.
-        dataframe.loc[
-            (
-                (dataframe["close"] <= dataframe["ema_trend"])
-                & (dataframe["rsi"] < 30)
-                & (dataframe["rng_low20"] == dataframe["rng_low20"].shift(6))
-                & (dataframe["low"] < dataframe["rng_low20"])
-                & (dataframe["close"] > dataframe["rng_low20"])
-                & uptick & live_vol
-            ),
-            ["enter_long", "enter_tag"],
-        ] = (1, "bear_bounce")
+        # [2026-07-12 SLEEVE RETIRED] The bear_bounce leg (downtrend half-stake
+        # sweep-and-reclaim bounce, shipped 07-03 to all four spot bots) is gone
+        # fleet-wide: tagged Binance replay 2022-2026 scored it negative in ALL
+        # FOUR carriers (19 entries, -$7.27 aggregate, 26% win; here 0-for-3,
+        # -$0.70) and it never fired once in live paper. Below the 200-EMA this
+        # bot stands down — the validated breakout edge above is untouched
+        # (+$201.59 / 603 entries on the same replay).
         return dataframe
 
     # [2026-07-03 VOL-TARGET] Inverse-volatility sizing — equal RISK per trade,
@@ -168,26 +146,14 @@ class MomoBreakoutV1(IStrategy):
                 stake *= max(0.3, min(1.0, 0.02 / atr_pct))
         except Exception:
             pass
-        if entry_tag == "bear_bounce":
-            stake *= 0.5
-        # [2026-07-04] halve again during an active panic news cluster — bounce
-        # entries into a live hack/regulatory shock are the knife-catch case.
+        # [2026-07-04] halve during an active panic news cluster — entries into
+        # a live hack/regulatory shock are the knife-catch case.
         if self._pulse_panic(current_time):
             stake *= 0.5
         if stake < proposed_stake and min_stake is not None and stake < min_stake:
             stake = min_stake
         return stake
 
-    # [2026-07-03 ADAPTIVE] Bounces bank +2.5% or time out after 72h; breakout
-    # trades are untouched (they ride until the Donchian breakdown below).
-    def custom_exit(self, pair, trade, current_time, current_rate, current_profit,
-                    **kwargs):
-        if trade.enter_tag == "bear_bounce":
-            if current_profit >= 0.025:
-                return "bounce_take"
-            if (current_time - trade.open_date_utc).total_seconds() >= 72 * 3600:
-                return "bounce_timeout"
-        return None
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # [2026-07-03 RESTORE] Trailing Donchian breakdown — the validated "let

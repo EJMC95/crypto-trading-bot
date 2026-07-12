@@ -107,15 +107,12 @@ class SwingDipV1(IStrategy):
         dataframe["rng_high20"] = dataframe["high"].rolling(20).max().shift(1)
         _rng_band = (dataframe["rng_high20"] - dataframe["rng_low20"]).clip(lower=1e-9)
         # [2026-07-03 ADAPTIVE] Buy zone widened 0.15 -> 0.20 (more dip entries in
-        # the friendly regime); bounce zone is deeper (bottom 10%) for bear use.
+        # the friendly regime).
         dataframe["rng_buy_zone"] = dataframe["rng_low20"] + 0.20 * _rng_band
         dataframe["rng_sell_zone"] = dataframe["rng_high20"] - 0.15 * _rng_band
-        dataframe["rng_bounce_zone"] = dataframe["rng_low20"] + 0.10 * _rng_band
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # [2026-07-03 ADAPTIVE] Two regime modes (own-pair daily 50/200 EMA):
-        uptick = dataframe["close"] > dataframe["close"].shift(1)
         live_vol = dataframe["volume"] > 0
 
         # UPTREND: the ORIGINAL VALIDATED entry — a genuine oversold dip (RSI<35
@@ -133,20 +130,12 @@ class SwingDipV1(IStrategy):
             ["enter_long", "enter_tag"],
         ] = (1, "dip_in_uptrend")
 
-        # DOWNTREND: capitulation bounce only — daily RSI<30 at the very bottom
-        # of the 20d range, AFTER the low has held ~5 days (a stabilized base,
-        # not a rolling waterfall), confirmed by an up-close. Half stake, fast
-        # exit via the custom_* methods below.
-        dataframe.loc[
-            (
-                (dataframe["ema50"] <= dataframe["ema200"])
-                & (dataframe["rsi"] < 30)
-                & (dataframe["rng_low20"] == dataframe["rng_low20"].shift(5))
-                & (dataframe["close"] <= dataframe["rng_bounce_zone"])
-                & uptick & live_vol
-            ),
-            ["enter_long", "enter_tag"],
-        ] = (1, "bear_bounce")
+        # [2026-07-12 SLEEVE RETIRED] The bear_bounce leg (downtrend half-stake
+        # capitulation bounce, shipped 07-03 to all four spot bots) is gone
+        # fleet-wide: tagged Binance replay 2022-2026 scored it negative in ALL
+        # FOUR carriers (19 entries, -$7.27 aggregate, 26% win) and it never
+        # fired once in live paper. In a downtrend this bot stands down — the
+        # originally validated behaviour.
         return dataframe
 
     # [2026-07-04 PULSE] Panic-cluster check (news shocks: hacks/SEC/depegs).
@@ -165,32 +154,16 @@ class SwingDipV1(IStrategy):
             c["ts"], c["panic"] = current_time, False
         return c["panic"]
 
-    # [2026-07-03 ADAPTIVE] Bear bounces run half stake — counter-trend swings
-    # don't earn full conviction sizing. [2026-07-04] During an active PANIC news
-    # cluster all new stakes halve again: dip-buying into a live hack/regulatory
-    # shock is the one knife the stabilized-low gate can't see coming.
+    # [2026-07-04] During an active PANIC news cluster all new stakes halve:
+    # dip-buying into a live hack/regulatory shock is the knife-catch case.
     def custom_stake_amount(self, pair, current_time, current_rate, proposed_stake,
                             min_stake, max_stake, leverage, entry_tag, side, **kwargs):
         stake = proposed_stake
-        if entry_tag == "bear_bounce":
-            stake *= 0.5
         if self._pulse_panic(current_time):
             stake *= 0.5
         if stake < proposed_stake and min_stake is not None and stake < min_stake:
             stake = min_stake
         return stake
-
-    # [2026-07-03 ADAPTIVE] Bear bounces bank +6% into the first rally or time out
-    # after 10 days — they must not become hopeful bear-market bagholds. Uptrend
-    # dips keep the normal ROI ladder / range-high exit.
-    def custom_exit(self, pair, trade, current_time, current_rate, current_profit,
-                    **kwargs):
-        if trade.enter_tag == "bear_bounce":
-            if current_profit >= 0.06:
-                return "bounce_take"
-            if (current_time - trade.open_date_utc).total_seconds() >= 10 * 86400:
-                return "bounce_timeout"
-        return None
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # [2026-07-03] Sell into strength, two ways: the validated RSI>65 exit OR
