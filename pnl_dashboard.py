@@ -20,10 +20,79 @@ import base64
 import html
 import threading
 import datetime as dt
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get("PORT", "8080"))
+
+# Tiled "$ EJMC $" watermark painted behind the whole page — styled like a
+# spraycan tag (grainy fill via feTurbulence, jittered per-glyph rotation,
+# overspray speckle, paint drips). Kept faint — purely decorative, must never
+# compete with card text for legibility.
+_G = "-8 0 5 -4 6 -5 0 7"  # per-glyph rotation jitter, shared across every text layer below
+_WATERMARK_TILE_SVG = (
+    "<svg xmlns='http://www.w3.org/2000/svg' width='460' height='250'>"
+    "<defs>"
+    "<filter id='spray' x='-30%' y='-30%' width='160%' height='160%'>"
+    "<feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' result='n'/>"
+    "<feColorMatrix in='n' type='matrix' "
+    "values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.3 0' result='an'/>"
+    "<feComposite in='SourceGraphic' in2='an' operator='in'/>"
+    "</filter>"
+    "<filter id='soft' x='-80%' y='-80%' width='260%' height='260%'>"
+    "<feGaussianBlur stdDeviation='2.4'/>"
+    "</filter>"
+    "<filter id='halo' x='-60%' y='-60%' width='220%' height='220%'>"
+    "<feGaussianBlur stdDeviation='5.5'/>"
+    "</filter>"
+    "<linearGradient id='dripfade' x1='0' y1='0' x2='0' y2='1'>"
+    "<stop offset='0%' stop-color='#b8860b' stop-opacity='0.9'/>"
+    "<stop offset='100%' stop-color='#b8860b' stop-opacity='0'/>"
+    "</linearGradient>"
+    "<linearGradient id='hlgrad' x1='0' y1='0' x2='0' y2='1'>"
+    "<stop offset='0%' stop-color='#ffffff' stop-opacity='0.85'/>"
+    "<stop offset='40%' stop-color='#ffffff' stop-opacity='0.15'/>"
+    "<stop offset='70%' stop-color='#ffffff' stop-opacity='0'/>"
+    "</linearGradient>"
+    "</defs>"
+    "<g opacity='0.5'>"
+    f"<g transform='rotate(-14 230 115)' font-family=\"'Arial Black',Impact,-apple-system,sans-serif\" "
+    f"font-size='54' font-weight='900' text-anchor='middle'>"
+    # soft overspray halo behind the whole piece
+    f"<text x='230' y='128' fill='#b8860b' opacity='0.3' filter='url(#halo)' rotate='{_G}'>$ EJMC $</text>"
+    # drop shadow, offset down-right for a chunky 3D block letter feel
+    f"<text x='235' y='135' fill='#2a1d04' opacity='0.55' rotate='{_G}'>$ EJMC $</text>"
+    # thick dark outline + spray-grained gold fill, in one pass
+    f"<text x='230' y='128' fill='#d4a017' stroke='#2a1d04' stroke-width='6.5' "
+    f"stroke-linejoin='round' paint-order='stroke fill' filter='url(#spray)' "
+    f"rotate='{_G}'>$ EJMC $</text>"
+    # glossy highlight streak across the top third of the letters
+    f"<text x='230' y='128' fill='url(#hlgrad)' style='mix-blend-mode:screen' "
+    f"rotate='{_G}'>$ EJMC $</text>"
+    "</g>"
+    # paint drips, tapering down from the lettering with a pooled blob at the tip
+    "<g opacity='0.85'>"
+    "<path d='M118 168 C117 188 115 202 113 222 C111 202 109 188 110 168 Z' fill='url(#dripfade)'/>"
+    "<circle cx='112' cy='224' r='4.5' fill='#b8860b' opacity='0.55'/>"
+    "<path d='M196 172 C195 184 194 192 193 204 C192 192 191 184 192 172 Z' fill='url(#dripfade)'/>"
+    "<circle cx='193' cy='205' r='3' fill='#b8860b' opacity='0.5'/>"
+    "<path d='M318 166 C317 182 315 194 313 210 C311 194 309 182 310 166 Z' fill='url(#dripfade)'/>"
+    "<circle cx='312' cy='212' r='4' fill='#b8860b' opacity='0.5'/>"
+    "<path d='M372 170 C371 180 370 187 369 196 C368 187 367 180 368 170 Z' fill='url(#dripfade)'/>"
+    "<circle cx='369' cy='197' r='2.6' fill='#b8860b' opacity='0.45'/>"
+    "</g>"
+    # overspray speckle + faint spray-ring flourish, like a tag finished off with the can
+    "<circle cx='120' cy='108' r='3.2' fill='#b8860b' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='134' cy='96' r='1.6' fill='#b8860b' opacity='0.5'/>"
+    "<circle cx='344' cy='120' r='2.8' fill='#b8860b' opacity='0.3' filter='url(#soft)'/>"
+    "<circle cx='330' cy='134' r='1.4' fill='#b8860b' opacity='0.45'/>"
+    "<circle cx='226' cy='68' r='2.2' fill='#b8860b' opacity='0.3' filter='url(#soft)'/>"
+    "<circle cx='396' cy='150' r='10' fill='none' stroke='#b8860b' stroke-width='1.2' "
+    "opacity='0.25' filter='url(#soft)'/>"
+    "</g>"
+    "</svg>"
+)
+WATERMARK_BG_URL = f"data:image/svg+xml,{quote(_WATERMARK_TILE_SVG)}"
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 # Login for THIS dashboard page (override via env on Railway).
@@ -1117,34 +1186,55 @@ def render():
 <meta http-equiv="refresh" content="30">
 <title>All Bots — Live P&amp;L</title>
 <style>
- body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
- header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
- h1{{margin:0 0 6px;font-size:18px}}
- .totals{{display:flex;gap:18px;flex-wrap:wrap;font-size:14px}}
+ @keyframes glowpulse{{0%,100%{{opacity:.55}}50%{{opacity:1}}}}
+ @keyframes gradientshift{{0%{{background-position:0% 50%}}50%{{background-position:100% 50%}}100%{{background-position:0% 50%}}}}
+ body{{font-family:-apple-system,system-ui,sans-serif;margin:0;color:#16232c;
+   background-color:#eef7fd;
+   background-image:url("{WATERMARK_BG_URL}"),
+     repeating-linear-gradient(135deg,#ffffff 0 46px,#cfe9fb 46px 92px);
+   background-repeat:no-repeat,repeat;
+   background-position:center center,0 0;
+   background-size:min(78vw,900px) auto,auto;
+   background-attachment:fixed,fixed}}
+ header{{padding:16px 18px;background:#ffffffd9;backdrop-filter:blur(2px);
+   border-bottom:3px solid #caa227;position:relative}}
+ header::after{{content:"";position:absolute;left:0;right:0;bottom:-6px;height:2px;
+   background:linear-gradient(90deg,#f4d879,#caa227,#8a6d1a,#caa227,#f4d879);
+   background-size:300% 100%;animation:gradientshift 6s ease infinite}}
+ h1{{margin:0 0 6px;font-size:19px;font-weight:800;letter-spacing:.2px;
+   background:linear-gradient(90deg,#8a6d1a,#caa227 35%,#2f7fd6 65%,#8a6d1a);
+   background-size:300% 100%;-webkit-background-clip:text;background-clip:text;
+   color:transparent;animation:gradientshift 8s ease infinite;display:inline-block}}
+ h1 a{{-webkit-text-fill-color:#1462c9;color:#1462c9}}
+ .totals{{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;color:#16232c}}
  .totals b{{font-size:16px}}
- .banner{{margin:12px 14px 0;padding:10px 12px;background:#3d2b12;border:1px solid #6b4a16;border-radius:8px;color:#f0c674;font-size:13px}}
- .banner.crit{{background:#3d1218;border-color:#6b1620;color:#f85149;font-weight:600}}
- .okline{{margin:12px 14px 0;padding:8px 12px;background:#122117;border:1px solid #1f4428;border-radius:8px;color:#3fb950;font-size:12px}}
+ .banner{{margin:12px 14px 0;padding:10px 12px;background:#fff6dd;border:1px solid #caa227;border-radius:8px;color:#7a5b12;font-size:13px}}
+ .banner.crit{{background:#ffe3e3;border-color:#d1242f;color:#a3121b;font-weight:600}}
+ .okline{{margin:12px 14px 0;padding:8px 12px;background:#e6f7ec;border:1px solid #caa227;border-radius:8px;color:#1a7f37;font-size:12px}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:14px}}
  /* [2026-07-10] Lighter Live section — real money, visually set apart */
- .livewrap{{margin:14px 14px 4px;border:1px solid #f85149;border-radius:12px;
-   background:linear-gradient(180deg,#f851490f,#f8514905);overflow:hidden}}
+ .livewrap{{margin:14px 14px 4px;border:2px solid #d1242f;border-radius:12px;
+   box-shadow:0 0 0 1px #caa227 inset,0 0 22px -6px #d1242f66;
+   background:linear-gradient(180deg,#ffecec,#fff6f6);overflow:hidden;
+   animation:glowpulse 3.2s ease-in-out infinite}}
  .livewrap .grid{{padding:12px}}
  .livehdr{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-   padding:11px 14px;background:#f8514914;border-bottom:1px solid #f8514933;
-   font-size:15px;font-weight:700;color:#ffb4ac}}
+   padding:11px 14px;background:#d1242f14;border-bottom:1px solid #d1242f33;
+   font-size:15px;font-weight:700;color:#a3121b}}
  .livetag{{font-size:10px;font-weight:800;letter-spacing:.5px;color:#fff;
-   background:#f85149;border-radius:6px;padding:2px 7px}}
- .livesum{{margin-left:auto;font-size:13px;font-weight:500;color:#e6e6e6}}
- .card{{background:#161b22;border:1px solid #222;border-radius:10px;padding:14px}}
+   background:#d1242f;border-radius:6px;padding:2px 7px;box-shadow:0 0 10px #d1242f66}}
+ .livesum{{margin-left:auto;font-size:13px;font-weight:500;color:#16232c}}
+ .card{{background:#ffffffdd;border:1px solid #caa227;border-radius:10px;padding:14px;
+   box-shadow:0 1px 0 #ffffffaa inset;transition:border-color .2s,box-shadow .2s}}
+ .card:hover{{border-color:#8a6d1a;box-shadow:0 0 16px -8px #caa227aa}}
  .card h2{{margin:0 0 2px;font-size:15px}}
  .row{{display:flex;justify-content:space-between;margin:5px 0;font-size:13px}}
- .sub{{margin:10px 0 4px;font-size:12px;color:#8b949e}}
- .muted{{color:#8b949e;font-size:12px}}
- .pos{{color:#3fb950}} .neg{{color:#f85149}}
+ .sub{{margin:10px 0 4px;font-size:12px;color:#5b7184}}
+ .muted{{color:#5b7184;font-size:12px}}
+ .pos{{color:#1a7f37}} .neg{{color:#d1242f}}
  .dot{{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:4px}}
- .dot.on{{background:#3fb950}} .dot.off{{background:#f85149}} .dot.warn{{background:#d29922}}
- footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
+ .dot.on{{background:#1a7f37;box-shadow:0 0 6px #1a7f37}} .dot.off{{background:#d1242f;box-shadow:0 0 6px #d1242f}} .dot.warn{{background:#b8860b;box-shadow:0 0 6px #b8860b}}
+ footer{{padding:10px 18px;color:#5b7184;font-size:11px}}
 </style></head><body>
 <header>
  <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a></h1>
