@@ -1,0 +1,19 @@
+# Image for 🎯 Perp Sniper (Lighter new-listing sniper) — SHADOW service.
+# Set RAILWAY_DOCKERFILE_PATH=Dockerfile.psniper and VENUE=lighter_shadow.
+# The bot is Lighter-only and defaults to shadow; lighter_live additionally
+# needs REAL_MONEY_KILL disarmed + its own sub-account keys (user-only).
+# Restarted as a proper service 12 Jul 2026 — the Gate-0 shadow ran locally
+# and its row went stale when that session ended.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_perp_sniper.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_perp_sniper.py"]
