@@ -35,13 +35,22 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # section. History stays in bot_equity_history / paper_trades / venue_orders.
 # Trail Blazer live retired 11 Jul; its sub-account + Railway service now run
 # the Funding Farmer (publishes as perps-funding-lighter-lighter).
-RETIRED_ROWS = {"perps-donchian-breakout-lighter"}
+# [2026-07-12 DECOMMISSION] Bounce Catcher (perps-rsi-meanrev) + Loop Scout
+# (scanner-triangular-arb) stopped on user sign-off: the 12-Jul audit found
+# Bounce Catcher running the IDENTICAL entry to Trail Blazer's paper bot
+# (REJECTED for edge 12 Jul), and Loop Scout carried a retire verdict since
+# the 22-Jun revalidation. Railway services perps-bot + triangular-arb are
+# down (empty shells left in the UI); momo-bot stays as the cluster's
+# representative. The stale rsi-meanrev lshadow row from Gate-0 goes too.
+RETIRED_ROWS = {"perps-donchian-breakout-lighter",
+                "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
+                "scanner-triangular-arb"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
-EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
+EXPECTED = ["perps-donchian-breakout", "perps-regime-switch",
             "perps-funding-carry", "perps-funding-lighter", "lighter-perp-sniper",
             "lighter-dislocation", "perps-funding-spread",
-            "scanner-triangular-arb", "event-listing-sniper",
+            "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h", "crypto-trendmomo-4h",
             "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"]
@@ -50,7 +59,7 @@ EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch
 # Their pnl_abs is real paper P&L but on a rosier basis than the freqtrade bots'
 # simulated fills — so it is reported as a SEPARATE subtotal and never folded
 # into the trading-bot P&L headline.
-SCANNERS = {"scanner-triangular-arb", "scanner-cross-exchange-arb"}
+SCANNERS = {"scanner-cross-exchange-arb"}
 
 # Stock/brokerage bots (IBKR + Alpaca). Shown as their own cards with a SEPARATE
 # subtotal so their large $ equity never swamps the crypto headline.
