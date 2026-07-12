@@ -45,17 +45,28 @@ jobs:
         working-directory: nrl-predictor
         run: pip install -q -r requirements.txt
 
-      - name: Run pipeline (refresh -> grade -> predict -> odds -> props/SGM -> feed)
+      - name: Run pipeline (refresh -> grade -> predict -> signals -> props/SGM -> snapshot -> season -> feed)
         working-directory: nrl-predictor
         run: |
           set -uo pipefail
           python -m src.cli refresh
+          # Settle last round's paper ledger AND prediction track record.
           python -m src.cli grade --auto || echo "::warning::grading failed (non-fatal)"
+          # This round's baseline predictions (saves fitted model artifacts).
           python -m src.cli predict
-          python -m src.cli odds || echo "::warning::odds capture failed (books unreachable from runner?) — continuing without market columns"
+          # On-the-day intel: named team lists + venue weather + news flags.
+          python -m src.cli signals || echo "::warning::signal scan failed (non-fatal)"
+          # Live market consensus + value flags + paper-ledger logging.
+          python -m src.cli odds || echo "::warning::odds capture failed — continuing without market columns"
+          # Props/SGM sims — consumes signals (named 17 + weather) when present.
           python scripts/run_phase4.py
+          # Log this round's model calls for later grading.
+          python -m src.cli snapshot || echo "::warning::snapshot failed (non-fatal)"
+          # Predict EVERY remaining round (self-updating season outlook).
+          python -m src.cli season
+          # Dashboard (round selector + intel + track record) + JSON feed.
           python -m src.cli feed
-          echo "--- outputs ---"; ls -la outputs/ | head -20
+          echo "--- outputs ---"; ls -la outputs/ | head -25
 
       - name: Commit refreshed outputs to the mirror branch
         run: |
