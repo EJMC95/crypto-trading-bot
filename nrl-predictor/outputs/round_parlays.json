@@ -1,12 +1,12 @@
 [
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0362,
-  "fair_price": 27.59,
+  "p_joint": 0.0433,
+  "fair_price": 23.08,
   "legs": [
    "Melbourne Storm win & Sualauvi Fa'alogo try",
    "Manly-Warringah Sea Eagles win & Jason Saab try",
-   "South Sydney Rabbitohs win & David Fifita try"
+   "South Sydney Rabbitohs win & Alex Johnston try"
   ]
  }
 ]
