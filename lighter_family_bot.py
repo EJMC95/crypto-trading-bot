@@ -1,0 +1,912 @@
+#!/usr/bin/env python3
+"""
+lighter_family_bot.py — 👨‍👩‍👧‍👦 the four FAMILY bots as Lighter SHADOW books.
+
+WHAT / WHY (2026-07-13)
+  Eamon asked for the family bots to run as shadow bots on Lighter — not a
+  mirror of the Kraken paper rows, the strategies themselves: signals computed
+  from LIGHTER's own candles, fills modelled by crossing the LIVE Lighter book
+  (ShadowBroker), funding drag accrued hourly, one -lshadow row per bot. The
+  Kraken paper originals keep running untouched — they are the control arm the
+  validation doctrine compares against (same logic, spot+fees vs perp+funding).
+
+  Ports match what the family services ACTUALLY run today (config overrides
+  strategy attrs — CLAUDE.md's NFI/E0V1E table is stale):
+    👩 Mum        freqtrade-mum        TrendMomoV1      4h   stop -8%   4 slots
+    👨 Dad        freqtrade-dad        MomoBreakoutV1   1h   stop -6%   4 slots
+    🙏 Avo Maria  freqtrade-avo-maria  SwingDipV1       4h   stop -10%  4 slots
+    🔮 Georgia    freqtrade-georgia    DayTraderV5Gated 15m  ATR≤5%     5 slots
+  Stake $50/trade (FAMILY_STAKE_USD), $1,000 start per book, long-only 1x —
+  a long perp PAYS funding; that drag is the point of the experiment.
+
+  UNVALIDATED on this venue. Shadow evidence first, like every bot before it
+  (Tide Rider -> live only after the perp-drag backtest; Snap Back/Counterweight
+  still shadow). VENUE=lighter_live REFUSES to start. Universe = the family
+  whitelist minus coins Lighter doesn't list (ATOM, ALGO — logged, skipped).
+
+KNOWN PORT DIVERGENCES (honest list, for the go/no-go review):
+  * Fills cross the spread (taker VWAP for the $50 clip) — the freqtrade twins
+    quote top-of-book same-side (maker-ish) and pay Kraken fees. Zero fee here.
+  * Stops/ROI check every loop (~90s) against the live mid, not tick-by-tick;
+    gap-throughs fill at the live book, not at the stop price (pessimistic).
+  * Freqtrade protections are re-implemented (cooldown / stoploss-guard /
+    max-drawdown as documented per strategy) — same shape, not the same code.
+  * market-pulse panic halving and Georgia's 2-entries-per-hour throttle ARE
+    ported; Kraken min-order-size quirks are not (Lighter mins are tiny).
+
+Usage:
+    VENUE=lighter_shadow python lighter_family_bot.py            # daemon
+    VENUE=lighter_shadow python lighter_family_bot.py --once     # smoke
+    python lighter_family_bot.py --selftest                      # indicator math
+"""
+import argparse
+import logging
+import math
+import os
+import sys
+import time
+from datetime import datetime, timezone
+
+import bot_pnl_store as store
+
+START_EQUITY = 1000.0
+STAKE_USD = float(os.environ.get("FAMILY_STAKE_USD", "50"))
+LOOP_SECONDS = int(os.environ.get("FAMILY_LOOP_SECONDS", "90"))
+DAILY_LOSS_LIMIT = float(os.environ.get("FAMILY_DAILY_LOSS", "0.10"))
+COINS = os.environ.get(
+    "FAMILY_COINS",
+    "BTC,ETH,SOL,XRP,ADA,DOT,AVAX,LINK,LTC,ATOM,NEAR,TRX,DOGE,ALGO,AAVE"
+).split(",")
+CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
+
+LOG_FILE = os.environ.get("FAMILY_LOG_FILE", "lighter_family_bot.log")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler(sys.stdout)])
+log = logging.getLogger("family-lighter")
+
+
+# ---------------------------------------------------------------------------
+# Indicators — pure python, talib-compatible (Wilder smoothing, SMA-seeded
+# EMA) so signals match the freqtrade twins as closely as data allows.
+# Each returns a full series aligned to the input (None while warming up).
+
+def sma_series(vals, p):
+    out = [None] * len(vals)
+    s = 0.0
+    for i, v in enumerate(vals):
+        s += v
+        if i >= p:
+            s -= vals[i - p]
+        if i >= p - 1:
+            out[i] = s / p
+    return out
+
+
+def ema_series(vals, p):
+    out = [None] * len(vals)
+    if len(vals) < p:
+        return out
+    k = 2.0 / (p + 1.0)
+    e = sum(vals[:p]) / p          # talib seeds with the SMA of the first p
+    out[p - 1] = e
+    for i in range(p, len(vals)):
+        e = vals[i] * k + e * (1 - k)
+        out[i] = e
+    return out
+
+
+def rsi_series(closes, p=14):
+    out = [None] * len(closes)
+    if len(closes) < p + 1:
+        return out
+    gains = losses = 0.0
+    for i in range(1, p + 1):
+        d = closes[i] - closes[i - 1]
+        gains += max(d, 0.0)
+        losses += max(-d, 0.0)
+    ag, al = gains / p, losses / p
+    out[p] = 100.0 if al == 0 else 100.0 - 100.0 / (1 + ag / al)
+    for i in range(p + 1, len(closes)):
+        d = closes[i] - closes[i - 1]
+        ag = (ag * (p - 1) + max(d, 0.0)) / p       # Wilder
+        al = (al * (p - 1) + max(-d, 0.0)) / p
+        out[i] = 100.0 if al == 0 else 100.0 - 100.0 / (1 + ag / al)
+    return out
+
+
+def _tr(h, l, c_prev):
+    return max(h - l, abs(h - c_prev), abs(l - c_prev))
+
+
+def atr_series(highs, lows, closes, p=14):
+    n = len(closes)
+    out = [None] * n
+    if n < p + 1:
+        return out
+    trs = [_tr(highs[i], lows[i], closes[i - 1]) for i in range(1, n)]
+    a = sum(trs[:p]) / p
+    out[p] = a
+    for i in range(p + 1, n):
+        a = (a * (p - 1) + trs[i - 1]) / p          # Wilder
+        out[i] = a
+    return out
+
+
+def adx_series(highs, lows, closes, p=14):
+    """talib-style Wilder ADX. None while warming up (needs ~2p bars)."""
+    n = len(closes)
+    out = [None] * n
+    if n < 2 * p + 1:
+        return out
+    plus_dm, minus_dm, trs = [], [], []
+    for i in range(1, n):
+        up = highs[i] - highs[i - 1]
+        dn = lows[i - 1] - lows[i]
+        plus_dm.append(up if (up > dn and up > 0) else 0.0)
+        minus_dm.append(dn if (dn > up and dn > 0) else 0.0)
+        trs.append(_tr(highs[i], lows[i], closes[i - 1]))
+    # Wilder-smoothed sums (seed = plain sum of first p)
+    sp, sm, st = sum(plus_dm[:p]), sum(minus_dm[:p]), sum(trs[:p])
+    dxs = []
+    for i in range(p, len(trs)):
+        if i > p:
+            sp = sp - sp / p + plus_dm[i - 1]
+            sm = sm - sm / p + minus_dm[i - 1]
+            st = st - st / p + trs[i - 1]
+        pdi = 100.0 * sp / st if st else 0.0
+        mdi = 100.0 * sm / st if st else 0.0
+        dxs.append(100.0 * abs(pdi - mdi) / (pdi + mdi) if (pdi + mdi) else 0.0)
+        if len(dxs) >= p:
+            if len(dxs) == p:
+                adx = sum(dxs) / p
+            else:
+                adx = (adx * (p - 1) + dxs[-1]) / p
+            out[i + 1] = adx
+    return out
+
+
+def stdev(vals, ddof=1):
+    n = len(vals)
+    if n <= ddof:
+        return 0.0
+    m = sum(vals) / n
+    return math.sqrt(sum((v - m) ** 2 for v in vals) / (n - ddof))
+
+
+def roll_max(vals, p, i):
+    """max of vals over the p bars ENDING at i (inclusive), or None."""
+    if i + 1 < p:
+        return None
+    return max(vals[i - p + 1:i + 1])
+
+
+def roll_min(vals, p, i):
+    if i + 1 < p:
+        return None
+    return min(vals[i - p + 1:i + 1])
+
+
+# ---------------------------------------------------------------------------
+# Candle plumbing
+
+def parse_candles(raw, interval_ms, now_ms):
+    """Venue candles -> dict of float lists, forming bar dropped."""
+    t, o, h, l, c, v = [], [], [], [], [], []
+    for row in raw or []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            ts = float(row.get("t") or row.get("timestamp"))
+            if ts < 1e12:               # seconds -> ms
+                ts *= 1000.0
+            t.append(int(ts))
+            o.append(float(row.get("o", row.get("open"))))
+            h.append(float(row.get("h", row.get("high"))))
+            l.append(float(row.get("l", row.get("low"))))
+            c.append(float(row.get("c", row.get("close"))))
+            v.append(float(row.get("v", row.get("volume", 0)) or 0))
+        except (TypeError, ValueError):
+            continue
+    # sort by time, drop the still-forming bar (t = open time)
+    order = sorted(range(len(t)), key=lambda i: t[i])
+    t = [t[i] for i in order]
+    o = [o[i] for i in order]
+    h = [h[i] for i in order]
+    l = [l[i] for i in order]
+    c = [c[i] for i in order]
+    v = [v[i] for i in order]
+    while t and t[-1] + interval_ms > now_ms - 5000:
+        t.pop(), o.pop(), h.pop(), l.pop(), c.pop(), v.pop()
+    return {"t": t, "o": o, "h": h, "l": l, "c": c, "v": v}
+
+
+class CandleCache:
+    """One governed fetch per (coin, timeframe) per closed candle, shared by
+    every book that needs it (mum + avo + georgia's regime all ride one 4h
+    fetch), so the REST budget stays far inside the governor."""
+
+    SPAN_BARS = {"15m": 300, "1h": 380, "4h": 280}
+
+    def __init__(self, venue):
+        self.venue = venue
+        self.data = {}       # (coin, tf) -> {"bars":…, "next_due": ms}
+
+    def get(self, coin, tf):
+        key = (coin, tf)
+        now_ms = int(time.time() * 1000)
+        hit = self.data.get(key)
+        if hit and now_ms < hit["next_due"]:
+            return hit["bars"]
+        ims = _interval_ms(tf)
+        span = self.SPAN_BARS.get(tf, 300) * ims
+        try:
+            raw = self.venue.candles(coin, tf, now_ms - span, now_ms)
+        except Exception as e:  # noqa: BLE001 — budget/venue hiccup: stale ok
+            if hit:
+                return hit["bars"]
+            log.warning("%s %s candles unavailable: %s", coin, tf, e)
+            return None
+        bars = parse_candles(raw, ims, now_ms)
+        if not bars["t"]:
+            return hit["bars"] if hit else None
+        nxt = bars["t"][-1] + 2 * ims + CANDLE_LAG_S * 1000
+        self.data[key] = {"bars": bars, "next_due": nxt}
+        return bars
+
+
+def _interval_ms(tf):
+    unit = tf[-1]
+    return int(tf[:-1]) * {"m": 60, "h": 3600, "d": 86400}[unit] * 1000
+
+
+# ---------------------------------------------------------------------------
+# Market-pulse panic (news shock) — sizing only, fail-safe neutral, 15-min
+# cache. Same contract as the freqtrade strategies' _pulse_panic.
+_pulse = {"ts": 0.0, "panic": False}
+
+
+def pulse_panic():
+    if time.time() - _pulse["ts"] < 900:
+        return _pulse["panic"]
+    try:
+        latest = (store.load_state("market-pulse") or {}).get("latest") or {}
+        _pulse.update(ts=time.time(), panic=bool(latest.get("panic")))
+    except Exception:  # noqa: BLE001
+        _pulse.update(ts=time.time(), panic=False)
+    return _pulse["panic"]
+
+
+# ---------------------------------------------------------------------------
+# Strategy ports. Each exposes:
+#   tf, stoploss (config-resolved), max_open, roi (min->ratio), protections,
+#   signals(bars, extra) -> {"enter": tag|None, "exit": bool, ...indicators}
+# computed on the LAST CLOSED bar, exactly the columns the freqtrade twin uses.
+
+class TrendMomo:
+    """👩 Mum — TrendMomoV1 @ 4h (config override; strategy default is 1d)."""
+    bot = "freqtrade-mum"
+    style = "trendmomo-4h"
+    tf = "4h"
+    stoploss = -0.08                    # config_mum.json override
+    max_open = 4
+    roi = {}                            # {"0": 100} = disabled
+    protections = {"cooldown_candles": 1,
+                   "maxdd": {"lookback": 40, "trades": 4, "dd": 0.25, "stop": 5}}
+    min_bars = 45
+
+    def signals(self, bars, extra):
+        c, v = bars["c"], bars["v"]
+        if len(c) < self.min_bars:
+            return None
+        fast = sma_series(c, 10)        # IntParameter defaults 10/40
+        slow = sma_series(c, 40)
+        i = len(c) - 1
+        if fast[i] is None or slow[i] is None or fast[i - 1] is None:
+            return None
+        enter = (fast[i] > slow[i] and c[i] > slow[i] and v[i] > 0)
+        exit_ = (fast[i] < slow[i] and fast[i - 1] >= slow[i - 1]
+                 and v[i] > 0)          # qtpylib.crossed_below
+        return {"enter": "sma_fast_above_slow" if enter else None,
+                "exit": exit_, "exit_reason": "death_cross"}
+
+    def stake_mult(self, tag, bars):
+        return 1.0
+
+
+class MomoBreakout:
+    """👨 Dad — MomoBreakoutV1 @ 1h (config override; validated on 4h)."""
+    bot = "freqtrade-dad"
+    style = "momo-breakout-1h"
+    tf = "1h"
+    stoploss = -0.06                    # config_dad.json override
+    max_open = 4
+    roi = {}
+    protections = {"cooldown_candles": 1,
+                   "slguard": {"lookback": 42, "trades": 3, "stop": 12},
+                   "maxdd": {"lookback": 90, "trades": 8, "dd": 0.25, "stop": 18}}
+    min_bars = 230
+
+    def signals(self, bars, extra):
+        c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]
+        if len(c) < self.min_bars:
+            return None
+        ema_t = ema_series(c, 200)
+        i = len(c) - 1
+        dc_high = roll_max(h, 20, i - 1)     # .rolling(20).max().shift(1)
+        dc_low = roll_min(l, 15, i - 1)
+        if ema_t[i] is None or dc_high is None or dc_low is None:
+            return None
+        enter = (c[i] > dc_high and c[i] > ema_t[i] and v[i] > 0)
+        exit_ = (c[i] < dc_low and v[i] > 0)
+        atr = atr_series(h, l, c, 14)
+        return {"enter": "breakout" if enter else None,
+                "exit": exit_, "exit_reason": "donchian_breakdown",
+                "atr_pct": (atr[i] / c[i]) if (atr[i] and c[i]) else None}
+
+    def stake_mult(self, tag, bars):
+        # inverse-volatility sizing (custom_stake_amount): ref 2% ATR, floor 0.3x
+        m = 1.0
+        sig = self.signals(bars, None) or {}
+        ap = sig.get("atr_pct")
+        if ap and ap > 0:
+            m *= max(0.3, min(1.0, 0.02 / ap))
+        if pulse_panic():
+            m *= 0.5
+        return m
+
+
+class SwingDip:
+    """🙏 Avo Maria — SwingDipV1 @ 4h (config override; validated on 1d)."""
+    bot = "freqtrade-avo-maria"
+    style = "swing-dip-4h"
+    tf = "4h"
+    stoploss = -0.10                    # config_avo_maria.json override
+    max_open = 4
+    roi = {0: 0.20, 5760: 0.12, 11520: 0.06, 20160: 0.0}
+    protections = {"cooldown_candles": 1,
+                   "slguard": {"lookback": 20, "trades": 2, "stop": 5},
+                   "maxdd": {"lookback": 40, "trades": 4, "dd": 0.20, "stop": 5}}
+    min_bars = 230
+
+    def signals(self, bars, extra):
+        c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]
+        if len(c) < self.min_bars:
+            return None
+        i = len(c) - 1
+        rsi = rsi_series(c, 14)
+        e50, e200 = ema_series(c, 50), ema_series(c, 200)
+        tp = [(h[j] + l[j] + c[j]) / 3.0 for j in range(len(c))]   # typical px
+        if None in (rsi[i], e50[i], e200[i]) or i < 20:
+            return None
+        bb_mid = sum(tp[i - 19:i + 1]) / 20.0
+        bb_lo = bb_mid - 2.0 * stdev(tp[i - 19:i + 1])
+        rng_hi = roll_max(h, 20, i - 1)      # shift(1)
+        rng_lo = roll_min(l, 20, i - 1)
+        if rng_hi is None or rng_lo is None:
+            return None
+        band = max(rng_hi - rng_lo, 1e-9)
+        sell_zone = rng_hi - 0.15 * band
+        enter = (e50[i] > e200[i] and rsi[i] < 42 and c[i] < bb_lo and v[i] > 0)
+        exit_ = ((rsi[i] > 65 or c[i] >= sell_zone) and v[i] > 0)
+        return {"enter": "dip_in_uptrend" if enter else None,
+                "exit": exit_, "exit_reason": "sell_into_strength"}
+
+    def stake_mult(self, tag, bars):
+        return 0.5 if pulse_panic() else 1.0
+
+
+class DayTraderGated:
+    """🔮 Georgia — DayTraderV5Gated @ 15m (config override; file default 1h).
+    Four entry modes switched by BTC's 4h 50/200 EMA regime; trailing ATR stop
+    capped by the config stoploss (-5%); ROI ladder; timeout exits."""
+    bot = "freqtrade-georgia"
+    style = "daytrader-15m"
+    tf = "15m"
+    stoploss = -0.05                    # config_georgia.json override
+    max_open = 5
+    roi = {0: 0.018, 180: 0.012, 360: 0.008, 720: 0.005}
+    protections = {"cooldown_candles": 4,
+                   "slguard": {"lookback": 48, "trades": 3, "stop": 12},
+                   "maxdd": {"lookback": 96, "trades": 10, "dd": 0.15, "stop": 24}}
+    min_bars = 70
+    BAND_PCT_ON = 0.015
+    BAND_PCT_OFF = 0.020
+    MAX_ENTRIES_PER_HOUR = 2            # confirm_trade_entry throttle
+
+    def signals(self, bars, extra):
+        c, h, l, v = bars["c"], bars["h"], bars["l"], bars["v"]
+        if len(c) < self.min_bars:
+            return None
+        i = len(c) - 1
+        e50 = ema_series(c, 50)
+        atr = atr_series(h, l, c, 14)
+        adx = adx_series(h, l, c, 14)
+        if e50[i] is None or atr[i] is None or i < 21:
+            return None
+        rng_hi = roll_max(h, 14, i - 1)      # _N=14, shift(1)
+        rng_lo = roll_min(l, 14, i - 1)
+        if rng_hi is None or rng_lo is None:
+            return None
+        band = max(rng_hi - rng_lo, 1e-9)
+        buy_zone = rng_lo + 0.37 * band
+        sell_zone = rng_hi - 0.22 * band
+        band_pct = band / max(c[i], 1e-9)
+        dc20 = roll_max(h, 20, i - 1)        # dc_high20.shift(1)
+        uptick = c[i] > c[i - 1]
+        live_vol = v[i] > 0
+        e50_rising = e50[i - 6] is not None and e50[i] > e50[i - 6]
+        regime_up = bool(extra.get("btc_regime_up"))   # fail-safe 0
+
+        # freqtrade .loc order — LAST matching assignment wins the tag
+        tag = None
+        if (regime_up and c[i] <= buy_zone and band_pct >= self.BAND_PCT_ON
+                and c[i] > e50[i] and uptick and live_vol):
+            tag = "range_on"
+        if (not regime_up and c[i] <= buy_zone and c[i] > e50[i] and e50_rising
+                and band_pct >= self.BAND_PCT_OFF and uptick and live_vol):
+            tag = "bounce_pullback"
+        if (adx[i] is not None and adx[i] >= 25 and c[i] > e50[i]
+                and dc20 is not None and c[i] > dc20
+                and band_pct >= self.BAND_PCT_ON and live_vol):
+            tag = "trend_breakout"
+        if (adx[i] is not None and adx[i] < 20 and c[i] <= buy_zone
+                and band_pct >= self.BAND_PCT_ON and uptick and live_vol):
+            tag = "range_meanrev"
+
+        exit_ = (c[i] >= sell_zone and live_vol)
+        return {"enter": tag, "exit": exit_, "exit_reason": "range_top",
+                "atr": atr[i]}
+
+    def stake_mult(self, tag, bars):
+        m = 1.0
+        if tag in ("bounce_pullback", "range_meanrev"):
+            m *= 0.5                    # counter-daily-trend scalps size down
+        if pulse_panic():
+            m *= 0.5
+        return m
+
+    def atr_stop_dist(self, tag, bars, px):
+        """custom_stoploss: 2.5x ATR (2.0x for the counter-trend tags) as a
+        fraction of price, capped at the config stoploss — RATCHETS up only."""
+        sig = self.signals(bars, {"btc_regime_up": 0}) if bars else None
+        atr = (sig or {}).get("atr")
+        if not atr or not px:
+            return -self.stoploss
+        mult = 2.0 if tag in ("bounce_pullback", "range_meanrev") else 2.5
+        return min(mult * atr / px, -self.stoploss)
+
+    def custom_exit(self, tag, age_min, profit):
+        if tag == "bounce_pullback":
+            if profit >= 0.012:
+                return "bounce_take"
+            if age_min >= 720:
+                return "bounce_timeout"
+        if age_min >= 1440:
+            return "max_hold_timeout"
+        return None
+
+
+STRATEGIES = [TrendMomo(), MomoBreakout(), SwingDip(), DayTraderGated()]
+
+
+# ---------------------------------------------------------------------------
+# Per-book runtime (one ShadowBroker + protections + ledger per family bot)
+
+class Book:
+    def __init__(self, strat, venue, coins):
+        from venues.safety import SafetyRails
+        from venues.shadow import ShadowBroker
+        self.s = strat
+        self.bot_id = strat.bot + "-lshadow"
+        self.broker = ShadowBroker(self.bot_id, venue, START_EQUITY)
+        self.rails = SafetyRails(strat.bot, "lighter_shadow")
+        self.coins = coins
+        self.meta = {}            # coin -> {entry, opened_ts, tag, accrued, stop_px}
+        self.closed = []          # [{ts, pnl, pct, stop, pair}] for protections
+        self.cooldown = {}        # pair -> release_ts
+        self.guard_until = 0.0    # StoplossGuard / MaxDrawdown book-wide lock
+        self.fund_realized = 0.0
+        self.last_sig_ts = {}     # coin -> last closed-candle ts acted on
+        self.throttle = {"bucket": None, "n": 0}
+        self.n_closed = self.n_wins = 0
+        self.halted_today = False
+        self.day_start_equity = None
+        self.last_accrue = time.time()
+
+    # -- persistence ----------------------------------------------------------
+    def restore(self):
+        try:
+            agg = store.fetch_paper_aggregate(self.bot_id)
+            if agg:
+                self.n_closed, self.n_wins = agg["closed"], agg["wins"]
+        except Exception:  # noqa: BLE001
+            pass
+        saved = store.load_state(self.bot_id)
+        if saved and self.broker.restore_state(saved.get("broker") or {}):
+            self.meta = {str(k): v for k, v in (saved.get("meta") or {}).items()}
+            self.closed = list(saved.get("closed") or [])
+            self.fund_realized = float(saved.get("fund_realized") or 0.0)
+            self.guard_until = float(saved.get("guard_until") or 0.0)
+            self.cooldown = {str(k): float(v) for k, v in
+                             (saved.get("cooldown") or {}).items()}
+            log.info("%s restored: $%.2f, %d open", self.bot_id,
+                     self.broker.equity(), self.broker.open_count())
+        if store.load_daily_halt(self.bot_id,
+                                 datetime.now(timezone.utc).date().isoformat()):
+            self.halted_today = True
+            log.warning("%s daily-loss halt restored — halted for today.", self.bot_id)
+
+    def persist(self):
+        try:
+            store.save_state(self.bot_id, {
+                "broker": self.broker.to_state(), "meta": self.meta,
+                "closed": self.closed[-200:], "fund_realized": self.fund_realized,
+                "guard_until": self.guard_until, "cooldown": self.cooldown})
+        except Exception:  # noqa: BLE001
+            pass
+
+    # -- accounting -----------------------------------------------------------
+    def equity(self):
+        open_accr = sum((m or {}).get("accrued", 0.0) for m in self.meta.values())
+        return self.broker.equity() + self.fund_realized + open_accr
+
+    # -- protections (freqtrade-shaped, per strategy config) -------------------
+    def entries_locked(self, now, tf_s):
+        if now < self.guard_until:
+            return True
+        p = self.s.protections
+        win = [c for c in self.closed
+               if now - c["ts"] <= p.get("slguard", {}).get("lookback", 0) * tf_s]
+        sg = p.get("slguard")
+        if sg and sum(1 for c in win if c["stop"]) >= sg["trades"]:
+            self.guard_until = now + sg["stop"] * tf_s
+            log.warning("%s StoplossGuard: %d stops in window — entries off %.0fmin",
+                        self.bot_id, sg["trades"], sg["stop"] * tf_s / 60)
+            return True
+        dd = p.get("maxdd")
+        if dd:
+            win = [c for c in self.closed if now - c["ts"] <= dd["lookback"] * tf_s]
+            if len(win) >= dd["trades"]:
+                cum = peak = trough = 0.0
+                worst = 0.0
+                for c in win:
+                    cum += c["pnl"]
+                    peak = max(peak, cum)
+                    worst = max(worst, (peak - cum) / START_EQUITY)
+                if worst >= dd["dd"]:
+                    self.guard_until = now + dd["stop"] * tf_s
+                    log.warning("%s MaxDrawdown %.0f%% in window — entries off %.0fmin",
+                                self.bot_id, worst * 100, dd["stop"] * tf_s / 60)
+                    return True
+        return False
+
+    def throttle_ok(self, now):
+        if not isinstance(self.s, DayTraderGated):
+            return True
+        bucket = int(now // 3600)
+        if self.throttle["bucket"] != bucket:
+            self.throttle.update(bucket=bucket, n=0)
+        if self.throttle["n"] >= self.s.MAX_ENTRIES_PER_HOUR:
+            return False
+        self.throttle["n"] += 1
+        return True
+
+    # -- trade lifecycle --------------------------------------------------------
+    def record_close(self, coin, px, price_pnl, reason, notional=None, shadow=True):
+        m = self.meta.get(coin) or {}
+        fund_pnl = m.get("accrued", 0.0)
+        self.fund_realized += fund_pnl
+        total = price_pnl + fund_pnl
+        pct = total / notional if notional else total / STAKE_USD
+        self.n_closed += 1
+        self.n_wins += 1 if total > 0 else 0
+        was_stop = "stop" in reason
+        self.closed.append({"ts": time.time(), "pnl": total,
+                            "pct": pct, "stop": was_stop,
+                            "pair": coin})
+        tf_s = _interval_ms(self.s.tf) / 1000
+        self.cooldown[coin] = time.time() + \
+            self.s.protections.get("cooldown_candles", 1) * tf_s
+        log.info("%s CLOSE %s | price %+.2f funding %+.2f [%s]",
+                 self.bot_id, coin, price_pnl, fund_pnl, reason)
+        try:
+            store.publish_paper_trade(
+                self.bot_id, trade_id=f"{coin}:{m.get('opened_ts')}",
+                pnl_abs=float(total), pnl_pct=pct, pair=coin,
+                opened_at=datetime.fromtimestamp(
+                    m.get("opened_ts") or time.time(), tz=timezone.utc).isoformat(),
+                closed_at=datetime.now(timezone.utc).isoformat(),
+                reason="long_" + reason, venue="lighter", shadow=shadow)
+        except Exception:  # noqa: BLE001
+            pass
+        self.meta.pop(coin, None)
+
+
+# ---------------------------------------------------------------------------
+
+def btc_regime_up(cache):
+    """BTC 4h EMA50>EMA200 on the last closed bar. Fail-safe 0 (the strategy's
+    documented conservative default when the regime series is missing)."""
+    bars = cache.get("BTC", "4h")
+    if not bars or len(bars["c"]) < 210:
+        return False
+    e50 = ema_series(bars["c"], 50)
+    e200 = ema_series(bars["c"], 200)
+    return bool(e50[-1] and e200[-1] and e50[-1] > e200[-1])
+
+
+def main():
+    p = argparse.ArgumentParser(description="Family bots — Lighter shadow books")
+    p.add_argument("--once", action="store_true", help="Single loop then exit.")
+    args = p.parse_args()
+
+    mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
+    # [v1 GATE] UNVALIDATED on this venue — shadow only, like Snap Back and
+    # Counterweight before it. Going live is a separate decision on the record.
+    if mode != "lighter_shadow":
+        raise SystemExit("lighter_family_bot runs VENUE=lighter_shadow ONLY in "
+                         "v1 — the family ports are unvalidated on Lighter; "
+                         "the shadow record earns (or kills) any go-live.")
+
+    from venues.lighter_client import LighterClient
+    from venues import marks
+    venue = LighterClient(net="mainnet", with_signer=False)
+
+    listed = [c for c in COINS if venue.supports(c)]
+    skipped = [c for c in COINS if c not in listed]
+    cache = CandleCache(venue)
+    books = [Book(s, venue, listed) for s in STRATEGIES]
+    for b in books:
+        b.restore()
+
+    log.info("=" * 64)
+    log.info("FAMILY on LIGHTER (shadow) | %d books | %d/%d coins listed "
+             "(skipped: %s)", len(books), len(listed), len(COINS),
+             ", ".join(skipped) or "none")
+    for b in books:
+        log.info("  %s | %s | tf=%s stop=%.0f%% slots=%d roi=%s",
+                 b.bot_id, b.s.style, b.s.tf, b.s.stoploss * 100,
+                 b.s.max_open, b.s.roi or "off")
+    log.info("$%.0f/trade | long-only 1x (pays funding — drag modelled) | "
+             "fills cross the live book | loop=%ds", STAKE_USD, LOOP_SECONDS)
+    log.info("EVIDENCE-FIRST: Kraken paper twins keep running as the control "
+             "arm. lighter_live REFUSED in v1.")
+    log.info("=" * 64)
+
+    cur_day = datetime.now(timezone.utc).date()
+    for b in books:
+        b.day_start_equity = b.equity()
+
+    while True:
+        t0 = time.time()
+        now = datetime.now(timezone.utc)
+        if now.date() != cur_day:
+            cur_day = now.date()
+            for b in books:
+                b.halted_today = False
+                b.day_start_equity = b.equity()
+
+        try:
+            fund = venue.funding_map()
+        except Exception as e:  # noqa: BLE001
+            log.warning("funding fetch failed (%s); accrual paused this loop", e)
+            fund = {}
+        regime = btc_regime_up(cache)
+
+        for b in books:
+            store.heartbeat(b.bot_id)
+            tf_s = _interval_ms(b.s.tf) / 1000.0
+
+            # ---- daily-loss rail (durable halt, debounced) ----
+            eq = b.equity()
+            if b.day_start_equity is None:
+                b.day_start_equity = eq
+            if (not b.halted_today and b.day_start_equity
+                    and eq <= b.day_start_equity * (1 - DAILY_LOSS_LIMIT)):
+                confirmed, eq = b.rails.confirm_daily_loss(
+                    b.day_start_equity, eq, DAILY_LOSS_LIMIT, b.equity)
+                if confirmed:
+                    log.warning("%s DAILY LOSS LIMIT (%.2f <= %.2f) — flatten + halt.",
+                                b.bot_id, eq, b.day_start_equity)
+                    b.halted_today = True
+                    store.save_daily_halt(b.bot_id, cur_day.isoformat(),
+                                          b.day_start_equity)
+                    for coin in list(b.meta):
+                        px = marks.fresh_mid(venue, coin) or b.meta[coin]["entry"]
+                        sz, ent = b.broker.pos.get(coin, (0.0, 0.0))
+                        pnl = b.broker.close(coin, px)
+                        b.record_close(coin, px, pnl, "rail_flatten",
+                                       notional=abs(sz) * ent)
+
+            dt_h = (t0 - b.last_accrue) / 3600.0
+            b.last_accrue = t0
+
+            if b.halted_today:
+                try:
+                    store.publish(b.bot_id, status="halted", equity=b.equity(),
+                                  pnl_abs=b.equity() - START_EQUITY,
+                                  closed_trades=b.n_closed, wins=b.n_wins,
+                                  losses=b.n_closed - b.n_wins,
+                                  extra={"mode": mode, "venue": mode,
+                                         "style": b.s.style, "family": True})
+                except Exception:  # noqa: BLE001
+                    pass
+                continue
+
+            locked = b.entries_locked(t0, tf_s)
+
+            for coin in b.coins:
+                bars = cache.get(coin, b.s.tf)
+                if not bars or not bars["t"]:
+                    continue
+                sig_ts = bars["t"][-1]
+                new_candle = b.last_sig_ts.get(coin) != sig_ts
+                sig = b.s.signals(bars, {"btc_regime_up": regime}) \
+                    if new_candle else None
+                if new_candle:
+                    b.last_sig_ts[coin] = sig_ts
+
+                held = coin in b.broker.pos
+                px = marks.fresh_mid(venue, coin)
+
+                # ---- manage an open long ----
+                if held:
+                    m = b.meta.get(coin) or {}
+                    entry = m.get("entry") or 0.0
+                    if px:
+                        b.broker.mark(coin, px)
+                        rate = (fund.get(coin) or {}).get("rate")
+                        if rate is not None:
+                            sz = abs(b.broker.pos[coin][0])
+                            m["accrued"] = m.get("accrued", 0.0) - rate * sz * px * dt_h
+                            b.meta[coin] = m
+                    if not px or not entry:
+                        continue
+                    profit = (px - entry) / entry
+                    age_min = (t0 - (m.get("opened_ts") or t0)) / 60.0
+                    reason = None
+
+                    # stop (georgia: trailing ATR ratchet; others: fixed)
+                    if isinstance(b.s, DayTraderGated):
+                        dist = b.s.atr_stop_dist(m.get("tag"), bars, px)
+                        m["stop_px"] = max(m.get("stop_px") or 0.0, px * (1 - dist))
+                        if px <= m["stop_px"]:
+                            reason = "trailing_stop_loss"
+                    elif profit <= b.s.stoploss:
+                        reason = "stop_loss"
+
+                    # ROI ladder (continuous, like freqtrade)
+                    if not reason and b.s.roi:
+                        rung = max((k for k in b.s.roi if k <= age_min), default=None)
+                        if rung is not None and profit >= b.s.roi[rung]:
+                            reason = "roi"
+                    # custom_exit timeouts (georgia)
+                    if not reason and isinstance(b.s, DayTraderGated):
+                        reason = b.s.custom_exit(m.get("tag"), age_min, profit)
+                    # exit signal on a fresh candle (trend_breakout vetoes it)
+                    if not reason and sig and sig.get("exit") and \
+                            m.get("tag") != "trend_breakout":
+                        reason = sig.get("exit_reason", "exit_signal")
+
+                    if reason:
+                        sz, ent = b.broker.pos.get(coin, (0.0, 0.0))
+                        pnl = b.broker.close(coin, px)
+                        b.record_close(coin, px, pnl, reason,
+                                       notional=abs(sz) * ent)
+                    continue
+
+                # ---- flat: consider an entry (new candle only) ----
+                if not sig or not sig.get("enter") or locked or not px:
+                    continue
+                if b.broker.open_count() >= b.s.max_open:
+                    continue
+                if t0 < b.cooldown.get(coin, 0.0):
+                    continue
+                if not b.throttle_ok(t0):
+                    log.info("%s %s entry throttled (max %d/h)", b.bot_id, coin,
+                             DayTraderGated.MAX_ENTRIES_PER_HOUR)
+                    continue
+                tag = sig["enter"]
+                stake = STAKE_USD * b.s.stake_mult(tag, bars)
+                size = stake / px
+                b.broker.open(coin, True, size, px)
+                ent = b.broker.pos.get(coin)
+                entry_px = ent[1] if ent else px
+                stop_px = None
+                if isinstance(b.s, DayTraderGated):
+                    dist = b.s.atr_stop_dist(tag, bars, entry_px)
+                    stop_px = entry_px * (1 - dist)
+                b.meta[coin] = {"entry": entry_px, "opened_ts": t0, "tag": tag,
+                                "accrued": 0.0, "stop_px": stop_px}
+                log.info("%s OPEN %s long $%.0f @ %.6g [%s]",
+                         b.bot_id, coin, stake, entry_px, tag)
+
+            # ---- publish + persist ----
+            open_accr = sum((m or {}).get("accrued", 0.0) for m in b.meta.values())
+            try:
+                store.publish(
+                    b.bot_id, status="online", equity=b.equity(),
+                    pnl_abs=b.equity() - START_EQUITY,
+                    open_trades=b.broker.open_count(),
+                    closed_trades=b.n_closed, wins=b.n_wins,
+                    losses=b.n_closed - b.n_wins,
+                    extra={"mode": mode, "venue": mode, "style": b.s.style,
+                           "family": True,
+                           "held": {c: (m or {}).get("tag") for c, m in b.meta.items()},
+                           "fund_realized": round(b.fund_realized, 4),
+                           "fund_open": round(open_accr, 4),
+                           "btc_regime_up": regime,
+                           "skipped_unlisted": skipped})
+            except Exception:  # noqa: BLE001
+                pass
+            b.persist()
+
+        log.info("loop ok | %s | regime_up=%s",
+                 " | ".join(f"{b.bot_id.split('-')[1]}: ${b.equity():.2f} "
+                            f"{b.broker.open_count()} open" for b in books),
+                 regime)
+        if args.once:
+            log.info("--once complete.")
+            break
+        time.sleep(max(1.0, LOOP_SECONDS - (time.time() - t0)))
+
+
+def _selftest():
+    # EMA: talib seeds with SMA of first p. Series 1..5, p=3 -> seed 2, then
+    # 2+ (4-2)*0.5 = 3, 3 + (5-3)*0.5 = 4.
+    assert ema_series([1, 2, 3, 4, 5], 3)[-3:] == [2.0, 3.0, 4.0]
+    # SMA plain.
+    assert sma_series([1, 2, 3, 4], 2)[-1] == 3.5
+    # RSI: all-up series -> 100; all-down -> 0.
+    up = list(range(1, 40))
+    assert abs(rsi_series(up, 14)[-1] - 100.0) < 1e-9
+    dn = list(range(40, 1, -1))
+    assert rsi_series(dn, 14)[-1] < 1e-9
+    # ATR of a constant series -> 0.
+    flat = [10.0] * 40
+    assert abs(atr_series(flat, flat, flat, 14)[-1]) < 1e-12
+    # ADX warms up and is bounded 0..100 on a trending series.
+    h = [i + 1.0 for i in range(80)]
+    l = [i + 0.5 for i in range(80)]
+    c = [i + 0.8 for i in range(80)]
+    a = adx_series(h, l, c, 14)[-1]
+    assert a is not None and 0.0 <= a <= 100.0 and a > 50.0, a
+    # stdev sample (ddof=1) matches the pandas default used by qtpylib BBs.
+    assert abs(stdev([1, 2, 3, 4]) - 1.2909944487358056) < 1e-12
+    # rolling window helpers honour shift semantics.
+    assert roll_max([1, 5, 3, 2], 2, 2) == 5 and roll_min([1, 5, 3, 2], 2, 2) == 3
+    # ROI rung selection: age 200min on georgia's ladder -> 0.012.
+    g = DayTraderGated()
+    rung = max((k for k in g.roi if k <= 200), default=None)
+    assert g.roi[rung] == 0.012
+    print("lighter_family_bot self-test: OK")
+
+
+def _supervised():
+    """[GO-GREEN pattern] unhandled exception -> log, mark rows ERROR,
+    restart in 60s (state re-hydrates). SystemExit/Ctrl-C pass through."""
+    while True:
+        try:
+            main()
+            return
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("unhandled exception — marking rows ERROR, restart in 60s")
+            for s in STRATEGIES:
+                try:
+                    store.set_status(s.bot + "-lshadow", "error")
+                except Exception:  # noqa: BLE001
+                    pass
+            time.sleep(60)
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
+        sys.exit(0)
+    try:
+        _supervised()
+    except KeyboardInterrupt:
+        log.info("stopped by user.")

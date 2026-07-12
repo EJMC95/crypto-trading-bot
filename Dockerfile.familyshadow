@@ -1,0 +1,22 @@
+# Image for 👨‍👩‍👧‍👦 the four FAMILY bots as Lighter SHADOW books — SHADOW ONLY in v1.
+# Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.familyshadow
+#   VENUE=lighter_shadow
+#   DATABASE_URL=${{Postgres.DATABASE_URL}}
+# One service, four books/rows: freqtrade-{mum,dad,avo-maria,georgia}-lshadow.
+# The bot itself REFUSES anything but lighter_shadow: the ports are UNVALIDATED
+# on Lighter — the shadow record vs the Kraken paper twins (the control arm)
+# earns (or kills) any go-live decision. No keys are needed for shadow.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_family_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_family_bot.py"]
