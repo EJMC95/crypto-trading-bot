@@ -4,11 +4,11 @@ _Blend = Elo+Poisson logistic stack (validated 2015–2025: Brier 0.2188 vs mark
 
 | fixture | kickoff | blend P(home) | market P(home) | margin | total | call |
 |---|---|---|---|---|---|---|
-| Manly-Warringah Sea Eagles v North Queensland Cowboys | Sun 12 Jul 16:05 | 64.8% | 74.2% | +3.7 | 48 | Manly-Warringah Sea Eagles (65%, lean) |
+| Manly-Warringah Sea Eagles v North Queensland Cowboys | Sun 12 Jul 16:05 | 64.8% | 89.8% | +3.7 | 48 | Manly-Warringah Sea Eagles (65%, lean) |
 | Melbourne Storm v Gold Coast Titans | Sun 12 Jul 18:15 | 78.0% | 71.8% | +4.5 | 48 | Melbourne Storm (78%, strong) |
 
 **Value flags (model vs best available price, paper only):**
-- North Queensland Cowboys in Manly-Warringah Sea Eagles v North Queensland Cowboys: model edge +9.4% vs consensus, EV +32.0% at best price (2 books)
+- North Queensland Cowboys in Manly-Warringah Sea Eagles v North Queensland Cowboys: model edge +24.9% vs consensus, EV +339.9% at best price (2 books)
 - Melbourne Storm in Melbourne Storm v Gold Coast Titans: model edge +6.2% vs consensus, EV +5.3% at best price (4 books)
 - _Caveat: on a fresh model most 'edges' are model error, not market error — the paper ledger exists to measure which. No real money._
 

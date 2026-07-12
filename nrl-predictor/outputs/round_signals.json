@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 19,
- "scanned_at": "2026-07-12T06:36:22+00:00",
+ "scanned_at": "2026-07-12T07:27:10+00:00",
  "games": [
   {
    "home": "Manly-Warringah Sea Eagles",
@@ -323,8 +323,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 16.9,
-    "temp_c": 14.5,
+    "wind_kmh": 16.6,
+    "temp_c": 14.4,
     "forecast_hour": "2026-07-12T16:00"
    },
    "news": [],
@@ -405,11 +405,11 @@
     },
     {
      "number": 9,
-     "position": "Hooker",
+     "position": "Interchange",
      "player": "Harry Grant",
      "player_id": 26157,
      "is_starter": true,
-     "is_spine": true,
+     "is_spine": false,
      "status": null
     },
     {
@@ -432,7 +432,7 @@
     },
     {
      "number": 12,
-     "position": "2nd Row",
+     "position": "Interchange",
      "player": "Alec MacDonald",
      "player_id": 31629,
      "is_starter": true,
@@ -450,16 +450,16 @@
     },
     {
      "number": 14,
-     "position": "Interchange",
+     "position": "Five-Eighth",
      "player": "Tyran Wishart",
      "player_id": 31628,
      "is_starter": false,
-     "is_spine": false,
+     "is_spine": true,
      "status": null
     },
     {
      "number": 15,
-     "position": "Interchange",
+     "position": "2nd Row",
      "player": "Joe Chan",
      "player_id": 30885,
      "is_starter": false,
@@ -643,8 +643,8 @@
    "weather": {
     "precip_mm": 1.1,
     "precip_prob": 92,
-    "wind_kmh": 16.8,
-    "temp_c": 10.4,
+    "wind_kmh": 15.3,
+    "temp_c": 10.5,
     "forecast_hour": "2026-07-12T18:00"
    },
    "news": [],

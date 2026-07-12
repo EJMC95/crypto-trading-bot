@@ -1,22 +1,9 @@
 {
- "generated_at": "2026-07-12T07:19:22+00:00",
+ "generated_at": "2026-07-12T07:29:22+00:00",
  "source": "nrl-predictor",
  "disclaimer": "Paper-track model output. Not betting advice.",
  "round": "Round 19",
  "predictions": [
-  {
-   "round": "Round 19",
-   "date": "2026-07-12 14:00:00",
-   "venue": "Accor Stadium",
-   "home": "South Sydney Rabbitohs",
-   "away": "Newcastle Knights",
-   "p_home_elo": 0.5844,
-   "p_home_poisson": 0.5758,
-   "p_home_gbm": 0.4911,
-   "p_home_blend": 0.5886,
-   "exp_margin_home": 3.2,
-   "exp_total_points": 49.0
-  },
   {
    "round": "Round 19",
    "date": "2026-07-12 16:05:00",
@@ -24,9 +11,9 @@
    "home": "Manly-Warringah Sea Eagles",
    "away": "North Queensland Cowboys",
    "p_home_elo": 0.6312,
-   "p_home_poisson": 0.5901,
-   "p_home_gbm": 0.6906,
-   "p_home_blend": 0.6496,
+   "p_home_poisson": 0.5864,
+   "p_home_gbm": 0.7298,
+   "p_home_blend": 0.6481,
    "exp_margin_home": 3.7,
    "exp_total_points": 48.2
   },
@@ -37,9 +24,9 @@
    "home": "Melbourne Storm",
    "away": "Gold Coast Titans",
    "p_home_elo": 0.7716,
-   "p_home_poisson": 0.6069,
-   "p_home_gbm": 0.6359,
-   "p_home_blend": 0.78,
+   "p_home_poisson": 0.6078,
+   "p_home_gbm": 0.6519,
+   "p_home_blend": 0.7803,
    "exp_margin_home": 4.5,
    "exp_total_points": 48.1
   }
@@ -47,176 +34,34 @@
  "market": [
   {
    "round": "Round 19",
-   "date": "2026-07-10 20:00:00",
-   "home": "Wests Tigers",
-   "away": "New Zealand Warriors",
-   "p_home_blend": 0.3812,
-   "market_p_home": 0.2946,
-   "edge_home": 0.0866,
-   "books": 4,
-   "best_odds_home": 3.35,
-   "best_odds_away": 1.36,
-   "value_side": "Wests Tigers",
-   "value_ev_pct": 27.702
-  },
-  {
-   "round": "Round 19",
-   "date": "2026-07-11 15:00:00",
-   "home": "Dolphins",
-   "away": "Cronulla-Sutherland Sharks",
-   "p_home_blend": 0.5859,
-   "market_p_home": 0.6124,
-   "edge_home": -0.0265,
-   "books": 4,
-   "best_odds_home": 1.58,
-   "best_odds_away": 2.5,
-   "value_side": "Cronulla-Sutherland Sharks",
-   "value_ev_pct": 3.525
-  },
-  {
-   "round": "Round 19",
-   "date": "2026-07-11 17:30:00",
-   "home": "Canterbury-Bankstown Bulldogs",
-   "away": "Canberra Raiders",
-   "p_home_blend": 0.5839,
-   "market_p_home": 0.6125,
-   "edge_home": -0.0286,
-   "books": 4,
-   "best_odds_home": 1.55,
-   "best_odds_away": 2.48,
-   "value_side": "Canberra Raiders",
-   "value_ev_pct": 3.1928
-  },
-  {
-   "round": "Round 19",
-   "date": "2026-07-11 19:35:00",
-   "home": "Sydney Roosters",
-   "away": "Parramatta Eels",
-   "p_home_blend": 0.7478,
-   "market_p_home": 0.7894,
-   "edge_home": -0.0416,
-   "books": 4,
-   "best_odds_home": 1.2,
-   "best_odds_away": 4.6,
-   "value_side": "Parramatta Eels",
-   "value_ev_pct": 16.012
-  },
-  {
-   "round": "Round 19",
-   "date": "2026-07-12 14:00:00",
-   "home": "South Sydney Rabbitohs",
-   "away": "Newcastle Knights",
-   "p_home_blend": 0.5897,
-   "market_p_home": 0.4816,
-   "edge_home": 0.1081,
-   "books": 4,
-   "best_odds_home": 2.0,
-   "best_odds_away": 1.85,
-   "value_side": "South Sydney Rabbitohs",
-   "value_ev_pct": 17.94
-  },
-  {
-   "round": "Round 19",
    "date": "2026-07-12 16:05:00",
    "home": "Manly-Warringah Sea Eagles",
    "away": "North Queensland Cowboys",
-   "p_home_blend": 0.6311,
-   "market_p_home": 0.6133,
-   "edge_home": 0.0178,
-   "books": 4,
-   "best_odds_home": 1.55,
-   "best_odds_away": 2.55,
-   "value_side": "Manly-Warringah Sea Eagles",
-   "value_ev_pct": -2.1795
+   "p_home_blend": 0.6481,
+   "market_p_home": 0.8975,
+   "edge_home": -0.2494,
+   "books": 2,
+   "best_odds_home": 1.11,
+   "best_odds_away": 12.5,
+   "value_side": "North Queensland Cowboys",
+   "value_ev_pct": 339.875
   },
   {
    "round": "Round 19",
    "date": "2026-07-12 18:15:00",
    "home": "Melbourne Storm",
    "away": "Gold Coast Titans",
-   "p_home_blend": 0.7567,
-   "market_p_home": 0.7033,
-   "edge_home": 0.0534,
+   "p_home_blend": 0.7803,
+   "market_p_home": 0.7178,
+   "edge_home": 0.0625,
    "books": 4,
-   "best_odds_home": 1.36,
-   "best_odds_away": 3.25,
+   "best_odds_home": 1.35,
+   "best_odds_away": 3.5,
    "value_side": "Melbourne Storm",
-   "value_ev_pct": 2.9112
+   "value_ev_pct": 5.3405
   }
  ],
  "props": [
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "team": "South Sydney Rabbitohs",
-   "player": "David Fifita",
-   "position": "2R",
-   "exp_tries": 0.87,
-   "p_ats": 0.579,
-   "fair_price": 1.73,
-   "p_2plus": 0.215,
-   "fair_2plus": 4.6,
-   "vs_opp": "8t/9g"
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "team": "South Sydney Rabbitohs",
-   "player": "Tallis Duncan",
-   "position": "C",
-   "exp_tries": 0.53,
-   "p_ats": 0.41,
-   "fair_price": 2.44,
-   "p_2plus": 0.098,
-   "fair_2plus": 10.2,
-   "vs_opp": "2t/4g"
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "team": "South Sydney Rabbitohs",
-   "player": "Jack Wighton",
-   "position": "C",
-   "exp_tries": 0.51,
-   "p_ats": 0.402,
-   "fair_price": 2.49,
-   "p_2plus": 0.094,
-   "fair_2plus": 10.6,
-   "vs_opp": "8t/21g"
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "team": "Newcastle Knights",
-   "player": "Greg Marzhew",
-   "position": "W",
-   "exp_tries": 0.72,
-   "p_ats": 0.515,
-   "fair_price": 1.94,
-   "p_2plus": 0.164,
-   "fair_2plus": 6.1,
-   "vs_opp": "7t/6g"
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "team": "Newcastle Knights",
-   "player": "Fletcher Sharpe",
-   "position": "FE",
-   "exp_tries": 0.58,
-   "p_ats": 0.439,
-   "fair_price": 2.28,
-   "p_2plus": 0.115,
-   "fair_2plus": 8.7,
-   "vs_opp": "4t/3g"
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "team": "Newcastle Knights",
-   "player": "Dominic Young",
-   "position": "W",
-   "exp_tries": 0.52,
-   "p_ats": 0.407,
-   "fair_price": 2.46,
-   "p_2plus": 0.097,
-   "fair_2plus": 10.3,
-   "vs_opp": "4t/6g"
-  },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
    "team": "Manly-Warringah Sea Eagles",
@@ -224,7 +69,7 @@
    "position": "W",
    "exp_tries": 0.78,
    "p_ats": 0.542,
-   "fair_price": 1.85,
+   "fair_price": 1.84,
    "p_2plus": 0.184,
    "fair_2plus": 5.4,
    "vs_opp": "7t/8g"
@@ -282,7 +127,7 @@
    "team": "North Queensland Cowboys",
    "player": "Tom Chester",
    "position": "C",
-   "exp_tries": 0.38,
+   "exp_tries": 0.37,
    "p_ats": 0.313,
    "fair_price": 3.2,
    "p_2plus": 0.055,
@@ -294,11 +139,11 @@
    "team": "Melbourne Storm",
    "player": "Sualauvi Fa'alogo",
    "position": "FB",
-   "exp_tries": 0.83,
-   "p_ats": 0.564,
-   "fair_price": 1.77,
-   "p_2plus": 0.202,
-   "fair_2plus": 5.0,
+   "exp_tries": 0.81,
+   "p_ats": 0.555,
+   "fair_price": 1.8,
+   "p_2plus": 0.195,
+   "fair_2plus": 5.1,
    "vs_opp": "3t/2g"
   },
   {
@@ -306,11 +151,11 @@
    "team": "Melbourne Storm",
    "player": "Cameron Munster",
    "position": "FE",
-   "exp_tries": 0.72,
-   "p_ats": 0.513,
-   "fair_price": 1.95,
-   "p_2plus": 0.163,
-   "fair_2plus": 6.1,
+   "exp_tries": 0.7,
+   "p_ats": 0.505,
+   "fair_price": 1.98,
+   "p_2plus": 0.157,
+   "fair_2plus": 6.4,
    "vs_opp": "12t/13g"
   },
   {
@@ -318,11 +163,11 @@
    "team": "Melbourne Storm",
    "player": "Will Warbrick",
    "position": "W",
-   "exp_tries": 0.68,
-   "p_ats": 0.492,
-   "fair_price": 2.03,
-   "p_2plus": 0.148,
-   "fair_2plus": 6.8,
+   "exp_tries": 0.66,
+   "p_ats": 0.484,
+   "fair_price": 2.07,
+   "p_2plus": 0.142,
+   "fair_2plus": 7.0,
    "vs_opp": "2t/3g"
   },
   {
@@ -330,11 +175,11 @@
    "team": "Gold Coast Titans",
    "player": "Jayden Campbell",
    "position": "FE",
-   "exp_tries": 0.5,
-   "p_ats": 0.396,
-   "fair_price": 2.53,
-   "p_2plus": 0.091,
-   "fair_2plus": 10.9,
+   "exp_tries": 0.49,
+   "p_ats": 0.388,
+   "fair_price": 2.57,
+   "p_2plus": 0.088,
+   "fair_2plus": 11.4,
    "vs_opp": "3t/5g"
   },
   {
@@ -342,11 +187,11 @@
    "team": "Gold Coast Titans",
    "player": "Jaylan De Groot",
    "position": "C",
-   "exp_tries": 0.45,
-   "p_ats": 0.362,
-   "fair_price": 2.76,
-   "p_2plus": 0.075,
-   "fair_2plus": 13.3,
+   "exp_tries": 0.44,
+   "p_ats": 0.355,
+   "fair_price": 2.81,
+   "p_2plus": 0.072,
+   "fair_2plus": 13.8,
    "vs_opp": "\u2014"
   },
   {
@@ -354,38 +199,26 @@
    "team": "Gold Coast Titans",
    "player": "Phillip Sami",
    "position": "W",
-   "exp_tries": 0.42,
-   "p_ats": 0.345,
-   "fair_price": 2.9,
-   "p_2plus": 0.068,
-   "fair_2plus": 14.7,
+   "exp_tries": 0.41,
+   "p_ats": 0.339,
+   "fair_price": 2.95,
+   "p_2plus": 0.065,
+   "fair_2plus": 15.3,
    "vs_opp": "3t/10g"
   }
  ],
  "sgm_candidates": [
   {
    "match": "Melbourne Storm v Gold Coast Titans",
-   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 ATS Will Warbrick \u00d7 ATS Moses Leo \u00d7 total over 42.5 \u00d7 match tries over 9.5",
+   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 ATS Will Warbrick \u00d7 ATS Moses Leo \u00d7 total over 40.5 \u00d7 match tries over 9.5",
    "n_legs": 6,
    "tier": "longshot",
-   "legs": "['home_win', 'ats 35390', 'ats 35233', 'ats 53362', 'total over 42.5', 'tries_total over 9.5']",
-   "leg_probs": "[0.5831, 0.5653, 0.4962, 0.4744, 0.5604, 0.2946]",
-   "p_joint": 0.0622,
-   "fair_price": 16.09,
-   "p_independent": 0.0128,
-   "correlation_lift": 4.853
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 ATS Tallis Duncan \u00d7 ATS Jack Wighton \u00d7 ATS Campbell Graham \u00d7 total over 44.5 \u00d7 match tries over 9.5",
-   "n_legs": 6,
-   "tier": "longshot",
-   "legs": "['home_win', 'ats 33570', 'ats 19515', 'ats 23913', 'total over 44.5', 'tries_total over 9.5']",
-   "leg_probs": "[0.5512, 0.4124, 0.4036, 0.3425, 0.577, 0.3506]",
-   "p_joint": 0.0301,
-   "fair_price": 33.27,
-   "p_independent": 0.0064,
-   "correlation_lift": 4.728
+   "legs": "['home_win', 'ats 35390', 'ats 35233', 'ats 53362', 'total over 40.5', 'tries_total over 9.5']",
+   "leg_probs": "[0.5788, 0.5569, 0.4874, 0.4648, 0.5857, 0.2689]",
+   "p_joint": 0.0543,
+   "fair_price": 18.4,
+   "p_independent": 0.0115,
+   "correlation_lift": 4.726
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -393,23 +226,11 @@
    "n_legs": 6,
    "tier": "longshot",
    "legs": "['home_win', 'ats 28736', 'ats 47241', 'ats 21487', 'total over 44.5', 'tries_total over 9.5']",
-   "leg_probs": "[0.5635, 0.542, 0.508, 0.4312, 0.5581, 0.3378]",
-   "p_joint": 0.059,
-   "fair_price": 16.95,
-   "p_independent": 0.0126,
-   "correlation_lift": 4.676
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 Tallis Duncan 2+ tries \u00d7 ATS Jack Wighton \u00d7 total over 52.5",
-   "n_legs": 4,
-   "tier": "longshot",
-   "legs": "['home_win', 'tries2+ 33570', 'ats 19515', 'total over 52.5']",
-   "leg_probs": "[0.5512, 0.1003, 0.4036, 0.3845]",
-   "p_joint": 0.0227,
-   "fair_price": 44.01,
-   "p_independent": 0.0086,
-   "correlation_lift": 2.647
+   "leg_probs": "[0.5622, 0.542, 0.5081, 0.4313, 0.5564, 0.3377]",
+   "p_joint": 0.0588,
+   "fair_price": 17.0,
+   "p_independent": 0.0125,
+   "correlation_lift": 4.688
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -417,47 +238,23 @@
    "n_legs": 4,
    "tier": "longshot",
    "legs": "['home_win', 'tries2+ 28736', 'ats 47241', 'total over 52.5']",
-   "leg_probs": "[0.5635, 0.1831, 0.508, 0.3691]",
-   "p_joint": 0.0503,
-   "fair_price": 19.86,
+   "leg_probs": "[0.5622, 0.1831, 0.5081, 0.3681]",
+   "p_joint": 0.0498,
+   "fair_price": 20.08,
    "p_independent": 0.0193,
-   "correlation_lift": 2.602
+   "correlation_lift": 2.587
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
-   "combo": "Melbourne Storm win \u00d7 Sualauvi Fa'alogo 2+ tries \u00d7 ATS Will Warbrick \u00d7 total over 50.5",
+   "combo": "Melbourne Storm win \u00d7 Sualauvi Fa'alogo 2+ tries \u00d7 ATS Will Warbrick \u00d7 total over 48.5",
    "n_legs": 4,
    "tier": "longshot",
-   "legs": "['home_win', 'tries2+ 35390', 'ats 35233', 'total over 50.5']",
-   "leg_probs": "[0.5831, 0.2036, 0.4962, 0.3694]",
-   "p_joint": 0.0555,
-   "fair_price": 18.01,
-   "p_independent": 0.0218,
-   "correlation_lift": 2.551
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs by 13+ \u00d7 ATS Tallis Duncan \u00d7 ATS Jack Wighton \u00d7 total over 44.5",
-   "n_legs": 4,
-   "tier": "longshot",
-   "legs": "['margin_band SOU 13 60', 'ats 33570', 'ats 19515', 'total over 44.5']",
-   "leg_probs": "[0.27, 0.4124, 0.4036, 0.577]",
-   "p_joint": 0.0603,
-   "fair_price": 16.57,
-   "p_independent": 0.0259,
-   "correlation_lift": 2.327
-  },
-  {
-   "match": "Melbourne Storm v Gold Coast Titans",
-   "combo": "Melbourne Storm by 13+ \u00d7 ATS Sualauvi Fa'alogo \u00d7 ATS Will Warbrick \u00d7 total over 42.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['margin_band MEL 13 60', 'ats 35390', 'ats 35233', 'total over 42.5']",
-   "leg_probs": "[0.2932, 0.5653, 0.4962, 0.5604]",
-   "p_joint": 0.0998,
-   "fair_price": 10.02,
-   "p_independent": 0.0461,
-   "correlation_lift": 2.165
+   "legs": "['home_win', 'tries2+ 35390', 'ats 35233', 'total over 48.5']",
+   "leg_probs": "[0.5788, 0.1969, 0.4874, 0.3885]",
+   "p_joint": 0.0545,
+   "fair_price": 18.35,
+   "p_independent": 0.0216,
+   "correlation_lift": 2.526
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -465,23 +262,23 @@
    "n_legs": 4,
    "tier": "big",
    "legs": "['margin_band MAN 13 60', 'ats 28736', 'ats 47241', 'total over 44.5']",
-   "leg_probs": "[0.2802, 0.542, 0.508, 0.5581]",
-   "p_joint": 0.0926,
-   "fair_price": 10.8,
-   "p_independent": 0.0431,
-   "correlation_lift": 2.151
+   "leg_probs": "[0.2805, 0.542, 0.5081, 0.5564]",
+   "p_joint": 0.0932,
+   "fair_price": 10.73,
+   "p_independent": 0.043,
+   "correlation_lift": 2.169
   },
   {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 ATS Tallis Duncan \u00d7 ATS Jack Wighton \u00d7 total over 44.5",
+   "match": "Melbourne Storm v Gold Coast Titans",
+   "combo": "Melbourne Storm by 13+ \u00d7 ATS Sualauvi Fa'alogo \u00d7 ATS Will Warbrick \u00d7 total over 40.5",
    "n_legs": 4,
    "tier": "big",
-   "legs": "['home_win', 'ats 33570', 'ats 19515', 'total over 44.5']",
-   "leg_probs": "[0.5512, 0.4124, 0.4036, 0.577]",
-   "p_joint": 0.0946,
-   "fair_price": 10.57,
-   "p_independent": 0.0529,
-   "correlation_lift": 1.787
+   "legs": "['margin_band MEL 13 60', 'ats 35390', 'ats 35233', 'total over 40.5']",
+   "leg_probs": "[0.2857, 0.5569, 0.4874, 0.5857]",
+   "p_joint": 0.0982,
+   "fair_price": 10.18,
+   "p_independent": 0.0454,
+   "correlation_lift": 2.162
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -489,35 +286,23 @@
    "n_legs": 4,
    "tier": "big",
    "legs": "['home_win', 'ats 28736', 'ats 47241', 'total over 44.5']",
-   "leg_probs": "[0.5635, 0.542, 0.508, 0.5581]",
-   "p_joint": 0.1485,
-   "fair_price": 6.73,
-   "p_independent": 0.0866,
-   "correlation_lift": 1.715
+   "leg_probs": "[0.5622, 0.542, 0.5081, 0.5564]",
+   "p_joint": 0.1477,
+   "fair_price": 6.77,
+   "p_independent": 0.0861,
+   "correlation_lift": 1.714
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
-   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 ATS Will Warbrick \u00d7 total over 42.5",
+   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 ATS Will Warbrick \u00d7 total over 40.5",
    "n_legs": 4,
    "tier": "big",
-   "legs": "['home_win', 'ats 35390', 'ats 35233', 'total over 42.5']",
-   "leg_probs": "[0.5831, 0.5653, 0.4962, 0.5604]",
-   "p_joint": 0.1565,
-   "fair_price": 6.39,
-   "p_independent": 0.0917,
-   "correlation_lift": 1.708
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 ATS Tallis Duncan \u00d7 total over 52.5",
-   "n_legs": 3,
-   "tier": "big",
-   "legs": "['home_win', 'ats 33570', 'total over 52.5']",
-   "leg_probs": "[0.5512, 0.4124, 0.3845]",
-   "p_joint": 0.1275,
-   "fair_price": 7.84,
-   "p_independent": 0.0874,
-   "correlation_lift": 1.459
+   "legs": "['home_win', 'ats 35390', 'ats 35233', 'total over 40.5']",
+   "leg_probs": "[0.5788, 0.5569, 0.4874, 0.5857]",
+   "p_joint": 0.1563,
+   "fair_price": 6.4,
+   "p_independent": 0.092,
+   "correlation_lift": 1.699
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -525,83 +310,23 @@
    "n_legs": 3,
    "tier": "big",
    "legs": "['home_win', 'ats 28736', 'total over 52.5']",
-   "leg_probs": "[0.5635, 0.542, 0.3691]",
-   "p_joint": 0.1593,
-   "fair_price": 6.28,
-   "p_independent": 0.1127,
-   "correlation_lift": 1.413
+   "leg_probs": "[0.5622, 0.542, 0.3681]",
+   "p_joint": 0.1587,
+   "fair_price": 6.3,
+   "p_independent": 0.1122,
+   "correlation_lift": 1.415
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
-   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 total over 50.5",
+   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 total over 48.5",
    "n_legs": 3,
    "tier": "value",
-   "legs": "['home_win', 'ats 35390', 'total over 50.5']",
-   "leg_probs": "[0.5831, 0.5653, 0.3694]",
-   "p_joint": 0.1717,
-   "fair_price": 5.82,
-   "p_independent": 0.1218,
-   "correlation_lift": 1.41
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 ATS Tallis Duncan \u00d7 total over 44.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 33570', 'total over 44.5']",
-   "leg_probs": "[0.5512, 0.4124, 0.577]",
-   "p_joint": 0.182,
-   "fair_price": 5.5,
-   "p_independent": 0.1311,
-   "correlation_lift": 1.388
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 ATS Tallis Duncan \u00d7 ATS Greg Marzhew \u00d7 total over 44.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['home_win', 'ats 33570', 'ats 31083', 'total over 44.5']",
-   "leg_probs": "[0.5512, 0.4124, 0.5172, 0.577]",
-   "p_joint": 0.0936,
-   "fair_price": 10.68,
-   "p_independent": 0.0678,
-   "correlation_lift": 1.381
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 Tallis Duncan 2+ tries",
-   "n_legs": 2,
-   "tier": "big",
-   "legs": "['home_win', 'tries2+ 33570']",
-   "leg_probs": "[0.5512, 0.1003]",
-   "p_joint": 0.0762,
-   "fair_price": 13.12,
-   "p_independent": 0.0553,
-   "correlation_lift": 1.378
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 ATS Tallis Duncan \u00d7 match tries over 7.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 33570', 'tries_total over 7.5']",
-   "leg_probs": "[0.5512, 0.4124, 0.6202]",
-   "p_joint": 0.1924,
-   "fair_price": 5.2,
-   "p_independent": 0.141,
-   "correlation_lift": 1.365
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs win \u00d7 ATS Tallis Duncan \u00d7 ATS Jack Wighton",
-   "n_legs": 3,
-   "tier": "big",
-   "legs": "['home_win', 'ats 33570', 'ats 19515']",
-   "leg_probs": "[0.5512, 0.4124, 0.4036]",
-   "p_joint": 0.1246,
-   "fair_price": 8.03,
-   "p_independent": 0.0917,
-   "correlation_lift": 1.358
+   "legs": "['home_win', 'ats 35390', 'total over 48.5']",
+   "leg_probs": "[0.5788, 0.5569, 0.3885]",
+   "p_joint": 0.1763,
+   "fair_price": 5.67,
+   "p_independent": 0.1252,
+   "correlation_lift": 1.408
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -609,23 +334,11 @@
    "n_legs": 4,
    "tier": "big",
    "legs": "['home_win', 'ats 28736', 'ats 23409', 'total over 44.5']",
-   "leg_probs": "[0.5635, 0.542, 0.45, 0.5581]",
-   "p_joint": 0.1042,
-   "fair_price": 9.6,
-   "p_independent": 0.0767,
-   "correlation_lift": 1.358
-  },
-  {
-   "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
-   "combo": "Manly-Warringah Sea Eagles win \u00d7 Jason Saab 2+ tries",
-   "n_legs": 2,
-   "tier": "big",
-   "legs": "['home_win', 'tries2+ 28736']",
-   "leg_probs": "[0.5635, 0.1831]",
-   "p_joint": 0.1386,
-   "fair_price": 7.21,
-   "p_independent": 0.1032,
-   "correlation_lift": 1.344
+   "leg_probs": "[0.5622, 0.542, 0.4498, 0.5564]",
+   "p_joint": 0.1035,
+   "fair_price": 9.66,
+   "p_independent": 0.0763,
+   "correlation_lift": 1.357
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
@@ -633,11 +346,11 @@
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 35390', 'tries_total over 7.5']",
-   "leg_probs": "[0.5831, 0.5653, 0.5602]",
-   "p_joint": 0.2478,
-   "fair_price": 4.04,
-   "p_independent": 0.1846,
-   "correlation_lift": 1.342
+   "leg_probs": "[0.5788, 0.5569, 0.5308]",
+   "p_joint": 0.2311,
+   "fair_price": 4.33,
+   "p_independent": 0.1711,
+   "correlation_lift": 1.351
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
@@ -645,11 +358,23 @@
    "n_legs": 2,
    "tier": "big",
    "legs": "['home_win', 'tries2+ 35390']",
-   "leg_probs": "[0.5831, 0.2036]",
-   "p_joint": 0.1591,
-   "fair_price": 6.28,
-   "p_independent": 0.1187,
-   "correlation_lift": 1.341
+   "leg_probs": "[0.5788, 0.1969]",
+   "p_joint": 0.1531,
+   "fair_price": 6.53,
+   "p_independent": 0.1139,
+   "correlation_lift": 1.344
+  },
+  {
+   "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
+   "combo": "Manly-Warringah Sea Eagles win \u00d7 Jason Saab 2+ tries",
+   "n_legs": 2,
+   "tier": "big",
+   "legs": "['home_win', 'tries2+ 28736']",
+   "leg_probs": "[0.5622, 0.1831]",
+   "p_joint": 0.1383,
+   "fair_price": 7.23,
+   "p_independent": 0.1029,
+   "correlation_lift": 1.344
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -657,47 +382,23 @@
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 28736', 'total over 44.5']",
-   "leg_probs": "[0.5635, 0.542, 0.5581]",
-   "p_joint": 0.2286,
-   "fair_price": 4.38,
-   "p_independent": 0.1705,
-   "correlation_lift": 1.341
+   "leg_probs": "[0.5622, 0.542, 0.5564]",
+   "p_joint": 0.2275,
+   "fair_price": 4.4,
+   "p_independent": 0.1695,
+   "correlation_lift": 1.342
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
-   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 ATS Jaylan De Groot \u00d7 total over 42.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['home_win', 'ats 35390', 'ats 37323', 'total over 42.5']",
-   "leg_probs": "[0.5831, 0.5653, 0.3589, 0.5604]",
-   "p_joint": 0.0888,
-   "fair_price": 11.26,
-   "p_independent": 0.0663,
-   "correlation_lift": 1.34
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs by 13+ \u00d7 ATS Tallis Duncan",
-   "n_legs": 2,
-   "tier": "big",
-   "legs": "['margin_band SOU 13 60', 'ats 33570']",
-   "leg_probs": "[0.27, 0.4124]",
-   "p_joint": 0.1492,
-   "fair_price": 6.7,
-   "p_independent": 0.1114,
-   "correlation_lift": 1.34
-  },
-  {
-   "match": "Melbourne Storm v Gold Coast Titans",
-   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 total over 42.5",
+   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 total over 40.5",
    "n_legs": 3,
    "tier": "value",
-   "legs": "['home_win', 'ats 35390', 'total over 42.5']",
-   "leg_probs": "[0.5831, 0.5653, 0.5604]",
-   "p_joint": 0.2469,
-   "fair_price": 4.05,
-   "p_independent": 0.1847,
-   "correlation_lift": 1.337
+   "legs": "['home_win', 'ats 35390', 'total over 40.5']",
+   "leg_probs": "[0.5788, 0.5569, 0.5857]",
+   "p_joint": 0.2516,
+   "fair_price": 3.98,
+   "p_independent": 0.1888,
+   "correlation_lift": 1.333
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -705,11 +406,11 @@
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 28736', 'tries_total over 7.5']",
-   "leg_probs": "[0.5635, 0.542, 0.6016]",
-   "p_joint": 0.2435,
+   "leg_probs": "[0.5622, 0.542, 0.6015]",
+   "p_joint": 0.2431,
    "fair_price": 4.11,
-   "p_independent": 0.1837,
-   "correlation_lift": 1.325
+   "p_independent": 0.1833,
+   "correlation_lift": 1.326
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -717,11 +418,11 @@
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 28736', 'ats 47241']",
-   "leg_probs": "[0.5635, 0.542, 0.508]",
-   "p_joint": 0.2048,
-   "fair_price": 4.88,
-   "p_independent": 0.1552,
-   "correlation_lift": 1.32
+   "leg_probs": "[0.5622, 0.542, 0.5081]",
+   "p_joint": 0.2041,
+   "fair_price": 4.9,
+   "p_independent": 0.1548,
+   "correlation_lift": 1.318
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
@@ -729,11 +430,23 @@
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 35390', 'ats 35233']",
-   "leg_probs": "[0.5831, 0.5653, 0.4962]",
-   "p_joint": 0.2144,
-   "fair_price": 4.66,
-   "p_independent": 0.1636,
-   "correlation_lift": 1.311
+   "leg_probs": "[0.5788, 0.5569, 0.4874]",
+   "p_joint": 0.2071,
+   "fair_price": 4.83,
+   "p_independent": 0.1571,
+   "correlation_lift": 1.318
+  },
+  {
+   "match": "Melbourne Storm v Gold Coast Titans",
+   "combo": "Melbourne Storm win \u00d7 ATS Sualauvi Fa'alogo \u00d7 ATS Jaylan De Groot \u00d7 total over 40.5",
+   "n_legs": 4,
+   "tier": "big",
+   "legs": "['home_win', 'ats 35390', 'ats 37323', 'total over 40.5']",
+   "leg_probs": "[0.5788, 0.5569, 0.3557, 0.5857]",
+   "p_joint": 0.0878,
+   "fair_price": 11.39,
+   "p_independent": 0.0672,
+   "correlation_lift": 1.307
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -741,11 +454,11 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['margin_band MAN 13 60', 'ats 28736']",
-   "leg_probs": "[0.2802, 0.542]",
-   "p_joint": 0.1943,
-   "fair_price": 5.15,
-   "p_independent": 0.1519,
-   "correlation_lift": 1.279
+   "leg_probs": "[0.2805, 0.542]",
+   "p_joint": 0.1948,
+   "fair_price": 5.13,
+   "p_independent": 0.152,
+   "correlation_lift": 1.281
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
@@ -753,23 +466,11 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['margin_band MEL 13 60', 'ats 35390']",
-   "leg_probs": "[0.2932, 0.5653]",
-   "p_joint": 0.2113,
-   "fair_price": 4.73,
-   "p_independent": 0.1657,
-   "correlation_lift": 1.275
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "South Sydney Rabbitohs -3.5 \u00d7 ATS Tallis Duncan",
-   "n_legs": 2,
-   "tier": "value",
-   "legs": "['line SOU -3.5', 'ats 33570']",
-   "leg_probs": "[0.4993, 0.4124]",
-   "p_joint": 0.2498,
-   "fair_price": 4.0,
-   "p_independent": 0.2059,
-   "correlation_lift": 1.213
+   "leg_probs": "[0.2857, 0.5569]",
+   "p_joint": 0.2032,
+   "fair_price": 4.92,
+   "p_independent": 0.1591,
+   "correlation_lift": 1.277
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -777,11 +478,11 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['line MAN -4.5', 'ats 28736']",
-   "leg_probs": "[0.468, 0.542]",
-   "p_joint": 0.304,
+   "leg_probs": "[0.4683, 0.542]",
+   "p_joint": 0.3039,
    "fair_price": 3.29,
-   "p_independent": 0.2537,
-   "correlation_lift": 1.198
+   "p_independent": 0.2538,
+   "correlation_lift": 1.197
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
@@ -789,11 +490,11 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['line MEL -4.5', 'ats 35390']",
-   "leg_probs": "[0.4873, 0.5653]",
-   "p_joint": 0.3283,
-   "fair_price": 3.05,
-   "p_independent": 0.2755,
-   "correlation_lift": 1.192
+   "leg_probs": "[0.4812, 0.5569]",
+   "p_joint": 0.3199,
+   "fair_price": 3.13,
+   "p_independent": 0.268,
+   "correlation_lift": 1.193
   },
   {
    "match": "Manly-Warringah Sea Eagles v North Queensland Cowboys",
@@ -801,11 +502,11 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['ats 28736', 'ats 23409']",
-   "leg_probs": "[0.542, 0.45]",
+   "leg_probs": "[0.542, 0.4498]",
    "p_joint": 0.2455,
    "fair_price": 4.07,
-   "p_independent": 0.2439,
-   "correlation_lift": 1.006
+   "p_independent": 0.2438,
+   "correlation_lift": 1.007
   },
   {
    "match": "Melbourne Storm v Gold Coast Titans",
@@ -813,49 +514,14 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['ats 35390', 'ats 37323']",
-   "leg_probs": "[0.5653, 0.3589]",
-   "p_joint": 0.2033,
-   "fair_price": 4.92,
-   "p_independent": 0.2029,
-   "correlation_lift": 1.002
-  },
-  {
-   "match": "South Sydney Rabbitohs v Newcastle Knights",
-   "combo": "ATS Tallis Duncan \u00d7 ATS Greg Marzhew",
-   "n_legs": 2,
-   "tier": "value",
-   "legs": "['ats 33570', 'ats 31083']",
-   "leg_probs": "[0.4124, 0.5172]",
-   "p_joint": 0.2114,
-   "fair_price": 4.73,
-   "p_independent": 0.2133,
-   "correlation_lift": 0.991
+   "leg_probs": "[0.5569, 0.3557]",
+   "p_joint": 0.1989,
+   "fair_price": 5.03,
+   "p_independent": 0.1981,
+   "correlation_lift": 1.004
   }
  ],
  "signals": [
-  {
-   "home": "South Sydney Rabbitohs",
-   "away": "Newcastle Knights",
-   "info_confidence": "high",
-   "team_lists_confirmed": true,
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 14.5,
-    "temp_c": 15.4,
-    "forecast_hour": "2026-07-12T14:00"
-   },
-   "weather_try_mult": 1.0,
-   "baseline_total": 49.0,
-   "adjusted_total": 49.0,
-   "flags": [
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Newcastle Knights: Kalyn Ponga named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    }
-   ]
-  },
   {
    "home": "Manly-Warringah Sea Eagles",
    "away": "North Queensland Cowboys",
@@ -864,8 +530,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 18.2,
-    "temp_c": 14.3,
+    "wind_kmh": 16.6,
+    "temp_c": 14.4,
     "forecast_hour": "2026-07-12T16:00"
    },
    "weather_try_mult": 1.0,
@@ -895,20 +561,20 @@
    "info_confidence": "provisional",
    "team_lists_confirmed": false,
    "weather": {
-    "precip_mm": 0.5,
-    "precip_prob": 90,
-    "wind_kmh": 17.8,
-    "temp_c": 10.6,
+    "precip_mm": 1.1,
+    "precip_prob": 92,
+    "wind_kmh": 15.3,
+    "temp_c": 10.5,
     "forecast_hour": "2026-07-12T18:00"
    },
-   "weather_try_mult": 0.962,
+   "weather_try_mult": 0.939,
    "baseline_total": 48.1,
-   "adjusted_total": 46.3,
+   "adjusted_total": 45.2,
    "flags": [
     {
      "severity": "info",
      "kind": "weather",
-     "text": "90% rain / 0.5mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
+     "text": "92% rain / 1.1mm at kickoff \u2192 tries \u00d70.94 (wet-weather suppression, assumption)"
     }
    ]
   }
