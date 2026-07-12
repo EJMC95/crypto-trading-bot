@@ -228,10 +228,14 @@ LABELS = {
     "equities-momentum-alpaca":    "🏆 Stock Leaders · momentum rank (Alpaca)",
     "equities-momentum":           "🏆 Stock Leaders · momentum rank",
     # Freqtrade fleet — new bots July 2026
-    "freqtrade-mum":               "👩 Mum · NFI X7 · 5m trend (Binance)",
-    "freqtrade-dad":               "👨 Dad · E0V1E · 5m breakout (Binance/Kraken)",
-    "freqtrade-avo-maria":         "🙏 Avo Maria · BinH+Cluc · 5m mean reversion",
-    "freqtrade-georgia":           "🔮 Georgia · FreqAI LightGBM · 1H ML adaptive",
+    # [2026-07-13 LABEL TRUTH-FIX] the NFI/E0V1E/BinHCluc/FreqAI era ended when
+    # the configs moved to the in-house strategies on Kraken (git: config_*.json
+    # "-> proven strategy"); the old labels misdescribed both the base rows and
+    # the new freqtrade-*-lshadow variant rows (the family ports on Lighter).
+    "freqtrade-mum":               "👩 Mum · TrendMomoV1 · 4h trend (Kraken)",
+    "freqtrade-dad":               "👨 Dad · MomoBreakoutV1 · 1h breakout (Kraken)",
+    "freqtrade-avo-maria":         "🙏 Avo Maria · SwingDipV1 · 4h dip buyer (Kraken)",
+    "freqtrade-georgia":           "🔮 Georgia · DayTraderV5Gated · 15m intraday (Kraken)",
 }
 def label_for(bot):
     base, suf = venue_variant(bot)
