@@ -139,13 +139,21 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # [2026-07-12 SAME-PAGE SWEEP] perps-donchian-breakout-lshadow was a Gate-0
 # local run that stopped 10 Jul (stale ever since); its signal is the
 # twice-retired range-buy, so the shadow is NOT restarted — row hidden.
-RETIRED_ROWS = {"perps-donchian-breakout-lighter",
+# [2026-07-12 DASHBOARD SWEEP] Trail Blazer's PAPER row (perps-donchian-breakout)
+# hidden on user request to clear the bots we're not going ahead with: the live
+# half retired 11 Jul and the entry was REJECTED for edge in the 12-Jul audit
+# (identical to Bounce Catcher's). NOTE the momo-bot Railway service still runs
+# and re-publishes this row — hiding is dashboard-side only; stopping/keeping
+# the service is a separate call. History stays in bot_equity_history /
+# paper_trades. Also dropped from EXPECTED so no placeholder card returns.
+RETIRED_ROWS = {"perps-donchian-breakout",
+                "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
-EXPECTED = ["perps-donchian-breakout", "perps-regime-switch",
+EXPECTED = ["perps-regime-switch",
             "perps-funding-carry", "perps-funding-lighter", "lighter-perp-sniper",
             "lighter-dislocation", "perps-funding-spread",
             "event-listing-sniper",
