@@ -296,10 +296,104 @@ def stale_secs_for(bot):
     return STALE_SECONDS
 
 
-def fetch_rows():
+# [2026-07-13 INTERACTIVE MANAGE] User-managed hidden set, persisted in
+# bot_state so it survives dashboard redeploys. Complements the static
+# RETIRED_ROWS above: code marks the officially-retired bots; this lets Eamon
+# hide/unhide (and delete rows for) retired or bunk bots from the page itself
+# instead of waiting for a code change. Applied inside fetch_rows, so the
+# grid, the totals AND /pnl.json all respect it — one choke point.
+HIDDEN_STATE_KEY = "dashboard-hidden-bots"
+
+
+def fetch_hidden_bots():
+    """{bot: iso_hidden_at} chosen via the Manage panel. {} on any error —
+    a broken state read must never blank the whole dashboard."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                if cur.fetchone()[0] is None:
+                    return {}
+                cur.execute("SELECT state FROM bot_state WHERE bot = %s",
+                            (HIDDEN_STATE_KEY,))
+                row = cur.fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return {}
+        st = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        return dict(st.get("bots") or {})
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def save_hidden_bots(bots):
+    """Upsert the hidden set (same shape bot_pnl_store.save_state writes)."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS bot_state (
+                    bot        TEXT PRIMARY KEY,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    state      JSONB
+                )
+                """)
+            cur.execute(
+                """
+                INSERT INTO bot_state (bot, updated_at, state)
+                VALUES (%s, now(), %s)
+                ON CONFLICT (bot) DO UPDATE SET
+                    updated_at = now(), state = EXCLUDED.state
+                """, (HIDDEN_STATE_KEY, json.dumps({"bots": bots})))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_bot_row(bot):
+    """Remove a bot's bot_pnl row. Dashboard-row only: ledger history
+    (bot_trades / paper_trades / venue_orders / bot_equity_history) is kept,
+    and an ACTIVE bot's row simply reappears on its next publish — so this
+    can only permanently remove bots that no longer run. Returns rows deleted."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM bot_pnl WHERE bot = %s", (bot,))
+            n = cur.rowcount
+        conn.commit()
+        return n
+    finally:
+        conn.close()
+
+
+def fetch_all_bot_ids():
+    """Every bot id present in bot_pnl (unfiltered) — feeds the Manage panel
+    so retired/legacy rows can be deleted even though the grid filters them."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.bot_pnl') AS t")
+            if cur.fetchone()[0] is None:
+                return []
+            cur.execute("SELECT bot FROM bot_pnl ORDER BY bot")
+            return [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def fetch_rows(hidden=None):
     """Return {bot: row_dict}. Raises on DB error (caller handles)."""
     import psycopg2
     import psycopg2.extras
+    if hidden is None:
+        hidden = fetch_hidden_bots()
     conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -313,6 +407,7 @@ def fetch_rows():
             # bot, so a live/shadow Lighter bot shows up automatically.
             return {r["bot"]: r for r in cur.fetchall()
                     if r["bot"] not in RETIRED_ROWS
+                    and r["bot"] not in hidden
                     and (r["bot"] in CURRENT_BOTS
                          or venue_variant(r["bot"])[0] in CURRENT_BOTS)}
     finally:
@@ -1037,8 +1132,9 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
 
 
 def render():
+    hidden = fetch_hidden_bots()
     try:
-        rows = fetch_rows()
+        rows = fetch_rows(hidden=hidden)
         db_err = None
     except Exception as e:
         rows, db_err = {}, f"{type(e).__name__}: {e}"
@@ -1067,8 +1163,11 @@ def render():
             "mode: range_on pullback buys (BTC 4h RISK-ON)" if _reg.get("risk_on")
             else "mode: bear_bounce only — sweep-reclaim setups (BTC 4h RISK-OFF)")
 
-    # union of expected + whatever actually published
-    names = list(EXPECTED) + [b for b in rows if b not in EXPECTED]
+    # union of expected + whatever actually published. Hidden bots are already
+    # out of `rows` (fetch_rows), but EXPECTED would resurrect a placeholder
+    # card for them — filter here too so hide really means gone.
+    names = [b for b in list(EXPECTED) + [b for b in rows if b not in EXPECTED]
+             if b not in hidden]
     # [2026-07-10] Real-money Lighter bots get their OWN section at the top of the
     # page, not interspersed with the paper fleet. is_live_bot = <bot>-lighter rows.
     _mk = lambda b: card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
@@ -1199,6 +1298,66 @@ def render():
             f'{money(shadow_pnl)}</b> · {n_shadow_bots} bot'
             f'{"s" if n_shadow_bots != 1 else ""} (modelled)</span>')
 
+    # [2026-07-13 INTERACTIVE MANAGE] Hide/unhide/delete panel. Hide = persisted
+    # in bot_state (reversible, survives redeploys, respected by the grid, the
+    # totals and /pnl.json). Delete = drop the bot_pnl row only (ledger history
+    # stays; an active bot's row reappears on its next publish, so delete can
+    # only permanently remove bots that no longer run).
+    try:
+        _all_ids = fetch_all_bot_ids()
+    except Exception:  # noqa: BLE001
+        _all_ids = []
+
+    def _mrow(b, kind):
+        lbl = html.escape(label_for(b))
+        bid = html.escape(b, quote=True)
+        btns = ""
+        if kind == "visible":
+            btns += (f'<button class="mbtn" onclick="botAdmin(\'hide\',\'{bid}\')">'
+                     f'hide</button>')
+        elif kind == "hidden":
+            btns += (f'<button class="mbtn" onclick="botAdmin(\'unhide\',\'{bid}\')">'
+                     f'unhide</button>')
+        btns += (f'<button class="mbtn del" onclick="botAdmin(\'delete\',\'{bid}\')">'
+                 f'delete row</button>')
+        note = {"visible": "", "hidden": " · hidden by you",
+                "retired": " · retired in code"}[kind]
+        return (f'<div class="mrow"><span class="mname">{lbl}'
+                f'<span class="muted"> — {bid}{note}</span></span>{btns}</div>')
+
+    _visible_ids = sorted(set(list(rows.keys()) + [b for b in names if b in CURRENT_BOTS]))
+    _hidden_ids = sorted(hidden.keys())
+    _retired_ids = sorted(b for b in _all_ids
+                          if b in RETIRED_ROWS and b not in hidden)
+    manage_html = (
+        '<details class="manage"><summary>🗂 Manage bots — hide or delete retired/bunk rows</summary>'
+        '<div class="mnote">Hide removes a bot from the grid, totals and feeds (reversible, '
+        'survives redeploys). Delete drops the dashboard row only — trade history stays in the '
+        'ledgers, and an <b>active</b> bot\'s row reappears on its next publish, so delete is '
+        'only permanent for bots that no longer run.</div>'
+        + '<div class="mgroup">Visible</div>'
+        + ("".join(_mrow(b, "visible") for b in _visible_ids) or '<div class="muted">none</div>')
+        + '<div class="mgroup">Hidden by you</div>'
+        + ("".join(_mrow(b, "hidden") for b in _hidden_ids) or '<div class="muted mrow">none</div>')
+        + ('<div class="mgroup">Retired in code (already hidden — rows still in the table)</div>'
+           + "".join(_mrow(b, "retired") for b in _retired_ids) if _retired_ids else "")
+        + '</details>'
+        + '''<script>
+async function botAdmin(action, bot){
+  if (action === 'delete' &&
+      !confirm('Delete the dashboard row for "' + bot + '"?\\n\\nLedger history stays. ' +
+               'If the bot still runs, the row reappears on its next publish.')) return;
+  try {
+    const r = await fetch('/admin/bot', {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+      body: JSON.stringify({action: action, bot: bot})});
+    const j = await r.json();
+    if (!j.ok) { alert('failed: ' + (j.error || r.status)); return; }
+  } catch (e) { alert('failed: ' + e); return; }
+  location.reload();
+}
+</script>''')
+
     # [2026-07-10] Dedicated "Lighter Live" section — real-money bots grouped at
     # the top in their own bordered block so live money is never lost in the grid.
     live_section = ""
@@ -1268,6 +1427,21 @@ def render():
  .dot{{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:4px}}
  .dot.on{{background:#1a7f37;box-shadow:0 0 6px #1a7f37}} .dot.off{{background:#d1242f;box-shadow:0 0 6px #d1242f}} .dot.warn{{background:#b8860b;box-shadow:0 0 6px #b8860b}}
  footer{{padding:10px 18px;color:#5b7184;font-size:11px}}
+ /* [2026-07-13] Manage bots panel */
+ .manage{{margin:6px 14px 0;border:1px solid #caa227;border-radius:10px;
+   background:#ffffffd9;font-size:13px}}
+ .manage summary{{cursor:pointer;padding:9px 13px;font-weight:600;color:#5b4a12}}
+ .manage[open] summary{{border-bottom:1px solid #eadfae}}
+ .mnote{{padding:8px 13px 2px;color:#5b7184;font-size:12px}}
+ .mgroup{{padding:10px 13px 3px;font-weight:700;color:#2f5a7a;font-size:12px;
+   text-transform:uppercase;letter-spacing:.4px}}
+ .mrow{{display:flex;align-items:center;gap:8px;padding:4px 13px}}
+ .mname{{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+ .mbtn{{border:1px solid #b8860b;background:#fff;border-radius:6px;padding:2px 10px;
+   font-size:12px;cursor:pointer;color:#5b4a12}}
+ .mbtn:hover{{background:#fff6dd}}
+ .mbtn.del{{border-color:#d1242f;color:#a3121b}}
+ .mbtn.del:hover{{background:#ffe3e3}}
 </style></head><body>
 {WATERMARK_HTML}
 <header>
@@ -1287,6 +1461,7 @@ def render():
 {health_html}
 {live_section}
 <div class="grid">{"".join(cards)}</div>
+{manage_html}
 <footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
 </body></html>'''
@@ -1895,6 +2070,53 @@ class H(BaseHTTPRequestHandler):
         self._no_cache()
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self):
+        # [2026-07-13 INTERACTIVE MANAGE] hide / unhide / delete a bot row from
+        # the page. Auth-gated like the HTML pages; the custom header makes a
+        # cross-site page trigger a CORS preflight this server never approves,
+        # so browser-credentialed CSRF can't fire it blind.
+        if not self.path.startswith("/admin/bot"):
+            self.send_response(404); self._no_cache(); self.end_headers()
+            self.wfile.write(b"not found"); return
+        if not self._auth_ok():
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="Crypto Bots"')
+            self.end_headers(); self.wfile.write(b"Auth required"); return
+        if self.headers.get("X-Requested-With") != "fetch":
+            self.send_response(403); self._no_cache(); self.end_headers()
+            self.wfile.write(b"forbidden"); return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(length) or b"{}")
+            bot = str(body.get("bot") or "").strip()
+            action = str(body.get("action") or "").strip()
+            if not bot or len(bot) > 80 or \
+                    not all(c.isalnum() or c in "-_.:" for c in bot):
+                raise ValueError(f"bad bot id {bot!r}")
+            if action not in ("hide", "unhide", "delete"):
+                raise ValueError(f"bad action {action!r}")
+            out = {"ok": True, "bot": bot, "action": action}
+            if action == "hide":
+                hidden = fetch_hidden_bots()
+                hidden[bot] = dt.datetime.now(dt.timezone.utc).isoformat()
+                save_hidden_bots(hidden)
+            elif action == "unhide":
+                hidden = fetch_hidden_bots()
+                hidden.pop(bot, None)
+                save_hidden_bots(hidden)
+            else:  # delete — bot_pnl row only; ledgers/history untouched
+                out["deleted_rows"] = delete_bot_row(bot)
+            payload = json.dumps(out).encode()
+            self.send_response(200)
+        except Exception as e:  # noqa: BLE001
+            payload = json.dumps({"ok": False,
+                                  "error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(400)
+        self._no_cache()
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(payload)
 
     def log_message(self, *a):
         pass
