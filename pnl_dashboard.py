@@ -40,7 +40,7 @@ RETIRED_ROWS = {"perps-donchian-breakout-lighter"}
 # Expected bots — so the grid shows a bot even before its first publish.
 EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
             "perps-funding-carry", "perps-funding-lighter", "lighter-perp-sniper",
-            "lighter-dislocation",
+            "lighter-dislocation", "perps-funding-spread",
             "scanner-triangular-arb", "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h", "crypto-trendmomo-4h",
@@ -54,7 +54,7 @@ SCANNERS = {"scanner-triangular-arb", "scanner-cross-exchange-arb"}
 
 # Stock/brokerage bots (IBKR + Alpaca). Shown as their own cards with a SEPARATE
 # subtotal so their large $ equity never swamps the crypto headline.
-STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca"}
+STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca", "equities-momentum"}
 
 # The only bots that should appear. Anything else in the table (e.g. legacy
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
@@ -109,11 +109,13 @@ LABELS = {
     "perps-funding-lighter":       "💸 Funding Farmer · Lighter directional funding (stop-guarded)",
     "lighter-perp-sniper":         "🎯 Perp Sniper · new Lighter-listing snipe",
     "lighter-dislocation":         "🧲 Snap Back · Lighter dislocation harvester",
+    "perps-funding-spread":        "⚖️ Counterweight · x-sect funding-spread book (L/S)",
     "scanner-triangular-arb":      "🔺 Loop Scout · triangular arb (scanner)",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout · cross-exchange arb (scanner)",
     "event-listing-sniper":        "🎯 Launch Sniper · new-listing buyer",
     "equities-regime-ibkr":        "📊 Index Pilot · SPY/QQQ regime (IBKR)",
     "equities-momentum-alpaca":    "🏆 Stock Leaders · momentum rank (Alpaca)",
+    "equities-momentum":           "🏆 Stock Leaders · momentum rank",
     # Freqtrade fleet — new bots July 2026
     "freqtrade-mum":               "👩 Mum · NFI X7 · 5m trend (Binance)",
     "freqtrade-dad":               "👨 Dad · E0V1E · 5m breakout (Binance/Kraken)",
@@ -161,6 +163,7 @@ VARIANT_STALE_SECONDS = {
     "crypto-trend-daily-lshadow":    2 * 3600 + 600,
     "perps-funding-lighter-lighter": 15 * 60,          # 300s loop
     "perps-funding-lighter-lshadow": 15 * 60,
+    "perps-funding-spread-lshadow":  15 * 60,          # 300s loop (Counterweight)
 }
 
 

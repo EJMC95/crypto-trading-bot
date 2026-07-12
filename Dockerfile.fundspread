@@ -1,0 +1,22 @@
+# Image for ⚖️ Counterweight (cross-sectional funding-spread factor book) —
+# SHADOW ONLY in v1. Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.fundspread
+#   VENUE=lighter_shadow
+#   LIGHTER_ORDER_USD=20          (backtested clip — ctx default is $30)
+# The bot itself REFUSES lighter_live in v1: the factor book passed the
+# validation doctrine in backtest (scripts/backtest_xsect_factor_lab.py,
+# 72h/K5/24h plateau centre) but has NO live-shadow record yet; that record
+# earns (or kills) a separate go-live decision. No keys needed for shadow.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_funding_spread_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_funding_spread_bot.py"]
