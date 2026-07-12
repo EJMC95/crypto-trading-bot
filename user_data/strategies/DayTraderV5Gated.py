@@ -256,8 +256,8 @@ class DayTraderV5Gated(IStrategy):
     # wide, washed-out bands (0.022 -> captured ~1.2%, ~+0.7% net) because bear
     # rallies fade fast and entry quality is everything there.
     BAND_PCT_ON = 0.015
-    # [2026-07-05] 0.022 -> 0.020 to loosen risk-off participation (bear_bounce +
-    # bounce_pullback). At 2.0% the captured move (~0.56*band = ~1.12%) still clears
+    # [2026-07-05] 0.022 -> 0.020 to loosen risk-off participation
+    # (bounce_pullback). At 2.0% the captured move (~0.56*band = ~1.12%) still clears
     # the ~0.52% round-trip fee with ~+0.6% net margin, so it stays above the
     # fee-bleed floor the 0/11 scratch run established — just admits more of the
     # current relief-rally pairs that were sitting a hair under the old 2.2% gate.
@@ -284,27 +284,13 @@ class DayTraderV5Gated(IStrategy):
             ["enter_long", "enter_tag"],
         ] = (1, "range_on")
 
-        # RISK-OFF (BTC 4h 50<200): SWEEP-AND-RECLAIM bounces only — the candle's
-        # low must UNDERCUT the prior 14-candle low (stop-run flush) and the close
-        # must RECLAIM it, with RSI<30 and a wide band. A failed breakdown is a
-        # far stronger long trigger than "price is near the low" (which was just
-        # knife-catching in a waterfall — the -19% backtest lesson). Half stake +
-        # tight invalidation + fast exits via the custom_* methods below.
-        dataframe.loc[
-            (
-                (dataframe["btc_regime_up"] == 0)
-                & (dataframe["rsi"] < 30)
-                # the flush level must have HELD ~6h first (no fresh lower-lows) —
-                # separates a capitulation reversal from a rolling waterfall,
-                # which was the 7%-win-rate failure of the unstabilized version.
-                & (dataframe["rng_low20"] == dataframe["rng_low20"].shift(6))
-                & (dataframe["low"] < dataframe["rng_low20"])      # swept the held low
-                & (dataframe["close"] > dataframe["rng_low20"])    # ...and reclaimed it
-                & (dataframe["rng_band_pct"] >= self.BAND_PCT_OFF)
-                & uptick & live_vol
-            ),
-            ["enter_long", "enter_tag"],
-        ] = (1, "bear_bounce")
+        # [2026-07-12 SLEEVE RETIRED] The bear_bounce leg (risk-off half-stake
+        # sweep-and-reclaim bounce, shipped 07-03 to all four spot bots) is gone
+        # fleet-wide: tagged Binance replay scored it negative in ALL FOUR
+        # carriers (19 entries, -$7.27 aggregate, 26% win; here 10 entries,
+        # -$0.81) and it never fired once in live paper. Risk-off participation
+        # is now bounce_pullback's job alone (confirmed relief rallies, own-pair
+        # rising trend — not capitulation knife-catches).
 
         # [2026-07-05 BOUNCE PARTICIPATION] Third mode. The two modes above leave a
         # gap: in risk-off the bot ONLY buys the exact capitulation bottom
@@ -421,7 +407,7 @@ class DayTraderV5Gated(IStrategy):
                             leverage: float, entry_tag: Optional[str], side: str,
                             **kwargs) -> float:
         stake = proposed_stake
-        if entry_tag in ("bear_bounce", "bounce_pullback", "range_meanrev"):
+        if entry_tag in ("bounce_pullback", "range_meanrev"):
             stake *= 0.5                             # counter-daily-trend scalps size down
         if self._pulse_panic(current_time):
             stake *= 0.5
@@ -436,8 +422,8 @@ class DayTraderV5Gated(IStrategy):
     def custom_exit(self, pair: str, trade, current_time: datetime,
                     current_rate: float, current_profit: float, **kwargs):
         age_min = (current_time - trade.open_date_utc).total_seconds() / 60.0
-        if trade.enter_tag in ("bear_bounce", "bounce_pullback"):
-            # bank quick relief-rally profit; bear bounces fade fast, don't overstay
+        if trade.enter_tag == "bounce_pullback":
+            # bank quick relief-rally profit; relief bounces fade fast, don't overstay
             if current_profit >= 0.012:
                 return "bounce_take"
             if age_min >= 720:
@@ -474,7 +460,7 @@ class DayTraderV5Gated(IStrategy):
         # [2026-07-03 ADAPTIVE] Bounce stop 2.0x: tested 1.2x and it was shredded
         # by ordinary 15m noise (7% win rate, avg hold 32min) — reclaims need room
         # to wobble. Half stake keeps the $ risk in line.
-        atr_multiplier = 2.0 if trade.enter_tag in ("bear_bounce", "bounce_pullback", "range_meanrev") else self.atr_stop_mult.value
+        atr_multiplier = 2.0 if trade.enter_tag in ("bounce_pullback", "range_meanrev") else self.atr_stop_mult.value
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
         if dataframe is None or len(dataframe) == 0:
             return None
