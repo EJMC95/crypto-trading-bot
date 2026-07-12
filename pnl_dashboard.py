@@ -31,7 +31,7 @@ PORT = int(os.environ.get("PORT", "8080"))
 # compete with card text for legibility.
 _G = "-8 0 5 -4 6 -5 0 7"  # per-glyph rotation jitter, shared across every text layer below
 _WATERMARK_TILE_SVG = (
-    "<svg xmlns='http://www.w3.org/2000/svg' width='460' height='250'>"
+    "<svg xmlns='http://www.w3.org/2000/svg' width='520' height='280'>"
     "<defs>"
     "<filter id='spray' x='-30%' y='-30%' width='160%' height='160%'>"
     "<feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' result='n'/>"
@@ -46,24 +46,30 @@ _WATERMARK_TILE_SVG = (
     "<feGaussianBlur stdDeviation='5.5'/>"
     "</filter>"
     "<linearGradient id='dripfade' x1='0' y1='0' x2='0' y2='1'>"
-    "<stop offset='0%' stop-color='#b8860b' stop-opacity='0.9'/>"
-    "<stop offset='100%' stop-color='#b8860b' stop-opacity='0'/>"
+    "<stop offset='0%' stop-color='#ff5a00' stop-opacity='0.95'/>"
+    "<stop offset='100%' stop-color='#c81800' stop-opacity='0'/>"
+    "</linearGradient>"
+    # molten lava fill — glowing yellow crest down to deep red-orange
+    "<linearGradient id='lavagrad' x1='0' y1='0' x2='0' y2='1'>"
+    "<stop offset='0%' stop-color='#ffd23f'/>"
+    "<stop offset='38%' stop-color='#ff7a00'/>"
+    "<stop offset='100%' stop-color='#e01e00'/>"
     "</linearGradient>"
     "<linearGradient id='hlgrad' x1='0' y1='0' x2='0' y2='1'>"
-    "<stop offset='0%' stop-color='#ffffff' stop-opacity='0.85'/>"
-    "<stop offset='40%' stop-color='#ffffff' stop-opacity='0.15'/>"
+    "<stop offset='0%' stop-color='#fff3c0' stop-opacity='0.9'/>"
+    "<stop offset='40%' stop-color='#ffffff' stop-opacity='0.18'/>"
     "<stop offset='70%' stop-color='#ffffff' stop-opacity='0'/>"
     "</linearGradient>"
     "</defs>"
-    "<g opacity='0.5'>"
+    "<g opacity='0.72'>"
     f"<g transform='rotate(-14 230 115)' font-family=\"'Arial Black',Impact,-apple-system,sans-serif\" "
-    f"font-size='54' font-weight='900' text-anchor='middle'>"
-    # soft overspray halo behind the whole piece
-    f"<text x='230' y='128' fill='#b8860b' opacity='0.3' filter='url(#halo)' rotate='{_G}'>$ EJMC $</text>"
+    f"font-size='64' font-weight='900' text-anchor='middle'>"
+    # molten glow halo behind the whole piece
+    f"<text x='230' y='128' fill='#ff5a00' opacity='0.4' filter='url(#halo)' rotate='{_G}'>$ EJMC $</text>"
     # drop shadow, offset down-right for a chunky 3D block letter feel
-    f"<text x='235' y='135' fill='#2a1d04' opacity='0.55' rotate='{_G}'>$ EJMC $</text>"
-    # thick dark outline + spray-grained gold fill, in one pass
-    f"<text x='230' y='128' fill='#d4a017' stroke='#2a1d04' stroke-width='6.5' "
+    f"<text x='236' y='136' fill='#2a0a00' opacity='0.6' rotate='{_G}'>$ EJMC $</text>"
+    # thick charred outline + spray-grained lava fill, in one pass
+    f"<text x='230' y='128' fill='url(#lavagrad)' stroke='#3a1000' stroke-width='7' "
     f"stroke-linejoin='round' paint-order='stroke fill' filter='url(#spray)' "
     f"rotate='{_G}'>$ EJMC $</text>"
     # glossy highlight streak across the top third of the letters
@@ -71,24 +77,24 @@ _WATERMARK_TILE_SVG = (
     f"rotate='{_G}'>$ EJMC $</text>"
     "</g>"
     # paint drips, tapering down from the lettering with a pooled blob at the tip
-    "<g opacity='0.85'>"
-    "<path d='M118 168 C117 188 115 202 113 222 C111 202 109 188 110 168 Z' fill='url(#dripfade)'/>"
-    "<circle cx='112' cy='224' r='4.5' fill='#b8860b' opacity='0.55'/>"
-    "<path d='M196 172 C195 184 194 192 193 204 C192 192 191 184 192 172 Z' fill='url(#dripfade)'/>"
-    "<circle cx='193' cy='205' r='3' fill='#b8860b' opacity='0.5'/>"
-    "<path d='M318 166 C317 182 315 194 313 210 C311 194 309 182 310 166 Z' fill='url(#dripfade)'/>"
-    "<circle cx='312' cy='212' r='4' fill='#b8860b' opacity='0.5'/>"
-    "<path d='M372 170 C371 180 370 187 369 196 C368 187 367 180 368 170 Z' fill='url(#dripfade)'/>"
-    "<circle cx='369' cy='197' r='2.6' fill='#b8860b' opacity='0.45'/>"
+    "<g opacity='0.9'>"
+    "<path d='M116 176 C115 198 113 214 111 236 C109 214 107 198 108 176 Z' fill='url(#dripfade)'/>"
+    "<circle cx='110' cy='238' r='5' fill='#ff5a00' opacity='0.6'/>"
+    "<path d='M198 180 C197 194 196 203 195 216 C194 203 193 194 194 180 Z' fill='url(#dripfade)'/>"
+    "<circle cx='195' cy='217' r='3.4' fill='#ff5a00' opacity='0.55'/>"
+    "<path d='M320 174 C319 192 317 205 315 222 C313 205 311 192 312 174 Z' fill='url(#dripfade)'/>"
+    "<circle cx='314' cy='224' r='4.4' fill='#ff5a00' opacity='0.55'/>"
+    "<path d='M376 178 C375 189 374 197 373 207 C372 197 371 189 372 178 Z' fill='url(#dripfade)'/>"
+    "<circle cx='373' cy='208' r='3' fill='#ff5a00' opacity='0.5'/>"
     "</g>"
     # overspray speckle + faint spray-ring flourish, like a tag finished off with the can
-    "<circle cx='120' cy='108' r='3.2' fill='#b8860b' opacity='0.35' filter='url(#soft)'/>"
-    "<circle cx='134' cy='96' r='1.6' fill='#b8860b' opacity='0.5'/>"
-    "<circle cx='344' cy='120' r='2.8' fill='#b8860b' opacity='0.3' filter='url(#soft)'/>"
-    "<circle cx='330' cy='134' r='1.4' fill='#b8860b' opacity='0.45'/>"
-    "<circle cx='226' cy='68' r='2.2' fill='#b8860b' opacity='0.3' filter='url(#soft)'/>"
-    "<circle cx='396' cy='150' r='10' fill='none' stroke='#b8860b' stroke-width='1.2' "
-    "opacity='0.25' filter='url(#soft)'/>"
+    "<circle cx='118' cy='104' r='3.6' fill='#ff5a00' opacity='0.4' filter='url(#soft)'/>"
+    "<circle cx='134' cy='90' r='1.8' fill='#ff5a00' opacity='0.55'/>"
+    "<circle cx='348' cy='116' r='3.2' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='332' cy='132' r='1.6' fill='#ff5a00' opacity='0.5'/>"
+    "<circle cx='226' cy='60' r='2.6' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='404' cy='148' r='11' fill='none' stroke='#ff5a00' stroke-width='1.4' "
+    "opacity='0.3' filter='url(#soft)'/>"
     "</g>"
     "</svg>"
 )
@@ -1191,10 +1197,10 @@ def render():
  body{{font-family:-apple-system,system-ui,sans-serif;margin:0;color:#16232c;
    background-color:#eef7fd;
    background-image:url("{WATERMARK_BG_URL}"),
-     repeating-linear-gradient(135deg,#ffffff 0 46px,#cfe9fb 46px 92px);
+     repeating-linear-gradient(180deg,#ffffff 0 70px,#aed8f6 70px 140px);
    background-repeat:no-repeat,repeat;
    background-position:center center,0 0;
-   background-size:min(78vw,900px) auto,auto;
+   background-size:min(90vw,1150px) auto,auto;
    background-attachment:fixed,fixed}}
  header{{padding:16px 18px;background:#ffffffd9;backdrop-filter:blur(2px);
    border-bottom:3px solid #caa227;position:relative}}
@@ -1224,9 +1230,10 @@ def render():
  .livetag{{font-size:10px;font-weight:800;letter-spacing:.5px;color:#fff;
    background:#d1242f;border-radius:6px;padding:2px 7px;box-shadow:0 0 10px #d1242f66}}
  .livesum{{margin-left:auto;font-size:13px;font-weight:500;color:#16232c}}
- .card{{background:#ffffffdd;border:1px solid #caa227;border-radius:10px;padding:14px;
-   box-shadow:0 1px 0 #ffffffaa inset;transition:border-color .2s,box-shadow .2s}}
- .card:hover{{border-color:#8a6d1a;box-shadow:0 0 16px -8px #caa227aa}}
+ .card{{background:#ffffffee;border:2.5px solid #d4af37;border-radius:10px;padding:14px;
+   box-shadow:0 0 0 1px #b8860b55,0 1px 0 #ffffffaa inset;
+   transition:border-color .2s,box-shadow .2s}}
+ .card:hover{{border-color:#b8860b;box-shadow:0 0 0 1px #b8860b,0 0 16px -6px #d4af37cc}}
  .card h2{{margin:0 0 2px;font-size:15px}}
  .row{{display:flex;justify-content:space-between;margin:5px 0;font-size:13px}}
  .sub{{margin:10px 0 4px;font-size:12px;color:#5b7184}}
