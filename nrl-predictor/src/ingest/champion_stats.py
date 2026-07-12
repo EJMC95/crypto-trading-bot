@@ -39,9 +39,13 @@ def _team_totals(players: list[dict]) -> dict:
     return t
 
 
-def scrape(seasons, max_round: int = 27) -> pd.DataFrame:
+def scrape(seasons, max_round: int = 27, have: set | None = None) -> pd.DataFrame:
+    """Scrape team-match advanced stats. `have`: a set of (season, round, home_id,
+    away_id) already present — those matches are skipped so an in-season refresh
+    only fetches newly-completed games (polite + fast)."""
     CACHE.mkdir(parents=True, exist_ok=True)
     alias = teams.alias_to_id()
+    have = have or set()
     rows = []
     for season in seasons:
         for rnd in range(1, max_round + 1):
@@ -57,6 +61,10 @@ def scrape(seasons, max_round: int = 27) -> pd.DataFrame:
                     break
                 continue
             for fx in fixtures:
+                hid0 = alias.get(fx["homeTeam"]["nickName"].strip())
+                aid0 = alias.get(fx["awayTeam"]["nickName"].strip())
+                if (season, rnd, hid0, aid0) in have:
+                    continue   # already scraped in a prior run
                 cache = CACHE / f"{season}_r{rnd:02d}_{fx['homeTeam']['nickName']}_{fx['awayTeam']['nickName']}.json".replace(" ", "")
                 if cache.exists():
                     md = json.loads(cache.read_text())
@@ -90,8 +98,32 @@ def scrape(seasons, max_round: int = 27) -> pd.DataFrame:
     return df
 
 
+def refresh(seasons) -> pd.DataFrame:
+    """Incremental in-season update: keep the committed parquet, fetch only the
+    matches it does not yet have, append, and re-save. Safe to run every pipeline
+    tick — a fully-scraped season is a no-op (a couple of draw fetches)."""
+    existing = pd.read_parquet(OUT) if OUT.exists() else pd.DataFrame()
+    have = set()
+    if len(existing):
+        have = {(int(r.season), int(r.round), r.home_id, r.away_id)
+                for r in existing.itertuples(index=False)}
+    fresh = scrape(seasons, have=have)
+    if len(fresh) and len(existing):
+        merged = (pd.concat([existing, fresh], ignore_index=True)
+                  .drop_duplicates(subset=["season", "round", "home_id", "away_id"], keep="last")
+                  .sort_values(["season", "round"]).reset_index(drop=True))
+    else:
+        merged = fresh if len(fresh) else existing
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    if len(merged):
+        merged.to_parquet(OUT, index=False)
+    return merged
+
+
 if __name__ == "__main__":
     import sys
-    yrs = [int(x) for x in sys.argv[1:]] or [2023, 2024, 2025]
-    d = scrape(yrs)
-    print(f"scraped {len(d)} team-match rows across {yrs} -> {OUT}")
+    args = sys.argv[1:]
+    incremental = "--refresh" in args
+    yrs = [int(x) for x in args if x.isdigit()] or [2023, 2024, 2025]
+    d = refresh(yrs) if incremental else scrape(yrs)   # both persist to OUT
+    print(f"{'refreshed' if incremental else 'scraped'} -> {len(d)} team-match rows -> {OUT}")

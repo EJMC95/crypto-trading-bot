@@ -176,7 +176,7 @@ function bar(label,p,cls,h,a){
 }
 
 function intel(g){
-  if(g.info_confidence===undefined && !g.weather) return "";
+  if(g.info_confidence===undefined && !g.weather && !g.xstats && !g.avail) return "";
   const conf=g.info_confidence||"low";
   const lbl={high:"Team lists confirmed",provisional:"Lists provisional",low:"Lists not out — last-game squad"}[conf];
   let h=`<h3>Match intel — on-the-day signals</h3><span class="conf ${conf}">${lbl}</span>`;
@@ -191,6 +191,11 @@ function intel(g){
     const s=g.avail.win_shift, who=s>=0?nick(g.home):nick(g.away);
     h+=`<div class="flag info"><span class="dot"></span><span>Lineup strength (named 17, ridge-APM):
       favours <b>${who}</b> — win prob adjusted ${s>=0?"+":""}${(100*s).toFixed(1)}% vs a neutral lineup.</span></div>`;
+  }
+  if(g.xstats){
+    const fmt=(m)=>`${m>=1?"+":""}${(100*(m-1)).toFixed(0)}%`;
+    h+=`<div class="flag info"><span class="dot"></span><span>Tryscorer prices sharpened by opponent edge-defence (xStats):
+      <b>${nick(g.home)}</b> tries ${fmt(g.xstats.home)}, <b>${nick(g.away)}</b> tries ${fmt(g.xstats.away)} — flows into every ATS &amp; SGM leg.</span></div>`;
   }
   if(!(g.flags||[]).length && conf==="high")
     h+=`<div class="flag info"><span class="dot"></span><span>No late changes or weather concerns flagged.</span></div>`;

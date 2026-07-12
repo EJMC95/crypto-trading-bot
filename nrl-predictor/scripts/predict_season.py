@@ -28,7 +28,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.features import player_rates, player_value, signal_adjust
+from src.features import player_rates, player_value, signal_adjust, xstats_defence
 from src.ingest import signals as signals_mod
 from src.ingest import teams
 from src.models import props_player
@@ -80,6 +80,14 @@ def main() -> None:
     apm = json.loads((OUT / "apm_values.json").read_text()) if (OUT / "apm_values.json").exists() else None
     apm_vals = {int(k): v for k, v in apm["values"].items()} if apm else {}
 
+    # xStats opponent-defence correction (SGM sharpening): only active when the
+    # phase-4 self-gate shipped it. Sharpens each side's expected tries -> every
+    # tryscorer price in the match; identity when a team lacks a rating.
+    xs = json.loads((OUT / "xstats_defence.json").read_text()) if (OUT / "xstats_defence.json").exists() else None
+    xs_active = bool(xs and xs.get("passed"))
+    xs_ratings = xstats_defence.build_ratings() if xs_active else None
+    xs_norm = xs.get("norm") if xs else None
+
     def _lineup_ids(entry, side, team_id):
         sq = signal_adjust.named_squad(entry, side) if entry else None
         if sq is not None and len(sq):
@@ -112,6 +120,7 @@ def main() -> None:
             p_elo_raw = elo.p_home(fx.home_id, fx.away_id)
             p_elo_cal = _sig(art["platt_coef"] * _logit(p_elo_raw) + art["platt_intercept"])
             pm_pred = tmodel.predict_match(fx.home_id, fx.away_id)
+            mh = ma = 1.0
             if pm_pred:
                 p_pois = pm_pred["p_home"]
                 p_blend = _sig(art["stack_coef"][0] * _logit(p_elo_cal)
@@ -126,10 +135,13 @@ def main() -> None:
                     avail_effect = {"lineup_diff": round(avail_raw, 1),
                                     "win_shift": round(p_corr - p_blend, 4)}
                     p_blend = p_corr
+                if xs_active:
+                    mh, ma = xstats_defence.matchup_multipliers(
+                        xs_ratings, xs_norm, xs["coef"], fx.home_id, fx.away_id)
                 margin = pm_pred["exp_margin"]
                 total = pm_pred["exp_total"] * wmult
-                lam_h = pm_pred["lam_tries_home"] * wmult
-                lam_a = pm_pred["lam_tries_away"] * wmult
+                lam_h = pm_pred["lam_tries_home"] * wmult * mh
+                lam_a = pm_pred["lam_tries_away"] * wmult * ma
                 margin_ci = [round(pm_pred["margin_p10"], 0), round(pm_pred["margin_p90"], 0)]
                 total_ci = [round(pm_pred["total_p10"] * wmult, 0), round(pm_pred["total_p90"] * wmult, 0)]
                 bands = {"home_1_12": round(pm_pred["p_home_1_12"], 3),
@@ -170,6 +182,8 @@ def main() -> None:
                       "blend": round(p_blend, 4), "market": None},
                 "margin": round(margin, 1), "total": round(total, 1),
                 "avail": avail_effect,
+                "xstats": ({"home": round(mh, 3), "away": round(ma, 3)}
+                           if xs_active and (abs(mh - 1) > 0.02 or abs(ma - 1) > 0.02) else None),
                 "margin_ci": margin_ci, "total_ci": total_ci, "bands": bands,
                 "tries": {"home": round(float(lam_h), 1), "away": round(float(lam_a), 1),
                           "total": round(float(lam_h + lam_a), 1)},

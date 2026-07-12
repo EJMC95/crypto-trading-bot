@@ -206,7 +206,11 @@ def main() -> None:
         sgm_sim.save(sims, season, round_no)
 
         p_sim = float(np.mean(sims["margin"] > 0) + 0.5 * np.mean(sims["margin"] == 0))
-        p_model = model.predict_match(fx.home_id, fx.away_id)["p_home"]
+        # consistency reference uses the SAME (xStats-corrected) try rates the player
+        # sim was built from, so the gate still verifies the thinning/score assembly
+        # — not merely that xStats moved tries (which is by design). The DISPLAYED
+        # match winner remains the champion blend; xStats only sharpens tries/props.
+        p_model = model.p_home_from_lambdas(lam_h, lam_a)
         consistency.append({"match": f"{names[fx.home_id]} v {names[fx.away_id]}",
                             "p_home_sim": round(p_sim, 4), "p_home_tier2": round(p_model, 4),
                             "diff": round(p_sim - p_model, 4)})

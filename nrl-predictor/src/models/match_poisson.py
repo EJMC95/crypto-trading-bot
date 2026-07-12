@@ -88,6 +88,15 @@ class TryModel:
         fg2 = RNG.poisson(self.lam_fg2_, size)
         return 4 * t + 2 * conv + 2 * pg + fg1 + 2 * fg2
 
+    def p_home_from_lambdas(self, lam_h: float, lam_a: float) -> float:
+        """Win prob from explicit team try rates, via the same scoring machinery
+        as predict_match. Lets the SGM consistency gate use the *corrected* try
+        rates its player sim was actually built from (see run_phase4 gate 3)."""
+        hs = self._sim_scores(lam_h, self.params.n_sims)
+        as_ = self._sim_scores(lam_a, self.params.n_sims)
+        margin = hs - as_
+        return float(np.mean(margin > 0) + 0.5 * np.mean(margin == 0))
+
     def predict_match(self, home: str, away: str) -> dict | None:
         lam_h = self.try_rate(home, away, True)
         lam_a = self.try_rate(away, home, False)
