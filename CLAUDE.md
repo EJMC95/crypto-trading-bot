@@ -6,12 +6,23 @@ Eamon's full crypto trading bot fleet. Multiple strategies running on paper (dry
 ## Fleet Overview
 
 ### Freqtrade Bots (new July 2026 — paper trading, $1,000 each)
-| Bot ID | Name | Strategy | Exchange | Timeframe |
-|--------|------|----------|----------|-----------|
-| freqtrade-mum | 👩 Mum | NFI X7 | Binance | 5m |
-| freqtrade-dad | 👨 Dad | E0V1E | Binance/Kraken | 5m |
-| freqtrade-avo-maria | 🙏 Avo Maria | CombinedBinHAndCluc | Binance/Kraken | 5m |
-| freqtrade-georgia | 🔮 Georgia | FreqAI LightGBM | Binance | 1H |
+The NFI/E0V1E/BinHCluc/FreqAI launch configs were replaced within days
+(git: `config_*.json "-> proven strategy"`); what actually runs is the
+in-house strategies on Kraken. Config `timeframe`/`stoploss` OVERRIDE the
+strategy files — the table below is the config-resolved truth.
+| Bot ID | Name | Strategy | Exchange | Timeframe | Stop |
+|--------|------|----------|----------|-----------|------|
+| freqtrade-mum | 👩 Mum | TrendMomoV1 | Kraken | 4h | -8% |
+| freqtrade-dad | 👨 Dad | MomoBreakoutV1 | Kraken | 1h | -6% |
+| freqtrade-avo-maria | 🙏 Avo Maria | SwingDipV1 | Kraken | 4h | -10% |
+| freqtrade-georgia | 🔮 Georgia | DayTraderV5Gated | Kraken | 15m | ATR ≤5% |
+
+Since 2026-07-13 the same four strategies ALSO run as **Lighter shadow
+books** (`lighter_family_bot.py`, Railway service `family-lighter-shadow`,
+deploys from `claude/lighter-gate0`): signals from Lighter's own candles,
+ShadowBroker book-VWAP fills, funding drag modelled, rows
+`freqtrade-*-lshadow`. The Kraken paper bots are the control arm; the port
+refuses `lighter_live` in v1.
 
 ### Existing Bots (already running)
 | Bot ID | Strategy | Type |
