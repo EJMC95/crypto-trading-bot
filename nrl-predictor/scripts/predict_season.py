@@ -158,12 +158,17 @@ def main() -> None:
             squad_a = signal_adjust.named_squad(entry, "away") if entry else None
             ph = props_player.match_player_lambdas(hist, rates, fx.home_id, lam_h, asof, squad_h, fx.away_id)
             pa = props_player.match_player_lambdas(hist, rates, fx.away_id, lam_a, asof, squad_a, fx.home_id)
+            # top tryscorers from BOTH teams — kept balanced (top 5 per side, home
+            # block then away block) so the underdog's scorers are always shown, not
+            # buried under a global top-N that skews to the favourite.
             scorers = []
             for side, frame in (("home", ph), ("away", pa)):
-                for t in frame.sort_values("p_ats", ascending=False).head(4).itertuples(index=False):
+                team_id = fx.home_id if side == "home" else fx.away_id
+                top = frame.sort_values("p_ats", ascending=False).head(5)
+                for t in top.itertuples(index=False):
                     p2 = 1 - np.exp(-t.lam) * (1 + t.lam)  # Poisson P(X>=2)
                     scorers.append({"player": player_names.get(t.player_id, t.player_id),
-                                    "team": names[fx.home_id if side == "home" else fx.away_id],
+                                    "team": names[team_id], "side": side,
                                     "position": t.position,
                                     "exp_tries": round(float(t.lam), 2),
                                     "p_ats": round(float(t.p_ats), 3),
@@ -171,7 +176,6 @@ def main() -> None:
                                     "p_2plus": round(float(p2), 3),
                                     "fair_2plus": round(1 / p2, 1) if p2 > 0.005 else None,
                                     "vs_opp": f"{int(t.h2h_tries)}t/{int(t.h2h_games)}g" if t.h2h_games else "—"})
-            scorers.sort(key=lambda s: -s["p_ats"])
 
             g = {
                 "home": names[fx.home_id], "away": names[fx.away_id],
@@ -188,7 +192,7 @@ def main() -> None:
                 "tries": {"home": round(float(lam_h), 1), "away": round(float(lam_a), 1),
                           "total": round(float(lam_h + lam_a), 1)},
                 "weather": weather, "weather_try_mult": round(wmult, 3),
-                "scorers": scorers[:6],
+                "scorers": scorers,  # top 5 each team, both sides always represented
                 "team_lists_confirmed": bool(entry and entry.get("team_lists_confirmed")),
             }
             games.append(g)

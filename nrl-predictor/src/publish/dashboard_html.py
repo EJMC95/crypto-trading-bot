@@ -101,6 +101,7 @@ BODY_TEMPLATE = r"""
      letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--grid);}
   td{padding:6px 8px;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums;}
   tr:last-child td{border-bottom:none;}
+  tr.teamsplit td{padding:0;height:6px;border-bottom:2px solid var(--border);background:var(--chip-bg);}
   .multi{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;}
   .multi .legs{font-weight:600;font-size:14px;}
   .multi .nums{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;color:var(--ink-2);font-size:12.5px;font-variant-numeric:tabular-nums;}
@@ -268,13 +269,21 @@ function renderGame(ri,gi){
     }
   }
   if((g.scorers||[]).length){
-    h+=`<h3>Tryscorers — ${r.actionable?"model top picks":"provisional (team list not out)"}</h3>
+    h+=`<h3>Tryscorers — both teams — ${r.actionable?"model top picks":"provisional (team list not out)"}</h3>
       <table><thead><tr><th>Player</th><th>Pos</th><th>Team</th><th>E(tries)</th><th>P(1+)</th><th>Fair 1+</th><th>P(2+)</th><th>Fair 2+</th><th>vs opp</th></tr></thead><tbody>`;
-    for(const t of g.scorers) h+=`<tr><td>${t.player}</td><td>${t.position}</td><td>${nick(t.team)}</td>
+    let prevTeam=null;
+    for(const t of g.scorers){
+      // a thin divider row between the two teams' blocks
+      if(prevTeam!==null && t.team!==prevTeam)
+        h+=`<tr class="teamsplit"><td colspan="9"></td></tr>`;
+      prevTeam=t.team;
+      const edge=["W","C","FB"].includes(t.position)?` title="edge attacker"`:"";
+      h+=`<tr><td${edge}>${t.player}</td><td>${t.position}</td><td>${nick(t.team)}</td>
       <td>${(t.exp_tries??0).toFixed(2)}</td><td>${pc(t.p_ats)}</td><td>$${(t.fair??0).toFixed(2)}</td>
       <td>${pc(t.p_2plus)}</td><td>${t.fair_2plus?"$"+t.fair_2plus.toFixed(1):"—"}</td><td>${t.vs_opp||"—"}</td></tr>`;
+    }
     h+=`</tbody></table>
-      <p style="color:var(--muted);font-size:11.5px;margin-top:4px">vs opp = this player's try record against this specific opponent (career, before today) — shrunk into the rate above.</p>`;
+      <p style="color:var(--muted);font-size:11.5px;margin-top:4px">Top 5 per side — both teams. vs opp = this player's try record against this specific opponent (career, before today) — shrunk into the rate above.</p>`;
   }
   panel.innerHTML=h;
 }

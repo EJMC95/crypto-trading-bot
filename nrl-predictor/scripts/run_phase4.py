@@ -76,8 +76,11 @@ def candidate_combos(sims, fx, props_h, props_a, names, player_names):
     fav_id = fx.home_id if fav_home else fx.away_id
     fav_win = "home_win" if fav_home else "away_win"
     fav_props = (props_h if fav_home else props_a).sort_values("p_ats", ascending=False)
+    dog_props = (props_a if fav_home else props_h).sort_values("p_ats", ascending=False)
     backs = fav_props[fav_props["position"].isin(["W", "FB", "C"])]
     top_back = backs.iloc[0] if len(backs) else fav_props.iloc[0]
+    dog_backs = dog_props[dog_props["position"].isin(["W", "FB", "C"])]
+    dog_back = dog_backs.iloc[0] if len(dog_backs) else (dog_props.iloc[0] if len(dog_props) else None)
     med_margin = abs(float(np.median(sims["margin"])))
     med_total = float(np.median(sims["total"]))
     med_tries = float(np.median(sims["home_tries"] + sims["away_tries"]))
@@ -112,6 +115,15 @@ def candidate_combos(sims, fx, props_h, props_a, names, player_names):
             # 6-leg "sweep": win × three scorers × over × plenty of tries
             combos.append([fav_win, f"ats {b0}", f"ats {b1}", f"ats {b2}",
                            f"total over {over}", f"tries_total over {big_tries}"])
+    # both-teams builders: pair the favourite's top back with the underdog's — a
+    # tryscorer from each side. Longer odds (an underdog back scoring is a real
+    # uplift) and gives the multis a scorer from BOTH teams, not just the fav.
+    if dog_back is not None:
+        d0 = int(dog_back.player_id)
+        combos += [
+            [f"ats {tid}", f"ats {d0}"],                                  # a scorer each way
+            [fav_win, f"ats {tid}", f"ats {d0}", f"total over {over}"],   # win + both scorers + over
+        ]
     rows = []
     for legs in combos:
         res = sgm_price.price_combo(sims, legs)
