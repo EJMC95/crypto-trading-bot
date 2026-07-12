@@ -112,10 +112,38 @@ def main() -> None:
         "stack_intercept": float(stack.intercept_[0]),
     }, indent=1))
     have = pred["p_pois"].notna()
-    pred["p_blend"] = pred["p_elo_cal"].copy()
-    pred.loc[have, "p_blend"] = stack.predict_proba(
+    pred["p_blend_base"] = pred["p_elo_cal"].copy()
+    pred.loc[have, "p_blend_base"] = stack.predict_proba(
         np.column_stack([logit(pred.loc[have, "p_elo_cal"]),
                          logit(pred.loc[have, "p_pois"])]))[:, 1]
+
+    # Availability correction (Tier 1b): ridge-APM lineup strength, walk-forward.
+    # Gated 2015-2025 at Brier 0.2179 vs 0.2187 base — it earns a place; the
+    # rest/travel/Origin context features did NOT (they're already in Elo).
+    print("== availability (ridge-APM) correction ==")
+    from src.features import player_value
+    app = player_value.player_appearances(pm, matches, teams)
+    avail_years = range(min(bt.TUNE_YEARS), 2027)
+    pred["avail_diff"] = player_value.walk_forward_avail(pred, app, avail_years).values
+    tune_mask = pred["year"].isin(bt.TUNE_YEARS).to_numpy()
+    a_mu = float(pred.loc[tune_mask, "avail_diff"].mean())
+    a_sd = float(pred.loc[tune_mask, "avail_diff"].std() or 1.0)
+    a_std = (pred["avail_diff"] - a_mu) / a_sd
+    yb = bt.outcome(pred)
+    ndm = tune_mask & (yb != 0.5)
+    avail_beta = player_value.fit_offset_logistic(
+        a_std.to_numpy()[ndm], yb[ndm], logit(pred.loc[ndm, "p_blend_base"].to_numpy()))
+    pred["p_blend"] = 1 / (1 + np.exp(-(logit(pred["p_blend_base"]) + avail_beta * a_std)))
+    print(f"avail_beta = {avail_beta:+.3f} (mu={a_mu:.2f}, sd={a_sd:.2f})")
+
+    # as-of-now APM values for live prediction of upcoming fixtures
+    apm_now = player_value.fit_apm(app, matches, matches["date"].max() + pd.Timedelta(days=1))
+    (OUT / "apm_values.json").write_text(_json.dumps(
+        {"values": apm_now, "avail_beta": avail_beta, "avail_mu": a_mu, "avail_sd": a_sd}))
+
+    pred[["match_id", "date", "year", "round", "home_id", "away_id", "home_score",
+          "away_score", "p_elo_cal", "p_pois", "p_blend_base", "p_blend"]].to_parquet(
+        OUT / "blend_frame.parquet", index=False)
 
     pred = bt.attach_market(pred, odds)
     pred["p_naive"] = bt.naive_baseline(pred)
@@ -162,6 +190,21 @@ def live_round(matches, pred, feats, long_rows, fixtures, elo_cal,
     pois = TryModel(pois_params).fit(long_rows, asof)
     gbm, gbm_cal = match_gbm.fit_final(pred, feats)
 
+    # availability correction inputs (as-of-now APM + fitted beta)
+    import json as _json
+    from src.features import player_rates, player_value, signal_adjust
+    apm = _json.loads((OUT / "apm_values.json").read_text()) if (OUT / "apm_values.json").exists() else None
+    apm_vals = {int(k): v for k, v in apm["values"].items()} if apm else {}
+    sig_by = signal_adjust.signals_by_pair(signal_adjust.load_signals())
+    hist_pv = player_rates.player_history(matches, pd.read_parquet(
+        PROCESSED / "player_matches.parquet"), teams)
+
+    def _lineup(entry, side, tid):
+        sq = signal_adjust.named_squad(entry, side) if entry else None
+        if sq is not None and len(sq):
+            return sq["player_id"].dropna().tolist()
+        return player_rates.squad_asof(hist_pv, tid, asof)["player_id"].dropna().tolist()
+
     # Team-form state for fixture features: rebuild on matches + fixture stubs.
     stubs = fixtures.copy()
     stubs["home_score"] = np.nan
@@ -184,6 +227,12 @@ def live_round(matches, pred, feats, long_rows, fixtures, elo_cal,
             feat_row[fx_feats.columns].to_frame().T)[:, 1])[0])
         p_blend = float(stack.predict_proba(
             [[float(logit(p_elo)), float(logit(pp["p_home"]))]])[0, 1])
+        if apm:
+            entry = sig_by.get((fx["home_id"], fx["away_id"]))
+            avail_raw = (player_value.lineup_value(_lineup(entry, "home", fx["home_id"]), apm_vals)
+                         - player_value.lineup_value(_lineup(entry, "away", fx["away_id"]), apm_vals))
+            p_blend = player_value.apply_avail(p_blend, avail_raw, apm["avail_beta"],
+                                               apm["avail_mu"], apm["avail_sd"])
         rows.append({
             "round": fx["round"], "date": fx["date"], "venue": fx["venue"],
             "home": teams.id_to_name()[fx["home_id"]],

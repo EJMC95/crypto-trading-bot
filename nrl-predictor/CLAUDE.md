@@ -50,6 +50,18 @@ fair prices for SGM leg combos. **Paper-track only** — never suggest staking r
   weather now scanned live (signals). Team-list ingest DONE via the
   match-centre endpoint.
 
+## Model metrics (blend inputs)
+Champion blend = Elo (Platt) + Poisson logistic stack, **+ an availability
+correction** (Tier 1b): ridge adjusted-plus-minus (APM) player values → a lineup
+strength difference (named 17 when confirmed, else last-game squad), applied as a
+bounded offset correction. Walk-forward 2015–2025 **Brier 0.2179 / log loss 0.6271**
+(was 0.2188 / 0.6293). This is what lets a rested/injured star move the *win* prob,
+not just the tryscorers; shown on the dashboard as a "lineup strength" line.
+Rest / travel / Origin context features (src/features/context.py) were built and
+gated too but **did NOT beat the blend** (already absorbed by Elo) — kept for
+reference / reuse in the xStats layer, not wired into production. Gate harness:
+scripts/eval_features.py (offset-logistic, nothing ships unless it beats base).
+
 ## Note on repo location
 This is the standalone private repo `github.com/EJMC95/nrl-predictor` (canonical as
 of 2026-07-07). The project was originally built on the crypto-trading-bot branch

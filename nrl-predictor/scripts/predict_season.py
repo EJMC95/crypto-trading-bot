@@ -28,7 +28,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.features import player_rates, signal_adjust
+from src.features import player_rates, player_value, signal_adjust
 from src.ingest import signals as signals_mod
 from src.ingest import teams
 from src.models import props_player
@@ -76,6 +76,16 @@ def main() -> None:
     current_round = int(fixtures["round_no"].min())
     sig_by = signal_adjust.signals_by_pair(signal_adjust.load_signals())
 
+    # availability correction (Tier 1b): APM lineup strength moves the win prob
+    apm = json.loads((OUT / "apm_values.json").read_text()) if (OUT / "apm_values.json").exists() else None
+    apm_vals = {int(k): v for k, v in apm["values"].items()} if apm else {}
+
+    def _lineup_ids(entry, side, team_id):
+        sq = signal_adjust.named_squad(entry, side) if entry else None
+        if sq is not None and len(sq):
+            return sq["player_id"].dropna().tolist()
+        return player_rates.squad_asof(hist, team_id, asof)["player_id"].dropna().tolist()
+
     # rich current-round data (already produced by the earlier pipeline steps)
     def _load(name):
         p = OUT / name
@@ -107,6 +117,15 @@ def main() -> None:
                 p_blend = _sig(art["stack_coef"][0] * _logit(p_elo_cal)
                                + art["stack_coef"][1] * _logit(p_pois)
                                + art["stack_intercept"])
+                avail_effect = None
+                if apm:
+                    avail_raw = (player_value.lineup_value(_lineup_ids(entry, "home", fx.home_id), apm_vals)
+                                 - player_value.lineup_value(_lineup_ids(entry, "away", fx.away_id), apm_vals))
+                    p_corr = player_value.apply_avail(p_blend, avail_raw, apm["avail_beta"],
+                                                      apm["avail_mu"], apm["avail_sd"])
+                    avail_effect = {"lineup_diff": round(avail_raw, 1),
+                                    "win_shift": round(p_corr - p_blend, 4)}
+                    p_blend = p_corr
                 margin = pm_pred["exp_margin"]
                 total = pm_pred["exp_total"] * wmult
                 lam_h = pm_pred["lam_tries_home"] * wmult
@@ -150,6 +169,7 @@ def main() -> None:
                 "p": {"elo": round(p_elo_cal, 4), "poisson": round(p_pois, 4),
                       "blend": round(p_blend, 4), "market": None},
                 "margin": round(margin, 1), "total": round(total, 1),
+                "avail": avail_effect,
                 "margin_ci": margin_ci, "total_ci": total_ci, "bands": bands,
                 "tries": {"home": round(float(lam_h), 1), "away": round(float(lam_a), 1),
                           "total": round(float(lam_h + lam_a), 1)},

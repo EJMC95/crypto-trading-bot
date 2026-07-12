@@ -1,4 +1,8 @@
 round,date,home,away,p_home_blend,market_p_home,edge_home,books,best_odds_home,best_odds_away,value_side,value_ev_pct
-Round 19,2026-07-12 14:00:00,South Sydney Rabbitohs,Newcastle Knights,0.5883,0.4764,0.1119,4,2.0,1.82,South Sydney Rabbitohs,17.66
-Round 19,2026-07-12 16:05:00,Manly-Warringah Sea Eagles,North Queensland Cowboys,0.6324,0.6643,-0.0319,4,1.45,2.85,North Queensland Cowboys,4.766
-Round 19,2026-07-12 18:15:00,Melbourne Storm,Gold Coast Titans,0.756,0.7178,0.0382,4,1.35,3.5,Melbourne Storm,2.06
+Round 19,2026-07-10 20:00:00,Wests Tigers,New Zealand Warriors,0.3812,0.2946,0.0866,4,3.35,1.36,Wests Tigers,27.702
+Round 19,2026-07-11 15:00:00,Dolphins,Cronulla-Sutherland Sharks,0.5859,0.6124,-0.0265,4,1.58,2.5,Cronulla-Sutherland Sharks,3.525
+Round 19,2026-07-11 17:30:00,Canterbury-Bankstown Bulldogs,Canberra Raiders,0.5839,0.6125,-0.0286,4,1.55,2.48,Canberra Raiders,3.1928
+Round 19,2026-07-11 19:35:00,Sydney Roosters,Parramatta Eels,0.7478,0.7894,-0.0416,4,1.2,4.6,Parramatta Eels,16.012
+Round 19,2026-07-12 14:00:00,South Sydney Rabbitohs,Newcastle Knights,0.5897,0.4816,0.1081,4,2.0,1.85,South Sydney Rabbitohs,17.94
+Round 19,2026-07-12 16:05:00,Manly-Warringah Sea Eagles,North Queensland Cowboys,0.6311,0.6133,0.0178,4,1.55,2.55,Manly-Warringah Sea Eagles,-2.1795
+Round 19,2026-07-12 18:15:00,Melbourne Storm,Gold Coast Titans,0.7567,0.7033,0.0534,4,1.36,3.25,Melbourne Storm,2.9112

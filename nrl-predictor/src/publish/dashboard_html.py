@@ -181,6 +181,11 @@ function intel(g){
     if(g.weather_try_mult&&g.weather_try_mult<0.999)
       h+=`<span>tries <b>×${g.weather_try_mult}</b></span>`;
     h+=`</div>`; }
+  if(g.avail && Math.abs(g.avail.win_shift)>=0.005){
+    const s=g.avail.win_shift, who=s>=0?nick(g.home):nick(g.away);
+    h+=`<div class="flag info"><span class="dot"></span><span>Lineup strength (named 17, ridge-APM):
+      favours <b>${who}</b> — win prob adjusted ${s>=0?"+":""}${(100*s).toFixed(1)}% vs a neutral lineup.</span></div>`;
+  }
   if(!(g.flags||[]).length && conf==="high")
     h+=`<div class="flag info"><span class="dot"></span><span>No late changes or weather concerns flagged.</span></div>`;
   for(const f of (g.flags||[]))
