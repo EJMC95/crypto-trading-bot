@@ -45,7 +45,11 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # [2026-07-12 LOSER CUT] TrendMomoV1 (crypto-trendmomo-4h) retired on user
 # sign-off: core leg -29%/4.5y on the tagged Binance replay (26.5% win), live
 # bleeder (-$11.33). Removed from run_all.sh in the same commit.
+# [2026-07-12 SAME-PAGE SWEEP] perps-donchian-breakout-lshadow was a Gate-0
+# local run that stopped 10 Jul (stale ever since); its signal is the
+# twice-retired range-buy, so the shadow is NOT restarted — row hidden.
 RETIRED_ROWS = {"perps-donchian-breakout-lighter",
+                "perps-donchian-breakout-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h"}
 
