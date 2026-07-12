@@ -84,20 +84,34 @@ def candidate_combos(sims, fx, props_h, props_a, names, player_names):
     line = -(np.floor(med_margin) + 0.5)
     over = np.floor(med_total - 4) + 0.5
     tries_over = np.floor(med_tries) - 0.5
+    tid = int(top_back.player_id)
+    big_over = np.floor(med_total + 4) + 0.5      # a longer total line
+    big_tries = np.floor(med_tries) + 1.5
     combos = [
-        [fav_win, f"ats {int(top_back.player_id)}", f"total over {over}"],
-        [f"line {fav_id} {line}", f"ats {int(top_back.player_id)}"],
-        [fav_win, f"tries2+ {int(top_back.player_id)}"],
-        [fav_win, f"ats {int(top_back.player_id)}", f"tries_total over {tries_over}"],
-        # advanced: winning-margin band × top back tryscorer
-        [f"margin_band {fav_id} 1 12", f"ats {int(top_back.player_id)}"],
-        [f"margin_band {fav_id} 13 60", f"ats {int(top_back.player_id)}"],
+        # value tier (~$3-6)
+        [fav_win, f"ats {tid}", f"total over {over}"],
+        [f"line {fav_id} {line}", f"ats {tid}"],
+        [fav_win, f"ats {tid}", f"tries_total over {tries_over}"],
+        # big tier (~$6-15)
+        [f"margin_band {fav_id} 13 60", f"ats {tid}"],
+        [fav_win, f"tries2+ {tid}"],
+        [fav_win, f"ats {tid}", f"total over {big_over}"],
     ]
     if len(backs) >= 2:
         b0, b1 = int(backs.iloc[0].player_id), int(backs.iloc[1].player_id)
-        combos.append([fav_win, f"ats {b0}", f"ats {b1}"])
-        # 4-leg "big day out": fav win × two backs ATS × over
-        combos.append([fav_win, f"ats {b0}", f"ats {b1}", f"total over {over}"])
+        combos += [
+            [fav_win, f"ats {b0}", f"ats {b1}"],
+            # 4-leg big day out
+            [fav_win, f"ats {b0}", f"ats {b1}", f"total over {over}"],
+            # longshot tier (~$15-60): 5-leg, big margin + two scorers + over
+            [f"margin_band {fav_id} 13 60", f"ats {b0}", f"ats {b1}", f"total over {over}"],
+            [fav_win, f"tries2+ {b0}", f"ats {b1}", f"total over {big_over}"],
+        ]
+        if len(backs) >= 3:
+            b2 = int(backs.iloc[2].player_id)
+            # 6-leg "sweep": win × three scorers × over × plenty of tries
+            combos.append([fav_win, f"ats {b0}", f"ats {b1}", f"ats {b2}",
+                           f"total over {over}", f"tries_total over {big_tries}"])
     rows = []
     for legs in combos:
         res = sgm_price.price_combo(sims, legs)
@@ -113,16 +127,20 @@ def candidate_combos(sims, fx, props_h, props_a, names, player_names):
             elif parts[0] == "team_tries":
                 pretty.append(f"{names[parts[1].upper()]} tries {parts[2]} {parts[3]}")
             elif parts[0] == "margin_band":
-                hi = "+" if float(parts[3]) >= 60 else parts[3]
-                pretty.append(f"{names[parts[1].upper()]} by {int(float(parts[2]))}-{hi}")
+                lo = int(float(parts[2]))
+                pretty.append(f"{names[parts[1].upper()]} by "
+                              + (f"{lo}+" if float(parts[3]) >= 60 else f"{lo}-{int(float(parts[3]))}"))
             elif parts[0] == "line":
                 pretty.append(f"{names[parts[1].upper()]} {float(parts[2]):+g}")
             elif parts[0] in ("home_win", "away_win"):
                 pretty.append(f"{names[fx.home_id if parts[0]=='home_win' else fx.away_id]} win")
             else:
                 pretty.append(leg)
+        fp = res["fair_price"]
+        tier = "value" if fp < 6 else ("big" if fp < 15 else "longshot")
         rows.append({"match": f"{names[fx.home_id]} v {names[fx.away_id]}",
-                     "combo": " × ".join(pretty), **res})
+                     "combo": " × ".join(pretty), "n_legs": len(legs),
+                     "tier": tier, **res})
     return rows
 
 
@@ -174,7 +192,7 @@ def main() -> None:
     from src.features import signal_adjust
     sig_by_pair = signal_adjust.signals_by_pair(signal_adjust.load_signals())
 
-    consistency, props_rows, sgm_rows, tries_rows = [], [], [], []
+    consistency, props_rows, sgm_rows, tries_rows, parlay_anchors = [], [], [], [], []
     for fx in fixtures.itertuples(index=False):
         entry = sig_by_pair.get((fx.home_id, fx.away_id))
         wmult, _ = signal_adjust.weather_multiplier(entry or {})
@@ -210,6 +228,16 @@ def main() -> None:
                     "fair_2plus": round(1 / p2, 1) if p2 > 0.005 else None,
                     "vs_opp": f"{int(t.h2h_tries)}t/{int(t.h2h_games)}g" if t.h2h_games else "—"})
         sgm_rows += candidate_combos(sims, fx, ph, pa, names, player_names)
+        # anchor legs for the cross-game parlay of the round
+        fav_home = p_sim >= 0.5
+        fav_id = fx.home_id if fav_home else fx.away_id
+        fav_props = (ph if fav_home else pa).sort_values("p_ats", ascending=False)
+        top_sc = fav_props.iloc[0] if len(fav_props) else None
+        parlay_anchors.append({
+            "match": f"{names[fx.home_id]} v {names[fx.away_id]}",
+            "fav": names[fav_id], "p_win": max(p_sim, 1 - p_sim),
+            "scorer": player_names.get(int(top_sc.player_id), "") if top_sc is not None else "",
+            "p_scorer": float(top_sc.p_ats) if top_sc is not None else None})
         tt = sims["home_tries"] + sims["away_tries"]
         tries_rows.append({
             "match": f"{names[fx.home_id]} v {names[fx.away_id]}",
@@ -232,6 +260,26 @@ def main() -> None:
     props.to_csv(OUT / "round_props.csv", index=False)
     sgm.to_csv(OUT / "round_sgm.csv", index=False)
     pd.DataFrame(tries_rows).to_csv(OUT / "round_tries.csv", index=False)
+
+    # Cross-game "parlay of the round" — legs from different matches are independent,
+    # so the accumulator price is the product (no correlation edge, but a big-payout
+    # ticket). Two builds: safest game winners, and a win×tryscorer value builder.
+    import json as _json
+    pa_sorted = sorted(parlay_anchors, key=lambda a: -a["p_win"])
+    parlays = []
+    if len(pa_sorted) >= 4:
+        legs = pa_sorted[:4]
+        p = float(np.prod([l["p_win"] for l in legs]))
+        parlays.append({"name": "4-leg winners parlay", "p_joint": round(p, 4),
+                        "fair_price": round(1 / p, 2),
+                        "legs": [f"{l['fav']} to win" for l in legs]})
+    builder = [a for a in pa_sorted if a["p_scorer"]][:3]
+    if len(builder) >= 3:
+        p = float(np.prod([l["p_win"] * l["p_scorer"] for l in builder]))
+        parlays.append({"name": "3-game win + tryscorer builder", "p_joint": round(p, 4),
+                        "fair_price": round(1 / p, 2),
+                        "legs": [f"{l['fav']} win & {l['scorer']} try" for l in builder]})
+    (OUT / "round_parlays.json").write_text(_json.dumps(parlays, indent=1))
 
     # Signal overlay (flags + info-confidence + weather-adjusted totals) for display.
     if (OUT / "round_predictions.csv").exists():

@@ -185,9 +185,11 @@ def main() -> None:
         rounds.append({"round": grp["round"].iloc[0], "round_no": rno,
                        "actionable": actionable, "games": games})
 
+    parlays = json.loads((OUT / "round_parlays.json").read_text()) if (OUT / "round_parlays.json").exists() else []
     payload = {"generated": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d %H:%M UTC"),
                "current_round": current_round,
                "current_round_label": f"Round {current_round}",
+               "parlays": parlays,
                "rounds": rounds}
     OUT.mkdir(exist_ok=True)
     (OUT / "season_predictions.json").write_text(json.dumps(payload, default=str))
@@ -201,14 +203,16 @@ def _merge_current(games, market, sgm) -> None:
     sg = {}
     if len(sgm):
         for m, grp in sgm.groupby("match"):
-            sg[m] = grp.sort_values("correlation_lift", ascending=False).head(6).to_dict(orient="records")
+            # a price LADDER (value -> longshot), de-duplicated, not just the tightest
+            grp = grp.drop_duplicates("combo").sort_values("fair_price")
+            sg[m] = grp.to_dict(orient="records")
     for g in games:
         m = mk.get((g["home"], g["away"]))
         if m is not None:
             g["p"]["market"] = float(m.market_p_home) if pd.notna(m.market_p_home) else None
             if getattr(m, "value_ev_pct", None) is not None and m.value_ev_pct > 0:
                 g["value"] = {"side": m.value_side, "ev": float(m.value_ev_pct)}
-        g["multis"] = sg.get(f"{g['home']} v {g['away']}", [])[:5]
+        g["multis"] = sg.get(f"{g['home']} v {g['away']}", [])[:12]
 
 
 if __name__ == "__main__":

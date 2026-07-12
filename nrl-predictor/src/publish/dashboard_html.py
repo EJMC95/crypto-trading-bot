@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "outputs"
 
-VALIDATION = ("Match model: walk-forward 2015–2025 Brier 0.2188 (naive 0.2456, "
+VALIDATION = ("Match model: walk-forward 2015–2025 Brier 0.2179 (naive 0.2456, "
               "closing line 0.2075). Tryscorer model: 2022–25 Brier 0.1401 vs "
               "positional base 0.1408 — gates passed.")
 
@@ -105,6 +105,12 @@ BODY_TEMPLATE = r"""
   .multi .legs{font-weight:600;font-size:14px;}
   .multi .nums{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;color:var(--ink-2);font-size:12.5px;font-variant-numeric:tabular-nums;}
   .multi .nums b{color:var(--ink);} .lift{background:var(--chip-bg);border-radius:999px;padding:2px 9px;font-weight:700;color:var(--ink);}
+  .tierchip{display:inline-block;color:#fff;border-radius:999px;padding:2px 9px;font-size:11.5px;
+            font-weight:700;margin-right:8px;text-transform:capitalize;vertical-align:middle;}
+  .parlay{border:1px solid var(--model);border-radius:12px;padding:14px;margin:6px 0 14px;background:var(--chip-bg);}
+  .parlay .h{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;}
+  .parlay .h b{font-size:15px;} .parlay .price{font-size:20px;font-weight:700;}
+  .parlay ul{margin:8px 0 0 18px;padding:0;font-size:13px;} .parlay li{padding:1px 0;}
   .conf{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;}
   .conf.high{background:rgba(12,163,12,.15);color:var(--good);}
   .conf.provisional{background:rgba(250,178,25,.18);color:#9a6a00;}
@@ -193,6 +199,18 @@ function intel(g){
   return h;
 }
 
+function parlaysHTML(){
+  if(!(DATA.parlays||[]).length) return "";
+  let h=`<h3>🎟 Parlay of the round (across games)</h3>`;
+  for(const p of DATA.parlays){
+    h+=`<div class="parlay"><div class="h"><b>${p.name}</b>
+      <span class="price">$${(+p.fair_price).toFixed(2)}</span></div>
+      <div style="color:var(--ink-2);font-size:12.5px">model joint ${pc(p.p_joint)} · legs are separate games (independent)</div>
+      <ul>${p.legs.map(l=>`<li>${l}</li>`).join("")}</ul></div>`;
+  }
+  return h;
+}
+
 function renderGame(ri,gi){
   const r=DATA.rounds[ri], g=r.games[gi];
   [...tabs.children].forEach((t,j)=>t.setAttribute("aria-selected",j===gi));
@@ -203,6 +221,7 @@ function renderGame(ri,gi){
   if(!r.actionable) h+=`<div class="banner">Projection for ${r.round} — win/margin/total
     from current model ratings, refreshed every run as results land. Team lists,
     live odds and same-game multis appear here in the days before kickoff.</div>`;
+  if(r.actionable && gi===0) h+=parlaysHTML();
   h+=`<div class="tiles">
     <div class="tile"><div class="k">Model call</div><div class="v">${p.blend>=0.5?nick(g.home):nick(g.away)}
       <small>${pc(Math.max(p.blend,1-p.blend))} blend</small></div></div>
@@ -230,11 +249,18 @@ function renderGame(ri,gi){
       </tbody></table>`;
   }
   if((g.multis||[]).length){
-    h+=`<h3>Multi suggestions (same-game, model fair prices)</h3>`;
-    for(const m of g.multis) h+=`<div class="multi"><div class="legs">${m.combo.replaceAll(" × "," &nbsp;×&nbsp; ")}</div>
-      <div class="nums"><span>joint <b>${pc(m.p_joint)}</b></span><span>fair <b>$${(+m.fair_price).toFixed(2)}</b></span>
-      <span>priced independently <b>$${(1/(+m.p_independent)).toFixed(2)}</b></span>
-      <span class="lift">×${(+m.correlation_lift).toFixed(2)} correlation</span></div></div>`;
+    h+=`<h3>Same-game multis — value to longshot (model fair prices)</h3>`;
+    for(const m of g.multis){
+      const tier=m.tier||(m.fair_price<6?"value":(m.fair_price<15?"big":"longshot"));
+      const tc={value:"var(--market)",big:"var(--model)",longshot:"#eb6834"}[tier];
+      h+=`<div class="multi"><div class="legs">
+        <span class="tierchip" style="background:${tc}">${tier} · $${(+m.fair_price).toFixed(2)}</span>
+        ${m.combo.replaceAll(" × "," &nbsp;×&nbsp; ")}</div>
+        <div class="nums"><span>joint <b>${pc(m.p_joint)}</b></span>
+        <span>${m.n_legs||m.combo.split(" × ").length} legs</span>
+        <span>priced independently <b>$${(1/(+m.p_independent)).toFixed(2)}</b></span>
+        <span class="lift">×${(+m.correlation_lift).toFixed(2)} correlation</span></div></div>`;
+    }
   }
   if((g.scorers||[]).length){
     h+=`<h3>Tryscorers — ${r.actionable?"model top picks":"provisional (team list not out)"}</h3>
