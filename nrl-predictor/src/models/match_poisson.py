@@ -96,12 +96,22 @@ class TryModel:
         hs = self._sim_scores(lam_h, self.params.n_sims)
         as_ = self._sim_scores(lam_a, self.params.n_sims)
         margin = hs - as_
+        total = hs + as_
         return {
             "p_home": float(np.mean(margin > 0) + 0.5 * np.mean(margin == 0)),
             "exp_margin": float(np.mean(margin)),
             "median_margin": float(np.median(margin)),
-            "exp_total": float(np.mean(hs + as_)),
+            "exp_total": float(np.mean(total)),
             "lam_tries_home": lam_h, "lam_tries_away": lam_a,
+            # probability enrichment: 80% central intervals + margin-band probs
+            "margin_p10": float(np.percentile(margin, 10)),
+            "margin_p90": float(np.percentile(margin, 90)),
+            "total_p10": float(np.percentile(total, 10)),
+            "total_p90": float(np.percentile(total, 90)),
+            "p_home_1_12": float(np.mean((margin >= 1) & (margin <= 12))),
+            "p_home_13plus": float(np.mean(margin >= 13)),
+            "p_away_1_12": float(np.mean((margin <= -1) & (margin >= -12))),
+            "p_away_13plus": float(np.mean(margin <= -13)),
         }
 
 

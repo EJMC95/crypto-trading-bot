@@ -89,10 +89,15 @@ def candidate_combos(sims, fx, props_h, props_a, names, player_names):
         [f"line {fav_id} {line}", f"ats {int(top_back.player_id)}"],
         [fav_win, f"tries2+ {int(top_back.player_id)}"],
         [fav_win, f"ats {int(top_back.player_id)}", f"tries_total over {tries_over}"],
+        # advanced: winning-margin band × top back tryscorer
+        [f"margin_band {fav_id} 1 12", f"ats {int(top_back.player_id)}"],
+        [f"margin_band {fav_id} 13 60", f"ats {int(top_back.player_id)}"],
     ]
     if len(backs) >= 2:
-        combos.append([fav_win, f"ats {int(backs.iloc[0].player_id)}",
-                       f"ats {int(backs.iloc[1].player_id)}"])
+        b0, b1 = int(backs.iloc[0].player_id), int(backs.iloc[1].player_id)
+        combos.append([fav_win, f"ats {b0}", f"ats {b1}"])
+        # 4-leg "big day out": fav win × two backs ATS × over
+        combos.append([fav_win, f"ats {b0}", f"ats {b1}", f"total over {over}"])
     rows = []
     for legs in combos:
         res = sgm_price.price_combo(sims, legs)
@@ -107,6 +112,9 @@ def candidate_combos(sims, fx, props_h, props_a, names, player_names):
                 pretty.append(f"match tries {parts[1]} {parts[2]}")
             elif parts[0] == "team_tries":
                 pretty.append(f"{names[parts[1].upper()]} tries {parts[2]} {parts[3]}")
+            elif parts[0] == "margin_band":
+                hi = "+" if float(parts[3]) >= 60 else parts[3]
+                pretty.append(f"{names[parts[1].upper()]} by {int(float(parts[2]))}-{hi}")
             elif parts[0] == "line":
                 pretty.append(f"{names[parts[1].upper()]} {float(parts[2]):+g}")
             elif parts[0] in ("home_win", "away_win"):
@@ -160,12 +168,22 @@ def main() -> None:
     season = int(fixtures["date"].dt.year.iloc[0])
     round_no = int(fixtures["round_no"].iloc[0])
 
+    # On-the-day signals (if scanned): confirmed team lists replace the squad the
+    # sim assumes; a wet forecast scales each team's expected tries. Absent -> the
+    # last-game proxy and no weather effect, exactly as before.
+    from src.features import signal_adjust
+    sig_by_pair = signal_adjust.signals_by_pair(signal_adjust.load_signals())
+
     consistency, props_rows, sgm_rows, tries_rows = [], [], [], []
     for fx in fixtures.itertuples(index=False):
-        lam_h = model.try_rate(fx.home_id, fx.away_id, True)
-        lam_a = model.try_rate(fx.away_id, fx.home_id, False)
-        ph = props_player.match_player_lambdas(hist, rates, fx.home_id, lam_h, asof)
-        pa = props_player.match_player_lambdas(hist, rates, fx.away_id, lam_a, asof)
+        entry = sig_by_pair.get((fx.home_id, fx.away_id))
+        wmult, _ = signal_adjust.weather_multiplier(entry or {})
+        lam_h = model.try_rate(fx.home_id, fx.away_id, True) * wmult
+        lam_a = model.try_rate(fx.away_id, fx.home_id, False) * wmult
+        squad_h = signal_adjust.named_squad(entry, "home") if entry else None
+        squad_a = signal_adjust.named_squad(entry, "away") if entry else None
+        ph = props_player.match_player_lambdas(hist, rates, fx.home_id, lam_h, asof, squad_h, fx.away_id)
+        pa = props_player.match_player_lambdas(hist, rates, fx.away_id, lam_a, asof, squad_a, fx.home_id)
         sims = sgm_sim.simulate_match(model, ph, pa, fx.home_id, fx.away_id)
         sgm_sim.save(sims, season, round_no)
 
@@ -179,6 +197,7 @@ def main() -> None:
             top = frame.sort_values("p_ats", ascending=False).head(3)
             for t in top.itertuples(index=False):
                 p2 = 1 - np.exp(-t.lam) * (1 + t.lam)  # Poisson P(X>=2)
+                opp = names[fx.away_id if side == "home" else fx.home_id]
                 props_rows.append({
                     "match": f"{names[fx.home_id]} v {names[fx.away_id]}",
                     "team": names[fx.home_id if side == "home" else fx.away_id],
@@ -188,7 +207,8 @@ def main() -> None:
                     "p_ats": round(t.p_ats, 3),
                     "fair_price": round(1 / t.p_ats, 2),
                     "p_2plus": round(float(p2), 3),
-                    "fair_2plus": round(1 / p2, 1) if p2 > 0.005 else None})
+                    "fair_2plus": round(1 / p2, 1) if p2 > 0.005 else None,
+                    "vs_opp": f"{int(t.h2h_tries)}t/{int(t.h2h_games)}g" if t.h2h_games else "—"})
         sgm_rows += candidate_combos(sims, fx, ph, pa, names, player_names)
         tt = sims["home_tries"] + sims["away_tries"]
         tries_rows.append({
@@ -212,6 +232,16 @@ def main() -> None:
     props.to_csv(OUT / "round_props.csv", index=False)
     sgm.to_csv(OUT / "round_sgm.csv", index=False)
     pd.DataFrame(tries_rows).to_csv(OUT / "round_tries.csv", index=False)
+
+    # Signal overlay (flags + info-confidence + weather-adjusted totals) for display.
+    if (OUT / "round_predictions.csv").exists():
+        base = pd.read_csv(OUT / "round_predictions.csv")
+        name_to_id = {v: k for k, v in names.items()}
+        base["home_id"] = base["home"].map(name_to_id)
+        base["away_id"] = base["away"].map(name_to_id)
+        signal_adjust.build_signal_overlay(base, {}, hist, asof)
+        n_conf = sum(1 for g in sig_by_pair.values() if g.get("team_lists_confirmed"))
+        print(f"signal overlay: {n_conf}/{len(sig_by_pair)} team lists confirmed")
 
     quotes = sgm_price.evaluate_quotes({}, round_no)  # populated via manual CSV later
 

@@ -43,6 +43,11 @@ def leg_mask(sims: dict, spec: str) -> np.ndarray:
         team, hcap = parts[1].upper(), float(parts[2])
         side_margin = margin if team == str(sims["home_id"]) else -margin
         return side_margin + hcap > 0
+    if parts[0] == "margin_band":
+        # margin_band <team> <lo> <hi>  — team wins by lo..hi inclusive
+        team, lo, hi = parts[1].upper(), float(parts[2]), float(parts[3])
+        side_margin = margin if team == str(sims["home_id"]) else -margin
+        return (side_margin >= lo) & (side_margin <= hi)
     if parts[0] == "total":
         pts = float(parts[2])
         return sims["total"] > pts if parts[1] == "over" else sims["total"] < pts

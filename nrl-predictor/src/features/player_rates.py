@@ -28,10 +28,25 @@ def player_history(matches: pd.DataFrame, player_matches: pd.DataFrame,
     """One row per player-match with date/team/position/tries, modeling era only."""
     pm = player_matches[player_matches["match_id"].isin(matches["match_id"].dropna())].copy()
     pm["team_id"] = teams_mod.to_canonical(pm["team"], "player_match_data")
+    pm["opp_id"] = teams_mod.to_canonical(pm["opposition_team"], "player_match_data")
     dates = matches[["match_id", "date"]]
     out = pm.merge(dates, on="match_id")
     out["tries_all"] = out["tries"].fillna(0) + out["penalty_tries"].fillna(0)
-    return out[["player_id", "match_id", "team_id", "position", "date", "tries_all"]]
+    return out[["player_id", "match_id", "team_id", "opp_id", "position", "date", "tries_all"]]
+
+
+def vs_opponent(hist: pd.DataFrame, player_ids, opp_id: str,
+                asof: pd.Timestamp) -> dict[int, dict]:
+    """Each player's record specifically against `opp_id`, before `asof`:
+    games, tries, and the anytime-tryscorer rate in those games (small samples —
+    used as context + a shrunk nudge, never a big mover)."""
+    h = hist[(hist["date"] < asof) & (hist["opp_id"] == opp_id)
+             & hist["player_id"].isin(list(player_ids))]
+    out = {}
+    for pid, g in h.groupby("player_id"):
+        out[int(pid)] = {"games": int(len(g)), "tries": int(g["tries_all"].sum()),
+                         "ats_rate": round(float((g["tries_all"] > 0).mean()), 3)}
+    return out
 
 
 def positional_priors(hist: pd.DataFrame, asof: pd.Timestamp) -> pd.DataFrame:

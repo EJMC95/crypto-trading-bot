@@ -99,6 +99,18 @@ def main() -> None:
     stack = LogisticRegression(C=10.0).fit(Xs[nd], y_stack[nd].astype(int))
     print("stack weights (elo, pois):", np.round(stack.coef_[0], 3),
           "intercept:", round(float(stack.intercept_[0]), 3))
+
+    # Persist the fitted blend so the season-wide predictor can apply it to every
+    # remaining fixture without retraining (scripts/predict_season.py).
+    import json as _json
+    (OUT / "model_artifacts.json").write_text(_json.dumps({
+        "elo_params": ELO_PARAMS.__dict__,
+        "pois_xi": float(best_xi),
+        "platt_coef": float(elo_cal.lr.coef_[0][0]),
+        "platt_intercept": float(elo_cal.lr.intercept_[0]),
+        "stack_coef": [float(c) for c in stack.coef_[0]],
+        "stack_intercept": float(stack.intercept_[0]),
+    }, indent=1))
     have = pred["p_pois"].notna()
     pred["p_blend"] = pred["p_elo_cal"].copy()
     pred.loc[have, "p_blend"] = stack.predict_proba(

@@ -24,6 +24,11 @@ def build() -> Path:
     props_path, sgm_path = OUT / "round_props.csv", OUT / "round_sgm.csv"
     props = pd.read_csv(props_path).to_dict(orient="records") if props_path.exists() else []
     sgm = pd.read_csv(sgm_path).to_dict(orient="records") if sgm_path.exists() else []
+    import json as _json
+    sig = _json.loads((OUT / "round_signals_applied.json").read_text()).get("games", []) \
+        if (OUT / "round_signals_applied.json").exists() else []
+    track = _json.loads((OUT / "track_record.json").read_text()) \
+        if (OUT / "track_record.json").exists() else None
     feed = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": "nrl-predictor",
@@ -33,6 +38,8 @@ def build() -> Path:
         "market": market,
         "props": props,
         "sgm_candidates": sgm,
+        "signals": sig,
+        "track_record": track,
         "ratings": ratings.to_dict(orient="records"),
         "models": {
             "elo": "tier 1 — K=10 (MOV-scaled), home adv 60, Platt-calibrated",

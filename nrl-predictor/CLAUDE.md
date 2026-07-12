@@ -29,12 +29,26 @@ fair prices for SGM leg combos. **Paper-track only** — never suggest staking r
   the upgrade path); joint-sim consistency within MC error. SGM = 50k player-level
   joint sims (`src/sgm/`), correlation lifts 1.17–1.49× on R19 candidates.
   Quoted-SGM grading via `data/manual_odds/roundNN.csv` (no public SGM feed).
+- On-the-day signals (src/ingest/signals.py) — DONE. NRL.com named-17 team lists
+  (matched to canonical player_ids), Open-Meteo venue weather, Google News RSS
+  (keyword-flagged, advisory). Stringency rule: only verifiable signals move a
+  number — confirmed team lists REPLACE the tryscorer sim's squad (src/features/
+  signal_adjust.py + props_player named_squad); a wet forecast applies a bounded
+  (<=12%) try-lambda multiplier; spine changes + news are FLAGS only (win-prob
+  impact isn't validated, so it's surfaced, not fabricated). Output
+  round_signals.json + round_signals_applied.json (info-confidence + flags).
+- Prediction track record (src/eval/track_record.py) — DONE. Logs every model call
+  (win/margin/total/top-tryscorer) at snapshot, grades after the round from NRL.com
+  final scores + per-player tries: win hit-rate + Brier, margin/total MAE + bias,
+  tryscorer hit-rate + Brier, per-round trend. SQLite `predictions` table +
+  track_record.json. Distinct from the paper *betting* ledger.
 - Phase 5 (automation) — CLI + service DONE, deploy + team-list ingest remain.
   `python -m src.cli {refresh,predict,preview,feed,odds,grade}` is the weekly
   rhythm (Cowork owns scheduling). `service/` + `railway.json` serve
   `outputs/nrl.json` (pnl-dashboard pattern) — deploy from the Mac per
   `service/README.md`. Tuesday team-list ingest (nrlR fetch_lineups port) and
-  weather are still open.
+  weather now scanned live (signals). Team-list ingest DONE via the
+  match-centre endpoint.
 
 ## Note on repo location
 This is the standalone private repo `github.com/EJMC95/nrl-predictor` (canonical as
@@ -77,6 +91,9 @@ and rebuild data/raw + data/processed.
 - `python scripts/capture_odds.py` — live 4-book odds snapshot → consensus,
   value flags, paper-ledger entries, market-aware preview + feed.
 - `python scripts/run_phase4.py` — props backtest gates + 50k SGM sims + candidates.
-- `python -m src.cli grade --round N` — Monday grading: settles the ledger,
+- `python -m src.cli signals` — scan team lists + weather + news for the round.
+- `python -m src.cli snapshot` — log the round's model calls for later grading.
+- `python -m src.cli track` — print/refresh the prediction track record.
+- `python -m src.cli grade --round N` — Monday grading: settles ledger + track record,
   prints a Notion-ready block. Ledger lives in `data/ledger.db` (committed;
   mirrors in outputs/paper_ledger.csv + data/processed/ledger.parquet).

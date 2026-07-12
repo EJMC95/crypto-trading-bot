@@ -154,10 +154,8 @@ def fetch_current_season(season: int, max_round: int = 27) -> pd.DataFrame:
         if not fully_played:
             df = _parse_draw_fixtures(fetch_nrl_draw(season, rnd, refresh=True), season)
         if df.empty:
-            break
+            break  # no fixtures scheduled for this round number -> end of the draw
         frames.append(df)
-        if not df["match_state"].eq("FullTime").any():
-            break  # first entirely-unplayed round fetched (that's our fixture list); stop
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
@@ -183,8 +181,12 @@ def build(season: int | None = None) -> dict[str, pd.DataFrame]:
         ]
         matches = pd.concat([hist, topup], ignore_index=True).sort_values("date")
 
-        next_round = draw.loc[~draw["match_state"].eq("FullTime"), "round_no"].min()
-        fixtures = draw[draw["round_no"].eq(next_round) & ~draw["match_state"].eq("FullTime")]
+        unplayed = draw[~draw["match_state"].eq("FullTime") & draw["round_no"].notna()]
+        next_round = unplayed["round_no"].min()
+        fixtures = unplayed[unplayed["round_no"].eq(next_round)]
+        # every remaining fixture of the season, for the multi-round dashboard
+        fixtures_all = unplayed.sort_values(["round_no", "date"]).reset_index(drop=True)
+        fixtures_all.to_parquet(PROCESSED / "fixtures_all.parquet", index=False)
     else:
         matches = hist
 

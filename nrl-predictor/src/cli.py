@@ -42,12 +42,36 @@ def cmd_preview(_: argparse.Namespace) -> None:
 
 def cmd_feed(_: argparse.Namespace) -> None:
     from src.publish import dashboard_feed, dashboard_html
+    if not (ROOT / "outputs" / "season_predictions.json").exists():
+        cmd_season(_)
     print(f"-> {dashboard_feed.build()}")
     print(f"-> {dashboard_html.build()}")
 
 
 def cmd_odds(_: argparse.Namespace) -> None:
     subprocess.run([sys.executable, str(ROOT / "scripts" / "capture_odds.py")], check=True)
+
+
+def cmd_season(_: argparse.Namespace) -> None:
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "predict_season.py")], check=True)
+
+
+def cmd_signals(_: argparse.Namespace) -> None:
+    from src.ingest import signals
+    p = signals.scan_round(with_news=True)
+    conf = sum(1 for g in p["games"] if g["team_lists_confirmed"])
+    print(f"signals: {conf}/{len(p['games'])} team lists confirmed -> outputs/round_signals.json")
+
+
+def cmd_snapshot(_: argparse.Namespace) -> None:
+    from src.eval import track_record
+    print(f"snapshot: {track_record.snapshot()} prediction rows logged")
+
+
+def cmd_track(_: argparse.Namespace) -> None:
+    from src.eval import track_record
+    track_record.print_summary()
+    track_record.write_summary()
 
 
 def cmd_grade(args: argparse.Namespace) -> None:
@@ -112,6 +136,13 @@ def cmd_grade(args: argparse.Namespace) -> None:
     print()
     print(ledger.summary())
 
+    # grade the prediction track record (win / margin / total / tryscorer)
+    from src.eval import track_record
+    graded = track_record.grade(args.round, season)
+    if len(graded):
+        print()
+        track_record.print_summary()
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="nrl", description=__doc__,
@@ -122,6 +153,10 @@ def main() -> None:
     sub.add_parser("preview").set_defaults(fn=cmd_preview)
     sub.add_parser("feed").set_defaults(fn=cmd_feed)
     sub.add_parser("odds").set_defaults(fn=cmd_odds)
+    sub.add_parser("signals").set_defaults(fn=cmd_signals)
+    sub.add_parser("snapshot").set_defaults(fn=cmd_snapshot)
+    sub.add_parser("track").set_defaults(fn=cmd_track)
+    sub.add_parser("season").set_defaults(fn=cmd_season)
     g = sub.add_parser("grade")
     g.add_argument("--round", type=int)
     g.add_argument("--season", type=int, default=None)
