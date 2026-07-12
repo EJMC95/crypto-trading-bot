@@ -1,29 +1,23 @@
 {
  "round": 19,
- "built_at": "2026-07-12T01:18:41+00:00",
+ "built_at": "2026-07-12T05:32:59+00:00",
  "games": [
   {
    "home": "South Sydney Rabbitohs",
    "away": "Newcastle Knights",
-   "info_confidence": "high",
-   "team_lists_confirmed": true,
+   "info_confidence": "provisional",
+   "team_lists_confirmed": false,
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 14.5,
-    "temp_c": 15.4,
+    "wind_kmh": 16.7,
+    "temp_c": 15.2,
     "forecast_hour": "2026-07-12T14:00"
    },
    "weather_try_mult": 1.0,
    "baseline_total": 49.0,
    "adjusted_total": 49.0,
-   "flags": [
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Newcastle Knights: Kalyn Ponga named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    }
-   ]
+   "flags": []
   },
   {
    "home": "Manly-Warringah Sea Eagles",
@@ -33,8 +27,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 18.2,
-    "temp_c": 14.3,
+    "wind_kmh": 16.9,
+    "temp_c": 14.5,
     "forecast_hour": "2026-07-12T16:00"
    },
    "weather_try_mult": 1.0,
@@ -63,23 +57,11 @@
    "away": "Gold Coast Titans",
    "info_confidence": "provisional",
    "team_lists_confirmed": false,
-   "weather": {
-    "precip_mm": 0.5,
-    "precip_prob": 90,
-    "wind_kmh": 17.8,
-    "temp_c": 10.6,
-    "forecast_hour": "2026-07-12T18:00"
-   },
-   "weather_try_mult": 0.962,
+   "weather": null,
+   "weather_try_mult": 1.0,
    "baseline_total": 48.1,
-   "adjusted_total": 46.3,
-   "flags": [
-    {
-     "severity": "info",
-     "kind": "weather",
-     "text": "90% rain / 0.5mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
-    }
-   ]
+   "adjusted_total": 48.1,
+   "flags": []
   }
  ]
 }

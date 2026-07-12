@@ -36,9 +36,9 @@ _Generated 2026-07-12. ATS model: hierarchical Poisson-gamma try rates (position
 
 | match                                                 |   p_home_sim |   p_home_tier2 |    diff |
 |:------------------------------------------------------|-------------:|---------------:|--------:|
-| South Sydney Rabbitohs v Newcastle Knights            |       0.5746 |         0.5774 | -0.0028 |
+| South Sydney Rabbitohs v Newcastle Knights            |       0.5757 |         0.5774 | -0.0016 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys |       0.5869 |         0.5829 |  0.004  |
-| Melbourne Storm v Gold Coast Titans                   |       0.6072 |         0.6045 |  0.0028 |
+| Melbourne Storm v Gold Coast Titans                   |       0.6082 |         0.6045 |  0.0037 |
 
 Max |diff| = 0.0040 vs 3σ MC bound 0.0173 → **PASSED**.
 
@@ -46,53 +46,53 @@ Max |diff| = 0.0040 vs 3σ MC bound 0.0173 → **PASSED**.
 
 | match                                                 | team                       | player            | position   |   exp_tries |   p_ats |   fair_price |   p_2plus |   fair_2plus | vs_opp   |
 |:------------------------------------------------------|:---------------------------|:------------------|:-----------|------------:|--------:|-------------:|----------:|-------------:|:---------|
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs     | David Fifita      | 2R         |        0.87 |   0.579 |         1.73 |     0.215 |          4.6 | 8t/9g    |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs     | Tallis Duncan     | C          |        0.53 |   0.41  |         2.44 |     0.098 |         10.2 | 2t/4g    |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs     | Jack Wighton      | C          |        0.51 |   0.402 |         2.49 |     0.094 |         10.6 | 8t/21g   |
-| South Sydney Rabbitohs v Newcastle Knights            | Newcastle Knights          | Greg Marzhew      | W          |        0.72 |   0.515 |         1.94 |     0.164 |          6.1 | 7t/6g    |
-| South Sydney Rabbitohs v Newcastle Knights            | Newcastle Knights          | Fletcher Sharpe   | FE         |        0.58 |   0.439 |         2.28 |     0.115 |          8.7 | 4t/3g    |
-| South Sydney Rabbitohs v Newcastle Knights            | Newcastle Knights          | Dominic Young     | W          |        0.52 |   0.407 |         2.46 |     0.097 |         10.3 | 4t/6g    |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs     | Alex Johnston     | W          |        1.12 |   0.673 |         1.49 |     0.308 |          3.2 | 17t/11g  |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs     | David Fifita      | 2R         |        0.52 |   0.405 |         2.47 |     0.096 |         10.4 | 8t/9g    |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs     | Edward Kosi       | W          |        0.51 |   0.399 |         2.51 |     0.093 |         10.8 | 2t/2g    |
+| South Sydney Rabbitohs v Newcastle Knights            | Newcastle Knights          | Greg Marzhew      | W          |        0.83 |   0.564 |         1.77 |     0.202 |          5   | 7t/6g    |
+| South Sydney Rabbitohs v Newcastle Knights            | Newcastle Knights          | Fletcher Sharpe   | FB         |        0.66 |   0.485 |         2.06 |     0.143 |          7   | 4t/3g    |
+| South Sydney Rabbitohs v Newcastle Knights            | Newcastle Knights          | Dominic Young     | W          |        0.6  |   0.451 |         2.22 |     0.122 |          8.2 | 4t/6g    |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles | Jason Saab        | W          |        0.78 |   0.542 |         1.85 |     0.184 |          5.4 | 7t/8g    |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles | Lehi Hopoate      | W          |        0.71 |   0.507 |         1.97 |     0.159 |          6.3 | 3t/4g    |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles | Tom Trbojevic     | FB         |        0.57 |   0.435 |         2.3  |     0.113 |          8.9 | 5t/9g    |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | North Queensland Cowboys   | Braidon Burns     | W          |        0.6  |   0.449 |         2.23 |     0.121 |          8.3 | 3t/6g    |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | North Queensland Cowboys   | Murray Taulagi    | W          |        0.41 |   0.334 |         3    |     0.063 |         15.8 | 1t/8g    |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | North Queensland Cowboys   | Tom Chester       | C          |        0.38 |   0.313 |         3.2  |     0.055 |         18.2 | 0t/1g    |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm            | Sualauvi Fa'alogo | FB         |        0.83 |   0.564 |         1.77 |     0.202 |          5   | 3t/2g    |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm            | Cameron Munster   | FE         |        0.72 |   0.513 |         1.95 |     0.163 |          6.1 | 12t/13g  |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm            | Will Warbrick     | W          |        0.68 |   0.492 |         2.03 |     0.148 |          6.8 | 2t/3g    |
-| Melbourne Storm v Gold Coast Titans                   | Gold Coast Titans          | Jayden Campbell   | FE         |        0.5  |   0.396 |         2.53 |     0.091 |         10.9 | 3t/5g    |
-| Melbourne Storm v Gold Coast Titans                   | Gold Coast Titans          | Jaylan De Groot   | C          |        0.45 |   0.362 |         2.76 |     0.075 |         13.3 | —        |
-| Melbourne Storm v Gold Coast Titans                   | Gold Coast Titans          | Phillip Sami      | W          |        0.42 |   0.345 |         2.9  |     0.068 |         14.7 | 3t/10g   |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm            | Sualauvi Fa'alogo | FB         |        0.86 |   0.578 |         1.73 |     0.214 |          4.7 | 3t/2g    |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm            | Cameron Munster   | FE         |        0.75 |   0.527 |         1.9  |     0.173 |          5.8 | 12t/13g  |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm            | Will Warbrick     | W          |        0.7  |   0.505 |         1.98 |     0.157 |          6.4 | 2t/3g    |
+| Melbourne Storm v Gold Coast Titans                   | Gold Coast Titans          | Jayden Campbell   | FE         |        0.52 |   0.408 |         2.45 |     0.097 |         10.3 | 3t/5g    |
+| Melbourne Storm v Gold Coast Titans                   | Gold Coast Titans          | Jaylan De Groot   | C          |        0.47 |   0.373 |         2.68 |     0.08  |         12.4 | —        |
+| Melbourne Storm v Gold Coast Titans                   | Gold Coast Titans          | Phillip Sami      | W          |        0.44 |   0.356 |         2.81 |     0.073 |         13.8 | 3t/10g   |
 
 ## Round 19 — SGM candidates (fair vs independence pricing)
 
 | match                                                 | combo                                                                                |   p_joint |   fair_price |   p_independent |   correlation_lift |
 |:------------------------------------------------------|:-------------------------------------------------------------------------------------|----------:|-------------:|----------------:|-------------------:|
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × ATS Tallis Duncan × ATS Jack Wighton × total over 44.5  |    0.0946 |        10.57 |          0.0529 |              1.787 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles win × ATS Jason Saab × ATS Lehi Hopoate × total over 44.5 |    0.1485 |         6.73 |          0.0866 |              1.715 |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × ATS Sualauvi Fa'alogo × ATS Will Warbrick × total over 42.5    |    0.1565 |         6.39 |          0.0917 |              1.708 |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × ATS Tallis Duncan × total over 44.5                     |    0.182  |         5.5  |          0.1311 |              1.388 |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × Tallis Duncan 2+ tries                                  |    0.0762 |        13.12 |          0.0553 |              1.378 |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × ATS Tallis Duncan × match tries over 7.5                |    0.1924 |         5.2  |          0.141  |              1.365 |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × ATS Tallis Duncan × ATS Jack Wighton                    |    0.1246 |         8.03 |          0.0917 |              1.358 |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × ATS Sualauvi Fa'alogo × ATS Will Warbrick × total over 44.5    |    0.1612 |         6.2  |          0.0954 |              1.69  |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × ATS Alex Johnston × ATS Edward Kosi × total over 44.5   |    0.1417 |         7.06 |          0.0847 |              1.673 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles win × Jason Saab 2+ tries                                 |    0.1386 |         7.21 |          0.1032 |              1.344 |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × ATS Sualauvi Fa'alogo × match tries over 7.5                   |    0.2478 |         4.04 |          0.1846 |              1.342 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles win × ATS Jason Saab × total over 44.5                    |    0.2286 |         4.38 |          0.1705 |              1.341 |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × Sualauvi Fa'alogo 2+ tries                                     |    0.1591 |         6.28 |          0.1187 |              1.341 |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs by 13-+ × ATS Tallis Duncan                                   |    0.1492 |         6.7  |          0.1114 |              1.34  |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × ATS Sualauvi Fa'alogo × total over 42.5                        |    0.2469 |         4.05 |          0.1847 |              1.337 |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × Sualauvi Fa'alogo 2+ tries                                     |    0.1674 |         5.97 |          0.1254 |              1.335 |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × ATS Sualauvi Fa'alogo × total over 44.5                        |    0.2492 |         4.01 |          0.1878 |              1.327 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles win × ATS Jason Saab × match tries over 7.5               |    0.2435 |         4.11 |          0.1837 |              1.325 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles win × ATS Jason Saab × ATS Lehi Hopoate                   |    0.2048 |         4.88 |          0.1552 |              1.32  |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × ATS Sualauvi Fa'alogo × ATS Will Warbrick                      |    0.2144 |         4.66 |          0.1636 |              1.311 |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × ATS Alex Johnston × ATS Edward Kosi                     |    0.1939 |         5.16 |          0.1474 |              1.316 |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × Alex Johnston 2+ tries                                  |    0.2246 |         4.45 |          0.171  |              1.314 |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × ATS Sualauvi Fa'alogo × match tries over 7.5                   |    0.2666 |         3.75 |          0.2034 |              1.311 |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm win × ATS Sualauvi Fa'alogo × ATS Will Warbrick                      |    0.223  |         4.49 |          0.1711 |              1.303 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles by 13-+ × ATS Jason Saab                                  |    0.1943 |         5.15 |          0.1519 |              1.279 |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm by 13-+ × ATS Sualauvi Fa'alogo                                      |    0.2113 |         4.73 |          0.1657 |              1.275 |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs -3.5 × ATS Tallis Duncan                                      |    0.2498 |         4    |          0.2059 |              1.213 |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × ATS Alex Johnston × total over 44.5                     |    0.2711 |         3.69 |          0.2143 |              1.265 |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm by 13-+ × ATS Sualauvi Fa'alogo                                      |    0.2185 |         4.58 |          0.1729 |              1.264 |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs win × ATS Alex Johnston × match tries over 7.5                |    0.2893 |         3.46 |          0.2312 |              1.251 |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs by 13-+ × ATS Alex Johnston                                   |    0.2284 |         4.38 |          0.1865 |              1.224 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles -4.5 × ATS Jason Saab                                     |    0.304  |         3.29 |          0.2537 |              1.198 |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm -4.5 × ATS Sualauvi Fa'alogo                                         |    0.3283 |         3.05 |          0.2755 |              1.192 |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm -4.5 × ATS Sualauvi Fa'alogo                                         |    0.3356 |         2.98 |          0.2834 |              1.184 |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs -4.5 × ATS Alex Johnston                                      |    0.3598 |         2.78 |          0.3095 |              1.162 |
+| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs by 1-12 × ATS Alex Johnston                                   |    0.1945 |         5.14 |          0.186  |              1.046 |
 | Manly-Warringah Sea Eagles v North Queensland Cowboys | Manly-Warringah Sea Eagles by 1-12 × ATS Jason Saab                                  |    0.1599 |         6.25 |          0.1532 |              1.044 |
-| South Sydney Rabbitohs v Newcastle Knights            | South Sydney Rabbitohs by 1-12 × ATS Tallis Duncan                                   |    0.1207 |         8.29 |          0.1158 |              1.042 |
-| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm by 1-12 × ATS Sualauvi Fa'alogo                                      |    0.1701 |         5.88 |          0.1637 |              1.04  |
+| Melbourne Storm v Gold Coast Titans                   | Melbourne Storm by 1-12 × ATS Sualauvi Fa'alogo                                      |    0.1691 |         5.91 |          0.1637 |              1.033 |
 
 _correlation_lift = joint probability ÷ product of leg marginals. Lift > 1 means the legs help each other — a bookmaker pricing them independently (then stacking 20–40% margin) undervalues the combo. No quoted SGM prices yet: paste bookie quotes into data/manual_odds/round19.csv and re-run to get EV columns._
 
