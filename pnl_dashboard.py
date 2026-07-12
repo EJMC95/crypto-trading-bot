@@ -42,70 +42,66 @@ _WATERMARK_TILE_SVG = (
     "<filter id='soft' x='-80%' y='-80%' width='260%' height='260%'>"
     "<feGaussianBlur stdDeviation='2.4'/>"
     "</filter>"
-    "<filter id='halo' x='-60%' y='-60%' width='220%' height='220%'>"
-    "<feGaussianBlur stdDeviation='5.5'/>"
-    "</filter>"
     "<linearGradient id='dripfade' x1='0' y1='0' x2='0' y2='1'>"
-    "<stop offset='0%' stop-color='#ff7a00' stop-opacity='0.95'/>"
-    "<stop offset='55%' stop-color='#ff3d00' stop-opacity='0.8'/>"
-    "<stop offset='100%' stop-color='#c81800' stop-opacity='0.15'/>"
+    "<stop offset='0%' stop-color='#f4f1e6' stop-opacity='0.95'/>"
+    "<stop offset='55%' stop-color='#e8e4d5' stop-opacity='0.7'/>"
+    "<stop offset='100%' stop-color='#d8d3c2' stop-opacity='0.1'/>"
     "</linearGradient>"
-    # molten lava fill — glowing yellow crest down to deep red-orange
-    "<linearGradient id='lavagrad' x1='0' y1='0' x2='0' y2='1'>"
-    "<stop offset='0%' stop-color='#ffd23f'/>"
-    "<stop offset='38%' stop-color='#ff7a00'/>"
-    "<stop offset='100%' stop-color='#e01e00'/>"
+    # off-white paint fill — soft top-lit cream down to a shaded cream
+    "<linearGradient id='paintgrad' x1='0' y1='0' x2='0' y2='1'>"
+    "<stop offset='0%' stop-color='#fdfcf6'/>"
+    "<stop offset='55%' stop-color='#f2efe4'/>"
+    "<stop offset='100%' stop-color='#e4dfd0'/>"
     "</linearGradient>"
     "<linearGradient id='hlgrad' x1='0' y1='0' x2='0' y2='1'>"
-    "<stop offset='0%' stop-color='#fff3c0' stop-opacity='0.9'/>"
-    "<stop offset='40%' stop-color='#ffffff' stop-opacity='0.18'/>"
+    "<stop offset='0%' stop-color='#ffffff' stop-opacity='0.95'/>"
+    "<stop offset='40%' stop-color='#ffffff' stop-opacity='0.2'/>"
     "<stop offset='70%' stop-color='#ffffff' stop-opacity='0'/>"
     "</linearGradient>"
     "</defs>"
-    "<g opacity='0.78'>"
+    "<g opacity='0.9'>"
     # Graffiti marker handstyle — 'Permanent Marker' web font (loaded on the page;
     # this SVG is inline so it inherits it), skewed for the aggressive tag slant.
     # Falls back to other marker/handwritten faces, then cursive.
     f"<g transform='rotate(-5 450 200) skewX(-11)' "
     f"font-family=\"'Permanent Marker','Rock Salt','Bradley Hand',cursive\" "
     f"font-size='150' font-weight='400' text-anchor='middle'>"
-    # molten glow halo behind the whole piece
-    "<text x='450' y='228' fill='#ff5a00' opacity='0.4' filter='url(#halo)'>$ EJMC $</text>"
-    # drop shadow, offset down-right for depth
-    "<text x='457' y='237' fill='#2a0a00' opacity='0.5'>$ EJMC $</text>"
-    # charred outline + spray-grained lava fill, in one pass
-    "<text x='450' y='228' fill='url(#lavagrad)' stroke='#3a1000' stroke-width='5' "
+    # soft cast shadow, offset down-right for depth against the light page
+    "<text x='456' y='236' fill='#3b4652' opacity='0.28' filter='url(#soft)'>$ EJMC $</text>"
+    # dark outline + spray-grained off-white fill (outline carries the contrast
+    # on the light background, like a white tag reads against dark)
+    "<text x='450' y='228' fill='url(#paintgrad)' stroke='#2c343d' stroke-width='4.5' "
     "stroke-linejoin='round' paint-order='stroke fill' filter='url(#spray)'>$ EJMC $</text>"
-    # glossy highlight streak across the top of the strokes
+    # subtle sheen across the top of the strokes
     "<text x='450' y='228' fill='url(#hlgrad)' style='mix-blend-mode:screen'>$ EJMC $</text>"
     "</g>"
     # paint drips — thin near-straight runs with a small drop at the tip, the way
     # a marker/spray tag bleeds down. Scattered along the baseline.
     "<g opacity='0.9'>"
     "<rect x='178' y='232' width='3.4' height='96' rx='1.7' fill='url(#dripfade)'/>"
-    "<circle cx='179.7' cy='330' r='4' fill='#ff3d00' opacity='0.7'/>"
+    "<circle cx='179.7' cy='330' r='4' fill='#d8d3c2' opacity='0.75'/>"
     "<rect x='262' y='236' width='2.8' height='60' rx='1.4' fill='url(#dripfade)'/>"
-    "<circle cx='263.4' cy='298' r='3.2' fill='#ff3d00' opacity='0.62'/>"
+    "<circle cx='263.4' cy='298' r='3.2' fill='#cfc9b8' opacity='0.62'/>"
     "<rect x='330' y='234' width='3.2' height='82' rx='1.6' fill='url(#dripfade)'/>"
-    "<circle cx='331.6' cy='318' r='3.8' fill='#ff3d00' opacity='0.66'/>"
+    "<circle cx='331.6' cy='318' r='3.8' fill='#cfc9b8' opacity='0.66'/>"
     "<rect x='404' y='238' width='2.6' height='46' rx='1.3' fill='url(#dripfade)'/>"
-    "<circle cx='405.3' cy='286' r='3' fill='#ff3d00' opacity='0.58'/>"
+    "<circle cx='405.3' cy='286' r='3' fill='#cfc9b8' opacity='0.58'/>"
     "<rect x='474' y='234' width='3.4' height='92' rx='1.7' fill='url(#dripfade)'/>"
-    "<circle cx='475.7' cy='328' r='4' fill='#ff3d00' opacity='0.7'/>"
+    "<circle cx='475.7' cy='328' r='4' fill='#d8d3c2' opacity='0.75'/>"
     "<rect x='560' y='236' width='2.8' height='56' rx='1.4' fill='url(#dripfade)'/>"
-    "<circle cx='561.4' cy='294' r='3.2' fill='#ff3d00' opacity='0.6'/>"
+    "<circle cx='561.4' cy='294' r='3.2' fill='#cfc9b8' opacity='0.6'/>"
     "<rect x='648' y='234' width='3' height='72' rx='1.5' fill='url(#dripfade)'/>"
-    "<circle cx='649.5' cy='308' r='3.6' fill='#ff3d00' opacity='0.64'/>"
+    "<circle cx='649.5' cy='308' r='3.6' fill='#cfc9b8' opacity='0.64'/>"
     "<rect x='736' y='236' width='2.8' height='50' rx='1.4' fill='url(#dripfade)'/>"
-    "<circle cx='737.4' cy='288' r='3.2' fill='#ff3d00' opacity='0.6'/>"
+    "<circle cx='737.4' cy='288' r='3.2' fill='#cfc9b8' opacity='0.6'/>"
     "</g>"
     # overspray speckle + faint spray-ring flourish, like a tag finished with the can
-    "<circle cx='150' cy='150' r='4' fill='#ff5a00' opacity='0.4' filter='url(#soft)'/>"
-    "<circle cx='176' cy='128' r='2.2' fill='#ff5a00' opacity='0.55'/>"
-    "<circle cx='690' cy='150' r='3.6' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
-    "<circle cx='664' cy='170' r='2' fill='#ff5a00' opacity='0.5'/>"
-    "<circle cx='450' cy='92' r='3' fill='#ff5a00' opacity='0.35' filter='url(#soft)'/>"
-    "<circle cx='800' cy='196' r='13' fill='none' stroke='#ff5a00' stroke-width='1.6' "
+    "<circle cx='150' cy='150' r='4' fill='#cfc9b8' opacity='0.4' filter='url(#soft)'/>"
+    "<circle cx='176' cy='128' r='2.2' fill='#cfc9b8' opacity='0.55'/>"
+    "<circle cx='690' cy='150' r='3.6' fill='#cfc9b8' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='664' cy='170' r='2' fill='#cfc9b8' opacity='0.5'/>"
+    "<circle cx='450' cy='92' r='3' fill='#cfc9b8' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='800' cy='196' r='13' fill='none' stroke='#cfc9b8' stroke-width='1.6' "
     "opacity='0.3' filter='url(#soft)'/>"
     "</g>"
     "</svg>"
@@ -1248,7 +1244,7 @@ def render():
  /* [2026-07-10] Lighter Live section — real money, visually set apart */
  .livewrap{{margin:14px 14px 4px;border:2px solid #d1242f;border-radius:12px;
    box-shadow:0 0 0 1px #caa227 inset,0 0 22px -6px #d1242f66;
-   background:linear-gradient(180deg,#ffecec,#fff6f6);overflow:hidden}}
+   background:linear-gradient(180deg,#ffececcc,#fff6f6cc);overflow:hidden}}
  .livewrap .grid{{padding:12px}}
  .livehdr{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
    padding:11px 14px;background:#d1242f14;border-bottom:1px solid #d1242f33;
@@ -1256,7 +1252,7 @@ def render():
  .livetag{{font-size:10px;font-weight:800;letter-spacing:.5px;color:#fff;
    background:#d1242f;border-radius:6px;padding:2px 7px;box-shadow:0 0 10px #d1242f66}}
  .livesum{{margin-left:auto;font-size:13px;font-weight:500;color:#16232c}}
- .card{{background:#ffffffee;border:2.5px solid #d4af37;border-radius:10px;padding:14px;
+ .card{{background:#ffffffcc;border:2.5px solid #d4af37;border-radius:10px;padding:14px;
    box-shadow:0 0 0 1px #b8860b55,0 1px 0 #ffffffaa inset;
    transition:border-color .2s,box-shadow .2s}}
  .card:hover{{border-color:#b8860b;box-shadow:0 0 0 1px #b8860b,0 0 16px -6px #d4af37cc}}
