@@ -42,9 +42,12 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # the 22-Jun revalidation. Railway services perps-bot + triangular-arb are
 # down (empty shells left in the UI); momo-bot stays as the cluster's
 # representative. The stale rsi-meanrev lshadow row from Gate-0 goes too.
+# [2026-07-12 LOSER CUT] TrendMomoV1 (crypto-trendmomo-4h) retired on user
+# sign-off: core leg -29%/4.5y on the tagged Binance replay (26.5% win), live
+# bleeder (-$11.33). Removed from run_all.sh in the same commit.
 RETIRED_ROWS = {"perps-donchian-breakout-lighter",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
-                "scanner-triangular-arb"}
+                "scanner-triangular-arb", "crypto-trendmomo-4h"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
 EXPECTED = ["perps-donchian-breakout", "perps-regime-switch",
@@ -52,7 +55,7 @@ EXPECTED = ["perps-donchian-breakout", "perps-regime-switch",
             "lighter-dislocation", "perps-funding-spread",
             "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
-            "crypto-breakout-4h", "crypto-trendmomo-4h",
+            "crypto-breakout-4h",
             "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"]
 
 # Scanners book OPTIMISTIC paper-arb fills (observed spreads, no slippage/latency).
