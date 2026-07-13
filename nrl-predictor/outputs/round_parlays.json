@@ -1,1 +1,23 @@
-[]
+[
+ {
+  "name": "4-leg winners parlay",
+  "p_joint": 0.1535,
+  "fair_price": 6.51,
+  "legs": [
+   "New Zealand Warriors to win",
+   "Penrith Panthers to win",
+   "Cronulla-Sutherland Sharks to win",
+   "Dolphins to win"
+  ]
+ },
+ {
+  "name": "3-game win + tryscorer builder",
+  "p_joint": 0.0594,
+  "fair_price": 16.84,
+  "legs": [
+   "New Zealand Warriors win & Alofiana Khan-Pereira try",
+   "Penrith Panthers win & Thomas Jenkins try",
+   "Cronulla-Sutherland Sharks win & Ronaldo Mulitalo try"
+  ]
+ }
+]
