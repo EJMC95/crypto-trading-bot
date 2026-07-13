@@ -149,9 +149,16 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 "scanner-triangular-arb", "crypto-trendmomo-4h"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
+# [2026-07-13 NO-DATA FIX] Venue-suffixed bots (Funding Farmer, Snap Back,
+# Counterweight, Perp Sniper) publish ONLY -lighter/-lshadow rows — their BASE
+# ids never publish, so listing them here produced permanent "no data yet"
+# placeholder cards (the user's "bots with no data" complaint). They move to
+# VARIANT_ONLY: still first-class CURRENT_BOTS (their variant rows pass the
+# fetch_rows filter) but no dead placeholder card.
+VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
+                "lighter-dislocation", "perps-funding-spread"}
 EXPECTED = ["perps-regime-switch",
-            "perps-funding-carry", "perps-funding-lighter", "lighter-perp-sniper",
-            "lighter-dislocation", "perps-funding-spread",
+            "perps-funding-carry",
             "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h",
@@ -173,7 +180,7 @@ STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca", "equities-momentum
 # grid — independent of whether the Postgres table has been pruned yet.
 # Freqtrade fleet bots (July 2026)
 FREQTRADE = {"freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"}
-CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS | FREQTRADE
+CURRENT_BOTS = set(EXPECTED) | VARIANT_ONLY | SCANNERS | STOCKS | FREQTRADE
 
 # [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows. When a bot trades on Lighter
 # its publisher suffixes the bot id by mode (venues/__init__._SUFFIX):
@@ -185,7 +192,8 @@ CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS | FREQTRADE
 # list) so whichever bots the user brings live just appear, each badged with its
 # mode, and the LIVE fleet is reported as its own P&L subtotal.
 VENUE_SUFFIXES = {
-    "-lighter": ("LIVE", "#f85149", "lighter_live"),
+    # [2026-07-13] LIVE badge red -> green on user request.
+    "-lighter": ("LIVE", "#1a7f37", "lighter_live"),
     "-ltest":   ("TESTNET", "#d29922", "lighter_testnet"),
     "-lshadow": ("SHADOW", "#58a6ff", "lighter_shadow"),
 }
@@ -1159,9 +1167,11 @@ def render():
     mode_notes = {}
     _reg = (pulse_latest or {}).get("btc_regime") or {}
     if _reg:
+        # [2026-07-13] risk-off text updated: bear_bounce retired 07-12,
+        # range_meanrev retired 07-13 — bounce_pullback is the only risk-off leg.
         mode_notes["crypto-intraday-15m"] = (
-            "mode: range_on pullback buys (BTC 4h RISK-ON)" if _reg.get("risk_on")
-            else "mode: bear_bounce only — sweep-reclaim setups (BTC 4h RISK-OFF)")
+            "mode: range_on pullbacks + breakouts (BTC 4h RISK-ON)" if _reg.get("risk_on")
+            else "mode: bounce_pullback only — confirmed relief rallies (BTC 4h RISK-OFF)")
 
     # union of expected + whatever actually published. Hidden bots are already
     # out of `rows` (fetch_rows), but EXPECTED would resurrect a placeholder
@@ -1286,8 +1296,8 @@ def render():
     live_total_line = ""
     if n_live_bots:
         live_total_line += (
-            f'<span style="border:1px solid #f85149;border-radius:6px;padding:2px 9px;'
-            f'background:#f8514918;font-weight:600">🔴 LIVE · Lighter '
+            f'<span style="border:1px solid #1a7f37;border-radius:6px;padding:2px 9px;'
+            f'background:#1a7f3718;font-weight:600">🟢 LIVE · Lighter '
             f'<b>{money(live_equity)}</b> eq · '
             f'<b class="{cls(live_pnl)}">{money(live_pnl)}</b> P&amp;L · '
             f'{n_live_bots} bot{"s" if n_live_bots != 1 else ""}</span>')
@@ -1404,16 +1414,17 @@ async function botAdmin(action, bot){
  .banner.crit{{background:#ffe3e3;border-color:#d1242f;color:#a3121b;font-weight:600}}
  .okline{{margin:12px 14px 0;padding:8px 12px;background:#e6f7ec;border:1px solid #caa227;border-radius:8px;color:#1a7f37;font-size:12px}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:14px}}
- /* [2026-07-10] Lighter Live section — real money, visually set apart */
- .livewrap{{margin:14px 14px 4px;border:2px solid #d1242f;border-radius:12px;
-   box-shadow:0 0 0 1px #caa227 inset,0 0 22px -6px #d1242f66;
-   background:linear-gradient(180deg,#ffececcc,#fff6f6cc);overflow:hidden}}
+ /* [2026-07-10] Lighter Live section — real money, visually set apart.
+    [2026-07-13] Red -> GREEN on user request (red read as "alarm", not "live"). */
+ .livewrap{{margin:14px 14px 4px;border:2px solid #1a7f37;border-radius:12px;
+   box-shadow:0 0 0 1px #caa227 inset,0 0 22px -6px #1a7f3766;
+   background:linear-gradient(180deg,#e6f7eccc,#f3fbf6cc);overflow:hidden}}
  .livewrap .grid{{padding:12px}}
  .livehdr{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-   padding:11px 14px;background:#d1242f14;border-bottom:1px solid #d1242f33;
-   font-size:15px;font-weight:700;color:#a3121b}}
+   padding:11px 14px;background:#1a7f3714;border-bottom:1px solid #1a7f3733;
+   font-size:15px;font-weight:700;color:#116329}}
  .livetag{{font-size:10px;font-weight:800;letter-spacing:.5px;color:#fff;
-   background:#d1242f;border-radius:6px;padding:2px 7px;box-shadow:0 0 10px #d1242f66}}
+   background:#1a7f37;border-radius:6px;padding:2px 7px;box-shadow:0 0 10px #1a7f3766}}
  .livesum{{margin-left:auto;font-size:13px;font-weight:500;color:#16232c}}
  .card{{background:#ffffffcc;border:2.5px solid #d4af37;border-radius:10px;padding:14px;
    box-shadow:0 0 0 1px #b8860b55,0 1px 0 #ffffffaa inset;

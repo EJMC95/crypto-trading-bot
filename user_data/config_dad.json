@@ -98,7 +98,5 @@
   "force_entry_enable": false,
   "internals": {
     "process_throttle_secs": 5
-  },
-  "timeframe": "1h",
-  "stoploss": -0.06
+  }
 }

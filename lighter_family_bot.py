@@ -10,12 +10,19 @@ WHAT / WHY (2026-07-13)
   Kraken paper originals keep running untouched — they are the control arm the
   validation doctrine compares against (same logic, spot+fees vs perp+funding).
 
-  Ports match what the family services ACTUALLY run today (config overrides
-  strategy attrs — CLAUDE.md's NFI/E0V1E table is stale):
-    👩 Mum        freqtrade-mum        TrendMomoV1      4h   stop -8%   4 slots
-    👨 Dad        freqtrade-dad        MomoBreakoutV1   1h   stop -6%   4 slots
+  Ports match what the carriers ACTUALLY run (config-resolved; mum/dad reflect
+  the 13-Jul reverts to their validated variants). [2026-07-13 FLEET-WIDE] the
+  original spot bots joined as three more books — the user asked for ALL bots
+  on Lighter, and they run these same strategies:
+    👩 Mum        freqtrade-mum        TrendMomoV1      1d   stop -15%  4 slots
+    👨 Dad        freqtrade-dad        MomoBreakoutV1   4h   stop -12%  4 slots
     🙏 Avo Maria  freqtrade-avo-maria  SwingDipV1       4h   stop -10%  4 slots
     🔮 Georgia    freqtrade-georgia    DayTraderV5Gated 15m  ATR≤5%     5 slots
+    ⚡ RangeRaider crypto-intraday-15m  DayTraderV5Gated 1h   ATR≤12%    5 slots
+    🩸 Dip Buyer  crypto-swing-daily   SwingDipV1       1d   stop -10%  8 slots
+    🚀 Breakout   crypto-breakout-4h   MomoBreakoutV1   4h   stop -12%  6 slots
+  (crypto-trend-daily's Lighter books live in the tide-rider service; the
+  perps/scanner bots have their own Lighter services or closed concepts.)
   Stake $50/trade (FAMILY_STAKE_USD), $1,000 start per book, long-only 1x —
   a long perp PAYS funding; that drag is the point of the experiment.
 
@@ -223,10 +230,10 @@ def parse_candles(raw, interval_ms, now_ms):
 
 class CandleCache:
     """One governed fetch per (coin, timeframe) per closed candle, shared by
-    every book that needs it (mum + avo + georgia's regime all ride one 4h
-    fetch), so the REST budget stays far inside the governor."""
+    every book that needs it (dad + avo + breakout + georgia's regime all ride
+    one 4h fetch), so the REST budget stays far inside the governor."""
 
-    SPAN_BARS = {"15m": 300, "1h": 380, "4h": 280}
+    SPAN_BARS = {"15m": 300, "1h": 380, "4h": 280, "1d": 240}
 
     def __init__(self, venue):
         self.venue = venue
@@ -278,18 +285,37 @@ def pulse_panic():
 
 
 # ---------------------------------------------------------------------------
-# Strategy ports. Each exposes:
-#   tf, stoploss (config-resolved), max_open, roi (min->ratio), protections,
-#   signals(bars, extra) -> {"enter": tag|None, "exit": bool, ...indicators}
+# Strategy ports. Each carrier instance exposes:
+#   bot, tf, stoploss, max_open, coins (config-resolved per carrier), roi,
+#   protections, signals(bars, extra) -> {"enter": tag|None, "exit": bool, ...}
 # computed on the LAST CLOSED bar, exactly the columns the freqtrade twin uses.
+# [2026-07-13 FLEET-WIDE] Parameterized so ONE strategy class serves every
+# carrier of that strategy (family + original spot bots) — the user asked for
+# ALL bots to run on Lighter, and the spot bots run these same four strategies
+# at their own timeframes/stops (config-resolved, verified 13 Jul).
 
-class TrendMomo:
-    """👩 Mum — TrendMomoV1 @ 4h (config override; strategy default is 1d)."""
-    bot = "freqtrade-mum"
-    style = "trendmomo-4h"
-    tf = "4h"
-    stoploss = -0.08                    # config_mum.json override
-    max_open = 4
+# The original spot bots' shared 29-pair whitelist (config_v5/v6/v7). Unlisted
+# coins are skipped per book at boot (logged + published in extra).
+WIDE_COINS = ("BTC,ETH,SOL,XRP,ADA,DOGE,AVAX,LINK,DOT,LTC,BCH,ATOM,XLM,TRX,"
+              "UNI,ETC,FIL,AAVE,ALGO,NEAR,APT,SUI,INJ,OP,TIA,ARB,WIF,BONK,"
+              "PEPE").split(",")
+
+
+class Carrier:
+    coins = None                        # None -> the family COINS list
+
+    def __init__(self, bot, tf, stoploss, max_open, style, coins=None):
+        self.bot = bot
+        self.tf = tf
+        self.stoploss = stoploss
+        self.max_open = max_open
+        self.style = style
+        if coins is not None:
+            self.coins = coins
+
+
+class TrendMomo(Carrier):
+    """TrendMomoV1 — SMA 10/40 trend follower (validated on 1d)."""
     roi = {}                            # {"0": 100} = disabled
     protections = {"cooldown_candles": 1,
                    "maxdd": {"lookback": 40, "trades": 4, "dd": 0.25, "stop": 5}}
@@ -314,13 +340,8 @@ class TrendMomo:
         return 1.0
 
 
-class MomoBreakout:
-    """👨 Dad — MomoBreakoutV1 @ 1h (config override; validated on 4h)."""
-    bot = "freqtrade-dad"
-    style = "momo-breakout-1h"
-    tf = "1h"
-    stoploss = -0.06                    # config_dad.json override
-    max_open = 4
+class MomoBreakout(Carrier):
+    """MomoBreakoutV1 — Donchian breakout above the 200-EMA (validated on 4h)."""
     roi = {}
     protections = {"cooldown_candles": 1,
                    "slguard": {"lookback": 42, "trades": 3, "stop": 12},
@@ -356,13 +377,8 @@ class MomoBreakout:
         return m
 
 
-class SwingDip:
-    """🙏 Avo Maria — SwingDipV1 @ 4h (config override; validated on 1d)."""
-    bot = "freqtrade-avo-maria"
-    style = "swing-dip-4h"
-    tf = "4h"
-    stoploss = -0.10                    # config_avo_maria.json override
-    max_open = 4
+class SwingDip(Carrier):
+    """SwingDipV1 — RSI/BB dip-in-uptrend (validated on 1d)."""
     roi = {0: 0.20, 5760: 0.12, 11520: 0.06, 20160: 0.0}
     protections = {"cooldown_candles": 1,
                    "slguard": {"lookback": 20, "trades": 2, "stop": 5},
@@ -396,15 +412,9 @@ class SwingDip:
         return 0.5 if pulse_panic() else 1.0
 
 
-class DayTraderGated:
-    """🔮 Georgia — DayTraderV5Gated @ 15m (config override; file default 1h).
-    Four entry modes switched by BTC's 4h 50/200 EMA regime; trailing ATR stop
-    capped by the config stoploss (-5%); ROI ladder; timeout exits."""
-    bot = "freqtrade-georgia"
-    style = "daytrader-15m"
-    tf = "15m"
-    stoploss = -0.05                    # config_georgia.json override
-    max_open = 5
+class DayTraderGated(Carrier):
+    """DayTraderV5Gated — entry modes switched by BTC's 4h 50/200 EMA regime;
+    trailing ATR stop capped by the carrier stoploss; ROI ladder; timeouts."""
     roi = {0: 0.018, 180: 0.012, 360: 0.008, 720: 0.005}
     protections = {"cooldown_candles": 4,
                    "slguard": {"lookback": 48, "trades": 3, "stop": 12},
@@ -491,7 +501,26 @@ class DayTraderGated:
         return None
 
 
-STRATEGIES = [TrendMomo(), MomoBreakout(), SwingDip(), DayTraderGated()]
+# One book per carrier — family four + the original spot bots (config-resolved
+# timeframes/stops; mum/dad reflect the 13-Jul reverts to validated variants).
+# crypto-trend-daily is NOT here: its Lighter shadow/live books already run in
+# the tide-rider service (one bot, one home, one writer).
+STRATEGIES = [
+    TrendMomo("freqtrade-mum", tf="1d", stoploss=-0.15, max_open=4,
+              style="trendmomo-1d"),
+    MomoBreakout("freqtrade-dad", tf="4h", stoploss=-0.12, max_open=4,
+                 style="momo-breakout-4h"),
+    SwingDip("freqtrade-avo-maria", tf="4h", stoploss=-0.10, max_open=4,
+             style="swing-dip-4h"),
+    DayTraderGated("freqtrade-georgia", tf="15m", stoploss=-0.05, max_open=5,
+                   style="daytrader-15m"),
+    DayTraderGated("crypto-intraday-15m", tf="1h", stoploss=-0.12, max_open=5,
+                   style="daytrader-1h", coins=WIDE_COINS),
+    SwingDip("crypto-swing-daily", tf="1d", stoploss=-0.10, max_open=8,
+             style="swing-dip-1d", coins=WIDE_COINS),
+    MomoBreakout("crypto-breakout-4h", tf="4h", stoploss=-0.12, max_open=6,
+                 style="momo-breakout-4h", coins=WIDE_COINS),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -657,21 +686,23 @@ def main():
     from venues import marks
     venue = LighterClient(net="mainnet", with_signer=False)
 
-    listed = [c for c in COINS if venue.supports(c)]
-    skipped = [c for c in COINS if c not in listed]
     cache = CandleCache(venue)
-    books = [Book(s, venue, listed) for s in STRATEGIES]
+    books = []
+    for s in STRATEGIES:
+        src = s.coins or COINS
+        listed = [c for c in src if venue.supports(c)]
+        s.skipped = [c for c in src if c not in listed]
+        books.append(Book(s, venue, listed))
     for b in books:
         b.restore()
 
     log.info("=" * 64)
-    log.info("FAMILY on LIGHTER (shadow) | %d books | %d/%d coins listed "
-             "(skipped: %s)", len(books), len(listed), len(COINS),
-             ", ".join(skipped) or "none")
+    log.info("FAMILY + SPOT bots on LIGHTER (shadow) | %d books", len(books))
     for b in books:
-        log.info("  %s | %s | tf=%s stop=%.0f%% slots=%d roi=%s",
+        log.info("  %s | %s | tf=%s stop=%.0f%% slots=%d coins=%d (skip: %s) roi=%s",
                  b.bot_id, b.s.style, b.s.tf, b.s.stoploss * 100,
-                 b.s.max_open, b.s.roi or "off")
+                 b.s.max_open, len(b.coins),
+                 ", ".join(b.s.skipped) or "none", b.s.roi or "off")
     log.info("$%.0f/trade | long-only 1x (pays funding — drag modelled) | "
              "fills cross the live book | loop=%ds", STAKE_USD, LOOP_SECONDS)
     log.info("EVIDENCE-FIRST: Kraken paper twins keep running as the control "
@@ -841,7 +872,7 @@ def main():
                            "fund_realized": round(b.fund_realized, 4),
                            "fund_open": round(open_accr, 4),
                            "btc_regime_up": regime,
-                           "skipped_unlisted": skipped})
+                           "skipped_unlisted": b.s.skipped})
             except Exception:  # noqa: BLE001
                 pass
             b.persist()
@@ -880,8 +911,8 @@ def _selftest():
     assert abs(stdev([1, 2, 3, 4]) - 1.2909944487358056) < 1e-12
     # rolling window helpers honour shift semantics.
     assert roll_max([1, 5, 3, 2], 2, 2) == 5 and roll_min([1, 5, 3, 2], 2, 2) == 3
-    # ROI rung selection: age 200min on georgia's ladder -> 0.012.
-    g = DayTraderGated()
+    # ROI rung selection: age 200min on the DayTrader ladder -> 0.012.
+    g = DayTraderGated("t", tf="15m", stoploss=-0.05, max_open=5, style="t")
     rung = max((k for k in g.roi if k <= 200), default=None)
     assert g.roi[rung] == 0.012
     print("lighter_family_bot self-test: OK")
