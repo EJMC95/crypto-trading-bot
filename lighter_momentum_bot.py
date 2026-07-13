@@ -65,6 +65,20 @@ CATASTROPHIC_STOP = float(os.environ.get("MOMO_CATASTROPHIC_STOP", "0.15"))
 DAILY_LOSS_LIMIT = float(os.environ.get("MOMO_DAILY_LOSS", "0.10"))
 LOOP_SECONDS = int(os.environ.get("MOMO_LOOP_SECONDS", "600"))
 
+# [2026-07-13 YIELD LAB — scratchpad momentum_yield_lab.py] price-based
+# ranking variants all FAILED the both-halves bar vs the shipped rule
+# (SHARPE -6pp; IVOL sizing DD 36.9->54.9%; SKIP/DUAL mixed across halves) —
+# don't re-test. The remaining yield lever is VENUE-NATIVE and has no history
+# to backtest: funding-aware selection (HOOD printed 301%apr = ~5.8%/WEEK
+# carry on day one — far larger than any adjacent-rank momentum spread). So
+# it runs as a LIVE A/B: the real book stays verbatim-Alpaca; this VIRTUAL
+# ledger applies a funding veto at each rebalance (skip qualifiers paying
+# more than MOMO_AB_VETO_APR, backfill next rank) and is marked/accrued in
+# parallel (mid fills — slightly optimistic vs the real book's VWAP; the
+# comparison horizon is weeks, where funding dwarfs that bias). Published in
+# extra.ab_funding_veto; the winner after ~2-4 weeks gets shipped.
+AB_VETO_APR = float(os.environ.get("MOMO_AB_VETO_APR", "1.5"))   # 150% APR
+
 LOG_FILE = os.environ.get("MOMO_LOG_FILE", "lighter_momentum_bot.log")
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
@@ -168,11 +182,16 @@ def main():
     fund_realized = 0.0
     next_reb = 0.0
     n_closed = n_wins = 0
+    ab_meta = {}          # A/B virtual book: sym -> {entry, size, accrued, mark}
+    ab_realized = 0.0
+    ab_vetoed = []
     saved = store.load_state(bot_id)
     if saved and broker.restore_state(saved.get("broker") or {}):
         meta = {str(k): v for k, v in (saved.get("meta") or {}).items()}
         fund_realized = float(saved.get("fund_realized") or 0.0)
         next_reb = float(saved.get("next_reb") or 0.0)
+        ab_meta = {str(k): v for k, v in (saved.get("ab_meta") or {}).items()}
+        ab_realized = float(saved.get("ab_realized") or 0.0)
         log.info("restored shadow state: $%.2f, %d open", broker.equity(),
                  broker.open_count())
     try:
@@ -185,6 +204,13 @@ def main():
     def equity():
         accr = sum((m or {}).get("accrued", 0.0) for m in meta.values())
         return broker.equity() + fund_realized + accr
+
+    def ab_equity():
+        out = START_EQUITY + ab_realized
+        for m in ab_meta.values():
+            mark = m.get("mark") or m["entry"]
+            out += m["size"] * (mark - m["entry"]) + m.get("accrued", 0.0)
+        return out
 
     def close_pos(s, px, reason):
         nonlocal fund_realized, n_closed, n_wins
@@ -279,9 +305,22 @@ def main():
             if entry and (px - entry) / entry <= -CATASTROPHIC_STOP:
                 close_pos(s, px, "catastrophic_stop")
 
+        # ---- A/B virtual book: mark + accrue (no seatbelt — rule-pure) ----
+        for s, m in ab_meta.items():
+            px = marks.fresh_mid(venue, s)
+            if not px:
+                continue
+            m["mark"] = px
+            rate = (fund.get(s) or {}).get("rate")
+            if rate is not None:
+                m["accrued"] = m.get("accrued", 0.0) - rate * m["size"] * px * dt_h
+
         # ---- weekly rotation ----
+        # (also fires once when the A/B ledger is empty but the real book
+        # holds — bootstraps the variant mid-cycle; idempotent for the real
+        # book, which only trades if the ranking actually changed)
         ranks = None
-        if t0 >= next_reb:
+        if t0 >= next_reb or (meta and not ab_meta):
             evals, blind = {}, []
             for s in symbols:
                 closes = ref_closes(s)
@@ -316,6 +355,33 @@ def main():
                              "funding %.1f%%apr", s, ORDER_USD, meta[s]["entry"],
                              (ranks.get(s) or 0) * 100,
                              ((fund.get(s) or {}).get("rate") or 0) * 24 * 365 * 100)
+                # ---- A/B: funding-veto variant rebalance (virtual fills) ----
+                apr = {s: ((fund.get(s) or {}).get("rate") or 0) * 24 * 365
+                       for s in symbols}
+                q = [(s, ev) for s, ev in evals.items()
+                     if ev and ev["is_long"] and ev["momentum"] is not None
+                     and apr.get(s, 0) <= AB_VETO_APR]
+                q.sort(key=lambda kv: kv[1]["momentum"], reverse=True)
+                ab_want = [s for s, _ in q[:TOP_N]]
+                ab_vetoed = [s for s in want
+                             if s not in ab_want and apr.get(s, 0) > AB_VETO_APR]
+                for s in list(ab_meta):
+                    if s not in ab_want:
+                        px = marks.fresh_mid(venue, s) or ab_meta[s]["entry"]
+                        m = ab_meta.pop(s)
+                        ab_realized += (m["size"] * (px - m["entry"])
+                                        + m.get("accrued", 0.0))
+                for s in ab_want:
+                    if s in ab_meta:
+                        continue
+                    px = marks.fresh_mid(venue, s)
+                    if px:
+                        ab_meta[s] = {"entry": px, "size": ORDER_USD / px,
+                                      "accrued": 0.0, "mark": px}
+                if ab_vetoed:
+                    log.info("A/B veto: %s (funding > %.0f%%apr) -> variant "
+                             "holds %s", ", ".join(ab_vetoed),
+                             AB_VETO_APR * 100, ", ".join(sorted(ab_meta)))
                 next_reb = t0 + REBALANCE_DAYS * 86400
                 log.info("REBALANCE done | holding %s | next %s",
                          ", ".join(sorted(meta)) or "none",
@@ -335,6 +401,10 @@ def main():
                        **({"last_ranks": ranks} if ranks else {}),
                        "fund_realized": round(fund_realized, 4),
                        "fund_open": round(accr, 4),
+                       "ab_funding_veto": {"eq": round(ab_equity(), 2),
+                                           "held": sorted(ab_meta),
+                                           "veto_apr": AB_VETO_APR,
+                                           "last_vetoed": ab_vetoed},
                        "next_reb": datetime.fromtimestamp(
                            next_reb, tz=timezone.utc).isoformat() if next_reb else None,
                        "skipped_unlisted": skipped})
@@ -343,6 +413,8 @@ def main():
         try:
             store.save_state(bot_id, {"broker": broker.to_state(), "meta": meta,
                                       "fund_realized": fund_realized,
+                                      "ab_meta": ab_meta,
+                                      "ab_realized": ab_realized,
                                       "next_reb": next_reb})
         except Exception:  # noqa: BLE001
             pass
