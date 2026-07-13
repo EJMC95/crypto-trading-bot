@@ -142,11 +142,17 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # and re-publishes this row — hiding is dashboard-side only; stopping/keeping
 # the service is a separate call. History stays in bot_equity_history /
 # paper_trades. Also dropped from EXPECTED so no placeholder card returns.
+# [2026-07-13 DECOMMISSION] Two-Way Tide (perps-regime-switch) removed on user
+# instruction: the 12-Jul Index Pilot review closed its long/short-regime
+# concept, live record 1/7 wins -$5.36. User deleted the Railway service
+# entirely (repo disconnected first, so nothing can resurrect it); row + the
+# EXPECTED placeholder retired here. History stays in the ledgers.
 RETIRED_ROWS = {"perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
-                "scanner-triangular-arb", "crypto-trendmomo-4h"}
+                "scanner-triangular-arb", "crypto-trendmomo-4h",
+                "perps-regime-switch", "perps-regime-switch-lshadow"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
 # [2026-07-13 NO-DATA FIX] Venue-suffixed bots (Funding Farmer, Snap Back,
@@ -157,8 +163,7 @@ RETIRED_ROWS = {"perps-donchian-breakout",
 # fetch_rows filter) but no dead placeholder card.
 VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 "lighter-dislocation", "perps-funding-spread"}
-EXPECTED = ["perps-regime-switch",
-            "perps-funding-carry",
+EXPECTED = ["perps-funding-carry",
             "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
             "crypto-breakout-4h",
