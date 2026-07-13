@@ -162,7 +162,10 @@ RETIRED_ROWS = {"perps-donchian-breakout",
 # VARIANT_ONLY: still first-class CURRENT_BOTS (their variant rows pass the
 # fetch_rows filter) but no dead placeholder card.
 VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
-                "lighter-dislocation", "perps-funding-spread"}
+                "lighter-dislocation", "perps-funding-spread",
+                # [2026-07-13] Index Rider — the IBKR bot's regime strategy on
+                # Lighter STOCK PERPS (SPY/QQQ), shadow-only; base never publishes
+                "equities-regime"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
@@ -238,6 +241,7 @@ LABELS = {
     "scanner-cross-exchange-arb":  "🔀 Gap Scout · cross-exchange arb (scanner)",
     "event-listing-sniper":        "🎯 Launch Sniper · new-listing buyer",
     "equities-regime-ibkr":        "📊 Index Pilot · SPY/QQQ regime (IBKR)",
+    "equities-regime":             "📊 Index Rider · SPY/QQQ 200d regime · stock perps",
     "equities-momentum-alpaca":    "🏆 Stock Leaders · momentum rank (Alpaca)",
     "equities-momentum":           "🏆 Stock Leaders · momentum rank",
     # Freqtrade fleet — new bots July 2026
