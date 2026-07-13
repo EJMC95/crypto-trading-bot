@@ -337,24 +337,18 @@ class DayTraderV5Gated(IStrategy):
             ["enter_long", "enter_tag"],
         ] = (1, "trend_breakout")
 
-        # [2026-07-05 REGULAR-OPERATION FIX] RANGE mean-reversion leg — the engine
-        # for a CHOPPY market (which is what we're in). Every mode above needs an
-        # uptrend (close>EMA50), so none fire in chop where price oscillates around
-        # the mean — that's why the bot sat idle. Public evidence: mean-reversion
-        # works in LOW-ADX (range) regimes and fails in trends; gating it to ADX<20
-        # is precisely the guard against the knife-catching this repo documents (a
-        # strong downtrend has HIGH ADX, so this leg stays OFF in a waterfall).
-        # Buy the range low in chop; half stake; exits at the range top via
-        # populate_exit_trend (unlike trend_breakout, this one SHOULD sell there).
-        dataframe.loc[
-            (
-                (dataframe["adx"] < 20)                       # chop / range regime
-                & (dataframe["close"] <= dataframe["rng_buy_zone"])
-                & (dataframe["rng_band_pct"] >= self.BAND_PCT_ON)
-                & uptick & live_vol
-            ),
-            ["enter_long", "enter_tag"],
-        ] = (1, "range_meanrev")
+        # [2026-07-13 SLEEVE RETIRED] range_meanrev (the 07-05 chop leg) is gone —
+        # same evidence shape as the fleet-wide bear_bounce retirement (07-12):
+        # 7d live, BOTH carriers (this bot 1h + georgia 15m): 52 entries, 16 wins,
+        # -$13.94 — every band-width bucket negative (fattest bands LOST MOST, so
+        # a higher fee gate can't save it), and a stop-variant counterfactual on
+        # the exact live trades (x1.75 / x2.5 / hard-cap-only replayed on real
+        # Kraken bars) stays red in every configuration: the entries don't earn
+        # enough favourable excursion to clear fees, no exit can fix that. Post-
+        # exit replay shows 80%+ of its stop-outs reclaimed entry within 24h —
+        # the leg was donating fees+noise to the book. In ADX<20 chop this bot
+        # now stands down (scripts in the 13-Jul session scratchpad; summary in
+        # reports/WEEKLY_REVIEW_2026-07-13.md).
         return dataframe
 
     # [2026-07-02 DIP-CLUSTER FIX, rebalanced 2026-07-03] Correlated-entry throttle.
@@ -460,7 +454,14 @@ class DayTraderV5Gated(IStrategy):
         # [2026-07-03 ADAPTIVE] Bounce stop 2.0x: tested 1.2x and it was shredded
         # by ordinary 15m noise (7% win rate, avg hold 32min) — reclaims need room
         # to wobble. Half stake keeps the $ risk in line.
-        atr_multiplier = 2.0 if trade.enter_tag in ("bounce_pullback", "range_meanrev") else self.atr_stop_mult.value
+        # [2026-07-13] 2.0x -> 3.5x for the counter-trend tags. Live post-exit
+        # replay (40 stop-outs, both carriers): 77-89% reclaimed ENTRY within 24h
+        # and avg fwd drift after the stop was POSITIVE — the 2.0x stop fired on
+        # noise, not danger. Counterfactual on the same trades: x1.75 wider cut
+        # the stop bleed -15.57->-9.62 (this bot) and -5.92->-3.77 (georgia).
+        # range_meanrev stays in the tuple only to manage positions opened
+        # before its 13-Jul entry retirement.
+        atr_multiplier = 3.5 if trade.enter_tag in ("bounce_pullback", "range_meanrev") else self.atr_stop_mult.value
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
         if dataframe is None or len(dataframe) == 0:
             return None
