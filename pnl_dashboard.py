@@ -294,7 +294,14 @@ def stale_secs_for(bot):
     """Per-bot stale threshold: each bot family has its own publish cadence."""
     if bot in VARIANT_STALE_SECONDS:   # variant cadence differs from its base
         return VARIANT_STALE_SECONDS[bot]
-    bot, _ = venue_variant(bot)   # other -lighter/-lshadow rows keep base cadence
+    bot, suf = venue_variant(bot)
+    # [2026-07-13] Every -lshadow row gets the slow-loop window by default: the
+    # 7-book family-lighter-shadow loop can exceed 180s around candle-refetch
+    # bursts (governed REST pacing), which flapped the fresh shadow rows
+    # "stale" + spammed the watchdog. 15 min = 3+ missed loops for every
+    # shadow bot (90-300s cadences) — a real outage still shows fast.
+    if suf == "-lshadow":
+        return SLOW_LOOP_STALE_SECONDS
     if bot in STOCKS:
         return STOCK_STALE_SECONDS
     if bot in SLOW_LOOP:
