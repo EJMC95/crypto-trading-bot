@@ -223,37 +223,65 @@ def is_live_bot(bot):
 # shows the descriptive label. label_for() falls back to the raw key if unmapped.
 # [2026-07-05] Trendy names + a plain "what it does" tail so a glance tells you
 # both the personality and the mechanism. Leading emoji = fast visual scanning.
+# [2026-07-13 NAME TIDY-UP on user request] Purpose-first names — no exchange
+# tags (the LIVE/SHADOW chips carry venue), the role after the dash, and a
+# one-line strategy description (DESCRIPTIONS below) rendered on every card so
+# each bot's intent + current units are reviewable at a glance.
 LABELS = {
-    "crypto-trend-daily":          "🌊 Tide Rider · daily 50/200 trend (long)",
-    "crypto-intraday-15m":         "⚡ Range Raider · 1h adaptive range + bounce",
-    "crypto-swing-daily":          "🩸 Dip Buyer · daily oversold dip (BB/RSI)",
-    "crypto-breakout-4h":          "🚀 Breakout Hunter · 4h Donchian breakout",
-    "crypto-trendmomo-4h":         "🏄 Momentum Surfer · daily SMA trend",
-    "perps-rsi-meanrev":           "🪃 Bounce Catcher · perps range reversion",
-    "perps-donchian-breakout":     "🧭 Trail Blazer · perps 4h breakout",
-    "perps-regime-switch":         "⚖️ Two-Way Tide · long/short trend engine (perps)",
-    "perps-funding-carry":         "🌾 Yield Harvester · perps funding carry",
-    "perps-funding-lighter":       "💸 Funding Farmer · Lighter directional funding (stop-guarded)",
-    "lighter-perp-sniper":         "🎯 Perp Sniper · new Lighter-listing snipe",
-    "lighter-dislocation":         "🧲 Snap Back · Lighter dislocation harvester",
-    "perps-funding-spread":        "⚖️ Counterweight · x-sect funding-spread book (L/S)",
-    "scanner-triangular-arb":      "🔺 Loop Scout · triangular arb (scanner)",
-    "scanner-cross-exchange-arb":  "🔀 Gap Scout · cross-exchange arb (scanner)",
-    "event-listing-sniper":        "🎯 Launch Sniper · new-listing buyer",
-    "equities-regime-ibkr":        "📊 Index Pilot · SPY/QQQ regime (IBKR)",
-    "equities-regime":             "📊 Index Rider · SPY/QQQ 200d regime · stock perps",
-    "equities-momentum-alpaca":    "🏆 Stock Leaders · momentum rank (Alpaca)",
-    "equities-momentum":           "🏆 Stock Leaders · momentum rank",
-    # Freqtrade fleet — new bots July 2026
-    # [2026-07-13 LABEL TRUTH-FIX] the NFI/E0V1E/BinHCluc/FreqAI era ended when
-    # the configs moved to the in-house strategies on Kraken (git: config_*.json
-    # "-> proven strategy"); the old labels misdescribed both the base rows and
-    # the new freqtrade-*-lshadow variant rows (the family ports on Lighter).
-    "freqtrade-mum":               "👩 Mum · TrendMomoV1 · 4h trend (Kraken)",
-    "freqtrade-dad":               "👨 Dad · MomoBreakoutV1 · 1h breakout (Kraken)",
-    "freqtrade-avo-maria":         "🙏 Avo Maria · SwingDipV1 · 4h dip buyer (Kraken)",
-    "freqtrade-georgia":           "🔮 Georgia · DayTraderV5Gated · 15m intraday (Kraken)",
+    "crypto-trend-daily":          "🌊 Tide Rider — trend rider",
+    "crypto-intraday-15m":         "⚡ Range Raider — day trader",
+    "crypto-swing-daily":          "🩸 Dip Buyer — swing dip buyer",
+    "crypto-breakout-4h":          "🚀 Breakout Hunter — breakout rider",
+    "crypto-trendmomo-4h":         "🏄 Momentum Surfer — retired",
+    "perps-rsi-meanrev":           "🪃 Bounce Catcher — retired",
+    "perps-donchian-breakout":     "🧭 Trail Blazer — retired",
+    "perps-regime-switch":         "⚖️ Two-Way Tide — retired",
+    "perps-funding-carry":         "🌾 Yield Harvester — funding carry",
+    "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
+    "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
+    "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
+    "perps-funding-spread":        "⚖️ Counterweight — funding L/S book",
+    "scanner-triangular-arb":      "🔺 Loop Scout — retired",
+    "scanner-cross-exchange-arb":  "🔀 Gap Scout — arb scanner",
+    "event-listing-sniper":        "🎯 Launch Sniper — listing buyer",
+    "equities-regime-ibkr":        "📊 Index Pilot — index regime (control)",
+    "equities-regime":             "📊 Index Rider — stock-perp regime",
+    "equities-momentum-alpaca":    "🏆 Stock Leaders — stock momentum",
+    "equities-momentum":           "🏆 Stock Leaders — stock momentum",
+    "freqtrade-mum":               "👩 Mum — daily trend",
+    "freqtrade-dad":               "👨 Dad — breakout rider",
+    "freqtrade-avo-maria":         "🙏 Avo Maria — dip buyer",
+    "freqtrade-georgia":           "🔮 Georgia — day trader",
 }
+
+# One-line strategy brief per bot (shared by its venue variants — the chips
+# say WHERE it runs, this says WHAT it does + current units).
+DESCRIPTIONS = {
+    "freqtrade-mum":       "TrendMomoV1 · 1d — long while SMA10>SMA40 with price above; exits on the cross-down · $50 × 4 slots",
+    "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
+    "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · $50 × 4 slots",
+    "freqtrade-georgia":   "DayTraderV5Gated · 15m — BTC-regime-switched pullback + breakout entries, 3.5×ATR trailing stop, ROI ladder · $50 × 5 slots",
+    "crypto-trend-daily":  "daily 50/200-EMA golden cross — long through uptrends, cash after the death cross; holds for weeks",
+    "crypto-intraday-15m": "DayTraderV5Gated · 1h — Georgia's engine at the validated 1h settings · 29 pairs, 5 slots",
+    "crypto-swing-daily":  "SwingDipV1 · 1d — the validated daily dip-buyer · 29 pairs, 8 slots",
+    "crypto-breakout-4h":  "MomoBreakoutV1 · 4h — the validated Donchian breakout · 29 pairs, 6 slots",
+    "perps-funding-lighter": "holds the side that RECEIVES funding when |APR|≥40%, vol-vetoed, stop-guarded · clip $20 × cap $80",
+    "perps-funding-carry":  "funding-rate carry on HL data — the Funding Farmer's origin strategy",
+    "perps-funding-spread": "ranks 72h mean funding: LONG the 5 most-negative, SHORT the 5 most-positive, rebalances daily · $20/leg",
+    "lighter-dislocation":  "fades ≥150bps Lighter-vs-reference price dislocations across 36 coins; census-first evidence bot",
+    "lighter-perp-sniper":  "watches brand-new Lighter listings and snipes day-one momentum",
+    "event-listing-sniper": "buys brand-new CEX listings — many tiny losses, occasional big wins by design",
+    "scanner-cross-exchange-arb": "scans cross-exchange spreads and paper-fills observed gaps (optimistic basis, own subtotal)",
+    "equities-regime":      "SPY + QQQ long above the 200d SMA (±1% band) + gold on a 20/50 cross · $250 × 3 slots",
+    "equities-regime-ibkr": "the same 200d regime rule on IBKR paper (raw, unbanded) — Index Rider's control arm",
+    "equities-momentum-alpaca": "momentum-ranked US stock rotation (weekday close cron)",
+    "equities-momentum":    "momentum-ranked US stock rotation",
+}
+
+
+def desc_for(bot):
+    base, _ = venue_variant(bot)
+    return DESCRIPTIONS.get(base, "")
 def label_for(bot):
     base, suf = venue_variant(bot)
     if suf:
@@ -976,9 +1004,11 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
         badge += (f' <span style="font-size:10px;border:1px solid {_vc};color:#fff;'
                   f'background:{_vc};border-radius:6px;padding:1px 6px;'
                   f'vertical-align:middle;font-weight:700;letter-spacing:.3px">{_vt}</span>')
+    _desc = desc_for(bot)
+    _desc_html = (f'<div class="desc">{html.escape(_desc)}</div>' if _desc else "")
     if row is None:
         return (f'<div class="card"><h2>{html.escape(label_for(bot))}{badge} '
-                f'<span class="dot off"></span></h2>'
+                f'<span class="dot off"></span></h2>{_desc_html}'
                 f'<div class="muted">no data yet — bot has not published</div></div>')
     thr = stale_secs_for(bot)
     age, stale = age_str(row.get("updated_at"), thr)
@@ -1145,6 +1175,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
                          f'({len(en["positions"])})</div>{_lines}')
     return f'''<div class="card">
       <h2>{html.escape(label_for(bot))}{badge} <span class="dot {dot}"></span></h2>
+      {_desc_html}
       <div class="muted">{html.escape(str(status))} · updated {html.escape(age)}{" · STALE" if stale else ""}</div>
       {f'<div class="muted" style="color:#d29922">{html.escape(mode_note)}</div>' if mode_note else ''}
       {"".join(rows)}
@@ -1447,6 +1478,8 @@ async function botAdmin(action, bot){
    transition:border-color .2s,box-shadow .2s}}
  .card:hover{{border-color:#b8860b;box-shadow:0 0 0 1px #b8860b,0 0 16px -6px #d4af37cc}}
  .card h2{{margin:0 0 2px;font-size:15px}}
+ .desc{{font-size:11px;color:#5b7184;margin:0 0 6px;line-height:1.35;
+   border-left:2px solid #d4af3766;padding-left:7px}}
  .row{{display:flex;justify-content:space-between;margin:5px 0;font-size:13px}}
  .sub{{margin:10px 0 4px;font-size:12px;color:#5b7184}}
  .muted{{color:#5b7184;font-size:12px}}
