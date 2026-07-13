@@ -1,0 +1,22 @@
+# Image for 🏆 Stock Leaders (the Alpaca momentum bot on Lighter STOCK PERPS)
+# — SHADOW ONLY in v1. Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.momoshadow
+#   VENUE=lighter_shadow
+#   DATABASE_URL=${{Postgres.DATABASE_URL}}
+# Rule verbatim from ~/Claude/Trading/bot/strategy.py (qualify close>SMA200 &
+# SMA20>SMA50, rank by 42d return, hold top-5); weekly rebalance per the
+# 13-Jul variant grid; 20-name probed universe. REFUSES lighter_live in v1;
+# the Alpaca paper account is the control arm. No keys needed for shadow.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_momentum_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_momentum_bot.py"]
