@@ -17,6 +17,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY lighter_momentum_bot.py bot_pnl_store.py paper_broker.py ./
 COPY venues/ ./venues/
 
+# [2026-07-13 SHELL REUSE] Stock Leaders deployed into the vacant perps-bot
+# service (user-approved; Funding Farmer/trail-blazer-live precedent) while
+# the railway CLI's service-creation auth is expired. That shell carries the
+# OLD custom start command `python hyperliquid_perps_bot.py`, which overrides
+# this CMD — the symlink satisfies it so the momentum bot runs either way.
+# Remove the start-command override in the service UI (or move to a clean
+# service) and this shim becomes inert.
+RUN ln -s lighter_momentum_bot.py hyperliquid_perps_bot.py
+
 ENV PYTHONUNBUFFERED=1
 
 CMD ["python", "lighter_momentum_bot.py"]
