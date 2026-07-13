@@ -24,29 +24,148 @@ from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get("PORT", "8080"))
+
+# Tiled "$ EJMC $" watermark painted behind the whole page — styled like a
+# spraycan tag (grainy fill via feTurbulence, jittered per-glyph rotation,
+# overspray speckle, paint drips). Kept faint — purely decorative, must never
+# compete with card text for legibility.
+_WATERMARK_TILE_SVG = (
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 360' "
+    "preserveAspectRatio='xMidYMid meet'>"
+    "<defs>"
+    "<filter id='spray' x='-30%' y='-30%' width='160%' height='160%'>"
+    "<feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' result='n'/>"
+    "<feColorMatrix in='n' type='matrix' "
+    "values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.3 0' result='an'/>"
+    "<feComposite in='SourceGraphic' in2='an' operator='in'/>"
+    "</filter>"
+    "<filter id='soft' x='-80%' y='-80%' width='260%' height='260%'>"
+    "<feGaussianBlur stdDeviation='2.4'/>"
+    "</filter>"
+    "<linearGradient id='dripfade' x1='0' y1='0' x2='0' y2='1'>"
+    "<stop offset='0%' stop-color='#f4f1e6' stop-opacity='0.95'/>"
+    "<stop offset='55%' stop-color='#e8e4d5' stop-opacity='0.7'/>"
+    "<stop offset='100%' stop-color='#d8d3c2' stop-opacity='0.1'/>"
+    "</linearGradient>"
+    # off-white paint fill — soft top-lit cream down to a shaded cream
+    "<linearGradient id='paintgrad' x1='0' y1='0' x2='0' y2='1'>"
+    "<stop offset='0%' stop-color='#fdfcf6'/>"
+    "<stop offset='55%' stop-color='#f2efe4'/>"
+    "<stop offset='100%' stop-color='#e4dfd0'/>"
+    "</linearGradient>"
+    "<linearGradient id='hlgrad' x1='0' y1='0' x2='0' y2='1'>"
+    "<stop offset='0%' stop-color='#ffffff' stop-opacity='0.95'/>"
+    "<stop offset='40%' stop-color='#ffffff' stop-opacity='0.2'/>"
+    "<stop offset='70%' stop-color='#ffffff' stop-opacity='0'/>"
+    "</linearGradient>"
+    "</defs>"
+    "<g opacity='0.9'>"
+    # Graffiti marker handstyle — 'Permanent Marker' web font (loaded on the page;
+    # this SVG is inline so it inherits it), skewed for the aggressive tag slant.
+    # Falls back to other marker/handwritten faces, then cursive.
+    f"<g transform='rotate(-5 450 200) skewX(-11)' "
+    f"font-family=\"'Permanent Marker','Rock Salt','Bradley Hand',cursive\" "
+    f"font-size='150' font-weight='400' text-anchor='middle'>"
+    # soft cast shadow, offset down-right for depth against the light page
+    "<text x='456' y='236' fill='#3b4652' opacity='0.28' filter='url(#soft)'>$ EJMC $</text>"
+    # dark outline + spray-grained off-white fill (outline carries the contrast
+    # on the light background, like a white tag reads against dark)
+    "<text x='450' y='228' fill='url(#paintgrad)' stroke='#2c343d' stroke-width='4.5' "
+    "stroke-linejoin='round' paint-order='stroke fill' filter='url(#spray)'>$ EJMC $</text>"
+    # subtle sheen across the top of the strokes
+    "<text x='450' y='228' fill='url(#hlgrad)' style='mix-blend-mode:screen'>$ EJMC $</text>"
+    "</g>"
+    # paint drips — thin near-straight runs with a small drop at the tip, the way
+    # a marker/spray tag bleeds down. Scattered along the baseline.
+    "<g opacity='0.9'>"
+    "<rect x='178' y='232' width='3.4' height='96' rx='1.7' fill='url(#dripfade)'/>"
+    "<circle cx='179.7' cy='330' r='4' fill='#d8d3c2' opacity='0.75'/>"
+    "<rect x='262' y='236' width='2.8' height='60' rx='1.4' fill='url(#dripfade)'/>"
+    "<circle cx='263.4' cy='298' r='3.2' fill='#cfc9b8' opacity='0.62'/>"
+    "<rect x='330' y='234' width='3.2' height='82' rx='1.6' fill='url(#dripfade)'/>"
+    "<circle cx='331.6' cy='318' r='3.8' fill='#cfc9b8' opacity='0.66'/>"
+    "<rect x='404' y='238' width='2.6' height='46' rx='1.3' fill='url(#dripfade)'/>"
+    "<circle cx='405.3' cy='286' r='3' fill='#cfc9b8' opacity='0.58'/>"
+    "<rect x='474' y='234' width='3.4' height='92' rx='1.7' fill='url(#dripfade)'/>"
+    "<circle cx='475.7' cy='328' r='4' fill='#d8d3c2' opacity='0.75'/>"
+    "<rect x='560' y='236' width='2.8' height='56' rx='1.4' fill='url(#dripfade)'/>"
+    "<circle cx='561.4' cy='294' r='3.2' fill='#cfc9b8' opacity='0.6'/>"
+    "<rect x='648' y='234' width='3' height='72' rx='1.5' fill='url(#dripfade)'/>"
+    "<circle cx='649.5' cy='308' r='3.6' fill='#cfc9b8' opacity='0.64'/>"
+    "<rect x='736' y='236' width='2.8' height='50' rx='1.4' fill='url(#dripfade)'/>"
+    "<circle cx='737.4' cy='288' r='3.2' fill='#cfc9b8' opacity='0.6'/>"
+    "</g>"
+    # overspray speckle + faint spray-ring flourish, like a tag finished with the can
+    "<circle cx='150' cy='150' r='4' fill='#cfc9b8' opacity='0.4' filter='url(#soft)'/>"
+    "<circle cx='176' cy='128' r='2.2' fill='#cfc9b8' opacity='0.55'/>"
+    "<circle cx='690' cy='150' r='3.6' fill='#cfc9b8' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='664' cy='170' r='2' fill='#cfc9b8' opacity='0.5'/>"
+    "<circle cx='450' cy='92' r='3' fill='#cfc9b8' opacity='0.35' filter='url(#soft)'/>"
+    "<circle cx='800' cy='196' r='13' fill='none' stroke='#cfc9b8' stroke-width='1.6' "
+    "opacity='0.3' filter='url(#soft)'/>"
+    "</g>"
+    "</svg>"
+)
+# Rendered as an INLINE svg (fixed, behind the cards) rather than a CSS
+# background-image, so it can use the 'Permanent Marker' web font — background
+# SVGs are sandboxed and can't load page fonts, which is why a font swap needs
+# this. The <link> for the font is added in the page <head>.
+WATERMARK_HTML = f'<div class="wm" aria-hidden="true">{_WATERMARK_TILE_SVG}</div>'
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 # Login for THIS dashboard page (override via env on Railway).
 DASH_USER = os.environ.get("DASH_USER", "eamon")
 DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 
+# [2026-07-11 SWAP] Decommissioned venue rows — hidden from the grid and every
+# feed so a retired bot can't sit next to its replacement and confuse the LIVE
+# section. History stays in bot_equity_history / paper_trades / venue_orders.
+# Trail Blazer live retired 11 Jul; its sub-account + Railway service now run
+# the Funding Farmer (publishes as perps-funding-lighter-lighter).
+# [2026-07-12 DECOMMISSION] Bounce Catcher (perps-rsi-meanrev) + Loop Scout
+# (scanner-triangular-arb) stopped on user sign-off: the 12-Jul audit found
+# Bounce Catcher running the IDENTICAL entry to Trail Blazer's paper bot
+# (REJECTED for edge 12 Jul), and Loop Scout carried a retire verdict since
+# the 22-Jun revalidation. Railway services perps-bot + triangular-arb are
+# down (empty shells left in the UI); momo-bot stays as the cluster's
+# representative. The stale rsi-meanrev lshadow row from Gate-0 goes too.
+# [2026-07-12 LOSER CUT] TrendMomoV1 (crypto-trendmomo-4h) retired on user
+# sign-off: core leg -29%/4.5y on the tagged Binance replay (26.5% win), live
+# bleeder (-$11.33). Removed from run_all.sh in the same commit.
+# [2026-07-12 SAME-PAGE SWEEP] perps-donchian-breakout-lshadow was a Gate-0
+# local run that stopped 10 Jul (stale ever since); its signal is the
+# twice-retired range-buy, so the shadow is NOT restarted — row hidden.
+# [2026-07-12 DASHBOARD SWEEP] Trail Blazer's PAPER row (perps-donchian-breakout)
+# hidden on user request to clear the bots we're not going ahead with: the live
+# half retired 11 Jul and the entry was REJECTED for edge in the 12-Jul audit
+# (identical to Bounce Catcher's). NOTE the momo-bot Railway service still runs
+# and re-publishes this row — hiding is dashboard-side only; stopping/keeping
+# the service is a separate call. History stays in bot_equity_history /
+# paper_trades. Also dropped from EXPECTED so no placeholder card returns.
+RETIRED_ROWS = {"perps-donchian-breakout",
+                "perps-donchian-breakout-lighter",
+                "perps-donchian-breakout-lshadow",
+                "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
+                "scanner-triangular-arb", "crypto-trendmomo-4h"}
+
 # Expected bots — so the grid shows a bot even before its first publish.
-EXPECTED = ["perps-rsi-meanrev", "perps-donchian-breakout", "perps-regime-switch",
-            "perps-funding-carry",
-            "scanner-triangular-arb", "event-listing-sniper",
+EXPECTED = ["perps-regime-switch",
+            "perps-funding-carry", "perps-funding-lighter", "lighter-perp-sniper",
+            "lighter-dislocation", "perps-funding-spread",
+            "event-listing-sniper",
             "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
-            "crypto-breakout-4h", "crypto-trendmomo-4h",
+            "crypto-breakout-4h",
             "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"]
 
 # Scanners book OPTIMISTIC paper-arb fills (observed spreads, no slippage/latency).
 # Their pnl_abs is real paper P&L but on a rosier basis than the freqtrade bots'
 # simulated fills — so it is reported as a SEPARATE subtotal and never folded
 # into the trading-bot P&L headline.
-SCANNERS = {"scanner-triangular-arb", "scanner-cross-exchange-arb"}
+SCANNERS = {"scanner-cross-exchange-arb"}
 
 # Stock/brokerage bots (IBKR + Alpaca). Shown as their own cards with a SEPARATE
 # subtotal so their large $ equity never swamps the crypto headline.
-STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca"}
+STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca", "equities-momentum"}
 
 # The only bots that should appear. Anything else in the table (e.g. legacy
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
@@ -55,6 +174,34 @@ STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca"}
 # Freqtrade fleet bots (July 2026)
 FREQTRADE = {"freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"}
 CURRENT_BOTS = set(EXPECTED) | SCANNERS | STOCKS | FREQTRADE
+
+# [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows. When a bot trades on Lighter
+# its publisher suffixes the bot id by mode (venues/__init__._SUFFIX):
+#   -lighter  = REAL MONEY live   (each on its own Lighter sub-account)
+#   -ltest    = Lighter testnet   (real order lifecycle, faucet funds)
+#   -lshadow  = shadow            (modelled fills on live books, NEVER sends)
+# These are SEPARATE dashboard rows from the paper (hl_paper) bot so the paper
+# equity curve is never contaminated. They are detected dynamically (not a fixed
+# list) so whichever bots the user brings live just appear, each badged with its
+# mode, and the LIVE fleet is reported as its own P&L subtotal.
+VENUE_SUFFIXES = {
+    "-lighter": ("LIVE", "#f85149", "lighter_live"),
+    "-ltest":   ("TESTNET", "#d29922", "lighter_testnet"),
+    "-lshadow": ("SHADOW", "#58a6ff", "lighter_shadow"),
+}
+
+
+def venue_variant(bot):
+    """(base_bot, suffix_key) if `bot` is a venue-variant row, else (bot, None)."""
+    for suf in VENUE_SUFFIXES:
+        if bot.endswith(suf):
+            return bot[:-len(suf)], suf
+    return bot, None
+
+
+def is_live_bot(bot):
+    """True only for REAL-money Lighter rows (not shadow/testnet)."""
+    return bot.endswith("-lighter")
 
 # [2026-07-01] Professional display names. Keys stay machine-safe; the dashboard
 # shows the descriptive label. label_for() falls back to the raw key if unmapped.
@@ -70,18 +217,31 @@ LABELS = {
     "perps-donchian-breakout":     "🧭 Trail Blazer · perps 4h breakout",
     "perps-regime-switch":         "⚖️ Two-Way Tide · long/short trend engine (perps)",
     "perps-funding-carry":         "🌾 Yield Harvester · perps funding carry",
+    "perps-funding-lighter":       "💸 Funding Farmer · Lighter directional funding (stop-guarded)",
+    "lighter-perp-sniper":         "🎯 Perp Sniper · new Lighter-listing snipe",
+    "lighter-dislocation":         "🧲 Snap Back · Lighter dislocation harvester",
+    "perps-funding-spread":        "⚖️ Counterweight · x-sect funding-spread book (L/S)",
     "scanner-triangular-arb":      "🔺 Loop Scout · triangular arb (scanner)",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout · cross-exchange arb (scanner)",
     "event-listing-sniper":        "🎯 Launch Sniper · new-listing buyer",
     "equities-regime-ibkr":        "📊 Index Pilot · SPY/QQQ regime (IBKR)",
     "equities-momentum-alpaca":    "🏆 Stock Leaders · momentum rank (Alpaca)",
+    "equities-momentum":           "🏆 Stock Leaders · momentum rank",
     # Freqtrade fleet — new bots July 2026
-    "freqtrade-mum":               "👩 Mum · NFI X7 · 5m trend (Binance)",
-    "freqtrade-dad":               "👨 Dad · E0V1E · 5m breakout (Binance/Kraken)",
-    "freqtrade-avo-maria":         "🙏 Avo Maria · BinH+Cluc · 5m mean reversion",
-    "freqtrade-georgia":           "🔮 Georgia · FreqAI LightGBM · 1H ML adaptive",
+    # [2026-07-13 LABEL TRUTH-FIX] the NFI/E0V1E/BinHCluc/FreqAI era ended when
+    # the configs moved to the in-house strategies on Kraken (git: config_*.json
+    # "-> proven strategy"); the old labels misdescribed both the base rows and
+    # the new freqtrade-*-lshadow variant rows (the family ports on Lighter).
+    "freqtrade-mum":               "👩 Mum · TrendMomoV1 · 4h trend (Kraken)",
+    "freqtrade-dad":               "👨 Dad · MomoBreakoutV1 · 1h breakout (Kraken)",
+    "freqtrade-avo-maria":         "🙏 Avo Maria · SwingDipV1 · 4h dip buyer (Kraken)",
+    "freqtrade-georgia":           "🔮 Georgia · DayTraderV5Gated · 15m intraday (Kraken)",
 }
 def label_for(bot):
+    base, suf = venue_variant(bot)
+    if suf:
+        tag = VENUE_SUFFIXES[suf][0]
+        return f"{LABELS.get(base, base)} — {tag} · Lighter"
     return LABELS.get(bot, bot)
 
 # Paper bots (freqtrade + perps) all start with a $1,000 simulated balance, so
@@ -107,10 +267,26 @@ SLOW_LOOP_STALE_SECONDS = 15 * 60
 # Give it its own window so those reload cycles stop tripping a false stale
 # flag (the sniper also heartbeats mid-cycle now, but keep this as the backstop).
 SNIPER_STALE_SECONDS = 900
+# [2026-07-12] Venue-variant rows do NOT always share their base's cadence —
+# the Lighter Tide Rider loops HOURLY (its base row is fed by the fast
+# freqtrade poller) and the Funding Farmer loops 300s (its base was never in
+# SLOW_LOOP after it took over the live slot). Both healthy LIVE bots were
+# flapping "stale" on the dashboard most of every cycle. Explicit per-ROW
+# windows sized ~2 missed publishes, so a real outage still shows fast.
+VARIANT_STALE_SECONDS = {
+    "crypto-trend-daily-lighter":    2 * 3600 + 600,   # hourly loop + debounce slack
+    "crypto-trend-daily-lshadow":    2 * 3600 + 600,
+    "perps-funding-lighter-lighter": 15 * 60,          # 300s loop
+    "perps-funding-lighter-lshadow": 15 * 60,
+    "perps-funding-spread-lshadow":  15 * 60,          # 300s loop (Counterweight)
+}
 
 
 def stale_secs_for(bot):
     """Per-bot stale threshold: each bot family has its own publish cadence."""
+    if bot in VARIANT_STALE_SECONDS:   # variant cadence differs from its base
+        return VARIANT_STALE_SECONDS[bot]
+    bot, _ = venue_variant(bot)   # other -lighter/-lshadow rows keep base cadence
     if bot in STOCKS:
         return STOCK_STALE_SECONDS
     if bot in SLOW_LOOP:
@@ -120,10 +296,104 @@ def stale_secs_for(bot):
     return STALE_SECONDS
 
 
-def fetch_rows():
+# [2026-07-13 INTERACTIVE MANAGE] User-managed hidden set, persisted in
+# bot_state so it survives dashboard redeploys. Complements the static
+# RETIRED_ROWS above: code marks the officially-retired bots; this lets Eamon
+# hide/unhide (and delete rows for) retired or bunk bots from the page itself
+# instead of waiting for a code change. Applied inside fetch_rows, so the
+# grid, the totals AND /pnl.json all respect it — one choke point.
+HIDDEN_STATE_KEY = "dashboard-hidden-bots"
+
+
+def fetch_hidden_bots():
+    """{bot: iso_hidden_at} chosen via the Manage panel. {} on any error —
+    a broken state read must never blank the whole dashboard."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                if cur.fetchone()[0] is None:
+                    return {}
+                cur.execute("SELECT state FROM bot_state WHERE bot = %s",
+                            (HIDDEN_STATE_KEY,))
+                row = cur.fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return {}
+        st = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        return dict(st.get("bots") or {})
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def save_hidden_bots(bots):
+    """Upsert the hidden set (same shape bot_pnl_store.save_state writes)."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS bot_state (
+                    bot        TEXT PRIMARY KEY,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    state      JSONB
+                )
+                """)
+            cur.execute(
+                """
+                INSERT INTO bot_state (bot, updated_at, state)
+                VALUES (%s, now(), %s)
+                ON CONFLICT (bot) DO UPDATE SET
+                    updated_at = now(), state = EXCLUDED.state
+                """, (HIDDEN_STATE_KEY, json.dumps({"bots": bots})))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_bot_row(bot):
+    """Remove a bot's bot_pnl row. Dashboard-row only: ledger history
+    (bot_trades / paper_trades / venue_orders / bot_equity_history) is kept,
+    and an ACTIVE bot's row simply reappears on its next publish — so this
+    can only permanently remove bots that no longer run. Returns rows deleted."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM bot_pnl WHERE bot = %s", (bot,))
+            n = cur.rowcount
+        conn.commit()
+        return n
+    finally:
+        conn.close()
+
+
+def fetch_all_bot_ids():
+    """Every bot id present in bot_pnl (unfiltered) — feeds the Manage panel
+    so retired/legacy rows can be deleted even though the grid filters them."""
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.bot_pnl') AS t")
+            if cur.fetchone()[0] is None:
+                return []
+            cur.execute("SELECT bot FROM bot_pnl ORDER BY bot")
+            return [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def fetch_rows(hidden=None):
     """Return {bot: row_dict}. Raises on DB error (caller handles)."""
     import psycopg2
     import psycopg2.extras
+    if hidden is None:
+        hidden = fetch_hidden_bots()
     conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -132,11 +402,40 @@ def fetch_rows():
                 return {}  # table not created yet (no bot has published)
             cur.execute("SELECT * FROM bot_pnl")
             # Drop legacy pre-rename rows so stale duplicates never reach the
-            # grid, totals, or the /pnl.json feed.
+            # grid, totals, or the /pnl.json feed. Venue-variant rows
+            # (<base>-lighter/-ltest/-lshadow) pass when their base is a current
+            # bot, so a live/shadow Lighter bot shows up automatically.
             return {r["bot"]: r for r in cur.fetchall()
-                    if r["bot"] in CURRENT_BOTS}
+                    if r["bot"] not in RETIRED_ROWS
+                    and r["bot"] not in hidden
+                    and (r["bot"] in CURRENT_BOTS
+                         or venue_variant(r["bot"])[0] in CURRENT_BOTS)}
     finally:
         conn.close()
+
+
+def fetch_fleet_alerts(hours=48):
+    """Recent evidence alerts written by market_context.evaluate_evidence into
+    bot_state('fleet-alerts'). Guarded — no alerts is an answer, not an error."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                if cur.fetchone()[0] is None:
+                    return []
+                cur.execute("SELECT state FROM bot_state WHERE bot = 'fleet-alerts'")
+                row = cur.fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return []
+        st = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        cut = time.time() - hours * 3600
+        return [a for a in (st.get("alerts") or []) if (a.get("ts") or 0) >= cut]
+    except Exception:
+        return []
 
 
 def fetch_analysis():
@@ -641,10 +940,18 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     open_trades = open_trades or {}
     en = enrich or {}
     badge = ""
-    if bot in BADGES:
-        _t, _c = BADGES[bot]
+    _base_bot, _suf = venue_variant(bot)
+    if _base_bot in BADGES:
+        _t, _c = BADGES[_base_bot]
         badge = (f' <span style="font-size:10px;border:1px solid {_c};color:{_c};'
                  f'border-radius:6px;padding:1px 5px;vertical-align:middle">{_t}</span>')
+    # [2026-07-09 LIGHTER GO-LIVE] mode badge — LIVE (real money) stands out in
+    # red-filled, TESTNET amber, SHADOW blue, so a live bot is unmistakable.
+    if _suf:
+        _vt, _vc, _ = VENUE_SUFFIXES[_suf]
+        badge += (f' <span style="font-size:10px;border:1px solid {_vc};color:#fff;'
+                  f'background:{_vc};border-radius:6px;padding:1px 6px;'
+                  f'vertical-align:middle;font-weight:700;letter-spacing:.3px">{_vt}</span>')
     if row is None:
         return (f'<div class="card"><h2>{html.escape(label_for(bot))}{badge} '
                 f'<span class="dot off"></span></h2>'
@@ -671,12 +978,19 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     # source the bot exposes so every card states its number explicitly.
     _pnl_abs = row.get("pnl_abs")
     _eq = row.get("equity")
-    if _pnl_abs is None and _eq is not None and bot not in STOCKS and bot not in SCANNERS:
+    # [2026-07-10] Live Lighter bots fund from real collateral (e.g. $65), NOT
+    # the $1000 paper start — so NEVER apply the paper baseline to them, or an
+    # untraded live account reads a phantom -$935. Their publisher sends real
+    # pnl_abs (equity - starting collateral); if it's ever None, show nothing.
+    _is_live = is_live_bot(bot)
+    if (_pnl_abs is None and _eq is not None and bot not in STOCKS
+            and bot not in SCANNERS and not _is_live):
         _pnl_abs = _eq - PAPER_START_EQUITY          # paper bots start at $1,000
     if _pnl_abs is not None:
         pnl_label = "Paper (arb)" if bot in SCANNERS else "Total P&amp;L"
         _pct = row.get("pnl_pct")
-        if _pct is None and _eq not in (None, 0) and bot not in STOCKS and bot not in SCANNERS:
+        if (_pct is None and _eq not in (None, 0) and bot not in STOCKS
+                and bot not in SCANNERS and not _is_live):
             _pct = _pnl_abs / PAPER_START_EQUITY
         rows.append(f'<div class="row"><span>{pnl_label}</span>'
                     f'<b class="{cls(_pnl_abs)}">{money(_pnl_abs)}'
@@ -818,8 +1132,9 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
 
 
 def render():
+    hidden = fetch_hidden_bots()
     try:
-        rows = fetch_rows()
+        rows = fetch_rows(hidden=hidden)
         db_err = None
     except Exception as e:
         rows, db_err = {}, f"{type(e).__name__}: {e}"
@@ -848,10 +1163,17 @@ def render():
             "mode: range_on pullback buys (BTC 4h RISK-ON)" if _reg.get("risk_on")
             else "mode: bear_bounce only — sweep-reclaim setups (BTC 4h RISK-OFF)")
 
-    # union of expected + whatever actually published
-    names = list(EXPECTED) + [b for b in rows if b not in EXPECTED]
-    cards = [card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
-                  mode_notes.get(b), enrich.get(b)) for b in names]
+    # union of expected + whatever actually published. Hidden bots are already
+    # out of `rows` (fetch_rows), but EXPECTED would resurrect a placeholder
+    # card for them — filter here too so hide really means gone.
+    names = [b for b in list(EXPECTED) + [b for b in rows if b not in EXPECTED]
+             if b not in hidden]
+    # [2026-07-10] Real-money Lighter bots get their OWN section at the top of the
+    # page, not interspersed with the paper fleet. is_live_bot = <bot>-lighter rows.
+    _mk = lambda b: card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
+                         mode_notes.get(b), enrich.get(b))
+    live_cards = [_mk(b) for b in names if is_live_bot(b)]
+    cards = [_mk(b) for b in names if not is_live_bot(b)]
     if brain_html:
         cards.append(brain_html)
 
@@ -875,15 +1197,39 @@ def render():
                    if checks else
                    '<div class="okline">Health ✓ persistence intact · no over-trading · probation within bounds</div>')
 
+    # [2026-07-11 EVIDENCE ALERTS] recent alerts from market_context's evidence
+    # evaluator (dislocation census hits, factor-sample milestones, coin-veto
+    # changes, live-vs-shadow divergence). Signal layer only — the sole
+    # automated ACTION in the fleet is the restrict-only coin-veto list.
+    _fa = fetch_fleet_alerts()
+    if _fa:
+        health_html += ('<div class="banner">🔔 EVIDENCE: '
+                        + " · ".join(html.escape(a.get("msg") or "")
+                                     for a in _fa[-6:]) + "</div>")
+
     live = [r for r in rows.values() if r]
-    _crypto = [r for r in live if r.get("bot") not in STOCKS]
-    # Crypto trading-bot P&L (the real headline) excludes scanners AND stocks;
-    # each of those is shown as its own subtotal so it can't distort the total.
+    # [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows (live/testnet/shadow on
+    # Lighter) are their OWN groups — never folded into the paper headline, so
+    # the paper curve stays clean and the LIVE fleet gets its own P&L line.
+    def _variant_kind(r):
+        return venue_variant(r.get("bot") or "")[1]
+    live_rows = [r for r in live if is_live_bot(r.get("bot") or "")]
+    shadow_rows = [r for r in live if _variant_kind(r) in ("-lshadow", "-ltest")]
+    _crypto = [r for r in live if r.get("bot") not in STOCKS and not _variant_kind(r)]
+    # Crypto trading-bot P&L (the real headline) excludes scanners AND stocks AND
+    # venue variants; each of those is shown as its own subtotal so it can't
+    # distort the paper total.
     tot_pnl = sum((r.get("pnl_abs") or 0) for r in _crypto
                   if r.get("bot") not in SCANNERS)
     scan_pnl = sum((r.get("pnl_abs") or 0) for r in live
                    if r.get("bot") in SCANNERS)
     stock_pnl = sum((r.get("pnl_abs") or 0) for r in live if r.get("bot") in STOCKS)
+    # LIVE (real money on Lighter) — the number that actually matters once funded.
+    live_pnl = sum((r.get("pnl_abs") or 0) for r in live_rows)
+    live_equity = sum((r.get("equity") or 0) for r in live_rows if r.get("equity") is not None)
+    n_live_bots = len(live_rows)
+    shadow_pnl = sum((r.get("pnl_abs") or 0) for r in shadow_rows)
+    n_shadow_bots = len(shadow_rows)
     tot_equity = sum((r.get("equity") or 0) for r in _crypto if r.get("equity") is not None)
     stock_equity = sum((r.get("equity") or 0) for r in live
                        if r.get("bot") in STOCKS and r.get("equity") is not None)
@@ -896,7 +1242,9 @@ def render():
     # Grand total across EVERYTHING (the full picture). Equity is a clean sum of
     # all account balances; P&L sums all bots' pnl_abs (mixed bases — see subtotals).
     grand_equity = sum((r.get("equity") or 0) for r in live if r.get("equity") is not None)
-    grand_pnl = tot_pnl + scan_pnl + stock_pnl
+    # Real-money live P&L IS part of the grand total; shadow is modelled (not real)
+    # so it stays out of the headline and only shows on its own muted line.
+    grand_pnl = tot_pnl + scan_pnl + stock_pnl + live_pnl
 
     # Whole-feed staleness. The DB can be reachable and rows can exist, yet every
     # row is old because the bots lost their write path (the exact failure mode on
@@ -932,36 +1280,177 @@ def render():
                   f'but unable to write to Postgres — check the DATABASE_URL reference on '
                   f'each bot service and redeploy.</div>')
 
+    # [2026-07-09 LIGHTER GO-LIVE] The LIVE fleet gets its own prominent P&L line
+    # (real money on Lighter, separate from every paper number). Shadow/testnet
+    # get a muted line so the compressed gate ladder is visible at a glance.
+    live_total_line = ""
+    if n_live_bots:
+        live_total_line += (
+            f'<span style="border:1px solid #f85149;border-radius:6px;padding:2px 9px;'
+            f'background:#f8514918;font-weight:600">🔴 LIVE · Lighter '
+            f'<b>{money(live_equity)}</b> eq · '
+            f'<b class="{cls(live_pnl)}">{money(live_pnl)}</b> P&amp;L · '
+            f'{n_live_bots} bot{"s" if n_live_bots != 1 else ""}</span>')
+    if n_shadow_bots:
+        live_total_line += (
+            f'<span class="muted" style="border:1px solid #30363d;border-radius:6px;'
+            f'padding:2px 9px">shadow/testnet <b class="{cls(shadow_pnl)}">'
+            f'{money(shadow_pnl)}</b> · {n_shadow_bots} bot'
+            f'{"s" if n_shadow_bots != 1 else ""} (modelled)</span>')
+
+    # [2026-07-13 INTERACTIVE MANAGE] Hide/unhide/delete panel. Hide = persisted
+    # in bot_state (reversible, survives redeploys, respected by the grid, the
+    # totals and /pnl.json). Delete = drop the bot_pnl row only (ledger history
+    # stays; an active bot's row reappears on its next publish, so delete can
+    # only permanently remove bots that no longer run).
+    try:
+        _all_ids = fetch_all_bot_ids()
+    except Exception:  # noqa: BLE001
+        _all_ids = []
+
+    def _mrow(b, kind):
+        lbl = html.escape(label_for(b))
+        bid = html.escape(b, quote=True)
+        btns = ""
+        if kind == "visible":
+            btns += (f'<button class="mbtn" onclick="botAdmin(\'hide\',\'{bid}\')">'
+                     f'hide</button>')
+        elif kind == "hidden":
+            btns += (f'<button class="mbtn" onclick="botAdmin(\'unhide\',\'{bid}\')">'
+                     f'unhide</button>')
+        btns += (f'<button class="mbtn del" onclick="botAdmin(\'delete\',\'{bid}\')">'
+                 f'delete row</button>')
+        note = {"visible": "", "hidden": " · hidden by you",
+                "retired": " · retired in code"}[kind]
+        return (f'<div class="mrow"><span class="mname">{lbl}'
+                f'<span class="muted"> — {bid}{note}</span></span>{btns}</div>')
+
+    _visible_ids = sorted(set(list(rows.keys()) + [b for b in names if b in CURRENT_BOTS]))
+    _hidden_ids = sorted(hidden.keys())
+    _retired_ids = sorted(b for b in _all_ids
+                          if b in RETIRED_ROWS and b not in hidden)
+    manage_html = (
+        '<details class="manage"><summary>🗂 Manage bots — hide or delete retired/bunk rows</summary>'
+        '<div class="mnote">Hide removes a bot from the grid, totals and feeds (reversible, '
+        'survives redeploys). Delete drops the dashboard row only — trade history stays in the '
+        'ledgers, and an <b>active</b> bot\'s row reappears on its next publish, so delete is '
+        'only permanent for bots that no longer run.</div>'
+        + '<div class="mgroup">Visible</div>'
+        + ("".join(_mrow(b, "visible") for b in _visible_ids) or '<div class="muted">none</div>')
+        + '<div class="mgroup">Hidden by you</div>'
+        + ("".join(_mrow(b, "hidden") for b in _hidden_ids) or '<div class="muted mrow">none</div>')
+        + ('<div class="mgroup">Retired in code (already hidden — rows still in the table)</div>'
+           + "".join(_mrow(b, "retired") for b in _retired_ids) if _retired_ids else "")
+        + '</details>'
+        + '''<script>
+async function botAdmin(action, bot){
+  if (action === 'delete' &&
+      !confirm('Delete the dashboard row for "' + bot + '"?\\n\\nLedger history stays. ' +
+               'If the bot still runs, the row reappears on its next publish.')) return;
+  try {
+    const r = await fetch('/admin/bot', {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+      body: JSON.stringify({action: action, bot: bot})});
+    const j = await r.json();
+    if (!j.ok) { alert('failed: ' + (j.error || r.status)); return; }
+  } catch (e) { alert('failed: ' + e); return; }
+  location.reload();
+}
+</script>''')
+
+    # [2026-07-10] Dedicated "Lighter Live" section — real-money bots grouped at
+    # the top in their own bordered block so live money is never lost in the grid.
+    live_section = ""
+    if live_cards:
+        live_section = (
+            f'<section class="livewrap">'
+            f'<div class="livehdr">⚡ Lighter Live <span class="livetag">REAL MONEY</span>'
+            f'<span class="livesum">{money(live_equity)} eq · '
+            f'<b class="{cls(live_pnl)}">{money(live_pnl)}</b> P&amp;L · '
+            f'{n_live_bots} bot{"s" if n_live_bots != 1 else ""}</span></div>'
+            f'<div class="grid">{"".join(live_cards)}</div></section>')
+
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="30">
 <title>All Bots — Live P&amp;L</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&amp;display=swap" rel="stylesheet">
 <style>
- body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
- header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
- h1{{margin:0 0 6px;font-size:18px}}
- .totals{{display:flex;gap:18px;flex-wrap:wrap;font-size:14px}}
+ @keyframes gradientshift{{0%{{background-position:0% 50%}}50%{{background-position:100% 50%}}100%{{background-position:0% 50%}}}}
+ body{{font-family:-apple-system,system-ui,sans-serif;margin:0;color:#16232c;
+   background-color:#eef7fd;
+   background-image:repeating-linear-gradient(180deg,#ffffff 0 70px,#aed8f6 70px 140px);
+   background-attachment:fixed}}
+ /* the "$ EJMC $" graffiti piece — fixed behind the cards (z-index:-1 so the
+    striped body shows behind it and the cards sit on top). */
+ .wm{{position:fixed;inset:0;z-index:-1;display:flex;align-items:center;
+   justify-content:center;pointer-events:none;overflow:hidden}}
+ .wm svg{{width:min(97vw,2000px);height:auto}}
+ header{{padding:16px 18px;background:#ffffffd9;backdrop-filter:blur(2px);
+   border-bottom:3px solid #caa227;position:relative}}
+ header::after{{content:"";position:absolute;left:0;right:0;bottom:-6px;height:2px;
+   background:linear-gradient(90deg,#f4d879,#caa227,#8a6d1a,#caa227,#f4d879);
+   background-size:300% 100%;animation:gradientshift 6s ease infinite}}
+ h1{{margin:0 0 6px;font-size:19px;font-weight:800;letter-spacing:.2px;
+   background:linear-gradient(90deg,#8a6d1a,#caa227 35%,#2f7fd6 65%,#8a6d1a);
+   background-size:300% 100%;-webkit-background-clip:text;background-clip:text;
+   color:transparent;animation:gradientshift 8s ease infinite;display:inline-block}}
+ h1 a{{-webkit-text-fill-color:#1462c9;color:#1462c9}}
+ .totals{{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;color:#16232c}}
  .totals b{{font-size:16px}}
- .banner{{margin:12px 14px 0;padding:10px 12px;background:#3d2b12;border:1px solid #6b4a16;border-radius:8px;color:#f0c674;font-size:13px}}
- .banner.crit{{background:#3d1218;border-color:#6b1620;color:#f85149;font-weight:600}}
- .okline{{margin:12px 14px 0;padding:8px 12px;background:#122117;border:1px solid #1f4428;border-radius:8px;color:#3fb950;font-size:12px}}
+ .banner{{margin:12px 14px 0;padding:10px 12px;background:#fff6dd;border:1px solid #caa227;border-radius:8px;color:#7a5b12;font-size:13px}}
+ .banner.crit{{background:#ffe3e3;border-color:#d1242f;color:#a3121b;font-weight:600}}
+ .okline{{margin:12px 14px 0;padding:8px 12px;background:#e6f7ec;border:1px solid #caa227;border-radius:8px;color:#1a7f37;font-size:12px}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:14px}}
- .card{{background:#161b22;border:1px solid #222;border-radius:10px;padding:14px}}
+ /* [2026-07-10] Lighter Live section — real money, visually set apart */
+ .livewrap{{margin:14px 14px 4px;border:2px solid #d1242f;border-radius:12px;
+   box-shadow:0 0 0 1px #caa227 inset,0 0 22px -6px #d1242f66;
+   background:linear-gradient(180deg,#ffececcc,#fff6f6cc);overflow:hidden}}
+ .livewrap .grid{{padding:12px}}
+ .livehdr{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+   padding:11px 14px;background:#d1242f14;border-bottom:1px solid #d1242f33;
+   font-size:15px;font-weight:700;color:#a3121b}}
+ .livetag{{font-size:10px;font-weight:800;letter-spacing:.5px;color:#fff;
+   background:#d1242f;border-radius:6px;padding:2px 7px;box-shadow:0 0 10px #d1242f66}}
+ .livesum{{margin-left:auto;font-size:13px;font-weight:500;color:#16232c}}
+ .card{{background:#ffffffcc;border:2.5px solid #d4af37;border-radius:10px;padding:14px;
+   box-shadow:0 0 0 1px #b8860b55,0 1px 0 #ffffffaa inset;
+   transition:border-color .2s,box-shadow .2s}}
+ .card:hover{{border-color:#b8860b;box-shadow:0 0 0 1px #b8860b,0 0 16px -6px #d4af37cc}}
  .card h2{{margin:0 0 2px;font-size:15px}}
  .row{{display:flex;justify-content:space-between;margin:5px 0;font-size:13px}}
- .sub{{margin:10px 0 4px;font-size:12px;color:#8b949e}}
- .muted{{color:#8b949e;font-size:12px}}
- .pos{{color:#3fb950}} .neg{{color:#f85149}}
+ .sub{{margin:10px 0 4px;font-size:12px;color:#5b7184}}
+ .muted{{color:#5b7184;font-size:12px}}
+ .pos{{color:#1a7f37}} .neg{{color:#d1242f}}
  .dot{{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:4px}}
- .dot.on{{background:#3fb950}} .dot.off{{background:#f85149}} .dot.warn{{background:#d29922}}
- footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
+ .dot.on{{background:#1a7f37;box-shadow:0 0 6px #1a7f37}} .dot.off{{background:#d1242f;box-shadow:0 0 6px #d1242f}} .dot.warn{{background:#b8860b;box-shadow:0 0 6px #b8860b}}
+ footer{{padding:10px 18px;color:#5b7184;font-size:11px}}
+ /* [2026-07-13] Manage bots panel */
+ .manage{{margin:6px 14px 0;border:1px solid #caa227;border-radius:10px;
+   background:#ffffffd9;font-size:13px}}
+ .manage summary{{cursor:pointer;padding:9px 13px;font-weight:600;color:#5b4a12}}
+ .manage[open] summary{{border-bottom:1px solid #eadfae}}
+ .mnote{{padding:8px 13px 2px;color:#5b7184;font-size:12px}}
+ .mgroup{{padding:10px 13px 3px;font-weight:700;color:#2f5a7a;font-size:12px;
+   text-transform:uppercase;letter-spacing:.4px}}
+ .mrow{{display:flex;align-items:center;gap:8px;padding:4px 13px}}
+ .mname{{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+ .mbtn{{border:1px solid #b8860b;background:#fff;border-radius:6px;padding:2px 10px;
+   font-size:12px;cursor:pointer;color:#5b4a12}}
+ .mbtn:hover{{background:#fff6dd}}
+ .mbtn.del{{border-color:#d1242f;color:#a3121b}}
+ .mbtn.del:hover{{background:#ffe3e3}}
 </style></head><body>
+{WATERMARK_HTML}
 <header>
  <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a></h1>
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
    <span style="border-right:1px solid #30363d;padding-right:18px">GRAND TOTAL <b>{money(grand_equity)}</b> eq · <b class="{cls(grand_pnl)}">{money(grand_pnl)}</b> P&amp;L</span>
-   <span>Crypto P&amp;L <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b> · eq {money(tot_equity)}</span>
+   {live_total_line}
+   <span>Crypto (paper) <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b> · eq {money(tot_equity)}</span>
    <span>Scanner paper <b class="{cls(scan_pnl)}">{money(scan_pnl)}</b></span>
    <span>Stocks (paper) <b class="{cls(stock_pnl)}">{money(stock_pnl)}</b> · eq {money(stock_equity)}</span>
    <span>Trades <b>{n_closed} closed · {n_open} open</b></span>
@@ -970,7 +1459,9 @@ def render():
 </header>
 {banner}
 {health_html}
+{live_section}
 <div class="grid">{"".join(cards)}</div>
+{manage_html}
 <footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
 </body></html>'''
@@ -1357,9 +1848,10 @@ class H(BaseHTTPRequestHandler):
         if self.path.startswith("/health"):
             self.send_response(200); self._no_cache(); self.end_headers(); self.wfile.write(b"ok"); return
         if self.path.startswith("/watchdog.json"):
-            # In-service fleet watchdog state (fleet_watchdog_svc daemon thread).
-            # Read-only, no auth — no secrets inside. The GH-Actions watchdog and
-            # humans read this to see problems/warnings + whether email is armed.
+            # [2026-07-13 BRANCH MERGE] In-service fleet watchdog state
+            # (fleet_watchdog_svc daemon thread) — ported from the main-branch
+            # dashboard fork so the two variants serve the same surface.
+            # Read-only, no auth — no secrets inside.
             try:
                 import fleet_watchdog_svc
                 body = json.dumps(fleet_watchdog_svc.get_state(), default=str).encode()
@@ -1398,6 +1890,35 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers(); self.wfile.write(body)
             return
+        if self.path.startswith("/alerts.json"):
+            # [2026-07-11] Evidence alerts + the restrict-only coin-veto list
+            # (market_context.py). Read-only, no secrets, no auth — so the
+            # scheduled report sessions and any external watchdog can consume.
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT bot, state, updated_at FROM bot_state "
+                                    "WHERE bot IN ('fleet-alerts', 'coin-vetoes')")
+                        rows_ = {b: (s if isinstance(s, dict) else json.loads(s), u)
+                                 for b, s, u in cur.fetchall()}
+                finally:
+                    conn.close()
+                fa = rows_.get("fleet-alerts", ({}, None))
+                cv = rows_.get("coin-vetoes", ({}, None))
+                body = json.dumps({
+                    "alerts": (fa[0].get("alerts") or [])[-25:],
+                    "alerts_updated_at": fa[1].isoformat() if fa[1] else None,
+                    "coin_vetoes": cv[0].get("coins") or {},
+                    "vetoes_updated_at": cv[1].isoformat() if cv[1] else None,
+                }, default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
         if self.path.startswith("/pnl.json"):
             # Read-only JSON snapshot of every bot, for the scheduled
             # daily/weekly breakdowns. Dry-run paper P&L only — no secrets.
@@ -1419,6 +1940,13 @@ class H(BaseHTTPRequestHandler):
                     # Tag so downstream reports never blend scanner paper-arb
                     # P&L with the trading bots' realized P&L.
                     d["kind"] = "scanner" if r.get("bot") in SCANNERS else "trading"
+                    # [2026-07-09 LIGHTER GO-LIVE] venue provenance for the feed:
+                    # which bots are real-money live vs shadow/testnet vs paper.
+                    _vbase, _vsuf = venue_variant(r.get("bot") or "")
+                    d["venue_mode"] = (VENUE_SUFFIXES[_vsuf][2] if _vsuf
+                                       else (r.get("extra") or {}).get("venue"))
+                    d["live"] = bool(_vsuf == "-lighter")
+                    d["base_bot"] = _vbase
                     # [2026-07-07 UNIFORM CARDS] same server-side enrichment the
                     # cards use, for feed consumers (artifact, reports).
                     _en = _enr.get(r.get("bot")) or {}
@@ -1454,6 +1982,16 @@ class H(BaseHTTPRequestHandler):
                 # single lagging stock bot no longer trips a false whole-feed alarm
                 # — while a truly frozen feed (the 2026-06-22 failure) still does.
                 freshest = min(_age_secs) if _age_secs else None
+                # [2026-07-09 LIGHTER GO-LIVE] real-money live-fleet subtotal so
+                # the scheduled daily/weekly reports can headline it separately.
+                _live_rows = [d for d in data if d.get("live")]
+                live_meta = {
+                    "n_live_bots": len(_live_rows),
+                    "live_pnl": round(sum((d.get("pnl_abs") or 0) for d in _live_rows), 2),
+                    "live_equity": round(sum((d.get("equity") or 0) for d in _live_rows
+                                             if d.get("equity") is not None), 2),
+                    "live_bots": [d.get("bot") for d in _live_rows],
+                }
                 meta = {
                     "generated_at": _now.isoformat(),
                     "stale_threshold_sec": STALE_SECONDS,
@@ -1463,6 +2001,7 @@ class H(BaseHTTPRequestHandler):
                     "feed_stale": bool(_stale_flags) and all(_stale_flags),
                     "n_stale": sum(1 for s in _stale_flags if s),
                     "n_live": len(_stale_flags),
+                    "live_fleet": live_meta,
                 }
                 payload = json.dumps({"meta": meta, "bots": data}).encode("utf-8")
                 code = 200
@@ -1545,6 +2084,53 @@ class H(BaseHTTPRequestHandler):
         self._no_cache()
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self):
+        # [2026-07-13 INTERACTIVE MANAGE] hide / unhide / delete a bot row from
+        # the page. Auth-gated like the HTML pages; the custom header makes a
+        # cross-site page trigger a CORS preflight this server never approves,
+        # so browser-credentialed CSRF can't fire it blind.
+        if not self.path.startswith("/admin/bot"):
+            self.send_response(404); self._no_cache(); self.end_headers()
+            self.wfile.write(b"not found"); return
+        if not self._auth_ok():
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="Crypto Bots"')
+            self.end_headers(); self.wfile.write(b"Auth required"); return
+        if self.headers.get("X-Requested-With") != "fetch":
+            self.send_response(403); self._no_cache(); self.end_headers()
+            self.wfile.write(b"forbidden"); return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(length) or b"{}")
+            bot = str(body.get("bot") or "").strip()
+            action = str(body.get("action") or "").strip()
+            if not bot or len(bot) > 80 or \
+                    not all(c.isalnum() or c in "-_.:" for c in bot):
+                raise ValueError(f"bad bot id {bot!r}")
+            if action not in ("hide", "unhide", "delete"):
+                raise ValueError(f"bad action {action!r}")
+            out = {"ok": True, "bot": bot, "action": action}
+            if action == "hide":
+                hidden = fetch_hidden_bots()
+                hidden[bot] = dt.datetime.now(dt.timezone.utc).isoformat()
+                save_hidden_bots(hidden)
+            elif action == "unhide":
+                hidden = fetch_hidden_bots()
+                hidden.pop(bot, None)
+                save_hidden_bots(hidden)
+            else:  # delete — bot_pnl row only; ledgers/history untouched
+                out["deleted_rows"] = delete_bot_row(bot)
+            payload = json.dumps(out).encode()
+            self.send_response(200)
+        except Exception as e:  # noqa: BLE001
+            payload = json.dumps({"ok": False,
+                                  "error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(400)
+        self._no_cache()
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(payload)
 
     def log_message(self, *a):
         pass
