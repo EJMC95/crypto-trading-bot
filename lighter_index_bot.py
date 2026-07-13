@@ -49,7 +49,10 @@ from venues.safety import SafetyRails
 BOT = "equities-regime"          # row: equities-regime-lshadow
 
 START_EQUITY = 1000.0
-ORDER_USD = float(os.environ.get("INDEX_ORDER_USD", "50"))
+# [2026-07-13 UTILIZATION] $50 -> $250/slot: at 3 sleeves the book deploys up
+# to 75% of its $1,000 instead of 15% — the IBKR original's biggest practical
+# flaw was 10% max deployment (5%/position x 2). Sizing only, not strategy.
+ORDER_USD = float(os.environ.get("INDEX_ORDER_USD", "250"))
 SYMBOLS = os.environ.get("INDEX_SYMBOLS", "SPY,QQQ,XAU").split(",")
 REGIME_SMA = int(os.environ.get("INDEX_REGIME_SMA", "200"))
 
@@ -69,9 +72,20 @@ REGIME_SMA = int(os.environ.get("INDEX_REGIME_SMA", "200"))
 # single names (the IBKR bot's own docs: timing rules fit indices, not
 # stocks). Breakeven funding: SPY +9.2%apr, QQQ +16.6%, XAU-cross +12.0% —
 # the venue printed ~28%apr at probe; the shadow measures the REAL average.
+# [2026-07-13 ENHANCEMENT LAB — scratchpad index_enhance_backtest.py]
+# regime + ±1% HYSTERESIS BAND on the index sleeves: enter > SMA200*1.01,
+# exit < SMA200*0.99. 15y: SPY +8.4%/20.2%DD (raw daily200 +7.7%/22.5%),
+# QQQ +14.4%/22.1% (raw +13.9%/22.3%), switches HALVED (2.3-2.8/yr vs
+# 4.5-5.6) — and robust: every band 0.5..2.0% beats raw on both indices in
+# BOTH window halves (a whipsaw-suppression plateau, not a fit). Divergence
+# from the IBKR twin (raw daily200) is deliberate and documented — the twin
+# doubles as the raw-vs-banded control.
+# REJECTED by the same lab (don't re-test): monthly-eval Faber timing (DD
+# 26-29% vs 20-22%), long/short regime (SPY +1.6%/46%DD), dual-momentum
+# SPY/QQQ rotation (+6.6% portfolio CAGR vs +9.9% shipped).
 SLEEVES = {          # symbol -> (rule, param)
-    "SPY": ("regime", 200),
-    "QQQ": ("regime", 200),
+    "SPY": ("regime_band", (200, 0.01)),
+    "QQQ": ("regime_band", (200, 0.01)),
     "XAU": ("sma_cross", (20, 50)),
 }
 YAHOO_REF = {"XAU": "GC=F", "XAG": "SI=F", "WTI": "CL=F",
@@ -111,11 +125,28 @@ def pos_sma_cross(close, fast=20, slow=50):
     return [1 if (f[i] and s[i] and f[i] > s[i]) else 0 for i in range(len(close))]
 
 
+def pos_regime_band(close, period=200, band=0.01):
+    """pos_regime with a hysteresis band: enter above SMA*(1+band), exit below
+    SMA*(1-band). Inside the band the previous state holds (whipsaw filter)."""
+    m = sma(close, period)
+    pos, holding = [], 0
+    for i in range(len(close)):
+        if m[i]:
+            if close[i] > m[i] * (1 + band):
+                holding = 1
+            elif close[i] < m[i] * (1 - band):
+                holding = 0
+        pos.append(holding)
+    return pos
+
+
 def want_position(symbol, closes):
-    """Desired position for `symbol` on its sleeve's rule (verbatim ports)."""
+    """Desired position for `symbol` on its sleeve's rule."""
     rule, param = SLEEVES.get(symbol, ("regime", REGIME_SMA))
     if rule == "sma_cross":
         return pos_sma_cross(closes, *param)[-1]
+    if rule == "regime_band":
+        return pos_regime_band(closes, *param)[-1]
     return pos_regime(closes, param)[-1]
 
 
