@@ -54,10 +54,25 @@ BOT = "equities-momentum"        # row: equities-momentum-lshadow
 START_EQUITY = 1000.0
 ORDER_USD = float(os.environ.get("MOMO_ORDER_USD", "180"))
 TOP_N = int(os.environ.get("MOMO_TOP_N", "5"))
+# [2026-07-13 REACH WIDENING — evidence in the 13-Jul universe sweep]
+# MULTI-ASSET rotation: gold/silver/oil + BTC/ETH now COMPETE for the same
+# five slots as the 20 stocks. Backtest (same harness, 15y, both halves):
+# beats the stock-only universe on CAGR AND maxDD in ALL SIX configs tested
+# (top3/5/8 x lb42/63; e.g. top5/42: +43.7%/44.3%DD vs +35.6%/50.1%DD) —
+# both-halves better in every cell. NOTE this is DISTINCT from the rejected
+# crypto x-sect momentum factor (Counterweight lab: 72h ranks, crypto-only);
+# here BTC/ETH are 2 of 25 candidates on 42d ranks behind SMA200 qualifiers.
+# REJECTED in the same sweep (don't re-test): EWY (adds nothing — never
+# out-ranks the growth names), SOXL (no benefit even before the objection
+# that a 3x levered ETF has no place in a 1x fleet), Asia singles + thematic
+# ETFs (MAGS/SOXX/BOTZ/ROBO/URA/TENCENT/BYD/XIAOMI/SAMSUNG etc.: dead books).
 UNIVERSE = os.environ.get(
     "MOMO_SYMBOLS",
     "MU,SNDK,NVDA,META,COIN,AMD,SPY,QQQ,INTC,MSTR,HOOD,CRCL,MSFT,MRVL,TSLA,"
-    "AMZN,GOOGL,AAPL,RKLB,NBIS").split(",")
+    "AMZN,GOOGL,AAPL,RKLB,NBIS,XAU,XAG,WTI,BTC,ETH").split(",")
+# Yahoo reference tickers for the non-equity legs (equities map 1:1).
+REF_MAP = {"XAU": "GC=F", "XAG": "SI=F", "WTI": "CL=F",
+           "BTC": "BTC-USD", "ETH": "ETH-USD"}
 TREND_MA, SLOW_MA, FAST_MA = 200, 50, 20         # Alpaca config.py values
 MOMENTUM_LOOKBACK = int(os.environ.get("MOMO_LOOKBACK", "42"))
 REBALANCE_DAYS = float(os.environ.get("MOMO_REBALANCE_DAYS", "7"))
@@ -126,8 +141,9 @@ def ref_closes(symbol):
     hit = _ref_cache.get(symbol)
     if hit and time.time() - hit["ts"] < _REF_TTL_S:
         return hit["closes"]
+    ref = REF_MAP.get(symbol, symbol)
     url = (f"https://query1.finance.yahoo.com/v8/finance/chart/"
-           f"{urllib.parse.quote(symbol, safe='')}?range=2y&interval=1d")
+           f"{urllib.parse.quote(ref, safe='')}?range=2y&interval=1d")
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         raw = json.loads(urllib.request.urlopen(req, timeout=20).read())
