@@ -1,0 +1,22 @@
+# Image for 📊 Index Rider (the IBKR stock bot on Lighter STOCK PERPS) —
+# SHADOW ONLY in v1. Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.indexshadow
+#   VENUE=lighter_shadow
+#   DATABASE_URL=${{Postgres.DATABASE_URL}}
+# Signal = close > SMA200 on the real market's dailies (Yahoo, keyless);
+# execution/marks/funding = Lighter SPY/QQQ perps via ShadowBroker. The bot
+# REFUSES lighter_live in v1: the funding-drag record vs the IBKR paper twin
+# (control arm) earns (or kills) any go-live. No keys needed for shadow.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_index_bot.py bot_pnl_store.py paper_broker.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_index_bot.py"]
