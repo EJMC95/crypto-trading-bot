@@ -38,6 +38,7 @@ import logging
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
@@ -49,8 +50,32 @@ BOT = "equities-regime"          # row: equities-regime-lshadow
 
 START_EQUITY = 1000.0
 ORDER_USD = float(os.environ.get("INDEX_ORDER_USD", "50"))
-SYMBOLS = os.environ.get("INDEX_SYMBOLS", "SPY,QQQ").split(",")
+SYMBOLS = os.environ.get("INDEX_SYMBOLS", "SPY,QQQ,XAU").split(",")
 REGIME_SMA = int(os.environ.get("INDEX_REGIME_SMA", "200"))
+
+# [2026-07-13 UNIVERSE EXPANSION — evidence in the 13-Jul sweep, scratchpad
+# index_universe_backtest.py, 15y Yahoo dailies, 10bps/switch cost]
+# Per-symbol rule + Yahoo reference. Both rules are VERBATIM from the IBKR
+# bot's signals.py with its own config defaults (regime_sma 200; fast/slow
+# 20/50) — no invented parameters.
+#   SPY  regime200:   +7.7% CAGR / 22.5% maxDD (B&H +12.6%/34.1%) — shipped v1
+#   QQQ  regime200:  +13.9% / 22.3% (B&H +18.3%/35.6%)            — shipped v1
+#   XAU  sma20/50:    +6.4% / 20.7% (B&H +6.5%/41.4%); regime200 was marginal
+#        (+4.0%/33.1%). Robust: every neighbour pair 15/40..30/70 positive
+#        (+4.8..+7.6%), recent-half all positive — a plateau, not a fit.
+# REJECTED by the same sweep (don't re-test): XAG (+1.2% regime / 55% DD
+# cross), WTI (-4.4% regime), BRENT (-0.7%), XCU (+0.4%), XPT (-5.3%);
+# NATGAS (broken funding print, decay); US500/US100 (duplicate SPY/QQQ);
+# single names (the IBKR bot's own docs: timing rules fit indices, not
+# stocks). Breakeven funding: SPY +9.2%apr, QQQ +16.6%, XAU-cross +12.0% —
+# the venue printed ~28%apr at probe; the shadow measures the REAL average.
+SLEEVES = {          # symbol -> (rule, param)
+    "SPY": ("regime", 200),
+    "QQQ": ("regime", 200),
+    "XAU": ("sma_cross", (20, 50)),
+}
+YAHOO_REF = {"XAU": "GC=F", "XAG": "SI=F", "WTI": "CL=F",
+             "BRENTOIL": "BZ=F", "XCU": "HG=F", "XPT": "PL=F"}
 CATASTROPHIC_STOP = float(os.environ.get("INDEX_CATASTROPHIC_STOP", "0.15"))
 DAILY_LOSS_LIMIT = float(os.environ.get("INDEX_DAILY_LOSS", "0.10"))
 LOOP_SECONDS = int(os.environ.get("INDEX_LOOP_SECONDS", "300"))
@@ -81,6 +106,19 @@ def pos_regime(close, period=200):
     return [1 if (m[i] and close[i] > m[i]) else 0 for i in range(len(close))]
 
 
+def pos_sma_cross(close, fast=20, slow=50):
+    f, s = sma(close, fast), sma(close, slow)
+    return [1 if (f[i] and s[i] and f[i] > s[i]) else 0 for i in range(len(close))]
+
+
+def want_position(symbol, closes):
+    """Desired position for `symbol` on its sleeve's rule (verbatim ports)."""
+    rule, param = SLEEVES.get(symbol, ("regime", REGIME_SMA))
+    if rule == "sma_cross":
+        return pos_sma_cross(closes, *param)[-1]
+    return pos_regime(closes, param)[-1]
+
+
 # --- reference daily closes (Yahoo chart API; keyless; ~2y of history) ------
 # (stooq was the first choice but now sits behind a JS proof-of-work wall.)
 # PARITY NOTE: the IBKR bot decides on the LATEST daily bar IB returns —
@@ -96,7 +134,8 @@ def ref_closes(symbol):
     hit = _ref_cache.get(symbol)
     if hit and time.time() - hit["ts"] < _REF_TTL_S:
         return hit
-    url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+    ref_sym = urllib.parse.quote(YAHOO_REF.get(symbol, symbol), safe="")
+    url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{ref_sym}"
            f"?range=2y&interval=1d")
     try:
         req = urllib.request.Request(url, headers={
@@ -185,10 +224,11 @@ def main():
     log.info("=" * 64)
     log.info("Index Rider (STOCK PERPS on Lighter, shadow) | %s (skipped: %s)",
              ", ".join(symbols), ", ".join(skipped) or "none")
-    log.info("signal: close > SMA%d on the REAL market's dailies (Yahoo) — "
-             "verbatim IBKR-bot pos_regime | $%.0f/slot x %d | seatbelt %.0f%% "
-             "| loop=%ds", REGIME_SMA, ORDER_USD, MAX_OPEN,
-             CATASTROPHIC_STOP * 100, LOOP_SECONDS)
+    log.info("sleeves: %s — signals on the REAL market's dailies (Yahoo), "
+             "rules verbatim from the IBKR bot's signals.py | $%.0f/slot x %d "
+             "| seatbelt %.0f%% | loop=%ds",
+             {s: SLEEVES.get(s, ("regime", REGIME_SMA)) for s in symbols},
+             ORDER_USD, MAX_OPEN, CATASTROPHIC_STOP * 100, LOOP_SECONDS)
     log.info("EVIDENCE-FIRST: measures the funding drag a long pays on equity "
              "perps (~28%% APR at probe). IBKR paper twin = control arm. "
              "lighter_live REFUSED in v1.")
@@ -288,7 +328,7 @@ def main():
             if ref is None:
                 regime[s] = None
                 continue
-            want = pos_regime(ref["closes"], REGIME_SMA)[-1]
+            want = want_position(s, ref["closes"])
             regime[s] = want
 
             if held and want == 0 and px:
@@ -312,9 +352,10 @@ def main():
                 ent = broker.pos.get(s)
                 meta[s] = {"entry": (ent[1] if ent else px),
                            "opened_ts": t0, "accrued": 0.0}
-                log.info("OPEN %s long $%.0f @ %.4f | close>SMA%d (ref %s) | "
+                rule, param = SLEEVES.get(s, ("regime", REGIME_SMA))
+                log.info("OPEN %s long $%.0f @ %.4f | %s%s (ref %s) | "
                          "funding %.1f%%apr", s, ORDER_USD, meta[s]["entry"],
-                         REGIME_SMA, ref["last_date"],
+                         rule, param, ref["last_date"],
                          ((fund.get(s) or {}).get("rate") or 0) * 24 * 365 * 100)
 
         # ---- publish + persist ----
@@ -327,6 +368,8 @@ def main():
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": mode, "venue": mode, "style": "stock-perp-regime",
                        "held": sorted(meta.keys()),
+                       "sleeves": {s: SLEEVES.get(s, ("regime", REGIME_SMA))[0]
+                                   for s in symbols},
                        "regime": {s: regime.get(s) for s in symbols},
                        "fund_realized": round(fund_realized, 4),
                        "fund_open": round(open_accr, 4),
