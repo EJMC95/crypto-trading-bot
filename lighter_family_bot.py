@@ -450,9 +450,10 @@ class DayTraderGated:
                 and dc20 is not None and c[i] > dc20
                 and band_pct >= self.BAND_PCT_ON and live_vol):
             tag = "trend_breakout"
-        if (adx[i] is not None and adx[i] < 20 and c[i] <= buy_zone
-                and band_pct >= self.BAND_PCT_ON and uptick and live_vol):
-            tag = "range_meanrev"
+        # [2026-07-13 SLEEVE RETIRED with the freqtrade twin] range_meanrev —
+        # 7d live in both Kraken carriers: 52 entries, -$13.94, negative in
+        # every band bucket and under every stop variant. Twin parity: see
+        # DayTraderV5Gated.py for the full evidence note.
 
         exit_ = (c[i] >= sell_zone and live_vol)
         return {"enter": tag, "exit": exit_, "exit_reason": "range_top",
@@ -473,7 +474,10 @@ class DayTraderGated:
         atr = (sig or {}).get("atr")
         if not atr or not px:
             return -self.stoploss
-        mult = 2.0 if tag in ("bounce_pullback", "range_meanrev") else 2.5
+        # [2026-07-13] counter-trend stop 2.0x -> 3.5x, matching the freqtrade
+        # twin (post-exit replay: the 2.0x stop fired on noise, 77-89% of
+        # stop-outs reclaimed entry within 24h).
+        mult = 3.5 if tag in ("bounce_pullback", "range_meanrev") else 2.5
         return min(mult * atr / px, -self.stoploss)
 
     def custom_exit(self, tag, age_min, profit):
