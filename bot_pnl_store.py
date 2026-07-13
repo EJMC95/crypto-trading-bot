@@ -355,7 +355,7 @@ def _ensure_trades_table(conn):
         # [2026-07-06] Migrate old (bot, open_ts) PK -> (bot, open_ts, pair).
         # Recreate the table if the old constraint exists to fix cross-bot collisions.
         cur.execute("""
-            DO \$\$
+            DO $$
             BEGIN
                 IF EXISTS (
                     SELECT 1 FROM information_schema.table_constraints
@@ -376,7 +376,7 @@ def _ensure_trades_table(conn):
                     END IF;
                 END IF;
             END
-            \$\$;
+            $$;
         """)
         conn.commit()
         cur.execute(
