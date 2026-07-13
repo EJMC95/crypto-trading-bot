@@ -275,7 +275,7 @@ DESCRIPTIONS = {
     "equities-regime":      "SPY + QQQ long above the 200d SMA (±1% band) + gold on a 20/50 cross · $250 × 3 slots",
     "equities-regime-ibkr": "the same 200d regime rule on IBKR paper (raw, unbanded) — Index Rider's control arm",
     "equities-momentum-alpaca": "momentum-ranked US stock rotation (weekday close cron) — Stock Leaders' control arm",
-    "equities-momentum":    "qualifies close>SMA200 & SMA20>SMA50, ranks by 42d return, holds top-5 of 20 names, weekly rotation · $180 × 5 slots",
+    "equities-momentum":    "qualifies close>SMA200 & SMA20>SMA50, ranks by 42d return, holds top-5 of 25 (US stocks + gold/silver/oil + BTC/ETH), weekly rotation · $180 × 5 slots",
 }
 
 
