@@ -1061,6 +1061,32 @@ def monitor(cfg, exchange_ids):
         except Exception:
             pass
 
+        # [2026-07-14 L3 SIGNAL BUS] Publish the intel classifications as their
+        # own bot_state key. The 07-07 design's Layer 3 called for scanner
+        # knowledge on the bus; until now classifications lived only in-process,
+        # invisible to the brain/dashboard. `updated` is ISO so consumers can
+        # apply the standard freshness contract (fleet_bus.is_fresh).
+        try:
+            _intel_counts = {}
+            for _p in positions:
+                _k = _p.get("intel") or "unknown"
+                _intel_counts[_k] = _intel_counts.get(_k, 0) + 1
+            with _store_lock:
+                store.save_state("listing-intel", {
+                    "updated": now_utc().isoformat(timespec="seconds"),
+                    "ttl_sec": 1800,
+                    "open_by_class": _intel_counts,
+                    "ghost_skipped_total": len(_GHOST_SKIPPED),
+                    "open_detail": [
+                        {"sym": _p.get("pair_id"), "class": _p.get("intel"),
+                         "detail": _p.get("intel_detail"),
+                         "venue": _p.get("exchange")}
+                        for _p in positions[:40]
+                    ],
+                })
+        except Exception:
+            pass
+
         # Heartbeat
         ok_n = len(results)
         skip_n = len(skipped)

@@ -547,10 +547,18 @@ def fetch_paper_trades(limit=2000):
         out = []
         for bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason in rows:
             reason = reason or ""
-            if "_" in reason:
+            # [2026-07-14 TAG-SEMANTICS FIX] Only a real direction prefix
+            # (long_/short_) carries entry info. Splitting EVERY reason made
+            # exit reasons masquerade as entry modes — funding-carry's 'flip'
+            # and the sniper's 'delisted' became enter_tags, and the brain
+            # spent 92 runs proposing to "tighten the 'flip' entry gates"
+            # (an exit path, not an entry). Now: no direction prefix ->
+            # untagged entry + the FULL reason kept as exit_reason (also fixes
+            # 'decay_paid' being mangled into enter 'decay' / exit 'paid').
+            if reason.startswith(("long_", "short_")):
                 direction, _sep, exit_reason = reason.partition("_")
             else:
-                direction, exit_reason = (reason or "trade"), (reason or "trade")
+                direction, exit_reason = "", (reason or "trade")
             dur = None
             try:
                 if opened_at and closed_at:
@@ -563,7 +571,7 @@ def fetch_paper_trades(limit=2000):
                 "bot": bot, "pair": pair,
                 "profit_abs": float(pnl_abs) if pnl_abs is not None else 0.0,
                 "profit_ratio": pnl_pct,
-                "enter_tag": direction or "trade",
+                "enter_tag": direction or None,   # None -> brain's "(untagged)"
                 "exit_reason": exit_reason or "trade",
                 "duration_min": dur,
                 "open_ts": opened_at, "close_ts": closed_at,
@@ -652,6 +660,43 @@ def _ensure_history_table(conn):
             "CREATE INDEX IF NOT EXISTS bot_state_history_key_ts "
             "ON bot_state_history (key, ts)")
     _history_table_ready = True
+
+
+def fetch_state_history(key, limit=800):
+    """[2026-07-14] Read side of save_history: recent bot_state_history
+    snapshots for one shared-layer key, NEWEST FIRST -> [{"ts": iso, "payload":
+    dict}]. Built for the brain's diagnosis layer (joining trades to the
+    regime-oracle reading at their open time). Returns [] when unavailable."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        _ensure_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ts, payload FROM bot_state_history "
+                "WHERE key = %s ORDER BY ts DESC LIMIT %s",
+                (key, int(limit)))
+            rows = cur.fetchall()
+        out = []
+        for ts, payload in rows:
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except Exception:
+                    continue
+            out.append({"ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+                        "payload": payload or {}})
+        return out
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"state-history read failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return []
 
 
 def save_history(key, payload):

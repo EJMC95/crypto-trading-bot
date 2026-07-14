@@ -2036,6 +2036,43 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers(); self.wfile.write(body)
             return
+        if self.path.startswith("/disloc.json"):
+            # [2026-07-14] Snap Back's dislocation CENSUS — the evidence the
+            # bot exists to collect (per-coin count / max_bps / last seen of
+            # every >=50bps Lighter-vs-HL print). Read-only, no auth: only the
+            # census + counters are exposed, never the broker/position blob.
+            # Serves the census reviews the bot's alerts keep asking for.
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT bot, state, updated_at FROM bot_state "
+                            "WHERE bot IN ('lighter-dislocation-lshadow', "
+                            "'lighter-dislocation-lighter', 'lighter-dislocation')")
+                        rows_ = cur.fetchall()
+                finally:
+                    conn.close()
+                payload = {"books": {}}
+                for b, st, u in rows_:
+                    st = st if isinstance(st, dict) else json.loads(st)
+                    census = st.get("census") or {}
+                    payload["books"][b] = {
+                        "updated_at": u.isoformat() if u else None,
+                        "census_events": sum(int(c.get("count") or 0)
+                                             for c in census.values()),
+                        "census": census,
+                    }
+                if not payload["books"]:
+                    payload = {"error": "no dislocation census published yet"}
+                body = json.dumps(payload, default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
         if self.path.startswith("/alerts.json"):
             # [2026-07-11] Evidence alerts + the restrict-only coin-veto list
             # (market_context.py). Read-only, no secrets, no auth — so the

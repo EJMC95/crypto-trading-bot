@@ -1,4 +1,5 @@
 {
+  "$comment": "2026-07-14: this repo deploys on RAILWAY (see RAILWAY_DEPLOY.md). A connected Vercel project ('ejmc/crypto-trading-bot') tried to deploy every push and always failed with 'No python entrypoint found' (there is none to find — the dashboard is a Railway service), stamping a red X on every PR. This disables Vercel's git deployments; delete this file (or flip to true) if the dashboard ever actually moves to Vercel.",
   "github": { "enabled": false },
   "git": { "deploymentEnabled": false }
 }
