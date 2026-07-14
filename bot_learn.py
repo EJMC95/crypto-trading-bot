@@ -310,6 +310,8 @@ def compute_stake_mults(cards, state, run_no):
     seen = set()
     for bot, c in cards.items():
         for tag, b in c.get("by_tag", {}).items():
+            if tag == "(untagged)":
+                continue   # no strategy passes this tag — a mult here is pure noise
             n, w, pnl = b["n"], b["w"], b["pnl"]
             wr = w / n if n else 0.0
             mult = None
