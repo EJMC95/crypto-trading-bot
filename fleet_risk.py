@@ -138,6 +138,16 @@ def main():
     xa = (by_bot.get("scanner-cross-exchange-arb") or {}).get("extra") or {}
     if xa.get("best_top_pct") is not None:
         bus["xexchange_dislocation_pct"] = xa.get("best_top_pct")
+    # [2026-07-14 review] Lighter venue premium (mark vs index, bps) — the
+    # dislocation signal measured on the venue the fleet actually trades.
+    # Advisory, like everything on the bus. Gap Scout publishes it.
+    if xa.get("lighter_prem_bps"):
+        bus["lighter_prem_bps"] = xa["lighter_prem_bps"]
+    if xa.get("lighter_prem_med_bps") is not None:
+        bus["lighter_venue_stress_bps"] = {
+            "med": xa.get("lighter_prem_med_bps"),
+            "max": xa.get("lighter_prem_max_bps"),
+            "n": xa.get("lighter_prem_n")}
     ta = (by_bot.get("scanner-triangular-arb") or {}).get("extra") or {}
     if ta.get("best_depth_pct") is not None:
         bus["tri_arb_best_depth_pct"] = ta.get("best_depth_pct")
@@ -154,10 +164,12 @@ def main():
     store.save_history(BUS_KEY, bus)
 
     hp = ",".join(f"{k}x{v}" for k, v in list(hot_pairs.items())[:4]) or "none"
+    lstress = (bus.get("lighter_venue_stress_bps") or {}).get("med")
     print(f"[fleet-risk] {now_iso()} light={light.upper()} "
           f"long={fleet_long}/{LONG_BUDGET} short={fleet_short}/{SHORT_BUDGET} "
           f"gross={gross} | pair-pileups: {hp} | mood={bus.get('pulse_mood')} "
-          f"panic={bus.get('pulse_panic')} | dislocation={bus.get('xexchange_dislocation_pct')}")
+          f"panic={bus.get('pulse_panic')} | dislocation={bus.get('xexchange_dislocation_pct')} "
+          f"| lighter-stress={lstress}bps")
 
 
 if __name__ == "__main__":
