@@ -58,6 +58,13 @@ BRK_VOL_M = float(os.environ.get("TT_BRK_VOL_M", "1.0"))   # >= $1M/day
 DIP_RANGE = float(os.environ.get("TT_DIP_RANGE", "0.05"))  # pinned to the low
 MOMO_CHG = float(os.environ.get("TT_MOMO_CHG", "5.0"))     # >= +5% day
 MOMO_VOL_M = float(os.environ.get("TT_MOMO_VOL_M", "2.0")) # >= $2M/day
+# [2026-07-14b] Divergence lens: receive Lighter's funding when it diverges
+# this hard (percentage points of APR) from the cross-venue median.
+DIV_GAP_PP = float(os.environ.get("TT_DIV_GAP", "500"))
+# [2026-07-14b] Stress veto: when the venue-wide |premium| median is at or
+# above this (bps), the whole venue is dislocated — take NO new entries this
+# cycle (exits keep running). Normal tape prints ~6bps median.
+STRESS_VETO_BPS = float(os.environ.get("TT_STRESS_VETO_BPS", "15"))
 
 
 def now():
@@ -116,14 +123,17 @@ def incredible(tickets):
     for t in (tickets.get("momentum") or []):
         if t.get("chg_pct", 0) >= MOMO_CHG and t.get("vol_m", 0) >= MOMO_VOL_M:
             out.append(("momentum", t))
+    for t in (tickets.get("divergence") or []):
+        if abs(t.get("gap_pct") or 0) >= DIV_GAP_PP:
+            out.append(("divergence", t))
     return out
 
 
-def exit_reason(entry, mark, opened, t_now):
-    """tp / sl / hold / None for a long held from `opened`."""
+def exit_reason(entry, mark, opened, t_now, is_long=True):
+    """tp / sl / hold / None for a position held from `opened`."""
     if not entry or entry <= 0 or not mark or mark <= 0:
         return None
-    ret = mark / entry - 1.0
+    ret = (mark / entry - 1.0) * (1.0 if is_long else -1.0)
     if ret >= TAKE_PROFIT:
         return "tp"
     if ret <= STOP_LOSS:
@@ -164,7 +174,10 @@ def main():
         rate = funding.get(sym)
         if hours > 0 and rate and mark:
             size, _entry = broker.pos[sym]
-            drag = abs(size) * mark * rate * hours     # long pays positive rate
+            # SIGNED accrual: a long pays a positive rate (drag > 0), a short
+            # RECEIVES it (drag < 0 = credit) — the divergence lens's whole
+            # thesis is collecting that credit.
+            drag = size * mark * rate * hours
             broker.fees += drag
             m["funding_paid"] = round(float(m.get("funding_paid") or 0.0) + drag, 6)
             m["accrued_to"] = iso(t_now)
@@ -178,25 +191,32 @@ def main():
             opened = parse_ts(m.get("opened"))
         except (ValueError, TypeError):
             opened = t_now
-        reason = exit_reason(broker.pos[sym][1], mark, opened, t_now)
+        size, entry = broker.pos[sym]
+        is_long = size > 0
+        reason = exit_reason(entry, mark, opened, t_now, is_long)
         if not reason:
             continue
         pnl = broker.close(sym, mark)
-        drag = float(m.get("funding_paid") or 0.0)
+        drag = float(m.get("funding_paid") or 0.0)   # signed: shorts credit
         fees = 2 * CLIP_USD * broker.fee
         net = pnl - drag - fees
         stats["closed"] += 1
         stats["wins" if net > 0 else "losses"] += 1
         lens = m.get("lens") or "ticket"
+        side = "long" if is_long else "short"
+        # tag format <side>-<lens>_<exit>: the ledger's reason parser splits
+        # on the FIRST underscore, so the brain's enter_tag becomes
+        # "long-breakout"/"short-divergence" — per-lens grading, not one
+        # blended "long" bucket.
         store.publish_paper_trade(
             BOT_ROW, trade_id=f"{sym}-{m.get('opened')}",
             pnl_abs=round(net, 4),
             pnl_pct=round(net / CLIP_USD, 6),
             pair=f"{sym}/USDC",
             opened_at=m.get("opened"), closed_at=iso(t_now),
-            reason=f"long_{lens}_{reason}")
-        print(f"[ticket-taker] {iso(t_now)} CLOSE {sym} ({lens}) {reason} "
-              f"pnl {pnl:+.2f} funding -{drag:.3f} net {net:+.2f}")
+            reason=f"{side}-{lens}_{reason}")
+        print(f"[ticket-taker] {iso(t_now)} CLOSE {side} {sym} ({lens}) {reason} "
+              f"pnl {pnl:+.2f} funding {-drag:+.3f} net {net:+.2f}")
         meta.pop(sym, None)
 
     # 3) entries — only from a FRESH scout snapshot, only the incredible subset
@@ -207,8 +227,16 @@ def main():
         fresh = age <= float(scout.get("ttl_sec") or 900)
     except (ValueError, TypeError):
         fresh = False
+    # [2026-07-14b] Stress veto: a venue-wide |premium| blowout means marks
+    # are unreliable and every book is dislocating together — no new bets.
+    stress_med = ((scout.get("stress") or {}).get("med")
+                  if fresh else None)
+    stressed = stress_med is not None and stress_med >= STRESS_VETO_BPS
+    if stressed:
+        print(f"[ticket-taker] {iso(t_now)} STRESS VETO — venue |premium| "
+              f"median {stress_med}bps >= {STRESS_VETO_BPS}bps; no new entries")
     opened_syms, opened_lenses = set(), set()
-    if fresh:
+    if fresh and not stressed:
         for lens, t in incredible(scout.get("tickets") or {}):
             sym = t.get("sym")
             # one NEW position per lens per cycle; never add to a held symbol
@@ -220,15 +248,17 @@ def main():
             mark = marks.get(sym)
             if not mark:
                 continue
-            broker.open(sym, True, CLIP_USD / mark, mark)
+            is_long = t.get("side", "long") != "short"
+            broker.open(sym, is_long, CLIP_USD / mark, mark)
             meta[sym] = {"lens": lens, "opened": iso(t_now),
                          "accrued_to": iso(t_now), "funding_paid": 0.0,
                          "evidence": {k: t.get(k) for k in
                                       ("range_pos", "chg_pct", "vol_m",
-                                       "prem_bps", "apr_pct")}}
+                                       "prem_bps", "apr_pct", "gap_pct")}}
             opened_syms.add(sym)
             opened_lenses.add(lens)
-            print(f"[ticket-taker] {iso(t_now)} OPEN {sym} ({lens}) @ {mark} "
+            print(f"[ticket-taker] {iso(t_now)} OPEN "
+                  f"{'long' if is_long else 'SHORT'} {sym} ({lens}) @ {mark} "
                   f"evidence={meta[sym]['evidence']}")
 
     # 4) persist + publish
@@ -244,9 +274,10 @@ def main():
         closed_trades=stats["closed"], wins=stats["wins"], losses=stats["losses"],
         extra={"venue": "lighter_shadow", "strategy": "scout tickets (shadow)",
                "open_pos": [{"pair": f"{s}/USDC",
-                             "tag": f"long_{(meta.get(s) or {}).get('lens', 'ticket')}"}
+                             "tag": (("long-" if broker.pos[s][0] > 0 else "short-")
+                                     + (meta.get(s) or {}).get("lens", "ticket"))}
                             for s in broker.pos],
-               "scout_fresh": fresh})
+               "scout_fresh": fresh, "stress_veto": stressed})
     print(f"[ticket-taker] {iso(t_now)} equity {equity:+.2f} "
           f"open {broker.open_count()}/{MAX_OPEN} closed {stats['closed']} "
           f"({stats['wins']}W/{stats['losses']}L) scout_fresh={fresh}")
@@ -257,37 +288,48 @@ def main():
 
 def selftest():
     print("Running Ticket Taker offline self-test...\n")
-    # conviction bars
+    # conviction bars (incl. the divergence lens)
     tk = {"breakout": [{"sym": "A", "range_pos": 0.96, "vol_m": 2.0},
                        {"sym": "B", "range_pos": 0.91, "vol_m": 2.0}],   # below bar
           "dip": [{"sym": "C", "range_pos": 0.04},
                   {"sym": "D", "range_pos": 0.08}],                      # below bar
           "momentum": [{"sym": "E", "chg_pct": 6.0, "vol_m": 3.0},
-                       {"sym": "F", "chg_pct": 6.0, "vol_m": 1.0}]}      # thin
+                       {"sym": "F", "chg_pct": 6.0, "vol_m": 1.0}],      # thin
+          "divergence": [{"sym": "G", "side": "short", "gap_pct": 700.0},
+                         {"sym": "H", "side": "long", "gap_pct": -350.0}]}  # below bar
     picks = incredible(tk)
     assert [(l, t["sym"]) for l, t in picks] == \
-        [("breakout", "A"), ("dip", "C"), ("momentum", "E")], picks
+        [("breakout", "A"), ("dip", "C"), ("momentum", "E"),
+         ("divergence", "G")], picks
 
-    # exit ladder
+    # exit ladder — long and short
     t0 = now()
     from datetime import timedelta
     assert exit_reason(100.0, 104.1, t0, t0) == "tp"
     assert exit_reason(100.0, 96.9, t0, t0) == "sl"
     assert exit_reason(100.0, 101.0, t0 - timedelta(hours=49), t0) == "hold"
     assert exit_reason(100.0, 101.0, t0, t0) is None
+    assert exit_reason(100.0, 95.9, t0, t0, is_long=False) == "tp"   # short profits down
+    assert exit_reason(100.0, 103.1, t0, t0, is_long=False) == "sl"
 
-    # accounting round-trip incl. funding drag
+    # accounting round-trip incl. funding drag (long pays, short receives)
     b = PaperBroker(start_equity=1000.0, fee_bps=4.0)
     b.open("A", True, 0.5, 100.0)           # $50 clip
     b.mark("A", 105.0)
-    drag = 0.5 * 105.0 * 0.0001 * 10        # 10h at 1bp/h
+    drag = 0.5 * 105.0 * 0.0001 * 10        # signed: long, +1bp/h, 10h -> pays
     b.fees += drag
     pnl = b.close("A", 105.0)
     assert abs(pnl - 2.5) < 1e-9
     exp = 1000.0 + 2.5 - (0.5*100*0.0004) - (0.5*105*0.0004) - drag
     assert abs(b.equity() - exp) < 1e-9, (b.equity(), exp)
+    b2 = PaperBroker(start_equity=1000.0, fee_bps=4.0)
+    b2.open("S", False, 0.5, 100.0)
+    credit = (-0.5) * 100.0 * 0.0001 * 10   # signed: SHORT under +rate -> credit
+    b2.fees += credit
+    assert credit < 0 and b2.fees < 0.5*100*0.0004, "short must be credited"
 
-    print("All Ticket Taker self-tests passed (bars, exits, accounting).")
+    print("All Ticket Taker self-tests passed (bars incl. divergence, "
+          "long/short exits, signed funding).")
 
 
 if __name__ == "__main__":
