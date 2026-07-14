@@ -147,12 +147,20 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # concept, live record 1/7 wins -$5.36. User deleted the Railway service
 # entirely (repo disconnected first, so nothing can resurrect it); row + the
 # EXPECTED placeholder retired here. History stays in the ledgers.
+# [2026-07-14 LIGHTER-FIRST CUT] The laptop stock bots (Alpaca Stock Leaders
+# + IBKR Index Pilot) retired on user instruction — their Lighter ports
+# (equities-momentum-lshadow / equities-regime-lshadow) ARE the bots now.
+# Their raw broker-scale equity ($100k/$250k paper accounts) also broke every
+# cross-bot comparison. NOTE: the laptop processes run OUTSIDE this repo —
+# rows are hidden+pruned here, but only the operator can stop the processes
+# (until then their rows re-upsert into bot_pnl, harmlessly hidden).
 RETIRED_ROWS = {"perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
-                "perps-regime-switch", "perps-regime-switch-lshadow"}
+                "perps-regime-switch", "perps-regime-switch-lshadow",
+                "equities-momentum-alpaca", "equities-regime-ibkr"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
 # [2026-07-13 NO-DATA FIX] Venue-suffixed bots (Funding Farmer, Snap Back,
@@ -180,7 +188,9 @@ SCANNERS = {"scanner-cross-exchange-arb"}
 
 # Stock/brokerage bots (IBKR + Alpaca). Shown as their own cards with a SEPARATE
 # subtotal so their large $ equity never swamps the crypto headline.
-STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca", "equities-momentum"}
+# [2026-07-14] laptop originals (ibkr/alpaca) retired — the Lighter ports are
+# the stock bots now. Bases stay listed so stock-class handling applies.
+STOCKS = {"equities-momentum", "equities-regime"}
 
 # The only bots that should appear. Anything else in the table (e.g. legacy
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
@@ -243,9 +253,7 @@ LABELS = {
     "perps-funding-spread":        "⚖️ Counterweight — funding L/S book",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout — arb scanner",
     "event-listing-sniper":        "🎯 Launch Sniper — listing buyer",
-    "equities-regime-ibkr":        "📊 Index Pilot — index regime (control)",
     "equities-regime":             "📊 Index Rider — stock-perp regime",
-    "equities-momentum-alpaca":    "🏆 Stock Leaders — stock momentum",
     "equities-momentum":           "🏆 Stock Leaders — stock momentum",
     "freqtrade-mum":               "👩 Mum — daily trend",
     "freqtrade-dad":               "👨 Dad — breakout rider",
@@ -272,8 +280,6 @@ DESCRIPTIONS = {
     "event-listing-sniper": "buys brand-new CEX listings — many tiny losses, occasional big wins by design",
     "scanner-cross-exchange-arb": "scans cross-exchange spreads and paper-fills observed gaps (optimistic basis, own subtotal)",
     "equities-regime":      "SPY + QQQ long above the 200d SMA (±1% band) + gold on a 20/50 cross · $250 × 3 slots",
-    "equities-regime-ibkr": "the same 200d regime rule on IBKR paper (raw, unbanded) — Index Rider's control arm",
-    "equities-momentum-alpaca": "momentum-ranked US stock rotation (weekday close cron) — Stock Leaders' control arm",
     "equities-momentum":    "qualifies close>SMA200 & SMA20>SMA50, ranks by 42d return, holds top-5 of 25 (US stocks + gold/silver/oil + BTC/ETH), weekly rotation · $180 × 5 slots",
 }
 
@@ -2002,9 +2008,14 @@ class H(BaseHTTPRequestHandler):
                         cur.execute("SELECT to_regclass('public.bot_state') AS t")
                         if cur.fetchone()[0] is None:
                             raise LookupError("bot_state table not created yet")
+                        # [2026-07-14] brain keys added: the brain died silently
+                        # for two days once (5-7 Jul) because nothing external
+                        # could see it. Its outputs are now on the same surface.
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
-                            "WHERE bot IN ('fleet-risk', 'signal-bus')")
+                            "WHERE bot IN ('fleet-risk', 'signal-bus', "
+                            "'learning-brain', 'brain-stake-mults', "
+                            "'brain-diagnosis', 'lighter-market')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -2016,7 +2027,9 @@ class H(BaseHTTPRequestHandler):
                         if cur.fetchone()[0] is not None:
                             cur.execute(
                                 "SELECT key, ts, payload FROM bot_state_history "
-                                "WHERE key IN ('fleet-risk', 'signal-bus') "
+                                "WHERE key IN ('fleet-risk', 'signal-bus', "
+                                "'brain-stake-mults', 'brain-diagnosis', "
+                                "'lighter-market') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
                             hist = [{"key": k,
@@ -2026,10 +2039,53 @@ class H(BaseHTTPRequestHandler):
                                     for k, t, p in cur.fetchall()]
                 finally:
                     conn.close()
+                lm = live.get("lighter-market") or {}
+                lm.pop("_marks", None)   # internal diff base, not for consumers
                 body = json.dumps({"fleet_risk": live.get("fleet-risk"),
                                    "signal_bus": live.get("signal-bus"),
+                                   "brain": live.get("learning-brain"),
+                                   "brain_stake_mults": live.get("brain-stake-mults"),
+                                   "brain_diagnosis": live.get("brain-diagnosis"),
+                                   "lighter_market": lm or None,
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
+        if self.path.startswith("/disloc.json"):
+            # [2026-07-14] Snap Back's dislocation CENSUS — the evidence the
+            # bot exists to collect (per-coin count / max_bps / last seen of
+            # every >=50bps Lighter-vs-HL print). Read-only, no auth: only the
+            # census + counters are exposed, never the broker/position blob.
+            # Serves the census reviews the bot's alerts keep asking for.
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT bot, state, updated_at FROM bot_state "
+                            "WHERE bot IN ('lighter-dislocation-lshadow', "
+                            "'lighter-dislocation-lighter', 'lighter-dislocation')")
+                        rows_ = cur.fetchall()
+                finally:
+                    conn.close()
+                payload = {"books": {}}
+                for b, st, u in rows_:
+                    st = st if isinstance(st, dict) else json.loads(st)
+                    census = st.get("census") or {}
+                    payload["books"][b] = {
+                        "updated_at": u.isoformat() if u else None,
+                        "census_events": sum(int(c.get("count") or 0)
+                                             for c in census.values()),
+                        "census": census,
+                    }
+                if not payload["books"]:
+                    payload = {"error": "no dislocation census published yet"}
+                body = json.dumps(payload, default=str).encode()
             except Exception as e:
                 body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
             self.send_response(200); self._no_cache()

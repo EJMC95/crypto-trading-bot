@@ -363,6 +363,15 @@ class DayTraderV5Gated(IStrategy):
     def confirm_trade_entry(self, pair: str, order_type: str, amount: float,
                             rate: float, time_in_force: str, current_time: datetime,
                             entry_tag: Optional[str], side: str, **kwargs) -> bool:
+        # [2026-07-14 L2] Fleet-risk long-budget veto — checked BEFORE the
+        # throttle so a vetoed entry doesn't burn a per-candle slot. Fail-safe
+        # OPEN: stale/missing fleet state never blocks trading (fleet_bus).
+        try:
+            import fleet_bus
+            if fleet_bus.long_entries_blocked(current_time):
+                return False
+        except Exception:
+            pass
         # Bucket entries by 1h candle; reject beyond the per-candle cap.
         bucket = current_time.replace(minute=0, second=0, microsecond=0)
         if self._entry_throttle_ts != bucket:
@@ -405,6 +414,15 @@ class DayTraderV5Gated(IStrategy):
             stake *= 0.5                             # counter-daily-trend scalps size down
         if self._pulse_panic(current_time):
             stake *= 0.5
+        # [2026-07-14 L4] Brain's reduce-only per-tag multiplier — the ledger
+        # throttles tags it has repeatedly scored negative at sample size.
+        # Neutral 1.0 on any doubt (fleet_bus fail-safe contract).
+        try:
+            import fleet_bus
+            stake *= fleet_bus.stake_multiplier(
+                self.config.get("bot_name"), entry_tag, current_time)
+        except Exception:
+            pass
         if stake < proposed_stake and min_stake is not None and stake < min_stake:
             stake = min_stake                       # never breach exchange minimums
         return stake

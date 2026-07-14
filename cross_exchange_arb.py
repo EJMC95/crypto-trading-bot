@@ -93,6 +93,16 @@ PREFILTER_GAP = 0.0020   # 0.20% raw last/mid price gap between venues
 # same real asset are sub-1%; anything above this ceiling is noise.
 MAX_PLAUSIBLE_GAP = 0.05   # 5%
 
+# [2026-07-14 SIGNAL FIX — Jul-14 review verdict] The published best_top_pct
+# was the max over ~340 pairs including illiquid/collision-prone books, so the
+# signal bus's "dislocation" printed 4.6% junk and was ruled unusable as a
+# stress gauge. The bus now gets liquid_top_pct: the same max restricted to
+# real majors that exist unambiguously on these venues — when THESE books
+# dislocate, that is genuine market stress. Raw best_top_pct is still
+# published for the scanner's own diagnostics.
+DISLOC_BASES = {s.strip() for s in os.environ.get(
+    "DISLOC_BASES", "BTC,ETH,SOL,XRP,ADA,DOGE,LTC,LINK,DOT,AVAX").split(",") if s.strip()}
+
 # Hard cap on order books fetched per scan (2 per confirmed pair). Rate guard.
 MAX_BOOK_FETCHES = 30
 
@@ -405,9 +415,18 @@ def run_live(once=False):
     )
 
     ensure_log()
-    virtual_balance = 0.0        # REAL basis: net of fees, slippage, haircuts
-    gross_balance = 0.0          # legacy optimistic basis (no haircuts), for comparison
+    # [2026-07-14 PERSISTENCE FIX] The paper balances reset to $0 on every
+    # redeploy (the same bug class fixed for the sniper on 25-Jun). Restore
+    # from bot_state so the cumulative bases survive restarts; saved next to
+    # every publish below. Guarded: no DB -> starts at 0 as before.
+    _saved = store.load_state("scanner-cross-exchange-arb") or {}
+    virtual_balance = float(_saved.get("virtual_balance") or 0.0)  # REAL basis
+    gross_balance = float(_saved.get("gross_balance") or 0.0)      # optimistic
+    if virtual_balance or gross_balance:
+        print(f"[{now_iso()}] restored balances from bot_state: "
+              f"real {virtual_balance:+.2f} / gross {gross_balance:+.2f}")
     last_heartbeat = 0.0
+    best_top = best_liquid = None   # safe defaults if the very first scan errors
 
     while True:
         t0 = time.time()
@@ -428,7 +447,8 @@ def run_live(once=False):
             # cross-venue price gap (no fees yet) — fees + real bid/ask +
             # slippage are applied in Stage 2 from order books.
             ranked = []
-            best_top = None  # (gap, symbol, buy_ex, sell_ex)
+            best_top = None     # (gap, symbol, buy_ex, sell_ex) — widest net
+            best_liquid = None  # same, restricted to DISLOC_BASES majors
             artifacts = 0    # implausible gaps skipped as data noise
             for symbol, exmarkets in sym_map.items():
                 refs = ref_prices(symbol, exmarkets, tickers_by_ex)
@@ -444,6 +464,9 @@ def run_live(once=False):
                     continue
                 if best_top is None or gap > best_top[0]:
                     best_top = (gap, symbol, buy_ex, sell_ex)
+                if (symbol.split("/")[0] in DISLOC_BASES
+                        and (best_liquid is None or gap > best_liquid[0])):
+                    best_liquid = (gap, symbol, buy_ex, sell_ex)
                 if gap >= PREFILTER_GAP:
                     ranked.append((gap, symbol, buy_ex, sell_ex))
             ranked.sort(reverse=True)
@@ -539,8 +562,14 @@ def run_live(once=False):
                    "gross_balance": round(gross_balance, 2),  # old optimistic rule
                    "pairs": len(sym_map),
                    "best_top_pct": round(best_top[0] * 100, 4) if best_top else None,
+                   # the bus-grade stress gauge: majors only (see DISLOC_BASES)
+                   "liquid_top_pct": round(best_liquid[0] * 100, 4) if best_liquid else None,
+                   "liquid_symbol": best_liquid[1] if best_liquid else None,
                    **lighter_extra()},
         )
+        store.save_state("scanner-cross-exchange-arb",
+                         {"virtual_balance": round(virtual_balance, 4),
+                          "gross_balance": round(gross_balance, 4)})
         if once:
             print(f"\n[{now_iso()}] --once smoke test complete. Engine ran "
                   f"end-to-end against live public data.")

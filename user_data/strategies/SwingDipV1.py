@@ -161,9 +161,29 @@ class SwingDipV1(IStrategy):
         stake = proposed_stake
         if self._pulse_panic(current_time):
             stake *= 0.5
+        # [2026-07-14 L4] Brain's reduce-only per-tag multiplier — neutral 1.0
+        # on any doubt (fleet_bus fail-safe contract).
+        try:
+            import fleet_bus
+            stake *= fleet_bus.stake_multiplier(
+                self.config.get("bot_name"), entry_tag, current_time)
+        except Exception:
+            pass
         if stake < proposed_stake and min_stake is not None and stake < min_stake:
             stake = min_stake
         return stake
+
+    def confirm_trade_entry(self, pair, order_type, amount, rate, time_in_force,
+                            current_time, entry_tag, side, **kwargs):
+        # [2026-07-14 L2] Fleet-risk long-budget veto (26-position-pileup guard,
+        # per the 07-07 design's Jul-14 enforcement review). Fail-safe OPEN.
+        try:
+            import fleet_bus
+            if fleet_bus.long_entries_blocked(current_time):
+                return False
+        except Exception:
+            pass
+        return True
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # [2026-07-03] Sell into strength, two ways: the validated RSI>65 exit OR
