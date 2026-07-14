@@ -25,6 +25,20 @@ import sys
 LEGACY_BOTS = [
     "perps-bot", "momo-bot",
     "v4core", "v5gated", "v6swing", "v7momo", "v8momo",
+    # [2026-07-14 GHOST-EXPOSURE CLEANUP] Officially-retired bots (the
+    # dashboard's RETIRED_ROWS set). Their services are stopped but their
+    # frozen bot_pnl rows lingered — Bounce Catcher's held 6 phantom longs
+    # and Trail Blazer's 16, pinning the fleet-risk light RED for hours
+    # (see CROSS_BOT_ADVISORY_REVIEW_2026-07-14.md). Deletes the bot_pnl
+    # snapshot row ONLY — trade ledgers (bot_trades / paper_trades /
+    # venue_orders) and bot_state history are kept, same semantics as the
+    # dashboard Manage panel's delete. A row reappears automatically if
+    # its bot is ever revived (publish() upserts).
+    "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
+    "perps-donchian-breakout", "perps-donchian-breakout-lighter",
+    "perps-donchian-breakout-lshadow",
+    "perps-regime-switch", "perps-regime-switch-lshadow",
+    "scanner-triangular-arb", "crypto-trendmomo-4h",
 ]
 
 
