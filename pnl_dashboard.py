@@ -232,16 +232,15 @@ LABELS = {
     "crypto-intraday-15m":         "⚡ Range Raider — day trader",
     "crypto-swing-daily":          "🩸 Dip Buyer — swing dip buyer",
     "crypto-breakout-4h":          "🚀 Breakout Hunter — breakout rider",
-    "crypto-trendmomo-4h":         "🏄 Momentum Surfer — retired",
-    "perps-rsi-meanrev":           "🪃 Bounce Catcher — retired",
-    "perps-donchian-breakout":     "🧭 Trail Blazer — retired",
-    "perps-regime-switch":         "⚖️ Two-Way Tide — retired",
+    # [2026-07-14] retired-bot labels removed (Momentum Surfer, Bounce
+    # Catcher, Trail Blazer, Two-Way Tide, Loop Scout): their rows are
+    # deleted from bot_pnl (cleanup_legacy_bots on boot) and RETIRED_ROWS
+    # filters any republish, so the labels were dead code.
     "perps-funding-carry":         "🌾 Yield Harvester — funding carry",
     "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
     "perps-funding-spread":        "⚖️ Counterweight — funding L/S book",
-    "scanner-triangular-arb":      "🔺 Loop Scout — retired",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout — arb scanner",
     "event-listing-sniper":        "🎯 Launch Sniper — listing buyer",
     "equities-regime-ibkr":        "📊 Index Pilot — index regime (control)",
@@ -534,6 +533,37 @@ def fetch_trades(bot=None, limit=500, include_open=False):
                 "duration_min, enter_tag, exit_reason, leverage "
                 f"FROM bot_trades {where} "
                 "ORDER BY close_ts DESC NULLS LAST, open_ts DESC LIMIT %s",
+                params,
+            )
+            return list(cur.fetchall())
+    finally:
+        conn.close()
+
+
+def fetch_paper_rows(bot=None, limit=500):
+    """Per-trade rows from the durable paper_trades ledger (funding bots,
+    sniper, live Lighter closes). [2026-07-14] The Jul-14 advisory review was
+    blind to these books because only bot_trades had a read endpoint — this
+    feeds /trades.json?source=paper so outside analysis sees the whole fleet."""
+    import psycopg2
+    import psycopg2.extras
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('public.paper_trades') AS t")
+            if cur.fetchone()["t"] is None:
+                return []
+            clauses, params = [], []
+            if bot:
+                clauses.append("bot = %s")
+                params.append(bot)
+            where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+            params.append(int(limit))
+            cur.execute(
+                "SELECT bot, trade_id, pair, pnl_abs, pnl_pct, opened_at, "
+                "closed_at, reason, seen_at "
+                f"FROM paper_trades {where} "
+                "ORDER BY seen_at DESC LIMIT %s",
                 params,
             )
             return list(cur.fetchall())
@@ -2159,12 +2189,16 @@ class H(BaseHTTPRequestHandler):
                 limit = min(max(int(q.get("limit", ["500"])[0]), 1), 5000)
             except (ValueError, TypeError):
                 limit = 500
+            source = q.get("source", ["bot"])[0]
             try:
-                rows = fetch_trades(bot=bot, limit=limit, include_open=include_open)
+                if source == "paper":
+                    rows = fetch_paper_rows(bot=bot, limit=limit)
+                else:
+                    rows = fetch_trades(bot=bot, limit=limit, include_open=include_open)
                 def _ser(v):
                     return v.isoformat() if hasattr(v, "isoformat") else v
                 data = [{k: _ser(v) for k, v in r.items()} for r in rows]
-                payload = json.dumps({"trades": data}).encode("utf-8")
+                payload = json.dumps({"trades": data, "source": source}).encode("utf-8")
                 code = 200
             except Exception as e:
                 payload = json.dumps({"error": str(e)}).encode("utf-8")

@@ -216,19 +216,40 @@ def build_pulse():
     }
 
 
+# [2026-07-14 HISTORY-WINDOW FIX] The 200-entry cap assumed hourly appends
+# ("~7d at 1/h") but the pulse loops every ~10 min, so the rolling window had
+# silently shrunk to ~33 HOURS — the brain's mood-conditioned analysis and the
+# Jul-14 review's panic study were reading a fraction of the intended history.
+# Append at most hourly (latest still refreshes every run); 200 ≈ 8 days again.
+HIST_MIN_GAP_SEC = 3300
+
+
+def append_hourly(hist, pulse):
+    """Append a compact history entry unless the newest is <55 min old."""
+    try:
+        if hist:
+            last = datetime.fromisoformat(str(hist[-1].get("ts", "")).replace("Z", "+00:00"))
+            now = datetime.fromisoformat(str(pulse["ts"]).replace("Z", "+00:00"))
+            if (now - last).total_seconds() < HIST_MIN_GAP_SEC:
+                return hist
+    except (ValueError, TypeError):
+        pass  # unparsable ts -> append rather than silently stall the history
+    hist.append({"ts": pulse["ts"], "mood": pulse["mood"],
+                 "fng": pulse["fear_greed"], "panic": pulse["panic"],
+                 # funding APRs per coin: lets the brain correlate perps
+                 # trades with crowd positioning at open (squeeze evidence)
+                 "funding": {k: v["apr"] for k, v in pulse["funding"].items() if v}})
+    return hist
+
+
 def save(pulse):
     saved = []
     # Durable copy + rolling history for the brain.
     try:
         import bot_pnl_store as store
         prev = store.load_state("market-pulse") or {}
-        hist = prev.get("history", [])
-        hist.append({"ts": pulse["ts"], "mood": pulse["mood"],
-                     "fng": pulse["fear_greed"], "panic": pulse["panic"],
-                     # funding APRs per coin: lets the brain correlate perps
-                     # trades with crowd positioning at open (squeeze evidence)
-                     "funding": {k: v["apr"] for k, v in pulse["funding"].items() if v}})
-        state = {"latest": pulse, "history": hist[-200:]}   # ~7d at 1/h, capped
+        hist = append_hourly(prev.get("history", []), pulse)
+        state = {"latest": pulse, "history": hist[-200:]}   # ~8d at 1/h, capped
         if store.save_state("market-pulse", state):
             saved.append("postgres")
     except Exception:
@@ -243,10 +264,7 @@ def save(pulse):
                 prev = json.load(open(loc))
             except Exception:
                 prev = {}
-        hist = prev.get("history", [])
-        hist.append({"ts": pulse["ts"], "mood": pulse["mood"],
-                     "fng": pulse["fear_greed"], "panic": pulse["panic"],
-                     "funding": {k: v["apr"] for k, v in pulse["funding"].items() if v}})
+        hist = append_hourly(prev.get("history", []), pulse)
         json.dump({"latest": pulse, "history": hist[-200:]}, open(loc, "w"), indent=1)
         md = [f"# Market pulse — {pulse['ts']}",
               f"- **Mood: {pulse['mood']:+.2f}**  (F&G {pulse['fear_greed']}, "
