@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bot_learn.py — the fleet's learning loop ("brain"), v1.  READ-ONLY / ADVISORY.
+bot_learn.py — the fleet's learning loop ("brain"), v2.
 
 WHAT IT DOES
   1. Pulls the durable trade ledger (the pnl-dashboard's /trades.json, which is
@@ -13,11 +13,29 @@ WHAT IT DOES
      runs AND keep its sample growing before it is promoted to ACTIONABLE —
      one lucky/unlucky day never changes anything.
   4. Writes reports/lessons_latest.md: per-bot scorecards + PROPOSALS.
+  5. [2026-07-14 L4 META-LABELING] Publishes NUMERIC, REDUCE-ONLY per-
+     (bot, enter_tag) stake multipliers to bot_state 'brain-stake-mults'.
+     Strategies read them at entry via fleet_bus.stake_multiplier() — the
+     first brain output any bot actually trades on. Hard guardrails:
+       - trade-count floor: n >= MULT_MIN_N (30) era trades on that tag
+         for a 0.5x; a softer 0.75x needs n >= MULT_SOFT_N (15)
+       - persistence: the reduction must recur on PROMOTE_RUNS (3)
+         consecutive brain runs before it is PUBLISHED (streak-gated,
+         same philosophy as hypothesis promotion)
+       - reduce-only: v1 never publishes > 1.0x; boosting must earn its
+         own evidence bar later
+       - fail-safe: payload carries updated+ttl_sec; consumers go neutral
+         when it is stale (see fleet_bus.py)
+  6. [2026-07-14 VENUE A/B] Compares every paper book with its Lighter
+     shadow twin (<bot> vs <bot>-lshadow, live -lighter rows too) from
+     bot_pnl — the shadow-book data collected since 13 Jul — and reports
+     the venue gap per strategy in lessons + state (key 'venue_ab').
 
 WHAT IT NEVER DOES
-  Change configs, strategies or trades. Humans (or, later, the cloud trainer's
-  promotion path) act on its proposals. This is the "brain grows" half; the
-  "hands" stay under human control by design — see NO_REAL_MONEY policy.
+  Change entry/exit logic, configs, or trades — and it never SIZES UP.
+  The multipliers only throttle stakes on tags the ledger has repeatedly
+  scored negative at sample size. Humans still ship logic changes; see
+  NO_REAL_MONEY policy.
 
 Run it anywhere: laptop (called by the 2-hourly research scan) or cloud.
 """
@@ -40,16 +58,28 @@ MIN_N_FLAG = 8        # min closed trades before a pair/tag pattern counts
 MIN_N_SESSION = 20    # sessions are noisier -> bigger sample required
 PROMOTE_RUNS = 3      # a hypothesis must survive this many runs to be ACTIONABLE
 
+# [2026-07-14 L4] Stake-multiplier floors. The design doc's non-negotiable:
+# tiny samples must never masquerade as edge. 30 era-trades for the hard
+# throttle mirrors the meta-labeling literature's minimum;
+# 15 for the soft one because it only shaves a quarter of the stake.
+MULT_MIN_N = 30       # era trades on a tag before a 0.5x may publish
+MULT_SOFT_N = 15      # era trades before a 0.75x may publish
+MULT_KEY = "brain-stake-mults"
+MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
+
 # [ERA AWARENESS] Hypotheses must come from trades taken by the CURRENT code.
 # Without this the brain prosecutes today's strategy for yesterday's crimes
 # (e.g. flagging pairs the dead 15m scalper bled on). Trades opened before a
 # bot's era-start still show in lifetime tallies but generate no hypotheses.
 ERA_START = {
-    "crypto-intraday-15m": "2026-07-03T06:00",   # 15m scalper -> 1h adaptive dual-mode
+    "crypto-intraday-15m": "2026-07-13T00:00",   # 13-Jul: range_meanrev retired + counter-trend stop 2.0->3.5x
     "crypto-swing-daily":  "2026-07-03T06:00",   # ungated range -> validated dip + bounce
-    "crypto-breakout-4h":  "2026-07-03T06:00",   # ungated range -> restored Donchian
-    "crypto-trendmomo-4h": "2026-07-03T06:00",   # 4h/20-alt -> 1d BTC+ETH 10/40
-    "perps-regime-switch": "2026-07-03T10:00",   # EMA-cross -> Donchian entries
+    "crypto-breakout-4h":  "2026-07-14T00:00",   # 14-Jul: BTC-tide gate on breakout entries (backtest-validated)
+    "crypto-trendmomo-4h": "2026-07-03T06:00",   # 4h/20-alt -> 1d BTC+ETH 10/40 (retired 12-Jul)
+    "perps-regime-switch": "2026-07-03T10:00",   # EMA-cross -> Donchian entries (retired 12-Jul)
+    "freqtrade-georgia":   "2026-07-13T00:00",   # 13-Jul: same DayTraderV5Gated sleeve/stop changes
+    "freqtrade-mum":       "2026-07-14T00:00",   # 14-Jul: whitelist curated to the 10 backtest-positive pairs
+    "freqtrade-dad":       "2026-07-14T00:00",   # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier)
 }
 
 # ---------------------------------------------------------------------------
@@ -263,6 +293,110 @@ def analyse_bot(bot, trades, pulse_hist=None):
     return card, hyps
 
 
+def compute_stake_mults(cards, state, run_no):
+    """[2026-07-14 L4] Reduce-only per-(bot, tag) stake multipliers.
+
+    Rule table (era trades only — ERA_START already applied to the cards):
+        n >= MULT_MIN_N,  pnl < 0, wr < 25%          -> 0.50x
+        n >= MULT_MIN_N,  pnl < 0, wr < 40%          -> 0.75x
+        MULT_SOFT_N <= n < MULT_MIN_N, pnl < 0, wr < 25% -> 0.75x
+    A computed reduction must recur on PROMOTE_RUNS consecutive runs before
+    it publishes (streak-gated); one bad day never throttles anything. A tag
+    that stops qualifying resets its streak and drops from the published set
+    immediately — the brain forgives as gracefully as it forgets.
+    Returns {bot: {tag: {mult, n, wr, pnl, streak}}} of PUBLISHED entries.
+    """
+    streaks = state.setdefault("mult_streaks", {})
+    seen = set()
+    for bot, c in cards.items():
+        for tag, b in c.get("by_tag", {}).items():
+            n, w, pnl = b["n"], b["w"], b["pnl"]
+            wr = w / n if n else 0.0
+            mult = None
+            if n >= MULT_MIN_N and pnl < 0 and wr < 0.25:
+                mult = 0.5
+            elif n >= MULT_MIN_N and pnl < 0 and wr < 0.40:
+                mult = 0.75
+            elif MULT_SOFT_N <= n < MULT_MIN_N and pnl < 0 and wr < 0.25:
+                mult = 0.75
+            if mult is None:
+                continue
+            key = f"{bot}|{tag}"
+            seen.add(key)
+            e = streaks.setdefault(key, {"streak": 0, "first_run": run_no})
+            e["streak"] += 1
+            e["last_run"] = run_no
+            e.update({"mult": mult, "n": n, "wr": round(wr * 100, 1), "pnl": round(pnl, 2)})
+    # Streak resets: qualification must be CONSECUTIVE runs.
+    for key in list(streaks):
+        if key not in seen:
+            del streaks[key]
+    published = defaultdict(dict)
+    for key, e in streaks.items():
+        if e["streak"] >= PROMOTE_RUNS:
+            bot, tag = key.split("|", 1)
+            published[bot][tag] = {"mult": e["mult"], "n": e["n"], "wr": e["wr"],
+                                   "pnl": e["pnl"], "streak": e["streak"]}
+    return dict(published)
+
+
+def _publish_stake_mults(published):
+    """Write the multiplier payload to bot_state (+history) — guarded."""
+    try:
+        import bot_pnl_store as store
+        payload = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                   "ttl_sec": MULT_TTL_SEC, "mode": "reduce-only",
+                   "min_n": MULT_MIN_N, "promote_runs": PROMOTE_RUNS,
+                   "mults": published}
+        ok = store.save_state(MULT_KEY, payload)
+        try:
+            store.save_history(MULT_KEY, payload)
+        except Exception:
+            pass
+        return bool(ok)
+    except Exception:
+        return False
+
+
+def venue_ab_report():
+    """[2026-07-14 REACH] Paper book vs Lighter shadow twin, from bot_pnl.
+
+    The shadow books (rows '<bot>-lshadow', live '<bot>-lighter') have been
+    collecting since 13 Jul — the first venue A/B data the fleet has. Same
+    strategy, different venue: a persistent gap is execution/funding, not
+    signal. Returns {base_bot: {"paper": {...}, "shadow": {...}, "gap_pnl"}}.
+    """
+    try:
+        import bot_pnl_store as store
+        rows = store.fetch_bot_pnl()
+        if not rows:
+            return {}
+        by_bot = {r["bot"]: r for r in rows}
+        out = {}
+        for name, r in by_bot.items():
+            for suffix in ("-lshadow", "-lighter"):
+                if not name.endswith(suffix):
+                    continue
+                base = name[: -len(suffix)]
+                twin = by_bot.get(base)
+                if not twin:
+                    continue
+
+                def _pick(row):
+                    return {"equity": row.get("equity"), "pnl_abs": row.get("pnl_abs"),
+                            "wins": row.get("wins"), "losses": row.get("losses"),
+                            "open": row.get("open_trades")}
+                e = out.setdefault(base, {"paper": _pick(twin)})
+                e["shadow" if suffix == "-lshadow" else "live"] = _pick(r)
+                try:
+                    e["gap_pnl"] = round((r.get("pnl_abs") or 0) - (twin.get("pnl_abs") or 0), 2)
+                except Exception:
+                    pass
+        return out
+    except Exception:
+        return {}
+
+
 def main():
     trades = _fetch_trades()
     state, src = _load_state()
@@ -304,6 +438,15 @@ def main():
     actionable = {k: e for k, e in hstate.items() if e["status"] == "ACTIONABLE"}
     candidates = {k: e for k, e in hstate.items() if e["status"] == "candidate"}
 
+    # [2026-07-14 L4] Numeric stake multipliers — computed every run, streak-
+    # gated, published reduce-only. Strategies consume via fleet_bus.
+    published_mults = compute_stake_mults(cards, state, run_no)
+    mults_saved = _publish_stake_mults(published_mults)
+
+    # [2026-07-14 REACH] Venue A/B: paper vs Lighter shadow twins.
+    venue_ab = venue_ab_report()
+    state["venue_ab"] = venue_ab
+
     # ---- write lessons_latest.md ------------------------------------------
     os.makedirs(REPORTS_DIR, exist_ok=True)
     L = [f"# Fleet lessons — run {run_no} @ {now} (state: {src})", ""]
@@ -324,6 +467,34 @@ def main():
         L.append("## Candidate hypotheses (watching — not yet actionable)")
         for k, e in sorted(live_cand.items()):
             L.append(f"- {e['proposal']}  \n  evidence: {e['evidence']} (seen {e['seen']}/{PROMOTE_RUNS})")
+        L.append("")
+    # [2026-07-14 L4] Published stake multipliers — the brain's live handle
+    # on sizing. Empty section = every tag is trading at full stake.
+    L.append("## Stake multipliers in force (bot_state '%s', reduce-only)" % MULT_KEY)
+    if published_mults:
+        for bot, tags in sorted(published_mults.items()):
+            for tag, m in sorted(tags.items()):
+                L.append(f"- **{bot} / {tag} -> {m['mult']}x**  "
+                         f"(n={m['n']}, wr={m['wr']}%, pnl ${m['pnl']:+.2f}, "
+                         f"streak {m['streak']} runs)")
+    else:
+        L.append("- none — no tag currently clears the floor "
+                 f"(n>={MULT_SOFT_N}, negative pnl, {PROMOTE_RUNS} consecutive runs)")
+    L.append("")
+    # [2026-07-14 REACH] Venue A/B — same strategy, Kraken paper vs Lighter.
+    ab_lines = []
+    for base, e in sorted(venue_ab.items()):
+        for arm in ("shadow", "live"):
+            if arm not in e:
+                continue
+            p, s = e["paper"], e[arm]
+            ab_lines.append(
+                f"- {base}: paper ${p.get('pnl_abs') or 0:+.2f} "
+                f"({p.get('wins') or 0}W/{p.get('losses') or 0}L) vs {arm} "
+                f"${s.get('pnl_abs') or 0:+.2f} ({s.get('wins') or 0}W/{s.get('losses') or 0}L)")
+    if ab_lines:
+        L.append("## Venue A/B (paper vs Lighter twins — execution/funding gap, not signal)")
+        L.extend(ab_lines)
         L.append("")
     L.append("## Per-bot scorecards (closed trades, all time in ledger)")
     for bot, c in sorted(cards.items()):
@@ -347,8 +518,11 @@ def main():
         f.write("\n".join(L) + "\n")
 
     saved = _save_state(state)
+    n_mults = sum(len(t) for t in published_mults.values())
     print(f"[bot_learn] run {run_no}: {len(trades)} closed trades, "
-          f"{len(live_act)} actionable, {len(live_cand)} candidates (current-era) "
+          f"{len(live_act)} actionable, {len(live_cand)} candidates (current-era), "
+          f"{n_mults} stake-mults published ({'ok' if mults_saved else 'no-db'}), "
+          f"venue A/B pairs: {len(venue_ab)} "
           f"-> {LESSONS_MD} (state: {'+'.join(saved) or 'NOT SAVED'})")
     for k, e in sorted(live_act.items()):
         print(f"  ACTIONABLE: {e['proposal']}")

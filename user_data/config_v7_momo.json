@@ -117,7 +117,7 @@
     "username": "freqtrader",
     "password": "freqbot2026"
   },
-  "bot_name": "momo_breakout_4h",
+  "bot_name": "crypto-breakout-4h",
   "initial_state": "running",
   "force_entry_enable": false,
   "internals": {

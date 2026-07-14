@@ -59,6 +59,20 @@ paper originals are the control arm; the port refuses `lighter_live` in v1.
 - `funding_carry_bot.py` — funding carry strategy
 - `user_data/` — Freqtrade user data directory
 
+## Cross-Bot Intelligence (bot_state keys — since 2026-07-14 CONSUMED, not just published)
+- `brain-stake-mults` — bot_learn's L4 reduce-only per-(bot, enter_tag) stake
+  multipliers (floors: n≥30 era trades / 3 consecutive runs; never >1.0).
+  Strategies apply them in `custom_stake_amount` via `fleet_bus.py`.
+- `fleet-risk` — L2 traffic light, mode **enforce**: strategies veto NEW long
+  entries at long-budget (20). Kill switch: `FLEET_RISK_MODE=advisory`.
+- `signal-bus`, `regime-oracle`, `market-pulse`, `listing-intel` — published
+  context (funding APRs, dislocation, per-major regime, news mood, sniper
+  intel classes). Only market-pulse.panic + the two keys above are consumed.
+- Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
+  data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).
+- Bot identity for multiplier lookup = `bot_name` in each freqtrade config
+  (= dashboard bot ID — keep them matching).
+
 ## How Bots Publish to Dashboard
 Each bot calls `bot_pnl_store.publish(...)` with:
 ```python

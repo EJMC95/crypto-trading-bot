@@ -117,7 +117,7 @@
     "username": "freqtrader",
     "password": "freqbot2026"
   },
-  "bot_name": "intraday_daytrader_5m",
+  "bot_name": "crypto-intraday-15m",
   "initial_state": "running",
   "force_entry_enable": false,
   "internals": {
