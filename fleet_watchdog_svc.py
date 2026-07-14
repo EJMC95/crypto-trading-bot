@@ -60,15 +60,34 @@ def evaluate(data):
         problems.append("STALE: " + ", ".join(stale))
     if off:
         problems.append("NOT ONLINE: " + ", ".join(off))
-    opens = 0
+    # [2026-07-14 APPLES-TO-APPLES FIX] The budget warning summed open_trades
+    # over EVERYTHING — shadow twins (modelled copies of their originals),
+    # delta-neutral funding books, stocks, the event sniper — and compared
+    # that to the 20-position DIRECTIONAL budget, so it read 64-vs-20 on a
+    # healthy day and warned forever, drowning real alerts. Warn on the
+    # directional cohort only (paper + real-money live trading rows, same
+    # cohort fleet_risk budgets); the raw everything-count stays in the
+    # snapshot line for context.
+    opens, dir_opens = 0, 0
+    non_directional = ("perps-funding", "equities-", "event-listing-sniper")
     for b in bots:
         try:
-            opens += int(b.get("open_trades") or 0)
+            n = int(b.get("open_trades") or 0)
         except (TypeError, ValueError):
-            pass
+            continue
+        opens += n
+        if b.get("kind") != "trading":
+            continue                      # scanners hold nothing real
+        if b.get("venue_mode") in ("lighter_shadow", "lighter_testnet"):
+            continue                      # modelled twins double-count originals
+        base = b.get("base_bot") or b.get("bot") or ""
+        if any(base == p or base.startswith(p) for p in non_directional):
+            continue                      # delta-neutral / stocks / event-class
+        dir_opens += n
     max_open = int(os.environ.get("WATCHDOG_MAX_OPEN", "20"))
-    if opens > max_open:
-        warnings.append(f"open positions {opens} exceed the {max_open}-position budget")
+    if dir_opens > max_open:
+        warnings.append(f"directional positions {dir_opens} exceed the "
+                        f"{max_open}-position budget ({opens} gross incl. shadows)")
     loss_floor = float(os.environ.get("WATCHDOG_DAILY_LOSS_ALERT", "-100"))
     big = [f"{b.get('bot')} ({b.get('pnl_daily'):+.1f})" for b in bots
            if isinstance(b.get("pnl_daily"), (int, float)) and b["pnl_daily"] < loss_floor]

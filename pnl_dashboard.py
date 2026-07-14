@@ -147,21 +147,31 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # concept, live record 1/7 wins -$5.36. User deleted the Railway service
 # entirely (repo disconnected first, so nothing can resurrect it); row + the
 # EXPECTED placeholder retired here. History stays in the ledgers.
-# [2026-07-15 STOCK ORIGINALS RETIRED] equities-momentum-alpaca (Alpaca 22:00
-# UTC cron) + equities-regime-ibkr (IBKR twin) retired on user instruction:
-# their Lighter STOCK-PERP ports (Stock Leaders equities-momentum-lshadow /
-# Index Rider equities-regime-lshadow) are the focus now. The lshadow rows stay
-# first-class (bases equities-momentum in STOCKS, equities-regime in
-# VARIANT_ONLY); history stays in the ledgers. NOTE the IBKR publisher runs on
-# an unidentified host (not this repo, not ~/Claude/Trading) and may keep
-# re-writing its row — this filter keeps it off the grid regardless.
+# [2026-07-14 LIGHTER-FIRST CUT] The laptop stock bots (Alpaca Stock Leaders
+# + IBKR Index Pilot) retired on user instruction — their Lighter ports
+# (equities-momentum-lshadow / equities-regime-lshadow) ARE the bots now.
+# Their raw broker-scale equity ($100k/$250k paper accounts) also broke every
+# cross-bot comparison. NOTE: the laptop processes run OUTSIDE this repo —
+# rows are hidden+pruned here, but only the operator can stop the processes
+# (until then their rows re-upsert into bot_pnl, harmlessly hidden).
+# [2026-07-14 KRAKEN RETIREMENT — user instruction] The 8 Kraken PAPER rows
+# retired; their Lighter -lshadow twins are the fleet and keep displaying
+# (bases move EXPECTED -> VARIANT_ONLY below), and Tide Rider's LIVE row
+# (crypto-trend-daily-lighter) is unaffected — this set matches exact row
+# names only. Operator side: stop the 4 family Railway services (ONLY_BOT
+# mum/dad/avo-maria/georgia); the main container drops its 4 spot bots on
+# this deploy.
 RETIRED_ROWS = {"perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
                 "perps-regime-switch", "perps-regime-switch-lshadow",
-                "equities-momentum-alpaca", "equities-regime-ibkr"}
+                "equities-momentum-alpaca", "equities-regime-ibkr",
+                "crypto-trend-daily", "crypto-intraday-15m",
+                "crypto-swing-daily", "crypto-breakout-4h",
+                "freqtrade-mum", "freqtrade-dad",
+                "freqtrade-avo-maria", "freqtrade-georgia"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
 # [2026-07-13 NO-DATA FIX] Venue-suffixed bots (Funding Farmer, Snap Back,
@@ -174,12 +184,18 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 "lighter-dislocation", "perps-funding-spread",
                 # [2026-07-13] Index Rider — the IBKR bot's regime strategy on
                 # Lighter STOCK PERPS (SPY/QQQ), shadow-only; base never publishes
-                "equities-regime"}
+                "equities-regime",
+                # [2026-07-14 KRAKEN RETIREMENT] the 8 ex-Kraken bases: paper
+                # rows retired, the -lshadow twins (+ Tide Rider live) display
+                # under these bases
+                "crypto-trend-daily", "crypto-intraday-15m",
+                "crypto-swing-daily", "crypto-breakout-4h",
+                "freqtrade-mum", "freqtrade-dad",
+                "freqtrade-avo-maria", "freqtrade-georgia",
+                # [2026-07-14] 🎫 Ticket Taker — shadow-only scout trader
+                "lighter-ticket-taker"}
 EXPECTED = ["perps-funding-carry",
-            "event-listing-sniper",
-            "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
-            "crypto-breakout-4h",
-            "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"]
+            "event-listing-sniper"]
 
 # Scanners book OPTIMISTIC paper-arb fills (observed spreads, no slippage/latency).
 # Their pnl_abs is real paper P&L but on a rosier basis than the freqtrade bots'
@@ -187,11 +203,11 @@ EXPECTED = ["perps-funding-carry",
 # into the trading-bot P&L headline.
 SCANNERS = {"scanner-cross-exchange-arb"}
 
-# Stock bots. Shown as their own cards with a SEPARATE subtotal so stock $
-# equity never swamps the crypto headline. The IBKR/Alpaca broker originals
-# were retired 2026-07-15 (see RETIRED_ROWS); equities-momentum stays as the
-# base id that lets Stock Leaders' equities-momentum-lshadow row through.
-STOCKS = {"equities-momentum"}
+# Stock/brokerage bots (IBKR + Alpaca). Shown as their own cards with a SEPARATE
+# subtotal so their large $ equity never swamps the crypto headline.
+# [2026-07-14] laptop originals (ibkr/alpaca) retired — the Lighter ports are
+# the stock bots now. Bases stay listed so stock-class handling applies.
+STOCKS = {"equities-momentum", "equities-regime"}
 
 # The only bots that should appear. Anything else in the table (e.g. legacy
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
@@ -243,21 +259,19 @@ LABELS = {
     "crypto-intraday-15m":         "⚡ Range Raider — day trader",
     "crypto-swing-daily":          "🩸 Dip Buyer — swing dip buyer",
     "crypto-breakout-4h":          "🚀 Breakout Hunter — breakout rider",
-    "crypto-trendmomo-4h":         "🏄 Momentum Surfer — retired",
-    "perps-rsi-meanrev":           "🪃 Bounce Catcher — retired",
-    "perps-donchian-breakout":     "🧭 Trail Blazer — retired",
-    "perps-regime-switch":         "⚖️ Two-Way Tide — retired",
+    # [2026-07-14] retired-bot labels removed (Momentum Surfer, Bounce
+    # Catcher, Trail Blazer, Two-Way Tide, Loop Scout): their rows are
+    # deleted from bot_pnl (cleanup_legacy_bots on boot) and RETIRED_ROWS
+    # filters any republish, so the labels were dead code.
     "perps-funding-carry":         "🌾 Yield Harvester — funding carry",
     "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
     "perps-funding-spread":        "⚖️ Counterweight — funding L/S book",
-    "scanner-triangular-arb":      "🔺 Loop Scout — retired",
+    "lighter-ticket-taker":        "🎫 Ticket Taker — scout-driven trader",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout — arb scanner",
     "event-listing-sniper":        "🎯 Launch Sniper — listing buyer",
-    "equities-regime-ibkr":        "📊 Index Pilot — index regime (control)",
     "equities-regime":             "📊 Index Rider — stock-perp regime",
-    "equities-momentum-alpaca":    "🏆 Stock Leaders — stock momentum",
     "equities-momentum":           "🏆 Stock Leaders — stock momentum",
     "freqtrade-mum":               "👩 Mum — daily trend",
     "freqtrade-dad":               "👨 Dad — breakout rider",
@@ -281,11 +295,10 @@ DESCRIPTIONS = {
     "perps-funding-spread": "ranks 72h mean funding: LONG the 5 most-negative, SHORT the 5 most-positive, rebalances daily · $20/leg",
     "lighter-dislocation":  "fades ≥150bps Lighter-vs-reference price dislocations across 36 coins; census-first evidence bot",
     "lighter-perp-sniper":  "watches brand-new Lighter listings and snipes day-one momentum",
+    "lighter-ticket-taker": "trades the Lighter Scout's high-conviction tickets (breakout/dip/momentum lenses over every liquid book) · $50 clips, TP+4%/SL−3%/48h · each close tagged by lens so the brain grades the scanner",
     "event-listing-sniper": "buys brand-new CEX listings — many tiny losses, occasional big wins by design",
     "scanner-cross-exchange-arb": "scans cross-exchange spreads and paper-fills observed gaps (optimistic basis, own subtotal)",
     "equities-regime":      "SPY + QQQ long above the 200d SMA (±1% band) + gold on a 20/50 cross · $250 × 3 slots",
-    "equities-regime-ibkr": "the same 200d regime rule on IBKR paper (raw, unbanded) — Index Rider's control arm",
-    "equities-momentum-alpaca": "momentum-ranked US stock rotation (weekday close cron) — Stock Leaders' control arm",
     "equities-momentum":    "qualifies close>SMA200 & SMA20>SMA50, ranks by 42d return, holds top-5 of 25 (US stocks + gold/silver/oil + BTC/ETH), weekly rotation · $180 × 5 slots",
 }
 
@@ -545,6 +558,37 @@ def fetch_trades(bot=None, limit=500, include_open=False):
                 "duration_min, enter_tag, exit_reason, leverage "
                 f"FROM bot_trades {where} "
                 "ORDER BY close_ts DESC NULLS LAST, open_ts DESC LIMIT %s",
+                params,
+            )
+            return list(cur.fetchall())
+    finally:
+        conn.close()
+
+
+def fetch_paper_rows(bot=None, limit=500):
+    """Per-trade rows from the durable paper_trades ledger (funding bots,
+    sniper, live Lighter closes). [2026-07-14] The Jul-14 advisory review was
+    blind to these books because only bot_trades had a read endpoint — this
+    feeds /trades.json?source=paper so outside analysis sees the whole fleet."""
+    import psycopg2
+    import psycopg2.extras
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('public.paper_trades') AS t")
+            if cur.fetchone()["t"] is None:
+                return []
+            clauses, params = [], []
+            if bot:
+                clauses.append("bot = %s")
+                params.append(bot)
+            where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+            params.append(int(limit))
+            cur.execute(
+                "SELECT bot, trade_id, pair, pnl_abs, pnl_pct, opened_at, "
+                "closed_at, reason, seen_at "
+                f"FROM paper_trades {where} "
+                "ORDER BY seen_at DESC LIMIT %s",
                 params,
             )
             return list(cur.fetchall())
@@ -1961,6 +2005,112 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers(); self.wfile.write(body)
             return
+        if self.path.startswith("/bus.json"):
+            # [2026-07-14 review] Cross-bot advisory surface: the live
+            # fleet-risk + signal-bus states AND their recent
+            # bot_state_history snapshots. The Jul-14 review had to
+            # reconstruct the advisory week from the trades ledger because
+            # these were unreachable off-Railway; this endpoint is the fix so
+            # the Jul-21 review reads evidence directly. Read-only, no auth —
+            # no secrets inside (same contract as /pulse.json).
+            # Query params: ?hours=<lookback for history, default 24, max 200>
+            q = parse_qs(urlparse(self.path).query)
+            try:
+                hours = min(max(float(q.get("hours", ["24"])[0]), 1.0), 200.0)
+            except (ValueError, TypeError):
+                hours = 24.0
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                        if cur.fetchone()[0] is None:
+                            raise LookupError("bot_state table not created yet")
+                        # [2026-07-14] brain keys added: the brain died silently
+                        # for two days once (5-7 Jul) because nothing external
+                        # could see it. Its outputs are now on the same surface.
+                        cur.execute(
+                            "SELECT bot, state, updated_at FROM bot_state "
+                            "WHERE bot IN ('fleet-risk', 'signal-bus', "
+                            "'learning-brain', 'brain-stake-mults', "
+                            "'brain-diagnosis', 'lighter-market')")
+                        live = {}
+                        for b, s, u in cur.fetchall():
+                            st = s if isinstance(s, dict) else json.loads(s)
+                            live[b] = {"updated_at": u.isoformat() if u else None,
+                                       **st}
+                        cur.execute(
+                            "SELECT to_regclass('public.bot_state_history') AS t")
+                        hist = []
+                        if cur.fetchone()[0] is not None:
+                            cur.execute(
+                                "SELECT key, ts, payload FROM bot_state_history "
+                                "WHERE key IN ('fleet-risk', 'signal-bus', "
+                                "'brain-stake-mults', 'brain-diagnosis', "
+                                "'lighter-market') "
+                                "AND ts > now() - %s * interval '1 hour' "
+                                "ORDER BY ts", (hours,))
+                            hist = [{"key": k,
+                                     "ts": t.isoformat() if t else None,
+                                     "payload": (p if isinstance(p, dict)
+                                                 else json.loads(p))}
+                                    for k, t, p in cur.fetchall()]
+                finally:
+                    conn.close()
+                lm = live.get("lighter-market") or {}
+                lm.pop("_marks", None)   # internal diff base, not for consumers
+                body = json.dumps({"fleet_risk": live.get("fleet-risk"),
+                                   "signal_bus": live.get("signal-bus"),
+                                   "brain": live.get("learning-brain"),
+                                   "brain_stake_mults": live.get("brain-stake-mults"),
+                                   "brain_diagnosis": live.get("brain-diagnosis"),
+                                   "lighter_market": lm or None,
+                                   "history_hours": hours,
+                                   "history": hist}, default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
+        if self.path.startswith("/disloc.json"):
+            # [2026-07-14] Snap Back's dislocation CENSUS — the evidence the
+            # bot exists to collect (per-coin count / max_bps / last seen of
+            # every >=50bps Lighter-vs-HL print). Read-only, no auth: only the
+            # census + counters are exposed, never the broker/position blob.
+            # Serves the census reviews the bot's alerts keep asking for.
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT bot, state, updated_at FROM bot_state "
+                            "WHERE bot IN ('lighter-dislocation-lshadow', "
+                            "'lighter-dislocation-lighter', 'lighter-dislocation')")
+                        rows_ = cur.fetchall()
+                finally:
+                    conn.close()
+                payload = {"books": {}}
+                for b, st, u in rows_:
+                    st = st if isinstance(st, dict) else json.loads(st)
+                    census = st.get("census") or {}
+                    payload["books"][b] = {
+                        "updated_at": u.isoformat() if u else None,
+                        "census_events": sum(int(c.get("count") or 0)
+                                             for c in census.values()),
+                        "census": census,
+                    }
+                if not payload["books"]:
+                    payload = {"error": "no dislocation census published yet"}
+                body = json.dumps(payload, default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
         if self.path.startswith("/alerts.json"):
             # [2026-07-11] Evidence alerts + the restrict-only coin-veto list
             # (market_context.py). Read-only, no secrets, no auth — so the
@@ -2114,12 +2264,16 @@ class H(BaseHTTPRequestHandler):
                 limit = min(max(int(q.get("limit", ["500"])[0]), 1), 5000)
             except (ValueError, TypeError):
                 limit = 500
+            source = q.get("source", ["bot"])[0]
             try:
-                rows = fetch_trades(bot=bot, limit=limit, include_open=include_open)
+                if source == "paper":
+                    rows = fetch_paper_rows(bot=bot, limit=limit)
+                else:
+                    rows = fetch_trades(bot=bot, limit=limit, include_open=include_open)
                 def _ser(v):
                     return v.isoformat() if hasattr(v, "isoformat") else v
                 data = [{k: _ser(v) for k, v in r.items()} for r in rows]
-                payload = json.dumps({"trades": data}).encode("utf-8")
+                payload = json.dumps({"trades": data, "source": source}).encode("utf-8")
                 code = 200
             except Exception as e:
                 payload = json.dumps({"error": str(e)}).encode("utf-8")

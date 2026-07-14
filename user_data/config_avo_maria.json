@@ -93,7 +93,7 @@
     "username": "freqtrader",
     "password": "freqbot2026"
   },
-  "bot_name": "trend_golden_cross",
+  "bot_name": "freqtrade-avo-maria",
   "initial_state": "running",
   "force_entry_enable": false,
   "internals": {

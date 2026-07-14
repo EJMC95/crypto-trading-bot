@@ -63,17 +63,20 @@ if [ -n "${ONLY_BOT:-}" ]; then
   exit 0
 fi
 
-# --- Main container: the 5 original spot bots --------------------------------
-run_bot user_data/config_v4_core.json   v4core   &   # crypto-trend-daily   · ImprovedStrategyV4 · daily trend
-run_bot user_data/config_v5_kraken.json  v5gated  &   # crypto-intraday-15m  · DayTraderV5Gated  · 15m
-run_bot user_data/config_v6_swing.json   v6swing  &   # crypto-swing-daily   · SwingDipV1        · dip buyer
-run_bot user_data/config_v7_momo.json    v7momo   &   # crypto-breakout-4h   · MomoBreakoutV1    · 4h breakout
+# --- Main container ----------------------------------------------------------
+# [2026-07-14 KRAKEN RETIREMENT — user instruction: "Retire the kraken bots,
+# let's just focus on lighter"] The 4 spot originals (v4core/v5gated/v6swing/
+# v7momo -> crypto-trend/intraday/swing/breakout) NO LONGER LAUNCH here; their
+# Lighter shadow twins (family-lighter service, gate0) are the fleet now, and
+# Tide Rider's LIVE Lighter book keeps running. The freqtrade poller goes with
+# them (nothing local to poll). This container keeps the fleet ORGANS: pulse,
+# brain, oracle, risk light, Lighter Scout, Ticket Taker, cleanup.
+# The 4 family Railway services (ONLY_BOT mode: mum/dad/avo-maria/georgia)
+# must be STOPPED by the operator in the Railway UI — ONLY_BOT stays
+# functional so a still-running service doesn't crash-loop meanwhile.
 # [2026-07-12 RETIRED] v8momo (crypto-trendmomo-4h · TrendMomoV1) — core leg
 # backtests -29%/4.5y (26.5% win) on the bear_bounce audit replay and bled
 # live (-$11.33); user-approved retirement. Row moved to dashboard RETIRED_ROWS.
-
-# Family bots (mum/dad/avo-maria/georgia) run in their OWN Railway services
-# via ONLY_BOT mode above — do NOT re-add them here (see CHANGELOG 2026-07-07).
 
 # Combined P&L + trades dashboard, served on $PORT (Railway exposes it).
 python3 /freqtrade/dashboard_server.py &
@@ -85,10 +88,9 @@ while true; do
   sleep 600
 done &
 
-# Publish each freqtrade bot's P&L to the shared Postgres table so they show on
-# the unified pnl_dashboard alongside perps/momo/arb/sniper. Guarded: no-op if
-# DATABASE_URL is unset. Restart-looped so a transient error can't kill it.
-run_poller &
+# [2026-07-14 KRAKEN RETIREMENT] main-mode poller removed with the spot bots —
+# there are no local freqtrade APIs left to poll here. ONLY_BOT services keep
+# their scoped poller until the operator stops them.
 
 # [2026-07-05] Run the learning brain every 2h. Reads the trade ledger across
 # ALL bots (original + new fleet), correlates with market_pulse signals, and
@@ -109,6 +111,14 @@ run_poller &
     sleep 1800
   done ) &
 
+# [2026-07-14 GHOST-EXPOSURE CLEANUP] One-shot on boot: prune retired bots'
+# frozen bot_pnl rows (explicit allow-list in the script; deleting an absent
+# row is a no-op, so re-running every deploy is safe). Bounce Catcher's and
+# Trail Blazer's dead rows were pinning the fleet light RED on 22 phantom
+# longs. Runs before fleet_risk's first cycle so the light starts clean.
+( sleep 60
+  python3 /freqtrade/cleanup_legacy_bots.py --apply || true ) &
+
 # [2026-07-07 CROSS-BOT L2/L3] Fleet risk traffic light + signal bus —
 # fleet-wide directional exposure vs budgets + scanner exhaust ->
 # bot_state 'fleet-risk' / 'signal-bus'. ADVISORY: enforcement wiring is
@@ -116,6 +126,27 @@ run_poller &
 ( sleep 90
   while true; do
     python3 /freqtrade/fleet_risk.py || true
+    sleep 300
+  done ) &
+
+# [2026-07-14 LIGHTER SCOUT] Venue-wide Lighter market map (all 215 books:
+# premium stress, liquid funding extremes, cross-venue funding divergence,
+# volume/OI moves, listings, per-strategy tickets) -> bot_state
+# 'lighter-market' + history. Two keyless calls per run.
+( sleep 150
+  while true; do
+    python3 /freqtrade/lighter_market_scout.py || true
+    sleep 300
+  done ) &
+
+# [2026-07-14 TICKET TAKER] 🎫 The scout's designated trader (SHADOW $1k
+# book): takes the high-conviction subset of the scout's tickets, models
+# fills at Lighter marks + funding drag, exits TP/SL/max-hold, tags every
+# close long_<lens>_<exit> so the brain grades each lens on real forward
+# returns. UNVALIDATED by design — that grading is what it exists to collect.
+( sleep 210
+  while true; do
+    python3 /freqtrade/lighter_ticket_taker.py || true
     sleep 300
   done ) &
 

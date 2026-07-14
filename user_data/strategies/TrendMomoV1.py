@@ -116,3 +116,31 @@ class TrendMomoV1(IStrategy):
             "exit_long",
         ] = 1
         return dataframe
+
+    # [2026-07-14 CROSS-BOT WIRING] This file previously consumed NOTHING from
+    # the shared bus (the only one of the four). Sizing + entry-veto only;
+    # entry/exit logic untouched. Both hooks are fail-safe neutral (fleet_bus).
+    def custom_stake_amount(self, pair, current_time, current_rate, proposed_stake,
+                            min_stake, max_stake, leverage, entry_tag, side, **kwargs):
+        stake = proposed_stake
+        try:
+            import fleet_bus
+            stake *= fleet_bus.stake_multiplier(
+                self.config.get("bot_name"), entry_tag, current_time)
+        except Exception:
+            pass
+        if stake < proposed_stake and min_stake is not None and stake < min_stake:
+            stake = min_stake
+        return stake
+
+    def confirm_trade_entry(self, pair, order_type, amount, rate, time_in_force,
+                            current_time, entry_tag, side, **kwargs):
+        # [2026-07-14 L2] Fleet-risk long-budget veto (26-position-pileup guard,
+        # per the 07-07 design's Jul-14 enforcement review). Fail-safe OPEN.
+        try:
+            import fleet_bus
+            if fleet_bus.long_entries_blocked(current_time):
+                return False
+        except Exception:
+            pass
+        return True
