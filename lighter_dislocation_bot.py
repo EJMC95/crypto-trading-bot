@@ -292,6 +292,11 @@ def main():
                                                    "last_iso": None})
                     rec["count"] += 1
                     rec["max_bps"] = max(rec["max_bps"], abs(dev_bps))
+                    # [2026-07-14] Count ENTRY-GRADE events separately — the
+                    # promotion review needs tradeable DENSITY, and count/max
+                    # alone can't say how many prints cleared the entry gate.
+                    if abs(dev_bps) >= ENTER_BPS:
+                        rec["count_enter"] = int(rec.get("count_enter") or 0) + 1
                     rec["last_iso"] = now.isoformat()
                     rec["last_mctx"] = _mctx_slice(coin)
                     log.info("DISLOC %-5s %+7.1fbps mid=%.6g ref=%.6g "
