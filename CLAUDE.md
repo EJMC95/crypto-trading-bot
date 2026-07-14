@@ -32,8 +32,10 @@ https://pnl-dashboard-production-858c.up.railway.app/
   `fleet_bus.py`), per-bucket DIAGNOSIS (exit/entry/fee/regime/venue),
   venue A/B; → `learning-brain`, `brain-stake-mults`, `brain-diagnosis`
 - `fleet_risk.py` — traffic light (live > lshadow > paper via
-  `authoritative_row`, 30-min staleness filter) + signal bus; long-budget
-  veto ENFORCED in strategies (`FLEET_RISK_MODE=advisory` = kill switch)
+  `authoritative_row`, 30-min staleness filter) + signal bus + **7d fleet
+  drawdown governor** (`clip_scale` 1.0/0.5/0.25 — Ticket Taker consumes,
+  gate0 advisory); long-budget veto ENFORCED in strategies
+  (`FLEET_RISK_MODE=advisory` = kill switch)
 - `regime_oracle.py`, `market_pulse.py` (history appends hourly),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 

@@ -131,6 +131,51 @@ LONG_BUDGET = 20
 SHORT_BUDGET = 12
 YELLOW_FRAC = 0.7
 
+# [2026-07-14b DRAWDOWN GOVERNOR] The missing risk leg: individual bots have
+# seatbelts, but nothing said "the whole fleet is bleeding — shrink". This
+# publishes a fleet-level 7-day equity drawdown and a clip_scale every run:
+# 1.0 normally, 0.5 past DD_HALF, 0.25 past DD_QUARTER. Ticket Taker consumes
+# it (scales its clips); for the gate0 books it is advisory until ported.
+# Equity cohort = the same authoritative rows the light counts. Samples are
+# kept inside this service's own state (>=30 min apart, 7-day window) so the
+# governor survives redeploys without touching bot_state_history.
+DD_HALF = float(os.environ.get("FLEET_DD_HALF", "-0.05"))
+DD_QUARTER = float(os.environ.get("FLEET_DD_QUARTER", "-0.10"))
+DD_SAMPLE_GAP_SEC = 1800
+DD_WINDOW_SEC = 7 * 24 * 3600
+
+
+def dd_governor(samples, fleet_equity, now_dt):
+    """(new_samples, dd_frac, clip_scale) — pure, unit-tested.
+
+    `samples` is [[iso_ts, equity], ...] oldest-first. Appends the current
+    reading if the newest sample is >= DD_SAMPLE_GAP_SEC old, trims to the
+    7-day window, and computes drawdown vs the window peak (current reading
+    included, so a fresh peak means dd == 0)."""
+    out = []
+    for ts, eq in samples or []:
+        try:
+            age = (now_dt - datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                   ).total_seconds()
+            if 0 <= age <= DD_WINDOW_SEC:
+                out.append([ts, float(eq)])
+        except (ValueError, TypeError):
+            continue
+    if fleet_equity and fleet_equity > 0:
+        if not out:
+            out.append([now_dt.isoformat(timespec="seconds"), fleet_equity])
+        else:
+            last_age = (now_dt - datetime.fromisoformat(
+                str(out[-1][0]).replace("Z", "+00:00"))).total_seconds()
+            if last_age >= DD_SAMPLE_GAP_SEC:
+                out.append([now_dt.isoformat(timespec="seconds"), fleet_equity])
+    if not fleet_equity or fleet_equity <= 0 or not out:
+        return out, None, 1.0
+    peak = max(max(eq for _, eq in out), fleet_equity)
+    dd = fleet_equity / peak - 1.0
+    scale = 0.25 if dd <= DD_QUARTER else (0.5 if dd <= DD_HALF else 1.0)
+    return out, round(dd, 4), scale
+
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -152,11 +197,14 @@ def main():
     by_bot = {r["bot"]: r for r in rows}
 
     fleet_long, fleet_short = 0, 0
+    fleet_equity = 0.0
     per_bot, pair_count, venues_seen = {}, {}, {}
     for name in FREQTRADE_BOTS:
         r, venue = authoritative_row(name, by_bot)
         if not r:
             continue
+        if r.get("equity") is not None:
+            fleet_equity += float(r["equity"])   # governor cohort = light cohort
         n = int(r.get("open_trades") or 0)
         if n == 0:
             continue
@@ -206,9 +254,17 @@ def main():
     sniper = by_bot.get("event-listing-sniper") or {}
     if not row_fresh(sniper):
         sniper = {}
+    prev_state = store.load_state(RISK_KEY) or {}
+    samples, dd_7d, clip_scale = dd_governor(
+        prev_state.get("equity_samples"), fleet_equity,
+        datetime.now(timezone.utc))
     risk_payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC, "mode": MODE,
         "light": light,
+        "fleet_equity": round(fleet_equity, 2),
+        "fleet_dd_7d": dd_7d,
+        "clip_scale": clip_scale,
+        "equity_samples": samples,
         "long_positions": fleet_long, "long_budget": LONG_BUDGET,
         "short_positions": fleet_short, "short_budget": SHORT_BUDGET,
         "gross": gross,
@@ -223,7 +279,10 @@ def main():
     store.save_state(RISK_KEY, risk_payload)
     store.save_history(RISK_KEY, {"light": light, "long": fleet_long,
                                   "short": fleet_short, "gross": gross,
-                                  "hot_pairs": hot_pairs})
+                                  "hot_pairs": hot_pairs,
+                                  "fleet_equity": round(fleet_equity, 2),
+                                  "fleet_dd_7d": dd_7d,
+                                  "clip_scale": clip_scale})
 
     # ---- Layer 3: signal bus -------------------------------------------
     bus = {"updated": now_iso(), "ttl_sec": TTL_SEC}
@@ -284,7 +343,8 @@ def main():
     lstress = (bus.get("lighter_venue_stress_bps") or {}).get("med")
     print(f"[fleet-risk] {now_iso()} mode={MODE} light={light.upper()} "
           f"long={fleet_long}/{LONG_BUDGET} short={fleet_short}/{SHORT_BUDGET} "
-          f"gross={gross} | live-venue: {_lv} | shadow(info) {shadow_long}L/{shadow_short}S "
+          f"gross={gross} | equity={fleet_equity:.0f} dd7d={dd_7d} scale={clip_scale} "
+          f"| live-venue: {_lv} | shadow(info) {shadow_long}L/{shadow_short}S "
           f"| funding_src={bus.get('funding_source')} | pair-pileups: {hp} "
           f"| mood={bus.get('pulse_mood')} panic={bus.get('pulse_panic')} "
           f"| dislocation={bus.get('xexchange_dislocation_pct')} | lighter-stress={lstress}bps")

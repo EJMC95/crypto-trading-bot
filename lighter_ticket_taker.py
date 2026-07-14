@@ -45,8 +45,16 @@ SCOUT_KEY = "lighter-market"
 API_BASE = os.environ.get("LIGHTER_API_BASE", "https://mainnet.zklighter.elliot.ai")
 
 START_EQUITY = 1000.0
-CLIP_USD = float(os.environ.get("TT_CLIP_USD", "50"))
+CLIP_USD = float(os.environ.get("TT_CLIP_USD", "50"))   # fallback when no vol data
 MAX_OPEN = int(os.environ.get("TT_MAX_OPEN", "6"))
+# [2026-07-14c CONSTANT-RISK SIZING] Fixed $ clips carry wildly different risk
+# across books (a $50 clip in a 10%-range alt is ~5x the risk of $50 in BTC).
+# Size so every position risks ~the same dollars: expected adverse move ~ half
+# the daily range, clip = RISK_USD / adverse, bounded. The brain still grades
+# per-lens on pnl_pct (per-clip), so sizing doesn't distort lens grading.
+RISK_USD = float(os.environ.get("TT_RISK_USD", "1.5"))
+CLIP_MIN = float(os.environ.get("TT_CLIP_MIN", "20"))
+CLIP_MAX = float(os.environ.get("TT_CLIP_MAX", "80"))
 TAKE_PROFIT = float(os.environ.get("TT_TP", "0.04"))       # +4%
 STOP_LOSS = float(os.environ.get("TT_SL", "-0.03"))        # -3%
 MAX_HOLD_H = float(os.environ.get("TT_MAX_HOLD_H", "48"))
@@ -87,13 +95,18 @@ def _get(path):
 
 
 def fetch_marks_and_funding():
-    """{sym: mark_price}, {sym: hourly_funding_rate} from the keyless API."""
+    """{sym: mark}, {sym: hourly_rate}, {sym: day_range_pct} — keyless API."""
     obd = _get("/api/v1/orderBookDetails")
-    marks = {}
+    marks, ranges = {}, {}
     for b in obd.get("order_book_details") or []:
         try:
             if b.get("status") == "active" and float(b.get("mark_price") or 0) > 0:
-                marks[b["symbol"]] = float(b["mark_price"])
+                sym = b["symbol"]
+                marks[sym] = float(b["mark_price"])
+                hi = float(b.get("daily_price_high") or 0.0)
+                lo = float(b.get("daily_price_low") or 0.0)
+                if hi > lo > 0:
+                    ranges[sym] = 100.0 * (hi - lo) / marks[sym]
         except (TypeError, ValueError):
             continue
     fr = _get("/api/v1/funding-rates")
@@ -104,12 +117,22 @@ def fetch_marks_and_funding():
                 funding[r["symbol"]] = float(r["rate"])
         except (TypeError, ValueError):
             continue
-    return marks, funding
+    return marks, funding, ranges
 
 
 # ---------------------------------------------------------------------------
 # PURE DECISION LOGIC (unit-tested offline)
 # ---------------------------------------------------------------------------
+
+def vol_clip(day_range_pct):
+    """Constant-risk clip: RISK_USD / expected adverse move (~half the daily
+    range, floored at 0.5%), bounded [CLIP_MIN, CLIP_MAX]. Falls back to
+    CLIP_USD when the book has no range data."""
+    if not day_range_pct or day_range_pct <= 0:
+        return CLIP_USD
+    adverse = max(day_range_pct / 2.0, 0.5) / 100.0
+    return round(min(CLIP_MAX, max(CLIP_MIN, RISK_USD / adverse)), 2)
+
 
 def incredible(tickets):
     """The high-conviction subset of the scout's tickets, per lens."""
@@ -148,7 +171,7 @@ def exit_reason(entry, mark, opened, t_now, is_long=True):
 
 def main():
     try:
-        marks, funding = fetch_marks_and_funding()
+        marks, funding, ranges = fetch_marks_and_funding()
     except Exception as e:  # noqa: BLE001 — keyless API down: skip this cycle
         print(f"[ticket-taker] {iso(now())} fetch failed (skipping): {e!r}")
         return
@@ -198,7 +221,8 @@ def main():
             continue
         pnl = broker.close(sym, mark)
         drag = float(m.get("funding_paid") or 0.0)   # signed: shorts credit
-        fees = 2 * CLIP_USD * broker.fee
+        clip_used = float(m.get("clip") or CLIP_USD)
+        fees = 2 * clip_used * broker.fee
         net = pnl - drag - fees
         stats["closed"] += 1
         stats["wins" if net > 0 else "losses"] += 1
@@ -211,7 +235,7 @@ def main():
         store.publish_paper_trade(
             BOT_ROW, trade_id=f"{sym}-{m.get('opened')}",
             pnl_abs=round(net, 4),
-            pnl_pct=round(net / CLIP_USD, 6),
+            pnl_pct=round(net / clip_used, 6),
             pair=f"{sym}/USDC",
             opened_at=m.get("opened"), closed_at=iso(t_now),
             reason=f"{side}-{lens}_{reason}")
@@ -235,6 +259,19 @@ def main():
     if stressed:
         print(f"[ticket-taker] {iso(t_now)} STRESS VETO — venue |premium| "
               f"median {stress_med}bps >= {STRESS_VETO_BPS}bps; no new entries")
+    # [2026-07-14c] Fleet drawdown governor: fleet_risk publishes clip_scale
+    # (1.0 / 0.5 past -5% 7d dd / 0.25 past -10%). Fail-safe neutral on
+    # missing/stale state — same contract as every bus consumer.
+    gov = 1.0
+    try:
+        fr = store.load_state("fleet-risk") or {}
+        fr_age = (t_now - parse_ts(fr.get("updated"))).total_seconds()
+        if fr_age <= float(fr.get("ttl_sec") or 900):
+            gov = max(0.25, min(1.0, float(fr.get("clip_scale") or 1.0)))
+    except (ValueError, TypeError):
+        gov = 1.0
+    if gov < 1.0:
+        print(f"[ticket-taker] {iso(t_now)} DRAWDOWN GOVERNOR — clips x{gov}")
     opened_syms, opened_lenses = set(), set()
     if fresh and not stressed:
         for lens, t in incredible(scout.get("tickets") or {}):
@@ -249,8 +286,9 @@ def main():
             if not mark:
                 continue
             is_long = t.get("side", "long") != "short"
-            broker.open(sym, is_long, CLIP_USD / mark, mark)
-            meta[sym] = {"lens": lens, "opened": iso(t_now),
+            clip = round(vol_clip(ranges.get(sym)) * gov, 2)
+            broker.open(sym, is_long, clip / mark, mark)
+            meta[sym] = {"lens": lens, "opened": iso(t_now), "clip": clip,
                          "accrued_to": iso(t_now), "funding_paid": 0.0,
                          "evidence": {k: t.get(k) for k in
                                       ("range_pos", "chg_pct", "vol_m",
@@ -258,7 +296,8 @@ def main():
             opened_syms.add(sym)
             opened_lenses.add(lens)
             print(f"[ticket-taker] {iso(t_now)} OPEN "
-                  f"{'long' if is_long else 'SHORT'} {sym} ({lens}) @ {mark} "
+                  f"{'long' if is_long else 'SHORT'} {sym} ({lens}) "
+                  f"${clip} @ {mark} (range {round(ranges.get(sym) or 0, 1)}%) "
                   f"evidence={meta[sym]['evidence']}")
 
     # 4) persist + publish
@@ -328,8 +367,15 @@ def selftest():
     b2.fees += credit
     assert credit < 0 and b2.fees < 0.5*100*0.0004, "short must be credited"
 
+    # constant-risk sizing: calm books size up, wild books size down, bounded
+    assert vol_clip(None) == CLIP_USD, "no range data -> fallback clip"
+    assert vol_clip(2.0) == CLIP_MAX, "calm 2%-range book hits the cap"
+    assert abs(vol_clip(6.0) - 50.0) < 1e-9, "6% range -> $50 (1.5/3%)"
+    assert abs(vol_clip(10.0) - 30.0) < 1e-9, "10% range -> $30"
+    assert vol_clip(30.0) == CLIP_MIN, "wild book floors at CLIP_MIN"
+
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
-          "long/short exits, signed funding).")
+          "long/short exits, signed funding, constant-risk sizing).")
 
 
 if __name__ == "__main__":
