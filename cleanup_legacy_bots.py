@@ -25,6 +25,34 @@ import sys
 LEGACY_BOTS = [
     "perps-bot", "momo-bot",
     "v4core", "v5gated", "v6swing", "v7momo", "v8momo",
+    # [2026-07-14 GHOST-EXPOSURE CLEANUP] Officially-retired bots (the
+    # dashboard's RETIRED_ROWS set). Their services are stopped but their
+    # frozen bot_pnl rows lingered — Bounce Catcher's held 6 phantom longs
+    # and Trail Blazer's 16, pinning the fleet-risk light RED for hours
+    # (see CROSS_BOT_ADVISORY_REVIEW_2026-07-14.md). Deletes the bot_pnl
+    # snapshot row ONLY — trade ledgers (bot_trades / paper_trades /
+    # venue_orders) and bot_state history are kept, same semantics as the
+    # dashboard Manage panel's delete. A row reappears automatically if
+    # its bot is ever revived (publish() upserts).
+    "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
+    "perps-donchian-breakout", "perps-donchian-breakout-lighter",
+    "perps-donchian-breakout-lshadow",
+    "perps-regime-switch", "perps-regime-switch-lshadow",
+    "scanner-triangular-arb", "crypto-trendmomo-4h",
+    # [2026-07-14 LIGHTER-FIRST CUT] laptop stock bots retired on user
+    # instruction — the Lighter ports (equities-*-lshadow) are the bots now.
+    # NOTE their processes run on the operator's machine OUTSIDE this repo;
+    # while they keep running, their rows re-upsert after each prune (hidden
+    # by RETIRED_ROWS either way). Stop the laptop cron/processes to finish.
+    "equities-momentum-alpaca", "equities-regime-ibkr",
+    # [2026-07-14 KRAKEN RETIREMENT] the 8 Kraken paper rows — the -lshadow
+    # twins are the fleet now (their rows are NOT in this list, nor is Tide
+    # Rider's live row). Family ONLY_BOT services re-upsert until the
+    # operator stops them in Railway; prunes stay idempotent.
+    "crypto-trend-daily", "crypto-intraday-15m",
+    "crypto-swing-daily", "crypto-breakout-4h",
+    "freqtrade-mum", "freqtrade-dad",
+    "freqtrade-avo-maria", "freqtrade-georgia",
 ]
 
 

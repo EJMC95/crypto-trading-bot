@@ -39,10 +39,31 @@
 # validated breakout as the uptrend mode, and made the dip-buy an explicit
 # half-stake bear-bounce mode (4h RSI<28 at the range bottom, up-tick confirmed)
 # with fast exits — so the bot trades BOTH regimes, each with a designed edge.
+#
+# [2026-07-14 BTC-TIDE GATE] Live bleed diagnosis: both carriers (crypto-
+# breakout-4h and freqtrade-dad) went 2W/9L (~-$8 each) in the 3-13 Jul window
+# — 11 different pairs broke above their OWN 200-EMA and died, a market-wide
+# fakeout wave in a fear tape (F&G 22, 8/10 majors in a short regime). The
+# per-pair EMA filter can't see that; a market-tide filter can. Backtest,
+# Kraken 4h, all 30 whitelist pairs, 2026-04-20 -> 07-14, 0.26%/side fees
+# (scripts/backtest_momo_tide_gate.py):
+#     A as-deployed:            121 trades, 33% win, sum -94.0%, PF 0.79
+#     B + BTC>4h-EMA200 gate:    74 trades, 37% win, sum +79.1%, PF 1.43
+#     C breadth>=50% gate:       78 trades, 35% win, sum  -9.3%, PF 0.96
+#     D half-size off-tide:     121 trades, 33% win, sum -19.1%, PF 0.94
+# The baseline faithfully reproduces the live July bleed (27 entries, 22% win)
+# and the hard BTC-tide gate flips it positive while cutting -12% catastrophe
+# stops 6 -> 1. Variant B shipped: breakout entries additionally require BTC
+# above its 4h EMA200. Same idea as the pair-level EMA200 rule, one level up —
+# and the same signal the regime oracle (L1) publishes; computed in-strategy
+# from the BTC informative pair so `freqtrade backtesting` reproduces it
+# deterministically. Honest caveat: one 3-month window, not 3 years — but it
+# is the exact regime the bot is bleeding in, and the untouched core edge
+# (+$201.59/603 entries on the 2022-26 replay) only ever fired in up-tides.
 
 from pandas import DataFrame
 import talib.abstract as ta
-from freqtrade.strategy import IStrategy, IntParameter
+from freqtrade.strategy import IStrategy, IntParameter, merge_informative_pair
 
 
 class MomoBreakoutV1(IStrategy):
@@ -50,6 +71,13 @@ class MomoBreakoutV1(IStrategy):
 
     timeframe = "4h"
     can_short = False
+
+    # [2026-07-14] Market-tide gate source (see header). BTC/USD is in every
+    # carrier's whitelist, so the informative data is always warm.
+    tide_pair = "BTC/USD"
+
+    def informative_pairs(self):
+        return [(self.tide_pair, self.timeframe)]
 
     # Circuit breakers (research-driven risk guards). Candle counts scale with
     # this strategy's timeframe. Cooldown after each trade; stop-loss guard pauses
@@ -88,6 +116,26 @@ class MomoBreakoutV1(IStrategy):
         # Prior-bar Donchian channels (shift(1) => no look-ahead on the current bar).
         dataframe["dc_high"] = dataframe["high"].rolling(self.entry_lookback.value).max().shift(1)
         dataframe["dc_low"]  = dataframe["low"].rolling(self.exit_lookback.value).min().shift(1)
+
+        # [2026-07-14 BTC-TIDE GATE] BTC above its own 4h EMA200 = tide up.
+        # FAIL-SAFE CLOSED (0): a breakout with no tide reading is treated as
+        # off-tide — backtest says ungated breakouts in this tape are net
+        # negative, and BTC/USD informative data is always present in practice.
+        btc = self.dp.get_pair_dataframe(pair=self.tide_pair, timeframe=self.timeframe)
+        tide_col = f"btc_tide_up_{self.timeframe}"
+        if btc is not None and len(btc) > 0:
+            btc = btc.copy()
+            btc["btc_tide_up"] = (
+                btc["close"] > ta.EMA(btc, timeperiod=self.trend_ema.value)
+            ).astype(int)
+            dataframe = merge_informative_pair(
+                dataframe, btc[["date", "btc_tide_up"]], self.timeframe,
+                self.timeframe, ffill=True
+            )
+        if tide_col in dataframe.columns:
+            dataframe["btc_tide_up"] = dataframe[tide_col].fillna(0).astype(int)
+        else:
+            dataframe["btc_tide_up"] = 0
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -95,10 +143,13 @@ class MomoBreakoutV1(IStrategy):
 
         # UPTREND (above 200-EMA): fresh breakout over the 30-bar high — the
         # validated momentum edge (let winners run, Donchian-trail out).
+        # [2026-07-14] Plus the market tide: BTC must also be above ITS 4h
+        # EMA200 (backtest evidence in the header — PF 0.79 -> 1.43).
         dataframe.loc[
             (
                 (dataframe["close"] > dataframe["dc_high"])
                 & (dataframe["close"] > dataframe["ema_trend"])
+                & (dataframe["btc_tide_up"] == 1)
                 & live_vol
             ),
             ["enter_long", "enter_tag"],
@@ -150,9 +201,31 @@ class MomoBreakoutV1(IStrategy):
         # a live hack/regulatory shock are the knife-catch case.
         if self._pulse_panic(current_time):
             stake *= 0.5
+        # [2026-07-14 L4] The brain's reduce-only per-tag multiplier: a tag the
+        # ledger has repeatedly scored negative at sample size trades smaller
+        # until it earns full stake back. Neutral 1.0 on any doubt (fleet_bus).
+        try:
+            import fleet_bus
+            stake *= fleet_bus.stake_multiplier(
+                self.config.get("bot_name"), entry_tag, current_time)
+        except Exception:
+            pass
         if stake < proposed_stake and min_stake is not None and stake < min_stake:
             stake = min_stake
         return stake
+
+    def confirm_trade_entry(self, pair, order_type, amount, rate, time_in_force,
+                            current_time, entry_tag, side, **kwargs):
+        # [2026-07-14 L2] Fleet-risk long-budget veto — the 26-position-pileup
+        # guard. Enforcement wiring per the 07-07 design's scheduled Jul-14
+        # review; fail-safe OPEN (stale/missing state never blocks trading).
+        try:
+            import fleet_bus
+            if fleet_bus.long_entries_blocked(current_time):
+                return False
+        except Exception:
+            pass
+        return True
 
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:

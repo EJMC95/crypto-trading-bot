@@ -5,14 +5,22 @@ single bot has.
 
 [2026-07-07] Built from CROSS_BOT_INTELLIGENCE_DESIGN_2026-07-07.md.
 
-LAYER 2 — FLEET RISK TRAFFIC LIGHT (advisory week one)
+LAYER 2 — FLEET RISK TRAFFIC LIGHT
   The scar this exists for: one July dip saw 26 same-direction crypto
   positions across three bots — every bot inside its own rules, the FLEET
   massively concentrated. This service reads every bot's live row in
   bot_pnl, counts directional crypto exposure fleet-wide, and publishes a
   traffic light + per-pair concentration to bot_state "fleet-risk".
-  ADVISORY: nothing reads it yet. After a week of history we decide the
-  enforcement wiring (confirm_trade_entry veto on RED) from evidence.
+  [2026-07-14 ENFORCEMENT REVIEW — the one scheduled in the 07-07 design]
+  After the advisory week, mode is now "enforce": the freqtrade strategies
+  veto NEW long entries in confirm_trade_entry (via fleet_bus.long_entries_
+  blocked) when long_positions >= long_budget. Side-specific on purpose —
+  the veto keys off the LONG count, not the blended light, so a blown short
+  budget can never freeze the long-only spot bots. Existing positions and
+  exits are never touched. Central kill switch: set FLEET_RISK_MODE=advisory
+  on this service and every consumer goes neutral within its cache TTL.
+  (This file also folds in the 07-09 gate0 venue-aware counting —
+  authoritative_row live-Lighter > paper — which main had missed.)
 
 LAYER 3 — SIGNAL BUS
   Mirrors the fleet's scanner exhaust into one consumable key,
@@ -30,6 +38,7 @@ no DATABASE_URL -> silent no-op; any single bot's weird extra -> skipped.
 """
 
 import json
+import os
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
@@ -37,15 +46,59 @@ import bot_pnl_store as store
 RISK_KEY = "fleet-risk"
 BUS_KEY = "signal-bus"
 TTL_SEC = 900
+# [2026-07-14] "enforce" = strategies honor the long-budget veto (fleet_bus).
+# Flip to "advisory" on the Railway service to stand the whole layer down.
+MODE = os.environ.get("FLEET_RISK_MODE", "enforce").strip().lower()
+
+# [2026-07-14 GHOST-EXPOSURE FIX] bot_pnl rows outlive their bots: a
+# decommissioned service (Bounce Catcher, stopped 12 Jul) leaves its last row
+# frozen — open positions included — and this service was counting them
+# forever (the light sat RED at 32L for hours on 22 phantom longs from two
+# retired rows the dashboard no longer even displays). Rows older than this
+# are now ignored everywhere: exposure counting AND the signal-bus mirrors
+# (a frozen scanner row must not keep republishing last week's dislocation).
+# Running bots publish every 1-10 min, so 30 min is generous; consumers
+# fail-safe on absence, per the standing bus contract. This filter is a
+# PREREQUISITE for wiring the RED entry veto — enforcement off a
+# ghost-inflated light would throttle live bots for positions nobody holds.
+STALE_ROW_SEC = 1800
+
+
+def row_fresh(r):
+    """True if this bot_pnl row was updated within STALE_ROW_SEC."""
+    ts = (r or {}).get("updated_at")
+    if not ts:
+        return False
+    try:
+        upd = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if upd.tzinfo is None:
+        upd = upd.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - upd).total_seconds() <= STALE_ROW_SEC
 
 # Directional crypto books only. Funding-carry is delta-neutral (excluded),
 # sniper is event-class (tracked as gross info only), stocks are a separate
-# mandate, scanners hold nothing.
+# mandate, scanners hold nothing. Freqtrade -lshadow twins are separate $1k
+# modelled books (counted only via the info_only shadow tallies, never the
+# light). [2026-07-14] Retired bots removed (the dashboard RETIRED_ROWS set):
+# crypto-trendmomo-4h + perps-regime-switch dropped from this list, and the
+# whole perps long/short cohort (Bounce Catcher decommissioned 12 Jul, Trail
+# Blazer retired) — their frozen rows were the ghost-exposure RED. Their
+# bot_pnl rows are pruned by cleanup_legacy_bots.py on boot; if one is ever
+# revived, re-add it here.
+# [2026-07-14 KRAKEN RETIREMENT] The Kraken paper rows are retired; each base
+# resolves via authoritative_row to live Lighter > -lshadow (the fleet's
+# modelled books now) > legacy paper. The light therefore tracks the LIGHTER
+# fleet — documented change of meaning: shadow books are modelled capital,
+# but they ARE the fleet being managed, and the pileup scar applies to
+# whatever cohort trades one beta. Ticket Taker (scout-driven shadow book)
+# is counted too — its open_pos extra is fleet_risk-shaped.
 FREQTRADE_BOTS = ["crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
-                  "crypto-breakout-4h", "crypto-trendmomo-4h", "freqtrade-mum",
+                  "crypto-breakout-4h", "freqtrade-mum",
                   "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia",
-                  "perps-regime-switch"]
-PERPS_LS_BOTS = ["perps-rsi-meanrev", "perps-donchian-breakout"]
+                  "lighter-ticket-taker"]
+PERPS_LS_BOTS = []
 
 # [2026-07-09 LIGHTER GO-LIVE — no-miss-sync] When a bot trades on Lighter it
 # publishes as <bot>-lighter (real money) / -lshadow (modelled) / -ltest. The
@@ -59,18 +112,69 @@ def _fresh(row):
 
 
 def authoritative_row(base, by_bot):
-    """(row, venue) for a directional bot — the LIVE Lighter row supersedes the
-    paper twin so real Lighter exposure is counted and never double-counted."""
-    live = by_bot.get(base + "-lighter")
-    if _fresh(live):
-        return live, "lighter_live"
-    return by_bot.get(base), "hl_paper"
+    """(row, venue) for a directional bot, one row so nothing double-counts:
+    live Lighter (real money) > -lshadow (the fleet's modelled Lighter books,
+    post-Kraken-retirement) > legacy paper (transition fallback while the old
+    services wind down). Every candidate must be FRESH — a frozen row of any
+    venue must never shadow a running one."""
+    for suffix, venue in (("-lighter", "lighter_live"),
+                          ("-lshadow", "lighter_shadow"),
+                          ("", "hl_paper")):
+        r = by_bot.get(base + suffix)
+        if _fresh(r) and row_fresh(r):
+            return r, venue
+    return None, None
 
 # Fleet budgets (positions, count-based v1 — inverse-vol weighting is a later
 # refinement once this has advisory history to calibrate against).
 LONG_BUDGET = 20
 SHORT_BUDGET = 12
 YELLOW_FRAC = 0.7
+
+# [2026-07-14b DRAWDOWN GOVERNOR] The missing risk leg: individual bots have
+# seatbelts, but nothing said "the whole fleet is bleeding — shrink". This
+# publishes a fleet-level 7-day equity drawdown and a clip_scale every run:
+# 1.0 normally, 0.5 past DD_HALF, 0.25 past DD_QUARTER. Ticket Taker consumes
+# it (scales its clips); for the gate0 books it is advisory until ported.
+# Equity cohort = the same authoritative rows the light counts. Samples are
+# kept inside this service's own state (>=30 min apart, 7-day window) so the
+# governor survives redeploys without touching bot_state_history.
+DD_HALF = float(os.environ.get("FLEET_DD_HALF", "-0.05"))
+DD_QUARTER = float(os.environ.get("FLEET_DD_QUARTER", "-0.10"))
+DD_SAMPLE_GAP_SEC = 1800
+DD_WINDOW_SEC = 7 * 24 * 3600
+
+
+def dd_governor(samples, fleet_equity, now_dt):
+    """(new_samples, dd_frac, clip_scale) — pure, unit-tested.
+
+    `samples` is [[iso_ts, equity], ...] oldest-first. Appends the current
+    reading if the newest sample is >= DD_SAMPLE_GAP_SEC old, trims to the
+    7-day window, and computes drawdown vs the window peak (current reading
+    included, so a fresh peak means dd == 0)."""
+    out = []
+    for ts, eq in samples or []:
+        try:
+            age = (now_dt - datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                   ).total_seconds()
+            if 0 <= age <= DD_WINDOW_SEC:
+                out.append([ts, float(eq)])
+        except (ValueError, TypeError):
+            continue
+    if fleet_equity and fleet_equity > 0:
+        if not out:
+            out.append([now_dt.isoformat(timespec="seconds"), fleet_equity])
+        else:
+            last_age = (now_dt - datetime.fromisoformat(
+                str(out[-1][0]).replace("Z", "+00:00"))).total_seconds()
+            if last_age >= DD_SAMPLE_GAP_SEC:
+                out.append([now_dt.isoformat(timespec="seconds"), fleet_equity])
+    if not fleet_equity or fleet_equity <= 0 or not out:
+        return out, None, 1.0
+    peak = max(max(eq for _, eq in out), fleet_equity)
+    dd = fleet_equity / peak - 1.0
+    scale = 0.25 if dd <= DD_QUARTER else (0.5 if dd <= DD_HALF else 1.0)
+    return out, round(dd, 4), scale
 
 
 def now_iso():
@@ -93,31 +197,34 @@ def main():
     by_bot = {r["bot"]: r for r in rows}
 
     fleet_long, fleet_short = 0, 0
-    per_bot, pair_count = {}, {}
+    fleet_equity = 0.0
+    per_bot, pair_count, venues_seen = {}, {}, {}
     for name in FREQTRADE_BOTS:
-        r = by_bot.get(name)
+        r, venue = authoritative_row(name, by_bot)
         if not r:
             continue
+        if r.get("equity") is not None:
+            fleet_equity += float(r["equity"])   # governor cohort = light cohort
         n = int(r.get("open_trades") or 0)
         if n == 0:
             continue
         extra = r.get("extra") or {}
         pos = extra.get("open_pos") or []
-        # freqtrade spot + regime-switch: entries are long unless the enter
-        # tag says otherwise (regime-switch shorts carry 'short' in the tag).
+        # entries are long unless the enter tag says otherwise
         longs = sum(1 for p in pos if "short" not in str(p.get("tag", "")).lower()) if pos else n
         shorts = (len(pos) - longs) if pos else 0
         fleet_long += longs
         fleet_short += shorts
-        per_bot[name] = {"long": longs, "short": shorts}
+        per_bot[name] = {"long": longs, "short": shorts, "venue": venue}
+        if venue != "hl_paper":
+            venues_seen[name] = venue
         for p in pos:
             base = str(p.get("pair", "")).split("/")[0]
             if base:
                 pair_count[base] = pair_count.get(base, 0) + 1
-    venues_seen = {}
     for name in PERPS_LS_BOTS:
         r, venue = authoritative_row(name, by_bot)   # live Lighter > paper twin
-        if not r:
+        if not r or not row_fresh(r):
             continue
         extra = r.get("extra") or {}
         longs = int(extra.get("longs") or 0)
@@ -145,9 +252,19 @@ def main():
                                          key=lambda kv: -kv[1]) if v >= 2}
 
     sniper = by_bot.get("event-listing-sniper") or {}
+    if not row_fresh(sniper):
+        sniper = {}
+    prev_state = store.load_state(RISK_KEY) or {}
+    samples, dd_7d, clip_scale = dd_governor(
+        prev_state.get("equity_samples"), fleet_equity,
+        datetime.now(timezone.utc))
     risk_payload = {
-        "updated": now_iso(), "ttl_sec": TTL_SEC, "mode": "advisory",
+        "updated": now_iso(), "ttl_sec": TTL_SEC, "mode": MODE,
         "light": light,
+        "fleet_equity": round(fleet_equity, 2),
+        "fleet_dd_7d": dd_7d,
+        "clip_scale": clip_scale,
+        "equity_samples": samples,
         "long_positions": fleet_long, "long_budget": LONG_BUDGET,
         "short_positions": fleet_short, "short_budget": SHORT_BUDGET,
         "gross": gross,
@@ -162,25 +279,50 @@ def main():
     store.save_state(RISK_KEY, risk_payload)
     store.save_history(RISK_KEY, {"light": light, "long": fleet_long,
                                   "short": fleet_short, "gross": gross,
-                                  "hot_pairs": hot_pairs})
+                                  "hot_pairs": hot_pairs,
+                                  "fleet_equity": round(fleet_equity, 2),
+                                  "fleet_dd_7d": dd_7d,
+                                  "clip_scale": clip_scale})
 
     # ---- Layer 3: signal bus -------------------------------------------
     bus = {"updated": now_iso(), "ttl_sec": TTL_SEC}
+
+    def fresh_row(bot):
+        r = by_bot.get(bot)
+        return r if (r and row_fresh(r)) else None
+
+    def fresh_extra(bot):
+        r = fresh_row(bot)
+        return (r.get("extra") or {}) if r else {}
+
     # [no-miss-sync] Funding rates GENUINELY differ across venues (Lighter vs HL
     # diverge — verified day-1). A Lighter-cohort entry filter must read LIGHTER
     # funding: prefer the Lighter-facing funding-carry row (live > shadow) over
     # the HL paper one, and tag the source so consumers know which venue it is.
-    fc_row = (by_bot.get("perps-funding-carry-lighter")
-              or by_bot.get("perps-funding-carry-lshadow")
-              or by_bot.get("perps-funding-carry") or {})
+    # Only FRESH rows qualify (a frozen live row must not outrank a running twin).
+    fc_row = (fresh_row("perps-funding-carry-lighter")
+              or fresh_row("perps-funding-carry-lshadow")
+              or fresh_row("perps-funding-carry") or {})
     fc = fc_row.get("extra") or {}
     if fc.get("hottest_funding_apr"):
         bus["funding_hottest_apr"] = fc["hottest_funding_apr"]
         bus["funding_source"] = fc.get("venue") or "hyperliquid"
-    xa = (by_bot.get("scanner-cross-exchange-arb") or {}).get("extra") or {}
-    if xa.get("best_top_pct") is not None:
-        bus["xexchange_dislocation_pct"] = xa.get("best_top_pct")
-    ta = (by_bot.get("scanner-triangular-arb") or {}).get("extra") or {}
+    xa = fresh_extra("scanner-cross-exchange-arb")
+    # [2026-07-14 review verdict] the raw best_top_pct max was symbol-collision
+    # noise (printed 4.6% junk) — the bus carries the majors-only gauge now.
+    if xa.get("liquid_top_pct") is not None:
+        bus["xexchange_dislocation_pct"] = xa.get("liquid_top_pct")
+    # [2026-07-14 review] Lighter venue premium (mark vs index, bps) — the
+    # dislocation signal measured on the venue the fleet actually trades.
+    # Advisory, like everything on the bus. Gap Scout publishes it.
+    if xa.get("lighter_prem_bps"):
+        bus["lighter_prem_bps"] = xa["lighter_prem_bps"]
+    if xa.get("lighter_prem_med_bps") is not None:
+        bus["lighter_venue_stress_bps"] = {
+            "med": xa.get("lighter_prem_med_bps"),
+            "max": xa.get("lighter_prem_max_bps"),
+            "n": xa.get("lighter_prem_n")}
+    ta = fresh_extra("scanner-triangular-arb")
     if ta.get("best_depth_pct") is not None:
         bus["tri_arb_best_depth_pct"] = ta.get("best_depth_pct")
     try:
@@ -196,12 +338,16 @@ def main():
     store.save_history(BUS_KEY, bus)
 
     hp = ",".join(f"{k}x{v}" for k, v in list(hot_pairs.items())[:4]) or "none"
-    _lv = ",".join(f"{k}:{v.split('_')[0]}" for k, v in venues_seen.items()) or "none-live"
-    print(f"[fleet-risk] {now_iso()} light={light.upper()} "
+    _lv = ",".join(f"{k}:{v.replace('lighter_', '')}"
+                   for k, v in venues_seen.items()) or "none-live"
+    lstress = (bus.get("lighter_venue_stress_bps") or {}).get("med")
+    print(f"[fleet-risk] {now_iso()} mode={MODE} light={light.upper()} "
           f"long={fleet_long}/{LONG_BUDGET} short={fleet_short}/{SHORT_BUDGET} "
-          f"gross={gross} | live-venue: {_lv} | shadow(info) {shadow_long}L/{shadow_short}S "
+          f"gross={gross} | equity={fleet_equity:.0f} dd7d={dd_7d} scale={clip_scale} "
+          f"| live-venue: {_lv} | shadow(info) {shadow_long}L/{shadow_short}S "
           f"| funding_src={bus.get('funding_source')} | pair-pileups: {hp} "
-          f"| mood={bus.get('pulse_mood')} dislocation={bus.get('xexchange_dislocation_pct')}")
+          f"| mood={bus.get('pulse_mood')} panic={bus.get('pulse_panic')} "
+          f"| dislocation={bus.get('xexchange_dislocation_pct')} | lighter-stress={lstress}bps")
 
 
 if __name__ == "__main__":

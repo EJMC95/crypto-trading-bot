@@ -45,12 +45,7 @@
       "SOL/USD",
       "XRP/USD",
       "ADA/USD",
-      "DOT/USD",
-      "AVAX/USD",
       "LINK/USD",
-      "LTC/USD",
-      "ATOM/USD",
-      "NEAR/USD",
       "TRX/USD",
       "DOGE/USD",
       "ALGO/USD",
@@ -93,10 +88,11 @@
     "username": "freqtrader",
     "password": "freqbot2026"
   },
-  "bot_name": "trend_golden_cross",
+  "bot_name": "freqtrade-mum",
   "initial_state": "running",
   "force_entry_enable": false,
   "internals": {
     "process_throttle_secs": 5
-  }
+  },
+  "_whitelist_note": "2026-07-14 curation: dropped DOT/ATOM/NEAR/LTC/AVAX \u2014 TrendMomoV1 rules replayed per-pair on 2yr Kraken 1d (scripts/backtest_trendmomo_pairs.py): all five negative (PF 0.08-0.71, sum -313%) while the kept 10 are positive (sum +863%). Matches the V4 majors-curation precedent and the strategy's BTC+ETH-only validation history."
 }

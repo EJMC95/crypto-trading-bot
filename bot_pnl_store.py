@@ -144,53 +144,14 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
             )
         return True
     except Exception as e:
-        # [2026-07-12 GO-GREEN] one immediate reconnect+retry so a transient
-        # Postgres blip doesn't cost a whole publish cycle. Second failure
-        # falls through to the original guarded behaviour.
+        _warn_once(f"write failed ({e})")
+        # drop the connection so the next call reconnects
         global _conn
         try:
             conn.close()
         except Exception:
             pass
         _conn = None
-        try:
-            conn2 = _get_conn()
-            if conn2 is not None:
-                with conn2.cursor() as cur:
-                    cur.execute(
-                        """
-                        INSERT INTO bot_pnl (bot, updated_at, status, equity, pnl_abs,
-                            pnl_pct, open_trades, closed_trades, wins, losses, extra,
-                            pnl_daily)
-                        VALUES (%s, now(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (bot) DO UPDATE SET
-                            updated_at    = now(),
-                            status        = EXCLUDED.status,
-                            equity        = EXCLUDED.equity,
-                            pnl_abs       = EXCLUDED.pnl_abs,
-                            pnl_pct       = EXCLUDED.pnl_pct,
-                            open_trades   = EXCLUDED.open_trades,
-                            closed_trades = EXCLUDED.closed_trades,
-                            wins          = EXCLUDED.wins,
-                            losses        = EXCLUDED.losses,
-                            extra         = EXCLUDED.extra,
-                            pnl_daily     = EXCLUDED.pnl_daily
-                        """,
-                        (bot, status, equity, pnl_abs, pnl_pct, open_trades,
-                         closed_trades, wins, losses,
-                         json.dumps(extra) if extra is not None else None,
-                         pnl_daily),
-                    )
-                return True
-        except Exception as e2:
-            _warn_once(f"write failed twice ({e}; retry: {e2})")
-            try:
-                _conn.close()  # type: ignore[union-attr]
-            except Exception:
-                pass
-            _conn = None
-            return False
-        _warn_once(f"write failed ({e})")
         return False
 
 
@@ -247,74 +208,6 @@ def save_state(bot, state):
             pass
         _conn = None
         return False
-
-
-def heartbeat(bot):
-    """[2026-07-12 GO-GREEN] Touch ONLY updated_at on the bot's existing row —
-    a liveness proof that never clobbers the last good snapshot. Cheap enough
-    to call at the TOP of every loop, so slow scans, venue outages and
-    skip-paths that never reach the full publish can't read as a dead bot."""
-    conn = _get_conn()
-    if conn is None:
-        return False
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE bot_pnl SET updated_at = now() WHERE bot = %s", (bot,))
-        return True
-    except Exception as e:
-        _warn_once(f"heartbeat failed ({e})")
-        global _conn
-        try:
-            conn.close()
-        except Exception:
-            pass
-        _conn = None
-        return False
-
-
-def set_status(bot, status):
-    """[2026-07-12 GO-GREEN] Update ONLY status+updated_at (keeps the last
-    equity/P&L intact). Used by boot-refusal paths so an ARMED/misconfigured
-    bot shows as ERROR on the dashboard instead of silently going stale."""
-    conn = _get_conn()
-    if conn is None:
-        return False
-    try:
-        _ensure_table(conn)
-        with conn.cursor() as cur:
-            cur.execute(
-                """INSERT INTO bot_pnl (bot, updated_at, status)
-                   VALUES (%s, now(), %s)
-                   ON CONFLICT (bot) DO UPDATE SET
-                       updated_at = now(), status = EXCLUDED.status""",
-                (bot, status))
-        return True
-    except Exception as e:
-        _warn_once(f"set_status failed ({e})")
-        global _conn
-        try:
-            conn.close()
-        except Exception:
-            pass
-        _conn = None
-        return False
-
-
-def save_daily_halt(bot, day_iso, day_start_equity=None):
-    """Persist a tripped daily-loss halt under <bot>:halt. Never raises.
-
-    [2026-07-11 DURABLE HALT] halted_today was memory-only in every perps bot,
-    so a restart/redeploy on the same UTC day silently resumed trading after
-    the loss rail fired. Bots call load_daily_halt at boot to stay halted.
-    """
-    return save_state(bot + ":halt", {"halted_date": day_iso,
-                                      "day_start_equity": day_start_equity})
-
-
-def load_daily_halt(bot, day_iso):
-    """Return the halt state saved for day_iso (UTC 'YYYY-MM-DD'), else None."""
-    st = load_state(bot + ":halt") or {}
-    return st if st.get("halted_date") == day_iso else None
 
 
 def load_state(bot):
@@ -564,16 +457,11 @@ def _ensure_paper_trades_table(conn):
             )
             """
         )
-        # [2026-07-09 LIGHTER GATE-0] venue provenance so shadow/testnet/live
-        # rows are queryable apart from the HL paper era (venue NULL = hl paper).
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS venue TEXT")
-        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS shadow BOOLEAN")
     _paper_trades_table_ready = True
 
 
 def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
-                        opened_at=None, closed_at=None, reason=None,
-                        venue=None, shadow=None):
+                        opened_at=None, closed_at=None, reason=None):
     """Idempotently record one closed paper trade so cumulative P&L survives a
     redeploy. `trade_id` must be stable+unique for the trade. Never raises."""
     conn = _get_conn()
@@ -585,16 +473,15 @@ def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
             cur.execute(
                 """
                 INSERT INTO paper_trades (bot, trade_id, pair, pnl_abs, pnl_pct,
-                    opened_at, closed_at, reason, venue, shadow, seen_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                    opened_at, closed_at, reason, seen_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
                 ON CONFLICT (bot, trade_id) DO UPDATE SET
                     pnl_abs=EXCLUDED.pnl_abs, pnl_pct=EXCLUDED.pnl_pct,
                     closed_at=EXCLUDED.closed_at, reason=EXCLUDED.reason,
-                    venue=EXCLUDED.venue, shadow=EXCLUDED.shadow,
                     seen_at=now()
                 """,
                 (bot, str(trade_id), pair, pnl_abs, pnl_pct,
-                 opened_at, closed_at, reason, venue, shadow),
+                 opened_at, closed_at, reason),
             )
         return True
     except Exception as e:  # noqa: BLE001
@@ -660,10 +547,18 @@ def fetch_paper_trades(limit=2000):
         out = []
         for bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason in rows:
             reason = reason or ""
-            if "_" in reason:
+            # [2026-07-14 TAG-SEMANTICS FIX] Only a real direction prefix
+            # (long_/short_) carries entry info. Splitting EVERY reason made
+            # exit reasons masquerade as entry modes — funding-carry's 'flip'
+            # and the sniper's 'delisted' became enter_tags, and the brain
+            # spent 92 runs proposing to "tighten the 'flip' entry gates"
+            # (an exit path, not an entry). Now: no direction prefix ->
+            # untagged entry + the FULL reason kept as exit_reason (also fixes
+            # 'decay_paid' being mangled into enter 'decay' / exit 'paid').
+            if reason.startswith(("long_", "short_")):
                 direction, _sep, exit_reason = reason.partition("_")
             else:
-                direction, exit_reason = (reason or "trade"), (reason or "trade")
+                direction, exit_reason = "", (reason or "trade")
             dur = None
             try:
                 if opened_at and closed_at:
@@ -676,7 +571,7 @@ def fetch_paper_trades(limit=2000):
                 "bot": bot, "pair": pair,
                 "profit_abs": float(pnl_abs) if pnl_abs is not None else 0.0,
                 "profit_ratio": pnl_pct,
-                "enter_tag": direction or "trade",
+                "enter_tag": direction or None,   # None -> brain's "(untagged)"
                 "exit_reason": exit_reason or "trade",
                 "duration_min": dur,
                 "open_ts": opened_at, "close_ts": closed_at,
@@ -767,6 +662,43 @@ def _ensure_history_table(conn):
     _history_table_ready = True
 
 
+def fetch_state_history(key, limit=800):
+    """[2026-07-14] Read side of save_history: recent bot_state_history
+    snapshots for one shared-layer key, NEWEST FIRST -> [{"ts": iso, "payload":
+    dict}]. Built for the brain's diagnosis layer (joining trades to the
+    regime-oracle reading at their open time). Returns [] when unavailable."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        _ensure_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ts, payload FROM bot_state_history "
+                "WHERE key = %s ORDER BY ts DESC LIMIT %s",
+                (key, int(limit)))
+            rows = cur.fetchall()
+        out = []
+        for ts, payload in rows:
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except Exception:
+                    continue
+            out.append({"ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+                        "payload": payload or {}})
+        return out
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"state-history read failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return []
+
+
 def save_history(key, payload):
     """Append one snapshot to bot_state_history (oracle calls, risk lights) so
     the shared layers become backtestable. Safe every loop. Never raises."""
@@ -783,77 +715,6 @@ def save_history(key, payload):
         return True
     except Exception as e:
         _warn_once(f"history write failed ({e})")
-        global _conn
-        try:
-            conn.close()
-        except Exception:
-            pass
-        _conn = None
-        return False
-
-
-# --------------------------------------------------------------------------
-# venue order log [2026-07-09 LIGHTER GATE-0]
-# Order-level provenance for the Lighter migration: every shadow-modelled fill
-# AND (later) every live order lands here with the raw exchange response, so
-# Gate-3 can price realizable spread/slippage per market from real evidence.
-_venue_orders_table_ready = False
-
-
-def _ensure_venue_orders_table(conn):
-    global _venue_orders_table_ready
-    if _venue_orders_table_ready:
-        return
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS venue_orders (
-                id            BIGSERIAL PRIMARY KEY,
-                at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-                bot           TEXT NOT NULL,
-                venue         TEXT NOT NULL,
-                shadow        BOOLEAN NOT NULL DEFAULT TRUE,
-                coin          TEXT,
-                side          TEXT,
-                size          DOUBLE PRECISION,
-                px_decision   DOUBLE PRECISION,
-                px_fill       DOUBLE PRECISION,
-                spread_bps    DOUBLE PRECISION,
-                slippage_bps  DOUBLE PRECISION,
-                raw           JSONB
-            )
-            """
-        )
-        cur.execute(
-            "CREATE INDEX IF NOT EXISTS venue_orders_bot_at "
-            "ON venue_orders (bot, at)")
-    _venue_orders_table_ready = True
-
-
-def publish_venue_order(bot, venue, shadow, coin, side, size,
-                        px_decision=None, px_fill=None, spread_bps=None,
-                        slippage_bps=None, raw=None):
-    """Append one venue order (shadow or live) to the durable order log.
-    Guarded like every publisher here: never raises into a trading loop."""
-    conn = _get_conn()
-    if conn is None:
-        return False
-    try:
-        _ensure_venue_orders_table(conn)
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO venue_orders (bot, venue, shadow, coin, side, size,
-                    px_decision, px_fill, spread_bps, slippage_bps, raw)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (bot, venue, bool(shadow), coin, side, size, px_decision,
-                 px_fill, spread_bps, slippage_bps,
-                 json.dumps(raw) if raw is not None else None),
-            )
-        return True
-    except Exception as e:  # noqa: BLE001
-        _warn_once(f"venue-order write failed ({e})")
         global _conn
         try:
             conn.close()
