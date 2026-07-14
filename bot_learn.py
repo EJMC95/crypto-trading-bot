@@ -30,6 +30,15 @@ WHAT IT DOES
      shadow twin (<bot> vs <bot>-lshadow, live -lighter rows too) from
      bot_pnl — the shadow-book data collected since 13 Jul — and reports
      the venue gap per strategy in lessons + state (key 'venue_ab').
+  7. [2026-07-14b DIAGNOSIS] For every negative (bot, tag) bucket at sample
+     size, classifies WHICH LEVER the loss lives in — exit_too_tight /
+     venue_execution / fee_bleed / regime_timing / entry_quality — using
+     exit-path splits, post-exit drift from public 1h candles (the
+     mechanized form of the manual replay behind the 13-Jul stop widening),
+     fee-scale tests, a regime-oracle-history join, and the venue A/B
+     table. Publishes bot_state 'brain-diagnosis'; proposals now name the
+     lever instead of defaulting to "tighten the entry gates" (the 92-run
+     'flip' artifact this replaces).
 
 WHAT IT NEVER DOES
   Change entry/exit logic, configs, or trades — and it never SIZES UP.
@@ -66,6 +75,22 @@ MULT_MIN_N = 30       # era trades on a tag before a 0.5x may publish
 MULT_SOFT_N = 15      # era trades before a 0.75x may publish
 MULT_KEY = "brain-stake-mults"
 MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
+
+# [2026-07-14b DIAGNOSIS LAYER] Discriminate WHERE a negative sleeve loses:
+# entry quality / exit path / fee bleed / regime timing / venue execution.
+# Born from the 92-run "tighten the 'flip' entry gates" artifact — the brain
+# could find patterns but not tell an entry problem from an exit problem from
+# a venue problem, so its prose pointed at the wrong lever.
+DIAG_KEY = "brain-diagnosis"
+DIAG_MIN_N = 10           # closed era trades before diagnosing a bucket
+DIAG_DRIFT_MAX_PAIRS = 30  # cap Kraken fetches per run (once per pair, cached)
+STOPPISH = ("stop_loss", "trailing_stop_loss", "bleed_stop", "stoploss",
+            "liquidation", "force_exit")
+# Round-trip friction estimate per bot (fraction of stake). Kraken spot taker
+# 0.26%/side is the freqtrade default; the perps ledger documented ~29bps.
+FEE_RT_DEFAULT = 0.0052
+FEE_RT = {"perps-funding-carry": 0.0029, "perps-rsi-meanrev": 0.0029,
+          "perps-donchian-breakout": 0.0029, "event-listing-sniper": 0.0060}
 
 # [ERA AWARENESS] Hypotheses must come from trades taken by the CURRENT code.
 # Without this the brain prosecutes today's strategy for yesterday's crimes
@@ -236,12 +261,11 @@ def analyse_bot(bot, trades, pulse_hist=None):
             hyp(f"pair:{pair}:earner", "pair_earner",
                 f"{pair}: {b['n']} trades, {b['w']/b['n']*100:.0f}% win, ${b['pnl']:+.2f}",
                 f"{pair} is a consistent earner for {bot} — protect it in any universe change")
-    # Entry-mode expectancy.
-    for tag, b in card["by_tag"].items():
-        if b["n"] >= MIN_N_FLAG + 2 and b["pnl"] < 0 and b["w"] / b["n"] < max(0.25, wr * 0.6):
-            hyp(f"tag:{tag}", "mode_negative",
-                f"mode '{tag}': {b['n']} trades, {b['w']/b['n']*100:.0f}% win, ${b['pnl']:+.2f}",
-                f"tighten the '{tag}' entry gates on {bot} (quality over quantity)")
+    # [2026-07-14b] Entry-mode expectancy moved to the DIAGNOSIS layer in
+    # main(): the old blanket "tighten the '{tag}' entry gates" prose fired on
+    # any negative bucket regardless of whether the loss lived in the entry,
+    # the exit path, fees, regime timing, or the venue — the 92-run 'flip'
+    # artifact. diagnose() now names the lever, with drift/fee/regime evidence.
     # Stop-too-tight signature: fast deaths dominate losses AND ROI exits win.
     fast = card["by_dur"].get("<30m", {"n": 0, "w": 0, "pnl": 0})
     roi = card["by_exit"].get("roi", {"n": 0, "w": 0, "pnl": 0})
@@ -291,6 +315,207 @@ def analyse_bot(bot, trades, pulse_hist=None):
                         f"'{k}' mood: {v[0]} trades at {bwr*100:.0f}% win vs {wr*100:.0f}% overall",
                         f"{bot} performs best in '{k}' mood — candidate for informed size-up")
     return card, hyps
+
+
+# --------------------------------------------------------------------------
+# [2026-07-14b] Diagnosis evidence collectors
+# --------------------------------------------------------------------------
+
+_KRAKEN_ALT = {"BTC": "XBT"}
+_kraken_cache = {}   # pair -> list[(epoch, o, h, l, c)] | None (per-process run)
+
+
+def _kraken_hourly(pair):
+    """720 recent 1h candles from Kraken's public OHLC (covers ~30 days — the
+    whole current ledger). Cached per pair per run; None (also cached) when the
+    pair isn't on Kraken (perps alts, sniper venues) — drift evidence is then
+    simply unavailable for that pair, never an error."""
+    if pair in _kraken_cache:
+        return _kraken_cache[pair]
+    result = None
+    try:
+        base, _, quote = str(pair).partition("/")
+        base = _KRAKEN_ALT.get(base.upper(), base.upper())
+        quote = (quote or "USD").upper()
+        if quote in ("USDT", "USDC"):
+            quote = "USD"
+        url = f"https://api.kraken.com/0/public/OHLC?pair={base}{quote}&interval=60"
+        with urllib.request.urlopen(url, timeout=20) as r:
+            d = json.loads(r.read().decode())
+        if not d.get("error"):
+            k = [k for k in d["result"] if k != "last"][0]
+            result = [(int(row[0]), float(row[1]), float(row[2]),
+                       float(row[3]), float(row[4])) for row in d["result"][k]]
+    except Exception:
+        result = None
+    _kraken_cache[pair] = result
+    return result
+
+
+def _epoch(ts):
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
+
+
+def _post_exit_drift(trade):
+    """(reclaimed_entry_within_24h, fwd_return_24h) for one closed trade, from
+    public 1h candles after its close — the mechanized version of the manual
+    replay that justified the 13-Jul stop widening. None when rates/candles are
+    missing or fewer than 6 post-close hours exist yet."""
+    close_ts = _epoch(trade.get("close_ts"))
+    close_rate = trade.get("close_rate")
+    open_rate = trade.get("open_rate")
+    if not (close_ts and close_rate and open_rate):
+        return None
+    candles = _kraken_hourly(trade.get("pair"))
+    if not candles:
+        return None
+    window = [c for c in candles if c[0] > close_ts][:24]
+    if len(window) < 6:
+        return None
+    reclaimed = any(h >= float(open_rate) for _, _, h, _, _ in window)
+    fwd = window[-1][4] / float(close_rate) - 1.0
+    return reclaimed, fwd
+
+
+def _load_regime_history():
+    """regime-oracle snapshots (every 30 min since 7-Jul) -> [{'ts': epoch,
+    'risk_off': bool}], newest first. [] when the DB isn't reachable."""
+    try:
+        import bot_pnl_store as store
+        hist = store.fetch_state_history("regime-oracle", limit=800)
+    except Exception:
+        return []
+    out = []
+    for h in hist or []:
+        ts = _epoch(h.get("ts"))
+        read = str(((h.get("payload") or {}).get("fleet") or {}).get("read") or "")
+        if ts:
+            out.append({"ts": ts, "risk_off": read.startswith("risk-off")})
+    return out
+
+
+def _regime_at(regime_hist, open_ts):
+    """Nearest oracle snapshot within 1h of a trade's open, else None."""
+    t = _epoch(open_ts)
+    if not (t and regime_hist):
+        return None
+    best, best_d = None, 3600.0
+    for h in regime_hist:
+        d = abs(h["ts"] - t)
+        if d < best_d:
+            best, best_d = h, d
+    return best
+
+
+def _median(xs):
+    xs = sorted(xs)
+    return xs[len(xs) // 2] if xs else None
+
+
+def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
+    """Classify WHY a negative (bot, tag) bucket loses. Returns a dict with
+    'primary', 'proposal', and the evidence, or None below the sample floor.
+    Rules are ordered by decisiveness; every piece of evidence is optional and
+    its absence just removes that rule from contention (fail-soft)."""
+    n = len(trades)
+    pnl = sum(t.get("profit_abs") or 0 for t in trades)
+    if n < DIAG_MIN_N or pnl >= 0:
+        return None
+    losers = [t for t in trades if (t.get("profit_abs") or 0) < 0]
+    by_exit = _bucketize(trades, lambda t: t.get("exit_reason") or "?")
+    gross_loss = sum(-(t.get("profit_abs") or 0) for t in losers) or 1e-9
+
+    worst_exit, worst = max(by_exit.items(), key=lambda kv: -kv[1]["pnl"])
+    worst_share = max(0.0, -worst["pnl"]) / gross_loss
+    worst_wr = worst["w"] / worst["n"] if worst["n"] else 0.0
+    working_exits = [k for k, v in by_exit.items()
+                     if v["n"] >= 3 and v["w"] / v["n"] >= 0.6 and v["pnl"] > 0]
+
+    drifts = []
+    for t in losers:
+        if len(_kraken_cache) >= DIAG_DRIFT_MAX_PAIRS and t.get("pair") not in _kraken_cache:
+            continue
+        if drift_budget.get("left", 0) <= 0:
+            break
+        d = _post_exit_drift(t)
+        drift_budget["left"] -= 1
+        if d is not None:
+            drifts.append(d)
+    reclaim = (sum(1 for r, _ in drifts if r) / len(drifts)) if drifts else None
+    avg_fwd = (sum(f for _, f in drifts) / len(drifts)) if drifts else None
+
+    med_loser = _median([abs(t.get("profit_ratio") or 0) for t in losers
+                         if t.get("profit_ratio") is not None])
+    fee_rt = FEE_RT.get(bot, FEE_RT_DEFAULT)
+    fee_share = (fee_rt / med_loser) if med_loser else None
+
+    matched = counter = 0
+    for t in losers:
+        r = _regime_at(regime_hist, t.get("open_ts"))
+        if r is not None:
+            matched += 1
+            counter += 1 if r["risk_off"] else 0
+    counter_share = (counter / matched) if matched >= 8 else None
+
+    ab = venue_ab.get(bot) or {}
+    twin = ab.get("shadow") or ab.get("live") or {}
+    twin_pnl = twin.get("pnl_abs")
+    twin_n = (twin.get("wins") or 0) + (twin.get("losses") or 0)
+
+    ev = {"n": n, "pnl": round(pnl, 2), "worst_exit": worst_exit,
+          "worst_share": round(worst_share, 2), "worst_wr": round(worst_wr, 2),
+          "working_exits": working_exits, "drift_n": len(drifts),
+          "reclaim": None if reclaim is None else round(reclaim, 2),
+          "avg_fwd": None if avg_fwd is None else round(avg_fwd, 4),
+          "med_loser_ratio": None if med_loser is None else round(med_loser, 4),
+          "fee_share": None if fee_share is None else round(fee_share, 2),
+          "regime_matched": matched,
+          "counter_regime": None if counter_share is None else round(counter_share, 2),
+          "twin_pnl": twin_pnl, "twin_n": twin_n}
+
+    def out(primary, proposal):
+        return {"primary": primary, "proposal": proposal, "evidence": ev}
+
+    where = f"{bot}/{tag}" if tag != "(untagged)" else bot
+    # 1. EXIT TOO TIGHT: a stop-family path eats the losses, almost never wins,
+    #    and price reclaims entry after it fires — the exit cuts noise as danger.
+    if (worst_exit in STOPPISH and worst_share >= 0.5 and worst_wr <= 0.15
+            and reclaim is not None and len(drifts) >= 5
+            and reclaim >= 0.6 and (avg_fwd or 0) > -0.005):
+        return out("exit_too_tight",
+                   f"widen/slow the '{worst_exit}' path on {where} — {reclaim:.0%} of "
+                   f"losing exits reclaimed entry within 24h (fwd {avg_fwd:+.1%}); "
+                   f"do NOT tighten entries")
+    # 2. VENUE/EXECUTION: same signal is profitable on the Lighter twin.
+    if twin_pnl is not None and pnl < 0 < twin_pnl and twin_n >= 5:
+        return out("venue_execution",
+                   f"{where}: signal survives on the Lighter twin (${twin_pnl:+.2f} "
+                   f"vs paper ${pnl:+.2f}) — fix venue/fees, not the strategy")
+    # 3. FEE BLEED: median loss is fee-scale — costs, not direction.
+    if fee_share is not None and fee_share >= 0.5 and med_loser <= 0.012:
+        return out("fee_bleed",
+                   f"{where} losses are fee-scale (median loser {med_loser:.2%} vs "
+                   f"~{fee_rt:.2%} round-trip) — raise band/edge floors or move venue; "
+                   f"signals are not the lever")
+    # 4. REGIME TIMING: losses cluster in oracle risk-off windows.
+    if counter_share is not None and counter_share >= 0.7:
+        return out("regime_timing",
+                   f"gate {where} entries on the shared regime — {counter_share:.0%} "
+                   f"of matched losses opened during oracle risk-off")
+    # 5. ENTRY QUALITY: price kept falling after losing exits — the exits were
+    #    right, the entries were wrong. The ONLY case that earns the old
+    #    "tighten the entry gates" prose.
+    if reclaim is not None and len(drifts) >= 5 and reclaim <= 0.35 and (avg_fwd or 0) < 0:
+        return out("entry_quality",
+                   f"tighten the '{tag}' entry gates on {bot} — post-exit drift "
+                   f"confirms the entries were wrong (only {reclaim:.0%} reclaimed, "
+                   f"fwd {avg_fwd:+.1%})")
+    return out("mixed_unclear",
+               f"{where} is negative but no single lever dominates yet "
+               f"(worst path '{worst_exit}' {worst_share:.0%} of losses) — keep sampling")
 
 
 def compute_stake_mults(cards, state, run_no):
@@ -411,14 +636,45 @@ def main():
         by_bot[t.get("bot", "?")].append(t)
 
     pulse_hist = _load_pulse_history()
-    cards, all_hyps = {}, []
+    cards, all_hyps, era_trades = {}, [], {}
     for bot, trs in sorted(by_bot.items()):
         era = ERA_START.get(bot)
         trs_era = [t for t in trs if str(t.get("open_ts") or "") >= era] if era else trs
+        era_trades[bot] = trs_era
         cards[bot], hyps = analyse_bot(bot, trs_era, pulse_hist)
         cards[bot]["n_lifetime"] = len(trs)
         cards[bot]["era"] = era or "all-time"
         all_hyps.extend(hyps)
+
+    # [2026-07-14b DIAGNOSIS] For every negative (bot, tag) bucket at sample
+    # size, name the LEVER (entry / exit / fee / regime / venue) instead of the
+    # old blanket entry-gate prose. Reuses the same hypothesis keys
+    # ('{bot}|tag:{tag}') so existing streaks carry over — the prose upgrades,
+    # the persistence memory survives.
+    venue_ab = venue_ab_report()
+    regime_hist = _load_regime_history()
+    drift_budget = {"left": 120}   # bounds Kraken candle work per run
+    diagnoses = {}
+    for bot, trs in sorted(era_trades.items()):
+        buckets = defaultdict(list)
+        for t in trs:
+            buckets[str(t.get("enter_tag") or "(untagged)")].append(t)
+        for tag, bucket in sorted(buckets.items()):
+            d = diagnose(bot, tag, bucket, regime_hist, venue_ab, drift_budget)
+            if d is None:
+                continue
+            diagnoses[f"{bot}|{tag}"] = d
+            b = d["evidence"]
+            all_hyps.append({
+                "key": f"{bot}|tag:{tag}", "kind": f"diag_{d['primary']}",
+                "evidence": (f"'{tag}': n={b['n']}, ${b['pnl']:+.2f}; worst path "
+                             f"'{b['worst_exit']}' ({b['worst_share']:.0%} of losses, "
+                             f"wr {b['worst_wr']:.0%}); drift n={b['drift_n']} "
+                             f"reclaim={b['reclaim']} fwd={b['avg_fwd']}; "
+                             f"fee_share={b['fee_share']}; "
+                             f"counter_regime={b['counter_regime']}"),
+                "proposal": d["proposal"],
+            })
 
     # Reconcile hypotheses with cumulative state: persistence -> promotion.
     seen_now = {h["key"] for h in all_hyps}
@@ -445,9 +701,24 @@ def main():
     published_mults = compute_stake_mults(cards, state, run_no)
     mults_saved = _publish_stake_mults(published_mults)
 
-    # [2026-07-14 REACH] Venue A/B: paper vs Lighter shadow twins.
-    venue_ab = venue_ab_report()
+    # [2026-07-14 REACH] Venue A/B computed above (feeds diagnosis too).
     state["venue_ab"] = venue_ab
+
+    # [2026-07-14b] Publish the diagnoses — same freshness contract as the
+    # multipliers. Advisory: consumers are humans + the dashboard; nothing
+    # trades on this directly.
+    try:
+        import bot_pnl_store as store
+        diag_payload = {"updated": now, "ttl_sec": MULT_TTL_SEC,
+                        "diagnoses": diagnoses}
+        store.save_state(DIAG_KEY, diag_payload)
+        try:
+            store.save_history(DIAG_KEY, diag_payload)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    state["diagnoses"] = diagnoses
 
     # ---- write lessons_latest.md ------------------------------------------
     os.makedirs(REPORTS_DIR, exist_ok=True)
@@ -483,6 +754,12 @@ def main():
         L.append("- none — no tag currently clears the floor "
                  f"(n>={MULT_SOFT_N}, negative pnl, {PROMOTE_RUNS} consecutive runs)")
     L.append("")
+    # [2026-07-14b] Diagnoses — WHY each negative sleeve loses (the lever).
+    if diagnoses:
+        L.append("## Diagnoses (which lever each negative sleeve needs)")
+        for key, d in sorted(diagnoses.items()):
+            L.append(f"- **[{d['primary']}]** {d['proposal']}")
+        L.append("")
     # [2026-07-14 REACH] Venue A/B — same strategy, Kraken paper vs Lighter.
     ab_lines = []
     for base, e in sorted(venue_ab.items()):
@@ -524,8 +801,10 @@ def main():
     print(f"[bot_learn] run {run_no}: {len(trades)} closed trades, "
           f"{len(live_act)} actionable, {len(live_cand)} candidates (current-era), "
           f"{n_mults} stake-mults published ({'ok' if mults_saved else 'no-db'}), "
-          f"venue A/B pairs: {len(venue_ab)} "
+          f"{len(diagnoses)} diagnoses, venue A/B pairs: {len(venue_ab)} "
           f"-> {LESSONS_MD} (state: {'+'.join(saved) or 'NOT SAVED'})")
+    for key, d in sorted(diagnoses.items()):
+        print(f"  DIAGNOSIS [{d['primary']}]: {d['proposal']}")
     for k, e in sorted(live_act.items()):
         print(f"  ACTIONABLE: {e['proposal']}")
     return 0

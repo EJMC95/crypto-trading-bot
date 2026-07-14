@@ -151,6 +151,23 @@ per-tag W/L analysis ended as prose. What shipped today:
 | BTC-tide gate | revert one condition in `MomoBreakoutV1.populate_entry_trend` |
 | Mum whitelist | restore 5 pairs in `config_mum.json` |
 
+## 6b. Addendum (same day): the diagnosis layer
+
+The brain-card review of its four "tighten the X entry gates" proposals
+exposed the next gap: the brain had one prose template for every negative
+bucket and couldn't tell an entry problem from an exit problem from a
+fee/venue problem (two of the four proposals were exit reasons mislabeled
+as entry modes — plumbing fixed the same day). Shipped in response:
+`diagnose()` classifies every negative (bot, tag) bucket at n≥10 into
+**exit_too_tight / venue_execution / fee_bleed / regime_timing /
+entry_quality / mixed_unclear**, evidenced by exit-path splits, post-exit
+drift from public 1h candles (the mechanized 13-Jul stop replay), fee-scale
+tests, a regime-oracle-history join, and the venue A/B table — published to
+bot_state `brain-diagnosis`. Ground-truth validation on the July ledger:
+it re-derived the trailing-stop verdict (79–100% reclaim vs the manual
+replay's 77–89%), confirmed the breakout bleed as entry-side (22% reclaim),
+and declined to call dad's murkier 11-trade sample. Advisory-only.
+
 ## 7. What to watch this week
 
 1. Breakout carriers: entries should go quiet until BTC reclaims its 4h

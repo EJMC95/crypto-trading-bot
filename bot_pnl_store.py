@@ -662,6 +662,43 @@ def _ensure_history_table(conn):
     _history_table_ready = True
 
 
+def fetch_state_history(key, limit=800):
+    """[2026-07-14] Read side of save_history: recent bot_state_history
+    snapshots for one shared-layer key, NEWEST FIRST -> [{"ts": iso, "payload":
+    dict}]. Built for the brain's diagnosis layer (joining trades to the
+    regime-oracle reading at their open time). Returns [] when unavailable."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        _ensure_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT ts, payload FROM bot_state_history "
+                "WHERE key = %s ORDER BY ts DESC LIMIT %s",
+                (key, int(limit)))
+            rows = cur.fetchall()
+        out = []
+        for ts, payload in rows:
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except Exception:
+                    continue
+            out.append({"ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+                        "payload": payload or {}})
+        return out
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"state-history read failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return []
+
+
 def save_history(key, payload):
     """Append one snapshot to bot_state_history (oracle calls, risk lights) so
     the shared layers become backtestable. Safe every loop. Never raises."""
