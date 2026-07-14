@@ -85,6 +85,12 @@ def book_stats(books, min_qvol):
                 "qvol": qvol,
                 "oi": float(b.get("open_interest") or 0.0),
                 "liquid": qvol >= min_qvol,
+                # coarse intraday shape for the strategy lenses (v1 fields —
+                # the bulk endpoint has no candle history)
+                "last": float(b.get("last_trade_price") or 0.0),
+                "high": float(b.get("daily_price_high") or 0.0),
+                "low": float(b.get("daily_price_low") or 0.0),
+                "chg": float(b.get("daily_price_change") or 0.0),
             }
         except (TypeError, ValueError):
             continue
@@ -113,6 +119,51 @@ def funding_aprs(rates):
 def _median(xs):
     xs = sorted(xs)
     return xs[len(xs) // 2] if xs else None
+
+
+def strategy_tickets(stats, lighter_apr):
+    """[2026-07-14 user ask] Per-strategy candidate TICKETS — the scanner
+    hunting each bot family's setup across the WHOLE venue instead of a fixed
+    whitelist. v1 lenses use only today's keyless fields (range position, day
+    change, volume, premium, funding); trend-aware lenses come once scout
+    history accumulates. ADVISORY + historized: the weekly review grades each
+    lens's forward returns BEFORE any bot consumes its feed — a lens only
+    earns a consumer by evidence, same doctrine as everything on the bus.
+
+    Lenses -> bot families:
+      breakout : Breakout Hunter / Dad   — at the daily high on real volume,
+                 not trading rich, longs not paying extreme funding
+      dip      : Dip Buyer / Avo Maria   — hard intraday flush to the lows,
+                 bounded (avoid falling knives), not rich (v1 has no trend
+                 context — tagged so consumers know)
+      momentum : Stock Leaders / momo    — strongest liquid day-movers with
+                 funding not eating the carry
+    """
+    out = {"breakout": [], "dip": [], "momentum": []}
+    for s, v in stats.items():
+        if not v["liquid"]:
+            continue
+        hi, lo, last = v.get("high"), v.get("low"), v.get("last")
+        if not hi or not lo or not last or hi <= lo:
+            continue
+        rng = (last - lo) / (hi - lo)          # 1.0 = at the daily high
+        chg = v.get("chg") or 0.0              # venue-reported daily change %
+        apr = lighter_apr.get(s)
+        rich = v["prem_bps"] > 15.0            # taker longs pay the premium
+        longs_pay_hard = apr is not None and apr > 100.0
+        row = {"sym": s, "range_pos": round(rng, 2), "chg_pct": round(chg, 2),
+               "vol_m": round(v["qvol"] / 1e6, 2), "prem_bps": v["prem_bps"],
+               "apr_pct": apr}
+        if rng >= 0.9 and chg > 0.0 and not rich and not longs_pay_hard:
+            out["breakout"].append(row)
+        if rng <= 0.1 and -8.0 <= chg <= -1.0 and not rich:
+            out["dip"].append({**row, "trend": "unknown_v1"})
+        if chg >= 3.0 and v["qvol"] >= 1e6 and not rich and not longs_pay_hard:
+            out["momentum"].append(row)
+    out["breakout"].sort(key=lambda r: (-r["range_pos"], -r["vol_m"]))
+    out["dip"].sort(key=lambda r: (r["range_pos"], r["chg_pct"]))
+    out["momentum"].sort(key=lambda r: -r["chg_pct"])
+    return {k: v[:6] for k, v in out.items()}
 
 
 def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
@@ -167,6 +218,7 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
     payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC,
         "n_books": len(stats), "n_liquid": len(liquid),
+        "tickets": strategy_tickets(stats, lighter_apr),
         "stress": stress,
         "prem_outliers": prem_outliers,
         "funding_extremes": funding_extremes,
@@ -210,10 +262,13 @@ def main():
                    for x in payload["funding_extremes"][:2]) or "n/a"
     dv = ", ".join(f"{x['sym']}{x['gap_pct']:+}pp"
                    for x in payload["funding_divergence"][:2]) or "n/a"
+    tk = payload["tickets"]
     print(f"[lighter-scout] {now_iso()} books={payload['n_books']} "
           f"liquid={payload['n_liquid']} | stress med={st.get('med')} "
           f"p90={st.get('p90')} max={st.get('max')}bps "
           f"| funding: {fx} | diverge: {dv} "
+          f"| tickets: brk={len(tk['breakout'])} dip={len(tk['dip'])} "
+          f"momo={len(tk['momentum'])} "
           f"| new={len(payload['new_listings'])} surge={len(payload['vol_surges'])}")
 
 
@@ -261,7 +316,26 @@ def selftest():
     assert snap["delisted"] == ["GONE"]
     assert "_marks" in snap and "BTC" in snap["_marks"]
 
-    print("All Lighter Scout self-tests passed (stats, funding, snapshot diffs).")
+    # 4) Strategy tickets: each lens picks its setup, exclusions hold.
+    def lb(sym, last, hi, lo, chg, qvol=5e6, prem=1.0):
+        return {"prem_bps": prem, "qvol": qvol, "oi": 1.0, "liquid": qvol >= 1e5,
+                "last": last, "high": hi, "low": lo, "chg": chg}
+    tstats = {
+        "BRK":  lb("BRK", 99.5, 100.0, 90.0, +4.0),            # at high, up
+        "RICH": lb("RICH", 99.5, 100.0, 90.0, +4.0, prem=25.0),  # rich: excluded
+        "DIPX": lb("DIPX", 90.4, 100.0, 90.0, -3.0),           # at low, bounded
+        "KNIFE": lb("KNIFE", 90.4, 100.0, 90.0, -12.0),        # crash: excluded
+        "MOMO": lb("MOMO", 95.0, 100.0, 90.0, +6.0, qvol=2e6),
+        "THIN": lb("THIN", 99.9, 100.0, 90.0, +9.0, qvol=5e4),  # illiquid
+    }
+    tk = strategy_tickets(tstats, {"BRK": 10.0, "MOMO": 20.0})
+    assert [r["sym"] for r in tk["breakout"]] == ["BRK"], tk["breakout"]
+    assert [r["sym"] for r in tk["dip"]] == ["DIPX"], tk["dip"]
+    momo_syms = [r["sym"] for r in tk["momentum"]]
+    assert "MOMO" in momo_syms and "THIN" not in momo_syms and "RICH" not in momo_syms
+    assert tk["dip"][0]["trend"] == "unknown_v1"
+
+    print("All Lighter Scout self-tests passed (stats, funding, diffs, tickets).")
 
 
 if __name__ == "__main__":
