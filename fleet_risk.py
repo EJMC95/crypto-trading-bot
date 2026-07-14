@@ -38,6 +38,33 @@ RISK_KEY = "fleet-risk"
 BUS_KEY = "signal-bus"
 TTL_SEC = 900
 
+# [2026-07-14 GHOST-EXPOSURE FIX] bot_pnl rows outlive their bots: a
+# decommissioned service (Bounce Catcher, stopped 12 Jul) leaves its last row
+# frozen — open positions included — and this service was counting them
+# forever (the light sat RED at 32L for hours on 22 phantom longs from two
+# retired rows the dashboard no longer even displays). Rows older than this
+# are now ignored everywhere: exposure counting AND the signal-bus mirrors
+# (a frozen scanner row must not keep republishing last week's dislocation).
+# Running bots publish every 1-10 min, so 30 min is generous; consumers
+# fail-safe on absence, per the standing bus contract. This filter is a
+# PREREQUISITE for wiring the RED entry veto — enforcement off a
+# ghost-inflated light would throttle live bots for positions nobody holds.
+STALE_ROW_SEC = 1800
+
+
+def row_fresh(r):
+    """True if this bot_pnl row was updated within STALE_ROW_SEC."""
+    ts = (r or {}).get("updated_at")
+    if not ts:
+        return False
+    try:
+        upd = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if upd.tzinfo is None:
+        upd = upd.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - upd).total_seconds() <= STALE_ROW_SEC
+
 # Directional crypto books only. Funding-carry is delta-neutral (excluded),
 # sniper is event-class (tracked as gross info only), stocks are a separate
 # mandate, scanners hold nothing.
@@ -77,7 +104,7 @@ def main():
     per_bot, pair_count = {}, {}
     for name in FREQTRADE_BOTS:
         r = by_bot.get(name)
-        if not r:
+        if not r or not row_fresh(r):
             continue
         n = int(r.get("open_trades") or 0)
         if n == 0:
@@ -97,7 +124,7 @@ def main():
                 pair_count[base] = pair_count.get(base, 0) + 1
     for name in PERPS_LS_BOTS:
         r = by_bot.get(name)
-        if not r:
+        if not r or not row_fresh(r):
             continue
         extra = r.get("extra") or {}
         longs = int(extra.get("longs") or 0)
@@ -115,6 +142,8 @@ def main():
                                          key=lambda kv: -kv[1]) if v >= 2}
 
     sniper = by_bot.get("event-listing-sniper") or {}
+    if not row_fresh(sniper):
+        sniper = {}
     risk_payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC, "mode": "advisory",
         "light": light,
@@ -132,10 +161,15 @@ def main():
 
     # ---- Layer 3: signal bus -------------------------------------------
     bus = {"updated": now_iso(), "ttl_sec": TTL_SEC}
-    fc = (by_bot.get("perps-funding-carry") or {}).get("extra") or {}
+
+    def fresh_extra(bot):
+        r = by_bot.get(bot)
+        return (r.get("extra") or {}) if (r and row_fresh(r)) else {}
+
+    fc = fresh_extra("perps-funding-carry")
     if fc.get("hottest_funding_apr"):
         bus["funding_hottest_apr"] = fc["hottest_funding_apr"]
-    xa = (by_bot.get("scanner-cross-exchange-arb") or {}).get("extra") or {}
+    xa = fresh_extra("scanner-cross-exchange-arb")
     if xa.get("best_top_pct") is not None:
         bus["xexchange_dislocation_pct"] = xa.get("best_top_pct")
     # [2026-07-14 review] Lighter venue premium (mark vs index, bps) — the
@@ -148,7 +182,7 @@ def main():
             "med": xa.get("lighter_prem_med_bps"),
             "max": xa.get("lighter_prem_max_bps"),
             "n": xa.get("lighter_prem_n")}
-    ta = (by_bot.get("scanner-triangular-arb") or {}).get("extra") or {}
+    ta = fresh_extra("scanner-triangular-arb")
     if ta.get("best_depth_pct") is not None:
         bus["tri_arb_best_depth_pct"] = ta.get("best_depth_pct")
     try:
