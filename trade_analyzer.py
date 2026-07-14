@@ -23,12 +23,21 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 
 # live bot publish-name -> strategy class
+# [2026-07-15 FAMILY COVERAGE] The July family bots were never in this map, so
+# the dashboard Learning tab silently excluded them (georgia had the fleet's
+# most closed trades with no card). Grouping is BY STRATEGY, so dad's trades
+# merge into the MomoBreakoutV1 card and georgia's into DayTraderV5Gated —
+# same semantic the map already used for crypto-trendmomo-4h/breakout-4h.
 BOT_TO_STRATEGY = {
     "crypto-swing-daily":       "SwingDipV1",
     "crypto-breakout-4h":      "MomoBreakoutV1",
     "crypto-trendmomo-4h":     "MomoBreakoutV1",
     "crypto-intraday-15m": "DayTraderV5Gated",
     "crypto-trend-daily":    "ImprovedStrategyV4",
+    "freqtrade-mum":            "TrendMomoV1",
+    "freqtrade-dad":           "MomoBreakoutV1",
+    "freqtrade-avo-maria":      "SwingDipV1",
+    "freqtrade-georgia":   "DayTraderV5Gated",
 }
 MIN_GROUP = 5  # don't draw conclusions from a slice with fewer trades than this
 

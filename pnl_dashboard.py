@@ -147,12 +147,21 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # concept, live record 1/7 wins -$5.36. User deleted the Railway service
 # entirely (repo disconnected first, so nothing can resurrect it); row + the
 # EXPECTED placeholder retired here. History stays in the ledgers.
+# [2026-07-15 STOCK ORIGINALS RETIRED] equities-momentum-alpaca (Alpaca 22:00
+# UTC cron) + equities-regime-ibkr (IBKR twin) retired on user instruction:
+# their Lighter STOCK-PERP ports (Stock Leaders equities-momentum-lshadow /
+# Index Rider equities-regime-lshadow) are the focus now. The lshadow rows stay
+# first-class (bases equities-momentum in STOCKS, equities-regime in
+# VARIANT_ONLY); history stays in the ledgers. NOTE the IBKR publisher runs on
+# an unidentified host (not this repo, not ~/Claude/Trading) and may keep
+# re-writing its row — this filter keeps it off the grid regardless.
 RETIRED_ROWS = {"perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
-                "perps-regime-switch", "perps-regime-switch-lshadow"}
+                "perps-regime-switch", "perps-regime-switch-lshadow",
+                "equities-momentum-alpaca", "equities-regime-ibkr"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
 # [2026-07-13 NO-DATA FIX] Venue-suffixed bots (Funding Farmer, Snap Back,
@@ -178,9 +187,11 @@ EXPECTED = ["perps-funding-carry",
 # into the trading-bot P&L headline.
 SCANNERS = {"scanner-cross-exchange-arb"}
 
-# Stock/brokerage bots (IBKR + Alpaca). Shown as their own cards with a SEPARATE
-# subtotal so their large $ equity never swamps the crypto headline.
-STOCKS = {"equities-regime-ibkr", "equities-momentum-alpaca", "equities-momentum"}
+# Stock bots. Shown as their own cards with a SEPARATE subtotal so stock $
+# equity never swamps the crypto headline. The IBKR/Alpaca broker originals
+# were retired 2026-07-15 (see RETIRED_ROWS); equities-momentum stays as the
+# base id that lets Stock Leaders' equities-momentum-lshadow row through.
+STOCKS = {"equities-momentum"}
 
 # The only bots that should appear. Anything else in the table (e.g. legacy
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
