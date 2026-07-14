@@ -6,6 +6,62 @@ watch for next. Everything here is DRY-RUN / paper unless explicitly stated.
 
 ---
 
+## 2026-07-14 — The Jul-14 review → Lighter-first fleet + the scanner→bot→brain loop (9 PRs merged: #35-#41 + #33 integrated)
+
+### The arc (started from "how does Gap Scout help other bots?")
+Gap Scout's honest answer was "it doesn't yet" — its bus signal was
+symbol-collision noise (4.64% "dislocation") and nothing consumed the bus.
+That pulled the thread on the whole intelligence layer, and the day ended
+with the fleet rebuilt Lighter-first with a working find→trade→learn loop.
+
+### The scheduled Jul-14 advisory review (CROSS_BOT_ADVISORY_REVIEW_2026-07-14.md)
+- Reconstructed the advisory week from the trades ledger (121 trades):
+  entries at 13+ fleet positions won 18% (n=44) → **RED veto justified**;
+  dislocation + hottest-funding ruled unusable as published; all 8 visible
+  panic-window entries fired during panic, 7 lost despite half-stake (n=8).
+- **Post-merge verification caught the light pinned RED 32L on 22 PHANTOM
+  longs** — dead bots' frozen bot_pnl rows counted forever. Fixed: 30-min
+  staleness filter everywhere + retired-row boot-prune. Review's GREEN
+  stamp was itself wrong (read off filtered /pnl.json) — corrected.
+
+### What shipped (each PR verified live before the next)
+1. **Lighter premium on the bus** (Gap Scout polls orderBookDetails;
+   mark/index in bps) + `/bus.json` (finally readable off-Railway).
+2. **Ghost-exposure fix** + dead-row cleanup → light RED 32 → GREEN ~10 real.
+3. **Pipeline sweep**: pulse "7d" history was actually 33h (hourly appends
+   now), watchdog stopped crying wolf (64-vs-20 apples/oranges), paper_trades
+   got a read endpoint, Vercel's phantom red X killed (vercel.json).
+4. **PR #33 integrated** (other session): brain L4 stake-mults consumed by
+   strategies via fleet_bus, DIAGNOSIS layer (exit/entry/fee/regime/venue),
+   L2 veto ENFORCED, BTC-tide gate + mum whitelist (backtest-gated).
+5. **Lighter-first cut** (user): laptop Alpaca/IBKR bots retired (their
+   $100k/$250k broker-scale rows were 100-250x every other book), then the
+   **8 Kraken paper bots retired** — the -lshadow twins ARE the fleet;
+   fleet light resolves live > lshadow > paper.
+6. **🛰️ Lighter Scout**: all ~215 books — premium stress, liquid funding
+   extremes, cross-venue funding divergence (live print: DATA +925pp),
+   vol/OI moves, listings, **per-strategy tickets** (breakout/dip/momentum
+   lenses over the whole venue instead of a fixed whitelist).
+7. **🎫 Ticket Taker**: the scanner's designated trader (user ask) — $1k
+   shadow book takes only high-conviction tickets, PaperBroker fills at
+   Lighter marks + real funding drag, TP+4%/SL−3%/48h; **every close
+   tagged long_<lens>_<exit> so the brain grades each lens on forward
+   returns**. First cycle absorbed NEAR (breakout), H100 (dip), WTI (momo).
+
+### Watchlist / next
+- **Operator**: stop the 4 family Railway services + laptop Alpaca/IBKR
+  processes (their hidden rows re-upsert until then); PR #34 (gate0) open.
+- **Jul-21 review** (from /bus.json history + the ledger): grade the
+  Lighter premium signal, the ticket lenses' forward returns vs the bots'
+  own entries, and the enforcement telemetry. Lenses only graduate to
+  feeding real bots on that evidence.
+- Trend-aware lenses unlock as scout history accumulates (no keyless candles).
+- FLEET_RISK_MODE=enforce is the default — set `advisory` to stand down.
+- gate0 port: fleet_risk staleness/chain changes + bus mirror (main's copy
+  is now ahead of gate0's venue-aware fork in some respects — reconcile).
+
+---
+
 ## 2026-07-07 — Full-fleet audit → Option-B isolation, brain revival, exit rebuilds
 
 ### What the audit found (live Postgres, 352 trades + 285 fills + 52k equity pts, plus code audit)

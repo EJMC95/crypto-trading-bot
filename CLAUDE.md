@@ -1,51 +1,52 @@
 # CLAUDE.md — crypto-trading-bot Fleet
 
 ## What This Repo Is
-Eamon's full crypto trading bot fleet. Multiple strategies running on paper (dry run) with $1,000 starting balance each, no top-ups. Dashboard lives at https://pnl-dashboard-production-858c.up.railway.app/
+Eamon's crypto trading bot fleet — **LIGHTER-FIRST since 2026-07-14** (user
+decision: "all services must run off lighter"). Books are $1,000 paper/shadow
+each, no top-ups, except the real-money Lighter live rows. Dashboard:
+https://pnl-dashboard-production-858c.up.railway.app/
 
-## Fleet Overview
+## Fleet Overview (post 14-Jul Kraken retirement — ~21 live rows)
 
-### Freqtrade Bots (new July 2026 — paper trading, $1,000 each)
-The NFI/E0V1E/BinHCluc/FreqAI launch configs were replaced within days
-(git: `config_*.json "-> proven strategy"`); what actually runs is the
-in-house strategies on Kraken. Config `timeframe`/`stoploss` OVERRIDE the
-strategy files — the table below is the config-resolved truth.
-| Bot ID | Name | Strategy | Exchange | Timeframe | Stop |
-|--------|------|----------|----------|-----------|------|
-| freqtrade-mum | 👩 Mum | TrendMomoV1 | Kraken | 1d | -15% |
-| freqtrade-dad | 👨 Dad | MomoBreakoutV1 | Kraken | 4h | -12% |
-| freqtrade-avo-maria | 🙏 Avo Maria | SwingDipV1 | Kraken | 4h | -10% |
-| freqtrade-georgia | 🔮 Georgia | DayTraderV5Gated | Kraken | 15m | ATR ≤5% |
+### The trading fleet (Lighter)
+| Row | Name | What it is |
+|-----|------|------------|
+| freqtrade-{mum,dad,avo-maria,georgia}-lshadow | 👩👨🙏🔮 family | TrendMomo/MomoBreakout/SwingDip/DayTraderV5 on Lighter (gate0 `lighter_family_bot.py`, service `family-lighter-shadow`) |
+| crypto-{intraday-15m,swing-daily,breakout-4h}-lshadow | spot ports | same service, 29-pair whitelist |
+| crypto-trend-daily-lighter / -lshadow | 🌊 Tide Rider | **LIVE real money** + shadow (tide-rider service) |
+| perps-funding-lighter-lighter / -lshadow | 💸 Funding Farmer | **LIVE** funding harvester + shadow |
+| perps-funding-carry (+ -lshadow) | 🌾 Yield Harvester | HL-data paper origin + Lighter shadow |
+| perps-funding-spread-lshadow | ⚖️ Counterweight | funding L/S book |
+| lighter-perp-sniper-lshadow | 🎯 Perp Sniper | new-listing sniper |
+| lighter-dislocation-lshadow | 🧲 Snap Back | dislocation fader |
+| lighter-ticket-taker-lshadow | 🎫 Ticket Taker | **trades Lighter Scout's high-conviction tickets**; closes tagged `long_<lens>_<exit>` so the brain grades each lens |
+| equities-regime-lshadow / equities-momentum-lshadow | 📊 Index Rider / 🏆 Stock Leaders | stock-perp ports (IBKR/Alpaca originals RETIRED 14-Jul) |
+| event-listing-sniper | 🎯 Launch Sniper | CEX spot listings (legacy, still running) |
+| scanner-cross-exchange-arb | 🔀 Gap Scout | CEX dislocation scanner + Lighter premium publisher |
 
-(mum/dad were reverted 13 Jul to their strategies' validated variants — the
-4h/1h speed-ups contradicted the strategy files' own backtest notes and lost
-live; evidence in the 13-Jul commits + WEEKLY_REVIEW_2026-07-13.md.)
+### Intelligence layer (main freqtrade-bots container, run_all.sh loops)
+- `lighter_market_scout.py` 🛰️ — ALL ~215 Lighter books: premium stress,
+  liquid funding extremes, cross-venue funding divergence, vol/OI moves,
+  listings, **per-strategy tickets** → bot_state `lighter-market`
+- `bot_learn.py` (brain) — L4 stake multipliers (strategies consume via
+  `fleet_bus.py`), per-bucket DIAGNOSIS (exit/entry/fee/regime/venue),
+  venue A/B; → `learning-brain`, `brain-stake-mults`, `brain-diagnosis`
+- `fleet_risk.py` — traffic light (live > lshadow > paper via
+  `authoritative_row`, 30-min staleness filter) + signal bus; long-budget
+  veto ENFORCED in strategies (`FLEET_RISK_MODE=advisory` = kill switch)
+- `regime_oracle.py`, `market_pulse.py` (history appends hourly),
+  `cleanup_legacy_bots.py` (boot prune of retired rows)
 
-Since 2026-07-13 `lighter_family_bot.py` (Railway service
-`family-lighter-shadow`, deploys from `claude/lighter-gate0`) runs **seven
-Lighter shadow books**: the family four PLUS the original spot bots
-(crypto-intraday-15m @1h, crypto-swing-daily @1d, crypto-breakout-4h @4h on
-the 29-pair whitelist). Signals from Lighter's own candles, ShadowBroker
-book-VWAP fills, funding drag modelled, rows `<bot>-lshadow`. The Kraken/
-paper originals are the control arm; the port refuses `lighter_live` in v1.
-(crypto-trend-daily's Lighter books live in the tide-rider service.)
+### RETIRED (rows hidden + pruned; ledgers kept)
+Kraken paper 8 (spot 4 + family 4, 14-Jul user cut — Kraken/laptop
+processes are operator-stopped), equities-momentum-alpaca +
+equities-regime-ibkr (14-Jul), Trail Blazer, Bounce Catcher, Two-Way Tide,
+Loop Scout, trendmomo-4h (12/13-Jul). See RETIRED_ROWS in pnl_dashboard.py.
 
-### Existing Bots (already running)
-| Bot ID | Strategy | Type |
-|--------|----------|------|
-| crypto-trend-daily | 50/200 EMA trend | Crypto spot |
-| crypto-intraday-15m | Adaptive range bounce | Crypto spot |
-| crypto-swing-daily | BB/RSI dip buyer | Crypto spot |
-| crypto-breakout-4h | Donchian breakout | Crypto spot |
-| crypto-trendmomo-4h | SMA momentum | Crypto spot |
-| perps-rsi-meanrev | RSI mean reversion | Perps |
-| perps-donchian-breakout | 4h breakout | Perps |
-| perps-regime-switch | Long/short trend | Perps |
-| perps-funding-carry | Funding rate carry | Perps |
-| scanner-triangular-arb | Triangular arb | Scanner |
-| event-listing-sniper | New listing buyer | Scanner |
-| equities-regime-ibkr | SPY/QQQ regime | Stocks (IBKR) |
-| equities-momentum-alpaca | Momentum rank | Stocks (Alpaca) |
+### Read-only endpoints (no auth)
+`/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger)
+`/bus.json` (risk light + signal bus + brain keys + lighter-market,
+`?hours=` history) `/pulse.json` `/disloc.json` `/watchdog.json`
 
 ## Dashboard
 - **File:** `pnl_dashboard.py` — Postgres-backed, auto-refreshes every 30s
@@ -53,11 +54,17 @@ paper originals are the control arm; the port refuses `lighter_live` in v1.
 - **Auth:** DASH_USER / DASH_PASS env vars on Railway
 
 ## Key Files
-- `pnl_dashboard.py` — main dashboard server
+- `pnl_dashboard.py` — main dashboard server (+ fleet_watchdog_svc.py)
 - `bot_pnl_store.py` — shared Postgres publisher (all bots import this)
-- `hyperliquid_momo_bot.py` — Hyperliquid momentum bot
-- `funding_carry_bot.py` — funding carry strategy
-- `user_data/` — Freqtrade user data directory
+- `lighter_market_scout.py` / `lighter_ticket_taker.py` — scout + its trader
+- `bot_learn.py` + `fleet_bus.py` — brain and the strategies' read client
+- `fleet_risk.py` / `regime_oracle.py` / `market_pulse.py` — shared organs
+- `cross_exchange_arb.py` — Gap Scout (CEX dislocation + Lighter premium)
+- `funding_carry_bot.py` — Yield Harvester (HL-data paper origin)
+- `user_data/` — Freqtrade strategies/configs (dormant post-Kraken; the
+  gate0 family bot re-expresses them on Lighter)
+- gate0 branch (`claude/lighter-gate0`) — the Lighter runtime (venues/,
+  ShadowBroker, lighter_family_bot.py); its services deploy from there
 
 ## Cross-Bot Intelligence (bot_state keys — since 2026-07-14 CONSUMED, not just published)
 - `brain-stake-mults` — bot_learn's L4 reduce-only per-(bot, enter_tag) stake
