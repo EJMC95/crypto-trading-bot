@@ -237,8 +237,10 @@ def main():
         bus["funding_hottest_apr"] = fc["hottest_funding_apr"]
         bus["funding_source"] = fc.get("venue") or "hyperliquid"
     xa = fresh_extra("scanner-cross-exchange-arb")
-    if xa.get("best_top_pct") is not None:
-        bus["xexchange_dislocation_pct"] = xa.get("best_top_pct")
+    # [2026-07-14 review verdict] the raw best_top_pct max was symbol-collision
+    # noise (printed 4.6% junk) — the bus carries the majors-only gauge now.
+    if xa.get("liquid_top_pct") is not None:
+        bus["xexchange_dislocation_pct"] = xa.get("liquid_top_pct")
     # [2026-07-14 review] Lighter venue premium (mark vs index, bps) — the
     # dislocation signal measured on the venue the fleet actually trades.
     # Advisory, like everything on the bus. Gap Scout publishes it.

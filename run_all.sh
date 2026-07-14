@@ -127,5 +127,15 @@ run_poller &
     sleep 300
   done ) &
 
+# [2026-07-14 LIGHTER SCOUT] Venue-wide Lighter market map (all 215 books:
+# premium stress, liquid funding extremes, cross-venue funding divergence,
+# volume/OI moves, listings) -> bot_state 'lighter-market' + history.
+# ADVISORY/publish-only, same doctrine as the bus. Two keyless calls per run.
+( sleep 150
+  while true; do
+    python3 /freqtrade/lighter_market_scout.py || true
+    sleep 300
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait

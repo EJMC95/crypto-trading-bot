@@ -18,6 +18,7 @@ COPY bot_learn.py /freqtrade/bot_learn.py
 COPY regime_oracle.py /freqtrade/regime_oracle.py
 COPY fleet_risk.py /freqtrade/fleet_risk.py
 COPY cleanup_legacy_bots.py /freqtrade/cleanup_legacy_bots.py
+COPY lighter_market_scout.py /freqtrade/lighter_market_scout.py
 RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh /freqtrade/dashboard_server.py /freqtrade/bot_pnl_store.py /freqtrade/freqtrade_pnl_poller.py /freqtrade/market_pulse.py
 # Persistent DB dir for the freqtrade sqlite files. Mount a Railway VOLUME at
 # /freqtrade/persist so open paper trades survive redeploys; without a volume

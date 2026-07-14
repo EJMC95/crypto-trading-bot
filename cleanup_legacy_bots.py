@@ -39,6 +39,12 @@ LEGACY_BOTS = [
     "perps-donchian-breakout-lshadow",
     "perps-regime-switch", "perps-regime-switch-lshadow",
     "scanner-triangular-arb", "crypto-trendmomo-4h",
+    # [2026-07-14 LIGHTER-FIRST CUT] laptop stock bots retired on user
+    # instruction — the Lighter ports (equities-*-lshadow) are the bots now.
+    # NOTE their processes run on the operator's machine OUTSIDE this repo;
+    # while they keep running, their rows re-upsert after each prune (hidden
+    # by RETIRED_ROWS either way). Stop the laptop cron/processes to finish.
+    "equities-momentum-alpaca", "equities-regime-ibkr",
 ]
 
 
