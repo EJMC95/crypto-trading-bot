@@ -1950,6 +1950,62 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers(); self.wfile.write(body)
             return
+        if self.path.startswith("/bus.json"):
+            # [2026-07-14 review] Cross-bot advisory surface: the live
+            # fleet-risk + signal-bus states AND their recent
+            # bot_state_history snapshots. The Jul-14 review had to
+            # reconstruct the advisory week from the trades ledger because
+            # these were unreachable off-Railway; this endpoint is the fix so
+            # the Jul-21 review reads evidence directly. Read-only, no auth —
+            # no secrets inside (same contract as /pulse.json).
+            # Query params: ?hours=<lookback for history, default 24, max 200>
+            q = parse_qs(urlparse(self.path).query)
+            try:
+                hours = min(max(float(q.get("hours", ["24"])[0]), 1.0), 200.0)
+            except (ValueError, TypeError):
+                hours = 24.0
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                        if cur.fetchone()[0] is None:
+                            raise LookupError("bot_state table not created yet")
+                        cur.execute(
+                            "SELECT bot, state, updated_at FROM bot_state "
+                            "WHERE bot IN ('fleet-risk', 'signal-bus')")
+                        live = {}
+                        for b, s, u in cur.fetchall():
+                            st = s if isinstance(s, dict) else json.loads(s)
+                            live[b] = {"updated_at": u.isoformat() if u else None,
+                                       **st}
+                        cur.execute(
+                            "SELECT to_regclass('public.bot_state_history') AS t")
+                        hist = []
+                        if cur.fetchone()[0] is not None:
+                            cur.execute(
+                                "SELECT key, ts, payload FROM bot_state_history "
+                                "WHERE key IN ('fleet-risk', 'signal-bus') "
+                                "AND ts > now() - %s * interval '1 hour' "
+                                "ORDER BY ts", (hours,))
+                            hist = [{"key": k,
+                                     "ts": t.isoformat() if t else None,
+                                     "payload": (p if isinstance(p, dict)
+                                                 else json.loads(p))}
+                                    for k, t, p in cur.fetchall()]
+                finally:
+                    conn.close()
+                body = json.dumps({"fleet_risk": live.get("fleet-risk"),
+                                   "signal_bus": live.get("signal-bus"),
+                                   "history_hours": hours,
+                                   "history": hist}, default=str).encode()
+            except Exception as e:
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
         if self.path.startswith("/alerts.json"):
             # [2026-07-11] Evidence alerts + the restrict-only coin-veto list
             # (market_context.py). Read-only, no secrets, no auth — so the
