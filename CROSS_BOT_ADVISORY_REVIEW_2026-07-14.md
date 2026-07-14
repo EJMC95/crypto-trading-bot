@@ -103,10 +103,23 @@ everything on the bus: guarded fetch (Railway's WAF has blocked other Lighter
 REST before — failure just omits the fields), TTL'd, historized, ADVISORY —
 no consumer until a review earns it.
 
-## Current state at review time
+## Current state at review time — CORRECTED (post-merge finding)
 
-Full-fleet light (live extras, incl. perps books): **GREEN — 10 long / 0
-short** vs budgets 20L/12S.
+The original stamp here said GREEN 10L/0S — measured off `/pnl.json`, which
+silently FILTERS retired bots. The live `fleet-risk` state (visible once
+`/bus.json` deployed) says **RED — 32 long / 0 short**, pinned for hours:
+the 10 real freqtrade longs PLUS 6 from Bounce Catcher (`perps-rsi-meanrev`,
+decommissioned 12 Jul — its `bot_pnl` row froze with its positions) and 16
+from Trail Blazer's undisplayed paper row. `fleet_risk` read raw `bot_pnl`
+with no staleness check, so dead bots' frozen rows contributed phantom
+exposure indefinitely.
+
+**Fix shipped (second PR of this review):** rows older than 30 min are
+ignored in exposure counts AND the signal-bus mirrors. This is a
+prerequisite for the L2 verdict above — wiring the RED veto off a
+ghost-inflated light would throttle live bots for positions nobody holds.
+After the filter, judge the TRUE light from `/bus.json` history before
+enforcement goes in.
 
 ## Action list
 
