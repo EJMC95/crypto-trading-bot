@@ -19,7 +19,7 @@ https://pnl-dashboard-production-858c.up.railway.app/
 | perps-funding-spread-lshadow | ⚖️ Counterweight | funding L/S book |
 | lighter-perp-sniper-lshadow | 🎯 Perp Sniper | new-listing sniper |
 | lighter-dislocation-lshadow | 🧲 Snap Back | dislocation fader |
-| lighter-ticket-taker-lshadow | 🎫 Ticket Taker | **trades Lighter Scout's high-conviction tickets**; closes tagged `long_<lens>_<exit>` so the brain grades each lens |
+| lighter-ticket-taker-lshadow | 🎫 Ticket Taker | **trades Lighter Scout's high-conviction tickets** (breakout/dip/momentum long + divergence long/short); stress veto pauses entries at venue |prem| med ≥15bps; closes tagged `<side>-<lens>_<exit>` so the brain grades each lens |
 | equities-regime-lshadow / equities-momentum-lshadow | 📊 Index Rider / 🏆 Stock Leaders | stock-perp ports (IBKR/Alpaca originals RETIRED 14-Jul) |
 | event-listing-sniper | 🎯 Launch Sniper | CEX spot listings (legacy, still running) |
 | scanner-cross-exchange-arb | 🔀 Gap Scout | CEX dislocation scanner + Lighter premium publisher |

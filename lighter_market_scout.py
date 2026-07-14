@@ -48,6 +48,10 @@ API_BASE = os.environ.get("LIGHTER_API_BASE", "https://mainnet.zklighter.elliot.
 MIN_QVOL = float(os.environ.get("SCOUT_MIN_QVOL", "100000"))   # liquid floor $/day
 VOL_SURGE_RATIO = float(os.environ.get("SCOUT_VOL_SURGE", "3.0"))
 OI_MOVE_FRAC = float(os.environ.get("SCOUT_OI_MOVE", "0.25"))
+# Funding-divergence tickets: |Lighter APR - cross-venue median APR| must be
+# at least this many percentage points to become a ticket (DATA printed
+# +925pp at first light — genuine divergences are triple digits).
+DIV_GAP_PP = float(os.environ.get("SCOUT_DIV_GAP", "300"))
 TOP_N = 8
 
 
@@ -121,7 +125,7 @@ def _median(xs):
     return xs[len(xs) // 2] if xs else None
 
 
-def strategy_tickets(stats, lighter_apr):
+def strategy_tickets(stats, lighter_apr, divergence=None):
     """[2026-07-14 user ask] Per-strategy candidate TICKETS — the scanner
     hunting each bot family's setup across the WHOLE venue instead of a fixed
     whitelist. v1 lenses use only today's keyless fields (range position, day
@@ -138,8 +142,14 @@ def strategy_tickets(stats, lighter_apr):
                  context — tagged so consumers know)
       momentum : Stock Leaders / momo    — strongest liquid day-movers with
                  funding not eating the carry
+      divergence: (2026-07-14 addition, nobody in the fleet trades this) —
+                 hold the RECEIVING side on Lighter when its funding rate
+                 diverges >= DIV_GAP_PP from the cross-venue median for the
+                 same symbol: positive gap -> SHORT receives it, negative ->
+                 LONG. Skips entries that fight the premium (shorting an
+                 already-cheap book / longing a rich one).
     """
-    out = {"breakout": [], "dip": [], "momentum": []}
+    out = {"breakout": [], "dip": [], "momentum": [], "divergence": []}
     for s, v in stats.items():
         if not v["liquid"]:
             continue
@@ -160,9 +170,26 @@ def strategy_tickets(stats, lighter_apr):
             out["dip"].append({**row, "trend": "unknown_v1"})
         if chg >= 3.0 and v["qvol"] >= 1e6 and not rich and not longs_pay_hard:
             out["momentum"].append(row)
+    for d in divergence or []:
+        s = d.get("sym")
+        v = stats.get(s) or {}
+        gap = d.get("gap_pct") or 0.0
+        if abs(gap) < DIV_GAP_PP:
+            continue
+        side = "short" if gap > 0 else "long"     # receive the divergent rate
+        prem = v.get("prem_bps") or 0.0
+        if (side == "short" and prem < -15.0) or (side == "long" and prem > 15.0):
+            continue                              # don't fight the premium
+        out["divergence"].append({"sym": s, "side": side,
+                                  "gap_pct": round(gap, 1),
+                                  "lighter_apr": d.get("lighter_apr"),
+                                  "xvenue_apr": d.get("xvenue_apr"),
+                                  "vol_m": round((v.get("qvol") or 0) / 1e6, 2),
+                                  "prem_bps": prem})
     out["breakout"].sort(key=lambda r: (-r["range_pos"], -r["vol_m"]))
     out["dip"].sort(key=lambda r: (r["range_pos"], r["chg_pct"]))
     out["momentum"].sort(key=lambda r: -r["chg_pct"])
+    out["divergence"].sort(key=lambda r: -abs(r["gap_pct"]))
     return {k: v[:6] for k, v in out.items()}
 
 
@@ -195,7 +222,6 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
                                "xvenue_apr": round(ref, 1),
                                "gap_pct": round(gap, 1)})
     divergence.sort(key=lambda d: -abs(d["gap_pct"]))
-    divergence = divergence[:5]
 
     surges, oi_moves = [], []
     for s, v in liquid.items():
@@ -218,11 +244,11 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
     payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC,
         "n_books": len(stats), "n_liquid": len(liquid),
-        "tickets": strategy_tickets(stats, lighter_apr),
+        "tickets": strategy_tickets(stats, lighter_apr, divergence),
         "stress": stress,
         "prem_outliers": prem_outliers,
         "funding_extremes": funding_extremes,
-        "funding_divergence": divergence,
+        "funding_divergence": divergence[:5],
         "vol_surges": surges[:TOP_N],
         "oi_moves": oi_moves[:TOP_N],
         "new_listings": new_listings[:20],
@@ -268,7 +294,7 @@ def main():
           f"p90={st.get('p90')} max={st.get('max')}bps "
           f"| funding: {fx} | diverge: {dv} "
           f"| tickets: brk={len(tk['breakout'])} dip={len(tk['dip'])} "
-          f"momo={len(tk['momentum'])} "
+          f"momo={len(tk['momentum'])} div={len(tk.get('divergence') or [])} "
           f"| new={len(payload['new_listings'])} surge={len(payload['vol_surges'])}")
 
 
@@ -334,6 +360,17 @@ def selftest():
     momo_syms = [r["sym"] for r in tk["momentum"]]
     assert "MOMO" in momo_syms and "THIN" not in momo_syms and "RICH" not in momo_syms
     assert tk["dip"][0]["trend"] == "unknown_v1"
+
+    # 5) Divergence tickets: side = receive the divergent rate; premium guard.
+    div = [
+        {"sym": "BRK", "lighter_apr": 500.0, "xvenue_apr": 10.0, "gap_pct": 490.0},
+        {"sym": "DIPX", "lighter_apr": -400.0, "xvenue_apr": 5.0, "gap_pct": -405.0},
+        {"sym": "MOMO", "lighter_apr": 60.0, "xvenue_apr": 10.0, "gap_pct": 50.0},   # below bar
+        {"sym": "RICH", "lighter_apr": -400.0, "xvenue_apr": 5.0, "gap_pct": -405.0},  # long a rich book: skip
+    ]
+    tkd = strategy_tickets(tstats, {}, div)["divergence"]
+    got = {(r["sym"], r["side"]) for r in tkd}
+    assert got == {("BRK", "short"), ("DIPX", "long")}, tkd
 
     print("All Lighter Scout self-tests passed (stats, funding, diffs, tickets).")
 
