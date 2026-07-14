@@ -40,6 +40,7 @@ Config is at the top of the file.
 
 import argparse
 import csv
+import json
 import os
 import time
 import traceback
@@ -92,6 +93,16 @@ PREFILTER_GAP = 0.0020   # 0.20% raw last/mid price gap between venues
 # same real asset are sub-1%; anything above this ceiling is noise.
 MAX_PLAUSIBLE_GAP = 0.05   # 5%
 
+# [2026-07-14 SIGNAL FIX — Jul-14 review verdict] The published best_top_pct
+# was the max over ~340 pairs including illiquid/collision-prone books, so the
+# signal bus's "dislocation" printed 4.6% junk and was ruled unusable as a
+# stress gauge. The bus now gets liquid_top_pct: the same max restricted to
+# real majors that exist unambiguously on these venues — when THESE books
+# dislocate, that is genuine market stress. Raw best_top_pct is still
+# published for the scanner's own diagnostics.
+DISLOC_BASES = {s.strip() for s in os.environ.get(
+    "DISLOC_BASES", "BTC,ETH,SOL,XRP,ADA,DOGE,LTC,LINK,DOT,AVAX").split(",") if s.strip()}
+
 # Hard cap on order books fetched per scan (2 per confirmed pair). Rate guard.
 MAX_BOOK_FETCHES = 30
 
@@ -126,6 +137,29 @@ BOOK_LEVELS = 50
 # seconds recording the best top-of-book cross edge, so the dashboard/digest
 # always has trend data instead of an empty file. 0 disables.
 HEARTBEAT_SECONDS = 900.0   # 15 min
+
+# ---- Lighter venue premium (2026-07-14, advisory — see the Jul-14 review) ---
+# The CEX legs above say nothing about Lighter, the venue the fleet actually
+# trades. Lighter's public orderBookDetails returns mark_price AND index_price
+# per book, so the venue premium (mark/index - 1) — how rich/cheap Lighter
+# trades vs its own external-index oracle — comes from one keyless call.
+# Published in extra.lighter_* each scan; fleet_risk mirrors it to the signal
+# bus. PUBLISH-ONLY: no trader consumes it until a review earns the wiring.
+# The fetch is guarded — Lighter's WAF has blocked other REST endpoints from
+# Railway before; any failure simply omits the fields (consumers fail-safe on
+# the bus TTL, same contract as everything else on it).
+LIGHTER_API = os.environ.get(
+    "LIGHTER_API",
+    "https://mainnet.zklighter.elliot.ai/api/v1/orderBookDetails")
+# Per-book premiums published for the family-relevant books only (bus stays
+# small); the stress gauge below still spans every liquid book.
+LIGHTER_WATCH = [s.strip() for s in os.environ.get(
+    "LIGHTER_WATCH", "BTC,ETH,SOL,SPY,QQQ,XAU").split(",") if s.strip()]
+# Books below this daily quote volume are excluded from the stress gauge —
+# a stale mark on a dead book is not venue stress.
+LIGHTER_MIN_QVOL = float(os.environ.get("LIGHTER_MIN_QVOL", "100000"))
+# Lighter is polled at most this often regardless of scan cadence.
+LIGHTER_POLL_SECONDS = float(os.environ.get("LIGHTER_POLL_SECONDS", "60"))
 
 LOG_DIR = os.path.dirname(os.path.abspath(__file__))
 OPP_LOG = os.path.join(LOG_DIR, "cross_arb_opportunities.csv")
@@ -209,6 +243,42 @@ def depth_edge(quote_size, asks_buy, bids_sell, fee_buy, fee_sell):
     return net, quote_out - quote_size, (buy_filled and sell_filled)
 
 
+def lighter_premiums(books, watch, min_qvol):
+    """Venue premiums from Lighter orderBookDetails rows (pure, unit-tested).
+
+    Premium = (mark_price / index_price - 1) in bps: positive means Lighter
+    trades RICH vs its external-index oracle (a taker long pays the premium;
+    persistent premium is the leading indicator of positive funding).
+
+    Returns (watch_prems, med_abs_bps, max_abs_bps, n) where watch_prems maps
+    each watched symbol to its premium and med/max span every active book at
+    or above the volume floor — the fleet-wide venue-stress gauge. Books
+    missing a positive mark/index are skipped; (…, None, None, 0) if nothing
+    qualifies.
+    """
+    prems, stress = {}, []
+    for b in books:
+        try:
+            if b.get("status") != "active":
+                continue
+            mark = float(b.get("mark_price") or 0.0)
+            idx = float(b.get("index_price") or 0.0)
+            if mark <= 0.0 or idx <= 0.0:
+                continue
+            bps = (mark / idx - 1.0) * 10_000.0
+            if float(b.get("daily_quote_token_volume") or 0.0) >= min_qvol:
+                stress.append(abs(bps))
+            if b.get("symbol") in watch:
+                prems[b["symbol"]] = round(bps, 1)
+        except (TypeError, ValueError):
+            continue
+    if not stress:
+        return prems, None, None, 0
+    stress.sort()
+    return (prems, round(stress[len(stress) // 2], 1),
+            round(stress[-1], 1), len(stress))
+
+
 # ----------------------------------------------------------------------------
 # GRAPH BUILDING
 # ----------------------------------------------------------------------------
@@ -256,6 +326,38 @@ def ensure_log():
 def log_opp(row):
     with open(OPP_LOG, "a", newline="") as f:
         csv.writer(f).writerow(row)
+
+
+_lighter_cache = {"t": 0.0, "extra": {}}
+
+
+def lighter_extra():
+    """Guarded Lighter premium fetch -> extra fields, {} on ANY failure.
+
+    Cached LIGHTER_POLL_SECONDS so the scan cadence doesn't hammer the API.
+    Never raises into the scan loop.
+    """
+    if time.time() - _lighter_cache["t"] < LIGHTER_POLL_SECONDS:
+        return _lighter_cache["extra"]
+    extra = {}
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            LIGHTER_API, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        books = payload.get("order_book_details") or []
+        prems, med, mx, n = lighter_premiums(
+            books, LIGHTER_WATCH, LIGHTER_MIN_QVOL)
+        if n:
+            extra = {"lighter_prem_bps": prems,
+                     "lighter_prem_med_bps": med,
+                     "lighter_prem_max_bps": mx,
+                     "lighter_prem_n": n}
+    except Exception as e:  # noqa: BLE001 — WAF/timeout/schema: skip quietly
+        print(f"[{now_iso()}] lighter premium fetch failed (skipping): {e!r}")
+    _lighter_cache.update(t=time.time(), extra=extra)
+    return extra
 
 
 def ref_prices(symbol, exmarkets, tickers_by_ex):
@@ -313,9 +415,18 @@ def run_live(once=False):
     )
 
     ensure_log()
-    virtual_balance = 0.0        # REAL basis: net of fees, slippage, haircuts
-    gross_balance = 0.0          # legacy optimistic basis (no haircuts), for comparison
+    # [2026-07-14 PERSISTENCE FIX] The paper balances reset to $0 on every
+    # redeploy (the same bug class fixed for the sniper on 25-Jun). Restore
+    # from bot_state so the cumulative bases survive restarts; saved next to
+    # every publish below. Guarded: no DB -> starts at 0 as before.
+    _saved = store.load_state("scanner-cross-exchange-arb") or {}
+    virtual_balance = float(_saved.get("virtual_balance") or 0.0)  # REAL basis
+    gross_balance = float(_saved.get("gross_balance") or 0.0)      # optimistic
+    if virtual_balance or gross_balance:
+        print(f"[{now_iso()}] restored balances from bot_state: "
+              f"real {virtual_balance:+.2f} / gross {gross_balance:+.2f}")
     last_heartbeat = 0.0
+    best_top = best_liquid = None   # safe defaults if the very first scan errors
 
     while True:
         t0 = time.time()
@@ -336,7 +447,8 @@ def run_live(once=False):
             # cross-venue price gap (no fees yet) — fees + real bid/ask +
             # slippage are applied in Stage 2 from order books.
             ranked = []
-            best_top = None  # (gap, symbol, buy_ex, sell_ex)
+            best_top = None     # (gap, symbol, buy_ex, sell_ex) — widest net
+            best_liquid = None  # same, restricted to DISLOC_BASES majors
             artifacts = 0    # implausible gaps skipped as data noise
             for symbol, exmarkets in sym_map.items():
                 refs = ref_prices(symbol, exmarkets, tickers_by_ex)
@@ -352,6 +464,9 @@ def run_live(once=False):
                     continue
                 if best_top is None or gap > best_top[0]:
                     best_top = (gap, symbol, buy_ex, sell_ex)
+                if (symbol.split("/")[0] in DISLOC_BASES
+                        and (best_liquid is None or gap > best_liquid[0])):
+                    best_liquid = (gap, symbol, buy_ex, sell_ex)
                 if gap >= PREFILTER_GAP:
                     ranked.append((gap, symbol, buy_ex, sell_ex))
             ranked.sort(reverse=True)
@@ -446,8 +561,15 @@ def run_live(once=False):
                    "basis": "real (fees+slippage+10bps latency+5bps rebalance)",
                    "gross_balance": round(gross_balance, 2),  # old optimistic rule
                    "pairs": len(sym_map),
-                   "best_top_pct": round(best_top[0] * 100, 4) if best_top else None},
+                   "best_top_pct": round(best_top[0] * 100, 4) if best_top else None,
+                   # the bus-grade stress gauge: majors only (see DISLOC_BASES)
+                   "liquid_top_pct": round(best_liquid[0] * 100, 4) if best_liquid else None,
+                   "liquid_symbol": best_liquid[1] if best_liquid else None,
+                   **lighter_extra()},
         )
+        store.save_state("scanner-cross-exchange-arb",
+                         {"virtual_balance": round(virtual_balance, 4),
+                          "gross_balance": round(gross_balance, 4)})
         if once:
             print(f"\n[{now_iso()}] --once smoke test complete. Engine ran "
                   f"end-to-end against live public data.")
@@ -500,7 +622,30 @@ def selftest():
     assert set(sm) == {"BTC/USD"}, "only BTC/USD is on >=2 venues with a good quote"
     assert set(sm["BTC/USD"]) == {"kraken", "binance", "coinbase"}
 
-    print("\nAll self-tests passed. Cross-exchange detection + depth math verified.")
+    # 5) Lighter venue premium: watch filtering, volume floor, junk handling.
+    def bk(sym, mark, idx, qvol, status="active"):
+        return {"symbol": sym, "mark_price": mark, "index_price": idx,
+                "daily_quote_token_volume": qvol, "status": status}
+    books = [
+        bk("BTC", 62430.0, 62461.3, 5e8),      # ~-5 bps, liquid, watched
+        bk("SPY", 746.7, 746.6, 2e6),          # ~+1.3 bps, liquid, watched
+        bk("RKLB", 100.26, 100.0, 3e5),        # +26 bps, liquid, NOT watched
+        bk("DEADCOIN", 110.0, 100.0, 5e3),     # below floor: excluded from stress
+        bk("HALTED", 90.0, 100.0, 9e9, status="inactive"),  # skipped
+        bk("BROKEN", None, 100.0, 9e9),        # missing mark: skipped
+    ]
+    prems, med, mx, n = lighter_premiums(books, ["BTC", "SPY"], 1e5)
+    print(f"  lighter premiums: {prems} | stress med {med} / max {mx} bps over {n} books")
+    assert set(prems) == {"BTC", "SPY"}, "only watched symbols published per-book"
+    assert prems["BTC"] < 0 < prems["SPY"]
+    assert n == 3, "stress gauge spans liquid active books only (BTC, SPY, RKLB)"
+    assert mx == 26.0, "RKLB's 26 bps is the max |premium|"
+    assert med == 5.0, "median |premium| of [1.3, 5.0, 26.0] is 5.0"
+    p2, m2, x2, n2 = lighter_premiums([], ["BTC"], 1e5)
+    assert (p2, m2, x2, n2) == ({}, None, None, 0), "empty payload -> empty result"
+
+    print("\nAll self-tests passed. Cross-exchange detection + depth math + "
+          "Lighter premium verified.")
 
 
 def main():

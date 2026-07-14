@@ -1,0 +1,105 @@
+name: fleet-watchdog
+# Deterministic, zero-token fleet monitor (every ~30 min). Probes the public
+# pnl.json feed; on problems it opens/updates ONE GitHub issue (label:
+# fleet-watchdog) and closes it on recovery — transition alerts, no email storms.
+# Per-bot "stale" flags come from the dashboard's own per-kind thresholds, so
+# future services (e.g. lighter-*) are covered automatically once they publish.
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: fleet-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe fleet feed
+        shell: bash
+        run: |
+          set -uo pipefail
+          URL="https://pnl-dashboard-production-858c.up.railway.app/pnl.json?nc=$(date +%s)"
+          RESP=""
+          for i in 1 2 3; do
+            if RESP=$(curl -fsS -m 20 "$URL"); then break; fi
+            echo "fetch attempt $i failed"; sleep 15
+          done
+          if [ -z "$RESP" ]; then
+            echo "FEED UNREACHABLE after 3 attempts - dashboard or Railway may be DOWN" > problems.txt
+            : > warnings.txt
+            echo "(no data)" > snapshot.txt
+            exit 0
+          fi
+          printf '%s' "$RESP" > pnl.json
+          python3 - <<'PY'
+          import json
+          d = json.load(open('pnl.json'))
+          meta = d.get('meta', {})
+          bots = d.get('bots', [])
+          problems, warnings = [], []
+          if meta.get('feed_stale'):
+              problems.append(f"FEED STALE (freshest={meta.get('freshest_update_age_sec')}s)")
+          if not bots:
+              problems.append("NO BOTS in feed")
+          stale = sorted(b.get('bot','?') for b in bots if b.get('stale'))
+          off   = sorted(b.get('bot','?') for b in bots if b.get('status') not in (None, 'online'))
+          if stale: problems.append("STALE: " + ", ".join(stale))
+          if off:   problems.append("NOT ONLINE: " + ", ".join(off))
+          opens = sum(int(b.get('open_trades') or 0) for b in bots)
+          if opens > 20:
+              warnings.append(f"open positions {opens} exceed the 20-position budget")
+          big = [f"{b.get('bot')} ({b.get('pnl_daily'):+.1f})" for b in bots
+                 if isinstance(b.get('pnl_daily'), (int, float)) and b['pnl_daily'] < -100]
+          if big:
+              warnings.append("daily P&L below -$100: " + ", ".join(big))
+          open('problems.txt','w').write("\n".join(problems))
+          open('warnings.txt','w').write("\n".join(warnings))
+          open('snapshot.txt','w').write(f"bots={len(bots)} open_positions={opens} freshest={meta.get('freshest_update_age_sec')}s")
+          print("problems:", problems or "none"); print("warnings:", warnings or "none")
+          PY
+
+      - name: Transition-aware alerting via single issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          PROB=$(cat problems.txt); WARN=$(cat warnings.txt); SNAP=$(cat snapshot.txt)
+          NOW=$(date -u '+%Y-%m-%d %H:%M UTC')
+          gh label create fleet-watchdog --repo "$REPO" --color D93F0B --description "automated fleet monitor" 2>/dev/null || true
+          NUM=$(gh issue list --repo "$REPO" --label fleet-watchdog --state open --json number -q '.[0].number' || true)
+          {
+            echo "## Fleet watchdog"
+            echo "**Last check:** $NOW · $SNAP"
+            if [ -n "$PROB" ]; then echo; echo "### 🚨 Problems"; echo "$PROB" | sed 's/^/- /'; fi
+            if [ -n "$WARN" ]; then echo; echo "### ⚠️ Warnings (non-fatal)"; echo "$WARN" | sed 's/^/- /'; fi
+            echo; echo "_Opened/maintained automatically by fleet-watchdog; closes itself on recovery._"
+          } > body.md
+          if [ -n "$PROB" ]; then
+            if [ -z "$NUM" ]; then
+              gh issue create --repo "$REPO" --label fleet-watchdog \
+                --title "🚨 fleet-watchdog: $(echo "$PROB" | head -1 | cut -c1-80)" \
+                --body-file body.md
+              echo "issue created"
+            else
+              gh issue edit "$NUM" --repo "$REPO" --body-file body.md >/dev/null
+              echo "issue #$NUM updated quietly"
+            fi
+          else
+            if [ -n "$NUM" ]; then
+              gh issue close "$NUM" --repo "$REPO" --comment "✅ Recovered — all bots fresh at $NOW · $SNAP"
+              echo "issue #$NUM closed (recovered)"
+            else
+              echo "fleet OK — nothing to do"
+            fi
+          fi
+          echo "$SNAP" >> "$GITHUB_STEP_SUMMARY"

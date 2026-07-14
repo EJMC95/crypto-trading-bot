@@ -1,0 +1,50 @@
+name: NRL Feed Deploy
+
+# Deploys the nrl-predictor dashboard/feed service (nrl-feed) to the fleet's
+# Railway project. Manual dispatch only — the NRL code lives in the standalone
+# repo EJMC95/nrl-predictor and is mirrored onto this repo's
+# claude/nrl-predictor-phases-1-2-vtb133 branch purely so this workflow (which
+# holds the Railway project token) can check it out and ship it.
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the nrl-predictor mirror branch
+        uses: actions/checkout@v4
+        with:
+          ref: claude/nrl-predictor-phases-1-2-vtb133
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Create service if missing, deploy, print domain
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        working-directory: nrl-predictor
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          echo "::group::create service (idempotent)"
+          railway add --service nrl-feed 2>&1 || echo "(service may already exist — continuing)"
+          echo "::endgroup::"
+          ok=0
+          for attempt in 1 2 3; do
+            if railway up --service nrl-feed --ci; then ok=1; break; fi
+            echo "attempt $attempt failed; retrying in $((attempt*15))s..."
+            sleep $((attempt*15))
+          done
+          [ "$ok" -eq 1 ] || { echo "::error::deploy failed after 3 attempts"; exit 1; }
+          echo "::group::public domain"
+          railway domain --service nrl-feed 2>&1 || true
+          echo "::endgroup::"
+          echo "OK: nrl-feed deployed"
