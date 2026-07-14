@@ -109,6 +109,14 @@ run_poller &
     sleep 1800
   done ) &
 
+# [2026-07-14 GHOST-EXPOSURE CLEANUP] One-shot on boot: prune retired bots'
+# frozen bot_pnl rows (explicit allow-list in the script; deleting an absent
+# row is a no-op, so re-running every deploy is safe). Bounce Catcher's and
+# Trail Blazer's dead rows were pinning the fleet light RED on 22 phantom
+# longs. Runs before fleet_risk's first cycle so the light starts clean.
+( sleep 60
+  python3 /freqtrade/cleanup_legacy_bots.py --apply || true ) &
+
 # [2026-07-07 CROSS-BOT L2/L3] Fleet risk traffic light + signal bus —
 # fleet-wide directional exposure vs budgets + scanner exhaust ->
 # bot_state 'fleet-risk' / 'signal-bus'. ADVISORY: enforcement wiring is

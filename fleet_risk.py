@@ -68,11 +68,16 @@ def row_fresh(r):
 # Directional crypto books only. Funding-carry is delta-neutral (excluded),
 # sniper is event-class (tracked as gross info only), stocks are a separate
 # mandate, scanners hold nothing.
+# [2026-07-14] Retired bots removed (the dashboard RETIRED_ROWS set):
+# crypto-trendmomo-4h + perps-regime-switch dropped from this list, and the
+# whole perps long/short cohort (Bounce Catcher decommissioned 12 Jul, Trail
+# Blazer retired) — their frozen rows were the ghost-exposure RED. Their
+# bot_pnl rows are pruned by cleanup_legacy_bots.py on boot; if one is ever
+# revived, re-add it here.
 FREQTRADE_BOTS = ["crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
-                  "crypto-breakout-4h", "crypto-trendmomo-4h", "freqtrade-mum",
-                  "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia",
-                  "perps-regime-switch"]
-PERPS_LS_BOTS = ["perps-rsi-meanrev", "perps-donchian-breakout"]
+                  "crypto-breakout-4h", "freqtrade-mum",
+                  "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"]
+PERPS_LS_BOTS = []
 
 # Fleet budgets (positions, count-based v1 — inverse-vol weighting is a later
 # refinement once this has advisory history to calibrate against).
