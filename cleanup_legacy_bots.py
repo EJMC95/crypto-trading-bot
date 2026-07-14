@@ -45,6 +45,14 @@ LEGACY_BOTS = [
     # while they keep running, their rows re-upsert after each prune (hidden
     # by RETIRED_ROWS either way). Stop the laptop cron/processes to finish.
     "equities-momentum-alpaca", "equities-regime-ibkr",
+    # [2026-07-14 KRAKEN RETIREMENT] the 8 Kraken paper rows — the -lshadow
+    # twins are the fleet now (their rows are NOT in this list, nor is Tide
+    # Rider's live row). Family ONLY_BOT services re-upsert until the
+    # operator stops them in Railway; prunes stay idempotent.
+    "crypto-trend-daily", "crypto-intraday-15m",
+    "crypto-swing-daily", "crypto-breakout-4h",
+    "freqtrade-mum", "freqtrade-dad",
+    "freqtrade-avo-maria", "freqtrade-georgia",
 ]
 
 

@@ -154,13 +154,24 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 # cross-bot comparison. NOTE: the laptop processes run OUTSIDE this repo —
 # rows are hidden+pruned here, but only the operator can stop the processes
 # (until then their rows re-upsert into bot_pnl, harmlessly hidden).
+# [2026-07-14 KRAKEN RETIREMENT — user instruction] The 8 Kraken PAPER rows
+# retired; their Lighter -lshadow twins are the fleet and keep displaying
+# (bases move EXPECTED -> VARIANT_ONLY below), and Tide Rider's LIVE row
+# (crypto-trend-daily-lighter) is unaffected — this set matches exact row
+# names only. Operator side: stop the 4 family Railway services (ONLY_BOT
+# mum/dad/avo-maria/georgia); the main container drops its 4 spot bots on
+# this deploy.
 RETIRED_ROWS = {"perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
                 "perps-regime-switch", "perps-regime-switch-lshadow",
-                "equities-momentum-alpaca", "equities-regime-ibkr"}
+                "equities-momentum-alpaca", "equities-regime-ibkr",
+                "crypto-trend-daily", "crypto-intraday-15m",
+                "crypto-swing-daily", "crypto-breakout-4h",
+                "freqtrade-mum", "freqtrade-dad",
+                "freqtrade-avo-maria", "freqtrade-georgia"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
 # [2026-07-13 NO-DATA FIX] Venue-suffixed bots (Funding Farmer, Snap Back,
@@ -173,12 +184,18 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 "lighter-dislocation", "perps-funding-spread",
                 # [2026-07-13] Index Rider — the IBKR bot's regime strategy on
                 # Lighter STOCK PERPS (SPY/QQQ), shadow-only; base never publishes
-                "equities-regime"}
+                "equities-regime",
+                # [2026-07-14 KRAKEN RETIREMENT] the 8 ex-Kraken bases: paper
+                # rows retired, the -lshadow twins (+ Tide Rider live) display
+                # under these bases
+                "crypto-trend-daily", "crypto-intraday-15m",
+                "crypto-swing-daily", "crypto-breakout-4h",
+                "freqtrade-mum", "freqtrade-dad",
+                "freqtrade-avo-maria", "freqtrade-georgia",
+                # [2026-07-14] 🎫 Ticket Taker — shadow-only scout trader
+                "lighter-ticket-taker"}
 EXPECTED = ["perps-funding-carry",
-            "event-listing-sniper",
-            "crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
-            "crypto-breakout-4h",
-            "freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"]
+            "event-listing-sniper"]
 
 # Scanners book OPTIMISTIC paper-arb fills (observed spreads, no slippage/latency).
 # Their pnl_abs is real paper P&L but on a rosier basis than the freqtrade bots'
@@ -251,6 +268,7 @@ LABELS = {
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
     "perps-funding-spread":        "⚖️ Counterweight — funding L/S book",
+    "lighter-ticket-taker":        "🎫 Ticket Taker — scout-driven trader",
     "scanner-cross-exchange-arb":  "🔀 Gap Scout — arb scanner",
     "event-listing-sniper":        "🎯 Launch Sniper — listing buyer",
     "equities-regime":             "📊 Index Rider — stock-perp regime",
@@ -277,6 +295,7 @@ DESCRIPTIONS = {
     "perps-funding-spread": "ranks 72h mean funding: LONG the 5 most-negative, SHORT the 5 most-positive, rebalances daily · $20/leg",
     "lighter-dislocation":  "fades ≥150bps Lighter-vs-reference price dislocations across 36 coins; census-first evidence bot",
     "lighter-perp-sniper":  "watches brand-new Lighter listings and snipes day-one momentum",
+    "lighter-ticket-taker": "trades the Lighter Scout's high-conviction tickets (breakout/dip/momentum lenses over every liquid book) · $50 clips, TP+4%/SL−3%/48h · each close tagged by lens so the brain grades the scanner",
     "event-listing-sniper": "buys brand-new CEX listings — many tiny losses, occasional big wins by design",
     "scanner-cross-exchange-arb": "scans cross-exchange spreads and paper-fills observed gaps (optimistic basis, own subtotal)",
     "equities-regime":      "SPY + QQQ long above the 200d SMA (±1% band) + gold on a 20/50 cross · $250 × 3 slots",

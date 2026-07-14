@@ -87,9 +87,17 @@ def row_fresh(r):
 # Blazer retired) — their frozen rows were the ghost-exposure RED. Their
 # bot_pnl rows are pruned by cleanup_legacy_bots.py on boot; if one is ever
 # revived, re-add it here.
+# [2026-07-14 KRAKEN RETIREMENT] The Kraken paper rows are retired; each base
+# resolves via authoritative_row to live Lighter > -lshadow (the fleet's
+# modelled books now) > legacy paper. The light therefore tracks the LIGHTER
+# fleet — documented change of meaning: shadow books are modelled capital,
+# but they ARE the fleet being managed, and the pileup scar applies to
+# whatever cohort trades one beta. Ticket Taker (scout-driven shadow book)
+# is counted too — its open_pos extra is fleet_risk-shaped.
 FREQTRADE_BOTS = ["crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-daily",
                   "crypto-breakout-4h", "freqtrade-mum",
-                  "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia"]
+                  "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia",
+                  "lighter-ticket-taker"]
 PERPS_LS_BOTS = []
 
 # [2026-07-09 LIGHTER GO-LIVE — no-miss-sync] When a bot trades on Lighter it
@@ -104,14 +112,18 @@ def _fresh(row):
 
 
 def authoritative_row(base, by_bot):
-    """(row, venue) for a directional bot — the LIVE Lighter row supersedes the
-    paper twin so real Lighter exposure is counted and never double-counted.
-    [2026-07-14] A live row must also be FRESH (row_fresh) to supersede — a
-    retired live book's frozen row must not shadow a running paper twin."""
-    live = by_bot.get(base + "-lighter")
-    if _fresh(live) and row_fresh(live):
-        return live, "lighter_live"
-    return by_bot.get(base), "hl_paper"
+    """(row, venue) for a directional bot, one row so nothing double-counts:
+    live Lighter (real money) > -lshadow (the fleet's modelled Lighter books,
+    post-Kraken-retirement) > legacy paper (transition fallback while the old
+    services wind down). Every candidate must be FRESH — a frozen row of any
+    venue must never shadow a running one."""
+    for suffix, venue in (("-lighter", "lighter_live"),
+                          ("-lshadow", "lighter_shadow"),
+                          ("", "hl_paper")):
+        r = by_bot.get(base + suffix)
+        if _fresh(r) and row_fresh(r):
+            return r, venue
+    return None, None
 
 # Fleet budgets (positions, count-based v1 — inverse-vol weighting is a later
 # refinement once this has advisory history to calibrate against).
@@ -140,28 +152,28 @@ def main():
     by_bot = {r["bot"]: r for r in rows}
 
     fleet_long, fleet_short = 0, 0
-    per_bot, pair_count = {}, {}
+    per_bot, pair_count, venues_seen = {}, {}, {}
     for name in FREQTRADE_BOTS:
-        r = by_bot.get(name)
-        if not r or not row_fresh(r):
+        r, venue = authoritative_row(name, by_bot)
+        if not r:
             continue
         n = int(r.get("open_trades") or 0)
         if n == 0:
             continue
         extra = r.get("extra") or {}
         pos = extra.get("open_pos") or []
-        # freqtrade spot + regime-switch: entries are long unless the enter
-        # tag says otherwise (regime-switch shorts carry 'short' in the tag).
+        # entries are long unless the enter tag says otherwise
         longs = sum(1 for p in pos if "short" not in str(p.get("tag", "")).lower()) if pos else n
         shorts = (len(pos) - longs) if pos else 0
         fleet_long += longs
         fleet_short += shorts
-        per_bot[name] = {"long": longs, "short": shorts}
+        per_bot[name] = {"long": longs, "short": shorts, "venue": venue}
+        if venue != "hl_paper":
+            venues_seen[name] = venue
         for p in pos:
             base = str(p.get("pair", "")).split("/")[0]
             if base:
                 pair_count[base] = pair_count.get(base, 0) + 1
-    venues_seen = {}
     for name in PERPS_LS_BOTS:
         r, venue = authoritative_row(name, by_bot)   # live Lighter > paper twin
         if not r or not row_fresh(r):
@@ -267,7 +279,8 @@ def main():
     store.save_history(BUS_KEY, bus)
 
     hp = ",".join(f"{k}x{v}" for k, v in list(hot_pairs.items())[:4]) or "none"
-    _lv = ",".join(f"{k}:{v.split('_')[0]}" for k, v in venues_seen.items()) or "none-live"
+    _lv = ",".join(f"{k}:{v.replace('lighter_', '')}"
+                   for k, v in venues_seen.items()) or "none-live"
     lstress = (bus.get("lighter_venue_stress_bps") or {}).get("med")
     print(f"[fleet-risk] {now_iso()} mode={MODE} light={light.upper()} "
           f"long={fleet_long}/{LONG_BUDGET} short={fleet_short}/{SHORT_BUDGET} "
