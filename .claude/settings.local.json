@@ -38,7 +38,8 @@
       "Bash(./send_report_email.sh \"emcmpg@gmail.com\" \"Crypto bots — email test ✅\" /tmp/crypto_mail_test.txt)",
       "Bash(python3 compile_market_data.py)",
       "Bash(date -v+1H \"+plus1h_iso: %Y-%m-%dT%H:%M:00%z\")",
-      "Bash(railway variables *)"
+      "Bash(railway variables *)",
+      "mcp__bf7c680d-5fdc-5ef4-b4a0-abadb619bf0a__send_later"
     ]
   }
 }
