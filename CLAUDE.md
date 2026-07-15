@@ -34,9 +34,11 @@ https://pnl-dashboard-production-858c.up.railway.app/
   LIVING bots only (retired set + 7d close recency, 15-Jul); →
   `learning-brain`, `brain-stake-mults`, `brain-diagnosis`, `brain-lens-forward`
 - `fleet_risk.py` — traffic light (live > lshadow > paper via
-  `authoritative_row`, 30-min staleness filter) + signal bus + **7d fleet
+  `authoritative_row`, 65-min staleness filter) + signal bus + **7d fleet
   drawdown governor** (`clip_scale` 1.0/0.5/0.25 — Ticket Taker consumes,
-  gate0 advisory); long-budget veto ENFORCED in strategies
+  gate0 advisory) + **exposure view** (`exposure`: effective-bet count via
+  1/HHI, per-symbol pileup, crypto/equity split — advisory, 15-Jul);
+  long-budget veto ENFORCED in strategies + taker + family bot
   (`FLEET_RISK_MODE=advisory` = kill switch)
 - `regime_oracle.py`, `market_pulse.py` (history appends hourly),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
@@ -73,6 +75,8 @@ its row is dashboard-retired regardless; stop the process when found.
 - `lighter_market_scout.py` / `lighter_ticket_taker.py` — scout + its trader
 - `bot_learn.py` + `fleet_bus.py` — brain and the strategies' read client
 - `fleet_risk.py` / `regime_oracle.py` / `market_pulse.py` — shared organs
+- `lighter_ticket_replay.py` — replay the recorded scout tape through the
+  taker's real code (rule changes judged in seconds, not shadow-days)
 - `cross_exchange_arb.py` — Gap Scout (CEX dislocation + Lighter premium)
 - `funding_carry_bot.py` — Yield Harvester (HL-data paper origin)
 - `user_data/` — Freqtrade strategies/configs (dormant post-Kraken; the

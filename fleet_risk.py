@@ -140,6 +140,51 @@ LONG_BUDGET = 20
 SHORT_BUDGET = 12
 YELLOW_FRAC = 0.7
 
+# [2026-07-15 EXPOSURE VIEW] The light counts HOW MANY positions; this says
+# HOW MANY BETS they really are (EVIDENCE_AND_LEARNING_REVIEW follow-up: 23
+# open longs that are all crypto beta on one venue is ~one trade, and nothing
+# said so). Advisory publish-only, same doctrine as every layer before it:
+# per-symbol pileup, effective independent-bet count (1/Herfindahl), and a
+# crypto-vs-equity-perp cluster split. Symbol classification is a curated
+# equity-base set (Lighter's stock perps), env-extensible without a deploy;
+# a miss just shifts the advisory split, never the light.
+# Ambiguity policy: symbols that collide with crypto tickers (e.g. LIT)
+# stay CRYPTO — a miss only shifts the advisory split. US100/US500/SOXL
+# spotted holding in the first live replay (15-Jul).
+EQUITY_BASES = {s.strip().upper() for s in os.environ.get(
+    "FLEET_EQUITY_BASES",
+    "SPY,QQQ,US100,US500,SOXL,AMD,MU,HOOD,RKLB,TSLA,NVDA,AAPL,MSFT,META,"
+    "GOOGL,GOOG,AMZN,COIN,MSTR,PLTR,TSM,INTC,SKHYNIX,AMAT,EWY,LITE,CRCL,"
+    "BMNR").split(",") if s.strip()}
+
+
+def exposure_concentration(positions, uncovered=0):
+    """Advisory concentration view over the SAME directional cohort the light
+    counts. `positions` is [(bot, base_symbol, side)] where side is
+    'long'/'short'; `uncovered` counts light-cohort positions whose publisher
+    exposes no symbol detail (honesty metric — the view only claims what it
+    can see). Pure; unit-tested via --selftest."""
+    longs = [(b, str(s).upper()) for b, s, side in positions if side == "long"]
+    shorts = [(b, str(s).upper()) for b, s, side in positions if side == "short"]
+    by_sym = {}
+    for _, s in longs:
+        by_sym[s] = by_sym.get(s, 0) + 1
+    n = len(longs)
+    hhi = sum((c / n) ** 2 for c in by_sym.values()) if n else 0.0
+    top = sorted(by_sym.items(), key=lambda kv: (-kv[1], kv[0]))[:8]
+    eq_n = sum(c for s, c in by_sym.items() if s in EQUITY_BASES)
+    return {
+        "long_n": n, "short_n": len(shorts),
+        "sym_uncovered": int(uncovered),
+        "long_distinct": len(by_sym),
+        # 1/HHI — "the longs behave like this many independent symbol bets".
+        "long_effective_n": round(1.0 / hhi, 1) if hhi > 0 else 0.0,
+        "long_max_symbol": top[0][0] if top else None,
+        "long_max_share": round(top[0][1] / n, 2) if n else None,
+        "long_crypto": n - eq_n, "long_equity": eq_n,
+        "long_by_symbol": dict(top),
+    }
+
 # [2026-07-14b DRAWDOWN GOVERNOR] The missing risk leg: individual bots have
 # seatbelts, but nothing said "the whole fleet is bleeding — shrink". This
 # publishes a fleet-level 7-day equity drawdown and a clip_scale every run:
@@ -209,6 +254,7 @@ def main():
     fleet_equity = 0.0
     equity_by_bot, equity_venue = {}, {}
     per_bot, pair_count, venues_seen = {}, {}, {}
+    expo, expo_uncovered = [], 0   # [2026-07-15 EXPOSURE VIEW] (bot, base, side)
     for name in FREQTRADE_BOTS:
         r, venue = authoritative_row(name, by_bot)
         if not r:
@@ -222,6 +268,7 @@ def main():
             continue
         extra = r.get("extra") or {}
         pos = extra.get("open_pos") or []
+        held = extra.get("held") or {}
         # entries are long unless the enter tag says otherwise
         longs = sum(1 for p in pos if "short" not in str(p.get("tag", "")).lower()) if pos else n
         shorts = (len(pos) - longs) if pos else 0
@@ -230,10 +277,30 @@ def main():
         per_bot[name] = {"long": longs, "short": shorts, "venue": venue}
         if venue != "hl_paper":
             venues_seen[name] = venue
+        # [2026-07-15 EXPOSURE VIEW] symbol harvest: open_pos (taker-shaped)
+        # first, else extra.held (the gate0 family books publish {coin: tag})
+        # — the family books were invisible to pair_concentration until now.
+        # Family entry tags ('breakout', 'sma_fast_above_slow', ...) are
+        # long-only; only an explicit 'S'/'short' marks a short.
+        covered = 0
         for p in pos:
             base = str(p.get("pair", "")).split("/")[0]
             if base:
+                side = "short" if "short" in str(p.get("tag", "")).lower() else "long"
                 pair_count[base] = pair_count.get(base, 0) + 1
+                expo.append((name, base, side))
+                covered += 1
+        if not pos:
+            for coin, tag in held.items():
+                base = str(coin).split("/")[0]
+                if not base:
+                    continue
+                t = str(tag)
+                side = "short" if (t.upper() == "S" or "short" in t.lower()) else "long"
+                pair_count[base] = pair_count.get(base, 0) + 1
+                expo.append((name, base, side))
+                covered += 1
+        expo_uncovered += max(0, longs + shorts - covered)
     for name in PERPS_LS_BOTS:
         r, venue = authoritative_row(name, by_bot)   # live Lighter > paper twin
         if not r or not row_fresh(r):
@@ -256,6 +323,19 @@ def main():
             fleet_short += shorts
             per_bot[name] = {"long": longs, "short": shorts, "venue": venue}
             venues_seen[name] = venue
+            # [2026-07-15 EXPOSURE VIEW] harvest the L/S held map too, so the
+            # live Funding Farmer's one-sided book joins the concentration view.
+            covered = 0
+            for coin, v in held.items():
+                base = str(coin).split("/")[0]
+                if not base:
+                    continue
+                t = str(v)
+                side = "short" if (t.upper().startswith("S") or "short" in t.lower()) else "long"
+                pair_count[base] = pair_count.get(base, 0) + 1
+                expo.append((name, base, side))
+                covered += 1
+            expo_uncovered += max(0, longs + shorts - covered)
 
     # Shadow/testnet cohort — modelled, NOT real capital, so it never moves the
     # risk light; surfaced as info so the Lighter-cohort activity is still visible.
@@ -275,6 +355,7 @@ def main():
                 key=["green", "yellow", "red"].index)
     hot_pairs = {k: v for k, v in sorted(pair_count.items(),
                                          key=lambda kv: -kv[1]) if v >= 2}
+    exposure = exposure_concentration(expo, uncovered=expo_uncovered)
 
     sniper = by_bot.get("event-listing-sniper") or {}
     if not row_fresh(sniper):
@@ -339,6 +420,8 @@ def main():
         "short_positions": fleet_short, "short_budget": SHORT_BUDGET,
         "gross": gross,
         "pair_concentration": hot_pairs,   # same base held by >=2 bots
+        # [2026-07-15 EXPOSURE VIEW] how many independent bets the count is.
+        "exposure": exposure,
         "by_bot": per_bot,
         # [no-miss-sync] which venue each directional bot's REAL book is on, so
         # the risk view is explicit about counting live Lighter over paper.
@@ -352,7 +435,13 @@ def main():
                                   "hot_pairs": hot_pairs,
                                   "fleet_equity": round(fleet_equity, 2),
                                   "fleet_dd_7d": dd_7d,
-                                  "clip_scale": clip_scale})
+                                  "clip_scale": clip_scale,
+                                  "exposure": {
+                                      "eff_n": exposure["long_effective_n"],
+                                      "crypto": exposure["long_crypto"],
+                                      "equity": exposure["long_equity"],
+                                      "max_share": exposure["long_max_share"],
+                                      "unseen": exposure["sym_uncovered"]}})
 
     # ---- Layer 3: signal bus -------------------------------------------
     bus = {"updated": now_iso(), "ttl_sec": TTL_SEC}
@@ -414,11 +503,45 @@ def main():
     print(f"[fleet-risk] {now_iso()} mode={MODE} light={light.upper()} "
           f"long={fleet_long}/{LONG_BUDGET} short={fleet_short}/{SHORT_BUDGET} "
           f"gross={gross} | equity={fleet_equity:.0f} dd7d={dd_7d} scale={clip_scale} "
+          f"| bets: eff_n={exposure['long_effective_n']} "
+          f"crypto={exposure['long_crypto']}L eq={exposure['long_equity']}L "
+          f"top={exposure['long_max_symbol']}@{exposure['long_max_share']} "
+          f"unseen={exposure['sym_uncovered']} "
           f"| live-venue: {_lv} | shadow(info) {shadow_long}L/{shadow_short}S "
           f"| funding_src={bus.get('funding_source')} | pair-pileups: {hp} "
           f"| mood={bus.get('pulse_mood')} panic={bus.get('pulse_panic')} "
           f"| dislocation={bus.get('xexchange_dislocation_pct')} | lighter-stress={lstress}bps")
 
 
+def selftest():
+    """Offline checks for the pure functions (no DB). `--selftest`."""
+    # exposure: empty
+    e = exposure_concentration([])
+    assert e["long_n"] == 0 and e["long_effective_n"] == 0.0 and \
+        e["long_max_symbol"] is None, e
+    # exposure: pileup — 4 bots long SOL + 1 long ETH reads as ~1.5 real bets
+    e = exposure_concentration(
+        [("a", "SOL", "long"), ("b", "SOL", "long"), ("c", "SOL", "long"),
+         ("d", "SOL", "long"), ("e", "ETH", "long")])
+    assert e["long_n"] == 5 and e["long_distinct"] == 2, e
+    assert e["long_max_symbol"] == "SOL" and e["long_max_share"] == 0.8, e
+    assert e["long_effective_n"] == 1.5, e            # 1/(0.8^2+0.2^2)=1.47
+    assert e["long_crypto"] == 5 and e["long_equity"] == 0, e
+    # exposure: equity cluster + shorts + coverage honesty
+    e = exposure_concentration(
+        [("t", "SPY", "long"), ("t", "MU", "long"), ("f", "BTC", "short")],
+        uncovered=2)
+    assert e["long_equity"] == 2 and e["long_crypto"] == 0, e
+    assert e["short_n"] == 1 and e["sym_uncovered"] == 2, e
+    # dd governor smoke (already unit-tested 14-Jul; keep one canary here)
+    _, dd, scale = dd_governor([], 1000.0, datetime.now(timezone.utc))
+    assert dd == 0.0 and scale == 1.0, (dd, scale)
+    print("[fleet-risk] selftest OK (exposure_concentration + dd_governor)")
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--selftest" in sys.argv:
+        selftest()
+    else:
+        main()
