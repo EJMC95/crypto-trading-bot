@@ -184,3 +184,38 @@ aimed at the wrong targets. The two wiring fixes (family tag-preserving
 closes + a family-bot multiplier hook) plus a liveness filter would point
 the whole apparatus at the fleet that actually trades — in time for the
 new era's sample sizes to reach the floors it's been patiently enforcing.
+
+## Addendum — shipped 15-Jul (same PR as this doc)
+
+Gaps 1, 2, 3, 5 and the run_all.sh comment drift are FIXED in this PR:
+
+- `lighter_family_bot.py` now composes closes as `long-<tag hyphenated>_
+  <exit>` (`ledger_reason`, hyphens because `bot_pnl_store.split_reason`
+  splits at the first underscore) and applies
+  `fleet_bus.stake_multiplier(b.bot_id, ledger_tag(tag))` at entry —
+  same function derives the ledger tag and the lookup key, so buckets and
+  lookups cannot drift. `fleet_bus.py` added to Dockerfile.familyshadow.
+  No-op at deploy (published table is empty); reduce-only + fail-neutral
+  by contract. **Needs the main→gate0 cross-merge to reach the running
+  family-lighter-shadow service.**
+- `bot_learn.py` generates hypotheses/diagnoses/multipliers for LIVING
+  bots only (not in `cleanup_legacy_bots.LEGACY_BOTS`, ≥1 ledger close in
+  7 days); scorecards still print for everyone, flagged
+  `[inactive/retired]`. Existing dead-bot ACTIONABLE entries decay to
+  retired via the normal 3-run path. `_epoch` now parses the sniper's
+  `'... UTC'` timestamps (liveness + drift joins).
+- `bot_pnl_store.fetch_paper_trades`'s reason-parse extracted to the pure
+  `split_reason()` — the one parser the taker's and family bot's composers
+  round-trip against (unit-tested: 36 tag/exit combos + legacy edges).
+- `/bus.json` now exposes `brain-lens-forward` (live + history), same as
+  the other brain keys.
+
+Verified: py_compile on all touched files; compose→parse round-trip;
+multiplier fail-safe/clamp cases (no-DB, stale, floor 0.5, ceil 1.0,
+wrong bot/tag → neutral); `compute_stake_mults` streak semantics (publish
+at run 3, drop on recovery, streak reset); and a 3-run `bot_learn` smoke
+against a fixture ledger — identical losing evidence in a live, a stale,
+and a retired bot produced hypotheses ONLY for the live one.
+
+Still open: #4 (operator stops Trail Blazer's momo Railway service) and
+the venue-A/B re-base (paper arms frozen — future change, low urgency).

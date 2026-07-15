@@ -111,6 +111,24 @@ ERA_START = {
     "freqtrade-dad":       "2026-07-14T00:00",   # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier)
 }
 
+# [2026-07-15 LIVENESS] Generate hypotheses/diagnoses/multipliers ONLY for
+# bots that are still part of the living fleet: not officially retired AND
+# with a ledger close inside LIVENESS_DAYS. Before this, retired bots' rows
+# never left the fetch window, their patterns re-fired every run, and the
+# streak-retire path could never trigger — 10 of the 16 ACTIONABLE entries
+# at run 120 prosecuted dead bots (EVIDENCE_AND_LEARNING_REVIEW_2026-07-15).
+# Scorecards still print for everyone (analytics), and existing state
+# entries decay to 'retired' through the normal 3-run path once generation
+# stops. The retired set imports from cleanup_legacy_bots.LEGACY_BOTS — a
+# superset of the dashboard's RETIRED_ROWS and already the fleet's one
+# maintained list of officially-dead row names.
+LIVENESS_DAYS = 7
+try:
+    from cleanup_legacy_bots import LEGACY_BOTS as _LEGACY
+    RETIRED_BOTS = set(_LEGACY)
+except Exception:              # laptop/partial checkouts keep working
+    RETIRED_BOTS = set()
+
 # ---------------------------------------------------------------------------
 
 
@@ -358,7 +376,10 @@ def _kraken_hourly(pair):
 
 def _epoch(ts):
     try:
-        return datetime.fromisoformat(str(ts).replace("Z", "+00:00")).timestamp()
+        s = str(ts).strip().replace("Z", "+00:00")
+        if s.endswith(" UTC"):
+            s = s[:-4] + "+00:00"   # listing sniper writes '... 15:05:04 UTC'
+        return datetime.fromisoformat(s).timestamp()
     except Exception:
         return None
 
@@ -713,6 +734,7 @@ def main():
         by_bot[t.get("bot", "?")].append(t)
 
     pulse_hist = _load_pulse_history()
+    now_ts = datetime.now(timezone.utc).timestamp()
     cards, all_hyps, era_trades = {}, [], {}
     for bot, trs in sorted(by_bot.items()):
         era = ERA_START.get(bot)
@@ -721,7 +743,15 @@ def main():
         cards[bot], hyps = analyse_bot(bot, trs_era, pulse_hist)
         cards[bot]["n_lifetime"] = len(trs)
         cards[bot]["era"] = era or "all-time"
-        all_hyps.extend(hyps)
+        # [2026-07-15 LIVENESS] retired or quiet > LIVENESS_DAYS -> scorecard
+        # only; no new hypotheses (state entries decay via the normal path).
+        last_close = max((e for e in (_epoch(t.get("close_ts")) for t in trs)
+                          if e is not None), default=None)
+        alive = (bot not in RETIRED_BOTS and last_close is not None
+                 and now_ts - last_close <= LIVENESS_DAYS * 86400)
+        cards[bot]["alive"] = alive
+        if alive:
+            all_hyps.extend(hyps)
 
     # [2026-07-14b DIAGNOSIS] For every negative (bot, tag) bucket at sample
     # size, name the LEVER (entry / exit / fee / regime / venue) instead of the
@@ -733,6 +763,8 @@ def main():
     drift_budget = {"left": 120}   # bounds Kraken candle work per run
     diagnoses = {}
     for bot, trs in sorted(era_trades.items()):
+        if not (cards.get(bot) or {}).get("alive"):
+            continue   # [2026-07-15 LIVENESS] don't diagnose the dead
         buckets = defaultdict(list)
         for t in trs:
             buckets[str(t.get("enter_tag") or "(untagged)")].append(t)
@@ -775,7 +807,10 @@ def main():
 
     # [2026-07-14 L4] Numeric stake multipliers — computed every run, streak-
     # gated, published reduce-only. Strategies consume via fleet_bus.
-    published_mults = compute_stake_mults(cards, state, run_no)
+    # [2026-07-15 LIVENESS] living bots only: a throttle for a dead bot has
+    # no consumer and would only be noise on the bus.
+    published_mults = compute_stake_mults(
+        {b: c for b, c in cards.items() if c.get("alive")}, state, run_no)
     mults_saved = _publish_stake_mults(published_mults)
 
     # [2026-07-14 REACH] Venue A/B computed above (feeds diagnosis too).
@@ -889,6 +924,8 @@ def main():
             continue
         era_note = "" if c.get("era") == "all-time" else \
             f" (current era since {str(c.get('era'))[:10]}; lifetime n={c.get('n_lifetime', c['n'])})"
+        if not c.get("alive"):
+            era_note += " [inactive/retired — analytics only, no new hypotheses]"
         L.append(f"\n### {bot} — n={c['n']}, win {c['wr']}%, pnl ${c['pnl']:+.2f}{era_note}")
         top_exit = sorted(c["by_exit"].items(), key=lambda x: -x[1]["n"])[:4]
         L.append("  exits: " + "; ".join(
