@@ -366,7 +366,8 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     return nxt, emit(nxt, "action", "expand", why)
 
 
-def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts):
+def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts,
+                      xp_state=None):
     """Board-authored EXPAND evidence. Same emit shape as synthesize(), every
     item carrying direction='expand'. Pure — selftested offline."""
     out = []
@@ -421,6 +422,20 @@ def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts):
                           "gate (expectancy + max-DD + profit factor) at the "
                           "review; go-live stays operator-only",
                  lever="promotion")
+
+    # 3b) The experiment judge's phase — the shadow→live promotion pipeline
+    #     visible where the operator triages.
+    if xp_state and _fresh(xp_state, max_age_s=float(xp_state.get("ttl_sec") or 10800)):
+        ph, cand = xp_state.get("phase"), xp_state.get("candidate")
+        if ph in ("running", "promoted") and cand:
+            emit(f"board:xp-{ph}:{cand}",
+                 (f"🧪 experiment '{cand}' RUNNING on the Funding Farmer "
+                  f"shadow arm" if ph == "running" else
+                  f"🧪 promotion '{cand}' IN FORCE on the LIVE Funding Farmer"),
+                 proposal="paired bar: ≥7d, ≥30 shadow closes, beats live "
+                          "per-trade on window AND both halves; fade-watch "
+                          "releases a turning promotion (state: 'xp-judge')",
+                 lever="xp-judge")
 
     # 4) Restrictions that never bind: the balance check on the board's own
     #    restrict side. A veto with permanent headroom is a calibration item.
@@ -524,13 +539,14 @@ def run_once():
     # ---- EXPAND-direction synthesis: winners, promotions, tuner activity,
     # and restrictions that never bind (the board's other eye) --------------
     tuner_state = store.load_state("scout-tuner") or {}
+    xp_state = store.load_state("xp-judge") or {}
     bot_rows = []
     try:
         bot_rows = store.fetch_bot_pnl() or []
     except Exception:
         bot_rows = []
     synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, 26000) else {},
-                               tuner_state, bot_rows, lm, now)
+                               tuner_state, bot_rows, lm, now, xp_state)
 
     # ---- LIVE lane 💰: evidence-gated clip scaling on the real-money bots --
     prior_live = prior.get("live_scale") or {}
@@ -742,10 +758,14 @@ def _selftest():
             {"bot": "perps-funding-carry-lshadow", "closed_trades": 10,
              "pnl_abs": 50.0, "extra": {}}]                            # n small
     ex = synthesize_expand(lfw, tstate, rows,
-                           {"updated": fresh, "stress": {"med": 5}}, _now())
+                           {"updated": fresh, "stress": {"med": 5}}, _now(),
+                           xp_state={"updated": fresh, "ttl_sec": 10800,
+                                     "phase": "running",
+                                     "candidate": "enter-gate-0.30"})
     xkeys = {e["key"] for e in ex}
     assert xkeys == {"board:lens-positive:dip", "board:tuner-enacted",
                      "board:promotion-watch:lighter-dislocation-lshadow",
+                     "board:xp-running:enter-gate-0.30",
                      "board:stress-headroom"}, xkeys
     assert all(e["direction"] == "expand" and e["severity"] == "info" for e in ex)
     # stale tuner + hot venue -> those items vanish; nothing else appears

@@ -70,9 +70,12 @@ CACHE_SEC = 60.0
 #                   URGENT to the phone. Remove the lane from this env to
 #                   kill it. Go-live itself (keys, dry_run, caps) remains
 #                   operator-only forever.
+#   lighter-xp    — the Funding Farmer SHADOW twin's experiment arm (the
+#                   judge's candidate parameters; zero real money)
 ENACT_LANES = {s.strip() for s in os.environ.get(
     "FLEET_TUNING_ENACT_LANES",
-    "paper-scanner,lighter-scout,lighter-taker,lighter-live").split(",") if s.strip()}
+    "paper-scanner,lighter-scout,lighter-taker,lighter-live,lighter-xp"
+    ).split(",") if s.strip()}
 
 # ---------------------------------------------------------------------------
 # THE REGISTRY — every autonomously-tunable lever in the fleet, with hard
@@ -136,6 +139,32 @@ LEVERS = {
     "live.clip_scale": {
         "kind": "float", "lo": 0.5, "hi": 1.5, "lane": "lighter-live",
         "note": "live clip multiplier; 1.0 = the operator's env sizing"},
+    # Funding Farmer EXPERIMENT arm 🧪 (the -lshadow twin ONLY — zero real
+    # money). The experiment judge runs ONE candidate at a time here; while
+    # a candidate runs, the twin is an experiment arm, not a control arm.
+    "xp.funding.enter_apr": {
+        "kind": "float", "lo": 0.25, "hi": 0.60, "lane": "lighter-xp",
+        "note": "shadow twin's funding entry gate; env default 0.40"},
+    "xp.funding.take_profit": {
+        "kind": "float", "lo": 0.03, "hi": 0.08, "lane": "lighter-xp",
+        "note": "shadow twin's TP; env default 0.04"},
+    "xp.funding.max_hold_h": {
+        "kind": "float", "lo": 24.0, "hi": 96.0, "lane": "lighter-xp",
+        "note": "shadow twin's max hold; env default 72"},
+    # …and their PROMOTED-to-live counterparts. Written by exactly ONE
+    # author — the experiment judge — and only after the paired promotion
+    # bar (>=7d, >=30 shadow closes, beats live per-trade on the window AND
+    # both halves by the margin). TTL'd: promotion fades back to env
+    # defaults when the judge stops re-asserting it.
+    "live.funding.enter_apr": {
+        "kind": "float", "lo": 0.25, "hi": 0.60, "lane": "lighter-live",
+        "note": "PROMOTED funding entry gate; env default 0.40"},
+    "live.funding.take_profit": {
+        "kind": "float", "lo": 0.03, "hi": 0.08, "lane": "lighter-live",
+        "note": "PROMOTED TP; env default 0.04"},
+    "live.funding.max_hold_h": {
+        "kind": "float", "lo": 24.0, "hi": 96.0, "lane": "lighter-live",
+        "note": "PROMOTED max hold; env default 72"},
 }
 
 

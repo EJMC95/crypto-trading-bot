@@ -112,6 +112,51 @@ SCAN_MOM_LOOKBACK_H = int(os.environ.get("SCAN_MOM_LOOKBACK_H", "6"))
 SCAN_ENTER = float(os.environ.get("SCAN_ENTER", str(ENTER_APR)))
 ENTER_GATE = SCAN_ENTER if SCAN_ENABLED else ENTER_APR
 
+# ---- Growth rail: EXPERIMENT arm + PROMOTED bars (2026-07-15) ---------------
+# The -lshadow twin is the fleet's experiment arm: the experiment judge can
+# move its bars via bounded xp.* levers (zero real money). The LIVE bot only
+# ever consumes live.funding.* — written by the judge ALONE, after a
+# candidate beats the live arm on the paired promotion bar. Env defaults
+# always rule when no lever is live (TTL auto-revert = the resting state).
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
+
+_ENV_BARS = {"enter_apr": ENTER_APR, "scan_enter": SCAN_ENTER,
+             "take_profit": TAKE_PROFIT, "max_hold_h": MAX_HOLD_H}
+_ACTIVE_BARS = {}    # what this arm is running NOW — stamped on every close
+
+
+def apply_levers(mode):
+    """Overlay this arm's levers onto the module bars, from env defaults
+    (never from mutated state — expiry reverts cleanly). Returns the moved
+    levers for the log; refreshes _ACTIVE_BARS either way."""
+    global ENTER_APR, SCAN_ENTER, ENTER_GATE, TAKE_PROFIT, MAX_HOLD_H
+    prefix = {"lighter_shadow": "xp.funding.", "lighter_live": "live.funding."}.get(mode)
+    moved = {}
+    ENTER_APR, SCAN_ENTER = _ENV_BARS["enter_apr"], _ENV_BARS["scan_enter"]
+    TAKE_PROFIT, MAX_HOLD_H = _ENV_BARS["take_profit"], _ENV_BARS["max_hold_h"]
+    if tuning is not None and prefix:
+        ea = tuning.get_lever(prefix + "enter_apr", ENTER_APR)
+        if ea != ENTER_APR:
+            ENTER_APR = SCAN_ENTER = ea         # one coherent gate
+            moved[prefix + "enter_apr"] = ea
+        tp = tuning.get_lever(prefix + "take_profit", TAKE_PROFIT)
+        if tp != TAKE_PROFIT:
+            TAKE_PROFIT = tp
+            moved[prefix + "take_profit"] = tp
+        mh = tuning.get_lever(prefix + "max_hold_h", MAX_HOLD_H)
+        if mh != MAX_HOLD_H:
+            MAX_HOLD_H = mh
+            moved[prefix + "max_hold_h"] = mh
+    ENTER_GATE = SCAN_ENTER if SCAN_ENABLED else ENTER_APR
+    _ACTIVE_BARS.clear()
+    _ACTIVE_BARS.update({"enter_apr": ENTER_APR, "take_profit": TAKE_PROFIT,
+                         "max_hold_h": MAX_HOLD_H,
+                         "arm": mode or "paper", "tuned": sorted(moved)})
+    return moved
+
 # ---- funding-SLOPE entry gate (2026-07-11) — only enter while the rate is
 # still BUILDING (|apr| >= |apr LOOKBACK_H ago|). Backtested on the 150d
 # portfolio sim (scripts/backtest_funding_leverage.py): at the live 2x config
@@ -402,7 +447,11 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_l
             bot, trade_id=f"{coin}:{ent_ts}", pnl_abs=pnl, pnl_pct=pnl_pct,
             pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
             reason=("long_" if was_long else "short_") + reason,
-            venue=venue, shadow=shadow)
+            venue=venue, shadow=shadow,
+            # [2026-07-15 XP] stamp the bars this arm was running — the
+            # experiment judge's paired evaluation needs unambiguous
+            # which-params-produced-what attribution on every row.
+            extra={"bars": dict(_ACTIVE_BARS)} if _ACTIVE_BARS else None)
     except Exception:
         pass
 
@@ -544,6 +593,7 @@ def main():
         day_start_equity = _halt.get("day_start_equity") or day_start_equity
         log.warning("daily-loss halt restored from state — halted for the rest of today.")
     last_ts = time.time()
+    _last_moved = None      # growth-rail bars log dedup
 
     while True:
         t0 = time.time()
@@ -559,6 +609,13 @@ def main():
                      order_usd, _clip)
             order_usd = _clip
             max_open = ctx.max_open_positions(MAX_OPEN_POSITIONS)
+        # [2026-07-15 XP] arm-aware bars: shadow twin runs the experiment
+        # candidate (xp.*), live runs promoted values only (live.funding.*).
+        _moved = apply_levers(ctx.mode)
+        if sorted(_moved) != _last_moved:
+            log.info("growth rail bars (%s): %s", ctx.mode,
+                     _moved or "env defaults")
+            _last_moved = sorted(_moved)
         now = datetime.now(timezone.utc)
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False

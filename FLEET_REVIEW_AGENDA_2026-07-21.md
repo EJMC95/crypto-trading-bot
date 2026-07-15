@@ -288,5 +288,9 @@ any trading-lane lever (e.g. TT dip range, replay-validated) earns a
 registry entry; (iv) LIVE lane (shipped 15-Jul late, user mandate):
 grade `live.clip_scale`'s enactment log — did the earn-gates (30 closes &
 positive on EVERY live row) hold, did any down-scale fire correctly, and
-should the ladder/cooldown/bounds move. B2-full (cross-quote BOOKING) and B4 (>5% identity check)
+should the ladder/cooldown/bounds move; (v) EXPERIMENT JUDGE: by the
+review, candidate 'enter-gate-0.30' will be ~6 days into its shadow run —
+inspect `xp-judge` state + verdicts + the stamped extra.bars rows, decide
+whether the promotion bar (7d/30 closes/+0.5pp both-halves/live n≥10) is
+right BEFORE the first promotion can fire (~22-Jul earliest). B2-full (cross-quote BOOKING) and B4 (>5% identity check)
 remain open — the census now records both bands.

@@ -63,6 +63,19 @@ https://pnl-dashboard-production-858c.up.railway.app/
   advisory tickets only). Everything lands as bounded TTL'd
   `fleet-tuning` levers (auto-revert); never widens a brain-vetoed lens;
   fail-safe neutral on a dark brain. → bot_state `scout-tuner`
+- `experiment_judge.py` 🧪⚖️ — the shadow→live PROMOTION pipeline (15-Jul
+  user mandate: shadow wins must "carry across to the real money bots").
+  Hourly, ONE candidate at a time on the Funding Farmer's -lshadow twin
+  (xp.* levers; while running, the twin is an EXPERIMENT arm, not a
+  control arm; every close row stamps extra.bars). Promotion to the live
+  arm (live.funding.* — this judge is the ONLY writer) requires the
+  PAIRED bar: ≥7d, ≥30 shadow closes, live ≥10, shadow positive in its
+  own right AND beats live per-trade by ≥0.5pp on the window AND both
+  halves. Fade-watch releases a promotion whose live arm turns negative
+  (n≥15). Candidate queue in CANDIDATES (first: enter_apr 0.30 — the
+  11-Jul "opt-in, shadow-validate" gate widening). Tide Rider excluded
+  (trades too rarely to judge; stays backtest-validated). → bot_state
+  `xp-judge`; phase surfaced on the evidence board (🧪)
 - `regime_oracle.py`, `market_pulse.py` (history appends hourly),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 
@@ -121,8 +134,9 @@ its row is dashboard-retired regardless; stop the process when found.
 - `fleet-tuning` — the growth rail's lever payload (authors: evidence board
   + scout tuner, MERGED writes with per-lever expiry; `fleet_tuning.py`
   registry clamps; consumers: Gap Scout, Lighter Scout, Ticket Taker).
-  Lanes: paper-scanner / lighter-scout / lighter-taker (zero real money) +
-  lighter-live (ONLY `live.clip_scale`, see growth rail above). `gapscout-census` — Gap Scout's epoch-2 episode census (board
+  Lanes: paper-scanner / lighter-scout / lighter-taker / lighter-xp (zero
+  real money) + lighter-live (`live.clip_scale` + the judge's PROMOTED
+  `live.funding.*` — see growth rail + experiment judge above). `gapscout-census` — Gap Scout's epoch-2 episode census (board
   reads `quiet_hours`). `scout-tuner` — the tuner's cycle log + enactments.
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).

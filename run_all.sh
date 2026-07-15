@@ -182,5 +182,18 @@ done &
     sleep "${TUNER_INTERVAL_SEC:-3600}"
   done ) &
 
+# [2026-07-15 EXPERIMENT JUDGE] 🧪⚖️ the shadow→live promotion pipeline
+# (user: shadow wins must "carry across to the real money bots"). Hourly:
+# runs ONE candidate at a time on the Funding Farmer's shadow arm (xp.*
+# levers), and promotes to the live arm (live.funding.*) ONLY after the
+# paired bar — >=7d, >=30 shadow closes, beats live per-trade by the margin
+# on the window AND both halves. Fade-watch releases a promotion whose live
+# performance turns. All TTL'd; phone-pushed per transition.
+( sleep 480
+  while true; do
+    python3 /freqtrade/experiment_judge.py || true
+    sleep "${XPJ_INTERVAL_SEC:-3600}"
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait
