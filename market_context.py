@@ -166,7 +166,13 @@ def evaluate_evidence(quality):
         building-vs-rolling win split with a crude two-proportion z at n>=30.
       * coin quality vetoes: measured slip > 15bps (n>=5) or stop-rate >= 50%
         (n>=5 closes) -> veto entry on that coin; alert on any list CHANGE.
-      * live vs shadow divergence (Funding Farmer) beyond 5pp -> alert.
+      * live vs shadow divergence (Funding Farmer): PAIRED per-coin per-trade
+        pnl_pct comparison on overlapping coins (>=3 coins, gap >1.5pp/trade)
+        -> alert. [2026-07-14] Replaced the whole-book equity-ratio check,
+        which divided a ~$64 live book against the $1k shadow book — every
+        live dollar moved the "gap" ~16x more, and the capital-constrained
+        live book holds only the top slots, so the old alert measured base
+        size + slot selection, not execution.
     """
     alerts = (store.load_state("fleet-alerts") or {}).get("alerts") or []
     fired = 0
@@ -231,23 +237,43 @@ def evaluate_evidence(quality):
     store.save_state("coin-vetoes",
                      {"ts": datetime.now(timezone.utc).isoformat(), "coins": vetoes})
 
-    # --- live vs shadow divergence (execution health) ---
+    # --- live vs shadow divergence (execution health, PAIRED per-coin) ---
+    # [2026-07-14] Same coin, same signal family, per-trade returns — only
+    # execution differs. Trade-count-weighted mean of (live avg pnl_pct −
+    # shadow avg pnl_pct) across coins BOTH books closed in the last 7d.
+    # Needs >=3 overlapping coins; below that it stays quiet rather than
+    # alerting on noise (the 13-Jul +5.4% firing was the old ratio artifact:
+    # live 9W/0L on its 3 slots vs shadow 15W/5L on 8, same-coin closes
+    # near-identical — SOL +$0.19 live vs +$0.27 shadow).
     try:
         conn2 = store._get_conn()
         if conn2 is None:
             raise LookupError("no DB connection")
+        LIVE, SHAD = "perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"
         with conn2.cursor() as cur:
-            cur.execute("""SELECT bot, pnl_abs, equity FROM bot_pnl
-                           WHERE bot IN ('perps-funding-lighter-lighter',
-                                         'perps-funding-lighter-lshadow')""")
-            r = {b: (p, e) for b, p, e in cur.fetchall()}
-        live, shad = r.get("perps-funding-lighter-lighter"), r.get("perps-funding-lighter-lshadow")
-        if live and shad and live[1] and shad[1]:
-            gap = (live[0] or 0) / live[1] - (shad[0] or 0) / shad[1]
-            if abs(gap) > 0.05:
+            # closed_at is TEXT (iso); seen_at is a real TIMESTAMPTZ stamped at
+            # insert (== close publication time) — filter on that.
+            cur.execute("""SELECT bot, pair, AVG(pnl_pct), COUNT(*) FROM paper_trades
+                           WHERE bot IN (%s, %s)
+                             AND pnl_pct IS NOT NULL
+                             AND seen_at >= now() - interval '7 days'
+                           GROUP BY bot, pair""", (LIVE, SHAD))
+            per = {}
+            for b, pair, avg_pct, n in cur.fetchall():
+                per.setdefault(pair, {})[b] = (float(avg_pct), int(n))
+        diffs = [(sides[LIVE][0] - sides[SHAD][0],
+                  min(sides[LIVE][1], sides[SHAD][1]))
+                 for sides in per.values() if LIVE in sides and SHAD in sides]
+        n_overlap = len(diffs)
+        tot_w = sum(w for _, w in diffs)
+        if n_overlap >= 3 and tot_w > 0:
+            gap = sum(d * w for d, w in diffs) / tot_w
+            if abs(gap) > 0.015:
                 fired += _alert(alerts, "live-shadow-gap", "warn",
-                                f"⚠️ Funding Farmer live vs shadow P&L gap {gap:+.1%} "
-                                f"— execution divergence worth investigating")
+                                f"⚠️ Funding Farmer live vs shadow PER-TRADE gap "
+                                f"{gap:+.2%} across {n_overlap} overlapping coins "
+                                f"({tot_w} paired closes) — execution divergence "
+                                f"worth investigating")
     except Exception as e:  # noqa: BLE001
         log.warning("divergence check failed: %s", e)
 
