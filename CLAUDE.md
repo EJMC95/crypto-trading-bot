@@ -40,6 +40,11 @@ https://pnl-dashboard-production-858c.up.railway.app/
   1/HHI, per-symbol pileup, crypto/equity split — advisory, 15-Jul);
   long-budget veto ENFORCED in strategies + taker + family bot
   (`FLEET_RISK_MODE=advisory` = kill switch)
+- `evidence_board.py` ⚖️ — the evidence organ (15-Jul): scores/corroborates
+  fleet-alerts, synthesizes cross-feed items (lens floors, veto flap, venue
+  stress, governor proximity), auto-verdicts mechanical items (manual
+  `evidence-review` stays senior), phone-notifies warn/action, publishes
+  SHADOW restrict-only proposals → `evidence-board` (EVBOARD_MODE=shadow)
 - `regime_oracle.py`, `market_pulse.py` (history appends hourly),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 
@@ -147,8 +152,11 @@ All new bots:
   times to him in AEST (15-Jul instruction: "use AEST for everything").
   Fleet INTERNALS stay UTC (ledger rows, `updated`+`ttl_sec` freshness
   contracts, cross-service joins) — this is a reporting/display rule.
-- **CHANGE FREEZE until the 21-Jul review** (user-approved 15-Jul):
-  hotfixes only; agenda + evidence plan in FLEET_REVIEW_AGENDA_2026-07-21.md.
+- **FREEZE LIFTED 15-Jul evening by user** ("this could be a breakthrough" —
+  the evidence-board v2 build). The 21-Jul review + its agenda stand;
+  restrict-only actuators / backtest-first / shadow-first remain doctrine
+  (they were never freeze rules). Freeze-window exceptions stay logged in
+  FLEET_REVIEW_AGENDA_2026-07-21.md §8.
 - $1,000 starting balance per bot, NO top-ups
 - Paper trading only until 30-day win rate > 55% AND max drawdown < 15%
 - Never modify bot logic without backtesting first

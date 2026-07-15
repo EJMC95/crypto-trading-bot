@@ -768,6 +768,46 @@ def fetch_pulse_strip():
         return "", {}
 
 
+def evidence_board_card():
+    """⚖️ [2026-07-15 EVIDENCE BOARD v2] The evidence organ's live output
+    (bot_state 'evidence-board'): scored/corroborated items with trend +
+    verdict, and its shadow-mode restrict-only proposals. Read-only render —
+    the organ itself lives in evidence_board.py on the freqtrade-bots
+    container. Fail-silent like every other card."""
+    try:
+        b = fetch_states(["evidence-board"]).get("evidence-board") or {}
+        items = b.get("items") or []
+        if not items:
+            return ""
+        _tr = {"escalating": "▲", "decaying": "▼", "steady": "•"}
+        _sevc = {"warn": "#d29922", "action": "#f85149"}
+        rows_html = []
+        for i in items[:8]:
+            col = _sevc.get(i.get("sev"), "#8b949e")
+            dim = ' style="opacity:.45"' if i.get("verdict") in ("resolved", "stale") else ""
+            prop = (f'<div class="muted" style="margin-left:14px">↳ would ({html.escape(str(b.get("mode","shadow")))}): '
+                    f'{html.escape(str(i.get("proposal")))}</div>') if i.get("proposal") else ""
+            rows_html.append(
+                f'<div{dim}><span style="color:{col}">{_tr.get(i.get("trend"), "•")} '
+                f'{i.get("score", 0):.1f}</span> {html.escape(str(i.get("msg") or i.get("key")))[:110]} '
+                f'<span class="muted">[{html.escape(str(i.get("verdict")))}]</span></div>{prop}')
+        age = ""
+        try:
+            _u = _iso_dt(b.get("updated"))
+            if _u:
+                age = f' · {int((dt.datetime.now(dt.timezone.utc) - _u).total_seconds() // 60)}m ago'
+        except Exception:
+            pass
+        n_prop = len(b.get("proposals") or [])
+        return (f'<div class="card"><h2>⚖️ Evidence board <span class="dot on"></span></h2>'
+                f'<div class="muted">mode {html.escape(str(b.get("mode", "shadow")))} · '
+                f'{len(items)} items · {n_prop} shadow proposals{age} — '
+                f'restrict-only levers, nothing consumes proposals until a review promotes</div>'
+                f'{"".join(rows_html)}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def brain_card_html():
     """Compact card for the learning loop's current state (bot_state 'learning-brain')."""
     try:
@@ -1273,7 +1313,7 @@ def render():
         enrich = {}
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
-    brain_html = brain_card_html()
+    brain_html = brain_card_html() + evidence_board_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}
@@ -1363,13 +1403,21 @@ def render():
         _byk = {}
         for a in _fa:                        # chronological — last wins per key
             _byk[a.get("key") or a.get("msg")] = a
-        _rev = fetch_states(["evidence-review"]).get("evidence-review") or {}
+        _sts = fetch_states(["evidence-review", "evidence-board"])
+        _rev = _sts.get("evidence-review") or {}
         # resolved = condition no longer true; stale = recorded evidence whose
         # decision gate lives elsewhere (weekly census/settlement reviews).
         # Both clear from the banner; 'active' verdicts (and unreviewed items)
         # stay. History is never deleted — fleet-alerts stays append-only.
-        _resolved = {v.get("key") for v in (_rev.get("verdicts") or [])
-                     if v.get("status") in ("resolved", "stale")}
+        # [2026-07-15 EVIDENCE BOARD v2] the organ's mechanical auto-verdicts
+        # also suppress; MANUAL evidence-review verdicts stay senior (a human
+        # 'active' overrides an organ 'stale', and vice versa).
+        _auto = {i.get("key"): i.get("verdict")
+                 for i in ((_sts.get("evidence-board") or {}).get("items") or [])}
+        _manual = {v.get("key"): v.get("status")
+                   for v in (_rev.get("verdicts") or []) if v.get("key")}
+        _resolved = {k for k, s in {**_auto, **_manual}.items()
+                     if s in ("resolved", "stale")}
         _now = time.time()
 
         def _age_txt(a):

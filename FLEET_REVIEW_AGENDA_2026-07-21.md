@@ -1,8 +1,11 @@
 # Fleet Review Agenda — Tuesday 21 July 2026 (loaded 15-Jul, user-approved)
 
 Scheduled at the close of the 15-Jul instrumentation sprint (PRs #45–#49).
-**CHANGE FREEZE from 15-Jul evening until this review** — hotfixes only.
-The measurement layer is complete; the week's job is recording, not shipping.
+**FREEZE LIFTED same evening by the user** ("take off the freeze as I believe
+this could be a breakthrough" — the evidence-board v2 build). This review and
+its agenda STAND; the standing doctrine (restrict-only actuators,
+backtest-first, shadow-first promotion) was never a freeze rule and binds as
+before. §8 remains the log of what shipped during the freeze window.
 All times AEST (operator timezone); data timestamps in the feeds stay UTC.
 
 How to run it: ask Claude to "run the 21-Jul review per
@@ -140,3 +143,11 @@ and service logs for veto/governor lines.
     zero trading surface. NOT salvaged even with the blanket approval:
     the pair-blacklist actuator (strategy logic; design lost to L4 mults
     — review decides if pair-level throttling rides the mult machinery).
+  - 15-Jul evening — FREEZE LIFTED by the user; later ships are normal
+    doctrine, not exceptions. First post-freeze ship: EVIDENCE BOARD v2
+    (`evidence_board.py`: scoring/corroboration/synthesis/auto-verdicts/
+    phone notify; proposals SHADOW-mode restrict-only, EVBOARD_MODE).
+    NEW REVIEW ITEM: grade the board's week of shadow proposals +
+    auto-verdicts; promote EVBOARD_MODE only if the would-act log earns
+    it (the L2-light path). Also queued: coin-veto remove-side
+    hysteresis (ADA flap, board:veto-flap:ADA) — backtest-first.

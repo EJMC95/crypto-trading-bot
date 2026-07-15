@@ -153,5 +153,19 @@ done &
     sleep 300
   done ) &
 
+# [2026-07-15 EVIDENCE BOARD v2] ⚖️ the evidence organ: scores + corroborates
+# the fleet-alerts feed, SYNTHESIZES cross-feed evidence (lens ruling floors,
+# veto flap, venue stress, governor proximity, budget crowding), auto-verdicts
+# the mechanical items (manual evidence-review verdicts stay senior), pushes
+# new warn/action items to the operator's phone (NTFY_TOPIC — the watchdog's
+# channel), and publishes SHADOW-MODE restrict-only proposals -> bot_state
+# 'evidence-board'. Nothing consumes the proposals until a review flips
+# EVBOARD_MODE=publish — the same earn-your-wiring path the L2 light walked.
+( sleep 330
+  while true; do
+    python3 /freqtrade/evidence_board.py --once || true
+    sleep "${EVBOARD_INTERVAL_SEC:-600}"
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait
