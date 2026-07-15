@@ -584,9 +584,14 @@ def fetch_paper_rows(bot=None, limit=500):
                 params.append(bot)
             where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
             params.append(int(limit))
+            # [2026-07-15 EVIDENCE] widened columns (side/tag/prices/size/extra)
+            # serve too, so outside reviews read entry context, not just P&L.
+            # side='skip' rows (sniper gate log) publish under the separate
+            # 'event-listing-sniper-skips' name — reachable via ?bot=.
             cur.execute(
                 "SELECT bot, trade_id, pair, pnl_abs, pnl_pct, opened_at, "
-                "closed_at, reason, seen_at "
+                "closed_at, reason, seen_at, side, tag, entry_price, "
+                "exit_price, size, extra "
                 f"FROM paper_trades {where} "
                 "ORDER BY seen_at DESC LIMIT %s",
                 params,
@@ -2368,7 +2373,10 @@ def fetch_period_pnl(period, limit_periods):
                 parts.append("SELECT bot, closed_at::timestamptz AS close_ts, "
                              "pnl_abs AS profit_abs FROM paper_trades "
                              "WHERE closed_at IS NOT NULL "
-                             "AND pg_input_is_valid(closed_at, 'timestamptz')")
+                             "AND pg_input_is_valid(closed_at, 'timestamptz') "
+                             # [2026-07-15 EVIDENCE] sniper gate-log rows are
+                             # not trades — keep them out of P&L periods.
+                             "AND side IS DISTINCT FROM 'skip'")
             if not parts:
                 return [], [], {}
             cur.execute(

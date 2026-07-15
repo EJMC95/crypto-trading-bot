@@ -422,6 +422,20 @@ def run_live(once=False):
     _saved = store.load_state("scanner-cross-exchange-arb") or {}
     virtual_balance = float(_saved.get("virtual_balance") or 0.0)  # REAL basis
     gross_balance = float(_saved.get("gross_balance") or 0.0)      # optimistic
+    # [2026-07-15 EVIDENCE] booked-fill record (W/L) — the dashboard showed
+    # trades=0 forever because only the running balance was published, and the
+    # 14-Jul review flagged the balance as unauditable (no per-fill rows).
+    n_booked = int(_saved.get("booked") or 0)
+    n_wins = int(_saved.get("wins") or 0)
+    n_losses = int(_saved.get("losses") or 0)
+    try:
+        _agg = store.fetch_paper_aggregate("scanner-cross-exchange-arb")
+        if _agg and _agg["closed"] > n_booked:
+            # ledger rows are written at booking time, the state blob at scan
+            # end — if a state write failed the ledger carries the truth.
+            n_booked, n_wins, n_losses = _agg["closed"], _agg["wins"], _agg["losses"]
+    except Exception:
+        pass
     if virtual_balance or gross_balance:
         print(f"[{now_iso()}] restored balances from bot_state: "
               f"real {virtual_balance:+.2f} / gross {gross_balance:+.2f}")
@@ -490,11 +504,17 @@ def run_live(once=False):
                 )
                 if net_d is None:
                     continue
-                confirmed.append((net_d, net_top, pnl, filled, symbol, buy_ex, sell_ex))
+                # [2026-07-15 EVIDENCE] carry the tops of the books we already
+                # fetched so a booked fill records entry/exit in the ledger.
+                ask_top = ab["asks"][0][0] if ab.get("asks") else None
+                bid_top = bb["bids"][0][0] if bb.get("bids") else None
+                confirmed.append((net_d, net_top, pnl, filled, symbol,
+                                  buy_ex, sell_ex, ask_top, bid_top))
 
             confirmed.sort(reverse=True)
 
-            for net_d, net_top, pnl, filled, symbol, buy_ex, sell_ex in confirmed:
+            for (net_d, net_top, pnl, filled, symbol, buy_ex, sell_ex,
+                 ask_top, bid_top) in confirmed:
                 if net_d < MIN_NET_EDGE:
                     continue
                 # Effective edge after execution-reality haircuts. Book on the
@@ -505,6 +525,31 @@ def run_live(once=False):
                 booked = net_eff >= 0.0 and filled
                 if booked:
                     virtual_balance += pnl_eff
+                    n_booked += 1
+                    if pnl_eff > 0:
+                        n_wins += 1
+                    else:
+                        n_losses += 1
+                    # [2026-07-15 EVIDENCE] one durable ledger row per booked
+                    # fill (REAL basis, same as the balance it feeds; the
+                    # optimistic figure rides in extra) — makes the cumulative
+                    # balance auditable fill-by-fill.
+                    try:
+                        store.publish_paper_trade(
+                            "scanner-cross-exchange-arb",
+                            trade_id=f"{symbol}:{buy_ex}>{sell_ex}:{t0:.3f}",
+                            pnl_abs=pnl_eff, pnl_pct=net_eff, pair=symbol,
+                            opened_at=now_iso(), closed_at=now_iso(),
+                            reason="long-xarb_paper-fill",
+                            entry_price=ask_top, exit_price=bid_top,
+                            size=PAPER_TRADE_SIZE, side="long",
+                            tag=f"{buy_ex}->{sell_ex}",
+                            extra={"net_top_pct": round(net_top * 100, 4),
+                                   "net_depth_pct": round(net_d * 100, 4),
+                                   "gross_pnl": round(pnl, 4)},
+                        )
+                    except Exception:
+                        pass
                 if net_d >= 0.0 and filled:
                     gross_balance += pnl   # what the old rule would have booked
                 # `filled` column = actual paper booking (profitable-after-depth
@@ -557,6 +602,7 @@ def run_live(once=False):
         store.publish(
             "scanner-cross-exchange-arb", status="online",
             pnl_abs=virtual_balance,   # REAL basis: fees+slippage+latency+rebalance
+            closed_trades=n_booked, wins=n_wins, losses=n_losses,
             extra={"kind": "scanner",
                    "basis": "real (fees+slippage+10bps latency+5bps rebalance)",
                    "gross_balance": round(gross_balance, 2),  # old optimistic rule
@@ -569,7 +615,9 @@ def run_live(once=False):
         )
         store.save_state("scanner-cross-exchange-arb",
                          {"virtual_balance": round(virtual_balance, 4),
-                          "gross_balance": round(gross_balance, 4)})
+                          "gross_balance": round(gross_balance, 4),
+                          "booked": n_booked, "wins": n_wins,
+                          "losses": n_losses})
         if once:
             print(f"\n[{now_iso()}] --once smoke test complete. Engine ran "
                   f"end-to-end against live public data.")

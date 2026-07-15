@@ -128,3 +128,9 @@ and service logs for veto/governor lines.
   - 15-Jul (user-requested, infra/alerting only): fleet_watchdog phone
     push via ntfy (`NTFY_TOPIC` on pnl-dashboard). No strategy logic; only
     the dashboard service restarts. Main only (watchdog runs there).
+  - 15-Jul (user-approved "anything obviously positive", measurement
+    only): 7-Jul stash salvage — paper_trades learning columns
+    (side/tag/prices/size/extra), sniper skip-mirroring + close
+    enrichment (agenda item 5 evidence, week head start), Gap Scout
+    per-fill ledger + W/L counters (makes its balance auditable).
+    Verified against the live DB before push. No strategy logic.

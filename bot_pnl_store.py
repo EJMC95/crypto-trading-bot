@@ -568,14 +568,32 @@ def _ensure_paper_trades_table(conn):
         # rows are queryable apart from the HL paper era (venue NULL = hl paper).
         cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS venue TEXT")
         cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS shadow BOOLEAN")
+        # [2026-07-15 EVIDENCE] learning-layer widening (revives the 7-Jul
+        # b82c5aa design that never reached the deployed line): WHERE the trade
+        # happened (prices/size/side), the publisher's own tag, and a JSONB
+        # extra for entry-time context (e.g. the sniper's book microstructure).
+        # side='skip' is reserved for gate-rejection log rows — every trade
+        # reader must exclude it (fetch_paper_trades does; per-bot aggregates
+        # are safe because skips publish under a separate '<bot>-skips' name).
+        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS side TEXT")
+        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS tag TEXT")
+        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS entry_price DOUBLE PRECISION")
+        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS exit_price DOUBLE PRECISION")
+        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS size DOUBLE PRECISION")
+        cur.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS extra JSONB")
     _paper_trades_table_ready = True
 
 
 def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
                         opened_at=None, closed_at=None, reason=None,
-                        venue=None, shadow=None):
+                        venue=None, shadow=None, side=None, tag=None,
+                        entry_price=None, exit_price=None, size=None,
+                        extra=None):
     """Idempotently record one closed paper trade so cumulative P&L survives a
-    redeploy. `trade_id` must be stable+unique for the trade. Never raises."""
+    redeploy. `trade_id` must be stable+unique for the trade. Never raises.
+    [2026-07-15 EVIDENCE] optional learning fields: side ('long'/'short', or
+    'skip' for gate-rejection logs), publisher tag, entry/exit price, size, and
+    a JSON-able `extra` dict for entry-time context."""
     conn = _get_conn()
     if conn is None or trade_id is None:
         return False
@@ -585,16 +603,23 @@ def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
             cur.execute(
                 """
                 INSERT INTO paper_trades (bot, trade_id, pair, pnl_abs, pnl_pct,
-                    opened_at, closed_at, reason, venue, shadow, seen_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                    opened_at, closed_at, reason, venue, shadow, side, tag,
+                    entry_price, exit_price, size, extra, seen_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, now())
                 ON CONFLICT (bot, trade_id) DO UPDATE SET
                     pnl_abs=EXCLUDED.pnl_abs, pnl_pct=EXCLUDED.pnl_pct,
                     closed_at=EXCLUDED.closed_at, reason=EXCLUDED.reason,
                     venue=EXCLUDED.venue, shadow=EXCLUDED.shadow,
-                    seen_at=now()
+                    side=EXCLUDED.side, tag=EXCLUDED.tag,
+                    entry_price=EXCLUDED.entry_price,
+                    exit_price=EXCLUDED.exit_price, size=EXCLUDED.size,
+                    extra=EXCLUDED.extra, seen_at=now()
                 """,
                 (bot, str(trade_id), pair, pnl_abs, pnl_pct,
-                 opened_at, closed_at, reason, venue, shadow),
+                 opened_at, closed_at, reason, venue, shadow, side, tag,
+                 entry_price, exit_price, size,
+                 json.dumps(extra) if extra is not None else None),
             )
         return True
     except Exception as e:  # noqa: BLE001
@@ -675,9 +700,12 @@ def fetch_paper_trades(limit=2000):
     try:
         _ensure_paper_trades_table(conn)
         with conn.cursor() as cur:
+            # [2026-07-15 EVIDENCE] side='skip' rows are gate-rejection logs
+            # (sniper), not trades — they must never reach the brain/analyzer.
             cur.execute(
                 "SELECT bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason "
-                "FROM paper_trades ORDER BY closed_at DESC NULLS LAST LIMIT %s",
+                "FROM paper_trades WHERE side IS DISTINCT FROM 'skip' "
+                "ORDER BY closed_at DESC NULLS LAST LIMIT %s",
                 (int(limit),),
             )
             rows = cur.fetchall()

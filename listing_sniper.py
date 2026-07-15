@@ -355,6 +355,26 @@ def log_skip(exid, sym, reason, m):
             f"{m.get('spread_bps'):.1f}" if m.get("spread_bps") is not None else "",
             f"{m.get('bid_depth_quote'):.2f}" if m.get("bid_depth_quote") is not None else "",
         ])
+    # [2026-07-15 EVIDENCE] Mirror the skip to Postgres — the false-negative
+    # half of the gate only lived in sniper_skips.csv, which a redeploy wipes,
+    # so nothing could ever ask "did the gate dodge rugs or skip winners?".
+    # SEPARATE bot name because fetch_paper_aggregate counts every row for a
+    # bot; side='skip' keeps the rows out of every trade reader. One-shot per
+    # pair: both call sites baseline the pair right after logging.
+    try:
+        with _store_lock:
+            store.publish_paper_trade(
+                "event-listing-sniper-skips",
+                trade_id=f"skip:{exid}:{sym}:{ts()}",
+                pnl_abs=None, pair=sym, closed_at=ts(), reason=reason,
+                side="skip",
+                extra={"exchange": exid, "last": m.get("last"),
+                       "quote_vol_24h": m.get("quote_vol_24h"),
+                       "spread_bps": m.get("spread_bps"),
+                       "bid_depth_quote": m.get("bid_depth_quote")},
+            )
+    except Exception:
+        pass
 
 
 # ----------------------------- pair filters ---------------------------------
@@ -1039,6 +1059,22 @@ def monitor(cfg, exchange_ids):
                             # splits at the FIRST underscore ->
                             # enter_tag 'long-listing', exit_reason preserved.
                             reason="long-listing_" + str(row[11]),
+                            # [2026-07-15 EVIDENCE] outcome context: the intel
+                            # class and the entry-time microstructure snapshot
+                            # were captured at open but never reached Postgres,
+                            # so post-mortems couldn't ask "what did the book
+                            # look like when we bought the losers?" (feeds the
+                            # go-live-gate restatement, agenda item 5).
+                            entry_price=pos["entry"], exit_price=float(row[7]),
+                            size=float(row[8]), side="long",
+                            tag=pos.get("intel"),
+                            extra={"exchange": pos["exchange"],
+                                   "entry_spread_bps": pos.get("entry_spread_bps"),
+                                   "entry_bid_depth_quote": pos.get("entry_bid_depth_quote"),
+                                   "entry_quote_vol_24h": pos.get("entry_quote_vol_24h"),
+                                   "intel_detail": pos.get("intel_detail"),
+                                   "peak_pct": float(row[13]) / 100.0,
+                                   "hold_minutes": float(row[12])},
                         )
                 except Exception:
                     pass
