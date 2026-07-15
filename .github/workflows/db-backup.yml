@@ -1,0 +1,94 @@
+name: DB Backup
+
+# [2026-07-15 — operator-queue item: "verify Railway Postgres backups exist"]
+# Nightly logical backup of the fleet's Postgres (EVERY ledger + all brain
+# memory lives there: bot_pnl, bot_trades, paper_trades, venue_orders,
+# bot_state, bot_state_history). Railway's own PITR/backup story is
+# plan-dependent and unverified from here — this workflow makes the fleet
+# independent of it: pg_dump via the Railway CLI's variable injection
+# (reusing the SAME account-token pattern as railway-volume.yml; no new
+# secrets), uploaded as a private-repo artifact, 30-day retention.
+#
+# Restore: download the artifact, then
+#   pg_restore --no-owner --dbname "$NEW_DATABASE_URL" bot_fleet.dump
+#
+# Runs 18:07 UTC daily = 04:07 AEST (quiet hour for the fleet), plus manual
+# workflow_dispatch for on-demand backups / testing.
+
+on:
+  schedule:
+    - cron: '7 18 * * *'
+  workflow_dispatch:
+    inputs:
+      db_service:
+        description: "Railway database service name"
+        required: false
+        default: "Postgres"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install Railway CLI (retry — see railway-volume.yml)
+        run: |
+          set -uo pipefail
+          n=0
+          until [ "$n" -ge 5 ]; do
+            if npm install -g @railway/cli; then
+              railway upgrade --yes 2>&1 || echo "(upgrade skipped; npm build ok)"
+              echo "Railway CLI: $(railway --version || echo unknown)"
+              exit 0
+            fi
+            n=$((n+1)); echo "install attempt $n failed; retry in $((n*3))s"; sleep $((n*3))
+          done
+          echo "::error::Railway CLI install failed after retries"; exit 1
+
+      - name: Resolve DATABASE_URL (never printed) and pg_dump
+        env:
+          # Account token: `railway link` + variable reads need its scope
+          # (project token can't link — learned in railway-volume.yml).
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_ACCOUNT_TOKEN }}
+          PROJECT: 9b3b7d3c-28db-417b-b864-ebc065df851f
+          DB_SERVICE: ${{ github.event.inputs.db_service || 'Postgres' }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_API_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_ACCOUNT_TOKEN secret missing (Settings > Secrets > Actions)."
+            exit 1
+          fi
+          unset RAILWAY_TOKEN || true
+          echo "whoami: $(railway whoami 2>&1 || echo '?')"
+          railway link --project "$PROJECT" --environment production --service "$DB_SERVICE" </dev/null 2>&1 \
+            || railway link -p "$PROJECT" -e production -s "$DB_SERVICE" </dev/null 2>&1 \
+            || { echo "::error::railway link to '$DB_SERVICE' failed — pass the DB service name via workflow_dispatch input."; exit 1; }
+          railway variables --json > /tmp/vars.json 2>/tmp/vars.err || { cat /tmp/vars.err; echo "::error::railway variables failed"; exit 1; }
+          # Prefer the PUBLIC url (GitHub runners can't reach railway.internal).
+          URL="$(jq -r '[.. | objects | to_entries[] | select(.key=="DATABASE_PUBLIC_URL") | .value] | first // empty' /tmp/vars.json)"
+          [ -n "$URL" ] || URL="$(jq -r '[.. | objects | to_entries[] | select(.key=="DATABASE_URL") | .value | select(test("railway.internal")|not)] | first // empty' /tmp/vars.json)"
+          rm -f /tmp/vars.json
+          if [ -z "$URL" ]; then
+            echo "::error::no externally-reachable DATABASE_(PUBLIC_)URL on service '$DB_SERVICE' — check the service name / enable the TCP proxy on the DB service."
+            exit 1
+          fi
+          echo "::add-mask::$URL"
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y postgresql-client-16 2>/dev/null || sudo apt-get -qq install -y postgresql-client
+          pg_dump --no-owner --format=custom --file=bot_fleet.dump "$URL"
+          ls -la bot_fleet.dump
+          echo "backup OK: $(stat -c%s bot_fleet.dump) bytes"
+
+      - name: Upload backup artifact (private repo, 30d retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pg-backup-${{ github.run_id }}
+          path: bot_fleet.dump
+          retention-days: 30
+          if-no-files-found: error
