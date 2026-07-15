@@ -637,6 +637,31 @@ def fetch_paper_aggregate(bot):
         return None
 
 
+def split_reason(reason):
+    """(enter_tag | None, exit_reason) from a paper-ledger close `reason`.
+
+    [2026-07-14 TAG-SEMANTICS FIX] Only a real direction prefix
+    (long_/short_) carries entry info. Splitting EVERY reason made exit
+    reasons masquerade as entry modes — funding-carry's 'flip' and the
+    sniper's 'delisted' became enter_tags, and the brain spent 92 runs
+    proposing to "tighten the 'flip' entry gates" (an exit path, not an
+    entry). No direction prefix -> untagged entry + the FULL reason kept as
+    exit_reason (also fixes 'decay_paid' being mangled into 'decay'/'paid').
+    [2026-07-15 AUDIT FIX] also accept the Ticket Taker's hyphenated
+    side-lens tags ('long-breakout_tp' -> enter 'long-breakout', exit 'tp')
+    — the underscore-only gate silently untagged every taker close.
+    [2026-07-15 LEARNING-LOOP WIRING] the split is at the FIRST underscore,
+    so composers must keep the tag part underscore-free — the family bot
+    hyphenates its strategy tags ('long-bounce-pullback_<exit>', see
+    lighter_family_bot.ledger_reason). This helper is the ONE parser those
+    composers round-trip against."""
+    reason = reason or ""
+    if reason.startswith(("long_", "short_", "long-", "short-")):
+        direction, _sep, exit_reason = reason.partition("_")
+        return (direction or None), (exit_reason or "trade")
+    return None, (reason or "trade")
+
+
 def fetch_paper_trades(limit=2000):
     """Per-trade rows from the durable paper_trades ledger (perps + sniper),
     normalized to the SAME shape bot_learn expects from the freqtrade /trades.json
@@ -659,23 +684,7 @@ def fetch_paper_trades(limit=2000):
         from datetime import datetime
         out = []
         for bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason in rows:
-            reason = reason or ""
-            # [2026-07-14 TAG-SEMANTICS FIX] Only a real direction prefix
-            # (long_/short_) carries entry info. Splitting EVERY reason made
-            # exit reasons masquerade as entry modes — funding-carry's 'flip'
-            # and the sniper's 'delisted' became enter_tags, and the brain
-            # spent 92 runs proposing to "tighten the 'flip' entry gates"
-            # (an exit path, not an entry). Now: no direction prefix ->
-            # untagged entry + the FULL reason kept as exit_reason (also fixes
-            # 'decay_paid' being mangled into enter 'decay' / exit 'paid').
-            # [2026-07-15 AUDIT FIX] also accept the Ticket Taker's hyphenated
-            # side-lens tags ('long-breakout_tp' -> enter 'long-breakout',
-            # exit 'tp') — the underscore-only gate silently untagged every
-            # taker close, so the brain never graded the scout lenses.
-            if reason.startswith(("long_", "short_", "long-", "short-")):
-                direction, _sep, exit_reason = reason.partition("_")
-            else:
-                direction, exit_reason = "", (reason or "trade")
+            direction, exit_reason = split_reason(reason)
             # [2026-07-15 AUDIT FIX] tolerant timestamp parse — the listing
             # sniper writes '2026-07-13 15:05:04 UTC', which fromisoformat
             # rejects, so its 337 rows carried duration_min=None forever.

@@ -145,7 +145,7 @@ done &
 # [2026-07-14 TICKET TAKER] 🎫 The scout's designated trader (SHADOW $1k
 # book): takes the high-conviction subset of the scout's tickets, models
 # fills at Lighter marks + funding drag, exits TP/SL/max-hold, tags every
-# close long_<lens>_<exit> so the brain grades each lens on real forward
+# close <side>-<lens>_<exit> so the brain grades each lens on real forward
 # returns. UNVALIDATED by design — that grading is what it exists to collect.
 ( sleep 210
   while true; do

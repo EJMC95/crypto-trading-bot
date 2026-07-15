@@ -2762,7 +2762,8 @@ class H(BaseHTTPRequestHandler):
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
                             "'learning-brain', 'brain-stake-mults', "
-                            "'brain-diagnosis', 'lighter-market')")
+                            "'brain-diagnosis', 'brain-lens-forward', "
+                            "'lighter-market')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -2776,7 +2777,7 @@ class H(BaseHTTPRequestHandler):
                                 "SELECT key, ts, payload FROM bot_state_history "
                                 "WHERE key IN ('fleet-risk', 'signal-bus', "
                                 "'brain-stake-mults', 'brain-diagnosis', "
-                                "'lighter-market') "
+                                "'brain-lens-forward', 'lighter-market') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
                             hist = [{"key": k,
@@ -2793,6 +2794,7 @@ class H(BaseHTTPRequestHandler):
                                    "brain": live.get("learning-brain"),
                                    "brain_stake_mults": live.get("brain-stake-mults"),
                                    "brain_diagnosis": live.get("brain-diagnosis"),
+                                   "brain_lens_forward": live.get("brain-lens-forward"),
                                    "lighter_market": lm or None,
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()

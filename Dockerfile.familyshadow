@@ -14,7 +14,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY lighter_family_bot.py bot_pnl_store.py paper_broker.py ./
+# fleet_bus.py: the brain's stake-multiplier consumer contract (15-Jul wiring)
+COPY lighter_family_bot.py bot_pnl_store.py paper_broker.py fleet_bus.py ./
 COPY venues/ ./venues/
 
 ENV PYTHONUNBUFFERED=1

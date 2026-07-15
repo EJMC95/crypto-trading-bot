@@ -66,6 +66,43 @@ COINS = os.environ.get(
 ).split(",")
 CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
 
+
+# ---------------------------------------------------------------------------
+# [2026-07-15 LEARNING-LOOP WIRING] Ledger tag contract + brain stake input.
+# bot_pnl_store.fetch_paper_trades splits a close's `reason` into
+# (enter_tag, exit_reason) at the FIRST underscore (the Ticket Taker's
+# '<side>-<lens>_<exit>' pattern), so the strategy tag must ride
+# underscore-free: 'bounce_pullback' -> 'long-bounce-pullback_<exit>'.
+# Before this every close published as 'long_<exit>' and the brain bucketed
+# all seven books under enter_tag 'long' — per-tag learning (and therefore
+# the L4 stake multipliers) was structurally impossible for the running
+# fleet. See EVIDENCE_AND_LEARNING_REVIEW_2026-07-15.md items 1-2.
+
+def ledger_tag(tag):
+    """The enter_tag the brain sees for this book's closes (and the key the
+    stake-multiplier lookup must use — same function, so they can't drift)."""
+    return "long-" + str(tag).replace("_", "-") if tag else "long"
+
+
+def ledger_reason(tag, exit_reason):
+    """Compose record_close's published reason: '<ledger_tag>_<exit>'.
+    No tag -> legacy 'long_<exit>' (enter_tag 'long'), exactly as before."""
+    return f"{ledger_tag(tag)}_{exit_reason}"
+
+
+def brain_stake_mult(bot_id, tag):
+    """The brain's reduce-only per-(bot, tag) stake multiplier for an entry,
+    looked up under EXACTLY the identity this book's ledger rows carry
+    (bot_id row name + ledger_tag). fleet_bus owns the fail-safe contract
+    (fresh payload only, clamp [0.5, 1.0], neutral 1.0 on any doubt); the
+    guard here only covers an image built without fleet_bus.py."""
+    try:
+        import fleet_bus
+        return float(fleet_bus.stake_multiplier(bot_id, ledger_tag(tag)))
+    except Exception:  # noqa: BLE001
+        return 1.0
+
+
 LOG_FILE = os.environ.get("FAMILY_LOG_FILE", "lighter_family_bot.log")
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
@@ -650,7 +687,8 @@ class Book:
                 opened_at=datetime.fromtimestamp(
                     m.get("opened_ts") or time.time(), tz=timezone.utc).isoformat(),
                 closed_at=datetime.now(timezone.utc).isoformat(),
-                reason="long_" + reason, venue="lighter", shadow=shadow)
+                reason=ledger_reason(m.get("tag"), reason),
+                venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass
         self.meta.pop(coin, None)
@@ -868,7 +906,15 @@ def main():
                              DayTraderGated.MAX_ENTRIES_PER_HOUR)
                     continue
                 tag = sig["enter"]
-                stake = STAKE_USD * b.s.stake_mult(tag, bars)
+                # [2026-07-15 L4 CONSUMER] apply the brain's reduce-only
+                # multiplier — restores the loop the Kraken retirement cut
+                # (the only prior consumers were the stopped freqtrade
+                # strategies). No-op until a tag earns a throttle at n>=15.
+                bm = brain_stake_mult(b.bot_id, tag)
+                if bm < 1.0:
+                    log.info("%s %s brain stake-mult x%.2f (%s)",
+                             b.bot_id, coin, bm, ledger_tag(tag))
+                stake = STAKE_USD * b.s.stake_mult(tag, bars) * bm
                 size = stake / px
                 b.broker.open(coin, True, size, px)
                 ent = b.broker.pos.get(coin)

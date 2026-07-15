@@ -11,7 +11,7 @@ https://pnl-dashboard-production-858c.up.railway.app/
 ### The trading fleet (Lighter)
 | Row | Name | What it is |
 |-----|------|------------|
-| freqtrade-{mum,dad,avo-maria,georgia}-lshadow | 👩👨🙏🔮 family | TrendMomo/MomoBreakout/SwingDip/DayTraderV5 on Lighter (gate0 `lighter_family_bot.py`, service `family-lighter-shadow`) |
+| freqtrade-{mum,dad,avo-maria,georgia}-lshadow | 👩👨🙏🔮 family | TrendMomo/MomoBreakout/SwingDip/DayTraderV5 on Lighter (gate0 `lighter_family_bot.py`, service `family-lighter-shadow`); closes tagged `long-<tag>_<exit>` + brain stake-mults applied at entry (15-Jul) |
 | crypto-{intraday-15m,swing-daily,breakout-4h}-lshadow | spot ports | same service, 29-pair whitelist |
 | crypto-trend-daily-lighter / -lshadow | 🌊 Tide Rider | **LIVE real money** + shadow (tide-rider service) |
 | perps-funding-lighter-lighter / -lshadow | 💸 Funding Farmer | **LIVE** funding harvester + shadow |
@@ -28,9 +28,11 @@ https://pnl-dashboard-production-858c.up.railway.app/
 - `lighter_market_scout.py` 🛰️ — ALL ~215 Lighter books: premium stress,
   liquid funding extremes, cross-venue funding divergence, vol/OI moves,
   listings, **per-strategy tickets** → bot_state `lighter-market`
-- `bot_learn.py` (brain) — L4 stake multipliers (strategies consume via
-  `fleet_bus.py`), per-bucket DIAGNOSIS (exit/entry/fee/regime/venue),
-  venue A/B; → `learning-brain`, `brain-stake-mults`, `brain-diagnosis`
+- `bot_learn.py` (brain) — L4 stake multipliers (family bot + strategies
+  consume via `fleet_bus.py`), per-bucket DIAGNOSIS (exit/entry/fee/regime/
+  venue), venue A/B, scout lens-forward grades (taker veto); generates for
+  LIVING bots only (retired set + 7d close recency, 15-Jul); →
+  `learning-brain`, `brain-stake-mults`, `brain-diagnosis`, `brain-lens-forward`
 - `fleet_risk.py` — traffic light (live > lshadow > paper via
   `authoritative_row`, 30-min staleness filter) + signal bus + **7d fleet
   drawdown governor** (`clip_scale` 1.0/0.5/0.25 — Ticket Taker consumes,
@@ -81,7 +83,9 @@ its row is dashboard-retired regardless; stop the process when found.
 ## Cross-Bot Intelligence (bot_state keys — since 2026-07-14 CONSUMED, not just published)
 - `brain-stake-mults` — bot_learn's L4 reduce-only per-(bot, enter_tag) stake
   multipliers (floors: n≥30 era trades / 3 consecutive runs; never >1.0).
-  Strategies apply them in `custom_stake_amount` via `fleet_bus.py`.
+  Consumers: `lighter_family_bot.py` at entry (keyed `<bot_id>` +
+  `long-<tag hyphenated>`, 15-Jul) and the freqtrade strategies'
+  `custom_stake_amount` — both via `fleet_bus.py`.
 - `fleet-risk` — L2 traffic light, mode **enforce**: strategies veto NEW long
   entries at long-budget (20). Kill switch: `FLEET_RISK_MODE=advisory`.
 - `signal-bus`, `regime-oracle`, `market-pulse`, `listing-intel` — published
