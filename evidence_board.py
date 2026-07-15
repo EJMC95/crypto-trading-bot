@@ -20,7 +20,12 @@ This organ makes the board a live participant:
      lens-forward crossing its n4h ruling floor (and lenses NEGATIVE at the
      floor), the drawdown governor approaching its clip line, budget
      crowding, and coin-veto FLAP (a coin oscillating across the veto
-     threshold).
+     threshold). AND — since 15-Jul late (user: "it's so restrict heavy …
+     completely one sided") — the EXPAND side with the same machinery:
+     lenses POSITIVE at the ruling floor (🏆), shadow books passing the
+     provisional promotion screen (🚀), the scout tuner's live enactments
+     (🌱), and restrictions that never bind (🔓). Expand items push to the
+     phone like warnings do — missing the cream is also a miss.
   3. AUTO-VERDICTS — mechanical verdicts (milestones auto-stale after 24h,
      dislocations fold into the census after 24h unless escalating, veto
      records age out at 48h). MANUAL verdicts in bot_state['evidence-review']
@@ -265,6 +270,93 @@ def widen_step(quiet_hours):
     return step, levers
 
 
+# ---------------------------------------------------------------------------
+# EXPAND-DIRECTION SYNTHESIS (2026-07-15 late, user: "the evidence board also
+# needs to suggest things to widen and expand and not just restrict… it's so
+# restrict heavy … completely one sided"). The board now authors POSITIVE
+# evidence with the same machinery it uses for warnings: winner lenses at the
+# ruling floor, shadow books passing the provisional promotion screen, the
+# tuner's live enactments, and restrictions that never bind. Expand items
+# push to the phone like warnings do (default priority, seedling tag) —
+# missing the cream is as real a failure as missing a risk.
+# ---------------------------------------------------------------------------
+
+# provisional promotion screen (agenda item 5 shape: expectancy, not WR —
+# the sniper's 9.8%-WR/+$192 book is the canonical WR-rule false negative)
+PROMO_MIN_CLOSED = int(os.environ.get("EVBOARD_PROMO_MIN_CLOSED", "30"))
+PROMO_MIN_PNL = float(os.environ.get("EVBOARD_PROMO_MIN_PNL", "10"))
+
+
+def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts):
+    """Board-authored EXPAND evidence. Same emit shape as synthesize(), every
+    item carrying direction='expand'. Pure — selftested offline."""
+    out = []
+
+    def emit(key, msg, proposal=None, lever=None):
+        out.append({"key": key, "severity": "info", "msg": msg,
+                    "proposal": proposal, "lever": lever, "ts": now_ts,
+                    "source": "board", "direction": "expand"})
+
+    # 1) WINNER lenses: brain-graded positive at its own ruling floor — the
+    #    exact inverse of the lens-veto rule the board already watches.
+    for lens, g in sorted((lens_fwd or {}).items()):
+        if ((g.get("n4h") or 0) >= LENS_FLOOR_N4H
+                and (g.get("avg4h_pct") or 0) > 0
+                and (g.get("hit4h") or 0) >= 0.5):
+            emit(f"board:lens-positive:{lens}",
+                 f"🏆 lens '{lens}' POSITIVE at the ruling floor "
+                 f"(n4h={g.get('n4h')}, hit {100*(g.get('hit4h') or 0):.0f}%, "
+                 f"avg4h {g.get('avg4h_pct'):+.2f}%)",
+                 proposal="scout tuner auto-expands its bar (replay-gated, "
+                          "both-halves); review: consider promotion / wider diet",
+                 lever="growth-rail")
+
+    # 2) The tuner's live enactments, surfaced where the operator triages.
+    if tuner_state and _fresh(tuner_state, max_age_s=float(
+            tuner_state.get("ttl_sec") or 10800)):
+        enacted = tuner_state.get("enacted") or {}
+        if enacted:
+            emit("board:tuner-enacted",
+                 "🌱 scout tuner self-tuned the Lighter loop: "
+                 + ", ".join(f"{k}={v}" for k, v in sorted(enacted.items())),
+                 proposal="replay-gated levers, TTL'd (auto-revert unless "
+                          "re-asserted hourly); history under 'fleet-tuning'",
+                 lever="growth-rail")
+
+    # 3) Promotion watch: shadow books passing the provisional expectancy
+    #    screen — the pipeline's whole purpose is finding these.
+    for r in sorted(bot_rows or [], key=lambda r: str(r.get("bot"))):
+        bot = str(r.get("bot") or "")
+        extra = r.get("extra") or {}
+        is_shadow = bot.endswith("-lshadow") or extra.get("venue") == "lighter_shadow"
+        if not is_shadow:
+            continue
+        closed = int(r.get("closed_trades") or 0)
+        pnl = float(r.get("pnl_abs") or 0.0)
+        if closed >= PROMO_MIN_CLOSED and pnl >= PROMO_MIN_PNL:
+            emit(f"board:promotion-watch:{bot}",
+                 f"🚀 {bot}: n={closed} closed, ${pnl:+.2f} — passes the "
+                 f"provisional expectancy screen (n≥{PROMO_MIN_CLOSED}, "
+                 f"≥${PROMO_MIN_PNL:g})",
+                 proposal="promotion-review candidate — run the agenda item-5 "
+                          "gate (expectancy + max-DD + profit factor) at the "
+                          "review; go-live stays operator-only",
+                 lever="promotion")
+
+    # 4) Restrictions that never bind: the balance check on the board's own
+    #    restrict side. A veto with permanent headroom is a calibration item.
+    if _fresh(lighter_market or {}):
+        med = ((lighter_market.get("stress") or {}).get("med"))
+        if med is not None and med * 2 <= STRESS_VETO_BPS:
+            emit("board:stress-headroom",
+                 f"🔓 venue stress med {med}bps vs taker veto bar "
+                 f"{STRESS_VETO_BPS:g}bps — this restriction has never bound",
+                 proposal="calibration item for the review: a veto that can't "
+                          "fire protects nothing (agenda item 2 already tracks it)",
+                 lever="stress-veto")
+    return out
+
+
 def detect_veto_flap(alerts_48h_plus, now_ts, window_d=7, min_events=3):
     """A coin appearing in >= min_events veto-change alerts inside window_d
     days is oscillating across its threshold. Restrict-only so harmless, but
@@ -350,6 +442,17 @@ def run_once():
     prior_synth = {k for k in prior_items if k.startswith("board:")}
     synth = synthesize(lm, fr, lf, prior_synth, now) + detect_veto_flap(fa, now)
 
+    # ---- EXPAND-direction synthesis: winners, promotions, tuner activity,
+    # and restrictions that never bind (the board's other eye) --------------
+    tuner_state = store.load_state("scout-tuner") or {}
+    bot_rows = []
+    try:
+        bot_rows = store.fetch_bot_pnl() or []
+    except Exception:
+        bot_rows = []
+    synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, 26000) else {},
+                               tuner_state, bot_rows, lm, now)
+
     # ---- growth rail: widen Gap Scout's net when its census runs quiet -----
     census = store.load_state("gapscout-census") or {}
     growth_step, growth_levers, quiet_h = 0, {}, 0.0
@@ -391,6 +494,7 @@ def run_once():
             "fires_24h": 1, "trend": "steady", "source": "board",
             "first_seen": prior_items.get(k, {}).get("first_seen") or _iso(now),
             "verdict": "active", "proposal": s.get("proposal"), "lever": s.get("lever"),
+            "direction": s.get("direction", "restrict"),
         })
 
     merged = merge_verdicts(review.get("verdicts"), auto_map)
@@ -424,16 +528,25 @@ def run_once():
         print(f"[evidence_board] growth rail ENACTED step {growth_step}: "
               f"{sorted(enacted['levers'])}", flush=True)
 
-    # ---- notify: NEW warn/action (or escalating) active items --------------
+    # ---- notify: NEW warn/action items AND new EXPAND items — good news
+    # reaches the phone with the same machinery as warnings (default
+    # priority, seedling tag; missing the cream is also a miss) -------------
     for i in items:
-        if i["verdict"] != "active" or i["sev"] not in ("warn", "action"):
+        is_expand = i.get("direction") == "expand"
+        if i["verdict"] != "active":
+            continue
+        if i["sev"] not in ("warn", "action") and not is_expand:
             continue
         is_new = i["key"] not in prior_items or (i["key"] in {s["key"] for s in synth_new})
         escalated = i["trend"] == "escalating" and prior_items.get(i["key"], {}).get("trend") != "escalating"
         last_n = notified.get(i["key"], 0)
         if (is_new or escalated) and now - last_n >= NOTIFY_GAP_H * 3600:
             body = (i["msg"] or "") + (f"\n\nProposed ({MODE}): {i['proposal']}" if i.get("proposal") else "")
-            if send_push(f"evidence board: {(i['msg'] or i['key'])[:60]}", body):
+            title = ("evidence board (expand): " if is_expand else "evidence board: ") \
+                + (i["msg"] or i["key"])[:60]
+            if send_push(title, body,
+                         priority="default" if is_expand else "urgent",
+                         tags="seedling" if is_expand else "scales"):
                 notified[i["key"]] = now
                 print(f"[evidence_board] notified: {i['key']}", flush=True)
 
@@ -504,6 +617,36 @@ def _selftest():
           {"key": "veto:ADA", "ts": now - 1000}]
     flaps = detect_veto_flap(fa, now)
     assert [f["key"] for f in flaps] == ["board:veto-flap:ADA"], flaps
+    # EXPAND synthesis: winners at the floor, tuner activity, promotion
+    # watch, dead vetoes — all direction='expand', all with the same shape
+    lfw = {"dip": {"n4h": 100, "avg4h_pct": 1.1, "hit4h": 0.92},      # winner
+           "momentum": {"n4h": 90, "avg4h_pct": -1.0, "hit4h": 0.33},  # loser
+           "breakout": {"n4h": 10, "avg4h_pct": 5.0, "hit4h": 1.0}}    # tiny n
+    tstate = {"updated": fresh, "ttl_sec": 10800,
+              "enacted": {"scout.dip_range_max": 0.15}}
+    rows = [{"bot": "lighter-dislocation-lshadow", "closed_trades": 45,
+             "pnl_abs": 22.0, "extra": {}},                            # passes
+            {"bot": "lighter-perp-sniper-lshadow", "closed_trades": 45,
+             "pnl_abs": -5.0, "extra": {}},                            # negative
+            {"bot": "crypto-trend-daily-lighter", "closed_trades": 99,
+             "pnl_abs": 99.0, "extra": {}},                            # live row
+            {"bot": "perps-funding-carry-lshadow", "closed_trades": 10,
+             "pnl_abs": 50.0, "extra": {}}]                            # n small
+    ex = synthesize_expand(lfw, tstate, rows,
+                           {"updated": fresh, "stress": {"med": 5}}, _now())
+    xkeys = {e["key"] for e in ex}
+    assert xkeys == {"board:lens-positive:dip", "board:tuner-enacted",
+                     "board:promotion-watch:lighter-dislocation-lshadow",
+                     "board:stress-headroom"}, xkeys
+    assert all(e["direction"] == "expand" and e["severity"] == "info" for e in ex)
+    # stale tuner + hot venue -> those items vanish; nothing else appears
+    ex2 = synthesize_expand(lfw, {"updated": "2020-01-01T00:00:00+00:00",
+                                  "ttl_sec": 10800, "enacted": {"x": 1}},
+                            [], {"updated": fresh, "stress": {"med": 20}}, _now())
+    k2 = {e["key"] for e in ex2}
+    assert "board:tuner-enacted" not in k2 and "board:stress-headroom" not in k2
+    assert "board:lens-positive:dip" in k2
+
     # growth-rail ladder: quiet->0, monotone, later steps inherit earlier
     assert widen_step(1) == (0, {})
     s1, lv1 = widen_step(25)
