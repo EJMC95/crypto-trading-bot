@@ -99,14 +99,15 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$URL"
-          # [run-2 fix] Railway's Postgres is 18.4; pg_dump must be >= server.
-          # The runner ships the pgdg apt source, so client-18 is available.
-          sudo apt-get -qq update
-          sudo apt-get -qq install -y postgresql-client-18 2>/dev/null \
-            || sudo apt-get -qq install -y postgresql-client-17 2>/dev/null \
-            || sudo apt-get -qq install -y postgresql-client
-          echo "pg_dump: $(pg_dump --version)"
-          pg_dump --no-owner --format=custom --file=bot_fleet.dump "$URL"
+          # [run-3 fix] Railway's Postgres is 18.4 and pg_dump must be >=
+          # server. The runner's apt only reached client 16 (the silent
+          # 2>/dev/null install-failure was runs 2-3's lesson) — so run
+          # pg_dump inside a pinned postgres:18 container instead: version
+          # drift eliminated. Bump the tag if the server ever upgrades.
+          export PGURL="$URL"
+          docker run --rm -e PGURL postgres:18-alpine \
+            sh -c 'pg_dump --no-owner --format=custom --dbname "$PGURL"' \
+            > bot_fleet.dump
           ls -la bot_fleet.dump
           echo "backup OK: $(stat -c%s bot_fleet.dump) bytes"
 
