@@ -59,7 +59,11 @@ and service logs for veto/governor lines.
   the replacement at this review: **implementation shortfall between the
   live and shadow arms of the SAME bot** (Tide Rider and Funding Farmer
   both have live + -lshadow rows) — real fills vs modelled fills is the
-  execution-quality series that matters now. Implementation post-freeze.
+  execution-quality series that matters now.
+- [15-Jul HEAD START] the Funding Farmer half is already RUNNING: PR #34's
+  paired per-coin per-trade divergence check landed on main (15-Jul (f))
+  — review its week of output (fleet-alerts 'live-shadow-gap' + quiet
+  cycles) and decide whether Tide Rider gets the same treatment.
 
 ## 5. Go-live gate restatement (deadline: family books' 30-day mark ~12-Aug)
 - Current CLAUDE.md rule (30d WR>55% AND DD<15%) fails the fleet's most
@@ -107,3 +111,7 @@ and service logs for veto/governor lines.
     (`hyperliquid_momo_bot.py` boots inert — executes the 12-Jul
     retirement decision); `db-backup.yml` (nightly pg_dump);
     `review-reminder.yml` (21-Jul kick-off issue).
+  - 15-Jul (user-approved, measurement only): PR #34's evidence changes
+    cherry-picked to main — paired Funding Farmer live-vs-shadow
+    divergence + Snap Back census `count_enter` (agenda item 4 head
+    start); gate0 fast-forwarded, one service-restart round accepted.
