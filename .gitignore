@@ -43,3 +43,8 @@ com.eamon.tri-arb.plist
 scripts/.funding_cache.json
 scripts/.dirfund_cache.json
 scripts/.tiderider_perp_cache.json
+
+# ---- Backtest caches (scripts/ hidden json = offline-rerun caches, ~10MB) ----
+# NOTE: .claude/settings.local.json stays TRACKED on purpose (15-Jul #55/#56:
+# it mirrors the claude-code-remote allowlist to every checkout).
+scripts/.*.json

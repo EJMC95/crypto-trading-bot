@@ -115,3 +115,7 @@ and service logs for veto/governor lines.
     cherry-picked to main — paired Funding Farmer live-vs-shadow
     divergence + Snap Back census `count_enter` (agenda item 4 head
     start); gate0 fast-forwarded, one service-restart round accepted.
+  - 15-Jul (docs/hygiene, zero runtime surface): Index Pilot macro-gate
+    REJECTED backtest scripts committed with VERDICT headers (evidence
+    registry — they were untracked) + `.gitignore` for backtest caches.
+    Main only; gate0 deliberately NOT fast-forwarded (no service bounce).
