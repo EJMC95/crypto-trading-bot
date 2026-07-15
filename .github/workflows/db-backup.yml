@@ -99,8 +99,13 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$URL"
+          # [run-2 fix] Railway's Postgres is 18.4; pg_dump must be >= server.
+          # The runner ships the pgdg apt source, so client-18 is available.
           sudo apt-get -qq update
-          sudo apt-get -qq install -y postgresql-client-16 2>/dev/null || sudo apt-get -qq install -y postgresql-client
+          sudo apt-get -qq install -y postgresql-client-18 2>/dev/null \
+            || sudo apt-get -qq install -y postgresql-client-17 2>/dev/null \
+            || sudo apt-get -qq install -y postgresql-client
+          echo "pg_dump: $(pg_dump --version)"
           pg_dump --no-owner --format=custom --file=bot_fleet.dump "$URL"
           ls -la bot_fleet.dump
           echo "backup OK: $(stat -c%s bot_fleet.dump) bytes"
