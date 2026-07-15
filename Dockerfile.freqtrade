@@ -38,6 +38,12 @@ COPY experiment_judge.py /freqtrade/experiment_judge.py
 # the immune + self-repair organ (alert filtration, sickness detection,
 # lever quarantine) — fleet_tuning.get_lever honors its quarantines
 COPY fleet_immune.py /freqtrade/fleet_immune.py
+# circadian clock, regeneration (last-good restore), reproduction (genotype
+# breeding), respiration (blood-oxygen / hypoxia monitor)
+COPY fleet_clock.py /freqtrade/fleet_clock.py
+COPY fleet_regen.py /freqtrade/fleet_regen.py
+COPY strategy_incubator.py /freqtrade/strategy_incubator.py
+COPY fleet_respiration.py /freqtrade/fleet_respiration.py
 RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh /freqtrade/dashboard_server.py /freqtrade/bot_pnl_store.py /freqtrade/freqtrade_pnl_poller.py /freqtrade/market_pulse.py
 # Persistent DB dir for the freqtrade sqlite files. Mount a Railway VOLUME at
 # /freqtrade/persist so open paper trades survive redeploys; without a volume

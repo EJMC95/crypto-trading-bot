@@ -87,6 +87,23 @@ https://pnl-dashboard-production-858c.up.railway.app/
   `fleet-immune.quarantined_levers` → reverts to operator default), phone-
   pushes NEW sickness. Restrict/clean only; fail-safe (dead immune = no
   quarantine). → bot_state `fleet-immune`; surfaced on the board (🛡️)
+- `fleet_regen.py` 🩹 — REGENERATION (self-repair tier 2): restores a
+  stateful organ the immune organ flagged SICK to its last-good history
+  snapshot (age-bounded) or a safe baseline; content-only, carries the
+  snapshot's own age so it never asserts old data as current. → `fleet-regen`
+- `strategy_incubator.py` 🧬 — REPRODUCTION: breeds strategy GENOTYPES
+  (crossover+mutation). Taker offspring scored instantly by replay
+  (shadow-only leaderboard); funding offspring PROPOSED to `xp-queue` for the
+  experiment judge's identical paired live bar — no offspring shortcuts the
+  gate. Recombines within registry bounds only (invention stays human). →
+  `strategy-incubator` + `xp-queue`
+- `fleet_clock.py` 🕐 — CIRCADIAN: the fleet's shared sense of time (trading
+  session, thin-liquidity, heavy-job window). Advisory. → `fleet-clock`
+- `fleet_respiration.py` 🫁 — RESPIRATION / blood-oxygen: OXYGEN = fresh
+  market data; LUNGS = the venue-fetch layer. Measures SpO2 (weighted
+  fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA
+  transition — the fleet-wide data-starvation the per-organ watchdog misses.
+  → `fleet-respiration`
 - `regime_oracle.py`, `market_pulse.py` (history appends hourly),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 

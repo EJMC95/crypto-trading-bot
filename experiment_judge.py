@@ -197,22 +197,56 @@ def _assert_levers(levers, reason, evidence):
         set_by="experiment-judge", ttl_sec=LEVER_TTL)
 
 
+def candidate_pool(queue):
+    """The static CANDIDATES followed by fresh incubator proposals from
+    'xp-queue', deduped by name (static wins). Only proposals whose levers
+    are all registered xp.funding.* are admitted — an offspring can't smuggle
+    an unknown lever past the judge. Pure — selftested."""
+    pool, seen = [], set()
+    for c in CANDIDATES:
+        pool.append(c)
+        seen.add(c["name"])
+    for c in (queue or {}).get("candidates", []):
+        nm, lv = c.get("name"), c.get("levers") or {}
+        if not nm or nm in seen:
+            continue
+        if lv and all(k in XP_TO_LIVE for k in lv):
+            pool.append({"name": nm, "levers": lv})
+            seen.add(nm)
+    return pool
+
+
+def next_candidate(pool, done, current):
+    """First pool candidate not already completed and not the current one.
+    Name-based so the pool may GROW (incubator appends) without reindexing.
+    Pure — selftested."""
+    done = set(done or [])
+    for c in pool:
+        if c["name"] not in done and c["name"] != current:
+            return c
+    return None
+
+
 def run_once():
     now = now_ts()
     st = store.load_state(KEY) or {}
     phase = st.get("phase") or "idle"
-    idx = int(st.get("cand_idx") or 0)
+    done = list(st.get("done") or [])
+    current = st.get("current")
+    spec = st.get("spec") or {}                 # full {name, levers} of current
     verdicts = st.get("verdicts") or []
     rows = store.fetch_paper_trades(limit=4000)
     have_ledger = bool(rows)
 
     def save(**kw):
-        payload = {"updated": iso(now), "ttl_sec": TTL_SEC, "phase": kw.get("phase", phase),
-                   "cand_idx": kw.get("cand_idx", idx),
-                   "candidate": (CANDIDATES[kw.get("cand_idx", idx)]["name"]
-                                 if kw.get("cand_idx", idx) < len(CANDIDATES)
-                                 and kw.get("phase", phase) in ("running", "promoted")
+        payload = {"updated": iso(now), "ttl_sec": TTL_SEC,
+                   "phase": kw.get("phase", phase),
+                   "current": kw.get("current", current),
+                   "spec": kw.get("spec", spec),
+                   "candidate": (kw.get("current", current)
+                                 if kw.get("phase", phase) in ("running", "promoted")
                                  else None),
+                   "done": kw.get("done", done),
                    "started_ts": kw.get("started_ts", st.get("started_ts")),
                    "promoted_ts": kw.get("promoted_ts", st.get("promoted_ts")),
                    "cooldown_until": kw.get("cooldown_until", st.get("cooldown_until")),
@@ -233,11 +267,12 @@ def run_once():
     if phase == "idle":
         if float(st.get("cooldown_until") or 0) > now:
             return save(note=f"cooldown until {iso(float(st['cooldown_until']))}")
-        if idx >= len(CANDIDATES):
-            return save(note="queue exhausted — new candidates via CANDIDATES")
         if not have_ledger:
             return save(note="no ledger visible — asserting nothing (fail-safe)")
-        cand = CANDIDATES[idx]
+        pool = candidate_pool(store.load_state("xp-queue") or {})
+        cand = next_candidate(pool, done, current)
+        if cand is None:
+            return save(note="queue exhausted — awaiting new incubator proposals")
         _assert_levers(cand["levers"], f"experiment {cand['name']} started",
                        f"shadow arm {SHADOW_BOT}; judge bar: {MIN_DAYS}d/"
                        f"{MIN_CLOSES} closes/+{MARGIN_PP}pp both-halves")
@@ -245,10 +280,13 @@ def run_once():
                   f"shadow arm now runs {json.dumps(cand['levers'])}; "
                   f"promotion bar {MIN_DAYS:g}d / {MIN_CLOSES} closes / "
                   f"+{MARGIN_PP}pp vs live on both halves")
-        return save(phase="running", started_ts=now, note=f"STARTED {cand['name']}")
+        return save(phase="running", current=cand["name"], spec=cand,
+                    started_ts=now, note=f"STARTED {cand['name']}")
+
+    # running / promoted use the stored spec (independent of the live pool)
+    cand = spec if spec.get("name") == current else {"name": current, "levers": {}}
 
     if phase == "running":
-        cand = CANDIDATES[idx]
         started = float(st.get("started_ts") or now)
         _assert_levers(cand["levers"], f"experiment {cand['name']} running",
                        f"started {iso(started)}")
@@ -271,13 +309,13 @@ def run_once():
                              "ts": iso(now), "eval": ev})
             send_push(f"experiment abandoned: {cand['name']}",
                       f"{MAX_DAYS:g}d without clearing the bar — {ev.get('why')}")
-            return save(phase="idle", cand_idx=idx + 1, started_ts=None,
+            return save(phase="idle", done=done + [cand["name"]], current=None,
+                        spec={}, started_ts=None,
                         cooldown_until=now + COOLDOWN_H * 3600, last_eval=ev,
                         note=f"ABANDONED {cand['name']}")
         return save(last_eval=ev, note=f"day {days:.1f}/{MIN_DAYS:g}: {ev.get('why')}")
 
     if phase == "promoted":
-        cand = CANDIDATES[idx]
         promoted = float(st.get("promoted_ts") or now)
         fading, n, m = fade_check(rows, promoted, now) if have_ledger else (False, 0, None)
         if fading:
@@ -287,8 +325,8 @@ def run_once():
                       f"live arm {m:+.2f}%/trade over n={n} since promotion — "
                       f"levers released, env defaults return within the TTL",
                       priority="urgent")
-            return save(phase="idle", cand_idx=idx + 1, started_ts=None,
-                        promoted_ts=None,
+            return save(phase="idle", done=done + [cand["name"]], current=None,
+                        spec={}, started_ts=None, promoted_ts=None,
                         cooldown_until=now + COOLDOWN_H * 3600,
                         note=f"FADED {cand['name']}")
         live_levers = {XP_TO_LIVE[k]: v for k, v in cand["levers"].items()}
@@ -299,7 +337,8 @@ def run_once():
         return save(note=f"promotion in force (live n={n}, mean "
                          f"{m if m is None else round(m, 2)}%)")
 
-    return save(phase="idle", note=f"unknown phase {phase!r} reset")
+    return save(phase="idle", current=None, spec={},
+                note=f"unknown phase {phase!r} reset")
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +396,23 @@ def _selftest():
             assert tuning.clamp(k, v) == v, (k, v)
             lk = XP_TO_LIVE[k]
             assert tuning.clamp(lk, v) == v, (lk, v)
+
+    # candidate_pool: static first, then admitted incubator proposals; an
+    # offspring with an UNKNOWN lever is rejected (can't smuggle a lever past)
+    q = {"candidates": [
+        {"name": "enter-gate-0.30", "levers": {"xp.funding.enter_apr": 0.30}},  # dup static
+        {"name": "xp-tp-0.05", "levers": {"xp.funding.take_profit": 0.05}},     # ok
+        {"name": "evil", "levers": {"xp.funding.enter_apr": 0.3, "bad.lever": 1}},  # reject
+    ]}
+    pool = candidate_pool(q)
+    names = [c["name"] for c in pool]
+    assert names[:3] == ["enter-gate-0.30", "tp-0.06", "hold-48"], names   # static order
+    assert "xp-tp-0.05" in names and "evil" not in names, names
+    assert names.count("enter-gate-0.30") == 1, "dup name deduped"
+    # next_candidate: skips done + current, name-based (pool may grow)
+    assert next_candidate(pool, [], None)["name"] == "enter-gate-0.30"
+    assert next_candidate(pool, ["enter-gate-0.30"], "tp-0.06")["name"] == "hold-48"
+    assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
           "floors, own-right, fade, registry mapping)")

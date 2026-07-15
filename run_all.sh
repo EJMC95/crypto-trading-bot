@@ -210,5 +210,40 @@ done &
     sleep "${IMMUNE_INTERVAL_SEC:-900}"
   done ) &
 
+# [2026-07-15 CIRCADIAN] 🕐 the fleet's coordinated sense of time (session /
+# thin-liquidity / heavy-ok). Advisory; published for any organ to read.
+( sleep 200
+  while true; do
+    python3 /freqtrade/fleet_clock.py || true
+    sleep "${CLOCK_INTERVAL_SEC:-1800}"
+  done ) &
+
+# [2026-07-15 REGENERATION] 🩹 self-repair tier 2: restores a stateful organ
+# the immune organ flagged SICK to its last-good history snapshot (or a safe
+# baseline). Runs AFTER the immune organ so it acts on fresh findings.
+( sleep 660
+  while true; do
+    python3 /freqtrade/fleet_regen.py || true
+    sleep "${REGEN_INTERVAL_SEC:-900}"
+  done ) &
+
+# [2026-07-15 REPRODUCTION] 🧬 breeds strategy genotypes: taker offspring
+# scored instantly by replay (shadow-only), funding offspring proposed to
+# 'xp-queue' for the experiment judge's paired live-promotion bar (gated).
+( sleep 600
+  while true; do
+    python3 /freqtrade/strategy_incubator.py || true
+    sleep "${INCUBATOR_INTERVAL_SEC:-3600}"
+  done ) &
+
+# [2026-07-15 RESPIRATION] 🫁 blood-oxygen monitor: the SUPPLY side the
+# watchdog (death) and immune organ (sickness) miss — is the fleet still
+# BREATHING fresh market data? SpO2 saturation + hypoxia phone alert.
+( sleep 240
+  while true; do
+    python3 /freqtrade/fleet_respiration.py || true
+    sleep "${RESP_INTERVAL_SEC:-600}"
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait
