@@ -1309,6 +1309,15 @@ def render():
                    if checks else
                    '<div class="okline">Health ✓ persistence intact · no over-trading · probation within bounds</div>')
 
+    # [2026-07-15 OPERATING HUB] fleet cockpit strip — risk light, budget
+    # usage, drawdown governor, venue stress, alert pressure. One glance =
+    # "should the fleet be trading right now".
+    try:
+        ops_html = ops_strip_html()
+    except Exception:  # noqa: BLE001
+        ops_html = ""
+    health_html = ops_html + health_html
+
     # [2026-07-11 EVIDENCE ALERTS] recent alerts from market_context's evidence
     # evaluator (dislocation census hits, factor-sample milestones, coin-veto
     # changes, live-vs-shadow divergence). Signal layer only — the sole
@@ -1515,6 +1524,9 @@ async function botAdmin(action, bot){
  .banner{{margin:12px 14px 0;padding:10px 12px;background:#fff6dd;border:1px solid #caa227;border-radius:8px;color:#7a5b12;font-size:13px}}
  .banner.crit{{background:#ffe3e3;border-color:#d1242f;color:#a3121b;font-weight:600}}
  .okline{{margin:12px 14px 0;padding:8px 12px;background:#e6f7ec;border:1px solid #caa227;border-radius:8px;color:#1a7f37;font-size:12px}}
+ .ops{{margin:12px 14px 0;padding:8px 12px;background:#ffffffd9;border:1px solid #caa227;
+   border-radius:8px;font-size:12.5px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}}
+ .ops .chip{{white-space:nowrap;color:#16232c}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:14px}}
  /* [2026-07-10] Lighter Live section — real money, visually set apart.
     [2026-07-13] Red -> GREEN on user request (red read as "alarm", not "live"). */
@@ -1582,7 +1594,207 @@ Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
 </body></html>'''
 
 
-def _svg_chart(series, color, label, height=170, width=760):
+# ---------------------------------------------------------------------------
+# [2026-07-15 OPERATING HUB] Cross-tab intelligence. Every tab renders the
+# WHOLE running fleet from state the organs already publish (bot_state /
+# paper_trades / bot_trades) — no new collectors, just surfacing what the
+# fleet already knows. Guarded: a missing/stale organ renders as an honest
+# "unavailable" line, never an exception.
+
+
+def fetch_states(keys):
+    """{key: state_dict} for several bot_state keys in ONE round-trip."""
+    import psycopg2
+    out = {}
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                if cur.fetchone()[0] is None:
+                    return out
+                cur.execute("SELECT bot, state FROM bot_state WHERE bot = ANY(%s)",
+                            (list(keys),))
+                for k, s in cur.fetchall():
+                    out[k] = s if isinstance(s, dict) else json.loads(s)
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return out
+
+
+def _chip(label, value, color=None, title=""):
+    v = f'<b style="color:{color}">{value}</b>' if color else f'<b>{value}</b>'
+    t = f' title="{html.escape(title)}"' if title else ""
+    return f'<span class="chip"{t}>{html.escape(label)} {v}</span>'
+
+
+def ops_strip_html():
+    """The cockpit line: should the fleet be trading right now? Risk light,
+    budget usage, drawdown governor, venue stress, alert pressure — the five
+    numbers an operator checks before anything else."""
+    st = fetch_states(["fleet-risk", "lighter-market"])
+    fr = st.get("fleet-risk") or {}
+    lm = st.get("lighter-market") or {}
+    parts = []
+    light = str(fr.get("light") or "?").upper()
+    lcol = {"GREEN": "#1a7f37", "AMBER": "#b8860b", "RED": "#d1242f"}.get(light, "#5b7184")
+    parts.append(_chip("Risk light", light, lcol,
+                       f"fleet_risk mode={fr.get('mode', '?')} — long-budget veto is "
+                       f"ENFORCED in the strategies via fleet_bus"))
+    if fr:
+        parts.append(_chip(
+            "Book", f"{fr.get('long_positions', '?')}L/{fr.get('long_budget', '?')} · "
+                    f"{fr.get('short_positions', '?')}S/{fr.get('short_budget', '?')}",
+            None, "directional positions vs fleet budget (live + shadow cohort)"))
+        eq, dd, cs = (fr.get("fleet_equity"), fr.get("fleet_dd_7d"),
+                      fr.get("clip_scale"))
+        if eq is not None:
+            parts.append(_chip("Fleet eq", money(eq)))
+        if dd is not None:
+            parts.append(_chip("7d dd", f"{dd * 100:+.2f}%",
+                               "#d1242f" if dd < -0.05 else None,
+                               "drawdown governor input (clip_scale halves past -5%)"))
+        if cs is not None and cs < 1:
+            parts.append(_chip("CLIP SCALE", f"{cs:g}x", "#d1242f",
+                               "drawdown governor is shrinking clips"))
+    stress = lm.get("stress") or {}
+    if stress:
+        med = stress.get("med")
+        parts.append(_chip("Lighter stress",
+                           f"{med}bps med · p90 {stress.get('p90')}",
+                           "#d1242f" if (med or 0) >= 15 else None,
+                           "venue-wide |premium|; Ticket Taker pauses entries at med ≥ 15bps"))
+    alerts = fetch_fleet_alerts(hours=24)
+    n_act = sum(1 for a in alerts if a.get("severity") in ("warn", "action"))
+    parts.append(_chip("Alerts 24h", f"{n_act} warn/action",
+                       "#b8860b" if n_act else None, "full feed: /alerts.json"))
+    if not fr and not lm:
+        return ('<div class="ops muted">fleet organs unreachable — risk light / '
+                'governor unavailable (freqtrade-bots container down?)</div>')
+    return '<div class="ops">' + "\n ".join(parts) + "</div>"
+
+
+def taker_lens_card():
+    """🎫 The scanner→bot→brain scoreboard: per-lens forward returns from the
+    Ticket Taker's durable ledger. This table IS the Ticket Taker's purpose —
+    it decides which scout lens earns a validated bot."""
+    import psycopg2
+    lens = {}
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.paper_trades') AS t")
+                if cur.fetchone()[0] is None:
+                    return ""
+                cur.execute(
+                    """SELECT reason, COUNT(*),
+                              SUM(CASE WHEN pnl_abs > 0 THEN 1 ELSE 0 END),
+                              COALESCE(SUM(pnl_abs), 0), COALESCE(AVG(pnl_pct), 0)
+                       FROM paper_trades
+                       WHERE bot = 'lighter-ticket-taker-lshadow'
+                         AND closed_at IS NOT NULL
+                       GROUP BY reason""")
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return ""
+    for reason, n, w, pnl, avgp in rows:
+        tag = (reason or "?").partition("_")[0] or "?"     # <side>-<lens>
+        g = lens.setdefault(tag, {"n": 0, "w": 0, "pnl": 0.0, "wavg": 0.0})
+        g["n"] += int(n); g["w"] += int(w or 0)
+        g["pnl"] += float(pnl); g["wavg"] += float(avgp) * int(n)
+    if not lens:
+        body = ('<div class="muted">No closed lens trades yet — this book exists to '
+                'collect exactly this evidence; rows appear as positions close.</div>')
+    else:
+        trs = []
+        for tag, g in sorted(lens.items(), key=lambda kv: -kv[1]["pnl"]):
+            exp = (g["wavg"] / g["n"] * 100) if g["n"] else 0.0
+            trs.append(f'<tr><td>{html.escape(tag)}</td><td>{g["n"]}</td>'
+                       f'<td>{g["w"]}/{g["n"] - g["w"]}</td>'
+                       f'<td class="{cls(g["pnl"])}">{money(g["pnl"])}</td>'
+                       f'<td class="{cls(exp)}">{exp:+.2f}%</td></tr>')
+        body = ('<table class="tbl"><tr><th>side-lens</th><th>n</th><th>W/L</th>'
+                '<th>P&amp;L</th><th>avg/trade</th></tr>' + "".join(trs) + '</table>')
+    return (f'<div class="card"><h2>🎫 Ticket Taker — lens report card</h2>'
+            f'<div class="muted">Each close is tagged &lt;side&gt;-&lt;lens&gt;_&lt;exit&gt;; '
+            f'this grades every scout lens on REAL forward returns. A lens that stays '
+            f'green at sample size graduates to the validation doctrine; a red one '
+            f'gets switched off. UNVALIDATED by design until then.</div>{body}</div>')
+
+
+def brain_panel_html():
+    """The learning loop itself: venue A/B verdicts, active reduce-only
+    throttles, and the diagnosis layer's loss post-mortems."""
+    st = fetch_states(["learning-brain", "brain-stake-mults", "brain-diagnosis"])
+    lb = st.get("learning-brain") or {}
+    sm = st.get("brain-stake-mults") or {}
+    dg = (st.get("brain-diagnosis") or {}).get("diagnoses") or lb.get("diagnoses") or {}
+    if not lb and not sm:
+        return ('<div class="card"><h2>🧠 Learning brain</h2>'
+                '<div class="muted">brain state unreachable — bot_learn runs in the '
+                'freqtrade-bots container every ~2h.</div></div>')
+    # Venue A/B — the pivot's central evidence: same strategy, Kraken paper vs
+    # Lighter shadow. The paper leg froze at the 14-Jul retirement; the gap is
+    # the venue/execution difference the port is supposed to prove.
+    ab = lb.get("venue_ab") or {}
+    ab_rows = []
+    for bot in sorted(ab):
+        p, s = ab[bot].get("paper") or {}, ab[bot].get("shadow") or {}
+        gap = ab[bot].get("gap_pnl")
+        ab_rows.append(
+            f'<tr><td>{html.escape(bot.replace("freqtrade-", ""))}</td>'
+            f'<td class="{cls(p.get("pnl_abs"))}">{money(p.get("pnl_abs") or 0)} '
+            f'<span class="n">({p.get("wins", 0)}W/{p.get("losses", 0)}L)</span></td>'
+            f'<td class="{cls(s.get("pnl_abs"))}">{money(s.get("pnl_abs") or 0)} '
+            f'<span class="n">({s.get("wins", 0)}W/{s.get("losses", 0)}L)</span></td>'
+            f'<td class="{cls(gap)}">{money(gap or 0)}</td></tr>')
+    ab_html = ""
+    if ab_rows:
+        ab_html = ('<div class="sub">Venue A/B — same strategy, Kraken paper (frozen '
+                   '14 Jul) vs Lighter shadow</div>'
+                   '<table class="tbl"><tr><th>bot</th><th>Kraken</th>'
+                   '<th>Lighter</th><th>gap</th></tr>' + "".join(ab_rows) + '</table>')
+    mults = sm.get("mults") or {}
+    if mults:
+        m_html = ('<div class="sub">Active stake throttles (reduce-only)</div>'
+                  + "".join(f'<div class="row"><span>{html.escape(k)}</span>'
+                            f'<b>{v}x</b></div>' for k, v in sorted(mults.items())))
+    else:
+        m_html = ('<div class="sub">Stake throttles</div><div class="muted">none active '
+                  f'— reduce-only mode, min n={sm.get("min_n", "?")}, '
+                  f'{sm.get("promote_runs", "?")} consecutive runs to apply.</div>')
+    dg_items = []
+    for key, d in sorted(dg.items()):
+        prop = d.get("proposal") or ""
+        ev = d.get("evidence") or {}
+        dg_items.append(f'<li><b>{html.escape(d.get("primary", "?"))}</b> · '
+                        f'{html.escape(prop)} <span class="n">(n={ev.get("n", "?")}, '
+                        f'{money(ev.get("pnl") or 0)})</span></li>')
+    dg_html = ""
+    if dg_items:
+        dg_html = ('<div class="sub">Loss diagnoses — WHERE each negative sleeve '
+                   'loses (proposals are human-review, never auto-applied)</div>'
+                   f'<ul class="recs">{"".join(dg_items)}</ul>')
+    meta = (f'run #{lb.get("runs", "?")} · {len(lb.get("hypotheses") or {})} live '
+            f'hypotheses · L4 meta-labeling is reduce-only by doctrine')
+    return (f'<div class="card"><h2>🧠 Learning brain</h2>'
+            f'<div class="muted">{meta}</div>{ab_html}{m_html}{dg_html}</div>')
+
+
+def _iso_dt(s):
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _svg_chart(series, color, label, height=170, width=760, fmt=None):
     """series: list of (datetime, value) oldest-first. Returns an SVG line chart."""
     series = [(t, v) for t, v in series if v is not None]
     if len(series) < 2:
@@ -1598,8 +1810,9 @@ def _svg_chart(series, color, label, height=170, width=760):
         f"{(i/(n-1))*width:.1f},{height - (v-lo)/(hi-lo)*height:.1f}"
         for i, (_, v) in enumerate(series))
     last = vals[-1]
-    return (f'<div class="sub">{label} · now <b>{money(last)}</b> '
-            f'<span class="muted">(min {money(lo)} / max {money(hi)})</span></div>'
+    fmt = fmt or money
+    return (f'<div class="sub">{label} · now <b>{fmt(last)}</b> '
+            f'<span class="muted">(min {fmt(lo)} / max {fmt(hi)})</span></div>'
             f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
             f'preserveAspectRatio="none" style="background:#0d1117;border:1px solid #222;'
             f'border-radius:8px;margin-bottom:8px">'
@@ -1613,14 +1826,32 @@ def render_history():
     except Exception as e:  # noqa: BLE001
         rows, db_err = [], f"{type(e).__name__}: {e}"
 
-    # Each snapshot batch shares one ts (INSERT ... SELECT now()). Aggregate per
-    # group (Total / Crypto / Stocks / Scanner) at each point in time. Each chart
-    # is auto-scaled so small crypto balances aren't flattened by big stock ones.
+    # [2026-07-15 OPERATING HUB] Cohorts match how the fleet is actually run
+    # since the Lighter-first pivot: LIVE real money, Lighter shadow books,
+    # remaining HL paper originals, scanners. Retired bots' trailing snapshots
+    # are excluded so a row deletion doesn't paint a fake cliff, and the IBKR
+    # $250k account can't dwarf the crypto curves.
+    def _cohort(bot):
+        if bot in RETIRED_ROWS:
+            return None
+        base, suf = venue_variant(bot)
+        if bot not in CURRENT_BOTS and base not in CURRENT_BOTS:
+            return None                      # legacy pre-rename rows
+        if is_live_bot(bot):
+            return "Live"
+        if suf == "-lshadow":
+            return "Shadow"
+        if bot in SCANNERS:
+            return "Scanner"
+        return "Paper"
+
     ts_axis = sorted({ts for ts, _, _, _ in rows})
-    GROUPS = ["Total", "Crypto", "Stocks", "Scanner"]
+    GROUPS = ["Total", "Live", "Shadow", "Paper", "Scanner"]
     agg = {g: {ts: {"eq": 0.0, "pnl": 0.0} for ts in ts_axis} for g in GROUPS}
     for ts, bot, eq, pnl in rows:
-        g = "Stocks" if bot in STOCKS else ("Scanner" if bot in SCANNERS else "Crypto")
+        g = _cohort(bot)
+        if g is None:
+            continue
         for gg in (g, "Total"):
             if eq is not None:
                 agg[gg][ts]["eq"] += eq
@@ -1637,18 +1868,19 @@ def render_history():
         banner = ('<div class="banner">No history captured yet. The dashboard snapshots '
                   'every bot\'s equity every 5 minutes — check back shortly.</div>')
 
-    # Whole operation, then per group. Scanners book no equity, so equity charts
-    # cover Total/Crypto/Stocks; P&L charts cover all four.
     charts = (
-        '<h2 style="font-size:15px;margin:18px 4px 2px">Whole operation</h2>'
+        '<h2 style="font-size:15px;margin:18px 4px 2px">Whole operation (active fleet)</h2>'
         + _svg_chart(series("Total", "eq"), "#e6e6e6", "Total equity")
         + _svg_chart(series("Total", "pnl"), "#3fb950", "Total P&amp;L")
-        + '<h2 style="font-size:15px;margin:18px 4px 2px">Crypto bots</h2>'
-        + _svg_chart(series("Crypto", "eq"), "#58a6ff", "Crypto equity")
-        + _svg_chart(series("Crypto", "pnl"), "#58a6ff", "Crypto P&amp;L")
-        + '<h2 style="font-size:15px;margin:18px 4px 2px">Stock bots (IKBR + Alpaca)</h2>'
-        + _svg_chart(series("Stocks", "eq"), "#d29922", "Stocks equity")
-        + _svg_chart(series("Stocks", "pnl"), "#d29922", "Stocks P&amp;L")
+        + '<h2 style="font-size:15px;margin:18px 4px 2px">🔴 Live — real money on Lighter</h2>'
+        + _svg_chart(series("Live", "eq"), "#3fb950", "Live equity")
+        + _svg_chart(series("Live", "pnl"), "#3fb950", "Live P&amp;L")
+        + '<h2 style="font-size:15px;margin:18px 4px 2px">Lighter shadow books (the fleet)</h2>'
+        + _svg_chart(series("Shadow", "eq"), "#58a6ff", "Shadow equity")
+        + _svg_chart(series("Shadow", "pnl"), "#58a6ff", "Shadow P&amp;L")
+        + '<h2 style="font-size:15px;margin:18px 4px 2px">HL paper originals</h2>'
+        + _svg_chart(series("Paper", "eq"), "#d29922", "Paper equity")
+        + _svg_chart(series("Paper", "pnl"), "#d29922", "Paper P&amp;L")
         + '<h2 style="font-size:15px;margin:18px 4px 2px">Scanners</h2>'
         + _svg_chart(series("Scanner", "pnl"), "#a371f7", "Scanner paper P&amp;L")
     )
@@ -1667,10 +1899,12 @@ def render_history():
  .pos{{color:#3fb950}} .neg{{color:#f85149}}
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
-<header><h1>All Bots — history &nbsp;·&nbsp; <a href="/">← live</a> &nbsp; <a href="/periods">P&amp;L by period →</a></h1></header>
+<header><h1>All Bots — history &nbsp;·&nbsp; <a href="/">← live</a> &nbsp; <a href="/periods">periods</a> &nbsp; <a href="/market">market</a> &nbsp; <a href="/learning">learning</a></h1></header>
 <div class="wrap">{banner}{charts}</div>
 <footer>Equity/P&amp;L sampled every 5 min from the shared bot_pnl table (last 7 days).
-Auto-refreshes every 60s. Times UTC.</footer>
+Retired bots are excluded so row prunes don't paint fake cliffs. Live = real-money
+Lighter accounts; Shadow = modelled fills on live Lighter books; Paper = HL-data
+originals. Auto-refreshes every 60s. Times UTC.</footer>
 </body></html>'''
 
 
@@ -1736,6 +1970,11 @@ def render_learning():
     elif not data:
         banner = ('<div class="banner">No analysis yet. The trainer writes this once a day '
                   'after the bots have closed some trades.</div>')
+    # [2026-07-15 OPERATING HUB] The tab now shows the whole learning LOOP, not
+    # just the daily strategy post-mortems: the brain's venue A/B + throttles +
+    # diagnoses, and the Ticket Taker's per-lens scoreboard (the scanner→bot→
+    # brain pipeline's output). Strategy cards follow below.
+    loop_cards = brain_panel_html() + taker_lens_card()
     cards = "".join(learning_card(s, r) for s, r in data.items())
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1759,17 +1998,21 @@ def render_learning():
  table.tbl{{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0 2px}}
  table.tbl th,table.tbl td{{text-align:left;padding:3px 6px;border-bottom:1px solid #21262d}}
  table.tbl th{{color:#8b949e;font-weight:600}}
+ .n{{color:#6e7681;font-size:11px}}
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
 <header>
- <h1>Crypto Bots — what they're learning</h1>
- <a href="/">← back to live P&amp;L</a>
+ <h1>Fleet — what it's learning</h1>
+ <a href="/">← live</a> &nbsp; <a href="/history">history</a> &nbsp; <a href="/periods">periods</a> &nbsp; <a href="/market">market</a>
 </header>
 {banner}
-<div class="grid">{cards}</div>
-<footer>Win/loss post-mortem written daily by the auto-retrainer. Returns are paper
-(dry-run). Recommendations marked for review are NOT auto-applied; only out-of-sample-
-validated parameter changes are. Auto-refreshes every 2 min. Times UTC.</footer>
+<div class="grid">{loop_cards}</div>
+<div class="grid" style="padding-top:0">{cards}</div>
+<footer>Top row: the live learning loop — brain venue A/B + reduce-only throttles +
+loss diagnoses (bot_learn, ~2h cadence) and the Ticket Taker lens scoreboard (durable
+paper_trades ledger). Below: per-strategy post-mortems written daily by the trainer.
+Proposals are human-review only; nothing here auto-applies except OOS-validated tuning
+and reduce-only stake throttles. Auto-refreshes every 2 min. Times UTC.</footer>
 </body></html>'''
 
 
@@ -1778,23 +2021,36 @@ TRADING_BOTS_ORDER = ["crypto-trend-daily", "crypto-intraday-15m",
 
 
 def fetch_period_pnl(period, limit_periods):
-    """Realized P&L per calendar {period} from the durable bot_trades table
-    (closed paper trades; survives redeploys). period is 'day'|'week'|'month'.
-    Returns (periods_newest_first, ordered_bots, grid[(period,bot)] -> {pnl,n}).
-    Scanners are excluded (they book no per-trade rows). Raises on DB error."""
+    """Realized P&L per calendar {period} from BOTH durable ledgers:
+    bot_trades (freqtrade poller era) UNION paper_trades (the Lighter fleet —
+    every -lshadow/-lighter book books its closes there). Without the union the
+    tab silently showed only the retired Kraken arm. period is
+    'day'|'week'|'month'. Returns (periods_newest_first, ordered_bots,
+    grid[(period,bot)] -> {pnl,n}). Scanners excluded. Raises on DB error."""
     import psycopg2
     conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT to_regclass('public.bot_trades') AS t")
-            if cur.fetchone()[0] is None:
+            cur.execute("SELECT to_regclass('public.bot_trades') AS bt, "
+                        "to_regclass('public.paper_trades') AS pt")
+            has_bt, has_pt = cur.fetchone()
+            parts = []
+            if has_bt:
+                parts.append("SELECT bot, close_ts, profit_abs FROM bot_trades "
+                             "WHERE is_open = FALSE AND close_ts IS NOT NULL")
+            if has_pt:
+                # closed_at is TEXT (iso strings from the venue layer) — cast,
+                # guarded by a shape check so one malformed row can't 500 the tab.
+                parts.append(r"SELECT bot, closed_at::timestamptz AS close_ts, "
+                             r"pnl_abs AS profit_abs FROM paper_trades "
+                             r"WHERE closed_at ~ '^\d{4}-\d{2}-\d{2}'")
+            if not parts:
                 return [], [], {}
             cur.execute(
-                """
+                f"""
                 SELECT date_trunc(%s, close_ts) AS p, bot,
                        COALESCE(SUM(profit_abs), 0), COUNT(*)
-                FROM bot_trades
-                WHERE is_open = FALSE AND close_ts IS NOT NULL
+                FROM ({" UNION ALL ".join(parts)}) t
                 GROUP BY 1, 2
                 ORDER BY 1 DESC
                 """,
@@ -1805,7 +2061,9 @@ def fetch_period_pnl(period, limit_periods):
         conn.close()
     grid, periods, bots = {}, [], set()
     for p, bot, pnl, n in rows:
-        if bot not in CURRENT_BOTS or bot in SCANNERS:
+        base, _suf = venue_variant(bot)
+        if (bot not in CURRENT_BOTS and base not in CURRENT_BOTS) \
+                or bot in SCANNERS or bot in RETIRED_ROWS:
             continue
         key = p.date().isoformat()
         if key not in periods:
@@ -1813,8 +2071,15 @@ def fetch_period_pnl(period, limit_periods):
         grid[(key, bot)] = {"pnl": float(pnl), "n": int(n)}
         bots.add(bot)
     periods = periods[:limit_periods]
-    ordered = ([b for b in TRADING_BOTS_ORDER if b in bots]
-               + sorted(b for b in bots if b not in TRADING_BOTS_ORDER))
+
+    # Live money first, then the Lighter shadow fleet, then remaining paper.
+    def _rank(b):
+        if is_live_bot(b):
+            return (0, b)
+        if b.endswith("-lshadow"):
+            return (1, b)
+        return (2, b)
+    ordered = sorted(bots, key=_rank)
     return periods, ordered, grid
 
 
@@ -1888,11 +2153,12 @@ def render_periods():
  .n{{color:#6e7681;font-size:11px}}
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
-<header><h1>Crypto Bots — P&amp;L by period &nbsp;·&nbsp;
- <a href="/">← live</a> &nbsp; <a href="/learning">learning →</a></h1></header>
+<header><h1>Fleet — P&amp;L by period &nbsp;·&nbsp;
+ <a href="/">← live</a> &nbsp; <a href="/history">history</a> &nbsp; <a href="/market">market</a> &nbsp; <a href="/learning">learning →</a></h1></header>
 <div class="wrap">{daily}{weekly}{monthly}</div>
-<footer>Realized P&amp;L from closed paper trades (durable bot_trades table; survives redeploys).
-Cells show P&amp;L and (trade count). Dry-run only. Times UTC. Auto-refreshes every 120s.</footer>
+<footer>Realized P&amp;L from BOTH durable ledgers (bot_trades + paper_trades — the whole
+fleet incl. every Lighter book; -lighter columns are REAL money). Columns ordered live →
+shadow → paper. Cells show P&amp;L and (trade count). Times UTC. Auto-refreshes every 120s.</footer>
 </body></html>'''
 
 
@@ -1915,25 +2181,143 @@ def market_md_cached(ttl=1800):
     return _MKT_CACHE["md"]
 
 
+def _ticket_rows(tickets, lens, n=3):
+    out = []
+    for t in (tickets.get(lens) or [])[:n]:
+        out.append(f'<tr><td>{html.escape(str(t.get("sym", "?")))}</td>'
+                   f'<td class="{cls(t.get("chg_pct"))}">{t.get("chg_pct", 0):+.1f}%</td>'
+                   f'<td>{t.get("apr_pct", 0):+.0f}%</td>'
+                   f'<td>{t.get("prem_bps", 0):.1f}</td>'
+                   f'<td>${t.get("vol_m", 0):.1f}M</td></tr>')
+    return "".join(out)
+
+
 def render_market():
+    """[2026-07-15 OPERATING HUB] The market tab is now the fleet's OWN market
+    intelligence first (scout venue map, regime oracle, mood history, vetoes),
+    with the external Binance/CoinGecko snapshot demoted to a details block."""
+    st = fetch_states(["lighter-market", "regime-oracle", "market-pulse", "coin-vetoes"])
+    lm = st.get("lighter-market") or {}
+    ro = st.get("regime-oracle") or {}
+    mp = st.get("market-pulse") or {}
+    cv = (st.get("coin-vetoes") or {}).get("coins") or {}
+
+    # --- Lighter venue map (the scout) -------------------------------------
+    if lm:
+        stress = lm.get("stress") or {}
+        med = stress.get("med", 0) or 0
+        scol = "#f85149" if med >= 15 else ("#d29922" if med >= 10 else "#3fb950")
+        tickets = lm.get("tickets") or {}
+        lens_tbls = []
+        for lens_name in ("breakout", "dip", "momentum", "divergence"):
+            rows_html = _ticket_rows(tickets, lens_name)
+            n_all = len(tickets.get(lens_name) or [])
+            if rows_html:
+                lens_tbls.append(
+                    f'<div class="sub">{lens_name} tickets ({n_all})</div>'
+                    f'<table class="tbl"><tr><th>sym</th><th>24h</th><th>funding</th>'
+                    f'<th>prem bps</th><th>vol</th></tr>{rows_html}</table>')
+            else:
+                lens_tbls.append(f'<div class="sub">{lens_name} tickets</div>'
+                                 f'<div class="muted">none this cycle</div>')
+        fx = "".join(
+            f'<tr><td>{html.escape(str(e.get("sym", "?")))}</td>'
+            f'<td class="{cls(e.get("apr_pct"))}">{e.get("apr_pct", 0):+.0f}%</td>'
+            f'<td>${e.get("vol_m", 0):.1f}M</td></tr>'
+            for e in (lm.get("funding_extremes") or [])[:6])
+        dv = "".join(
+            f'<tr><td>{html.escape(str(d.get("sym", "?")))}</td>'
+            f'<td>{d.get("gap_pct", 0):+.0f}pp</td>'
+            f'<td>{d.get("lighter_apr", 0):+.0f}%</td>'
+            f'<td>{d.get("xvenue_apr", 0):+.0f}%</td></tr>'
+            for d in (lm.get("funding_divergence") or [])[:6])
+        listings = ", ".join(str(x) for x in (lm.get("new_listings") or [])) or "none"
+        scout_card = f'''<div class="card">
+  <h2>🛰️ Lighter venue map <span class="muted">— {lm.get("n_liquid", "?")} liquid /
+  {lm.get("n_books", "?")} books</span></h2>
+  <div class="row"><span>Venue stress (|premium|)</span>
+    <b style="color:{scol}">{med}bps med · p90 {stress.get("p90", "?")} · max {stress.get("max", "?")}</b></div>
+  <div class="row"><span>New listings this cycle</span><b>{html.escape(listings)}</b></div>
+  {"".join(lens_tbls)}
+  <div class="sub">Funding extremes (APR)</div>
+  <table class="tbl"><tr><th>sym</th><th>APR</th><th>vol</th></tr>{fx}</table>
+  <div class="sub">Cross-venue funding divergence (Lighter vs binance/bybit/HL median)</div>
+  <table class="tbl"><tr><th>sym</th><th>gap</th><th>Lighter</th><th>x-venue</th></tr>{dv}</table>
+</div>'''
+    else:
+        scout_card = ('<div class="card"><h2>🛰️ Lighter venue map</h2>'
+                      '<div class="muted">scout state unreachable</div></div>')
+
+    # --- Regime oracle ------------------------------------------------------
+    if ro:
+        fleet = ro.get("fleet") or {}
+        pairs = ro.get("pairs") or {}
+        prow = "".join(
+            f'<tr><td>{html.escape(c)}</td>'
+            f'<td>{html.escape(str((p or {}).get("verdict", "?")))}</td>'
+            f'<td>{(p or {}).get("adx", 0):.0f}</td></tr>'
+            for c, p in sorted(pairs.items()))
+        oracle_card = f'''<div class="card">
+  <h2>🧭 Regime oracle <span class="muted">— {html.escape(str(fleet.get("read", "?")))}</span></h2>
+  <div class="row"><span>Windows</span><b>{fleet.get("n_long", 0)} long ·
+    {fleet.get("n_short", 0)} short · {fleet.get("n_flat_or_chop", 0)} flat/chop</b></div>
+  <table class="tbl"><tr><th>coin</th><th>window</th><th>ADX</th></tr>{prow}</table>
+</div>'''
+    else:
+        oracle_card = ('<div class="card"><h2>🧭 Regime oracle</h2>'
+                       '<div class="muted">oracle state unreachable</div></div>')
+
+    # --- Mood history + vetoes ----------------------------------------------
+    hist = mp.get("history") or []
+    mood_pts = [(_iso_dt(h.get("ts")), h.get("mood")) for h in hist]
+    mood_pts = [(t, v) for t, v in mood_pts if t is not None]
+    fng_pts = [(_iso_dt(h.get("ts")), h.get("fng")) for h in hist]
+    fng_pts = [(t, v) for t, v in fng_pts if t is not None]
+    charts = ""
+    if mood_pts:
+        charts = (_svg_chart(mood_pts, "#58a6ff", "Fleet mood (news/social/funding)",
+                             height=120, fmt=lambda v: f"{v:+.2f}")
+                  + _svg_chart(fng_pts, "#d29922", "Fear &amp; Greed",
+                               height=120, fmt=lambda v: f"{v:.0f}"))
+    vet = "".join(f'<div class="row"><span>{html.escape(k)}</span>'
+                  f'<b class="neg">{html.escape(str(v))}</b></div>'
+                  for k, v in sorted(cv.items())) or '<div class="muted">none</div>'
+    pulse_card = f'''<div class="card"><h2>🌡️ Mood — last ~8 days (hourly)</h2>{charts}
+  <div class="sub">Coin vetoes (execution evidence — restrict-only)</div>{vet}</div>'''
+
     md = market_md_cached()
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="600">
-<title>Crypto Bots — market regime</title>
+<meta http-equiv="refresh" content="300">
+<title>Fleet — market &amp; venue intel</title>
 <style>
  body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
  header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
  h1{{margin:0;font-size:18px}} a{{color:#58a6ff;text-decoration:none}}
- pre{{margin:14px;padding:14px;background:#161b22;border:1px solid #222;border-radius:10px;
-   font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-x:auto}}
+ .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;padding:14px}}
+ .card{{background:#161b22;border:1px solid #222;border-radius:10px;padding:14px}}
+ .card h2{{margin:0 0 6px;font-size:15px}}
+ .row{{display:flex;justify-content:space-between;margin:5px 0;font-size:13px}}
+ .sub{{margin:12px 0 4px;font-size:12px;color:#8b949e;font-weight:600}}
+ .muted{{color:#8b949e;font-size:12px}}
+ .pos{{color:#3fb950}} .neg{{color:#f85149}}
+ table.tbl{{width:100%;border-collapse:collapse;font-size:12px;margin:4px 0 2px}}
+ table.tbl th,table.tbl td{{text-align:left;padding:3px 6px;border-bottom:1px solid #21262d}}
+ table.tbl th{{color:#8b949e;font-weight:600}}
+ details{{margin:0 14px 14px}} details pre{{padding:14px;background:#161b22;border:1px solid #222;
+   border-radius:10px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-x:auto}}
+ details summary{{cursor:pointer;color:#8b949e;font-size:13px;padding:4px 0}}
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
-<header><h1>Crypto Bots — market regime &nbsp;·&nbsp;
- <a href="/">← live</a> &nbsp; <a href="/periods">P&amp;L by period</a> &nbsp; <a href="/learning">learning</a></h1></header>
-<pre>{html.escape(md)}</pre>
-<footer>Sources: Binance (trend/vol/breadth), alternative.me (Fear&amp;Greed), CoinGecko (dominance/mcap).
-Cached ~30 min. The trend bots (V4/V6/V7) are designed to sit out risk-off regimes. Not financial advice.</footer>
+<header><h1>Fleet — market &amp; venue intel &nbsp;·&nbsp;
+ <a href="/">← live</a> &nbsp; <a href="/history">history</a> &nbsp; <a href="/periods">periods</a> &nbsp; <a href="/learning">learning</a></h1></header>
+<div class="grid">{scout_card}{oracle_card}{pulse_card}</div>
+<details><summary>External market snapshot (Binance / Fear&amp;Greed / CoinGecko — cached ~30 min)</summary>
+<pre>{html.escape(md)}</pre></details>
+<footer>Scout maps every Lighter book each ~5 min (premium stress, funding extremes,
+cross-venue divergence, per-lens tickets — the Ticket Taker trades the high-conviction
+subset). Oracle windows gate the perps books. Vetoes come from measured slippage/stops,
+restrict-only. Auto-refreshes every 5 min. Times UTC. Not financial advice.</footer>
 </body></html>'''
 
 
