@@ -375,6 +375,30 @@ def main():
         start = end - (EMA_SLOW * 3 + 5) * 86400 * 1000
         open_now = sum(1 for v in pos.values() if (v.get("size") if isinstance(v, dict) else v))
 
+        # [2026-07-15 GAP FIX] L2 fleet long-budget veto — Tide Rider was the
+        # only real-money LONG book counted BY the light that never CHECKED
+        # it (the 15-Jul consumption audit). Same contract as the family bot
+        # and taker: fresh payload + mode=enforce + budget full -> skip NEW
+        # entries this cycle; exits/stops untouched; anything missing/stale
+        # fails OPEN (a fleet_risk outage must never stop the live book).
+        # Kill switch stays central: FLEET_RISK_MODE=advisory.
+        fleet_long_veto = False
+        try:
+            _fr = store.load_state("fleet-risk") or {}
+            _age = (now - datetime.fromisoformat(
+                str(_fr.get("updated")).replace("Z", "+00:00"))).total_seconds()
+            _lb = _fr.get("long_budget")
+            _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
+            if (_age <= float(_fr.get("ttl_sec") or 900)
+                    and _fr.get("mode") == "enforce"
+                    and (_fr.get("long_positions") or 0) >= _lb):
+                fleet_long_veto = True
+                log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
+                         "no new entries this cycle (exits unaffected)",
+                         _fr.get("long_positions"), _fr.get("long_budget"))
+        except Exception:  # noqa: BLE001 — fail-safe open
+            fleet_long_veto = False
+
         # Entry-admission order. Default = COINS list order (byte-identical to before).
         # RANK_BY_FUNDING sorts lowest-funding-first so that when open_now hits the cap
         # / margin runs out, the cheapest-to-carry golden majors get the slots. Only the
@@ -447,6 +471,8 @@ def main():
 
             # ----- flat: enter long on a golden cross -----
             if is_golden and open_now < max_open:
+                if fleet_long_veto:
+                    continue      # L2: fleet directional-long budget is full
                 size = round(order_usd / px, 6)
                 if not dry_run:
                     # open_now is the live counter (grows with same-loop opens); the
