@@ -158,6 +158,20 @@ EQUITY_BASES = {s.strip().upper() for s in os.environ.get(
     "BMNR").split(",") if s.strip()}
 
 
+def held_items(held):
+    """Normalize a publisher's extra.held to (symbol, marker) pairs. Two
+    shapes exist in the wild: the funding bots publish {coin: 'L'/'S'} and
+    the family books {coin: tag}, but the LIVE trend bot (and the equities
+    ports) publish a plain LIST of coins — sorted(meta.keys()). [2026-07-15b
+    HOTFIX] the exposure harvest assumed .items() and crashed fleet_risk on
+    Tide Rider's live row, freezing the light (consumers fail open — the
+    long-budget veto went dark). List entries carry no side marker -> ''
+    (classified long, correct for the long-only publishers of that shape)."""
+    if isinstance(held, dict):
+        return list(held.items())
+    return [(c, "") for c in (held or [])]
+
+
 def exposure_concentration(positions, uncovered=0):
     """Advisory concentration view over the SAME directional cohort the light
     counts. `positions` is [(bot, base_symbol, side)] where side is
@@ -291,7 +305,7 @@ def main():
                 expo.append((name, base, side))
                 covered += 1
         if not pos:
-            for coin, tag in held.items():
+            for coin, tag in held_items(held):
                 base = str(coin).split("/")[0]
                 if not base:
                     continue
@@ -314,10 +328,11 @@ def main():
         # rather than longs/shorts ints — derive counts so live real-money
         # positions actually reach the light.
         held = extra.get("held") or {}
+        _hv = [v for _, v in held_items(held)]   # list-shape tolerant (hotfix)
         longs = int(extra.get("longs") or 0) or \
-            sum(1 for v in held.values() if str(v).upper().startswith("L"))
+            sum(1 for v in _hv if str(v).upper().startswith("L"))
         shorts = int(extra.get("shorts") or 0) or \
-            sum(1 for v in held.values() if str(v).upper().startswith("S"))
+            sum(1 for v in _hv if str(v).upper().startswith("S"))
         if longs or shorts:
             fleet_long += longs
             fleet_short += shorts
@@ -326,7 +341,7 @@ def main():
             # [2026-07-15 EXPOSURE VIEW] harvest the L/S held map too, so the
             # live Funding Farmer's one-sided book joins the concentration view.
             covered = 0
-            for coin, v in held.items():
+            for coin, v in held_items(held):
                 base = str(coin).split("/")[0]
                 if not base:
                     continue
@@ -515,6 +530,11 @@ def main():
 
 def selftest():
     """Offline checks for the pure functions (no DB). `--selftest`."""
+    # held shapes seen in the wild: dict (funding/family), LIST (live trend
+    # bot, equities ports — the 15-Jul crash), absent.
+    assert held_items({"ETH": "S", "BTC": "L"}) == [("ETH", "S"), ("BTC", "L")]
+    assert held_items(["BTC", "SOL"]) == [("BTC", ""), ("SOL", "")]
+    assert held_items(None) == [] and held_items({}) == []
     # exposure: empty
     e = exposure_concentration([])
     assert e["long_n"] == 0 and e["long_effective_n"] == 0.0 and \
