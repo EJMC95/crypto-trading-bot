@@ -74,14 +74,36 @@ and service logs for veto/governor lines.
   Verify: no fake resets (equity_cohort stable), samples ≥30min apart,
   and whether any real drawdown approached the −5% half-clip line.
 
-## 7. Operator checklist (standing items)
-- [ ] Stop Trail Blazer's momo Railway service (STILL trading paper as of
-      15-Jul — 16 closes since 14-Jul).
-- [ ] Approve the scheduler MCP prompt so Claude's check-ins self-arm.
-- [ ] Optional: set SMTP vars to wake `report_emailer.py` (built, dormant).
-- [ ] Verify Railway Postgres backups exist (every ledger + brain memory).
-- [ ] Identify/stop the equities-regime-ibkr publisher host (14-Jul note).
+## 7. Operator checklist (standing items — swept 15-Jul evening on user
+   instruction "attend to all of my queue"; residuals marked)
+- [x] Stop Trail Blazer — RETIREMENT GUARD shipped in
+      `hyperliquid_momo_bot.py` (momo-bot auto-deploys from main, so the
+      guard IS the stop: boots inert, publishes/trades nothing; its stale
+      row gets boot-pruned). Verify at review: zero perps-donchian-breakout
+      paper_trades closes after 15-Jul ~17:00 AEST. Residual: deleting the
+      idle Railway service entirely is still a console click.
+- [~] Scheduler: MCP approval prompt still pending (needs Eamon's click for
+      Claude's self-arming check-ins). Durable review kick-off covered
+      WITHOUT it: `.github/workflows/review-reminder.yml` opens a GitHub
+      issue at 09:00 AEST 21-Jul.
+- [ ] Optional: wake `report_emailer.py` — set on the pnl-dashboard
+      service: SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS (app password) +
+      REPORT_TO; it self-arms, idempotent (header of report_emailer.py).
+      Secrets are operator-only by policy.
+- [x] Postgres backups — `.github/workflows/db-backup.yml` shipped:
+      nightly 04:07 AEST pg_dump via the Railway account token (existing
+      secret, volume-workflow pattern), 30-day artifacts on the PRIVATE
+      repo. First manual run dispatched 15-Jul as the verification.
+- [ ] equities-regime-ibkr publisher host — unreachable from repo-side (it
+      runs OUTSIDE this repo). Hunt hints: it needs an IBKR gateway
+      session, so check IBKR portal > active sessions, plus old-laptop
+      crontabs (`crontab -l`) and any cloud VM with ~/Claude/Trading.
+      Row stays hidden + boot-pruned either way.
 
 ## 8. Freeze compliance
 - Log any exception shipped during the freeze window here, with reason:
-  - (none yet)
+  - 15-Jul (same evening, user-instructed queue sweep — infra/retirement,
+    no strategy logic): Trail Blazer retirement guard
+    (`hyperliquid_momo_bot.py` boots inert — executes the 12-Jul
+    retirement decision); `db-backup.yml` (nightly pg_dump);
+    `review-reminder.yml` (21-Jul kick-off issue).

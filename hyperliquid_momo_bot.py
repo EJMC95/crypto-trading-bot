@@ -191,6 +191,24 @@ def signals_from_candles(candles):
 
 
 def main():
+    # [2026-07-15 RETIREMENT GUARD — operator queue: "stop Trail Blazer"]
+    # This bot (🧭 Trail Blazer, perps-donchian-breakout) was RETIRED on user
+    # sign-off: live half 11-Jul, paper row hidden 12-Jul (entry REJECTED for
+    # edge in the 12-Jul audit), yet the momo-bot Railway service kept running
+    # and wrote 16+ ledger closes after retirement. The service auto-deploys
+    # from main, so this guard IS the stop: idle forever (restartPolicy=always
+    # would crash-loop a sys.exit), publish/trade NOTHING — the bot_pnl row
+    # goes stale and the boot prune removes it for good. Ledger history is
+    # untouched, per retirement policy. To resurrect deliberately, set
+    # MOMO_RETIRED_OVERRIDE=run on the service.
+    if os.environ.get("MOMO_RETIRED_OVERRIDE", "").strip().lower() not in (
+            "run", "1", "true"):
+        log.warning("perps-donchian-breakout is RETIRED (12-Jul decision; "
+                    "guard shipped 15-Jul). Idling — no data, no trades, no "
+                    "publishes. Set MOMO_RETIRED_OVERRIDE=run to resurrect, "
+                    "or stop/delete the momo-bot Railway service.")
+        while True:
+            time.sleep(3600)
     load_env()
     # [2026-07-09 LIGHTER GATE-0] All venue plumbing (HL info/exchange, Lighter
     # client, paper vs shadow broker, kill switch, notional rails) now lives in
