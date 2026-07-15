@@ -169,6 +169,24 @@ def run_loop(dash):
             except Exception as fe:  # noqa: BLE001
                 problems = [f"LOCAL FEED UNREACHABLE: {type(fe).__name__}: {fe}"]
                 warnings, snapshot = [], "(no data)"
+            # [2026-07-15 VITALS] ORGAN-DEATH detection — the 5-7 Jul scar:
+            # the brain died silently for two days because the watchdog only
+            # watched BOTS. Critical organs (scout/risk/brain/pulse/board)
+            # going DARK (>3x their own ttl) are now problems -> phone push.
+            # Guarded: vitals unreachable adds nothing (pnl.json staleness
+            # already covers whole-feed death).
+            try:
+                vurl = f"http://127.0.0.1:{port}/vitals.json?nc={int(time.time())}"
+                with urllib.request.urlopen(vurl, timeout=20) as r:
+                    vd = json.load(r)
+                for o in (vd.get("organs") or []):
+                    if o.get("critical") and o.get("status") == "DARK":
+                        age = o.get("age_min")
+                        problems.append(
+                            f"ORGAN DARK: {o.get('key')}"
+                            + (f" (last publish {age:.0f}m ago)" if age is not None else " (never published)"))
+            except Exception:  # noqa: BLE001
+                pass
             email_armed = bool(report_emailer and report_emailer.smtp_configured())
             push_armed = bool(ntfy_topic())
             armed = email_armed or push_armed

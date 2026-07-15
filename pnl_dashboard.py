@@ -1734,7 +1734,7 @@ async function botAdmin(action, bot){
 </style></head><body>
 {WATERMARK_HTML}
 <header>
- <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a></h1>
+ <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a> &nbsp;·&nbsp; <a href="/vitals" style="color:#58a6ff;font-size:14px">health →</a></h1>
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
    <span style="border-right:1px solid #30363d;padding-right:18px">GRAND TOTAL <b>{money(grand_equity)}</b> eq · <b class="{cls(grand_pnl)}">{money(grand_pnl)}</b> P&amp;L</span>
@@ -1762,6 +1762,309 @@ Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
 # paper_trades / bot_trades) — no new collectors, just surfacing what the
 # fleet already knows. Guarded: a missing/stale organ renders as an honest
 # "unavailable" line, never an exception.
+
+
+# ---------------------------------------------------------------------------
+# [2026-07-15 VITALS] /vitals — the fleet's HEALTH TAB (user: "upgrade and
+# advance the health tab and integrate with evidence and brain and scanner").
+# Three layers no other surface shows together:
+#   ORGAN VITALS — every intelligence organ's freshness vs its OWN ttl (the
+#     5-7 Jul scar: the brain died silently for two days because nothing
+#     watched the organs' pulse; the watchdog now reads this and pushes
+#     ORGAN DARK to the phone).
+#   CONSUMPTION MATRIX — the 15-Jul consumption audit as a PERMANENT live
+#     surface: who publishes, who consumes, what mode, is the contract fresh.
+#   FLOW VITALS — is data actually moving: ledger writes, skips, history
+#     rows, alert pressure over the last 24h.
+# /vitals.json is read-only no-auth (same contract as /watchdog.json).
+# ---------------------------------------------------------------------------
+
+def organ_status(age_s, ttl_s):
+    """FRESH within ttl, LATE to 3x ttl, DARK beyond. ttl None = event-driven
+    feed (never DARK — silence is an answer, not a failure)."""
+    if ttl_s is None:
+        return "EVENT"
+    if age_s is None:
+        return "DARK"
+    if age_s <= ttl_s:
+        return "FRESH"
+    if age_s <= 3 * ttl_s:
+        return "LATE"
+    return "DARK"
+
+
+def _v(fmt, *vals):
+    try:
+        return fmt.format(*vals)
+    except Exception:  # noqa: BLE001
+        return "—"
+
+
+def _organ_vital(key, st):
+    """One-line vital sign per organ — the number you'd ask for first."""
+    try:
+        if key == "fleet-risk":
+            return _v("light {} · {}L/{} · clip {}x · 7d dd {:+.2f}%",
+                      st.get("light"), st.get("gross"), st.get("long_budget"),
+                      st.get("clip_scale"), 100 * (st.get("fleet_dd_7d") or 0))
+        if key == "lighter-market":
+            s = st.get("stress") or {}
+            tk = st.get("tickets") or {}
+            return _v("{} books ({} liquid) · stress med {}bps · tickets {}",
+                      st.get("n_books"), st.get("n_liquid"), s.get("med"),
+                      sum(len(v) for v in tk.values() if isinstance(v, list)))
+        if key == "market-pulse":
+            return _v("mood {:+.2f} · {}", st.get("mood") or 0,
+                      "PANIC" if st.get("panic") else "calm")
+        if key == "learning-brain":
+            return _v("run {} · {} hypotheses", st.get("runs"),
+                      len(st.get("hypotheses") or {}))
+        if key == "brain-stake-mults":
+            return _v("{} active mults · {}", len(st.get("mults") or {}), st.get("mode"))
+        if key == "brain-lens-forward":
+            ls = st.get("lenses") or {}
+            return " · ".join(f"{k} n4h={int((v or {}).get('n4h') or 0)}"
+                              for k, v in sorted(ls.items())) or "—"
+        if key == "brain-diagnosis":
+            return _v("{} diagnoses", len(st.get("diagnoses") or {}))
+        if key == "evidence-board":
+            return _v("{} items · {} proposals · mode {}",
+                      len(st.get("items") or []), len(st.get("proposals") or []),
+                      st.get("mode"))
+        if key == "signal-bus":
+            return _v("prem {}bps · stress {}bps", st.get("lighter_prem_bps"),
+                      st.get("lighter_venue_stress_bps"))
+        if key == "regime-oracle":
+            return _v("{} majors tracked", len([k for k in st if not k.startswith(("updated", "ttl"))]))
+        if key == "fleet-alerts":
+            al = st.get("alerts") or []
+            return _v("{} alerts total · last: {}", len(al),
+                      (al[-1].get("msg") or "")[:60] if al else "none")
+        if key == "evidence-review":
+            return _v("{} verdicts · reviewed {}", len(st.get("verdicts") or []),
+                      str(st.get("reviewed_at"))[:16])
+    except Exception:  # noqa: BLE001
+        pass
+    return "—"
+
+
+# (key, label, critical-for-watchdog, fallback ttl seconds when payload has none)
+ORGAN_SPECS = [
+    ("fleet-risk",         "💡 fleet_risk — light/budget/governor",  True,  900),
+    ("lighter-market",     "🛰️ Lighter Scout — venue map + tickets", True,  900),
+    ("evidence-board",     "⚖️ Evidence board — scoring/synthesis",  True,  1800),
+    ("market-pulse",       "🫀 Market Pulse — news/social mood",     True,  2700),
+    ("learning-brain",     "🧠 Brain — hypotheses/diagnosis",        True,  26000),
+    ("brain-stake-mults",  "✋ L4 stake multipliers",                 False, 26000),
+    ("brain-lens-forward", "🎓 Lens-forward (brain grades scanners)", False, 26000),
+    ("brain-diagnosis",    "🩺 Per-bucket diagnosis",                 False, 26000),
+    ("signal-bus",         "🚌 Signal bus mirror",                    False, 900),
+    ("regime-oracle",      "🧭 Regime oracle",                        False, 14400),
+    ("fleet-alerts",       "🔔 Alert feed (event-driven)",            False, None),
+    ("evidence-review",    "🧾 Evidence review (daily + operator)",   False, None),
+]
+
+# The consumption matrix: (signal, publisher, consumers, mode, freshness key).
+# Static contract truth — freshness comes live from the organ read. An honest
+# row for everything published-but-unconsumed keeps the map from flattering.
+CONTRACTS = [
+    ("light + long-budget veto", "fleet_risk.py",
+     "family bot · Ticket Taker · Tide Rider LIVE",
+     "ENFORCED (kill switch FLEET_RISK_MODE=advisory)", "fleet-risk"),
+    ("clip_scale (drawdown governor)", "fleet_risk.py",
+     "Ticket Taker · family bot (entry sizing)", "enforced", "fleet-risk"),
+    ("stake multipliers (L4)", "bot_learn.py",
+     "family bot custom_stake_amount via fleet_bus",
+     "reduce-only · floors n≥30 / 3 runs", "brain-stake-mults"),
+    ("panic flag", "market_pulse.py", "strategies (half-stake on panic)",
+     "enforced", "market-pulse"),
+    ("tickets (per-lens)", "lighter_market_scout.py",
+     "Ticket Taker (high-conviction bars, shadow $1k)", "shadow book",
+     "lighter-market"),
+    ("venue stress", "lighter_market_scout.py", "Ticket Taker stress veto",
+     "restrict-only", "lighter-market"),
+    ("lens-forward grades", "bot_learn.py",
+     "21-Jul lens ruling · taker lens veto", "restrict-only", "brain-lens-forward"),
+    ("coin veto list", "market_context.py", "Funding Farmer",
+     "restrict-only (the fleet's one automated action)", "fleet-alerts"),
+    ("evidence proposals", "evidence_board.py",
+     "NOTHING yet — shadow; review promotes via EVBOARD_MODE", "shadow",
+     "evidence-board"),
+    ("regime / listing intel / bus extras", "various",
+     "published, unconsumed (info-only by design)", "advisory", "signal-bus"),
+]
+
+
+def fetch_flow_vitals():
+    """Is data actually MOVING — 24h write counts across every durable store.
+    Returns {} on DB trouble (the page renders without it)."""
+    import psycopg2
+    out = {}
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.paper_trades') pt, "
+                            "to_regclass('public.bot_trades') bt, "
+                            "to_regclass('public.bot_equity_history') eh, "
+                            "to_regclass('public.venue_orders') vo")
+                pt, bt, eh, vo = cur.fetchone()
+                if pt:
+                    cur.execute(
+                        "SELECT COUNT(*) FILTER (WHERE side IS DISTINCT FROM 'skip'), "
+                        "COUNT(*) FILTER (WHERE side = 'skip'), "
+                        "COUNT(*) FILTER (WHERE side IS DISTINCT FROM 'skip' AND pnl_pct IS NULL) "
+                        "FROM paper_trades WHERE seen_at > now() - interval '24 hours'")
+                    c, sk, nn = cur.fetchone()
+                    out["paper_closes_24h"] = int(c)
+                    out["sniper_skips_24h"] = int(sk)
+                    out["paper_pct_null_24h"] = int(nn)
+                if bt:
+                    cur.execute("SELECT COUNT(*) FROM bot_trades "
+                                "WHERE close_ts > now() - interval '24 hours'")
+                    out["freqtrade_closes_24h"] = int(cur.fetchone()[0])
+                if eh:
+                    cur.execute("SELECT COUNT(*) FROM bot_equity_history "
+                                "WHERE ts > now() - interval '24 hours'")
+                    out["equity_samples_24h"] = int(cur.fetchone()[0])
+                if vo:
+                    cur.execute("SELECT COUNT(*) FROM venue_orders "
+                                "WHERE seen_at > now() - interval '24 hours'")
+                    out["venue_orders_24h"] = int(cur.fetchone()[0])
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _states_with_ts(keys):
+    """Like fetch_states but ALSO returns the bot_state TABLE's updated_at —
+    several organs (brain, pulse) carry no timestamp inside their payload;
+    the table stamp is the truth of when they last wrote."""
+    import psycopg2
+    out = {}
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.bot_state') AS t")
+                if cur.fetchone()[0] is None:
+                    return out
+                cur.execute("SELECT bot, state, updated_at FROM bot_state "
+                            "WHERE bot = ANY(%s)", (list(keys),))
+                for k, s, ts in cur.fetchall():
+                    out[k] = (s if isinstance(s, dict) else json.loads(s), ts)
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def vitals_payload():
+    """Machine-readable health of the whole operation (serves /vitals.json;
+    the in-service watchdog reads it for ORGAN DARK detection)."""
+    now = time.time()
+    sts = _states_with_ts([k for k, *_ in ORGAN_SPECS])
+    organs = []
+    for key, label, critical, fb_ttl in ORGAN_SPECS:
+        st, row_ts = sts.get(key) or ({}, None)
+        upd = st.get("updated") or st.get("updated_at") or st.get("reviewed_at")
+        if key == "fleet-alerts":
+            al = st.get("alerts") or []
+            age_s = (now - al[-1]["ts"]) if al else None
+        else:
+            u = _iso_dt(upd)
+            if u is None and row_ts is not None:
+                u = row_ts       # table write stamp — when the organ last spoke
+            age_s = (now - u.timestamp()) if u else None
+        ttl = st.get("ttl_sec") if st.get("ttl_sec") else fb_ttl
+        if key in ("fleet-alerts", "evidence-review"):
+            ttl = None                     # event-driven: silence ≠ failure
+        organs.append({
+            "key": key, "label": label, "critical": critical,
+            "age_min": round(age_s / 60, 1) if age_s is not None else None,
+            "ttl_sec": ttl, "status": organ_status(age_s, ttl),
+            "vital": _organ_vital(key, st),
+        })
+    fresh = {o["key"]: o["status"] for o in organs}
+    contracts = [{"signal": s, "publisher": p, "consumers": c, "mode": m,
+                  "freshness": fresh.get(k, "?")} for s, p, c, m, k in CONTRACTS]
+    try:
+        import fleet_watchdog_svc
+        wd = fleet_watchdog_svc.get_state()
+    except Exception:  # noqa: BLE001
+        wd = {}
+    return {"updated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+            "organs": organs, "contracts": contracts,
+            "flows": fetch_flow_vitals(), "watchdog": wd}
+
+
+def render_vitals():
+    """The health tab: watchdog headline, organ vitals, consumption matrix,
+    flow vitals, and the board/brain/scout minis — one page answering
+    'is the ORGANISM working', not just 'are the bots up'."""
+    p = vitals_payload()
+    _c = {"FRESH": "#3fb950", "LATE": "#d29922", "DARK": "#f85149", "EVENT": "#8b949e"}
+
+    wd = p.get("watchdog") or {}
+    probs = wd.get("problems") or []
+    wd_line = (f'<div class="banner">🚨 {" · ".join(html.escape(x) for x in probs)}</div>'
+               if probs else
+               '<div class="okline">Watchdog ✓ no problems · snapshot: '
+               + html.escape(str(wd.get("snapshot") or "?"))
+               + (' · 📱 push armed' if wd.get("push_armed") else ' · 📱 PUSH NOT ARMED')
+               + '</div>')
+    warns = wd.get("warnings") or []
+    if warns:
+        wd_line += ('<div class="muted" style="margin:4px">⚠️ '
+                    + " · ".join(html.escape(w) for w in warns) + '</div>')
+
+    orows = "".join(
+        f'<tr><td>{html.escape(o["label"])}</td>'
+        f'<td style="color:{_c.get(o["status"], "#8b949e")};font-weight:600">{o["status"]}</td>'
+        f'<td>{("%.0fm" % o["age_min"]) if o.get("age_min") is not None else "—"}</td>'
+        f'<td class="muted">{html.escape(str(o.get("vital") or "—"))}</td></tr>'
+        for o in p["organs"])
+    crows = "".join(
+        f'<tr><td>{html.escape(c["signal"])}</td>'
+        f'<td class="muted">{html.escape(c["publisher"])}</td>'
+        f'<td>{html.escape(c["consumers"])}</td>'
+        f'<td class="muted">{html.escape(c["mode"])}</td>'
+        f'<td style="color:{_c.get(c["freshness"], "#8b949e")}">{c["freshness"]}</td></tr>'
+        for c in p["contracts"])
+    fl = p.get("flows") or {}
+    chips = " · ".join(f'{k.replace("_", " ")} <b>{v}</b>' for k, v in sorted(fl.items())) or "no flow data"
+    return f'''<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<title>Fleet Health — vitals</title>
+<style>
+ body{{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#0e1117;color:#e6e6e6}}
+ header{{padding:16px 18px;background:#161b22;border-bottom:1px solid #222}}
+ h1{{margin:0;font-size:18px}} h2{{font-size:15px;margin:20px 4px 6px}}
+ a{{color:#58a6ff;text-decoration:none;font-size:14px}}
+ .wrap{{padding:14px}} .muted{{color:#8b949e;font-size:12px}}
+ .banner{{margin:12px 4px;padding:10px 12px;background:#3d1d1d;border:1px solid #6b2a2a;border-radius:8px;color:#f0a0a0;font-size:13px}}
+ .okline{{margin:12px 4px;padding:8px 12px;background:#12261a;border:1px solid #1f4d2e;border-radius:8px;color:#7ee2a8;font-size:13px}}
+ table{{border-collapse:collapse;width:100%;font-size:13px}}
+ td,th{{padding:6px 8px;border-bottom:1px solid #21262d;text-align:left;vertical-align:top}}
+ th{{color:#8b949e;font-weight:600;font-size:12px}}
+</style></head><body>
+<header><h1>Fleet Health — vitals &nbsp;·&nbsp; <a href="/">← live</a> &nbsp; <a href="/history">history</a> &nbsp; <a href="/periods">periods</a> &nbsp; <a href="/market">market</a> &nbsp; <a href="/learning">learning</a></h1></header>
+<div class="wrap">
+{wd_line}
+<h2>🫀 Organ vitals — is every intelligence organ publishing on its own cadence?</h2>
+<table><tr><th>organ</th><th>status</th><th>age</th><th>vital sign</th></tr>{orows}</table>
+<div class="muted" style="margin:6px 4px">FRESH within its own ttl · LATE to 3× · DARK beyond (critical DARK organs page the phone via the watchdog) · EVENT = event-driven, silence is an answer.</div>
+<h2>🔗 Consumption matrix — who publishes, who consumes, what mode (live freshness per contract)</h2>
+<table><tr><th>signal</th><th>publisher</th><th>consumed by</th><th>mode</th><th>fresh</th></tr>{crows}</table>
+<h2>🚿 Flow vitals — did data actually move in the last 24h?</h2>
+<div style="font-size:13px;margin:4px">{chips}</div>
+</div>
+<footer class="muted" style="padding:10px 18px">Auto-refreshes 60s · machine feed at /vitals.json (no auth) · times UTC.</footer>
+</body></html>'''
 
 
 def fetch_states(keys):
@@ -2809,6 +3112,19 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers(); self.wfile.write(body)
             return
+        if self.path.startswith("/vitals.json"):
+            # [2026-07-15 VITALS] whole-operation health: organ freshness vs
+            # ttl, consumption matrix, 24h flow counts, watchdog state.
+            # Read-only, no auth — no secrets (same contract as /watchdog.json).
+            # The in-service watchdog polls this for ORGAN DARK detection.
+            try:
+                body = json.dumps(vitals_payload(), default=str).encode()
+            except Exception as e:  # noqa: BLE001
+                body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body)
+            return
         if self.path.startswith("/pulse.json"):
             # Market pulse (news/social/funding mood) written by market_pulse.py
             # into bot_state. Read-only, no auth — no secrets inside. Serves the
@@ -3136,6 +3452,8 @@ class H(BaseHTTPRequestHandler):
             elif self.path.startswith("/history"):
                 q = parse_qs(urlparse(self.path).query)
                 body = render_history((q.get("hours") or ["168"])[0]).encode()
+            elif self.path.startswith("/vitals"):
+                body = render_vitals().encode()
             else:
                 body = render().encode()
         except Exception as e:
