@@ -808,6 +808,113 @@ def evidence_board_card():
         return ""
 
 
+def autonomy_rail_card():
+    """🤖 [2026-07-16] Autonomy / Growth Rail — one glance at the self-tuning
+    stack that was headless until now (bot_state: fleet-tuning, scout-tuner,
+    strategy-incubator, xp-queue, xp-judge, fleet-immune, fleet-regen,
+    fleet-respiration, fleet-clock, impl-shortfall, gapscout-census). Read-only
+    render; the organs live on the freqtrade-bots container. Fail-silent like
+    every other card: a DARK organ omits its row, an all-dark fleet hides the
+    card, any error renders nothing. One fetch_states round-trip for all 11."""
+    try:
+        s = fetch_states([
+            "fleet-tuning", "scout-tuner", "strategy-incubator", "xp-queue",
+            "xp-judge", "fleet-immune", "fleet-regen", "fleet-respiration",
+            "fleet-clock", "impl-shortfall", "gapscout-census",
+        ])
+        G, R, Y, M = "#1a7f37", "#d1242f", "#d29922", "#8b949e"
+
+        def _d(x):   # money or dash — never "$None"
+            try:
+                return money(x) if isinstance(x, (int, float)) else "—"
+            except Exception:  # noqa: BLE001
+                return "—"
+
+        def row(key, label, val, color=None):
+            st = s.get(key) or {}
+            if not st:
+                return None                      # dark / never spoke -> omit
+            fresh = _state_fresh(st)
+            dim = "" if fresh else ' style="opacity:.45"'
+            tail = "" if fresh else " · STALE"
+            c = f'color:{color}' if color else ''
+            return (f'<div{dim}><span class="muted">{html.escape(label)}</span> '
+                    f'<b style="{c}">{html.escape(str(val))}{tail}</b></div>')
+
+        rows = []
+        ft = s.get("fleet-tuning") or {}
+        lv = ft.get("levers") or {}
+        live = sum(1 for x in lv.values()
+                   if isinstance(x, dict) and x.get("lane") == "lighter-live")
+        rows.append(row("fleet-tuning", "🎚️ Levers active",
+                        f'{len(lv)}' + (f' · {live} LIVE' if live else ''),
+                        Y if live else None))
+        tn = s.get("scout-tuner") or {}
+        ntn = len(tn.get("enacted") or {})
+        rows.append(row("scout-tuner", "🔧 Scout tuner",
+                        f'{ntn} enacted · baseline {_d(tn.get("baseline_net"))}',
+                        Y if ntn else None))
+        ic = s.get("strategy-incubator") or {}
+        ch = ic.get("champion") or {}
+        conf = ch.get("confidence") or "none"
+        icv = ("no champion yet" if conf == "none" or ch.get("net") is None
+               else f'{conf} · net {_d(ch.get("net"))}'
+               + (f' (vs default {_d(ch.get("vs_default"))})'
+                  if ch.get("vs_default") is not None else ''))
+        rows.append(row("strategy-incubator", "🧬 Incubator", icv,
+                        G if conf == "stable" else M))
+        rows.append(row("xp-queue", "📥 XP queue",
+                        f'{len((s.get("xp-queue") or {}).get("candidates") or [])} candidates'))
+        xj = s.get("xp-judge") or {}
+        ph = xj.get("phase")
+        rows.append(row("xp-judge", "⚖️ XP judge",
+                        f'{ph} · {xj.get("candidate") or "—"}',
+                        G if ph == "promoted" else (Y if ph == "running" else M)))
+        im = s.get("fleet-immune") or {}
+        nsick, nq = len(im.get("sick") or []), len(im.get("quarantined_levers") or {})
+        rows.append(row("fleet-immune", "🛡️ Immune",
+                        f'{nsick} sick · {nq} quarantined · {im.get("pruned_alerts") or 0} pruned',
+                        R if nsick else (Y if nq else G)))
+        rg = s.get("fleet-regen") or {}
+        nrep, nop = len(rg.get("repaired") or []), len(rg.get("needs_operator") or [])
+        rows.append(row("fleet-regen", "🩹 Regen",
+                        f'{nrep} repaired' + (f' · {nop} NEED OPERATOR' if nop else ''),
+                        R if nop else (Y if nrep else None)))
+        rp = s.get("fleet-respiration") or {}
+        spo2 = rp.get("spo2")
+        rc = (R if (spo2 is not None and spo2 < 0.7)
+              else (Y if (spo2 is not None and spo2 < 0.9) else G))
+        rows.append(row("fleet-respiration", "🫁 Respiration",
+                        f'SpO2 {int(round((spo2 or 0) * 100))}% · {rp.get("state")}', rc))
+        ck = s.get("fleet-clock") or {}
+        rows.append(row("fleet-clock", "🕰️ Clock",
+                        f'{ck.get("primary")}' + (" · THIN" if ck.get("thin_liquidity") else ""),
+                        Y if ck.get("thin_liquidity") else None))
+        sf = s.get("impl-shortfall") or {}
+        vd = sf.get("verdict")
+        sc = R if vd == "live-slipping" else (G if vd == "live-ahead" else M)
+        xs = sf.get("exit_slip_bps")
+        rows.append(row("impl-shortfall", "📉 Live vs shadow",
+                        f'{vd} · gap {sf.get("gap_pp")}pp'
+                        + (f' · exit-slip {xs}bps' if xs is not None else ''), sc))
+        gc = s.get("gapscout-census") or {}
+        bp = (gc.get("day") or {}).get("booked_pnl")
+        rows.append(row("gapscout-census", "📊 Gap Scout census",
+                        f'{gc.get("episodes_open")} open · quiet {gc.get("quiet_hours")}h'
+                        + (f' · day {_d(bp)}' if bp is not None else ''),
+                        (G if (bp or 0) > 0 else R) if bp else None))
+
+        rows = [r for r in rows if r]
+        if not rows:
+            return ""
+        return (f'<div class="card"><h2>🤖 Autonomy / Growth Rail '
+                f'<span class="dot on"></span></h2>'
+                f'<div class="muted">self-tuning stack · levers auto-revert on TTL · '
+                f'nothing ratchets · live money gated</div>{"".join(rows)}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def brain_card_html():
     """Compact card for the learning loop's current state (bot_state 'learning-brain')."""
     try:
@@ -1313,7 +1420,7 @@ def render():
         enrich = {}
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
-    brain_html = brain_card_html() + evidence_board_card()
+    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}
@@ -1843,6 +1950,39 @@ def _organ_vital(key, st):
         if key == "evidence-review":
             return _v("{} verdicts · reviewed {}", len(st.get("verdicts") or []),
                       str(st.get("reviewed_at"))[:16])
+        # [2026-07-16] growth-rail organs (make the autonomy stack visible)
+        if key == "fleet-tuning":
+            lv = st.get("levers") or {}
+            live = sum(1 for x in lv.values()
+                       if isinstance(x, dict) and x.get("lane") == "lighter-live")
+            return _v("{} active levers · {} lighter-live", len(lv), live)
+        if key == "scout-tuner":
+            return _v("{} enacted · baseline net ${}",
+                      len(st.get("enacted") or {}), st.get("baseline_net"))
+        if key == "strategy-incubator":
+            ch = st.get("champion") or {}
+            return _v("champion {} · net ${}", ch.get("confidence") or "none", ch.get("net"))
+        if key == "xp-queue":
+            return _v("{} candidates queued", len(st.get("candidates") or []))
+        if key == "xp-judge":
+            return _v("phase {} · cand {}", st.get("phase"), st.get("candidate") or "—")
+        if key == "fleet-immune":
+            return _v("{} sick · {} quarantined",
+                      len(st.get("sick") or []), len(st.get("quarantined_levers") or {}))
+        if key == "fleet-regen":
+            return _v("{} repaired · {} need operator",
+                      len(st.get("repaired") or []), len(st.get("needs_operator") or []))
+        if key == "fleet-respiration":
+            return _v("SpO2 {}% · {}",
+                      int(round((st.get("spo2") or 0) * 100)), st.get("state"))
+        if key == "fleet-clock":
+            return _v("session {}{}",
+                      st.get("primary"), " · THIN" if st.get("thin_liquidity") else "")
+        if key == "impl-shortfall":
+            return _v("{} · gap {}pp", st.get("verdict"), st.get("gap_pp"))
+        if key == "gapscout-census":
+            return _v("{} episodes open · quiet {}h",
+                      st.get("episodes_open"), st.get("quiet_hours"))
     except Exception:  # noqa: BLE001
         pass
     return "—"
@@ -1860,6 +2000,21 @@ ORGAN_SPECS = [
     ("brain-diagnosis",    "🩺 Per-bucket diagnosis",                 False, 26000),
     ("signal-bus",         "🚌 Signal bus mirror",                    False, 900),
     ("regime-oracle",      "🧭 Regime oracle",                        False, 14400),
+    # [2026-07-16] growth-rail cohort — was headless; now health-graded.
+    # Only immune + respiration are watchdog-critical for the first rollout
+    # (a DARK immune/lungs = the fleet is flying blind); the rest bed in as
+    # non-critical to avoid a pager storm, promote per-organ once proven.
+    ("fleet-tuning",       "🎚️ Fleet tuning — active levers",        False, 7200),
+    ("scout-tuner",        "🔧 Scout tuner — self-enacted levers",    False, 10800),
+    ("strategy-incubator", "🧬 Incubator — champion genotype",        False, 10800),
+    ("xp-queue",           "📥 XP queue — candidates for the judge",  False, 10800),
+    ("xp-judge",           "⚖️ XP judge — promotion state machine",   False, 10800),
+    ("fleet-immune",       "🛡️ Fleet immune — sick/quarantine",       True,  2400),
+    ("fleet-regen",        "🩹 Fleet regen — auto-heal",              False, 2400),
+    ("fleet-respiration",  "🫁 Respiration — data-feed SpO2",         True,  1200),
+    ("fleet-clock",        "🕰️ Fleet clock — session/liquidity",      False, 1800),
+    ("impl-shortfall",     "📉 Impl shortfall — live vs shadow slip", False, 3600),
+    ("gapscout-census",    "📊 Gap Scout census — episodes",          False, 3600),
     ("fleet-alerts",       "🔔 Alert feed (event-driven)",            False, None),
     ("evidence-review",    "🧾 Evidence review (daily + operator)",   False, None),
 ]
