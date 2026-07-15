@@ -167,5 +167,20 @@ done &
     sleep "${EVBOARD_INTERVAL_SEC:-600}"
   done ) &
 
+# [2026-07-15 SCOUT TUNER] 🧠🔧 the Lighter loop's self-tuning organ (user
+# mandate: the scanner "needs the freedom, with the brain's support, to act").
+# Hourly: replays the recorded scout tape through the taker's REAL code,
+# widens starving lenses' bars (not-worse on both halves), expands
+# brain-graded winners (must IMPROVE both halves), sweeps the TP/SL/hold
+# grid (anti-overfit floors), widens starving lenses' scout emission (the
+# brain's grading diet). Everything lands as bounded TTL'd fleet_tuning
+# levers that expire back to env defaults unless re-asserted — auto-revert
+# is the resting state. First cycles need tape: it skips below 60 snapshots.
+( sleep 420
+  while true; do
+    python3 /freqtrade/lighter_scout_tuner.py || true
+    sleep "${TUNER_INTERVAL_SEC:-3600}"
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait

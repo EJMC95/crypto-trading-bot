@@ -39,6 +39,11 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 from paper_broker import PaperBroker
 
+try:
+    import fleet_tuning as tuning     # growth rail (optional import)
+except Exception:  # noqa: BLE001
+    tuning = None
+
 BOT_ROW = "lighter-ticket-taker-lshadow"
 STATE_KEY = "lighter-ticket-taker"
 SCOUT_KEY = "lighter-market"
@@ -73,6 +78,35 @@ DIV_GAP_PP = float(os.environ.get("TT_DIV_GAP", "500"))
 # above this (bps), the whole venue is dislocated — take NO new entries this
 # cycle (exits keep running). Normal tape prints ~6bps median.
 STRESS_VETO_BPS = float(os.environ.get("TT_STRESS_VETO_BPS", "15"))
+
+
+# [2026-07-15 GROWTH RAIL] The tuner (lighter_scout_tuner.py) may move the
+# conviction bars / exit ladder within fleet_tuning's hard bounds — but ONLY
+# after the change beat/matched baseline on BOTH halves of the recorded tape
+# through this module's own decision code. Levers expire on their own; the
+# env defaults above stay authoritative whenever no live lever exists.
+TUNABLE = (("taker.dip_range", "DIP_RANGE"),
+           ("taker.brk_range", "BRK_RANGE"),
+           ("taker.momo_chg", "MOMO_CHG"),
+           ("taker.div_gap_pp", "DIV_GAP_PP"),
+           ("taker.tp", "TAKE_PROFIT"),
+           ("taker.sl", "STOP_LOSS"),
+           ("taker.max_hold_h", "MAX_HOLD_H"))
+
+
+def apply_tuning():
+    """Overlay live growth-rail levers onto the module bars. Returns what
+    moved (for the log). Defaults untouched when no lever is live."""
+    if tuning is None:
+        return {}
+    moved = {}
+    for lever, attr in TUNABLE:
+        cur = globals()[attr]
+        val = tuning.get_lever(lever, cur)
+        if val != cur:
+            globals()[attr] = val
+            moved[lever] = val
+    return moved
 
 
 def now():
@@ -170,6 +204,9 @@ def exit_reason(entry, mark, opened, t_now, is_long=True):
 
 
 def main():
+    moved = apply_tuning()
+    if moved:
+        print(f"[ticket-taker] {iso(now())} growth-rail levers active: {moved}")
     try:
         marks, funding, ranges = fetch_marks_and_funding()
     except Exception as e:  # noqa: BLE001 — keyless API down: skip this cycle
@@ -357,7 +394,10 @@ def main():
                              "tag": (("long-" if broker.pos[s][0] > 0 else "short-")
                                      + (meta.get(s) or {}).get("lens", "ticket"))}
                             for s in broker.pos],
-               "scout_fresh": fresh, "stress_veto": stressed})
+               "scout_fresh": fresh, "stress_veto": stressed,
+               # the bars actually in force this cycle (growth-rail visible)
+               "bars": {lever: globals()[attr] for lever, attr in TUNABLE},
+               "tuned": sorted(moved)})
     print(f"[ticket-taker] {iso(t_now)} equity {equity:+.2f} "
           f"open {broker.open_count()}/{MAX_OPEN} closed {stats['closed']} "
           f"({stats['wins']}W/{stats['losses']}L) scout_fresh={fresh}")

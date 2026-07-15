@@ -52,6 +52,17 @@ https://pnl-dashboard-production-858c.up.railway.app/
   stay proposal-only until a review adds them; real money NEVER). First
   loop: Gap Scout census quiet 24/48/96h → widen prefilter/book-budget/
   second-tier venues (kucoin/gateio/mexc), phone-notified per step
+- `lighter_scout_tuner.py` 🧠🔧 — the Lighter loop's SELF-TUNING organ
+  (15-Jul user mandate: the scanner "needs the freedom, with the brain's
+  support, to act"). Hourly, stateless, replay-gated: replays the scout
+  tape through the taker's REAL code (`lighter_ticket_replay`), widens
+  STARVING lenses' taker bars (not-worse both halves), expands
+  brain-graded WINNER lenses (must IMPROVE both halves), auto-runs the
+  TP/SL/hold sweep (anti-overfit floors: ≥10 closed, +$2 total, both
+  halves), widens starving lenses' SCOUT emission bars (grading diet —
+  advisory tickets only). Everything lands as bounded TTL'd
+  `fleet-tuning` levers (auto-revert); never widens a brain-vetoed lens;
+  fail-safe neutral on a dark brain. → bot_state `scout-tuner`
 - `regime_oracle.py`, `market_pulse.py` (history appends hourly),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 
@@ -107,10 +118,12 @@ its row is dashboard-retired regardless; stop the process when found.
 - `signal-bus`, `regime-oracle`, `market-pulse`, `listing-intel` — published
   context (funding APRs, dislocation, per-major regime, news mood, sniper
   intel classes). Only market-pulse.panic + the two keys above are consumed.
-- `fleet-tuning` — the growth rail's lever payload (evidence board authors,
-  `fleet_tuning.py` registry clamps; consumers: Gap Scout). `gapscout-census`
-  — Gap Scout's epoch-2 episode/artifact/cross-quote census (board reads
-  `quiet_hours` for the widen ladder). Both TTL'd like everything else.
+- `fleet-tuning` — the growth rail's lever payload (authors: evidence board
+  + scout tuner, MERGED writes with per-lever expiry; `fleet_tuning.py`
+  registry clamps; consumers: Gap Scout, Lighter Scout, Ticket Taker).
+  Lanes: paper-scanner / lighter-scout / lighter-taker — all zero real
+  money. `gapscout-census` — Gap Scout's epoch-2 episode census (board
+  reads `quiet_hours`). `scout-tuner` — the tuner's cycle log + enactments.
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).
 - Bot identity for multiplier lookup = `bot_name` in each freqtrade config

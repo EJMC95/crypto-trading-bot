@@ -41,6 +41,12 @@ and service logs for veto/governor lines.
 - **Dip starvation:** the dip lens graded n=2 while others graded ~90 in
   the same window — `TT_DIP_RANGE=0.05` may be too strict to ever learn.
   Replay-sweep 0.05 → 0.10 → 0.15 on the week's tape before touching env.
+  [15-Jul late: AUTOMATED — `lighter_scout_tuner.py` now runs exactly this
+  loop hourly (starving-lens ladder + winner expansion + the TP/SL/hold
+  sweep, all replay-gated both-halves, levers via fleet_tuning). At review:
+  grade its enactment history (`scout-tuner` + `fleet-tuning` history)
+  instead of hand-running the sweep — did the dip diet widen, did n4h reach
+  the floor, did any winner expansion fire, did anything auto-revert.]
 - **TP/SL/hold sweep:** replay grid over TT_TP (3–6%), TT_SL (−2…−4%),
   TT_MAX_HOLD_H (24/48/72) on ≥6 days of tape. Ship only replay-positive
   changes, env-first (no code edits needed — the bars are env vars).

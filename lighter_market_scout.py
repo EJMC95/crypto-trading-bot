@@ -42,6 +42,11 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 
+try:
+    import fleet_tuning as tuning     # growth rail (optional import)
+except Exception:  # noqa: BLE001
+    tuning = None
+
 KEY = "lighter-market"
 TTL_SEC = 900
 API_BASE = os.environ.get("LIGHTER_API_BASE", "https://mainnet.zklighter.elliot.ai")
@@ -53,6 +58,37 @@ OI_MOVE_FRAC = float(os.environ.get("SCOUT_OI_MOVE", "0.25"))
 # +925pp at first light — genuine divergences are triple digits).
 DIV_GAP_PP = float(os.environ.get("SCOUT_DIV_GAP", "300"))
 TOP_N = 8
+
+# ---- Lens EMISSION bars (2026-07-15 GROWTH RAIL) ----------------------------
+# These gate which ADVISORY tickets are emitted — i.e. what the brain gets
+# to grade counterfactually — NOT what trades (the taker's own conviction
+# bars gate fills). The scout tuner may WIDEN them via bounded fleet_tuning
+# levers when a lens is starving for samples: more tickets = faster lens
+# learning, zero trading surface.
+BRK_RANGE_MIN = float(os.environ.get("SCOUT_BRK_RANGE_MIN", "0.9"))
+DIP_RANGE_MAX = float(os.environ.get("SCOUT_DIP_RANGE_MAX", "0.1"))
+MOMO_CHG_MIN = float(os.environ.get("SCOUT_MOMO_CHG_MIN", "3.0"))
+TICKET_TOP_N = int(os.environ.get("SCOUT_TICKET_TOP_N", "6"))
+
+
+def apply_tuning():
+    """Growth-rail levers override the env defaults (bounded in the
+    fleet_tuning registry; expired/absent levers leave defaults intact).
+    Returns {lever: value} of anything that actually moved, for the log."""
+    global BRK_RANGE_MIN, DIP_RANGE_MAX, MOMO_CHG_MIN, TICKET_TOP_N
+    if tuning is None:
+        return {}
+    moved = {}
+    for lever, attr in (("scout.brk_range_min", "BRK_RANGE_MIN"),
+                        ("scout.dip_range_max", "DIP_RANGE_MAX"),
+                        ("scout.momo_chg_min", "MOMO_CHG_MIN"),
+                        ("scout.ticket_top_n", "TICKET_TOP_N")):
+        cur = globals()[attr]
+        val = tuning.get_lever(lever, cur)
+        if val != cur:
+            globals()[attr] = val
+            moved[lever] = val
+    return moved
 
 
 def now_iso():
@@ -164,11 +200,11 @@ def strategy_tickets(stats, lighter_apr, divergence=None):
         row = {"sym": s, "range_pos": round(rng, 2), "chg_pct": round(chg, 2),
                "vol_m": round(v["qvol"] / 1e6, 2), "prem_bps": v["prem_bps"],
                "apr_pct": apr}
-        if rng >= 0.9 and chg > 0.0 and not rich and not longs_pay_hard:
+        if rng >= BRK_RANGE_MIN and chg > 0.0 and not rich and not longs_pay_hard:
             out["breakout"].append(row)
-        if rng <= 0.1 and -8.0 <= chg <= -1.0 and not rich:
+        if rng <= DIP_RANGE_MAX and -8.0 <= chg <= -1.0 and not rich:
             out["dip"].append({**row, "trend": "unknown_v1"})
-        if chg >= 3.0 and v["qvol"] >= 1e6 and not rich and not longs_pay_hard:
+        if chg >= MOMO_CHG_MIN and v["qvol"] >= 1e6 and not rich and not longs_pay_hard:
             out["momentum"].append(row)
     for d in divergence or []:
         s = d.get("sym")
@@ -190,7 +226,7 @@ def strategy_tickets(stats, lighter_apr, divergence=None):
     out["dip"].sort(key=lambda r: (r["range_pos"], r["chg_pct"]))
     out["momentum"].sort(key=lambda r: -r["chg_pct"])
     out["divergence"].sort(key=lambda r: -abs(r["gap_pct"]))
-    return {k: v[:6] for k, v in out.items()}
+    return {k: v[:TICKET_TOP_N] for k, v in out.items()}
 
 
 def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
@@ -271,6 +307,9 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
 
 
 def main():
+    moved = apply_tuning()
+    if moved:
+        print(f"[lighter-scout] {now_iso()} growth-rail levers active: {moved}")
     try:
         obd = _get("/api/v1/orderBookDetails")
         fr = _get("/api/v1/funding-rates")

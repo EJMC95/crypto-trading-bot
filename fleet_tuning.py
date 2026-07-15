@@ -53,9 +53,17 @@ TTL_SEC = int(os.environ.get("FLEET_TUNING_TTL_SEC", "7200"))   # 2h re-assert
 CACHE_SEC = 60.0
 
 # Lanes the rail may ENACT autonomously. Everything else is proposal-only.
-# "paper-scanner" = detection/census organs with zero trading surface.
+# Every enactable lane is ZERO real money by construction:
+#   paper-scanner — detection/census organs (no trading surface at all)
+#   lighter-scout — the scout's ADVISORY ticket emission (widens what gets
+#                   GRADED by the brain; the taker's bars still gate fills)
+#   lighter-taker — the $1k SHADOW book's bars; enactments on this lane are
+#                   REPLAY-GATED by lighter_scout_tuner (both-halves on the
+#                   recorded tape) before they are ever written here
+# Live-money lanes do not exist in this registry and never will.
 ENACT_LANES = {s.strip() for s in os.environ.get(
-    "FLEET_TUNING_ENACT_LANES", "paper-scanner").split(",") if s.strip()}
+    "FLEET_TUNING_ENACT_LANES",
+    "paper-scanner,lighter-scout,lighter-taker").split(",") if s.strip()}
 
 # ---------------------------------------------------------------------------
 # THE REGISTRY — every autonomously-tunable lever in the fleet, with hard
@@ -73,6 +81,46 @@ LEVERS = {
         "kind": "csv", "allowed": {"kucoin", "gateio", "mexc", "bitget", "htx"},
         "lane": "paper-scanner",
         "note": "second-tier venues hot-added to the census net"},
+    # Lighter Scout 🛰️ — learning-throughput levers: they widen which
+    # ADVISORY tickets get emitted (and therefore counterfactually graded by
+    # the brain), not what trades. Widening = faster lens learning.
+    "scout.ticket_top_n": {
+        "kind": "int", "lo": 6, "hi": 15, "lane": "lighter-scout",
+        "note": "tickets emitted per lens per scan; default 6"},
+    "scout.brk_range_min": {
+        "kind": "float", "lo": 0.80, "hi": 0.90, "lane": "lighter-scout",
+        "note": "breakout lens: min range_pos to emit; default 0.90"},
+    "scout.dip_range_max": {
+        "kind": "float", "lo": 0.10, "hi": 0.25, "lane": "lighter-scout",
+        "note": "dip lens: max range_pos to emit; default 0.10"},
+    "scout.momo_chg_min": {
+        "kind": "float", "lo": 2.0, "hi": 3.0, "lane": "lighter-scout",
+        "note": "momentum lens: min day change %% to emit; default 3.0"},
+    # Ticket Taker 🎫 (SHADOW $1k book) — conviction bars + exit ladder.
+    # Bounds = the 21-Jul agenda's own sweep grids. The tuner only writes
+    # these after the change beats/matches baseline on BOTH halves of the
+    # recorded tape (lighter_ticket_replay through the taker's real code).
+    "taker.dip_range": {
+        "kind": "float", "lo": 0.05, "hi": 0.15, "lane": "lighter-taker",
+        "note": "dip conviction bar (range_pos <=); default 0.05"},
+    "taker.brk_range": {
+        "kind": "float", "lo": 0.90, "hi": 0.97, "lane": "lighter-taker",
+        "note": "breakout conviction bar (range_pos >=); default 0.95"},
+    "taker.momo_chg": {
+        "kind": "float", "lo": 3.0, "hi": 6.0, "lane": "lighter-taker",
+        "note": "momentum conviction bar (day %% >=); default 5.0"},
+    "taker.div_gap_pp": {
+        "kind": "float", "lo": 300.0, "hi": 700.0, "lane": "lighter-taker",
+        "note": "divergence conviction bar (|gap| pp >=); default 500"},
+    "taker.tp": {
+        "kind": "float", "lo": 0.03, "hi": 0.06, "lane": "lighter-taker",
+        "note": "take-profit fraction; default 0.04"},
+    "taker.sl": {
+        "kind": "float", "lo": -0.04, "hi": -0.02, "lane": "lighter-taker",
+        "note": "stop-loss fraction; default -0.03"},
+    "taker.max_hold_h": {
+        "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
+        "note": "max hold hours; default 48"},
 }
 
 
@@ -123,15 +171,30 @@ def _load(now_ts):
     return payload
 
 
+def _lever_alive(entry, now_ts):
+    """A lever entry is alive until its own `expires` stamp (falling back to
+    never-expired for entries that predate per-lever expiry)."""
+    try:
+        exp = entry.get("expires")
+        if not exp:
+            return True
+        e = datetime.fromisoformat(str(exp).replace("Z", "+00:00"))
+        if e.tzinfo is None:
+            e = e.replace(tzinfo=timezone.utc)
+        return e.timestamp() > now_ts
+    except Exception:
+        return False
+
+
 def get_lever(name, default, now_ts=None):
-    """Fresh, registered, clamped lever value — or the caller's default."""
+    """Fresh, unexpired, registered, clamped lever value — or the default."""
     now_ts = now_ts if now_ts is not None else time.time()
     try:
         p = _load(now_ts)
         if not p or not _is_fresh(p, now_ts):
             return default
         entry = (p.get("levers") or {}).get(name)
-        if not isinstance(entry, dict):
+        if not isinstance(entry, dict) or not _lever_alive(entry, now_ts):
             return default
         v = clamp(name, entry.get("value"))
         return default if v is None else v
@@ -140,19 +203,28 @@ def get_lever(name, default, now_ts=None):
 
 
 def active_levers(now_ts=None):
-    """{name: entry} of currently-fresh levers (for display/telemetry)."""
+    """{name: entry} of currently-live levers (for display/telemetry)."""
     now_ts = now_ts if now_ts is not None else time.time()
     p = _load(now_ts)
     if not p or not _is_fresh(p, now_ts):
         return {}
-    return {k: v for k, v in (p.get("levers") or {}).items() if k in LEVERS}
+    return {k: v for k, v in (p.get("levers") or {}).items()
+            if k in LEVERS and isinstance(v, dict) and _lever_alive(v, now_ts)}
 
 
-def write_levers(levers, set_by="evidence-board", now_ts=None):
-    """Author the tuning payload. Drops unknown/out-of-lane levers, clamps
-    every value, stamps updated+ttl_sec. Returns the payload written, or
-    None when nothing valid survived (or no DB). Never raises."""
+def write_levers(levers, set_by="evidence-board", now_ts=None, ttl_sec=None):
+    """Author lever entries, MERGED with other authors' live levers (the
+    board and the scout tuner share this key — a write must never clobber
+    the other author's lane). Drops unknown/out-of-lane levers, clamps every
+    value, stamps per-lever `expires` (auto-revert) + payload updated/ttl.
+    Returns the payload written, or None when nothing valid survived (or no
+    DB). Never raises."""
     now_ts = now_ts if now_ts is not None else time.time()
+    ttl = float(ttl_sec or TTL_SEC)
+
+    def _iso(ts):
+        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(timespec="seconds")
+
     out = {}
     for name, entry in (levers or {}).items():
         spec = LEVERS.get(name)
@@ -162,16 +234,35 @@ def write_levers(levers, set_by="evidence-board", now_ts=None):
         if v is None:
             continue
         out[name] = {"value": v, "lane": spec["lane"], "set_by": set_by,
+                     "expires": _iso(now_ts + ttl),
                      "reason": str((entry or {}).get("reason") or "")[:200],
                      "evidence": str((entry or {}).get("evidence") or "")[:300]}
     if not out:
         return None
-    payload = {"updated": datetime.fromtimestamp(now_ts, tz=timezone.utc)
-               .isoformat(timespec="seconds"),
-               "ttl_sec": TTL_SEC, "levers": out}
     try:
         if store is None:
             return None
+        # merge: keep OTHER authors' still-alive levers; mine replace mine.
+        prev = {}
+        try:
+            prev = store.load_state(KEY) or {}
+        except Exception:
+            prev = {}
+        merged = {k: v for k, v in (prev.get("levers") or {}).items()
+                  if k in LEVERS and isinstance(v, dict) and k not in out
+                  and v.get("set_by") != set_by and _lever_alive(v, now_ts)}
+        merged.update(out)
+        # payload ttl covers the longest-lived lever so readers stay fresh
+        horizon = now_ts
+        for v in merged.values():
+            try:
+                e = datetime.fromisoformat(str(v.get("expires")).replace("Z", "+00:00"))
+                horizon = max(horizon, e.timestamp())
+            except Exception:
+                horizon = max(horizon, now_ts + ttl)
+        payload = {"updated": _iso(now_ts),
+                   "ttl_sec": int(max(ttl, horizon - now_ts)),
+                   "levers": merged}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
             store.save_history(KEY, {"updated": payload["updated"],
@@ -213,13 +304,30 @@ def _selftest():
     assert get_lever("unknown.lever", 7, now_ts=now) == 7
     assert set(active_levers(now_ts=now)) == {"gapscout.prefilter_gap",
                                               "gapscout.extra_exchanges"}
-    # writer: unknown/out-of-lane dropped, values clamped; no-DB -> None but
-    # never raises (store.save_state is a guarded no-op without DATABASE_URL)
+    # per-lever expiry: a dead lever yields the default even in a fresh payload
+    _cache.update(ts=now, payload={"updated": fresh_iso, "ttl_sec": 7200,
+                                   "levers": {
+                                       "taker.tp": {"value": 0.05,
+                                                    "expires": "2020-01-01T00:00:00+00:00"},
+                                       "taker.sl": {"value": -0.02}}})   # no expires = alive
+    assert get_lever("taker.tp", 0.04, now_ts=now) == 0.04, "expired lever -> default"
+    assert get_lever("taker.sl", -0.03, now_ts=now) == -0.02
+    assert set(active_levers(now_ts=now)) == {"taker.sl"}
+    # writer: unknown/out-of-lane dropped, values clamped, expires stamped,
+    # merge keeps OTHER authors' live levers; no-DB -> save is a guarded no-op
     p = write_levers({"gapscout.prefilter_gap": {"value": 0.00001, "reason": "r"},
-                      "not.a.lever": {"value": 1}}, now_ts=now)
-    if p is not None:                       # only when a DB is configured
-        assert set(p["levers"]) == {"gapscout.prefilter_gap"}
+                      "taker.dip_range": {"value": 0.99},
+                      "not.a.lever": {"value": 1}}, set_by="t", now_ts=now)
+    if p is not None:                       # store module importable
+        assert set(p["levers"]) >= {"gapscout.prefilter_gap", "taker.dip_range"}
         assert p["levers"]["gapscout.prefilter_gap"]["value"] == 0.0010
+        assert p["levers"]["taker.dip_range"]["value"] == 0.15       # clamped
+        assert p["levers"]["taker.dip_range"]["expires"] > fresh_iso[:10]
+    # every registered lever must clamp its own documented default
+    for name, spec in LEVERS.items():
+        if spec["kind"] in ("float", "int"):
+            assert clamp(name, spec["lo"]) == spec["lo"]
+            assert clamp(name, spec["hi"]) == spec["hi"]
     print("fleet_tuning selftest OK")
 
 
