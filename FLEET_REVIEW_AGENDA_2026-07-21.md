@@ -151,3 +151,30 @@ and service logs for veto/governor lines.
     auto-verdicts; promote EVBOARD_MODE only if the would-act log earns
     it (the L2-light path). Also queued: coin-veto remove-side
     hysteresis (ADA flap, board:veto-flap:ADA) — backtest-first.
+  - 15-Jul (post-lift, restrict-only data hygiene): 🎯 Launch Sniper —
+    EWY + EWYG added to `TOKENIZED_BASES` on the operator's note
+    ("consider dropping EWY/USDT"). Ledger evidence: EWY flap-listed
+    on/off 9 times 4→13-Jul, every close `delisted` within ~2h, 8/9 red
+    (net −$1.9) — the exact class the 3-Jul filter exists for (EWZ/EWT
+    already in the set). No backtest is possible for new listings; the
+    ledger is the evidence, per the 7-Jul wave-2 precedent. Main only;
+    the sniper service redeploys, gate0 untouched.
+
+## 9. Launch Sniper: 03–05 UTC session sizing (operator note, 15-Jul)
+Operator observation: "UTC03-05 is event-listing-sniper's best session — a
+future tweak could size up there." Ledger check (15-Jul, 339 closes since
+26-Jun) confirms the raw numbers: the 03–05 UTC entry block is **+$350.06 on
+39 closes vs −$106.66 on the other 300**, win rate 23% in-block vs 8.7%
+outside. Plausible mechanism too (Asian-venue listing windows). BUT the
+block's profit is ~4 payoff events — ANSEM +$274 (28-Jun, one position split
+TP-partial/TP), INDEX +$51 (15-Jul), BIBI +$45 (8-Jul), DATA +$4 — and the
+median in-block trade is still −$0.10. A sniper's P&L is lottery-shaped;
+whichever hour bucket caught the biggest ticket is always "the best session"
+in hindsight.
+- **Decision for the review:** keep recording, DON'T size up yet. Evidence
+  bar for a session-size multiplier: materially more in-block payoff events
+  (n≥30 winners is the brain's own floor), both-halves hold-up, and rule out
+  the confound that 03–05 is really "which exchange" not "which hour"
+  (session sizing on 4 events is the Trail Blazer lucky-window lesson).
+- Cheap week task: log entry-hour histograms of payoff events (>$5 closes)
+  per exchange from `paper_trades` — one query at the review, no code.

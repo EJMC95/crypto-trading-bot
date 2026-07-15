@@ -191,6 +191,12 @@ TOKENIZED_BASES = {
     "RKLB", "AXTI", "SONY", "MRVL", "HYUNDAI", "TQQQ", "FLNC", "ONDS",
     "NBIS", "SPCX", "DRAM", "HIMS", "EWZ", "ASTS", "XCU", "BBX", "CBRS",
     "AAOI", "CIEN",
+    # [2026-07-15] EWY (iShares South Korea ETF token — EWZ/EWT's sibling) is
+    # not a wave, it FLAPS: the venue delists/relists it, each reappearance
+    # reads as brand-new, and the sniper re-bought it 9 times 4→13-Jul — every
+    # close `delisted` within ~2h, 8/9 red, net −$1.9. EWYG rode the same
+    # section. Operator-requested drop.
+    "EWY", "EWYG",
 }
 
 # Rough global spot-volume ranking of major exchanges (CCXT ids). Anything not
