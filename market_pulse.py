@@ -220,8 +220,11 @@ def build_pulse():
 # ("~7d at 1/h") but the pulse loops every ~10 min, so the rolling window had
 # silently shrunk to ~33 HOURS — the brain's mood-conditioned analysis and the
 # Jul-14 review's panic study were reading a fraction of the intended history.
-# Append at most hourly (latest still refreshes every run); 200 ≈ 8 days again.
-HIST_MIN_GAP_SEC = 3300
+# [2026-07-15] Operator: append every 30 MIN not hourly — "more data to better
+# inform" the brain/board. Cap bumped to 400 so the ~8-day window holds at the
+# doubled resolution (latest still refreshes every ~10-min run).
+HIST_MIN_GAP_SEC = int(os.environ.get("PULSE_HIST_GAP_SEC", "1740"))   # ~29 min
+HIST_CAP = int(os.environ.get("PULSE_HIST_CAP", "400"))                # ~8d at 2/h
 
 
 def append_hourly(hist, pulse):
@@ -249,7 +252,11 @@ def save(pulse):
         import bot_pnl_store as store
         prev = store.load_state("market-pulse") or {}
         hist = append_hourly(prev.get("history", []), pulse)
-        state = {"latest": pulse, "history": hist[-200:]}   # ~8d at 1/h, capped
+        # [2026-07-15] carry the fleet freshness contract (updated+ttl_sec) so
+        # respiration / immune / fleet_bus can read pulse's age — it had none,
+        # which made the respiration organ false-flag it as a dead feed.
+        state = {"latest": pulse, "history": hist[-HIST_CAP:],
+                 "updated": pulse["ts"], "ttl_sec": 3600}
         if store.save_state("market-pulse", state):
             saved.append("postgres")
     except Exception:
@@ -265,7 +272,8 @@ def save(pulse):
             except Exception:
                 prev = {}
         hist = append_hourly(prev.get("history", []), pulse)
-        json.dump({"latest": pulse, "history": hist[-200:]}, open(loc, "w"), indent=1)
+        json.dump({"latest": pulse, "history": hist[-HIST_CAP:],
+                   "updated": pulse["ts"], "ttl_sec": 3600}, open(loc, "w"), indent=1)
         md = [f"# Market pulse — {pulse['ts']}",
               f"- **Mood: {pulse['mood']:+.2f}**  (F&G {pulse['fear_greed']}, "
               f"text {pulse['text_sentiment']:+.2f})",

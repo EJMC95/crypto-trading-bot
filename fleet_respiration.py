@@ -50,7 +50,7 @@ OXYGEN_FEEDS = {
     "lighter-market":  {"limit": 1200, "weight": 3},   # the whole-venue map — most organs breathe this
     "signal-bus":      {"limit": 1200, "weight": 1},
     "regime-oracle":   {"limit": 7200, "weight": 1},   # slow feed (30-min)
-    "market-pulse":    {"limit": 7200, "weight": 1},
+    "market-pulse":    {"limit": 1800, "weight": 1},   # refreshes ~10-min; 30-min limit
 }
 # Live bots' publish freshness is their own breathing — read from bot_pnl.
 LIVE_BREATHS = {

@@ -104,7 +104,7 @@ https://pnl-dashboard-production-858c.up.railway.app/
   fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA
   transition — the fleet-wide data-starvation the per-organ watchdog misses.
   → `fleet-respiration`
-- `regime_oracle.py`, `market_pulse.py` (history appends hourly),
+- `regime_oracle.py`, `market_pulse.py` (history appends every 30 min, 15-Jul),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 
 ### RETIRED (rows hidden + pruned; ledgers kept)
