@@ -773,6 +773,7 @@ def main():
         # matches fleet_bus: fresh payload + mode=enforce + budget full ->
         # skip NEW entries; anything missing/stale fails OPEN (never blocks).
         fleet_long_veto = False
+        fleet_gov = 1.0
         try:
             _fr = store.load_state("fleet-risk") or {}
             _upd = datetime.fromisoformat(
@@ -780,15 +781,25 @@ def main():
             _age = (now - _upd).total_seconds()
             _lb = _fr.get("long_budget")
             _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
-            if (_age <= float(_fr.get("ttl_sec") or 900)
-                    and _fr.get("mode") == "enforce"
-                    and (_fr.get("long_positions") or 0) >= _lb):
-                fleet_long_veto = True
-                log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
-                         "no new entries this cycle (exits unaffected)",
-                         _fr.get("long_positions"), _fr.get("long_budget"))
+            if _age <= float(_fr.get("ttl_sec") or 900):
+                if (_fr.get("mode") == "enforce"
+                        and (_fr.get("long_positions") or 0) >= _lb):
+                    fleet_long_veto = True
+                    log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
+                             "no new entries this cycle (exits unaffected)",
+                             _fr.get("long_positions"), _fr.get("long_budget"))
+                # [2026-07-15 GAP FIX] fleet drawdown governor — the taker
+                # consumed clip_scale since 14-Jul, the gate0 books stayed
+                # "advisory until ported". Ported: new-entry stakes scale by
+                # clip_scale (1.0/0.5/0.25), clamped like the taker; stale/
+                # missing state stays neutral 1.0 (fail-open).
+                fleet_gov = max(0.25, min(1.0, float(_fr.get("clip_scale") or 1.0)))
+                if fleet_gov < 1.0:
+                    log.info("FLEET DRAWDOWN GOVERNOR — new-entry stakes x%.2f",
+                             fleet_gov)
         except Exception:  # noqa: BLE001 — fail-safe open
             fleet_long_veto = False
+            fleet_gov = 1.0
 
         for b in books:
             store.heartbeat(b.bot_id)
@@ -914,7 +925,7 @@ def main():
                 if bm < 1.0:
                     log.info("%s %s brain stake-mult x%.2f (%s)",
                              b.bot_id, coin, bm, ledger_tag(tag))
-                stake = STAKE_USD * b.s.stake_mult(tag, bars) * bm
+                stake = STAKE_USD * b.s.stake_mult(tag, bars) * bm * fleet_gov
                 size = stake / px
                 b.broker.open(coin, True, size, px)
                 ent = b.broker.pos.get(coin)

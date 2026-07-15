@@ -1033,7 +1033,12 @@ def monitor(cfg, exchange_ids):
                             pnl_abs=float(row[10]),
                             pnl_pct=float(row[9]) / 100.0,
                             pair=row[5], opened_at=row[1], closed_at=row[2],
-                            reason=row[11],
+                            # [2026-07-15 GAP FIX] direction-prefixed so the
+                            # brain can bucket this book per-sleeve (its 337
+                            # closes were permanently '(untagged)'). Parser
+                            # splits at the FIRST underscore ->
+                            # enter_tag 'long-listing', exit_reason preserved.
+                            reason="long-listing_" + str(row[11]),
                         )
                 except Exception:
                     pass

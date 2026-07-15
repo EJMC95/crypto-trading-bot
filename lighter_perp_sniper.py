@@ -256,7 +256,12 @@ def main():
                           open_trades=pub_open,
                           extra={"mode": ctx.mode, "venue": ctx.mode,
                                  "watching": len(baseline),
-                                 "dir": "long" if DIRECTION_LONG else "short"})
+                                 "dir": "long" if DIRECTION_LONG else "short",
+                                 # [2026-07-15 GAP FIX] position detail so the
+                                 # fleet exposure/concentration view can see
+                                 # this book (it was sym_uncovered before).
+                                 "held": {c: ("L" if DIRECTION_LONG else "S")
+                                          for c in sorted(broker.pos)}})
         except Exception:  # noqa: BLE001
             pass
         if dry_run:
