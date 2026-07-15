@@ -53,23 +53,43 @@ jobs:
 
       - name: Resolve DATABASE_URL (never printed) and pg_dump
         env:
-          # Account token: `railway link` + variable reads need its scope
-          # (project token can't link — learned in railway-volume.yml).
+          # [2026-07-15 run-1 fix] The ACCOUNT token secret is dead
+          # ("Unauthorized" — railway-volume.yml already called it
+          # unreliable). The PROJECT token works (railway-redeploy.yml uses
+          # it daily) and reads service variables WITHOUT linking, so it is
+          # primary; the account token stays as a fallback path.
+          RAILWAY_PROJECT_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_ACCOUNT_TOKEN }}
           PROJECT: 9b3b7d3c-28db-417b-b864-ebc065df851f
           DB_SERVICE: ${{ github.event.inputs.db_service || 'Postgres' }}
         run: |
           set -uo pipefail
-          if [ -z "${RAILWAY_API_TOKEN:-}" ]; then
-            echo "::error::RAILWAY_ACCOUNT_TOKEN secret missing (Settings > Secrets > Actions)."
+          if [ -n "${RAILWAY_PROJECT_TOKEN:-}" ]; then
+            export RAILWAY_TOKEN="$RAILWAY_PROJECT_TOKEN"
+            unset RAILWAY_API_TOKEN || true
+            echo "auth: project token"
+          elif [ -n "${RAILWAY_API_TOKEN:-}" ]; then
+            unset RAILWAY_TOKEN || true
+            echo "auth: account token (fallback)"
+            railway link --project "$PROJECT" --environment production --service "$DB_SERVICE" </dev/null 2>&1 || true
+          else
+            echo "::error::neither RAILWAY_TOKEN nor RAILWAY_ACCOUNT_TOKEN secret is set."
             exit 1
           fi
-          unset RAILWAY_TOKEN || true
-          echo "whoami: $(railway whoami 2>&1 || echo '?')"
-          railway link --project "$PROJECT" --environment production --service "$DB_SERVICE" </dev/null 2>&1 \
-            || railway link -p "$PROJECT" -e production -s "$DB_SERVICE" </dev/null 2>&1 \
-            || { echo "::error::railway link to '$DB_SERVICE' failed — pass the DB service name via workflow_dispatch input."; exit 1; }
-          railway variables --json > /tmp/vars.json 2>/tmp/vars.err || { cat /tmp/vars.err; echo "::error::railway variables failed"; exit 1; }
+          # Service-name diagnostics (names only — never variable values).
+          railway status --json > /tmp/st.json 2>/dev/null || true
+          echo "services in project: $(jq -r '[.. | objects | select(has("name")) | .name] | unique | join(", ")' /tmp/st.json 2>/dev/null | head -c 400 || echo '?')"
+          vars_ok=""
+          for svc in "$DB_SERVICE" Postgres postgres PostgreSQL postgres-db; do
+            if railway variables --service "$svc" --json > /tmp/vars.json 2>/tmp/vars.err; then
+              echo "variables read from service '$svc'"; vars_ok=1; break
+            fi
+          done
+          if [ -z "$vars_ok" ]; then
+            cat /tmp/vars.err 2>/dev/null || true
+            echo "::error::could not read variables for a DB service — re-dispatch with the right db_service name (see the service list above)."
+            exit 1
+          fi
           # Prefer the PUBLIC url (GitHub runners can't reach railway.internal).
           URL="$(jq -r '[.. | objects | to_entries[] | select(.key=="DATABASE_PUBLIC_URL") | .value] | first // empty' /tmp/vars.json)"
           [ -n "$URL" ] || URL="$(jq -r '[.. | objects | to_entries[] | select(.key=="DATABASE_URL") | .value | select(test("railway.internal")|not)] | first // empty' /tmp/vars.json)"
