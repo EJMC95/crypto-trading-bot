@@ -538,7 +538,8 @@ def run_once():
     # set (was ~8 individual round-trips per cycle). Fall back to per-key reads
     # only if the batch came back empty (DB down).
     _keys = ["fleet-alerts", "evidence-review", "lighter-market", "fleet-risk",
-             "brain-lens-forward", "scout-tuner", "xp-judge", "gapscout-census"]
+             "brain-lens-forward", "scout-tuner", "xp-judge", "gapscout-census",
+             "impl-shortfall"]
     _b = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     _ok = bool(_b)
     def _g(k):
@@ -578,6 +579,25 @@ def run_once():
         bot_rows = []
     synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, 26000) else {},
                                tuner_state, bot_rows, lm, now, xp_state)
+
+    # implementation shortfall (live execution quality) — its own tracker
+    # pushes the phone alert; the board only SURFACES the verdict (dedicated-
+    # push key, so no double-send). live-ahead = info, live-slipping = warn.
+    isf = _g("impl-shortfall")
+    if _fresh(isf) and isf.get("verdict") in ("live-ahead", "live-slipping"):
+        _ahead = isf["verdict"] == "live-ahead"
+        _xs = isf.get("exit_slip_bps")
+        synth.append({
+            "key": "board:impl-shortfall",
+            "severity": "info" if _ahead else "warn",
+            "direction": "expand" if _ahead else "restrict",
+            "msg": (f"📏 LIVE {'BEATS' if _ahead else 'trails'} shadow "
+                    f"{isf.get('gap_pp')}pp/trade over {isf.get('n_overlap')} coins"
+                    + (f" (exit-slip {_xs}bps)" if _xs is not None else "")),
+            "proposal": ("execution AHEAD of the model — no action" if _ahead else
+                         "sustained slip → live clip-scale reflex + judge respond; "
+                         "watch the entry-vs-exit split as fill prices accrue"),
+            "lever": "impl-shortfall", "ts": now, "source": "board"})
 
     # ---- LIVE lane 💰: evidence-gated clip scaling on the real-money bots --
     prior_live = prior.get("live_scale") or {}
@@ -686,7 +706,8 @@ def run_once():
     # are skipped here so they aren't double-sent — and, critically, so an
     # ENACTED live action is never mislabeled "Proposed (shadow)" by the
     # generic template (the 15-Jul confusing push).
-    DEDICATED_PUSH = {"board:live-clip-scale", "board:gapscout-quiet"}
+    DEDICATED_PUSH = {"board:live-clip-scale", "board:gapscout-quiet",
+                      "board:impl-shortfall"}   # its tracker owns the push
     for i in items:
         if i["key"] in DEDICATED_PUSH:
             continue

@@ -99,6 +99,13 @@ https://pnl-dashboard-production-858c.up.railway.app/
   `strategy-incubator` + `xp-queue`
 - `fleet_clock.py` 🕐 — CIRCADIAN: the fleet's shared sense of time (trading
   session, thin-liquidity, heavy-job window). Advisory. → `fleet-clock`
+- `implementation_shortfall.py` 📏 — LIVE-vs-SHADOW execution quality: the
+  continuous per-trade return gap (live real fills − shadow mark fills) on
+  the SAME coins both arms closed, weighted by paired closes, with ENTRY/
+  EXIT-slip decomposition (funding bot records fill prices since 15-Jul).
+  Verdict clean/live-ahead/live-slipping/insufficient; sustained slip →
+  phone. Answers "is the live book slipping, and on entry or exit?". →
+  `impl-shortfall`
 - `fleet_respiration.py` 🫁 — RESPIRATION / blood-oxygen: OXYGEN = fresh
   market data; LUNGS = the venue-fetch layer. Measures SpO2 (weighted
   fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA

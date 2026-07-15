@@ -245,5 +245,15 @@ done &
     sleep "${RESP_INTERVAL_SEC:-600}"
   done ) &
 
+# [2026-07-15 IMPL SHORTFALL] 📏 live-vs-shadow execution-quality tracker:
+# the continuous per-trade gap (live real fills − shadow mark fills) on the
+# SAME coins, with entry/exit-slip decomposition as fill prices accrue. The
+# clean yes/no on "is the live Funding Farmer slipping?" (30-min).
+( sleep 720
+  while true; do
+    python3 /freqtrade/implementation_shortfall.py || true
+    sleep "${SHORTFALL_INTERVAL_SEC:-1800}"
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait

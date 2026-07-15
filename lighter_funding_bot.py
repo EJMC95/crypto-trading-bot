@@ -448,6 +448,11 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_l
             pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
             reason=("long_" if was_long else "short_") + reason,
             venue=venue, shadow=shadow,
+            # [2026-07-15] record fill prices + side so the implementation-
+            # shortfall tracker can attribute the live-vs-shadow gap to the
+            # ENTRY vs EXIT side (live = real fills, shadow = mark fills).
+            side=("long" if was_long else "short"),
+            entry_price=ent_px, exit_price=exit_px,
             # [2026-07-15 XP] stamp the bars this arm was running — the
             # experiment judge's paired evaluation needs unambiguous
             # which-params-produced-what attribution on every row.

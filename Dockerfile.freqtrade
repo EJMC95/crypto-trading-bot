@@ -44,6 +44,8 @@ COPY fleet_clock.py /freqtrade/fleet_clock.py
 COPY fleet_regen.py /freqtrade/fleet_regen.py
 COPY strategy_incubator.py /freqtrade/strategy_incubator.py
 COPY fleet_respiration.py /freqtrade/fleet_respiration.py
+# live-vs-shadow execution-quality tracker (implementation shortfall)
+COPY implementation_shortfall.py /freqtrade/implementation_shortfall.py
 RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh /freqtrade/dashboard_server.py /freqtrade/bot_pnl_store.py /freqtrade/freqtrade_pnl_poller.py /freqtrade/market_pulse.py
 # Persistent DB dir for the freqtrade sqlite files. Mount a Railway VOLUME at
 # /freqtrade/persist so open paper trades survive redeploys; without a volume
