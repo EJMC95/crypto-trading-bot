@@ -2,7 +2,11 @@
 __pycache__
 *.pyc
 *.log
-user_data
+# user_data must ship (Dockerfile.freqtrade COPYs it); exclude only its bulk.
+# A bare `user_data` here broke every freqtrade-bots railway up on 15 Jul
+# ("/user_data": not found at COPY) once the lean-deploy ignore landed.
+user_data/data
+user_data/backtest_results
 analysis_*
 *.sqlite
 *.sqlite-journal
