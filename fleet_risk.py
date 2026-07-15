@@ -66,6 +66,7 @@ MODE = os.environ.get("FLEET_RISK_MODE", "enforce").strip().lower()
 # light every cycle and its real-money position went uncounted half the time.
 # 65 min still catches a genuinely dead publisher within ~1 loop.
 STALE_ROW_SEC = 3900
+CARRY_MAX_SEC = 86400   # dd-governor equity carry-forward expires after 24h
 
 
 def row_fresh(r):
@@ -206,7 +207,7 @@ def main():
 
     fleet_long, fleet_short = 0, 0
     fleet_equity = 0.0
-    equity_by_bot = {}
+    equity_by_bot, equity_venue = {}, {}
     per_bot, pair_count, venues_seen = {}, {}, {}
     for name in FREQTRADE_BOTS:
         r, venue = authoritative_row(name, by_bot)
@@ -215,6 +216,7 @@ def main():
         if r.get("equity") is not None:
             fleet_equity += float(r["equity"])   # governor cohort = light cohort
             equity_by_bot[name] = float(r["equity"])
+            equity_venue[name] = venue
         n = int(r.get("open_trades") or 0)
         if n == 0:
             continue
@@ -239,6 +241,7 @@ def main():
         if r.get("equity") is not None:
             fleet_equity += float(r["equity"])
             equity_by_bot[name] = float(r["equity"])
+            equity_venue[name] = venue
         extra = r.get("extra") or {}
         # [2026-07-15 AUDIT FIX] Funding Farmer publishes held={'ETH':'S',...}
         # rather than longs/shorts ints — derive counts so live real-money
@@ -260,8 +263,11 @@ def main():
     for base in PERPS_LS_BOTS:
         for suf in ("-lshadow", "-ltest"):
             e = (by_bot.get(base + suf) or {}).get("extra") or {}
-            shadow_long += int(e.get("longs") or 0)
-            shadow_short += int(e.get("shorts") or 0)
+            held = e.get("held") or {}
+            shadow_long += int(e.get("longs") or 0) or \
+                sum(1 for v in held.values() if str(v).upper().startswith("L"))
+            shadow_short += int(e.get("shorts") or 0) or \
+                sum(1 for v in held.values() if str(v).upper().startswith("S"))
 
     gross = fleet_long + fleet_short
     light = max(light_for(fleet_long, LONG_BUDGET),
@@ -281,18 +287,43 @@ def main():
     # base's last-known equity forward (it decays out only when the whole
     # state is superseded by fresh reads).
     _prev_eq = prev_state.get("equity_by_bot") or {}
-    _carried = []
+    _prev_cts = prev_state.get("equity_carry_ts") or {}
+    _carried, _carry_ts = [], {}
+    _now_dt = datetime.now(timezone.utc)
     for _base in FREQTRADE_BOTS + PERPS_LS_BOTS:
         if _base not in equity_by_bot and _base in _prev_eq:
+            # [2026-07-15b VERIFIED FIX] carry EXPIRES: first miss starts a
+            # 24h clock; past it the bot is genuinely gone and its equity
+            # leaves the pool (the cohort key below resets the dd window, so
+            # the drop can't read as a drawdown).
+            _t0 = _prev_cts.get(_base) or _now_dt.isoformat(timespec="seconds")
+            try:
+                _age = (_now_dt - datetime.fromisoformat(
+                    str(_t0).replace("Z", "+00:00"))).total_seconds()
+            except (ValueError, TypeError):
+                _age = 0.0
+            if _age > CARRY_MAX_SEC:
+                continue
             try:
                 fleet_equity += float(_prev_eq[_base])
                 equity_by_bot[_base] = float(_prev_eq[_base])
+                equity_venue[_base] = "carried"
                 _carried.append(_base)
+                _carry_ts[_base] = _t0
             except (TypeError, ValueError):
                 continue
+    # [2026-07-15b VERIFIED FIX] the dd window only compares LIKE WITH LIKE:
+    # the sample series resets whenever the equity cohort changes — a live
+    # book substituted by its $1k shadow (venue change), a bot list edit, or
+    # an expired carry would otherwise read as a fake ±12% "drawdown" and pin
+    # clip_scale at 0.25 for a week. True drawdown within a stable cohort is
+    # unaffected.
+    _cohort = "|".join(sorted(f"{b}:{equity_venue.get(b, '?')}"
+                              for b in equity_by_bot))
+    _samples_in = (prev_state.get("equity_samples")
+                   if prev_state.get("equity_cohort") == _cohort else [])
     samples, dd_7d, clip_scale = dd_governor(
-        prev_state.get("equity_samples"), fleet_equity,
-        datetime.now(timezone.utc))
+        _samples_in, fleet_equity, _now_dt)
     risk_payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC, "mode": MODE,
         "light": light,
@@ -300,6 +331,8 @@ def main():
         "fleet_dd_7d": dd_7d,
         "clip_scale": clip_scale,
         "equity_by_bot": {k: round(v, 2) for k, v in equity_by_bot.items()},
+        "equity_cohort": _cohort,
+        "equity_carry_ts": _carry_ts,
         "equity_carried": _carried,      # bases riding on last-known equity
         "equity_samples": samples,
         "long_positions": fleet_long, "long_budget": LONG_BUDGET,

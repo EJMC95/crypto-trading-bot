@@ -83,6 +83,10 @@ MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
 # a venue problem, so its prose pointed at the wrong lever.
 DIAG_KEY = "brain-diagnosis"
 DIAG_MIN_N = 10           # closed era trades before diagnosing a bucket
+# [2026-07-15 LENS-FORWARD] counterfactual scout-lens scoreboard published for
+# the taker (restrict-only veto) + the dashboard. Same freshness contract.
+LENS_FWD_KEY = "brain-lens-forward"
+LENS_HORIZONS = ((1, 3600), (4, 4 * 3600), (24, 24 * 3600))
 DIAG_DRIFT_MAX_PAIRS = 30  # cap Kraken fetches per run (once per pair, cached)
 STOPPISH = ("stop_loss", "trailing_stop_loss", "bleed_stop", "stoploss",
             "liquidation", "force_exit")
@@ -624,6 +628,79 @@ def venue_ab_report():
         return {}
 
 
+def grade_scout_lenses(max_snapshots=2200):
+    """[2026-07-15 LENS-FORWARD] Counterfactual per-lens scoreboard: EVERY
+    ticket the scout has emitted (bot_state_history 'lighter-market'), graded
+    on forward returns from the snapshots' own liquid-book marks ('marks',
+    present since 15 Jul). The taker fills ~6 tickets; the scout emits ~5,000
+    a day — this is the sample size lens verdicts actually need. Shorts
+    (divergence side) are sign-flipped. Returns {lens: {n4h, hit4h,
+    avg4h_pct, ...}} or {} when history/marks are unavailable."""
+    import bisect
+    try:
+        import bot_pnl_store as store
+        hist = store.fetch_state_history("lighter-market", limit=max_snapshots)
+    except Exception:
+        return {}
+    snaps = []
+    for h in reversed(hist or []):          # newest-first -> oldest-first
+        p = h.get("payload") or {}
+        marks = p.get("marks") or {}
+        if not marks:
+            continue                        # pre-15-Jul snapshots carry no prices
+        try:
+            ts = datetime.fromisoformat(
+                str(h.get("ts")).replace("Z", "+00:00")).timestamp()
+        except (ValueError, TypeError):
+            continue
+        snaps.append((ts, marks, p.get("tickets") or {}))
+    if len(snaps) < 3:
+        return {}
+    times = [s[0] for s in snaps]
+    last_ts = times[-1]
+
+    def mark_at(t_target, sym, tol=1800):
+        i = bisect.bisect_left(times, t_target)
+        for j in (i, i + 1, i - 1):
+            if 0 <= j < len(snaps) and abs(times[j] - t_target) <= tol:
+                m = snaps[j][1].get(sym)
+                if m:
+                    return m
+        return None
+
+    agg = {}
+    for ts, marks, tickets in snaps:
+        for lens, arr in (tickets or {}).items():
+            for t in arr or []:
+                sym = t.get("sym")
+                entry = marks.get(sym)
+                if not sym or not entry:
+                    continue
+                sign = -1.0 if str(t.get("side", "long")) == "short" else 1.0
+                for label, hsec in LENS_HORIZONS:
+                    if ts + hsec > last_ts + 900:
+                        continue            # horizon hasn't elapsed yet
+                    px = mark_at(ts + hsec, sym)
+                    if not px:
+                        continue
+                    fwd = sign * (px / entry - 1.0)
+                    g = agg.setdefault(lens, {}).setdefault(
+                        label, {"n": 0, "hit": 0, "sum": 0.0})
+                    g["n"] += 1
+                    g["hit"] += 1 if fwd > 0 else 0
+                    g["sum"] += fwd
+    out = {}
+    for lens, hz in agg.items():
+        o = {}
+        for label, g in hz.items():
+            o[f"n{label}h"] = g["n"]
+            o[f"hit{label}h"] = round(g["hit"] / g["n"], 3) if g["n"] else None
+            o[f"avg{label}h_pct"] = (round(100.0 * g["sum"] / g["n"], 3)
+                                     if g["n"] else None)
+        out[lens] = o
+    return out
+
+
 def main():
     trades = _fetch_trades()
     state, src = _load_state()
@@ -720,6 +797,27 @@ def main():
         pass
     state["diagnoses"] = diagnoses
 
+    # [2026-07-15 LENS-FORWARD] grade the scout's lenses on every ticket and
+    # publish for the taker (restrict-only veto) + dashboard. Failure-neutral.
+    lens_forward = {}
+    try:
+        lens_forward = grade_scout_lenses() or {}
+    except Exception:
+        lens_forward = {}
+    state["lens_forward"] = lens_forward
+    if lens_forward:
+        try:
+            import bot_pnl_store as store
+            lf_payload = {"updated": now, "ttl_sec": MULT_TTL_SEC,
+                          "lenses": lens_forward}
+            store.save_state(LENS_FWD_KEY, lf_payload)
+            try:
+                store.save_history(LENS_FWD_KEY, lf_payload)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     # ---- write lessons_latest.md ------------------------------------------
     os.makedirs(REPORTS_DIR, exist_ok=True)
     L = [f"# Fleet lessons — run {run_no} @ {now} (state: {src})", ""]
@@ -754,6 +852,16 @@ def main():
         L.append("- none — no tag currently clears the floor "
                  f"(n>={MULT_SOFT_N}, negative pnl, {PROMOTE_RUNS} consecutive runs)")
     L.append("")
+    # [2026-07-15 LENS-FORWARD] scout lens scoreboard.
+    if lens_forward:
+        L.append("## Scout lens forward returns (counterfactual — EVERY ticket, "
+                 "not just taker fills)")
+        for lens, o in sorted(lens_forward.items()):
+            L.append(f"- **{lens}**: 4h n={o.get('n4h', 0)} "
+                     f"hit={o.get('hit4h')} avg={o.get('avg4h_pct')}% · "
+                     f"24h n={o.get('n24h', 0)} hit={o.get('hit24h')} "
+                     f"avg={o.get('avg24h_pct')}%")
+        L.append("")
     # [2026-07-14b] Diagnoses — WHY each negative sleeve loses (the lever).
     if diagnoses:
         L.append("## Diagnoses (which lever each negative sleeve needs)")

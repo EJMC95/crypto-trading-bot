@@ -1871,10 +1871,13 @@ def taker_lens_card():
 
 def brain_panel_html():
     """The learning loop itself: venue A/B verdicts, active reduce-only
-    throttles, and the diagnosis layer's loss post-mortems."""
-    st = fetch_states(["learning-brain", "brain-stake-mults", "brain-diagnosis"])
+    throttles, the diagnosis layer's loss post-mortems, and the scout-lens
+    forward scoreboard (the brain grading the scanners)."""
+    st = fetch_states(["learning-brain", "brain-stake-mults", "brain-diagnosis",
+                       "brain-lens-forward"])
     lb = st.get("learning-brain") or {}
     sm = st.get("brain-stake-mults") or {}
+    lf = (st.get("brain-lens-forward") or {}).get("lenses") or {}
     dg = (st.get("brain-diagnosis") or {}).get("diagnoses") or lb.get("diagnoses") or {}
     if not lb and not sm:
         return ('<div class="card"><h2>🧠 Learning brain</h2>'
@@ -1931,10 +1934,33 @@ def brain_panel_html():
         dg_html = ('<div class="sub">Loss diagnoses — WHERE each negative sleeve '
                    'loses (proposals are human-review, never auto-applied)</div>'
                    f'<ul class="recs">{"".join(dg_items)}</ul>')
+    # [2026-07-15 LENS-FORWARD] the brain grading the scanners: every scout
+    # ticket's counterfactual forward return, by lens. This is the sample the
+    # taker's ~6 fills can't provide — and the taker's restrict-only lens veto
+    # reads exactly this table.
+    lf_html = ""
+    if lf:
+        _rows = []
+        for lens, o in sorted(lf.items(),
+                              key=lambda kv: -(kv[1].get("avg4h_pct") or 0)):
+            hit = o.get("hit4h")
+            hit_s = "—" if hit is None else f"{hit * 100:.0f}%"
+            a4, a24 = o.get("avg4h_pct"), o.get("avg24h_pct")
+            _rows.append(
+                f'<tr><td>{html.escape(lens)}</td>'
+                f'<td>{o.get("n4h", 0)}</td>'
+                f'<td>{hit_s}</td>'
+                f'<td class="{cls(a4)}">{"—" if a4 is None else f"{a4:+.2f}%"}</td>'
+                f'<td class="{cls(a24)}">{"—" if a24 is None else f"{a24:+.2f}%"}</td></tr>')
+        lf_html = ('<div class="sub">Scout lens forward returns — counterfactual, '
+                   'EVERY ticket (taker veto reads this at n≥75)</div>'
+                   '<table class="tbl"><tr><th>lens</th><th>n·4h</th><th>hit</th>'
+                   '<th>avg 4h</th><th>avg 24h</th></tr>' + "".join(_rows)
+                   + '</table>')
     meta = (f'run #{lb.get("runs", "?")} · {len(lb.get("hypotheses") or {})} live '
             f'hypotheses · L4 meta-labeling is reduce-only by doctrine')
     return (f'<div class="card"><h2>🧠 Learning brain</h2>'
-            f'<div class="muted">{meta}</div>{ab_html}{m_html}{dg_html}</div>')
+            f'<div class="muted">{meta}</div>{lf_html}{ab_html}{m_html}{dg_html}</div>')
 
 
 def _iso_dt(s):

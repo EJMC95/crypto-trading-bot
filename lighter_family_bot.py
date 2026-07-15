@@ -740,10 +740,11 @@ def main():
             _upd = datetime.fromisoformat(
                 str(_fr.get("updated")).replace("Z", "+00:00"))
             _age = (now - _upd).total_seconds()
+            _lb = _fr.get("long_budget")
+            _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
             if (_age <= float(_fr.get("ttl_sec") or 900)
                     and _fr.get("mode") == "enforce"
-                    and (_fr.get("long_positions") or 0)
-                    >= (_fr.get("long_budget") or 10**9)):
+                    and (_fr.get("long_positions") or 0) >= _lb):
                 fleet_long_veto = True
                 log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
                          "no new entries this cycle (exits unaffected)",

@@ -73,10 +73,17 @@ def evaluate(data):
     # warning covering almost nothing. Mirror fleet_risk.authoritative_row:
     # one row per base, live > shadow (shadow only counts when no live twin).
     opens, dir_opens = 0, 0
-    non_directional = ("perps-funding", "equities-", "event-listing-sniper")
+    # [2026-07-15b VERIFIED FIX] perps-funding-lighter is DIRECTIONAL (one-
+    # sided funding receiver) and counted by fleet_risk — only the truly
+    # delta-neutral/market-neutral funding books stay excluded. live_bases
+    # honors row freshness so a dead live publisher can't permanently
+    # suppress its running shadow twin.
+    non_directional = ("perps-funding-carry", "perps-funding-spread",
+                       "equities-", "event-listing-sniper")
     live_bases = {(b.get("base_bot") or b.get("bot") or "") for b in bots
                   if b.get("kind") == "trading"
-                  and b.get("venue_mode") == "lighter_live"}
+                  and b.get("venue_mode") == "lighter_live"
+                  and not b.get("stale")}
     for b in bots:
         try:
             n = int(b.get("open_trades") or 0)

@@ -275,9 +275,10 @@ def main():
             # [2026-07-15 AUDIT FIX] L2 long-budget veto now has a consumer in
             # the RUNNING fleet (it was wired only into the retired Kraken
             # strategies). Fail-safe OPEN: stale/missing state never blocks.
+            _lb = fr.get("long_budget")
+            _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
             if (fr.get("mode") == "enforce"
-                    and (fr.get("long_positions") or 0)
-                    >= (fr.get("long_budget") or 10**9)):
+                    and (fr.get("long_positions") or 0) >= _lb):
                 long_budget_full = True
     except (ValueError, TypeError):
         gov = 1.0
@@ -287,10 +288,33 @@ def main():
         print(f"[ticket-taker] {iso(t_now)} FLEET LONG-BUDGET VETO — "
               f"{fr.get('long_positions')}/{fr.get('long_budget')} directional "
               f"longs; no new LONG entries this cycle (shorts unaffected)")
+    # [2026-07-15 LENS-FORWARD VETO] The brain grades every scout ticket
+    # counterfactually (bot_state 'brain-lens-forward'). RESTRICT-ONLY, per
+    # doctrine: a lens graded negative at sample size stops getting fills;
+    # missing/stale grades never block anything (fail-safe open).
+    lens_vetoed = set()
+    try:
+        lf = store.load_state("brain-lens-forward") or {}
+        lf_age = (t_now - parse_ts(lf.get("updated"))).total_seconds()
+        if lf_age <= float(lf.get("ttl_sec") or 26000):
+            min_n = int(os.environ.get("TT_LENS_VETO_MIN_N", "75"))
+            for _lens, o in (lf.get("lenses") or {}).items():
+                if ((o.get("n4h") or 0) >= min_n
+                        and (o.get("avg4h_pct") or 0) < 0
+                        and (o.get("hit4h") or 0) < 0.5):
+                    lens_vetoed.add(_lens)
+    except (ValueError, TypeError):
+        lens_vetoed = set()
+    if lens_vetoed:
+        print(f"[ticket-taker] {iso(t_now)} LENS VETO — brain grades "
+              f"{sorted(lens_vetoed)} negative at sample size; skipping their "
+              f"tickets (restrict-only; recovers when the grade does)")
     opened_syms, opened_lenses = set(), set()
     if fresh and not stressed:
         for lens, t in incredible(scout.get("tickets") or {}):
             sym = t.get("sym")
+            if lens in lens_vetoed:
+                continue          # brain graded this lens negative at n>=min_n
             # one NEW position per lens per cycle; never add to a held symbol
             if (not sym or sym in broker.pos or sym in opened_syms
                     or lens in opened_lenses):
