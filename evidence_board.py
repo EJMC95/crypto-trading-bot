@@ -308,6 +308,12 @@ LIVE_DOWN_SCALE = float(os.environ.get("EVBOARD_LIVE_DOWN_SCALE", "0.75"))
 LIVE_DD_MIN = float(os.environ.get("EVBOARD_LIVE_DD_MIN", "-0.02"))      # 7d fleet dd
 LIVE_STEP_COOLDOWN_H = float(os.environ.get("EVBOARD_LIVE_COOLDOWN_H", "24"))
 LIVE_LADDER = [1.0, 1.25, 1.5]
+# A divergence alert only cuts LIVE size if it is CURRENT. The window was
+# 48h, which let a 39h-old fossil from the RETIRED whole-book ratio check
+# (the diagnosed "+5.4%" artifact) cut real money on 15-Jul. A genuine
+# execution divergence re-fires within market_context's cadence, so the
+# reflex trusts only a fresh alert — stale/retired signals age out.
+LIVE_GAP_FRESH_H = float(os.environ.get("EVBOARD_LIVE_GAP_FRESH_H", "6"))
 
 
 def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
@@ -330,9 +336,12 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
                 "lever": "live.clip_scale", "ts": now_ts, "source": "board",
                 "direction": direction}
 
-    # DOWN first — restriction needs no cooldown and no permission.
+    # DOWN first — restriction needs no cooldown and no permission, but the
+    # divergence signal must be FRESH (a stale/retired alert is not evidence
+    # of current execution divergence — that was the 15-Jul false down-scale).
     gap = any(str(a.get("key", "")).startswith("live-shadow-gap")
-              and (a.get("ts") or 0) >= now_ts - 48 * 3600 for a in alerts or [])
+              and (a.get("ts") or 0) >= now_ts - LIVE_GAP_FRESH_H * 3600
+              for a in alerts or [])
     hurt = [b for b, r in sorted(rows.items())
             if float(r.get("pnl_abs") or 0) <= -LIVE_DOWN_PNL]
     if gap or hurt:
@@ -651,7 +660,14 @@ def run_once():
     # ---- notify: NEW warn/action items AND new EXPAND items — good news
     # reaches the phone with the same machinery as warnings (default
     # priority, seedling tag; missing the cream is also a miss) -------------
+    # Items with a DEDICATED push above (live clip scale, growth-rail step)
+    # are skipped here so they aren't double-sent — and, critically, so an
+    # ENACTED live action is never mislabeled "Proposed (shadow)" by the
+    # generic template (the 15-Jul confusing push).
+    DEDICATED_PUSH = {"board:live-clip-scale", "board:gapscout-quiet"}
     for i in items:
+        if i["key"] in DEDICATED_PUSH:
+            continue
         is_expand = i.get("direction") == "expand"
         if i["verdict"] != "active":
             continue
@@ -661,7 +677,13 @@ def run_once():
         escalated = i["trend"] == "escalating" and prior_items.get(i["key"], {}).get("trend") != "escalating"
         last_n = notified.get(i["key"], 0)
         if (is_new or escalated) and now - last_n >= NOTIFY_GAP_H * 3600:
-            body = (i["msg"] or "") + (f"\n\nProposed ({MODE}): {i['proposal']}" if i.get("proposal") else "")
+            # expand items SUGGEST (review candidates); restrict items in
+            # shadow mode are PROPOSED — never tag an expand item "(shadow)".
+            if i.get("proposal"):
+                tag = "Suggests" if is_expand else f"Proposed ({MODE})"
+                body = (i["msg"] or "") + f"\n\n{tag}: {i['proposal']}"
+            else:
+                body = i["msg"] or ""
             title = ("evidence board (expand): " if is_expand else "evidence board: ") \
                 + (i["msg"] or i["key"])[:60]
             if send_push(title, body,
@@ -803,7 +825,24 @@ def _selftest():
     s6, _ = synthesize_live(live_ok, fresh_fr, calm_lm,
                             [{"key": "live-shadow-gap:ff", "ts": nowts - 100}],
                             {}, nowts)
-    assert s6 == 0.75, "divergence alert -> immediate down-scale"
+    assert s6 == 0.75, "FRESH divergence alert -> immediate down-scale"
+    # a STALE divergence alert must NOT cut live size (the 15-Jul artifact:
+    # a 39h-old fossil from the retired whole-book check triggered a false
+    # down-scale). Use not-yet-earned rows so ignoring the stale alert lands
+    # cleanly on "assert nothing" — the correct outcome.
+    live_neutral = [dict(live_ok[0], closed_trades=5), dict(live_ok[1], closed_trades=5)]
+    s6b, it6b = synthesize_live(
+        live_neutral, fresh_fr, calm_lm,
+        [{"key": "live-shadow-gap", "ts": nowts - (LIVE_GAP_FRESH_H + 1) * 3600,
+          "msg": "gap +5.4%"}],
+        {}, nowts)
+    assert s6b is None and it6b is None, "stale divergence alert must be ignored"
+    # ...and the SAME alert, fresh, still cuts (the reflex still works)
+    s6c, _ = synthesize_live(
+        live_neutral, fresh_fr, calm_lm,
+        [{"key": "live-shadow-gap", "ts": nowts - 100, "msg": "gap +5.4%"}],
+        {}, nowts)
+    assert s6c == 0.75, "a FRESH divergence alert still down-scales"
     live_small = [dict(live_ok[0], closed_trades=5), live_ok[1]]
     assert synthesize_live(live_small, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
     assert synthesize_live(live_ok, dict(fresh_fr, light="red"), calm_lm,
