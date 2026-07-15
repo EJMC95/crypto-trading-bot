@@ -71,6 +71,20 @@ def _now_iso():
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
 
 
+def _now_op():
+    """[2026-07-15 OPERATOR TZ] Sydney-local stamp for anything the OPERATOR
+    reads (push bodies) — AEST/AEDT as actually in effect, so alert times
+    match Eamon's clock. tzdata can be absent on slim images; the fixed +10
+    fallback is right in winter and only off by 1h in DST — labeled anyway."""
+    try:
+        from zoneinfo import ZoneInfo
+        n = dt.datetime.now(ZoneInfo("Australia/Sydney"))
+        return n.strftime("%Y-%m-%d %H:%M ") + (n.tzname() or "AET")
+    except Exception:  # noqa: BLE001
+        return (dt.datetime.now(dt.timezone.utc)
+                + dt.timedelta(hours=10)).strftime("%Y-%m-%d %H:%M AEST*")
+
+
 def get_state():
     with _LOCK:
         return dict(_STATE)
@@ -202,7 +216,8 @@ def run_loop(dash):
             if kind and armed:
                 subj = ("🚨 fleet-watchdog: " + problems[0][:70]) if kind == "alert" else \
                        "✅ fleet-watchdog: recovered — all bots fresh"
-                body_lines = [f"Time: {_now_iso()}", f"Snapshot: {snapshot}", ""]
+                body_lines = [f"Time: {_now_op()} ({_now_iso()} UTC)",
+                              f"Snapshot: {snapshot}", ""]
                 if problems:
                     body_lines += ["Problems:"] + ["  - " + p for p in problems]
                 if warnings:

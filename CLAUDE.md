@@ -148,8 +148,11 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
-- **Operator timezone: AEST (UTC+10)** — Eamon is in Australia; report all
-  times to him in AEST (15-Jul instruction: "use AEST for everything").
+- **Operator timezone: Australia/Sydney — ALWAYS give Eamon Sydney-local
+  times** (corrected 15-Jul evening; the earlier "AEST" note was recorded too
+  narrowly). Sydney runs AEST (UTC+10) in winter and AEDT (UTC+11) during
+  daylight saving (Oct→Apr) — use whichever is in effect and label it, so
+  reported times always match his clock. Never hand him a bare UTC time.
   Fleet INTERNALS stay UTC (ledger rows, `updated`+`ttl_sec` freshness
   contracts, cross-service joins) — this is a reporting/display rule.
 - **FREEZE LIFTED 15-Jul evening by user** ("this could be a breakthrough" —
