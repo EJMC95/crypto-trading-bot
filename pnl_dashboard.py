@@ -914,8 +914,9 @@ def fetch_ledger_enrich():
                              "FROM bot_trades WHERE close_ts IS NOT NULL")
             if g["t2"]:
                 parts.append("SELECT bot, pair, pnl_abs, reason, "
-                             "COALESCE(NULLIF(closed_at,'')::timestamptz, seen_at) "
-                             "FROM paper_trades")
+                             "COALESCE(CASE WHEN pg_input_is_valid(closed_at, "
+                             "'timestamptz') THEN closed_at::timestamptz END, "
+                             "seen_at) FROM paper_trades")
             if parts:
                 union = " UNION ALL ".join(parts)
                 cur.execute(
@@ -1043,7 +1044,7 @@ def _orders_html(extra):
 
 
 def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
-         enrich=None):
+         enrich=None, extra_html=""):
     open_trades = open_trades or {}
     en = enrich or {}
     badge = ""
@@ -1238,6 +1239,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
       {holdings_html}
       {orders_html}
       {f'<div class="sub">{extra_bits}</div>' if extra_bits else ''}
+      {extra_html}
     </div>'''
 
 
@@ -1282,12 +1284,34 @@ def render():
              if b not in hidden]
     # [2026-07-10] Real-money Lighter bots get their OWN section at the top of the
     # page, not interspersed with the paper fleet. is_live_bot = <bot>-lighter rows.
-    _mk = lambda b: card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
-                         mode_notes.get(b), enrich.get(b))
+    # [2026-07-15 LIFECYCLE SECTIONS] Everything else is grouped by promotion
+    # stage, with the go-live gates COMPUTED per bot (see fetch_gate_metrics).
+    try:
+        gates = fetch_gate_metrics()
+    except Exception:  # noqa: BLE001
+        gates = {}
+
+    def _mk(b, extra=""):
+        return card(b, rows.get(b), open_trades, quality.get(b), sparks.get(b),
+                    mode_notes.get(b), enrich.get(b), extra_html=extra)
+
     live_cards = [_mk(b) for b in names if is_live_bot(b)]
-    cards = [_mk(b) for b in names if not is_live_bot(b)]
-    if brain_html:
-        cards.append(brain_html)
+    staged = {"ready": [], "proving": [], "experiment": [], "control": [],
+              "scanner": []}
+    stage_pnl = {k: 0.0 for k in staged}
+    for b in names:
+        if is_live_bot(b):
+            continue
+        stg = classify_stage(b, gates)
+        extra = ""
+        if stg in ("ready", "proving"):
+            _ok, chips = _gate_eval(gates.get(b) or {})
+            extra = f'<div class="gates">{chips}</div>'
+        staged[stg].append(_mk(b, extra))
+        stage_pnl[stg] += ((rows.get(b) or {}).get("pnl_abs") or 0)
+    # [2026-07-15 AUDIT FIX] brain card joins the scanners SECTION BODY, not
+    # the staged list, so the header's bot count stays honest.
+    stage_organ = {"scanner": brain_html or ""}
 
     # [2026-07-05] Ambient health checks — the silent-failure classes we have
     # actually hit (persistence resets, over-trading) surfaced on every load.
@@ -1322,11 +1346,45 @@ def render():
     # evaluator (dislocation census hits, factor-sample milestones, coin-veto
     # changes, live-vs-shadow divergence). Signal layer only — the sole
     # automated ACTION in the fleet is the restrict-only coin-veto list.
+    # [2026-07-15 EVIDENCE REFRESH] The feed is append-only, so the banner used
+    # to replay superseded items for 48h. Now: latest-per-key only, each item
+    # age-stamped, items the daily autonomous review marked RESOLVED are
+    # dropped, and the review's own stamp is shown so staleness is visible.
     _fa = fetch_fleet_alerts()
     if _fa:
-        health_html += ('<div class="banner">🔔 EVIDENCE: '
-                        + " · ".join(html.escape(a.get("msg") or "")
-                                     for a in _fa[-6:]) + "</div>")
+        _byk = {}
+        for a in _fa:                        # chronological — last wins per key
+            _byk[a.get("key") or a.get("msg")] = a
+        _rev = fetch_states(["evidence-review"]).get("evidence-review") or {}
+        # resolved = condition no longer true; stale = recorded evidence whose
+        # decision gate lives elsewhere (weekly census/settlement reviews).
+        # Both clear from the banner; 'active' verdicts (and unreviewed items)
+        # stay. History is never deleted — fleet-alerts stays append-only.
+        _resolved = {v.get("key") for v in (_rev.get("verdicts") or [])
+                     if v.get("status") in ("resolved", "stale")}
+        _now = time.time()
+
+        def _age_txt(a):
+            m = int(max(0, _now - (a.get("ts") or _now)) // 60)
+            return f"{m}m" if m < 120 else f"{m // 60}h"
+        _items = [a for a in sorted(_byk.values(), key=lambda a: -(a.get("ts") or 0))
+                  if (a.get("key") or a.get("msg")) not in _resolved][:6]
+        _rev_note = ""
+        if _rev.get("reviewed_at"):
+            _rt = _iso_dt(_rev.get("reviewed_at"))
+            _rage = (f"{int((_now - _rt.timestamp()) // 3600)}h ago"
+                     if _rt else str(_rev.get("reviewed_at"))[:16])
+            _n_res = len(_resolved)
+            _rev_note = (f' <span class="muted">· 🧾 reviewed {_rage}'
+                         + (f" · {_n_res} resolved" if _n_res else "") + "</span>")
+        elif _items:
+            _rev_note = ' <span class="muted">· no autonomous review yet</span>'
+        if _items:
+            health_html += ('<div class="banner">🔔 EVIDENCE: '
+                            + " · ".join(f'{html.escape(a.get("msg") or "")} '
+                                         f'<span class="muted">({_age_txt(a)})</span>'
+                                         for a in _items)
+                            + _rev_note + "</div>")
 
     live = [r for r in rows.values() if r]
     # [2026-07-09 LIGHTER GO-LIVE] Venue-variant rows (live/testnet/shadow on
@@ -1479,6 +1537,46 @@ async function botAdmin(action, bot){
 }
 </script>''')
 
+    # [2026-07-15 LIFECYCLE SECTIONS] Render the staged groups. READY renders
+    # even when empty — the bar itself is information (what promotion takes).
+    _stage_meta = [
+        ("ready", "🟢 Ready for live",
+         "passes every house gate (≥{n} trades/30d · WR &gt;{wr}% · dd &lt;{dd}% · "
+         "{age}d record) — going live still needs your sign-off + GO_LIVE_CHECKLIST".format(
+             n=GATE_MIN_TRADES_30D, wr=int(GATE_MIN_WR * 100),
+             dd=int(-GATE_MAX_DD * 100), age=GATE_MIN_AGE_DAYS)),
+        ("proving", "🔵 Proving",
+         "shadow/paper books building the 30-day record the gates demand"),
+        ("experiment", "🧪 Experiments",
+         "evidence collectors — unvalidated by design (census/lens/listing theses); "
+         "they graduate through the validation doctrine, not through P&amp;L"),
+        ("control", "⚖️ Controls &amp; references",
+         "kept for comparison (delta-neutral / venue A/B baselines), not on the "
+         "promotion track"),
+        ("scanner", "🛰 Scanners &amp; fleet organs",
+         "market intelligence and the learning loop — optimistic-fill paper is "
+         "never folded into trading P&amp;L"),
+    ]
+    sections_html = ""
+    for key, title, note in _stage_meta:
+        cards_k = staged[key]
+        organ = stage_organ.get(key, "")
+        if not cards_k and not organ and key != "ready":
+            continue
+        pnl_k = stage_pnl[key]
+        subtotal = (f' · <b class="{cls(pnl_k)}">{money(pnl_k)}</b> P&amp;L'
+                    if cards_k else "")
+        if cards_k or organ:
+            body = f'<div class="grid">{"".join(cards_k)}{organ}</div>'
+        else:
+            body = ('<div class="stageempty">none yet — the gates above are the '
+                    'bar. Proving bots that clear every gate appear here '
+                    'automatically.</div>')
+        sections_html += (f'<div class="stagehdr">{title} '
+                          f'<span class="stagecount">{len(cards_k)} bot'
+                          f'{"s" if len(cards_k) != 1 else ""}{subtotal}</span>'
+                          f'<div class="stagenote">{note}</div></div>{body}')
+
     # [2026-07-10] Dedicated "Lighter Live" section — real-money bots grouped at
     # the top in their own bordered block so live money is never lost in the grid.
     live_section = ""
@@ -1527,6 +1625,14 @@ async function botAdmin(action, bot){
  .ops{{margin:12px 14px 0;padding:8px 12px;background:#ffffffd9;border:1px solid #caa227;
    border-radius:8px;font-size:12.5px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}}
  .ops .chip{{white-space:nowrap;color:#16232c}}
+ .stagehdr{{margin:18px 14px 0;padding:9px 13px;background:#ffffffd9;border:1px solid #caa227;
+   border-radius:10px;font-size:15px;font-weight:700;color:#16232c}}
+ .stagecount{{font-weight:500;font-size:12.5px;color:#5b7184;margin-left:6px}}
+ .stagenote{{font-weight:400;font-size:11.5px;color:#5b7184;margin-top:3px;line-height:1.4}}
+ .stageempty{{margin:8px 14px;padding:12px;border:1px dashed #caa227;border-radius:10px;
+   color:#5b7184;font-size:12.5px;background:#ffffff90}}
+ .gates{{margin-top:8px;padding-top:7px;border-top:1px dashed #d4af3766;font-size:11px;
+   color:#5b7184;line-height:1.6}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;padding:14px}}
  /* [2026-07-10] Lighter Live section — real money, visually set apart.
     [2026-07-13] Red -> GREEN on user request (red read as "alarm", not "live"). */
@@ -1587,7 +1693,7 @@ async function botAdmin(action, bot){
 {banner}
 {health_html}
 {live_section}
-<div class="grid">{"".join(cards)}</div>
+{sections_html}
 {manage_html}
 <footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
@@ -1625,21 +1731,57 @@ def fetch_states(keys):
 
 
 def _chip(label, value, color=None, title=""):
-    v = f'<b style="color:{color}">{value}</b>' if color else f'<b>{value}</b>'
+    ve = html.escape(str(value))
+    v = f'<b style="color:{color}">{ve}</b>' if color else f'<b>{ve}</b>'
     t = f' title="{html.escape(title)}"' if title else ""
     return f'<span class="chip"{t}>{html.escape(label)} {v}</span>'
+
+
+def _state_fresh(payload, grace=2.0):
+    """Honor the organs' own updated+ttl_sec contract (fleet_bus.is_fresh
+    semantics): False when the payload is older than grace×ttl. Payloads
+    without the fields are treated as fresh (older organs)."""
+    upd = _iso_dt((payload or {}).get("updated"))
+    ttl = (payload or {}).get("ttl_sec")
+    if upd is None or not ttl:
+        return True
+    age = (dt.datetime.now(dt.timezone.utc) - upd).total_seconds()
+    return age <= float(ttl) * grace
+
+
+def _state_age_h(payload):
+    upd = _iso_dt((payload or {}).get("updated"))
+    if upd is None:
+        return None
+    return (dt.datetime.now(dt.timezone.utc) - upd).total_seconds() / 3600.0
 
 
 def ops_strip_html():
     """The cockpit line: should the fleet be trading right now? Risk light,
     budget usage, drawdown governor, venue stress, alert pressure — the five
-    numbers an operator checks before anything else."""
+    numbers an operator checks before anything else.
+    [2026-07-15 AUDIT FIX] Organs are checked against their own updated+ttl_sec
+    contract: a dead publisher renders as a loud red STALE chip instead of
+    silently painting its last state as current."""
     st = fetch_states(["fleet-risk", "lighter-market"])
     fr = st.get("fleet-risk") or {}
     lm = st.get("lighter-market") or {}
     parts = []
+    if fr and not _state_fresh(fr):
+        _a = _state_age_h(fr)
+        parts.append(_chip("Risk organ", f"STALE {_a:.0f}h" if _a else "STALE",
+                           "#d1242f", "fleet_risk stopped publishing — its last "
+                           "light/governor values are NOT current"))
+        fr = {}
+    if lm and not _state_fresh(lm):
+        _a = _state_age_h(lm)
+        parts.append(_chip("Scout", f"STALE {_a:.0f}h" if _a else "STALE",
+                           "#d1242f", "lighter_market_scout stopped publishing"))
+        lm = {}
     light = str(fr.get("light") or "?").upper()
-    lcol = {"GREEN": "#1a7f37", "AMBER": "#b8860b", "RED": "#d1242f"}.get(light, "#5b7184")
+    # fleet_risk emits lowercase green/yellow/red ([2026-07-15 AUDIT FIX]:
+    # the map keyed AMBER, so the warning state rendered gray).
+    lcol = {"GREEN": "#1a7f37", "YELLOW": "#b8860b", "RED": "#d1242f"}.get(light, "#5b7184")
     parts.append(_chip("Risk light", light, lcol,
                        f"fleet_risk mode={fr.get('mode', '?')} — long-budget veto is "
                        f"ENFORCED in the strategies via fleet_bus"))
@@ -1670,7 +1812,7 @@ def ops_strip_html():
     n_act = sum(1 for a in alerts if a.get("severity") in ("warn", "action"))
     parts.append(_chip("Alerts 24h", f"{n_act} warn/action",
                        "#b8860b" if n_act else None, "full feed: /alerts.json"))
-    if not fr and not lm:
+    if not fr and not lm and not any("STALE" in p for p in parts):
         return ('<div class="ops muted">fleet organs unreachable — risk light / '
                 'governor unavailable (freqtrade-bots container down?)</div>')
     return '<div class="ops">' + "\n ".join(parts) + "</div>"
@@ -1759,11 +1901,20 @@ def brain_panel_html():
                    '14 Jul) vs Lighter shadow</div>'
                    '<table class="tbl"><tr><th>bot</th><th>Kraken</th>'
                    '<th>Lighter</th><th>gap</th></tr>' + "".join(ab_rows) + '</table>')
+    # [2026-07-15 AUDIT FIX] mults is NESTED {bot: {tag: {mult,n,wr,pnl,...}}}
+    # (bot_learn.compute_stake_mults) — the flat render printed dicts as "x".
     mults = sm.get("mults") or {}
     if mults:
+        _mrows = []
+        for _bot, _tags in sorted(mults.items()):
+            for _tag, _e in sorted((_tags or {}).items()):
+                _m = (_e or {}).get("mult", _e)
+                _n = (_e or {}).get("n")
+                _mrows.append(
+                    f'<div class="row"><span>{html.escape(f"{_bot} · {_tag}")}</span>'
+                    f'<b>{_m}x{f" (n={_n})" if _n else ""}</b></div>')
         m_html = ('<div class="sub">Active stake throttles (reduce-only)</div>'
-                  + "".join(f'<div class="row"><span>{html.escape(k)}</span>'
-                            f'<b>{v}x</b></div>' for k, v in sorted(mults.items())))
+                  + "".join(_mrows))
     else:
         m_html = ('<div class="sub">Stake throttles</div><div class="muted">none active '
                   f'— reduce-only mode, min n={sm.get("min_n", "?")}, '
@@ -1792,6 +1943,151 @@ def _iso_dt(s):
         return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# [2026-07-15 LIFECYCLE SECTIONS] The main grid is grouped by promotion stage,
+# and the house go-live gates (Rules in CLAUDE.md: 30-day WR > 55% AND max
+# drawdown < 15%, plus enough trades and a full 30-day record) are COMPUTED
+# per bot, not asserted. A bot that passes every gate surfaces in "READY FOR
+# LIVE" automatically — the promotion pipeline as a standing page section.
+
+GATE_MIN_TRADES_30D = 20
+GATE_MIN_AGE_DAYS = 30
+GATE_MIN_WR = 0.55
+GATE_MAX_DD = -0.15
+
+# Books that are evidence collectors by design — never candidates until their
+# thesis is validated through the doctrine (census / lens grading / overlap).
+EXPERIMENT_BASES = {"lighter-ticket-taker", "lighter-dislocation",
+                    "lighter-perp-sniper", "event-listing-sniper"}
+# Reference books: kept for comparison, not on the promotion track.
+CONTROL_BASES = {"perps-funding-carry"}
+
+_GATES_CACHE = {"data": None, "ts": 0.0}
+
+
+def fetch_gate_metrics(ttl=600):
+    """{bot: {n30, w30, wr, dd, age_days}} from the union ledger + equity
+    history. Cached ~10 min — the page refreshes every 30s and these
+    aggregates move slowly.
+    [2026-07-15 AUDIT FIXES] dd walks hourly MIN/MAX buckets (hourly AVG
+    understated true peak-to-trough); age comes from the bot's FIRST-EVER
+    snapshot (measuring inside the 30d window pinned the age gate at the
+    boundary); failures never populate the cache (a cold-start DB blip froze
+    all-failed gate chips for 10 min); the TEXT-timestamp cast is guarded by
+    pg_input_is_valid (a prefix-date garbage value aborted the whole union)."""
+    now = time.time()
+    if _GATES_CACHE["data"] is not None and now - _GATES_CACHE["ts"] < ttl:
+        return _GATES_CACHE["data"]
+    import psycopg2
+    out = {}
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT to_regclass('public.bot_trades') AS bt, "
+                            "to_regclass('public.paper_trades') AS pt, "
+                            "to_regclass('public.bot_equity_history') AS eh")
+                has_bt, has_pt, has_eh = cur.fetchone()
+                parts = []
+                if has_bt:
+                    parts.append("SELECT bot, close_ts, profit_abs FROM bot_trades "
+                                 "WHERE is_open = FALSE AND close_ts IS NOT NULL")
+                if has_pt:
+                    parts.append("SELECT bot, closed_at::timestamptz, pnl_abs "
+                                 "FROM paper_trades WHERE closed_at IS NOT NULL "
+                                 "AND pg_input_is_valid(closed_at, 'timestamptz')")
+                if parts:
+                    cur.execute(
+                        f"""SELECT bot,
+                                   COUNT(*) FILTER (WHERE close_ts > now() - interval '30 days'),
+                                   COUNT(*) FILTER (WHERE close_ts > now() - interval '30 days'
+                                                      AND profit_abs > 0)
+                            FROM ({" UNION ALL ".join(parts)}) t(bot, close_ts, profit_abs)
+                            GROUP BY bot""")
+                    for bot, n30, w30 in cur.fetchall():
+                        out.setdefault(bot, {})["n30"] = int(n30)
+                        out[bot]["w30"] = int(w30)
+                if has_eh:
+                    cur.execute(
+                        """SELECT bot, date_trunc('hour', ts) AS h,
+                                  MIN(equity), MAX(equity)
+                           FROM bot_equity_history
+                           WHERE ts > now() - interval '30 days' AND equity IS NOT NULL
+                           GROUP BY bot, 2 ORDER BY bot, 2""")
+                    series = {}
+                    for bot, h, lo, hi in cur.fetchall():
+                        series.setdefault(bot, []).append((float(lo), float(hi)))
+                    for bot, buckets in series.items():
+                        peak, ddv = None, 0.0
+                        for lo, hi in buckets:
+                            peak = hi if peak is None or hi > peak else peak
+                            if peak:
+                                ddv = min(ddv, lo / peak - 1.0)
+                        out.setdefault(bot, {})["dd"] = ddv
+                    cur.execute("SELECT bot, MIN(ts) FROM bot_equity_history "
+                                "WHERE equity IS NOT NULL GROUP BY bot")
+                    for bot, f in cur.fetchall():
+                        if f is None:
+                            continue
+                        age = (dt.datetime.now(dt.timezone.utc)
+                               - f.replace(tzinfo=f.tzinfo or dt.timezone.utc))
+                        out.setdefault(bot, {})["age_days"] = \
+                            age.total_seconds() / 86400.0
+        finally:
+            conn.close()
+    except Exception:
+        # serve the last good cache or the partial once — NEVER cache failure
+        if _GATES_CACHE["data"] is not None:
+            return _GATES_CACHE["data"]
+        for m in out.values():
+            n, w = m.get("n30") or 0, m.get("w30") or 0
+            m["wr"] = (w / n) if n else None
+        return out
+    for m in out.values():
+        n, w = m.get("n30") or 0, m.get("w30") or 0
+        m["wr"] = (w / n) if n else None
+    _GATES_CACHE["data"] = out
+    _GATES_CACHE["ts"] = now
+    return out
+
+
+def _gate_eval(m):
+    """(all_pass, chips_html) for one bot's gate metrics."""
+    n30 = m.get("n30") or 0
+    wr = m.get("wr")
+    dd = m.get("dd")
+    age = m.get("age_days")
+    def chip(ok, text):
+        mark = "✓" if ok else "✗"
+        colr = "#1a7f37" if ok else "#a3121b"
+        return f'<span style="color:{colr};white-space:nowrap">{text} {mark}</span>'
+    c1 = chip(n30 >= GATE_MIN_TRADES_30D, f"{n30}/{GATE_MIN_TRADES_30D} trades·30d")
+    c2 = chip(wr is not None and wr >= GATE_MIN_WR,
+              f"WR {wr * 100:.0f}%" if wr is not None else "WR —")
+    c3 = chip(dd is not None and dd >= GATE_MAX_DD,
+              f"dd {dd * 100:+.1f}%" if dd is not None else "dd —")
+    c4 = chip(age is not None and age >= GATE_MIN_AGE_DAYS,
+              f"age {age:.0f}/{GATE_MIN_AGE_DAYS}d" if age is not None else "age —")
+    ok = (n30 >= GATE_MIN_TRADES_30D and wr is not None and wr >= GATE_MIN_WR
+          and dd is not None and dd >= GATE_MAX_DD
+          and age is not None and age >= GATE_MIN_AGE_DAYS)
+    return ok, ("Go-live gates: " + " · ".join((c1, c2, c3, c4)))
+
+
+def classify_stage(bot, gates):
+    """'ready' | 'proving' | 'experiment' | 'control' | 'scanner' for one
+    NON-live display bot. Live rows keep their own section."""
+    base, _suf = venue_variant(bot)
+    if bot in SCANNERS or base in SCANNERS:
+        return "scanner"
+    if base in EXPERIMENT_BASES:
+        return "experiment"
+    if base in CONTROL_BASES:
+        return "control"
+    ok, _chips = _gate_eval(gates.get(bot) or {})
+    return "ready" if ok else "proving"
 
 
 def _svg_chart(series, color, label, height=170, width=760, fmt=None):
@@ -2040,10 +2336,13 @@ def fetch_period_pnl(period, limit_periods):
                              "WHERE is_open = FALSE AND close_ts IS NOT NULL")
             if has_pt:
                 # closed_at is TEXT (iso strings from the venue layer) — cast,
-                # guarded by a shape check so one malformed row can't 500 the tab.
-                parts.append(r"SELECT bot, closed_at::timestamptz AS close_ts, "
-                             r"pnl_abs AS profit_abs FROM paper_trades "
-                             r"WHERE closed_at ~ '^\d{4}-\d{2}-\d{2}'")
+                # guarded by a real cast-validity check (PG16+) so one
+                # malformed row can't 500 the tab ([2026-07-15 AUDIT FIX]: the
+                # old prefix regex passed date-like garbage into the cast).
+                parts.append("SELECT bot, closed_at::timestamptz AS close_ts, "
+                             "pnl_abs AS profit_abs FROM paper_trades "
+                             "WHERE closed_at IS NOT NULL "
+                             "AND pg_input_is_valid(closed_at, 'timestamptz')")
             if not parts:
                 return [], [], {}
             cur.execute(
@@ -2182,13 +2481,29 @@ def market_md_cached(ttl=1800):
 
 
 def _ticket_rows(tickets, lens, n=3):
+    """[2026-07-15 AUDIT FIX] Divergence tickets carry their OWN schema
+    (side/gap_pct/lighter_apr/xvenue_apr — no chg_pct/apr_pct), and any lens
+    can carry apr_pct=None (book absent from the funding feed) — the old
+    single-shape render printed fabricated zeros and a None crashed the tab."""
     out = []
     for t in (tickets.get(lens) or [])[:n]:
-        out.append(f'<tr><td>{html.escape(str(t.get("sym", "?")))}</td>'
-                   f'<td class="{cls(t.get("chg_pct"))}">{t.get("chg_pct", 0):+.1f}%</td>'
-                   f'<td>{t.get("apr_pct", 0):+.0f}%</td>'
-                   f'<td>{t.get("prem_bps", 0):.1f}</td>'
-                   f'<td>${t.get("vol_m", 0):.1f}M</td></tr>')
+        sym = html.escape(str(t.get("sym", "?")))
+        if lens == "divergence":
+            out.append(
+                f'<tr><td>{sym} <span class="muted">'
+                f'{html.escape(str(t.get("side", "")))}</span></td>'
+                f'<td class="{cls(t.get("gap_pct"))}">{(t.get("gap_pct") or 0):+.0f}pp</td>'
+                f'<td>{(t.get("lighter_apr") or 0):+.0f}%→{(t.get("xvenue_apr") or 0):+.0f}%</td>'
+                f'<td>{(t.get("prem_bps") or 0):.1f}</td>'
+                f'<td>${(t.get("vol_m") or 0):.1f}M</td></tr>')
+        else:
+            apr = t.get("apr_pct")
+            out.append(
+                f'<tr><td>{sym}</td>'
+                f'<td class="{cls(t.get("chg_pct"))}">{(t.get("chg_pct") or 0):+.1f}%</td>'
+                f'<td>{"—" if apr is None else f"{apr:+.0f}%"}</td>'
+                f'<td>{(t.get("prem_bps") or 0):.1f}</td>'
+                f'<td>${(t.get("vol_m") or 0):.1f}M</td></tr>')
     return "".join(out)
 
 
@@ -2212,10 +2527,13 @@ def render_market():
         for lens_name in ("breakout", "dip", "momentum", "divergence"):
             rows_html = _ticket_rows(tickets, lens_name)
             n_all = len(tickets.get(lens_name) or [])
+            hdr = ('<th>sym/side</th><th>gap</th><th>Lighter→x-venue</th>'
+                   if lens_name == "divergence"
+                   else '<th>sym</th><th>24h</th><th>funding</th>')
             if rows_html:
                 lens_tbls.append(
                     f'<div class="sub">{lens_name} tickets ({n_all})</div>'
-                    f'<table class="tbl"><tr><th>sym</th><th>24h</th><th>funding</th>'
+                    f'<table class="tbl"><tr>{hdr}'
                     f'<th>prem bps</th><th>vol</th></tr>{rows_html}</table>')
             else:
                 lens_tbls.append(f'<div class="sub">{lens_name} tickets</div>'

@@ -310,11 +310,13 @@ def coin_quality():
                         "spread_bps": round(float(r[3]), 2) if r[3] is not None else None}
                  for r in cur.fetchall()}
             cur.execute("""
-                SELECT pair, count(*),
+                SELECT split_part(pair, '/', 1), count(*),
                        sum(case when pnl_abs > 0 then 1 else 0 end),
                        sum(case when reason like '%%stop%%' then 1 else 0 end)
                 FROM paper_trades WHERE closed_at > (now() - interval '30 days')::text
-                GROUP BY pair""")
+                GROUP BY 1""")
+            # [2026-07-15 AUDIT FIX] keys normalized to base coin so they merge
+            # with venue_orders' coin namespace ('NEAR', not 'NEAR/USDC')
             for pair, closes, wins, stops in cur.fetchall():
                 rec = q.setdefault(pair, {})
                 rec.update({"closes_30d": closes, "wins_30d": wins,

@@ -853,8 +853,10 @@ def main():
                     continue
                 size = round(order_usd / px, 6)
                 if not dry_run:
-                    open_ntl = sum(1 for v in pos.values()
-                                   if (v.get("size") if isinstance(v, dict) else v)) * order_usd
+                    # [2026-07-15 AUDIT FIX] use the live open_now counter —
+                    # it grows with same-loop opens (MAX_NEW_PER_LOOP=2); the
+                    # loop-start pos snapshot under-counted the second open.
+                    open_ntl = open_now * order_usd
                     if not ctx.rails.notional_ok(open_ntl, order_usd):
                         log.info("%s NOTIONAL_CAP_SKIP", coin)
                         continue

@@ -729,6 +729,28 @@ def main():
             fund = {}
         regime = btc_regime_up(cache)
 
+        # [2026-07-15 AUDIT FIX] L2 fleet long-budget veto, checked once per
+        # cycle. The 14-Jul enforcement was wired only into the retired Kraken
+        # strategies, leaving the RUNNING Lighter fleet unenforced. Contract
+        # matches fleet_bus: fresh payload + mode=enforce + budget full ->
+        # skip NEW entries; anything missing/stale fails OPEN (never blocks).
+        fleet_long_veto = False
+        try:
+            _fr = store.load_state("fleet-risk") or {}
+            _upd = datetime.fromisoformat(
+                str(_fr.get("updated")).replace("Z", "+00:00"))
+            _age = (now - _upd).total_seconds()
+            if (_age <= float(_fr.get("ttl_sec") or 900)
+                    and _fr.get("mode") == "enforce"
+                    and (_fr.get("long_positions") or 0)
+                    >= (_fr.get("long_budget") or 10**9)):
+                fleet_long_veto = True
+                log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
+                         "no new entries this cycle (exits unaffected)",
+                         _fr.get("long_positions"), _fr.get("long_budget"))
+        except Exception:  # noqa: BLE001 — fail-safe open
+            fleet_long_veto = False
+
         for b in books:
             store.heartbeat(b.bot_id)
             tf_s = _interval_ms(b.s.tf) / 1000.0
@@ -834,6 +856,8 @@ def main():
                 # ---- flat: consider an entry (new candle only) ----
                 if not sig or not sig.get("enter") or locked or not px:
                     continue
+                if fleet_long_veto:
+                    continue      # L2: fleet directional-long budget is full
                 if b.broker.open_count() >= b.s.max_open:
                     continue
                 if t0 < b.cooldown.get(coin, 0.0):

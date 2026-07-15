@@ -668,16 +668,27 @@ def fetch_paper_trades(limit=2000):
             # (an exit path, not an entry). Now: no direction prefix ->
             # untagged entry + the FULL reason kept as exit_reason (also fixes
             # 'decay_paid' being mangled into enter 'decay' / exit 'paid').
-            if reason.startswith(("long_", "short_")):
+            # [2026-07-15 AUDIT FIX] also accept the Ticket Taker's hyphenated
+            # side-lens tags ('long-breakout_tp' -> enter 'long-breakout',
+            # exit 'tp') — the underscore-only gate silently untagged every
+            # taker close, so the brain never graded the scout lenses.
+            if reason.startswith(("long_", "short_", "long-", "short-")):
                 direction, _sep, exit_reason = reason.partition("_")
             else:
                 direction, exit_reason = "", (reason or "trade")
+            # [2026-07-15 AUDIT FIX] tolerant timestamp parse — the listing
+            # sniper writes '2026-07-13 15:05:04 UTC', which fromisoformat
+            # rejects, so its 337 rows carried duration_min=None forever.
+            def _pts(s):
+                s = str(s).strip().replace("Z", "+00:00")
+                if s.endswith(" UTC"):
+                    s = s[:-4] + "+00:00"
+                return datetime.fromisoformat(s)
             dur = None
             try:
                 if opened_at and closed_at:
-                    o = datetime.fromisoformat(str(opened_at).replace("Z", "+00:00"))
-                    c = datetime.fromisoformat(str(closed_at).replace("Z", "+00:00"))
-                    dur = max(0.0, (c - o).total_seconds() / 60.0)
+                    dur = max(0.0, (_pts(closed_at) - _pts(opened_at))
+                              .total_seconds() / 60.0)
             except Exception:
                 dur = None
             out.append({
@@ -773,43 +784,6 @@ def _ensure_history_table(conn):
             "CREATE INDEX IF NOT EXISTS bot_state_history_key_ts "
             "ON bot_state_history (key, ts)")
     _history_table_ready = True
-
-
-def fetch_state_history(key, limit=800):
-    """[2026-07-14] Read side of save_history: recent bot_state_history
-    snapshots for one shared-layer key, NEWEST FIRST -> [{"ts": iso, "payload":
-    dict}]. Built for the brain's diagnosis layer (joining trades to the
-    regime-oracle reading at their open time). Returns [] when unavailable."""
-    conn = _get_conn()
-    if conn is None:
-        return []
-    try:
-        _ensure_history_table(conn)
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT ts, payload FROM bot_state_history "
-                "WHERE key = %s ORDER BY ts DESC LIMIT %s",
-                (key, int(limit)))
-            rows = cur.fetchall()
-        out = []
-        for ts, payload in rows:
-            if isinstance(payload, str):
-                try:
-                    payload = json.loads(payload)
-                except Exception:
-                    continue
-            out.append({"ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
-                        "payload": payload or {}})
-        return out
-    except Exception as e:  # noqa: BLE001
-        _warn_once(f"state-history read failed ({e})")
-        global _conn
-        try:
-            conn.close()
-        except Exception:
-            pass
-        _conn = None
-        return []
 
 
 def save_history(key, payload):

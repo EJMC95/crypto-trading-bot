@@ -78,8 +78,11 @@ fi
 # backtests -29%/4.5y (26.5% win) on the bear_bounce audit replay and bled
 # live (-$11.33); user-approved retirement. Row moved to dashboard RETIRED_ROWS.
 
-# Combined P&L + trades dashboard, served on $PORT (Railway exposes it).
-python3 /freqtrade/dashboard_server.py &
+# [2026-07-15 AUDIT FIX] dashboard_server.py retired from main mode: it
+# polled 127.0.0.1:8084-8088 for the five RETIRED local freqtrade bots
+# (v4core..v8momo) — dead ports since the Kraken retirement. The real
+# dashboard is the pnl-dashboard Railway service; this container needs no
+# HTTP listener (no healthcheckPath configured).
 
 # Market pulse collector (news/social/funding mood) -> Postgres bot_state
 # every 10 min. All bots feed from this for sizing decisions.

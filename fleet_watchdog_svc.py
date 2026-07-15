@@ -68,8 +68,15 @@ def evaluate(data):
     # directional cohort only (paper + real-money live trading rows, same
     # cohort fleet_risk budgets); the raw everything-count stays in the
     # snapshot line for context.
+    # [2026-07-15 AUDIT FIX] After the Kraken retirement the -lshadow books ARE
+    # the fleet-risk cohort, so the blanket shadow exclusion left the budget
+    # warning covering almost nothing. Mirror fleet_risk.authoritative_row:
+    # one row per base, live > shadow (shadow only counts when no live twin).
     opens, dir_opens = 0, 0
     non_directional = ("perps-funding", "equities-", "event-listing-sniper")
+    live_bases = {(b.get("base_bot") or b.get("bot") or "") for b in bots
+                  if b.get("kind") == "trading"
+                  and b.get("venue_mode") == "lighter_live"}
     for b in bots:
         try:
             n = int(b.get("open_trades") or 0)
@@ -78,9 +85,12 @@ def evaluate(data):
         opens += n
         if b.get("kind") != "trading":
             continue                      # scanners hold nothing real
-        if b.get("venue_mode") in ("lighter_shadow", "lighter_testnet"):
-            continue                      # modelled twins double-count originals
         base = b.get("base_bot") or b.get("bot") or ""
+        vm = b.get("venue_mode")
+        if vm == "lighter_testnet":
+            continue                      # faucet funds, never budgeted
+        if vm == "lighter_shadow" and base in live_bases:
+            continue                      # live twin supersedes; avoid double count
         if any(base == p or base.startswith(p) for p in non_directional):
             continue                      # delta-neutral / stocks / event-class
         dir_opens += n

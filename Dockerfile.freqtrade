@@ -3,6 +3,11 @@
 FROM freqtradeorg/freqtrade:stable
 
 USER root
+# [2026-07-15 AUDIT FIX] make /freqtrade importable from strategy callbacks —
+# fleet_bus/bot_pnl_store live there, but freqtrade runs with user_data on
+# sys.path, so `import fleet_bus` silently failed (fail-safe try/except) and
+# the L2 veto / L4 stake-mults never executed in this container.
+ENV PYTHONPATH=/freqtrade
 # psycopg2 for the P&L poller that publishes to the shared Postgres table.
 RUN pip install --no-cache-dir psycopg2-binary
 # Bake in the bot configs + strategies (built locally in user_data/)

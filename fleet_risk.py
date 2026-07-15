@@ -61,7 +61,11 @@ MODE = os.environ.get("FLEET_RISK_MODE", "enforce").strip().lower()
 # fail-safe on absence, per the standing bus contract. This filter is a
 # PREREQUISITE for wiring the RED entry veto — enforcement off a
 # ghost-inflated light would throttle live bots for positions nobody holds.
-STALE_ROW_SEC = 1800
+# [2026-07-15 AUDIT FIX] raised 1800 -> 3900: the LIVE Tide Rider book
+# publishes once per LOOP_SECONDS=3600, so at 30 min it flickered out of the
+# light every cycle and its real-money position went uncounted half the time.
+# 65 min still catches a genuinely dead publisher within ~1 loop.
+STALE_ROW_SEC = 3900
 
 
 def row_fresh(r):
@@ -98,7 +102,11 @@ FREQTRADE_BOTS = ["crypto-trend-daily", "crypto-intraday-15m", "crypto-swing-dai
                   "crypto-breakout-4h", "freqtrade-mum",
                   "freqtrade-dad", "freqtrade-avo-maria", "freqtrade-georgia",
                   "lighter-ticket-taker"]
-PERPS_LS_BOTS = []
+# [2026-07-15 AUDIT FIX] the LIVE Funding Farmer (perps-funding-lighter) is
+# directional-funding — it HOLDS one-sided positions (the side that receives
+# funding), so real money was counted in NO cohort after the 14-Jul sweep
+# emptied this list. Its longs/shorts derive from extra.held when absent.
+PERPS_LS_BOTS = ["perps-funding-lighter"]
 
 # [2026-07-09 LIGHTER GO-LIVE — no-miss-sync] When a bot trades on Lighter it
 # publishes as <bot>-lighter (real money) / -lshadow (modelled) / -ltest. The
@@ -198,6 +206,7 @@ def main():
 
     fleet_long, fleet_short = 0, 0
     fleet_equity = 0.0
+    equity_by_bot = {}
     per_bot, pair_count, venues_seen = {}, {}, {}
     for name in FREQTRADE_BOTS:
         r, venue = authoritative_row(name, by_bot)
@@ -205,6 +214,7 @@ def main():
             continue
         if r.get("equity") is not None:
             fleet_equity += float(r["equity"])   # governor cohort = light cohort
+            equity_by_bot[name] = float(r["equity"])
         n = int(r.get("open_trades") or 0)
         if n == 0:
             continue
@@ -226,9 +236,18 @@ def main():
         r, venue = authoritative_row(name, by_bot)   # live Lighter > paper twin
         if not r or not row_fresh(r):
             continue
+        if r.get("equity") is not None:
+            fleet_equity += float(r["equity"])
+            equity_by_bot[name] = float(r["equity"])
         extra = r.get("extra") or {}
-        longs = int(extra.get("longs") or 0)
-        shorts = int(extra.get("shorts") or 0)
+        # [2026-07-15 AUDIT FIX] Funding Farmer publishes held={'ETH':'S',...}
+        # rather than longs/shorts ints — derive counts so live real-money
+        # positions actually reach the light.
+        held = extra.get("held") or {}
+        longs = int(extra.get("longs") or 0) or \
+            sum(1 for v in held.values() if str(v).upper().startswith("L"))
+        shorts = int(extra.get("shorts") or 0) or \
+            sum(1 for v in held.values() if str(v).upper().startswith("S"))
         if longs or shorts:
             fleet_long += longs
             fleet_short += shorts
@@ -255,6 +274,22 @@ def main():
     if not row_fresh(sniper):
         sniper = {}
     prev_state = store.load_state(RISK_KEY) or {}
+    # [2026-07-15 AUDIT FIX] Outage guard for the drawdown governor: a bot
+    # whose publisher went quiet must read as "publisher lost", not "equity
+    # lost" — otherwise a container restart looks like a -12% fleet drawdown
+    # and the governor shrinks clips for the wrong reason. Carry each missing
+    # base's last-known equity forward (it decays out only when the whole
+    # state is superseded by fresh reads).
+    _prev_eq = prev_state.get("equity_by_bot") or {}
+    _carried = []
+    for _base in FREQTRADE_BOTS + PERPS_LS_BOTS:
+        if _base not in equity_by_bot and _base in _prev_eq:
+            try:
+                fleet_equity += float(_prev_eq[_base])
+                equity_by_bot[_base] = float(_prev_eq[_base])
+                _carried.append(_base)
+            except (TypeError, ValueError):
+                continue
     samples, dd_7d, clip_scale = dd_governor(
         prev_state.get("equity_samples"), fleet_equity,
         datetime.now(timezone.utc))
@@ -264,6 +299,8 @@ def main():
         "fleet_equity": round(fleet_equity, 2),
         "fleet_dd_7d": dd_7d,
         "clip_scale": clip_scale,
+        "equity_by_bot": {k: round(v, 2) for k, v in equity_by_bot.items()},
+        "equity_carried": _carried,      # bases riding on last-known equity
         "equity_samples": samples,
         "long_positions": fleet_long, "long_budget": LONG_BUDGET,
         "short_positions": fleet_short, "short_budget": SHORT_BUDGET,

@@ -238,7 +238,10 @@ def main():
             pnl_pct=round(net / clip_used, 6),
             pair=f"{sym}/USDC",
             opened_at=m.get("opened"), closed_at=iso(t_now),
-            reason=f"{side}-{lens}_{reason}")
+            reason=f"{side}-{lens}_{reason}",
+            # [2026-07-15 AUDIT FIX] provenance: shadow-only book on Lighter
+            # marks — venue NULL claimed the pre-Gate-0 HL-paper era.
+            venue="lighter", shadow=True)
         print(f"[ticket-taker] {iso(t_now)} CLOSE {side} {sym} ({lens}) {reason} "
               f"pnl {pnl:+.2f} funding {-drag:+.3f} net {net:+.2f}")
         meta.pop(sym, None)
@@ -263,15 +266,27 @@ def main():
     # (1.0 / 0.5 past -5% 7d dd / 0.25 past -10%). Fail-safe neutral on
     # missing/stale state — same contract as every bus consumer.
     gov = 1.0
+    long_budget_full = False
     try:
         fr = store.load_state("fleet-risk") or {}
         fr_age = (t_now - parse_ts(fr.get("updated"))).total_seconds()
         if fr_age <= float(fr.get("ttl_sec") or 900):
             gov = max(0.25, min(1.0, float(fr.get("clip_scale") or 1.0)))
+            # [2026-07-15 AUDIT FIX] L2 long-budget veto now has a consumer in
+            # the RUNNING fleet (it was wired only into the retired Kraken
+            # strategies). Fail-safe OPEN: stale/missing state never blocks.
+            if (fr.get("mode") == "enforce"
+                    and (fr.get("long_positions") or 0)
+                    >= (fr.get("long_budget") or 10**9)):
+                long_budget_full = True
     except (ValueError, TypeError):
         gov = 1.0
     if gov < 1.0:
         print(f"[ticket-taker] {iso(t_now)} DRAWDOWN GOVERNOR — clips x{gov}")
+    if long_budget_full:
+        print(f"[ticket-taker] {iso(t_now)} FLEET LONG-BUDGET VETO — "
+              f"{fr.get('long_positions')}/{fr.get('long_budget')} directional "
+              f"longs; no new LONG entries this cycle (shorts unaffected)")
     opened_syms, opened_lenses = set(), set()
     if fresh and not stressed:
         for lens, t in incredible(scout.get("tickets") or {}):
@@ -286,6 +301,8 @@ def main():
             if not mark:
                 continue
             is_long = t.get("side", "long") != "short"
+            if is_long and long_budget_full:
+                continue          # L2 veto: fleet long budget is full
             clip = round(vol_clip(ranges.get(sym)) * gov, 2)
             broker.open(sym, is_long, clip / mark, mark)
             meta[sym] = {"lens": lens, "opened": iso(t_now), "clip": clip,

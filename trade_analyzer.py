@@ -188,9 +188,24 @@ def run_analysis(log=print):
     for bot, strat in BOT_TO_STRATEGY.items():
         by_strategy_names[strat].append(bot)
 
+    # [2026-07-15 AUDIT FIX] Since the Kraken retirement the ACTIVE fleet books
+    # its closes into paper_trades under '<bot>-lshadow' ids — bot_trades is
+    # frozen history. Fetch the paper ledger once and merge each strategy's
+    # shadow-twin rows in, so the analysis keeps learning from live books.
+    paper_by_bot = defaultdict(list)
+    try:
+        for t in store.fetch_paper_trades(limit=5000):
+            paper_by_bot[t.get("bot")].append(t)
+    except Exception:  # noqa: BLE001 — analysis must survive a ledger hiccup
+        pass
+
     results = {}
     for strat, bots in by_strategy_names.items():
+        shadow_ids = [b + "-lshadow" for b in bots]
         trades = store.fetch_trades(bots)
+        for sid in shadow_ids:
+            trades.extend(paper_by_bot.get(sid, []))
+        bots = bots + [s for s in shadow_ids if paper_by_bot.get(s)]
         s = analyze(trades)
         results[strat] = s
         log(f"----- TRADE ANALYSIS: {strat} ({', '.join(bots)}) -----")
