@@ -199,6 +199,19 @@ def synthesize(lighter_market, fleet_risk, lens_forward, prior_keys, now_ts):
     fr_ok = _fresh(fleet_risk or {})
     lf = (lens_forward or {}).get("lenses") or {}
 
+    # the immune organ's findings, surfaced on the triage board (it already
+    # phone-pushes; this puts sickness where the operator reviews everything)
+    imm = store.load_state("fleet-immune") or {}
+    if _fresh(imm) and (imm.get("sick") or imm.get("quarantined_levers")):
+        q = imm.get("quarantined_levers") or {}
+        n = len(imm.get("sick") or [])
+        emit("board:immune", "warn",
+             f"🛡️ immune organ flags {n} sick finding(s)"
+             + (f"; quarantined {sorted(q)}" if q else ""),
+             proposal="sickness = fresh-but-wrong data (bot_state 'fleet-immune'); "
+                      "quarantined levers already revert to operator defaults",
+             lever="immune")
+
     if lm_ok:
         med = ((lighter_market.get("stress") or {}).get("med")) or 0
         if med >= STRESS_VETO_BPS:

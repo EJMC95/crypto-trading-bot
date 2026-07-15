@@ -200,6 +200,7 @@ def _is_fresh(payload, now_ts):
 
 
 _cache = {"ts": 0.0, "payload": None}
+_immune_cache = {"ts": 0.0, "q": frozenset()}
 
 
 def _load(now_ts):
@@ -213,6 +214,26 @@ def _load(now_ts):
         payload = None
     _cache.update(ts=now_ts, payload=payload)
     return payload
+
+
+def _quarantined(now_ts):
+    """Levers the immune organ ('fleet-immune') has quarantined — get_lever
+    returns the caller's default for these, so a sick lever reverts to the
+    operator's own value. Fail-safe OPEN: a stale/absent immune payload
+    quarantines nothing (a dead immune organ must not paralyze tuning; the
+    levers stay bounded + TTL'd regardless)."""
+    if now_ts - _immune_cache["ts"] < CACHE_SEC:
+        return _immune_cache["q"]
+    q = frozenset()
+    try:
+        if store is not None:
+            p = store.load_state("fleet-immune") or {}
+            if _is_fresh(p, now_ts):
+                q = frozenset((p.get("quarantined_levers") or {}).keys())
+    except Exception:
+        q = frozenset()
+    _immune_cache.update(ts=now_ts, q=q)
+    return q
 
 
 def _lever_alive(entry, now_ts):
@@ -231,9 +252,12 @@ def _lever_alive(entry, now_ts):
 
 
 def get_lever(name, default, now_ts=None):
-    """Fresh, unexpired, registered, clamped lever value — or the default."""
+    """Fresh, unexpired, un-quarantined, registered, clamped lever value —
+    or the caller's default."""
     now_ts = now_ts if now_ts is not None else time.time()
     try:
+        if name in _quarantined(now_ts):
+            return default                   # immune-quarantined -> operator default
         p = _load(now_ts)
         if not p or not _is_fresh(p, now_ts):
             return default
@@ -346,6 +370,12 @@ def _selftest():
     assert get_lever("gapscout.prefilter_gap", 0.002, now_ts=now) == 0.0030  # clamped
     assert get_lever("gapscout.extra_exchanges", "", now_ts=now) == "kucoin"
     assert get_lever("unknown.lever", 7, now_ts=now) == 7
+    # immune QUARANTINE: a quarantined lever returns the caller's default
+    # even with a fresh, in-bounds value present
+    _immune_cache.update(ts=now, q=frozenset({"gapscout.prefilter_gap"}))
+    assert get_lever("gapscout.prefilter_gap", 0.002, now_ts=now) == 0.002
+    assert get_lever("gapscout.extra_exchanges", "", now_ts=now) == "kucoin"  # others fine
+    _immune_cache.update(ts=now, q=frozenset())    # clear for later asserts
     assert set(active_levers(now_ts=now)) == {"gapscout.prefilter_gap",
                                               "gapscout.extra_exchanges"}
     # per-lever expiry: a dead lever yields the default even in a fresh payload

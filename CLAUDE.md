@@ -76,6 +76,17 @@ https://pnl-dashboard-production-858c.up.railway.app/
   11-Jul "opt-in, shadow-validate" gate widening). Tide Rider excluded
   (trades too rarely to judge; stays backtest-validated). → bot_state
   `xp-judge`; phase surfaced on the evidence board (🧪)
+- `fleet_immune.py` 🛡️ — the IMMUNE + SELF-REPAIR organ (15-Jul, from the
+  operator's "what self-repairs / what filters" framing + the same-evening
+  incident where a 39h-stale artifact drove a false live down-scale).
+  Covers the failure class the death-oriented watchdog misses — ALIVE BUT
+  SICK (fresh, in-TTL, trusted, but WRONG). FILTRATION: prunes the
+  fleet-alerts bloodstream of age-stale + known-toxic ANTIBODY matches.
+  ADAPTIVE IMMUNITY: scans fresh organ payloads for invariant violations,
+  QUARANTINES a sick growth-rail lever (`fleet_tuning.get_lever` honors
+  `fleet-immune.quarantined_levers` → reverts to operator default), phone-
+  pushes NEW sickness. Restrict/clean only; fail-safe (dead immune = no
+  quarantine). → bot_state `fleet-immune`; surfaced on the board (🛡️)
 - `regime_oracle.py`, `market_pulse.py` (history appends hourly),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 

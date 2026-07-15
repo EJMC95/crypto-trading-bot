@@ -195,5 +195,20 @@ done &
     sleep "${XPJ_INTERVAL_SEC:-3600}"
   done ) &
 
+# [2026-07-15 IMMUNE ORGAN] 🛡️ the fleet's immune + self-repair layer (from
+# the operator's "what organ self-repairs / what filters" framing, and the
+# same evening's live incident where a 39h-stale artifact drove a false live
+# down-scale). Every ~15 min: FILTERS the alert bloodstream (prune age-stale
+# + known-toxic antibody matches), DETECTS fresh-but-wrong organ payloads
+# (the failure class the death-oriented watchdog misses), QUARANTINES a sick
+# growth-rail lever (fleet_tuning honors it -> reverts to operator default),
+# phone-pushes NEW sickness. Restrict/clean only; fail-safe (dead immune =
+# no quarantine).
+( sleep 540
+  while true; do
+    python3 /freqtrade/fleet_immune.py || true
+    sleep "${IMMUNE_INTERVAL_SEC:-900}"
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait
