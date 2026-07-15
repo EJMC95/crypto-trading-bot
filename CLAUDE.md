@@ -236,3 +236,13 @@ All new bots:
 - $1,000 starting balance per bot, NO top-ups
 - Paper trading only until 30-day win rate > 55% AND max drawdown < 15%
 - Never modify bot logic without backtesting first
+- **LIVE BOTS ALWAYS IN AUDIT SCOPE (operator rule, 16-Jul).** Every audit,
+  bug-scan, code-review, or security-review — WHATEVER its nominal scope —
+  MUST also check the LIVE REAL-MONEY bots in the same pass: Funding Farmer
+  (`lighter_funding_bot.py` → `perps-funding-lighter-lighter`) and Tide Rider
+  (`lighter_trend_bot.py` → `crypto-trend-daily-lighter`), plus their shared
+  real-money surface (`venues/` SafetyRails / notional caps / equity guard,
+  `order_usd`, and the `live.*` lever consumers). Why: real money lives there,
+  and the 15-Jul cap breach proved a change ELSEWHERE (the growth rail) can
+  break the live bots even when the audit isn't "about" them. Never let an
+  audit exclude the live bots.
