@@ -178,3 +178,83 @@ in hindsight.
   (session sizing on 4 events is the Trail Blazer lucky-window lesson).
 - Cheap week task: log entry-hour histograms of payoff events (>$5 closes)
   per exchange from `paper_trades` — one query at the review, no code.
+
+## 10. Gap Scout: the +$5k odometer — make it honest, then widen the net
+   (operator question, 15-Jul: "how can the gap scanner's +5000 be? are we
+   missing things it's picking up on — can we better implement positive
+   finds so we don't miss out?")
+
+**Diagnosis (15-Jul forensics).** `pnl_abs +$5,225` (gross +$6,995) is an
+odometer, not a book: fills are only booked when the modelled edge ≥ 0 (no
+losing trades exist), and each ~19s scan re-books a still-open gap as a
+fresh $1,000 clip — a gap that persists one hour is counted ~190 times.
+The counter restarted from $0 when the 14-Jul persistence fix first
+deployed (the pre-fix container showed +$6,095 at the 14-Jul review), so
+the whole +$5,225 accrued in ≲30h — then froze: every retrievable log
+window on 15-Jul shows zero PAPER-FILL lines and best depth-confirmed edge
+≈ −1%, with the restored balance bit-identical across deployments.
+Burst-then-flat is the signature of a few milked stale-book/collision
+episodes, not a steady edge. One artifact caught in the act (15-Jul ~20:50
+AEST): the bus's "1.0% majors dislocation" on DOT/USDT was Coinbase
+Exchange's DEAD DOT/USDT book ($2.8k/day volume, last trade 4½h old)
+priced 1% off Kraken's live mid — Stage 1 must use `last` where bulk
+tickers carry no bid/ask (CBX, Gemini), so dead books manufacture
+persistent gaps; the 14-Jul DISLOC_BASES fix restricted the gauge to major
+BASES but not to live BOOKS. Attribution of THIS +$5,225 is unrecoverable
+(pre-ledger era: upsert row, ephemeral CSV, purged deploy logs).
+**On "missing out": nothing real is being missed on the CEX legs** —
+combined base-tier taker fees are 0.66–1.0%, the engine's own docstring
+says flat is the honest expected result, and the fleet has no CEX
+execution anyway (Lighter-first). The genuinely useful exhaust (Lighter
+premium, majors gauge) is already on the bus.
+
+**A. Honesty fixes (booking side — tighten):**
+1. ✅ per-fill ledger + W/L counters shipped 15-Jul (j). Verify at review:
+   every newly booked dollar has a `paper_trades` row
+   (`long-xarb_paper-fill`, route in tag).
+2. **Episode dedup** — one booking per (symbol, buy_ex, sell_ex) gap
+   episode; re-arm only after the gap closes below threshold. Kills the
+   ×190 compounding while keeping every find visible.
+3. **Bookable-pair floors** — fresh REAL bid/ask on both venues (never
+   `last`), minimum book volume/depth beyond the clip; apply the same
+   floor to the published `liquid_top_pct` (major-BASE ≠ liquid-BOOK —
+   the DOT/USDT case above).
+4. **Balance epoch** — when 2–3 ship, zero the odometer (park the old
+   number in extra as `legacy_balance`) so the printed figure is 100%
+   ledger-backed from then on.
+
+**B. Widening (detection side — the operator's ask; publish/census-only):**
+Principle: widen the funnel's MOUTH, tighten its THROAT. Every widening
+below lands only after A — widening a fictional counter just makes bigger
+fiction faster.
+1. **More venues** — Kraken/CBX/Gemini is the most efficient, least
+   dislocation-prone corner of crypto. Real gaps live on second-tier
+   venues: KuCoin, Gate, MEXC, Bitget, HTX (all in ccxt; needs a
+   Railway-region reachability probe — Binance 451s from there, OKX/Bybit
+   likely geo-block).
+2. **Cross-quote comparison** — compare USD vs USDT/USDC books through a
+   LIVE USDT/USD reference (Kraken lists it) instead of excluding them:
+   roughly doubles the comparable universe and upgrades the gauge into a
+   real stablecoin-stress detector. The 1:1-par shortcut stays banned.
+3. **Capacity census** — walk the already-fetched books at
+   $250/$1k/$5k/$25k (pure math, no extra fetches): a per-find capacity
+   curve, the one number that could ever justify real execution.
+4. **Mine the >5% band instead of silently skipping it** (5–7
+   artifacts/scan today): with a base-identity check (ccxt metadata/name
+   match; persistent-offset fingerprint ⇒ collision), the residue is
+   listings/halts/depegs — Launch/Perp Sniper + listing-intel food, not
+   arb.
+5. **Budget knobs** — PREFILTER_GAP 0.20→0.10%, MAX_BOOK_FETCHES 30→60,
+   IF scan time allows (the loop already runs ~19s against a 10s poll —
+   measure first).
+**Anti-widenings** (named so nobody re-litigates): bigger clip size alone,
+softer haircuts, USDT=USD at par, looser `MIN_NET_EDGE` booking — all
+inflate fiction without new information; and no Lighter-side duplication
+(`lighter_market_scout` owns the per-book Lighter view).
+
+**Decision shapes:** (a) A only — census organ + cleaned gauge; (b) A + B,
+judged on episodes/day by class (stale-book / collision / real) from the
+new ledger; (c) retire the CEX legs, keep the Lighter-premium publisher;
+(d) a real-execution project — only if the capacity census shows
+fee-beating capacity on a venue we'd actually fund (out of doctrine
+today).
