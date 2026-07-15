@@ -227,6 +227,16 @@ def next_candidate(pool, done, current):
     return None
 
 
+def _needs_reset(phase, current, spec):
+    """True when the judge is mid-experiment (running/promoted) but the stored
+    spec is missing or mismatched — e.g. state written by the old index-based
+    code before the 16-Jul name-based refactor. Pure — selftested."""
+    if phase not in ("running", "promoted"):
+        return False
+    return not (current and isinstance(spec, dict)
+                and spec.get("name") == current and "levers" in spec)
+
+
 def run_once():
     now = now_ts()
     st = store.load_state(KEY) or {}
@@ -283,8 +293,15 @@ def run_once():
         return save(phase="running", current=cand["name"], spec=cand,
                     started_ts=now, note=f"STARTED {cand['name']}")
 
-    # running / promoted use the stored spec (independent of the live pool)
-    cand = spec if spec.get("name") == current else {"name": current, "levers": {}}
+    # running / promoted use the stored spec. [2026-07-16 FIX] Guard the
+    # migration from the OLD index-based state (cand_idx, no 'current'/'spec'):
+    # a running/promoted phase with no valid spec used to KeyError on
+    # cand['levers'] every cycle (the judge was dead ~9h). Reset to idle and
+    # re-select from the pool cleanly instead.
+    if _needs_reset(phase, current, spec):
+        return save(phase="idle", current=None, spec={},
+                    note="legacy/partial judge state (no valid spec) — reset to idle")
+    cand = spec
 
     if phase == "running":
         started = float(st.get("started_ts") or now)
@@ -413,6 +430,15 @@ def _selftest():
     assert next_candidate(pool, [], None)["name"] == "enter-gate-0.30"
     assert next_candidate(pool, ["enter-gate-0.30"], "tp-0.06")["name"] == "hold-48"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
+
+    # migration guard: OLD index-based state (running phase, no current/spec)
+    # must trigger a reset instead of KeyError on cand['levers']
+    assert _needs_reset("running", None, {}) is True          # the 16-Jul crash
+    assert _needs_reset("promoted", None, {}) is True
+    assert _needs_reset("running", "x", {"name": "y", "levers": {}}) is True  # mismatch
+    assert _needs_reset("running", "x", {"name": "x"}) is True  # spec lacks 'levers'
+    assert _needs_reset("running", "x", {"name": "x", "levers": {"a": 1}}) is False  # valid
+    assert _needs_reset("idle", None, {}) is False             # idle never resets here
 
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
           "floors, own-right, fade, registry mapping)")
