@@ -435,10 +435,38 @@ def scan_candidates(ctx, prelim, order_usd, log):
             for _, c, f, apr, is_short, bm, ev in finalists]
 
 
+def _open_notional(pos, meta, open_now, order_usd):
+    """[2026-07-15 AUDIT FIX v2] REAL deployed notional of open positions:
+    each HELD position at its OWN entry clip (meta['clip'], or size*entry as a
+    fallback), plus this loop's new opens at the current clip. The old
+    `open_now * order_usd` estimate under-counts whenever the growth rail moved
+    the clip mid-session — a live.clip_scale DOWN-scale shrinks order_usd,
+    which RAISES max_open=floor(cap/clip) and, with held positions still sized
+    at the larger clip, could let a new entry breach the operator's hard
+    notional cap. Pure — unit-checked in _selftest_notional()."""
+    held, n = 0.0, 0
+    for c, v in (pos or {}).items():
+        sz = v.get("size") if isinstance(v, dict) else v
+        if not sz:
+            continue
+        n += 1
+        mc = meta.get(c) or {}
+        if mc.get("clip"):
+            held += float(mc["clip"])
+        elif mc.get("entry"):
+            held += abs(float(sz)) * float(mc["entry"])
+        else:
+            held += float(order_usd)
+    return held + max(0, int(open_now) - n) * float(order_usd)
+
+
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
                   reason, order_usd=ORDER_USD, venue=None, shadow=None):
     """Mirror a realized directional funding trade to the paper_trades ledger.
-    pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip."""
+    pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip
+    (the ENTRY clip — callers pass meta['clip'], not the current loop's clip,
+    so a mid-hold growth-rail clip change can't distort the per-trade return
+    the promotion judge reads)."""
     pnl = float(price_pnl) + float(fund_pnl)
     pnl_pct = (pnl / (order_usd or 1.0)) if ent_px else None
     oa = datetime.fromtimestamp(ent_ts, tz=timezone.utc).isoformat() if ent_ts else None
@@ -571,7 +599,8 @@ def main():
             n_closed += 1
             n_wins += 1 if price_pnl > 0 else 0
             _record_close(bot_id, c, entry, opened_ts, px, price_pnl, m.get("accrued", 0.0),
-                          was_long=not is_short, reason=reason, order_usd=order_usd,
+                          was_long=not is_short, reason=reason,
+                          order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag)
             try:
                 store.publish_venue_order(
@@ -770,7 +799,8 @@ def main():
                         ctx.venue.market_close(coin)
                         _record_close(bot_id, coin, entry, opened_ts, entry, 0.0,
                                       m.get("accrued", 0.0), was_long=not is_short,
-                                      reason="stop_blind", order_usd=order_usd,
+                                      reason="stop_blind",
+                                      order_usd=float((m or {}).get("clip") or order_usd),
                                       venue=venue_tag, shadow=shadow_tag)
                         n_closed += 1
                         meta.pop(coin, None)
@@ -834,7 +864,8 @@ def main():
                      coin, "short" if is_short else "long", held_h, price_pnl,
                      fund_pnl, decision)
             _record_close(bot_id, coin, entry, opened_ts, px, price_pnl, fund_pnl,
-                          was_long=not is_short, reason=decision, order_usd=order_usd,
+                          was_long=not is_short, reason=decision,
+                          order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag)
             try:
                 store.publish_venue_order(
@@ -924,10 +955,10 @@ def main():
                     continue
                 size = round(order_usd / px, 6)
                 if not dry_run:
-                    # [2026-07-15 AUDIT FIX] use the live open_now counter —
-                    # it grows with same-loop opens (MAX_NEW_PER_LOOP=2); the
-                    # loop-start pos snapshot under-counted the second open.
-                    open_ntl = open_now * order_usd
+                    # [2026-07-15 AUDIT FIX v2] real deployed notional (held at
+                    # their own clips + this loop's opens) — NOT open_now*clip,
+                    # which breaches the cap when the growth rail moved the clip.
+                    open_ntl = _open_notional(pos, meta, open_now, order_usd)
                     if not ctx.rails.notional_ok(open_ntl, order_usd):
                         log.info("%s NOTIONAL_CAP_SKIP", coin)
                         continue
@@ -940,7 +971,7 @@ def main():
                     log.error("open %s failed: %s", coin, e)
                     continue
                 meta[coin] = {"is_short": is_short, "entry": px, "opened_ts": t0,
-                              "accrued": 0.0}
+                              "accrued": 0.0, "clip": order_usd}   # deployed clip
                 open_now += 1
                 opened_this_loop += 1
                 log.info("OPEN %s %s $%.0f | funding %+.1f%% APR | px %.6g | spread %.0fbps%s",

@@ -809,8 +809,11 @@ def fetch_bot_pnl():
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT bot, updated_at, status, equity, pnl_abs, open_trades, "
-                "closed_trades, wins, losses, extra FROM bot_pnl")
+                # [2026-07-15 AUDIT FIX] include pnl_pct — the immune organ's
+                # NaN/absurd-pnl_pct sickness check reads it; it was omitted, so
+                # that check silently never fired on real rows.
+                "SELECT bot, updated_at, status, equity, pnl_abs, pnl_pct, "
+                "open_trades, closed_trades, wins, losses, extra FROM bot_pnl")
             cols = [d[0] for d in cur.description]
             out = []
             for row in cur.fetchall():

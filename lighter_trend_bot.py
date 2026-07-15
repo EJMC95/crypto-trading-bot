@@ -105,9 +105,33 @@ def fresh_mid(ctx, coin):
     return marks.fresh_mid(ctx.venue, coin)
 
 
+def _open_notional(pos, meta, open_now, order_usd):
+    """[2026-07-15 AUDIT FIX v2] REAL deployed notional of open positions —
+    each held position at its OWN clip (meta['clip'] / size*entry) + this
+    loop's opens at the current clip. `open_now * order_usd` under-counts once
+    the growth rail moved the clip, which could breach the operator's notional
+    cap on a live.clip_scale down-scale (down-scale raises max_open)."""
+    held, n = 0.0, 0
+    for c, v in (pos or {}).items():
+        sz = v.get("size") if isinstance(v, dict) else v
+        if not sz:
+            continue
+        n += 1
+        mc = meta.get(c) or {}
+        if mc.get("clip"):
+            held += float(mc["clip"])
+        elif mc.get("entry"):
+            held += abs(float(sz)) * float(mc["entry"])
+        else:
+            held += float(order_usd)
+    return held + max(0, int(open_now) - n) * float(order_usd)
+
+
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, reason,
                   order_usd=ORDER_USD, venue=None, shadow=None):
     pnl = float(price_pnl) + float(fund_pnl)
+    # pnl_pct on the ENTRY clip (callers pass meta['clip']) so a mid-hold
+    # growth-rail clip change can't distort the per-trade return.
     pnl_pct = (pnl / (order_usd or 1.0)) if ent_px else None
     oa = datetime.fromtimestamp(ent_ts, tz=timezone.utc).isoformat() if ent_ts else None
     try:
@@ -211,7 +235,8 @@ def main():
             n_closed += 1
             n_wins += 1 if price_pnl > 0 else 0
             _record_close(bot_id, c, entry, opened_ts, px, price_pnl, m.get("accrued", 0.0),
-                          reason, order_usd=order_usd, venue=venue_tag, shadow=shadow_tag)
+                          reason, order_usd=float((m or {}).get("clip") or order_usd),
+                          venue=venue_tag, shadow=shadow_tag)
             # Mirror the emergency exit into venue_orders (close_long does this for
             # normal exits). _flatten_all only runs in funded modes, so this row is
             # the real forced-close leg; keep it non-fatal to the flatten loop.
@@ -246,7 +271,8 @@ def main():
         log.info("CLOSE %s long | price %+.2f funding %+.2f [%s]",
                  coin, price_pnl, fund_pnl, reason)
         _record_close(bot_id, coin, entry, opened_ts, px, price_pnl, fund_pnl,
-                      reason, order_usd=order_usd, venue=venue_tag, shadow=shadow_tag)
+                      reason, order_usd=float((m or {}).get("clip") or order_usd),
+                      venue=venue_tag, shadow=shadow_tag)
         # Funded lighter modes only (shadow's ShadowBroker already logged the honest
         # fill; hl_paper must not write the live-id ledger).
         if venue_tag and not shadow_tag:
@@ -484,10 +510,10 @@ def main():
                     continue      # L2: fleet directional-long budget is full
                 size = round(order_usd / px, 6)
                 if not dry_run:
-                    # open_now is the live counter (grows with same-loop opens); the
-                    # once-captured `pos` snapshot would miss them. max_open=floor(cap/
-                    # clip) is the primary cap — notional_ok is the belt-and-suspenders.
-                    open_ntl = open_now * order_usd
+                    # [2026-07-15 AUDIT FIX v2] real deployed notional (held at
+                    # their own clips + this loop's opens), NOT open_now*clip —
+                    # which breaches the cap when the growth rail moved the clip.
+                    open_ntl = _open_notional(pos, meta, open_now, order_usd)
                     if not ctx.rails.notional_ok(open_ntl, order_usd):
                         log.info("%s NOTIONAL_CAP_SKIP", coin)
                         continue
@@ -499,7 +525,8 @@ def main():
                 except Exception as e:
                     log.error("open %s failed: %s", coin, e)
                     continue
-                meta[coin] = {"entry": px, "opened_ts": t0, "accrued": 0.0}
+                meta[coin] = {"entry": px, "opened_ts": t0, "accrued": 0.0,
+                              "clip": order_usd}   # deployed clip (notional + pnl_pct)
                 open_now += 1
                 log.info("OPEN %s long $%.0f | ema%d %.4g > ema%d %.4g | px %.6g",
                          coin, order_usd, EMA_FAST, ef, EMA_SLOW, es, px)

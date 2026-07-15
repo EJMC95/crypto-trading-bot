@@ -366,8 +366,11 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     # UP must be earned on every gate at once.
     fr_ok = (_fresh(fleet_risk or {})
              and str(fleet_risk.get("light")) == "green"
-             and (fleet_risk.get("fleet_dd_7d") is None
-                  or float(fleet_risk.get("fleet_dd_7d")) > LIVE_DD_MIN))
+             # [2026-07-15 AUDIT FIX] fail CLOSED for a real-money UP-scale: a
+             # MISSING drawdown field must NOT bypass the shallow-DD guard
+             # (was `is None or > MIN`, which up-scaled on absent dd).
+             and fleet_risk.get("fleet_dd_7d") is not None
+             and float(fleet_risk.get("fleet_dd_7d")) > LIVE_DD_MIN)
     med = ((lighter_market or {}).get("stress") or {}).get("med")
     lm_ok = (_fresh(lighter_market or {}) and med is not None
              and med * 2 <= STRESS_VETO_BPS)

@@ -77,10 +77,21 @@ def _snap_ts(snap):
 def is_clean(key, payload, now):
     """True if this payload violates NONE of the immune organ's invariants
     for its organ. Reuses the immune checks so 'clean' means exactly 'not
-    what the immune organ would flag'."""
+    what the immune organ would flag'.
+
+    [2026-07-15 AUDIT FIX] immune.organ_invariants freshness-gates every
+    organ (it only inspects payloads whose own `updated` is fresh) — but a
+    HISTORY snapshot carries its original (aged) `updated`, so the invariant
+    check was being SKIPPED and is_clean returned True for corrupt content in
+    the 3–24h window regen is meant to repair. Stamp a fresh `updated` ONLY
+    for the content inspection (a shallow copy — the restored snapshot keeps
+    its real age)."""
     if not payload:
         return False
-    findings = immune.organ_invariants({key: payload}, now)
+    probe = dict(payload)
+    probe["updated"] = _iso(now)          # inspect content, not freshness
+    probe["ttl_sec"] = max(int(probe.get("ttl_sec") or 0), 3600)
+    findings = immune.organ_invariants({key: probe}, now)
     return not any(f["organ"] == key for f in findings)
 
 
