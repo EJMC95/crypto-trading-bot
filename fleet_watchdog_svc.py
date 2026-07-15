@@ -10,11 +10,14 @@ Runs as a guarded daemon thread inside the always-on pnl-dashboard service
   warnings  : fleet open positions > WATCHDOG_MAX_OPEN (default 20)
               any bot pnl_daily < WATCHDOG_DAILY_LOSS_ALERT (default -100)
 
-Alerting is TRANSITION-based email via report_emailer.send_email (dormant until
-the SMTP_* env vars are set, exactly like the emailer):
-  ok -> problems        🚨 alert email
-  problem set changes   updated email (min 30-min gap)
-  problems -> ok        ✅ recovery email
+Alerting is TRANSITION-based, to either or both channels:
+  phone push  via ntfy.sh (set NTFY_TOPIC; user-requested 2026-07-15 — the
+              operator's preferred channel; no account/credentials, the phone
+              app subscribes to the same topic)
+  email       via report_emailer.send_email (dormant until SMTP_* is set)
+  ok -> problems        🚨 alert
+  problem set changes   updated alert (min 30-min gap)
+  problems -> ok        ✅ recovery
 
 Current state is always served at /watchdog.json (no auth, no secrets) so the
 external GitHub-Actions fleet-watchdog and humans can read it. Read-only
@@ -32,8 +35,36 @@ import datetime as dt
 
 _LOCK = threading.Lock()
 _STATE = {"started": None, "checked_at": None, "problems": [], "warnings": [],
-          "snapshot": "", "email_armed": False, "last_email_at": None,
-          "last_email_kind": None, "error": None}
+          "snapshot": "", "email_armed": False, "push_armed": False,
+          "last_email_at": None, "last_email_kind": None, "error": None}
+
+# [2026-07-15 PUSH] ntfy.sh phone push — auth-free pub/sub: unguessable topic
+# is the only secret, the operator's phone app subscribes to the same topic.
+NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
+
+
+def ntfy_topic():
+    return os.environ.get("NTFY_TOPIC", "").strip()
+
+
+def send_push(title, body, priority="urgent", tags="rotating_light"):
+    """One push to the ntfy topic. Returns True on 2xx; never raises.
+    HTTP headers are latin-1 in urllib, so the title is ASCII-sanitized and
+    emoji ride in `tags` (ntfy renders shortcodes ahead of the title)."""
+    topic = ntfy_topic()
+    if not topic:
+        return False
+    try:
+        req = urllib.request.Request(f"{NTFY_SERVER}/{topic}",
+                                     data=body.encode("utf-8"), method="POST")
+        req.add_header("Title", title.encode("ascii", "ignore").decode().strip())
+        req.add_header("Priority", priority)
+        req.add_header("Tags", tags)
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return 200 <= r.status < 300
+    except Exception as e:  # noqa: BLE001
+        print(f"[fleet_watchdog] push failed: {type(e).__name__}: {e}", flush=True)
+        return False
 
 
 def _now_iso():
@@ -138,7 +169,9 @@ def run_loop(dash):
             except Exception as fe:  # noqa: BLE001
                 problems = [f"LOCAL FEED UNREACHABLE: {type(fe).__name__}: {fe}"]
                 warnings, snapshot = [], "(no data)"
-            armed = bool(report_emailer and report_emailer.smtp_configured())
+            email_armed = bool(report_emailer and report_emailer.smtp_configured())
+            push_armed = bool(ntfy_topic())
+            armed = email_armed or push_armed
             cur = tuple(problems)
             now = time.time()
             kind = None
@@ -158,25 +191,85 @@ def run_loop(dash):
                     body_lines += ["Warnings (non-fatal):"] + ["  - " + w for w in warnings]
                 body_lines += ["", "State: /watchdog.json on the pnl-dashboard service.",
                                "This is a transition alert (max one per state change, 30-min gap)."]
-                if report_emailer.send_email(subj, "\n".join(body_lines)):
+                body = "\n".join(body_lines)
+                # [2026-07-15 PUSH] phone first (operator's channel), email if
+                # also configured. Either delivery marks the transition sent —
+                # the 30-min gap applies to the state change, not per channel.
+                sent = False
+                if push_armed:
+                    sent = send_push(
+                        subj, body,
+                        priority="urgent" if kind == "alert" else "default",
+                        tags="rotating_light" if kind == "alert" else "white_check_mark",
+                    ) or sent
+                if email_armed:
+                    sent = report_emailer.send_email(subj, body) or sent
+                if sent:
                     last_email_ts = now
                     last_emailed = cur if kind == "alert" else ()
                     with _LOCK:
                         _STATE["last_email_at"] = _now_iso()
                         _STATE["last_email_kind"] = kind
             elif kind and not armed:
-                # No SMTP configured — remember state anyway so /watchdog.json
-                # and logs still show transitions without spamming later.
+                # Neither channel configured — remember state anyway so
+                # /watchdog.json and logs still show transitions without
+                # spamming later.
                 last_emailed = cur if kind == "alert" else ()
-                print(f"[fleet_watchdog] {kind} (email dormant): {problems or 'ok'}", flush=True)
+                print(f"[fleet_watchdog] {kind} (alerts dormant): {problems or 'ok'}", flush=True)
             elif not cur and last_emailed is None:
                 last_emailed = ()
             with _LOCK:
                 _STATE.update({"checked_at": _now_iso(), "problems": list(problems),
                                "warnings": list(warnings), "snapshot": snapshot,
-                               "email_armed": armed, "error": None})
+                               "email_armed": email_armed, "push_armed": push_armed,
+                               "error": None})
         except Exception:  # noqa: BLE001
             with _LOCK:
                 _STATE["error"] = traceback.format_exc(limit=3)
             print("[fleet_watchdog] loop error:\n" + traceback.format_exc(), flush=True)
         time.sleep(interval)
+
+
+if __name__ == "__main__":
+    # --selftest for the push channel: fake urlopen, no network.
+    import contextlib
+    import io
+
+    calls = []
+
+    class _FakeResp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def _fake_urlopen(req, timeout=None):
+        calls.append({"url": req.full_url, "data": req.data,
+                      "headers": dict(req.header_items())})
+        return _FakeResp()
+
+    _real = urllib.request.urlopen
+    urllib.request.urlopen = _fake_urlopen
+    try:
+        os.environ["NTFY_TOPIC"] = "test-topic-abc"
+        assert send_push("🚨 fleet-watchdog: STALE: mum", "body ünïcode ok", tags="rotating_light")
+        c = calls[-1]
+        assert c["url"].endswith("/test-topic-abc"), c["url"]
+        assert c["headers"]["Title"] == "fleet-watchdog: STALE: mum", c["headers"]   # emoji stripped, ASCII kept
+        assert c["headers"]["Priority"] == "urgent" and c["headers"]["Tags"] == "rotating_light"
+        assert c["data"].decode("utf-8") == "body ünïcode ok"                        # UTF-8 rides in the body
+        os.environ["NTFY_TOPIC"] = ""
+        assert send_push("t", "b") is False and len(calls) == 1                      # unconfigured -> no post
+        os.environ["NTFY_TOPIC"] = "test-topic-abc"
+
+        def _boom(req, timeout=None):
+            raise OSError("network down")
+        urllib.request.urlopen = _boom
+        with contextlib.redirect_stdout(io.StringIO()):
+            assert send_push("t", "b") is False                                     # failure -> False, never raises
+    finally:
+        urllib.request.urlopen = _real
+    print("fleet_watchdog_svc selftest OK (push channel)")

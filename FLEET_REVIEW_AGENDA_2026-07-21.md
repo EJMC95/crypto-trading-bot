@@ -90,10 +90,16 @@ and service logs for veto/governor lines.
       Claude's self-arming check-ins). Durable review kick-off covered
       WITHOUT it: `.github/workflows/review-reminder.yml` opens a GitHub
       issue at 09:00 AEST 21-Jul.
-- [ ] Optional: wake `report_emailer.py` — set on the pnl-dashboard
-      service: SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS (app password) +
-      REPORT_TO; it self-arms, idempotent (header of report_emailer.py).
-      Secrets are operator-only by policy.
+- [x] Watchdog alerting armed 15-Jul via PHONE PUSH (user-requested):
+      `NTFY_TOPIC` set on pnl-dashboard, ntfy app subscribes to the same
+      topic. Operator residual: install the ntfy app + subscribe (a test
+      push is waiting in the topic's cache). SMTP is no longer needed for
+      watchdog alerts.
+- [ ] Optional: wake `report_emailer.py` (scheduled P&L mails only — the
+      watchdog no longer needs it) — set on the pnl-dashboard service:
+      SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS (app password) + REPORT_TO;
+      it self-arms, idempotent (header of report_emailer.py). Secrets are
+      operator-only by policy.
 - [x] Postgres backups — `.github/workflows/db-backup.yml` shipped:
       nightly 04:07 AEST pg_dump via the Railway account token (existing
       secret, volume-workflow pattern), 30-day artifacts on the PRIVATE
@@ -119,3 +125,6 @@ and service logs for veto/governor lines.
     REJECTED backtest scripts committed with VERDICT headers (evidence
     registry — they were untracked) + `.gitignore` for backtest caches.
     Main only; gate0 deliberately NOT fast-forwarded (no service bounce).
+  - 15-Jul (user-requested, infra/alerting only): fleet_watchdog phone
+    push via ntfy (`NTFY_TOPIC` on pnl-dashboard). No strategy logic; only
+    the dashboard service restarts. Main only (watchdog runs there).
