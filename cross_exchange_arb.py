@@ -28,6 +28,28 @@ risk-free gaps between major USD/USDT pairs on Kraken/Binance/Coinbase are rare
 and short-lived — market makers eat them in milliseconds. Treat a flat balance
 as the honest, expected result, not a bug.
 
+EPOCH 2 — HONEST COUNTER + WIDE NET (2026-07-15, agenda item 10)
+----------------------------------------------------------------
+The v1 counter was an odometer: bookings required modelled edge >= 0 (losses
+impossible) and a PERSISTING gap was re-booked every ~19s scan (~190x/hour),
+so a couple of stale-book/collision episodes printed +$5,225 in ~a day.
+Epoch 2 changes the unit of account to the EPISODE:
+  - one booking per (symbol, buy_venue, sell_venue) gap EPISODE; the episode
+    re-arms only after the gap closes below REARM_EDGE (or falls silent);
+  - bookable pairs need a 24h volume floor on BOTH venues (dead books can no
+    longer print fills — or drive the liquid gauge);
+  - the old odometer is parked in extra.legacy; balances restart at $0 with
+    every new booked dollar carrying a paper_trades ledger row;
+  - each booking records a CAPACITY CURVE (the same edge repriced at
+    $250/$1k/$5k/$25k) — the number that would ever justify real execution;
+  - a census (bot_state 'gapscout-census') records episodes, the >5% artifact
+    band, and a cross-quote (USD vs USDT/USDC via live stablecoin rate)
+    dislocation gauge for the majors.
+Detection is meant to WIDEN over time (venues via ARB_EXCHANGES/tuning,
+prefilter via tuning): the evidence board's growth rail (fleet_tuning.py)
+may widen these bounded levers autonomously when the census runs quiet —
+booking stays strict no matter how wide detection gets.
+
 Usage
 -----
     pip install ccxt
@@ -48,16 +70,27 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
 
+# fleet_tuning: the evidence board's bounded growth rail. Optional import so
+# the scanner runs unchanged if the module isn't shipped alongside it.
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
+
 # ----------------------------------------------------------------------------
 # CONFIG
 # ----------------------------------------------------------------------------
 
-# Exchanges to compare. ccxt ids. Public data only.
-# NOTE: US-region-friendly set. Binance.com is NOT used because it returns
-# HTTP 451 ("restricted location") from Railway's region. We use
+# Exchanges to compare. ccxt ids. Public data only. Env-overridable so the
+# net can widen without a code change; the growth rail can hot-add from the
+# whitelist in fleet_tuning (gapscout.extra_exchanges) at runtime.
+# NOTE: US-region-friendly default set. Binance.com is NOT used because it
+# returns HTTP 451 ("restricted location") from Railway's region. We use
 # `coinbaseexchange` (Coinbase Exchange / ex-Pro) rather than `coinbase`
 # (Advanced Trade) because the former exposes a working fetch_tickers.
-EXCHANGES = ["kraken", "coinbaseexchange", "gemini"]
+EXCHANGES = [s.strip() for s in os.environ.get(
+    "ARB_EXCHANGES", "kraken,coinbaseexchange,gemini").split(",") if s.strip()]
+MAX_VENUES = int(os.environ.get("ARB_MAX_VENUES", "6"))   # scan-time bound
 
 # Base-tier TAKER fee per exchange (fraction). Arb fills must be taker. These
 # are conservative public defaults; the engine uses each market's own ccxt
@@ -67,6 +100,11 @@ TAKER_FEE = {
     "kraken": 0.0026,           # Kraken Pro spot taker, base tier
     "coinbaseexchange": 0.0060, # Coinbase Exchange taker, base tier
     "gemini": 0.0040,           # Gemini ActiveTrader taker, base tier
+    "kucoin": 0.0010,           # second-tier venues (growth-rail candidates)
+    "gateio": 0.0020,
+    "mexc": 0.0010,
+    "bitget": 0.0010,
+    "htx": 0.0020,
 }
 DEFAULT_TAKER = 0.0040   # used for any exchange not listed above
 
@@ -108,6 +146,27 @@ MAX_BOOK_FETCHES = 30
 
 # Log a confirmed (depth-aware) opportunity if its net edge is at least this.
 MIN_NET_EDGE = -0.005
+
+# ---- Epoch-2 honesty knobs (2026-07-15, agenda item 10) ---------------------
+EPOCH = 2
+# BOOKABLE floor: TOUCH DEPTH measured from the REAL order books Stage 2
+# already fetches — a pair may only book when BOTH legs have at least this
+# much quote value resting within TOUCH_DEPTH_PCT of that book's own mid.
+# This kills dead/hollow books (the DOT/USDT-class artifact: a CBX book
+# doing $2.8k/day was the 15-Jul "1% majors dislocation") using executable
+# liquidity that is fresh by construction. NOTE: deliberately NOT a
+# bulk-ticker volume/bid-ask bar — live probes showed CBX and Gemini
+# structurally omit volume AND bid/ask from fetch_tickers (only `last`),
+# so any bulk-ticker floor disqualifies 2 of 3 venues outright.
+MIN_TOUCH_DEPTH = float(os.environ.get("ARB_MIN_TOUCH_DEPTH", "5000"))
+TOUCH_DEPTH_PCT = 0.01
+# An open episode re-arms (closes) when its depth edge net of haircuts falls
+# below this; it also closes after EPISODE_STALE_S without being seen above
+# the prefilter (gap gone or book died).
+REARM_EDGE = -0.001
+EPISODE_STALE_S = 900.0
+# Capacity curve: each booked episode reprices its edge at these clip sizes.
+CAPACITY_SIZES = [250.0, 1000.0, 5000.0, 25000.0]
 
 # ---- Execution-reality haircuts (2026-07-03) --------------------------------
 # Fees + book-walking slippage were always modelled, but fills were booked
@@ -279,6 +338,128 @@ def lighter_premiums(books, watch, min_qvol):
             round(stress[-1], 1), len(stress))
 
 
+def book_mid(book):
+    """Two-sided top-of-book mid from a fetched order book; None when either
+    side is empty (a one-sided book is dead or halted — never bookable)."""
+    try:
+        bid = book["bids"][0][0]
+        ask = book["asks"][0][0]
+        if bid > 0 and ask > 0:
+            return (bid + ask) / 2.0
+    except (KeyError, IndexError, TypeError):
+        pass
+    return None
+
+
+def touch_depth(levels, mid, pct=TOUCH_DEPTH_PCT):
+    """Quote value resting within pct of mid on ONE side of a real book —
+    the bookable-liquidity floor. A hollow book (wide quotes, dust near
+    touch) scores ~0 here no matter what its ticker claims."""
+    if not mid or mid <= 0:
+        return 0.0
+    total = 0.0
+    for level in levels or []:
+        price, size = level[0], level[1]
+        if price and size and price > 0 and size > 0 \
+                and abs(price / mid - 1.0) <= pct:
+            total += price * size
+    return total
+
+
+def fresh_mid(t):
+    """Bid/ask mid ONLY when the venue reports both in the bulk tickers —
+    the anti-stale bar for the gauge and for bookability. None otherwise
+    (a `last`-only venue can still be book-CHECKED, just never booked)."""
+    if not t:
+        return None
+    bid, ask = t.get("bid"), t.get("ask")
+    if bid and ask and bid > 0 and ask > 0:
+        return (bid + ask) / 2.0
+    return None
+
+
+def update_episode(episodes, key, symbol, route, net_eff, filled, now_ts):
+    """Episode state machine (pure; epoch-2 unit of account).
+
+    Returns (should_book, closed_record). An ELIGIBLE signal (net_eff >= 0
+    and both legs fillable) BOOKS only when no episode is open on this key;
+    while the episode stays open the same gap is tracked, never re-booked.
+    The episode closes (re-arms) when the pair is re-checked and its edge
+    has fallen below REARM_EDGE."""
+    eligible = net_eff is not None and net_eff >= 0.0 and filled
+    ep = episodes.get(key)
+    if eligible:
+        if ep is None:
+            episodes[key] = {"symbol": symbol, "route": route,
+                             "opened": now_ts, "last_seen": now_ts,
+                             "peak_eff": net_eff}
+            return True, None
+        ep["last_seen"] = now_ts
+        ep["peak_eff"] = max(ep["peak_eff"], net_eff)
+        return False, None
+    if ep is not None and net_eff is not None and net_eff < REARM_EDGE:
+        closed = dict(episodes.pop(key), closed=now_ts, close_reason="rearm")
+        return False, closed
+    if ep is not None:                       # hovering between bars: keep open
+        ep["last_seen"] = now_ts
+    return False, None
+
+
+def sweep_stale_episodes(episodes, now_ts, stale_s=EPISODE_STALE_S):
+    """Close episodes not seen above the prefilter for stale_s (gap vanished
+    without a re-check, or the book died). Returns the closed records."""
+    closed = []
+    for key in [k for k, ep in episodes.items()
+                if now_ts - ep["last_seen"] >= stale_s]:
+        closed.append(dict(episodes.pop(key), closed=now_ts,
+                           close_reason="stale"))
+    return closed
+
+
+def capacity_curve(asks_buy, bids_sell, fee_buy, fee_sell, haircut,
+                   sizes=None):
+    """The same books repriced at multiple clip sizes — the edge's CAPACITY.
+    Answers the only question that could ever justify real execution: how
+    much money the find absorbs before fees+depth (+haircuts) eat it."""
+    out = []
+    for size in (sizes or CAPACITY_SIZES):
+        net, _pnl, filled = depth_edge(size, asks_buy, bids_sell,
+                                       fee_buy, fee_sell)
+        out.append({"size": size,
+                    "net_eff_pct": round((net - haircut) * 100, 4)
+                    if net is not None else None,
+                    "filled": bool(filled)})
+    return out
+
+
+def cross_quote_gap(prices_by_quote, usd_rates):
+    """Max USD-normalized gap between DIFFERENT-quote books of one base.
+
+    prices_by_quote: {"USD": {ex: mid}, "USDT": {ex: mid}, ...} (fresh mids
+    only). usd_rates: {quote: quote->USD rate} from LIVE stablecoin books —
+    never an assumed 1:1 par. Quotes without a live rate are skipped.
+    Returns (gap_frac, cheap_label, dear_label) or (None, None, None);
+    labels are "venue:quote". Same-quote gaps are the main scan's business —
+    this gauge only reports across quotes (the stablecoin-stress signal)."""
+    entries = []
+    for quote, per_ex in (prices_by_quote or {}).items():
+        rate = (usd_rates or {}).get(quote)
+        if not rate or rate <= 0:
+            continue
+        for ex, mid in (per_ex or {}).items():
+            if mid and mid > 0:
+                entries.append((mid * rate, f"{ex}:{quote}", quote))
+    best = (None, None, None)
+    for px_a, lab_a, q_a in entries:
+        for px_b, lab_b, q_b in entries:
+            if q_a == q_b or px_a <= 0:
+                continue
+            gap = px_b / px_a - 1.0
+            if best[0] is None or gap > best[0]:
+                best = (gap, lab_a, lab_b)
+    return best
+
+
 # ----------------------------------------------------------------------------
 # GRAPH BUILDING
 # ----------------------------------------------------------------------------
@@ -384,23 +565,32 @@ def ref_prices(symbol, exmarkets, tickers_by_ex):
 def run_live(once=False):
     import ccxt  # imported here so --selftest works without ccxt installed
 
-    exchanges = {}
-    for ex_id in EXCHANGES:
+    exchanges, markets_by_ex, failed_venues = {}, {}, set()
+
+    def add_venue(ex_id):
+        """Init + load markets for one venue. False (and process-lifetime
+        blacklist) on any failure — a geo-blocked or broken venue never
+        stalls the scan loop. Used at boot AND for growth-rail hot-adds."""
+        if ex_id in exchanges or ex_id in failed_venues or len(exchanges) >= MAX_VENUES:
+            return False
         try:
-            exchanges[ex_id] = getattr(ccxt, ex_id)({"enableRateLimit": True})
-        except Exception as e:
-            print(f"[{now_iso()}] could not init {ex_id}: {e}")
+            ex = getattr(ccxt, ex_id)({"enableRateLimit": True})
+            markets_by_ex[ex_id] = ex.load_markets()
+            exchanges[ex_id] = ex
+            return True
+        except Exception as e:  # noqa: BLE001
+            print(f"[{now_iso()}] venue {ex_id} unavailable (blacklisted): {e}")
+            failed_venues.add(ex_id)
+            markets_by_ex.pop(ex_id, None)
+            return False
+
+    print(f"[{now_iso()}] Loading markets for {', '.join(EXCHANGES)} ...")
+    for ex_id in EXCHANGES:
+        add_venue(ex_id)
     if len(exchanges) < 2:
         print(f"[{now_iso()}] need >=2 working exchanges, have {len(exchanges)}. Exiting.")
         return
 
-    print(f"[{now_iso()}] Loading markets for {', '.join(exchanges)} ...")
-    markets_by_ex = {}
-    for ex_id, ex in exchanges.items():
-        try:
-            markets_by_ex[ex_id] = ex.load_markets()
-        except Exception as e:
-            print(f"[{now_iso()}] {ex_id} load_markets failed: {e}")
     sym_map = build_symbol_map(markets_by_ex)
     print(
         f"[{now_iso()}] {len(sym_map)} pairs listed on >=2 venues. "
@@ -428,22 +618,63 @@ def run_live(once=False):
     n_booked = int(_saved.get("booked") or 0)
     n_wins = int(_saved.get("wins") or 0)
     n_losses = int(_saved.get("losses") or 0)
-    try:
-        _agg = store.fetch_paper_aggregate("scanner-cross-exchange-arb")
-        if _agg and _agg["closed"] > n_booked:
+    legacy = _saved.get("legacy")
+    # [2026-07-15 EPOCH 2 — agenda item 10] the v1 counters were an odometer
+    # (re-booked persisting gaps, no floors). Park them once and restart at
+    # $0 so every printed dollar from here is episode-deduped, floored, and
+    # ledger-backed. One-way migration; the old numbers stay visible in extra.
+    if int(_saved.get("epoch") or 1) < EPOCH:
+        legacy = {"real": round(virtual_balance, 2),
+                  "gross": round(gross_balance, 2),
+                  "booked": n_booked, "wins": n_wins, "losses": n_losses,
+                  "retired": now_iso(),
+                  "note": "v1 odometer: re-booked persisting gaps (agenda item 10)"}
+        print(f"[{now_iso()}] EPOCH {EPOCH}: v1 odometer parked "
+              f"(real {virtual_balance:+.2f} / gross {gross_balance:+.2f}) — "
+              f"honest counter restarts at $0")
+        virtual_balance = gross_balance = 0.0
+        n_booked = n_wins = n_losses = 0
+        epoch_started = time.time()
+    else:
+        epoch_started = float(_saved.get("epoch_started") or time.time())
+        try:
             # ledger rows are written at booking time, the state blob at scan
             # end — if a state write failed the ledger carries the truth.
-            n_booked, n_wins, n_losses = _agg["closed"], _agg["wins"], _agg["losses"]
-    except Exception:
-        pass
-    if virtual_balance or gross_balance:
-        print(f"[{now_iso()}] restored balances from bot_state: "
-              f"real {virtual_balance:+.2f} / gross {gross_balance:+.2f}")
+            # (Safe across the epoch reset: the ledger shipped 15-Jul with
+            # zero pre-epoch rows, so every row IS an epoch-2 booking.)
+            _agg = store.fetch_paper_aggregate("scanner-cross-exchange-arb")
+            if _agg and _agg["closed"] > n_booked:
+                n_booked, n_wins, n_losses = _agg["closed"], _agg["wins"], _agg["losses"]
+        except Exception:
+            pass
+    episodes = _saved.get("episodes") or {}       # open gap episodes
+    recent_eps = _saved.get("recent_episodes") or []
+    last_close_ts = float(_saved.get("last_episode_close_ts") or 0.0)
+    census_day = _saved.get("census_day") or {}
+    if virtual_balance or gross_balance or episodes:
+        print(f"[{now_iso()}] restored epoch-{EPOCH} state: "
+              f"real {virtual_balance:+.2f} / gross {gross_balance:+.2f} / "
+              f"{len(episodes)} open episodes")
     last_heartbeat = 0.0
     best_top = best_liquid = None   # safe defaults if the very first scan errors
+    xq_best = (None, None, None, None)
+    liquid_conf = None
+    quiet_hours = 0.0
+    eff_prefilter, eff_books = PREFILTER_GAP, MAX_BOOK_FETCHES
 
     while True:
         t0 = time.time()
+        # Growth-rail levers: bounded in fleet_tuning's registry, authored by
+        # the evidence board, expiring back to these defaults on their own.
+        if tuning is not None:
+            eff_prefilter = tuning.get_lever("gapscout.prefilter_gap", PREFILTER_GAP)
+            eff_books = tuning.get_lever("gapscout.max_book_fetches", MAX_BOOK_FETCHES)
+            for ex_id in str(tuning.get_lever("gapscout.extra_exchanges", "")).split(","):
+                if ex_id.strip() and add_venue(ex_id.strip()):
+                    sym_map = build_symbol_map(markets_by_ex)
+                    print(f"[{now_iso()}] growth rail: venue {ex_id.strip()} hot-added "
+                          f"-> {len(sym_map)} pairs across {len(exchanges)} venues")
+
         # Stage 0: one fetch_tickers per exchange.
         tickers_by_ex = {}
         for ex_id, ex in exchanges.items():
@@ -456,14 +687,20 @@ def run_live(once=False):
             continue
 
         try:
+            today = now_iso()[:10]
+            if census_day.get("day") != today:
+                census_day = {"day": today, "opened": 0, "booked_pnl": 0.0}
             # Stage 1: rank every cross-venue pair on a reference price (mid
             # when bid/ask present, else last). The number here is the RAW
             # cross-venue price gap (no fees yet) — fees + real bid/ask +
-            # slippage are applied in Stage 2 from order books.
+            # slippage + the TOUCH-DEPTH bookability floor are all applied
+            # in Stage 2 from real order books (bulk tickers on CBX/Gemini
+            # carry only `last`, so stage 1 can rank but never book).
             ranked = []
             best_top = None     # (gap, symbol, buy_ex, sell_ex) — widest net
-            best_liquid = None  # same, restricted to DISLOC_BASES majors
-            artifacts = 0    # implausible gaps skipped as data noise
+            best_liquid = None  # majors' widest REFERENCE gap (stage-2 confirms)
+            artifacts = []      # > MAX_PLAUSIBLE_GAP — the census's >5% band
+            xq_prices = {}      # majors' fresh mids by quote, for cross-quote
             for symbol, exmarkets in sym_map.items():
                 refs = ref_prices(symbol, exmarkets, tickers_by_ex)
                 if len(refs) < 2:
@@ -473,22 +710,47 @@ def run_live(once=False):
                 if buy_ex == sell_ex or refs[buy_ex] <= 0:
                     continue
                 gap = refs[sell_ex] / refs[buy_ex] - 1.0
+                base = symbol.split("/")[0]
+                if base in DISLOC_BASES:
+                    quote = symbol.split("/")[-1]
+                    for ex_id in exmarkets:
+                        m = fresh_mid(tickers_by_ex.get(ex_id, {}).get(symbol))
+                        if m:
+                            xq_prices.setdefault(base, {}).setdefault(quote, {})[ex_id] = m
                 if gap > MAX_PLAUSIBLE_GAP:
-                    artifacts += 1   # symbol collision / stale price — ignore
+                    artifacts.append((gap, symbol, buy_ex, sell_ex))
                     continue
                 if best_top is None or gap > best_top[0]:
                     best_top = (gap, symbol, buy_ex, sell_ex)
-                if (symbol.split("/")[0] in DISLOC_BASES
+                if (base in DISLOC_BASES
                         and (best_liquid is None or gap > best_liquid[0])):
                     best_liquid = (gap, symbol, buy_ex, sell_ex)
-                if gap >= PREFILTER_GAP:
+                if gap >= eff_prefilter:
                     ranked.append((gap, symbol, buy_ex, sell_ex))
             ranked.sort(reverse=True)
+            artifacts.sort(reverse=True)
 
-            # Stage 2: confirm the top candidates depth-aware at trade size.
-            books, confirmed, fetches = {}, [], 0
+            # Cross-quote gauge: USD vs USDT/USDC books of the same major,
+            # normalized through LIVE stablecoin rates (never assumed par).
+            usd_rates = {"USD": 1.0}
+            for q in ("USDT", "USDC"):
+                for ex_id in exchanges:
+                    m = fresh_mid(tickers_by_ex.get(ex_id, {}).get(f"{q}/USD"))
+                    if m:
+                        usd_rates[q] = m
+                        break
+            xq_best = (None, None, None, None)   # gap, base, cheap, dear
+            for base, pq in xq_prices.items():
+                g, cheap, dear = cross_quote_gap(pq, usd_rates)
+                if g is not None and (xq_best[0] is None or g > xq_best[0]):
+                    xq_best = (g, base, cheap, dear)
+
+            # Stage 2: confirm the top candidates depth-aware at trade size,
+            # and apply the TOUCH-DEPTH bookability floor from the real books.
+            confirmed, fetches, depth_rejected = [], 0, 0
+            liquid_books = None    # real books of the best MAJOR candidate
             for net_top, symbol, buy_ex, sell_ex in ranked:
-                if fetches + 2 > MAX_BOOK_FETCHES:
+                if fetches + 2 > eff_books:
                     break
                 try:
                     ab = exchanges[buy_ex].fetch_order_book(symbol, limit=BOOK_LEVELS)
@@ -496,6 +758,9 @@ def run_live(once=False):
                     fetches += 2
                 except Exception:
                     continue
+                if best_liquid and symbol == best_liquid[1] \
+                        and (buy_ex, sell_ex) == (best_liquid[2], best_liquid[3]):
+                    liquid_books = (ab, bb)
                 fee_b = fee_for(buy_ex, sym_map[symbol].get(buy_ex))
                 fee_s = fee_for(sell_ex, sym_map[symbol].get(sell_ex))
                 net_d, pnl, filled = depth_edge(
@@ -504,40 +769,60 @@ def run_live(once=False):
                 )
                 if net_d is None:
                     continue
-                # [2026-07-15 EVIDENCE] carry the tops of the books we already
-                # fetched so a booked fill records entry/exit in the ledger.
-                ask_top = ab["asks"][0][0] if ab.get("asks") else None
-                bid_top = bb["bids"][0][0] if bb.get("bids") else None
-                confirmed.append((net_d, net_top, pnl, filled, symbol,
-                                  buy_ex, sell_ex, ask_top, bid_top))
+                # bookability floor: enough REAL liquidity near both books'
+                # own mids. A hollow/one-sided book can be logged, never booked.
+                depth_ok = (
+                    touch_depth(ab.get("asks"), book_mid(ab)) >= MIN_TOUCH_DEPTH
+                    and touch_depth(bb.get("bids"), book_mid(bb)) >= MIN_TOUCH_DEPTH)
+                if not depth_ok:
+                    depth_rejected += 1
+                # carry the books + fees forward: a booked episode records its
+                # entry/exit tops AND a capacity curve from these same books.
+                confirmed.append((net_d, net_top, pnl, filled, depth_ok, symbol,
+                                  buy_ex, sell_ex,
+                                  ab.get("asks") or [], bb.get("bids") or [],
+                                  fee_b, fee_s))
 
-            confirmed.sort(reverse=True)
+            confirmed.sort(key=lambda c: c[0], reverse=True)
 
-            for (net_d, net_top, pnl, filled, symbol, buy_ex, sell_ex,
-                 ask_top, bid_top) in confirmed:
+            closed_eps, booked_this_scan = [], False
+            for (net_d, net_top, pnl, filled, depth_ok, symbol, buy_ex, sell_ex,
+                 ab_asks, bb_bids, fee_b, fee_s) in confirmed:
                 if net_d < MIN_NET_EDGE:
                     continue
-                # Effective edge after execution-reality haircuts. Book on the
-                # REAL basis; keep the legacy optimistic booking in parallel so
-                # the dashboard can show how much of the "edge" was fiction.
+                # Effective edge after execution-reality haircuts. EPOCH 2:
+                # the EPISODE is the unit of account — one booking per gap
+                # episode, tracked (never re-booked) while it persists.
                 net_eff = net_d - LATENCY_HAIRCUT - REBALANCE_HAIRCUT
                 pnl_eff = pnl - PAPER_TRADE_SIZE * (LATENCY_HAIRCUT + REBALANCE_HAIRCUT)
-                booked = net_eff >= 0.0 and filled
+                key = f"{symbol}|{buy_ex}|{sell_ex}"
+                booked, closed = update_episode(
+                    episodes, key, symbol, f"{buy_ex}->{sell_ex}",
+                    net_eff, filled and depth_ok, t0)
+                if closed:
+                    closed_eps.append(closed)
                 if booked:
+                    booked_this_scan = True
                     virtual_balance += pnl_eff
+                    gross_balance += pnl   # same episode, no haircuts (basis A/B)
                     n_booked += 1
                     if pnl_eff > 0:
                         n_wins += 1
                     else:
                         n_losses += 1
-                    # [2026-07-15 EVIDENCE] one durable ledger row per booked
-                    # fill (REAL basis, same as the balance it feeds; the
-                    # optimistic figure rides in extra) — makes the cumulative
-                    # balance auditable fill-by-fill.
+                    census_day["opened"] = int(census_day.get("opened") or 0) + 1
+                    census_day["booked_pnl"] = round(
+                        float(census_day.get("booked_pnl") or 0.0) + pnl_eff, 4)
+                    cap = capacity_curve(ab_asks, bb_bids, fee_b, fee_s,
+                                         LATENCY_HAIRCUT + REBALANCE_HAIRCUT)
+                    ask_top = ab_asks[0][0] if ab_asks else None
+                    bid_top = bb_bids[0][0] if bb_bids else None
+                    # one durable ledger row per EPISODE (REAL basis) — the
+                    # balance stays auditable fill-by-fill.
                     try:
                         store.publish_paper_trade(
                             "scanner-cross-exchange-arb",
-                            trade_id=f"{symbol}:{buy_ex}>{sell_ex}:{t0:.3f}",
+                            trade_id=f"e{EPOCH}:{symbol}:{buy_ex}>{sell_ex}:{t0:.3f}",
                             pnl_abs=pnl_eff, pnl_pct=net_eff, pair=symbol,
                             opened_at=now_iso(), closed_at=now_iso(),
                             reason="long-xarb_paper-fill",
@@ -546,45 +831,119 @@ def run_live(once=False):
                             tag=f"{buy_ex}->{sell_ex}",
                             extra={"net_top_pct": round(net_top * 100, 4),
                                    "net_depth_pct": round(net_d * 100, 4),
-                                   "gross_pnl": round(pnl, 4)},
+                                   "gross_pnl": round(pnl, 4),
+                                   "episode": True, "epoch": EPOCH,
+                                   "capacity": cap},
                         )
                     except Exception:
                         pass
-                if net_d >= 0.0 and filled:
-                    gross_balance += pnl   # what the old rule would have booked
-                # `filled` column = actual paper booking (profitable-after-depth
-                # AND both legs fully fillable). A fillable-but-negative spread is
-                # only "seen", never a fill, so write `booked` here. `had_depth`
-                # keeps the liquidity diagnostic in the console log.
-                had_depth = filled
+                # `filled` column = actual paper booking; an open episode's
+                # repeat sightings and negative spreads are logged, not booked.
                 log_opp([
                     now_iso(), symbol, buy_ex, sell_ex,
                     f"{net_top*100:.4f}", f"{net_d*100:.4f}",
                     f"{pnl_eff:.4f}", booked, f"{virtual_balance:.4f}",
                 ])
-                tag = "PAPER-FILL" if booked else "seen"
+                tag = ("PAPER-FILL" if booked
+                       else "in-episode" if key in episodes else "seen")
                 print(
                     f"[{now_iso()}] {tag} {symbol} buy {buy_ex}->sell {sell_ex} "
                     f"| top {net_top*100:+.3f}% | depth {net_d*100:+.3f}% "
                     f"| eff {net_eff*100:+.3f}% | P&L {pnl_eff:+.2f} | booked={booked} "
-                    f"| had_depth={had_depth} | real {virtual_balance:+.2f} "
-                    f"| gross {gross_balance:+.2f}"
+                    f"| had_depth={filled} | touch_ok={depth_ok} "
+                    f"| real {virtual_balance:+.2f} | gross {gross_balance:+.2f}"
                 )
+
+            # Close episodes whose gap fell silent (no re-check above the
+            # prefilter for EPISODE_STALE_S), then record every closure.
+            closed_eps += sweep_stale_episodes(episodes, t0)
+            for ce in closed_eps:
+                last_close_ts = ce["closed"]
+                summary = {"symbol": ce["symbol"], "route": ce["route"],
+                           "opened": now_iso(), "dur_s": round(ce["closed"] - ce["opened"], 1),
+                           "peak_eff_pct": round(ce["peak_eff"] * 100, 4),
+                           "close_reason": ce["close_reason"]}
+                summary["opened"] = datetime.fromtimestamp(
+                    ce["opened"], tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                recent_eps.append(summary)
+                print(f"[{now_iso()}] EPISODE-CLOSE {ce['symbol']} {ce['route']} "
+                      f"| peak eff {ce['peak_eff']*100:+.3f}% "
+                      f"| {summary['dur_s']:.0f}s | {ce['close_reason']}")
+            recent_eps = recent_eps[-15:]
+
+            # The MAJORS gauge, depth-confirmed: the 15-Jul "1% dislocation"
+            # was a stale `last` on a dead CBX book — so the bus-grade number
+            # now comes from REAL top-of-book mids of the best major
+            # candidate (2 extra fetches when the budget didn't cover it).
+            # None = no major above the prefilter, itself an honest reading.
+            liquid_conf = None
+            if best_liquid is not None and best_liquid[0] >= eff_prefilter:
+                _, lsym, lbuy, lsell = best_liquid
+                if liquid_books is None:
+                    try:
+                        liquid_books = (
+                            exchanges[lbuy].fetch_order_book(lsym, limit=BOOK_LEVELS),
+                            exchanges[lsell].fetch_order_book(lsym, limit=BOOK_LEVELS))
+                        fetches += 2
+                    except Exception:
+                        liquid_books = None
+                if liquid_books:
+                    mid_a, mid_b = book_mid(liquid_books[0]), book_mid(liquid_books[1])
+                    da = touch_depth(liquid_books[0].get("asks"), mid_a)
+                    db = touch_depth(liquid_books[1].get("bids"), mid_b)
+                    if mid_a and mid_b and min(da, db) >= MIN_TOUCH_DEPTH:
+                        liquid_conf = mid_b / mid_a - 1.0
+            liquid_books = None
 
             best = confirmed[0] if confirmed else None
             if best:
                 summary = (f"best depth {best[0]*100:+.3f}% "
-                           f"({best[4]} {best[5]}->{best[6]})")
+                           f"({best[5]} {best[6]}->{best[7]})")
             elif best_top is not None:
                 summary = (f"no depth confirm; best top {best_top[0]*100:+.3f}% "
                            f"({best_top[1]} {best_top[2]}->{best_top[3]})")
             else:
                 summary = "no priceable pairs"
             print(
-                f"[{now_iso()}] {len(sym_map)} pairs | {len(ranked)} passed prefilter "
-                f"| {artifacts} artifacts skipped | {fetches} books pulled "
+                f"[{now_iso()}] {len(sym_map)} pairs | {len(ranked)} past prefilter "
+                f"| {depth_rejected} failed touch-depth | {len(artifacts)} artifacts "
+                f"| {fetches} books | {len(episodes)} episodes open "
                 f"| {summary} | {time.time()-t0:.1f}s"
             )
+
+            # The census: what the net actually saw, for the board/review.
+            quiet_since = max(epoch_started, last_close_ts)
+            quiet_hours = 0.0 if episodes else round((t0 - quiet_since) / 3600.0, 2)
+            census = {
+                "updated": now_iso(), "ttl_sec": 3600, "epoch": EPOCH,
+                "episodes_open": len(episodes),
+                "open_keys": sorted(episodes)[:10],
+                "day": census_day,
+                "quiet_hours": quiet_hours,
+                "recent_episodes": recent_eps[-10:],
+                "implausible": {"count": len(artifacts),
+                                "top": [{"symbol": s, "gap_pct": round(g * 100, 2),
+                                         "route": f"{b}->{sl}"}
+                                        for g, s, b, sl in artifacts[:3]]},
+                "depth_rejected": depth_rejected,
+                "xquote": ({"base": xq_best[1],
+                            "gap_pct": round(xq_best[0] * 100, 4),
+                            "cheap": xq_best[2], "dear": xq_best[3],
+                            "rates": {k: round(v, 5) for k, v in usd_rates.items()}}
+                           if xq_best[0] is not None else None),
+                "venues": sorted(exchanges),
+                "prefilter_pct": round(eff_prefilter * 100, 3),
+                "book_budget": eff_books,
+            }
+            store.save_state("gapscout-census", census)
+            if (booked_this_scan or closed_eps) and hasattr(store, "save_history"):
+                try:
+                    store.save_history("gapscout-census", {
+                        "updated": census["updated"],
+                        "episodes_open": len(episodes),
+                        "day": census_day, "quiet_hours": quiet_hours})
+                except Exception:
+                    pass
 
             # Heartbeat row so the CSV/dashboard always has trend data.
             if (HEARTBEAT_SECONDS and best_top is not None
@@ -604,20 +963,41 @@ def run_live(once=False):
             pnl_abs=virtual_balance,   # REAL basis: fees+slippage+latency+rebalance
             closed_trades=n_booked, wins=n_wins, losses=n_losses,
             extra={"kind": "scanner",
-                   "basis": "real (fees+slippage+10bps latency+5bps rebalance)",
-                   "gross_balance": round(gross_balance, 2),  # old optimistic rule
+                   "basis": f"epoch-{EPOCH} episodes "
+                            "(deduped, floored, fees+slippage+15bps haircuts)",
+                   "epoch": EPOCH,
+                   "legacy": legacy,          # the parked v1 odometer
+                   "gross_balance": round(gross_balance, 2),  # same eps, no haircuts
+                   "episodes_open": len(episodes),
+                   "quiet_hours": quiet_hours,
+                   "venues": sorted(exchanges),
+                   "prefilter_pct": round(eff_prefilter * 100, 3),
                    "pairs": len(sym_map),
                    "best_top_pct": round(best_top[0] * 100, 4) if best_top else None,
-                   # the bus-grade stress gauge: majors only (see DISLOC_BASES)
-                   "liquid_top_pct": round(best_liquid[0] * 100, 4) if best_liquid else None,
+                   # bus-grade stress gauge: majors, DEPTH-CONFIRMED from the
+                   # real books (None = no major above the prefilter). The
+                   # raw stage-1 reference number stays as _ref diagnostics.
+                   "liquid_top_pct": (round(liquid_conf * 100, 4)
+                                      if liquid_conf is not None else None),
+                   "liquid_basis": "book-mids",
+                   "liquid_ref_pct": round(best_liquid[0] * 100, 4) if best_liquid else None,
                    "liquid_symbol": best_liquid[1] if best_liquid else None,
+                   "xquote_top_pct": (round(xq_best[0] * 100, 4)
+                                      if xq_best[0] is not None else None),
+                   "xquote_base": xq_best[1],
                    **lighter_extra()},
         )
         store.save_state("scanner-cross-exchange-arb",
                          {"virtual_balance": round(virtual_balance, 4),
                           "gross_balance": round(gross_balance, 4),
                           "booked": n_booked, "wins": n_wins,
-                          "losses": n_losses})
+                          "losses": n_losses,
+                          "epoch": EPOCH, "epoch_started": epoch_started,
+                          "legacy": legacy,
+                          "episodes": episodes,
+                          "recent_episodes": recent_eps,
+                          "last_episode_close_ts": last_close_ts,
+                          "census_day": census_day})
         if once:
             print(f"\n[{now_iso()}] --once smoke test complete. Engine ran "
                   f"end-to-end against live public data.")
@@ -692,8 +1072,64 @@ def selftest():
     p2, m2, x2, n2 = lighter_premiums([], ["BTC"], 1e5)
     assert (p2, m2, x2, n2) == ({}, None, None, 0), "empty payload -> empty result"
 
+    # 6) Epoch-2 episode machine: book ONCE, hold while persisting, re-arm.
+    eps = {}
+    b1, closed = update_episode(eps, "X/USD|a|b", "X/USD", "a->b", 0.004, True, 1000.0)
+    assert b1 and closed is None and "X/USD|a|b" in eps
+    b2, closed = update_episode(eps, "X/USD|a|b", "X/USD", "a->b", 0.009, True, 1010.0)
+    assert not b2 and closed is None, "a persisting gap must NOT re-book"
+    assert eps["X/USD|a|b"]["peak_eff"] == 0.009
+    b3, closed = update_episode(eps, "X/USD|a|b", "X/USD", "a->b", -0.0005, True, 1020.0)
+    assert not b3 and closed is None and "X/USD|a|b" in eps, "hover keeps it open"
+    b4, closed = update_episode(eps, "X/USD|a|b", "X/USD", "a->b", -0.002, True, 1030.0)
+    assert not b4 and closed["close_reason"] == "rearm" and not eps
+    b5, _ = update_episode(eps, "X/USD|a|b", "X/USD", "a->b", 0.001, True, 1040.0)
+    assert b5, "after re-arm the same route may open a NEW episode"
+    stale = sweep_stale_episodes(eps, 1040.0 + EPISODE_STALE_S + 1)
+    assert [s["close_reason"] for s in stale] == ["stale"] and not eps
+    print("  episode machine: book-once / hold / re-arm / stale-sweep OK")
+
+    # 7) Capacity curve: the edge decays (and fill fails) as the clip grows.
+    asks = [[100.0, 20.0], [101.0, 20.0]]
+    bids = [[102.0, 5.0], [99.0, 100.0]]
+    cap = capacity_curve(asks, bids, 0.001, 0.001, 0.0015, sizes=[250.0, 5000.0])
+    assert cap[0]["net_eff_pct"] > cap[1]["net_eff_pct"]
+    assert cap[0]["filled"] and not cap[1]["filled"]
+    print(f"  capacity curve: $250 {cap[0]['net_eff_pct']:+.2f}% vs "
+          f"$5k {cap[1]['net_eff_pct']:+.2f}% (thins out as it should)")
+
+    # 8) Cross-quote gauge: live rate normalization, cross-quote pairs only.
+    g, cheap, dear = cross_quote_gap(
+        {"USD": {"kraken": 100.0}, "USDT": {"mexc": 102.0}},
+        {"USD": 1.0, "USDT": 1.0})
+    assert abs(g - 0.02) < 1e-9 and cheap == "kraken:USD" and dear == "mexc:USDT"
+    g2, _, _ = cross_quote_gap(
+        {"USD": {"kraken": 100.0}, "USDT": {"mexc": 102.0}},
+        {"USD": 1.0, "USDT": 0.999})
+    assert g2 < g, "a real USDT/USD rate must shrink the naive-par gap"
+    g3, _, _ = cross_quote_gap({"USD": {"k": 100.0}, "USDT": {"m": 200.0}},
+                               {"USD": 1.0})
+    assert g3 is None, "a quote without a LIVE rate contributes nothing"
+    g4, _, _ = cross_quote_gap({"USD": {"k": 100.0, "c": 101.0}}, {"USD": 1.0})
+    assert g4 is None, "same-quote gaps are the main scan's business"
+    print(f"  cross-quote gauge: {g*100:+.2f}% naive-par vs {g2*100:+.2f}% live-rate")
+
+    # 9) Bookable floor: touch depth from REAL books + the freshness bar.
+    healthy = {"bids": [[99.5, 100.0]], "asks": [[100.5, 100.0], [150.0, 999.0]]}
+    assert book_mid(healthy) == 100.0
+    assert book_mid({"bids": [], "asks": [[100.0, 1.0]]}) is None, "one-sided = dead"
+    d = touch_depth(healthy["asks"], book_mid(healthy))
+    assert d == 100.5 * 100.0, "only levels within 1% of mid count"
+    # the DOT/USDT-class hollow book: wide quotes, dust near touch
+    hollow = {"bids": [[0.85, 30.0]], "asks": [[0.86, 30.0]]}
+    assert touch_depth(hollow["asks"], book_mid(hollow)) < MIN_TOUCH_DEPTH
+    assert touch_depth(healthy["asks"], None) == 0.0
+    assert fresh_mid({"bid": 99.0, "ask": 101.0}) == 100.0
+    assert fresh_mid({"last": 100.0}) is None, "last-only tickers are never fresh"
+    print("  bookable floor: touch-depth + freshness bar OK")
+
     print("\nAll self-tests passed. Cross-exchange detection + depth math + "
-          "Lighter premium verified.")
+          "Lighter premium + epoch-2 episode machinery verified.")
 
 
 def main():

@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir "ccxt>=4.2.0" "psycopg2-binary>=2.9"
 
 COPY cross_exchange_arb.py /app/cross_exchange_arb.py
 COPY bot_pnl_store.py /app/bot_pnl_store.py
+# fleet_tuning: the evidence board's bounded growth rail (scanner = consumer)
+COPY fleet_tuning.py /app/fleet_tuning.py
 
 ENV PYTHONUNBUFFERED=1
 # Detection + paper trading only. NO API keys, places NO real orders.

@@ -258,3 +258,26 @@ new ledger; (c) retire the CEX legs, keep the Lighter-premium publisher;
 (d) a real-execution project — only if the capacity census shows
 fee-beating capacity on a venue we'd actually fund (out of doctrine
 today).
+
+**IMPLEMENTED 15-Jul evening (user: "implement now" + growth mandate —
+"if the scanner just restricts then we eventually will only stay still").**
+A2–A4 + B3 + the gauge fix shipped in `cross_exchange_arb.py` (epoch-2:
+episode dedup, TOUCH-DEPTH bookable floor from the real books — live
+probes killed both bulk-ticker floors: CBX/Gemini `fetch_tickers` carry
+neither volume nor bid/ask — balance epoch reset with the odometer parked
+in `extra.legacy`, capacity curve per booking, `gapscout-census` bot_state
+key, cross-quote gauge via live USDT/USD, `liquid_top_pct` now
+depth-confirmed book-mids with `liquid_ref_pct` kept for continuity).
+B1/B5 shipped as bounded levers, not defaults. **NEW: the GROWTH RAIL**
+(`fleet_tuning.py` + evidence board ENACT tier) — the board autonomously
+widens the scanner's net when the census runs quiet (24h → prefilter
+0.15%/45 books; 48h → 0.10%/60 books + kucoin,gateio; 96h → +mexc),
+every lever whitelisted, hard-bounded, TTL'd (auto-revert), phone-notified
+per step; lanes gated by `FLEET_TUNING_ENACT_LANES` (default paper-scanner
+ONLY — trading-book lanes stay proposal-only until THIS review adds them).
+**Grade at the review:** (i) episodes/day by class + capacity curves from
+the ledger; (ii) the growth rail's enactment log (`fleet-tuning` history)
+— did widening surface anything real, did auto-revert behave; (iii) whether
+any trading-lane lever (e.g. TT dip range, replay-validated) earns a
+registry entry. B2-full (cross-quote BOOKING) and B4 (>5% identity check)
+remain open — the census now records both bands.

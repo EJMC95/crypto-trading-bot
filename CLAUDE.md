@@ -45,6 +45,13 @@ https://pnl-dashboard-production-858c.up.railway.app/
   stress, governor proximity), auto-verdicts mechanical items (manual
   `evidence-review` stays senior), phone-notifies warn/action, publishes
   SHADOW restrict-only proposals → `evidence-board` (EVBOARD_MODE=shadow)
+  + **GROWTH RAIL (15-Jul user mandate: widening must not need the
+  operator)**: EXPAND-direction responses ENACT via `fleet_tuning.py` —
+  whitelisted, hard-bounded, TTL'd levers (auto-revert by expiry), lanes in
+  `FLEET_TUNING_ENACT_LANES` only (default `paper-scanner`; trading lanes
+  stay proposal-only until a review adds them; real money NEVER). First
+  loop: Gap Scout census quiet 24/48/96h → widen prefilter/book-budget/
+  second-tier venues (kucoin/gateio/mexc), phone-notified per step
 - `regime_oracle.py`, `market_pulse.py` (history appends hourly),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 
@@ -100,6 +107,10 @@ its row is dashboard-retired regardless; stop the process when found.
 - `signal-bus`, `regime-oracle`, `market-pulse`, `listing-intel` — published
   context (funding APRs, dislocation, per-major regime, news mood, sniper
   intel classes). Only market-pulse.panic + the two keys above are consumed.
+- `fleet-tuning` — the growth rail's lever payload (evidence board authors,
+  `fleet_tuning.py` registry clamps; consumers: Gap Scout). `gapscout-census`
+  — Gap Scout's epoch-2 episode/artifact/cross-quote census (board reads
+  `quiet_hours` for the widen ladder). Both TTL'd like everything else.
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).
 - Bot identity for multiplier lookup = `bot_name` in each freqtrade config

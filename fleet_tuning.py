@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""fleet_tuning.py — the fleet's bounded GROWTH RAIL (shipped 2026-07-15).
+
+WHY THIS EXISTS (user instruction, 15-Jul): "if the scanner just restricts
+then we eventually will only stay still … the scanner needs to be able to
+implement opening or altering a strategy or widening something too so growth
+can happen fleet wide as I am not going to be able to make fixes and
+implement suggestions every occasion in time."
+
+Until now every autonomous actuator in the fleet was RESTRICT-only (vetoes,
+clip scales, stake mults ≤ 1.0). Safe — but a fleet that can only say "no"
+converges to standing still unless the operator hand-ships every widening.
+This module is the sanctioned middle path: a WHITELISTED, HARD-BOUNDED,
+TTL'd lever registry through which an authoring organ (the evidence board)
+can WIDEN parameters autonomously — but only levers registered here, only
+inside their bounds, only on lanes explicitly marked enactable (paper/
+scanner lanes today), and only while the author keeps re-asserting the
+evidence every cycle: levers EXPIRE back to defaults on their own, so
+auto-revert is the resting state, not a feature to remember.
+
+WHAT IT CAN NEVER DO
+  - touch a lever that is not in the registry (unknown names are dropped);
+  - exceed a lever's hard bounds (values are clamped, never trusted);
+  - act on a real-money lane: no lever carries lane="live", and
+    write_levers() drops anything whose lane isn't in ENACT_LANES. Go-live
+    and real-money sizing stay operator-only (NO_REAL_MONEY unchanged).
+  - outlive its TTL: if the author dies or stops re-asserting, every
+    consumer is back on its own defaults within TTL_SEC.
+
+CONTRACT (same fail-safe shape as fleet_bus):
+  writer:  write_levers({name: {"value", "reason", "evidence"}})
+           -> bot_state['fleet-tuning'] with updated+ttl_sec (+ history).
+  reader:  get_lever(name, default) -> clamped fresh value, else default.
+           No DB / stale / unknown / unparseable -> default. Backtests are
+           inert (no DATABASE_URL -> load_state returns None -> defaults).
+
+Adding a lever = one registry line here + one get_lever() call in the
+consumer. Trading-book lanes (e.g. Ticket Taker bars) may be REGISTERED
+later but stay proposal-only until a review adds their lane to
+FLEET_TUNING_ENACT_LANES — the earn-your-wiring path the L2 light walked.
+"""
+import os
+import time
+from datetime import datetime, timezone
+
+try:
+    import bot_pnl_store as store
+except Exception:                                    # pragma: no cover
+    store = None
+
+KEY = "fleet-tuning"
+TTL_SEC = int(os.environ.get("FLEET_TUNING_TTL_SEC", "7200"))   # 2h re-assert
+CACHE_SEC = 60.0
+
+# Lanes the rail may ENACT autonomously. Everything else is proposal-only.
+# "paper-scanner" = detection/census organs with zero trading surface.
+ENACT_LANES = {s.strip() for s in os.environ.get(
+    "FLEET_TUNING_ENACT_LANES", "paper-scanner").split(",") if s.strip()}
+
+# ---------------------------------------------------------------------------
+# THE REGISTRY — every autonomously-tunable lever in the fleet, with hard
+# bounds. A lever absent from this dict cannot be moved by any organ.
+# ---------------------------------------------------------------------------
+LEVERS = {
+    # Gap Scout (scanner-cross-exchange-arb): paper-only census organ.
+    "gapscout.prefilter_gap": {
+        "kind": "float", "lo": 0.0010, "hi": 0.0030, "lane": "paper-scanner",
+        "note": "stage-1 raw-gap bar for book-checking; default 0.0020"},
+    "gapscout.max_book_fetches": {
+        "kind": "int", "lo": 10, "hi": 60, "lane": "paper-scanner",
+        "note": "order books pulled per scan (2/pair); default 30"},
+    "gapscout.extra_exchanges": {
+        "kind": "csv", "allowed": {"kucoin", "gateio", "mexc", "bitget", "htx"},
+        "lane": "paper-scanner",
+        "note": "second-tier venues hot-added to the census net"},
+}
+
+
+def clamp(name, value):
+    """Registry-checked, bounds-clamped value; None if unusable/unknown."""
+    spec = LEVERS.get(name)
+    if not spec:
+        return None
+    kind = spec["kind"]
+    try:
+        if kind == "float":
+            return min(spec["hi"], max(spec["lo"], float(value)))
+        if kind == "int":
+            return int(min(spec["hi"], max(spec["lo"], int(value))))
+        if kind == "csv":
+            items = value if isinstance(value, (list, tuple)) else str(value).split(",")
+            kept = [s.strip() for s in items if s.strip() in spec["allowed"]]
+            return ",".join(dict.fromkeys(kept))     # dedup, order-stable
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
+def _is_fresh(payload, now_ts):
+    try:
+        u = datetime.fromisoformat(str(payload["updated"]).replace("Z", "+00:00"))
+        if u.tzinfo is None:
+            u = u.replace(tzinfo=timezone.utc)
+        age = now_ts - u.timestamp()
+        return 0 <= age <= float(payload.get("ttl_sec") or 0)
+    except Exception:
+        return False
+
+
+_cache = {"ts": 0.0, "payload": None}
+
+
+def _load(now_ts):
+    if now_ts - _cache["ts"] < CACHE_SEC:
+        return _cache["payload"]
+    payload = None
+    try:
+        if store is not None:
+            payload = store.load_state(KEY) or None
+    except Exception:
+        payload = None
+    _cache.update(ts=now_ts, payload=payload)
+    return payload
+
+
+def get_lever(name, default, now_ts=None):
+    """Fresh, registered, clamped lever value — or the caller's default."""
+    now_ts = now_ts if now_ts is not None else time.time()
+    try:
+        p = _load(now_ts)
+        if not p or not _is_fresh(p, now_ts):
+            return default
+        entry = (p.get("levers") or {}).get(name)
+        if not isinstance(entry, dict):
+            return default
+        v = clamp(name, entry.get("value"))
+        return default if v is None else v
+    except Exception:
+        return default
+
+
+def active_levers(now_ts=None):
+    """{name: entry} of currently-fresh levers (for display/telemetry)."""
+    now_ts = now_ts if now_ts is not None else time.time()
+    p = _load(now_ts)
+    if not p or not _is_fresh(p, now_ts):
+        return {}
+    return {k: v for k, v in (p.get("levers") or {}).items() if k in LEVERS}
+
+
+def write_levers(levers, set_by="evidence-board", now_ts=None):
+    """Author the tuning payload. Drops unknown/out-of-lane levers, clamps
+    every value, stamps updated+ttl_sec. Returns the payload written, or
+    None when nothing valid survived (or no DB). Never raises."""
+    now_ts = now_ts if now_ts is not None else time.time()
+    out = {}
+    for name, entry in (levers or {}).items():
+        spec = LEVERS.get(name)
+        if not spec or spec["lane"] not in ENACT_LANES:
+            continue
+        v = clamp(name, (entry or {}).get("value"))
+        if v is None:
+            continue
+        out[name] = {"value": v, "lane": spec["lane"], "set_by": set_by,
+                     "reason": str((entry or {}).get("reason") or "")[:200],
+                     "evidence": str((entry or {}).get("evidence") or "")[:300]}
+    if not out:
+        return None
+    payload = {"updated": datetime.fromtimestamp(now_ts, tz=timezone.utc)
+               .isoformat(timespec="seconds"),
+               "ttl_sec": TTL_SEC, "levers": out}
+    try:
+        if store is None:
+            return None
+        store.save_state(KEY, payload)
+        if hasattr(store, "save_history"):
+            store.save_history(KEY, {"updated": payload["updated"],
+                                     "levers": {k: v["value"] for k, v in out.items()},
+                                     "set_by": set_by})
+        _cache.update(ts=now_ts, payload=payload)   # readers in-process see it
+        return payload
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+
+def _selftest():
+    now = time.time()
+    # clamping: bounds enforced, unknown dropped, junk rejected
+    assert clamp("gapscout.prefilter_gap", 0.0001) == 0.0010     # floor
+    assert clamp("gapscout.prefilter_gap", 0.5) == 0.0030        # ceiling
+    assert clamp("gapscout.prefilter_gap", 0.0015) == 0.0015
+    assert clamp("gapscout.max_book_fetches", 999) == 60
+    assert clamp("gapscout.max_book_fetches", "45") == 45
+    assert clamp("nonexistent.lever", 1) is None
+    assert clamp("gapscout.prefilter_gap", "junk") is None
+    # csv: only whitelisted venues survive, deduped
+    assert clamp("gapscout.extra_exchanges", "kucoin, binance, gateio,kucoin") == "kucoin,gateio"
+    assert clamp("gapscout.extra_exchanges", ["mexc", "evil"]) == "mexc"
+    assert clamp("gapscout.extra_exchanges", "binance") == ""
+    # reader: stale payload -> default; fresh -> clamped value
+    _cache.update(ts=now, payload={"updated": "2020-01-01T00:00:00+00:00",
+                                   "ttl_sec": 7200,
+                                   "levers": {"gapscout.prefilter_gap": {"value": 0.0015}}})
+    assert get_lever("gapscout.prefilter_gap", 0.002, now_ts=now) == 0.002
+    fresh_iso = datetime.fromtimestamp(now, tz=timezone.utc).isoformat(timespec="seconds")
+    _cache.update(ts=now, payload={"updated": fresh_iso, "ttl_sec": 7200,
+                                   "levers": {"gapscout.prefilter_gap": {"value": 0.9},
+                                              "gapscout.extra_exchanges": {"value": "kucoin"}}})
+    assert get_lever("gapscout.prefilter_gap", 0.002, now_ts=now) == 0.0030  # clamped
+    assert get_lever("gapscout.extra_exchanges", "", now_ts=now) == "kucoin"
+    assert get_lever("unknown.lever", 7, now_ts=now) == 7
+    assert set(active_levers(now_ts=now)) == {"gapscout.prefilter_gap",
+                                              "gapscout.extra_exchanges"}
+    # writer: unknown/out-of-lane dropped, values clamped; no-DB -> None but
+    # never raises (store.save_state is a guarded no-op without DATABASE_URL)
+    p = write_levers({"gapscout.prefilter_gap": {"value": 0.00001, "reason": "r"},
+                      "not.a.lever": {"value": 1}}, now_ts=now)
+    if p is not None:                       # only when a DB is configured
+        assert set(p["levers"]) == {"gapscout.prefilter_gap"}
+        assert p["levers"]["gapscout.prefilter_gap"]["value"] == 0.0010
+    print("fleet_tuning selftest OK")
+
+
+if __name__ == "__main__":
+    _selftest()

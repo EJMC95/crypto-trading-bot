@@ -25,22 +25,34 @@ This organ makes the board a live participant:
      dislocations fold into the census after 24h unless escalating, veto
      records age out at 48h). MANUAL verdicts in bot_state['evidence-review']
      always win — the daily review and the operator stay senior to the organ.
-  4. RESPONSE — two tiers, honest about authority:
+  4. RESPONSE — three tiers, honest about authority:
        NOTIFY (live): new warn/action items or escalations push to the
          operator's phone (same NTFY_TOPIC channel as the watchdog),
          min EVBOARD_NOTIFY_GAP_H per key.
-       PROPOSE (shadow): every response rule names an EXISTING restrict-only
-         lever (lens veto, clip scale, stress veto, budget) and what it WOULD
-         do. Published in the payload, consumed by NOTHING until a review
-         flips EVBOARD_MODE=publish — the same earn-your-wiring path the L2
-         risk light walked (advisory 07-Jul -> enforced 15-Jul on evidence).
+       PROPOSE (shadow): every RESTRICT response rule names an EXISTING
+         restrict-only lever (lens veto, clip scale, stress veto, budget)
+         and what it WOULD do. Published in the payload, consumed by
+         NOTHING until a review flips EVBOARD_MODE=publish — the same
+         earn-your-wiring path the L2 risk light walked.
+       ENACT (live, GROWTH RAIL — 15-Jul user instruction: "the scanner
+         needs to be able to implement opening or altering … or widening
+         something too so growth can happen fleet wide"): EXPAND-direction
+         responses go through fleet_tuning's whitelisted, hard-bounded,
+         TTL'd lever registry. Today's ladder: when the Gap Scout census
+         runs quiet, the board autonomously widens the scanner's detection
+         net (prefilter, book budget, second-tier venues) — and because
+         every lever EXPIRES unless re-asserted each cycle, reverting is
+         the resting state. Only lanes in FLEET_TUNING_ENACT_LANES
+         (default: paper-scanner — zero trading surface) are enactable;
+         trading-book lanes stay proposal-only until a review adds them.
 
 WHAT IT NEVER DOES
-  Open positions, loosen a veto, raise a stake, or touch bot logic. The
-  fleet's standing doctrine (restrict-only actuators, backtest-first,
-  NO_REAL_MONEY) binds this organ regardless of freeze state. Opportunity
-  flow stays where it already lives: scout tickets -> Ticket Taker's shadow
-  book -> brain grading -> review promotion.
+  Open positions, raise a stake on a trading book, loosen a live veto, or
+  touch real money — go-live and real-money sizing stay operator-only
+  (NO_REAL_MONEY unchanged). The growth rail can only move levers that are
+  registered in fleet_tuning with hard bounds, on explicitly enactable
+  lanes. Opportunity flow stays where it already lives: scout tickets ->
+  Ticket Taker's shadow book -> brain grading -> review promotion.
 
 Publishes bot_state['evidence-board'] (+ lean history when available):
   {updated, ttl_sec, mode, items:[{key, msg, sev, score, fires_24h, trend,
@@ -57,6 +69,11 @@ import urllib.request
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+
+try:
+    import fleet_tuning as tuning     # the growth rail (optional import)
+except Exception:  # noqa: BLE001
+    tuning = None
 
 BOARD_KEY = "evidence-board"
 INTERVAL = int(os.environ.get("EVBOARD_INTERVAL_SEC", "600"))
@@ -220,6 +237,34 @@ def synthesize(lighter_market, fleet_risk, lens_forward, prior_keys, now_ts):
     return out
 
 
+# ---------------------------------------------------------------------------
+# GROWTH RAIL (expand direction) — the widen-when-quiet ladder for Gap Scout.
+# Quiet = the census's own quiet_hours (0 while any episode is open, else
+# hours since the last episode closed / the epoch started). Booking honesty
+# is the scanner's own (episode dedup + floors); the board only widens the
+# DETECTION net, one evidence-gated step at a time. Every lever expires in
+# fleet_tuning's TTL unless re-asserted here — auto-revert is the default.
+# ---------------------------------------------------------------------------
+
+WIDEN_LADDER = [
+    (24.0, {"gapscout.prefilter_gap": 0.0015, "gapscout.max_book_fetches": 45}),
+    (48.0, {"gapscout.prefilter_gap": 0.0010, "gapscout.max_book_fetches": 60,
+            "gapscout.extra_exchanges": "kucoin,gateio"}),
+    (96.0, {"gapscout.extra_exchanges": "kucoin,gateio,mexc"}),
+]
+
+
+def widen_step(quiet_hours):
+    """(step, merged_levers) for a census this many hours quiet. Monotone;
+    later steps inherit (and may override) earlier steps' levers."""
+    step, levers = 0, {}
+    for i, (bar, lv) in enumerate(WIDEN_LADDER, 1):
+        if quiet_hours >= bar:
+            step = i
+            levers.update(lv)
+    return step, levers
+
+
 def detect_veto_flap(alerts_48h_plus, now_ts, window_d=7, min_events=3):
     """A coin appearing in >= min_events veto-change alerts inside window_d
     days is oscillating across its threshold. Restrict-only so harmless, but
@@ -304,6 +349,22 @@ def run_once():
     # ---- synthesized evidence (condition-ENTER only) -----------------------
     prior_synth = {k for k in prior_items if k.startswith("board:")}
     synth = synthesize(lm, fr, lf, prior_synth, now) + detect_veto_flap(fa, now)
+
+    # ---- growth rail: widen Gap Scout's net when its census runs quiet -----
+    census = store.load_state("gapscout-census") or {}
+    growth_step, growth_levers, quiet_h = 0, {}, 0.0
+    if _fresh(census, max_age_s=3600):
+        quiet_h = float(census.get("quiet_hours") or 0.0)
+        growth_step, growth_levers = widen_step(quiet_h)
+        if growth_step:
+            synth.append({
+                "key": "board:gapscout-quiet", "severity": "info",
+                "msg": f"🌱 Gap Scout census quiet {quiet_h:.0f}h — detection "
+                       f"net widened to step {growth_step}/{len(WIDEN_LADDER)}",
+                "proposal": "widen (ENACTED via fleet_tuning): " + ", ".join(
+                    f"{k}={v}" for k, v in sorted(growth_levers.items())),
+                "lever": "growth-rail", "direction": "expand",
+                "ts": now, "source": "board"})
     synth_new = [s for s in synth if s["key"] not in prior_synth]
 
     # ---- assemble the board -------------------------------------------------
@@ -338,7 +399,30 @@ def run_once():
     items.sort(key=lambda i: -i["score"])
 
     proposals = [{"key": s["key"], "lever": s["lever"], "proposal": s["proposal"],
-                  "mode": MODE} for s in synth if s.get("proposal")]
+                  "direction": s.get("direction", "restrict"),
+                  "mode": "enact" if s.get("direction") == "expand" else MODE}
+                 for s in synth if s.get("proposal")]
+
+    # ---- enact the growth levers (bounded + TTL'd in fleet_tuning; only
+    # lanes in FLEET_TUNING_ENACT_LANES survive write_levers) ----------------
+    enacted = None
+    if growth_levers and tuning is not None:
+        enacted = tuning.write_levers(
+            {k: {"value": v,
+                 "reason": f"census quiet {quiet_h:.0f}h -> widen step {growth_step}",
+                 "evidence": f"gapscout-census {census.get('updated')}: "
+                             f"episodes_open={census.get('episodes_open')}, "
+                             f"day={json.dumps(census.get('day'))}"}
+             for k, v in growth_levers.items()},
+            set_by="evidence-board", now_ts=now)
+    prior_step = int(prior.get("growth_step") or 0)
+    if growth_step > prior_step and enacted:
+        send_push(f"growth rail: Gap Scout net -> step {growth_step}",
+                  f"census quiet {quiet_h:.0f}h; enacted: " + ", ".join(
+                      f"{k}={v['value']}" for k, v in enacted["levers"].items()),
+                  priority="default", tags="seedling")
+        print(f"[evidence_board] growth rail ENACTED step {growth_step}: "
+              f"{sorted(enacted['levers'])}", flush=True)
 
     # ---- notify: NEW warn/action (or escalating) active items --------------
     for i in items:
@@ -357,9 +441,13 @@ def run_once():
         "updated": _iso(now), "ttl_sec": TTL_SEC, "mode": MODE,
         "items": items[:20],
         "proposals": proposals,
+        "growth_step": growth_step,
+        "enacted": ({k: v["value"] for k, v in enacted["levers"].items()}
+                    if enacted else None),
         "notified": {k: v for k, v in notified.items() if now - v < 7 * 86400},
         "inputs_fresh": {"lighter_market": _fresh(lm), "fleet_risk": _fresh(fr),
-                         "lens_forward": bool(lf)},
+                         "lens_forward": bool(lf),
+                         "gapscout_census": _fresh(census, max_age_s=3600)},
     }
     store.save_state(BOARD_KEY, payload)
     if hasattr(store, "save_history"):
@@ -416,6 +504,23 @@ def _selftest():
           {"key": "veto:ADA", "ts": now - 1000}]
     flaps = detect_veto_flap(fa, now)
     assert [f["key"] for f in flaps] == ["board:veto-flap:ADA"], flaps
+    # growth-rail ladder: quiet->0, monotone, later steps inherit earlier
+    assert widen_step(1) == (0, {})
+    s1, lv1 = widen_step(25)
+    assert s1 == 1 and lv1["gapscout.prefilter_gap"] == 0.0015
+    assert "gapscout.extra_exchanges" not in lv1, "venues need 48h quiet"
+    s2, lv2 = widen_step(50)
+    assert s2 == 2 and lv2["gapscout.prefilter_gap"] == 0.0010
+    assert lv2["gapscout.extra_exchanges"] == "kucoin,gateio"
+    s3, lv3 = widen_step(200)
+    assert s3 == 3 and lv3["gapscout.extra_exchanges"] == "kucoin,gateio,mexc"
+    assert lv3["gapscout.max_book_fetches"] == 60, "step 3 inherits step 2"
+    # every ladder value must be registered AND in-bounds in fleet_tuning —
+    # a ladder entry that would be clamped/dropped is a config bug HERE.
+    if tuning is not None:
+        for _, lv in WIDEN_LADDER:
+            for k, v in lv.items():
+                assert tuning.clamp(k, v) == v, f"ladder lever out of registry bounds: {k}={v}"
     # push: unconfigured -> False, no crash
     os.environ.pop("NTFY_TOPIC", None)
     assert send_push("t", "b") is False
