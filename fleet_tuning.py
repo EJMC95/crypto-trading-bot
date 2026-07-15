@@ -53,17 +53,26 @@ TTL_SEC = int(os.environ.get("FLEET_TUNING_TTL_SEC", "7200"))   # 2h re-assert
 CACHE_SEC = 60.0
 
 # Lanes the rail may ENACT autonomously. Everything else is proposal-only.
-# Every enactable lane is ZERO real money by construction:
 #   paper-scanner — detection/census organs (no trading surface at all)
 #   lighter-scout — the scout's ADVISORY ticket emission (widens what gets
 #                   GRADED by the brain; the taker's bars still gate fills)
 #   lighter-taker — the $1k SHADOW book's bars; enactments on this lane are
 #                   REPLAY-GATED by lighter_scout_tuner (both-halves on the
 #                   recorded tape) before they are ever written here
-# Live-money lanes do not exist in this registry and never will.
+#   lighter-live  — (15-Jul user mandate: "i want evidence and scanning for
+#                   live bot changes also and for it to implement also")
+#                   REAL-MONEY lane, deliberately one lever: a bounded
+#                   multiplier on the operator's env clip size. It cannot
+#                   raise total live exposure — SafetyRails' notional cap is
+#                   operator-only, checked at order time, and divides the
+#                   open-position budget by the scaled clip. Evidence bar in
+#                   evidence_board.synthesize_live(); every change pushes
+#                   URGENT to the phone. Remove the lane from this env to
+#                   kill it. Go-live itself (keys, dry_run, caps) remains
+#                   operator-only forever.
 ENACT_LANES = {s.strip() for s in os.environ.get(
     "FLEET_TUNING_ENACT_LANES",
-    "paper-scanner,lighter-scout,lighter-taker").split(",") if s.strip()}
+    "paper-scanner,lighter-scout,lighter-taker,lighter-live").split(",") if s.strip()}
 
 # ---------------------------------------------------------------------------
 # THE REGISTRY — every autonomously-tunable lever in the fleet, with hard
@@ -121,6 +130,12 @@ LEVERS = {
     "taker.max_hold_h": {
         "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
         "note": "max hold hours; default 48"},
+    # LIVE lane 💰 — one lever, a multiplier on the env clip (LIGHTER_ORDER_USD).
+    # SafetyRails' notional cap stays senior at order time: this reshapes
+    # clips, it can never raise total live exposure.
+    "live.clip_scale": {
+        "kind": "float", "lo": 0.5, "hi": 1.5, "lane": "lighter-live",
+        "note": "live clip multiplier; 1.0 = the operator's env sizing"},
 }
 
 

@@ -280,6 +280,15 @@ def main():
         t0 = time.time()
         # [2026-07-12 GO-GREEN] loop-top liveness touch — see bot_pnl_store.heartbeat
         store.heartbeat(bot_id)
+        # [2026-07-15 GROWTH RAIL] live clip re-read each loop: the evidence
+        # board's bounded live.clip_scale lever applies to NEW entries only
+        # (open positions untouched); reverts with the lever's own expiry.
+        _clip = ctx.order_usd(ORDER_USD)
+        if _clip != order_usd:
+            log.info("growth rail: clip %s -> %s (max_open recomputed)",
+                     order_usd, _clip)
+            order_usd = _clip
+            max_open = ctx.max_open_positions(MAX_OPEN_POSITIONS)
         now = datetime.now(timezone.utc)
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False

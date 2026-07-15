@@ -285,5 +285,8 @@ ONLY — trading-book lanes stay proposal-only until THIS review adds them).
 the ledger; (ii) the growth rail's enactment log (`fleet-tuning` history)
 — did widening surface anything real, did auto-revert behave; (iii) whether
 any trading-lane lever (e.g. TT dip range, replay-validated) earns a
-registry entry. B2-full (cross-quote BOOKING) and B4 (>5% identity check)
+registry entry; (iv) LIVE lane (shipped 15-Jul late, user mandate):
+grade `live.clip_scale`'s enactment log — did the earn-gates (30 closes &
+positive on EVERY live row) hold, did any down-scale fire correctly, and
+should the ladder/cooldown/bounds move. B2-full (cross-quote BOOKING) and B4 (>5% identity check)
 remain open — the census now records both bands.

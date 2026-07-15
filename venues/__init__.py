@@ -32,6 +32,11 @@ from .base import VenueClient, VenueError          # noqa: F401 (re-export)
 from .governor import TxBudgetGovernor             # noqa: F401
 from .safety import SafetyRails
 
+try:
+    import fleet_tuning as _tuning     # growth rail (optional import)
+except Exception:  # noqa: BLE001 — images without the module: lever inert
+    _tuning = None
+
 log = logging.getLogger("venues")
 
 MODES = ("hl_paper", "lighter_shadow", "lighter_testnet", "lighter_live")
@@ -63,7 +68,15 @@ class VenueContext:
     def order_usd(self, paper_default: float) -> float:
         if self.mode == "hl_paper":
             return paper_default
-        return float(os.environ.get("LIGHTER_ORDER_USD", "30"))
+        base = float(os.environ.get("LIGHTER_ORDER_USD", "30"))
+        # [2026-07-15 GROWTH RAIL — live lane] lighter_live clips carry the
+        # evidence board's bounded clip_scale (fleet_tuning clamps to
+        # [0.5, 1.5]; lever expires to 1.0 on its own). The operator's env
+        # stays the anchor and SafetyRails' notional cap stays senior at
+        # order time — this reshapes clips, it cannot add exposure.
+        if self.mode == "lighter_live" and _tuning is not None:
+            base = round(base * _tuning.get_lever("live.clip_scale", 1.0), 2)
+        return base
 
     def max_open_positions(self, paper_default: int) -> int:
         if self.mode == "hl_paper" or self.rails.max_notional is None:

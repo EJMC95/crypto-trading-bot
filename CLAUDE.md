@@ -121,8 +121,8 @@ its row is dashboard-retired regardless; stop the process when found.
 - `fleet-tuning` — the growth rail's lever payload (authors: evidence board
   + scout tuner, MERGED writes with per-lever expiry; `fleet_tuning.py`
   registry clamps; consumers: Gap Scout, Lighter Scout, Ticket Taker).
-  Lanes: paper-scanner / lighter-scout / lighter-taker — all zero real
-  money. `gapscout-census` — Gap Scout's epoch-2 episode census (board
+  Lanes: paper-scanner / lighter-scout / lighter-taker (zero real money) +
+  lighter-live (ONLY `live.clip_scale`, see growth rail above). `gapscout-census` — Gap Scout's epoch-2 episode census (board
   reads `quiet_hours`). `scout-tuner` — the tuner's cycle log + enactments.
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).

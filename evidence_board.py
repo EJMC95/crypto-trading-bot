@@ -286,6 +286,85 @@ def widen_step(quiet_hours):
 PROMO_MIN_CLOSED = int(os.environ.get("EVBOARD_PROMO_MIN_CLOSED", "30"))
 PROMO_MIN_PNL = float(os.environ.get("EVBOARD_PROMO_MIN_PNL", "10"))
 
+# ---------------------------------------------------------------------------
+# LIVE lane 💰 (15-Jul user mandate: "i want evidence and scanning for live
+# bot changes also and for it to implement also — otherwise it's just a
+# shadow bot tuning… rather than the live one which actually has money").
+# One lever, `live.clip_scale`: a bounded multiplier on the operator's env
+# clip for the lighter_live bots. It reshapes clip size; it CANNOT add
+# exposure (SafetyRails' notional cap is operator-only and checked at order
+# time). Sizing UP must be EARNED — every live row over the closed-trade
+# floor AND net positive, fleet light green, drawdown shallow, venue calm —
+# one ladder step per cooldown, TTL auto-revert to 1.0 the moment the board
+# stops re-asserting. Sizing DOWN fires immediately on a hurt live row or a
+# live-vs-shadow divergence alert. Every change pushes URGENT to the phone.
+# ---------------------------------------------------------------------------
+LIVE_ROWS = {s.strip() for s in os.environ.get(
+    "EVBOARD_LIVE_ROWS",
+    "crypto-trend-daily-lighter,perps-funding-lighter-lighter").split(",") if s.strip()}
+LIVE_MIN_CLOSED = int(os.environ.get("EVBOARD_LIVE_MIN_CLOSED", "30"))
+LIVE_DOWN_PNL = float(os.environ.get("EVBOARD_LIVE_DOWN_PNL", "10"))     # -$10 hurts
+LIVE_DOWN_SCALE = float(os.environ.get("EVBOARD_LIVE_DOWN_SCALE", "0.75"))
+LIVE_DD_MIN = float(os.environ.get("EVBOARD_LIVE_DD_MIN", "-0.02"))      # 7d fleet dd
+LIVE_STEP_COOLDOWN_H = float(os.environ.get("EVBOARD_LIVE_COOLDOWN_H", "24"))
+LIVE_LADDER = [1.0, 1.25, 1.5]
+
+
+def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
+                    prior_scale, now_ts):
+    """The live lane's decision. Returns (desired_scale | None, item | None).
+    None = assert nothing (the lever expires back to 1.0 on its own).
+    prior_scale: {"value", "ts"} from the previous board payload — the
+    up-ladder's cooldown memory. Pure — selftested offline."""
+    rows = {str(r.get("bot")): r for r in (bot_rows or [])
+            if str(r.get("bot")) in LIVE_ROWS}
+    if not LIVE_ROWS or len(rows) < len(LIVE_ROWS):
+        return None, None                    # can't see the whole live cohort
+
+    def emit(scale, sev, direction, why):
+        return {"key": "board:live-clip-scale", "severity": sev,
+                "msg": f"💰 LIVE clips x{scale:g} — {why}",
+                "proposal": "live.clip_scale via fleet_tuning (bounds 0.5–1.5, "
+                            "TTL auto-revert; SafetyRails notional cap stays "
+                            "senior — reshapes clips, cannot add exposure)",
+                "lever": "live.clip_scale", "ts": now_ts, "source": "board",
+                "direction": direction}
+
+    # DOWN first — restriction needs no cooldown and no permission.
+    gap = any(str(a.get("key", "")).startswith("live-shadow-gap")
+              and (a.get("ts") or 0) >= now_ts - 48 * 3600 for a in alerts or [])
+    hurt = [b for b, r in sorted(rows.items())
+            if float(r.get("pnl_abs") or 0) <= -LIVE_DOWN_PNL]
+    if gap or hurt:
+        why = " ; ".join((["live-vs-shadow divergence alert"] if gap else [])
+                         + [f"{b} ${float(rows[b].get('pnl_abs') or 0):+.2f}"
+                            for b in hurt])
+        return LIVE_DOWN_SCALE, emit(LIVE_DOWN_SCALE, "action", "restrict", why)
+
+    # UP must be earned on every gate at once.
+    fr_ok = (_fresh(fleet_risk or {})
+             and str(fleet_risk.get("light")) == "green"
+             and (fleet_risk.get("fleet_dd_7d") is None
+                  or float(fleet_risk.get("fleet_dd_7d")) > LIVE_DD_MIN))
+    med = ((lighter_market or {}).get("stress") or {}).get("med")
+    lm_ok = (_fresh(lighter_market or {}) and med is not None
+             and med * 2 <= STRESS_VETO_BPS)
+    earned = all(int(r.get("closed_trades") or 0) >= LIVE_MIN_CLOSED
+                 and float(r.get("pnl_abs") or 0) > 0 for r in rows.values())
+    if not (fr_ok and lm_ok and earned):
+        return None, None                    # lever expires -> 1.0
+
+    cur = float((prior_scale or {}).get("value") or 1.0)
+    since = float((prior_scale or {}).get("ts") or 0)
+    nxt = next((v for v in LIVE_LADDER if v > cur + 1e-9), cur)
+    if cur > 1.0 and now_ts - since < LIVE_STEP_COOLDOWN_H * 3600:
+        nxt = cur                            # hold this step through cooldown
+    if nxt <= 1.0:
+        return None, None
+    why = (f"EARNED: every live row ≥{LIVE_MIN_CLOSED} closes & net positive, "
+           f"fleet green, dd>{LIVE_DD_MIN:.0%}, venue calm ({med}bps)")
+    return nxt, emit(nxt, "action", "expand", why)
+
 
 def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts):
     """Board-authored EXPAND evidence. Same emit shape as synthesize(), every
@@ -453,6 +532,12 @@ def run_once():
     synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, 26000) else {},
                                tuner_state, bot_rows, lm, now)
 
+    # ---- LIVE lane 💰: evidence-gated clip scaling on the real-money bots --
+    prior_live = prior.get("live_scale") or {}
+    desired_live, live_item = synthesize_live(bot_rows, fr, lm, fa, prior_live, now)
+    if live_item:
+        synth.append(live_item)
+
     # ---- growth rail: widen Gap Scout's net when its census runs quiet -----
     census = store.load_state("gapscout-census") or {}
     growth_step, growth_levers, quiet_h = 0, {}, 0.0
@@ -507,18 +592,26 @@ def run_once():
                   "mode": "enact" if s.get("direction") == "expand" else MODE}
                  for s in synth if s.get("proposal")]
 
-    # ---- enact the growth levers (bounded + TTL'd in fleet_tuning; only
-    # lanes in FLEET_TUNING_ENACT_LANES survive write_levers) ----------------
-    enacted = None
-    if growth_levers and tuning is not None:
-        enacted = tuning.write_levers(
+    # ---- enact: ONE combined write per cycle (merge semantics keep other
+    # authors' levers; the board's own set must arrive together) -------------
+    board_levers = {}
+    if growth_levers:
+        board_levers.update(
             {k: {"value": v,
                  "reason": f"census quiet {quiet_h:.0f}h -> widen step {growth_step}",
                  "evidence": f"gapscout-census {census.get('updated')}: "
                              f"episodes_open={census.get('episodes_open')}, "
                              f"day={json.dumps(census.get('day'))}"}
-             for k, v in growth_levers.items()},
-            set_by="evidence-board", now_ts=now)
+             for k, v in growth_levers.items()})
+    if desired_live is not None:
+        board_levers["live.clip_scale"] = {
+            "value": desired_live,
+            "reason": (live_item or {}).get("msg", "")[:180],
+            "evidence": f"live rows {sorted(LIVE_ROWS)}; gates in synthesize_live"}
+    enacted = None
+    if board_levers and tuning is not None:
+        enacted = tuning.write_levers(board_levers, set_by="evidence-board",
+                                      now_ts=now)
     prior_step = int(prior.get("growth_step") or 0)
     if growth_step > prior_step and enacted:
         send_push(f"growth rail: Gap Scout net -> step {growth_step}",
@@ -527,6 +620,17 @@ def run_once():
                   priority="default", tags="seedling")
         print(f"[evidence_board] growth rail ENACTED step {growth_step}: "
               f"{sorted(enacted['levers'])}", flush=True)
+    # live changes always reach the phone URGENT — it's real money
+    prior_live_val = prior_live.get("value")
+    if desired_live != prior_live_val and (desired_live is not None
+                                           or prior_live_val is not None):
+        send_push("LIVE clips " + (f"x{desired_live:g}" if desired_live
+                                   else "back to x1.0 (lever released)"),
+                  (live_item or {}).get("msg")
+                  or "conditions no longer hold — expires to operator sizing",
+                  priority="urgent", tags="moneybag")
+        print(f"[evidence_board] LIVE clip_scale: {prior_live_val} -> "
+              f"{desired_live}", flush=True)
 
     # ---- notify: NEW warn/action items AND new EXPAND items — good news
     # reaches the phone with the same machinery as warnings (default
@@ -555,7 +659,12 @@ def run_once():
         "items": items[:20],
         "proposals": proposals,
         "growth_step": growth_step,
-        "enacted": ({k: v["value"] for k, v in enacted["levers"].items()}
+        "live_scale": ({"value": desired_live,
+                        "ts": (prior_live.get("ts") if desired_live == prior_live_val
+                               else now)}
+                       if desired_live is not None else None),
+        "enacted": ({k: v["value"] for k, v in enacted["levers"].items()
+                     if v.get("set_by") == "evidence-board"}
                     if enacted else None),
         "notified": {k: v for k, v in notified.items() if now - v < 7 * 86400},
         "inputs_fresh": {"lighter_market": _fresh(lm), "fleet_risk": _fresh(fr),
@@ -646,6 +755,46 @@ def _selftest():
     k2 = {e["key"] for e in ex2}
     assert "board:tuner-enacted" not in k2 and "board:stress-headroom" not in k2
     assert "board:lens-positive:dip" in k2
+
+    # LIVE lane: earn-up ladder + cooldown, instant down, fail-safe absent
+    nowts = _now()
+    fresh_fr = {"updated": fresh, "ttl_sec": 900, "light": "green",
+                "fleet_dd_7d": -0.005}
+    calm_lm = {"updated": fresh, "stress": {"med": 5}}
+    live_ok = [{"bot": "crypto-trend-daily-lighter", "closed_trades": 40,
+                "pnl_abs": 12.0},
+               {"bot": "perps-funding-lighter-lighter", "closed_trades": 33,
+                "pnl_abs": 4.0}]
+    s, it = synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts)
+    assert s == 1.25 and it["direction"] == "expand" and it["severity"] == "action"
+    s2, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
+                            {"value": 1.25, "ts": nowts - 3600}, nowts)
+    assert s2 == 1.25, "cooldown must hold the step"
+    s3, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
+                            {"value": 1.25, "ts": nowts - 25 * 3600}, nowts)
+    assert s3 == 1.5, "past cooldown -> next step"
+    s4, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
+                            {"value": 1.5, "ts": nowts - 25 * 3600}, nowts)
+    assert s4 == 1.5, "ladder top is the ceiling"
+    live_hurt = [dict(live_ok[0], pnl_abs=-15.0), live_ok[1]]
+    s5, it5 = synthesize_live(live_hurt, fresh_fr, calm_lm, [],
+                              {"value": 1.5, "ts": 0}, nowts)
+    assert s5 == 0.75 and it5["direction"] == "restrict" and it5["severity"] == "action"
+    s6, _ = synthesize_live(live_ok, fresh_fr, calm_lm,
+                            [{"key": "live-shadow-gap:ff", "ts": nowts - 100}],
+                            {}, nowts)
+    assert s6 == 0.75, "divergence alert -> immediate down-scale"
+    live_small = [dict(live_ok[0], closed_trades=5), live_ok[1]]
+    assert synthesize_live(live_small, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
+    assert synthesize_live(live_ok, dict(fresh_fr, light="red"), calm_lm,
+                           [], {}, nowts) == (None, None)
+    assert synthesize_live(live_ok, fresh_fr,
+                           {"updated": fresh, "stress": {"med": 20}},
+                           [], {}, nowts) == (None, None), "hot venue blocks up"
+    assert synthesize_live(live_ok[:1], fresh_fr, calm_lm, [], {}, nowts) == (None, None)
+    if tuning is not None:
+        for v in LIVE_LADDER + [LIVE_DOWN_SCALE]:
+            assert tuning.clamp("live.clip_scale", v) == v
 
     # growth-rail ladder: quiet->0, monotone, later steps inherit earlier
     assert widen_step(1) == (0, {})

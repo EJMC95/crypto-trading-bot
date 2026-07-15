@@ -7,7 +7,7 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY lighter_trend_bot.py bot_pnl_store.py paper_broker.py ./
+COPY lighter_trend_bot.py bot_pnl_store.py paper_broker.py fleet_tuning.py ./
 COPY venues/ ./venues/
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "lighter_trend_bot.py"]
