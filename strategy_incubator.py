@@ -49,6 +49,18 @@ QUEUE_KEY = "xp-queue"
 TTL_SEC = int(os.environ.get("INCUBATOR_TTL_SEC", "10800"))
 ELITE_N = int(os.environ.get("INCUBATOR_ELITE_N", "4"))
 MIN_SNAPS = int(os.environ.get("INCUBATOR_MIN_SNAPS", "60"))
+# [2026-07-15 ANTI-OVERFIT] The max-over-a-population on a SHORT tape is biased
+# upward — you select the luckiest genotype, not the best. (First live cycle:
+# the "fittest" scored +$2.35 but h1 was +$0.01 — all edge in one half = noise
+# wearing a both-halves badge.) A genotype is only a trusted CHAMPION when:
+#   tape spans >= MIN_TAPE_HOURS, each half clears HALF_MARGIN (not just >0),
+#   it beats the DEFAULT genome by EDGE_MARGIN, AND it stays the champion for
+#   PERSIST_CYCLES independent cycles. Until then the leaderboard is published
+#   but explicitly flagged tentative (noise-risk) — trusted by nothing.
+MIN_TAPE_HOURS = float(os.environ.get("INCUBATOR_MIN_TAPE_HOURS", "48"))
+HALF_MARGIN = float(os.environ.get("INCUBATOR_HALF_MARGIN", "1.0"))      # $ each half
+EDGE_MARGIN = float(os.environ.get("INCUBATOR_EDGE_MARGIN", "2.0"))      # $ vs default
+PERSIST_CYCLES = int(os.environ.get("INCUBATOR_PERSIST", "3"))
 
 # TAKER genes: (tt attr, lever, discrete allele grid within registry bounds).
 # The grid is the search space; offspring are points on it.
@@ -161,7 +173,8 @@ def evaluate(genotype, tape):
         for g, v in saved.items():
             setattr(tt, g, v)
     return {"net": round(full, 3), "h1": round(h1, 3), "h2": round(h2, 3),
-            "both_halves_pos": h1 > 0 and h2 > 0}
+            # both-halves POSITIVE-BY-MARGIN — a +$0.01 half is noise, not edge
+            "both_halves_pos": h1 >= HALF_MARGIN and h2 >= HALF_MARGIN}
 
 
 def rank(population, tape):
@@ -169,6 +182,32 @@ def rank(population, tape):
     # fittest = highest net, tie-broken toward both-halves-positive
     scored.sort(key=lambda s: (s["net"], s["both_halves_pos"]), reverse=True)
     return scored
+
+
+def assess_champion(top, default_net, tape_hours, prior_champ, prior_streak):
+    """Is the fittest genotype a TRUSTWORTHY champion, or noise? Returns
+    (is_champion, streak, stable, confidence, reason). Pure — selftested.
+    This is the anti-overfit gate: short tape, a weak half, or a thin edge
+    over the default genome all read 'tentative' no matter how high the net."""
+    if not top:
+        return False, 0, False, "none", "no population"
+    if tape_hours < MIN_TAPE_HOURS:
+        return (False, 0, False, "tentative",
+                f"tape {tape_hours:.0f}h < {MIN_TAPE_HOURS:g}h min (noise-risk)")
+    half = min(top["h1"], top["h2"])
+    if half < HALF_MARGIN:
+        return (False, 0, False, "tentative",
+                f"weak half ${half:+.2f} < ${HALF_MARGIN:g} (one-half win = noise)")
+    edge = top["net"] - default_net
+    if edge < EDGE_MARGIN:
+        return (False, 0, False, "tentative",
+                f"edge vs default ${edge:+.2f} < ${EDGE_MARGIN:g}")
+    same = prior_champ == top["genotype"]
+    streak = (int(prior_streak or 0) + 1) if same else 1
+    stable = streak >= PERSIST_CYCLES
+    return (True, streak, stable, "stable" if stable else "candidate",
+            f"beats default ${edge:+.2f}, both halves ≥ ${HALF_MARGIN:g}, "
+            f"streak {streak}/{PERSIST_CYCLES}")
 
 
 # ---------------------------------------------------------------------------
@@ -208,18 +247,31 @@ def run_once():
     tape, used = rp.load_tape(source="auto")
 
     # --- TAKER breeding (shadow-only, replay-scored) -----------------------
-    leaderboard = []
+    leaderboard, champion = [], None
     if len(tape) >= MIN_SNAPS:
         prior_elite = [e["genotype"] for e in (prior.get("elite") or [])]
         population = dedupe(seed_population(TAKER_GENES)
                             + breed(prior_elite, TAKER_GENES))
         scored = rank(population, tape)
         leaderboard = scored[:ELITE_N]
+        default_gt = {g: getattr(tt, g) for g in TAKER_GENES}
+        default_net = next((s["net"] for s in scored
+                            if s["genotype"] == default_gt), 0.0)
+        tape_hours = ((tape[-1][0] - tape[0][0]).total_seconds() / 3600.0
+                      if len(tape) >= 2 else 0.0)
         top = leaderboard[0] if leaderboard else None
+        is_champ, streak, stable, conf, why = assess_champion(
+            top, default_net, tape_hours,
+            (prior.get("champion") or {}).get("genotype"),
+            (prior.get("champion") or {}).get("streak"))
         if top:
-            print(f"[incubator] fittest taker genotype net ${top['net']:+.2f} "
-                  f"(h1 ${top['h1']:+.2f} h2 ${top['h2']:+.2f} "
-                  f"both+={top['both_halves_pos']}) {top['genotype']}", flush=True)
+            champion = {"genotype": top["genotype"], "net": top["net"],
+                        "h1": top["h1"], "h2": top["h2"], "confidence": conf,
+                        "streak": streak, "stable": stable,
+                        "vs_default": round(top["net"] - default_net, 3)}
+            print(f"[incubator] fittest net ${top['net']:+.2f} vs default "
+                  f"${default_net:+.2f} (h1 ${top['h1']:+.2f} h2 ${top['h2']:+.2f}) "
+                  f"| {conf.upper()}: {why}", flush=True)
     else:
         print(f"[incubator] tape too short ({len(tape)}/{MIN_SNAPS}) — "
               f"skipping taker breeding", flush=True)
@@ -241,7 +293,7 @@ def run_once():
     payload = {
         "updated": _iso(now), "ttl_sec": TTL_SEC,
         "tape_snaps": len(tape), "tape_source": used,
-        "elite": leaderboard,
+        "elite": leaderboard, "champion": champion,
         "proposed": (prior.get("proposed") or []) + props,
     }
     payload["proposed"] = payload["proposed"][-20:]
@@ -302,8 +354,32 @@ def _selftest():
     for p in props:                                     # every allele is in-registry
         (lever, val), = p["levers"].items()
         assert tuning.clamp(lever, val) == val, p
+    # anti-overfit champion gate: the +$0.01-half case is REJECTED as noise
+    noise = {"genotype": {"A": 2}, "net": 2.35, "h1": 0.01, "h2": 2.34}
+    isc, _, _, conf, why = assess_champion(noise, 0.0, 200, None, 0)
+    assert not isc and conf == "tentative" and "half" in why, (conf, why)
+    # short tape -> tentative even with a strong, balanced result
+    strong = {"genotype": {"A": 2}, "net": 8.0, "h1": 4.0, "h2": 4.0}
+    isc2, _, _, conf2, why2 = assess_champion(strong, 0.0, 10, None, 0)
+    assert not isc2 and "min" in why2, why2
+    # thin edge over default -> tentative
+    isc3, _, _, conf3, _ = assess_champion(strong, 7.0, 200, None, 0)
+    assert not isc3 and conf3 == "tentative"
+    # a genuine champion: long tape, both halves strong, beats default, and
+    # persistence promotes candidate -> stable across cycles
+    isc4, streak4, stable4, conf4, _ = assess_champion(strong, 0.0, 200, None, 0)
+    assert isc4 and streak4 == 1 and not stable4 and conf4 == "candidate"
+    isc5, streak5, stable5, conf5, _ = assess_champion(
+        strong, 0.0, 200, {"A": 2}, 2)          # same champ, 3rd cycle
+    assert isc5 and streak5 == 3 and stable5 and conf5 == "stable"
+    # a DIFFERENT champion resets the streak (no free ride on prior stability)
+    other = {"genotype": {"A": 3}, "net": 9.0, "h1": 4.5, "h2": 4.5}
+    _, streak6, stable6, _, _ = assess_champion(other, 0.0, 200, {"A": 2}, 5)
+    assert streak6 == 1 and not stable6
+
     print("strategy_incubator selftest OK (seed, dedupe, crossover+mutation "
-          "on-grid, lever mapping/clamp, judge-gated funding proposals)")
+          "on-grid, lever mapping/clamp, judge-gated funding proposals, "
+          "anti-overfit champion gate)")
 
 
 if __name__ == "__main__":

@@ -534,11 +534,20 @@ def run_once():
     prior_items = {i["key"]: i for i in prior.get("items", [])}
     notified = dict(prior.get("notified") or {})
 
-    fa = (store.load_state("fleet-alerts") or {}).get("alerts") or []
-    review = store.load_state("evidence-review") or {}
-    lm = store.load_state("lighter-market") or {}
-    fr = store.load_state("fleet-risk") or {}
-    lf = store.load_state("brain-lens-forward") or {}
+    # [2026-07-15 BLOODSTREAM] one batched beat for the board's whole working
+    # set (was ~8 individual round-trips per cycle). Fall back to per-key reads
+    # only if the batch came back empty (DB down).
+    _keys = ["fleet-alerts", "evidence-review", "lighter-market", "fleet-risk",
+             "brain-lens-forward", "scout-tuner", "xp-judge", "gapscout-census"]
+    _b = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
+    _ok = bool(_b)
+    def _g(k):
+        return (_b.get(k) or {}) if _ok else (store.load_state(k) or {})
+    fa = _g("fleet-alerts").get("alerts") or []
+    review = _g("evidence-review")
+    lm = _g("lighter-market")
+    fr = _g("fleet-risk")
+    lf = _g("brain-lens-forward")
 
     # ---- feed alerts: latest per key inside the window --------------------
     latest, fires24, fires_12, fires_prior12 = {}, {}, {}, {}
@@ -560,8 +569,8 @@ def run_once():
 
     # ---- EXPAND-direction synthesis: winners, promotions, tuner activity,
     # and restrictions that never bind (the board's other eye) --------------
-    tuner_state = store.load_state("scout-tuner") or {}
-    xp_state = store.load_state("xp-judge") or {}
+    tuner_state = _g("scout-tuner")
+    xp_state = _g("xp-judge")
     bot_rows = []
     try:
         bot_rows = store.fetch_bot_pnl() or []
@@ -577,7 +586,7 @@ def run_once():
         synth.append(live_item)
 
     # ---- growth rail: widen Gap Scout's net when its census runs quiet -----
-    census = store.load_state("gapscout-census") or {}
+    census = _g("gapscout-census")
     growth_step, growth_levers, quiet_h = 0, {}, 0.0
     if _fresh(census, max_age_s=3600):
         quiet_h = float(census.get("quiet_hours") or 0.0)

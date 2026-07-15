@@ -341,6 +341,41 @@ def load_state(bot):
         return None
 
 
+def fetch_states(keys):
+    """[2026-07-15 BLOODSTREAM] Batch read: {key: state_dict} for many keys in
+    ONE query instead of N round-trips. Organs that read a fistful of bus keys
+    per cycle (immune, respiration, regen, evidence board) get their whole
+    working set in a single beat. Missing keys are simply absent from the
+    result. Returns {} on any failure — callers fall back to load_state /
+    defaults, so this is a pure optimization with the same fail-safe contract."""
+    keys = [k for k in (keys or []) if k]
+    if not keys:
+        return {}
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        _ensure_state_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT bot, state FROM bot_state WHERE bot = ANY(%s)",
+                        (list(keys),))
+            out = {}
+            for k, v in cur.fetchall():
+                if v is None:
+                    continue
+                out[k] = v if isinstance(v, dict) else json.loads(v)
+        return out
+    except Exception as e:
+        _warn_once(f"batch state read failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return {}
+
+
 _trades_table_ready = False
 
 

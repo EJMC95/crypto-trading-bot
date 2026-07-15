@@ -238,9 +238,13 @@ def run_once():
     prior = store.load_state(KEY) or {}
     prior_sick = set(prior.get("notified") or [])
 
-    states = {k: (store.load_state(k) or {}) for k in
-              ("lighter-market", "brain-lens-forward", "gapscout-census",
-               "xp-judge", "fleet-tuning")}
+    # one batched beat instead of five round-trips (fail-safe: batch {} on
+    # DB failure -> every organ reads as absent, same as load_state failing)
+    _keys = ("lighter-market", "brain-lens-forward", "gapscout-census",
+             "xp-judge", "fleet-tuning")
+    _batch = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
+    states = {k: (_batch.get(k) or store.load_state(k) or {}) for k in _keys} \
+        if not _batch else {k: (_batch.get(k) or {}) for k in _keys}
     try:
         bot_rows = store.fetch_bot_pnl() or []
     except Exception:

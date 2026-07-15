@@ -126,7 +126,10 @@ def send_push(title, body, priority="high"):
 def run_once():
     now = now_ts()
     prior = store.load_state(KEY) or {}
-    states = {k: (store.load_state(k) or {}) for k in OXYGEN_FEEDS}
+    # one batched beat for every oxygen feed
+    states = (store.fetch_states(list(OXYGEN_FEEDS))
+              if hasattr(store, "fetch_states") else {}) or {}
+    states = {k: (states.get(k) or {}) for k in OXYGEN_FEEDS}
     bot_ages = {}
     try:
         for r in (store.fetch_bot_pnl() or []):
