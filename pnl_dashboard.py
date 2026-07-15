@@ -849,7 +849,8 @@ def history_loop(interval=300):
 
 
 def fetch_history(hours=168):
-    """(ts, bot, equity, pnl_abs) rows for the last N hours, oldest first."""
+    """(ts, bot, equity, pnl_abs) rows for the last N hours, oldest first.
+    [2026-07-15 SALVAGE] hours=None -> the whole table (/history?hours=all)."""
     import psycopg2
     conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
     try:
@@ -857,8 +858,10 @@ def fetch_history(hours=168):
             cur.execute("SELECT to_regclass('public.bot_equity_history') AS t")
             if cur.fetchone()[0] is None:
                 return []
+            where = ("" if hours is None
+                     else f"WHERE ts > now() - interval '{int(hours)} hours' ")
             cur.execute("SELECT ts, bot, equity, pnl_abs FROM bot_equity_history "
-                        f"WHERE ts > now() - interval '{int(hours)} hours' ORDER BY ts")
+                        f"{where}ORDER BY ts")
             return cur.fetchall()
     finally:
         conn.close()
@@ -2146,9 +2149,30 @@ def _svg_chart(series, color, label, height=170, width=760, fmt=None):
             f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/></svg>')
 
 
-def render_history():
+def _max_drawdown_pct(vals):
+    """[2026-07-15 SALVAGE] Worst peak-to-trough move as a % of the peak (a
+    negative number), or None if the series is unusable (empty / peak <= 0)."""
+    peak, dd, seen = None, 0.0, False
+    for v in vals:
+        if v is None:
+            continue
+        peak = v if peak is None else max(peak, v)
+        if peak and peak > 0:
+            dd = min(dd, v / peak - 1.0)
+            seen = True
+    return dd * 100.0 if seen else None
+
+
+def render_history(hours=168):
+    # [2026-07-15 SALVAGE] window selector: ?hours=<n> (default 168) or ?hours=all
+    # — the review week reads this page; 7d-only made longer arcs invisible.
     try:
-        rows = fetch_history(hours=168)  # last 7 days
+        hours = (None if str(hours).strip().lower() == "all"
+                 else max(1, int(str(hours).strip())))
+    except (TypeError, ValueError):
+        hours = 168
+    try:
+        rows = fetch_history(hours=hours)  # None = all history
         db_err = None
     except Exception as e:  # noqa: BLE001
         rows, db_err = [], f"{type(e).__name__}: {e}"
@@ -2173,6 +2197,16 @@ def render_history():
         return "Paper"
 
     ts_axis = sorted({ts for ts, _, _, _ in rows})
+    # [2026-07-15 SALVAGE] "all" can be thousands of 5-min snapshots — thin the
+    # time axis to <=500 points (always keeping the newest) so the SVGs stay
+    # light. Windowed views under the cap pass through untouched.
+    _MAXPTS = 500
+    if len(ts_axis) > _MAXPTS:
+        _step = -(-len(ts_axis) // _MAXPTS)  # ceil division
+        _keep = set(ts_axis[::_step])
+        _keep.add(ts_axis[-1])
+        ts_axis = [t for t in ts_axis if t in _keep]
+        rows = [r for r in rows if r[0] in _keep]
     GROUPS = ["Total", "Live", "Shadow", "Paper", "Scanner"]
     agg = {g: {ts: {"eq": 0.0, "pnl": 0.0} for ts in ts_axis} for g in GROUPS}
     for ts, bot, eq, pnl in rows:
@@ -2195,22 +2229,37 @@ def render_history():
         banner = ('<div class="banner">No history captured yet. The dashboard snapshots '
                   'every bot\'s equity every 5 minutes — check back shortly.</div>')
 
+    # [2026-07-15 SALVAGE] max-drawdown caption per cohort, from the same
+    # aggregated series the charts draw (Scanner books no equity -> P&L curve).
+    def _dd_caption(group, key="eq"):
+        ddv = _max_drawdown_pct([agg[group][ts][key] for ts in ts_axis]) if ts_axis else None
+        return (f' <span class="muted" style="font-weight:400">· max DD {ddv:+.1f}%</span>'
+                if ddv is not None else "")
+
     charts = (
-        '<h2 style="font-size:15px;margin:18px 4px 2px">Whole operation (active fleet)</h2>'
+        f'<h2 style="font-size:15px;margin:18px 4px 2px">Whole operation (active fleet){_dd_caption("Total")}</h2>'
         + _svg_chart(series("Total", "eq"), "#e6e6e6", "Total equity")
         + _svg_chart(series("Total", "pnl"), "#3fb950", "Total P&amp;L")
-        + '<h2 style="font-size:15px;margin:18px 4px 2px">🔴 Live — real money on Lighter</h2>'
+        + f'<h2 style="font-size:15px;margin:18px 4px 2px">🔴 Live — real money on Lighter{_dd_caption("Live")}</h2>'
         + _svg_chart(series("Live", "eq"), "#3fb950", "Live equity")
         + _svg_chart(series("Live", "pnl"), "#3fb950", "Live P&amp;L")
-        + '<h2 style="font-size:15px;margin:18px 4px 2px">Lighter shadow books (the fleet)</h2>'
+        + f'<h2 style="font-size:15px;margin:18px 4px 2px">Lighter shadow books (the fleet){_dd_caption("Shadow")}</h2>'
         + _svg_chart(series("Shadow", "eq"), "#58a6ff", "Shadow equity")
         + _svg_chart(series("Shadow", "pnl"), "#58a6ff", "Shadow P&amp;L")
-        + '<h2 style="font-size:15px;margin:18px 4px 2px">HL paper originals</h2>'
+        + f'<h2 style="font-size:15px;margin:18px 4px 2px">HL paper originals{_dd_caption("Paper")}</h2>'
         + _svg_chart(series("Paper", "eq"), "#d29922", "Paper equity")
         + _svg_chart(series("Paper", "pnl"), "#d29922", "Paper P&amp;L")
-        + '<h2 style="font-size:15px;margin:18px 4px 2px">Scanners</h2>'
+        + f'<h2 style="font-size:15px;margin:18px 4px 2px">Scanners{_dd_caption("Scanner", "pnl")}</h2>'
         + _svg_chart(series("Scanner", "pnl"), "#a371f7", "Scanner paper P&amp;L")
     )
+    # [2026-07-15 SALVAGE] window selector (current window bold, not a link)
+    _wlabel = ("all time" if hours is None
+               else (f"{hours}h" if hours < 48 else f"last {hours // 24}d"))
+    _cur = "all" if hours is None else str(hours)
+    selector = " ".join(
+        (f'<b style="color:#e6e6e6;font-size:14px">{lbl}</b>' if v == _cur
+         else f'<a href="/history?hours={v}">{lbl}</a>')
+        for v, lbl in (("24", "24h"), ("168", "7d"), ("720", "30d"), ("all", "all")))
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="60">
@@ -2226,12 +2275,12 @@ def render_history():
  .pos{{color:#3fb950}} .neg{{color:#f85149}}
  footer{{padding:10px 18px;color:#8b949e;font-size:11px}}
 </style></head><body>
-<header><h1>All Bots — history &nbsp;·&nbsp; <a href="/">← live</a> &nbsp; <a href="/periods">periods</a> &nbsp; <a href="/market">market</a> &nbsp; <a href="/learning">learning</a></h1></header>
+<header><h1>All Bots — history ({_wlabel}) &nbsp;·&nbsp; {selector} &nbsp;·&nbsp; <a href="/">← live</a> &nbsp; <a href="/periods">periods</a> &nbsp; <a href="/market">market</a> &nbsp; <a href="/learning">learning</a></h1></header>
 <div class="wrap">{banner}{charts}</div>
-<footer>Equity/P&amp;L sampled every 5 min from the shared bot_pnl table (last 7 days).
-Retired bots are excluded so row prunes don't paint fake cliffs. Live = real-money
-Lighter accounts; Shadow = modelled fills on live Lighter books; Paper = HL-data
-originals. Auto-refreshes every 60s. Times UTC.</footer>
+<footer>Equity/P&amp;L sampled every 5 min from the shared bot_pnl table ({_wlabel};
+charts thinned to &le;500 points). Retired bots are excluded so row prunes don't
+paint fake cliffs. Live = real-money Lighter accounts; Shadow = modelled fills on
+live Lighter books; Paper = HL-data originals. Auto-refreshes every 60s. Times UTC.</footer>
 </body></html>'''
 
 
@@ -3037,7 +3086,8 @@ class H(BaseHTTPRequestHandler):
             elif self.path.startswith("/learning"):
                 body = render_learning().encode()
             elif self.path.startswith("/history"):
-                body = render_history().encode()
+                q = parse_qs(urlparse(self.path).query)
+                body = render_history((q.get("hours") or ["168"])[0]).encode()
             else:
                 body = render().encode()
         except Exception as e:

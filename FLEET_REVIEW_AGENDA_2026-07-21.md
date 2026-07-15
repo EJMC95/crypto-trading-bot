@@ -134,3 +134,9 @@ and service logs for veto/governor lines.
     enrichment (agenda item 5 evidence, week head start), Gap Scout
     per-fill ledger + W/L counters (makes its balance auditable).
     Verified against the live DB before push. No strategy logic.
+  - 15-Jul (user: "implement your changes even though the freeze is on —
+    take data over the week"): salvage part 2, /history window selector
+    (?hours=24/168/720/all) + per-cohort max-DD captions. Dashboard-only,
+    zero trading surface. NOT salvaged even with the blanket approval:
+    the pair-blacklist actuator (strategy logic; design lost to L4 mults
+    — review decides if pair-level throttling rides the mult machinery).
