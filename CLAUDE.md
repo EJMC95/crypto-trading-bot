@@ -147,6 +147,8 @@ All new bots:
   times to him in AEST (15-Jul instruction: "use AEST for everything").
   Fleet INTERNALS stay UTC (ledger rows, `updated`+`ttl_sec` freshness
   contracts, cross-service joins) — this is a reporting/display rule.
+- **CHANGE FREEZE until the 21-Jul review** (user-approved 15-Jul):
+  hotfixes only; agenda + evidence plan in FLEET_REVIEW_AGENDA_2026-07-21.md.
 - $1,000 starting balance per bot, NO top-ups
 - Paper trading only until 30-day win rate > 55% AND max drawdown < 15%
 - Never modify bot logic without backtesting first
