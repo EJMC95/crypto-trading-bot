@@ -139,6 +139,10 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **Operator timezone: AEST (UTC+10)** — Eamon is in Australia; report all
+  times to him in AEST (15-Jul instruction: "use AEST for everything").
+  Fleet INTERNALS stay UTC (ledger rows, `updated`+`ttl_sec` freshness
+  contracts, cross-service joins) — this is a reporting/display rule.
 - $1,000 starting balance per bot, NO top-ups
 - Paper trading only until 30-day win rate > 55% AND max drawdown < 15%
 - Never modify bot logic without backtesting first
