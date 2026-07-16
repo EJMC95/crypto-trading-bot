@@ -123,7 +123,11 @@ def _open_notional(pos, meta, open_now, order_usd):
         elif mc.get("entry"):
             held += abs(float(sz)) * float(mc["entry"])
         else:
-            held += float(order_usd)
+            # [2026-07-16 AUDIT] untracked position: price it at the VENUE's
+            # entry notional, not the current (possibly down-scaled) clip —
+            # order_usd here understates a position opened at a larger clip.
+            _ven = (v.get("entry") if isinstance(v, dict) else 0) or 0
+            held += (abs(float(sz)) * float(_ven)) or float(order_usd)
     return held + max(0, int(open_now) - n) * float(order_usd)
 
 
@@ -361,6 +365,13 @@ def main():
 
         if halted_today:
             log.info("halted for today; sleeping.")
+            # [2026-07-16 AUDIT FIX] retry the daily-loss flatten every halted
+            # loop — it used to run exactly ONCE at the halt transition, so a
+            # single failed close left that position with NO stop until the
+            # day rolled. Idempotent once flat; skip when the kill-switch path
+            # just flattened this same loop.
+            if not dry_run and not ctx.rails.kill_check():
+                _flatten_all("daily_loss")
             # [2026-07-11 HALT HEARTBEAT] keep the dashboard row fresh while
             # halted — the early `continue` skipped the publish below, so a
             # halted bot looked DEAD (stale row) instead of HALTED.
@@ -611,7 +622,22 @@ def _supervised():
             time.sleep(60)
 
 
+def _selftest_notional():
+    """Same breach scenario as the funding bot: held-at-own-clip beats
+    open_now*order_usd once the growth rail has moved the clip."""
+    pos = {c: {"size": 1.0, "entry": 30.0} for c in "ABCDE"}
+    meta = {c: {"clip": 30.0, "entry": 30.0} for c in "ABCDE"}
+    assert _open_notional(pos, meta, 5, 22.50) == 150.0
+    assert _open_notional(pos, {}, 5, 22.50) == 150.0          # venue-entry fallback
+    assert _open_notional({c: {"size": 1.0} for c in "ABCDE"}, {}, 5, 22.50) == 112.5
+    assert _open_notional(pos, meta, 7, 22.50) == 195.0
+    print("lighter_trend_bot _selftest_notional OK")
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest_notional()
+        sys.exit(0)
     try:
         _supervised()
     except KeyboardInterrupt:

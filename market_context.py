@@ -141,10 +141,17 @@ class LiqTape:
 def _alert(alerts, key, severity, msg, dedup_h=24):
     """Append an alert unless the same key fired within dedup_h. Returns True
     if it fired. Alerts are the SIGNAL layer only — the only automated ACTION
-    anywhere in the fleet is the veto list (restrict-only, below)."""
+    anywhere in the fleet is the veto list (restrict-only, below).
+    [2026-07-16 AUDIT FIX] a dedup-hit now REFRESHES last_seen (+msg) on the
+    existing entry: the board trusts a divergence alert for only 6h, but the
+    24h dedup meant a PERSISTING divergence carried a fresh ts once per day —
+    the live down-scale reflex was blind ~18h of every 24. last_seen keeps a
+    still-confirmed condition visibly current without re-firing notify."""
     now = time.time()
     for a in alerts:
         if a["key"] == key and now - a["ts"] < dedup_h * 3600:
+            a["last_seen"] = now
+            a["msg"] = msg
             return False
     alerts.append({"ts": now, "iso": datetime.now(timezone.utc).isoformat(),
                    "key": key, "severity": severity, "msg": msg})

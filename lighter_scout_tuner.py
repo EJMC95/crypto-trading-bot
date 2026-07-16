@@ -218,21 +218,37 @@ def desired_taker_bars(tape, baseline, lens_fwd, helping=None):
                 ok = all(replay_with(h, cand)["closed_net"]
                          >= replay_with(h, bars)["closed_net"] + MARGIN_HALF
                          for h in (h1, h2))
-                why = "improves both halves"
-            else:
-                ok = not_worse(h1, h2, bars, cand)
-                why = "not-worse both halves"
-            if not ok:
-                log.append(f"{lens}: notch {notch} REJECTED "
-                           f"({'no improvement' if earned else 'worse'} on a half)")
-                break
-            bars[attr] = notch
+                if not ok:
+                    log.append(f"{lens}: notch {notch} REJECTED "
+                               f"(no improvement on a half)")
+                    break
+                bars[attr] = notch
+                taken = (replay_with(tape, cand).get("lenses") or {}) \
+                    .get(lens, {}).get("taken", 0)
+                log.append(f"{lens} ({mode}): widened {attr} -> {notch} "
+                           f"(replay taken={taken}, improves both halves)")
+                continue
+            # [2026-07-16 AUDIT FIX] starving path: a notch that produces ZERO
+            # replay fills used to pass not_worse trivially (0.0 vs 0.0) and
+            # the walk enacted the ladder MAX on no evidence at all. A notch
+            # is only enacted when the replay actually FILLS at it (evidence)
+            # AND not-worse holds; unevidenced notches are probed but never
+            # enacted, and an unreachable lens correctly gets NO widen. (The
+            # earned walk above needs no gate — a zero-fill notch can never
+            # clear its improve-by-margin bar.)
             taken = (replay_with(tape, cand).get("lenses") or {}) \
                 .get(lens, {}).get("taken", 0)
-            log.append(f"{lens} ({mode}): "
-                       f"widened {attr} -> {notch} (replay taken={taken}, {why})")
-            if starving and not earned and taken > 0:
-                break                    # first notch that produces samples
+            if taken == 0:
+                log.append(f"{lens}: notch {notch} not enacted "
+                           f"(0 replay fills — no evidence)")
+                continue                 # probe wider; enact only on evidence
+            if not not_worse(h1, h2, bars, cand):
+                log.append(f"{lens}: notch {notch} REJECTED (worse on a half)")
+                break
+            bars[attr] = notch
+            log.append(f"{lens} (starving): widened {attr} -> {notch} "
+                       f"(replay taken={taken}, not-worse both halves)")
+            break                        # first EVIDENCED notch that holds
     return {k: v for k, v in bars.items() if v != DEFAULTS[k]}, log
 
 
@@ -492,6 +508,23 @@ def _selftest():
     assert base["lenses"]["dip"]["seen"] == 2 and base["lenses"]["dip"]["taken"] == 0
     bars, log = desired_taker_bars(win_tape, base, {})
     assert bars.get("DIP_RANGE") == 0.08, (bars, log)
+
+    # [2026-07-16 AUDIT] tickets UNREACHABLE at every notch (range_pos 0.30
+    # > ladder max 0.15): every notch fills nothing, not_worse passes 0-vs-0
+    # trivially — the walk used to enact ladder MAX on zero evidence. Now an
+    # unevidenced notch is never enacted: NO widen at all.
+    fart = {"sym": "FFF", "range_pos": 0.30}
+    far_tape = [
+        snap(0, {"FFF": 100.0}, {"dip": [fart]}),
+        snap(1, {"FFF": 105.0}),
+        snap(4, {}),
+    ]
+    base_far = replay_with(far_tape, DEFAULTS)
+    assert base_far["lenses"]["dip"]["seen"] == 1 and \
+        base_far["lenses"]["dip"]["taken"] == 0
+    bars_far, log_far = desired_taker_bars(far_tape, base_far, {})
+    assert "DIP_RANGE" not in bars_far, (bars_far, log_far)
+    assert any("no evidence" in l for l in log_far), log_far
 
     # Same setup but the dip trades LOSE hard (price dumps to SL) on both
     # halves: the widen must be REJECTED by the not-worse rule.

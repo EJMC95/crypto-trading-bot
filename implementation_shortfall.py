@@ -191,8 +191,11 @@ def run_once():
     streak = int(prior.get("slip_streak") or 0)
     streak = streak + 1 if rep["verdict"] == "live-slipping" else 0
 
+    last_push = float(prior.get("last_push") or 0)
+    # last_push rides IN the saved payload (16-Jul: the first save dropped it,
+    # so a sustained slip re-paged every ~2 cycles instead of every NOTIFY_GAP_H)
     payload = {"updated": _iso(now), "ttl_sec": TTL_SEC, "slip_streak": streak,
-               "window_days": WINDOW_DAYS, **rep}
+               "window_days": WINDOW_DAYS, "last_push": last_push, **rep}
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
         try:
@@ -203,7 +206,6 @@ def run_once():
         except Exception:
             pass
 
-    last_push = float(prior.get("last_push") or 0)
     if streak >= SUSTAIN and now - last_push >= NOTIFY_GAP_H * 3600:
         exitmsg = (f"; exit-slip {rep['exit_slip_bps']}bps / entry-slip "
                    f"{rep['entry_slip_bps']}bps" if rep["exit_slip_bps"] is not None

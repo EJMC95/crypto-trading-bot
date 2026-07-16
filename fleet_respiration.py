@@ -129,6 +129,15 @@ def run_once():
     # one batched beat for every oxygen feed
     states = (store.fetch_states(list(OXYGEN_FEEDS))
               if hasattr(store, "fetch_states") else {}) or {}
+    # [2026-07-16 AUDIT FIX] a failed BATCH read used to read as "every feed
+    # absent" -> SpO2 0 -> urgent HYPOXIA push loop for the whole DB blip.
+    # Fall back per-key first (the immune organ's pattern) ...
+    if not any(states.get(k) for k in OXYGEN_FEEDS):
+        for k in OXYGEN_FEEDS:
+            try:
+                states[k] = store.load_state(k) or {}
+            except Exception:
+                states[k] = {}
     states = {k: (states.get(k) or {}) for k in OXYGEN_FEEDS}
     bot_ages = {}
     try:
@@ -139,13 +148,27 @@ def run_once():
     except Exception:
         pass
 
+    # ... and if EVERY feed is still absent-from-birth, that is respiration's
+    # OWN eyes failing (real starvation leaves stale-but-present payloads):
+    # report BLIND, don't diagnose the fleet off a failed query.
+    blind = not any(states.values()) and not bot_ages
+
     breaths = read_breaths(states, bot_ages, now)
     spo2, hypoxic = saturation(breaths)
-    state = ("healthy" if spo2 >= 0.9 else
+    state = ("blind" if blind else
+             "healthy" if spo2 >= 0.9 else
              "labored" if spo2 >= HYPOXIA_SPO2 else "HYPOXIC")
 
+    # [2026-07-16 AUDIT FIX] HYPOXIA needs a CONFIRMATION cycle: push on the
+    # 2nd consecutive hypoxic read, not the 1st (one bad sample paged). A
+    # blind cycle carries the prior streak (it is not evidence either way).
+    streak = int(prior.get("hypoxic_streak") or 0)
+    streak = streak if blind else (streak + 1 if state == "HYPOXIC" else 0)
+
+    last_push = float(prior.get("last_push") or 0)
     payload = {"updated": _iso(now), "ttl_sec": TTL_SEC, "spo2": spo2,
-               "state": state, "hypoxic": hypoxic, "breaths": breaths}
+               "state": state, "hypoxic": hypoxic, "breaths": breaths,
+               "hypoxic_streak": streak, "last_push": last_push}
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
         try:
@@ -154,19 +177,15 @@ def run_once():
         except Exception:
             pass
 
-    # push only on a TRANSITION into hypoxia (recovery is quiet-good news)
-    prior_state = prior.get("state")
-    last_push = float(prior.get("last_push") or 0)
-    if state == "HYPOXIC" and prior_state != "HYPOXIC" \
-            and now - last_push >= NOTIFY_GAP_H * 3600:
+    # push only on a CONFIRMED transition into hypoxia (streak == 2, so one
+    # bad sample never pages; recovery is quiet-good news)
+    if streak == 2 and now - last_push >= NOTIFY_GAP_H * 3600:
         if send_push(f"🫁 fleet HYPOXIC — SpO2 {spo2:.0%}",
                      "starved oxygen feeds: " + ", ".join(hypoxic)
                      + "\n(fresh market data supply dropped — check the venue "
                        "fetch layer / WAF)", priority="urgent"):
             payload["last_push"] = now
             store.save_state(KEY, payload)
-    else:
-        payload["last_push"] = last_push
 
     print(f"[fleet-respiration] {_iso(now)} SpO2 {spo2:.0%} {state} "
           f"hypoxic={hypoxic or '—'}", flush=True)

@@ -42,6 +42,7 @@ phone. Run-once; run_all.sh loops it. --selftest is offline.
 """
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -102,7 +103,10 @@ def alert_fossils(alerts, now, max_age_h=MAX_ALERT_AGE_H):
     keep, pruned = [], []
     for a in alerts or []:
         why = None
-        ts = a.get("ts") or 0
+        # a persisting condition refreshes last_seen on every dedup-hit
+        # (market_context 16-Jul) — age off the latest confirmation, not the
+        # first firing, so a still-live alert isn't pruned as a fossil.
+        ts = max(a.get("ts") or 0, a.get("last_seen") or 0)
         if now - ts > max_age_h * 3600:
             why = f"age-stale ({(now - ts) / 3600:.0f}h > {max_age_h:g}h)"
         else:
@@ -281,9 +285,15 @@ def run_once():
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
             + [{"organ": "fleet-tuning", "detail": f"{n}: {w}"} for n, w in q.items()])
 
-    sick_ids = {f"{s['organ']}:{s['detail']}" for s in sick}
+    # [2026-07-16 AUDIT FIX] sick-ids must be VALUE-STABLE: detail strings
+    # embed live numbers ("n_liquid 151 > n_books 100"), so a persistently
+    # sick organ minted a NEW id every cycle and re-paged the phone forever.
+    # Normalize digits out of the identity; the full detail stays in `sick`.
+    _norm = lambda d: re.sub(r"[-+]?\d[\d.,]*", "#", str(d))  # noqa: E731
+    sick_ids = {f"{s['organ']}:{_norm(s['detail'])}" for s in sick}
     new_sick = sick_ids - prior_sick
 
+    last_push = float(prior.get("last_push") or 0)
     payload = {
         "updated": _iso(now), "ttl_sec": TTL_SEC,
         "sick": sick[:30],
@@ -292,6 +302,10 @@ def run_once():
         "pruned_detail": pruned[:10],
         "antibodies": [a[0] for a in ANTIBODIES],
         "notified": sorted(sick_ids)[:50],
+        # [2026-07-16 AUDIT FIX] last_push must be IN the saved payload — the
+        # first save dropped it, so the stored gap survived exactly one cycle
+        # and NOTIFY_GAP_H was effectively ~2 cycles.
+        "last_push": last_push,
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -311,15 +325,12 @@ def run_once():
     if q:
         print(f"[fleet-immune] QUARANTINED levers: {sorted(q)}", flush=True)
     # push only genuinely NEW sickness (dedup vs prior), min gap per organ
-    last_push = float(prior.get("last_push") or 0)
     if new_sick and now - last_push >= NOTIFY_GAP_H * 3600:
         body = "\n".join(sorted(new_sick)[:8]) + (
             f"\n\nquarantined: {sorted(q)}" if q else "")
         if send_push(f"🛡️ fleet immune: {len(new_sick)} new sickness finding(s)", body):
             payload["last_push"] = now
             store.save_state(KEY, payload)
-    else:
-        payload["last_push"] = last_push
 
     print(f"[fleet-immune] {_iso(now)} sick={len(sick)} quarantined={len(q)} "
           f"pruned={len(pruned)} new={len(new_sick)}", flush=True)
@@ -346,6 +357,12 @@ def _selftest():
     assert len(pruned) == 3
     assert any("antibody" in p["why"] for p in pruned)
     assert any("age-stale" in p["why"] for p in pruned)
+    # [2026-07-16 AUDIT] a persisting alert (old ts, fresh last_seen from the
+    # dedup-hit refresh) is NOT a fossil — must be kept
+    keep2, _ = alert_fossils(
+        [{"key": "persisting", "ts": now - 30 * 3600,
+          "last_seen": now - 3600, "msg": "still confirmed"}], now)
+    assert [a["key"] for a in keep2] == ["persisting"], keep2
 
     # LEVER SICKNESS: an out-of-bounds value on a real lever is caught;
     # in-bounds and expired are not

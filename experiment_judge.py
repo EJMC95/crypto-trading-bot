@@ -68,6 +68,12 @@ LIVE_MIN_CLOSES = int(os.environ.get("XPJ_LIVE_MIN_CLOSES", "10"))
 MARGIN_PP = float(os.environ.get("XPJ_MARGIN_PP", "0.5"))     # per-trade pp
 FADE_N = int(os.environ.get("XPJ_FADE_N", "15"))
 COOLDOWN_H = float(os.environ.get("XPJ_COOLDOWN_H", "48"))
+# [2026-07-16 AUDIT] promoted-phase ledger blackout tolerance: keep re-asserting
+# live levers through a SHORT ledger outage (a DB blip shouldn't release a
+# 7d-earned promotion), but past this many consecutive blind cycles stop
+# asserting — fade-watch is blind, so the fail-safe direction (levers expire
+# back to env defaults) must win over an indefinitely-blind promotion.
+BLIND_MAX = int(os.environ.get("XPJ_BLIND_MAX_CYCLES", "24"))
 
 # One candidate at a time, in order. First: the gate widening the 11-Jul
 # scanner review explicitly queued as "opt-in, shadow-validate first".
@@ -146,8 +152,13 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
         shm = _mean_pct(arm_trades(rows, shadow_bot, a, b))
         lvm = _mean_pct(arm_trades(rows, live_bot, a, b))
         v[label] = {"shadow": shm, "live": lvm}
-        if shm is None or lvm is None or shm <= lvm:
-            v["why"] = f"{label}: shadow {shm} vs live {lvm} — no edge on this half"
+        # [2026-07-16 AUDIT FIX] each half must clear the SAME margin as the
+        # full window — `shm > lvm` by any amount let one half's edge be pure
+        # noise (+0.01pp), which is the lucky-half pattern this bar exists to
+        # reject before real money moves.
+        if shm is None or lvm is None or (shm - lvm) < margin_pp:
+            v["why"] = (f"{label}: shadow {shm} vs live {lvm} — edge < margin "
+                        f"{margin_pp}pp on this half")
             return v
     full_gap = v["shadow_mean_pct"] - v["live_mean_pct"]
     v["gap_pp"] = round(full_gap, 3)
@@ -257,14 +268,28 @@ def next_candidate(pool, done, current):
     return None
 
 
+def _num(x, d=0.0):
+    """Corrupt/legacy state fields must reset the judge, never crash-loop it."""
+    try:
+        return float(x)
+    except Exception:
+        return d
+
+
 def _needs_reset(phase, current, spec):
     """True when the judge is mid-experiment (running/promoted) but the stored
     spec is missing or mismatched — e.g. state written by the old index-based
-    code before the 16-Jul name-based refactor. Pure — selftested."""
+    code before the 16-Jul name-based refactor. `levers` must be a non-empty
+    dict ({"levers": None} passed the old `in` check and crashed downstream).
+    Pure — selftested."""
     if phase not in ("running", "promoted"):
         return False
-    return not (current and isinstance(spec, dict)
-                and spec.get("name") == current and "levers" in spec)
+    if not (current and isinstance(spec, dict) and spec.get("name") == current
+            and isinstance(spec.get("levers"), dict) and spec.get("levers")):
+        return True
+    # a persisted spec whose lever was dropped from XP_TO_LIVE would KeyError
+    # at promotion time — treat it as invalid state, not a crash-loop
+    return any(k not in XP_TO_LIVE for k in spec["levers"])
 
 
 def run_once():
@@ -290,13 +315,16 @@ def run_once():
                    "started_ts": kw.get("started_ts", st.get("started_ts")),
                    "promoted_ts": kw.get("promoted_ts", st.get("promoted_ts")),
                    "cooldown_until": kw.get("cooldown_until", st.get("cooldown_until")),
+                   "blind_cycles": kw.get("blind_cycles", st.get("blind_cycles") or 0),
                    "verdicts": verdicts[-10:], "last_eval": kw.get("last_eval")}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
             try:
-                store.save_history(KEY, {"updated": payload["updated"],
-                                         "phase": payload["phase"],
-                                         "candidate": payload["candidate"]})
+                # [2026-07-16 AUDIT FIX] snapshot the FULL state, not a
+                # {phase, candidate} summary — fleet_regen restores the judge
+                # from these rows, and a summary "repair" wiped done/verdicts/
+                # spec (total memory loss, promotion dropped).
+                store.save_history(KEY, payload)
             except Exception:
                 pass
         print(f"[xp-judge] {iso(now)} phase={payload['phase']} "
@@ -305,8 +333,8 @@ def run_once():
         return payload
 
     if phase == "idle":
-        if float(st.get("cooldown_until") or 0) > now:
-            return save(note=f"cooldown until {iso(float(st['cooldown_until']))}")
+        if _num(st.get("cooldown_until")) > now:
+            return save(note=f"cooldown until {iso(_num(st['cooldown_until']))}")
         if not have_ledger:
             return save(note="no ledger visible — asserting nothing (fail-safe)")
         pool = candidate_pool(store.load_state("xp-queue") or {})
@@ -334,7 +362,7 @@ def run_once():
     cand = spec
 
     if phase == "running":
-        started = float(st.get("started_ts") or now)
+        started = _num(st.get("started_ts"), now)
         _assert_levers(cand["levers"], f"experiment {cand['name']} running",
                        f"started {iso(started)}")
         days = (now - started) / 86400.0
@@ -363,7 +391,22 @@ def run_once():
         return save(last_eval=ev, note=f"day {days:.1f}/{MIN_DAYS:g}: {ev.get('why')}")
 
     if phase == "promoted":
-        promoted = float(st.get("promoted_ts") or now)
+        promoted = _num(st.get("promoted_ts"), now)
+        # [2026-07-16 AUDIT FIX] ledger blackout used to be fail-OPEN here:
+        # fade_check was skipped but the live levers kept re-asserting every
+        # cycle, so a fading promotion could never release while the judge was
+        # blind. Tolerate a short outage, then stop asserting (levers expire
+        # to env defaults — the safe direction). Ledger back = counter resets.
+        blind = int(_num(st.get("blind_cycles")))
+        if not have_ledger:
+            blind += 1
+            if blind > BLIND_MAX:
+                return save(blind_cycles=blind,
+                            note=f"ledger dark {blind} cycles (> {BLIND_MAX}) — "
+                                 f"NOT re-asserting live levers; env defaults "
+                                 f"return within the TTL")
+        else:
+            blind = 0
         fading, n, m = fade_check(rows, promoted, now) if have_ledger else (False, 0, None)
         live_levers = {XP_TO_LIVE[k]: v for k, v in cand["levers"].items()}
         # 🦾 the earlier fade signal: the live lane's own paired grades
@@ -387,8 +430,10 @@ def run_once():
                        f"promotion {cand['name']} in force",
                        f"promoted {iso(promoted)}; live n={n} mean "
                        f"{m if m is None else round(m, 3)}%/trade")
-        return save(note=f"promotion in force (live n={n}, mean "
-                         f"{m if m is None else round(m, 2)}%)")
+        return save(blind_cycles=blind,
+                    note=f"promotion in force (live n={n}, mean "
+                         f"{m if m is None else round(m, 2)}%"
+                         f"{', ledger dark ' + str(blind) + ' cycles' if blind else ''})")
 
     return save(phase="idle", current=None, spec={},
                 note=f"unknown phase {phase!r} reset")
@@ -424,6 +469,16 @@ def _selftest():
              + [row(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
     ev3 = paired_eval(rows3, t0, end)
     assert not ev3["promote"] and "margin" in ev3["why"], ev3
+
+    # [2026-07-16 AUDIT] the margin must hold on EACH half: h1 +1.8pp but h2
+    # only +0.01pp (full-window gap comfortably > 0.5pp) must NOT promote —
+    # the old `shm > lvm` any-amount check let this lucky-half case through
+    rows3b = ([row(SHADOW_BOT, t0 + i * (4 * day / 16), 0.02) for i in range(16)]
+              + [row(SHADOW_BOT, t0 + 4 * day + i * (4 * day / 16), 0.0021)
+                 for i in range(16)]
+              + [row(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
+    ev3b = paired_eval(rows3b, t0, end)
+    assert not ev3b["promote"] and "h2" in ev3b["why"], ev3b
 
     # floors: not enough closes -> not ready
     ev4 = paired_eval(rows[:10], t0, end)
@@ -489,8 +544,15 @@ def _selftest():
     assert _needs_reset("promoted", None, {}) is True
     assert _needs_reset("running", "x", {"name": "y", "levers": {}}) is True  # mismatch
     assert _needs_reset("running", "x", {"name": "x"}) is True  # spec lacks 'levers'
-    assert _needs_reset("running", "x", {"name": "x", "levers": {"a": 1}}) is False  # valid
+    _ok_lever = next(iter(XP_TO_LIVE))
+    assert _needs_reset("running", "x", {"name": "x", "levers": {_ok_lever: 1}}) is False
     assert _needs_reset("idle", None, {}) is False             # idle never resets here
+    # [2026-07-16 AUDIT] shapes that passed the old guard but crashed downstream
+    assert _needs_reset("running", "x", {"name": "x", "levers": None}) is True
+    assert _needs_reset("running", "x", {"name": "x", "levers": {}}) is True
+    assert _needs_reset("promoted", "x", {"name": "x", "levers": {"gone.lever": 1}}) is True
+    # corrupt numeric state fields must degrade, not crash-loop
+    assert _num("not-a-ts") == 0.0 and _num(None, 5.0) == 5.0 and _num("7") == 7.0
 
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
           "floors, own-right, fade, proprioception early-fade, registry mapping)")

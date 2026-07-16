@@ -179,8 +179,12 @@ def run_once():
         print(f"[fleet-regen] REPAIRED {key} <- {src}"
               + (f" ({age_h:.1f}h old)" if age_h is not None else ""), flush=True)
 
+    last_push = float(prior.get("last_push") or 0)
+    # last_push rides IN the saved payload (16-Jul: the first save dropped it,
+    # so the notify gap survived exactly one cycle)
     payload = {"updated": _iso(now), "ttl_sec": TTL_SEC,
-               "repaired": repaired, "needs_operator": needs_op}
+               "repaired": repaired, "needs_operator": needs_op,
+               "last_push": last_push}
     store.save_state(KEY, payload)
     if hasattr(store, "save_history") and (repaired or needs_op):
         try:
@@ -189,7 +193,6 @@ def run_once():
                                      "needs_operator": needs_op})
         except Exception:
             pass
-    last_push = float(prior.get("last_push") or 0)
     if (repaired or needs_op) and now - last_push >= NOTIFY_GAP_H * 3600:
         body = ("\n".join(f"repaired {r['organ']} ({r['source']})" for r in repaired)
                 + ("\nNEEDS OPERATOR: " + ", ".join(needs_op) if needs_op else ""))
