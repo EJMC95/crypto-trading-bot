@@ -915,6 +915,77 @@ def autonomy_rail_card():
         return ""
 
 
+def incubator_card():
+    """🧬 [2026-07-16] Incubator / Reproduction (bot_state 'strategy-incubator').
+    The genotype-breeding stack made visible: the elite leaderboard of bred
+    Ticket-Taker genotypes scored by replay over the recorded tape, the
+    champion + its anti-overfit confidence (tentative / candidate / stable),
+    and the funding candidates it proposes to the experiment judge. Read-only
+    render; the organ lives in strategy_incubator.py on the freqtrade-bots
+    container. Fail-silent like every other card — empty state hides it."""
+    try:
+        b = fetch_states(["strategy-incubator"]).get("strategy-incubator") or {}
+        elite = b.get("elite") or []
+        champ = b.get("champion") or {}
+        if not elite and not champ:
+            return ""
+        G, R, M, Y = "#1a7f37", "#d1242f", "#8b949e", "#d29922"
+
+        def _dm(x):
+            return f"${money(x)}" if isinstance(x, (int, float)) else "—"
+
+        def _geno(gt):
+            if not isinstance(gt, dict):
+                return ""
+            ab = {"BRK_RANGE": "brk", "DIP_RANGE": "dip", "MOMO_CHG": "momo",
+                  "TAKE_PROFIT": "tp", "STOP_LOSS": "sl", "MAX_HOLD_H": "hold"}
+            return html.escape(" ".join(f"{ab[k]}{gt[k]}" for k in ab if k in gt))
+
+        # champion line
+        champ_line = ""
+        if champ:
+            conf = str(champ.get("confidence") or "—")
+            cc = {"stable": G, "candidate": Y}.get(conf, M)
+            vs = champ.get("vs_default")
+            champ_line = (
+                f'<div><span class="muted">champion</span> '
+                f'<b style="color:{cc}">{html.escape(conf).upper()}</b> · '
+                f'net {_dm(champ.get("net"))}'
+                + (f' · vs default {_dm(vs)}' if isinstance(vs, (int, float)) else '')
+                + f' · streak {champ.get("streak")} · '
+                f'h1 {_dm(champ.get("h1"))} h2 {_dm(champ.get("h2"))}</div>')
+
+        # leaderboard
+        rows = []
+        for i, e in enumerate(elite[:5], 1):
+            net = e.get("net")
+            col = (G if isinstance(net, (int, float)) and net > 0
+                   else (M if isinstance(net, (int, float)) and net == 0 else R))
+            mark = ' <span style="color:%s">✓both</span>' % G if e.get("both_halves_pos") else ""
+            rows.append(
+                f'<div><span style="color:{col}">#{i} {_dm(net)}</span>{mark} '
+                f'<span class="muted">h1 {_dm(e.get("h1"))} h2 {_dm(e.get("h2"))}</span> '
+                f'<span class="muted" style="font-size:.85em">{_geno(e.get("genotype"))}</span></div>')
+
+        n_prop = len(b.get("proposed") or [])
+        age = ""
+        try:
+            _u = _iso_dt(b.get("updated"))
+            if _u:
+                age = f' · {int((dt.datetime.now(dt.timezone.utc) - _u).total_seconds() // 60)}m ago'
+        except Exception:
+            pass
+        return (f'<div class="card"><h2>🧬 Incubator / Reproduction '
+                f'<span class="dot on"></span></h2>'
+                f'<div class="muted">breeding {b.get("tape_snaps")} snaps '
+                f'({html.escape(str(b.get("tape_source")))}) · {n_prop} funding '
+                f'candidates → judge{age} — genotypes replay-scored; champion '
+                f'only trusted when STABLE (anti-overfit)</div>'
+                f'{champ_line}{"".join(rows)}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def brain_card_html():
     """Compact card for the learning loop's current state (bot_state 'learning-brain')."""
     try:
@@ -1420,7 +1491,7 @@ def render():
         enrich = {}
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
-    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card()
+    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + incubator_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}
