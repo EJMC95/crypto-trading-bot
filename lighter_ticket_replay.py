@@ -107,7 +107,7 @@ def replay(tape, clip_usd=None, max_open=None):
     max_open = max_open or tt.MAX_OPEN
     pos = {}          # sym -> {lens, side, entry, opened(dt), clip}
     lens_stats = defaultdict(lambda: {"taken": 0, "closed": 0, "wins": 0,
-                                      "net": 0.0, "pnl_pcts": [],
+                                      "net": 0.0, "pnl_pcts": [], "nets": [],
                                       "exits": defaultdict(int)})
     seen = defaultdict(int)             # raw tickets seen per lens
     vetoed_cycles = 0
@@ -129,6 +129,7 @@ def replay(tape, clip_usd=None, max_open=None):
             s["wins"] += 1 if net > 0 else 0
             s["net"] += net
             s["pnl_pcts"].append(net / m["clip"])
+            s["nets"].append(net)
             s["exits"][reason] += 1
             del pos[sym]
         # 2) entries — stress veto + the taker's own conviction bars
@@ -175,11 +176,17 @@ def replay(tape, clip_usd=None, max_open=None):
             "closed": s["closed"], "wins": s["wins"],
             "net": round(s["net"], 2),
             "avg_pnl_pct": round(100 * sum(s["pnl_pcts"]) / n, 3) if n else None,
+            # [2026-07-17] per-trade net $, ADDITIVE (no existing field moved).
+            # The mean alone cannot price uncertainty: strategy_incubator needs
+            # the spread to rank genotypes on a lower CONFIDENCE BOUND instead
+            # of a point estimate (winner's curse) at the n<20 this tape yields.
+            "pnl_usd": [round(x, 4) for x in s["nets"]],
             "exits": dict(s["exits"]),
         }
     for lens, n in seen.items():        # lenses that never produced a fill
         lenses.setdefault(lens, {"seen": n, "taken": 0, "closed": 0, "wins": 0,
-                                 "net": 0.0, "avg_pnl_pct": None, "exits": {}})
+                                 "net": 0.0, "avg_pnl_pct": None,
+                                 "pnl_usd": [], "exits": {}})
     return {
         "snapshots": len(tape),
         "span": (f"{tape[0][0].isoformat(timespec='seconds')} -> "

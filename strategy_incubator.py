@@ -34,12 +34,15 @@ Publishes bot_state 'strategy-incubator' (leaderboard + elite) and appends
 to 'xp-queue'. Run-once; run_all.sh loops it. --selftest is offline.
 """
 import json
+import math
 import os
+import statistics
 import sys
 import time
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import brain_stats as bs
 import fleet_tuning as tuning
 import lighter_ticket_taker as tt
 import lighter_ticket_replay as rp
@@ -58,14 +61,45 @@ MIN_SNAPS = int(os.environ.get("INCUBATOR_MIN_SNAPS", "60"))
 # upward — you select the luckiest genotype, not the best. (First live cycle:
 # the "fittest" scored +$2.35 but h1 was +$0.01 — all edge in one half = noise
 # wearing a both-halves badge.) A genotype is only a trusted CHAMPION when:
-#   tape spans >= MIN_TAPE_HOURS, each half clears HALF_MARGIN (not just >0),
-#   it beats the DEFAULT genome by EDGE_MARGIN, AND it stays the champion for
-#   PERSIST_CYCLES independent cycles. Until then the leaderboard is published
-#   but explicitly flagged tentative (noise-risk) — trusted by nothing.
+#   the tape carries >= MIN_CLOSES closed trades AND spans >= MIN_TAPE_HOURS,
+#   each half clears HALF_MARGIN (not just >0), it beats the DEFAULT genome by
+#   EDGE_MARGIN, AND it stays the champion for PERSIST_CYCLES independent
+#   cycles. Until then the leaderboard is published but explicitly flagged
+#   tentative (noise-risk) — trusted by nothing.
+#
+# [2026-07-17 DENOMINATION] Those gates were denominated in HOURS and DOLLARS.
+# The fleet's quantum of evidence is ONE FILL. Measured on the real tape
+# (15-Jul 04:27Z -> 16-Jul 23:03Z, 42.7h): 11 closed trades, 10 of them the
+# same stop-loss. At clip $50 / TP +4% / SL -3% one trade flipping SL->TP
+# swings $3.50 — MORE than the old EDGE_MARGIN ($2.00), and one take-profit
+# (+$1.96) alone cleared the old HALF_MARGIN ($1.00). Every anti-overfit gate
+# was satisfiable by a single lucky fill; they looked strict and were not.
+# Both margins are now denominated in TRADE SWINGS, and the champion gate
+# counts CLOSES — hours are not evidence (a 200h tape with 11 closes passed
+# MIN_TAPE_HOURS and was still noise). An explicit env override still wins.
 MIN_TAPE_HOURS = float(os.environ.get("INCUBATOR_MIN_TAPE_HOURS", "48"))
-HALF_MARGIN = float(os.environ.get("INCUBATOR_HALF_MARGIN", "1.0"))      # $ each half
-EDGE_MARGIN = float(os.environ.get("INCUBATOR_EDGE_MARGIN", "2.0"))      # $ vs default
 PERSIST_CYCLES = int(os.environ.get("INCUBATOR_PERSIST", "3"))
+# closed trades on the tape before ANY genotype can be crowned. ~6 closes/day
+# at the observed rate, so ~7 days of tape — and >=20 per half for the
+# both-halves test to mean anything.
+MIN_CLOSES = int(os.environ.get("INCUBATOR_MIN_CLOSES", "40"))
+# closed trades a genotype needs to enter the BREEDING pool (see select_elite)
+MIN_GT_CLOSES = int(os.environ.get("INCUBATOR_MIN_GT_CLOSES", "12"))
+EDGE_TRADES = float(os.environ.get("INCUBATOR_EDGE_TRADES", "2.0"))   # vs default
+HALF_TRADES = float(os.environ.get("INCUBATOR_HALF_TRADES", "1.0"))   # each half
+
+
+def _env_f(name, derived):
+    """Explicit operator override wins; otherwise the trade-denominated bar."""
+    v = os.environ.get(name)
+    return float(v) if v not in (None, "") else derived
+
+
+# $ swing of ONE fill flipping SL->TP at the default genome — the smallest
+# unit of evidence this tape can produce. Any gate below it is noise.
+TRADE_SWING = abs(tt.TAKE_PROFIT - tt.STOP_LOSS) * tt.CLIP_USD
+HALF_MARGIN = _env_f("INCUBATOR_HALF_MARGIN", HALF_TRADES * TRADE_SWING)
+EDGE_MARGIN = _env_f("INCUBATOR_EDGE_MARGIN", EDGE_TRADES * TRADE_SWING)
 
 # TAKER genes: (tt attr, lever, discrete allele grid within registry bounds).
 # The grid is the search space; offspring are points on it.
@@ -73,10 +107,21 @@ TAKER_GENES = {
     "BRK_RANGE": ("taker.brk_range", [0.90, 0.93, 0.95, 0.97]),
     "DIP_RANGE": ("taker.dip_range", [0.05, 0.08, 0.11, 0.15]),
     "MOMO_CHG": ("taker.momo_chg", [3.0, 4.0, 5.0, 6.0]),
+    # [2026-07-17] DIV_GAP_PP was the one taker lever in the fleet_tuning
+    # registry (taker.div_gap_pp, bounds 300-700) that the taker consumes and
+    # the scout tuner walks, but the GENE POOL omitted — so the fleet's only
+    # SHORT lens was unevolvable and the genome was long-only. On the measured
+    # tape divergence is also the only lens not losing (+$2.10 — on n=1, which
+    # is itself the point). The tuner's ladder only ever WIDENS (500->300);
+    # this grid also explores TIGHTENING, which nothing else in the fleet does.
+    "DIV_GAP_PP": ("taker.div_gap_pp", [300.0, 400.0, 500.0, 600.0, 700.0]),
     "TAKE_PROFIT": ("taker.tp", [0.03, 0.04, 0.05, 0.06]),
     "STOP_LOSS": ("taker.sl", [-0.04, -0.03, -0.02]),
     "MAX_HOLD_H": ("taker.max_hold_h", [24.0, 48.0, 72.0]),
 }
+# The gene whose alleles the TAPE must be long enough to exercise (see
+# reachable_genes) — a hold >= the span never fires.
+HOLD_GENE = "MAX_HOLD_H"
 # FUNDING genes (live-reachable, judge-gated): allele grids within xp bounds.
 FUNDING_GENES = {
     "enter_apr": ("xp.funding.enter_apr", [0.30, 0.40, 0.50]),
@@ -91,6 +136,83 @@ def now_ts():
 
 def _iso(ts=None):
     return datetime.fromtimestamp(ts or now_ts(), tz=timezone.utc).isoformat(timespec="seconds")
+
+
+# ---------------------------------------------------------------------------
+# evidence (pure — selftested)
+# ---------------------------------------------------------------------------
+
+# One-sided 90% Student-t quantiles, df 1..30, converging to brain_stats.Z80
+# (the fleet's evidence convention). At the n<20 this tape yields, the normal
+# approximation is far too generous — t prices the small sample honestly.
+_T90 = (3.078, 1.886, 1.638, 1.533, 1.476, 1.440, 1.415, 1.397, 1.383, 1.372,
+        1.363, 1.356, 1.350, 1.345, 1.341, 1.337, 1.333, 1.330, 1.328, 1.325,
+        1.323, 1.321, 1.319, 1.318, 1.316, 1.315, 1.314, 1.313, 1.311, 1.310)
+
+
+def t90(df):
+    """One-sided 90% t quantile; Z80 past the table (df -> inf)."""
+    if df < 1:
+        return float("inf")
+    return _T90[df - 1] if df <= len(_T90) else bs.Z80
+
+
+def _marked(rep):
+    """[2026-07-17 IMB-10 parity — mirrors lighter_scout_tuner._marked]
+    closed_net + end-of-tape unrealized.
+
+    closed_net ALONE is blind to DEFERRAL: a genotype 'wins' by pushing losses
+    past the tape's end, where open positions are valued at entry and invisible
+    to the very gate accepting on them. The tuner's gates went deferral-proof
+    first; the bred leaderboard/champion (dashboard-only today) must not keep a
+    bias a future consumer would inherit. It is not hypothetical here: the real
+    tape shows ZERO hold-exits and 10-of-11 closes are stop-losses, so "never
+    close anything" was the strongest gradient in the landscape — and the
+    MAX_HOLD grid offered 48h/72h alleles on a 42.7h tape to express it with."""
+    return float(rep["closed_net"]) + float(rep.get("unrealized") or 0.0)
+
+
+def _pnl_usd(rep):
+    """Every closed trade's net $ across all lenses (replay field, 17-Jul)."""
+    out = []
+    for s in (rep.get("lenses") or {}).values():
+        out.extend(s.get("pnl_usd") or [])
+    return out
+
+
+def net_lcb(pnl_usd):
+    """One-sided 90% LOWER CONFIDENCE BOUND on the total net of these trades.
+
+    The winner's curse: a max-over-population on a POINT estimate selects the
+    luckiest genotype, not the best. This file's header said exactly that in
+    July and then ranked the breeding elite on... the point estimate. The LCB
+    prices uncertainty, so a thin or noisy genotype cannot out-rank a robust
+    one on luck alone. Std error of a SUM of n draws is sd*sqrt(n)."""
+    n = len(pnl_usd)
+    if n == 0:
+        return 0.0
+    total = float(sum(pnl_usd))
+    if n == 1:
+        return min(total, 0.0)          # one trade evidences no edge, ever
+    return total - t90(n - 1) * statistics.stdev(pnl_usd) * math.sqrt(n)
+
+
+def reachable_genes(genes, tape_hours):
+    """[2026-07-17 IMB-10] Drop MAX_HOLD alleles the tape cannot exercise: a
+    hold >= the span never fires, so its 'edge' is unpriced open risk rather
+    than evidence. Mirrors lighter_scout_tuner's _skipped_holds. Returns
+    (genes, dropped). No-op when the span is unknown or nothing is unreachable
+    — and never strips the grid bare (a filter that leaves no allele is a
+    filter that has stopped measuring anything)."""
+    spec = genes.get(HOLD_GENE)
+    if not spec or tape_hours <= 0:
+        return genes, []
+    lever, grid = spec
+    keep = [h for h in grid if h < tape_hours]
+    dropped = [h for h in grid if h >= tape_hours]
+    if not keep or not dropped:
+        return genes, []
+    return dict(genes, **{HOLD_GENE: (lever, keep)}), dropped
 
 
 # ---------------------------------------------------------------------------
@@ -163,47 +285,82 @@ def genotype_to_levers(genotype, genes):
 # ---------------------------------------------------------------------------
 
 def evaluate(genotype, tape):
-    """Fitness of a TAKER genotype = replayed closed-net over the tape, with
-    a both-halves-positive flag (an offspring that only wins one lucky half
-    is not fit). Patches tt bars, always restores."""
+    """Fitness of a TAKER genotype = replayed MARKED net over the tape (see
+    _marked), with a both-halves-positive flag (an offspring that only wins
+    one lucky half is not fit), the closed-trade COUNT (the real evidence
+    unit) and a lower confidence bound. Patches tt bars, always restores."""
     saved = {g: getattr(tt, g) for g in genotype}
-
-    def _marked(rep):
-        # [2026-07-17 IMB-10 parity] closed + end-of-tape unrealized — the
-        # tuner's gates went deferral-proof; the bred leaderboard/champion
-        # (dashboard-only today) must not keep the bias a future consumer
-        # would inherit.
-        return rep["closed_net"] + float(rep.get("unrealized") or 0.0)
-
     try:
         for g, v in genotype.items():
             setattr(tt, g, v)
-        full = _marked(rp.replay(tape))
+        full = rp.replay(tape)
         mid = len(tape) // 2
         h1 = _marked(rp.replay(tape[:mid])) if mid else 0.0
         h2 = _marked(rp.replay(tape[mid:])) if mid else 0.0
     finally:
         for g, v in saved.items():
             setattr(tt, g, v)
-    return {"net": round(full, 3), "h1": round(h1, 3), "h2": round(h2, 3),
+    pnl = _pnl_usd(full)
+    return {"net": round(_marked(full), 3), "h1": round(h1, 3),
+            "h2": round(h2, 3), "closes": len(pnl),
+            "lcb": round(net_lcb(pnl), 3),
             # both-halves POSITIVE-BY-MARGIN — a +$0.01 half is noise, not edge
             "both_halves_pos": h1 >= HALF_MARGIN and h2 >= HALF_MARGIN}
 
 
 def rank(population, tape):
     scored = [{"genotype": gt, **evaluate(gt, tape)} for gt in population]
-    # fittest = highest net, tie-broken toward both-halves-positive
-    scored.sort(key=lambda s: (s["net"], s["both_halves_pos"]), reverse=True)
+    # [2026-07-17] fittest = highest LOWER BOUND, not the highest point
+    # estimate. Ranking a population by its max point estimate IS the winner's
+    # curse this file's header warns about; net only breaks ties between
+    # equally-evidenced genotypes.
+    scored.sort(key=lambda s: (s["lcb"], s["net"]), reverse=True)
     return scored
+
+
+def select_elite(scored, n, min_closes):
+    """GAMETE SELECTION (2026-07-17, operator: "an egg needs good sperm and
+    good eggs to fertilise to produce good offspring").
+
+    The old code took scored[:ELITE_N] ranked by raw net, with both_halves_pos
+    only breaking exact float ties — i.e. never. So the very noise genotype
+    assess_champion REJECTS still bred, and elite feed forward into the next
+    cycle's population (run_once reads prior['elite']), so noise compounded
+    across generations. The champion gate protected the REPORT; nothing
+    protected the GENE POOL. Selection ran at birth, not at the gametes.
+
+    A genotype is a gamete only if its OWN result is trustworthy:
+      MEASURABLE — enough closed trades to have a fitness at all. This biases
+        toward looser bars, which is correct rather than a bug: you cannot
+        select a genotype you cannot measure, and it is the same "starving
+        lens earns its grading diet" logic the scout tuner already runs.
+      ROBUST — both halves clear HALF_MARGIN. The birth gate, moved upstream.
+
+    Diversity needs no explicit distance floor: seed_population re-injects the
+    default plus every single-gene neighbour every cycle, so the pool cannot
+    inbreed toward a converged elite the way a pure elite-carry GA would."""
+    return [s for s in scored
+            if s["closes"] >= min_closes and s["both_halves_pos"]][:n]
 
 
 def assess_champion(top, default_net, tape_hours, prior_champ, prior_streak):
     """Is the fittest genotype a TRUSTWORTHY champion, or noise? Returns
     (is_champion, streak, stable, confidence, reason). Pure — selftested.
-    This is the anti-overfit gate: short tape, a weak half, or a thin edge
-    over the default genome all read 'tentative' no matter how high the net."""
+    This is the anti-overfit gate: too few CLOSED TRADES, a short tape, a weak
+    half, or a thin edge over the default genome all read 'tentative' no
+    matter how high the net."""
     if not top:
         return False, 0, False, "none", "no population"
+    # [2026-07-17] CLOSES first — hours are not evidence. The tape crossed the
+    # 48h floor at 04:27Z today carrying 11 closed trades; without this gate
+    # the organ would have started minting champions off a dozen fills this
+    # afternoon, and PERSIST_CYCLES=3 hourly cycles would call one "stable"
+    # by evening. Every other bar below is meaningless under it.
+    closes = int(top.get("closes") or 0)
+    if closes < MIN_CLOSES:
+        return (False, 0, False, "tentative",
+                f"{closes} closed trades < {MIN_CLOSES} min — no fitness "
+                f"signal yet (hours are not evidence)")
     if tape_hours < MIN_TAPE_HOURS:
         return (False, 0, False, "tentative",
                 f"tape {tape_hours:.0f}h < {MIN_TAPE_HOURS:g}h min (noise-risk)")
@@ -274,17 +431,28 @@ def run_once():
     # --- TAKER breeding (shadow-only, replay-scored) -----------------------
     leaderboard, champion = [], None
     if len(tape) >= MIN_SNAPS:
-        prior_elite = [e["genotype"] for e in (prior.get("elite") or [])]
-        population = dedupe(seed_population(TAKER_GENES)
-                            + breed(prior_elite, TAKER_GENES))
-        scored = rank(population, tape)
-        leaderboard = scored[:ELITE_N]
-        default_gt = {g: getattr(tt, g) for g in TAKER_GENES}
-        default_net = next((s["net"] for s in scored
-                            if s["genotype"] == default_gt), 0.0)
         tape_hours = ((tape[-1][0] - tape[0][0]).total_seconds() / 3600.0
                       if len(tape) >= 2 else 0.0)
-        top = leaderboard[0] if leaderboard else None
+        # [2026-07-17 IMB-10] a hold the tape can never reach is deferral, not
+        # edge — drop those alleles before selection can reward them.
+        genes, dropped = reachable_genes(TAKER_GENES, tape_hours)
+        if dropped:
+            print(f"[incubator] max-hold alleles {dropped} excluded — tape "
+                  f"spans {tape_hours:.0f}h; an unreachable hold never fires "
+                  f"(deferral, not edge)", flush=True)
+        prior_elite = [e["genotype"] for e in (prior.get("elite") or [])]
+        population = dedupe(seed_population(genes) + breed(prior_elite, genes))
+        scored = rank(population, tape)
+        # [2026-07-17] GAMETES (who breeds) and the CHAMPION (what we would
+        # trust) are now separate questions. The elite are robustness-filtered
+        # so noise cannot reproduce; the fittest genotype is still assessed and
+        # published either way, so its confidence reason explains WHY it is not
+        # a champion instead of the card just going quiet.
+        leaderboard = select_elite(scored, ELITE_N, MIN_GT_CLOSES)
+        default_gt = {g: getattr(tt, g) for g in genes}
+        default_net = next((s["net"] for s in scored
+                            if s["genotype"] == default_gt), 0.0)
+        top = scored[0] if scored else None
         is_champ, streak, stable, conf, why = assess_champion(
             top, default_net, tape_hours,
             (prior.get("champion") or {}).get("genotype"),
@@ -293,10 +461,15 @@ def run_once():
             champion = {"genotype": top["genotype"], "net": top["net"],
                         "h1": top["h1"], "h2": top["h2"], "confidence": conf,
                         "streak": streak, "stable": stable,
+                        "closes": top["closes"], "lcb": top["lcb"],
                         "vs_default": round(top["net"] - default_net, 3)}
-            print(f"[incubator] fittest net ${top['net']:+.2f} vs default "
-                  f"${default_net:+.2f} (h1 ${top['h1']:+.2f} h2 ${top['h2']:+.2f}) "
-                  f"| {conf.upper()}: {why}", flush=True)
+            print(f"[incubator] fittest net ${top['net']:+.2f} (lcb "
+                  f"${top['lcb']:+.2f} on {top['closes']} closes) vs default "
+                  f"${default_net:+.2f} (h1 ${top['h1']:+.2f} h2 "
+                  f"${top['h2']:+.2f}) | {conf.upper()}: {why}", flush=True)
+        print(f"[incubator] gametes: {len(leaderboard)}/{len(scored)} genotypes "
+              f"viable (>= {MIN_GT_CLOSES} closes AND both halves >= "
+              f"${HALF_MARGIN:.2f})", flush=True)
     else:
         print(f"[incubator] tape too short ({len(tape)}/{MIN_SNAPS}) — "
               f"skipping taker breeding", flush=True)
@@ -379,6 +552,15 @@ def _selftest():
     # genotype_to_levers clamps + drops unknowns against the REAL registry
     lv = genotype_to_levers({"DIP_RANGE": 0.99, "NOPE": 1}, TAKER_GENES)
     assert lv == {"taker.dip_range": 0.15}, lv          # clamped to ceiling, unknown dropped
+    # [2026-07-17] the divergence gene (the fleet's only SHORT lens) reaches
+    # taker.div_gap_pp, and EVERY allele in its grid is registry-legal in both
+    # directions — the tuner's ladder only ever widens (500->300).
+    for allele in TAKER_GENES["DIV_GAP_PP"][1]:
+        assert genotype_to_levers({"DIV_GAP_PP": allele}, TAKER_GENES) == \
+            {"taker.div_gap_pp": allele}, allele
+    for gene, (lever, grid) in TAKER_GENES.items():     # no dead alleles anywhere
+        for allele in grid:
+            assert tuning.clamp(lever, allele) == allele, (gene, lever, allele)
 
     # funding proposals exclude already-tried names, cap, and map to xp levers
     js = {"verdicts": [{"name": "xp-enter_apr-0.3"}]}
@@ -396,32 +578,88 @@ def _selftest():
     assert any("take_profit" in p["name"] for p in ph), ph
     assert funding_proposals({}, {}, hurting=set()) == funding_proposals({}, {})
     assert funding_proposals({}, {}, hurting=None) == funding_proposals({}, {})
-    # anti-overfit champion gate: the +$0.01-half case is REJECTED as noise
-    noise = {"genotype": {"A": 2}, "net": 2.35, "h1": 0.01, "h2": 2.34}
+    # [2026-07-17] IMB-10: unreachable max-hold alleles dropped, and only those
+    g2, dropped = reachable_genes(TAKER_GENES, 43.0)
+    assert dropped == [48.0, 72.0], dropped
+    assert g2["MAX_HOLD_H"][1] == [24.0], g2["MAX_HOLD_H"]
+    assert g2["TAKE_PROFIT"] == TAKER_GENES["TAKE_PROFIT"], "other genes intact"
+    assert reachable_genes(TAKER_GENES, 200.0)[1] == [], "all reachable -> no-op"
+    assert reachable_genes(TAKER_GENES, 0.0)[1] == [], "unknown span -> no-op"
+    assert reachable_genes(TAKER_GENES, 10.0)[1] == [], "never strip the grid bare"
+
+    # _marked prices DEFERRAL: closed_net alone would score this +$2
+    assert _marked({"closed_net": 2.0, "unrealized": -5.0}) == -3.0
+    assert _marked({"closed_net": 2.0}) == 2.0          # absent -> closed only
+
+    # net_lcb: the winner's curse priced. Zero spread -> bound == total; a
+    # noisy sample is discounted; one trade evidences no edge, ever.
+    assert net_lcb([]) == 0.0
+    assert net_lcb([5.0]) == 0.0 and net_lcb([-2.0]) == -2.0
+    assert abs(net_lcb([1.0] * 20) - 20.0) < 1e-9
+    coin = [1.96, -1.54] * 6                            # the tape's real shape
+    assert net_lcb(coin) < sum(coin), "spread must be discounted"
+    # the SAME per-trade mean/sd with more evidence -> a less punitive bound
+    assert net_lcb([1.96, -1.54] * 30) / 30 > net_lcb(coin) / 6
+    assert t90(1) == 3.078 and t90(4) == 1.533 and t90(500) == bs.Z80
+    assert t90(0) == float("inf")
+
+    # GAMETE SELECTION: the noise genotype the champion gate rejects must not
+    # BREED either, and an unmeasurable genotype is not a gamete however fit.
+    sc = [{"genotype": {"A": 1}, "net": 9.0, "h1": 0.01, "h2": 8.99,
+           "closes": 40, "lcb": 8.0, "both_halves_pos": False},   # one-half win
+          {"genotype": {"A": 3}, "net": 8.0, "h1": 4.0, "h2": 4.0,
+           "closes": 3, "lcb": 7.0, "both_halves_pos": True},     # 3 trades
+          {"genotype": {"A": 2}, "net": 5.0, "h1": 2.5, "h2": 2.5,
+           "closes": 40, "lcb": 4.0, "both_halves_pos": True}]    # robust
+    el = select_elite(sc, 4, 12)
+    assert [e["genotype"] for e in el] == [{"A": 2}], el
+    assert select_elite(sc, 0, 12) == [], "elite cap honored"
+    assert select_elite([], 4, 12) == []
+
+    # anti-overfit champion gate. Every case carries enough closes to reach
+    # the bar under test — MIN_CLOSES is checked FIRST and shadows the rest.
+    def _c(**kw):
+        return dict({"genotype": {"A": 2}, "closes": MIN_CLOSES}, **kw)
+
+    # too few closed trades -> tentative no matter how good it looks
+    thin = _c(net=99.0, h1=49.0, h2=50.0, closes=MIN_CLOSES - 1)
+    isc0, _, _, conf0, why0 = assess_champion(thin, 0.0, 200, None, 0)
+    assert not isc0 and conf0 == "tentative" and "closed trades" in why0, why0
+    # the +$0.01-half case is REJECTED as noise
+    noise = _c(net=2.35, h1=0.01, h2=2.34)
     isc, _, _, conf, why = assess_champion(noise, 0.0, 200, None, 0)
     assert not isc and conf == "tentative" and "half" in why, (conf, why)
+    # a single lucky fill can no longer clear the gates: one SL->TP swing is
+    # TRADE_SWING, and both bars are now denominated above it
+    assert HALF_MARGIN >= TRADE_SWING and EDGE_MARGIN > TRADE_SWING
+    one_fill = _c(net=TRADE_SWING, h1=1.96, h2=1.96)
+    isc_f, _, _, _, why_f = assess_champion(one_fill, 0.0, 200, None, 0)
+    assert not isc_f, (why_f, TRADE_SWING)
     # short tape -> tentative even with a strong, balanced result
-    strong = {"genotype": {"A": 2}, "net": 8.0, "h1": 4.0, "h2": 4.0}
+    strong = _c(net=8.0 + EDGE_MARGIN, h1=4.0 + HALF_MARGIN, h2=4.0 + HALF_MARGIN)
     isc2, _, _, conf2, why2 = assess_champion(strong, 0.0, 10, None, 0)
     assert not isc2 and "min" in why2, why2
     # thin edge over default -> tentative
-    isc3, _, _, conf3, _ = assess_champion(strong, 7.0, 200, None, 0)
+    isc3, _, _, conf3, _ = assess_champion(strong, strong["net"] - 0.01, 200, None, 0)
     assert not isc3 and conf3 == "tentative"
-    # a genuine champion: long tape, both halves strong, beats default, and
-    # persistence promotes candidate -> stable across cycles
+    # a genuine champion: enough closes, long tape, both halves strong, beats
+    # default, and persistence promotes candidate -> stable across cycles
     isc4, streak4, stable4, conf4, _ = assess_champion(strong, 0.0, 200, None, 0)
     assert isc4 and streak4 == 1 and not stable4 and conf4 == "candidate"
     isc5, streak5, stable5, conf5, _ = assess_champion(
         strong, 0.0, 200, {"A": 2}, 2)          # same champ, 3rd cycle
     assert isc5 and streak5 == 3 and stable5 and conf5 == "stable"
     # a DIFFERENT champion resets the streak (no free ride on prior stability)
-    other = {"genotype": {"A": 3}, "net": 9.0, "h1": 4.5, "h2": 4.5}
+    other = _c(genotype={"A": 3}, net=strong["net"] + 1, h1=4.5 + HALF_MARGIN,
+               h2=4.5 + HALF_MARGIN)
     _, streak6, stable6, _, _ = assess_champion(other, 0.0, 200, {"A": 2}, 5)
     assert streak6 == 1 and not stable6
 
     print("strategy_incubator selftest OK (seed, dedupe, crossover+mutation "
           "on-grid, lever mapping/clamp, judge-gated funding proposals, "
-          "proprioception hurting-gene skip, anti-overfit champion gate)")
+          "proprioception hurting-gene skip, IMB-10 marked/reachable-holds, "
+          "t-LCB winner's-curse ranking, gamete selection, anti-overfit "
+          "champion gate incl. the closes floor)")
 
 
 if __name__ == "__main__":

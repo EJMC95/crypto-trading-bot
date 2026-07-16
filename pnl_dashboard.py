@@ -1094,8 +1094,12 @@ def incubator_card():
         def _geno(gt):
             if not isinstance(gt, dict):
                 return ""
+            # [2026-07-17] div = the divergence lens (taker.div_gap_pp), added
+            # to the gene pool that day; without it the card silently omitted
+            # the only SHORT lens's allele from every genotype it rendered.
             ab = {"BRK_RANGE": "brk", "DIP_RANGE": "dip", "MOMO_CHG": "momo",
-                  "TAKE_PROFIT": "tp", "STOP_LOSS": "sl", "MAX_HOLD_H": "hold"}
+                  "DIV_GAP_PP": "div", "TAKE_PROFIT": "tp", "STOP_LOSS": "sl",
+                  "MAX_HOLD_H": "hold"}
             return html.escape(" ".join(f"{ab[k]}{gt[k]}" for k in ab if k in gt))
 
         # champion line
