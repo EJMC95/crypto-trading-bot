@@ -247,6 +247,7 @@ def _is_fresh(payload, now_ts):
 
 _cache = {"ts": 0.0, "payload": None}
 _immune_cache = {"ts": 0.0, "q": frozenset()}
+_prop_cache = {"ts": 0.0, "h": frozenset()}
 
 
 def _load(now_ts):
@@ -282,6 +283,37 @@ def _quarantined(now_ts):
     return q
 
 
+def _live_hurting(now_ts):
+    """[2026-07-16 late, operator: 'and with the new rule, real money bots
+    too'] LIVE-lane levers whose fleet_proprioception verdict is HURTING —
+    get_lever returns the caller's env default for these, so a measured-bad
+    lever stops steering REAL MONEY at the consumer, every loop, without
+    waiting out the board's 10-min cycle, the judge's hourly cycle, or the
+    lever's TTL. Same one-hook-protects-every-consumer pattern as the
+    immune quarantine above: the funding bot's apply_levers and both live
+    bots' clip read (venues VenueContext.order_usd) all pass through here.
+    LIVE LANE ONLY: shadow lanes keep TTL semantics — their authors already
+    stop re-asserting on hurting, and an instant consumer-side revert there
+    would distort the learning dynamics the 21-Jul review grades. Fail-safe
+    OPEN: a dark/stale organ reverts nothing (a dead sense must not steer;
+    levers stay bounded + TTL'd regardless). Restrict-only by construction:
+    the hook can only ever hand back the operator's own default."""
+    if now_ts - _prop_cache["ts"] < CACHE_SEC:
+        return _prop_cache["h"]
+    h = frozenset()
+    try:
+        if store is not None:
+            p = store.load_state("fleet-proprioception") or {}
+            if _is_fresh(p, now_ts):
+                h = frozenset(
+                    k for k, v in (p.get("verdicts") or {}).items()
+                    if isinstance(v, dict) and v.get("verdict") == "hurting")
+    except Exception:
+        h = frozenset()
+    _prop_cache.update(ts=now_ts, h=h)
+    return h
+
+
 def _lever_alive(entry, now_ts):
     """A lever entry is alive until its own `expires` stamp (falling back to
     never-expired for entries that predate per-lever expiry)."""
@@ -298,12 +330,16 @@ def _lever_alive(entry, now_ts):
 
 
 def get_lever(name, default, now_ts=None):
-    """Fresh, unexpired, un-quarantined, registered, clamped lever value —
-    or the caller's default."""
+    """Fresh, unexpired, un-quarantined, not-hurting-on-live, registered,
+    clamped lever value — or the caller's default."""
     now_ts = now_ts if now_ts is not None else time.time()
     try:
         if name in _quarantined(now_ts):
             return default                   # immune-quarantined -> operator default
+        spec = LEVERS.get(name)
+        if (spec is not None and spec.get("lane") == "lighter-live"
+                and name in _live_hurting(now_ts)):
+            return default                   # measured-bad LIVE lever -> operator default
         p = _load(now_ts)
         if not p or not _is_fresh(p, now_ts):
             return default
@@ -424,6 +460,28 @@ def _selftest():
     assert get_lever("gapscout.prefilter_gap", 0.002, now_ts=now) == 0.002
     assert get_lever("gapscout.extra_exchanges", "", now_ts=now) == "kucoin"  # others fine
     _immune_cache.update(ts=now, q=frozenset())    # clear for later asserts
+    # 🦾 LIVE hurting-revert (the real-money consumer hook): a fresh HURTING
+    # verdict on a lighter-live lever returns the caller's env default at
+    # the consumer; SHADOW lanes keep their TTL semantics (lane-scoped)
+    _cache.update(ts=now, payload={"updated": fresh_iso, "ttl_sec": 7200,
+                                   "levers": {"live.clip_scale": {"value": 1.25},
+                                              "live.funding.enter_apr": {"value": 0.30},
+                                              "taker.tp": {"value": 0.05}}})
+    _prop_cache.update(ts=now, h=frozenset({"live.clip_scale",
+                                            "live.funding.enter_apr",
+                                            "taker.tp"}))
+    assert get_lever("live.clip_scale", 1.0, now_ts=now) == 1.0, \
+        "hurting LIVE lever -> operator default"
+    assert get_lever("live.funding.enter_apr", 0.40, now_ts=now) == 0.40
+    assert get_lever("taker.tp", 0.04, now_ts=now) == 0.05, \
+        "shadow lane keeps TTL semantics (author-side skip owns it)"
+    _prop_cache.update(ts=now, h=frozenset())
+    assert get_lever("live.clip_scale", 1.0, now_ts=now) == 1.25, \
+        "verdict cleared -> the asserted lever applies again"
+    assert get_lever("live.funding.enter_apr", 0.40, now_ts=now) == 0.30
+    _cache.update(ts=now, payload={"updated": fresh_iso, "ttl_sec": 7200,
+                                   "levers": {"gapscout.prefilter_gap": {"value": 0.9},
+                                              "gapscout.extra_exchanges": {"value": "kucoin"}}})
     assert set(active_levers(now_ts=now)) == {"gapscout.prefilter_gap",
                                               "gapscout.extra_exchanges"}
     # per-lever expiry: a dead lever yields the default even in a fresh payload

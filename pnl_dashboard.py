@@ -837,7 +837,8 @@ def autonomy_rail_card():
     card, any error renders nothing. One fetch_states round-trip for all 11."""
     try:
         s = fetch_states([
-            "fleet-tuning", "scout-tuner", "strategy-incubator", "xp-queue",
+            "fleet-tuning", "scout-tuner", "fleet-proprioception",
+            "strategy-incubator", "xp-queue",
             "xp-judge", "fleet-immune", "fleet-regen", "fleet-respiration",
             "fleet-clock", "impl-shortfall", "gapscout-census",
         ])
@@ -973,14 +974,24 @@ def autonomy_rail_card():
                        + (f' · day {_d(bp)}' if bp is not None else ''),
                        (G if (bp or 0) > 0 else R) if bp else None)
 
+        def b_proprio():
+            pr = s.get("fleet-proprioception") or {}
+            pc = pr.get("counts") or {}
+            n_hurt = pc.get("hurting") or 0
+            return row("fleet-proprioception", "🦾 Outcomes",
+                       f'{pc.get("graded") or 0} graded of {pc.get("episodes") or 0} '
+                       f'episodes · {pc.get("helping") or 0} helping · '
+                       f'{n_hurt} hurting',
+                       Y if n_hurt else (G if (pc.get("graded") or 0) else None))
+
         rows = []
         # [2026-07-16 AUDIT FIX] one organ's odd-shaped payload used to throw
         # inside the single outer try and silently vanish the WHOLE card —
         # indistinguishable from "autonomy stack not running". Each row now
         # degrades alone.
-        for build in (b_tuning, b_tuner, b_incubator, b_queue, b_judge,
-                      b_immune, b_regen, b_resp, b_clock, b_shortfall,
-                      b_census):
+        for build in (b_tuning, b_tuner, b_proprio, b_incubator, b_queue,
+                      b_judge, b_immune, b_regen, b_resp, b_clock,
+                      b_shortfall, b_census):
             try:
                 rows.append(build())
             except Exception:  # noqa: BLE001
@@ -2148,6 +2159,11 @@ def _organ_vital(key, st):
         if key == "scout-tuner":
             return _v("{} enacted · baseline net ${}",
                       len(st.get("enacted") or {}), st.get("baseline_net"))
+        if key == "fleet-proprioception":
+            c = st.get("counts") if isinstance(st.get("counts"), dict) else {}
+            return _v("{} episodes ({} graded) · {} helping · {} hurting",
+                      c.get("episodes") or 0, c.get("graded") or 0,
+                      c.get("helping") or 0, c.get("hurting") or 0)
         if key == "strategy-incubator":
             ch = st.get("champion") or {}
             return _v("champion {} · net ${}", ch.get("confidence") or "none", ch.get("net"))
@@ -2207,6 +2223,9 @@ ORGAN_SPECS = [
     # non-critical to avoid a pager storm, promote per-organ once proven.
     ("fleet-tuning",       "🎚️ Fleet tuning — active levers",        False, 7200),
     ("scout-tuner",        "🔧 Scout tuner — self-enacted levers",    False, 10800),
+    # [2026-07-16] proprioception — the growth rail grading its own
+    # enactments (out-of-sample); the tuner consumes hurting verdicts.
+    ("fleet-proprioception", "🦾 Proprioception — enactment outcomes", False, 2700),
     ("strategy-incubator", "🧬 Incubator — champion genotype",        False, 10800),
     ("xp-queue",           "📥 XP queue — candidates for the judge",  False, 10800),
     ("xp-judge",           "⚖️ XP judge — promotion state machine",   False, 10800),
@@ -2246,6 +2265,13 @@ CONTRACTS = [
     ("evidence proposals", "evidence_board.py",
      "NOTHING yet — shadow; review promotes via EVBOARD_MODE", "shadow",
      "evidence-board"),
+    ("enactment outcome verdicts", "fleet_proprioception.py",
+     "scout tuner (hurting-skip + helping-walk) · board (🦾 items, clip "
+     "gates, ladder discount) · judge early-fade · incubator gene-skip · "
+     "LIVE BOTS (get_lever hurting-revert, every loop) · "
+     "any bot via fleet_bus.lever_outcome · /bus.json",
+     "verdict-gated: restrict-first; live top step fail-closed",
+     "fleet-proprioception"),
     ("market open/close events + heavy_ok", "fleet_clock.py",
      "published, unconsumed — first wiring decided at the 21-Jul review",
      "advisory", "fleet-clock"),
@@ -3572,12 +3598,16 @@ class H(BaseHTTPRequestHandler):
                         # [2026-07-14] brain keys added: the brain died silently
                         # for two days once (5-7 Jul) because nothing external
                         # could see it. Its outputs are now on the same surface.
+                        # [2026-07-16] fleet-proprioception added: consumer
+                        # support — the outcome verdicts must be reachable
+                        # off-Railway (gate0 services, the review, ad-hoc
+                        # consumers) exactly like the brain keys are.
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
                             "'learning-brain', 'brain-stake-mults', "
                             "'brain-diagnosis', 'brain-lens-forward', "
-                            "'lighter-market')")
+                            "'lighter-market', 'fleet-proprioception')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -3591,7 +3621,8 @@ class H(BaseHTTPRequestHandler):
                                 "SELECT key, ts, payload FROM bot_state_history "
                                 "WHERE key IN ('fleet-risk', 'signal-bus', "
                                 "'brain-stake-mults', 'brain-diagnosis', "
-                                "'brain-lens-forward', 'lighter-market') "
+                                "'brain-lens-forward', 'lighter-market', "
+                                "'fleet-proprioception') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
                             hist = [{"key": k,
@@ -3610,6 +3641,7 @@ class H(BaseHTTPRequestHandler):
                                    "brain_diagnosis": live.get("brain-diagnosis"),
                                    "brain_lens_forward": live.get("brain-lens-forward"),
                                    "lighter_market": lm or None,
+                                   "proprioception": live.get("fleet-proprioception"),
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
             except Exception as e:

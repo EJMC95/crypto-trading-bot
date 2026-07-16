@@ -193,6 +193,21 @@ done &
     sleep "${TUNER_INTERVAL_SEC:-3600}"
   done ) &
 
+# [2026-07-16 PROPRIOCEPTION] 🦾 the autonomy stack's sense of its OWN
+# movements: tracks every growth-rail lever episode (open -> expire/release/
+# change), grades it retrospectively OUT-OF-SAMPLE (taker levers get the
+# replay counterfactual in $ on the tape recorded DURING the episode; scout
+# diet levers get grading throughput; gapscout gets census activity;
+# live/xp record-only — the judge stays the real-money authority), and
+# publishes per-lever helping/hurting verdicts. The scout tuner consumes
+# HURTING restrict-only: a movement that measured net-negative in reality
+# stops being repeated. Fail-safe: a dark organ restricts nothing.
+( sleep 540
+  while true; do
+    python3 /freqtrade/fleet_proprioception.py || true
+    sleep "${PROPRIO_INTERVAL_SEC:-900}"
+  done ) &
+
 # [2026-07-15 EXPERIMENT JUDGE] 🧪⚖️ the shadow→live promotion pipeline
 # (user: shadow wins must "carry across to the real money bots"). Hourly:
 # runs ONE candidate at a time on the Funding Farmer's shadow arm (xp.*
