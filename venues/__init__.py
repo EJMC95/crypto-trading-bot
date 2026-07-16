@@ -65,8 +65,17 @@ class VenueContext:
                      self.bot_id, coin, self.venue.name)
         return ok
 
-    def order_usd(self, paper_default: float) -> float:
+    def order_usd(self, paper_default: float, own: bool = False) -> float:
         if self.mode == "hl_paper":
+            return paper_default
+        # [2026-07-16 AUDIT FIX] own=True: bots whose clip is part of their
+        # BACKTESTED definition (Snap Back $10, Counterweight $20/leg) keep
+        # their per-bot env — the global LIGHTER_ORDER_USD silently overrode
+        # it on every Lighter mode, so Snap Back ran 3x its documented size.
+        # The funding/trend twins deliberately DON'T pass own: they mirror
+        # live sizing (control arm). Live mode keeps the global anchor +
+        # growth-rail lever regardless.
+        if own and self.mode != "lighter_live":
             return paper_default
         base = float(os.environ.get("LIGHTER_ORDER_USD", "30"))
         # [2026-07-15 GROWTH RAIL — live lane] lighter_live clips carry the

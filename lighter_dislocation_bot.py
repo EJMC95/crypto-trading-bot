@@ -63,6 +63,12 @@ CONFIRM_LOOPS = int(os.environ.get("DISLOC_CONFIRM_LOOPS", "2"))
 MAX_ENTRY_SLIP_BPS = float(os.environ.get("DISLOC_MAX_ENTRY_SLIP_BPS", "30"))
 HARD_STOP = float(os.environ.get("DISLOC_HARD_STOP", "0.05"))
 MAX_HOLD_S = float(os.environ.get("DISLOC_MAX_HOLD_S", "7200"))
+# [2026-07-16 ZOMBIE GUARD] a held coin whose HL reference vanished, whose
+# Lighter book went dark, or that got delisted skipped even the HARD STOP
+# (`continue` before the manage block). Give up at the last usable exit
+# price after this long unmanageable — but only while the reference feed
+# itself is alive (a whole-feed outage must never flatten the book).
+DELIST_GIVEUP_H = float(os.environ.get("DISLOC_DELIST_GIVEUP_H", "6"))
 DAILY_LOSS_LIMIT = float(os.environ.get("DISLOC_DAILY_LOSS", "0.05"))
 
 LOOP_SECONDS = int(os.environ.get("DISLOC_LOOP_SECONDS", "90"))
@@ -164,8 +170,11 @@ def main():
                          "evidence; go-live is a separate decision.")
     bot_id = ctx.bot_id
     broker = ctx.broker
-    order_usd = ctx.order_usd(ORDER_USD)
-    max_open = ctx.max_open_positions(MAX_OPEN_POSITIONS)
+    order_usd = ctx.order_usd(ORDER_USD, own=True)   # backtested $10 clip
+    # [2026-07-16 AUDIT] the bot's own cap stays senior: floor(cap/clip) can
+    # exceed DISLOC_MAX_OPEN when a notional-cap env is set (the sniper
+    # already min()s — this didn't).
+    max_open = min(MAX_OPEN_POSITIONS, ctx.max_open_positions(MAX_OPEN_POSITIONS))
     shadow_tag = ctx.mode == "lighter_shadow"
 
     meta = {}            # coin -> {is_long, entry, opened_ts, ref_at_entry}
@@ -274,6 +283,7 @@ def main():
                     "liq_5m": c.get("liq_5m"), "liq_1h": c.get("liq_1h")}
 
         events_this_loop = 0
+        managed = set()   # held coins the manage block could actually price
         if ref:
             for coin in COINS:
                 r = ref.get(coin)
@@ -313,6 +323,9 @@ def main():
                     exit_px = bv["sell_vwap"] if is_long else bv["buy_vwap"]
                     if exit_px is None:
                         continue
+                    managed.add(coin)
+                    held.pop("no_px_since", None)   # priceable — reset clock
+                    held["last_px"] = exit_px
                     reason = None
                     if abs(dev_bps) <= EXIT_BPS:
                         reason = "converged"
@@ -380,6 +393,31 @@ def main():
                              "mctx": _mctx_slice(coin)})
                 except Exception:  # noqa: BLE001
                     pass
+            # [2026-07-16 ZOMBIE GUARD] held coins the loop above could not
+            # manage this pass (ref gone for THIS coin / unsupported / book
+            # dark / removed from COINS). Runs only inside `if ref:` so a
+            # whole-feed outage never advances the clocks.
+            for coin in [c for c in list(meta) if c not in managed]:
+                held = meta.get(coin) or {}
+                first = held.get("no_px_since")
+                if not isinstance(first, (int, float)):
+                    held["no_px_since"] = time.time()
+                    meta[coin] = held
+                    continue
+                if (time.time() - first) / 3600.0 < DELIST_GIVEUP_H:
+                    continue
+                ent = held.get("entry") or 0.0
+                zpx = float(held.get("last_px") or ent or 0.0)
+                if not zpx:
+                    continue
+                pnl = broker.close(coin, zpx)
+                n_closed += 1
+                n_wins += 1 if pnl > 0 else 0
+                _record_close(bot_id, coin, ent, held.get("opened_ts"), zpx,
+                              pnl, held.get("is_long", True), "delisted",
+                              venue="lighter", shadow=shadow_tag)
+                meta.pop(coin, None)
+                log.warning("DELIST GIVE-UP CLOSE %s @ %.6g", coin, zpx)
         else:
             log.info("reference-blind (no HL mids) — no signals this loop.")
 

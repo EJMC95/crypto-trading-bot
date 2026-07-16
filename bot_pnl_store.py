@@ -861,9 +861,38 @@ def _ensure_history_table(conn):
     _history_table_ready = True
 
 
+_HISTORY_KEEP_DAYS = float(os.environ.get("BOT_STATE_HISTORY_KEEP_DAYS", "60"))
+_hist_writes = 0
+
+
+def prune_history(conn=None, keep_days=None):
+    """[2026-07-16 AUDIT FIX] bot_state_history had NO retention anywhere in
+    the repo (~400+ rows/day from the 15-Jul organs alone — the shared
+    Railway Postgres bloated indefinitely). Deletes rows older than
+    keep_days (default 60 — every consumer reads days, not months: brain
+    lens grading, replay tape, regen last-good 24h, /bus.json?hours<=200).
+    Returns rows deleted, or None on DB trouble. Never raises."""
+    conn = conn or _get_conn()
+    if conn is None:
+        return None
+    try:
+        _ensure_history_table(conn)
+        days = float(keep_days if keep_days is not None else _HISTORY_KEEP_DAYS)
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM bot_state_history WHERE ts < now() - "
+                "make_interval(days => %s)", (days,))
+            return cur.rowcount
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"history prune failed ({e})")
+        return None
+
+
 def save_history(key, payload):
     """Append one snapshot to bot_state_history (oracle calls, risk lights) so
-    the shared layers become backtestable. Safe every loop. Never raises."""
+    the shared layers become backtestable. Safe every loop. Never raises.
+    Every ~200th write also age-prunes the table (see prune_history)."""
+    global _hist_writes
     conn = _get_conn()
     if conn is None:
         return False
@@ -874,6 +903,12 @@ def save_history(key, payload):
                 "INSERT INTO bot_state_history (key, ts, payload) "
                 "VALUES (%s, now(), %s)",
                 (key, json.dumps(payload)))
+        _hist_writes += 1
+        if _hist_writes % 200 == 0:
+            n = prune_history(conn)
+            if n:
+                print(f"[bot_pnl_store] history prune: {n} rows older than "
+                      f"{_HISTORY_KEEP_DAYS:g}d removed", flush=True)
         return True
     except Exception as e:
         _warn_once(f"history write failed ({e})")

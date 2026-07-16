@@ -27,6 +27,17 @@ misses), and does `event_window` sample honestly at the 5-min cadence?
 <<<<<<< HEAD
 ## 12. 16-Jul fleet-wide bug audit: deferred findings (fixes shipped separately)
 
+**STATUS UPDATE (16-Jul evening, operator blanket approval "you have my
+approval / get around me having to do anything"):** items (i) zombie
+positions, (ii) replay mark universe, (iii) per-bot clips (fixed in CODE —
+no Railway env change needed), (iv) census double-count, (vi) history
+retention, and the (viii) smaller items K-prefix + sniper W/L + Snap Back
+max_open are **SHIPPED** (CHANGELOG 2026-07-16 (ag)). At this review, grade
+their first days instead of deciding them. Still open below: (v) merge
+race (bounded, deliberate), (vii) live fill prices (needs the real signer
+fill response — the one item touching the live order path), and the
+remaining (viii) measurement-grade items.
+
 Six parallel adversarial audits (live-money surface, 15-Jul organs, core
 intelligence, scanners, shadow bots, dashboard/watchdog) ran 16-Jul on the
 operator's "have all bugs been fixed" request. Every finding rated

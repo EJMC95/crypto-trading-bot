@@ -289,12 +289,17 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
         "oi_moves": oi_moves[:TOP_N],
         "new_listings": new_listings[:20],
         "delisted": delisted[:20],
-        # [2026-07-15 BRAIN LENS-FORWARD] compact liquid-book price map that
-        # SURVIVES into bot_state_history (unlike _marks) — the brain joins
-        # each ticket@T with marks@T+h to grade every lens counterfactually
-        # on forward returns, not just the ~6 tickets the taker trades.
+        # [2026-07-15 BRAIN LENS-FORWARD] compact price map that SURVIVES
+        # into bot_state_history (unlike _marks) — the brain joins each
+        # ticket@T with marks@T+h to grade every lens counterfactually.
+        # [2026-07-16 AUDIT FIX] ALL active books, not liquid-only: the live
+        # taker marks and exits from the full active set, so a liquid-only
+        # tape meant replayed positions whose book dropped below the volume
+        # floor mid-hold could never exit and were valued at ENTRY — an
+        # optimistic bias in closed_net, the exact metric the tuner and
+        # incubator accept on. (~215 vs ~130 symbols; a few KB per snapshot.)
         "marks": {s: float(f'{v["last"]:.6g}')
-                  for s, v in liquid.items() if v.get("last")},
+                  for s, v in stats.items() if v.get("last")},
         # compact diff base for the NEXT run (all active books, not just liquid,
         # so listings/delistings diff over the full set)
         "_marks": {s: [round(v["qvol"], 2), round(v["oi"], 4)]

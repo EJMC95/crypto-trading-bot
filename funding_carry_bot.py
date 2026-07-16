@@ -58,6 +58,10 @@ MIN_DAY_VOLUME = 2e6      # only coins with >= $2M 24h notional volume [2026-07-
 ENTER_APR = 0.40          # open when |annualized funding| >= 40% [2026-07-06 raised from 20% to avoid fee bleed on fast-decaying rates]
 EXIT_APR = 0.15           # close when it decays below 15% [2026-07-06 raised from 8% to exit before fees eat accrual]
 MAX_HOLD_H = 14 * 24      # recycle capital after 2 weeks [2026-07-06 extended from 7d to let high-rate carries compound]
+# [2026-07-16 ZOMBIE GUARD] close a carry whose coin has been continuously
+# absent from the funding map this long (delisted): the position could never
+# expire and its fees dragged equity forever.
+DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 
 # [2026-07-07 EXIT REBUILD] 0W/28L root cause: decay-exits realized fees before
 # funding could pay them back (round-trip 29bps needs ~64h at 40% APR; spiky alt
@@ -242,7 +246,39 @@ def main():
                 pos = positions[coin]
                 f = fund.get(coin)
                 if f is None:
-                    continue  # coin missing this poll; accrual just pauses
+                    # [2026-07-16 ZOMBIE GUARD] a coin that leaves the funding
+                    # map used to pause EVERYTHING including max-hold — the
+                    # carry could never expire and its open fees dragged
+                    # equity forever. Delta-neutral, so the harm is slot +
+                    # fees; give up after DELIST_GIVEUP_H continuously absent
+                    # (modelled close cost — the live book is gone).
+                    first = pos.setdefault("missing_since", t0)
+                    if (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
+                        continue
+                    pos["fees"] += OPEN_COST * pos["notional"] + \
+                        HEDGE_COST * pos["notional"]
+                    pnl = pos["accrued"] - pos["fees"]
+                    realized += pnl
+                    n_closed += 1
+                    n_wins += 1 if pnl > 0 else 0
+                    held_h = (t0 - pos["opened_ts"]) / 3600.0
+                    print(f"[{now_iso()}] CLOSE {coin} {pos['side']} after "
+                          f"{held_h:.1f}h | accrued {pos['accrued']:+.2f} fees "
+                          f"{pos['fees']:.2f} | pnl {pnl:+.2f} [delisted] "
+                          f"| realized {realized:+.2f}")
+                    try:
+                        store.publish_paper_trade(
+                            bot_id, trade_id=f"{coin}:{pos['opened_ts']:.0f}",
+                            pnl_abs=pnl, pnl_pct=pnl / pos["notional"], pair=coin,
+                            opened_at=datetime.fromtimestamp(
+                                pos["opened_ts"], timezone.utc).isoformat(),
+                            closed_at=datetime.now(timezone.utc).isoformat(),
+                            reason="delisted", venue=venue_tag, shadow=shadow_tag)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    del positions[coin]
+                    continue
+                pos.pop("missing_since", None)   # back in the map — reset clock
                 rate = f["rate"]
                 apr = rate * HOURS_PER_YEAR
                 # Accrue at the LIVE rate: we receive |funding| while it keeps
