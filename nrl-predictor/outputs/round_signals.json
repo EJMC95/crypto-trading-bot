@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 20,
- "scanned_at": "2026-07-16T07:43:28+00:00",
+ "scanned_at": "2026-07-16T09:03:13+00:00",
  "games": [
   {
    "home": "Penrith Panthers",
@@ -337,7 +337,7 @@
    "home_id": "CRO",
    "away_id": "NEW",
    "kickoff": "2026-07-17 18:00:00",
-   "team_lists_confirmed": true,
+   "team_lists_confirmed": false,
    "home_17": [
     {
      "number": 1,
@@ -461,15 +461,6 @@
      "position": "Interchange",
      "player": "Hohepa Puru",
      "player_id": 35545,
-     "is_starter": false,
-     "is_spine": false,
-     "status": null
-    },
-    {
-     "number": 15,
-     "position": "Interchange",
-     "player": "Siosifa Talakai",
-     "player_id": 22775,
      "is_starter": false,
      "is_spine": false,
      "status": null
@@ -2004,17 +1995,7 @@
    "weather": null,
    "news": [],
    "news_home": [],
-   "news_away": [
-    {
-     "headline": "Wests Tigers v Warriors: Luai returns: Fisher-Harris back on deck - NRL.com",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMiogFBVV95cUxPbWVnYmxnc0lObEFGcC1vRGQtTXY1MldjTWhQZ0V3cW5fSkd1elAwWlozU0FHSzBCTk1iRE5EOE5rWUw0N0RGblF2Q1ZNdldzMnVsdG9kN284T2FCY0dBM0tfWE1EcGxxeUF0LWt5ejR3OHl5aVJLZWVIUDBwSm1iSFY2ZENGSnVwejR1WG1vWlpfWVJ3XzZWVDBFbENTTnJCV0E?oc=5",
-     "published": "Fri, 10 Jul 2026 08:33:14 GMT"
-    }
-   ]
+   "news_away": []
   },
   {
    "home": "Gold Coast Titans",
@@ -2333,7 +2314,13 @@
      "status": null
     }
    ],
-   "weather": null,
+   "weather": {
+    "precip_mm": 1.1,
+    "precip_prob": 63,
+    "wind_kmh": 30.8,
+    "temp_c": 18.2,
+    "forecast_hour": "2026-07-19T14:00"
+   },
    "news": [],
    "news_home": [
     {

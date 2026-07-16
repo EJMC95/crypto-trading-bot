@@ -4,7 +4,7 @@ _Blend = Elo+Poisson logistic stack (validated 2015–2025: Brier 0.2188 vs mark
 
 | fixture | kickoff | blend P(home) | market P(home) | margin | total | call |
 |---|---|---|---|---|---|---|
-| Penrith Panthers v Brisbane Broncos | Thu 16 Jul 19:50 | 80.7% | 77.7% | +6.4 | 47 | Penrith Panthers (81%, strong) |
+| Penrith Panthers v Brisbane Broncos | Thu 16 Jul 19:50 | 80.7% | 77.0% | +6.4 | 47 | Penrith Panthers (81%, strong) |
 | Cronulla-Sutherland Sharks v Newcastle Knights | Fri 17 Jul 18:00 | 70.8% | 68.7% | +4.0 | 49 | Cronulla-Sutherland Sharks (71%, strong) |
 | Sydney Roosters v Melbourne Storm | Fri 17 Jul 20:00 | 65.0% | 74.8% | +2.0 | 48 | Sydney Roosters (65%, lean) |
 | Canberra Raiders v South Sydney Rabbitohs | Sat 18 Jul 15:00 | 54.0% | 48.9% | -0.3 | 47 | Canberra Raiders (54%, coin flip) |
@@ -18,6 +18,7 @@ _Blend = Elo+Poisson logistic stack (validated 2015–2025: Brier 0.2188 vs mark
 - Manly-Warringah Sea Eagles in Gold Coast Titans v Manly-Warringah Sea Eagles: model edge +9.2% vs consensus, EV +9.4% at best price (4 books)
 - Dolphins in Dolphins v North Queensland Cowboys: model edge +7.8% vs consensus, EV +7.9% at best price (4 books)
 - Canberra Raiders in Canberra Raiders v South Sydney Rabbitohs: model edge +5.0% vs consensus, EV +5.3% at best price (4 books)
+- Penrith Panthers in Penrith Panthers v Brisbane Broncos: model edge +3.7% vs consensus, EV +0.1% at best price (4 books)
 - _Caveat: on a fresh model most 'edges' are model error, not market error — the paper ledger exists to measure which. No real money._
 
 **Model spread this round:** games where the tiers disagree by >10% are the ones to watch for team-list news — that disagreement is usually roster signal one model has and the other hasn't.
