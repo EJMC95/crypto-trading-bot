@@ -130,6 +130,12 @@ _last_publish = {"kwargs": None, "ts": 0.0}
 # process still goes stale on the dashboard instead of being masked forever.
 HEARTBEAT_SECONDS = 60
 HEARTBEAT_GIVE_UP_SECONDS = 30 * 60
+# [2026-07-16] The fleet's paper-book convention ($1,000 start, NO top-ups —
+# CLAUDE.md Rules). This bot published pnl_abs but never `equity`, so
+# bot_equity_history stored NULL for it and its dashboard GO-LIVE GATE read
+# "dd —" / "age —" forever (the gate filters equity IS NOT NULL). Same basis
+# the other paper books use (PaperBroker start_equity=1000).
+START_EQUITY = 1000.0
 
 
 def _heartbeat_loop():
@@ -1201,6 +1207,13 @@ def monitor(cfg, exchange_ids):
                 unrealized += ((_lp / _p["entry"]) - 1.0) * _p["stake_quote"] * _p.get("remaining_frac", 1.0)
                 n_priced += 1
         _pub_kwargs = dict(status="online",
+                           # [2026-07-16] equity = paper start + realized +
+                           # open unrealized. Never published before, so this
+                           # bot's dd/age go-live gates were permanently blank.
+                           # Only equity rows from now on carry a value, so the
+                           # age gate honestly counts the equity track record
+                           # we actually have (0/30d), not the bot's uptime.
+                           equity=round(START_EQUITY + realized + unrealized, 2),
                            pnl_abs=realized, open_trades=len(positions),
                            closed_trades=nclosed, wins=wins, losses=nclosed - wins,
                            extra={"pending": len(pending), "exchanges_ok": ok_n,

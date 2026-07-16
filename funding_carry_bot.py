@@ -281,7 +281,17 @@ def main():
                             opened_at=datetime.fromtimestamp(
                                 pos["opened_ts"], timezone.utc).isoformat(),
                             closed_at=datetime.now(timezone.utc).isoformat(),
-                            reason="delisted", venue=venue_tag, shadow=shadow_tag)
+                            # [2026-07-16] prefix the DIRECTION so the close
+                            # carries an entry tag. A bare reason is untagged
+                            # by design (split_reason, 14-Jul: treating
+                            # 'flip'/'delisted' as entry modes cost the brain
+                            # 92 runs) — the fix belongs HERE, not in the
+                            # parser. First-underscore split keeps the exit
+                            # intact: 'short_delisted' -> tag short / exit
+                            # delisted.
+                            reason=("short_" if pos["side"] == "short_perp"
+                                    else "long_") + "delisted",
+                            venue=venue_tag, shadow=shadow_tag)
                     except Exception:  # noqa: BLE001
                         pass
                     del positions[coin]
@@ -351,7 +361,13 @@ def main():
                         opened_at=datetime.fromtimestamp(
                             pos["opened_ts"], timezone.utc).isoformat(),
                         closed_at=datetime.now(timezone.utc).isoformat(),
-                        reason=reason, venue=venue_tag, shadow=shadow_tag)
+                        # [2026-07-16] direction prefix — see the delisted
+                        # close above. 'short_' + 'decay_paid' splits back to
+                        # tag short / exit decay_paid, so the brain can finally
+                        # grade this book's two directions separately.
+                        reason=("short_" if pos["side"] == "short_perp"
+                                else "long_") + reason,
+                        venue=venue_tag, shadow=shadow_tag)
                 except Exception:
                     pass
                 del positions[coin]

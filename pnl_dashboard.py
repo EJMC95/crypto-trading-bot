@@ -2298,13 +2298,23 @@ ORGAN_SPECS = [
     # Only immune + respiration are watchdog-critical for the first rollout
     # (a DARK immune/lungs = the fleet is flying blind); the rest bed in as
     # non-critical to avoid a pager storm, promote per-organ once proven.
-    ("fleet-tuning",       "🎚️ Fleet tuning — active levers",        False, 7200),
+    # [2026-07-16] EVENT, not TTL'd: write_levers() returns None and writes
+    # NOTHING when no lever is authored, so a quiet key means "no levers
+    # active — they auto-reverted", which is the HEALTHY resting state, not a
+    # dead organ. It sat permanently DARK on a calm fleet, which is exactly
+    # how operators learn to ignore DARK. The tuner's real liveness is proven
+    # by 'scout-tuner' below, which IS an unconditional per-run heartbeat.
+    ("fleet-tuning",       "🎚️ Fleet tuning — active levers",        False, None),
     ("scout-tuner",        "🔧 Scout tuner — self-enacted levers",    False, 10800),
     # [2026-07-16] proprioception — the growth rail grading its own
     # enactments (out-of-sample); the tuner consumes hurting verdicts.
     ("fleet-proprioception", "🦾 Proprioception — enactment outcomes", False, 2700),
     ("strategy-incubator", "🧬 Incubator — champion genotype",        False, 10800),
-    ("xp-queue",           "📥 XP queue — candidates for the judge",  False, 10800),
+    # [2026-07-16] EVENT for the same reason: the incubator's only
+    # save_state('xp-queue') is guarded by `if props:`, so an empty queue is
+    # never rewritten. Silence = "nothing new to propose" = normal. The
+    # incubator's own 'strategy-incubator' payload above is its heartbeat.
+    ("xp-queue",           "📥 XP queue — candidates for the judge",  False, None),
     ("xp-judge",           "⚖️ XP judge — promotion state machine",   False, 10800),
     ("fleet-immune",       "🛡️ Fleet immune — sick/quarantine",       True,  2400),
     ("fleet-regen",        "🩹 Fleet regen — auto-heal",              False, 2400),
