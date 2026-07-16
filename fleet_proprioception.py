@@ -39,14 +39,28 @@ WHAT IT DOES (hourly-ish, run-once, looped by run_all.sh)
      hurting / neutral / insufficient. HURTING exists only on the taker
      lane — the one lane with a real $ counterfactual. Joint stances share
      blame across their levers (conservative in the restrict direction).
-  4. CONSUMPTION (restrict-only, the doctrine's always-allowed direction):
-     lighter_scout_tuner drops any would-be enactment whose lever carries a
-     fresh HURTING verdict — the tuner stops repeating a movement that
-     measured net-negative in reality, even when in-sample replay still
-     likes it. The evidence board surfaces helping (expand evidence for the
-     review) and hurting (warn) items. Fail-safe: a dark/stale
-     proprioception restricts NOTHING (levers stay bounded + TTL'd
-     regardless; a dead sense must not paralyze the body).
+  4. CONSUMPTION — both directions since 16-Jul evening (operator:
+     "implement the expanding side ... so the July 21 [review] can review
+     both sides"):
+       RESTRICT: lighter_scout_tuner drops any would-be enactment whose
+         lever carries a fresh HURTING verdict — the tuner stops repeating
+         a movement that measured net-negative in reality, even when
+         in-sample replay still likes it.
+       EXPAND (every consumer stays inside its own gates — registry
+         clamps, TTL, per-notch replay margins, brain veto senior):
+         a HELPING taker lever unlocks the tuner's improve-both-halves
+         expansion walk BEFORE the brain's ruling floor (the episode
+         counterfactual is an independent evidence bar); a HELPING scout
+         diet lever walks one notch DEEPER while its lens is under the
+         floor; a HELPING gapscout lever discounts the board's
+         widen-ladder quiet-hour bars (x0.75, 12h floor) so a net that
+         has measurably found things re-widens sooner. The live lane
+         earns NOTHING here — the judge's paired bar stays the only road
+         to real money.
+     The evidence board surfaces helping (expand evidence) and hurting
+     (warn) items. Fail-safe BOTH WAYS: a dark/stale proprioception
+     restricts nothing and earns nothing (levers stay bounded + TTL'd
+     regardless; a dead sense must not paralyze — or embolden — the body).
 
 WHAT IT NEVER DOES
   Open positions, write or widen any lever, touch real money, or override
@@ -349,16 +363,30 @@ def lever_verdicts(episodes):
     return out
 
 
-def hurting_levers(state, now, fallback_ttl=TTL_SEC):
-    """The one thing an AUTHOR consumes: fresh HURTING lever names. Fail-safe
-    empty — a dark/stale/absent proprioception restricts nothing."""
+def _verdict_levers(state, now, verdict, fallback_ttl):
     try:
         if not state or not _fresh(state, now, fallback_ttl):
             return {}
         return {k: v for k, v in (state.get("verdicts") or {}).items()
-                if isinstance(v, dict) and v.get("verdict") == "hurting"}
+                if isinstance(v, dict) and v.get("verdict") == verdict}
     except Exception:
         return {}
+
+
+def hurting_levers(state, now, fallback_ttl=TTL_SEC):
+    """The restrict-side consumer hook: fresh HURTING lever names. Fail-safe
+    empty — a dark/stale/absent proprioception restricts nothing."""
+    return _verdict_levers(state, now, "hurting", fallback_ttl)
+
+
+def helping_levers(state, now, fallback_ttl=TTL_SEC):
+    """[2026-07-16 later, operator: 'implement the expanding side'] The
+    expand-side consumer hook: fresh HELPING lever names. Fail-safe empty —
+    a dark organ EARNS nothing either (symmetry with hurting: no verdict, no
+    effect in either direction). Every consumer of this stays bounded by its
+    own gates: the tuner's per-notch replay improvement rule, the board's
+    ladder values, fleet_tuning's registry clamps + TTL."""
+    return _verdict_levers(state, now, "helping", fallback_ttl)
 
 
 # ---------------------------------------------------------------------------
@@ -617,14 +645,17 @@ def _selftest():
     # non-graded episodes contribute nothing
     assert lever_verdicts([dict(tk_ep(-9), status="too-short")]) == {}
 
-    # the consumer hook: fresh hurting surfaces; stale/absent restricts nothing
+    # the consumer hooks: fresh verdicts surface on their own side ONLY;
+    # stale/absent restricts nothing AND earns nothing (symmetry)
     fresh_state = {"updated": _iso(now), "ttl_sec": TTL_SEC,
                    "verdicts": {"taker.dip_range": {"verdict": "hurting"},
                                 "taker.tp": {"verdict": "helping"}}}
     assert set(hurting_levers(fresh_state, now)) == {"taker.dip_range"}
+    assert set(helping_levers(fresh_state, now)) == {"taker.tp"}
     stale = dict(fresh_state, updated="2020-01-01T00:00:00+00:00")
-    assert hurting_levers(stale, now) == {}
+    assert hurting_levers(stale, now) == {} and helping_levers(stale, now) == {}
     assert hurting_levers({}, now) == {} and hurting_levers(None, now) == {}
+    assert helping_levers({}, now) == {} and helping_levers(None, now) == {}
 
     # every graded lane's levers are registry-known (a rename there must
     # break HERE, not silently stop grading)
@@ -634,7 +665,8 @@ def _selftest():
     print("fleet_proprioception selftest OK (grouping, episode lifecycle "
           "incl. backdated release + daily slice, replay counterfactual "
           "win/lose/too-short, scout throughput, gapscout activity, live "
-          "record-only, verdict floors + joint blame, fail-safe consumer hook)")
+          "record-only, verdict floors + joint blame, fail-safe hurting+"
+          "helping consumer hooks)")
 
 
 if __name__ == "__main__":

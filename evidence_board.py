@@ -270,14 +270,40 @@ WIDEN_LADDER = [
             "gapscout.extra_exchanges": "kucoin,gateio"}),
     (96.0, {"gapscout.extra_exchanges": "kucoin,gateio,mexc"}),
 ]
+# [2026-07-16 expand side] when proprioception has graded the widened net
+# HELPING (a past widening measurably coincided with census activity), the
+# quiet-hour bars are discounted so the net re-widens SOONER — the ladder's
+# VALUES never change, only how long the board waits to climb it. Bounded:
+# fixed scale, hard floor on the effective bar.
+GAPSCOUT_HELP_SCALE = float(os.environ.get("EVBOARD_GAPSCOUT_HELP_SCALE", "0.75"))
+WIDEN_BAR_MIN_H = float(os.environ.get("EVBOARD_WIDEN_BAR_MIN_H", "12"))
 
 
-def widen_step(quiet_hours):
+def gapscout_bar_scale(prop_state):
+    """GAPSCOUT_HELP_SCALE when any fresh proprioception verdict grades a
+    gapscout.* lever HELPING, else 1.0. Fail-safe 1.0 — a dark organ earns
+    nothing. Pure — selftested offline."""
+    try:
+        if not prop_state or not _fresh(prop_state, max_age_s=float(
+                prop_state.get("ttl_sec") or 2700)):
+            return 1.0
+        for lever, v in (prop_state.get("verdicts") or {}).items():
+            if (str(lever).startswith("gapscout.") and isinstance(v, dict)
+                    and v.get("verdict") == "helping"):
+                return GAPSCOUT_HELP_SCALE
+    except Exception:  # noqa: BLE001
+        return 1.0
+    return 1.0
+
+
+def widen_step(quiet_hours, bar_scale=1.0):
     """(step, merged_levers) for a census this many hours quiet. Monotone;
-    later steps inherit (and may override) earlier steps' levers."""
+    later steps inherit (and may override) earlier steps' levers. bar_scale
+    < 1 (proprioception HELPING) lowers the quiet-hour bars, never below
+    WIDEN_BAR_MIN_H."""
     step, levers = 0, {}
     for i, (bar, lv) in enumerate(WIDEN_LADDER, 1):
-        if quiet_hours >= bar:
+        if quiet_hours >= max(WIDEN_BAR_MIN_H, bar * bar_scale):
             step = i
             levers.update(lv)
     return step, levers
@@ -623,7 +649,8 @@ def run_once():
                                tuner_state, bot_rows, lm, now, xp_state)
 
     # 🦾 proprioception: what the autonomy stack's own movements measured
-    synth += synthesize_proprioception(_g("fleet-proprioception"), now)
+    prop_b = _g("fleet-proprioception")
+    synth += synthesize_proprioception(prop_b, now)
 
     # implementation shortfall (live execution quality) — its own tracker
     # pushes the phone alert; the board only SURFACES the verdict (dedicated-
@@ -655,12 +682,15 @@ def run_once():
     growth_step, growth_levers, quiet_h = 0, {}, 0.0
     if _fresh(census, max_age_s=3600):
         quiet_h = float(census.get("quiet_hours") or 0.0)
-        growth_step, growth_levers = widen_step(quiet_h)
+        bar_scale = gapscout_bar_scale(prop_b)
+        growth_step, growth_levers = widen_step(quiet_h, bar_scale)
         if growth_step:
             synth.append({
                 "key": "board:gapscout-quiet", "severity": "info",
                 "msg": f"🌱 Gap Scout census quiet {quiet_h:.0f}h — detection "
-                       f"net widened to step {growth_step}/{len(WIDEN_LADDER)}",
+                       f"net widened to step {growth_step}/{len(WIDEN_LADDER)}"
+                       + (f" (bars ×{bar_scale:g} — 🦾 the wider net has "
+                          f"helped before)" if bar_scale < 1.0 else ""),
                 "proposal": "widen (ENACTED via fleet_tuning): " + ", ".join(
                     f"{k}={v}" for k, v in sorted(growth_levers.items())),
                 "lever": "growth-rail", "direction": "expand",
@@ -974,6 +1004,25 @@ def _selftest():
     s3, lv3 = widen_step(200)
     assert s3 == 3 and lv3["gapscout.extra_exchanges"] == "kucoin,gateio,mexc"
     assert lv3["gapscout.max_book_fetches"] == 60, "step 3 inherits step 2"
+    # 🦾 expand side: a HELPING gapscout verdict discounts the quiet bars
+    # (values unchanged, only the wait) — with a hard floor on the bar
+    assert widen_step(19) == (0, {}), "19h quiet: no step at full bars"
+    s1h, lv1h = widen_step(19, 0.75)
+    assert s1h == 1 and lv1h["gapscout.prefilter_gap"] == 0.0015, (s1h, lv1h)
+    assert widen_step(37, 0.75)[0] == 2, "48h bar -> 36h under the discount"
+    assert widen_step(11, 0.4)[0] == 0, "WIDEN_BAR_MIN_H floors the bar (12h)"
+    assert widen_step(13, 0.4)[0] == 1
+    # scale sourcing: fresh helping gapscout verdict -> discount; a helping
+    # TAKER verdict, a stale organ, or nothing -> full bars
+    prop_gs = {"updated": fresh, "ttl_sec": 2700, "verdicts": {
+        "gapscout.prefilter_gap": {"verdict": "helping", "n": 2}}}
+    assert gapscout_bar_scale(prop_gs) == GAPSCOUT_HELP_SCALE
+    assert gapscout_bar_scale({"updated": fresh, "ttl_sec": 2700, "verdicts": {
+        "taker.tp": {"verdict": "helping"},
+        "gapscout.prefilter_gap": {"verdict": "neutral"}}}) == 1.0
+    assert gapscout_bar_scale(dict(prop_gs,
+                                   updated="2020-01-01T00:00:00+00:00")) == 1.0
+    assert gapscout_bar_scale({}) == 1.0 and gapscout_bar_scale(None) == 1.0
     # every ladder value must be registered AND in-bounds in fleet_tuning —
     # a ladder entry that would be clamped/dropped is a config bug HERE.
     if tuning is not None:

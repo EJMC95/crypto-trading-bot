@@ -86,12 +86,18 @@ https://pnl-dashboard-production-858c.up.railway.app/
   judge + fade-watch stay the real-money authority). Per-lever verdicts
   helping/hurting/neutral (floors n≥2 episodes, ±$3; HURTING exists only
   on the taker lane — the one lane with a $ counterfactual; joint stances
-  share blame, conservative in the restrict direction). CONSUMED
-  restrict-only: the scout tuner refuses to re-assert a HURTING lever
-  (`apply_proprioception`); the board surfaces 🦾 items (hurting=warn,
-  helping=expand evidence for the review); immune scans the payload.
-  Fail-safe: a dark organ restricts nothing. Expand-side consumption
-  deliberately unwired until the 21-Jul review (agenda item 12). →
+  share blame, conservative in the restrict direction). CONSUMED BOTH
+  WAYS (16-Jul evening, operator: "implement the expanding side ... so
+  the July 21 can review both sides"): RESTRICT — the scout tuner refuses
+  to re-assert a HURTING lever (`apply_proprioception`); EXPAND — a
+  HELPING taker lever unlocks the tuner's improve-both-halves expansion
+  walk before the brain's ruling floor (brain veto stays senior), a
+  HELPING diet lever walks one notch deeper, a HELPING gapscout lever
+  discounts the board's widen-ladder bars (×0.75, 12h floor). The live
+  lane earns nothing — the judge's paired bar stays the only road to real
+  money. Board surfaces 🦾 items (hurting=warn, helping=expand); immune
+  scans the payload. Fail-safe both ways: a dark organ restricts nothing
+  AND earns nothing. Review grades both sides — agenda item 12. →
   bot_state `fleet-proprioception`
 - `experiment_judge.py` 🧪⚖️ — the shadow→live PROMOTION pipeline (15-Jul
   user mandate: shadow wins must "carry across to the real money bots").

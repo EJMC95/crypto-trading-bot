@@ -348,6 +348,24 @@ scans the payload; /vitals + autonomy card render it.
   tuner enacted next cycle (the `scout-tuner` log carries the skip line)?
 - Verdict floors: are n≥2 / ±$3 (`PROP_MIN_EPISODES`/`PROP_HURT_USD`)
   the right bar, or does a week of episodes argue for more evidence?
-- Decide whether HELPING verdicts should earn anything (e.g. the tuner
-  holding a helping lever's notch longer) — expand-side consumption is
-  deliberately NOT wired until this review rules on it.
+
+**Expand side (wired 16-Jul evening, operator: "implement the expanding
+side of things now so the July 21 can review both sides"):** HELPING now
+earns, inside the existing gates — (i) a HELPING taker lever unlocks the
+tuner's improve-both-halves expansion walk BEFORE the brain's ruling
+floor (brain veto stays senior; every notch still replay-gated); (ii) a
+HELPING scout diet lever walks one notch deeper while its lens is under
+the floor (advisory tickets only, released at the floor); (iii) a
+HELPING gapscout lever discounts the board's widen-ladder quiet-hour
+bars ×0.75 (12h hard floor — values unchanged, only the wait). The live
+lane earns NOTHING (judge's paired bar stays the only road to real
+money). Grade BOTH sides at the review:
+- Did any HELPING verdict fire, and did it change an enactment (tuner
+  log carries "proprio-helping"; board 🌱 item carries "bars ×0.75")?
+- Was every helping-unlocked notch still margin-positive on both halves
+  when spot-checked by hand?
+- Is ×0.75 / 12h the right ladder discount, and should helping DECAY
+  faster than the verdict window's n=10 episodes?
+- Symmetry check: over the week, did the restrict side (hurting-skip)
+  and the expand side (helping-earn) fire in sane proportion, or is one
+  eye still dominant?
