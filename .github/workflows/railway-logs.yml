@@ -10,7 +10,8 @@ on:
       service:
         description: "Railway service name"
         required: false
-        default: "perps-regime-switch"
+        # [2026-07-16] was perps-regime-switch — decommissioned 12/13-Jul
+        default: "freqtrade-bots"
       lines:
         description: "How many recent log lines"
         required: false

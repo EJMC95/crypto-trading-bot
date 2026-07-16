@@ -26,10 +26,6 @@ on:
       - 'report_emailer.py'
       - 'compile_market_data.py'
       - 'Dockerfile.dashboard'
-      # perps-regime-switch service (no Railway-native auto-deploy — [2026-07-04]
-      # its Donchian-entry ship sat undeployed for 15h before this was added)
-      - 'run_regime.sh'
-      - 'Dockerfile.regime'
       # funding-carry service
       - 'funding_carry_bot.py'
       - 'Dockerfile.funding'
@@ -95,11 +91,11 @@ jobs:
             if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$)'; then
               svcs="${svcs:+$svcs,}pnl-dashboard"
             fi
-            # perps-regime-switch: surgical filter (its own files only) so a V5
-            # tweak doesn't churn this service; its volume keeps trades safe anyway.
-            if echo "$changed" | grep -qE '^(user_data/strategies/RegimeSwitchV[0-9]+\.py$|user_data/config_regimeswitch\.json$|run_regime\.sh$|Dockerfile\.regime$|bot_pnl_store\.py$|freqtrade_pnl_poller\.py$)'; then
-              svcs="${svcs:+$svcs,}perps-regime-switch"
-            fi
+            # [2026-07-16] perps-regime-switch REMOVED: the service was
+            # decommissioned in the 12/13-Jul retirement (RETIRED_ROWS), so
+            # `railway up` returned "Service not found" x3 on every
+            # bot_pnl_store.py change — two red runs + failure emails on
+            # 16-Jul while every LIVING service deployed fine.
             # funding-carry service
             if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$)'; then
               svcs="${svcs:+$svcs,}funding-carry"
