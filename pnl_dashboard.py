@@ -209,6 +209,21 @@ SCANNERS = {"scanner-cross-exchange-arb"}
 # the stock bots now. Bases stay listed so stock-class handling applies.
 STOCKS = {"equities-momentum", "equities-regime"}
 
+# [2026-07-16] Over-trading bar per bot CLASS (keyed by BASE name). The flat
+# 15/day was written when `quality` only saw the slow freqtrade books; once the
+# paper ledger joined it, the high-frequency-BY-DESIGN books would trip the
+# health banner on every load. These cadences are the design, not a fault:
+# a dislocation fader and a listing sniper are supposed to close often.
+OVERTRADE_LIMIT = {
+    "lighter-dislocation":   60,   # 🧲 Snap Back — fades every dislocation print
+    "lighter-ticket-taker":  40,   # 🎫 Ticket Taker — up to one per lens per cycle
+    "event-listing-sniper":  60,   # 🎯 Launch Sniper — every new CEX listing
+    "lighter-perp-sniper":   60,   # 🎯 Perp Sniper — same, on Lighter
+    "perps-funding-lighter": 40,   # 💸 Funding Farmer — 5-min loop, flips often
+    "perps-funding-spread":  40,   # ⚖️ Counterweight — x-sect L/S rebalances
+}
+OVERTRADE_DEFAULT = 15
+
 # The only bots that should appear. Anything else in the table (e.g. legacy
 # pre-rename rows perps-bot/momo-bot/v4core/v5gated/v6swing/v7momo/v8momo) is a
 # stale duplicate and is filtered out here so it can never skew totals or the
@@ -621,59 +636,108 @@ BADGES = {
 
 
 def fetch_bot_quality():
-    """{bot: quality dict} from closed bot_trades — win rate, profit factor,
-    expectancy and last-close age (the numbers raw W/L counts hide), plus
-    'since rework' era stats for the 2026-07-03 strategy changes."""
+    """{bot: quality dict} from closed trades in BOTH ledgers — win rate,
+    profit factor, expectancy, last-close age, 24h count and the per-mode
+    breakdown, plus 'since rework' era stats where an era is defined.
+
+    [2026-07-16 UNIFIED] This read bot_trades ONLY, so every Lighter bot —
+    including BOTH LIVE real-money rows (crypto-trend-daily-lighter,
+    perps-funding-lighter-lighter), which record to paper_trades — rendered
+    blank while retired Kraken paper rows showed full stats. The bots with
+    actual money had the least detail. Now every bot, live or shadow, gets
+    identical metrics.
+
+    Merged in SQL (UNION ALL -> GROUP BY bot), never client-side: wr/pf/exp
+    are RATIOS, recomputable only from summed gross-win/gross-loss.
+    Keys stay FULLY-SUFFIXED row ids — paper_trades.bot already carries the
+    venue suffix (venues/__init__.py), so normalizing would merge a live book
+    with its shadow twin. Ledger differences handled: pnl_abs vs profit_abs,
+    closed_at(TEXT) vs close_ts, and paper_trades' side='skip' rows (the
+    sniper's gate-rejection LOGS, not trades) which would poison every metric.
+    """
     import psycopg2
     conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT to_regclass('public.bot_trades') AS t")
-            if cur.fetchone()[0] is None:
+            parts = []
+            cur.execute("SELECT to_regclass('public.bot_trades')")
+            if cur.fetchone()[0] is not None:
+                # is_open IS NOT TRUE (not = FALSE): the column is nullable, and
+                # `= FALSE` silently drops closed-by-omission rows.
+                parts.append("""
+                    SELECT bot, profit_abs AS pnl_abs, close_ts, open_ts,
+                           COALESCE(enter_tag,'?') AS enter_tag,
+                           'bot_trades'::text AS src
+                    FROM bot_trades
+                    WHERE is_open IS NOT TRUE AND profit_abs IS NOT NULL""")
+            cur.execute("SELECT to_regclass('public.paper_trades')")
+            if cur.fetchone()[0] is not None:
+                # enter_tag from `reason` ('<dir>_<exit>' -> '<dir>'), mirroring
+                # bot_pnl_store.split_reason. NOT the `tag` column: Gap Scout
+                # writes a venue ROUTE there ("kraken->coinbaseexchange").
+                parts.append("""
+                    SELECT bot, pnl_abs,
+                           closed_at::timestamptz AS close_ts,
+                           CASE WHEN pg_input_is_valid(opened_at,'timestamptz')
+                                THEN opened_at::timestamptz END AS open_ts,
+                           COALESCE(NULLIF(CASE WHEN reason ~ '^(long|short)[_-]'
+                                                THEN split_part(reason,'_',1) END,''),
+                                    '?') AS enter_tag,
+                           'paper_trades'::text AS src
+                    FROM paper_trades
+                    WHERE closed_at IS NOT NULL
+                      AND pg_input_is_valid(closed_at,'timestamptz')
+                      AND side IS DISTINCT FROM 'skip'
+                      AND pnl_abs IS NOT NULL""")
+            if not parts:
                 return {}
-            cur.execute("""
+            u = "WITH u AS (" + " UNION ALL ".join(parts) + ") "
+
+            cur.execute(u + """
                 SELECT bot, COUNT(*) AS n,
-                       COUNT(*) FILTER (WHERE profit_abs > 0) AS w,
-                       COALESCE(SUM(profit_abs) FILTER (WHERE profit_abs > 0), 0) AS gw,
-                       COALESCE(SUM(profit_abs) FILTER (WHERE profit_abs < 0), 0) AS gl,
-                       COALESCE(SUM(profit_abs), 0) AS pnl,
-                       MAX(close_ts) AS last_close
-                FROM bot_trades WHERE is_open = FALSE GROUP BY bot""")
+                       COUNT(*) FILTER (WHERE pnl_abs > 0) AS w,
+                       COALESCE(SUM(pnl_abs) FILTER (WHERE pnl_abs > 0), 0) AS gw,
+                       COALESCE(SUM(pnl_abs) FILTER (WHERE pnl_abs < 0), 0) AS gl,
+                       COALESCE(SUM(pnl_abs), 0) AS pnl,
+                       MAX(close_ts) AS last_close,
+                       COUNT(*) FILTER (WHERE close_ts > now() - interval '24 hours')
+                           AS n24,
+                       COUNT(DISTINCT src) AS nsrc
+                FROM u GROUP BY bot""")
             life = {r[0]: r[1:] for r in cur.fetchall()}
             era = {}
             for bot, start in ERA_START.items():
-                cur.execute(
-                    "SELECT COUNT(*), COUNT(*) FILTER (WHERE profit_abs > 0), "
-                    "COALESCE(SUM(profit_abs), 0) FROM bot_trades "
-                    "WHERE bot=%s AND is_open=FALSE AND open_ts >= %s",
-                    (bot, start))
+                cur.execute(u + "SELECT COUNT(*), COUNT(*) FILTER (WHERE pnl_abs > 0), "
+                            "COALESCE(SUM(pnl_abs), 0) FROM u "
+                            "WHERE bot=%s AND open_ts >= %s", (bot, start))
                 era[bot] = cur.fetchone()
-            # closed-in-last-24h per bot (over-trading health check)
-            cur.execute("SELECT bot, COUNT(*) FROM bot_trades WHERE is_open=FALSE "
-                        "AND close_ts > now() - interval '24 hours' GROUP BY bot")
-            n24 = dict(cur.fetchall())
             # per-mode (enter_tag) breakdown — era-scoped for reworked bots so
             # the dual-mode design is judged on current-code trades only
             tags = {}
-            cur.execute("SELECT bot, COALESCE(enter_tag,'?') , COUNT(*), "
-                        "COUNT(*) FILTER (WHERE profit_abs > 0), "
-                        "COALESCE(SUM(profit_abs),0) FROM bot_trades "
-                        "WHERE is_open=FALSE GROUP BY bot, enter_tag")
+            cur.execute(u + "SELECT bot, enter_tag, COUNT(*), "
+                        "COUNT(*) FILTER (WHERE pnl_abs > 0), "
+                        "COALESCE(SUM(pnl_abs),0) FROM u GROUP BY bot, enter_tag")
             for bot, tag, tn, tw, tpnl in cur.fetchall():
                 if bot not in ERA_START:
                     tags.setdefault(bot, []).append(
-                        {"tag": tag, "n": tn, "w": tw, "pnl": float(tpnl)})
+                        {"tag": tag, "n": int(tn), "w": int(tw), "pnl": float(tpnl)})
             for bot, start in ERA_START.items():
-                cur.execute("SELECT COALESCE(enter_tag,'?'), COUNT(*), "
-                            "COUNT(*) FILTER (WHERE profit_abs > 0), "
-                            "COALESCE(SUM(profit_abs),0) FROM bot_trades "
-                            "WHERE bot=%s AND is_open=FALSE AND open_ts >= %s "
-                            "GROUP BY enter_tag", (bot, start))
+                cur.execute(u + "SELECT enter_tag, COUNT(*), "
+                            "COUNT(*) FILTER (WHERE pnl_abs > 0), "
+                            "COALESCE(SUM(pnl_abs),0) FROM u "
+                            "WHERE bot=%s AND open_ts >= %s GROUP BY enter_tag",
+                            (bot, start))
                 for tag, tn, tw, tpnl in cur.fetchall():
                     tags.setdefault(bot, []).append(
-                        {"tag": tag, "n": tn, "w": tw, "pnl": float(tpnl)})
+                        {"tag": tag, "n": int(tn), "w": int(tw), "pnl": float(tpnl)})
         out = {}
-        for bot, (n, w, gw, gl, pnl, last_close) in life.items():
+        for bot, (n, w, gw, gl, pnl, last_close, n24, nsrc) in life.items():
+            n, w = int(n), int(w)
+            if int(nsrc or 1) > 1:
+                # A card blending a dead Kraken history with a live Lighter book
+                # is the one merge failure that looks plausible and is wrong.
+                print(f"[dashboard] {bot}: closes in BOTH ledgers — blended",
+                      flush=True)
             q = {"n": n, "w": w, "wr": (100.0 * w / n if n else None),
                  "pf": (float(gw) / abs(float(gl)) if float(gl) else None),
                  # [2026-07-07 RESET-PROOF] lifetime ledger P&L — the durable sum
@@ -681,11 +745,11 @@ def fetch_bot_quality():
                  # dashboard show $1000/0 while the ledger held 8 real trades).
                  "pnl": float(pnl),
                  "exp": (float(pnl) / n if n else None), "last_close": last_close,
-                 "n24": int(n24.get(bot) or 0),
+                 "n24": int(n24 or 0),
                  "tags": sorted(tags.get(bot, []), key=lambda t: -t["n"])}
             if bot in era and era[bot]:
                 en, ew, epnl = era[bot]
-                q["era"] = {"n": en, "w": ew, "pnl": float(epnl)}
+                q["era"] = {"n": int(en), "w": int(ew), "pnl": float(epnl)}
             out[bot] = q
         return out
     finally:
@@ -1638,15 +1702,20 @@ def render():
     # actually hit (persistence resets, over-trading) surfaced on every load.
     checks = []
     for b, r in rows.items():
-        if b in SCANNERS or b in STOCKS:
+        # [2026-07-16 FIX] STOCKS holds BASE names but rows are venue-suffixed
+        # (equities-regime-lshadow), so this skip never matched. Latent while
+        # `quality` was empty for those rows — unifying the ledgers arms it.
+        if b in SCANNERS or venue_variant(b)[0] in STOCKS:
             continue
         q = quality.get(b) or {}
         eq = r.get("equity")
         if (isinstance(eq, (int, float)) and abs(eq - 1000.0) < 1e-9
                 and (q.get("n") or 0) > 0 and (r.get("closed_trades") or 0) == 0):
             checks.append(f"{label_for(b)}: equity exactly $1000 with ledger history — possible persistence reset")
-        if (q.get("n24") or 0) > 15:
-            checks.append(f"{label_for(b)}: {q['n24']} closed trades in 24h — over-trading vs design")
+        _ot = OVERTRADE_LIMIT.get(venue_variant(b)[0], OVERTRADE_DEFAULT)
+        if (q.get("n24") or 0) > _ot:
+            checks.append(f"{label_for(b)}: {q['n24']} closed trades in 24h "
+                          f"(>{_ot}) — over-trading vs design")
     _era5 = (quality.get("crypto-intraday-15m") or {}).get("era") or {}
     if (_era5.get("pnl") or 0) < -5:
         checks.append(f"V5 probation breach: since-rework P&L {money(_era5.get('pnl'))}")
