@@ -1689,7 +1689,15 @@ def render():
             continue
         stg = classify_stage(b, gates)
         extra = ""
-        if stg in ("ready", "proving"):
+        # [2026-07-16] "experiment" now shows its go-live gates too. It was
+        # excluded, so the EXPERIMENT_BASES books (Ticket Taker, Snap Back,
+        # Perp Sniper, Launch Sniper) rendered NO progress-to-live — including
+        # Snap Back, which is the standing next go-live candidate. Stage
+        # classification is unchanged (they stay in the experiment section and
+        # can never auto-promote to "ready" on gates alone); this only makes
+        # their distance from the bar visible. "control"/"scanner" stay off by
+        # design — a reference book isn't on the promotion track.
+        if stg in ("ready", "proving", "experiment"):
             _ok, chips = _gate_eval(gates.get(b) or {})
             extra = f'<div class="gates">{chips}</div>'
         staged[stg].append(_mk(b, extra))
@@ -2868,9 +2876,17 @@ def fetch_gate_metrics(ttl=600):
                     parts.append("SELECT bot, close_ts, profit_abs FROM bot_trades "
                                  "WHERE is_open = FALSE AND close_ts IS NOT NULL")
                 if has_pt:
+                    # [2026-07-16] exclude side='skip' + NULL pnl: those rows are
+                    # the sniper's gate-REJECTION logs, not trades. They land
+                    # under a separate bot id today (event-listing-sniper-skips),
+                    # so this only drops a phantom gate row — but if skips were
+                    # ever written under a real bot id they'd silently inflate
+                    # n30 and crater its win rate. Same guard as fetch_bot_quality.
                     parts.append("SELECT bot, closed_at::timestamptz, pnl_abs "
                                  "FROM paper_trades WHERE closed_at IS NOT NULL "
-                                 "AND pg_input_is_valid(closed_at, 'timestamptz')")
+                                 "AND pg_input_is_valid(closed_at, 'timestamptz') "
+                                 "AND side IS DISTINCT FROM 'skip' "
+                                 "AND pnl_abs IS NOT NULL")
                 if parts:
                     cur.execute(
                         f"""SELECT bot,
