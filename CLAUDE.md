@@ -37,8 +37,11 @@ https://pnl-dashboard-production-858c.up.railway.app/
   Wilson/t evidence bars, regime splits, episode-deduped lens grading (raw
   fields unchanged — consumer contracts held); floors/streaks/reduce-only
   UNCHANGED (authority did not move); validated by `brain_replay.py`
-  (ledger no-regression + 5-scenario synthetic discrimination, header has
-  the verdict); kill switch `BRAIN_MULT_ENGINE=v2`; →
+  (ledger no-regression + 6-scenario synthetic discrimination, header has
+  the verdict); kill switch `BRAIN_MULT_ENGINE=v2`. **Fast-path (16-Jul
+  "no-brainer window")**: EMER_* bars (n≥40, t≤−2.5, post_wr<0.20) skip the
+  3-run streak gate on the FIRST qualifying run — latency only, authority
+  unchanged; urgent keys surfaced on `brain-vitals`; →
   `learning-brain`, `brain-stake-mults`, `brain-diagnosis`,
   `brain-lens-forward`, `brain-vitals`
 - `fleet_risk.py` — traffic light (live > lshadow > paper via
@@ -119,6 +122,20 @@ https://pnl-dashboard-production-858c.up.railway.app/
   fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA
   transition — the fleet-wide data-starvation the per-organ watchdog misses.
   → `fleet-respiration`
+- `event_sentinel.py` 🗞️⚡ — the EVENT organ (16-Jul user mandate: "be ahead
+  of the game" on major world events). market_pulse reads MOOD; the
+  sentinel reads discrete typed EVENTS: RSS + GDELT sweep every 10 min →
+  keyword taxonomy (monetary tightening/easing, CPI hot/cool, crypto
+  crackdown/ETF-adoption, exchange incident, stablecoin stress,
+  geopolitical shock, banking stress, AI boom) → severity-gated per-sector
+  anticipations from a seeded HISTORICAL PLAYBOOK (COVID, Terra, FTX, SVB
+  safe-haven flip, ETF Jan-24, yen-carry Aug-24, tariffs Apr-25) → then
+  GRADES its own anticipations at 4h/24h/72h against sector indices
+  chained from the scout's marks, and the playbook confidence LEARNS
+  (EB blend; a wrong playbook decays toward zero bias — direction never
+  auto-flips without review). ADVISORY: zero consumers until a review
+  wires one (restrict-only first). Tuning: `evsent.*` levers, lane
+  `event-sentinel`. → bot_state `event-sentinel` (+ `-state`)
 - `regime_oracle.py`, `market_pulse.py` (history appends every 30 min, 15-Jul),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 

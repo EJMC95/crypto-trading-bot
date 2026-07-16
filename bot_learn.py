@@ -663,13 +663,22 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
     for key in list(streaks):
         if key not in seen:
             del streaks[key]
+    # [2026-07-16b FAST-PATH] urgent entries (brain_stats EMER_* bars:
+    # overwhelming evidence a streak gate protects nothing against) publish
+    # on their FIRST qualifying run — the operator's "genuine no-brainer
+    # window". Latency-only: grid/clamp/floors unchanged, and the entry
+    # still resets like any other the moment it stops qualifying.
     published = defaultdict(dict)
+    urgent_now = []
     for key, e in streaks.items():
-        if e["streak"] >= PROMOTE_RUNS:
+        if e["streak"] >= PROMOTE_RUNS or e.get("urgent"):
             bot, tag = key.split("|", 1)
             published[bot][tag] = {k: v for k, v in e.items()
                                    if k not in ("first_run", "last_run")}
+            if e.get("urgent") and e["streak"] < PROMOTE_RUNS:
+                urgent_now.append(key)
     vitals = {"engine": engine, "priors": priors_out,
+              "urgent": urgent_now,
               "watchlist": sorted(watchlist, key=lambda x: x.get("t", 0))[:20]}
     return dict(published), vitals
 
@@ -1025,6 +1034,7 @@ def main():
                   "soft_w_hi": bstats.SOFT_W_HI, "soft_t": bstats.SOFT_T}
                  if bstats else {}),
         "priors": mult_vitals.get("priors") or {},
+        "urgent": mult_vitals.get("urgent") or [],
         "watchlist": mult_vitals.get("watchlist") or [],
         "regime_splits": regime_splits,
         "lens_episodes": {lens: {"eps4h": o.get("eps4h"), "ehit4h": o.get("ehit4h"),

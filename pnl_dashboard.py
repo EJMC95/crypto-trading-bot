@@ -2038,6 +2038,14 @@ def _organ_vital(key, st):
             return _v("{} · {} mults · watch {} · {} regime splits",
                       st.get("engine"), c.get("mults_published"),
                       c.get("watchlist"), len(st.get("regime_splits") or {}))
+        if key == "event-sentinel":
+            c = st.get("counts") or {}
+            fresh = [e for e in (st.get("active_events") or []) if e.get("fresh")]
+            top = (f" · top: {fresh[0]['type']} sev={fresh[0]['severity']}"
+                   if fresh else "")
+            return _v("{} events · bias {} · {} heads{}",
+                      len(fresh), st.get("market_bias"),
+                      c.get("headlines"), top)
         if key == "evidence-board":
             return _v("{} items · {} proposals · mode {}",
                       len(st.get("items") or []), len(st.get("proposals") or []),
@@ -2111,6 +2119,9 @@ ORGAN_SPECS = [
     # [2026-07-16] v3 statistics engine instrumentation (bot_learn +
     # brain_stats): priors, watchlist, regime splits, lens episodes.
     ("brain-vitals",       "🔬 Brain vitals — v3 statistics engine",  False, 26000),
+    # [2026-07-16] Event Sentinel — typed major-event detection + sector
+    # ripple playbook (advisory; grades its own anticipations).
+    ("event-sentinel",     "🗞️ Event Sentinel — major events/ripples", False, 2400),
     ("signal-bus",         "🚌 Signal bus mirror",                    False, 900),
     ("regime-oracle",      "🧭 Regime oracle",                        False, 14400),
     # [2026-07-16] growth-rail cohort — was headless; now health-graded.

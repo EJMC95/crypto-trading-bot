@@ -46,6 +46,11 @@ VERDICT (run 2026-07-16, ledger 2026-07-03..07-15, 763 closed era trades,
     E pooling condemn:    both fire — the family-condemn path lowers the
                           t bar to -0.5 when the family (n_eff>=30) is
                           itself bad (mu<0.30); own EV still required
+    F flash collapse:     v3's EMERGENCY fast-path (EMER_* bars, 16-Jul
+                          "no-brainer window") publishes on the FIRST
+                          qualifying run (day 6.29) while v2 waits out
+                          the 3-run streak (6.38); trickle bleeders (A)
+                          correctly get NO fast-path
   => v3 SHIPPED as default engine; BRAIN_MULT_ENGINE=v2 remains the
   kill switch.
 """
@@ -253,6 +258,14 @@ def synthetic_scenarios(t0):
         S += _syn(sib, "long-cond",
                   t0, [(d * 0.4, (0.8 if i % 5 == 0 else -0.7))
                        for i, d in enumerate(range(25))])
+    # F. flash collapse: 20 harmless trades over 6 days, then 25 straight
+    #    losses inside half a day. v2 qualifies but waits out the 3-run
+    #    streak; v3's EMERGENCY fast-path (n>=40, t<=-2.5, post_wr<0.20)
+    #    publishes on the first qualifying run.
+    S += _syn("syn-flash", "long-flash",
+              t0, [(d * 0.3, (1.0 if i % 3 == 0 else -0.1))
+                   for i, d in enumerate(range(20))]
+              + [(6.0 + i * 0.016, -2.0) for i in range(25)])
 
     def c(name, bot, tag, fn):
         return (name, bot, tag, fn)
@@ -271,6 +284,9 @@ def synthetic_scenarios(t0):
                                   f"first v2={f2} v3={f3}")),
         c("E pooling condemn: BOTH fire", "syn-condA", "long-cond",
           lambda e2, e3, f2, f3: (f2 is not None and f3 is not None,
+                                  f"first v2={f2} v3={f3}")),
+        c("F flash collapse: v3 fast-path beats v2's streak wait", "syn-flash", "long-flash",
+          lambda e2, e3, f2, f3: (f2 is not None and f3 is not None and f3 < f2,
                                   f"first v2={f2} v3={f3}")),
     ]
     return S, checks
@@ -332,7 +348,7 @@ def main():
     for name, bot, tag, fn in checks:
         f2, e2 = bucket_timeline(syn_tl["v2"], bot, tag)
         f3, e3 = bucket_timeline(syn_tl["v3"], bot, tag)
-        rel = lambda f: None if f is None else round((f - t0) / 86400.0, 1)
+        rel = lambda f: None if f is None else round((f - t0) / 86400.0, 2)
         ok, note = fn(e2, e3, rel(f2), rel(f3))
         syn_ok &= bool(ok)
         print(f"  [{'PASS' if ok else 'FAIL'}] {name}  ({note})")

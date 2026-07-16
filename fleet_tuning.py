@@ -82,6 +82,17 @@ ENACT_LANES = {s.strip() for s in os.environ.get(
 # bounds. A lever absent from this dict cannot be moved by any organ.
 # ---------------------------------------------------------------------------
 LEVERS = {
+    # Event Sentinel 🗞️⚡ (event_sentinel.py): ADVISORY news-event organ —
+    # nothing trades on it yet, so these levers tune detection sensitivity
+    # only (how much corroboration activates an event / freezes a
+    # prediction). Bounds keep it between "wire-service confirmation" and
+    # "front-page only".
+    "evsent.min_sources": {
+        "kind": "int", "lo": 2, "hi": 5, "lane": "event-sentinel",
+        "note": "distinct headlines to activate an event; default 2"},
+    "evsent.severity_bar": {
+        "kind": "float", "lo": 0.30, "hi": 0.80, "lane": "event-sentinel",
+        "note": "min severity to freeze a sector anticipation; default 0.45"},
     # Gap Scout (scanner-cross-exchange-arb): paper-only census organ.
     "gapscout.prefilter_gap": {
         "kind": "float", "lo": 0.0010, "hi": 0.0030, "lane": "paper-scanner",

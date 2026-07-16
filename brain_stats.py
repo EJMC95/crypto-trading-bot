@@ -71,6 +71,18 @@ FAMILY_BAD_WR = 0.30
 FAM_T = -0.5
 KAPPA_FAM = 11.0
 
+# [2026-07-16b FAST-PATH] Emergency tier: evidence so overwhelming that the
+# PROMOTE_RUNS streak gate protects against nothing (one bad day cannot
+# print these numbers), so the throttle publishes on the FIRST qualifying
+# run. This reduces LATENCY only — the multiplier grid, reduce-only clamp
+# and floors are untouched; authority did not move. Born from the operator's
+# 16-Jul "genuine no-brainer window" ask.
+EMER_N = 40                  # raw era trades
+EMER_N_EFF = 28.0            # decayed evidence floor
+EMER_POST_WR = 0.20          # EB-shrunk win rate below even the hard bar
+EMER_W_HI = 0.35             # optimistic bound still terrible
+EMER_T = -2.5                # dollars negative at >= 2.5 sigma
+
 # Episode grouping for the lens-forward grader: the scout re-emits a live
 # ticket every cycle, so raw counts are massively serially correlated
 # (~200 emissions of one BTC breakout != 200 samples). A new EPISODE starts
@@ -240,11 +252,15 @@ def qualify_v3(stats, prior, min_n=30, soft_n=15):
           "post_wr": round(post, 3), "w_hi": round(w_hi, 3),
           "t": round(t, 2), "pnl_w": round(stats["pnl_w"], 2),
           "prior_mu": round(mu, 3), "prior_kappa": round(kappa, 1),
-          "prior_src": src}
+          "prior_src": src, "urgent": False}
     if stats["pnl_w"] >= 0:
         return None, ev
     if (n >= min_n and n_eff >= MIN_N_EFF_HARD
             and post < HARD_POST_WR and w_hi < HARD_W_HI and t <= HARD_T):
+        # Emergency fast-path: overwhelming evidence skips the streak gate.
+        ev["urgent"] = bool(n >= EMER_N and n_eff >= EMER_N_EFF
+                            and post < EMER_POST_WR and w_hi < EMER_W_HI
+                            and t <= EMER_T)
         return 0.5, ev
     if (n >= min_n and n_eff >= MIN_N_EFF_HARD
             and post < SOFT_POST_WR and w_hi < SOFT_W_HI and t <= SOFT_T):
@@ -342,6 +358,14 @@ def _selftest():
     m_small, _ = qualify_v3(weak, (0.20, KAPPA_MIN, "tag-family"))  # small pool
     assert m_no is None and m_small is None and m_yes == 0.75, (m_no, m_yes, m_small)
     assert ev_yes.get("via") == "family-condemn"
+
+    # Fast-path: a catastrophic fresh bleeder is URGENT; the ordinary
+    # bleeder from above is NOT (streak gate still applies to it).
+    disaster = weighted_bucket([mk(-2.0, 0.2)] * 42 + [mk(1.0, 0.2)] * 4, now)
+    m_d, ev_d = qualify_v3(disaster, eb_prior([], [], []))
+    assert m_d == 0.5 and ev_d["urgent"] is True, ev_d
+    m_b, ev_b = qualify_v3(bad, eb_prior([], [], []))
+    assert m_b == 0.5 and ev_b["urgent"] is False, ev_b
 
     # Episodes: 3 tight emissions + one after a gap = 2 episodes.
     f = episode_firsts([0, 60, 120, 9000])
