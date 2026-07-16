@@ -789,8 +789,16 @@ def fetch_paper_trades(limit=2000):
         with conn.cursor() as cur:
             # [2026-07-15 EVIDENCE] side='skip' rows are gate-rejection logs
             # (sniper), not trades — they must never reach the brain/analyzer.
+            # [2026-07-16] `extra` carries the arm's PROOF-OF-APPLICATION
+            # receipt (extra.bars, stamped only inside the bot's apply_levers).
+            # It was written since 15-Jul and never selected, so the experiment
+            # judge — whose docstring already relies on it ("Every close row
+            # carries extra.bars") — could not see which params produced a
+            # close, and scored an arm that ignores its levers. Additive: every
+            # other consumer ignores unknown keys.
             cur.execute(
-                "SELECT bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason "
+                "SELECT bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, "
+                "reason, extra "
                 "FROM paper_trades WHERE side IS DISTINCT FROM 'skip' "
                 "ORDER BY closed_at DESC NULLS LAST LIMIT %s",
                 (int(limit),),
@@ -798,7 +806,8 @@ def fetch_paper_trades(limit=2000):
             rows = cur.fetchall()
         from datetime import datetime
         out = []
-        for bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason in rows:
+        for (bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason,
+             extra) in rows:
             direction, exit_reason = split_reason(reason)
             # [2026-07-15 AUDIT FIX] tolerant timestamp parse — the listing
             # sniper writes '2026-07-13 15:05:04 UTC', which fromisoformat
@@ -824,6 +833,8 @@ def fetch_paper_trades(limit=2000):
                 "duration_min": dur,
                 "open_ts": opened_at, "close_ts": closed_at,
                 "is_open": False,
+                # dict or {} — never None, so consumers can .get() safely
+                "extra": extra if isinstance(extra, dict) else {},
             })
         return out
     except Exception as e:  # noqa: BLE001

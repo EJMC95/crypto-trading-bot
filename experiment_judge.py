@@ -109,11 +109,47 @@ def parse_ts(s):
 # pure evaluation (selftested offline)
 # ---------------------------------------------------------------------------
 
-def arm_trades(rows, bot, start_ts, end_ts=None):
-    """[(close_ts, pnl_pct)] for one arm inside the window, oldest first."""
+def ran_candidate(row, levers):
+    """PROOF the arm actually APPLIED these levers on this close.
+
+    [2026-07-16 SKEW GATE] `extra.bars` is stamped by the ARM, and only from
+    inside its apply_levers() — an image with no lever-reading code
+    structurally CANNOT emit it. That makes a missing receipt DISPROOF, not
+    silence, which is the whole point: this gate must fail CLOSED.
+
+    Why it exists: the judge asserted xp.funding.enter_apr=0.30 for hours at a
+    frozen shadow arm carrying zero lever code (30 closes, 0 receipts). It runs
+    the env default 0.40 — the SAME gate live runs — so the paired bar was
+    scoring 07-11-code vs 07-16-code and calling the difference the candidate's
+    edge, on a path that promotes to live.funding.* (REAL MONEY).
+    """
+    bars = (row.get("extra") or {}).get("bars")
+    if not isinstance(bars, dict):
+        return False
+    for name, want in (levers or {}).items():
+        # xp.funding.enter_apr -> enter_apr (the arm stamps the bare bar name)
+        got = bars.get(str(name).split(".")[-1])
+        try:
+            if got is None or abs(float(got) - float(want)) > 1e-9:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
+def arm_trades(rows, bot, start_ts, end_ts=None, levers=None):
+    """[(close_ts, pnl_pct)] for one arm inside the window, oldest first.
+
+    levers=None keeps the historical behaviour (time-window attribution only) —
+    correct for the LIVE control arm, which runs env defaults and whose rows
+    predate the receipt. Pass levers to count ONLY closes the arm PROVED it ran
+    them on (see ran_candidate).
+    """
     out = []
     for r in rows or []:
         if str(r.get("bot")) != bot or r.get("profit_ratio") is None:
+            continue
+        if levers is not None and not ran_candidate(r, levers):
             continue
         try:
             ts = parse_ts(r.get("close_ts"))
@@ -130,26 +166,48 @@ def _mean_pct(trades):
 
 
 def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
-                min_closes=None, live_min=None, margin_pp=None):
+                min_closes=None, live_min=None, margin_pp=None,
+                cand_levers=None):
     """The promotion bar. Returns a verdict dict; verdict['promote'] is True
     only when the shadow arm is positive AND beats the live arm per-trade by
     margin_pp on the FULL window AND on BOTH halves (the doctrine's
-    both-halves rule — a candidate that won one lucky week doesn't clear)."""
+    both-halves rule — a candidate that won one lucky week doesn't clear).
+
+    [2026-07-16] cand_levers gates the SHADOW arm on proof-of-application: a
+    close counts only if its receipt shows the arm ran the candidate's bars.
+    The LIVE arm is deliberately NOT gated — it is the control running env
+    defaults, and its rows predate the receipt (1 of 14 stamped), so gating it
+    would starve the baseline and freeze the pipeline for good.
+    """
     shadow_bot = shadow_bot or SHADOW_BOT
     live_bot = live_bot or LIVE_BOT
     min_closes = min_closes or MIN_CLOSES
     live_min = live_min or LIVE_MIN_CLOSES
     margin_pp = MARGIN_PP if margin_pp is None else margin_pp
-    sh = arm_trades(rows, shadow_bot, start_ts, end_ts)
+    sh = arm_trades(rows, shadow_bot, start_ts, end_ts, levers=cand_levers)
     lv = arm_trades(rows, live_bot, start_ts, end_ts)
     v = {"promote": False, "n_shadow": len(sh), "n_live": len(lv),
          "shadow_mean_pct": _mean_pct(sh), "live_mean_pct": _mean_pct(lv)}
+    if cand_levers:
+        # ARM SKEW: the arm closed trades in-window but proved NONE of them ran
+        # the candidate. Distinct from "not enough data yet" — the experiment
+        # is not running at all, so no window will ever make it valid. Caller
+        # must NOT age this toward ABANDONED (that would retire a possibly-good
+        # candidate on a verdict about an experiment that never happened).
+        n_all = len(arm_trades(rows, shadow_bot, start_ts, end_ts))
+        v["n_shadow_closes"] = n_all
+        if n_all and not sh:
+            v["arm_skew"] = True
+            v["why"] = (f"ARM NOT APPLYING: 0/{n_all} shadow closes carry a "
+                        f"receipt for {json.dumps(cand_levers)} — the arm is "
+                        f"not running this experiment")
+            return v
     if len(sh) < min_closes or len(lv) < live_min:
         v["why"] = f"floors: shadow {len(sh)}/{min_closes}, live {len(lv)}/{live_min}"
         return v
     mid = start_ts + (end_ts - start_ts) / 2.0
     for a, b, label in ((start_ts, mid, "h1"), (mid, end_ts, "h2")):
-        shm = _mean_pct(arm_trades(rows, shadow_bot, a, b))
+        shm = _mean_pct(arm_trades(rows, shadow_bot, a, b, levers=cand_levers))
         lvm = _mean_pct(arm_trades(rows, live_bot, a, b))
         v[label] = {"shadow": shm, "live": lvm}
         # [2026-07-16 AUDIT FIX] each half must clear the SAME margin as the
@@ -316,6 +374,10 @@ def run_once():
                    "promoted_ts": kw.get("promoted_ts", st.get("promoted_ts")),
                    "cooldown_until": kw.get("cooldown_until", st.get("cooldown_until")),
                    "blind_cycles": kw.get("blind_cycles", st.get("blind_cycles") or 0),
+                   # [2026-07-16] sticky across cycles so the urgent ARM-SKEW
+                   # push fires once per episode, not every 30 min forever.
+                   "skew_notified": bool(kw.get("skew_notified",
+                                                st.get("skew_notified"))),
                    "verdicts": verdicts[-10:], "last_eval": kw.get("last_eval")}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
@@ -366,7 +428,30 @@ def run_once():
         _assert_levers(cand["levers"], f"experiment {cand['name']} running",
                        f"started {iso(started)}")
         days = (now - started) / 86400.0
-        ev = paired_eval(rows, started, now) if have_ledger else {"promote": False, "why": "no ledger"}
+        ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"))
+              if have_ledger else {"promote": False, "why": "no ledger"})
+        # [2026-07-16] ARM SKEW -> HOLD. The arm is closing trades but proving
+        # none of them ran the candidate, so every number here is about a
+        # different experiment. Do not promote (real money) and do not age
+        # toward ABANDONED (a false negative retires the candidate for good).
+        # Stay running and stay LOUD until the arm is fixed — fail-closed:
+        # a stuck, noisy queue beats a phantom promotion.
+        if ev.get("arm_skew"):
+            if not st.get("skew_notified"):
+                send_push(f"experiment ARM NOT APPLYING: {cand['name']}",
+                          f"{ev['why']}\nthe judge is holding — no promotion "
+                          f"can clear until the arm runs the candidate's bars",
+                          priority="urgent")
+            return save(last_eval=ev, skew_notified=True,
+                        note=f"ARM SKEW {cand['name']}: {ev['why']}")
+        if st.get("skew_notified"):
+            # Arm recovered. Restart the clock: `days` accrued while the arm
+            # was NOT applying, so without this the first good cycle could land
+            # past MAX_DAYS and instantly ABANDON an experiment that had never
+            # actually run. The window must cover only the applied period.
+            return save(last_eval=ev, skew_notified=False, started_ts=now,
+                        note=f"arm applying again: {cand['name']} — "
+                             f"experiment clock restarted")
         if days >= MIN_DAYS and ev["promote"]:
             live_levers = {XP_TO_LIVE[k]: v for k, v in cand["levers"].items()}
             _assert_levers({**cand["levers"], **live_levers},
@@ -554,8 +639,54 @@ def _selftest():
     # corrupt numeric state fields must degrade, not crash-loop
     assert _num("not-a-ts") == 0.0 and _num(None, 5.0) == 5.0 and _num("7") == 7.0
 
+    # ---- [2026-07-16] ARM-SKEW gate: enactment is not application ---------
+    # Regression guard for the live defect: the judge asserted xp.* levers at a
+    # frozen shadow arm with no lever code (30 closes, 0 receipts), so the bar
+    # scored version skew and would have promoted an untested value to REAL
+    # MONEY. A receipt is stamped only inside the arm's apply_levers(), so a
+    # missing one is disproof. This gate must stay fail-CLOSED.
+    def rowb(bot, ts, pct, bars=None):
+        r = {"bot": bot, "profit_ratio": pct, "close_ts": iso(ts), "extra": {}}
+        if bars is not None:
+            r["extra"] = {"bars": bars}
+        return r
+
+    _cand = {"xp.funding.enter_apr": 0.3}
+    _applied = {"arm": "lighter_shadow", "enter_apr": 0.3}
+    _default = {"arm": "lighter_shadow", "enter_apr": 0.4}   # what a deaf arm runs
+
+    assert ran_candidate(rowb(SHADOW_BOT, t0, 0.01, _applied), _cand) is True
+    assert ran_candidate(rowb(SHADOW_BOT, t0, 0.01), _cand) is False      # no receipt
+    assert ran_candidate(rowb(SHADOW_BOT, t0, 0.01, _default), _cand) is False
+    assert ran_candidate({"bot": SHADOW_BOT}, _cand) is False             # no extra
+
+    # shadow crushes live, but proves nothing: must NOT promote
+    _sk = ([rowb(SHADOW_BOT, t0 + i * (8 * day / 32), 0.05) for i in range(32)]
+           + [rowb(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
+    assert paired_eval(_sk, t0, end)["promote"] is True          # old bar: promotes
+    _skv = paired_eval(_sk, t0, end, cand_levers=_cand)          # gated: blocked
+    assert _skv["promote"] is False and _skv["arm_skew"] is True, _skv
+    assert _skv["n_shadow_closes"] == 32, _skv
+
+    # the gate is not a brick wall — an APPLYING arm still clears
+    _ap = ([rowb(SHADOW_BOT, t0 + i * (8 * day / 32), 0.01, _applied) for i in range(32)]
+           + [rowb(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
+    _apv = paired_eval(_ap, t0, end, cand_levers=_cand)
+    assert _apv["promote"] is True and not _apv.get("arm_skew"), _apv
+
+    # rows carrying the WRONG bars are excluded from n and the mean
+    _mx = ([rowb(SHADOW_BOT, t0 + i * (8 * day / 32), 0.01, _applied) for i in range(32)]
+           + [rowb(SHADOW_BOT, t0 + i * (8 * day / 8), -0.99, _default) for i in range(8)]
+           + [rowb(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
+    _mxv = paired_eval(_mx, t0, end, cand_levers=_cand)
+    assert _mxv["n_shadow"] == 32 and _mxv["shadow_mean_pct"] > 0, _mxv
+
+    # cand_levers=None must be byte-identical to the historical bar
+    assert paired_eval(_sk, t0, end) == paired_eval(_sk, t0, end, cand_levers=None)
+
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
-          "floors, own-right, fade, proprioception early-fade, registry mapping)")
+          "floors, own-right, fade, proprioception early-fade, registry mapping, "
+          "arm-skew receipt gate)")
 
 
 if __name__ == "__main__":
