@@ -391,16 +391,11 @@ def write_levers(levers, set_by="evidence-board", now_ts=None, ttl_sec=None):
                      "evidence": str((entry or {}).get("evidence") or "")[:300]}
     if not out:
         return None
-    try:
-        if store is None:
-            return None
-        # merge: keep OTHER authors' still-alive levers; mine replace mine.
-        prev = {}
-        try:
-            prev = store.load_state(KEY) or {}
-        except Exception:
-            prev = {}
-        merged = {k: v for k, v in (prev.get("levers") or {}).items()
+
+    def _merge_payload(prev):
+        """Merge MY levers over the other authors' still-alive levers. Pure —
+        runs under the store's advisory lock when available."""
+        merged = {k: v for k, v in ((prev or {}).get("levers") or {}).items()
                   if k in LEVERS and isinstance(v, dict) and k not in out
                   and v.get("set_by") != set_by and _lever_alive(v, now_ts)}
         merged.update(out)
@@ -412,10 +407,29 @@ def write_levers(levers, set_by="evidence-board", now_ts=None, ttl_sec=None):
                 horizon = max(horizon, e.timestamp())
             except Exception:
                 horizon = max(horizon, now_ts + ttl)
-        payload = {"updated": _iso(now_ts),
-                   "ttl_sec": int(max(ttl, horizon - now_ts)),
-                   "levers": merged}
-        store.save_state(KEY, payload)
+        return {"updated": _iso(now_ts),
+                "ttl_sec": int(max(ttl, horizon - now_ts)),
+                "levers": merged}
+
+    try:
+        if store is None:
+            return None
+        # [2026-07-16 MERGE-RACE FIX] three authors write this key on
+        # independent timers; a merge off a stale read silently dropped the
+        # other author's just-written levers. The advisory-locked update
+        # serializes read->merge->write; the unlocked path stays as the
+        # fallback so a lock failure degrades to exactly today's behavior.
+        payload = None
+        if hasattr(store, "locked_state_update"):
+            payload = store.locked_state_update(KEY, _merge_payload)
+        if payload is None:
+            prev = {}
+            try:
+                prev = store.load_state(KEY) or {}
+            except Exception:
+                prev = {}
+            payload = _merge_payload(prev)
+            store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
             store.save_history(KEY, {"updated": payload["updated"],
                                      "levers": {k: v["value"] for k, v in out.items()},

@@ -578,6 +578,25 @@ def main():
             return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
         return ctx.venue.positions()
 
+    def _real_exit(coin, is_short, fallback):
+        """[2026-07-16 FILL RECON] REAL exit fill (venue trades read; closing
+        a long SELLS -> is_ask=True) or the decision price. The shortfall
+        tracker's live-vs-shadow premise needs real fills on the live arm —
+        exits were decision mids. Entry fills were already real (the manage
+        pass rebuilds meta entry from the venue's avg_entry_price)."""
+        if dry_run:
+            return fallback
+        try:
+            fl = getattr(ctx.venue, "last_fill", None)
+            real = fl(coin, is_ask=not is_short,
+                      since_ts=time.time() - 180) if fl else None
+        except Exception:  # noqa: BLE001
+            real = None
+        if real:
+            log.info("%s exit fill (venue): %.6g (decision %.6g)", coin, real,
+                     fallback or 0.0)
+        return real or fallback
+
     def _flatten_all(reason):
         """Emergency flatten that MIRRORS normal-close bookkeeping (ledger + counters
         + meta pop) so forensic reconstruction stays consistent with account equity."""
@@ -601,6 +620,7 @@ def main():
             except Exception as e:
                 log.error("flatten %s: %s", c, e)
                 continue
+            px = _real_exit(c, is_short, px)
             price_pnl = abs(held) * ((px - entry) if not is_short else (entry - px))
             n_closed += 1
             n_wins += 1 if price_pnl > 0 else 0
@@ -811,7 +831,10 @@ def main():
                     log.error("%s: stop unverifiable %dx — fail-safe flatten", coin, miss[coin])
                     try:
                         ctx.venue.market_close(coin)
-                        _record_close(bot_id, coin, entry, opened_ts, entry, 0.0,
+                        _bpx = _real_exit(coin, is_short, entry)
+                        _bpnl = abs(held) * ((_bpx - entry) if not is_short
+                                             else (entry - _bpx))
+                        _record_close(bot_id, coin, entry, opened_ts, _bpx, _bpnl,
                                       m.get("accrued", 0.0), was_long=not is_short,
                                       reason="stop_blind",
                                       order_usd=float((m or {}).get("clip") or order_usd),
@@ -869,6 +892,7 @@ def main():
                 except Exception as e:
                     log.error("close %s failed: %s — leaving position, retry next loop", coin, e)
                     continue
+                px = _real_exit(coin, is_short, px)
                 price_pnl = (abs(held) * (px - entry)) if not is_short \
                     else (abs(held) * (entry - px))
             realized += (price_pnl + fund_pnl) if dry_run else 0.0

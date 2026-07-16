@@ -228,7 +228,15 @@ def main():
           f"friction {2*OPEN_COST*1e4:.0f}bps round-trip | realized so far "
           f"${realized:+.2f} ({n_closed} closed)")
 
-    last_ts = time.time()
+    # [2026-07-16 AUDIT FIX] restore the accrual clock: it reset to
+    # boot time on every redeploy, so funding during the gap was never
+    # accrued (systematic undercount of the drag/credit this book
+    # measures). Gap bounded to 48h so ancient state can't over-accrue.
+    try:
+        _lt = float((_saved or {}).get("last_ts") or 0)
+    except Exception:  # noqa: BLE001 — incl. unbound saved-state
+        _lt = 0.0
+    last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
     while True:
         t0 = time.time()
         try:
@@ -410,7 +418,8 @@ def main():
 
             # [2026-07-03 PERSIST] Durable open-carry state -> Postgres.
             try:
-                store.save_state(bot_id, {"positions": positions, "hot_since": hot_since})
+                store.save_state(bot_id, {"positions": positions, "hot_since": hot_since,
+                                           "last_ts": last_ts})
             except Exception:
                 pass
 

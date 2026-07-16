@@ -215,6 +215,24 @@ def main():
             return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
         return ctx.venue.positions()
 
+    def _real_exit(coin, fallback):
+        """[2026-07-16 FILL RECON] REAL exit fill (venue trades read; this
+        bot is long-only, so a close always SELLS -> is_ask=True) or the
+        decision price. Entry fills are already venue-real via the manage
+        pass's avg_entry_price rebuild."""
+        if dry_run:
+            return fallback
+        try:
+            fl = getattr(ctx.venue, "last_fill", None)
+            real = fl(coin, is_ask=True,
+                      since_ts=time.time() - 180) if fl else None
+        except Exception:  # noqa: BLE001
+            real = None
+        if real:
+            log.info("%s exit fill (venue): %.6g (decision %.6g)", coin, real,
+                     fallback or 0.0)
+        return real or fallback
+
     def _flatten_all(reason):
         nonlocal n_closed, n_wins
         try:
@@ -235,6 +253,7 @@ def main():
             except Exception as e:
                 log.error("flatten %s: %s", c, e)
                 continue
+            px = _real_exit(c, px)
             price_pnl = abs(held) * (px - entry)
             n_closed += 1
             n_wins += 1 if price_pnl > 0 else 0
@@ -268,6 +287,7 @@ def main():
             except Exception as e:
                 log.error("close %s failed: %s — retry next loop", coin, e)
                 return False
+            px = _real_exit(coin, px)
             price_pnl = abs(held) * (px - entry)
         realized += (price_pnl + fund_pnl) if dry_run else 0.0
         n_closed += 1

@@ -507,6 +507,53 @@ class LighterClient(VenueClient):
         return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
                 "resp": getattr(resp, "to_dict", lambda: str(resp))()}
 
+    def last_fill(self, coin, is_ask, since_ts, lookback=10):
+        """[2026-07-16 FILL RECON] Best-effort REAL average fill price for
+        THIS account's most recent fills on `coin` since `since_ts` (epoch
+        seconds), on the given side (is_ask=True when we sold). Size-weighted
+        across the partial fills a single market order crossed. Read-only —
+        an auth-token GET on the venue's trades endpoint (verified against
+        lighter-sdk OrderApi.trades: price/size/ask_account_id/bid_account_id/
+        timestamp fields). Returns None on ANY failure; callers fall back to
+        the decision price, so a broken read can never block a close."""
+        try:
+            if self.signer is None or self.account_index is None:
+                return None
+            _sym, _mult, m = self._resolve(coin)
+            auth = self.signer.create_auth_token_with_expiry(
+                api_key_index=self.api_key_index)
+            if isinstance(auth, tuple):          # sdk returns (token, err)
+                auth, _err = auth
+                if _err or not auth:
+                    return None
+            r = self._run(self._order_api.trades(
+                sort_by="timestamp", sort_dir="desc", limit=int(lookback),
+                authorization=auth, market_id=m["id"],
+                account_index=self.account_index))
+            fills = []
+            for t in (getattr(r, "trades", None) or []):
+                ts = float(getattr(t, "timestamp", 0) or 0)
+                if ts > 1e12:                    # ms -> s
+                    ts /= 1000.0
+                if ts < float(since_ts) - 5:
+                    continue
+                ours_ask = getattr(t, "ask_account_id", None) == self.account_index
+                ours_bid = getattr(t, "bid_account_id", None) == self.account_index
+                if is_ask and not ours_ask:
+                    continue
+                if not is_ask and not ours_bid:
+                    continue
+                px = float(getattr(t, "price", 0) or 0)
+                sz = abs(float(getattr(t, "size", 0) or 0))
+                if px > 0 and sz > 0:
+                    fills.append((px, sz))
+            if not fills:
+                return None
+            tot = sum(sz for _, sz in fills)
+            return sum(px * sz for px, sz in fills) / tot
+        except Exception:  # noqa: BLE001 — measurement-only: never raise
+            return None
+
     def market_close(self, coin):
         pos = self.positions().get(coin)
         if not pos or not pos["size"]:

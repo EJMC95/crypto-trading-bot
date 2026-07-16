@@ -144,6 +144,10 @@ def main():
     p.add_argument("--once", action="store_true", help="Single loop then exit.")
     args = p.parse_args()
 
+    # [2026-07-16 AUDIT] a lost Railway VENUE var silently booted hl_paper
+    # (unsuffixed row, HL data under a Lighter-named book). Lighter-shadow
+    # is this bot's identity — default to it like the sniper does.
+    os.environ.setdefault("VENUE", "lighter_shadow")
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=False)
     # [v1 GATE] UNVALIDATED LIVE — the shadow record must earn a separate,
@@ -219,7 +223,15 @@ def main():
         halted_today = True
         log.warning("daily-loss halt restored from state — halted for today.")
     day_start_equity = account_value()
-    last_ts = time.time()
+    # [2026-07-16 AUDIT FIX] restore the accrual clock: it reset to
+    # boot time on every redeploy, so funding during the gap was never
+    # accrued (systematic undercount of the drag/credit this book
+    # measures). Gap bounded to 48h so ancient state can't over-accrue.
+    try:
+        _lt = float((_saved or {}).get("last_ts") or 0)
+    except Exception:  # noqa: BLE001 — incl. unbound saved-state
+        _lt = 0.0
+    last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
     last_sample = 0.0
 
     def close_position(coin, reason, px=None):
@@ -392,7 +404,8 @@ def main():
             store.save_state(bot_id, {"broker": broker.to_state(), "meta": meta,
                                       "fund_hist": fund_hist,
                                       "fund_realized": fund_realized,
-                                      "next_reb": next_reb})
+                                      "next_reb": next_reb,
+                                      "last_ts": last_ts})
         except Exception:  # noqa: BLE001
             pass
 

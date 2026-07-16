@@ -261,7 +261,15 @@ def main():
         halted_today = True
         log.warning("daily-loss halt restored — halted for today.")
     day_start_equity = equity()
-    last_ts = time.time()
+    # [2026-07-16 AUDIT FIX] restore the accrual clock: it reset to
+    # boot time on every redeploy, so funding during the gap was never
+    # accrued (systematic undercount of the drag/credit this book
+    # measures). Gap bounded to 48h so ancient state can't over-accrue.
+    try:
+        _lt = float((saved or {}).get("last_ts") or 0)
+    except Exception:  # noqa: BLE001 — incl. unbound saved-state
+        _lt = 0.0
+    last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
 
     while True:
         t0 = time.time()
@@ -431,7 +439,8 @@ def main():
                                       "fund_realized": fund_realized,
                                       "ab_meta": ab_meta,
                                       "ab_realized": ab_realized,
-                                      "next_reb": next_reb})
+                                      "next_reb": next_reb,
+                                      "last_ts": last_ts})
         except Exception:  # noqa: BLE001
             pass
 
