@@ -74,6 +74,53 @@ https://pnl-dashboard-production-858c.up.railway.app/
   advisory tickets only). Everything lands as bounded TTL'd
   `fleet-tuning` levers (auto-revert); never widens a brain-vetoed lens;
   fail-safe neutral on a dark brain. → bot_state `scout-tuner`
+- `fleet_proprioception.py` 🦾 — PROPRIOCEPTION (16-Jul, "advance the
+  autonomous organ"): the autonomy stack's sense of its OWN movements —
+  the first RETROSPECTIVE grade on growth-rail enactments (every prior
+  gate was prospective/in-sample). Tracks every lever EPISODE (open →
+  expire/release/value-change; long stances sliced daily) and grades it
+  out-of-sample: taker levers get the TRUE replay counterfactual in $
+  (during-episode tape, env defaults vs enacted bars through the taker's
+  real code), scout diet levers get grading throughput (lens n4h delta),
+  gapscout gets census activity; live/xp episodes are RECORDED only (the
+  judge + fade-watch stay the real-money authority). Per-lever verdicts
+  helping/hurting/neutral (floors n≥2 episodes, ±$3; HURTING exists only
+  on the taker lane — the one lane with a $ counterfactual; joint stances
+  share blame, conservative in the restrict direction). CONSUMED BOTH
+  WAYS (16-Jul evening, operator: "implement the expanding side ... so
+  the July 21 can review both sides"): RESTRICT — the scout tuner refuses
+  to re-assert a HURTING lever (`apply_proprioception`); EXPAND — a
+  HELPING taker lever unlocks the tuner's improve-both-halves expansion
+  walk before the brain's ruling floor (brain veto stays senior), a
+  HELPING diet lever walks one notch deeper, a HELPING gapscout lever
+  discounts the board's widen-ladder bars (×0.75, 12h floor). **LIVE LANE
+  LEARNS (16-Jul evening, operator mandate)**: live episodes graded
+  per-trade vs TWO baselines (the books' own pre-window AND the shadow
+  twins, same window; clip vs funding split by author so the board's
+  movement is never blamed on the judge's; 'bad' only when worse than
+  EVERY baseline by the margin; floors higher than shadow lanes) —
+  consumed restrict-first: HURTING live.clip_scale releases the board's
+  lever + blocks up-steps; HURTING live.funding.* is the judge's EARLIER
+  fade signal (`prop_fade`; the judge stays the only writer); the single
+  live earn is the clip ladder's TOP step (1.5) now REQUIRING a measured
+  HELPING at 1.25 — fail-CLOSED (dark sense = top out of reach). Board
+  surfaces 🦾 items (hurting=warn, helping=expand); immune scans the
+  payload. Fail-safe both ways on shadow lanes: a dark organ restricts
+  nothing AND earns nothing. **CONSUMER SUPPORT (16-Jul late)**: verdicts
+  are a first-class bus signal — `fleet_bus.lever_outcome(lever)` is the
+  supported accessor for any strategy/bot (standard fail-safe contract),
+  `/bus.json` serves the payload + history off-Railway, and the incubator
+  consumes it (skips proposing a funding gene whose live lever is
+  currently graded hurting — a 7-day judge slot isn't spent re-testing a
+  knob the live lane just measured bad). **REAL-MONEY BOTS CONSUME TOO
+  (16-Jul late)**: `fleet_tuning.get_lever` reverts a HURTING live-lane
+  lever to the operator's env default AT THE CONSUMER, every loop (the
+  immune-quarantine central-hook pattern; covers the funding bot's
+  `apply_levers` + both live bots' clip via venues) — a measured-bad
+  lever stops steering real money immediately instead of waiting out the
+  board/judge cycle or the lever TTL; live-lane only (shadow lanes keep
+  TTL semantics), fail-safe open, restrict-only by construction. Review
+  grades both sides — agenda item 12. → bot_state `fleet-proprioception`
 - `experiment_judge.py` 🧪⚖️ — the shadow→live PROMOTION pipeline (15-Jul
   user mandate: shadow wins must "carry across to the real money bots").
   Hourly, ONE candidate at a time on the Funding Farmer's -lshadow twin
@@ -147,8 +194,9 @@ Loop Scout, trendmomo-4h (12/13-Jul). See RETIRED_ROWS in pnl_dashboard.py.
 
 ### Read-only endpoints (no auth)
 `/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger)
-`/bus.json` (risk light + signal bus + brain keys + lighter-market,
-`?hours=` history) `/pulse.json` `/disloc.json` `/watchdog.json`
+`/bus.json` (risk light + signal bus + brain keys + lighter-market +
+fleet-proprioception, `?hours=` history) `/pulse.json` `/disloc.json`
+`/watchdog.json`
 
 ### 15-Jul reconciliation (this repo's git now matches what runs)
 The 14-Jul pivot shipped from branch `claude/gapscout-profitable-trades-ebrprj`
@@ -198,6 +246,11 @@ its row is dashboard-retired regardless; stop the process when found.
   real money) + lighter-live (`live.clip_scale` + the judge's PROMOTED
   `live.funding.*` — see growth rail + experiment judge above). `gapscout-census` — Gap Scout's epoch-2 episode census (board
   reads `quiet_hours`). `scout-tuner` — the tuner's cycle log + enactments.
+  `fleet-proprioception` — per-lever enactment outcome grades (episodes +
+  helping/hurting verdicts). Consumers: scout tuner (hurting-skip +
+  helping-walk), board (🦾 items + live clip gates + gapscout ladder
+  discount), judge (early fade), incubator (hurting-gene skip), anything
+  else via `fleet_bus.lever_outcome` / `/bus.json`.
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).
 - Bot identity for multiplier lookup = `bot_name` in each freqtrade config

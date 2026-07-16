@@ -30,6 +30,11 @@ doctrine (replay-first = backtest-first; both-halves; bounded levers):
   3. NEVER FIGHTS THE BRAIN. A lens the brain grades negative at its ruling
      floor (the taker's veto rule) is never widened — the restrict side owns
      it until the grade recovers.
+  4. NEVER REPEATS A MOVEMENT THAT MEASURED BAD (16-Jul, proprioception).
+     fleet_proprioception grades every closed lever episode on the tape
+     recorded DURING it — out-of-sample relative to this tuner's in-sample
+     replay gate. A lever with a fresh HURTING verdict is not re-asserted
+     (apply_proprioception; restrict-only, fail-safe none on a dark organ).
 
 STATELESS BY DESIGN: every cycle recomputes the desired bars from the env
 DEFAULTS + today's tape, then re-asserts them via fleet_tuning (TTL'd
@@ -53,6 +58,11 @@ import bot_pnl_store as store
 import fleet_tuning as tuning
 import lighter_ticket_taker as tt
 import lighter_ticket_replay as rp
+
+try:
+    import fleet_proprioception as proprio   # outcome grades (optional import)
+except Exception:  # noqa: BLE001
+    proprio = None
 
 KEY = "scout-tuner"
 TTL_SEC = int(os.environ.get("TUNER_TTL_SEC", "10800"))       # 3h payload ttl
@@ -159,8 +169,8 @@ def vetoed_lenses(lens_fwd):
     return out
 
 
-def desired_taker_bars(tape, baseline, lens_fwd):
-    """Walk each lens's conviction-bar ladder from the DEFAULT. Two rules:
+def desired_taker_bars(tape, baseline, lens_fwd, helping=None):
+    """Walk each lens's conviction-bar ladder from the DEFAULT. Three rules:
 
     STARVING (seen tickets, zero fills, under the brain's ruling floor):
       widen one not-worse-on-both-halves notch at a time until the lens
@@ -170,15 +180,22 @@ def desired_taker_bars(tape, baseline, lens_fwd):
       inverted): expand the bar while each notch IMPROVES the replayed net
       on both halves by MARGIN_HALF — this is how the cream gets captured
       at size instead of waiting for an operator to notice.
+    PROPRIO-HELPING (16-Jul, the expand side of proprioception): a lever
+      whose graded real-world episodes measured net-POSITIVE (n>=2, >=+$3
+      counterfactual — an evidence bar independent of the brain's) unlocks
+      the same expansion walk BEFORE the lens reaches the brain's ruling
+      floor. Every notch still needs the improve-both-halves margin, and
+      the brain's veto stays senior — helping never overrides a veto.
 
     Returns ({tt attr: value} that differ from default, log list)."""
     h1, h2 = halves(tape)
     if not h1 or not h2:
         return {}, ["tape too short to halve — no taker-bar changes"]
+    helping = set(helping or ())
     veto = vetoed_lenses(lens_fwd)
     bars = dict(DEFAULTS)
     log = []
-    for lens, (attr, _lever, ladder) in TAKER_LADDERS.items():
+    for lens, (attr, lever, ladder) in TAKER_LADDERS.items():
         if lens in veto:
             log.append(f"{lens}: brain-vetoed at floor — never widened")
             continue
@@ -187,14 +204,17 @@ def desired_taker_bars(tape, baseline, lens_fwd):
         graded = g.get("n4h") or 0
         positive = (graded >= LENS_FLOOR and (g.get("avg4h_pct") or 0) > 0
                     and (g.get("hit4h") or 0) >= 0.5)
+        earned = positive or lever in helping
         starving = (lens_rep.get("seen", 0) > 0
                     and lens_rep.get("taken", 0) == 0
                     and graded < LENS_FLOOR)
-        if not (starving or positive):
+        if not (starving or earned):
             continue
+        mode = ("winner" if positive else
+                "proprio-helping" if lever in helping else "starving")
         for notch in next_notches(ladder, DEFAULTS[attr]):
             cand = dict(bars, **{attr: notch})
-            if positive:
+            if earned:
                 ok = all(replay_with(h, cand)["closed_net"]
                          >= replay_with(h, bars)["closed_net"] + MARGIN_HALF
                          for h in (h1, h2))
@@ -204,14 +224,14 @@ def desired_taker_bars(tape, baseline, lens_fwd):
                 why = "not-worse both halves"
             if not ok:
                 log.append(f"{lens}: notch {notch} REJECTED "
-                           f"({'no improvement' if positive else 'worse'} on a half)")
+                           f"({'no improvement' if earned else 'worse'} on a half)")
                 break
             bars[attr] = notch
             taken = (replay_with(tape, cand).get("lenses") or {}) \
                 .get(lens, {}).get("taken", 0)
-            log.append(f"{lens} ({'winner' if positive else 'starving'}): "
+            log.append(f"{lens} ({mode}): "
                        f"widened {attr} -> {notch} (replay taken={taken}, {why})")
-            if starving and taken > 0:
+            if starving and not earned and taken > 0:
                 break                    # first notch that produces samples
     return {k: v for k, v in bars.items() if v != DEFAULTS[k]}, log
 
@@ -258,35 +278,65 @@ def sweep_exits(tape, baseline):
     return {k: v for k, v in best.items() if v != DEFAULTS[k]}, log
 
 
-def desired_scout_levers(lens_fwd):
+def desired_scout_levers(lens_fwd, helping=None):
     """Scout emission widening: advisory tickets only — this widens the
     BRAIN'S GRADING DIET, never what trades (the taker's bars gate fills).
     A lens under the brain's ruling floor gets its emission bar held one
     notch beyond default until the floor is reached, then released (the
     lever expires back to default on its own). The live 15-Jul case this
     exists for: dip graded n4h=25 (hit 92%!) while every other lens sat at
-    ~250 — the best lens was the one starving for grades. Returns
-    ({lever: value}, log)."""
+    ~250 — the best lens was the one starving for grades.
+    [16-Jul expand side] A diet lever proprioception graded HELPING (its
+    past episodes measurably delivered grades) walks ONE NOTCH DEEPER while
+    the lens stays under the floor — the diet that proved it feeds the
+    brain gets a bigger portion; still advisory-only, still released at the
+    floor. Returns ({lever: value}, log)."""
     out, log = {}, []
+    helping = set(helping or ())
     veto = vetoed_lenses(lens_fwd)
     for lens, (lever, default, ladder) in SCOUT_LADDERS.items():
         if lens in veto:
             continue
         graded = ((lens_fwd or {}).get(lens) or {}).get("n4h") or 0
         if graded < LENS_FLOOR:
-            val = ladder[1] if len(ladder) > 1 else default
+            deeper = lever in helping and len(ladder) > 2
+            val = (ladder[2] if deeper
+                   else ladder[1] if len(ladder) > 1 else default)
             out[lever] = val
             log.append(f"{lens}: graded n4h={graded} < {LENS_FLOOR} — scout "
-                       f"emission {lever} -> {val} (grading diet, not trading)")
+                       f"emission {lever} -> {val} (grading diet, not trading"
+                       + (", deeper: proprio-helping" if deeper else "") + ")")
         # else: floor reached — stop asserting, lever expires to default
     lever, default, ladder = TOP_N_LADDER
     hungry = any(((lens_fwd or {}).get(l) or {}).get("n4h", 0) < LENS_FLOOR
                  for l in SCOUT_LADDERS)
     if hungry and lens_fwd:
-        val = ladder[1]
+        deeper = lever in helping and len(ladder) > 2
+        val = ladder[2] if deeper else ladder[1]
         out[lever] = val
-        log.append(f"ticket_top_n -> {val} (a lens is below the ruling floor)")
+        log.append(f"ticket_top_n -> {val} (a lens is below the ruling floor"
+                   + (", deeper: proprio-helping" if deeper else "") + ")")
     return out, log
+
+
+def apply_proprioception(levers, prop_state, now_ts):
+    """[2026-07-16 PROPRIOCEPTION] Drop any would-be enactment whose lever
+    carries a fresh HURTING verdict from fleet_proprioception — the lever's
+    graded real-world episodes measured net-negative, so the tuner stops
+    repeating the movement even while in-sample replay still likes it.
+    Restrict-only (only ever removes enactments) and fail-safe: a dark/
+    stale/absent proprioception drops nothing. Pure — selftested."""
+    if proprio is None or not levers:
+        return levers, []
+    hurt = proprio.hurting_levers(prop_state, now_ts)
+    dropped = sorted(set(levers) & set(hurt))
+    if not dropped:
+        return levers, []
+    log = [f"{k}: proprioception verdict HURTING "
+           f"(Σ${(hurt[k].get('sum_delta_usd') or 0):+.2f} over "
+           f"n={hurt[k].get('n')} graded episodes) — NOT re-asserted"
+           for k in dropped]
+    return {k: v for k, v in levers.items() if k not in hurt}, log
 
 
 NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
@@ -329,12 +379,19 @@ def run_once():
     # replay is their evidence) but grading-floor logic contributes nothing.
     lens_fwd = (lf_state.get("lenses") or {}) if lf_fresh else {}
 
+    # proprioception (16-Jul): HELPING levers earn the expansion walk /
+    # deeper diet; HURTING levers are dropped before the write. Both sides
+    # fail-safe — a dark organ earns nothing and restricts nothing.
+    prop_state = (store.load_state(proprio.KEY) or {}) if proprio else {}
+    prop_now = datetime.now(timezone.utc).timestamp()
+    helping = set(proprio.helping_levers(prop_state, prop_now)) if proprio else set()
+
     baseline = replay_with(tape, DEFAULTS)
-    bars, log1 = desired_taker_bars(tape, baseline, lens_fwd)
+    bars, log1 = desired_taker_bars(tape, baseline, lens_fwd, helping=helping)
     exits, log2 = sweep_exits(tape, baseline)
     bars.update(exits)
     if lf_fresh:
-        scout_levers, log3 = desired_scout_levers(lens_fwd)
+        scout_levers, log3 = desired_scout_levers(lens_fwd, helping=helping)
     else:
         scout_levers, log3 = {}, ["lens-forward missing/stale — no scout-diet "
                                   "changes (fail-safe neutral)"]
@@ -353,6 +410,10 @@ def run_once():
                          "reason": "lens starving — widen the brain's grading diet",
                          "evidence": f"lens-forward n4h below {LENS_FLOOR}"}
 
+    # proprioception veto: a lever whose graded episodes measured HURTING in
+    # reality is not re-asserted this cycle (restrict-only; fail-safe none)
+    levers, log4 = apply_proprioception(levers, prop_state, prop_now)
+
     enacted = tuning.write_levers(levers, set_by="scout-tuner",
                                   ttl_sec=LEVER_TTL) if levers else None
 
@@ -367,7 +428,7 @@ def run_once():
         "baseline_net": baseline["closed_net"],
         "baseline_lenses": {l: {k: s.get(k) for k in ("seen", "taken", "closed", "net")}
                             for l, s in (baseline.get("lenses") or {}).items()},
-        "enacted": now_set, "log": (log1 + log2 + log3)[:20],
+        "enacted": now_set, "log": (log4 + log1 + log2 + log3)[:20],
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -459,6 +520,43 @@ def _selftest():
     bars_wl, _ = desired_taker_bars(lose_tape, base_l, lf_winner)
     assert "DIP_RANGE" not in bars_wl
 
+    # PROPRIO-HELPING unlock (16-Jul expand side): dip FILLS at the default
+    # bar (not starving) and the brain sits below its ruling floor (not a
+    # winner) — only a HELPING verdict unlocks the expansion walk, and each
+    # notch still needs the improve-both-halves margin. Tickets at 0.04 fill
+    # at the default bar; tickets at 0.07 fill only at 0.08; every trade
+    # WINS, so the wider bar improves both halves.
+    in_a = {"sym": "AAA", "range_pos": 0.04}
+    out_b = {"sym": "BBB", "range_pos": 0.07}
+    in_c = {"sym": "CCC", "range_pos": 0.04}
+    out_d = {"sym": "DDD", "range_pos": 0.07}
+    help_tape = [
+        snap(0, {"AAA": 100.0, "BBB": 100.0}, {"dip": [in_a, out_b]}),
+        snap(1, {"AAA": 105.0, "BBB": 100.0}, {"dip": [out_b]}),
+        snap(2, {"BBB": 105.0}),
+        snap(3, {}),
+        snap(4, {"CCC": 100.0, "DDD": 100.0}, {"dip": [in_c, out_d]}),
+        snap(5, {"CCC": 105.0, "DDD": 100.0}, {"dip": [out_d]}),
+        snap(6, {"DDD": 105.0}),
+        snap(7, {}),
+    ]
+    base_h = replay_with(help_tape, DEFAULTS)
+    assert base_h["lenses"]["dip"]["taken"] == 2, base_h["lenses"]["dip"]
+    bars_h0, _ = desired_taker_bars(help_tape, base_h, {})
+    assert "DIP_RANGE" not in bars_h0, bars_h0        # no evidence -> no walk
+    bars_h1, log_h1 = desired_taker_bars(help_tape, base_h, {},
+                                         helping={"taker.dip_range"})
+    assert bars_h1.get("DIP_RANGE") == 0.08, (bars_h1, log_h1)
+    assert any("proprio-helping" in l for l in log_h1), log_h1
+    # ...but a losing tape refuses the helping walk (margin rule holds)...
+    bars_h2, _ = desired_taker_bars(lose_tape, base_l, {},
+                                    helping={"taker.dip_range"})
+    assert "DIP_RANGE" not in bars_h2, bars_h2
+    # ...and the brain's veto stays senior to a helping verdict
+    bars_h3, _ = desired_taker_bars(help_tape, base_h, lf_veto,
+                                    helping={"taker.dip_range"})
+    assert "DIP_RANGE" not in bars_h3, bars_h3
+
     # sweep refuses tiny samples (anti-overfit floor)
     exits, slog = sweep_exits(win_tape, base)
     assert exits == {} and "skipped" in slog[0], slog
@@ -483,6 +581,35 @@ def _selftest():
                                    "breakout": {"n4h": 100},
                                    "momentum": {"n4h": 100}})
     assert "scout.dip_range_max" not in sl3, sl3
+    # HELPING diet levers walk one notch DEEPER while under the floor
+    # (0.15 -> 0.20, top_n 9 -> 12); un-helped levers keep the first notch
+    sl4, _ = desired_scout_levers({"dip": {"n4h": 25, "avg4h_pct": 1.1,
+                                           "hit4h": 0.92},
+                                   "breakout": {"n4h": 20},
+                                   "momentum": {"n4h": 252}},
+                                  helping={"scout.dip_range_max",
+                                           "scout.ticket_top_n"})
+    assert sl4.get("scout.dip_range_max") == 0.20, sl4
+    assert sl4.get("scout.brk_range_min") == 0.87, sl4   # not helped: notch 1
+    assert sl4.get("scout.ticket_top_n") == 12, sl4
+
+    # proprioception veto: a fresh HURTING verdict drops the enactment; a
+    # stale/absent payload drops NOTHING (fail-safe); helping never drops
+    if proprio is not None:
+        nowts = datetime.now(timezone.utc).timestamp()
+        want = {"taker.dip_range": {"value": 0.08, "reason": "r"},
+                "scout.dip_range_max": {"value": 0.15, "reason": "r"}}
+        fresh_prop = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                      "ttl_sec": 2700,
+                      "verdicts": {"taker.dip_range": {"verdict": "hurting",
+                                                       "n": 3, "sum_delta_usd": -5.1},
+                                   "scout.dip_range_max": {"verdict": "helping"}}}
+        kept, plog = apply_proprioception(dict(want), fresh_prop, nowts)
+        assert set(kept) == {"scout.dip_range_max"} and len(plog) == 1, (kept, plog)
+        stale_prop = dict(fresh_prop, updated="2020-01-01T00:00:00+00:00")
+        assert apply_proprioception(dict(want), stale_prop, nowts) == (want, [])
+        assert apply_proprioception(dict(want), {}, nowts) == (want, [])
+        assert apply_proprioception({}, fresh_prop, nowts) == ({}, [])
 
     # every ladder/sweep value must be registered + in-bounds in fleet_tuning
     for lens, (attr, lever, ladder) in TAKER_LADDERS.items():
@@ -501,7 +628,8 @@ def _selftest():
         assert tuning.clamp(TOP_N_LADDER[0], v) == v
 
     print("scout_tuner selftest OK (ladders, veto, win-widen, lose-reject, "
-          "floor-release, anti-overfit sweep gate, registry bounds)")
+          "floor-release, anti-overfit sweep gate, proprioception "
+          "hurting-skip + helping-unlock + deeper-diet, registry bounds)")
 
 
 if __name__ == "__main__":

@@ -320,3 +320,86 @@ cadence. Still ADVISORY / publish-first per doctrine — no consumer wired.
 **Grade before wiring:** pull `fleet-clock` history — did the NYSE
 open/close transitions land at the right instants (DST honest, no holiday
 misses), and does `event_window` sample honestly at the 5-min cadence?
+
+## 12. Proprioception 🦾: grade the grader's first week (added 16-Jul)
+
+**What shipped (16-Jul, operator: "advance, enhance and improve the
+autonomous organ"):** `fleet_proprioception.py` — the autonomy stack's
+first RETROSPECTIVE sense. Every growth-rail lever episode (open →
+expire/release/change; long stances sliced daily) is graded out-of-sample:
+taker levers get the replay counterfactual in $ on the tape recorded
+DURING the episode (defaults vs enacted bars through the taker's real
+code), scout diet levers get grading throughput (n4h delta), gapscout
+gets census activity; live/xp episodes are recorded only — the judge and
+fade-watch remain the sole real-money authority. Per-lever verdicts
+(floors n≥2, ±$3) land in bot_state `fleet-proprioception`. FIRST
+CONSUMER, restrict-only: the scout tuner refuses to re-assert a lever
+carrying a fresh HURTING verdict (`apply_proprioception`) — the tuner
+stops repeating a movement that measured net-negative in reality even
+while in-sample replay still likes it. Board surfaces 🦾 items; immune
+scans the payload; /vitals + autonomy card render it.
+
+**Grade at the review:**
+- Episode ledger sanity: do episode windows match the fleet-tuning
+  history (no phantom opens, releases backdated to lever expiry)?
+- Counterfactual honesty: spot-check 2-3 graded taker episodes by
+  re-running the replay by hand on the same window.
+- Did any HURTING verdict fire, and if so — did the skip change what the
+  tuner enacted next cycle (the `scout-tuner` log carries the skip line)?
+- Verdict floors: are n≥2 / ±$3 (`PROP_MIN_EPISODES`/`PROP_HURT_USD`)
+  the right bar, or does a week of episodes argue for more evidence?
+
+**Expand side (wired 16-Jul evening, operator: "implement the expanding
+side of things now so the July 21 can review both sides"):** HELPING now
+earns, inside the existing gates — (i) a HELPING taker lever unlocks the
+tuner's improve-both-halves expansion walk BEFORE the brain's ruling
+floor (brain veto stays senior; every notch still replay-gated); (ii) a
+HELPING scout diet lever walks one notch deeper while its lens is under
+the floor (advisory tickets only, released at the floor); (iii) a
+HELPING gapscout lever discounts the board's widen-ladder quiet-hour
+bars ×0.75 (12h hard floor — values unchanged, only the wait). The live
+lane earns NOTHING (judge's paired bar stays the only road to real
+money). Grade BOTH sides at the review:
+- Did any HELPING verdict fire, and did it change an enactment (tuner
+  log carries "proprio-helping"; board 🌱 item carries "bars ×0.75")?
+- Was every helping-unlocked notch still margin-positive on both halves
+  when spot-checked by hand?
+- Is ×0.75 / 12h the right ladder discount, and should helping DECAY
+  faster than the verdict window's n=10 episodes?
+- Symmetry check: over the week, did the restrict side (hurting-skip)
+  and the expand side (helping-earn) fire in sane proportion, or is one
+  eye still dominant?
+
+**Live lane learning (wired 16-Jul evening, operator: "the live lane
+needs to learn"):** live episodes now GRADE instead of merely recording —
+per-trade pnl_pct during the episode vs the books' own pre-window AND the
+shadow twins over the same window ('bad' only when worse than EVERY
+available baseline by ≥0.25pp; per-episode floor n≥5 live closes;
+clip_scale and funding bars grade as separate groups so the board's
+movement is never blamed on the judge's). Consumption is restrict-first
+on real money: a HURTING live.clip_scale RELEASES the board's lever and
+blocks every up-step; a HURTING live.funding.* is the judge's EARLIER
+fade signal (prop_fade — the judge remains the only writer); and the one
+live earn: the clip ladder's TOP step (1.5) now requires a measured
+HELPING grade at 1.25, fail-CLOSED (a dark sense caps the ladder at
+1.25). Grade at the review:
+- Did any live episode reach 'graded' (the trend book may be too slow —
+  n≥5 in 24h slices), and were the twin windows honestly matched?
+- Is the 0.25pp margin / n≥5 floor right for the funding bot's cadence?
+- Did the top-step gate ever bind, and would the old aggregate-only
+  ladder have stepped where the measured gate refused?
+- prop_fade vs fade_check: which would have fired first on the week's
+  data, and did either false-positive?
+
+**Real-money consumer hook (wired 16-Jul late, operator: "and with the
+new rule, real money bots too"):** `fleet_tuning.get_lever` now reverts a
+lighter-live lever carrying a fresh HURTING verdict to the operator's env
+default AT THE CONSUMER — the funding bot's apply_levers and both live
+bots' clip read pass through it every loop, closing the latency window
+between a verdict landing and the board/judge/TTL catching up. Live-lane
+only; fail-safe open; restrict-only by construction (can only hand back
+the operator's own default). Grade at the review:
+- Did the hook ever fire, and how much earlier did it revert than the
+  board release / judge fade would have (compare timestamps)?
+- Confirm composition with the immune quarantine (quarantine first, then
+  hurting-revert) produced no double-handling surprises in the logs.

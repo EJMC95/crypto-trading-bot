@@ -44,6 +44,11 @@ import fleet_tuning as tuning
 import lighter_ticket_taker as tt
 import lighter_ticket_replay as rp
 
+try:
+    import fleet_proprioception as proprio   # outcome grades (optional import)
+except Exception:  # noqa: BLE001
+    proprio = None
+
 KEY = "strategy-incubator"
 QUEUE_KEY = "xp-queue"
 TTL_SEC = int(os.environ.get("INCUBATOR_TTL_SEC", "10800"))
@@ -212,10 +217,15 @@ def assess_champion(top, default_net, tape_hours, prior_champ, prior_streak):
 
 # ---------------------------------------------------------------------------
 
-def funding_proposals(judge_state, incubator_state):
+def funding_proposals(judge_state, incubator_state, hurting=None):
     """Novel FUNDING genotypes not already run/queued — proposed for the
     experiment judge's paired bar. Diversity-ordered (single-gene changes
-    first). Never pre-scored (no funding replay); the judge is the filter."""
+    first). Never pre-scored (no funding replay); the judge is the filter.
+    [16-Jul consumer support] 🦾 a gene whose LIVE counterpart lever is
+    currently proprioception-graded HURTING is skipped this cycle — the
+    live lane just measured that knob bad; don't spend a 7-day judge slot
+    re-proposing it while the verdict holds. Restrict-only (only removes
+    proposals) and fail-safe (a dark organ skips nothing)."""
     default = {g: tuning.get_lever(FUNDING_GENES[g][0],
                                    {"enter_apr": tt and 0.40}.get(g, None))
                for g in FUNDING_GENES}
@@ -228,8 +238,11 @@ def funding_proposals(judge_state, incubator_state):
             tried.add(nm)
     for p in (incubator_state.get("proposed") or []):
         tried.add(p.get("name"))
+    hurting = set(hurting or ())
     props = []
     for g, (lever, grid) in FUNDING_GENES.items():
+        if lever.replace("xp.", "live.", 1) in hurting:
+            continue      # live lane measured this knob bad — wait it out
         for allele in grid:
             if allele == base[g]:
                 continue
@@ -278,7 +291,17 @@ def run_once():
 
     # --- FUNDING proposals (live-reachable, JUDGE-gated) -------------------
     judge_state = store.load_state("xp-judge") or {}
-    props = funding_proposals(judge_state, prior)
+    hurting = set()
+    if proprio is not None:
+        try:
+            hurting = set(proprio.hurting_levers(
+                store.load_state(proprio.KEY) or {}, now))
+        except Exception:
+            hurting = set()
+    props = funding_proposals(judge_state, prior, hurting=hurting)
+    if hurting:
+        print(f"[incubator] 🦾 proprioception hurting levers honored: "
+              f"{sorted(hurting)}", flush=True)
     if props:
         q = store.load_state(QUEUE_KEY) or {}
         existing = {p["name"] for p in (q.get("candidates") or [])}
@@ -354,6 +377,13 @@ def _selftest():
     for p in props:                                     # every allele is in-registry
         (lever, val), = p["levers"].items()
         assert tuning.clamp(lever, val) == val, p
+    # 🦾 a gene whose LIVE lever is proprioception-graded HURTING is skipped
+    # this cycle; other genes unaffected; empty/absent hurting skips nothing
+    ph = funding_proposals({}, {}, hurting={"live.funding.enter_apr"})
+    assert not any("enter_apr" in p["name"] for p in ph), ph
+    assert any("take_profit" in p["name"] for p in ph), ph
+    assert funding_proposals({}, {}, hurting=set()) == funding_proposals({}, {})
+    assert funding_proposals({}, {}, hurting=None) == funding_proposals({}, {})
     # anti-overfit champion gate: the +$0.01-half case is REJECTED as noise
     noise = {"genotype": {"A": 2}, "net": 2.35, "h1": 0.01, "h2": 2.34}
     isc, _, _, conf, why = assess_champion(noise, 0.0, 200, None, 0)
@@ -379,7 +409,7 @@ def _selftest():
 
     print("strategy_incubator selftest OK (seed, dedupe, crossover+mutation "
           "on-grid, lever mapping/clamp, judge-gated funding proposals, "
-          "anti-overfit champion gate)")
+          "proprioception hurting-gene skip, anti-overfit champion gate)")
 
 
 if __name__ == "__main__":

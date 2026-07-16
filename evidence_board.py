@@ -270,14 +270,40 @@ WIDEN_LADDER = [
             "gapscout.extra_exchanges": "kucoin,gateio"}),
     (96.0, {"gapscout.extra_exchanges": "kucoin,gateio,mexc"}),
 ]
+# [2026-07-16 expand side] when proprioception has graded the widened net
+# HELPING (a past widening measurably coincided with census activity), the
+# quiet-hour bars are discounted so the net re-widens SOONER — the ladder's
+# VALUES never change, only how long the board waits to climb it. Bounded:
+# fixed scale, hard floor on the effective bar.
+GAPSCOUT_HELP_SCALE = float(os.environ.get("EVBOARD_GAPSCOUT_HELP_SCALE", "0.75"))
+WIDEN_BAR_MIN_H = float(os.environ.get("EVBOARD_WIDEN_BAR_MIN_H", "12"))
 
 
-def widen_step(quiet_hours):
+def gapscout_bar_scale(prop_state):
+    """GAPSCOUT_HELP_SCALE when any fresh proprioception verdict grades a
+    gapscout.* lever HELPING, else 1.0. Fail-safe 1.0 — a dark organ earns
+    nothing. Pure — selftested offline."""
+    try:
+        if not prop_state or not _fresh(prop_state, max_age_s=float(
+                prop_state.get("ttl_sec") or 2700)):
+            return 1.0
+        for lever, v in (prop_state.get("verdicts") or {}).items():
+            if (str(lever).startswith("gapscout.") and isinstance(v, dict)
+                    and v.get("verdict") == "helping"):
+                return GAPSCOUT_HELP_SCALE
+    except Exception:  # noqa: BLE001
+        return 1.0
+    return 1.0
+
+
+def widen_step(quiet_hours, bar_scale=1.0):
     """(step, merged_levers) for a census this many hours quiet. Monotone;
-    later steps inherit (and may override) earlier steps' levers."""
+    later steps inherit (and may override) earlier steps' levers. bar_scale
+    < 1 (proprioception HELPING) lowers the quiet-hour bars, never below
+    WIDEN_BAR_MIN_H."""
     step, levers = 0, {}
     for i, (bar, lv) in enumerate(WIDEN_LADDER, 1):
-        if quiet_hours >= bar:
+        if quiet_hours >= max(WIDEN_BAR_MIN_H, bar * bar_scale):
             step = i
             levers.update(lv)
     return step, levers
@@ -329,12 +355,35 @@ LIVE_LADDER = [1.0, 1.25, 1.5]
 LIVE_GAP_FRESH_H = float(os.environ.get("EVBOARD_LIVE_GAP_FRESH_H", "6"))
 
 
+def live_clip_grade(prop_state):
+    """'hurting' | 'helping' | None for live.clip_scale from a FRESH
+    proprioception payload. None on dark/stale/neutral — and the up-ladder
+    treats None as fail-CLOSED for the TOP step (real-money default: no
+    measured evidence, no top step). Pure — selftested offline."""
+    try:
+        if not prop_state or not _fresh(prop_state, max_age_s=float(
+                prop_state.get("ttl_sec") or 2700)):
+            return None
+        v = (prop_state.get("verdicts") or {}).get("live.clip_scale")
+        vd = v.get("verdict") if isinstance(v, dict) else None
+        return vd if vd in ("hurting", "helping") else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
-                    prior_scale, now_ts):
+                    prior_scale, now_ts, clip_grade=None):
     """The live lane's decision. Returns (desired_scale | None, item | None).
     None = assert nothing (the lever expires back to 1.0 on its own).
     prior_scale: {"value", "ts"} from the previous board payload — the
-    up-ladder's cooldown memory. Pure — selftested offline."""
+    up-ladder's cooldown memory.
+    clip_grade (16-Jul evening, operator: "the live lane needs to learn"):
+    proprioception's live.clip_scale verdict. HURTING (scaled episodes
+    measured worse than the pre-window AND the shadow twin) releases the
+    lever and blocks every up-step; the ladder's TOP step additionally
+    REQUIRES a measured HELPING grade at the mid step — fail-CLOSED, so a
+    dark sense caps the ladder at the mid step. Sizing down never needs
+    the grade. Pure — selftested offline."""
     rows = {str(r.get("bot")): r for r in (bot_rows or [])
             if str(r.get("bot")) in LIVE_ROWS}
     if not LIVE_ROWS or len(rows) < len(LIVE_ROWS):
@@ -363,6 +412,25 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
                             for b in hurt])
         return LIVE_DOWN_SCALE, emit(LIVE_DOWN_SCALE, "action", "restrict", why)
 
+    # 🦾 the live lane's own learning: a HURTING clip grade (scaled episodes
+    # measured worse than the pre-window AND the shadow twin) stops the
+    # board asserting ANY scale — the lever expires back to the operator's
+    # env sizing. Not a punishment down-scale: the measured-bad movement
+    # simply stops being repeated until the grade recovers.
+    if clip_grade == "hurting":
+        if (prior_scale or {}).get("value"):
+            return None, {
+                "key": "board:live-clip-scale", "severity": "action",
+                "msg": "💰 LIVE clip lever RELEASED — 🦾 proprioception graded "
+                       "scaled episodes HURTING (worse than pre-window AND "
+                       "shadow twin); reverting to operator env sizing",
+                "proposal": "no re-assert while the verdict holds; the judge "
+                            "and the operator remain the only expand paths "
+                            "for live",
+                "lever": "live.clip_scale", "ts": now_ts, "source": "board",
+                "direction": "restrict"}
+        return None, None
+
     # UP must be earned on every gate at once.
     fr_ok = (_fresh(fleet_risk or {})
              and str(fleet_risk.get("light")) == "green"
@@ -384,10 +452,16 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     nxt = next((v for v in LIVE_LADDER if v > cur + 1e-9), cur)
     if cur > 1.0 and now_ts - since < LIVE_STEP_COOLDOWN_H * 3600:
         nxt = cur                            # hold this step through cooldown
+    # the TOP step must be MEASURED, not just gated: it requires a fresh
+    # HELPING grade at the current step (fail-CLOSED — no grade, no top)
+    if nxt == LIVE_LADDER[-1] and nxt > cur and clip_grade != "helping":
+        nxt = cur
     if nxt <= 1.0:
         return None, None
     why = (f"EARNED: every live row ≥{LIVE_MIN_CLOSED} closes & net positive, "
-           f"fleet green, dd>{LIVE_DD_MIN:.0%}, venue calm ({med}bps)")
+           f"fleet green, dd>{LIVE_DD_MIN:.0%}, venue calm ({med}bps)"
+           + (" · 🦾 measured HELPING at the prior step"
+              if nxt == LIVE_LADDER[-1] and clip_grade == "helping" else ""))
     return nxt, emit(nxt, "action", "expand", why)
 
 
@@ -476,6 +550,45 @@ def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts,
     return out
 
 
+def synthesize_proprioception(prop_state, now_ts):
+    """[2026-07-16] 🦾 proprioception verdicts on the triage board. HURTING
+    (a lever whose graded real-world episodes measured net-negative — the
+    tuner already auto-skips it) surfaces as a warn/restrict item; HELPING
+    surfaces as expand evidence for the review. Stale/absent organ emits
+    nothing (fail-safe). Pure — selftested offline."""
+    out = []
+    if not prop_state or not _fresh(prop_state, max_age_s=float(
+            prop_state.get("ttl_sec") or 2700)):
+        return out
+    for lever, v in sorted((prop_state.get("verdicts") or {}).items()):
+        if not isinstance(v, dict):
+            continue
+        n = v.get("n")
+        measure = (f"Σ${v['sum_delta_usd']:+.2f}" if v.get("sum_delta_usd")
+                   is not None else
+                   f"Σ{v.get('sum_delta_grades', 0):+d} grades"
+                   if v.get("sum_delta_grades") is not None else "activity")
+        if v.get("verdict") == "hurting":
+            out.append({"key": f"board:prop-hurting:{lever}", "severity": "warn",
+                        "msg": f"🦾 lever {lever} graded HURTING in reality: "
+                               f"{measure} over n={n} episodes (out-of-sample "
+                               f"replay counterfactual)",
+                        "proposal": "scout tuner auto-skips re-assertion while "
+                                    "the verdict holds (restrict-only); review "
+                                    "whether the ladder/bounds need tightening",
+                        "lever": "proprioception", "ts": now_ts, "source": "board"})
+        elif v.get("verdict") == "helping":
+            out.append({"key": f"board:prop-helping:{lever}", "severity": "info",
+                        "msg": f"🦾 lever {lever} graded HELPING in reality: "
+                               f"{measure} over n={n} episodes",
+                        "proposal": "outcome evidence for the review — the "
+                                    "widening is paying on the tape recorded "
+                                    "while it was in force",
+                        "lever": "proprioception", "ts": now_ts,
+                        "source": "board", "direction": "expand"})
+    return out
+
+
 def detect_veto_flap(alerts_48h_plus, now_ts, window_d=7, min_events=3):
     """A coin appearing in >= min_events veto-change alerts inside window_d
     days is oscillating across its threshold. Restrict-only so harmless, but
@@ -542,7 +655,7 @@ def run_once():
     # only if the batch came back empty (DB down).
     _keys = ["fleet-alerts", "evidence-review", "lighter-market", "fleet-risk",
              "brain-lens-forward", "scout-tuner", "xp-judge", "gapscout-census",
-             "impl-shortfall"]
+             "impl-shortfall", "fleet-proprioception"]
     _b = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     _ok = bool(_b)
     def _g(k):
@@ -583,6 +696,10 @@ def run_once():
     synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, 26000) else {},
                                tuner_state, bot_rows, lm, now, xp_state)
 
+    # 🦾 proprioception: what the autonomy stack's own movements measured
+    prop_b = _g("fleet-proprioception")
+    synth += synthesize_proprioception(prop_b, now)
+
     # implementation shortfall (live execution quality) — its own tracker
     # pushes the phone alert; the board only SURFACES the verdict (dedicated-
     # push key, so no double-send). live-ahead = info, live-slipping = warn.
@@ -602,9 +719,11 @@ def run_once():
                          "watch the entry-vs-exit split as fill prices accrue"),
             "lever": "impl-shortfall", "ts": now, "source": "board"})
 
-    # ---- LIVE lane 💰: evidence-gated clip scaling on the real-money bots --
+    # ---- LIVE lane 💰: evidence-gated clip scaling on the real-money bots,
+    # now grade-aware (🦾 hurting releases/blocks; top step needs helping) --
     prior_live = prior.get("live_scale") or {}
-    desired_live, live_item = synthesize_live(bot_rows, fr, lm, fa, prior_live, now)
+    desired_live, live_item = synthesize_live(bot_rows, fr, lm, fa, prior_live,
+                                              now, live_clip_grade(prop_b))
     if live_item:
         synth.append(live_item)
 
@@ -613,12 +732,15 @@ def run_once():
     growth_step, growth_levers, quiet_h = 0, {}, 0.0
     if _fresh(census, max_age_s=3600):
         quiet_h = float(census.get("quiet_hours") or 0.0)
-        growth_step, growth_levers = widen_step(quiet_h)
+        bar_scale = gapscout_bar_scale(prop_b)
+        growth_step, growth_levers = widen_step(quiet_h, bar_scale)
         if growth_step:
             synth.append({
                 "key": "board:gapscout-quiet", "severity": "info",
                 "msg": f"🌱 Gap Scout census quiet {quiet_h:.0f}h — detection "
-                       f"net widened to step {growth_step}/{len(WIDEN_LADDER)}",
+                       f"net widened to step {growth_step}/{len(WIDEN_LADDER)}"
+                       + (f" (bars ×{bar_scale:g} — 🦾 the wider net has "
+                          f"helped before)" if bar_scale < 1.0 else ""),
                 "proposal": "widen (ENACTED via fleet_tuning): " + ", ".join(
                     f"{k}={v}" for k, v in sorted(growth_levers.items())),
                 "lever": "growth-rail", "direction": "expand",
@@ -844,6 +966,26 @@ def _selftest():
     assert "board:tuner-enacted" not in k2 and "board:stress-headroom" not in k2
     assert "board:lens-positive:dip" in k2
 
+    # 🦾 proprioception synthesis: hurting=warn/restrict, helping=expand,
+    # neutral silent, stale organ emits nothing
+    prop = {"updated": fresh, "ttl_sec": 2700, "verdicts": {
+        "taker.dip_range": {"verdict": "hurting", "n": 3, "sum_delta_usd": -5.1},
+        "scout.dip_range_max": {"verdict": "helping", "n": 2,
+                                "sum_delta_grades": 35},
+        "taker.tp": {"verdict": "neutral", "n": 1, "sum_delta_usd": 0.4}}}
+    pit = synthesize_proprioception(prop, _now())
+    pk = {p["key"]: p for p in pit}
+    assert set(pk) == {"board:prop-hurting:taker.dip_range",
+                       "board:prop-helping:scout.dip_range_max"}, pk
+    assert pk["board:prop-hurting:taker.dip_range"]["severity"] == "warn"
+    assert "Σ$-5.10" in pk["board:prop-hurting:taker.dip_range"]["msg"]
+    assert pk["board:prop-helping:scout.dip_range_max"]["direction"] == "expand"
+    assert "Σ+35 grades" in pk["board:prop-helping:scout.dip_range_max"]["msg"]
+    assert synthesize_proprioception(
+        dict(prop, updated="2020-01-01T00:00:00+00:00"), _now()) == []
+    assert synthesize_proprioception({}, _now()) == []
+    assert synthesize_proprioception(None, _now()) == []
+
     # LIVE lane: earn-up ladder + cooldown, instant down, fail-safe absent
     nowts = _now()
     fresh_fr = {"updated": fresh, "ttl_sec": 900, "light": "green",
@@ -858,12 +1000,43 @@ def _selftest():
     s2, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                             {"value": 1.25, "ts": nowts - 3600}, nowts)
     assert s2 == 1.25, "cooldown must hold the step"
+    # 🦾 the top step must be MEASURED: no grade (dark sense) -> fail-closed
+    # hold at the mid step; a fresh HELPING grade unlocks it
     s3, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                             {"value": 1.25, "ts": nowts - 25 * 3600}, nowts)
-    assert s3 == 1.5, "past cooldown -> next step"
+    assert s3 == 1.25, "no measured HELPING -> top step stays out of reach"
+    s3b, it3b = synthesize_live(live_ok, fresh_fr, calm_lm, [],
+                                {"value": 1.25, "ts": nowts - 25 * 3600},
+                                nowts, clip_grade="helping")
+    assert s3b == 1.5 and "HELPING" in it3b["msg"], (s3b, it3b)
     s4, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
-                            {"value": 1.5, "ts": nowts - 25 * 3600}, nowts)
+                            {"value": 1.5, "ts": nowts - 25 * 3600}, nowts,
+                            clip_grade="helping")
     assert s4 == 1.5, "ladder top is the ceiling"
+    # 🦾 HURTING releases an asserted lever (item, no scale) and silently
+    # blocks a fresh up-start; the DOWN reflex stays senior to the grade
+    sh, ith = synthesize_live(live_ok, fresh_fr, calm_lm, [],
+                              {"value": 1.25, "ts": nowts - 25 * 3600},
+                              nowts, clip_grade="hurting")
+    assert sh is None and ith["direction"] == "restrict" \
+        and "RELEASED" in ith["msg"], (sh, ith)
+    assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
+                           clip_grade="hurting") == (None, None)
+    live_hurt0 = [dict(live_ok[0], pnl_abs=-15.0), live_ok[1]]
+    sh2, ith2 = synthesize_live(live_hurt0, fresh_fr, calm_lm, [],
+                                {"value": 1.25, "ts": 0}, nowts,
+                                clip_grade="hurting")
+    assert sh2 == LIVE_DOWN_SCALE, "hurt row down-scale beats the release"
+    # grade sourcing: fresh hurting/helping surface; neutral/stale/absent None
+    fp = _iso()
+    assert live_clip_grade({"updated": fp, "ttl_sec": 2700, "verdicts": {
+        "live.clip_scale": {"verdict": "hurting"}}}) == "hurting"
+    assert live_clip_grade({"updated": fp, "ttl_sec": 2700, "verdicts": {
+        "live.clip_scale": {"verdict": "neutral"}}}) is None
+    assert live_clip_grade({"updated": "2020-01-01T00:00:00+00:00",
+                            "ttl_sec": 60, "verdicts": {
+                                "live.clip_scale": {"verdict": "helping"}}}) is None
+    assert live_clip_grade({}) is None and live_clip_grade(None) is None
     live_hurt = [dict(live_ok[0], pnl_abs=-15.0), live_ok[1]]
     s5, it5 = synthesize_live(live_hurt, fresh_fr, calm_lm, [],
                               {"value": 1.5, "ts": 0}, nowts)
@@ -912,6 +1085,25 @@ def _selftest():
     s3, lv3 = widen_step(200)
     assert s3 == 3 and lv3["gapscout.extra_exchanges"] == "kucoin,gateio,mexc"
     assert lv3["gapscout.max_book_fetches"] == 60, "step 3 inherits step 2"
+    # 🦾 expand side: a HELPING gapscout verdict discounts the quiet bars
+    # (values unchanged, only the wait) — with a hard floor on the bar
+    assert widen_step(19) == (0, {}), "19h quiet: no step at full bars"
+    s1h, lv1h = widen_step(19, 0.75)
+    assert s1h == 1 and lv1h["gapscout.prefilter_gap"] == 0.0015, (s1h, lv1h)
+    assert widen_step(37, 0.75)[0] == 2, "48h bar -> 36h under the discount"
+    assert widen_step(11, 0.4)[0] == 0, "WIDEN_BAR_MIN_H floors the bar (12h)"
+    assert widen_step(13, 0.4)[0] == 1
+    # scale sourcing: fresh helping gapscout verdict -> discount; a helping
+    # TAKER verdict, a stale organ, or nothing -> full bars
+    prop_gs = {"updated": fresh, "ttl_sec": 2700, "verdicts": {
+        "gapscout.prefilter_gap": {"verdict": "helping", "n": 2}}}
+    assert gapscout_bar_scale(prop_gs) == GAPSCOUT_HELP_SCALE
+    assert gapscout_bar_scale({"updated": fresh, "ttl_sec": 2700, "verdicts": {
+        "taker.tp": {"verdict": "helping"},
+        "gapscout.prefilter_gap": {"verdict": "neutral"}}}) == 1.0
+    assert gapscout_bar_scale(dict(prop_gs,
+                                   updated="2020-01-01T00:00:00+00:00")) == 1.0
+    assert gapscout_bar_scale({}) == 1.0 and gapscout_bar_scale(None) == 1.0
     # every ladder value must be registered AND in-bounds in fleet_tuning —
     # a ladder entry that would be clamped/dropped is a config bug HERE.
     if tuning is not None:

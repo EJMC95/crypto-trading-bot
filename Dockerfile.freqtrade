@@ -33,6 +33,9 @@ COPY fleet_tuning.py /freqtrade/fleet_tuning.py
 # taker's real code -> bounded lever enactments)
 COPY lighter_ticket_replay.py /freqtrade/lighter_ticket_replay.py
 COPY lighter_scout_tuner.py /freqtrade/lighter_scout_tuner.py
+# proprioception: grades every growth-rail enactment episode out-of-sample;
+# the scout tuner consumes its HURTING verdicts (restrict-only)
+COPY fleet_proprioception.py /freqtrade/fleet_proprioception.py
 # the shadow→live promotion judge (paired arms, both-halves, fade-watch)
 COPY experiment_judge.py /freqtrade/experiment_judge.py
 # the immune + self-repair organ (alert filtration, sickness detection,
