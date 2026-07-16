@@ -34,7 +34,7 @@ import json
 import os
 import sys
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import bot_pnl_store as store
 from paper_broker import PaperBroker
@@ -63,6 +63,12 @@ CLIP_MAX = float(os.environ.get("TT_CLIP_MAX", "80"))
 TAKE_PROFIT = float(os.environ.get("TT_TP", "0.04"))       # +4%
 STOP_LOSS = float(os.environ.get("TT_SL", "-0.03"))        # -3%
 MAX_HOLD_H = float(os.environ.get("TT_MAX_HOLD_H", "48"))
+# [2026-07-16 ZOMBIE GUARD] a delisted/vanished book used to mean "hold
+# forever" (exit_reason needs a mark, so even max-hold was unreachable) —
+# the position froze at its last mark and ate a MAX_OPEN slot for good.
+# After this many hours continuously unpriceable, close at the last known
+# mark (entry if none was ever seen) — the sniper's 2-Jul give-up, ported.
+DELIST_GIVEUP_H = float(os.environ.get("TT_DELIST_GIVEUP_H", "6"))
 
 # "Incredible" — the conviction bars. A ticket must clear its lens's bar to
 # be taken; ordinary tickets stay advisory for the weekly lens grading.
@@ -186,6 +192,16 @@ def incredible(tickets):
     return out
 
 
+def delist_due(no_mark_since_iso, t_now, giveup_h=None):
+    """True when a mark has been continuously missing since the given stamp
+    for >= giveup_h. Unparseable stamp -> False (the caller re-stamps)."""
+    try:
+        gone_h = (t_now - parse_ts(no_mark_since_iso)).total_seconds() / 3600.0
+    except (ValueError, TypeError):
+        return False
+    return gone_h >= (DELIST_GIVEUP_H if giveup_h is None else giveup_h)
+
+
 def exit_reason(entry, mark, opened, t_now, is_long=True):
     """tp / sl / hold / None for a position held from `opened`."""
     if not entry or entry <= 0 or not mark or mark <= 0:
@@ -253,7 +269,26 @@ def main():
             opened = t_now
         size, entry = broker.pos[sym]
         is_long = size > 0
-        reason = exit_reason(entry, mark, opened, t_now, is_long)
+        if mark:
+            m.pop("no_mark_since", None)     # priceable again — reset the clock
+            m["last_mark"] = mark
+            meta[sym] = m
+            reason = exit_reason(entry, mark, opened, t_now, is_long)
+        else:
+            # [2026-07-16 ZOMBIE GUARD] book missing from the active universe
+            first = m.get("no_mark_since")
+            try:
+                parse_ts(first)
+            except (ValueError, TypeError):
+                first = None
+            if not first:
+                m["no_mark_since"] = iso(t_now)   # start (or restart) the clock
+                meta[sym] = m
+                continue
+            if not delist_due(first, t_now):
+                continue
+            mark = float(m.get("last_mark") or entry)
+            reason = "delisted"
         if not reason:
             continue
         pnl = broker.close(sym, mark)
@@ -455,8 +490,14 @@ def selftest():
     assert abs(vol_clip(10.0) - 30.0) < 1e-9, "10% range -> $30"
     assert vol_clip(30.0) == CLIP_MIN, "wild book floors at CLIP_MIN"
 
+    # [2026-07-16 ZOMBIE GUARD] delist give-up clock
+    _t = now()
+    assert delist_due(iso(_t - timedelta(hours=DELIST_GIVEUP_H + 1)), _t) is True
+    assert delist_due(iso(_t - timedelta(hours=1)), _t) is False
+    assert delist_due("garbage", _t) is False and delist_due(None, _t) is False
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
-          "long/short exits, signed funding, constant-risk sizing).")
+          "long/short exits, signed funding, constant-risk sizing, "
+          "delist give-up).")
 
 
 if __name__ == "__main__":

@@ -32,6 +32,12 @@ documented so a replay number is never mistaken for a shadow number):
   * No fleet long-budget veto / drawdown governor / lens veto — external
     bus state isn't in this tape. Stress veto IS replayed (snapshots carry
     stress.med).
+  * No delist give-up — the taker force-closes a position whose book stays
+    unpriceable for TT_DELIST_GIVEUP_H (16-Jul zombie guard); the replay
+    has no such clock. Since 16-Jul the tape's marks cover ALL active books
+    (not liquid-only), so a position can only go unpriceable here when the
+    book truly leaves the venue — rare, and it is valued at ENTRY (flat) at
+    tape end rather than force-closed.
 
 READ-ONLY: fetches history (Postgres when DATABASE_URL is set, else the
 dashboard's public /bus.json), writes nothing anywhere.

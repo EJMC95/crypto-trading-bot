@@ -58,6 +58,12 @@ import bot_pnl_store as store
 
 START_EQUITY = 1000.0
 STAKE_USD = float(os.environ.get("FAMILY_STAKE_USD", "50"))
+# [2026-07-16 ZOMBIE GUARD] close a held coin the manage loop can't see or
+# price — dropped from the book's coin list (env change / unsupported at
+# boot) or continuously unpriceable — after this many hours, at the last
+# known mark. Without it such positions froze forever (no stop, no ROI,
+# no exit) while still counting toward the slot cap.
+DELIST_GIVEUP_H = float(os.environ.get("FAMILY_DELIST_GIVEUP_H", "6"))
 LOOP_SECONDS = int(os.environ.get("FAMILY_LOOP_SECONDS", "90"))
 DAILY_LOSS_LIMIT = float(os.environ.get("FAMILY_DAILY_LOSS", "0.10"))
 COINS = os.environ.get(
@@ -862,13 +868,28 @@ def main():
                     m = b.meta.get(coin) or {}
                     entry = m.get("entry") or 0.0
                     if px:
+                        m.pop("no_px_since", None)   # priceable — reset clock
+                        m["last_px"] = px
                         b.broker.mark(coin, px)
                         rate = (fund.get(coin) or {}).get("rate")
                         if rate is not None:
                             sz = abs(b.broker.pos[coin][0])
                             m["accrued"] = m.get("accrued", 0.0) - rate * sz * px * dt_h
-                            b.meta[coin] = m
+                        b.meta[coin] = m
                     if not px or not entry:
+                        # [2026-07-16 ZOMBIE GUARD] unpriceable in-list coin
+                        if not px:
+                            first = m.get("no_px_since")
+                            if not isinstance(first, (int, float)):
+                                m["no_px_since"] = t0
+                                b.meta[coin] = m
+                            elif (t0 - first) / 3600.0 >= DELIST_GIVEUP_H:
+                                sz, ent = b.broker.pos.get(coin, (0.0, 0.0))
+                                zpx = float(m.get("last_px") or ent or 0.0)
+                                if zpx:
+                                    pnl = b.broker.close(coin, zpx)
+                                    b.record_close(coin, zpx, pnl, "delisted",
+                                                   notional=abs(sz) * ent)
                         continue
                     profit = (px - entry) / entry
                     age_min = (t0 - (m.get("opened_ts") or t0)) / 60.0
@@ -938,6 +959,39 @@ def main():
                                 "accrued": 0.0, "stop_px": stop_px}
                 log.info("%s OPEN %s long $%.0f @ %.6g [%s]",
                          b.bot_id, coin, stake, entry_px, tag)
+
+            # [2026-07-16 ZOMBIE GUARD] ORPHANS: a restored position whose
+            # coin is no longer in b.coins never enters the loop above at all
+            # (no mark, no accrual, no stop). Try to price it directly; give
+            # up at the last known mark after DELIST_GIVEUP_H.
+            for coin in [c for c in list(b.broker.pos) if c not in b.coins]:
+                m = b.meta.get(coin) or {}
+                try:
+                    opx = marks.fresh_mid(venue, coin)
+                except Exception:  # noqa: BLE001
+                    opx = None
+                if opx:
+                    m.pop("no_px_since", None)
+                    m["last_px"] = opx
+                    b.meta[coin] = m
+                    b.broker.mark(coin, opx)
+                first = m.get("no_px_since")
+                if opx is None and not isinstance(first, (int, float)):
+                    m["no_px_since"] = t0
+                    b.meta[coin] = m
+                    continue
+                # orphaned-but-priceable closes immediately (nothing manages
+                # it); unpriceable waits out the give-up clock first
+                if opx is None and (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
+                    continue
+                sz, ent = b.broker.pos.get(coin, (0.0, 0.0))
+                zpx = float(opx or m.get("last_px") or ent or 0.0)
+                if not zpx:
+                    continue
+                pnl = b.broker.close(coin, zpx)
+                b.record_close(coin, zpx, pnl, "delisted", notional=abs(sz) * ent)
+                log.info("%s ORPHAN CLOSE %s @ %.6g (coin left the book's "
+                         "universe)", b.bot_id, coin, zpx)
 
             # ---- publish + persist ----
             open_accr = sum((m or {}).get("accrued", 0.0) for m in b.meta.values())

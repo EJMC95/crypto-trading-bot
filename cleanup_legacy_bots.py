@@ -112,5 +112,19 @@ def main():
         conn.close()
 
 
+def _prune_history():
+    """[2026-07-16] boot-time bot_state_history retention sweep — the inline
+    every-~200-writes prune in bot_pnl_store covers long-running containers;
+    this covers each deploy deterministically."""
+    try:
+        import bot_pnl_store as store
+        n = store.prune_history()
+        if n is not None:
+            print(f"bot_state_history: pruned {n} rows past retention.")
+    except Exception as e:  # noqa: BLE001
+        print(f"history prune skipped ({e}).")
+
+
 if __name__ == "__main__":
+    _prune_history()
     raise SystemExit(main())

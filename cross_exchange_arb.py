@@ -730,6 +730,18 @@ def run_live(once=False):
             ranked.sort(reverse=True)
             artifacts.sort(reverse=True)
 
+            # [2026-07-16 AUDIT FIX] a persisting gap crowded OUT of the
+            # stage-2 book budget (or freshly restored after a restart) used
+            # to age past EPISODE_STALE_S and re-book as a NEW episode on its
+            # next confirmation — double-counting census opened/n_booked (the
+            # growth rail reads them). A stage-1 sighting above the prefilter
+            # now keeps an ALREADY-OPEN episode alive; it cannot BOOK anything
+            # (booking stays depth-confirmed in stage 2).
+            for _g, _sym, _bex, _sex in ranked:
+                _ep = episodes.get(f"{_sym}|{_bex}|{_sex}")
+                if _ep is not None:
+                    _ep["last_seen"] = t0
+
             # Cross-quote gauge: USD vs USDT/USDC books of the same major,
             # normalized through LIVE stablecoin rates (never assumed par).
             usd_rates = {"USD": 1.0}

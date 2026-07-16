@@ -91,6 +91,10 @@ SLEEVES = {          # symbol -> (rule, param)
 YAHOO_REF = {"XAU": "GC=F", "XAG": "SI=F", "WTI": "CL=F",
              "BRENTOIL": "BZ=F", "XCU": "HG=F", "XPT": "PL=F"}
 CATASTROPHIC_STOP = float(os.environ.get("INDEX_CATASTROPHIC_STOP", "0.15"))
+# [2026-07-16 ZOMBIE GUARD] a held symbol that leaves the tradable universe
+# (unsupported at boot / removed from SYMBOLS / book dark) was never marked,
+# accrued, or exit-checked again. Give up after this long at the last mark.
+DELIST_GIVEUP_H = float(os.environ.get("INDEX_DELIST_GIVEUP_H", "6"))
 DAILY_LOSS_LIMIT = float(os.environ.get("INDEX_DAILY_LOSS", "0.10"))
 LOOP_SECONDS = int(os.environ.get("INDEX_LOOP_SECONDS", "300"))
 MAX_OPEN = int(os.environ.get("INDEX_MAX_OPEN", str(len(SYMBOLS))))
@@ -333,7 +337,29 @@ def main():
             m = meta.get(s) or {}
 
             # mark + funding accrual + catastrophic seatbelt (live px, always)
+            if held and not px:
+                # [2026-07-16 ZOMBIE GUARD] unpriceable held symbol
+                first = m.get("no_px_since")
+                if not isinstance(first, (int, float)):
+                    m["no_px_since"] = t0
+                    meta[s] = m
+                elif (t0 - first) / 3600.0 >= DELIST_GIVEUP_H:
+                    sz, ent = broker.pos.get(s, (0.0, 0.0))
+                    zpx = float(m.get("last_px") or ent or 0.0)
+                    if zpx:
+                        pnl = broker.close(s, zpx)
+                        fund_realized += m.get("accrued", 0.0)
+                        n_closed += 1
+                        n_wins += 1 if (pnl + m.get("accrued", 0.0)) > 0 else 0
+                        _record_close(bot_id, s, m.get("entry"), m.get("opened_ts"),
+                                      zpx, pnl, m.get("accrued", 0.0), "delisted",
+                                      abs(sz) * ent)
+                        meta.pop(s, None)
+                        log.warning("%s DELIST GIVE-UP CLOSE @ %.4f", s, zpx)
             if held and px:
+                m.pop("no_px_since", None)
+                m["last_px"] = px
+                meta[s] = m
                 broker.mark(s, px)
                 rate = (fund.get(s) or {}).get("rate")
                 if rate is not None:
@@ -388,6 +414,39 @@ def main():
                          "funding %.1f%%apr", s, ORDER_USD, meta[s]["entry"],
                          rule, param, ref["last_date"],
                          ((fund.get(s) or {}).get("rate") or 0) * 24 * 365 * 100)
+
+        # [2026-07-16 ZOMBIE GUARD] ORPHANS: a restored position on a symbol
+        # no longer in the tradable list never enters the loop above at all.
+        for s in [c for c in list(broker.pos) if c not in symbols]:
+            m = meta.get(s) or {}
+            try:
+                opx = marks.fresh_mid(venue, s)
+            except Exception:  # noqa: BLE001
+                opx = None
+            if opx:
+                broker.mark(s, opx)
+                m.pop("no_px_since", None)
+                m["last_px"] = opx
+                meta[s] = m
+            first = m.get("no_px_since")
+            if opx is None and not isinstance(first, (int, float)):
+                m["no_px_since"] = t0
+                meta[s] = m
+                continue
+            if opx is None and (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
+                continue
+            sz, ent = broker.pos.get(s, (0.0, 0.0))
+            zpx = float(opx or m.get("last_px") or ent or 0.0)
+            if not zpx:
+                continue
+            pnl = broker.close(s, zpx)
+            fund_realized += m.get("accrued", 0.0)
+            n_closed += 1
+            n_wins += 1 if (pnl + m.get("accrued", 0.0)) > 0 else 0
+            _record_close(bot_id, s, m.get("entry"), m.get("opened_ts"), zpx,
+                          pnl, m.get("accrued", 0.0), "delisted", abs(sz) * ent)
+            meta.pop(s, None)
+            log.warning("%s ORPHAN CLOSE @ %.4f (symbol left the universe)", s, zpx)
 
         # ---- publish + persist ----
         open_accr = sum((m or {}).get("accrued", 0.0) for m in meta.values())

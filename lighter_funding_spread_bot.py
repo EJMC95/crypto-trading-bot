@@ -154,7 +154,7 @@ def main():
                          "record; go-live is a separate decision.")
     bot_id = ctx.bot_id
     broker = ctx.broker
-    order_usd = ctx.order_usd(ORDER_USD)
+    order_usd = ctx.order_usd(ORDER_USD, own=True)   # backtested $20/leg clip
     shadow_tag = ctx.mode == "lighter_shadow"
 
     meta = {}            # coin -> {is_short, entry, opened_ts, accrued}

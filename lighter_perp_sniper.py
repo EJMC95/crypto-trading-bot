@@ -49,6 +49,11 @@ PAPER_START = 1000.0
 TAKE_PROFIT_PCT = 0.15      # +15%: new listings pop hard or not at all
 STOP_LOSS_PCT = 0.10       # -10% hard stop
 MAX_HOLD_SEC = 6 * 3600    # 6h — snipe the debut move, don't marry it
+# [2026-07-16 ZOMBIE GUARD] a pulled/delisted book used to mean "hold
+# forever" (`if not px: continue` skipped even max-hold) — the most likely
+# fate for a fresh listing. Give up after this long continuously
+# unpriceable; close at the last seen mid (entry if none).
+DELIST_GIVEUP_SEC = float(os.environ.get("SNIPER_DELIST_GIVEUP_SEC", str(6 * 3600)))
 MAX_OPEN = 4               # global cap on concurrent snipes
 LOOP_SECONDS = 60          # poll the market list every minute
 DIRECTION_LONG = os.environ.get("SNIPER_DIRECTION", "long").lower() != "short"
@@ -100,6 +105,8 @@ def main():
     # Restore paper account + baseline + open snipes from Postgres.
     entry_ts = {}
     baseline = set()
+    no_px_since = {}      # coin -> first ts the book was unpriceable (zombie clock)
+    last_px = {}          # coin -> last seen mid (zombie exit price)
     _saved = store.load_state(bot_id) if dry_run else None
     if _saved:
         if dry_run and broker.restore_state(_saved.get("broker") or {}):
@@ -127,7 +134,17 @@ def main():
             reason=("long_" if was_long else "short_") + reason,
             venue=venue_tag, shadow=shadow_tag)
 
-    realized_seeded = False
+    # [2026-07-16 AUDIT FIX] seed W/L from the durable ledger — this bot
+    # published NULL counts every loop (the dashboard row showed no record),
+    # and `realized_seeded` was assigned but never used (the seeding it
+    # promised was never written).
+    n_closed, n_wins = 0, 0
+    try:
+        agg = store.fetch_paper_aggregate(bot_id)
+        if agg:
+            n_closed, n_wins = agg["closed"], agg["wins"]
+    except Exception:  # noqa: BLE001
+        pass
     while True:
         now = datetime.now(timezone.utc)
         try:
@@ -209,18 +226,32 @@ def main():
                 px = _mid(ctx.venue.orderbook(coin))
             except Exception:  # noqa: BLE001
                 px = None
-            if not px:
-                continue
             was_long = sz > 0
             ent_px = broker.pos.get(coin, (0.0, 0.0))[1] if dry_run else \
                 ctx.venue.positions().get(coin, {}).get("entry", 0.0)
+            zombie = False
+            if not px:
+                # [2026-07-16 ZOMBIE GUARD] unpriceable book: start the clock;
+                # past the give-up, value at the last seen mid (entry if none)
+                first = no_px_since.setdefault(coin, now.timestamp())
+                if now.timestamp() - first < DELIST_GIVEUP_SEC:
+                    continue
+                px = last_px.get(coin) or ent_px
+                if not px:
+                    continue             # nothing to value it at — keep waiting
+                zombie = True
+            else:
+                no_px_since.pop(coin, None)
+                last_px[coin] = px
             if dry_run:
                 broker.mark(coin, px)
             gain = ((px - ent_px) / ent_px) if (ent_px and was_long) else \
                    ((ent_px - px) / ent_px) if ent_px else 0.0
             held_sec = now.timestamp() - entry_ts.get(coin, now.timestamp())
             reason = None
-            if gain >= TAKE_PROFIT_PCT:
+            if zombie:
+                reason = "delisted"
+            elif gain >= TAKE_PROFIT_PCT:
                 reason = "tp"
             elif gain <= -STOP_LOSS_PCT:
                 reason = "sl"
@@ -232,10 +263,16 @@ def main():
                     pnl = broker.close(coin, px)
                     record_close(coin, _ent, entry_ts.pop(coin, None), px, pnl,
                                  _sz > 0, reason)
+                    n_closed += 1
+                    n_wins += 1 if pnl > 0 else 0
+                    no_px_since.pop(coin, None)
+                    last_px.pop(coin, None)
                 else:
                     try:
                         ctx.venue.market_close(coin)
                         entry_ts.pop(coin, None)
+                        no_px_since.pop(coin, None)
+                        last_px.pop(coin, None)
                     except Exception as e:  # noqa: BLE001
                         log.error("close failed %s: %s", coin, e)
                         continue
@@ -254,6 +291,8 @@ def main():
         try:
             store.publish(bot_id, status="online", equity=pub_equity, pnl_abs=pub_pnl,
                           open_trades=pub_open,
+                          closed_trades=n_closed, wins=n_wins,
+                          losses=n_closed - n_wins,
                           extra={"mode": ctx.mode, "venue": ctx.mode,
                                  "watching": len(baseline),
                                  "dir": "long" if DIRECTION_LONG else "short",

@@ -117,16 +117,25 @@ def classify(pair_symbol, now=None):
     market symbol like 'ANSEM/USDT'. Fail-safe neutral."""
     try:
         base = str(pair_symbol).split("/")[0].upper()
-        base = re.sub(r"^K(?=[A-Z]{3,})", "", base)     # kSHIB-style prefixes
-        ann = refresh_announced(now).get(base)
-        if ann:
-            return "announced", 1.0, f"pre-announced on {ann['src']}"
-        fp = footprint(base)
-        if fp == "?":
-            return "unknown", 1.0, "intel unavailable (neutral)"
-        if fp:
-            rank = fp.get("rank")
-            return "footprint", 1.0, f"coingecko:{fp.get('id')}" + (f" rank {rank}" if rank else "")
+        # [2026-07-16 AUDIT FIX] the unconditional K-strip mangled REAL
+        # K-symbols (KAVA→AVA, KAITO→AITO, KERNEL→ERNEL): wrong intel class,
+        # wrong stake, ghost-skips of genuine listings. Look the RAW symbol
+        # up first; the stripped variant (kSHIB-style 1000x prefixes) is only
+        # a fallback when the raw one draws a complete blank.
+        candidates = [base]
+        stripped = re.sub(r"^K(?=[A-Z]{3,})", "", base)
+        if stripped != base:
+            candidates.append(stripped)
+        for b in candidates:
+            ann = refresh_announced(now).get(b)
+            if ann:
+                return "announced", 1.0, f"pre-announced on {ann['src']}"
+            fp = footprint(b)
+            if fp == "?":
+                return "unknown", 1.0, "intel unavailable (neutral)"
+            if fp:
+                rank = fp.get("rank")
+                return "footprint", 1.0, f"coingecko:{fp.get('id')}" + (f" rank {rank}" if rank else "")
         return "junk", 0.25, "no announcement, no coingecko page"  # [2026-07-07] was 0.5 — the junk class is 80% of tickets and dies by delisting
     except Exception:
         return "unknown", 1.0, "intel error (neutral)"
