@@ -133,6 +133,7 @@ BODY_TEMPLATE = r"""
     <div class="sub">Paper-track model output — not betting advice. Generated <span id="gen"></span>.</div>
   </header>
   <div class="nav">
+    <button class="trackbtn" id="valuebtn">💹 Value board</button>
     <button class="trackbtn" id="trackbtn">📊 Track record</button>
     <button class="trackbtn" id="formbtn">📈 Form guide</button>
     <label style="color:var(--ink-2);font-size:13px">Round</label>
@@ -169,6 +170,7 @@ sel.value = curRound;
 sel.onchange = ()=>{ selectRound(+sel.value); };
 document.getElementById("trackbtn").onclick = renderTrack;
 document.getElementById("formbtn").onclick = renderForm;
+document.getElementById("valuebtn").onclick = renderValue;
 
 function bar(label,p,cls,h,a){
   if(p==null||isNaN(p)) return "";
@@ -224,6 +226,7 @@ function renderGame(ri,gi){
   [...tabs.children].forEach((t,j)=>t.setAttribute("aria-selected",j===gi));
   document.getElementById("trackbtn").classList.remove("on");
   document.getElementById("formbtn").classList.remove("on");
+  document.getElementById("valuebtn").classList.remove("on");
   const p=g.p, marginSide=g.margin>=0?nick(g.home):nick(g.away);
   let h=`<div class="matchhead"><h2>${g.home} v ${g.away}</h2>
     <span class="when">${g.kickoff} · ${g.venue}</span></div>`;
@@ -306,6 +309,7 @@ function selectRound(ri){
 function renderTrack(){
   document.getElementById("trackbtn").classList.add("on");
   document.getElementById("formbtn").classList.remove("on");
+  document.getElementById("valuebtn").classList.remove("on");
   [...tabs.children].forEach(t=>t.setAttribute("aria-selected",false));
   const t=DATA.track;
   if(!t||(!t.win.n&&!t.tryscorer.n)){
@@ -329,12 +333,60 @@ function renderTrack(){
   }
   h+=`<p style="color:var(--muted);font-size:12px;margin-top:12px">Bias > 0 = model over-predicts.
     Brier lower = better calibrated (0 perfect, 0.25 a coin flip).</p>`;
+  // paper betting scorecard: ROI / yield / CLV / bankroll — the professional read
+  const pf=DATA.performance||{};
+  if(pf.n_settled){
+    const clv=pf.clv_avg_pct;
+    h+=`<h3>Paper betting scorecard (flat + quarter-Kelly ledger)</h3>
+      <div class="statgrid">
+        <div class="s"><div class="l">Record</div><div class="n" style="font-size:20px">${pf.record||"—"}</div><div class="l">${pf.n_settled} settled</div></div>
+        <div class="s"><div class="l">P&amp;L</div><div class="n">${pf.pnl_units>=0?"+":""}${pf.pnl_units??"—"}<small style="font-size:13px">u</small></div><div class="l">on ${pf.staked_units??"—"}u</div></div>
+        <div class="s"><div class="l">ROI / yield</div><div class="n" style="color:${(pf.roi_pct||0)>=0?'var(--good)':'#c0392b'}">${pf.roi_pct>=0?"+":""}${pf.roi_pct??"—"}%</div><div class="l">per unit staked</div></div>
+        <div class="s"><div class="l">CLV (beat close)</div><div class="n" style="color:${(clv||0)>=0?'var(--good)':'#c0392b'}">${clv==null?"—":(clv>=0?"+":"")+clv+"%"}</div><div class="l">${pf.clv_n?`${Math.round(100*pf.clv_beat_rate)}% of ${pf.clv_n}`:"awaiting closes"}</div></div>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin-top:6px">CLV = did we take a better price than the market's close?
+      Positive CLV over time is the surest sign of a real edge — it survives short-run variance. Paper only.</p>`;
+  }
+  panel.innerHTML=h;
+}
+
+function renderValue(){
+  document.getElementById("valuebtn").classList.add("on");
+  document.getElementById("trackbtn").classList.remove("on");
+  document.getElementById("formbtn").classList.remove("on");
+  [...tabs.children].forEach(t=>t.setAttribute("aria-selected",false));
+  const v=DATA.value_board||[];
+  if(!v.length){
+    panel.innerHTML=`<h2>Value board</h2><p style="color:var(--ink-2)">No positive-EV edges
+      in the current market snapshot — the model agrees with the books, or odds aren't live yet.
+      Edges appear here when the model's price beats the best of the four books.</p>`; return;
+  }
+  let h=`<h2>Value board — model vs market edge</h2>
+    <p style="color:var(--ink-2);font-size:13px">Every side of every game where the model's probability
+    implies value at the <b>best available price across the four books</b> (line-shopped). Ranked by
+    expected value. <b>Kelly</b> = suggested stake as % of bankroll (quarter-Kelly, capped 5%).</p>
+    <table><thead><tr><th>Selection</th><th>Match</th><th>Model</th><th>Market</th><th>Edge</th>
+      <th>Best price</th><th>Fair</th><th>EV</th><th>Kelly</th></tr></thead><tbody>`;
+  for(const r of v){
+    const evc=r.ev_pct>=8?"var(--good)":r.ev_pct>=3?"var(--model)":"var(--ink)";
+    h+=`<tr><td><b>${nick(r.selection)}</b></td><td style="color:var(--ink-2);font-size:12px">${nick(r.match.split(" v ")[0])} v ${nick(r.match.split(" v ")[1])}</td>
+      <td>${pc(r.model_p)}</td><td>${r.market_p==null?"—":pc(r.market_p)}</td>
+      <td>${r.edge_pp==null?"—":(r.edge_pp>=0?"+":"")+r.edge_pp+"pp"}</td>
+      <td><b>$${r.best_price.toFixed(2)}</b></td><td style="color:var(--muted)">$${r.fair_price?r.fair_price.toFixed(2):"—"}</td>
+      <td style="color:${evc};font-weight:700">+${r.ev_pct}%</td>
+      <td>${r.kelly_pct>0?r.kelly_pct+"%":"—"}</td></tr>`;
+  }
+  h+=`</tbody></table>
+    <p style="color:var(--muted);font-size:12px;margin-top:10px">Model and market both de-vigged. Edge = model − market
+    (percentage points). A fair price below the quoted price is the value. <b>Paper only — model opinions, not betting advice;
+    bookmaker margins and limits are real.</b></p>`;
   panel.innerHTML=h;
 }
 
 function renderForm(){
   document.getElementById("formbtn").classList.add("on");
   document.getElementById("trackbtn").classList.remove("on");
+  document.getElementById("valuebtn").classList.remove("on");
   [...tabs.children].forEach(t=>t.setAttribute("aria-selected",false));
   const f=DATA.form||[];
   if(!f.length){

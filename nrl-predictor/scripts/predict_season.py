@@ -28,6 +28,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from src.eval import edge as edge_mod
 from src.features import player_rates, player_value, signal_adjust, xstats_defence
 from src.ingest import signals as signals_mod
 from src.ingest import teams
@@ -208,12 +209,25 @@ def main() -> None:
     # edge leak per team). Built from whatever xStats data exists — empty if none.
     form_ratings = xs_ratings if xs_ratings is not None else xstats_defence.build_ratings()
     form = xstats_defence.latest_form_table(form_ratings, names)
+
+    # professional edge layer: value board (model vs de-vigged market, line-shopped
+    # to the best of the books, ranked by EV with a quarter-Kelly stake) + the
+    # paper-ledger performance scorecard (ROI / yield / CLV / bankroll curve).
+    value_board = edge_mod.value_board(market)
+    try:
+        from src.eval import ledger as ledger_mod
+        performance = edge_mod.performance(ledger_mod.load())
+    except Exception:
+        performance = {}
+
     payload = {"generated": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d %H:%M UTC"),
                "current_round": current_round,
                "current_round_label": f"Round {current_round}",
                "parlays": parlays,
                "form": form,
                "form_as_of": form[0]["as_of"] if form else None,
+               "value_board": value_board,
+               "performance": performance,
                "rounds": rounds}
     OUT.mkdir(exist_ok=True)
     (OUT / "season_predictions.json").write_text(json.dumps(payload, default=str))
