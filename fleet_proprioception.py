@@ -110,6 +110,10 @@ TTL_SEC = 3 * INTERVAL
 EP_CAP = int(os.environ.get("PROP_EP_CAP", "120"))           # episode ledger
 MIN_EP_H = float(os.environ.get("PROP_MIN_EP_H", "0.75"))    # gradeable floor
 MIN_EP_SNAPS = int(os.environ.get("PROP_MIN_EP_SNAPS", "8"))  # taker replay
+# [2026-07-17] the floor that actually bites: closed TRADES in the episode's
+# replay window. Time and snapshots measure the tape, not the evidence — see
+# grade_taker for the live 3.13h/37-snap episode that graded on zero trades.
+MIN_EP_CLOSES = int(os.environ.get("PROP_MIN_EP_CLOSES", "4"))
 SLICE_H = float(os.environ.get("PROP_SLICE_H", "24"))        # long-stance cut
 VERDICT_WINDOW = int(os.environ.get("PROP_VERDICT_WINDOW", "10"))
 MIN_EPISODES = int(os.environ.get("PROP_MIN_EPISODES", "2"))
@@ -297,9 +301,41 @@ def _replay_with(tape, bars):
             setattr(tt, k, v)
 
 
+def _marked(rep):
+    """[2026-07-17 IMB-10 parity — mirrors lighter_scout_tuner/_incubator]
+    closed_net + end-of-tape unrealized. closed_net alone is blind to
+    DEFERRAL: an arm 'wins' by pushing losses past the window's end, where
+    open positions are valued at entry and invisible to the gate. Both other
+    replay consumers score marked; this one was missed."""
+    return float(rep["closed_net"]) + float(rep.get("unrealized") or 0.0)
+
+
+def _closes(rep):
+    return sum(int(s.get("closed") or 0)
+               for s in (rep.get("lenses") or {}).values())
+
+
 def grade_taker(ep, tape):
     """The counterfactual: during-episode tape, env defaults vs the stance's
-    bars. delta_usd > 0 = the enactment beat doing nothing."""
+    bars. delta_usd > 0 = the enactment beat doing nothing.
+
+    [2026-07-17] Two floors, because HOURS AND SNAPSHOTS ARE NOT EVIDENCE.
+    Observed live: a 3.13h/37-snapshot taker episode returned
+    stance_net 0.0 / default_net 0.0 / delta_usd 0.0 and was stamped
+    "graded" — ZERO trades closed on either arm, recorded as a measurement.
+    The old floors (MIN_EP_H=0.75 → 45 minutes, MIN_EP_SNAPS=8) count time
+    and ticks against a strategy whose median position lives for hours, so
+    an episode could clear both while resolving nothing. An empty sample is
+    UNGRADEABLE, not neutral — and 'neutral' is not free: it spends an
+    episode toward MIN_EPISODES and lets a verdict form out of nothing.
+
+    The floor is denominated in CLOSED TRADES (the fleet's quantum of
+    evidence: one fill swings ~$3.50 at clip $50/TP+4%/SL-3%, which is
+    larger than HURT_USD/HELP_USD — so a single trade can carry a verdict).
+    Taken on the better-evidenced arm: the two arms trade different sets by
+    construction, and the question is whether EITHER resolved enough to
+    speak. Restrict-only and fail-safe by the organ's own contract — an
+    ungraded episode restricts nothing AND earns nothing."""
     start, end = ep["start"], ep["end"]
     window = [(dt, p) for dt, p in (tape or [])
               if start <= dt.timestamp() <= end]
@@ -309,11 +345,15 @@ def grade_taker(ep, tape):
             if k in TAKER_ATTR}
     if not bars:
         return {"status": "ungraded"}
-    base = _replay_with(window, DEFAULTS)["closed_net"]
-    var = _replay_with(window, dict(DEFAULTS, **bars))["closed_net"]
-    return {"status": "graded", "n_snaps": len(window),
-            "default_net": base, "stance_net": var,
-            "delta_usd": round(var - base, 2)}
+    base_rep = _replay_with(window, DEFAULTS)
+    var_rep = _replay_with(window, dict(DEFAULTS, **bars))
+    n_closed = max(_closes(base_rep), _closes(var_rep))
+    if n_closed < MIN_EP_CLOSES:
+        return {"status": "too-few-trades", "n_snaps": len(window),
+                "n_closed": n_closed}
+    return {"status": "graded", "n_snaps": len(window), "n_closed": n_closed,
+            "default_net": _marked(base_rep), "stance_net": _marked(var_rep),
+            "delta_usd": round(_marked(var_rep) - _marked(base_rep), 2)}
 
 
 def grade_scout(ep, lens_fwd_end):
@@ -696,28 +736,48 @@ def _selftest():
     def snap(h, marks, tickets=None, mi=0):
         return (dt(h, mi), {"marks": marks, "tickets": tickets or {}})
 
-    dipt = {"sym": "DDD", "range_pos": 0.07}
-    dipt2 = {"sym": "EEE", "range_pos": 0.07}
-
-    def mk_tape(end_px):
-        tape = [snap(0, {"DDD": 100.0}, {"dip": [dipt]}),
-                snap(1, {"DDD": end_px}),
-                snap(2, {"EEE": 100.0}, {"dip": [dipt2]}),
-                snap(3, {"EEE": end_px})]
-        tape += [snap(4, {}, mi=m) for m in (0, 10, 20, 30, 40)]
+    # [2026-07-17] the fixture must RESOLVE trades, not just span time: one
+    # dip symbol opens and closes per 2 snapshots (one new position per lens
+    # per cycle), so N symbols => N closed trades on the stance arm. The
+    # default arm (DIP_RANGE=0.05) takes none of them — range_pos 0.07 fails
+    # its bar — which is the whole counterfactual.
+    def mk_tape(end_px, n_syms=MIN_EP_CLOSES):
+        syms = [f"S{i}" for i in range(n_syms)]
+        tape = []
+        for i, s in enumerate(syms):
+            tape.append(snap(2 * i, {s: 100.0},
+                             {"dip": [{"sym": s, "range_pos": 0.07}]}))
+            tape.append(snap(2 * i + 1, {s: end_px}))
+        tape += [snap(2 * len(syms), {}, mi=m) for m in (0, 10, 20, 30, 40)]
         return tape
 
     win_tape = mk_tape(105.0)
     t0 = dt(0).timestamp()
-    ep = {"group": "taker", "start": t0, "end": dt(5).timestamp(),
+    ep = {"group": "taker", "start": t0, "end": dt(23).timestamp(),
           "stance": {"taker.dip_range": 0.08}}
     g = grade_taker(ep, win_tape)
     assert g["status"] == "graded" and g["delta_usd"] > 0, g
+    assert g["n_closed"] >= MIN_EP_CLOSES, g
     g_bad = grade_taker(ep, mk_tape(90.0))
     assert g_bad["status"] == "graded" and g_bad["delta_usd"] < 0, g_bad
     # too-short episodes refuse to grade (anti-noise floor)
     g_short = grade_taker(dict(ep, end=t0 + 600), win_tape)
     assert g_short["status"] == "too-short", g_short
+    # [2026-07-17] HOURS AND SNAPSHOTS ARE NOT EVIDENCE. This is the live
+    # 16-Jul episode's shape: long enough, tick-rich enough, and it resolved
+    # NOTHING. It must refuse to grade rather than report delta 0.0 =
+    # "neutral" and spend an episode toward a verdict.
+    empty = [snap(0, {"ZZZ": 100.0})] + [snap(1, {"ZZZ": 100.0}, mi=m)
+                                         for m in range(0, 60, 5)]
+    g_empty = grade_taker(ep, empty)
+    assert g_empty["status"] == "too-few-trades", g_empty
+    assert g_empty["n_closed"] == 0, g_empty
+    # a thin-but-nonzero sample is still refused (one fill ~= $3.50 > HURT_USD)
+    g_thin = grade_taker(ep, mk_tape(105.0, n_syms=MIN_EP_CLOSES - 1))
+    assert g_thin["status"] == "too-few-trades", g_thin
+    # and lever_verdicts must ignore every non-graded status
+    assert lever_verdicts([dict(ep, status="too-few-trades",
+                                levers=["taker.dip_range"])]) == {}
     # replay patching restored the module bars
     assert tt.DIP_RANGE == DEFAULTS["DIP_RANGE"]
 
@@ -893,7 +953,8 @@ def _selftest():
 
     print("fleet_proprioception selftest OK (grouping, episode lifecycle "
           "incl. backdated release + daily slice, replay counterfactual "
-          "win/lose/too-short, scout throughput, gapscout activity, live "
+          "win/lose/too-short/too-few-trades (marked), scout throughput, "
+          "gapscout activity, live "
           "paired-learning (bad/flat/good vs pre-window+twin, funding split), "
           "verdict floors + joint blame, fail-safe hurting+helping hooks)")
 
