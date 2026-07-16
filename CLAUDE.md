@@ -74,6 +74,25 @@ https://pnl-dashboard-production-858c.up.railway.app/
   advisory tickets only). Everything lands as bounded TTL'd
   `fleet-tuning` levers (auto-revert); never widens a brain-vetoed lens;
   fail-safe neutral on a dark brain. → bot_state `scout-tuner`
+- `fleet_proprioception.py` 🦾 — PROPRIOCEPTION (16-Jul, "advance the
+  autonomous organ"): the autonomy stack's sense of its OWN movements —
+  the first RETROSPECTIVE grade on growth-rail enactments (every prior
+  gate was prospective/in-sample). Tracks every lever EPISODE (open →
+  expire/release/value-change; long stances sliced daily) and grades it
+  out-of-sample: taker levers get the TRUE replay counterfactual in $
+  (during-episode tape, env defaults vs enacted bars through the taker's
+  real code), scout diet levers get grading throughput (lens n4h delta),
+  gapscout gets census activity; live/xp episodes are RECORDED only (the
+  judge + fade-watch stay the real-money authority). Per-lever verdicts
+  helping/hurting/neutral (floors n≥2 episodes, ±$3; HURTING exists only
+  on the taker lane — the one lane with a $ counterfactual; joint stances
+  share blame, conservative in the restrict direction). CONSUMED
+  restrict-only: the scout tuner refuses to re-assert a HURTING lever
+  (`apply_proprioception`); the board surfaces 🦾 items (hurting=warn,
+  helping=expand evidence for the review); immune scans the payload.
+  Fail-safe: a dark organ restricts nothing. Expand-side consumption
+  deliberately unwired until the 21-Jul review (agenda item 12). →
+  bot_state `fleet-proprioception`
 - `experiment_judge.py` 🧪⚖️ — the shadow→live PROMOTION pipeline (15-Jul
   user mandate: shadow wins must "carry across to the real money bots").
   Hourly, ONE candidate at a time on the Funding Farmer's -lshadow twin
@@ -198,6 +217,8 @@ its row is dashboard-retired regardless; stop the process when found.
   real money) + lighter-live (`live.clip_scale` + the judge's PROMOTED
   `live.funding.*` — see growth rail + experiment judge above). `gapscout-census` — Gap Scout's epoch-2 episode census (board
   reads `quiet_hours`). `scout-tuner` — the tuner's cycle log + enactments.
+  `fleet-proprioception` — per-lever enactment outcome grades (episodes +
+  helping/hurting verdicts; tuner consumes HURTING restrict-only).
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).
 - Bot identity for multiplier lookup = `bot_name` in each freqtrade config

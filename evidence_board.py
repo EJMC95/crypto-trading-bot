@@ -476,6 +476,45 @@ def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts,
     return out
 
 
+def synthesize_proprioception(prop_state, now_ts):
+    """[2026-07-16] 🦾 proprioception verdicts on the triage board. HURTING
+    (a lever whose graded real-world episodes measured net-negative — the
+    tuner already auto-skips it) surfaces as a warn/restrict item; HELPING
+    surfaces as expand evidence for the review. Stale/absent organ emits
+    nothing (fail-safe). Pure — selftested offline."""
+    out = []
+    if not prop_state or not _fresh(prop_state, max_age_s=float(
+            prop_state.get("ttl_sec") or 2700)):
+        return out
+    for lever, v in sorted((prop_state.get("verdicts") or {}).items()):
+        if not isinstance(v, dict):
+            continue
+        n = v.get("n")
+        measure = (f"Σ${v['sum_delta_usd']:+.2f}" if v.get("sum_delta_usd")
+                   is not None else
+                   f"Σ{v.get('sum_delta_grades', 0):+d} grades"
+                   if v.get("sum_delta_grades") is not None else "activity")
+        if v.get("verdict") == "hurting":
+            out.append({"key": f"board:prop-hurting:{lever}", "severity": "warn",
+                        "msg": f"🦾 lever {lever} graded HURTING in reality: "
+                               f"{measure} over n={n} episodes (out-of-sample "
+                               f"replay counterfactual)",
+                        "proposal": "scout tuner auto-skips re-assertion while "
+                                    "the verdict holds (restrict-only); review "
+                                    "whether the ladder/bounds need tightening",
+                        "lever": "proprioception", "ts": now_ts, "source": "board"})
+        elif v.get("verdict") == "helping":
+            out.append({"key": f"board:prop-helping:{lever}", "severity": "info",
+                        "msg": f"🦾 lever {lever} graded HELPING in reality: "
+                               f"{measure} over n={n} episodes",
+                        "proposal": "outcome evidence for the review — the "
+                                    "widening is paying on the tape recorded "
+                                    "while it was in force",
+                        "lever": "proprioception", "ts": now_ts,
+                        "source": "board", "direction": "expand"})
+    return out
+
+
 def detect_veto_flap(alerts_48h_plus, now_ts, window_d=7, min_events=3):
     """A coin appearing in >= min_events veto-change alerts inside window_d
     days is oscillating across its threshold. Restrict-only so harmless, but
@@ -542,7 +581,7 @@ def run_once():
     # only if the batch came back empty (DB down).
     _keys = ["fleet-alerts", "evidence-review", "lighter-market", "fleet-risk",
              "brain-lens-forward", "scout-tuner", "xp-judge", "gapscout-census",
-             "impl-shortfall"]
+             "impl-shortfall", "fleet-proprioception"]
     _b = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     _ok = bool(_b)
     def _g(k):
@@ -582,6 +621,9 @@ def run_once():
         bot_rows = []
     synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, 26000) else {},
                                tuner_state, bot_rows, lm, now, xp_state)
+
+    # 🦾 proprioception: what the autonomy stack's own movements measured
+    synth += synthesize_proprioception(_g("fleet-proprioception"), now)
 
     # implementation shortfall (live execution quality) — its own tracker
     # pushes the phone alert; the board only SURFACES the verdict (dedicated-
@@ -843,6 +885,26 @@ def _selftest():
     k2 = {e["key"] for e in ex2}
     assert "board:tuner-enacted" not in k2 and "board:stress-headroom" not in k2
     assert "board:lens-positive:dip" in k2
+
+    # 🦾 proprioception synthesis: hurting=warn/restrict, helping=expand,
+    # neutral silent, stale organ emits nothing
+    prop = {"updated": fresh, "ttl_sec": 2700, "verdicts": {
+        "taker.dip_range": {"verdict": "hurting", "n": 3, "sum_delta_usd": -5.1},
+        "scout.dip_range_max": {"verdict": "helping", "n": 2,
+                                "sum_delta_grades": 35},
+        "taker.tp": {"verdict": "neutral", "n": 1, "sum_delta_usd": 0.4}}}
+    pit = synthesize_proprioception(prop, _now())
+    pk = {p["key"]: p for p in pit}
+    assert set(pk) == {"board:prop-hurting:taker.dip_range",
+                       "board:prop-helping:scout.dip_range_max"}, pk
+    assert pk["board:prop-hurting:taker.dip_range"]["severity"] == "warn"
+    assert "Σ$-5.10" in pk["board:prop-hurting:taker.dip_range"]["msg"]
+    assert pk["board:prop-helping:scout.dip_range_max"]["direction"] == "expand"
+    assert "Σ+35 grades" in pk["board:prop-helping:scout.dip_range_max"]["msg"]
+    assert synthesize_proprioception(
+        dict(prop, updated="2020-01-01T00:00:00+00:00"), _now()) == []
+    assert synthesize_proprioception({}, _now()) == []
+    assert synthesize_proprioception(None, _now()) == []
 
     # LIVE lane: earn-up ladder + cooldown, instant down, fail-safe absent
     nowts = _now()

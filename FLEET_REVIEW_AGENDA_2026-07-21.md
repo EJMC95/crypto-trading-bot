@@ -320,3 +320,34 @@ cadence. Still ADVISORY / publish-first per doctrine — no consumer wired.
 **Grade before wiring:** pull `fleet-clock` history — did the NYSE
 open/close transitions land at the right instants (DST honest, no holiday
 misses), and does `event_window` sample honestly at the 5-min cadence?
+
+## 12. Proprioception 🦾: grade the grader's first week (added 16-Jul)
+
+**What shipped (16-Jul, operator: "advance, enhance and improve the
+autonomous organ"):** `fleet_proprioception.py` — the autonomy stack's
+first RETROSPECTIVE sense. Every growth-rail lever episode (open →
+expire/release/change; long stances sliced daily) is graded out-of-sample:
+taker levers get the replay counterfactual in $ on the tape recorded
+DURING the episode (defaults vs enacted bars through the taker's real
+code), scout diet levers get grading throughput (n4h delta), gapscout
+gets census activity; live/xp episodes are recorded only — the judge and
+fade-watch remain the sole real-money authority. Per-lever verdicts
+(floors n≥2, ±$3) land in bot_state `fleet-proprioception`. FIRST
+CONSUMER, restrict-only: the scout tuner refuses to re-assert a lever
+carrying a fresh HURTING verdict (`apply_proprioception`) — the tuner
+stops repeating a movement that measured net-negative in reality even
+while in-sample replay still likes it. Board surfaces 🦾 items; immune
+scans the payload; /vitals + autonomy card render it.
+
+**Grade at the review:**
+- Episode ledger sanity: do episode windows match the fleet-tuning
+  history (no phantom opens, releases backdated to lever expiry)?
+- Counterfactual honesty: spot-check 2-3 graded taker episodes by
+  re-running the replay by hand on the same window.
+- Did any HURTING verdict fire, and if so — did the skip change what the
+  tuner enacted next cycle (the `scout-tuner` log carries the skip line)?
+- Verdict floors: are n≥2 / ±$3 (`PROP_MIN_EPISODES`/`PROP_HURT_USD`)
+  the right bar, or does a week of episodes argue for more evidence?
+- Decide whether HELPING verdicts should earn anything (e.g. the tuner
+  holding a helping lever's notch longer) — expand-side consumption is
+  deliberately NOT wired until this review rules on it.

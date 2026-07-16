@@ -182,6 +182,21 @@ def organ_invariants(states, now):
         if ph is not None and ph not in ("idle", "running", "promoted"):
             sick("xp-judge", f"unknown phase {ph!r}")
 
+    # [2026-07-16] 🦾 proprioception: impossible episodes / unknown verdicts
+    # would mislead the tuner's hurting-skip and the board's outcome items
+    pr = states.get("fleet-proprioception") or {}
+    if _fresh(pr, now):
+        for ep in (pr.get("episodes") or [])[-30:]:
+            s, e = ep.get("start"), ep.get("end")
+            if isinstance(s, (int, float)) and isinstance(e, (int, float)) and e < s:
+                sick("fleet-proprioception",
+                     f"episode {ep.get('group')} end < start (impossible)")
+        for lever, v in (pr.get("verdicts") or {}).items():
+            vd = v.get("verdict") if isinstance(v, dict) else None
+            if vd is not None and vd not in ("helping", "hurting", "neutral",
+                                             "insufficient"):
+                sick("fleet-proprioception", f"{lever} unknown verdict {vd!r}")
+
     return out
 
 
@@ -241,7 +256,7 @@ def run_once():
     # one batched beat instead of five round-trips (fail-safe: batch {} on
     # DB failure -> every organ reads as absent, same as load_state failing)
     _keys = ("lighter-market", "brain-lens-forward", "gapscout-census",
-             "xp-judge", "fleet-tuning")
+             "xp-judge", "fleet-tuning", "fleet-proprioception")
     _batch = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     states = {k: (_batch.get(k) or store.load_state(k) or {}) for k in _keys} \
         if not _batch else {k: (_batch.get(k) or {}) for k in _keys}
@@ -353,13 +368,24 @@ def _selftest():
                                "lenses": {"dip": {"n4h": -5, "hit4h": 1.4}}},
         "gapscout-census": {"updated": fresh, "ttl_sec": 3600, "episodes_open": -1},
         "xp-judge": {"updated": fresh, "ttl_sec": 10800, "phase": "haywire"},
+        "fleet-proprioception": {"updated": fresh, "ttl_sec": 2700,
+                                 "episodes": [{"group": "taker", "start": 100.0,
+                                               "end": 50.0},           # impossible
+                                              {"group": "live", "start": 1.0,
+                                               "end": 2.0}],           # fine
+                                 "verdicts": {"taker.tp": {"verdict": "banana"},
+                                              "taker.sl": {"verdict": "helping"}}},
         "stale-organ": {"updated": "2020-01-01T00:00:00+00:00", "ttl_sec": 900,
                         "n_books": 1, "n_liquid": 999},
     }
     inv = organ_invariants(states, now)
     organs = {i["organ"] for i in inv}
     assert organs == {"lighter-market", "brain-lens-forward",
-                      "gapscout-census", "xp-judge"}, organs
+                      "gapscout-census", "xp-judge",
+                      "fleet-proprioception"}, organs
+    prio = [i["detail"] for i in inv if i["organ"] == "fleet-proprioception"]
+    assert len(prio) == 2 and any("end < start" in d for d in prio) \
+        and any("banana" in d for d in prio), prio
     # the stale organ's impossible content is NOT flagged (death != sickness)
     assert not any(i["organ"] == "stale-organ" for i in inv)
 

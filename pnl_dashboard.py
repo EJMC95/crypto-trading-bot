@@ -837,7 +837,8 @@ def autonomy_rail_card():
     card, any error renders nothing. One fetch_states round-trip for all 11."""
     try:
         s = fetch_states([
-            "fleet-tuning", "scout-tuner", "strategy-incubator", "xp-queue",
+            "fleet-tuning", "scout-tuner", "fleet-proprioception",
+            "strategy-incubator", "xp-queue",
             "xp-judge", "fleet-immune", "fleet-regen", "fleet-respiration",
             "fleet-clock", "impl-shortfall", "gapscout-census",
         ])
@@ -873,6 +874,14 @@ def autonomy_rail_card():
         rows.append(row("scout-tuner", "🔧 Scout tuner",
                         f'{ntn} enacted · baseline {_d(tn.get("baseline_net"))}',
                         Y if ntn else None))
+        pr = s.get("fleet-proprioception") or {}
+        pc = pr.get("counts") or {}
+        n_hurt = pc.get("hurting") or 0
+        rows.append(row("fleet-proprioception", "🦾 Outcomes",
+                        f'{pc.get("graded") or 0} graded of {pc.get("episodes") or 0} '
+                        f'episodes · {pc.get("helping") or 0} helping · '
+                        f'{n_hurt} hurting',
+                        Y if n_hurt else (G if (pc.get("graded") or 0) else None)))
         ic = s.get("strategy-incubator") or {}
         ch = ic.get("champion") or {}
         conf = ch.get("confidence") or "none"
@@ -2071,6 +2080,11 @@ def _organ_vital(key, st):
         if key == "scout-tuner":
             return _v("{} enacted · baseline net ${}",
                       len(st.get("enacted") or {}), st.get("baseline_net"))
+        if key == "fleet-proprioception":
+            c = st.get("counts") if isinstance(st.get("counts"), dict) else {}
+            return _v("{} episodes ({} graded) · {} helping · {} hurting",
+                      c.get("episodes") or 0, c.get("graded") or 0,
+                      c.get("helping") or 0, c.get("hurting") or 0)
         if key == "strategy-incubator":
             ch = st.get("champion") or {}
             return _v("champion {} · net ${}", ch.get("confidence") or "none", ch.get("net"))
@@ -2130,6 +2144,9 @@ ORGAN_SPECS = [
     # non-critical to avoid a pager storm, promote per-organ once proven.
     ("fleet-tuning",       "🎚️ Fleet tuning — active levers",        False, 7200),
     ("scout-tuner",        "🔧 Scout tuner — self-enacted levers",    False, 10800),
+    # [2026-07-16] proprioception — the growth rail grading its own
+    # enactments (out-of-sample); the tuner consumes hurting verdicts.
+    ("fleet-proprioception", "🦾 Proprioception — enactment outcomes", False, 2700),
     ("strategy-incubator", "🧬 Incubator — champion genotype",        False, 10800),
     ("xp-queue",           "📥 XP queue — candidates for the judge",  False, 10800),
     ("xp-judge",           "⚖️ XP judge — promotion state machine",   False, 10800),
@@ -2169,6 +2186,10 @@ CONTRACTS = [
     ("evidence proposals", "evidence_board.py",
      "NOTHING yet — shadow; review promotes via EVBOARD_MODE", "shadow",
      "evidence-board"),
+    ("enactment outcome verdicts", "fleet_proprioception.py",
+     "scout tuner (hurting-skip) · board 🦾 items · 21-Jul review",
+     "restrict-only (a hurting lever stops being re-asserted)",
+     "fleet-proprioception"),
     ("market open/close events + heavy_ok", "fleet_clock.py",
      "published, unconsumed — first wiring decided at the 21-Jul review",
      "advisory", "fleet-clock"),

@@ -30,6 +30,11 @@ doctrine (replay-first = backtest-first; both-halves; bounded levers):
   3. NEVER FIGHTS THE BRAIN. A lens the brain grades negative at its ruling
      floor (the taker's veto rule) is never widened — the restrict side owns
      it until the grade recovers.
+  4. NEVER REPEATS A MOVEMENT THAT MEASURED BAD (16-Jul, proprioception).
+     fleet_proprioception grades every closed lever episode on the tape
+     recorded DURING it — out-of-sample relative to this tuner's in-sample
+     replay gate. A lever with a fresh HURTING verdict is not re-asserted
+     (apply_proprioception; restrict-only, fail-safe none on a dark organ).
 
 STATELESS BY DESIGN: every cycle recomputes the desired bars from the env
 DEFAULTS + today's tape, then re-asserts them via fleet_tuning (TTL'd
@@ -53,6 +58,11 @@ import bot_pnl_store as store
 import fleet_tuning as tuning
 import lighter_ticket_taker as tt
 import lighter_ticket_replay as rp
+
+try:
+    import fleet_proprioception as proprio   # outcome grades (optional import)
+except Exception:  # noqa: BLE001
+    proprio = None
 
 KEY = "scout-tuner"
 TTL_SEC = int(os.environ.get("TUNER_TTL_SEC", "10800"))       # 3h payload ttl
@@ -289,6 +299,26 @@ def desired_scout_levers(lens_fwd):
     return out, log
 
 
+def apply_proprioception(levers, prop_state, now_ts):
+    """[2026-07-16 PROPRIOCEPTION] Drop any would-be enactment whose lever
+    carries a fresh HURTING verdict from fleet_proprioception — the lever's
+    graded real-world episodes measured net-negative, so the tuner stops
+    repeating the movement even while in-sample replay still likes it.
+    Restrict-only (only ever removes enactments) and fail-safe: a dark/
+    stale/absent proprioception drops nothing. Pure — selftested."""
+    if proprio is None or not levers:
+        return levers, []
+    hurt = proprio.hurting_levers(prop_state, now_ts)
+    dropped = sorted(set(levers) & set(hurt))
+    if not dropped:
+        return levers, []
+    log = [f"{k}: proprioception verdict HURTING "
+           f"(Σ${(hurt[k].get('sum_delta_usd') or 0):+.2f} over "
+           f"n={hurt[k].get('n')} graded episodes) — NOT re-asserted"
+           for k in dropped]
+    return {k: v for k, v in levers.items() if k not in hurt}, log
+
+
 NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
 
 
@@ -353,6 +383,12 @@ def run_once():
                          "reason": "lens starving — widen the brain's grading diet",
                          "evidence": f"lens-forward n4h below {LENS_FLOOR}"}
 
+    # proprioception veto: a lever whose graded episodes measured HURTING in
+    # reality is not re-asserted this cycle (restrict-only; fail-safe none)
+    prop_state = (store.load_state(proprio.KEY) or {}) if proprio else {}
+    levers, log4 = apply_proprioception(
+        levers, prop_state, datetime.now(timezone.utc).timestamp())
+
     enacted = tuning.write_levers(levers, set_by="scout-tuner",
                                   ttl_sec=LEVER_TTL) if levers else None
 
@@ -367,7 +403,7 @@ def run_once():
         "baseline_net": baseline["closed_net"],
         "baseline_lenses": {l: {k: s.get(k) for k in ("seen", "taken", "closed", "net")}
                             for l, s in (baseline.get("lenses") or {}).items()},
-        "enacted": now_set, "log": (log1 + log2 + log3)[:20],
+        "enacted": now_set, "log": (log4 + log1 + log2 + log3)[:20],
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -484,6 +520,24 @@ def _selftest():
                                    "momentum": {"n4h": 100}})
     assert "scout.dip_range_max" not in sl3, sl3
 
+    # proprioception veto: a fresh HURTING verdict drops the enactment; a
+    # stale/absent payload drops NOTHING (fail-safe); helping never drops
+    if proprio is not None:
+        nowts = datetime.now(timezone.utc).timestamp()
+        want = {"taker.dip_range": {"value": 0.08, "reason": "r"},
+                "scout.dip_range_max": {"value": 0.15, "reason": "r"}}
+        fresh_prop = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                      "ttl_sec": 2700,
+                      "verdicts": {"taker.dip_range": {"verdict": "hurting",
+                                                       "n": 3, "sum_delta_usd": -5.1},
+                                   "scout.dip_range_max": {"verdict": "helping"}}}
+        kept, plog = apply_proprioception(dict(want), fresh_prop, nowts)
+        assert set(kept) == {"scout.dip_range_max"} and len(plog) == 1, (kept, plog)
+        stale_prop = dict(fresh_prop, updated="2020-01-01T00:00:00+00:00")
+        assert apply_proprioception(dict(want), stale_prop, nowts) == (want, [])
+        assert apply_proprioception(dict(want), {}, nowts) == (want, [])
+        assert apply_proprioception({}, fresh_prop, nowts) == ({}, [])
+
     # every ladder/sweep value must be registered + in-bounds in fleet_tuning
     for lens, (attr, lever, ladder) in TAKER_LADDERS.items():
         for v in ladder:
@@ -501,7 +555,8 @@ def _selftest():
         assert tuning.clamp(TOP_N_LADDER[0], v) == v
 
     print("scout_tuner selftest OK (ladders, veto, win-widen, lose-reject, "
-          "floor-release, anti-overfit sweep gate, registry bounds)")
+          "floor-release, anti-overfit sweep gate, proprioception hurting-skip, "
+          "registry bounds)")
 
 
 if __name__ == "__main__":
