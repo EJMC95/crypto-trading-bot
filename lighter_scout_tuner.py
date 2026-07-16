@@ -133,14 +133,35 @@ def halves(tape):
     return tape[:mid], tape[mid:]
 
 
+def _marked(rep):
+    """closed_net + end-of-tape unrealized (survivors marked at the last
+    snapshot's prices). [2026-07-17 IMB-10] Every tuner gate now scores THIS:
+    closed_net alone was blind to deferral — a variant could 'win' a gate by
+    pushing losses past the tape's end, because open positions were valued
+    at entry and invisible to the very evidence bar the tuner accepts on."""
+    return rep["closed_net"] + float(rep.get("unrealized") or 0.0)
+
+
+def _tape_span_h(tape):
+    """Tape span in hours; 0.0 when unparseable (callers then apply no
+    span-based exclusion — the old behavior, never a degenerate sweep)."""
+    try:
+        t0 = datetime.fromisoformat(str(tape[0][0]).replace("Z", "+00:00"))
+        t1 = datetime.fromisoformat(str(tape[-1][0]).replace("Z", "+00:00"))
+        return max(0.0, (t1 - t0).total_seconds() / 3600.0)
+    except Exception:  # noqa: BLE001
+        return 0.0
+
+
 def not_worse(tape_a, tape_b, bars_base, bars_var, tol=TOL):
-    """Variant is acceptable if its closed net is within tol of (or above)
-    the base bars' on BOTH halves — the doctrine's both-halves rule."""
+    """Variant is acceptable if its MARKED net (closed + unrealized) is
+    within tol of (or above) the base bars' on BOTH halves — the doctrine's
+    both-halves rule, deferral-proof (see _marked)."""
     for half in (tape_a, tape_b):
         if not half:
             return False
-        base = replay_with(half, bars_base)["closed_net"]
-        var = replay_with(half, bars_var)["closed_net"]
+        base = _marked(replay_with(half, bars_base))
+        var = _marked(replay_with(half, bars_var))
         if var < base - tol:
             return False
     return True
@@ -226,8 +247,8 @@ def desired_taker_bars(tape, baseline, lens_fwd, helping=None):
         for notch in next_notches(ladder, DEFAULTS[attr]):
             cand = dict(bars, **{attr: notch})
             if earned:
-                ok = all(replay_with(h, cand)["closed_net"]
-                         >= replay_with(h, bars)["closed_net"] + MARGIN_HALF
+                ok = all(_marked(replay_with(h, cand))
+                         >= _marked(replay_with(h, bars)) + MARGIN_HALF
                          for h in (h1, h2))
                 if not ok:
                     log.append(f"{lens}: notch {notch} REJECTED "
@@ -275,15 +296,25 @@ def sweep_exits(tape, baseline):
     base_bars = {"TAKE_PROFIT": DEFAULTS["TAKE_PROFIT"],
                  "STOP_LOSS": DEFAULTS["STOP_LOSS"],
                  "MAX_HOLD_H": DEFAULTS["MAX_HOLD_H"]}
-    base_net = baseline["closed_net"]
+    base_net = _marked(baseline)
     best, best_net = None, base_net
+    # [2026-07-17 IMB-10] a hold the tape can never reach is pure deferral —
+    # nothing max-hold-exits inside the window, so its 'edge' is unpriced
+    # open risk. Excluded from the grid (span 0 = unparseable -> no cap).
+    span_h = _tape_span_h(tape)
+    _skipped_holds = sorted(h for h in SWEEP_HOLD if span_h > 0 and h >= span_h)
+    if _skipped_holds:
+        log.append(f"sweep: holds {_skipped_holds} excluded "
+                   f"(tape spans {span_h:.0f}h — unreachable = deferral)")
     for tp in SWEEP_TP:
         for sl in SWEEP_SL:
             for hold in SWEEP_HOLD:
+                if hold in _skipped_holds:
+                    continue
                 cand = {"TAKE_PROFIT": tp, "STOP_LOSS": sl, "MAX_HOLD_H": hold}
                 if cand == base_bars:
                     continue
-                net = replay_with(tape, cand)["closed_net"]
+                net = _marked(replay_with(tape, cand))
                 if net > best_net:
                     best, best_net = cand, net
     if not best or best_net - base_net < MARGIN_TOTAL:
@@ -294,8 +325,8 @@ def sweep_exits(tape, baseline):
     for half in (h1, h2):
         if not half:
             return {}, log + ["sweep: empty half — refused"]
-        b = replay_with(half, base_bars)["closed_net"]
-        v = replay_with(half, best)["closed_net"]
+        b = _marked(replay_with(half, base_bars))
+        v = _marked(replay_with(half, best))
         if v < b + MARGIN_HALF:
             log.append(f"sweep: winner fails a half (+${v - b:.2f} < "
                        f"${MARGIN_HALF:.2f}) — refused (both-halves rule)")
@@ -513,6 +544,19 @@ def _selftest():
 
     def snap(h, marks, tickets=None, mi=0):
         return (dt(h, mi), {"marks": marks, "tickets": tickets or {}})
+
+    # [2026-07-17 IMB-10] the deferral-proof score + span helpers (a
+    # regression back to closed_net-only scoring must not pass silently)
+    assert _marked({"closed_net": 5.0, "unrealized": -3.5}) == 1.5
+    assert _marked({"closed_net": 5.0}) == 5.0            # missing -> 0
+    assert _marked({"closed_net": -2.0, "unrealized": None}) == -2.0
+    _sp = [(dt(0).isoformat(), {}), (dt(30 % 24).isoformat(), {})]
+    assert _tape_span_h([(dt(0).isoformat(), {}),
+                         ((dt(0) + timedelta(hours=30)).isoformat(), {})]) == 30.0
+    assert _tape_span_h([]) == 0.0 and _tape_span_h([("junk", {})]) == 0.0
+    # ...so a 72h hold is excluded on a 30h tape, 24h is not (sweep grid)
+    assert [h for h in SWEEP_HOLD
+            if 30.0 > 0 and h >= 30.0] == [48.0, 72.0]
 
     # ladders: next_notches walks outward from any starting point
     assert next_notches([0.05, 0.08, 0.11, 0.15], 0.05) == [0.08, 0.11, 0.15]

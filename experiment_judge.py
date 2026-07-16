@@ -63,6 +63,12 @@ SHADOW_BOT = os.environ.get("XPJ_SHADOW_BOT", "perps-funding-lighter-lshadow")
 LIVE_BOT = os.environ.get("XPJ_LIVE_BOT", "perps-funding-lighter-lighter")
 MIN_DAYS = float(os.environ.get("XPJ_MIN_DAYS", "7"))
 MAX_DAYS = float(os.environ.get("XPJ_MAX_DAYS", "14"))
+# [2026-07-17 IMB-07] the done-list AGES: a finite candidate universe (3
+# statics + <=6 incubator lever-sets) with a lifetime done-list permanently
+# self-exhausted the pipeline — an ABANDONED/FADED candidate becomes
+# retry-eligible after this many days. Retry is FALLBACK-only (see
+# pick_candidate): untried candidates always come first.
+DONE_RETRY_D = float(os.environ.get("XPJ_DONE_RETRY_D", "28"))
 MIN_CLOSES = int(os.environ.get("XPJ_MIN_CLOSES", "30"))      # shadow arm
 LIVE_MIN_CLOSES = int(os.environ.get("XPJ_LIVE_MIN_CLOSES", "10"))
 MARGIN_PP = float(os.environ.get("XPJ_MARGIN_PP", "0.5"))     # per-trade pp
@@ -385,6 +391,25 @@ def next_candidate(pool, done, current):
     return None
 
 
+def pick_candidate(pool, done, done_at, current, now, retry_sec):
+    """[2026-07-17 IMB-07] (candidate, retried) — untried candidates FIRST,
+    always; a done entry aged past retry_sec is retry-eligible ONLY when
+    nothing untried remains. Plain aging was verify-refuted: the statics
+    sit ahead of offspring in pool order and rotate (~16d per failed slot)
+    slower than the retry window, so an aged static would be re-selected
+    ahead of every NEVER-tried offspring, forever — the fallback shape
+    starves nothing. Pure — selftested."""
+    cand = next_candidate(pool, done, current)
+    if cand is not None:
+        return cand, False
+    aged = {n for n in (done or [])
+            if now - (done_at or {}).get(n, now) >= retry_sec}
+    if not aged:
+        return None, False
+    cand = next_candidate(pool, [n for n in done if n not in aged], current)
+    return cand, cand is not None
+
+
 def _num(x, d=0.0):
     """Corrupt/legacy state fields must reset the judge, never crash-loop it."""
     try:
@@ -414,6 +439,13 @@ def run_once():
     st = store.load_state(KEY) or {}
     phase = st.get("phase") or "idle"
     done = list(st.get("done") or [])
+    # [2026-07-17 IMB-07] done_at stamps make the done-list AGEABLE. Legacy
+    # names with no stamp (pre-aging state) are stamped NOW — a fresh retry
+    # clock, never an instant flood-back.
+    done_at = {k: _num(v, now) for k, v in (st.get("done_at") or {}).items()}
+    for _n in done:
+        done_at.setdefault(_n, now)
+    done_at = {k: v for k, v in done_at.items() if k in done}
     current = st.get("current")
     spec = st.get("spec") or {}                 # full {name, levers} of current
     verdicts = st.get("verdicts") or []
@@ -429,6 +461,7 @@ def run_once():
                                  if kw.get("phase", phase) in ("running", "promoted")
                                  else None),
                    "done": kw.get("done", done),
+                   "done_at": kw.get("done_at", done_at),
                    "started_ts": kw.get("started_ts", st.get("started_ts")),
                    "promoted_ts": kw.get("promoted_ts", st.get("promoted_ts")),
                    "cooldown_until": kw.get("cooldown_until", st.get("cooldown_until")),
@@ -468,9 +501,18 @@ def run_once():
         if not have_ledger:
             return save(note="no ledger visible — asserting nothing (fail-safe)")
         pool = candidate_pool(store.load_state("xp-queue") or {})
-        cand = next_candidate(pool, done, current)
+        cand, _retried = pick_candidate(pool, done, done_at, current, now,
+                                        DONE_RETRY_D * 86400)
         if cand is None:
-            return save(note="queue exhausted — awaiting new incubator proposals")
+            return save(note="queue exhausted — awaiting new incubator "
+                             "proposals (or a done entry aging past "
+                             f"{DONE_RETRY_D:g}d)")
+        if _retried:
+            done = [n for n in done if n != cand["name"]]
+            done_at.pop(cand["name"], None)
+            print(f"[xp-judge] RETRYING aged-out candidate {cand['name']} "
+                  f"(done {DONE_RETRY_D:g}d+ ago; no untried candidates "
+                  f"remain)", flush=True)
         # [2026-07-16] a candidate the registry can NEVER accept (unknown
         # lever / unclampable value) must not retry forever — mark INVALID and
         # move on, spending no judge slot. Distinct from a transient write
@@ -484,6 +526,7 @@ def run_once():
             send_push(f"experiment INVALID: {cand['name']}",
                       f"registry rejected {bad} — skipped, no judge slot spent")
             return save(done=done + [cand["name"]],
+                        done_at={**done_at, cand["name"]: now},
                         note=f"INVALID {cand['name']}: registry rejected {bad}")
         rc = _assert_levers(cand["levers"], f"experiment {cand['name']} started",
                             f"shadow arm {SHADOW_BOT}; judge bar: {MIN_DAYS}d/"
@@ -603,7 +646,8 @@ def run_once():
                              "ts": iso(now), "eval": ev})
             send_push(f"experiment abandoned: {cand['name']}",
                       f"{MAX_DAYS:g}d without clearing the bar — {ev.get('why')}")
-            return save(phase="idle", done=done + [cand["name"]], current=None,
+            return save(phase="idle", done=done + [cand["name"]],
+                        done_at={**done_at, cand["name"]: now}, current=None,
                         spec={}, started_ts=None,
                         cooldown_until=now + COOLDOWN_H * 3600, last_eval=ev,
                         note=f"ABANDONED {cand['name']}")
@@ -649,7 +693,8 @@ def run_once():
                       f"{why} — levers released, env defaults return within "
                       f"the TTL",
                       priority="urgent")
-            return save(phase="idle", done=done + [cand["name"]], current=None,
+            return save(phase="idle", done=done + [cand["name"]],
+                        done_at={**done_at, cand["name"]: now}, current=None,
                         spec={}, started_ts=None, promoted_ts=None,
                         promote_baseline=None,
                         cooldown_until=now + COOLDOWN_H * 3600,
@@ -895,6 +940,29 @@ def _selftest():
     assert _asserted({"levers": {"a": {}}}, {"a": 1, "b": 2}) is False  # partial
     assert _asserted({}, {"a": 1}) is False
     assert _asserted({"levers": {"a": {}}}, {}) is False     # nothing wanted
+
+    # [2026-07-17 IMB-07] fallback-only retry: untried candidates ALWAYS
+    # beat an aged-out done entry; a retry happens only when nothing
+    # untried remains (plain aging was verify-refuted — pool-order statics
+    # rotate slower than the retry window and would starve offspring)
+    _pool = [{"name": "s1", "levers": {}}, {"name": "s2", "levers": {}},
+             {"name": "off1", "levers": {}}]
+    c, r = pick_candidate(_pool, ["s1"], {"s1": t0 - 40 * day}, None, t0,
+                          28 * day)
+    assert c["name"] == "s2" and not r, "untried static beats aged retry"
+    c, r = pick_candidate(_pool, ["s1", "s2"], {"s1": t0 - 40 * day,
+                                                "s2": t0 - day}, None, t0,
+                          28 * day)
+    assert c["name"] == "off1" and not r, \
+        "NEVER-tried offspring beats an aged static (the starving case)"
+    c, r = pick_candidate(_pool, ["s1", "s2", "off1"],
+                          {"s1": t0 - 40 * day, "s2": t0 - day,
+                           "off1": t0 - day}, None, t0, 28 * day)
+    assert c["name"] == "s1" and r, "nothing untried -> retry the aged one"
+    c, r = pick_candidate(_pool, ["s1", "s2", "off1"],
+                          {k: t0 - day for k in ("s1", "s2", "off1")},
+                          None, t0, 28 * day)
+    assert c is None and not r, "nothing untried, nothing aged -> exhausted"
 
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
           "floors, own-right, fade, proprioception early-fade, registry mapping, "

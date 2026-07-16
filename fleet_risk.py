@@ -211,6 +211,18 @@ DD_HALF = float(os.environ.get("FLEET_DD_HALF", "-0.05"))
 DD_QUARTER = float(os.environ.get("FLEET_DD_QUARTER", "-0.10"))
 DD_SAMPLE_GAP_SEC = 1800
 DD_WINDOW_SEC = 7 * 24 * 3600
+# [2026-07-17 IMB-02] minimum sample-window SPAN before the governor asserts
+# a drawdown number at all. A freshly-reset window computed dd=0.0 off one
+# sample — and 0.0 is "not None", so it sailed through the evidence board's
+# deliberately fail-closed dd leg on the real-money up-ladder. Below the
+# span the governor abstains: dd=None (consumers' conservative sides bite),
+# clip_scale 1.0. DELIBERATE trade (verify-reviewed): for up to 6h after a
+# GENUINE cohort reset the governor is tighten-blind on the shadow-clip
+# lane (the old code could re-trip DD_HALF off a sub-6h window; the pool is
+# ~$8k paper + <$100 real, per-bot seatbelts + the board's ledger-anchored
+# DOWN reflex stay active) — the dual of closing the fake-0.0 hole that
+# passed the REAL-money up-gate. On the 21-Jul review agenda.
+DD_MIN_SPAN_SEC = float(os.environ.get("FLEET_DD_MIN_SPAN_SEC", str(6 * 3600)))
 
 
 def dd_governor(samples, fleet_equity, now_dt):
@@ -238,6 +250,15 @@ def dd_governor(samples, fleet_equity, now_dt):
             if last_age >= DD_SAMPLE_GAP_SEC:
                 out.append([now_dt.isoformat(timespec="seconds"), fleet_equity])
     if not fleet_equity or fleet_equity <= 0 or not out:
+        return out, None, 1.0
+    # thin window -> abstain (dd None), never a fake 0.0 (IMB-02)
+    try:
+        span = (datetime.fromisoformat(str(out[-1][0]).replace("Z", "+00:00"))
+                - datetime.fromisoformat(str(out[0][0]).replace("Z", "+00:00"))
+                ).total_seconds()
+    except (ValueError, TypeError):
+        span = 0.0
+    if span < DD_MIN_SPAN_SEC:
         return out, None, 1.0
     peak = max(max(eq for _, eq in out), fleet_equity)
     dd = fleet_equity / peak - 1.0
@@ -404,7 +425,15 @@ def main():
             try:
                 fleet_equity += float(_prev_eq[_base])
                 equity_by_bot[_base] = float(_prev_eq[_base])
-                equity_venue[_base] = "carried"
+                # [2026-07-17 IMB-02] a carried base keeps its REAL venue in
+                # the cohort key: the carried equity IS the same book at its
+                # last reading, so like-for-like still holds — flipping the
+                # key to "carried" wiped the 7d dd samples on every stale-flap
+                # of a slow publisher (Tide Rider publishes hourly vs the
+                # 65-min bar: 5-min slack), always landing on the RELEASE
+                # side (dd -> None/0, clips 0.25 -> 1.0 mid-drawdown).
+                equity_venue[_base] = ((prev_state.get("equity_venue") or {})
+                                       .get(_base) or "carried")
                 _carried.append(_base)
                 _carry_ts[_base] = _t0
             except (TypeError, ValueError):
@@ -429,6 +458,9 @@ def main():
         "clip_scale": clip_scale,
         "equity_by_bot": {k: round(v, 2) for k, v in equity_by_bot.items()},
         "equity_cohort": _cohort,
+        # persisted so a CARRIED base can keep its real venue in the cohort
+        # key next cycle (IMB-02 — carry must not wipe the dd window)
+        "equity_venue": equity_venue,
         "equity_carry_ts": _carry_ts,
         "equity_carried": _carried,      # bases riding on last-known equity
         "equity_samples": samples,
@@ -554,9 +586,20 @@ def selftest():
         uncovered=2)
     assert e["long_equity"] == 2 and e["long_crypto"] == 0, e
     assert e["short_n"] == 1 and e["sym_uncovered"] == 2, e
-    # dd governor smoke (already unit-tested 14-Jul; keep one canary here)
-    _, dd, scale = dd_governor([], 1000.0, datetime.now(timezone.utc))
-    assert dd == 0.0 and scale == 1.0, (dd, scale)
+    # dd governor: a thin window ABSTAINS (dd None — a fresh reset must not
+    # hand the board's fail-closed dd leg a passing 0.0, IMB-02); a window
+    # past DD_MIN_SPAN_SEC asserts a real number
+    from datetime import timedelta
+    _now = datetime.now(timezone.utc)
+    _, dd, scale = dd_governor([], 1000.0, _now)
+    assert dd is None and scale == 1.0, (dd, scale)
+    _mid = (_now - timedelta(hours=2)).isoformat(timespec="seconds")
+    assert dd_governor([[_mid, 1100.0]], 1000.0, _now)[1] is None, \
+        "2h span is below the 6h evidence bar"
+    _old = (_now - timedelta(hours=7)).isoformat(timespec="seconds")
+    _, dd2, sc2 = dd_governor([[_old, 1100.0]], 1000.0, _now)
+    assert dd2 is not None and abs(dd2 - (1000.0 / 1100.0 - 1.0)) < 1e-3, dd2
+    assert sc2 == 0.5, sc2                       # -9.1% is past DD_HALF
     print("[fleet-risk] selftest OK (exposure_concentration + dd_governor)")
 
 

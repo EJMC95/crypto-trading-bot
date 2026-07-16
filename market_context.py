@@ -241,8 +241,14 @@ def evaluate_evidence(quality):
                         + (f"added {added} " if added else "")
                         + (f"removed {removed}" if removed else "")
                         + f" | now vetoed: {sorted(vetoes) or 'none'}")
+    # [2026-07-17 IMB-03] the fleet freshness contract (updated+ttl_sec) on
+    # the ONE consumed payload of the live-money entry path that lacked it —
+    # a dead publisher must read as "no evidence", not as a standing veto
+    # set (or a standing all-clear) forever. TTL = 12 missed 5-min cycles.
     store.save_state("coin-vetoes",
-                     {"ts": datetime.now(timezone.utc).isoformat(), "coins": vetoes})
+                     {"ts": datetime.now(timezone.utc).isoformat(),
+                      "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                      "ttl_sec": 3600, "coins": vetoes})
 
     # --- live vs shadow divergence (execution health, PAIRED per-coin) ---
     # [2026-07-14] Same coin, same signal family, per-trade returns — only
@@ -448,6 +454,22 @@ def main():
             except Exception as e:  # noqa: BLE001
                 log.warning("evidence evaluation failed: %s", e)
             last_quality = time.time()
+
+        # [2026-07-17 verify fix] coin-vetoes LIVENESS re-stamp every loop:
+        # the veto CONTENT changes only per QUALITY_EVERY_H evaluation, but
+        # `updated` attests the publisher is ALIVE — without this, the 1h
+        # ttl went stale for ~5 of every 6 hours on a healthy service and
+        # the live consumer discarded the set (adversarial-verify caught
+        # the cadence mismatch before it shipped). Now ttl 3600 really does
+        # mean "12 missed 5-min loops = dead publisher".
+        try:
+            _cv = store.load_state("coin-vetoes") or {}
+            if _cv.get("coins") is not None:
+                _cv["updated"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                _cv["ttl_sec"] = 3600
+                store.save_state("coin-vetoes", _cv)
+        except Exception:  # noqa: BLE001
+            pass
 
         if once:
             log.info("--once complete.")

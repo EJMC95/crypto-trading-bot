@@ -44,17 +44,17 @@ Live-lane proprioception verdicts were contaminated during a consumer-side rever
 - evidence: fleet_tuning.py:286-316 (_live_hurting revert) vs fleet_proprioception stances from active_levers (no filter); grade_live uses actual ledger trades; verdict window displacement eps[-10:].
 - fix shape: already-fixed-in-diff — fleet_proprioception.observed_active() drops quarantined levers (any lane) and live-hurting lighter-live levers from the observed stance set, mirroring get_lever's scoping; episodes close as 'released' and none open during a revert; selftested. NOTE: this makes IMB-08's amnesia the sole heal path by construction — pair them at the 21-Jul review.
 
-### IMB-02 [medium] — VERIFIED REAL 3/3 (one refuter executed the dd_governor code)
+### IMB-02 [medium] — SHIPPED 17-Jul (verify 3/3; deliberate <=6h post-reset abstain window on the shadow-clip lane recorded for review)
 One cohort publisher stale-flap (live Tide Rider publishes hourly vs the 65-min freshness bar) flips its equity venue to 'carried', changes the cohort key, and WIPES the 7d dd-governor sample series — dd recomputes as 0.0 on a single sample, snapping clip_scale 0.25→1.0 mid-drawdown, and the blanked dd=0.0 is 'not None' so it PASSES the board's deliberately fail-closed dd leg on the real-money up-ladder.
 - evidence: fleet_risk.py:407 (venue='carried'), :418-423 (cohort key + sample reset), :240-244 (single-sample dd=0.0); evidence_board.py fr_ok leg accepts dd=0.0 > -0.02.
 - fix shape: Keep the carried base's REAL venue in the cohort key (carry already keeps fleet_equity comparable), reset samples only when the bot SET changes or a live book is substituted by its shadow; alternatively rescale retained samples by the cohort-equity ratio instead of wiping.
 
-### IMB-03 [medium] — VERIFIED 2/3 (money-safety lens: fail direction arguably tolerable)
+### IMB-03 [medium] — SHIPPED 17-Jul (verify caught + repaired a ttl/cadence mismatch in the first cut: publisher now liveness-re-stamps every 5-min loop)
 The coin-quality veto is the only consumed payload on the live-money entry path with NO freshness gate, and its publisher stamps no updated/ttl_sec: a dead market-context service fossilizes the last veto set forever (restrict that never heals) or, if it died empty, silently disables the veto forever — violating the fleet's own updated+ttl_sec contract on the highest-stakes consumer.
 - evidence: lighter_funding_bot.py:794-798 (load_state('coin-vetoes'), zero age check) vs the trend bot's fleet-risk read at lighter_trend_bot.py:452-460; market_context.py:244-245 publishes only ts+coins; publisher runs on a separate service (Dockerfile.marketcontext, not run_all.sh).
 - fix shape: Publish updated+ttl_sec on the coin-vetoes payload; gate the consumer on freshness (stale → empty veto set, matching its documented fails-open direction) and log loudly when a stale set is discarded.
 
-### IMB-04 [medium] — VERIFIED REAL 3/3
+### IMB-04 [medium] — SHIPPED 17-Jul (verify 3/3)
 pulse_panic halves stakes on a payload with NO freshness check in the family bot and all four freqtrade strategies: a fossil panic=true from a dead market_pulse keeps halving every new entry indefinitely — the exact 'alive but sick / 39h fossil' class, on an input fleet_immune does not scan.
 - evidence: lighter_family_bot.py:319-327 (raw latest.panic, 15-min cache only); user_data/strategies/DayTraderV5Gated.py:395-403 same; market_pulse.py:258-259 publishes ttl_sec=3600 nobody reads; fleet_bus.is_fresh exists and is used for every other key.
 - fix shape: Gate pulse_panic on the payload's updated+ttl_sec (reuse fleet_bus.is_fresh); stale → panic=False. One-line parity in each consumer.
@@ -64,12 +64,12 @@ SHORT_BUDGET=12 is computed, colors the light, and is published, but NO consumer
 - evidence: fleet_risk.py:140 (SHORT_BUDGET), :369-371 (shorts only move the light); lighter_ticket_taker.py:359-362,:400 ('shorts unaffected'); grep shows no short_positions check in any consumer.
 - fix shape: Mirror the fresh+enforce+fail-open veto for new shorts in the taker's divergence-short path; document the Funding Farmer's treatment (honor or exempt) next to the SHORT_BUDGET definition.
 
-### IMB-06 [medium] — survives 2/3 (doctrine lens dissents)
+### IMB-06 [medium] — SHIPPED 17-Jul (rolling keep-bar; verify sound)
 fade_check — the keep-bar on a live real-money promotion — uses the CUMULATIVE mean since promoted_ts, so it degrades as the promotion ages: months of good early trades mask a recent turn negative, and if fleet_proprioception is dark (prop_fade fails safe OFF) the degrading cumulative bar is the ONLY release signal on live.funding.*. The earn-bar was a fixed 7-14d window; the keep-bar has no rolling window at all.
 - evidence: experiment_judge.py:177-184 (mean over whole since-promotion window), :429-432 (unconditional re-assert while not fading), :198-208 (prop_fade False on dark organ).
 - fix shape: Add a rolling fade bar alongside the cumulative one: trailing FADE_N closes (or trailing 7d) mean < 0 also releases — earn-bar and keep-bar then share a time anchor.
 
-### IMB-07 [medium] — survives 2/3 (doctrine lens dissents)
+### IMB-07 [medium] — SHIPPED 17-Jul (verify caught + repaired offspring starvation in the first cut: aging is fallback-only — untried candidates always win)
 The judge's candidate flow permanently self-exhausts: a lifetime done-list over a FINITE universe (3 statics + ≤6 incubator lever-sets), dedupe by NAME only so three incubator names collide by content with the statics (up to ~3-6 weeks of the one-at-a-time slot re-testing identical levers), and ledger-dark days still count toward MAX_DAYS so a long outage burns a candidate for nothing. After ~2-3 months the expand pipeline idles at 'queue exhausted' while every restrict actuator stays reachable — the only-say-no convergence the rail was built to prevent.
 - evidence: experiment_judge.py:260-268 (done skipped forever), :387/:425 (never pruned), :369+:382 (blind days accrue), :249-257 (name-only dedupe); strategy_incubator.py:81-85 (finite grids), :249 ('xp-enter_apr-0.3' == static 'enter-gate-0.30' by content).
 - fix shape: Dedupe candidate_pool AND the done check by canonicalized lever-set key (tuple(sorted(levers.items()))); age done entries (retry-eligible after N weeks or on a regime-oracle change / epoch-versioned names); exclude ledger-dark cycles from MAX_DAYS accrual. Ship the three together — content dedupe alone removes today's only accidental retry path.
@@ -84,7 +84,7 @@ Regen's repair map and immune's detection map don't intersect where it matters: 
 - evidence: fleet_regen.py:52-56 (REPAIRABLE incl. scout-tuner) + :156-161 (gated on immune sick list) vs fleet_immune.py:150-204/:262-263 (no scout-tuner invariant or key); proprioception invariants exist but organ absent from REPAIRABLE; verdict consumers never consult 'fleet-immune'.sick.
 - fix shape: Add a scout-tuner invariant to organ_invariants (or drop it from REPAIRABLE); add fleet-proprioception to REPAIRABLE with an empty episodes/verdicts baseline; have verdict consumers treat a fresh-immune-flagged-sick proprioception as dark.
 
-### IMB-10 [medium] — survives 2/3
+### IMB-10 [medium] — SHIPPED 17-Jul (marked-net gates + unreachable-hold exclusion; verify 3/3 incl. executed deferral scenario)
 Every tuner replay gate scores closed_net ONLY — end-of-tape open positions are invisible: the exit sweep can clear its +$2/both-halves margin purely by DEFERRING losses (wider SL leaves losers open; MAX_HOLD=72 on a 48h tape can never hold-exit and is systematically survivorship-favored), and the starving path enacts a notch on taken>0 with ZERO closed outcomes (common at MIN_SNAPS=60, ~2.5h halves) — logged as 'evidenced' while possibly deep in unrealized loss.
 - evidence: lighter_scout_tuner.py:136-146 + :286-301 (closed_net comparisons), :250-262 (taken>0, not closed>0), :105 (SWEEP_HOLD 72) vs lighter_ticket_replay.py:79 (48h tape) and :219-230 (unrealized computed, never read).
 - fix shape: Score closed_net + unrealized (survivors marked at last tape price) in not_worse and sweep_exits; exclude grid hold values ≥ the tape's actual span; require closed≥1 (or MTM the fills) before enacting a starving notch.
@@ -94,7 +94,7 @@ Compound expansion across the two tuner lanes is never jointly validated and str
 - evidence: lighter_scout_tuner.py:84-99/:308-352 (diet, no replay gate) vs :78-83 (taker ladder max 0.15); fleet_tuning.py scout hi 0.25 overlaps taker hi 0.15; joint interaction check (:431-440) is taker-internal only.
 - fix shape: Freeze diet widening for any lens whose taker bar is off-default (or hold the taker walk at scout-emission-bar-minus-one-notch per lens) so the recorded tape always leads the tradable surface.
 
-### IMB-12 [medium] — VERIFIED REAL 3/3
+### IMB-12 [medium] — SHIPPED 17-Jul (verify 3/3)
 gapscout.extra_exchanges is an expand whose promised TTL auto-revert is unreachable: hot-added venues (kucoin/gateio/mexc) join the scan set for the LIFETIME of the process — when the lever expires nothing removes the venue or rebuilds sym_map. The rail's core contract ('auto-revert is the resting state') holds for the scalar levers (re-read per scan) but silently not for venues.
 - evidence: cross_exchange_arb.py:672-676 (add-only loop), :570-585 (no removal counterpart; exchanges dict only grows) vs :669-671 (scalars re-read each scan); contract at fleet_tuning.py:17-20.
 - fix shape: Each scan derive the intended venue set = EXCHANGES + current lever value, drop venues no longer asserted and rebuild sym_map; or document one-way-until-redeploy and surface the divergence (census.venues vs lever) to the board/immune.
@@ -119,7 +119,7 @@ Kill-switch coverage gap: the header promises FLEET_RISK_MODE=advisory sends eve
 - evidence: fleet_risk.py:20-21/:51; lighter_ticket_taker.py:342-346 (gov on freshness, mode only at :352); lighter_family_bot.py:800-815 same pattern.
 - fix shape: Producer-side one-liner: publish clip_scale=1.0 when MODE=advisory (covers all consumers at once); correct the header either way.
 
-### IMB-17 [low] — survives 2/3
+### IMB-17 [low] — SHIPPED 17-Jul (L2 long veto wired, restrict-only; verify 3/3)
 The live Funding Farmer is counted INTO the long budget (its held longs feed fleet_long) but never reads fleet-risk — it consumes budget every other book must honor while its own long entries go unvetoed; the trend bot's 'only real-money LONG book counted but never checked' fix comment overlooked this second live book.
 - evidence: fleet_risk.py:106-110/:331-342 (harvest into fleet_long); grep of lighter_funding_bot.py: zero fleet-risk reads; lighter_trend_bot.py:444-447 claim.
 - fix shape: Wire the same fresh+enforce+fail-open long-entry skip into the funding bot's entry loop (longs only), or exclude it from the count and document the exemption (contrarian negative-funding longs are anti-crowding by thesis) next to PERPS_LS_BOTS.
@@ -144,12 +144,12 @@ The tuner's brain-ruling floor mirrors the taker's veto via the SAME env var (TT
 - evidence: lighter_scout_tuner.py:75 vs lighter_ticket_taker.py:372; separate services per fleet map.
 - fix shape: Taker publishes its effective min_n and computed veto set in its bot_state payload; tuner consumes that, env fallback only when stale.
 
-### IMB-22 [low] — survives 2/3
+### IMB-22 [low] — SHIPPED 17-Jul (per-half floors; verify sound)
 paired_eval enforces close floors on the FULL window (shadow≥30, live≥10) but none per half while requiring each half to clear the 0.5pp margin — a live arm split 9/1 lets a single close pass or veto a real-money promotion; the anti-luck core of the bar can rest on one-trade noise.
 - evidence: experiment_judge.py:147-149 (full-window floors only), :150-162 (per-half means, no per-half n), :128-129 (_mean_pct averages 1 trade).
 - fix shape: Per-half minimums (e.g. shadow ≥ min_closes//3, live ≥ 3) returning the 'floors' verdict when a half is too thin.
 
-### IMB-23 [low] — survives 2/3
+### IMB-23 [low] — SHIPPED 17-Jul (env-derived base; verify 3/3)
 funding_proposals computes a get_lever-based default dict that is never used and compares alleles against a HARD-CODED base {0.40, 0.04, 72.0}: if the operator's env defaults drift, the incubator proposes an allele equal to the real default (a 7-14d judge slot proving x==x) and never probes the vacated value.
 - evidence: strategy_incubator.py:229-231 (dead dict), :233 (hard-coded base), :247 (skip only allele==base).
 - fix shape: Delete the dead dict; derive base from the funding bot's actual env defaults (same envs / imported constants).

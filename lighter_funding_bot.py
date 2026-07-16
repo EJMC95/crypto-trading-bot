@@ -181,6 +181,10 @@ QUALITY_VETO = os.environ.get("FUNDING_QUALITY_VETO", "on").strip().lower() \
 
 LOOP_SECONDS = int(os.environ.get("FUNDING_LOOP_SECONDS", "300"))
 
+# [2026-07-17 IMB-03] one-shot log flag for a stale coin-vetoes payload
+# (warn on the fresh->stale transition, not every 5-min loop).
+_veto_stale = {"warned": False}
+
 LOG_FILE = os.environ.get("FUNDING_LOG_FILE", "funding_lighter_bot.log")
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
@@ -792,10 +796,63 @@ def main():
         except Exception:  # noqa: BLE001
             _mctx = {}
         try:
-            _vetoes = ((store.load_state("coin-vetoes") or {}).get("coins") or {}) \
-                if QUALITY_VETO else {}
+            _vp = (store.load_state("coin-vetoes") or {}) if QUALITY_VETO else {}
+            _vetoes = _vp.get("coins") or {}
+            # [2026-07-17 IMB-03] freshness gate on the LIVE entry path — the
+            # one consumed payload that had none. A fossil set is not
+            # evidence: a dead market-context either vetoed forever or (died
+            # empty) silently disabled the veto forever. Stale -> NO vetoes,
+            # the veto's documented fail-OPEN direction. Accepts the legacy
+            # 'ts' stamp and an env TTL fallback so a publisher one deploy
+            # behind still ages honestly.
+            _vts = _vp.get("updated") or _vp.get("ts")
+            _vttl = float(_vp.get("ttl_sec")
+                          or os.environ.get("FUNDING_VETO_TTL_S", "3600"))
+            _vage = ((now - datetime.fromisoformat(
+                str(_vts).replace("Z", "+00:00"))).total_seconds()
+                if _vts else None)
+            if _vage is not None and 0 <= _vage <= _vttl:
+                # ANY fresh payload (an empty set included) re-arms the
+                # one-shot warning — a later, independent staleness episode
+                # must not be silent (verify amendment).
+                _veto_stale["warned"] = False
+            elif _vetoes:
+                if not _veto_stale["warned"]:
+                    log.warning("coin-vetoes STALE (age %s > ttl %.0fs) — "
+                                "discarding %d veto(s); quality veto fails "
+                                "OPEN until the publisher is back",
+                                f"{_vage:.0f}s" if _vage is not None
+                                else "unstamped", _vttl, len(_vetoes))
+                    _veto_stale["warned"] = True
+                _vetoes = {}
         except Exception:  # noqa: BLE001
             _vetoes = {}
+
+        # [2026-07-17 IMB-17] L2 long-budget veto: this book's directional
+        # longs were counted INTO the fleet's long budget but the bot never
+        # read the light — count and enforcement now match. Same contract as
+        # the trend bot / family bot / taker: fresh payload + mode=enforce +
+        # budget full -> skip NEW LONGS this loop (shorts, exits and stops
+        # untouched; the short budget is deliberately unenforced — see the
+        # 16-Jul balance audit, IMB-05 refuted). Missing/stale fails OPEN;
+        # kill switch stays central: FLEET_RISK_MODE=advisory.
+        fleet_long_veto = False
+        try:
+            _fr = store.load_state("fleet-risk") or {}
+            _fage = (now - datetime.fromisoformat(
+                str(_fr.get("updated")).replace("Z", "+00:00"))).total_seconds()
+            _lb = _fr.get("long_budget")
+            _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
+            if (_fage <= float(_fr.get("ttl_sec") or 900)
+                    and _fr.get("mode") == "enforce"
+                    and (_fr.get("long_positions") or 0) >= _lb):
+                fleet_long_veto = True
+                log.info("FLEET LONG-BUDGET VETO — %s/%s directional longs; "
+                         "no new LONG entries this cycle (shorts/exits "
+                         "unaffected)", _fr.get("long_positions"),
+                         _fr.get("long_budget"))
+        except Exception:  # noqa: BLE001 — fail-safe open
+            fleet_long_veto = False
 
         # [2026-07-11 SLOPE GATE] rolling in-process funding history (apr units)
         # feeding the building-vs-rolling-over entry gate. Restart loses ~1h of
@@ -970,6 +1027,12 @@ def main():
                 # [2026-07-11 QUALITY VETO] fleet-measured toxicity, restrict-only
                 if coin in _vetoes:
                     log.info("%s VETO_SKIP (%s)", coin, _vetoes[coin])
+                    continue
+                # [2026-07-17 IMB-17] fleet long budget (computed above) —
+                # NEW directional longs only; the funding mandate's shorts
+                # and every exit path are untouched
+                if not is_short and fleet_long_veto:
+                    log.info("%s FLEET_LONG_VETO_SKIP", coin)
                     continue
                 # [2026-07-11 SLOPE GATE] only enter while crowding still builds
                 # (validated: see config block). Fails open with no history.

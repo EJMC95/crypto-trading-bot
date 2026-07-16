@@ -669,11 +669,33 @@ def run_live(once=False):
         if tuning is not None:
             eff_prefilter = tuning.get_lever("gapscout.prefilter_gap", PREFILTER_GAP)
             eff_books = tuning.get_lever("gapscout.max_book_fetches", MAX_BOOK_FETCHES)
-            for ex_id in str(tuning.get_lever("gapscout.extra_exchanges", "")).split(","):
-                if ex_id.strip() and add_venue(ex_id.strip()):
-                    sym_map = build_symbol_map(markets_by_ex)
-                    print(f"[{now_iso()}] growth rail: venue {ex_id.strip()} hot-added "
-                          f"-> {len(sym_map)} pairs across {len(exchanges)} venues")
+            # [2026-07-17 IMB-12] the venue set is DERIVED each scan from the
+            # operator's base EXCHANGES + whatever the lever asserts NOW —
+            # hot-added venues DROP the moment the lever expires or stops
+            # naming them, so the rail's promised TTL auto-revert is real for
+            # this lever too (it was one-way-until-redeploy: the only expand
+            # lever in the fleet whose revert was unreachable). An open
+            # census episode on a dropped venue closes via the census's own
+            # staleness path — booking honesty is the scanner's, as ever.
+            _extra = {e.strip() for e in
+                      str(tuning.get_lever("gapscout.extra_exchanges", "")
+                          ).split(",") if e.strip()}
+            _vchanged = False
+            for ex_id in sorted(_extra):
+                if ex_id not in exchanges and add_venue(ex_id):
+                    _vchanged = True
+                    print(f"[{now_iso()}] growth rail: venue {ex_id} hot-added")
+            for ex_id in [e for e in list(exchanges)
+                          if e not in EXCHANGES and e not in _extra]:
+                exchanges.pop(ex_id, None)
+                markets_by_ex.pop(ex_id, None)
+                _vchanged = True
+                print(f"[{now_iso()}] growth rail: venue {ex_id} dropped "
+                      f"(lever expired/unasserted — TTL revert)")
+            if _vchanged:
+                sym_map = build_symbol_map(markets_by_ex)
+                print(f"[{now_iso()}] venue set {sorted(exchanges)} -> "
+                      f"{len(sym_map)} pairs")
 
         # Stage 0: one fetch_tickers per exchange.
         tickers_by_ex = {}

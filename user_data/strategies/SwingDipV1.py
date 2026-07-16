@@ -148,8 +148,17 @@ class SwingDipV1(IStrategy):
             if c["ts"] is not None and (current_time - c["ts"]).total_seconds() < 900:
                 return c["panic"]
             import bot_pnl_store as store
-            latest = (store.load_state("market-pulse") or {}).get("latest") or {}
-            c["ts"], c["panic"] = current_time, bool(latest.get("panic"))
+            st = store.load_state("market-pulse") or {}
+            latest = st.get("latest") or {}
+            # [2026-07-17 IMB-04] gate on the payload's OWN updated+ttl_sec —
+            # a fossil panic=true from a dead market_pulse must not halve
+            # stakes forever. Stale/unstamped/future-dated -> False.
+            from datetime import datetime as _dt, timezone as _tz
+            _age = (_dt.now(_tz.utc) - _dt.fromisoformat(
+                str(st.get("updated")).replace("Z", "+00:00"))).total_seconds()
+            c["ts"], c["panic"] = current_time, (
+                bool(latest.get("panic"))
+                and 0 <= _age <= float(st.get("ttl_sec") or 0))
         except Exception:
             c["ts"], c["panic"] = current_time, False
         return c["panic"]

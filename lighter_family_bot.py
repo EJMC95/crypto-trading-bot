@@ -320,8 +320,17 @@ def pulse_panic():
     if time.time() - _pulse["ts"] < 900:
         return _pulse["panic"]
     try:
-        latest = (store.load_state("market-pulse") or {}).get("latest") or {}
-        _pulse.update(ts=time.time(), panic=bool(latest.get("panic")))
+        st = store.load_state("market-pulse") or {}
+        latest = st.get("latest") or {}
+        # [2026-07-17 IMB-04] gate on the payload's OWN updated+ttl_sec — a
+        # fossil panic=true from a dead market_pulse kept halving every new
+        # entry forever (the 'alive but sick' class the immune organ doesn't
+        # scan). Stale/unstamped/future-dated -> False; parity with every
+        # other consumed bus key.
+        age = (datetime.now(timezone.utc) - datetime.fromisoformat(
+            str(st.get("updated")).replace("Z", "+00:00"))).total_seconds()
+        fresh = 0 <= age <= float(st.get("ttl_sec") or 0)
+        _pulse.update(ts=time.time(), panic=bool(latest.get("panic")) and fresh)
     except Exception:  # noqa: BLE001
         _pulse.update(ts=time.time(), panic=False)
     return _pulse["panic"]

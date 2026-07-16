@@ -167,13 +167,21 @@ def evaluate(genotype, tape):
     a both-halves-positive flag (an offspring that only wins one lucky half
     is not fit). Patches tt bars, always restores."""
     saved = {g: getattr(tt, g) for g in genotype}
+
+    def _marked(rep):
+        # [2026-07-17 IMB-10 parity] closed + end-of-tape unrealized — the
+        # tuner's gates went deferral-proof; the bred leaderboard/champion
+        # (dashboard-only today) must not keep the bias a future consumer
+        # would inherit.
+        return rep["closed_net"] + float(rep.get("unrealized") or 0.0)
+
     try:
         for g, v in genotype.items():
             setattr(tt, g, v)
-        full = rp.replay(tape)["closed_net"]
+        full = _marked(rp.replay(tape))
         mid = len(tape) // 2
-        h1 = rp.replay(tape[:mid])["closed_net"] if mid else 0.0
-        h2 = rp.replay(tape[mid:])["closed_net"] if mid else 0.0
+        h1 = _marked(rp.replay(tape[:mid])) if mid else 0.0
+        h2 = _marked(rp.replay(tape[mid:])) if mid else 0.0
     finally:
         for g, v in saved.items():
             setattr(tt, g, v)
@@ -226,11 +234,15 @@ def funding_proposals(judge_state, incubator_state, hurting=None):
     live lane just measured that knob bad; don't spend a 7-day judge slot
     re-proposing it while the verdict holds. Restrict-only (only removes
     proposals) and fail-safe (a dark organ skips nothing)."""
-    default = {g: tuning.get_lever(FUNDING_GENES[g][0],
-                                   {"enter_apr": tt and 0.40}.get(g, None))
-               for g in FUNDING_GENES}
-    # env baseline for funding (the bot's own defaults)
-    base = {"enter_apr": 0.40, "take_profit": 0.04, "max_hold_h": 72.0}
+    # [2026-07-17 IMB-23] the baseline is the funding bot's OWN env defaults
+    # (the same env names it reads), not a hard-coded snapshot: if the
+    # operator drifts an env, an allele equal to the REAL baseline is a
+    # no-op and must be skipped, not proposed as a 7-day experiment. (The
+    # old get_lever `default` dict here was dead code — computed, never
+    # read — and the literals it shadowed could silently diverge.)
+    base = {"enter_apr": float(os.environ.get("FUNDING_ENTER_APR", "0.40")),
+            "take_profit": float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04")),
+            "max_hold_h": float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))}
     tried = set()
     for v in (judge_state.get("verdicts") or []):
         nm = v.get("name")
