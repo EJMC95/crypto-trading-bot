@@ -441,7 +441,15 @@ def write_levers(levers, set_by="evidence-board", now_ts=None, ttl_sec=None):
             except Exception:
                 prev = {}
             payload = _merge_payload(prev)
-            store.save_state(KEY, payload)
+            # [2026-07-16 F3 REPAIR — adversarial-verify finding] save_state
+            # returns False on a failed write and NEVER raises; ignoring it
+            # returned a truthy payload that never persisted (reads-OK/
+            # writes-failing DB — e.g. Postgres flipped read-only), which
+            # false-positived every "landed" check downstream, including the
+            # board's live_write_ok guard on the real-money push. None on a
+            # failed durable write is the documented contract — honor it.
+            if not store.save_state(KEY, payload):
+                return None
         if hasattr(store, "save_history"):
             store.save_history(KEY, {"updated": payload["updated"],
                                      "levers": {k: v["value"] for k, v in out.items()},
@@ -500,7 +508,10 @@ def release_levers(names, set_by, now_ts=None):
             except Exception:
                 prev = {}
             payload = _released_payload(prev, names, set_by, now_ts)
-            store.save_state(KEY, payload)
+            # [2026-07-16 F3 REPAIR] same landed-signal contract as
+            # write_levers: a failed durable write must return None.
+            if not store.save_state(KEY, payload):
+                return None
         if hasattr(store, "save_history"):
             store.save_history(KEY, {"updated": payload["updated"],
                                      "released": sorted(names),
@@ -579,7 +590,15 @@ def _selftest():
     assert get_lever("taker.sl", -0.03, now_ts=now) == -0.02
     assert set(active_levers(now_ts=now)) == {"taker.sl"}
     # writer: unknown/out-of-lane dropped, values clamped, expires stamped,
-    # merge keeps OTHER authors' live levers; no-DB -> save is a guarded no-op
+    # merge keeps OTHER authors' live levers. Writer tests run against a
+    # stubbed ALWAYS-SUCCEEDS store (no local DB) so the merge/clamp logic
+    # executes; the failed-write landed-signal contract is pinned right
+    # after with the opposite stub.
+    _real_save = getattr(store, "save_state", None) if store else None
+    _real_locked = getattr(store, "locked_state_update", None) if store else None
+    if store is not None:
+        store.save_state = lambda k, s: True
+        store.locked_state_update = lambda k, fn: None    # force the fallback
     p = write_levers({"gapscout.prefilter_gap": {"value": 0.00001, "reason": "r"},
                       "taker.dip_range": {"value": 0.99},
                       "not.a.lever": {"value": 1}}, set_by="t", now_ts=now)
@@ -648,6 +667,22 @@ def _selftest():
     assert "taker.tp" not in rp["levers"], "dead entries pruned in passing"
     assert rp["ttl_sec"] >= 60
     assert release_levers([], "evidence-board", now_ts=now) is None
+    # [F3 REPAIR] the landed-signal contract: a reads-OK/writes-FAILING
+    # store (save_state -> False, locked path unavailable) must yield None
+    # from BOTH authors — a payload that never persisted must never read
+    # as a landed real-money write (the board's live_write_ok depends on it)
+    if store is not None:
+        store.save_state = lambda k, s: False
+        assert write_levers({"live.clip_scale": {"value": 0.75}},
+                            set_by="evidence-board", now_ts=now) is None, \
+            "failed durable write must not report as landed"
+        assert release_levers(["live.clip_scale"], "evidence-board",
+                              now_ts=now) is None, \
+            "failed durable release must not report as landed"
+        if _real_save is not None:
+            store.save_state = _real_save
+        if _real_locked is not None:
+            store.locked_state_update = _real_locked
     # every registered lever must clamp its own documented default
     for name, spec in LEVERS.items():
         if spec["kind"] in ("float", "int"):

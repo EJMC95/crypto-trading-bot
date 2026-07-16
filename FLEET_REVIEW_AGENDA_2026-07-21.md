@@ -191,15 +191,17 @@ doctrine) or an operator decision. Grade at this review:
   (small systematic undercount); perp sniper never publishes W/L counts;
   hl_paper VENUE fallback footgun in two Dockerfiles.
 
-## 14. EXPAND↔TIGHTEN balance audit — 25 open findings (added 16-Jul)
+## 14. EXPAND↔TIGHTEN balance audit — VERIFY COMPLETE (added 16-Jul)
 Full list with fix shapes + per-finding verification status:
 `AUDIT_EXPAND_TIGHTEN_2026-07-16.md` (32 consolidated findings; 7 SHIPPED
-same day — the live-lane gate rework itself shipped in the same commit:
-7d-window anchors both directions, holder/trader role split, blind-hold,
-explicit lever release, anti-flap; all 8 fixes graded SOUND by the audit's
-own synthesis pass). Adversarial verify (3 lenses each) completed for
-IMB-01..-10 before the session usage cap; the rest re-run after reset.
-Top of the OPEN list by consequence (v2 numbering):
+same day and verify-confirmed — the live-lane gate rework itself shipped in
+the same commit: 7d-window anchors both directions, holder/trader role
+split, blind-hold, explicit lever release, anti-flap). Adversarial verify
+(3 lenses per target, 131 agents): fixes F1-F2/F4-F8 survive 3/3; F3's
+landed-guard was refuted and REPAIRED same evening (rail authors now
+return None on a failed durable write). 8 findings REFUTED (do-not-build:
+IMB-05, -09, -11, -19, -21, -25, -26, -27), 4 contested-low-confidence
+(IMB-16, -18, -28, -29). VERIFIED-real open items, by consequence:
 - **IMB-02 (verified real)** dd-governor evidence window erased by any
   cohort flap — one Tide Rider stale-flap (hourly publish vs 65-min bar)
   wipes the 7d samples, dd recomputes 0.0, clips snap 0.25→1.0
@@ -215,10 +217,8 @@ Top of the OPEN list by consequence (v2 numbering):
   SOLE heal path post-IMB-01-fix; needs the probation re-assert design.
 - **IMB-17** live Funding Farmer counted INTO the L2 long budget but never
   reads fleet-risk (enforce or exempt-and-document).
-- REFUTED by verify (do not build): IMB-05 (short-budget enforcement — the
-  exemption is deliberate; document it), IMB-09 (regen/immune map mismatch
-  — dead code, fails safe; housekeeping only).
-- Remainder (tuner closed_net blindness IMB-10 survives; venue hot-add
-  revert IMB-12; diet-lane compounding; veto floor diversity; event
-  sentinel lifetime learning; family-bot bus drift; v2-fallback anchors):
-  see doc, unverified pending the re-run.
+- **IMB-12 (verified 3/3)** gapscout.extra_exchanges hot-add never reverts
+  in-process — the one growth-rail lever whose TTL promise is unreachable.
+- Also surviving 2/3: IMB-10 (tuner gates blind to unrealized), IMB-20
+  (registry coverage asymmetries), IMB-22/-23/-24 (judge per-half floors,
+  incubator hard-coded base, lens-veto floor diversity).
