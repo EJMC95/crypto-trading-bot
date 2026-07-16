@@ -81,13 +81,24 @@ TAKER_LADDERS = {
     "momentum":   ("MOMO_CHG",   "taker.momo_chg",   [5.0, 4.5, 4.0, 3.5, 3.0]),
     "divergence": ("DIV_GAP_PP", "taker.div_gap_pp", [500.0, 450.0, 400.0, 350.0, 300.0]),
 }
-# Scout emission-bar ladders (advisory tickets — widen the brain's diet)
+# Scout emission-bar ladders (advisory tickets — widen the brain's diet).
+# [2026-07-16 AUDIT FIX] defaults come from the SCOUT'S OWN env (same names
+# it reads — same container), not hardcoded notches: with an operator
+# env-widened scout, the old absolute ladder[1] values would have TIGHTENED
+# the very bars this organ exists to widen.
 SCOUT_LADDERS = {
-    "dip":      ("scout.dip_range_max", 0.10, [0.10, 0.15, 0.20, 0.25]),
-    "breakout": ("scout.brk_range_min", 0.90, [0.90, 0.87, 0.84, 0.80]),
-    "momentum": ("scout.momo_chg_min",  3.0,  [3.0, 2.5, 2.0]),
+    "dip":      ("scout.dip_range_max",
+                 float(os.environ.get("SCOUT_DIP_RANGE_MAX", "0.1")),
+                 [0.10, 0.15, 0.20, 0.25]),
+    "breakout": ("scout.brk_range_min",
+                 float(os.environ.get("SCOUT_BRK_RANGE_MIN", "0.9")),
+                 [0.90, 0.87, 0.84, 0.80]),
+    "momentum": ("scout.momo_chg_min",
+                 float(os.environ.get("SCOUT_MOMO_CHG_MIN", "3.0")),
+                 [3.0, 2.5, 2.0]),
 }
-TOP_N_LADDER = ("scout.ticket_top_n", 6, [6, 9, 12, 15])
+TOP_N_LADDER = ("scout.ticket_top_n",
+                int(os.environ.get("SCOUT_TICKET_TOP_N", "6")), [6, 9, 12, 15])
 # Exit-ladder sweep grid = the 21-Jul agenda item-2 grid, verbatim
 SWEEP_TP = [0.03, 0.04, 0.05, 0.06]
 SWEEP_SL = [-0.02, -0.03, -0.04]
@@ -315,9 +326,13 @@ def desired_scout_levers(lens_fwd, helping=None):
             continue
         graded = ((lens_fwd or {}).get(lens) or {}).get("n4h") or 0
         if graded < LENS_FLOOR:
-            deeper = lever in helping and len(ladder) > 2
-            val = (ladder[2] if deeper
-                   else ladder[1] if len(ladder) > 1 else default)
+            # only notches strictly WIDER than the (env) default — never
+            # tighten a scout the operator already widened
+            beyond = next_notches(ladder, default)
+            if not beyond:
+                continue          # env already at/past the ladder ceiling
+            deeper = lever in helping and len(beyond) > 1
+            val = beyond[1] if deeper else beyond[0]
             out[lever] = val
             log.append(f"{lens}: graded n4h={graded} < {LENS_FLOOR} — scout "
                        f"emission {lever} -> {val} (grading diet, not trading"
@@ -327,11 +342,13 @@ def desired_scout_levers(lens_fwd, helping=None):
     hungry = any(((lens_fwd or {}).get(l) or {}).get("n4h", 0) < LENS_FLOOR
                  for l in SCOUT_LADDERS)
     if hungry and lens_fwd:
-        deeper = lever in helping and len(ladder) > 2
-        val = ladder[2] if deeper else ladder[1]
-        out[lever] = val
-        log.append(f"ticket_top_n -> {val} (a lens is below the ruling floor"
-                   + (", deeper: proprio-helping" if deeper else "") + ")")
+        beyond = next_notches(ladder, default)
+        if beyond:
+            deeper = lever in helping and len(beyond) > 1
+            val = beyond[1] if deeper else beyond[0]
+            out[lever] = val
+            log.append(f"ticket_top_n -> {val} (a lens is below the ruling floor"
+                       + (", deeper: proprio-helping" if deeper else "") + ")")
     return out, log
 
 
@@ -405,7 +422,24 @@ def run_once():
     baseline = replay_with(tape, DEFAULTS)
     bars, log1 = desired_taker_bars(tape, baseline, lens_fwd, helping=helping)
     exits, log2 = sweep_exits(tape, baseline)
-    bars.update(exits)
+    # [2026-07-16 AUDIT FIX] bars were validated against DEFAULT exits and
+    # exits against DEFAULT bars — the deployed COMBINATION was never on the
+    # tape. When both move in one cycle, the joint set must itself be
+    # not-worse on both halves; if the interaction fails, the exits are
+    # dropped this cycle (each side alone is a replay-tested combination —
+    # the untested thing was only the pairing).
+    if bars and exits:
+        joint = dict(bars, **exits)
+        h1j, h2j = halves(tape)
+        if h1j and h2j and not_worse(h1j, h2j, DEFAULTS, dict(DEFAULTS, **joint)):
+            bars = joint
+            log2.append("joint bars+exits replay: not-worse both halves — "
+                        "enacting together")
+        else:
+            log2.append("joint bars+exits replay FAILED a half — exits "
+                        "dropped this cycle (interaction unproven)")
+    else:
+        bars.update(exits)
     if lf_fresh:
         scout_levers, log3 = desired_scout_levers(lens_fwd, helping=helping)
     else:

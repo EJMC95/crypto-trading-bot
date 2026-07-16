@@ -24,81 +24,6 @@ cadence. Still ADVISORY / publish-first per doctrine — no consumer wired.
 open/close transitions land at the right instants (DST honest, no holiday
 misses), and does `event_window` sample honestly at the 5-min cadence?
 
-<<<<<<< HEAD
-## 12. 16-Jul fleet-wide bug audit: deferred findings (fixes shipped separately)
-
-**STATUS UPDATE (16-Jul evening, operator blanket approval "you have my
-approval / get around me having to do anything"):** items (i) zombie
-positions, (ii) replay mark universe, (iii) per-bot clips (fixed in CODE —
-no Railway env change needed), (iv) census double-count, (vi) history
-retention, and the (viii) smaller items K-prefix + sniper W/L + Snap Back
-max_open are **SHIPPED** (CHANGELOG 2026-07-16 (ag)). At this review, grade
-their first days instead of deciding them. Still open below: (v) merge
-race (bounded, deliberate), (vii) live fill prices (needs the real signer
-fill response — the one item touching the live order path), and the
-remaining (viii) measurement-grade items.
-
-Six parallel adversarial audits (live-money surface, 15-Jul organs, core
-intelligence, scanners, shadow bots, dashboard/watchdog) ran 16-Jul on the
-operator's "have all bugs been fixed" request. Every finding rated
-critical-to-medium on a MONEY or PAGER path was fixed the same day (see
-CHANGELOG 2026-07-16 (ad)). The remainder below is deliberately DEFERRED —
-each needs either a trading-logic change (backtest/replay first, per
-doctrine) or an operator decision. Grade at this review:
-
-- **(i) DELISTED-BOOK ZOMBIE POSITIONS (medium, 6 shadow bots).** Ticket
-  Taker, Perp Sniper, Yield Harvester, family bot, Index Rider, Snap Back:
-  a position whose book vanishes (delist / dropped from the coin list) is
-  never exited — even past max-hold — and holds an open slot forever.
-  exit_reason returns None on a missing mark, so the hold clock never
-  fires. The sniper solved this class 2-Jul ("zombie guard": close at last
-  mark after N missing cycles); Counterweight + Stock Leaders already
-  handle it via rebalance-close. DECIDE: port the sniper's give-up to the
-  six bots (trading-logic change — needs the replay harness / paper only).
-- **(ii) REPLAY MARK UNIVERSE (medium).** lighter_ticket_replay marks from
-  LIQUID books only (scout tape) while the live taker marks from ALL
-  active books: positions that go illiquid mid-hold never exit in replay
-  and are valued at entry — an optimistic bias in closed_net, the exact
-  metric the tuner and incubator accept on. Document as a known divergence
-  now; fix = record all-book marks on the tape (scout change).
-- **(iii) PER-BOT CLIP ENV KNOBS DEAD ON LIGHTER (medium, operator
-  action).** VenueContext.order_usd ignores DISLOC_ORDER_USD /
-  FUNDSPREAD_ORDER_USD outside hl_paper: Snap Back clips $30 vs its
-  documented $10, Counterweight $30/leg vs the backtested $20. Either set
-  LIGHTER_ORDER_USD per Railway service (operator, 2 min) or wire the
-  per-bot envs through order_usd (code).
-- **(iv) GAP SCOUT CENSUS DOUBLE-COUNT (medium).** An eligible gap crowded
-  out of the fetch budget for >EPISODE_STALE_S (900s) closes "stale" and
-  re-books as a NEW episode on the next confirmation — and every restart
-  >15 min sweeps ALL episodes stale then re-books the still-alive ones.
-  Inflates census_day.opened/n_booked, which the growth rail reads.
-  Fix: refresh last_seen at stage-1 sighting, persist across restart.
-- **(v) fleet_tuning WRITE MERGE RACE (low-med).** write_levers is an
-  unlocked read-modify-write: two authors writing in the same instant can
-  drop each other's just-written levers until re-assert (≤1h; the board
-  re-asserts in 10 min). Expired levers can NOT be resurrected
-  (_lever_alive filters), so harm is bounded to a transient gap. Fix if
-  graded worth it: pg_advisory_xact_lock around the merge.
-- **(vi) bot_state_history HAS NO RETENTION (ops).** ~400+ rows/day from
-  the new organs alone, zero DELETE anywhere; the shared Railway Postgres
-  bloats indefinitely and brain/replay reads slow. DECIDE a retention
-  window (e.g. 30-60d) + who prunes (cleanup_legacy_bots boot sweep is
-  the natural home).
-- **(vii) LIVE FILL PRICES ARE DECISION MIDS (low, measurement).** The
-  funding bot's ledger entry/exit "fill" prices are the pre-order mids,
-  not venue fills — the implementation-shortfall tracker's live-vs-shadow
-  premise is weakened (live slippage structurally invisible). Fix: parse
-  the signer response / read back the fill from the venue.
-- **(viii) SMALLER ITEMS:** listing_intel K-prefix strip mangles real
-  K-symbols (KAVA→AVA, KERNEL→ERNEL → wrong intel class); sniper
-  ghost-skipped candidates pend forever (age-out only covers gate-fail);
-  same-cycle partial+final sniper exits collide on trade_id (ledger drops
-  one leg); tuner lens-bar + exit-sweep levers enacted together but never
-  jointly replayed; scout-diet levers are absolute notches (tighten if the
-  operator env-widens the scout); funding-accrual gap across restarts
-  (small systematic undercount); perp sniper never publishes W/L counts;
-  hl_paper VENUE fallback footgun in two Dockerfiles.
-=======
 ## 12. Proprioception 🦾: grade the grader's first week (added 16-Jul)
 
 **What shipped (16-Jul, operator: "advance, enhance and improve the
@@ -181,4 +106,87 @@ the operator's own default). Grade at the review:
   board release / judge fade would have (compare timestamps)?
 - Confirm composition with the immune quarantine (quarantine first, then
   hurting-revert) produced no double-handling surprises in the logs.
->>>>>>> origin/main
+
+## 13. 16-Jul fleet-wide bug audit: deferred findings (fixes shipped separately)
+
+**STATUS UPDATE (16-Jul evening, operator blanket approval "you have my
+approval / get around me having to do anything"):** items (i) zombie
+positions, (ii) replay mark universe, (iii) per-bot clips (fixed in CODE —
+no Railway env change needed), (iv) census double-count, (vi) history
+retention, and the (viii) smaller items K-prefix + sniper W/L + Snap Back
+max_open are **SHIPPED** (CHANGELOG 2026-07-16 (al)). At this review, grade
+their first days instead of deciding them. Still open below: (v) merge
+race (bounded, deliberate), (vii) live fill prices (needs the real signer
+fill response — the one item touching the live order path), and the
+remaining (viii) measurement-grade items.
+
+**SECOND UPDATE (16-Jul, later):** (v) merge race and (vii) live fill
+prices ALSO shipped (CHANGELOG (am) — the fill-response shape was verified
+against the installed lighter-sdk, and the lock got an unlocked fallback),
+plus every remaining (viii) item: sniper ghost-skip age-out, trade_id leg
+collision, joint bars+exits replay, env-relative scout ladders,
+funding-accrual restart persistence, VENUE setdefaults. NOTHING on this
+item waits on a decision anymore — at the review, grade the first days of
+all of it (fill_source coverage on live closes, lock behavior under the
+three authors, zombie-guard closes, census counts post-fix).
+
+Six parallel adversarial audits (live-money surface, 15-Jul organs, core
+intelligence, scanners, shadow bots, dashboard/watchdog) ran 16-Jul on the
+operator's "have all bugs been fixed" request. Every finding rated
+critical-to-medium on a MONEY or PAGER path was fixed the same day (see
+CHANGELOG 2026-07-16 (ak)). The remainder below is deliberately DEFERRED —
+each needs either a trading-logic change (backtest/replay first, per
+doctrine) or an operator decision. Grade at this review:
+
+- **(i) DELISTED-BOOK ZOMBIE POSITIONS (medium, 6 shadow bots).** Ticket
+  Taker, Perp Sniper, Yield Harvester, family bot, Index Rider, Snap Back:
+  a position whose book vanishes (delist / dropped from the coin list) is
+  never exited — even past max-hold — and holds an open slot forever.
+  exit_reason returns None on a missing mark, so the hold clock never
+  fires. The sniper solved this class 2-Jul ("zombie guard": close at last
+  mark after N missing cycles); Counterweight + Stock Leaders already
+  handle it via rebalance-close. DECIDE: port the sniper's give-up to the
+  six bots (trading-logic change — needs the replay harness / paper only).
+- **(ii) REPLAY MARK UNIVERSE (medium).** lighter_ticket_replay marks from
+  LIQUID books only (scout tape) while the live taker marks from ALL
+  active books: positions that go illiquid mid-hold never exit in replay
+  and are valued at entry — an optimistic bias in closed_net, the exact
+  metric the tuner and incubator accept on. Document as a known divergence
+  now; fix = record all-book marks on the tape (scout change).
+- **(iii) PER-BOT CLIP ENV KNOBS DEAD ON LIGHTER (medium, operator
+  action).** VenueContext.order_usd ignores DISLOC_ORDER_USD /
+  FUNDSPREAD_ORDER_USD outside hl_paper: Snap Back clips $30 vs its
+  documented $10, Counterweight $30/leg vs the backtested $20. Either set
+  LIGHTER_ORDER_USD per Railway service (operator, 2 min) or wire the
+  per-bot envs through order_usd (code).
+- **(iv) GAP SCOUT CENSUS DOUBLE-COUNT (medium).** An eligible gap crowded
+  out of the fetch budget for >EPISODE_STALE_S (900s) closes "stale" and
+  re-books as a NEW episode on the next confirmation — and every restart
+  >15 min sweeps ALL episodes stale then re-books the still-alive ones.
+  Inflates census_day.opened/n_booked, which the growth rail reads.
+  Fix: refresh last_seen at stage-1 sighting, persist across restart.
+- **(v) fleet_tuning WRITE MERGE RACE (low-med).** write_levers is an
+  unlocked read-modify-write: two authors writing in the same instant can
+  drop each other's just-written levers until re-assert (≤1h; the board
+  re-asserts in 10 min). Expired levers can NOT be resurrected
+  (_lever_alive filters), so harm is bounded to a transient gap. Fix if
+  graded worth it: pg_advisory_xact_lock around the merge.
+- **(vi) bot_state_history HAS NO RETENTION (ops).** ~400+ rows/day from
+  the new organs alone, zero DELETE anywhere; the shared Railway Postgres
+  bloats indefinitely and brain/replay reads slow. DECIDE a retention
+  window (e.g. 30-60d) + who prunes (cleanup_legacy_bots boot sweep is
+  the natural home).
+- **(vii) LIVE FILL PRICES ARE DECISION MIDS (low, measurement).** The
+  funding bot's ledger entry/exit "fill" prices are the pre-order mids,
+  not venue fills — the implementation-shortfall tracker's live-vs-shadow
+  premise is weakened (live slippage structurally invisible). Fix: parse
+  the signer response / read back the fill from the venue.
+- **(viii) SMALLER ITEMS:** listing_intel K-prefix strip mangles real
+  K-symbols (KAVA→AVA, KERNEL→ERNEL → wrong intel class); sniper
+  ghost-skipped candidates pend forever (age-out only covers gate-fail);
+  same-cycle partial+final sniper exits collide on trade_id (ledger drops
+  one leg); tuner lens-bar + exit-sweep levers enacted together but never
+  jointly replayed; scout-diet levers are absolute notches (tighten if the
+  operator env-widens the scout); funding-accrual gap across restarts
+  (small systematic undercount); perp sniper never publishes W/L counts;
+  hl_paper VENUE fallback footgun in two Dockerfiles.

@@ -317,6 +317,58 @@ def load_daily_halt(bot, day_iso):
     return st if st.get("halted_date") == day_iso else None
 
 
+def locked_state_update(key, fn):
+    """[2026-07-16 MERGE-RACE FIX] Serialize a read-modify-write on ONE
+    bot_state key across processes: read under a Postgres session advisory
+    lock, apply fn(old_dict_or_None) -> new_dict, upsert, release. The
+    fleet-tuning key has three authors on independent timers — an unlocked
+    merge off a stale read silently dropped the other author's just-written
+    levers. Returns the written dict, or None when the DB/lock path is
+    unavailable (callers keep their unlocked fallback). fn must be pure and
+    fast — the lock is held while it runs. Never raises."""
+    conn = _get_conn()
+    if conn is None:
+        return None
+    lock_id = None
+    try:
+        _ensure_state_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT hashtext(%s)", (key,))
+            lock_id = cur.fetchone()[0]
+            cur.execute("SELECT pg_advisory_lock(%s)", (lock_id,))
+            cur.execute("SELECT state FROM bot_state WHERE bot = %s", (key,))
+            row = cur.fetchone()
+            old = row[0] if row else None
+            if isinstance(old, str):
+                try:
+                    old = json.loads(old)
+                except Exception:
+                    old = None
+            new = fn(old if isinstance(old, dict) else None)
+            if not isinstance(new, dict):
+                return None
+            cur.execute(
+                """
+                INSERT INTO bot_state (bot, updated_at, state)
+                VALUES (%s, now(), %s)
+                ON CONFLICT (bot) DO UPDATE SET
+                    updated_at = now(),
+                    state      = EXCLUDED.state
+                """,
+                (key, json.dumps(new)))
+            return new
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"locked state update failed ({e})")
+        return None
+    finally:
+        if lock_id is not None:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_unlock(%s)", (lock_id,))
+            except Exception:  # noqa: BLE001
+                pass
+
+
 def load_state(bot):
     """Return the bot's saved state dict (from save_state), or None. Never raises."""
     conn = _get_conn()

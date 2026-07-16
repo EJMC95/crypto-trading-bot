@@ -606,6 +606,15 @@ class Book:
             self.guard_until = float(saved.get("guard_until") or 0.0)
             self.cooldown = {str(k): float(v) for k, v in
                              (saved.get("cooldown") or {}).items()}
+            # [2026-07-16 AUDIT FIX] restore the accrual clock — it reset to
+            # boot time each redeploy, so funding across the gap was never
+            # accrued (systematic undercount). Gap bounded to 48h.
+            try:
+                _lt = float(saved.get("last_accrue") or 0)
+                if _lt:
+                    self.last_accrue = max(_lt, time.time() - 48 * 3600)
+            except Exception:  # noqa: BLE001
+                pass
             log.info("%s restored: $%.2f, %d open", self.bot_id,
                      self.broker.equity(), self.broker.open_count())
         if store.load_daily_halt(self.bot_id,
@@ -618,7 +627,8 @@ class Book:
             store.save_state(self.bot_id, {
                 "broker": self.broker.to_state(), "meta": self.meta,
                 "closed": self.closed[-200:], "fund_realized": self.fund_realized,
-                "guard_until": self.guard_until, "cooldown": self.cooldown})
+                "guard_until": self.guard_until, "cooldown": self.cooldown,
+                "last_accrue": self.last_accrue})
         except Exception:  # noqa: BLE001
             pass
 

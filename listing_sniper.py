@@ -1029,6 +1029,20 @@ def monitor(cfg, exchange_ids):
                 positions.append(pos)
                 baseline.setdefault(exid, set()).add(sym)
             else:
+                # [2026-07-16 AUDIT FIX] the age-out only covered the
+                # gate-FAIL branch: a gate-passing candidate that
+                # open_position skips deterministically (GHOST-SKIP: junk
+                # intel + minor venue, or persistent no-price) re-pended
+                # FOREVER, re-spending API calls every cycle until the venue
+                # delisted the pair. Same give-up applies here.
+                age = time.time() - st.get("ts", time.time())
+                if max_pending_sec > 0 and age >= max_pending_sec:
+                    gate_drop += 1
+                    log_skip(exid, sym, "aged_out:no_open", metrics)
+                    print(f"  SKIP [{exid}] {sym} — gave up after "
+                          f"{age/60:.0f}m (gate passed, no open)")
+                    baseline.setdefault(exid, set()).add(sym)
+                    continue
                 still_pending[key] = st  # no fill price yet, keep trying
         pending = still_pending
 
@@ -1055,7 +1069,13 @@ def monitor(cfg, exchange_ids):
                     with _store_lock:
                         store.publish_paper_trade(
                             "event-listing-sniper",
-                            trade_id=f"{row[3]}:{row[4]}:{row[1]}:{row[2]}",
+                            # [2026-07-16 AUDIT FIX] reason is part of the id:
+                            # a same-cycle partial+final pair (e.g. tp1 +
+                            # trail_stop) shared opened/closed to the second,
+                            # so ON CONFLICT silently overwrote one leg — CSV
+                            # and DB totals diverged, DB (missing a leg) wins
+                            # after a redeploy.
+                            trade_id=f"{row[3]}:{row[4]}:{row[1]}:{row[2]}:{row[11]}",
                             pnl_abs=float(row[10]),
                             pnl_pct=float(row[9]) / 100.0,
                             pair=row[5], opened_at=row[1], closed_at=row[2],

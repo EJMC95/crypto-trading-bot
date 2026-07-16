@@ -160,6 +160,11 @@ def main():
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
     args = p.parse_args()
 
+    # [2026-07-16 AUDIT] a lost Railway VENUE var silently booted hl_paper:
+    # unsuffixed row id (the -lshadow row went stale) + HL reference data
+    # under a Lighter-named bot (dev≈0 forever). The sniper already guards
+    # itself this way; this bot is Lighter-shadow by definition.
+    os.environ.setdefault("VENUE", "lighter_shadow")
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=False)
     # [v1 GATE] UNVALIDATED — the census + shadow ledger must earn a separate,
