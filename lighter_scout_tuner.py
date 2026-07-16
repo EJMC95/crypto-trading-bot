@@ -190,15 +190,12 @@ def next_notches(ladder, current):
 
 
 def vetoed_lenses(lens_fwd):
-    """The taker's own veto rule — the tuner never widens what the brain
-    has ruled negative at the floor."""
-    out = set()
-    for lens, o in (lens_fwd or {}).items():
-        if ((o.get("n4h") or 0) >= LENS_FLOOR
-                and (o.get("avg4h_pct") or 0) < 0
-                and (o.get("hit4h") or 0) < 0.5):
-            out.add(lens)
-    return out
+    """The taker's own veto rule — the tuner never widens what the brain has
+    ruled negative at the floor. [2026-07-17] Delegates to the taker, which
+    now owns the single definition: this was a hand-copy of the taker's inline
+    rule, and a third copy was about to land in the incubator. Same behaviour
+    (LENS_FLOOR is the same TT_LENS_VETO_MIN_N env the taker reads)."""
+    return tt.vetoed_lenses(lens_fwd, min_n=LENS_FLOOR)
 
 
 def desired_taker_bars(tape, baseline, lens_fwd, helping=None):

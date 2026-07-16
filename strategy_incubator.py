@@ -122,6 +122,11 @@ TAKER_GENES = {
 # The gene whose alleles the TAPE must be long enough to exercise (see
 # reachable_genes) — a hold >= the span never fires.
 HOLD_GENE = "MAX_HOLD_H"
+# lens -> the ENTRY gene that acts on that lens ALONE. The exit genes
+# (TAKE_PROFIT/STOP_LOSS/MAX_HOLD_H) are pleiotropic — exit_reason() is
+# lens-blind, so one allele acts on every lens at once — and are never dropped.
+LENS_GENE = {"breakout": "BRK_RANGE", "dip": "DIP_RANGE",
+             "momentum": "MOMO_CHG", "divergence": "DIV_GAP_PP"}
 # FUNDING genes (live-reachable, judge-gated): allele grids within xp bounds.
 FUNDING_GENES = {
     "enter_apr": ("xp.funding.enter_apr", [0.30, 0.40, 0.50]),
@@ -157,9 +162,56 @@ def t90(df):
     return _T90[df - 1] if df <= len(_T90) else bs.Z80
 
 
-def _marked(rep):
+def live_lenses(lens_fwd):
+    """The lenses the LIVE taker is currently ALLOWED to fill (2026-07-17).
+
+    The replay is deliberately veto-blind — "external bus state isn't in this
+    tape" — which is right for a pure harness and which each CONSUMER is then
+    expected to correct for. The tuner does (it never widens a brain-vetoed
+    lens). The incubator did NOT, and it was breeding a fiction: measured
+    16-Jul, the brain grades breakout (n=2241, avg4h -0.184%, hit 40.5%), dip
+    (n=2110, -0.438%, 42.6%) and momentum (n=1178, -0.233%, 41.0%) negative at
+    sample size, so the live taker vetoes all three and only DIVERGENCE
+    (n=2463, +0.041%, 55.2%) can fill. Ten of the tape's eleven closes came
+    from lenses the live bot refuses to trade.
+
+    Fail-safe OPEN, matching the taker's own documented direction: no grades =
+    nothing vetoed. Freshness is the caller's job (see fresh_lens_fwd)."""
+    return set(LENS_GENE) - tt.vetoed_lenses(lens_fwd)
+
+
+def fresh_lens_fwd(state, now):
+    """The brain's lens grades if they are FRESH, else {} (which vetoes
+    nothing). Mirrors the tuner's lf_fresh check. Pure — selftested."""
+    try:
+        u = datetime.fromisoformat(str((state or {}).get("updated"))
+                                   .replace("Z", "+00:00"))
+        if u.tzinfo is None:
+            u = u.replace(tzinfo=timezone.utc)
+        if (now - u.timestamp()) <= float((state or {}).get("ttl_sec") or 0):
+            return (state or {}).get("lenses") or {}
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return {}
+
+
+def evolvable_genes(genes, allowed):
+    """Drop the ENTRY gene of any lens the taker is vetoing: its allele cannot
+    move a single live fill, so breeding it is search over a bot that does not
+    exist. Restrict-only; pleiotropic exit genes are always kept. Returns
+    (genes, dropped)."""
+    out, dropped = dict(genes), []
+    for lens, gene in LENS_GENE.items():
+        if lens not in allowed and gene in out:
+            del out[gene]
+            dropped.append(gene)
+    return out, sorted(dropped)
+
+
+def _marked(rep, lenses=None):
     """[2026-07-17 IMB-10 parity — mirrors lighter_scout_tuner._marked]
-    closed_net + end-of-tape unrealized.
+    closed_net + end-of-tape unrealized, optionally restricted to `lenses`
+    (the ones the live taker may actually fill — see live_lenses).
 
     closed_net ALONE is blind to DEFERRAL: a genotype 'wins' by pushing losses
     past the tape's end, where open positions are valued at entry and invisible
@@ -169,14 +221,23 @@ def _marked(rep):
     tape shows ZERO hold-exits and 10-of-11 closes are stop-losses, so "never
     close anything" was the strongest gradient in the landscape — and the
     MAX_HOLD grid offered 48h/72h alleles on a 42.7h tape to express it with."""
-    return float(rep["closed_net"]) + float(rep.get("unrealized") or 0.0)
+    if lenses is None:
+        return float(rep["closed_net"]) + float(rep.get("unrealized") or 0.0)
+    net = sum(float(s.get("net") or 0.0)
+              for l, s in (rep.get("lenses") or {}).items() if l in lenses)
+    upnl = sum(float(o.get("upnl") or 0.0)
+               for o in (rep.get("open") or []) if o.get("lens") in lenses)
+    return net + upnl
 
 
-def _pnl_usd(rep):
-    """Every closed trade's net $ across all lenses (replay field, 17-Jul)."""
+def _pnl_usd(rep, lenses=None):
+    """Every closed trade's net $ (replay field, 17-Jul), optionally only for
+    the lenses the live taker may fill — a vetoed lens's fills are evidence
+    about a bot that does not exist and must not enter the fitness."""
     out = []
-    for s in (rep.get("lenses") or {}).values():
-        out.extend(s.get("pnl_usd") or [])
+    for l, s in (rep.get("lenses") or {}).items():
+        if lenses is None or l in lenses:
+            out.extend(s.get("pnl_usd") or [])
     return out
 
 
@@ -242,6 +303,26 @@ def dedupe(pop):
     return out
 
 
+def conform(genotypes, genes):
+    """Project stored genotypes onto the CURRENT gene set (2026-07-17).
+
+    The gene set is now DYNAMIC — alleles are dropped when the tape cannot
+    exercise them (reachable_genes), the entry gene of a brain-vetoed lens is
+    dropped (evolvable_genes), and DIV_GAP_PP was added — so a genotype
+    carried forward in prior['elite'] can disagree with `genes` in BOTH
+    directions. breed() indexes a[g] for every g in genes, so one stale elite
+    entry would KeyError the whole organ on its next cycle: the currently
+    published elite were bred before the divergence gene existed. Missing
+    genes take the module default; unknown genes are dropped. An off-grid
+    allele survives (breed's mutation no-ops on it; genotype_to_levers clamps
+    it), because a value the operator is really running is not invalid."""
+    out = []
+    for gt in genotypes or []:
+        if isinstance(gt, dict):
+            out.append({g: gt.get(g, getattr(tt, g)) for g in genes})
+    return dedupe(out)
+
+
 def breed(elite, genes):
     """Next generation from the elite: CROSSOVER (gene-wise pairing of the
     top two) + MUTATION (each elite genome, each gene stepped to its adjacent
@@ -284,32 +365,33 @@ def genotype_to_levers(genotype, genes):
 # fitness (taker: replay over the tape)
 # ---------------------------------------------------------------------------
 
-def evaluate(genotype, tape):
+def evaluate(genotype, tape, lenses=None):
     """Fitness of a TAKER genotype = replayed MARKED net over the tape (see
     _marked), with a both-halves-positive flag (an offspring that only wins
     one lucky half is not fit), the closed-trade COUNT (the real evidence
-    unit) and a lower confidence bound. Patches tt bars, always restores."""
+    unit) and a lower confidence bound. `lenses` restricts the score to the
+    lenses the live taker may actually fill. Patches tt bars, restores."""
     saved = {g: getattr(tt, g) for g in genotype}
     try:
         for g, v in genotype.items():
             setattr(tt, g, v)
         full = rp.replay(tape)
         mid = len(tape) // 2
-        h1 = _marked(rp.replay(tape[:mid])) if mid else 0.0
-        h2 = _marked(rp.replay(tape[mid:])) if mid else 0.0
+        h1 = _marked(rp.replay(tape[:mid]), lenses) if mid else 0.0
+        h2 = _marked(rp.replay(tape[mid:]), lenses) if mid else 0.0
     finally:
         for g, v in saved.items():
             setattr(tt, g, v)
-    pnl = _pnl_usd(full)
-    return {"net": round(_marked(full), 3), "h1": round(h1, 3),
+    pnl = _pnl_usd(full, lenses)
+    return {"net": round(_marked(full, lenses), 3), "h1": round(h1, 3),
             "h2": round(h2, 3), "closes": len(pnl),
             "lcb": round(net_lcb(pnl), 3),
             # both-halves POSITIVE-BY-MARGIN — a +$0.01 half is noise, not edge
             "both_halves_pos": h1 >= HALF_MARGIN and h2 >= HALF_MARGIN}
 
 
-def rank(population, tape):
-    scored = [{"genotype": gt, **evaluate(gt, tape)} for gt in population]
+def rank(population, tape, lenses=None):
+    scored = [{"genotype": gt, **evaluate(gt, tape, lenses)} for gt in population]
     # [2026-07-17] fittest = highest LOWER BOUND, not the highest point
     # estimate. Ranking a population by its max point estimate IS the winner's
     # curse this file's header warns about; net only breaks ties between
@@ -430,6 +512,7 @@ def run_once():
 
     # --- TAKER breeding (shadow-only, replay-scored) -----------------------
     leaderboard, champion = [], None
+    scored_lenses = set(LENS_GENE)      # fail-safe open: veto nothing
     if len(tape) >= MIN_SNAPS:
         tape_hours = ((tape[-1][0] - tape[0][0]).total_seconds() / 3600.0
                       if len(tape) >= 2 else 0.0)
@@ -440,9 +523,22 @@ def run_once():
             print(f"[incubator] max-hold alleles {dropped} excluded — tape "
                   f"spans {tape_hours:.0f}h; an unreachable hold never fires "
                   f"(deferral, not edge)", flush=True)
-        prior_elite = [e["genotype"] for e in (prior.get("elite") or [])]
+        # [2026-07-17] Honor the brain's LENS VETO, as the tuner already does.
+        # The replay is veto-blind by design, so without this the fitness is
+        # dominated by fills the live taker refuses to make.
+        lens_fwd = fresh_lens_fwd(store.load_state("brain-lens-forward"), now)
+        allowed = scored_lenses = live_lenses(lens_fwd)
+        genes, gene_dropped = evolvable_genes(genes, allowed)
+        if gene_dropped:
+            print(f"[incubator] lens veto — brain grades "
+                  f"{sorted(set(LENS_GENE) - allowed)} negative at sample "
+                  f"size; genes {gene_dropped} dropped and their fills "
+                  f"excluded from fitness (breeding a vetoed lens optimizes a "
+                  f"bot that does not exist)", flush=True)
+        prior_elite = conform([e.get("genotype") for e in
+                               (prior.get("elite") or [])], genes)
         population = dedupe(seed_population(genes) + breed(prior_elite, genes))
-        scored = rank(population, tape)
+        scored = rank(population, tape, allowed)
         # [2026-07-17] GAMETES (who breeds) and the CHAMPION (what we would
         # trust) are now separate questions. The elite are robustness-filtered
         # so noise cannot reproduce; the fittest genotype is still assessed and
@@ -502,6 +598,10 @@ def run_once():
         "updated": _iso(now), "ttl_sec": TTL_SEC,
         "tape_snaps": len(tape), "tape_source": used,
         "elite": leaderboard, "champion": champion,
+        # [2026-07-17] what the fitness was actually scored on — a champion
+        # means nothing without the lens set the live taker could fill.
+        "lenses_scored": sorted(scored_lenses),
+        "lenses_vetoed": sorted(set(LENS_GENE) - scored_lenses),
         "proposed": (prior.get("proposed") or []) + props,
     }
     payload["proposed"] = payload["proposed"][-20:]
@@ -578,6 +678,60 @@ def _selftest():
     assert any("take_profit" in p["name"] for p in ph), ph
     assert funding_proposals({}, {}, hurting=set()) == funding_proposals({}, {})
     assert funding_proposals({}, {}, hurting=None) == funding_proposals({}, {})
+    # [2026-07-17] LENS VETO: the incubator must not breed a lens the live
+    # taker refuses to fill. These are the REAL 16-Jul grades.
+    real_lf = {"breakout": {"n4h": 2241, "avg4h_pct": -0.184, "hit4h": 0.405},
+               "dip": {"n4h": 2110, "avg4h_pct": -0.438, "hit4h": 0.426},
+               "momentum": {"n4h": 1178, "avg4h_pct": -0.233, "hit4h": 0.410},
+               "divergence": {"n4h": 2463, "avg4h_pct": 0.041, "hit4h": 0.552}}
+    assert live_lenses(real_lf) == {"divergence"}, live_lenses(real_lf)
+    assert live_lenses({}) == set(LENS_GENE), "no grades -> fail-safe OPEN"
+    assert live_lenses(None) == set(LENS_GENE)
+    # a negative lens UNDER the floor is not vetoed (evidence, not opinion)
+    assert "dip" in live_lenses({"dip": {"n4h": 5, "avg4h_pct": -9.0,
+                                         "hit4h": 0.0}})
+    # only the vetoed lens's ENTRY gene is dropped; pleiotropic exits stay
+    ev, evd = evolvable_genes(TAKER_GENES, {"divergence"})
+    assert evd == ["BRK_RANGE", "DIP_RANGE", "MOMO_CHG"], evd
+    assert "DIV_GAP_PP" in ev and "TAKE_PROFIT" in ev and "MAX_HOLD_H" in ev
+    assert evolvable_genes(TAKER_GENES, set(LENS_GENE))[1] == [], "none vetoed"
+    # fitness restricted to the allowed lenses only
+    rep = {"closed_net": 10.0, "unrealized": 1.0,
+           "lenses": {"dip": {"net": 8.0, "pnl_usd": [8.0]},
+                      "divergence": {"net": 2.0, "pnl_usd": [1.0, 1.0]}},
+           "open": [{"lens": "dip", "upnl": 5.0},
+                    {"lens": "divergence", "upnl": -4.0}]}
+    assert _marked(rep) == 11.0                       # unrestricted
+    assert _marked(rep, {"divergence"}) == -2.0       # 2.0 net + (-4.0) upnl
+    assert _pnl_usd(rep) == [8.0, 1.0, 1.0] or _pnl_usd(rep) == [1.0, 1.0, 8.0]
+    assert _pnl_usd(rep, {"divergence"}) == [1.0, 1.0]
+    assert _pnl_usd(rep, set()) == []
+
+    # fresh_lens_fwd: stale/absent/unparseable grades veto nothing
+    fresh = {"updated": _iso(1000.0), "ttl_sec": 600, "lenses": real_lf}
+    assert fresh_lens_fwd(fresh, 1300.0) == real_lf          # inside ttl
+    assert fresh_lens_fwd(fresh, 2000.0) == {}               # aged out
+    assert fresh_lens_fwd({"updated": "garbage", "lenses": real_lf}, 1.0) == {}
+    assert fresh_lens_fwd(None, 1.0) == {} and fresh_lens_fwd({}, 1.0) == {}
+
+    # conform: a stale elite from an OLDER gene set must not KeyError breed().
+    # This is the real upgrade path — the published elite predate DIV_GAP_PP.
+    old_elite = [{"BRK_RANGE": 0.93, "DIP_RANGE": 0.05, "MOMO_CHG": 5.0,
+                  "TAKE_PROFIT": 0.04, "STOP_LOSS": -0.03, "MAX_HOLD_H": 48.0}]
+    conformed = conform(old_elite, TAKER_GENES)
+    assert set(conformed[0]) == set(TAKER_GENES), conformed
+    assert conformed[0]["DIV_GAP_PP"] == tt.DIV_GAP_PP, "missing -> default"
+    breed(conformed, TAKER_GENES)                    # must not raise
+    # extra/unknown genes are dropped; junk entries ignored; off-grid survives
+    narrow, _ = evolvable_genes(TAKER_GENES, {"divergence"})
+    c2 = conform(old_elite, narrow)
+    assert "BRK_RANGE" not in c2[0] and "DIV_GAP_PP" in c2[0], c2
+    breed(c2, narrow)                                # must not raise
+    assert conform([None, "nope", 42], TAKER_GENES) == []
+    assert conform(None, TAKER_GENES) == []
+    held = conform([{"MAX_HOLD_H": 72.0}], reachable_genes(TAKER_GENES, 43.0)[0])
+    assert held[0]["MAX_HOLD_H"] == 72.0, "off-grid allele in force is kept"
+
     # [2026-07-17] IMB-10: unreachable max-hold alleles dropped, and only those
     g2, dropped = reachable_genes(TAKER_GENES, 43.0)
     assert dropped == [48.0, 72.0], dropped

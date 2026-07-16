@@ -174,6 +174,29 @@ def vol_clip(day_range_pct):
     return round(min(CLIP_MAX, max(CLIP_MIN, RISK_USD / adverse)), 2)
 
 
+def vetoed_lenses(lens_fwd, min_n=None):
+    """THE lens veto rule, and the single authority for it (2026-07-17): a
+    lens the brain grades negative at sample size stops getting fills.
+
+    Extracted from this module's own loop so the rule has ONE definition. It
+    had two — the loop below and lighter_scout_tuner.vetoed_lenses — and a
+    third was about to appear in strategy_incubator, which breeds the very
+    bars this veto decides are worthless. Consumers must not drift on the
+    question "is this lens allowed to trade?".
+
+    RESTRICT-ONLY and fail-safe open: an empty/missing grade set vetoes
+    nothing (freshness is the CALLER's job — see the loop and the tuner)."""
+    if min_n is None:
+        min_n = int(os.environ.get("TT_LENS_VETO_MIN_N", "75"))
+    out = set()
+    for lens, o in (lens_fwd or {}).items():
+        if ((o.get("n4h") or 0) >= min_n
+                and (o.get("avg4h_pct") or 0) < 0
+                and (o.get("hit4h") or 0) < 0.5):
+            out.add(lens)
+    return out
+
+
 def incredible(tickets):
     """The high-conviction subset of the scout's tickets, per lens."""
     out = []
@@ -369,12 +392,7 @@ def main():
         lf = store.load_state("brain-lens-forward") or {}
         lf_age = (t_now - parse_ts(lf.get("updated"))).total_seconds()
         if lf_age <= float(lf.get("ttl_sec") or 26000):
-            min_n = int(os.environ.get("TT_LENS_VETO_MIN_N", "75"))
-            for _lens, o in (lf.get("lenses") or {}).items():
-                if ((o.get("n4h") or 0) >= min_n
-                        and (o.get("avg4h_pct") or 0) < 0
-                        and (o.get("hit4h") or 0) < 0.5):
-                    lens_vetoed.add(_lens)
+            lens_vetoed = vetoed_lenses(lf.get("lenses"))
     except (ValueError, TypeError):
         lens_vetoed = set()
     if lens_vetoed:
