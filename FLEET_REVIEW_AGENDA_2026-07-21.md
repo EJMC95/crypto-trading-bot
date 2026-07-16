@@ -23,6 +23,11 @@ cadence. Still ADVISORY / publish-first per doctrine — no consumer wired.
 **Grade before wiring:** pull `fleet-clock` history — did the NYSE
 open/close transitions land at the right instants (DST honest, no holiday
 misses), and does `event_window` sample honestly at the 5-min cadence?
+- *Pre-graded 17-Jul (first full session, PASS so far):* 16-Jul NYSE open
+  logged **13:31:12Z** (true 13:30Z EDT ✓), close logged **20:01:29Z**
+  (true 20:00Z ✓) — both within one 5-min tick; DST-honest; history is
+  transitions-only as designed. Only ONE full session observed — re-check
+  the 17/18-Jul sessions + the weekend gap at the review before wiring.
 
 ## 12. Proprioception 🦾: grade the grader's first week (added 16-Jul)
 
@@ -213,12 +218,33 @@ IMB-05, -09, -11, -19, -21, -25, -26, -27), 4 contested-low-confidence
 - **IMB-06/-07 (survive 2/3)** judge keep-bar degrades with age
   (cumulative-mean fade check) and candidate flow self-exhausts
   (lifetime done-list over a finite universe).
-- **IMB-08 (survives)** hurting verdicts heal only by amnesia — now the
-  SOLE heal path post-IMB-01-fix; needs the probation re-assert design.
-- **IMB-17** live Funding Farmer counted INTO the L2 long budget but never
-  reads fleet-risk (enforce or exempt-and-document).
-- **IMB-12 (verified 3/3)** gapscout.extra_exchanges hot-add never reverts
-  in-process — the one growth-rail lever whose TTL promise is unreachable.
-- Also surviving 2/3: IMB-10 (tuner gates blind to unrealized), IMB-20
-  (registry coverage asymmetries), IMB-22/-23/-24 (judge per-half floors,
-  incubator hard-coded base, lens-veto floor diversity).
+- **17-Jul UPDATE — the verified-real list is now SHIPPED** (IMB-02, -03,
+  -04, -06, -07, -10, -12, -17, -22, -23 in commit e657fd6 after a second
+  21-refuter verify pass caught+repaired two defects in the tranche
+  itself; IMB-08 shipped separately — see below). Still genuinely OPEN
+  for this review:
+- **IMB-08 — SHIPPED 17-Jul** (upgraded from calibration item to DEADLOCK:
+  post-IMB-01 a reverted lever generates no episodes, so a hurting verdict
+  could never heal on honest evidence — permanent freeze). Fix: verdict
+  EVIDENCE EXPIRY (`PROP_HURT_PROBATION_D` 7d) — a non-neutral verdict
+  whose newest episode is older decays to neutral+probation; the author
+  probes once, fresh episodes re-grade, still-bad re-freezes within ~1
+  day. Symmetric (helping expires too). Grade the first probation cycle.
+- **IMB-20 (2/3, doctrine lens dissents)** registry coverage asymmetries —
+  a divergence-lens emission lever etc.; adding an expand lever needs this
+  review's sanction, not a session's.
+- **IMB-24 (2/3)** lens-veto n4h floor counts serially-correlated raw
+  emissions — adopt the brain v3 episode fields (eps4h/n_syms) in the
+  taker veto + tuner floor; explicitly gated on this review validating
+  those fields (replay-gated migration).
+- **G1 amendment (review-item, not blocker):** the dd-governor's <=6h
+  post-reset abstain window returns scale 1.0 — decide whether it should
+  HOLD a prior <1.0 clip (blind-hold pattern) instead; shadow-clip lane
+  only.
+- Contested (refuter lenses split — re-argue or drop): IMB-16 (governor
+  consumers ignore FLEET_RISK_MODE=advisory; at minimum fix the header
+  claim), IMB-18 (tuner brain-veto fails open on stale brain while expand
+  runs), IMB-28 (immune sickness detection-without-action), IMB-29
+  (bot_learn twin-anchor mismatches + silent v2 fallback).
+- REFUTED — do not build (recorded per-finding in the audit doc):
+  IMB-05, -09, -11, -19, -21, -25, -26, -27.

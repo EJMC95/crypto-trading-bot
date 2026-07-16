@@ -114,6 +114,19 @@ SLICE_H = float(os.environ.get("PROP_SLICE_H", "24"))        # long-stance cut
 VERDICT_WINDOW = int(os.environ.get("PROP_VERDICT_WINDOW", "10"))
 MIN_EPISODES = int(os.environ.get("PROP_MIN_EPISODES", "2"))
 HURT_USD = float(os.environ.get("PROP_HURT_USD", "3.0"))
+# [2026-07-17 IMB-08] verdict EVIDENCE EXPIRY — the missing heal path. The
+# IMB-01 fix (observed_active) correctly stops a reverted lever generating
+# episodes, but verdicts recompute from the stored ledger, so a HURTING
+# verdict could never clear on honest evidence again: first hurting = a
+# PERMANENT freeze (the old "heal" was the contaminated default-arm
+# episodes we removed). Now any non-neutral verdict whose NEWEST
+# contributing episode is older than this window decays to neutral
+# (evidence too stale to steer). For hurting that is a bounded PROBATION:
+# the author may re-assert once, fresh episodes re-grade it, and a
+# still-bad lever re-freezes within an episode (~1 day). For helping it is
+# plain staleness fail-safe: an expand unlock must not ride week-old
+# evidence. Symmetric, and both directions decay toward NEUTRAL.
+HURT_PROBATION_SEC = float(os.environ.get("PROP_HURT_PROBATION_D", "7")) * 86400
 HELP_USD = float(os.environ.get("PROP_HELP_USD", "3.0"))
 GRADES_MIN = int(os.environ.get("PROP_GRADES_MIN", "10"))
 # live-lane grading floors (16-Jul evening, operator: "the live lane needs
@@ -409,14 +422,21 @@ def grade_episode(ep, feeds):
 # pure: per-lever verdicts (selftested offline)
 # ---------------------------------------------------------------------------
 
-def lever_verdicts(episodes):
+def lever_verdicts(episodes, now=None):
     """{lever: {verdict, n, ...}} over the newest VERDICT_WINDOW graded
     episodes per lever. HURTING exists on the two lanes with a real paired
     measure: taker (the $ replay counterfactual) and live (per-trade vs
     pre-window + shadow twin — 16-Jul evening, 'the live lane needs to
     learn'). Joint stances share blame — conservative in the restrict
     direction. Diet/detection levers can only help or sit neutral; xp never
-    verdicts here (the judge's paired arms own it)."""
+    verdicts here (the judge's paired arms own it).
+    [2026-07-17 IMB-08] pass `now` to apply EVIDENCE EXPIRY: a non-neutral
+    verdict whose newest contributing episode is older than
+    HURT_PROBATION_SEC decays to neutral (probation flag kept for display)
+    — every consumer hook (tuner skip, get_lever live revert, board
+    release/top-step gate, judge prop_fade) keys on the verdict string, so
+    the probe re-arms everywhere at once. now=None skips expiry (offline
+    analysis of a historical ledger)."""
     per = {}
     for ep in episodes or []:
         if ep.get("status") != "graded":
@@ -461,6 +481,17 @@ def lever_verdicts(episodes):
                 v = "helping"
             out[lever] = {"verdict": v, "n": n, "good": goods, "bad": bads,
                           "basis": "live-paired"}
+        # [2026-07-17 IMB-08] evidence expiry (see module constant): stale
+        # evidence steers nothing, in EITHER direction. Verdict fields are
+        # kept so the dashboard still shows what the evidence said.
+        if now is not None and out.get(lever, {}).get("verdict") in (
+                "hurting", "helping"):
+            newest = max((float(e.get("end") or 0) for e in eps), default=0.0)
+            if newest and (now - newest) >= HURT_PROBATION_SEC:
+                out[lever]["expired_verdict"] = out[lever]["verdict"]
+                out[lever]["verdict"] = "neutral"
+                out[lever]["probation"] = True
+                out[lever]["evidence_age_d"] = round((now - newest) / 86400, 1)
     return out
 
 
@@ -564,7 +595,7 @@ def run_once():
                 sm["quiet_hours"] = census.get("quiet_hours")
             cur["start_metrics"] = sm
 
-    verdicts = lever_verdicts(episodes)
+    verdicts = lever_verdicts(episodes, now)
     prior_hurt = set(hurting_levers(prior, _parse_ts(prior.get("updated")) or 0,
                                     fallback_ttl=10**12))
     now_hurt = {k for k, v in verdicts.items() if v.get("verdict") == "hurting"}
@@ -809,6 +840,39 @@ def _selftest():
                             "levers": ["xp.funding.enter_apr"]}]) == {}
     # non-graded episodes contribute nothing
     assert lever_verdicts([dict(tk_ep(-9), status="too-short")]) == {}
+
+    # [2026-07-17 IMB-08] EVIDENCE EXPIRY / probation: post-IMB-01 a reverted
+    # lever generates no new episodes, so without expiry a hurting verdict
+    # could NEVER heal on honest evidence (permanent freeze). A verdict whose
+    # newest episode is older than HURT_PROBATION_SEC decays to neutral
+    # (probation flag kept) — the author probes once, fresh episodes
+    # re-grade. Fresh evidence keeps its verdict; helping expires the same
+    # way (an expand unlock must not ride week-old evidence); now=None
+    # (offline analysis) applies no expiry.
+    _tnow = 1_800_000_000.0
+    _old = _tnow - HURT_PROBATION_SEC - 3600
+    _fr = _tnow - 3600
+    vex = lever_verdicts([dict(lv_ep("bad"), end=_old),
+                          dict(lv_ep("bad"), end=_old)], _tnow)
+    assert vex["live.clip_scale"]["verdict"] == "neutral" \
+        and vex["live.clip_scale"]["probation"] is True \
+        and vex["live.clip_scale"]["expired_verdict"] == "hurting", vex
+    vfr = lever_verdicts([dict(lv_ep("bad"), end=_old),
+                          dict(lv_ep("bad"), end=_fr)], _tnow)
+    assert vfr["live.clip_scale"]["verdict"] == "hurting", \
+        "one fresh episode keeps the verdict alive"
+    vhe = lever_verdicts([dict(lv_ep("good"), end=_old),
+                          dict(lv_ep("good"), end=_old)], _tnow)
+    assert vhe["live.clip_scale"]["verdict"] == "neutral" \
+        and vhe["live.clip_scale"]["expired_verdict"] == "helping", vhe
+    vtk = lever_verdicts([dict(tk_ep(-5.0), end=_old),
+                          dict(tk_ep(-5.0), end=_old)], _tnow)
+    assert vtk["taker.dip_range"]["verdict"] == "neutral" \
+        and vtk["taker.dip_range"]["probation"] is True, vtk
+    assert lever_verdicts([dict(lv_ep("bad"), end=_old),
+                           dict(lv_ep("bad"), end=_old)]
+                          )["live.clip_scale"]["verdict"] == "hurting", \
+        "now=None (offline) applies no expiry"
 
     # the consumer hooks: fresh verdicts surface on their own side ONLY;
     # stale/absent restricts nothing AND earns nothing (symmetry)
