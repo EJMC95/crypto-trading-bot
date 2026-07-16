@@ -1,6 +1,6 @@
 {
  "round": 20,
- "built_at": "2026-07-16T07:20:21+00:00",
+ "built_at": "2026-07-16T07:44:29+00:00",
  "games": [
   {
    "home": "Penrith Panthers",
@@ -149,13 +149,7 @@
    "away": "Wests Tigers",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 10,
-    "wind_kmh": 7.3,
-    "temp_c": 14.9,
-    "forecast_hour": "2026-07-18T19:00"
-   },
+   "weather": null,
    "weather_try_mult": 1.0,
    "baseline_total": 46.8,
    "adjusted_total": 46.8,
@@ -172,16 +166,10 @@
    "away": "Manly-Warringah Sea Eagles",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": {
-    "precip_mm": 1.1,
-    "precip_prob": 63,
-    "wind_kmh": 30.8,
-    "temp_c": 18.2,
-    "forecast_hour": "2026-07-19T14:00"
-   },
-   "weather_try_mult": 0.958,
+   "weather": null,
+   "weather_try_mult": 1.0,
    "baseline_total": 47.3,
-   "adjusted_total": 45.3,
+   "adjusted_total": 47.3,
    "flags": [
     {
      "severity": "warn",
@@ -195,11 +183,6 @@
     },
     {
      "severity": "info",
-     "kind": "weather",
-     "text": "63% rain / 1.1mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
-    },
-    {
-     "severity": "info",
      "kind": "news",
      "text": "Gold Coast Titans news: Titans v Eels: Murphy sticks solid; Cherrington sidelined - NRL.com"
     }
@@ -210,7 +193,13 @@
    "away": "North Queensland Cowboys",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": null,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 53,
+    "wind_kmh": 18.8,
+    "temp_c": 19.5,
+    "forecast_hour": "2026-07-19T16:00"
+   },
    "weather_try_mult": 1.0,
    "baseline_total": 50.2,
    "adjusted_total": 50.2,

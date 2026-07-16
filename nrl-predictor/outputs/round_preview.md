@@ -8,7 +8,7 @@ _Blend = Elo+Poisson logistic stack (validated 2015–2025: Brier 0.2188 vs mark
 | Cronulla-Sutherland Sharks v Newcastle Knights | Fri 17 Jul 18:00 | 70.8% | 68.7% | +4.0 | 49 | Cronulla-Sutherland Sharks (71%, strong) |
 | Sydney Roosters v Melbourne Storm | Fri 17 Jul 20:00 | 65.0% | 74.8% | +2.0 | 48 | Sydney Roosters (65%, lean) |
 | Canberra Raiders v South Sydney Rabbitohs | Sat 18 Jul 15:00 | 54.0% | 48.9% | -0.3 | 47 | Canberra Raiders (54%, coin flip) |
-| New Zealand Warriors v St George Illawarra Dragons | Sat 18 Jul 17:35 | 83.2% | 81.5% | +7.2 | 47 | New Zealand Warriors (83%, strong) |
+| New Zealand Warriors v St George Illawarra Dragons | Sat 18 Jul 17:30 | 83.2% | 81.5% | +7.2 | 47 | New Zealand Warriors (83%, strong) |
 | Canterbury-Bankstown Bulldogs v Wests Tigers | Sat 18 Jul 19:35 | 63.3% | 64.2% | +2.3 | 47 | Canterbury-Bankstown Bulldogs (63%, lean) |
 | Gold Coast Titans v Manly-Warringah Sea Eagles | Sun 19 Jul 14:00 | 30.3% | 39.6% | -2.7 | 47 | Manly-Warringah Sea Eagles (70%, lean) |
 | Dolphins v North Queensland Cowboys | Sun 19 Jul 16:05 | 66.6% | 58.8% | +4.1 | 50 | Dolphins (67%, lean) |

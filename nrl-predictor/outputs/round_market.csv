@@ -1,9 +1,9 @@
-round,date,home,away,p_home_blend,market_p_home,edge_home,books,best_odds_home,best_odds_away,value_side,value_ev_pct
-Round 20,2026-07-16 19:50:00,Penrith Panthers,Brisbane Broncos,0.8073,0.777,0.0303,4,1.23,4.4,Penrith Panthers,-0.7021
-Round 20,2026-07-17 18:00:00,Cronulla-Sutherland Sharks,Newcastle Knights,0.708,0.6866,0.0214,4,1.4,3.1,Cronulla-Sutherland Sharks,-0.88
-Round 20,2026-07-17 20:00:00,Sydney Roosters,Melbourne Storm,0.6501,0.7483,-0.0982,4,1.28,3.85,Melbourne Storm,34.7115
-Round 20,2026-07-18 15:00:00,Canberra Raiders,South Sydney Rabbitohs,0.5399,0.4895,0.0504,4,1.95,1.9,Canberra Raiders,5.2805
-Round 20,2026-07-18 17:35:00,New Zealand Warriors,St George Illawarra Dragons,0.832,0.8154,0.0166,4,1.18,5.25,New Zealand Warriors,-1.824
-Round 20,2026-07-18 19:35:00,Canterbury-Bankstown Bulldogs,Wests Tigers,0.6334,0.6416,-0.0082,4,1.48,2.65,Wests Tigers,-2.851
-Round 20,2026-07-19 14:00:00,Gold Coast Titans,Manly-Warringah Sea Eagles,0.3035,0.3955,-0.092,4,2.48,1.57,Manly-Warringah Sea Eagles,9.3505
-Round 20,2026-07-19 16:05:00,Dolphins,North Queensland Cowboys,0.666,0.5882,0.0778,4,1.62,2.4,Dolphins,7.892
+round,date,home,away,p_home_blend,market_p_home,edge_home,books,best_odds_home,best_odds_away,disp_home,disp_away,value_side,value_ev_pct
+Round 20,2026-07-16 19:50:00,Penrith Panthers,Brisbane Broncos,0.8073,0.777,0.0303,4,1.23,4.4,0.0082,0.0353,Penrith Panthers,-0.7021
+Round 20,2026-07-17 18:00:00,Cronulla-Sutherland Sharks,Newcastle Knights,0.708,0.6866,0.0214,4,1.4,3.1,0.0145,0.0248,Cronulla-Sutherland Sharks,-0.88
+Round 20,2026-07-17 20:00:00,Sydney Roosters,Melbourne Storm,0.6501,0.7483,-0.0982,4,1.28,3.85,0.0079,0.0199,Melbourne Storm,34.7115
+Round 20,2026-07-18 15:00:00,Canberra Raiders,South Sydney Rabbitohs,0.5399,0.4895,0.0504,4,1.95,1.9,0.0052,0.016,Canberra Raiders,5.2805
+Round 20,2026-07-18 17:30:00,New Zealand Warriors,St George Illawarra Dragons,0.832,0.8154,0.0166,4,1.18,5.25,0.0172,0.0244,New Zealand Warriors,-1.824
+Round 20,2026-07-18 19:35:00,Canterbury-Bankstown Bulldogs,Wests Tigers,0.6334,0.6416,-0.0082,4,1.5,2.65,0.0135,0.0,Wests Tigers,-2.851
+Round 20,2026-07-19 14:00:00,Gold Coast Titans,Manly-Warringah Sea Eagles,0.3035,0.3955,-0.092,4,2.48,1.57,0.0333,0.0,Manly-Warringah Sea Eagles,9.3505
+Round 20,2026-07-19 16:05:00,Dolphins,North Queensland Cowboys,0.666,0.5882,0.0778,4,1.62,2.4,0.0062,0.0435,Dolphins,7.892

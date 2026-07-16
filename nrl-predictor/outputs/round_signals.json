@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 20,
- "scanned_at": "2026-07-16T07:19:26+00:00",
+ "scanned_at": "2026-07-16T07:43:28+00:00",
  "games": [
   {
    "home": "Penrith Panthers",
@@ -1338,7 +1338,7 @@
    "away": "St George Illawarra Dragons",
    "home_id": "NZW",
    "away_id": "SGI",
-   "kickoff": "2026-07-18 17:35:00",
+   "kickoff": "2026-07-18 17:30:00",
    "team_lists_confirmed": true,
    "home_17": [
     {
@@ -2001,13 +2001,7 @@
      "status": null
     }
    ],
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 10,
-    "wind_kmh": 7.3,
-    "temp_c": 14.9,
-    "forecast_hour": "2026-07-18T19:00"
-   },
+   "weather": null,
    "news": [],
    "news_home": [],
    "news_away": [
@@ -2339,13 +2333,7 @@
      "status": null
     }
    ],
-   "weather": {
-    "precip_mm": 1.1,
-    "precip_prob": 63,
-    "wind_kmh": 30.8,
-    "temp_c": 18.2,
-    "forecast_hour": "2026-07-19T14:00"
-   },
+   "weather": null,
    "news": [],
    "news_home": [
     {
@@ -2677,7 +2665,13 @@
      "status": null
     }
    ],
-   "weather": null,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 53,
+    "wind_kmh": 18.8,
+    "temp_c": 19.5,
+    "forecast_hour": "2026-07-19T16:00"
+   },
    "news": [],
    "news_home": [],
    "news_away": [
