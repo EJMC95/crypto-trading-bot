@@ -369,3 +369,24 @@ money). Grade BOTH sides at the review:
 - Symmetry check: over the week, did the restrict side (hurting-skip)
   and the expand side (helping-earn) fire in sane proportion, or is one
   eye still dominant?
+
+**Live lane learning (wired 16-Jul evening, operator: "the live lane
+needs to learn"):** live episodes now GRADE instead of merely recording —
+per-trade pnl_pct during the episode vs the books' own pre-window AND the
+shadow twins over the same window ('bad' only when worse than EVERY
+available baseline by ≥0.25pp; per-episode floor n≥5 live closes;
+clip_scale and funding bars grade as separate groups so the board's
+movement is never blamed on the judge's). Consumption is restrict-first
+on real money: a HURTING live.clip_scale RELEASES the board's lever and
+blocks every up-step; a HURTING live.funding.* is the judge's EARLIER
+fade signal (prop_fade — the judge remains the only writer); and the one
+live earn: the clip ladder's TOP step (1.5) now requires a measured
+HELPING grade at 1.25, fail-CLOSED (a dark sense caps the ladder at
+1.25). Grade at the review:
+- Did any live episode reach 'graded' (the trend book may be too slow —
+  n≥5 in 24h slices), and were the twin windows honestly matched?
+- Is the 0.25pp margin / n≥5 floor right for the funding bot's cadence?
+- Did the top-step gate ever bind, and would the old aggregate-only
+  ladder have stepped where the measured gate refused?
+- prop_fade vs fade_check: which would have fired first on the week's
+  data, and did either false-positive?

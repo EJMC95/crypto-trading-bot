@@ -355,12 +355,35 @@ LIVE_LADDER = [1.0, 1.25, 1.5]
 LIVE_GAP_FRESH_H = float(os.environ.get("EVBOARD_LIVE_GAP_FRESH_H", "6"))
 
 
+def live_clip_grade(prop_state):
+    """'hurting' | 'helping' | None for live.clip_scale from a FRESH
+    proprioception payload. None on dark/stale/neutral — and the up-ladder
+    treats None as fail-CLOSED for the TOP step (real-money default: no
+    measured evidence, no top step). Pure — selftested offline."""
+    try:
+        if not prop_state or not _fresh(prop_state, max_age_s=float(
+                prop_state.get("ttl_sec") or 2700)):
+            return None
+        v = (prop_state.get("verdicts") or {}).get("live.clip_scale")
+        vd = v.get("verdict") if isinstance(v, dict) else None
+        return vd if vd in ("hurting", "helping") else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
-                    prior_scale, now_ts):
+                    prior_scale, now_ts, clip_grade=None):
     """The live lane's decision. Returns (desired_scale | None, item | None).
     None = assert nothing (the lever expires back to 1.0 on its own).
     prior_scale: {"value", "ts"} from the previous board payload — the
-    up-ladder's cooldown memory. Pure — selftested offline."""
+    up-ladder's cooldown memory.
+    clip_grade (16-Jul evening, operator: "the live lane needs to learn"):
+    proprioception's live.clip_scale verdict. HURTING (scaled episodes
+    measured worse than the pre-window AND the shadow twin) releases the
+    lever and blocks every up-step; the ladder's TOP step additionally
+    REQUIRES a measured HELPING grade at the mid step — fail-CLOSED, so a
+    dark sense caps the ladder at the mid step. Sizing down never needs
+    the grade. Pure — selftested offline."""
     rows = {str(r.get("bot")): r for r in (bot_rows or [])
             if str(r.get("bot")) in LIVE_ROWS}
     if not LIVE_ROWS or len(rows) < len(LIVE_ROWS):
@@ -389,6 +412,25 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
                             for b in hurt])
         return LIVE_DOWN_SCALE, emit(LIVE_DOWN_SCALE, "action", "restrict", why)
 
+    # 🦾 the live lane's own learning: a HURTING clip grade (scaled episodes
+    # measured worse than the pre-window AND the shadow twin) stops the
+    # board asserting ANY scale — the lever expires back to the operator's
+    # env sizing. Not a punishment down-scale: the measured-bad movement
+    # simply stops being repeated until the grade recovers.
+    if clip_grade == "hurting":
+        if (prior_scale or {}).get("value"):
+            return None, {
+                "key": "board:live-clip-scale", "severity": "action",
+                "msg": "💰 LIVE clip lever RELEASED — 🦾 proprioception graded "
+                       "scaled episodes HURTING (worse than pre-window AND "
+                       "shadow twin); reverting to operator env sizing",
+                "proposal": "no re-assert while the verdict holds; the judge "
+                            "and the operator remain the only expand paths "
+                            "for live",
+                "lever": "live.clip_scale", "ts": now_ts, "source": "board",
+                "direction": "restrict"}
+        return None, None
+
     # UP must be earned on every gate at once.
     fr_ok = (_fresh(fleet_risk or {})
              and str(fleet_risk.get("light")) == "green"
@@ -410,10 +452,16 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     nxt = next((v for v in LIVE_LADDER if v > cur + 1e-9), cur)
     if cur > 1.0 and now_ts - since < LIVE_STEP_COOLDOWN_H * 3600:
         nxt = cur                            # hold this step through cooldown
+    # the TOP step must be MEASURED, not just gated: it requires a fresh
+    # HELPING grade at the current step (fail-CLOSED — no grade, no top)
+    if nxt == LIVE_LADDER[-1] and nxt > cur and clip_grade != "helping":
+        nxt = cur
     if nxt <= 1.0:
         return None, None
     why = (f"EARNED: every live row ≥{LIVE_MIN_CLOSED} closes & net positive, "
-           f"fleet green, dd>{LIVE_DD_MIN:.0%}, venue calm ({med}bps)")
+           f"fleet green, dd>{LIVE_DD_MIN:.0%}, venue calm ({med}bps)"
+           + (" · 🦾 measured HELPING at the prior step"
+              if nxt == LIVE_LADDER[-1] and clip_grade == "helping" else ""))
     return nxt, emit(nxt, "action", "expand", why)
 
 
@@ -671,9 +719,11 @@ def run_once():
                          "watch the entry-vs-exit split as fill prices accrue"),
             "lever": "impl-shortfall", "ts": now, "source": "board"})
 
-    # ---- LIVE lane 💰: evidence-gated clip scaling on the real-money bots --
+    # ---- LIVE lane 💰: evidence-gated clip scaling on the real-money bots,
+    # now grade-aware (🦾 hurting releases/blocks; top step needs helping) --
     prior_live = prior.get("live_scale") or {}
-    desired_live, live_item = synthesize_live(bot_rows, fr, lm, fa, prior_live, now)
+    desired_live, live_item = synthesize_live(bot_rows, fr, lm, fa, prior_live,
+                                              now, live_clip_grade(prop_b))
     if live_item:
         synth.append(live_item)
 
@@ -950,12 +1000,43 @@ def _selftest():
     s2, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                             {"value": 1.25, "ts": nowts - 3600}, nowts)
     assert s2 == 1.25, "cooldown must hold the step"
+    # 🦾 the top step must be MEASURED: no grade (dark sense) -> fail-closed
+    # hold at the mid step; a fresh HELPING grade unlocks it
     s3, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                             {"value": 1.25, "ts": nowts - 25 * 3600}, nowts)
-    assert s3 == 1.5, "past cooldown -> next step"
+    assert s3 == 1.25, "no measured HELPING -> top step stays out of reach"
+    s3b, it3b = synthesize_live(live_ok, fresh_fr, calm_lm, [],
+                                {"value": 1.25, "ts": nowts - 25 * 3600},
+                                nowts, clip_grade="helping")
+    assert s3b == 1.5 and "HELPING" in it3b["msg"], (s3b, it3b)
     s4, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
-                            {"value": 1.5, "ts": nowts - 25 * 3600}, nowts)
+                            {"value": 1.5, "ts": nowts - 25 * 3600}, nowts,
+                            clip_grade="helping")
     assert s4 == 1.5, "ladder top is the ceiling"
+    # 🦾 HURTING releases an asserted lever (item, no scale) and silently
+    # blocks a fresh up-start; the DOWN reflex stays senior to the grade
+    sh, ith = synthesize_live(live_ok, fresh_fr, calm_lm, [],
+                              {"value": 1.25, "ts": nowts - 25 * 3600},
+                              nowts, clip_grade="hurting")
+    assert sh is None and ith["direction"] == "restrict" \
+        and "RELEASED" in ith["msg"], (sh, ith)
+    assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
+                           clip_grade="hurting") == (None, None)
+    live_hurt0 = [dict(live_ok[0], pnl_abs=-15.0), live_ok[1]]
+    sh2, ith2 = synthesize_live(live_hurt0, fresh_fr, calm_lm, [],
+                                {"value": 1.25, "ts": 0}, nowts,
+                                clip_grade="hurting")
+    assert sh2 == LIVE_DOWN_SCALE, "hurt row down-scale beats the release"
+    # grade sourcing: fresh hurting/helping surface; neutral/stale/absent None
+    fp = _iso()
+    assert live_clip_grade({"updated": fp, "ttl_sec": 2700, "verdicts": {
+        "live.clip_scale": {"verdict": "hurting"}}}) == "hurting"
+    assert live_clip_grade({"updated": fp, "ttl_sec": 2700, "verdicts": {
+        "live.clip_scale": {"verdict": "neutral"}}}) is None
+    assert live_clip_grade({"updated": "2020-01-01T00:00:00+00:00",
+                            "ttl_sec": 60, "verdicts": {
+                                "live.clip_scale": {"verdict": "helping"}}}) is None
+    assert live_clip_grade({}) is None and live_clip_grade(None) is None
     live_hurt = [dict(live_ok[0], pnl_abs=-15.0), live_ok[1]]
     s5, it5 = synthesize_live(live_hurt, fresh_fr, calm_lm, [],
                               {"value": 1.5, "ts": 0}, nowts)

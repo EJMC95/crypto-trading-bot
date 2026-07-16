@@ -32,9 +32,16 @@ WHAT IT DOES (hourly-ish, run-once, looped by run_all.sh)
                   close minus at open (the diet levers exist to buy grades).
        gapscout — did the widened detection net actually find anything
                   (census quiet_hours reset inside the window)?
-       live/xp  — RECORDED ONLY, never verdicted: the judge's paired bar and
-                  fade-watch stay the sole authority on real money; this
-                  organ just keeps the episode ledger the review reads.
+       live     — THE LIVE LANE LEARNS (16-Jul evening, operator: "the live
+                  lane needs to learn"): per-trade pnl_pct during the
+                  episode vs TWO baselines — the books' own pre-episode
+                  window AND the shadow twins over the same window. 'bad'
+                  only when worse than EVERY available baseline by the
+                  margin (real money is never blamed on one noisy
+                  comparison); higher floors than the shadow lanes.
+                  clip_scale and funding bars grade as separate groups so
+                  the board's movement is never blamed on the judge's.
+       xp       — RECORDED ONLY: the judge's paired arms already grade it.
   3. VERDICTS. Per-lever, floors-gated (n episodes + $ margin): helping /
      hurting / neutral / insufficient. HURTING exists only on the taker
      lane — the one lane with a real $ counterfactual. Joint stances share
@@ -54,9 +61,15 @@ WHAT IT DOES (hourly-ish, run-once, looped by run_all.sh)
          diet lever walks one notch DEEPER while its lens is under the
          floor; a HELPING gapscout lever discounts the board's
          widen-ladder quiet-hour bars (x0.75, 12h floor) so a net that
-         has measurably found things re-widens sooner. The live lane
-         earns NOTHING here — the judge's paired bar stays the only road
-         to real money.
+         has measurably found things re-widens sooner.
+       LIVE (restrict-first — the lane's learning loop): a HURTING
+         live.clip_scale verdict BLOCKS the board's up-ladder and releases
+         the lever back to operator sizing; a HURTING live.funding.*
+         verdict is an EARLIER fade signal for the judge (the judge stays
+         the only writer). The single live earn: the clip ladder's TOP
+         step (1.5) now requires a measured HELPING grade at 1.25 —
+         fail-CLOSED, a dark sense keeps the top out of reach. New live
+         levers and promotions still have exactly one road: the judge.
      The evidence board surfaces helping (expand evidence) and hurting
      (warn) items. Fail-safe BOTH WAYS: a dark/stale proprioception
      restricts nothing and earns nothing (levers stay bounded + TTL'd
@@ -96,6 +109,11 @@ MIN_EPISODES = int(os.environ.get("PROP_MIN_EPISODES", "2"))
 HURT_USD = float(os.environ.get("PROP_HURT_USD", "3.0"))
 HELP_USD = float(os.environ.get("PROP_HELP_USD", "3.0"))
 GRADES_MIN = int(os.environ.get("PROP_GRADES_MIN", "10"))
+# live-lane grading floors (16-Jul evening, operator: "the live lane needs
+# to learn") — real money gets HIGHER evidence bars than the shadow lanes
+LIVE_EP_MIN_N = int(os.environ.get("PROP_LIVE_EP_MIN_N", "5"))
+LIVE_BASE_MIN_N = int(os.environ.get("PROP_LIVE_BASE_MIN_N", "3"))
+LIVE_MARGIN_PP = float(os.environ.get("PROP_LIVE_MARGIN_PP", "0.25"))
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
     "crypto-trend-daily-lighter,perps-funding-lighter-lighter").split(",")
@@ -147,13 +165,21 @@ def _fresh(state, now, fallback_ttl=None):
 def group_of(name):
     """The attribution unit a lever belongs to. All taker bars replay as one
     joint bar set, so they form ONE stance; each scout diet lever stands
-    alone; live/xp are record-only ledger groups."""
+    alone. The live lane splits by ACTUATOR so attribution is clean:
+    clip_scale reshapes BOTH live books' clips (board-authored) while the
+    funding bars steer only the Funding Farmer (judge-authored) — lumping
+    them would blame one author's movement on the other. xp is record-only
+    (the judge's own paired arms already grade it)."""
     if name.startswith("taker."):
         return "taker"
     if name.startswith("scout."):
         return f"scout:{name}"
     if name.startswith("gapscout."):
         return "gapscout"
+    if name == "live.clip_scale":
+        return "live-clip"
+    if name.startswith("live.funding."):
+        return "live-funding"
     if name.startswith("live."):
         return "live"
     if name.startswith("xp."):
@@ -283,24 +309,57 @@ def grade_gapscout(ep, census_end):
             "quiet_end": q, "found_activity": bool(float(q) < hours)}
 
 
-def grade_live(ep, trades):
-    """Record-only: live rows' per-trade mean during vs before the episode.
-    The judge's paired bar + fade-watch stay the authority on real money."""
-    start, end = ep["start"], ep["end"]
+def _twin(bot):
+    """A live row's shadow twin: same signals, mark fills, $1k paper book —
+    the natural control arm for a live-lane episode."""
+    return bot[:-len("-lighter")] + "-lshadow" if bot.endswith("-lighter") else None
 
-    def stats(a, b):
+
+def grade_live(ep, trades, group="live-clip"):
+    """The live lane LEARNS (16-Jul evening, operator mandate): an episode
+    under live levers is graded per-trade against TWO baselines — the same
+    books' own pre-episode window AND the shadow twins over the SAME window
+    (identical signals; the only difference is the lever + real fills).
+    'bad' requires being worse than EVERY available baseline by the margin
+    (conservative — real money is never blamed on one noisy comparison);
+    'good' is symmetric; anything mixed is 'flat'. The metric is per-trade
+    pnl_pct — size-invariant by design (the judge's own lesson: equity
+    comparisons across different-sized books lie). Thin data -> 'recorded'
+    (no signal, no verdict). What consumes the verdicts stays restrict-
+    first: the board blocks clip UP-steps and releases on hurting, the
+    judge fades a promotion early; HELPING earns exactly one thing — the
+    clip ladder's TOP step, fail-closed."""
+    start, end = ep["start"], ep["end"]
+    bots = ({b for b in LIVE_ROWS if "funding" in b} if group == "live-funding"
+            else set(LIVE_ROWS))
+    twins = {t for t in (_twin(b) for b in bots) if t}
+
+    def stats(names, a, b):
         pcts = [float(r["profit_ratio"]) for r in trades or []
-                if str(r.get("bot")) in LIVE_ROWS
+                if str(r.get("bot")) in names
                 and r.get("profit_ratio") is not None
-                and (_parse_ts(r.get("close_ts")) or 0) >= a
-                and (_parse_ts(r.get("close_ts")) or 0) < b]
+                and a <= (_parse_ts(r.get("close_ts")) or -1) < b]
         return (len(pcts),
                 round(100.0 * sum(pcts) / len(pcts), 3) if pcts else None)
 
-    n_in, m_in = stats(start, end)
-    n_pre, m_pre = stats(start - (end - start), start)
-    return {"status": "recorded", "n_during": n_in, "mean_pct_during": m_in,
-            "n_before": n_pre, "mean_pct_before": m_pre}
+    n_in, m_in = stats(bots, start, end)
+    n_pre, m_pre = stats(bots, start - (end - start), start)
+    n_tw, m_tw = stats(twins, start, end)
+    rec = {"n_during": n_in, "mean_pct_during": m_in,
+           "n_before": n_pre, "mean_pct_before": m_pre,
+           "n_twin": n_tw, "mean_pct_twin": m_tw}
+    baselines = [m for n, m in ((n_pre, m_pre), (n_tw, m_tw))
+                 if n >= LIVE_BASE_MIN_N and m is not None]
+    if (n_in < LIVE_EP_MIN_N or m_in is None or not baselines
+            or (end - start) < MIN_EP_H * 3600):
+        return {"status": "recorded", **rec}
+    if all(m_in < b - LIVE_MARGIN_PP for b in baselines):
+        sig = "bad"
+    elif all(m_in > b + LIVE_MARGIN_PP for b in baselines):
+        sig = "good"
+    else:
+        sig = "flat"
+    return {"status": "graded", "signal": sig, **rec}
 
 
 def grade_episode(ep, feeds):
@@ -311,8 +370,10 @@ def grade_episode(ep, feeds):
         return grade_scout(ep, feeds.get("lens_fwd"))
     if g == "gapscout":
         return grade_gapscout(ep, feeds.get("census"))
-    if g in ("live", "xp"):
-        return grade_live(ep, feeds.get("trades"))
+    if g in ("live-clip", "live-funding", "live"):
+        return grade_live(ep, feeds.get("trades"), group=g)
+    if g == "xp":
+        return {"status": "recorded"}   # the judge's paired arms grade xp
     return {"status": "recorded"}
 
 
@@ -322,10 +383,12 @@ def grade_episode(ep, feeds):
 
 def lever_verdicts(episodes):
     """{lever: {verdict, n, ...}} over the newest VERDICT_WINDOW graded
-    episodes per lever. HURTING exists only for taker levers (the $
-    counterfactual lane); joint stances share blame — conservative in the
-    restrict direction. Diet/detection levers can only help or sit neutral;
-    live/xp never verdict here (the judge owns them)."""
+    episodes per lever. HURTING exists on the two lanes with a real paired
+    measure: taker (the $ replay counterfactual) and live (per-trade vs
+    pre-window + shadow twin — 16-Jul evening, 'the live lane needs to
+    learn'). Joint stances share blame — conservative in the restrict
+    direction. Diet/detection levers can only help or sit neutral; xp never
+    verdicts here (the judge's paired arms own it)."""
     per = {}
     for ep in episodes or []:
         if ep.get("status") != "graded":
@@ -360,6 +423,16 @@ def lever_verdicts(episodes):
             found = any(e.get("found_activity") for e in eps)
             out[lever] = {"verdict": "helping" if found else "neutral", "n": n,
                           "basis": "census-activity"}
+        elif lever.startswith("live."):
+            goods = sum(1 for e in eps if e.get("signal") == "good")
+            bads = sum(1 for e in eps if e.get("signal") == "bad")
+            v = "neutral"
+            if bads >= MIN_EPISODES and bads > goods:
+                v = "hurting"
+            elif goods >= MIN_EPISODES and goods > bads:
+                v = "helping"
+            out[lever] = {"verdict": v, "n": n, "good": goods, "bad": bads,
+                          "basis": "live-paired"}
     return out
 
 
@@ -422,7 +495,8 @@ def run_once():
         except Exception as e:  # noqa: BLE001
             print(f"[proprioception] tape load failed: {type(e).__name__}: {e}",
                   flush=True)
-    if any(c["group"] in ("live", "xp") for c in closed):
+    if any(c["group"] in ("live-clip", "live-funding", "live", "xp")
+           for c in closed):
         try:
             feeds["trades"] = store.fetch_paper_trades(limit=4000)
         except Exception:
@@ -492,12 +566,16 @@ def run_once():
 def _selftest():
     now = 1_800_000_000.0
 
-    # grouping: taker bars are ONE joint stance; each scout lever its own
+    # grouping: taker bars are ONE joint stance; each scout lever its own;
+    # the live lane splits by ACTUATOR (board's clip vs judge's bars)
     assert group_of("taker.tp") == "taker" == group_of("taker.dip_range")
     assert group_of("scout.dip_range_max") == "scout:scout.dip_range_max"
     assert group_of("gapscout.prefilter_gap") == "gapscout"
-    assert group_of("live.clip_scale") == "live"
+    assert group_of("live.clip_scale") == "live-clip"
+    assert group_of("live.funding.enter_apr") == "live-funding"
     assert group_of("xp.funding.enter_apr") == "xp"
+    assert _twin("crypto-trend-daily-lighter") == "crypto-trend-daily-lshadow"
+    assert _twin("perps-funding-lighter-lighter") == "perps-funding-lighter-lshadow"
 
     exp = _iso(now + 7800)
     active = {
@@ -507,7 +585,7 @@ def _selftest():
         "live.clip_scale": {"value": 1.25, "set_by": "evidence-board", "expires": exp},
     }
     st = build_stances(active)
-    assert set(st) == {"taker", "scout:scout.dip_range_max", "live"}, st
+    assert set(st) == {"taker", "scout:scout.dip_range_max", "live-clip"}, st
     assert st["taker"]["stance"] == {"taker.dip_range": 0.08, "taker.tp": 0.05}
     assert st["taker"]["set_by"] == ["scout-tuner"]
 
@@ -591,16 +669,44 @@ def _selftest():
     assert gg2["found_activity"] is False, gg2
     assert grade_gapscout(ep_g, {})["status"] == "ungraded"
 
-    # live grading records, never verdicts
-    trades = [{"bot": "crypto-trend-daily-lighter", "profit_ratio": 0.01,
-               "close_ts": _iso(t0 + 3600)},
-              {"bot": "crypto-trend-daily-lighter", "profit_ratio": -0.02,
-               "close_ts": _iso(t0 - 3600)},
-              {"bot": "not-live", "profit_ratio": 9.9, "close_ts": _iso(t0 + 3600)}]
-    gl = grade_live({"group": "live", "start": t0, "end": t0 + 2 * 3600,
-                     "stance": {"live.clip_scale": 1.25}}, trades)
-    assert gl["status"] == "recorded" and gl["n_during"] == 1 \
-        and gl["mean_pct_during"] == 1.0 and gl["n_before"] == 1, gl
+    # LIVE lane learning: per-trade during vs BOTH baselines (pre-window +
+    # shadow twin). Thin data records; clear divergence signals.
+    LIVE = "crypto-trend-daily-lighter"
+    TWIN = "crypto-trend-daily-lshadow"
+
+    def lt(bot, off_h, pct):
+        return {"bot": bot, "profit_ratio": pct, "close_ts": _iso(t0 + off_h * 3600)}
+
+    ep_lv = {"group": "live-clip", "start": t0, "end": t0 + 6 * 3600,
+             "stance": {"live.clip_scale": 1.25}}
+    # during: live 6 trades @ +0.2%; before: 6 @ +1.5%; twin during: 6 @ +1.2%
+    tr_bad = ([lt(LIVE, 1 + i * 0.5, 0.002) for i in range(6)]
+              + [lt(LIVE, -6 + i * 0.5, 0.015) for i in range(6)]
+              + [lt(TWIN, 1 + i * 0.5, 0.012) for i in range(6)]
+              + [lt("not-live", 2, 9.9)])
+    glb = grade_live(ep_lv, tr_bad)
+    assert glb["status"] == "graded" and glb["signal"] == "bad", glb
+    assert glb["n_during"] == 6 and glb["mean_pct_during"] == 0.2, glb
+    # worse than pre-window but BETTER than the twin -> flat (never 'bad'
+    # unless worse than EVERY baseline — real money isn't blamed on noise)
+    tr_flat = ([lt(LIVE, 1 + i * 0.5, 0.002) for i in range(6)]
+               + [lt(LIVE, -6 + i * 0.5, 0.015) for i in range(6)]
+               + [lt(TWIN, 1 + i * 0.5, -0.02) for i in range(6)])
+    assert grade_live(ep_lv, tr_flat)["signal"] == "flat"
+    # better than both -> good
+    tr_good = ([lt(LIVE, 1 + i * 0.5, 0.02) for i in range(6)]
+               + [lt(LIVE, -6 + i * 0.5, 0.002) for i in range(6)]
+               + [lt(TWIN, 1 + i * 0.5, 0.001) for i in range(6)])
+    assert grade_live(ep_lv, tr_good)["signal"] == "good"
+    # thin during-window or no usable baseline -> recorded (no signal)
+    assert grade_live(ep_lv, tr_bad[:3])["status"] == "recorded"
+    assert grade_live(ep_lv, [lt(LIVE, 1 + i * 0.5, 0.002)
+                              for i in range(6)])["status"] == "recorded"
+    # live-funding group grades only the funding rows
+    ep_fund = dict(ep_lv, group="live-funding",
+                   stance={"live.funding.enter_apr": 0.30})
+    glf = grade_live(ep_fund, tr_bad, group="live-funding")
+    assert glf["status"] == "recorded" and glf["n_during"] == 0, glf
 
     # verdicts: floors + directions. Two negative taker episodes past the $
     # bar -> HURTING; two positive -> HELPING; one -> neutral (floor).
@@ -638,10 +744,23 @@ def _selftest():
                           "levers": ["gapscout.prefilter_gap"],
                           "found_activity": True}])
     assert v8["gapscout.prefilter_gap"]["verdict"] == "helping", v8
-    # live/xp episodes produce NO verdict (the judge owns real money)
-    v9 = lever_verdicts([{"group": "live", "status": "graded",
-                          "levers": ["live.clip_scale"]}])
-    assert v9 == {}, v9
+    # live verdicts: two 'bad' paired episodes -> HURTING; two 'good' ->
+    # HELPING; mixed -> neutral; a single episode never verdicts (floor)
+    def lv_ep(sig, lever="live.clip_scale"):
+        return {"group": "live-clip", "status": "graded", "levers": [lever],
+                "signal": sig}
+
+    v9 = lever_verdicts([lv_ep("bad"), lv_ep("bad")])
+    assert v9["live.clip_scale"]["verdict"] == "hurting" \
+        and v9["live.clip_scale"]["basis"] == "live-paired", v9
+    v10 = lever_verdicts([lv_ep("good"), lv_ep("good"), lv_ep("flat")])
+    assert v10["live.clip_scale"]["verdict"] == "helping", v10
+    v11 = lever_verdicts([lv_ep("bad"), lv_ep("good")])
+    assert v11["live.clip_scale"]["verdict"] == "neutral", v11
+    assert lever_verdicts([lv_ep("bad")])["live.clip_scale"]["verdict"] == "neutral"
+    # xp episodes still produce NO verdict (the judge's arms grade xp)
+    assert lever_verdicts([{"group": "xp", "status": "graded",
+                            "levers": ["xp.funding.enter_apr"]}]) == {}
     # non-graded episodes contribute nothing
     assert lever_verdicts([dict(tk_ep(-9), status="too-short")]) == {}
 
@@ -665,8 +784,8 @@ def _selftest():
     print("fleet_proprioception selftest OK (grouping, episode lifecycle "
           "incl. backdated release + daily slice, replay counterfactual "
           "win/lose/too-short, scout throughput, gapscout activity, live "
-          "record-only, verdict floors + joint blame, fail-safe hurting+"
-          "helping consumer hooks)")
+          "paired-learning (bad/flat/good vs pre-window+twin, funding split), "
+          "verdict floors + joint blame, fail-safe hurting+helping hooks)")
 
 
 if __name__ == "__main__":

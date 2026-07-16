@@ -93,12 +93,21 @@ https://pnl-dashboard-production-858c.up.railway.app/
   HELPING taker lever unlocks the tuner's improve-both-halves expansion
   walk before the brain's ruling floor (brain veto stays senior), a
   HELPING diet lever walks one notch deeper, a HELPING gapscout lever
-  discounts the board's widen-ladder bars (×0.75, 12h floor). The live
-  lane earns nothing — the judge's paired bar stays the only road to real
-  money. Board surfaces 🦾 items (hurting=warn, helping=expand); immune
-  scans the payload. Fail-safe both ways: a dark organ restricts nothing
-  AND earns nothing. Review grades both sides — agenda item 12. →
-  bot_state `fleet-proprioception`
+  discounts the board's widen-ladder bars (×0.75, 12h floor). **LIVE LANE
+  LEARNS (16-Jul evening, operator mandate)**: live episodes graded
+  per-trade vs TWO baselines (the books' own pre-window AND the shadow
+  twins, same window; clip vs funding split by author so the board's
+  movement is never blamed on the judge's; 'bad' only when worse than
+  EVERY baseline by the margin; floors higher than shadow lanes) —
+  consumed restrict-first: HURTING live.clip_scale releases the board's
+  lever + blocks up-steps; HURTING live.funding.* is the judge's EARLIER
+  fade signal (`prop_fade`; the judge stays the only writer); the single
+  live earn is the clip ladder's TOP step (1.5) now REQUIRING a measured
+  HELPING at 1.25 — fail-CLOSED (dark sense = top out of reach). Board
+  surfaces 🦾 items (hurting=warn, helping=expand); immune scans the
+  payload. Fail-safe both ways on shadow lanes: a dark organ restricts
+  nothing AND earns nothing. Review grades both sides — agenda item 12.
+  → bot_state `fleet-proprioception`
 - `experiment_judge.py` 🧪⚖️ — the shadow→live PROMOTION pipeline (15-Jul
   user mandate: shadow wins must "carry across to the real money bots").
   Hourly, ONE candidate at a time on the Funding Farmer's -lshadow twin

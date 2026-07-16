@@ -34,7 +34,12 @@ attribution is never confounded):
             FADE WATCH: if the live arm's mean pnl_pct since promotion
             goes negative at n >= FADE_N, stop asserting; every lever
             expires back to env defaults on its own. Cooldown, then the
-            queue continues.
+            queue continues. [16-Jul evening] prop_fade is the EARLIER
+            signal: fleet_proprioception grades the promotion's episodes
+            per-trade vs the live arm's own pre-window AND the shadow
+            twin — a fresh HURTING verdict releases before the absolute
+            fade bar is reached. The judge stays the only writer;
+            proprioception is evidence in, never a hand on the lever.
 
 Every transition pushes to the phone (urgent for PROMOTE and FADE — real
 money changed). Fail-safe: no DB / short ledger -> nothing is asserted and
@@ -166,6 +171,31 @@ def fade_check(rows, promoted_ts, now, live_bot=None, fade_n=None):
         return False, len(lv), _mean_pct(lv)
     m = _mean_pct(lv)
     return (m is not None and m < 0), len(lv), m
+
+
+def prop_fade(prop_state, live_levers, now):
+    """[2026-07-16 evening, operator: 'the live lane needs to learn'] The
+    EARLIER fade signal: fleet_proprioception grades every live.funding.*
+    episode per-trade against the live arm's own pre-window AND the shadow
+    twin; a fresh HURTING verdict on a promoted lever means the promotion
+    is measurably underperforming BOTH baselines — release it before the
+    absolute fade bar (live mean < 0 at n>=FADE_N) is even reached. The
+    judge stays the ONLY writer of live.funding.*; proprioception is
+    evidence in, never a hand on the lever. Fail-safe False on a dark/
+    stale/absent organ. Returns (fading, why). Pure — selftested."""
+    try:
+        upd = parse_ts((prop_state or {}).get("updated"))
+        if now - upd > float(prop_state.get("ttl_sec") or 0):
+            return False, None
+        for k in sorted(live_levers or ()):
+            v = (prop_state.get("verdicts") or {}).get(k)
+            if isinstance(v, dict) and v.get("verdict") == "hurting":
+                return True, (f"proprioception: {k} graded HURTING "
+                              f"(bad {v.get('bad')}/{v.get('n')} episodes vs "
+                              f"pre-window + shadow twin)")
+    except Exception:
+        return False, None
+    return False, None
 
 
 # ---------------------------------------------------------------------------
@@ -335,18 +365,24 @@ def run_once():
     if phase == "promoted":
         promoted = float(st.get("promoted_ts") or now)
         fading, n, m = fade_check(rows, promoted, now) if have_ledger else (False, 0, None)
-        if fading:
+        live_levers = {XP_TO_LIVE[k]: v for k, v in cand["levers"].items()}
+        # 🦾 the earlier fade signal: the live lane's own paired grades
+        pfading, pwhy = prop_fade(store.load_state("fleet-proprioception") or {},
+                                  set(live_levers), now)
+        if fading or pfading:
+            why = (f"live arm {m:+.2f}%/trade over n={n} since promotion"
+                   if fading else pwhy)
             verdicts.append({"name": cand["name"], "verdict": "FADED",
-                             "ts": iso(now), "live_n": n, "live_mean_pct": m})
+                             "ts": iso(now), "live_n": n, "live_mean_pct": m,
+                             "why": why})
             send_push(f"promotion FADED: {cand['name']}",
-                      f"live arm {m:+.2f}%/trade over n={n} since promotion — "
-                      f"levers released, env defaults return within the TTL",
+                      f"{why} — levers released, env defaults return within "
+                      f"the TTL",
                       priority="urgent")
             return save(phase="idle", done=done + [cand["name"]], current=None,
                         spec={}, started_ts=None, promoted_ts=None,
                         cooldown_until=now + COOLDOWN_H * 3600,
-                        note=f"FADED {cand['name']}")
-        live_levers = {XP_TO_LIVE[k]: v for k, v in cand["levers"].items()}
+                        note=f"FADED {cand['name']} ({why})")
         _assert_levers({**cand["levers"], **live_levers},
                        f"promotion {cand['name']} in force",
                        f"promoted {iso(promoted)}; live n={n} mean "
@@ -407,6 +443,22 @@ def _selftest():
     fading2, n2, _ = fade_check(rows6[:5], t0, t0 + 2 * day)
     assert not fading2 and n2 == 5, "below FADE_N: keep the promotion"
 
+    # 🦾 prop_fade: the earlier fade signal — a fresh HURTING verdict on a
+    # promoted lever releases; helping/unrelated/stale/absent do nothing
+    fresh_p = {"updated": iso(t0), "ttl_sec": 2700, "verdicts": {
+        "live.funding.enter_apr": {"verdict": "hurting", "n": 3, "bad": 2}}}
+    okp, whyp = prop_fade(fresh_p, {"live.funding.enter_apr"}, t0 + 60)
+    assert okp and "HURTING" in whyp, (okp, whyp)
+    assert not prop_fade(fresh_p, {"live.funding.take_profit"}, t0 + 60)[0], \
+        "unrelated lever must not fade"
+    assert not prop_fade({"updated": iso(t0), "ttl_sec": 2700, "verdicts": {
+        "live.funding.enter_apr": {"verdict": "helping"}}},
+        {"live.funding.enter_apr"}, t0 + 60)[0]
+    assert not prop_fade(fresh_p, {"live.funding.enter_apr"}, t0 + 99999)[0], \
+        "stale organ must not fade"
+    assert prop_fade({}, {"live.funding.enter_apr"}, t0) == (False, None)
+    assert prop_fade(None, {"live.funding.enter_apr"}, t0) == (False, None)
+
     # every candidate's levers are registered, in-bounds, and map to a live twin
     for c in CANDIDATES:
         for k, v in c["levers"].items():
@@ -441,7 +493,7 @@ def _selftest():
     assert _needs_reset("idle", None, {}) is False             # idle never resets here
 
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
-          "floors, own-right, fade, registry mapping)")
+          "floors, own-right, fade, proprioception early-fade, registry mapping)")
 
 
 if __name__ == "__main__":
