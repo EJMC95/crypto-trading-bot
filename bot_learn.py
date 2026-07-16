@@ -40,6 +40,19 @@ WHAT IT DOES
      lever instead of defaulting to "tighten the entry gates" (the 92-run
      'flip' artifact this replaces).
 
+  8. [2026-07-16 v3 STATISTICS ENGINE — brain_stats.py] The qualification
+     statistics grew up: decay-weighted buckets (half-life forgetting inside
+     an era), Kish effective sample sizes, empirical-Bayes pooling (a tag's
+     win rate shrinks toward its siblings on other bots, then the bot, then
+     the fleet), Wilson bounds + weighted t-stats as evidence bars, richer
+     bucket metrics, per-(bot,tag) REGIME SPLITS, episode-deduplicated lens
+     grading (raw fields unchanged — consumers keep their contract), and a
+     'brain-vitals' bot_state key exposing priors/watchlist/config.
+     Validated by brain_replay.py (ledger replay, v2-vs-v3, both halves).
+     BRAIN_MULT_ENGINE=v2 is the no-redeploy kill switch back to the
+     frozen 14-Jul rules. Floors, streak gate, reduce-only grid and the
+     fleet_bus [0.5,1.0] clamp are UNCHANGED — authority did not move.
+
 WHAT IT NEVER DOES
   Change entry/exit logic, configs, or trades — and it never SIZES UP.
   The multipliers only throttle stakes on tags the ledger has repeatedly
@@ -75,6 +88,20 @@ MULT_MIN_N = 30       # era trades on a tag before a 0.5x may publish
 MULT_SOFT_N = 15      # era trades before a 0.75x may publish
 MULT_KEY = "brain-stake-mults"
 MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
+
+# [2026-07-16 v3] brain_stats.py carries the statistics engine (decay
+# weighting, EB pooling, Wilson/t bars). Import-guarded like every other
+# optional organ: a checkout without it falls back to the frozen v2 rules,
+# and BRAIN_MULT_ENGINE=v2 flips back without a code change.
+try:
+    import brain_stats as bstats
+except Exception:
+    bstats = None
+MULT_ENGINE = os.environ.get("BRAIN_MULT_ENGINE", "v3") if bstats else "v2"
+if MULT_ENGINE not in ("v2", "v3"):
+    MULT_ENGINE = "v3"
+HALF_LIFE_DAYS = float(os.environ.get("BRAIN_HALF_LIFE_DAYS", "14"))
+VITALS_KEY = "brain-vitals"
 
 # [2026-07-14b DIAGNOSIS LAYER] Discriminate WHERE a negative sleeve loses:
 # entry quality / exit path / fee bleed / regime timing / venue execution.
@@ -543,34 +570,86 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
                f"(worst path '{worst_exit}' {worst_share:.0%} of losses) — keep sampling")
 
 
-def compute_stake_mults(cards, state, run_no):
-    """[2026-07-14 L4] Reduce-only per-(bot, tag) stake multipliers.
+def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
+                        engine=None):
+    """[2026-07-14 L4, 2026-07-16 v3] Reduce-only per-(bot, tag) stake mults.
 
-    Rule table (era trades only — ERA_START already applied to the cards):
+    v2 rule table (frozen in brain_stats.qualify_v2, era trades only):
         n >= MULT_MIN_N,  pnl < 0, wr < 25%          -> 0.50x
         n >= MULT_MIN_N,  pnl < 0, wr < 40%          -> 0.75x
         MULT_SOFT_N <= n < MULT_MIN_N, pnl < 0, wr < 25% -> 0.75x
-    A computed reduction must recur on PROMOTE_RUNS consecutive runs before
-    it publishes (streak-gated); one bad day never throttles anything. A tag
-    that stops qualifying resets its streak and drops from the published set
-    immediately — the brain forgives as gracefully as it forgets.
-    Returns {bot: {tag: {mult, n, wr, pnl, streak}}} of PUBLISHED entries.
+    v3 keeps the SAME raw-count floors and multiplier grid but judges the
+    bucket on decay-weighted evidence: EB-shrunk win rate, Wilson upper
+    bound and a weighted t-stat must all agree the tag is bad (brain_stats.
+    qualify_v3). Decay means an old bleed heals on its own; pooling means
+    ten noisy trades can't outvote what the tag's siblings know.
+    Both engines share the streak gate: a reduction must recur on
+    PROMOTE_RUNS consecutive runs before it publishes, and a tag that stops
+    qualifying drops immediately — the brain forgives as gracefully as it
+    forgets.
+    Returns (published {bot: {tag: {...}}}, vitals {engine, priors,
+    watchlist}). `engine` param overrides the env default (replay harness).
     """
+    engine = engine or MULT_ENGINE
+    if engine == "v3" and (bstats is None or era_trades is None):
+        engine = "v2"
     streaks = state.setdefault("mult_streaks", {})
     seen = set()
+    watchlist, priors_out = [], {}
+
+    # v3 evidence layer: decay-weighted stats per (bot, tag) + pool priors.
+    wstats = {}
+    if engine == "v3":
+        for bot, trs in era_trades.items():
+            by_tag = defaultdict(list)
+            for t in trs:
+                tag = str(t.get("enter_tag") or "(untagged)")
+                if tag != "(untagged)":
+                    by_tag[tag].append(t)
+            for tag, bucket in by_tag.items():
+                wstats[(bot, tag)] = bstats.weighted_bucket(
+                    bucket, now_ts, HALF_LIFE_DAYS)
+        tag_pool, bot_pool = defaultdict(list), defaultdict(list)
+        for (bot, tag), st in wstats.items():
+            tag_pool[tag].append((bot, st))
+            bot_pool[bot].append((tag, st))
+        all_buckets = [st for st in wstats.values()]
+
     for bot, c in cards.items():
         for tag, b in c.get("by_tag", {}).items():
             if tag == "(untagged)":
                 continue   # no strategy passes this tag — a mult here is pure noise
             n, w, pnl = b["n"], b["w"], b["pnl"]
             wr = w / n if n else 0.0
-            mult = None
-            if n >= MULT_MIN_N and pnl < 0 and wr < 0.25:
-                mult = 0.5
-            elif n >= MULT_MIN_N and pnl < 0 and wr < 0.40:
-                mult = 0.75
-            elif MULT_SOFT_N <= n < MULT_MIN_N and pnl < 0 and wr < 0.25:
-                mult = 0.75
+            ev = {}
+            if engine == "v3" and (bot, tag) in wstats:
+                st = wstats[(bot, tag)]
+                prior = bstats.eb_prior(
+                    [s for bb, s in tag_pool.get(tag, []) if bb != bot],
+                    [s for tt, s in bot_pool.get(bot, []) if tt != tag],
+                    [s for s in all_buckets if s is not st])
+                mult, ev = bstats.qualify_v3(st, prior,
+                                             min_n=MULT_MIN_N, soft_n=MULT_SOFT_N)
+                priors_out[f"{bot}|{tag}"] = {
+                    "mu": ev["prior_mu"], "kappa": ev["prior_kappa"],
+                    "src": ev["prior_src"]}
+                # Watchlist: evidence pointing down but not yet at the bar —
+                # the operator sees what is WARMING, not just what fired.
+                # Advisory only (no actuator), so it may surface below the
+                # publish floors (n >= 8 vs MULT_SOFT_N 15).
+                if (mult is None and n >= 8 and ev["pnl_w"] < 0
+                        and ev["post_wr"] < bstats.SOFT_POST_WR):
+                    watchlist.append({"bot": bot, "tag": tag, "n": n, **ev})
+            else:
+                mult = (bstats.qualify_v2(n, w, pnl, MULT_MIN_N, MULT_SOFT_N)
+                        if bstats else None)
+                if bstats is None:   # frozen v2 rules, inline fallback
+                    if n >= MULT_MIN_N and pnl < 0 and wr < 0.25:
+                        mult = 0.5
+                    elif n >= MULT_MIN_N and pnl < 0 and wr < 0.40:
+                        mult = 0.75
+                    elif MULT_SOFT_N <= n < MULT_MIN_N and pnl < 0 and wr < 0.25:
+                        mult = 0.75
             if mult is None:
                 continue
             key = f"{bot}|{tag}"
@@ -578,18 +657,30 @@ def compute_stake_mults(cards, state, run_no):
             e = streaks.setdefault(key, {"streak": 0, "first_run": run_no})
             e["streak"] += 1
             e["last_run"] = run_no
-            e.update({"mult": mult, "n": n, "wr": round(wr * 100, 1), "pnl": round(pnl, 2)})
+            e.update({"mult": mult, "n": n, "wr": round(wr * 100, 1),
+                      "pnl": round(pnl, 2), "engine": engine, **ev})
     # Streak resets: qualification must be CONSECUTIVE runs.
     for key in list(streaks):
         if key not in seen:
             del streaks[key]
+    # [2026-07-16b FAST-PATH] urgent entries (brain_stats EMER_* bars:
+    # overwhelming evidence a streak gate protects nothing against) publish
+    # on their FIRST qualifying run — the operator's "genuine no-brainer
+    # window". Latency-only: grid/clamp/floors unchanged, and the entry
+    # still resets like any other the moment it stops qualifying.
     published = defaultdict(dict)
+    urgent_now = []
     for key, e in streaks.items():
-        if e["streak"] >= PROMOTE_RUNS:
+        if e["streak"] >= PROMOTE_RUNS or e.get("urgent"):
             bot, tag = key.split("|", 1)
-            published[bot][tag] = {"mult": e["mult"], "n": e["n"], "wr": e["wr"],
-                                   "pnl": e["pnl"], "streak": e["streak"]}
-    return dict(published)
+            published[bot][tag] = {k: v for k, v in e.items()
+                                   if k not in ("first_run", "last_run")}
+            if e.get("urgent") and e["streak"] < PROMOTE_RUNS:
+                urgent_now.append(key)
+    vitals = {"engine": engine, "priors": priors_out,
+              "urgent": urgent_now,
+              "watchlist": sorted(watchlist, key=lambda x: x.get("t", 0))[:20]}
+    return dict(published), vitals
 
 
 def _publish_stake_mults(published):
@@ -599,6 +690,7 @@ def _publish_stake_mults(published):
         payload = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "ttl_sec": MULT_TTL_SEC, "mode": "reduce-only",
                    "min_n": MULT_MIN_N, "promote_runs": PROMOTE_RUNS,
+                   "engine": MULT_ENGINE, "half_life_days": HALF_LIFE_DAYS,
                    "mults": published}
         ok = store.save_state(MULT_KEY, payload)
         try:
@@ -689,7 +781,28 @@ def grade_scout_lenses(max_snapshots=2200):
                     return m
         return None
 
+    # [2026-07-16 v3 EPISODES] The scout re-emits a live ticket every cycle,
+    # so raw counts are serially correlated (~200 emissions of one breakout
+    # are one market opinion, not 200). Group each (lens, sym)'s emissions
+    # into EPISODES (gap > EPISODE_GAP_SEC starts a new one) and grade the
+    # FIRST emission of each — the moment a taker could first have acted.
+    # RAW fields (n4h/hit4h/avg4h_pct...) keep their exact v2 semantics:
+    # the taker's veto floor (TT_LENS_VETO_MIN_N) and the tuner were
+    # calibrated on them. Episode stats land as NEW fields (eps*/ehit*/
+    # eavg*, Wilson bounds, sym diversity) for consumers to adopt at review.
+    emissions = defaultdict(list)      # (lens, sym) -> [ts, ...]
+    for ts, marks, tickets in snaps:
+        for lens, arr in (tickets or {}).items():
+            for t in arr or []:
+                if t.get("sym"):
+                    emissions[(lens, t["sym"])].append(ts)
+    ep_firsts = {}
+    if bstats is not None:
+        ep_firsts = {k: bstats.episode_firsts(v) for k, v in emissions.items()}
+
     agg = {}
+    eagg = {}
+    esyms = {}
     for ts, marks, tickets in snaps:
         for lens, arr in (tickets or {}).items():
             for t in arr or []:
@@ -698,6 +811,7 @@ def grade_scout_lenses(max_snapshots=2200):
                 if not sym or not entry:
                     continue
                 sign = -1.0 if str(t.get("side", "long")) == "short" else 1.0
+                is_first = ts in ep_firsts.get((lens, sym), ())
                 for label, hsec in LENS_HORIZONS:
                     if ts + hsec > last_ts + 900:
                         continue            # horizon hasn't elapsed yet
@@ -710,6 +824,13 @@ def grade_scout_lenses(max_snapshots=2200):
                     g["n"] += 1
                     g["hit"] += 1 if fwd > 0 else 0
                     g["sum"] += fwd
+                    if is_first:
+                        ge = eagg.setdefault(lens, {}).setdefault(
+                            label, {"n": 0, "hit": 0, "sum": 0.0})
+                        ge["n"] += 1
+                        ge["hit"] += 1 if fwd > 0 else 0
+                        ge["sum"] += fwd
+                        esyms.setdefault(lens, set()).add(sym)
     out = {}
     for lens, hz in agg.items():
         o = {}
@@ -718,12 +839,27 @@ def grade_scout_lenses(max_snapshots=2200):
             o[f"hit{label}h"] = round(g["hit"] / g["n"], 3) if g["n"] else None
             o[f"avg{label}h_pct"] = (round(100.0 * g["sum"] / g["n"], 3)
                                      if g["n"] else None)
+        for label, g in (eagg.get(lens) or {}).items():
+            o[f"eps{label}h"] = g["n"]
+            if g["n"]:
+                ehit = g["hit"] / g["n"]
+                o[f"ehit{label}h"] = round(ehit, 3)
+                o[f"eavg{label}h_pct"] = round(100.0 * g["sum"] / g["n"], 3)
+                if bstats is not None and label == 4:
+                    lo, hi = bstats.wilson(ehit, g["n"])
+                    o["ehit4h_lo"] = round(lo, 3)
+                    o["ehit4h_hi"] = round(hi, 3)
+        o["n_syms"] = len(esyms.get(lens) or ())
         out[lens] = o
     return out
 
 
 def main():
     trades = _fetch_trades()
+    # [2026-07-16 v3] one epoch parse per trade — decay weighting and the
+    # liveness check both key off it.
+    for t in trades:
+        t["_close_epoch"] = _epoch(t.get("close_ts"))
     state, src = _load_state()
     state["runs"] = int(state.get("runs", 0)) + 1
     run_no = state["runs"]
@@ -809,9 +945,40 @@ def main():
     # gated, published reduce-only. Strategies consume via fleet_bus.
     # [2026-07-15 LIVENESS] living bots only: a throttle for a dead bot has
     # no consumer and would only be noise on the bus.
-    published_mults = compute_stake_mults(
-        {b: c for b, c in cards.items() if c.get("alive")}, state, run_no)
+    alive_cards = {b: c for b, c in cards.items() if c.get("alive")}
+    alive_trades = {b: era_trades[b] for b in alive_cards if b in era_trades}
+    published_mults, mult_vitals = compute_stake_mults(
+        alive_cards, state, run_no, era_trades=alive_trades, now_ts=now_ts)
     mults_saved = _publish_stake_mults(published_mults)
+
+    # [2026-07-16 v3 REGIME SPLITS] Per-(bot, tag) win/pnl conditioned on the
+    # oracle regime at entry — the evidence that decides whether a tag is
+    # bad or just badly timed. ADVISORY: published on brain-vitals for the
+    # dashboard/board; no actuator reads it yet.
+    regime_splits = {}
+    for bot in sorted(alive_trades):
+        buckets = defaultdict(list)
+        for t in alive_trades[bot]:
+            tag = str(t.get("enter_tag") or "(untagged)")
+            if tag != "(untagged)":
+                buckets[tag].append(t)
+        for tag, bucket in buckets.items():
+            if len(bucket) < DIAG_MIN_N:
+                continue
+            split = {"risk_on": {"n": 0, "w": 0, "pnl": 0.0},
+                     "risk_off": {"n": 0, "w": 0, "pnl": 0.0}, "unmatched": 0}
+            for t in bucket:
+                r = _regime_at(regime_hist, t.get("open_ts"))
+                if r is None:
+                    split["unmatched"] += 1
+                    continue
+                s = split["risk_off" if r["risk_off"] else "risk_on"]
+                s["n"] += 1
+                s["pnl"] = round(s["pnl"] + (t.get("profit_abs") or 0.0), 2)
+                if (t.get("profit_abs") or 0) > 0:
+                    s["w"] += 1
+            if split["risk_on"]["n"] + split["risk_off"]["n"] >= 8:
+                regime_splits[f"{bot}|{tag}"] = split
 
     # [2026-07-14 REACH] Venue A/B computed above (feeds diagnosis too).
     state["venue_ab"] = venue_ab
@@ -853,6 +1020,45 @@ def main():
         except Exception:
             pass
 
+    # [2026-07-16 v3 VITALS] The engine's own instrumentation: which prior
+    # every graded bucket shrank toward, what is WARMING toward a throttle,
+    # regime splits, lens episode summaries, and the exact bars in force.
+    # Advisory + fail-soft: a vitals failure must never cost a mult publish
+    # (which already happened above).
+    vitals_payload = {
+        "updated": now, "ttl_sec": MULT_TTL_SEC, "run": run_no,
+        "engine": mult_vitals.get("engine"),
+        "half_life_days": HALF_LIFE_DAYS,
+        "bars": ({"hard_post_wr": bstats.HARD_POST_WR, "hard_w_hi": bstats.HARD_W_HI,
+                  "hard_t": bstats.HARD_T, "soft_post_wr": bstats.SOFT_POST_WR,
+                  "soft_w_hi": bstats.SOFT_W_HI, "soft_t": bstats.SOFT_T}
+                 if bstats else {}),
+        "priors": mult_vitals.get("priors") or {},
+        "urgent": mult_vitals.get("urgent") or [],
+        "watchlist": mult_vitals.get("watchlist") or [],
+        "regime_splits": regime_splits,
+        "lens_episodes": {lens: {"eps4h": o.get("eps4h"), "ehit4h": o.get("ehit4h"),
+                                 "eavg4h_pct": o.get("eavg4h_pct"),
+                                 "ehit4h_lo": o.get("ehit4h_lo"),
+                                 "n_syms": o.get("n_syms")}
+                          for lens, o in (lens_forward or {}).items()},
+        "counts": {"bots_alive": sum(1 for c in cards.values() if c.get("alive")),
+                   "mults_published": sum(len(t) for t in published_mults.values()),
+                   "watchlist": len(mult_vitals.get("watchlist") or []),
+                   "diagnoses": len(diagnoses)},
+    }
+    try:
+        import bot_pnl_store as store
+        store.save_state(VITALS_KEY, vitals_payload)
+        try:
+            store.save_history(VITALS_KEY, vitals_payload)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    state["vitals"] = {k: vitals_payload[k] for k in
+                       ("engine", "half_life_days", "counts")}
+
     # ---- write lessons_latest.md ------------------------------------------
     os.makedirs(REPORTS_DIR, exist_ok=True)
     L = [f"# Fleet lessons — run {run_no} @ {now} (state: {src})", ""]
@@ -876,26 +1082,52 @@ def main():
         L.append("")
     # [2026-07-14 L4] Published stake multipliers — the brain's live handle
     # on sizing. Empty section = every tag is trading at full stake.
-    L.append("## Stake multipliers in force (bot_state '%s', reduce-only)" % MULT_KEY)
+    L.append("## Stake multipliers in force (bot_state '%s', reduce-only, engine %s)"
+             % (MULT_KEY, mult_vitals.get("engine")))
     if published_mults:
         for bot, tags in sorted(published_mults.items()):
             for tag, m in sorted(tags.items()):
+                v3ev = (f", post_wr={m['post_wr']}, t={m['t']}, "
+                        f"prior={m.get('prior_src')}({m.get('prior_mu')})"
+                        if m.get("post_wr") is not None else "")
                 L.append(f"- **{bot} / {tag} -> {m['mult']}x**  "
                          f"(n={m['n']}, wr={m['wr']}%, pnl ${m['pnl']:+.2f}, "
-                         f"streak {m['streak']} runs)")
+                         f"streak {m['streak']} runs{v3ev})")
     else:
         L.append("- none — no tag currently clears the floor "
                  f"(n>={MULT_SOFT_N}, negative pnl, {PROMOTE_RUNS} consecutive runs)")
     L.append("")
+    # [2026-07-16 v3] What is WARMING toward a throttle + regime splits.
+    wl = mult_vitals.get("watchlist") or []
+    if wl:
+        L.append("## Watchlist (negative evidence below the bar — not throttled)")
+        for e in wl[:10]:
+            L.append(f"- {e['bot']} / {e['tag']}: n={e['n']} n_eff={e['n_eff']} "
+                     f"post_wr={e['post_wr']} t={e['t']} pnl_w=${e['pnl_w']:+.2f} "
+                     f"(prior {e['prior_src']} {e['prior_mu']})")
+        L.append("")
+    stark = {k: s for k, s in regime_splits.items()
+             if s["risk_on"]["n"] >= 4 and s["risk_off"]["n"] >= 4}
+    if stark:
+        L.append("## Regime splits (entry-time oracle read — advisory)")
+        for k, s in sorted(stark.items()):
+            on, off = s["risk_on"], s["risk_off"]
+            L.append(f"- {k}: risk-on {on['w']}/{on['n']} ${on['pnl']:+.2f} · "
+                     f"risk-off {off['w']}/{off['n']} ${off['pnl']:+.2f}")
+        L.append("")
     # [2026-07-15 LENS-FORWARD] scout lens scoreboard.
     if lens_forward:
         L.append("## Scout lens forward returns (counterfactual — EVERY ticket, "
                  "not just taker fills)")
         for lens, o in sorted(lens_forward.items()):
+            ep = (f" · EPISODES 4h n={o.get('eps4h')} hit={o.get('ehit4h')} "
+                  f"[{o.get('ehit4h_lo')},{o.get('ehit4h_hi')}] "
+                  f"avg={o.get('eavg4h_pct')}% syms={o.get('n_syms')}"
+                  if o.get("eps4h") else "")
             L.append(f"- **{lens}**: 4h n={o.get('n4h', 0)} "
                      f"hit={o.get('hit4h')} avg={o.get('avg4h_pct')}% · "
                      f"24h n={o.get('n24h', 0)} hit={o.get('hit24h')} "
-                     f"avg={o.get('avg24h_pct')}%")
+                     f"avg={o.get('avg24h_pct')}%{ep}")
         L.append("")
     # [2026-07-14b] Diagnoses — WHY each negative sleeve loses (the lever).
     if diagnoses:
@@ -943,9 +1175,12 @@ def main():
 
     saved = _save_state(state)
     n_mults = sum(len(t) for t in published_mults.values())
-    print(f"[bot_learn] run {run_no}: {len(trades)} closed trades, "
+    print(f"[bot_learn] run {run_no} ({mult_vitals.get('engine')}): "
+          f"{len(trades)} closed trades, "
           f"{len(live_act)} actionable, {len(live_cand)} candidates (current-era), "
           f"{n_mults} stake-mults published ({'ok' if mults_saved else 'no-db'}), "
+          f"watchlist {len(mult_vitals.get('watchlist') or [])}, "
+          f"{len(regime_splits)} regime splits, "
           f"{len(diagnoses)} diagnoses, venue A/B pairs: {len(venue_ab)} "
           f"-> {LESSONS_MD} (state: {'+'.join(saved) or 'NOT SAVED'})")
     for key, d in sorted(diagnoses.items()):

@@ -808,6 +808,25 @@ def evidence_board_card():
         return ""
 
 
+def _mins_until(iso_utc):
+    """' in 42m' / ' in 4.5h' from an ISO-UTC stamp; ' now' right at it;
+    '' when unparsable or already well past (stale sample). Relative on
+    purpose — timezone-neutral wherever the operator reads it."""
+    try:
+        from datetime import datetime, timezone
+        t = datetime.fromisoformat(str(iso_utc))
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        m = (t - datetime.now(timezone.utc)).total_seconds() / 60.0
+        if m < -5:
+            return ""
+        if m <= 2:
+            return " now"
+        return f" in {m / 60:.1f}h" if m >= 90 else f" in {int(round(m))}m"
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def autonomy_rail_card():
     """🤖 [2026-07-16] Autonomy / Growth Rail — one glance at the self-tuning
     stack that was headless until now (bot_state: fleet-tuning, scout-tuner,
@@ -876,31 +895,11 @@ def autonomy_rail_card():
                    else f'{conf} · net {_d(ch.get("net"))}'
                    + (f' (vs default {_d(ch.get("vs_default"))})'
                       if ch.get("vs_default") is not None else ''))
-            main = row("strategy-incubator", "🧬 Incubator", icv,
+            # the full genotype LEADERBOARD lives in the dedicated
+            # incubator_card() below (operator: "no genotype list on the
+            # pnl" → 16-Jul (ad)); this row stays the one-line summary.
+            return row("strategy-incubator", "🧬 Incubator", icv,
                        G if conf == "stable" else M)
-            if main is None:
-                return None
-            # [2026-07-16 operator request] the genotype LEADERBOARD was
-            # published every cycle but rendered NOWHERE on the pnl page —
-            # list the elite (top 5) under the incubator line.
-            def _g(v):
-                fv = _f(v)
-                return f"{fv:g}" if fv is not None else html.escape(str(v))
-            lb = []
-            for i, e in enumerate((ic.get("elite") or [])[:5]):
-                if not isinstance(e, dict):
-                    continue
-                gt = e.get("genotype")
-                genes = (" ".join(f"{k.split('_')[0].lower()} {_g(gt[k])}"
-                                  for k in sorted(gt))
-                         if isinstance(gt, dict) and gt else "—")
-                star = "⭐" if (isinstance(ch.get("genotype"), dict)
-                               and gt == ch.get("genotype")) else f"#{i + 1}"
-                lb.append(f'<div class="muted" style="margin-left:14px">'
-                          f'{star} {_d(e.get("net"))} '
-                          f'(h1 {_d(e.get("h1"))} / h2 {_d(e.get("h2"))}) · '
-                          f'{genes}</div>')
-            return main + "".join(lb)
 
         def b_queue():
             return row("xp-queue", "📥 XP queue",
@@ -939,9 +938,20 @@ def autonomy_rail_card():
 
         def b_clock():
             ck = s.get("fleet-clock") or {}
-            return row("fleet-clock", "🕰️ Clock",
-                       f'{_s(ck.get("primary"))}'
-                       + (" · THIN" if ck.get("thin_liquidity") else ""),
+            # clock v2 (16-Jul): NYSE open/close + the next market event
+            ck_ny = ck.get("markets")
+            ck_ny = ck_ny.get("nyse") if isinstance(ck_ny, dict) else None
+            ck_ny = ck_ny if isinstance(ck_ny, dict) else {}
+            ck_ne = ck.get("next_event")
+            ck_ne = ck_ne if isinstance(ck_ne, dict) else {}
+            ck_txt = f'{_s(ck.get("primary"))}' \
+                + (" · THIN" if ck.get("thin_liquidity") else "")
+            if ck_ny:
+                ck_txt += ' · NYSE ' + ('open' if ck_ny.get("open") else 'closed')
+            if ck_ne.get("at_utc"):
+                ck_txt += (f' · {_s(ck_ne.get("market"))} {_s(ck_ne.get("event"))}'
+                           f'{_mins_until(ck_ne.get("at_utc"))}')
+            return row("fleet-clock", "🕰️ Clock", ck_txt,
                        Y if ck.get("thin_liquidity") else None)
 
         def b_shortfall():
@@ -983,6 +993,79 @@ def autonomy_rail_card():
                 f'<span class="dot on"></span></h2>'
                 f'<div class="muted">self-tuning stack · levers auto-revert on TTL · '
                 f'nothing ratchets · live money gated</div>{"".join(rows)}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def incubator_card():
+    """🧬 [2026-07-16] Incubator / Reproduction (bot_state 'strategy-incubator').
+    The genotype-breeding stack made visible: the elite leaderboard of bred
+    Ticket-Taker genotypes scored by replay over the recorded tape, the
+    champion + its anti-overfit confidence (tentative / candidate / stable),
+    and the funding candidates it proposes to the experiment judge. Read-only
+    render; the organ lives in strategy_incubator.py on the freqtrade-bots
+    container. Fail-silent like every other card — empty state hides it."""
+    try:
+        b = fetch_states(["strategy-incubator"]).get("strategy-incubator") or {}
+        elite = b.get("elite") or []
+        champ = b.get("champion") or {}
+        if not elite and not champ:
+            return ""
+        G, R, M, Y = "#1a7f37", "#d1242f", "#8b949e", "#d29922"
+
+        def _dm(x):
+            return f"${money(x)}" if isinstance(x, (int, float)) else "—"
+
+        def _geno(gt):
+            if not isinstance(gt, dict):
+                return ""
+            ab = {"BRK_RANGE": "brk", "DIP_RANGE": "dip", "MOMO_CHG": "momo",
+                  "TAKE_PROFIT": "tp", "STOP_LOSS": "sl", "MAX_HOLD_H": "hold"}
+            return html.escape(" ".join(f"{ab[k]}{gt[k]}" for k in ab if k in gt))
+
+        # champion line
+        champ_line = ""
+        if champ:
+            conf = str(champ.get("confidence") or "—")
+            cc = {"stable": G, "candidate": Y}.get(conf, M)
+            vs = champ.get("vs_default")
+            champ_line = (
+                f'<div><span class="muted">champion</span> '
+                f'<b style="color:{cc}">{html.escape(conf).upper()}</b> · '
+                f'net {_dm(champ.get("net"))}'
+                + (f' · vs default {_dm(vs)}' if isinstance(vs, (int, float)) else '')
+                + f' · streak {champ.get("streak")} · '
+                f'h1 {_dm(champ.get("h1"))} h2 {_dm(champ.get("h2"))}</div>')
+
+        # leaderboard
+        rows = []
+        # non-dict entries are skipped, not allowed to hide the whole card
+        elite = [e for e in elite if isinstance(e, dict)]
+        for i, e in enumerate(elite[:5], 1):
+            net = e.get("net")
+            col = (G if isinstance(net, (int, float)) and net > 0
+                   else (M if isinstance(net, (int, float)) and net == 0 else R))
+            mark = ' <span style="color:%s">✓both</span>' % G if e.get("both_halves_pos") else ""
+            rows.append(
+                f'<div><span style="color:{col}">#{i} {_dm(net)}</span>{mark} '
+                f'<span class="muted">h1 {_dm(e.get("h1"))} h2 {_dm(e.get("h2"))}</span> '
+                f'<span class="muted" style="font-size:.85em">{_geno(e.get("genotype"))}</span></div>')
+
+        n_prop = len(b.get("proposed") or [])
+        age = ""
+        try:
+            _u = _iso_dt(b.get("updated"))
+            if _u:
+                age = f' · {int((dt.datetime.now(dt.timezone.utc) - _u).total_seconds() // 60)}m ago'
+        except Exception:
+            pass
+        return (f'<div class="card"><h2>🧬 Incubator / Reproduction '
+                f'<span class="dot on"></span></h2>'
+                f'<div class="muted">breeding {b.get("tape_snaps")} snaps '
+                f'({html.escape(str(b.get("tape_source")))}) · {n_prop} funding '
+                f'candidates → judge{age} — genotypes replay-scored; champion '
+                f'only trusted when STABLE (anti-overfit)</div>'
+                f'{champ_line}{"".join(rows)}</div>')
     except Exception:  # noqa: BLE001
         return ""
 
@@ -1492,7 +1575,7 @@ def render():
         enrich = {}
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
-    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card()
+    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + incubator_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}
@@ -2026,6 +2109,19 @@ def _organ_vital(key, st):
                               for k, v in sorted(ls.items())) or "—"
         if key == "brain-diagnosis":
             return _v("{} diagnoses", len(st.get("diagnoses") or {}))
+        if key == "brain-vitals":
+            c = st.get("counts") or {}
+            return _v("{} · {} mults · watch {} · {} regime splits",
+                      st.get("engine"), c.get("mults_published"),
+                      c.get("watchlist"), len(st.get("regime_splits") or {}))
+        if key == "event-sentinel":
+            c = st.get("counts") or {}
+            fresh = [e for e in (st.get("active_events") or []) if e.get("fresh")]
+            top = (f" · top: {fresh[0]['type']} sev={fresh[0]['severity']}"
+                   if fresh else "")
+            return _v("{} events · bias {} · {} heads{}",
+                      len(fresh), st.get("market_bias"),
+                      c.get("headlines"), top)
         if key == "evidence-board":
             return _v("{} items · {} proposals · mode {}",
                       len(st.get("items") or []), len(st.get("proposals") or []),
@@ -2069,8 +2165,14 @@ def _organ_vital(key, st):
             return _v("SpO2 {}% · {}",
                       int(round((st.get("spo2") or 0) * 100)), st.get("state"))
         if key == "fleet-clock":
-            return _v("session {}{}",
-                      st.get("primary"), " · THIN" if st.get("thin_liquidity") else "")
+            ny = (st.get("markets") or {}).get("nyse") or {}
+            ne = st.get("next_event") or {}
+            return _v("session {}{}{}{}",
+                      st.get("primary"),
+                      " · THIN" if st.get("thin_liquidity") else "",
+                      (" · NYSE " + ("open" if ny.get("open") else "closed")) if ny else "",
+                      (f' · {ne.get("market")} {ne.get("event")}'
+                       f'{_mins_until(ne.get("at_utc"))}') if ne.get("at_utc") else "")
         if key == "impl-shortfall":
             return _v("{} · gap {}pp", st.get("verdict"), st.get("gap_pp"))
         if key == "gapscout-census":
@@ -2091,6 +2193,12 @@ ORGAN_SPECS = [
     ("brain-stake-mults",  "✋ L4 stake multipliers",                 False, 26000),
     ("brain-lens-forward", "🎓 Lens-forward (brain grades scanners)", False, 26000),
     ("brain-diagnosis",    "🩺 Per-bucket diagnosis",                 False, 26000),
+    # [2026-07-16] v3 statistics engine instrumentation (bot_learn +
+    # brain_stats): priors, watchlist, regime splits, lens episodes.
+    ("brain-vitals",       "🔬 Brain vitals — v3 statistics engine",  False, 26000),
+    # [2026-07-16] Event Sentinel — typed major-event detection + sector
+    # ripple playbook (advisory; grades its own anticipations).
+    ("event-sentinel",     "🗞️ Event Sentinel — major events/ripples", False, 2400),
     ("signal-bus",         "🚌 Signal bus mirror",                    False, 900),
     ("regime-oracle",      "🧭 Regime oracle",                        False, 14400),
     # [2026-07-16] growth-rail cohort — was headless; now health-graded.
@@ -2105,7 +2213,7 @@ ORGAN_SPECS = [
     ("fleet-immune",       "🛡️ Fleet immune — sick/quarantine",       True,  2400),
     ("fleet-regen",        "🩹 Fleet regen — auto-heal",              False, 2400),
     ("fleet-respiration",  "🫁 Respiration — data-feed SpO2",         True,  1200),
-    ("fleet-clock",        "🕰️ Fleet clock — session/liquidity",      False, 1800),
+    ("fleet-clock",        "🕰️ Fleet clock — sessions/market events", False, 1800),
     ("impl-shortfall",     "📉 Impl shortfall — live vs shadow slip", False, 3600),
     ("gapscout-census",    "📊 Gap Scout census — episodes",          False, 3600),
     ("fleet-alerts",       "🔔 Alert feed (event-driven)",            False, None),
@@ -2138,6 +2246,9 @@ CONTRACTS = [
     ("evidence proposals", "evidence_board.py",
      "NOTHING yet — shadow; review promotes via EVBOARD_MODE", "shadow",
      "evidence-board"),
+    ("market open/close events + heavy_ok", "fleet_clock.py",
+     "published, unconsumed — first wiring decided at the 21-Jul review",
+     "advisory", "fleet-clock"),
     ("regime / listing intel / bus extras", "various",
      "published, unconsumed (info-only by design)", "advisory", "signal-bus"),
 ]

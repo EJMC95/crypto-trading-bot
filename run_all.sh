@@ -91,6 +91,17 @@ while true; do
   sleep 600
 done &
 
+# [2026-07-16 EVENT ORGAN] Event Sentinel 🗞️⚡ — typed MAJOR-EVENT detection
+# (RSS + GDELT) + historical sector-ripple playbook + self-grading against
+# the scout's marks -> bot_state 'event-sentinel'. ADVISORY: no consumer
+# trades on it until a review wires one. Offset from pulse so the two news
+# fetchers don't hit feeds in the same second.
+( sleep 240
+  while true; do
+    python3 /freqtrade/event_sentinel.py || true
+    sleep 600
+  done ) &
+
 # [2026-07-14 KRAKEN RETIREMENT] main-mode poller removed with the spot bots —
 # there are no local freqtrade APIs left to poll here. ONLY_BOT services keep
 # their scoped poller until the operator stops them.
@@ -212,10 +223,13 @@ done &
 
 # [2026-07-15 CIRCADIAN] 🕐 the fleet's coordinated sense of time (session /
 # thin-liquidity / heavy-ok). Advisory; published for any organ to read.
+# v2 2026-07-16: NYSE calendar + open/close EVENTS for every market +
+# event_window, so consumers can allocate resources around any open/close.
+# 5-min cadence keeps the sampled window flags honest (ttl 15 min).
 ( sleep 200
   while true; do
     python3 /freqtrade/fleet_clock.py || true
-    sleep "${CLOCK_INTERVAL_SEC:-1800}"
+    sleep "${CLOCK_INTERVAL_SEC:-300}"
   done ) &
 
 # [2026-07-15 REGENERATION] 🩹 self-repair tier 2: restores a stateful organ
