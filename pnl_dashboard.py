@@ -2033,6 +2033,11 @@ def _organ_vital(key, st):
                               for k, v in sorted(ls.items())) or "—"
         if key == "brain-diagnosis":
             return _v("{} diagnoses", len(st.get("diagnoses") or {}))
+        if key == "brain-vitals":
+            c = st.get("counts") or {}
+            return _v("{} · {} mults · watch {} · {} regime splits",
+                      st.get("engine"), c.get("mults_published"),
+                      c.get("watchlist"), len(st.get("regime_splits") or {}))
         if key == "evidence-board":
             return _v("{} items · {} proposals · mode {}",
                       len(st.get("items") or []), len(st.get("proposals") or []),
@@ -2103,6 +2108,9 @@ ORGAN_SPECS = [
     ("brain-stake-mults",  "✋ L4 stake multipliers",                 False, 26000),
     ("brain-lens-forward", "🎓 Lens-forward (brain grades scanners)", False, 26000),
     ("brain-diagnosis",    "🩺 Per-bucket diagnosis",                 False, 26000),
+    # [2026-07-16] v3 statistics engine instrumentation (bot_learn +
+    # brain_stats): priors, watchlist, regime splits, lens episodes.
+    ("brain-vitals",       "🔬 Brain vitals — v3 statistics engine",  False, 26000),
     ("signal-bus",         "🚌 Signal bus mirror",                    False, 900),
     ("regime-oracle",      "🧭 Regime oracle",                        False, 14400),
     # [2026-07-16] growth-rail cohort — was headless; now health-graded.

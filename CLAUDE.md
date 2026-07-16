@@ -31,8 +31,16 @@ https://pnl-dashboard-production-858c.up.railway.app/
 - `bot_learn.py` (brain) — L4 stake multipliers (family bot + strategies
   consume via `fleet_bus.py`), per-bucket DIAGNOSIS (exit/entry/fee/regime/
   venue), venue A/B, scout lens-forward grades (taker veto); generates for
-  LIVING bots only (retired set + 7d close recency, 15-Jul); →
-  `learning-brain`, `brain-stake-mults`, `brain-diagnosis`, `brain-lens-forward`
+  LIVING bots only (retired set + 7d close recency, 15-Jul). **v3 statistics
+  engine (16-Jul, `brain_stats.py`)**: decay-weighted buckets (14d half-life
+  forgetting), empirical-Bayes pooling (tag-family → bot → fleet priors),
+  Wilson/t evidence bars, regime splits, episode-deduped lens grading (raw
+  fields unchanged — consumer contracts held); floors/streaks/reduce-only
+  UNCHANGED (authority did not move); validated by `brain_replay.py`
+  (ledger no-regression + 5-scenario synthetic discrimination, header has
+  the verdict); kill switch `BRAIN_MULT_ENGINE=v2`; →
+  `learning-brain`, `brain-stake-mults`, `brain-diagnosis`,
+  `brain-lens-forward`, `brain-vitals`
 - `fleet_risk.py` — traffic light (live > lshadow > paper via
   `authoritative_row`, 65-min staleness filter) + signal bus + **7d fleet
   drawdown governor** (`clip_scale` 1.0/0.5/0.25 — Ticket Taker consumes,
