@@ -1,6 +1,6 @@
 {
  "round": 20,
- "built_at": "2026-07-16T06:59:48+00:00",
+ "built_at": "2026-07-16T07:20:21+00:00",
  "games": [
   {
    "home": "Penrith Panthers",
@@ -8,10 +8,10 @@
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.5,
+    "precip_mm": 0.4,
     "precip_prob": 100,
-    "wind_kmh": 15.2,
-    "temp_c": 14.4,
+    "wind_kmh": 18.0,
+    "temp_c": 14.7,
     "forecast_hour": "2026-07-16T19:00"
    },
    "weather_try_mult": 0.958,
@@ -26,7 +26,7 @@
     {
      "severity": "info",
      "kind": "weather",
-     "text": "100% rain / 0.5mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
+     "text": "100% rain / 0.4mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
     }
    ]
   },
@@ -38,8 +38,8 @@
    "weather": {
     "precip_mm": 0.1,
     "precip_prob": 62,
-    "wind_kmh": 8.8,
-    "temp_c": 14.0,
+    "wind_kmh": 6.6,
+    "temp_c": 14.4,
     "forecast_hour": "2026-07-17T18:00"
    },
    "weather_try_mult": 0.974,
@@ -102,6 +102,11 @@
      "severity": "warn",
      "kind": "spine-change",
      "text": "Melbourne Storm: Trent Toelau named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "Melbourne Storm news: Munster's knee surgery deals major blow to Storm's NRL finals push - ABC News & Headlines \u2013 Australian Broadca"
     }
    ]
   },
@@ -144,7 +149,13 @@
    "away": "Wests Tigers",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": null,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 10,
+    "wind_kmh": 7.3,
+    "temp_c": 14.9,
+    "forecast_hour": "2026-07-18T19:00"
+   },
    "weather_try_mult": 1.0,
    "baseline_total": 46.8,
    "adjusted_total": 46.8,
@@ -165,7 +176,7 @@
     "precip_mm": 1.1,
     "precip_prob": 63,
     "wind_kmh": 30.8,
-    "temp_c": 19.4,
+    "temp_c": 18.2,
     "forecast_hour": "2026-07-19T14:00"
    },
    "weather_try_mult": 0.958,
@@ -199,13 +210,7 @@
    "away": "North Queensland Cowboys",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 53,
-    "wind_kmh": 17.1,
-    "temp_c": 20.0,
-    "forecast_hour": "2026-07-19T16:00"
-   },
+   "weather": null,
    "weather_try_mult": 1.0,
    "baseline_total": 50.2,
    "adjusted_total": 50.2,

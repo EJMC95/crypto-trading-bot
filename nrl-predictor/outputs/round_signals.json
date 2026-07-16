@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 20,
- "scanned_at": "2026-07-16T06:58:53+00:00",
+ "scanned_at": "2026-07-16T07:19:26+00:00",
  "games": [
   {
    "home": "Penrith Panthers",
@@ -321,10 +321,10 @@
     }
    ],
    "weather": {
-    "precip_mm": 0.5,
+    "precip_mm": 0.4,
     "precip_prob": 100,
-    "wind_kmh": 15.2,
-    "temp_c": 14.4,
+    "wind_kmh": 18.0,
+    "temp_c": 14.7,
     "forecast_hour": "2026-07-16T19:00"
    },
    "news": [],
@@ -651,8 +651,8 @@
    "weather": {
     "precip_mm": 0.1,
     "precip_prob": 62,
-    "wind_kmh": 8.8,
-    "temp_c": 14.0,
+    "wind_kmh": 6.6,
+    "temp_c": 14.4,
     "forecast_hour": "2026-07-17T18:00"
    },
    "news": [],
@@ -979,7 +979,17 @@
    "weather": null,
    "news": [],
    "news_home": [],
-   "news_away": []
+   "news_away": [
+    {
+     "headline": "Munster's knee surgery deals major blow to Storm's NRL finals push - ABC News & Headlines \u2013 Australian Broadcasting Corporation",
+     "flags": [
+      "injury"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMipwFBVV95cUxNYWdwUGhGMTItNjllYlRXb1hHX056RnJ6bXVidFoxQWZIZEVIRHVtZHZYU1Rqc19oVzNyUm1NR0VyNC1Tdy1fVzZwaUdDMUItOU14MkxXSWpYN2pHWDZwU2NZN3JtVzkxNVJWeTRQalpZRmV2bFBkSGhUMk9WYkVmNV9YYzFLNDl0WUplZV9sTjFfd2UyUzVtc1hMSXhRbm9zTTA3ajA0Zw?oc=5",
+     "published": "Tue, 14 Jul 2026 00:24:20 GMT"
+    }
+   ]
   },
   {
    "home": "Canberra Raiders",
@@ -1991,7 +2001,13 @@
      "status": null
     }
    ],
-   "weather": null,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 10,
+    "wind_kmh": 7.3,
+    "temp_c": 14.9,
+    "forecast_hour": "2026-07-18T19:00"
+   },
    "news": [],
    "news_home": [],
    "news_away": [
@@ -2327,7 +2343,7 @@
     "precip_mm": 1.1,
     "precip_prob": 63,
     "wind_kmh": 30.8,
-    "temp_c": 19.4,
+    "temp_c": 18.2,
     "forecast_hour": "2026-07-19T14:00"
    },
    "news": [],
@@ -2661,13 +2677,7 @@
      "status": null
     }
    ],
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 53,
-    "wind_kmh": 17.1,
-    "temp_c": 20.0,
-    "forecast_hour": "2026-07-19T16:00"
-   },
+   "weather": null,
    "news": [],
    "news_home": [],
    "news_away": [
