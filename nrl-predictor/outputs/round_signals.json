@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 20,
- "scanned_at": "2026-07-14T12:08:48+00:00",
+ "scanned_at": "2026-07-16T06:58:53+00:00",
  "games": [
   {
    "home": "Penrith Panthers",
@@ -321,10 +321,10 @@
     }
    ],
    "weather": {
-    "precip_mm": 0.1,
-    "precip_prob": 82,
-    "wind_kmh": 18.2,
-    "temp_c": 14.7,
+    "precip_mm": 0.5,
+    "precip_prob": 100,
+    "wind_kmh": 15.2,
+    "temp_c": 14.4,
     "forecast_hour": "2026-07-16T19:00"
    },
    "news": [],
@@ -650,34 +650,14 @@
    ],
    "weather": {
     "precip_mm": 0.1,
-    "precip_prob": 71,
-    "wind_kmh": 9.0,
+    "precip_prob": 62,
+    "wind_kmh": 8.8,
     "temp_c": 14.0,
     "forecast_hour": "2026-07-17T18:00"
    },
    "news": [],
-   "news_home": [
-    {
-     "headline": "Cowboys v Sharks: Nanai returns; McInnes back on deck - NRL.com",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMikgFBVV95cUxOeUhVSDh0b2Z5LVY0TWZ5cGRIZ1ZxaFltTWUydXlaUjBNZXAtdnNQYjVLQmVEbTZDX0VZOGxpSHAtRXJpR0h4c2ZmWGpuMVdTOWhfQnlNcXJaMkl1QmlLbkI4eXBVWDQya3VzZGtlcVFXZHpJQXA5YjdoWTk3R3NuU3J0d0J2LUJhVnQ0SjdFWXp5QQ?oc=5",
-     "published": "Fri, 24 Apr 2026 07:00:00 GMT"
-    }
-   ],
-   "news_away": [
-    {
-     "headline": "Knights v Dragons: Best back on deck; Leilua returns - NRL.com",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMikAFBVV95cUxQWWhoZlpkV01vZDRUdGpCaWoxeWhQV01rYjRKa0FGSlhwVk9aempZeFNIS0ZWTlBHU0k4eFhCeklQMzVRMHBZVnNrSUpQblJSdnRhYW1Ec2E5a29HQUFBQ2pTTTdQdnR5UWpTdDFMVGh6UF9Cbl8wb0RuY1l4aGZhNm12Yjh2WndLYWdWc3gwZGw?oc=5",
-     "published": "Fri, 19 Jun 2026 07:00:00 GMT"
-    }
-   ]
+   "news_home": [],
+   "news_away": []
   },
   {
    "home": "Sydney Roosters",
@@ -999,17 +979,7 @@
    "weather": null,
    "news": [],
    "news_home": [],
-   "news_away": [
-    {
-     "headline": "Munster's knee surgery deals major blow to Storm's NRL finals push - ABC News & Headlines \u2013 Australian Broadcasting Corporation",
-     "flags": [
-      "injury"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMipwFBVV95cUxNYWdwUGhGMTItNjllYlRXb1hHX056RnJ6bXVidFoxQWZIZEVIRHVtZHZYU1Rqc19oVzNyUm1NR0VyNC1Tdy1fVzZwaUdDMUItOU14MkxXSWpYN2pHWDZwU2NZN3JtVzkxNVJWeTRQalpZRmV2bFBkSGhUMk9WYkVmNV9YYzFLNDl0WUplZV9sTjFfd2UyUzVtc1hMSXhRbm9zTTA3ajA0Zw?oc=5",
-     "published": "Tue, 14 Jul 2026 00:26:06 GMT"
-    }
-   ]
+   "news_away": []
   },
   {
    "home": "Canberra Raiders",
@@ -1330,7 +1300,17 @@
    ],
    "weather": null,
    "news": [],
-   "news_home": [],
+   "news_home": [
+    {
+     "headline": "Raiders v Rabbitohs: Strange steps up: Johnston returns - NRL.com",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxQMk10M0NyM1ZHSHpfR1ZXT0JjSXVpREhfSW80WHgxN0pHOUloSXZfbi1yMVpQTXdTTWtkczVZa3VXVDQ3VUtlaVI0Rzl0UTlWdEE3WC1SV1lWX2d2cVdURWdXaGZzRTU2blFsa3h2YmpTaGVnaUlwYkQ0MHBwQ29CQjdxS0JXXzhPblprQWZSR0tYdU9P?oc=5",
+     "published": "Tue, 14 Jul 2026 08:01:43 GMT"
+    }
+   ],
    "news_away": [
     {
      "headline": "Raiders v Rabbitohs: Strange steps up: Johnston returns - NRL.com",
@@ -1664,13 +1644,22 @@
    "news": [],
    "news_home": [
     {
-     "headline": "Warriors v Bulldogs: Broughton's club debut; Robinson steps up - NRL.com",
+     "headline": "Warriors v Cowboys: Griffiths rings changes; Williams returns - NRL.com",
      "flags": [
-      "debut"
+      "return"
      ],
      "players": [],
-     "link": "https://news.google.com/rss/articles/CBMinAFBVV95cUxPRWVaMkxJSHRmNFNyV2VFd3lsRW9wRmhwLTFpeFFvaUFiYWl4V0FNa3NLbjItVXJoRENQcFRlcUlGei1fUEVJZHBZTm9hVXYyU2Zjd1JoSlNxN2JMaHJSTUhrS3NveEJIMHZ1WWF0Q2tTNENaUUZwbW1fQzBIQmpzeXhCd1BWeU1DVV8xYmpxeWJRdXRqN1I2MnhRd2k?oc=5",
-     "published": "Tue, 30 Jun 2026 07:00:00 GMT"
+     "link": "https://news.google.com/rss/articles/CBMinAFBVV95cUxPODltUW1GRFlTdEZ2QlhHMTRxOS1Gd0dxelQ2enJ5ZU1lZ0t1OTRZMndKUHFtakpoT0Q5cWVhRkRlOWVLMFlrazd3aEl2WW1DN2NJXzNpcTJVUUVKckxLX04wRFhCb3pJRDdSWG9Wak45ekhzWWtFdFNYbHlqSWEtSUlUQThIc2l4cFN6Wm9wWVZfN3kwRjZYdE55ZTc?oc=5",
+     "published": "Wed, 15 Jul 2026 01:29:49 GMT"
+    },
+    {
+     "headline": "Dolphins v Warriors: Katoa returns; Stowers-Smith steps up - NRL.com",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxQTjZVbXI0YlZybGRvMFVuWGhVN1pfZmcwRk1jaWpMTUZKYU9Ea3JnTGRMRWdkNVhxcGNIMmtzWUNQX1BRTExNVTFFVmJ2VWFvaWRPTkJuaXBhZ1JPR29iRU1HeWswZGRVSzRmQ0JWbGROZEZRZHlpR20wZEtBdFBWR1U0cGJHVjl1RVctSXBjejlic3MzZmZV?oc=5",
+     "published": "Sat, 27 Jun 2026 07:00:00 GMT"
     }
    ],
    "news_away": [
@@ -1682,15 +1671,6 @@
      "players": [],
      "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxPQlRwX1RHM2k3aXdwUFpvS0JUOVZzZ1M3WUxtRUVDaHVKSnc3ZzBUX0RDbGdLeG1OUnJoTmNjSXByLUhHYWJ2OUFDOVBNdGxwQ3FpOEttYUxfUExoUE42eENldXRHWVE5T1lISS1rV2N5cEszeDc1d0o3Z3hLUmVyLWVGa1FucnVaSEtlVDlYYTJibFJI?oc=5",
      "published": "Sat, 04 Jul 2026 07:00:00 GMT"
-    },
-    {
-     "headline": "Knights v Dragons: Best back on deck; Leilua returns - NRL.com",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMikAFBVV95cUxQWWhoZlpkV01vZDRUdGpCaWoxeWhQV01rYjRKa0FGSlhwVk9aempZeFNIS0ZWTlBHU0k4eFhCeklQMzVRMHBZVnNrSUpQblJSdnRhYW1Ec2E5a29HQUFBQ2pTTTdQdnR5UWpTdDFMVGh6UF9Cbl8wb0RuY1l4aGZhNm12Yjh2WndLYWdWc3gwZGw?oc=5",
-     "published": "Fri, 19 Jun 2026 07:00:00 GMT"
     }
    ]
   },
@@ -2344,14 +2324,24 @@
     }
    ],
    "weather": {
-    "precip_mm": 0.1,
-    "precip_prob": 47,
-    "wind_kmh": 27.6,
-    "temp_c": 19.5,
+    "precip_mm": 1.1,
+    "precip_prob": 63,
+    "wind_kmh": 30.8,
+    "temp_c": 19.4,
     "forecast_hour": "2026-07-19T14:00"
    },
    "news": [],
-   "news_home": [],
+   "news_home": [
+    {
+     "headline": "Titans v Eels: Murphy sticks solid; Cherrington sidelined - NRL.com",
+     "flags": [
+      "out"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxPQnlFRWdzalJQS2xBRE9oYVdFT1l1cEx2TWJlTm1jN2wyOHlBekptOGRObU5HTDNHYUlSY0hDb2o0NHZFcTRUNVViWlRIck1DalJPaXFZbE9TamZvOTBLdGhVbVF1UnY1bWYxUzZSRVhoSHJEU1BzME8zdnlXd1FBTkVTeU5BZlFkckEtQTM5Wlo3VS1KU21J?oc=5",
+     "published": "Wed, 15 Jul 2026 01:29:58 GMT"
+    }
+   ],
    "news_away": []
   },
   {
@@ -2672,15 +2662,25 @@
     }
    ],
    "weather": {
-    "precip_mm": 0.1,
-    "precip_prob": 31,
-    "wind_kmh": 13.6,
-    "temp_c": 19.9,
+    "precip_mm": 0.0,
+    "precip_prob": 53,
+    "wind_kmh": 17.1,
+    "temp_c": 20.0,
     "forecast_hour": "2026-07-19T16:00"
    },
    "news": [],
    "news_home": [],
-   "news_away": []
+   "news_away": [
+    {
+     "headline": "Warriors v Cowboys: Griffiths rings changes; Williams returns - NRL.com",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMinAFBVV95cUxPODltUW1GRFlTdEZ2QlhHMTRxOS1Gd0dxelQ2enJ5ZU1lZ0t1OTRZMndKUHFtakpoT0Q5cWVhRkRlOWVLMFlrazd3aEl2WW1DN2NJXzNpcTJVUUVKckxLX04wRFhCb3pJRDdSWG9Wak45ekhzWWtFdFNYbHlqSWEtSUlUQThIc2l4cFN6Wm9wWVZfN3kwRjZYdE55ZTc?oc=5",
+     "published": "Wed, 15 Jul 2026 01:29:49 GMT"
+    }
+   ]
   }
  ]
 }

@@ -1,7 +1,7 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1502,
+  "p_joint": 0.1501,
   "fair_price": 6.66,
   "legs": [
    "New Zealand Warriors to win",
@@ -12,8 +12,8 @@
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0621,
-  "fair_price": 16.09,
+  "p_joint": 0.062,
+  "fair_price": 16.13,
   "legs": [
    "New Zealand Warriors win & Alofiana Khan-Pereira try",
    "Penrith Panthers win & Thomas Jenkins try",

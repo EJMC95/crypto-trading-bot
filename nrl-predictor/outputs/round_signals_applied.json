@@ -1,45 +1,176 @@
 {
- "round": 19,
- "built_at": "2026-07-16T06:50:20+00:00",
+ "round": 20,
+ "built_at": "2026-07-16T06:59:48+00:00",
  "games": [
   {
-   "home": "South Sydney Rabbitohs",
-   "away": "Newcastle Knights",
+   "home": "Penrith Panthers",
+   "away": "Brisbane Broncos",
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 14.5,
-    "temp_c": 15.4,
-    "forecast_hour": "2026-07-12T14:00"
+    "precip_mm": 0.5,
+    "precip_prob": 100,
+    "wind_kmh": 15.2,
+    "temp_c": 14.4,
+    "forecast_hour": "2026-07-16T19:00"
    },
-   "weather_try_mult": 1.0,
-   "baseline_total": 49.0,
-   "adjusted_total": 49.0,
+   "weather_try_mult": 0.958,
+   "baseline_total": 46.7,
+   "adjusted_total": 44.7,
    "flags": [
     {
      "severity": "warn",
      "kind": "spine-change",
-     "text": "Newcastle Knights: Kalyn Ponga named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+     "text": "Brisbane Broncos: Reece Walsh named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "weather",
+     "text": "100% rain / 0.5mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
     }
    ]
   },
   {
-   "home": "Manly-Warringah Sea Eagles",
-   "away": "North Queensland Cowboys",
+   "home": "Cronulla-Sutherland Sharks",
+   "away": "Newcastle Knights",
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 18.2,
-    "temp_c": 14.3,
-    "forecast_hour": "2026-07-12T16:00"
+    "precip_mm": 0.1,
+    "precip_prob": 62,
+    "wind_kmh": 8.8,
+    "temp_c": 14.0,
+    "forecast_hour": "2026-07-17T18:00"
    },
+   "weather_try_mult": 0.974,
+   "baseline_total": 48.9,
+   "adjusted_total": 47.6,
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Cronulla-Sutherland Sharks: William Kennedy named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Cronulla-Sutherland Sharks: Nicho Hynes named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Cronulla-Sutherland Sharks: Blayke Brailey named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Newcastle Knights: Kalyn Ponga named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "weather",
+     "text": "62% rain / 0.1mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
+    }
+   ]
+  },
+  {
+   "home": "Sydney Roosters",
+   "away": "Melbourne Storm",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": null,
    "weather_try_mult": 1.0,
-   "baseline_total": 48.2,
-   "adjusted_total": 48.2,
+   "baseline_total": 48.1,
+   "adjusted_total": 48.1,
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Sydney Roosters: Sam Walker named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Sydney Roosters: Reece Robson named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Melbourne Storm: Tyran Wishart named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Melbourne Storm: Trent Toelau named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
+  },
+  {
+   "home": "Canberra Raiders",
+   "away": "South Sydney Rabbitohs",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": null,
+   "weather_try_mult": 1.0,
+   "baseline_total": 47.1,
+   "adjusted_total": 47.1,
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Canberra Raiders: Ethan Strange named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
+  },
+  {
+   "home": "New Zealand Warriors",
+   "away": "St George Illawarra Dragons",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": null,
+   "weather_try_mult": 1.0,
+   "baseline_total": 46.6,
+   "adjusted_total": 46.6,
+   "flags": [
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "St George Illawarra Dragons news: Dragons v Wests Tigers: Dragons stick solid; Luai sidelined - NRL.com"
+    }
+   ]
+  },
+  {
+   "home": "Canterbury-Bankstown Bulldogs",
+   "away": "Wests Tigers",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": null,
+   "weather_try_mult": 1.0,
+   "baseline_total": 46.8,
+   "adjusted_total": 46.8,
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Wests Tigers: Adam Doueihi named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    }
+   ]
+  },
+  {
+   "home": "Gold Coast Titans",
+   "away": "Manly-Warringah Sea Eagles",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": {
+    "precip_mm": 1.1,
+    "precip_prob": 63,
+    "wind_kmh": 30.8,
+    "temp_c": 19.4,
+    "forecast_hour": "2026-07-19T14:00"
+   },
+   "weather_try_mult": 0.958,
+   "baseline_total": 47.3,
+   "adjusted_total": 45.3,
    "flags": [
     {
      "severity": "warn",
@@ -53,31 +184,36 @@
     },
     {
      "severity": "info",
+     "kind": "weather",
+     "text": "63% rain / 1.1mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
+    },
+    {
+     "severity": "info",
      "kind": "news",
-     "text": "North Queensland Cowboys news: Cowboys star ruled out as Payten provides State of Origin update - Townsville Bulletin"
+     "text": "Gold Coast Titans news: Titans v Eels: Murphy sticks solid; Cherrington sidelined - NRL.com"
     }
    ]
   },
   {
-   "home": "Melbourne Storm",
-   "away": "Gold Coast Titans",
-   "info_confidence": "provisional",
-   "team_lists_confirmed": false,
+   "home": "Dolphins",
+   "away": "North Queensland Cowboys",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.5,
-    "precip_prob": 90,
-    "wind_kmh": 17.8,
-    "temp_c": 10.6,
-    "forecast_hour": "2026-07-12T18:00"
+    "precip_mm": 0.0,
+    "precip_prob": 53,
+    "wind_kmh": 17.1,
+    "temp_c": 20.0,
+    "forecast_hour": "2026-07-19T16:00"
    },
-   "weather_try_mult": 0.962,
-   "baseline_total": 48.1,
-   "adjusted_total": 46.3,
+   "weather_try_mult": 1.0,
+   "baseline_total": 50.2,
+   "adjusted_total": 50.2,
    "flags": [
     {
-     "severity": "info",
-     "kind": "weather",
-     "text": "90% rain / 0.5mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Dolphins: Hamiso Tabuai-Fidow named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
     }
    ]
   }
