@@ -48,8 +48,11 @@ https://pnl-dashboard-production-858c.up.railway.app/
   + **GROWTH RAIL (15-Jul user mandate: widening must not need the
   operator)**: EXPAND-direction responses ENACT via `fleet_tuning.py` —
   whitelisted, hard-bounded, TTL'd levers (auto-revert by expiry), lanes in
-  `FLEET_TUNING_ENACT_LANES` only (default `paper-scanner`; trading lanes
-  stay proposal-only until a review adds them; real money NEVER). First
+  `FLEET_TUNING_ENACT_LANES` only (shipped default: paper-scanner +
+  lighter-scout/-taker/-xp + **lighter-live**, the 15-Jul user-mandated
+  live lane; 16-Jul `AUTHOR_LANES` binds each author — board →
+  `live.clip_scale` only, judge → `live.funding.*` only; go-live/keys/
+  SafetyRails caps stay operator-only forever). First
   loop: Gap Scout census quiet 24/48/96h → widen prefilter/book-budget/
   second-tier venues (kucoin/gateio/mexc), phone-notified per step
 - `lighter_scout_tuner.py` 🧠🔧 — the Lighter loop's SELF-TUNING organ

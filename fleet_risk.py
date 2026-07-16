@@ -359,10 +359,11 @@ def main():
         for suf in ("-lshadow", "-ltest"):
             e = (by_bot.get(base + suf) or {}).get("extra") or {}
             held = e.get("held") or {}
+            _shv = [v for _, v in held_items(held)]   # list-shape tolerant, like the live tally
             shadow_long += int(e.get("longs") or 0) or \
-                sum(1 for v in held.values() if str(v).upper().startswith("L"))
+                sum(1 for v in _shv if str(v).upper().startswith("L"))
             shadow_short += int(e.get("shorts") or 0) or \
-                sum(1 for v in held.values() if str(v).upper().startswith("S"))
+                sum(1 for v in _shv if str(v).upper().startswith("S"))
 
     gross = fleet_long + fleet_short
     light = max(light_for(fleet_long, LONG_BUDGET),

@@ -27,6 +27,7 @@ towards the fleet; never raises into the server.
 """
 import json
 import os
+import re
 import threading
 import time
 import traceback
@@ -100,11 +101,19 @@ def evaluate(data):
     if not bots:
         problems.append("NO BOTS in feed")
     stale = sorted(b.get("bot", "?") for b in bots if b.get("stale"))
-    off = sorted(b.get("bot", "?") for b in bots if b.get("status") not in (None, "online"))
+    # [2026-07-16 AUDIT FIX] "halted" is the NORMAL daily-loss state (nine
+    # publishers use it) and "paper" is the hl_paper row's resting status —
+    # neither is a death; they paged as NOT ONLINE all day. Halted rows
+    # surface as a warning instead (visible, not paged).
+    off = sorted(b.get("bot", "?") for b in bots
+                 if b.get("status") not in (None, "online", "halted", "paper"))
+    halted = sorted(b.get("bot", "?") for b in bots if b.get("status") == "halted")
     if stale:
         problems.append("STALE: " + ", ".join(stale))
     if off:
         problems.append("NOT ONLINE: " + ", ".join(off))
+    if halted:
+        warnings.append("halted (daily-loss rule): " + ", ".join(halted))
     # [2026-07-14 APPLES-TO-APPLES FIX] The budget warning summed open_trades
     # over EVERYTHING — shadow twins (modelled copies of their originals),
     # delta-neutral funding books, stocks, the event sniper — and compared
@@ -193,22 +202,38 @@ def run_loop(dash):
                 vurl = f"http://127.0.0.1:{port}/vitals.json?nc={int(time.time())}"
                 with urllib.request.urlopen(vurl, timeout=20) as r:
                     vd = json.load(r)
+                # [2026-07-16 AUDIT FIX] a REACHABLE vitals endpoint returning
+                # an error payload / zero organs used to read as "no problems"
+                # — one malformed organ payload silently disabled this whole
+                # pager layer. Monitoring being down IS a problem.
+                if vd.get("error") or not vd.get("organs"):
+                    problems.append("VITALS UNREADABLE: organ-death detection blind"
+                                    + (f" ({str(vd.get('error'))[:80]})" if vd.get("error") else ""))
                 for o in (vd.get("organs") or []):
-                    if o.get("critical") and o.get("status") == "DARK":
+                    if o.get("critical") and o.get("status") in ("DARK", "ERROR"):
                         age = o.get("age_min")
                         problems.append(
-                            f"ORGAN DARK: {o.get('key')}"
-                            + (f" (last publish {age:.0f}m ago)" if age is not None else " (never published)"))
+                            f"ORGAN {o.get('status')}: {o.get('key')}"
+                            + (f" (last publish {age:.0f}m ago)" if age is not None else
+                               (" (never published)" if o.get("status") == "DARK"
+                                else " (payload unreadable)")))
             except Exception:  # noqa: BLE001
                 pass
             email_armed = bool(report_emailer and report_emailer.smtp_configured())
             push_armed = bool(ntfy_topic())
             armed = email_armed or push_armed
-            cur = tuple(problems)
+            # [2026-07-16 AUDIT FIX] dedup on VALUE-STABLE keys: problem
+            # strings embed live numbers ("freshest=312s", "last publish 47m
+            # ago"), so a persistent problem read as a permanently-changing
+            # set and re-paged every 30 min forever. The min gap now applies
+            # to EVERY alert send (incl. right after a recovery) so a bot
+            # flapping at its staleness boundary can't page on each flap.
+            cur = tuple(re.sub(r"\d+", "#", p) for p in problems)
             now = time.time()
             kind = None
             if cur:
-                if last_emailed in (None, ()) or (cur != last_emailed and now - last_email_ts >= min_gap):
+                if (last_emailed in (None, ()) or cur != last_emailed) \
+                        and now - last_email_ts >= min_gap:
                     kind = "alert"
             else:
                 if last_emailed not in (None, ()):

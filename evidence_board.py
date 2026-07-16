@@ -47,14 +47,18 @@ This organ makes the board a live participant:
          runs quiet, the board autonomously widens the scanner's detection
          net (prefilter, book budget, second-tier venues) — and because
          every lever EXPIRES unless re-asserted each cycle, reverting is
-         the resting state. Only lanes in FLEET_TUNING_ENACT_LANES
-         (default: paper-scanner — zero trading surface) are enactable;
-         trading-book lanes stay proposal-only until a review adds them.
+         the resting state. Only lanes in FLEET_TUNING_ENACT_LANES are
+         enactable (the shipped default includes the scanner/scout/taker/xp
+         lanes AND lighter-live — the 15-Jul user-mandated live lane), and
+         fleet_tuning's AUTHOR_LANES binds each author to its own lanes:
+         this board may write live.clip_scale and nothing else live.
 
 WHAT IT NEVER DOES
-  Open positions, raise a stake on a trading book, loosen a live veto, or
-  touch real money — go-live and real-money sizing stay operator-only
-  (NO_REAL_MONEY unchanged). The growth rail can only move levers that are
+  Open positions, place orders, or move a lever past its registry bounds.
+  On real money its whole reach is live.clip_scale [0.5-1.5] on the two
+  live Lighter bots (16-Jul: up-scale gates fail CLOSED on missing/stale
+  telemetry) — go-live, keys, and the operator's SafetyRails notional caps
+  stay operator-only. The growth rail can only move levers that are
   registered in fleet_tuning with hard bounds, on explicitly enactable
   lanes. Opportunity flow stays where it already lives: scout tickets ->
   Ticket Taker's shadow book -> brain grading -> review promotion.
@@ -107,10 +111,22 @@ def _iso(ts=None):
 
 def _fresh(state, max_age_s=2700):
     """A feed is usable if its own `updated` stamp is younger than max_age_s
-    (fail-safe: unusable feeds contribute NOTHING — no synthesis, no boost)."""
+    (fail-safe: unusable feeds contribute NOTHING — no synthesis, no boost).
+    [2026-07-16 AUDIT FIX] a payload's OWN ttl_sec now tightens the window —
+    the fixed 2700s let a 40-min-stale fleet-risk (ttl 900s) keep gating the
+    real-money up-scale, violating the fleet's updated+ttl_sec doctrine."""
     try:
         u = datetime.fromisoformat(str(state.get("updated")).replace("Z", "+00:00"))
-        return (_now() - u.timestamp()) <= max_age_s
+        if u.tzinfo is None:
+            u = u.replace(tzinfo=timezone.utc)
+        limit = float(max_age_s)
+        try:
+            ttl = float(state.get("ttl_sec") or 0)
+            if ttl > 0:
+                limit = min(limit, ttl)
+        except Exception:
+            pass
+        return (_now() - u.timestamp()) <= limit
     except Exception:
         return False
 
@@ -327,6 +343,22 @@ LIVE_LADDER = [1.0, 1.25, 1.5]
 # execution divergence re-fires within market_context's cadence, so the
 # reflex trusts only a fresh alert — stale/retired signals age out.
 LIVE_GAP_FRESH_H = float(os.environ.get("EVBOARD_LIVE_GAP_FRESH_H", "6"))
+# [2026-07-16 AUDIT FIX] the up-scale gates read bot_pnl rows but never checked
+# their age — a FROZEN live row with lifetime-positive pnl kept satisfying the
+# "earned" gate while the bot's real state was unknown. 2h10m covers Tide
+# Rider's hourly loop with the same headroom the dashboard uses.
+LIVE_ROW_FRESH_S = float(os.environ.get("EVBOARD_LIVE_ROW_FRESH_S", "7800"))
+
+
+def _row_fresh(r, now_ts, max_age_s=None):
+    """bot_pnl row freshness by its updated_at (fail-closed on missing/bad)."""
+    try:
+        u = datetime.fromisoformat(str((r or {}).get("updated_at")).replace("Z", "+00:00"))
+        if u.tzinfo is None:
+            u = u.replace(tzinfo=timezone.utc)
+        return (now_ts - u.timestamp()) <= (max_age_s or LIVE_ROW_FRESH_S)
+    except Exception:
+        return False
 
 
 def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
@@ -352,8 +384,12 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     # DOWN first — restriction needs no cooldown and no permission, but the
     # divergence signal must be FRESH (a stale/retired alert is not evidence
     # of current execution divergence — that was the 15-Jul false down-scale).
+    # last_seen (refreshed by market_context on every re-confirmation) keeps a
+    # PERSISTING divergence current between 24h-dedup re-fires — without it
+    # the reflex was blind ~18h of every 24 mid-divergence.
     gap = any(str(a.get("key", "")).startswith("live-shadow-gap")
-              and (a.get("ts") or 0) >= now_ts - LIVE_GAP_FRESH_H * 3600
+              and max(a.get("ts") or 0, a.get("last_seen") or 0)
+              >= now_ts - LIVE_GAP_FRESH_H * 3600
               for a in alerts or [])
     hurt = [b for b, r in sorted(rows.items())
             if float(r.get("pnl_abs") or 0) <= -LIVE_DOWN_PNL]
@@ -374,8 +410,11 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     med = ((lighter_market or {}).get("stress") or {}).get("med")
     lm_ok = (_fresh(lighter_market or {}) and med is not None
              and med * 2 <= STRESS_VETO_BPS)
+    # up-scale is earned only on FRESH rows (fail-closed): a frozen row's
+    # lifetime-positive pnl is not evidence the bot is healthy right now.
     earned = all(int(r.get("closed_trades") or 0) >= LIVE_MIN_CLOSED
-                 and float(r.get("pnl_abs") or 0) > 0 for r in rows.values())
+                 and float(r.get("pnl_abs") or 0) > 0
+                 and _row_fresh(r, now_ts) for r in rows.values())
     if not (fr_ok and lm_ok and earned):
         return None, None                    # lever expires -> 1.0
 
@@ -850,9 +889,9 @@ def _selftest():
                 "fleet_dd_7d": -0.005}
     calm_lm = {"updated": fresh, "stress": {"med": 5}}
     live_ok = [{"bot": "crypto-trend-daily-lighter", "closed_trades": 40,
-                "pnl_abs": 12.0},
+                "pnl_abs": 12.0, "updated_at": fresh},
                {"bot": "perps-funding-lighter-lighter", "closed_trades": 33,
-                "pnl_abs": 4.0}]
+                "pnl_abs": 4.0, "updated_at": fresh}]
     s, it = synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts)
     assert s == 1.25 and it["direction"] == "expand" and it["severity"] == "action"
     s2, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
@@ -889,8 +928,31 @@ def _selftest():
         [{"key": "live-shadow-gap", "ts": nowts - 100, "msg": "gap +5.4%"}],
         {}, nowts)
     assert s6c == 0.75, "a FRESH divergence alert still down-scales"
+    # [2026-07-16 AUDIT] a PERSISTING divergence: old ts (dedup) but fresh
+    # last_seen (re-confirmed) must keep cutting — no ~18h blind window
+    s6d, _ = synthesize_live(
+        live_neutral, fresh_fr, calm_lm,
+        [{"key": "live-shadow-gap", "ts": nowts - 20 * 3600,
+          "last_seen": nowts - 100, "msg": "gap +5.4%"}],
+        {}, nowts)
+    assert s6d == 0.75, "fresh last_seen on a persisting divergence still cuts"
     live_small = [dict(live_ok[0], closed_trades=5), live_ok[1]]
     assert synthesize_live(live_small, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
+    # [2026-07-16 AUDIT] a FROZEN row (updated_at 4h old) must block the
+    # up-scale even with lifetime-positive pnl; so must a missing updated_at
+    live_frozen = [dict(live_ok[0], updated_at=_iso(nowts - 4 * 3600)), live_ok[1]]
+    assert synthesize_live(live_frozen, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
+    live_noage = [{k: v for k, v in live_ok[0].items() if k != "updated_at"}, live_ok[1]]
+    assert synthesize_live(live_noage, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
+    # ...but a frozen row does NOT block the hurt-row down reflex
+    s_fdown, _ = synthesize_live([dict(live_frozen[0], pnl_abs=-15.0), live_ok[1]],
+                                 fresh_fr, calm_lm, [], {}, nowts)
+    assert s_fdown == 0.75, "down-scale must not require row freshness"
+    # [2026-07-16 AUDIT] a payload's own ttl_sec tightens _fresh: fleet-risk
+    # (ttl 900) that is 40 min stale must no longer pass the 2700s window
+    stale_fr = dict(fresh_fr, updated=_iso(nowts - 2400))
+    assert synthesize_live(live_ok, stale_fr, calm_lm, [], {}, nowts) == (None, None), \
+        "40-min-stale fleet-risk (ttl 900s) must fail _fresh"
     assert synthesize_live(live_ok, dict(fresh_fr, light="red"), calm_lm,
                            [], {}, nowts) == (None, None)
     assert synthesize_live(live_ok, fresh_fr,

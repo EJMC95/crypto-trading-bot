@@ -456,7 +456,13 @@ def _open_notional(pos, meta, open_now, order_usd):
         elif mc.get("entry"):
             held += abs(float(sz)) * float(mc["entry"])
         else:
-            held += float(order_usd)
+            # [2026-07-16 AUDIT] untracked position (meta lost): price it at
+            # the VENUE's own entry notional, not the current (possibly
+            # down-scaled) clip — order_usd here understates a position opened
+            # at a larger clip and re-opens the cap-breach window this
+            # function exists to close.
+            _ven = (v.get("entry") if isinstance(v, dict) else 0) or 0
+            held += (abs(float(sz)) * float(_ven)) or float(order_usd)
     return held + max(0, int(open_now) - n) * float(order_usd)
 
 
@@ -697,6 +703,14 @@ def main():
 
         if halted_today:
             log.info("halted for today; sleeping.")
+            # [2026-07-16 AUDIT FIX] retry the daily-loss flatten every halted
+            # loop — it used to run exactly ONCE at the halt transition, so a
+            # single failed close (rate-limit storm, venue blip) left that
+            # position with NO stop until the day rolled. Idempotent once the
+            # book is flat; the kill-switch path already retries per loop, so
+            # skip when the kill switch just flattened this same loop.
+            if not dry_run and not ctx.rails.kill_check():
+                _flatten_all("daily_loss")
             # [2026-07-11 HALT HEARTBEAT] keep the dashboard row fresh while
             # halted — the early `continue` skipped the publish below, so a
             # halted bot looked DEAD (stale row) instead of HALTED.
@@ -1066,7 +1080,29 @@ def _supervised():
             time.sleep(60)
 
 
+def _selftest_notional():
+    """The exact 16-Jul breach scenario: cap $150, five $30 positions held at
+    clip 30, growth-rail down-scale to clip 22.50 → the old open_now*order_usd
+    estimate said $112.50 (a 6th entry passed); real deployment is $150 (at
+    cap — the 6th must block)."""
+    pos = {c: {"size": 1.0, "entry": 30.0} for c in "ABCDE"}
+    meta = {c: {"clip": 30.0, "entry": 30.0} for c in "ABCDE"}
+    assert _open_notional(pos, meta, 5, 22.50) == 150.0
+    # meta lost entirely → venue entry notional (not the down-scaled clip)
+    assert _open_notional(pos, {}, 5, 22.50) == 150.0
+    # venue entry also missing → last-resort current clip (conservative floor)
+    assert _open_notional({c: {"size": 1.0} for c in "ABCDE"}, {}, 5, 22.50) == 112.5
+    # opens-this-loop not yet visible in pos count at the current clip
+    assert _open_notional(pos, meta, 7, 22.50) == 195.0
+    # short at its own entry (size*entry, sign-independent)
+    assert _open_notional({"Z": {"size": -2.0, "entry": 20.0}}, {}, 1, 30.0) == 40.0
+    print("lighter_funding_bot _selftest_notional OK")
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest_notional()
+        sys.exit(0)
     try:
         _supervised()
     except KeyboardInterrupt:

@@ -841,68 +841,140 @@ def autonomy_rail_card():
             return (f'<div{dim}><span class="muted">{html.escape(label)}</span> '
                     f'<b style="{c}">{html.escape(str(val))}{tail}</b></div>')
 
+        def _f(x):   # float or None — payload numbers arrive as anything
+            try:
+                return float(x)
+            except Exception:  # noqa: BLE001
+                return None
+
+        def _s(x):   # display string, never the literal "None"
+            return "—" if x is None else str(x)
+
+        def b_tuning():
+            ft = s.get("fleet-tuning") or {}
+            lv = ft.get("levers")
+            lv = lv if isinstance(lv, dict) else {}
+            lv = {k: x for k, x in lv.items() if _lever_unexpired(x)}
+            live = sum(1 for x in lv.values()
+                       if isinstance(x, dict) and x.get("lane") == "lighter-live")
+            return row("fleet-tuning", "🎚️ Levers active",
+                       f'{len(lv)}' + (f' · {live} LIVE' if live else ''),
+                       Y if live else None)
+
+        def b_tuner():
+            tn = s.get("scout-tuner") or {}
+            ntn = len(tn.get("enacted") or {})
+            return row("scout-tuner", "🔧 Scout tuner",
+                       f'{ntn} enacted · baseline {_d(tn.get("baseline_net"))}',
+                       Y if ntn else None)
+
+        def b_incubator():
+            ic = s.get("strategy-incubator") or {}
+            ch = ic.get("champion") or {}
+            conf = ch.get("confidence") or "none"
+            icv = ("no champion yet" if conf == "none" or ch.get("net") is None
+                   else f'{conf} · net {_d(ch.get("net"))}'
+                   + (f' (vs default {_d(ch.get("vs_default"))})'
+                      if ch.get("vs_default") is not None else ''))
+            main = row("strategy-incubator", "🧬 Incubator", icv,
+                       G if conf == "stable" else M)
+            if main is None:
+                return None
+            # [2026-07-16 operator request] the genotype LEADERBOARD was
+            # published every cycle but rendered NOWHERE on the pnl page —
+            # list the elite (top 5) under the incubator line.
+            def _g(v):
+                fv = _f(v)
+                return f"{fv:g}" if fv is not None else html.escape(str(v))
+            lb = []
+            for i, e in enumerate((ic.get("elite") or [])[:5]):
+                if not isinstance(e, dict):
+                    continue
+                gt = e.get("genotype")
+                genes = (" ".join(f"{k.split('_')[0].lower()} {_g(gt[k])}"
+                                  for k in sorted(gt))
+                         if isinstance(gt, dict) and gt else "—")
+                star = "⭐" if (isinstance(ch.get("genotype"), dict)
+                               and gt == ch.get("genotype")) else f"#{i + 1}"
+                lb.append(f'<div class="muted" style="margin-left:14px">'
+                          f'{star} {_d(e.get("net"))} '
+                          f'(h1 {_d(e.get("h1"))} / h2 {_d(e.get("h2"))}) · '
+                          f'{genes}</div>')
+            return main + "".join(lb)
+
+        def b_queue():
+            return row("xp-queue", "📥 XP queue",
+                       f'{len((s.get("xp-queue") or {}).get("candidates") or [])} candidates')
+
+        def b_judge():
+            xj = s.get("xp-judge") or {}
+            ph = xj.get("phase")
+            return row("xp-judge", "⚖️ XP judge",
+                       f'{_s(ph)} · {xj.get("candidate") or "—"}',
+                       G if ph == "promoted" else (Y if ph == "running" else M))
+
+        def b_immune():
+            im = s.get("fleet-immune") or {}
+            nsick, nq = len(im.get("sick") or []), len(im.get("quarantined_levers") or {})
+            return row("fleet-immune", "🛡️ Immune",
+                       f'{nsick} sick · {nq} quarantined · {im.get("pruned_alerts") or 0} pruned',
+                       R if nsick else (Y if nq else G))
+
+        def b_regen():
+            rg = s.get("fleet-regen") or {}
+            nrep, nop = len(rg.get("repaired") or []), len(rg.get("needs_operator") or [])
+            return row("fleet-regen", "🩹 Regen",
+                       f'{nrep} repaired' + (f' · {nop} NEED OPERATOR' if nop else ''),
+                       R if nop else (Y if nrep else None))
+
+        def b_resp():
+            rp = s.get("fleet-respiration") or {}
+            spo2 = _f(rp.get("spo2"))
+            # missing SpO2 is UNKNOWN (grey), not a healthy green 0%
+            rc = (M if spo2 is None else
+                  R if spo2 < 0.7 else (Y if spo2 < 0.9 else G))
+            pct = f"{int(round(spo2 * 100))}%" if spo2 is not None else "—"
+            return row("fleet-respiration", "🫁 Respiration",
+                       f'SpO2 {pct} · {_s(rp.get("state"))}', rc)
+
+        def b_clock():
+            ck = s.get("fleet-clock") or {}
+            return row("fleet-clock", "🕰️ Clock",
+                       f'{_s(ck.get("primary"))}'
+                       + (" · THIN" if ck.get("thin_liquidity") else ""),
+                       Y if ck.get("thin_liquidity") else None)
+
+        def b_shortfall():
+            sf = s.get("impl-shortfall") or {}
+            vd = sf.get("verdict")
+            sc = R if vd == "live-slipping" else (G if vd == "live-ahead" else M)
+            xs = sf.get("exit_slip_bps")
+            gap = sf.get("gap_pp")
+            return row("impl-shortfall", "📉 Live vs shadow",
+                       f'{_s(vd)} · gap {_s(gap)}pp'
+                       + (f' · exit-slip {xs}bps' if xs is not None else ''), sc)
+
+        def b_census():
+            gc = s.get("gapscout-census") or {}
+            bp = _f((gc.get("day") or {}).get("booked_pnl"))
+            return row("gapscout-census", "📊 Gap Scout census",
+                       f'{_s(gc.get("episodes_open"))} open · '
+                       f'quiet {_s(gc.get("quiet_hours"))}h'
+                       + (f' · day {_d(bp)}' if bp is not None else ''),
+                       (G if (bp or 0) > 0 else R) if bp else None)
+
         rows = []
-        ft = s.get("fleet-tuning") or {}
-        lv = ft.get("levers") or {}
-        live = sum(1 for x in lv.values()
-                   if isinstance(x, dict) and x.get("lane") == "lighter-live")
-        rows.append(row("fleet-tuning", "🎚️ Levers active",
-                        f'{len(lv)}' + (f' · {live} LIVE' if live else ''),
-                        Y if live else None))
-        tn = s.get("scout-tuner") or {}
-        ntn = len(tn.get("enacted") or {})
-        rows.append(row("scout-tuner", "🔧 Scout tuner",
-                        f'{ntn} enacted · baseline {_d(tn.get("baseline_net"))}',
-                        Y if ntn else None))
-        ic = s.get("strategy-incubator") or {}
-        ch = ic.get("champion") or {}
-        conf = ch.get("confidence") or "none"
-        icv = ("no champion yet" if conf == "none" or ch.get("net") is None
-               else f'{conf} · net {_d(ch.get("net"))}'
-               + (f' (vs default {_d(ch.get("vs_default"))})'
-                  if ch.get("vs_default") is not None else ''))
-        rows.append(row("strategy-incubator", "🧬 Incubator", icv,
-                        G if conf == "stable" else M))
-        rows.append(row("xp-queue", "📥 XP queue",
-                        f'{len((s.get("xp-queue") or {}).get("candidates") or [])} candidates'))
-        xj = s.get("xp-judge") or {}
-        ph = xj.get("phase")
-        rows.append(row("xp-judge", "⚖️ XP judge",
-                        f'{ph} · {xj.get("candidate") or "—"}',
-                        G if ph == "promoted" else (Y if ph == "running" else M)))
-        im = s.get("fleet-immune") or {}
-        nsick, nq = len(im.get("sick") or []), len(im.get("quarantined_levers") or {})
-        rows.append(row("fleet-immune", "🛡️ Immune",
-                        f'{nsick} sick · {nq} quarantined · {im.get("pruned_alerts") or 0} pruned',
-                        R if nsick else (Y if nq else G)))
-        rg = s.get("fleet-regen") or {}
-        nrep, nop = len(rg.get("repaired") or []), len(rg.get("needs_operator") or [])
-        rows.append(row("fleet-regen", "🩹 Regen",
-                        f'{nrep} repaired' + (f' · {nop} NEED OPERATOR' if nop else ''),
-                        R if nop else (Y if nrep else None)))
-        rp = s.get("fleet-respiration") or {}
-        spo2 = rp.get("spo2")
-        rc = (R if (spo2 is not None and spo2 < 0.7)
-              else (Y if (spo2 is not None and spo2 < 0.9) else G))
-        rows.append(row("fleet-respiration", "🫁 Respiration",
-                        f'SpO2 {int(round((spo2 or 0) * 100))}% · {rp.get("state")}', rc))
-        ck = s.get("fleet-clock") or {}
-        rows.append(row("fleet-clock", "🕰️ Clock",
-                        f'{ck.get("primary")}' + (" · THIN" if ck.get("thin_liquidity") else ""),
-                        Y if ck.get("thin_liquidity") else None))
-        sf = s.get("impl-shortfall") or {}
-        vd = sf.get("verdict")
-        sc = R if vd == "live-slipping" else (G if vd == "live-ahead" else M)
-        xs = sf.get("exit_slip_bps")
-        rows.append(row("impl-shortfall", "📉 Live vs shadow",
-                        f'{vd} · gap {sf.get("gap_pp")}pp'
-                        + (f' · exit-slip {xs}bps' if xs is not None else ''), sc))
-        gc = s.get("gapscout-census") or {}
-        bp = (gc.get("day") or {}).get("booked_pnl")
-        rows.append(row("gapscout-census", "📊 Gap Scout census",
-                        f'{gc.get("episodes_open")} open · quiet {gc.get("quiet_hours")}h'
-                        + (f' · day {_d(bp)}' if bp is not None else ''),
-                        (G if (bp or 0) > 0 else R) if bp else None))
+        # [2026-07-16 AUDIT FIX] one organ's odd-shaped payload used to throw
+        # inside the single outer try and silently vanish the WHOLE card —
+        # indistinguishable from "autonomy stack not running". Each row now
+        # degrades alone.
+        for build in (b_tuning, b_tuner, b_incubator, b_queue, b_judge,
+                      b_immune, b_regen, b_resp, b_clock, b_shortfall,
+                      b_census):
+            try:
+                rows.append(build())
+            except Exception:  # noqa: BLE001
+                rows.append(None)
 
         rows = [r for r in rows if r]
         if not rows:
@@ -1901,10 +1973,30 @@ def organ_status(age_s, ttl_s):
 
 
 def _v(fmt, *vals):
+    # [2026-07-16 AUDIT FIX] None formats successfully ("$None", "phase None"
+    # leaked to the operator on /vitals + the Autonomy card) — render a dash
+    # per missing VALUE; only a genuinely broken format degrades the line.
     try:
-        return fmt.format(*vals)
+        return fmt.format(*("—" if v is None else v for v in vals))
     except Exception:  # noqa: BLE001
         return "—"
+
+
+def _lever_unexpired(x):
+    """[2026-07-16 AUDIT FIX] the dashboard counted EXPIRED levers as active
+    (the payload lingers until the next author write) — including LIVE-flagged
+    ones, for hours after they reverted. Entries without `expires` (legacy)
+    count as active."""
+    try:
+        if not isinstance(x, dict):
+            return False
+        e = x.get("expires")
+        if not e:
+            return True
+        d = _iso_dt(e)
+        return d is None or d.timestamp() > time.time()
+    except Exception:  # noqa: BLE001
+        return True
 
 
 def _organ_vital(key, st):
@@ -1952,7 +2044,8 @@ def _organ_vital(key, st):
                       str(st.get("reviewed_at"))[:16])
         # [2026-07-16] growth-rail organs (make the autonomy stack visible)
         if key == "fleet-tuning":
-            lv = st.get("levers") or {}
+            lv = {k: x for k, x in (st.get("levers") or {}).items()
+                  if _lever_unexpired(x)}
             live = sum(1 for x in lv.values()
                        if isinstance(x, dict) and x.get("lane") == "lighter-live")
             return _v("{} active levers · {} lighter-live", len(lv), live)
@@ -2124,25 +2217,50 @@ def vitals_payload():
     sts = _states_with_ts([k for k, *_ in ORGAN_SPECS])
     organs = []
     for key, label, critical, fb_ttl in ORGAN_SPECS:
-        st, row_ts = sts.get(key) or ({}, None)
-        upd = st.get("updated") or st.get("updated_at") or st.get("reviewed_at")
-        if key == "fleet-alerts":
-            al = st.get("alerts") or []
-            age_s = (now - al[-1]["ts"]) if al else None
-        else:
-            u = _iso_dt(upd)
-            if u is None and row_ts is not None:
-                u = row_ts       # table write stamp — when the organ last spoke
-            age_s = (now - u.timestamp()) if u else None
-        ttl = st.get("ttl_sec") if st.get("ttl_sec") else fb_ttl
-        if key in ("fleet-alerts", "evidence-review"):
-            ttl = None                     # event-driven: silence ≠ failure
-        organs.append({
-            "key": key, "label": label, "critical": critical,
-            "age_min": round(age_s / 60, 1) if age_s is not None else None,
-            "ttl_sec": ttl, "status": organ_status(age_s, ttl),
-            "vital": _organ_vital(key, st),
-        })
+        # [2026-07-16 AUDIT FIX] one malformed payload among 23 organ keys
+        # used to kill the ENTIRE vitals surface (and with it the watchdog's
+        # organ-death detection — the monitoring died of what it monitors).
+        # Each organ now degrades alone to a loud ERROR row.
+        try:
+            st, row_ts = sts.get(key) or ({}, None)
+            if not isinstance(st, dict):
+                st = {}
+            upd = st.get("updated") or st.get("updated_at") or st.get("reviewed_at")
+            if key == "fleet-alerts":
+                al = st.get("alerts")
+                last = (al[-1] if al and isinstance(al, list) else None)
+                ts = last.get("ts") if isinstance(last, dict) else None
+                if isinstance(ts, (int, float)):
+                    age_s = now - float(ts)
+                else:
+                    _t = _iso_dt(ts)
+                    age_s = (now - _t.timestamp()) if _t else None
+            else:
+                u = _iso_dt(upd)
+                if u is None and row_ts is not None:
+                    u = row_ts   # table write stamp — when the organ last spoke
+                age_s = (now - u.timestamp()) if u else None
+            try:
+                ttl = float(st.get("ttl_sec")) if st.get("ttl_sec") else fb_ttl
+            except Exception:
+                ttl = fb_ttl                   # a junk ttl_sec is not a dead organ
+            if key in ("fleet-alerts", "evidence-review",
+                       # [2026-07-16 AUDIT FIX] both are written ON EVENTS
+                       # only (an enactment / a proposal) — in a healthy,
+                       # QUIET fleet they sat permanently DARK, training the
+                       # operator to ignore DARK.
+                       "fleet-tuning", "xp-queue"):
+                ttl = None                     # event-driven: silence ≠ failure
+            organs.append({
+                "key": key, "label": label, "critical": critical,
+                "age_min": round(age_s / 60, 1) if age_s is not None else None,
+                "ttl_sec": ttl, "status": organ_status(age_s, ttl),
+                "vital": _organ_vital(key, st),
+            })
+        except Exception as e:  # noqa: BLE001
+            organs.append({"key": key, "label": label, "critical": critical,
+                           "age_min": None, "ttl_sec": None, "status": "ERROR",
+                           "vital": f"payload unreadable ({type(e).__name__})"})
     fresh = {o["key"]: o["status"] for o in organs}
     contracts = [{"signal": s, "publisher": p, "consumers": c, "mode": m,
                   "freshness": fresh.get(k, "?")} for s, p, c, m, k in CONTRACTS]
@@ -2151,9 +2269,13 @@ def vitals_payload():
         wd = fleet_watchdog_svc.get_state()
     except Exception:  # noqa: BLE001
         wd = {}
+    try:
+        flows = fetch_flow_vitals()
+    except Exception:  # noqa: BLE001
+        flows = {}     # the flows section must never take the organs down
     return {"updated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
             "organs": organs, "contracts": contracts,
-            "flows": fetch_flow_vitals(), "watchdog": wd}
+            "flows": flows, "watchdog": wd}
 
 
 def render_vitals():
@@ -2161,7 +2283,8 @@ def render_vitals():
     flow vitals, and the board/brain/scout minis — one page answering
     'is the ORGANISM working', not just 'are the bots up'."""
     p = vitals_payload()
-    _c = {"FRESH": "#3fb950", "LATE": "#d29922", "DARK": "#f85149", "EVENT": "#8b949e"}
+    _c = {"FRESH": "#3fb950", "LATE": "#d29922", "DARK": "#f85149",
+          "ERROR": "#f85149", "EVENT": "#8b949e"}
 
     wd = p.get("watchdog") or {}
     probs = wd.get("problems") or []
@@ -2478,9 +2601,13 @@ def brain_panel_html():
 
 
 def _iso_dt(s):
-    from datetime import datetime
+    from datetime import datetime, timezone
     try:
-        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        d = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        # normalize naive -> UTC (fleet_bus.is_fresh semantics): a tz-naive
+        # stamp used to TypeError in aware arithmetic (_state_fresh) and take
+        # the whole Autonomy card down with it
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
     except Exception:
         return None
 

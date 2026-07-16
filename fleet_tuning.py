@@ -21,9 +21,13 @@ auto-revert is the resting state, not a feature to remember.
 WHAT IT CAN NEVER DO
   - touch a lever that is not in the registry (unknown names are dropped);
   - exceed a lever's hard bounds (values are clamped, never trusted);
-  - act on a real-money lane: no lever carries lane="live", and
-    write_levers() drops anything whose lane isn't in ENACT_LANES. Go-live
-    and real-money sizing stay operator-only (NO_REAL_MONEY unchanged).
+  - let the WRONG author touch real money: the `lighter-live` lane (added
+    15-Jul by user mandate — live.clip_scale for the board, live.funding.*
+    for the experiment judge's promotions, and nothing else) is bound per
+    author in AUTHOR_LANES; write_levers() drops any lever outside the
+    author's own lanes, anything whose lane isn't in ENACT_LANES, and any
+    live.* lever from an unbound author. Go-live and the operator's hard
+    caps (SafetyRails) stay operator-only.
   - outlive its TTL: if the author dies or stops re-asserting, every
     consumer is back on its own defaults within TTL_SEC.
 
@@ -76,6 +80,37 @@ ENACT_LANES = {s.strip() for s in os.environ.get(
     "FLEET_TUNING_ENACT_LANES",
     "paper-scanner,lighter-scout,lighter-taker,lighter-live,lighter-xp"
     ).split(",") if s.strip()}
+
+# [2026-07-16 AUDIT FIX] author -> lanes each author may WRITE. "The judge is
+# the ONLY writer of live.funding.*" was pure convention — any author could
+# technically have written any enact-lane lever, so one bug in the board's or
+# tuner's lever dict could move a real-money bar. Now enforced here, plus a
+# name-prefix rule inside the live lane (the board owns live.clip_scale, the
+# judge owns live.funding.*). An author absent from this map keeps the old
+# behavior for NON-live lanes but can never write live.*.
+AUTHOR_LANES = {
+    "evidence-board":   {"paper-scanner", "lighter-scout", "lighter-taker",
+                         "lighter-live"},
+    "scout-tuner":      {"lighter-scout", "lighter-taker"},
+    "experiment-judge": {"lighter-xp", "lighter-live"},
+}
+_LIVE_PREFIX_OWNERS = {"live.clip_scale": "evidence-board",
+                       "live.funding.": "experiment-judge"}
+
+
+def _author_may_write(name, lane, set_by):
+    """Lane + live-prefix authorization for one lever write."""
+    allowed = AUTHOR_LANES.get(set_by)
+    if allowed is not None and lane not in allowed:
+        return False
+    if lane == "lighter-live":
+        for prefix, owner in _LIVE_PREFIX_OWNERS.items():
+            if name == prefix or name.startswith(prefix):
+                return set_by == owner
+        return False          # unknown live lever name: nobody writes it
+    if allowed is None and name.startswith("live."):
+        return False          # unbound authors never touch real money
+    return True
 
 # ---------------------------------------------------------------------------
 # THE REGISTRY — every autonomously-tunable lever in the fleet, with hard
@@ -298,6 +333,8 @@ def write_levers(levers, set_by="evidence-board", now_ts=None, ttl_sec=None):
         spec = LEVERS.get(name)
         if not spec or spec["lane"] not in ENACT_LANES:
             continue
+        if not _author_may_write(name, spec["lane"], set_by):
+            continue
         v = clamp(name, (entry or {}).get("value"))
         if v is None:
             continue
@@ -397,12 +434,36 @@ def _selftest():
         assert p["levers"]["gapscout.prefilter_gap"]["value"] == 0.0010
         assert p["levers"]["taker.dip_range"]["value"] == 0.15       # clamped
         assert p["levers"]["taker.dip_range"]["expires"] > fresh_iso[:10]
+    # [2026-07-16 AUDIT] author -> lane binding: only the board may write
+    # live.clip_scale, only the judge live.funding.*; nobody else touches
+    # the live lane (this was convention only — now enforced)
+    assert _author_may_write("live.clip_scale", "lighter-live", "evidence-board")
+    assert not _author_may_write("live.clip_scale", "lighter-live", "scout-tuner")
+    assert not _author_may_write("live.clip_scale", "lighter-live", "experiment-judge")
+    assert _author_may_write("live.funding.enter_apr", "lighter-live", "experiment-judge")
+    assert not _author_may_write("live.funding.enter_apr", "lighter-live", "evidence-board")
+    assert not _author_may_write("live.clip_scale", "lighter-live", "t")  # unbound
+    assert _author_may_write("gapscout.prefilter_gap", "paper-scanner", "t")
+    assert not _author_may_write("taker.tp", "lighter-taker", "experiment-judge")
+    p_bad = write_levers({"live.clip_scale": {"value": 1.5}}, set_by="scout-tuner",
+                         now_ts=now)
+    assert p_bad is None or "live.clip_scale" not in p_bad["levers"], \
+        "tuner must never write the live lane"
+    p_j = write_levers({"xp.funding.enter_apr": {"value": 0.30},
+                        "live.funding.enter_apr": {"value": 0.30},
+                        "live.clip_scale": {"value": 1.5}},
+                       set_by="experiment-judge", now_ts=now)
+    if p_j is not None:
+        assert "xp.funding.enter_apr" in p_j["levers"]
+        assert "live.funding.enter_apr" in p_j["levers"]
+        assert p_j["levers"].get("live.clip_scale", {}).get("set_by") != \
+            "experiment-judge", "judge must never write the board's clip lever"
     # every registered lever must clamp its own documented default
     for name, spec in LEVERS.items():
         if spec["kind"] in ("float", "int"):
             assert clamp(name, spec["lo"]) == spec["lo"]
             assert clamp(name, spec["hi"]) == spec["hi"]
-    print("fleet_tuning selftest OK")
+    print("fleet_tuning selftest OK (incl. author-lane binding)")
 
 
 if __name__ == "__main__":
