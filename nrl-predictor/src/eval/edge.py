@@ -61,8 +61,9 @@ def value_board(market: pd.DataFrame, min_ev: float = MIN_EDGE) -> list[dict]:
         if p_home is None or not np.isfinite(p_home):
             continue
         mk_home = getattr(r, "market_p_home", np.nan)
-        move_pp = getattr(r, "move_home_pp", np.nan)     # +ve = market drifting to home
-        steam = bool(getattr(r, "steam", False)) if pd.notna(getattr(r, "steam", np.nan)) else False
+        move_pp = pd.to_numeric(getattr(r, "move_home_pp", None), errors="coerce")  # +ve = to home
+        _steam = getattr(r, "steam", False)
+        steam = bool(_steam) if isinstance(_steam, (bool, int, float, np.bool_)) and pd.notna(_steam) else False
         for side, team, opp, mp, mk, price, disp in (
             ("home", r.home, r.away, p_home, mk_home, getattr(r, "best_odds_home", np.nan),
              getattr(r, "disp_home", np.nan)),

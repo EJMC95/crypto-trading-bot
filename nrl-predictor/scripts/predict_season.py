@@ -30,6 +30,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.eval import edge as edge_mod
 from src.features import player_rates, player_value, signal_adjust, xstats_defence
+from src.ingest import odds_live
 from src.ingest import signals as signals_mod
 from src.ingest import teams
 from src.models import props_player
@@ -213,7 +214,18 @@ def main() -> None:
     # professional edge layer: value board (model vs de-vigged market, line-shopped
     # to the best of the books, ranked by EV with a quarter-Kelly stake) + the
     # paper-ledger performance scorecard (ROI / yield / CLV / bankroll curve).
-    value_board = edge_mod.value_board(market)
+    #
+    # LIVE odds: match the live book prices to the model's blend for those exact
+    # fixtures across ALL rounds, so the board reflects whatever the books are
+    # pricing right now — never blocked by the results feed lagging a round behind.
+    live_market = _live_market(rounds)
+    value_board = edge_mod.value_board(live_market if len(live_market) else market)
+    odds_as_of = None
+    if (PROCESSED / "odds_snapshot.parquet").exists():
+        try:
+            odds_as_of = str(pd.read_parquet(PROCESSED / "odds_snapshot.parquet")["fetched_at"].max())
+        except Exception:
+            odds_as_of = None
     try:
         from src.eval import ledger as ledger_mod
         performance = edge_mod.performance(ledger_mod.load())
@@ -227,13 +239,55 @@ def main() -> None:
                "form": form,
                "form_as_of": form[0]["as_of"] if form else None,
                "value_board": value_board,
+               "odds_as_of": odds_as_of,
                "performance": performance,
                "rounds": rounds}
     OUT.mkdir(exist_ok=True)
     (OUT / "season_predictions.json").write_text(json.dumps(payload, default=str))
     print(f"season predictions: {len(rounds)} rounds, "
           f"{sum(len(r['games']) for r in rounds)} games "
-          f"(current = Round {current_round})")
+          f"(current = Round {current_round}); value board: {len(value_board)} live edges")
+    return
+
+
+def _live_market(rounds) -> pd.DataFrame:
+    """Match live book odds to the model's blend for those exact fixtures across
+    ALL rounds. Returns a market frame (home, away, p_home_blend, market_p_home,
+    best/median odds, dispersion, line movement) for whatever the books are
+    currently pricing — so the value board is live even when the results feed is a
+    round behind. Empty frame if no live odds are reachable."""
+    snap_path = PROCESSED / "odds_snapshot.parquet"
+    if not snap_path.exists():
+        return pd.DataFrame()
+    try:
+        cons = odds_live.consensus(pd.read_parquet(snap_path))
+    except Exception:
+        return pd.DataFrame()
+    if cons is None or cons.empty:
+        return pd.DataFrame()
+    game_by_pair = {(g["home_id"], g["away_id"]): g for r in rounds for g in r["games"]}
+    try:
+        move = odds_live.line_movement()
+    except Exception:
+        move = pd.DataFrame()
+    move_by = {(r.home_id, r.away_id): r for r in move.itertuples(index=False)} if len(move) else {}
+    rows = []
+    for c in cons.itertuples(index=False):
+        g = game_by_pair.get((c.home_id, c.away_id))
+        if not g:
+            continue
+        mv = move_by.get((c.home_id, c.away_id))
+        rows.append({
+            "round": None, "home": g["home"], "away": g["away"],
+            "p_home_blend": g["p"]["blend"], "market_p_home": c.market_p_home,
+            "books": int(getattr(c, "books", 0) or 0),
+            "best_odds_home": c.best_odds_home, "best_odds_away": c.best_odds_away,
+            "disp_home": getattr(c, "disp_home", None), "disp_away": getattr(c, "disp_away", None),
+            "move_home_pp": getattr(mv, "move_home_pp", None) if mv else None,
+            "steam": bool(getattr(mv, "steam", False)) if mv else False,
+            "drift_side": getattr(mv, "drift_side", None) if mv else None,
+        })
+    return pd.DataFrame(rows)
 
 
 def _merge_current(games, market, sgm) -> None:

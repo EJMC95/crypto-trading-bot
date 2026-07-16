@@ -361,10 +361,11 @@ function renderValue(){
       in the current market snapshot — the model agrees with the books, or odds aren't live yet.
       Edges appear here when the model's price beats the best of the four books.</p>`; return;
   }
+  const asof=DATA.odds_as_of?` · live odds as of ${DATA.odds_as_of.slice(0,16).replace("T"," ")} UTC`:"";
   let h=`<h2>Value board — model vs market edge</h2>
-    <p style="color:var(--ink-2);font-size:13px">Every side of every game where the model's probability
-    implies value at the <b>best available price across the four books</b> (line-shopped). Ranked by
-    expected value. <b>Kelly</b> = suggested stake as % of bankroll (quarter-Kelly, capped 5%).</p>
+    <p style="color:var(--ink-2);font-size:13px">Every game the books are <b>currently pricing</b>, matched to the
+    model's probability, where there's value at the <b>best available price across the four books</b> (line-shopped).
+    Ranked by expected value. <b>Kelly</b> = suggested stake as % of bankroll (quarter-Kelly, capped 5%).<span style="color:var(--muted)">${asof}</span></p>
     <table><thead><tr><th>Selection</th><th>Match</th><th>Model</th><th>Market</th><th>Edge</th>
       <th>Best price</th><th>Fair</th><th>EV</th><th>Kelly</th><th>Market move</th></tr></thead><tbody>`;
   for(const r of v){
