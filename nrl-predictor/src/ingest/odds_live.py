@@ -188,10 +188,52 @@ def consensus(df: pd.DataFrame) -> pd.DataFrame:
         best_odds_away=("odds_away", "max"),
         median_odds_home=("odds_home", "median"),
         median_odds_away=("odds_away", "median"),
+        # book dispersion: how far the best price beats the median (a soft/outlier
+        # line = the value). Higher = one book is out of step with the market.
+        disp_home=("odds_home", lambda s: float(s.max() / s.median() - 1) if s.median() else 0.0),
+        disp_away=("odds_away", lambda s: float(s.max() / s.median() - 1) if s.median() else 0.0),
         avg_overround=("overround", "mean"),
         kickoff=("kickoff", "first"),
     )
     return g
+
+
+HISTORY = PROCESSED / "odds_history.parquet"
+
+
+def append_history(cons: pd.DataFrame) -> None:
+    """Append this consensus snapshot to the odds-history store so line movement
+    and steam (rapid, one-directional moves) can be measured over time."""
+    if cons is None or cons.empty:
+        return
+    keep = [c for c in ["home_id", "away_id", "market_p_home", "best_odds_home",
+                        "best_odds_away", "median_odds_home", "median_odds_away"] if c in cons]
+    snap = cons[keep].copy()
+    snap["observed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    PROCESSED.mkdir(exist_ok=True)
+    if HISTORY.exists():
+        snap = pd.concat([pd.read_parquet(HISTORY), snap], ignore_index=True)
+    snap.to_parquet(HISTORY, index=False)
+
+
+def line_movement() -> pd.DataFrame:
+    """Per fixture: opening vs latest de-vigged home prob, the net move in
+    percentage points, and a steam flag (a large, one-directional shift)."""
+    if not HISTORY.exists():
+        return pd.DataFrame()
+    h = pd.read_parquet(HISTORY).sort_values("observed_at")
+    rows = []
+    for (hid, aid), g in h.groupby(["home_id", "away_id"]):
+        if len(g) < 2:
+            continue
+        first, last = g.iloc[0], g.iloc[-1]
+        move = float(last["market_p_home"] - first["market_p_home"]) * 100
+        rows.append({"home_id": hid, "away_id": aid, "n_obs": int(len(g)),
+                     "open_p_home": round(float(first["market_p_home"]), 4),
+                     "latest_p_home": round(float(last["market_p_home"]), 4),
+                     "move_home_pp": round(move, 1), "steam": abs(move) >= 3.0,
+                     "drift_side": "home" if move > 0 else "away"})
+    return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":

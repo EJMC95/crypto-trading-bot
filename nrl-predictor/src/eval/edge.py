@@ -61,13 +61,18 @@ def value_board(market: pd.DataFrame, min_ev: float = MIN_EDGE) -> list[dict]:
         if p_home is None or not np.isfinite(p_home):
             continue
         mk_home = getattr(r, "market_p_home", np.nan)
-        for side, team, opp, mp, mk, price in (
-            ("home", r.home, r.away, p_home, mk_home, getattr(r, "best_odds_home", np.nan)),
+        move_pp = getattr(r, "move_home_pp", np.nan)     # +ve = market drifting to home
+        steam = bool(getattr(r, "steam", False)) if pd.notna(getattr(r, "steam", np.nan)) else False
+        for side, team, opp, mp, mk, price, disp in (
+            ("home", r.home, r.away, p_home, mk_home, getattr(r, "best_odds_home", np.nan),
+             getattr(r, "disp_home", np.nan)),
             ("away", r.away, r.home, 1 - p_home, 1 - mk_home if np.isfinite(mk_home) else np.nan,
-             getattr(r, "best_odds_away", np.nan))):
+             getattr(r, "best_odds_away", np.nan), getattr(r, "disp_away", np.nan))):
             e = ev(mp, price)
             if not np.isfinite(e) or e <= min_ev:
                 continue
+            # is the market moving toward (confirming) or away from our pick?
+            side_move = (move_pp if side == "home" else -move_pp) if np.isfinite(move_pp) else None
             rows.append({
                 "match": f"{r.home} v {r.away}", "selection": team, "opponent": opp,
                 "side": side, "model_p": round(float(mp), 4),
@@ -78,6 +83,9 @@ def value_board(market: pd.DataFrame, min_ev: float = MIN_EDGE) -> list[dict]:
                 "ev_pct": round(e * 100, 1),
                 "kelly_pct": round(kelly_fraction(mp, price) * 100, 2),
                 "books": int(getattr(r, "books", 0) or 0),
+                "disp_pct": round(float(disp) * 100, 1) if np.isfinite(disp) else None,
+                "move_pp": round(float(side_move), 1) if side_move is not None else None,
+                "steam": steam,
                 "fair_price": round(1 / float(mp), 2) if mp > 0 else None,
             })
     rows.sort(key=lambda x: -x["ev_pct"])

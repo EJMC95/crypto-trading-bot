@@ -90,6 +90,35 @@ def log_bets(rows: list[dict]) -> int:
     return n
 
 
+def update_closing(round_label: str, prices: pd.DataFrame) -> int:
+    """Record the current best price as the (rolling) closing line for every open
+    h2h bet in the round, and recompute CLV = price_taken / closing - 1.
+
+    prices: home_id, away_id, best_odds_home, best_odds_away. Called on each odds
+    run; the last snapshot before a game plays becomes its effective close, so CLV
+    reflects whether we took a better price than the market settled on — the single
+    most reliable sign of a real edge, independent of who won."""
+    con = _conn()
+    n = 0
+    with con:
+        for r in prices.itertuples(index=False):
+            for sel_id, price in ((r.home_id, getattr(r, "best_odds_home", None)),
+                                  (r.away_id, getattr(r, "best_odds_away", None))):
+                if price is None or not pd.notna(price):
+                    continue
+                rows = con.execute(
+                    "SELECT id, market_price_at_log FROM bets WHERE round=? AND home_id=? "
+                    "AND away_id=? AND market='h2h' AND selection=? AND settled_at IS NULL",
+                    (round_label, r.home_id, r.away_id, sel_id)).fetchall()
+                for bid, taken in rows:
+                    clv = (float(taken) / float(price) - 1.0) if taken and price else None
+                    con.execute("UPDATE bets SET closing_price=?, clv=? WHERE id=?",
+                                (round(float(price), 3), round(clv, 4) if clv is not None else None, bid))
+                    n += 1
+    _mirror(con)
+    return n
+
+
 def settle_h2h(round_label: str, results: pd.DataFrame) -> pd.DataFrame:
     """results: home_id, away_id, home_score, away_score. Settles the round's h2h
     rows; returns the round's frame."""

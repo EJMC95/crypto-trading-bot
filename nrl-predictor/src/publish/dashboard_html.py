@@ -366,20 +366,30 @@ function renderValue(){
     implies value at the <b>best available price across the four books</b> (line-shopped). Ranked by
     expected value. <b>Kelly</b> = suggested stake as % of bankroll (quarter-Kelly, capped 5%).</p>
     <table><thead><tr><th>Selection</th><th>Match</th><th>Model</th><th>Market</th><th>Edge</th>
-      <th>Best price</th><th>Fair</th><th>EV</th><th>Kelly</th></tr></thead><tbody>`;
+      <th>Best price</th><th>Fair</th><th>EV</th><th>Kelly</th><th>Market move</th></tr></thead><tbody>`;
   for(const r of v){
     const evc=r.ev_pct>=8?"var(--good)":r.ev_pct>=3?"var(--model)":"var(--ink)";
+    // soft line: the best price is well above the median across books
+    const soft=(r.disp_pct!=null&&r.disp_pct>=3)?` <span title="best price ${r.disp_pct}% above median — a soft/outlier line" style="color:var(--market)">◆</span>`:"";
+    // is the market drifting toward our pick (confirming) or away (fading)?
+    let mv="—";
+    if(r.move_pp!=null&&Math.abs(r.move_pp)>=0.5){
+      const toward=r.move_pp>0;
+      mv=`<span style="color:${toward?'var(--good)':'#c0392b'}">${toward?"▲ toward":"▼ against"} ${Math.abs(r.move_pp)}pp</span>${r.steam?' <span title="steam: sharp one-way move" style="color:#eb6834">🔥</span>':""}`;
+    }
     h+=`<tr><td><b>${nick(r.selection)}</b></td><td style="color:var(--ink-2);font-size:12px">${nick(r.match.split(" v ")[0])} v ${nick(r.match.split(" v ")[1])}</td>
       <td>${pc(r.model_p)}</td><td>${r.market_p==null?"—":pc(r.market_p)}</td>
       <td>${r.edge_pp==null?"—":(r.edge_pp>=0?"+":"")+r.edge_pp+"pp"}</td>
-      <td><b>$${r.best_price.toFixed(2)}</b></td><td style="color:var(--muted)">$${r.fair_price?r.fair_price.toFixed(2):"—"}</td>
+      <td><b>$${r.best_price.toFixed(2)}</b>${soft}</td><td style="color:var(--muted)">$${r.fair_price?r.fair_price.toFixed(2):"—"}</td>
       <td style="color:${evc};font-weight:700">+${r.ev_pct}%</td>
-      <td>${r.kelly_pct>0?r.kelly_pct+"%":"—"}</td></tr>`;
+      <td>${r.kelly_pct>0?r.kelly_pct+"%":"—"}</td>
+      <td style="font-size:12px">${mv}</td></tr>`;
   }
   h+=`</tbody></table>
-    <p style="color:var(--muted);font-size:12px;margin-top:10px">Model and market both de-vigged. Edge = model − market
-    (percentage points). A fair price below the quoted price is the value. <b>Paper only — model opinions, not betting advice;
-    bookmaker margins and limits are real.</b></p>`;
+    <p style="color:var(--muted);font-size:12px;margin-top:10px">Model and market both de-vigged. Edge = model − market (pp).
+    <b>◆</b> = soft line (best price well above the market median). <b>Market move</b> = has the line drifted toward (confirming) or
+    against our pick since it opened; 🔥 = steam (a sharp one-way move). A fair price below the quote is the value.
+    <b>Paper only — model opinions, not betting advice; bookmaker margins and limits are real.</b></p>`;
   panel.innerHTML=h;
 }
 

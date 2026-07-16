@@ -38,7 +38,14 @@ def main() -> None:
     preds["home_id"] = preds["home"].map(name_to_id)
     preds["away_id"] = preds["away"].map(name_to_id)
 
+    # persist this snapshot to the odds-history store (line movement / steam)
+    odds_live.append_history(cons)
+    move = odds_live.line_movement()
+
     m = preds.merge(cons, on=["home_id", "away_id"], how="left")
+    if len(move):
+        m = m.merge(move[["home_id", "away_id", "move_home_pp", "steam", "drift_side"]],
+                    on=["home_id", "away_id"], how="left")
     m["edge_home"] = m["p_home_blend"] - m["market_p_home"]
     pick_home = m["edge_home"] >= 0
     m["value_side"] = np.where(pick_home, m["home"], m["away"])
@@ -47,8 +54,11 @@ def main() -> None:
     m["value_ev_pct"] = (m["value_p_model"] * m["value_best_odds"] - 1) * 100
     cols = ["round", "date", "home", "away", "p_home_blend", "market_p_home",
             "edge_home", "books", "best_odds_home", "best_odds_away",
-            "value_side", "value_ev_pct"]
-    market = m[cols].round(4)
+            "disp_home", "disp_away", "value_side", "value_ev_pct"]
+    for opt in ("move_home_pp", "steam", "drift_side"):
+        if opt in m:
+            cols.append(opt)
+    market = m[[c for c in cols if c in m]].round(4)
     market.to_csv(OUT / "round_market.csv", index=False)
     print(market.to_string(index=False))
 
@@ -69,6 +79,13 @@ def main() -> None:
         })
     n = ledger.log_bets(rows)
     print(f"ledger: {n} h2h rows logged -> {ledger.DB}")
+
+    # closing-line capture: stamp the current best price as the rolling close for
+    # every open bet this round + recompute CLV. Last run before kickoff = close.
+    if len(m):
+        rnd_label = str(m["round"].iloc[0])
+        nc = ledger.update_closing(rnd_label, cons)
+        print(f"ledger: closing line updated on {nc} open bets ({rnd_label})")
 
     notion_preview.build()
     dashboard_feed.build()
