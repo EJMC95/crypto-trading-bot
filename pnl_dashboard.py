@@ -2189,6 +2189,7 @@ CONTRACTS = [
     ("enactment outcome verdicts", "fleet_proprioception.py",
      "scout tuner (hurting-skip + helping-walk) · board (🦾 items, clip "
      "gates, ladder discount) · judge early-fade · incubator gene-skip · "
+     "LIVE BOTS (get_lever hurting-revert, every loop) · "
      "any bot via fleet_bus.lever_outcome · /bus.json",
      "verdict-gated: restrict-first; live top step fail-closed",
      "fleet-proprioception"),

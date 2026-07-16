@@ -66,8 +66,15 @@ WHAT IT DOES (hourly-ish, run-once, looped by run_all.sh)
          live.clip_scale verdict BLOCKS the board's up-ladder and releases
          the lever back to operator sizing; a HURTING live.funding.*
          verdict is an EARLIER fade signal for the judge (the judge stays
-         the only writer). The single live earn: the clip ladder's TOP
-         step (1.5) now requires a measured HELPING grade at 1.25 —
+         the only writer). AND — 'real money bots too' (16-Jul late) —
+         the REAL-MONEY BOTS THEMSELVES consume the verdicts every loop:
+         fleet_tuning.get_lever reverts a HURTING live-lane lever to the
+         operator's env default AT THE CONSUMER (funding bot apply_levers
+         + both bots' clip via venues), closing the latency window between
+         a verdict landing and the board/judge/TTL catching up — same
+         central-hook pattern as the immune quarantine, restrict-only by
+         construction. The single live earn: the clip ladder's TOP step
+         (1.5) now requires a measured HELPING grade at 1.25 —
          fail-CLOSED, a dark sense keeps the top out of reach. New live
          levers and promotions still have exactly one road: the judge.
      The evidence board surfaces helping (expand evidence) and hurting

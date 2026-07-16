@@ -112,8 +112,15 @@ https://pnl-dashboard-production-858c.up.railway.app/
   `/bus.json` serves the payload + history off-Railway, and the incubator
   consumes it (skips proposing a funding gene whose live lever is
   currently graded hurting — a 7-day judge slot isn't spent re-testing a
-  knob the live lane just measured bad). Review grades both sides —
-  agenda item 12. → bot_state `fleet-proprioception`
+  knob the live lane just measured bad). **REAL-MONEY BOTS CONSUME TOO
+  (16-Jul late)**: `fleet_tuning.get_lever` reverts a HURTING live-lane
+  lever to the operator's env default AT THE CONSUMER, every loop (the
+  immune-quarantine central-hook pattern; covers the funding bot's
+  `apply_levers` + both live bots' clip via venues) — a measured-bad
+  lever stops steering real money immediately instead of waiting out the
+  board/judge cycle or the lever TTL; live-lane only (shadow lanes keep
+  TTL semantics), fail-safe open, restrict-only by construction. Review
+  grades both sides — agenda item 12. → bot_state `fleet-proprioception`
 - `experiment_judge.py` 🧪⚖️ — the shadow→live PROMOTION pipeline (15-Jul
   user mandate: shadow wins must "carry across to the real money bots").
   Hourly, ONE candidate at a time on the Funding Farmer's -lshadow twin

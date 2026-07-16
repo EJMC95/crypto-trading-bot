@@ -390,3 +390,16 @@ HELPING grade at 1.25, fail-CLOSED (a dark sense caps the ladder at
   ladder have stepped where the measured gate refused?
 - prop_fade vs fade_check: which would have fired first on the week's
   data, and did either false-positive?
+
+**Real-money consumer hook (wired 16-Jul late, operator: "and with the
+new rule, real money bots too"):** `fleet_tuning.get_lever` now reverts a
+lighter-live lever carrying a fresh HURTING verdict to the operator's env
+default AT THE CONSUMER — the funding bot's apply_levers and both live
+bots' clip read pass through it every loop, closing the latency window
+between a verdict landing and the board/judge/TTL catching up. Live-lane
+only; fail-safe open; restrict-only by construction (can only hand back
+the operator's own default). Grade at the review:
+- Did the hook ever fire, and how much earlier did it revert than the
+  board release / judge fade would have (compare timestamps)?
+- Confirm composition with the immune quarantine (quarantine first, then
+  hurting-revert) produced no double-handling surprises in the logs.
