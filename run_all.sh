@@ -212,10 +212,13 @@ done &
 
 # [2026-07-15 CIRCADIAN] 🕐 the fleet's coordinated sense of time (session /
 # thin-liquidity / heavy-ok). Advisory; published for any organ to read.
+# v2 2026-07-16: NYSE calendar + open/close EVENTS for every market +
+# event_window, so consumers can allocate resources around any open/close.
+# 5-min cadence keeps the sampled window flags honest (ttl 15 min).
 ( sleep 200
   while true; do
     python3 /freqtrade/fleet_clock.py || true
-    sleep "${CLOCK_INTERVAL_SEC:-1800}"
+    sleep "${CLOCK_INTERVAL_SEC:-300}"
   done ) &
 
 # [2026-07-15 REGENERATION] 🩹 self-repair tier 2: restores a stateful organ

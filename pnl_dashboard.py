@@ -808,6 +808,25 @@ def evidence_board_card():
         return ""
 
 
+def _mins_until(iso_utc):
+    """' in 42m' / ' in 4.5h' from an ISO-UTC stamp; ' now' right at it;
+    '' when unparsable or already well past (stale sample). Relative on
+    purpose — timezone-neutral wherever the operator reads it."""
+    try:
+        from datetime import datetime, timezone
+        t = datetime.fromisoformat(str(iso_utc))
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        m = (t - datetime.now(timezone.utc)).total_seconds() / 60.0
+        if m < -5:
+            return ""
+        if m <= 2:
+            return " now"
+        return f" in {m / 60:.1f}h" if m >= 90 else f" in {int(round(m))}m"
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def autonomy_rail_card():
     """🤖 [2026-07-16] Autonomy / Growth Rail — one glance at the self-tuning
     stack that was headless until now (bot_state: fleet-tuning, scout-tuner,
@@ -887,8 +906,17 @@ def autonomy_rail_card():
         rows.append(row("fleet-respiration", "🫁 Respiration",
                         f'SpO2 {int(round((spo2 or 0) * 100))}% · {rp.get("state")}', rc))
         ck = s.get("fleet-clock") or {}
-        rows.append(row("fleet-clock", "🕰️ Clock",
-                        f'{ck.get("primary")}' + (" · THIN" if ck.get("thin_liquidity") else ""),
+        ck_ny = ck.get("markets")
+        ck_ny = ck_ny.get("nyse") if isinstance(ck_ny, dict) else None
+        ck_ny = ck_ny if isinstance(ck_ny, dict) else {}
+        ck_ne = ck.get("next_event")
+        ck_ne = ck_ne if isinstance(ck_ne, dict) else {}
+        ck_txt = f'{ck.get("primary")}' + (" · THIN" if ck.get("thin_liquidity") else "")
+        if ck_ny:
+            ck_txt += ' · NYSE ' + ('open' if ck_ny.get("open") else 'closed')
+        if ck_ne.get("at_utc"):
+            ck_txt += f' · {ck_ne.get("market")} {ck_ne.get("event")}{_mins_until(ck_ne.get("at_utc"))}'
+        rows.append(row("fleet-clock", "🕰️ Clock", ck_txt,
                         Y if ck.get("thin_liquidity") else None))
         sf = s.get("impl-shortfall") or {}
         vd = sf.get("verdict")
@@ -2047,8 +2075,14 @@ def _organ_vital(key, st):
             return _v("SpO2 {}% · {}",
                       int(round((st.get("spo2") or 0) * 100)), st.get("state"))
         if key == "fleet-clock":
-            return _v("session {}{}",
-                      st.get("primary"), " · THIN" if st.get("thin_liquidity") else "")
+            ny = (st.get("markets") or {}).get("nyse") or {}
+            ne = st.get("next_event") or {}
+            return _v("session {}{}{}{}",
+                      st.get("primary"),
+                      " · THIN" if st.get("thin_liquidity") else "",
+                      (" · NYSE " + ("open" if ny.get("open") else "closed")) if ny else "",
+                      (f' · {ne.get("market")} {ne.get("event")}'
+                       f'{_mins_until(ne.get("at_utc"))}') if ne.get("at_utc") else "")
         if key == "impl-shortfall":
             return _v("{} · gap {}pp", st.get("verdict"), st.get("gap_pp"))
         if key == "gapscout-census":
@@ -2083,7 +2117,7 @@ ORGAN_SPECS = [
     ("fleet-immune",       "🛡️ Fleet immune — sick/quarantine",       True,  2400),
     ("fleet-regen",        "🩹 Fleet regen — auto-heal",              False, 2400),
     ("fleet-respiration",  "🫁 Respiration — data-feed SpO2",         True,  1200),
-    ("fleet-clock",        "🕰️ Fleet clock — session/liquidity",      False, 1800),
+    ("fleet-clock",        "🕰️ Fleet clock — sessions/market events", False, 1800),
     ("impl-shortfall",     "📉 Impl shortfall — live vs shadow slip", False, 3600),
     ("gapscout-census",    "📊 Gap Scout census — episodes",          False, 3600),
     ("fleet-alerts",       "🔔 Alert feed (event-driven)",            False, None),
@@ -2116,6 +2150,9 @@ CONTRACTS = [
     ("evidence proposals", "evidence_board.py",
      "NOTHING yet — shadow; review promotes via EVBOARD_MODE", "shadow",
      "evidence-board"),
+    ("market open/close events + heavy_ok", "fleet_clock.py",
+     "published, unconsumed — first wiring decided at the 21-Jul review",
+     "advisory", "fleet-clock"),
     ("regime / listing intel / bus extras", "various",
      "published, unconsumed (info-only by design)", "advisory", "signal-bus"),
 ]

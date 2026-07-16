@@ -294,3 +294,29 @@ inspect `xp-judge` state + verdicts + the stamped extra.bars rows, decide
 whether the promotion bar (7d/30 closes/+0.5pp both-halves/live n≥10) is
 right BEFORE the first promotion can fire (~22-Jul earliest). B2-full (cross-quote BOOKING) and B4 (>5% identity check)
 remain open — the census now records both bands.
+
+## 11. Fleet clock v2: first consumers for market open/close events (added 16-Jul)
+
+**What shipped (16-Jul, operator: "when any market opens or closes we are
+able to allocate resources"):** the circadian organ (`fleet_clock.py`) went
+from zones to EVENTS — real NYSE calendar (zoneinfo DST, 2026-27 holidays,
+13:00-ET early closes), `events`/`next_event` (absolute `at_utc` open/close
+times for NYSE + the three crypto sessions), `event_window` (±15 min,
+env-tunable), `heavy_ok` now also stands aside inside event windows, and
+`fleet-clock` history is a transitions-only open/close event log. 5-min
+cadence. Still ADVISORY / publish-first per doctrine — no consumer wired.
+
+**Decide at the review — who gets wired FIRST (pick one, earn the rest):**
+- **Equities books** (Index Rider 📊 / Stock Leaders 🏆): idle their scan
+  loop while `markets.nyse.open` is false (the underlying doesn't print;
+  a frozen index makes their marks noise) and wake at `next_open_utc`.
+  Cheapest win, clearly correct — but backtest-first per house rules.
+- **Scanners** (Lighter Scout / Gap Scout): cadence boost inside
+  `event_window` — opens/closes are when dislocations and vol moves happen.
+- **Heavy jobs** (incubator breeding, big sweeps): consume `heavy_ok`
+  instead of running whenever — the flag now means "thin AND nothing
+  opening/closing".
+
+**Grade before wiring:** pull `fleet-clock` history — did the NYSE
+open/close transitions land at the right instants (DST honest, no holiday
+misses), and does `event_window` sample honestly at the 5-min cadence?
