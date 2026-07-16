@@ -41,6 +41,11 @@ COPY experiment_judge.py /freqtrade/experiment_judge.py
 # the immune + self-repair organ (alert filtration, sickness detection,
 # lever quarantine) — fleet_tuning.get_lever honors its quarantines
 COPY fleet_immune.py /freqtrade/fleet_immune.py
+# [2026-07-17] the event organ (RSS+GDELT major-event scanner + sector
+# playbook). Shipped 16-Jul into run_all.sh but never COPY'd — the loop's
+# `|| true` swallowed "No such file" every 10 min and the organ sat DARK
+# since birth. The infra flavour of enacted-is-not-applied.
+COPY event_sentinel.py /freqtrade/event_sentinel.py
 # circadian clock, regeneration (last-good restore), reproduction (genotype
 # breeding), respiration (blood-oxygen / hypoxia monitor)
 COPY fleet_clock.py /freqtrade/fleet_clock.py
