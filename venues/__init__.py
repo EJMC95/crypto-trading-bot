@@ -90,8 +90,19 @@ class VenueContext:
     def max_open_positions(self, paper_default: int) -> int:
         if self.mode == "hl_paper" or self.rails.max_notional is None:
             return paper_default
-        return max(1, math.floor(self.rails.max_notional /
-                                 self.order_usd(paper_default)))
+        # [2026-07-16 BALANCE] live slots anchor to the OPERATOR's env clip,
+        # not the lever-scaled clip: floor(cap/scaled_clip) meant a
+        # live.clip_scale DOWN-scale (restrict intent) MINTED position slots
+        # (x0.5 doubled max_open) and an up-scale burned them. Dollar
+        # exposure was already safe either way (_open_notional sums real
+        # entry clips against the cap at order time); this keeps the SLOT
+        # budget stable across lever moves so a tighten action can never
+        # expand any budget. Shadow modes keep mirroring their own clip.
+        if self.mode == "lighter_live":
+            anchor = float(os.environ.get("LIGHTER_ORDER_USD", "30"))
+        else:
+            anchor = self.order_usd(paper_default)
+        return max(1, math.floor(self.rails.max_notional / anchor))
 
 
 def venue_context(bot: str, default_hl_net: str = "testnet",

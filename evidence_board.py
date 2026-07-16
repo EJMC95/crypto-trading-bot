@@ -99,6 +99,12 @@ LENS_FLOOR_N4H = int(os.environ.get("EVBOARD_LENS_FLOOR", "75"))
 LENS_NEG_AVG4H = float(os.environ.get("EVBOARD_LENS_NEG_AVG4H", "-0.5"))
 STRESS_VETO_BPS = float(os.environ.get("TT_STRESS_VETO_BPS", "15"))
 DD_NEAR_TRIP = float(os.environ.get("EVBOARD_DD_NEAR_TRIP", "-0.035"))
+# the lens feed's usability window (~7.2h — the brain publishes hourly; a
+# payload older than this is a fossil, not evidence). [2026-07-16 BALANCE
+# FIX] BOTH sides now gate on it: the expand side always did, but the
+# restrict side read the raw payload — a dead brain's last lens table kept
+# firing lens-negative warns (and lens-veto proposals) indefinitely.
+LENS_FRESH_S = float(os.environ.get("EVBOARD_LENS_FRESH_S", "26000"))
 
 
 def _now():
@@ -200,10 +206,13 @@ def corroborate(key, lighter_market):
     return False
 
 
-def synthesize(lighter_market, fleet_risk, lens_forward, prior_keys, now_ts):
-    """Board-authored evidence from feed JOINS. Each item fires on condition
-    ENTER (not every cycle) — prior_keys is the set of synthesized keys that
-    were active last cycle. Returns [{key, severity, msg, proposal, lever}]."""
+def synthesize(lighter_market, fleet_risk, lens_forward, now_ts):
+    """Board-authored evidence from feed JOINS. Emission is level-triggered —
+    an item re-emits every cycle its condition holds; run_once's seen-map
+    dedups notifications. EVERY input is freshness-gated here (a stale feed
+    contributes NOTHING) — including the lens feed, which outlives a dead
+    brain in bot_state, so presence is not currency.
+    Returns [{key, severity, msg, proposal, lever}]."""
     out = []
 
     def emit(key, severity, msg, proposal=None, lever=None):
@@ -213,7 +222,8 @@ def synthesize(lighter_market, fleet_risk, lens_forward, prior_keys, now_ts):
 
     lm_ok = _fresh(lighter_market or {})
     fr_ok = _fresh(fleet_risk or {})
-    lf = (lens_forward or {}).get("lenses") or {}
+    lf = ((lens_forward or {}).get("lenses") or {}) \
+        if _fresh(lens_forward or {}, LENS_FRESH_S) else {}
 
     # the immune organ's findings, surfaced on the triage board (it already
     # phone-pushes; this puts sickness where the operator reviews everything)
@@ -348,21 +358,51 @@ PROMO_MIN_PNL = float(os.environ.get("EVBOARD_PROMO_MIN_PNL", "10"))
 # One lever, `live.clip_scale`: a bounded multiplier on the operator's env
 # clip for the lighter_live bots. It reshapes clip size; it CANNOT add
 # exposure (SafetyRails' notional cap is operator-only and checked at order
-# time). Sizing UP must be EARNED — every live row over the closed-trade
-# floor AND net positive, fleet light green, drawdown shallow, venue calm —
-# one ladder step per cooldown, TTL auto-revert to 1.0 the moment the board
-# stops re-asserting. Sizing DOWN fires immediately on a hurt live row or a
-# live-vs-shadow divergence alert. Every change pushes URGENT to the phone.
+# time). Sizing UP must be EARNED on the measured 7d ledger window — the
+# whole cohort fresh + non-harming, at least one row proving the edge
+# (lifetime volume + window sample + positive week), fleet light green,
+# drawdown shallow, venue calm — one ladder step per cooldown, explicit
+# release + TTL auto-revert to 1.0 the moment the board stops asserting.
+# Sizing DOWN fires immediately on a hurt window (lifetime backstop at 2x,
+# old lifetime rule when the ledger is dark) or a live-vs-shadow divergence
+# alert. Every change that LANDS pushes URGENT to the phone.
 # ---------------------------------------------------------------------------
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
     "crypto-trend-daily-lighter,perps-funding-lighter-lighter").split(",") if s.strip()}
 LIVE_MIN_CLOSED = int(os.environ.get("EVBOARD_LIVE_MIN_CLOSED", "30"))
-LIVE_DOWN_PNL = float(os.environ.get("EVBOARD_LIVE_DOWN_PNL", "10"))     # -$10 hurts
+LIVE_DOWN_PNL = float(os.environ.get("EVBOARD_LIVE_DOWN_PNL", "10"))     # -$10/7d hurts
 LIVE_DOWN_SCALE = float(os.environ.get("EVBOARD_LIVE_DOWN_SCALE", "0.75"))
 LIVE_DD_MIN = float(os.environ.get("EVBOARD_LIVE_DD_MIN", "-0.02"))      # 7d fleet dd
 LIVE_STEP_COOLDOWN_H = float(os.environ.get("EVBOARD_LIVE_COOLDOWN_H", "24"))
 LIVE_LADDER = [1.0, 1.25, 1.5]
+# [2026-07-16 BALANCE PASS — user: "ensure the expand vs tighten is balanced
+# for real money"] The original gates were LIFETIME-anchored on both sides,
+# which in practice made the lane one-sided: lifetime pnl never heals (the
+# down reflex was a ratchet) and the earned bar required EVERY live row
+# >=30 lifetime closes — unreachable, because Tide Rider is a position
+# HOLDER (0 closes ever, by design; the judge excludes it for the same
+# reason). Both sides now anchor on the same 7d realized-P&L ledger window:
+#   TIGHTEN: 7d realized <= -LIVE_DOWN_PNL, with a 2x lifetime BACKSTOP
+#            (and the old lifetime rule as the fallback when the ledger
+#            window is dark — tighten never gets weaker on missing data).
+#   EXPAND:  every row fresh + non-harming (lifetime bleed within
+#            LIVE_SLOW_TOL) AND >=1 row PROVES it: >=LIVE_MIN_CLOSED
+#            lifetime closes, >=LIVE_MIN_CLOSED_7D closes in the window,
+#            positive 7d realized. Dark window = no up-scale (fail-closed).
+LIVE_DOWN_HARD = float(os.environ.get("EVBOARD_LIVE_DOWN_HARD",
+                                      str(2 * LIVE_DOWN_PNL)))
+LIVE_SLOW_TOL = float(os.environ.get("EVBOARD_LIVE_SLOW_TOL", "1"))
+LIVE_MIN_CLOSED_7D = int(os.environ.get("EVBOARD_LIVE_MIN_CLOSED_7D", "5"))
+# anti-flap: after ANY release the up-ladder waits this long before
+# re-asserting — a gate oscillating at its threshold must not strobe
+# URGENT pushes at the operator every 10-min cycle. Down stays instant.
+LIVE_REASSERT_GAP_H = float(os.environ.get("EVBOARD_LIVE_REASSERT_GAP_H", "1"))
+# the live lever's own leash: 3 board cycles, not the rail's 2h default —
+# a dead board reverts real-money clips in ~30min (write_levers per-entry
+# ttl_sec can only shorten, never extend).
+LIVE_LEVER_TTL_S = int(os.environ.get("EVBOARD_LIVE_LEVER_TTL_S",
+                                      str(3 * INTERVAL)))
 # A divergence alert only cuts LIVE size if it is CURRENT. The window was
 # 48h, which let a 39h-old fossil from the RETIRED whole-book ratio check
 # (the diagnosed "+5.4%" artifact) cut real money on 15-Jul. A genuine
@@ -404,7 +444,8 @@ def live_clip_grade(prop_state):
 
 
 def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
-                    prior_scale, now_ts, clip_grade=None):
+                    prior_scale, now_ts, clip_grade=None, window=None,
+                    released_ts=0.0):
     """The live lane's decision. Returns (desired_scale | None, item | None).
     None = assert nothing (the lever expires back to 1.0 on its own).
     prior_scale: {"value", "ts"} from the previous board payload — the
@@ -415,11 +456,22 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     lever and blocks every up-step; the ladder's TOP step additionally
     REQUIRES a measured HELPING grade at the mid step — fail-CLOSED, so a
     dark sense caps the ladder at the mid step. Sizing down never needs
-    the grade. Pure — selftested offline."""
+    the grade.
+    window (16-Jul balance pass): {bot: {"pnl", "closes"}} — 7d realized
+    P&L per live row from the paper_trades ledger. Time-local evidence for
+    BOTH directions; None (ledger dark) fails the up-scale closed and
+    drops the down reflex back to the conservative lifetime rule.
+    released_ts: when the board last RELEASED the lever — the up-ladder
+    waits LIVE_REASSERT_GAP_H after any release (anti-flap; down ignores
+    it).
+    Cohort visibility is ASYMMETRIC by design: the DOWN reflex fires on
+    whatever rows are visible (plus the rows-free divergence alert), while
+    a partially-visible cohort returns no decision for everything else —
+    run_once then HOLDS an in-force restriction rather than releasing it.
+    Pure — selftested offline."""
     rows = {str(r.get("bot")): r for r in (bot_rows or [])
             if str(r.get("bot")) in LIVE_ROWS}
-    if not LIVE_ROWS or len(rows) < len(LIVE_ROWS):
-        return None, None                    # can't see the whole live cohort
+    cohort_ok = bool(LIVE_ROWS) and len(rows) >= len(LIVE_ROWS)
 
     def emit(scale, sev, direction, why):
         return {"key": "board:live-clip-scale", "severity": sev,
@@ -440,13 +492,40 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
               and max(a.get("ts") or 0, a.get("last_seen") or 0)
               >= now_ts - LIVE_GAP_FRESH_H * 3600
               for a in alerts or [])
-    hurt = [b for b, r in sorted(rows.items())
-            if float(r.get("pnl_abs") or 0) <= -LIVE_DOWN_PNL]
+
+    # hurt is TIME-LOCAL (16-Jul balance pass): a 7d realized hole in the
+    # ledger window, with a 2x lifetime BACKSTOP for slow bleeds the window
+    # can't see. Lifetime alone was a ratchet — a book that healed stayed
+    # "hurt" forever. Two conservative carve-outs: a row with ZERO window
+    # closes (a position HOLDER — the window is structurally blind to it)
+    # keeps the FULL lifetime bar on its mark-anchored pnl, and a dark
+    # window drops every row back to the old lifetime rule. The DOWN reflex
+    # runs on whatever rows ARE visible — a vanished bot_pnl row must never
+    # disarm the tighten side (it only blocks the expand side, below).
+    def _hurt_why(b, r):
+        life = float(r.get("pnl_abs") or 0)
+        w = (window or {}).get(b) if window else None
+        if w is not None:
+            wp = float(w.get("pnl") or 0)
+            if wp <= -LIVE_DOWN_PNL:
+                return f"{b} 7d ${wp:+.2f}"
+            if int(w.get("closes") or 0) == 0:
+                return (f"{b} ${life:+.2f} (mark)"
+                        if life <= -LIVE_DOWN_PNL else None)
+            if life <= -LIVE_DOWN_HARD:
+                return f"{b} lifetime ${life:+.2f} (backstop)"
+            return None
+        return f"{b} ${life:+.2f}" if life <= -LIVE_DOWN_PNL else None
+
+    hurt = [w for b, r in sorted(rows.items()) for w in [_hurt_why(b, r)] if w]
     if gap or hurt:
         why = " ; ".join((["live-vs-shadow divergence alert"] if gap else [])
-                         + [f"{b} ${float(rows[b].get('pnl_abs') or 0):+.2f}"
-                            for b in hurt])
+                         + hurt
+                         + ([] if cohort_ok else ["cohort partially visible"]))
         return LIVE_DOWN_SCALE, emit(LIVE_DOWN_SCALE, "action", "restrict", why)
+
+    if not cohort_ok:
+        return None, None      # blind: no decision (run_once HOLDS a restriction)
 
     # 🦾 the live lane's own learning: a HURTING clip grade (scaled episodes
     # measured worse than the pre-window AND the shadow twin) stops the
@@ -467,6 +546,11 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
                 "direction": "restrict"}
         return None, None
 
+    # a fresh RELEASE parks the up-ladder briefly (anti-flap): a gate
+    # oscillating at its threshold must not strobe URGENT pushes.
+    if released_ts and now_ts - float(released_ts) < LIVE_REASSERT_GAP_H * 3600:
+        return None, None
+
     # UP must be earned on every gate at once.
     fr_ok = (_fresh(fleet_risk or {})
              and str(fleet_risk.get("light")) == "green"
@@ -478,12 +562,30 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     med = ((lighter_market or {}).get("stress") or {}).get("med")
     lm_ok = (_fresh(lighter_market or {}) and med is not None
              and med * 2 <= STRESS_VETO_BPS)
-    # up-scale is earned only on FRESH rows (fail-closed): a frozen row's
-    # lifetime-positive pnl is not evidence the bot is healthy right now.
-    earned = all(int(r.get("closed_trades") or 0) >= LIVE_MIN_CLOSED
-                 and float(r.get("pnl_abs") or 0) > 0
-                 and _row_fresh(r, now_ts) for r in rows.values())
-    if not (fr_ok and lm_ok and earned):
+    # EARNED, time-local + cohort-aware (16-Jul balance pass). The old bar
+    # (EVERY row >=30 LIFETIME closes AND lifetime-positive) was unreachable:
+    # Tide Rider holds positions (0 closes ever, by design) and a lifetime
+    # anchor never heals — expand existed only on paper. The clip lever is
+    # SHARED across the live cohort, so the bar splits by role: every row
+    # must be FRESH and NON-HARMING (lifetime bleed inside LIVE_SLOW_TOL —
+    # a frozen row's history is not evidence of current health), and at
+    # least one row must PROVE the edge on the measured week: >=
+    # LIVE_MIN_CLOSED lifetime closes AND >= LIVE_MIN_CLOSED_7D window
+    # closes AND positive 7d realized. No ledger window -> no up (CLOSED).
+    if window is None:
+        return None, None
+    nonharm = all(_row_fresh(r, now_ts)
+                  and float(r.get("pnl_abs") or 0) >= -LIVE_SLOW_TOL
+                  for r in rows.values())
+
+    def _proves(b, r):
+        w = window.get(b) or {}
+        return (int(r.get("closed_trades") or 0) >= LIVE_MIN_CLOSED
+                and int(w.get("closes") or 0) >= LIVE_MIN_CLOSED_7D
+                and float(w.get("pnl") or 0) > 0)
+
+    provers = [b for b, r in sorted(rows.items()) if _proves(b, r)]
+    if not (fr_ok and lm_ok and nonharm and provers):
         return None, None                    # lever expires -> 1.0
 
     cur = float((prior_scale or {}).get("value") or 1.0)
@@ -497,8 +599,10 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
         nxt = cur
     if nxt <= 1.0:
         return None, None
-    why = (f"EARNED: every live row ≥{LIVE_MIN_CLOSED} closes & net positive, "
-           f"fleet green, dd>{LIVE_DD_MIN:.0%}, venue calm ({med}bps)"
+    why = (f"EARNED: {'+'.join(provers)} ≥{LIVE_MIN_CLOSED} closes & 7d-positive"
+           f" (≥{LIVE_MIN_CLOSED_7D} window closes), cohort fresh & non-harming"
+           f" (≥-${LIVE_SLOW_TOL:g}), fleet green, dd>{LIVE_DD_MIN:.0%}, "
+           f"venue calm ({med}bps)"
            + (" · 🦾 measured HELPING at the prior step"
               if nxt == LIVE_LADDER[-1] and clip_grade == "helping" else ""))
     return nxt, emit(nxt, "action", "expand", why)
@@ -688,6 +792,11 @@ def run_once():
     prior = store.load_state(BOARD_KEY) or {}
     prior_items = {i["key"]: i for i in prior.get("items", [])}
     notified = dict(prior.get("notified") or {})
+    # [2026-07-16] full first-seen memory. prior_items only holds the top-20
+    # DISPLAYED items, so anything ranked 21+ lost its first_seen and could
+    # re-notify as "new" after the gap. Migrate from prior items on first run.
+    seen_prior = dict(prior.get("seen") or {}) or \
+        {k: (v.get("first_seen") or "") for k, v in prior_items.items()}
 
     # [2026-07-15 BLOODSTREAM] one batched beat for the board's whole working
     # set (was ~8 individual round-trips per cycle). Fall back to per-key reads
@@ -719,9 +828,8 @@ def run_once():
         elif ts >= now - 24 * 3600:
             fires_prior12[k] = fires_prior12.get(k, 0) + 1
 
-    # ---- synthesized evidence (condition-ENTER only) -----------------------
-    prior_synth = {k for k in prior_items if k.startswith("board:")}
-    synth = synthesize(lm, fr, lf, prior_synth, now) + detect_veto_flap(fa, now)
+    # ---- synthesized evidence (level-triggered; seen-map dedups notify) ----
+    synth = synthesize(lm, fr, lf, now) + detect_veto_flap(fa, now)
 
     # ---- EXPAND-direction synthesis: winners, promotions, tuner activity,
     # and restrictions that never bind (the board's other eye) --------------
@@ -732,7 +840,7 @@ def run_once():
         bot_rows = store.fetch_bot_pnl() or []
     except Exception:
         bot_rows = []
-    synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, 26000) else {},
+    synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, LENS_FRESH_S) else {},
                                tuner_state, bot_rows, lm, now, xp_state)
 
     # 🦾 proprioception: what the autonomy stack's own movements measured
@@ -759,10 +867,41 @@ def run_once():
             "lever": "impl-shortfall", "ts": now, "source": "board"})
 
     # ---- LIVE lane 💰: evidence-gated clip scaling on the real-money bots,
-    # now grade-aware (🦾 hurting releases/blocks; top step needs helping) --
+    # grade-aware (🦾 hurting releases/blocks; top step needs helping) and
+    # time-local (7d realized ledger window on BOTH directions, 16-Jul) ----
+    live_window = None
+    try:
+        if hasattr(store, "fetch_realized_window"):
+            live_window = store.fetch_realized_window(sorted(LIVE_ROWS), days=7)
+    except Exception:  # noqa: BLE001
+        live_window = None
     prior_live = prior.get("live_scale") or {}
+    prior_release_ts = float(prior.get("live_released_ts") or 0)
     desired_live, live_item = synthesize_live(bot_rows, fr, lm, fa, prior_live,
-                                              now, live_clip_grade(prop_b))
+                                              now, live_clip_grade(prop_b),
+                                              window=live_window,
+                                              released_ts=prior_release_ts)
+    # [2026-07-16 blind-hold] an in-force RESTRICTION (< 1.0) is never
+    # withdrawn on missing data: assert-nothing WITHOUT a reasoned item
+    # (blind cohort / dark window) re-asserts the prior restriction until
+    # the evidence is back and healing is MEASURED. A reasoned release
+    # (hurting grade) and any expansion release stay fail-closed as-is.
+    _plv = prior_live.get("value")
+    _vis = {str(r.get("bot")) for r in (bot_rows or [])
+            if str(r.get("bot")) in LIVE_ROWS}
+    live_cohort_ok = bool(LIVE_ROWS) and len(_vis) >= len(LIVE_ROWS)
+    if (desired_live is None and live_item is None
+            and _plv is not None and float(_plv) < 1.0
+            and not (live_cohort_ok and live_window is not None)):
+        desired_live = float(_plv)
+        live_item = {"key": "board:live-clip-scale", "severity": "action",
+                     "msg": f"💰 LIVE clips x{desired_live:g} HELD — cohort/"
+                            f"window not fully visible; a restriction is only "
+                            f"released on measured healing",
+                     "proposal": "conservative hold, re-asserted each cycle "
+                                 "until the cohort + ledger window are back",
+                     "lever": "live.clip_scale", "ts": now, "source": "board",
+                     "direction": "restrict"}
     if live_item:
         synth.append(live_item)
 
@@ -784,7 +923,7 @@ def run_once():
                     f"{k}={v}" for k, v in sorted(growth_levers.items())),
                 "lever": "growth-rail", "direction": "expand",
                 "ts": now, "source": "board"})
-    synth_new = [s for s in synth if s["key"] not in prior_synth]
+    synth_new = [s for s in synth if s["key"] not in seen_prior]
 
     # ---- assemble the board -------------------------------------------------
     auto_map, items = {}, []
@@ -798,7 +937,7 @@ def run_once():
             "score": score_item(a.get("severity"), age_h, fires24.get(k, 1),
                                 corroborate(k, lm if _fresh(lm) else None)),
             "fires_24h": fires24.get(k, 0), "trend": tr, "source": "alerts",
-            "first_seen": prior_items.get(k, {}).get("first_seen") or _iso(a.get("ts")),
+            "first_seen": seen_prior.get(k) or _iso(a.get("ts")),
             "verdict": v,
         })
     for s in synth:
@@ -808,7 +947,7 @@ def run_once():
             "key": k, "msg": s["msg"], "sev": s["severity"],
             "score": score_item(s["severity"], 0.0, 1, True),
             "fires_24h": 1, "trend": "steady", "source": "board",
-            "first_seen": prior_items.get(k, {}).get("first_seen") or _iso(now),
+            "first_seen": seen_prior.get(k) or _iso(now),
             "verdict": "active", "proposal": s.get("proposal"), "lever": s.get("lever"),
             "direction": s.get("direction", "restrict"),
         })
@@ -834,34 +973,65 @@ def run_once():
                              f"episodes_open={census.get('episodes_open')}, "
                              f"day={json.dumps(census.get('day'))}"}
              for k, v in growth_levers.items()})
+    prior_live_val = prior_live.get("value")
+    # [2026-07-16] a lapse/hurting release is now an EXPLICIT WITHDRAWAL
+    # (tuning.release_levers), not a wait-for-TTL: the phone said "back to
+    # x1.0" while the old lever could stay in force up to 2h. A true
+    # removal (not a 1.0 overwrite) so consumers revert instantly AND
+    # proprioception sees a clean 'released' episode end instead of a
+    # phantom no-op stance it would have to grade.
+    release_live = desired_live is None and prior_live_val is not None
     if desired_live is not None:
         board_levers["live.clip_scale"] = {
-            "value": desired_live,
+            "value": desired_live, "ttl_sec": LIVE_LEVER_TTL_S,
             "reason": (live_item or {}).get("msg", "")[:180],
             "evidence": f"live rows {sorted(LIVE_ROWS)}; gates in synthesize_live"}
     enacted = None
     if board_levers and tuning is not None:
         enacted = tuning.write_levers(board_levers, set_by="evidence-board",
                                       now_ts=now)
+    released = None
+    if release_live and tuning is not None:
+        released = tuning.release_levers(["live.clip_scale"],
+                                         set_by="evidence-board", now_ts=now)
+    # did the LIVE change actually land? The URGENT push and the ladder's
+    # memory must not claim a change the rail never recorded.
+    live_write_needed = desired_live is not None or release_live
+    live_write_ok = ((desired_live is not None
+                      and bool(enacted
+                               and "live.clip_scale" in (enacted.get("levers") or {})))
+                     or (release_live and released is not None))
     prior_step = int(prior.get("growth_step") or 0)
-    if growth_step > prior_step and enacted:
+    # the step push lists ONLY the board's own gapscout levers — the merged
+    # payload also carries other authors' lanes (and the live lever), which
+    # made the push read as if the census had enacted them.
+    _gs_enacted = {k: v["value"]
+                   for k, v in ((enacted or {}).get("levers") or {}).items()
+                   if v.get("set_by") == "evidence-board"
+                   and k.startswith("gapscout.")}
+    if growth_step > prior_step and _gs_enacted:
         send_push(f"growth rail: Gap Scout net -> step {growth_step}",
                   f"census quiet {quiet_h:.0f}h; enacted: " + ", ".join(
-                      f"{k}={v['value']}" for k, v in enacted["levers"].items()),
+                      f"{k}={v}" for k, v in sorted(_gs_enacted.items())),
                   priority="default", tags="seedling")
         print(f"[evidence_board] growth rail ENACTED step {growth_step}: "
-              f"{sorted(enacted['levers'])}", flush=True)
-    # live changes always reach the phone URGENT — it's real money
-    prior_live_val = prior_live.get("value")
+              f"{sorted(_gs_enacted)}", flush=True)
+    # live changes always reach the phone URGENT — it's real money — but
+    # only once the write LANDED; a failed write logs and retries next cycle.
     if desired_live != prior_live_val and (desired_live is not None
                                            or prior_live_val is not None):
-        send_push("LIVE clips " + (f"x{desired_live:g}" if desired_live
-                                   else "back to x1.0 (lever released)"),
-                  (live_item or {}).get("msg")
-                  or "conditions no longer hold — expires to operator sizing",
-                  priority="urgent", tags="moneybag")
-        print(f"[evidence_board] LIVE clip_scale: {prior_live_val} -> "
-              f"{desired_live}", flush=True)
+        if live_write_ok:
+            send_push("LIVE clips " + (f"x{desired_live:g}" if desired_live
+                                       else "back to x1.0 (lever released)"),
+                      (live_item or {}).get("msg")
+                      or "conditions no longer hold — released to operator sizing",
+                      priority="urgent", tags="moneybag")
+            print(f"[evidence_board] LIVE clip_scale: {prior_live_val} -> "
+                  f"{desired_live}", flush=True)
+        else:
+            print(f"[evidence_board] LIVE clip_scale write FAILED — lever "
+                  f"unchanged (wanted {prior_live_val} -> {desired_live}); "
+                  f"retrying next cycle", flush=True)
 
     # ---- notify: NEW warn/action items AND new EXPAND items — good news
     # reaches the phone with the same machinery as warnings (default
@@ -880,7 +1050,7 @@ def run_once():
             continue
         if i["sev"] not in ("warn", "action") and not is_expand:
             continue
-        is_new = i["key"] not in prior_items or (i["key"] in {s["key"] for s in synth_new})
+        is_new = i["key"] not in seen_prior
         escalated = i["trend"] == "escalating" and prior_items.get(i["key"], {}).get("trend") != "escalating"
         last_n = notified.get(i["key"], 0)
         if (is_new or escalated) and now - last_n >= NOTIFY_GAP_H * 3600:
@@ -899,21 +1069,36 @@ def run_once():
                 notified[i["key"]] = now
                 print(f"[evidence_board] notified: {i['key']}", flush=True)
 
+    # ladder memory: a live write that never landed must not advance the
+    # cooldown clock or the release stamp — carry the prior state so the
+    # transition retries next cycle.
+    if live_write_needed and not live_write_ok:
+        live_scale_out = prior.get("live_scale")
+        released_out = prior_release_ts or None
+    else:
+        live_scale_out = ({"value": desired_live,
+                           "ts": (prior_live.get("ts")
+                                  if desired_live == prior_live_val else now)}
+                          if desired_live is not None else None)
+        released_out = (now if release_live else prior_release_ts) or None
     payload = {
         "updated": _iso(now), "ttl_sec": TTL_SEC, "mode": MODE,
         "items": items[:20],
+        "seen": {i["key"]: i["first_seen"] for i in items},
         "proposals": proposals,
-        "growth_step": growth_step,
-        "live_scale": ({"value": desired_live,
-                        "ts": (prior_live.get("ts") if desired_live == prior_live_val
-                               else now)}
-                       if desired_live is not None else None),
+        # step memory only advances when the gapscout write LANDED — else a
+        # failed write at a step transition swallows the mandated push forever
+        "growth_step": (growth_step if (_gs_enacted or not growth_levers)
+                        else prior_step),
+        "live_scale": live_scale_out,
+        "live_released_ts": released_out,
         "enacted": ({k: v["value"] for k, v in enacted["levers"].items()
                      if v.get("set_by") == "evidence-board"}
                     if enacted else None),
         "notified": {k: v for k, v in notified.items() if now - v < 7 * 86400},
         "inputs_fresh": {"lighter_market": _fresh(lm), "fleet_risk": _fresh(fr),
-                         "lens_forward": bool(lf),
+                         "lens_forward": _fresh(lf, LENS_FRESH_S),
+                         "live_window": live_window is not None,
                          "gapscout_census": _fresh(census, max_age_s=3600)},
     }
     store.save_state(BOARD_KEY, payload)
@@ -957,13 +1142,19 @@ def _selftest():
     lm = {"updated": fresh, "stress": {"med": 20}}
     fr = {"updated": fresh, "fleet_dd_7d": -0.04, "gross": 25, "long_budget": 20,
           "exposure": {"long_effective_n": 10.1}}
-    lf = {"lenses": {"momentum": {"n4h": 90, "hit4h": 0.37, "avg4h_pct": -1.05},
+    lf = {"updated": fresh,
+          "lenses": {"momentum": {"n4h": 90, "hit4h": 0.37, "avg4h_pct": -1.05},
                      "dip": {"n4h": 2, "hit4h": 0.0, "avg4h_pct": -0.6}}}
-    keys = {s["key"] for s in synthesize(lm, fr, lf, set(), _now())}
+    keys = {s["key"] for s in synthesize(lm, fr, lf, _now())}
     assert keys == {"board:venue-stress", "board:governor-near-trip", "board:budget-crowding",
                     "board:lens-floor:momentum", "board:lens-negative:momentum"}, keys
     assert synthesize({"updated": "2020-01-01T00:00:00+00:00", "stress": {"med": 99}},
-                      {}, {}, set(), _now()) == []
+                      {}, {}, _now()) == []
+    # a FOSSIL lens payload (dead brain) fires NO lens items on the restrict
+    # side either — the same freshness bar the expand side always used
+    k_st = {s["key"] for s in synthesize(
+        lm, fr, dict(lf, updated="2020-01-01T00:00:00+00:00"), _now())}
+    assert not any(k.startswith("board:lens-") for k in k_st), k_st
     # flap detection
     now = _now()
     fa = [{"key": "veto:ADA,kBONK", "ts": now - 3 * 86400},
@@ -1025,47 +1216,59 @@ def _selftest():
     assert synthesize_proprioception({}, _now()) == []
     assert synthesize_proprioception(None, _now()) == []
 
-    # LIVE lane: earn-up ladder + cooldown, instant down, fail-safe absent
+    # LIVE lane: earn-up ladder + cooldown, instant down, fail-safe absent.
+    # The rows mirror the REAL cohort shape (16-Jul balance pass): Tide Rider
+    # HOLDS positions (0 closes ever, tiny mark bleed), the Funding Farmer
+    # trades (lifetime slightly negative, 7d window positive). This exact
+    # shape must earn the first step — that reachability IS the fix.
     nowts = _now()
     fresh_fr = {"updated": fresh, "ttl_sec": 900, "light": "green",
                 "fleet_dd_7d": -0.005}
     calm_lm = {"updated": fresh, "stress": {"med": 5}}
-    live_ok = [{"bot": "crypto-trend-daily-lighter", "closed_trades": 40,
-                "pnl_abs": 12.0, "updated_at": fresh},
+    live_ok = [{"bot": "crypto-trend-daily-lighter", "closed_trades": 0,
+                "pnl_abs": -0.23, "updated_at": fresh},
                {"bot": "perps-funding-lighter-lighter", "closed_trades": 33,
-                "pnl_abs": 4.0, "updated_at": fresh}]
-    s, it = synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts)
+                "pnl_abs": -0.30, "updated_at": fresh}]
+    win_ok = {"crypto-trend-daily-lighter": {"pnl": 0.0, "closes": 0},
+              "perps-funding-lighter-lighter": {"pnl": 2.4, "closes": 14}}
+    s, it = synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
+                            window=win_ok)
     assert s == 1.25 and it["direction"] == "expand" and it["severity"] == "action"
+    # DARK ledger window -> the up-scale fails CLOSED (no measured week, no up)
+    assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
     s2, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
-                            {"value": 1.25, "ts": nowts - 3600}, nowts)
+                            {"value": 1.25, "ts": nowts - 3600}, nowts,
+                            window=win_ok)
     assert s2 == 1.25, "cooldown must hold the step"
     # 🦾 the top step must be MEASURED: no grade (dark sense) -> fail-closed
     # hold at the mid step; a fresh HELPING grade unlocks it
     s3, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
-                            {"value": 1.25, "ts": nowts - 25 * 3600}, nowts)
+                            {"value": 1.25, "ts": nowts - 25 * 3600}, nowts,
+                            window=win_ok)
     assert s3 == 1.25, "no measured HELPING -> top step stays out of reach"
     s3b, it3b = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                                 {"value": 1.25, "ts": nowts - 25 * 3600},
-                                nowts, clip_grade="helping")
+                                nowts, clip_grade="helping", window=win_ok)
     assert s3b == 1.5 and "HELPING" in it3b["msg"], (s3b, it3b)
     s4, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                             {"value": 1.5, "ts": nowts - 25 * 3600}, nowts,
-                            clip_grade="helping")
+                            clip_grade="helping", window=win_ok)
     assert s4 == 1.5, "ladder top is the ceiling"
     # 🦾 HURTING releases an asserted lever (item, no scale) and silently
     # blocks a fresh up-start; the DOWN reflex stays senior to the grade
     sh, ith = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                               {"value": 1.25, "ts": nowts - 25 * 3600},
-                              nowts, clip_grade="hurting")
+                              nowts, clip_grade="hurting", window=win_ok)
     assert sh is None and ith["direction"] == "restrict" \
         and "RELEASED" in ith["msg"], (sh, ith)
     assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
-                           clip_grade="hurting") == (None, None)
-    live_hurt0 = [dict(live_ok[0], pnl_abs=-15.0), live_ok[1]]
-    sh2, ith2 = synthesize_live(live_hurt0, fresh_fr, calm_lm, [],
+                           clip_grade="hurting", window=win_ok) == (None, None)
+    win_hole = dict(win_ok, **{"perps-funding-lighter-lighter":
+                               {"pnl": -12.0, "closes": 9}})
+    sh2, ith2 = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                                 {"value": 1.25, "ts": 0}, nowts,
-                                clip_grade="hurting")
-    assert sh2 == LIVE_DOWN_SCALE, "hurt row down-scale beats the release"
+                                clip_grade="hurting", window=win_hole)
+    assert sh2 == LIVE_DOWN_SCALE, "7d-hole down-scale beats the release"
     # grade sourcing: fresh hurting/helping surface; neutral/stale/absent None
     fp = _iso()
     assert live_clip_grade({"updated": fp, "ttl_sec": 2700, "verdicts": {
@@ -1076,10 +1279,35 @@ def _selftest():
                             "ttl_sec": 60, "verdicts": {
                                 "live.clip_scale": {"verdict": "helping"}}}) is None
     assert live_clip_grade({}) is None and live_clip_grade(None) is None
-    live_hurt = [dict(live_ok[0], pnl_abs=-15.0), live_ok[1]]
-    s5, it5 = synthesize_live(live_hurt, fresh_fr, calm_lm, [],
-                              {"value": 1.5, "ts": 0}, nowts)
-    assert s5 == 0.75 and it5["direction"] == "restrict" and it5["severity"] == "action"
+    # DOWN is TIME-LOCAL (16-Jul balance pass): a 7d realized hole cuts even
+    # while lifetime looks harmless...
+    s5, it5 = synthesize_live(live_ok, fresh_fr, calm_lm, [],
+                              {"value": 1.5, "ts": 0}, nowts, window=win_hole)
+    assert s5 == 0.75 and it5["direction"] == "restrict" \
+        and it5["severity"] == "action" and "7d" in it5["msg"]
+    # ...a healed book is NOT hurt by an old lifetime scar (ratchet removed;
+    # the scar still blocks the up-scale via the non-harm tolerance)...
+    healed = [live_ok[0], dict(live_ok[1], pnl_abs=-15.0)]
+    assert synthesize_live(healed, fresh_fr, calm_lm, [], {}, nowts,
+                           window=win_ok) == (None, None), \
+        "positive 7d window forgives a -$15 lifetime scar (no down, no up)"
+    # ...a HOLDER row (0 window closes) keeps the FULL -$10 bar on its
+    # mark-anchored lifetime — the window is structurally blind to it, so
+    # it must not inherit the weaker backstop...
+    bleed = [dict(live_ok[0], pnl_abs=-12.0), live_ok[1]]
+    s5c, it5c = synthesize_live(bleed, fresh_fr, calm_lm, [], {}, nowts,
+                                window=win_ok)
+    assert s5c == 0.75 and "(mark)" in it5c["msg"], (s5c, it5c)
+    # ...while a TRADER row (window visible + positive) only cuts at the
+    # 2x lifetime backstop...
+    deep = [live_ok[0], dict(live_ok[1], pnl_abs=-22.0)]
+    s5e, it5e = synthesize_live(deep, fresh_fr, calm_lm, [], {}, nowts,
+                                window=win_ok)
+    assert s5e == 0.75 and "backstop" in it5e["msg"], (s5e, it5e)
+    # ...and a DARK window falls back to the OLD lifetime rule (tighten
+    # never weakens on missing data)
+    s5d, _ = synthesize_live(healed, fresh_fr, calm_lm, [], {}, nowts)
+    assert s5d == 0.75, "dark window -> lifetime <= -$10 still cuts"
     s6, _ = synthesize_live(live_ok, fresh_fr, calm_lm,
                             [{"key": "live-shadow-gap:ff", "ts": nowts - 100}],
                             {}, nowts)
@@ -1109,29 +1337,72 @@ def _selftest():
           "last_seen": nowts - 100, "msg": "gap +5.4%"}],
         {}, nowts)
     assert s6d == 0.75, "fresh last_seen on a persisting divergence still cuts"
-    live_small = [dict(live_ok[0], closed_trades=5), live_ok[1]]
-    assert synthesize_live(live_small, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
+    # the EARNED gate's three prover bars + the cohort non-harm tolerance
+    tol = [dict(live_ok[0], pnl_abs=-5.0), live_ok[1]]
+    assert synthesize_live(tol, fresh_fr, calm_lm, [], {}, nowts,
+                           window=win_ok) == (None, None), \
+        "slow-row bleed beyond LIVE_SLOW_TOL blocks the up-scale"
+    small = [live_ok[0], dict(live_ok[1], closed_trades=14)]
+    assert synthesize_live(small, fresh_fr, calm_lm, [], {}, nowts,
+                           window=win_ok) == (None, None), \
+        "no row with >=30 lifetime closes -> nothing proves the edge"
+    thin = dict(win_ok, **{"perps-funding-lighter-lighter":
+                           {"pnl": 2.4, "closes": 3}})
+    assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
+                           window=thin) == (None, None), \
+        "a thin window sample proves nothing"
+    flat = dict(win_ok, **{"perps-funding-lighter-lighter":
+                           {"pnl": 0.0, "closes": 14}})
+    assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
+                           window=flat) == (None, None), \
+        "a flat week proves nothing"
+    # anti-flap: a fresh release parks the up-ladder; an old one does not;
+    # the DOWN reflex ignores the gap entirely
+    assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
+                           window=win_ok,
+                           released_ts=nowts - 600) == (None, None)
+    sr, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
+                            window=win_ok, released_ts=nowts - 2 * 3600)
+    assert sr == 1.25, "an old release must not park the ladder forever"
+    srd, _ = synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
+                             window=win_hole, released_ts=nowts - 600)
+    assert srd == 0.75, "down ignores the re-assert gap"
     # [2026-07-16 AUDIT] a FROZEN row (updated_at 4h old) must block the
-    # up-scale even with lifetime-positive pnl; so must a missing updated_at
+    # up-scale even with a healthy window; so must a missing updated_at
     live_frozen = [dict(live_ok[0], updated_at=_iso(nowts - 4 * 3600)), live_ok[1]]
-    assert synthesize_live(live_frozen, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
+    assert synthesize_live(live_frozen, fresh_fr, calm_lm, [], {}, nowts,
+                           window=win_ok) == (None, None)
     live_noage = [{k: v for k, v in live_ok[0].items() if k != "updated_at"}, live_ok[1]]
-    assert synthesize_live(live_noage, fresh_fr, calm_lm, [], {}, nowts) == (None, None)
-    # ...but a frozen row does NOT block the hurt-row down reflex
-    s_fdown, _ = synthesize_live([dict(live_frozen[0], pnl_abs=-15.0), live_ok[1]],
-                                 fresh_fr, calm_lm, [], {}, nowts)
+    assert synthesize_live(live_noage, fresh_fr, calm_lm, [], {}, nowts,
+                           window=win_ok) == (None, None)
+    # ...but a frozen row does NOT block the down reflex (lifetime backstop)
+    s_fdown, _ = synthesize_live([dict(live_frozen[0], pnl_abs=-25.0), live_ok[1]],
+                                 fresh_fr, calm_lm, [], {}, nowts,
+                                 window=win_ok)
     assert s_fdown == 0.75, "down-scale must not require row freshness"
     # [2026-07-16 AUDIT] a payload's own ttl_sec tightens _fresh: fleet-risk
     # (ttl 900) that is 40 min stale must no longer pass the 2700s window
     stale_fr = dict(fresh_fr, updated=_iso(nowts - 2400))
-    assert synthesize_live(live_ok, stale_fr, calm_lm, [], {}, nowts) == (None, None), \
+    assert synthesize_live(live_ok, stale_fr, calm_lm, [], {}, nowts,
+                           window=win_ok) == (None, None), \
         "40-min-stale fleet-risk (ttl 900s) must fail _fresh"
     assert synthesize_live(live_ok, dict(fresh_fr, light="red"), calm_lm,
-                           [], {}, nowts) == (None, None)
+                           [], {}, nowts, window=win_ok) == (None, None)
     assert synthesize_live(live_ok, fresh_fr,
                            {"updated": fresh, "stress": {"med": 20}},
-                           [], {}, nowts) == (None, None), "hot venue blocks up"
-    assert synthesize_live(live_ok[:1], fresh_fr, calm_lm, [], {}, nowts) == (None, None)
+                           [], {}, nowts, window=win_ok) == (None, None), \
+        "hot venue blocks up"
+    assert synthesize_live(live_ok[:1], fresh_fr, calm_lm, [], {}, nowts,
+                           window=win_ok) == (None, None)
+    # PARTIAL COHORT never disarms the tighten side: the rows-free divergence
+    # alert and a visible row's hurt both still cut; only expand goes blind
+    sp1, ip1 = synthesize_live(live_ok[:1], fresh_fr, calm_lm,
+                               [{"key": "live-shadow-gap", "ts": nowts - 100}],
+                               {}, nowts, window=win_ok)
+    assert sp1 == 0.75 and "cohort partially visible" in ip1["msg"], (sp1, ip1)
+    sp2, _ = synthesize_live([dict(live_ok[0], pnl_abs=-12.0)], fresh_fr,
+                             calm_lm, [], {}, nowts, window=win_ok)
+    assert sp2 == 0.75, "a visible hurt row cuts even with the cohort partial"
     if tuning is not None:
         for v in LIVE_LADDER + [LIVE_DOWN_SCALE]:
             assert tuning.clamp("live.clip_scale", v) == v

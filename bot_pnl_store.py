@@ -851,6 +851,43 @@ if __name__ == "__main__":
 # never-raise pattern as everything above.
 
 
+def fetch_realized_window(bots, days=7):
+    """[2026-07-16 LIVE-LANE BALANCE] Per-bot realized P&L over the trailing
+    window, straight from the paper_trades ledger: {bot: {"pnl", "closes"}}.
+    Bots with no closes in the window get {"pnl": 0.0, "closes": 0} — present,
+    not missing, so callers can tell "quiet book" from "DB dark". Returns None
+    if the DB is unavailable (callers must fail toward their conservative
+    side). Read-only; used by evidence_board's live clip lane, which needed a
+    time-local view: lifetime pnl_abs anchors never heal (a healed book stayed
+    'hurt' forever) and never forgive (one good month masked a bad week)."""
+    conn = _get_conn()
+    if conn is None:
+        return None
+    try:
+        _ensure_paper_trades_table(conn)
+        from datetime import datetime, timedelta, timezone
+        cut = (datetime.now(timezone.utc) - timedelta(days=float(days))).isoformat()
+        out = {str(b): {"pnl": 0.0, "closes": 0} for b in bots}
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT bot, COUNT(*), COALESCE(SUM(pnl_abs), 0) FROM paper_trades "
+                "WHERE bot = ANY(%s) AND side IS DISTINCT FROM 'skip' "
+                "AND closed_at >= %s GROUP BY bot",
+                (list(out), cut))
+            for b, n, s in cur.fetchall():
+                out[str(b)] = {"pnl": float(s or 0.0), "closes": int(n or 0)}
+        return out
+    except Exception as e:  # noqa: BLE001
+        _warn_once(f"realized-window read failed ({e})")
+        global _conn
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _conn = None
+        return None
+
+
 def fetch_bot_pnl():
     """Return every bot's latest bot_pnl row as a list of dicts, or None if
     the DB is unavailable. Read-only; used by fleet_risk.py."""

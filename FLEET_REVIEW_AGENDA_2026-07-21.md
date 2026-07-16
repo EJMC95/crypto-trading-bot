@@ -190,3 +190,35 @@ doctrine) or an operator decision. Grade at this review:
   operator env-widens the scout); funding-accrual gap across restarts
   (small systematic undercount); perp sniper never publishes W/L counts;
   hl_paper VENUE fallback footgun in two Dockerfiles.
+
+## 14. EXPAND↔TIGHTEN balance audit — 25 open findings (added 16-Jul)
+Full list with fix shapes + per-finding verification status:
+`AUDIT_EXPAND_TIGHTEN_2026-07-16.md` (32 consolidated findings; 7 SHIPPED
+same day — the live-lane gate rework itself shipped in the same commit:
+7d-window anchors both directions, holder/trader role split, blind-hold,
+explicit lever release, anti-flap; all 8 fixes graded SOUND by the audit's
+own synthesis pass). Adversarial verify (3 lenses each) completed for
+IMB-01..-10 before the session usage cap; the rest re-run after reset.
+Top of the OPEN list by consequence (v2 numbering):
+- **IMB-02 (verified real)** dd-governor evidence window erased by any
+  cohort flap — one Tide Rider stale-flap (hourly publish vs 65-min bar)
+  wipes the 7d samples, dd recomputes 0.0, clips snap 0.25→1.0
+  mid-drawdown AND dd=0.0 passes the board's fail-closed up-gate leg.
+- **IMB-03/-04 (verified)** freshness-contract gaps on consumed keys:
+  coin-quality veto (LIVE entry path — publisher stamps no ttl; fossil
+  vetoes forever or veto silently dead) and pulse_panic (family bot + 4
+  strategies halve stakes on a possibly-fossil panic flag).
+- **IMB-06/-07 (survive 2/3)** judge keep-bar degrades with age
+  (cumulative-mean fade check) and candidate flow self-exhausts
+  (lifetime done-list over a finite universe).
+- **IMB-08 (survives)** hurting verdicts heal only by amnesia — now the
+  SOLE heal path post-IMB-01-fix; needs the probation re-assert design.
+- **IMB-17** live Funding Farmer counted INTO the L2 long budget but never
+  reads fleet-risk (enforce or exempt-and-document).
+- REFUTED by verify (do not build): IMB-05 (short-budget enforcement — the
+  exemption is deliberate; document it), IMB-09 (regen/immune map mismatch
+  — dead code, fails safe; housekeeping only).
+- Remainder (tuner closed_net blindness IMB-10 survives; venue hot-add
+  revert IMB-12; diet-lane compounding; veto floor diversity; event
+  sentinel lifetime learning; family-bot bus drift; v2-fallback anchors):
+  see doc, unverified pending the re-run.

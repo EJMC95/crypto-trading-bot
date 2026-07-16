@@ -385,8 +385,20 @@ def write_levers(levers, set_by="evidence-board", now_ts=None, ttl_sec=None):
         v = clamp(name, (entry or {}).get("value"))
         if v is None:
             continue
+        # [2026-07-16] optional per-entry ttl_sec — may only SHORTEN the
+        # call-level TTL (floor 60s), never extend it: faster auto-revert is
+        # always allowed, a longer-lived lever never is. The board uses this
+        # to give its real-money live.clip_scale a 30-min leash while the
+        # scanner levers keep the 2h default.
+        ettl = ttl
+        try:
+            e_req = float((entry or {}).get("ttl_sec") or 0)
+            if e_req > 0:
+                ettl = max(60.0, min(ttl, e_req))
+        except (TypeError, ValueError):
+            pass
         out[name] = {"value": v, "lane": spec["lane"], "set_by": set_by,
-                     "expires": _iso(now_ts + ttl),
+                     "expires": _iso(now_ts + ettl),
                      "reason": str((entry or {}).get("reason") or "")[:200],
                      "evidence": str((entry or {}).get("evidence") or "")[:300]}
     if not out:
@@ -435,6 +447,65 @@ def write_levers(levers, set_by="evidence-board", now_ts=None, ttl_sec=None):
                                      "levers": {k: v["value"] for k, v in out.items()},
                                      "set_by": set_by})
         _cache.update(ts=now_ts, payload=payload)   # readers in-process see it
+        return payload
+    except Exception:
+        return None
+
+
+def _released_payload(prev, names, set_by, now_ts):
+    """Pure: `prev` minus MY named levers — other authors' levers and my
+    unnamed levers survive, dead entries are pruned, updated/ttl recomputed.
+    Selftested offline; runs under the store's advisory lock when available."""
+    def _iso(ts):
+        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(timespec="seconds")
+    levers = {k: v for k, v in ((prev or {}).get("levers") or {}).items()
+              if k in LEVERS and isinstance(v, dict) and _lever_alive(v, now_ts)
+              and not (k in names and v.get("set_by") == set_by)}
+    horizon = now_ts
+    for v in levers.values():
+        try:
+            e = datetime.fromisoformat(str(v.get("expires")).replace("Z", "+00:00"))
+            horizon = max(horizon, e.timestamp())
+        except Exception:
+            horizon = max(horizon, now_ts + TTL_SEC)
+    return {"updated": _iso(now_ts),
+            "ttl_sec": int(max(60, horizon - now_ts)),
+            "levers": levers}
+
+
+def release_levers(names, set_by, now_ts=None):
+    """[2026-07-16] Withdraw MY OWN named levers NOW — auto-revert without
+    the TTL wait. The honest twin of write_levers for the moment an author's
+    evidence LAPSES: the lever disappears from the rail (consumers fall back
+    to operator defaults immediately) instead of lingering to expiry or
+    being overwritten with a no-op value that downstream graders would
+    treat as a real stance. An author can never release another author's
+    lever. Returns the payload written; None only when no lever names were
+    given or the DB path is unavailable (callers retry). Never raises."""
+    now_ts = now_ts if now_ts is not None else time.time()
+    names = {str(n) for n in (names or ())}
+    if not names:
+        return None
+    try:
+        if store is None:
+            return None
+        payload = None
+        if hasattr(store, "locked_state_update"):
+            payload = store.locked_state_update(
+                KEY, lambda prev: _released_payload(prev, names, set_by, now_ts))
+        if payload is None:
+            prev = {}
+            try:
+                prev = store.load_state(KEY) or {}
+            except Exception:
+                prev = {}
+            payload = _released_payload(prev, names, set_by, now_ts)
+            store.save_state(KEY, payload)
+        if hasattr(store, "save_history"):
+            store.save_history(KEY, {"updated": payload["updated"],
+                                     "released": sorted(names),
+                                     "set_by": set_by})
+        _cache.update(ts=now_ts, payload=payload)
         return payload
     except Exception:
         return None
@@ -541,12 +612,48 @@ def _selftest():
         assert "live.funding.enter_apr" in p_j["levers"]
         assert p_j["levers"].get("live.clip_scale", {}).get("set_by") != \
             "experiment-judge", "judge must never write the board's clip lever"
+    # per-entry ttl_sec: shortens the leash, can never extend it
+    p_ttl = write_levers({"live.clip_scale": {"value": 1.25, "ttl_sec": 1800},
+                          "gapscout.prefilter_gap": {"value": 0.0015},
+                          "gapscout.max_book_fetches": {"value": 45,
+                                                        "ttl_sec": 999999}},
+                         set_by="evidence-board", now_ts=now)
+    if p_ttl is not None:
+        from datetime import timedelta
+        _short = datetime.fromtimestamp(now + 1800, tz=timezone.utc).isoformat(timespec="seconds")
+        _full = datetime.fromtimestamp(now + TTL_SEC, tz=timezone.utc).isoformat(timespec="seconds")
+        assert p_ttl["levers"]["live.clip_scale"]["expires"] == _short, \
+            "per-entry ttl must shorten expiry"
+        assert p_ttl["levers"]["gapscout.prefilter_gap"]["expires"] == _full
+        assert p_ttl["levers"]["gapscout.max_book_fetches"]["expires"] == _full, \
+            "per-entry ttl must never EXTEND the call-level TTL"
+    # release: an author withdraws its OWN lever instantly; other authors'
+    # levers and its own unnamed levers survive; dead entries are pruned
+    _far = datetime.fromtimestamp(now + 3600, tz=timezone.utc).isoformat(timespec="seconds")
+    _prev = {"levers": {
+        "live.clip_scale": {"value": 1.25, "set_by": "evidence-board",
+                            "expires": _far},
+        "gapscout.prefilter_gap": {"value": 0.0015, "set_by": "evidence-board",
+                                   "expires": _far},
+        "live.funding.enter_apr": {"value": 0.30, "set_by": "experiment-judge",
+                                   "expires": _far},
+        "taker.tp": {"value": 0.05, "set_by": "scout-tuner",
+                     "expires": "2020-01-01T00:00:00+00:00"}}}
+    rp = _released_payload(_prev, {"live.clip_scale", "live.funding.enter_apr"},
+                           "evidence-board", now)
+    assert "live.clip_scale" not in rp["levers"], "own named lever released"
+    assert "live.funding.enter_apr" in rp["levers"], \
+        "another author's lever must survive my release"
+    assert "gapscout.prefilter_gap" in rp["levers"], "my unnamed lever survives"
+    assert "taker.tp" not in rp["levers"], "dead entries pruned in passing"
+    assert rp["ttl_sec"] >= 60
+    assert release_levers([], "evidence-board", now_ts=now) is None
     # every registered lever must clamp its own documented default
     for name, spec in LEVERS.items():
         if spec["kind"] in ("float", "int"):
             assert clamp(name, spec["lo"]) == spec["lo"]
             assert clamp(name, spec["hi"]) == spec["hi"]
-    print("fleet_tuning selftest OK (incl. author-lane binding)")
+    print("fleet_tuning selftest OK (incl. author-lane binding + per-entry ttl)")
 
 
 if __name__ == "__main__":

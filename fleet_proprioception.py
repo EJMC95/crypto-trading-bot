@@ -194,6 +194,27 @@ def group_of(name):
     return f"other:{name.split('.')[0]}"
 
 
+def observed_active(active, quarantined, live_hurting):
+    """[2026-07-16 IMB-01] The stance set consumers actually FOLLOW. While a
+    consumer-side revert is in force — immune QUARANTINE on any lane, or a
+    HURTING grade on a lighter-live lever — get_lever hands every consumer
+    the operator default, so an episode opened/held over that span would
+    measure the DEFAULT and bill the verdict to the stance (self-poisoning:
+    a hurting verdict could never clear on honest evidence). Dropping the
+    reverted lever from the observed set closes its episode honestly
+    ('released'/'changed') and opens no new one until the revert lifts.
+    Mirrors get_lever's own scoping exactly. Pure — selftested."""
+    out = {}
+    for k, v in (active or {}).items():
+        if k in (quarantined or ()):
+            continue
+        if k in (live_hurting or ()) and \
+                (tuning.LEVERS.get(k) or {}).get("lane") == "lighter-live":
+            continue
+        out[k] = v
+    return out
+
+
 def build_stances(active):
     """{group: {stance:{lever:value}, set_by:[...], expires_max:ts|None}}
     from fleet_tuning.active_levers()' {name: entry}."""
@@ -482,6 +503,14 @@ def run_once():
             open_eps[g] = cur
 
     active = tuning.active_levers(now_ts=now)
+    # observe only what consumers FOLLOW (quarantined / live-hurting levers
+    # are being reverted at get_lever — measuring them would poison the
+    # verdicts). Fail-safe: a hook error observes the unfiltered set.
+    try:
+        active = observed_active(active, tuning._quarantined(now),
+                                 tuning._live_hurting(now))
+    except Exception:  # noqa: BLE001
+        pass
     stances_now = build_stances(active)
     open_next, closed = track(open_eps, stances_now, now)
 
@@ -595,6 +624,16 @@ def _selftest():
     assert set(st) == {"taker", "scout:scout.dip_range_max", "live-clip"}, st
     assert st["taker"]["stance"] == {"taker.dip_range": 0.08, "taker.tp": 0.05}
     assert st["taker"]["set_by"] == ["scout-tuner"]
+
+    # observed_active: a quarantined lever (any lane) and a HURTING
+    # lighter-live lever vanish from the observed stance set; a hurting
+    # verdict on a SHADOW-lane lever does NOT (get_lever ignores it there —
+    # the author-side skip owns that lane)
+    oa = observed_active(active, {"scout.dip_range_max"},
+                         {"live.clip_scale", "taker.tp"})
+    assert set(oa) == {"taker.dip_range", "taker.tp"}, oa
+    assert observed_active(active, set(), set()) == active
+    assert observed_active({}, {"x"}, {"y"}) == {}
 
     # tracking: open new; hold same; value change closes+reopens; release
     # backdates end to the last seen expiry; long stances slice

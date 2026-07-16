@@ -659,6 +659,11 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
             e["last_run"] = run_no
             e.update({"mult": mult, "n": n, "wr": round(wr * 100, 1),
                       "pnl": round(pnl, 2), "engine": engine, **ev})
+            # urgent must be re-earned EVERY run: ev={} on the v2/fallback
+            # path, so a sticky True from an earlier v3 run would keep
+            # fast-pathing straight through the BRAIN_MULT_ENGINE=v2 kill
+            # switch (the streak gate exists precisely for that engine).
+            e["urgent"] = bool(ev.get("urgent"))
     # Streak resets: qualification must be CONSECUTIVE runs.
     for key in list(streaks):
         if key not in seen:
