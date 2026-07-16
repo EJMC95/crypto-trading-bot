@@ -88,6 +88,34 @@ def stake_multiplier(bot, entry_tag, current_time=None):
         return 1.0
 
 
+def lever_outcome(lever, current_time=None):
+    """🦾 fleet_proprioception's per-lever OUTCOME verdict: 'helping' |
+    'hurting' | 'neutral' | 'insufficient' | None.
+
+    [2026-07-16 CONSUMER SUPPORT] The proprioception organ grades every
+    growth-rail lever episode retrospectively (taker = replay counterfactual
+    $, scout = grading throughput, gapscout = census activity, live =
+    per-trade vs pre-window + shadow twin). This accessor is the ONE
+    supported way for any strategy/bot to consume those grades — same
+    fail-safe contract as every helper here: dark/stale/absent organ or
+    unknown lever -> None, and a None consumer MUST treat it as 'no
+    evidence' (restrict nothing, earn nothing). First-party consumers
+    (scout tuner, evidence board, experiment judge, incubator) read the
+    payload directly on their own cadences; this is the client for
+    everyone else.
+    """
+    try:
+        p = _load("fleet-proprioception", current_time)
+        if not p or not is_fresh(p, current_time):
+            return None
+        v = (p.get("verdicts") or {}).get(str(lever))
+        vd = v.get("verdict") if isinstance(v, dict) else None
+        return vd if vd in ("helping", "hurting", "neutral", "insufficient") \
+            else None
+    except Exception:
+        return None
+
+
 def long_entries_blocked(current_time=None):
     """L2 fleet-risk veto: True when the fleet's LONG book is at/over budget.
 
@@ -107,3 +135,24 @@ def long_entries_blocked(current_time=None):
         return int(p.get("long_positions", 0)) >= int(p.get("long_budget", 10**9))
     except Exception:
         return False
+
+
+if __name__ == "__main__":
+    # offline selftest: prime the cache directly, exercise the fail-safe
+    # contract (no DB touched)
+    _now = datetime.now(timezone.utc)
+    _fresh_p = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 2700,
+                "verdicts": {"taker.dip_range": {"verdict": "hurting"},
+                             "scout.dip_range_max": {"verdict": "helping"},
+                             "weird": {"verdict": "banana"}}}
+    _cache["fleet-proprioception"] = {"ts": _now, "payload": _fresh_p}
+    assert lever_outcome("taker.dip_range", _now) == "hurting"
+    assert lever_outcome("scout.dip_range_max", _now) == "helping"
+    assert lever_outcome("taker.tp", _now) is None, "unknown lever -> None"
+    assert lever_outcome("weird", _now) is None, "unknown verdict value -> None"
+    _cache["fleet-proprioception"] = {"ts": _now, "payload": dict(
+        _fresh_p, updated="2020-01-01T00:00:00+00:00")}
+    assert lever_outcome("taker.dip_range", _now) is None, "stale -> None"
+    _cache["fleet-proprioception"] = {"ts": _now, "payload": None}
+    assert lever_outcome("taker.dip_range", _now) is None, "absent -> None"
+    print("fleet_bus selftest OK (lever_outcome fresh/unknown/stale/absent)")

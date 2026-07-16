@@ -2187,8 +2187,10 @@ CONTRACTS = [
      "NOTHING yet — shadow; review promotes via EVBOARD_MODE", "shadow",
      "evidence-board"),
     ("enactment outcome verdicts", "fleet_proprioception.py",
-     "scout tuner (hurting-skip) · board 🦾 items · 21-Jul review",
-     "restrict-only (a hurting lever stops being re-asserted)",
+     "scout tuner (hurting-skip + helping-walk) · board (🦾 items, clip "
+     "gates, ladder discount) · judge early-fade · incubator gene-skip · "
+     "any bot via fleet_bus.lever_outcome · /bus.json",
+     "verdict-gated: restrict-first; live top step fail-closed",
      "fleet-proprioception"),
     ("market open/close events + heavy_ok", "fleet_clock.py",
      "published, unconsumed — first wiring decided at the 21-Jul review",
@@ -3482,12 +3484,16 @@ class H(BaseHTTPRequestHandler):
                         # [2026-07-14] brain keys added: the brain died silently
                         # for two days once (5-7 Jul) because nothing external
                         # could see it. Its outputs are now on the same surface.
+                        # [2026-07-16] fleet-proprioception added: consumer
+                        # support — the outcome verdicts must be reachable
+                        # off-Railway (gate0 services, the review, ad-hoc
+                        # consumers) exactly like the brain keys are.
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
                             "'learning-brain', 'brain-stake-mults', "
                             "'brain-diagnosis', 'brain-lens-forward', "
-                            "'lighter-market')")
+                            "'lighter-market', 'fleet-proprioception')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -3501,7 +3507,8 @@ class H(BaseHTTPRequestHandler):
                                 "SELECT key, ts, payload FROM bot_state_history "
                                 "WHERE key IN ('fleet-risk', 'signal-bus', "
                                 "'brain-stake-mults', 'brain-diagnosis', "
-                                "'brain-lens-forward', 'lighter-market') "
+                                "'brain-lens-forward', 'lighter-market', "
+                                "'fleet-proprioception') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
                             hist = [{"key": k,
@@ -3520,6 +3527,7 @@ class H(BaseHTTPRequestHandler):
                                    "brain_diagnosis": live.get("brain-diagnosis"),
                                    "brain_lens_forward": live.get("brain-lens-forward"),
                                    "lighter_market": lm or None,
+                                   "proprioception": live.get("fleet-proprioception"),
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
             except Exception as e:

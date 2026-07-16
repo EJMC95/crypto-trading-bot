@@ -106,8 +106,14 @@ https://pnl-dashboard-production-858c.up.railway.app/
   HELPING at 1.25 — fail-CLOSED (dark sense = top out of reach). Board
   surfaces 🦾 items (hurting=warn, helping=expand); immune scans the
   payload. Fail-safe both ways on shadow lanes: a dark organ restricts
-  nothing AND earns nothing. Review grades both sides — agenda item 12.
-  → bot_state `fleet-proprioception`
+  nothing AND earns nothing. **CONSUMER SUPPORT (16-Jul late)**: verdicts
+  are a first-class bus signal — `fleet_bus.lever_outcome(lever)` is the
+  supported accessor for any strategy/bot (standard fail-safe contract),
+  `/bus.json` serves the payload + history off-Railway, and the incubator
+  consumes it (skips proposing a funding gene whose live lever is
+  currently graded hurting — a 7-day judge slot isn't spent re-testing a
+  knob the live lane just measured bad). Review grades both sides —
+  agenda item 12. → bot_state `fleet-proprioception`
 - `experiment_judge.py` 🧪⚖️ — the shadow→live PROMOTION pipeline (15-Jul
   user mandate: shadow wins must "carry across to the real money bots").
   Hourly, ONE candidate at a time on the Funding Farmer's -lshadow twin
@@ -181,8 +187,9 @@ Loop Scout, trendmomo-4h (12/13-Jul). See RETIRED_ROWS in pnl_dashboard.py.
 
 ### Read-only endpoints (no auth)
 `/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger)
-`/bus.json` (risk light + signal bus + brain keys + lighter-market,
-`?hours=` history) `/pulse.json` `/disloc.json` `/watchdog.json`
+`/bus.json` (risk light + signal bus + brain keys + lighter-market +
+fleet-proprioception, `?hours=` history) `/pulse.json` `/disloc.json`
+`/watchdog.json`
 
 ### 15-Jul reconciliation (this repo's git now matches what runs)
 The 14-Jul pivot shipped from branch `claude/gapscout-profitable-trades-ebrprj`
@@ -233,7 +240,10 @@ its row is dashboard-retired regardless; stop the process when found.
   `live.funding.*` — see growth rail + experiment judge above). `gapscout-census` — Gap Scout's epoch-2 episode census (board
   reads `quiet_hours`). `scout-tuner` — the tuner's cycle log + enactments.
   `fleet-proprioception` — per-lever enactment outcome grades (episodes +
-  helping/hurting verdicts; tuner consumes HURTING restrict-only).
+  helping/hurting verdicts). Consumers: scout tuner (hurting-skip +
+  helping-walk), board (🦾 items + live clip gates + gapscout ladder
+  discount), judge (early fade), incubator (hurting-gene skip), anything
+  else via `fleet_bus.lever_outcome` / `/bus.json`.
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).
 - Bot identity for multiplier lookup = `bot_name` in each freqtrade config
