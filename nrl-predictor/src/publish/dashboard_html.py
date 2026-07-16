@@ -134,6 +134,7 @@ BODY_TEMPLATE = r"""
   </header>
   <div class="nav">
     <button class="trackbtn" id="trackbtn">📊 Track record</button>
+    <button class="trackbtn" id="formbtn">📈 Form guide</button>
     <label style="color:var(--ink-2);font-size:13px">Round</label>
     <select id="roundsel"></select>
     <span id="roundtag" style="color:var(--muted);font-size:12.5px"></span>
@@ -167,6 +168,7 @@ DATA.rounds.forEach((r,i)=>{
 sel.value = curRound;
 sel.onchange = ()=>{ selectRound(+sel.value); };
 document.getElementById("trackbtn").onclick = renderTrack;
+document.getElementById("formbtn").onclick = renderForm;
 
 function bar(label,p,cls,h,a){
   if(p==null||isNaN(p)) return "";
@@ -221,6 +223,7 @@ function renderGame(ri,gi){
   const r=DATA.rounds[ri], g=r.games[gi];
   [...tabs.children].forEach((t,j)=>t.setAttribute("aria-selected",j===gi));
   document.getElementById("trackbtn").classList.remove("on");
+  document.getElementById("formbtn").classList.remove("on");
   const p=g.p, marginSide=g.margin>=0?nick(g.home):nick(g.away);
   let h=`<div class="matchhead"><h2>${g.home} v ${g.away}</h2>
     <span class="when">${g.kickoff} · ${g.venue}</span></div>`;
@@ -302,6 +305,7 @@ function selectRound(ri){
 
 function renderTrack(){
   document.getElementById("trackbtn").classList.add("on");
+  document.getElementById("formbtn").classList.remove("on");
   [...tabs.children].forEach(t=>t.setAttribute("aria-selected",false));
   const t=DATA.track;
   if(!t||(!t.win.n&&!t.tryscorer.n)){
@@ -325,6 +329,45 @@ function renderTrack(){
   }
   h+=`<p style="color:var(--muted);font-size:12px;margin-top:12px">Bias > 0 = model over-predicts.
     Brier lower = better calibrated (0 perfect, 0.25 a coin flip).</p>`;
+  panel.innerHTML=h;
+}
+
+function renderForm(){
+  document.getElementById("formbtn").classList.add("on");
+  document.getElementById("trackbtn").classList.remove("on");
+  [...tabs.children].forEach(t=>t.setAttribute("aria-selected",false));
+  const f=DATA.form||[];
+  if(!f.length){
+    panel.innerHTML=`<h2>Form guide</h2><p style="color:var(--ink-2)">Advanced-stats form
+      table appears once the season's match stats have been scraped.</p>`; return;
+  }
+  // colour a rank 1..N from strong (green) to weak (amber)
+  const n=f.length, tint=(rk)=>{if(rk==null)return "";const q=(rk-1)/(n-1||1);
+    const g=`rgba(27,175,122,${(0.16*(1-q)).toFixed(3)})`, a=`rgba(235,104,52,${(0.16*q).toFixed(3)})`;
+    return `background:${q<0.5?g:a}`;};
+  const arrow=t=>t>0.15?`<span style="color:var(--good)">▲ ${t.toFixed(2)}</span>`
+    :t<-0.15?`<span style="color:#c0392b">▼ ${Math.abs(t).toFixed(2)}</span>`
+    :`<span style="color:var(--muted)">→</span>`;
+  let h=`<h2>Form guide — expected-stats league table</h2>
+    <p style="color:var(--ink-2);font-size:13px">Built from the scraped advanced match stats
+    (line breaks, tackle breaks, run &amp; post-contact metres, offloads). <b>xAtt</b> = tries a team
+    deserves to score per game, <b>xDef</b> = tries it deserves to concede, <b>Edge leak</b> = line +
+    tackle breaks conceded (edge softness). Leak-free rolling form as of ${DATA.form_as_of||""}.
+    This is what feeds the tryscorer xStats sharpening.</p>
+    <table><thead><tr><th>#</th><th>Team</th><th>xAtt</th><th>xDef</th><th>Net</th>
+      <th>Edge leak</th><th>Trend (net, last 5)</th></tr></thead><tbody>`;
+  for(const r of f){
+    h+=`<tr><td>${r.rank}</td><td><b>${nick(r.team)}</b></td>
+      <td style="${tint(r.xatt_rank)}">${r.xatt.toFixed(2)} <small style="color:var(--muted)">#${r.xatt_rank}</small></td>
+      <td style="${tint(r.xdef_rank)}">${r.xdef.toFixed(2)} <small style="color:var(--muted)">#${r.xdef_rank}</small></td>
+      <td><b>${r.xdiff>=0?"+":""}${r.xdiff.toFixed(2)}</b></td>
+      <td style="${tint(r.xedge_rank)}">${r.xedge==null?"—":r.xedge.toFixed(1)}${r.xedge_rank?` <small style="color:var(--muted)">#${r.xedge_rank}</small>`:""}</td>
+      <td>${arrow(r.trend)}</td></tr>`;
+  }
+  h+=`</tbody></table>
+    <p style="color:var(--muted);font-size:12px;margin-top:10px">Net = xAtt − xDef (attacking minus
+    defensive expected tries). Green = league-best, amber = league-worst on that column. Edge leak lower
+    is stauncher. A team facing a high edge-leak opponent gets its tryscorer prices lifted (xStats).</p>`;
   panel.innerHTML=h;
 }
 

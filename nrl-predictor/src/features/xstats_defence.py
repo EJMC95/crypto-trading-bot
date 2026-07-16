@@ -361,12 +361,52 @@ def matchup_multipliers(ratings: pd.DataFrame, norm: dict, coef: dict,
 
 
 def ratings_asof(ratings: pd.DataFrame, team_id: str) -> dict | None:
-    """Most recent (xatt, xdef) for a team — used for live/current-round pricing."""
+    """Most recent (xatt, xdef, xedge) for a team — live/current-round pricing."""
     r = ratings[ratings["team_id"] == team_id].dropna(subset=["xdef"])
     if r.empty:
         return None
     last = r.iloc[-1]
-    return {"xatt": float(last["xatt"]), "xdef": float(last["xdef"])}
+    return {"xatt": float(last["xatt"]), "xdef": float(last["xdef"]),
+            "xedge": float(last["xedge"]) if pd.notna(last.get("xedge")) else None}
+
+
+def latest_form_table(ratings: pd.DataFrame, names: dict | None = None) -> list[dict]:
+    """League form guide from the newest rating per team: expected tries scored
+    (xatt) and conceded (xdef) per game, edge leakiness (xedge), net xDiff, and a
+    last-5-game trend on xDiff. Ranked best net first. Powered entirely by the
+    scraped advanced stats — surfaces WHY the try model rates each side."""
+    if ratings.empty:
+        return []
+    r = ratings.dropna(subset=["xatt", "xdef"]).copy()
+    rows = []
+    for tid, g in r.groupby("team_id"):
+        g = g.sort_values("date")
+        last = g.iloc[-1]
+        xdiff_series = (g["xatt"] - g["xdef"]).dropna()
+        recent = xdiff_series.tail(5)
+        prev = xdiff_series.tail(10).head(5)
+        trend = (float(recent.mean()) - float(prev.mean())) if len(prev) else 0.0
+        rows.append({
+            "team_id": tid,
+            "team": (names or {}).get(tid, tid),
+            "xatt": round(float(last["xatt"]), 2),
+            "xdef": round(float(last["xdef"]), 2),
+            "xedge": round(float(last["xedge"]), 1) if pd.notna(last.get("xedge")) else None,
+            "xdiff": round(float(last["xatt"] - last["xdef"]), 2),
+            "trend": round(trend, 2),
+            "games": int(len(g)),
+            "as_of": str(last["date"])[:10],
+        })
+    rows.sort(key=lambda x: -x["xdiff"])
+    # league ranks (1 = best) for attack (high good), defence (low conceded good)
+    for key, rev in (("xatt", True), ("xdef", False), ("xedge", False)):
+        vals = [x for x in rows if x[key] is not None]
+        vals.sort(key=lambda x: -x[key] if rev else x[key])
+        for i, x in enumerate(vals, 1):
+            x[f"{key}_rank"] = i
+    for i, x in enumerate(rows, 1):
+        x["rank"] = i
+    return rows
 
 
 def league_norm(ratings: pd.DataFrame) -> dict:

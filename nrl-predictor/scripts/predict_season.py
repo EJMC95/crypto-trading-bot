@@ -204,10 +204,16 @@ def main() -> None:
                        "actionable": actionable, "games": games})
 
     parlays = json.loads((OUT / "round_parlays.json").read_text()) if (OUT / "round_parlays.json").exists() else []
+    # Form guide: league table from the scraped advanced stats (xAttack/xDefence/
+    # edge leak per team). Built from whatever xStats data exists — empty if none.
+    form_ratings = xs_ratings if xs_ratings is not None else xstats_defence.build_ratings()
+    form = xstats_defence.latest_form_table(form_ratings, names)
     payload = {"generated": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d %H:%M UTC"),
                "current_round": current_round,
                "current_round_label": f"Round {current_round}",
                "parlays": parlays,
+               "form": form,
+               "form_as_of": form[0]["as_of"] if form else None,
                "rounds": rounds}
     OUT.mkdir(exist_ok=True)
     (OUT / "season_predictions.json").write_text(json.dumps(payload, default=str))
