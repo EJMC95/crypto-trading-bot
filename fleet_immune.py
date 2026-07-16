@@ -147,6 +147,102 @@ def lever_sickness(levers, now):
     return out
 
 
+# [2026-07-16] ENACTED-IS-NOT-APPLIED — the application invariant.
+# Every growth-rail gate validated the DECISION to write a lever; none
+# validated that a bot ever READ it. That skew bit the same day: the judge
+# asserted xp.funding.enter_apr=0.30 at a frozen arm with no lever code (30
+# closes, 0 receipts) — fresh, in-TTL, trusted, and WRONG: exactly this
+# organ's remit. Only lanes with a receipt channel are checked: the funding
+# arms stamp extra.bars from inside apply_levers(), so an image without lever
+# code structurally cannot forge one — a missing receipt is DISPROOF.
+# Deliberately NOT a quarantine: quarantining a lever the consumer provably
+# ignores reverts nothing (that IS the sickness) and would create a feedback
+# loop on a healthy arm (quarantine -> consumer runs defaults -> receipts stop
+# matching -> sickness persists forever). Sick-list + phone only; the judge's
+# own ARM-SKEW hold is the measurement guard.
+APP_RECEIPT_BOTS = {
+    "xp.funding.": os.environ.get("XPJ_SHADOW_BOT",
+                                  "perps-funding-lighter-lshadow"),
+    "live.funding.": os.environ.get("XPJ_LIVE_BOT",
+                                    "perps-funding-lighter-lighter"),
+}
+APP_SICK_MIN_CLOSES = int(os.environ.get("IMMUNE_APP_MIN_CLOSES", "2"))
+APP_GRACE_S = float(os.environ.get("IMMUNE_APP_GRACE_S", "900"))  # arm loop lag
+
+
+def _close_ts(row):
+    """Tolerant close-time parse for a fetch_paper_trades row; None on any
+    failure (an unparseable row is no evidence, not sickness)."""
+    s = str(row.get("close_ts") or "").strip().replace("Z", "+00:00")
+    if s.endswith(" UTC"):
+        s = s[:-4] + "+00:00"
+    try:
+        d = datetime.fromisoformat(s)
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=timezone.utc)
+        return d.timestamp()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def application_sickness(levers, paper_rows, now, seen):
+    """{lever: why} for receipt-lane levers whose consumer has closed
+    >= APP_SICK_MIN_CLOSES trades since the lever appeared (plus grace for the
+    arm's loop) with NONE carrying a matching extra.bars receipt.
+
+    `seen` is the organ's own first-seen map {name: {value, since}} — the
+    tuning payload carries no set-time, and the judge re-asserts hourly, so
+    the immune organ tracks when it first saw each (name, value) itself.
+    Mutated in place; persisted by the caller. Fail-safe: zero closes = no
+    evidence = healthy; dark tuning/ledger = nothing flagged. Pure given its
+    inputs — selftested."""
+    out = {}
+    if tuning is None:
+        return out
+    live_names = set()
+    for name, entry in (levers or {}).items():
+        bot = next((b for p, b in APP_RECEIPT_BOTS.items()
+                    if name.startswith(p)), None)
+        if bot is None or not isinstance(entry, dict):
+            continue
+        try:
+            if not tuning._lever_alive(entry, now):
+                continue
+        except Exception:  # noqa: BLE001
+            continue
+        live_names.add(name)
+        want = entry.get("value")
+        rec = seen.get(name)
+        if not isinstance(rec, dict) or rec.get("value") != want:
+            seen[name] = {"value": want, "since": now}
+            continue                       # first sighting — start the clock
+        since = float(rec.get("since") or now)
+        bar = name.rsplit(".", 1)[-1]
+        n_closes, n_hits = 0, 0
+        for r in paper_rows or []:
+            if str(r.get("bot")) != bot:
+                continue
+            ts = _close_ts(r)
+            if ts is None or ts < since + APP_GRACE_S or ts > now:
+                continue
+            n_closes += 1
+            bars = (r.get("extra") or {}).get("bars")
+            try:
+                if isinstance(bars, dict) and \
+                        abs(float(bars.get(bar)) - float(want)) <= 1e-9:
+                    n_hits += 1
+            except (TypeError, ValueError):
+                pass
+        if n_closes >= APP_SICK_MIN_CLOSES and n_hits == 0:
+            # digits normalize out of the sick-id, so the episode pages once
+            out[name] = (f"enacted but not applied: {bot} closes since "
+                         f"assert carry no receipt for {bar}={want}")
+    # forget levers no longer in force so a re-assert starts a fresh episode
+    for gone in set(seen) - live_names:
+        seen.pop(gone, None)
+    return out
+
+
 def organ_invariants(states, now):
     """Fresh-but-WRONG content in the key organs. Each finding is
     {organ, detail}. Only checks organs whose payload is FRESH (a stale
@@ -281,9 +377,20 @@ def run_once():
         store.save_state("fleet-alerts", {"alerts": keep2})
 
     # --- ADAPTIVE IMMUNITY: recognize sickness -----------------------------
-    q = lever_sickness((states["fleet-tuning"] or {}).get("levers") or {}, now)
+    levers = (states["fleet-tuning"] or {}).get("levers") or {}
+    q = lever_sickness(levers, now)
+    # [2026-07-16] enacted-is-not-applied: consumer closes with no matching
+    # receipt. Sick-list only, never quarantine (see application_sickness).
+    app_seen = dict(prior.get("app_seen") or {})
+    try:
+        _papers = store.fetch_paper_trades(limit=1500)
+    except Exception:  # noqa: BLE001
+        _papers = []
+    app = application_sickness(levers, _papers, now, app_seen)
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
-            + [{"organ": "fleet-tuning", "detail": f"{n}: {w}"} for n, w in q.items()])
+            + [{"organ": "fleet-tuning", "detail": f"{n}: {w}"} for n, w in q.items()]
+            + [{"organ": "lever-application", "detail": f"{n}: {w}"}
+               for n, w in app.items()])
 
     # [2026-07-16 AUDIT FIX] sick-ids must be VALUE-STABLE: detail strings
     # embed live numbers ("n_liquid 151 > n_books 100"), so a persistently
@@ -301,6 +408,9 @@ def run_once():
         "pruned_alerts": len(pruned),
         "pruned_detail": pruned[:10],
         "antibodies": [a[0] for a in ANTIBODIES],
+        # [2026-07-16] first-seen map for the application invariant — the
+        # organ's own memory of when each (lever, value) appeared.
+        "app_seen": app_seen,
         "notified": sorted(sick_ids)[:50],
         # [2026-07-16 AUDIT FIX] last_push must be IN the saved payload — the
         # first save dropped it, so the stored gap survived exactly one cycle
@@ -414,12 +524,61 @@ def _selftest():
     bs = bot_row_sickness(rows)
     assert {b["organ"] for b in bs} == {"a", "b", "c"}, bs
 
+    # APPLICATION SICKNESS: enacted-is-not-applied (receipt lanes only)
+    if tuning is not None:
+        _sb = APP_RECEIPT_BOTS["xp.funding."]
+        _lv = {"xp.funding.enter_apr": {"value": 0.3, "expires": _iso(now + 3600)}}
+
+        def _prow(off, bars):
+            r = {"bot": _sb, "close_ts": _iso(now - off), "extra": {}}
+            if bars is not None:
+                r["extra"] = {"bars": bars}
+            return r
+
+        # first sighting only starts the clock — never sick on sight
+        seen = {}
+        assert application_sickness(_lv, [_prow(60, None)] * 3, now, seen) == {}
+        assert seen["xp.funding.enter_apr"]["value"] == 0.3
+        # clock running, 3 receiptless closes after grace -> SICK
+        seen = {"xp.funding.enter_apr": {"value": 0.3, "since": now - 7200}}
+        app = application_sickness(_lv, [_prow(600, None), _prow(1200, None),
+                                         _prow(1800, None)], now, dict(seen))
+        assert set(app) == {"xp.funding.enter_apr"}, app
+        # matching receipts -> healthy
+        ok_bars = {"arm": "lighter_shadow", "enter_apr": 0.3}
+        assert application_sickness(_lv, [_prow(600, ok_bars),
+                                          _prow(1200, ok_bars)], now,
+                                    dict(seen)) == {}
+        # WRONG-value receipts are not proof -> sick (the deaf-arm signature:
+        # the arm stamps its env default, not the enacted value)
+        bad_bars = {"arm": "lighter_shadow", "enter_apr": 0.4}
+        assert set(application_sickness(_lv, [_prow(600, bad_bars),
+                                              _prow(1200, bad_bars)], now,
+                                        dict(seen))) == {"xp.funding.enter_apr"}
+        # below the floor (1 close) -> no verdict
+        assert application_sickness(_lv, [_prow(600, None)], now,
+                                    dict(seen)) == {}
+        # closes inside the grace window AFTER first-seen (since=now-7200,
+        # grace 900 -> anything closed now-7200..now-6300) are the arm's
+        # loop lag, not evidence — ignored
+        assert application_sickness(_lv, [_prow(7000, None), _prow(6500, None)],
+                                    now, dict(seen)) == {}
+        # non-receipt lanes are never judged; expired levers drop from `seen`
+        assert application_sickness(
+            {"live.clip_scale": {"value": 0.5, "expires": _iso(now + 3600)}},
+            [_prow(600, None)] * 5, now, dict(seen)) == {}
+        gone = dict(seen)
+        application_sickness({}, [], now, gone)
+        assert gone == {}, gone
+
     # empty / healthy fleet -> nothing
     assert alert_fossils([], now) == ([], [])
     assert organ_invariants({}, now) == []
     assert bot_row_sickness([]) == []
+    assert application_sickness({}, [], now, {}) == {}
     print("fleet_immune selftest OK (filtration age+antibody, lever sickness, "
-          "organ invariants, bot-row sickness, death!=sickness)")
+          "organ invariants, bot-row sickness, death!=sickness, "
+          "application invariant)")
 
 
 if __name__ == "__main__":

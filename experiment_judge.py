@@ -206,9 +206,25 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
         v["why"] = f"floors: shadow {len(sh)}/{min_closes}, live {len(lv)}/{live_min}"
         return v
     mid = start_ts + (end_ts - start_ts) / 2.0
+    # [2026-07-16] per-half sample floors. The full-window floors said nothing
+    # about the halves, so ONE live trade in a half set that half's entire
+    # baseline and the both-halves rule — the doctrine's central noise filter —
+    # degenerated into a noise amplifier on the exact comparison that moves
+    # real money. Floors derive from the effective window floors (env-tunable
+    # via the same XPJ_* knobs), so an even split of exactly-at-floor data
+    # still clears; a lopsided one holds until the thin half fills in.
+    half_sh_min = max(2, min_closes // 2)
+    half_lv_min = max(3, live_min // 2)
     for a, b, label in ((start_ts, mid, "h1"), (mid, end_ts, "h2")):
-        shm = _mean_pct(arm_trades(rows, shadow_bot, a, b, levers=cand_levers))
-        lvm = _mean_pct(arm_trades(rows, live_bot, a, b))
+        sh_h = arm_trades(rows, shadow_bot, a, b, levers=cand_levers)
+        lv_h = arm_trades(rows, live_bot, a, b)
+        if len(sh_h) < half_sh_min or len(lv_h) < half_lv_min:
+            v[label] = {"shadow_n": len(sh_h), "live_n": len(lv_h)}
+            v["why"] = (f"{label} under-powered: shadow {len(sh_h)}/"
+                        f"{half_sh_min}, live {len(lv_h)}/{half_lv_min}")
+            return v
+        shm = _mean_pct(sh_h)
+        lvm = _mean_pct(lv_h)
         v[label] = {"shadow": shm, "live": lvm}
         # [2026-07-16 AUDIT FIX] each half must clear the SAME margin as the
         # full window — `shm > lvm` by any amount let one half's edge be pure
@@ -232,14 +248,45 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     return v
 
 
-def fade_check(rows, promoted_ts, now, live_bot=None, fade_n=None):
-    """True when the LIVE arm has gone negative since promotion (n>=fade_n)
-    — the promoted edge is fading; release it back to env defaults."""
+def fade_check(rows, promoted_ts, now, live_bot=None, fade_n=None,
+               baseline_pct=None, margin_pp=None):
+    """True when the promoted lever is measured HURTING the live arm.
+
+    [2026-07-16] Two release bars; either trips (restrict-only — an extra
+    release path can only ever pull a lever OFF real money, never keep one on):
+
+      ABSOLUTE — recent live mean < 0 (the original bar).
+      RELATIVE — recent live mean has fallen >= margin_pp below the arm's own
+        PRE-promotion baseline (the paired window's live mean, stamped into
+        state at PROMOTE). The old bar was absolute-only: a lever that cut
+        live from +0.80%%/trade to +0.10%% destroyed the promoted edge without
+        inverting the sign and could stay in force forever. The promotion bar
+        is relative (+margin vs live); the release bar must be too.
+
+    Both bars run on the ROLLING last fade_n closes, not the cumulative mean
+    since promotion — the cumulative mean converges toward its early value as
+    n grows, so a LATE fade became mathematically unreachable.
+
+    Fail-safe: fewer than fade_n closes -> no release signal here (the lever
+    TTL + the blind-cycle guard remain the backstop); missing/invalid baseline
+    -> absolute bar only, exactly the historical behaviour.
+    """
     lv = arm_trades(rows, live_bot or LIVE_BOT, promoted_ts, now)
-    if len(lv) < (fade_n or FADE_N):
+    k = int(fade_n or FADE_N)
+    if len(lv) < k:
         return False, len(lv), _mean_pct(lv)
-    m = _mean_pct(lv)
-    return (m is not None and m < 0), len(lv), m
+    m = _mean_pct(lv[-k:])
+    if m is None:
+        return False, len(lv), m
+    if m < 0:
+        return True, len(lv), m
+    mp = MARGIN_PP if margin_pp is None else float(margin_pp)
+    try:
+        if baseline_pct is not None and m < float(baseline_pct) - mp:
+            return True, len(lv), m
+    except (TypeError, ValueError):
+        pass
+    return False, len(lv), m
 
 
 def prop_fade(prop_state, live_levers, now):
@@ -294,6 +341,18 @@ def _assert_levers(levers, reason, evidence):
         {k: {"value": v, "reason": reason[:180], "evidence": evidence[:280]}
          for k, v in levers.items()},
         set_by="experiment-judge", ttl_sec=LEVER_TTL)
+
+
+def _asserted(rc, levers):
+    """[2026-07-16] Did the rail write actually LAND? write_levers returns the
+    payload written, or None when nothing valid survived (unknown lever,
+    out-of-lane, clamp reject, no DB) — documented as never raising. Every
+    call site used to discard that return, so a silently-dropped write left
+    the judge counting days toward promotion on an experiment it never
+    asserted, and could stamp phase=promoted while no live lever was in
+    force. Pure — selftested."""
+    got = (rc or {}).get("levers") or {}
+    return bool(levers) and all(k in got for k in levers)
 
 
 def candidate_pool(queue):
@@ -378,6 +437,15 @@ def run_once():
                    # push fires once per episode, not every 30 min forever.
                    "skew_notified": bool(kw.get("skew_notified",
                                                 st.get("skew_notified"))),
+                   # [2026-07-16] same once-per-episode contract for failed
+                   # rail writes (idle-start / re-assert / promote).
+                   "assert_fail_notified": bool(kw.get("assert_fail_notified",
+                                                       st.get("assert_fail_notified"))),
+                   # [2026-07-16] the live arm's pre-promotion mean, stamped at
+                   # PROMOTE — the relative fade bar's anchor. None for
+                   # promotions predating the stamp (absolute bar only).
+                   "promote_baseline": kw.get("promote_baseline",
+                                              st.get("promote_baseline")),
                    "verdicts": verdicts[-10:], "last_eval": kw.get("last_eval")}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
@@ -403,9 +471,29 @@ def run_once():
         cand = next_candidate(pool, done, current)
         if cand is None:
             return save(note="queue exhausted — awaiting new incubator proposals")
-        _assert_levers(cand["levers"], f"experiment {cand['name']} started",
-                       f"shadow arm {SHADOW_BOT}; judge bar: {MIN_DAYS}d/"
-                       f"{MIN_CLOSES} closes/+{MARGIN_PP}pp both-halves")
+        # [2026-07-16] a candidate the registry can NEVER accept (unknown
+        # lever / unclampable value) must not retry forever — mark INVALID and
+        # move on, spending no judge slot. Distinct from a transient write
+        # failure below, which retries.
+        bad = [k for k, v in cand["levers"].items()
+               if k not in tuning.LEVERS or tuning.clamp(k, v) is None]
+        if bad:
+            verdicts.append({"name": cand["name"], "verdict": "INVALID",
+                             "ts": iso(now),
+                             "why": f"registry rejected levers: {bad}"})
+            send_push(f"experiment INVALID: {cand['name']}",
+                      f"registry rejected {bad} — skipped, no judge slot spent")
+            return save(done=done + [cand["name"]],
+                        note=f"INVALID {cand['name']}: registry rejected {bad}")
+        rc = _assert_levers(cand["levers"], f"experiment {cand['name']} started",
+                            f"shadow arm {SHADOW_BOT}; judge bar: {MIN_DAYS}d/"
+                            f"{MIN_CLOSES} closes/+{MARGIN_PP}pp both-halves")
+        if not _asserted(rc, cand["levers"]):
+            # [2026-07-16] the write did not land (no DB / lock lost) — the
+            # experiment did NOT start. Without this the judge stamped
+            # started_ts and counted days on an arm running env defaults.
+            return save(note=f"lever write did not land for {cand['name']} — "
+                             f"experiment NOT started, retrying next cycle")
         send_push(f"experiment started: {cand['name']}",
                   f"shadow arm now runs {json.dumps(cand['levers'])}; "
                   f"promotion bar {MIN_DAYS:g}d / {MIN_CLOSES} closes / "
@@ -425,8 +513,9 @@ def run_once():
 
     if phase == "running":
         started = _num(st.get("started_ts"), now)
-        _assert_levers(cand["levers"], f"experiment {cand['name']} running",
-                       f"started {iso(started)}")
+        rc = _assert_levers(cand["levers"], f"experiment {cand['name']} running",
+                            f"started {iso(started)}")
+        assert_ok = _asserted(rc, cand["levers"])
         days = (now - started) / 86400.0
         ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"))
               if have_ledger else {"promote": False, "why": "no ledger"})
@@ -452,17 +541,62 @@ def run_once():
             return save(last_eval=ev, skew_notified=False, started_ts=now,
                         note=f"arm applying again: {cand['name']} — "
                              f"experiment clock restarted")
+        # [2026-07-16] the re-assert did not land: the lever will TTL-expire
+        # and the arm reverts to env defaults — data from here on measures the
+        # wrong experiment. Same HOLD semantics as ARM SKEW (which the receipt
+        # gate would eventually raise anyway once unstamped closes arrive —
+        # this just refuses to promote/abandon in the gap before that).
+        if not assert_ok:
+            if not st.get("assert_fail_notified"):
+                send_push(f"experiment lever write FAILING: {cand['name']}",
+                          "the judge could not re-assert the xp levers — "
+                          "holding (not promoting, not aging); the arm reverts "
+                          "to env defaults when the TTL lapses",
+                          priority="urgent")
+            return save(assert_fail_notified=True, last_eval=ev,
+                        note=f"lever re-assert did not land — holding "
+                             f"{cand['name']}")
+        if st.get("assert_fail_notified"):
+            # writes recovered — restart the clock for the same reason as the
+            # skew recovery above: days accrued while the arm ran defaults.
+            return save(assert_fail_notified=False, started_ts=now,
+                        last_eval=ev,
+                        note=f"lever writes recovered: {cand['name']} — "
+                             f"experiment clock restarted")
         if days >= MIN_DAYS and ev["promote"]:
             live_levers = {XP_TO_LIVE[k]: v for k, v in cand["levers"].items()}
-            _assert_levers({**cand["levers"], **live_levers},
-                           f"PROMOTED {cand['name']}", ev["why"])
+            rc = _assert_levers({**cand["levers"], **live_levers},
+                                f"PROMOTED {cand['name']}", ev["why"])
+            # [2026-07-16] the promotion IS the write. If it did not land,
+            # nothing reached real money — do not stamp phase=promoted (the
+            # fade-watch would grade a lever that is not in force) and do not
+            # push PROMOTED. Stay running; the bar stays cleared, retry next
+            # cycle. ABANDON at MAX_DAYS cannot fire meanwhile because that
+            # branch is unreachable while ev['promote'] holds (this return).
+            if not _asserted(rc, {**cand["levers"], **live_levers}):
+                if not st.get("assert_fail_notified"):
+                    send_push(f"PROMOTION WRITE FAILED: {cand['name']}",
+                              "the paired bar cleared but the live lever write "
+                              "did not land — staying RUNNING and retrying; "
+                              "nothing reached real money",
+                              priority="urgent")
+                return save(assert_fail_notified=True, last_eval=ev,
+                            note=f"promotion write did not land for "
+                                 f"{cand['name']} — staying running")
             verdicts.append({"name": cand["name"], "verdict": "PROMOTED",
                              "ts": iso(now), "eval": ev})
             send_push(f"PROMOTED to LIVE: {cand['name']}",
                       f"{ev['why']}\nlive levers: {json.dumps(live_levers)} "
                       f"(TTL'd; fades back to env if the live arm turns)",
                       priority="urgent")
+            # [2026-07-16] stamp the live arm's PRE-promotion baseline (the
+            # paired window's live mean) — the relative fade bar releases the
+            # lever when the post-promotion live mean falls margin_pp below
+            # this. Absent/None -> fade_check falls back to the absolute bar.
             return save(phase="promoted", promoted_ts=now, last_eval=ev,
+                        assert_fail_notified=False,
+                        promote_baseline={"live_mean_pct": ev.get("live_mean_pct"),
+                                          "n_live": ev.get("n_live")},
                         note=f"PROMOTED {cand['name']}")
         if days >= MAX_DAYS:
             verdicts.append({"name": cand["name"], "verdict": "ABANDONED",
@@ -492,13 +626,21 @@ def run_once():
                                  f"return within the TTL")
         else:
             blind = 0
-        fading, n, m = fade_check(rows, promoted, now) if have_ledger else (False, 0, None)
+        # [2026-07-16] the relative fade bar measures against the live arm's
+        # own pre-promotion baseline, stamped at PROMOTE. Old promotions (or a
+        # regen restore predating the stamp) have none -> absolute bar only.
+        baseline = (st.get("promote_baseline") or {}).get("live_mean_pct")
+        fading, n, m = (fade_check(rows, promoted, now, baseline_pct=baseline)
+                        if have_ledger else (False, 0, None))
         live_levers = {XP_TO_LIVE[k]: v for k, v in cand["levers"].items()}
         # 🦾 the earlier fade signal: the live lane's own paired grades
         pfading, pwhy = prop_fade(store.load_state("fleet-proprioception") or {},
                                   set(live_levers), now)
         if fading or pfading:
-            why = (f"live arm {m:+.2f}%/trade over n={n} since promotion"
+            why = (f"live arm {m:+.2f}%/trade on the recent window (n={n} "
+                   f"since promotion"
+                   + (f"; pre-promotion baseline {baseline:+.2f}%"
+                      if isinstance(baseline, (int, float)) else "") + ")"
                    if fading else pwhy)
             verdicts.append({"name": cand["name"], "verdict": "FADED",
                              "ts": iso(now), "live_n": n, "live_mean_pct": m,
@@ -509,13 +651,29 @@ def run_once():
                       priority="urgent")
             return save(phase="idle", done=done + [cand["name"]], current=None,
                         spec={}, started_ts=None, promoted_ts=None,
+                        promote_baseline=None,
                         cooldown_until=now + COOLDOWN_H * 3600,
                         note=f"FADED {cand['name']} ({why})")
-        _assert_levers({**cand["levers"], **live_levers},
-                       f"promotion {cand['name']} in force",
-                       f"promoted {iso(promoted)}; live n={n} mean "
-                       f"{m if m is None else round(m, 3)}%/trade")
-        return save(blind_cycles=blind,
+        rc = _assert_levers({**cand["levers"], **live_levers},
+                            f"promotion {cand['name']} in force",
+                            f"promoted {iso(promoted)}; live n={n} mean "
+                            f"{m if m is None else round(m, 3)}%/trade")
+        # [2026-07-16] re-assert failure here is inherently fail-safe (the
+        # lever TTL-expires and real money reverts to env defaults) but must
+        # not be SILENT: the judge would keep reporting "promotion in force"
+        # while nothing was. One warn per episode; fade-watch keeps running on
+        # live data either way.
+        if not _asserted(rc, live_levers):
+            if not st.get("assert_fail_notified"):
+                send_push(f"promotion re-assert FAILING: {cand['name']}",
+                          "the live lever write is not landing — it will "
+                          "TTL-expire back to env defaults (fail-safe); "
+                          "fade-watch continues on live data",
+                          priority="urgent")
+            return save(blind_cycles=blind, assert_fail_notified=True,
+                        note=f"promotion re-assert did not land — lever "
+                             f"expires to env defaults within the TTL")
+        return save(blind_cycles=blind, assert_fail_notified=False,
                     note=f"promotion in force (live n={n}, mean "
                          f"{m if m is None else round(m, 2)}%"
                          f"{', ledger dark ' + str(blind) + ' cycles' if blind else ''})")
@@ -684,9 +842,64 @@ def _selftest():
     # cand_levers=None must be byte-identical to the historical bar
     assert paired_eval(_sk, t0, end) == paired_eval(_sk, t0, end, cand_levers=None)
 
+    # ---- [2026-07-16] per-half sample floors -------------------------------
+    # Full-window floors said nothing about the halves: 25 shadow closes in h1
+    # and 5 in h2 clears 30 overall, but h2's "both-halves" verdict rides on 5
+    # trades. Must hold as under-powered, not promote.
+    _lop = ([rowb(SHADOW_BOT, t0 + i * (4 * day / 25), 0.01, _applied) for i in range(25)]
+            + [rowb(SHADOW_BOT, t0 + 4 * day + i * (4 * day / 5), 0.01, _applied)
+               for i in range(5)]
+            + [rowb(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
+    _lv2 = paired_eval(_lop, t0, end, cand_levers=_cand)
+    assert _lv2["promote"] is False and "under-powered" in _lv2["why"], _lv2
+    # one live trade per half must never carry a promotion: 10 live closes all
+    # in h1, h2 has 1 — the exact noise-amplifier shape
+    _one = ([rowb(SHADOW_BOT, t0 + i * (8 * day / 32), 0.01, _applied) for i in range(32)]
+            + [rowb(LIVE_BOT, t0 + i * (4 * day / 10), 0.002) for i in range(10)]
+            + [rowb(LIVE_BOT, t0 + 5 * day, 0.002)])
+    _ov = paired_eval(_one, t0, end, cand_levers=_cand)
+    assert _ov["promote"] is False and "under-powered" in _ov["why"], _ov
+    # the original promote case still clears (16/16 + 6/6 split >= 15/5 floors)
+    assert paired_eval(rows, t0, end)["promote"], "per-half floors broke the base case"
+
+    # ---- [2026-07-16] relative + rolling fade bar --------------------------
+    # edge destroyed but not inverted: baseline +0.8, post-promotion +0.1 —
+    # the old absolute bar (m<0) never released this. n=20 @ FADE_N=15.
+    _fade_rows = [rowb(LIVE_BOT, t0 + i * 3600, 0.001) for i in range(20)]
+    f, n, m = fade_check(_fade_rows, t0 - 1, end, fade_n=15, baseline_pct=0.8,
+                         margin_pp=0.5)
+    assert f is True and n == 20, (f, n, m)
+    # same data, no baseline (old promotion) -> absolute bar only -> no release
+    f2, _, _ = fade_check(_fade_rows, t0 - 1, end, fade_n=15)
+    assert f2 is False, "missing baseline must fall back to the absolute bar"
+    # healthy: post-promotion holds near baseline -> no release
+    _ok_rows = [rowb(LIVE_BOT, t0 + i * 3600, 0.007) for i in range(20)]
+    f3, _, _ = fade_check(_ok_rows, t0 - 1, end, fade_n=15, baseline_pct=0.8,
+                          margin_pp=0.5)
+    assert f3 is False, "a healthy promotion must not release"
+    # ROLLING beats cumulative: 30 early wins then 15 recent losses — the
+    # cumulative mean stays positive (the old unreachable-release bug), the
+    # rolling window sees the fade
+    _late = ([rowb(LIVE_BOT, t0 + i * 3600, 0.02) for i in range(30)]
+             + [rowb(LIVE_BOT, t0 + (40 + i) * 3600, -0.005) for i in range(15)])
+    f4, _, m4 = fade_check(_late, t0 - 1, end, fade_n=15)
+    assert f4 is True and m4 < 0, (f4, m4)
+    assert 100.0 * (30 * 0.02 - 15 * 0.005) / 45 > 0  # cumulative would miss it
+    # under FADE_N closes -> no signal (fail-safe unchanged)
+    assert fade_check(_fade_rows[:5], t0 - 1, end, fade_n=15,
+                      baseline_pct=9.9)[0] is False
+
+    # ---- [2026-07-16] _asserted: a dropped rail write is not an assert -----
+    assert _asserted({"levers": {"a": {}, "b": {}}}, {"a": 1, "b": 2}) is True
+    assert _asserted(None, {"a": 1}) is False                # write_levers None
+    assert _asserted({"levers": {"a": {}}}, {"a": 1, "b": 2}) is False  # partial
+    assert _asserted({}, {"a": 1}) is False
+    assert _asserted({"levers": {"a": {}}}, {}) is False     # nothing wanted
+
     print("experiment_judge selftest OK (promote, lucky-half reject, margin, "
           "floors, own-right, fade, proprioception early-fade, registry mapping, "
-          "arm-skew receipt gate)")
+          "arm-skew receipt gate, per-half floors, relative+rolling fade, "
+          "asserted-write guard)")
 
 
 if __name__ == "__main__":
