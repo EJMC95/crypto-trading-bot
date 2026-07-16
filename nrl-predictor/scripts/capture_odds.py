@@ -69,7 +69,9 @@ def main() -> None:
         pick_home = r.edge_home >= 0
         sel = r.home_id if pick_home else r.away_id
         prob = r.p_home_blend if pick_home else 1 - r.p_home_blend
-        price = r.median_odds_home if pick_home else r.median_odds_away
+        # log at the BEST available (line-shopped) price — the price the value board
+        # actually recommends — so CLV compares best-taken vs best-close consistently.
+        price = r.best_odds_home if pick_home else r.best_odds_away
         rows.append({
             "round": r.round, "date": str(r.date), "home_id": r.home_id,
             "away_id": r.away_id, "market": "h2h", "selection": sel,

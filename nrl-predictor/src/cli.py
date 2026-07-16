@@ -23,8 +23,14 @@ sys.path.insert(0, str(ROOT))
 
 def cmd_refresh(_: argparse.Namespace) -> None:
     from src.ingest import nrl_stats, results_history
-    results_history.build()
-    res = nrl_stats.build()
+    # Historical closing-odds refresh (aussportsbetting/Wayback) is best-effort:
+    # it feeds the market-vs-model backtest, NOT the live match data. If the source
+    # is down it must NOT block the NRL.com results refresh that advances the round.
+    try:
+        results_history.build()
+    except Exception as e:
+        print(f"::warning::historical odds refresh skipped ({type(e).__name__}: {str(e)[:80]})")
+    res = nrl_stats.build()          # NRL.com — the authoritative live results/fixtures
     m = res["matches"]
     print(f"matches: {len(m)} through {m['date'].max().date()}")
     if not res["fixtures_next"].empty:

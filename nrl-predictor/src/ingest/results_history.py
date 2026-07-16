@@ -48,7 +48,14 @@ def download(force: bool = False) -> Path:
     except requests.RequestException as e:
         print(f"direct download failed ({e}); falling back to Wayback", file=sys.stderr)
     avail = requests.get(WAYBACK_AVAIL, timeout=60).json()
-    snap = avail["archived_snapshots"]["closest"]
+    snap = (avail.get("archived_snapshots") or {}).get("closest")
+    if not snap:
+        # Wayback has no capture right now; if we have a cached copy, keep it,
+        # otherwise signal a soft failure the caller can absorb.
+        if RAW.exists():
+            print("Wayback unavailable; using cached historical odds", file=sys.stderr)
+            return RAW
+        raise RuntimeError("historical odds source unavailable (Cloudflare + no Wayback capture)")
     ts = snap["timestamp"]
     url = f"https://web.archive.org/web/{ts}id_/http://www.aussportsbetting.com/historical_data/nrl.xlsx"
     r = requests.get(url, timeout=180)
