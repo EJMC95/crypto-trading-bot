@@ -87,11 +87,27 @@ LOOP_SECONDS = int(os.environ.get("MOMO_LOOP_SECONDS", "600"))
 # to backtest: funding-aware selection (HOOD printed 301%apr = ~5.8%/WEEK
 # carry on day one — far larger than any adjacent-rank momentum spread). So
 # it runs as a LIVE A/B: the real book stays verbatim-Alpaca; this VIRTUAL
-# ledger applies a funding veto at each rebalance (skip qualifiers paying
-# more than MOMO_AB_VETO_APR, backfill next rank) and is marked/accrued in
-# parallel (mid fills — slightly optimistic vs the real book's VWAP; the
-# comparison horizon is weeks, where funding dwarfs that bias). Published in
+# ledger applies a funding veto (skip/exit qualifiers paying more than
+# MOMO_AB_VETO_APR, backfill next rank) and is marked/accrued in parallel
+# (mid fills — slightly optimistic vs the real book's VWAP; the comparison
+# horizon is weeks, where funding dwarfs that bias). Published in
 # extra.ab_funding_veto; the winner after ~2-4 weeks gets shipped.
+#
+# [2026-07-17 EPOCH 2 — the instrument was measuring nothing] v1's A/B
+# differed from the real book in THREE variables at once, so no divergence
+# was attributable: (a) it was bootstrapped mid-cycle at its own entry
+# prices, i.e. a different window; (b) it carried NO seatbelt while the real
+# book did; (c) the veto was checked ONLY at rebalance. On 17-Jul it read
+# eq $829.30 vs the real book's $872.21 — which invites "the funding veto
+# loses $43" when in fact last_vetoed was EMPTY (the veto had never once
+# fired) and the whole $43 was the seatbelt. Epoch 2 makes the veto the ONLY
+# variable: the ledger is SEEDED from the real book (identical positions,
+# entries, accrual, marks -> both start at the same equity, so all later
+# divergence is the veto), it MIRRORS the seatbelt and the rail flatten, and
+# the veto runs CONTINUOUSLY. Continuity matters because the spike is the
+# whole cost: SNDK/NBIS entered affordable and only later printed ~967%/687%
+# apr — an entry-only veto cannot see the carry that actually gets paid.
+# Epoch stamped in extra.ab_funding_veto.epoch; pre-epoch numbers are void.
 AB_VETO_APR = float(os.environ.get("MOMO_AB_VETO_APR", "1.5"))   # 150% APR
 
 LOG_FILE = os.environ.get("MOMO_LOG_FILE", "lighter_momentum_bot.log")
@@ -200,7 +216,16 @@ def main():
     n_closed = n_wins = 0
     ab_meta = {}          # A/B virtual book: sym -> {entry, size, accrued, mark}
     ab_realized = 0.0
-    ab_vetoed = []
+    ab_fund_realized = 0.0   # funding component only — lets the review say
+                             # how much of any edge is CARRY vs price luck
+    ab_vetoed = []        # entry-vetoes at the last rebalance
+    ab_veto_exits = []    # CONTINUOUS veto exits since the epoch. Without
+                          # this the payload shows the variant holding fewer
+                          # names than the real book with `last_vetoed: []`
+                          # beside it — unreadable, and exactly the kind of
+                          # silent mismatch that made the v1 A/B misleading.
+    ab_base = None        # [EPOCH 2] closed-book equity at the seed instant;
+    ab_epoch = None       # None -> seed from the real book on this loop
     saved = store.load_state(bot_id)
     if saved and broker.restore_state(saved.get("broker") or {}):
         meta = {str(k): v for k, v in (saved.get("meta") or {}).items()}
@@ -208,6 +233,11 @@ def main():
         next_reb = float(saved.get("next_reb") or 0.0)
         ab_meta = {str(k): v for k, v in (saved.get("ab_meta") or {}).items()}
         ab_realized = float(saved.get("ab_realized") or 0.0)
+        ab_fund_realized = float(saved.get("ab_fund_realized") or 0.0)
+        ab_veto_exits[:] = list(saved.get("ab_veto_exits") or [])
+        ab_epoch = saved.get("ab_epoch")
+        _ab = saved.get("ab_base")
+        ab_base = float(_ab) if _ab is not None else None
         log.info("restored shadow state: $%.2f, %d open", broker.equity(),
                  broker.open_count())
     try:
@@ -222,11 +252,56 @@ def main():
         return broker.equity() + fund_realized + accr
 
     def ab_equity():
-        out = START_EQUITY + ab_realized
+        # [EPOCH 2] ab_base is the real book's CLOSED-book equity at the seed
+        # instant, so ab_equity() == equity() to the cent at the epoch and
+        # every later dollar of divergence is the veto's doing. START_EQUITY
+        # only applies before the first seed.
+        out = (START_EQUITY if ab_base is None else ab_base) + ab_realized
         for m in ab_meta.values():
             mark = m.get("mark") or m["entry"]
             out += m["size"] * (mark - m["entry"]) + m.get("accrued", 0.0)
         return out
+
+    def ab_close(s, px, reason):
+        """Realise a virtual leg. The A/B mirrors EVERY exit the real book
+        takes (seatbelt, rail flatten, rotation) so the funding veto stays the
+        only variable — plus the veto's own exit, which is what's under test."""
+        nonlocal ab_realized, ab_fund_realized
+        m = ab_meta.pop(s, None)
+        if not m:
+            return
+        px = px or m["entry"]
+        pnl = m["size"] * (px - m["entry"])
+        fnd = m.get("accrued", 0.0)
+        ab_realized += pnl + fnd
+        ab_fund_realized += fnd
+        if reason == "funding_veto":
+            ab_veto_exits.append({"sym": s, "at": datetime.now(timezone.utc)
+                                  .isoformat(), "fund": round(fnd, 3)})
+            del ab_veto_exits[:-20]        # keep the payload bounded
+        log.info("AB CLOSE %s | price %+.2f funding %+.2f [%s]",
+                 s, pnl, fnd, reason)
+
+    def ab_seed():
+        """[EPOCH 2] Start the variant FROM the real book: identical legs,
+        entries, accrual and marks, plus a base equity that makes the two
+        ledgers agree right now. v1 bootstrapped at its own prices in its own
+        window — which is why its $43 gap measured the seatbelt, not the veto."""
+        nonlocal ab_meta, ab_realized, ab_fund_realized, ab_base, ab_epoch
+        ab_meta = {s: {"entry": ent, "size": abs(sz),
+                       "accrued": (meta.get(s) or {}).get("accrued", 0.0),
+                       "mark": broker.marks.get(s) or ent}
+                   for s, (sz, ent) in broker.pos.items()}
+        ab_realized = ab_fund_realized = 0.0
+        del ab_veto_exits[:]           # a new epoch starts with a clean slate
+        # Closed-book equity: total less what the open legs contribute, since
+        # ab_equity() re-adds exactly those legs back out of ab_meta.
+        ab_base = broker.equity() - broker.unrealized() + fund_realized
+        ab_epoch = datetime.now(timezone.utc).isoformat()
+        log.info("A/B EPOCH 2 seeded from the real book | base $%.2f | eq "
+                 "$%.2f == real $%.2f | mirroring %s | veto >%.0f%%apr "
+                 "CONTINUOUS", ab_base, ab_equity(), equity(),
+                 ", ".join(sorted(ab_meta)) or "flat", AB_VETO_APR * 100)
 
     def close_pos(s, px, reason):
         nonlocal fund_realized, n_closed, n_wins
@@ -257,10 +332,29 @@ def main():
 
     cur_day = datetime.now(timezone.utc).date()
     halted_today = False
-    if store.load_daily_halt(bot_id, cur_day.isoformat()):
-        halted_today = True
-        log.warning("daily-loss halt restored — halted for today.")
     day_start_equity = equity()
+    # [2026-07-17 AUDIT FIX] the daily-loss rail lost its BASELINE on every
+    # restart: day_start_equity re-based to boot equity, so a redeploy part
+    # way down a losing day re-anchored the 10% rail to the already-depressed
+    # number and it could no longer fire on that day's drawdown. The baseline
+    # now rides the persisted state (same UTC day only) or the saved halt
+    # record. Same class as the 16-Jul last_ts fix below.
+    # NOTE the two LIVE bots (lighter_funding_bot / lighter_trend_bot) carry
+    # only the narrower halt-record half of this, so they still re-base on a
+    # PRE-halt restart — real money, logged for the 21-Jul review, not
+    # touched here.
+    _halt = store.load_daily_halt(bot_id, cur_day.isoformat())
+    if _halt:
+        halted_today = True
+        day_start_equity = _halt.get("day_start_equity") or day_start_equity
+        log.warning("daily-loss halt restored — halted for today.")
+    elif (saved or {}).get("day") == cur_day.isoformat():
+        try:
+            day_start_equity = float(saved["day_start_equity"])
+            log.info("daily-rail baseline restored from state: $%.2f",
+                     day_start_equity)
+        except (KeyError, TypeError, ValueError):
+            pass
     # [2026-07-16 AUDIT FIX] restore the accrual clock: it reset to
     # boot time on every redeploy, so funding during the gap was never
     # accrued (systematic undercount of the drag/credit this book
@@ -292,6 +386,10 @@ def main():
                 for s in list(meta):
                     px = marks.fresh_mid(venue, s) or meta[s].get("entry")
                     close_pos(s, px, "rail_flatten")
+                # [EPOCH 2] the variant mirrors the rail too — it exists to
+                # isolate the funding veto, not to also test "no daily rail".
+                for s in list(ab_meta):
+                    ab_close(s, marks.fresh_mid(venue, s), "rail_flatten")
 
         if halted_today:
             try:
@@ -315,6 +413,16 @@ def main():
         dt_h = (t0 - last_ts) / 3600.0
         last_ts = t0
 
+        # [EPOCH 2] Seed BEFORE this loop's mark/accrue, never after: seeding
+        # afterwards copied an `accrued` the real book had ALREADY advanced by
+        # dt_h and then advanced it again in the A/B pass — one loop of double
+        # funding, which showed up as a $0.01 epoch drift that must be exactly
+        # $0.00. Seeding here, both books enter the loop identical and each
+        # applies the same dt_h once. (ab_base is mark-independent: the
+        # unrealized term cancels, leaving start+realized-fees+fund_realized.)
+        if ab_epoch is None:
+            ab_seed()
+
         # ---- mark + accrue + seatbelt (every loop, all held) ----
         for s in list(meta):
             px = marks.fresh_mid(venue, s)
@@ -329,8 +437,10 @@ def main():
             if entry and (px - entry) / entry <= -CATASTROPHIC_STOP:
                 close_pos(s, px, "catastrophic_stop")
 
-        # ---- A/B virtual book: mark + accrue (no seatbelt — rule-pure) ----
-        for s, m in ab_meta.items():
+        # ---- A/B virtual book: mark + accrue + MIRRORED seatbelt + the
+        # continuous funding veto (the one variable). Seeded at the loop top. --
+        for s in list(ab_meta):
+            m = ab_meta[s]
             px = marks.fresh_mid(venue, s)
             if not px:
                 continue
@@ -338,13 +448,33 @@ def main():
             rate = (fund.get(s) or {}).get("rate")
             if rate is not None:
                 m["accrued"] = m.get("accrued", 0.0) - rate * m["size"] * px * dt_h
+            entry = m.get("entry") or 0.0
+            if entry and (px - entry) / entry <= -CATASTROPHIC_STOP:
+                ab_close(s, px, "catastrophic_stop")   # mirrors the real book
+                continue
+            # THE VARIABLE UNDER TEST: bail out of a leg whose carry has spiked
+            # past the bar. v1 checked only at entry and so never saw the cost
+            # that actually gets paid — SNDK/NBIS entered affordable and only
+            # later printed ~967%/687% apr. The freed slot stays CASH until the
+            # next weekly rebalance: back-filling mid-week would smuggle a
+            # second variable (rotation cadence) into the comparison.
+            if rate is not None and rate * 24 * 365 > AB_VETO_APR:
+                ab_close(s, px, "funding_veto")
 
         # ---- weekly rotation ----
-        # (also fires once when the A/B ledger is empty but the real book
-        # holds — bootstraps the variant mid-cycle; idempotent for the real
-        # book, which only trades if the ranking actually changed)
+        # [2026-07-17 STORM FIX] the trigger used to be
+        # `t0 >= next_reb or (meta and not ab_meta)` — a mid-cycle bootstrap
+        # for the A/B ledger. But that disjunct re-fires EVERY loop for as
+        # long as the variant is flat while the real book holds, which is
+        # precisely what a fully-vetoed top-5 produces (SNDK 967% / NBIS 687%
+        # apr are one bad week away from it). It would silently demote the
+        # WEEKLY rotation the backtest validated to a ~6-hourly one (bounded
+        # only by the Yahoo cache TTL) — and the same sweep already found
+        # daily WORSE than weekly (maxDD 40.7 vs 36.9%, 176 vs 81 switches/yr).
+        # The variant now seeds itself once from the real book (ab_seed), so
+        # the rebalance is the clock and nothing else.
         ranks = None
-        if t0 >= next_reb or (meta and not ab_meta):
+        if t0 >= next_reb:
             evals, blind = {}, []
             for s in symbols:
                 closes = ref_closes(s)
@@ -391,17 +521,29 @@ def main():
                              if s not in ab_want and apr.get(s, 0) > AB_VETO_APR]
                 for s in list(ab_meta):
                     if s not in ab_want:
-                        px = marks.fresh_mid(venue, s) or ab_meta[s]["entry"]
-                        m = ab_meta.pop(s)
-                        ab_realized += (m["size"] * (px - m["entry"])
-                                        + m.get("accrued", 0.0))
+                        ab_close(s, marks.fresh_mid(venue, s), "rotated_out")
                 for s in ab_want:
                     if s in ab_meta:
                         continue
                     px = marks.fresh_mid(venue, s)
                     if px:
-                        ab_meta[s] = {"entry": px, "size": ORDER_USD / px,
-                                      "accrued": 0.0, "mark": px}
+                        # [EPOCH 2] when the real book entered this same name
+                        # at THIS rebalance, take its ACTUAL crossed fill: a
+                        # mid fill would hand the variant a free half-spread
+                        # on every shared leg, and that is not the veto's
+                        # doing. A leg the real book holds from an earlier
+                        # rebalance is genuine veto-driven divergence — the
+                        # variant is entering it fresh, so mid is correct.
+                        # Mirror the real book EXACTLY on a shared leg: it
+                        # sizes off the mid, fills crossed, and marks at its
+                        # own fill (so it shows no crossing cost until the
+                        # next loop). Sizing off `ent` or marking at mid here
+                        # would re-introduce a spread-shaped difference that
+                        # the veto would then get blamed or credited for.
+                        _m = meta.get(s) or {}
+                        ent = _m["entry"] if _m.get("opened_ts") == t0 else px
+                        ab_meta[s] = {"entry": ent, "size": ORDER_USD / px,
+                                      "accrued": 0.0, "mark": ent}
                 if ab_vetoed:
                     log.info("A/B veto: %s (funding > %.0f%%apr) -> variant "
                              "holds %s", ", ".join(ab_vetoed),
@@ -425,10 +567,25 @@ def main():
                        **({"last_ranks": ranks} if ranks else {}),
                        "fund_realized": round(fund_realized, 4),
                        "fund_open": round(accr, 4),
+                       # [EPOCH 2] `epoch` is when the two ledgers were made
+                       # identical — the comparison means NOTHING before it.
+                       # vs_real is the headline (ab minus real, same instant,
+                       # same start); fund_paid vs the real book's
+                       # fund_realized+fund_open attributes any edge to CARRY
+                       # rather than price luck.
                        "ab_funding_veto": {"eq": round(ab_equity(), 2),
+                                           "vs_real": round(ab_equity() - equity(), 2),
+                                           "epoch": ab_epoch,
+                                           "base": round(ab_base, 2)
+                                           if ab_base is not None else None,
+                                           "fund_paid": round(
+                                               ab_fund_realized
+                                               + sum((m or {}).get("accrued", 0.0)
+                                                     for m in ab_meta.values()), 4),
                                            "held": sorted(ab_meta),
                                            "veto_apr": AB_VETO_APR,
-                                           "last_vetoed": ab_vetoed},
+                                           "last_vetoed": ab_vetoed,
+                                           "veto_exits": ab_veto_exits},
                        "next_reb": datetime.fromtimestamp(
                            next_reb, tz=timezone.utc).isoformat() if next_reb else None,
                        "skipped_unlisted": skipped})
@@ -439,8 +596,16 @@ def main():
                                       "fund_realized": fund_realized,
                                       "ab_meta": ab_meta,
                                       "ab_realized": ab_realized,
+                                      "ab_fund_realized": ab_fund_realized,
+                                      "ab_veto_exits": ab_veto_exits,
+                                      "ab_base": ab_base,
+                                      "ab_epoch": ab_epoch,
                                       "next_reb": next_reb,
-                                      "last_ts": last_ts})
+                                      "last_ts": last_ts,
+                                      # daily-rail baseline rides the state so
+                                      # a restart can't re-base it (see boot)
+                                      "day": cur_day.isoformat(),
+                                      "day_start_equity": day_start_equity})
         except Exception:  # noqa: BLE001
             pass
 
