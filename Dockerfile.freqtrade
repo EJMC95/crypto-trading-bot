@@ -24,7 +24,11 @@ ENV PYTHONPATH=/freqtrade
 # caught the missing `COPY venues/` and was satisfied. `lighter` is a PIP dep,
 # invisible to it, so the guard verified the file and not the wheel. Same
 # failure class, one layer down. See BORN_DARK_OK / the 17-Jul (m) CHANGELOG.
-RUN pip install --no-cache-dir psycopg2-binary "lighter-sdk>=1.1.1" "websockets>=12.0.0"
+# [2026-07-17] lighter-sdk PINNED — see requirements.txt for the full reason.
+# This image names the dep by hand instead of using requirements.txt, so the
+# `>=` drift had to be closed in BOTH places or the pin is decorative. 1.1.2 is
+# the version the live fleet is MEASURED to run (boot banner, 17-Jul 10:58Z).
+RUN pip install --no-cache-dir psycopg2-binary "lighter-sdk==1.1.2" "websockets>=12.0.0"
 # Bake in the bot configs + strategies (built locally in user_data/)
 COPY user_data /freqtrade/user_data
 COPY run_all.sh /freqtrade/run_all.sh

@@ -27,6 +27,21 @@ jobs:
       - name: The guard must still be able to see (negative fixture)
         run: python3 scripts/audit_image_imports.py --selftest
 
+  sdk-pin:
+    name: Real-money wheels are PINNED (no signer drift)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-17] lighter-sdk was `>=1.1.1`, so every image resolved to
+      # PyPI's latest on BUILD DAY — 1.1.2 shipped 10-Jul and silently became
+      # the code SIGNING REAL ORDERS. The born-dark guard cannot see a pip dep
+      # (its own docstring: it "verified the FILE and not the WHEEL"), so this
+      # is the sibling control for the layer it is blind to.
+      - name: A wheel that signs real orders must not float
+        run: python3 scripts/audit_sdk_pin.py
+      - name: The guard must still be able to see (negative fixture)
+        run: python3 scripts/audit_sdk_pin.py --selftest
+
   changelog:
     runs-on: ubuntu-latest
     steps:

@@ -4,7 +4,22 @@ eth-account>=0.10.0
 numpy>=1.24
 ccxt>=4.2.0
 psycopg2-binary>=2.9   # shared P&L publisher (bot_pnl_store) + pnl_dashboard
-lighter-sdk>=1.1.1     # Lighter venue layer (venues/) — signer binaries verified
+# [2026-07-17] PINNED — this wheel SIGNS REAL ORDERS (SignerClient,
+# create_market_order, the Go signer binary, the nonce manager). It was
+# `>=1.1.1`, so every image resolved to whatever PyPI's latest was on BUILD DAY:
+# 1.1.2 shipped 10-Jul and silently became the code moving real money, unreviewed
+# and unbacktested. The born-dark guard models repo-local imports and CANNOT see
+# a pip dep — this is that same class, one layer out.
+# 1.1.2 is what the LIVE Funding Farmer is MEASURED to be running (its boot
+# banner, 17-Jul 10:58Z: "lighter signer ready (account 733196, key index 4) |
+# lighter-sdk 1.1.2"), so pinning HERE is a NO-OP for the running fleet and only
+# stops the drift. Pinning to the docs' "verified" 1.1.1 would have DOWNGRADED a
+# live signer that is placing orders fine — which is why this waited for the
+# measurement instead of guessing.
+# BEFORE MOVING THIS PIN: it changes the code that signs real money. Read the
+# upstream diff, and note `lighter.__version__` LIES (reports "1.0.0", a release
+# PyPI does not have) — use `importlib.metadata.version("lighter-sdk")`.
+lighter-sdk==1.1.2     # Lighter venue layer (venues/) — signer binaries verified
                        # on linux/amd64 (python:3.11-slim) AND Mac arm64, docs/lighter.md
 websockets>=12.0.0     # direct: venues/lighter_client.py uses websockets.sync.client
                        # (also a lighter-sdk transitive; pin it so it can't be dropped)
