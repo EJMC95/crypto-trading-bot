@@ -338,10 +338,29 @@ def get_lever(name, default, now_ts=None):
     clamped lever value — or the caller's default."""
     now_ts = now_ts if now_ts is not None else time.time()
     try:
+        spec = LEVERS.get(name)
+        # [2026-07-17 AUDIT] THE LANE GATE, at the CONSUMER. FLEET_TUNING_ENACT_LANES
+        # is documented as the per-lane kill switch — "Remove the lane from this
+        # env to kill it" (:74) — but the check lived ONLY in write_levers
+        # (:385). get_lever tested quarantine, live-hurting, freshness, expiry
+        # and clamp, and never the lane. Measured with the live lane removed:
+        #   get_lever('live.clip_scale', 1.0)         -> 1.5     (should be 1.0)
+        #   get_lever('live.funding.enter_apr', 0.05) -> 0.075   (should be 0.05)
+        # i.e. throwing the documented switch changed nothing a bot reads; an
+        # already-written lever kept steering REAL MONEY until its TTL lapsed —
+        # and only if the AUTHOR's service also got the env and was redeployed.
+        # This is the exact shape of the 17-Jul FLEET_RISK_MODE finding (a kill
+        # switch only some consumers honoured), which is now a CLAUDE.md rule:
+        # a switch that does not reach the consumer is not a switch. Checked
+        # FIRST, so a killed lane short-circuits every other read. `not spec`
+        # keeps the old behaviour for unregistered names (they fell through to
+        # clamp() -> None -> default anyway). Inert by default: the shipped
+        # ENACT_LANES contains all five lanes.
+        if not spec or spec.get("lane") not in ENACT_LANES:
+            return default                   # lane switched off -> operator default
         if name in _quarantined(now_ts):
             return default                   # immune-quarantined -> operator default
-        spec = LEVERS.get(name)
-        if (spec is not None and spec.get("lane") == "lighter-live"
+        if (spec.get("lane") == "lighter-live"
                 and name in _live_hurting(now_ts)):
             return default                   # measured-bad LIVE lever -> operator default
         p = _load(now_ts)
@@ -357,13 +376,21 @@ def get_lever(name, default, now_ts=None):
 
 
 def active_levers(now_ts=None):
-    """{name: entry} of currently-live levers (for display/telemetry)."""
+    """{name: entry} of currently-live levers (for display/telemetry).
+
+    [2026-07-17 AUDIT] Honours ENACT_LANES too, so this cannot report a lever
+    as ACTIVE that get_lever now ignores — the dashboard's 🎚️ count and the
+    Autonomy card read this, and a switched-off lane still listed here would
+    tell the operator the switch had not worked. Display must agree with the
+    consumer; a telemetry view that disagrees with the actuator is how you get
+    talked out of a correct kill."""
     now_ts = now_ts if now_ts is not None else time.time()
     p = _load(now_ts)
     if not p or not _is_fresh(p, now_ts):
         return {}
     return {k: v for k, v in (p.get("levers") or {}).items()
-            if k in LEVERS and isinstance(v, dict) and _lever_alive(v, now_ts)}
+            if k in LEVERS and isinstance(v, dict) and _lever_alive(v, now_ts)
+            and LEVERS[k].get("lane") in ENACT_LANES}
 
 
 def write_levers(levers, set_by="evidence-board", now_ts=None, ttl_sec=None):
@@ -692,7 +719,61 @@ def _selftest():
         if spec["kind"] in ("float", "int"):
             assert clamp(name, spec["lo"]) == spec["lo"]
             assert clamp(name, spec["hi"]) == spec["hi"]
-    print("fleet_tuning selftest OK (incl. author-lane binding + per-entry ttl)")
+
+    # [2026-07-17 AUDIT] THE LANE KILL SWITCH, ASSERTED AT THE CONSUMER.
+    # ENACT_LANES only ever gated write_levers, so a lever ALREADY WRITTEN kept
+    # steering real money through a thrown switch. The old suite tested the
+    # write side and called it covered — but the operator throws this switch to
+    # stop a lever that is already in force, which is precisely the case nothing
+    # tested. Drive get_lever/active_levers directly with the live lane removed.
+    _saved_lanes = ENACT_LANES
+    _saved_load, _saved_q, _saved_h = _load, _quarantined, _live_hurting
+    try:
+        _t = 1_800_000_000.0
+
+        def _ts(ts):
+            return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+        _p = {"updated": _ts(_t), "ttl_sec": 3600, "levers": {
+            "live.clip_scale": {"value": 1.5, "expires": _ts(_t + 3600),
+                                "set_by": "evidence-board"},
+            "taker.dip_range": {"value": 0.11, "expires": _ts(_t + 3600),
+                                "set_by": "scout-tuner"}}}
+        globals()["_load"] = lambda now_ts=None: _p
+        globals()["_quarantined"] = lambda now_ts=None: set()
+        globals()["_live_hurting"] = lambda now_ts=None: set()
+
+        globals()["ENACT_LANES"] = {"paper-scanner", "lighter-scout",
+                                    "lighter-taker", "lighter-live", "lighter-xp"}
+        assert get_lever("live.clip_scale", 1.0, _t) == 1.5, "shipped lanes: enacted"
+        assert get_lever("taker.dip_range", 0.08, _t) == 0.11
+        assert set(active_levers(_t)) == {"live.clip_scale", "taker.dip_range"}
+
+        # the operator kills ONLY the live lane
+        globals()["ENACT_LANES"] = {"paper-scanner", "lighter-scout",
+                                    "lighter-taker", "lighter-xp"}
+        assert get_lever("live.clip_scale", 1.0, _t) == 1.0, \
+            "REGRESSION: a killed lane still steers REAL MONEY at the consumer"
+        assert get_lever("taker.dip_range", 0.08, _t) == 0.11, \
+            "killing one lane must not disturb another"
+        assert set(active_levers(_t)) == {"taker.dip_range"}, \
+            "display must not report a killed lane as active"
+
+        # kill everything -> every consumer reads the operator's env default
+        globals()["ENACT_LANES"] = set()
+        assert get_lever("live.clip_scale", 1.0, _t) == 1.0
+        assert get_lever("taker.dip_range", 0.08, _t) == 0.08
+        assert active_levers(_t) == {}
+        # an UNREGISTERED name keeps its old behaviour (default), not a crash
+        assert get_lever("nope.not.a.lever", 7.0, _t) == 7.0
+    finally:
+        globals()["ENACT_LANES"] = _saved_lanes
+        globals()["_load"] = _saved_load
+        globals()["_quarantined"] = _saved_q
+        globals()["_live_hurting"] = _saved_h
+
+    print("fleet_tuning selftest OK (incl. author-lane binding + per-entry ttl "
+          "+ the ENACT_LANES kill switch at the CONSUMER)")
 
 
 if __name__ == "__main__":
