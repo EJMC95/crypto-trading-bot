@@ -53,7 +53,9 @@ NOTIONAL = 300.0          # quote notional per carry position [2026-07-06 raised
 MAX_POSITIONS = 8         # at most 8 concurrent carries [2026-07-06 raised from 5]
 MIN_DAY_VOLUME = 2e6      # only coins with >= $2M 24h notional volume [2026-07-06 lowered from $5M to capture hot-rate coins like ME/MINA]
 
-# Funding thresholds, ANNUALIZED (hourly rate * 24 * 365). Hyperliquid's
+# Funding thresholds, ANNUALIZED. These are denominated in THIS FILE'S ORIGINAL
+# HYPERLIQUID basis (hourly rate * 24 * 365) and are NOT the numbers either arm
+# compares against — `_basis()` below rescales them per venue. Hyperliquid's
 # baseline funding is ~0.0000125/h ~= 11%/yr; we want clearly-hot funding.
 ENTER_APR = 0.40          # open when |annualized funding| >= 40% [2026-07-06 raised from 20% to avoid fee bleed on fast-decaying rates]
 EXIT_APR = 0.15           # close when it decays below 15% [2026-07-06 raised from 8% to exit before fees eat accrual]
@@ -85,6 +87,93 @@ OPEN_COST = PERP_FEE + HEDGE_COST    # charged at open; same again at close
 LOOP_SECONDS = 300        # funding is hourly; 5-min polling is plenty
 
 HOURS_PER_YEAR = 24 * 365
+
+
+def _basis(mode):
+    """[2026-07-17 THE SIXTH 8x BOT] Per-venue funding basis for THIS file's two
+    arms, as (H, scale).
+
+      H     — periods per year in the venue's OWN quote basis. Multiply a quoted
+              `rate` by H to get a TRUE apr.
+      scale — what to multiply this file's HL-denominated thresholds by so the
+              SAME rate still decides the SAME way. scale == H / (24*365).
+
+    WHY THIS EXISTS. `HOURS_PER_YEAR = 24*365` is CORRECT for the `hl_paper`
+    arm — Hyperliquid quotes hourly — and 8x WRONG for the `lighter_shadow`
+    arm this file grew later: Lighter quotes per 8h. Every apr this bot
+    computed, gated on, logged and published on that arm was 8x TRUE.
+
+    HOW IT WAS MISSED, which is the part worth keeping: `funding_basis.py`'s
+    header cleared this file BY NAME ("these sites are CORRECT and must not be
+    touched: funding_carry_bot.py ... (Hyperliquid, hourly)"). That was TRUE
+    when written and FALSE the day the Lighter arm landed. A named exemption is
+    a blind spot with a half-life — re-derive it when a file gains a mode.
+
+    BEHAVIOUR-NEUTRAL BY CONSTRUCTION (the 31ec660 shape): the conversion AND
+    every threshold denominated in it move by the same factor, so
+        rate*H >= ENTER_APR*scale   <=>   rate*(24*365) >= ENTER_APR
+    holds for every rate. Same trades, honest labels. Proven in _selftest_basis.
+
+    VENUE IS PASSED, NEVER DEFAULTED: funding_basis.DEFAULT_VENUE is "lighter"
+    and this file's default arm is HYPERLIQUID — a bare call would invert the
+    bug onto the honest arm.
+    """
+    import funding_basis
+    venue = _venue_of(mode)
+    H = funding_basis.periods_per_year(venue)
+    return H, H / float(HOURS_PER_YEAR)
+
+
+def _bars(mode):
+    """The (H, enter_apr, exit_apr) THIS mode's arm actually compares against.
+
+    ONE OWNER, deliberately. main() must not re-derive `ENTER_APR * scale`
+    inline: a selftest that re-does that arithmetic proves the ARITHMETIC and
+    not the WIRING, so dropping the `* scale` at the call site passes it. That
+    is verbatim the trap 17-Jul (l) recorded — "its basis assertions exercise
+    funding_basis, not the CALL SITE" — and my first cut of _selftest_basis
+    reproduced it, caught by mutation. With the derivation here, the selftest
+    exercises the same code main() does.
+    """
+    H, scale = _basis(mode)
+    return H, ENTER_APR * scale, EXIT_APR * scale
+
+
+_MODE_VENUE = {"lighter_shadow": "lighter", "hl_paper": "hyperliquid"}
+
+
+def _venue_of(mode):
+    """This file's VENUE mode -> the funding_basis venue name.
+
+    RAISES on an unknown mode — it does NOT default. Two reasons, both learned
+    the hard way today:
+      * funding_basis.DEFAULT_VENUE is "lighter", so a bare call there would
+        invert the 8x onto the (historic) HYPERLIQUID arm.
+      * an `else: "hyperliquid"` default would hand the 8x-wrong basis to any
+        future Lighter mode that someone adds to main()'s allowlist without
+        reading this file. That is exactly the shape of the defect this
+        function exists to fix, rebuilt one layer down — and it is the rule the
+        fleet shipped twice today: a default is fine for a preference, never
+        for an IDENTITY that decides what a number MEANS.
+
+    `hl_paper` is retained though `main()`'s allowlist no longer admits it
+    (LIGHTER-ONLY, 17-Jul): it is what _selftest_basis uses to PROVE the
+    conversion left the historic arm bit-identical.
+    """
+    try:
+        return _MODE_VENUE[mode]
+    except KeyError:
+        raise ValueError(
+            f"funding_carry_bot._venue_of: unknown VENUE mode {mode!r} — refusing "
+            f"to guess a funding basis. Add it to _MODE_VENUE with its venue, "
+            f"or the apr is silently 8x wrong. Known: {sorted(_MODE_VENUE)}"
+        ) from None
+
+
+def _hourly(rate, mode):
+    """Quoted rate -> fraction accrued per HOUR, on THIS mode's venue basis."""
+    import funding_basis
+    return funding_basis.to_hourly(rate, _venue_of(mode))
 
 
 def now_iso():
@@ -206,6 +295,13 @@ def main():
             "the opposite of the strategy. lighter_shadow runs the full loop on "
             "real Lighter data and measures perp-leg slippage without sending.")
 
+    # [2026-07-17] Per-venue basis + rescaled thresholds. MUST be derived from
+    # _mode, not defaulted — see _basis(). Behaviour-neutral: on hl_paper the
+    # scale is exactly 1.0 and every number below is byte-identical to before.
+    # The derivation lives in _bars() so the selftest exercises THIS code and
+    # not a re-implementation of it.
+    _H, _enter_apr, _exit_apr = _bars(_mode)
+
     # [2026-07-09 LIGHTER GATE-0] Funding reads go through the venue layer.
     # VENUE unset -> hl_paper -> Hyperliquid MAINNET meta_and_asset_ctxs, the
     # exact pre-refactor source. VENUE=lighter_shadow reads Lighter's own
@@ -243,8 +339,13 @@ def main():
     except Exception:
         pass
 
-    print(f"[{now_iso()}] funding-carry DRY-RUN start | enter>={ENTER_APR:.0%} APR "
-          f"exit<{EXIT_APR:.0%} | ${NOTIONAL:.0f} x max {MAX_POSITIONS} | "
+    # [2026-07-17] The banner prints the bars THIS ARM actually uses. It printed
+    # the HL-denominated constants on both arms — so the lighter_shadow arm has
+    # announced "enter>=40% APR" for its whole life while admitting at 5% TRUE.
+    # Caught by _selftest_basis's call-site check, not by reading it.
+    print(f"[{now_iso()}] funding-carry DRY-RUN start | venue {_venue_of(_mode)} "
+          f"| enter>={_enter_apr:.2%} APR "
+          f"exit<{_exit_apr:.2%} | ${NOTIONAL:.0f} x max {MAX_POSITIONS} | "
           f"friction {2*OPEN_COST*1e4:.0f}bps round-trip | realized so far "
           f"${realized:+.2f} ({n_closed} closed)")
 
@@ -318,11 +419,19 @@ def main():
                     continue
                 pos.pop("missing_since", None)   # back in the map — reset clock
                 rate = f["rate"]
-                apr = rate * HOURS_PER_YEAR
+                apr = rate * _H
                 # Accrue at the LIVE rate: we receive |funding| while it keeps
                 # our sign, and PAY it if the rate flips before we exit.
+                # [2026-07-17] `rate * dt_h` is only right when the quote IS
+                # hourly. On the lighter_shadow arm the quote is per 8h, so this
+                # over-accrued 8x — straight into `accrued`, which IS this
+                # book's reported P&L and its win/loss call. This is the
+                # load-bearing half of the sixth-8x-bot defect; the gates were
+                # the visible half. to_hourly(rate, venue) is exactly the
+                # venue's own hourly settlement (Lighter settles rate/8 per h).
                 sign = -1.0 if pos["side"] == "short_perp" else 1.0
-                pos["accrued"] += (-sign) * rate * dt_h * pos["notional"]
+                pos["accrued"] += ((-sign) * _hourly(rate, _mode) * dt_h
+                                   * pos["notional"])
                 held_h = (t0 - pos["opened_ts"]) / 3600.0
 
                 flipped_now = (pos["side"] == "short_perp" and apr < 0) or \
@@ -347,7 +456,7 @@ def main():
                 # already wants to close (no book read every loop for every pos).
                 closing_short = pos["side"] == "short_perp"
                 decayed = False
-                if abs(apr) < EXIT_APR and net_if_closed >= FEE_PAYBACK_MARGIN:
+                if abs(apr) < _exit_apr and net_if_closed >= FEE_PAYBACK_MARGIN:
                     _pc, _ = _perp_leg_fill(
                         ctx, bot_id, coin, is_buy=closing_short,
                         notional=pos["notional"], mark=(f.get("mark") or 0.0),
@@ -396,7 +505,7 @@ def main():
             # Track how long each coin has held >= ENTER_APR. First-seen coins
             # start their clock now, so nothing enters before PERSIST_H.
             for c, f in fund.items():
-                if abs(f["rate"] * HOURS_PER_YEAR) >= ENTER_APR:
+                if abs(f["rate"] * _H) >= _enter_apr:
                     hot_since.setdefault(c, t0)
                 else:
                     hot_since.pop(c, None)
@@ -406,11 +515,11 @@ def main():
                 candidates = sorted(
                     ((c, f) for c, f in fund.items()
                      if c not in positions and f["vol"] >= MIN_DAY_VOLUME
-                     and abs(f["rate"] * HOURS_PER_YEAR) >= ENTER_APR
+                     and abs(f["rate"] * _H) >= _enter_apr
                      and (t0 - hot_since.get(c, t0)) >= PERSIST_H * 3600.0),
                     key=lambda cf: -abs(cf[1]["rate"]))
                 for coin, f in candidates[:MAX_POSITIONS - len(positions)]:
-                    apr = f["rate"] * HOURS_PER_YEAR
+                    apr = f["rate"] * _H
                     side = "short_perp" if f["rate"] > 0 else "long_perp"
                     # Perp leg: short_perp opens with a SELL, long_perp with a BUY.
                     # In shadow this MEASURES the real book slippage (+logs it); in
@@ -446,8 +555,18 @@ def main():
                            # the stock bots' list-of-dicts holdings format.
                            "carries": {c: f"{p['side']}@{p['entry_apr']:+.0%}"
                                        for c, p in positions.items()},
+                           # [2026-07-17] STAMP THE VENUE. fleet_risk.py:548 does
+                           # `fc.get("venue") or "hyperliquid"` and this payload
+                           # never carried the key — so the signal-bus labelled
+                           # the LIGHTER arm's rates "hyperliquid", a hardcoded
+                           # default asserting a venue nobody measured. Same rule
+                           # the fleet shipped twice today for VENUE/TT_VENUE: a
+                           # default is fine for a preference, never for an
+                           # IDENTITY. With the key present the `or` never fires.
+                           "venue": _venue_of(_mode),
+                           "funding_basis_periods_per_year": _H,
                            "hottest_funding_apr": {
-                               c: f"{f['rate']*HOURS_PER_YEAR:+.1%}" for c, f in top}},
+                               c: f"{f['rate']*_H:+.1%}" for c, f in top}},
                 )
             except Exception:
                 pass
@@ -469,5 +588,93 @@ def main():
         time.sleep(max(1.0, LOOP_SECONDS - (time.time() - t0)))
 
 
+def _selftest_basis():
+    """[2026-07-17] The BEHAVIOUR-NEUTRALITY proof for the sixth-8x-bot fix, and
+    a DETECTOR for the defect itself. The 31ec660 bar: the conversion AND every
+    threshold denominated in it move by the same factor, so no decision changes.
+
+    Mutation-checked — each of these must FAIL the suite:
+      * `_venue_of` returning "lighter" for hl_paper  (inverts the bug)
+      * dropping the `* _scale` on either threshold   (silently stops the arm)
+      * `_hourly` reverting to a bare `rate`          (the 8x accrual)
+    """
+    import funding_basis
+
+    # 1) the HL arm is UNTOUCHED — the bars are byte-identical to the constants
+    H_hl, en_hl, ex_hl = _bars("hl_paper")
+    assert H_hl == HOURS_PER_YEAR, H_hl
+    assert en_hl == ENTER_APR and ex_hl == EXIT_APR, (en_hl, ex_hl)
+
+    # 2) the LIGHTER arm is exactly 1/8 — and 8.0 is the defect's own signature
+    H_lt, en_lt, ex_lt = _bars("lighter_shadow")
+    assert H_lt == 3 * 365, H_lt
+    assert HOURS_PER_YEAR / H_lt == 8.0, "the 8x is exactly 8760/1095"
+    assert en_lt == 0.05 and ex_lt == 0.01875, (en_lt, ex_lt)
+
+    # 3) THE PROOF: every gate decides IDENTICALLY on both arms, for every rate.
+    #    Uses _bars() — the SAME call main() makes — so dropping the rescale at
+    #    the call site fails here. (My first cut re-derived `ENTER_APR * scale`
+    #    inline and therefore could NOT fail on that mutation.)
+    rates = [0.0, 1e-9, 1e-6, 1.2493e-05, 4.5e-5, 4.5662e-5, 9.6e-5, 1e-4,
+             1e-3, 5e-3, -1e-6, -9.6e-5, -1e-3, 0.0456621, 1.0]
+    for mode in ("hl_paper", "lighter_shadow"):
+        H, enter_bar, exit_bar = _bars(mode)
+        for r in rates:
+            assert (abs(r * H) >= enter_bar) == (abs(r * HOURS_PER_YEAR) >= ENTER_APR), \
+                f"ENTER gate flipped: mode={mode} rate={r}"
+            assert (abs(r * H) < exit_bar) == (abs(r * HOURS_PER_YEAR) < EXIT_APR), \
+                f"EXIT gate flipped: mode={mode} rate={r}"
+
+    # 3b) THE CALL SITE, checked against executable code — because (3) proves the
+    #     arithmetic and main() could still ignore it. Same technique as the
+    #     17-Jul (c) storm-trigger check: read main()'s SOURCE, comments stripped,
+    #     and assert no gate compares a raw-basis apr again.
+    import inspect
+    _src = [ln.split("#", 1)[0] for ln in inspect.getsource(main).splitlines()]
+    _code = "\n".join(_src)
+    assert "_H, _enter_apr, _exit_apr = _bars(_mode)" in _code, \
+        "main() must derive its bars from _bars(_mode) — one owner"
+    assert "HOURS_PER_YEAR" not in _code, (
+        "main() must never touch the raw HL basis again — that constant is the "
+        "defect. Every gate/accrual/publish goes through _H / _bars / _hourly.")
+    for _bad in ("ENTER_APR", "EXIT_APR"):
+        assert _bad not in _code, (
+            f"main() must compare against _enter_apr/_exit_apr, never the "
+            f"HL-denominated {_bad} — that is the 8x gate, rebuilt.")
+
+    # 4) the ACCRUAL — the load-bearing half. HL unchanged; Lighter exactly /8.
+    for r in rates:
+        assert _hourly(r, "hl_paper") == r, \
+            f"the HL arm's accrual MOVED: {r} -> {_hourly(r, 'hl_paper')}"
+        assert _hourly(r, "lighter_shadow") == r * 0.125, r
+    # ...and the venue is never defaulted onto the honest arm
+    assert _venue_of("hl_paper") == "hyperliquid"
+    assert _venue_of("lighter_shadow") == "lighter"
+    assert funding_basis.DEFAULT_VENUE == "lighter", (
+        "if this ever becomes 'hyperliquid', the bare-call trap inverts — but "
+        "this file passes venue explicitly, which is why it does not care")
+
+    # 5) an unknown/future mode must RAISE, never silently inherit a basis.
+    #    A concurrent session removed hl_paper from main()'s allowlist the same
+    #    night this landed (LIGHTER-ONLY) — so the allowlist is not a stable
+    #    thing to lean on. If someone adds `lighter_live` tomorrow, this must
+    #    stop them, not hand them Hyperliquid's basis and an 8x apr.
+    for _bad_mode in ("lighter_live", "hl_live", "", None):
+        try:
+            _venue_of(_bad_mode)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(
+                f"_venue_of({_bad_mode!r}) must RAISE, not guess a basis — "
+                f"a default here is an 8x apr wearing a venue name")
+
+    print("funding_carry_bot _selftest_basis OK "
+          "(hl arm bit-identical; lighter arm exactly /8; no gate flips)")
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest_basis()
+        sys.exit(0)
     main()

@@ -111,7 +111,15 @@ def to_hourly(rate, venue: str = DEFAULT_VENUE):
     """
     if rate is None:
         return None
-    return float(rate) * periods_per_day(venue) / 24.0
+    # [2026-07-17] The divide is HOISTED deliberately: `rate * p / 24.0` parses
+    # as `(rate*p)/24.0` — two roundings, which differ from the one-rounding
+    # form on ~17% of inputs by up to 1 ulp. Hoisted, the factor is an EXACT
+    # binary value (1.0 for hyperliquid, 0.125 for lighter), so `rate*factor`
+    # is exact identity / an exact /8. ~1e-16 is far below any threshold this
+    # feeds, so this is a PROOF-STANDARD fix, not a money fix: it is what lets
+    # a per-venue basis change be proven BIT-IDENTICAL on the untouched arm,
+    # which is the 31ec660 bar.
+    return float(rate) * (periods_per_day(venue) / 24.0)
 
 
 def _selftest():

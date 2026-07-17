@@ -35,6 +35,16 @@ import time
 from .base import VenueClient, VenueError
 from .equity_guard import EquityGuard, EquityRejected, vet_account_read
 from .governor import TxBudgetGovernor, WEIGHT_INFO, WEIGHT_ORDER_TX
+
+# Tokens the public-tape FILL FALLBACK will not dip below, so a measurement can
+# never eat the budget a pending market order (WEIGHT_ORDER_TX=6, capacity ~21)
+# still needs. Paired with a NON-BLOCKING acquire, which is the real protection:
+# telemetry never QUEUES behind money, it takes a free token or skips and says
+# so. Measured on the taker's real 2-open cycle: 17 of 21 tokens spent, so one
+# order's reserve leaves the measurement reachable — a reserve of 2 orders
+# suppressed the very fill this fix exists to record.
+_TELEMETRY_RESERVE = float(os.environ.get("LIGHTER_TELEMETRY_RESERVE",
+                                          WEIGHT_ORDER_TX))
 from .symbol_map import to_lighter
 
 log = logging.getLogger("venues.lighter")
@@ -218,8 +228,12 @@ class LighterClient(VenueClient):
             pass
 
     # ---- plumbing -----------------------------------------------------------
-    def _run(self, coro, timeout=30.0, weight=WEIGHT_INFO):
-        if not self.gov.acquire(weight=weight):
+    def _run(self, coro, timeout=30.0, weight=WEIGHT_INFO, gov_timeout=None):
+        # gov_timeout=0 -> NON-BLOCKING acquire: take a free token or give up
+        # instantly. Telemetry passes 0 so a measurement can never queue ahead
+        # of (and delay) a real order. Default None keeps acquire's own 120s.
+        _kw = {} if gov_timeout is None else {"timeout": gov_timeout}
+        if not self.gov.acquire(weight=weight, **_kw):
             raise VenueError("lighter tx budget exhausted; skipping")
         fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
         try:
@@ -497,43 +511,53 @@ class LighterClient(VenueClient):
         base, px = self._scaled(m, size * mult, worst)
         if base <= 0:
             raise VenueError(f"{coin}: size {size} scales to 0")
+        # [2026-07-17] KEEP the client id — it is the fill's exact name. It was
+        # computed and thrown away, so the fill read had to guess with
+        # (side, since_ts) and VWAP everything that matched. Returned ADDITIVELY:
+        # every caller in the fleet discards this dict (the taker only tests it
+        # for None), so nothing downstream moves.
+        _cid = int(time.time() * 1000) % (2 ** 48)
         tx, resp, err = self._run_signer(self.signer.create_market_order(
             market_index=m["id"],
-            client_order_index=int(time.time() * 1000) % (2 ** 48),
+            client_order_index=_cid,
             base_amount=base, avg_execution_price=px, is_ask=not is_long,
             api_key_index=self.api_key_index))
         if err:
             raise VenueError(f"order failed {coin}: {err}")
         return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
-                "resp": getattr(resp, "to_dict", lambda: str(resp))()}
+                "resp": getattr(resp, "to_dict", lambda: str(resp))(),
+                "client_order_index": _cid}
 
-    def last_fill(self, coin, is_ask, since_ts, lookback=10):
-        """[2026-07-16 FILL RECON] Best-effort REAL average fill price for
-        THIS account's most recent fills on `coin` since `since_ts` (epoch
-        seconds), on the given side (is_ask=True when we sold). Size-weighted
-        across the partial fills a single market order crossed. Read-only —
-        an auth-token GET on the venue's trades endpoint (verified against
-        lighter-sdk OrderApi.trades: price/size/ask_account_id/bid_account_id/
-        timestamp fields). Returns None on ANY failure; callers fall back to
-        the decision price, so a broken read can never block a close."""
-        try:
-            if self.signer is None or self.account_index is None:
-                return None
-            _sym, _mult, m = self._resolve(coin)
-            auth = self.signer.create_auth_token_with_expiry(
-                api_key_index=self.api_key_index)
-            if isinstance(auth, tuple):          # sdk returns (token, err)
-                auth, _err = auth
-                if _err or not auth:
-                    return None
-            r = self._run(self._order_api.trades(
-                sort_by="timestamp", sort_dir="desc", limit=int(lookback),
-                authorization=auth, market_id=m["id"],
-                account_index=self.account_index))
-            fills = []
-            for t in (getattr(r, "trades", None) or []):
+    def _our_fills(self, trades, is_ask, since_ts, client_id=None):
+        """Size-weighted VWAP of OUR fills in a trade list, or None. Shared by
+        both read paths so the authoritative and fallback tapes can never
+        disagree about what counts as ours.
+
+        [2026-07-17] `client_id` NAMES THE ORDER, and it is what makes this a
+        measurement rather than an estimate. VWAP across the partial fills of
+        ONE market order is exactly right — that IS the fill price. VWAP across
+        DIFFERENT orders is a fabrication: two same-side sells inside the
+        `since_ts` window (an open on one lens plus a stop on another) blended
+        into a single fake "fill". The old (is_ask, since_ts) match could not
+        tell them apart, and the public tape widens the blend from 10 rows of
+        OUR trades to 100 rows of the WHOLE market. With the id, neither window
+        nor tape choice can corrupt the read.
+
+        Without an id it still falls back to the heuristic, so callers that
+        cannot supply one (an exit whose order id was not threaded) are no worse
+        off than before — but they get `approx` in the reason so a blended read
+        is never mistaken for an exact one."""
+        fills = []
+        for t in (trades or []):
+            if client_id is not None:
+                # our side's client id must match EXACTLY — no window, no blend
+                cid = (getattr(t, "ask_client_id", None) if is_ask
+                       else getattr(t, "bid_client_id", None))
+                if cid is None or int(cid) != int(client_id):
+                    continue
+            else:
                 ts = float(getattr(t, "timestamp", 0) or 0)
-                if ts > 1e12:                    # ms -> s
+                if ts > 1e12:                # ms -> s (venue stamps ms)
                     ts /= 1000.0
                 if ts < float(since_ts) - 5:
                     continue
@@ -543,16 +567,109 @@ class LighterClient(VenueClient):
                     continue
                 if not is_ask and not ours_bid:
                     continue
-                px = float(getattr(t, "price", 0) or 0)
-                sz = abs(float(getattr(t, "size", 0) or 0))
-                if px > 0 and sz > 0:
-                    fills.append((px, sz))
-            if not fills:
-                return None
-            tot = sum(sz for _, sz in fills)
-            return sum(px * sz for px, sz in fills) / tot
-        except Exception:  # noqa: BLE001 — measurement-only: never raise
+            px = float(getattr(t, "price", 0) or 0)
+            sz = abs(float(getattr(t, "size", 0) or 0))
+            if px > 0 and sz > 0:
+                fills.append((px, sz))
+        if not fills:
             return None
+        tot = sum(sz for _, sz in fills)
+        return sum(px * sz for px, sz in fills) / tot
+
+    def last_fill_detail(self, coin, is_ask, since_ts, lookback=10,
+                         client_id=None):
+        """[2026-07-17 OBSERVABLE] REAL average fill price for THIS account,
+        as (price_or_None, reason). `reason` names WHY a read produced no price
+        — the whole point of this method.
+
+        WHY IT EXISTS. `last_fill` returned None for every distinct failure
+        through one bare `except`, so a broken read and a genuinely empty tape
+        were indistinguishable. MEASURED 17-Jul: the taker's first two REAL
+        orders (STRC, 1000BONK) both fell back to the decision price with no
+        log line, and the fleet had NO way to tell why — 0 of 57 real-money
+        orders in its history carry a measured fill. That is the same defect
+        the 17-Jul (g) fix named one level up: "measured 0" and "never
+        recorded" must never be conflated. Here: "no fill found" and "the read
+        exploded" must never be conflated either.
+
+        TWO TAPES, deliberately. The account-filtered `trades` endpoint is
+        AUTHORITATIVE but needs an auth token; the public `recentTrades` needs
+        none and carries the same ask_account_id/bid_account_id fields.
+        VERIFIED 17-Jul against the venue: our account_index appears in the
+        public tape and reproduces both live fills exactly, size to the unit
+        (STRC 0.175 @ 85.511 vs a decision 85.629 = 13.78bps; 1000BONK 4580 @
+        0.003275 = at mark). So the fallback is a MEASUREMENT, not a guess.
+        It is second, not first, because it is a market-wide window: a busy
+        book can push our fill out of its 100-row cap, which the
+        account-filtered tape cannot do.
+
+        Measurement-only: EVERY path is caught and reported; a broken read can
+        never block or unwind an order."""
+        if self.signer is None or self.account_index is None:
+            return None, "no-signer"
+        try:
+            _sym, _mult, m = self._resolve(coin)
+        except Exception as e:  # noqa: BLE001
+            return None, f"resolve-failed:{type(e).__name__}"
+
+        # --- 1) authoritative: account-filtered, auth'd -----------------------
+        reason = None
+        try:
+            auth = self.signer.create_auth_token_with_expiry(
+                api_key_index=self.api_key_index)
+            if isinstance(auth, tuple):          # sdk returns (token, err)
+                auth, _err = auth
+                if _err or not auth:
+                    reason = f"auth-failed:{str(_err)[:60] or 'empty-token'}"
+                    auth = None
+            if auth:
+                r = self._run(self._order_api.trades(
+                    sort_by="timestamp", sort_dir="desc",
+                    limit=max(1, min(int(lookback), 100)),
+                    authorization=auth, market_id=m["id"],
+                    account_index=self.account_index))
+                trades = getattr(r, "trades", None) or []
+                px = self._our_fills(trades, is_ask, since_ts, client_id)
+                if px:
+                    return px, ("trades" if client_id is not None
+                                else "trades(approx)")
+                reason = "no-match:trades" if trades else "empty:trades"
+        except Exception as e:  # noqa: BLE001 — never raise from telemetry
+            reason = f"api-error:trades:{type(e).__name__}:{str(e)[:60]}"
+
+        # --- 2) fallback: PUBLIC market tape, no auth ------------------------
+        # TELEMETRY MUST NEVER STARVE AN ORDER. `_run` blocks up to 120s to
+        # acquire, and WEIGHT_ORDER_TX is 6 against a capacity of ~21 — so a
+        # measurement burst here could make the NEXT market_open wait, or trip
+        # the 429 ladder. Take this tape only from genuinely spare budget:
+        # skip (naming the skip) rather than queue behind money.
+        with self.gov._lock:                       # noqa: SLF001 — read-only peek
+            self.gov._refill()                     # noqa: SLF001
+            spare = self.gov.tokens - _TELEMETRY_RESERVE
+        if spare < WEIGHT_INFO:
+            return None, (f"skipped:budget({self.gov.tokens:.1f} tok, reserve "
+                          f"{_TELEMETRY_RESERVE}) after {reason or 'trades-empty'}")
+        try:
+            r = self._run(self._order_api.recent_trades(
+                market_id=m["id"], limit=100), gov_timeout=0)
+            trades = getattr(r, "trades", None) or []
+            px = self._our_fills(trades, is_ask, since_ts, client_id)
+            if px:
+                _exact = "" if client_id is not None else "-approx"
+                return px, f"recentTrades{_exact}(after {reason or 'trades-empty'})"
+            return None, (f"no-match:both({reason or 'trades-empty'})"
+                          if trades else f"empty:both({reason or 'trades-empty'})")
+        except Exception as e:  # noqa: BLE001
+            return None, (f"api-error:recentTrades:{type(e).__name__}"
+                          f":{str(e)[:50]} (after {reason or 'trades-empty'})")
+
+    def last_fill(self, coin, is_ask, since_ts, lookback=10, client_id=None):
+        """[2026-07-16 FILL RECON] REAL average fill price, or None. Thin
+        back-compat wrapper over `last_fill_detail` — same contract, reason
+        dropped. Prefer `last_fill_detail`: a caller that cannot say WHY it
+        got no price is how the fleet went 57 real orders without one."""
+        return self.last_fill_detail(coin, is_ask, since_ts, lookback,
+                                    client_id)[0]
 
     def market_close(self, coin):
         pos = self.positions().get(coin)
@@ -566,12 +683,14 @@ class LighterClient(VenueClient):
             raise VenueError(f"{coin}: empty book")
         worst = side[0][0] * (0.98 if is_long else 1.02)
         base, px = self._scaled(m, abs(pos["size"]) * mult, worst)
+        _cid = int(time.time() * 1000) % (2 ** 48)   # see market_open: the fill's name
         tx, resp, err = self._run_signer(self.signer.create_market_order(
             market_index=m["id"],
-            client_order_index=int(time.time() * 1000) % (2 ** 48),
+            client_order_index=_cid,
             base_amount=base, avg_execution_price=px, is_ask=is_long,
             reduce_only=True, api_key_index=self.api_key_index))
         if err:
             raise VenueError(f"close failed {coin}: {err}")
         return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
-                "resp": getattr(resp, "to_dict", lambda: str(resp))()}
+                "resp": getattr(resp, "to_dict", lambda: str(resp))(),
+                "client_order_index": _cid}

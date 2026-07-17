@@ -600,7 +600,7 @@ def main(_ctx=None):
         # all six 1000-markets — verified against all 218 live markets.)
         return {to_lighter(c)[0]: v for c, v in (venue.positions() or {}).items()}
 
-    def _real_fill(sym, is_ask, fallback, leg):
+    def _real_fill(sym, is_ask, fallback, leg, client_id=None):
         """REAL fill price from the venue's own trade tape as (price, measured,
         reason). is_ask=True when WE sold (opening a SHORT / closing a LONG).
         `price` is the decision price when `measured` is False, so every caller
@@ -630,7 +630,8 @@ def main(_ctx=None):
         try:
             fl = getattr(venue, "last_fill_detail", None)
             if fl:
-                real, reason = fl(sym, is_ask=is_ask, since_ts=time.time() - 180)
+                real, reason = fl(sym, is_ask=is_ask, since_ts=time.time() - 180,
+                                  client_id=client_id)
             else:                                  # older venue: no reason channel
                 fl = getattr(venue, "last_fill", None)
                 if fl:
@@ -751,7 +752,8 @@ def main(_ctx=None):
                 # [2026-07-17] None == the venue did NOT close it (no position
                 # under that key). Treating it as success books a phantom close
                 # and pops meta, stranding a REAL position with no exit rule.
-                if venue.market_close(_fleet(sym)) is None:
+                _res = venue.market_close(_fleet(sym))
+                if _res is None:
                     print(f"[ticket-taker] {iso(t_now)} flatten {sym}: venue "
                           f"reported NO position to close — leaving meta intact "
                           f"and retrying next cycle (NOT booking a close)")
@@ -760,8 +762,9 @@ def main(_ctx=None):
                 print(f"[ticket-taker] {iso(t_now)} flatten {sym}: {e!r}")
                 continue
             _dpx = px
-            px, _meas, _why = _real_fill(sym, is_ask=is_long, fallback=px,
-                                         leg="exit")
+            px, _meas, _why = _real_fill(
+                sym, is_ask=is_long, fallback=px, leg="exit",
+                client_id=(_res or {}).get("client_order_index"))
             pnl = abs(size) * ((px - entry) if is_long else (entry - px))
             _book_close(sym, m, size, entry, px, pnl, reason, decision_px=_dpx,
                         measured=_meas, fill_reason=_why)
@@ -1006,7 +1009,8 @@ def main(_ctx=None):
                 # (venues/lighter_client.py:558-560). That is precisely the
                 # symbol-space failure, so the guard missed the case it was
                 # written for. None is a FAILED close.
-                if venue.market_close(_fleet(sym)) is None:
+                _res = venue.market_close(_fleet(sym))
+                if _res is None:
                     print(f"[ticket-taker] {iso(t_now)} close {sym}: venue "
                           f"reported NO position under {_fleet(sym)!r} — NOT "
                           f"booking a close; leaving position, retry next cycle")
@@ -1019,8 +1023,9 @@ def main(_ctx=None):
                       f"leaving position, retry next cycle")
                 continue
             _dpx = mark                                  # mid at the decision
-            mark, _meas, _why = _real_fill(sym, is_ask=is_long, fallback=mark,
-                                           leg="exit")
+            mark, _meas, _why = _real_fill(
+                sym, is_ask=is_long, fallback=mark, leg="exit",
+                client_id=(_res or {}).get("client_order_index"))
             pnl = abs(size) * ((mark - entry) if is_long else (entry - mark))
         _book_close(sym, m, size, entry, mark, pnl, reason, decision_px=_dpx,
                     measured=_meas, fill_reason=_why)
@@ -1154,12 +1159,13 @@ def main(_ctx=None):
                     # fleet symbol — the space the client's API speaks. This one
                     # would have "worked" with a native symbol (_resolve tolerates
                     # it), which is exactly how open/close drifted apart.
-                    venue.market_open(_fleet(sym), is_long, size)
+                    _res = venue.market_open(_fleet(sym), is_long, size)
                 except Exception as e:  # noqa: BLE001
                     print(f"[ticket-taker] {iso(t_now)} open {sym} failed: {e!r}")
                     continue
-                entry_px, _meas, _why = _real_fill(sym, is_ask=not is_long,
-                                                   fallback=mark, leg="entry")
+                entry_px, _meas, _why = _real_fill(
+                    sym, is_ask=not is_long, fallback=mark, leg="entry",
+                    client_id=(_res or {}).get("client_order_index"))
                 try:
                     store.publish_venue_order(
                         BOT_ROW, venue="lighter", shadow=False, coin=sym,
@@ -1409,14 +1415,26 @@ def selftest():
 class _StubVenue:
     """Records orders instead of sending them. Mirrors the LighterClient
     surface the live path touches: positions / account_value / market_open /
-    market_close / last_fill."""
+    market_close / last_fill_detail / last_fill.
 
-    def __init__(self, equity=1000.0, pos=None, fills=None):
+    [2026-07-17] IT MUST MIRROR `last_fill_detail`, NOT JUST `last_fill`.
+    Production's LighterClient has both, and `_real_fill` prefers the detail
+    API — so a stub carrying only `last_fill` sends every test down the
+    LEGACY fallback branch and leaves the real production path untested. That
+    is exactly how `_StubRails`, lacking `assert_can_start`, let tests 3/4 pass
+    against a path production could not reach (17-Jul entry (p)). A stub that
+    is missing a method does not fail — it silently tests something else."""
+
+    def __init__(self, equity=1000.0, pos=None, fills=None, fill_reason=None):
         self._equity = equity
         self._pos = dict(pos or {})
-        self._fills = dict(fills or {})     # sym -> fill px returned by last_fill
+        self._fills = dict(fills or {})     # sym -> REAL fill px the tape returns
+        self._fill_reason = fill_reason     # reason reported when there is no fill
         self.opens, self.closes, self.value_reads = [], [], 0
         self.fail_close = set()
+        self._cid = 0
+        self.last_cid = None
+        self.seen_client_ids = []      # what the fill read was ACTUALLY given
 
     def account_value(self):
         self.value_reads += 1
@@ -1429,17 +1447,34 @@ class _StubVenue:
         self.opens.append((coin, is_long, size))
         self._pos[coin] = {"size": size if is_long else -size,
                            "entry": self._fills.get(coin, 100.0)}
-        return {"tx": "stub"}
+        # mirrors the real client: the order's client id comes back so the fill
+        # read can name it. A stub that omits it sends the caller down the
+        # id-less heuristic and leaves the exact-match path untested.
+        self._cid += 1
+        self.last_cid = self._cid
+        return {"tx": "stub", "client_order_index": self._cid}
 
     def market_close(self, coin):
         if coin in self.fail_close:
             raise RuntimeError(f"stub: close {coin} refused")
         self.closes.append(coin)
         self._pos.pop(coin, None)
-        return {"tx": "stub"}
+        self._cid += 1
+        self.last_cid = self._cid
+        return {"tx": "stub", "client_order_index": self._cid}
 
-    def last_fill(self, coin, is_ask, since_ts, lookback=10):
-        return self._fills.get(coin)
+    def last_fill_detail(self, coin, is_ask, since_ts, lookback=10,
+                         client_id=None):
+        self.seen_client_ids.append(client_id)
+        px = self._fills.get(coin)
+        if px:
+            return px, ("trades" if client_id is not None else "trades(approx)")
+        return None, (self._fill_reason or "empty:both(stub)")
+
+    def last_fill(self, coin, is_ask, since_ts, lookback=10, client_id=None):
+        # delegates exactly as the real client does
+        return self.last_fill_detail(coin, is_ask, since_ts, lookback,
+                                     client_id)[0]
 
 
 class _StubRails:
@@ -1881,6 +1916,63 @@ def _selftest_live():
         finally:
             store.set_status = _real_set
 
+        # ================================================================
+        # 12) FILL TELEMETRY is a DETECTOR — a measured 0 is a 0, and an
+        #     unmeasured leg is NULL *and names why*.
+        #
+        #     Both halves are regression fixtures for real 17-Jul defects:
+        #     (a) the taker's first two REAL orders recorded px_fill ==
+        #         px_decision with slippage NULL and NO reason anywhere — 0 of
+        #         57 real-money orders fleet-wide had ever carried a measured
+        #         fill, and nobody could ask the ledger why.
+        #     (b) 1000BONK's REAL fill was 0.003275 against a decision price of
+        #         0.003275 — a genuinely perfect fill. The old `d == f` rule
+        #         inferred "no read" and THREW THE MEASUREMENT AWAY.
+        #     Mutation-checked: reverting _slip_bps_of to the `d == f`
+        #     inference must fail (a) or (b).
+        # ================================================================
+        captured["state"].clear()
+        captured["orders"].clear()
+        # (b) a REAL fill exactly ON the mark -> slippage 0.0, measured True
+        _stub_market(marks={"MRK": 100.0}, funding={}, ranges={"MRK": 6.0})
+        _scout({"divergence": [{"sym": "MRK", "side": "short", "gap_pct": 99.0}]})
+        v = _StubVenue(equity=1000.0, fills={"MRK": 100.0})   # fill == decision
+        main(_ctx={"venue": v, "rails": _StubRails(max_notional=150.0),
+                   "broker": None})
+        _o = captured["orders"][0][1]
+        assert _o["px_fill"] == 100.0 and _o["px_decision"] == 100.0
+        assert _o["slippage_bps"] == 0.0, \
+            ("a MEASURED at-mark fill must record 0.0, not None — an at-mark "
+             f"fill is a measurement, not a failure: {_o['slippage_bps']!r}")
+        assert _o["raw"]["measured"] is True, _o["raw"]
+        # EXACT match, not the (side, since_ts) heuristic: the order's own
+        # client id must reach the read, or the fill is a VWAP of whatever else
+        # we happened to trade on that side inside the window.
+        assert _o["raw"]["fill_src"] == "trades", \
+            (f"fill_src {_o['raw']['fill_src']!r} — '(approx)' means the client "
+             f"id did NOT reach last_fill_detail, so the read is a blend")
+        assert v.seen_client_ids == [v.last_cid], \
+            (f"the fill read must be given the order's client id: "
+             f"got {v.seen_client_ids!r}, order was {v.last_cid!r}")
+
+        # (a) NO read -> decision price recorded, slippage NULL, reason NAMED
+        captured["state"].clear()
+        captured["orders"].clear()
+        _stub_market(marks={"UNM": 100.0}, funding={}, ranges={"UNM": 6.0})
+        _scout({"divergence": [{"sym": "UNM", "side": "short", "gap_pct": 99.0}]})
+        v = _StubVenue(equity=1000.0, fills={},
+                       fill_reason="api-error:trades:VenueError:boom")
+        main(_ctx={"venue": v, "rails": _StubRails(max_notional=150.0),
+                   "broker": None})
+        _o = captured["orders"][0][1]
+        assert v.opens, "the order must still SEND — telemetry never blocks it"
+        assert _o["px_fill"] == 100.0, _o          # falls back to the decision
+        assert _o["slippage_bps"] is None, \
+            f"an UNMEASURED leg must be NULL, never 0.0: {_o['slippage_bps']!r}"
+        assert _o["raw"]["measured"] is False, _o["raw"]
+        assert "api-error" in (_o["raw"]["fill_src"] or ""), \
+            f"the ledger must NAME why it could not measure: {_o['raw']!r}"
+
         print("\nAll LIVE order-path self-tests passed:")
         print("  1 entry SENDS a real order + records the REAL fill")
         print("  2 notional cap is senior — cap-breaching entry never sends")
@@ -1893,6 +1985,8 @@ def _selftest_live():
         print("  9 the DEPLOYED shadow arm still trades, on the TRUE 8h basis")
         print(" 10 a crash marks the row ERROR instead of going quietly stale")
         print(" 11 a DIRTY account (Tide Rider's TRX) HALTS; kill switch still flattens")
+        print(" 12 fill telemetry DETECTS: a measured at-mark fill records 0.0,")
+        print("    an unmeasured leg records NULL and names the reason")
     finally:
         for k, fn in _real.items():
             setattr(store, k, fn)
