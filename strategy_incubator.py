@@ -42,7 +42,18 @@ import time
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
-import brain_stats as bs
+# [2026-07-17] LOUD-fail import: brain_stats is integral to gamete scoring
+# now, so a missing/broken file must still crash this run-once organ (no
+# silent degrade) — but VISIBLY. run_all.sh's `|| true` swallowed the
+# traceback and the reproduction organ would simply go dark (the exact
+# born-dark class the 17-Jul Dockerfile audit closed).
+try:
+    import brain_stats as bs
+except Exception as _e:  # noqa: BLE001
+    print(f"[incubator] FATAL: brain_stats unimportable ({_e!r}) — the "
+          f"reproduction organ CANNOT run; check the image's COPY list "
+          f"(see 17-Jul born-dark postmortem)", flush=True)
+    raise
 import fleet_tuning as tuning
 import lighter_ticket_taker as tt
 import lighter_ticket_replay as rp

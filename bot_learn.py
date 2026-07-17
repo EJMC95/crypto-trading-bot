@@ -98,6 +98,14 @@ try:
 except Exception:
     bstats = None
 MULT_ENGINE = os.environ.get("BRAIN_MULT_ENGINE", "v3") if bstats else "v2"
+# [2026-07-17 IMB-29b] the fallback must be LOUD: a checkout missing
+# brain_stats silently ran frozen v2 rules (era-lifetime anchors, no decay,
+# no EB pooling) while everything downstream assumed v3 — say so every run.
+if bstats is None and os.environ.get("BRAIN_MULT_ENGINE", "") != "v2":
+    print("[bot_learn] WARNING: brain_stats.py NOT importable — SILENT v2 "
+          "fallback engaged (frozen rules, lifetime anchors). If this run "
+          "did not set BRAIN_MULT_ENGINE=v2 deliberately, the deploy is "
+          "missing a file.", flush=True)
 if MULT_ENGINE not in ("v2", "v3"):
     MULT_ENGINE = "v3"
 HALF_LIFE_DAYS = float(os.environ.get("BRAIN_HALF_LIFE_DAYS", "14"))
@@ -542,10 +550,21 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
                    f"losing exits reclaimed entry within 24h (fwd {avg_fwd:+.1%}); "
                    f"do NOT tighten entries")
     # 2. VENUE/EXECUTION: same signal is profitable on the Lighter twin.
-    if twin_pnl is not None and pnl < 0 < twin_pnl and twin_n >= 5:
+    # [2026-07-17 IMB-29a, verify-corrected] the floor rises to DIAG_MIN_N
+    # (was 5) and the message stops dressing a WHOLE-BOOK aggregate up as a
+    # per-trade signal. Honest limitation, on the record: twin_pnl is the
+    # twin row's lifetime, whole-book pnl_abs (incl. unrealized), not this
+    # tag's bucket — a sign comparison across different books is a HINT,
+    # not a measurement. The real fix (per-tag era bucket from the twin's
+    # own trade ledger) is agenda item 14 follow-up; a per-trade transform
+    # here was proven decision-inert (sign-preserving) by the verify pass.
+    if twin_pnl is not None and twin_n >= DIAG_MIN_N and pnl < 0 < twin_pnl:
         return out("venue_execution",
-                   f"{where}: signal survives on the Lighter twin (${twin_pnl:+.2f} "
-                   f"vs paper ${pnl:+.2f}) — fix venue/fees, not the strategy")
+                   f"{where}: signal survives on the Lighter twin "
+                   f"(whole-book ${twin_pnl:+.2f} over {twin_n} closes — "
+                   f"aggregate hint, not per-tag) vs this bucket "
+                   f"${pnl:+.2f} — check venue/fees before blaming the "
+                   f"strategy")
     # 3. FEE BLEED: median loss is fee-scale — costs, not direction.
     if fee_share is not None and fee_share >= 0.5 and med_loser <= 0.012:
         return out("fee_bleed",

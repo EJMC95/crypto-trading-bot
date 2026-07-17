@@ -18,7 +18,11 @@ LAYER 2 — FLEET RISK TRAFFIC LIGHT
   the veto keys off the LONG count, not the blended light, so a blown short
   budget can never freeze the long-only spot bots. Existing positions and
   exits are never touched. Central kill switch: set FLEET_RISK_MODE=advisory
-  on this service and every consumer goes neutral within its cache TTL.
+  on this service and every consumer goes neutral within its cache TTL —
+  [2026-07-17 IMB-16] made TRUE at the publish side: advisory mode now also
+  publishes clip_scale=1.0 (the governor's raw value stays visible as
+  clip_scale_raw), because the clip consumers (taker, family) never checked
+  mode and would have kept down-scaling through a thrown kill switch.
   (This file also folds in the 07-09 gate0 venue-aware counting —
   authoritative_row live-Lighter > paper — which main had missed.)
 
@@ -450,12 +454,34 @@ def main():
                    if prev_state.get("equity_cohort") == _cohort else [])
     samples, dd_7d, clip_scale = dd_governor(
         _samples_in, fleet_equity, _now_dt)
+    # [2026-07-17 G1 amendment — decided under delegated review authority]
+    # BLIND-HOLD through the governor's thin-window abstain: while dd is
+    # None (window below DD_MIN_SPAN_SEC) a PRIOR clip restriction (<1.0)
+    # is held rather than snapped to 1.0 — same pattern as the board's
+    # blind-cohort hold: assert-nothing on missing evidence must never
+    # RELEASE an in-force restriction. A fresh cohort with no prior
+    # restriction still starts at 1.0 (nothing to hold).
+    if dd_7d is None:
+        _prev_clip = prev_state.get("clip_scale_raw",
+                                    prev_state.get("clip_scale"))
+        try:
+            if _prev_clip is not None and float(_prev_clip) < 1.0:
+                clip_scale = float(_prev_clip)
+        except (TypeError, ValueError):
+            pass
+    # [2026-07-17 IMB-16] the kill switch is SENIOR and now true at the one
+    # place all clip consumers read: advisory mode publishes clip_scale=1.0
+    # (raw kept for display/forensics).
+    clip_scale_raw = clip_scale
+    if MODE != "enforce":
+        clip_scale = 1.0
     risk_payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC, "mode": MODE,
         "light": light,
         "fleet_equity": round(fleet_equity, 2),
         "fleet_dd_7d": dd_7d,
         "clip_scale": clip_scale,
+        "clip_scale_raw": clip_scale_raw,   # pre-kill-switch governor value
         "equity_by_bot": {k: round(v, 2) for k, v in equity_by_bot.items()},
         "equity_cohort": _cohort,
         # persisted so a CARRIED base can keep its real venue in the cohort

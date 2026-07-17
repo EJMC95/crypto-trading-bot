@@ -9,11 +9,54 @@ env-tunable), `heavy_ok` now also stands aside inside event windows, and
 `fleet-clock` history is a transitions-only open/close event log. 5-min
 cadence. Still ADVISORY / publish-first per doctrine — no consumer wired.
 
-**Decide at the review — who gets wired FIRST (pick one, earn the rest):**
-- **Equities books** (Index Rider 📊 / Stock Leaders 🏆): idle their scan
+**⛔ 17-Jul: THIS ITEM'S PREMISE IS FALSE — the equities option is WITHDRAWN,
+not deferred. Read this before re-litigating it.**
+Attempted under delegated authority, built, adversarially verified, and then
+REVERTED on the evidence. The option below said the equities books "idle
+while the underlying doesn't print; a frozen index makes their marks noise."
+**That describes a bot design this repo does not contain.** Verified by
+inspection of the real code (and independently by 3/3 refuter lenses):
+- `lighter_index_bot.want_position(symbol, closes)` and
+  `lighter_momentum_bot.evaluate(closes)` are PURE functions of `closes`,
+  and both `ref_closes()` fetch **Yahoo daily bars of the REAL market**
+  (`query1.finance.yahoo.com`, `interval=1d`). Neither signal reads a perp
+  mark. `marks.fresh_mid` appears only at fill/mark/seatbelt sites.
+- So both books were ALREADY deciding on real prints. An NYSE gate adds
+  **zero** signal quality — it is pure latency, and (as built) it deferred
+  regime EXITS and `rotated_out` exits by up to **65h** across a weekend
+  while the long keeps paying ~28% APR funding, bounded only by the
+  −15%-from-entry seatbelt.
+- Both books' own labs have already MEASURED that coarsening decision
+  cadence HURTS them: Index Rider — "monthly-eval Faber timing REJECTED
+  (DD 26-29% vs 20-22%)"; Stock Leaders — "monthly re-widens DD to 46.7%".
+  A clock gate is the same family of knob, and it shipped with no backtest.
+- The gate would also have corrupted the very evidence these shadow books
+  exist to produce (the funding-drag study) and diverged them from their
+  named IBKR/Alpaca control arms — a control arm only controls if the venue
+  is the only difference.
+Also killed en route (recorded so nobody rebuilds it): the first cut wired
+`hyperliquid_momo_bot.py`, which is **Trail Blazer's 24/7 CRYPTO book** on
+the recycled momo-bot service — not Stock Leaders (names lie; check what a
+service RUNS). And `lighter_momentum_bot`'s universe holds BTC/ETH/XAU/XAG/
+WTI — 5 of its 25 candidates are NOT NYSE-clocked, so a whole-rotation gate
+pins 24/7 legs to the NYSE bell.
+**If a clock consumer is still wanted, the honest options are:** scanners
+(cadence boost in `event_window` — a real resource rationale, no exit path
+to suppress) or heavy-jobs (`heavy_ok`). If equities are ever revisited, the
+only defensible claim is FILL QUALITY (don't cross a thin after-hours
+equity-perp book) — a different hypothesis on a different evidence bar, and
+it must clear the existing 15y harness (`index_enhance_backtest.py`,
+`momentum_universe_backtest.py`) on both halves first, scoped per-symbol so
+non-NYSE legs are exempt.
+Also: EVBOARD_MODE=publish was checked and is currently INERT — zero coded
+consumers of board proposals exist; that review item is really "design the
+proposal consumer", not "flip the env".
+
+**Original options (equities WITHDRAWN — see above; the other two stand):**
+- ~~**Equities books** (Index Rider 📊 / Stock Leaders 🏆): idle their scan
   loop while `markets.nyse.open` is false (the underlying doesn't print;
   a frozen index makes their marks noise) and wake at `next_open_utc`.
-  Cheapest win, clearly correct — but backtest-first per house rules.
+  Cheapest win, clearly correct~~ — **premise false, withdrawn 17-Jul.**
 - **Scanners** (Lighter Scout / Gap Scout): cadence boost inside
   `event_window` — opens/closes are when dislocations and vol moves happen.
 - **Heavy jobs** (incubator breeding, big sweeps): consume `heavy_ok`
@@ -48,6 +91,11 @@ while in-sample replay still likes it. Board surfaces 🦾 items; immune
 scans the payload; /vitals + autonomy card render it.
 
 **Grade at the review:**
+- *17-Jul day-1 snapshot (organ alive, thin as expected):* 2 episodes
+  graded — taker joint stance released neutral (Σ$0.00), gapscout levers
+  HELPING (census activity during the widened net); xp episode open;
+  verdict expiry/probation (IMB-08) shipped 17-Jul — grade its first
+  cycle here too.
 - Episode ledger sanity: do episode windows match the fleet-tuning
   history (no phantom opens, releases backdated to lever expiry)?
 - Counterfactual honesty: spot-check 2-3 graded taker episodes by
@@ -237,6 +285,15 @@ IMB-05, -09, -11, -19, -21, -25, -26, -27), 4 contested-low-confidence
   emissions — adopt the brain v3 episode fields (eps4h/n_syms) in the
   taker veto + tuner floor; explicitly gated on this review validating
   those fields (replay-gated migration).
+  - *17-Jul validation attempt: the gate CANNOT pass yet — and the reason
+    was a production bug.* All four lenses showed eps4h=None/n_syms=0
+    against n4h in the thousands: `brain_stats.py` was NEVER COPY'd into
+    Dockerfile.freqtrade, so the deployed brain silently ran frozen v2
+    from the day v3 "shipped" (the import-guarded fallback hid it — now
+    fixed: COPY added, loud fallback warning added, systematic
+    import-vs-COPY audit run — brain_stats was the only miss). Episode
+    fields start accruing from the 17-Jul redeploy; validate ~4 days of
+    REAL v3 data at the review before the veto-floor migration.
 - **G1 amendment (review-item, not blocker):** the dd-governor's <=6h
   post-reset abstain window returns scale 1.0 — decide whether it should
   HOLD a prior <1.0 clip (blind-hold pattern) instead; shadow-clip lane
