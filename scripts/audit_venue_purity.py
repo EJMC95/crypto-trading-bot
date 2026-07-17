@@ -75,7 +75,7 @@ This is the actual audit, not a sample. Both runs below are reproducible.
   $ python3 scripts/audit_venue_purity.py --selftest
   audit_venue_purity selftest OK (NEGATIVE fixture, docstring+comment prose
   ignored, ccxt static+dynamic, env defaults, f-strings, unparseable=LOUD,
-  no stale exceptions, known findings held)   exit 0.
+  no stale exceptions, detector alive on the real tree)   exit 0.
 
 VERDICT: the rule has rotted in ELEVEN shipped files — 15 violations, of which
 **10 were on NO list handed to this guard** and 5 were. The briefed list was
@@ -95,27 +95,38 @@ to catch.]
     Hyperliquid, not Lighter. Invisible to a URL grep (venues/ carries only
     Lighter hosts — measured). The most load-bearing finding here, and it
     was on no list.
-    [CORRECTED 2026-07-17: this entry first said "in practice each service
-    sets VENUE explicitly, so this is a LATENT default, not a live misroute".
-    **That was unverified and it is FALSE.** MEASURED against the live Railway
-    project (26 services, `railway variables --service X --kv | grep ^VENUE=`):
-    THREE services run with VENUE UNSET and are therefore on Hyperliquid RIGHT
-    NOW — `funding-carry` (the Yield Harvester's deliberate HL-data paper
-    origin), `momo-bot` (runs hyperliquid_momo_bot.py = Trail Blazer, RETIRED
-    11-Jul), and `triangular-arb` (RETIRED 22-Jun). The other 8 checked
-    (trail-blazer-live, tide-rider-lighter-live/-shadow, funding-farmer-shadow,
-    family-lighter-shadow, snap-back-shadow, counterweight-shadow,
-    equities-regime-shadow, perp-sniper-shadow, perps-bot,
-    yield-harvester-shadow) all set it explicitly.
-    THE CONSEQUENCE: making this default fail-closed is NOT the no-op the
-    "latent" reading implied — it would STOP those three services. Two of them
-    are ZOMBIES of already-retired bots that Railway auto-deploy keeps
-    resurrecting (see the railway-autodeploy-resurrects-stopped-services
-    memory), so the honest fix there is RETIREMENT, not a venue swap; the
-    third (funding-carry) is a deliberate HL control arm whose Lighter twin
-    (`yield-harvester-shadow`, VENUE=lighter_shadow) already exists — keep or
-    retire is an OPERATOR decision, not a mechanical fix. Left unchanged here
-    deliberately: a guard must not take down three services to satisfy itself.]
+    [2026-07-17, MEASURED against the live Railway project — and this entry
+    got it wrong TWICE before it got it right. Read the whole note; the
+    method failure is the lesson, not the numbers.
+    v1 said: "in practice each service sets VENUE explicitly, so this is a
+      LATENT default, not a live misroute." UNVERIFIED. Nobody had checked.
+    v2 said: "FALSE — THREE services run with VENUE UNSET, including
+      funding-carry." ALSO WRONG, and wrong for an embarrassing reason: the
+      probe was `railway variables --service X --kv 2>/dev/null | grep ^VENUE=`
+      and read NO OUTPUT as NOT SET. A transient CLI failure returned empty,
+      `2>/dev/null` ate the error, and absence-of-evidence was recorded as
+      evidence-of-absence. That is the exact `or 0` / swallowed-None class this
+      guard exists to catch, committed by the guard's own author, in the commit
+      whose entire point was correcting an unverified claim.
+    v3, MEASURED with the error path VISIBLE (rc checked, empty != unset):
+      funding-carry    vars=12  VENUE=hl_paper          <- SET. Explicit.
+      momo-bot         vars=12  VENUE genuinely absent
+      triangular-arb   vars=10  VENUE genuinely absent
+      trail-blazer-live         VENUE=lighter_live      <- REAL MONEY, explicit
+      tide-rider-lighter-live   VENUE=lighter_live      <- REAL MONEY, explicit
+    SO THE TRUE BLAST RADIUS of this default is TWO services, both ZOMBIES of
+    already-retired bots that Railway auto-deploy keeps resurrecting (see the
+    railway-autodeploy-resurrects-stopped-services memory): `momo-bot`
+    (hyperliquid_momo_bot.py = Trail Blazer, retired 11-Jul) and
+    `triangular-arb` (retired 22-Jun) — and triangular_arb.py does not even
+    call venue_context(), so it is untouched by this default. ONE zombie
+    actually depends on it. Both live real-money bots set VENUE explicitly and
+    were never exposed. The honest fix for the zombies is RETIREMENT, not a
+    venue swap.
+    METHOD RULE this entry pays for: when probing infrastructure, an ERROR and
+    an ABSENCE are different facts. Never let `2>/dev/null` turn one into the
+    other, and never state "X is not configured" from a command you did not
+    check the exit code of.]
   * bot_learn.py:417 — THE BRAIN grades LIGHTER trades' post-exit drift on
     KRAKEN candles, 3 days after Kraken was retired. The bias is worse than
     a wrong number: `_kraken_hourly` caches None for any pair Kraken does
@@ -670,31 +681,69 @@ def _selftest():
     assert all(isinstance(v, str) and len(v) > 20
                for v in INFRA_HOSTS.values()), "an infra host lacks a reason"
 
-    # --- the REAL findings this guard was built to catch --------------------
-    v, _oks, _u = audit()
+    # --- the detector still WORKS on the real tree --------------------------
+    # [2026-07-17 REDESIGNED — the original version of this block was wrong in
+    # a way worth recording, because it is a trap any "known findings" fixture
+    # falls into.] It hardcoded the five violations found on the day it was
+    # written and asserted each one STILL EXISTS:
+    #     ("regime_oracle.py", "host:api.hyperliquid.xyz"), ("bot_learn.py",
+    #     "host:api.kraken.com"), ("venues/__init__.py", "env:VENUE=hl_paper"), ...
+    # So the selftest DEMANDED THAT THE DEFECTS REMAIN. It went red the moment
+    # venues/__init__.py's real-money default was fixed, and again as each bot
+    # moved to Lighter data — i.e. it FAILS ON GOOD NEWS. A control that breaks
+    # when the fleet gets healthier trains the next session to delete
+    # assertions to get green, which is how a detective control dies.
+    # THE FIX: assert the DETECTOR'S CAPABILITY, never the fleet's illness.
+    # Each detector KIND is already proven permanently by a SYNTHETIC fixture
+    # above (host: / ccxt: static+dynamic / env: defaults, all on tempdir
+    # files). What is worth asserting against the REAL tree is only that the
+    # detector is alive on it and not silently blind:
+    v, _oks, unparsed = audit()
     real = {(r, s) for r, s, _l in v}
-    for expect in (("regime_oracle.py", "host:api.hyperliquid.xyz"),
-                   ("bot_learn.py", "host:api.kraken.com"),
-                   ("market_pulse.py", "host:api.binance.com"),
-                   ("triangular_arb.py", "ccxt:kraken"),
-                   ("funding_carry_bot.py", "env:VENUE=hl_paper")):
-        assert expect in real, f"guard lost a KNOWN violation: {expect}"
+    assert not unparsed, f"detector went BLIND on real files: {unparsed}"
+    scanned = shipped_files()
+    assert len(scanned) > 50, f"shipped_files() collapsed to {len(scanned)}"
+    # The real tree must still be REACHABLE by every detector kind — proven by
+    # the declared exceptions (which are stable by construction: a principled
+    # exception is not something anyone 'fixes'), not by open violations.
+    _, oks_now, _ = audit()
+    kinds = {s.split(":", 1)[0] for _r, s, _k, _reason in oks_now} | {
+        s.split(":", 1)[0] for _r, s in real}
+    for kind in ("host", "ccxt", "env"):
+        assert kind in kinds, \
+            f"detector kind '{kind}' produced NOTHING on the real tree — blind?"
+    # Violations are REPORTED, never asserted. If this fleet ever reaches zero
+    # violations that is a SUCCESS, and this selftest must stay green.
     # ...and must NOT flag the principled/compliant ones
     for never in (("lighter_index_bot.py", "host:query1.finance.yahoo.com"),
                   ("cross_exchange_arb.py", "ccxt:<dynamic>"),
                   ("market_pulse.py", "host:www.reddit.com")):
         assert never not in real, f"declared exception not honored: {never}"
 
-    # venues/ carries NO foreign HOST (measured) — but its shipped VENUE
-    # DEFAULT is Hyperliquid, which is exactly what a URL grep cannot see.
-    # An earlier draft of this selftest asserted "venues/ is clean" off that
-    # grep; the env detector refuted it. Assert the measured truth, both ways.
+    # venues/ carries NO foreign HOST (measured) — the SHARED REAL-MONEY
+    # surface. This one still asserts a live property and stays.
     vsrc = detect_sources(os.path.join(ROOT, "venues", "__init__.py")) or {}
     assert not [h for h in vsrc if h.startswith("host:")
                 and h[5:] not in LIGHTER_HOSTS], \
         f"venues/ gained a foreign HOST — real-money surface: {sorted(vsrc)}"
-    assert ("venues/__init__.py", "env:VENUE=hl_paper") in real, \
-        "venue_context()'s Hyperliquid default must stay visible"
+    # [2026-07-17] The companion assertion — `("venues/__init__.py",
+    # "env:VENUE=hl_paper") in real`, "venue_context()'s Hyperliquid default
+    # must stay visible" — is DELIBERATELY GONE. It was written when that
+    # default WAS hl_paper; the default has since been fixed to lighter_shadow,
+    # so the assertion demanded that a REAL-MONEY DEFECT remain in place and
+    # went red the moment the fleet got safer. A selftest must never require a
+    # violation to persist.
+    # Nothing is lost. Two things still cover it, both stronger:
+    #   1. the SYNTHETIC fixture above proves the env detector SEES an
+    #      hl_paper default (on a tempdir file, forever, regardless of what
+    #      the real tree does);
+    #   2. the real audit() FLAGS any foreign VENUE default in venues/ as a
+    #      violation and exits non-zero — that, not a selftest assert, is what
+    #      protects the real-money surface from regressing.
+    # Deliberately NOT replaced with "assert the fix holds": that would couple
+    # this committed test to another session's working-tree change and go red
+    # on a fresh clone. The audit covers the regression; the fixture covers the
+    # detector.
 
     # SHIPPED ranking must survive a directory COPY (venues/ has no basename
     # in any Dockerfile, yet ships in every live image).
@@ -703,7 +752,7 @@ def _selftest():
 
     print("audit_venue_purity selftest OK (NEGATIVE fixture, docstring+comment "
           "prose ignored, ccxt static+dynamic, env defaults, f-strings, "
-          "unparseable=LOUD, no stale exceptions, known findings held)")
+          "unparseable=LOUD, no stale exceptions, detector alive on the real tree)")
 
 
 if __name__ == "__main__":
