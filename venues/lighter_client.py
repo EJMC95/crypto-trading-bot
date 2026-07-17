@@ -423,8 +423,33 @@ class LighterClient(VenueClient):
         err = self.signer.check_client()   # local Go-binary validation (no loop)
         if err:
             raise VenueError(f"lighter signer check failed: {err}")
-        log.info("lighter signer ready (account %d, key index %d)",
-                 self.account_index, self.api_key_index)
+        # [2026-07-17] STATE THE WHEEL THAT SIGNS REAL ORDERS. requirements.txt
+        # pins `lighter-sdk>=1.1.1` — UNPINNED — and 1.1.2 shipped 10-Jul, so
+        # every image built since resolves to whatever PyPI's latest is on build
+        # day. That wheel IS the signer (SignerClient, create_market_order, the
+        # Go binary, the nonce manager): a `pip install` at build time can
+        # silently swap the code that moves real money, and the born-dark guard
+        # models repo-local imports and CANNOT see a pip dep (its own docstring
+        # says so).
+        #
+        # It is NOT pinned here on purpose: either pin moves the signer under a
+        # bot holding real positions, and NOBODY HAS MEASURED which version is
+        # actually deployed — the build logs are cached, and `lighter.__version__`
+        # is stale upstream ("1.0.0", a release PyPI does not even have; use
+        # importlib.metadata). Choosing a pin from an INFERENCE is exactly the
+        # mistake this file's own min_size_error withdrawal records.
+        #
+        # So: measure first. Every boot now names its own signer version, which
+        # turns "which SDK signs our orders?" from an argument into a grep.
+        try:
+            import importlib.metadata as _md
+            _sdk = _md.version("lighter-sdk")
+        except Exception:  # noqa: BLE001 — never let telemetry block a signer
+            _sdk = "unknown"
+        log.info("lighter signer ready (account %d, key index %d) | "
+                 "lighter-sdk %s (requirements pins >=1.1.1 — UNPINNED; this "
+                 "wheel signs real orders)",
+                 self.account_index, self.api_key_index, _sdk)
 
     def _run_signer(self, coro, timeout=30.0):
         return self._run(coro, timeout=timeout, weight=WEIGHT_ORDER_TX)
