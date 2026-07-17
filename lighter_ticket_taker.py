@@ -334,7 +334,15 @@ def main(_ctx=None):
     try:
         marks, funding, ranges = fetch_marks_and_funding()
     except Exception as e:  # noqa: BLE001 — keyless API down: skip this cycle
+        # [2026-07-17] liveness touch on the skip path (the funding bot's
+        # 12-Jul GO-GREEN rule, ported): this `return` published NOTHING, so a
+        # keyless-API blip made the row go STALE — indistinguishable from a
+        # dead bot. A skip is not a death; say so.
         print(f"[ticket-taker] {iso(now())} fetch failed (skipping): {e!r}")
+        try:
+            store.heartbeat(BOT_ROW)
+        except Exception:  # noqa: BLE001
+            pass
         return
 
     if TT_VENUE not in TT_MODES:
@@ -1134,6 +1142,12 @@ def _selftest_live():
             "updated": iso(now()), "ttl_sec": 900, "tickets": tickets,
             "stress": {"med": 1.0}}
 
+    def _boom(*_a, **_kw):
+        # the REAL 17-Jul crash: LighterClient -> `import lighter` -> missing
+        # wheel -> VenueError, every cycle, behind an "online" row.
+        raise RuntimeError("lighter-sdk missing (pip install lighter-sdk): "
+                           "No module named 'lighter'")
+
     try:
         # ================================================================
         # 1) ENTRY sends a REAL order — not a modelled fill
@@ -1374,6 +1388,52 @@ def _selftest_live():
         # and it still takes new tickets (the entry pass survived the refactor)
         assert _pub["open_trades"] == 1, _pub["open_trades"]
 
+        # ================================================================
+        # 10) A CRASH MUST MARK THE ROW. The negative fixture is the REAL
+        #     incident: the exact VenueError the missing lighter-sdk wheel
+        #     raised, crash-looping behind a row that still read "online".
+        # ================================================================
+        _status = []
+        _real_set = store.set_status
+        _real_load = store.load_state
+        store.set_status = lambda bot, st: _status.append((bot, st))
+        try:
+            # The incident crashed at LighterClient construction — line 335 of
+            # main(), propagating straight out to <module> UNCAUGHT. Reproduce
+            # the shape (an uncaught raise from main's body) rather than the
+            # exact call: the fetch path is CAUGHT and returns, so raising
+            # there would prove nothing about this control. Verified the hard
+            # way — the first draft of this fixture did exactly that and passed
+            # against a supervisor that had never run.
+            globals()["fetch_marks_and_funding"] = lambda: ({}, {}, {})
+            store.load_state = _boom
+            try:
+                _supervised()
+                raise AssertionError("the crash must propagate")
+            except RuntimeError:
+                pass               # re-raised by design
+            store.load_state = _real_load
+            assert _status == [(BOT_ROW, "error")], \
+                f"a crash must mark the row, got {_status}"
+            # ... and a boot REFUSAL is not a crash: it must pass through
+            # untouched (SafetyRails._publish_refusal already owns that row).
+            _status.clear()
+            globals()["fetch_marks_and_funding"] = lambda: ({}, {}, {})
+            _tt_save = TT_VENUE
+            try:
+                globals()["TT_VENUE"] = "lighter_live"
+                try:
+                    _supervised()          # no _ctx -> the evidence refusal
+                    raise AssertionError("lighter_live must refuse")
+                except SystemExit:
+                    pass
+                assert _status == [], f"a refusal is not a crash, got {_status}"
+            finally:
+                globals()["TT_VENUE"] = _tt_save
+        finally:
+            store.set_status = _real_set
+            store.load_state = _real_load
+
         print("\nAll LIVE order-path self-tests passed:")
         print("  1 entry SENDS a real order + records the REAL fill")
         print("  2 notional cap is senior — cap-breaching entry never sends")
@@ -1384,11 +1444,40 @@ def _selftest_live():
         print("  7 unreadable positions SKIP the cycle — never trade blind")
         print("  8 a failed flatten reports the open book, not a green zero")
         print("  9 the DEPLOYED shadow arm still trades, on the TRUE 8h basis")
+        print(" 10 a crash marks the row ERROR instead of going quietly stale")
     finally:
         for k, fn in _real.items():
             setattr(store, k, fn)
         globals()["fetch_marks_and_funding"] = _real_fetch
         TT_VENUE, BOT_ROW = _saved_env
+
+
+def _supervised():
+    """[2026-07-17 INCIDENT] A crash used to publish NOTHING — the row simply
+    went stale, which reads as a DEAD bot rather than a broken one, and the two
+    look identical on the dashboard until someone greps the container.
+
+    That is not hypothetical: the shadow arm shipped at 05:35 UTC missing its
+    lighter-sdk wheel and crash-looped every 5 minutes for an hour behind a row
+    still showing the OLD image's last-good `online, 1013.99, 18 closes`. Two
+    commits then cited that fossil as evidence the arm was healthy.
+
+    A run-once process has no supervisor loop to mark the row, so do it here:
+    mark ERROR and re-raise. run_all.sh's `|| true` swallows the exit code, but
+    the ROW now says why — the same reason SafetyRails._publish_refusal exists
+    (a refused boot must not look like a dead one). Status-only: the last good
+    equity/P&L stays intact.
+    """
+    try:
+        main()
+    except (KeyboardInterrupt, SystemExit):
+        raise                      # boot refusals (incl. lighter_live) pass through
+    except Exception:              # noqa: BLE001
+        try:
+            store.set_status(BOT_ROW, "error")
+        except Exception:          # noqa: BLE001 — never mask the real failure
+            pass
+        raise
 
 
 if __name__ == "__main__":
@@ -1397,4 +1486,4 @@ if __name__ == "__main__":
     elif "--selftest-live" in sys.argv:
         _selftest_live()
     else:
-        main()
+        _supervised()

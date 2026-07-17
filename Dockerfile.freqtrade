@@ -9,7 +9,22 @@ USER root
 # the L2 veto / L4 stake-mults never executed in this container.
 ENV PYTHONPATH=/freqtrade
 # psycopg2 for the P&L poller that publishes to the shared Postgres table.
-RUN pip install --no-cache-dir psycopg2-binary
+# [2026-07-17 INCIDENT — BORN-DARK, ONE LAYER DOWN] lighter-sdk + websockets are
+# NOT optional here: the Ticket Taker's DEFAULT mode (TT_VENUE=lighter_shadow)
+# constructs venues.lighter_client.LighterClient, which does `import lighter`.
+# This image had never installed it, so from the moment the shadow arm shipped
+# (c5924e4, 05:35 UTC) the taker CRASH-LOOPED every 5 min:
+#     venues.base.VenueError: lighter-sdk missing ... No module named 'lighter'
+# MEASURED: the -lshadow row last published 05:48 UTC and then went stale for
+# ~1h, and venue_orders for this bot is still ZERO — the arm that exists to
+# earn a go-live had never completed a single cycle. c5924e4's "shadow arm
+# healthy (1013.99, 18 closes)" and 09245dd's repeat of it were both reading
+# the LAST publish of the OLD image: a fossil, not a heartbeat.
+# WHY THE GUARD MISSED IT: audit_image_imports models REPO-LOCAL imports — it
+# caught the missing `COPY venues/` and was satisfied. `lighter` is a PIP dep,
+# invisible to it, so the guard verified the file and not the wheel. Same
+# failure class, one layer down. See BORN_DARK_OK / the 17-Jul (m) CHANGELOG.
+RUN pip install --no-cache-dir psycopg2-binary "lighter-sdk>=1.1.1" "websockets>=12.0.0"
 # Bake in the bot configs + strategies (built locally in user_data/)
 COPY user_data /freqtrade/user_data
 COPY run_all.sh /freqtrade/run_all.sh
