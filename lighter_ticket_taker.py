@@ -560,7 +560,30 @@ def main(_ctx=None):
         broker.restore_state(saved.get("broker") or {})
         live_baseline = None
     else:
-        saved = store.load_state(LIVE_STATE_KEY) or {}
+        # [2026-07-17 AUDIT] load_state_CHECKED on the live arm. `load_state`
+        # collapses "no row" and "READ FAILED" into None (bot_pnl_store.py:409
+        # — its sibling's docstring calls this "a trap for any caller that
+        # SEEDS durable state on an empty read"), and `or {}` then made meta={}
+        # -> EVERY live position unattributable -> the dirty-account guard
+        # below fired on a bot whose account was perfectly clean. One Postgres
+        # blip therefore stopped the exit ladder on REAL positions while
+        # telling the operator to go hunt a foreign position that never
+        # existed. A read we could not perform is NOT evidence of an empty
+        # account; refuse the cycle and let the 300s loop retry, rather than
+        # act on a fact we do not have.
+        _ok, _saved = store.load_state_checked(LIVE_STATE_KEY)
+        if not _ok:
+            store.set_status(BOT_ROW, "error")
+            raise SystemExit(
+                "lighter-ticket-taker: live state READ FAILED — cannot tell "
+                "an empty account from an unreadable one, so this cycle does "
+                "nothing rather than guess. Positions (if any) keep their "
+                "venue-side state; the next cycle retries in ~300s. This is a "
+                "TRANSIENT database condition, NOT a dirty account — do not "
+                "reconcile meta on the strength of this message. If it "
+                "persists, the DB is down: REAL_MONEY_KILL=DISARMED_I_UNDERSTAND "
+                "still flattens (the kill switch runs above this).")
+        saved = _saved or {}
         live_baseline = saved.get("initial_equity")
     meta = saved.get("meta") or {}          # sym -> {lens, opened, accrued_to}
     stats = saved.get("stats") or {"closed": 0, "wins": 0, "losses": 0}
@@ -902,21 +925,45 @@ def main(_ctx=None):
     # here, and halting is still right — a position we cannot attribute is one
     # we cannot manage. The kill switch runs ABOVE this and still flattens,
     # so REAL_MONEY_KILL remains the escape hatch for a dirty account.
+    # [2026-07-17 AUDIT] SCOPED to the foreign symbols, not the whole account.
+    # This guard was `raise SystemExit` on ANY unattributable position — which
+    # ran BEFORE sections 1-4, so it did not merely decline to adopt the
+    # stranger: it abandoned OUR OWN meta'd positions in the same breath. No
+    # mark, no stop-loss, no max-hold, no delist give-up, for as long as the
+    # stranger sat there. On a $15 clip at the $30 cap that is real money left
+    # unstopped, and a lost meta WRITE (save_state returns False silently)
+    # makes it PERMANENT — operator-only to clear.
+    #
+    # The original reasoning is still honoured, and is the reason this is a
+    # FILTER rather than a deletion: we must not run the taker's exit ladder on
+    # another strategy's position (no entry clip, lens or opened-time), and we
+    # must not trade while the account is dirty. So: drop the foreign symbols
+    # from the working set (sections 1-2 can never touch them), refuse NEW
+    # entries, and page — while our own positions keep every exit they had.
+    # The file's own live_boot_gate docstring names this exact hazard: "the
+    # switch meant to protect the money would be what abandons it."
+    dirty_syms = []
     if live:
-        _foreign = sorted(s for s in pos if s not in meta)
-        if _foreign:
+        dirty_syms = sorted(s for s in pos if s not in meta)
+        if dirty_syms:
             store.set_status(BOT_ROW, "error")
-            raise SystemExit(
-                f"lighter-ticket-taker REFUSES to trade a DIRTY ACCOUNT: the "
-                f"venue reports {_foreign} with no meta of ours. This bot did "
-                f"not open {'them' if len(_foreign) > 1 else 'it'} and will not "
-                f"adopt {'them' if len(_foreign) > 1 else 'it'} — it has no "
-                f"entry clip, lens or opened-time, so its exit ladder would "
-                f"manage another strategy's position on the taker's bars. If "
-                f"this is Tide Rider's leftover on the handed-over sub-account, "
-                f"flatten it FIRST (operator, by hand or via REAL_MONEY_KILL). "
-                f"If it is ours with lost state, reconcile "
-                f"bot_state['{LIVE_STATE_KEY}'].meta before restarting.")
+            print(f"[ticket-taker] {iso(t_now)} DIRTY ACCOUNT: venue reports "
+                  f"{dirty_syms} with no meta of ours — NOT adopting "
+                  f"{'them' if len(dirty_syms) > 1 else 'it'} (no entry clip, "
+                  f"lens or opened-time, so the exit ladder would manage "
+                  f"another strategy's position on the taker's bars) and NO "
+                  f"NEW ENTRIES this cycle. Our own {len(pos) - len(dirty_syms)} "
+                  f"position(s) keep their stop/max-hold. If this is Tide "
+                  f"Rider's leftover on the handed-over sub-account, flatten it "
+                  f"(by hand, or REAL_MONEY_KILL=DISARMED_I_UNDERSTAND). If it "
+                  f"is OURS with a lost meta write, reconcile "
+                  f"bot_state['{LIVE_STATE_KEY}'].meta — those symbols have NO "
+                  f"stop until you do.", flush=True)
+            # (the `error` row status above IS the operator signal — this file
+            # has no push helper, and inventing one here would be a second
+            # untested path on a live bot.)
+            # sections 1-2 iterate `pos`; the stranger must not be in it
+            pos = {s: v for s, v in pos.items() if s not in set(dirty_syms)}
 
     # 1) mark + hourly funding drag on held positions (longs pay positive rate)
     for sym in list(pos):
@@ -1032,7 +1079,14 @@ def main(_ctx=None):
         pos.pop(sym, None)
 
     # 3) entries — only from a FRESH scout snapshot, only the incredible subset
-    scout = store.load_state(SCOUT_KEY) or {}
+    # [2026-07-17 AUDIT] ...and never onto a DIRTY account. The old guard's
+    # SystemExit blocked entries as a side effect of abandoning everything;
+    # scoping it to the foreign symbols means the no-new-entries half must now
+    # be stated EXPLICITLY, or relaxing the strand would have quietly relaxed
+    # the trading refusal too. Refusing to ADD exposure while the account holds
+    # something we cannot attribute is the half of the original rule that was
+    # always right — it is the abandonment half that was the bug.
+    scout = {} if dirty_syms else (store.load_state(SCOUT_KEY) or {})
     fresh = False
     try:
         age = (t_now - parse_ts(scout.get("updated"))).total_seconds()
@@ -1214,9 +1268,27 @@ def main(_ctx=None):
                    if (equity is not None and live_baseline is not None) else None)
         pnl_pct = ((pnl_abs / live_baseline)
                    if (pnl_abs is not None and live_baseline) else None)
-        store.save_state(LIVE_STATE_KEY, {
-            "initial_equity": live_baseline, "meta": meta, "stats": stats,
-            "day_start": {"day": cur_day, "equity": day_start_equity}})
+        # [2026-07-17 AUDIT] The meta WRITE's return was discarded. save_state
+        # "Never raises" — it returns False (bot_pnl_store.py:222). So a write
+        # that failed after a successful market_open lost that position's meta
+        # SILENTLY AND FOREVER: next cycle the venue reports a position we have
+        # no record of, and it is indistinguishable from a stranger. Before the
+        # guard above was scoped that meant a PERMANENT strand; it is still the
+        # one path that manufactures an unstoppable position out of nothing but
+        # a DB blip. We cannot retroactively remember what we failed to write —
+        # but we can refuse to let it pass unnoticed, so the operator finds it
+        # by page rather than by reading the P&L.
+        if not store.save_state(LIVE_STATE_KEY, {
+                "initial_equity": live_baseline, "meta": meta, "stats": stats,
+                "day_start": {"day": cur_day, "equity": day_start_equity}}):
+            store.set_status(BOT_ROW, "error")
+            print(f"[ticket-taker] {iso(t_now)} CRITICAL: live state WRITE "
+                  f"FAILED — {len(meta)} position(s) worth of meta (entry clip, "
+                  f"lens, max-hold clock) did NOT persist. If the process dies "
+                  f"before the next successful write, those positions become "
+                  f"unattributable and lose their stop/max-hold until you "
+                  f"reconcile bot_state['{LIVE_STATE_KEY}'].meta by hand. "
+                  f"Held: {sorted(meta)}", flush=True)
     store.publish(
         BOT_ROW, status="online",
         equity=(round(equity, 2) if equity is not None else None),
@@ -1532,12 +1604,42 @@ def _selftest_live():
                 "published": []}
     _real = {k: getattr(store, k) for k in
              ("publish_paper_trade", "publish_venue_order", "save_state",
-              "load_state", "publish", "save_daily_halt", "load_daily_halt",
-              "heartbeat")}
+              "load_state", "load_state_checked", "publish", "save_daily_halt",
+              "load_daily_halt", "heartbeat")}
     store.heartbeat = lambda bot: None
     store.publish_paper_trade = lambda bot, **kw: captured["paper"].append((bot, kw))
     store.publish_venue_order = lambda bot, **kw: captured["orders"].append((bot, kw))
-    store.save_state = lambda k, v: captured["state"].__setitem__(k, v)
+
+    # [2026-07-17 AUDIT] These two stubs must mirror the REAL functions'
+    # RETURN CONTRACTS, not just their names — a stub that gets the shape right
+    # and the semantics wrong makes every green assertion below meaningless.
+    #   save_state: really returns True/False and NEVER raises
+    #     (bot_pnl_store.py:222-250). The old stub returned None (dict
+    #     __setitem__), i.e. FALSY — so the moment main() started checking that
+    #     return, every fixture would have reported a failed write. The stub was
+    #     silently teaching the bot that all writes fail.
+    #   load_state_checked: (ok, state) — ok=False means "I could not find out",
+    #     which is NOT "no row". Unstubbed, it would have reached real Postgres
+    #     from inside the selftest and returned (False, None), tripping main()'s
+    #     new READ-FAILED refusal in every live fixture.
+    # `captured["fail_writes"]` / `["fail_reads"]` let a fixture drive the
+    # failure halves deliberately — see fixtures 11a-11c.
+    captured["fail_writes"] = False
+    captured["fail_reads"] = False
+
+    def _stub_save(k, v):
+        if captured["fail_writes"]:
+            return False
+        captured["state"][k] = v
+        return True
+
+    def _stub_load_checked(k):
+        if captured["fail_reads"]:
+            return (False, None)          # read FAILED — not "no row"
+        return (True, captured["state"].get(k))
+
+    store.save_state = _stub_save
+    store.load_state_checked = _stub_load_checked
     store.load_state = lambda k: captured["state"].get(k)
     store.publish = lambda bot, **kw: captured["published"].append((bot, kw))
     store.save_daily_halt = lambda bot, day, eq=None: captured["halts"].append((bot, day, eq))
@@ -1878,16 +1980,96 @@ def _selftest_live():
             captured["state"][LIVE_STATE_KEY] = {
                 "initial_equity": 34.67, "meta": {},
                 "stats": {"closed": 0, "wins": 0, "losses": 0}}
-            try:
-                main(_ctx={"venue": v, "rails": r, "broker": None})
-                raise AssertionError("a dirty account must REFUSE")
-            except SystemExit as e:
-                assert "DIRTY ACCOUNT" in str(e) and "TRX" in str(e), str(e)
+            # [2026-07-17 AUDIT] No longer a SystemExit: the guard is SCOPED to
+            # the foreign symbols. Everything this fixture ever asserted still
+            # holds — the stranger is not managed, nothing is traded, the row is
+            # marked — but the bot now completes its cycle instead of dying,
+            # which is what lets 11a (below) keep its own stops.
+            main(_ctx={"venue": v, "rails": r, "broker": None})
             assert v.closes == [], f"must not manage a foreign position: {v.closes}"
             assert v.opens == [], f"must not trade on a dirty account: {v.opens}"
             assert captured["paper"] == [], "must not book a foreign close"
-            assert _status == [(BOT_ROW, "error")], \
+            assert _status[0] == (BOT_ROW, "error"), \
                 f"a dirty account must mark the row: {_status}"
+
+            # ================================================================
+            # 11a) THE BUG THIS FIXTURE NEVER CAUGHT: our OWN position, held
+            #      ALONGSIDE the stranger, must keep its stop-loss. The case
+            #      above is all-foreign (meta={}) — the one shape where
+            #      "abandon everything" and "abandon only the stranger" are
+            #      INDISTINGUISHABLE. So `assert v.closes == []` passed for the
+            #      whole life of the defect while encoding it as the contract.
+            #      Mixed is the shape that tells them apart, and it is the shape
+            #      production actually has: a lost meta write (or one Postgres
+            #      blip) puts a stranger next to real, stopped positions.
+            # ================================================================
+            _status.clear()
+            captured["paper"].clear()
+            # OURS: a divergence SHORT 10% against us — far through the -3% stop.
+            # THEIRS: Tide Rider's TRX, untouched.
+            _stub_market(marks={"OWN": 110.0, "TRX": 0.2625}, funding={}, ranges={})
+            v3 = _StubVenue(equity=34.67,
+                            pos={"OWN": {"size": -0.15, "entry": 100.0},
+                                 "TRX": {"size": 100.0, "entry": 0.25}},
+                            fills={"OWN": 110.0, "TRX": 0.2625})
+            r3 = _StubRails(max_notional=150.0)
+            captured["state"][LIVE_STATE_KEY] = {
+                "initial_equity": 34.67,
+                "meta": {"OWN": {"lens": "divergence", "opened": iso(now()),
+                                 "entry": 100.0, "clip": 15.0, "is_long": False}},
+                "stats": {"closed": 0, "wins": 0, "losses": 0}}
+            main(_ctx={"venue": v3, "rails": r3, "broker": None})
+            assert "OWN" in v3.closes, (
+                "REGRESSION: our own position was abandoned because a stranger "
+                f"shared the account — this is the whole bug: {v3.closes}")
+            assert "TRX" not in v3.closes, \
+                f"the stranger must still not be managed: {v3.closes}"
+            assert v3.opens == [], f"still no new entries while dirty: {v3.opens}"
+            assert _status[0] == (BOT_ROW, "error"), "still marks the row"
+
+            # ================================================================
+            # 11b) A FAILED READ IS NOT A DIRTY ACCOUNT. One Postgres blip used
+            #      to yield meta={} -> every position "foreign" -> the guard
+            #      fired on a CLEAN account, stopping the exit ladder on real
+            #      money and sending the operator hunting a phantom stranger.
+            # ================================================================
+            _status.clear()
+            captured["fail_reads"] = True
+            v4 = _StubVenue(equity=34.67, pos={"OWN": {"size": -0.15, "entry": 100.0}},
+                            fills={"OWN": 110.0})
+            try:
+                main(_ctx={"venue": v4, "rails": _StubRails(max_notional=150.0),
+                           "broker": None})
+                raise AssertionError("an unreadable state must not be guessed at")
+            except SystemExit as e:
+                assert "READ FAILED" in str(e), str(e)
+                assert "DIRTY ACCOUNT" not in str(e), \
+                    f"must NOT blame a dirty account for a DB fault: {e}"
+            assert v4.closes == [] and v4.opens == [], \
+                "a blind cycle must not trade on either side"
+            captured["fail_reads"] = False
+
+            # ================================================================
+            # 11c) A FAILED WRITE MUST PAGE. save_state returns False and never
+            #      raises, so a lost meta write is how a position becomes
+            #      unattributable — and therefore unstoppable — out of nothing
+            #      but a DB blip. It cannot be undone; it must not be silent.
+            # ================================================================
+            _status.clear()
+            captured["fail_writes"] = True
+            v5 = _StubVenue(equity=34.67, pos={"OWN": {"size": -0.15, "entry": 100.0}},
+                            fills={"OWN": 100.5})
+            captured["state"][LIVE_STATE_KEY] = {
+                "initial_equity": 34.67,
+                "meta": {"OWN": {"lens": "divergence", "opened": iso(now()),
+                                 "entry": 100.0, "clip": 15.0, "is_long": False}},
+                "stats": {"closed": 0, "wins": 0, "losses": 0}}
+            main(_ctx={"venue": v5, "rails": _StubRails(max_notional=150.0),
+                       "broker": None})
+            assert (BOT_ROW, "error") in _status, \
+                f"a failed meta write must mark the row: {_status}"
+            captured["fail_writes"] = False
+            _status.clear()
 
             # ... and the kill switch stays the escape hatch: it runs ABOVE the
             # guard, so REAL_MONEY_KILL can still flatten a dirty account.
@@ -1984,7 +2166,11 @@ def _selftest_live():
         print("  8 a failed flatten reports the open book, not a green zero")
         print("  9 the DEPLOYED shadow arm still trades, on the TRUE 8h basis")
         print(" 10 a crash marks the row ERROR instead of going quietly stale")
-        print(" 11 a DIRTY account (Tide Rider's TRX) HALTS; kill switch still flattens")
+        print(" 11 a DIRTY account is QUARANTINED, not adopted: the stranger is\n"
+              "    never managed and nothing new is opened — but our OWN positions\n"
+              "    keep their stop (11a), a failed READ is not called a dirty\n"
+              "    account (11b), a failed meta WRITE pages (11c), and the kill\n"
+              "    switch still flattens")
         print(" 12 fill telemetry DETECTS: a measured at-mark fill records 0.0,")
         print("    an unmeasured leg records NULL and names the reason")
     finally:
