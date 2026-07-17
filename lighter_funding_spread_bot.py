@@ -40,8 +40,12 @@ RISK MODEL (why each gate exists)
   * Thin books: fills are the clip's real book VWAP (ShadowBroker crosses the
     spread); the 15bps/side stress case stays positive in both halves.
   * Warm boot: ranking needs LOOKBACK_H of funding history — backfilled from
-    HL fundingHistory (the backtest's own data source; rates ~arbitraged) and
-    replaced by sampled Lighter rates as they accumulate.
+    LIGHTER'S OWN SETTLED series (/api/v1/fundings), converted into the same
+    per-period basis as the live funding_map() samples, and replaced by those
+    samples as they accumulate. It used to backfill from HL's hourly
+    fundingHistory, which put 8x-apart units in one window AND ranked a Lighter
+    book on a foreign venue's cross-section (17-Jul; the venue was the real
+    defect — see lighter_backfill()).
   * Fleet furniture: durable daily-loss halt (debounced), loop heartbeat,
     every fill ledgered to venue_orders, round-trips to paper_trades.
 
@@ -55,12 +59,14 @@ import logging
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
 import funding_basis
 from venues import venue_context
+from venues.symbol_map import to_lighter
 
 BOT = "perps-funding-spread"
 
@@ -82,7 +88,12 @@ MIN_COVERAGE = LOOKBACK_H // 2  # doctrine: rank only with >=half-window history
 # (8x). Logging-only here, but a log that lies is how the fleet believed the
 # venue's floor was 28% apr for four days. See funding_basis.py.
 H = funding_basis.periods_per_year('lighter')   # rate -> TRUE APR (logging)
-HL_INFO = "https://api.hyperliquid.xyz/info"
+LIGHTER_API = "https://mainnet.zklighter.elliot.ai"
+# Hours per Lighter QUOTED funding period (24/3 == 8), asked of the basis
+# authority rather than hardcoded. The SETTLED series is %/HOUR; the live
+# funding_map() quote is a fraction per PERIOD. This is the factor that puts
+# them in ONE basis — the whole point of the 17-Jul backfill swap.
+HOURS_PER_PERIOD = 24.0 / funding_basis.periods_per_day('lighter')
 
 LOG_FILE = os.environ.get("FUNDSPREAD_LOG_FILE", "lighter_funding_spread_bot.log")
 logging.basicConfig(
@@ -91,23 +102,66 @@ logging.basicConfig(
 log = logging.getLogger(BOT)
 
 
-def hl_backfill(coin, hours):
-    """Bootstrap funding history from HL (the backtest's data source — rates
-    are ~arbitraged cross-venue). Returns [(epoch_s, hourly_rate)] or []."""
+def lighter_market_ids():
+    """{lighter symbol: market_id}. One call; {} on failure (caller degrades to
+    no backfill, which is honest — the book simply cannot rank until it has
+    sampled MIN_COVERAGE hours of real Lighter funding)."""
     try:
-        start = int((time.time() - hours * 3600) * 1000)
-        body = json.dumps({"type": "fundingHistory", "coin": coin,
-                           "startTime": start}).encode()
-        req = urllib.request.Request(
-            HL_INFO, data=body, headers={"Content-Type": "application/json"})
-        rows = json.loads(urllib.request.urlopen(req, timeout=20).read())
+        with urllib.request.urlopen(
+                LIGHTER_API + "/api/v1/orderBookDetails", timeout=20) as r:
+            obs = json.loads(r.read()).get("order_book_details") or []
+        return {o["symbol"]: o["market_id"] for o in obs if o.get("symbol")}
+    except Exception as e:  # noqa: BLE001
+        log.warning("lighter market list failed: %s", e)
+        return {}
+
+
+def lighter_backfill(market_id, hours):
+    """Bootstrap the ranking window from LIGHTER'S OWN SETTLED funding series
+    (/api/v1/fundings) — the venue this book actually trades and earns on.
+
+    [2026-07-17] REPLACES an api.hyperliquid.xyz backfill. Two measured reasons,
+    and note the second is the one that matters:
+      * UNITS — HL quotes per 1h, Lighter per 8h, and BOTH landed in this one
+        `fund_hist` list, so the rebalance averaged rows whose units differ 8x.
+      * VENUE — rescaling the HL rows by 8 does NOT fix it. Measured: it makes
+        the cold-start ranking WORSE (fidelity 7.88 -> 5.38 /10, control closer
+        in 16/16 boots), because a raw HL row is ~8x SMALLER and acts as
+        near-zero filler worth ~6% of the score; x8 re-weights a FOREIGN
+        cross-section to a full THIRD of the ranking. The contaminant was the
+        VENUE, not the scale. See scripts/study_fundspread_basis_mixing.py.
+    Doctrine agrees (CLAUDE.md "BACKTEST ON LIGHTER ONLY"), audit_venue_purity
+    flagged this file, and the factor is now validated on exactly THIS tape
+    (scripts/backtest_xsect_funding_lighter.py: 72h row 4/4 green).
+
+    UNITS, carefully. The settled row is
+        {timestamp, rate PERCENT-PER-HOUR, direction long|short, value}
+    — an UNSIGNED rate plus a direction (unlike /funding-rates, which IS signed).
+    Returns [(epoch_s, rate_per_period)] in the SAME basis as funding_map()'s
+    `rate`, so the merged window is unit-PURE and the persisted state (already
+    in that basis) stays valid — no migration. VERIFIED against the live quote:
+    median ratio 1.00 across the majors (ETH/DOGE/LTC exactly 1.00).
+    """
+    try:
+        q = urllib.parse.urlencode({"market_id": market_id, "resolution": "1h",
+                                    "start_timestamp": 0,
+                                    "end_timestamp": int(time.time()),
+                                    "count_back": 0})
+        with urllib.request.urlopen(
+                LIGHTER_API + "/api/v1/fundings?" + q, timeout=25) as r:
+            rows = json.loads(r.read()).get("fundings") or []
+        cut = time.time() - hours * 3600
         out = {}
-        for r in rows or []:
-            t = (int(r["time"]) // 3600000) * 3600
-            out[t] = float(r["fundingRate"])
+        for f in rows or []:
+            t = int(f["timestamp"])
+            if t < cut:
+                continue
+            sign = 1.0 if f.get("direction") == "long" else -1.0
+            hourly = float(f["rate"]) / 100.0          # %/hr -> fraction per hr
+            out[(t // 3600) * 3600] = sign * hourly * HOURS_PER_PERIOD
         return sorted(out.items())
     except Exception as e:  # noqa: BLE001
-        log.warning("HL backfill %s failed: %s", coin, e)
+        log.warning("lighter backfill market %s failed: %s", market_id, e)
         return []
 
 
@@ -201,12 +255,19 @@ def main():
     log.info("=" * 64)
 
     # ---- warm boot: make the ranking possible from loop one ----------------
+    # [2026-07-17] Backfill is LIGHTER'S OWN settled series now, not HL's. A
+    # coin Lighter does not list gets NO backfill (bf=[]) instead of 78 rows of
+    # a foreign venue's funding — those coins are filtered by ctx.supports()
+    # below anyway, so the window loses nothing it was entitled to.
     now_s = time.time()
+    mids = lighter_market_ids()
     for coin in COINS:
         have = fund_hist.get(coin) or []
         cov = sum(1 for t, _ in have if t >= now_s - LOOKBACK_H * 3600)
         if cov < MIN_COVERAGE:
-            bf = hl_backfill(coin, LOOKBACK_H + 6)
+            sym, _ = to_lighter(coin)
+            mid = mids.get(sym)
+            bf = lighter_backfill(mid, LOOKBACK_H + 6) if mid is not None else []
             seen = {int(t) for t, _ in have}
             merged = have + [[t, r] for t, r in bf if t not in seen]
             merged.sort()
