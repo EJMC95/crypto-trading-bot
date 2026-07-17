@@ -302,6 +302,38 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **BORN-DARK GUARD (17-Jul, after THREE incidents: `fleet_bus` 15-Jul,
+  `event_sentinel` 16-Jul, `brain_stats` 17-Jul).** Adding a module, an
+  import to shipped code, or a COPY means running
+  `python3 scripts/audit_image_imports.py` before you ship. It reconstructs
+  each image's real file set (multi-source COPY, `COPY venues/`, `COPY . .`)
+  and walks the imports of every python file in it — **including inside
+  COPY'd packages** (`venues/`, `user_data/strategies/`, where the
+  real-money surface lives) — plus every run path (CMD, any COPY'd `*.sh`,
+  and railway*.toml `startCommand`). Verified against all three incidents.
+  Why it matters: each was SILENT, because a `try/except ImportError` guard
+  — correct for optional organs — turns a missing file into a degraded
+  fallback instead of a crash. **A deliberate omission is DECLARED in
+  `BORN_DARK_OK` with a reason; silence is not an option.** Runtime
+  backstop: `fleet_immune` pages when `brain-vitals` reports engine=v2
+  without a deliberate `BRAIN_MULT_ENGINE=v2` (both parse that env
+  identically — they must, or a typo'd kill switch silences the detector).
+  NOT wired into CI (the PAT lacks workflow scope — see
+  [[push-straight-to-main]]); adding it to `changelog-check.yml` via the
+  GitHub web editor is the standing follow-up, because a guard that relies
+  on remembering is the control that already failed three times.
+  **Verify a NEW module by its OWN published output, never by "it shipped"**
+  — and never from git (see [[railway-cli-frozen-services]]: marker-grep the
+  RUNNING container).
+- **FLEET_RISK_MODE=advisory is SENIOR and now releases BOTH actuators
+  (17-Jul).** It was documented as "every consumer goes neutral" but only the
+  long-budget veto consumers ever checked mode — the 7d drawdown governor's
+  `clip_scale` kept biting through a thrown kill switch. `fleet_risk` now
+  publishes `clip_scale=1.0` in advisory mode (raw value kept as
+  `clip_scale_raw`). Deliberate scope expansion of a documented contract:
+  throwing the switch to stop the veto ALSO restores full clip size. Inert by
+  default (mode=enforce) and it reaches only shadow consumers (family/taker);
+  the live bots size off the separate `live.clip_scale` lever.
 - **Operator timezone: Australia/Sydney — ALWAYS give Eamon Sydney-local
   times** (corrected 15-Jul evening; the earlier "AEST" note was recorded too
   narrowly). Sydney runs AEST (UTC+10) in winter and AEDT (UTC+11) during

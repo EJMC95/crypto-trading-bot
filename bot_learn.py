@@ -95,18 +95,36 @@ MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
 # and BRAIN_MULT_ENGINE=v2 flips back without a code change.
 try:
     import brain_stats as bstats
-except Exception:
+    _BSTATS_ERR = None
+except Exception as _e:  # noqa: BLE001
     bstats = None
-MULT_ENGINE = os.environ.get("BRAIN_MULT_ENGINE", "v3") if bstats else "v2"
+    _BSTATS_ERR = repr(_e)          # WHY it failed — missing file vs broken file
+# [2026-07-17] The operator's INTENT, normalized. fleet_immune's born-dark
+# detector parses this env the SAME way (.strip().lower()) — the two MUST
+# agree or a case-typo'd kill switch silences the detector. Previously this
+# was a raw `!= "v2"` compare here vs .strip().lower() there.
+_ENGINE_INTENT = os.environ.get("BRAIN_MULT_ENGINE", "").strip().lower()
+MULT_ENGINE = (_ENGINE_INTENT or "v3") if bstats else "v2"
 # [2026-07-17 IMB-29b] the fallback must be LOUD: a checkout missing
 # brain_stats silently ran frozen v2 rules (era-lifetime anchors, no decay,
-# no EB pooling) while everything downstream assumed v3 — say so every run.
-if bstats is None and os.environ.get("BRAIN_MULT_ENGINE", "") != "v2":
-    print("[bot_learn] WARNING: brain_stats.py NOT importable — SILENT v2 "
-          "fallback engaged (frozen rules, lifetime anchors). If this run "
-          "did not set BRAIN_MULT_ENGINE=v2 deliberately, the deploy is "
-          "missing a file.", flush=True)
+# no EB pooling) for a DAY while everything downstream assumed v3 (the
+# 17-Jul born-dark postmortem). Report the REAL error — "missing from the
+# image" and "present but raises on import" need different fixes, and the
+# old message asserted the former. Detection also lives in fleet_immune
+# (brain-vitals engine=v2 without a deliberate kill switch -> phone) and
+# prevention in scripts/audit_image_imports.py.
+if bstats is None and _ENGINE_INTENT != "v2":
+    print(f"[bot_learn] WARNING: brain_stats unimportable ({_BSTATS_ERR}) — "
+          f"SILENT v2 fallback engaged (frozen rules, lifetime anchors, no "
+          f"episode grading). BRAIN_MULT_ENGINE was not set to v2, so this "
+          f"is NOT deliberate: check the image's COPY list.", flush=True)
 if MULT_ENGINE not in ("v2", "v3"):
+    # An unrecognized value used to be coerced to v3 SILENTLY — so
+    # BRAIN_MULT_ENGINE=V2 (or a typo) meant the operator threw the kill
+    # switch and nothing happened, with no signal anywhere. Say so.
+    print(f"[bot_learn] WARNING: BRAIN_MULT_ENGINE={_ENGINE_INTENT!r} is not "
+          f"'v2' or 'v3' — IGNORING it and running v3. If you meant to throw "
+          f"the kill switch, it is NOT thrown.", flush=True)
     MULT_ENGINE = "v3"
 HALF_LIFE_DAYS = float(os.environ.get("BRAIN_HALF_LIFE_DAYS", "14"))
 VITALS_KEY = "brain-vitals"

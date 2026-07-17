@@ -282,6 +282,34 @@ def organ_invariants(states, now):
         if ph is not None and ph not in ("idle", "running", "promoted"):
             sick("xp-judge", f"unknown phase {ph!r}")
 
+    # [2026-07-17 BORN-DARK DETECTOR] an organ silently running a DEGRADED
+    # FALLBACK nobody asked for. The brain shipped its v3 engine on 16-Jul
+    # and ran FROZEN v2 in production for a day: brain_stats.py was never
+    # COPY'd into the image, so bot_learn's `try: import brain_stats /
+    # except: bstats = None` guard swallowed it. Nothing crashed — the
+    # import guard is what made it silent, which is exactly the alive-but-
+    # sick class this organ exists for. The env is the operator's INTENT;
+    # the payload is the REALITY; a mismatch is sickness.
+    # (Repo-side prevention: scripts/audit_image_imports.py.)
+    bv = states.get("brain-vitals") or {}
+    if _fresh(bv, now):
+        eng = bv.get("engine")
+        # Same normalization bot_learn uses for _ENGINE_INTENT — the two MUST
+        # agree, or a case-typo'd kill switch ("V2") makes the brain warn
+        # "not deliberate" while this detector stays silent. Premise: both
+        # modules run in the SAME container (Dockerfile.freqtrade/run_all.sh),
+        # so this env IS the brain's env. If fleet_immune ever moves to
+        # another service, that premise breaks and this rule must move too.
+        want = os.environ.get("BRAIN_MULT_ENGINE", "").strip().lower()
+        if eng == "v2" and want != "v2":
+            sick("brain-vitals",
+                 "engine=v2 but BRAIN_MULT_ENGINE was not set to v2 — the "
+                 "brain is silently running its FROZEN fallback (brain_stats "
+                 "missing/unimportable in the image?). Stake mults, lens "
+                 "grades and priors are NOT the v3 engine the fleet assumes")
+        if eng is not None and eng not in ("v2", "v3"):
+            sick("brain-vitals", f"unknown engine {eng!r}")
+
     # [2026-07-16] 🦾 proprioception: impossible episodes / unknown verdicts
     # would mislead the tuner's hurting-skip and the board's outcome items
     pr = states.get("fleet-proprioception") or {}
@@ -356,7 +384,8 @@ def run_once():
     # one batched beat instead of five round-trips (fail-safe: batch {} on
     # DB failure -> every organ reads as absent, same as load_state failing)
     _keys = ("lighter-market", "brain-lens-forward", "gapscout-census",
-             "xp-judge", "fleet-tuning", "fleet-proprioception")
+             "xp-judge", "fleet-tuning", "fleet-proprioception",
+             "brain-vitals")     # [2026-07-17] born-dark detector, see above
     _batch = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     states = {k: (_batch.get(k) or store.load_state(k) or {}) for k in _keys} \
         if not _batch else {k: (_batch.get(k) or {}) for k in _keys}
@@ -510,6 +539,36 @@ def _selftest():
     assert organs == {"lighter-market", "brain-lens-forward",
                       "gapscout-census", "xp-judge",
                       "fleet-proprioception"}, organs
+
+    # [2026-07-17 BORN-DARK DETECTOR] engine=v2 without the operator asking
+    # for v2 is sickness (the 17-Jul brain_stats postmortem: a missing COPY
+    # + a guarded import ran the frozen engine silently for a day). The env
+    # is INTENT; the payload is REALITY; a mismatch pages.
+    _saved_eng = os.environ.pop("BRAIN_MULT_ENGINE", None)
+    try:
+        _bv = {"brain-vitals": {"updated": _iso(now), "ttl_sec": 26000,
+                                "engine": "v2"}}
+        _f = organ_invariants(_bv, now)
+        assert len(_f) == 1 and _f[0]["organ"] == "brain-vitals" \
+            and "FROZEN fallback" in _f[0]["detail"], _f
+        # v3 is healthy; an unknown engine is its own sickness
+        assert organ_invariants(
+            {"brain-vitals": dict(_bv["brain-vitals"], engine="v3")}, now) == []
+        _u = organ_invariants(
+            {"brain-vitals": dict(_bv["brain-vitals"], engine="v9")}, now)
+        assert len(_u) == 1 and "unknown engine" in _u[0]["detail"], _u
+        # a DELIBERATE v2 (operator threw the kill switch) is NOT sickness
+        os.environ["BRAIN_MULT_ENGINE"] = "v2"
+        assert organ_invariants(_bv, now) == [], "deliberate v2 must not page"
+        # a STALE vitals payload is the watchdog's job, not sickness
+        os.environ.pop("BRAIN_MULT_ENGINE", None)
+        assert organ_invariants(
+            {"brain-vitals": {"updated": "2020-01-01T00:00:00+00:00",
+                              "ttl_sec": 900, "engine": "v2"}}, now) == []
+    finally:
+        os.environ.pop("BRAIN_MULT_ENGINE", None)
+        if _saved_eng is not None:
+            os.environ["BRAIN_MULT_ENGINE"] = _saved_eng
     prio = [i["detail"] for i in inv if i["organ"] == "fleet-proprioception"]
     assert len(prio) == 2 and any("end < start" in d for d in prio) \
         and any("banana" in d for d in prio), prio
