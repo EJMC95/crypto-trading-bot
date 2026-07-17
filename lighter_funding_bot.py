@@ -47,6 +47,7 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 import funding_basis
 from venues import marks, venue_context
+from venues.safety import open_notional
 
 BOT = "perps-funding-lighter"
 # [2026-07-17 BASIS FIX — behaviour-NEUTRAL, see funding_basis.py]
@@ -457,35 +458,13 @@ def scan_candidates(ctx, prelim, order_usd, log):
             for _, c, f, apr, is_short, bm, ev in finalists]
 
 
-def _open_notional(pos, meta, open_now, order_usd):
-    """[2026-07-15 AUDIT FIX v2] REAL deployed notional of open positions:
-    each HELD position at its OWN entry clip (meta['clip'], or size*entry as a
-    fallback), plus this loop's new opens at the current clip. The old
-    `open_now * order_usd` estimate under-counts whenever the growth rail moved
-    the clip mid-session — a live.clip_scale DOWN-scale shrinks order_usd,
-    which RAISES max_open=floor(cap/clip) and, with held positions still sized
-    at the larger clip, could let a new entry breach the operator's hard
-    notional cap. Pure — unit-checked in _selftest_notional()."""
-    held, n = 0.0, 0
-    for c, v in (pos or {}).items():
-        sz = v.get("size") if isinstance(v, dict) else v
-        if not sz:
-            continue
-        n += 1
-        mc = meta.get(c) or {}
-        if mc.get("clip"):
-            held += float(mc["clip"])
-        elif mc.get("entry"):
-            held += abs(float(sz)) * float(mc["entry"])
-        else:
-            # [2026-07-16 AUDIT] untracked position (meta lost): price it at
-            # the VENUE's own entry notional, not the current (possibly
-            # down-scaled) clip — order_usd here understates a position opened
-            # at a larger clip and re-opens the cap-breach window this
-            # function exists to close.
-            _ven = (v.get("entry") if isinstance(v, dict) else 0) or 0
-            held += (abs(float(sz)) * float(_ven)) or float(order_usd)
-    return held + max(0, int(open_now) - n) * float(order_usd)
+# [2026-07-17] The cap rule now lives on the RAIL that enforces it
+# (venues.safety.open_notional) — this bot and lighter_trend_bot each carried
+# their own code-identical copy, and the Ticket Taker's live path would have
+# been the third. Re-exported under the original private name so every call
+# site and _selftest_notional() below are unchanged: the selftests are the
+# proof this move is behaviour-neutral, not a claim that it is.
+_open_notional = open_notional
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,

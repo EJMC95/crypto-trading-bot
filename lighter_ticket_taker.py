@@ -21,23 +21,37 @@ makes a trade")
 
   UNVALIDATED BY DESIGN (like every new shadow book: Perp Sniper, Snap Back):
   the lens rules cannot be backtested — they need forward data, which is
-  exactly what this book collects. There is NO live path at all: pure paper
-  on public keyless data. Run-once process; run_all.sh loops it every 5 min.
-  Broker state + entry metadata persist in bot_state so redeploys continue
-  the same equity curve.
+  exactly what this book collects. Run-once process; run_all.sh loops it every
+  5 min. Broker state + entry metadata persist in bot_state so redeploys
+  continue the same equity curve.
+
+  THE LIVE PATH EXISTS AND IS REFUSED (see main()). It is built so the switch
+  is one env var WHEN the evidence lands — not a claim that it has.
 
 Usage:
-    python3 lighter_ticket_taker.py            # one management cycle
-    python3 lighter_ticket_taker.py --selftest # offline accounting checks
+    python3 lighter_ticket_taker.py             # one management cycle
+    python3 lighter_ticket_taker.py --selftest  # offline accounting checks
+    python3 lighter_ticket_taker.py --selftest-live
+                                     # drive the LIVE order path end-to-end
+                                     # against a stub venue (no network, no
+                                     # signer, no money) — see _selftest_live()
 """
 import json
 import os
 import sys
+import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import bot_pnl_store as store
+import funding_basis
 from paper_broker import PaperBroker
+# The notional-cap rule lives on the rail that enforces it. Imported at module
+# scope on purpose (not lazily inside the live branch): the born-dark guard
+# reads static imports, and a money rule that only materialises on the live
+# path is a money rule the image audit cannot see. venues/safety.py is
+# dependency-free — no SDK, no network — so this costs the shadow arm nothing.
+from venues.safety import open_notional
 
 # [2026-07-17 LIVE PATH] The taker was PAPER-ONLY BY CONSTRUCTION: PaperBroker
 # modelling its own fills at a flat 4bps, a hardcoded -lshadow row, and no
@@ -55,10 +69,27 @@ from paper_broker import PaperBroker
 #                  with decision-vs-fill slippage. This is the arm that earns a
 #                  go-live, because it is the only one measuring real execution.
 #   lighter_live   REFUSED — see the guard in main(). Divergence is the only
-#                  lens with forward evidence and it has n=6 (~2 fills of
+#                  lens with forward evidence and it has n=7 (~2 fills of
 #                  swing) against a 30-day gate. The path exists so the switch
 #                  is one env var WHEN the evidence lands; it is not a promise
 #                  that it has.
+#
+# [2026-07-17] TT_VENUE KEEPS its default, deliberately — unlike $VENUE on the
+# two real-money bots, which f44e3eb just made MANDATORY ("a default is fine
+# for a preference, never for an IDENTITY that decides whether real money
+# moves"). The rule is the same; the exposure is not. This bot has no service
+# of its own: run_all.sh loops it inside the shared freqtrade-bots container
+# with no env, so a mandatory var would simply kill the shadow arm that is
+# collecting the only evidence a go-live could rest on. And an unset var CANNOT
+# produce a live taker — live requires the literal string "lighter_live", which
+# is explicit by construction, so the lost-var case fails SAFE here rather than
+# silently-live.
+# GO-LIVE PRECONDITION (write it down now, while it is cheap): the live arm
+# must be its OWN Railway service with TT_VENUE set explicitly. The moment a
+# second taker process exists, a lost var on it defaults to lighter_shadow and
+# double-writes `-lshadow` — the exact silent two-writers-one-row failure
+# f44e3eb found on the funding bot. Add the mandatory guard THEN, with the
+# service; it is inert until one exists.
 TT_VENUE = os.environ.get("TT_VENUE", "lighter_shadow").strip() or "lighter_shadow"
 TT_MODES = ("lighter_paper", "lighter_shadow", "lighter_live")
 
@@ -75,6 +106,14 @@ _ROW_SUFFIX = {"lighter_paper": "-lshadow", "lighter_shadow": "-lshadow",
                "lighter_live": "-lighter"}
 BOT_ROW = BOT + _ROW_SUFFIX.get(TT_VENUE, "-lshadow")
 STATE_KEY = "lighter-ticket-taker"
+# [2026-07-17 LIVE PATH] The live arm keeps its OWN state key. STATE_KEY holds
+# a PaperBroker/ShadowBroker snapshot (a local account); a live arm restoring
+# that would inherit the shadow book's equity curve and open positions as if
+# they were its own. Live persists only what a live arm can legitimately
+# remember: the P&L baseline and per-position meta (the max-hold clock, entry
+# clip and lens) — the ACCOUNT itself lives on the venue. Mirrors
+# lighter_funding_bot's `bot_id + ":live"`.
+LIVE_STATE_KEY = STATE_KEY + ":live"
 SCOUT_KEY = "lighter-market"
 API_BASE = os.environ.get("LIGHTER_API_BASE", "https://mainnet.zklighter.elliot.ai")
 
@@ -114,6 +153,11 @@ DIV_GAP_PP = float(os.environ.get("TT_DIV_GAP", "62.5"))
 # above this (bps), the whole venue is dislocated — take NO new entries this
 # cycle (exits keep running). Normal tape prints ~6bps median.
 STRESS_VETO_BPS = float(os.environ.get("TT_STRESS_VETO_BPS", "15"))
+# [2026-07-17 LIVE PATH] Per-bot daily-loss rail, as a FRACTION of the day's
+# starting equity — the strategy-side rail every funded bot carries on top of
+# SafetyRails' absolute fleet rail (LIGHTER_MAX_DAILY_LOSS). Either one firing
+# flattens the book and halts for the rest of the UTC day. Live-only.
+DAILY_LOSS_LIMIT = float(os.environ.get("TT_DAILY_LOSS_LIMIT", "0.05"))
 
 
 # [2026-07-15 GROWTH RAIL] The tuner (lighter_scout_tuner.py) may move the
@@ -272,7 +316,18 @@ def exit_reason(entry, mark, opened, t_now, is_long=True):
 # ---------------------------------------------------------------------------
 
 
-def main():
+def main(_ctx=None):
+    """One management cycle.
+
+    `_ctx` is a TEST-ONLY injection point ({venue, rails, broker}); production
+    calls main() with no args. It bypasses the EVIDENCE refusal below so the
+    live order path can be driven end-to-end offline (--selftest-live). It does
+    NOT bypass SafetyRails: the kill switch and the notional cap stay senior on
+    every path, so an injected REAL client still cannot send an order without a
+    deliberate REAL_MONEY_KILL=DISARMED_I_UNDERSTAND and an explicit cap. The
+    evidence gate and the money gate are different gates — this opens neither
+    for production, and only the first for a test.
+    """
     moved = apply_tuning()
     if moved:
         print(f"[ticket-taker] {iso(now())} growth-rail levers active: {moved}")
@@ -293,19 +348,21 @@ def main():
     # exactly (live on ~2d of shadow; retired as "a lucky ~30d window").
     # This refusal is what makes the live path safe to BUILD before it is
     # earned. Lift it when divergence has the closes — not to fill a vacancy.
-    if TT_VENUE == "lighter_live":
+    live = (TT_VENUE == "lighter_live")
+    dry_run = not live
+    if live and _ctx is None:
         raise SystemExit(
             "lighter-ticket-taker REFUSES lighter_live: divergence is the only "
-            "fillable lens (the brain vetoes the other three) and it has n=6 "
+            "fillable lens (the brain vetoes the other three) and it has n=7 "
             "closes — the fleet's gate is a 30-day record. The live path is "
-            "wired and shadow-verified; it needs EVIDENCE, not permission. "
-            "See the block above.")
+            "BUILT and selftested (--selftest-live); it needs EVIDENCE, not "
+            "permission. See the block above.")
 
-    saved = store.load_state(STATE_KEY) or {}
-    venue = None
-    rails = None
-    live = (TT_VENUE == "lighter_live")
-    if TT_VENUE == "lighter_paper":
+    t_now = now()
+    venue = rails = broker = None
+    if _ctx is not None:
+        venue, rails, broker = _ctx["venue"], _ctx["rails"], _ctx["broker"]
+    elif TT_VENUE == "lighter_paper":
         # legacy: models its own fills at a flat fee. Kept for curve continuity.
         broker = PaperBroker(start_equity=START_EQUITY, fee_bps=4.0)
     else:
@@ -321,30 +378,283 @@ def main():
         # from a real one. shadow -> no signer, ShadowBroker walks the book;
         # live -> signer + market_open/market_close against the venue, and
         # SafetyRails demands an explicit notional cap or refuses to start.
-        # [2026-07-17] Signer wiring is READY for live (with_signer=live) and
-        # SafetyRails is constructed from the real mode, so a live boot demands
-        # an explicit LIGHTER_TICKET_TAKER_MAX_NOTIONAL or refuses. But the
-        # ORDER PATH ITSELF IS NOT BUILT: every call site below assumes a local
-        # broker (broker.pos / .open / .close / .equity / .fees), and live needs
-        # positions read from the VENUE, market_open/market_close, last_fill
-        # reconciliation, an equity guard and a daily-loss rail. Until that
-        # exists, live must construct NOTHING — a None broker would AttributeError
-        # its way through the loop, which is a trap dressed as a fail-safe.
-        # The refusal above is what makes this honest; do not lift it to "see
-        # what happens".
-        venue = LighterClient(net="mainnet", with_signer=live)
+        #
+        # guard_state_key is LIVE-ONLY and load-bearing: LighterClient only
+        # builds an EquityGuard when it has a signer, and vet_account_read()
+        # returns the raw print unvetted when the guard is None. Omitting it
+        # would have run the live arm's daily-loss rail on UNVETTED equity —
+        # the exact 11-Jul failure where one dislocated print tripped the rail
+        # and the flatten sold into the dislocation for a real -5.9%. The
+        # funding bot gets this via venue_context(); this bot builds its client
+        # directly, so it must pass it explicitly.
+        venue = LighterClient(
+            net="mainnet", with_signer=live,
+            guard_state_key=(BOT_ROW + ":eqguard") if live else None)
         rails = SafetyRails(BOT, TT_VENUE)
         rails.assert_can_start()
-        broker = ShadowBroker(BOT_ROW, venue, START_EQUITY)
-    broker.restore_state(saved.get("broker") or {})
+        broker = None if live else ShadowBroker(BOT_ROW, venue, START_EQUITY)
+
+    # State: the paper/shadow arms own a local ACCOUNT (broker snapshot); the
+    # live arm's account lives on the venue and it persists only what it may
+    # legitimately remember — the P&L baseline, the day-start equity and
+    # per-position meta (max-hold clock, entry clip, lens).
+    if dry_run:
+        saved = store.load_state(STATE_KEY) or {}
+        broker.restore_state(saved.get("broker") or {})
+        live_baseline = None
+    else:
+        saved = store.load_state(LIVE_STATE_KEY) or {}
+        live_baseline = saved.get("initial_equity")
     meta = saved.get("meta") or {}          # sym -> {lens, opened, accrued_to}
     stats = saved.get("stats") or {"closed": 0, "wins": 0, "losses": 0}
-    t_now = now()
+    # ShadowBroker's cost is the CROSSED SPREAD, already inside the fill price
+    # (fee_bps=0 — Lighter charges no perp fee). Charging a flat fee on top
+    # would double-count it; the legacy paper arm still models one. LIVE pays
+    # the venue's real fee (zero) and its spread is inside the real fill, so
+    # its modelled fee is zero for the same reason the shadow arm's is.
+    fee_rate = broker.fee if dry_run else 0.0
+
+    def account_value():
+        """Equity. dry_run: the local broker. live: the VENUE, vetted by the
+        EquityGuard (raises VenueError on a dislocated print)."""
+        return broker.equity() if dry_run else venue.account_value()
+
+    def positions():
+        """{sym: {size, entry}} — the funding bot's shape. In LIVE the account
+        is the source of truth, never our memory (the 11-Jul ghost-position
+        lesson: a redeploy wiped an in-memory halt and the bot re-bought 37s
+        after boot)."""
+        if dry_run:
+            return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
+        return venue.positions()
+
+    def _real_fill(sym, is_ask, fallback, leg):
+        """REAL fill price from the venue's own trade tape, or the decision
+        price. is_ask=True when WE sold (opening a SHORT / closing a LONG).
+
+        Extends lighter_funding_bot._real_exit to the OPEN leg too: that bot
+        echoes the decision price on opens, which is the same unmeasurable-fill
+        shape its own 17-Jul telemetry fix called out on closes. Entries here
+        are rare (<=4/cycle), so the extra governed read is cheap and it makes
+        this arm's execution measurable on BOTH legs — which is the entire
+        reason a live arm exists before a go-live.
+
+        Measurement-only: ANY failure falls back to the decision price, so a
+        broken read can never block or unwind an order."""
+        if dry_run:
+            return fallback
+        try:
+            fl = getattr(venue, "last_fill", None)
+            real = fl(sym, is_ask=is_ask, since_ts=time.time() - 180) if fl else None
+        except Exception:  # noqa: BLE001 — never let telemetry break an order
+            real = None
+        if real:
+            print(f"[ticket-taker] {sym} {leg} fill (venue): {real:.6g} "
+                  f"(decision {fallback:.6g})")
+        return real or fallback
+
+    def _slip_bps_of(decision, fill, is_buy):
+        """Signed slippage on ONE order, bps, POSITIVE = worse than the
+        decision price. None when the two are identical, because a fallback to
+        the decision price means we got NO fill read — recording that as 0.0
+        would be indistinguishable from a genuinely perfect fill. The fleet's
+        whole execution blind spot came from an echoed decision price being
+        read as data; a null is honest, a fabricated zero is not."""
+        try:
+            d, f = float(decision), float(fill)
+            if d <= 0 or f <= 0 or d == f:
+                return None
+            return (f / d - 1.0) * 10_000.0 * (1.0 if is_buy else -1.0)
+        except (TypeError, ValueError, ZeroDivisionError):
+            return None
+
+    def _book_close(sym, m, size, entry, exit_px, pnl, reason, decision_px=None):
+        """Ledger + counters + meta pop for ONE close. Shared by the exit pass
+        and _flatten_all so an emergency flatten reconstructs identically to a
+        normal close (the funding bot's rule: forensics must stay consistent
+        with account equity)."""
+        is_long = size > 0
+        drag = float(m.get("funding_paid") or 0.0)   # signed: shorts credit
+        clip_used = float(m.get("clip") or CLIP_USD)
+        fees = 2 * clip_used * fee_rate
+        net = pnl - drag - fees
+        stats["closed"] += 1
+        stats["wins" if net > 0 else "losses"] += 1
+        lens = m.get("lens") or "ticket"
+        side = "long" if is_long else "short"
+        # tag format <side>-<lens>_<exit>: the ledger's reason parser splits
+        # on the FIRST underscore, so the brain's enter_tag becomes
+        # "long-breakout"/"short-divergence" — per-lens grading, not one
+        # blended "long" bucket.
+        store.publish_paper_trade(
+            BOT_ROW, trade_id=f"{sym}-{m.get('opened')}",
+            pnl_abs=round(net, 4),
+            pnl_pct=round(net / clip_used, 6),
+            pair=f"{sym}/USDC",
+            opened_at=m.get("opened"), closed_at=iso(t_now),
+            reason=f"{side}-{lens}_{reason}",
+            # [2026-07-15 AUDIT FIX] provenance: venue + arm on every row —
+            # venue NULL claimed the pre-Gate-0 HL-paper era.
+            venue="lighter", shadow=dry_run)
+        if not dry_run:
+            try:
+                store.publish_venue_order(
+                    BOT_ROW, venue="lighter", shadow=False, coin=sym,
+                    side=("sell" if is_long else "buy"), size=abs(size),
+                    px_decision=decision_px, px_fill=exit_px,
+                    slippage_bps=_slip_bps_of(decision_px, exit_px,
+                                              is_buy=not is_long),
+                    raw={"reason": reason, "lens": lens, "leg": "close"})
+            except Exception:  # noqa: BLE001
+                pass
+        print(f"[ticket-taker] {iso(t_now)} CLOSE {side} {sym} ({lens}) {reason} "
+              f"pnl {pnl:+.2f} funding {-drag:+.3f} net {net:+.2f}")
+        meta.pop(sym, None)
+
+    def _flatten_all(reason):
+        """LIVE emergency flatten (kill switch / daily loss). Reads the VENUE,
+        not meta — an untracked position still holds real risk and must still
+        be closed. Mirrors normal-close bookkeeping via _book_close."""
+        try:
+            live_pos = venue.positions()
+        except Exception as e:  # noqa: BLE001
+            print(f"[ticket-taker] {iso(t_now)} flatten scan failed: {e!r}")
+            return
+        for sym in list(live_pos):
+            size = (live_pos.get(sym) or {}).get("size") or 0.0
+            if not size:
+                continue
+            m = meta.get(sym) or {}
+            is_long = size > 0
+            entry = float((live_pos.get(sym) or {}).get("entry")
+                          or m.get("entry") or 0.0)
+            px = marks.get(sym) or float(m.get("last_mark") or entry)
+            try:
+                venue.market_close(sym)
+            except Exception as e:  # noqa: BLE001
+                print(f"[ticket-taker] {iso(t_now)} flatten {sym}: {e!r}")
+                continue
+            _dpx = px
+            px = _real_fill(sym, is_ask=is_long, fallback=px, leg="exit")
+            pnl = abs(size) * ((px - entry) if is_long else (entry - px))
+            _book_close(sym, m, size, entry, px, pnl, reason, decision_px=_dpx)
+
+    # ---- LIVE RAILS (loop-top order mirrors lighter_funding_bot) -----------
+    # This bot is a RUN-ONCE process (run_all.sh loops it every 5 min), so
+    # everything the funding bot keeps in memory across its `while True` must
+    # be DURABLE here or it resets every cycle: the day-start equity baseline
+    # and the halt. A memory-only halt is exactly the 11-Jul incident — the
+    # redeploy wiped it and the bot re-bought 37 seconds after boot.
+    cur_day = t_now.date().isoformat()
+    halted_today = False
+    day_start_equity = None
+    if live:
+        _halt = store.load_daily_halt(BOT_ROW, cur_day)
+        if _halt:
+            halted_today = True
+            day_start_equity = _halt.get("day_start_equity")
+            print(f"[ticket-taker] {iso(t_now)} daily-loss halt restored from "
+                  f"state — halted for the rest of {cur_day}")
+        else:
+            _ds = saved.get("day_start") or {}
+            if _ds.get("day") == cur_day:
+                day_start_equity = _ds.get("equity")
+
+        # kill switch FIRST — checked every cycle, not once at boot.
+        if rails.kill_check():
+            print(f"[ticket-taker] {iso(t_now)} REAL_MONEY_KILL armed — "
+                  f"flatten + halt.")
+            halted_today = True
+            _flatten_all("kill_switch")
+
+    try:
+        equity = account_value()
+    except Exception as e:  # noqa: BLE001 — guard rejected, or venue down
+        print(f"[ticket-taker] {iso(t_now)} account value unavailable: {e!r}")
+        equity = None
+
+    if live:
+        if day_start_equity is None and equity is not None:
+            # [2026-07-11 LATE BASELINE] if the boot/day-roll capture failed
+            # (venue down, or the guard vetoed a dislocated print) the rail
+            # used to stay OFF all day. Adopt the first credible read instead.
+            day_start_equity = equity
+            print(f"[ticket-taker] {iso(t_now)} day-start equity for {cur_day}: "
+                  f"{equity:.2f}")
+        _fleet_loss = rails.daily_loss_hit(day_start_equity, equity)
+        if (not halted_today and equity is not None and day_start_equity
+                and (equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT)
+                     or _fleet_loss)):
+            # [2026-07-11 RAIL DEBOUNCE] one dislocated equity print sold the
+            # book into the dislocation (-5.9% real). Confirm on a second read
+            # (shared SafetyRails.confirm_daily_loss — FAIL-SAFE: an unreadable
+            # confirm counts as CONFIRMED). Adopt the fresher read either way
+            # so a phantom print can't leak into published equity or the
+            # persisted baseline.
+            _confirmed, equity = rails.confirm_daily_loss(
+                day_start_equity, equity, DAILY_LOSS_LIMIT, account_value)
+            if _confirmed:
+                print(f"[ticket-taker] {iso(t_now)} DAILY LOSS LIMIT HIT "
+                      f"({equity:.2f} vs day start {day_start_equity:.2f}) — "
+                      f"flatten + halt.")
+                halted_today = True
+                store.save_daily_halt(BOT_ROW, cur_day, day_start_equity)
+                _flatten_all("daily_loss")
+
+        if halted_today:
+            # [2026-07-16 AUDIT FIX] retry the flatten every halted cycle — it
+            # used to run once at the halt transition, so a single failed close
+            # (rate-limit storm, venue blip) left that position with NO stop
+            # until the day rolled. Idempotent once flat; skip when the kill
+            # switch already flattened this same cycle.
+            if not rails.kill_check():
+                _flatten_all("daily_loss")
+            store.save_state(LIVE_STATE_KEY, {
+                "initial_equity": live_baseline, "meta": meta, "stats": stats,
+                "day_start": {"day": cur_day, "equity": day_start_equity}})
+            # Report what the VENUE actually holds, not 0. A flatten can fail
+            # (rate-limit storm, venue blip) and publishing open_trades=0 while
+            # real positions are still open would make the retry-every-cycle
+            # rail above invisible — a green row over an unstopped book is the
+            # convergent-metric trap the perp sniper already walked into.
+            try:
+                _still = len(venue.positions())
+            except Exception:  # noqa: BLE001
+                _still = None
+            store.publish(
+                BOT_ROW, status="halted", equity=equity,
+                pnl_abs=((equity - live_baseline)
+                         if (equity is not None and live_baseline is not None)
+                         else None),
+                open_trades=_still, closed_trades=stats["closed"],
+                wins=stats["wins"], losses=stats["losses"],
+                extra={"venue": TT_VENUE, "strategy": "scout tickets (live)",
+                       "halted": True, "day": cur_day,
+                       "flatten_incomplete": bool(_still)})
+            print(f"[ticket-taker] {iso(t_now)} halted for {cur_day}; no entries"
+                  f"{f'; {_still} STILL OPEN — flatten incomplete' if _still else ''}.")
+            return
+
+    try:
+        pos = positions()
+    except Exception as e:  # noqa: BLE001
+        # [2026-07-17] LIVE: never act on a phantom-empty position set. An
+        # unreadable venue would zero BOTH the MAX_OPEN slot count and the
+        # notional cap's input (open_notional sums what's in `pos`), so the
+        # entry pass below would happily open a full book ON TOP of positions
+        # that already exist — the cap breach the rail exists to prevent,
+        # reached by believing our own blindness. The funding bot skips its
+        # loop for exactly this reason; this is a run-once process, so
+        # skipping the cycle IS the loop-skip.
+        print(f"[ticket-taker] {iso(t_now)} positions unreadable ({e!r}) — "
+              f"skipping cycle (no entries, no exits)")
+        store.heartbeat(BOT_ROW)
+        return
 
     # 1) mark + hourly funding drag on held positions (longs pay positive rate)
-    for sym in list(broker.pos):
+    for sym in list(pos):
         mark = marks.get(sym)
-        if mark:
+        if mark and dry_run:
             broker.mark(sym, mark)
         m = meta.get(sym) or {}
         try:
@@ -354,25 +664,48 @@ def main():
             hours = 0.0
         rate = funding.get(sym)
         if hours > 0 and rate and mark:
-            size, _entry = broker.pos[sym]
+            size = pos[sym]["size"]
             # SIGNED accrual: a long pays a positive rate (drag > 0), a short
             # RECEIVES it (drag < 0 = credit) — the divergence lens's whole
             # thesis is collecting that credit.
-            drag = size * mark * rate * hours
-            broker.fees += drag
+            #
+            # [2026-07-17 BASIS FIX] This read Lighter's quote as HOURLY and
+            # accrued `rate * hours` = 8x TRUE (Lighter quotes per 8h). The
+            # THIRD accruing book to carry this bug — 93be95e fixed
+            # Counterweight and the family bot and called the set complete;
+            # this one models its carry inline rather than via funding_basis,
+            # so a grep for the fixed call site could not see it.
+            # It lands exactly where it hurts most: DIVERGENCE is the only
+            # lens with a positive forward grade and the only one that
+            # COLLECTS carry, so the inflated credit flattered the one number
+            # that could earn this bot a go-live. Same shape as Counterweight,
+            # whose entire reported profit was this artifact.
+            # LIVE note: a live arm's real funding is charged by the VENUE and
+            # is already inside account_value(), so it must NOT also hit a
+            # modelled equity — but the accrual still reaches the per-trade
+            # ledger and the win/loss call, which is why it is computed on
+            # both arms and applied to equity on only one.
+            drag = size * mark * funding_basis.to_hourly(rate, "lighter") * hours
+            if dry_run:
+                broker.fees += drag
             m["funding_paid"] = round(float(m.get("funding_paid") or 0.0) + drag, 6)
             m["accrued_to"] = iso(t_now)
             meta[sym] = m
 
     # 2) exits
-    for sym in list(broker.pos):
+    for sym in list(pos):
         mark = marks.get(sym)
         m = meta.get(sym) or {}
         try:
             opened = parse_ts(m.get("opened"))
         except (ValueError, TypeError):
             opened = t_now
-        size, entry = broker.pos[sym]
+        size = pos[sym]["size"]
+        # The VENUE's avg_entry_price is the REAL fill and outranks our
+        # decision price; meta is the fallback for a position the venue
+        # reports without one. In dry_run pos[] IS the broker, so this is the
+        # broker's own entry — one expression, right on both arms.
+        entry = float(pos[sym].get("entry") or m.get("entry") or 0.0)
         is_long = size > 0
         if mark:
             m.pop("no_mark_since", None)     # priceable again — reset the clock
@@ -396,35 +729,24 @@ def main():
             reason = "delisted"
         if not reason:
             continue
-        pnl = broker.close(sym, mark)
-        drag = float(m.get("funding_paid") or 0.0)   # signed: shorts credit
-        clip_used = float(m.get("clip") or CLIP_USD)
-        # ShadowBroker's cost is the CROSSED SPREAD, already inside the fill
-        # price (fee_bps=0 — Lighter charges no perp fee). Charging a flat fee
-        # on top would double-count it; the legacy paper arm still models one.
-        fees = 2 * clip_used * broker.fee
-        net = pnl - drag - fees
-        stats["closed"] += 1
-        stats["wins" if net > 0 else "losses"] += 1
-        lens = m.get("lens") or "ticket"
-        side = "long" if is_long else "short"
-        # tag format <side>-<lens>_<exit>: the ledger's reason parser splits
-        # on the FIRST underscore, so the brain's enter_tag becomes
-        # "long-breakout"/"short-divergence" — per-lens grading, not one
-        # blended "long" bucket.
-        store.publish_paper_trade(
-            BOT_ROW, trade_id=f"{sym}-{m.get('opened')}",
-            pnl_abs=round(net, 4),
-            pnl_pct=round(net / clip_used, 6),
-            pair=f"{sym}/USDC",
-            opened_at=m.get("opened"), closed_at=iso(t_now),
-            reason=f"{side}-{lens}_{reason}",
-            # [2026-07-15 AUDIT FIX] provenance: shadow-only book on Lighter
-            # marks — venue NULL claimed the pre-Gate-0 HL-paper era.
-            venue="lighter", shadow=(TT_VENUE != "lighter_live"))
-        print(f"[ticket-taker] {iso(t_now)} CLOSE {side} {sym} ({lens}) {reason} "
-              f"pnl {pnl:+.2f} funding {-drag:+.3f} net {net:+.2f}")
-        meta.pop(sym, None)
+        if dry_run:
+            pnl = broker.close(sym, mark)
+            _dpx = None
+        else:
+            try:
+                venue.market_close(sym)
+            except Exception as e:  # noqa: BLE001
+                # Leave the position and retry next cycle. Never book a close
+                # that did not happen — a phantom close drops the position from
+                # meta while the venue still holds the risk.
+                print(f"[ticket-taker] {iso(t_now)} close {sym} failed: {e!r} — "
+                      f"leaving position, retry next cycle")
+                continue
+            _dpx = mark                                  # mid at the decision
+            mark = _real_fill(sym, is_ask=is_long, fallback=mark, leg="exit")
+            pnl = abs(size) * ((mark - entry) if is_long else (entry - mark))
+        _book_close(sym, m, size, entry, mark, pnl, reason, decision_px=_dpx)
+        pos.pop(sym, None)
 
     # 3) entries — only from a FRESH scout snapshot, only the incredible subset
     scout = store.load_state(SCOUT_KEY) or {}
@@ -491,10 +813,10 @@ def main():
             if lens in lens_vetoed:
                 continue          # brain graded this lens negative at n>=min_n
             # one NEW position per lens per cycle; never add to a held symbol
-            if (not sym or sym in broker.pos or sym in opened_syms
+            if (not sym or sym in pos or sym in opened_syms
                     or lens in opened_lenses):
                 continue
-            if broker.open_count() >= MAX_OPEN:
+            if len(pos) >= MAX_OPEN:
                 break
             mark = marks.get(sym)
             if not mark:
@@ -503,41 +825,112 @@ def main():
             if is_long and long_budget_full:
                 continue          # L2 veto: fleet long budget is full
             clip = round(vol_clip(ranges.get(sym)) * gov, 2)
-            broker.open(sym, is_long, clip / mark, mark)
+            size = clip / mark
+            ev = {k: t.get(k) for k in ("range_pos", "chg_pct", "vol_m",
+                                        "prem_bps", "apr_pct", "gap_pct")}
+            entry_px = mark
+            if dry_run:
+                broker.open(sym, is_long, size, mark)
+                # ShadowBroker fills by WALKING the book, so the decision price
+                # is NOT the fill — read the entry back instead of assuming it.
+                # PaperBroker.open() also silently no-ops on a bad size/price;
+                # a missing key here means no position was actually taken, and
+                # claiming one in `pos` would strand a phantom in the cap
+                # count and the slot budget.
+                if sym not in broker.pos:
+                    print(f"[ticket-taker] {iso(t_now)} open {sym} rejected by "
+                          f"broker (size {size} @ {mark})")
+                    continue
+                _sz, entry_px = broker.pos[sym]
+                size = abs(_sz)
+            else:
+                # The operator's hard notional cap is SENIOR to every other
+                # sizing input (governor, vol_clip, growth rail) and is checked
+                # against REAL deployed notional at order time — never
+                # count*clip, which breached the cap on 15-Jul once the growth
+                # rail made the clip variable. venues.safety owns this rule.
+                open_ntl = open_notional(pos, meta, len(pos), clip)
+                if not rails.notional_ok(open_ntl, clip):
+                    print(f"[ticket-taker] {iso(t_now)} {sym} NOTIONAL_CAP_SKIP "
+                          f"(deployed ${open_ntl:.2f} + ${clip:.2f} > cap "
+                          f"${rails.max_notional})")
+                    continue
+                size = round(size, 6)
+                try:
+                    venue.market_open(sym, is_long, size)
+                except Exception as e:  # noqa: BLE001
+                    print(f"[ticket-taker] {iso(t_now)} open {sym} failed: {e!r}")
+                    continue
+                entry_px = _real_fill(sym, is_ask=not is_long, fallback=mark,
+                                      leg="entry")
+                try:
+                    store.publish_venue_order(
+                        BOT_ROW, venue="lighter", shadow=False, coin=sym,
+                        side=("buy" if is_long else "sell"), size=size,
+                        px_decision=mark, px_fill=entry_px,
+                        slippage_bps=_slip_bps_of(mark, entry_px, is_buy=is_long),
+                        raw={"lens": lens, "leg": "open", "clip": clip,
+                             "evidence": ev})
+                except Exception:  # noqa: BLE001
+                    pass
+            # visible to the rest of THIS cycle: the cap check above and the
+            # MAX_OPEN slot count must both see what we just opened.
+            pos[sym] = {"size": size if is_long else -size, "entry": entry_px}
             meta[sym] = {"lens": lens, "opened": iso(t_now), "clip": clip,
+                         "entry": entry_px,
                          "accrued_to": iso(t_now), "funding_paid": 0.0,
-                         "evidence": {k: t.get(k) for k in
-                                      ("range_pos", "chg_pct", "vol_m",
-                                       "prem_bps", "apr_pct", "gap_pct")}}
+                         "evidence": ev}
             opened_syms.add(sym)
             opened_lenses.add(lens)
             print(f"[ticket-taker] {iso(t_now)} OPEN "
                   f"{'long' if is_long else 'SHORT'} {sym} ({lens}) "
-                  f"${clip} @ {mark} (range {round(ranges.get(sym) or 0, 1)}%) "
-                  f"evidence={meta[sym]['evidence']}")
+                  f"${clip} @ {entry_px} (range {round(ranges.get(sym) or 0, 1)}%) "
+                  f"evidence={ev}")
 
     # 4) persist + publish
-    equity = broker.equity()
-    store.save_state(STATE_KEY, {"broker": broker.to_state(), "meta": meta,
-                                 "stats": stats})
+    if dry_run:
+        equity = broker.equity()
+        pnl_abs = equity - START_EQUITY
+        pnl_pct = equity / START_EQUITY - 1.0
+        store.save_state(STATE_KEY, {"broker": broker.to_state(), "meta": meta,
+                                     "stats": stats})
+    else:
+        # re-read AFTER trading: the loop-top print fed the rails, this one is
+        # what the row reports. A failed re-read keeps the loop-top value
+        # rather than publishing a hole.
+        try:
+            equity = account_value()
+        except Exception:  # noqa: BLE001
+            pass
+        if live_baseline is None and equity is not None:
+            live_baseline = equity
+        pnl_abs = ((equity - live_baseline)
+                   if (equity is not None and live_baseline is not None) else None)
+        pnl_pct = ((pnl_abs / live_baseline)
+                   if (pnl_abs is not None and live_baseline) else None)
+        store.save_state(LIVE_STATE_KEY, {
+            "initial_equity": live_baseline, "meta": meta, "stats": stats,
+            "day_start": {"day": cur_day, "equity": day_start_equity}})
     store.publish(
         BOT_ROW, status="online",
-        equity=round(equity, 2),
-        pnl_abs=round(equity - START_EQUITY, 2),
-        pnl_pct=round(equity / START_EQUITY - 1.0, 6),
-        open_trades=broker.open_count(),
+        equity=(round(equity, 2) if equity is not None else None),
+        pnl_abs=(round(pnl_abs, 2) if pnl_abs is not None else None),
+        pnl_pct=(round(pnl_pct, 6) if pnl_pct is not None else None),
+        open_trades=len(pos),
         closed_trades=stats["closed"], wins=stats["wins"], losses=stats["losses"],
-        extra={"venue": "lighter_shadow", "strategy": "scout tickets (shadow)",
+        extra={"venue": TT_VENUE,
+               "strategy": f"scout tickets ({'live' if live else 'shadow'})",
                "open_pos": [{"pair": f"{s}/USDC",
-                             "tag": (("long-" if broker.pos[s][0] > 0 else "short-")
+                             "tag": (("long-" if pos[s]["size"] > 0 else "short-")
                                      + (meta.get(s) or {}).get("lens", "ticket"))}
-                            for s in broker.pos],
+                            for s in pos],
                "scout_fresh": fresh, "stress_veto": stressed,
                # the bars actually in force this cycle (growth-rail visible)
                "bars": {lever: globals()[attr] for lever, attr in TUNABLE},
                "tuned": sorted(moved)})
-    print(f"[ticket-taker] {iso(t_now)} equity {equity:+.2f} "
-          f"open {broker.open_count()}/{MAX_OPEN} closed {stats['closed']} "
+    print(f"[ticket-taker] {iso(t_now)} equity "
+          f"{equity if equity is None else round(equity, 2)} "
+          f"open {len(pos)}/{MAX_OPEN} closed {stats['closed']} "
           f"({stats['wins']}W/{stats['losses']}L) scout_fresh={fresh}")
 
 
@@ -600,13 +993,408 @@ def selftest():
     assert delist_due(iso(_t - timedelta(hours=DELIST_GIVEUP_H + 1)), _t) is True
     assert delist_due(iso(_t - timedelta(hours=1)), _t) is False
     assert delist_due("garbage", _t) is False and delist_due(None, _t) is False
+
+    # [2026-07-17 BASIS FIX] Lighter quotes funding per 8h; the old code
+    # accrued `rate * hours` = 8x.
+    #
+    # HONEST SCOPE — this block PINS THE ARITHMETIC, it does NOT detect the
+    # bug. Verified by mutation: re-introduce `rate * hours` in main() and
+    # these assertions still pass, because they exercise funding_basis (which
+    # has its own selftest) rather than the CALL SITE. The accrual is inline
+    # in main()'s loop, so the only real detector is --selftest-live (tests 6
+    # and 9), which drives that loop and caught the mutation immediately.
+    # Left here as the worked example of the true numbers; do not mistake it
+    # for the guard.
+    _true = 1.0 * 100.0 * funding_basis.to_hourly(8e-4, "lighter") * 8.0
+    assert abs(_true - 0.08) < 1e-12, _true
+    assert abs(1.0 * 100.0 * 8e-4 * 8.0 - 0.64) < 1e-12    # what the bug paid
+    assert abs(_true * funding_basis.LIGHTER_LEGACY_APR_FACTOR - 0.64) < 1e-12
+    # a SHORT still gets the credit, and it is the true-sized one
+    _short = -1.0 * 100.0 * funding_basis.to_hourly(8e-4, "lighter") * 8.0
+    assert _short < 0 and abs(_short + 0.08) < 1e-12, _short
+
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
-          "long/short exits, signed funding, constant-risk sizing, "
-          "delist give-up).")
+          "long/short exits, signed funding on the TRUE 8h basis, "
+          "constant-risk sizing, delist give-up).")
+
+
+# ---------------------------------------------------------------------------
+# LIVE ORDER PATH — driven end-to-end against a stub venue.
+#
+# The live branch is REFUSED in production (evidence, not safety), so without
+# this it would be code no one has ever executed — which is how the fleet got
+# a "live-ready" bot that would not have placed a single order (c5924e4). The
+# stub speaks LighterClient's interface and records what it was asked to do;
+# no network, no signer, no money.
+# ---------------------------------------------------------------------------
+
+
+class _StubVenue:
+    """Records orders instead of sending them. Mirrors the LighterClient
+    surface the live path touches: positions / account_value / market_open /
+    market_close / last_fill."""
+
+    def __init__(self, equity=1000.0, pos=None, fills=None):
+        self._equity = equity
+        self._pos = dict(pos or {})
+        self._fills = dict(fills or {})     # sym -> fill px returned by last_fill
+        self.opens, self.closes, self.value_reads = [], [], 0
+        self.fail_close = set()
+
+    def account_value(self):
+        self.value_reads += 1
+        return self._equity
+
+    def positions(self):
+        return {s: dict(v) for s, v in self._pos.items() if v.get("size")}
+
+    def market_open(self, coin, is_long, size):
+        self.opens.append((coin, is_long, size))
+        self._pos[coin] = {"size": size if is_long else -size,
+                           "entry": self._fills.get(coin, 100.0)}
+        return {"tx": "stub"}
+
+    def market_close(self, coin):
+        if coin in self.fail_close:
+            raise RuntimeError(f"stub: close {coin} refused")
+        self.closes.append(coin)
+        self._pos.pop(coin, None)
+        return {"tx": "stub"}
+
+    def last_fill(self, coin, is_ask, since_ts, lookback=10):
+        return self._fills.get(coin)
+
+
+class _StubRails:
+    """SafetyRails' surface, with the real notional_ok/daily_loss_hit rules."""
+
+    def __init__(self, max_notional=None, killed=False, max_daily_loss=30.0):
+        from venues.safety import SafetyRails
+        self.max_notional = max_notional
+        self.max_daily_loss = max_daily_loss
+        self.killed = killed
+        self.live = True
+        self._real = SafetyRails.__new__(SafetyRails)
+        self._real.max_notional = max_notional
+        self._real.max_daily_loss = max_daily_loss
+        self._real.live = True
+        self.confirmed = []
+
+    def kill_check(self):
+        return self.killed
+
+    def notional_ok(self, open_ntl, add_usd):
+        return self._real.notional_ok(open_ntl, add_usd)
+
+    def daily_loss_hit(self, day_start_equity, equity):
+        return self._real.daily_loss_hit(day_start_equity, equity)
+
+    def confirm_daily_loss(self, day_start, first_eq, pct_limit, read_equity):
+        # the REAL one sleeps 60s to debounce; the rule under test here is
+        # "what does the taker do once it IS confirmed", so confirm instantly.
+        self.confirmed.append((day_start, first_eq))
+        return True, first_eq
+
+
+def _selftest_live():
+    """Drive main()'s LIVE branch against the stub. Asserts the properties the
+    order path exists to guarantee — every one of them a rail that has already
+    cost real money somewhere in this fleet."""
+    import types
+    global TT_VENUE, BOT_ROW
+    print("Running Ticket Taker LIVE order-path self-test (stub venue)...\n")
+
+    _saved_env = (TT_VENUE, BOT_ROW)
+    TT_VENUE, BOT_ROW = "lighter_live", BOT + "-lighter"
+
+    # --- capture every side effect instead of hitting Postgres -------------
+    captured = {"paper": [], "orders": [], "state": {}, "halts": [],
+                "published": []}
+    _real = {k: getattr(store, k) for k in
+             ("publish_paper_trade", "publish_venue_order", "save_state",
+              "load_state", "publish", "save_daily_halt", "load_daily_halt",
+              "heartbeat")}
+    store.heartbeat = lambda bot: None
+    store.publish_paper_trade = lambda bot, **kw: captured["paper"].append((bot, kw))
+    store.publish_venue_order = lambda bot, **kw: captured["orders"].append((bot, kw))
+    store.save_state = lambda k, v: captured["state"].__setitem__(k, v)
+    store.load_state = lambda k: captured["state"].get(k)
+    store.publish = lambda bot, **kw: captured["published"].append((bot, kw))
+    store.save_daily_halt = lambda bot, day, eq=None: captured["halts"].append((bot, day, eq))
+    store.load_daily_halt = lambda bot, day: None
+
+    _real_fetch = globals()["fetch_marks_and_funding"]
+
+    def _stub_market(marks=None, funding=None, ranges=None):
+        globals()["fetch_marks_and_funding"] = lambda: (
+            dict(marks or {}), dict(funding or {}), dict(ranges or {}))
+
+    def _scout(tickets):
+        captured["state"][SCOUT_KEY] = {
+            "updated": iso(now()), "ttl_sec": 900, "tickets": tickets,
+            "stress": {"med": 1.0}}
+
+    try:
+        # ================================================================
+        # 1) ENTRY sends a REAL order — not a modelled fill
+        # ================================================================
+        captured["state"].clear()
+        _stub_market(marks={"AAA": 100.0}, funding={}, ranges={"AAA": 6.0})
+        _scout({"divergence": [{"sym": "AAA", "side": "short", "gap_pct": 99.0}]})
+        v = _StubVenue(equity=1000.0, fills={"AAA": 100.5})
+        r = _StubRails(max_notional=150.0)
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert v.opens == [("AAA", False, 0.5)], v.opens        # $50 clip @ 100
+        assert len(captured["orders"]) == 1, captured["orders"]
+        _o = captured["orders"][0][1]
+        assert _o["shadow"] is False and _o["side"] == "sell"
+        # the REAL fill (100.5) is recorded, and selling above the decision
+        # price is NEGATIVE slippage = better than decided
+        assert _o["px_fill"] == 100.5 and _o["px_decision"] == 100.0
+        assert _o["slippage_bps"] < 0, _o["slippage_bps"]
+        # live state is its OWN key, and it never writes a broker snapshot
+        assert LIVE_STATE_KEY in captured["state"]
+        assert STATE_KEY not in captured["state"]
+        assert "broker" not in captured["state"][LIVE_STATE_KEY]
+        # entry recorded at the REAL fill, not the decision price
+        assert captured["state"][LIVE_STATE_KEY]["meta"]["AAA"]["entry"] == 100.5
+
+        # ================================================================
+        # 2) NOTIONAL CAP is senior — the cap-breaching entry never sends
+        # ================================================================
+        captured["state"].clear()
+        captured["orders"].clear()
+        _stub_market(marks={"BBB": 100.0}, funding={}, ranges={"BBB": 6.0})
+        _scout({"divergence": [{"sym": "BBB", "side": "short", "gap_pct": 99.0}]})
+        # $120 already deployed at its own clip, cap $150, this clip is $50
+        v = _StubVenue(equity=1000.0, pos={"HELD": {"size": 1.0, "entry": 120.0}})
+        r = _StubRails(max_notional=150.0)
+        captured["state"][LIVE_STATE_KEY] = {
+            "initial_equity": 1000.0, "meta": {"HELD": {"clip": 120.0,
+                                                        "lens": "divergence"}},
+            "stats": {"closed": 0, "wins": 0, "losses": 0}}
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert v.opens == [], f"cap breach: {v.opens}"
+        assert captured["orders"] == []
+
+        # ================================================================
+        # 3) KILL SWITCH flattens the venue's book and halts — no entries
+        # ================================================================
+        captured["state"].clear()
+        captured["paper"].clear()
+        _stub_market(marks={"CCC": 100.0}, funding={}, ranges={"CCC": 6.0})
+        _scout({"divergence": [{"sym": "CCC", "side": "short", "gap_pct": 99.0}]})
+        v = _StubVenue(equity=1000.0, pos={"ZZZ": {"size": 1.0, "entry": 90.0}},
+                       fills={"ZZZ": 95.0})
+        r = _StubRails(max_notional=150.0, killed=True)
+        captured["state"][LIVE_STATE_KEY] = {
+            "initial_equity": 1000.0,
+            "meta": {"ZZZ": {"clip": 90.0, "lens": "divergence",
+                             "opened": iso(now()), "funding_paid": 0.0}},
+            "stats": {"closed": 0, "wins": 0, "losses": 0}}
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert v.closes == ["ZZZ"], v.closes
+        assert v.opens == [], "halted bot must not enter"
+        assert len(captured["paper"]) == 1, captured["paper"]
+        # the flatten books the ledger row like a normal close: a long closed
+        # at 95 from entry 90 = +5
+        _p = captured["paper"][0][1]
+        assert _p["reason"] == "long-divergence_kill_switch", _p["reason"]
+        assert abs(_p["pnl_abs"] - 5.0) < 1e-9, _p["pnl_abs"]
+        assert _p["shadow"] is False
+        assert captured["published"][-1][1]["status"] == "halted"
+
+        # ================================================================
+        # 4) DAILY LOSS flattens + halts DURABLY (survives the next cycle)
+        # ================================================================
+        captured["state"].clear()
+        captured["halts"].clear()
+        _stub_market(marks={"DDD": 100.0}, funding={}, ranges={"DDD": 6.0})
+        _scout({"divergence": [{"sym": "DDD", "side": "short", "gap_pct": 99.0}]})
+        v = _StubVenue(equity=940.0, pos={"YYY": {"size": 1.0, "entry": 90.0}},
+                       fills={"YYY": 90.0})
+        r = _StubRails(max_notional=150.0)
+        captured["state"][LIVE_STATE_KEY] = {
+            "initial_equity": 1000.0,
+            "meta": {"YYY": {"clip": 90.0, "lens": "divergence",
+                             "opened": iso(now()), "funding_paid": 0.0}},
+            "stats": {"closed": 0, "wins": 0, "losses": 0},
+            "day_start": {"day": now().date().isoformat(), "equity": 1000.0}}
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert r.confirmed, "a loss breach must be CONFIRMED before flattening"
+        assert v.closes == ["YYY"], v.closes
+        assert v.opens == []
+        assert captured["halts"] and captured["halts"][0][0] == BOT_ROW
+        # ... and the halt is durable: replay with load_daily_halt returning it
+        store.load_daily_halt = lambda bot, day: {"halted_date": day,
+                                                  "day_start_equity": 1000.0}
+        v2 = _StubVenue(equity=940.0)
+        r2 = _StubRails(max_notional=150.0)
+        main(_ctx={"venue": v2, "rails": r2, "broker": None})
+        assert v2.opens == [], "a restored halt must still block entries"
+        store.load_daily_halt = lambda bot, day: None
+
+        # ================================================================
+        # 5) A FAILED CLOSE never books a phantom exit
+        # ================================================================
+        captured["state"].clear()
+        captured["paper"].clear()
+        _stub_market(marks={"EEE": 200.0}, funding={}, ranges={})
+        _scout({})
+        v = _StubVenue(equity=1000.0, pos={"EEE": {"size": 1.0, "entry": 100.0}})
+        v.fail_close.add("EEE")                     # +100% -> TP, but close fails
+        r = _StubRails(max_notional=150.0)
+        captured["state"][LIVE_STATE_KEY] = {
+            "initial_equity": 1000.0,
+            "meta": {"EEE": {"clip": 100.0, "lens": "breakout",
+                             "opened": iso(now()), "funding_paid": 0.0}},
+            "stats": {"closed": 0, "wins": 0, "losses": 0}}
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert captured["paper"] == [], "a failed close must not book a row"
+        assert "EEE" in captured["state"][LIVE_STATE_KEY]["meta"], \
+            "a failed close must KEEP the position — the venue still holds it"
+
+        # ================================================================
+        # 6) LIVE funding is the VENUE's — it must not hit modelled equity,
+        #    but it must still reach the ledger and the win/loss call
+        # ================================================================
+        captured["state"].clear()
+        captured["paper"].clear()
+        _stub_market(marks={"FFF": 104.0}, funding={"FFF": 8e-4}, ranges={})
+        _scout({})
+        v = _StubVenue(equity=1234.56, pos={"FFF": {"size": 1.0, "entry": 100.0}},
+                       fills={"FFF": 104.0})
+        r = _StubRails(max_notional=150.0)
+        _opened = iso(now() - timedelta(hours=8))
+        captured["state"][LIVE_STATE_KEY] = {
+            "initial_equity": 1000.0,
+            "meta": {"FFF": {"clip": 100.0, "lens": "breakout",
+                             "opened": _opened, "accrued_to": _opened,
+                             "funding_paid": 0.0}},
+            "stats": {"closed": 0, "wins": 0, "losses": 0}}
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert len(captured["paper"]) == 1, captured["paper"]
+        _p = captured["paper"][0][1]
+        # price +4 on a long; funding on the TRUE 8h basis = 1*104*1e-4*8 = 0.0832
+        # (the 8x bug would have charged 0.6656). net = 4 - 0.0832 - 0 (no fee).
+        assert abs(_p["pnl_abs"] - (4.0 - 0.0832)) < 1e-4, _p["pnl_abs"]
+        # published equity is the VENUE's, never a modelled one
+        _pub = captured["published"][-1][1]
+        assert _pub["equity"] == 1234.56, _pub["equity"]
+        assert abs(_pub["pnl_abs"] - 234.56) < 1e-9, _pub["pnl_abs"]
+
+        # ================================================================
+        # 7) UNREADABLE positions must SKIP the cycle — never trade blind.
+        #    The negative fixture that matters: a phantom-empty set zeroes
+        #    both the slot count and the cap's input, so "no positions" would
+        #    read as "full book available" on top of real open risk.
+        # ================================================================
+        captured["state"].clear()
+        _stub_market(marks={"GGG": 100.0}, funding={}, ranges={"GGG": 6.0})
+        _scout({"divergence": [{"sym": "GGG", "side": "short", "gap_pct": 99.0}]})
+
+        class _BlindVenue(_StubVenue):
+            def positions(self):
+                raise RuntimeError("stub: venue unreadable")
+
+        v = _BlindVenue(equity=1000.0)
+        r = _StubRails(max_notional=150.0)
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert v.opens == [], f"traded blind: {v.opens}"
+
+        # ================================================================
+        # 8) A FAILED FLATTEN must not publish open_trades=0. The halted row
+        #    has to show the book it could not close, or the retry rail above
+        #    is invisible behind a green-looking row.
+        # ================================================================
+        captured["state"].clear()
+        captured["published"].clear()
+        _stub_market(marks={"HHH": 100.0}, funding={}, ranges={})
+        _scout({})
+        v = _StubVenue(equity=1000.0, pos={"HHH": {"size": 1.0, "entry": 100.0}})
+        v.fail_close.add("HHH")
+        r = _StubRails(max_notional=150.0, killed=True)   # kill -> flatten fails
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        _pub = captured["published"][-1][1]
+        assert _pub["status"] == "halted"
+        assert _pub["open_trades"] == 1, \
+            f"a failed flatten must report the open book, got {_pub['open_trades']}"
+        assert _pub["extra"]["flatten_incomplete"] is True
+
+        # ================================================================
+        # 9) THE SHADOW ARM MUST NOT REGRESS. It is DEPLOYED and it is
+        #    collecting the only evidence a go-live could ever rest on;
+        #    breaking it mid-flight costs exactly what we are waiting for.
+        #    The live refactor moved every call site in this loop off
+        #    broker.pos, so drive the dry_run path end-to-end too.
+        # ================================================================
+        TT_VENUE, BOT_ROW = "lighter_shadow", BOT + "-lshadow"
+        captured["state"].clear()
+        captured["paper"].clear()
+        captured["published"].clear()
+        _stub_market(marks={"III": 104.0}, funding={"III": 8e-4},
+                     ranges={"III": 6.0})
+        _scout({"divergence": [{"sym": "III", "side": "short", "gap_pct": 99.0}]})
+        b = PaperBroker(start_equity=1000.0, fee_bps=4.0)
+        _opened = iso(now() - timedelta(hours=8))
+        b.open("III", True, 1.0, 100.0)          # held long, +4% -> TP
+        captured["state"][STATE_KEY] = {
+            "broker": b.to_state(),
+            "meta": {"III": {"clip": 100.0, "lens": "breakout",
+                             "opened": _opened, "accrued_to": _opened,
+                             "funding_paid": 0.0}},
+            "stats": {"closed": 0, "wins": 0, "losses": 0}}
+        b2 = PaperBroker(start_equity=1000.0, fee_bps=4.0)
+        main(_ctx={"venue": None, "rails": None, "broker": b2})
+        # closed through the BROKER, and the shadow arm writes the shadow row
+        assert len(captured["paper"]) == 1, captured["paper"]
+        _p = captured["paper"][0][1]
+        assert _p["shadow"] is True and _p["reason"] == "long-breakout_tp"
+        # funding on the TRUE 8h basis reaches the ledger AND the equity here
+        # (a shadow book has no venue charging it): 1*104*1e-4*8 = 0.0832
+        # price +4, fees 2*100*0.0004 = 0.08  ->  net = 4 - 0.0832 - 0.08
+        assert abs(_p["pnl_abs"] - (4.0 - 0.0832 - 0.08)) < 1e-4, _p["pnl_abs"]
+        # shadow persists a BROKER snapshot under its own key, never the live one
+        assert STATE_KEY in captured["state"] and LIVE_STATE_KEY not in captured["state"]
+        assert "broker" in captured["state"][STATE_KEY]
+        # equity is the broker's, and the drag landed in it. Leg by leg, the
+        # broker charges on ACTUAL notional at each leg (not the ledger's
+        # modelled 2*clip*fee above — a pre-existing, deliberate difference):
+        #   0.0400  restored entry fee on the held long (1 @ 100)
+        # + 0.0832  funding, TRUE 8h basis (1 * 104 * 1e-4 * 8)
+        # + 0.0416  close fee at the EXIT price 104, not the entry
+        # + 0.0200  entry fee on the new divergence short (50/104 @ 104)
+        _pub = captured["published"][-1][1]
+        assert _pub["extra"]["venue"] == "lighter_shadow"
+        assert abs(b2.fees - 0.1848) < 1e-4, b2.fees
+        # THE basis detector: with the 8x bug the funding leg alone was 0.6656
+        # and this total would be 0.7672. This assertion is what fails if
+        # anyone ever routes this accrual around funding_basis again.
+        assert abs(b2.fees - 0.7672) > 1e-2, "8x funding over-accrual is BACK"
+        # and it still takes new tickets (the entry pass survived the refactor)
+        assert _pub["open_trades"] == 1, _pub["open_trades"]
+
+        print("\nAll LIVE order-path self-tests passed:")
+        print("  1 entry SENDS a real order + records the REAL fill")
+        print("  2 notional cap is senior — cap-breaching entry never sends")
+        print("  3 kill switch flattens the VENUE's book + halts")
+        print("  4 daily loss confirms, flattens, halts DURABLY")
+        print("  5 a failed close books no phantom row and keeps the position")
+        print("  6 live funding hits the ledger, not equity; equity is the venue's")
+        print("  7 unreadable positions SKIP the cycle — never trade blind")
+        print("  8 a failed flatten reports the open book, not a green zero")
+        print("  9 the DEPLOYED shadow arm still trades, on the TRUE 8h basis")
+    finally:
+        for k, fn in _real.items():
+            setattr(store, k, fn)
+        globals()["fetch_marks_and_funding"] = _real_fetch
+        TT_VENUE, BOT_ROW = _saved_env
 
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         selftest()
+    elif "--selftest-live" in sys.argv:
+        _selftest_live()
     else:
         main()

@@ -38,6 +38,7 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 import funding_basis
 from venues import marks, venue_context
+from venues.safety import open_notional
 
 BOT = "crypto-trend-daily"          # venue layer suffixes -lshadow / -lighter
 H = funding_basis.periods_per_year('lighter')   # [2026-07-17 BASIS FIX]
@@ -106,30 +107,13 @@ def fresh_mid(ctx, coin):
     return marks.fresh_mid(ctx.venue, coin)
 
 
-def _open_notional(pos, meta, open_now, order_usd):
-    """[2026-07-15 AUDIT FIX v2] REAL deployed notional of open positions —
-    each held position at its OWN clip (meta['clip'] / size*entry) + this
-    loop's opens at the current clip. `open_now * order_usd` under-counts once
-    the growth rail moved the clip, which could breach the operator's notional
-    cap on a live.clip_scale down-scale (down-scale raises max_open)."""
-    held, n = 0.0, 0
-    for c, v in (pos or {}).items():
-        sz = v.get("size") if isinstance(v, dict) else v
-        if not sz:
-            continue
-        n += 1
-        mc = meta.get(c) or {}
-        if mc.get("clip"):
-            held += float(mc["clip"])
-        elif mc.get("entry"):
-            held += abs(float(sz)) * float(mc["entry"])
-        else:
-            # [2026-07-16 AUDIT] untracked position: price it at the VENUE's
-            # entry notional, not the current (possibly down-scaled) clip —
-            # order_usd here understates a position opened at a larger clip.
-            _ven = (v.get("entry") if isinstance(v, dict) else 0) or 0
-            held += (abs(float(sz)) * float(_ven)) or float(order_usd)
-    return held + max(0, int(open_now) - n) * float(order_usd)
+# [2026-07-17] The cap rule now lives on the RAIL that enforces it
+# (venues.safety.open_notional) — this bot and lighter_funding_bot each carried
+# their own code-identical copy with DIFFERENT selftests (this one never
+# covered the short-at-own-entry case), and the Ticket Taker's live path would
+# have been the third. Re-exported under the original private name so every
+# call site and _selftest_notional() below are unchanged.
+_open_notional = open_notional
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, reason,

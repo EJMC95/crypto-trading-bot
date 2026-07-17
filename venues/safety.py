@@ -136,3 +136,81 @@ class SafetyRails:
         log.warning("breach NOT confirmed (second read %.2f) — transient print; "
                     "continuing.", eq2)
         return False, eq2
+
+
+def open_notional(pos, meta, open_now, order_usd):
+    """REAL deployed notional of open positions — the INPUT to notional_ok().
+
+    Each HELD position at its OWN entry clip (meta['clip'], or size*entry as a
+    fallback), plus this loop's new opens at the current clip. The naive
+    `open_now * order_usd` estimate under-counts whenever the growth rail moved
+    the clip mid-session — a live.clip_scale DOWN-scale shrinks order_usd, which
+    RAISES max_open=floor(cap/clip) and, with held positions still sized at the
+    larger clip, lets a new entry breach the operator's hard notional cap. That
+    is not hypothetical: it breached on 15-Jul (see [[notional-cap-vs-variable-clip]]).
+
+    [2026-07-17] LIFTED HERE from lighter_funding_bot / lighter_trend_bot, which
+    each carried their own copy. They were code-identical the day this moved —
+    and that is the argument, not the counter-argument: a money rule with two
+    definitions and two DIFFERENT selftests (the trend bot's lacked the
+    short-at-own-entry case) is one edit away from drifting, and the drift is a
+    cap breach on real money. The Ticket Taker's live path would have made it
+    three. The rail that enforces the cap now also computes its input, so
+    `notional_ok(open_notional(...), clip)` is one rule with one test.
+    Pure — unit-checked in _selftest() below and by each bot's own selftest.
+    """
+    held, n = 0.0, 0
+    for c, v in (pos or {}).items():
+        sz = v.get("size") if isinstance(v, dict) else v
+        if not sz:
+            continue
+        n += 1
+        mc = (meta or {}).get(c) or {}
+        if mc.get("clip"):
+            held += float(mc["clip"])
+        elif mc.get("entry"):
+            held += abs(float(sz)) * float(mc["entry"])
+        else:
+            # [2026-07-16 AUDIT] untracked position (meta lost): price it at
+            # the VENUE's own entry notional, not the current (possibly
+            # down-scaled) clip — order_usd here understates a position opened
+            # at a larger clip and re-opens the cap-breach window this
+            # function exists to close.
+            _ven = (v.get("entry") if isinstance(v, dict) else 0) or 0
+            held += (abs(float(sz)) * float(_ven)) or float(order_usd)
+    return held + max(0, int(open_now) - n) * float(order_usd)
+
+
+def _selftest():
+    """The 15-Jul breach scenario + the cases the two copies tested between
+    them (neither tested all of them alone — see open_notional's docstring)."""
+    pos = {c: {"size": 1.0, "entry": 30.0} for c in "ABCDE"}
+    meta = {c: {"clip": 30.0, "entry": 30.0} for c in "ABCDE"}
+    # cap $150, five $30 positions, growth-rail down-scale to clip 22.50: the
+    # old open_now*order_usd estimate said $112.50 and passed a 6th entry.
+    assert open_notional(pos, meta, 5, 22.50) == 150.0
+    assert open_notional(pos, {}, 5, 22.50) == 150.0        # venue-entry fallback
+    # venue entry also missing -> last-resort current clip (conservative floor)
+    assert open_notional({c: {"size": 1.0} for c in "ABCDE"}, {}, 5, 22.50) == 112.5
+    # opens-this-loop not yet visible in pos, priced at the current clip
+    assert open_notional(pos, meta, 7, 22.50) == 195.0
+    # short at its own entry (size*entry, sign-independent) — the case ONLY the
+    # funding bot's copy covered
+    assert open_notional({"Z": {"size": -2.0, "entry": 20.0}}, {}, 1, 30.0) == 40.0
+    # zero-size rows are not positions and must not consume cap
+    assert open_notional({"Z": {"size": 0.0, "entry": 20.0}}, {}, 0, 30.0) == 0.0
+    # empty / None inputs
+    assert open_notional({}, {}, 0, 30.0) == 0.0
+    assert open_notional(None, None, 0, 30.0) == 0.0
+    # the rail itself: cap is inclusive, and no cap == no limit
+    r = SafetyRails.__new__(SafetyRails)
+    r.max_notional = 150.0
+    assert r.notional_ok(120.0, 30.0) is True      # exactly at cap
+    assert r.notional_ok(120.0, 30.01) is False    # one cent over
+    r.max_notional = None
+    assert r.notional_ok(1e9, 1e9) is True
+    print("venues.safety self-tests passed (open_notional + notional_ok).")
+
+
+if __name__ == "__main__":
+    _selftest()
