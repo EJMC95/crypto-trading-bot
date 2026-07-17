@@ -301,6 +301,10 @@ def organ_invariants(states, now):
         # so this env IS the brain's env. If fleet_immune ever moves to
         # another service, that premise breaks and this rule must move too.
         want = os.environ.get("BRAIN_MULT_ENGINE", "").strip().lower()
+        # Expected transient: after REMOVING a deliberate BRAIN_MULT_ENGINE=v2
+        # and redeploying, the last v2 payload stays fresh (ttl 26000s) until
+        # the brain's next run (~2h), so one deduped page is normal and
+        # self-heals. A page that persists past a brain cycle is real.
         if eng == "v2" and want != "v2":
             sick("brain-vitals",
                  "engine=v2 but BRAIN_MULT_ENGINE was not set to v2 — the "

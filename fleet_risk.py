@@ -459,8 +459,14 @@ def main():
     # None (window below DD_MIN_SPAN_SEC) a PRIOR clip restriction (<1.0)
     # is held rather than snapped to 1.0 — same pattern as the board's
     # blind-cohort hold: assert-nothing on missing evidence must never
-    # RELEASE an in-force restriction. A fresh cohort with no prior
-    # restriction still starts at 1.0 (nothing to hold).
+    # RELEASE an in-force restriction.
+    # HONEST SCOPE (verify-corrected): this reads the prior clip regardless
+    # of whether the equity COHORT matched, so a cohort change (which
+    # empties the sample window -> dd None) INHERITS the old cohort's
+    # restriction until >=6h of new samples accrue. That is deliberate and
+    # restrict-only — a book that was being throttled keeps being throttled
+    # while we are blind — but it means "a fresh cohort starts at 1.0" is
+    # only true when there was NO prior restriction to inherit.
     if dd_7d is None:
         _prev_clip = prev_state.get("clip_scale_raw",
                                     prev_state.get("clip_scale"))
