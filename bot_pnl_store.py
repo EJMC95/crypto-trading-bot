@@ -24,8 +24,10 @@ service's connection string (Railway: Variables -> add reference -> Postgres
 DATABASE_URL). Locally, leave it unset and this module is a no-op.
 """
 import os
+import sys
 import json
 import time
+import hashlib
 
 _DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
@@ -105,6 +107,128 @@ def _ensure_table(conn):
     _table_ready = True
 
 
+# ---------------------------------------------------------------------------
+# BUILD ID — what code is this process actually running?
+# ---------------------------------------------------------------------------
+# WHY IT LIVES HERE and not in its own module. It was `build_id.py` for about
+# ten minutes, until the born-dark guard reported it MISSING FROM 19 OF 20
+# IMAGES — because this file is universal and nothing COPYs that one. The fix
+# is not 20 `COPY build_id.py` lines: that is a ROSTER, and a roster nobody
+# maintains is the control that already failed (17-Jul: LIVE_FRESHNESS_LIMITS
+# rotted, the deploy path list rotted, and this very guard exists because
+# `brain_stats` shipped to an image that lacked it). A new image tomorrow
+# forgets the COPY, that bot silently never stamps, and the drift detector goes
+# quiet for exactly the bot that changed. Here, "can publish" == "can stamp",
+# by construction — the property no list can give you.
+#
+# WHY BYTES, NOT A LABEL. Every self-describing label in this fleet has lied:
+# `RAILWAY_GIT_*` reads 0 on EVERY service, connected or not (it produced a
+# false fleet-wide "nothing is git-connected" verdict on 17-Jul);
+# `railway status` meta.branch is blank for every `railway up`, so CI and a
+# desk upload are indistinguishable; `lighter.__version__` reports "1.0.0", a
+# release PyPI does not have, while the wheel signing real orders was 1.1.2.
+# A hash of the source bytes cannot lie about being those bytes.
+#
+# WHAT IT CATCHES — ARM DRIFT. Every live bot has a `-lshadow` CONTROL arm in a
+# DIFFERENT Railway service (Farmer: trail-blazer-live vs funding-farmer-shadow;
+# Taker: tide-rider-lighter-live vs the organ container) — separate deploy
+# clocks. `experiment_judge` promotes to `live.funding.*` on "shadow beats live
+# per-trade", and `implementation_shortfall` reads that same gap as execution
+# quality. Drifted arms put a strategy delta into both numbers, and neither
+# organ can see it: they compare OUTCOMES, the drift is in the INPUTS.
+_BUILD_ROOT = os.path.dirname(os.path.abspath(__file__))
+# A FIXED, DECLARED set — the entry module + the real-money surface both arms
+# share. NOT "every repo-local module in sys.modules": a lazy or conditional
+# import (`if VENUE.startswith('lighter')`, a try/except organ guard) changes
+# the module set without changing the code, so identical arms would report
+# different ids and the detector would cry drift forever. The set must not
+# depend on the execution path — the same reason `if dry_run` branches cannot
+# be compared across arms.
+_BUILD_SHARED = ("venues", "funding_basis.py", "bot_pnl_store.py")
+_BUILD_CACHE = None
+
+
+def _build_rel(path):
+    """The name a file has INSIDE its image — the only path two arms share.
+
+    LOAD-BEARING: the same module sits at DIFFERENT absolute paths in different
+    images (`/app/...` on the live Farmer, `/freqtrade/...` in the organ
+    container). Keying on the absolute path would report permanent drift
+    between identical code. Falls back to the basename for anything outside the
+    root (test tmpdirs only) rather than raising.
+
+    NOTE the explicit prefix test rather than a bare `os.path.relpath`: relpath
+    does NOT fail for a path outside the root, it happily returns
+    `../../tmp/xyz/arm.py` — so two identical files in different temp dirs got
+    different keys and the path-independence fixture caught it. A fallback that
+    triggers on an exception is worthless when the function never raises."""
+    p = os.path.abspath(path)
+    root = _BUILD_ROOT.rstrip(os.sep) + os.sep
+    if p.startswith(root):
+        return p[len(root):]
+    return os.path.basename(p)
+
+
+def _build_files(entry=None):
+    out = []
+    if entry and os.path.isfile(entry):
+        out.append(os.path.abspath(entry))
+    for name in _BUILD_SHARED:
+        p = os.path.join(_BUILD_ROOT, name)
+        if os.path.isdir(p):
+            for d, _sub, fs in os.walk(p):
+                out.extend(os.path.join(d, f) for f in fs if f.endswith(".py"))
+        elif os.path.isfile(p):
+            out.append(p)
+    return sorted(set(out), key=_build_rel)
+
+
+def build_compute(entry=None):
+    """(id12, n_files) — sha256 over name+bytes of a fixed file set.
+    None on any read failure: a sensor that cannot see must not vote, and a
+    fabricated id would read as agreement between two drifted arms."""
+    try:
+        if entry is None:
+            m = sys.modules.get("__main__")
+            entry = getattr(m, "__file__", None)
+            entry = os.path.abspath(entry) if entry else None
+        files = _build_files(entry)
+        if not files:
+            return None, 0
+        h = hashlib.sha256()
+        for p in files:
+            h.update(_build_rel(p).encode())
+            h.update(b"\0")
+            with open(p, "rb") as fh:
+                h.update(fh.read())
+            h.update(b"\0")
+        return h.hexdigest()[:12], len(files)
+    except Exception:      # noqa: BLE001 — never break a publish
+        return None, 0
+
+
+def build_code_id():
+    """Cached per process — the bytes cannot change under a running process."""
+    global _BUILD_CACHE
+    if _BUILD_CACHE is None:
+        _BUILD_CACHE = build_compute()
+    return _BUILD_CACHE[0]
+
+
+def _stamp_build(extra):
+    """Stamp `extra.build` on every publish. Never raises, never overwrites a
+    caller's key: telemetry must not break a publish that reports real money."""
+    try:
+        cid = build_code_id()
+        if not cid:
+            return extra
+        out = dict(extra or {})
+        out.setdefault("build", cid)
+        return out
+    except Exception:      # noqa: BLE001
+        return extra
+
+
 def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
             open_trades=None, closed_trades=None, wins=None, losses=None,
             extra=None, pnl_daily=None):
@@ -115,6 +239,7 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
     conn = _get_conn()
     if conn is None:
         return False
+    extra = _stamp_build(extra)
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
@@ -895,7 +1020,63 @@ def fetch_paper_trades(limit=2000):
         return []
 
 
+def _selftest_build():
+    """The build-id contract. It had its own module and its own suite for ten
+    minutes; the born-dark guard sent it in here, so the suite comes too — a
+    guard that moves house without its tests is how `brain_stats` shipped."""
+    import tempfile
+    a, n = build_compute(__file__)
+    assert a and n >= 2, (a, n)
+    assert build_compute(__file__)[0] == a, "must be deterministic across calls"
+
+    # THE CONTRACT: different bytes -> different id. Without this the detector
+    # reports agreement between two drifted arms — a green light on the judge's
+    # invalid promotion bar, which is worse than having no detector.
+    with tempfile.TemporaryDirectory() as d:
+        m = os.path.join(d, "m.py")
+        open(m, "w").write("x = 1\n")
+        b1, _ = build_compute(m)
+        open(m, "w").write("x = 2\n")
+        b2, _ = build_compute(m)
+        assert b1 and b2, f"a readable entry must yield an id: {b1!r}/{b2!r}"
+        assert b1 != b2, "a byte change MUST change the id"
+
+    # SAME bytes, DIFFERENT path -> SAME id. This is production: the live arm
+    # runs /app/<mod>.py, the shadow arm /freqtrade/<mod>.py. Keying on the
+    # absolute path would flag permanent drift between identical code.
+    with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2:
+        for d in (d1, d2):
+            open(os.path.join(d, "arm.py"), "w").write("SAME = 'bytes'\n")
+        i1, _ = build_compute(os.path.join(d1, "arm.py"))
+        i2, _ = build_compute(os.path.join(d2, "arm.py"))
+        assert i1 and i1 == i2, f"same bytes must agree across paths: {i1} vs {i2}"
+
+    # The ENTRY MODULE COUNTS — two bots sharing venues/ are NOT one build.
+    # Asserted with a file that is NOT already in _BUILD_SHARED: this module is
+    # both the entry and a shared file, so compute(__file__) == the shared-only
+    # id and the naive form of this check passes vacuously. A fixture that can
+    # only pass is not a fixture (`tests-must-not-fail-on-good-news`, inverted).
+    _probe = os.path.join(_BUILD_ROOT, "implementation_shortfall.py")
+    if os.path.isfile(_probe):
+        _with = build_compute(_probe)[0]
+        _without = build_compute(os.path.join(_BUILD_ROOT, "nope.py"))[0]
+        assert _with and _without and _with != _without, \
+            f"the entry file must change the id: {_with} vs {_without}"
+
+    # the stamp: adds `build`, preserves caller keys, never overwrites one
+    e = _stamp_build({"venue": "lighter_live"})
+    assert e["build"] == build_code_id() and e["venue"] == "lighter_live", e
+    assert _stamp_build(None)["build"] == build_code_id()
+    assert _stamp_build({"build": "caller"})["build"] == "caller"
+    print(f"bot_pnl_store selftest OK (build id: deterministic, byte-sensitive, "
+          f"path-independent, entry counts; stamp preserves caller keys) "
+          f"build={a} over {n} files")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        sys.exit(_selftest_build())
     # quick self-test: writes a dummy row if DATABASE_URL is set, else no-ops.
     ok = publish("selftest", status="online", pnl_abs=1.23, pnl_pct=0.0123,
                  extra={"note": "self-test"})

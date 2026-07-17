@@ -71,7 +71,7 @@ def _iso(ts=None):
 # pure computation (selftested offline)
 # ---------------------------------------------------------------------------
 
-def compute_shortfall(per_coin, xp_running=False):
+def compute_shortfall(per_coin, xp_running=False, drift=None):
     """per_coin: {coin: {'live': {'avg_pct', 'n', 'entry', 'exit'},
                          'shadow': {'avg_pct', 'n', 'entry', 'exit'}}}.
     Returns the overall weighted gap (live − shadow, in pp/trade), the
@@ -133,6 +133,22 @@ def compute_shortfall(per_coin, xp_running=False):
 
     if n_overlap < MIN_COINS or tot_w < MIN_CLOSES:
         verdict = "insufficient"
+    elif drift:
+        # [2026-07-17 ARM DRIFT] The two arms are running DIFFERENT CODE, so
+        # this gap contains a strategy delta and cannot be attributed to
+        # execution. Identical reasoning to xp-contaminated below, and ranked
+        # ABOVE it: an experiment is a difference we CHOSE and are measuring on
+        # purpose; drift is one nobody chose and nobody could see.
+        # WHY IT HAPPENS: each live bot's `-lshadow` control arm lives in a
+        # DIFFERENT Railway service (Farmer: trail-blazer-live vs
+        # funding-farmer-shadow; Taker: tide-rider-lighter-live vs the organ
+        # container). Separate deploy clocks, so any ship that moves one arm and
+        # not the other silently makes this organ's number a lie — and the
+        # judge's promotion bar too, which spends REAL MONEY on it.
+        # MEASURED 17-Jul: 4 arms across 4 services, aligned only because they
+        # happened to be deployed inside the same 23 minutes. Nothing said so.
+        # Refuse the verdict, report the number, name both builds.
+        verdict = "arm-drift"
     elif xp_running:
         # the control arm is an EXPERIMENT arm — this gap measures strategy +
         # execution together and cannot be attributed to either. Report the
@@ -151,7 +167,7 @@ def compute_shortfall(per_coin, xp_running=False):
     return {"gap_pp": gap, "verdict": verdict, "n_overlap": n_overlap,
             "paired_closes": tot_w, "coins": coins,
             "entry_slip_bps": entry_slip, "exit_slip_bps": exit_slip,
-            "xp_running": bool(xp_running)}
+            "xp_running": bool(xp_running), "drift": drift or None}
 
 
 def _slip_bps(lv, sh):
@@ -302,6 +318,41 @@ def send_push(title, body):
         return False
 
 
+def arm_drift(rows, live=None, shadow=None):
+    """(None | {'live','shadow'}) — are the two arms running DIFFERENT CODE?
+
+    Pure; `rows` is bot_pnl as fetch_bot_pnl returns it. Each bot stamps
+    `extra.build` via the central hook in bot_pnl_store.publish (build_id.py):
+    a hash of the BYTES it loaded, never a deploy label. That distinction is the
+    whole point — `RAILWAY_GIT_*` reads 0 on every service whether connected or
+    not, `railway status` meta.branch is blank for every `railway up`, and
+    `lighter.__version__` reports a release that does not exist. All three are
+    labels a system applies to itself. Bytes cannot lie about being bytes.
+
+    FAIL-SAFE TOWARD SILENCE, unlike _xp_running below — and the asymmetry is
+    deliberate. A missing stamp means "an arm has not published since the hook
+    shipped", which is the NORMAL state during any rollout; treating unknown as
+    drift would fire on every deploy of this very feature and teach the operator
+    to ignore it (`convergent-metric-is-not-a-health-check` cuts both ways —
+    a check that fires on healthy cadence is as useless as one that never
+    fires). We only ever claim drift on POSITIVE evidence: two stamps present,
+    two stamps different. Absence stays quiet and stays visible in the payload.
+    """
+    live = live or LIVE
+    shadow = shadow or SHADOW
+    by = {str(r.get("bot")): r for r in (rows or [])}
+    a, b = by.get(live), by.get(shadow)
+    if not a or not b:
+        return None
+    ba = ((a.get("extra") or {}) or {}).get("build")
+    bb = ((b.get("extra") or {}) or {}).get("build")
+    if not ba or not bb:
+        return None          # not yet stamped — no claim
+    if ba == bb:
+        return None
+    return {"live": ba, "shadow": bb}
+
+
 def _xp_running(now):
     """Is the experiment judge running a candidate on OUR shadow arm right now?
 
@@ -337,7 +388,11 @@ def run_once():
     now = now_ts()
     prior = store.load_state(KEY) or {}
     xp = _xp_running(now)
-    rep = compute_shortfall(_fetch_per_coin(), xp_running=xp)
+    try:
+        _drift = arm_drift(store.fetch_bot_pnl() or [])
+    except Exception:      # noqa: BLE001 — a dark sensor accuses nobody
+        _drift = None
+    rep = compute_shortfall(_fetch_per_coin(), xp_running=xp, drift=_drift)
     # [2026-07-17] the real execution read: decision-vs-fill on ONE order.
     # Replaces the withdrawn averaged-price decomposition (see _slip_bps).
     _os = _fetch_order_slip()
@@ -499,9 +554,45 @@ def _selftest():
     finally:
         store.load_state = _real_ls
 
+    # --- ARM DRIFT (17-Jul) -------------------------------------------------
+    # Synthetic rows: asserts the DETECTOR, never tonight's fleet. It must keep
+    # passing when the arms are aligned (which is the normal, healthy state).
+    def _row(bot, build=None):
+        return {"bot": bot, "extra": ({"build": build} if build else {})}
+
+    # POSITIVE: two stamps, different -> drift, and it NAMES both builds
+    d = arm_drift([_row(LIVE, "aaaaaaaaaaaa"), _row(SHADOW, "bbbbbbbbbbbb")])
+    assert d == {"live": "aaaaaaaaaaaa", "shadow": "bbbbbbbbbbbb"}, d
+    # NEGATIVE 1: same build -> silent. The healthy state must never fire.
+    assert arm_drift([_row(LIVE, "aaaaaaaaaaaa"), _row(SHADOW, "aaaaaaaaaaaa")]) is None
+    # NEGATIVE 2: unstamped arms -> NO CLAIM. This is the rollout state — the
+    # hook ships before the bots restart. Firing here would make the feature's
+    # own deploy its first false alarm, which is how an alarm gets muted.
+    assert arm_drift([_row(LIVE), _row(SHADOW)]) is None
+    assert arm_drift([_row(LIVE, "aaaaaaaaaaaa"), _row(SHADOW)]) is None, \
+        "one arm unstamped is UNKNOWN, not drift"
+    # NEGATIVE 3: an arm missing entirely -> no claim (not both present)
+    assert arm_drift([_row(LIVE, "aaaaaaaaaaaa")]) is None
+    assert arm_drift([]) is None and arm_drift(None) is None
+
+    # the VERDICT wiring: drift outranks xp-contamination and refuses the number
+    _pair = {"BTC": {"live": {"avg_pct": 1.0, "n": 40}, "shadow": {"avg_pct": 1.0, "n": 40}},
+             "ETH": {"live": {"avg_pct": 1.0, "n": 40}, "shadow": {"avg_pct": 1.0, "n": 40}}}
+    r_ok = compute_shortfall(_pair)
+    assert r_ok["verdict"] == "clean" and r_ok["drift"] is None, r_ok
+    r_d = compute_shortfall(_pair, drift={"live": "a", "shadow": "b"})
+    assert r_d["verdict"] == "arm-drift", r_d
+    assert r_d["gap_pp"] == r_ok["gap_pp"], "report the NUMBER, refuse the VERDICT"
+    # drift beats xp: an experiment is a difference we CHOSE; drift is not
+    assert compute_shortfall(_pair, xp_running=True,
+                             drift={"live": "a", "shadow": "b"})["verdict"] == "arm-drift"
+    # and it must not phone: run_once's streak only counts 'live-slipping'
+    assert r_d["verdict"] != "live-slipping"
+
     print("implementation_shortfall selftest OK (xp-contaminated control arm, "
           "clean/slipping/ahead/"
-          "insufficient, one-arm ignored, entry+exit decomposition long+short)")
+          "insufficient, one-arm ignored, entry+exit decomposition long+short, "
+          "arm-drift: fires on 2 differing builds, silent on same/unstamped/absent)")
 
 
 if __name__ == "__main__":
