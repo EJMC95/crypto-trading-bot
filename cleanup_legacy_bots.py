@@ -60,6 +60,7 @@ LEGACY_BOTS = [
     # only — its Lighter twin `perps-funding-carry-lshadow` keeps running and is
     # deliberately absent from this list. Ledgers kept (see the note above).
     "event-listing-sniper", "perps-funding-carry",
+    "scanner-cross-exchange-arb",
     # [2026-07-14 LIGHTER-FIRST CUT] laptop stock bots retired on user
     # instruction — the Lighter ports (equities-*-lshadow) are the bots now.
     # NOTE their processes run on the operator's machine OUTSIDE this repo;

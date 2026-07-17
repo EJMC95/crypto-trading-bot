@@ -1172,8 +1172,42 @@ def main():
     ap.add_argument("--once", action="store_true", help="single live scan then exit")
     args = ap.parse_args()
     if args.selftest:
-        selftest()
+        selftest()          # offline math — always allowed, no venue touched
     else:
+        # [2026-07-17 LIGHTER-ONLY GUARD — operator: "i only want things running
+        # on lighter"] 🔀 Gap Scout paper-trades arbitrage BETWEEN Kraken,
+        # Binance and Coinbase. There is no Lighter leg in that trade and there
+        # cannot be one — you cannot arb a single venue against itself — so
+        # unlike Snap Back this bot could not be MOVED to Lighter, only stopped.
+        # This file says so itself at line ~201: "The CEX legs above say nothing
+        # about Lighter, the venue the fleet actually trades."
+        #
+        # Its one Lighter-facing job — publishing the venue premium — is now
+        # done by lighter_market_scout.py, which reads the SAME mark/index off
+        # the SAME endpoint for every liquid book instead of the 6 in
+        # LIGHTER_WATCH. fleet_risk.py was rewired to that source in the same
+        # commit, so the bus keys (and the dashboard card that formats them)
+        # keep working, with better coverage. The Ticket Taker's stress veto
+        # already read the scout, so nothing load-bearing moves.
+        #
+        # KNOCK-ON, stated so it isn't a surprise: `gapscout-census` stops
+        # updating, so the evidence board's widen-ladder loop goes inert (it
+        # fails safe on staleness). That loop widens the scanner to MORE CEXes
+        # (kucoin/gateio/mexc) — under Lighter-only it should be inert.
+        #
+        # IDLE, never sys.exit: restartPolicy would crash-loop an exit (the
+        # Trail Blazer reasoning, 15-Jul). Ledger + odometer history kept.
+        # To resurrect deliberately: GAPSCOUT_RETIRED_OVERRIDE=run.
+        if os.environ.get("GAPSCOUT_RETIRED_OVERRIDE", "").strip().lower() \
+                not in ("run", "1", "true"):
+            print("scanner-cross-exchange-arb is RETIRED: it paper-trades "
+                  "Kraken/Binance/Coinbase against each other — no Lighter leg — "
+                  "and the fleet is LIGHTER-ONLY (operator, 17-Jul). Its Lighter "
+                  "premium is published by lighter_market_scout.py (every liquid "
+                  "book, vs 6 here). Idling: no exchange calls, no publishes. "
+                  "GAPSCOUT_RETIRED_OVERRIDE=run to resurrect.", flush=True)
+            while True:
+                time.sleep(3600)
         run_live(once=args.once)
 
 

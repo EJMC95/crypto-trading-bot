@@ -210,7 +210,13 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 #     Its Lighter twin perps-funding-carry-lshadow CONTINUES and
                 #     is deliberately NOT retired here.
                 # Ledgers kept, per retirement policy.
-                "event-listing-sniper", "perps-funding-carry"}
+                #   scanner-cross-exchange-arb (🔀 Gap Scout) — paper-traded arb
+                #     BETWEEN Kraken/Binance/Coinbase; no Lighter leg exists in
+                #     that trade, so it could only be stopped, not moved. Its
+                #     Lighter-premium job moved to lighter_market_scout (every
+                #     liquid book vs its 6); fleet_risk rewired to that source.
+                "event-listing-sniper", "perps-funding-carry",
+                "scanner-cross-exchange-arb"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
 # [2026-07-13 NO-DATA FIX] Venue-suffixed bots (Funding Farmer, Snap Back,

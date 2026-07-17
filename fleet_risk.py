@@ -86,6 +86,28 @@ def row_fresh(r):
         upd = upd.replace(tzinfo=timezone.utc)
     return (datetime.now(timezone.utc) - upd).total_seconds() <= STALE_ROW_SEC
 
+
+def state_fresh(payload):
+    """True if a bot_state payload self-reports as CURRENT (updated + ttl_sec).
+
+    [2026-07-17] row_fresh() above is for bot_pnl rows and applies a fixed
+    STALE_ROW_SEC. bot_state payloads carry their OWN contract — "every payload
+    carries updated+ttl_sec; consumers go NEUTRAL on stale data" — so honour the
+    publisher's TTL rather than a heuristic. Fails CLOSED: an unparseable or
+    missing clock is stale, never fresh. (A fresh-but-wrong artifact is the
+    failure class fleet_immune exists for; a stale-read-as-current one is what
+    drove the 15-Jul false live down-scale off a 39h-old payload.)
+    """
+    try:
+        upd = datetime.fromisoformat(
+            str((payload or {})["updated"]).replace("Z", "+00:00"))
+        if upd.tzinfo is None:
+            upd = upd.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - upd).total_seconds()
+        return 0 <= age <= float((payload or {}).get("ttl_sec") or 0)
+    except Exception:  # noqa: BLE001
+        return False
+
 # Directional crypto books only. Funding-carry is delta-neutral (excluded),
 # sniper is event-class (tracked as gross info only), stocks are a separate
 # mandate, scanners hold nothing. Freqtrade -lshadow twins are separate $1k
@@ -546,24 +568,37 @@ def main():
     if fc.get("hottest_funding_apr"):
         bus["funding_hottest_apr"] = fc["hottest_funding_apr"]
         bus["funding_source"] = fc.get("venue") or "hyperliquid"
-    xa = fresh_extra("scanner-cross-exchange-arb")
-    # [2026-07-14 review verdict] the raw best_top_pct max was symbol-collision
-    # noise (printed 4.6% junk) — the bus carries the majors-only gauge now.
-    if xa.get("liquid_top_pct") is not None:
-        bus["xexchange_dislocation_pct"] = xa.get("liquid_top_pct")
-    # [2026-07-14 review] Lighter venue premium (mark vs index, bps) — the
-    # dislocation signal measured on the venue the fleet actually trades.
-    # Advisory, like everything on the bus. Gap Scout publishes it.
-    if xa.get("lighter_prem_bps"):
-        bus["lighter_prem_bps"] = xa["lighter_prem_bps"]
-    if xa.get("lighter_prem_med_bps") is not None:
-        bus["lighter_venue_stress_bps"] = {
-            "med": xa.get("lighter_prem_med_bps"),
-            "max": xa.get("lighter_prem_max_bps"),
-            "n": xa.get("lighter_prem_n")}
-    ta = fresh_extra("scanner-triangular-arb")
-    if ta.get("best_depth_pct") is not None:
-        bus["tri_arb_best_depth_pct"] = ta.get("best_depth_pct")
+    # [2026-07-17 LIGHTER-ONLY — operator: "i only want things running on
+    # lighter"] The Lighter venue premium now comes from the MARKET SCOUT, not
+    # Gap Scout. Both read mark/index off the SAME Lighter endpoint, so this is
+    # not a change of measurement — it is the same gauge from the better
+    # publisher:
+    #   * coverage: every LIQUID book (~200) vs Gap Scout's 6-symbol
+    #     LIGHTER_WATCH (BTC,ETH,SOL,SPY,QQQ,XAU). A venue-wide stress median
+    #     over 6 hand-picked books was never venue-wide.
+    #   * agreement: it is already the source the Ticket Taker's stress veto
+    #     trusts (`lighter-market`.stress.med). The bus and the veto now cite
+    #     ONE number instead of two that could disagree.
+    # Gap Scout itself is retired: its trade was CEX<->CEX arb with no Lighter
+    # leg at all (its own line 201: "The CEX legs above say nothing about
+    # Lighter"). `xexchange_dislocation_pct` and `tri_arb_best_depth_pct` retire
+    # WITH their scanners — both were CEX gauges, and nothing outside this file
+    # ever read them.
+    # Shapes are preserved EXACTLY (the dashboard's signal-bus card formats
+    # both keys): stress -> {med,max,n}; per-symbol -> {sym: bps}.
+    _scout = store.load_state("lighter-market") or {}
+    if state_fresh(_scout):
+        _stress = _scout.get("stress") or {}
+        if _stress.get("med") is not None:
+            bus["lighter_venue_stress_bps"] = {"med": _stress.get("med"),
+                                               "max": _stress.get("max"),
+                                               "n": _stress.get("n")}
+        # The books furthest from fair value — the ones a premium gauge is FOR.
+        _outliers = {o["sym"]: o["prem_bps"]
+                     for o in (_scout.get("prem_outliers") or [])
+                     if o.get("sym") and o.get("prem_bps") is not None}
+        if _outliers:
+            bus["lighter_prem_bps"] = _outliers
     try:
         pulse = store.load_state("market-pulse") or {}
         latest = pulse.get("latest") or {}
@@ -590,7 +625,10 @@ def main():
           f"| live-venue: {_lv} | shadow(info) {shadow_long}L/{shadow_short}S "
           f"| funding_src={bus.get('funding_source')} | pair-pileups: {hp} "
           f"| mood={bus.get('pulse_mood')} panic={bus.get('pulse_panic')} "
-          f"| dislocation={bus.get('xexchange_dislocation_pct')} | lighter-stress={lstress}bps")
+          # [2026-07-17] dropped `dislocation=` — it was Gap Scout's CEX<->CEX
+          # gauge and retired with it. lighter-stress is the venue gauge, and it
+          # now covers every liquid book rather than 6.
+          f"| lighter-stress={lstress}bps n={(bus.get('lighter_venue_stress_bps') or {}).get('n')}")
 
 
 def selftest():
