@@ -297,6 +297,28 @@ def main():
             reason=("long_" if was_long else "short_") + reason,
             venue=venue_tag, shadow=shadow_tag)
 
+    def _real_exit(coin, was_long, fallback):
+        """[2026-07-17 LEDGER FIX] The REAL average exit fill from the venue, or
+        the decision mid. Same pattern (and same accessor) as
+        lighter_funding_bot._real_exit — closing a LONG SELLS, so is_ask=True.
+
+        Never raises and never blocks: `last_fill` is a best-effort read that
+        returns None on any failure, and a ledger row priced at the decision mid
+        is a small inaccuracy, where a close that throws is a stuck position.
+        """
+        if dry_run:
+            return fallback
+        try:
+            fl = getattr(ctx.venue, "last_fill", None)
+            real = fl(coin, is_ask=was_long,
+                      since_ts=time.time() - 180) if fl else None
+        except Exception:  # noqa: BLE001
+            real = None
+        if real:
+            log.info("%s exit fill (venue): %.6g (decision %.6g)",
+                     coin, real, fallback or 0.0)
+        return real or fallback
+
     def open_snipe(sym, now_ts, open_now):
         """Attempt ONE snipe. True only if a position actually opened.
 
@@ -498,12 +520,29 @@ def main():
                 else:
                     try:
                         ctx.venue.market_close(coin)
-                        entry_ts.pop(coin, None)
-                        no_px_since.pop(coin, None)
-                        last_px.pop(coin, None)
                     except Exception as e:  # noqa: BLE001
                         log.error("close failed %s: %s", coin, e)
                         continue
+                    # [2026-07-17 LEDGER FIX] a funded close used to record
+                    # NOTHING: record_close sat in the dry_run branch only, so
+                    # the live row's closed/wins/losses were seeded from an
+                    # empty ledger and would have read 0 forever — the same
+                    # silent-zero-behind-a-green-row this bot keeps producing
+                    # (see the 16-Jul W/L seeding fix, and `watching` before
+                    # it). No trade record also means no P&L, and a sniper you
+                    # cannot grade cannot earn its way past a review.
+                    # Price it at the REAL fill, not the decision mid: this is
+                    # the fleet's live-vs-shadow premise (implementation_
+                    # shortfall) and the funding bot's established pattern.
+                    exit_px = _real_exit(coin, was_long, px)
+                    pnl = abs(float(sz)) * ((exit_px - ent_px) if was_long
+                                            else (ent_px - exit_px))
+                    record_close(coin, ent_px, entry_ts.pop(coin, None),
+                                 exit_px, pnl, was_long, reason)
+                    n_closed += 1
+                    n_wins += 1 if pnl > 0 else 0
+                    no_px_since.pop(coin, None)
+                    last_px.pop(coin, None)
                 log.info("CLOSED %s [%s] gain %.1f%%", coin, reason, gain * 100)
 
         # ----- publish + persist -----
@@ -806,6 +845,7 @@ def selftest():
     class _FakeStore:
         def __init__(self, saved):
             self._saved, self.published, self.saves = saved, [], []
+            self.trades = []
 
         def load_state_checked(self, bot):
             return True, self._saved
@@ -820,8 +860,8 @@ def selftest():
         def fetch_paper_aggregate(self, bot):
             return None
 
-        def publish_paper_trade(self, *a, **kw):
-            pass
+        def publish_paper_trade(self, bot, **kw):
+            self.trades.append((bot, kw))
 
     def _drive(venue, cap, clip, saved, broker=None, mode="lighter_live"):
         """Run ONE --once loop of main() against a fake venue; return the store."""
@@ -887,6 +927,49 @@ def selftest():
     assert [o[0] for o in ven2.opened] == ["NEW"], ven2.opened
     assert "NEW" in fs2.saves[-1][1]["baseline"]
     assert "NEW" in fs2.saves[-1][1]["entry_ts"], "a funded snipe must clock itself"
+
+    # ---- NEGATIVE FIXTURE — a FUNDED close must write a LEDGER row, priced at
+    # the REAL fill. record_close used to live in the dry_run branch alone, so a
+    # live close recorded nothing: closed/wins/losses are seeded from the ledger
+    # (fetch_paper_aggregate), so the live row would have read 0 closed forever
+    # while really trading. T1 is +15.25% on the book -> take-profit.
+    _tp_books = dict(_books, T1={"bids": [[46.0, 5]], "asks": [[46.2, 5]]})
+    _tp_markets = {s: {"status": "active"} for s in ("OLD", "T1")}
+    ven4 = _FakeVenue(_tp_markets, _tp_books, {"T1": {"size": 1.0, "entry": 40.0}})
+    fs4 = _drive(ven4, CAP, CLIP, {"baseline": ["OLD", "T1"], "entry_ts": {},
+                                   "pending": {}})
+    assert ven4.closed == ["T1"], ven4.closed
+    assert fs4.trades, "a FUNDED close recorded NO ledger row — the 17-Jul gap"
+    _bot4, tr = fs4.trades[-1]
+    assert _bot4 == BOT + "-lighter" and tr["pair"] == "T1", (_bot4, tr)
+    assert tr["reason"] == "long_tp", tr["reason"]
+    assert tr["shadow"] is False and tr["venue"] == "lighter", tr   # REAL money
+    # no last_fill on this venue -> falls back to the decision mid (46.1)
+    assert abs(tr["pnl_abs"] - 6.1) < 1e-6, tr["pnl_abs"]
+    assert fs4.published[-1][1]["closed_trades"] == 1, fs4.published[-1][1]
+
+    # ...and when the venue CAN report the real fill, the row is priced at it —
+    # not at the decision mid. This is the whole point of pricing a live ledger
+    # off fills (implementation_shortfall's live-vs-shadow premise): a row that
+    # echoes back the decision price silently reports zero slippage.
+    ven5 = _FakeVenue(_tp_markets, _tp_books, {"T1": {"size": 1.0, "entry": 40.0}})
+    ven5.last_fill = lambda coin, is_ask, since_ts, lookback=10: (
+        45.0 if (coin == "T1" and is_ask is True) else None)   # sold a long
+    fs5 = _drive(ven5, CAP, CLIP, {"baseline": ["OLD", "T1"], "entry_ts": {},
+                                   "pending": {}})
+    _bot5, tr5 = fs5.trades[-1]
+    assert abs(tr5["pnl_abs"] - 5.0) < 1e-6, \
+        f"the ledger must use the REAL fill (45.0 -> $5.00), not the mid: {tr5}"
+    assert abs(tr5["pnl_pct"] - 0.125) < 1e-9, tr5["pnl_pct"]
+    # a last_fill that dies must never block the close — just cost precision
+    ven6 = _FakeVenue(_tp_markets, _tp_books, {"T1": {"size": 1.0, "entry": 40.0}})
+    def _boom_fill(*a, **k):
+        raise RuntimeError("venue trades endpoint 503")
+    ven6.last_fill = _boom_fill
+    fs6 = _drive(ven6, CAP, CLIP, {"baseline": ["OLD", "T1"], "entry_ts": {},
+                                   "pending": {}})
+    assert ven6.closed == ["T1"], "a broken fill read must not block the close"
+    assert abs(fs6.trades[-1][1]["pnl_abs"] - 6.1) < 1e-6, fs6.trades[-1][1]
 
     # ---- REGRESSION FIXTURE — the SHADOW path, which is what actually runs
     # today (perp-sniper-shadow / lighter-perp-sniper-lshadow). The fixes above
