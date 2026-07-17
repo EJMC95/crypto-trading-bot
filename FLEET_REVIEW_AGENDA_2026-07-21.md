@@ -653,3 +653,49 @@ gives noisy ratios, e.g. MU 12.1 / MSTR 26.5, and proves nothing either way.)
   the 60-day tape is self-correcting rather than 60 days of false fact.
 - Sweep needed: every `24 * 365` on a Lighter funding rate — scout, funding
   bot (`H`), momentum, index, taker/tuner/replay, dashboard.
+
+## 17. 💸 THE FUNDING FARMER HAS NO EDGE ON LIGHTER — and its live record agrees (added 17-Jul)
+The fleet's ONLY profitable live bot, measured on the venue it trades for the
+first time ever. This is the biggest open real-money question on the agenda.
+
+- **BASIS FIX SHIPPED (commit (a), behaviour-NEUTRAL).** `funding_basis.py` is
+  now the fleet's per-venue authority; every Lighter consumer + every
+  apr-denominated threshold moved by the same 8 in ONE commit. Verified
+  bit-identical on 214/214 live books. The live bot's own log now reads
+  `enter |apr|>=5%` where it read 40% — same trades, honest label. Both live
+  bots deployed and verified clean (positions/entries/closed-counts unchanged,
+  no orders on boot). **Nothing to decide here — this half is done.**
+- **THE DECISION: `backtest_funding_lighter.py` (150d, Lighter's OWN settled
+  tape) says NO GATE PASSES BOTH HALVES — at any bar.** The mechanism, not a
+  curve fit: carry per trade = apr x hold_h/8760, so breakeven =
+  round_trip_slip x 8760/hold_h. **63% of trades end because the funding signal
+  EVAPORATES (flip/cold), at a MEDIAN 8h hold — the market closes the trade,
+  not the 72h cap.** At 8h, breakeven = **~110% TRUE apr**. Lighter's floor band
+  is **3.5%**; ETH is **10.5%**. The bot is **10-31x below its own friction
+  breakeven**. Raising the gate makes it WORSE (hotter rates mean-revert faster
+  -> 3h hold -> 292% breakeven). "Hold longer" REFUTED (72->720h moves funding
+  earned by $0.20 and makes P&L worse).
+- **THE LIVE RECORD INDEPENDENTLY CONFIRMS THE MECHANISM** (n=22, so it
+  confirms the SHAPE, not the size): 12 of 22 trades (55%) ended on
+  flip/decay — the backtest predicted 63%. And the entire +$5.32 is **7
+  take-profits (+$6.47) against 1 stop (-$2.01)**. It is a TP/stop lottery that
+  has drawn well on a tiny sample, not a carry harvester. The backtest prices
+  stops at -$2.51/trade at 7.1% frequency; at n=22 you expect ~1.6 and it got 1.
+- **The "82% WR" is NOT citable.** The modelled accrual was 8x too generous and
+  feeds the win/loss call; these are SHORTS collecting carry, so the credit is
+  inflated. The ledger does not store the funding component separately, so it
+  CANNOT be de-inflated retroactively — the reason mix above is the honest read.
+  (Equity +$4.92 comes from `account_value` and stands.) FIX FORWARD: record the
+  funding component on every close so this is recomputable.
+- **DECIDE — and note what is NOT being claimed.** The backtest is 150d, n=1
+  path, 25 markets, no slippage model beyond a flat 10bps. It does NOT prove the
+  bot loses; it proves **no gate has demonstrable support on this venue**, and
+  that the structure (8h holds vs 10bps round trip) cannot pay from carry.
+  Options: (a) PARK the live book pending a design that clears the friction
+  arithmetic; (b) keep it as a TP/stop momentum-reversion bot and re-justify it
+  as THAT (it is what the record says it is) — its TP/stop bars then need
+  tuning, not its funding gate; (c) shrink and keep measuring. **Real money +
+  open positions (ETH/HYPE/SNDK/XAU short) — operator's call, not mine.**
+- **COMMIT (b) — the gate re-tune — IS WITHDRAWN, not deferred.** There is no
+  gate to tune to. Tuning `FUNDING_ENTER_APR` to any value is unsupported by the
+  only data that has ever measured this bot on its own venue.
