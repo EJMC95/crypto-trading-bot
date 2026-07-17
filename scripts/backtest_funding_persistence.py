@@ -2,6 +2,31 @@
 """
 scripts/backtest_funding_persistence.py — is the CARRY'S SURVIVAL predictable?
 
+⛔ THE RULING BELOW IS WITHDRAWN (2026-07-17, later the same day). READ FIRST.
+   This file concludes "THE FUNDING FARMER AS A CARRY STRATEGY IS DEAD... DO NOT
+   re-tune the gate, the slope, the vol filter, or the persist bar: all four are
+   measured here and none is the problem." Two things are wrong with that:
+   1. THE LEAP. Those four ARE measured here and none of them is the problem —
+      that part is fine. The error is generalising from "the four knobs I
+      thought of fail" to "the STRATEGY is dead". **The STOP was never swept**,
+      and it is the one that works: at 0.86bps, TP.04/STOP.03 takes 150d from
+      −$15.85 to +$21.32, both halves, n=1911 ([[funding-farmer-stop-is-the-bug]]).
+      "I tested every knob I thought of" is not "no knob works".
+   2. THE CONSTANT. Every $/yr figure here is denominated in an ASSUMED 10bps
+      round trip, which this file's own LIMITATIONS calls "the load-bearing
+      constant... not measured" — and then the ruling ignores that. The
+      candidates are 5bps (assumed, mine), 0.86bps (the SHADOW arm's MODELLED
+      fill), and the real one, which is UNKNOWN: the live book's 49 real orders
+      record px_fill == px_decision exactly, so measured slippage is 0.000bps
+      because the entry leg logs the price it WANTED, not the price it GOT
+      (lighter_funding_bot.py:1127; the close legs were fixed in 445e189, the
+      entry leg was not — and a round trip needs both).
+   WHAT SURVIVES, and it is the valuable half — all structural and
+   friction-INDEPENDENT: §1's resting-default pin (68.6% of the tape is two
+   constants; the live gate sits UNDER the crypto default), the 86%-sign-flip
+   death mechanism, the age hazard, and the REFUTED cross-venue predictor.
+   What does NOT survive: every $/yr number and the ruling itself.
+
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║ VERDICT (2026-07-17, measured — 300d, 30 markets, 2025-09-20→2026-07-17,  ║
 ║ 14 with HL cross-venue history. 151,561 settled hourly observations).     ║

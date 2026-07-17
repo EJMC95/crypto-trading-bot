@@ -3,8 +3,78 @@
 scripts/backtest_funding_lighter.py — the Funding Farmer, backtested ON LIGHTER.
 
 ╔══════════════════════════════════════════════════════════════════════════╗
-║ VERDICT (2026-07-17, first run — the first time this bot has EVER been    ║
-║ measured on the venue it trades). 150d, 25 markets, 2026-02-17→07-17.     ║
+║ ⛔ VERDICT WITHDRAWN 2026-07-17 (later the same day). READ THIS FIRST.    ║
+║                                                                          ║
+║ EVERY ECONOMIC CONCLUSION BELOW IS DENOMINATED IN `SLIP = 0.0005`         ║
+║ (5bps/fill) — A NUMBER I ASSUMED AND NEVER MEASURED. The LIMITATIONS      ║
+║ block below says so in as many words ("FRICTION IS ASSUMED at 10bps, NOT  ║
+║ measured. It is the load-bearing constant") — and then the VERDICT says   ║
+║ "the strategy is DEAD" and "DO NOT re-tune the gate, the slope, the vol   ║
+║ filter, or the persist bar" anyway. The caveat went in the small print;   ║
+║ the unqualified claim went in the headline. Under this repo's "don't      ║
+║ re-test what a script header rejects" doctrine, that header BLOCKED the   ║
+║ next reader from the right answer. **If a constant is load-bearing and    ║
+║ unmeasured, it belongs in the VERDICT SENTENCE or the verdict is not      ║
+║ earned.**                                                                 ║
+║                                                                          ║
+║ EXACTLY WHAT IS REFUTED — do not over-withdraw this either. Re-run at     ║
+║ both frictions (BT_SLIP_BPS=5.0 vs 0.86), same 150d, same code:           ║
+║      gate   @5bps(assumed)   @0.86bps(modelled)   both halves             ║
+║      0.05      -41.95            -15.85             no / no               ║
+║      0.12      -10.26            +11.91             no (h1 -4.23)         ║
+║      0.20       +5.01            +22.51             no (h1 -2.31)         ║
+║      0.40      -10.66             -0.82             no / no               ║
+║  * **"NO GATE PASSES BOTH HALVES" SURVIVES at BOTH frictions.** That row  ║
+║    of the verdict stands and is friction-independent.                     ║
+║  * REFUTED: the breakeven arithmetic (0.122 / ~110% TRUE APR), "14-31x     ║
+║    below breakeven", "THE STRATEGY IS DEAD", "NOT a tuning problem".      ║
+║  * WHY I got it wrong, and it is not the constant — it is the LEAP: I     ║
+║    swept the GATE, the slope, the vol filter and the persist bar, found   ║
+║    none of them worked, and concluded the STRATEGY was dead. **I never    ║
+║    swept the STOP.** At 0.86bps, TP.04/**STOP.03** takes the same 150d to ║
+║    **+$21.32, both halves positive, n=1911** — a 10% stop against a 4%    ║
+║    take-profit lets losers run 2.5x further than winners are allowed,     ║
+║    backwards for a mean-reversion book. "I tested every knob I thought    ║
+║    of" is NOT "no knob works", and the header even listed the four knobs  ║
+║    it had tested while the headline generalised to all of them. See       ║
+║    [[funding-farmer-stop-is-the-bug]] and                                 ║
+║    [[refutation-doesnt-clear-the-siblings]] — same shape.                 ║
+║                                                                          ║
+║ BUT DO NOT SWAP ONE UNMEASURED CONSTANT FOR ANOTHER — the 0.86bps is NOT  ║
+║ A MEASURED FILL EITHER, and I checked before believing it:                ║
+║   * `venue_orders` for `perps-funding-lighter-lshadow` (n=160, slip       ║
+║     0.882bps, spread 1.744bps) is the SHADOW arm — `shadow=True`. Those   ║
+║     are ShadowBroker MODELLED fills against the real book, not fills the  ║
+║     venue gave anyone. A model's output is a hypothesis about friction.   ║
+║   * The LIVE book (`perps-funding-lighter-lighter`) has **49 REAL orders, ║
+║     07-11 → 07-17 — and `slippage_bps` is NULL on all 49**. Both prices   ║
+║     ARE stored, and `px_fill == px_decision` EXACTLY on every one:        ║
+║     measured real slippage = **0.000bps**, because the bot records the    ║
+║     price it WANTED, not the price it GOT.                                ║
+║   * A fill-telemetry fix landed today (445e189) and is HALF DONE: the two ║
+║     CLOSE legs now read the real fill (`_real_exit` -> `last_fill`), but  ║
+║     the ENTRY leg still publishes `px_decision=px, px_fill=px` with no    ║
+║     slippage_bps. A ROUND TRIP NEEDS BOTH LEGS. A live order at 07-17     ║
+║     05:29Z — an hour AFTER that commit — still wrote fill == decision.    ║
+║                                                                          ║
+║ SO: **Lighter's real round-trip friction has never been measured, and     ║
+║ cannot be until the entry leg records a real fill.** My 5bps and the      ║
+║ 0.86bps that refuted it are BOTH unmeasured; they merely disagree. The    ║
+║ ranking of gates/stops below is a function of that constant, so nothing   ║
+║ here is a verdict — it is a SENSITIVITY ANALYSIS awaiting one number.     ║
+║ THE ONE EXPERIMENT THAT SETTLES THIS: fix the entry leg, let the live     ║
+║ book accumulate paired decision/fill prices, and read the round trip off  ║
+║ real money. Everything else is arithmetic on a guess.                     ║
+║                                                                          ║
+║ What still stands (structural, friction-independent): the resting-default ║
+║ pin (§1 of backtest_funding_persistence), the sign-flip death mechanism,  ║
+║ "hold longer" REFUTED, and Lighter's tape being 438d not 150d.            ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ ORIGINAL VERDICT (2026-07-17, first run — the first time this bot had     ║
+║ EVER been measured on the venue it trades). 150d, 25 markets,             ║
+║ 2026-02-17→07-17. **All economic rows below assume SLIP=5bps — VOID.**    ║
 ║                                                                          ║
 ║ 1. NO GATE PASSES BOTH HALVES. Not one row. The naive Funding Farmer has  ║
 ║    no validated edge on Lighter at ANY entry gate.                        ║
@@ -141,7 +211,23 @@ CACHE = os.path.join(os.path.dirname(__file__), ".lighterfund_cache.json")
 
 # ---- live-bot config mirrored (lighter_funding_bot.py tuned defaults) -------
 ORDER_USD = 25.0
-SLIP = 0.0005            # 5bps per fill (Lighter perp fee = 0)
+# ⛔ THE LOAD-BEARING CONSTANT — every verdict this file has ever printed is a
+# function of it, and NOBODY HAS MEASURED IT. Lighter's perp fee is 0, so this
+# is pure spread/impact. Provenance of the candidates, checked 17-Jul:
+#   0.0005  (5bps)  — what I ASSUMED. Source: nothing. It produced "the strategy
+#                     is dead / 110% breakeven".
+#   0.000086 (0.86bps) — the SHADOW arm's ShadowBroker MODEL (venue_orders,
+#                     bot=perps-funding-lighter-lshadow, shadow=TRUE, n=160).
+#                     A modelled fill against the real book — a hypothesis about
+#                     friction, not a fill anyone got. It produces "+$21.32".
+#   REAL    — UNKNOWN. The live book has 49 real orders (07-11→07-17) and
+#             slippage_bps is NULL on every one: px_fill == px_decision exactly,
+#             because the entry leg still records the decision price as the fill
+#             (lighter_funding_bot.py:1127; the close legs were fixed in
+#             445e189, the entry leg was not — a round trip needs both).
+# Override it and re-run rather than trusting any single row: the sweep is a
+# SENSITIVITY ANALYSIS until a real round trip is measured on the live book.
+SLIP = float(os.environ.get("BT_SLIP_BPS", "5.0")) / 1e4
 EXIT_RATIO = 0.375       # live EXIT_APR/ENTER_APR = 0.15/0.40 — held across the sweep
 PERSIST_H = 4
 MAX_HOLD_H = 72
