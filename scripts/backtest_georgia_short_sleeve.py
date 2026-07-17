@@ -59,14 +59,56 @@ WHAT *IS* ROBUST (holds at BOTH slippage assumptions — quote these freely):
     A 15m bot cannot harvest a 14-month move; it pays more than the move is
     worth at that horizon. THIS IS A FACT ABOUT THE TAPE, not the strategy.
 
- 4. DIRECTION WAS NEVER THE PROBLEM — THE PAYOFF STRUCTURE IS. The long arm is
-    RIGHT nearly half the time (wr 49.7% frictionless) and still loses; the
-    short tags range_off (62.5% wr) and fade_rally (64.2% wr) are ~flat despite
-    winning ~2 of every 3 trades. Winning more often than you lose and still
-    bleeding is the signature of an ROI ladder that CAPS winners (1.8% decaying
-    to 0.5%) below what the 2.5xATR trailing stop risks. A mirror inherits the
-    SAME broken payoff on the other side — which is why direction cannot be the
-    "winning factor" being looked for. Fix the payoff before adding sleeves.
+ 4. DIRECTION WAS NEVER THE PROBLEM — **ONE TAG IS.** `trend_breakout` is
+    **62.7% of every trade georgia makes** and it is **the entire loss**:
+    -$67.00 of the -$53.73 total (frictionless). The other two modes are
+    POSITIVE — range_on +$12.11, bounce_pullback +$1.16.
+
+      tag              share   P&L(0bps)   wr     vs its OWN break-even wr
+      trend_breakout   62.7%   - $67.00   42.3%   44.3%  ->  -2.0pp
+      range_on         19.5%   + $12.11   61.4%   59.9%  ->  +1.5pp
+      bounce_pullback  17.8%   +  $1.16   62.9%   62.6%  ->  +0.3pp
+
+    **AN EARLIER DRAFT OF THIS HEADER BLAMED THE ROI LADDER ("caps winners
+    below what the 2.5xATR stop risks"). THAT IS REFUTED** by the ledger it
+    was written next to: the payoff ratio is **0.970 overall** (avg win
+    +1.3058% vs avg loss -1.3459%) and **1.26 for trend_breakout itself** —
+    its winners are 26% BIGGER than its losers. Georgia does not have a payoff
+    problem. It has an **ENTRY-QUALITY** problem, confined to one tag, worth
+    2.0pp of win rate.
+
+    CORROBORATED INDEPENDENTLY, which is why this one is worth believing: the
+    brain's lens-forward grades say the `breakout` lens hits **37.9%** and
+    averages **-0.264% at 4h over n=2,445 LIVE scout tickets** — a different
+    instrument, different data, same verdict. See [[taker-long-lenses-no-
+    forward-edge]].
+
+ 4b. THE FIX IS "DROP", NOT "GATE" — and its ceiling is BREAK-EVEN.
+    `trend_breakout` is the ONE mode with no macro-regime check (`range_on`
+    needs regime_up, `bounce_pullback` needs NOT regime_up, breakout needs
+    neither), so the obvious fix is to gate it. **Measured: gating does NOT
+    work.** The mode is unprofitable in BOTH regimes.
+
+      slip/side   BASELINE    breakout GATED   breakout DROPPED
+      0.00 bps    - $53.73    - $38.65         + $11.21
+      0.86 bps    - $85.83    - $54.38         +  $0.36
+      5.00 bps    -$223.95    -$138.01         - $51.38
+
+    **SO THERE IS NO "MISSING WINNING FACTOR" IN THIS DESIGN.** Cut the one
+    mode that loses and georgia's best case is **+$0.36 over 438 DAYS** at the
+    optimistic slippage, and negative at the assumed one. The surviving range
+    edge is ~+$13 frictionless on a $1,000 book over 14 months (~1.1%/yr
+    GROSS) — below cash, and it does not survive friction. Passive
+    short-and-hold earned +$324 over the same tape.
+    (Note: dropping breakout RAISES the trade count 1,362 -> 1,631 — the losing
+    mode was crowding the profitable ones out of the 5 slots / 2-per-hour
+    throttle.)
+    **REGIME-FITTING WARNING, stated because this tape invites it:** these
+    numbers come from a 61.5%-risk-off tape, so ANY change that removes
+    long trades flatters itself here. The reason to believe the breakout
+    finding is NOT this backtest — it is the brain's independent n=2,445
+    live-ticket agreement. The bear tape can price the bug; it cannot
+    validate a fix. Only a bull regime can (see finding 6 / §NEXT).
 
  5. FUNDING IS IRRELEVANT AT THIS HOLDING PERIOD. Shorts earned +$5.12 across
     3,773 trades = $0.0014/trade. Flipping long->short swings funding by <3c on
