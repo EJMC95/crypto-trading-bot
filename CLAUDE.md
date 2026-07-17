@@ -349,6 +349,39 @@ All new bots:
 - $1,000 starting balance per bot, NO top-ups
 - Paper trading only until 30-day win rate > 55% AND max drawdown < 15%
 - Never modify bot logic without backtesting first
+- **BACKTEST ON LIGHTER ONLY — the venue we trade is the venue we measure
+  (operator rule, 17-Jul: "Lighter needs to be the only exchange backtests run
+  on as we run on lighter").** LIGHTER-FIRST governed SERVICES since 14-Jul;
+  this extends it to EVIDENCE. A backtest on another venue's data is not
+  validation of a Lighter bot — it is a hypothesis about Lighter.
+  WHY, measured 17-Jul: **every funding backtest in this repo loads
+  HYPERLIQUID** (`backtest_directional_funding` / `_scanner` / `_carry_hedged` /
+  `_funding` / `_regime` / `_leverage` / `_persistence` / `study_funding_settlement`),
+  and the Tide Rider set loads HL **+ Binance** (`backtest_tide_rider` /
+  `_perp` / `_scanner`). **Both LIVE bots' go-live justifications are on that
+  list**, and it has already cost real money twice:
+    * Funding Farmer — `FUNDING_ENTER_APR=0.40` was fitted on HL (hourly, so
+      `24*365` is CORRECT there) and ported to Lighter as a bare constant.
+      Lighter quotes per 8h, so the LIVE gate silently admitted at **5% TRUE**
+      for as long as it has run, on a bar no backtest ever supported.
+    * Tide Rider — its header's "~13pp funding drag / +52% spot -> +40% perp"
+      is **Hyperliquid's funding**, from a script whose own line 16 claims it
+      shows "what Lighter would actually deliver".
+  THE RULE: a Lighter bot's evidence comes from Lighter's own tape. If a study
+  must be cross-venue (e.g. the HL-vs-Lighter equivalence study), that is a
+  DECLARED exception with a reason — the same pattern as `BORN_DARK_OK` /
+  `VENUE_PURITY_OK`. `scripts/audit_venue_purity.py` currently SKIPS `scripts/`
+  (`_SKIP_DIRS`, "research tools") — extending it to backtests is what makes
+  this rule enforced rather than merely written; an unenforced rule rots.
+  THE COST, state it honestly: **Lighter's tape is ~438d** (settled hourly
+  funding pages backward via `/api/v1/fundings` with `end_timestamp=oldest-3600`;
+  candles page 500 bars). So Lighter-only means **~14 months, not 2.7 years** —
+  Tide Rider's 2.7yr window is NOT reproducible on Lighter and never will be.
+  That is a real loss of window, and it is the price of measuring the venue that
+  holds the money. Short-and-honest beats long-and-borrowed: a 438d Lighter
+  result is evidence; a 2.7yr HL result about a Lighter bot is an assumption
+  wearing a number. Retired-bot backtests (Kraken originals) are HISTORY — do
+  not re-run them; they justify nothing that still trades.
 - **LIVE BOTS ALWAYS IN AUDIT SCOPE (operator rule, 16-Jul).** Every audit,
   bug-scan, code-review, or security-review — WHATEVER its nominal scope —
   MUST also check the LIVE REAL-MONEY bots in the same pass: Funding Farmer
