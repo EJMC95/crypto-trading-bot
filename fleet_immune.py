@@ -380,6 +380,29 @@ def send_push(title, body, priority="high"):
         return False
 
 
+def notify_ledger(prior_sick, sick_ids, delivered=()):
+    """[2026-07-17 AUDIT] The `notified` ledger — what has been DELIVERED, not
+    what has been SEEN. Pure, so the selftest drives THIS, not a copy of it.
+
+    Carries forward the prior ids that are STILL sick, plus whatever this cycle
+    actually pushed. Dropping a healed id is deliberate: a recurrence should
+    page afresh rather than be suppressed forever by an old delivery.
+
+    The bug this replaces: `notified` was set to every sick_id and saved BEFORE
+    the push decision, so a finding the gap limiter vetoed (NOTIFY_GAP_H=6h) or
+    whose push FAILED (send_push returns False when NTFY_TOPIC is unset or ntfy
+    is down) was recorded as already-notified. `new_sick = sick_ids -
+    prior_sick` was then empty forever: the edge was CONSUMED, not deferred.
+    Measured — 21h continuously sick after one failed push: 0 pages; born-dark
+    sickness appearing 1h after any unrelated page: 0 pages, for 12h. Both now
+    page. That silence defeated the runtime backstop CLAUDE.md names for the
+    BORN-DARK class, a class that caused three incidents in three days.
+
+    Errs toward re-paging over swallowing — the right direction for a detector
+    of last resort."""
+    return sorted((set(prior_sick) & set(sick_ids)) | set(delivered))[:50]
+
+
 def run_once():
     now = now_ts()
     prior = store.load_state(KEY) or {}
@@ -437,6 +460,7 @@ def run_once():
     payload = {
         "updated": _iso(now), "ttl_sec": TTL_SEC,
         "sick": sick[:30],
+        # (the ledger is built by notify_ledger() — see the note on it below)
         "quarantined_levers": q,
         "pruned_alerts": len(pruned),
         "pruned_detail": pruned[:10],
@@ -444,7 +468,28 @@ def run_once():
         # [2026-07-16] first-seen map for the application invariant — the
         # organ's own memory of when each (lever, value) appeared.
         "app_seen": app_seen,
-        "notified": sorted(sick_ids)[:50],
+        # [2026-07-17 AUDIT] `notified` records what was DELIVERED, not what was
+        # SEEN. It used to be set to every sick_id and saved BELOW, before the
+        # push decision — so a finding the gap limiter vetoed (NOTIFY_GAP_H=6h)
+        # or whose push FAILED (send_push returns False when NTFY_TOPIC is unset
+        # or ntfy is down) was recorded as "already notified". `new_sick =
+        # sick_ids - prior_sick` was then empty on every later cycle: the edge
+        # was CONSUMED, not deferred, and the page never came.
+        #
+        # Measured: sick continuously for 72h -> 0 pages, because one unrelated
+        # finding had paged an hour earlier. And 21h of continuous sickness with
+        # a failing push -> 1 attempt, never retried — the limiter would have
+        # ALLOWED it; new_sick was simply empty.
+        #
+        # That defeats the runtime backstop CLAUDE.md names for the BORN-DARK
+        # class ("fleet_immune pages when brain-vitals reports engine=v2..."),
+        # for a bug class that caused three incidents in three days — silenced
+        # by any other sickness in the prior 6h.
+        #
+        # So: carry the PRIOR set forward here, and only add the ids we actually
+        # pushed (below, on send_push success). Undelivered sickness stays NEW
+        # and pages on the next cycle the limiter allows.
+        "notified": notify_ledger(prior_sick, sick_ids),
         # [2026-07-16 AUDIT FIX] last_push must be IN the saved payload — the
         # first save dropped it, so the stored gap survived exactly one cycle
         # and NOTIFY_GAP_H was effectively ~2 cycles.
@@ -473,6 +518,13 @@ def run_once():
             f"\n\nquarantined: {sorted(q)}" if q else "")
         if send_push(f"🛡️ fleet immune: {len(new_sick)} new sickness finding(s)", body):
             payload["last_push"] = now
+            # [2026-07-17 AUDIT] commit the delivered ids ONLY on a successful
+            # push — this is the single place that may mark sickness "notified".
+            # The body is capped at 8 findings, so only those are recorded as
+            # delivered; the rest stay NEW and page next cycle rather than being
+            # silently dropped by the cap.
+            payload["notified"] = notify_ledger(prior_sick, sick_ids,
+                                                sorted(new_sick)[:8])
             store.save_state(KEY, payload)
 
     print(f"[fleet-immune] {_iso(now)} sick={len(sick)} quarantined={len(q)} "
@@ -639,7 +691,59 @@ def _selftest():
     assert organ_invariants({}, now) == []
     assert bot_row_sickness([]) == []
     assert application_sickness({}, [], now, {}) == {}
-    print("fleet_immune selftest OK (filtration age+antibody, lever sickness, "
+    # [2026-07-17 AUDIT] THE NOTIFY LEDGER: `notified` must mean DELIVERED, not
+    # SEEN. It was committed with every sick_id before the push decision, so a
+    # gap-vetoed or FAILED push consumed the edge and the finding never paged
+    # again. This silently defeated the runtime backstop CLAUDE.md names for the
+    # born-dark class. Mirrors run_once's real merge; `old=True` is the shipped
+    # bug, kept as the negative control so the fixture proves the DIFFERENCE.
+    def _notify_cycle(prior_notified, prior_last_push, sick_ids, now,
+                      push_ok, old=False):
+        # drives the REAL notify_ledger() — only the gap/push plumbing around
+        # it is mirrored here. `old=True` re-creates the shipped bug (seen ==
+        # notified) as the negative control.
+        prior_sick = set(prior_notified)
+        new_sick = sick_ids - prior_sick
+        notified = (sorted(sick_ids)[:50] if old
+                    else notify_ledger(prior_sick, sick_ids))
+        last_push, pushed = prior_last_push, False
+        if new_sick and now - last_push >= NOTIFY_GAP_H * 3600:
+            if push_ok:
+                last_push, pushed = now, True
+                if not old:
+                    notified = notify_ledger(prior_sick, sick_ids,
+                                             sorted(new_sick)[:8])
+        return notified, last_push, pushed
+
+    _T = 1_784_000_000.0        # a REAL unix ts: `now - last_push` must be huge
+    for _old, _want in ((True, 0), (False, 1)):
+        # a FAILED push (ntfy down / NTFY_TOPIC unset), then 21h sick + healthy
+        _n, _lp, _ = _notify_cycle([], 0, {"BORN_DARK"}, _T, False, _old)
+        _pages = 0
+        for _h in range(1, 22):
+            _n, _lp, _p = _notify_cycle(_n, _lp, {"BORN_DARK"},
+                                        _T + _h * 3600, True, _old)
+            _pages += 1 if _p else 0
+        assert _pages == _want, (f"failed-push retry: old={_old} "
+                                 f"pages={_pages} want={_want}")
+        # RATE-LIMITED: an unrelated finding pages, then born-dark appears 1h on
+        _n, _lp, _ = _notify_cycle([], 0, {"A"}, _T, True, _old)
+        _pages = 0
+        for _h in range(1, 13):
+            _n, _lp, _p = _notify_cycle(_n, _lp, {"A", "B"},
+                                        _T + _h * 3600, True, _old)
+            _pages += 1 if _p else 0
+        assert _pages == _want, (f"gap-vetoed retry: old={_old} "
+                                 f"pages={_pages} want={_want}")
+    # a DELIVERED finding must not re-page every cycle (the limiter still works)
+    _n, _lp, _ = _notify_cycle([], 0, {"A"}, _T, True)
+    assert _n == ["A"], _n
+    _n2, _, _p2 = _notify_cycle(_n, _lp, {"A"}, _T + 7 * 3600, True)
+    assert _p2 is False and _n2 == ["A"], "delivered sickness must stay quiet"
+    # a HEALED finding drops out of the ledger, so a recurrence pages afresh
+    assert _notify_cycle(["A"], _T, set(), _T + 8 * 3600, True)[0] == []
+
+    print("fleet_immune selftest OK (notify ledger delivered!=seen, filtration age+antibody, lever sickness, "
           "organ invariants, bot-row sickness, death!=sickness, "
           "application invariant)")
 

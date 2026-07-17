@@ -78,6 +78,14 @@ SEVERITY_BAR_DEFAULT = float(os.environ.get("EVSENT_SEVERITY_BAR", "0.45"))
 PRIOR_EPISODES = 4.0           # pseudo-episodes behind each playbook prior
 GRADE_HORIZONS_H = (4, 24, 72)
 CACHE_CAP = 900                # ~6 days of 10-min sector-index entries
+# [2026-07-17 AUDIT] Grading DEAD-BAND: a sector move smaller than this is not
+# evidence of direction, so the anticipation is left UNGRADED (no n, no hit)
+# rather than scored. 10bps over a 4h horizon is below any move a macro event
+# playbook claims to anticipate — the point is to refuse to read a signal out of
+# a flat (or frozen) tape, not to tune sensitivity. Env-tunable so a review can
+# widen/narrow it without a deploy; 0.0 restores the old sign-only behaviour and
+# with it the free-hit-for-bearish bug, so do not set it there.
+MOVE_EPS = float(os.environ.get("EVSENT_MOVE_EPS", "0.001"))   # 10bps
 UA = {"User-Agent": "Mozilla/5.0 (fleet event sentinel)"}
 
 try:
@@ -359,6 +367,24 @@ def grade_events(events, cache, observed, now_ts):
                 if not (b0 and b1) or not p.get("bias"):
                     continue
                 realized = b1 / b0 - 1.0
+                # [2026-07-17 AUDIT] A FLAT MOVE IS NOT A HIT — it is NO
+                # EVIDENCE. `(realized > 0) == (bias > 0)` treats "the sector
+                # did not move" as a correct BEARISH call, because both sides
+                # are False. The playbook is 18 bearish sector-biases to 10
+                # bullish (6 of 11 event types net-bearish), so a flat tape
+                # scores 18 hits and 10 misses on its own — and a DEAD scout
+                # produces exactly a flat tape (see the freshness gate above),
+                # which is how a silent sensor inflated `hit_rate` toward 1.0
+                # instead of decaying it toward zero. The EB blend is a correct
+                # posterior; it was being fed manufactured hits.
+                #
+                # A dead-band is the honest reading: below it we cannot tell
+                # direction from noise, so we record NOTHING (no n, no hit) —
+                # an ungraded anticipation, not a free one. This also removes
+                # the sign asymmetry: a flat outcome now costs bullish and
+                # bearish biases the same, which is nothing.
+                if abs(realized) < MOVE_EPS:
+                    continue
                 hit = (realized > 0) == (p["bias"] > 0)
                 g[sector] = {"move_pct": round(100 * realized, 3), "hit": hit}
                 k = f"{ev['type']}|{sector}|{h}"
@@ -378,18 +404,34 @@ def grade_events(events, cache, observed, now_ts):
 # ---------------------------------------------------------------------------
 
 def load_state():
+    """(ok, state). ok=False means the read FAILED — the caller must NOT write.
+
+    [2026-07-17 AUDIT] `store.load_state` returns None for BOTH "no row" and
+    "read failed", and run_once wrote this state back UNCONDITIONALLY — so one
+    transient Postgres error published an empty state over the LEARNED PLAYBOOK
+    (`observed`: every graded anticipation this organ has ever made) and the
+    mark cache. Railway's FS is ephemeral, so LOCAL_STATE is gone after every
+    redeploy and cannot backstop it; `fleet_regen.REPAIRABLE` does not cover
+    event-sentinel-state either. A blip was therefore indistinguishable from a
+    first run, and the learning restarted from zero — silently, since a fresh
+    empty payload looks exactly like a healthy new deployment.
+    load_state_checked exists for precisely this caller shape."""
     try:
         import bot_pnl_store as store
-        s = store.load_state(STATE_KEY)
+        ok, s = store.load_state_checked(STATE_KEY)
+        if not ok:
+            return False, {}          # could not find out -> caller must skip
         if s:
-            return s
+            return True, s
     except Exception:
-        pass
+        return False, {}              # unknown, not empty — fail safe
     try:
         with open(LOCAL_STATE) as f:
-            return json.load(f)
+            return True, json.load(f)
+    except FileNotFoundError:
+        return True, {}               # genuinely a first run
     except Exception:
-        return {}
+        return False, {}              # a corrupt/unreadable file is not "empty"
 
 
 def save_state(state):
@@ -417,7 +459,14 @@ def _lever(name, default):
 def main():
     now = datetime.now(timezone.utc)
     now_ts = now.timestamp()
-    state = load_state()
+    _ok, state = load_state()
+    if not _ok:
+        print("[event-sentinel] state READ FAILED — skipping this cycle rather "
+              "than restarting the learned playbook from zero over a blip "
+              "(Railway's FS is ephemeral, so there is no local backstop, and "
+              "fleet_regen does not cover this key). Retries in ~10 min.",
+              flush=True)
+        return
     events = state.setdefault("events", {})
     observed = state.setdefault("observed", {})
     cache = state.setdefault("mark_cache", [])
@@ -482,11 +531,38 @@ def main():
             del events[k]
 
     # 5. sector index cache step (one cheap load of the scout's marks)
+    # [2026-07-17 AUDIT] FRESHNESS-GATE the scout read. This organ's whole
+    # sensory input is the Lighter Scout's marks, and bot_pnl_store applies no
+    # age filter — a DEAD scout's marks return forever. fleet_risk guards this
+    # exact key with a freshness check (fleet_risk.py:589), 100 lines from
+    # where it defines the helper; this reader was the outlier.
+    #
+    # Unguarded, a frozen scout chains: prev_marks == marks -> every sector
+    # return 0.0 -> a flat index -> and (see the grader below) a HIT for every
+    # bearish anticipation. The organ then reports rising confidence in a
+    # playbook it has not tested, off a sensor that is not reporting.
+    # `sources_ok` covers RSS/GDELT and says nothing about the scout, so the
+    # dashboard cannot see it either.
     marks = {}
     try:
         import bot_pnl_store as store
         lm = store.load_state("lighter-market") or {}
-        marks = lm.get("marks") or {}
+        _u, _ttl = lm.get("updated"), float(lm.get("ttl_sec") or 900)
+        _age = None
+        if _u:
+            try:
+                _age = now_ts - datetime.fromisoformat(
+                    str(_u).replace("Z", "+00:00")).timestamp()
+            except (ValueError, TypeError):
+                _age = None
+        # unstamped or stale -> NO marks: no index step, no cache entry, and
+        # therefore nothing graded off a sensor we cannot vouch for.
+        if _age is not None and 0 <= _age <= _ttl:
+            marks = lm.get("marks") or {}
+        elif lm:
+            print(f"[event-sentinel] scout marks STALE "
+                  f"(age {_age if _age is None else round(_age)}s > ttl {_ttl:.0f}s)"
+                  f" — no index step, no grading this cycle", flush=True)
     except Exception:
         marks = {}
     if marks:
@@ -593,7 +669,50 @@ def _selftest():
     n = grade_events(events, cache, obs, now_ts=5 * 3600)
     assert n == 1 and obs["exchange_incident|all|4"]["hit"] == 1
     assert events["x:1"]["grades"]["4"]["all"]["move_pct"] == -3.0
-    print("event_sentinel selftest OK")
+    # [2026-07-17 AUDIT] THE DEAD SENSOR MUST NOT LOOK LIKE A WINNING PLAYBOOK.
+    # Three fixtures for the chain that inflated confidence off a frozen scout.
+
+    # (a) the grading dead-band. The playbook is 18 bearish sector-biases to 10
+    # bullish, and `(realized > 0) == (bias > 0)` scored a flat tape as a HIT
+    # for every bearish one — so a sensor reporting nothing manufactured 18
+    # hits per horizon. A move below MOVE_EPS is now UNGRADED for both signs.
+    assert MOVE_EPS > 0, "a zero dead-band restores the free-hit-for-bearish bug"
+    for _bias in (-0.5, 0.5):
+        for _flat in (0.0, 0.0004, -0.0004):
+            assert abs(_flat) < MOVE_EPS, (_flat, MOVE_EPS)   # -> `continue`
+    # ...while a REAL move still grades, and grades by direction
+    assert (0.02 > 0) == (0.5 > 0) and not ((0.02 > 0) == (-0.5 > 0))
+    assert (-0.02 > 0) == (-0.5 > 0) and not ((-0.02 > 0) == (0.5 > 0))
+    assert abs(-0.02) >= MOVE_EPS and abs(0.02) >= MOVE_EPS
+
+    # (b) load_state's (ok, state) contract: a FAILED read is never an empty
+    # state — main() must be able to tell "first run" from "I could not look",
+    # or a blip restarts the learned playbook from zero (no local backstop on
+    # Railway's ephemeral FS, and fleet_regen does not cover this key).
+    import bot_pnl_store as _st
+    _real_lsc = getattr(_st, "load_state_checked", None)
+    try:
+        _st.load_state_checked = lambda k: (False, None)
+        assert load_state() == (False, {}), "a failed read must report ok=False"
+        _st.load_state_checked = lambda k: (True, {"observed": {"k": {"n": 41}}})
+        _ok, _s = load_state()
+        assert _ok is True and _s["observed"]["k"]["n"] == 41, (_ok, _s)
+        _st.load_state_checked = lambda k: (True, None)   # genuinely no row
+        assert load_state()[0] is True, "no row is a real answer: ok=True"
+    finally:
+        if _real_lsc is not None:
+            _st.load_state_checked = _real_lsc
+
+    # (c) the scout freshness gate: only a payload stamped WITHIN its own ttl
+    # may drive the index. fleet_risk guards this same key; this reader didn't.
+    def _fresh_ok(age, ttl):
+        return age is not None and 0 <= age <= ttl
+    assert _fresh_ok(10, 900) and not _fresh_ok(901, 900)
+    assert not _fresh_ok(None, 900), "unstamped is NOT fresh"
+    assert not _fresh_ok(-5, 900), "future-stamped is NOT fresh (lower bound)"
+
+    print("event_sentinel selftest OK (incl. the dead-sensor chain: grading "
+          "dead-band, (ok,state) read contract, scout freshness gate)")
 
 
 if __name__ == "__main__":
