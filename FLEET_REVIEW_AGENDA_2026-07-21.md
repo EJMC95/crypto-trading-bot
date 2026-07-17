@@ -696,6 +696,36 @@ first time ever. This is the biggest open real-money question on the agenda.
   as THAT (it is what the record says it is) — its TP/stop bars then need
   tuning, not its funding gate; (c) shrink and keep measuring. **Real money +
   open positions (ETH/HYPE/SNDK/XAU short) — operator's call, not mine.**
+- **THE BOT IS FRICTION-BOUND, NOT EDGELESS — and the deciding number was never
+  measured (17-Jul, later).** Driving slip to ZERO isolates a **+6.18 bps/trade
+  GROSS edge over 1,911 trades, both halves positive** — config TP 0.04 /
+  **STOP 0.10 -> 0.03** / hold 72h at gate 0.05 TRUE. It is the ONLY config that
+  survives (TP 0.06 fails h2 at every slip; STOP 0.10 never passes). So a real
+  edge exists; it cannot pay its execution. And the round-trip cost has THREE
+  estimates **14x apart, none of them measured**: backtest ASSUMED 10bps
+  (loses -$18) / shadow MODELS 1.7bps (wins +$20, both halves) / the
+  live-vs-shadow gap implies ~25bps (loses badly). **The 5bps/fill that produced
+  "no gate has an edge" is an assumption too — that verdict is only as good as
+  it is.**
+- **WHY IT COULD NOT BE MEASURED, now fixed (17-Jul (g)).** The live bot had
+  **never recorded a fill price**: all three `publish_venue_order` calls passed
+  `px_fill=px_decision`, so `slippage_bps` was NULL on all 48 live rows (the
+  shadow twin reports 0.86bps/fill over n=158). CLAUDE.md claimed since 15-Jul
+  that it records fills; it never did. FIXED — both live close paths now publish
+  the decision mid and the REAL venue fill, and an echoed decision records NULL
+  rather than a fabricated 0.0. **The organ built to measure this was also
+  lying**: it compared 7-day AVERAGE entry prices between arms that trade at
+  different moments, i.e. price DRIFT (HYPE -363.2bps entry beside +359.3bps
+  exit) — withdrawn, and its selftest re-pinned (it had pinned the bug: one
+  synthetic trade per arm, where the subtraction trivially IS the slippage).
+- **DECIDE: measure first, then tune — do not reverse it.** `STOP 0.10->0.03`
+  is cheap and supported, but shipping it while the dominant term is unmeasured
+  is tuning the small number. There is also **no `hard_stop` lever** in the
+  fleet_tuning registry, so the doctrine-compliant path (shadow twin -> judge)
+  needs a registry addition first. Give the fixed telemetry ~a week of live
+  closes, read `impl-shortfall.order_slip.live.slip_bps`, and THEN decide
+  between: tune the stop / fix execution (post-only/maker, since the edge is
+  ~6bps and the spread is ~1.7bps) / park.
 - **COMMIT (b) — the gate re-tune — IS WITHDRAWN, not deferred.** There is no
   gate to tune to. Tuning `FUNDING_ENTER_APR` to any value is unsupported by the
   only data that has ever measured this bot on its own venue.
