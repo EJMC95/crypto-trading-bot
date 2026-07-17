@@ -1,4 +1,4 @@
-## 11. Fleet clock v2: first consumers for market open/close events (added 16-Jul)
+## 11. Fleet clock v2: does the clock get a consumer at all? (added 16-Jul; menu struck 17-Jul)
 
 **What shipped (16-Jul, operator: "when any market opens or closes we are
 able to allocate resources"):** the circadian organ (`fleet_clock.py`) went
@@ -40,28 +40,83 @@ the recycled momo-bot service — not Stock Leaders (names lie; check what a
 service RUNS). And `lighter_momentum_bot`'s universe holds BTC/ETH/XAU/XAG/
 WTI — 5 of its 25 candidates are NOT NYSE-clocked, so a whole-rotation gate
 pins 24/7 legs to the NYSE bell.
-**If a clock consumer is still wanted, the honest options are:** scanners
-(cadence boost in `event_window` — a real resource rationale, no exit path
-to suppress) or heavy-jobs (`heavy_ok`). If equities are ever revisited, the
-only defensible claim is FILL QUALITY (don't cross a thin after-hours
-equity-perp book) — a different hypothesis on a different evidence bar, and
-it must clear the existing 15y harness (`index_enhance_backtest.py`,
-`momentum_universe_backtest.py`) on both halves first, scoped per-symbol so
-non-NYSE legs are exempt.
+**⛔ 17-Jul (later, on review of the withdrawal itself): THE MENU IS
+WITHDRAWN TOO — this item no longer offers a pick-list.** The equities gate
+was refuted on TWO independent grounds and only the empirical one got
+written down. The one that got dropped is the one that generalizes:
+- **DOCTRINE — and it does not care which option was picked.** This organ is
+  advisory/publish-first, and its own header states the contract: *"nothing
+  is FORCED to obey it until a consumer earns the wiring at a review (21-Jul
+  agenda item 11)."* Wiring a consumer IS the design decision this item
+  exists to make. A session that takes an option off this list and builds it
+  has pre-empted the review using the review's own homework as its warrant —
+  which is exactly what happened on 17-Jul. That argument applies to
+  scanners and heavy-jobs **verbatim**. Nothing here gets wired by a session.
+- **THE MENU IS NOT EVIDENCE.** All three options were written by the same
+  16-Jul session, in one breath, with the same (zero) verification. The
+  operator's mandate was the ORGAN — "when any market opens or closes we are
+  able to allocate resources" — not this list; *able to* is what the organ
+  already delivers. One of the three was finally checked against the real
+  code and turned out to be **fabricated**: it described a bot design this
+  repo does not contain. The other two did not survive scrutiny — **they
+  were never scrutinised.** They are survivors, not findings. Writing
+  "scanners/heavy-jobs remain the honest candidates" (as this item and the
+  17-Jul CHANGELOG both did) reproduced the exact unearned confidence that
+  produced the fabrication, one line further down the same page. Struck.
+
+**What the review actually decides (real reasoning, not this menu):** first,
+whether the clock gets a consumer AT ALL. "We built an organ" is not a
+reason to obey it; an advisory organ nobody obeys is a valid resting state,
+and the fleet already has one honest use for the clock — a human reading the
+dashboard. If a consumer IS wanted, its premise must arrive **stated as a
+claim about code that exists**, verified by inspection before anything is
+built — the check that took one `grep` on 17-Jul and would have saved the
+entire build. The two struck options are restated below as UNVERIFIED
+premises so the review can attack them properly rather than inherit them.
+*This restatement is itself unverified reasoning — attack it too.*
+- *Scanners* (Lighter Scout / Gap Scout) — the claim was "opens/closes are
+  when dislocations and vol moves happen." Never tested. Note its shape:
+  both are **crypto** scanners on 24/7 books, and the option keys their
+  cadence to an **equity** bell — the same family of unexamined assumption
+  the equities premise turned out to be. It is also cheaply checkable
+  against data the fleet already collects: `gapscout-census` writes a
+  history row on every episode open/close carrying a UTC `updated`, so
+  hour-of-day episode density vs the `fleet-clock` transition log answers it
+  with no new code and no shadow-days. Caveat, honestly: epoch 2 only
+  started 15-Jul, so the record may still be too thin to answer — which is
+  itself worth knowing BEFORE anyone builds. Run the check first; if
+  dislocations are flat across the bell, the option dies without a build.
+- *Heavy jobs* (incubator breeding, big sweeps) — the claim was that heavy
+  jobs running inside an event window cost something. Never tested, and no
+  resource has been named as scarce: the sweeps contend for CPU with loops
+  that are not on a deadline. Name the contended resource and measure the
+  contention, or this is a knob that buys a tidier story and no dollars.
+
+If equities are ever revisited, the only defensible claim is FILL QUALITY
+(don't cross a thin after-hours equity-perp book) — a different hypothesis
+on a different evidence bar, and it must clear the existing 15y harness
+(`index_enhance_backtest.py`, `momentum_universe_backtest.py`) on both
+halves first, scoped per-symbol so non-NYSE legs are exempt.
 Also: EVBOARD_MODE=publish was checked and is currently INERT — zero coded
 consumers of board proposals exist; that review item is really "design the
 proposal consumer", not "flip the env".
 
-**Original options (equities WITHDRAWN — see above; the other two stand):**
+**Original options — ALL THREE STRUCK 17-Jul. Kept verbatim as a record of
+what the menu claimed, NOT as a pick-list. Nothing below is a live option:**
 - ~~**Equities books** (Index Rider 📊 / Stock Leaders 🏆): idle their scan
   loop while `markets.nyse.open` is false (the underlying doesn't print;
   a frozen index makes their marks noise) and wake at `next_open_utc`.
-  Cheapest win, clearly correct~~ — **premise false, withdrawn 17-Jul.**
-- **Scanners** (Lighter Scout / Gap Scout): cadence boost inside
-  `event_window` — opens/closes are when dislocations and vol moves happen.
-- **Heavy jobs** (incubator breeding, big sweeps): consume `heavy_ok`
+  Cheapest win, clearly correct~~ — **premise FABRICATED, withdrawn 17-Jul.**
+  ("Cheapest win, clearly correct" was the most confident line on the page
+  and the only one checked against the code. It was false. Calibration note
+  for everything else written in that voice, here and elsewhere.)
+- ~~**Scanners** (Lighter Scout / Gap Scout): cadence boost inside
+  `event_window` — opens/closes are when dislocations and vol moves
+  happen.~~ — **premise UNVERIFIED, struck 17-Jul.** Not refuted; never
+  tested. See the restated open question above.
+- ~~**Heavy jobs** (incubator breeding, big sweeps): consume `heavy_ok`
   instead of running whenever — the flag now means "thin AND nothing
-  opening/closing".
+  opening/closing".~~ — **premise UNVERIFIED, struck 17-Jul.** Same.
 
 **Grade before wiring:** pull `fleet-clock` history — did the NYSE
 open/close transitions land at the right instants (DST honest, no holiday

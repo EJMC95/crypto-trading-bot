@@ -13,9 +13,16 @@ heavy low-priority jobs.
 v2 (2026-07-16, operator: "when any market opens or closes we are able to
 allocate resources"). The clock now knows EVENTS, not just zones:
   * a real NYSE calendar — zoneinfo DST, 2026-27 holidays, 13:00-ET early
-    closes — because the equity-perp books (Index Rider 📊 / Stock Leaders
-    🏆) trade underlyings that only PRINT during NYSE regular hours; their
-    perps trade 24/7 on a frozen index the rest of the time.
+    closes. Built "because the equity-perp books (Index Rider 📊 / Stock
+    Leaders 🏆) trade underlyings that only PRINT during NYSE regular hours;
+    their perps trade 24/7 on a frozen index the rest of the time." Those
+    facts are true; the "because" was REFUTED 17-Jul. Neither book's signal
+    has ever read a perp mark — `want_position()` / `evaluate()` are pure
+    functions of Yahoo dailies of the REAL market — so the frozen index
+    enters no decision and the bell is not decision-relevant to them. The
+    calendar STAYS (honest time math, pre-graded accurate to within one
+    5-min tick, DST-correct); what it does not come with is a reason for
+    anyone to obey it. See 21-Jul agenda item 11.
   * `events` / `next_event`: the next open/close of EVERY market (NYSE +
     the three crypto liquidity sessions), each with an absolute `at_utc`.
     Consumers allocate resources off `at_utc` (authoritative); the sampled
