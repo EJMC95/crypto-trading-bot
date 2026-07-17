@@ -551,6 +551,49 @@ gives noisy ratios, e.g. MU 12.1 / MSTR 26.5, and proves nothing either way.)
   genuinely mis-set? `funding-carry-structural-edge-lighter` memory says the
   40% gate is backtest-confirmed; check WHICH units that backtest ran in.
   **Backtest-first either way. Do not flip it live on this finding alone.**
+- **✅ SETTLED 17-Jul (later) — it is the SECOND horn: GENUINELY MIS-SET, and
+  worse than the question assumed.** Checked which units the backtests ran in.
+  **Every funding backtest in this repo loads HYPERLIQUID**, not Lighter:
+  `backtest_directional_funding.py` (its header: *"tune the Funding Farmer's
+  RISK defaults… The Funding Farmer (`lighter_funding_bot.py`)… Funding accrues
+  hourly at the live rate"*, `HL = "https://api.hyperliquid.xyz/info"`),
+  `backtest_scanner.py` (*"real HL hourly funding + 1h candles"*),
+  `backtest_carry_hedged.py`, `backtest_tide_rider_scanner.py` — all `HL = …`,
+  all `H = 24 * 365`. **HL funding really IS hourly, so `24*365` is CORRECT
+  there and `ENTER_APR = 0.40` was fitted against a TRUE 40% APR.** The number
+  was born in `funding_carry_bot.py` (HL data, correct units, *"[2026-07-06]
+  raised from 20% to avoid fee bleed"*) and ported to `lighter_funding_bot.py`
+  as a bare constant. **The PORT is the bug: it silently multiplied the gate's
+  looseness by 8.** So "fixing" the conversion alone does NOT merely re-label —
+  it restores the gate that was actually validated. The live bot has been
+  admitting at 5% true since the port, on a bar no backtest ever supported.
+- **The deeper finding the sweep should carry to the review: ZERO backtests
+  ran on Lighter funding data.** The Funding Farmer's entire evidence base is a
+  DIFFERENT VENUE's funding series, ported across a basis mismatch nobody
+  noticed. So neither 40% true nor 5% true is established *on the venue that
+  holds the money* — and Lighter's economics genuinely differ (zero perp fee;
+  see `funding-carry-structural-edge-lighter`: *"zero perp fee flips it
+  net-positive"*), so the right Lighter gate is probably NOT HL's 40% either.
+  The missing artifact is a **Lighter-data funding backtest**; that, not a
+  conversion patch, is what unblocks the decision.
+- **⚠️ DO NOT GLOBAL-REPLACE `24 * 365` — that breaks four CORRECT call
+  sites.** The fleet already knows both conventions and applies them correctly
+  everywhere except Lighter: `funding_carry_bot.py` + `market_context.py` read
+  **Hyperliquid** (hourly → `24*365` RIGHT), `market_pulse.py` reads **Binance**
+  and already does `rate_8h * 3 * 365` (RIGHT), and every `scripts/backtest_*`
+  is HL (RIGHT). It is wrong on exactly ONE venue — the one carrying real
+  money. The fix is a **per-venue basis constant**, not an arithmetic
+  correction.
+- **Ship it as TWO commits that never mix** (the [[ab-tests-must-vary-exactly-one-variable]]
+  rule, and the same shape as Stock Leaders' epoch 2): **(a) denomination,
+  behaviour-NEUTRAL** — correct the Lighter conversion AND divide every
+  Lighter-denominated threshold by 8 in the SAME commit (`ENTER_APR`
+  0.40→0.05, `AB_VETO_APR` 1.5→0.1875, `DIV_GAP_PP` 300→37.5), asserting entry
+  decisions are bit-identical, so ledgers/reports go true while behaviour does
+  not move; stamp an epoch (pre-fix drag is void). **(b) re-tune the gate** —
+  the real, operator-gated question, backtest-first on Lighter data. Doing (a)
+  alone is honest and safe; doing (b) by accident *inside* (a) is how a
+  reporting fix silently becomes an 8x live entry change.
 - Same question for `AB_VETO_APR` 1.5 (= **18.75% true**, ~3x TIGHTER than
   Stock Leaders' ~52% breakeven, so it vetoes affordable names and holds cash)
   and `DIV_GAP_PP` 300/500.
