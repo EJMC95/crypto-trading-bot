@@ -45,6 +45,7 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 from venues import venue_context
+from venues.safety import open_notional
 
 BOT = "lighter-perp-sniper"
 
@@ -126,10 +127,16 @@ def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
                    max_age_sec=PENDING_MAX_AGE_SEC):
     """One snipe pass over `candidates`. Mutates `pending` and `baseline`.
 
-    `try_snipe(sym)` does the I/O and returns True only if a position actually
-    OPENED; any retryable skip returns False. This function owns the one rule
-    the old code got wrong: a symbol enters `baseline` on exactly two routes —
-    a snipe that opened, or a bounded give-up — and on nothing else.
+    `try_snipe(sym, open_now)` does the I/O and returns True only if a position
+    actually OPENED; any retryable skip returns False. This function owns the one
+    rule the old code got wrong: a symbol enters `baseline` on exactly two routes
+    — a snipe that opened, or a bounded give-up — and on nothing else.
+
+    `open_now` is passed to `try_snipe` because the notional cap needs the count
+    INCLUDING this pass's earlier opens: position snapshots come over REST and
+    are eventually consistent, so a clip sent two seconds ago may still be
+    invisible. Without it, two snipes in one pass can both price the cap off the
+    same stale snapshot and both be admitted (see venues.safety.open_notional).
 
     `is_held(sym)` is the DOUBLE-OPEN guard. The old unconditional fold was, by
     accident, also a "snipe each market at most once" latch; retrying without
@@ -165,7 +172,7 @@ def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
             log.info("%s: cap %d reached — stays pending (age %.0f min)",
                      sym, max_open, age / 60)
             continue
-        if try_snipe(sym):
+        if try_snipe(sym, open_now):
             pending.pop(sym, None)
             baseline.add(sym)
             sniped.append(sym)
@@ -214,28 +221,40 @@ def main():
     # publishes a healthy row while sniping nothing — the exact silent-zero this
     # file was fixed for. Retrying cannot help (an unset var will not appear), so
     # say the real cause and refuse now rather than after 3 misleading tries.
+    #
+    # [2026-07-17 FUNDED-MODE FIX] Every line of this guard, and the restore it
+    # protects, used to be gated `if dry_run` — so it existed only in shadow. In
+    # lighter_live/lighter_testnet the venues layer returns broker=None, hence
+    # dry_run=False, hence the baseline was never read back: each boot re-seeded
+    # from the current active set, silently absorbing any listing that appeared
+    # during the restart, and the pending retry clock died with the process. The
+    # case for a durable baseline is about DETECTION, which is venue-independent
+    # — if anything it is stronger with real money, where a missed listing and a
+    # doubled clip both cost. Only the paper broker's own state is dry_run-
+    # specific. State is keyed by ctx.bot_id, which the venues layer already
+    # suffixes per mode (-lshadow / -ltest / -lighter), so the live row reads and
+    # writes its OWN baseline and can never inherit the shadow twin's.
     _saved, _ok = None, True
-    if dry_run and not os.environ.get("DATABASE_URL", "").strip():
+    if not os.environ.get("DATABASE_URL", "").strip():
         log.error("DATABASE_URL is not set. This sniper's correctness DEPENDS on a"
                   " durable baseline: with no persistence every boot re-seeds and"
                   " absorbs every live listing, so it would look online and snipe"
                   " nothing. Refusing to run.")
         sys.exit(3)
-    if dry_run:
-        for _try_n in range(1, STATE_READ_TRIES + 1):
-            _ok, _saved = store.load_state_checked(bot_id)
-            if _ok:
-                break
-            log.error("state read FAILED (try %d/%d) — NOT seeding: an unreadable"
-                      " state is indistinguishable from a fresh bot, and seeding"
-                      " now would absorb every live listing forever.",
-                      _try_n, STATE_READ_TRIES)
-            if _try_n < STATE_READ_TRIES:
-                time.sleep(LOOP_SECONDS)
-        if not _ok:
-            log.error("state unreadable after %d tries — exiting rather than "
-                      "seeding a false baseline.", STATE_READ_TRIES)
-            sys.exit(3)
+    for _try_n in range(1, STATE_READ_TRIES + 1):
+        _ok, _saved = store.load_state_checked(bot_id)
+        if _ok:
+            break
+        log.error("state read FAILED (try %d/%d) — NOT seeding: an unreadable"
+                  " state is indistinguishable from a fresh bot, and seeding"
+                  " now would absorb every live listing forever.",
+                  _try_n, STATE_READ_TRIES)
+        if _try_n < STATE_READ_TRIES:
+            time.sleep(LOOP_SECONDS)
+    if not _ok:
+        log.error("state unreadable after %d tries — exiting rather than "
+                  "seeding a false baseline.", STATE_READ_TRIES)
+        sys.exit(3)
     if _saved:
         if dry_run and broker.restore_state(_saved.get("broker") or {}):
             log.info("restored paper state: equity $%.2f, %d open",
@@ -278,7 +297,7 @@ def main():
             reason=("long_" if was_long else "short_") + reason,
             venue=venue_tag, shadow=shadow_tag)
 
-    def open_snipe(sym, now_ts):
+    def open_snipe(sym, now_ts, open_now):
         """Attempt ONE snipe. True only if a position actually opened.
 
         Every False is a retryable skip — the caller keeps the symbol pending
@@ -307,9 +326,21 @@ def main():
                 return False
             entry_ts[sym] = now_ts
         else:
-            open_notional = len(ctx.venue.positions()) * order_usd
-            if not ctx.rails.notional_ok(open_notional, order_usd):
-                log.info("%s NOTIONAL_CAP_SKIP — staying pending", sym)
+            # [2026-07-17 CAP FIX] was `len(positions()) * order_usd` — the
+            # count*clip estimate the 15-Jul CRITICAL fix deleted from both
+            # real-money bots and never reached this file (it was the last
+            # holdout; the helper is now shared, so there is no third copy to
+            # miss next time). Positions are keyed by symbol and were opened at
+            # THEIR clip, not the current one: on the live lane a
+            # live.clip_scale down-scale would have under-counted deployed
+            # notional and walked a new clip straight through the operator's
+            # hard cap. `meta={}` — this bot keeps no per-position clip record,
+            # so the venue's own avg entry price prices each held position.
+            open_ntl = open_notional(ctx.venue.positions(), {}, open_now, order_usd)
+            if not ctx.rails.notional_ok(open_ntl, order_usd):
+                log.info("%s NOTIONAL_CAP_SKIP ($%.2f deployed + $%.2f clip > "
+                         "cap $%s) — staying pending",
+                         sym, open_ntl, order_usd, ctx.rails.max_notional)
                 return False
             try:
                 ctx.venue.market_open(sym, DIRECTION_LONG, size)
@@ -386,7 +417,7 @@ def main():
         open_now, _sniped, _abandoned = run_snipe_pass(
             candidates=new_listings, pending=pending, baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
-            try_snipe=lambda s: open_snipe(s, now.timestamp()),
+            try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n),
             is_held=lambda s: s in _held_now)
 
         # ----- manage open snipes (TP / SL / max-hold) -----
@@ -395,6 +426,30 @@ def main():
         for coin, sz in list(held.items()):
             if not sz:
                 continue
+            if coin not in entry_ts:
+                # [2026-07-17 CLOCK FIX] `entry_ts.get(coin, now.timestamp())`
+                # recomputed the default EVERY loop, so a position with no
+                # recorded entry had held_sec ~0 forever and max_hold could never
+                # fire: held to eternity. That is the same "hold forever" failure
+                # the 16-Jul zombie guard closed for unpriceable books, arriving
+                # by another road — and unlike that one it is silent, because a
+                # 0-second hold looks perfectly healthy.
+                # It is reachable on the funded path specifically: entry_ts is
+                # set only AFTER market_open RETURNS, so an order that lands but
+                # whose ack times out leaves a REAL position with no clock. The
+                # is_held guard stops the double-open, but nothing backfilled the
+                # timestamp. A restart or a hand-opened position does the same.
+                # The true entry time is unknowable here — the venue's position
+                # payload carries no open time (lighter_client._positions_from
+                # returns size/entry/upnl only) — so start the clock at first
+                # sighting and say so out loud. Deliberately conservative: this
+                # exits LATE, never early, and never "never".
+                entry_ts[coin] = now.timestamp()
+                log.warning("%s: held with no entry timestamp (lost order ack, or"
+                            " opened before this process started) — starting the"
+                            " max-hold clock NOW: it exits %.0fh from this"
+                            " sighting, not from its real entry.",
+                            coin, MAX_HOLD_SEC / 3600)
             try:
                 px = _mid(ctx.venue.orderbook(coin))
             except Exception:  # noqa: BLE001
@@ -420,7 +475,7 @@ def main():
                 broker.mark(coin, px)
             gain = ((px - ent_px) / ent_px) if (ent_px and was_long) else \
                    ((ent_px - px) / ent_px) if ent_px else 0.0
-            held_sec = now.timestamp() - entry_ts.get(coin, now.timestamp())
+            held_sec = now.timestamp() - entry_ts[coin]
             reason = None
             if zombie:
                 reason = "delisted"
@@ -456,11 +511,20 @@ def main():
             pub_equity = broker.equity()
             pub_open = broker.open_count()
             pub_pnl = pub_equity - PAPER_START
+            _held_syms = sorted(broker.pos)
         else:
             _pos = ctx.venue.positions()
             pub_equity = None
             pub_open = len(_pos)
             pub_pnl = None
+            # [2026-07-17 PUBLISH FIX] the `held` map below read
+            # `sorted(broker.pos)` unconditionally, but broker is None in funded
+            # modes: AttributeError, raised INSIDE the try and swallowed whole by
+            # the bare `except: pass`. The live row published NOTHING — no
+            # equity, no counts, and none of the pending/gave_up telemetry added
+            # today precisely so a silent sniper can be SEEN. A dashboard row
+            # that simply stops updating is the failure this bot keeps having.
+            _held_syms = sorted(_pos)
         try:
             store.publish(bot_id, status="online", equity=pub_equity, pnl_abs=pub_pnl,
                           open_trades=pub_open,
@@ -481,14 +545,20 @@ def main():
                                  # fleet exposure/concentration view can see
                                  # this book (it was sym_uncovered before).
                                  "held": {c: ("L" if DIRECTION_LONG else "S")
-                                          for c in sorted(broker.pos)}})
-        except Exception:  # noqa: BLE001
-            pass
-        if dry_run:
-            store.save_state(bot_id, {"baseline": sorted(baseline),
-                                      "broker": broker.to_state(),
-                                      "entry_ts": entry_ts,
-                                      "pending": pending})
+                                          for c in _held_syms}})
+        except Exception as e:  # noqa: BLE001
+            # Never let telemetry kill the trading loop — but never let it fail
+            # in silence either: a bare `except: pass` here is what hid the
+            # funded-mode AttributeError above indefinitely.
+            log.warning("publish failed (row will go stale): %s", e)
+        # [2026-07-17 FUNDED-MODE FIX] was `if dry_run` — the mirror of the
+        # restore gate above, and the reason a funded boot had nothing to read
+        # back. The seed path already saved unconditionally, so live mode wrote a
+        # baseline it then ignored. Only "broker" is dry_run-specific.
+        store.save_state(bot_id, {"baseline": sorted(baseline),
+                                  "broker": broker.to_state() if dry_run else None,
+                                  "entry_ts": entry_ts,
+                                  "pending": pending})
 
         if args.once:
             log.info("--once complete: watching %d markets, %d pending, %d open.",
@@ -500,8 +570,8 @@ def main():
 def selftest():
     print("Running Lighter perp sniper offline self-test...\n")
     t0 = 1_000_000.0
-    never = lambda s: False       # noqa: E731 — every snipe skips
-    always = lambda s: True       # noqa: E731 — every snipe opens
+    never = lambda s, n: False    # noqa: E731 — every snipe skips
+    always = lambda s, n: True    # noqa: E731 — every snipe opens
 
     # ---- _mid: a one-sided book has NO price. This is why the bug bit a
     # brand-new listing specifically — a fresh perp's debut book is the most
@@ -533,7 +603,7 @@ def selftest():
              3: {"bids": [[5.0, 10]], "asks": [[5.2, 10]]}}       # two-sided at last
     loop, opened = {"n": 0}, []
 
-    def _try(sym):
+    def _try(sym, _open_now):
         px, _why = _snipe_price(lambda s: books[loop["n"]], sym)
         if not px:
             return False
@@ -582,7 +652,7 @@ def selftest():
     baseline, pending = {"OLD"}, {}
     run_snipe_pass(candidates=["X1"], pending=pending, baseline=baseline, now_ts=t0,
                    open_now=0, max_open=4,
-                   try_snipe=lambda s: bool(_snipe_price(_boom, s)[0]))
+                   try_snipe=lambda s, n: bool(_snipe_price(_boom, s)[0]))
     assert "X1" not in baseline and pending["X1"]["attempts"] == 1
 
     # ---- give-up is BOUNDED by attempts (age pinned) ...
@@ -625,11 +695,11 @@ def selftest():
     sends = []
     run_snipe_pass(candidates=["D1"], pending=pending, baseline=baseline, now_ts=t0,
                    open_now=0, max_open=4,
-                   try_snipe=lambda s: sends.append(s) or False)   # landed, ack failed
+                   try_snipe=lambda s, n: sends.append(s) or False)  # landed, ack failed
     assert sends == ["D1"] and "D1" not in baseline and pending["D1"]["attempts"] == 1
     run_snipe_pass(candidates=["D1"], pending=pending, baseline=baseline,
                    now_ts=t0 + LOOP_SECONDS, open_now=1, max_open=4,
-                   try_snipe=lambda s: sends.append(s) or False,
+                   try_snipe=lambda s, n: sends.append(s) or False,
                    is_held=lambda s: s == "D1")                    # ack caught up
     assert sends == ["D1"], f"a held symbol must NEVER be re-sent: {sends}"
     assert "D1" in baseline and "D1" not in pending, (baseline, pending)
@@ -656,10 +726,201 @@ def selftest():
         "no DATABASE_URL must report ok=False (cannot confirm emptiness), not (True, None)"
     assert _st.load_state("no-such-bot") is None, "load_state must still delegate unchanged"
 
+    # ---- NEGATIVE FIXTURE — the count*clip notional cap, pinned in ARITHMETIC.
+    # The estimate this file ran until 17-Jul (`len(positions()) * order_usd`)
+    # prices HELD positions at the CURRENT clip. They were opened at THEIRS. On
+    # the live lane a growth-rail `live.clip_scale` down-scale moves the current
+    # clip and nothing else, so the estimate under-reports deployed dollars and
+    # admits a clip the operator's hard cap forbids. Three positions opened at
+    # $40 = $120 real; clip now $15; cap $130:
+    CAP, CLIP = 130.0, 15.0
+    _held3 = {c: {"size": 1.0, "entry": 40.0} for c in ("G1", "G2", "G3")}
+    assert open_notional(_held3, {}, 3, CLIP) == 120.0, open_notional(_held3, {}, 3, CLIP)
+    _old_estimate = len(_held3) * CLIP                       # what this file ran
+    assert _old_estimate == 45.0
+    assert _old_estimate + CLIP <= CAP, "fixture must reproduce the OLD admit"
+    assert open_notional(_held3, {}, 3, CLIP) + CLIP > CAP, \
+        "the TRUTH must reject what count*clip admitted — else this fixture is blind"
+    # meta['clip'] (what the bot sent) outranks the venue's entry price...
+    assert open_notional(_held3, {"G1": {"clip": 99.0}}, 3, CLIP) == 179.0
+    # ...and an open this loop that the venue's REST snapshot cannot see yet is
+    # still charged to the cap, at the current clip (the open_now - n term).
+    assert open_notional({}, {}, 1, CLIP) == CLIP
+    assert open_notional(_held3, {}, 4, CLIP) == 120.0 + CLIP
+
+    # ---- NEGATIVE FIXTURE — the FUNDED path, driven end-to-end through main().
+    # All three 17-Jul defects live in `if dry_run` branches, so no amount of
+    # shadow testing reaches them. venues/__init__ hands funded modes
+    # broker=None (hence dry_run=False); this fixture supplies exactly that and
+    # asserts the live path SAVES, PUBLISHES, CLOCKS and CAPS. Every assertion
+    # below fails on the pre-17-Jul file.
+    class _FakeVenue:
+        def __init__(self, markets, books, positions):
+            self._markets, self._books = markets, books
+            self.pos = {k: dict(v) for k, v in positions.items()}
+            self.opened, self.closed = [], []
+
+        def refresh_markets(self):
+            return self._markets
+
+        def orderbook(self, sym):
+            return self._books[sym]
+
+        def announcements(self):
+            return []
+
+        def positions(self):
+            return {k: dict(v) for k, v in self.pos.items()}
+
+        def market_open(self, sym, is_long, size):
+            self.opened.append((sym, is_long, size))
+            self.pos[sym] = {"size": size if is_long else -size,
+                             "entry": _mid(self._books[sym])}
+
+        def market_close(self, sym):
+            self.closed.append(sym)
+            self.pos.pop(sym, None)
+
+    class _FakeRails:
+        def __init__(self, cap):
+            self.max_notional = cap
+
+        def notional_ok(self, open_ntl, add_usd):      # venues/safety.py contract
+            return (open_ntl + add_usd) <= self.max_notional + 1e-9
+
+    class _FakeCtx:
+        def __init__(self, venue, rails, clip, broker=None, mode="lighter_live"):
+            self.mode, self.venue, self.rails = mode, venue, rails
+            self.broker = broker          # None IS the funded-mode contract...
+            self.dry_run = broker is not None   # ...and venues/__init__ derives
+            self._clip = clip                   # dry_run from it exactly so.
+            self.bot_id = BOT + ("-lshadow" if mode == "lighter_shadow"
+                                 else "-lighter")
+
+        def order_usd(self, default, own=False):
+            return self._clip
+
+        def max_open_positions(self, default):
+            return default
+
+    class _FakeStore:
+        def __init__(self, saved):
+            self._saved, self.published, self.saves = saved, [], []
+
+        def load_state_checked(self, bot):
+            return True, self._saved
+
+        def publish(self, bot, **kw):
+            self.published.append((bot, kw))
+
+        def save_state(self, bot, state):
+            self.saves.append((bot, state))
+            return True
+
+        def fetch_paper_aggregate(self, bot):
+            return None
+
+        def publish_paper_trade(self, *a, **kw):
+            pass
+
+    def _drive(venue, cap, clip, saved, broker=None, mode="lighter_live"):
+        """Run ONE --once loop of main() against a fake venue; return the store."""
+        g, fs = globals(), _FakeStore(saved)
+        keep = (g["venue_context"], g["store"], sys.argv,
+                os.environ.get("DATABASE_URL"))
+        try:
+            g["venue_context"] = lambda **kw: _FakeCtx(venue, _FakeRails(cap), clip,
+                                                       broker=broker, mode=mode)
+            g["store"] = fs
+            sys.argv = ["lighter_perp_sniper.py", "--once"]
+            os.environ["DATABASE_URL"] = "postgres://selftest-not-dialled"
+            main()
+        finally:
+            g["venue_context"], g["store"], sys.argv = keep[0], keep[1], keep[2]
+            if keep[3] is None:
+                os.environ.pop("DATABASE_URL", None)
+            else:
+                os.environ["DATABASE_URL"] = keep[3]
+        return fs
+
+    # G1..G3 are positions the venue HAS and the bot never recorded — the
+    # lost-ack case: market_open lands, the ack times out, entry_ts is never set.
+    # Their book sits at their entry so no TP/SL fires and the pass stays clean.
+    _books = {"NEW": {"bids": [[5.0, 10]], "asks": [[5.2, 10]]},
+              "G1": {"bids": [[40.0, 5]], "asks": [[40.2, 5]]},
+              "G2": {"bids": [[40.0, 5]], "asks": [[40.2, 5]]},
+              "G3": {"bids": [[40.0, 5]], "asks": [[40.2, 5]]}}
+    _markets = {s: {"status": "active"} for s in ("OLD", "NEW", "G1", "G2", "G3")}
+    _state = {"baseline": ["OLD", "G1", "G2", "G3"], "entry_ts": {}, "pending": {}}
+    ven = _FakeVenue(_markets, _books, _held3)
+    fs = _drive(ven, CAP, CLIP, _state)
+
+    # fix 2 — funded modes PERSIST. Was `if dry_run`: the live row read back
+    # nothing and re-seeded (absorbing any listing born during a restart).
+    assert fs.saves, "funded mode saved NO state — the 17-Jul dry_run gate"
+    _bot, blob = fs.saves[-1]
+    assert _bot == BOT + "-lighter", _bot          # its OWN row, not the twin's
+    assert blob["broker"] is None                  # no broker to serialise
+    assert "OLD" in blob["baseline"]
+    # fix 1 — the cap REJECTS $120-deployed + $15 against a $130 cap. The old
+    # count*clip saw $45 and would have sent the order. (Asserted before the
+    # clock check below so that breaking the cap trips THIS line, not that one.)
+    assert ven.opened == [], f"count*clip admitted a cap-breaching clip: {ven.opened}"
+    assert "NEW" not in blob["baseline"], "a cap skip must never absorb the listing"
+    assert "NEW" in blob["pending"], blob["pending"]
+    # fix 4 — a venue position with no recorded entry gets its clock STARTED and
+    # REMEMBERED. Was: `entry_ts.get(coin, now)` re-defaulted every loop, so
+    # held_sec was ~0 forever and max_hold could never fire.
+    assert sorted(blob["entry_ts"]) == ["G1", "G2", "G3"], blob["entry_ts"]
+    # fix 3 — the live row PUBLISHES. Was: `sorted(broker.pos)` with broker=None
+    # -> AttributeError inside the try, eaten by a bare `except: pass`. Note the
+    # failure was SILENT, so the fixture asserts the ROW, not an exception.
+    assert fs.published, "funded mode published NOTHING — the 17-Jul AttributeError"
+    _bot, kw = fs.published[-1]
+    assert kw["extra"]["held"] == {"G1": "L", "G2": "L", "G3": "L"}, kw["extra"]
+    assert kw["extra"]["mode"] == "lighter_live" and kw["open_trades"] == 3
+    assert kw["equity"] is None and kw["extra"]["pending"] == 1
+
+    # ...and the same pass with headroom SNIPES (the cap rejects, it doesn't jam).
+    ven2 = _FakeVenue(_markets, _books, _held3)
+    fs2 = _drive(ven2, 1000.0, CLIP, dict(_state, pending={}))
+    assert [o[0] for o in ven2.opened] == ["NEW"], ven2.opened
+    assert "NEW" in fs2.saves[-1][1]["baseline"]
+    assert "NEW" in fs2.saves[-1][1]["entry_ts"], "a funded snipe must clock itself"
+
+    # ---- REGRESSION FIXTURE — the SHADOW path, which is what actually runs
+    # today (perp-sniper-shadow / lighter-perp-sniper-lshadow). The fixes above
+    # are for a mode nothing runs yet; this asserts the same pass still works
+    # where a broker EXISTS, so the funded-mode work cannot quietly break the
+    # live book. Same harness, dry_run derived from the broker exactly as
+    # venues/__init__ does.
+    _seed = PaperBroker(start_equity=1000.0)
+    _seed.mark("G1", 40.0)
+    _seed.open("G1", True, 1.0, 40.0)     # a restored position with NO entry_ts
+    ven3 = _FakeVenue({s: {"status": "active"} for s in ("OLD", "NEW", "G1")},
+                      _books, {})
+    fs3 = _drive(ven3, CAP, CLIP, {"baseline": ["OLD", "G1"],
+                                   "broker": _seed.to_state(),
+                                   "entry_ts": {}, "pending": {}},
+                 broker=PaperBroker(start_equity=1000.0), mode="lighter_shadow")
+    _bot3, blob3 = fs3.saves[-1]
+    assert _bot3 == BOT + "-lshadow", _bot3
+    assert blob3["broker"] is not None, "shadow must still persist its paper book"
+    assert "NEW" in blob3["baseline"], "shadow must still snipe a fresh listing"
+    # the backfill is not funded-only: a restored paper position whose clock was
+    # lost would have been held forever here too.
+    assert sorted(blob3["entry_ts"]) == ["G1", "NEW"], blob3["entry_ts"]
+    _bot3, kw3 = fs3.published[-1]
+    assert kw3["equity"] is not None and kw3["open_trades"] == 2, kw3
+    assert kw3["extra"]["held"] == {"G1": "L", "NEW": "L"}, kw3["extra"]
+    assert ven3.opened == [], "shadow must NEVER send an order to the venue"
+
     print("All perp sniper self-tests passed (one-sided debut book RETRIES and "
           "still snipes; cap/exception/skip never absorb; give-up bounded by "
           "attempts AND age; held symbols never double-open; an unreadable "
-          "state never looks empty).")
+          "state never looks empty; the FUNDED path saves, publishes, clocks a "
+          "lost-ack position and caps on REAL deployed notional; and the SHADOW "
+          "path still books, persists and never sends).")
 
 
 if __name__ == "__main__":
