@@ -176,11 +176,12 @@ what the menu claimed, NOT as a pick-list. Nothing below is a live option:**
   for everything else written in that voice, here and elsewhere.)
 - ~~**Scanners** (Lighter Scout / Gap Scout): cadence boost inside
   `event_window` — opens/closes are when dislocations and vol moves
-  happen.~~ — **premise UNVERIFIED, struck 17-Jul.** Not refuted; never
-  tested. See the restated open question above.
+  happen.~~ — struck 17-Jul as unverified, then **MEASURED same day: NO
+  SUPPORT FOUND** (dislocation intensity flat at the bell). See above.
 - ~~**Heavy jobs** (incubator breeding, big sweeps): consume `heavy_ok`
   instead of running whenever — the flag now means "thin AND nothing
-  opening/closing".~~ — **premise UNVERIFIED, struck 17-Jul.** Same.
+  opening/closing".~~ — struck 17-Jul as unverified, then **MEASURED same
+  day: NO SUPPORT FOUND** (nothing contends). See above.
 
 **Grade before wiring:** pull `fleet-clock` history — did the NYSE
 open/close transitions land at the right instants (DST honest, no holiday
