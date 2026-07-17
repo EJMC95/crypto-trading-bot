@@ -37,6 +37,14 @@ COPY cleanup_legacy_bots.py /freqtrade/cleanup_legacy_bots.py
 COPY lighter_market_scout.py /freqtrade/lighter_market_scout.py
 COPY paper_broker.py /freqtrade/paper_broker.py
 COPY lighter_ticket_taker.py /freqtrade/lighter_ticket_taker.py
+# [2026-07-17] venues/ — the taker's LIVE PATH. It was PaperBroker-only
+# (modelled fills, flat 4bps); it now defaults to ShadowBroker, which walks the
+# REAL Lighter book and writes decision-vs-fill slippage to venue_orders. That
+# import is LAZY (inside the mode branch), so without this COPY the taker would
+# have crash-looped on its DEFAULT mode in production, silently, exactly like
+# brain_stats/event_sentinel/fleet_bus did this week. Caught by
+# scripts/audit_image_imports.py before shipping, which is the whole point.
+COPY venues/ /freqtrade/venues/
 COPY evidence_board.py /freqtrade/evidence_board.py
 # fleet_tuning: the bounded growth rail (board + scout tuner = authors)
 COPY fleet_tuning.py /freqtrade/fleet_tuning.py

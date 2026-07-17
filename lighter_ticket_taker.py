@@ -39,12 +39,41 @@ from datetime import datetime, timedelta, timezone
 import bot_pnl_store as store
 from paper_broker import PaperBroker
 
+# [2026-07-17 LIVE PATH] The taker was PAPER-ONLY BY CONSTRUCTION: PaperBroker
+# modelling its own fills at a flat 4bps, a hardcoded -lshadow row, and no
+# venue client, signer, order path or SafetyRails anywhere. Setting
+# VENUE=lighter_live on the service would NOT have placed one order — it would
+# have published paper P&L into a real-money row, which looks like it works.
+# That is the failure this wiring removes.
+#
+# Modes (TT_VENUE, default lighter_shadow — the fleet's fail-safe default):
+#   lighter_paper  the legacy book: PaperBroker, modelled fills, flat fee.
+#                  KEPT so the existing -lshadow equity curve stays continuous
+#                  and comparable; it is a MODEL, not execution.
+#   lighter_shadow ShadowBroker: fills WALK THE REAL LIGHTER BOOK (crossing the
+#                  spread at our clip) and every order lands in venue_orders
+#                  with decision-vs-fill slippage. This is the arm that earns a
+#                  go-live, because it is the only one measuring real execution.
+#   lighter_live   REFUSED — see the guard in main(). Divergence is the only
+#                  lens with forward evidence and it has n=6 (~2 fills of
+#                  swing) against a 30-day gate. The path exists so the switch
+#                  is one env var WHEN the evidence lands; it is not a promise
+#                  that it has.
+TT_VENUE = os.environ.get("TT_VENUE", "lighter_shadow").strip() or "lighter_shadow"
+TT_MODES = ("lighter_paper", "lighter_shadow", "lighter_live")
+
 try:
     import fleet_tuning as tuning     # growth rail (optional import)
 except Exception:  # noqa: BLE001
     tuning = None
 
-BOT_ROW = "lighter-ticket-taker-lshadow"
+# [2026-07-17] the row follows the MODE — a live arm must never publish into
+# the shadow arm's curve (and vice versa). paper/shadow share -lshadow on
+# purpose: same book, better fill model, one continuous curve.
+BOT = "lighter-ticket-taker"
+_ROW_SUFFIX = {"lighter_paper": "-lshadow", "lighter_shadow": "-lshadow",
+               "lighter_live": "-lighter"}
+BOT_ROW = BOT + _ROW_SUFFIX.get(TT_VENUE, "-lshadow")
 STATE_KEY = "lighter-ticket-taker"
 SCOUT_KEY = "lighter-market"
 API_BASE = os.environ.get("LIGHTER_API_BASE", "https://mainnet.zklighter.elliot.ai")
@@ -253,8 +282,42 @@ def main():
         print(f"[ticket-taker] {iso(now())} fetch failed (skipping): {e!r}")
         return
 
+    if TT_VENUE not in TT_MODES:
+        raise SystemExit(f"TT_VENUE={TT_VENUE!r} unknown (expected {TT_MODES})")
+    # [2026-07-17 LIVE REFUSED — the path is built, the evidence is not.]
+    # Of the four lenses the brain grades, THREE are vetoed negative at
+    # n=1263-2470 (dip -0.424%/hit .41, breakout -0.211%/.40, momentum
+    # -0.377%/.39). Only divergence is positive (n=2820, +0.164%, hit .571) —
+    # and it has SIX closes, ~2 fills of swing, against a fleet gate of 30-day
+    # WR>55% AND maxDD<15%. Going live on that is the Trail Blazer mistake
+    # exactly (live on ~2d of shadow; retired as "a lucky ~30d window").
+    # This refusal is what makes the live path safe to BUILD before it is
+    # earned. Lift it when divergence has the closes — not to fill a vacancy.
+    if TT_VENUE == "lighter_live":
+        raise SystemExit(
+            "lighter-ticket-taker REFUSES lighter_live: divergence is the only "
+            "fillable lens (the brain vetoes the other three) and it has n=6 "
+            "closes — the fleet's gate is a 30-day record. The live path is "
+            "wired and shadow-verified; it needs EVIDENCE, not permission. "
+            "See the block above.")
+
     saved = store.load_state(STATE_KEY) or {}
-    broker = PaperBroker(start_equity=START_EQUITY, fee_bps=4.0)
+    venue = None
+    if TT_VENUE == "lighter_paper":
+        # legacy: models its own fills at a flat fee. Kept for curve continuity.
+        broker = PaperBroker(start_equity=START_EQUITY, fee_bps=4.0)
+    else:
+        # REAL fills: ShadowBroker walks the live Lighter book at our clip and
+        # writes every order to venue_orders (decision px vs modelled fill px,
+        # spread + slippage). Lighter's perp fee is ZERO — the crossed spread
+        # IS the cost, and it lands in the fill price rather than a flat 4bps
+        # guess. This is the arm whose record can support a go-live.
+        from venues.lighter_client import LighterClient
+        from venues.shadow import ShadowBroker
+        from venues.safety import SafetyRails
+        venue = LighterClient(net="mainnet", with_signer=False)
+        SafetyRails(BOT, "lighter_shadow").assert_can_start()
+        broker = ShadowBroker(BOT_ROW, venue, START_EQUITY)
     broker.restore_state(saved.get("broker") or {})
     meta = saved.get("meta") or {}          # sym -> {lens, opened, accrued_to}
     stats = saved.get("stats") or {"closed": 0, "wins": 0, "losses": 0}
@@ -318,6 +381,9 @@ def main():
         pnl = broker.close(sym, mark)
         drag = float(m.get("funding_paid") or 0.0)   # signed: shorts credit
         clip_used = float(m.get("clip") or CLIP_USD)
+        # ShadowBroker's cost is the CROSSED SPREAD, already inside the fill
+        # price (fee_bps=0 — Lighter charges no perp fee). Charging a flat fee
+        # on top would double-count it; the legacy paper arm still models one.
         fees = 2 * clip_used * broker.fee
         net = pnl - drag - fees
         stats["closed"] += 1
@@ -337,7 +403,7 @@ def main():
             reason=f"{side}-{lens}_{reason}",
             # [2026-07-15 AUDIT FIX] provenance: shadow-only book on Lighter
             # marks — venue NULL claimed the pre-Gate-0 HL-paper era.
-            venue="lighter", shadow=True)
+            venue="lighter", shadow=(TT_VENUE != "lighter_live"))
         print(f"[ticket-taker] {iso(t_now)} CLOSE {side} {sym} ({lens}) {reason} "
               f"pnl {pnl:+.2f} funding {-drag:+.3f} net {net:+.2f}")
         meta.pop(sym, None)
