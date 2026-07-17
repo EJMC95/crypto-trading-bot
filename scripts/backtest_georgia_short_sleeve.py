@@ -548,9 +548,26 @@ def report_null(real_pnl, dist, label):
     print(f"    null sd          ${sd:>9.2f}   5-95%: ${sorted(dist)[len(dist)//20]:.2f} "
           f".. ${sorted(dist)[int(len(dist)*0.95)]:.2f}")
     print(f"    percentile       {p:>9.1f}%   z={z:+.2f}")
-    verdict = ("EDGE: timing beats random" if p >= 95 else
-               "NO EDGE: inside the null — this is DRIFT, not skill" if p > 5 else
-               "WORSE than random entry")
+    # A HARD p>=95 CUT WOULD MAKE THIS FUNCTION THE AUTHOR OF THE VERDICT.
+    # Measured 17-Jul @0.86bps, the SAME sleeve landed at 94.2 (NULL A) and
+    # 95.0 (NULL B) — a bare threshold prints "NO EDGE" and "EDGE" for one
+    # strategy, and a later reader quotes whichever suits. Two nulls of the
+    # same thing straddling the line IS the result: borderline. So say so,
+    # and never let a knife-edge read as a clean verdict. (Same disease as
+    # the assumed-5bps headline that got backtest_funding_lighter.py's
+    # verdict withdrawn: a decision resting on a number nobody pinned.)
+    if p >= 97.5:
+        verdict = "EDGE: timing beats random"
+    elif p >= 90:
+        verdict = (f"BORDERLINE ({p:.1f}th pct) — NOT an edge. Straddles the "
+                   f"bar; needs the slippage MEASURED, not another replay")
+    elif p > 5:
+        verdict = "NO EDGE: inside the null — this is DRIFT, not skill"
+    else:
+        verdict = "WORSE than random entry"
+    if real_pnl < 0 and p >= 90:
+        verdict += " (and NEGATIVE anyway — beating a coin flip while losing "
+        verdict += "money is not an edge)"
     print(f"    verdict          {verdict}")
 
 
