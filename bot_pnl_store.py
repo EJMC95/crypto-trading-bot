@@ -369,19 +369,32 @@ def locked_state_update(key, fn):
                 pass
 
 
-def load_state(bot):
-    """Return the bot's saved state dict (from save_state), or None. Never raises."""
+def load_state_checked(bot):
+    """(ok, state) — `ok` is False only if the READ ITSELF failed.
+
+    [2026-07-17] load_state() collapses "no row" and "read failed" into the same
+    None. That is fine for a bot that just wants its last state, but it is a trap
+    for any caller that SEEDS durable state on an empty read: a Postgres blip
+    then looks identical to a first run. The perp sniper seeds its listing
+    baseline that way, and a false seed there silently absorbs every live market
+    (see the 17-Jul RETRY FIX in lighter_perp_sniper.py). Such callers must be
+    able to tell "definitely nothing stored" from "I could not find out".
+
+    ok=True,  state=dict -> the row exists
+    ok=True,  state=None -> read succeeded, genuinely no row
+    ok=False, state=None -> read FAILED; the caller must NOT infer emptiness
+    """
     conn = _get_conn()
     if conn is None:
-        return None
+        return False, None
     try:
         _ensure_state_table(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT state FROM bot_state WHERE bot = %s", (bot,))
             row = cur.fetchone()
         if row and row[0] is not None:
-            return row[0] if isinstance(row[0], dict) else json.loads(row[0])
-        return None
+            return True, (row[0] if isinstance(row[0], dict) else json.loads(row[0]))
+        return True, None
     except Exception as e:
         _warn_once(f"state read failed ({e})")
         global _conn
@@ -390,7 +403,15 @@ def load_state(bot):
         except Exception:
             pass
         _conn = None
-        return None
+        return False, None
+
+
+def load_state(bot):
+    """Return the bot's saved state dict (from save_state), or None. Never raises.
+
+    NOTE: None means "no state OR the read failed" — see load_state_checked().
+    """
+    return load_state_checked(bot)[1]
 
 
 def fetch_states(keys):
