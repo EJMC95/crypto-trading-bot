@@ -108,13 +108,8 @@ def _read(p):
 
 
 def workflow_filters():
-    """(service -> compiled path regex) as the workflow ACTUALLY applies it.
-
-    Parsed from the `grep -qE '...'` lines in the decide step, not from the
-    `paths:` block at the top. Those two lists are maintained by hand and can
-    disagree — `paths:` only decides whether the job RUNS; the greps decide
-    which service is deployed. The greps are what bind, so the greps are what
-    this guard reads."""
+    """(service -> compiled path regex) from the `grep -qE` lines in the decide
+    step — the list that chooses WHICH SERVICE gets deployed."""
     src = _read(WORKFLOW)
     out = {}
     # grep -qE '<regex>'; then svcs="<name>"  /  svcs="${svcs:+$svcs,}<name>"
@@ -125,6 +120,41 @@ def workflow_filters():
         rx, svc = m.group(1), m.group(2)
         out.setdefault(svc, []).append(re.compile(rx))
     return out
+
+
+def workflow_paths():
+    """The `on: push: paths:` globs — the list that decides whether the job RUNS
+    AT ALL.
+
+    [2026-07-17 CORRECTION — this guard shipped with a FALSE-OK.] It read only
+    the greps above and argued in its own docstring that "the greps are what
+    bind". Wrong, and backwards: `paths:` is evaluated by GitHub BEFORE the job
+    starts. A file present in a grep but absent from `paths:` never reaches the
+    grep, because the workflow never runs. So the binding list is the INTERSECTION
+    — a file needs BOTH — and a guard that checked only one half would hand out a
+    green OK for a file that can never deploy. That is the exact failure class
+    this file exists to catch, committed inside the file catching it.
+    Found by reconciling with scripts/audit_deploy_filter.py, which a concurrent
+    session wrote against the SAME bug from the other side: it checks `paths:`
+    and not the greps. Neither guard was right alone."""
+    src = _read(WORKFLOW)
+    m = re.search(r"^\s*paths:\s*\n((?:\s*(?:#.*)?\n|\s*-\s*'[^']+'\s*\n)+)",
+                  src, re.M)
+    if not m:
+        return None                     # unparseable -> caller fails closed
+    return [g.group(1) for g in re.finditer(r"-\s*'([^']+)'", m.group(1))]
+
+
+def _path_listed(rel, globs):
+    """Does `rel` match any `paths:` glob? Supports the two forms the workflow
+    actually uses: an exact filename and a `dir/**` prefix."""
+    for g in globs:
+        if g.endswith("/**"):
+            if rel.startswith(g[:-2]):
+                return True
+        elif g == rel:
+            return True
+    return False
 
 
 def image_files(dockerfile):
@@ -172,13 +202,44 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                "Dockerfile.funding": "funding-carry"}
 
 
+_UNSET = object()   # "not supplied" — distinct from None, which means UNPARSEABLE
+
+
+def covered(svc, rel, filters=_UNSET, globs=_UNSET):
+    """Can a push to `rel` deploy `svc`? BOTH lists must contain it.
+
+    Module-level ON PURPOSE. This was a lambda inside main(), and the selftest
+    that "proved" the both-lists rule mutation-SURVIVED reverting it to grep-only
+    — because the test drove _path_listed() in isolation and never touched the
+    integration. A test that cannot fail when the rule is removed is decoration.
+    Same closure-untestable shape as lighter_funding_bot's fill helpers, made by
+    the same author, one hour later."""
+    # [2026-07-17] _UNSET, not None. `globs=None` used to mean BOTH "caller did
+    # not supply it, go read the workflow" AND "the paths: block did not parse".
+    # One value, two meanings — the load_state_seeds_on_a_failed_read shape — and
+    # it made the fail-closed branch UNREACHABLE from a test: passing None just
+    # re-fetched the real workflow. My mutation test caught it by surviving.
+    filters = workflow_filters() if filters is _UNSET else filters
+    globs = workflow_paths() if globs is _UNSET else globs
+    if globs is None:
+        return False                      # unparseable paths: -> fail CLOSED
+    return (any(rx.match(rel) for rx in filters.get(svc, []))
+            and _path_listed(rel, globs))
+
+
 def main():
     filters = workflow_filters()
-    if not filters:
-        print("audit_deploy_coverage: FAILED — could not parse any service "
-              f"filter from {WORKFLOW}. The guard cannot vouch for a file it "
-              "cannot read; failing closed.")
+    globs = workflow_paths()
+    if not filters or globs is None:
+        print("audit_deploy_coverage: FAILED — could not parse the workflow's "
+              f"{'service greps' if not filters else 'paths: block'} from "
+              f"{WORKFLOW}. The guard cannot vouch for a file it cannot read; "
+              "failing closed.")
         return 1
+    # A file must be in BOTH lists to deploy: `paths:` gates whether the job
+    # runs, the greps choose the service. Fold `paths:` into the service test so
+    # a file listed in one and not the other is reported, not passed.
+    _cov = lambda svc, p: covered(svc, p, filters, globs)
 
     orphans, ok_declared = [], []
     for df, svc in sorted(AUTO_IMAGES.items()):
@@ -188,21 +249,19 @@ def main():
         files, catch_all = image_files(dfp)
         if catch_all:
             continue                       # `COPY . .` — everything ships
-        rxs = filters.get(svc, [])
         for f in sorted(files):
             # only python we actually run is interesting; assets/configs churn
             if not (f.endswith(".py") or f.endswith(".sh")):
                 continue
-            if any(rx.match(f) for rx in rxs):
+            if _cov(svc, f):
                 continue
             why = declared(f)
             (ok_declared if why else orphans).append((f, svc, df))
 
     organs = run_all_organs()
-    rxs = filters.get("freqtrade-bots", [])
     organ_orphans = sorted(
         o for o in organs
-        if not any(rx.match(o) for rx in rxs) and not declared(o)
+        if not _cov("freqtrade-bots", o) and not declared(o)
         and os.path.exists(os.path.join(ROOT, o))
     )
 
@@ -243,16 +302,26 @@ def _selftest():
     assert "freqtrade-bots" in fs, fs.keys()
     assert "pnl-dashboard" in fs, fs.keys()
     m = lambda svc, p: any(rx.match(p) for rx in fs[svc])
-    # POSITIVE: the four the workflow really does cover
+    # POSITIVE: these four predate the 07-07 filter and must always be covered.
     for p in ("fleet_risk.py", "regime_oracle.py", "market_pulse.py",
               "freqtrade_pnl_poller.py"):
         assert m("freqtrade-bots", p), f"{p} should be covered"
     assert m("freqtrade-bots", "user_data/strategies/X.py"), "user_data/ prefix"
-    # NEGATIVE: the detector must SEE a gap, or it can only ever say OK
-    assert not m("freqtrade-bots", "bot_learn.py"), "brain must read as orphaned"
-    assert not m("pnl-dashboard", "bot_learn.py")
-    # the regex is anchored: a suffix match must not pass
-    assert not m("freqtrade-bots", "x_fleet_risk.py"), "must be anchored"
+    # NEGATIVE — on a SYNTHETIC regex, never on the real tree.
+    # [2026-07-17] This line used to be `assert not m("freqtrade-bots",
+    # "bot_learn.py"), "brain must read as orphaned"` — and it went RED the hour
+    # someone ADDED the brain to the filter. A test that fails on GOOD NEWS is a
+    # test that demands the defect remain, and this file's own selftest docstring
+    # says so three lines up. I wrote the warning and the violation in the same
+    # commit. The detector's ability to SEE a gap is a property of the regex, so
+    # prove it on a fixture whose gap cannot be fixed out from under it.
+    import re as _re
+    fake = [_re.compile(r"^(only_this\.py$)")]
+    _m = lambda p: any(rx.match(p) for rx in fake)
+    assert _m("only_this.py"), "fixture sanity"
+    assert not _m("bot_learn.py"), "detector must be able to report a gap"
+    assert not _m("x_only_this.py"), "must be anchored"
+    assert not _m("only_this.pyc"), "must be exact, not a prefix"
 
     # COPY reconstruction, incl. the multi-source form
     import tempfile
@@ -265,6 +334,40 @@ def _selftest():
         open(p, "w").write("FROM x\nCOPY . .\n")
         _, ca = image_files(p)
         assert ca is True, "COPY . . must set catch_all (everything ships)"
+
+    # BOTH lists bind: `paths:` gates the job, the greps pick the service.
+    # Today the real workflow's two lists agree, so this is a LATENT false-OK —
+    # it fires the moment someone edits one list and not the other, which is
+    # precisely what extending this workflow requires. Fixtures, so the test
+    # proves the RULE rather than today's accident.
+    globs = ["'x'"] and ["bot_learn.py", "user_data/**"]
+    assert _path_listed("bot_learn.py", globs)
+    assert _path_listed("user_data/strategies/S.py", globs), "dir/** prefix"
+    assert not _path_listed("fleet_risk.py", globs), "must not match by accident"
+    assert not _path_listed("bot_learn.pyc", globs), "exact filename, not prefix"
+    # the false-OK itself: in a grep, absent from paths: -> CANNOT deploy
+    grep_ok = True
+    assert not (grep_ok and _path_listed("fleet_risk.py", globs)), \
+        "a file in the grep but not paths: must NOT read as covered"
+    assert workflow_paths() is not None, "real paths: block must parse"
+    assert len(workflow_paths()) > 5, "paths: parse looks truncated"
+
+    # DRIVE covered() ITSELF — with injected fixtures, not around it.
+    # My first two attempts at this test both mutation-SURVIVED: the assertions
+    # exercised _path_listed() and a local lambda, so reverting the real rule to
+    # grep-only changed nothing and the suite stayed green. Testing AROUND a
+    # function is not testing it. covered() takes filters/globs as parameters
+    # precisely so this can reach it.
+    F = {"svc": [re.compile(r"^(a\.py$|b\.py$)")]}
+    assert covered("svc", "a.py", F, ["a.py"]) is True, "in BOTH lists -> deploys"
+    assert covered("svc", "b.py", F, ["a.py"]) is False, \
+        "in the GREP but not paths: -> the job never runs -> must NOT read covered"
+    assert covered("svc", "a.py", F, []) is False, "paths: empty -> nothing runs"
+    assert covered("svc", "z.py", F, ["z.py"]) is False, \
+        "in paths: but no grep -> job runs, deploys nothing -> not covered"
+    assert covered("svc", "a.py", F, None) is False, \
+        "unparseable paths: must fail CLOSED, never open"
+    assert covered("nope", "a.py", F, ["a.py"]) is False, "unknown service"
 
     # declared(): longest-prefix, so venues/ covers its children
     assert declared("venues/lighter_client.py"), "venues/ prefix must cover children"
