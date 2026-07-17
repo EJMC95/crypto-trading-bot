@@ -560,6 +560,38 @@ def _epoch(ts):
         return None
 
 
+def _trade_side(trade):
+    """'long' | 'short' | None — the direction this trade was actually held in.
+
+    [2026-07-17] `_post_exit_drift` used LONG semantics on every row. Every
+    drift-eligible Lighter row is a SHORT (measured: 12/12 with a known side,
+    9 on the LIVE Funding Farmer), and for a LOSING short `any(high >= entry)`
+    is true BY CONSTRUCTION — so the brain's reclaim rate pinned to 1.0 and its
+    stop-too-tight rule fired tautologically. Direction must be READ, never
+    assumed.
+
+    Two sources, in order of authority, and NEITHER is a guess:
+      1. `enter_tag` — bot_pnl_store sets it from the ledger's `side` column.
+         Authoritative, but only 12 of 141 closed Lighter rows have it.
+      2. the exit_reason PREFIX — every Lighter book stamps direction into the
+         close reason by design: the funding bot writes ("long_"|"short_") +
+         reason, the family bot and Ticket Taker write "<side>-<tag>_<exit>"
+         (CLAUDE.md). MEASURED: this recovers 112 of the 129 side=NULL rows.
+    Anything else -> None -> NO CLAIM. The remaining ~17 (perps-funding-carry's
+    bare 'flip'/'decay_paid') stay ungraded rather than guessed: a wrong
+    direction does not merely lose a verdict, it INVERTS one.
+    """
+    tag = str(trade.get("enter_tag") or "").strip().lower()
+    if tag in ("long", "short"):
+        return tag
+    reason = str(trade.get("exit_reason") or "").strip().lower()
+    for side in ("long", "short"):
+        # '_' = funding/spread books, '-' = family bot + Ticket Taker lenses
+        if reason.startswith(side + "_") or reason.startswith(side + "-"):
+            return side
+    return None
+
+
 def _post_exit_drift(trade):
     """(reclaimed_entry_within_24h, fwd_return_24h) for one closed trade, from
     LIGHTER's public 1h candles after its close — the mechanized version of the
@@ -594,11 +626,47 @@ def _post_exit_drift(trade):
     # a raw-unit 1000X coin prices x1000 on Lighter). x1 for every ordinary coin.
     open_l = float(open_rate) * price_mult
     close_l = float(close_rate) * price_mult
-    window = [c for c in candles if c[0] > close_ts][:24]
+    # [2026-07-17 FIX #1 — a `[:24]` slice is NOT a 24-HOUR window.] This was
+    # `[c for c in candles if c[0] > close_ts][:24]`: the first 24 bars that
+    # exist after the close, whatever their dates. Lighter's candle tape only
+    # reaches back ~500 hourly bars (~20d), so once a trade is older than the
+    # tape, "the 24h after close" silently becomes "the oldest 24 bars we
+    # have" — days or MONTHS later. MEASURED on a flat-200 fixture: a trade
+    # closed 40d ago yielded a window spanning 19.2-20.1d after close and
+    # returned reclaimed=True, fwd=+100%. len(window)==24 in every such case,
+    # so the 6-bar floor below can never catch it. Not hypothetical: the fetch
+    # bounds by row count (limit=5000), not by date, and the Lighter books have
+    # no ERA_START — it starts fabricating verdicts once the ledger passes the
+    # tape depth. Bound the window by TIME, which is what it always claimed.
+    window = [c for c in candles if close_ts < c[0] <= close_ts + 24 * 3600]
     if len(window) < 6:
         return None
-    reclaimed = any(h >= open_l for _, _, h, _, _ in window)
-    fwd = window[-1][4] / close_l - 1.0
+    # [2026-07-17 FIX #2 — the grader was DIRECTION-BLIND on a 100%-SHORT
+    # sample.] `reclaimed = any(high >= entry)` and `fwd = last/close - 1` are
+    # LONG semantics: "did price come back UP to my entry, and did it keep
+    # rising?". Every drift-eligible Lighter row is a SHORT — MEASURED: 12 of
+    # 12 closed Lighter trades with a known side are short, NINE of them on
+    # perps-funding-lighter-lighter, the LIVE REAL-MONEY Funding Farmer (the
+    # funding bot shorts whenever apr>0, which is the venue's resting state).
+    # For a LOSING SHORT the exit is ABOVE the entry by definition, so the
+    # price is already above entry at close and `any(high >= entry)` is TRUE BY
+    # CONSTRUCTION -> reclaim pins to 1.0 -> the "stop too tight" rule
+    # (reclaim >= 0.6) fires tautologically and the "stop is fine" rule
+    # (reclaim <= 0.35) is UNREACHABLE. The brain was advising on a coin flip
+    # it could not lose. Direction is already ON the row (`enter_tag` =
+    # 'short'|'long', bot_pnl_store sets it from the ledger's `side`) and was
+    # simply never read.
+    side = _trade_side(trade)
+    if side is None:
+        return None
+    if side == "short":
+        # mirror image: reclaimed = price fell back DOWN to the entry; a
+        # favourable move after the close is a FALL, so the return is negated.
+        reclaimed = any(lo <= open_l for _, _, _, lo, _ in window)
+        fwd = -(window[-1][4] / close_l - 1.0)
+    else:
+        reclaimed = any(h >= open_l for _, _, h, _, _ in window)
+        fwd = window[-1][4] / close_l - 1.0
     return reclaimed, fwd
 
 
@@ -662,6 +730,18 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
             continue
         if drift_budget.get("left", 0) <= 0:
             break
+        # [2026-07-17 FIX #3] The budget was decremented for EVERY candidate,
+        # including rows _post_exit_drift rejects for free. main() diagnoses
+        # bots in SORTED order, so the CEX listing-sniper's rows (venue !=
+        # lighter, rejected without any fetch) burned the 120-call budget on
+        # no-ops, and the LIVE Funding Farmer — the book this evidence exists
+        # for — could be starved before it was reached. The venue gate is the
+        # cheap, decisive filter (a plain string compare, no network), so it
+        # runs HERE and only rows that can actually cost a fetch are charged.
+        # _post_exit_drift keeps its own identical gate: it is called from the
+        # selftest too and must never price a foreign venue's trade.
+        if str(t.get("venue") or "").strip().lower() != "lighter":
+            continue
         d = _post_exit_drift(t)
         drift_budget["left"] -= 1
         if d is not None:
@@ -1422,16 +1502,61 @@ def _selftest():
     # 24 synthetic 1h bars after the close; high 110 reclaims an open of 100.
     _lighter_cache["ETH"] = [(int(t0 + i * 3600), 100.0, 110.0, 90.0, 105.0)
                              for i in range(1, 25)]
+    # [2026-07-17] `good` gains enter_tag: a trade's DIRECTION is now read, not
+    # assumed (see _trade_side). This fixture had none, and the check below
+    # asserted LONG semantics — which is precisely how the direction bug
+    # survived review: the test encoded the bug's assumption as the contract.
     good = {"venue": "lighter", "pair": "ETH", "close_ts": close_ts,
-            "open_rate": 100.0, "close_rate": 100.0}
+            "open_rate": 100.0, "close_rate": 100.0, "enter_tag": "long"}
     d = _post_exit_drift(dict(good))
-    ck("lighter trade -> (bool, float) contract",
+    ck("lighter LONG -> (bool, float) contract",
        isinstance(d, tuple) and d[0] is True and abs(d[1] - 0.05) < 1e-9)
     ck("venue=None refused", _post_exit_drift(dict(good, venue=None)) is None)
     ck("venue='kraken' refused", _post_exit_drift(dict(good, venue="kraken")) is None)
     ck("missing open_rate -> None", _post_exit_drift(dict(good, open_rate=None)) is None)
     ck("missing close_rate -> None", _post_exit_drift(dict(good, close_rate=None)) is None)
     ck("missing close_ts -> None", _post_exit_drift(dict(good, close_ts=None)) is None)
+
+    # --- DIRECTION: the bug that made reclaim tautological -------------------
+    # The tape rises to high=110 and never falls below low=90.
+    # A LOSING SHORT (entry 95, exit 100): price is ABOVE entry at close, so
+    # `any(high >= entry)` is True BY CONSTRUCTION — the pre-fix answer. The
+    # short's real question is "did price fall back DOWN to 95?" -> low 90 <= 95
+    # -> True here. Use entry 85 to make the honest answer False and prove the
+    # long-shaped tautology is gone.
+    sh = dict(good, enter_tag="short", open_rate=85.0, close_rate=100.0)
+    d = _post_exit_drift(sh)
+    ck("SHORT reclaim is NOT tautological (long logic would say True)",
+       isinstance(d, tuple) and d[0] is False)
+    ck("SHORT fwd is NEGATED (a price RISE is a loss for a short)",
+       isinstance(d, tuple) and abs(d[1] - (-0.05)) < 1e-9)
+    ck("SHORT reclaim=True only when price RETURNS DOWN to entry",
+       _post_exit_drift(dict(good, enter_tag="short", open_rate=95.0,
+                             close_rate=100.0))[0] is True)
+    # direction recovered from the exit_reason prefix (112 of 129 side=NULL
+    # rows carry it; measured) — enter_tag absent, reason decides.
+    for reason, want in (("short_flip", "short"), ("long_rebalance", "long"),
+                         ("short-divergence_tp", "short"), ("long-dip_exit", "long")):
+        ck("side from exit_reason %r -> %s" % (reason, want),
+           _trade_side({"exit_reason": reason}) == want)
+    ck("enter_tag OUTRANKS the reason prefix",
+       _trade_side({"enter_tag": "short", "exit_reason": "long_x"}) == "short")
+    ck("UNKNOWN direction -> None (never a long-shaped guess)",
+       _trade_side({"exit_reason": "flip"}) is None
+       and _trade_side({}) is None)
+    ck("directionless trade gets NO drift claim",
+       _post_exit_drift({k: v for k, v in good.items() if k != "enter_tag"}) is None)
+
+    # --- the window is 24 HOURS, not "the first 24 bars we happen to have" ---
+    # A trade older than the tape used to slice 24 bars from DAYS later and
+    # return a confident verdict (measured: closed 40d ago -> reclaimed=True,
+    # fwd=+100%). len(window)==24 there, so the 6-bar floor never caught it.
+    _lighter_cache["ETH"] = [(int(t0 + i * 3600), 100.0, 110.0, 90.0, 105.0)
+                             for i in range(1, 25)]
+    stale = dict(good, close_ts="2026-05-01T00:00:00+00:00")   # 61d before the tape
+    ck("trade OLDER than the tape -> None (no fabricated verdict)",
+       _post_exit_drift(stale) is None)
+
     # < 6 post-close hours must abstain
     _lighter_cache["ETH"] = [(int(t0 + i * 3600), 100.0, 110.0, 90.0, 105.0)
                              for i in range(1, 6)]
