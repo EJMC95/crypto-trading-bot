@@ -2,6 +2,13 @@ name: Changelog check
 
 # Parallel Claude sessions edit this repo; CHANGELOG.md is how they stay in sync.
 # Fail the build if a PR/push changes bot-affecting code without logging it.
+#
+# [2026-07-17] Also runs the BORN-DARK guard. Three incidents in three days
+# (fleet_bus 15-Jul, event_sentinel 16-Jul, brain_stats 17-Jul) all shipped
+# code the IMAGE never contained; the fleet's correct try/except import
+# guards made every one SILENT rather than a crash. A rule that says
+# "remember to run the audit" is the same control that already failed three
+# times — so it runs here, on every push/PR. Stdlib-only, milliseconds.
 
 on:
   pull_request:
@@ -10,6 +17,16 @@ on:
     branches: [main]
 
 jobs:
+  born-dark:
+    name: Born-dark guard (image imports)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every image must contain the modules its code imports
+        run: python3 scripts/audit_image_imports.py
+      - name: The guard must still be able to see (negative fixture)
+        run: python3 scripts/audit_image_imports.py --selftest
+
   changelog:
     runs-on: ubuntu-latest
     steps:
