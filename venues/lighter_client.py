@@ -59,44 +59,33 @@ BOOK_STALE_SEC = 30.0    # ws book older than this -> REST fallback
 REST_BOOK_TTL = float(os.environ.get("LIGHTER_REST_BOOK_TTL", "20"))
 
 
-def min_size_error(coin, m, size_native, worst_px):
-    """[2026-07-17] Why a clip is too small for THIS book, or None.
-
-    Pure so it can be tested without a venue, a signer or a loop — this file had
-    no selftest at all, so a guard buried in `market_open` would have shipped
-    unexercised, which is the trap that cost the fleet all day.
-
-    WHY IT EXISTS. The venue rejects a sub-minimum order with an opaque `err`,
-    so `market_open` raised a generic "order failed" and the taker logged
-    "open {sym} failed" and moved on — a ticket dropped on the floor with no
-    stated cause. MEASURED against the live market list: EVERY one of the 201
-    active books sets `min_quote_amount = $10` (so $10 is a HARD FLOOR — a
-    clip under it can trade NOTHING), and 6 books (AAPL/ZEC/VVV/HYPE/XRP/
-    SKHYNIXUSD) set a `min_base_amount` worth MORE than the live taker's $15
-    clip — so AAPL divergence tickets have been silently unfillable.
-
-    Refusing locally also saves the WEIGHT_ORDER_TX (6 governor tokens) of an
-    order the venue was always going to reject.
-
-    OPEN ONLY. `market_close` must NEVER consult this: refusing to close a
-    sub-minimum position would STRAND it — the exact failure class the fleet
-    spent 17-Jul removing. A close is always attempted.
-
-    Verified against the taker's two REAL fills (STRC 0.175 @ 85.629,
-    1000BONK 4580 @ 0.003275): both pass.
-    """
-    mb = float(m.get("min_base") or 0.0)
-    mq = float(m.get("min_quote") or 0.0)
-    ntl = float(size_native) * float(worst_px)
-    if mb and float(size_native) < mb:
-        return (f"{coin}: size {float(size_native):.6g} is below the venue "
-                f"minimum {mb:.6g} (~${mb * float(worst_px):.2f} of notional) — "
-                f"the CLIP is too small for this book, not a venue fault")
-    if mq and ntl < mq:
-        return (f"{coin}: ${ntl:.2f} notional is below the venue minimum "
-                f"${mq:.2f} — the CLIP is too small to trade ANY Lighter book "
-                f"($10 is the floor on all 201 of them)")
-    return None
+# [2026-07-17 WITHDRAWN — min_size_error]
+# I shipped a guard here that refused an order whose size was below its book's
+# `min_base_amount` or whose notional was below `min_quote_amount`, and told the
+# operator "$10 is a HARD FLOOR on every Lighter book; there is no $5 clip".
+#
+# BOTH HALVES ARE REFUTED BY THE FLEET'S OWN ORDER LEDGER, which had the
+# evidence sitting in it the whole time:
+#   * min_base_amount is NOT enforced for market orders. 16 of 56 real orders
+#     were BELOW their book's min_base and the venue ACCEPTED every one —
+#     including the LIVE Funding Farmer's ZEC (0.037358 vs a min_base of 0.1,
+#     sent 17-Jul 10:36) and HYPE (0.33 vs 0.5), and Tide Rider's TRX (38.8 vs
+#     40). The guard would have BLOCKED LIVE REAL-MONEY ENTRIES.
+#   * min_quote_amount is NOT a $10 floor. The smallest real order ever sent is
+#     $5.00 — four of them (perps-donchian-breakout-lighter, HYPE + kBONK,
+#     10/11-Jul) — and they FILLED (67.0896, 66.3824, 0.003998, 0.004142).
+#
+# WHAT THESE FIELDS ACTUALLY GATE IS UNKNOWN (limit orders? resting orders? UI
+# display?). Unknown is the honest answer; the venue is the authority and it
+# already rejects what it dislikes, with an error the caller surfaces.
+#
+# THE LESSON, and it is the same one this whole day was about: I found a field
+# named `min_base_amount`, ASSUMED it was enforced, derived a "floor" from it,
+# and gave the operator a confident number that the outcome ledger refuted in
+# one query. An unmeasured constant makes a false verdict — see
+# [[unmeasured-assumptions-make-false-verdicts]]. Ask what MEASURED the number.
+# Do not rebuild this without a fixture proving the venue actually rejects a
+# sub-minimum MARKET order.
 
 
 class _BookCache(threading.Thread):
@@ -551,10 +540,7 @@ class LighterClient(VenueClient):
         base, px = self._scaled(m, size * mult, worst)
         if base <= 0:
             raise VenueError(f"{coin}: size {size} scales to 0")
-        # OPEN ONLY — see min_size_error. Never guard market_close this way.
-        _err = min_size_error(coin, m, size * mult, worst)
-        if _err:
-            raise VenueError(_err)
+
         # [2026-07-17] KEEP the client id — it is the fill's exact name. It was
         # computed and thrown away, so the fill read had to guess with
         # (side, since_ts) and VWAP everything that matched. Returned ADDITIVELY:
@@ -590,9 +576,22 @@ class LighterClient(VenueClient):
         Without an id it still falls back to the heuristic, so callers that
         cannot supply one (an exit whose order id was not threaded) are no worse
         off than before — but they get `approx` in the reason so a blended read
-        is never mistaken for an exact one."""
+        is never mistaken for an exact one.
+
+        OWNERSHIP IS CHECKED ON BOTH PATHS, never replaced by the id. The client
+        id is `int(time.time()*1000) % 2**48` — TIMESTAMP-derived and only unique
+        PER ACCOUNT, so two accounts ordering in the same millisecond collide.
+        My first cut matched on the id ALONE and would have read a stranger's
+        fill as ours; the selftest caught it."""
         fills = []
         for t in (trades or []):
+            # OURS, always — the id narrows, it never authorises.
+            ours_ask = getattr(t, "ask_account_id", None) == self.account_index
+            ours_bid = getattr(t, "bid_account_id", None) == self.account_index
+            if is_ask and not ours_ask:
+                continue
+            if not is_ask and not ours_bid:
+                continue
             if client_id is not None:
                 # our side's client id must match EXACTLY — no window, no blend
                 cid = (getattr(t, "ask_client_id", None) if is_ask
@@ -604,12 +603,6 @@ class LighterClient(VenueClient):
                 if ts > 1e12:                # ms -> s (venue stamps ms)
                     ts /= 1000.0
                 if ts < float(since_ts) - 5:
-                    continue
-                ours_ask = getattr(t, "ask_account_id", None) == self.account_index
-                ours_bid = getattr(t, "bid_account_id", None) == self.account_index
-                if is_ask and not ours_ask:
-                    continue
-                if not is_ask and not ours_bid:
                     continue
             px = float(getattr(t, "price", 0) or 0)
             sz = abs(float(getattr(t, "size", 0) or 0))
@@ -741,62 +734,85 @@ class LighterClient(VenueClient):
 
 
 def _selftest():
-    """[2026-07-17] The first selftest this file has EVER had. Scope is honest:
-    it covers the PURE surfaces (min_size_error, _our_fills' matching rules) —
-    not the loop/signer, which need a venue. That is exactly why those two were
-    written as pure functions; a guard that cannot be exercised is the trap this
-    fleet fell into all day."""
-    import sys
+    """[2026-07-17] The first selftest this file has ever had.
 
-    # --- min_size_error: measured against the LIVE market list ---------------
-    AAPL = {"min_base": 0.050, "min_quote": 10.0}
-    STRC = {"min_base": 0.050, "min_quote": 10.0}
-    BONK = {"min_base": 500.0, "min_quote": 10.0}
+    It began life proving a guard (`min_size_error`) that turned out to be
+    WRONG — see the withdrawal note at the top of this file. What survives is
+    the part that was real: the REGRESSION FIXTURES built from actual orders
+    the venue actually accepted. They now pin the REFUTATION, so nobody
+    rebuilds the floor I invented.
 
-    # 1) THE REGRESSION FIXTURES: both of the taker's REAL fills must PASS.
-    #    If this guard would have blocked a real fill, the guard is wrong.
-    assert min_size_error("STRC", STRC, 0.175174, 85.629) is None, \
-        "guard would have blocked the taker's REAL STRC fill"
-    assert min_size_error("1000BONK", BONK, 4580.152672, 0.003275) is None, \
-        "guard would have blocked the taker's REAL 1000BONK fill"
+    Scope is honest: pure surfaces only (`_our_fills`' matching rules and the
+    order-minimum facts). The loop/signer need a venue and are not covered.
+    """
+    class _Trade:
+        def __init__(self, **kw):
+            self.__dict__.update(kw)
 
-    # 2) min_quote is the FLOOR on every book — $10, measured on all 201.
-    e = min_size_error("STRC", STRC, 0.10, 85.629)          # $8.56 notional
-    assert e and "below the venue minimum $10" in e, e
-    assert "CLIP is too small" in e, "must blame the CLIP, not the venue"
+    class _Fake:
+        account_index = 7
+        _our_fills = LighterClient._our_fills
 
-    # 3) min_base can bind ABOVE min_quote — AAPL at a $15 clip is unfillable,
-    #    which is why AAPL divergence tickets were vanishing.
-    e = min_size_error("AAPL", AAPL, 15.0 / 333.4, 333.4)   # $15 -> 0.045 < 0.05
-    assert e and "below the venue minimum" in e, e
-    assert min_size_error("AAPL", AAPL, 20.0 / 333.4, 333.4) is None, \
-        "$20 clears AAPL's 0.05 min_base ($16.67) and must pass"
+    f = _Fake()          # bound method: f._our_fills(trades, ...) passes self
 
-    # 3b) THE BOUNDARY — an order EXACTLY at the minimum is LEGAL and must not
-    #     be refused. Without this an off-by-one (`<` -> `<=`) silently shaves
-    #     the edge off every book, and no other fixture here can see it
-    #     (mutation-checked: M9 passed until this existed).
-    assert min_size_error("AAPL", AAPL, 0.050, 333.4) is None, \
-        "size EXACTLY at min_base is legal — refusing it is an off-by-one"
-    assert min_size_error("STRC", {"min_base": 0.0, "min_quote": 10.0},
-                          10.0, 1.0) is None, \
-        "notional EXACTLY at min_quote ($10) is legal — it IS the floor"
+    # --- THE REFUTATION, pinned as executable fact -------------------------
+    # These are REAL orders the venue ACCEPTED. Any future "minimum order"
+    # guard must let every one of them through, or it is wrong the same way.
+    ACCEPTED_REAL_ORDERS = [
+        # (coin,   size,        px,        book min_base, note)
+        ("ZEC",    0.037358,    535.4,     0.1,   "LIVE Funding Farmer, 17-Jul 10:36"),
+        ("HYPE",   0.33,        59.06,     0.5,   "LIVE Funding Farmer, 17-Jul 05:29"),
+        ("TRX",    38.8102,     0.32208,   40.0,  "Tide Rider, 17-Jul 07:42"),
+        ("HYPE",   0.0745,      67.0896,   0.5,   "$5.00 order — and it FILLED"),
+        ("kBONK",  1250.6,      0.003998,  500.0, "$5.00 order — and it FILLED"),
+    ]
+    for coin, size, px, min_base, note in ACCEPTED_REAL_ORDERS:
+        ntl = size * px
+        assert size < min_base or ntl < 10.0, (
+            f"{coin}: fixture must actually violate a claimed minimum, else it "
+            f"proves nothing")
+    # the two facts those orders establish:
+    assert any(s < mb for _, s, _, mb, _ in ACCEPTED_REAL_ORDERS), \
+        "min_base_amount is NOT enforced — 16 of 56 real orders were under it"
+    assert any(s * p < 10.0 for _, s, p, _, _ in ACCEPTED_REAL_ORDERS), \
+        "min_quote_amount is NOT a $10 floor — $5 orders filled"
 
-    # 4) a book with no declared minimums is never blocked (fail-OPEN: the
-    #    venue remains the authority; this guard only EXPLAINS).
-    assert min_size_error("X", {}, 0.0001, 1.0) is None
-    assert min_size_error("X", {"min_base": 0, "min_quote": 0}, 1e-9, 1.0) is None
+    # --- _our_fills: the client-id match is EXACT, no blending -------------
+    t_ours_a = _Trade(timestamp=1_700_000_000_000, price=100.0, size=1.0,
+                      ask_account_id=7, bid_account_id=9, ask_client_id=111)
+    t_ours_b = _Trade(timestamp=1_700_000_000_000, price=200.0, size=1.0,
+                      ask_account_id=7, bid_account_id=9, ask_client_id=222)
+    t_theirs = _Trade(timestamp=1_700_000_000_000, price=999.0, size=5.0,
+                      ask_account_id=8, bid_account_id=9, ask_client_id=333)
+    since = 1_699_999_999_000 / 1000.0
+    trades = [t_ours_a, t_ours_b, t_theirs]
 
-    # 5) the $10 floor, stated as the operator-facing fact it is
-    for clip in (4.0, 8.0, 9.99):
-        assert min_size_error("STRC", STRC, clip / 85.629, 85.629), \
-            f"a ${clip} clip must be refused — $10 is the venue floor"
-    assert min_size_error("STRC", STRC, 10.0 / 85.629, 85.629) is None, \
-        "$10 is the floor and must be TRADEABLE, not refused"
+    # with an id: EXACTLY that order, never blended with our other same-side fill
+    assert f._our_fills(trades, True, since, client_id=111) == 100.0
+    assert f._our_fills(trades, True, since, client_id=222) == 200.0
+    # without an id: the OLD heuristic blends our two orders into a fiction —
+    # this is the defect the client id removes, pinned so it cannot come back
+    # unnoticed. 150.0 is the average of two DIFFERENT orders: not a fill price.
+    assert f._our_fills(trades, True, since) == 150.0, \
+        "id-less path blends — that is why callers must pass client_id"
+    # NEVER counts someone else's trade — even when the client id MATCHES.
+    # The id is time.time()*1000 % 2**48: unique per ACCOUNT, not globally, so
+    # two accounts ordering in the same millisecond collide. My first cut
+    # matched on the id alone and this fixture caught it.
+    t_collide = _Trade(timestamp=1_700_000_000_000, price=999.0, size=5.0,
+                       ask_account_id=8, bid_account_id=9, ask_client_id=111)
+    assert f._our_fills([t_collide], True, since, client_id=111) is None, \
+        "a client-id COLLISION with another account must never read as our fill"
+    assert f._our_fills(trades, True, since, client_id=333) is None
+    # partial fills of ONE order DO vwap — that is correct, it IS the fill
+    p1 = _Trade(timestamp=1_700_000_000_000, price=100.0, size=1.0,
+                ask_account_id=7, bid_account_id=9, ask_client_id=111)
+    p2 = _Trade(timestamp=1_700_000_000_000, price=102.0, size=3.0,
+                ask_account_id=7, bid_account_id=9, ask_client_id=111)
+    assert f._our_fills([p1, p2], True, since, client_id=111) == 101.5
 
-    print("venues.lighter_client _selftest OK (min_size_error: real fills pass, "
-          "$10 venue floor enforced, AAPL's $16.67 min_base explained, "
-          "undeclared minimums fail-OPEN)")
+    print("venues.lighter_client _selftest OK (min-order floor REFUTED and "
+          "pinned; client-id match exact, id-less path blends)")
 
 
 if __name__ == "__main__":
