@@ -37,6 +37,20 @@ LEGACY_BOTS = [
     "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
     "perps-donchian-breakout", "perps-donchian-breakout-lighter",
     "perps-donchian-breakout-lshadow",
+    # [2026-07-17] 🌊 Tide Rider's LIVE row — 🎫 Ticket Taker took the slot on
+    # the SAME service/keys/sub-account (the 11-Jul Trail Blazer -> Funding
+    # Farmer shape). Both halves of a retirement, per the 16-Jul lesson that
+    # hiding a row is not retiring it: RETIRED_ROWS hides the card, this PRUNES
+    # the frozen row. It must be pruned, not just hidden — the row still holds a
+    # stale $34.67 for a sub-account the TAKER now reports, so leaving it makes
+    # the fleet double-count real money (and a frozen row with phantom holdings
+    # is what pinned the fleet-risk light RED for hours on 14-Jul).
+    # Safe to prune permanently: tide-rider-lighter-live now builds
+    # Dockerfile.tickettaker, so nothing can ever re-upsert this id.
+    # The -lshadow twin is NOT listed: its service still runs the trend bot and
+    # would re-upsert after every prune (see the equities note below for that
+    # exact failure mode). Stop tide-rider-lighter-shadow first.
+    "crypto-trend-daily-lighter",
     "perps-regime-switch", "perps-regime-switch-lshadow",
     "scanner-triangular-arb", "crypto-trendmomo-4h",
     # [2026-07-14 LIGHTER-FIRST CUT] laptop stock bots retired on user

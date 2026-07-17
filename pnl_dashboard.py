@@ -164,6 +164,25 @@ DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
 RETIRED_ROWS = {"perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
+                # [2026-07-17] 🌊 Tide Rider RETIRED from the live slot —
+                # 🎫 Ticket Taker took it (operator: "taker was meant to replace
+                # rider"), the same shape as the 11-Jul Trail Blazer -> Funding
+                # Farmer swap: SAME service (tide-rider-lighter-live), same keys,
+                # same sub-account, no transfer. The service now builds
+                # Dockerfile.tickettaker, so this id can never be published
+                # again — the retirement is permanent, not a hidden live bot.
+                # RETIRING IT IS REQUIRED, not cosmetic: the taker already
+                # publishes the SAME $34.67 sub-account under
+                # lighter-ticket-taker-lighter, so both rows reported the same
+                # real money and the fleet total DOUBLE-COUNTED it. The money is
+                # not hidden by this — it moves to the taker's row.
+                # Its record: 0 closed trades ever, died on n=14; the operator
+                # flattened its last TRX by hand and armed the kill switch.
+                # NOTE the -lshadow twin is deliberately NOT here: the
+                # tide-rider-lighter-shadow SERVICE still runs the trend bot, so
+                # hiding that row would hide a bot that is still publishing —
+                # stop the service first, or the row simply returns.
+                "crypto-trend-daily-lighter",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
                 "perps-regime-switch", "perps-regime-switch-lshadow",
