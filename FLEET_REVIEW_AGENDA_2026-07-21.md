@@ -455,10 +455,27 @@ on trial here; the VENUE FIT is.
   loop veto-exited BOTH holdings — HOOD and MU are each already above the 150%
   bar — so the variant sits in cash until the 20-Jul rebalance; that IS the
   test, not a fault.
-- **DECIDE — `AB_VETO_APR` (150%) is the variable under test, not a truth.**
-  It binds on SNDK/NBIS/COIN but passes MU at 126% — which is still ~3× the
-  strategy's whole gross CAGR. If the review wants to test "affordable", the
-  bar is arguably near the 28% baseline, not 150%.
+- **SUPERSEDED 17-Jul (d) — read item 16 first.** Every APR quoted in this item
+  is **8x TRUE** (the venue's floor is 3.5%, not 28%). Corrected: the picks paid
+  **~7.7% true APR** against a **~52% breakeven** — **funding was never this
+  book's problem**, and the "momentum ranks crowding" read here is REFUTED
+  (Spearman -0.174, p=0.40; sign-unstable; untestable at n=25 where most names
+  tie on the floor). `AB_VETO_APR` 1.5 = **18.75% true**, ~3x TIGHTER than
+  breakeven, so the A/B vetoes affordable names and sits in cash — as configured
+  it measures the wrong thing.
+- **WHAT STANDS, and it needs no funding data at all: the book cannot promote.**
+  Four independent harnesses put the rule's maxDD at **37-44% with ZERO funding
+  modelled** (its own header says 36.9-44.3%); the go-live gate is **maxDD <
+  15%** — 2.5-3x over before a cent of carry, and a one-path maxDD is
+  downward-biased. Every alternative fails too: best-of-field (mega-cap
+  universe) **+7.2% CAGR / -39.5% DD**, failing both halves; top-3 -67.6%. Zero
+  of ~10 designs clear 15%. Carry is time-based (drag 29.5/28.4/29.1pp at
+  7/14/28d) so trading less cannot outrun it. Also: `+43.7%/44.3%` is a GRID
+  ARTIFACT (union-of-25 grid annualising 15.3y as 19.9, freezing stock legs on
+  ~26% of rows; fair NYSE grid +59.5%/41.8%), the REACH WIDENING verdict
+  INVERTS its own drawdown half (fair grid: wins CAGR 6/6, LOSES maxDD 6/6),
+  and ~38% of the CAGR comes from names unselectable at window start.
+- **RECOMMENDATION: PARK.** Not for venue fit — for the drawdown.
 - **LIVE RAIL RESIDUAL — real money, deliberately NOT touched.**
   `lighter_funding_bot` and `lighter_trend_bot` restore `day_start_equity` only
   from the saved **halt record**, so a **PRE-halt** restart part-way down a
@@ -471,3 +488,44 @@ on trial here; the VENUE FIT is.
   MU/CRCL 126.1) are Lighter's own discrete bands, **not** a symbol collision
   corrupting the live funding read; and the hourly-rate convention matches the
   live bot's `H = 24*365`.
+
+## 16. REAL MONEY: every funding APR the fleet prints is 8x TRUE (added 17-Jul)
+Found while adding the scout's carry cross-section (item 15's fix). **Lighter's
+`/funding-rates` `rate` is a fraction per 8-HOUR funding period. Every fleet
+consumer annualises it as HOURLY (`rate * 24 * 365`).** Correct conversion is
+`rate * 3 * 365 * 100` — 3 periods/day.
+
+VERIFIED against the SETTLED series `/api/v1/fundings` (its `rate` is %/hr):
+ETH predicted `9.6e-05` -> fleet prints **84.1%**, settled **10.51%**, ratio
+**exactly 8.00**. DOGE and SPY also exactly 8.00 (SPY's floor: prints 28.0%,
+settled **3.50%**). Arithmetic closes: `9.6e-05*3*365*100 = 10.512`.
+(Compare only STABLE names — a spiking predicted rate vs a 48h settled mean
+gives noisy ratios, e.g. MU 12.1 / MSTR 26.5, and proves nothing either way.)
+
+- **The 8x is a MONOTONIC rescale.** Rankings, the `funding_extremes` ordering,
+  and cross-venue `funding_divergence` (all rows share the basis) are
+  **UNAFFECTED**. What is wrong: every ABSOLUTE apr a human reads, and any
+  threshold meant to express a TRUE apr. Two different bugs — don't conflate.
+- **DECIDE — the live gate.** `lighter_funding_bot.FUNDING_ENTER_APR = 0.40`
+  really admits at **~5% true APR**. THE question to settle first: was 0.40
+  **FITTED** in these (wrong) units on this venue's data — in which case it
+  works as fitted and only the LABEL is wrong, and "fixing" the conversion
+  would tighten the live gate 8x and change real-money behaviour — or was it
+  set from a TRUE-apr reference (e.g. carried over from the HL-data carry bot,
+  a different venue with a possibly different basis), in which case it is
+  genuinely mis-set? `funding-carry-structural-edge-lighter` memory says the
+  40% gate is backtest-confirmed; check WHICH units that backtest ran in.
+  **Backtest-first either way. Do not flip it live on this finding alone.**
+- Same question for `AB_VETO_APR` 1.5 (= **18.75% true**, ~3x TIGHTER than
+  Stock Leaders' ~52% breakeven, so it vetoes affordable names and holds cash)
+  and `DIV_GAP_PP` 300/500.
+- **Shadow ledgers over-accrue 8x**: `lighter_momentum_bot` /
+  `lighter_index_bot` do `accrued -= rate * size * px * dt_h`, treating the 8h
+  rate as hourly. Their measured "drag" is 8x too big (Stock Leaders' −$17.53
+  is really ~−$2.19). The LIVE bots are charged by the VENUE, so their realized
+  P&L is honest — only their DECISIONS use the inflated number.
+- **Mitigation already shipped (17-Jul (d)):** `lighter-market` carries a
+  `funding_basis` stamp (`true_apr_divisor: 8.0`), pinned + mutation-tested, so
+  the 60-day tape is self-correcting rather than 60 days of false fact.
+- Sweep needed: every `24 * 365` on a Lighter funding rate — scout, funding
+  bot (`H`), momentum, index, taker/tuner/replay, dashboard.

@@ -16,6 +16,17 @@ direction")
                        (taker entries there pay the premium; it mean-reverts)
     funding_extremes   top |Lighter-native APR| on LIQUID books only — fixes
                        the old bus signal's flaw (max over tiny dead coins)
+    funding            [2026-07-17] the FULL per-symbol APR cross-section over
+                       every ACTIVE book — see the note on `funding` below.
+                       funding_extremes is the top-8 VIEW of this; the tape
+                       needs the cross-section to answer carry after the fact
+    funding_basis      the units `funding` is denominated in. READ IT: every
+                       APR this organ publishes is 8x TRUE, because
+                       funding_aprs() annualises an 8-HOUR fraction as hourly
+                       (verified vs the settled /api/v1/fundings series, ratio
+                       exactly 8.00). Divide by true_apr_divisor. Deliberately
+                       not corrected — the same conversion denominates the LIVE
+                       Funding Farmer's gate; see the BASIS STAMP note below
     funding_divergence Lighter APR vs the median of binance/bybit/hyperliquid
                        for the same symbol — a venue-carry dislocation lead
                        (the funding-veto A/B measures the trailing cost;
@@ -161,6 +172,16 @@ def _median(xs):
     return xs[len(xs) // 2] if xs else None
 
 
+def historized(payload):
+    """The append-only-history projection of a snapshot. `_marks` is the diff
+    base for the NEXT run only and would bloat the tape; everything else is
+    evidence and must survive. Extracted from main() [2026-07-17] so the
+    selftest can pin the REAL projection — this whole organ's `marks`/`funding`
+    cross-sections exist ONLY to be joined to a decision after the fact, so a
+    key silently dropped here is the difference between evidence and nothing."""
+    return {k: v for k, v in payload.items() if k != "_marks"}
+
+
 def strategy_tickets(stats, lighter_apr, divergence=None):
     """[2026-07-14 user ask] Per-strategy candidate TICKETS — the scanner
     hunting each bot family's setup across the WHOLE venue instead of a fixed
@@ -300,6 +321,65 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
         # incubator accept on. (~215 vs ~130 symbols; a few KB per snapshot.)
         "marks": {s: float(f'{v["last"]:.6g}')
                   for s, v in stats.items() if v.get("last")},
+        # [2026-07-17 CARRY CROSS-SECTION] the FULL per-symbol funding APR over
+        # every ACTIVE book, historized alongside `marks` and for the same
+        # reason: only a stored cross-section can be joined to a decision after
+        # the fact. Until now the ONLY funding this organ persisted was the
+        # top-8 |extremes| — which is a VIEW, not the data. When Stock Leaders
+        # was reviewed on 17-Jul ("it's constantly losing"), four of five
+        # evidence strands could not be resolved: with no per-symbol funding
+        # history there was no way to test whether the book's picks were
+        # systematically expensive, or merely expensive that week. The
+        # correlation had to be run on ONE live snapshot at n=25 — where most
+        # names sit on the venue's floor band, so |rho| > 0.398 is needed for
+        # p<0.05 and the test cannot resolve at all. That is a data gap, not a
+        # hard question. `marks` was widened from liquid-only to all books on
+        # 16-Jul on the identical argument (a few KB per snapshot); this is the
+        # carry half of the same tape, and every long-perp design pays or earns
+        # funding (Tide Rider + Funding Farmer are REAL MONEY).
+        # NOT the whole story: /api/v1/fundings already serves ~31d of SETTLED
+        # hourly rates retroactively. What only this key can give is depth past
+        # that window, and the PREDICTED rate as seen at the decision instant.
+        # COST, measured 17-Jul against the live venue, not estimated: ~201
+        # active books, all carrying a rate (the funding map's 214 rows include
+        # inactive books this intersection drops). ~3.0 KB/snapshot of raw JSON
+        # => +47% on a 6.3 KB history row => ~52 MB at the 60-day retention
+        # floor (BOT_STATE_HISTORY_KEEP_DAYS, 16-Jul audit fix), on a DB that
+        # reaches ~150 MB at that steady state regardless. Those are RAW-JSON
+        # figures and so conservative: jsonb TOAST-compresses this key well (it
+        # is ~43 distinct values across ~201 symbols), measuring ~1.5 KB and
+        # ~32 MB on disk. Bounded and worth it either way.
+        # Deliberately NOT liquid-gated and NOT kill-switched: liquid-only is
+        # the exact bug the 16-Jul `marks` fix repaired (a book can fall under
+        # the floor while still held), and an env flag on a DATA key is just a
+        # born-dark switch waiting to be flipped.
+        # Keyed like `marks` (raw Lighter symbol, from the same `symbol` field)
+        # so the two join directly. Joining to paper_trades/bot ledgers needs
+        # venues/symbol_map.from_lighter() — 5 keys differ (the 1000X markets).
+        "funding": {s: lighter_apr[s] for s in stats if s in lighter_apr},
+        # [2026-07-17 BASIS STAMP — READ BEFORE USING `funding`.]
+        # funding_aprs() annualises /funding-rates `rate` as if it were HOURLY
+        # (rate*24*365). It is an 8-HOUR fraction. Every APR this organ
+        # publishes — `funding`, `funding_extremes`, and the Lighter side of
+        # `funding_divergence` — is therefore 8x TRUE. Verified 17-Jul against
+        # the SETTLED series /api/v1/fundings (whose rate is %/hr): ETH
+        # predicted 9.6e-05 -> published 84.1%, settled 10.51%, ratio exactly
+        # 8.00; DOGE and SPY also exactly 8.00 (SPY's floor: published 28.0%,
+        # settled 3.50%). The arithmetic closes: 9.6e-05*3*365*100 = 10.512.
+        # The correct conversion is rate*3*365*100 (3 funding periods/day).
+        # DELIBERATELY NOT CORRECTED HERE. The same conversion denominates the
+        # LIVE Funding Farmer's entry gate (FUNDING_ENTER_APR 0.40 -> really 5%
+        # true) plus AB_VETO_APR and DIV_GAP_PP, so re-denominating is a
+        # real-money behaviour change and goes backtest-first with the operator
+        # — 21-Jul agenda. NOTE the 8x is a MONOTONIC rescale: rankings, the
+        # extremes ordering, and cross-venue divergence (all rows share the
+        # basis) are unaffected. What is wrong is every ABSOLUTE apr a human
+        # reads, and any threshold meant to express a TRUE apr.
+        # Stamped so the 60-day tape is self-correcting rather than 60 days of
+        # 8x-wrong carry asserted as fact.
+        "funding_basis": {"unit": "apr_pct", "true_apr_divisor": 8.0,
+                          "src": "funding-rates.rate (8h fraction)",
+                          "note": "divide by 8 for true APR; see BASIS STAMP"},
         # compact diff base for the NEXT run (all active books, not just liquid,
         # so listings/delistings diff over the full set)
         "_marks": {s: [round(v["qvol"], 2), round(v["oi"], 4)]
@@ -330,8 +410,7 @@ def main():
     prev = store.load_state(KEY) or {}
     payload = build_snapshot(stats, lighter_apr, other_aprs, prev.get("_marks") or {})
     store.save_state(KEY, payload)
-    hist = {k: v for k, v in payload.items() if k != "_marks"}
-    store.save_history(KEY, hist)
+    store.save_history(KEY, historized(payload))
 
     st = payload["stress"] or {}
     fx = ", ".join(f"{x['sym']}@{x['apr_pct']}%"
@@ -391,6 +470,25 @@ def selftest():
     assert snap["new_listings"] == ["DEAD", "HALT", "RKLB"] or "RKLB" in snap["new_listings"]
     assert snap["delisted"] == ["GONE"]
     assert "_marks" in snap and "BTC" in snap["_marks"]
+
+    # [2026-07-17 CARRY CROSS-SECTION] `funding` is the DATA; funding_extremes
+    # is a top-8 liquid VIEW of it. DEAD is illiquid and so is correctly absent
+    # from the view (asserted above) — but it MUST be present here, or the tape
+    # can only ever answer questions about the coins that were already loud.
+    assert set(snap["funding"]) == {"BTC", "RKLB", "DEAD"}, snap["funding"]
+    assert "HALT" not in snap["funding"], "inactive book carries no funding"
+    assert abs(snap["funding"]["RKLB"] - 299.6) < 1.0, snap["funding"]
+    # must be joinable to `marks` (same key space) — that join IS the use case
+    assert set(snap["funding"]) <= set(stats), "funding/marks key spaces diverged"
+    assert set(snap["marks"]) <= set(stats)
+    # the BASIS STAMP must ride with the data — an 8x-wrong APR that travels
+    # WITHOUT its divisor is exactly how a tape becomes 60 days of false fact
+    assert snap["funding_basis"]["true_apr_divisor"] == 8.0, snap["funding_basis"]
+    assert "funding_basis" in historized(snap), "basis stamp must survive history"
+    # ...and must SURVIVE into history, or none of the above is worth anything
+    _h = historized(snap)
+    assert "funding" in _h and _h["funding"] == snap["funding"], "history drops funding"
+    assert "marks" in _h and "_marks" not in _h, _h.keys()
 
     # 4) Strategy tickets: each lens picks its setup, exclusions hold.
     def lb(sym, last, hi, lo, chg, qvol=5e6, prem=1.0):
