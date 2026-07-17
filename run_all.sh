@@ -158,9 +158,21 @@ done &
 # fills at Lighter marks + funding drag, exits TP/SL/max-hold, tags every
 # close <side>-<lens>_<exit> so the brain grades each lens on real forward
 # returns. UNVALIDATED by design — that grading is what it exists to collect.
+# [2026-07-17] TT_VENUE is DECLARED here, not inherited. The taker now REFUSES
+# to start without it (identity must never come from a default — the same rule
+# 121f830/f44e3eb applied to the two real-money bots). That guard is inert for
+# them because their services set VENUE explicitly; this arm has NO service and
+# NO env, so without this line the mandatory guard is not inert — it is LETHAL:
+# main() raises SystemExit, _supervised() re-raises it UNTOUCHED (a refusal is
+# deliberately not a crash, so the row is never marked), `|| true` swallows it,
+# and the shadow arm goes silently dark behind a stale "online" row. That is
+# this morning's crash-loop incident exactly, third time in one day.
+# lighter_shadow is the correct value AND the safe one: this container hosts the
+# SHADOW book — the control arm and the only evidence a go-live can rest on. The
+# LIVE arm is a separate service (Dockerfile.takerlive) and sets its own.
 ( sleep 210
   while true; do
-    python3 /freqtrade/lighter_ticket_taker.py || true
+    TT_VENUE=lighter_shadow python3 /freqtrade/lighter_ticket_taker.py || true
     sleep 300
   done ) &
 

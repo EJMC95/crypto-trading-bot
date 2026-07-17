@@ -105,11 +105,14 @@ from venues.safety import open_notional
 # is explicit by construction, so the lost-var case fails SAFE here rather than
 # silently-live.
 # GO-LIVE PRECONDITION (write it down now, while it is cheap): the live arm
-# must be its OWN Railway service with TT_VENUE set explicitly. The moment a
-# second taker process exists, a lost var on it defaults to lighter_shadow and
-# double-writes `-lshadow` — the exact silent two-writers-one-row failure
-# f44e3eb found on the funding bot. Add the mandatory guard THEN, with the
-# service; it is inert until one exists.
+# must be its OWN Railway service with TT_VENUE set explicitly.
+# [2026-07-17 DONE — that service exists: Dockerfile.takerlive +
+# railway.takerlive.toml, and the mandatory guard is now in main(). The module
+# default below is what run_all.sh's shadow arm no longer relies on: it DECLARES
+# TT_VENUE=lighter_shadow on the command line, because with the guard in place
+# an unset var is a refusal, not a fallback. Keep the default only so the four
+# modules that import this file (replay/tuner/incubator/proprioception) can read
+# the bars without an env.]
 TT_VENUE = os.environ.get("TT_VENUE", "lighter_shadow").strip() or "lighter_shadow"
 TT_MODES = ("lighter_paper", "lighter_shadow", "lighter_live")
 
@@ -358,6 +361,35 @@ def incredible(tickets):
     return out
 
 
+def live_boot_gate(rails, live):
+    """The BOOT half of the rails for a RUN-ONCE live arm. Returns a refusal
+    string, or None to proceed. Pure — unit-tested in selftest().
+
+    THE RULE, and why it differs from every daemon in this fleet: the cap is a
+    hard boot gate; the KILL SWITCH IS NOT — it must be allowed to reach
+    _flatten_all() + halt in main().
+
+    venues/safety.py promises both halves ("refuses to start — and
+    flattens+halts mid-run"), and for a daemon both hold: the funding bot is
+    already looping when the switch is armed, so kill_check() fires and closes
+    the book. This bot is run-once — EVERY CYCLE IS A BOOT — so
+    assert_can_start() would raise before kill_check() is ever reached, and the
+    flatten would be unreachable dead code. Arming REAL_MONEY_KILL would stop
+    the position manager and STRAND the book: no stop, no max-hold, nothing
+    watching it. The switch meant to protect the money would be what abandons
+    it. That is not hypothetical — it is the shape of Tide Rider's live row
+    right now (kill armed, boot refused, a position left for the operator to
+    close by hand).
+
+    So the kill switch still stops ALL trading on the first cycle (main() halts
+    and takes no entries) — it now closes the book on the way out.
+    """
+    if live and rails.max_notional is None:
+        return ("lighter_live requires an explicit per-bot notional cap "
+                "(LIGHTER_TICKET_TAKER_MAX_NOTIONAL) — refusing to start.")
+    return None
+
+
 def delist_due(no_mark_since_iso, t_now, giveup_h=None):
     """True when a mark has been continuously missing since the given stamp
     for >= giveup_h. Unparseable stamp -> False (the caller re-stamps)."""
@@ -494,7 +526,29 @@ def main(_ctx=None):
             net="mainnet", with_signer=live,
             guard_state_key=(BOT_ROW + ":eqguard") if live else None)
         rails = SafetyRails(BOT, TT_VENUE)
-        rails.assert_can_start()
+        # [2026-07-17 RUN-ONCE KILL SEMANTICS — deliberately NOT
+        # assert_can_start() on the live arm.]
+        # safety.py promises BOTH halves: lighter_live "refuses to start — and
+        # flattens+halts mid-run". For a DAEMON both work: the funding bot is
+        # already looping, so kill_check() fires and _flatten_all() closes the
+        # book. This bot is RUN-ONCE (run_all.sh / the live loop re-invokes it
+        # every 5 min), so EVERY CYCLE IS A BOOT — assert_can_start() would
+        # raise SystemExit before kill_check() is ever reached, making the
+        # flatten below unreachable dead code. Arming REAL_MONEY_KILL would
+        # then STOP the position manager and STRAND whatever it holds, with no
+        # stop and no max-hold: the switch meant to protect the money would be
+        # the thing that abandons it. (That is not theoretical — it is exactly
+        # the shape of Tide Rider's live row today: kill armed, boot refused,
+        # a position left behind for the operator to close by hand.)
+        # So: keep the CAP half as a hard boot gate, and let the kill switch
+        # reach _flatten_all() + halt below. The kill switch still stops all
+        # trading on the very first cycle; it now closes the book on the way.
+        _refusal = live_boot_gate(rails, live)
+        if _refusal:
+            store.set_status(BOT_ROW, "error")
+            raise SystemExit(_refusal)
+        if not live:
+            rails.assert_can_start()
         broker = None if live else ShadowBroker(BOT_ROW, venue, START_EQUITY)
 
     # State: the paper/shadow arms own a local ACCOUNT (broker snapshot); the
@@ -777,6 +831,43 @@ def main(_ctx=None):
               f"skipping cycle (no entries, no exits)")
         store.heartbeat(BOT_ROW)
         return
+
+    # [2026-07-17 ADOPTION GUARD — the Tide Rider handover] A live arm inherits
+    # a real Lighter SUB-ACCOUNT, and the plan is to hand it the one Tide Rider
+    # is vacating. If ANY position on it has no meta of ours, this bot did not
+    # open it and MUST NOT manage it: it has no entry clip, no lens and no
+    # opened-time, so every rule below would be applied to someone else's
+    # position on the wrong strategy's bars — the exit ladder would TP/SL a
+    # trend position at the taker's ±4%, the ledger would book it under a
+    # "ticket" lens the brain then grades, and the divergence-only mandate
+    # would be silently violated by a coin no scout ever ticketed.
+    #
+    # WHY THIS IS NOT PARANOIA: crypto-trend-daily-lighter's row still reads
+    # held:['TRX'] at equity $34.67 — but its status is `error`, and
+    # SafetyRails._publish_refusal is a STATUS-ONLY write, so those values are
+    # the LAST GOOD PUBLISH, frozen. The dashboard cannot tell you whether that
+    # account is flat; only a keyed read can. So the bot checks at the venue,
+    # every cycle, and refuses rather than guesses.
+    #
+    # Fail-CLOSED on real money: a lost meta (a failed state write) also lands
+    # here, and halting is still right — a position we cannot attribute is one
+    # we cannot manage. The kill switch runs ABOVE this and still flattens,
+    # so REAL_MONEY_KILL remains the escape hatch for a dirty account.
+    if live:
+        _foreign = sorted(s for s in pos if s not in meta)
+        if _foreign:
+            store.set_status(BOT_ROW, "error")
+            raise SystemExit(
+                f"lighter-ticket-taker REFUSES to trade a DIRTY ACCOUNT: the "
+                f"venue reports {_foreign} with no meta of ours. This bot did "
+                f"not open {'them' if len(_foreign) > 1 else 'it'} and will not "
+                f"adopt {'them' if len(_foreign) > 1 else 'it'} — it has no "
+                f"entry clip, lens or opened-time, so its exit ladder would "
+                f"manage another strategy's position on the taker's bars. If "
+                f"this is Tide Rider's leftover on the handed-over sub-account, "
+                f"flatten it FIRST (operator, by hand or via REAL_MONEY_KILL). "
+                f"If it is ours with lost state, reconcile "
+                f"bot_state['{LIVE_STATE_KEY}'].meta before restarting.")
 
     # 1) mark + hourly funding drag on held positions (longs pay positive rate)
     for sym in list(pos):
@@ -1144,6 +1235,32 @@ def selftest():
     assert abs(vol_clip(6.0) - 50.0) < 1e-9, "6% range -> $50 (1.5/3%)"
     assert abs(vol_clip(10.0) - 30.0) < 1e-9, "10% range -> $30"
     assert vol_clip(30.0) == CLIP_MIN, "wild book floors at CLIP_MIN"
+
+    # [2026-07-17 RUN-ONCE KILL SEMANTICS] the boot gate: the cap refuses, the
+    # kill switch must NOT (it has to reach the flatten). The negative fixture
+    # is the one that matters — if this ever starts refusing on an armed kill
+    # switch, a live taker abandons its book instead of closing it.
+    class _R:
+        def __init__(self, cap): self.max_notional = cap
+    assert live_boot_gate(_R(None), live=True), "live with NO cap must refuse"
+    assert live_boot_gate(_R(150.0), live=True) is None, "live with a cap proceeds"
+    # the kill switch is NOT a boot gate here — armed or not, the gate is the
+    # cap alone, so main() reaches kill_check() -> _flatten_all() -> halt.
+    _prev = os.environ.get("REAL_MONEY_KILL")
+    os.environ["REAL_MONEY_KILL"] = "ARMED"
+    try:
+        from venues.safety import kill_switch_armed
+        assert kill_switch_armed() is True, "fixture must actually arm the switch"
+        assert live_boot_gate(_R(150.0), live=True) is None, \
+            ("an ARMED kill switch must NOT refuse the boot of a run-once bot — "
+             "it must reach _flatten_all() and CLOSE the book, not strand it")
+    finally:
+        if _prev is None:
+            os.environ.pop("REAL_MONEY_KILL", None)
+        else:
+            os.environ["REAL_MONEY_KILL"] = _prev
+    # shadow never needs a cap
+    assert live_boot_gate(_R(None), live=False) is None
 
     # [2026-07-16 ZOMBIE GUARD] delist give-up clock
     _t = now()
@@ -1652,6 +1769,66 @@ def _selftest_live():
             store.set_status = _real_set
             store.load_state = _real_load
 
+        # ================================================================
+        # 11) THE TIDE RIDER HANDOVER. The live arm inherits the sub-account
+        #     Tide Rider is vacating. A leftover position there must HALT the
+        #     bot, not be silently adopted onto the taker's exit ladder.
+        # ================================================================
+        TT_VENUE, BOT_ROW = "lighter_live", BOT + "-lighter"
+        captured["state"].clear()
+        captured["paper"].clear()
+        _status = []
+        _real_set = store.set_status
+        store.set_status = lambda bot, st: _status.append((bot, st))
+        try:
+            # TRX at Tide Rider's entry, 5% against — inside the taker's ±4% TP
+            # bar, so an ADOPTING bot would close a trend position on the
+            # taker's rule. It must refuse instead.
+            _stub_market(marks={"TRX": 0.2625}, funding={}, ranges={})
+            _scout({"divergence": [{"sym": "AAA", "side": "short", "gap_pct": 99.0}]})
+            v = _StubVenue(equity=34.67, pos={"TRX": {"size": 100.0, "entry": 0.25}})
+            r = _StubRails(max_notional=150.0)
+            captured["state"][LIVE_STATE_KEY] = {
+                "initial_equity": 34.67, "meta": {},
+                "stats": {"closed": 0, "wins": 0, "losses": 0}}
+            try:
+                main(_ctx={"venue": v, "rails": r, "broker": None})
+                raise AssertionError("a dirty account must REFUSE")
+            except SystemExit as e:
+                assert "DIRTY ACCOUNT" in str(e) and "TRX" in str(e), str(e)
+            assert v.closes == [], f"must not manage a foreign position: {v.closes}"
+            assert v.opens == [], f"must not trade on a dirty account: {v.opens}"
+            assert captured["paper"] == [], "must not book a foreign close"
+            assert _status == [(BOT_ROW, "error")], \
+                f"a dirty account must mark the row: {_status}"
+
+            # ... and the kill switch stays the escape hatch: it runs ABOVE the
+            # guard, so REAL_MONEY_KILL can still flatten a dirty account.
+            _status.clear()
+            v2 = _StubVenue(equity=34.67, pos={"TRX": {"size": 100.0, "entry": 0.25}},
+                            fills={"TRX": 0.2625})
+            r2 = _StubRails(max_notional=150.0, killed=True)
+            captured["state"][LIVE_STATE_KEY] = {
+                "initial_equity": 34.67, "meta": {},
+                "stats": {"closed": 0, "wins": 0, "losses": 0}}
+            main(_ctx={"venue": v2, "rails": r2, "broker": None})
+            assert v2.closes == ["TRX"], \
+                f"the kill switch must still flatten a dirty account: {v2.closes}"
+
+            # ... and a CLEAN account (every position has meta) proceeds.
+            _stub_market(marks={"KNOWN": 100.0}, funding={}, ranges={})
+            _scout({})
+            v3 = _StubVenue(equity=1000.0, pos={"KNOWN": {"size": 1.0, "entry": 100.0}})
+            r3 = _StubRails(max_notional=150.0)
+            captured["state"][LIVE_STATE_KEY] = {
+                "initial_equity": 1000.0,
+                "meta": {"KNOWN": {"clip": 100.0, "lens": "divergence",
+                                   "opened": iso(now()), "funding_paid": 0.0}},
+                "stats": {"closed": 0, "wins": 0, "losses": 0}}
+            main(_ctx={"venue": v3, "rails": r3, "broker": None})   # must not raise
+        finally:
+            store.set_status = _real_set
+
         print("\nAll LIVE order-path self-tests passed:")
         print("  1 entry SENDS a real order + records the REAL fill")
         print("  2 notional cap is senior — cap-breaching entry never sends")
@@ -1663,6 +1840,7 @@ def _selftest_live():
         print("  8 a failed flatten reports the open book, not a green zero")
         print("  9 the DEPLOYED shadow arm still trades, on the TRUE 8h basis")
         print(" 10 a crash marks the row ERROR instead of going quietly stale")
+        print(" 11 a DIRTY account (Tide Rider's TRX) HALTS; kill switch still flattens")
     finally:
         for k, fn in _real.items():
             setattr(store, k, fn)

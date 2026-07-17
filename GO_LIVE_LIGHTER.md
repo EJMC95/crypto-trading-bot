@@ -262,3 +262,131 @@ Keys/disarm/deposit are yours.
 **Alternative:** the strategy is *stronger* on Kraken spot (no funding drag, keeps the
 down-trend protection). If you'd rather the full validated edge, the Freqtrade/Kraken
 live path (real Kraken keys + dry_run:false) delivers +52% vs this +40%.
+
+---
+
+## 🎫 Ticket Taker — go-live (added 2026-07-17, divergence-only, Tide Rider's slot)
+
+**Status: BUILT AND INERT.** The code refusal is lifted; every remaining gate is
+an env var only you can set. The image trades nothing until you do.
+
+### What was fixed to make this safe (all shipped, all fixture-tested)
+- **Symbol namespace** — the taker keys on Lighter-native symbols (`1000BONK`),
+  `LighterClient` on fleet symbols (`kBONK`). Unconverted, live would have
+  re-opened `1000BONK` every 5 min and silently no-op'd its closes. Converted at
+  the venue boundary; `to_lighter` now mirrors `from_lighter` (verified against
+  all 218 live markets, 0 round-trip failures — the old hardcoded 4-entry list
+  missed `1000NOT`/`1000TOSHI`).
+- **`market_close` returning `None` is now a FAILED close**, both call sites. It
+  does not raise, so an `except` guard could not see it.
+- **Divergence-only allow-list**, fail-CLOSED, reads no bus payload.
+- **`TT_VENUE` mandatory** — identity is never inherited.
+- **`apply_tuning()` no-ops live** — `taker.*` is the SHADOW lane.
+- **Adoption guard** — refuses to trade an account holding a position it has no
+  meta for (see the handover step below).
+- **Run-once kill semantics** — see the ⚠️ note below.
+
+### ⚠️ Read this before you arm anything
+**The kill switch on this bot FLATTENS; it does not refuse-to-boot.** The taker
+is a run-once process (one cycle, then exit), so every cycle is a boot. If it
+used `assert_can_start()` like the daemons, arming `REAL_MONEY_KILL` would raise
+before the flatten could run and would **strand the book** — no stop, no
+max-hold, nothing watching it. So the live arm keeps the **cap** as a hard boot
+gate and lets the kill switch reach flatten+halt. Arming it stops all trading on
+the very first cycle and closes the book on the way out.
+*(This is why `crypto-trend-daily-lighter` sits at `status: error` with a
+position behind it — that bot refuses to boot when armed. Different semantics;
+know which you are looking at.)*
+
+### 🛑 THE IMAGE DECIDES WHICH BOT THE KILL SWITCH IS PROTECTING — read first
+**This already went wrong once, at 17:42 Sydney on 17-Jul, with real money.**
+The disarm was applied to `tide-rider-lighter-live` in order to take the taker
+live. But that service is built from **`Dockerfile.trendlighter`**, whose `CMD`
+is `lighter_trend_bot.py` — **the taker's code is not in that image at all**, so
+`TT_VENUE` there was inert. `REAL_MONEY_KILL` was the *only* thing holding Tide
+Rider down. Disarming it **booted the bot being retired**, and it immediately
+re-bought the position the operator had just flattened by hand
+(`OPEN TRX long $12 | ema50 0.3278 > ema200 0.3195`, on a $34.67 real book).
+
+The rule that follows, and it is not negotiable:
+> **Never disarm a kill switch to change WHICH bot runs.** The env vars of a bot
+> that is not in the image are inert; the disarm is the one change that always
+> lands. Change the IMAGE, verify the running container is the bot you meant,
+> and disarm LAST.
+
+`REAL_MONEY_KILL=ARMED` on a service whose image runs bot X protects **bot X** —
+not whatever bot you intend to run there next.
+
+### 🔴 USER-ONLY steps — in this order
+1. **Point the service at the taker's IMAGE. Do this BEFORE any env change.**
+   Set the service's Config-as-code **Railway Config File** to
+   `railway.takerlive.toml` (it selects `Dockerfile.takerlive` and
+   `restartPolicyType=always`). Prefer a **NEW service** — repurposing
+   `tide-rider-lighter-live` is what produced the incident above, and its
+   `CRYPTO_TREND_DAILY_MAX_NOTIONAL` / `VENUE` vars would linger.
+   Leave `REAL_MONEY_KILL=ARMED` throughout this step.
+2. **VERIFY the running container is the taker — do not trust the deploy.**
+   After it redeploys, with the switch still ARMED, the logs must show the
+   taker's own marker and nothing of Tide Rider's:
+   ```
+   railway logs --service <svc> | grep -E "ticket-taker|TT_VENUE|trend|ema50"
+   ```
+   You want `[ticket-taker] ...` lines (or its `TT_VENUE is unset` refusal).
+   If you see `ema50` / `OPEN ... long`, **you are still running Tide Rider —
+   STOP.** ("git-connected" and "the push rebuilt it" have both been proven
+   false here; the running container is the only evidence.)
+3. **FLATTEN THE SUB-ACCOUNT.** If you hand over Tide Rider's sub-account,
+   its leftover position must be closed by hand before the taker boots. The
+   taker **refuses to trade a dirty account** rather than adopt it (it has no
+   entry clip, lens or opened-time for a foreign position, so its ±4% ladder
+   would manage a trend position on the wrong bars). Note the dashboard **cannot
+   confirm this for you**: `crypto-trend-daily-lighter` shows `held:['TRX']` at
+   equity $34.67, but its status is `error` and that write is status-only — those
+   numbers are the last good publish, frozen. Only a keyed read or the Lighter
+   app can tell you if it is actually flat.
+4. **Env for the live service** — only after steps 1–3:
+```
+TT_VENUE=lighter_live                       # mandatory; the bot refuses without it
+LIGHTER_API_PRIVATE_KEY=<trade-only key for THIS sub-account>   # you paste, never me
+LIGHTER_ACCOUNT_INDEX=<this bot's sub-account index>
+LIGHTER_API_KEY_INDEX=4
+LIGHTER_TICKET_TAKER_MAX_NOTIONAL=90        # hard cap on deployed notional; live REFUSES to boot without it
+LIGHTER_MAX_DAILY_LOSS=15                   # absolute $/UTC-day flatten+halt
+TT_DAILY_LOSS_LIMIT=0.05                    # % daily rail on top (default 0.05)
+LIGHTER_BUDGET_SHARE=0.25                   # keep all live services' shares summing <=1.0
+TT_LOOP_SECONDS=300                         # match the shadow arm so the arms stay comparable
+# TT_CLIP_* / TT_TP / TT_SL / TT_MAX_HOLD_H: the OPERATOR's env is authoritative
+#   live (apply_tuning is a no-op there). Defaults: TP +4%, SL -3%, hold 48h,
+#   constant-risk clips $20-80. NOTE the shadow arm currently runs growth-rail
+#   levers taker.sl=-0.04 / taker.max_hold_h=24 — live will NOT inherit those.
+#   If you want the shadow arm's bars, set them explicitly here.
+# REAL_MONEY_KILL intentionally NOT set -> boots ARMED -> first cycle flattens
+#   (a no-op on a flat account) and halts. Nothing trades.
+```
+5. **Arm it LAST** — and only once step 2 has *proved* the container is running
+   the taker: set `REAL_MONEY_KILL=DISARMED_I_UNDERSTAND` **on that service
+   only**. If step 2 was skipped, this is the single change that moves money on
+   whatever bot the image actually contains. That is the whole incident above.
+   **Instant stop:** `REAL_MONEY_KILL=ARMED` + redeploy → next cycle flattens and
+   halts (this bot's kill switch closes the book — see the ⚠️ note; Tide Rider's
+   refuses to boot instead, which is why its TRX needed closing by hand).
+
+### The evidence, stated plainly (measured 17-Jul ~18:00 Sydney)
+This does **not** meet the fleet's own gate (`CLAUDE.md`: 30-day WR>55% AND
+maxDD<15%), and you should go in knowing the numbers:
+- **1.18 days** of divergence record (n=7 closes), against a **30-day** gate.
+- **n=1 real book-walked fill, ever.** All 7 closes were priced by PaperBroker at
+  a flat **4bps**; the one measured fill cost **14.59bps** (~3.6x).
+- The brain's counterfactual edge is **+25.3bps/4h** (n=2988) vs a measured
+  **~29.2bps round trip** → **−3.9bps**. Horizons differ (the taker holds to
+  TP/SL/24h, not 4h), so this bounds rather than settles it — but n=1 is the
+  entire cost evidence.
+- Win rate is **7/7 = 100%** closed-only, **9/13 = 69%** including open positions
+  marked to market.
+- **`long-divergence` is n=0 realized** and XPD is held long-divergence in shadow
+  now. "Divergence only" ≠ "shorts only" and the brain grades divergence as one
+  blended lens with no per-side split. Decide this before arming.
+Precedent: Trail Blazer went live on ~2 days of shadow and was retired as "a
+lucky ~30d window". The shadow arm only started measuring real execution at
+06:53 UTC on 17-Jul — a week of real fills costs nothing and would answer the
+question the record currently cannot.

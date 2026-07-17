@@ -1,0 +1,22 @@
+# Service-specific Railway config for the LIVE 🎫 Ticket Taker ONLY
+# (lighter_ticket_taker.py; bot id lighter-ticket-taker -> row
+# lighter-ticket-taker-lighter). Point that service's Config-as-code
+# "Railway Config File" setting at this file so it does NOT affect the other
+# services deploying from this same repo. Selecting the image here also removes
+# the manual RAILWAY_DOCKERFILE_PATH env step.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.takerlive"
+# Dockerfile.takerlive bakes CMD ["./taker_live_entry.sh"], which owns the
+# 5-minute cycle loop, so no [deploy].startCommand is needed.
+
+[deploy]
+# Restart on any exit, no retry cap. The taker is a RUN-ONCE process wrapped in
+# taker_live_entry.sh, and THAT LOOP IS THE POSITION MANAGER: every rail — kill
+# switch, daily-loss flatten, notional cap, equity guard, TP/SL/max-hold — runs
+# per cycle inside main(). A live perp has NO resting stop on Lighter's book, so
+# if the loop dies the position has nothing watching it. Keep it alive so it
+# auto-resumes managing real positions after a crash. (Railway's default is
+# ON_FAILURE with a retry cap — a crash-loop would abandon a funded position.)
+# Same reasoning as railway.trendlighter.toml, for the same reason.
+restartPolicyType = "always"
