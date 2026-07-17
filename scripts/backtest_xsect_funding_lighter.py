@@ -67,12 +67,32 @@ VERDICT (17 Jul 2026, 150d ending 17 Jul, 25 coins, 3585 hourly bars)
     cross-section is less extreme (its floor band is 3.5% apr, not 28%), so the
     carry leg contributes about a third less. The edge is correspondingly more
     dependent on the price/mean-reversion leg than the HL lab implied.
-  NOTE THE CONTRAST WITH THE FUNDING FARMER: the same "re-test it on Lighter"
-  move KILLED that book (no gate has an edge; see backtest_funding_lighter.py).
-  It VINDICATES this one. The validation gap was the finding; the answer
-  happened to be favourable. maxDD 10.1% also clears the 15% go-live gate — but
-  a backtest is not a shadow record, and go-live remains a separate decision on
-  the LIVE record (which, until 3c06978, was 8x-inflated on its funding leg).
+  **THIS VERDICT IS A FLOOR, NOT AN ESTIMATE — read this before citing it.**
+  SLIP is held at the HL lab's 5bps/side so that exactly ONE variable (the
+  venue) changes. But 5bps is an ASSUMPTION, and Lighter friction has since been
+  MEASURED at **0.86bps/fill** (see the 17-Jul stop finding in
+  backtest_funding_lighter.py's orbit) — the same unmeasured assumption that
+  manufactured a FALSE "no edge" verdict on the Funding Farmer. So the real
+  numbers are BETTER than these, and the "3x stress" at 15bps is really ~17x
+  measured. The PASS is conservative in the direction that matters. A re-run at
+  0.86bps is the obvious next measurement — and the lesson cuts BOTH ways: an
+  assumed friction can fake an edge as easily as it can hide one.
+
+  DO NOT say this "killed the Funding Farmer and vindicates Counterweight". The
+  Funding Farmer's verdict was itself REVISED the same day (its HARD_STOP, not
+  its gate, was the defect: STOP 0.03 -> +$21.32, both halves positive, n=1911).
+  What the re-test does is replace a HYPOTHESIS with a MEASUREMENT; the answer
+  here happened to be favourable. maxDD 10.1% also clears the 15% go-live gate —
+  but a backtest is not a shadow record, and go-live remains a separate decision
+  on the LIVE record (which, until 93be95e, was 8x-inflated on its funding leg).
+
+  DOCTRINE CONVERGENCE (17-Jul, operator: "backtest on Lighter ONLY — the venue
+  we trade is the venue we measure"): this file IS that rule applied to
+  Counterweight. Note the same rule condemns the bot's `hl_backfill()` —
+  audit_venue_purity.py flags lighter_funding_spread_bot.py line 85
+  (api.hyperliquid.xyz) as a SHIPPED violation. Removing it is no longer just
+  this study's recommendation; it is required. The replacement (Lighter's own
+  settled series) is the very tape this file validates.
 
 Read-only: hits public endpoints, writes only its cache. Touches no bot, no DB.
 Usage:
