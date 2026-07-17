@@ -729,3 +729,62 @@ first time ever. This is the biggest open real-money question on the agenda.
 - **COMMIT (b) — the gate re-tune — IS WITHDRAWN, not deferred.** There is no
   gate to tune to. Tuning `FUNDING_ENTER_APR` to any value is unsupported by the
   only data that has ever measured this bot on its own venue.
+
+## 18. LIGHTER'S TAPE IS SINGLE-REGIME — every directional verdict this fleet can produce is a bear-market verdict (added 17-Jul)
+
+**This is not a Georgia item. It is a doctrine item, and it is load-bearing for
+every directional bot on the venue.**
+
+MEASURED, 17-Jul, off Lighter's own whole tape (`scripts/backtest_georgia_short_sleeve.py`):
+- 438d is the WHOLE tape (600d returns 0 bars). Over it, **BTC 93,935 -> 63,072
+  = -32.9%**, and the family regime gate reads **risk-off 61.5%** of all bars —
+  **0% risk-on in Nov-25, Dec-25, Feb-26 and Jun-26**.
+- Both halves FALL (-6.6% then -28%). So the validation doctrine's
+  **"positive in both halves" bar is TOOTHLESS for anything directional here** —
+  it is satisfied by the drift, not the edge. A short sleeve passes both halves
+  on this tape *by construction*, and that tells you nothing.
+
+**WHAT CLAUDE.md GETS RIGHT, AND WHAT IT UNDERPRICES.** The 17-Jul rule
+("BACKTEST ON LIGHTER ONLY — the venue we trade is the venue we measure") is
+correct and should stand; a 2.7yr Hyperliquid result about a Lighter bot really
+is "an assumption wearing a number". But the rule prices its own cost as a
+**LENGTH** loss ("~14 months, not 2.7 years"). The real cost is a **REGIME**
+loss: a single-regime window cannot validate a directional strategy **at any
+length**. More Lighter tape does not fix it; only a different regime does.
+
+**THE FIX IS ALREADY ON-VENUE AND UNUSED.** Lighter lists ~27 non-crypto books
+(201 books total, 91 liquid) whose regimes are the OPPOSITE of crypto's. Over
+their listed windows, while BTC fell 32.9%:
+
+| book | window | change |  | book | window | change |
+|---|---|---|---|---|---|---|
+| WTI | 149d | **+23.0%** |  | SPY | 176d | +8.1% |
+| IWM | 136d | +13.4% |  | XAG | 270d | +5.5% |
+| QQQ | 176d | +12.2% |  | XCU | 158d | +4.7% |
+| NVDA | 233d | +11.8% |  | XAU | 270d | -8.7% |
+
+That is the bull tape the crypto-only universe cannot supply, **without leaving
+Lighter or breaking the venue-purity rule**. Trade-off is honest and the
+opposite of crypto's: regime diversity, short windows (SPY 176d, IWM 136d).
+Together they are complementary; separately each is weak.
+
+**PREREQUISITE — a per-asset regime gate, or widening actively HARMS.**
+`lighter_family_bot.btc_regime_up()` is **BTC's 4h EMA50/200**. Pointing it at
+SPY/XAU/WTI is incoherent: over this exact window it reads **risk-off 61.5%
+while SPY rose 8.1%**, so it would have suppressed `range_on` longs *through
+SPY's bull run* and fired half-stake counter-trend `bounce_pullback` instead —
+backwards, most of the time. This is the Index Rider's own lesson (the equity
+perp is a DERIVATIVE of NYSE; NYSE's trend drives it, not BTC's). **Fix the gate
+before widening the universe**, or every non-crypto trade is graded through
+BTC's mood.
+
+**DECIDE:**
+1. Does the "both halves" bar get an explicit **regime-coverage** caveat for
+   directional strategies? (It is currently satisfiable by drift alone.)
+2. Do the non-crypto books become the fleet's directional test-bed — and if so,
+   who owns the per-asset regime gate? (Candidates already exist: 📊 Index Rider
+   trades stock perps; 🎫 Ticket Taker already reads all ~215 books via scout
+   tickets. **Do not duplicate a role that exists** — the vacant niche is
+   *intraday range on non-crypto perps*.)
+3. Caution on record: 🏆 Stock Leaders was RETIRED at 37-44% maxDD vs the 15%
+   gate. Equity perps on Lighter have burned this fleet once already.
