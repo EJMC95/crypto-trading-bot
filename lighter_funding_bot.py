@@ -523,6 +523,34 @@ def main():
     args = p.parse_args()
 
     global _SUPERVISOR_BOT_ID
+    # [2026-07-17 VENUE MUST BE EXPLICIT — real money] This bot's identity, and
+    # whether it trades REAL MONEY, come from $VENUE. It has no default it can
+    # safely inherit, and until now it had NO guard at all — the only
+    # venue_context caller with neither a setdefault nor a mode refusal, while
+    # every shadow-only bot had one.
+    #   The shared default moved hl_paper -> lighter_shadow (correct on the
+    #   operator's "the real money fallback has to be lighter" rule), and that
+    #   silently flipped this bot's lost-var failure mode from LOUD to SILENT:
+    #     before: lost VENUE -> hl_paper -> bot_id "perps-funding-lighter",
+    #             which publishes nothing -> the row goes STALE -> the watchdog
+    #             phones the operator.
+    #     after : lost VENUE -> lighter_shadow -> "perps-funding-lighter-lshadow"
+    #             == experiment_judge.SHADOW_BOT (online, $1012.78, 38 closed).
+    #             The LIVE service would SIMULATE fills while its REAL positions
+    #             sat unmanaged on the venue, double-write the judge's promotion
+    #             arm (the only writer of live.funding.*), and NEVER page.
+    # A lost Railway VENUE var is not hypothetical — it happened on 16-Jul and
+    # is why the sniper/spread/family bots carry setdefaults. Both services
+    # (trail-blazer-live=lighter_live, funding-farmer-shadow=lighter_shadow) set
+    # it explicitly, so this is INERT for them: it only turns the lost-var case
+    # back into a loud one. --once (offline smoke) is exempt.
+    if not os.environ.get("VENUE", "").strip() and not args.once:
+        raise SystemExit(
+            "VENUE is unset. This bot's identity — and whether it trades REAL "
+            "MONEY — comes from it, and its lighter_shadow id collides with the "
+            "experiment judge's shadow arm. An inherited default must never "
+            "decide that. Set VENUE=lighter_live or VENUE=lighter_shadow "
+            "explicitly (or pass --once for an offline smoke).")
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=("--live" in sys.argv))
     bot_id = ctx.bot_id

@@ -154,6 +154,21 @@ def main():
     args = p.parse_args()
 
     global _SUPERVISOR_BOT_ID
+    # [2026-07-17 VENUE MUST BE EXPLICIT — real money] The hl_paper refusal below
+    # was written when hl_paper was the DEFAULT: it catches a lost $VENUE landing
+    # on the unsuffixed live-colliding id. The default is now lighter_shadow
+    # (ff5cd43), so that guard no longer covers the lost-var case at all — a lost
+    # VENUE sails past it into "crypto-trend-daily-lshadow", the id the
+    # tide-rider-lighter-shadow service already publishes (online, $999.76). Two
+    # writers, one row, no page, while THIS service's real positions go unmanaged.
+    # Both services set VENUE explicitly, so this is inert for them.
+    if not os.environ.get("VENUE", "").strip() and not args.once:
+        raise SystemExit(
+            "VENUE is unset. This bot's identity — and whether it trades REAL "
+            "MONEY — comes from it, and every mode's id collides with a row some "
+            "other service already publishes. An inherited default must never "
+            "decide that. Set VENUE=lighter_live or VENUE=lighter_shadow "
+            "explicitly (or pass --once for an offline smoke).")
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=("--live" in sys.argv))
     bot_id = ctx.bot_id
