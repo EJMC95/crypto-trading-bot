@@ -198,6 +198,7 @@ import argparse
 import ast
 import os
 import re
+import tempfile
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -517,6 +518,169 @@ def _is_shipped(rel, shipped):
     return any(rel.startswith(p) for p in shipped if p.endswith("/"))
 
 
+# ===========================================================================
+# BACKTEST SECTION [2026-07-17] — a SEPARATE pass, deliberately.
+#
+# The operator rule (CLAUDE.md 17-Jul) is "BACKTEST ON LIGHTER ONLY — the venue
+# we trade is the venue we measure". This file enforced it on SHIPPED code and
+# skipped `scripts/` entirely (_SKIP_DIRS, rationalised as "research tools") —
+# which is precisely where every backtest lives. So the rule that matters most
+# was the one nothing checked.
+#
+# WHY NOT JUST DROP "scripts" FROM _SKIP_DIRS: because that answer is CONFIDENT
+# AND WRONG. Measured 17-Jul: the host: detector flags 17 files in scripts/, but
+# 26 of 32 actually load a foreign venue. Nine launder it past an AST host scan:
+#   * `.dirfund_cache.json` is WRITTEN by backtest_directional_funding.py (HL)
+#     and READ by backtest_leverage_operator / _overdrive / _xsect_momentum /
+#     _xsect_factor_lab — zero host literals in any of them.
+#   * `import backtest_directional_funding as bdf` (backtest_funding_leverage,
+#     which justifies the LIVE 2x config), `bl.HL` (backtest_bounce_catcher_audit
+#     borrowing another module's constant), `.tiderider_scanner_cache.json`
+#     (Binance+HL -> backtest_strategy_shootout / _tide_rider_adaptive).
+# Dropping the skip alone would mark backtest_funding_leverage.py CLEAN. A guard
+# that says "clean" about the file justifying a live real-money constant is worse
+# than no guard: it launders the assumption it was built to catch.
+#
+# So: trace PROVENANCE (cache writes + intra-scripts imports), keep a SEPARATE
+# BACKTEST_VENUE_OK table, and report in a SEPARATE section that does NOT change
+# the shipped verdict or the exit code yet. Turning these into build failures is
+# a deliberate later step once the triage below is agreed — the same staging the
+# born-dark guard got.
+# ===========================================================================
+
+BACKTEST_VENUE_OK = {
+    "study_lighter_vs_hl_equivalence.py": (
+        "DECLARED CROSS-VENUE by CLAUDE.md itself: the HL-vs-Lighter equivalence "
+        "study. Its whole subject is the relationship between two venues, so it "
+        "cannot be Lighter-only without ceasing to exist."
+    ),
+    "study_hl_as_lighter_funding_proxy.py": (
+        "Asks 'is HL a usable proxy for Lighter funding?' — a question that "
+        "requires both tapes. Its own verdict (APPROXIMATELY SURVIVES, BY LUCK, "
+        "NOT BY METHOD) is what makes the Tide Rider header indefensible."
+    ),
+    "study_fundspread_basis_mixing.py": (
+        "8h-vs-1h basis mixing across venues — the measurement that produced the "
+        "funding_basis.py per-venue authority. Cross-venue by construction."
+    ),
+    "study_market_pulse_venue_swap.py": (
+        "Proved the market_pulse Binance->Lighter swap behaviour-neutral. An A/B "
+        "of a venue swap needs both sides of the swap."
+    ),
+    "backtest_index_pilot_macro.py": (
+        "Yahoo dailies for the equity-perp UNDERLYING. Lighter's equity perps are "
+        "a DERIVATIVE of NYSE — the underlying index is not available on Lighter "
+        "at all, and using Lighter's own perp mark as its own signal is circular. "
+        "Same principled exception as VENUE_PURITY_OK's Index Rider entry."
+    ),
+}
+
+# Files whose venue is inherited rather than literal. Maps a provenance marker
+# -> the file that actually fetches. Derived by reading each fetcher's own CACHE
+# constant; kept explicit because guessing a cache's owner from its name is how
+# you get a confident wrong answer.
+_CACHE_OWNER = {
+    ".dirfund_cache.json": "backtest_directional_funding.py",
+    ".tiderider_scanner_cache.json": "backtest_tide_rider_scanner.py",
+    ".fundpersist_cache.json": "backtest_funding_persistence.py",
+    ".funding_cache.json": "backtest_funding.py",
+    ".lighterfund_cache.json": "backtest_funding_lighter.py",   # LIGHTER-native
+}
+
+
+def backtest_files(root=None):
+    """Every backtest/study in scripts/ — the files _SKIP_DIRS excludes."""
+    root = root or ROOT
+    d = os.path.join(root, "scripts")
+    if not os.path.isdir(d):
+        return []
+    return sorted(f for f in os.listdir(d)
+                  if (f.startswith("backtest_") or f.startswith("study_"))
+                  and f.endswith(".py"))
+
+
+def backtest_venues(name, root=None, _seen=None):
+    """{source: why} for one backtest — direct AND inherited.
+
+    Inheritance is what makes this more than a host: grep. A file with no host
+    literal that reads another file's cache, or imports it, loads that file's
+    venue as surely as if it had fetched it itself. Recursion is depth-guarded
+    on _seen: backtest_leverage_rails imports backtest_leverage imports ...
+    """
+    root = root or ROOT
+    _seen = _seen if _seen is not None else set()
+    if name in _seen:
+        return {}                       # import cycle — already accounted
+    _seen.add(name)
+    path = os.path.join(root, "scripts", name)
+    if not os.path.exists(path):
+        return {}
+    out = {}
+    srcs = detect_sources(path)
+    if srcs is None:
+        return {"UNPARSED": "does not parse — its venue is UNKNOWN, not clean"}
+    for s in srcs:
+        if s.startswith("host:") or s.startswith("ccxt:"):
+            out[s] = "direct"
+    try:
+        tree = ast.parse(open(path, encoding="utf-8", errors="ignore").read())
+    except Exception:  # noqa: BLE001
+        return out
+
+    # [2026-07-17] AST, NOT a substring scan over the raw text. My first cut did
+    # `if cache in text` and FALSE-FLAGGED backtest_xsect_funding_lighter.py —
+    # a genuinely Lighter-native file whose line 8 is a COMMENT saying "...it ran
+    # on `.dirfund_cache.json`, which [was the bug]". The tracer read the
+    # sentence describing the FIX and charged the file for it. That is the exact
+    # blind spot this module's own detector was built to avoid ("docstring+
+    # comment prose ignored" is in its selftest name), reintroduced by me one
+    # function later. A guard that cries wolf about the one compliant file is as
+    # useless as a guard that is blind — both teach you to stop reading it.
+    lits = set(_code_strings(tree))          # string literals in CODE, not prose
+    for cache, owner in _CACHE_OWNER.items():
+        if owner == name:
+            continue
+        if any(cache in s for s in lits):
+            for s in backtest_venues(owner, root, _seen):
+                if s != "UNPARSED":
+                    out.setdefault(s, f"via {cache} (written by {owner})")
+
+    # imports, from the AST — a commented-out or docstring'd import is not one
+    deps = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            deps.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            deps.add(node.module)
+    for d in sorted(deps):
+        if not (d.startswith("backtest_") or d.startswith("study_")):
+            continue
+        dep = d + ".py"
+        if dep == name:
+            continue
+        for s in backtest_venues(dep, root, _seen):
+            if s != "UNPARSED":
+                out.setdefault(s, f"via `import {d}`")
+    return out
+
+
+def audit_backtests(root=None):
+    """(offenders, declared) — offenders are (name, {source: why})."""
+    root = root or ROOT
+    offenders, declared = [], []
+    for name in backtest_files(root):
+        v = backtest_venues(name, root)
+        foreign = {s: w for s, w in v.items()
+                   if s != "UNPARSED" and "lighter" not in s.lower()}
+        if not foreign:
+            continue
+        if name in BACKTEST_VENUE_OK:
+            declared.append((name, foreign))
+        else:
+            offenders.append((name, foreign))
+    return offenders, declared
+
+
 def audit(root=None):
     """(violations, oks, unparsed) — violations are (rel, source, lines).
 
@@ -575,6 +739,28 @@ def main(argv):
                 print(f"      {source:42} line {ln}")
         print(f"\n  Fix: move it to Lighter data, or DECLARE it in "
               f"VENUE_PURITY_OK with a reason.")
+
+    # ---- BACKTESTS: separate section, ADVISORY, does not touch the exit code --
+    bt_offenders, bt_declared = audit_backtests()
+    if bt_offenders:
+        print("\n" + "=" * 74)
+        print("BACKTEST VENUE PURITY [ADVISORY — does not fail the build yet]")
+        print("  Operator rule 17-Jul: \"the venue we trade is the venue we "
+              "measure\".\n  A backtest on another venue's data is not "
+              "validation of a Lighter bot —\n  it is a hypothesis about "
+              "Lighter.\n")
+        for name, foreign in bt_offenders:
+            inherited = any(w != "direct" for w in foreign.values())
+            flag = "  [LAUNDERED — invisible to a host: scan]" if inherited and \
+                not any(w == "direct" for w in foreign.values()) else ""
+            print(f"  scripts/{name}{flag}")
+            for s, why in sorted(foreign.items()):
+                print(f"      {s:34} {why}")
+        print(f"\n  {len(bt_offenders)} undeclared / {len(bt_declared)} declared. "
+              f"Declare in BACKTEST_VENUE_OK with a reason,\n  or re-run the study "
+              f"on Lighter's own ~438d tape. Retired-bot backtests are HISTORY —\n"
+              f"  do not re-run them; they justify nothing that still trades.")
+        print("=" * 74)
 
     total = len(violations) + len(unparsed)
     if total:
@@ -763,9 +949,48 @@ def _selftest():
     assert _is_shipped("venues/__init__.py", _run_paths()), \
         "package files mislabelled unshipped"
 
+    # ---- BACKTEST provenance tracer [2026-07-17] ---------------------------
+    # Fixtures, not the real tree's current counts: asserting today's 22
+    # violations still exist would demand the defects remain
+    # (tests-must-not-fail-on-good-news).
+    with tempfile.TemporaryDirectory() as d:
+        s = os.path.join(d, "scripts")
+        os.makedirs(s)
+        w = lambda n, t: open(os.path.join(s, n), "w").write(t)
+        w("backtest_directional_funding.py",
+          'CACHE = ".dirfund_cache.json"\nURL = "https://api.hyperliquid.xyz/info"\n')
+        # inherits via the cache STRING LITERAL
+        w("backtest_child_cache.py", 'C = ".dirfund_cache.json"\nx = 1\n')
+        # inherits via an AST import
+        w("backtest_child_import.py", 'import backtest_directional_funding as b\n')
+        # THE REGRESSION FIXTURE: names the cache only in PROSE. My first cut
+        # substring-scanned raw text and charged this file for a comment that
+        # described the bug being FIXED (the real backtest_xsect_funding_lighter).
+        w("backtest_prose_only.py",
+          '"""We used to read .dirfund_cache.json — that was the bug, now fixed."""\n'
+          '# never touch .dirfund_cache.json again\n'
+          'URL = "https://mainnet.zklighter.elliot.ai/api/v1/candles"\n')
+        HL = "host:api.hyperliquid.xyz"
+        assert HL in backtest_venues("backtest_child_cache.py", d), "cache literal"
+        assert HL in backtest_venues("backtest_child_import.py", d), "AST import"
+        got = backtest_venues("backtest_prose_only.py", d)
+        assert HL not in got, f"PROSE must not taint a clean file: {got}"
+        assert any("lighter" in k for k in got), got
+        assert set(backtest_files(d)) == {
+            "backtest_directional_funding.py", "backtest_child_cache.py",
+            "backtest_child_import.py", "backtest_prose_only.py"}, backtest_files(d)
+        # a self-import / cycle must terminate, not recurse forever
+        w("backtest_cycle_a.py", "import backtest_cycle_b\n")
+        w("backtest_cycle_b.py", "import backtest_cycle_a\n")
+        backtest_venues("backtest_cycle_a.py", d)      # must return, not hang
+    for k, v in BACKTEST_VENUE_OK.items():
+        assert len(v) > 60, f"{k}: a reason must be a reason, not a label"
+
     print("audit_venue_purity selftest OK (NEGATIVE fixture, docstring+comment "
           "prose ignored, ccxt static+dynamic, env defaults, f-strings, "
-          "unparseable=LOUD, no stale exceptions, detector alive on the real tree)")
+          "unparseable=LOUD, no stale exceptions, detector alive on the real "
+          "tree; backtest provenance: cache+import inherit, PROSE does not, "
+          "cycles terminate)")
 
 
 if __name__ == "__main__":
