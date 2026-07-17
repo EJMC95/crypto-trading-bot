@@ -1,3 +1,13 @@
+## 2026-07-17 (ac) — the taker HEARS its venue layer (and the SDK banner had already started lying)
+- **THE FIX FROM (ab) IS LIVE AND IT WORKED — three lines that were invisible an hour ago**, off the LIVE taker's own boot at 11:17Z:
+  - `INFO venues.lighter lighter mainnet: 218 markets loaded`
+  - `INFO venues.lighter lighter signer ready (account 281474976512881, key index 4) | lighter-sdk 1.1.2`
+  - `INFO venues.equity_guard equity guard: restored last accepted read $34.67 (age 4 min)`
+  The **equity guard** — the rail whose absence cost a real **-5.9%** on 11-Jul when a dislocated print tripped a flatten — has been reporting into a void on this bot for its entire live life. It is audible now.
+- **AND IT INDEPENDENTLY CONFIRMS THE PIN: the taker runs `lighter-sdk 1.1.2` too.** Both live real-money bots are now MEASURED on the same wheel, so (aa)'s `==1.1.2` is verified as a **no-op on the whole live fleet** rather than on one bot plus an inference.
+- **THE BANNER HAD ALREADY GONE STALE — in four hours.** (z) hardcoded `"(requirements pins >=1.1.1 — UNPINNED; this wheel signs real orders)"`. True when written; **a LIE the moment (aa) pinned it** — and it shipped that lie to the live taker's boot log tonight, where the next reader would have taken it as current. A log line cannot know the repo's state. It now states only the FACT it measured: the version. Same class as the comment-honesty fixes, and a reminder that **a diagnostic decays like any other claim** — the ones that assert context rot fastest.
+- **Verification:** client selftest green; `audit_sdk_pin` green; both live bots marker-grepped on 1.1.2; taker's 2 real positions intact across the redeploy, 0 orders.
+
 ## 2026-07-17 (ab) — the live taker was BLIND to its own venue layer: no signer, no equity-guard REJECTs, no governor
 - **`lighter_ticket_taker.py` configured NO logging, so Python dropped every `log.info` from `venues/`.** The LIVE real-money bot could not see: its **signer banner** (and therefore its lighter-sdk version), **EQUITY GUARD REJECTs**, governor **429/punish**, ws-degraded. Only WARNING+ ever surfaced — via the handler of last resort — which is exactly why `Unclosed client session` was visible and nothing else was.
 - **THE ASYMMETRY IS WHAT EXPOSED IT, and it is worth recording as the detection method.** (z) added a signer banner naming the wheel that signs real orders. The **funding bot printed it on its first boot**; the **taker printed nothing**. Two bots, same venue layer, one answer — the difference was not the banner, it was that one bot could hear its own dependencies. **A diagnostic that cannot be seen is not a diagnostic**, and the only reason the SDK got measured at all is that the *other* bot happened to configure logging.

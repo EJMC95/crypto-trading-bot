@@ -446,9 +446,13 @@ class LighterClient(VenueClient):
             _sdk = _md.version("lighter-sdk")
         except Exception:  # noqa: BLE001 — never let telemetry block a signer
             _sdk = "unknown"
+        # State the FACT (the version), not a claim about the repo. The first
+        # cut appended "requirements pins >=1.1.1 — UNPINNED", which was true
+        # when written and became a LIE the moment the pin landed hours later —
+        # a log line asserting something it cannot know. Same class as the
+        # comment-honesty fixes: say what you measured, nothing else.
         log.info("lighter signer ready (account %d, key index %d) | "
-                 "lighter-sdk %s (requirements pins >=1.1.1 — UNPINNED; this "
-                 "wheel signs real orders)",
+                 "lighter-sdk %s (this wheel signs real orders)",
                  self.account_index, self.api_key_index, _sdk)
 
     def _run_signer(self, coro, timeout=30.0):
