@@ -608,7 +608,28 @@ def helping_levers(state, now, fallback_ttl=TTL_SEC):
 
 def run_once():
     now = _now()
-    prior = store.load_state(KEY) or {}
+    # [2026-07-17 AUDIT] A FAILED READ IS NOT AN EMPTY LEDGER. Same trap as the
+    # judge: `load_state` collapses "no row" and "read failed" into None, this
+    # function seeds from `or {}`, and run_once writes the payload back
+    # UNCONDITIONALLY — so one transient read error published `episodes: []`,
+    # `verdicts: {}` over the real ledger, permanently (up to EP_CAP=120
+    # episodes plus every open one). load_state_checked exists precisely for
+    # "any caller that SEEDS durable state on an empty read"; this is one.
+    #
+    # It reaches real money: the wiped verdicts include live-lane rulings, so a
+    # HURTING live lever that get_lever was reverting to the operator's default
+    # every loop silently STOPS being reverted — the protection evaporates with
+    # the evidence for it, and the fresh-and-empty payload looks perfectly
+    # healthy to every consumer. An hourly organ loses one hour by skipping;
+    # seeding loses the out-of-sample record the whole growth rail is graded on.
+    _ok, prior = store.load_state_checked(KEY)
+    if not _ok:
+        print("[fleet-proprioception] state READ FAILED — skipping this cycle "
+              "rather than publishing an empty ledger over the real one "
+              "(a blind organ must not look healthy). Retries next hour.",
+              flush=True)
+        return
+    prior = prior or {}
     episodes = list(prior.get("episodes") or [])
     open_eps = {}
     for g, cur in (prior.get("open") or {}).items():

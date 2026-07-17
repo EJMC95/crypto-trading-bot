@@ -473,7 +473,38 @@ def _needs_reset(phase, current, spec):
 
 def run_once():
     now = now_ts()
-    st = store.load_state(KEY) or {}
+    # [2026-07-17 AUDIT] A FAILED READ IS NOT AN EMPTY JUDGE. `load_state`
+    # returns None for BOTH "no row" and "read failed" — and
+    # load_state_checked's docstring names this exact caller shape: "a trap for
+    # any caller that SEEDS durable state on an empty read". This function is
+    # that caller: it read `or {}`, defaulted phase to "idle", and then wrote
+    # the whole state back UNCONDITIONALLY at the end. Reads and writes fail
+    # independently (the read path drops the connection; the write path
+    # reconnects), so read-fails/write-OK is the ordinary shape of a Postgres
+    # blip — not an exotic one.
+    #
+    # Measured: with one failed read, a stored `phase=promoted` (7 days earned,
+    # steering REAL live.funding.* bars), its done-list and every verdict were
+    # overwritten with an idle first-run state. The promotion record dies
+    # silently — the phone said PROMOTED and no FADED verdict is ever logged —
+    # and the wiped done-list makes a candidate previously FADED (i.e. MEASURED
+    # to be hurting the live arm) immediately retry-eligible, bypassing both
+    # COOLDOWN_H and DONE_RETRY_D.
+    #
+    # It also silently disarmed BLIND_MAX, whose own comment says "a DB blip
+    # shouldn't release a 7d-earned promotion": a DB outage fails load_state
+    # too, so `phase` read "idle" and the promoted branch it guards was never
+    # reached. The guard could not fire in the scenario it was written for.
+    #
+    # Skipping a cycle costs one hour on an hourly organ. Seeding costs a
+    # 7-day experiment and can re-run a knob the live lane already measured bad.
+    _ok, _st = store.load_state_checked(KEY)
+    if not _ok:
+        print("[xp-judge] state READ FAILED — skipping this cycle rather than "
+              "seeding an empty judge over a live promotion (a blip must not "
+              "release a 7d-earned experiment). Retries next hour.", flush=True)
+        return
+    st = _st or {}
     phase = st.get("phase") or "idle"
     done = list(st.get("done") or [])
     # [2026-07-17 IMB-07] done_at stamps make the done-list AGEABLE. Legacy
