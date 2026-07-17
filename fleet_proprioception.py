@@ -138,9 +138,19 @@ GRADES_MIN = int(os.environ.get("PROP_GRADES_MIN", "10"))
 LIVE_EP_MIN_N = int(os.environ.get("PROP_LIVE_EP_MIN_N", "5"))
 LIVE_BASE_MIN_N = int(os.environ.get("PROP_LIVE_BASE_MIN_N", "3"))
 LIVE_MARGIN_PP = float(os.environ.get("PROP_LIVE_MARGIN_PP", "0.25"))
+# [2026-07-17 AUDIT] Retired row REMOVED — the third copy of the same rot (see
+# evidence_board.LIVE_ROWS and fleet_respiration.LIVE_BREATHS). Tide Rider left
+# the live slot on 17-Jul and its bot_pnl row is DELETED at boot
+# (cleanup_legacy_bots.py:53), so it can contribute no trades to any baseline;
+# it could only ever dilute a live cohort with a book that structurally cannot
+# appear. Shares EVBOARD_LIVE_ROWS with the board deliberately, so the two
+# organs can never disagree about who is live. The Ticket Taker took that slot
+# but is NOT added: it never calls venue_context (lighter_ticket_taker.py:523),
+# so it does not consume live.clip_scale — grading a lever on a book the lever
+# cannot move is exactly the defect fixed in grade_live below.
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
-    "crypto-trend-daily-lighter,perps-funding-lighter-lighter").split(",")
+    "perps-funding-lighter-lighter").split(",")
     if s.strip()}
 
 # taker lever -> the tt module attr the replay patches (same map the tuner uses)
@@ -429,6 +439,39 @@ def grade_live(ep, trades, group="live-clip"):
     rec = {"n_during": n_in, "mean_pct_during": m_in,
            "n_before": n_pre, "mean_pct_before": m_pre,
            "n_twin": n_tw, "mean_pct_twin": m_tw}
+
+    # [2026-07-17 AUDIT] live.clip_scale is RECORDED, never GRADED — the metric
+    # above is EXACTLY invariant to it, so any verdict is other-causes + noise.
+    #
+    # The lever's only effect is `order_usd` (venues/__init__.py:92). The
+    # recorder computes pnl_pct = (price_pnl + fund_pnl) / order_usd
+    # (lighter_funding_bot.py:477), and BOTH terms are proportional to the clip
+    # (price_pnl = |held|*(px-entry) with held = clip/entry; fund_pnl scales
+    # with notional). The clip therefore cancels top and bottom. Measured
+    # across the whole lever range 0.5 -> 1.5: profit_ratio 0.0108080000 at
+    # EVERY step — ONE distinct value.
+    #
+    # This is not a metric bug to swap out; it is the docstring above being
+    # right for the wrong lever. Per-trade pnl_pct is size-invariant BY DESIGN
+    # (the judge's lesson: equity comparisons across different-sized books
+    # lie), which is correct for live.funding.* — those bars change the EDGE,
+    # so the per-trade return really does move — and structurally blind for a
+    # lever that changes only SIZE. Nor is there a legitimate substitute: the
+    # size-dependent alternative (pnl_abs) would say "bigger clips earn more
+    # while winning", which is a martingale, not evidence. A RISK choice on a
+    # <$100 real book is not gradeable by outcome at this n.
+    #
+    # So it fails CLOSED, which is what its own consumers already expect of a
+    # dark sense: the board's top step (1.5) requires a MEASURED helping at
+    # 1.25 and now stays out of reach, and no noise-driven `hurting` reverts a
+    # real clip at get_lever. Restrict-only — this removes an actuator input
+    # and adds none. The board's DOWN reflex and the lever TTL are unaffected
+    # and remain the real protection. The episode RECORD is kept: the numbers
+    # are still true, it is the causal claim that was never supportable.
+    if group == "live-clip":
+        return {"status": "recorded", "reason": "metric-invariant-to-lever",
+                **rec}
+
     baselines = [m for n, m in ((n_pre, m_pre), (n_tw, m_tw))
                  if n >= LIVE_BASE_MIN_N and m is not None]
     if (n_in < LIVE_EP_MIN_N or m_in is None or not baselines
@@ -808,20 +851,47 @@ def _selftest():
 
     # LIVE lane learning: per-trade during vs BOTH baselines (pre-window +
     # shadow twin). Thin data records; clear divergence signals.
-    LIVE = "crypto-trend-daily-lighter"
-    TWIN = "crypto-trend-daily-lshadow"
+    # [2026-07-17 AUDIT] These baseline-logic fixtures moved from "live-clip"
+    # to "live-funding" — the lane where this metric is actually VALID. The
+    # funding bars change the EDGE, so per-trade return really does move under
+    # them; the clip lever changes only SIZE, and the metric cancels it exactly
+    # (see grade_live). The logic under test (during vs BOTH baselines, 'bad'
+    # only when worse than every one) is unchanged and still needs covering —
+    # only its lane was wrong. The rows are also the REAL funding pair now: the
+    # old fixture drove `crypto-trend-daily-lighter`, retired 17-Jul, whose
+    # bot_pnl row is pruned at boot — a fixture no production data can produce.
+    # [2026-07-17 AUDIT] THE PRODUCTION-ROSTER GUARD — third copy of the same
+    # guard (evidence_board, fleet_respiration), because this was the third
+    # copy of the same stale roster. A retired row's bot_pnl is pruned at boot,
+    # so it can contribute no trade to any baseline; it can only dilute.
+    try:
+        from cleanup_legacy_bots import LEGACY_BOTS as _retired
+        _rot = LIVE_ROWS & set(_retired)
+        assert not _rot, (
+            f"LIVE_ROWS names RETIRED row(s) {sorted(_rot)} — pruned at boot, "
+            f"so they can never appear in `trades`. Remove them; add the live "
+            f"slot's new occupant ONLY if it consumes the lever being graded.")
+    except ImportError:      # not in this image — the guard is best-effort
+        pass
+
+    LIVE = "perps-funding-lighter-lighter"
+    TWIN = "perps-funding-lighter-lshadow"
 
     def lt(bot, off_h, pct):
         return {"bot": bot, "profit_ratio": pct, "close_ts": _iso(t0 + off_h * 3600)}
 
-    ep_lv = {"group": "live-clip", "start": t0, "end": t0 + 6 * 3600,
-             "stance": {"live.clip_scale": 1.25}}
+    ep_lv = {"group": "live-funding", "start": t0, "end": t0 + 6 * 3600,
+             "stance": {"live.funding.enter_apr": 0.0375}}
+
+    def gl(trades):
+        return grade_live(ep_lv, trades, group="live-funding")
+
     # during: live 6 trades @ +0.2%; before: 6 @ +1.5%; twin during: 6 @ +1.2%
     tr_bad = ([lt(LIVE, 1 + i * 0.5, 0.002) for i in range(6)]
               + [lt(LIVE, -6 + i * 0.5, 0.015) for i in range(6)]
               + [lt(TWIN, 1 + i * 0.5, 0.012) for i in range(6)]
               + [lt("not-live", 2, 9.9)])
-    glb = grade_live(ep_lv, tr_bad)
+    glb = gl(tr_bad)
     assert glb["status"] == "graded" and glb["signal"] == "bad", glb
     assert glb["n_during"] == 6 and glb["mean_pct_during"] == 0.2, glb
     # worse than pre-window but BETTER than the twin -> flat (never 'bad'
@@ -829,20 +899,45 @@ def _selftest():
     tr_flat = ([lt(LIVE, 1 + i * 0.5, 0.002) for i in range(6)]
                + [lt(LIVE, -6 + i * 0.5, 0.015) for i in range(6)]
                + [lt(TWIN, 1 + i * 0.5, -0.02) for i in range(6)])
-    assert grade_live(ep_lv, tr_flat)["signal"] == "flat"
+    assert gl(tr_flat)["signal"] == "flat"
     # better than both -> good
     tr_good = ([lt(LIVE, 1 + i * 0.5, 0.02) for i in range(6)]
                + [lt(LIVE, -6 + i * 0.5, 0.002) for i in range(6)]
                + [lt(TWIN, 1 + i * 0.5, 0.001) for i in range(6)])
-    assert grade_live(ep_lv, tr_good)["signal"] == "good"
+    assert gl(tr_good)["signal"] == "good"
     # thin during-window or no usable baseline -> recorded (no signal)
-    assert grade_live(ep_lv, tr_bad[:3])["status"] == "recorded"
-    assert grade_live(ep_lv, [lt(LIVE, 1 + i * 0.5, 0.002)
-                              for i in range(6)])["status"] == "recorded"
-    # live-funding group grades only the funding rows
-    ep_fund = dict(ep_lv, group="live-funding",
-                   stance={"live.funding.enter_apr": 0.30})
-    glf = grade_live(ep_fund, tr_bad, group="live-funding")
+    assert gl(tr_bad[:3])["status"] == "recorded"
+    assert gl([lt(LIVE, 1 + i * 0.5, 0.002)
+               for i in range(6)])["status"] == "recorded"
+
+    # [2026-07-17 AUDIT] live-clip is RECORDED-ONLY, whatever the data says.
+    # The metric is EXACTLY invariant to clip_scale (the lever scales pnl AND
+    # the divisor), so the very same rows that legitimately signal 'bad'/'good'
+    # on the funding lane must yield NO clip verdict — they are evidence about
+    # something else. The record survives; only the causal claim is withdrawn.
+    ep_clip = {"group": "live-clip", "start": t0, "end": t0 + 6 * 3600,
+               "stance": {"live.clip_scale": 1.25}}
+    for _rows in (tr_bad, tr_good, tr_flat):
+        _g = grade_live(ep_clip, _rows, group="live-clip")
+        assert _g["status"] == "recorded" and "signal" not in _g, _g
+        assert _g["reason"] == "metric-invariant-to-lever", _g
+    assert grade_live(ep_clip, tr_bad, group="live-clip")["n_during"] == 6, \
+        "the episode RECORD is kept — the numbers are true, the verdict wasn't"
+    # ...so no clip verdict can reach an actuator: no noise-driven revert at
+    # get_lever, and the board's 1.5 top step stays fail-CLOSED.
+    _clip_eps = [{"group": "live-clip", "status": "recorded",
+                  "levers": ["live.clip_scale"], "signal": None}] * 4
+    _clip_state = {"updated": _iso(t0), "ttl_sec": 2700,
+                   "verdicts": lever_verdicts(_clip_eps, t0)}
+    assert "live.clip_scale" not in hurting_levers(_clip_state, t0), \
+        "a recorded-only lane must never produce a HURTING verdict"
+    assert "live.clip_scale" not in helping_levers(_clip_state, t0), \
+        "...and must never EARN the top step either — fail-CLOSED both ways"
+
+    # live-funding group grades only the funding rows: a non-funding row in
+    # LIVE_ROWS contributes nothing to it
+    glf = grade_live(dict(ep_lv, group="live-funding"),
+                     [lt("not-live", 2, 9.9)], group="live-funding")
     assert glf["status"] == "recorded" and glf["n_during"] == 0, glf
 
     # verdicts: floors + directions. Two negative taker episodes past the $
