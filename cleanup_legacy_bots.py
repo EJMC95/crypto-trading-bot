@@ -45,6 +45,18 @@ LEGACY_BOTS = [
     # while they keep running, their rows re-upsert after each prune (hidden
     # by RETIRED_ROWS either way). Stop the laptop cron/processes to finish.
     "equities-momentum-alpaca", "equities-regime-ibkr",
+    # [2026-07-17] 🏆 Stock Leaders RETIRED — the retirement was HALF DONE and
+    # the dashboard hid the evidence. It was added to pnl_dashboard's
+    # RETIRED_ROWS (so the row vanished from the grid) but NOT here, so the
+    # bot_pnl snapshot lingered and went stale forever: invisible on the
+    # dashboard, still sat in the table, still counted by anything that reads
+    # bot_pnl directly rather than through RETIRED_ROWS. That is the exact
+    # shape of the 14-Jul ghost-exposure incident above (frozen rows pinning
+    # the risk light RED). Hiding a row is not retiring it — the two lists
+    # must move together.
+    # The bot itself refuses to start (MOMO_RETIRED guard), so this prune is
+    # terminal rather than a race with a live publisher.
+    "equities-momentum", "equities-momentum-lshadow",
     # [2026-07-14 KRAKEN RETIREMENT] the 8 Kraken paper rows — the -lshadow
     # twins are the fleet now (their rows are NOT in this list, nor is Tide
     # Rider's live row). Family ONLY_BOT services re-upsert until the

@@ -24,9 +24,53 @@ WHAT IT WRITES (bot_state rows)
     validated by construction.
 
 SOURCES (all free, no keys)
-  * Hyperliquid metaAndAssetCtxs — OI / funding / premium for every perp, 1 call.
+  * Lighter /api/v1/orderBookDetails — mark / index / OI for every book, 1 call.
+  * Lighter /api/v1/funding-rates — the venue's own funding, 1 call.
   * Binance futures !forceOrder@arr websocket — liquidation tape (guarded: if
     the stream is unreachable from this host, liq fields are simply absent).
+    NOT a Lighter substitute and NOT a purity violation: Lighter publishes no
+    liquidation tape, and these feed a SEPARATE field family (liq_5m/liq_1h)
+    that no Lighter field could supply. Untouched by the 17-Jul swap below.
+
+[2026-07-17 VENUE SWAP — Hyperliquid -> Lighter]  audit_venue_purity flagged
+`host:api.hyperliquid.xyz:44`: this collector fed the LIGHTER-FIRST fleet its
+market context off a venue the fleet does not trade. The four quantities are
+now sourced from Lighter NATIVELY. Same key names, same units, same consumers.
+
+  VERDICT — the swap is BEHAVIOUR-NEUTRAL BY CONSTRUCTION, not by luck. The
+  mctx snapshot is written into the ledger AFTER the order executes
+  (lighter_funding_bot.py:1137, `raw={... "mctx": _mctx_slice(...)}`); no
+  branch anywhere reads it. It is a DATASET, and the swap re-denominates that
+  dataset. Nothing here gates a trade, so nothing here changes one.
+
+  MEASURED HL-vs-Lighter divergence (2026-07-17, 96 overlapping coins) — read
+  LIMITATIONS below before joining pre- and post-swap ledger rows:
+    mark         median -6.9 bps, max |26 bps|      — same asset, same price.
+    funding_apr  median diff -0.0044; |apr| medians 0.1095 (HL) vs 0.1051 (LT)
+                 — those ARE the two venues' resting defaults. Conversion goes
+                 through funding_basis (8h basis), never 24*365.
+    premium_bps  |prem| median 2.4 bps (HL) vs 6.4 bps (LT) — ~2.7x. NOT a
+                 bug: a different QUANTITY. See premium_bps in book_ctxs().
+    oi_ntl       Lighter/HL notional ratio median 0.052 (p10 0.022, p90 0.117)
+                 — Lighter is a ~20x smaller venue. A LEVEL break, not an
+                 error; oi_chg_1h/24h are RATIOS and stay comparable.
+
+LIMITATIONS (read before trusting this row)
+  * EPOCH BREAK. `heat_mean_apr` (mean |apr| over the venue's own universe)
+    measures HL 0.1278 vs Lighter 0.2210 — 1.73x, on DIFFERENT universes
+    (Lighter lists 105 books HL does not, incl. equity/commodity perps that
+    rest at a lower 0.03504). `heat`, `premium_bps` and `oi_ntl` are NOT
+    comparable across 17-Jul. evaluate_evidence()'s joined decision+context
+    dataset spans the boundary: any factor study on those three fields must
+    split at the swap or it will fit the venue change, not the market.
+    oi_chg_1h/24h and btc_vol_1h are ratios and cross the boundary cleanly.
+  * COVERAGE MOVED (deliberately, and toward the consumers). HL 232 books vs
+    Lighter 201 active; only 96 overlap. 136 HL-only coins are gone — but the
+    fleet does not trade them. The two consumers are Lighter bots, so this
+    swap ADDS context for 105 Lighter books that previously resolved to an
+    empty slice. Coverage is explicit, never silent: a book with no Lighter
+    funding row gets funding_apr=None (not 0.0), and a book with no index
+    gets premium_bps=None — a missing input reads as "no evidence".
 """
 import json
 import logging
@@ -39,9 +83,12 @@ from collections import deque
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import funding_basis
+from venues.symbol_map import from_lighter
 
 BOT = "market-context"
-HL_INFO = "https://api.hyperliquid.xyz/info"
+LIGHTER_API = os.environ.get("LIGHTER_API_BASE",
+                             "https://mainnet.zklighter.elliot.ai")
 BINANCE_WS = "wss://fstream.binance.com/ws/!forceOrder@arr"
 
 LOOP_SECONDS = int(os.environ.get("MCTX_LOOP_SECONDS", "300"))
@@ -63,26 +110,106 @@ def _fleet_sym(binance_sym):
     return _BINANCE_MAP.get(s, s)
 
 
-def hl_asset_ctxs():
-    """{coin: {oi_ntl, funding_apr, premium_bps, mark}} for every HL perp."""
-    body = json.dumps({"type": "metaAndAssetCtxs"}).encode()
-    req = urllib.request.Request(HL_INFO, data=body,
-                                 headers={"Content-Type": "application/json"})
-    meta, ctxs = json.loads(urllib.request.urlopen(req, timeout=20).read())
+# ---------------------------------------------------------------------------
+# PURE COMPUTE (unit-tested offline via --selftest — no network, no DB)
+# ---------------------------------------------------------------------------
+
+def funding_aprs(rows):
+    """/funding-rates rows -> {fleet_coin: apr_fraction}, Lighter's OWN rows only.
+
+    The endpoint also republishes binance/bybit/hyperliquid benchmark rows
+    (that is how the fleet reads a cross-venue rate without leaving Lighter);
+    they are NOT this venue's funding and are skipped here.
+
+    EVERY row on that endpoint — Lighter's included — is quoted on an 8-HOUR
+    basis, so the conversion goes through funding_basis. Do NOT write 24*365
+    here: that is the 8x bug the fleet fixed on 17-Jul. It was CORRECT in this
+    file's old Hyperliquid call (HL quotes hourly) and is wrong for Lighter —
+    which is exactly how a venue swap smuggles the bug back in.
+    """
     out = {}
-    for u, c in zip(meta.get("universe") or [], ctxs or []):
+    for row in rows or []:
+        if row.get("exchange") != "lighter":
+            continue
+        rate = row.get("rate")
+        if rate is None:
+            continue          # absent, never 0.0 — a missing rate is not "flat"
         try:
-            mark = float(c.get("markPx") or 0)
-            oi = float(c.get("openInterest") or 0)
-            out[u["name"]] = {
+            fleet, _ = from_lighter(row.get("symbol") or "")
+            out[fleet] = funding_basis.to_apr(float(rate), "lighter")
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def book_ctxs(books, aprs):
+    """orderBookDetails rows + {coin: apr} -> {coin: {oi_ntl, funding_apr,
+    premium_bps, mark}} for every ACTIVE book. Key names and units are the
+    Hyperliquid call's, unchanged — pnl_dashboard's alert/veto rows and both
+    bot consumers read this shape.
+
+    oi_ntl — `open_interest` is in BASE units, so notional = oi * mark. VERIFIED
+      against live rows rather than assumed: the Lighter/HL notional ratio holds
+      at ~0.03-0.12 across coins whose marks span 63354 (BTC) to 0.072 (DOGE).
+      Were the field quote-denominated, that ratio would scale with mark and the
+      two ends would differ by ~10^6. They do not. (BTC: 1745 * $63.4k = $110M
+      OI — plausible for the venue; $1,745 of total BTC OI would be absurd.)
+
+    premium_bps — Lighter publishes NO premium field. It publishes the two
+      ingredients (`mark_price`, `index_price`), and mark-vs-index IS the
+      fleet's established Lighter premium (lighter_market_scout.book_stats
+      `prem_bps`, same formula) — so this is the venue's own convention, not a
+      proxy invented here.
+      BUT IT IS NOT HL's `premium`, AND THE OPERATOR MUST KNOW THAT: HL's field
+      matches NO instantaneous formula (measured 17-Jul — mark/mid/impact-vs-
+      oracle each reproduce it on only 36-44 of 177 coins), because HL publishes
+      a SMOOTHED, funding-relevant premium. Ours is instantaneous mark-vs-index.
+      Both are "premium"; they are different quantities, and the magnitude gap
+      is real (|prem| median 6.4 bps here vs 2.4 bps on HL, ~2.7x).
+      No index -> None. A premium is not fabricated from a fallback.
+    """
+    out = {}
+    for b in books or []:
+        try:
+            if b.get("status") != "active":
+                continue
+            sym = b.get("symbol")
+            mark = float(b.get("mark_price") or 0.0)
+            oi = float(b.get("open_interest") or 0.0)
+            if not sym or mark <= 0.0:
+                continue
+            idx = float(b.get("index_price") or 0.0)
+            fleet, _ = from_lighter(sym)
+            out[fleet] = {
                 "oi_ntl": oi * mark,
-                "funding_apr": float(c.get("funding") or 0) * 24 * 365,
-                "premium_bps": float(c.get("premium") or 0) * 1e4,
+                # None (not 0.0) when the venue published no rate for this book:
+                # heat skips it and the ledger records "unknown" honestly.
+                "funding_apr": (aprs or {}).get(fleet),
+                "premium_bps": ((mark / idx - 1.0) * 1e4) if idx > 0.0 else None,
                 "mark": mark,
             }
         except (TypeError, ValueError, KeyError):
             continue
     return out
+
+
+# ---------------------------------------------------------------------------
+# NETWORK
+# ---------------------------------------------------------------------------
+
+def _get(path):
+    req = urllib.request.Request(LIGHTER_API + path,
+                                 headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def lighter_ctxs():
+    """{coin: {oi_ntl, funding_apr, premium_bps, mark}} for every ACTIVE Lighter
+    book. Two calls; raises to the caller's guard (which goes NEUTRAL)."""
+    books = _get("/api/v1/orderBookDetails").get("order_book_details") or []
+    rows = _get("/api/v1/funding-rates").get("funding_rates") or []
+    return book_ctxs(books, funding_aprs(rows))
 
 
 class LiqTape:
@@ -383,9 +510,9 @@ def main():
     while True:
         t0 = time.time()
         try:
-            ctxs = hl_asset_ctxs()
+            ctxs = lighter_ctxs()
         except Exception as e:  # noqa: BLE001
-            log.warning("HL asset ctxs unavailable: %s", e)
+            log.warning("Lighter market ctxs unavailable: %s", e)
             ctxs = {}
 
         if ctxs:
@@ -398,7 +525,11 @@ def main():
                     btc_marks.append((hour, ctxs["BTC"]["mark"]))
 
             liq = tape.rolling()
-            aprs = [abs(v["funding_apr"]) for v in ctxs.values()]
+            # funding_apr is None for a book the venue published no rate for
+            # (see book_ctxs) — heat SKIPS it rather than averaging in a 0.0
+            # that would silently drag the fleet's heat gauge toward zero.
+            aprs = [abs(v["funding_apr"]) for v in ctxs.values()
+                    if v["funding_apr"] is not None]
             rets = [(b / a - 1) for (_, a), (_, b) in
                     zip(list(btc_marks)[:-1], list(btc_marks)[1:]) if a]
             btc_vol = (sum(r * r for r in rets) / len(rets)) ** 0.5 if len(rets) > 3 else None
@@ -408,14 +539,18 @@ def main():
             h24 = oi_hist.get(hour - 24 * 3600, {})
             coins = {}
             for c, v in top:
+                # funding_apr / premium_bps are None-able since the 17-Jul swap
+                # (missing venue rate / missing index) — round() would raise on
+                # None and take the whole snapshot down with it.
+                _apr, _prem = v["funding_apr"], v["premium_bps"]
                 coins[c] = {
                     "oi_ntl": round(v["oi_ntl"]),
                     "oi_chg_1h": (round(v["oi_ntl"] / h1[c] - 1, 4)
                                   if h1.get(c) else None),
                     "oi_chg_24h": (round(v["oi_ntl"] / h24[c] - 1, 4)
                                    if h24.get(c) else None),
-                    "funding_apr": round(v["funding_apr"], 4),
-                    "premium_bps": round(v["premium_bps"], 2),
+                    "funding_apr": round(_apr, 4) if _apr is not None else None,
+                    "premium_bps": round(_prem, 2) if _prem is not None else None,
                     **{k: round(x) for k, x in (liq.get(c) or {}).items()},
                 }
             snapshot = {
@@ -477,7 +612,105 @@ def main():
         time.sleep(max(1.0, LOOP_SECONDS - (time.time() - t0)))
 
 
+def _selftest():
+    """Offline. Guards the CONTRACT (key names/units the consumers read) and
+    the two ways this swap could go wrong silently: the 8x funding bug and a
+    fabricated premium."""
+    # --- funding_aprs: basis + row selection -------------------------------
+    rows = [
+        {"exchange": "lighter", "symbol": "ETH", "rate": 9.6e-05},
+        {"exchange": "hyperliquid", "symbol": "ETH", "rate": 9.6e-05},  # bench
+        {"exchange": "binance", "symbol": "ETH", "rate": 5.0e-04},      # bench
+        {"exchange": "lighter", "symbol": "1000BONK", "rate": 1.0e-04},
+        {"exchange": "lighter", "symbol": "NORATE", "rate": None},
+        {"exchange": "lighter", "symbol": "JUNK", "rate": "abc"},
+    ]
+    a = funding_aprs(rows)
+    # the verified Lighter anchor: 9.6e-05 per 8h -> 10.512% TRUE apr
+    assert abs(a["ETH"] - 0.10512) < 1e-6, a["ETH"]
+    # NEGATIVE FIXTURE — the 8x bug this swap could smuggle back in. If someone
+    # "simplifies" funding_basis away to `rate * 24 * 365`, ETH reads 0.84096
+    # and every number stays self-consistent and merely wrong by 8x. Fail LOUD.
+    assert abs(a["ETH"] - 9.6e-05 * 24 * 365) > 0.7, "8x funding bug reintroduced"
+    assert a["ETH"] == funding_basis.to_apr(9.6e-05, "lighter")
+    # bench rows are other venues' funding, not ours — they must not leak in
+    # (both bench rows here are ETH; a leak would overwrite the real rate)
+    assert abs(a["ETH"] - 0.10512) < 1e-6, "cross-venue bench row leaked"
+    assert from_lighter("1000BONK")[0] == "kBONK"
+    assert "kBONK" in a and "1000BONK" not in a, "fleet symbol namespace broken"
+    assert "NORATE" not in a and "JUNK" not in a, "missing/junk rate must be absent"
+
+    # --- book_ctxs: units, contract, coverage ------------------------------
+    books = [
+        {"symbol": "BTC", "status": "active", "mark_price": "63354.1",
+         "index_price": "63381.5", "open_interest": 1744.18314},
+        {"symbol": "ETH", "status": "active", "mark_price": 1845.0,
+         "index_price": 1845.0, "open_interest": 100.0},
+        {"symbol": "1000BONK", "status": "active", "mark_price": 2.0,
+         "index_price": 2.0, "open_interest": 10.0},
+        {"symbol": "NOIDX", "status": "active", "mark_price": 10.0,
+         "index_price": 0, "open_interest": 5.0},          # no index
+        {"symbol": "HALT", "status": "inactive", "mark_price": 5.0,
+         "index_price": 5.0, "open_interest": 1.0},        # not tradeable
+        {"symbol": "BROKEN", "status": "active", "mark_price": None,
+         "index_price": 1.0, "open_interest": 1.0},
+    ]
+    c = book_ctxs(books, a)
+    # the OUTPUT CONTRACT: exact key names + units pnl_dashboard's consumers and
+    # both bots read. A rename here is a silent None at the far end.
+    assert set(c["BTC"]) == {"oi_ntl", "funding_apr", "premium_bps", "mark"}, set(c["BTC"])
+    assert c["BTC"]["mark"] == 63354.1                       # strings coerced
+    # oi_ntl: BASE units * mark == notional (VERIFIED against live rows)
+    assert abs(c["BTC"]["oi_ntl"] - 1744.18314 * 63354.1) < 1e-6
+    assert abs(c["ETH"]["oi_ntl"] - 184500.0) < 1e-9
+    # premium_bps: mark-vs-index, in BPS, signed (mark < index -> negative)
+    assert abs(c["BTC"]["premium_bps"] - (63354.1 / 63381.5 - 1) * 1e4) < 1e-9
+    assert c["BTC"]["premium_bps"] < 0 and abs(c["BTC"]["premium_bps"]) < 10
+    assert c["ETH"]["premium_bps"] == 0.0                    # mark == index
+    # FAIL-SAFE, both directions: a missing input is None, never a fabricated
+    # number and never a 0.0 that reads as "flat".
+    assert c["NOIDX"]["premium_bps"] is None, "premium fabricated without an index"
+    assert c["ETH"]["funding_apr"] == 0.10512
+    # BTC is ACTIVE and priced but the venue published no funding row for it,
+    # so its apr is unknown. The COVERAGE TRAP in miniature: the book must still
+    # appear (its OI/mark/premium are real) with funding_apr None — dropping the
+    # coin, or calling it 0.0, are both lies. (This assertion is here because the
+    # first draft of this test asserted heat saw 3 rates and it saw 2 — the code
+    # was right and the test was wrong. Kept as the fixture that proves it.)
+    assert "BTC" in c and c["BTC"]["funding_apr"] is None, \
+        "a priced book with no venue rate must survive with funding_apr None"
+    assert c["BTC"]["oi_ntl"] > 0 and c["BTC"]["premium_bps"] is not None
+    assert "NOIDX" in c and c["NOIDX"]["funding_apr"] is None, \
+        "a book with no venue rate must read None, not 0.0"
+    assert "HALT" not in c, "inactive book must be skipped"
+    assert "BROKEN" not in c, "junk row must be skipped"
+    assert "kBONK" in c and c["kBONK"]["funding_apr"] == funding_basis.to_apr(1.0e-04, "lighter")
+
+    # heat: the main loop's aggregation must SKIP None, not crash or count 0.0.
+    # Exactly the 2 books with a venue rate (ETH, kBONK) — NOT 4, and not a
+    # 0.0 from BTC/NOIDX dragging the fleet's heat gauge toward zero.
+    aprs = [abs(v["funding_apr"]) for v in c.values() if v["funding_apr"] is not None]
+    assert len(aprs) == 2 and all(x > 0 for x in aprs), aprs
+    assert abs(sum(aprs) / len(aprs) - 0.10731) < 1e-5, sum(aprs) / len(aprs)
+
+    # the snapshot's round() guards must survive a None-able field: this is the
+    # exact expression main() builds, run over a ctx that CONTAINS Nones.
+    for _c, v in c.items():
+        _apr, _prem = v["funding_apr"], v["premium_bps"]
+        row = {"oi_ntl": round(v["oi_ntl"]),
+               "funding_apr": round(_apr, 4) if _apr is not None else None,
+               "premium_bps": round(_prem, 2) if _prem is not None else None}
+        assert isinstance(row["oi_ntl"], int)
+    assert json.dumps({"coins": c})   # the row is published as JSON — None is fine, NaN is not
+    print("market_context self-tests passed (LIGHTER-native: 8h funding basis "
+          "via funding_basis, mark-vs-index premium, BASE-unit OI, fleet "
+          "symbols, coverage explicit, output contract held).")
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
+        sys.exit(0)
     try:
         main()
     except KeyboardInterrupt:

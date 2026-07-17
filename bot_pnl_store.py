@@ -796,9 +796,20 @@ def fetch_paper_trades(limit=2000):
             # carries extra.bars") — could not see which params produced a
             # close, and scored an arm that ignores its levers. Additive: every
             # other consumer ignores unknown keys.
+            # [2026-07-17 DRIFT PLUMBING] venue/entry_price/exit_price were in
+            # the table since day one and NEVER selected, so every paper row
+            # reached the brain with open_rate/close_rate = None. bot_learn's
+            # _post_exit_drift needs both rates and returned None at its guard
+            # for ALL 409 recent losers on the living fleet — drift evidence was
+            # 0 of 409, silently, because the fetch dropped the columns rather
+            # than because the data was missing. `venue` comes along so a
+            # consumer can grade a trade on the venue it actually happened on
+            # (the brain now refuses to price a Lighter close off any other
+            # book). Additive, like the 16-Jul `extra` fix above: every other
+            # consumer ignores unknown keys.
             cur.execute(
                 "SELECT bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, "
-                "reason, extra "
+                "reason, extra, venue, entry_price, exit_price "
                 "FROM paper_trades WHERE side IS DISTINCT FROM 'skip' "
                 "ORDER BY closed_at DESC NULLS LAST LIMIT %s",
                 (int(limit),),
@@ -807,7 +818,7 @@ def fetch_paper_trades(limit=2000):
         from datetime import datetime
         out = []
         for (bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason,
-             extra) in rows:
+             extra, venue, entry_price, exit_price) in rows:
             direction, exit_reason = split_reason(reason)
             # [2026-07-15 AUDIT FIX] tolerant timestamp parse — the listing
             # sniper writes '2026-07-13 15:05:04 UTC', which fromisoformat
@@ -824,6 +835,13 @@ def fetch_paper_trades(limit=2000):
                               .total_seconds() / 60.0)
             except Exception:
                 dur = None
+            def _rate(x):
+                # None stays None: a missing fill price must read as ABSENT
+                # evidence, never as 0.0 (which would look like a real price).
+                try:
+                    return float(x) if x is not None else None
+                except (TypeError, ValueError):
+                    return None
             out.append({
                 "bot": bot, "pair": pair,
                 "profit_abs": float(pnl_abs) if pnl_abs is not None else 0.0,
@@ -833,6 +851,14 @@ def fetch_paper_trades(limit=2000):
                 "duration_min": dur,
                 "open_ts": opened_at, "close_ts": closed_at,
                 "is_open": False,
+                # [2026-07-17] the venue this trade actually executed on
+                # ('lighter' | None for the CEX sniper / HL-data carry book).
+                "venue": venue,
+                # freqtrade's names, so a paper row and a bot_trades row carry
+                # rates under the SAME keys (bot_learn reads open_rate /
+                # close_rate for both).
+                "open_rate": _rate(entry_price),
+                "close_rate": _rate(exit_price),
                 # dict or {} — never None, so consumers can .get() safely
                 "extra": extra if isinstance(extra, dict) else {},
             })

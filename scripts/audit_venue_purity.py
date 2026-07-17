@@ -62,8 +62,8 @@ This is the actual audit, not a sample. Both runs below are reproducible.
     lighter_funding_spread_bot.py  [SHIPPED]  host:api.hyperliquid.xyz  :85
     listing_sniper.py              [SHIPPED]  ccxt:<dynamic>            :234
     market_context.py              [SHIPPED]  host:api.hyperliquid.xyz  :44
-    market_pulse.py                [SHIPPED]  host:api.binance.com      :129
-                                              host:fapi.binance.com     :146
+    market_pulse.py                [SHIPPED]  host:api.binance.com      :129   [FIXED 17-Jul]
+                                              host:fapi.binance.com     :146   [FIXED 17-Jul]
     regime_oracle.py               [SHIPPED]  host:api.hyperliquid.xyz  :56
     triangular_arb.py              [SHIPPED]  ccxt:kraken               :267
     venues/__init__.py             [SHIPPED]  env:VENUE=hl_paper        :110
@@ -145,6 +145,19 @@ to catch.]
     the Lighter cache; the Binance `btc_regime` reaches only the dashboard
     display (pnl_dashboard.py:830,1669). Advisory TODAY — a Binance-derived
     regime sitting on a Lighter-first fleet's bus, one consumer from biting.
+    [FIXED 2026-07-17 — this finding is CLOSED; kept here because the lesson
+    about per-(file, source) keying is why it was ever visible. Both price
+    feeds moved to the venue we trade: fetch_btc_regime() -> Lighter
+    /api/v1/candles, fetch_funding() -> Lighter /funding-rates (exchange ==
+    'lighter' rows only — that endpoint republishes binance/bybit/hyperliquid
+    benchmarks, so an unfiltered read would have been a COSMETIC swap: a
+    Binance rate served through a Lighter URL, and this guard would have
+    called it clean). Behaviour-neutrality MEASURED, not assumed: the regime
+    rule replayed at every step over 500 aligned 4h bars agreed 251/251 =
+    100.0%, zero flips. The NEWS hosts stay declared above and are asserted
+    NOT-a-finding in the selftest — that half of this entry is still live.
+    The output block at the top of this header is the PRE-FIX snapshot; the
+    counts there move as violations land, and market_pulse's two are gone.]
   * triangular_arb.py:267 (ccxt.kraken) and listing_sniper.py:234
     (ccxt.exchanges — the top-100 CEX universe). Zero URLs in either file.
     A literal-URL grep calls both clean. This is the gap detector #2 exists

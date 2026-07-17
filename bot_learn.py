@@ -39,6 +39,12 @@ WHAT IT DOES
      table. Publishes bot_state 'brain-diagnosis'; proposals now name the
      lever instead of defaulting to "tighten the entry gates" (the 92-run
      'flip' artifact this replaces).
+     [2026-07-17 LIGHTER-FIRST] Those drift candles now come from LIGHTER's
+     own book (was: Kraken spot — a RETIRED venue, and the wrong instrument
+     for a perp close), gated to trades whose venue IS Lighter. See the
+     block above _lighter_market_ids() for the measurement showing the old
+     path was already dead (drift verdicts: 0 of 409 living-fleet losers)
+     and what really gates coverage now: shadow brokers recording fills.
 
   8. [2026-07-16 v3 STATISTICS ENGINE — brain_stats.py] The qualification
      statistics grew up: decay-weighted buckets (half-life forgetting inside
@@ -140,7 +146,7 @@ DIAG_MIN_N = 10           # closed era trades before diagnosing a bucket
 # the taker (restrict-only veto) + the dashboard. Same freshness contract.
 LENS_FWD_KEY = "brain-lens-forward"
 LENS_HORIZONS = ((1, 3600), (4, 4 * 3600), (24, 24 * 3600))
-DIAG_DRIFT_MAX_PAIRS = 30  # cap Kraken fetches per run (once per pair, cached)
+DIAG_DRIFT_MAX_PAIRS = 30  # cap Lighter candle fetches per run (1/pair, cached)
 STOPPISH = ("stop_loss", "trailing_stop_loss", "bleed_stop", "stoploss",
             "liquidation", "force_exit")
 # Round-trip friction estimate per bot (fraction of stake). Kraken spot taker
@@ -396,34 +402,151 @@ def analyse_bot(bot, trades, pulse_hist=None):
 # [2026-07-14b] Diagnosis evidence collectors
 # --------------------------------------------------------------------------
 
-_KRAKEN_ALT = {"BTC": "XBT"}
-_kraken_cache = {}   # pair -> list[(epoch, o, h, l, c)] | None (per-process run)
+# [2026-07-17 LIGHTER-FIRST] Post-exit drift is measured on LIGHTER's own 1h
+# candles — the venue, and the instrument, the trade actually happened on.
+#
+# WHAT THIS REPLACED: a Kraken spot OHLC fetch (api.kraken.com), wrong twice
+# over — Kraken was RETIRED 14-Jul, and it priced a LIGHTER PERP close off
+# KRAKEN SPOT, a different instrument. audit_venue_purity.py flagged the host.
+#
+# MEASURED before shipping (17-Jul, real ledger, through the brain's own code
+# path): the Kraken call was ALREADY unreachable for every living bot. All 409
+# recent losers on the 15 alive bots are paper_trades rows, and fetch_paper_
+# trades dropped entry_price/exit_price, so _post_exit_drift returned None at
+# its rate guard BEFORE any candle fetch. Real coverage was 0 of 409, so the
+# candle swap ALONE would have been 0 -> 0. Two things had to move together:
+#   * bot_pnl_store.fetch_paper_trades now selects entry_price/exit_price/venue
+#     (present in the table since day one, never read) -> open_rate/close_rate.
+#   * drift is gated on venue == 'lighter' below, so the CEX listing sniper and
+#     the HL-data carry book — both ALIVE — are never priced off Lighter's
+#     book. That would repeat the very cross-venue error this commit removes.
+#
+# LIMITATION, stated plainly: only 3 of the 51 venue='lighter' losers in the
+# ledger carry fill prices at all (the funding bot has recorded them since
+# 15-Jul; no other Lighter book does). Coverage on today's tape is 0 -> 3. The
+# binding constraint is now the SHADOW BROKERS recording fills, not this code.
+# Nothing here changes trading: 'brain-diagnosis' has no consumer but the
+# dashboard, and compute_stake_mults never reads drift.
+LIGHTER_API = os.environ.get("LIGHTER_API", "https://mainnet.zklighter.elliot.ai")
+DRIFT_BARS = 500     # Lighter's HARD cap per /api/v1/candles call -> 500 1h
+                     # bars ~= 20.8 days of lookback per pair.
+_lighter_cache = {}  # pair -> list[(epoch_sec, o, h, l, c)] | None (per run)
+_lighter_markets = None   # {lighter symbol: market_id} | None — fetched once
+_drift_no_book = set()    # symbols that resolved to no Lighter book (warned)
 
 
-def _kraken_hourly(pair):
-    """720 recent 1h candles from Kraken's public OHLC (covers ~30 days — the
-    whole current ledger). Cached per pair per run; None (also cached) when the
-    pair isn't on Kraken (perps alts, sniper venues) — drift evidence is then
-    simply unavailable for that pair, never an error."""
-    if pair in _kraken_cache:
-        return _kraken_cache[pair]
-    result = None
+def _lighter_market_ids():
+    """{lighter symbol -> market_id} from the public order-book list, fetched
+    ONCE per run (218 books today) and reused by every pair. {} on any failure,
+    which makes every drift lookup return None: a dark feed asserts NOTHING,
+    it never fabricates a 0."""
+    global _lighter_markets
+    if _lighter_markets is not None:
+        return _lighter_markets
+    out = {}
     try:
-        base, _, quote = str(pair).partition("/")
-        base = _KRAKEN_ALT.get(base.upper(), base.upper())
-        quote = (quote or "USD").upper()
-        if quote in ("USDT", "USDC"):
-            quote = "USD"
-        url = f"https://api.kraken.com/0/public/OHLC?pair={base}{quote}&interval=60"
-        with urllib.request.urlopen(url, timeout=20) as r:
+        with urllib.request.urlopen(
+                f"{LIGHTER_API}/api/v1/orderBookDetails", timeout=20) as r:
             d = json.loads(r.read().decode())
-        if not d.get("error"):
-            k = [k for k in d["result"] if k != "last"][0]
-            result = [(int(row[0]), float(row[1]), float(row[2]),
-                       float(row[3]), float(row[4])) for row in d["result"][k]]
+        for b in d.get("order_book_details") or []:
+            sym, mid = b.get("symbol"), b.get("market_id")
+            if sym is not None and mid is not None:
+                out[str(sym)] = int(mid)
     except Exception:
-        result = None
-    _kraken_cache[pair] = result
+        out = {}
+    _lighter_markets = out
+    return out
+
+
+def _drift_market(pair):
+    """fleet pair -> (market_id, fleet->lighter PRICE multiplier), or None.
+
+    PRECONDITION: call this ONLY for a trade already known to have executed on
+    Lighter (_post_exit_drift checks the venue BEFORE it gets here). The DRIFT
+    GAP warning below asserts "yet the trade closed on Lighter" — call it for a
+    CEX row and that warning becomes a lie, and every foreign symbol the sniper
+    ever touched turns into false alarm noise.
+
+    The ledger spells one Lighter market up to three ways ('BONK', 'kBONK',
+    '1000BONK/USDC'), and quotes it bare or suffixed ('ETH' vs 'NEAR/USDC'), so
+    strip the quote and route the coin through venues/symbol_map — the fleet's
+    one maintained mapping (do NOT fork it here).
+
+    symbol_map returns a SIZE multiplier; PRICE scales INVERSELY, because
+    notional is conserved (fleet_price*fleet_size == lighter_price*lighter_size).
+    A raw-unit 'BONK' (size x0.001) therefore prices x1000 on the 1000BONK book,
+    while 'kBONK'/'1000BONK' already count thousands -> x1. Getting this wrong
+    would not fail loudly — it would silently report a ~99900% forward return.
+
+    VERIFIED 17-Jul: all 43 distinct venue='lighter' ledger pairs resolve to a
+    live market_id (0 unmappable). NOT verified against real fills: no 1000X row
+    carries a recorded price yet, so the x1000 leg rests on symbol_map's
+    convention — magnitude agrees (raw BONK ~3.3e-6 x1000 == the 1000BONK
+    book's ~0.0033), but the first real 1000X fill should be spot-checked.
+    """
+    try:
+        from venues.symbol_map import to_lighter
+    except Exception:
+        return None          # no map -> no claim (fail-safe)
+    coin = str(pair or "").split("/")[0].strip()
+    if not coin:
+        return None
+    sym, size_mult = to_lighter(coin)
+    ids = _lighter_market_ids()
+    if not ids:
+        return None          # dark market list -> no claim, and no false alarm
+    mid = ids.get(sym)
+    if mid is None:
+        # A REAL absence, not a "not listed here" shrug. The Kraken version
+        # cached None for every perp alt Kraken never listed and moved on, which
+        # is exactly how the drift sample got silently biased toward a retired
+        # venue's spot universe. This trade CLOSED on Lighter, so its book
+        # existed: if we cannot find it, that is a delisting or a stale
+        # symbol_map, and it gets said OUT LOUD once per symbol.
+        if sym not in _drift_no_book:
+            _drift_no_book.add(sym)
+            print(f"[bot_learn] DRIFT GAP: pair {pair!r} -> Lighter symbol "
+                  f"{sym!r} has no book in the live market list, yet the trade "
+                  f"closed on Lighter (delisted, or symbol_map is stale?) — no "
+                  f"drift evidence for this pair", file=sys.stderr)
+        return None
+    if not size_mult:
+        return None
+    return mid, 1.0 / float(size_mult)
+
+
+def _lighter_hourly(pair):
+    """Up to DRIFT_BARS recent 1h candles for `pair` from Lighter's public
+    /api/v1/candles, as [(epoch_SECONDS, o, h, l, c)] oldest-first, in LIGHTER
+    price units. Cached per pair per run — ONE HTTP call per pair, the same
+    budget discipline the Kraken version had (DIAG_DRIFT_MAX_PAIRS caps the
+    distinct pairs; drift_budget caps the trades).
+
+    500 bars is the API's hard cap, so the window reaches ~20.8 days back; a
+    trade that closed before that simply gets no verdict (None), never a guess.
+    `t` arrives in MILLISECONDS — divided here so callers can compare it to
+    _epoch()'s seconds. None (also cached) on any failure or unknown book.
+    """
+    if pair in _lighter_cache:
+        return _lighter_cache[pair]
+    result = None
+    m = _drift_market(pair)
+    if m is not None:
+        mid = m[0]
+        try:
+            now = int(datetime.now(timezone.utc).timestamp())
+            url = (f"{LIGHTER_API}/api/v1/candles?market_id={mid}"
+                   f"&resolution=1h&start_timestamp={now - DRIFT_BARS * 3600}"
+                   f"&end_timestamp={now}&count_back={DRIFT_BARS}")
+            with urllib.request.urlopen(url, timeout=20) as r:
+                d = json.loads(r.read().decode())
+            rows = [(int(c["t"]) // 1000, float(c["o"]), float(c["h"]),
+                     float(c["l"]), float(c["c"])) for c in (d.get("c") or [])]
+            rows.sort(key=lambda x: x[0])
+            result = rows or None
+        except Exception:
+            result = None
+    _lighter_cache[pair] = result
     return result
 
 
@@ -439,22 +562,43 @@ def _epoch(ts):
 
 def _post_exit_drift(trade):
     """(reclaimed_entry_within_24h, fwd_return_24h) for one closed trade, from
-    public 1h candles after its close — the mechanized version of the manual
-    replay that justified the 13-Jul stop widening. None when rates/candles are
-    missing or fewer than 6 post-close hours exist yet."""
+    LIGHTER's public 1h candles after its close — the mechanized version of the
+    manual replay that justified the 13-Jul stop widening. None when the trade
+    did not happen on Lighter, when rates/candles are missing, or when fewer
+    than 6 post-close hours exist yet.
+
+    CONTRACT UNCHANGED (14-Jul): same return shape, same 24-bar window, same
+    6-bar floor, same None-on-missing-data. Only the price SOURCE moved — from
+    Kraken spot to the Lighter book the trade actually executed on.
+    """
     close_ts = _epoch(trade.get("close_ts"))
     close_rate = trade.get("close_rate")
     open_rate = trade.get("open_rate")
     if not (close_ts and close_rate and open_rate):
         return None
-    candles = _kraken_hourly(trade.get("pair"))
+    # [2026-07-17] Grade a trade ONLY on its own venue's book. The living fleet
+    # also holds CEX-spot listing-sniper rows (BMNR/USDT & friends, most not on
+    # Lighter at all) and the HL-data carry book; pricing either off Lighter
+    # would be the same cross-venue category error as the Kraken fetch this
+    # replaced. Absent/unknown venue -> no claim, never a guess.
+    if str(trade.get("venue") or "").strip().lower() != "lighter":
+        return None
+    candles = _lighter_hourly(trade.get("pair"))
     if not candles:
         return None
+    m = _drift_market(trade.get("pair"))
+    if m is None:                      # unreachable if candles exist; belt+braces
+        return None
+    price_mult = m[1]
+    # Convert the TRADE's rates into the candles' price basis (see _drift_market:
+    # a raw-unit 1000X coin prices x1000 on Lighter). x1 for every ordinary coin.
+    open_l = float(open_rate) * price_mult
+    close_l = float(close_rate) * price_mult
     window = [c for c in candles if c[0] > close_ts][:24]
     if len(window) < 6:
         return None
-    reclaimed = any(h >= float(open_rate) for _, _, h, _, _ in window)
-    fwd = window[-1][4] / float(close_rate) - 1.0
+    reclaimed = any(h >= open_l for _, _, h, _, _ in window)
+    fwd = window[-1][4] / close_l - 1.0
     return reclaimed, fwd
 
 
@@ -514,7 +658,7 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
 
     drifts = []
     for t in losers:
-        if len(_kraken_cache) >= DIAG_DRIFT_MAX_PAIRS and t.get("pair") not in _kraken_cache:
+        if len(_lighter_cache) >= DIAG_DRIFT_MAX_PAIRS and t.get("pair") not in _lighter_cache:
             continue
         if drift_budget.get("left", 0) <= 0:
             break
@@ -938,7 +1082,7 @@ def main():
     # the persistence memory survives.
     venue_ab = venue_ab_report()
     regime_hist = _load_regime_history()
-    drift_budget = {"left": 120}   # bounds Kraken candle work per run
+    drift_budget = {"left": 120}   # bounds Lighter candle work per run
     diagnoses = {}
     for bot, trs in sorted(era_trades.items()):
         if not (cards.get(bot) or {}).get("alive"):
@@ -1232,5 +1376,76 @@ def main():
     return 0
 
 
+def _selftest():
+    """[2026-07-17] Locks the LIGHTER drift contract. OFFLINE by construction:
+    the market list is stubbed, so this runs in CI/on a laptop with no venue.
+
+    Guards the failure this code is uniquely prone to — a price-BASIS slip on a
+    1000X market fails SILENTLY (a x1000 error reads as a ~99900% forward
+    return, not a crash) — plus every fail-safe: a foreign venue, a dark feed,
+    a missing fill price and a too-young close must each return None, never a
+    fabricated 0. Every detective control gets a negative fixture.
+    """
+    global _lighter_markets, _lighter_cache
+    fails = []
+    ran = []
+
+    def ck(name, cond):
+        ran.append(name)
+        if not cond:
+            fails.append(name)
+        print(("  PASS  " if cond else "  FAIL  ") + name)
+
+    _lighter_markets = {"ETH": 0, "1000BONK": 18}      # stub: no network
+    _lighter_cache = {}
+
+    # --- symbol + price-basis resolution -------------------------------------
+    ck("bare 'ETH' -> id 0, price x1", _drift_market("ETH") == (0, 1.0))
+    ck("suffixed 'ETH/USDC' strips quote", _drift_market("ETH/USDC") == (0, 1.0))
+    ck("'kBONK' -> 1000BONK, price x1", _drift_market("kBONK") == (18, 1.0))
+    ck("'1000BONK/USDC' -> same book x1", _drift_market("1000BONK/USDC") == (18, 1.0))
+    m = _drift_market("BONK")            # raw units: size x0.001 -> price x1000
+    ck("raw 'BONK' -> 1000BONK, price x1000",
+       m is not None and m[0] == 18 and abs(m[1] - 1000.0) < 1e-6)
+    ck("unknown symbol -> None", _drift_market("NOTACOIN") is None)
+    ck("empty pair -> None", _drift_market("") is None and _drift_market(None) is None)
+
+    # --- fail-safes: a dark feed must assert NOTHING --------------------------
+    _lighter_markets = {}
+    ck("DARK market list -> None (never a false 'no book')",
+       _drift_market("ETH") is None)
+    _lighter_markets = {"ETH": 0, "1000BONK": 18}
+
+    # --- _post_exit_drift contract + gates ------------------------------------
+    close_ts = "2026-07-01T00:00:00+00:00"
+    t0 = _epoch(close_ts)
+    # 24 synthetic 1h bars after the close; high 110 reclaims an open of 100.
+    _lighter_cache["ETH"] = [(int(t0 + i * 3600), 100.0, 110.0, 90.0, 105.0)
+                             for i in range(1, 25)]
+    good = {"venue": "lighter", "pair": "ETH", "close_ts": close_ts,
+            "open_rate": 100.0, "close_rate": 100.0}
+    d = _post_exit_drift(dict(good))
+    ck("lighter trade -> (bool, float) contract",
+       isinstance(d, tuple) and d[0] is True and abs(d[1] - 0.05) < 1e-9)
+    ck("venue=None refused", _post_exit_drift(dict(good, venue=None)) is None)
+    ck("venue='kraken' refused", _post_exit_drift(dict(good, venue="kraken")) is None)
+    ck("missing open_rate -> None", _post_exit_drift(dict(good, open_rate=None)) is None)
+    ck("missing close_rate -> None", _post_exit_drift(dict(good, close_rate=None)) is None)
+    ck("missing close_ts -> None", _post_exit_drift(dict(good, close_ts=None)) is None)
+    # < 6 post-close hours must abstain
+    _lighter_cache["ETH"] = [(int(t0 + i * 3600), 100.0, 110.0, 90.0, 105.0)
+                             for i in range(1, 6)]
+    ck("<6 post-close bars -> None", _post_exit_drift(dict(good)) is None)
+    # no candles at all
+    _lighter_cache["ETH"] = None
+    ck("no candles -> None", _post_exit_drift(dict(good)) is None)
+
+    print("selftest: %d checks, %d FAILED%s"
+          % (len(ran), len(fails), (" -> " + ", ".join(fails)) if fails else ""))
+    return 1 if fails else 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        sys.exit(_selftest())
     sys.exit(main())

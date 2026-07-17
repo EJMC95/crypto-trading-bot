@@ -2230,7 +2230,19 @@ def _organ_vital(key, st):
             return _v("prem {}bps · stress {}bps", st.get("lighter_prem_bps"),
                       st.get("lighter_venue_stress_bps"))
         if key == "regime-oracle":
-            return _v("{} majors tracked", len([k for k in st if not k.startswith(("updated", "ttl"))]))
+            # [2026-07-17] This counted TOP-LEVEL PAYLOAD KEYS, not majors —
+            # params/pairs/fleet/errors made it read "4 majors tracked" for a
+            # 16-major universe, and the HL->Lighter swap's additive
+            # `coverage` key would have silently moved it to 5. Read the
+            # majors from `pairs`, and surface coverage: a major dropped for
+            # want of Lighter history is exactly what the operator must see
+            # here. Pre-swap payloads carry no `coverage` — hence the guards.
+            cov = st.get("coverage") or {}
+            miss = cov.get("missing") or {}
+            return _v("{} majors tracked{}", len(st.get("pairs") or {}),
+                      (f" · MISSING {', '.join(sorted(miss))}" if miss else
+                       (f" · coverage {cov.get('n_published')}/"
+                        f"{cov.get('universe')}" if cov else "")))
         if key == "fleet-alerts":
             al = st.get("alerts") or []
             return _v("{} alerts total · last: {}", len(al),

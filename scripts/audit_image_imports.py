@@ -67,6 +67,23 @@ BORN_DARK_OK = {
                   "Dockerfile.indexshadow", "Dockerfile.momolive",
                   "Dockerfile.momoshadow", "Dockerfile.perpslive",
                   "Dockerfile.psniper")},
+    # [2026-07-17 VENUE SWAP] market-context COPYs venues/ purely for
+    # venues.symbol_map.from_lighter (the fleet<->Lighter symbol authority)
+    # after moving off Hyperliquid. It is an INSTRUMENT-ONLY collector: it
+    # never calls venue_context(), constructs no client and places no order,
+    # so neither module is reachable — but both are declared, not silent.
+    ("Dockerfile.marketcontext", "fleet_tuning"):
+        "instrument-only collector — never constructs a venue client, so "
+        "venues/__init__'s guarded growth-rail import is inert by design; it "
+        "imports venues.symbol_map (from_lighter) and nothing else. A "
+        "collector that never trades must not be sized by a clip lever.",
+    ("Dockerfile.marketcontext", "paper_broker"):
+        "venues/shadow.py rides along in the COPY'd package but is imported "
+        "LAZILY (venues/__init__:144, inside venue_context()) and this image "
+        "never calls it — market_context only trades data, never orders. "
+        "NOTE the latent trap this declares away: if anything in this image "
+        "ever imports venues.shadow, it will crash on boot. Copy "
+        "paper_broker.py rather than widening this reason.",
     # These two COPY user_data/ (for its configs/strategy files) but never
     # RUN the four fleet_bus-importing strategies with a live bus:
     ("Dockerfile.regime", "fleet_bus"):
