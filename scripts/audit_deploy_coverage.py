@@ -282,8 +282,12 @@ def main():
             print(f"  {o:<32} launched by run_all.sh -> service freqtrade-bots")
         print("\n  Fix: add the path to BOTH the `paths:` block AND the service's "
               "`grep -qE` in\n  .github/workflows/railway-redeploy.yml — or DECLARE "
-              "it in DEPLOY_COVERAGE_OK\n  with a reason. Workflow files need the "
-              "GitHub web editor (push-straight-to-main).")
+              "it in DEPLOY_COVERAGE_OK\n  with a reason. Both lists bind: `paths:` "
+              "gates whether the job RUNS,\n  the grep picks the service. A file in "
+              "one and not the other cannot deploy.\n  (You CAN `git push` a "
+              "workflow file — the PAT has the scope. TESTED 17-Jul,\n  ce446c7. "
+              "The 'web editor only' caveat is FALSE and was steering sessions\n"
+              "  away from CI fixes for weeks — see push-straight-to-main.)")
         print(f"\naudit_deploy_coverage: {len(seen)} ORPHANED file(s); "
               f"{len(ok_declared)} declared exception(s).")
         return 1
