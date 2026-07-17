@@ -584,9 +584,29 @@ def _trade_side(trade):
     tag = str(trade.get("enter_tag") or "").strip().lower()
     if tag in ("long", "short"):
         return tag
+    # [2026-07-17] The LENS-tagged shape, and why source 2 could not see it.
+    # `bot_pnl_store.split_reason` runs BEFORE this function on every
+    # paper_trades row: it partitions the direction prefix OUT of the reason and
+    # INTO enter_tag. So a Ticket Taker close stored as `short-divergence_tp`
+    # arrives here as enter_tag='short-divergence', exit_reason='tp' — the exact
+    # prefix source 2 hunts for has already been moved into the field source 1
+    # was only checking for equality. Both missed; every lens-tagged row
+    # returned None.
+    # MEASURED 17-Jul off the ledger, post-split, through this real function:
+    # 'long-breakout_tp' -> None, 'short-divergence_tp' -> None, while the older
+    # 'long_roi' -> 'long' still resolved. That is 100% of the LIVE Ticket
+    # Taker's closed rows and every lens-tagged family close — i.e. exactly the
+    # books the 17-Jul direction fix was written to protect — silently ungraded,
+    # while the docstring's "112 of 129" was measured against the RAW `reason`
+    # column this function never receives.
+    for side in ("long", "short"):
+        if tag.startswith(side + "-") or tag.startswith(side + "_"):
+            return side
     reason = str(trade.get("exit_reason") or "").strip().lower()
     for side in ("long", "short"):
-        # '_' = funding/spread books, '-' = family bot + Ticket Taker lenses
+        # '_' = funding/spread books, '-' = family bot + Ticket Taker lenses.
+        # Still load-bearing for UN-split rows: _fetch_trades also merges
+        # `bot_trades` over HTTP, which carries the reason as stored.
         if reason.startswith(side + "_") or reason.startswith(side + "-"):
             return side
     return None
@@ -1533,8 +1553,9 @@ def _selftest():
     ck("SHORT reclaim=True only when price RETURNS DOWN to entry",
        _post_exit_drift(dict(good, enter_tag="short", open_rate=95.0,
                              close_rate=100.0))[0] is True)
-    # direction recovered from the exit_reason prefix (112 of 129 side=NULL
-    # rows carry it; measured) — enter_tag absent, reason decides.
+    # direction recovered from the exit_reason prefix — for rows that still
+    # CARRY one. Un-split shape: `bot_trades` over HTTP delivers the reason as
+    # stored, so this path stays load-bearing.
     for reason, want in (("short_flip", "short"), ("long_rebalance", "long"),
                          ("short-divergence_tp", "short"), ("long-dip_exit", "long")):
         ck("side from exit_reason %r -> %s" % (reason, want),
@@ -1544,6 +1565,27 @@ def _selftest():
     ck("UNKNOWN direction -> None (never a long-shaped guess)",
        _trade_side({"exit_reason": "flip"}) is None
        and _trade_side({}) is None)
+    # [2026-07-17] THE SHAPE PRODUCTION ACTUALLY DELIVERS. The four cases above
+    # hand-build `{"exit_reason": "short-divergence_tp"}` — a dict no paper row
+    # ever looks like by the time it reaches this function, because
+    # `split_reason` has already moved that prefix into enter_tag. The fixture
+    # encoded the assumption under test, so it stayed green across the entire
+    # window in which every lens-tagged row silently graded as directionless.
+    # Fix: drive the REAL splitter, so the fixture cannot drift from the
+    # producer. If split_reason's contract ever moves again, this fails here
+    # instead of going quiet in the brain.
+    import bot_pnl_store as _store          # module-scope import is lazy here
+    for raw, want in (("short-divergence_tp", "short"), ("long-breakout_tp", "long"),
+                      ("long-dip_hold", "long"), ("long_roi", "long"),
+                      ("short_flip", "short")):
+        _tg, _ex = _store.split_reason(raw)
+        ck("POST-SPLIT %r (tag=%r exit=%r) -> %s" % (raw, _tg, _ex, want),
+           _trade_side({"enter_tag": _tg, "exit_reason": _ex}) == want)
+    # and the genuinely directionless rows STILL make no claim after splitting
+    for raw in ("flip", "decay_paid"):
+        _tg, _ex = _store.split_reason(raw)
+        ck("POST-SPLIT %r stays UNGRADED (no guess)" % raw,
+           _trade_side({"enter_tag": _tg, "exit_reason": _ex}) is None)
     ck("directionless trade gets NO drift claim",
        _post_exit_drift({k: v for k, v in good.items() if k != "enter_tag"}) is None)
 

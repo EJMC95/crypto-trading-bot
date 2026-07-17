@@ -21,7 +21,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # modules that are deliberately NOT copied (fleet_tuning, paper_broker) are
 # DECLARED in scripts/audit_image_imports.py BORN_DARK_OK with reasons —
 # silence is not an option (CLAUDE.md born-dark rule).
-COPY market_context.py bot_pnl_store.py funding_basis.py ./
+# [2026-07-17] cleanup_legacy_bots.py is the fleet's ONE authority on which
+# rows are retired, and market_context's selftest asserts LIVE_CADENCE_SEC
+# against it (the rot guard evidence_board.py and fleet_proprioception.py
+# already carry — Dockerfile.freqtrade:55 copies it for exactly that reason).
+# Stdlib-only, 164 lines, no cascade. COPY'd rather than declared BORN_DARK_OK
+# so `--selftest` is runnable INSIDE this image: a guard that can only run on
+# someone's laptop is the control that already failed here once — this dict
+# rotted because retiring a row and sweeping the rosters were separate acts
+# nobody linked.
+COPY market_context.py bot_pnl_store.py funding_basis.py cleanup_legacy_bots.py ./
 COPY venues/ ./venues/
 
 ENV PYTHONUNBUFFERED=1

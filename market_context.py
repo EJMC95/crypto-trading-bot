@@ -270,6 +270,39 @@ class LiqTape:
         return out
 
 
+# [2026-07-17 BUS CONTRACT] fleet-alerts was the ONE bot_state key published
+# without `updated`/`ttl_sec`. CLAUDE.md's bus contract is unambiguous — "every
+# payload carries updated+ttl_sec; consumers go NEUTRAL on stale data" — and
+# every other feed the evidence board reads is _fresh()-gated. fleet-alerts
+# could not be: with no `updated` to read, `_fresh()` returns False on the
+# except branch, so gating it as-written would have blinded the board entirely
+# rather than protecting it. The fix belongs at the WRITER: give the payload
+# the stamp the contract requires, and the existing gate starts working.
+#
+# TTL sizing is the load-bearing decision. evaluate_evidence only runs on the
+# coin-quality tick (QUALITY_EVERY_H, default 6h), so this payload is EXPECTED
+# to be up to ~6h old in normal health — a 6h TTL would flap between "fresh"
+# and "stale" on nothing but cadence. Two cadences share one key, so the TTL
+# must cover the SLOWER writer plus slack: check_live_freshness re-stamps every
+# loop, but only when it fires. 8h = the 6h evidence cadence + 2h slack.
+# WHAT THIS IS NOT: the per-alert `ts`/`last_seen` remain the authority on
+# whether any INDIVIDUAL alert is current (the board's 6h LIVE_GAP_FRESH_H
+# still rules the real-money down-scale). This TTL answers only "is the alerts
+# FEED itself still being written?" — a different question, and the one that
+# went unasked when the feed's own age was invisible to every reader.
+ALERTS_TTL_SEC = int(os.environ.get("MCTX_ALERTS_TTL_SEC", str(8 * 3600)))
+
+
+def save_alerts(alerts):
+    """The single writer for fleet-alerts. Every save carries the bus stamp —
+    there is no path that writes this key without one."""
+    store.save_state("fleet-alerts", {
+        "alerts": alerts,
+        "updated": datetime.now(timezone.utc).isoformat(),
+        "ttl_sec": ALERTS_TTL_SEC,
+    })
+
+
 def _alert(alerts, key, severity, msg, dedup_h=24):
     """Append an alert unless the same key fired within dedup_h. Returns True
     if it fired. Alerts are the SIGNAL layer only — the only automated ACTION
@@ -422,7 +455,7 @@ def evaluate_evidence(quality):
     except Exception as e:  # noqa: BLE001
         log.warning("divergence check failed: %s", e)
 
-    store.save_state("fleet-alerts", {"alerts": alerts})
+    save_alerts(alerts)
     if fired:
         log.warning("evidence evaluation: %d new alert(s).", fired)
     return fired
@@ -432,10 +465,58 @@ def evaluate_evidence(quality):
 # sfo while the LIVE bots run in Southeast Asia — independent failure domains,
 # so a region outage that silences the bots can't silence THIS alert. Limits
 # sized ~4 missed publishes (the dashboard's stale windows are ~2).
-LIVE_FRESHNESS_LIMITS = {
-    "perps-funding-lighter-lighter": 1200,    # 300s loop
-    "crypto-trend-daily-lighter":    9000,    # hourly loop
+#
+# [2026-07-17 ROSTER] The roster is DERIVED from bot_pnl, not declared here.
+# WHY: the declared version was the LAST live-cohort constant in the fleet left
+# unswept by the 17-Jul retirement, and it had rotted BOTH ways at once —
+#   * it still named `crypto-trend-daily-lighter`, retired that day. A pruned
+#     row returns no age, and the old loop's `if age is not None` skipped it in
+#     silence: a dead name is indistinguishable from a healthy bot.
+#   * it never gained `lighter-ticket-taker-lighter`, the LIVE real-money book
+#     that TOOK that slot the same day — so the one watchdog deliberately built
+#     to survive a region outage did not know the Ticket Taker existed.
+# fleet_respiration.py:57 is the receipt: that sweep EXAMINED this dict, wrote
+# down that its semantics differ ("treats it as no-evidence"), and moved on.
+# Unrefuted is not checked. A roster that must be remembered is the control
+# that already failed — so this one cannot be forgotten, because nobody
+# maintains it: `venue_mode == lighter_live` IS the roster, exactly as
+# fleet_watchdog_svc.py:137 derives it (the only live-cohort reader that
+# survived the swap untouched, because it never hardcoded one).
+#
+# FAIL-SAFE DIRECTION. Discovery reads the LAST PUBLISHED row, which survives
+# the bot's death — a live book whose service dies keeps its row, keeps
+# venue=lighter_live, and its `updated_at` simply stops moving. So the case
+# this organ exists for (a live bot going dark) is exactly the case discovery
+# still catches. The residue is a book that has NEVER published, or one whose
+# last publish carried no venue: both are louder, different failures, and
+# neither is quieter than the old dict's silent skip.
+LIVE_CADENCE_SEC = {
+    "perps-funding-lighter-lighter": 1200,    # 💸 Funding Farmer — 300s loop
+    "lighter-ticket-taker-lighter":  1200,    # 🎫 Ticket Taker — 300s loop, LIVE 17-Jul
 }
+# Any live row NOT named above is still watched, at a deliberately slack bar —
+# an unknown cadence earns a late page, never no page.
+DEFAULT_LIVE_LIMIT = int(os.environ.get("MCTX_DEFAULT_LIVE_LIMIT", "3600"))
+
+
+def live_freshness_alerts(rows, alerts, now_iso=None):
+    """Pure core: [(bot, age_s, equity)] -> alerts fired. Split out so the
+    detector is testable without a DB — the `if dry_run`-branch lesson: a
+    detective control whose only path needs live Postgres is a control nobody
+    has ever seen fire."""
+    fired = 0
+    for bot, age, equity in rows:
+        if age is None:
+            continue
+        limit = LIVE_CADENCE_SEC.get(bot, DEFAULT_LIVE_LIMIT)
+        if age > limit:
+            eq = f" (${equity:,.2f} real)" if equity is not None else ""
+            fired += _alert(alerts, f"stale-live:{bot}", "warn",
+                            f"⚠️ LIVE bot {bot}{eq} last published "
+                            f"{age / 60:.0f} min ago (limit {limit / 60:.0f}) "
+                            f"— check the Railway service",
+                            dedup_h=6)
+    return fired
 
 
 def check_live_freshness():
@@ -444,24 +525,25 @@ def check_live_freshness():
         return
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT bot, extract(epoch from now()-updated_at) "
-                        "FROM bot_pnl WHERE bot = ANY(%s)",
-                        (list(LIVE_FRESHNESS_LIMITS),))
-            ages = dict(cur.fetchall())
+            # The roster IS the query. No name to forget, no name to rot.
+            cur.execute("SELECT bot, extract(epoch from now()-updated_at), equity "
+                        "FROM bot_pnl WHERE extra->>'venue' = %s", ("lighter_live",))
+            rows = list(cur.fetchall())
     except Exception as e:  # noqa: BLE001
         log.warning("live-freshness check failed: %s", e)
         return
+    if not rows:
+        # Zero live rows is not "all healthy" — it is the sensor reading blank.
+        # Cheap to say, and it is the reading a total prune/outage produces.
+        log.warning("live-freshness: NO rows with venue=lighter_live — "
+                    "either no live book is publishing, or the venue stamp moved")
+        return
     alerts = (store.load_state("fleet-alerts") or {}).get("alerts") or []
-    fired = 0
-    for b, limit in LIVE_FRESHNESS_LIMITS.items():
-        age = ages.get(b)
-        if age is not None and age > limit:
-            fired += _alert(alerts, f"stale-live:{b}", "warn",
-                            f"⚠️ LIVE bot {b} last published {age / 60:.0f} min ago "
-                            f"(limit {limit / 60:.0f}) — check the Railway service",
-                            dedup_h=6)
+    fired = live_freshness_alerts(rows, alerts)
+    log.info("live-freshness: %d live row(s) watched (%s), %d alert(s)",
+             len(rows), ", ".join(sorted(r[0] for r in rows)), fired)
     if fired:
-        store.save_state("fleet-alerts", {"alerts": alerts})
+        save_alerts(alerts)
 
 
 def coin_quality():
@@ -735,9 +817,56 @@ def _selftest():
                "premium_bps": round(_prem, 2) if _prem is not None else None}
         assert isinstance(row["oi_ntl"], int)
     assert json.dumps({"coins": c})   # the row is published as JSON — None is fine, NaN is not
+
+    # --- the cross-region live-bot watchdog (17-Jul) -----------------------
+    # NEGATIVE FIXTURE FIRST: the detector must FIRE. This control had never
+    # been seen firing — its only path needed live Postgres, so `pure core +
+    # thin query` is what makes it testable at all. Synthetic rows throughout:
+    # it asserts the DETECTOR, not today's fleet, so it cannot start failing on
+    # good news (a healthy fleet) or pass on bad news (an empty roster).
+    a = []
+    assert live_freshness_alerts([("perps-funding-lighter-lighter", 60.0, 66.26)], a) == 0
+    assert a == [], "a FRESH live bot must not alert"
+    a = []
+    assert live_freshness_alerts([("perps-funding-lighter-lighter", 5000.0, 66.26)], a) == 1
+    assert "perps-funding-lighter-lighter" in a[0]["msg"] and a[0]["severity"] == "warn"
+    assert "$66.26 real" in a[0]["msg"], a[0]["msg"]   # name the money at stake
+
+    # THE ACTUAL 17-Jul BUG: a live row absent from LIVE_CADENCE_SEC must still
+    # be watched, at DEFAULT_LIVE_LIMIT. The Ticket Taker went live into a slot
+    # whose previous occupant was retired; the old dict-driven loop iterated its
+    # own keys, so an unlisted live book was not late — it was invisible.
+    a = []
+    assert live_freshness_alerts([("some-future-live-bot", DEFAULT_LIVE_LIMIT + 1, 12.0)], a) == 1
+    assert "some-future-live-bot" in a[0]["msg"], "an UNLISTED live row must still be watched"
+    a = []
+    assert live_freshness_alerts([("some-future-live-bot", DEFAULT_LIVE_LIMIT - 1, 12.0)], a) == 0
+
+    # a None age (row present, age unreadable) makes NO claim rather than a
+    # false page — but note this is the ONLY silent path, and it is now
+    # unreachable from the query, which cannot return a NULL age for a live row.
+    a = []
+    assert live_freshness_alerts([("perps-funding-lighter-lighter", None, 1.0)], a) == 0
+
+    # ROT GUARD: the cadence map is a display/tuning aid now, not the roster —
+    # but a retired name in it is still a lie about what we watch, and the
+    # retirement list is the only authority on that. Same guard evidence_board
+    # and fleet_proprioception carry; this module is where it was missing.
+    try:
+        from cleanup_legacy_bots import LEGACY_BOTS as _retired
+        _rot = set(LIVE_CADENCE_SEC) & set(_retired)
+        assert not _rot, (
+            f"LIVE_CADENCE_SEC names RETIRED row(s) {sorted(_rot)}. The roster "
+            f"itself is derived (venue=lighter_live), so this no longer blinds "
+            f"the watchdog — but a retired name here still advertises a cadence "
+            f"for a book that cannot publish. Remove them.")
+    except ImportError:      # not in this image — the guard is best-effort
+        pass
+
     print("market_context self-tests passed (LIGHTER-native: 8h funding basis "
           "via funding_basis, mark-vs-index premium, BASE-unit OI, fleet "
-          "symbols, coverage explicit, output contract held).")
+          "symbols, coverage explicit, output contract held; live-freshness "
+          "detector fires + unlisted live rows watched + no retired cadence).")
 
 
 if __name__ == "__main__":

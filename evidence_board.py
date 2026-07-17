@@ -88,6 +88,12 @@ BOARD_KEY = "evidence-board"
 INTERVAL = int(os.environ.get("EVBOARD_INTERVAL_SEC", "600"))
 MODE = os.environ.get("EVBOARD_MODE", "shadow").strip().lower()   # shadow|publish
 NOTIFY_GAP_H = float(os.environ.get("EVBOARD_NOTIFY_GAP_H", "6"))
+# [2026-07-17] Reminder cadence for a warn/action board item that is STILL true
+# long after its onset page. Deliberately much slacker than NOTIFY_GAP_H (which
+# is the floor between ANY two pushes for one key): this is "that thing is
+# still broken", not a nag. 12h means an overnight problem is on the phone by
+# morning instead of having been announced once and forgotten.
+RENOTIFY_H = float(os.environ.get("EVBOARD_RENOTIFY_H", "12"))
 WINDOW_H = 48          # board horizon — matches the dashboard banner
 TTL_SEC = 3 * INTERVAL
 
@@ -204,6 +210,80 @@ def corroborate(key, lighter_market):
             if str(sym).upper() == coin.upper():
                 return True
     return False
+
+
+# [2026-07-17] fleet-alerts is written on market_context's coin-quality tick
+# (QUALITY_EVERY_H, default 6h) and stamped ttl_sec=8h by save_alerts. The bar
+# here is generous on purpose: `_fresh` takes min(max_age_s, payload ttl_sec),
+# so the PRODUCER's own 8h stamp is what actually rules and this constant only
+# has to stay out of its way. The board's default 2700s would have gated a feed
+# that is 6h old in perfect health — a "freshness" check that fires on cadence
+# teaches you to ignore it.
+ALERTS_FRESH_S = float(os.environ.get("EVBOARD_ALERTS_FRESH_S", str(12 * 3600)))
+
+
+def synthesize_alerts_feed(alerts_raw, now_ts):
+    """Is the alert BLOODSTREAM itself still flowing?
+
+    WHY THIS EXISTS, and why it is not a freshness gate on `fa`. Every consumer
+    of the alerts list already windows on each alert's OWN `ts`/`last_seen` —
+    the live down-reflex at 6h (LIVE_GAP_FRESH_H), veto-flap at 7d, item score
+    by 12h decay. A dead producer writes no new timestamps, so all of those go
+    quiet by themselves; blanking the list on a feed-level stamp would discard
+    individually-valid, individually-windowed alerts and buy nothing.
+
+    What NOTHING defends is the silence itself. An empty alerts list reads
+    EXACTLY the same whether the fleet is healthy or market_context has been
+    dead for a day — the board's quietest, most reassuring output is also its
+    total-failure output. Same shape as the sniper's `watching:201`: ask what a
+    metric reads under TOTAL failure, and if the answer is "fine", it is not a
+    health check. So: don't drop the data — say the producer stopped.
+
+    Restrict-direction and cheap: one warn item, no lever, no actuator."""
+    if _fresh(alerts_raw or {}, ALERTS_FRESH_S):
+        return []
+
+    # ABSENT STAMP IS NOT A DEAD PRODUCER — and conflating them would make this
+    # organ's FIRST act a false page. market_context runs in its own Railway
+    # service, on its own deploy clock, so between this board shipping and
+    # market-context shipping save_alerts the feed is legitimately unstamped
+    # while perfectly healthy. `_fresh` cannot tell the two apart: no `updated`
+    # and a 3-day-old `updated` both land on its except branch as False. So
+    # split them at the only place that knows — presence of the key. INFO
+    # (board-visible, no phone) for "the producer predates the stamp"; WARN
+    # (phone) only for a stamp we can read and that is genuinely old. Cost of
+    # the split: during the transition the dark-feed check is inert — which is
+    # the status quo, not a regression. If the info item is still there
+    # tomorrow, the stamp never arrived and THAT is the finding.
+    u = (alerts_raw or {}).get("updated")
+    if not u:
+        return [{"key": "board:alerts-unstamped", "severity": "info",
+                 "msg": "🩸 fleet-alerts carries no `updated` stamp — its age is "
+                        "unknowable, so a dark producer would look identical to a "
+                        "quiet fleet",
+                 "proposal": "redeploy the market-context service: save_alerts "
+                             "(17-Jul) stamps updated+ttl_sec per the bus "
+                             "contract. Expected to clear on its next deploy — "
+                             "if this persists, the stamp is not shipping.",
+                 "lever": None, "ts": now_ts, "source": "board",
+                 "direction": "restrict"}]
+    try:
+        t = datetime.fromisoformat(str(u).replace("Z", "+00:00"))
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        age = f"{(now_ts - t.timestamp()) / 3600:.1f}h old"
+    except Exception:
+        age = "unparseable `updated`"
+    return [{"key": "board:alerts-feed-dark", "severity": "warn",
+             "msg": f"🩸 the fleet-alerts feed is not being written ({age}) — "
+                    f"an empty board is NOT evidence of a healthy fleet",
+             "proposal": "check the market-context service: evaluate_evidence "
+                         "runs on the coin-quality tick (MCTX_QUALITY_EVERY_H, "
+                         "6h) and save_alerts stamps ttl_sec=8h. Alerts already "
+                         "on the board stay valid on their own ts — this says "
+                         "only that NEW ones would not appear.",
+             "lever": None, "ts": now_ts, "source": "board",
+             "direction": "restrict"}]
 
 
 def synthesize(lighter_market, fleet_risk, lens_forward, now_ts):
@@ -831,7 +911,8 @@ def run_once():
     _ok = bool(_b)
     def _g(k):
         return (_b.get(k) or {}) if _ok else (store.load_state(k) or {})
-    fa = _g("fleet-alerts").get("alerts") or []
+    fa_raw = _g("fleet-alerts")
+    fa = fa_raw.get("alerts") or []
     review = _g("evidence-review")
     lm = _g("lighter-market")
     fr = _g("fleet-risk")
@@ -852,7 +933,8 @@ def run_once():
             fires_prior12[k] = fires_prior12.get(k, 0) + 1
 
     # ---- synthesized evidence (level-triggered; seen-map dedups notify) ----
-    synth = synthesize(lm, fr, lf, now) + detect_veto_flap(fa, now)
+    synth = (synthesize(lm, fr, lf, now) + detect_veto_flap(fa, now)
+             + synthesize_alerts_feed(fa_raw, now))
 
     # ---- EXPAND-direction synthesis: winners, promotions, tuner activity,
     # and restrictions that never bind (the board's other eye) --------------
@@ -963,6 +1045,29 @@ def run_once():
             "first_seen": seen_prior.get(k) or _iso(a.get("ts")),
             "verdict": v,
         })
+    # [2026-07-17] The three literals below are DELIBERATE, not unfinished —
+    # recorded because they read like hardcodes and invite a "fix" that would
+    # be wrong. A board item is LEVEL-TRIGGERED (docstring, synthesize): it is
+    # re-derived from scratch each cycle and emitted ONLY while its condition
+    # is true RIGHT NOW. So:
+    #   age_h=0.0     — it is a live reading, not a past event. Decaying it
+    #                   would bury a currently-true condition as it ages, which
+    #                   is precisely backwards. Alerts decay because they are
+    #                   edge-triggered facts about the past; these are not.
+    #   fires_24h=1   — there is no fire history to count; level-triggered
+    #                   items have no edges. persistence stays 1.0 rather than
+    #                   inventing a number.
+    #   corroborated  — every synthesizer is a JOIN over >=2 freshness-gated
+    #                   feeds, so these are corroborated by construction, which
+    #                   is the boost's whole meaning. `corroborate()` only knows
+    #                   how to cross-check `disloc:` alert keys against
+    #                   lighter-market; asking it about a board key would answer
+    #                   False for the wrong reason.
+    # CONSEQUENCE, ACCEPTED: an info board item scores 1.5 flat, so severity is
+    # the only discriminator among them. That is the intended ordering — what
+    # is true now, ranked by how bad it is.
+    # The real defect these literals DID cause was in notify, not score: see
+    # `escalated` below, which read `trend` and therefore read a constant.
     for s in synth:
         k = s["key"]
         auto_map[k] = "active"
@@ -1074,9 +1179,36 @@ def run_once():
         if i["sev"] not in ("warn", "action") and not is_expand:
             continue
         is_new = i["key"] not in seen_prior
-        escalated = i["trend"] == "escalating" and prior_items.get(i["key"], {}).get("trend") != "escalating"
+        prior_i = prior_items.get(i["key"], {})
+        escalated = i["trend"] == "escalating" and prior_i.get("trend") != "escalating"
+        # [2026-07-17] TWO ways a board item reaches the phone AFTER onset.
+        # Neither existed: `escalated` reads `trend`, and every board item's
+        # trend is the literal "steady" (see the assemble block above), so
+        # `escalated` was False BY CONSTRUCTION for the entire board-authored
+        # half. The gate collapsed to `is_new`, and `seen_prior` is written
+        # every cycle the condition holds — so a level-triggered warn or action
+        # notified EXACTLY ONCE, at onset, and then never again no matter how
+        # long it ran or how bad it got. NOTIFY_GAP_H was unreachable for them.
+        # That is the failure mode where a real problem is announced once, at
+        # 3am, and is silent for the next three days.
+        #
+        # 1) WORSENED: severity climbed (info->warn->action) while the item was
+        #    already on the board. For a level-triggered item this IS the
+        #    escalation signal — the fires-based `trend` cannot see it, because
+        #    a re-derived item has no edges to count.
+        # 2) SUSTAINED: a warn/action that simply will not go away. Rate-limited
+        #    by RENOTIFY_H (a reminder, not a nag) and still subject to the
+        #    NOTIFY_GAP_H floor below.
+        # Restrict-side only: expand items announce once and stay quiet —
+        # re-paging good news is noise, and it is not what blindness costs.
         last_n = notified.get(i["key"], 0)
-        if (is_new or escalated) and now - last_n >= NOTIFY_GAP_H * 3600:
+        worsened = (not is_new
+                    and SEV_W.get(i["sev"], 1.0) > SEV_W.get(prior_i.get("sev"), 1.0))
+        sustained = (not is_new and not is_expand
+                     and i["sev"] in ("warn", "action")
+                     and last_n > 0 and now - last_n >= RENOTIFY_H * 3600)
+        if ((is_new or escalated or worsened or sustained)
+                and now - last_n >= NOTIFY_GAP_H * 3600):
             # expand items SUGGEST (review candidates); restrict items in
             # shadow mode are PROPOSED — never tag an expand item "(shadow)".
             if i.get("proposal"):
@@ -1122,6 +1254,7 @@ def run_once():
         "inputs_fresh": {"lighter_market": _fresh(lm), "fleet_risk": _fresh(fr),
                          "lens_forward": _fresh(lf, LENS_FRESH_S),
                          "live_window": live_window is not None,
+                         "fleet_alerts": _fresh(fa_raw, ALERTS_FRESH_S),
                          "gapscout_census": _fresh(census, max_age_s=3600)},
     }
     store.save_state(BOARD_KEY, payload)
@@ -1500,10 +1633,52 @@ def _selftest():
         for _, lv in WIDEN_LADDER:
             for k, v in lv.items():
                 assert tuning.clamp(k, v) == v, f"ladder lever out of registry bounds: {k}={v}"
+    # --- the alerts BLOODSTREAM check (17-Jul) -----------------------------
+    # Synthetic ages throughout: asserts the detector, never today's feed.
+    _n = _now()
+
+    def _stamped(age_h, ttl=8 * 3600):
+        return {"alerts": [], "ttl_sec": ttl,
+                "updated": datetime.fromtimestamp(
+                    _n - age_h * 3600, tz=timezone.utc).isoformat()}
+
+    assert synthesize_alerts_feed(_stamped(0.2), _n) == []
+    # THE CADENCE TRAP, and the whole reason ALERTS_FRESH_S is 12h: market_context
+    # writes this key on the 6-hourly coin-quality tick, so ~6h old IS perfect
+    # health. The board's DEFAULT _fresh window is 2700s — had this check used
+    # it, the organ would have screamed "feed dark" through every healthy cycle
+    # and been muted within a day. A freshness check that fires on cadence is
+    # not a health check.
+    assert synthesize_alerts_feed(_stamped(5.9), _n) == [], \
+        "6h is NORMAL cadence (QUALITY_EVERY_H) — must stay silent"
+    _dark = synthesize_alerts_feed(_stamped(9.0), _n)
+    assert len(_dark) == 1 and _dark[0]["key"] == "board:alerts-feed-dark" \
+        and _dark[0]["severity"] == "warn", _dark
+    # the producer's OWN ttl_sec rules, not this module's constant: a feed that
+    # declares a tighter cadence is judged by it (min(max_age_s, ttl_sec)).
+    assert synthesize_alerts_feed(_stamped(2.0, ttl=3600), _n), \
+        "a payload's own 1h ttl must tighten the window"
+    # DEPLOY TRANSITION: market-context is a separate service on its own deploy
+    # clock. An unstamped payload is the OLD WRITER, not a dead one — info, so
+    # the board shows it without paging. This is the exact shape in production
+    # right now, and shipping a phone-waking false alarm on deploy is how an
+    # alerting organ gets ignored.
+    _uns = synthesize_alerts_feed({"alerts": []}, _n)
+    assert len(_uns) == 1 and _uns[0]["key"] == "board:alerts-unstamped" \
+        and _uns[0]["severity"] == "info", _uns
+    assert synthesize_alerts_feed({}, _n)[0]["severity"] == "info"
+
+    # --- notify: a SUSTAINED warn re-pages; a level-triggered item's `trend`
+    # is a constant, so `escalated` alone could never fire for board items ----
+    assert SEV_W["action"] > SEV_W["warn"] > SEV_W["info"], SEV_W
+    assert RENOTIFY_H >= NOTIFY_GAP_H, \
+        "the reminder cadence must not undercut the per-key push floor"
+
     # push: unconfigured -> False, no crash
     os.environ.pop("NTFY_TOPIC", None)
     assert send_push("t", "b") is False
-    print("evidence_board selftest OK")
+    print("evidence_board selftest OK (+ alerts-feed bloodstream: cadence-safe, "
+          "dark=warn, unstamped=info, producer ttl rules)")
 
 
 if __name__ == "__main__":

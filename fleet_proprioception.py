@@ -551,8 +551,28 @@ def lever_verdicts(episodes, now=None):
             out[lever] = {"verdict": v, "n": n, "sum_delta_grades": total,
                           "basis": "grading-throughput"}
         elif lever.startswith("gapscout."):
-            found = any(e.get("found_activity") for e in eps)
-            out[lever] = {"verdict": "helping" if found else "neutral", "n": n,
+            # [2026-07-17] MIN_EPISODES applies HERE TOO. This was the only lane
+            # that graded off a bare any() with no episode floor, while the taker
+            # (n>=MIN_EPISODES + $ bars), scout-lens (GRADES_MIN) and live lanes
+            # all gated theirs — and the module docstring advertises "floors n>=2
+            # episodes" for all of them. MEASURED 17-Jul: it published n=1
+            # HELPING for gapscout.prefilter_gap AND .max_book_fetches, off ONE
+            # 9.3h episode, and the board carried both into the 21-Jul review as
+            # "the widening is paying". One episode of "the census moved" is not
+            # evidence that the widening moved it; `any()` over a single sample
+            # is just that sample. A HELPING here also discounts the board's
+            # widen-ladder bars (x0.75) — an expand-direction consumer fed by an
+            # unfloored grader.
+            # Gap Scout was RETIRED on 17-Jul (census stale forever -> census_ok
+            # False -> grade_gapscout never runs), so this lane grades nothing
+            # new and the floor is inert TODAY. It is still the right code: the
+            # floor is what the docstring promises, and a dead lane that would
+            # publish an unfloored verdict the moment a census returned is a
+            # loaded gun, not a non-issue.
+            n_found = sum(1 for e in eps if e.get("found_activity"))
+            v = "helping" if (n >= MIN_EPISODES and n_found >= MIN_EPISODES) \
+                else "neutral"
+            out[lever] = {"verdict": v, "n": n, "n_found": n_found,
                           "basis": "census-activity"}
         elif lever.startswith("live."):
             goods = sum(1 for e in eps if e.get("signal") == "good")
@@ -870,6 +890,28 @@ def _selftest():
     assert gg2["found_activity"] is False, gg2
     assert grade_gapscout(ep_g, {})["status"] == "ungraded"
 
+    # [2026-07-17] the gapscout lane obeys MIN_EPISODES like every other lane.
+    # NEGATIVE FIXTURE FIRST: this is the shape that shipped — ONE episode that
+    # found activity, which the old bare `any()` graded HELPING (measured live:
+    # gapscout.prefilter_gap n=1 helping). Synthetic, so it asserts the FLOOR
+    # rather than today's data: it keeps passing after Gap Scout's retirement
+    # empties the real lane, and it fails if anyone re-widens the gate.
+    def _gs_ep(found):
+        return {"group": "gapscout", "status": "graded",
+                "levers": ["gapscout.prefilter_gap"], "found_activity": found}
+    v1 = lever_verdicts([_gs_ep(True)])["gapscout.prefilter_gap"]
+    assert v1["verdict"] == "neutral" and v1["n"] == 1, \
+        f"one episode must not earn a verdict (MIN_EPISODES={MIN_EPISODES}): {v1}"
+    v2 = lever_verdicts([_gs_ep(True), _gs_ep(True)])["gapscout.prefilter_gap"]
+    assert v2["verdict"] == "helping" and v2["n_found"] == 2, v2
+    # episodes present but activity thin: the floor is on FINDINGS, not cycles —
+    # 5 episodes of silence plus one hit is not a working detection net.
+    v3 = lever_verdicts([_gs_ep(True)] + [_gs_ep(False)] * 4)["gapscout.prefilter_gap"]
+    assert v3["verdict"] == "neutral", f"n_found=1 must not earn helping: {v3}"
+    # and the lane still cannot invent a HURTING (no $ counterfactual exists)
+    assert lever_verdicts([_gs_ep(False)] * 3)["gapscout.prefilter_gap"]["verdict"] \
+        == "neutral"
+
     # LIVE lane learning: per-trade during vs BOTH baselines (pre-window +
     # shadow twin). Thin data records; clear divergence signals.
     # [2026-07-17 AUDIT] These baseline-logic fixtures moved from "live-clip"
@@ -992,10 +1034,17 @@ def _selftest():
     assert v6["scout.dip_range_max"]["verdict"] == "helping", v6
     v7 = lever_verdicts(sc[:1])
     assert v7["scout.dip_range_max"]["verdict"] == "neutral", v7
-    # gapscout: found_activity -> helping
+    # gapscout: found_activity -> helping, but ONLY past the episode floor.
+    # [2026-07-17] This fixture used to assert n=1 -> "helping" and so PINNED
+    # the missing floor as the contract: the one lane that skipped MIN_EPISODES
+    # had a test demanding it keep skipping it. It sat one line above the live
+    # lane's own "a single episode never verdicts (floor)" — the same file
+    # asserting opposite rules for the same question. A test that encodes the
+    # bug is worse than no test: it makes the fix look like the regression.
+    # Full floor coverage lives with the grade_gapscout fixtures above.
     v8 = lever_verdicts([{"group": "gapscout", "status": "graded",
                           "levers": ["gapscout.prefilter_gap"],
-                          "found_activity": True}])
+                          "found_activity": True}] * 2)
     assert v8["gapscout.prefilter_gap"]["verdict"] == "helping", v8
     # live verdicts: two 'bad' paired episodes -> HURTING; two 'good' ->
     # HELPING; mixed -> neutral; a single episode never verdicts (floor)

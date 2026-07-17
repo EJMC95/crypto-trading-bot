@@ -428,9 +428,23 @@ def run_once():
     keep, pruned = alert_fossils(alerts, now)
     if pruned:
         # re-read immediately before write to shrink the append race window
-        cur = (store.load_state("fleet-alerts") or {}).get("alerts") or alerts
+        cur_raw = store.load_state("fleet-alerts") or {}
+        cur = cur_raw.get("alerts") or alerts
         keep2, _ = alert_fossils(cur, now)
-        store.save_state("fleet-alerts", {"alerts": keep2})
+        # [2026-07-17] PRESERVE the producer's bus stamp, never re-mint it.
+        # fleet-alerts carries `updated`/`ttl_sec` from market_context.save_alerts
+        # (17-Jul), and the evidence board now gates on it. Two ways to get this
+        # wrong, and this organ sits exactly where both would land:
+        #   * dropping the keys (a bare {"alerts": ...} write, which is what this
+        #     line did) silently un-stamps the feed — the board's gate reads no
+        #     `updated`, fails closed, and a PRUNE blinds the board;
+        #   * refreshing `updated` to now() is worse: this organ runs on its own
+        #     loop, so a dead market_context would keep looking alive for as long
+        #     as the immune organ kept tidying its corpse — the freshness gate
+        #     would report on the JANITOR, not the producer.
+        # Filtration is content-only; the age belongs to whoever wrote the data.
+        # Same rule fleet_regen follows for its snapshots.
+        store.save_state("fleet-alerts", {**cur_raw, "alerts": keep2})
 
     # --- ADAPTIVE IMMUNITY: recognize sickness -----------------------------
     levers = (states["fleet-tuning"] or {}).get("levers") or {}
