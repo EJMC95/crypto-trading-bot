@@ -75,17 +75,47 @@ entire build. The two struck options are restated below as UNVERIFIED
 premises so the review can attack them properly rather than inherit them.
 *This restatement is itself unverified reasoning — attack it too.*
 - *Scanners* (Lighter Scout / Gap Scout) — the claim was "opens/closes are
-  when dislocations and vol moves happen." Never tested. Note its shape:
-  both are **crypto** scanners on 24/7 books, and the option keys their
-  cadence to an **equity** bell — the same family of unexamined assumption
-  the equities premise turned out to be. It is also cheaply checkable
-  against data the fleet already collects: `gapscout-census` writes a
-  history row on every episode open/close carrying a UTC `updated`, so
-  hour-of-day episode density vs the `fleet-clock` transition log answers it
-  with no new code and no shadow-days. Caveat, honestly: epoch 2 only
-  started 15-Jul, so the record may still be too thin to answer — which is
-  itself worth knowing BEFORE anyone builds. Run the check first; if
-  dislocations are flat across the bell, the option dies without a build.
+  when dislocations and vol moves happen." **MEASURED 17-Jul: NO SUPPORT
+  FOUND** (`clock_consumer_premise_check.py`, verdict + limitations in its
+  header; re-run it before the review). The premise is a density claim, and
+  the fleet already writes the tape to test it: the Lighter Scout publishes a
+  premium-stress cross-section every ~5 min and `bot_state_history` keeps 60
+  days. Over 827 samples / 69h / 3 NYSE sessions, INSIDE the clock's real
+  ±15min window vs outside: `stress.med` **5.62 vs 5.62** (t=+0.06),
+  `stress.p90` 15.59 vs 16.28 (t=−1.91), `stress.max` 67.65 vs 74.71
+  (t=−1.41), `oi_moves` 0.11 vs 0.06 (t=+0.98), tickets 17.06 vs 17.45
+  (t=−0.79). **Not one metric is higher in-window**, and widening to any
+  clock event (n=144) doesn't move it. Dislocation intensity at the bell is
+  indistinguishable from any other moment. The premise had the burden and
+  produced nothing.
+  *Honest limits — this is "no support found", NOT "refuted":* only 3 NYSE
+  sessions (n=36 in-window), so a real effect under ~1bps wouldn't show yet;
+  it measures intensity, not the VALUE of acting in the window (a boost
+  catching *better* dislocations is a different, untested hypothesis — and
+  not the one the agenda offered). **The scoped next test if the review wants
+  this alive:** the equity-perp SUBSET, which is un-tested and where an
+  effect would actually live — `stress` is an aggregate over ~94 books and
+  the scout's outliers are dominated by equity names, so a real bell effect
+  could be washed out by the crypto majority. It would need the right bell
+  per name (KRX/HKEX for SAMSUNGUSD/SKHYNIXUSD/ZHIPU, not NYSE).
+  **Two of my own claims in this item were wrong — both caught by running the
+  check instead of writing more prose, which is the whole lesson:**
+  (i) *"cheaply checkable via `gapscout-census`"* — **false.** Epoch 2 has
+  written **4 history rows total, spanning 12 minutes on 07-16**: two
+  episodes, both CRO/USD on the same kraken→coinbaseexchange route
+  (`scanner-cross-exchange-arb` has 2 paper_trades rows fleet-wide). There is
+  no density to measure; **the Gap Scout half is NOT ANSWERABLE** and stays
+  untested. The answer came from a different tape (`lighter-market`)
+  entirely. (ii) *"both are CRYPTO scanners on 24/7 books… keyed to an EQUITY
+  bell"* — **false, and it stacked the deck against an option I had already
+  struck.** The Lighter Scout's ~215-book universe includes equity perps; its
+  premium outliers are mostly equity names. I wrote a confident argument from
+  an unverified claim about the scout's universe, inside the document warning
+  against exactly that.
+  **Also worth the review's attention:** a "cadence boost" for a Gap Scout
+  booking 2 episodes in 2 days is aimed at the wrong bottleneck — the census
+  is quiet enough that the board's growth rail is already widening its
+  prefilter.
 - *Heavy jobs* (incubator breeding, big sweeps) — the claim was that heavy
   jobs running inside an event window cost something. Never tested, and no
   resource has been named as scarce: the sweeps contend for CPU with loops
