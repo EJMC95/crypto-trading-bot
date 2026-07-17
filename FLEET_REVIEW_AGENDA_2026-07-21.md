@@ -74,6 +74,24 @@ misses), and does `event_window` sample honestly at the 5-min cadence?
 
 ## 12. Proprioception 🦾: grade the grader's first week (added 16-Jul)
 
+**FLEET CURRENCY VERIFIED 17-Jul 01:30Z (in the RUNNING containers, not from
+git) — the "operator-gated" blockers are CLOSED, and the enactment→APPLICATION
+question this item was created for can now actually be graded:**
+- `tide-rider-lighter-live` (REAL MONEY): has `fleet_tuning` + the notional
+  fix. The earlier "frozen at 07-11, clip lever is a silent no-op" note was
+  stale — already fixed by the 16-Jul unfreeze round before it was repeated.
+- `trail-blazer-live` (the LIVE Funding Farmer): carries the 17-Jul
+  live-entry-path fixes (coin-veto freshness gate, L2 long-budget veto).
+- `funding-farmer-shadow`: has `fleet_tuning` + `apply_levers` — **the arm
+  skew CLEARED**. `xp-judge` is RUNNING `enter-gate-0.30` with the lever
+  actually applied and the experiment clock restarted (`skew_notified:false`,
+  `arm_skew:null`, honestly at "floors: shadow 0/30" while it accrues).
+- All 13 other active services marker-grepped: every one current (16-Jul+).
+- Immune reports **0 sick**; the new born-dark detector is live and quiet
+  (verified it would page on a v2 relapse).
+So: nothing is waiting on an operator restart. Grade the first REAL week of
+proprioception + the xp pipeline from here.
+
 **What shipped (16-Jul, operator: "advance, enhance and improve the
 autonomous organ"):** `fleet_proprioception.py` — the autonomy stack's
 first RETROSPECTIVE sense. Every growth-rail lever episode (open →
