@@ -177,7 +177,7 @@ def _mean_pct(trades):
 
 def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
                 min_closes=None, live_min=None, margin_pp=None,
-                cand_levers=None):
+                cand_levers=None, drift=None):
     """The promotion bar. Returns a verdict dict; verdict['promote'] is True
     only when the shadow arm is positive AND beats the live arm per-trade by
     margin_pp on the FULL window AND on BOTH halves (the doctrine's
@@ -198,6 +198,31 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     lv = arm_trades(rows, live_bot, start_ts, end_ts)
     v = {"promote": False, "n_shadow": len(sh), "n_live": len(lv),
          "shadow_mean_pct": _mean_pct(sh), "live_mean_pct": _mean_pct(lv)}
+    # [2026-07-17 ARM DRIFT] The arms are running DIFFERENT CODE, so this
+    # comparison contains a code delta and cannot be read as edge. Same class as
+    # ARM SKEW below, and checked FIRST: skew asks "is the arm running the
+    # candidate?", drift asks the prior question "are these two arms the same
+    # experiment at all?". Neither is a data-volume problem — no window makes a
+    # drifted comparison valid, so waiting cannot fix it.
+    # WHY THIS GATE EXISTS AT ALL: the arms live in different Railway services
+    # (trail-blazer-live vs funding-farmer-shadow) on separate deploy clocks —
+    # and that split is DELIBERATE and must stay: the control arm's container
+    # holds ZERO keys and no REAL_MONEY_KILL, so it is PHYSICALLY incapable of
+    # trading real money. Merging the arms into one service to stop the drift
+    # would trade that hard boundary for a soft one (a TT_VENUE string). So the
+    # drift stays possible BY DESIGN — and this gate is what makes it harmless:
+    # the judge refuses to spend real money on a comparison it cannot trust.
+    # Build ids come from bot_pnl_store's central stamp (bytes, not a label —
+    # every self-describing label in this fleet has lied).
+    # Fail-safe toward SILENCE, matching the sensor: `drift` is only ever set on
+    # positive evidence (two stamps, both present, both different). Unknown is
+    # not drift, or this gate would freeze the queue through every rollout.
+    if drift:
+        v["arm_drift"] = drift
+        v["why"] = (f"ARMS ON DIFFERENT CODE: live={drift.get('live')} "
+                    f"shadow={drift.get('shadow')} — this window measures a "
+                    f"code delta, not edge; no promotion can rest on it")
+        return v
     if cand_levers:
         # ARM SKEW: the arm closed trades in-window but proved NONE of them ran
         # the candidate. Distinct from "not enough data yet" — the experiment
@@ -628,8 +653,33 @@ def run_once():
                             f"started {iso(started)}")
         assert_ok = _asserted(rc, cand["levers"])
         days = (now - started) / 86400.0
-        ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"))
+        # [2026-07-17] Read the arms' build stamps off the SAME `rows` the bar
+        # is computed from — one snapshot, so the drift check and the numbers it
+        # gates can never describe different moments. Imported lazily and
+        # guarded: implementation_shortfall is not in every image, and a dark
+        # sensor must cost this organ nothing (it simply cannot claim drift).
+        _drift = None
+        try:
+            import implementation_shortfall as _isf
+            _drift = _isf.arm_drift(rows, live=LIVE_BOT, shadow=SHADOW_BOT)
+        except Exception:      # noqa: BLE001
+            _drift = None
+        ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"),
+                          drift=_drift)
               if have_ledger else {"promote": False, "why": "no ledger"})
+        # ARM DRIFT -> HOLD, exactly as ARM SKEW below and for the same reason:
+        # the comparison is structurally invalid, so no window fixes it and the
+        # candidate is not at fault. Do not promote, do not age toward ABANDONED.
+        if ev.get("arm_drift"):
+            if not st.get("drift_notified"):
+                send_push(f"experiment ARMS ON DIFFERENT CODE: {cand['name']}",
+                          f"{ev['why']}\nthe judge is holding — deploy both arms "
+                          f"to the same build; no promotion can clear until they "
+                          f"match", priority="urgent")
+            return save(last_eval=ev, drift_notified=True,
+                        note=f"ARM DRIFT {cand['name']}: {ev['why']}")
+        if st.get("drift_notified"):
+            st["drift_notified"] = False   # arms re-matched; re-arm the page
         # [2026-07-16] ARM SKEW -> HOLD. The arm is closing trades but proving
         # none of them ran the candidate, so every number here is about a
         # different experiment. Do not promote (real money) and do not age
@@ -963,6 +1013,27 @@ def _selftest():
     _skv = paired_eval(_sk, t0, end, cand_levers=_cand)          # gated: blocked
     assert _skv["promote"] is False and _skv["arm_skew"] is True, _skv
     assert _skv["n_shadow_closes"] == 32, _skv
+
+    # ---- [2026-07-17] ARM-DRIFT gate: same arms, or no verdict -------------
+    # The arms live in different Railway services on separate deploy clocks —
+    # DELIBERATELY, because the control arm's container holds zero keys and so
+    # cannot trade real money. Drift is therefore possible BY DESIGN, and this
+    # gate is what keeps it harmless: a comparison across two builds measures a
+    # code delta, not edge, and no window makes it valid. Synthetic throughout,
+    # so it asserts the GATE, not tonight's (currently aligned) fleet.
+    _win = ([rowb(SHADOW_BOT, t0 + i * (8 * day / 32), 0.05) for i in range(32)]
+            + [rowb(LIVE_BOT, t0 + i * (8 * day / 12), 0.002) for i in range(12)])
+    assert paired_eval(_win, t0, end)["promote"] is True, "baseline must promote"
+    _dv = paired_eval(_win, t0, end, drift={"live": "aaa", "shadow": "bbb"})
+    assert _dv["promote"] is False and _dv["arm_drift"] == {"live": "aaa", "shadow": "bbb"}, _dv
+    assert "different code" in _dv["why"].lower(), _dv["why"]
+    # unknown is NOT drift — the rollout state must not freeze the queue
+    assert paired_eval(_win, t0, end, drift=None)["promote"] is True
+    # drift is checked BEFORE skew: "are these the same experiment at all?" is
+    # the prior question to "is the arm running the candidate?"
+    _both = paired_eval(_win, t0, end, cand_levers=_cand,
+                        drift={"live": "aaa", "shadow": "bbb"})
+    assert _both.get("arm_drift") and not _both.get("arm_skew"), _both
 
     # the gate is not a brick wall — an APPLYING arm still clears
     _ap = ([rowb(SHADOW_BOT, t0 + i * (8 * day / 32), 0.01, _applied) for i in range(32)]
