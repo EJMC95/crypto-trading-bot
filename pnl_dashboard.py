@@ -168,6 +168,14 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
                 "perps-regime-switch", "perps-regime-switch-lshadow",
                 "equities-momentum-alpaca", "equities-regime-ibkr",
+                # [2026-07-17] 🏆 Stock Leaders RETIRED. Not the rule (n=3 fills
+                # in a real market-wide crash, inside its own envelope) — it
+                # cannot promote at any size worth the slot: maxDD 37-44% with
+                # ZERO carry vs the 15% go-live gate, and the only deployment
+                # that clears the gate (15%, $30/slot) earns ~$42-67/yr, at or
+                # below risk-free. Funding was never the problem (~8% TRUE apr
+                # vs a ~52% breakeven). Ledger kept; see lighter_momentum_bot.py.
+                "equities-momentum", "equities-momentum-lshadow",
                 "crypto-trend-daily", "crypto-intraday-15m",
                 "crypto-swing-daily", "crypto-breakout-4h",
                 "freqtrade-mum", "freqtrade-dad",

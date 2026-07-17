@@ -194,6 +194,50 @@ def main():
     p.add_argument("--once", action="store_true")
     args = p.parse_args()
 
+    # [2026-07-17 RETIRED] The shadow record KILLED the go-live — exactly what
+    # the guard below promised it could. Recording why, because the obvious
+    # reading is wrong:
+    #   The RULE is not what failed. 86% of the 4-day loss that prompted the
+    #   review was a real market-wide crash (SNDK/MRVL/NBIS/MU printed
+    #   -18.3/-18.7/-20.7/-10.1% on Yahoo over the same window) on n=3 fills,
+    #   well inside this strategy's own backtested envelope. Nothing was tuned.
+    #   What failed is that it cannot promote AT ANY SIZE WORTH THE SLOT:
+    #   * maxDD 37-44% with ZERO funding modelled (four independent harnesses;
+    #     this file's own header says 36.9-44.3%) against the fleet's go-live
+    #     gate of maxDD < 15% (CLAUDE.md Rules) — 2.5-3x over before a cent of
+    #     carry. A one-path maxDD is downward-biased, so the truth is worse.
+    #   * SIZING is the only lever that touches DD, and DD scales SUBLINEARLY:
+    #     the only deployment clearing 15% is 15% ($30/slot) -> 6.7% CAGR /
+    #     13.9% maxDD = ~$67/yr on the $1000 book. Strip the ~38% hindsight
+    #     premium (names unselectable at window start) -> ~$42/yr: at or BELOW
+    #     risk-free cash, for a 14% drawdown. Cutting size 6x only halves DD
+    #     while cutting return 5x.
+    #   * Every other design fails too (~10 tested): best-of-field 28%-band
+    #     universe +7.2% CAGR / -39.5% DD, failing both halves; top-3 -67.6%.
+    #     Carry is TIME-based (drag 29.5/28.4/29.1pp at 7/14/28d rebalance) so
+    #     trading less cannot outrun it.
+    #   * FUNDING WAS NEVER THE PROBLEM: ~8% TRUE apr against a ~52% breakeven.
+    #     The "98-967% apr" read was 8x inflated — the venue's rate is an 8-HOUR
+    #     fraction annualised as hourly fleet-wide (see the BASIS STAMP in
+    #     lighter_market_scout.py + 21-Jul agenda item 16). The companion
+    #     "momentum ranks crowding" claim was REFUTED (Spearman -0.174, p=0.40).
+    #   * The header's +43.7%/44.3% is itself a GRID ARTIFACT (union-of-25 grid
+    #     annualising 15.3y as 19.9 and freezing stock legs on ~26% of rows).
+    # Ledger + row history KEPT (paper_trades, bot_state). Row hidden via
+    # RETIRED_ROWS in pnl_dashboard.py. A code guard rather than `railway down`
+    # because Railway auto-deploy RESURRECTS stopped services on git push.
+    # TO UN-RETIRE: set MOMO_RETIRED=off (or revert this block) and drop
+    # "equities-momentum-lshadow" from RETIRED_ROWS.
+    if os.environ.get("MOMO_RETIRED", "on").strip().lower() \
+            not in ("off", "0", "false", "no"):
+        raise SystemExit(
+            "equities-momentum is RETIRED (2026-07-17). maxDD 37-44% vs the "
+            "fleet's 15% go-live gate, and the only deployment that clears the "
+            "gate earns ~$42-67/yr — at or below risk-free. The momentum rule "
+            "is NOT what failed (n=3 fills, a real market crash); the venue fit "
+            "at a size worth the slot is. See the block above. "
+            "MOMO_RETIRED=off to run it anyway.")
+
     mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     if mode != "lighter_shadow":
         raise SystemExit("equities-momentum runs VENUE=lighter_shadow ONLY in "
