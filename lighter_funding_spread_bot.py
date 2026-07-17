@@ -325,8 +325,14 @@ def main():
             rate = (fund.get(coin) or {}).get("rate")
             if rate is not None:
                 notional = abs(broker.szi().get(coin, 0.0)) * px
+                # [2026-07-17 BASIS FIX ii] `rate` is per 8h — modelling it as
+                # HOURLY over-accrued 8x. This book RECEIVES on both legs, so
+                # the artifact FLATTERED the one number it exists to earn:
+                # published +$0.86 was really -$0.04. Commit 31ec660 fixed the
+                # four siblings and missed this site (it changed only `H`).
                 m["accrued"] = m.get("accrued", 0.0) + \
-                    (1.0 if m.get("is_short") else -1.0) * rate * notional * dt_h
+                    (1.0 if m.get("is_short") else -1.0) \
+                    * funding_basis.to_hourly(rate, "lighter") * notional * dt_h
 
         # ---- rebalance on schedule -----------------------------------------
         if next_reb is None:

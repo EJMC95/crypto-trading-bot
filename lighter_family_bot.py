@@ -55,6 +55,7 @@ import time
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import funding_basis
 
 START_EQUITY = 1000.0
 STAKE_USD = float(os.environ.get("FAMILY_STAKE_USD", "50"))
@@ -893,7 +894,13 @@ def main():
                         rate = (fund.get(coin) or {}).get("rate")
                         if rate is not None:
                             sz = abs(b.broker.pos[coin][0])
-                            m["accrued"] = m.get("accrued", 0.0) - rate * sz * px * dt_h
+                            # [2026-07-17 BASIS FIX ii] `rate` is per 8h, not
+                            # hourly. These books are long-only and PAY, so the
+                            # 8x over-accrual made them look WORSE than real —
+                            # the opposite sign to Counterweight's, same bug.
+                            m["accrued"] = m.get("accrued", 0.0) - (
+                                funding_basis.to_hourly(rate, "lighter")
+                                * sz * px * dt_h)
                         b.meta[coin] = m
                     if not px or not entry:
                         # [2026-07-16 ZOMBIE GUARD] unpriceable in-list coin
