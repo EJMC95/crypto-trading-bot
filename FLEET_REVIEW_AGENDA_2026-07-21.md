@@ -285,15 +285,31 @@ IMB-05, -09, -11, -19, -21, -25, -26, -27), 4 contested-low-confidence
   emissions — adopt the brain v3 episode fields (eps4h/n_syms) in the
   taker veto + tuner floor; explicitly gated on this review validating
   those fields (replay-gated migration).
-  - *17-Jul validation attempt: the gate CANNOT pass yet — and the reason
-    was a production bug.* All four lenses showed eps4h=None/n_syms=0
-    against n4h in the thousands: `brain_stats.py` was NEVER COPY'd into
-    Dockerfile.freqtrade, so the deployed brain silently ran frozen v2
-    from the day v3 "shipped" (the import-guarded fallback hid it — now
-    fixed: COPY added, loud fallback warning added, systematic
-    import-vs-COPY audit run — brain_stats was the only miss). Episode
-    fields start accruing from the 17-Jul redeploy; validate ~4 days of
-    REAL v3 data at the review before the veto-floor migration.
+  - *17-Jul: the validation attempt found a PRODUCTION BUG, then produced
+    the data that CONFIRMS IMB-24 quantitatively.* First, all four lenses
+    showed eps4h=None/n_syms=0 against n4h in the thousands, because
+    `brain_stats.py` was NEVER COPY'd into Dockerfile.freqtrade — the
+    deployed brain import-guarded its way to frozen v2 from the day v3
+    "shipped" (16-Jul). Fixed + redeployed + VERIFIED live: brain-vitals
+    `engine: v3` at 00:45:39Z, EB priors 23 (v2 computed none).
+  - **First real v3 episode data (00:45Z), and it makes IMB-24 concrete:**
+    | lens | n4h (raw) | eps4h | n_syms | ehit4h [Wilson] | eavg4h |
+    |---|---|---|---|---|---|
+    | breakout | 2267 | 227 | 72 | 0.383 [0.343,0.425] | −0.24% |
+    | dip | 2200 | 296 | 88 | 0.436 [0.399,0.473] | −0.31% |
+    | divergence | 2553 | 235 | 58 | 0.528 [0.486,0.569] | −0.06% |
+    | momentum | 1202 | **34** | **15** | 0.294 [0.205,0.402] | −0.95% |
+    The serial-correlation factor is **~10x** (breakout/dip/divergence) and
+    **~35x for momentum**. So today's `n4h >= 75` veto floor can be met by
+    as few as ~2-8 genuinely independent opinions — exactly IMB-24's claim,
+    now measured rather than argued. Momentum is the starkest: it clears the
+    raw floor 16x over on 34 episodes across 15 symbols.
+    **Also note every lens's episode-graded 4h mean is NEGATIVE** — worth its
+    own look at the review (is the scout's diet net-negative at 4h, or is the
+    4h horizon simply wrong for these lenses?).
+    DECIDE: migrate the taker veto + tuner floor to eps4h/n_syms (replay-
+    gated per the documented migration), and pick the floor from these
+    distributions rather than by re-scaling 75.
 - **G1 amendment (review-item, not blocker):** the dd-governor's <=6h
   post-reset abstain window returns scale 1.0 — decide whether it should
   HOLD a prior <1.0 clip (blind-hold pattern) instead; shadow-clip lane
