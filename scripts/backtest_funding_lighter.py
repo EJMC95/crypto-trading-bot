@@ -9,13 +9,33 @@ scripts/backtest_funding_lighter.py — the Funding Farmer, backtested ON LIGHTE
 ║ 1. NO GATE PASSES BOTH HALVES. Not one row. The naive Funding Farmer has  ║
 ║    no validated edge on Lighter at ANY entry gate.                        ║
 ║ 2. THE LIVE GATE IS BELOW THE FRICTION BREAKEVEN — structurally, before   ║
-║    any price risk. At a 72h max hold, carry per trade = apr * 72/8760.    ║
-║    A 10bps round trip needs apr > 0.122 TRUE just to pay the slippage.    ║
-║    The live bot sits at 0.05 TRUE (= 0.40 published / 8) and Lighter's    ║
-║    floor band is 0.035 TRUE. Both are BELOW breakeven by construction.    ║
+║    any price risk. Carry per trade = apr * hold_h/8760, so breakeven =    ║
+║    round_trip_slip * 8760/hold_h. At the 72h CAP that is 0.122 TRUE; the  ║
+║    live bot sits at 0.05 TRUE and the venue's floor band is 0.035 TRUE.   ║
+║    Both below, by construction.                                           ║
+║ 2b. **AND 0.122 IS FAR TOO GENEROUS — THE CAP NEVER BINDS.** Measured     ║
+║    exit mix at the live gate: flip 42.9% / take_profit 24.5% / cold 20.5% ║
+║    / stop 7.1% / max_hold only 4.9%. **63% of trades end because the      ║
+║    FUNDING SIGNAL ITSELF EVAPORATED** (flip = rate crossed zero, cold =   ║
+║    decayed under the exit bar) at a **MEDIAN HOLD OF 8h** (mean 16.8h).   ║
+║    The MARKET closes the trade, not the cap. So the operative breakeven   ║
+║    uses 8h, not 72h:  0.001 * 8760/8 = **1.09 = ~110% TRUE APR.**         ║
+║    Lighter's floor is 3.5% and ETH is ~8% TRUE. The bot is **14-31x       ║
+║    below its own friction breakeven** at the holding period the market    ║
+║    actually grants it. Even a 0.5bp/fill fill (perp fee is 0 — this is    ║
+║    pure spread) only brings breakeven to 11% TRUE at 8h, still above ETH. ║
+║ 2c. RAISING THE GATE MAKES THIS WORSE, NOT BETTER: at gate 0.20 the       ║
+║    median hold falls to 3h (hotter rates are spikier and mean-revert      ║
+║    faster), so carry earned is 0.7bps against the same 10bps round trip.  ║
 ║ 3. THE SWEEP AND THE ARITHMETIC AGREE INDEPENDENTLY: P&L flips sign       ║
-║    between gate 0.12 and 0.20; the one-line friction breakeven predicts   ║
-║    0.122. A mechanism, not a curve fit.                                   ║
+║    between gate 0.12 and 0.20; the cap-based breakeven predicts 0.122.    ║
+║    A mechanism, not a curve fit. (The sweep can only ever reach ~flat     ║
+║    because of 2b — no gate buys a longer hold.)                           ║
+║ 3b. REFUTED HYPOTHESIS, recorded so nobody re-runs it: "hold longer —     ║
+║    breakeven falls linearly with hold_h." MEASURED: raising MAX_HOLD_H    ║
+║    72->168->336->720 moves funding earned by $0.20 ($15.95 -> $15.75)     ║
+║    and makes P&L WORSE (-41.95 -> -47.12). The cap is not binding; you    ║
+║    cannot buy hold time the market will not give you.                     ║
 ║ 4. FUNDING IS POSITIVE AT EVERY GATE (+$12..+$22 / 150d) AND TOO SMALL    ║
 ║    TO MATTER. Price P&L is negative at every gate. At the live gate,      ║
 ║    slippage (~1261 trades x 10bps x $25 = ~$31.5) costs ~2x the entire    ║
@@ -26,11 +46,23 @@ scripts/backtest_funding_lighter.py — the Funding Farmer, backtested ON LIGHTE
 ║                                                                          ║
 ║ THEREFORE: "fix the conversion, keep 0.40" is NOT the answer either — a   ║
 ║ TRUE-40% gate also fails both halves (-$10.66). Neither the live gate nor ║
-║ the HL-validated one survives on Lighter. This is a STRATEGY question,    ║
-║ not a threshold tweak: at a 72h hold, Lighter's real funding (3.5% floor, ║
-║ ~8% typical) cannot pay a 10bps round trip plus a 10%-stop/4%-TP          ║
-║ asymmetry. The carry is real (funding>0 everywhere) and economically      ║
-║ irrelevant at this holding period.                                        ║
+║ the HL-validated one survives on Lighter. THIS IS NOT A THRESHOLD TWEAK   ║
+║ AND NOT A TUNING PROBLEM: no gate exists that clears a ~110% breakeven on ║
+║ a venue whose floor is 3.5% and whose typical name is ~8% TRUE. The carry ║
+║ is real (funding > 0 at every gate) and ~20x too small to pay for the     ║
+║ round trip it takes to collect it.                                        ║
+║                                                                          ║
+║ AND IT IS NOT A FUNDING BOT. P&L by exit at the live gate:                ║
+║     take_profit  +$304.06  (309 trades, +$0.98 ea)  <- the ONLY positive  ║
+║     stop         -$225.51  ( 90 trades, -$2.51 ea)                        ║
+║     flip          -$64.90  (541 trades)                                   ║
+║     cold          -$24.59  (259 trades)                                   ║
+║     max_hold      -$31.02  ( 62 trades)                                   ║
+║ Every dollar of outcome is the 4%-TP / 10%-stop directional lottery. The  ║
+║ funding is an entry FLAVOUR, not a P&L source: it decides which coin to   ║
+║ bet on, then the price decides everything. Whatever this book is, it is   ║
+║ not harvesting carry — and calling it "the Funding Farmer" is why nobody  ║
+║ checked whether the carry could pay.                                      ║
 ║                                                                          ║
 ║ LIMITS — read before acting. This replays the NAIVE selector (first-come  ║
 ║ above the gate). The live bot also runs a multi-factor SCANNER            ║
@@ -211,6 +243,7 @@ def run(mk, enter_apr, t0, t1):
     pos, hot, cool = {}, {}, {}
     fund_pnl = price_pnl = 0.0
     trades, wins, eq, peak, maxdd = 0, 0, 0.0, 0.0, 0.0
+    why_n, why_pnl, holds = {}, {}, []   # the exit mix IS the finding — see 2b
 
     for t in hours:
         for sym, m in mk.items():
@@ -248,6 +281,9 @@ def run(mk, enter_apr, t0, t1):
                     eq += tot
                     peak = max(peak, eq)
                     maxdd = min(maxdd, eq - peak)
+                    why_n[why] = why_n.get(why, 0) + 1
+                    why_pnl[why] = why_pnl.get(why, 0.0) + tot
+                    holds.append(held_h)
                     cool[sym] = t + 12 * 3600 if why == "stop" else 0
                     pos.pop(sym)
                 continue
@@ -261,9 +297,15 @@ def run(mk, enter_apr, t0, t1):
                     and t >= cool.get(sym, 0)):
                 pos[sym] = {"px": close, "short": apr > 0, "t0": t,
                             "ntl": ORDER_USD, "fund": 0.0}
+    med = sorted(holds)[len(holds) // 2] if holds else 0.0
     return {"enter": enter_apr, "pnl": eq, "fund": fund_pnl, "price": price_pnl,
             "n": trades, "win": 100.0 * wins / trades if trades else 0.0,
-            "maxdd": maxdd}
+            "maxdd": maxdd, "why_n": why_n, "why_pnl": why_pnl,
+            "hold_med": med,
+            "hold_mean": (sum(holds) / len(holds)) if holds else 0.0,
+            # The operative breakeven uses the hold the MARKET grants, not the
+            # cap — the cap fires on <5% of trades. See verdict 2b.
+            "breakeven": (2 * SLIP * 8760 / med) if med else float("inf")}
 
 
 def main():
@@ -302,6 +344,24 @@ def main():
               f"{h1['pnl']:>9.2f} {h2['pnl']:>9.2f}{tag}")
     print("\nBOTH HALVES must agree in sign before a gate is believable — a row that "
           "wins only on one half is a window, not an edge (see trail-blazer-no-durable-edge).")
+
+    # ---- the diagnosis that matters more than the sweep (verdict 2b) --------
+    for g in (0.05, 0.20):
+        r = run(mk, g, lo, hi + 1)
+        n = r["n"] or 1
+        print(f"\n=== gate {g:.2f} TRUE — WHY trades end (n={n}) ===")
+        print(f"  median hold {r['hold_med']:.1f}h / mean {r['hold_mean']:.1f}h "
+              f"vs a {MAX_HOLD_H}h cap")
+        for why, k in sorted(r["why_n"].items(), key=lambda x: -x[1]):
+            print(f"  {why:>12s} {k:>5d} {100*k/n:>5.1f}%  ${r['why_pnl'][why]:>8.2f}  "
+                  f"(${r['why_pnl'][why]/k:>6.3f}/trade)")
+        signal_gone = 100 * (r["why_n"].get("flip", 0) + r["why_n"].get("cold", 0)) / n
+        print(f"  -> {signal_gone:.0f}% of trades end because the FUNDING SIGNAL "
+              f"EVAPORATED (flip+cold), not on price or the cap.")
+        print(f"  -> carry earned over a {r['hold_med']:.0f}h hold at gate {g:.2f} = "
+              f"{g*r['hold_med']/8760*1e4:.1f}bps vs {2*SLIP*1e4:.0f}bps round-trip slip")
+        print(f"  -> OPERATIVE BREAKEVEN at that hold = {r['breakeven']:.2f} TRUE apr "
+              f"({r['breakeven']*100:.0f}% APR). Venue floor is 3.5%, ETH ~8%.")
 
 
 if __name__ == "__main__":
