@@ -619,6 +619,22 @@ def main():
                      fallback or 0.0)
         return real or fallback
 
+    def _slip_bps_of(decision, fill, is_buy):
+        """[2026-07-17 FILL TELEMETRY] Signed slippage on ONE order, bps,
+        POSITIVE = worse than the decision price (paid up buying / sold lower).
+        Returns None when the two are identical, because _real_exit falling
+        back to the decision mid means we got NO fill read — and recording that
+        as 0.0 would be indistinguishable from a genuinely perfect fill. The
+        fleet's whole execution blind spot came from an echoed decision price
+        being read as data; a null is honest, a fabricated zero is not."""
+        try:
+            d, f = float(decision), float(fill)
+            if d <= 0 or f <= 0 or d == f:
+                return None
+            return (f / d - 1.0) * 10_000.0 * (1.0 if is_buy else -1.0)
+        except (TypeError, ValueError, ZeroDivisionError):
+            return None
+
     def _flatten_all(reason):
         """Emergency flatten that MIRRORS normal-close bookkeeping (ledger + counters
         + meta pop) so forensic reconstruction stays consistent with account equity."""
@@ -642,7 +658,8 @@ def main():
             except Exception as e:
                 log.error("flatten %s: %s", c, e)
                 continue
-            px = _real_exit(c, is_short, px)
+            _decision_px = px                      # mid at the close decision
+            px = _real_exit(c, is_short, px)       # -> REAL venue fill if readable
             price_pnl = abs(held) * ((px - entry) if not is_short else (entry - px))
             n_closed += 1
             n_wins += 1 if price_pnl > 0 else 0
@@ -651,10 +668,18 @@ def main():
                           order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag)
             try:
+                # [2026-07-17 FILL TELEMETRY] px_fill was px_decision — the
+                # decision price echoed back, so slippage_bps was NULL on every
+                # live order and the fleet could not measure its own execution.
+                # `px` here is ALREADY the real venue fill when _real_exit got
+                # one (it falls back to the decision mid), so pass the decision
+                # mid separately and let the two differ.
                 store.publish_venue_order(
                     bot_id, venue=("lighter" if venue_tag else "hl"), shadow=shadow_tag,
                     coin=c, side=("buy" if is_short else "sell"), size=abs(held),
-                    px_decision=px, px_fill=px, raw={"reason": reason, "leg": "close"})
+                    px_decision=_decision_px, px_fill=px,
+                    slippage_bps=_slip_bps_of(_decision_px, px, is_buy=is_short),
+                    raw={"reason": reason, "leg": "close"})
             except Exception:
                 pass
             meta.pop(c, None)
@@ -973,7 +998,8 @@ def main():
                 except Exception as e:
                     log.error("close %s failed: %s — leaving position, retry next loop", coin, e)
                     continue
-                px = _real_exit(coin, is_short, px)
+                _decision_px = px                  # mid at the close decision
+                px = _real_exit(coin, is_short, px)  # -> REAL venue fill if readable
                 price_pnl = (abs(held) * (px - entry)) if not is_short \
                     else (abs(held) * (entry - px))
             realized += (price_pnl + fund_pnl) if dry_run else 0.0
@@ -987,11 +1013,15 @@ def main():
                           order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag)
             try:
+                # [2026-07-17 FILL TELEMETRY] px_fill was the decision price
+                # echoed back -> slippage_bps NULL on every live order.
                 store.publish_venue_order(
                     bot_id, venue=("lighter" if venue_tag else "hl"),
                     shadow=shadow_tag, coin=coin,
                     side=("buy" if is_short else "sell"), size=abs(held),
-                    px_decision=px, px_fill=px, raw={"reason": decision, "leg": "close"})
+                    px_decision=_decision_px, px_fill=px,
+                    slippage_bps=_slip_bps_of(_decision_px, px, is_buy=is_short),
+                    raw={"reason": decision, "leg": "close"})
             except Exception:
                 pass
             meta.pop(coin, None)
