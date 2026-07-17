@@ -467,6 +467,89 @@ def scan_candidates(ctx, prelim, order_usd, log):
 _open_notional = open_notional
 
 
+# [2026-07-17 FILL READ — the id, and the seam that tests it]
+# These three were closures inside main(). main() needs a signer, so the funded
+# half never ran and NOTHING here was reachable from a test — the same shape as
+# the `if dry_run` branches swept on 17-Jul. They are pure, so they live at
+# module scope now and _selftest_fill_read() drives them directly.
+#
+# WHY THE ID. venues.lighter_client.market_open/market_close mint a
+# `client_order_index` and return it; every call site in this bot DISCARDS the
+# return value, so _our_fills fell to its (is_ask, since_ts) heuristic — which
+# VWAPs every same-side fill in a 180s window into one price. The venue layer's
+# own selftest pins that as a fabrication ("id-less path blends"). MEASURED
+# 17-Jul off the ledger: 58 real orders, 0 with a measured fill.
+def _measured_from_reason(px, reason):
+    """Did the venue NAME this fill, or guess it?
+
+    Single source of truth, and deliberately parasitic on the venue layer's own
+    labelling: lighter_client tags every id-less read `approx` (`trades(approx)`
+    / `recentTrades-approx(...)`) and every id-matched read without it. Deriving
+    `measured` from that string rather than re-deciding it here means the two
+    layers cannot drift into disagreeing about what counts as a measurement."""
+    return px is not None and "approx" not in (reason or "")
+
+
+def _read_fill(detail_fn, coin, is_ask, since_ts, client_id):
+    """(px_or_None, measured, reason) — the id first, the heuristic as a net.
+
+    STRICTLY BETTER THAN BOTH NEIGHBOURS, which is the whole design:
+      - better than this bot today, which passes no id and so can only ever
+        blend;
+      - better than the taker's read, where the id is a HARD filter with no
+        fallback (venues/lighter_client.py:624-629 `continue`s on a mismatch),
+        so a venue that stopped echoing ids would take it from `approx` to
+        NOTHING — a silent regression to less measurement than it started with.
+    Here an id-miss falls back to the heuristic and says so, so the worst case
+    is exactly today's behaviour, labelled.
+
+    RETRY ONLY ON no-match. `skipped:budget` / `api-error` / `auth-failed` mean
+    the tape was never read; retrying spends the governor's telemetry reserve to
+    fail identically, and lighter_client's own comment is explicit that a
+    measurement burst must never make the NEXT market_open queue behind it.
+    A no-match means the tape WAS read and our id simply was not on it — that,
+    and only that, is worth a second look."""
+    if detail_fn is None:
+        return None, False, "no-detail-fn"
+    try:
+        px, reason = detail_fn(coin, is_ask=is_ask, since_ts=since_ts,
+                               client_id=client_id)
+    except Exception as e:  # noqa: BLE001 — telemetry NEVER raises at a caller
+        return None, False, f"read-raised:{type(e).__name__}"
+    if px is None and client_id is not None and "no-match" in (reason or ""):
+        try:
+            px2, reason2 = detail_fn(coin, is_ask=is_ask, since_ts=since_ts,
+                                     client_id=None)
+        except Exception as e:  # noqa: BLE001
+            return None, False, f"retry-raised:{type(e).__name__} (after {reason})"
+        if px2 is not None:
+            return px2, False, f"{reason2} (id-miss: {reason})"
+        return None, False, f"{reason2} (id-miss: {reason})"
+    return px, _measured_from_reason(px, reason), reason
+
+
+def _slip_bps_of(decision, fill, is_buy, measured=False):
+    """Signed slippage on ONE order, bps. POSITIVE = worse than the decision
+    price (paid up buying / sold lower).
+
+    `measured` is passed, never inferred from d == f. The old rule returned None
+    whenever the two were equal, because an unread fill fell back to the decision
+    mid and a fabricated 0.000 is worse than a null. But it also threw away every
+    GENUINELY perfect fill — 1000BONK filled exactly at mark on the taker's first
+    live order, which is real data the venue gave us and this function silently
+    dropped. With the flag the two cases separate: measured d == f is a true 0.0;
+    unmeasured d == f stays NULL."""
+    try:
+        d, f = float(decision), float(fill)
+        if d <= 0 or f <= 0:
+            return None
+        if d == f:
+            return 0.0 if measured else None
+        return (f / d - 1.0) * 10_000.0 * (1.0 if is_buy else -1.0)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
                   reason, order_usd=ORDER_USD, venue=None, shadow=None):
     """Mirror a realized directional funding trade to the paper_trades ledger.
@@ -607,73 +690,60 @@ def main():
             return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
         return ctx.venue.positions()
 
-    def _real_exit(coin, is_short, fallback):
-        """[2026-07-16 FILL RECON] REAL exit fill (venue trades read; closing
-        a long SELLS -> is_ask=True) or the decision price. The shortfall
-        tracker's live-vs-shadow premise needs real fills on the live arm —
-        exits were decision mids. Entry fills were already real (the manage
-        pass rebuilds meta entry from the venue's avg_entry_price)."""
-        if dry_run:
-            return fallback
-        try:
-            fl = getattr(ctx.venue, "last_fill", None)
-            real = fl(coin, is_ask=not is_short,
-                      since_ts=time.time() - 180) if fl else None
-        except Exception:  # noqa: BLE001
-            real = None
-        if real:
-            log.info("%s exit fill (venue): %.6g (decision %.6g)", coin, real,
-                     fallback or 0.0)
-        return real or fallback
+    def _real_exit(coin, is_short, fallback, client_id=None):
+        """[2026-07-17 FILL READ] (px, measured, reason) — REAL exit fill (venue
+        trades read; closing a long SELLS -> is_ask=True) or the decision price.
 
-    def _real_entry(coin, is_short, fallback):
-        """[2026-07-17 FILL TELEMETRY — the half 445e189 missed] REAL entry fill
-        (venue trades read; OPENING a short SELLS -> is_ask=True) or None.
+        `client_id` is the order's own name, threaded from the market_close that
+        produced this exit. Without it the read blends every same-side fill in a
+        180s window; with it, the fill is exact.
+
+        Still returns `fallback` for the price when there is no read — the exit
+        price is LOAD-BEARING (it feeds price_pnl and the ledger row), so it
+        cannot be None. But it now says whether that price was measured, so the
+        caller records slippage NULL instead of a fabricated zero. This is why
+        the two legs differ: the entry leg's fill is telemetry and can be NULL;
+        this one has to be a number either way."""
+        if dry_run:
+            return fallback, False, "dry_run"
+        px, measured, reason = _read_fill(
+            getattr(ctx.venue, "last_fill_detail", None), coin,
+            is_ask=not is_short, since_ts=time.time() - 180, client_id=client_id)
+        if px is not None:
+            log.info("%s exit fill (venue): %.6g (decision %.6g) [%s%s]", coin,
+                     px, fallback or 0.0, reason,
+                     "" if measured else " — NOT measured")
+        else:
+            log.info("%s exit fill: no read [%s] — slippage NULL", coin, reason)
+        return (px if px is not None else fallback), measured, reason
+
+    def _real_entry(coin, is_short, fallback, client_id=None):
+        """[2026-07-17 FILL READ] (px_or_None, measured, reason) — REAL entry
+        fill (OPENING a short SELLS -> is_ask=True).
 
         MIRROR of _real_exit, and it exists because A ROUND TRIP NEEDS BOTH
         LEGS. 445e189 gave the two CLOSE legs a real fill read and left the
         entry leg publishing `px_decision=px, px_fill=px` — the decision mid
-        echoed into the fill field. MEASURED consequence: all 49 live orders
-        (07-11 -> 07-17) carry slippage_bps NULL, so the fleet's ENTRY
-        execution has never been measured — and the whole Funding Farmer
-        verdict (dead at 5bps vs +$21 at 0.86bps) turns on exactly that number.
+        echoed into the fill field.
 
         Returns None (not the fallback) when there is no read, so the caller
-        can record px_fill=NULL rather than an echo: an echoed decision price
-        is what let me compute a confident "0.000bps slippage" off this table
-        an hour ago. _slip_bps_of already refuses to turn d==f into a zero;
-        this stops the echo reaching the column at all.
-        """
+        records px_fill=NULL rather than an echo: an echoed decision price is
+        what let me compute a confident "0.000bps slippage" off this table an
+        hour ago. TELEMETRY ONLY — nothing downstream consumes this price."""
         if dry_run:
-            return None
-        try:
-            fl = getattr(ctx.venue, "last_fill", None)
+            return None, False, "dry_run"
+        px, measured, reason = _read_fill(
+            getattr(ctx.venue, "last_fill_detail", None), coin,
             # opening a SHORT sells -> is_ask=True (the exact inverse of the
             # close leg's `is_ask=not is_short`).
-            real = fl(coin, is_ask=is_short,
-                      since_ts=time.time() - 180) if fl else None
-        except Exception:  # noqa: BLE001
-            real = None
-        if real:
-            log.info("%s entry fill (venue): %.6g (decision %.6g)", coin, real,
-                     fallback or 0.0)
-        return real
-
-    def _slip_bps_of(decision, fill, is_buy):
-        """[2026-07-17 FILL TELEMETRY] Signed slippage on ONE order, bps,
-        POSITIVE = worse than the decision price (paid up buying / sold lower).
-        Returns None when the two are identical, because _real_exit falling
-        back to the decision mid means we got NO fill read — and recording that
-        as 0.0 would be indistinguishable from a genuinely perfect fill. The
-        fleet's whole execution blind spot came from an echoed decision price
-        being read as data; a null is honest, a fabricated zero is not."""
-        try:
-            d, f = float(decision), float(fill)
-            if d <= 0 or f <= 0 or d == f:
-                return None
-            return (f / d - 1.0) * 10_000.0 * (1.0 if is_buy else -1.0)
-        except (TypeError, ValueError, ZeroDivisionError):
-            return None
+            is_ask=is_short, since_ts=time.time() - 180, client_id=client_id)
+        if px is not None:
+            log.info("%s entry fill (venue): %.6g (decision %.6g) [%s%s]", coin,
+                     px, fallback or 0.0, reason,
+                     "" if measured else " — NOT measured")
+        else:
+            log.info("%s entry fill: no read [%s] — px_fill NULL", coin, reason)
+        return px, measured, reason
 
     def _flatten_all(reason):
         """Emergency flatten that MIRRORS normal-close bookkeeping (ledger + counters
@@ -694,12 +764,14 @@ def main():
             opened_ts = m.get("opened_ts") or time.time()
             px = fresh_mid(ctx, c) or entry
             try:
-                ctx.venue.market_close(c)
+                _res = ctx.venue.market_close(c)
             except Exception as e:
                 log.error("flatten %s: %s", c, e)
                 continue
             _decision_px = px                      # mid at the close decision
-            px = _real_exit(c, is_short, px)       # -> REAL venue fill if readable
+            # -> REAL venue fill if readable, named by the order's own client id
+            px, _meas, _src = _real_exit(
+                c, is_short, px, client_id=(_res or {}).get("client_order_index"))
             price_pnl = abs(held) * ((px - entry) if not is_short else (entry - px))
             n_closed += 1
             n_wins += 1 if price_pnl > 0 else 0
@@ -718,8 +790,10 @@ def main():
                     bot_id, venue=("lighter" if venue_tag else "hl"), shadow=shadow_tag,
                     coin=c, side=("buy" if is_short else "sell"), size=abs(held),
                     px_decision=_decision_px, px_fill=px,
-                    slippage_bps=_slip_bps_of(_decision_px, px, is_buy=is_short),
-                    raw={"reason": reason, "leg": "close"})
+                    slippage_bps=_slip_bps_of(_decision_px, px, is_buy=is_short,
+                                              measured=_meas),
+                    raw={"reason": reason, "leg": "close",
+                         "measured": _meas, "fill_src": _src})
             except Exception:
                 pass
             meta.pop(c, None)
@@ -970,8 +1044,10 @@ def main():
                 if not dry_run and miss[coin] >= BLIND_STOP_MISSES:
                     log.error("%s: stop unverifiable %dx — fail-safe flatten", coin, miss[coin])
                     try:
-                        ctx.venue.market_close(coin)
-                        _bpx = _real_exit(coin, is_short, entry)
+                        _res = ctx.venue.market_close(coin)
+                        _bpx, _, _ = _real_exit(
+                            coin, is_short, entry,
+                            client_id=(_res or {}).get("client_order_index"))
                         _bpnl = abs(held) * ((_bpx - entry) if not is_short
                                              else (entry - _bpx))
                         _record_close(bot_id, coin, entry, opened_ts, _bpx, _bpnl,
@@ -1029,17 +1105,32 @@ def main():
                 continue
 
             fund_pnl = m.get("accrued", 0.0)
+            # [2026-07-17] BIND BEFORE THE BRANCH. 445e189 bound _decision_px
+            # only in the `else`, but the publish below reads it unconditionally
+            # -> every dry_run close raised NameError into the bare `except:
+            # pass` beneath it, so the SHADOW arm silently stopped writing close
+            # rows to venue_orders the moment that image deployed. The shadow
+            # arm is the control this bot is judged against; losing its rows is
+            # not cosmetic. Nothing in the ledger shows the break because the
+            # deployed image still predates 445e189 — the bug is armed, not yet
+            # fired. In dry_run the fill IS the decision mid (ShadowBroker
+            # publishes its own modelled-fill row separately), so measured=False
+            # is the honest label, not a degradation.
+            _decision_px = px                      # mid at the close decision
+            _meas, _src = False, "dry_run"
             if dry_run:
                 price_pnl = broker.close(coin, px)   # realizes price P&L in broker
                 fund_realized += fund_pnl
             else:
                 try:
-                    ctx.venue.market_close(coin)
+                    _res = ctx.venue.market_close(coin)
                 except Exception as e:
                     log.error("close %s failed: %s — leaving position, retry next loop", coin, e)
                     continue
-                _decision_px = px                  # mid at the close decision
-                px = _real_exit(coin, is_short, px)  # -> REAL venue fill if readable
+                # -> REAL venue fill if readable, named by the order's client id
+                px, _meas, _src = _real_exit(
+                    coin, is_short, px,
+                    client_id=(_res or {}).get("client_order_index"))
                 price_pnl = (abs(held) * (px - entry)) if not is_short \
                     else (abs(held) * (entry - px))
             realized += (price_pnl + fund_pnl) if dry_run else 0.0
@@ -1060,8 +1151,10 @@ def main():
                     shadow=shadow_tag, coin=coin,
                     side=("buy" if is_short else "sell"), size=abs(held),
                     px_decision=_decision_px, px_fill=px,
-                    slippage_bps=_slip_bps_of(_decision_px, px, is_buy=is_short),
-                    raw={"reason": decision, "leg": "close"})
+                    slippage_bps=_slip_bps_of(_decision_px, px, is_buy=is_short,
+                                              measured=_meas),
+                    raw={"reason": decision, "leg": "close",
+                         "measured": _meas, "fill_src": _src})
             except Exception:
                 pass
             meta.pop(coin, None)
@@ -1157,11 +1250,15 @@ def main():
                     if not ctx.rails.notional_ok(open_ntl, order_usd):
                         log.info("%s NOTIONAL_CAP_SKIP", coin)
                         continue
+                _res = None
                 try:
                     if dry_run:
                         broker.open(coin, not is_short, size, px)
                     else:
-                        ctx.venue.market_open(coin, not is_short, size)
+                        # KEEP the return: it carries this order's
+                        # client_order_index, which is what turns the fill read
+                        # below from a 180s same-side blend into a measurement.
+                        _res = ctx.venue.market_open(coin, not is_short, size)
                 except Exception as e:
                     log.error("open %s failed: %s", coin, e)
                     continue
@@ -1191,14 +1288,19 @@ def main():
                     # is untouched (it feeds the stop/TP and the manage pass
                     # already reconciles it from avg_entry_price), so this
                     # changes what we RECORD, never what the bot DOES.
-                    _fill_px = _real_entry(coin, is_short, px)
+                    _fill_px, _meas, _src = _real_entry(
+                        coin, is_short, px,
+                        client_id=(_res or {}).get("client_order_index"))
+                    raw["measured"] = _meas
+                    raw["fill_src"] = _src
                     store.publish_venue_order(
                         bot_id, venue=("lighter" if venue_tag else "hl"),
                         shadow=shadow_tag, coin=coin,
                         side=("sell" if is_short else "buy"), size=size,
                         px_decision=px, px_fill=_fill_px,
                         slippage_bps=_slip_bps_of(px, _fill_px,
-                                                  is_buy=not is_short),
+                                                  is_buy=not is_short,
+                                                  measured=_meas),
                         raw=raw)
                 except Exception:
                     pass
@@ -1294,9 +1396,93 @@ def _selftest_notional():
     print("lighter_funding_bot _selftest_notional OK")
 
 
+def _selftest_fill_read():
+    """[2026-07-17] Drives the fill read directly — the point of lifting it out
+    of main(). Every case below is a MUTATION test: each one FAILS against the
+    behaviour that shipped before this commit, so a revert cannot pass silently.
+
+    The fixtures encode the venue layer's real contract (px, reason) with its
+    real reason strings, not a paraphrase — a stub that mirrors names but not
+    semantics is how a green test comes to mean nothing."""
+    calls = []
+
+    def fake(px_by_call, reasons):
+        def _f(coin, is_ask, since_ts, client_id=None):
+            calls.append(client_id)
+            i = len(calls) - 1
+            return px_by_call[i], reasons[i]
+        return _f
+
+    # 1) id MATCHES -> exact, and it is a MEASUREMENT.
+    calls.clear()
+    px, meas, src = _read_fill(fake([100.5], ["trades"]), "SOL", True, 0, 12345)
+    assert (px, meas) == (100.5, True), (px, meas)
+    assert calls == [12345], "the id must reach the venue — the whole point"
+
+    # 2) NO id -> the venue blends; a price, but NOT a measurement.
+    #    Pre-commit this bot ALWAYS took this path (it passed no id at all).
+    calls.clear()
+    px, meas, src = _read_fill(fake([100.5], ["trades(approx)"]), "SOL", True, 0, None)
+    assert (px, meas) == (100.5, False), (px, meas)
+    assert "approx" in src
+
+    # 3) id MISSES on a readable tape -> fall back to the heuristic, say so.
+    #    This is the case the taker's hard filter loses entirely (-> None).
+    calls.clear()
+    px, meas, src = _read_fill(
+        fake([None, 99.0], ["no-match:trades", "trades(approx)"]),
+        "SOL", True, 0, 777)
+    assert (px, meas) == (99.0, False), (px, meas)
+    assert calls == [777, None], "must retry WITHOUT the id, exactly once"
+    assert "id-miss" in src, src
+
+    # 4) budget skip / auth failure -> NO retry. A second call would spend the
+    #    governor's telemetry reserve to fail identically, and lighter_client is
+    #    explicit that telemetry must never make the next order queue behind it.
+    for bad in ("skipped:budget(2.0 tok, reserve 4)", "auth-failed:expired",
+                "api-error:trades:TimeoutError:x", "empty:trades"):
+        calls.clear()
+        px, meas, _ = _read_fill(fake([None, 1.0], [bad, "trades(approx)"]),
+                                 "SOL", True, 0, 777)
+        assert (px, meas) == (None, False), (bad, px, meas)
+        assert calls == [777], f"{bad!r} must NOT retry (spends budget to re-fail)"
+
+    # 5) a raising venue never reaches the caller — telemetry cannot break money.
+    def boom(coin, is_ask, since_ts, client_id=None):
+        raise RuntimeError("venue on fire")
+    px, meas, src = _read_fill(boom, "SOL", True, 0, 1)
+    assert (px, meas) == (None, False) and "read-raised" in src, src
+    assert _read_fill(None, "SOL", True, 0, 1) == (None, False, "no-detail-fn")
+
+    # 6) measured d == f is a TRUE zero; unmeasured d == f stays NULL.
+    #    The old rule returned None for both and silently dropped every genuinely
+    #    perfect fill (1000BONK filled exactly at mark on the taker's first live
+    #    order — real data the fleet threw away).
+    assert _slip_bps_of(100.0, 100.0, is_buy=True, measured=True) == 0.0
+    assert _slip_bps_of(100.0, 100.0, is_buy=True, measured=False) is None
+    assert _slip_bps_of(100.0, 100.0, is_buy=True) is None, "default must be safe"
+
+    # 7) sign: POSITIVE = worse than the decision price, both directions.
+    assert round(_slip_bps_of(100.0, 100.1, is_buy=True, measured=True), 4) == 10.0
+    assert round(_slip_bps_of(100.0, 99.9, is_buy=False, measured=True), 4) == 10.0
+    assert round(_slip_bps_of(100.0, 99.9, is_buy=True, measured=True), 4) == -10.0
+    assert _slip_bps_of(0.0, 1.0, is_buy=True, measured=True) is None
+    assert _slip_bps_of(None, 1.0, is_buy=True, measured=True) is None
+
+    # 8) `measured` is derived from the venue's OWN label, never re-decided here.
+    assert _measured_from_reason(1.0, "trades") is True
+    assert _measured_from_reason(1.0, "recentTrades(after empty:trades)") is True
+    assert _measured_from_reason(1.0, "trades(approx)") is False
+    assert _measured_from_reason(1.0, "recentTrades-approx(after x)") is False
+    assert _measured_from_reason(None, "trades") is False, "no price is no measurement"
+
+    print("lighter_funding_bot _selftest_fill_read OK")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_notional()
+        _selftest_fill_read()
         sys.exit(0)
     try:
         _supervised()
