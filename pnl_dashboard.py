@@ -318,7 +318,7 @@ DESCRIPTIONS = {
     "perps-funding-spread": "ranks 72h mean funding: LONG the 5 most-negative, SHORT the 5 most-positive, rebalances daily · $20/leg",
     "lighter-dislocation":  "fades ≥150bps Lighter-vs-reference price dislocations across 36 coins; census-first evidence bot",
     "lighter-perp-sniper":  "watches brand-new Lighter listings and snipes day-one momentum",
-    "lighter-ticket-taker": "trades the Lighter Scout's high-conviction tickets (breakout/dip/momentum lenses over every liquid book) · $50 clips, TP+4%/SL−3%/48h · each close tagged by lens so the brain grades the scanner",
+    "lighter-ticket-taker": "trades the Lighter Scout's high-conviction tickets · SHADOW arm takes all four lenses (breakout/dip/momentum/divergence) so the brain keeps grading them; the LIVE arm is DIVERGENCE-ONLY — the brain grades the other three negative at n≈1300–2600 · each close tagged by lens",
     "event-listing-sniper": "buys brand-new CEX listings — many tiny losses, occasional big wins by design",
     "scanner-cross-exchange-arb": "scans cross-exchange spreads and paper-fills observed gaps (optimistic basis, own subtotal)",
     "equities-regime":      "SPY + QQQ long above the 200d SMA (±1% band) + gold on a 20/50 cross · $250 × 3 slots",
@@ -371,6 +371,12 @@ VARIANT_STALE_SECONDS = {
     "perps-funding-lighter-lighter": 15 * 60,          # 300s loop
     "perps-funding-lighter-lshadow": 15 * 60,
     "perps-funding-spread-lshadow":  15 * 60,          # 300s loop (Counterweight)
+    # [2026-07-17] 🎫 Ticket Taker: 300s cadence on BOTH arms — the shadow arm
+    # from run_all.sh, the live arm from tickettaker_loop.sh, deliberately the
+    # same so the two records stay comparable (the shadow arm is the control the
+    # go-live rests on). ~2 missed publishes, matching the Funding Farmer's.
+    "lighter-ticket-taker-lighter":  15 * 60,
+    "lighter-ticket-taker-lshadow":  15 * 60,
 }
 
 

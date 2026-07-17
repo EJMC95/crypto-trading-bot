@@ -1,0 +1,22 @@
+# Service-specific Railway config for the 🎫 Ticket Taker's OWN service ONLY
+# (lighter_ticket_taker.py; bot id lighter-ticket-taker -> -lshadow / -lighter).
+# Point that service's Config-as-code "Railway Config File" setting at this file
+# so it does NOT affect the other services deploying from this same repo.
+# Selecting the image here also removes the manual RAILWAY_DOCKERFILE_PATH step —
+# the step whose absence, on 17-Jul, left tide-rider-lighter-live still running
+# the TREND BOT while its kill switch was disarmed for the taker.
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.tickettaker"
+# Dockerfile.tickettaker bakes CMD ["/app/tickettaker_loop.sh"] (main() is one
+# cycle; the wrapper owns the 300s cadence), so no [deploy].startCommand here.
+
+[deploy]
+# Restart on any exit, no retry cap. The taker's exits — TP, stop, max-hold,
+# delist give-up, daily-loss flatten, kill-switch flatten — all run IN-PROCESS,
+# and a live perp has NO resting stop on Lighter's book. The running process IS
+# the position manager: keep it alive so it resumes managing real positions after
+# a crash. (Railway's default is ON_FAILURE with a retry cap — a crash-loop would
+# abandon a funded position.) The loop wrapper already absorbs a single bad
+# cycle, so a restart here means the wrapper itself died.
+restartPolicyType = "always"

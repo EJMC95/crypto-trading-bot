@@ -1,0 +1,48 @@
+# Image for 🎫 Ticket Taker on its OWN service (lighter_ticket_taker.py; bot id
+# lighter-ticket-taker -> suffixed -lshadow / -lighter).
+#
+# WHY A DEDICATED IMAGE (2026-07-17). The taker has only ever shipped inside
+# Dockerfile.freqtrade, and it CANNOT go live there: that container also runs
+# lighter_scout_tuner, lighter_ticket_replay, strategy_incubator and
+# fleet_proprioception (run_all.sh), and ALL FOUR `import lighter_ticket_taker`.
+# Setting TT_VENUE=lighter_live in that environment would hand a real-money mode
+# to four modules that must keep grading ALL FOUR lenses over shadow tape — the
+# exact "env silently decides real-money semantics" trap the 17-Jul VENUE work
+# closed. The live arm needs its own process, its own env, and its own row.
+# It also lets the SHADOW arm keep running in freqtrade-bots as the control arm,
+# which is what any go-live evidence rests on.
+#
+# SAFETY — inert until the operator does all of this, and each refuses LOUDLY:
+#   TT_VENUE                            explicit; unset REFUSES (identity guard)
+#   REAL_MONEY_KILL=DISARMED_I_UNDERSTAND   exact token or SafetyRails refuses
+#   LIGHTER_TICKET_TAKER_MAX_NOTIONAL   assert_can_start refuses live without it
+#   LIGHTER_API_PRIVATE_KEY / LIGHTER_ACCOUNT_INDEX / LIGHTER_API_KEY_INDEX
+# TT_VENUE=lighter_shadow runs the same code with ShadowBroker and sends NOTHING.
+#
+# Live is DIVERGENCE-ONLY by construction (allowed_lenses(), fail-closed, does
+# not read the brain). The brain's lens veto stays senior on top.
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+# Every one of these is an UNGUARDED import in lighter_ticket_taker.py — a
+# missing COPY here is a boot crash-loop, not a silent degrade. Verified by
+# scripts/audit_image_imports.py (the born-dark guard), which walks this file's
+# real file set including inside COPY'd packages.
+#   funding_basis : the 8h-vs-hourly basis authority (funding drag + apr labels)
+#   fleet_tuning  : apply_tuning() — a NO-OP in live by design (taker.* is the
+#                   SHADOW lane; only live.* levers may steer real money), but
+#                   still imported at module scope, so the image needs it.
+#   paper_broker  : the lighter_paper arm's modelled book
+#   venues/       : LighterClient (signer, market_open/close, positions),
+#                   SafetyRails (kill switch, notional cap, equity guard),
+#                   ShadowBroker, symbol_map (the fleet<->native round trip)
+COPY lighter_ticket_taker.py bot_pnl_store.py paper_broker.py fleet_tuning.py \
+     funding_basis.py ./
+COPY venues/ ./venues/
+COPY tickettaker_loop.sh ./tickettaker_loop.sh
+RUN chmod +x /app/tickettaker_loop.sh
+ENV PYTHONUNBUFFERED=1
+# main() is ONE cycle; the loop lives in the wrapper. See tickettaker_loop.sh for
+# why this is not a bare CMD + restartPolicyType="always".
+CMD ["/app/tickettaker_loop.sh"]
