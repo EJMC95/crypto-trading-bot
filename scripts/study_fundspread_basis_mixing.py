@@ -3,6 +3,41 @@
 scripts/study_fundspread_basis_mixing.py — does the HL/Lighter unit MIXING in
 Counterweight's ranking window (`fund_hist`) actually corrupt the L/S picks?
 
+RECONCILED WITH ITS SOURCE — scripts/study_lighter_vs_hl_equivalence.py §2c
+  That study is where this bug was reported, and the two studies AGREE the bug
+  is real and DISAGREE on the mechanism. Settled here, with the live state:
+  * ITS SIGNEDNESS ANSWER WAS ALREADY RIGHT and the brief that reached me was
+    stale: §2c already says "/funding-rates IS signed (105/684 rows negative)".
+    Measured again independently here: 12/201 LIGHTER rows negative (its 684 is
+    all four exchanges, so both numbers are consistent). REFUTED, twice, and
+    nobody should re-open it.
+  * ITS 8.0000 RATIO IS THE BETTER MEASUREMENT, and its §2b method warning is
+    correct: a one-shot cross-section divides two numbers read at different
+    instants and manufactures outliers (it saw -5.4..187.9; this study's first
+    naive pass saw ADA -167 for the same reason). Its PAIRED same-instant test
+    (170 observations, per-coin medians 7.99-8.01) is the sound one. The 8x
+    here rests on the STRUCTURAL proof instead — HL returns exactly 72 rows for
+    a 72h window, so HL is hourly by construction, no statistics needed.
+  * ITS MECHANISM IS **REFUTED**: "THE MIX RATIO DIFFERS PER COIN ... a freshly
+    backfilled coin's score is compressed ~8x toward zero purely from uptime."
+    Measured against the live persisted state: all 30 coins receive a FULL
+    78-row backfill (none is short-changed), so the mix is UNIFORM across the
+    cross-section; and right now every RANKED coin's window is unit-PURE. See
+    (2) and (3). The per-coin compression it describes needs coverage to
+    straddle MIN_COVERAGE at a restart — possible, not the general case.
+  * ITS PROPOSED FIX IS THE RIGHT ONE, and better than the brief's x8:
+    "backfilling from Lighter's OWN settled series (/api/v1/fundings) fixes the
+    units AND drops the cross-venue proxy." The sweep in (5) shows why the
+    second half is what matters — x8 fixes units and makes the ranking WORSE,
+    because the contaminant is the FOREIGN VENUE, not the scale. Both write
+    sites must then land in ONE basis (store TRUE APR, convert via
+    funding_basis at each write) — the settled series is %/hr and
+    /funding-rates is an 8h fraction, so "both are Lighter" is NOT yet "both
+    are the same unit". That is a ranking change, so it is backtest-first —
+    and the backtest now EXISTS: scripts/backtest_xsect_funding_lighter.py
+    validates this factor on exactly that settled tape (72h row 4/4 green).
+    21-Jul's call; nothing ranking-side shipped here.
+
 THE REPORTED BUG (2026-07-17, from a read-only equivalence study)
   lighter_funding_spread_bot.py builds one `fund_hist[coin]` list from TWO
   sources with DIFFERENT funding bases:
