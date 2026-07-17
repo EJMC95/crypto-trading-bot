@@ -125,7 +125,10 @@ TAKER_GENES = {
     # tape divergence is also the only lens not losing (+$2.10 — on n=1, which
     # is itself the point). The tuner's ladder only ever WIDENS (500->300);
     # this grid also explores TIGHTENING, which nothing else in the fleet does.
-    "DIV_GAP_PP": ("taker.div_gap_pp", [300.0, 400.0, 500.0, 600.0, 700.0]),
+    # [2026-07-17 BASIS FIX] grid /8 with the fleet-wide funding basis — the
+    # apr these pp measure was 8x TRUE. Same alleles, true units; every one
+    # must stay inside the (also /8) registry bounds 37.5-87.5.
+    "DIV_GAP_PP": ("taker.div_gap_pp", [37.5, 50.0, 62.5, 75.0, 87.5]),
     "TAKE_PROFIT": ("taker.tp", [0.03, 0.04, 0.05, 0.06]),
     "STOP_LOSS": ("taker.sl", [-0.04, -0.03, -0.02]),
     "MAX_HOLD_H": ("taker.max_hold_h", [24.0, 48.0, 72.0]),
@@ -140,7 +143,9 @@ LENS_GENE = {"breakout": "BRK_RANGE", "dip": "DIP_RANGE",
              "momentum": "MOMO_CHG", "divergence": "DIV_GAP_PP"}
 # FUNDING genes (live-reachable, judge-gated): allele grids within xp bounds.
 FUNDING_GENES = {
-    "enter_apr": ("xp.funding.enter_apr", [0.30, 0.40, 0.50]),
+    # [2026-07-17 BASIS FIX] /8 — TRUE apr; must sit inside the (also /8)
+    # registry bounds 0.03125-0.075, which these do (0.0375/0.05/0.0625).
+    "enter_apr": ("xp.funding.enter_apr", [0.0375, 0.05, 0.0625]),
     "take_profit": ("xp.funding.take_profit", [0.04, 0.05, 0.06]),
     "max_hold_h": ("xp.funding.max_hold_h", [48.0, 72.0, 96.0]),
 }
@@ -490,7 +495,7 @@ def funding_proposals(judge_state, incubator_state, hurting=None):
     # no-op and must be skipped, not proposed as a 7-day experiment. (The
     # old get_lever `default` dict here was dead code — computed, never
     # read — and the literals it shadowed could silently diverge.)
-    base = {"enter_apr": float(os.environ.get("FUNDING_ENTER_APR", "0.40")),
+    base = {"enter_apr": float(os.environ.get("FUNDING_ENTER_APR", "0.05")),  # /8 basis fix
             "take_profit": float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04")),
             "max_hold_h": float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))}
     tried = set()
@@ -674,10 +679,10 @@ def _selftest():
             assert tuning.clamp(lever, allele) == allele, (gene, lever, allele)
 
     # funding proposals exclude already-tried names, cap, and map to xp levers
-    js = {"verdicts": [{"name": "xp-enter_apr-0.3"}]}
+    js = {"verdicts": [{"name": "xp-enter_apr-0.0375"}]}
     props = funding_proposals(js, {})
     names = {p["name"] for p in props}
-    assert "xp-enter_apr-0.3" not in names, "already-tried excluded"
+    assert "xp-enter_apr-0.0375" not in names, "already-tried excluded"
     assert all(list(p["levers"])[0].startswith("xp.funding.") for p in props)
     for p in props:                                     # every allele is in-registry
         (lever, val), = p["levers"].items()

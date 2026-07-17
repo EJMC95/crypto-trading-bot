@@ -52,6 +52,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import funding_basis
 
 try:
     import fleet_tuning as tuning     # growth rail (optional import)
@@ -67,7 +68,8 @@ OI_MOVE_FRAC = float(os.environ.get("SCOUT_OI_MOVE", "0.25"))
 # Funding-divergence tickets: |Lighter APR - cross-venue median APR| must be
 # at least this many percentage points to become a ticket (DATA printed
 # +925pp at first light — genuine divergences are triple digits).
-DIV_GAP_PP = float(os.environ.get("SCOUT_DIV_GAP", "300"))
+# [2026-07-17] /8 with the basis fix — same divergence decision, true units.
+DIV_GAP_PP = float(os.environ.get("SCOUT_DIV_GAP", "37.5"))
 TOP_N = 8
 
 # ---- Lens EMISSION bars (2026-07-15 GROWTH RAIL) ----------------------------
@@ -150,14 +152,24 @@ def book_stats(books, min_qvol):
 
 def funding_aprs(rates):
     """funding-rates rows -> ({sym: lighter_apr_pct}, {sym: [other-venue aprs]}).
-    Hourly rate -> APR%: rate * 24 * 365 * 100."""
+    [2026-07-17 BASIS FIX] Lighter's `rate` is an 8-HOUR fraction, not hourly:
+    APR% = rate * 3 * 365 * 100 (funding_basis.to_apr_pct). It was annualised
+    as hourly here, making every apr this organ published 8x TRUE. The venue's
+    floor band is 3.5% apr, not 28%. SCOUT_DIV_GAP is divided by the same 8 in
+    this commit so the divergence bar keeps its meaning.
+    NOTE the benchmark rows (binance/bybit/hyperliquid) come from the SAME
+    endpoint and are annualised the same way here — binance/bybit are also 8h,
+    so they are now RIGHT too; hyperliquid rows are hourly and are now 8x LOW.
+    Only the LIGHTER value is consumed (`rate`); `_bench` feeds divergence,
+    which is why div_gap is a Lighter-vs-median comparison and stays internally
+    consistent. Cross-venue absolute apr is NOT a supported read off this key."""
     lighter, others = {}, {}
     for r in rates:
         try:
             sym, rate = r.get("symbol"), r.get("rate")
             if not sym or rate is None:
                 continue
-            apr = float(rate) * 24 * 365 * 100.0
+            apr = funding_basis.to_apr_pct(rate, 'lighter')
             if r.get("exchange") == "lighter":
                 lighter[sym] = round(apr, 1)
             else:
@@ -357,29 +369,25 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
         # so the two join directly. Joining to paper_trades/bot ledgers needs
         # venues/symbol_map.from_lighter() — 5 keys differ (the 1000X markets).
         "funding": {s: lighter_apr[s] for s in stats if s in lighter_apr},
-        # [2026-07-17 BASIS STAMP — READ BEFORE USING `funding`.]
-        # funding_aprs() annualises /funding-rates `rate` as if it were HOURLY
-        # (rate*24*365). It is an 8-HOUR fraction. Every APR this organ
-        # publishes — `funding`, `funding_extremes`, and the Lighter side of
-        # `funding_divergence` — is therefore 8x TRUE. Verified 17-Jul against
-        # the SETTLED series /api/v1/fundings (whose rate is %/hr): ETH
-        # predicted 9.6e-05 -> published 84.1%, settled 10.51%, ratio exactly
-        # 8.00; DOGE and SPY also exactly 8.00 (SPY's floor: published 28.0%,
-        # settled 3.50%). The arithmetic closes: 9.6e-05*3*365*100 = 10.512.
-        # The correct conversion is rate*3*365*100 (3 funding periods/day).
-        # DELIBERATELY NOT CORRECTED HERE. The same conversion denominates the
-        # LIVE Funding Farmer's entry gate (FUNDING_ENTER_APR 0.40 -> really 5%
-        # true) plus AB_VETO_APR and DIV_GAP_PP, so re-denominating is a
-        # real-money behaviour change and goes backtest-first with the operator
-        # — 21-Jul agenda. NOTE the 8x is a MONOTONIC rescale: rankings, the
-        # extremes ordering, and cross-venue divergence (all rows share the
-        # basis) are unaffected. What is wrong is every ABSOLUTE apr a human
-        # reads, and any threshold meant to express a TRUE apr.
-        # Stamped so the 60-day tape is self-correcting rather than 60 days of
-        # 8x-wrong carry asserted as fact.
-        "funding_basis": {"unit": "apr_pct", "true_apr_divisor": 8.0,
+        # [2026-07-17 BASIS STAMP — the tape describes its own units.]
+        # Rows written BEFORE this fix carry true_apr_divisor 8.0: this organ
+        # annualised Lighter's 8-HOUR funding fraction as if hourly, so every
+        # apr it published was 8x TRUE. Rows written AFTER carry 1.0 — the
+        # conversion now goes through funding_basis (rate * 3 * 365 * 100) and
+        # SCOUT_DIV_GAP was divided by the same 8 in that commit, so the
+        # divergence decision is unchanged.
+        # VERIFIED against the SETTLED series /api/v1/fundings: ETH predicted
+        # 9.6e-05 -> published 84.1%, settled 10.51%, ratio exactly 8.00; DOGE
+        # and SPY likewise (SPY's floor: 28.0% published -> 3.50% TRUE).
+        # KEEP THIS KEY even at 1.0: a consumer joining the 60-day tape spans
+        # BOTH epochs, and the divisor is the only thing that makes the old
+        # rows readable. Divide by it; never assume.
+        "funding_basis": {"unit": "apr_pct",
+                          "true_apr_divisor": 1.0,
                           "src": "funding-rates.rate (8h fraction)",
-                          "note": "divide by 8 for true APR; see BASIS STAMP"},
+                          "corrected": "2026-07-17",
+                          "note": ("apr is TRUE from 2026-07-17; rows stamped "
+                                   "8.0 predate the fix — divide those by 8")},
         # compact diff base for the NEXT run (all active books, not just liquid,
         # so listings/delistings diff over the full set)
         "_marks": {s: [round(v["qvol"], 2), round(v["oi"], 4)]
@@ -455,7 +463,7 @@ def selftest():
         {"symbol": "DEAD", "exchange": "lighter", "rate": 0.005},        # extreme but illiquid
     ]
     lighter_apr, other_aprs = funding_aprs(rates)
-    assert abs(lighter_apr["RKLB"] - 299.6) < 1.0, lighter_apr
+    assert abs(lighter_apr["RKLB"] - 37.45) < 0.5, lighter_apr  # 8h basis: TRUE
 
     prev = {"BTC": [1e8, 800.0], "GONE": [1e6, 5.0]}
     snap = build_snapshot(stats, lighter_apr, other_aprs, prev)
@@ -464,7 +472,7 @@ def selftest():
     assert "DEAD" not in syms, "illiquid extreme funding must be excluded"
     assert syms[0] == "RKLB", "RKLB is the top liquid funding extreme"
     assert snap["funding_divergence"][0]["sym"] == "RKLB", snap["funding_divergence"]
-    assert abs(snap["funding_divergence"][0]["gap_pct"] - 289.6) < 1.5
+    assert abs(snap["funding_divergence"][0]["gap_pct"] - 36.2) < 1.5
     assert snap["vol_surges"][0]["sym"] == "BTC", "5e8 vs 1e8 = 5x surge"
     assert snap["oi_moves"][0]["sym"] == "BTC", "1000 vs 800 OI = +25%"
     assert snap["new_listings"] == ["DEAD", "HALT", "RKLB"] or "RKLB" in snap["new_listings"]
@@ -477,13 +485,18 @@ def selftest():
     # can only ever answer questions about the coins that were already loud.
     assert set(snap["funding"]) == {"BTC", "RKLB", "DEAD"}, snap["funding"]
     assert "HALT" not in snap["funding"], "inactive book carries no funding"
-    assert abs(snap["funding"]["RKLB"] - 299.6) < 1.0, snap["funding"]
+    assert abs(snap["funding"]["RKLB"] - 37.45) < 0.5, snap["funding"]
     # must be joinable to `marks` (same key space) — that join IS the use case
     assert set(snap["funding"]) <= set(stats), "funding/marks key spaces diverged"
     assert set(snap["marks"]) <= set(stats)
     # the BASIS STAMP must ride with the data — an 8x-wrong APR that travels
     # WITHOUT its divisor is exactly how a tape becomes 60 days of false fact
-    assert snap["funding_basis"]["true_apr_divisor"] == 8.0, snap["funding_basis"]
+    # post-fix the tape is TRUE (divisor 1.0); the key must SURVIVE anyway —
+    # a 60-day join spans both epochs and only the divisor makes old rows read.
+    assert snap["funding_basis"]["true_apr_divisor"] == 1.0, snap["funding_basis"]
+    assert snap["funding_basis"]["corrected"] == "2026-07-17"
+    # and the conversion itself must now be TRUE: RKLB ~300%apr the OLD way
+    assert abs(snap["funding"]["RKLB"] - 37.4) < 1.0, snap["funding"]
     assert "funding_basis" in historized(snap), "basis stamp must survive history"
     # ...and must SURVIVE into history, or none of the above is worth anything
     _h = historized(snap)
@@ -510,11 +523,17 @@ def selftest():
     assert tk["dip"][0]["trend"] == "unknown_v1"
 
     # 5) Divergence tickets: side = receive the divergent rate; premium guard.
+    # [2026-07-17 BASIS FIX] fixture apr/gap values RE-DENOMINATED /8 with
+    # DIV_GAP_PP (300 -> 37.5). The INTENT is what is pinned, not the digits:
+    # BRK/DIPX clear the bar, MOMO sits BELOW it, RICH is skipped on premium.
+    # Left in old units, MOMO's 50pp gap would have cleared the new 37.5 bar
+    # and silently inverted this test's meaning — the fixture is denominated
+    # in the same units as the threshold it exercises.
     div = [
-        {"sym": "BRK", "lighter_apr": 500.0, "xvenue_apr": 10.0, "gap_pct": 490.0},
-        {"sym": "DIPX", "lighter_apr": -400.0, "xvenue_apr": 5.0, "gap_pct": -405.0},
-        {"sym": "MOMO", "lighter_apr": 60.0, "xvenue_apr": 10.0, "gap_pct": 50.0},   # below bar
-        {"sym": "RICH", "lighter_apr": -400.0, "xvenue_apr": 5.0, "gap_pct": -405.0},  # long a rich book: skip
+        {"sym": "BRK", "lighter_apr": 62.5, "xvenue_apr": 1.25, "gap_pct": 61.25},
+        {"sym": "DIPX", "lighter_apr": -50.0, "xvenue_apr": 0.625, "gap_pct": -50.625},
+        {"sym": "MOMO", "lighter_apr": 7.5, "xvenue_apr": 1.25, "gap_pct": 6.25},   # below the 37.5 bar
+        {"sym": "RICH", "lighter_apr": -50.0, "xvenue_apr": 0.625, "gap_pct": -50.625},  # long a rich book: skip
     ]
     tkd = strategy_tickets(tstats, {}, div)["divergence"]
     got = {(r["sym"], r["side"]) for r in tkd}

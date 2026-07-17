@@ -79,7 +79,10 @@ TAKER_LADDERS = {
     "dip":        ("DIP_RANGE",  "taker.dip_range",  [0.05, 0.08, 0.11, 0.15]),
     "breakout":   ("BRK_RANGE",  "taker.brk_range",  [0.95, 0.93, 0.91, 0.90]),
     "momentum":   ("MOMO_CHG",   "taker.momo_chg",   [5.0, 4.5, 4.0, 3.5, 3.0]),
-    "divergence": ("DIV_GAP_PP", "taker.div_gap_pp", [500.0, 450.0, 400.0, 350.0, 300.0]),
+    # [2026-07-17 BASIS FIX] ladder /8 with the fleet funding basis; every
+    # rung must stay inside the (also /8) registry bounds 37.5-87.5.
+    "divergence": ("DIV_GAP_PP", "taker.div_gap_pp",
+                   [62.5, 56.25, 50.0, 43.75, 37.5]),
 }
 # Scout emission-bar ladders (advisory tickets — widen the brain's diet).
 # [2026-07-16 AUDIT FIX] defaults come from the SCOUT'S OWN env (same names

@@ -84,7 +84,11 @@ BLIND_MAX = int(os.environ.get("XPJ_BLIND_MAX_CYCLES", "24"))
 # One candidate at a time, in order. First: the gate widening the 11-Jul
 # scanner review explicitly queued as "opt-in, shadow-validate first".
 CANDIDATES = [
-    {"name": "enter-gate-0.30", "levers": {"xp.funding.enter_apr": 0.30}},
+    # [2026-07-17 BASIS FIX] /8 with the fleet funding basis. This candidate
+    # is the 11-Jul "opt-in, shadow-validate" gate WIDENING: 0.30 old units
+    # == 0.0375 TRUE apr, still a widening vs the 0.05 TRUE env default.
+    # The experiment is unchanged; only its denomination is.
+    {"name": "enter-gate-0.0375", "levers": {"xp.funding.enter_apr": 0.0375}},
     {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
     {"name": "hold-48",         "levers": {"xp.funding.max_hold_h": 48.0}},
 ]
@@ -812,18 +816,18 @@ def _selftest():
     # candidate_pool: static first, then admitted incubator proposals; an
     # offspring with an UNKNOWN lever is rejected (can't smuggle a lever past)
     q = {"candidates": [
-        {"name": "enter-gate-0.30", "levers": {"xp.funding.enter_apr": 0.30}},  # dup static
+        {"name": "enter-gate-0.0375", "levers": {"xp.funding.enter_apr": 0.0375}},  # dup static
         {"name": "xp-tp-0.05", "levers": {"xp.funding.take_profit": 0.05}},     # ok
         {"name": "evil", "levers": {"xp.funding.enter_apr": 0.3, "bad.lever": 1}},  # reject
     ]}
     pool = candidate_pool(q)
     names = [c["name"] for c in pool]
-    assert names[:3] == ["enter-gate-0.30", "tp-0.06", "hold-48"], names   # static order
+    assert names[:3] == ["enter-gate-0.0375", "tp-0.06", "hold-48"], names  # static order
     assert "xp-tp-0.05" in names and "evil" not in names, names
-    assert names.count("enter-gate-0.30") == 1, "dup name deduped"
+    assert names.count("enter-gate-0.0375") == 1, "dup name deduped"
     # next_candidate: skips done + current, name-based (pool may grow)
-    assert next_candidate(pool, [], None)["name"] == "enter-gate-0.30"
-    assert next_candidate(pool, ["enter-gate-0.30"], "tp-0.06")["name"] == "hold-48"
+    assert next_candidate(pool, [], None)["name"] == "enter-gate-0.0375"
+    assert next_candidate(pool, ["enter-gate-0.0375"], "tp-0.06")["name"] == "hold-48"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
     # migration guard: OLD index-based state (running phase, no current/spec)

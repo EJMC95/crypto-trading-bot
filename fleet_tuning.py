@@ -168,8 +168,10 @@ LEVERS = {
         "kind": "float", "lo": 3.0, "hi": 6.0, "lane": "lighter-taker",
         "note": "momentum conviction bar (day %% >=); default 5.0"},
     "taker.div_gap_pp": {
-        "kind": "float", "lo": 300.0, "hi": 700.0, "lane": "lighter-taker",
-        "note": "divergence conviction bar (|gap| pp >=); default 500"},
+        # [2026-07-17] bounds /8 with the fleet-wide funding BASIS FIX: the
+        # apr these pp are measured against was 8x TRUE. Same bar, true units.
+        "kind": "float", "lo": 37.5, "hi": 87.5, "lane": "lighter-taker",
+        "note": "divergence conviction bar (|gap| pp >=); default 62.5"},
     "taker.tp": {
         "kind": "float", "lo": 0.03, "hi": 0.06, "lane": "lighter-taker",
         "note": "take-profit fraction; default 0.04"},
@@ -189,8 +191,9 @@ LEVERS = {
     # money). The experiment judge runs ONE candidate at a time here; while
     # a candidate runs, the twin is an experiment arm, not a control arm.
     "xp.funding.enter_apr": {
-        "kind": "float", "lo": 0.25, "hi": 0.60, "lane": "lighter-xp",
-        "note": "shadow twin's funding entry gate; env default 0.40"},
+        # [2026-07-17] bounds /8 with the BASIS FIX — TRUE apr now.
+        "kind": "float", "lo": 0.03125, "hi": 0.075, "lane": "lighter-xp",
+        "note": "shadow twin's funding entry gate (TRUE apr); env default 0.05"},
     "xp.funding.take_profit": {
         "kind": "float", "lo": 0.03, "hi": 0.08, "lane": "lighter-xp",
         "note": "shadow twin's TP; env default 0.04"},
@@ -203,8 +206,9 @@ LEVERS = {
     # both halves by the margin). TTL'd: promotion fades back to env
     # defaults when the judge stops re-asserting it.
     "live.funding.enter_apr": {
-        "kind": "float", "lo": 0.25, "hi": 0.60, "lane": "lighter-live",
-        "note": "PROMOTED funding entry gate; env default 0.40"},
+        # [2026-07-17] bounds /8 with the BASIS FIX — TRUE apr now. 💰
+        "kind": "float", "lo": 0.03125, "hi": 0.075, "lane": "lighter-live",
+        "note": "PROMOTED funding entry gate (TRUE apr); env default 0.05"},
     "live.funding.take_profit": {
         "kind": "float", "lo": 0.03, "hi": 0.08, "lane": "lighter-live",
         "note": "PROMOTED TP; env default 0.04"},
@@ -561,20 +565,20 @@ def _selftest():
     # the consumer; SHADOW lanes keep their TTL semantics (lane-scoped)
     _cache.update(ts=now, payload={"updated": fresh_iso, "ttl_sec": 7200,
                                    "levers": {"live.clip_scale": {"value": 1.25},
-                                              "live.funding.enter_apr": {"value": 0.30},
+                                              "live.funding.enter_apr": {"value": 0.0375},
                                               "taker.tp": {"value": 0.05}}})
     _prop_cache.update(ts=now, h=frozenset({"live.clip_scale",
                                             "live.funding.enter_apr",
                                             "taker.tp"}))
     assert get_lever("live.clip_scale", 1.0, now_ts=now) == 1.0, \
         "hurting LIVE lever -> operator default"
-    assert get_lever("live.funding.enter_apr", 0.40, now_ts=now) == 0.40
+    assert get_lever("live.funding.enter_apr", 0.05, now_ts=now) == 0.05
     assert get_lever("taker.tp", 0.04, now_ts=now) == 0.05, \
         "shadow lane keeps TTL semantics (author-side skip owns it)"
     _prop_cache.update(ts=now, h=frozenset())
     assert get_lever("live.clip_scale", 1.0, now_ts=now) == 1.25, \
         "verdict cleared -> the asserted lever applies again"
-    assert get_lever("live.funding.enter_apr", 0.40, now_ts=now) == 0.30
+    assert get_lever("live.funding.enter_apr", 0.05, now_ts=now) == 0.0375
     _cache.update(ts=now, payload={"updated": fresh_iso, "ttl_sec": 7200,
                                    "levers": {"gapscout.prefilter_gap": {"value": 0.9},
                                               "gapscout.extra_exchanges": {"value": "kucoin"}}})
@@ -623,7 +627,7 @@ def _selftest():
     assert p_bad is None or "live.clip_scale" not in p_bad["levers"], \
         "tuner must never write the live lane"
     p_j = write_levers({"xp.funding.enter_apr": {"value": 0.30},
-                        "live.funding.enter_apr": {"value": 0.30},
+                        "live.funding.enter_apr": {"value": 0.0375},
                         "live.clip_scale": {"value": 1.5}},
                        set_by="experiment-judge", now_ts=now)
     if p_j is not None:
@@ -654,7 +658,7 @@ def _selftest():
                             "expires": _far},
         "gapscout.prefilter_gap": {"value": 0.0015, "set_by": "evidence-board",
                                    "expires": _far},
-        "live.funding.enter_apr": {"value": 0.30, "set_by": "experiment-judge",
+        "live.funding.enter_apr": {"value": 0.0375, "set_by": "experiment-judge",
                                    "expires": _far},
         "taker.tp": {"value": 0.05, "set_by": "scout-tuner",
                      "expires": "2020-01-01T00:00:00+00:00"}}}

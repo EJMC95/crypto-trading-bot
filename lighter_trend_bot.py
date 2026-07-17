@@ -36,10 +36,11 @@ import time
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import funding_basis
 from venues import marks, venue_context
 
 BOT = "crypto-trend-daily"          # venue layer suffixes -lshadow / -lighter
-H = 24 * 365
+H = funding_basis.periods_per_year('lighter')   # [2026-07-17 BASIS FIX]
 
 # --------------------------- configuration ----------------------------------
 START_EQUITY = 1000.0
@@ -494,7 +495,10 @@ def main():
                 if dry_run:
                     broker.mark(coin, px)
                 if rate is not None:
-                    m["accrued"] = m.get("accrued", 0.0) - rate * abs(held) * px * dt_h
+                    # [2026-07-17 BASIS FIX] 8h quote accrued per hour = 8x
+                    m["accrued"] = (m.get("accrued", 0.0)
+                                    - funding_basis.to_hourly(rate, "lighter")
+                                    * abs(held) * px * dt_h)
                 meta[coin] = {**m, "entry": entry, "opened_ts": opened_ts}
 
             # Candles for the cross. DROP the still-forming current-day candle so the

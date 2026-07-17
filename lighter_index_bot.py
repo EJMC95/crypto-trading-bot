@@ -43,6 +43,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import funding_basis
 from venues import marks
 from venues.safety import SafetyRails
 
@@ -372,7 +373,10 @@ def main():
                 rate = (fund.get(s) or {}).get("rate")
                 if rate is not None:
                     sz = abs(broker.pos[s][0])
-                    m["accrued"] = m.get("accrued", 0.0) - rate * sz * px * dt_h
+                    # [2026-07-17 BASIS FIX] 8h quote accrued per hour = 8x
+                    m["accrued"] = (m.get("accrued", 0.0)
+                                    - funding_basis.to_hourly(rate, "lighter")
+                                    * sz * px * dt_h)
                     meta[s] = m
                 entry = m.get("entry") or 0.0
                 if entry and (px - entry) / entry <= -CATASTROPHIC_STOP:
@@ -421,7 +425,7 @@ def main():
                 log.info("OPEN %s long $%.0f @ %.4f | %s%s (ref %s) | "
                          "funding %.1f%%apr", s, ORDER_USD, meta[s]["entry"],
                          rule, param, ref["last_date"],
-                         ((fund.get(s) or {}).get("rate") or 0) * 24 * 365 * 100)
+                         funding_basis.to_apr_pct((fund.get(s) or {}).get('rate') or 0, 'lighter'))
 
         # [2026-07-16 ZOMBIE GUARD] ORPHANS: a restored position on a symbol
         # no longer in the tradable list never enters the loop above at all.
@@ -471,8 +475,9 @@ def main():
                        "regime": {s: regime.get(s) for s in symbols},
                        "fund_realized": round(fund_realized, 4),
                        "fund_open": round(open_accr, 4),
-                       "funding_apr": {s: round(((fund.get(s) or {}).get("rate")
-                                                 or 0) * 24 * 365 * 100, 1)
+                       "funding_apr": {s: round(funding_basis.to_apr_pct(
+                                           (fund.get(s) or {}).get("rate") or 0,
+                                           "lighter"), 1)
                                        for s in symbols},
                        "skipped_unlisted": skipped})
         except Exception:  # noqa: BLE001

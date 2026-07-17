@@ -45,10 +45,19 @@ from collections import deque
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import funding_basis
 from venues import marks, venue_context
 
 BOT = "perps-funding-lighter"
-H = 24 * 365
+# [2026-07-17 BASIS FIX — behaviour-NEUTRAL, see funding_basis.py]
+# Was `H = 24 * 365`, which annualised Lighter's 8-HOUR funding fraction as if
+# hourly: every apr this LIVE book computed was 8x TRUE. H is now 3*365=1095,
+# and EVERY apr-denominated threshold below is divided by the same 8 in this
+# SAME commit — so entry/exit decisions are bit-identical (asserted in the
+# selftest). This commit re-denominates ONLY; it does not re-tune. Re-tuning
+# the gate is a separate, operator-gated, backtest-first change — mixing the
+# two is how a reporting fix becomes an 8x live entry change.
+H = funding_basis.periods_per_year("lighter")
 
 # --------------------------- configuration ----------------------------------
 START_EQUITY = 1000.0
@@ -56,8 +65,17 @@ ORDER_USD = float(os.environ.get("FUNDING_ORDER_USD", "25"))   # small: directio
 MAX_OPEN_POSITIONS = int(os.environ.get("FUNDING_MAX_OPEN", "6"))
 MAX_NEW_PER_LOOP = int(os.environ.get("FUNDING_MAX_NEW_PER_LOOP", "2"))
 
-ENTER_APR = float(os.environ.get("FUNDING_ENTER_APR", "0.40"))  # enter when |apr|>=40%
-EXIT_APR = float(os.environ.get("FUNDING_EXIT_APR", "0.15"))    # leave when it cools
+# [2026-07-17 RE-DENOMINATED /8 with H above — the DECISION is unchanged.]
+# These were 0.40 / 0.15 against an 8x-inflated apr, i.e. they really admitted
+# at 5% / 1.875% TRUE. They now read 0.05 / 0.01875 against a TRUE apr: the
+# same trades, honestly labelled. 0.40 was NOT fitted in these units — it was
+# born in funding_carry_bot.py against HYPERLIQUID (hourly, so 24*365 is right
+# there and 0.40 meant a true 40%) and ported here as a bare constant. The PORT
+# is the bug. So the live gate has never been supported by any backtest, and
+# ZERO backtests have ever run on Lighter funding data — that artifact
+# (scripts/backtest_lighter_funding.py) is what re-tuning must wait for.
+ENTER_APR = float(os.environ.get("FUNDING_ENTER_APR", "0.05"))  # TRUE apr >= 5%
+EXIT_APR = float(os.environ.get("FUNDING_EXIT_APR", "0.01875"))  # TRUE apr cools
 PERSIST_H = float(os.environ.get("FUNDING_PERSIST_H", "4"))     # hot this long first
 MAX_HOLD_H = float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))  # recycle after 3d
 MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "10e6"))      # 24h turnover floor
@@ -913,7 +931,13 @@ def main():
                 # live uses it only for the per-trade ledger + win count (the real
                 # funding is already in account_value, so open_fund/realized stay
                 # dry_run-guarded to avoid double-counting).
-                accr = (1.0 if is_short else -1.0) * rate * notional * dt_h
+                # [2026-07-17 BASIS FIX] Lighter quotes an 8h rate; this line
+                # accrued it PER HOUR = 8x. Live equity is honest (the venue
+                # charges the real thing) but this figure reaches the
+                # per-trade ledger AND the win/loss call — an inflated carry
+                # credit inflates the win rate of a book that COLLECTS carry.
+                accr = ((1.0 if is_short else -1.0)
+                        * funding_basis.to_hourly(rate, 'lighter') * notional * dt_h)
                 m["accrued"] = m.get("accrued", 0.0) + accr
             meta[coin] = {**m, "is_short": is_short, "entry": entry, "opened_ts": opened_ts}
 

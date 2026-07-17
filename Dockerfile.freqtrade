@@ -15,6 +15,9 @@ COPY user_data /freqtrade/user_data
 COPY run_all.sh /freqtrade/run_all.sh
 COPY dashboard_server.py /freqtrade/dashboard_server.py
 COPY bot_pnl_store.py /freqtrade/bot_pnl_store.py
+# [2026-07-17] the fleet's funding-BASIS authority (Lighter quotes an 8h
+# rate; annualising it hourly was 8x). Imported by lighter_market_scout.
+COPY funding_basis.py /freqtrade/funding_basis.py
 # fleet_bus: strategies' read-side client for brain stake-mults + fleet-risk veto
 COPY fleet_bus.py /freqtrade/fleet_bus.py
 COPY freqtrade_pnl_poller.py /freqtrade/freqtrade_pnl_poller.py

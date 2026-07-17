@@ -79,7 +79,8 @@ MOMO_CHG = float(os.environ.get("TT_MOMO_CHG", "5.0"))     # >= +5% day
 MOMO_VOL_M = float(os.environ.get("TT_MOMO_VOL_M", "2.0")) # >= $2M/day
 # [2026-07-14b] Divergence lens: receive Lighter's funding when it diverges
 # this hard (percentage points of APR) from the cross-venue median.
-DIV_GAP_PP = float(os.environ.get("TT_DIV_GAP", "500"))
+# [2026-07-17] /8 with the fleet basis fix — same decision, true units.
+DIV_GAP_PP = float(os.environ.get("TT_DIV_GAP", "62.5"))
 # [2026-07-14b] Stress veto: when the venue-wide |premium| median is at or
 # above this (bps), the whole venue is dislocated — take NO new entries this
 # cycle (exits keep running). Normal tape prints ~6bps median.
@@ -468,8 +469,10 @@ def selftest():
                   {"sym": "D", "range_pos": 0.08}],                      # below bar
           "momentum": [{"sym": "E", "chg_pct": 6.0, "vol_m": 3.0},
                        {"sym": "F", "chg_pct": 6.0, "vol_m": 1.0}],      # thin
-          "divergence": [{"sym": "G", "side": "short", "gap_pct": 700.0},
-                         {"sym": "H", "side": "long", "gap_pct": -350.0}]}  # below bar
+          # [2026-07-17 BASIS FIX] fixture /8 with DIV_GAP_PP (500 -> 62.5):
+          # G clears the bar, H sits below it. Intent pinned, not digits.
+          "divergence": [{"sym": "G", "side": "short", "gap_pct": 87.5},
+                         {"sym": "H", "side": "long", "gap_pct": -43.75}]}  # below bar
     picks = incredible(tk)
     assert [(l, t["sym"]) for l, t in picks] == \
         [("breakout", "A"), ("dip", "C"), ("momentum", "E"),

@@ -59,6 +59,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import funding_basis
 from venues import venue_context
 
 BOT = "perps-funding-spread"
@@ -77,7 +78,10 @@ DAILY_LOSS_LIMIT = float(os.environ.get("FUNDSPREAD_DAILY_LOSS", "0.05"))
 LOOP_SECONDS = int(os.environ.get("FUNDSPREAD_LOOP_SECONDS", "300"))
 SAMPLE_SECONDS = 3300           # ~hourly funding samples (one per venue period)
 MIN_COVERAGE = LOOKBACK_H // 2  # doctrine: rank only with >=half-window history
-H = 24 * 365                    # hourly rate -> APR (logging only)
+# [2026-07-17 BASIS FIX] Lighter quotes an 8h rate — was annualised as hourly
+# (8x). Logging-only here, but a log that lies is how the fleet believed the
+# venue's floor was 28% apr for four days. See funding_basis.py.
+H = funding_basis.periods_per_year('lighter')   # rate -> TRUE APR (logging)
 HL_INFO = "https://api.hyperliquid.xyz/info"
 
 LOG_FILE = os.environ.get("FUNDSPREAD_LOG_FILE", "lighter_funding_spread_bot.log")

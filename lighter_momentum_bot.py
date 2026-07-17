@@ -46,6 +46,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+import funding_basis
 from venues import marks
 from venues.safety import SafetyRails
 
@@ -108,7 +109,7 @@ LOOP_SECONDS = int(os.environ.get("MOMO_LOOP_SECONDS", "600"))
 # whole cost: SNDK/NBIS entered affordable and only later printed ~967%/687%
 # apr — an entry-only veto cannot see the carry that actually gets paid.
 # Epoch stamped in extra.ab_funding_veto.epoch; pre-epoch numbers are void.
-AB_VETO_APR = float(os.environ.get("MOMO_AB_VETO_APR", "1.5"))   # 150% APR
+AB_VETO_APR = float(os.environ.get("MOMO_AB_VETO_APR", "0.1875"))  # /8 basis fix = 18.75% TRUE
 
 LOG_FILE = os.environ.get("MOMO_LOG_FILE", "lighter_momentum_bot.log")
 logging.basicConfig(
@@ -476,7 +477,9 @@ def main():
             rate = (fund.get(s) or {}).get("rate")
             if rate is not None:
                 szv = abs(broker.pos.get(s, (0.0, 0.0))[0])
-                meta[s]["accrued"] = meta[s].get("accrued", 0.0) - rate * szv * px * dt_h
+                meta[s]["accrued"] = (meta[s].get("accrued", 0.0)   # [BASIS FIX] /8
+                                      - funding_basis.to_hourly(rate, "lighter")
+                                      * szv * px * dt_h)
             entry = meta[s].get("entry") or 0.0
             if entry and (px - entry) / entry <= -CATASTROPHIC_STOP:
                 close_pos(s, px, "catastrophic_stop")
@@ -491,7 +494,9 @@ def main():
             m["mark"] = px
             rate = (fund.get(s) or {}).get("rate")
             if rate is not None:
-                m["accrued"] = m.get("accrued", 0.0) - rate * m["size"] * px * dt_h
+                m["accrued"] = (m.get("accrued", 0.0)               # [BASIS FIX] /8
+                                - funding_basis.to_hourly(rate, "lighter")
+                                * m["size"] * px * dt_h)
             entry = m.get("entry") or 0.0
             if entry and (px - entry) / entry <= -CATASTROPHIC_STOP:
                 ab_close(s, px, "catastrophic_stop")   # mirrors the real book
@@ -502,7 +507,7 @@ def main():
             # later printed ~967%/687% apr. The freed slot stays CASH until the
             # next weekly rebalance: back-filling mid-week would smuggle a
             # second variable (rotation cadence) into the comparison.
-            if rate is not None and rate * 24 * 365 > AB_VETO_APR:
+            if rate is not None and funding_basis.to_apr(rate, 'lighter') > AB_VETO_APR:
                 ab_close(s, px, "funding_veto")
 
         # ---- weekly rotation ----
@@ -552,9 +557,9 @@ def main():
                     log.info("OPEN %s long $%.0f @ %.4f | mom %+0.1f%% | "
                              "funding %.1f%%apr", s, ORDER_USD, meta[s]["entry"],
                              (ranks.get(s) or 0) * 100,
-                             ((fund.get(s) or {}).get("rate") or 0) * 24 * 365 * 100)
+                             funding_basis.to_apr_pct((fund.get(s) or {}).get('rate') or 0, 'lighter'))
                 # ---- A/B: funding-veto variant rebalance (virtual fills) ----
-                apr = {s: ((fund.get(s) or {}).get("rate") or 0) * 24 * 365
+                apr = {s: funding_basis.to_apr((fund.get(s) or {}).get('rate') or 0, 'lighter')
                        for s in symbols}
                 q = [(s, ev) for s, ev in evals.items()
                      if ev and ev["is_long"] and ev["momentum"] is not None
