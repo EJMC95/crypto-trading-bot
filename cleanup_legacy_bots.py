@@ -53,6 +53,13 @@ LEGACY_BOTS = [
     "crypto-trend-daily-lighter",
     "perps-regime-switch", "perps-regime-switch-lshadow",
     "scanner-triangular-arb", "crypto-trendmomo-4h",
+    # [2026-07-17 LIGHTER-ONLY CUT] operator: "i only want things running on
+    # lighter". Both rows traded NON-Lighter venues; both bots now idle at boot
+    # behind a code guard, so this prune is durable rather than a race with a
+    # live writer. `perps-funding-carry` is the Yield Harvester's HL-DATA arm
+    # only — its Lighter twin `perps-funding-carry-lshadow` keeps running and is
+    # deliberately absent from this list. Ledgers kept (see the note above).
+    "event-listing-sniper", "perps-funding-carry",
     # [2026-07-14 LIGHTER-FIRST CUT] laptop stock bots retired on user
     # instruction — the Lighter ports (equities-*-lshadow) are the bots now.
     # NOTE their processes run on the operator's machine OUTSIDE this repo;

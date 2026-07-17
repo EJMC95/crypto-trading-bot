@@ -509,6 +509,25 @@ if __name__ == "__main__":
                    help="run ONE live scan against Kraken and exit (smoke test)")
     args = p.parse_args()
     if args.selftest:
-        selftest()
+        selftest()          # offline math — always allowed, no venue touched
     else:
+        # [2026-07-17 LIGHTER-ONLY GUARD — operator: "i only want things running
+        # on lighter"] scanner-triangular-arb scans KRAKEN. Under LIGHTER-FIRST
+        # (14-Jul) it should not run at all, and it was already REJECTED on edge
+        # (22-Jun re-validation) and already in RETIRED_ROWS + LEGACY_BOTS — yet
+        # the triangular-arb service auto-deploys from main and rebuilds on every
+        # git push, so "retired" never actually stopped it. This guard IS the
+        # stop. IDLE, never sys.exit: restartPolicyType=always turns an exit into
+        # a permanent crash-loop (the reasoning the Trail Blazer guard shipped
+        # with on 15-Jul). Publishes nothing -> the row goes stale and the boot
+        # prune removes it. Selftest above still runs; ledger untouched.
+        # To resurrect deliberately: ARB_RETIRED_OVERRIDE=run on the service.
+        if os.environ.get("ARB_RETIRED_OVERRIDE", "").strip().lower() not in (
+                "run", "1", "true"):
+            print("scanner-triangular-arb is RETIRED (Kraken — LIGHTER-FIRST, "
+                  "operator 17-Jul; no edge, 22-Jun). Idling: no data, no "
+                  "trades, no publishes. ARB_RETIRED_OVERRIDE=run to resurrect, "
+                  "or delete the triangular-arb Railway service.", flush=True)
+            while True:
+                time.sleep(3600)
         run_live(once=args.once)

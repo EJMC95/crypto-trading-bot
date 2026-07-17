@@ -177,14 +177,34 @@ def main():
     # Fail-safe ALLOWLIST (not a blocklist): only the two order-less modes are
     # permitted. Any other / future / unknown VENUE refuses, so a new funded mode
     # added to venues.MODES can never silently run this hedge-less bot naked.
-    _mode = os.environ.get("VENUE", "hl_paper").strip() or "hl_paper"
-    if _mode not in ("hl_paper", "lighter_shadow"):
+    #
+    # [2026-07-17 LIGHTER-ONLY — operator: "i only want things running on
+    # lighter"] hl_paper is REMOVED from the allowlist and the default is now
+    # lighter_shadow. The HL arm (row `perps-funding-carry`) was this bot's
+    # data ORIGIN, and its edge was measured on HYPERLIQUID's funding — which
+    # under the 17-Jul backtest rule is not evidence about Lighter, it is a
+    # hypothesis about Lighter. The Lighter twin (`perps-funding-carry-lshadow`)
+    # already runs the same loop on Lighter's own funding, so the shadow record
+    # that matters continues uninterrupted; only the foreign-data arm stops.
+    # The delta-neutral refusal below is UNCHANGED and still senior: this bot
+    # has no hedge leg, so every order-sending mode stays refused regardless.
+    # OPERATOR ACTION: set VENUE=lighter_shadow on the funding-carry service.
+    # It is currently pinned to VENUE=hl_paper (see CLAUDE.md), so it will hit
+    # the refusal below until that env var is flipped — deliberately loud, not
+    # silent, because a foreign-venue arm going quiet must be a decision you
+    # see rather than a row that just stops moving.
+    _mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
+    if _mode not in ("lighter_shadow",):
         raise SystemExit(
-            f"VENUE={_mode}: funding-carry (Yield Harvester) has NO automated "
-            "delta-neutral hedge leg yet — refusing to run in any order-sending "
-            "mode (would place a naked Lighter perp). Only hl_paper and "
-            "lighter_shadow are allowed; the latter accumulates live-book "
-            "slippage evidence without sending orders.")
+            f"VENUE={_mode}: funding-carry (Yield Harvester) runs "
+            "VENUE=lighter_shadow ONLY. Two independent reasons: (1) LIGHTER-"
+            "FIRST — hl_paper reads HYPERLIQUID funding, and the fleet is "
+            "Lighter-only (operator, 17-Jul); flip the service's VENUE to "
+            "lighter_shadow to keep the Lighter twin running. (2) This bot has "
+            "NO automated delta-neutral hedge leg, so every order-sending mode "
+            "would place a NAKED perp and book its price P&L as if neutral — "
+            "the opposite of the strategy. lighter_shadow runs the full loop on "
+            "real Lighter data and measures perp-leg slippage without sending.")
 
     # [2026-07-09 LIGHTER GATE-0] Funding reads go through the venue layer.
     # VENUE unset -> hl_paper -> Hyperliquid MAINNET meta_and_asset_ctxs, the

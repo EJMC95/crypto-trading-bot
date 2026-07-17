@@ -198,7 +198,19 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 "crypto-trend-daily", "crypto-intraday-15m",
                 "crypto-swing-daily", "crypto-breakout-4h",
                 "freqtrade-mum", "freqtrade-dad",
-                "freqtrade-avo-maria", "freqtrade-georgia"}
+                "freqtrade-avo-maria", "freqtrade-georgia",
+                # [2026-07-17] LIGHTER-ONLY (operator: "i only want things
+                # running on lighter"). Both traded NON-Lighter venues and both
+                # are now code-guarded to idle at boot (the guard is the stop —
+                # Railway resurrects stopped services on git push).
+                #   event-listing-sniper — spot listings on ~100 CEXes. Its
+                #     replacement, the Lighter Perp Sniper, has run since 9-Jul;
+                #     both were sniping at once for 8 days.
+                #   perps-funding-carry — the HL-data arm of Yield Harvester.
+                #     Its Lighter twin perps-funding-carry-lshadow CONTINUES and
+                #     is deliberately NOT retired here.
+                # Ledgers kept, per retirement policy.
+                "event-listing-sniper", "perps-funding-carry"}
 
 # Expected bots — so the grid shows a bot even before its first publish.
 # [2026-07-13 NO-DATA FIX] Venue-suffixed bots (Funding Farmer, Snap Back,

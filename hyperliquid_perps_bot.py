@@ -166,6 +166,25 @@ def ema(closes, period):
 
 
 def main():
+    # [2026-07-17 LIGHTER-ONLY GUARD — operator: "i only want things running on
+    # lighter"] 🪃 Bounce Catcher (perps-rsi-meanrev) trades HYPERLIQUID. It was
+    # decommissioned 12-Jul and is already in RETIRED_ROWS + LEGACY_BOTS, but the
+    # perps-bot Railway service auto-deploys from main and rebuilds on every git
+    # push — so the row was hidden while the process kept running. This guard IS
+    # the stop, and it is the same shape as the Trail Blazer guard next door
+    # (hyperliquid_momo_bot.py, 15-Jul): IDLE rather than sys.exit, because
+    # restartPolicy=always turns an exit into a permanent crash-loop. No data, no
+    # trades, no publishes -> the row goes stale and the boot prune clears it.
+    # Ledger history untouched, per retirement policy.
+    # To resurrect deliberately: PERPS_RETIRED_OVERRIDE=run on the service.
+    if os.environ.get("PERPS_RETIRED_OVERRIDE", "").strip().lower() not in (
+            "run", "1", "true"):
+        log.warning("perps-rsi-meanrev is RETIRED (Hyperliquid — LIGHTER-FIRST, "
+                    "operator 17-Jul; decommissioned 12-Jul). Idling — no data, "
+                    "no trades, no publishes. Set PERPS_RETIRED_OVERRIDE=run to "
+                    "resurrect, or stop/delete the perps-bot Railway service.")
+        while True:
+            time.sleep(3600)
     load_env()
     # [2026-07-09 LIGHTER GATE-0] Venue plumbing (HL info/exchange, Lighter
     # client, paper vs shadow broker, kill switch, notional rails) moved to

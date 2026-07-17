@@ -1244,6 +1244,35 @@ def monitor(cfg, exchange_ids):
 
 
 def main():
+    # [2026-07-17 LIGHTER-ONLY GUARD — operator: "i only want things running on
+    # lighter"] 🎯 Launch Sniper (event-listing-sniper) trades brand-new SPOT
+    # listings across ~100 CCXT exchanges. Every venue it touches is a non-Lighter
+    # venue — it is the single largest LIGHTER-FIRST (14-Jul) violation still
+    # running, and unlike the others it was never even hidden: the row was live.
+    #
+    # It has a REPLACEMENT that already runs: lighter_perp_sniper.py was built
+    # 2026-07-09 at the operator's request explicitly "to replace the spot sniper
+    # (which can't run on a fixed-market perps venue)" — see that file's header.
+    # The replacement shipped and the predecessor never stopped, so the fleet has
+    # been sniping listings on two venue-sets at once for 8 days. This is the
+    # stop; the Lighter half continues as lighter-perp-sniper-lshadow.
+    #
+    # IDLE, never sys.exit: railway.sniper.toml sets restartPolicyType="always"
+    # with NO retry cap, so an exit here is an infinite crash-loop (the same
+    # reasoning the Trail Blazer guard shipped with, hyperliquid_momo_bot.py
+    # 15-Jul). Publishes nothing -> the event-listing-sniper row goes stale and
+    # the boot prune removes it. Ledger history KEPT, per retirement policy.
+    # To resurrect deliberately: LISTING_SNIPER_OVERRIDE=run on the service.
+    if os.environ.get("LISTING_SNIPER_OVERRIDE", "").strip().lower() not in (
+            "run", "1", "true"):
+        print("event-listing-sniper is RETIRED: it trades SPOT on ~100 CEXes and "
+              "the fleet is LIGHTER-ONLY (operator, 17-Jul). Its replacement, "
+              "lighter_perp_sniper.py, has run on Lighter since 9-Jul. Idling — "
+              "no exchange calls, no trades, no publishes. Set "
+              "LISTING_SNIPER_OVERRIDE=run to resurrect, or delete the "
+              "listing-sniper Railway service.", flush=True)
+        while True:
+            time.sleep(3600)
     p = argparse.ArgumentParser(description="DRY-RUN multi-exchange new-listing paper-trader")
     p.add_argument("--seed", action="store_true",
                    help="Snapshot current pairs as baseline, then exit.")
