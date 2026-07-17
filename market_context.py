@@ -87,6 +87,11 @@ import funding_basis
 from venues.symbol_map import from_lighter
 
 BOT = "market-context"
+# [2026-07-17] The VENUE this organ's raw levels come from. Stamped into the
+# persisted snapshot so a future venue swap cannot silently divide one venue's
+# open interest by another's — see the VENUE-EPOCH guard in main(). Bump this
+# string whenever the price/OI source changes; that is the whole mechanism.
+SOURCE = "lighter"
 LIGHTER_API = os.environ.get("LIGHTER_API_BASE",
                              "https://mainnet.zklighter.elliot.ai")
 BINANCE_WS = "wss://fstream.binance.com/ws/!forceOrder@arr"
@@ -499,8 +504,31 @@ def main():
     oi_hist = {}      # hour_ts -> {coin: oi_ntl}; restart-safe via state
     btc_marks = deque(maxlen=25)   # (hour_ts, mark) for 24h realized vol
     _saved = store.load_state(BOT) or {}
-    oi_hist = {int(k): v for k, v in (_saved.get("oi_hist") or {}).items()}
-    btc_marks.extend((int(t), m) for t, m in (_saved.get("btc_marks") or []))
+    # [2026-07-17 VENUE-EPOCH GUARD] oi_hist and btc_marks are RAW LEVELS, and
+    # oi_chg_1h/24h divide today's level by a persisted one. The persisted rows
+    # were written from HYPERLIQUID; this loop now reads LIGHTER. The two venues
+    # hold genuinely different open interest — MEASURED: Lighter/HL oi_ntl ratio
+    # has a MEDIAN of 0.052 across the 96 overlapping coins. So a restored HL
+    # row would make the FIRST post-swap loop compute Lighter_OI / HL_OI - 1 and
+    # publish a ~-94% OI COLLAPSE, fleet-wide, on every coin at once — a change
+    # that never happened, on the exact key ("OI is dumping") a human or organ
+    # would read as a crisis. Reviewers measured 35/35 boundary-crossing top-60
+    # coins reading >50% collapse, 25/35 >90%.
+    # A history whose SOURCE has changed is not history, it is a different
+    # series wearing the same key. Discard it and re-accumulate: 24h of a
+    # missing oi_chg is honest; a fabricated -94% is not. regime_oracle stamps
+    # its tape the same way, "because it must not lie about the tape".
+    _prev_src = _saved.get("source")
+    if _prev_src != SOURCE:
+        if _saved.get("oi_hist") or _saved.get("btc_marks"):
+            log.warning("VENUE EPOCH: saved state is from source=%r, now %r — "
+                        "dropping oi_hist/btc_marks (raw levels are NOT "
+                        "comparable across venues; oi_chg re-accumulates over "
+                        "~24h rather than publishing a phantom move)",
+                        _prev_src, SOURCE)
+    else:
+        oi_hist = {int(k): v for k, v in (_saved.get("oi_hist") or {}).items()}
+        btc_marks.extend((int(t), m) for t, m in (_saved.get("btc_marks") or []))
     last_quality = 0.0
 
     log.info("market-context collector | loop=%ds | top %d coins by OI | "
@@ -561,8 +589,13 @@ def main():
                 "coins": coins,
             }
             store.save_state("market-context", snapshot)
+            # `source` STAMPS the venue these raw levels came from, so the next
+            # boot can tell whether they are comparable (see the VENUE-EPOCH
+            # guard in main()). Without it, a venue swap silently divides one
+            # venue's OI by another's.
             store.save_state(BOT, {"oi_hist": {str(k): v for k, v in oi_hist.items()},
-                                   "btc_marks": list(btc_marks)})
+                                   "btc_marks": list(btc_marks),
+                                   "source": SOURCE})
             tot_liq = sum((liq.get(c) or {}).get("liq_1h", 0) for c in liq)
             log.info("ctx ok | %d coins | heat %.1f%% | btc vol %s | liq(1h) $%.0fk%s",
                      len(coins), (snapshot["heat_mean_apr"] or 0) * 100,
