@@ -94,9 +94,28 @@ to catch.]
     surface: the fallback venue for any service that does not set VENUE is
     Hyperliquid, not Lighter. Invisible to a URL grep (venues/ carries only
     Lighter hosts — measured). The most load-bearing finding here, and it
-    was on no list. In practice each service sets VENUE explicitly, so this
-    is a latent default, not a live misroute — but it is the wrong default
-    for a Lighter-first fleet and it is one unset env var from mattering.
+    was on no list.
+    [CORRECTED 2026-07-17: this entry first said "in practice each service
+    sets VENUE explicitly, so this is a LATENT default, not a live misroute".
+    **That was unverified and it is FALSE.** MEASURED against the live Railway
+    project (26 services, `railway variables --service X --kv | grep ^VENUE=`):
+    THREE services run with VENUE UNSET and are therefore on Hyperliquid RIGHT
+    NOW — `funding-carry` (the Yield Harvester's deliberate HL-data paper
+    origin), `momo-bot` (runs hyperliquid_momo_bot.py = Trail Blazer, RETIRED
+    11-Jul), and `triangular-arb` (RETIRED 22-Jun). The other 8 checked
+    (trail-blazer-live, tide-rider-lighter-live/-shadow, funding-farmer-shadow,
+    family-lighter-shadow, snap-back-shadow, counterweight-shadow,
+    equities-regime-shadow, perp-sniper-shadow, perps-bot,
+    yield-harvester-shadow) all set it explicitly.
+    THE CONSEQUENCE: making this default fail-closed is NOT the no-op the
+    "latent" reading implied — it would STOP those three services. Two of them
+    are ZOMBIES of already-retired bots that Railway auto-deploy keeps
+    resurrecting (see the railway-autodeploy-resurrects-stopped-services
+    memory), so the honest fix there is RETIREMENT, not a venue swap; the
+    third (funding-carry) is a deliberate HL control arm whose Lighter twin
+    (`yield-harvester-shadow`, VENUE=lighter_shadow) already exists — keep or
+    retire is an OPERATOR decision, not a mechanical fix. Left unchanged here
+    deliberately: a guard must not take down three services to satisfy itself.]
   * bot_learn.py:417 — THE BRAIN grades LIGHTER trades' post-exit drift on
     KRAKEN candles, 3 days after Kraken was retired. The bias is worse than
     a wrong number: `_kraken_hourly` caches None for any pair Kraken does
