@@ -24,11 +24,15 @@ on:
       # pnl-dashboard service
       - 'pnl_dashboard.py'
       - 'report_emailer.py'
+      - 'fleet_watchdog_svc.py'
       - 'compile_market_data.py'
       - 'Dockerfile.dashboard'
       # funding-carry service
       - 'funding_carry_bot.py'
       - 'Dockerfile.funding'
+      # market-context service
+      - 'market_context.py'
+      - 'Dockerfile.marketcontext'
       # shared (freqtrade poller + dashboard + regime supervisor)
       - 'bot_pnl_store.py'
       - 'freqtrade_pnl_poller.py'
@@ -37,6 +41,41 @@ on:
       # 2026-07-07 after 9cedf08 (SUI + historize) silently didn't deploy
       - 'regime_oracle.py'
       - 'fleet_risk.py'
+      # ---------------------------------------------------------------------
+      # The CROSS-BOT LAYER — every module run_all.sh runs inside
+      # freqtrade-bots. Added 2026-07-07 for regime_oracle + fleet_risk after
+      # 9cedf08 silently didn't deploy; the other 15 were never added as they
+      # shipped, so the ENTIRE autonomy + evidence layer had no deploy path for
+      # 10 days — a fix that merges, goes green and never reaches the container
+      # is indistinguishable from one that worked. Measured 17-Jul: 15 of 19
+      # organs absent. `scripts/audit_deploy_coverage.py` derives each service's
+      # real file set from its Dockerfile and FAILS when this drifts — run it
+      # instead of remembering. Keep in sync with the grep below: two
+      # lists gate one deploy, and being in one but not the other deploys
+      # nothing while looking green.
+      - 'bot_learn.py'
+      - 'brain_stats.py'
+      - 'evidence_board.py'
+      - 'fleet_immune.py'
+      - 'fleet_regen.py'
+      - 'fleet_proprioception.py'
+      - 'fleet_respiration.py'
+      - 'fleet_clock.py'
+      - 'fleet_bus.py'
+      - 'fleet_tuning.py'
+      - 'experiment_judge.py'
+      - 'strategy_incubator.py'
+      - 'implementation_shortfall.py'
+      - 'event_sentinel.py'
+      - 'lighter_market_scout.py'
+      - 'lighter_ticket_taker.py'
+      - 'lighter_scout_tuner.py'
+      - 'lighter_ticket_replay.py'
+      - 'cleanup_legacy_bots.py'
+      - 'funding_basis.py'
+      - 'dashboard_server.py'
+      - 'paper_broker.py'
+      - 'venues/**'
   workflow_dispatch:
     inputs:
       services:
@@ -85,10 +124,12 @@ jobs:
             # service now has a Railway volume at /freqtrade/persist and every
             # bot's db_url points into it, so redeploys/restarts no longer wipe
             # the dry-run paper DBs (the reason for the 2026-07-01 freeze).
-            if echo "$changed" | grep -qE '^(user_data/|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$)'; then
+            # Keep in sync with the `paths:` filter above — both gate the same
+            # deploy. scripts/audit_deploy_coverage.py enforces both against the Dockerfiles.
+            if echo "$changed" | grep -qE '^(user_data/|venues/|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$|bot_learn\.py$|brain_stats\.py$|evidence_board\.py$|fleet_immune\.py$|fleet_regen\.py$|fleet_proprioception\.py$|fleet_respiration\.py$|fleet_clock\.py$|fleet_bus\.py$|fleet_tuning\.py$|experiment_judge\.py$|strategy_incubator\.py$|implementation_shortfall\.py$|event_sentinel\.py$|lighter_market_scout\.py$|lighter_ticket_taker\.py$|lighter_scout_tuner\.py$|lighter_ticket_replay\.py$|cleanup_legacy_bots\.py$|funding_basis\.py$|dashboard_server\.py$|paper_broker\.py$)'; then
               svcs="freqtrade-bots"
             fi
-            if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$)'; then
+            if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$|fleet_watchdog_svc\.py$)'; then
               svcs="${svcs:+$svcs,}pnl-dashboard"
             fi
             # [2026-07-16] perps-regime-switch REMOVED: the service was
@@ -97,8 +138,18 @@ jobs:
             # bot_pnl_store.py change — two red runs + failure emails on
             # 16-Jul while every LIVING service deployed fine.
             # funding-carry service
-            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$)'; then
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|venues/)'; then
               svcs="${svcs:+$svcs,}funding-carry"
+            fi
+            # market-context service (🛰️ instrument collector). Its live-bot
+            # freshness watchdog is the fleet's ONLY cross-region check on the
+            # real-money books — it runs in a different service from the bots on
+            # purpose, so a region outage that silences them cannot silence it.
+            # A change here that does not deploy is a blind spot on real money.
+            # [2026-07-17] This service had NO deploy rule at all; market_context.py
+            # had only ever shipped via a manual `railway up`.
+            if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|venues/|cleanup_legacy_bots\.py$)'; then
+              svcs="${svcs:+$svcs,}market-context"
             fi
           fi
           echo "services=$svcs" >> "$GITHUB_OUTPUT"
