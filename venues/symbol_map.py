@@ -34,8 +34,33 @@ _EXPLICIT = {
 
 def to_lighter(coin: str) -> tuple[str, float]:
     """fleet symbol -> (lighter_symbol, size_mult). Unknown coins map to
-    themselves 1:1 — listing is checked against the live market list, not here."""
-    return _EXPLICIT.get(coin, (coin, 1.0))
+    themselves 1:1 — listing is checked against the live market list, not here.
+
+    [2026-07-17 ROUND-TRIP FIX] `from_lighter()` is GENERIC (any 1000* -> k*)
+    while this was a hardcoded list of FOUR, frozen at the 2026-07-09 market
+    dump. Lighter now lists SIX 1000-markets, so `1000NOT` and `1000TOSHI`
+    round-tripped to `kNOT`/`kTOSHI` and then mapped to THEMSELVES — symbols
+    that do not exist on the venue. The asymmetry is the bug.
+
+    Why it mattered: `LighterClient.positions()` returns FLEET symbols, so a
+    bot holding 1000NOT sees `kNOT`, and `market_close("kNOT")` resolves to the
+    non-existent `kNOT` and returns None WITHOUT RAISING — the caller books a
+    close while the position stays open on the venue, untracked, with no exit
+    rule. Mirroring from_lighter() closes the trip for every 1000-market,
+    including ones listed after this file was written.
+
+    Fail-safe by construction: an unknown k-form maps to a 1000-symbol that is
+    simply absent from the live market list, so `_resolve()` raises VenueError
+    and the coin is skipped — exactly what happened before, never a wrong fill.
+    """
+    if coin in _EXPLICIT:
+        return _EXPLICIT[coin]
+    if len(coin) > 1 and coin.startswith("k"):
+        # the k-form IS the fleet spelling of a Lighter 1000-market, 1:1 size
+        # (both sides count thousands) — the same contract the four explicit
+        # k-entries above encode.
+        return ("1000" + coin[1:], 1.0)
+    return (coin, 1.0)
 
 
 def from_lighter(symbol: str) -> tuple[str, float]:

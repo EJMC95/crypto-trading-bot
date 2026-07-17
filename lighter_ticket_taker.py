@@ -46,6 +46,26 @@ from datetime import datetime, timedelta, timezone
 import bot_pnl_store as store
 import funding_basis
 from paper_broker import PaperBroker
+# Module scope, same reason as venues.safety below: this bot keys everything by
+# the venue-native symbol while LighterClient.positions() speaks FLEET symbols,
+# and the conversion between them is a real-money rule (see _positions()). A
+# lazy import inside the live branch is one the born-dark audit cannot see.
+from venues.symbol_map import from_lighter, to_lighter
+
+
+def _fleet(sym):
+    """venue-native symbol -> FLEET symbol: the space LighterClient's API speaks.
+
+    [2026-07-17] The client is fleet-symbol'd END TO END — positions() runs every
+    symbol through from_lighter(), and market_close() looks the coin up IN THAT
+    DICT (venues/lighter_client.py:558). Its _resolve() happens to tolerate a
+    native symbol (to_lighter is identity for "1000BONK"), which is exactly what
+    makes this dangerous: market_OPEN accepts native and works, while
+    market_CLOSE accepts native, misses the lookup, and returns None WITHOUT
+    RAISING. Open succeeds, close silently no-ops, and the position is stranded.
+    So: convert at EVERY venue call, not just the ones that fail loudly.
+    """
+    return from_lighter(sym)[0]
 # The notional-cap rule lives on the rail that enforces it. Imported at module
 # scope on purpose (not lazily inside the live branch): the born-dark guard
 # reads static imports, and a money rule that only materialises on the live
@@ -176,7 +196,23 @@ TUNABLE = (("taker.dip_range", "DIP_RANGE"),
 
 def apply_tuning():
     """Overlay live growth-rail levers onto the module bars. Returns what
-    moved (for the log). Defaults untouched when no lever is live."""
+    moved (for the log). Defaults untouched when no lever is live.
+
+    [2026-07-17 NOT ON REAL MONEY] The `taker.*` levers live in the
+    `lighter-taker` lane — fleet_tuning.py documents it as "the $1k SHADOW
+    book's bars", its author is `scout-tuner` (which has NO live authority and
+    is gated by a replay over SHADOW tape), and it sits in ENACT_LANES by
+    default. Taking this bot live would silently promote a shadow lane into a
+    real-money lane: a shadow-replay-gated author would be steering real clips,
+    which is exactly what `_LIVE_PREFIX_OWNERS` exists to prevent. Fleet
+    doctrine is that ONLY `live.*` levers may steer real money, and only their
+    bound author may write them. So live runs the OPERATOR's env bars, full
+    stop. If the live clip should ever be tunable it goes through the existing
+    board-owned `live.clip_scale` (bounded, TTL'd, and already reverted at the
+    consumer when proprioception grades it hurting) — not through this door.
+    """
+    if TT_VENUE == "lighter_live":
+        return {}
     if tuning is None:
         return {}
     moved = {}
@@ -361,6 +397,25 @@ def main(_ctx=None):
     evidence gate and the money gate are different gates — this opens neither
     for production, and only the first for a test.
     """
+    # [2026-07-17 TT_VENUE MUST BE EXPLICIT — real money] This bot's identity,
+    # its dashboard row, and whether it trades REAL MONEY all come from
+    # $TT_VENUE, and it has no default it can safely inherit: the shadow id is
+    # the row the freqtrade-bots container already publishes, so a lost var on
+    # the live service would make TWO writers of one row while the live book's
+    # positions went unmanaged — no page, because the row looks healthy. Same
+    # class as the 17-Jul VENUE fix on the other two live bots; both services
+    # set it explicitly, so this is inert for them and only makes a lost var
+    # LOUD. Gated INSIDE main() on purpose: four modules import this one
+    # (lighter_ticket_replay, lighter_scout_tuner, strategy_incubator,
+    # fleet_proprioception) and an import-time guard would break every one.
+    # _ctx is the offline test path and never trades.
+    if _ctx is None and not os.environ.get("TT_VENUE", "").strip():
+        raise SystemExit(
+            "TT_VENUE is unset. This bot's identity — and whether it trades "
+            "REAL MONEY — comes from it, and its lighter_shadow id is a row "
+            "another service already publishes. An inherited default must never "
+            "decide that. Set TT_VENUE=lighter_live or TT_VENUE=lighter_shadow "
+            "explicitly.")
     moved = apply_tuning()
     if moved:
         print(f"[ticket-taker] {iso(now())} growth-rail levers active: {moved}")
@@ -380,24 +435,31 @@ def main(_ctx=None):
 
     if TT_VENUE not in TT_MODES:
         raise SystemExit(f"TT_VENUE={TT_VENUE!r} unknown (expected {TT_MODES})")
-    # [2026-07-17 LIVE REFUSED — the path is built, the evidence is not.]
-    # Of the four lenses the brain grades, THREE are vetoed negative at
-    # n=1263-2470 (dip -0.424%/hit .41, breakout -0.211%/.40, momentum
-    # -0.377%/.39). Only divergence is positive (n=2820, +0.164%, hit .571) —
-    # and it has SIX closes, ~2 fills of swing, against a fleet gate of 30-day
-    # WR>55% AND maxDD<15%. Going live on that is the Trail Blazer mistake
-    # exactly (live on ~2d of shadow; retired as "a lucky ~30d window").
-    # This refusal is what makes the live path safe to BUILD before it is
-    # earned. Lift it when divergence has the closes — not to fill a vacancy.
+    # [2026-07-17 LIVE REFUSAL LIFTED — operator decision, on the record.]
+    # The refusal that stood here said: "divergence is the only fillable lens
+    # and it has n=7 closes; the fleet's gate is a 30-day record. Lift it when
+    # divergence has the closes — NOT to fill a vacancy." The operator was shown
+    # that reasoning with the numbers and lifted it deliberately, to take Tide
+    # Rider's vacated live slot. Recording what was traded away, because nobody
+    # should have to re-derive it later:
+    #   * THE EVIDENCE IS THIN AND KNOWN THIN. divergence's episode-deduped
+    #     forward grade is +0.004%/4h (≈zero) with an ehit4h CI of 0.494-0.572
+    #     STRADDLING a coin flip, while this bot's median divergence hold is
+    #     6.68h. Its realized +4.23%/trade is 5-1000x the brain's forward grade
+    #     of the SAME signal at n=2934 — that gap is the luck. $10.72 over 7
+    #     fills is ~3 fills of swing, at 100% WR: a streak, not a record.
+    #   * The fleet gate (30d WR>55% AND maxDD<15%) is NOT met. This is a
+    #     deliberate exception to it, not a pass.
+    #   * long-divergence has ZERO realized fills and the live arm can take it.
+    # What replaced the refusal is not permission — it is guards, all landed and
+    # negative-fixture tested: a fail-CLOSED live lens allow-list that does not
+    # read the brain (allowed_lenses), a hard assert at the order, the symbol
+    # round-trip fix, None-is-a-failed-close, TT_VENUE mandatory, apply_tuning
+    # disabled live, plus the pre-existing kill switch / notional cap / equity
+    # guard / daily-loss rail. REAL_MONEY_KILL is still the last gate and it is
+    # the OPERATOR's to disarm.
     live = (TT_VENUE == "lighter_live")
     dry_run = not live
-    if live and _ctx is None:
-        raise SystemExit(
-            "lighter-ticket-taker REFUSES lighter_live: divergence is the only "
-            "fillable lens (the brain vetoes the other three) and it has n=7 "
-            "closes — the fleet's gate is a 30-day record. The live path is "
-            "BUILT and selftested (--selftest-live); it needs EVIDENCE, not "
-            "permission. See the block above.")
 
     t_now = now()
     venue = rails = broker = None
@@ -467,7 +529,22 @@ def main(_ctx=None):
         after boot)."""
         if dry_run:
             return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
-        return venue.positions()
+        # [2026-07-17 SYMBOL SPACE — live-only, and it fires on the FIRST ticket]
+        # This bot keys marks/funding/ranges/meta by the VENUE-NATIVE symbol from
+        # its own orderBookDetails fetch ("1000BONK"). LighterClient.positions()
+        # runs every symbol through from_lighter() and returns FLEET symbols
+        # ("kBONK"). Unremapped, the live arm looks up "1000BONK" in a dict keyed
+        # "kBONK", sees itself FLAT, and RE-OPENS the same position every cycle;
+        # meanwhile the exit pass never examines the real one, so it runs with no
+        # stop and no max-hold. MEASURED: 1000BONK is a divergence ticket right
+        # now (short, gap 87.5pp) — the first thing a divergence-only arm touches.
+        # Remap at THIS boundary rather than normalising the bot into fleet space:
+        # meta and the broker snapshot are PERSISTED in the venue-native keys, so
+        # changing the bot's key space would strand every open position on the
+        # shadow arm. One space, converted where the two meet.
+        # (to_lighter() mirrors from_lighter() as of today, so the trip closes for
+        # all six 1000-markets — verified against all 218 live markets.)
+        return {to_lighter(c)[0]: v for c, v in (venue.positions() or {}).items()}
 
     def _real_fill(sym, is_ask, fallback, leg):
         """REAL fill price from the venue's own trade tape, or the decision
@@ -557,7 +634,9 @@ def main(_ctx=None):
         not meta — an untracked position still holds real risk and must still
         be closed. Mirrors normal-close bookkeeping via _book_close."""
         try:
-            live_pos = venue.positions()
+            # fleet -> venue-native, same boundary rule as _positions()
+            live_pos = {to_lighter(c)[0]: v
+                        for c, v in (venue.positions() or {}).items()}
         except Exception as e:  # noqa: BLE001
             print(f"[ticket-taker] {iso(t_now)} flatten scan failed: {e!r}")
             return
@@ -571,7 +650,14 @@ def main(_ctx=None):
                           or m.get("entry") or 0.0)
             px = marks.get(sym) or float(m.get("last_mark") or entry)
             try:
-                venue.market_close(sym)
+                # [2026-07-17] None == the venue did NOT close it (no position
+                # under that key). Treating it as success books a phantom close
+                # and pops meta, stranding a REAL position with no exit rule.
+                if venue.market_close(_fleet(sym)) is None:
+                    print(f"[ticket-taker] {iso(t_now)} flatten {sym}: venue "
+                          f"reported NO position to close — leaving meta intact "
+                          f"and retrying next cycle (NOT booking a close)")
+                    continue
             except Exception as e:  # noqa: BLE001
                 print(f"[ticket-taker] {iso(t_now)} flatten {sym}: {e!r}")
                 continue
@@ -775,7 +861,18 @@ def main(_ctx=None):
             _dpx = None
         else:
             try:
-                venue.market_close(sym)
+                # [2026-07-17] This block's own comment already said "never book
+                # a close that did not happen" — but it only caught EXCEPTIONS,
+                # and the stranding case does NOT raise: market_close() returns
+                # None when it finds no position under that key
+                # (venues/lighter_client.py:558-560). That is precisely the
+                # symbol-space failure, so the guard missed the case it was
+                # written for. None is a FAILED close.
+                if venue.market_close(_fleet(sym)) is None:
+                    print(f"[ticket-taker] {iso(t_now)} close {sym}: venue "
+                          f"reported NO position under {_fleet(sym)!r} — NOT "
+                          f"booking a close; leaving position, retry next cycle")
+                    continue
             except Exception as e:  # noqa: BLE001
                 # Leave the position and retry next cycle. Never book a close
                 # that did not happen — a phantom close drops the position from
@@ -914,7 +1011,10 @@ def main(_ctx=None):
                     continue
                 size = round(size, 6)
                 try:
-                    venue.market_open(sym, is_long, size)
+                    # fleet symbol — the space the client's API speaks. This one
+                    # would have "worked" with a native symbol (_resolve tolerates
+                    # it), which is exactly how open/close drifted apart.
+                    venue.market_open(_fleet(sym), is_long, size)
                 except Exception as e:  # noqa: BLE001
                     print(f"[ticket-taker] {iso(t_now)} open {sym} failed: {e!r}")
                     continue
@@ -1098,10 +1198,32 @@ def selftest():
                and l not in {"divergence"}}
     assert _senior == set(), _senior
 
+    # ---- SYMBOL SPACE — the live-only stranding bug, pinned -----------------
+    # This bot keys everything venue-native ("1000BONK"); LighterClient speaks
+    # FLEET ("kBONK") in positions() AND in market_close()'s own lookup. The
+    # round trip must close for every 1000-market or a real position is stranded
+    # with no exit rule. 1000BONK was a live divergence ticket when this landed.
+    for _native in ("1000BONK", "1000PEPE", "1000SHIB", "1000FLOKI",
+                    "1000NOT", "1000TOSHI"):
+        _f = _fleet(_native)                       # what the venue calls it
+        assert _f.startswith("k"), (_native, _f)
+        assert to_lighter(_f)[0] == _native, (_native, _f, to_lighter(_f)[0])
+    # 1000NOT/1000TOSHI are the regression: they were absent from _EXPLICIT, so
+    # to_lighter("kNOT") used to return "kNOT" — a symbol the venue does not have.
+    assert to_lighter("kNOT")[0] == "1000NOT"
+    assert to_lighter("kTOSHI")[0] == "1000TOSHI"
+    # plain symbols must be untouched in both directions
+    for _plain in ("BTC", "ETH", "SOL", "XPD", "DRAM"):
+        assert _fleet(_plain) == _plain and to_lighter(_plain)[0] == _plain, _plain
+    # raw-unit markets keep their size multiplier (PEPE != kPEPE)
+    assert to_lighter("PEPE") == ("1000PEPE", 0.001)
+    assert to_lighter("kPEPE") == ("1000PEPE", 1.0)
+
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
           "long/short exits, signed funding on the TRUE 8h basis, "
           "constant-risk sizing, delist give-up, LIVE lens allow-list "
-          "fail-CLOSED vs a dark brain).")
+          "fail-CLOSED vs a dark brain, symbol round-trip for all six "
+          "1000-markets).")
 
 
 # ---------------------------------------------------------------------------
@@ -1192,6 +1314,14 @@ def _selftest_live():
 
     _saved_env = (TT_VENUE, BOT_ROW)
     TT_VENUE, BOT_ROW = "lighter_live", BOT + "-lighter"
+    # [2026-07-17] This harness rebinds the MODULE GLOBAL; the identity guard in
+    # main() reads os.environ (it must — the global carries a default and so
+    # cannot tell "unset" from "set to shadow"). One fixture below drives
+    # _supervised() -> bare main(), which trips that guard before the crash it
+    # is actually testing. Production always sets the var, so give the harness
+    # one too; the guard has its own dedicated fixture in selftest().
+    _saved_ttv = os.environ.get("TT_VENUE")
+    os.environ["TT_VENUE"] = "lighter_live"
 
     # --- capture every side effect instead of hitting Postgres -------------
     captured = {"paper": [], "orders": [], "state": {}, "halts": [],
@@ -1495,19 +1625,29 @@ def _selftest_live():
                 f"a crash must mark the row, got {_status}"
             # ... and a boot REFUSAL is not a crash: it must pass through
             # untouched (SafetyRails._publish_refusal already owns that row).
+            # [2026-07-17] This used to assert on the EVIDENCE refusal
+            # (lighter_live raises SystemExit). The operator lifted that gate,
+            # so the fixture had to be re-pointed at a refusal that still
+            # exists — otherwise it would assert that a removed gate is present
+            # and demand the code stay as it was. The IDENTITY refusal (TT_VENUE
+            # unset) is the right subject: it is a boot refusal on the same path,
+            # and unlike the old one it cannot be lifted by a decision.
             _status.clear()
             globals()["fetch_marks_and_funding"] = lambda: ({}, {}, {})
-            _tt_save = TT_VENUE
+            _ttv_save = os.environ.get("TT_VENUE")
             try:
-                globals()["TT_VENUE"] = "lighter_live"
+                os.environ.pop("TT_VENUE", None)
                 try:
-                    _supervised()          # no _ctx -> the evidence refusal
-                    raise AssertionError("lighter_live must refuse")
+                    _supervised()          # no _ctx, no TT_VENUE -> identity refusal
+                    raise AssertionError("an unset TT_VENUE must refuse")
                 except SystemExit:
                     pass
                 assert _status == [], f"a refusal is not a crash, got {_status}"
             finally:
-                globals()["TT_VENUE"] = _tt_save
+                if _ttv_save is None:
+                    os.environ.pop("TT_VENUE", None)
+                else:
+                    os.environ["TT_VENUE"] = _ttv_save
         finally:
             store.set_status = _real_set
             store.load_state = _real_load
@@ -1528,6 +1668,10 @@ def _selftest_live():
             setattr(store, k, fn)
         globals()["fetch_marks_and_funding"] = _real_fetch
         TT_VENUE, BOT_ROW = _saved_env
+        if _saved_ttv is None:
+            os.environ.pop("TT_VENUE", None)
+        else:
+            os.environ["TT_VENUE"] = _saved_ttv
 
 
 def _supervised():
