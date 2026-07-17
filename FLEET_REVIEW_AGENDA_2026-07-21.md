@@ -567,6 +567,52 @@ gives noisy ratios, e.g. MU 12.1 / MSTR 26.5, and proves nothing either way.)
   looseness by 8.** So "fixing" the conversion alone does NOT merely re-label —
   it restores the gate that was actually validated. The live bot has been
   admitting at 5% true since the port, on a bar no backtest ever supported.
+- **✅ THE LIGHTER-DATA BACKTEST NOW EXISTS AND IT CHANGES THE ANSWER**
+  (17-Jul, operator: *"we need everything to run off lighter as thats what we
+  run on"*) — `scripts/backtest_funding_lighter.py`, verdict + limits in its
+  header. **The "no Lighter history" premise was FALSE**: `/api/v1/fundings`
+  pages back to **2025-05-05 (438d+)** of SETTLED HOURLY rates and
+  `/api/v1/candles` pages 500 bars at a time arbitrarily far back. The HL
+  harnesses fetch 150d. **There was never a data reason to backtest the Lighter
+  bot on another venue.** First run: 150d, 25 markets, 2026-02-17→07-17, the
+  live bot's real rules, TRUE apr from the settled series only (`/funding-rates`
+  is never touched, so the 8x cannot leak in):
+
+  | gate (TRUE apr) | P&L | funding | price | n | 1st half | 2nd half |
+  |---|---|---|---|---|---|---|
+  | 0.03 | −76.44 | +12.09 | −88.47 | 1074 | −34.58 | −45.13 |
+  | **0.05 (LIVE TODAY)** | **−41.95** | +15.95 | −57.88 | 1261 | −21.40 | −11.40 |
+  | 0.12 | −10.26 | +21.77 | −32.01 | 1071 | −12.74 | +5.68 |
+  | 0.20 | +5.01 | +20.78 | −15.75 | 845 | −8.72 | +13.65 |
+  | **0.40 (HL-validated)** | **−10.66** | +18.14 | −28.78 | 475 | −12.68 | +2.86 |
+
+  1. **NO GATE PASSES BOTH HALVES.** Not one row. No validated edge at any gate.
+  2. **The live gate is BELOW the FRICTION BREAKEVEN, structurally.** At a 72h
+     max hold, carry/trade = `apr × 72/8760`; a 10bps round trip needs
+     **apr > 0.122 TRUE** just to pay the slippage. The live bot sits at **0.05
+     TRUE**; the venue's floor band is **0.035 TRUE**. Both below, by
+     construction — before any price risk.
+  3. **Sweep and arithmetic agree INDEPENDENTLY**: P&L flips sign between 0.12
+     and 0.20; the one-line breakeven predicts 0.122. A mechanism, not a fit.
+  4. **Funding is positive at every gate and too small to matter.** At the live
+     gate, slippage (1261 × 10bps × $25 ≈ **$31.5**) costs ~**2×** the entire
+     funding earned (**+$15.95**). The bot pays more to trade than it harvests.
+  5. So the 8x did not merely mislabel the gate — **it parked the live bot in
+     the WORST region of its own gate curve** (0.02–0.08 all lose $30–76).
+  **So "fix the conversion, keep 0.40" is ALSO wrong**: a TRUE-40% gate fails
+  both halves too (−$10.66). Neither the live gate nor the HL-validated one
+  survives on Lighter. **This is a STRATEGY question, not a threshold tweak** —
+  at a 72h hold, Lighter's real funding (3.5% floor, ~8% typical) cannot pay a
+  10bps round trip plus the 10%-stop/4%-TP asymmetry. The carry is real and
+  economically irrelevant at this holding period.
+  *Limits (in the header, read them):* this replays the **naive** selector; the
+  live bot also runs the multi-factor SCANNER that `funding-farmer-scanner`
+  credits with "the durable +52%", plus the 11-Jul slope gate — neither modelled,
+  so the live bot may beat these rows. What the scanner cannot change is #2: it
+  picks WHICH names clear the gate, not how much carry a 72h hold earns.
+  **NEXT: model the scanner's selection before calling the bot unfixable** — but
+  do not re-denominate to 0.40 true expecting the HL result; it does not
+  reproduce on Lighter.
 - **The deeper finding the sweep should carry to the review: ZERO backtests
   ran on Lighter funding data.** The Funding Farmer's entire evidence base is a
   DIFFERENT VENUE's funding series, ported across a basis mismatch nobody

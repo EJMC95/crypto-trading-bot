@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+"""
+scripts/backtest_funding_lighter.py — the Funding Farmer, backtested ON LIGHTER.
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ VERDICT (2026-07-17, first run — the first time this bot has EVER been    ║
+║ measured on the venue it trades). 150d, 25 markets, 2026-02-17→07-17.     ║
+║                                                                          ║
+║ 1. NO GATE PASSES BOTH HALVES. Not one row. The naive Funding Farmer has  ║
+║    no validated edge on Lighter at ANY entry gate.                        ║
+║ 2. THE LIVE GATE IS BELOW THE FRICTION BREAKEVEN — structurally, before   ║
+║    any price risk. At a 72h max hold, carry per trade = apr * 72/8760.    ║
+║    A 10bps round trip needs apr > 0.122 TRUE just to pay the slippage.    ║
+║    The live bot sits at 0.05 TRUE (= 0.40 published / 8) and Lighter's    ║
+║    floor band is 0.035 TRUE. Both are BELOW breakeven by construction.    ║
+║ 3. THE SWEEP AND THE ARITHMETIC AGREE INDEPENDENTLY: P&L flips sign       ║
+║    between gate 0.12 and 0.20; the one-line friction breakeven predicts   ║
+║    0.122. A mechanism, not a curve fit.                                   ║
+║ 4. FUNDING IS POSITIVE AT EVERY GATE (+$12..+$22 / 150d) AND TOO SMALL    ║
+║    TO MATTER. Price P&L is negative at every gate. At the live gate,      ║
+║    slippage (~1261 trades x 10bps x $25 = ~$31.5) costs ~2x the entire    ║
+║    funding earned (+$15.95). The bot pays more to trade than it harvests. ║
+║ 5. So the 8x bug did not merely mislabel the gate — it parked the live    ║
+║    bot in the WORST region of its own gate curve (0.02-0.08 all lose      ║
+║    $30-76; 0.20-0.30 are ~flat).                                          ║
+║                                                                          ║
+║ THEREFORE: "fix the conversion, keep 0.40" is NOT the answer either — a   ║
+║ TRUE-40% gate also fails both halves (-$10.66). Neither the live gate nor ║
+║ the HL-validated one survives on Lighter. This is a STRATEGY question,    ║
+║ not a threshold tweak: at a 72h hold, Lighter's real funding (3.5% floor, ║
+║ ~8% typical) cannot pay a 10bps round trip plus a 10%-stop/4%-TP          ║
+║ asymmetry. The carry is real (funding>0 everywhere) and economically      ║
+║ irrelevant at this holding period.                                        ║
+║                                                                          ║
+║ LIMITS — read before acting. This replays the NAIVE selector (first-come  ║
+║ above the gate). The live bot also runs a multi-factor SCANNER            ║
+║ (SCAN_ENABLED, vol veto) that `funding-farmer-scanner` memory credits     ║
+║ with "the durable +52%", plus the 11-Jul slope gate — neither is modelled ║
+║ here, so the live bot may do better than these rows. What the scanner     ║
+║ cannot change is finding #2: it picks WHICH names clear the gate, not how ║
+║ much carry a 72h hold earns. Universe = top 25 by daily quote volume      ║
+║ (includes equity perps + commodities). One 150d window; halves shown.     ║
+║ NEXT TEST: re-run with the scanner's selection modelled before concluding ║
+║ the bot is unfixable — but do NOT re-denominate the live gate to 0.40     ║
+║ true expecting the HL result; on Lighter data it does not reproduce.      ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+WHY THIS EXISTS (2026-07-17, operator: "we need everything to run off lighter
+as thats what we run on"). Agenda item 16 found every Lighter funding APR is 8x
+true. The blocking question was whether `FUNDING_ENTER_APR=0.40` was FITTED in
+those wrong units (label-only bug) or set from a TRUE-apr reference (genuinely
+mis-set). Settled: **genuinely mis-set.** EVERY funding backtest in this repo
+loads HYPERLIQUID (`backtest_directional_funding.py`, `backtest_scanner.py`,
+`backtest_carry_hedged.py`, `backtest_tide_rider_scanner.py` — all
+`HL = api.hyperliquid.xyz`, all `H = 24*365`), and HL's native funding really IS
+hourly, so 24*365 is CORRECT there and 0.40 meant a TRUE 40% APR. The live bot
+applies that same 0.40 to Lighter's 8h-basis rate, so it admits at ~5% TRUE.
+
+VERIFIED, not assumed (17-Jul, against both live APIs):
+  * HL `fundingHistory` ETH = 168 rows/7d = HOURLY, mean 1.2493e-05/hr;
+    x24x365 = 10.94% APR (plausible) vs x3x365 = 1.37% (not). HL = hourly. ✓
+  * Lighter `/api/v1/funding-rates` carries FOUR exchanges (lighter/binance/
+    bybit/hyperliquid) normalised to a common 8-HOUR basis: its `hyperliquid`
+    row is 0.0001 = exactly 8x HL's native 1.2493e-05/hr. Its `lighter` ETH row
+    9.6e-05 x3x365 = 10.51% = the SETTLED series to the digit. Lighter = 8h. ✓
+So the two venues' conventions differ by exactly 8, and the threshold was ported
+across that gap as a bare constant. THE PORT IS THE BUG.
+
+THE DATA GAP THIS CLOSES. The fleet used HL data as a proxy — but Lighter serves
+its OWN history and always did: `/api/v1/fundings` pages back to **2025-05-05
+(438d+)** of SETTLED HOURLY rates, and `/api/v1/candles` pages 500 bars at a
+time arbitrarily far back. The HL harnesses fetch 150d. There was never a data
+reason to backtest the Lighter bot on another venue.
+
+TRUE APR, and the only conversion this file uses:
+    settled `/api/v1/fundings` row = {timestamp, rate (PERCENT PER HOUR),
+                                      direction: long|short, value}
+    apr_true = rate/100 * 24 * 365, signed: direction 'long' => longs pay
+                                    => apr>0 => the farmer SHORTS to earn.
+  (Sanity: ETH mean rate 0.000947 %/hr -> 8.3% APR. Not 66%.)
+  This file NEVER touches /funding-rates, so the 8x cannot leak in here.
+
+FIDELITY — the live bot's real rules (`lighter_funding_bot.py`), mirrored:
+  ENTER_GATE on |apr|, PERSIST_H hot-streak first, then exits in the live
+  order: HARD_STOP (adverse) > TAKE_PROFIT (favour) > flip (apr crossed zero)
+  > EXIT_APR (|apr| decayed) > MAX_HOLD_H. MAX_OPEN slots, ORDER_USD clip,
+  SLIP per fill, funding accrued hourly at the settled rate.
+  NO LOOK-AHEAD, same convention as the HL harnesses: the decision at hour t
+  uses the rate settled at t and the candle CLOSED at t; stops are checked on
+  the NEXT bar's intrabar high/low (stop before take-profit = conservative).
+  EXIT_APR scales WITH the swept gate at the live ratio (0.15/0.40 = 0.375), so
+  the sweep moves ONE variable — the gate — not the gate and its exit together
+  ([[ab-tests-must-vary-exactly-one-variable]]).
+
+READ THE VERDICT IN THE OUTPUT, and read `both halves` before believing any row.
+Read-only: hits public endpoints, writes only its cache. Touches no bot, no DB.
+    python3 scripts/backtest_funding_lighter.py            # sweep the gate
+    python3 scripts/backtest_funding_lighter.py --days 150 --refresh
+"""
+import argparse
+import json
+import os
+import time
+import urllib.parse
+import urllib.request
+
+B = "https://mainnet.zklighter.elliot.ai"
+CACHE = os.path.join(os.path.dirname(__file__), ".lighterfund_cache.json")
+
+# ---- live-bot config mirrored (lighter_funding_bot.py tuned defaults) -------
+ORDER_USD = 25.0
+SLIP = 0.0005            # 5bps per fill (Lighter perp fee = 0)
+EXIT_RATIO = 0.375       # live EXIT_APR/ENTER_APR = 0.15/0.40 — held across the sweep
+PERSIST_H = 4
+MAX_HOLD_H = 72
+HARD_STOP = 0.10
+TAKE_PROFIT = 0.04
+MAX_OPEN = 6
+
+# The gate, in TRUE apr. 0.05 = what the live bot does TODAY (0.40 published /8).
+# 0.40 = what the HL backtest validated. The rest bracket them.
+SWEEP = [0.02, 0.03, 0.05, 0.08, 0.12, 0.20, 0.30, 0.40]
+
+
+def _get(path, **q):
+    url = B + path + "?" + urllib.parse.urlencode(q)
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(url, timeout=40) as r:
+                return json.loads(r.read())
+        except Exception:
+            if attempt == 3:
+                raise
+            time.sleep(1.5 * (attempt + 1))
+
+
+def fetch_fundings(mid, days):
+    """Settled hourly funding, paged backward. -> {hour_ts: signed_apr_true}."""
+    out, end, cutoff = {}, int(time.time()), int(time.time()) - days * 86400
+    seen_oldest = None
+    while True:
+        rows = _get("/api/v1/fundings", market_id=mid, resolution="1h",
+                    start_timestamp=0, end_timestamp=end, count_back=0).get("fundings") or []
+        if not rows:
+            break
+        for f in rows:
+            rate = float(f["rate"]) / 100.0 * 24 * 365          # %/hr -> apr fraction
+            out[int(f["timestamp"])] = rate * (1 if f["direction"] == "long" else -1)
+        oldest = min(f["timestamp"] for f in rows)
+        if oldest <= cutoff or (seen_oldest is not None and oldest >= seen_oldest):
+            break
+        seen_oldest, end = oldest, oldest - 3600
+    return {t: v for t, v in out.items() if t >= cutoff}
+
+
+def fetch_candles(mid, days):
+    """Hourly OHLC, paged backward (500-bar cap per call). -> {hour_ts: (o,h,l,c)}."""
+    out, end, cutoff = {}, int(time.time()), int(time.time()) - days * 86400
+    seen_oldest = None
+    while True:
+        cs = _get("/api/v1/candles", market_id=mid, resolution="1h",
+                  start_timestamp=end - 500 * 3600, end_timestamp=end,
+                  count_back=500).get("c") or []
+        if not cs:
+            break
+        for c in cs:
+            out[int(c["t"]) // 1000] = (float(c["o"]), float(c["h"]),
+                                        float(c["l"]), float(c["c"]))
+        oldest = min(int(c["t"]) // 1000 for c in cs)
+        if oldest <= cutoff or (seen_oldest is not None and oldest >= seen_oldest):
+            break
+        seen_oldest, end = oldest, oldest - 3600
+    return {t: v for t, v in out.items() if t >= cutoff}
+
+
+def load(days, universe_n, refresh):
+    if os.path.exists(CACHE) and not refresh:
+        d = json.load(open(CACHE))
+        if d.get("days") >= days and d.get("universe_n") >= universe_n:
+            return {s: {"fund": {int(k): v for k, v in m["fund"].items()},
+                        "cand": {int(k): tuple(v) for k, v in m["cand"].items()}}
+                    for s, m in d["mk"].items()}
+    obs = _get("/api/v1/orderBookDetails").get("order_book_details") or []
+    liquid = sorted((o for o in obs if o.get("symbol")),
+                    key=lambda o: -float(o.get("daily_quote_token_volume") or 0))
+    mk = {}
+    for o in liquid[:universe_n]:
+        sym, mid = o["symbol"], o["market_id"]
+        try:
+            fund, cand = fetch_fundings(mid, days), fetch_candles(mid, days)
+        except Exception as e:
+            print(f"  {sym}: fetch failed ({e}) — skipped")
+            continue
+        common = set(fund) & set(cand)
+        if len(common) < 24 * 20:
+            print(f"  {sym}: only {len(common)}h of paired history — skipped")
+            continue
+        mk[sym] = {"fund": fund, "cand": cand}
+        print(f"  {sym:12s} {len(common):5d}h paired "
+              f"({(max(common)-min(common))/86400:.0f}d)")
+    json.dump({"days": days, "universe_n": universe_n,
+               "mk": {s: {"fund": m["fund"], "cand": m["cand"]} for s, m in mk.items()}},
+              open(CACHE, "w"))
+    return mk
+
+
+def run(mk, enter_apr, t0, t1):
+    """Replay the live bot's rules over [t0,t1). Returns a result dict."""
+    exit_apr = enter_apr * EXIT_RATIO
+    hours = sorted({t for m in mk.values() for t in m["fund"] if t0 <= t < t1})
+    pos, hot, cool = {}, {}, {}
+    fund_pnl = price_pnl = 0.0
+    trades, wins, eq, peak, maxdd = 0, 0, 0.0, 0.0, 0.0
+
+    for t in hours:
+        for sym, m in mk.items():
+            apr, c = m["fund"].get(t), m["cand"].get(t)
+            if apr is None or c is None:
+                continue
+            _o, hi, lo, close = c
+            p = pos.get(sym)
+            if p:
+                # funding accrues hourly at the SETTLED rate
+                f = (1.0 if p["short"] else -1.0) * (apr / (24 * 365)) * p["ntl"]
+                fund_pnl += f
+                p["fund"] += f
+                held_h = (t - p["t0"]) / 3600.0
+                adverse = ((hi - p["px"]) / p["px"]) if p["short"] else ((p["px"] - lo) / p["px"])
+                favour = ((p["px"] - lo) / p["px"]) if p["short"] else ((hi - p["px"]) / p["px"])
+                out_px, why = None, None
+                if adverse >= HARD_STOP:                       # stop first = conservative
+                    out_px, why = p["px"] * (1 + HARD_STOP if p["short"] else 1 - HARD_STOP), "stop"
+                elif favour >= TAKE_PROFIT:
+                    out_px, why = p["px"] * (1 - TAKE_PROFIT if p["short"] else 1 + TAKE_PROFIT), "tp"
+                elif (p["short"] and apr < 0) or (not p["short"] and apr > 0):
+                    out_px, why = close, "flip"
+                elif abs(apr) < exit_apr:
+                    out_px, why = close, "cold"
+                elif held_h >= MAX_HOLD_H:
+                    out_px, why = close, "max_hold"
+                if out_px is not None:
+                    raw = (p["px"] - out_px) / p["px"] if p["short"] else (out_px - p["px"]) / p["px"]
+                    pp = raw * p["ntl"] - 2 * SLIP * p["ntl"]
+                    price_pnl += pp
+                    tot = pp + p["fund"]
+                    trades += 1
+                    wins += 1 if tot > 0 else 0
+                    eq += tot
+                    peak = max(peak, eq)
+                    maxdd = min(maxdd, eq - peak)
+                    cool[sym] = t + 12 * 3600 if why == "stop" else 0
+                    pos.pop(sym)
+                continue
+            # ---- entry: hot for PERSIST_H, gate on TRUE apr, slots free ----
+            if abs(apr) >= enter_apr:
+                hot[sym] = hot.get(sym) or t
+            else:
+                hot[sym] = None
+            if (len(pos) < MAX_OPEN and hot.get(sym)
+                    and (t - hot[sym]) / 3600.0 >= PERSIST_H
+                    and t >= cool.get(sym, 0)):
+                pos[sym] = {"px": close, "short": apr > 0, "t0": t,
+                            "ntl": ORDER_USD, "fund": 0.0}
+    return {"enter": enter_apr, "pnl": eq, "fund": fund_pnl, "price": price_pnl,
+            "n": trades, "win": 100.0 * wins / trades if trades else 0.0,
+            "maxdd": maxdd}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--days", type=int, default=150)
+    ap.add_argument("--universe", type=int, default=25)
+    ap.add_argument("--refresh", action="store_true")
+    a = ap.parse_args()
+
+    print(f"Fetching LIGHTER history — {a.days}d, top {a.universe} by daily quote volume")
+    mk = load(a.days, a.universe, a.refresh)
+    if not mk:
+        raise SystemExit("no markets with paired funding+candle history")
+    hours = sorted({t for m in mk.values() for t in m["fund"]})
+    lo, hi = min(hours), max(hours)
+    mid = lo + (hi - lo) // 2
+    print(f"\n{len(mk)} markets | {time.strftime('%Y-%m-%d', time.gmtime(lo))} -> "
+          f"{time.strftime('%Y-%m-%d', time.gmtime(hi))} ({(hi-lo)/86400:.0f}d)")
+    print(f"clip ${ORDER_USD:.0f} x {MAX_OPEN} slots | slip {SLIP*1e4:.0f}bps/fill | "
+          f"exit = enter x {EXIT_RATIO}\n")
+
+    hdr = (f"{'gate(TRUE apr)':>15s} {'P&L $':>9s} {'fund $':>8s} {'price $':>9s} "
+           f"{'n':>5s} {'win%':>6s} {'maxDD $':>8s} | {'1st half':>9s} {'2nd half':>9s}")
+    print(hdr); print("-" * len(hdr))
+    for g in SWEEP:
+        full = run(mk, g, lo, hi + 1)
+        h1 = run(mk, g, lo, mid)
+        h2 = run(mk, g, mid, hi + 1)
+        tag = ""
+        if abs(g - 0.05) < 1e-9:
+            tag = "  <- LIVE TODAY (0.40 published / 8)"
+        if abs(g - 0.40) < 1e-9:
+            tag = "  <- what the HL backtest validated"
+        print(f"{g:>15.2f} {full['pnl']:>9.2f} {full['fund']:>8.2f} {full['price']:>9.2f} "
+              f"{full['n']:>5d} {full['win']:>6.1f} {full['maxdd']:>8.2f} | "
+              f"{h1['pnl']:>9.2f} {h2['pnl']:>9.2f}{tag}")
+    print("\nBOTH HALVES must agree in sign before a gate is believable — a row that "
+          "wins only on one half is a window, not an edge (see trail-blazer-no-durable-edge).")
+
+
+if __name__ == "__main__":
+    main()
