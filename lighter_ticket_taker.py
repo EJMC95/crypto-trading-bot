@@ -248,6 +248,39 @@ def vol_clip(day_range_pct):
     return round(min(CLIP_MAX, max(CLIP_MIN, RISK_USD / adverse)), 2)
 
 
+ALL_LENSES = frozenset({"breakout", "dip", "momentum", "divergence"})
+# [2026-07-17 LIVE = DIVERGENCE ONLY — operator decision] The live arm may fill
+# ONE lens. The brain grades the other three NEGATIVE at n=1279-2620 with
+# hit-rate 95% CIs entirely below 50% (dip -0.471%/.392, breakout -0.210%/.399,
+# momentum -0.365%/.394) — three independent dip-buyer rejections across the
+# fleet's history. Real money does not get to re-litigate that.
+LIVE_LENSES = frozenset({"divergence"})
+
+
+def allowed_lenses(mode):
+    """Hard per-MODE lens allow-list. Fail-CLOSED, and deliberately NOT the
+    brain's veto.
+
+    Why this exists ALONGSIDE vetoed_lenses(): that one is RESTRICT-ONLY and
+    fail-safe OPEN by design — a dark brain, a stale payload, a DB read blip or
+    a lens dropped from the grade set all collapse to "veto nothing". That is
+    correct for a shadow book whose JOB is grading every lens. It is
+    catastrophic as the ONLY thing standing between real money and a lens the
+    fleet has already rejected three times. Four independent paths re-enable
+    dip/breakout/momentum with no error; none of them can reach this function,
+    because it reads no bus payload at all.
+
+    `mode` is taken EXPLICITLY rather than read off module-level TT_VENUE: four
+    modules import this one (lighter_ticket_replay, lighter_scout_tuner,
+    strategy_incubator, fleet_proprioception) and every one must keep grading
+    ALL FOUR lenses on the shadow tape. A module-level read would make their
+    behaviour depend on the importing process's environment — the exact
+    "env silently decides real-money semantics" trap the 17-Jul VENUE fix
+    closed. The brain's veto stays SENIOR on top of this (restrict-only).
+    """
+    return LIVE_LENSES if mode == "lighter_live" else ALL_LENSES
+
+
 def vetoed_lenses(lens_fwd, min_n=None):
     """THE lens veto rule, and the single authority for it (2026-07-17): a
     lens the brain grades negative at sample size stops getting fills.
@@ -815,11 +848,17 @@ def main(_ctx=None):
               f"{sorted(lens_vetoed)} negative at sample size; skipping their "
               f"tickets (restrict-only; recovers when the grade does)")
     opened_syms, opened_lenses = set(), set()
+    # [2026-07-17] Hard mode allow-list, evaluated ONCE and independently of any
+    # bus payload. Live = divergence only; shadow keeps filling all four so the
+    # control arm still grades them. See allowed_lenses().
+    _allowed = allowed_lenses(TT_VENUE)
     if fresh and not stressed:
         for lens, t in incredible(scout.get("tickets") or {}):
             sym = t.get("sym")
+            if lens not in _allowed:
+                continue          # mode allow-list — FAIL-CLOSED, reads no bus
             if lens in lens_vetoed:
-                continue          # brain graded this lens negative at n>=min_n
+                continue          # brain veto stays SENIOR (restrict-only)
             # one NEW position per lens per cycle; never add to a held symbol
             if (not sym or sym in pos or sym in opened_syms
                     or lens in opened_lenses):
@@ -837,6 +876,16 @@ def main(_ctx=None):
             ev = {k: t.get(k) for k in ("range_pos", "chg_pct", "vol_m",
                                         "prem_bps", "apr_pct", "gap_pct")}
             entry_px = mark
+            # [2026-07-17] BRACES to the allow-list's belt. The filter above is
+            # the belt; this is the last statement before real money moves, so
+            # a future second entry path cannot bypass it by construction.
+            # SystemExit propagates through _supervised() untouched — a breach
+            # HALTS rather than restarting into the same bug.
+            if not dry_run and lens not in LIVE_LENSES:
+                raise SystemExit(
+                    f"live lens allow-list BREACHED: {lens!r} reached the order "
+                    f"path on real money (allowed: {sorted(LIVE_LENSES)}). "
+                    f"Halting rather than filling.")
             if dry_run:
                 broker.open(sym, is_long, size, mark)
                 # ShadowBroker fills by WALKING the book, so the decision price
@@ -1021,9 +1070,38 @@ def selftest():
     _short = -1.0 * 100.0 * funding_basis.to_hourly(8e-4, "lighter") * 8.0
     assert _short < 0 and abs(_short + 0.08) < 1e-12, _short
 
+    # ---- LIVE LENS ALLOW-LIST — fail-CLOSED, and the negative fixture ------
+    # A guard that never fires is not a guard (adversarial-verify-3-lens).
+    assert allowed_lenses("lighter_live") == {"divergence"}, allowed_lenses("lighter_live")
+    assert allowed_lenses("lighter_shadow") == ALL_LENSES   # control arm grades all 4
+    assert allowed_lenses("lighter_paper") == ALL_LENSES
+    # an UNKNOWN mode must not silently widen live (it is not "lighter_live",
+    # so it gets the shadow set — and TT_VENUE is validated against TT_MODES
+    # before this is ever reached)
+    assert allowed_lenses("") == ALL_LENSES
+
+    # THE POINT: a DARK brain vetoes NOTHING (fail-open by design), and the
+    # allow-list must hold anyway. This is the fixture that proves live cannot
+    # re-acquire a rejected lens when the brain goes down.
+    _dark = vetoed_lenses({})
+    assert _dark == set(), _dark                    # confirms the fail-open premise
+    _live_fills = {l for l, _ in incredible(tk)
+                   if l in allowed_lenses("lighter_live") and l not in _dark}
+    assert _live_fills == {"divergence"}, _live_fills
+    # ...while the shadow arm still fills every lens the fixture qualifies
+    _shadow_fills = {l for l, _ in incredible(tk)
+                     if l in allowed_lenses("lighter_shadow") and l not in _dark}
+    assert _shadow_fills == {"breakout", "dip", "momentum", "divergence"}, _shadow_fills
+    # and the brain stays SENIOR on top: it can still restrict divergence away
+    _senior = {l for l, _ in incredible(tk)
+               if l in allowed_lenses("lighter_live")
+               and l not in {"divergence"}}
+    assert _senior == set(), _senior
+
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
           "long/short exits, signed funding on the TRUE 8h basis, "
-          "constant-risk sizing, delist give-up).")
+          "constant-risk sizing, delist give-up, LIVE lens allow-list "
+          "fail-CLOSED vs a dark brain).")
 
 
 # ---------------------------------------------------------------------------
