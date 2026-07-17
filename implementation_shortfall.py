@@ -43,6 +43,14 @@ KEY = "impl-shortfall"
 TTL_SEC = int(os.environ.get("SHORTFALL_TTL_SEC", "3600"))
 LIVE = os.environ.get("SHORTFALL_LIVE", "perps-funding-lighter-lighter")
 SHADOW = os.environ.get("SHORTFALL_SHADOW", "perps-funding-lighter-lshadow")
+# [2026-07-17 AUDIT] The judge's experiment arm, read from ITS OWN env var with
+# ITS OWN default — so if the operator re-points either organ, they still agree
+# about whether SHADOW is a control or an experiment. Hard-coding the row here
+# would let the two drift apart silently, which is how the collision below went
+# unnoticed for as long as it did. Not imported from experiment_judge on
+# purpose: that would add a heavy import (and a born-dark surface) to read one
+# string.
+XPJ_SHADOW_BOT = os.environ.get("XPJ_SHADOW_BOT", "perps-funding-lighter-lshadow")
 WINDOW_DAYS = int(os.environ.get("SHORTFALL_WINDOW_DAYS", "7"))
 MIN_COINS = int(os.environ.get("SHORTFALL_MIN_COINS", "2"))
 MIN_CLOSES = int(os.environ.get("SHORTFALL_MIN_CLOSES", "4"))
@@ -63,12 +71,36 @@ def _iso(ts=None):
 # pure computation (selftested offline)
 # ---------------------------------------------------------------------------
 
-def compute_shortfall(per_coin):
+def compute_shortfall(per_coin, xp_running=False):
     """per_coin: {coin: {'live': {'avg_pct', 'n', 'entry', 'exit'},
                          'shadow': {'avg_pct', 'n', 'entry', 'exit'}}}.
     Returns the overall weighted gap (live − shadow, in pp/trade), the
     per-coin gaps, overlap/close counts, entry/exit slip decomposition (bps,
-    where both arms carry prices), and a verdict. Pure."""
+    where both arms carry prices), and a verdict. Pure.
+
+    `xp_running`: the experiment judge has a candidate on the shadow arm, so
+    the arms differ by STRATEGY as well as execution -> gap is reported but
+    NOT judged (verdict 'xp-contaminated'). See the note in run_once.
+
+    [2026-07-17 AUDIT] This organ's premise (:5-10) is that the two arms run
+    "the SAME strategy on the SAME coins ... the ONLY difference is execution".
+    That is FALSE whenever the judge is running a candidate, because SHADOW
+    (:45) and experiment_judge.SHADOW_BOT (:62) are THE SAME ROW — the judge
+    calls it "the EXPERIMENT arm: runs the current candidate's bars via xp.*
+    levers", and lighter_funding_bot maps lighter_shadow -> "xp.funding.",
+    moving enter_apr/take_profit/max_hold_h. Both loop in the same container.
+    This organ had ZERO references to xp-judge.
+
+    The thresholds collide EXACTLY:
+        judge MARGIN_PP 0.5 / MIN_DAYS 7   |   isf CLEAN_PP 0.5 / WINDOW_DAYS 7
+    So ANY candidate clearing the judge's promotion bar by any margin — i.e.
+    every SUCCESS — forces gap < -CLEAN_PP here and reports 'live-slipping',
+    phoning the operator "LIVE slipping vs shadow" every 6h for the
+    candidate's 7+ day run, with perfectly clean execution. Inverted, a LOSING
+    candidate reports 'live-ahead': a strategy handicap read as execution
+    alpha, which the board surfaces as `expand`. The A/B rule this fleet
+    already learned the hard way: vary exactly ONE variable, or the headline
+    can point the opposite way to the truth."""
     coins, diffs, weights = {}, [], []
     entry_slips, exit_slips, dw = [], [], []
     for coin, sides in sorted(per_coin.items()):
@@ -101,6 +133,14 @@ def compute_shortfall(per_coin):
 
     if n_overlap < MIN_COINS or tot_w < MIN_CLOSES:
         verdict = "insufficient"
+    elif xp_running:
+        # the control arm is an EXPERIMENT arm — this gap measures strategy +
+        # execution together and cannot be attributed to either. Report the
+        # number, refuse the verdict. Deliberately NOT 'clean': the honest
+        # answer is "cannot tell", and a false CLEAN would hide real slippage
+        # for the 7+ days a candidate runs. Never phones (run_once's streak
+        # only counts 'live-slipping').
+        verdict = "xp-contaminated"
     elif gap is None or abs(gap) <= CLEAN_PP:
         verdict = "clean"
     elif gap > 0:
@@ -110,7 +150,8 @@ def compute_shortfall(per_coin):
 
     return {"gap_pp": gap, "verdict": verdict, "n_overlap": n_overlap,
             "paired_closes": tot_w, "coins": coins,
-            "entry_slip_bps": entry_slip, "exit_slip_bps": exit_slip}
+            "entry_slip_bps": entry_slip, "exit_slip_bps": exit_slip,
+            "xp_running": bool(xp_running)}
 
 
 def _slip_bps(lv, sh):
@@ -261,10 +302,42 @@ def send_push(title, body):
         return False
 
 
+def _xp_running(now):
+    """Is the experiment judge running a candidate on OUR shadow arm right now?
+
+    [2026-07-17 AUDIT] The shadow arm is the judge's EXPERIMENT arm whenever a
+    candidate is in force, so this organ's execution premise does not hold —
+    see compute_shortfall. FAIL-SAFE toward CONTAMINATED: a dark/stale/
+    unreadable xp-judge returns True, because the dangerous error is assuming
+    a clean control we cannot verify. Being wrong this way costs a few quiet
+    cycles; being wrong the other way phones the operator "LIVE slipping"
+    about a candidate that is WINNING. Only skipped when the judge positively
+    reports a non-running phase on a FRESH payload — the same shape as every
+    other consumer contract in the fleet.
+
+    Scoped by row: if the judge's shadow arm isn't the one we measure, its
+    phase is irrelevant to us."""
+    if SHADOW != XPJ_SHADOW_BOT:
+        return False
+    try:
+        st = store.load_state("xp-judge")
+        if not st:
+            return True                     # no ledger visible -> assume running
+        u, ttl = st.get("updated"), float(st.get("ttl_sec") or 10800)
+        age = now - datetime.fromisoformat(
+            str(u).replace("Z", "+00:00")).timestamp()
+        if not (0 <= age <= ttl):
+            return True                     # stale -> cannot vouch for the arm
+        return str(st.get("phase") or "") == "running"
+    except Exception:                       # noqa: BLE001
+        return True                         # unreadable -> assume contaminated
+
+
 def run_once():
     now = now_ts()
     prior = store.load_state(KEY) or {}
-    rep = compute_shortfall(_fetch_per_coin())
+    xp = _xp_running(now)
+    rep = compute_shortfall(_fetch_per_coin(), xp_running=xp)
     # [2026-07-17] the real execution read: decision-vs-fill on ONE order.
     # Replaces the withdrawn averaged-price decomposition (see _slip_bps).
     _os = _fetch_order_slip()
@@ -372,7 +445,62 @@ def _selftest():
     # an ECHOED decision price is NOT zero slippage — it is no reading at all
     assert _slip_bps_of_check(100.0, 100.0, True) is None, \
         "px_fill == px_decision must be None, never 0.0"
-    print("implementation_shortfall selftest OK (clean/slipping/ahead/"
+    # [2026-07-17 AUDIT] THE CONTROL ARM IS AN EXPERIMENT ARM. A candidate that
+    # CLEARS the judge's promotion bar (shadow beats live by >= MARGIN_PP=0.5)
+    # is, to this organ, gap <= -CLEAN_PP=0.5 -> 'live-slipping'. Same rows,
+    # same 7d window, same 0.5pp bar. So every judge SUCCESS phoned the operator
+    # "LIVE slipping vs shadow" for 7+ days, with EXECUTION PERFECTLY CLEAN.
+    # Fixture: identical fills on both arms (zero real shortfall), shadow ahead
+    # purely on the candidate's bars.
+    _xp_rows = {"ETH": {"live":   {"avg_pct": 0.001, "n": 10, "entry": 100.0, "exit": 100.1},
+                        "shadow": {"avg_pct": 0.010, "n": 10, "entry": 100.0, "exit": 100.1}},
+                "BTC": {"live":   {"avg_pct": 0.002, "n": 9,  "entry": 100.0, "exit": 100.2},
+                        "shadow": {"avg_pct": 0.011, "n": 9,  "entry": 100.0, "exit": 100.2}}}
+    _dirty = compute_shortfall(_xp_rows, xp_running=False)
+    assert _dirty["verdict"] == "live-slipping" and _dirty["gap_pp"] < -0.5, _dirty
+    assert _dirty["gap_pp"] == round(-0.9, 3), _dirty        # the false alarm
+    _honest = compute_shortfall(_xp_rows, xp_running=True)
+    assert _honest["verdict"] == "xp-contaminated", _honest
+    assert _honest["gap_pp"] == _dirty["gap_pp"], "report the number, refuse the verdict"
+    assert _honest["xp_running"] is True
+    # ...and it must NOT be called 'clean' — that would hide real slippage for
+    # the 7+ days a candidate runs. Only 'live-slipping' phones (run_once's
+    # streak), so xp-contaminated is silent by construction.
+    assert _honest["verdict"] != "clean"
+    # the INVERSE: a LOSING candidate read as execution alpha ('live-ahead'),
+    # which the board surfaces as `expand`
+    _lose = {c: {"live": v["shadow"], "shadow": v["live"]} for c, v in _xp_rows.items()}
+    assert compute_shortfall(_lose, xp_running=False)["verdict"] == "live-ahead"
+    assert compute_shortfall(_lose, xp_running=True)["verdict"] == "xp-contaminated"
+    # with NO candidate running, a real slip still reports normally
+    assert compute_shortfall(_xp_rows, xp_running=False)["verdict"] == "live-slipping"
+    # thin data still wins over contamination (nothing to contaminate)
+    assert compute_shortfall({"ETH": {"live": {"avg_pct": 0.0, "n": 1},
+                                      "shadow": {"avg_pct": 0.0, "n": 1}}},
+                             xp_running=True)["verdict"] == "insufficient"
+
+    # _xp_running fails SAFE toward contaminated: only a FRESH, positively
+    # non-running judge licenses a verdict.
+    _t = 1_784_000_000.0
+    _real_ls = store.load_state
+
+    def _judge(st):
+        store.load_state = lambda k: st if k == "xp-judge" else None
+        return _xp_running(_t)
+    try:
+        _fresh = datetime.fromtimestamp(_t - 60, tz=timezone.utc).isoformat()
+        _old = datetime.fromtimestamp(_t - 99999, tz=timezone.utc).isoformat()
+        assert _judge({"phase": "idle", "updated": _fresh, "ttl_sec": 10800}) is False
+        assert _judge({"phase": "running", "updated": _fresh, "ttl_sec": 10800}) is True
+        assert _judge({"phase": "idle", "updated": _old, "ttl_sec": 10800}) is True, \
+            "a STALE judge cannot vouch for the arm -> assume contaminated"
+        assert _judge(None) is True, "no ledger visible -> assume contaminated"
+        assert _judge({"phase": "idle"}) is True, "unstamped -> assume contaminated"
+    finally:
+        store.load_state = _real_ls
+
+    print("implementation_shortfall selftest OK (xp-contaminated control arm, "
+          "clean/slipping/ahead/"
           "insufficient, one-arm ignored, entry+exit decomposition long+short)")
 
 
