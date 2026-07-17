@@ -71,9 +71,20 @@ and the fleet already has one honest use for the clock — a human reading the
 dashboard. If a consumer IS wanted, its premise must arrive **stated as a
 claim about code that exists**, verified by inspection before anything is
 built — the check that took one `grep` on 17-Jul and would have saved the
-entire build. The two struck options are restated below as UNVERIFIED
-premises so the review can attack them properly rather than inherit them.
-*This restatement is itself unverified reasoning — attack it too.*
+entire build.
+
+**Both struck options were then MEASURED (17-Jul, operator: "may as well fix
+now") — and BOTH found NO SUPPORT.** They are restated below with their
+numbers, not as prose to inherit. Every quantity either premise names is flat:
+the bell marks no dislocation the scanner would want, and nothing in the
+container contends for the heavy-job flag to protect. One re-runnable
+read-only script covers both — `clock_consumer_premise_check.py`, verdict and
+limitations in its header (repo convention: **don't re-test what a script
+header already rejects**). Re-run it before the review; the tape is only 69h.
+So the live question is genuinely "does the clock get a consumer at all", with
+all three original answers now measured or refuted rather than merely struck.
+*Held honestly as NO SUPPORT FOUND, not REFUTED — the tape is thin and each
+check names its own blind spot. The scoped survivors are in the bullets.*
 - *Scanners* (Lighter Scout / Gap Scout) — the claim was "opens/closes are
   when dislocations and vol moves happen." **MEASURED 17-Jul: NO SUPPORT
   FOUND** (`clock_consumer_premise_check.py`, verdict + limitations in its
@@ -117,10 +128,33 @@ premises so the review can attack them properly rather than inherit them.
   is quiet enough that the board's growth rail is already widening its
   prefilter.
 - *Heavy jobs* (incubator breeding, big sweeps) — the claim was that heavy
-  jobs running inside an event window cost something. Never tested, and no
-  resource has been named as scarce: the sweeps contend for CPU with loops
-  that are not on a deadline. Name the contended resource and measure the
-  contention, or this is a knob that buys a tidier story and no dollars.
+  jobs running inside an event window cost something. **MEASURED 17-Jul: NO
+  SUPPORT FOUND** (same script). The premise has a prerequisite nobody stated,
+  let alone checked: **something must actually CONTEND.** In `run_all.sh`
+  every organ runs in its own `( … ) &` subshell with its own sleep loop —
+  independent processes sharing container CPU, not a sequential queue — and
+  the canonical heavy job (the incubator) runs hourly in that same container
+  as the scout, which loops `run; sleep 300`. If a heavy job stole CPU, the
+  scout's cycle would stretch. Over 831 intervals / 69h: **p50 300.6s, p90
+  300.7s** against a 300s nominal (p99 344.6s, stdev 20.1s, implied scout
+  runtime 0.6s). 90% of cycles land within **0.7s** of nominal — the container
+  is idle from the scout's vantage — and the slowest 10% spread FLAT across
+  minute-of-hour buckets (worst 10 vs 7.0 expected), so the hourly incubator
+  leaves no signature. **Nothing measurably contends, so `heavy_ok` currently
+  protects nothing.**
+  *Honest limits:* the scout is I/O-bound (0.6s runtime, one bulk API call),
+  so this is an INDIRECT probe of CPU pressure — a fair one, since a starved
+  container would delay the `sleep 300` wake and p90 says it doesn't, but a
+  direct Railway container CPU metric would beat it. The incubator's phase
+  drifts (`run; sleep 3600`), so the minute-of-hour test is weak corroboration
+  and the interval distribution is the finding. Contention could exist on a
+  resource this misses (network, DB pool, RAM) — name the resource first, then
+  measure that one.
+  **My own claim here was also unverified until this ran:** "no resource has
+  been named as scarce; the sweeps contend for CPU with loops that are not on
+  a deadline" was an assertion dressed as a finding, in the same breath as the
+  scanner ones. It happens to have survived measurement — which is luck, not
+  method, and exactly why it got measured.
 
 If equities are ever revisited, the only defensible claim is FILL QUALITY
 (don't cross a thin after-hours equity-perp book) — a different hypothesis
