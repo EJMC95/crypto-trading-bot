@@ -77,9 +77,17 @@ This is the actual audit, not a sample. Both runs below are reproducible.
   ignored, ccxt static+dynamic, env defaults, f-strings, unparseable=LOUD,
   no stale exceptions, known findings held)   exit 0.
 
-VERDICT: the rule has rotted in ELEVEN shipped files — and the 8-item list
-this guard was briefed with was both INCOMPLETE (7 findings it never
-mentioned) and WRONG in one place. Every claim below is measured.
+VERDICT: the rule has rotted in ELEVEN shipped files — 15 violations, of which
+**10 were on NO list handed to this guard** and 5 were. The briefed list was
+both INCOMPLETE and WRONG in one place (it handed market_pulse over as a
+declared exception; it is a real violation). Every claim below is measured.
+[2026-07-17 CORRECTION: this verdict first read "7 findings it never mentioned"
+and "the 4 findings the brief did name" — both unmeasurable (no BRIEF constant
+exists in this code) and both refuted by this header's OWN itemisation, which
+sums to 10 + 5 = 15 = the measured total. Fixed to the numbers the list
+actually supports. A guard whose self-description is unchecked prose, under a
+banner reading "every claim below is measured", is the exact failure it exists
+to catch.]
 
   * venues/__init__.py:110 — `venue_context()` defaults VENUE to "hl_paper",
     which constructs a HyperliquidClient. This is the SHARED REAL-MONEY
@@ -113,9 +121,11 @@ mentioned) and WRONG in one place. Every claim below is measured.
     for, and it is 2 of the 15.
   * compile_market_data.py — 4 foreign price hosts feeding the research
     brief's "breadth gauge" (its F&G sentiment host IS declared).
-  * The 4 findings the brief did name (2x api.hyperliquid.xyz in the
-    dislocation/funding-spread bots, regime_oracle, market_context,
+  * The 5 findings the brief DID name (api.hyperliquid.xyz in the dislocation
+    bot and in the funding-spread bot, regime_oracle, market_context, and
     funding_carry's hl_paper default) all reproduce exactly.
+  (10 novel + 5 named = 15 = the measured violation count. The counts in this
+  header are the itemisation above, added up — not a recollection of a brief.)
 
 NOT violations — measured, and worth stating so nobody "fixes" them:
   * lighter_index_bot / lighter_momentum_bot -> Yahoo. PRINCIPLED, permanent
@@ -274,8 +284,14 @@ _SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", ".claude", "scripts",
               "logs", "backtest_results"}
 
 
-def shipped_files():
-    """Every shipped python file.
+def shipped_files(root=None):
+    """Every shipped python file under `root` (default: the real repo).
+
+    [2026-07-17] `root` is a PARAMETER so the negative fixture can run in a
+    tempdir. It used to write its probe into the live repo root — the audit's
+    own scan target AND the `COPY . .` image surface — which made a concurrent
+    audit report a phantom violation and two concurrent selftests crash. A
+    detective control that mutates the thing it inspects is not a control.
 
     Repo root is the fleet's module surface. venues/ and user_data/strategies/
     are included deliberately: they are COPY'd packages and venues/ is the
@@ -283,19 +299,20 @@ def shipped_files():
     scope, whatever its nominal scope). Excluded: scripts/ (research tools,
     this file included), .venv, .claude (worktrees live there), caches.
     """
+    root = root or ROOT
     out = []
-    for f in sorted(os.listdir(ROOT)):
-        if f.endswith(".py") and os.path.isfile(os.path.join(ROOT, f)):
+    for f in sorted(os.listdir(root)):
+        if f.endswith(".py") and os.path.isfile(os.path.join(root, f)):
             out.append(f)
     for pkg in ("venues", os.path.join("user_data", "strategies")):
-        base = os.path.join(ROOT, pkg)
+        base = os.path.join(root, pkg)
         if not os.path.isdir(base):
             continue
         for r, dirs, fs in os.walk(base):
             dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
             for f in sorted(fs):
                 if f.endswith(".py"):
-                    out.append(os.path.relpath(os.path.join(r, f), ROOT))
+                    out.append(os.path.relpath(os.path.join(r, f), root))
     return out
 
 
@@ -457,11 +474,15 @@ def _is_shipped(rel, shipped):
     return any(rel.startswith(p) for p in shipped if p.endswith("/"))
 
 
-def audit():
-    """(violations, oks, unparsed) — violations are (rel, source, lines)."""
+def audit(root=None):
+    """(violations, oks, unparsed) — violations are (rel, source, lines).
+
+    `root` defaults to the real repo; the selftest passes a tempdir so its
+    negative fixture never touches the tree it is auditing."""
+    root = root or ROOT
     violations, oks, unparsed = [], [], []
-    for rel in shipped_files():
-        srcs = detect_sources(os.path.join(ROOT, rel))
+    for rel in shipped_files(root):
+        srcs = detect_sources(os.path.join(root, rel))
         if srcs is None:
             unparsed.append(rel)
             continue
@@ -533,9 +554,16 @@ def _selftest():
     # --- NEGATIVE FIXTURE: the whole point of a detective control. ----------
     # A synthetic shipped file with an UNDECLARED foreign host MUST be flagged.
     # Without this, "0 violations" is indistinguishable from a broken detector.
-    probe = os.path.join(ROOT, "_venue_purity_selftest_probe.py")
-    try:
-        open(probe, "w").write(
+    # [2026-07-17 FIX] This fixture used to write its probe into the LIVE repo
+    # root and call the global audit() — mutating the very tree it inspects, on
+    # the `COPY . .` image surface, ungitignored. Reproduced by a reviewer: a
+    # concurrent audit saw a phantom `host:api.foreign-venue.example`, and two
+    # of three concurrent selftests died on FileNotFoundError. It also made this
+    # file's own "writes nothing, never edits another file" claim FALSE. It now
+    # runs in a tempdir like the other three fixture blocks below already did.
+    with tempfile.TemporaryDirectory() as d:
+        probe_name = "_venue_purity_selftest_probe.py"
+        open(os.path.join(d, probe_name), "w").write(
             '"""Docstring mentioning https://api.evil-exchange.com — PROSE, '
             'must NOT be a finding."""\n'
             "import os, urllib.request\n"
@@ -543,9 +571,9 @@ def _selftest():
             'BAD = "https://api.foreign-venue.example/klines"\n'
             'OK_ = "https://mainnet.zklighter.elliot.ai/api/v1/candles"\n'
             'PUSH = "https://ntfy.sh/topic"\n')
-        v, _oks, unp = audit()
+        v, _oks, unp = audit(root=d)
         assert not unp, unp
-        got = {s for r, s, _l in v if r == os.path.basename(probe)}
+        got = {s for r, s, _l in v if r == probe_name}
         assert got == {"host:api.foreign-venue.example"}, \
             f"negative fixture: expected the foreign host ONLY, got {got}"
         # and the compliant/infra/prose ones must NOT be findings
@@ -554,8 +582,10 @@ def _selftest():
         assert "host:api.evil-exchange.com" not in got, \
             "DOCSTRING host flagged — prose is not a dependency"
         assert "host:api.also-not-a-finding.com" not in got, "COMMENT flagged"
-    finally:
-        os.remove(probe)
+    # PROVE the fixture left no trace in the real tree — the defect it replaces
+    # was invisible precisely because nobody checked.
+    assert not os.path.exists(os.path.join(ROOT, "_venue_purity_selftest_probe.py")), \
+        "selftest leaked a probe into the repo root"
 
     # --- ccxt: the gap a URL grep cannot see -------------------------------
     with tempfile.TemporaryDirectory() as d:

@@ -17,7 +17,8 @@ Lighter instead? MEASURED, per consumer. Nothing is swapped here.
 ║    200 closed days x 16 majors, prev_trend hysteresis carried per source,     ║
 ║    the 300d window rebuilt at every day exactly as the oracle does:           ║
 ║      **VERDICTS IDENTICAL ON 99.4% OF COIN-DAYS (3,066/3,085). 19 differ.**   ║
-║      11 of 16 majors agree on 100.0% of days. Worst: DOGE 96.0%.              ║
+║      10 of 16 majors agree on 100.0% of days. Worst: DOGE 96.0% (8 days),     ║
+║      then NEAR 98.0%, SOL 98.5%, TAO 99.0%, AVAX/DOT 99.5%.                   ║
 ║      Prices agree too: median close divergence 1.3-8.4bps/coin, max 106.2bps. ║
 ║    I EXPECTED THIS TO BE A BEHAVIOUR CHANGE. It mostly is not. The signal     ║
 ║    survives the swap.                                                         ║
@@ -61,26 +62,44 @@ Lighter instead? MEASURED, per consumer. Nothing is swapped here.
 ║ 2. lighter_funding_spread_bot.hl_backfill()  ->  **LIGHTER IS BETTER.         ║
 ║    Swap it — but as a BUG FIX, not a venue preference.**                      ║
 ║    THE BENCH RATIO GENERALISES: the brief's single ETH sample holds across    ║
-║    the cross-section. **Pooled median ratio 8.0000** over 170 same-instant    ║
-║    paired observations (10 moving-funding coins x 20 polls / 6.3 min);        ║
-║    per-coin medians 7.99-8.01 for every coin with a full sample.              ║
-║    STALENESS: **the bench is LIVE, trailing HL by ~20 SECONDS** (best lag     ║
-║    20s, median rel-err 0.30%, vs 0.69% at lag 0). It ticks 14-15 distinct     ║
-║    values per 6.3 min — not a fossil. For an hourly-funding consumer that is  ║
-║    zero. No staleness reason to keep the direct HL call.                      ║
+║    the cross-section. **Pooled median ratio 8.0021** over 196 same-instant    ║
+║    paired observations (10 moving-funding coins x 20 polls / 6.7 min); an     ║
+║    earlier independent run gave 8.0000 (n=170). Per-coin medians 7.98-8.24    ║
+║    (the two widest, BERA/OP, are the small-n coins after the near-zero cut).  ║
+║    STALENESS: **the bench is LIVE, trailing HL by SECONDS.** On a 20s grid    ║
+║    the best fit is lag 20s (median rel-err 0.18%, vs 0.23% at lag 0, rising   ║
+║    monotonically to 1.08% by 100s); on a 2s grid it is lag 2s (0.11%). The    ║
+║    lag is under one sample interval BOTH times, so the honest resolution is   ║
+║    "seconds" — not minutes, not hours. It ticks 15-17 distinct values per 20  ║
+║    polls: live, not a fossil. For an hourly-funding consumer that is zero.    ║
+║    No staleness reason to keep the direct HL call.                            ║
 ║                                                                              ║
-║ 2b. **A METHOD WARNING I EARNED THE HARD WAY — DO NOT RE-RUN THE NAIVE TEST.**║
-║    A one-shot cross-section of /funding-rates vs HL's live `funding` reports  ║
-║    median 8.000 BUT min **-5.4** and max **187.9**, with only 64/92 symbols   ║
-║    within 0.5% of 8.00. THOSE OUTLIERS ARE AN ARTIFACT OF THE INSTRUMENT,     ║
-║    NOT A BASIS DIFFERENCE. HL's live `funding` moves CONTINUOUSLY (measured:  ║
-║    GRASS live +1.39e-04 while its last FOUR settled hours are all +1.25e-05), ║
-║    so a snapshot divides two moving numbers read at different instants, and   ║
-║    coins whose rate sits near zero (AVAX live 8.5e-07) manufacture 30x-188x   ║
-║    ratios from rounding. Proof it is the instrument: the same coins' ratios   ║
-║    CHANGED between two runs minutes apart, and the same-instant paired        ║
-║    measurement collapses to 8.0000. Pair your samples or you will "discover"  ║
-║    a basis bug that is not there.                                             ║
+║ 2b. **A METHOD WARNING — GUARD YOUR NEAR-ZERO DENOMINATORS.**                 ║
+║    [2026-07-17 CORRECTED. This box first read "Pair your samples, or you will ║
+║    'discover' a basis bug that is not there", and blamed the outliers on an   ║
+║    UNPAIRED read. THAT DIAGNOSIS WAS WRONG ABOUT ITS OWN INSTRUMENT: [A]      ║
+║    (:496) and [B] (:532) call the IDENTICAL `_bench_snapshot()` and carry the ║
+║    identical sub-second intra-call offset. [A] was never unpaired. Pairing is ║
+║    CONSTANT across the two arms, so it cannot be what separates them — the    ║
+║    box credited a variable that does not differ. Same shape as the bug it     ║
+║    was documenting, and a same-day repeat of the Stock Leaders A/B that       ║
+║    differed three ways and pointed the opposite way to the truth.]            ║
+║    WHAT ACTUALLY DIFFERS, three things at once: the near-zero cut **1e-9 vs   ║
+║    NEAR_ZERO 5e-6** (5000x), the universe (92 symbols vs 10 hand-picked), and ║
+║    20 pooled repeats. HOLDING PAIRING CONSTANT AND CHANGING ONLY THE CUT:     ║
+║    min/max **7.329/8.155 -> 7.876/8.085**; median |err| **11.95% below the    ║
+║    cut (n=5) vs 0.00% above it (n=87)**. Ratio error is a monotone function   ║
+║    of the DENOMINATOR, not of read skew: the worst offenders are the smallest ║
+║    denominators (BCH |live|=1.36e-06 -> 9.17; BERA 2.69e-06 -> 5.87), and a   ║
+║    **-5.37 sign flip cannot come from a 0.5s skew** — it needs a denominator  ║
+║    that crossed zero. The header's own mechanism sentence (AVAX at 8.5e-07,   ║
+║    below the 5e-6 cut) always named the real cause; it was stapled to the     ║
+║    wrong conclusion. THE LESSON: **guard near-zero denominators**, or you     ║
+║    will "discover" a basis bug that is not there — a sign-flipped ratio is    ║
+║    exactly the artifact that would get a real, correct API blamed.            ║
+║    (The two runs' instability — min -5.37/187.87 vs 6.42/9.28 — is the SAME   ║
+║    [A] instrument twice: evidence that near-zero coins wander in and out of   ║
+║    the unguarded set, NOT evidence about pairing.)                            ║
 ║                                                                              ║
 ║ 2c. **THE REAL FINDING HERE IS A LIVE BUG, NOT A SWAP QUESTION.**             ║
 ║    `hl_backfill()` returns HL rates (1h basis). The live sampling loop        ║
@@ -95,8 +114,12 @@ Lighter instead? MEASURED, per consumer. Nothing is swapped here.
 ║    THE CROSS-SECTION, and the bot is a pure cross-sectional ranker: it LONGs  ║
 ║    the K most-negative and SHORTs the K most-positive. A freshly-backfilled   ║
 ║    coin's score is compressed ~8x toward zero purely from uptime.             ║
-║    Sign convention is NOT the problem — /funding-rates IS signed (measured:   ║
-║    105/684 rows negative; lighter rows span -0.013256..+0.027672).            ║
+║    Sign convention is NOT the problem — /funding-rates IS signed. MEASURED    ║
+║    (a ruled-out hypothesis, recorded so nobody re-tests it): ~105-123 of its  ║
+║    684 rows are negative on any given snapshot, and the lighter rows span     ║
+║    both signs (e.g. -0.015224..+0.014616). Unlike the SETTLED /api/v1/        ║
+║    fundings series — whose `rate` is unsigned and needs its `direction`       ║
+║    field — /funding-rates needs no direction. The bot's L/S legs are fine.    ║
 ║    Backfilling from Lighter's OWN settled series (/api/v1/fundings, pages     ║
 ║    back 438d+) fixes the units AND drops the cross-venue proxy. Shadow book,  ║
 ║    no real money — but this book's whole record is suspect until it is fixed. ║
@@ -121,14 +144,17 @@ Lighter instead? MEASURED, per consumer. Nothing is swapped here.
 ║    fine. It would still be wrong, for two measured reasons:                   ║
 ║    (a) IT IS A DIFFERENT QUANTITY. HL OI is the MARKET's positioning;         ║
 ║        Lighter OI is OUR VENUE's. MEASURED across the 16 majors: Lighter OI   ║
-║        notional is a median **4.2%** of HL's (range 0.6%-18.3%; BTC $111M vs  ║
-║        $2.42B, NEAR $0.49M vs $83.9M). Not two reads of one number — a 24x    ║
-║        smaller, differently-composed book.                                    ║
-║    (b) HL's `premium` is NOT (mark-index)/index. It is impact-price vs        ║
-║        oracle, time-weighted. MEASURED on HL's own BTC snapshot: the          ║
-║        `premium` field read -0.47bps while (mark-oracle)/oracle on THE SAME   ║
-║        snapshot = -0.63bps. A Lighter "premium_bps" would wear the field      ║
-║        name and mean something else.                                          ║
+║        notional is a median **~4%** of HL's (4.0% and 4.2% on two runs;       ║
+║        range 0.6%-18.4%; BTC $110M vs $2.40B, NEAR $0.49M vs $83.8M). Not     ║
+║        two reads of one number — a ~25x smaller, differently-composed book.   ║
+║    (b) HL's `premium` field is NOT (mark-index)/index — MEASURED on HL's OWN  ║
+║        BTC snapshot, where both numbers come from the SAME payload:           ║
+║          run 1: premium field -0.47bps vs (mark-oracle)/oracle -0.63bps       ║
+║          run 2: premium field +0.00bps vs (mark-oracle)/oracle -0.47bps       ║
+║        They never coincide. (HL documents `premium` as an impact-price-vs-    ║
+║        oracle construct — that EXPLANATION is inferred, not measured here;    ║
+║        the DIFFERENCE is measured.) A Lighter "premium_bps" derived from      ║
+║        mark-vs-index would wear the field name and mean something else.       ║
 ║    And the decisive one: market_context exists to ACCUMULATE a clean factor   ║
 ║    dataset ("LOG FIRST, gate later" — its own header) stamped onto live       ║
 ║    entries as `mctx` (lighter_funding_bot.py:813, lighter_dislocation_bot     ║
@@ -492,22 +518,35 @@ def part2_bench(poll_n, poll_every):
           f"{funding_basis.periods_per_year('lighter'):.0f}/yr (8h) vs "
           f"hyperliquid {funding_basis.periods_per_year('hyperliquid'):.0f}/yr (1h)")
 
-    # --- the NAIVE test, shown ONLY to document that it lies (verdict 2b) ----
+    # --- the UNFILTERED test, shown ONLY to document that it lies (2b) ------
+    # NOTE: this arm is PAIRED — it reads bench and live from the single
+    # _bench_snapshot() above, exactly as [B] does. The ONLY thing that makes it
+    # lie is the near-zero cut below (1e-9 vs [B]'s NEAR_ZERO=5e-6): a
+    # denominator near zero manufactures 30x-188x ratios and sign flips out of
+    # rounding. Do not relabel this "unpaired" — that was the original,
+    # incorrect diagnosis and the whole point of verdict 2b's correction.
     pairs = [(s, bench[s], live[s]) for s in bench
              if s in live and abs(live[s]) > 1e-9]
     naive = sorted(b / h for _, b, h in pairs)
     nok = sum(1 for r in naive if abs(r - 8.0) <= 0.04)
-    print(f"\n  [A] NAIVE UNPAIRED CROSS-SECTION ({len(naive)} symbols) — "
-          f"THIS INSTRUMENT LIES:")
+    print(f"\n  [A] UNFILTERED CROSS-SECTION ({len(naive)} symbols, near-zero cut "
+          f"1e-9 — PAIRED, same snapshot as [B]) — THIS INSTRUMENT LIES:")
     print(f"      median {st.median(naive):.3f} | min {min(naive):.3f} | "
           f"max {max(naive):.3f} | within 0.5% of 8.00: {nok}/{len(naive)}")
-    print("      Do NOT read the outliers as a basis bug. HL's live `funding`")
-    print("      moves continuously, so an unpaired snapshot divides two moving")
-    print("      numbers; near-zero rates then manufacture huge ratios. Proof:")
-    print("      the paired test below collapses to 8.0000 on the same venue.")
+    print("      Do NOT read the outliers as a basis bug. The cause is the")
+    print("      DENOMINATOR: this arm keeps coins whose |HL rate| is ~0 (cut")
+    print("      1e-9), and a near-zero denominator manufactures 30x-188x")
+    print("      ratios and sign flips out of rounding. [B] below differs in")
+    print("      THREE ways (near-zero cut 5e-6, 10 coins, 20 repeats) — it is")
+    print("      NOT a pairing contrast: both arms read one _bench_snapshot().")
+    print("      Holding pairing constant and changing ONLY the cut already")
+    print("      collapses the tail (min/max 7.329/8.155 -> 7.876/8.085).")
 
-    # --- the PAIRED test: same-instant samples (the correct instrument) ------
-    print(f"\n  [B] PAIRED SAME-INSTANT POLL — {poll_n} samples every "
+    # --- [B]: FILTERED + pooled repeats. NOT a pairing contrast with [A] —
+    # both arms are same-instant paired from one _bench_snapshot(). [B] differs
+    # by its near-zero guard (NEAR_ZERO=5e-6), its 10-coin universe, and 20
+    # repeats. It is the trustworthy instrument because of the GUARD.
+    print(f"\n  [B] FILTERED POLL (near-zero cut 5e-6) — {poll_n} samples every "
           f"{poll_every}s (~{poll_n*poll_every/60:.1f} min), "
           f"{len(POLL_COINS)} moving-funding coins")
     samples = []
@@ -705,7 +744,7 @@ def main():
     print("                      joins its HISTORY — the splice is longitudinal.")
     print("  spread backfill  -> Lighter BETTER; the mixed-unit window is a BUG.")
     print("  dislocation mids -> KEEP HL. No equivalent exists; would be circular.")
-    print("  market_context   -> DO NOT SWAP. Different quantity (OI 4.2% of HL's);")
+    print("  market_context   -> DO NOT SWAP. Different quantity (OI ~4% of HL's);")
     print("                      poisons the `mctx` factor dataset.")
     print("=" * 78)
 

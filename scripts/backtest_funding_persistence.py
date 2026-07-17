@@ -3,7 +3,163 @@
 scripts/backtest_funding_persistence.py — is the CARRY'S SURVIVAL predictable?
 
 ╔══════════════════════════════════════════════════════════════════════════╗
-║ VERDICT — filled in from the real run; see RUN OUTPUT below.             ║
+║ VERDICT (2026-07-17, measured — 300d, 30 markets, 2025-09-20→2026-07-17,  ║
+║ 14 with HL cross-venue history. 151,561 settled hourly observations).     ║
+║                                                                          ║
+║ THE QUESTION: is the carry's SURVIVAL predictable at entry? If yes that's ║
+║ the redesign; if no the strategy is dead.                                 ║
+║ THE ANSWER: **YES — AND IT DOES NOT MATTER.** Survival is predictable     ║
+║ three ways. Every rule built on it collects **$8-10 A YEAR.** The bot is  ║
+║ dead for a reason no amount of prediction can touch.                      ║
+║                                                                          ║
+║ 1. **HALF THE TAPE IS A CONSTANT — and this reframes everything.**        ║
+║    49.8% of ALL 151,561 hourly observations sit at EXACTLY |apr|=0.10512  ║
+║    (0.0012 %/hr = 10.5% APR). Another 18.8% sit at exactly 0.03504 (3.5%  ║
+║    APR). **TWO VALUES ARE 68.6% OF THE ENTIRE DATASET.** Every one of the ║
+║    151,561 obs lies exactly on a 0.0001 %/hr grid. These are not a cap    ║
+║    (17.9% of obs exceed 0.105; max 43.80 = 4380% APR) — they are the      ║
+║    venue's RESTING DEFAULTS, where the rate sits when the premium is ~0   ║
+║    (0.0012 %/hr x 8h ~ 0.01%/8h, the standard perp interest component).   ║
+║    Two classes, two defaults: CRYPTO rests at 10.5% APR (AAVE 82.8% of    ║
+║    hours, NEAR 81.7%, ETH 51.1%, BTC 46.7%); EQUITY/COMMODITY perps rest  ║
+║    at 3.5% (US500 89.3%, INTC 85.7%, WTI 46.1%). Found only because the   ║
+║    age arm reported `med apr 0.105` across 18 unrelated symbols.          ║
+║ 1b. **SO THE LIVE GATE (0.05) IS BELOW THE CRYPTO RESTING DEFAULT.** The  ║
+║    bot is not selecting hot funding at all — it admits the venue's        ║
+║    RESTING STATE on every crypto book, permanently. MEASURED: 55.9% of    ║
+║    episodes (2075/3710) enter at exactly a default, and 86.0% of spell    ║
+║    deaths are a SIGN FLIP vs 14.0% genuine decay — because 0.105 can      ║
+║    never fall under the 0.019 exit bar, a 'cold' death is ARITHMETICALLY  ║
+║    IMPOSSIBLE there. **This is the mechanism under                        ║
+║    [[backtest_funding_lighter]]'s "63% of trades die when the rate        ║
+║    evaporates": THE RATE NEVER EVAPORATED. IT NEVER MOVED. The SIGN of an ║
+║    administrative constant flipped.** The Funding Farmer at its live gate ║
+║    is a coin-flip generator wearing a funding label.                      ║
+║                                                                          ║
+║ 2. SURVIVAL, live gate: median residual 7h, p90 69h. 64% of hot crossings ║
+║    (6463 of 10173) die before the 4h PERSIST bar — never tradeable. Only  ║
+║    13.0% of episodes' real carry beats the 10bps round trip. Best gate by ║
+║    %-clearing is 1.10 -> 38.9% (i.e. 61% of even those lose).             ║
+║ 3. REQUIRED vs OBSERVED survival (3b) is the constraint nothing lifts:    ║
+║    apr 0.00-0.10 needs 200h, gets 4h. 0.10-0.20 needs 83h, gets 9h.       ║
+║    0.20-0.40 needs 32h, gets 6h. 0.40-0.80 needs 16h, gets 8h. ONLY the   ║
+║    >0.80 band clears (needs 4.7h, gets 8h) — ~5 exotic books.             ║
+║                                                                          ║
+║ 4. **SURVIVAL IS PREDICTABLE — the honest finding, recorded in full.**    ║
+║    (a) AGE is the strongest signal and a DECREASING HAZARD: at gate 0.20, ║
+║        spells alive at 4h have 5h left (21.8% clear friction); alive at   ║
+║        48h have 52h left (55.0%); at 72h, 74h left (58.1%). Observable at ║
+║        entry, no look-ahead — you wait and watch.                         ║
+║    (b) **CROSS-VENUE AGREEMENT: REFUTED — and this file committed its own ║
+║        §1 TRAP to get the first answer.** The hypothesis (all venues hot  ║
+║        => structural carry, persists; only Lighter hot => dislocation,    ║
+║        reverts) FIRST read as CONFIRMED: rho=+0.262, p=1.4e-10, both      ║
+║        halves. It was an ARTIFACT. The "HL is hot" bar was 0.5*gate =     ║
+║        0.025/0.060/0.100 at gates 0.05/0.12/0.20 — every one of them      ║
+║        BELOW **Hyperliquid's OWN resting default of 0.10950** (57.9% of   ║
+║        its 91,413 obs; now measured by hl_resting_default() from HL's own ║
+║        tape, never assumed). So "HL is hot" was true for **73-93% of HL   ║
+║        observations AT REST**: the conjunct was not measuring agreement,  ║
+║        it was measuring whether TWO ADMINISTRATIVE CONSTANTS SHARED A     ║
+║        SIGN. The file discovered the resting-default trap on Lighter in   ║
+║        §1 and then walked into it against HL, in its own predictor.       ║
+║        With the bar raised above HL's default (the fix), EVERY number     ║
+║        INVERTS: **rho +0.262 -> -0.029, p 1.4e-10 -> 0.485, halves        ║
+║        -0.049/+0.008 — fails.** The hypothesis is DEAD. What survives is  ║
+║        the CROSS-VENUE RATIO (continuous, never thresholded against a     ║
+║        default, so the trap cannot reach it): rho=+0.234, p=1.04e-08,     ║
+║        halves +0.198/+0.274, %clearing spread +24.1pp. It predicts and    ║
+║        (§6) pays NOTHING — 0 arms clear.                                  ║
+║    (c) 3 of 12 predictor x gate tests move the ECONOMIC bar on both       ║
+║        halves (was 5 before the (b) fix — the two lost are the refuted    ║
+║        agreement arms). SLOPE (4h/12h) and VOL 24h carry NO usable        ║
+║        signal, but for TWO different reasons — do not merge them:         ║
+║        SIGN FLIP across the split (slope12 @0.05 -0.030/+0.077; slope4 +  ║
+║        vol24 @0.20 -0.054/+0.216, -0.047/+0.116) vs merely NOT            ║
+║        SIGNIFICANT while sign-stable (slope4 @0.05 +0.046/+0.019,         ║
+║        p=0.056). [CORRECTED 17-Jul: this line said all of them "sign      ║
+║        flip", which is false for 2 of 6, and called VOL 24h "inert" —     ║
+║        overstated: at gate 0.05 it is rho +0.085, p=2.6e-07, both halves  ║
+║        SAME sign. It is weak and fails the economic bar; it is not inert. ║
+║        "Inert" is reserved for a metric that CANNOT speak (e.g. a fixed   ║
+║        top-N whose length is constant), not one that speaks quietly.]     ║
+║                                                                          ║
+║ 5. **...AND THE PREDICTION IS WORTH $8-10/YEAR.** The age arm (section    ║
+║    4c) is the test that could have overturned this and it CLEARS the bps  ║
+║    bar — 5 arms, median net > 0 on BOTH halves, n>=30:                    ║
+║      gate 0.80 / age 24h  n=33   +21.37bps  $ 8.15/yr  dies at 31bps fric ║
+║      gate 0.12 / age 72h  n=98    +4.05bps  $ 8.26/yr  dies at 14bps fric ║
+║      gate 0.20 / age 72h  n=85    +3.68bps  $ 8.13/yr  dies at 14bps fric ║
+║      gate 0.20 / age 48h  n=124   +2.84bps  $10.32/yr  dies at 13bps fric ║
+║      gate 0.40 / age 24h  n=59    +2.12bps  $ 8.65/yr  dies at 12bps fric ║
+║    THE INVARIANT THAT KILLS IT: **every arm that CLEARS earns $8-10/yr**  ║
+║    at the live $25 clip, regardless of gate or age. Across the 5 clearing ║
+║    arms the bps spread is **10x** (+2.12 -> +21.37) and the fill count    ║
+║    spreads **4x** (33 -> 124) — and $/yr never leaves $8.13-$10.32.       ║
+║    Filtering harder buys bps and loses fills at almost exactly the rate   ║
+║    that cancels it. You cannot escape by tuning: the frontier is flat and ║
+║    it is at zero. [CORRECTED 2026-07-17: this line used to illustrate the ║
+║    invariant with "3710 fills at -9.22bps ... same ~$8". That arm does    ║
+║    NOT clear and the code computes it at **-$29.02/yr**, not $8 — it was  ║
+║    a non-clearing arm smuggled into a claim about clearing arms. The 5    ║
+║    arms above are the whole evidence; they make the point without it.]    ║
+║ 5b. And that $8-10 is CARRY ONLY. [[backtest_funding_lighter]] measured   ║
+║    the price P&L riding along as NEGATIVE and DOMINANT: the 4%-TP/10%-    ║
+║    stop lottery (+$304 TP / -$225 stop) swamps every bp counted here.     ║
+║ 5c. Section 6 (gate x cross-venue, the ORIGINAL redesign candidate):      ║
+║    **0 arms clear.** The predictor that works (cross-venue) only speaks   ║
+║    about the HL-covered subset = the majors = exactly the books pinned at ║
+║    the 10.5% default. Where it can see, there is nothing to collect.      ║
+║ 5d. **THE FRICTION CONSTANT IS LOAD-BEARING — and it is ASSUMED, never    ║
+║    MEASURED.** [CORRECTED 2026-07-17: this line first claimed "the MEDIAN ║
+║    is negative at EVERY friction assumption including 5bps", and §7 PRINTED║
+║    that as unconditional prose — while the table directly above it showed ║
+║    the opposite. MEASURED, computed from the cells (never hardcoded now):  ║
+║    **the median DOES pay in 3 of 20 (gate x arm x friction) cells — all at║
+║    <= 5bps round trip.** So the ruling does NOT rest on "the median always ║
+║    loses". It rests on the 10bps friction ASSUMPTION.] The arms that flip ║
+║    positive under 5bps are 0.80/1.10 HL-dark — ~50% held by 3 symbols     ║
+║    (SKHYNIXUSD/WTI/BRENTOIL/XAG/COIN), the fleet's THINNEST books, where  ║
+║    a 5bps/fill fill is LEAST defensible. That is the honest shape of it:  ║
+║    the strategy is dead at the friction we assume, and the one experiment ║
+║    that could revive it is MEASURING A REAL ROUND TRIP on those books.    ║
+║                                                                          ║
+║ THEREFORE: **THE FUNDING FARMER AS A CARRY STRATEGY IS DEAD, AND THE      ║
+║ REDESIGN THIS FILE WENT LOOKING FOR DOES NOT EXIST.** Not mis-tuned, and  ║
+║ not blind: it can see survival fine. It is pointed at a venue where       ║
+║ funding is a PINNED ADMINISTRATIVE DEFAULT 68.6% of the time, so the      ║
+║ thing it would select for is a constant worth 10.5% APR — ~6bps over a    ║
+║ 53h hold against a 10bps round trip to touch it. DO NOT re-tune the gate, ║
+║ the slope, the vol filter, or the persist bar: all four are measured here ║
+║ and none is the problem. WHAT WOULD CHANGE THIS: a venue where funding is ║
+║ a continuous market-clearing price rather than a pinned default, or a     ║
+║ MEASURED round trip under ~2bps. Neither is Lighter today.                ║
+║                                                                          ║
+║ LIMITATIONS — read before acting.                                         ║
+║  * CARRY ONLY. No price P&L, no stops/TP, no slots, no scanner. This is   ║
+║    not a bot replay; it prices the CARRY LEG. The full replay is          ║
+║    [[backtest_funding_lighter]] and it is more negative, not less.        ║
+║  * FRICTION IS ASSUMED at 10bps (2 x 5bps), NOT measured. It is the       ║
+║    load-bearing constant: the age arms die at 12-14bps (0.80/24h at       ║
+║    31bps). Nothing here is safe until a real round trip is measured on    ║
+║    these books — and the arms that look best are the thinnest books.      ║
+║  * The 0.20/48h arm's 1st half is +0.57bps — statistically indistinct     ║
+║    from zero. Its "both halves positive" is technically true and thin.    ║
+║  * n is EPISODES, not fills of a live book, and the clearing arms fire    ║
+║    33-124 times in 300d ([[incubator-evidence-denominated-in-fills]]).    ║
+║  * Cross-venue uses HL fundingHistory as the only HISTORICAL reference.   ║
+║    Production would read Lighter's own /funding-rates _bench rows, so a   ║
+║    cross-venue rule stays "everything off Lighter" — only 14 of 30 books  ║
+║    have an HL twin, and they are the majors (the pinned ones).            ║
+║  * Universe = top 30 by daily quote volume; includes equity/commodity     ║
+║    perps whose defaults and liquidity differ from crypto. One 300d        ║
+║    window; both halves reported on every headline.                        ║
+║  * The resting-default reading (base rate, not cap) is INFERRED from the  ║
+║    distribution — 17.9% exceed it, it sits on the grid, and 0.0012 %/hr   ║
+║    x 8h ~ 0.01%/8h matches the venue-standard interest component. Not     ║
+║    confirmed against Lighter's published funding formula. The 8x basis    ║
+║    trap is avoided by construction (this file never touches               ║
+║    /funding-rates); see UNITS below.                                      ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
 WHY THIS EXISTS. [[backtest_funding_lighter]] settled that the Funding Farmer
@@ -56,7 +212,17 @@ PREDICTORS, all computed at entry from data AT OR BEFORE entry (no look-ahead):
   and means nothing. The honest test is conditional survival ACROSS episodes:
   of the spells that reach X hours, what is the median REMAINING life? Flat in X
   = memoryless (persistence buys you nothing); rising = persistence begets
-  persistence; falling = the hot spell is burning out.
+  persistence; falling = the hot spell is burning out. MEASURED: strongly RISING
+  (4a) — which is why section 4c then PRICES it as an entry rule rather than
+  leaving the file's strongest signal admired and untested.
+
+SECTION 4c EXISTS BECAUSE THE FIRST DRAFT OF THIS FILE RULED WITHOUT IT. The
+predictor block (4b) and the redesign block (6) sweep gate x cross-venue only, so
+a verdict of "nothing pays" rested on never having priced AGE — the one predictor
+4a shows is strongest. An unrefuted survivor is not a checked one
+([[refutation-doesnt-clear-the-siblings]]). Priced, the age arm CLEARS the bps
+bar (5 arms, both halves) and earns $8-10/yr. The ruling did not change; the
+REASON did, and the reason is what a reader would have acted on.
 
 UNITS — the 8x trap this file cannot fall into. Lighter /api/v1/fundings rate is
 PERCENT PER HOUR, so apr_true = rate/100*24*365 (ETH ~8% TRUE). HL fundingHistory
@@ -201,6 +367,32 @@ def median(xs):
 
 
 # ─────────────────────────────── data ────────────────────────────────────────
+def hl_resting_default(hl):
+    """The modal |apr| of a venue's OWN funding tape — its RESTING DEFAULT, the
+    value the rate sits at when the premium is ~0.
+
+    [2026-07-17] This exists because §1 of this file found Lighter pins 68.6% of
+    its tape at two constants, and then the cross-venue predictor made EXACTLY
+    that mistake about Hyperliquid: it called HL "hot" at 0.5*gate, below HL's
+    own 0.10950 default (57.9% of its obs), so "both venues hot" was really
+    "two constants happen to share a sign". A resting default is a property of
+    the VENUE, so it is measured per venue from its own data, never assumed.
+
+    Returns None when the tape is too thin, or when no value is modal enough
+    (<20% of obs) to be a pin — a venue with a genuinely continuous rate has no
+    resting default and must not have one invented for it.
+    """
+    vals = [abs(float(v)) for v in hl.values()] if hl else []
+    if len(vals) < 200:
+        return None
+    counts = {}
+    for v in vals:
+        k = round(v, 6)
+        counts[k] = counts.get(k, 0) + 1
+    top, n = max(counts.items(), key=lambda kv: kv[1])
+    return top if n / len(vals) >= 0.20 else None
+
+
 def _hl(payload):
     body = json.dumps(payload).encode()
     req = urllib.request.Request(HL, data=body,
@@ -323,6 +515,13 @@ def episodes(sym, m, gate, persist_h=PERSIST_H):
     """
     exit_gate = gate * EXIT_RATIO
     fund, cand, hl = m["fund"], m["cand"], m["hl"]
+    # A cross-venue "hot" bar is meaningless unless it clears the OTHER venue's
+    # RESTING DEFAULT — see the note at hl_same_sign_hot. Derived from HL's own
+    # tape, never hardcoded, so it self-corrects if the venue changes its base
+    # rate. 1.05x gives a little headroom above the pin without inventing a
+    # threshold. Falls back to the old 0.5*gate only when HL's tape is too thin
+    # to have a mode (in which case the predictor is reported as unusable).
+    hl_hot_bar = max(0.5 * gate, (hl_resting_default(hl) or 0.0) * 1.05)
     hours = sorted(fund)
     eps, early_ts, cens_ts = [], [], []
     st = None
@@ -364,8 +563,18 @@ def episodes(sym, m, gate, persist_h=PERSIST_H):
             "slope4": slope(4), "slope12": slope(12),
             "vol24": realized_vol(cand, entry),
             "hl_apr": hl_apr,
+            # [2026-07-17 FIX — this predictor committed THIS FILE'S OWN §1 TRAP
+            # against Hyperliquid.] The bar was `abs(hl_apr) >= 0.5 * gate`, i.e.
+            # 0.025/0.060/0.100 at gates 0.05/0.12/0.20 — all BELOW HL's own
+            # RESTING DEFAULT of 0.10950 (57.9% of its 91,413 obs; measured by
+            # hl_resting_default() from HL's own tape). So "HL is hot" was true
+            # for 73-93% of HL observations AT REST: the conjunct degenerated to
+            # pure SIGN AGREEMENT between two administrative constants, which is
+            # what produced the "cross-venue agreement is real" reading. The bar
+            # must clear the OTHER venue's resting state to mean anything.
             "hl_same_sign_hot": (None if hl_apr is None else
-                                 (1 if (hl_apr * sgn > 0 and abs(hl_apr) >= 0.5 * gate) else 0)),
+                                 (1 if (hl_apr * sgn > 0
+                                        and abs(hl_apr) >= hl_hot_bar) else 0)),
             "hl_ratio": (None if hl_apr is None or apr_e <= 0 else (hl_apr * sgn) / apr_e),
             "carry_spec": apr_e * surv_h / 8760.0,
             "carry_trade": apr_e * res_h / 8760.0,
@@ -757,11 +966,15 @@ def redesign_block(mk, lo, mid, hi):
     different bands.
 
     RANKED ON THE MEDIAN, NOT THE MEAN, deliberately. Carry per episode is
-    violently right-skewed (at gate 1.10 the HL-dark mean is 42.6bps gross while
-    the MEDIAN is 7.3bps): a mean-ranked table crowns a thin tail and calls it an
-    edge. The median trade is the one you actually get
+    violently right-skewed (measured: at gate 1.10 the HL-dark mean is 42.6bps
+    gross against a 7.3bps MEDIAN): a mean-ranked table crowns a thin tail and
+    calls it an edge. The median trade is the one you actually get
     ([[incubator-evidence-denominated-in-fills]]: rank on a lower bound, never
-    the max point estimate)."""
+    the max point estimate).
+
+    NOTE: this block sweeps gate x CROSS-VENUE only and finds 0 clearing arms.
+    That is not the file's ruling — section 4c sweeps gate x AGE and finds 5.
+    Read them together."""
     print(f"\n\n{'='*78}\n6. THE REDESIGN CANDIDATE — does the predictor COMPOSE with the gate?\n{'='*78}")
     print("   HL-agree = HL hot, same sign (structural) | HL-dark = coin has no HL twin")
     print("   net bps = realized carry - 10bps friction. MEDIAN net > 0 is the bar;")
@@ -816,6 +1029,14 @@ def friction_sensitivity(mk):
                     (0.0005, 0.0010, 0.0020, 0.0040, 0.0060)))
     print(hdr)
     print("-" * len(hdr))
+    # [2026-07-17 FIX] This block used to PRINT, as unconditional prose, "the
+    # MEDIAN is negative at EVERY assumption" — while the table directly above
+    # it showed three positive medians. A hardcoded conclusion re-asserts itself
+    # on every run no matter what the data says, and repo doctrine makes a
+    # script header the artifact of record. The sentence is now COMPUTED from
+    # the same cells the table prints, so it can never drift from them again.
+    frictions = (0.0005, 0.0010, 0.0020, 0.0040, 0.0060)
+    pos_med = []          # (gate, arm, friction_bps) where the MEDIAN pays
     for g in (0.80, 1.10):
         eps, _, _ = all_episodes(mk, g)
         for nm, arm in (("all", eps),
@@ -823,15 +1044,28 @@ def friction_sensitivity(mk):
             if len(arm) < 30:
                 continue
             cells = []
-            for f in (0.0005, 0.0010, 0.0020, 0.0040, 0.0060):
+            for f in frictions:
                 v = [e["carry_real"] * 1e4 - f * 1e4 for e in arm]
-                cells.append(f"{sum(v)/len(v):>+5.1f}/{median(v):>+5.1f}")
+                md = median(v)
+                if md > 0:
+                    pos_med.append((g, nm, f * 1e4))
+                cells.append(f"{sum(v)/len(v):>+5.1f}/{md:>+5.1f}")
             print(f"{f'{g:.2f} {nm}':>18s} {len(arm):>5d} " +
                   " ".join(f"{c:>11s}" for c in cells))
-    print("  Read as mean/MEDIAN. The MEDIAN is negative at EVERY assumption including")
-    print("  the most generous one — the median episode never pays its own round trip.")
-    print("  The positive mean survives only while friction is assumed at majors levels")
-    print("  on books that are not majors. That is an assumption, not a finding.")
+    print("  Read as mean/MEDIAN. MEDIAN net > 0 is the bar; a positive MEAN with a")
+    print("  negative median is a tail, not a strategy.")
+    if not pos_med:
+        print("  MEASURED: the MEDIAN is negative at EVERY friction assumption above,")
+        print("  including the most generous — the median episode never pays its round trip.")
+    else:
+        worst = max(f for _, _, f in pos_med)
+        print(f"  MEASURED: the median DOES pay in {len(pos_med)} of "
+              f"{2*len(frictions)*2} (gate x arm x friction) cells — all at "
+              f"<= {worst:.0f}bps round trip.")
+        print("  So the ruling does NOT rest on 'the median always loses'. It rests on the")
+        print("  FRICTION CONSTANT, which is ASSUMED (10bps), never measured — and these")
+        print("  arms are the fleet's THINNEST books, where 5bps/fill is least defensible.")
+        print("  Measure a real round trip on these books before believing any of it.")
 
 
 def main():
