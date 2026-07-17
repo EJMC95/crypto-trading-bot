@@ -626,6 +626,39 @@ def main():
                      fallback or 0.0)
         return real or fallback
 
+    def _real_entry(coin, is_short, fallback):
+        """[2026-07-17 FILL TELEMETRY — the half 445e189 missed] REAL entry fill
+        (venue trades read; OPENING a short SELLS -> is_ask=True) or None.
+
+        MIRROR of _real_exit, and it exists because A ROUND TRIP NEEDS BOTH
+        LEGS. 445e189 gave the two CLOSE legs a real fill read and left the
+        entry leg publishing `px_decision=px, px_fill=px` — the decision mid
+        echoed into the fill field. MEASURED consequence: all 49 live orders
+        (07-11 -> 07-17) carry slippage_bps NULL, so the fleet's ENTRY
+        execution has never been measured — and the whole Funding Farmer
+        verdict (dead at 5bps vs +$21 at 0.86bps) turns on exactly that number.
+
+        Returns None (not the fallback) when there is no read, so the caller
+        can record px_fill=NULL rather than an echo: an echoed decision price
+        is what let me compute a confident "0.000bps slippage" off this table
+        an hour ago. _slip_bps_of already refuses to turn d==f into a zero;
+        this stops the echo reaching the column at all.
+        """
+        if dry_run:
+            return None
+        try:
+            fl = getattr(ctx.venue, "last_fill", None)
+            # opening a SHORT sells -> is_ask=True (the exact inverse of the
+            # close leg's `is_ask=not is_short`).
+            real = fl(coin, is_ask=is_short,
+                      since_ts=time.time() - 180) if fl else None
+        except Exception:  # noqa: BLE001
+            real = None
+        if real:
+            log.info("%s entry fill (venue): %.6g (decision %.6g)", coin, real,
+                     fallback or 0.0)
+        return real
+
     def _slip_bps_of(decision, fill, is_buy):
         """[2026-07-17 FILL TELEMETRY] Signed slippage on ONE order, bps,
         POSITIVE = worse than the decision price (paid up buying / sold lower).
@@ -1148,11 +1181,25 @@ def main():
                                      "gate": SLOPE_GATE}}
                     if ev:
                         raw["scan"] = ev      # vol/adverse/slip/xv/score -> shadow ledger
+                    # [2026-07-17 FILL TELEMETRY — entry leg] was
+                    # `px_decision=px, px_fill=px`: the decision mid echoed into
+                    # the fill column, so ENTRY slippage was unmeasurable and
+                    # anyone computing it off this table got a fabricated 0.000.
+                    # A round trip needs BOTH legs; 445e189 fixed only the
+                    # closes. px_fill is NULL when the venue gives no read —
+                    # never an echo. TELEMETRY ONLY: meta[coin]["entry"] above
+                    # is untouched (it feeds the stop/TP and the manage pass
+                    # already reconciles it from avg_entry_price), so this
+                    # changes what we RECORD, never what the bot DOES.
+                    _fill_px = _real_entry(coin, is_short, px)
                     store.publish_venue_order(
                         bot_id, venue=("lighter" if venue_tag else "hl"),
                         shadow=shadow_tag, coin=coin,
                         side=("sell" if is_short else "buy"), size=size,
-                        px_decision=px, px_fill=px, raw=raw)
+                        px_decision=px, px_fill=_fill_px,
+                        slippage_bps=_slip_bps_of(px, _fill_px,
+                                                  is_buy=not is_short),
+                        raw=raw)
                 except Exception:
                     pass
 
