@@ -6,10 +6,20 @@ WHAT / WHY (2026-07-11)
   On 11 Jul a Lighter mark printed ~25% away from Binance/HL for minutes and a
   bot on the WRONG side of it (Trail Blazer's loss rail) paid $3.85. This bot
   is the other side of that trade: when a Lighter book dislocates from a deep
-  independent reference (Hyperliquid mainnet mids), take the reconvergence —
-  BUY Lighter when it prints cheap, SHORT when it prints rich, exit when the
-  gap closes. Thin new venue + zero fees + small clips is precisely the niche
-  where small capital has an edge big money can't be bothered with.
+  independent reference, take the reconvergence — BUY Lighter when it prints
+  cheap, SHORT when it prints rich, exit when the gap closes. Thin new venue +
+  zero fees + small clips is precisely the niche where small capital has an
+  edge big money can't be bothered with.
+
+  THE REFERENCE IS LIGHTER'S OWN INDEX PRICE (changed 2026-07-17, operator:
+  "i only want things running on lighter"). It was Hyperliquid mainnet mids.
+  Lighter publishes index_price for every active book on the same endpoint the
+  market scout already reads, and it is the price Lighter MARKS and LIQUIDATES
+  against — i.e. the gap this bot bets on closing is the one the venue's own
+  funding and liquidation machinery pulls closed. Measured 17-Jul, the two
+  references agree to a median 3.8 bps (vs a 150 bps entry gate) but the index
+  residual is systematically tighter: `book/hl_mid - 1` was charging Lighter
+  for HYPERLIQUID's basis. See reference_prices() for the numbers.
 
   UNVALIDATED. This bot's first job is EVIDENCE, not profit: a census of every
   dislocation >= PRE_BPS (frequency, size, depth, duration) plus honest
@@ -23,8 +33,8 @@ RISK MODEL (why each gate exists)
     signal must persist CONFIRM_LOOPS consecutive loops before entry.
   * Real repricing: if Lighter is right (news) the gap never closes — hard
     price stop (HARD_STOP) + MAX_HOLD_S cap the bet; no averaging down.
-  * Reference-blind: no HL mids -> no signal -> do nothing (never trade
-    against a reference we can't see).
+  * Reference-blind: no Lighter index -> no signal -> do nothing (never trade
+    against a reference we can't see). An EMPTY parse counts as blind too.
   * Fleet furniture: kill switch re-checked every loop, durable daily-loss
     halt (SafetyRails.confirm_daily_loss debounce), halted heartbeat, all
     fills ledgered to venue_orders with px_decision vs px_fill.
@@ -63,7 +73,7 @@ CONFIRM_LOOPS = int(os.environ.get("DISLOC_CONFIRM_LOOPS", "2"))
 MAX_ENTRY_SLIP_BPS = float(os.environ.get("DISLOC_MAX_ENTRY_SLIP_BPS", "30"))
 HARD_STOP = float(os.environ.get("DISLOC_HARD_STOP", "0.05"))
 MAX_HOLD_S = float(os.environ.get("DISLOC_MAX_HOLD_S", "7200"))
-# [2026-07-16 ZOMBIE GUARD] a held coin whose HL reference vanished, whose
+# [2026-07-16 ZOMBIE GUARD] a held coin whose reference vanished, whose
 # Lighter book went dark, or that got delisted skipped even the HARD STOP
 # (`continue` before the manage block). Give up at the last usable exit
 # price after this long unmanageable — but only while the reference feed
@@ -72,7 +82,11 @@ DELIST_GIVEUP_H = float(os.environ.get("DISLOC_DELIST_GIVEUP_H", "6"))
 DAILY_LOSS_LIMIT = float(os.environ.get("DISLOC_DAILY_LOSS", "0.05"))
 
 LOOP_SECONDS = int(os.environ.get("DISLOC_LOOP_SECONDS", "90"))
-HL_INFO = "https://api.hyperliquid.xyz/info"
+# [2026-07-17 LIGHTER-ONLY] was HL_INFO = "https://api.hyperliquid.xyz/info".
+# The reference is now Lighter's own index price off this base — see
+# reference_prices(). Same host the venue layer already trades against.
+LIGHTER_API = os.environ.get("LIGHTER_API_BASE",
+                             "https://mainnet.zklighter.elliot.ai")
 
 LOG_FILE = os.environ.get("DISLOC_LOG_FILE", "lighter_dislocation_bot.log")
 logging.basicConfig(
@@ -81,17 +95,65 @@ logging.basicConfig(
 log = logging.getLogger(BOT)
 
 
-def hl_mids():
-    """Independent reference: HL mainnet mids for EVERY coin in one call.
-    Returns {coin: mid} or {} — {} means reference-blind, callers must skip."""
+def index_from_books(books):
+    """orderBookDetails rows -> {coin: index_price} for ACTIVE books. Pure:
+    no network, no clock — the self-test drives the REAL parse. Junk skipped."""
+    out = {}
+    for b in books or []:
+        try:
+            if b.get("status") != "active":
+                continue
+            sym = b.get("symbol")
+            idx = float(b.get("index_price") or 0.0)
+            if sym and idx > 0.0:
+                out[sym] = idx
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def reference_prices():
+    """Independent reference: LIGHTER'S OWN INDEX PRICE for every active book.
+    Returns {coin: index} or {} — {} means reference-blind, callers must skip.
+
+    [2026-07-17 LIGHTER-ONLY — operator: "i only want things running on
+    lighter"] This was hl_mids(): a POST to api.hyperliquid.xyz for HL mainnet
+    mids. Replacing it is not merely rule-compliance, it is a better reference,
+    for three measured reasons:
+
+      * HL's mid carries HL'S OWN basis, so `book/hl_mid - 1` measured Lighter's
+        dislocation PLUS Hyperliquid's deviation — foreign noise entering as
+        signal. Measured head-to-head on live books 17-Jul: the two references
+        agree to a median 3.8 bps (max 8.6 across 13 coins) — negligible against
+        this bot's 150 bps entry gate, so the swap is signal-neutral where it
+        decides — but the index residual is SYSTEMATICALLY TIGHTER (SUI -5.7 vs
+        -14.3 bps, LTC -7.4 vs -14.9, LINK -9.8 vs -15.6). The excess was HL's.
+      * The index is what Lighter itself MARKS and LIQUIDATES against, so it is
+        the gap that funding and liquidation actually pull the book back toward.
+        A reconvergence bet against a foreign venue's mid has no such mechanism.
+      * It costs one fewer venue: no HL outage can blind us (the old comment
+        "no HL mids -> do nothing" was a real, regular hole), no cross-venue
+        symbol mapping, one clock. It also covers books HL does not list at all
+        (Lighter's equity perps + XAU), though the COINS universe is
+        deliberately UNCHANGED here — one variable at a time.
+
+    Same endpoint the market scout has used since it shipped, same raw urllib +
+    browser UA: the generated SDK omits index_price/mark_price from its model
+    AND its default UA trips Lighter's CloudFront WAF (405 -> captcha), so the
+    raw read is the proven path, not a shortcut.
+    """
     try:
-        body = json.dumps({"type": "allMids"}).encode()
         req = urllib.request.Request(
-            HL_INFO, data=body, headers={"Content-Type": "application/json"})
+            LIGHTER_API + "/api/v1/orderBookDetails",
+            headers={"User-Agent": "Mozilla/5.0"})
         raw = json.loads(urllib.request.urlopen(req, timeout=15).read())
-        return {c: float(v) for c, v in raw.items() if float(v) > 0}
+        ref = index_from_books(raw.get("order_book_details"))
+        if not ref:
+            log.warning("Lighter index reference came back EMPTY — treating as "
+                        "reference-blind (no trades this loop)")
+        return ref
     except Exception as e:  # noqa: BLE001
-        log.warning("HL reference mids unavailable: %s", e)
+        log.warning("Lighter index reference unavailable: %s", e)
         return {}
 
 
@@ -161,9 +223,11 @@ def main():
     args = p.parse_args()
 
     # [2026-07-16 AUDIT] a lost Railway VENUE var silently booted hl_paper:
-    # unsuffixed row id (the -lshadow row went stale) + HL reference data
+    # unsuffixed row id (the -lshadow row went stale) + a Hyperliquid book
     # under a Lighter-named bot (dev≈0 forever). The sniper already guards
     # itself this way; this bot is Lighter-shadow by definition.
+    # (The REFERENCE is Lighter's own index as of 17-Jul; this guard is about
+    # the BOOK the bot reads and prices against, which must be Lighter's.)
     os.environ.setdefault("VENUE", "lighter_shadow")
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=False)
@@ -271,7 +335,7 @@ def main():
             time.sleep(LOOP_SECONDS)
             continue
 
-        ref = hl_mids()
+        ref = reference_prices()
         # [2026-07-11 INSTRUMENT-FIRST] market-context snapshot (market_context.py)
         # rides along on census events + entry ledger rows — the dislocation<->
         # liquidation correlation is this bot's core hypothesis to validate.
@@ -424,7 +488,7 @@ def main():
                 meta.pop(coin, None)
                 log.warning("DELIST GIVE-UP CLOSE %s @ %.6g", coin, zpx)
         else:
-            log.info("reference-blind (no HL mids) — no signals this loop.")
+            log.info("reference-blind (no Lighter index) — no signals this loop.")
 
         # ---- publish + persist ----
         try:
@@ -475,8 +539,99 @@ def _supervised():
             time.sleep(60)
 
 
-if __name__ == "__main__":
+def selftest():
+    """[2026-07-17] Offline checks for the reference swap (HL mids -> Lighter's
+    own index). No network, no DB. This bot had NO selftest before the swap;
+    the reference is the one input the whole strategy is denominated in, so it
+    gets pinned now.
+    """
+    print("Running Snap Back offline self-test...\n")
+
+    # ---- the happy parse
+    books = [{"symbol": "BTC", "status": "active", "index_price": "62800.2"},
+             {"symbol": "ETH", "status": "active", "index_price": 1827.34}]
+    assert index_from_books(books) == {"BTC": 62800.2, "ETH": 1827.34}
+
+    # ---- NEGATIVE FIXTURES: every shape that must NOT become a reference.
+    # A bad reference is worse than none: `dev_bps = mid/ref - 1` turns a junk
+    # ref into a fake ~10,000 bps dislocation, which clears the 150 bps entry
+    # gate by 60x. Each of these must be ABSENT from the map, so the coin is
+    # simply skipped (`if not r: continue`) rather than traded against garbage.
+    for bad, why in [
+        ({"symbol": "X", "status": "inactive", "index_price": "5"}, "inactive book"),
+        ({"symbol": "X", "status": "active", "index_price": 0}, "zero index"),
+        ({"symbol": "X", "status": "active", "index_price": None}, "null index"),
+        ({"symbol": "X", "status": "active"}, "missing index"),
+        ({"symbol": "X", "status": "active", "index_price": "abc"}, "junk index"),
+        ({"symbol": "X", "status": "active", "index_price": -5.0}, "negative index"),
+        ({"symbol": None, "status": "active", "index_price": "5"}, "no symbol"),
+        ({"status": "active", "index_price": "5"}, "no symbol key"),
+    ]:
+        assert "X" not in index_from_books([bad]), f"{why} must NOT yield a reference"
+    # ...and one junk row must not poison its healthy neighbours
+    assert index_from_books([{"symbol": "A", "status": "active", "index_price": "x"},
+                             {"symbol": "B", "status": "active", "index_price": "2"}]) \
+        == {"B": 2.0}
+
+    # ---- reference-blind contract: empty/none in -> empty out. main() only
+    # signals `if ref:`, so {} is the fail-safe (do nothing), never a default.
+    assert index_from_books([]) == {} and index_from_books(None) == {}
+
+    # ---- the gap maths this reference feeds, at the REAL gates. A reference
+    # 3.8 bps different (the measured HL-vs-index median, 17-Jul) cannot move a
+    # decision at ENTER_BPS=150; that is why the swap is signal-neutral.
+    mid, ref = 100.0, 100.0
+    assert abs((mid / ref - 1) * 1e4) < PRE_BPS                    # no signal
+    assert ((101.6 / 100.0 - 1) * 1e4) >= ENTER_BPS                # +160bps rich
+    assert ((98.4 / 100.0 - 1) * 1e4) <= -ENTER_BPS                # -160bps cheap
+    _drift = (100.038 / 100.0 - 1) * 1e4                           # 3.8 bps
+    assert _drift < PRE_BPS and _drift < EXIT_BPS, _drift
+
+    # ---- the reference must come from LIGHTER, asserted on the CALL the
+    # function makes rather than on its source text (the docstring names
+    # api.hyperliquid.xyz to record what it replaced — grepping source would
+    # trip on the history it is important to keep). Drive it with a stubbed
+    # transport and pin the host it actually dials.
+    assert "zklighter" in LIGHTER_API, LIGHTER_API
+    _calls = []
+
+    class _Resp:
+        def read(self):
+            return json.dumps({"order_book_details": [
+                {"symbol": "BTC", "status": "active", "index_price": "7"}]}).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    _real_open = urllib.request.urlopen
     try:
-        _supervised()
-    except KeyboardInterrupt:
-        log.info("stopped by user.")
+        urllib.request.urlopen = lambda req, *a, **k: (
+            _calls.append(req.full_url), _Resp())[1]
+        assert reference_prices() == {"BTC": 7.0}, "live parse path broken"
+        assert len(_calls) == 1, _calls
+        assert "zklighter" in _calls[0], f"reference must dial LIGHTER: {_calls[0]}"
+        assert "hyperliquid" not in _calls[0].lower(), _calls[0]
+        assert "orderBookDetails" in _calls[0], _calls[0]
+        # a transport failure must be reference-BLIND, never a partial map
+        urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(
+            RuntimeError("503"))
+        assert reference_prices() == {}, "a dead reference feed must return {}"
+    finally:
+        urllib.request.urlopen = _real_open
+
+    print("All Snap Back self-tests passed (Lighter index parses; inactive/"
+          "zero/null/junk/negative refs are SKIPPED not traded; empty stays "
+          "reference-blind; 3.8bps reference drift cannot move a 150bps gate).")
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        selftest()
+    else:
+        try:
+            _supervised()
+        except KeyboardInterrupt:
+            log.info("stopped by user.")
