@@ -303,6 +303,8 @@ def main():
 
     saved = store.load_state(STATE_KEY) or {}
     venue = None
+    rails = None
+    live = (TT_VENUE == "lighter_live")
     if TT_VENUE == "lighter_paper":
         # legacy: models its own fills at a flat fee. Kept for curve continuity.
         broker = PaperBroker(start_equity=START_EQUITY, fee_bps=4.0)
@@ -315,8 +317,24 @@ def main():
         from venues.lighter_client import LighterClient
         from venues.shadow import ShadowBroker
         from venues.safety import SafetyRails
-        venue = LighterClient(net="mainnet", with_signer=False)
-        SafetyRails(BOT, "lighter_shadow").assert_can_start()
+        # [2026-07-17 LIVE PATH] the signer is what separates a modelled fill
+        # from a real one. shadow -> no signer, ShadowBroker walks the book;
+        # live -> signer + market_open/market_close against the venue, and
+        # SafetyRails demands an explicit notional cap or refuses to start.
+        # [2026-07-17] Signer wiring is READY for live (with_signer=live) and
+        # SafetyRails is constructed from the real mode, so a live boot demands
+        # an explicit LIGHTER_TICKET_TAKER_MAX_NOTIONAL or refuses. But the
+        # ORDER PATH ITSELF IS NOT BUILT: every call site below assumes a local
+        # broker (broker.pos / .open / .close / .equity / .fees), and live needs
+        # positions read from the VENUE, market_open/market_close, last_fill
+        # reconciliation, an equity guard and a daily-loss rail. Until that
+        # exists, live must construct NOTHING — a None broker would AttributeError
+        # its way through the loop, which is a trap dressed as a fail-safe.
+        # The refusal above is what makes this honest; do not lift it to "see
+        # what happens".
+        venue = LighterClient(net="mainnet", with_signer=live)
+        rails = SafetyRails(BOT, TT_VENUE)
+        rails.assert_can_start()
         broker = ShadowBroker(BOT_ROW, venue, START_EQUITY)
     broker.restore_state(saved.get("broker") or {})
     meta = saved.get("meta") or {}          # sym -> {lens, opened, accrued_to}
