@@ -37,6 +37,7 @@ Usage:
                                      # signer, no money) — see _selftest_live()
 """
 import json
+import logging
 import os
 import sys
 import time
@@ -417,6 +418,35 @@ def exit_reason(entry, mark, opened, t_now, is_long=True):
 # ---------------------------------------------------------------------------
 
 
+def _setup_logging(_ctx=None):
+    """[2026-07-17] Make the venue layer AUDIBLE. This bot configured NO logging,
+    and Python drops `log.info` when the root logger has no handler — so the LIVE
+    taker has been running BLIND to `venues/`: no signer banner (and therefore no
+    lighter-sdk version), no EQUITY GUARD REJECTs, no governor 429/punish, no
+    ws-degraded. Only WARNING+ ever surfaced, via the handler of last resort,
+    which is exactly why `Unclosed client session` was visible and nothing else
+    was. The funding bot configures logging and printed its signer's wheel on the
+    first boot after the banner shipped; this bot could not, and that asymmetry
+    is what exposed the hole.
+
+    INSIDE main(), never at import. FOUR modules import this file
+    (lighter_ticket_replay, lighter_scout_tuner, strategy_incubator,
+    fleet_proprioception) and NONE configure logging — an import-time
+    basicConfig would silently hijack the root logger for all of them inside the
+    shared freqtrade-bots container. Same reason the TT_VENUE gate lives here.
+
+    Idempotent by construction: basicConfig is a no-op when the root already has
+    handlers, so a caller that configured its own logging keeps it. `_ctx` is the
+    offline test path — left alone so the selftests' captured stdout stays clean.
+    """
+    if _ctx is not None:
+        return
+    logging.basicConfig(
+        level=os.environ.get("TT_LOG_LEVEL", "INFO").strip().upper() or "INFO",
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        stream=sys.stdout)
+
+
 def main(_ctx=None):
     """One management cycle.
 
@@ -448,6 +478,7 @@ def main(_ctx=None):
             "another service already publishes. An inherited default must never "
             "decide that. Set TT_VENUE=lighter_live or TT_VENUE=lighter_shadow "
             "explicitly.")
+    _setup_logging(_ctx)
     moved = apply_tuning()
     if moved:
         print(f"[ticket-taker] {iso(now())} growth-rail levers active: {moved}")
@@ -2155,6 +2186,71 @@ def _selftest_live():
         assert "api-error" in (_o["raw"]["fill_src"] or ""), \
             f"the ledger must NAME why it could not measure: {_o['raw']!r}"
 
+        # ================================================================
+        # 13) THE VENUE LAYER IS AUDIBLE — and importing this file must NOT
+        #     hijack anyone else's logging.
+        #
+        #     The live taker configured no logging, so Python dropped every
+        #     `log.info` from venues/: no signer banner (hence no lighter-sdk
+        #     version), no EQUITY GUARD REJECTs, no governor 429s. The funding
+        #     bot could report its wheel and this bot could not — that asymmetry
+        #     IS the bug. Both halves are pinned because the fix has two ways to
+        #     be wrong: silent (no handler) or invasive (hijacking 4 importers).
+        # ================================================================
+        import logging as _lg
+        import inspect as _insp
+
+        # (0) THE CALL SITE. Testing _setup_logging() directly proves the
+        #     FUNCTION works and says NOTHING about main() calling it — and a
+        #     helper nobody calls is precisely the original bug. This is the
+        #     THIRD time tonight that a fixture exercised a helper and missed
+        #     its wiring (see _bars in funding_carry_bot, and _slip_bps_of's
+        #     `measured`); mutation-proven, M14 sailed through without it.
+        _main_src = "\n".join(ln.split("#", 1)[0]
+                              for ln in _insp.getsource(main).splitlines())
+        assert "_setup_logging(_ctx)" in _main_src, (
+            "main() must CALL _setup_logging(_ctx) — without it venues' "
+            "log.info is dropped and the live bot runs blind to its own "
+            "signer, equity guard and governor")
+
+        # (a) IMPORT-TIME PURITY. Four modules import this file and NONE of them
+        #     configure logging; a module-level basicConfig would silently take
+        #     over the root logger for all four inside the shared container.
+        #     Merely importing us must therefore add no handler.
+        _root = _lg.getLogger()
+        _saved_handlers, _saved_level = list(_root.handlers), _root.level
+        try:
+            for _h in list(_root.handlers):
+                _root.removeHandler(_h)
+            assert not _lg.getLogger().handlers, (
+                "importing lighter_ticket_taker must NOT configure the root "
+                "logger — four modules import it and none configure logging")
+            # _ctx (the offline path) must also leave logging alone, so these
+            # very selftests never inherit a handler they did not ask for.
+            _setup_logging(_ctx={"stub": True})
+            assert not _lg.getLogger().handlers, \
+                "_setup_logging(_ctx=...) is the TEST path — it must not configure"
+
+            # (b) THE FIX ITSELF: the real path makes venues' log.info audible.
+            _setup_logging(None)
+            assert _lg.getLogger().handlers, \
+                "_setup_logging() must give the root a handler, or venues' " \
+                "log.info is dropped and the live bot runs blind"
+            assert _lg.getLogger("venues.lighter").isEnabledFor(_lg.INFO), \
+                "venues log.info must be ENABLED — that is the signer banner, " \
+                "the equity-guard REJECTs and the governor 429s"
+            # idempotent: a caller that already configured keeps its own setup
+            _n = len(_lg.getLogger().handlers)
+            _setup_logging(None)
+            assert len(_lg.getLogger().handlers) == _n, \
+                "basicConfig must be a no-op when the root already has handlers"
+        finally:
+            for _h in list(_root.handlers):
+                _root.removeHandler(_h)
+            for _h in _saved_handlers:
+                _root.addHandler(_h)
+            _root.setLevel(_saved_level)
+
         print("\nAll LIVE order-path self-tests passed:")
         print("  1 entry SENDS a real order + records the REAL fill")
         print("  2 notional cap is senior — cap-breaching entry never sends")
@@ -2173,6 +2269,8 @@ def _selftest_live():
               "    switch still flattens")
         print(" 12 fill telemetry DETECTS: a measured at-mark fill records 0.0,")
         print("    an unmeasured leg records NULL and names the reason")
+        print(" 13 the venue layer is AUDIBLE (signer/equity-guard/governor),")
+        print("    and importing this file hijacks nobody's logging")
     finally:
         for k, fn in _real.items():
             setattr(store, k, fn)
