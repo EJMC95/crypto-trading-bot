@@ -169,7 +169,7 @@ done &
 # this morning's crash-loop incident exactly, third time in one day.
 # lighter_shadow is the correct value AND the safe one: this container hosts the
 # SHADOW book — the control arm and the only evidence a go-live can rest on. The
-# LIVE arm is a separate service (Dockerfile.takerlive) and sets its own.
+# LIVE arm is a separate service (Dockerfile.tickettaker) and sets its own.
 ( sleep 210
   while true; do
     TT_VENUE=lighter_shadow python3 /freqtrade/lighter_ticket_taker.py || true

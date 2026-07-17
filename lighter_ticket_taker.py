@@ -106,8 +106,8 @@ from venues.safety import open_notional
 # silently-live.
 # GO-LIVE PRECONDITION (write it down now, while it is cheap): the live arm
 # must be its OWN Railway service with TT_VENUE set explicitly.
-# [2026-07-17 DONE — that service exists: Dockerfile.takerlive +
-# railway.takerlive.toml, and the mandatory guard is now in main(). The module
+# [2026-07-17 DONE — that service exists: Dockerfile.tickettaker +
+# railway.tickettaker.toml, and the mandatory guard is now in main(). The module
 # default below is what run_all.sh's shadow arm no longer relies on: it DECLARES
 # TT_VENUE=lighter_shadow on the command line, because with the guard in place
 # an unset var is a refusal, not a fallback. Keep the default only so the four
@@ -601,8 +601,11 @@ def main(_ctx=None):
         return {to_lighter(c)[0]: v for c, v in (venue.positions() or {}).items()}
 
     def _real_fill(sym, is_ask, fallback, leg):
-        """REAL fill price from the venue's own trade tape, or the decision
-        price. is_ask=True when WE sold (opening a SHORT / closing a LONG).
+        """REAL fill price from the venue's own trade tape as (price, measured,
+        reason). is_ask=True when WE sold (opening a SHORT / closing a LONG).
+        `price` is the decision price when `measured` is False, so every caller
+        can keep using it as a price — but only `measured` may be read as
+        evidence.
 
         Extends lighter_funding_bot._real_exit to the OPEN leg too: that bot
         echoes the decision price on opens, which is the same unmeasurable-fill
@@ -611,40 +614,75 @@ def main(_ctx=None):
         this arm's execution measurable on BOTH legs — which is the entire
         reason a live arm exists before a go-live.
 
+        [2026-07-17] RETURNS `measured` INSTEAD OF LETTING THE CALLER INFER IT.
+        The old contract said "price == decision means we got no read". MEASURED
+        false the same night: 1000BONK's REAL fill was 0.003275 and the decision
+        price was 0.003275 — a genuinely perfect fill, identical to the mark,
+        which the inference threw away as "unmeasured". Only THIS function knows
+        whether the tape answered; inferring it from the number is a guess.
+
         Measurement-only: ANY failure falls back to the decision price, so a
         broken read can never block or unwind an order."""
         if dry_run:
-            return fallback
+            return fallback, False, "dry-run"
+        real = None
+        reason = "no-venue-method"
         try:
-            fl = getattr(venue, "last_fill", None)
-            real = fl(sym, is_ask=is_ask, since_ts=time.time() - 180) if fl else None
-        except Exception:  # noqa: BLE001 — never let telemetry break an order
-            real = None
+            fl = getattr(venue, "last_fill_detail", None)
+            if fl:
+                real, reason = fl(sym, is_ask=is_ask, since_ts=time.time() - 180)
+            else:                                  # older venue: no reason channel
+                fl = getattr(venue, "last_fill", None)
+                if fl:
+                    real = fl(sym, is_ask=is_ask, since_ts=time.time() - 180)
+                    reason = "ok" if real else "unknown(no-detail-api)"
+        except Exception as e:  # noqa: BLE001 — never let telemetry break an order
+            real, reason = None, f"caller-error:{type(e).__name__}"
         if real:
             print(f"[ticket-taker] {sym} {leg} fill (venue): {real:.6g} "
-                  f"(decision {fallback:.6g})")
-        return real or fallback
+                  f"(decision {fallback:.6g}) via {reason}")
+            return real, True, reason
+        # NOT a crash and NOT zero slippage — an UNMEASURED leg. Say so, loudly
+        # enough that 57 orders can never again go by without anyone noticing.
+        print(f"[ticket-taker] {sym} {leg} fill UNMEASURED — {reason} "
+              f"(recording decision {fallback:.6g}, slippage NULL)")
+        return fallback, False, reason
 
-    def _slip_bps_of(decision, fill, is_buy):
+    def _slip_bps_of(decision, fill, is_buy, measured=None):
         """Signed slippage on ONE order, bps, POSITIVE = worse than the
-        decision price. None when the two are identical, because a fallback to
-        the decision price means we got NO fill read — recording that as 0.0
+        decision price. None when we got NO fill read — recording that as 0.0
         would be indistinguishable from a genuinely perfect fill. The fleet's
         whole execution blind spot came from an echoed decision price being
-        read as data; a null is honest, a fabricated zero is not."""
+        read as data; a null is honest, a fabricated zero is not.
+
+        [2026-07-17] `measured` is now PASSED, not inferred. When it is None the
+        old `d == f` inference still applies (back-compat for call sites that
+        cannot know), but that inference is WRONG for a real fill that lands
+        exactly on the mark — measured live on 1000BONK the night this shipped.
+        A caller that knows MUST say so, and then a measured 0.0 is recorded as
+        the 0.0 it is."""
         try:
             d, f = float(decision), float(fill)
-            if d <= 0 or f <= 0 or d == f:
+            if d <= 0 or f <= 0:
+                return None
+            if measured is False:
+                return None
+            if measured is None and d == f:
                 return None
             return (f / d - 1.0) * 10_000.0 * (1.0 if is_buy else -1.0)
         except (TypeError, ValueError, ZeroDivisionError):
             return None
 
-    def _book_close(sym, m, size, entry, exit_px, pnl, reason, decision_px=None):
+    def _book_close(sym, m, size, entry, exit_px, pnl, reason, decision_px=None,
+                    measured=None, fill_reason=None):
         """Ledger + counters + meta pop for ONE close. Shared by the exit pass
         and _flatten_all so an emergency flatten reconstructs identically to a
         normal close (the funding bot's rule: forensics must stay consistent
-        with account equity)."""
+        with account equity).
+
+        `measured`/`fill_reason` carry _real_fill's verdict so the order row can
+        record a MEASURED zero as zero, and name the cause when it measured
+        nothing. Default None = "caller doesn't know" = the old inference."""
         is_long = size > 0
         drag = float(m.get("funding_paid") or 0.0)   # signed: shorts credit
         clip_used = float(m.get("clip") or CLIP_USD)
@@ -675,8 +713,14 @@ def main(_ctx=None):
                     side=("sell" if is_long else "buy"), size=abs(size),
                     px_decision=decision_px, px_fill=exit_px,
                     slippage_bps=_slip_bps_of(decision_px, exit_px,
-                                              is_buy=not is_long),
-                    raw={"reason": reason, "lens": lens, "leg": "close"})
+                                              is_buy=not is_long,
+                                              measured=measured),
+                    # `measured` + `fill_src` make the blind spot QUERYABLE off
+                    # the ledger instead of grep-able off a container log that
+                    # ages out. 0 of 57 real orders carried a fill; nobody could
+                    # ask the database why.
+                    raw={"reason": reason, "lens": lens, "leg": "close",
+                         "measured": measured, "fill_src": fill_reason})
             except Exception:  # noqa: BLE001
                 pass
         print(f"[ticket-taker] {iso(t_now)} CLOSE {side} {sym} ({lens}) {reason} "
@@ -716,9 +760,11 @@ def main(_ctx=None):
                 print(f"[ticket-taker] {iso(t_now)} flatten {sym}: {e!r}")
                 continue
             _dpx = px
-            px = _real_fill(sym, is_ask=is_long, fallback=px, leg="exit")
+            px, _meas, _why = _real_fill(sym, is_ask=is_long, fallback=px,
+                                         leg="exit")
             pnl = abs(size) * ((px - entry) if is_long else (entry - px))
-            _book_close(sym, m, size, entry, px, pnl, reason, decision_px=_dpx)
+            _book_close(sym, m, size, entry, px, pnl, reason, decision_px=_dpx,
+                        measured=_meas, fill_reason=_why)
 
     # ---- LIVE RAILS (loop-top order mirrors lighter_funding_bot) -----------
     # This bot is a RUN-ONCE process (run_all.sh loops it every 5 min), so
@@ -950,6 +996,7 @@ def main(_ctx=None):
         if dry_run:
             pnl = broker.close(sym, mark)
             _dpx = None
+            _meas, _why = None, None
         else:
             try:
                 # [2026-07-17] This block's own comment already said "never book
@@ -972,9 +1019,11 @@ def main(_ctx=None):
                       f"leaving position, retry next cycle")
                 continue
             _dpx = mark                                  # mid at the decision
-            mark = _real_fill(sym, is_ask=is_long, fallback=mark, leg="exit")
+            mark, _meas, _why = _real_fill(sym, is_ask=is_long, fallback=mark,
+                                           leg="exit")
             pnl = abs(size) * ((mark - entry) if is_long else (entry - mark))
-        _book_close(sym, m, size, entry, mark, pnl, reason, decision_px=_dpx)
+        _book_close(sym, m, size, entry, mark, pnl, reason, decision_px=_dpx,
+                    measured=_meas, fill_reason=_why)
         pos.pop(sym, None)
 
     # 3) entries — only from a FRESH scout snapshot, only the incredible subset
@@ -1109,16 +1158,19 @@ def main(_ctx=None):
                 except Exception as e:  # noqa: BLE001
                     print(f"[ticket-taker] {iso(t_now)} open {sym} failed: {e!r}")
                     continue
-                entry_px = _real_fill(sym, is_ask=not is_long, fallback=mark,
-                                      leg="entry")
+                entry_px, _meas, _why = _real_fill(sym, is_ask=not is_long,
+                                                   fallback=mark, leg="entry")
                 try:
                     store.publish_venue_order(
                         BOT_ROW, venue="lighter", shadow=False, coin=sym,
                         side=("buy" if is_long else "sell"), size=size,
                         px_decision=mark, px_fill=entry_px,
-                        slippage_bps=_slip_bps_of(mark, entry_px, is_buy=is_long),
+                        slippage_bps=_slip_bps_of(mark, entry_px,
+                                                  is_buy=is_long,
+                                                  measured=_meas),
                         raw={"lens": lens, "leg": "open", "clip": clip,
-                             "evidence": ev})
+                             "evidence": ev,
+                             "measured": _meas, "fill_src": _why})
                 except Exception:  # noqa: BLE001
                     pass
             # visible to the rest of THIS cycle: the cap check above and the

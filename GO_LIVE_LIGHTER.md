@@ -320,7 +320,7 @@ not whatever bot you intend to run there next.
 ### 🔴 USER-ONLY steps — in this order
 1. **Point the service at the taker's IMAGE. Do this BEFORE any env change.**
    Set the service's Config-as-code **Railway Config File** to
-   `railway.takerlive.toml` (it selects `Dockerfile.takerlive` and
+   `railway.tickettaker.toml` (it selects `Dockerfile.tickettaker` and
    `restartPolicyType=always`). Prefer a **NEW service** — repurposing
    `tide-rider-lighter-live` is what produced the incident above, and its
    `CRYPTO_TREND_DAILY_MAX_NOTIONAL` / `VENUE` vars would linger.
