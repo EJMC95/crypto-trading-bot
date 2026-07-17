@@ -73,9 +73,43 @@ MAX_NEW_PER_LOOP = int(os.environ.get("FUNDING_MAX_NEW_PER_LOOP", "2"))
 # same trades, honestly labelled. 0.40 was NOT fitted in these units — it was
 # born in funding_carry_bot.py against HYPERLIQUID (hourly, so 24*365 is right
 # there and 0.40 meant a true 40%) and ported here as a bare constant. The PORT
-# is the bug. So the live gate has never been supported by any backtest, and
-# ZERO backtests have ever run on Lighter funding data — that artifact
-# (scripts/backtest_lighter_funding.py) is what re-tuning must wait for.
+# is the bug. So the live gate has never been supported by any backtest.
+#
+# [2026-07-17 CORRECTION — the sentence that stood here was FALSE, and under
+# this repo's "don't re-test what a script header rejects" doctrine it BLOCKED
+# the next reader from the right answer.] It read: "ZERO backtests have ever
+# run on Lighter funding data — that artifact (scripts/backtest_lighter_funding
+# .py) is what re-tuning must wait for." Both halves are wrong. The filename is
+# TRANSPOSED — the artifact is scripts/backtest_FUNDING_LIGHTER.py — and it
+# EXISTS, is Lighter-native, and has already run. Its verdict on 150d of
+# Lighter's own settled tape, gate in TRUE apr:
+#
+#     gate      @0.86bps (shadow MODEL)   @5bps (ASSUMED)   both halves
+#     0.05 LIVE      -15.85                  -41.95            no / no
+#     0.12           +11.91                  -10.26            no (h1 -4.23)
+#     0.20           +22.51                   +5.01            no (h1 -2.31)
+#     0.40 (HL)       -0.82                  -10.66            no / no
+#
+# So the live gate is not merely unsupported — it is the WORST value tested, at
+# BOTH frictions, on the venue it trades. NO gate passes both halves at either
+# friction; that row is friction-INDEPENDENT and stands.
+#
+# WHY IT IS STILL 0.05, deliberately: the ranking above is denominated in a
+# friction NOBODY HAS MEASURED. 5bps was assumed; 0.86bps is the ShadowBroker's
+# MODEL, not a fill the venue gave anyone. They merely disagree. The only two
+# REAL fills ever observed (venues/lighter_client.py:664-667: STRC 13.78bps,
+# 1000BONK 0.00bps — n=2, the taker's illiquid books) lean toward the "dead"
+# end. Moving the gate now swaps one unmeasured constant for another. The live
+# fill telemetry is running as of 17-Jul 11:20Z; re-derive the gate when paired
+# decision/fill prices exist on THIS book. See [[funding-farmer-stop-is-the-bug]].
+#
+# STRUCTURAL, and it does not need the friction number: Lighter publishes only
+# 39 distinct funding values across 201 books — 96 books (47.8%) sit at exactly
+# 9.6e-05/8h = 10.51% TRUE, and 59 (29.4%) at 3.50%. 77% of the venue rests on
+# two constants. A 5% bar is BELOW the 10.51% resting default, so it admits the
+# resting population wholesale: 132 of 201 books (65.7%) clear it, and 21 of the
+# live book's first 27 opens fired at exactly that resting value. Measured
+# 17-Jul off /api/v1/funding-rates. See [[venue-resting-defaults-trap]].
 ENTER_APR = float(os.environ.get("FUNDING_ENTER_APR", "0.05"))  # TRUE apr >= 5%
 EXIT_APR = float(os.environ.get("FUNDING_EXIT_APR", "0.01875"))  # TRUE apr cools
 PERSIST_H = float(os.environ.get("FUNDING_PERSIST_H", "4"))     # hot this long first
@@ -84,11 +118,37 @@ MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "10e6"))      # 24h turnover f
 MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-spread gate
 
 # Directional risk controls, TUNED on scripts/backtest_directional_funding.py
-# (real HL funding+price, 150d, 30 coins). Key finding: funding capture is real
-# (+) but directional price risk eats it (-), so the strategy is only ~break-even.
-# A WIDE stop + TIGHT take-profit was the least-bad / most robust config — a tight
-# stop whipsaws out on noise before funding + mean-reversion pay, LOSING more.
-HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — wide (anti-whipsaw)
+# (real HYPERLIQUID funding+price, 150d, 30 coins). Key finding: funding capture
+# is real (+) but directional price risk eats it (-), so the strategy is only
+# ~break-even. Its config claim — "a WIDE stop + TIGHT take-profit is least-bad;
+# a tight stop whipsaws out before funding + mean-reversion pay, LOSING more" —
+# is HYPERLIQUID'S. It is the ONLY justification this live stop has ever had.
+#
+# [2026-07-17] LIGHTER'S OWN TAPE INVERTS IT. Same 150d, same code, gate 0.05,
+# HARD_STOP swept (scripts/backtest_funding_lighter.py):
+#
+#     STOP   @0.86bps (model)   h1/h2      @5bps (assumed)   h1/h2
+#     0.10        -15.85      -5.66/-1.34      -41.95     -21.40/-11.40   <- LIVE
+#     0.06        +11.59      +2.41/+15.78     -18.55     -15.04/+3.18
+#     0.03        +21.32     +12.05/+9.31      -18.24      -9.23/-8.91
+#
+# At 0.86bps the TIGHT stop wins by $37 with both halves positive (n=1911) —
+# the exact opposite of the HL claim above. A 10% stop against a 4% TP lets
+# losers run 2.5x further than winners are allowed, backwards for a
+# mean-reversion book. At the live gate the stop is only 7.1% of trades but
+# -$223.65 of P&L, the single biggest losing bucket, at -$2.49/trade.
+#
+# NOT CHANGED, and the reason is the whole point: at 5bps EVERY stop value is
+# negative. The verdict flips on a friction NOBODY HAS MEASURED — so the tight
+# stop is a hypothesis conditional on the shadow's MODEL, not a finding. This is
+# the same error one knob to the right: a friction-dependent GATE verdict was
+# replaced by a friction-dependent STOP verdict and the second was called solid.
+# FUNDING_HARD_STOP=0.03 is set on funding-farmer-shadow ONLY as the A/B arm;
+# live keeps 0.10 as the control. Promote through the judge's paired bar, never
+# by flipping the env — and NEVER tighten a live stop with positions open (it is
+# evaluated against them on the next loop and liquidates anything already >3%
+# adverse). See [[funding-farmer-stop-is-the-bug]].
+HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — HL-fitted; Lighter disagrees (above)
 TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% — lock the reversion pop
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDING_DAILY_LOSS", "0.05"))
 STOP_COOLDOWN_H = float(os.environ.get("FUNDING_STOP_COOLDOWN_H", "12"))  # quarantine after a stop

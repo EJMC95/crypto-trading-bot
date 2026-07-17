@@ -573,6 +573,42 @@ BACKTEST_VENUE_OK = {
         "at all, and using Lighter's own perp mark as its own signal is circular. "
         "Same principled exception as VENUE_PURITY_OK's Index Rider entry."
     ),
+
+    # ---- RETIRED-HISTORY [2026-07-17 triage] -------------------------------
+    # These load a foreign venue AND that is correct, because the bot they
+    # justify does not trade. CLAUDE.md: "Retired-bot backtests are HISTORY — do
+    # not re-run them; they justify nothing that still trades." Re-running them
+    # on Lighter would spend days manufacturing evidence for a corpse. Each row
+    # below was VERIFIED against cleanup_legacy_bots.LEGACY_BOTS (the prune
+    # list), not against a doc — hiding-a-row-is-NOT-retiring-it.
+    "backtest_regime.py": (
+        "HL. Justifies Trail Blazer (hyperliquid_momo_bot.py), retired 11-Jul: "
+        "row `momo-bot` is in LEGACY_BOTS and the bot idles at boot behind "
+        "MOMO_RETIRED_OVERRIDE. Its verdict is history; see "
+        "trail-blazer-no-durable-edge (paper +$197 was a lucky ~30d window)."
+    ),
+    "backtest_leverage.py": (
+        "HL. Trail Blazer's leverage study — same retired bot as "
+        "backtest_regime.py (`momo-bot` in LEGACY_BOTS, guarded off 15-Jul)."
+    ),
+    "backtest_leverage_rails.py": (
+        "HL, inherited via `import backtest_leverage`. Same retired Trail Blazer "
+        "lineage; it can only be as current as its parent, which justifies a bot "
+        "that no longer trades."
+    ),
+    "backtest_bounce_catcher_audit.py": (
+        "HL, inherited via `import backtest_leverage`. Justifies Bounce Catcher "
+        "(hyperliquid_perps_bot.py): row `perps-rsi-meanrev` is in LEGACY_BOTS "
+        "and the bot idles behind PERPS_RETIRED_OVERRIDE since the 17-Jul "
+        "LIGHTER-ONLY cut."
+    ),
+    "backtest_tide_rider.py": (
+        "Binance. The KRAKEN-ERA SPOT original — row `crypto-trend-daily` is in "
+        "LEGACY_BOTS (14-Jul Kraken retirement, an operator decision, not an "
+        "outage). Distinct from backtest_tide_rider_perp.py, which is NOT "
+        "declared: that one is still cited by lighter_trend_bot.py:11 as the live "
+        "bot's justification and is a real defect."
+    ),
 }
 
 # Files whose venue is inherited rather than literal. Maps a provenance marker
@@ -586,6 +622,39 @@ _CACHE_OWNER = {
     ".funding_cache.json": "backtest_funding.py",
     ".lighterfund_cache.json": "backtest_funding_lighter.py",   # LIGHTER-native
 }
+
+
+# The LIVE real-money bots. A foreign-venue backtest CITED by one of these is a
+# different animal from one cited by nobody: it is the stated justification for a
+# constant that is moving real money right now.
+_LIVE_BOTS = {"lighter_funding_bot.py", "lighter_ticket_taker.py",
+              "lighter_trend_bot.py"}
+
+
+def backtest_citations(root=None):
+    """{backtest_name: {citing_file: [lines]}} — read from the SHIPPED bots.
+
+    THE TRIAGE IS DERIVED, NOT DECLARED. A hand-written "which bot does this
+    justify?" table is the same rotting artifact as the deploy path list and the
+    07-07 organ list: correct the day it is written, silently wrong a week later.
+    Every bot here already NAMES its own backtests in source ("TUNED on
+    scripts/backtest_directional_funding.py"), so the citation IS the map, and it
+    cannot drift from the code because it IS the code.
+
+    Blast radius, measured 17-Jul: 5 backtests are cited by a LIVE real-money
+    bot, and 4 of the 5 load Hyperliquid or Binance."""
+    root = root or ROOT
+    out = {}
+    for rel in shipped_files(root):
+        p = os.path.join(root, rel)
+        try:
+            txt = open(p, encoding="utf-8", errors="ignore").read()
+        except Exception:  # noqa: BLE001
+            continue
+        for m in re.finditer(r"scripts/((?:backtest|study)_[a-z_]+\.py)", txt):
+            line = txt[:m.start()].count("\n") + 1
+            out.setdefault(m.group(1), {}).setdefault(rel, []).append(line)
+    return out
 
 
 def backtest_files(root=None):
@@ -749,17 +818,44 @@ def main(argv):
               "measure\".\n  A backtest on another venue's data is not "
               "validation of a Lighter bot —\n  it is a hypothesis about "
               "Lighter.\n")
-        for name, foreign in bt_offenders:
-            inherited = any(w != "direct" for w in foreign.values())
-            flag = "  [LAUNDERED — invisible to a host: scan]" if inherited and \
-                not any(w == "direct" for w in foreign.values()) else ""
+        cites = backtest_citations()
+
+        def radius(item):
+            """Rank by BLAST RADIUS: what does this thing justify, and does that
+            justification still move money? An undifferentiated list of 22 is a
+            list nobody triages."""
+            name = item[0]
+            by = cites.get(name, {})
+            if any(b in _LIVE_BOTS for b in by):
+                return 0                       # justifies a LIVE real-money bot
+            if by:
+                return 1                       # justifies some shipped bot
+            return 2                           # cited by nothing shipped
+
+        BUCKET = {0: "LIVE REAL MONEY", 1: "shipped (shadow/retired bot)",
+                  2: "cited by no shipped code"}
+        last = None
+        for name, foreign in sorted(bt_offenders, key=lambda i: (radius(i), i[0])):
+            r = radius((name, foreign))
+            if r != last:
+                print(f"\n  --- {BUCKET[r]} " + "-" * (56 - len(BUCKET[r])))
+                last = r
+            inherited = not any(w == "direct" for w in foreign.values())
+            flag = "  [LAUNDERED — invisible to a host: scan]" if inherited else ""
             print(f"  scripts/{name}{flag}")
             for s, why in sorted(foreign.items()):
                 print(f"      {s:34} {why}")
+            for b, lines in sorted(cites.get(name, {}).items()):
+                mark = "  <-- ITS STATED JUSTIFICATION" if b in _LIVE_BOTS else ""
+                ln = ",".join(str(x) for x in lines[:3])
+                print(f"      cited by {b}:{ln}{mark}")
+        live_n = sum(1 for i in bt_offenders if radius(i) == 0)
         print(f"\n  {len(bt_offenders)} undeclared / {len(bt_declared)} declared. "
-              f"Declare in BACKTEST_VENUE_OK with a reason,\n  or re-run the study "
-              f"on Lighter's own ~438d tape. Retired-bot backtests are HISTORY —\n"
-              f"  do not re-run them; they justify nothing that still trades.")
+              f"{live_n} are cited BY A LIVE REAL-MONEY BOT as the\n  justification "
+              f"for a constant moving real money today — triage those first.\n"
+              f"  Declare in BACKTEST_VENUE_OK with a reason, or re-run on "
+              f"Lighter's own ~438d tape.\n  Retired-bot backtests are HISTORY: "
+              f"declare them, do not re-run them.")
         print("=" * 74)
 
     total = len(violations) + len(unparsed)
