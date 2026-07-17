@@ -6,23 +6,65 @@ decision: "all services must run off lighter"). Books are $1,000 paper/shadow
 each, no top-ups, except the real-money Lighter live rows. Dashboard:
 https://pnl-dashboard-production-858c.up.railway.app/
 
-## Fleet Overview (post 14-Jul Kraken retirement — ~21 live rows)
+## Fleet Overview (post 14-Jul Kraken retirement; post 17-Jul LIGHTER-ONLY cut)
+Every TRADING row below is on Lighter. Four non-Lighter services were code-
+guarded off on 17-Jul — see the LIGHTER-ONLY table after the fleet table.
 
 ### The trading fleet (Lighter)
 | Row | Name | What it is |
 |-----|------|------------|
 | freqtrade-{mum,dad,avo-maria,georgia}-lshadow | 👩👨🙏🔮 family | TrendMomo/MomoBreakout/SwingDip/DayTraderV5 on Lighter (gate0 `lighter_family_bot.py`, service `family-lighter-shadow`); closes tagged `long-<tag>_<exit>` + brain stake-mults applied at entry (15-Jul) |
 | crypto-{intraday-15m,swing-daily,breakout-4h}-lshadow | spot ports | same service, 29-pair whitelist |
-| crypto-trend-daily-lighter / -lshadow | 🌊 Tide Rider | **LIVE real money** + shadow (tide-rider service) |
+| crypto-trend-daily-lshadow | 🌊 Tide Rider | shadow only. Its LIVE row `crypto-trend-daily-lighter` was RETIRED 17-Jul — 🎫 Ticket Taker took the slot on the SAME service/keys/sub-account, so leaving both rows would DOUBLE-COUNT the same $34.67 of real money |
 | perps-funding-lighter-lighter / -lshadow | 💸 Funding Farmer | **LIVE** funding harvester + shadow |
-| perps-funding-carry (+ -lshadow) | 🌾 Yield Harvester | HL-data paper origin + Lighter shadow |
+| perps-funding-carry-lshadow | 🌾 Yield Harvester | Lighter shadow. Its HL-data arm (`perps-funding-carry`) is RETIRED 17-Jul — see LIGHTER-ONLY below |
 | perps-funding-spread-lshadow | ⚖️ Counterweight | funding L/S book |
 | lighter-perp-sniper-lshadow | 🎯 Perp Sniper | new-listing sniper |
-| lighter-dislocation-lshadow | 🧲 Snap Back | dislocation fader |
+| lighter-dislocation-lshadow | 🧲 Snap Back | dislocation fader — reference is LIGHTER'S OWN `index_price` since 17-Jul (was Hyperliquid mids) |
 | lighter-ticket-taker-lshadow | 🎫 Ticket Taker | **trades Lighter Scout's high-conviction tickets** (breakout/dip/momentum long + divergence long/short); stress veto pauses entries at venue |prem| med ≥15bps; closes tagged `<side>-<lens>_<exit>` so the brain grades each lens |
-| equities-regime-lshadow / equities-momentum-lshadow | 📊 Index Rider / 🏆 Stock Leaders | stock-perp ports (IBKR/Alpaca originals RETIRED 14-Jul) |
-| event-listing-sniper | 🎯 Launch Sniper | CEX spot listings (legacy, still running) |
-| scanner-cross-exchange-arb | 🔀 Gap Scout | CEX dislocation scanner + Lighter premium publisher |
+| equities-regime-lshadow | 📊 Index Rider | stock-perp port (IBKR original RETIRED 14-Jul). 🏆 Stock Leaders (`equities-momentum{,-lshadow}`) RETIRED 17-Jul — maxDD 37-44% vs the 15% go-live gate |
+
+### LIGHTER-ONLY (17-Jul, operator: "i only want things running on lighter")
+LIGHTER-FIRST governed SERVICES since 14-Jul, but five rows were still TRADING
+elsewhere. All stops are CODE GUARDS, not `railway down` (auto-deploy
+resurrects stopped services on every git push). Guards print WHY, keep every
+ledger, don't break `--selftest`, and are reversible by env var. Rows are in
+BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
+
+**Two different mechanisms — don't conflate them:**
+- The four BOTS **IDLE** at boot (`while True: sleep`), never `sys.exit`, because
+  `restartPolicy=always` turns an exit into a permanent crash-loop (the Trail
+  Blazer pattern, `hyperliquid_momo_bot.py` 15-Jul).
+- **funding-carry does NOT idle**: it `raise SystemExit`s unless
+  `VENUE=lighter_shadow`. Its service is still pinned `VENUE=hl_paper`, so it
+  will exit-loop until the operator flips that env var — deliberately LOUD, not
+  a silent row that just stops moving. **This one needs an operator action.**
+
+| Row (retired) | File | Was trading | Resurrect with |
+|---|---|---|---|
+| event-listing-sniper 🎯 Launch Sniper | `listing_sniper.py` | spot on ~100 CCXT exchanges | `LISTING_SNIPER_OVERRIDE=run` |
+| scanner-cross-exchange-arb 🔀 Gap Scout | `cross_exchange_arb.py` | arb BETWEEN Kraken/Binance/Coinbase | `GAPSCOUT_RETIRED_OVERRIDE=run` |
+| scanner-triangular-arb | `triangular_arb.py` | Kraken | `ARB_RETIRED_OVERRIDE=run` |
+| perps-rsi-meanrev 🪃 Bounce Catcher | `hyperliquid_perps_bot.py` | Hyperliquid | `PERPS_RETIRED_OVERRIDE=run` |
+| perps-funding-carry 🌾 (HL arm only) | `funding_carry_bot.py` | `VENUE=hl_paper` | set `VENUE=lighter_shadow` on the service |
+
+- **The Launch Sniper was the one nobody switched off.** `lighter_perp_sniper.py`
+  was built 9-Jul *"to replace the spot sniper (which can't run on a fixed-market
+  perps venue)"* — the replacement shipped, the predecessor kept trading ~100
+  CEXes for 8 more days behind a row that was never even hidden.
+- **Gap Scout could not be MOVED, only stopped** — its trade was CEX↔CEX arb and
+  you cannot arb one venue against itself (its own source: "The CEX legs above
+  say nothing about Lighter"). Its Lighter-premium job moved to
+  `lighter_market_scout` (every liquid book vs its 6-symbol `LIGHTER_WATCH`);
+  `fleet_risk` now mirrors the bus premium from bot_state `lighter-market`.
+- **Snap Back COULD be moved and was**: `hl_mids()` → Lighter's own
+  `index_price`. Measured 17-Jul: the two agree to a median 3.8 bps (vs a 150 bps
+  entry gate) but the index residual is systematically tighter — `book/hl_mid − 1`
+  was charging Lighter for Hyperliquid's basis.
+- Still non-Lighter and DELIBERATELY kept: `compile_market_data.py` (Binance/
+  CoinGecko/Kraken prices for the DASHBOARD's display — not a trader).
+- Guards bite on each service's NEXT DEPLOY. `hyperliquid_momo_bot.py`
+  (Trail Blazer) was already guarded 15-Jul.
 
 ### Intelligence layer (main freqtrade-bots container, run_all.sh loops)
 - `lighter_market_scout.py` 🛰️ — ALL ~215 Lighter books: premium stress,
@@ -63,9 +105,12 @@ https://pnl-dashboard-production-858c.up.railway.app/
   lighter-scout/-taker/-xp + **lighter-live**, the 15-Jul user-mandated
   live lane; 16-Jul `AUTHOR_LANES` binds each author — board →
   `live.clip_scale` only, judge → `live.funding.*` only; go-live/keys/
-  SafetyRails caps stay operator-only forever). First
-  loop: Gap Scout census quiet 24/48/96h → widen prefilter/book-budget/
-  second-tier venues (kucoin/gateio/mexc), phone-notified per step
+  SafetyRails caps stay operator-only forever). Its first
+  loop (Gap Scout census quiet 24/48/96h → widen prefilter/book-budget/
+  second-tier venues kucoin/gateio/mexc) is INERT since 17-Jul: Gap Scout is
+  retired, so `gapscout-census` never refreshes and the ladder fails safe on
+  staleness. That loop widened toward MORE CEXes, so under LIGHTER-ONLY it
+  SHOULD be inert — the growth rail now has no active author on that lane.
 - `lighter_scout_tuner.py` 🧠🔧 — the Lighter loop's SELF-TUNING organ
   (15-Jul user mandate: the scanner "needs the freedom, with the brain's
   support, to act"). Hourly, stateless, replay-gated: replays the scout
@@ -85,7 +130,10 @@ https://pnl-dashboard-production-858c.up.railway.app/
   out-of-sample: taker levers get the TRUE replay counterfactual in $
   (during-episode tape, env defaults vs enacted bars through the taker's
   real code), scout diet levers get grading throughput (lens n4h delta),
-  gapscout gets census activity; live/xp episodes are RECORDED only (the
+  gapscout GOT census activity — DEAD since 17-Jul: Gap Scout is retired, so
+  the census never refreshes, `census_ok` is False (`fleet_proprioception.py`
+  :595) and `grade_gapscout` never runs; that lane grades nothing;
+  live/xp episodes are RECORDED only (the
   judge + fade-watch stay the real-money authority). Per-lever verdicts
   helping/hurting/neutral (floors n≥2 episodes, ±$3; HURTING exists only
   on the taker lane — the one lane with a $ counterfactual; joint stances
@@ -193,7 +241,25 @@ https://pnl-dashboard-production-858c.up.railway.app/
 Kraken paper 8 (spot 4 + family 4, 14-Jul user cut — Kraken/laptop
 processes are operator-stopped), equities-momentum-alpaca +
 equities-regime-ibkr (14-Jul), Trail Blazer, Bounce Catcher, Two-Way Tide,
-Loop Scout, trendmomo-4h (12/13-Jul). See RETIRED_ROWS in pnl_dashboard.py.
+Loop Scout, trendmomo-4h (12/13-Jul).
+
+**17-Jul LIGHTER-ONLY cut** (operator: "i only want things running on lighter"):
+`event-listing-sniper` (🎯 Launch Sniper), `scanner-cross-exchange-arb`
+(🔀 Gap Scout), `perps-funding-carry` (🌾 Yield Harvester's HL-DATA arm — its
+`-lshadow` twin CONTINUES and is deliberately NOT retired). `scanner-triangular-arb`
+and `perps-rsi-meanrev` were already-hidden rows whose SERVICES kept running;
+they now have guards too. Per-row stop mechanism + resurrect switch: see the
+LIGHTER-ONLY table above — not restated here.
+
+**Also 17-Jul**: `crypto-trend-daily-lighter` (🌊 Tide Rider's LIVE row — 🎫
+Ticket Taker took the same service/keys/sub-account; retiring it is REQUIRED,
+not cosmetic: both rows reported the same $34.67 and the fleet total
+double-counted real money), `equities-momentum{,-lshadow}` (🏆 Stock Leaders —
+maxDD 37-44% vs the 15% go-live gate).
+
+A retirement needs BOTH halves: `RETIRED_ROWS` in pnl_dashboard.py (hides the
+card) AND `LEGACY_BOTS` in cleanup_legacy_bots.py (prunes the frozen row).
+Doing one hides your own omission.
 
 ### Read-only endpoints (no auth)
 `/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger)
@@ -224,8 +290,15 @@ its row is dashboard-retired regardless; stop the process when found.
 - `fleet_risk.py` / `regime_oracle.py` / `market_pulse.py` — shared organs
 - `lighter_ticket_replay.py` — replay the recorded scout tape through the
   taker's real code (rule changes judged in seconds, not shadow-days)
-- `cross_exchange_arb.py` — Gap Scout (CEX dislocation + Lighter premium)
-- `funding_carry_bot.py` — Yield Harvester (HL-data paper origin)
+- `venues/safety.py` — SafetyRails (kill switch, notional caps, daily-loss halt)
+  **+ `open_notional()`**: the fleet's ONE answer to "how much is really
+  deployed?" — sum each held position at ITS OWN entry clip, never
+  `count * current_clip` (that estimate breaches the cap when the growth rail
+  moves the clip). Imported by BOTH live bots + the taker + the sniper.
+- `cross_exchange_arb.py` — Gap Scout, **RETIRED 17-Jul** (CEX↔CEX arb, no
+  Lighter leg); idles at boot
+- `funding_carry_bot.py` — Yield Harvester; `lighter_shadow` ONLY since 17-Jul
+  (the HL-data arm is retired; the hedge-less refusal is unchanged and senior)
 - `user_data/` — Freqtrade strategies/configs (dormant post-Kraken; the
   gate0 family bot re-expresses them on Lighter)
 - gate0 branch (`claude/lighter-gate0`) — the Lighter runtime (venues/,
@@ -239,16 +312,31 @@ its row is dashboard-retired regardless; stop the process when found.
   `custom_stake_amount` — both via `fleet_bus.py`.
 - `fleet-risk` — L2 traffic light, mode **enforce**: strategies veto NEW long
   entries at long-budget (20). Kill switch: `FLEET_RISK_MODE=advisory`.
-- `signal-bus`, `regime-oracle`, `market-pulse`, `listing-intel` — published
-  context (funding APRs, dislocation, per-major regime, news mood, sniper
-  intel classes). Only market-pulse.panic + the two keys above are consumed.
+- `signal-bus`, `regime-oracle`, `market-pulse` — published context (funding
+  APRs, venue premium, per-major regime, news mood). Only market-pulse.panic +
+  the two keys above are consumed.
+  **`listing-intel` is DARK since 17-Jul**: its ONLY publisher was
+  `listing_sniper.py:1148`, which now idles behind the LIGHTER-ONLY guard
+  (`listing_intel.py` is a pure library and publishes nothing). The key will
+  simply go stale — consumers fail-safe on absence, per the bus contract.
+  [17-Jul] The bus's Lighter premium (`lighter_prem_bps`,
+  `lighter_venue_stress_bps`) now comes from the market scout's
+  `lighter-market` — every liquid book, and the SAME number the Ticket Taker's
+  stress veto reads — instead of retired Gap Scout's 6-symbol watchlist.
+  DROPPED with their scanners: `xexchange_dislocation_pct`,
+  `tri_arb_best_depth_pct` (CEX gauges; nothing outside fleet_risk read them).
+  `fleet_risk.state_fresh()` honours a bot_state payload's own `updated`+
+  `ttl_sec` and fails CLOSED (`row_fresh()` is for bot_pnl rows only).
 - `fleet-tuning` — the growth rail's lever payload (authors: evidence board
   + scout tuner, MERGED writes with per-lever expiry; `fleet_tuning.py`
-  registry clamps; consumers: Gap Scout, Lighter Scout, Ticket Taker).
-  Lanes: paper-scanner / lighter-scout / lighter-taker / lighter-xp (zero
+  registry clamps; consumers: Lighter Scout, Ticket Taker — Gap Scout was one
+  until it retired 17-Jul, so the `paper-scanner` lane now has no consumer).
+  Lanes: paper-scanner (INERT — Gap Scout retired) / lighter-scout /
+  lighter-taker / lighter-xp (zero
   real money) + lighter-live (`live.clip_scale` + the judge's PROMOTED
-  `live.funding.*` — see growth rail + experiment judge above). `gapscout-census` — Gap Scout's epoch-2 episode census (board
-  reads `quiet_hours`). `scout-tuner` — the tuner's cycle log + enactments.
+  `live.funding.*` — see growth rail + experiment judge above).
+  `gapscout-census` — Gap Scout's epoch-2 episode census; STALE FOREVER since
+  17-Jul (bot retired), board's `quiet_hours` ladder fails safe on it. `scout-tuner` — the tuner's cycle log + enactments.
   `fleet-proprioception` — per-lever enactment outcome grades (episodes +
   helping/hurting verdicts). Consumers: scout tuner (hurting-skip +
   helping-walk), board (🦾 items + live clip gates + gapscout ladder
