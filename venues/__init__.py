@@ -5,8 +5,13 @@ venues/__init__.py — venue selection for the custom perps bots (Gate 0).
     ctx = venue_context(bot="perps-donchian-breakout", default_hl_net="testnet",
                         paper_start=1000.0, live_flag=False)
 
-VENUE env picks the mode (default hl_paper = pre-migration behaviour, byte
-identical). The context bundles everything the bots used to build inline:
+VENUE env picks the mode. DEFAULT = lighter_shadow (2026-07-17 operator
+rule: "the real money fallback has to be lighter"). It was hl_paper — a
+pre-migration default that outlived the migration and silently pointed the
+SHARED entry point, real-money services included, at Hyperliquid. The fallback
+is Lighter's SHADOW, never lighter_live: right venue AND fail-safe. A foreign
+venue is now an explicit, declared choice (hl_paper stays legal — funding-carry
+sets it on the service). The context bundles everything the bots build inline:
 
     ctx.mode         hl_paper | lighter_shadow | lighter_testnet | lighter_live
     ctx.venue        VenueClient (market data + live order entry)
@@ -107,7 +112,24 @@ class VenueContext:
 
 def venue_context(bot: str, default_hl_net: str = "testnet",
                   paper_start: float = 1000.0, live_flag: bool = False):
-    mode = os.environ.get("VENUE", "hl_paper").strip() or "hl_paper"
+    # [2026-07-17 OPERATOR RULE — "the real money fallback has to be lighter"]
+    # This defaulted to **hl_paper**: a missing or typo'd VENUE on ANY service —
+    # including the two that hold real money — silently landed the shared
+    # entry point on HYPERLIQUID. It was the pre-migration default and it
+    # outlived the migration, which is the same rot LIGHTER-FIRST suffered
+    # everywhere else (see audit_venue_purity.py): the docs said Lighter, the
+    # fallback said HL, and nothing crashed.
+    #
+    # The fallback is now **lighter_shadow** — the right VENUE, and still
+    # fail-safe: a config slip must never put real money on the book, so the
+    # default is Lighter's SHADOW, never lighter_live. Both halves matter.
+    # Verified 17-Jul before flipping: every Lighter service already sets VENUE
+    # explicitly (trail-blazer-live + tide-rider-lighter-live = lighter_live;
+    # the shadow fleet = lighter_shadow), so nothing rode this default except
+    # `funding-carry` (Yield Harvester, HL-data paper by design) — which was
+    # pinned to VENUE=hl_paper on the service FIRST, so this flip moves nothing.
+    # A foreign venue is now an EXPLICIT, declared choice. That is the point.
+    mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     if mode not in MODES:
         raise SystemExit(f"VENUE={mode!r} unknown (expected one of {MODES})")
 
