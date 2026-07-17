@@ -47,6 +47,7 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 import funding_basis
 from venues import marks, venue_context
+from venues.fills import measured_from_reason, read_fill, slip_bps_of
 from venues.safety import open_notional
 
 BOT = "perps-funding-lighter"
@@ -467,87 +468,27 @@ def scan_candidates(ctx, prelim, order_usd, log):
 _open_notional = open_notional
 
 
-# [2026-07-17 FILL READ — the id, and the seam that tests it]
-# These three were closures inside main(). main() needs a signer, so the funded
-# half never ran and NOTHING here was reachable from a test — the same shape as
-# the `if dry_run` branches swept on 17-Jul. They are pure, so they live at
-# module scope now and _selftest_fill_read() drives them directly.
+# [2026-07-17 FILL READ] The three fill helpers moved to venues/fills.py, where
+# the Ticket Taker's LIVE path imports the same code instead of copying it. The
+# copy is exactly what let them drift: the taker's `_real_fill` stamped
+# measured=True on any price that came back (reason string ignored), and its
+# `_slip_bps_of` returned None for an unmeasured leg where this one returned a
+# number computed off a blended read. Same move, same reason, and the same proof
+# as _open_notional above: re-exported under the original private names so every
+# call site and _selftest_fill_read() below are UNCHANGED — the selftests are
+# what demonstrate the move is behaviour-neutral, not a claim that it is.
 #
-# WHY THE ID. venues.lighter_client.market_open/market_close mint a
-# `client_order_index` and return it; every call site in this bot DISCARDS the
-# return value, so _our_fills fell to its (is_ask, since_ts) heuristic — which
-# VWAPs every same-side fill in a 180s window into one price. The venue layer's
-# own selftest pins that as a fabrication ("id-less path blends"). MEASURED
-# 17-Jul off the ledger: 58 real orders, 0 with a measured fill.
-def _measured_from_reason(px, reason):
-    """Did the venue NAME this fill, or guess it?
-
-    Single source of truth, and deliberately parasitic on the venue layer's own
-    labelling: lighter_client tags every id-less read `approx` (`trades(approx)`
-    / `recentTrades-approx(...)`) and every id-matched read without it. Deriving
-    `measured` from that string rather than re-deciding it here means the two
-    layers cannot drift into disagreeing about what counts as a measurement."""
-    return px is not None and "approx" not in (reason or "")
-
-
-def _read_fill(detail_fn, coin, is_ask, since_ts, client_id):
-    """(px_or_None, measured, reason) — the id first, the heuristic as a net.
-
-    STRICTLY BETTER THAN BOTH NEIGHBOURS, which is the whole design:
-      - better than this bot today, which passes no id and so can only ever
-        blend;
-      - better than the taker's read, where the id is a HARD filter with no
-        fallback (venues/lighter_client.py:624-629 `continue`s on a mismatch),
-        so a venue that stopped echoing ids would take it from `approx` to
-        NOTHING — a silent regression to less measurement than it started with.
-    Here an id-miss falls back to the heuristic and says so, so the worst case
-    is exactly today's behaviour, labelled.
-
-    RETRY ONLY ON no-match. `skipped:budget` / `api-error` / `auth-failed` mean
-    the tape was never read; retrying spends the governor's telemetry reserve to
-    fail identically, and lighter_client's own comment is explicit that a
-    measurement burst must never make the NEXT market_open queue behind it.
-    A no-match means the tape WAS read and our id simply was not on it — that,
-    and only that, is worth a second look."""
-    if detail_fn is None:
-        return None, False, "no-detail-fn"
-    try:
-        px, reason = detail_fn(coin, is_ask=is_ask, since_ts=since_ts,
-                               client_id=client_id)
-    except Exception as e:  # noqa: BLE001 — telemetry NEVER raises at a caller
-        return None, False, f"read-raised:{type(e).__name__}"
-    if px is None and client_id is not None and "no-match" in (reason or ""):
-        try:
-            px2, reason2 = detail_fn(coin, is_ask=is_ask, since_ts=since_ts,
-                                     client_id=None)
-        except Exception as e:  # noqa: BLE001
-            return None, False, f"retry-raised:{type(e).__name__} (after {reason})"
-        if px2 is not None:
-            return px2, False, f"{reason2} (id-miss: {reason})"
-        return None, False, f"{reason2} (id-miss: {reason})"
-    return px, _measured_from_reason(px, reason), reason
-
-
-def _slip_bps_of(decision, fill, is_buy, measured=False):
-    """Signed slippage on ONE order, bps. POSITIVE = worse than the decision
-    price (paid up buying / sold lower).
-
-    `measured` is passed, never inferred from d == f. The old rule returned None
-    whenever the two were equal, because an unread fill fell back to the decision
-    mid and a fabricated 0.000 is worse than a null. But it also threw away every
-    GENUINELY perfect fill — 1000BONK filled exactly at mark on the taker's first
-    live order, which is real data the venue gave us and this function silently
-    dropped. With the flag the two cases separate: measured d == f is a true 0.0;
-    unmeasured d == f stays NULL."""
-    try:
-        d, f = float(decision), float(fill)
-        if d <= 0 or f <= 0:
-            return None
-        if d == f:
-            return 0.0 if measured else None
-        return (f / d - 1.0) * 10_000.0 * (1.0 if is_buy else -1.0)
-    except (TypeError, ValueError, ZeroDivisionError):
-        return None
+# ONE RULE DID CHANGE, deliberately. slip_bps_of now returns None for ANY
+# unmeasured leg, not only when d == f. It was unreachable before: an unmeasured
+# read had no price, so d == f always held and both rules agreed. read_fill's
+# id-miss fallback is the first thing in the fleet's history to produce a REAL
+# price with measured=False, and implementation_shortfall._fetch_order_slip
+# AVGs slippage_bps without reading `measured` — so the old rule would have
+# averaged a 180s VWAP blend into the live-vs-shadow execution verdict. Pinned
+# by case (9) in _selftest_fill_read.
+_measured_from_reason = measured_from_reason
+_read_fill = read_fill
+_slip_bps_of = slip_bps_of
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
@@ -1427,7 +1368,9 @@ def _selftest_fill_read():
     assert "approx" in src
 
     # 3) id MISSES on a readable tape -> fall back to the heuristic, say so.
-    #    This is the case the taker's hard filter loses entirely (-> None).
+    #    The taker's hard filter used to lose this case entirely (-> None); it
+    #    now shares read_fill, and check 12(c) there pins the same behaviour
+    #    end-to-end through main().
     calls.clear()
     px, meas, src = _read_fill(
         fake([None, 99.0], ["no-match:trades", "trades(approx)"]),
@@ -1475,6 +1418,22 @@ def _selftest_fill_read():
     assert _measured_from_reason(1.0, "trades(approx)") is False
     assert _measured_from_reason(1.0, "recentTrades-approx(after x)") is False
     assert _measured_from_reason(None, "trades") is False, "no price is no measurement"
+
+    # 9) UNMEASURED IS NULL EVEN WHEN d != f. The rule the two copies disagreed
+    #    on, and the one read_fill's fallback makes REACHABLE: an approx read is
+    #    the first thing in the fleet's history to carry a real price AND
+    #    measured=False. This bot's old rule returned the bps for it (only the
+    #    d == f branch consulted `measured`); the taker's returned None. That
+    #    number would land in venue_orders.slippage_bps, which
+    #    implementation_shortfall._fetch_order_slip AVGs with no `measured`
+    #    filter at all — one blended row is indistinguishable from a clean one in
+    #    the live-vs-shadow execution verdict. Record the blend as px_fill (it IS
+    #    a real price); record NO slippage from it.
+    assert _slip_bps_of(100.0, 100.5, is_buy=True, measured=False) is None, \
+        ("an unmeasured leg must record NULL slippage even with a real blended "
+         "price — implementation_shortfall AVGs this column unfiltered")
+    assert _slip_bps_of(100.0, 100.5, is_buy=True, measured=True) is not None, \
+        "and the strict rule must not swallow a genuine measurement"
 
     print("lighter_funding_bot _selftest_fill_read OK")
 

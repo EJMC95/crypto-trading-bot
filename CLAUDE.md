@@ -381,12 +381,36 @@ All new bots:
 - Ask Claude to backtest any bot: `freqtrade backtesting --config <bot>/config.json --strategy <Name>`
 - Ask Claude to tune via Hyperopt: `freqtrade hyperopt --config <bot>/config.json --strategy <Name> --hyperopt-loss SharpeHyperOptLoss`
 - Ask Claude to check logs: `tail -f <bot>/logs/freqtrade.log`
-- Ask Claude to deploy: push to main branch → Railway auto-deploys
+- Ask Claude to deploy: **a push is NOT a deploy** — see Railway Setup below.
 
 ## Railway Setup
 - Each bot is a separate Railway service
 - All services share the same Postgres plugin via DATABASE_URL
-- Deploy trigger: push to main branch
+- **DEPLOY TRIGGER — "push to main → Railway auto-deploys" is FALSE, and was
+  false for both real-money bots (MEASURED 17-Jul, commit 259e3b4: not one
+  of the 12 services is git-connected — `railway variables` returns zero
+  `RAILWAY_GIT_*` keys on every one).** The ONLY automated path is
+  `.github/workflows/railway-redeploy.yml`, which runs `railway up` for a
+  **hardcoded `paths:` list** covering exactly three services:
+  freqtrade-bots (`user_data/**`, `Dockerfile.freqtrade`, `run_all.sh`),
+  pnl-dashboard (`pnl_dashboard.py`, `report_emailer.py`,
+  `compile_market_data.py`, `Dockerfile.dashboard`), funding-carry
+  (`funding_carry_bot.py`, `Dockerfile.funding`), plus shared
+  `bot_pnl_store.py` / `freqtrade_pnl_poller.py` / `market_pulse.py`.
+  **Anything not on that list ships only when a human runs `railway up`** —
+  the whole intelligence layer, `fleet_tuning`, `funding_basis`, and BOTH
+  LIVE BOTS (`lighter_funding_bot.py`, `lighter_ticket_taker.py`,
+  `venues/**`). The RETIRED HL funding-carry arm auto-deploys; the LIVE
+  Funding Farmer does not.
+  **What it cost:** six fill-telemetry commits landed 04:27→10:52 UTC 17-Jul;
+  the funding container booted 04:34 and picked up NONE of them — 58 real
+  orders, 0 measured fills. The code was right and was never running. This is
+  the mechanism behind every "frozen service" incident.
+  Check before you claim a fix is live: `scripts/audit_deploy_coverage.py`
+  (does a path have ANY deploy route?), then marker-grep the RUNNING
+  container — the only proof a deploy landed ([[railway-cli-frozen-services]]).
+  Deploy live from a CLEAN worktree: `railway up` uploads your DESK, WIP and
+  all ([[deploy-live-from-a-clean-worktree]]).
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
@@ -406,10 +430,13 @@ All new bots:
   backstop: `fleet_immune` pages when `brain-vitals` reports engine=v2
   without a deliberate `BRAIN_MULT_ENGINE=v2` (both parse that env
   identically — they must, or a typo'd kill switch silences the detector).
-  NOT wired into CI (the PAT lacks workflow scope — see
-  [[push-straight-to-main]]); adding it to `changelog-check.yml` via the
-  GitHub web editor is the standing follow-up, because a guard that relies
-  on remembering is the control that already failed three times.
+  **IN CI since `ce446c7`** — the guard and its `--selftest` run on every
+  push/PR from `changelog-check.yml`, alongside `audit_sdk_pin`. (This line
+  said "NOT wired into CI, the PAT lacks workflow scope — standing
+  follow-up" for a day AFTER it was wired; verified 17-Jul (ad). A doc that
+  tells the next reader to go re-do a done job is the same rot the guard
+  exists to catch.) Still run it locally before you ship: CI tells you after
+  the push, and the push is not what deploys anyway (see Railway Setup).
   **Verify a NEW module by its OWN published output, never by "it shipped"**
   — and never from git (see [[railway-cli-frozen-services]]: marker-grep the
   RUNNING container).

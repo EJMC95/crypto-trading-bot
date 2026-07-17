@@ -47,6 +47,13 @@ from datetime import datetime, timedelta, timezone
 import bot_pnl_store as store
 import funding_basis
 from paper_broker import PaperBroker
+# [2026-07-17] The fill read is SHARED with the live Funding Farmer now
+# (venues/fills.py), not copied. The copy is what let the two drift: this bot
+# stamped measured=True on any price the venue returned and had no fallback when
+# the client id missed, where the Farmer derived measured from the venue's own
+# label and fell back once. Two live bots disagreeing about what "measured"
+# means is not a style problem — implementation_shortfall compares their rows.
+from venues.fills import measured_from_reason, read_fill, slip_bps_of
 # Module scope, same reason as venues.safety below: this bot keys everything by
 # the venue-native symbol while LighterClient.positions() speaks FLEET symbols,
 # and the conversion between them is a real-money rule (see _positions()). A
@@ -675,58 +682,79 @@ def main(_ctx=None):
         which the inference threw away as "unmeasured". Only THIS function knows
         whether the tape answered; inferring it from the number is a guess.
 
+        [2026-07-17b] TWO DEFECTS FIXED, both by delegating to venues.fills:
+
+        (1) THE ID FILTER WAS A CLIFF. `_our_fills` HARD-filters on the client id
+            (lighter_client.py:624-629 `continue`s on a mismatch, no fallback),
+            so the moment Lighter stopped echoing `client_order_index` — or any
+            call site handed us a dict without the key — this read went from
+            approximate to NOTHING (`no-match:both`), silently. Threading the id
+            made the read exact on the happy path and strictly WORSE than the old
+            heuristic on the unhappy one. `read_fill` retries once without the id
+            on a no-match, so a venue that stops echoing costs precision, never
+            the measurement. The round trip is still UNPROVEN in production: the
+            only two live orders (STRC + 1000BONK, 17-Jul 09:08/09:13Z) predate
+            the fill-read code by an hour, so no venue_orders row has ever
+            carried `measured` at all. The fallback is what makes that
+            uncertainty cost precision instead of the whole reading.
+
+        (2) `measured` WAS HARD-CODED TRUE. This function returned
+            `real, True, reason` for any price that came back, ignoring the very
+            reason string that says whether the venue NAMED the fill or guessed
+            it. An id-less read is labelled `trades(approx)` and is a 180s
+            same-side VWAP blend — it would have been recorded as an exact
+            measurement. `measured_from_reason` derives the verdict from the
+            venue layer's own label, so the two cannot drift.
+
         Measurement-only: ANY failure falls back to the decision price, so a
         broken read can never block or unwind an order."""
         if dry_run:
             return fallback, False, "dry-run"
-        real = None
-        reason = "no-venue-method"
-        try:
-            fl = getattr(venue, "last_fill_detail", None)
-            if fl:
-                real, reason = fl(sym, is_ask=is_ask, since_ts=time.time() - 180,
-                                  client_id=client_id)
-            else:                                  # older venue: no reason channel
-                fl = getattr(venue, "last_fill", None)
-                if fl:
-                    real = fl(sym, is_ask=is_ask, since_ts=time.time() - 180)
-                    reason = "ok" if real else "unknown(no-detail-api)"
-        except Exception as e:  # noqa: BLE001 — never let telemetry break an order
-            real, reason = None, f"caller-error:{type(e).__name__}"
-        if real:
-            print(f"[ticket-taker] {sym} {leg} fill (venue): {real:.6g} "
-                  f"(decision {fallback:.6g}) via {reason}")
-            return real, True, reason
+        detail = getattr(venue, "last_fill_detail", None)
+        if detail is not None:
+            px, measured, reason = read_fill(
+                detail, sym, is_ask=is_ask, since_ts=time.time() - 180,
+                client_id=client_id)
+        else:
+            # LEGACY venue: no reason channel and no id round trip, so this read
+            # can only ever be a (side, since_ts) blend. It is labelled `approx`
+            # for that reason — the old code called it `ok` and returned
+            # measured=True, claiming an exactness the accessor cannot deliver.
+            # Unreachable in production (LighterClient has both methods and the
+            # shadow arm returns above), kept so a venue without the detail API
+            # degrades to the heuristic rather than to nothing — the same cliff
+            # as (1), one layer up.
+            try:
+                _lf = getattr(venue, "last_fill", None)
+                px = (_lf(sym, is_ask=is_ask, since_ts=time.time() - 180)
+                      if _lf else None)
+                reason = ("last_fill(approx:no-detail-api)" if px
+                          else "no-venue-method")
+            except Exception as e:  # noqa: BLE001 — telemetry never breaks money
+                px, reason = None, f"caller-error:{type(e).__name__}"
+            measured = measured_from_reason(px, reason)
+        if px is not None:
+            print(f"[ticket-taker] {sym} {leg} fill (venue): {px:.6g} "
+                  f"(decision {fallback:.6g}) via {reason}"
+                  f"{'' if measured else ' — NOT measured, slippage NULL'}")
+            return px, measured, reason
         # NOT a crash and NOT zero slippage — an UNMEASURED leg. Say so, loudly
         # enough that 57 orders can never again go by without anyone noticing.
         print(f"[ticket-taker] {sym} {leg} fill UNMEASURED — {reason} "
               f"(recording decision {fallback:.6g}, slippage NULL)")
         return fallback, False, reason
 
-    def _slip_bps_of(decision, fill, is_buy, measured=None):
-        """Signed slippage on ONE order, bps, POSITIVE = worse than the
-        decision price. None when we got NO fill read — recording that as 0.0
-        would be indistinguishable from a genuinely perfect fill. The fleet's
-        whole execution blind spot came from an echoed decision price being
-        read as data; a null is honest, a fabricated zero is not.
-
-        [2026-07-17] `measured` is now PASSED, not inferred. When it is None the
-        old `d == f` inference still applies (back-compat for call sites that
-        cannot know), but that inference is WRONG for a real fill that lands
-        exactly on the mark — measured live on 1000BONK the night this shipped.
-        A caller that knows MUST say so, and then a measured 0.0 is recorded as
-        the 0.0 it is."""
-        try:
-            d, f = float(decision), float(fill)
-            if d <= 0 or f <= 0:
-                return None
-            if measured is False:
-                return None
-            if measured is None and d == f:
-                return None
-            return (f / d - 1.0) * 10_000.0 * (1.0 if is_buy else -1.0)
-        except (TypeError, ValueError, ZeroDivisionError):
-            return None
+    # [2026-07-17] SHARED with the live Funding Farmer (venues/fills.py). The
+    # local copy's `measured=None -> infer d == f` back-compat is gone: both
+    # call sites below pass `measured` explicitly (they get it from _real_fill,
+    # which is the only thing that knows), so the inference was dead code that
+    # existed only to be gotten wrong later. The shared rule is the STRICTER of
+    # the two copies — an unmeasured leg is NULL even when d != f, which is this
+    # bot's rule winning over the Farmer's. See venues/fills.py for why that
+    # direction: the id-miss fallback is the first read that can hand us a real
+    # price we did NOT measure, and implementation_shortfall AVGs this column
+    # without ever reading `measured`.
+    _slip_bps_of = slip_bps_of
 
     def _book_close(sym, m, size, entry, exit_px, pnl, reason, decision_px=None,
                     measured=None, fill_reason=None):
@@ -1248,15 +1276,15 @@ def main(_ctx=None):
                 except Exception as e:  # noqa: BLE001
                     print(f"[ticket-taker] {iso(t_now)} open {sym} failed: {e!r}")
                     continue
-                entry_px, _meas, _why = _real_fill(
+                _fill_px, _meas, _why = _real_fill(
                     sym, is_ask=not is_long, fallback=mark, leg="entry",
                     client_id=(_res or {}).get("client_order_index"))
                 try:
                     store.publish_venue_order(
                         BOT_ROW, venue="lighter", shadow=False, coin=sym,
                         side=("buy" if is_long else "sell"), size=size,
-                        px_decision=mark, px_fill=entry_px,
-                        slippage_bps=_slip_bps_of(mark, entry_px,
+                        px_decision=mark, px_fill=_fill_px,
+                        slippage_bps=_slip_bps_of(mark, _fill_px,
                                                   is_buy=is_long,
                                                   measured=_meas),
                         raw={"lens": lens, "leg": "open", "clip": clip,
@@ -1264,6 +1292,30 @@ def main(_ctx=None):
                              "measured": _meas, "fill_src": _why})
                 except Exception:  # noqa: BLE001
                     pass
+                # ---- ORDER BEHAVIOUR STOPS HERE ---------------------------
+                # Everything above is telemetry. `entry_px` is NOT: it becomes
+                # meta[sym]["entry"], which the stop and TP hang off, so it
+                # decides when REAL money closes. This is the one place the
+                # taker differs from the Farmer, whose exit read is pure
+                # forensics (the position is already flat when it runs) — here
+                # the read steers the next decision.
+                #
+                # So an UNMEASURED price never reaches it. read_fill's id-miss
+                # fallback is a 180s same-side VWAP and has NEVER run in
+                # production (the id round trip is unproven — the only two live
+                # orders predate the fill-read code), and a fallback's first
+                # ever execution must not be the thing that moves a live stop.
+                # It is probably a better entry estimate than the decision mark.
+                # "Probably" is not a bar this bot clears with real money on the
+                # book: the ledger records the blend and names it, the operator
+                # reads it there, and a later change can promote it on evidence.
+                #
+                # BEHAVIOUR-IDENTICAL on every path production can reach today:
+                # an exact id match (_meas=True) keeps feeding meta the real
+                # fill exactly as it does now, and no-read keeps feeding it the
+                # mark. Only the id-miss path — today a `no-match:both` that
+                # yields the mark anyway — is touched, and it yields the mark.
+                entry_px = _fill_px if _meas else mark
             # visible to the rest of THIS cycle: the cap check above and the
             # MAX_OPEN slot count must both see what we just opened.
             pos[sym] = {"size": size if is_long else -size, "entry": entry_px}
@@ -1528,11 +1580,19 @@ class _StubVenue:
     against a path production could not reach (17-Jul entry (p)). A stub that
     is missing a method does not fail — it silently tests something else."""
 
-    def __init__(self, equity=1000.0, pos=None, fills=None, fill_reason=None):
+    def __init__(self, equity=1000.0, pos=None, fills=None, fill_reason=None,
+                 echo_ids=True):
         self._equity = equity
         self._pos = dict(pos or {})
         self._fills = dict(fills or {})     # sym -> REAL fill px the tape returns
         self._fill_reason = fill_reason     # reason reported when there is no fill
+        # echo_ids=False models THE failure this stub exists for: Lighter stops
+        # echoing client_order_index back as ask_client_id/bid_client_id, so an
+        # id-filtered read matches nothing while the tape itself is perfectly
+        # readable. That round trip is UNPROVEN in production — the taker's only
+        # two live orders predate the fill-read code — so the id working is an
+        # assumption, and this is the fixture that stops it being a silent one.
+        self._echo_ids = echo_ids
         self.opens, self.closes, self.value_reads = [], [], 0
         self.fail_close = set()
         self._cid = 0
@@ -1571,6 +1631,12 @@ class _StubVenue:
         self.seen_client_ids.append(client_id)
         px = self._fills.get(coin)
         if px:
+            if client_id is not None and not self._echo_ids:
+                # The tape IS readable — our id simply is not on it. This is the
+                # venue layer's real string for that (lighter_client.py:726) and
+                # the reason strings are the contract `read_fill` keys its retry
+                # on, so a paraphrase here would test nothing.
+                return None, "no-match:both(no-match:trades)"
             return px, ("trades" if client_id is not None else "trades(approx)")
         return None, (self._fill_reason or "empty:both(stub)")
 
@@ -2186,6 +2252,102 @@ def _selftest_live():
         assert "api-error" in (_o["raw"]["fill_src"] or ""), \
             f"the ledger must NAME why it could not measure: {_o['raw']!r}"
 
+        # (c) THE ID FILTER IS NOT A CLIFF. Lighter stops echoing client ids —
+        #     the tape is readable, our id is just not on it. The venue layer's
+        #     id match is HARD (lighter_client.py:624-629 `continue`s, no
+        #     fallback), so before this fix the read went from approximate to
+        #     NOTHING: threading the id made the happy path exact and the
+        #     unhappy path strictly WORSE than the heuristic it replaced, in
+        #     silence. That round trip has never been proven in production — the
+        #     taker's only two live orders (STRC/1000BONK, 09:08 + 09:13Z 17-Jul)
+        #     predate the fill-read code by an hour, so NO venue_orders row has
+        #     ever carried `measured`. This fixture is the whole reason the
+        #     assumption is survivable.
+        #
+        #     MUTATION: drop read_fill's retry (revert to the hard filter) and
+        #     px_fill collapses to the decision price -> RED.
+        captured["state"].clear()
+        captured["orders"].clear()
+        _stub_market(marks={"NOID": 100.0}, funding={}, ranges={"NOID": 6.0})
+        _scout({"divergence": [{"sym": "NOID", "side": "short", "gap_pct": 99.0}]})
+        v = _StubVenue(equity=1000.0, fills={"NOID": 100.5}, echo_ids=False)
+        main(_ctx={"venue": v, "rails": _StubRails(max_notional=150.0),
+                   "broker": None})
+        _o = captured["orders"][0][1]
+        assert _o["px_fill"] == 100.5, \
+            (f"an id-miss must FALL BACK to the (side, since_ts) read, not "
+             f"collapse to the decision price: px_fill={_o['px_fill']!r}")
+        assert v.seen_client_ids == [v.last_cid, None], \
+            (f"the id must be tried FIRST and dropped exactly once: "
+             f"{v.seen_client_ids!r}")
+        # ...and the fallback is an ESTIMATE. A blended read recorded as a
+        # measurement is worse than no read at all: it is a fabrication wearing
+        # a `measured: true` stamp.
+        #     MUTATION: restore `return real, True, reason` in _real_fill -> RED.
+        assert _o["raw"]["measured"] is False, \
+            f"a fallback read is a BLEND, never a measurement: {_o['raw']!r}"
+        assert "id-miss" in (_o["raw"]["fill_src"] or ""), \
+            f"the ledger must NAME the degraded read: {_o['raw']!r}"
+        #     MUTATION: let slip_bps_of return the bps for an unmeasured leg
+        #     (the Farmer's old rule) -> RED. implementation_shortfall AVGs this
+        #     column with no `measured` filter, so a blend would contaminate the
+        #     live-vs-shadow execution verdict rather than just sit there.
+        assert _o["slippage_bps"] is None, \
+            (f"an unmeasured leg must record NULL slippage even though the "
+             f"blended price differs from the decision: {_o['slippage_bps']!r}")
+        # ...and the blend goes NO FURTHER THAN THE LEDGER. meta[sym]["entry"]
+        # is where telemetry would become ORDER BEHAVIOUR: the stop and TP hang
+        # off it, so a fallback that has never run in production would be
+        # deciding when real money closes on its first ever execution. The
+        # ledger row above carries the blend (px_fill=100.5, named + measured
+        # False); the bot still runs its stop off the decision mark, exactly as
+        # it does today when the id misses.
+        #     MUTATION: `entry_px = _fill_px` (drop the `if _meas else mark`)
+        #     and this is RED — that one line is the whole telemetry/behaviour
+        #     boundary, and nothing else in the suite constrains it.
+        _live = captured["state"][LIVE_STATE_KEY]
+        assert _live["meta"]["NOID"]["entry"] == 100.0, \
+            (f"an UNMEASURED fill must never reach meta['entry'] — the stop "
+             f"and TP hang off it: {_live['meta']['NOID']['entry']!r} "
+             f"(decision mark was 100.0, the blended read was 100.5)")
+        # The measured path is the control: when the venue NAMES the fill, meta
+        # takes it — that is today's behaviour and this fix must not touch it.
+        captured["state"].clear()
+        captured["orders"].clear()
+        _stub_market(marks={"YESID": 100.0}, funding={}, ranges={"YESID": 6.0})
+        _scout({"divergence": [{"sym": "YESID", "side": "short",
+                                "gap_pct": 99.0}]})
+        v = _StubVenue(equity=1000.0, fills={"YESID": 100.5})   # ids echo
+        main(_ctx={"venue": v, "rails": _StubRails(max_notional=150.0),
+                   "broker": None})
+        _live = captured["state"][LIVE_STATE_KEY]
+        assert _live["meta"]["YESID"]["entry"] == 100.5, \
+            (f"a MEASURED fill must still reach meta['entry'] — guarding the "
+             f"fallback must not cost us the real fill we did measure: "
+             f"{_live['meta']['YESID']['entry']!r}")
+
+        # (d) A FAILED READ MUST NOT RETRY. `skipped:budget` / `auth-failed` /
+        #     `api-error` mean the tape was never read — a second call spends the
+        #     governor's telemetry reserve to fail identically, against
+        #     lighter_client's explicit rule that telemetry must never make the
+        #     NEXT market_open queue behind it. Only `no-match` (a readable tape
+        #     our id was absent from) earns the retry.
+        #
+        #     MUTATION: retry on any falsy read instead of `no-match` only -> RED.
+        for _bad in ("skipped:budget(2.0 tok, reserve 4)", "auth-failed:expired",
+                     "api-error:trades:TimeoutError:x", "empty:both(stub)"):
+            captured["state"].clear()
+            captured["orders"].clear()
+            _stub_market(marks={"BUD": 100.0}, funding={}, ranges={"BUD": 6.0})
+            _scout({"divergence": [{"sym": "BUD", "side": "short",
+                                    "gap_pct": 99.0}]})
+            v = _StubVenue(equity=1000.0, fills={}, fill_reason=_bad)
+            main(_ctx={"venue": v, "rails": _StubRails(max_notional=150.0),
+                       "broker": None})
+            assert v.seen_client_ids == [v.last_cid], \
+                (f"{_bad!r} must NOT retry — the tape was never read, so a "
+                 f"second call burns budget to re-fail: {v.seen_client_ids!r}")
+
         # ================================================================
         # 13) THE VENUE LAYER IS AUDIBLE — and importing this file must NOT
         #     hijack anyone else's logging.
@@ -2268,7 +2430,9 @@ def _selftest_live():
               "    account (11b), a failed meta WRITE pages (11c), and the kill\n"
               "    switch still flattens")
         print(" 12 fill telemetry DETECTS: a measured at-mark fill records 0.0,")
-        print("    an unmeasured leg records NULL and names the reason")
+        print("    an unmeasured leg records NULL and names the reason, an")
+        print("    id-miss FALLS BACK (labelled, never stamped measured), and")
+        print("    a read that never happened does not retry into the reserve")
         print(" 13 the venue layer is AUDIBLE (signer/equity-guard/governor),")
         print("    and importing this file hijacks nobody's logging")
     finally:
