@@ -321,3 +321,50 @@ IMB-05, -09, -11, -19, -21, -25, -26, -27), 4 contested-low-confidence
   (bot_learn twin-anchor mismatches + silent v2 fallback).
 - REFUTED — do not build (recorded per-finding in the audit doc):
   IMB-05, -09, -11, -19, -21, -25, -26, -27.
+
+## 15. 🏆 Stock Leaders: the venue-fit verdict + a LIVE rail residual (added 17-Jul)
+The operator flagged the book as "constantly losing" (−$127.79, −12.8%). The
+premise was checked before anything was changed, and **the rule survived**:
+86% of the loss is PRICE, and the price is a real market-wide crash
+(SNDK/MRVL/NBIS/MU printed −18.3/−18.7/−20.7/−10.1% on Yahoo the same window)
+on **3 fills in 4 days**, against the strategy's own backtested **44.3% maxDD**.
+Nothing was tuned — see the fills-not-hours doctrine. The momentum rule is NOT
+on trial here; the VENUE FIT is.
+
+- **DECIDE — can this strategy pay its carry on Lighter at all?** 16 of 25
+  names sit at Lighter's 28.0% baseline band, but ranking by 42d return ranks
+  by CROWDEDNESS, and crowdedness *is* carry: the rule's picks printed **SNDK
+  967%, NBIS 687%, COIN 245%, MU 126%, HOOD 98% apr**, 4 of 5 above baseline.
+  The justifying backtest (+43.7% CAGR / 44.3% DD, 15y, 10bps/switch) modelled
+  **no funding at all**. Measured drag −$17.53 in 3.7d ≈ 2% of deployed capital.
+  Note the asymmetry in what the evidence can carry: the price P&L is 3 fills
+  and proves nothing, but the drag is a RATE across 5 names × continuous
+  accrual and converges much faster. Options: keep the veto A/B running to a
+  verdict / re-run the 15y harness with a flat funding overlay at the measured
+  band (no funding history exists for these perps — this is the only
+  backtestable form) / park the book.
+- **The evidence for that decision now exists — epoch 2 shipped 17-Jul.** The
+  A/B that was meant to answer it had been measuring the SEATBELT (it differed
+  from the real book in 3 variables and read "veto loses $43" while the veto
+  had never fired). It is now seeded FROM the real book, mirrors the seatbelt
+  and rail, and vetoes CONTINUOUSLY. **Read `vs_real` + `fund_paid`, and treat
+  anything before `extra.ab_funding_veto.epoch` as void.** First production
+  loop veto-exited BOTH holdings — HOOD and MU are each already above the 150%
+  bar — so the variant sits in cash until the 20-Jul rebalance; that IS the
+  test, not a fault.
+- **DECIDE — `AB_VETO_APR` (150%) is the variable under test, not a truth.**
+  It binds on SNDK/NBIS/COIN but passes MU at 126% — which is still ~3× the
+  strategy's whole gross CAGR. If the review wants to test "affordable", the
+  bar is arguably near the 28% baseline, not 150%.
+- **LIVE RAIL RESIDUAL — real money, deliberately NOT touched.**
+  `lighter_funding_bot` and `lighter_trend_bot` restore `day_start_equity` only
+  from the saved **halt record**, so a **PRE-halt** restart part-way down a
+  losing day re-bases the daily-loss rail to the already-depressed equity and
+  the 10% rail can no longer fire on that day's drawdown. The shadow pair got
+  the full fix (baseline rides the persisted state, same UTC day); the live
+  pair needs the operator's call. Same class as the 16-Jul `last_ts` fix.
+- CLEARED in the same pass (don't re-investigate): `venues.symbol_map
+  .from_lighter` is identity, so identical funding prints (COIN/XAU 245.3,
+  MU/CRCL 126.1) are Lighter's own discrete bands, **not** a symbol collision
+  corrupting the live funding read; and the hourly-rate convention matches the
+  live bot's `H = 24*365`.
