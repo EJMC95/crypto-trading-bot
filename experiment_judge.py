@@ -365,22 +365,55 @@ def _asserted(rc, levers):
     return bool(levers) and all(k in got for k in levers)
 
 
+def _lever_sig(levers):
+    """A candidate's IDENTITY: the experiment it actually runs, not its name.
+    Values are floated so 48 and 48.0 are one experiment. Never raises — a
+    non-numeric value keeps its raw form rather than sinking the whole pool."""
+    out = []
+    for k in sorted(levers or {}):
+        v = levers[k]
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            pass
+        out.append((k, v))
+    return tuple(out)
+
+
 def candidate_pool(queue):
     """The static CANDIDATES followed by fresh incubator proposals from
-    'xp-queue', deduped by name (static wins). Only proposals whose levers
-    are all registered xp.funding.* are admitted — an offspring can't smuggle
-    an unknown lever past the judge. Pure — selftested."""
-    pool, seen = [], set()
+    'xp-queue', deduped by name AND by LEVER SIGNATURE (static wins). Only
+    proposals whose levers are all registered xp.funding.* are admitted — an
+    offspring can't smuggle an unknown lever past the judge. Pure — selftested.
+
+    [2026-07-17 AUDIT] Signature dedup added. Name dedup ALONE was vacuous
+    here: the incubator mints its own namespace (`xp-<gene>-<allele>`,
+    strategy_incubator.py:517) which can never collide with a static name, so
+    three of its six cycle-1 proposals were byte-identical experiments to the
+    three statics wearing different names — and `done`/`next_candidate` are
+    name-based, so each one bought a SECOND >=7d slot on a SERIAL pipeline
+    that is the fleet's only path to live.funding.*. Measured: pool of 9 =
+    6 distinct experiments + 3 duplicates = >=21 wasted judge-days.
+    The old selftest missed it because its dup fixture re-used a static NAME
+    — the one shape the incubator never emits (see the negative fixture in
+    _selftest). Dedup on identity, not on label. Restrict-only: this can only
+    REMOVE a candidate that some earlier pool entry already tests."""
+    pool, seen, sigs = [], set(), set()
     for c in CANDIDATES:
         pool.append(c)
         seen.add(c["name"])
+        sigs.add(_lever_sig(c["levers"]))
     for c in (queue or {}).get("candidates", []):
         nm, lv = c.get("name"), c.get("levers") or {}
         if not nm or nm in seen:
             continue
         if lv and all(k in XP_TO_LIVE for k in lv):
+            sig = _lever_sig(lv)
+            if sig in sigs:
+                continue          # same experiment, different label
             pool.append({"name": nm, "levers": lv})
             seen.add(nm)
+            sigs.add(sig)
     return pool
 
 
@@ -825,6 +858,31 @@ def _selftest():
     assert names[:3] == ["enter-gate-0.0375", "tp-0.06", "hold-48"], names  # static order
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("enter-gate-0.0375") == 1, "dup name deduped"
+
+    # [2026-07-17 AUDIT] NEGATIVE FIXTURE for the signature dedup — the shape
+    # the incubator ACTUALLY emits: same experiment, name it can never share
+    # with a static. The fixture above (dup NAME) passed throughout the bug's
+    # life, so it proved nothing about the real failure. 48 vs 48.0 pins the
+    # float normalisation; the last row proves a genuinely NEW experiment
+    # still gets in (dedup must not become a wall).
+    q2 = {"candidates": [
+        {"name": "xp-enter_apr-0.0375", "levers": {"xp.funding.enter_apr": 0.0375}},
+        {"name": "xp-take_profit-0.06", "levers": {"xp.funding.take_profit": 0.06}},
+        {"name": "xp-max_hold_h-48", "levers": {"xp.funding.max_hold_h": 48}},  # int vs 48.0
+        {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
+    ]}
+    n2 = [c["name"] for c in candidate_pool(q2)]
+    assert n2 == ["enter-gate-0.0375", "tp-0.06", "hold-48",
+                  "xp-enter_apr-0.0625"], n2
+    # two offspring proposing the SAME novel experiment: first wins, no dup slot
+    q3 = {"candidates": [
+        {"name": "child-a", "levers": {"xp.funding.enter_apr": 0.0625}},
+        {"name": "child-b", "levers": {"xp.funding.enter_apr": 0.0625}},
+    ]}
+    assert [c["name"] for c in candidate_pool(q3)][-1] == "child-a"
+    assert len(candidate_pool(q3)) == len(CANDIDATES) + 1
+    assert _lever_sig({"a": 1}) == _lever_sig({"a": 1.0})
+    assert _lever_sig({"a": "x"}) == (("a", "x"),)      # non-numeric survives
     # next_candidate: skips done + current, name-based (pool may grow)
     assert next_candidate(pool, [], None)["name"] == "enter-gate-0.0375"
     assert next_candidate(pool, ["enter-gate-0.0375"], "tp-0.06")["name"] == "hold-48"

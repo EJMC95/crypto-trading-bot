@@ -53,9 +53,24 @@ OXYGEN_FEEDS = {
     "market-pulse":    {"limit": 1800, "weight": 1},   # refreshes ~10-min; 30-min limit
 }
 # Live bots' publish freshness is their own breathing — read from bot_pnl.
+# [2026-07-17 AUDIT] Tracks the LIVE slot's CURRENT occupant. Tide Rider
+# (crypto-trend-daily-lighter) was retired from the slot on 17-Jul and the
+# Ticket Taker took the same service/sub-account; Tide Rider's bot_pnl row is
+# now PRUNED at boot (cleanup_legacy_bots.py:53), so `bot_ages.get(bot)` was
+# None -> fresh=False FOREVER. Measured with every surviving feed 100% fresh:
+# SpO2 80% / state "labored", every hypoxia page naming a deliberately-retired
+# bot as a starved feed, and `healthy` (>=0.9) UNREACHABLE BY CONSTRUCTION —
+# a health metric permanently decoupled from reality, which is how operators
+# learn to ignore it. Meanwhile the live real-money bot that REPLACED it had
+# no breath at all. Absence is read here as "not breathing" (unlike
+# market_context.LIVE_FRESHNESS_LIMITS, which treats it as no-evidence), so a
+# retired row MUST be removed from this dict, not merely left to rot.
+# Limit = ~6 missed publishes on a 300s loop, matching the Funding Farmer;
+# the dashboard's own cadence record for both rows is VARIANT_STALE_SECONDS
+# (pnl_dashboard.py:405).
 LIVE_BREATHS = {
-    "perps-funding-lighter-lighter": 1800,
-    "crypto-trend-daily-lighter": 5400,
+    "perps-funding-lighter-lighter": 1800,   # 💸 Funding Farmer — 300s loop
+    "lighter-ticket-taker-lighter": 1800,    # 🎫 Ticket Taker — 300s loop, LIVE 17-Jul
 }
 HYPOXIA_SPO2 = float(os.environ.get("RESP_HYPOXIA_SPO2", "0.7"))   # <70% sat = hypoxic
 
@@ -194,6 +209,26 @@ def run_once():
 
 def _selftest():
     now = 1_800_000_000.0
+
+    # [2026-07-17 AUDIT] THE PRODUCTION-ROSTER GUARD. Every fixture below
+    # SUPPLIES an age for each LIVE_BREATHS row (`ages_ok = {b: 10 for b in
+    # LIVE_BREATHS}`) — which is exactly what production cannot do for a
+    # RETIRED row: cleanup_legacy_bots deletes its bot_pnl row at boot, so
+    # `bot_ages.get(bot)` is None -> fresh=False forever. That is why a retired
+    # entry here was invisible to this suite while pegging live SpO2 at 80%,
+    # making `healthy` (>=0.9) unreachable and naming a deliberately-retired
+    # bot in every hypoxia page. Absence is read here as "not breathing", so a
+    # retired row is not inert — it is a permanent false alarm.
+    try:
+        from cleanup_legacy_bots import LEGACY_BOTS as _retired
+        _rot = set(LIVE_BREATHS) & set(_retired)
+        assert not _rot, (
+            f"LIVE_BREATHS names RETIRED row(s) {sorted(_rot)} — their bot_pnl "
+            f"rows are pruned at boot, so they can never breathe: SpO2 is "
+            f"capped below 'healthy' forever and every hypoxia page names a "
+            f"retired bot. Remove them, and add the live slot's new occupant.")
+    except ImportError:      # not in this image — the guard is best-effort
+        pass
 
     # all feeds fresh -> ~100% sat, healthy
     def st(age):

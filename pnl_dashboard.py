@@ -1081,13 +1081,12 @@ def autonomy_rail_card():
                        + (f' · exit-slip {xs}bps' if xs is not None else ''), sc)
 
         def b_census():
-            gc = s.get("gapscout-census") or {}
-            bp = _f((gc.get("day") or {}).get("booked_pnl"))
-            return row("gapscout-census", "📊 Gap Scout census",
-                       f'{_s(gc.get("episodes_open"))} open · '
-                       f'quiet {_s(gc.get("quiet_hours"))}h'
-                       + (f' · day {_d(bp)}' if bp is not None else ''),
-                       (G if (bp or 0) > 0 else R) if bp else None)
+            # [2026-07-17 AUDIT] Gap Scout retired (6432868): it no longer
+            # publishes, so this row could only ever render its own fossil
+            # marked "· STALE". Drop it rather than teach the operator that a
+            # STALE badge on this card is normal. Its board loop (the widen
+            # ladder off `quiet_hours`) is inert for the same reason.
+            return ""
 
         def b_proprio():
             pr = s.get("fleet-proprioception") or {}
@@ -2238,9 +2237,38 @@ def _organ_vital(key, st):
             return _v("{} books ({} liquid) · stress med {}bps · tickets {}",
                       st.get("n_books"), st.get("n_liquid"), s.get("med"),
                       sum(len(v) for v in tk.values() if isinstance(v, list)))
+        if key == "coin-vetoes":
+            # 0 vetoes is a LEGITIMATE healthy reading (nothing is failing
+            # quality), so the count alone can't distinguish "clean" from
+            # "publisher dead" — which is precisely why this organ is
+            # `critical`: the DARK/LATE badge beside it carries that half.
+            _cv = st.get("coins")
+            return _v("{} coin(s) vetoed{}",
+                      None if _cv is None else len(_cv),
+                      f" · {', '.join(sorted(_cv)[:3])}" if _cv else "")
         if key == "market-pulse":
-            return _v("mood {:+.2f} · {}", st.get("mood") or 0,
-                      "PANIC" if st.get("panic") else "calm")
+            # [2026-07-17 AUDIT] mood/panic live under `latest` (market_pulse.py
+            # :408) — reading them TOP-LEVEL got None for both, and `or 0` then
+            # rendered a confident "mood +0.00 · calm" through a genuine PANIC
+            # (measured: publisher mood -0.62 / panic True -> "mood +0.00 ·
+            # calm"). Not a blank: a WRONG answer indistinguishable from a
+            # healthy neutral market, on the one organ whose panic flag the
+            # strategies actually consume. `mood or 0` is dropped with it — a
+            # missing mood must read "—", not a serene zero. fetch_pulse_strip
+            # (:864) and fleet_risk (:603) already read `latest`; this was the
+            # lone outlier.
+            # `calm` is TRI-STATE for the same reason: absent panic data is
+            # UNKNOWN, not calm. A binary flag read off a payload that may not
+            # be there answers "is the market ok?" with "yes" when the honest
+            # answer is "I can't see" — the convergent-metric trap this fleet
+            # already ate once (a `watching:201` that matched under total
+            # failure). Freshness is shown beside this, but the words must
+            # stand alone: nobody reads DARK and un-reads "calm".
+            latest = st.get("latest") or {}
+            mood, panic = latest.get("mood"), latest.get("panic")
+            return _v("mood {} · {}",
+                      None if mood is None else f"{float(mood):+.2f}",
+                      None if panic is None else ("PANIC" if panic else "calm"))
         if key == "learning-brain":
             return _v("run {} · {} hypotheses", st.get("runs"),
                       len(st.get("hypotheses") or {}))
@@ -2270,8 +2298,23 @@ def _organ_vital(key, st):
                       len(st.get("items") or []), len(st.get("proposals") or []),
                       st.get("mode"))
         if key == "signal-bus":
-            return _v("prem {}bps · stress {}bps", st.get("lighter_prem_bps"),
-                      st.get("lighter_venue_stress_bps"))
+            # [2026-07-17 AUDIT] both are DICTS, not scalars (fleet_risk.py
+            # :593-601): prem is {sym: bps}, stress is {med,max,n}. Formatted
+            # as scalars they rendered the raw repr —
+            #   "prem {'HYPE': 42.1, 'FARTCOIN': -31.0}bps · stress
+            #    {'med': 3.2, 'max': 88.0, 'n': 214}bps"
+            # Show what the gauge is FOR: how stressed the venue is, and the
+            # single book furthest from fair value. (fleet_risk:587 claims a
+            # "signal-bus card" formats these — no such card exists; this line
+            # is the only formatter, so that comment is stale.)
+            _pr = st.get("lighter_prem_bps")
+            _sr = st.get("lighter_venue_stress_bps")
+            _med = (_sr or {}).get("med") if isinstance(_sr, dict) else _sr
+            _top = None
+            if isinstance(_pr, dict) and _pr:
+                _sym = max(_pr, key=lambda k: abs(_pr[k] or 0))
+                _top = f"{_sym} {_pr[_sym]:+.0f}bps"
+            return _v("stress med {}bps · widest {}", _med, _top)
         if key == "regime-oracle":
             # [2026-07-17] This counted TOP-LEVEL PAYLOAD KEYS, not majors —
             # params/pairs/fleet/errors made it read "4 majors tracked" for a
@@ -2347,6 +2390,19 @@ def _organ_vital(key, st):
 ORGAN_SPECS = [
     ("fleet-risk",         "💡 fleet_risk — light/budget/governor",  True,  900),
     ("lighter-market",     "🛰️ Lighter Scout — venue map + tickets", True,  900),
+    # [2026-07-17 AUDIT] coin-vetoes was the fleet's one automated action with
+    # NO organ row — so the watchdog (which pages only on `critical` organs in
+    # this list, fleet_watchdog_svc.py:213) could not page for it. It gates the
+    # LIVE Funding Farmer, it FAILS OPEN when stale (lighter_funding_bot.py:902
+    # `_vetoes = {}`), and its only distress signal is a ONE-SHOT log warning
+    # nobody tails. Its publisher (market_context.py) is a SEPARATE Railway
+    # service that can die on its own — so market-context dying silently
+    # disarmed a real-money quality filter, invisibly and unpaged. CRITICAL
+    # because fail-open + real money is exactly what a pager is for. This is
+    # also the market-context service's liveness beacon: `updated` is re-stamped
+    # every loop (market_context.py:626) even when the veto CONTENT is
+    # unchanged, so a fresh row really does attest a living publisher.
+    ("coin-vetoes",        "🚫 Coin vetoes — quality filter (LIVE)", True,  3600),
     ("evidence-board",     "⚖️ Evidence board — scoring/synthesis",  True,  1800),
     ("market-pulse",       "🫀 Market Pulse — news/social mood",     True,  2700),
     ("learning-brain",     "🧠 Brain — hypotheses/diagnosis",        True,  26000),
@@ -2388,7 +2444,15 @@ ORGAN_SPECS = [
     ("fleet-respiration",  "🫁 Respiration — data-feed SpO2",         True,  1200),
     ("fleet-clock",        "🕰️ Fleet clock — sessions/market events", False, 1800),
     ("impl-shortfall",     "📉 Impl shortfall — live vs shadow slip", False, 3600),
-    ("gapscout-census",    "📊 Gap Scout census — episodes",          False, 3600),
+    # [2026-07-17 AUDIT] gapscout-census REMOVED: Gap Scout was retired today
+    # (6432868 — it arb'd Kraken/Binance/Coinbase with no Lighter leg) and now
+    # IDLES with no publishes, while cleanup_legacy_bots prunes bot_pnl only —
+    # so the frozen bot_state row would have sat DARK forever and the Autonomy
+    # card rendered "· STALE" forever. A row that is permanently DARK by design
+    # is how operators learn to ignore DARK, which is the one thing this list
+    # cannot afford: fleet-alerts/fleet-tuning/xp-queue are EVENT-typed for
+    # exactly this reason. The ledger + odometer history are kept; if Gap Scout
+    # is ever resurrected (GAPSCOUT_RETIRED_OVERRIDE=run) restore this line.
     ("fleet-alerts",       "🔔 Alert feed (event-driven)",            False, None),
     ("evidence-review",    "🧾 Evidence review (daily + operator)",   False, None),
 ]
@@ -2414,8 +2478,14 @@ CONTRACTS = [
      "restrict-only", "lighter-market"),
     ("lens-forward grades", "bot_learn.py",
      "21-Jul lens ruling · taker lens veto", "restrict-only", "brain-lens-forward"),
-    ("coin veto list", "market_context.py", "Funding Farmer",
-     "restrict-only (the fleet's one automated action)", "fleet-alerts"),
+    # [2026-07-17 AUDIT] freshness key was 'fleet-alerts' — the wrong key. The
+    # vetoes publish as 'coin-vetoes'; fleet-alerts is force-set to EVENT (see
+    # _organ_status), so this row could NEVER go dark — for what the row itself
+    # calls the fleet's one automated action, gating a LIVE book and failing
+    # OPEN. It attested the liveness of a different organ entirely.
+    ("coin veto list", "market_context.py", "Funding Farmer (LIVE)",
+     "restrict-only (the fleet's one automated action) · FAILS OPEN when stale",
+     "coin-vetoes"),
     ("evidence proposals", "evidence_board.py",
      "NOTHING yet — shadow; review promotes via EVBOARD_MODE", "shadow",
      "evidence-board"),

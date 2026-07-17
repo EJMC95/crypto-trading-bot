@@ -367,9 +367,32 @@ PROMO_MIN_PNL = float(os.environ.get("EVBOARD_PROMO_MIN_PNL", "10"))
 # old lifetime rule when the ledger is dark) or a live-vs-shadow divergence
 # alert. Every change that LANDS pushes URGENT to the phone.
 # ---------------------------------------------------------------------------
+# [2026-07-17 AUDIT] The cohort is "REAL-MONEY BOOKS THIS LEVER STEERS", and
+# it must be BOTH halves of that sentence — the shipped default had it wrong on
+# each half at once:
+#
+#   * crypto-trend-daily-lighter (Tide Rider) was RETIRED from the live slot
+#     today and its bot_pnl row is now DELETED at boot (cleanup_legacy_bots.py
+#     :53 — "this id can never be published again"). It can never appear in
+#     bot_rows, so `cohort_ok = len(rows) >= len(LIVE_ROWS)` was 1 >= 2 =>
+#     FALSE ON EVERY CYCLE, FOREVER. Measured consequence: no up-scale is ever
+#     proposed, AND — worse — the DOWN reflex still fires on the visible
+#     funding row, after which the blind-hold re-asserts that restriction every
+#     cycle, because RELEASE requires the cohort to be readable. Real clips
+#     could pin at 0.75 with no path back except the operator. A retired row
+#     left in a live cohort is not inert; it is a one-way ratchet.
+#   * The taker took that slot, but it is deliberately NOT added here: it
+#     builds its client directly and never calls venue_context()
+#     (lighter_ticket_taker.py:523), so it does NOT consume live.clip_scale —
+#     it sizes off the SHADOW fleet-risk governor (:1059). Adding it would
+#     grade this lever on a book the lever cannot move, which is the exact
+#     defect proprioception has on live-clip today. When the taker is wired to
+#     venue_context/live.clip_scale, add it HERE in the same commit.
+#
+# So the cohort is the ONE book that is both live and steered by this lever.
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
-    "crypto-trend-daily-lighter,perps-funding-lighter-lighter").split(",") if s.strip()}
+    "perps-funding-lighter-lighter").split(",") if s.strip()}
 LIVE_MIN_CLOSED = int(os.environ.get("EVBOARD_LIVE_MIN_CLOSED", "30"))
 LIVE_DOWN_PNL = float(os.environ.get("EVBOARD_LIVE_DOWN_PNL", "10"))     # -$10/7d hurts
 LIVE_DOWN_SCALE = float(os.environ.get("EVBOARD_LIVE_DOWN_SCALE", "0.75"))
@@ -1225,12 +1248,25 @@ def _selftest():
     fresh_fr = {"updated": fresh, "ttl_sec": 900, "light": "green",
                 "fleet_dd_7d": -0.005}
     calm_lm = {"updated": fresh, "stress": {"med": 5}}
-    live_ok = [{"bot": "crypto-trend-daily-lighter", "closed_trades": 0,
+    # [2026-07-17 AUDIT] The cohort under test is DECLARED, not inherited from
+    # the production roster. These cases exercise synthesize_live's ROW SHAPES
+    # — a HOLDER (0 window closes, judged on its mark-anchored lifetime) vs a
+    # TRADER, plus partial-cohort semantics — logic that must stay covered no
+    # matter who occupies the live slot. Pinning the fixture to the real
+    # LIVE_ROWS meant this suite FAILED ON THE ROSTER FIX rather than on a bug,
+    # which is the tell: a test that reads a production constant is testing
+    # today's deployment, not the function. Two synthetic books, so the holder
+    # branch survives Tide Rider's retirement. The production roster gets its
+    # OWN guard below (`no retired row in LIVE_ROWS`) — that is the assertion
+    # that would have caught the real defect.
+    _saved_live_rows = LIVE_ROWS
+    globals()["LIVE_ROWS"] = {"holder-book", "trader-book"}
+    live_ok = [{"bot": "holder-book", "closed_trades": 0,
                 "pnl_abs": -0.23, "updated_at": fresh},
-               {"bot": "perps-funding-lighter-lighter", "closed_trades": 33,
+               {"bot": "trader-book", "closed_trades": 33,
                 "pnl_abs": -0.30, "updated_at": fresh}]
-    win_ok = {"crypto-trend-daily-lighter": {"pnl": 0.0, "closes": 0},
-              "perps-funding-lighter-lighter": {"pnl": 2.4, "closes": 14}}
+    win_ok = {"holder-book": {"pnl": 0.0, "closes": 0},
+              "trader-book": {"pnl": 2.4, "closes": 14}}
     s, it = synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
                             window=win_ok)
     assert s == 1.25 and it["direction"] == "expand" and it["severity"] == "action"
@@ -1263,7 +1299,7 @@ def _selftest():
         and "RELEASED" in ith["msg"], (sh, ith)
     assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
                            clip_grade="hurting", window=win_ok) == (None, None)
-    win_hole = dict(win_ok, **{"perps-funding-lighter-lighter":
+    win_hole = dict(win_ok, **{"trader-book":
                                {"pnl": -12.0, "closes": 9}})
     sh2, ith2 = synthesize_live(live_ok, fresh_fr, calm_lm, [],
                                 {"value": 1.25, "ts": 0}, nowts,
@@ -1346,12 +1382,12 @@ def _selftest():
     assert synthesize_live(small, fresh_fr, calm_lm, [], {}, nowts,
                            window=win_ok) == (None, None), \
         "no row with >=30 lifetime closes -> nothing proves the edge"
-    thin = dict(win_ok, **{"perps-funding-lighter-lighter":
+    thin = dict(win_ok, **{"trader-book":
                            {"pnl": 2.4, "closes": 3}})
     assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
                            window=thin) == (None, None), \
         "a thin window sample proves nothing"
-    flat = dict(win_ok, **{"perps-funding-lighter-lighter":
+    flat = dict(win_ok, **{"trader-book":
                            {"pnl": 0.0, "closes": 14}})
     assert synthesize_live(live_ok, fresh_fr, calm_lm, [], {}, nowts,
                            window=flat) == (None, None), \
@@ -1406,6 +1442,27 @@ def _selftest():
     if tuning is not None:
         for v in LIVE_LADDER + [LIVE_DOWN_SCALE]:
             assert tuning.clamp("live.clip_scale", v) == v
+    globals()["LIVE_ROWS"] = _saved_live_rows
+
+    # [2026-07-17 AUDIT] THE PRODUCTION-ROSTER GUARD — the assertion that would
+    # have caught the real defect, which no row-shape fixture could. A retired
+    # row in LIVE_ROWS is unfalsifiable from inside synthesize_live: its bot_pnl
+    # row is deleted at boot, so `cohort_ok = len(rows) >= len(LIVE_ROWS)` is
+    # permanently False — no up-scale ever, and any down-scale is re-asserted
+    # by the blind-hold forever (a one-way ratchet on REAL clips). Assert the
+    # roster against the retirement list itself, so retiring a bot without
+    # sweeping this cohort fails loudly HERE instead of silently pinning clips.
+    try:
+        from cleanup_legacy_bots import LEGACY_BOTS as _retired
+        _rot = LIVE_ROWS & set(_retired)
+        assert not _rot, (
+            f"LIVE_ROWS names RETIRED row(s) {sorted(_rot)} — their bot_pnl "
+            f"rows are pruned at boot, so the live cohort can never be fully "
+            f"visible: no up-scale is possible and any down-scale becomes "
+            f"permanent. Remove them (and add the slot's new occupant ONLY if "
+            f"it actually consumes live.clip_scale via venue_context).")
+    except ImportError:      # not in this image — the guard is best-effort
+        pass
 
     # growth-rail ladder: quiet->0, monotone, later steps inherit earlier
     assert widen_step(1) == (0, {})

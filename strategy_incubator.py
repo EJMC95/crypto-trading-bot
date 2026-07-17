@@ -249,11 +249,36 @@ def _marked(rep, lenses=None):
 def _pnl_usd(rep, lenses=None):
     """Every closed trade's net $ (replay field, 17-Jul), optionally only for
     the lenses the live taker may fill — a vetoed lens's fills are evidence
-    about a bot that does not exist and must not enter the fitness."""
+    about a bot that does not exist and must not enter the fitness.
+
+    This is the EVIDENCE COUNT's series (closed trades only — an open position
+    is not evidence of a closed edge). For the series the LCB must PRICE, see
+    _marked_series: these two are deliberately different questions."""
     out = []
     for l, s in (rep.get("lenses") or {}).items():
         if lenses is None or l in lenses:
             out.extend(s.get("pnl_usd") or [])
+    return out
+
+
+def _marked_series(rep, lenses=None):
+    """[2026-07-17 AUDIT] The per-trade series the LCB must price: every closed
+    trade PLUS each end-of-tape open position marked at its unrealized — the
+    per-trade decomposition of _marked, so sum(_marked_series) == _marked (to
+    rounding) and the bound prices exactly the quantity `net` reports.
+
+    _pnl_usd ALONE is the censored sample _marked exists to fix (see :227). It
+    was the PRIMARY sort key while net/h1/h2 were marked, so `rank` selected on
+    precisely the deferral-blind measure the line above it disclaims: a genotype
+    that pushed a $50 loss past the tape's end scored lcb=+20 on a marked net of
+    -$30 and took rank 1 — and run_once assesses ONLY scored[0], so the deferrer
+    also evicted the genuinely-best genotype from ever being assessed. Not
+    hypothetical: the real tape has ZERO hold-exits, so "never close anything"
+    is the strongest gradient in the landscape."""
+    out = list(_pnl_usd(rep, lenses))
+    for o in (rep.get("open") or []):
+        if lenses is None or o.get("lens") in lenses:
+            out.append(float(o.get("upnl") or 0.0))
     return out
 
 
@@ -401,7 +426,9 @@ def evaluate(genotype, tape, lenses=None):
     pnl = _pnl_usd(full, lenses)
     return {"net": round(_marked(full, lenses), 3), "h1": round(h1, 3),
             "h2": round(h2, 3), "closes": len(pnl),
-            "lcb": round(net_lcb(pnl), 3),
+            # [2026-07-17 AUDIT] bound the MARKED series, not the censored
+            # closed-only one — `closes` stays the closed-trade evidence count
+            "lcb": round(net_lcb(_marked_series(full, lenses)), 3),
             # both-halves POSITIVE-BY-MARGIN — a +$0.01 half is noise, not edge
             "both_halves_pos": h1 >= HALF_MARGIN and h2 >= HALF_MARGIN}
 
@@ -412,7 +439,19 @@ def rank(population, tape, lenses=None):
     # estimate. Ranking a population by its max point estimate IS the winner's
     # curse this file's header warns about; net only breaks ties between
     # equally-evidenced genotypes.
-    scored.sort(key=lambda s: (s["lcb"], s["net"]), reverse=True)
+    #
+    # [2026-07-17 AUDIT] `closes > 0` leads the key because net_lcb([]) == 0.0
+    # — "no evidence" scored a bound of ZERO, which beats every genotype with
+    # evidence of LOSS. On a net-negative tape (today's: the brain grades 3 of
+    # 4 lenses negative) rank 1 therefore went to a genotype that never fired,
+    # and since run_once assesses only scored[0], NO genotype that trades could
+    # ever be crowned — the champion card read "no champion yet" by
+    # construction, not by measurement. Fixed HERE and not in net_lcb because
+    # `lcb` is published: -inf would be invalid JSON and Postgres JSONB would
+    # reject the whole payload. select_elite already refuses these genotypes
+    # (min_closes); this makes rank agree with it.
+    scored.sort(key=lambda s: (s["closes"] > 0, s["lcb"], s["net"]),
+                reverse=True)
     return scored
 
 
@@ -761,8 +800,28 @@ def _selftest():
     assert _marked({"closed_net": 2.0, "unrealized": -5.0}) == -3.0
     assert _marked({"closed_net": 2.0}) == 2.0          # absent -> closed only
 
+    # [2026-07-17 AUDIT] _marked_series = the per-trade decomposition of
+    # _marked. The deferrer below closes 2 winners and sits on a -$50 loser:
+    # the closed-only series calls it +$4, the marked series prices the truth.
+    _def = {"lenses": {"divergence": {"pnl_usd": [2.0, 2.0], "net": 4.0}},
+            "open": [{"lens": "divergence", "upnl": -50.0}]}
+    assert _pnl_usd(_def, {"divergence"}) == [2.0, 2.0]        # evidence count
+    assert _marked_series(_def, {"divergence"}) == [2.0, 2.0, -50.0]
+    assert abs(sum(_marked_series(_def, {"divergence"}))
+               - _marked(_def, {"divergence"})) < 1e-9, "series must sum to _marked"
+    assert net_lcb(_marked_series(_def, {"divergence"})) < 0, "deferral priced"
+    assert net_lcb(_pnl_usd(_def, {"divergence"})) > 0, "censored sample lies"
+    # an open position on a lens we do NOT score must not leak into the bound
+    _other = {"lenses": {"divergence": {"pnl_usd": [1.0], "net": 1.0}},
+              "open": [{"lens": "breakout", "upnl": -99.0}]}
+    assert _marked_series(_other, {"divergence"}) == [1.0]
+
     # net_lcb: the winner's curse priced. Zero spread -> bound == total; a
     # noisy sample is discounted; one trade evidences no edge, ever.
+    # [2026-07-17 AUDIT] 0.0-on-empty is a JSON-SAFE SENTINEL, not a verdict of
+    # "riskless": it out-ranks every genotype with evidence of loss, so it is
+    # `rank`'s job (closes>0 leads the key) to keep no-evidence off rank 1 —
+    # asserted below. -inf would say it better and would break the payload.
     assert net_lcb([]) == 0.0
     assert net_lcb([5.0]) == 0.0 and net_lcb([-2.0]) == -2.0
     assert abs(net_lcb([1.0] * 20) - 20.0) < 1e-9
@@ -772,6 +831,40 @@ def _selftest():
     assert net_lcb([1.96, -1.54] * 30) / 30 > net_lcb(coin) / 6
     assert t90(1) == 3.078 and t90(4) == 1.533 and t90(500) == bs.Z80
     assert t90(0) == float("inf")
+
+    # [2026-07-17 AUDIT] rank's two failure modes, driven through the REAL
+    # rank()/evaluate() with a faked replay keyed off the patched bar. Both
+    # fixtures FAIL on the pre-audit sort key — the population is otherwise
+    # identical, so the sort key is the only variable.
+    _saved_replay = rp.replay
+    try:
+        def _fake_replay(tape):
+            # DIV_GAP_PP 37.5 = never fires; 50.0 = defers a $50 loss past the
+            # tape's end; 62.5 = the real tape's shape, honestly closed.
+            bar = getattr(tt, "DIV_GAP_PP")
+            if bar == 37.5:
+                return {"lenses": {"divergence": {"pnl_usd": [], "net": 0.0}},
+                        "open": [], "closed_net": 0.0, "unrealized": 0.0}
+            if bar == 50.0:
+                return {"lenses": {"divergence": {"pnl_usd": [2.0] * 20,
+                                                  "net": 40.0}},
+                        "open": [{"lens": "divergence", "upnl": -50.0}],
+                        "closed_net": 40.0, "unrealized": -50.0}
+            return {"lenses": {"divergence": {"pnl_usd": [3.0] * 20,
+                                              "net": 60.0}},
+                    "open": [], "closed_net": 60.0, "unrealized": 0.0}
+        rp.replay = _fake_replay
+        _pop = [{"DIV_GAP_PP": 37.5}, {"DIV_GAP_PP": 50.0}, {"DIV_GAP_PP": 62.5}]
+        _sc = rank(_pop, [1, 2], {"divergence"})
+        # the honest closer wins; the deferrer's marked net is NEGATIVE despite
+        # 20 closed winners; the do-nothing genotype ranks LAST, not first.
+        assert _sc[0]["genotype"]["DIV_GAP_PP"] == 62.5, _sc[0]
+        assert _sc[-1]["genotype"]["DIV_GAP_PP"] == 37.5, _sc[-1]
+        assert _sc[-1]["closes"] == 0 and _sc[-1]["lcb"] == 0.0   # the sentinel
+        _defr = [s for s in _sc if s["genotype"]["DIV_GAP_PP"] == 50.0][0]
+        assert _defr["net"] == -10.0 and _defr["lcb"] < 0, _defr
+    finally:
+        rp.replay = _saved_replay
 
     # GAMETE SELECTION: the noise genotype the champion gate rejects must not
     # BREED either, and an unmeasurable genotype is not a gamete however fit.
