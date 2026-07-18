@@ -503,3 +503,100 @@ def test_new_wrapped_blob_restores_last_accepted():
     })
     g = _run_once_guard({"BTC": 100.0}, store)
     assert g.has_state and g._last["equity"] == 100.0 and g._last["entries"] == {"BTC": 100.0}
+
+
+# ── legacy no-entries blob on the RUN-ONCE path: the deploy-blocker pair ──────
+# [2026-07-18] Adversarial review (HIGH/CRITICAL, reproduced end-to-end): the
+# live Taker's first post-deploy blob is the OLD flat shape with no `entries`,
+# so entries_match degraded to True and an entry+upnl lockstep phantom rebased
+# +13% into the daily-loss rail. The discriminator that closes it: a genuine
+# deposit MOVES ledger collateral away from the trusted baseline; the lockstep
+# phantom keeps collateral flat (its injection rides upnl). These two tests are
+# the REQUIRED pair — the phantom must reject AND the honest deposit must heal;
+# a fix that trades one for the other reintroduces a closed incident.
+_LEGACY_2COIN = {"ts": T - 600.0, "equity": 200.0, "collateral": 200.0,
+                 "mids": {"A": 50.0, "B": 100.0}, "sizes": {"A": 2.0, "B": 1.0}}
+
+
+def test_legacy_blob_run_once_entry_corruption_phantom_rejects():
+    # Baseline (legacy, no entries): 2 A @50 + 1 B @100, equity=collateral=200.
+    # Venue corrupts B's entry 100->70 with matching phantom upnl +30 (STEP 1's
+    # gap stays 0); collateral held FLAT at 200. Each relaunch is a fresh guard
+    # sharing the store. Must never rebase onto the phantom.
+    store = _Store(dict(_LEGACY_2COIN))
+    mids = {"A": 50.0, "B": 100.0}
+    for amid in (55.0, 60.0, 65.0, 70.0):
+        mids["A"] = amid
+        ua = round(2 * (amid - 50.0), 4)               # A's real upnl
+        pos = {"A": _pos(2, 50, upnl=ua),
+               "B": _pos(1, 70, upnl=30.0)}            # corrupted entry + phantom
+        g = _run_once_guard(mids, store)
+        v = g.evaluate(round(200.0 + ua + 30.0, 4), 200.0, pos)
+        assert not v.accepted, "lockstep phantom must NOT rebase on a legacy blob"
+    # the trusted baseline never moved onto the phantom
+    blob = store.blob
+    last = blob.get("last") if isinstance(blob, dict) and "last" in blob else blob
+    assert last["equity"] == 200.0
+
+
+def test_legacy_blob_run_once_honest_deposit_still_heals():
+    # Same legacy no-entries shape, but an HONEST $30 deposit: collateral moves
+    # 100 -> 130 (ledger cash), book drifts so only coll_stable can heal. The
+    # discriminator must let this through — collateral moved from baseline.
+    store = _Store({"ts": T - 600.0, "equity": 100.0, "collateral": 100.0,
+                    "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}})
+    mids = {"BTC": 100.0}
+    outcome = None
+    for m in (99.4, 100.6, 99.5):
+        mids["BTC"] = m
+        upnl = round(m - 100.0, 4)
+        g = _run_once_guard(mids, store)
+        assert g.has_state and not g._last.get("entries")   # legacy: no entries
+        outcome = g.evaluate(round(130.0 + upnl, 4), 130.0,
+                             {"BTC": _pos(1, 100, upnl=upnl)})
+    assert outcome.accepted and outcome.reason == "rebase"
+    # and the healing rebase re-armed entry verification for the next episode
+    assert store.blob["last"]["entries"] == {"BTC": 100.0}
+
+
+def test_future_timestamped_reject_does_not_break_streak_restore():
+    # A future-stamped reject (clock skew / corrupt blob) must be dropped, not
+    # anchor the walk and orphan the genuine recent streak behind it.
+    store = _Store({
+        "last": {"ts": T - 600.0, "equity": 130.0, "collateral": 130.0,
+                 "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}, "entries": {"BTC": 100.0}},
+        "rejects": [[T - 300.0, 130.0, 130.0, "continuity"],
+                    [T - 20.0, 130.0, 130.0, "continuity"],
+                    [T + 7200.0, 130.0, 130.0, "continuity"]],   # future junk
+    })
+    g = _run_once_guard({"BTC": 100.0}, store)
+    assert [r[0] for r in g._rejects] == [T - 300.0, T - 20.0]
+
+
+# ── flag wiring: run-once bots opt in, long-lived bots stay memory-only ───────
+def test_persist_flag_wiring():
+    """The persist flag is load-bearing at three sites; none is covered by any
+    runtime test (the live client needs the signer SDK), so pin the wiring:
+      * EquityGuard defaults persist_reject_streak=False (long-lived-safe);
+      * LighterClient defaults guard_persist_reject_streak=False and threads it
+        into the guard;
+      * the Ticket Taker (run-once) passes it; venue_context (the Funding
+        Farmer's path) does NOT, so the Farmer keeps the default False."""
+    import inspect
+    from pathlib import Path
+    import venues.lighter_client as lc
+
+    assert inspect.signature(EquityGuard.__init__).parameters[
+        "persist_reject_streak"].default is False
+    assert inspect.signature(lc.LighterClient.__init__).parameters[
+        "guard_persist_reject_streak"].default is False
+    assert "persist_reject_streak=self._guard_persist_reject_streak" in \
+        inspect.getsource(lc.LighterClient._make_guard)
+
+    root = Path(__file__).resolve().parent.parent.parent
+    taker_src = (root / "lighter_ticket_taker.py").read_text(encoding="utf-8")
+    assert "guard_persist_reject_streak=live" in taker_src, \
+        "the run-once Ticket Taker must opt in to streak persistence"
+    ctx_src = (root / "venues" / "__init__.py").read_text(encoding="utf-8")
+    assert "guard_persist_reject_streak" not in ctx_src, \
+        "venue_context (Funding Farmer) must keep the default False"

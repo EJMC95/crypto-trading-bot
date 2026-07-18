@@ -213,6 +213,10 @@ class EquityGuard:
                                None if r[2] is None else float(r[2]), str(r[3])))
         except (TypeError, ValueError, IndexError):
             return []
+        # a future-stamped reject (clock skew / corrupt blob) would anchor the
+        # walk and break the genuine streak behind it — drop it, mirroring the
+        # `0 <= age` guard the last-accepted restore already has.
+        parsed = [r for r in parsed if r[0] <= now + 60.0]
         parsed.sort(key=lambda x: x[0])
         out = []
         nxt = now          # anchor: the newest reject must be recent vs now
@@ -449,18 +453,34 @@ class EquityGuard:
         # current entry to match the entry recorded at the last accepted read.
         # Graceful degradation: a baseline with NO stored entries (a legacy
         # pre-fix snapshot restored across a redeploy, or a not-yet-accepted
-        # guard) cannot verify entry — skip the check rather than block the
-        # rebase forever, which would re-strand a deposit-stuck bot on the very
-        # deploy that ships this fix. The first fresh accept records entries and
-        # the check re-arms. During that transient the (non-live-exploitable,
-        # USD-clip-sized bots) entry edge is briefly open — an acceptable trade
-        # for not re-breaking the incident this whole path exists to fix.
+        # guard) cannot verify entry — but skipping the check OUTRIGHT was a
+        # CONFIRMED false-rebase hole (adversarial review, HIGH/CRITICAL,
+        # reproduced end-to-end): the live Taker's first post-deploy blob is
+        # exactly that legacy shape, and an entry+upnl lockstep phantom then
+        # rebased +13% into the daily-loss rail. The DISCRIMINATOR that closes
+        # it without re-stranding the honest deposit: a genuine deposit or
+        # withdrawal MOVES ledger collateral away from the trusted baseline,
+        # while the lockstep phantom leaves collateral flat (its injection
+        # rides upnl, and identity_ok pins total = collateral + upnl). So when
+        # entry verification is impossible, require |collateral - baseline
+        # collateral| > tol before the rebase may fire. Honest deposit ->
+        # collateral moved -> heals; phantom -> collateral flat -> stays
+        # equity-blind (recoverable). The first fresh accept records entries
+        # and full verification re-arms.
+        # (Do NOT replace this with `not last_entries and not persist` — on the
+        # persist path that collapses entries_match to False and re-strands the
+        # honest legacy-blob deposit, the exact incident this file heals.)
         last_entries = (self._last or {}).get("entries") or {}
-        entries_match = (not last_entries) or all(
-            last_entries.get(c) is not None and p.get("entry") is not None
-            and abs(float(p["entry"]) - float(last_entries[c]))
-            <= 1e-6 * max(1.0, abs(float(last_entries[c])))
-            for c, p in held.items())
+        if last_entries:
+            entries_match = all(
+                last_entries.get(c) is not None and p.get("entry") is not None
+                and abs(float(p["entry"]) - float(last_entries[c]))
+                <= 1e-6 * max(1.0, abs(float(last_entries[c])))
+                for c, p in held.items())
+        else:
+            _last_coll = (self._last or {}).get("collateral")
+            entries_match = (collateral is not None and _last_coll is not None
+                             and abs(float(collateral) - float(_last_coll)) > tol)
         # With entries pinned to the trusted baseline, marks corroborated for
         # every coin, and sizes unchanged, the rebased equity = collateral +
         # book-corroborated upnl; the only residual error is O(tol) (STEP 1 and
