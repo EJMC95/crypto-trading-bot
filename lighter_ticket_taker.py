@@ -562,7 +562,13 @@ def main(_ctx=None):
         # directly, so it must pass it explicitly.
         venue = LighterClient(
             net="mainnet", with_signer=live,
-            guard_state_key=(BOT_ROW + ":eqguard") if live else None)
+            guard_state_key=(BOT_ROW + ":eqguard") if live else None,
+            # RUN-ONCE (this file re-invokes main() every ~300s via
+            # tickettaker_loop.sh / run_all.sh), so the EquityGuard must PERSIST
+            # its reject streak across relaunches or the deposit-heal rebase can
+            # never reach its consecutive-reject count. The long-lived Funding
+            # Farmer leaves this False (keeps its redeploy streak-reset).
+            guard_persist_reject_streak=live)
         rails = SafetyRails(BOT, TT_VENUE)
         # [2026-07-17 RUN-ONCE KILL SEMANTICS — deliberately NOT
         # assert_can_start() on the live arm.]

@@ -89,6 +89,14 @@ _UNREADABLE_NTL_ALLOW = 0.05
 # persisted guard state older than this is ignored (positions/mids from a
 # week-old process prove nothing about today's book)
 _PERSIST_MAX_AGE_S = 7 * 86400.0
+# [2026-07-18] max gap between two reject reads for them to count as the SAME
+# consecutive streak (and max age of the newest reject on restore). A run-once
+# bot relaunches every ~300s (tickettaker_loop.sh) and does 1-2 reads/process,
+# so a live streak's gaps are seconds-to-300s; 900s (3 cadences) tolerates one
+# skipped cycle while refusing to STITCH a dead sub-`need` episode to a fresh
+# reject a relaunch later. Fail direction: a broken/short streak = stay
+# equity-blind (recoverable); a rebase onto a bad number moves real money.
+_REJECT_STREAK_MAX_GAP_S = 900.0
 
 
 class EquityRejected(Exception):
@@ -112,11 +120,21 @@ def _env_flag(name, default="1"):
 
 class EquityGuard:
     def __init__(self, mids_cached, mids_fresh, *, now=time.time,
-                 load_state=None, save_state=None):
+                 load_state=None, save_state=None, persist_reject_streak=False):
         """mids_cached/mids_fresh: callable(coins) -> {coin: mid} (cached =
         ws-first + TTL REST; fresh = force new REST snapshots, no caches).
         load_state/save_state persist the last ACCEPTED read across redeploys
-        (same rationale as the durable daily-loss halt)."""
+        (same rationale as the durable daily-loss halt).
+
+        persist_reject_streak: RUN-ONCE bots ONLY (the Ticket Taker, relaunched
+        every ~300s by tickettaker_loop.sh). A run-once process rebuilds the
+        guard every cycle, so the in-memory reject streak resets and the
+        N-consecutive-rejects rebase can never fire — set this True to persist
+        the streak across relaunches. A LONG-LIVED bot (the Funding Farmer's
+        `while True`) MUST leave this False: its streak already lives in memory,
+        and persisting it would strip the redeploy streak-reset it relies on,
+        letting a dislocation spanning a `railway up` rebase onto a phantom
+        (adversarial review, HIGH)."""
         self.enabled = _env_flag("LIGHTER_EQUITY_GUARD")
         self.tol_abs = float(os.environ.get("LIGHTER_EQUITY_TOL_ABS", "1.0"))
         self.tol_ntl_pct = float(os.environ.get("LIGHTER_EQUITY_TOL_NTL_PCT", "0.01"))
@@ -127,19 +145,34 @@ class EquityGuard:
         self._mids_fresh = mids_fresh
         self._now = now
         self._save = save_state
+        self._persist_streak = bool(persist_reject_streak)
         self._last = None      # {ts, equity, collateral, mids:{c:px}, sizes:{c:sz}}
-        self._rejects = []     # consecutive rejected reads: (ts, venue_total, reason)
+        self._rejects = []     # consecutive rejected reads: (ts, venue_total, collateral, reason)
         if load_state is not None:
             try:
                 st = load_state() or {}
-                age = self._now() - float(st.get("ts") or 0)
-                if st.get("equity") is not None and 0 <= age <= _PERSIST_MAX_AGE_S:
+                # [2026-07-18] blob shape is {"last": <accepted>, "rejects": [...]}
+                # so the reject STREAK survives a run-once relaunch. Without it a
+                # run-once bot (Ticket Taker: `python … ; sleep 300` —
+                # tickettaker_loop.sh) rebuilds the guard every cycle, self._rejects
+                # resets to [] every process, and the N-consecutive-rejects rebase
+                # can NEVER reach N — a legit deposit leaves the bot equity-BLIND
+                # forever (MEASURED 2026-07-18: the Farmer, a `while True` process,
+                # healed within minutes; the Taker, run-once, stayed None until
+                # this). Old flat blobs (top-level "equity", no wrapper) read as
+                # last-only.
+                wrapped = ("last" in st) or ("rejects" in st)
+                last_blob = (st.get("last") if wrapped else st) or {}
+                age = self._now() - float(last_blob.get("ts") or 0)
+                # last-accepted read restores for EVERY bot (unchanged); only a
+                # run-once bot resumes the reject STREAK (below).
+                if last_blob.get("equity") is not None and 0 <= age <= _PERSIST_MAX_AGE_S:
                     self._last = {
-                        "ts": float(st["ts"]), "equity": float(st["equity"]),
-                        "collateral": (float(st["collateral"])
-                                       if st.get("collateral") is not None else None),
-                        "mids": {str(k): float(v) for k, v in (st.get("mids") or {}).items()},
-                        "sizes": {str(k): float(v) for k, v in (st.get("sizes") or {}).items()},
+                        "ts": float(last_blob["ts"]), "equity": float(last_blob["equity"]),
+                        "collateral": (float(last_blob["collateral"])
+                                       if last_blob.get("collateral") is not None else None),
+                        "mids": {str(k): float(v) for k, v in (last_blob.get("mids") or {}).items()},
+                        "sizes": {str(k): float(v) for k, v in (last_blob.get("sizes") or {}).items()},
                         # [2026-07-18] entries MUST survive the redeploy too, or
                         # the collateral-stable rebase's entries_match gate is
                         # permanently False post-restart and the deposit-stuck
@@ -147,13 +180,73 @@ class EquityGuard:
                         # Legacy snapshots have no entries -> {}; entries_match
                         # degrades gracefully (below) until the first fresh accept.
                         "entries": {str(k): float(v)
-                                    for k, v in (st.get("entries") or {}).items()
+                                    for k, v in (last_blob.get("entries") or {}).items()
                                     if v is not None},
                     }
                     log.info("equity guard: restored last accepted read $%.2f "
                              "(age %.0f min)", self._last["equity"], age / 60.0)
+                if self._persist_streak:
+                    self._rejects = self._restore_rejects(st.get("rejects"))
+                    if self._rejects:
+                        log.info("equity guard: resumed reject streak of %d (%s)",
+                                 len(self._rejects), self._rejects[-1][3])
             except Exception as e:  # noqa: BLE001 — cold start is always safe
                 log.warning("equity guard: state restore failed (%s) — starting cold", e)
+
+    def _restore_rejects(self, raw):
+        """Rebuild the consecutive-reject streak a prior RUN-ONCE process
+        persisted. Keeps only a CONTIGUOUS, SAME-REASON run ending at the most
+        recent reject: the newest reject must be within _REJECT_STREAK_MAX_GAP_S
+        of now, each earlier one within that gap of its successor, and all one
+        reason. This refuses to (a) stitch a dead sub-`need` episode to a fresh
+        reject a relaunch later, and (b) mix a high-bar mark_gap reject into a
+        low-bar continuity window. Malformed input -> []. Fail toward NOT
+        rebasing (staying equity-blind is recoverable; a bad rebase moves money).
+        Trimmed to the last 4*rebase_after (the widest window _reject inspects)."""
+        if not raw:
+            return []
+        now = self._now()
+        parsed = []
+        try:
+            for r in raw:
+                parsed.append((float(r[0]), float(r[1]),
+                               None if r[2] is None else float(r[2]), str(r[3])))
+        except (TypeError, ValueError, IndexError):
+            return []
+        parsed.sort(key=lambda x: x[0])
+        out = []
+        nxt = now          # anchor: the newest reject must be recent vs now
+        reason = None
+        for rec in reversed(parsed):
+            if nxt - rec[0] > _REJECT_STREAK_MAX_GAP_S:
+                break      # gap too wide -> the streak ends here
+            if reason is None:
+                reason = rec[3]
+            elif rec[3] != reason:
+                break      # a different failure mode -> not the same streak
+            out.append(rec)
+            nxt = rec[0]
+        out.reverse()
+        return out[-4 * self.rebase_after:]
+
+    def _persist(self):
+        """Persist guard state. A RUN-ONCE bot (persist_reject_streak) stores the
+        last accepted read AND the reject streak, so a relaunch resumes the
+        streak instead of restarting it at 0. A LONG-LIVED bot stores ONLY the
+        last accepted read (exact pre-2026-07-18 behaviour) — its streak lives in
+        memory and MUST reset on every redeploy, or a dislocation spanning a
+        `railway up` rebases onto a phantom (adversarial review, HIGH)."""
+        if self._save is None:
+            return
+        try:
+            if self._persist_streak:
+                self._save({"last": self._last,
+                            "rejects": [list(r)
+                                        for r in self._rejects[-4 * self.rebase_after:]]})
+            else:
+                self._save(self._last)
+        except Exception:  # noqa: BLE001 — persistence is best-effort
+            pass
 
     # -- public ----------------------------------------------------------------
     @property
@@ -277,18 +370,29 @@ class EquityGuard:
                       "mids": dict(mids),
                       "sizes": {c: p["size"] for c, p in held.items()},
                       "entries": {c: p.get("entry") for c, p in held.items()}}
-        if self._save is not None:
-            try:
-                self._save(self._last)
-            except Exception:  # noqa: BLE001 — persistence is best-effort
-                pass
+        # persists {"last": self._last, "rejects": []} — the empty streak clears
+        # any persisted rejects so the next process starts the counter fresh.
+        self._persist()
         return Verdict(True, float(venue_total), reason)
 
     def _reject(self, now, venue_total, collateral, held, mids, problem):
         reason, detail = problem
+        # [2026-07-18] a streak is "N consecutive SELF-CONSISTENT rejects" — a
+        # change of reason (e.g. mark_gap -> continuity when a held coin's mid
+        # goes dark) is a DIFFERENT failure mode, not the same one continuing.
+        # Reset on a reason change so `need` (sized by reason) and the
+        # value-stability window can never mix a high-bar mark_gap reject into a
+        # low-bar continuity rebase (adversarial review, HIGH: persisted mark_gap
+        # rejects were laundered into a continuity-bar total_stable rebase onto
+        # the exact 2026-07-11 phantom class).
+        if self._rejects and self._rejects[-1][3] != reason:
+            self._rejects = []
         self._rejects.append((now, float(venue_total),
                               float(collateral) if collateral is not None else None,
                               reason))
+        # hygiene: bound the in-memory streak (only the last `need` are read).
+        if len(self._rejects) > 4 * self.rebase_after:
+            del self._rejects[:-4 * self.rebase_after]
         # self-heal: the venue's number is what margining actually runs on, so
         # N consecutive SELF-CONSISTENT prints eventually win over our model.
         # mark_gap rejects carry live counter-evidence (book vs marks) so their
@@ -367,12 +471,30 @@ class EquityGuard:
                        and max(colls) - min(colls) <= tol
                        and identity_ok and marks_corroborated and entries_match)
 
-        if len(self._rejects) >= need and (total_stable or coll_stable):
-            how = "collateral-stable" if (coll_stable and not total_stable) else "consistent"
+        # [2026-07-18] total_stable is the UN-corroborated "concede to a stable
+        # total" path. On the RUN-ONCE persisted path it is the false-rebase
+        # vector — a persistent phantom total (or a streak stitched across
+        # relaunches) rebases with zero mark/entry corroboration (adversarial
+        # review, HIGH). The deposit this whole path exists to heal is a
+        # COLLATERAL move, which coll_stable (fully corroborated) catches — so a
+        # run-once bot heals ONLY via coll_stable and stays equity-blind
+        # (recoverable) on a total-only phantom rather than rebasing onto a bad
+        # number. total_stable stays for LONG-LIVED bots, whose streak is
+        # memory-only and reset by every redeploy (no cross-process stitch).
+        allow_total_stable = total_stable and not self._persist_streak
+
+        if len(self._rejects) >= need and (allow_total_stable or coll_stable):
+            how = "collateral-stable" if (coll_stable and not allow_total_stable) else "consistent"
             log.error("equity guard: %d consecutive %s rejects — REBASING to "
                       "venue value $%.2f (last: %s).",
                       len(self._rejects), how, venue_total, detail)
             return self._accept(now, venue_total, collateral, mids, held, "rebase")
+        # [2026-07-18] a run-once bot persists the growing streak so a relaunch
+        # resumes it (`_accept` already persisted the cleared streak on a rebase).
+        # A long-lived bot does NOT persist on reject — its streak is memory-only
+        # by design (redeploy reset).
+        if self._persist_streak:
+            self._persist()
         log.warning("equity guard: REJECT #%d (%s) — %s",
                     len(self._rejects), reason, detail)
         return Verdict(False, None, reason, detail)
