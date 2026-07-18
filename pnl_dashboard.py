@@ -692,11 +692,14 @@ def fetch_bot_quality():
     breakdown, plus 'since rework' era stats where an era is defined.
 
     [2026-07-16 UNIFIED] This read bot_trades ONLY, so every Lighter bot —
-    including BOTH LIVE real-money rows (crypto-trend-daily-lighter,
+    including BOTH LIVE real-money rows (lighter-ticket-taker-lighter,
     perps-funding-lighter-lighter), which record to paper_trades — rendered
     blank while retired Kraken paper rows showed full stats. The bots with
     actual money had the least detail. Now every bot, live or shadow, gets
-    identical metrics.
+    identical metrics. [2026-07-17] The live trend row shown here used to be
+    crypto-trend-daily-lighter (🌊 Tide Rider); it retired that day and 🎫
+    Ticket Taker took the same sub-account, so lighter-ticket-taker-lighter is
+    now the second live real-money row.
 
     Merged in SQL (UNION ALL -> GROUP BY bot), never client-side: wr/pf/exp
     are RATIOS, recomputable only from summed gross-win/gross-loss.
