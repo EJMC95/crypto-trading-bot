@@ -290,9 +290,40 @@ VENUE_PURITY_OK = {
                  "api-manager.upbit.com", "api.coingecko.com")},
     ("compile_market_data.py", "host:api.alternative.me"):
         "Fear & Greed sentiment index — a mood gauge, not price or a venue "
-        "quote (same class as market_pulse's news feeds). The rest of this "
-        "file's foreign hosts ARE price data and are deliberately NOT "
-        "declared — see the findings.",
+        "quote (same class as market_pulse's news feeds). This file's price "
+        "hosts are its dashboard display panel, declared below.",
+
+    # -- compile_market_data's price panel: DASHBOARD DISPLAY, not a trader ---
+    # [2026-07-18 operator decision] These four price hosts feed the dashboard's
+    # breadth/regime DISPLAY gauge only. CLAUDE.md already lists this file as
+    # "Still non-Lighter and DELIBERATELY kept ... for the DASHBOARD's display —
+    # not a trader". It steers no orders and publishes to no strategy bus, so
+    # LIGHTER-FIRST (which governs where we TRADE and MEASURE) has no claim on
+    # it. Declared so the guard can be CI-blocking on the SHIPPED rule; if this
+    # file ever feeds a strategy, remove the entry and it becomes a finding
+    # again. (An earlier revision left these flagged; the operator's call is to
+    # exempt the display panel and enforce the rest.)
+    **{("compile_market_data.py", f"host:{h}"):
+       "dashboard DISPLAY breadth/regime gauge — multi-venue spot prices for "
+       "the dashboard's own view, not a trader (CLAUDE.md deliberately keeps "
+       "this); steers no orders and publishes to no strategy bus."
+       for h in ("api.binance.com", "api.coingecko.com",
+                 "api.coinpaprika.com", "api.kraken.com")},
+
+    # -- RETIRED bots that idle at boot (LIGHTER-ONLY cut, 2026-07-17) --------
+    # Both rows are in cleanup_legacy_bots.LEGACY_BOTS and both bots idle at
+    # boot behind a code guard, so the foreign-venue path is never reached in
+    # production. Declared here (not left as findings) because a retired,
+    # guarded-off bot is not a live LIGHTER-FIRST violation — same rationale as
+    # BACKTEST_VENUE_OK's retired-history section.
+    ("listing_sniper.py", "ccxt:<dynamic>"):
+        "🎯 Launch Sniper RETIRED 2026-07-17 — the row is in LEGACY_BOTS and "
+        "the bot idles at boot behind LISTING_SNIPER_OVERRIDE, so the ccxt CEX "
+        "universe is never reached; replaced by lighter_perp_sniper.py.",
+    ("triangular_arb.py", "ccxt:kraken"):
+        "scanner-triangular-arb RETIRED — row in LEGACY_BOTS and the bot idles "
+        "at boot behind ARB_RETIRED_OVERRIDE (LIGHTER-ONLY cut); the Kraken "
+        "triangular scan is never reached in production.",
 }
 
 # A conservative roster of ccxt exchange ids the fleet plausibly touches, plus

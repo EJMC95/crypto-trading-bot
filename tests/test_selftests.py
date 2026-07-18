@@ -78,18 +78,18 @@ LIVE_SELFTESTS = [
     ("lighter_ticket_taker", "--selftest-live", "lighter"),
 ]
 
-# Structural guards. Two of these already gate CI (changelog-check.yml) and are
-# green on main — their FULL scan is asserted here too. The other two are policy
-# checks whose full scan reflects repo CONTENT (venue purity currently has 6
-# pre-existing violations in scripts/*; deploy-coverage is informational): for
-# those we run only the negative `--selftest` fixture, which proves the guard
-# logic still bites without gating this suite on unrelated pre-existing debt.
+# Structural guards. The CI-gating ones are green on main — their FULL scan is
+# asserted here too. deploy-coverage is informational (its full scan reports a
+# census, not a pass/fail), so it runs only its negative `--selftest` fixture.
+# [2026-07-18] venue-purity's shipped-code scan was made green (compile_market_data
+# declared as a dashboard display panel; the 2 retired bots declared) and wired
+# into CI, so it moves up to ENFORCED. Its BACKTEST section stays advisory.
 ENFORCED_AUDITS = [
     "scripts/audit_image_imports.py",   # born-dark guard (CI-gating)
     "scripts/audit_sdk_pin.py",         # real-money wheel pin (CI-gating)
+    "scripts/audit_venue_purity.py",    # LIGHTER-first, shipped-code scan (CI-gating)
 ]
 GUARD_ONLY_AUDITS = [
-    "scripts/audit_venue_purity.py",    # LIGHTER-first policy; full scan tracked separately
     "scripts/audit_deploy_coverage.py", # deploy-route census (informational)
 ]
 
