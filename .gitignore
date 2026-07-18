@@ -48,3 +48,9 @@ scripts/.tiderider_perp_cache.json
 # NOTE: .claude/settings.local.json stays TRACKED on purpose (15-Jul #55/#56:
 # it mirrors the claude-code-remote allowlist to every checkout).
 scripts/.*.json
+
+# test artifacts
+.coverage
+.pytest_cache/
+htmlcov/
+__pycache__/
