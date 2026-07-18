@@ -17,6 +17,7 @@ import os
 import json
 import time
 import base64
+import hmac
 import html
 import threading
 import datetime as dt
@@ -113,9 +114,15 @@ _WATERMARK_TILE_SVG = (
 WATERMARK_HTML = f'<div class="wm" aria-hidden="true">{_WATERMARK_TILE_SVG}</div>'
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
-# Login for THIS dashboard page (override via env on Railway).
+# Login for THIS dashboard page. Set DASH_PASS via env on the Railway service.
+# [2026-07-18] The password is NOT committed, and auth FAILS CLOSED when it is
+# unset. A real-money console (live positions + kill-switch surface) must never
+# ship a working default: the previous committed default ("freqbot2026") was
+# found live on the production service, which set no override, so the password
+# effectively sat in git. No secret configured now => no access, never a
+# guessable one. DASH_USER stays defaulted (a username is not a secret).
 DASH_USER = os.environ.get("DASH_USER", "eamon")
-DASH_PASS = os.environ.get("DASH_PASS", "freqbot2026")
+DASH_PASS = os.environ.get("DASH_PASS", "")
 
 # [2026-07-11 SWAP] Decommissioned venue rows — hidden from the grid and every
 # feed so a retired bot can't sit next to its replacement and confuse the LIVE
@@ -3972,6 +3979,8 @@ restrict-only. Auto-refreshes every 5 min. Times UTC. Not financial advice.</foo
 
 class H(BaseHTTPRequestHandler):
     def _auth_ok(self):
+        if not DASH_PASS:            # no secret configured -> deny everyone
+            return False
         hdr = self.headers.get("Authorization", "")
         if not hdr.startswith("Basic "):
             return False
@@ -3979,7 +3988,8 @@ class H(BaseHTTPRequestHandler):
             u, p = base64.b64decode(hdr[6:]).decode().split(":", 1)
         except Exception:
             return False
-        return u == DASH_USER and p == DASH_PASS
+        # constant-time compare on the password (the secret); username plain
+        return u == DASH_USER and hmac.compare_digest(p, DASH_PASS)
 
     def _no_cache(self):
         """Forbid any browser/proxy caching. The snapshot is regenerated on every
