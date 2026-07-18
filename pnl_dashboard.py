@@ -2054,7 +2054,7 @@ async function botAdmin(action, bot){
 
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="30">
+<noscript><meta http-equiv="refresh" content="30"></noscript>
 <title>All Bots — Live P&amp;L</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2123,6 +2123,12 @@ async function botAdmin(action, bot){
  .dot{{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:4px}}
  .dot.on{{background:#1a7f37;box-shadow:0 0 6px #1a7f37}} .dot.off{{background:#d1242f;box-shadow:0 0 6px #d1242f}} .dot.warn{{background:#b8860b;box-shadow:0 0 6px #b8860b}}
  footer{{padding:10px 18px;color:#5b7184;font-size:11px}}
+ /* [2026-07-18] live-station heartbeat */
+ .hbwrap{{display:inline-flex;align-items:center;gap:5px;font-weight:600}}
+ .hb{{width:9px;height:9px;border-radius:50%;background:#8b949e;display:inline-block;
+   box-shadow:0 0 0 0 rgba(46,160,67,.5);animation:hbpulse 2s infinite}}
+ @keyframes hbpulse{{0%{{box-shadow:0 0 0 0 rgba(46,160,67,.45)}}
+   70%{{box-shadow:0 0 0 6px rgba(46,160,67,0)}}100%{{box-shadow:0 0 0 0 rgba(46,160,67,0)}}}}
  /* [2026-07-13] Manage bots panel */
  .manage{{margin:6px 14px 0;border:1px solid #caa227;border-radius:10px;
    background:#ffffffd9;font-size:13px}}
@@ -2140,6 +2146,7 @@ async function botAdmin(action, bot){
  .mbtn.del:hover{{background:#ffe3e3}}
 </style></head><body>
 {WATERMARK_HTML}
+<div id="station">
 <header>
  <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a> &nbsp;·&nbsp; <a href="/vitals" style="color:#58a6ff;font-size:14px">health →</a></h1>
  <div class="totals">
@@ -2157,9 +2164,11 @@ async function botAdmin(action, bot){
 {health_html}
 {live_section}
 {sections_html}
+</div>
 {manage_html}
-<footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
+<footer><span class="hbwrap"><span id="hb" class="hb" title="live"></span> <span class="hbtxt">live</span> · <span id="hbage">updated 0s ago</span></span> · Reads the shared bot_pnl Postgres table. Live-updating (in-place, no reload). Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
+{live_js("station")}
 </body></html>'''
 
 
@@ -2707,6 +2716,109 @@ def render_vitals():
 </div>
 <footer class="muted" style="padding:10px 18px">Auto-refreshes 60s · machine feed at /vitals.json (no auth) · times UTC.</footer>
 </body></html>'''
+
+
+def fetch_tick():
+    """The cheapest possible "has anything changed?" signal for the live page.
+
+    ONE round-trip, two indexed MAX(updated_at) reads over the tables that feed
+    every card — bot_pnl (all bot rows) and bot_state (every organ). Returns
+    {"v": <latest epoch>, "t": <server now epoch>}. The client polls THIS every
+    few seconds and only re-fetches the full page when `v` moves, so the
+    expensive full render runs about as often as data actually changes — not on
+    a fixed timer. That keeps DB load at or below today's blanket 30s
+    meta-refresh while making the page feel live.
+
+    Fail-OPEN: on any error it returns `v=None`, which the client treats as
+    "can't tell — refresh anyway on the slow fallback". A dashboard that can't
+    prove data is fresh must not pretend it is (an operating station shows when
+    it's blind), but it also must never freeze — hence the fallback."""
+    import psycopg2
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT extract(epoch from GREATEST("
+                    "  (SELECT max(updated_at) FROM bot_pnl),"
+                    "  (SELECT max(updated_at) FROM bot_state)))")
+                row = cur.fetchone()
+                v = float(row[0]) if row and row[0] is not None else None
+        finally:
+            conn.close()
+        return {"v": v, "t": time.time()}
+    except Exception:
+        return {"v": None, "t": time.time()}
+
+
+# [2026-07-18] LIVE STATION — turn the auto-refreshing page into a real
+# operating console. Replaces the blunt full-page `<meta http-equiv=refresh>`
+# (which reloads everything, flickers, and drops your scroll position) with an
+# in-place morph: poll the cheap /tick.json, and only when the data version
+# changes, fetch the page and swap the #station container's innerHTML. Every
+# item updates, nothing flickers, scroll is kept.
+#
+# DESIGN NOTES (each earned):
+#  * The poller lives OUTSIDE #station. innerHTML assignment does not execute
+#    <script> tags, so morphing #station can never kill the loop driving it.
+#  * <noscript> keeps a slow meta-refresh, so a JS-off browser still updates.
+#  * A HEARTBEAT shows live / stale / OFFLINE — an operating station must show
+#    when it has stopped seeing the fleet, never present old data as current.
+#  * FAIL-SAFE: if /tick.json errors repeatedly the page force-reloads on a slow
+#    timer, so a broken poller degrades to today's behaviour, never to a frozen
+#    screen watching real money.
+#  * A 1-second "updated Ns ago" ticker makes liveness visible between morphs.
+LIVE_POLL_MS = int(os.environ.get("DASH_LIVE_POLL_MS", "5000"))
+LIVE_FALLBACK_MS = int(os.environ.get("DASH_LIVE_FALLBACK_MS", "60000"))
+
+
+def live_js(container="station"):
+    """Vanilla-JS live updater for a page whose morphable content is in
+    `#<container>`. No dependencies, no build step. Same script on every page."""
+    return f'''<script>
+(function(){{
+  var POLL={LIVE_POLL_MS}, FB={LIVE_FALLBACK_MS}, ID="{container}";
+  var last=null, lastOk=Date.now(), fails=0, busy=false;
+  var hb=document.getElementById("hb"), age=document.getElementById("hbage");
+  function beat(state){{
+    if(!hb) return;
+    var m={{live:["#2ea043","live"],stale:["#d29922","reconnecting…"],
+            off:["#f85149","OFFLINE — not updating"]}}[state]||["#8b949e","…"];
+    hb.style.background=m[0]; hb.title=m[1];
+    var t=hb.nextElementSibling; if(t&&t.classList.contains("hbtxt")) t.textContent=m[1];
+  }}
+  async function morph(){{
+    var r=await fetch(location.href,{{cache:"no-store",headers:{{"X-Live":"1"}}}});
+    if(!r.ok) throw new Error("http "+r.status);
+    var t=await r.text();
+    var doc=new DOMParser().parseFromString(t,"text/html");
+    var fresh=doc.getElementById(ID), cur=document.getElementById(ID);
+    if(fresh&&cur&&fresh.innerHTML!==cur.innerHTML) cur.innerHTML=fresh.innerHTML;
+    lastOk=Date.now();
+  }}
+  async function tick(){{
+    if(busy) return; busy=true;
+    try{{
+      var r=await fetch("/tick.json",{{cache:"no-store"}});
+      var j=await r.json(); fails=0; beat("live");
+      if(j.v===null||j.v!==last){{ last=j.v; await morph(); }}
+    }}catch(e){{
+      fails++; beat(fails>2?"off":"stale");
+      // fail-safe: a persistently blind poller must not leave a frozen page
+      if(Date.now()-lastOk>FB){{ location.reload(); }}
+    }}finally{{ busy=false; }}
+  }}
+  function ageTick(){{
+    if(!age) return;
+    var s=Math.max(0,Math.round((Date.now()-lastOk)/1000));
+    age.textContent=s<60?("updated "+s+"s ago"):("updated "+Math.floor(s/60)+"m ago");
+  }}
+  document.addEventListener("visibilitychange",function(){{
+    if(!document.hidden) tick(); // catch up instantly when the tab refocuses
+  }});
+  setInterval(tick,POLL); setInterval(ageTick,1000); tick();
+}})();
+</script>'''
 
 
 def fetch_states(keys):
@@ -3752,6 +3864,14 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/health"):
             self.send_response(200); self._no_cache(); self.end_headers(); self.wfile.write(b"ok"); return
+        if self.path.startswith("/tick.json"):
+            # [2026-07-18] the live-station change signal — cheap, no auth (no
+            # secrets: it is a single timestamp). The page polls this to decide
+            # whether to re-fetch; keeping it public + tiny is the whole point.
+            body = json.dumps(fetch_tick()).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body); return
         if self.path.startswith("/watchdog.json"):
             # [2026-07-13 BRANCH MERGE] In-service fleet watchdog state
             # (fleet_watchdog_svc daemon thread) — ported from the main-branch
