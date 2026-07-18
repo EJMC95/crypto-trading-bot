@@ -113,10 +113,127 @@ def test_cash_move_escape_accepts_a_deposit():
     assert v.accepted and v.reason == "ok"
 
 
-def test_cash_escape_disabled_without_discriminating_upnl():
-    # Same $30 jump, but |sum(upnl)| is within tolerance, so collateral==total
-    # semantics are indistinguishable and the escape must stay OFF -> reject.
+def test_deposit_heals_via_collateral_stable_rebase_on_drifting_book():
+    # [2026-07-18] The regression that stuck the LIVE Funding Farmer + Ticket
+    # Taker at equity=None after a deposit. The raw-total rebase can't fire here
+    # because the total drifts with mids (|upnl| swings on the order of tol) while
+    # |upnl| stays under tol so the cash-move escape also stays off. The
+    # collateral-stable rebase heals it: collateral is fixed at the new balance,
+    # so after `rebase_after` consistent continuity rejects the guard re-baselines.
+    mids = {"BTC": 100.0}
+    g = _guard(mids)   # cached=mids (mutable) so we can drift the book per read
+    assert g.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    accepted = reason = None
+    for m in (99.4, 100.6, 99.5):          # wobble < $1 -> |upnl| < tol, total drifts > tol
+        mids["BTC"] = m
+        upnl = round(m - 100.0, 4)
+        v = g.evaluate(round(130.0 + upnl, 4), 130.0, {"BTC": _pos(1, 100, upnl=upnl)})
+        accepted, reason = v.accepted, v.reason
+    assert accepted and reason == "rebase"
+    assert g._last["equity"] == 129.5      # re-baselined at the fresh correct equity
+
+
+def test_transient_collateral_glitch_shorter_than_rebase_does_not_heal():
+    # Persistence gate: a phantom collateral level that reverts within
+    # `rebase_after` reads must NOT rebase (it is not a real cash move).
     g = _guard({"BTC": 100.0})
+    assert g.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    for _ in range(2):                     # 2 < rebase_after(3): glitch, not yet trusted
+        v = g.evaluate(60.0, 60.0, {"BTC": _pos(1, 100, upnl=0.0)})
+        assert not v.accepted and v.reason == "continuity"
+    v = g.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)})   # reverts to truth
+    assert v.accepted and v.reason == "ok"
+    assert g._last["equity"] == 100.0      # never re-baselined onto the glitch
+
+
+def test_dark_book_does_not_collateral_stable_rebase():
+    # Adversarial-review hole (closed): if mids are dark for every held coin,
+    # STEP 1 can't corroborate upnl, so total == collateral + upnl is only a
+    # venue-INTERNAL identity a phantom upnl move satisfies. The collateral-stable
+    # rebase must NOT fire — the bot stays equity-unreadable rather than trusting
+    # an uncorroborated total.
+    g = _guard(cached={})                  # no mids, ever
+    assert g.evaluate(1000.0, 1000.0, {"BTC": _pos(1, 1000, upnl=0.0)}).accepted
+    # collateral held stable at 1000, but total wanders via a phantom upnl
+    for total, upnl in ((800.0, -200.0), (760.0, -240.0), (830.0, -170.0)):
+        v = g.evaluate(total, 1000.0, {"BTC": _pos(1, 1000, upnl=upnl)})
+        assert not v.accepted and v.reason == "continuity"
+    assert g._last["equity"] == 1000.0     # never rebased onto the phantom
+
+
+def test_partial_darkness_phantom_leg_does_not_rebase():
+    # Adversarial-review hole (closed): a tiny-notional coin kept dark can carry
+    # an UNBOUNDED phantom upnl past STEP 1 while a big readable coin makes the
+    # notional coverage look ~full. The rebase requires EVERY held coin's mid to
+    # be readable, so a single dark leg blocks it.
+    mids = {"A": 1000.0}                    # coin B has no mid -> dark
+    g = _guard(mids)
+    base = {"A": _pos(0.1, 1000, upnl=0.0), "B": _pos(0.002, 500, upnl=0.0)}
+    assert g.evaluate(100.0, 100.0, base).accepted
+    # collateral stable at 100; B injects a growing phantom upnl; A stays true
+    for tot, ub in ((110.0, 10.0), (120.0, 20.0), (130.0, 30.0)):
+        pos = {"A": _pos(0.1, 1000, upnl=0.0), "B": _pos(0.002, 500, upnl=ub)}
+        v = g.evaluate(tot, 100.0, pos)
+        assert not v.accepted and v.reason == "continuity"
+    assert g._last["equity"] == 100.0      # phantom on the dark leg never trusted
+
+
+def test_legacy_restore_without_entries_still_heals_deposit():
+    # A guard restored from a PRE-FIX snapshot (no 'entries' key) must still heal
+    # a deposit — otherwise this fix would re-strand the currently-stuck bots on
+    # the very deploy that ships it. entries_match degrades gracefully until the
+    # first fresh accept records entries.
+    st = {"ts": T - 600.0, "equity": 100.0, "collateral": 100.0,
+          "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}}     # legacy: no 'entries'
+    mids = {"BTC": 100.0}
+    g = _guard(mids, load_state=lambda: st)
+    assert g.has_state and not g._last.get("entries")        # restored without entries
+    accepted = reason = None
+    for m in (99.4, 100.6, 99.5):
+        mids["BTC"] = m
+        upnl = round(m - 100.0, 4)
+        v = g.evaluate(round(130.0 + upnl, 4), 130.0, {"BTC": _pos(1, 100, upnl=upnl)})
+        accepted, reason = v.accepted, v.reason
+    assert accepted and reason == "rebase"      # healed despite the missing baseline entries
+
+
+def test_entry_corruption_phantom_does_not_rebase():
+    # Adversarial-review hole (closed): STEP 1's gap cancels entry, so a venue
+    # that lowers a held position's reported ENTRY and raises its upnl by the
+    # matching amount keeps gap=0 (passes the mark check) while injecting an
+    # unbounded phantom into total = collateral + sum(upnl). A held entry is
+    # fixed, so the rebase requires it match the trusted baseline entry.
+    mids = {"A": 50.0, "B": 100.0}
+    g = _guard(mids)
+    base = {"A": _pos(2, 50, upnl=0.0), "B": _pos(1, 100, upnl=0.0)}
+    assert g.evaluate(200.0, 200.0, base).accepted   # equity 200 = collateral 200
+    # collateral stable 200; A's real mid rises; B injects a phantom via a
+    # LOWERED reported entry (100->70) with matching upnl so gap_B stays 0.
+    for amid in (55.0, 60.0, 65.0):
+        mids["A"] = amid
+        ua = round(2 * (amid - 50.0), 4)             # A's real upnl
+        pos = {"A": _pos(2, 50, upnl=ua),
+               "B": _pos(1, 70, upnl=30.0)}          # entry 100->70, phantom upnl +30
+        v = g.evaluate(round(200.0 + ua + 30.0, 4), 200.0, pos)
+        assert not v.accepted and v.reason == "continuity"
+    assert g._last["equity"] == 200.0      # phantom via corrupted entry never trusted
+
+
+def test_corrupt_total_with_unchanged_collateral_still_rejects():
+    # The dislocation this guard exists for: total_asset_value jumps but
+    # collateral does NOT move to explain it -> the mark-verified escape must
+    # NOT fire (d_total != d_collateral).
+    g = _guard({"BTC": 100.0})
+    assert g.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    v = g.evaluate(70.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)})  # collateral unchanged
+    assert not v.accepted and v.reason == "continuity"
+
+
+def test_deposit_without_verified_marks_still_rejects():
+    # A collateral-matched jump but the marks were NOT verifiable (book mids
+    # unreadable this read) and |upnl| is small -> no positive cash evidence,
+    # so it must still reject rather than accept an unverified equity.
+    g = _guard(cached={})                     # no mids readable at all
     assert g.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
     v = g.evaluate(130.0, 130.0, {"BTC": _pos(1, 100, upnl=0.0)})
     assert not v.accepted and v.reason == "continuity"

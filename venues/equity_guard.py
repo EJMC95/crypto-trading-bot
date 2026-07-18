@@ -140,6 +140,15 @@ class EquityGuard:
                                        if st.get("collateral") is not None else None),
                         "mids": {str(k): float(v) for k, v in (st.get("mids") or {}).items()},
                         "sizes": {str(k): float(v) for k, v in (st.get("sizes") or {}).items()},
+                        # [2026-07-18] entries MUST survive the redeploy too, or
+                        # the collateral-stable rebase's entries_match gate is
+                        # permanently False post-restart and the deposit-stuck
+                        # symptom returns on the very deploy that ships the fix.
+                        # Legacy snapshots have no entries -> {}; entries_match
+                        # degrades gracefully (below) until the first fresh accept.
+                        "entries": {str(k): float(v)
+                                    for k, v in (st.get("entries") or {}).items()
+                                    if v is not None},
                     }
                     log.info("equity guard: restored last accepted read $%.2f "
                              "(age %.0f min)", self._last["equity"], age / 60.0)
@@ -176,8 +185,7 @@ class EquityGuard:
                 mids = {**mids, **fresh}
                 problem = self._judge(now, venue_total, collateral, held, mids)
         if problem is None:
-            return self._accept(now, venue_total, collateral, mids,
-                                {c: p["size"] for c, p in held.items()}, "ok")
+            return self._accept(now, venue_total, collateral, mids, held, "ok")
         return self._reject(now, venue_total, collateral, held, mids, problem)
 
     # -- checks ------------------------------------------------------------------
@@ -226,7 +234,8 @@ class EquityGuard:
                 # collateral just tracks total this would be a hole. The proof
                 # needs discriminating power: with |sum(upnl)| inside tolerance
                 # both semantics satisfy the identity, so the escape stays OFF
-                # (a real deposit then heals via rebase instead — slower, safe).
+                # (a real deposit then heals via the COLLATERAL-STABLE rebase in
+                # _reject — persistence-gated, robust to book drift, safe).
                 cash_like = (collateral is not None
                              and last.get("collateral") is not None
                              and upnl_all
@@ -252,14 +261,22 @@ class EquityGuard:
                    for c in cur)
 
     # -- verdicts ----------------------------------------------------------------
-    def _accept(self, now, venue_total, collateral, mids, sizes, reason):
+    def _accept(self, now, venue_total, collateral, mids, held, reason):
         if self._rejects:
             log.info("equity guard: read accepted after %d reject(s).",
                      len(self._rejects))
         self._rejects = []
+        # [2026-07-18] entries stored alongside sizes: a held position's entry is
+        # FIXED, so the collateral-stable rebase can require the current payload
+        # entry to match this trusted baseline. Without it, STEP 1's mark check
+        # cancels entry (gap = upnl - size*(mid-entry)) so a venue that corrupts
+        # upnl AND entry together keeps gap=0 while injecting an unbounded phantom
+        # into total = collateral + sum(upnl) (adversarial review, MEDIUM).
         self._last = {"ts": now, "equity": float(venue_total),
                       "collateral": (float(collateral) if collateral is not None else None),
-                      "mids": dict(mids), "sizes": dict(sizes)}
+                      "mids": dict(mids),
+                      "sizes": {c: p["size"] for c, p in held.items()},
+                      "entries": {c: p.get("entry") for c, p in held.items()}}
         if self._save is not None:
             try:
                 self._save(self._last)
@@ -269,23 +286,93 @@ class EquityGuard:
 
     def _reject(self, now, venue_total, collateral, held, mids, problem):
         reason, detail = problem
-        self._rejects.append((now, float(venue_total), reason))
+        self._rejects.append((now, float(venue_total),
+                              float(collateral) if collateral is not None else None,
+                              reason))
         # self-heal: the venue's number is what margining actually runs on, so
         # N consecutive SELF-CONSISTENT prints eventually win over our model.
         # mark_gap rejects carry live counter-evidence (book vs marks) so their
         # bar is 4x higher, but even they concede rather than blind the rail
         # forever.
         need = self.rebase_after * (4 if reason == "mark_gap" else 1)
-        vals = [v for _, v, _ in self._rejects[-need:]]
+        recent = self._rejects[-need:]
+        vals = [v for _, v, _c, _r in recent]
         gross = sum(abs(p["size"]) * (mids.get(c) or p.get("entry") or 0.0)
                     for c, p in held.items())
-        if (len(self._rejects) >= need
-                and max(vals) - min(vals) <= self.tolerance(gross, venue_total)):
-            log.error("equity guard: %d consecutive consistent rejects — REBASING "
-                      "to venue value $%.2f (last: %s).",
-                      len(self._rejects), venue_total, detail)
-            return self._accept(now, venue_total, collateral, mids,
-                                {c: p["size"] for c, p in held.items()}, "rebase")
+        tol = self.tolerance(gross, venue_total)
+        total_stable = max(vals) - min(vals) <= tol
+
+        # [2026-07-18] COLLATERAL-STABLE rebase. total_stable compares raw TOTALS,
+        # which drift with mids — so on a normally-volatile book it never fires
+        # when |upnl| swings on the order of tol, and a deposit-induced continuity
+        # reject leaves the bot equity-BLIND indefinitely. MEASURED: a live
+        # operator deposit stuck BOTH real-money bots (Funding Farmer + Ticket
+        # Taker) at equity=None until their guard state was cleared by hand;
+        # equity=None also disables the daily-loss rail (it needs a non-None
+        # equity), so the stuck state is itself a real-money hazard.
+        # Collateral is the LEDGER cash figure — it does NOT drift with mids — so
+        # a genuine deposit yields a STABLE collateral series while a transient
+        # glitch reverts within `need` reads. Rebase when, across `need`
+        # consecutive CONTINUITY rejects (not mark_gap — that is a marks-vs-book
+        # disagreement, unrelated to cash), collateral has been stable AND the
+        # current total is consistent with collateral + sum(upnl). The identity
+        # gate means a total-ONLY dislocation (total glitches, collateral stays,
+        # identity broken) still does NOT rebase this way — only a persistent,
+        # ledger-consistent cash level does, and `need` reads of persistence is
+        # the same bar the total-stable path already trusts.
+        colls = [c for _, _v, c, _r in recent if c is not None]
+        upnl_all = bool(held) and all(p.get("upnl") is not None for p in held.values())
+        upnl_sum = sum(p["upnl"] for p in held.values() if p.get("upnl") is not None)
+        identity_ok = (collateral is not None and upnl_all
+                       and abs(venue_total - (collateral + upnl_sum)) <= tol)
+        # [2026-07-18] marks_corroborated: identity_ok only proves the
+        # venue-INTERNAL identity total == collateral + sum(upnl); a upnl-side
+        # mismark satisfies it too. It is trustworthy ONLY when EVERY held coin's
+        # mark was cross-checked against the live book this read (STEP 1 ran over
+        # all of them; reason=='continuity' means it AGREED). A NOTIONAL-coverage
+        # bound is NOT enough: a dark coin's phantom upnl = size*(mark-entry) is
+        # UNBOUNDED by its notional (size*entry), so one dark low-notional leg can
+        # inject an arbitrarily large uncorroborated phantom while covered_now
+        # still ~= gross (adversarial review, HIGH). Require a readable mid for
+        # EVERY held coin. Fail-safe: any dark leg keeps the bot equity-unreadable
+        # rather than trusting a total a phantom could hide inside.
+        marks_corroborated = bool(held) and all(mids.get(c) for c in held)
+        # [2026-07-18] entries_match: STEP 1 cancels entry, so identity_ok +
+        # marks_corroborated verify mark==mid but NOT that entry is real — a
+        # venue that corrupts upnl AND entry together (gap held at 0) injects an
+        # unbounded phantom into total = collateral + sum(upnl) (adversarial
+        # review, MEDIUM). A HELD position's entry is fixed, so require every
+        # current entry to match the entry recorded at the last accepted read.
+        # Graceful degradation: a baseline with NO stored entries (a legacy
+        # pre-fix snapshot restored across a redeploy, or a not-yet-accepted
+        # guard) cannot verify entry — skip the check rather than block the
+        # rebase forever, which would re-strand a deposit-stuck bot on the very
+        # deploy that ships this fix. The first fresh accept records entries and
+        # the check re-arms. During that transient the (non-live-exploitable,
+        # USD-clip-sized bots) entry edge is briefly open — an acceptable trade
+        # for not re-breaking the incident this whole path exists to fix.
+        last_entries = (self._last or {}).get("entries") or {}
+        entries_match = (not last_entries) or all(
+            last_entries.get(c) is not None and p.get("entry") is not None
+            and abs(float(p["entry"]) - float(last_entries[c]))
+            <= 1e-6 * max(1.0, abs(float(last_entries[c])))
+            for c, p in held.items())
+        # With entries pinned to the trusted baseline, marks corroborated for
+        # every coin, and sizes unchanged, the rebased equity = collateral +
+        # book-corroborated upnl; the only residual error is O(tol) (STEP 1 and
+        # identity_ok each carry a directional tol of slack that can stack to
+        # ~2*tol) plus a PERSISTENT collateral corruption — the same tradeoff the
+        # total-stable path already makes, not an unbounded phantom injection.
+        coll_stable = (reason == "continuity" and len(colls) >= need
+                       and max(colls) - min(colls) <= tol
+                       and identity_ok and marks_corroborated and entries_match)
+
+        if len(self._rejects) >= need and (total_stable or coll_stable):
+            how = "collateral-stable" if (coll_stable and not total_stable) else "consistent"
+            log.error("equity guard: %d consecutive %s rejects — REBASING to "
+                      "venue value $%.2f (last: %s).",
+                      len(self._rejects), how, venue_total, detail)
+            return self._accept(now, venue_total, collateral, mids, held, "rebase")
         log.warning("equity guard: REJECT #%d (%s) — %s",
                     len(self._rejects), reason, detail)
         return Verdict(False, None, reason, detail)
