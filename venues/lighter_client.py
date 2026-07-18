@@ -203,7 +203,8 @@ class LighterClient(VenueClient):
 
     def __init__(self, net: str = "mainnet", with_signer: bool = False,
                  governor: TxBudgetGovernor | None = None,
-                 guard_state_key: str | None = None):
+                 guard_state_key: str | None = None,
+                 guard_persist_reject_streak: bool = False):
         try:
             import lighter  # lazy: only lighter modes need the SDK installed
         except ImportError as e:
@@ -240,6 +241,11 @@ class LighterClient(VenueClient):
         self.signer = None
         self.account_index = None
         self._guard = None
+        # RUN-ONCE bots (Ticket Taker) set this so the guard persists its reject
+        # streak across relaunches; long-lived bots (Funding Farmer) leave it
+        # False so their memory-only streak resets on every redeploy. See
+        # EquityGuard(persist_reject_streak=...).
+        self._guard_persist_reject_streak = bool(guard_persist_reject_streak)
         if with_signer:
             self._init_signer()
             self.sends_orders = True
@@ -477,7 +483,8 @@ class LighterClient(VenueClient):
             mids_cached=lambda coins: mid_map(self, coins),
             mids_fresh=lambda coins: {c: m for c in coins
                                       if (m := self._mid_fresh(c))},
-            load_state=load, save_state=save)
+            load_state=load, save_state=save,
+            persist_reject_streak=self._guard_persist_reject_streak)
 
     def _mid_fresh(self, coin):
         """Force-fresh REST book mid (bypasses ws + TTL caches) — dislocation

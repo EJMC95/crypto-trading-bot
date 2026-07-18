@@ -328,3 +328,275 @@ def test_state_restore_ignores_stale_snapshot():
           "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}}
     g = _guard({"BTC": 100.0}, load_state=lambda: st)
     assert not g.has_state           # >7d old snapshot proves nothing about today
+
+
+# ── run-once relaunch: the reject STREAK must survive the process boundary ────
+# [2026-07-18] The Ticket-Taker half of the deposit incident. The Taker is
+# RUN-ONCE (tickettaker_loop.sh: `python3 lighter_ticket_taker.py; sleep 300`),
+# so every cycle rebuilds the guard and self._rejects resets to []. Before the
+# streak was persisted, the N-consecutive-rejects rebase could NEVER reach N —
+# a legit deposit left the bot equity-blind (and its daily-loss rail off, since
+# that needs a non-None equity) forever, while the Farmer (a while-True process
+# with a long-lived guard) healed in minutes. These model the process boundary
+# with a fresh guard per cycle sharing ONE persisted store.
+class _Store:
+    """A dict-backed persistence like bot_state, round-tripping through JSON so
+    the reject tuples degrade to lists exactly as bot_pnl_store.save_state does."""
+    def __init__(self, initial=None):
+        import json
+        self.blob = None if initial is None else json.loads(json.dumps(initial))
+
+    def load(self):
+        return self.blob
+
+    def save(self, st):
+        import json
+        self.blob = json.loads(json.dumps(st))
+
+
+def _run_once_guard(cached, store, fresh=None, **kw):
+    """A guard as the RUN-ONCE Ticket Taker builds it (persist_reject_streak=True):
+    the reject streak survives across relaunches. Each call models one fresh
+    process reading a shared store."""
+    return _guard(cached, fresh=fresh, load_state=store.load, save_state=store.save,
+                  persist_reject_streak=True, **kw)
+
+
+def test_run_once_relaunch_resumes_streak_and_heals_deposit():
+    store = _Store()
+    mids = {"BTC": 100.0}
+    # cycle 0: an accepted baseline (pre-deposit) persists the last-accepted read.
+    g0 = _run_once_guard(mids, store)
+    assert g0.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    assert store.blob is not None and store.blob["rejects"] == []
+    # deposit lands; each RELAUNCH is a brand-new guard reading the shared store.
+    # The book drifts so the raw-total rebase can't fire — only the persisted
+    # COLLATERAL-stable streak can heal it, and only if the streak crosses the
+    # process boundary. Pre-fix this loop rejected forever.
+    outcome = None
+    for m in (99.4, 100.6, 99.5):
+        mids["BTC"] = m
+        upnl = round(m - 100.0, 4)
+        g = _run_once_guard(mids, store)
+        assert g.has_state                       # last-accepted restored each relaunch
+        outcome = g.evaluate(round(130.0 + upnl, 4), 130.0,
+                             {"BTC": _pos(1, 100, upnl=upnl)})
+    assert outcome.accepted and outcome.reason == "rebase"   # healed ACROSS processes
+    assert store.blob["rejects"] == []           # rebase cleared the persisted streak
+    assert store.blob["last"]["equity"] == 129.5
+
+
+def test_long_lived_guard_does_not_persist_reject_streak():
+    # [2026-07-18] Funding Farmer regression guard (adversarial review, HIGH). A
+    # long-lived bot's streak is memory-only and MUST reset on every redeploy;
+    # persisting it would let a dislocation spanning a `railway up` rebase onto a
+    # phantom. Persistence defaults OFF; the blob stays the flat last-accepted
+    # shape and no reject is ever written, so a relaunch resets the count.
+    store = _Store()
+    g0 = _guard({"BTC": 100.0}, load_state=store.load, save_state=store.save)  # flag default False
+    assert g0.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    assert "rejects" not in store.blob and store.blob.get("equity") == 100.0   # FLAT shape
+    for _ in range(4):                           # a dislocation across 4 relaunches
+        g = _guard({"BTC": 100.0}, load_state=store.load, save_state=store.save)
+        v = g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100)})    # continuity phantom
+        assert not v.accepted and v.reason == "continuity"    # never rebases across boundary
+        assert "rejects" not in store.blob                    # streak never persisted
+
+
+def test_run_once_does_not_launder_mark_gap_into_continuity_rebase():
+    # [2026-07-18] Adversarial review (HIGH). Persisted high-bar mark_gap rejects
+    # must not be counted at the low continuity bar. Two mark_gap rejects across
+    # relaunches, then a continuity read (a mid goes dark): the reason change
+    # resets the streak, so it must NOT rebase onto the phantom.
+    store = _Store()
+    g0 = _run_once_guard({"BTC": 100.0}, store)
+    assert g0.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    for _ in range(2):                            # book flat 100, venue phantom -25
+        g = _run_once_guard({"BTC": 100.0}, store)
+        assert g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100, upnl=-25.0)}).reason == "mark_gap"
+    g = _run_once_guard({}, store)                # BTC mid dark -> continuity, total still 75
+    v = g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100)})
+    assert not v.accepted                          # phantom NOT laundered into a rebase
+    assert g._last["equity"] == 100.0              # never re-baselined onto 75
+
+
+def test_run_once_refuses_total_stable_phantom_without_corroboration():
+    # [2026-07-18] FIX C: the run-once path heals ONLY via the corroborated
+    # coll_stable, never via bare total_stable. A stable phantom total with an
+    # UNREADABLE book (no mark corroboration) must keep the bot equity-blind.
+    store = _Store()
+    g0 = _run_once_guard({"BTC": 100.0}, store)
+    assert g0.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    for _ in range(4):                            # well past rebase_after
+        g = _run_once_guard({}, store)            # book dark every cycle
+        v = g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100)})   # total stuck 75, stable
+        assert not v.accepted and v.reason == "continuity"
+    assert store.blob["last"]["equity"] == 100.0  # never rebased onto the phantom
+
+
+def test_reason_change_resets_the_streak():
+    # [2026-07-18] A streak is "N consecutive SELF-CONSISTENT rejects": a reason
+    # change resets it, so mark_gap and continuity rejects never mix in one
+    # rebase window (this fires on the in-memory path too, not just persisted).
+    g = _baseline(_guard({"BTC": 100.0}))
+    assert g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100, upnl=-25.0)}).reason == "mark_gap"
+    assert g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100, upnl=-25.0)}).reason == "mark_gap"
+    assert len(g._rejects) == 2
+    v = g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100)})    # upnl absent -> continuity
+    assert v.reason == "continuity"
+    assert len(g._rejects) == 1                   # reset on the reason change, not 3
+    assert not v.accepted                          # so it does NOT rebase at need=3
+
+
+def test_stale_persisted_reject_streak_is_dropped():
+    # A reject streak whose newest reject is older than the max gap is not
+    # 'consecutive' with a fresh read and must not count toward a rebase.
+    old = T - eg._REJECT_STREAK_MAX_GAP_S - 1.0
+    store = _Store({
+        "last": {"ts": T - 100.0, "equity": 130.0, "collateral": 130.0,
+                 "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0},
+                 "entries": {"BTC": 100.0}},
+        "rejects": [[old, 130.0, 130.0, "continuity"],
+                    [old, 130.0, 130.0, "continuity"]],
+    })
+    g = _run_once_guard({"BTC": 100.0}, store)
+    assert g.has_state                # last-accepted still restored (within 7d)
+    assert g._rejects == []           # stale streak dropped — starts the count fresh
+
+
+def test_persisted_streak_breaks_on_a_wide_gap():
+    # Two rejects separated by more than the max gap are not 'consecutive': only
+    # the contiguous recent run survives, so a dead episode can't be stitched to
+    # a fresh reject a relaunch later.
+    store = _Store({
+        "last": {"ts": T - 100.0, "equity": 130.0, "collateral": 130.0,
+                 "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}, "entries": {"BTC": 100.0}},
+        "rejects": [[T - eg._REJECT_STREAK_MAX_GAP_S - 100.0, 130.0, 130.0, "continuity"],
+                    [T - 50.0, 130.0, 130.0, "continuity"]],
+    })
+    g = _run_once_guard({"BTC": 100.0}, store)
+    assert [r[0] for r in g._rejects] == [T - 50.0]   # only the recent reject survived
+
+
+def test_accept_clears_persisted_reject_streak():
+    # A transient reject episode that resolves must not leave a lingering streak
+    # in the store that a later, unrelated reject could ride to a false rebase.
+    store = _Store()
+    g1 = _run_once_guard({"BTC": 100.0}, store)
+    assert g1.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    g2 = _run_once_guard({"BTC": 100.0}, store)
+    assert not g2.evaluate(70.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    assert store.blob["rejects"]                 # one reject persisted
+    g3 = _run_once_guard({"BTC": 100.0}, store)
+    assert g3.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    assert store.blob["rejects"] == []           # cleared on the next accept
+
+
+def test_new_wrapped_blob_restores_last_accepted():
+    # The last-accepted read must restore from the new {"last":…, "rejects":…}
+    # shape just as it did from the old flat blob.
+    store = _Store({
+        "last": {"ts": T - 300.0, "equity": 100.0, "collateral": 100.0,
+                 "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0},
+                 "entries": {"BTC": 100.0}},
+        "rejects": [],
+    })
+    g = _run_once_guard({"BTC": 100.0}, store)
+    assert g.has_state and g._last["equity"] == 100.0 and g._last["entries"] == {"BTC": 100.0}
+
+
+# ── legacy no-entries blob on the RUN-ONCE path: the deploy-blocker pair ──────
+# [2026-07-18] Adversarial review (HIGH/CRITICAL, reproduced end-to-end): the
+# live Taker's first post-deploy blob is the OLD flat shape with no `entries`,
+# so entries_match degraded to True and an entry+upnl lockstep phantom rebased
+# +13% into the daily-loss rail. The discriminator that closes it: a genuine
+# deposit MOVES ledger collateral away from the trusted baseline; the lockstep
+# phantom keeps collateral flat (its injection rides upnl). These two tests are
+# the REQUIRED pair — the phantom must reject AND the honest deposit must heal;
+# a fix that trades one for the other reintroduces a closed incident.
+_LEGACY_2COIN = {"ts": T - 600.0, "equity": 200.0, "collateral": 200.0,
+                 "mids": {"A": 50.0, "B": 100.0}, "sizes": {"A": 2.0, "B": 1.0}}
+
+
+def test_legacy_blob_run_once_entry_corruption_phantom_rejects():
+    # Baseline (legacy, no entries): 2 A @50 + 1 B @100, equity=collateral=200.
+    # Venue corrupts B's entry 100->70 with matching phantom upnl +30 (STEP 1's
+    # gap stays 0); collateral held FLAT at 200. Each relaunch is a fresh guard
+    # sharing the store. Must never rebase onto the phantom.
+    store = _Store(dict(_LEGACY_2COIN))
+    mids = {"A": 50.0, "B": 100.0}
+    for amid in (55.0, 60.0, 65.0, 70.0):
+        mids["A"] = amid
+        ua = round(2 * (amid - 50.0), 4)               # A's real upnl
+        pos = {"A": _pos(2, 50, upnl=ua),
+               "B": _pos(1, 70, upnl=30.0)}            # corrupted entry + phantom
+        g = _run_once_guard(mids, store)
+        v = g.evaluate(round(200.0 + ua + 30.0, 4), 200.0, pos)
+        assert not v.accepted, "lockstep phantom must NOT rebase on a legacy blob"
+    # the trusted baseline never moved onto the phantom
+    blob = store.blob
+    last = blob.get("last") if isinstance(blob, dict) and "last" in blob else blob
+    assert last["equity"] == 200.0
+
+
+def test_legacy_blob_run_once_honest_deposit_still_heals():
+    # Same legacy no-entries shape, but an HONEST $30 deposit: collateral moves
+    # 100 -> 130 (ledger cash), book drifts so only coll_stable can heal. The
+    # discriminator must let this through — collateral moved from baseline.
+    store = _Store({"ts": T - 600.0, "equity": 100.0, "collateral": 100.0,
+                    "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}})
+    mids = {"BTC": 100.0}
+    outcome = None
+    for m in (99.4, 100.6, 99.5):
+        mids["BTC"] = m
+        upnl = round(m - 100.0, 4)
+        g = _run_once_guard(mids, store)
+        assert g.has_state and not g._last.get("entries")   # legacy: no entries
+        outcome = g.evaluate(round(130.0 + upnl, 4), 130.0,
+                             {"BTC": _pos(1, 100, upnl=upnl)})
+    assert outcome.accepted and outcome.reason == "rebase"
+    # and the healing rebase re-armed entry verification for the next episode
+    assert store.blob["last"]["entries"] == {"BTC": 100.0}
+
+
+def test_future_timestamped_reject_does_not_break_streak_restore():
+    # A future-stamped reject (clock skew / corrupt blob) must be dropped, not
+    # anchor the walk and orphan the genuine recent streak behind it.
+    store = _Store({
+        "last": {"ts": T - 600.0, "equity": 130.0, "collateral": 130.0,
+                 "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}, "entries": {"BTC": 100.0}},
+        "rejects": [[T - 300.0, 130.0, 130.0, "continuity"],
+                    [T - 20.0, 130.0, 130.0, "continuity"],
+                    [T + 7200.0, 130.0, 130.0, "continuity"]],   # future junk
+    })
+    g = _run_once_guard({"BTC": 100.0}, store)
+    assert [r[0] for r in g._rejects] == [T - 300.0, T - 20.0]
+
+
+# ── flag wiring: run-once bots opt in, long-lived bots stay memory-only ───────
+def test_persist_flag_wiring():
+    """The persist flag is load-bearing at three sites; none is covered by any
+    runtime test (the live client needs the signer SDK), so pin the wiring:
+      * EquityGuard defaults persist_reject_streak=False (long-lived-safe);
+      * LighterClient defaults guard_persist_reject_streak=False and threads it
+        into the guard;
+      * the Ticket Taker (run-once) passes it; venue_context (the Funding
+        Farmer's path) does NOT, so the Farmer keeps the default False."""
+    import inspect
+    from pathlib import Path
+    import venues.lighter_client as lc
+
+    assert inspect.signature(EquityGuard.__init__).parameters[
+        "persist_reject_streak"].default is False
+    assert inspect.signature(lc.LighterClient.__init__).parameters[
+        "guard_persist_reject_streak"].default is False
+    assert "persist_reject_streak=self._guard_persist_reject_streak" in \
+        inspect.getsource(lc.LighterClient._make_guard)
+
+    root = Path(__file__).resolve().parent.parent.parent
+    taker_src = (root / "lighter_ticket_taker.py").read_text(encoding="utf-8")
+    assert "guard_persist_reject_streak=live" in taker_src, \
+        "the run-once Ticket Taker must opt in to streak persistence"
+    ctx_src = (root / "venues" / "__init__.py").read_text(encoding="utf-8")
+    assert "guard_persist_reject_streak" not in ctx_src, \
+        "venue_context (Funding Farmer) must keep the default False"
