@@ -2,6 +2,13 @@
 hyperliquid-python-sdk>=0.9.0
 eth-account>=0.10.0
 numpy>=1.24
+# [2026-07-18] regime_oracle.py hard-imports pandas at module load (used for its
+# rolling stats). In production it runs in the freqtrade image, whose
+# freqtradeorg/freqtrade base already bundles pandas — so this was satisfied only
+# IMPLICITLY, and an undeclared dep is the born-dark shape one layer out (the
+# audit_image_imports guard sees repo files, not pip wheels). Pinned explicitly
+# so the dependency is declared, not inherited by luck.
+pandas>=2.0
 ccxt>=4.2.0
 psycopg2-binary>=2.9   # shared P&L publisher (bot_pnl_store) + pnl_dashboard
 # [2026-07-17] PINNED — this wheel SIGNS REAL ORDERS (SignerClient,

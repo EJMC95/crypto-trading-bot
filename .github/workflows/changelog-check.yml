@@ -42,6 +42,22 @@ jobs:
       - name: The guard must still be able to see (negative fixture)
         run: python3 scripts/audit_sdk_pin.py --selftest
 
+  venue-purity:
+    name: LIGHTER-FIRST (no foreign market data in shipped code)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-18] The LIGHTER-FIRST rule (CLAUDE.md, user decision 14-Jul)
+      # had a detective control since 17-Jul but it was never wired in, so it
+      # rotted red on main unnoticed. Now enforced on SHIPPED code: every
+      # foreign market-data source must be Lighter, infrastructure, or DECLARED
+      # in VENUE_PURITY_OK. The backtest section stays ADVISORY (does not fail
+      # the build) — that triage is a separate, larger effort.
+      - name: Shipped code must trade the venue it measures
+        run: python3 scripts/audit_venue_purity.py
+      - name: The guard must still be able to see (negative fixture)
+        run: python3 scripts/audit_venue_purity.py --selftest
+
   changelog:
     runs-on: ubuntu-latest
     steps:

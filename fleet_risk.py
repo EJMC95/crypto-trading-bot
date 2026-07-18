@@ -304,6 +304,19 @@ def light_for(n, budget):
     return "green"
 
 
+def governed_clip_scale(raw, mode):
+    """(published, raw) clip_scale after the central kill switch.
+
+    [2026-07-17 IMB-16] FLEET_RISK_MODE=advisory is SENIOR and releases the
+    drawdown governor's clip actuator too — not just the long-budget veto. The
+    published value goes to 1.0 in any non-enforce mode (consumers size at full
+    clip), while `raw` keeps the governor's value for display/forensics. This is
+    the one place all clip consumers read, so the release lives here. Extracted
+    from main() so the contract is unit-tested (it drove real money before it
+    had a test)."""
+    return (raw if mode == "enforce" else 1.0), raw
+
+
 def main():
     rows = store.fetch_bot_pnl()
     if rows is None:
@@ -500,9 +513,7 @@ def main():
     # [2026-07-17 IMB-16] the kill switch is SENIOR and now true at the one
     # place all clip consumers read: advisory mode publishes clip_scale=1.0
     # (raw kept for display/forensics).
-    clip_scale_raw = clip_scale
-    if MODE != "enforce":
-        clip_scale = 1.0
+    clip_scale, clip_scale_raw = governed_clip_scale(clip_scale, MODE)
     risk_payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC, "mode": MODE,
         "light": light,

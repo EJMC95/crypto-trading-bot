@@ -26,6 +26,7 @@ DATABASE_URL). Locally, leave it unset and this module is a no-op.
 import os
 import sys
 import json
+import math
 import time
 import hashlib
 
@@ -229,6 +230,26 @@ def _stamp_build(extra):
         return extra
 
 
+def _finite_or_none(x):
+    """Coerce a money field to a FINITE float, else None.
+
+    [2026-07-18] The shared bot_pnl schema is nullable and every consumer treats
+    None as 'no value'. A NaN/inf/garbage value does NOT fail the write —
+    Postgres float8 accepts 'NaN'/'Infinity' — it silently poisons every
+    aggregate that reads the column: SUM(pnl_abs) over the fleet becomes NaN, so
+    ONE mis-publishing bot corrupts the whole fleet total (and the dashboard's
+    `money()` would render it '+nan'). Nulling the bad value contains the blast
+    radius to the one row. Never raises; identity on a valid finite number.
+    """
+    if x is None:
+        return None
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
 def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
             open_trades=None, closed_trades=None, wins=None, losses=None,
             extra=None, pnl_daily=None):
@@ -240,6 +261,12 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
     if conn is None:
         return False
     extra = _stamp_build(extra)
+    # Sanitize the money fields BEFORE they reach the shared table — a single
+    # NaN/inf poisons the fleet-wide SUM() aggregates (see _finite_or_none).
+    equity = _finite_or_none(equity)
+    pnl_abs = _finite_or_none(pnl_abs)
+    pnl_pct = _finite_or_none(pnl_pct)
+    pnl_daily = _finite_or_none(pnl_daily)
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
