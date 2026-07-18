@@ -2821,6 +2821,57 @@ def live_js(container="station"):
 </script>'''
 
 
+# Shared heartbeat CSS + footer widget, injected by live_wrap into the
+# drill-down pages (the main page carries its own copy inline).
+LIVE_CSS = ('<style>'
+            '.hbwrap{display:inline-flex;align-items:center;gap:5px;font-weight:600}'
+            '.hb{width:9px;height:9px;border-radius:50%;background:#8b949e;'
+            'display:inline-block;animation:hbpulse 2s infinite}'
+            '@keyframes hbpulse{0%{box-shadow:0 0 0 0 rgba(46,160,67,.45)}'
+            '70%{box-shadow:0 0 0 6px rgba(46,160,67,0)}'
+            '100%{box-shadow:0 0 0 0 rgba(46,160,67,0)}}'
+            '</style>')
+HEARTBEAT_HTML = ('<span class="hbwrap"><span id="hb" class="hb" title="live">'
+                  '</span> <span class="hbtxt">live</span> · '
+                  '<span id="hbage">updated 0s ago</span></span>')
+
+
+def live_wrap(page):
+    """Turn a static, meta-refresh page into a live-updating one — mechanically,
+    so every drill-down page gets the same treatment without hand-surgery.
+
+    Does four things, each idempotent-safe and each a no-op if its anchor is
+    absent (a page missing a <footer> or <body> still returns valid HTML):
+      1. the <meta refresh> becomes a <noscript> fallback (JS-off still cycles);
+      2. injects the heartbeat CSS before </head>;
+      3. wraps the body in <div id="station"> … </div> (the morph target),
+         closing right before the footer so the footer + poller stay OUTSIDE it;
+      4. drops the heartbeat into the footer and the poller before </body>.
+
+    SAFE on these pages specifically because they carry NO inline <script> — a
+    morph replaces innerHTML and does not re-run scripts, so a page that drew a
+    chart in JS would break; these draw everything server-side. Verified: 0
+    <script>/<canvas> across all five drill-downs before wiring this."""
+    import re
+    if "<div id=\"station\">" in page:      # already wrapped — never double-wrap
+        return page
+    page = re.sub(r'<meta http-equiv="refresh" content="\d+">',
+                  lambda m: f'<noscript>{m.group(0)}</noscript>', page, count=1)
+    page = page.replace('</head>', LIVE_CSS + '</head>', 1)
+    page = page.replace('<body>', '<body>\n<div id="station">', 1)
+    # close #station right before the footer (or, failing that, before </body>)
+    idx = page.rfind('<footer')
+    if idx == -1:
+        idx = page.rfind('</body>')
+    if idx != -1:
+        page = page[:idx] + '</div>\n' + page[idx:]
+    # heartbeat just inside the footer's open tag; poller before </body>
+    page = re.sub(r'(<footer[^>]*>)', lambda m: m.group(1) + HEARTBEAT_HTML + ' · ',
+                  page, count=1)
+    page = page.replace('</body>', live_js("station") + '</body>', 1)
+    return page
+
+
 def fetch_states(keys):
     """{key: state_dict} for several bot_state keys in ONE round-trip."""
     import psycopg2
@@ -4223,17 +4274,22 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(b"Auth required")
             return
         try:
+            # [2026-07-18] live_wrap() turns each static, meta-refresh drill-down
+            # into a live-updating page (in-place morph + heartbeat), the same
+            # console treatment the main page carries inline. Applied at the
+            # ONE dispatch site so every route gets it uniformly; render() (the
+            # main page) is already wired inline, and live_wrap no-ops on it.
             if self.path.startswith("/market"):
-                body = render_market().encode()
+                body = live_wrap(render_market()).encode()
             elif self.path.startswith("/periods"):
-                body = render_periods().encode()
+                body = live_wrap(render_periods()).encode()
             elif self.path.startswith("/learning"):
-                body = render_learning().encode()
+                body = live_wrap(render_learning()).encode()
             elif self.path.startswith("/history"):
                 q = parse_qs(urlparse(self.path).query)
-                body = render_history((q.get("hours") or ["168"])[0]).encode()
+                body = live_wrap(render_history((q.get("hours") or ["168"])[0])).encode()
             elif self.path.startswith("/vitals"):
-                body = render_vitals().encode()
+                body = live_wrap(render_vitals()).encode()
             else:
                 body = render().encode()
         except Exception as e:
