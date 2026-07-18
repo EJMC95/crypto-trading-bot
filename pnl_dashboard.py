@@ -2772,10 +2772,74 @@ LIVE_POLL_MS = int(os.environ.get("DASH_LIVE_POLL_MS", "5000"))
 LIVE_FALLBACK_MS = int(os.environ.get("DASH_LIVE_FALLBACK_MS", "60000"))
 
 
+# [2026-07-18] Interactive charts, morph-safe. The live-station morph replaces
+# innerHTML and does NOT re-run <script>, so per-chart init would die on the
+# first data update. This handler is DELEGATED on `document` — attached once,
+# outside #station, so it survives every morph and simply re-targets whatever
+# .ichart SVGs the fresh markup contains. It reads the polyline's OWN points
+# for geometry (no per-point data embedded — the shape is already in the DOM)
+# and inverts a tiny scale (data-lo/hi + data-t0/t1) to recover value + time at
+# the cursor. Tooltip/crosshair are HTML overlays, not SVG: the charts use
+# preserveAspectRatio="none", which would stretch any SVG text.
+CHART_JS = '''<script>
+(function(){
+  var tip,cross,dot;
+  function el(css){var d=document.createElement("div");d.style.cssText=css;
+    d.style.position="fixed";d.style.pointerEvents="none";d.style.zIndex="9999";
+    d.style.display="none";document.body.appendChild(d);return d;}
+  function ensure(){
+    if(tip) return;
+    tip=el("background:#0d1117;color:#e6e6e6;border:1px solid #30363d;border-radius:6px;"
+      +"padding:5px 8px;font:12px -apple-system,system-ui,sans-serif;white-space:nowrap;"
+      +"box-shadow:0 2px 8px rgba(0,0,0,.4)");
+    cross=el("width:1px;background:#8b949e;opacity:.6");
+    dot=el("width:8px;height:8px;border-radius:50%;background:#fff;"
+      +"box-shadow:0 0 0 2px #0d1117;margin:-4px 0 0 -4px");
+  }
+  function fmtMoney(v){var s=v<0?"-":"+";
+    return s+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function fmtTime(sec){var d=new Date(sec*1000);
+    function p(n){return(n<10?"0":"")+n;}
+    return d.getUTCFullYear()+"-"+p(d.getUTCMonth()+1)+"-"+p(d.getUTCDate())+" "
+      +p(d.getUTCHours())+":"+p(d.getUTCMinutes())+" UTC";}
+  function findChart(t){while(t&&t!==document){
+    if(t.classList&&t.classList.contains("ichart"))return t;t=t.parentNode;}return null;}
+  function hide(){if(tip){tip.style.display=cross.style.display=dot.style.display="none";}}
+  document.addEventListener("pointermove",function(e){
+    var svg=findChart(e.target); if(!svg){hide();return;}
+    var pl=svg.querySelector("polyline"); if(!pl||!pl.points){hide();return;}
+    var pts=pl.points, n=pts.numberOfItems; if(n<2){hide();return;}
+    var r=svg.getBoundingClientRect();
+    var f=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
+    var idx=Math.round(f*(n-1)); var p=pts.getItem(idx);
+    var lo=+svg.dataset.lo, hi=+svg.dataset.hi, h=+svg.dataset.h||170;
+    var t0=+svg.dataset.t0, t1=+svg.dataset.t1;
+    var val=lo+(1-p.y/h)*(hi-lo);
+    var ts=t0+(n>1?idx/(n-1):0)*(t1-t0);
+    ensure();
+    var snapX=r.left+(idx/(n-1))*r.width;
+    var snapY=r.top+(p.y/h)*r.height;
+    cross.style.display="block";cross.style.left=snapX+"px";
+    cross.style.top=r.top+"px";cross.style.height=r.height+"px";
+    dot.style.display="block";dot.style.left=snapX+"px";dot.style.top=snapY+"px";
+    tip.innerHTML="<b>"+fmtMoney(val)+"</b><br><span style=\\"color:#8b949e\\">"+fmtTime(ts)+"</span>";
+    tip.style.display="block";
+    var tw=tip.offsetWidth, left=snapX+12;
+    if(left+tw>window.innerWidth-8) left=snapX-tw-12;
+    tip.style.left=left+"px";
+    tip.style.top=Math.max(8,r.top-8)+"px";
+  },true);
+  document.addEventListener("pointerleave",hide,true);
+  window.addEventListener("scroll",hide,true);
+})();
+</script>'''
+
+
 def live_js(container="station"):
     """Vanilla-JS live updater for a page whose morphable content is in
-    `#<container>`. No dependencies, no build step. Same script on every page."""
-    return f'''<script>
+    `#<container>`, PLUS the delegated interactive-chart handler (CHART_JS).
+    Both attach to document, so they survive content morphs. No dependencies."""
+    return CHART_JS + f'''<script>
 (function(){{
   var POLL={LIVE_POLL_MS}, FB={LIVE_FALLBACK_MS}, ID="{container}";
   var last=null, lastOk=Date.now(), fails=0, busy=false;
@@ -3309,12 +3373,28 @@ def _svg_chart(series, color, label, height=170, width=760, fmt=None):
         for i, (_, v) in enumerate(series))
     last = vals[-1]
     fmt = fmt or money
+
+    # [2026-07-18] interactive: hover a crosshair over the curve to read the
+    # value + timestamp at that point. The handler (CHART_JS, delegated on
+    # document so it survives live-morphs) reads the polyline's OWN points for
+    # the shape and inverts THIS tiny scale — lo/hi map y->value, t0/t1 map
+    # index->time. Only 5 numbers embedded per chart, not the whole series.
+    def _epoch(t):
+        try:
+            return int(t.timestamp())
+        except Exception:      # noqa: BLE001 — a bad stamp just disables time readout
+            return 0
+    t0, t1 = _epoch(series[0][0]), _epoch(series[-1][0])
     return (f'<div class="sub">{label} · now <b>{fmt(last)}</b> '
-            f'<span class="muted">(min {fmt(lo)} / max {fmt(hi)})</span></div>'
-            f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
-            f'preserveAspectRatio="none" style="background:#0d1117;border:1px solid #222;'
-            f'border-radius:8px;margin-bottom:8px">'
-            f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/></svg>')
+            f'<span class="muted">(min {fmt(lo)} / max {fmt(hi)}) · hover to inspect</span></div>'
+            f'<div class="ic" style="position:relative;margin-bottom:8px">'
+            f'<svg class="ichart" viewBox="0 0 {width} {height}" width="100%" height="{height}" '
+            f'preserveAspectRatio="none" data-lo="{lo:.4f}" data-hi="{hi:.4f}" '
+            f'data-h="{height}" data-t0="{t0}" data-t1="{t1}" '
+            f'style="display:block;background:#0d1117;border:1px solid #222;'
+            f'border-radius:8px;cursor:crosshair">'
+            f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/></svg>'
+            f'</div>')
 
 
 def _max_drawdown_pct(vals):
