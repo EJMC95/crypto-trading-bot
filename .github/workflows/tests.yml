@@ -1,0 +1,30 @@
+name: Tests
+
+# The fleet had NO automated test suite until 2026-07-18: ~38 in-module
+# `--selftest` blocks that nothing ran, so a regression in a *covered* function
+# still shipped green. This workflow is that missing regression net — it runs
+# the pytest suite (which includes a subprocess runner over every module's
+# `--selftest`) on every push/PR. Stdlib + numpy/pandas only; no lighter-sdk, so
+# the live signer harness self-skips here and runs only where the SDK is present.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  pytest:
+    name: pytest (selftests + real-money / financial / autonomy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+      - name: Run the suite
+        run: python -m pytest -p no:cacheprovider

@@ -1,0 +1,9 @@
+# Test-only deps — kept SEPARATE from requirements.txt so the bot images (which
+# already carry lighter-sdk, numpy, etc.) are not bloated by test tooling, and
+# so the CI test job installs the minimum needed to import the fleet modules and
+# run their offline `--selftest` blocks. NOT installed into any Railway image.
+pytest>=8.0
+pytest-cov>=5.0
+coverage>=7.0
+numpy>=1.24        # regime_oracle, market_pulse, brain_stats, … import it at module load
+pandas>=2.0        # regime_oracle imports pandas (hard dep) — needed to run its selftest
