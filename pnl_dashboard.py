@@ -2054,7 +2054,7 @@ async function botAdmin(action, bot){
 
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="30">
+<noscript><meta http-equiv="refresh" content="30"></noscript>
 <title>All Bots — Live P&amp;L</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2123,6 +2123,12 @@ async function botAdmin(action, bot){
  .dot{{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:4px}}
  .dot.on{{background:#1a7f37;box-shadow:0 0 6px #1a7f37}} .dot.off{{background:#d1242f;box-shadow:0 0 6px #d1242f}} .dot.warn{{background:#b8860b;box-shadow:0 0 6px #b8860b}}
  footer{{padding:10px 18px;color:#5b7184;font-size:11px}}
+ /* [2026-07-18] live-station heartbeat */
+ .hbwrap{{display:inline-flex;align-items:center;gap:5px;font-weight:600}}
+ .hb{{width:9px;height:9px;border-radius:50%;background:#8b949e;display:inline-block;
+   box-shadow:0 0 0 0 rgba(46,160,67,.5);animation:hbpulse 2s infinite}}
+ @keyframes hbpulse{{0%{{box-shadow:0 0 0 0 rgba(46,160,67,.45)}}
+   70%{{box-shadow:0 0 0 6px rgba(46,160,67,0)}}100%{{box-shadow:0 0 0 0 rgba(46,160,67,0)}}}}
  /* [2026-07-13] Manage bots panel */
  .manage{{margin:6px 14px 0;border:1px solid #caa227;border-radius:10px;
    background:#ffffffd9;font-size:13px}}
@@ -2140,6 +2146,7 @@ async function botAdmin(action, bot){
  .mbtn.del:hover{{background:#ffe3e3}}
 </style></head><body>
 {WATERMARK_HTML}
+<div id="station">
 <header>
  <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a> &nbsp;·&nbsp; <a href="/vitals" style="color:#58a6ff;font-size:14px">health →</a></h1>
  <div class="totals">
@@ -2157,9 +2164,11 @@ async function botAdmin(action, bot){
 {health_html}
 {live_section}
 {sections_html}
+</div>
 {manage_html}
-<footer>Reads the shared bot_pnl Postgres table. Auto-refreshes every 30s. Times UTC.
+<footer><span class="hbwrap"><span id="hb" class="hb" title="live"></span> <span class="hbtxt">live</span> · <span id="hbage">updated 0s ago</span></span> · Reads the shared bot_pnl Postgres table. Live-updating (in-place, no reload). Times UTC.
 Snapshots older than {STALE_SECONDS}s are flagged stale.</footer>
+{live_js("station")}
 </body></html>'''
 
 
@@ -2709,6 +2718,224 @@ def render_vitals():
 </body></html>'''
 
 
+def fetch_tick():
+    """The cheapest possible "has anything changed?" signal for the live page.
+
+    ONE round-trip, two indexed MAX(updated_at) reads over the tables that feed
+    every card — bot_pnl (all bot rows) and bot_state (every organ). Returns
+    {"v": <latest epoch>, "t": <server now epoch>}. The client polls THIS every
+    few seconds and only re-fetches the full page when `v` moves, so the
+    expensive full render runs about as often as data actually changes — not on
+    a fixed timer. That keeps DB load at or below today's blanket 30s
+    meta-refresh while making the page feel live.
+
+    Fail-OPEN: on any error it returns `v=None`, which the client treats as
+    "can't tell — refresh anyway on the slow fallback". A dashboard that can't
+    prove data is fresh must not pretend it is (an operating station shows when
+    it's blind), but it also must never freeze — hence the fallback."""
+    import psycopg2
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=6)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT extract(epoch from GREATEST("
+                    "  (SELECT max(updated_at) FROM bot_pnl),"
+                    "  (SELECT max(updated_at) FROM bot_state)))")
+                row = cur.fetchone()
+                v = float(row[0]) if row and row[0] is not None else None
+        finally:
+            conn.close()
+        return {"v": v, "t": time.time()}
+    except Exception:
+        return {"v": None, "t": time.time()}
+
+
+# [2026-07-18] LIVE STATION — turn the auto-refreshing page into a real
+# operating console. Replaces the blunt full-page `<meta http-equiv=refresh>`
+# (which reloads everything, flickers, and drops your scroll position) with an
+# in-place morph: poll the cheap /tick.json, and only when the data version
+# changes, fetch the page and swap the #station container's innerHTML. Every
+# item updates, nothing flickers, scroll is kept.
+#
+# DESIGN NOTES (each earned):
+#  * The poller lives OUTSIDE #station. innerHTML assignment does not execute
+#    <script> tags, so morphing #station can never kill the loop driving it.
+#  * <noscript> keeps a slow meta-refresh, so a JS-off browser still updates.
+#  * A HEARTBEAT shows live / stale / OFFLINE — an operating station must show
+#    when it has stopped seeing the fleet, never present old data as current.
+#  * FAIL-SAFE: if /tick.json errors repeatedly the page force-reloads on a slow
+#    timer, so a broken poller degrades to today's behaviour, never to a frozen
+#    screen watching real money.
+#  * A 1-second "updated Ns ago" ticker makes liveness visible between morphs.
+LIVE_POLL_MS = int(os.environ.get("DASH_LIVE_POLL_MS", "5000"))
+LIVE_FALLBACK_MS = int(os.environ.get("DASH_LIVE_FALLBACK_MS", "60000"))
+
+
+# [2026-07-18] Interactive charts, morph-safe. The live-station morph replaces
+# innerHTML and does NOT re-run <script>, so per-chart init would die on the
+# first data update. This handler is DELEGATED on `document` — attached once,
+# outside #station, so it survives every morph and simply re-targets whatever
+# .ichart SVGs the fresh markup contains. It reads the polyline's OWN points
+# for geometry (no per-point data embedded — the shape is already in the DOM)
+# and inverts a tiny scale (data-lo/hi + data-t0/t1) to recover value + time at
+# the cursor. Tooltip/crosshair are HTML overlays, not SVG: the charts use
+# preserveAspectRatio="none", which would stretch any SVG text.
+CHART_JS = '''<script>
+(function(){
+  var tip,cross,dot;
+  function el(css){var d=document.createElement("div");d.style.cssText=css;
+    d.style.position="fixed";d.style.pointerEvents="none";d.style.zIndex="9999";
+    d.style.display="none";document.body.appendChild(d);return d;}
+  function ensure(){
+    if(tip) return;
+    tip=el("background:#0d1117;color:#e6e6e6;border:1px solid #30363d;border-radius:6px;"
+      +"padding:5px 8px;font:12px -apple-system,system-ui,sans-serif;white-space:nowrap;"
+      +"box-shadow:0 2px 8px rgba(0,0,0,.4)");
+    cross=el("width:1px;background:#8b949e;opacity:.6");
+    dot=el("width:8px;height:8px;border-radius:50%;background:#fff;"
+      +"box-shadow:0 0 0 2px #0d1117;margin:-4px 0 0 -4px");
+  }
+  function fmtMoney(v){var s=v<0?"-":"+";
+    return s+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function fmtTime(sec){var d=new Date(sec*1000);
+    function p(n){return(n<10?"0":"")+n;}
+    return d.getUTCFullYear()+"-"+p(d.getUTCMonth()+1)+"-"+p(d.getUTCDate())+" "
+      +p(d.getUTCHours())+":"+p(d.getUTCMinutes())+" UTC";}
+  function findChart(t){while(t&&t!==document){
+    if(t.classList&&t.classList.contains("ichart"))return t;t=t.parentNode;}return null;}
+  function hide(){if(tip){tip.style.display=cross.style.display=dot.style.display="none";}}
+  document.addEventListener("pointermove",function(e){
+    var svg=findChart(e.target); if(!svg){hide();return;}
+    var pl=svg.querySelector("polyline"); if(!pl||!pl.points){hide();return;}
+    var pts=pl.points, n=pts.numberOfItems; if(n<2){hide();return;}
+    var r=svg.getBoundingClientRect();
+    var f=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
+    var idx=Math.round(f*(n-1)); var p=pts.getItem(idx);
+    var lo=+svg.dataset.lo, hi=+svg.dataset.hi, h=+svg.dataset.h||170;
+    var t0=+svg.dataset.t0, t1=+svg.dataset.t1;
+    var val=lo+(1-p.y/h)*(hi-lo);
+    var ts=t0+(n>1?idx/(n-1):0)*(t1-t0);
+    ensure();
+    var snapX=r.left+(idx/(n-1))*r.width;
+    var snapY=r.top+(p.y/h)*r.height;
+    cross.style.display="block";cross.style.left=snapX+"px";
+    cross.style.top=r.top+"px";cross.style.height=r.height+"px";
+    dot.style.display="block";dot.style.left=snapX+"px";dot.style.top=snapY+"px";
+    tip.innerHTML="<b>"+fmtMoney(val)+"</b><br><span style=\\"color:#8b949e\\">"+fmtTime(ts)+"</span>";
+    tip.style.display="block";
+    var tw=tip.offsetWidth, left=snapX+12;
+    if(left+tw>window.innerWidth-8) left=snapX-tw-12;
+    tip.style.left=left+"px";
+    tip.style.top=Math.max(8,r.top-8)+"px";
+  },true);
+  document.addEventListener("pointerleave",hide,true);
+  window.addEventListener("scroll",hide,true);
+})();
+</script>'''
+
+
+def live_js(container="station"):
+    """Vanilla-JS live updater for a page whose morphable content is in
+    `#<container>`, PLUS the delegated interactive-chart handler (CHART_JS).
+    Both attach to document, so they survive content morphs. No dependencies."""
+    return CHART_JS + f'''<script>
+(function(){{
+  var POLL={LIVE_POLL_MS}, FB={LIVE_FALLBACK_MS}, ID="{container}";
+  var last=null, lastOk=Date.now(), fails=0, busy=false;
+  var hb=document.getElementById("hb"), age=document.getElementById("hbage");
+  function beat(state){{
+    if(!hb) return;
+    var m={{live:["#2ea043","live"],stale:["#d29922","reconnecting…"],
+            off:["#f85149","OFFLINE — not updating"]}}[state]||["#8b949e","…"];
+    hb.style.background=m[0]; hb.title=m[1];
+    var t=hb.nextElementSibling; if(t&&t.classList.contains("hbtxt")) t.textContent=m[1];
+  }}
+  async function morph(){{
+    var r=await fetch(location.href,{{cache:"no-store",headers:{{"X-Live":"1"}}}});
+    if(!r.ok) throw new Error("http "+r.status);
+    var t=await r.text();
+    var doc=new DOMParser().parseFromString(t,"text/html");
+    var fresh=doc.getElementById(ID), cur=document.getElementById(ID);
+    if(fresh&&cur&&fresh.innerHTML!==cur.innerHTML) cur.innerHTML=fresh.innerHTML;
+    lastOk=Date.now();
+  }}
+  async function tick(){{
+    if(busy) return; busy=true;
+    try{{
+      var r=await fetch("/tick.json",{{cache:"no-store"}});
+      var j=await r.json(); fails=0; beat("live");
+      if(j.v===null||j.v!==last){{ last=j.v; await morph(); }}
+    }}catch(e){{
+      fails++; beat(fails>2?"off":"stale");
+      // fail-safe: a persistently blind poller must not leave a frozen page
+      if(Date.now()-lastOk>FB){{ location.reload(); }}
+    }}finally{{ busy=false; }}
+  }}
+  function ageTick(){{
+    if(!age) return;
+    var s=Math.max(0,Math.round((Date.now()-lastOk)/1000));
+    age.textContent=s<60?("updated "+s+"s ago"):("updated "+Math.floor(s/60)+"m ago");
+  }}
+  document.addEventListener("visibilitychange",function(){{
+    if(!document.hidden) tick(); // catch up instantly when the tab refocuses
+  }});
+  setInterval(tick,POLL); setInterval(ageTick,1000); tick();
+}})();
+</script>'''
+
+
+# Shared heartbeat CSS + footer widget, injected by live_wrap into the
+# drill-down pages (the main page carries its own copy inline).
+LIVE_CSS = ('<style>'
+            '.hbwrap{display:inline-flex;align-items:center;gap:5px;font-weight:600}'
+            '.hb{width:9px;height:9px;border-radius:50%;background:#8b949e;'
+            'display:inline-block;animation:hbpulse 2s infinite}'
+            '@keyframes hbpulse{0%{box-shadow:0 0 0 0 rgba(46,160,67,.45)}'
+            '70%{box-shadow:0 0 0 6px rgba(46,160,67,0)}'
+            '100%{box-shadow:0 0 0 0 rgba(46,160,67,0)}}'
+            '</style>')
+HEARTBEAT_HTML = ('<span class="hbwrap"><span id="hb" class="hb" title="live">'
+                  '</span> <span class="hbtxt">live</span> · '
+                  '<span id="hbage">updated 0s ago</span></span>')
+
+
+def live_wrap(page):
+    """Turn a static, meta-refresh page into a live-updating one — mechanically,
+    so every drill-down page gets the same treatment without hand-surgery.
+
+    Does four things, each idempotent-safe and each a no-op if its anchor is
+    absent (a page missing a <footer> or <body> still returns valid HTML):
+      1. the <meta refresh> becomes a <noscript> fallback (JS-off still cycles);
+      2. injects the heartbeat CSS before </head>;
+      3. wraps the body in <div id="station"> … </div> (the morph target),
+         closing right before the footer so the footer + poller stay OUTSIDE it;
+      4. drops the heartbeat into the footer and the poller before </body>.
+
+    SAFE on these pages specifically because they carry NO inline <script> — a
+    morph replaces innerHTML and does not re-run scripts, so a page that drew a
+    chart in JS would break; these draw everything server-side. Verified: 0
+    <script>/<canvas> across all five drill-downs before wiring this."""
+    import re
+    if "<div id=\"station\">" in page:      # already wrapped — never double-wrap
+        return page
+    page = re.sub(r'<meta http-equiv="refresh" content="\d+">',
+                  lambda m: f'<noscript>{m.group(0)}</noscript>', page, count=1)
+    page = page.replace('</head>', LIVE_CSS + '</head>', 1)
+    page = page.replace('<body>', '<body>\n<div id="station">', 1)
+    # close #station right before the footer (or, failing that, before </body>)
+    idx = page.rfind('<footer')
+    if idx == -1:
+        idx = page.rfind('</body>')
+    if idx != -1:
+        page = page[:idx] + '</div>\n' + page[idx:]
+    # heartbeat just inside the footer's open tag; poller before </body>
+    page = re.sub(r'(<footer[^>]*>)', lambda m: m.group(1) + HEARTBEAT_HTML + ' · ',
+                  page, count=1)
+    page = page.replace('</body>', live_js("station") + '</body>', 1)
+    return page
+
+
 def fetch_states(keys):
     """{key: state_dict} for several bot_state keys in ONE round-trip."""
     import psycopg2
@@ -3146,12 +3373,28 @@ def _svg_chart(series, color, label, height=170, width=760, fmt=None):
         for i, (_, v) in enumerate(series))
     last = vals[-1]
     fmt = fmt or money
+
+    # [2026-07-18] interactive: hover a crosshair over the curve to read the
+    # value + timestamp at that point. The handler (CHART_JS, delegated on
+    # document so it survives live-morphs) reads the polyline's OWN points for
+    # the shape and inverts THIS tiny scale — lo/hi map y->value, t0/t1 map
+    # index->time. Only 5 numbers embedded per chart, not the whole series.
+    def _epoch(t):
+        try:
+            return int(t.timestamp())
+        except Exception:      # noqa: BLE001 — a bad stamp just disables time readout
+            return 0
+    t0, t1 = _epoch(series[0][0]), _epoch(series[-1][0])
     return (f'<div class="sub">{label} · now <b>{fmt(last)}</b> '
-            f'<span class="muted">(min {fmt(lo)} / max {fmt(hi)})</span></div>'
-            f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
-            f'preserveAspectRatio="none" style="background:#0d1117;border:1px solid #222;'
-            f'border-radius:8px;margin-bottom:8px">'
-            f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/></svg>')
+            f'<span class="muted">(min {fmt(lo)} / max {fmt(hi)}) · hover to inspect</span></div>'
+            f'<div class="ic" style="position:relative;margin-bottom:8px">'
+            f'<svg class="ichart" viewBox="0 0 {width} {height}" width="100%" height="{height}" '
+            f'preserveAspectRatio="none" data-lo="{lo:.4f}" data-hi="{hi:.4f}" '
+            f'data-h="{height}" data-t0="{t0}" data-t1="{t1}" '
+            f'style="display:block;background:#0d1117;border:1px solid #222;'
+            f'border-radius:8px;cursor:crosshair">'
+            f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{pts}"/></svg>'
+            f'</div>')
 
 
 def _max_drawdown_pct(vals):
@@ -3752,6 +3995,14 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/health"):
             self.send_response(200); self._no_cache(); self.end_headers(); self.wfile.write(b"ok"); return
+        if self.path.startswith("/tick.json"):
+            # [2026-07-18] the live-station change signal — cheap, no auth (no
+            # secrets: it is a single timestamp). The page polls this to decide
+            # whether to re-fetch; keeping it public + tiny is the whole point.
+            body = json.dumps(fetch_tick()).encode()
+            self.send_response(200); self._no_cache()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers(); self.wfile.write(body); return
         if self.path.startswith("/watchdog.json"):
             # [2026-07-13 BRANCH MERGE] In-service fleet watchdog state
             # (fleet_watchdog_svc daemon thread) — ported from the main-branch
@@ -4103,17 +4354,22 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(b"Auth required")
             return
         try:
+            # [2026-07-18] live_wrap() turns each static, meta-refresh drill-down
+            # into a live-updating page (in-place morph + heartbeat), the same
+            # console treatment the main page carries inline. Applied at the
+            # ONE dispatch site so every route gets it uniformly; render() (the
+            # main page) is already wired inline, and live_wrap no-ops on it.
             if self.path.startswith("/market"):
-                body = render_market().encode()
+                body = live_wrap(render_market()).encode()
             elif self.path.startswith("/periods"):
-                body = render_periods().encode()
+                body = live_wrap(render_periods()).encode()
             elif self.path.startswith("/learning"):
-                body = render_learning().encode()
+                body = live_wrap(render_learning()).encode()
             elif self.path.startswith("/history"):
                 q = parse_qs(urlparse(self.path).query)
-                body = render_history((q.get("hours") or ["168"])[0]).encode()
+                body = live_wrap(render_history((q.get("hours") or ["168"])[0])).encode()
             elif self.path.startswith("/vitals"):
-                body = render_vitals().encode()
+                body = live_wrap(render_vitals()).encode()
             else:
                 body = render().encode()
         except Exception as e:

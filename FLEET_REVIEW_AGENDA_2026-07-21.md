@@ -788,3 +788,43 @@ BTC's mood.
    *intraday range on non-crypto perps*.)
 3. Caution on record: 🏆 Stock Leaders was RETIRED at 37-44% maxDD vs the 15%
    gate. Equity perps on Lighter have burned this fleet once already.
+
+## 19. "Filter" — the operating-station front door: access + domain (added 18-Jul, operator's name)
+
+**Operator named this "Filter"** (18-Jul) and deferred it here: *"Neither for the
+minute — save for July 21 review."* It covers the dashboard's front door — who
+reaches the real-money console, and at what address.
+
+**What shipped 18-Jul (context — this item is NOT about the UX, that is done):**
+the dashboard became a live operating station — in-place morph (no full-page
+reload), a live/reconnecting/**OFFLINE** heartbeat, and interactive hover charts
+on /history. All six pages, all verified in a real browser, deployed, guards
+green. What was DEFERRED to here is the front door around it.
+
+**⚠️ MEASURED 18-Jul — the load-bearing finding, and it is a real-money one:**
+the live `pnl-dashboard` service sets **no `DASH_USER`/`DASH_PASS`** (measured:
+0 such env vars), so the console — which displays LIVE positions, equity and
+the kill-switch surface — is behind the **hardcoded default password committed
+in `pnl_dashboard.py:117-118`** (`DASH_USER='eamon'`, `DASH_PASS='freqbot2026'`).
+Anyone with read access to the repo has the dashboard password. This is the
+"filter" that currently barely filters. It was NOT changed on the operator's
+"neither for the minute" — but it should be the FIRST thing this item decides,
+and arguably should not wait for the 21st: setting a strong `DASH_PASS` env var
+on the Railway service is a one-line, zero-risk change the operator can do
+anytime (it needs no deploy — the service reads it at boot).
+
+**DECIDE at the review:**
+1. **Auth (the actual "filter").** Set a strong `DASH_PASS` on the Railway
+   service NOW (retires the committed default). Then decide the target: keep
+   HTTP basic auth with a real secret (cheapest, fine for one operator), add an
+   IP allowlist, or move to a session login. The page shows real money — the
+   bar is "not a password sitting in git."
+2. **Custom domain.** Swap the `…railway.app` URL for e.g. `dash.<domain>` —
+   Railway-native, needs one DNS record from the operator. Low effort, high
+   daily value; the "proper website" step the operator asked about.
+3. **On record — NOT recommended:** a framework rewrite (Flask/FastAPI/React).
+   The stdlib `http.server` is fast, dependency-free, and easy to deploy; the
+   dashboard is already a real website in every way that matters for a single
+   operator. Rewriting the live-money console would be ceremony + risk for no
+   operator gain. Only revisit if multi-user accounts or a public API become a
+   requirement.
