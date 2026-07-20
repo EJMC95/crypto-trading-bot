@@ -1,23 +1,23 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1506,
-  "fair_price": 6.64,
+  "p_joint": 0.1034,
+  "fair_price": 9.67,
   "legs": [
-   "New Zealand Warriors to win",
    "Penrith Panthers to win",
-   "Cronulla-Sutherland Sharks to win",
-   "Dolphins to win"
+   "Canberra Raiders to win",
+   "New Zealand Warriors to win",
+   "Sydney Roosters to win"
   ]
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0666,
-  "fair_price": 15.02,
+  "p_joint": 0.0331,
+  "fair_price": 30.26,
   "legs": [
-   "New Zealand Warriors win & Alofiana Khan-Pereira try",
    "Penrith Panthers win & Thomas Jenkins try",
-   "Cronulla-Sutherland Sharks win & Ronaldo Mulitalo try"
+   "Canberra Raiders win & Xavier Savage try",
+   "New Zealand Warriors win & Alofiana Khan-Pereira try"
   ]
  }
 ]

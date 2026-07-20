@@ -1,9 +1,9 @@
 round,date,home,away,p_home_blend,market_p_home,edge_home,books,best_odds_home,best_odds_away,disp_home,disp_away,value_side,value_ev_pct
-Round 20,2026-07-16 19:50:00,Penrith Panthers,Brisbane Broncos,0.8073,0.7702,0.0371,4,1.24,4.25,0.0081,0.0303,Penrith Panthers,0.1052
-Round 20,2026-07-17 18:00:00,Cronulla-Sutherland Sharks,Newcastle Knights,0.708,0.6866,0.0214,4,1.4,3.1,0.0145,0.0248,Cronulla-Sutherland Sharks,-0.88
-Round 20,2026-07-17 20:00:00,Sydney Roosters,Melbourne Storm,0.6501,0.7483,-0.0982,4,1.28,3.85,0.0079,0.0199,Melbourne Storm,34.7115
-Round 20,2026-07-18 15:00:00,Canberra Raiders,South Sydney Rabbitohs,0.5399,0.4895,0.0504,4,1.95,1.9,0.0052,0.016,Canberra Raiders,5.2805
-Round 20,2026-07-18 17:30:00,New Zealand Warriors,St George Illawarra Dragons,0.832,0.8154,0.0166,4,1.18,5.25,0.0172,0.0244,New Zealand Warriors,-1.824
-Round 20,2026-07-18 19:35:00,Canterbury-Bankstown Bulldogs,Wests Tigers,0.6334,0.6416,-0.0082,4,1.5,2.65,0.0135,0.0,Wests Tigers,-2.851
-Round 20,2026-07-19 14:00:00,Gold Coast Titans,Manly-Warringah Sea Eagles,0.3035,0.3955,-0.092,4,2.48,1.57,0.0333,0.0,Manly-Warringah Sea Eagles,9.3505
-Round 20,2026-07-19 16:05:00,Dolphins,North Queensland Cowboys,0.666,0.5882,0.0778,4,1.62,2.4,0.0062,0.0435,Dolphins,7.892
+Round 21,2026-07-23 19:50:00,Parramatta Eels,Penrith Panthers,0.2412,0.2021,0.0391,4,4.8,1.2,0.0213,0.0084,Parramatta Eels,15.776
+Round 21,2026-07-24 18:00:00,Newcastle Knights,Sydney Roosters,0.4075,0.4543,-0.0468,4,2.25,1.75,0.0714,0.0057,Sydney Roosters,3.6875
+Round 21,2026-07-24 20:00:00,South Sydney Rabbitohs,Melbourne Storm,0.51,0.6273,-0.1173,4,1.53,2.7,0.0099,0.0588,Melbourne Storm,32.3
+Round 21,2026-07-25 15:00:00,Canberra Raiders,Wests Tigers,0.6986,0.7634,-0.0648,4,1.25,4.3,0.0081,0.075,Wests Tigers,29.602
+Round 21,2026-07-25 17:30:00,Canterbury-Bankstown Bulldogs,New Zealand Warriors,0.4177,0.3737,0.044,4,2.6,1.55,0.0236,0.0231,Canterbury-Bankstown Bulldogs,8.602
+Round 21,2026-07-25 19:35:00,North Queensland Cowboys,Brisbane Broncos,0.6304,0.4648,0.1656,4,2.05,1.8,0.0,0.0112,North Queensland Cowboys,29.232
+Round 21,2026-07-26 14:00:00,St George Illawarra Dragons,Gold Coast Titans,0.5233,0.5053,0.018,4,1.89,2.0,0.0053,0.0417,St George Illawarra Dragons,-1.0963
+Round 21,2026-07-26 16:05:00,Manly-Warringah Sea Eagles,Cronulla-Sutherland Sharks,0.5164,0.4231,0.0933,4,2.35,1.65,0.0444,0.0,Manly-Warringah Sea Eagles,21.354
