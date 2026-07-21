@@ -1050,9 +1050,13 @@ def autonomy_rail_card():
                    else f'{conf} · net {_d(ch.get("net"))}'
                    + (f' (vs default {_d(ch.get("vs_default"))})'
                       if ch.get("vs_default") is not None else ''))
-            # the full genotype LEADERBOARD lives in the dedicated
-            # incubator_card() below (operator: "no genotype list on the
-            # pnl" → 16-Jul (ad)); this row stays the one-line summary.
+            npr = len(ic.get("prospects") or [])
+            if npr:
+                icv += f' · {npr} prospects'
+            # the full genotype LEADERBOARD + prospect register live in the
+            # dedicated incubator_card() below (operator: "no genotype list
+            # on the pnl" → 16-Jul (ad); "no list of the prospective bots"
+            # → 22-Jul); this row stays the one-line summary.
             return row("strategy-incubator", "🧬 Incubator", icv,
                        G if conf == "stable" else M)
 
@@ -1297,14 +1301,23 @@ def incubator_card():
     The genotype-breeding stack made visible: the elite leaderboard of bred
     Ticket-Taker genotypes scored by replay over the recorded tape, the
     champion + its anti-overfit confidence (tentative / candidate / stable),
-    and the funding candidates it proposes to the experiment judge. Read-only
-    render; the organ lives in strategy_incubator.py on the freqtrade-bots
-    container. Fail-silent like every other card — empty state hides it."""
+    and the funding candidates it proposes to the experiment judge.
+    [2026-07-22 PROSPECT REGISTER (operator: "the incubator has no list of
+    the prospective bots its created and their stats")]: renders the organ's
+    durable `prospects` list (every genotype ever scored — latest + best-ever
+    stats, origin, role, cycles seen) and `funding_prospects` (each proposal
+    joined to its judge lifecycle: queued/running/promoted/abandoned/faded).
+    Read-only render; the organ lives in strategy_incubator.py on the
+    freqtrade-bots container. Fail-silent like every other card — empty
+    state hides it."""
     try:
         b = fetch_states(["strategy-incubator"]).get("strategy-incubator") or {}
-        elite = b.get("elite") or []
+        elite = [e for e in (b.get("elite") or []) if isinstance(e, dict)]
         champ = b.get("champion") or {}
-        if not elite and not champ:
+        pros = [p for p in (b.get("prospects") or []) if isinstance(p, dict)]
+        fpros = [p for p in (b.get("funding_prospects") or [])
+                 if isinstance(p, dict)]
+        if not elite and not champ and not pros and not fpros:
             return ""
         G, R, M, Y = "#1a7f37", "#d1242f", "#8b949e", "#d29922"
 
@@ -1317,10 +1330,14 @@ def incubator_card():
             # [2026-07-17] div = the divergence lens (taker.div_gap_pp), added
             # to the gene pool that day; without it the card silently omitted
             # the only SHORT lens's allele from every genotype it rendered.
+            # [2026-07-22] unknown (future) genes render as k=v instead of
+            # silently vanishing — the same omission class, closed for good.
             ab = {"BRK_RANGE": "brk", "DIP_RANGE": "dip", "MOMO_CHG": "momo",
                   "DIV_GAP_PP": "div", "TAKE_PROFIT": "tp", "STOP_LOSS": "sl",
                   "MAX_HOLD_H": "hold"}
-            return html.escape(" ".join(f"{ab[k]}{gt[k]}" for k in ab if k in gt))
+            parts = [f"{ab[k]}{gt[k]}" for k in ab if k in gt]
+            parts += [f"{k.lower()}={gt[k]}" for k in sorted(gt) if k not in ab]
+            return html.escape(" ".join(parts))
 
         # champion line
         champ_line = ""
@@ -1336,19 +1353,74 @@ def incubator_card():
                 + f' · streak {champ.get("streak")} · '
                 f'h1 {_dm(champ.get("h1"))} h2 {_dm(champ.get("h2"))}</div>')
 
-        # leaderboard
+        # THE PROSPECT REGISTER — the full bred-genotype list (rank order,
+        # dormants last). Falls back to the old ≤5-row elite render only for
+        # payloads predating the register.
         rows = []
-        # non-dict entries are skipped, not allowed to hide the whole card
-        elite = [e for e in elite if isinstance(e, dict)]
-        for i, e in enumerate(elite[:5], 1):
+        rolec = {"fittest": Y, "gamete": G, "scored": M,
+                 "unmeasured": M, "dormant": M}
+        for i, e in enumerate(pros[:12], 1):
             net = e.get("net")
             col = (G if isinstance(net, (int, float)) and net > 0
                    else (M if isinstance(net, (int, float)) and net == 0 else R))
-            mark = ' <span style="color:%s">✓both</span>' % G if e.get("both_halves_pos") else ""
+            role = str(e.get("role") or "")
+            mark = (' <span style="color:%s">✓both</span>' % G
+                    if e.get("both_halves_pos") else "")
+            best = (f' · best lcb {_dm(e.get("best_lcb"))}'
+                    if isinstance(e.get("best_lcb"), (int, float))
+                    and e.get("best_lcb") != e.get("lcb") else "")
             rows.append(
-                f'<div><span style="color:{col}">#{i} {_dm(net)}</span>{mark} '
-                f'<span class="muted">h1 {_dm(e.get("h1"))} h2 {_dm(e.get("h2"))}</span> '
-                f'<span class="muted" style="font-size:.85em">{_geno(e.get("genotype"))}</span></div>')
+                f'<div><span class="muted">#{i}</span> '
+                f'<b style="color:{rolec.get(role, M)}">{html.escape(role.upper())}</b> '
+                f'<span style="color:{col}">{_dm(net)}</span>{mark} '
+                f'<span class="muted">lcb {_dm(e.get("lcb"))} · '
+                f'{e.get("closes") if e.get("closes") is not None else "—"}cl · '
+                f'×{e.get("cycles") or 1} {html.escape(str(e.get("origin") or ""))}'
+                f'{best}</span> '
+                f'<span class="muted" style="font-size:.85em">'
+                f'{_geno(e.get("genotype"))}</span></div>')
+        if pros and len(pros) > 12:
+            rows.append(f'<div class="muted" style="font-size:.85em">… '
+                        f'{len(pros) - 12} more tracked</div>')
+        if not pros:
+            for i, e in enumerate(elite[:5], 1):
+                net = e.get("net")
+                col = (G if isinstance(net, (int, float)) and net > 0
+                       else (M if isinstance(net, (int, float)) and net == 0 else R))
+                mark = (' <span style="color:%s">✓both</span>' % G
+                        if e.get("both_halves_pos") else "")
+                rows.append(
+                    f'<div><span style="color:{col}">#{i} {_dm(net)}</span>{mark} '
+                    f'<span class="muted">h1 {_dm(e.get("h1"))} h2 {_dm(e.get("h2"))}</span> '
+                    f'<span class="muted" style="font-size:.85em">{_geno(e.get("genotype"))}</span></div>')
+
+        # FUNDING PROSPECTS — each proposal's judge lifecycle (newest first)
+        frows = []
+        statc = {"promoted": G, "running": Y, "queued": M, "proposed": M,
+                 "completed": M, "abandoned": R, "faded": R, "invalid": R}
+        for e in list(reversed(fpros))[:8]:
+            st = str(e.get("status") or "—")
+            s = e.get("stats") or {}
+            bits = []
+            if s.get("n_shadow") is not None:
+                bits.append(f'shadow n={s["n_shadow"]}')
+            if s.get("n_live") is not None:
+                bits.append(f'live n={s["n_live"]}')
+            if isinstance(s.get("shadow_mean_pct"), (int, float)):
+                bits.append(f'sh {s["shadow_mean_pct"]:+.2f}pp')
+            if isinstance(s.get("live_mean_pct"), (int, float)):
+                bits.append(f'lv {s["live_mean_pct"]:+.2f}pp')
+            why = s.get("why")
+            tail = (" · ".join(bits)
+                    + (f' · {html.escape(str(why)[:60])}' if why else ""))
+            frows.append(
+                f'<div><b style="color:{statc.get(st, M)}">'
+                f'{html.escape(st.upper())}</b> '
+                f'{html.escape(str(e.get("name") or ""))} '
+                f'<span class="muted" style="font-size:.85em">{tail}</span></div>')
+        if frows:
+            frows.insert(0, f'<div class="muted" style="margin-top:4px">'
+                            f'funding prospects → judge ({len(fpros)})</div>')
 
         n_prop = len(b.get("proposed") or [])
         age = ""
@@ -1358,13 +1430,16 @@ def incubator_card():
                 age = f' · {int((dt.datetime.now(dt.timezone.utc) - _u).total_seconds() // 60)}m ago'
         except Exception:
             pass
+        n_cur = sum(1 for e in pros if str(e.get("role") or "") != "dormant")
+        reg = (f'{len(pros)} prospects tracked ({n_cur} scored this cycle) · '
+               if pros else "")
         return (f'<div class="card"><h2>🧬 Incubator / Reproduction '
                 f'<span class="dot on"></span></h2>'
                 f'<div class="muted">breeding {b.get("tape_snaps")} snaps '
-                f'({html.escape(str(b.get("tape_source")))}) · {n_prop} funding '
-                f'candidates → judge{age} — genotypes replay-scored; champion '
-                f'only trusted when STABLE (anti-overfit)</div>'
-                f'{champ_line}{"".join(rows)}</div>')
+                f'({html.escape(str(b.get("tape_source")))}) · {reg}{n_prop} '
+                f'funding candidates → judge{age} — genotypes replay-scored; '
+                f'champion only trusted when STABLE (anti-overfit)</div>'
+                f'{champ_line}{"".join(rows)}{"".join(frows)}</div>')
     except Exception:  # noqa: BLE001
         return ""
 
@@ -2548,7 +2623,9 @@ def _organ_vital(key, st):
                       c.get("helping") or 0, c.get("hurting") or 0)
         if key == "strategy-incubator":
             ch = st.get("champion") or {}
-            return _v("champion {} · net ${}", ch.get("confidence") or "none", ch.get("net"))
+            return _v("champion {} · net ${} · {} prospects",
+                      ch.get("confidence") or "none", ch.get("net"),
+                      len(st.get("prospects") or []))
         if key == "xp-queue":
             return _v("{} candidates queued", len(st.get("candidates") or []))
         if key == "xp-judge":
