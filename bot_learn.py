@@ -851,6 +851,29 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
                f"(worst path '{worst_exit}' {worst_share:.0%} of losses) — keep sampling")
 
 
+def derive_actions(hypotheses):
+    """[2026-07-21 BRAIN ACTS] Actions from the hypothesis ledger — pure.
+
+    v1: only ACTIONABLE `diag_regime_timing` findings become `regime_gate`
+    actions (restrict-only; the consumer additionally requires the oracle to
+    read risk-off RIGHT NOW). Candidate/retired findings act on nothing, so
+    the existing PROMOTE_RUNS persistence is the streak gate and retirement
+    is the automatic release. Nested {bot: {tag: {...}}} — the mults' shape,
+    keyed by the ledger identity the consumer already uses."""
+    actions = {}
+    for hk, e in (hypotheses or {}).items():
+        if e.get("status") != "ACTIONABLE" or e.get("kind") != "diag_regime_timing":
+            continue
+        try:
+            hb, htag = hk.split("|tag:", 1)
+        except ValueError:
+            continue
+        actions.setdefault(hb, {})[htag] = {
+            "action": "regime_gate", "since_run": e.get("first_run"),
+            "seen": e.get("seen")}
+    return actions
+
+
 def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
                         engine=None):
     """[2026-07-14 L4, 2026-07-16 v3] Reduce-only per-(bot, tag) stake mults.
@@ -1272,10 +1295,31 @@ def main():
     # [2026-07-14b] Publish the diagnoses — same freshness contract as the
     # multipliers. Advisory: consumers are humans + the dashboard; nothing
     # trades on this directly.
+    # [2026-07-21 BRAIN ACTS — operator: "the brain also needs to be able to
+    # implement its findings"] ...no longer entirely true: the payload now
+    # carries ACTIONS derived from the hypothesis ledger's ACTIONABLE entries
+    # (streak-hardened by the existing PROMOTE_RUNS persistence — a finding
+    # must recur across consecutive runs before it acts, and a retired
+    # finding's action lifts automatically). v1 is ONE action class,
+    # restrict-only: `regime_gate` from diag_regime_timing — the diagnosis
+    # whose evidence is "counter_share >= 0.7 of matched losses opened during
+    # oracle risk-off" (n matched >= 8, bucket n >= DIAG_MIN_N). The consumer
+    # (fleet_bus.entry_regime_gated -> family bot) skips NEW entries for that
+    # (bot, tag) ONLY WHILE the same oracle currently reads risk-off — the
+    # gate acts on exactly the signal the evidence measured, never a
+    # different one (the SPY-vs-btc_regime_up lesson, item 18). Kill switch:
+    # BRAIN_ACTIONS_MODE=advisory publishes the actions but consumers stand
+    # down (the FLEET_RISK_MODE pattern). Expand-direction diagnosis classes
+    # (exit_too_tight etc.) stay advisory — widening needs replay/backtest
+    # per doctrine, and this door is restrict-only by construction.
+    actions = derive_actions(state.get("hypotheses"))
     try:
         import bot_pnl_store as store
         diag_payload = {"updated": now, "ttl_sec": MULT_TTL_SEC,
-                        "diagnoses": diagnoses}
+                        "diagnoses": diagnoses,
+                        "actions": actions,
+                        "actions_mode": os.environ.get("BRAIN_ACTIONS_MODE",
+                                                       "enforce")}
         store.save_state(DIAG_KEY, diag_payload)
         try:
             store.save_history(DIAG_KEY, diag_payload)
@@ -1606,6 +1650,30 @@ def _selftest():
     # no candles at all
     _lighter_cache["ETH"] = None
     ck("no candles -> None", _post_exit_drift(dict(good)) is None)
+
+    # --- [2026-07-21 BRAIN ACTS] derive_actions: only ACTIONABLE
+    # regime_timing findings act; candidates/retired/other kinds never do ---
+    _hyp = {
+        "georgia|tag:long-trend-breakout": {"status": "ACTIONABLE",
+                                            "kind": "diag_regime_timing",
+                                            "first_run": 3, "seen": 5},
+        "dad|tag:long-momo": {"status": "candidate",
+                              "kind": "diag_regime_timing"},
+        "mum|tag:long-x": {"status": "retired", "kind": "diag_regime_timing"},
+        "avo|tag:long-y": {"status": "ACTIONABLE", "kind": "diag_exit_too_tight"},
+        "malformed-key-no-sep": {"status": "ACTIONABLE",
+                                 "kind": "diag_regime_timing"},
+    }
+    _acts = derive_actions(_hyp)
+    ck("ACTIONABLE regime_timing -> regime_gate action",
+       _acts.get("georgia", {}).get("long-trend-breakout", {}).get("action")
+       == "regime_gate")
+    ck("candidate does NOT act (streak gate)", "dad" not in _acts)
+    ck("retired finding releases its action", "mum" not in _acts)
+    ck("expand-direction kinds never act (restrict-only door)",
+       "avo" not in _acts)
+    ck("malformed key skipped, no crash", "malformed-key-no-sep" not in _acts)
+    ck("empty/None ledger -> no actions", derive_actions(None) == {})
 
     print("selftest: %d checks, %d FAILED%s"
           % (len(ran), len(fails), (" -> " + ", ".join(fails)) if fails else ""))
