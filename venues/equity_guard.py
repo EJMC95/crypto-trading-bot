@@ -148,6 +148,7 @@ class EquityGuard:
         self._persist_streak = bool(persist_reject_streak)
         self._last = None      # {ts, equity, collateral, mids:{c:px}, sizes:{c:sz}}
         self._rejects = []     # consecutive rejected reads: (ts, venue_total, collateral, reason)
+        self._capital_moves = []   # accepted deposits/withdrawals awaiting pop (D1 2026-07-21)
         if load_state is not None:
             try:
                 st = load_state() or {}
@@ -252,6 +253,35 @@ class EquityGuard:
         except Exception:  # noqa: BLE001 — persistence is best-effort
             pass
 
+    # -- capital moves (deposits / withdrawals are NOT P&L) ---------------------
+    def _record_capital_move(self, now, delta, how):
+        """[2026-07-21 review N1] A cash move the guard just accepted is CAPITAL,
+        and the guard is the only layer that can tell it from P&L (it holds the
+        last TRUSTED collateral). Record the ledger-grade delta so the bot can
+        move its P&L baseline instead of printing the operator's own money as
+        profit (MEASURED 2026-07-18: two ~$32 deposits printed as +$64.77 of
+        live "P&L" on the dashboard — the (ao) heal restored equity continuity
+        and nothing moved the baseline). Declared residual: a funding settlement
+        big enough to breach the continuity tolerance ALONE would be
+        misclassified as capital — orders of magnitude above the funding
+        allowance already inside the band on these books, and every event is
+        logged + persisted by the caller for audit."""
+        try:
+            d = round(float(delta), 2)
+        except (TypeError, ValueError):
+            return
+        self._capital_moves.append({"ts": float(now), "delta": d, "how": str(how)})
+        log.warning("equity guard: CAPITAL MOVE $%+.2f (%s) — the P&L baseline "
+                    "should absorb this, not report it as profit.", d, how)
+
+    def pop_capital_moves(self):
+        """Return-and-clear capital-move events accepted since the last pop.
+        In-memory only (declared residual: a crash between the accept and the
+        caller's pop loses the event — the window is one loop iteration, and
+        the CAPITAL_ADJUST_USD env knob is the manual recovery)."""
+        out, self._capital_moves = self._capital_moves, []
+        return out
+
     # -- public ----------------------------------------------------------------
     @property
     def has_state(self):
@@ -342,6 +372,10 @@ class EquityGuard:
                     log.warning("equity guard: cash-side move $%+.2f accepted "
                                 "(collateral moved with total; positions unchanged "
                                 "— deposit/withdrawal/funding settlement).", d_total)
+                    # capital, not P&L — the collateral delta is the ledger-grade
+                    # size of the move (D1 2026-07-21)
+                    self._record_capital_move(now, collateral - last["collateral"],
+                                              "cash-escape")
                     return None
                 return ("continuity",
                         f"equity moved ${d_total:+.2f} vs book-implied "
@@ -505,6 +539,15 @@ class EquityGuard:
 
         if len(self._rejects) >= need and (allow_total_stable or coll_stable):
             how = "collateral-stable" if (coll_stable and not allow_total_stable) else "consistent"
+            # [2026-07-21 D1] a rebase that moved LEDGER collateral vs the last
+            # trusted read is a cash move (the deposit-heal path) — record it
+            # before _accept overwrites the baseline. Flat collateral (a
+            # model-drift total_stable concession) records nothing.
+            _lc = (self._last or {}).get("collateral")
+            if collateral is not None and _lc is not None:
+                _cap = float(collateral) - float(_lc)
+                if abs(_cap) > tol:
+                    self._record_capital_move(now, _cap, "rebase-" + how)
             log.error("equity guard: %d consecutive %s rejects — REBASING to "
                       "venue value $%.2f (last: %s).",
                       len(self._rejects), how, venue_total, detail)

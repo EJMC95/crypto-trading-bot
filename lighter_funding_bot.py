@@ -63,6 +63,15 @@ H = funding_basis.periods_per_year("lighter")
 
 # --------------------------- configuration ----------------------------------
 START_EQUITY = 1000.0
+# [2026-07-21 D1] CAPITAL IS NOT P&L. The EquityGuard records the deposits/
+# withdrawals it accepts (pop_capital_moves) and they accumulate in the
+# persisted ":live" state; this env knob backfills moves that predate the
+# mechanism. Default = this book's 18-Jul deposit as measured in the
+# fleet-equity series (+$32.55 @ 02:33Z — review 2026-07-21 N1; printed as
+# profit until this fix). Override with the exact figure if known; set to 0
+# if initial_equity is ever re-baselined by hand (the backfill assumes the
+# baseline predates the 18-Jul deposit).
+CAPITAL_ADJUST_USD = float(os.environ.get("CAPITAL_ADJUST_USD", "32.55"))
 ORDER_USD = float(os.environ.get("FUNDING_ORDER_USD", "25"))   # small: directional
 MAX_OPEN_POSITIONS = int(os.environ.get("FUNDING_MAX_OPEN", "6"))
 MAX_NEW_PER_LOOP = int(os.environ.get("FUNDING_MAX_NEW_PER_LOOP", "2"))
@@ -657,6 +666,10 @@ def main():
         meta = {str(k): v for k, v in (_live.get("meta") or {}).items()}
     live_baseline = (store.load_state(bot_id + ":live") or {}).get("initial_equity") \
         if not dry_run else None
+    # [2026-07-21 D1] persisted capital ledger: guard-detected deposits/
+    # withdrawals fold in here (loop below); pnl subtracts it + the env backfill.
+    capital_adjust = ((store.load_state(bot_id + ":live") or {}).get("capital_adjust")
+                      if not dry_run else None) or {"total": 0.0, "events": []}
 
     log.info("=" * 64)
     log.info("Yield Harvester (Lighter DIRECTIONAL funding) | venue=%s (%s)",
@@ -685,6 +698,29 @@ def main():
 
     def account_value():
         return broker.equity() if dry_run else ctx.venue.account_value()
+
+    def _live_pnl(eq):
+        """[2026-07-21 D1] Live P&L = equity − baseline − CAPITAL. Deposits and
+        withdrawals are the operator's money moving, not trading results —
+        subtract the persisted guard-recorded ledger plus the env backfill
+        (CAPITAL_ADJUST_USD). Reporting-only: no trading decision reads this."""
+        if eq is None or live_baseline is None:
+            return None
+        return eq - live_baseline - capital_adjust["total"] - CAPITAL_ADJUST_USD
+
+    def _fold_capital_moves():
+        """[2026-07-21 D1] Fold guard-detected cash moves into the persisted
+        capital ledger the moment they are accepted (fail-safe: no guard or no
+        moves -> no-op). Events keep the last 20 for audit."""
+        if dry_run:
+            return
+        for _mv in getattr(ctx.venue, "pop_capital_moves", lambda: [])():
+            capital_adjust["total"] = round(capital_adjust["total"] + _mv["delta"], 2)
+            capital_adjust["events"] = (capital_adjust.get("events") or [])[-19:] + [_mv]
+            log.warning("capital ledger: $%+.2f (%s) -> lifetime $%+.2f "
+                        "(+$%.2f env backfill) — P&L baseline absorbed it.",
+                        _mv["delta"], _mv["how"], capital_adjust["total"],
+                        CAPITAL_ADJUST_USD)
 
     def positions():
         if dry_run:
@@ -814,6 +850,18 @@ def main():
         halted_today = True
         day_start_equity = _halt.get("day_start_equity") or day_start_equity
         log.warning("daily-loss halt restored from state — halted for the rest of today.")
+    elif not dry_run:
+        # [2026-07-21 D3 — review item 15 residual] same-UTC-day persisted
+        # baseline (the Ticket Taker's proven pattern): a PRE-halt restart
+        # part-way down a losing day used to re-base the 10% daily-loss rail to
+        # the already-depressed boot equity, so the rail could no longer fire on
+        # that day's real drawdown. The halt record above stays SENIOR; a
+        # persisted day_start for TODAY beats the boot re-read.
+        _ds = (store.load_state(bot_id + ":live") or {}).get("day_start") or {}
+        if _ds.get("day") == cur_day.isoformat() and _ds.get("equity"):
+            day_start_equity = float(_ds["equity"])
+            log.info("day-start equity restored from state: $%.2f (%s)",
+                     day_start_equity, cur_day)
     last_ts = time.time()
     _last_moved = None      # growth-rail bars log dedup
 
@@ -857,6 +905,9 @@ def main():
         except Exception as e:
             log.warning("account value unavailable: %s", e)
             equity = None
+        # [2026-07-21 D1] a deposit/withdrawal the guard accepted on that read
+        # is capital — absorb it into the ledger before any P&L is computed.
+        _fold_capital_moves()
         # [2026-07-11 LATE BASELINE] if the boot/day-roll capture failed (venue
         # down, or the equity guard vetoed a dislocated print) the rail used to
         # stay OFF all day. Adopt the first credible read instead.
@@ -904,8 +955,7 @@ def main():
                     _hb_pnl = _hb_eq - START_EQUITY
                 else:
                     _hb_eq = equity
-                    _hb_pnl = (equity - live_baseline) if (equity is not None
-                                                           and live_baseline is not None) else None
+                    _hb_pnl = _live_pnl(equity)   # capital-adjusted (D1)
                 store.publish(
                     bot_id, status="paper" if ctx.mode == "hl_paper" and dry_run
                     else "halted",
@@ -1318,8 +1368,7 @@ def main():
                            if (v.get("size") if isinstance(v, dict) else v))
             if live_baseline is None and equity is not None:
                 live_baseline = equity
-            pub_pnl = (equity - live_baseline) if (equity is not None
-                                                   and live_baseline is not None) else None
+            pub_pnl = _live_pnl(equity)   # capital-adjusted (D1)
         top = sorted(((c, f.get("rate") or 0.0) for c, f in fund.items()),
                      key=lambda cr: -abs(cr[1]))[:3]
         try:
@@ -1331,7 +1380,10 @@ def main():
                 extra={"mode": ctx.mode, "venue": ctx.mode, "style": "directional-funding",
                        "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                 for c in meta},
-                       "hottest_apr": {c: f"{r*H:+.0%}" for c, r in top}})
+                       "hottest_apr": {c: f"{r*H:+.0%}" for c, r in top},
+                       # D1: total capital excluded from pnl_abs — self-describing
+                       **({} if dry_run else {"capital_adjust": round(
+                           capital_adjust["total"] + CAPITAL_ADJUST_USD, 2)})})
         except Exception:
             pass
         # persist state (dry_run: full paper account; live: baseline + open meta)
@@ -1340,8 +1392,13 @@ def main():
                 store.save_state(bot_id, {"broker": broker.to_state(), "meta": meta,
                                           "fund_realized": fund_realized})
             elif live_baseline is not None:
-                store.save_state(bot_id + ":live", {"initial_equity": live_baseline,
-                                                    "meta": meta})
+                store.save_state(bot_id + ":live", {
+                    "initial_equity": live_baseline, "meta": meta,
+                    # D1: guard-recorded deposits/withdrawals (capital, not P&L)
+                    "capital_adjust": capital_adjust,
+                    # D3: same-UTC-day rail baseline survives a pre-halt restart
+                    "day_start": {"day": cur_day.isoformat(),
+                                  "equity": day_start_equity}})
         except Exception:
             pass
 

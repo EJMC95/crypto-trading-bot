@@ -600,3 +600,78 @@ def test_persist_flag_wiring():
     ctx_src = (root / "venues" / "__init__.py").read_text(encoding="utf-8")
     assert "guard_persist_reject_streak" not in ctx_src, \
         "venue_context (Funding Farmer) must keep the default False"
+
+
+# ── capital moves: deposits/withdrawals are NOT P&L ──────────────────────────
+# [2026-07-21 review N1] The (ao) heal restored equity CONTINUITY after the
+# 18-Jul deposits but nothing moved the P&L baseline, so both live rows printed
+# the operator's ~$32 deposits as profit (+$64.77 of the dashboard's +$68.46).
+# The guard is the only layer holding the last TRUSTED collateral, so it now
+# records the ledger-grade delta on every cash-accepting path; the bots pop and
+# fold it into their persisted capital ledger and pnl_abs subtracts it.
+def test_cash_escape_records_capital_move():
+    # the escape path: deposit $30 accepted immediately (collateral 105 -> 135)
+    g = _guard({"BTC": 95.0})
+    assert g.evaluate(100.0, 105.0, {"BTC": _pos(1, 100, upnl=-5.0)}).accepted
+    assert g.pop_capital_moves() == []            # baseline accept records nothing
+    v = g.evaluate(130.0, 135.0, {"BTC": _pos(1, 100, upnl=-5.0)})
+    assert v.accepted
+    moves = g.pop_capital_moves()
+    assert len(moves) == 1 and moves[0]["delta"] == pytest.approx(30.0)
+    assert moves[0]["how"] == "cash-escape"
+    assert g.pop_capital_moves() == []            # pop clears
+
+def test_cash_escape_records_a_withdrawal_negative():
+    g = _guard({"BTC": 95.0})
+    assert g.evaluate(100.0, 105.0, {"BTC": _pos(1, 100, upnl=-5.0)}).accepted
+    v = g.evaluate(70.0, 75.0, {"BTC": _pos(1, 100, upnl=-5.0)})
+    assert v.accepted
+    moves = g.pop_capital_moves()
+    assert len(moves) == 1 and moves[0]["delta"] == pytest.approx(-30.0)
+
+def test_collateral_stable_rebase_records_capital_move():
+    # the (ao) heal path: deposit heals via coll_stable on a drifting book —
+    # the recorded delta is collateral vs the LAST TRUSTED read (100 -> 130).
+    mids = {"BTC": 100.0}
+    g = _guard(mids)
+    assert g.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    for m in (99.4, 100.6, 99.5):
+        mids["BTC"] = m
+        upnl = round(m - 100.0, 4)
+        v = g.evaluate(round(130.0 + upnl, 4), 130.0, {"BTC": _pos(1, 100, upnl=upnl)})
+    assert v.accepted and v.reason == "rebase"
+    moves = g.pop_capital_moves()
+    assert len(moves) == 1 and moves[0]["delta"] == pytest.approx(30.0)
+    assert moves[0]["how"].startswith("rebase-")
+
+def test_flat_collateral_rebase_records_no_capital_move():
+    # a total-stable concession to model drift (collateral NEVER moved) is not
+    # a cash move — recording it would misclassify P&L as capital, the inverse
+    # of the bug this fixes.
+    g = _baseline(_guard({"BTC": 100.0}))
+    for _ in range(2):
+        assert g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100)}).reason == "continuity"
+    v = g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100)})
+    assert v.accepted and v.reason == "rebase"    # concedes to the stable total
+    assert g.pop_capital_moves() == []            # …but records NO capital move
+
+def test_ordinary_reads_record_no_capital_moves():
+    g = _baseline(_guard({"BTC": 100.0}))
+    g.evaluate(100.0, 100.0, {"BTC": _pos(1, 100, upnl=0.0)})       # accept
+    g.evaluate(75.0, 100.0, {"BTC": _pos(1, 100, upnl=-25.0)})      # mark_gap reject
+    assert g.pop_capital_moves() == []
+
+def test_capital_adjust_wiring():
+    """Pin the consumer wiring the runtime tests can't reach (both live bots'
+    main loops need a signer): each live bot pops the guard's capital moves,
+    persists the ledger, and subtracts capital from its published pnl."""
+    from pathlib import Path
+    import venues.lighter_client as lc
+    import inspect
+    assert "pop_capital_moves" in inspect.getsource(lc.LighterClient)
+    root = Path(__file__).resolve().parent.parent.parent
+    for fname in ("lighter_funding_bot.py", "lighter_ticket_taker.py"):
+        src = (root / fname).read_text(encoding="utf-8")
+        assert "pop_capital_moves" in src, f"{fname} must fold guard capital moves"
+        assert "capital_adjust" in src, f"{fname} must persist the capital ledger"
+        assert "CAPITAL_ADJUST_USD" in src, f"{fname} must honor the env backfill"
