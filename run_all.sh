@@ -296,5 +296,22 @@ done &
     sleep "${SHORTFALL_INTERVAL_SEC:-1800}"
   done ) &
 
+# [2026-07-21 PARLIAMENT] 🏛️ the six-layer PM shadow fleet (operator ask:
+# comprehensive self-evolving system, bots named for the last 8 Australian
+# PMs). ONE asyncio process carrying all six layers: Lighter-only data,
+# Keating's 10 scanners + 5-model ML ensemble, the six $1k SHADOW books
+# (pm-albanese/morrison/turnbull/abbott/rudd/gillard, rows *-lshadow),
+# their six bounded TTL'd tuners, and Howard the ecosystem brain ->
+# bot_state 'parliament' + 'parliament-tuning'. No keys, no signing, no
+# orders — shadow-first like every book before it. PARLIAMENT_ENABLED=0
+# idles the chamber (the process idles rather than exits — the Trail
+# Blazer restart-loop lesson).
+( sleep 360
+  while true; do
+    python3 /freqtrade/parliament_main.py || true
+    echo "[supervisor] parliament exited — restarting in 30s"
+    sleep 30
+  done ) &
+
 # Keep the container alive as long as any supervisor loop is running.
 wait
