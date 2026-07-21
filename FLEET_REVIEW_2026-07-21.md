@@ -163,6 +163,27 @@ Verified in code this session:
   at last mark after N missing cycles) — paper-only bots, replay-gated per
   doctrine. It is the remaining hole from an audit everything else in
   which has shipped.
+  **⛔ CORRECTION (2026-07-21, follow-up session — this recommendation was
+  FALSE; do NOT port anything).** The port already shipped 17-Jul and all
+  six bots carry a working give-up. Verified in code AND git-blame, not from
+  a comment date:
+  - `funding_carry_bot.py`, `lighter_family_bot.py`, `lighter_index_bot.py`
+    — guard introduced by commit `fcb91af` (2026-07-17); `lighter_dislocation_bot.py`
+    by `30bf24ce` (2026-07-17); `lighter_ticket_taker.py` carries it plus a
+    `delist_due()` helper and a `--selftest` assertion; the sniper is the
+    reference. Each has a per-bot env knob (`CARRY_/FAMILY_/INDEX_/DISLOC_/
+    TT_DELIST_GIVEUP_H`), a main-loop unpriceable-book clock, and — for
+    index/family/dislocation — a second **orphan sweep** for positions on
+    symbols that left the universe entirely.
+  - This item is internally inconsistent with its own §4, which says "taker
+    + sniper already carry give-ups" while this bullet says "none of the six."
+    Both halves are wrong in the same direction: the code has all six.
+  - This is the item-14 **G1 situation verbatim** (a prior session closed it;
+    this review graded it as open). Same remedy: nothing to build. Had the
+    "sanctioned paper-lane port" been executed it would have layered a second
+    close path into six bots — a double-close / conflicting-`no_px_since`
+    hazard. **The audit hole from 16-Jul is CLOSED.** The `--selftest`s and
+    `scripts/audit_image_imports.py` are the standing proof, not this doc.
 - **(ii) replay mark universe** — documented divergence stands; the fix
   (record all-book marks on the scout tape) remains queued. Keep.
 - **(iii) per-bot clips** — shipped in code ✓. **(iv) census
@@ -220,6 +241,9 @@ Verified in code this session:
   brain while an expansion walk is mid-flight is a 10-line code read this
   session did not spend; it is the only contested item touching an actuator,
   so it gets the next session's first look rather than a drop.
+  **→ RESOLVED & SHIPPED 2026-07-21 (follow-up session): it DID fail open;
+  fixed fail-CLOSED in `lighter_scout_tuner.taker_bars_this_cycle`. Detail in
+  the §4 IMB-18 stamp.**
 
 ### Item 15 — 🏆 Stock Leaders → **PARK CONFIRMED; ship the rail fix to the live pair**
 
@@ -457,6 +481,25 @@ money), or explicitly deferred with a date.
   done: taker + sniper already carry give-ups; the remaining four
   (Yield Harvester, family bot, Index Rider, Snap Back) are the port
   targets for a replay-gated follow-up session.
+  **⛔ CORRECTION (2026-07-21, follow-up session): the "remaining four"
+  ALREADY CARRY the guard (shipped 17-Jul, `fcb91af`/`30bf24ce`) — the port
+  is DONE, nothing to defer. See item 13-(i) correction for the per-bot
+  evidence. This is the second item in this review (with G1) graded open
+  that a prior session had closed; both were caught only by re-reading the
+  code, which is the doctrine.**
+
+- **IMB-18 (contested, the one actuator-touching item) — SHIPPED this
+  follow-up session.** The review said it "gets the next session's first
+  look." Confirmed REAL: `lighter_scout_tuner.run_once` passed `lens_fwd={}`
+  on a dark/stale brain, so `vetoed_lenses()` (fail-safe OPEN — "freshness is
+  the CALLER's job") vetoed nothing, yet the taker-bar expansion walk still
+  ran — the `starving` and `proprio-helping` paths widened the live fill gate
+  with the brain veto silently absent. On Lighter's single-regime tape the
+  both-halves replay check is toothless (item 18), so the veto was doing real
+  work the replay cannot. **Fix: `taker_bars_this_cycle()` fails the walk
+  CLOSED on a dark brain** (mirrors the scout-diet gate + the taker's own
+  freshness contract); restrict-direction, fail-safe, selftested (dark →
+  no widen; fresh-but-empty → helping may still expand; fresh-veto → blocked).
 
 ## R. Residuals this session could not reach (no DB / no dashboard login)
 

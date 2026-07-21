@@ -293,6 +293,34 @@ def desired_taker_bars(tape, baseline, lens_fwd, helping=None):
     return {k: v for k, v in bars.items() if v != DEFAULTS[k]}, log
 
 
+def taker_bars_this_cycle(tape, baseline, lens_fwd, lf_fresh, helping=None):
+    """[2026-07-21 IMB-18] The freshness gate around the taker-bar walk.
+
+    desired_taker_bars WIDENS the live fill gate, and its senior invariant is
+    "NEVER widen a brain-vetoed lens" — vetoed_lenses() is the authority. But
+    that authority is fail-safe OPEN and, in its own words, "freshness is the
+    CALLER's job": handed an empty grade set it vetoes NOTHING. On a dark/stale
+    brain run_once passes lens_fwd={}, so the veto silently disappears while the
+    starving and proprio-helping paths keep widening on replay evidence alone —
+    the exact fail-open the 21-Jul review flagged (IMB-18). The prior comment
+    ("taker-bar walks still run, the replay is their evidence") was the bug's
+    rationale: on Lighter's single-regime tape the both-halves replay check is
+    toothless (agenda item 18), so the brain veto is doing real work the replay
+    cannot, and dropping it is not neutral.
+
+    So the walk fails CLOSED here — no widening while the veto is dark — exactly
+    as the scout-diet already does. A fresh brain that simply has no grade yet
+    for a lens is a DIFFERENT state (lf_fresh=True, thin/empty grade): the veto
+    is legitimately empty and proprio-helping may still expand. lf_fresh is the
+    discriminator run_once already computes; this only teaches the taker-bar
+    walk to honour it too."""
+    if not lf_fresh:
+        return {}, ["lens-forward missing/stale — no taker-bar widening "
+                    "(fail-CLOSED: the brain veto that gates every widen is "
+                    "dark; replay alone is single-regime-toothless) [IMB-18]"]
+    return desired_taker_bars(tape, baseline, lens_fwd, helping=helping)
+
+
 def sweep_exits(tape, baseline):
     """The agenda's TP/SL/hold grid. Returns ({attr: value}, log). Enacts
     only past anti-overfit floors: enough baseline trades, wins on BOTH
@@ -452,8 +480,10 @@ def run_once():
                     <= float(lf_state.get("ttl_sec") or 0))
     except Exception:
         lf_fresh = False
-    # fail-safe NEUTRAL on a dark brain: taker-bar walks still run (the
-    # replay is their evidence) but grading-floor logic contributes nothing.
+    # [2026-07-21 IMB-18] fail-CLOSED on a dark brain. lens_fwd stays {} when
+    # stale (vetoed_lenses vetoes nothing on it — fail-safe open), and the
+    # taker-bar walk is now suppressed to match (see taker_bars_this_cycle):
+    # without a live veto the walk would widen the fill gate unchecked.
     lens_fwd = (lf_state.get("lenses") or {}) if lf_fresh else {}
 
     # proprioception (16-Jul): HELPING levers earn the expansion walk /
@@ -464,7 +494,8 @@ def run_once():
     helping = set(proprio.helping_levers(prop_state, prop_now)) if proprio else set()
 
     baseline = replay_with(tape, DEFAULTS)
-    bars, log1 = desired_taker_bars(tape, baseline, lens_fwd, helping=helping)
+    bars, log1 = taker_bars_this_cycle(tape, baseline, lens_fwd, lf_fresh,
+                                       helping=helping)
     exits, log2 = sweep_exits(tape, baseline)
     # [2026-07-16 AUDIT FIX] bars were validated against DEFAULT exits and
     # exits against DEFAULT bars — the deployed COMBINATION was never on the
@@ -681,6 +712,25 @@ def _selftest():
                                     helping={"taker.dip_range"})
     assert "DIP_RANGE" not in bars_h3, bars_h3
 
+    # [2026-07-21 IMB-18] the CALLER's freshness gate. bars_h1 above proves the
+    # walk WOULD proprio-helping-expand on an empty grade set; run_once passes
+    # exactly that empty set on a dark brain. taker_bars_this_cycle must fail
+    # CLOSED there — no widen while the veto is dark — and say why.
+    bars_dark, log_dark = taker_bars_this_cycle(help_tape, base_h, {}, False,
+                                                helping={"taker.dip_range"})
+    assert bars_dark == {}, bars_dark
+    assert any("IMB-18" in l for l in log_dark), log_dark
+    # ...while a FRESH brain (lf_fresh=True) runs the walk unchanged: an empty
+    # grade for a not-yet-floored lens is a legitimate no-veto state where a
+    # HELPING verdict may still expand (the pre-IMB-18 behaviour, preserved).
+    bars_live, _ = taker_bars_this_cycle(help_tape, base_h, {}, True,
+                                         helping={"taker.dip_range"})
+    assert bars_live.get("DIP_RANGE") == 0.08, bars_live
+    # ...and a fresh brain that VETOES the lens still blocks it (veto senior)
+    bars_livev, _ = taker_bars_this_cycle(help_tape, base_h, lf_veto, True,
+                                          helping={"taker.dip_range"})
+    assert "DIP_RANGE" not in bars_livev, bars_livev
+
     # sweep refuses tiny samples (anti-overfit floor)
     exits, slog = sweep_exits(win_tape, base)
     assert exits == {} and "skipped" in slog[0], slog
@@ -779,7 +829,8 @@ def _selftest():
 
     print("scout_tuner selftest OK (ladders, veto, win-widen, lose-reject, "
           "floor-release, anti-overfit sweep gate, proprioception "
-          "hurting-skip + helping-unlock + deeper-diet, registry bounds)")
+          "hurting-skip + helping-unlock + deeper-diet, dark-brain fail-CLOSED "
+          "[IMB-18], registry bounds)")
 
 
 if __name__ == "__main__":
