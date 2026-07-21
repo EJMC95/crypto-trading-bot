@@ -23,6 +23,7 @@ guarded off on 17-Jul — see the LIGHTER-ONLY table after the fleet table.
 | lighter-dislocation-lshadow | 🧲 Snap Back | dislocation fader — reference is LIGHTER'S OWN `index_price` since 17-Jul (was Hyperliquid mids) |
 | lighter-ticket-taker-lshadow | 🎫 Ticket Taker | **trades Lighter Scout's high-conviction tickets** (breakout/dip/momentum long + divergence long/short); stress veto pauses entries at venue |prem| med ≥15bps; closes tagged `<side>-<lens>_<exit>` so the brain grades each lens |
 | equities-regime-lshadow | 📊 Index Rider | stock-perp port (IBKR original RETIRED 14-Jul). 🏆 Stock Leaders (`equities-momentum{,-lshadow}`) RETIRED 17-Jul — maxDD 37-44% vs the 15% go-live gate |
+| pm-{albanese,morrison,turnbull,abbott,rudd,gillard}-lshadow | 🏛️ the Parliament | six-layer self-evolving shadow fleet (21-Jul, operator ask; named for the last 8 Australian PMs — the other two are its organs: Keating 🔭 scanners+ML, Howard 🧠 ecosystem brain). `parliament_main.py` in the freqtrade-bots container; SQLite ecosystem DB on the persist volume; consumes scout stress + L2 veto + brain mults; closes tagged per lens; `PARLIAMENT_ENABLED=0` idles it |
 
 ### LIGHTER-ONLY (17-Jul, operator: "i only want things running on lighter")
 LIGHTER-FIRST governed SERVICES since 14-Jul, but five rows were still TRADING
@@ -234,6 +235,14 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   auto-flips without review). ADVISORY: zero consumers until a review
   wires one (restrict-only first). Tuning: `evsent.*` levers, lane
   `event-sentinel`. → bot_state `event-sentinel` (+ `-state`)
+- `parliament_main.py` 🏛️ — the Parliament's supervisor (21-Jul): six asyncio
+  layers in one process — `parliament/` data (Lighter REST+ws ONLY),
+  Keating's 10 scanners + 5-model prequential ML ensemble, the six PM shadow
+  books, six replay-gated auto-reverting tuners (the scout-tuner doctrine:
+  bounds cage, TTL, both-halves floors, hurting-refusal), Howard's brain →
+  bot_state `parliament` + `parliament-tuning`. Redis mirror optional
+  (`REDIS_URL`); in-process bus is primary. Shadow-only forever until the
+  standard go-live gate.
 - `regime_oracle.py`, `market_pulse.py` (history appends every 30 min, 15-Jul),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 
@@ -290,6 +299,8 @@ its row is dashboard-retired regardless; stop the process when found.
 - `fleet_risk.py` / `regime_oracle.py` / `market_pulse.py` — shared organs
 - `lighter_ticket_replay.py` — replay the recorded scout tape through the
   taker's real code (rule changes judged in seconds, not shadow-days)
+- `parliament_main.py` + `parliament/` — 🏛️ the six-layer PM shadow fleet
+  (see intelligence layer); ecosystem DB at `/freqtrade/persist/parliament.db`
 - `venues/safety.py` — SafetyRails (kill switch, notional caps, daily-loss halt)
   **+ `open_notional()`**: the fleet's ONE answer to "how much is really
   deployed?" — sum each held position at ITS OWN entry clip, never

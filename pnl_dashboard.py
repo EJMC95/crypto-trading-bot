@@ -245,7 +245,12 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 "freqtrade-mum", "freqtrade-dad",
                 "freqtrade-avo-maria", "freqtrade-georgia",
                 # [2026-07-14] 🎫 Ticket Taker — shadow-only scout trader
-                "lighter-ticket-taker"}
+                "lighter-ticket-taker",
+                # [2026-07-21] 🏛️ the Parliament — six PM shadow books
+                # (parliament_main.py in the freqtrade-bots container).
+                # Publish ONLY -lshadow rows; bases never publish.
+                "pm-albanese", "pm-morrison", "pm-turnbull",
+                "pm-abbott", "pm-rudd", "pm-gillard"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper"]
 
@@ -273,6 +278,8 @@ OVERTRADE_LIMIT = {
     "lighter-perp-sniper":   60,   # 🎯 Perp Sniper — same, on Lighter
     "perps-funding-lighter": 40,   # 💸 Funding Farmer — 5-min loop, flips often
     "perps-funding-spread":  40,   # ⚖️ Counterweight — x-sect L/S rebalances
+    "pm-abbott":             40,   # 🥊 Parliament scalper — ≤4h holds by design
+    "pm-gillard":            40,   # 🤝 Parliament disloc fader — closes often
 }
 OVERTRADE_DEFAULT = 15
 
@@ -344,6 +351,14 @@ LABELS = {
     "freqtrade-dad":               "👨 Dad — breakout rider",
     "freqtrade-avo-maria":         "🙏 Avo Maria — dip buyer",
     "freqtrade-georgia":           "🔮 Georgia — day trader",
+    # [2026-07-21] 🏛️ the Parliament — last 8 Australian PMs: 6 books here,
+    # Keating (scanners+ML) and Howard (ecosystem brain) are its organs.
+    "pm-albanese":                 "🏗️ Albanese — trend rider",
+    "pm-morrison":                 "📣 Morrison — breakout chaser",
+    "pm-turnbull":                 "💼 Turnbull — mean reverter",
+    "pm-abbott":                   "🥊 Abbott — momentum scalper",
+    "pm-rudd":                     "🌏 Rudd — funding diplomat",
+    "pm-gillard":                  "🤝 Gillard — dislocation fader",
 }
 
 # One-line strategy brief per bot (shared by its venue variants — the chips
@@ -367,6 +382,12 @@ DESCRIPTIONS = {
     "scanner-cross-exchange-arb": "scans cross-exchange spreads and paper-fills observed gaps (optimistic basis, own subtotal)",
     "equities-regime":      "SPY + QQQ long above the 200d SMA (±1% band) + gold on a 20/50 cross · $250 × 3 slots",
     "equities-momentum":    "qualifies close>SMA200 & SMA20>SMA50, ranks by 42d return, holds top-5 of 25 (US stocks + gold/silver/oil + BTC/ETH), weekly rotation · $180 × 5 slots",
+    "pm-albanese":  "Parliament 🏛️ · rides 15m+1h EMA(12/48) agreement confirmed by a momentum burst · ML-gated, $25 × 3 slots",
+    "pm-morrison":  "Parliament 🏛️ · chases 48-bar Donchian breaks confirmed by a volume spike · ML-gated, $25 × 3 slots",
+    "pm-turnbull":  "Parliament 🏛️ · fades RSI<25/>75 stretch, stands down in expanding vol · ML-gated, $25 × 3 slots",
+    "pm-abbott":    "Parliament 🏛️ · scalps strong 15m momentum bursts, tight TP/SL, ≤4h hold · ML-gated, $25 × 3 slots",
+    "pm-rudd":      "Parliament 🏛️ · holds the side funding PAYS when |TRUE apr| ≥ 20%, trend-sanity-checked · $25 × 3 slots",
+    "pm-gillard":   "Parliament 🏛️ · fades ≥25bps mark-vs-index premium (Lighter's OWN index), exits on reconverge · $25 × 3 slots",
 }
 
 
