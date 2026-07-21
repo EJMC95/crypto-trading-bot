@@ -49,6 +49,33 @@ from .symbol_map import to_lighter
 
 log = logging.getLogger("venues.lighter")
 
+
+def _tx_hash_of(tx, resp):
+    """Best-effort tx hash from the signer's (tx, resp) pair, or None.
+
+    [2026-07-21] The SDK has returned the send response in several shapes
+    across versions (a bare hash string, an object with .tx_hash, a dict) —
+    probe them all rather than pin one, because a None here only means the
+    fill read falls back to the (measured-broken) client-id tier, never an
+    error. A hex-looking string of plausible length is accepted as a hash;
+    anything else is not (a str(resp) like '<TxResp ...>' must never match
+    a trade's tx_hash by accident — and cannot, since the comparison is
+    exact equality against the venue's hex)."""
+    for cand in (resp, tx):
+        if cand is None:
+            continue
+        for attr in ("tx_hash", "hash"):
+            v = getattr(cand, attr, None)
+            if v is None and isinstance(cand, dict):
+                v = cand.get(attr)
+            if v:
+                return str(v)
+        if isinstance(cand, str):
+            s = cand.strip()
+            if len(s) >= 40 and all(c in "0123456789abcdefABCDEF" for c in s):
+                return s
+    return None
+
 MAINNET_URL = "https://mainnet.zklighter.elliot.ai"
 TESTNET_URL = "https://testnet.zklighter.elliot.ai"   # verified live 2026-07-09
 BOOK_STALE_SEC = 30.0    # ws book older than this -> REST fallback
@@ -599,9 +626,16 @@ class LighterClient(VenueClient):
             raise VenueError(f"order failed {coin}: {err}")
         return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
                 "resp": getattr(resp, "to_dict", lambda: str(resp))(),
-                "client_order_index": _cid}
+                "client_order_index": _cid,
+                # [2026-07-21] the fill's OTHER exact name: every venue trade
+                # row stamps the taker's tx_hash, so OUR submission's hash
+                # matches OUR fills without depending on the venue echoing
+                # client ids (measured live: 0 of 61 real orders ever
+                # id-matched — fill_src 'id-miss' on every read).
+                "tx_hash": _tx_hash_of(tx, resp)}
 
-    def _our_fills(self, trades, is_ask, since_ts, client_id=None):
+    def _our_fills(self, trades, is_ask, since_ts, client_id=None,
+                   tx_hash=None):
         """Size-weighted VWAP of OUR fills in a trade list, or None. Shared by
         both read paths so the authoritative and fallback tapes can never
         disagree about what counts as ours.
@@ -626,6 +660,15 @@ class LighterClient(VenueClient):
         PER ACCOUNT, so two accounts ordering in the same millisecond collide.
         My first cut matched on the id ALONE and would have read a stranger's
         fill as ours; the selftest caught it."""
+        # [2026-07-21 TX-HASH TIER] the STRONGEST exact name, tried first:
+        # every venue trade row stamps the taker transaction's tx_hash, and
+        # OUR submission gets that hash back from SendTx — so matching on it
+        # cannot depend on the venue propagating client_order_index into the
+        # tape (MEASURED live: it does not — 0 of 61 real orders across both
+        # live bots ever id-matched; fill_src said 'id-miss' on every read).
+        # Partial fills of one IOC market order share the taker's hash, so
+        # the VWAP across matches IS the fill price. Ownership is STILL
+        # checked (the doctrine below: an id narrows, it never authorises).
         fills = []
         for t in (trades or []):
             # OURS, always — the id narrows, it never authorises.
@@ -635,7 +678,11 @@ class LighterClient(VenueClient):
                 continue
             if not is_ask and not ours_bid:
                 continue
-            if client_id is not None:
+            if tx_hash:
+                th = getattr(t, "tx_hash", None)
+                if not th or str(th) != str(tx_hash):
+                    continue
+            elif client_id is not None:
                 # our side's client id must match EXACTLY — no window, no blend
                 cid = (getattr(t, "ask_client_id", None) if is_ask
                        else getattr(t, "bid_client_id", None))
@@ -657,7 +704,7 @@ class LighterClient(VenueClient):
         return sum(px * sz for px, sz in fills) / tot
 
     def last_fill_detail(self, coin, is_ask, since_ts, lookback=10,
-                         client_id=None):
+                         client_id=None, tx_hash=None):
         """[2026-07-17 OBSERVABLE] REAL average fill price for THIS account,
         as (price_or_None, reason). `reason` names WHY a read produced no price
         — the whole point of this method.
@@ -709,9 +756,11 @@ class LighterClient(VenueClient):
                     authorization=auth, market_id=m["id"],
                     account_index=self.account_index))
                 trades = getattr(r, "trades", None) or []
-                px = self._our_fills(trades, is_ask, since_ts, client_id)
+                px = self._our_fills(trades, is_ask, since_ts, client_id,
+                                     tx_hash=tx_hash)
                 if px:
-                    return px, ("trades" if client_id is not None
+                    return px, ("trades(tx)" if tx_hash
+                                else "trades" if client_id is not None
                                 else "trades(approx)")
                 reason = "no-match:trades" if trades else "empty:trades"
         except Exception as e:  # noqa: BLE001 — never raise from telemetry
@@ -733,9 +782,11 @@ class LighterClient(VenueClient):
             r = self._run(self._order_api.recent_trades(
                 market_id=m["id"], limit=100), gov_timeout=0)
             trades = getattr(r, "trades", None) or []
-            px = self._our_fills(trades, is_ask, since_ts, client_id)
+            px = self._our_fills(trades, is_ask, since_ts, client_id,
+                                 tx_hash=tx_hash)
             if px:
-                _exact = "" if client_id is not None else "-approx"
+                _exact = ("-tx" if tx_hash
+                          else "" if client_id is not None else "-approx")
                 return px, f"recentTrades{_exact}(after {reason or 'trades-empty'})"
             return None, (f"no-match:both({reason or 'trades-empty'})"
                           if trades else f"empty:both({reason or 'trades-empty'})")
@@ -773,7 +824,8 @@ class LighterClient(VenueClient):
             raise VenueError(f"close failed {coin}: {err}")
         return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
                 "resp": getattr(resp, "to_dict", lambda: str(resp))(),
-                "client_order_index": _cid}
+                "client_order_index": _cid,
+                "tx_hash": _tx_hash_of(tx, resp)}   # see market_open
 
 
 def _selftest():
@@ -854,8 +906,47 @@ def _selftest():
                 ask_account_id=7, bid_account_id=9, ask_client_id=111)
     assert f._our_fills([p1, p2], True, since, client_id=111) == 101.5
 
+    # --- [2026-07-21] the TX-HASH tier: senior to the id, ownership still --
+    # required. Measured live: the venue never echoes client_order_index
+    # into the tape (0/61 orders id-matched), but every trade row stamps the
+    # taker's tx_hash — which our own submission returns.
+    tx1 = _Trade(timestamp=1_700_000_000_000, price=100.0, size=1.0,
+                 ask_account_id=7, bid_account_id=9, ask_client_id=999,
+                 tx_hash="aa11")
+    tx2 = _Trade(timestamp=1_700_000_000_000, price=102.0, size=3.0,
+                 ask_account_id=7, bid_account_id=9, ask_client_id=998,
+                 tx_hash="aa11")
+    tx_other = _Trade(timestamp=1_700_000_000_000, price=999.0, size=5.0,
+                      ask_account_id=7, bid_account_id=9, ask_client_id=997,
+                      tx_hash="bb22")
+    # tx match wins even though NO client id matches (the live defect's shape)
+    assert f._our_fills([tx1, tx2, tx_other], True, since,
+                        client_id=111, tx_hash="aa11") == 101.5, \
+        "partials sharing one tx hash VWAP into the fill"
+    # ownership stays senior to the hash — a matching hash on a trade whose
+    # ask side is not us must never read as our fill
+    tx_stranger = _Trade(timestamp=1_700_000_000_000, price=50.0, size=1.0,
+                         ask_account_id=8, bid_account_id=9, ask_client_id=1,
+                         tx_hash="aa11")
+    assert f._our_fills([tx_stranger], True, since, tx_hash="aa11") is None
+    # a supplied-but-unmatched hash is a MISS, never a silent id/heuristic blend
+    assert f._our_fills(trades, True, since, client_id=111,
+                        tx_hash="nope") is None
+    # _tx_hash_of: every response shape the SDK has shipped, junk rejected
+    assert _tx_hash_of(None, "f6cac47de876de02a37347e134cc22f7b9e9e186") \
+        == "f6cac47de876de02a37347e134cc22f7b9e9e186"
+    assert _tx_hash_of(None, {"tx_hash": "abc123"}) == "abc123"
+
+    class _Resp:
+        tx_hash = "def456"
+    assert _tx_hash_of(None, _Resp()) == "def456"
+    assert _tx_hash_of(None, "<TxResp code=200>") is None, \
+        "a repr string must never pass as a hash"
+    assert _tx_hash_of(None, None) is None
+
     print("venues.lighter_client _selftest OK (min-order floor REFUTED and "
-          "pinned; client-id match exact, id-less path blends)")
+          "pinned; client-id match exact, id-less path blends; tx-hash tier "
+          "senior + ownership-guarded)")
 
 
 if __name__ == "__main__":

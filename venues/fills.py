@@ -48,7 +48,7 @@ def measured_from_reason(px, reason):
     return px is not None and "approx" not in (reason or "")
 
 
-def read_fill(detail_fn, coin, is_ask, since_ts, client_id):
+def read_fill(detail_fn, coin, is_ask, since_ts, client_id, tx_hash=None):
     """(px_or_None, measured, reason) — the id first, the heuristic as a net.
 
     THE ESCALATION, and why it cannot live one layer down in
@@ -82,11 +82,37 @@ def read_fill(detail_fn, coin, is_ask, since_ts, client_id):
     """
     if detail_fn is None:
         return None, False, "no-detail-fn"
+    # [2026-07-21 TX TIER] the transaction hash is the STRONGEST exact name
+    # (measured live: the venue does not echo client_order_index into the
+    # tape — 0 of 61 real orders ever id-matched — but every trade row
+    # stamps the taker's tx_hash, which OUR submission returns). Same
+    # escalation doctrine as below: tx-on-both-tapes, then id-on-both-tapes,
+    # then the labelled heuristic; retry only on no-match (the tape was read
+    # and we simply were not on it). Older venue layers without the tx_hash
+    # kwarg degrade to the id tier via TypeError — additive by construction.
+    if tx_hash:
+        try:
+            px, reason = detail_fn(coin, is_ask=is_ask, since_ts=since_ts,
+                                   client_id=client_id, tx_hash=tx_hash)
+        except TypeError:
+            px, reason = None, "tx-unsupported"
+        except Exception as e:  # noqa: BLE001
+            return None, False, f"read-raised:{type(e).__name__}"
+        if px is not None:
+            return px, measured_from_reason(px, reason), reason
+        if "no-match" not in (reason or "") and reason != "tx-unsupported":
+            # skipped:budget / api-error / auth-failed: the tape was never
+            # read — retrying spends the reserve to fail identically.
+            return None, False, reason
+        _tx_note = f" (tx-miss: {reason})"
+    else:
+        _tx_note = ""
     try:
         px, reason = detail_fn(coin, is_ask=is_ask, since_ts=since_ts,
                                client_id=client_id)
     except Exception as e:  # noqa: BLE001 — telemetry NEVER raises at a caller
         return None, False, f"read-raised:{type(e).__name__}"
+    reason = f"{reason}{_tx_note}" if reason else reason
     if px is None and client_id is not None and "no-match" in (reason or ""):
         try:
             px2, reason2 = detail_fn(coin, is_ask=is_ask, since_ts=since_ts,
