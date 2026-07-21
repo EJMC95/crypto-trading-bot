@@ -107,6 +107,11 @@ SELFTEST_EXCLUDE = {
     # verdict (NO CHANGE at any stop width; bleed is entry-side) lives in
     # its header; re-run with --refresh, never re-argue from prose.
     "scripts/study_intraday_tsl_reclaim_lighter.py",
+    # [2026-07-21] carry flip-grace study: --selftest is offline-green (run it
+    # directly); the full run needs the venue API + dashboard ledger. Verdict
+    # in its header: NO exit change (magnitude bar is a no-op on the real
+    # episodes, 8h grace is deferral), the queued follow-up is the ENTRY gate.
+    "scripts/study_carry_flip_grace_lighter.py",
     # Their selfcheck() blocks run INSIDE `parliament_main --selftest` (which
     # IS registered above) — the marker hit here is the docstring saying so.
     "parliament/bus.py",
