@@ -4119,12 +4119,17 @@ class H(BaseHTTPRequestHandler):
                         # support — the outcome verdicts must be reachable
                         # off-Railway (gate0 services, the review, ad-hoc
                         # consumers) exactly like the brain keys are.
+                        # [2026-07-21] parliament keys added: Howard's vitals
+                        # (books/ML/tuners/health) + active tuner levers must
+                        # be reachable off-Railway like every other organ —
+                        # "verify a module by its OWN published output".
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
                             "'learning-brain', 'brain-stake-mults', "
                             "'brain-diagnosis', 'brain-lens-forward', "
-                            "'lighter-market', 'fleet-proprioception')")
+                            "'lighter-market', 'fleet-proprioception', "
+                            "'parliament', 'parliament-tuning')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -4139,7 +4144,7 @@ class H(BaseHTTPRequestHandler):
                                 "WHERE key IN ('fleet-risk', 'signal-bus', "
                                 "'brain-stake-mults', 'brain-diagnosis', "
                                 "'brain-lens-forward', 'lighter-market', "
-                                "'fleet-proprioception') "
+                                "'fleet-proprioception', 'parliament') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
                             hist = [{"key": k,
@@ -4159,6 +4164,8 @@ class H(BaseHTTPRequestHandler):
                                    "brain_lens_forward": live.get("brain-lens-forward"),
                                    "lighter_market": lm or None,
                                    "proprioception": live.get("fleet-proprioception"),
+                                   "parliament": live.get("parliament"),
+                                   "parliament_tuning": live.get("parliament-tuning"),
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
             except Exception as e:
