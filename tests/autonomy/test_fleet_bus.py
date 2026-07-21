@@ -56,10 +56,19 @@ def test_stake_multiplier_clamps_below_half_to_floor():
 
 
 def test_stake_multiplier_clamps_above_one_to_ceiling():
-    # The brain must never boost past full stake via this path.
+    # [2026-07-21 TWO-WAY, operator: "brain needs to be able to widen too"]
+    # This test used to pin reduce-only (ceiling 1.0). The contract changed
+    # deliberately: expand mults (1.25/1.5) pass, and the clamp now bounds
+    # at 1.5 — anything above still cannot boost past it.
     _prime("brain-stake-mults", _fresh(
         mults={"b": {"t": {"mult": 1.5}}}))
-    assert fleet_bus.stake_multiplier("b", "t", NOW) == fleet_bus.MULT_CEIL == 1.0
+    assert fleet_bus.stake_multiplier("b", "t", NOW) == fleet_bus.MULT_CEIL == 1.5
+    _prime("brain-stake-mults", _fresh(
+        mults={"b": {"t": {"mult": 3.0}}}))
+    assert fleet_bus.stake_multiplier("b", "t", NOW) == 1.5, "over-ceiling clamps"
+    _prime("brain-stake-mults", _fresh(
+        mults={"b": {"t": {"mult": 1.25}}}))
+    assert fleet_bus.stake_multiplier("b", "t", NOW) == 1.25, "expand step passes"
 
 
 def test_stake_multiplier_neutral_on_missing_tag():

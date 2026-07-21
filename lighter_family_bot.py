@@ -992,12 +992,13 @@ def main():
                              "finding retires)",
                              b.bot_id, coin, ledger_tag(tag))
                     continue
-                # [2026-07-15 L4 CONSUMER] apply the brain's reduce-only
-                # multiplier — restores the loop the Kraken retirement cut
-                # (the only prior consumers were the stopped freqtrade
-                # strategies). No-op until a tag earns a throttle at n>=15.
+                # [2026-07-15 L4 CONSUMER; 2026-07-21 TWO-WAY] apply the
+                # brain's per-tag multiplier — reduce (0.5/0.75) since
+                # 15-Jul, and since 21-Jul also EXPAND (1.25/1.5) for tags
+                # proving out on the v3 mirror bars (operator: "brain needs
+                # to be able to widen too"). fleet_bus clamps [0.5, 1.5].
                 bm = brain_stake_mult(b.bot_id, tag)
-                if bm < 1.0:
+                if bm != 1.0:
                     log.info("%s %s brain stake-mult x%.2f (%s)",
                              b.bot_id, coin, bm, ledger_tag(tag))
                 stake = STAKE_USD * b.s.stake_mult(tag, bars) * bm * fleet_gov
