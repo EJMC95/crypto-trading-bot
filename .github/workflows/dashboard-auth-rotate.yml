@@ -1,0 +1,58 @@
+name: Dashboard Auth Rotate
+
+# "Filter" (July-21 review item 19 / decision D6): rotate the operating
+# station's password WITHOUT the secret ever touching git, workflow inputs,
+# logs, or chat. The password is generated INSIDE this run, masked, set on
+# the pnl-dashboard service via the same Railway PROJECT token the redeploy
+# workflow uses, and the service is redeployed to pick it up (pnl_dashboard.py
+# reads DASH_PASS at boot; auth fails CLOSED when it is unset — (ap)).
+#
+# READ THE NEW PASSWORD in Railway -> pnl-dashboard -> Variables. It exists
+# nowhere else, which is the point: the 18-Jul finding was a password
+# committed in git; the bar is "not a password sitting anywhere readable".
+# Dispatch this workflow again any time to rotate.
+
+on:
+  workflow_dispatch:
+    inputs:
+      user:
+        description: "DASH_USER to set alongside the new password (a username is not a secret)."
+        required: false
+        default: "eamon"
+
+concurrency:
+  group: railway-deploy     # serialize with Railway Redeploy — same service surface
+  cancel-in-progress: false
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Generate + set DASH_USER/DASH_PASS, then redeploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          DASH_USER_IN: ${{ github.event.inputs.user }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          # 32 chars of [A-Za-z0-9] from 48 random bytes (~190 bits pre-filter);
+          # length-checked so a filtering surprise can never ship a weak secret.
+          PASS="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | cut -c1-32)"
+          if [ "${#PASS}" -lt 24 ]; then
+            echo "::error::password generation produced a short string — aborting, nothing set."
+            exit 1
+          fi
+          echo "::add-mask::$PASS"
+          railway variables --service pnl-dashboard --skip-deploys \
+            --set "DASH_USER=${DASH_USER_IN:-eamon}" \
+            --set "DASH_PASS=$PASS"
+          # DASH_PASS is read at boot — restart the service on the new env.
+          # (railway up is unnecessary: same code, new variables.)
+          railway redeploy --service pnl-dashboard --yes
+          echo "Rotated. The new DASH_PASS lives ONLY in Railway -> pnl-dashboard -> Variables (masked in this log)."

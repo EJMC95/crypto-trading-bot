@@ -151,6 +151,14 @@ LEVERS = {
     "scout.dip_range_max": {
         "kind": "float", "lo": 0.10, "hi": 0.25, "lane": "lighter-scout",
         "note": "dip lens: max range_pos to emit; default 0.10"},
+    # [2026-07-21 IMB-20, review-sanctioned] divergence-ticket emission gap
+    # (TRUE pp since the basis fix). The winner lens (only one positive at
+    # every horizon, ehit4h Wilson lo 0.509) had no diet lever — the one
+    # registry expand-asymmetry the audit flagged. Lower = more advisory
+    # tickets; fills stay gated by the taker's bars.
+    "scout.div_gap_pp": {
+        "kind": "float", "lo": 20.0, "hi": 75.0, "lane": "lighter-scout",
+        "note": "divergence-ticket emission gap (TRUE pp); env default 37.5"},
     "scout.momo_chg_min": {
         "kind": "float", "lo": 2.0, "hi": 3.0, "lane": "lighter-scout",
         "note": "momentum lens: min day change %% to emit; default 3.0"},

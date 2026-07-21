@@ -88,14 +88,16 @@ def apply_tuning():
     """Growth-rail levers override the env defaults (bounded in the
     fleet_tuning registry; expired/absent levers leave defaults intact).
     Returns {lever: value} of anything that actually moved, for the log."""
-    global BRK_RANGE_MIN, DIP_RANGE_MAX, MOMO_CHG_MIN, TICKET_TOP_N
+    global BRK_RANGE_MIN, DIP_RANGE_MAX, MOMO_CHG_MIN, TICKET_TOP_N, DIV_GAP_PP
     if tuning is None:
         return {}
     moved = {}
     for lever, attr in (("scout.brk_range_min", "BRK_RANGE_MIN"),
                         ("scout.dip_range_max", "DIP_RANGE_MAX"),
                         ("scout.momo_chg_min", "MOMO_CHG_MIN"),
-                        ("scout.ticket_top_n", "TICKET_TOP_N")):
+                        ("scout.ticket_top_n", "TICKET_TOP_N"),
+                        # [2026-07-21 IMB-20] the winner lens's diet lever
+                        ("scout.div_gap_pp", "DIV_GAP_PP")):
         cur = globals()[attr]
         val = tuning.get_lever(lever, cur)
         if val != cur:

@@ -336,6 +336,34 @@ def allowed_lenses(mode):
     return LIVE_LENSES if mode == "lighter_live" else ALL_LENSES
 
 
+def lens_evidence(o, min_n=None):
+    """(n, floor_met, avg_pct, hit) for one lens grade — EPISODE basis when
+    the brain's v3 fields are present, RAW fallback otherwise.
+
+    [2026-07-21 IMB-24, review-sanctioned migration] Raw `n4h` counts
+    serially-correlated emissions: MEASURED 8-11x per genuinely independent
+    episode (31x for momentum), so a raw floor of 75 can be met by ~2-8
+    independent opinions. When the v3 engine publishes episode fields
+    (eps4h/n_syms/eavg4h_pct/ehit4h — validated at this review: eps4h
+    117-850 across the four lenses), the floor is eps4h >= TT_LENS_VETO_MIN_EPS
+    AND n_syms >= TT_LENS_VETO_MIN_SYMS, and the GRADE is the episode-deduped
+    mean/hit. Fallback to the raw rule when episode fields are absent keeps
+    the restrict capability under a v2 brain relapse (which the immune organ
+    pages on independently)."""
+    o = o or {}
+    if o.get("eps4h") is not None:
+        eps_min = int(os.environ.get("TT_LENS_VETO_MIN_EPS", "25"))
+        syms_min = int(os.environ.get("TT_LENS_VETO_MIN_SYMS", "10"))
+        floor = ((o.get("eps4h") or 0) >= eps_min
+                 and (o.get("n_syms") or 0) >= syms_min)
+        return ((o.get("eps4h") or 0), floor,
+                (o.get("eavg4h_pct") or 0), (o.get("ehit4h") or 0))
+    if min_n is None:
+        min_n = int(os.environ.get("TT_LENS_VETO_MIN_N", "75"))
+    n = o.get("n4h") or 0
+    return n, n >= min_n, (o.get("avg4h_pct") or 0), (o.get("hit4h") or 0)
+
+
 def vetoed_lenses(lens_fwd, min_n=None):
     """THE lens veto rule, and the single authority for it (2026-07-17): a
     lens the brain grades negative at sample size stops getting fills.
@@ -346,15 +374,19 @@ def vetoed_lenses(lens_fwd, min_n=None):
     bars this veto decides are worthless. Consumers must not drift on the
     question "is this lens allowed to trade?".
 
+    [2026-07-21 IMB-24] Evidence basis migrated to EPISODES via
+    lens_evidence() — measured consequence on the 21-Jul payload, recorded
+    honestly: dip flips allowed->vetoed (raw hit4h 0.505 vs episode ehit4h
+    0.495 — the dedup'd number sits on the other side of coin-flip).
+    Restrict-only, shadow-book consequence only (the LIVE taker's
+    allowed_lenses is divergence-only regardless).
+
     RESTRICT-ONLY and fail-safe open: an empty/missing grade set vetoes
     nothing (freshness is the CALLER's job — see the loop and the tuner)."""
-    if min_n is None:
-        min_n = int(os.environ.get("TT_LENS_VETO_MIN_N", "75"))
     out = set()
     for lens, o in (lens_fwd or {}).items():
-        if ((o.get("n4h") or 0) >= min_n
-                and (o.get("avg4h_pct") or 0) < 0
-                and (o.get("hit4h") or 0) < 0.5):
+        _n, floor_met, avg, hit = lens_evidence(o, min_n=min_n)
+        if floor_met and avg < 0 and hit < 0.5:
             out.add(lens)
     return out
 
@@ -1558,6 +1590,29 @@ def selftest():
     # THE POINT: a DARK brain vetoes NOTHING (fail-open by design), and the
     # allow-list must hold anyway. This is the fixture that proves live cannot
     # re-acquire a rejected lens when the brain goes down.
+    # [2026-07-21 IMB-24] the veto's evidence basis is EPISODES when v3
+    # fields are present, raw fallback otherwise:
+    # raw-only payload (v2 relapse) — old rule verbatim
+    assert vetoed_lenses({"m": {"n4h": 80, "avg4h_pct": -1.0, "hit4h": 0.3}}) == {"m"}
+    assert vetoed_lenses({"m": {"n4h": 50, "avg4h_pct": -1.0, "hit4h": 0.3}}) == set()
+    # episode payload — the serial-correlation case IMB-24 exists for: a lens
+    # clearing the raw floor 16x over on too few independent episodes/symbols
+    # no longer clears the floor…
+    assert vetoed_lenses({"m": {"n4h": 1202, "eps4h": 20, "n_syms": 15,
+                                "eavg4h_pct": -0.95, "ehit4h": 0.29}}) == set()
+    assert vetoed_lenses({"m": {"n4h": 1202, "eps4h": 34, "n_syms": 8,
+                                "eavg4h_pct": -0.95, "ehit4h": 0.29}}) == set()
+    # …while real episode evidence vetoes on the DEDUP'D grade
+    assert vetoed_lenses({"m": {"n4h": 1202, "eps4h": 117, "n_syms": 29,
+                                "eavg4h_pct": -0.30, "ehit4h": 0.427}}) == {"m"}
+    # the measured 21-Jul dip flip: raw says allowed (hit4h 0.505), episodes
+    # say vetoed (ehit4h 0.495) — the episode number wins when present
+    _dip = {"n4h": 6072, "avg4h_pct": -0.048, "hit4h": 0.505,
+            "eps4h": 760, "n_syms": 110, "eavg4h_pct": -0.053, "ehit4h": 0.495}
+    assert vetoed_lenses({"dip": _dip}) == {"dip"}
+    assert vetoed_lenses({"dip": {k: v for k, v in _dip.items()
+                                  if not k.startswith(("e", "n_s"))}}) == set()
+
     _dark = vetoed_lenses({})
     assert _dark == set(), _dark                    # confirms the fail-open premise
     _live_fills = {l for l, _ in incredible(tk)
