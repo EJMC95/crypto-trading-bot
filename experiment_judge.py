@@ -807,7 +807,20 @@ def run_once():
             return save(last_eval=ev, drift_notified=True,
                         note=f"ARM DRIFT {cand['name']}: {ev['why']}")
         if st.get("drift_notified"):
-            st["drift_notified"] = False   # arms re-matched; re-arm the page
+            # [2026-07-21 AUDIT FIX] arms re-matched — RESTART THE CLOCK,
+            # exactly as the skew and assert-fail recoveries below already
+            # do and for the same reason: the days (and closes) that accrued
+            # while the arms ran DIFFERENT BUILDS belong to a comparison the
+            # drift hold itself ruled structurally invalid. Without this,
+            # the moment the stale twin was redeployed the window could
+            # already exceed MIN_DAYS and the paired bar would score a
+            # mixed-build shadow tape against live — the exact mixing (bb)
+            # flagged ("consider restarting the judge window at the new
+            # build"). This was the one recovery of the three that kept the
+            # old clock.
+            return save(last_eval=ev, drift_notified=False, started_ts=now,
+                        note=f"arms re-matched: {cand['name']} — experiment "
+                             f"clock restarted at the common build")
         # [2026-07-16] ARM SKEW -> HOLD. The arm is closing trades but proving
         # none of them ran the candidate, so every number here is about a
         # different experiment. Do not promote (real money) and do not age
