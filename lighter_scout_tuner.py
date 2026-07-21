@@ -99,6 +99,14 @@ SCOUT_LADDERS = {
     "momentum": ("scout.momo_chg_min",
                  float(os.environ.get("SCOUT_MOMO_CHG_MIN", "3.0")),
                  [3.0, 2.5, 2.0]),
+    # [2026-07-21 IMB-20, review-sanctioned] the WINNER lens finally gets a
+    # diet lever: divergence is the only lens positive at every horizon
+    # (ehit4h Wilson lo 0.509) and had NO emission knob — the one expand
+    # asymmetry the audit flagged. Widening = LOWER gap = more advisory
+    # tickets for the brain to grade; the taker's bars still gate fills.
+    "divergence": ("scout.div_gap_pp",
+                   float(os.environ.get("SCOUT_DIV_GAP", "37.5")),
+                   [37.5, 30.0, 25.0, 20.0]),
 }
 TOP_N_LADDER = ("scout.ticket_top_n",
                 int(os.environ.get("SCOUT_TICKET_TOP_N", "6")), [6, 9, 12, 15])
@@ -233,13 +241,14 @@ def desired_taker_bars(tape, baseline, lens_fwd, helping=None):
             continue
         lens_rep = (baseline.get("lenses") or {}).get(lens) or {}
         g = (lens_fwd or {}).get(lens) or {}
-        graded = g.get("n4h") or 0
-        positive = (graded >= LENS_FLOOR and (g.get("avg4h_pct") or 0) > 0
-                    and (g.get("hit4h") or 0) >= 0.5)
+        # [2026-07-21 IMB-24] episode basis when the brain publishes v3
+        # fields, raw fallback otherwise — same authority as the veto.
+        graded, floor_met, avg, hit = tt.lens_evidence(g, min_n=LENS_FLOOR)
+        positive = floor_met and avg > 0 and hit >= 0.5
         earned = positive or lever in helping
         starving = (lens_rep.get("seen", 0) > 0
                     and lens_rep.get("taken", 0) == 0
-                    and graded < LENS_FLOOR)
+                    and not floor_met)
         if not (starving or earned):
             continue
         mode = ("winner" if positive else
@@ -355,8 +364,11 @@ def desired_scout_levers(lens_fwd, helping=None):
     for lens, (lever, default, ladder) in SCOUT_LADDERS.items():
         if lens in veto:
             continue
-        graded = ((lens_fwd or {}).get(lens) or {}).get("n4h") or 0
-        if graded < LENS_FLOOR:
+        # [2026-07-21 IMB-24] episode-basis floor (raw fallback) — the diet
+        # widens until the lens has enough INDEPENDENT episodes, not raw ticks
+        graded, floor_met, _avg, _hit = tt.lens_evidence(
+            (lens_fwd or {}).get(lens), min_n=LENS_FLOOR)
+        if not floor_met:
             # only notches strictly WIDER than the (env) default — never
             # tighten a scout the operator already widened
             beyond = next_notches(ladder, default)
@@ -365,12 +377,13 @@ def desired_scout_levers(lens_fwd, helping=None):
             deeper = lever in helping and len(beyond) > 1
             val = beyond[1] if deeper else beyond[0]
             out[lever] = val
-            log.append(f"{lens}: graded n4h={graded} < {LENS_FLOOR} — scout "
+            log.append(f"{lens}: graded n={graded} under floor — scout "
                        f"emission {lever} -> {val} (grading diet, not trading"
                        + (", deeper: proprio-helping" if deeper else "") + ")")
         # else: floor reached — stop asserting, lever expires to default
     lever, default, ladder = TOP_N_LADDER
-    hungry = any(((lens_fwd or {}).get(l) or {}).get("n4h", 0) < LENS_FLOOR
+    hungry = any(not tt.lens_evidence((lens_fwd or {}).get(l),
+                                      min_n=LENS_FLOOR)[1]
                  for l in SCOUT_LADDERS)
     if hungry and lens_fwd:
         beyond = next_notches(ladder, default)
@@ -673,36 +686,62 @@ def _selftest():
     assert exits == {} and "skipped" in slog[0], slog
 
     # scout levers: a lens under the ruling floor gets its emission bar one
-    # notch beyond default (grading diet); at the floor it is released
+    # notch beyond default (grading diet); at the floor it is released.
+    # [2026-07-21] divergence joined SCOUT_LADDERS (IMB-20), so every fixture
+    # feeds it too — _fed keeps the pre-existing cases meaning what they meant.
+    _fed = {"n4h": 252}
     sl, slog2 = desired_scout_levers({"dip": {"n4h": 25, "avg4h_pct": 1.1,
                                               "hit4h": 0.92},
                                       "breakout": {"n4h": 240},
-                                      "momentum": {"n4h": 252}})
+                                      "momentum": {"n4h": 252},
+                                      "divergence": dict(_fed)})
     assert sl.get("scout.dip_range_max") == 0.15, (sl, slog2)
     assert "scout.brk_range_min" not in sl, sl
     assert sl.get("scout.ticket_top_n") == 9, sl
     sl2, _ = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": 1.0,
                                            "hit4h": 0.6},
                                    "breakout": {"n4h": 100},
-                                   "momentum": {"n4h": 100}})
+                                   "momentum": {"n4h": 100},
+                                   "divergence": dict(_fed)})
     assert sl2 == {}, sl2
     # a vetoed lens gets NO extra diet either
     sl3, _ = desired_scout_levers({"dip": {"n4h": 80, "avg4h_pct": -1.0,
                                            "hit4h": 0.3},
                                    "breakout": {"n4h": 100},
-                                   "momentum": {"n4h": 100}})
+                                   "momentum": {"n4h": 100},
+                                   "divergence": dict(_fed)})
     assert "scout.dip_range_max" not in sl3, sl3
     # HELPING diet levers walk one notch DEEPER while under the floor
     # (0.15 -> 0.20, top_n 9 -> 12); un-helped levers keep the first notch
     sl4, _ = desired_scout_levers({"dip": {"n4h": 25, "avg4h_pct": 1.1,
                                            "hit4h": 0.92},
                                    "breakout": {"n4h": 20},
-                                   "momentum": {"n4h": 252}},
+                                   "momentum": {"n4h": 252},
+                                   "divergence": dict(_fed)},
                                   helping={"scout.dip_range_max",
                                            "scout.ticket_top_n"})
     assert sl4.get("scout.dip_range_max") == 0.20, sl4
     assert sl4.get("scout.brk_range_min") == 0.87, sl4   # not helped: notch 1
     assert sl4.get("scout.ticket_top_n") == 12, sl4
+    # [2026-07-21 IMB-20] a STARVING divergence lens finally has a diet lever
+    # to widen (37.5 -> 30.0)…
+    sl5, _ = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": 1.0,
+                                           "hit4h": 0.6},
+                                   "breakout": {"n4h": 100},
+                                   "momentum": {"n4h": 100},
+                                   "divergence": {"n4h": 10}})
+    assert sl5.get("scout.div_gap_pp") == 30.0, sl5
+    # [2026-07-21 IMB-24] …and the floor is EPISODE-based when v3 fields are
+    # present: raw n4h thousands with too few independent episodes still
+    # counts as starving (the serial-correlation case, measured 8-31x)
+    sl6, _ = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": 1.0,
+                                           "hit4h": 0.6},
+                                   "breakout": {"n4h": 100},
+                                   "momentum": {"n4h": 5000, "eps4h": 12,
+                                                "n_syms": 4, "eavg4h_pct": 0.1,
+                                                "ehit4h": 0.55},
+                                   "divergence": dict(_fed)})
+    assert sl6.get("scout.momo_chg_min") == 2.5, sl6
 
     # proprioception veto: a fresh HURTING verdict drops the enactment; a
     # stale/absent payload drops NOTHING (fail-safe); helping never drops

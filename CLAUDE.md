@@ -508,6 +508,21 @@ All new bots:
   result is evidence; a 2.7yr HL result about a Lighter bot is an assumption
   wearing a number. Retired-bot backtests (Kraken originals) are HISTORY — do
   not re-run them; they justify nothing that still trades.
+- **REGIME-COVERAGE CAVEAT (21-Jul review, item 18 — adopted D5): "positive in
+  both halves" is necessary but NOT SUFFICIENT for DIRECTIONAL strategies.**
+  Lighter's whole 438d tape is one falling regime (BTC −32.9%; the family
+  regime gate reads risk-off 61.5% of bars; BOTH halves fall), so a
+  directional short passes both halves BY CONSTRUCTION — the bar is satisfied
+  by the drift, not the edge. A directional validation must STATE which
+  regimes its window contains, and a one-regime pass is a pass in that regime
+  only. More Lighter tape does not fix this; only a different regime does —
+  the venue's ~27 non-crypto books (SPY +8.1%, QQQ +12.2%, WTI +23.0% over
+  the same falling-BTC window) are the on-venue source. PREREQUISITE before
+  any non-crypto directional widening: a PER-ASSET regime gate — never BTC's
+  EMA for SPY/XAU/WTI (measured: btc_regime_up read risk-off 61.5% through
+  SPY's bull run; the brain's Georgia diagnosis — 100% of losses opened in
+  oracle risk-off — corroborates from independent data). Build order: oracle
+  per-asset coverage → the gate consumes it → only then the universe.
 - **LIVE BOTS ALWAYS IN AUDIT SCOPE (operator rule, 16-Jul).** Every audit,
   bug-scan, code-review, or security-review — WHATEVER its nominal scope —
   MUST also check the LIVE REAL-MONEY bots in the same pass: Funding Farmer

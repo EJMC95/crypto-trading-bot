@@ -206,6 +206,11 @@ Verified in code this session:
   the live-lane gates already use. Note the governor spent the entire
   week at clip 1.0 / dd 0.00% (2,018/2,018 samples), so this is
   future-proofing, not a live fix.
+  **CORRECTION (same day, while implementing): ALREADY SHIPPED 17-Jul**
+  under delegated review authority (`fleet_risk.py:492`, verify-corrected
+  scope note included) — this review graded an item a prior session had
+  closed. Nothing to build; the stamp above stands as written evidence
+  the reviewer should grep before recommending.
 - Contested four: **IMB-16 — resolved at the publisher** (advisory mode now
   releases both actuators per the 17-Jul CLAUDE.md change) — DROP.
   **IMB-28 — restrict-only detection is the immune organ's design** — DROP.
@@ -431,6 +436,11 @@ money), or explicitly deferred with a date.
   per-asset-regime build order (18.3). *Recommended: yes.*
 - **D6 (ops, 2 min each): confirm `DASH_PASS` is set on Railway; add the
   custom domain DNS record if wanted; flip nothing else on item 19.**
+  **✅ DASH_PASS DONE same day — by the operator's own hand** ("I've got the
+  dash password I like set"). `dashboard-auth-rotate.yml` ships as the
+  standing rotation tool (never dispatched; dispatching OVERWRITES the
+  password with a random one). The domain half waits on the one fact only
+  the operator holds — the hostname.
 - **D7 (informational): the long-budget saturation (N3)** — no action
   recommended this week; flag if you want the pileup cap designed.
 - **Paper-lane code changes sanctioned by this review** (no operator
@@ -438,6 +448,15 @@ money), or explicitly deferred with a date.
   zombie-guard port to the six shadow bots (13-i, replay-gated), IMB-24
   eps4h/n_syms floor migration (replay-gated), IMB-20 divergence emission
   lever, G1 blind-hold.
+  **✅ BATCH SHIPPED same day (operator: "continue with other items") —
+  CHANGELOG (au):** pooling (rejoin grace, IMB-01-safe), IMB-24 migration
+  (episode basis with raw fallback; measured consequence: dip flips
+  allowed→vetoed on the dedup'd grade — shadow book only), IMB-20
+  `scout.div_gap_pp` lever + tuner ladder. G1 was found ALREADY SHIPPED
+  17-Jul (correction above). Zombie-guard port DEFERRED with the survey
+  done: taker + sniper already carry give-ups; the remaining four
+  (Yield Harvester, family bot, Index Rider, Snap Back) are the port
+  targets for a replay-gated follow-up session.
 
 ## R. Residuals this session could not reach (no DB / no dashboard login)
 
