@@ -148,6 +148,27 @@ UNIVERSE = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX",
             "LINK", "LTC", "DOT", "NEAR", "SUI",  # SUI: day-zero review catch
             "HYPE", "ZEC", "TAO"]  # [2026-07-07] coverage adds with the perps web
 
+# [2026-07-21 REVIEW ITEM 18 — build order step 1: PER-ASSET COVERAGE,
+# publish-only.] The venue's non-crypto books are the fleet's only on-venue
+# source of a regime that is not crypto's (measured at the review: SPY +8.1%
+# through BTC −32.9%, while btc_regime_up read risk-off 61.5% of bars — a
+# BTC gate over SPY is incoherent). This build publishes each non-crypto
+# book's OWN regime so the per-asset gate (the NEXT, review-gated step) has
+# something to consume; NOTHING consumes these entries yet, and `fleet.read`
+# stays CRYPTO-ONLY (bot_learn's risk_off join reads it — see summarize()).
+# MEASURED before building (21-Jul, this venue's own tape): Lighter prints
+# non-crypto daily bars 7d/wk and the weekend bars are NOT flat (SPY: 52
+# weekend bars, 0 flat), so the crypto method applies unmodified — no
+# session filter, no frozen-bar hazard. Coverage graduates with the tape:
+# at ship NVDA/TSLA/XAU/XAG clear the 203-bar EMA floor; MSTR ~1wk out;
+# SPY/QQQ ~3-4wk; XCU/WTI/IWM later — each NAMED short-history until then.
+NONCRYPTO = {
+    "SPY": "equity-index", "QQQ": "equity-index", "IWM": "equity-index",
+    "NVDA": "equity-single", "TSLA": "equity-single", "MSTR": "equity-single",
+    "WTI": "commodity", "XAU": "commodity", "XAG": "commodity",
+    "XCU": "commodity",
+}
+
 ADX_TREND = 17          # >= trending (matches RegimeSwitchV2 after Jul-6 cut)
 ADX_CHOP = 11           # <= chop; between = hysteresis (hold previous)
 EMA_FAST, EMA_SLOW, SLOPE_BARS = 50, 200, 3
@@ -295,10 +316,45 @@ def classify(df, prev_trend):
             "verdict": verdict, "asof": str(df["t"].iloc[-1])}
 
 
+def summarize(pairs):
+    """(fleet, noncrypto) summaries from the full pairs dict — pure, selftested.
+
+    [2026-07-21 item 18] THE CONTRACT THIS PROTECTS: `fleet.read` is consumed
+    by bot_learn's risk_off history join (bot_learn.py:704 reads
+    payload.fleet.read — the Georgia "100% of losses in risk-off" diagnosis
+    came from it), and it has always meant the CRYPTO majors. Non-crypto
+    books must never blend into it — an aggregate across asset classes is
+    exactly the incoherence item 18 exists to remove. Each non-crypto book's
+    regime is PER-ASSET only (read `pairs[sym]`); the `noncrypto` block is a
+    display summary, not a signal."""
+    crypto = {k: v for k, v in pairs.items() if k not in NONCRYPTO}
+    nc = {k: v for k, v in pairs.items() if k in NONCRYPTO}
+    n_long = sum(1 for p in crypto.values() if p["verdict"] == "LONG-window")
+    n_short = sum(1 for p in crypto.values() if p["verdict"] == "SHORT-window")
+    n_idle = len(crypto) - n_long - n_short
+    read = ("risk-off downtrend" if n_short > n_long and n_short >= 4 else
+            "risk-on uptrend" if n_long > n_short and n_long >= 4 else
+            "mixed / transitional")
+    fleet = {"n_long": n_long, "n_short": n_short, "n_flat_or_chop": n_idle,
+             "read": read}
+    noncrypto = {
+        "n_published": len(nc),
+        "n_long": sum(1 for p in nc.values() if p["verdict"] == "LONG-window"),
+        "n_short": sum(1 for p in nc.values() if p["verdict"] == "SHORT-window"),
+        "by_class": {cls: [s for s in sorted(nc) if NONCRYPTO[s] == cls]
+                     for cls in sorted(set(NONCRYPTO.values()))},
+        "note": "per-asset only — never blended into fleet.read",
+    }
+    return fleet, noncrypto
+
+
 def main():
     prev = store.load_state(KEY) or {}
     prev_pairs = prev.get("pairs", {})
-    pairs, errors, missing = {}, [], {}
+    # missing_nc keeps the crypto coverage contract untouched: coverage.missing
+    # / n_missing have always meant THE MAJORS; a young non-crypto book (most
+    # of them at ship) is named in coverage.noncrypto.missing instead.
+    pairs, errors, missing, missing_nc = {}, [], {}, {}
 
     try:
         ids = market_ids()
@@ -308,32 +364,37 @@ def main():
               f"good + TTL)")
         return
 
-    for coin in UNIVERSE:
+    for coin in list(UNIVERSE) + list(NONCRYPTO):
+        _miss = missing_nc if coin in NONCRYPTO else missing
         mid = ids.get(coin)
         if mid is None:
             # NAMED, not dropped: a coin Lighter does not list is a coverage
             # hole the fleet must be able to SEE.
-            missing[coin] = "no-lighter-book"
+            _miss[coin] = "no-lighter-book"
             errors.append(f"{coin}:no-lighter-book")
             continue
         try:
             df = fetch_daily(mid)
             if len(df) < EMA_SLOW + SLOPE_BARS:
-                # the young-book trap (ZEC). No verdict > a wrong verdict.
-                missing[coin] = (f"short-history({len(df)}<"
-                                 f"{EMA_SLOW + SLOPE_BARS})")
+                # the young-book trap (ZEC; at ship most non-crypto books —
+                # they graduate as tape accrues). No verdict > a wrong verdict.
+                _miss[coin] = (f"short-history({len(df)}<"
+                               f"{EMA_SLOW + SLOPE_BARS})")
                 errors.append(f"{coin}:short-history({len(df)})")
                 continue
             age = tape_age_days(df)
             if age is not None and age > MAX_TAPE_AGE_DAYS:
                 # the frozen-book trap. Grading this would assert an old
                 # regime as today's — the wrong verdict this must never give.
-                missing[coin] = f"stale-tape({age}d)"
+                _miss[coin] = f"stale-tape({age}d)"
                 errors.append(f"{coin}:stale-tape({age}d)")
                 continue
             pairs[coin] = classify(df, (prev_pairs.get(coin) or {}).get("trend"))
+            # [2026-07-21 item 18] every pair self-describes its asset class —
+            # the future per-asset gate keys on this, never on a blended read.
+            pairs[coin]["class"] = NONCRYPTO.get(coin, "crypto")
         except Exception as e:
-            missing[coin] = f"fetch-failed:{type(e).__name__}"
+            _miss[coin] = f"fetch-failed:{type(e).__name__}"
             errors.append(f"{coin}:{type(e).__name__}")
         time.sleep(0.4)  # gentle on the public API
 
@@ -342,27 +403,33 @@ def main():
               f"NOT publishing (consumers keep last good + TTL)")
         return
 
-    n_long = sum(1 for p in pairs.values() if p["verdict"] == "LONG-window")
-    n_short = sum(1 for p in pairs.values() if p["verdict"] == "SHORT-window")
-    n_idle = len(pairs) - n_long - n_short
-    read = ("risk-off downtrend" if n_short > n_long and n_short >= 4 else
-            "risk-on uptrend" if n_long > n_short and n_long >= 4 else
-            "mixed / transitional")
+    fleet, noncrypto = summarize(pairs)
+    n_long, n_short = fleet["n_long"], fleet["n_short"]
+    n_idle, read = fleet["n_flat_or_chop"], fleet["read"]
+    n_crypto = len(pairs) - noncrypto["n_published"]
     payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC,
         "params": {"adx_trend": ADX_TREND, "adx_chop": ADX_CHOP,
                    "ema": [EMA_FAST, EMA_SLOW], "source": "lighter-1d"},
         "pairs": pairs,
-        "fleet": {"n_long": n_long, "n_short": n_short, "n_flat_or_chop": n_idle,
-                  "read": read},
+        "fleet": fleet,        # CRYPTO-ONLY by contract — see summarize()
+        # [2026-07-21 item 18, publish-only] per-asset regime for the venue's
+        # non-crypto books lives in `pairs` keyed by symbol (each entry tagged
+        # `class`); this block is the display summary. NO consumer yet — the
+        # per-asset gate is the next, review-gated step.
+        "noncrypto": dict(noncrypto, missing=missing_nc,
+                          universe=len(NONCRYPTO)),
         "errors": errors,
         # [2026-07-17] ADDITIVE — the swap's real cost, made visible. A coin
         # Lighter cannot grade (young book, delisting, dead fetch) is NAMED
         # here with its reason. Silence is what made this a bug.
+        # [2026-07-21] `universe`/`n_missing`/`missing`/`complete` keep their
+        # original CRYPTO-majors meaning; non-crypto holes live in
+        # `noncrypto.missing` (most books are young at ship — by design).
         "coverage": {
             "source": "lighter-1d",
             "universe": len(UNIVERSE),
-            "n_published": len(pairs),
+            "n_published": n_crypto,
             "n_missing": len(missing),
             "missing": missing,
             "complete": not missing,
@@ -380,11 +447,16 @@ def main():
         print(f"[regime-oracle]   {k:5s} adx={v['adx']:5.1f} dir={v['dir']:+d} "
               f"trend={v['trend']} -> {v['verdict']}")
     if missing:
-        print(f"[regime-oracle]   COVERAGE: {len(pairs)}/{len(UNIVERSE)} graded; "
+        print(f"[regime-oracle]   COVERAGE: {n_crypto}/{len(UNIVERSE)} graded; "
               f"MISSING " + ", ".join(f"{k}({v})" for k, v in missing.items()))
     else:
-        print(f"[regime-oracle]   COVERAGE: {len(pairs)}/{len(UNIVERSE)} majors "
+        print(f"[regime-oracle]   COVERAGE: {n_crypto}/{len(UNIVERSE)} majors "
               f"graded on Lighter — complete")
+    print(f"[regime-oracle]   NON-CRYPTO (per-asset, publish-only): "
+          f"{noncrypto['n_published']}/{len(NONCRYPTO)} graded"
+          + (f"; young/missing " + ", ".join(f"{k}({v})"
+                                             for k, v in missing_nc.items())
+             if missing_nc else " — complete"))
 
 
 def _selftest():
@@ -534,10 +606,33 @@ def _selftest():
         main()
     assert not saved, "a dark venue must NOT publish — consumers keep TTL"
 
+    # ---- [2026-07-21 item 18] per-asset coverage: the fleet.read contract --
+    # NONCRYPTO and UNIVERSE must never overlap (a symbol in both would be
+    # counted into fleet.read AND tagged non-crypto — an incoherent state).
+    assert not set(NONCRYPTO) & set(UNIVERSE), set(NONCRYPTO) & set(UNIVERSE)
+    # fleet.read is CRYPTO-ONLY: ten shorting non-crypto books must not move
+    # it (bot_learn's risk_off join reads fleet.read — the Georgia diagnosis
+    # came from it; blending classes is the incoherence item 18 removes).
+    _long = {"verdict": "LONG-window"}
+    _short = {"verdict": "SHORT-window"}
+    _crypto_up = {c: dict(_long) for c in ["BTC", "ETH", "SOL", "BNB", "XRP"]}
+    _nc_down = {s: dict(_short) for s in NONCRYPTO}
+    _fleet_mixed, _nc_sum = summarize({**_crypto_up, **_nc_down})
+    _fleet_alone, _ = summarize(dict(_crypto_up))
+    assert _fleet_mixed == _fleet_alone, (_fleet_mixed, _fleet_alone)
+    assert _fleet_mixed["read"] == "risk-on uptrend", _fleet_mixed
+    assert _nc_sum["n_short"] == len(NONCRYPTO) and _nc_sum["n_published"] == len(NONCRYPTO)
+    assert _nc_sum["by_class"]["equity-index"] == ["IWM", "QQQ", "SPY"], _nc_sum
+    assert "never blended" in _nc_sum["note"]
+    # empty non-crypto (all young at ship) summarizes clean
+    _f2, _nc2 = summarize(dict(_crypto_up))
+    assert _nc2["n_published"] == 0 and _f2["read"] == "risk-on uptrend"
+
     print("regime_oracle selftest OK (closed-bars-by-timestamp, ms stamps, "
           "500-bar paging + termination, young-book NAMED not dropped, "
           "unlisted coin NAMED, FROZEN tape NAMED not graded, payload shape "
-          "held, dark venue publishes nothing)")
+          "held, dark venue publishes nothing, per-asset non-crypto coverage "
+          "additive + fleet.read stays crypto-only)")
 
 
 if __name__ == "__main__":
