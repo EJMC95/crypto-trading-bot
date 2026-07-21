@@ -113,6 +113,13 @@ SELFTEST_EXCLUDE = {
     # measured benefit is an UPPER bound (the actuator also needs a
     # standing ACTIONABLE finding).
     "scripts/study_intraday_regime_gate.py",
+    # [2026-07-21] DIV_GAP tighten study: offline --selftest green but the
+    # module imports the taker+replay surface and its full run wants the
+    # bus tape — research script. Header verdict: NO SUPPORTED CHANGE at
+    # 75/87.5 (replay fails H2; ledger method inert at n=3); the entry
+    # filter is EXHAUSTED as a diagnosis for divergence's bleed — the big
+    # losers were the highest-conviction tickets (all |gap| >= 101).
+    "scripts/study_div_gap_tighten.py",
     # Their selfcheck() blocks run INSIDE `parliament_main --selftest` (which
     # IS registered above) — the marker hit here is the docstring saying so.
     "parliament/bus.py",
