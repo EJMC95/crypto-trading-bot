@@ -1,3 +1,7 @@
+## 2026-07-21 (ba) — the oracle's vital stops blending classes: majors from the crypto coverage count, non-crypto as its own tail
+
+- Follow-through on (az), found while waiting for its deploy receipt: the dashboard's regime-oracle vital counted `len(pairs)` as "majors tracked", so the widened payload would have read "20 majors" — a blended-class count on the exact organ that just learned not to blend classes, and the operator's requested RECEIPT had no honest surface. The vital now takes majors from `coverage.n_published` (the crypto contract) and appends `· non-crypto n/10` from the `noncrypto` block; payloads predating either addition render exactly as before. The receipt for (az) is now externally observable on /vitals.json.
+
 ## 2026-07-21 (az) — 🧭 the oracle grows PER-ASSET eyes: non-crypto regime coverage, publish-only (review item 18, build order step 1)
 
 - **WHAT (operator: "do the oracle per-asset build next"):** `regime_oracle` now grades the venue's non-crypto reference books — SPY/QQQ/IWM (equity-index), NVDA/TSLA/MSTR (equity-single), WTI/XAU/XAG/XCU (commodity) — each with its OWN regime off Lighter's own 1d tape, same EMA50/200+ADX method as the majors, each pair tagged `class`. This is the review-adopted build order's STEP 1 (oracle coverage → gate consumes → only then universe): **publish-only, zero consumers** — the per-asset gate is the next, review-gated step.
