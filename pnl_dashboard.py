@@ -1153,6 +1153,98 @@ def autonomy_rail_card():
         return ""
 
 
+def parliament_card():
+    """🏛️ [2026-07-21] The Parliament on the MAIN page (operator: "i cant see
+    howard, vitals, or the 10 scanners on the pnl dashboard") — the six-layer
+    chamber made visible where the operator actually looks, not just on
+    /vitals.json. Renders Howard's brain vitals, the full 10-scanner bench
+    (quiet members INCLUDED — absent is how gaps hide), the ML bench's
+    prequential OOS accuracies, and the tuner bench's active levers.
+    Read-only; bot_state 'parliament' + 'parliament-tuning' (Howard publishes
+    both every 5 min from the freqtrade-bots container). Fail-silent like
+    every card: a chamber that has never spoken hides the card; a STALE
+    chamber renders dimmed with the honest tail."""
+    try:
+        s = fetch_states(["parliament", "parliament-tuning"])
+        p = s.get("parliament") or {}
+        if not p:
+            return ""
+        G, R, Y, M = "#1a7f37", "#d1242f", "#d29922", "#8b949e"
+        fresh = _state_fresh(p)
+        dim = "" if fresh else ' style="opacity:.45"'
+        tail = "" if fresh else " · STALE"
+
+        health = p.get("health") or {}
+        stalled = health.get("stalled") or []
+        stress = p.get("stress") or {}
+        data = p.get("data") or {}
+        books = p.get("books") or {}
+        n_closed = sum(int(b.get("closed") or 0) for b in books.values()
+                       if isinstance(b, dict))
+        hcolor = R if stalled else (Y if stress.get("pause") else G)
+        htxt = (f'{len(books)} books · {n_closed} closed · '
+                f'{data.get("books") or 0} Lighter books tracked · '
+                f'stress {stress.get("med_bps") if stress.get("med_bps") is not None else "—"}bps'
+                + (' · ENTRY PAUSE' if stress.get("pause") else '')
+                + (f' · STALLED {", ".join(stalled)}' if stalled else ''))
+        rows = [f'<div{dim}><span class="muted">🧠 Howard</span> '
+                f'<b style="color:{hcolor}">{html.escape(htxt)}{tail}</b></div>']
+
+        ml = p.get("ml") or {}
+        accs = ml.get("oos_acc") or {}
+        if ml.get("enabled"):
+            acc_txt = " · ".join(f'{k} {float(v):.0%}' for k, v in
+                                 sorted(accs.items())) if accs else "—"
+            mtxt = (f'{"READY" if ml.get("ready") else "warming"} · '
+                    f'n={ml.get("n_seen") or 0} · {acc_txt}')
+            rows.append(f'<div{dim}><span class="muted">🤖 Keating ML</span> '
+                        f'<b style="color:{G if ml.get("ready") else M}">'
+                        f'{html.escape(mtxt)}{tail}</b></div>')
+
+        t = s.get("parliament-tuning") or {}
+        act = t.get("active") or {}
+        levers = [f'{bot.replace("pm-", "")}:{lv.get("param")}='
+                  f'{lv.get("value")}'
+                  for bot, lvs in sorted(act.items())
+                  for lv in (lvs if isinstance(lvs, list) else [])]
+        rows.append(f'<div{dim}><span class="muted">🎚️ Tuners</span> '
+                    f'<b style="color:{Y if levers else ""}">'
+                    f'{html.escape(" · ".join(levers) if levers else "no active levers (auto-reverted)")}'
+                    f'{tail}</b></div>')
+
+        bench = (p.get("scanners") or {}).get("bench") or {}
+        table = ""
+        if bench:
+            trs = []
+            for name, b in sorted(bench.items()):
+                n = b.get("n") or 0
+                if n:
+                    last = (f'{html.escape(str(b.get("last_sym") or "—"))} · '
+                            f'{int((b.get("last_age_sec") or 0) / 60)}m ago')
+                    style = ""
+                else:
+                    last, style = "quiet", ' style="opacity:.45"'
+                trs.append(f'<tr{style}><td>{html.escape(name)}</td>'
+                           f'<td style="text-align:right">{n}</td>'
+                           f'<td style="text-align:right">{b.get("runs") or 0}</td>'
+                           f'<td>{last}</td></tr>')
+            table = ('<table style="width:100%;font-size:12px;margin-top:6px">'
+                     '<tr class="muted"><th style="text-align:left">🔭 scanner</th>'
+                     '<th style="text-align:right">signals</th>'
+                     '<th style="text-align:right">runs</th>'
+                     '<th style="text-align:left">last fire</th></tr>'
+                     + "".join(trs) + '</table>')
+
+        dot = "on" if fresh and not stalled else ""
+        return (f'<div class="card"><h2>🏛️ Parliament '
+                f'<span class="dot {dot}"></span></h2>'
+                f'<div class="muted">six PM shadow books · Keating 🔭 10 scanners '
+                f'+ 5-model ML · Howard 🧠 brain · $25 clips, shadow-only, '
+                f'fleet-governed</div>{"".join(rows)}{table}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def incubator_card():
     """🧬 [2026-07-16] Incubator / Reproduction (bot_state 'strategy-incubator').
     The genotype-breeding stack made visible: the elite leaderboard of bred
@@ -1735,7 +1827,7 @@ def render():
         enrich = {}
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
-    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + incubator_card()
+    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}
