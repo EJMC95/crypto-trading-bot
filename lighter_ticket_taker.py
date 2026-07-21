@@ -237,7 +237,11 @@ TUNABLE = (("taker.dip_range", "DIP_RANGE"),
            ("taker.div_gap_pp", "DIV_GAP_PP"),
            ("taker.tp", "TAKE_PROFIT"),
            ("taker.sl", "STOP_LOSS"),
-           ("taker.max_hold_h", "MAX_HOLD_H"))
+           ("taker.max_hold_h", "MAX_HOLD_H"),
+           # [2026-07-21] the post-stop cooldown joins the growth rail: the
+           # stamp at close reads the module attr, so a lever overlay moves
+           # future stamps (never an already-written sl_block entry).
+           ("taker.sl_cooldown_h", "SL_COOLDOWN_H"))
 
 
 def apply_tuning():
@@ -2110,7 +2114,14 @@ def _selftest_live():
         # published equity is the VENUE's, never a modelled one
         _pub = captured["published"][-1][1]
         assert _pub["equity"] == 1234.56, _pub["equity"]
-        assert abs(_pub["pnl_abs"] - 234.56) < 1e-9, _pub["pnl_abs"]
+        # [2026-07-21 D1] published live P&L is CAPITAL-ADJUSTED: equity −
+        # baseline − guard-recorded capital (0 here) − the env backfill.
+        # Computed from the module constant so the fixture tracks the
+        # contract, not a frozen number (this assert still read the pre-D1
+        # 234.56 after D1 shipped — it only ever runs on signer-wheel
+        # machines, where it failed on GOOD news).
+        assert abs(_pub["pnl_abs"] - (234.56 - CAPITAL_ADJUST_USD)) < 1e-9, \
+            _pub["pnl_abs"]
 
         # ================================================================
         # 7) UNREADABLE positions must SKIP the cycle — never trade blind.
