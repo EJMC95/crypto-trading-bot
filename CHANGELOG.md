@@ -1,3 +1,8 @@
+## 2026-07-21 (be) — 🏛️ the Parliament card on the MAIN dashboard page (operator: "i cant see howard, vitals, or the 10 scanners on the pnl dashboard")
+
+- The chamber was fully visible to MACHINES (/bus.json, /vitals.json, the organ list) and nearly invisible to the OPERATOR — the one consumer the dashboard exists for. New `parliament_card()` on the main page next to the Autonomy card: 🧠 Howard's vitals line (books/closed/tracked/stress/pause/stalled, colour-coded), 🤖 Keating's ML bench (ready/warming, n, per-model prequential OOS), 🎚️ active tuner levers (auto-revert noted when none), and the FULL 🔭 10-scanner bench table — signals, runs, last fire; QUIET scanners render as dimmed visible rows (absent is how gaps hide).
+- Fail-silent per the card idiom: never-spoken chamber hides the card; STALE renders dimmed with the honest tail; any error renders nothing. Read-only. Offline render test added (fresh / dark-hidden / stale-dimmed). Rides the pnl-dashboard auto-deploy on merge.
+
 ## 2026-07-21 (bd) — the TSL reclaim study returns NO CHANGE — and the honest verdict is itself the finding
 
 - `scripts/study_intraday_tsl_reclaim_lighter.py` (180d of Lighter's OWN 1h tape, 25 books, the REAL DayTraderGated class with a vectorized-vs-real cross-check every run): the Kraken-era 77-89% reclaim signature **does not reproduce** — TSL reclaim is 54% (n=191), inside the ambiguous zone, and widening the trend stop to 3.0x/3.5x ATR **fails the both-halves rule at every width** (each improves h2, worsens h1). **Verdict: keep 2.5x/3.5x.** A tempting "obvious fix" (the 9/9 TSL losses) was refuted by the venue's own tape before it touched a strategy — the doctrine working exactly as written.
