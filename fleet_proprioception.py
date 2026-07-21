@@ -115,6 +115,11 @@ MIN_EP_SNAPS = int(os.environ.get("PROP_MIN_EP_SNAPS", "8"))  # taker replay
 # grade_taker for the live 3.13h/37-snap episode that graded on zero trades.
 MIN_EP_CLOSES = int(os.environ.get("PROP_MIN_EP_CLOSES", "4"))
 SLICE_H = float(os.environ.get("PROP_SLICE_H", "24"))        # long-stance cut
+# [2026-07-21 review item 12] same-stance rejoin grace: a stance that lapses
+# by TTL between an author's re-asserts continues its episode if re-asserted
+# identically within this window (pooling), instead of fragmenting into
+# sub-floor slivers. 0 disables (pre-review behaviour).
+REJOIN_H = float(os.environ.get("PROP_REJOIN_GRACE_H", "3.0"))
 VERDICT_WINDOW = int(os.environ.get("PROP_VERDICT_WINDOW", "10"))
 MIN_EPISODES = int(os.environ.get("PROP_MIN_EPISODES", "2"))
 HURT_USD = float(os.environ.get("PROP_HURT_USD", "3.0"))
@@ -262,23 +267,53 @@ def build_stances(active):
     return out
 
 
-def track(open_eps, stances_now, now, slice_h=SLICE_H):
+def track(open_eps, stances_now, now, slice_h=SLICE_H, rejoin_h=None):
     """One tracking step. Returns (open_next, closed) where closed carries
     {group, stance, set_by, start, end, reason, start_metrics}. Reasons:
     'changed' (stance moved), 'released' (gone — end backdated to the last
     seen expiry so a dead author doesn't inflate the window), 'slice'
     (long-running stance cut so grades accrue). start_metrics for newly
     opened groups is left None — the caller stamps it (feed reads are
-    impure)."""
+    impure).
+
+    [2026-07-21 review item 12 — EPISODE POOLING] The first real week graded
+    almost nothing: 16/17 taker episodes ended too-few-trades because the
+    tuner's levers EXPIRE between its hourly re-asserts, fragmenting one
+    continuous stance into 2-4h slivers each too short for the trade floor
+    (the week's one repeated stance had 10 closes POOLED — a verdict's
+    worth). A stance that vanished by NATURAL EXPIRY (last_expires <= now)
+    now waits in a rejoin grace (PROP_REJOIN_GRACE_H): the SAME stance
+    re-asserted inside it CONTINUES the episode (gone_since cleared); a
+    DIFFERENT stance or a lapsed grace closes it with the end backdated to
+    the expiry, exactly as before. A stance removed MID-TTL (quarantine /
+    IMB-01 hurting-revert — last_expires still in the future) closes
+    IMMEDIATELY: pooling across a revert would bill default-behaviour tape
+    to the stance, the self-poisoning observed_active exists to prevent.
+    The replay counterfactual is gap-safe by construction — both arms
+    (stance bars vs env defaults) replay the SAME tape, gaps included."""
+    grace = (REJOIN_H if rejoin_h is None else rejoin_h) * 3600.0
     open_next, closed = {}, []
     for group, cur in (open_eps or {}).items():
         now_g = stances_now.get(group)
-        if now_g is None or now_g["stance"] != cur.get("stance"):
-            exp = cur.get("last_expires")
-            end = now if now_g is not None else min(
-                now, exp if isinstance(exp, (int, float)) and exp else now)
+        exp = cur.get("last_expires")
+        expn = exp if isinstance(exp, (int, float)) and exp else None
+        gone = cur.get("gone_since")
+        if now_g is None:
+            lapsed = expn is not None and expn <= now
+            if lapsed and gone is None:
+                gone = expn                    # the gap starts at the expiry
+            if lapsed and grace > 0 and now - gone <= grace:
+                open_next[group] = dict(cur, gone_since=gone)  # await re-assert
+                continue
+            end = min(now, expn) if expn is not None else now
             closed.append(dict(cur, group=group, end=max(end, cur["start"]),
-                               reason="changed" if now_g is not None else "released"))
+                               reason="released"))
+        elif now_g["stance"] != cur.get("stance"):
+            # a different stance arriving mid-grace ends the old episode at
+            # its expiry (the stance was genuinely dead through the gap)
+            end = gone if gone is not None else now
+            closed.append(dict(cur, group=group, end=max(end, cur["start"]),
+                               reason="changed"))
         elif now - cur["start"] >= slice_h * 3600:
             closed.append(dict(cur, group=group, end=now, reason="slice"))
             open_next[group] = {"stance": dict(now_g["stance"]),
@@ -286,8 +321,10 @@ def track(open_eps, stances_now, now, slice_h=SLICE_H):
                                 "last_expires": now_g["expires_max"],
                                 "start_metrics": None}
         else:
-            open_next[group] = dict(cur, last_expires=now_g["expires_max"],
-                                    set_by=now_g["set_by"])
+            nxt = dict(cur, last_expires=now_g["expires_max"],
+                       set_by=now_g["set_by"])
+            nxt.pop("gone_since", None)        # re-asserted — the gap closed
+            open_next[group] = nxt
     for group, g in stances_now.items():
         if group not in open_next:
             open_next[group] = {"stance": dict(g["stance"]), "set_by": g["set_by"],
@@ -810,6 +847,38 @@ def _selftest():
     o5, c5 = track(o2, st, now + SLICE_H * 3600 + 60)
     assert all(c["reason"] == "slice" for c in c5) and len(c5) == len(st), c5
     assert o5["taker"]["start"] == now + SLICE_H * 3600 + 60
+
+    # [2026-07-21 item 12] EPISODE POOLING — the rejoin grace.
+    # (a) a stance that lapsed by TTL (expires now+7800) observed gone at
+    # now+8000 stays OPEN awaiting re-assert (gap stamped at the expiry)…
+    gp, cp = track(o2, gone, now + 8000)
+    assert "taker" in gp and not [c for c in cp if c["group"] == "taker"], (gp, cp)
+    assert gp["taker"]["gone_since"] == now + 7800, gp["taker"]
+    # (b) …the SAME stance re-asserted inside the grace CONTINUES the episode:
+    # original start, gap cleared, nothing closed
+    gp2, cp2 = track(gp, st, now + 9000)
+    assert cp2 == [] and gp2["taker"]["start"] == now, (gp2, cp2)
+    assert "gone_since" not in gp2["taker"], gp2["taker"]
+    # (c) …a DIFFERENT stance inside the grace closes at the EXPIRY (the old
+    # stance was dead through the gap), then the new one opens
+    gp3, cp3 = track(gp, st_moved, now + 9000)
+    ch = [c for c in cp3 if c["group"] == "taker"]
+    assert ch and ch[0]["reason"] == "changed" and ch[0]["end"] == now + 7800, cp3
+    assert gp3["taker"]["start"] == now + 9000
+    # (d) …the grace lapsing closes 'released', still backdated to the expiry
+    gp4, cp4 = track(gp, gone, now + 7800 + int(REJOIN_H * 3600) + 61)
+    rel4 = [c for c in cp4 if c["group"] == "taker"]
+    assert rel4 and rel4[0]["reason"] == "released" and rel4[0]["end"] == now + 7800, cp4
+    # (e) a stance removed MID-TTL (quarantine / hurting-revert: expiry still
+    # in the future) gets NO grace — closes immediately (IMB-01 stays intact)
+    o2f = {k: dict(v, last_expires=now + 99999) for k, v in o2.items()}
+    gp5, cp5 = track(o2f, gone, now + 8000)
+    rel5 = [c for c in cp5 if c["group"] == "taker"]
+    assert rel5 and rel5[0]["reason"] == "released", cp5
+    assert "taker" not in gp5, gp5
+    # (f) grace 0 = pre-review behaviour (kill switch)
+    gp6, cp6 = track(o2, gone, now + 8000, rejoin_h=0.0)
+    assert [c for c in cp6 if c["group"] == "taker"], cp6
 
     # taker grading: the replay counterfactual. Tape where dip tickets sit at
     # range_pos 0.07 — defaults (0.05) take nothing; the stance (0.08) takes
