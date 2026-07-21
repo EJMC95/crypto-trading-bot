@@ -1,3 +1,8 @@
+## 2026-07-21 (ay) — parliament/** gets its deploy trigger: the frozen-service class caught on day one, on its own telemetry
+
+- **`railway-redeploy.yml` had no `parliament/**` / `parliament_main.py` entry** (both hardcoded lists predate the chamber), so #74's scanner-bench change — a parliament/*.py-only diff — merged green and deployed NOTHING: the exact "a fix that merges, goes green and never reaches the container" failure the 17-Jul six-commit incident documented. Caught within minutes because the missing payload was itself telemetry (the bench never appeared on /bus.json). Both lists fixed (the `paths:` filter AND the in-job grep — being in one but not the other deploys nothing while looking green, per the file's own warning).
+- Deploy note: this workflow change itself doesn't redeploy anything; the bench code ships via a manual `workflow_dispatch` of Railway Redeploy (freqtrade-bots) immediately after merge — accepted trade: one container restart, paper state survives on the persist volume.
+
 ## 2026-07-21 (ax) — the Parliament joins the dashboard's ORGAN panel, and all 10 scanners become individually visible
 
 - **ORGAN_SPECS gets `parliament` + `parliament-tuning`** — the chamber published vitals since (av) but the dashboard's organ-health panel (and the watchdog's staleness eye) predated it, so the Parliament had bot ROWS but no ORGAN row. Non-critical for the first rollout (the growth-rail bedding-in doctrine); both keys are unconditional per-cycle publishes, so a stale row really is a sick chamber. Summary lines: books/closed/signals/quiet-scanners/stalled, and active-lever count for the tuner bench.
