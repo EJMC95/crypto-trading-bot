@@ -49,9 +49,13 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$PASS"
+          # [2026-07-21 AUDIT] output discarded: DASH_PASS itself is masked
+          # above, but `railway variables --set` may echo the service's FULL
+          # variable table (DATABASE_URL, NTFY_TOPIC, ...) unmasked into the
+          # Actions log — none of those values are masked here.
           railway variables --service pnl-dashboard --skip-deploys \
             --set "DASH_USER=${DASH_USER_IN:-eamon}" \
-            --set "DASH_PASS=$PASS"
+            --set "DASH_PASS=$PASS" > /dev/null 2>&1
           # DASH_PASS is read at boot — restart the service on the new env.
           # (railway up is unnecessary: same code, new variables.)
           railway redeploy --service pnl-dashboard --yes

@@ -392,7 +392,12 @@ def main() -> None:
     if "--selftest" in sys.argv:
         selftest()
         return
-    if os.environ.get("PARLIAMENT_ENABLED", "1").strip() in ("0", "false", "no"):
+    # [2026-07-21 AUDIT FIX] .lower() + the full synonym set: an operator
+    # typing PARLIAMENT_ENABLED=False (Python-style, plausible in Railway's
+    # UI) used to get a RUNNING chamber the env said was prorogued — a kill
+    # switch that silently doesn't kill (the BRAIN_MULT_ENGINE typo class).
+    if os.environ.get("PARLIAMENT_ENABLED", "1").strip().lower() \
+            in ("0", "false", "no", "off", "disabled"):
         # Guard, not exit: run_all.sh would relaunch an exiting process every
         # 30s forever (the Trail Blazer restart-loop lesson) — idle instead.
         print("PARLIAMENT_ENABLED=0 — the chamber is prorogued; idling. "

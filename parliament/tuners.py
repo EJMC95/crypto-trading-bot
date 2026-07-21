@@ -38,6 +38,7 @@ import os
 import time
 
 from .strategies import PARAM_BOUNDS, clamp_params
+from .data import RES_FAST
 
 log = logging.getLogger("parliament.tuners")
 
@@ -123,18 +124,34 @@ class TunerBench:
         return clamp_params(p)
 
     # -- proprioception-lite --------------------------------------------------
-    def _last_verdict(self, bot: str, param: str) -> str | None:
+    def _last_verdict(self, bot: str, param: str,
+                      max_age_sec: float = 7 * 86400) -> str | None:
+        """[2026-07-21 AUDIT FIX] verdicts now AGE OUT (default 7d from the
+        episode's end). The old any-age read made a 'hurting' PERMANENT: the
+        hurting refusal blocks new levers on that (bot,param), new verdicts
+        only come from new levers, so nothing could ever supersede the
+        blacklist — the exact opposite of the fleet's proprioception
+        contract, where a stale organ restricts nothing."""
         try:
             hist = self.db.lever_history(bot, param, limit=3)
         except Exception:  # noqa: BLE001
             return None
+        now = time.time()
         for h in hist:
             if h.get("verdict") in ("helping", "hurting", "neutral"):
+                ended = h.get("released_ts") or h.get("expires_ts") or 0
+                if ended and now - ended > max_age_sec:
+                    return None      # newest conclusive verdict is stale
                 return h["verdict"]
         return None
 
     # -- the hourly cycle for one bot -----------------------------------------
-    def tune_bot(self, bot: str, base: dict, resolution: str = "15m") -> dict | None:
+    # [2026-07-21 AUDIT FIX] default resolution follows the data layer's
+    # RES_FAST — the hardcoded '15m' meant a PARL_RES_FAST override stored
+    # candles under one key while every replay read another: empty tapes,
+    # replay_pnl_usd None for every trade, all performance tuning silently off.
+    def tune_bot(self, bot: str, base: dict,
+                 resolution: str = RES_FAST) -> dict | None:
         self.cycles += 1
         self.grade_episodes(bot)
         if self.db is None:
@@ -239,7 +256,16 @@ class TunerBench:
             for h in self.db.lever_history(bot, param, limit=5):
                 ended = h["released_ts"] or (
                     h["expires_ts"] if h["expires_ts"] < now else None)
-                if not ended or h.get("verdict"):
+                if not ended:
+                    continue
+                # [2026-07-21 AUDIT FIX] 'insufficient' is no longer frozen
+                # forever: while the episode's 14d evidence window is still
+                # open, re-examine it each pass — trades that closed AFTER
+                # the first look can upgrade it to a real verdict. Conclusive
+                # verdicts stay final.
+                verdict_now = h.get("verdict")
+                if verdict_now and not (verdict_now == "insufficient"
+                                        and now - ended <= 14 * 86400):
                     continue
                 trades = self.db.closed_trades(bot=bot, days=14.0)
                 inside = [t["pnl_abs"] for t in trades
@@ -250,8 +276,9 @@ class TunerBench:
                            and not (h["applied_ts"] <= (t["closed_ts"] or 0)
                                     <= ended)]
                 if len(inside) < GRADE_MIN_TRADES or len(outside) < GRADE_MIN_TRADES:
-                    self.db.grade_lever(h["id"], "insufficient")
-                    graded += 1
+                    if verdict_now != "insufficient":
+                        self.db.grade_lever(h["id"], "insufficient")
+                        graded += 1
                     continue
                 delta = (sum(inside) / len(inside)
                          - sum(outside) / len(outside)) * len(inside)

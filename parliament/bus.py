@@ -26,6 +26,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 
 log = logging.getLogger("parliament.bus")
 
@@ -36,7 +37,8 @@ class EcosystemBus:
     def __init__(self):
         self._subs: dict[str, list[asyncio.Queue]] = {}
         self._redis = None
-        self._redis_dead = False
+        self._redis_dead = False          # permanent: no URL / wheel absent
+        self._redis_retry_at = 0.0        # transient-error backoff stamp
         self.published = 0          # lifetime counters, surfaced by Howard
         self.dropped = 0
 
@@ -76,8 +78,10 @@ class EcosystemBus:
         self._mirror(topic, payload)
 
     # -- optional Redis mirror ------------------------------------------------
+    _REDIS_RETRY_SEC = 300.0
+
     def _mirror(self, topic: str, payload: dict) -> None:
-        if self._redis_dead:
+        if self._redis_dead or time.time() < self._redis_retry_at:
             return
         url = os.environ.get("REDIS_URL", "").strip()
         if not url:
@@ -85,16 +89,25 @@ class EcosystemBus:
             return
         try:
             if self._redis is None:
-                import redis  # optional wheel — absent is a supported state
-
+                try:
+                    import redis  # optional wheel — absent is a supported state
+                except Exception:  # noqa: BLE001 — permanently absent
+                    self._redis_dead = True
+                    return
                 self._redis = redis.Redis.from_url(
                     url, socket_timeout=2, socket_connect_timeout=2)
             self._redis.publish("parliament." + topic,
                                 json.dumps(payload, default=str))
         except Exception as e:  # noqa: BLE001 — mirror only, go quiet
-            log.info("redis mirror off (%s) — in-process bus unaffected", e)
+            # [2026-07-21 AUDIT FIX] one transient error used to disable the
+            # mirror for the PROCESS LIFETIME (potentially weeks). Back off
+            # instead: dead until the retry stamp, then one reconnect
+            # attempt; repeated failure just re-arms the backoff. In-process
+            # bus unaffected either way.
+            log.info("redis mirror off (%s) — retrying in %.0fs; in-process "
+                     "bus unaffected", e, self._REDIS_RETRY_SEC)
             self._redis = None
-            self._redis_dead = True
+            self._redis_retry_at = time.time() + self._REDIS_RETRY_SEC
 
 
 async def drain(q: asyncio.Queue, max_items: int = 200) -> list:

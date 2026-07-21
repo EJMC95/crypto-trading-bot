@@ -862,15 +862,25 @@ def synthesize_parliament(parl_state, tuning_state, now_ts):
                                 "PARLIAMENT_ENABLED=0 idles the chamber if it "
                                 "is sick (restrict-only kill switch)",
                     "lever": "parliament", "ts": now_ts, "source": "board"})
+    # [2026-07-21 AUDIT FIX — label honesty] this measures P&L-FROM-START,
+    # not max drawdown (Howard's book_summary carries no peak). Since peak
+    # >= start, P&L-from-start is a LOWER BOUND on maxDD: a book −15% from
+    # start has maxDD >= 15%, so the ACTION band fires conservatively-
+    # correctly — but the item must SAY what it measured, or the operator
+    # reads a maxDD number that isn't one (a book that rallied +30% then
+    # gave it back sits at 0% here with a 23% true maxDD).
     for bot, b in sorted((parl_state.get("books") or {}).items()):
         try:
             pnl_pct = float(b.get("pnl", 0.0)) / 1000.0
         except (TypeError, ValueError):
             continue
         if pnl_pct <= -0.15:
-            sev, band = "action", "BEYOND the 15% go-live gate bar"
+            sev, band = "action", ("P&L-from-start beyond −15% — a LOWER "
+                                   "BOUND on maxDD, so the 15% go-live gate "
+                                   "bar is breached")
         elif pnl_pct <= -0.10:
-            sev, band = "warn", "approaching the 15% go-live gate bar"
+            sev, band = "warn", ("P&L-from-start past −10% — maxDD is at "
+                                 "least this; the 15% go-live gate bar nears")
         else:
             continue
         out.append({"key": f"board:parliament-drawdown:{bot}",

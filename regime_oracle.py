@@ -398,9 +398,17 @@ def main():
             errors.append(f"{coin}:{type(e).__name__}")
         time.sleep(0.4)  # gentle on the public API
 
-    if not pairs:
-        print(f"[regime-oracle] {now_iso()} FAILED for all coins ({errors}) — "
-              f"NOT publishing (consumers keep last good + TTL)")
+    # [2026-07-21 AUDIT FIX] the dark-venue guard gates on CRYPTO pairs, not
+    # any pair: the (az) per-asset widening put NONCRYPTO into the fetch
+    # loop, so an all-crypto-failure cycle with one surviving stock book
+    # would have PUBLISHED a fresh crypto-empty fleet read — consumers
+    # (`fleet.read` gates real entries via the (bc) regime gate) would read
+    # a fresh 'no signal' instead of going TTL-neutral on a dark venue,
+    # which the module's own selftest pins as the contract.
+    if not any(c in UNIVERSE for c in pairs):
+        print(f"[regime-oracle] {now_iso()} crypto majors ALL failed "
+              f"({errors}) — NOT publishing (consumers keep last good + TTL; "
+              f"{len(pairs)} non-crypto grades held back with it)")
         return
 
     fleet, noncrypto = summarize(pairs)

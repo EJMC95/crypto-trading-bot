@@ -676,6 +676,13 @@ def fetch_paper_rows(bot=None, limit=500):
             if bot:
                 clauses.append("bot = %s")
                 params.append(bot)
+            else:
+                # [2026-07-21 AUDIT FIX] the default window excludes the
+                # sniper's side='skip' gate-log rows: 278 of the newest 500
+                # were skip diagnostics of a RETIRED bot, crowding real
+                # fleet history out of the very endpoint reviews read.
+                # Still reachable explicitly via ?bot=<name>-skips.
+                clauses.append("side IS DISTINCT FROM 'skip'")
             where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
             params.append(int(limit))
             # [2026-07-15 EVIDENCE] widened columns (side/tag/prices/size/extra)
@@ -987,6 +994,7 @@ def autonomy_rail_card():
             "strategy-incubator", "xp-queue",
             "xp-judge", "fleet-immune", "fleet-regen", "fleet-respiration",
             "fleet-clock", "impl-shortfall", "gapscout-census",
+            "tuning-proposals",
         ])
         G, R, Y, M = "#1a7f37", "#d1242f", "#d29922", "#8b949e"
 
@@ -1129,13 +1137,33 @@ def autonomy_rail_card():
                        f'{n_hurt} hurting',
                        Y if n_hurt else (G if (pc.get("graded") or 0) else None))
 
+        def b_proposals():
+            # [2026-07-21] the organs' proposal channel: what the wider
+            # organism is ASKING the tuners for right now (the tuners' own
+            # gates decide). Summarized by author so one glance shows who is
+            # proposing; dark/empty channel omits the row.
+            tp = s.get("tuning-proposals") or {}
+            props = [p for p in (tp.get("proposals") or {}).values()
+                     if isinstance(p, dict) and _lever_unexpired(p)]
+            if not props:
+                return None
+            by = {}
+            for p in props:
+                by.setdefault(str(p.get("set_by") or "?"), []).append(p)
+            n_r = sum(1 for p in props if p.get("direction") == "restrict")
+            txt = (f'{len(props)} open ({n_r} restrict / '
+                   f'{len(props) - n_r} expand) · '
+                   + " · ".join(f'{a}×{len(v)}' for a, v in sorted(by.items())))
+            return row("tuning-proposals", "🗳️ Organ proposals", txt,
+                       Y if n_r else None)
+
         rows = []
         # [2026-07-16 AUDIT FIX] one organ's odd-shaped payload used to throw
         # inside the single outer try and silently vanish the WHOLE card —
         # indistinguishable from "autonomy stack not running". Each row now
         # degrades alone.
-        for build in (b_tuning, b_tuner, b_proprio, b_incubator, b_queue,
-                      b_judge, b_immune, b_regen, b_resp, b_clock,
+        for build in (b_tuning, b_tuner, b_proposals, b_proprio, b_incubator,
+                      b_queue, b_judge, b_immune, b_regen, b_resp, b_clock,
                       b_shortfall, b_census):
             try:
                 rows.append(build())
@@ -1201,26 +1229,45 @@ def parliament_card():
                         f'<b style="color:{G if ml.get("ready") else M}">'
                         f'{html.escape(mtxt)}{tail}</b></div>')
 
+        # [2026-07-21 AUDIT FIX] the tuning row judges freshness on the
+        # TUNING payload's own updated+ttl_sec — it used to inherit the
+        # `parliament` key's verdict, so a day-old lever list rendered
+        # bright/current whenever Howard's other publish was healthy.
         t = s.get("parliament-tuning") or {}
+        t_fresh = _state_fresh(t)
+        t_dim = "" if t_fresh else ' style="opacity:.45"'
+        t_tail = "" if t_fresh else " · STALE"
         act = t.get("active") or {}
         levers = [f'{bot.replace("pm-", "")}:{lv.get("param")}='
                   f'{lv.get("value")}'
                   for bot, lvs in sorted(act.items())
                   for lv in (lvs if isinstance(lvs, list) else [])]
-        rows.append(f'<div{dim}><span class="muted">🎚️ Tuners</span> '
+        rows.append(f'<div{t_dim}><span class="muted">🎚️ Tuners</span> '
                     f'<b style="color:{Y if levers else ""}">'
                     f'{html.escape(" · ".join(levers) if levers else "no active levers (auto-reverted)")}'
-                    f'{tail}</b></div>')
+                    f'{t_tail}</b></div>')
 
         bench = (p.get("scanners") or {}).get("bench") or {}
         table = ""
         if bench:
+            # [2026-07-21 AUDIT FIX] last-fire ages are frozen AT PUBLISH by
+            # Howard — rendering them raw on a stale payload said "5m ago"
+            # about an hours-old fire. Re-base to now with the payload's own
+            # age so the printed age is honest however stale the chamber is.
+            _p_age = 0.0
+            try:
+                _pd = _iso_dt(p.get("updated"))
+                if _pd is not None:
+                    from datetime import datetime as _dt, timezone as _tz
+                    _p_age = max(0.0, (_dt.now(_tz.utc) - _pd).total_seconds())
+            except Exception:  # noqa: BLE001
+                _p_age = 0.0
             trs = []
             for name, b in sorted(bench.items()):
                 n = b.get("n") or 0
                 if n:
                     last = (f'{html.escape(str(b.get("last_sym") or "—"))} · '
-                            f'{int((b.get("last_age_sec") or 0) / 60)}m ago')
+                            f'{int(((b.get("last_age_sec") or 0) + _p_age) / 60)}m ago')
                     style = ""
                 else:
                     last, style = "quiet", ' style="opacity:.45"'
@@ -2360,8 +2407,14 @@ def _organ_vital(key, st):
     """One-line vital sign per organ — the number you'd ask for first."""
     try:
         if key == "fleet-risk":
+            # [2026-07-21 AUDIT FIX] the 'L' slot renders long_positions —
+            # `gross` includes shorts, so this read "23L/20" while longs
+            # were 22 (a short inflating a LONG budget readout). gross stays
+            # as the fallback for payloads predating long_positions.
             return _v("light {} · {}L/{} · clip {}x · 7d dd {:+.2f}%",
-                      st.get("light"), st.get("gross"), st.get("long_budget"),
+                      st.get("light"),
+                      st.get("long_positions", st.get("gross")),
+                      st.get("long_budget"),
                       st.get("clip_scale"), 100 * (st.get("fleet_dd_7d") or 0))
         if key == "lighter-market":
             s = st.get("stress") or {}
@@ -2637,7 +2690,7 @@ CONTRACTS = [
      "Ticket Taker · family bot (entry sizing)", "enforced", "fleet-risk"),
     ("stake multipliers (L4)", "bot_learn.py",
      "family bot custom_stake_amount via fleet_bus",
-     "reduce-only · floors n≥30 / 3 runs", "brain-stake-mults"),
+     "two-way since 21-Jul · floors n≥30 / 3 runs", "brain-stake-mults"),
     ("panic flag", "market_pulse.py", "strategies (half-stake on panic)",
      "enforced", "market-pulse"),
     ("tickets (per-lens)", "lighter_market_scout.py",
@@ -3295,6 +3348,11 @@ def brain_panel_html():
                    '<th>Lighter</th><th>gap</th></tr>' + "".join(ab_rows) + '</table>')
     # [2026-07-15 AUDIT FIX] mults is NESTED {bot: {tag: {mult,n,wr,pnl,...}}}
     # (bot_learn.compute_stake_mults) — the flat render printed dicts as "x".
+    # [2026-07-21 AUDIT FIX] the labels read the payload's OWN mode stamp —
+    # they were hardcoded 'reduce-only' the same day the mults went two-way,
+    # so an earned 1.25x/1.5x BOOST would have rendered under a 'throttle'
+    # heading (the honest-label field existed precisely for this reader).
+    _mode = sm.get("mode") or "reduce-only"
     mults = sm.get("mults") or {}
     if mults:
         _mrows = []
@@ -3302,14 +3360,18 @@ def brain_panel_html():
             for _tag, _e in sorted((_tags or {}).items()):
                 _m = (_e or {}).get("mult", _e)
                 _n = (_e or {}).get("n")
+                try:
+                    _boost = float(_m) > 1.0
+                except (TypeError, ValueError):
+                    _boost = False
                 _mrows.append(
                     f'<div class="row"><span>{html.escape(f"{_bot} · {_tag}")}</span>'
-                    f'<b>{_m}x{f" (n={_n})" if _n else ""}</b></div>')
-        m_html = ('<div class="sub">Active stake throttles (reduce-only)</div>'
+                    f'<b>{"⬆ " if _boost else ""}{_m}x{f" (n={_n})" if _n else ""}</b></div>')
+        m_html = (f'<div class="sub">Active stake multipliers ({html.escape(_mode)})</div>'
                   + "".join(_mrows))
     else:
-        m_html = ('<div class="sub">Stake throttles</div><div class="muted">none active '
-                  f'— reduce-only mode, min n={sm.get("min_n", "?")}, '
+        m_html = ('<div class="sub">Stake multipliers</div><div class="muted">none active '
+                  f'— {html.escape(_mode)} mode, min n={sm.get("min_n", "?")}, '
                   f'{sm.get("promote_runs", "?")} consecutive runs to apply.</div>')
     dg_items = []
     for key, d in sorted(dg.items()):
@@ -3320,8 +3382,12 @@ def brain_panel_html():
                         f'{money(ev.get("pnl") or 0)})</span></li>')
     dg_html = ""
     if dg_items:
+        # [2026-07-21] label updated with BRAIN ACTS: ACTIONABLE
+        # regime_timing findings now gate counter-regime entries
+        # (restrict-only, shadow lane); everything else stays human-review.
         dg_html = ('<div class="sub">Loss diagnoses — WHERE each negative sleeve '
-                   'loses (proposals are human-review, never auto-applied)</div>'
+                   'loses (ACTIONABLE regime-timing findings gate counter-regime '
+                   'entries, restrict-only; all else human-review)</div>'
                    f'<ul class="recs">{"".join(dg_items)}</ul>')
     # [2026-07-15 LENS-FORWARD] the brain grading the scanners: every scout
     # ticket's counterfactual forward return, by lens. This is the sample the
@@ -3347,7 +3413,8 @@ def brain_panel_html():
                    '<th>avg 4h</th><th>avg 24h</th></tr>' + "".join(_rows)
                    + '</table>')
     meta = (f'run #{lb.get("runs", "?")} · {len(lb.get("hypotheses") or {})} live '
-            f'hypotheses · L4 meta-labeling is reduce-only by doctrine')
+            f'hypotheses · L4 meta-labeling two-way since 21-Jul '
+            f'(expand on the v3 mirror bars; reduce unchanged)')
     return (f'<div class="card"><h2>🧠 Learning brain</h2>'
             f'<div class="muted">{meta}</div>{lf_html}{ab_html}{m_html}{dg_html}</div>')
 
@@ -3793,11 +3860,13 @@ def render_learning():
 {banner}
 <div class="grid">{loop_cards}</div>
 <div class="grid" style="padding-top:0">{cards}</div>
-<footer>Top row: the live learning loop — brain venue A/B + reduce-only throttles +
+<footer>Top row: the live learning loop — brain venue A/B + two-way stake multipliers +
 loss diagnoses (bot_learn, ~2h cadence) and the Ticket Taker lens scoreboard (durable
 paper_trades ledger). Below: per-strategy post-mortems written daily by the trainer.
-Proposals are human-review only; nothing here auto-applies except OOS-validated tuning
-and reduce-only stake throttles. Auto-refreshes every 2 min. Times UTC.</footer>
+Auto-applied, all evidence-gated: OOS-validated tuning, two-way stake multipliers
+(reduce 0.5x/0.75x, earn 1.25x/1.5x on the v3 mirror bars), and ACTIONABLE
+regime-timing gates (restrict-only). Everything else is human-review.
+Auto-refreshes every 2 min. Times UTC.</footer>
 </body></html>'''
 
 
@@ -4264,6 +4333,9 @@ class H(BaseHTTPRequestHandler):
                         # xp-judge + scout-tuner added on the same rule: the
                         # promotion pipeline's phase and the growth rail's
                         # active levers were only inferable, not readable.
+                        # [2026-07-21] tuning-proposals added: the organs'
+                        # proposal channel to the tuners must be visible on
+                        # the same surface its enactments are.
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
@@ -4271,7 +4343,8 @@ class H(BaseHTTPRequestHandler):
                             "'brain-diagnosis', 'brain-lens-forward', "
                             "'lighter-market', 'fleet-proprioception', "
                             "'parliament', 'parliament-tuning', "
-                            "'impl-shortfall', 'xp-judge', 'scout-tuner')")
+                            "'impl-shortfall', 'xp-judge', 'scout-tuner', "
+                            "'tuning-proposals')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -4312,6 +4385,7 @@ class H(BaseHTTPRequestHandler):
                                    "impl_shortfall": live.get("impl-shortfall"),
                                    "xp_judge": live.get("xp-judge"),
                                    "scout_tuner": live.get("scout-tuner"),
+                                   "tuning_proposals": live.get("tuning-proposals"),
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
             except Exception as e:

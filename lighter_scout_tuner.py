@@ -64,6 +64,11 @@ try:
 except Exception:  # noqa: BLE001
     proprio = None
 
+try:
+    import fleet_proposals as fprop          # organ proposal channel (optional)
+except Exception:  # noqa: BLE001
+    fprop = None
+
 KEY = "scout-tuner"
 TTL_SEC = int(os.environ.get("TUNER_TTL_SEC", "10800"))       # 3h payload ttl
 LEVER_TTL = int(os.environ.get("TUNER_LEVER_TTL", "7800"))    # 2h10m per lever
@@ -114,6 +119,22 @@ TOP_N_LADDER = ("scout.ticket_top_n",
 SWEEP_TP = [0.03, 0.04, 0.05, 0.06]
 SWEEP_SL = [-0.02, -0.03, -0.04]
 SWEEP_HOLD = [24.0, 48.0, 72.0]
+
+# [2026-07-21 ORGAN PROPOSALS] levers this tuner will consider when another
+# organ proposes them (fleet_proposals), with each attr's TIGHTER direction —
+# the tuner re-derives the true direction itself; a declared intent that
+# disagrees is disqualifying (an organ cannot smuggle a widening through a
+# restrict-shaped gate). tp/sl stay sweep-owned: their direction semantics
+# are not monotone, so proposals on them are ignored in v1.
+PROPOSAL_TAKER = {
+    "taker.dip_range":  ("DIP_RANGE",  "down"),   # lower  = tighter
+    "taker.brk_range":  ("BRK_RANGE",  "up"),     # higher = tighter
+    "taker.momo_chg":   ("MOMO_CHG",   "up"),
+    "taker.div_gap_pp": ("DIV_GAP_PP", "up"),
+    "taker.max_hold_h": ("MAX_HOLD_H", "down"),   # shorter = tighter
+}
+_ATTR_LENS = {attr: lens for lens, (attr, _lv, _lad) in TAKER_LADDERS.items()}
+MAX_PROPOSALS_CYCLE = int(os.environ.get("TUNER_MAX_PROPOSALS", "3"))
 
 # env defaults captured at import — the stateless walk always starts here
 DEFAULTS = {attr: getattr(tt, attr)
@@ -394,7 +415,29 @@ def desired_scout_levers(lens_fwd, helping=None):
             log.append(f"{lens}: graded n={graded} under floor — scout "
                        f"emission {lever} -> {val} (grading diet, not trading"
                        + (", deeper: proprio-helping" if deeper else "") + ")")
-        # else: floor reached — stop asserting, lever expires to default
+        elif _avg is not None and _avg > 0 and (_hit or 0) >= 0.5:
+            # [2026-07-21b AUDIT FIX] the WINNER path — the exact state
+            # IMB-20 shipped scout.div_gap_pp FOR (divergence: floor met,
+            # positive at every horizon) was UNREACHABLE: the diet only
+            # widened UNDER the floor, so a graded winner's emission lever
+            # never engaged. A lens POSITIVE at the ruling floor (the same
+            # bar the taker-bar winner walk uses) now holds ONE widening
+            # notch (deeper if proprio-helping): more advisory tickets from
+            # a proven lens = more brain grading + more taker opportunity;
+            # fills stay gated by the taker's own bars. Stops asserting the
+            # moment the grade drops — TTL reverts.
+            beyond = next_notches(ladder, default)
+            if not beyond:
+                continue
+            deeper = lever in helping and len(beyond) > 1
+            val = beyond[1] if deeper else beyond[0]
+            out[lever] = val
+            log.append(f"{lens}: WINNER at floor (n={graded}, avg "
+                       f"{_avg:+.2f}%, hit {(_hit or 0):.0%}) — scout "
+                       f"emission {lever} -> {val} (winner diet"
+                       + (", deeper: proprio-helping" if deeper else "") + ")")
+        # else: floor reached without a positive grade — stop asserting,
+        # lever expires to default
     lever, default, ladder = TOP_N_LADDER
     hungry = any(not tt.lens_evidence((lens_fwd or {}).get(l),
                                       min_n=LENS_FLOOR)[1]
@@ -408,6 +451,96 @@ def desired_scout_levers(lens_fwd, helping=None):
             log.append(f"ticket_top_n -> {val} (a lens is below the ruling floor"
                        + (", deeper: proprio-helping" if deeper else "") + ")")
     return out, log
+
+
+def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh):
+    """[2026-07-21 operator mandate: "the organs need more ability to
+    implement changes to forward onto the tuners to act on"] Gate ORGAN
+    PROPOSALS (fleet_proposals) through this tuner's OWN evidence bars and
+    merge the survivors into this cycle's taker bars. The organ supplies the
+    trigger; the tape decides:
+
+      RESTRICT (tighter than the cycle's current value): enacted iff the
+        replay is NOT WORSE on both halves — a protective tightening that
+        would have cost real P&L on the tape needs stronger evidence than a
+        proposal carries. No brain needed (restricting is always allowed,
+        dark brain included).
+      EXPAND (wider): the full winner bar — fresh brain, lens not vetoed,
+        and the notch must IMPROVE the replayed net on both halves by
+        MARGIN_HALF. max_hold has no lens, so it accepts restrict only.
+
+    A proposal whose DECLARED direction disagrees with the re-derived one is
+    disqualified, not reinterpreted. At most MAX_PROPOSALS_CYCLE enactments
+    per cycle; later proposals gate against the already-accepted set. Pure
+    w.r.t. inputs (bars copied); selftested offline.
+    Returns (bars, {attr: proposing organ}, log)."""
+    log = []
+    prov = {}
+    if not proposals:
+        return bars, prov, log
+    h1, h2 = halves(tape)
+    if not h1 or not h2:
+        return bars, prov, ["proposals skipped: tape too short to halve"]
+    bars = dict(bars)
+    current = dict(DEFAULTS, **bars)
+    enacted = 0
+    flat = sorted((p for plist in proposals.values() for p in plist),
+                  key=lambda p: (0 if p["direction"] == "restrict" else 1,
+                                 p["set_by"], p["lever"]))
+    for p in flat:
+        if enacted >= MAX_PROPOSALS_CYCLE:
+            log.append(f"proposal({p['set_by']}): {p['lever']} skipped — "
+                       f"per-cycle cap {MAX_PROPOSALS_CYCLE} reached")
+            continue
+        attr, tighter = PROPOSAL_TAKER.get(p["lever"], (None, None))
+        if attr is None:
+            continue
+        cur = current[attr]
+        v = p["value"]
+        if v == cur:
+            continue
+        true_dir = ("restrict"
+                    if (tighter == "up" and v > cur) or
+                       (tighter == "down" and v < cur)
+                    else "expand")
+        if true_dir != p["direction"]:
+            log.append(f"proposal({p['set_by']}): {p['lever']}={v} DISQUALIFIED"
+                       f" — declared {p['direction']}, derived {true_dir}")
+            continue
+        cand = dict(current, **{attr: v})
+        if true_dir == "restrict":
+            if not not_worse(h1, h2, current, cand):
+                log.append(f"proposal({p['set_by']}): restrict {p['lever']}"
+                           f"={v} REJECTED (worse on a half)")
+                continue
+        else:
+            lens = _ATTR_LENS.get(attr)
+            if lens is None:
+                log.append(f"proposal({p['set_by']}): expand {p['lever']}"
+                           f"={v} refused (no lens — restrict-only attr)")
+                continue
+            if not lens_fresh:
+                log.append(f"proposal({p['set_by']}): expand {p['lever']}"
+                           f"={v} refused (brain dark — earns nothing)")
+                continue
+            if lens in vetoed_lenses(lens_fwd):
+                log.append(f"proposal({p['set_by']}): expand {p['lever']}"
+                           f"={v} refused (lens brain-vetoed)")
+                continue
+            ok = all(_marked(replay_with(h, cand))
+                     >= _marked(replay_with(h, current)) + MARGIN_HALF
+                     for h in (h1, h2))
+            if not ok:
+                log.append(f"proposal({p['set_by']}): expand {p['lever']}"
+                           f"={v} REJECTED (no improvement on a half)")
+                continue
+        current[attr] = v
+        bars[attr] = v
+        prov[attr] = p["set_by"]
+        enacted += 1
+        log.append(f"proposal({p['set_by']}): {true_dir} {p['lever']} -> {v} "
+                   f"ENACTED ({p['reason'][:80] or 'no reason given'})")
+    return ({k: v for k, v in bars.items() if v != DEFAULTS[k]}, prov, log)
 
 
 def apply_proprioception(levers, prop_state, now_ts):
@@ -505,12 +638,23 @@ def run_once():
         scout_levers, log3 = {}, ["lens-forward missing/stale — no scout-diet "
                                   "changes (fail-safe neutral)"]
 
+    # [2026-07-21 ORGAN PROPOSALS] other organs' proposed bar changes, gated
+    # by THIS tuner's replay evidence (restrict: not-worse; expand: winner
+    # bar). Fail-safe: dark channel proposes nothing.
+    prov, log5 = {}, []
+    if fprop is not None:
+        props = fprop.proposals_for(set(PROPOSAL_TAKER))
+        bars, prov, log5 = consume_proposals(props, tape, bars, lens_fwd,
+                                             lens_fresh=lf_fresh)
+
     attr_to_lever = {attr: lever for _l, (attr, lever, _lad) in TAKER_LADDERS.items()}
     attr_to_lever.update({"TAKE_PROFIT": "taker.tp", "STOP_LOSS": "taker.sl",
                           "MAX_HOLD_H": "taker.max_hold_h"})
     levers = {attr_to_lever[a]: {
         "value": v,
-        "reason": "replay-gated widen/optimize (both-halves on the tape)",
+        "reason": (f"organ-proposal:{prov[a]} (replay-gated at this tuner)"
+                   if a in prov else
+                   "replay-gated widen/optimize (both-halves on the tape)"),
         "evidence": f"tape {baseline['span']} ({baseline['snapshots']} snaps); "
                     f"baseline net ${baseline['closed_net']}"}
         for a, v in bars.items()}
@@ -537,7 +681,7 @@ def run_once():
         "baseline_net": baseline["closed_net"],
         "baseline_lenses": {l: {k: s.get(k) for k in ("seen", "taken", "closed", "net")}
                             for l, s in (baseline.get("lenses") or {}).items()},
-        "enacted": now_set, "log": (log4 + log1 + log2 + log3)[:20],
+        "enacted": now_set, "log": (log4 + log5 + log1 + log2 + log3)[:20],
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -718,12 +862,24 @@ def _selftest():
     assert sl.get("scout.dip_range_max") == 0.15, (sl, slog2)
     assert "scout.brk_range_min" not in sl, sl
     assert sl.get("scout.ticket_top_n") == 9, sl
-    sl2, _ = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": 1.0,
-                                           "hit4h": 0.6},
-                                   "breakout": {"n4h": 100},
-                                   "momentum": {"n4h": 100},
-                                   "divergence": dict(_fed)})
-    assert sl2 == {}, sl2
+    # [2026-07-21b] a lens POSITIVE at the floor now earns the WINNER diet
+    # (one notch) — the pre-fix contract ({} here) was exactly the IMB-20
+    # gap: the winner lens's emission lever was unreachable at the floor.
+    # Lenses at the floor WITHOUT a positive grade still release to default.
+    sl2, sl2log = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": 1.0,
+                                                "hit4h": 0.6},
+                                        "breakout": {"n4h": 100},
+                                        "momentum": {"n4h": 100},
+                                        "divergence": dict(_fed)})
+    assert sl2 == {"scout.dip_range_max": 0.15}, sl2
+    assert any("WINNER at floor" in l for l in sl2log), sl2log
+    # ...and a floor-met lens with a NEGATIVE grade gets nothing
+    sl2b, _ = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": -0.2,
+                                            "hit4h": 0.6},
+                                    "breakout": {"n4h": 100},
+                                    "momentum": {"n4h": 100},
+                                    "divergence": dict(_fed)})
+    assert sl2b == {}, sl2b
     # a vetoed lens gets NO extra diet either
     sl3, _ = desired_scout_levers({"dip": {"n4h": 80, "avg4h_pct": -1.0,
                                            "hit4h": 0.3},
@@ -780,6 +936,85 @@ def _selftest():
         assert apply_proprioception(dict(want), stale_prop, nowts) == (want, [])
         assert apply_proprioception(dict(want), {}, nowts) == (want, [])
         assert apply_proprioception({}, fresh_prop, nowts) == ({}, [])
+
+    # [2026-07-21 ORGAN PROPOSALS] consume_proposals: the organ proposes,
+    # THIS tuner's replay evidence decides.
+    def prop(lever, value, direction, who="organ-x"):
+        return {lever: [{"lever": lever, "value": value, "direction": direction,
+                         "set_by": who, "reason": "test", "evidence": "t"}]}
+
+    # restrict with no matching tickets on tape: replay unchanged -> not-worse
+    # trivially -> ENACTED (a free protective tightening)
+    b1, pv1, pl1 = consume_proposals(prop("taker.momo_chg", 6.0, "restrict"),
+                                     win_tape, {}, {}, lens_fresh=True)
+    assert b1.get("MOMO_CHG") == 6.0 and pv1 == {"MOMO_CHG": "organ-x"}, (b1, pl1)
+    # ...and a dark brain does NOT block a restrict (restricting is always
+    # allowed)
+    b1d, _, _ = consume_proposals(prop("taker.momo_chg", 6.0, "restrict"),
+                                  win_tape, {}, {}, lens_fresh=False)
+    assert b1d.get("MOMO_CHG") == 6.0, b1d
+    # restrict that would have EXCLUDED winning trades -> worse on a half ->
+    # REJECTED (momo tickets at +5.5% win at the default 5.0 bar)
+    m_in = {"sym": "MMM", "chg_pct": 5.5, "vol_m": 9.0}
+    m_in2 = {"sym": "NNN", "chg_pct": 5.5, "vol_m": 9.0}
+    momo_win = [
+        snap(0, {"MMM": 100.0}, {"momentum": [m_in]}),
+        snap(1, {"MMM": 105.0}),
+        snap(2, {}),
+        snap(3, {"NNN": 100.0}, {"momentum": [m_in2]}),
+        snap(4, {"NNN": 105.0}),
+        snap(5, {}),
+    ]
+    b2, pv2, pl2 = consume_proposals(prop("taker.momo_chg", 6.0, "restrict"),
+                                     momo_win, {}, {}, lens_fresh=True)
+    assert "MOMO_CHG" not in b2 and not pv2, (b2, pl2)
+    assert any("REJECTED" in l for l in pl2), pl2
+    # expand: winner bar — improves both halves (tickets at +4.6% win, only
+    # reachable at the proposed 4.5 bar), brain fresh, lens not vetoed
+    m_lo = {"sym": "MMM", "chg_pct": 4.6, "vol_m": 9.0}
+    m_lo2 = {"sym": "NNN", "chg_pct": 4.6, "vol_m": 9.0}
+    momo_exp = [
+        snap(0, {"MMM": 100.0}, {"momentum": [m_lo]}),
+        snap(1, {"MMM": 105.0}),
+        snap(2, {}),
+        snap(3, {"NNN": 100.0}, {"momentum": [m_lo2]}),
+        snap(4, {"NNN": 105.0}),
+        snap(5, {}),
+    ]
+    b3, pv3, pl3 = consume_proposals(prop("taker.momo_chg", 4.5, "expand"),
+                                     momo_exp, {}, {}, lens_fresh=True)
+    assert b3.get("MOMO_CHG") == 4.5, (b3, pl3)
+    # ...refused on a dark brain (expand earns nothing dark)
+    b3d, _, pl3d = consume_proposals(prop("taker.momo_chg", 4.5, "expand"),
+                                     momo_exp, {}, {}, lens_fresh=False)
+    assert "MOMO_CHG" not in b3d and any("brain dark" in l for l in pl3d), pl3d
+    # ...refused when the lens is brain-vetoed (veto stays senior)
+    lf_mveto = {"momentum": {"n4h": 80, "avg4h_pct": -1.0, "hit4h": 0.3}}
+    b3v, _, pl3v = consume_proposals(prop("taker.momo_chg", 4.5, "expand"),
+                                     momo_exp, {}, lf_mveto, lens_fresh=True)
+    assert "MOMO_CHG" not in b3v and any("vetoed" in l for l in pl3v), pl3v
+    # declared direction disagreeing with the derived one is DISQUALIFIED
+    b4, _, pl4 = consume_proposals(prop("taker.momo_chg", 4.0, "restrict"),
+                                   momo_exp, {}, {}, lens_fresh=True)
+    assert "MOMO_CHG" not in b4 and any("DISQUALIFIED" in l for l in pl4), pl4
+    # max_hold: restrict OK, expand refused (no lens to earn with)
+    b5, _, _ = consume_proposals(prop("taker.max_hold_h", 24.0, "restrict"),
+                                 win_tape, {}, {}, lens_fresh=True)
+    assert b5.get("MAX_HOLD_H") == 24.0, b5
+    b6, _, pl6 = consume_proposals(prop("taker.max_hold_h", 72.0, "expand"),
+                                   win_tape, {}, {}, lens_fresh=True)
+    assert "MAX_HOLD_H" not in b6 and any("restrict-only" in l for l in pl6), pl6
+    # per-cycle cap: 4 free restricts, only MAX_PROPOSALS_CYCLE enacted
+    many = {}
+    for lv, val in (("taker.momo_chg", 6.0), ("taker.brk_range", 0.97),
+                    ("taker.div_gap_pp", 87.5), ("taker.max_hold_h", 24.0)):
+        many.update(prop(lv, val, "restrict"))
+    b7, pv7, pl7 = consume_proposals(many, win_tape, {}, {}, lens_fresh=True)
+    assert len(pv7) == MAX_PROPOSALS_CYCLE, (pv7, pl7)
+    assert any("cap" in l for l in pl7), pl7
+    # empty channel -> untouched passthrough
+    assert consume_proposals({}, win_tape, {"MOMO_CHG": 4.5}, {}, True)[0] \
+        == {"MOMO_CHG": 4.5}
 
     # every ladder/sweep value must be registered + in-bounds in fleet_tuning
     for lens, (attr, lever, ladder) in TAKER_LADDERS.items():

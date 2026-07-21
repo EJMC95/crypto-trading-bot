@@ -161,6 +161,11 @@ HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — HL-
 TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% — lock the reversion pop
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDING_DAILY_LOSS", "0.05"))
 STOP_COOLDOWN_H = float(os.environ.get("FUNDING_STOP_COOLDOWN_H", "12"))  # quarantine after a stop
+# [2026-07-21] repeat-stop escalation (the LIT lesson: 5 of 7 fleet stops
+# were the same coin, re-selected by the entry gate after every 12h
+# quarantine because its funding stays extreme). 0 disables.
+REPEAT_STOP_COOLDOWN_H = float(os.environ.get("FUNDING_REPEAT_STOP_COOLDOWN_H", "72"))
+REPEAT_STOP_WINDOW_D = float(os.environ.get("FUNDING_REPEAT_STOP_WINDOW_D", "7"))
 BLIND_STOP_MISSES = int(os.environ.get("FUNDING_BLIND_STOP_MISSES", "3"))  # live fail-safe
 
 # ---- position SCANNER (2026-07-11) — choose the best RISK-ADJUSTED positions, not
@@ -657,6 +662,7 @@ def main():
     rate_hist = {}     # coin -> deque[(ts, apr)] — slope-gate memory (in-process)
     hot_since = {}     # coin -> ts |apr| first >= ENTER_APR
     cooldown = {}      # coin -> ts until which re-entry is blocked (post-stop)
+    stop_hist = {}     # coin -> [stop ts] inside the repeat window (21-Jul)
     miss = {}          # coin -> consecutive fresh-price misses (live fail-safe)
     fund_realized = 0.0  # dry_run only: cumulative realized funding (price P&L is in broker)
 
@@ -896,11 +902,20 @@ def main():
             _last_moved = sorted(_moved)
         now = datetime.now(timezone.utc)
         if now.date() != cur_day:
-            cur_day, halted_today = now.date(), False
+            # [2026-07-21 AUDIT FIX] roll the day ONLY on a successful
+            # baseline read. The old order stamped cur_day first, so a failed
+            # account_value() left YESTERDAY's day_start_equity filed under
+            # today — and the D3 restart-durable restore then trusted that
+            # stale baseline across restarts (pre-D3 a restart re-read fresh
+            # boot equity; D3 made the corruption durable). Failing the read
+            # keeps yesterday's stamp so the roll retries next loop;
+            # halted_today stays conservative until the roll lands.
             try:
                 day_start_equity = account_value()
+                cur_day, halted_today = now.date(), False
             except Exception:
-                pass
+                log.warning("day-roll equity read failed — keeping the %s "
+                            "baseline; retrying next loop", cur_day)
 
         # kill switch (live) — flatten every held coin and halt on arm.
         if not dry_run and ctx.rails.kill_check():
@@ -1219,7 +1234,27 @@ def main():
             meta.pop(coin, None)
             hot_since.pop(coin, None)      # force a fresh persistence wait — no instant re-entry
             if decision == "stop":
-                cooldown[coin] = t0 + STOP_COOLDOWN_H * 3600.0   # quarantine after a stop
+                # [2026-07-21 AUDIT FIX] ESCALATING quarantine on repeat
+                # stops. Measured across both arms: 5 of the Farmer's 7
+                # stops are LIT shorts (-$9.17 of -$11.19 total stop
+                # damage) — the coin is the venue's standing funding
+                # extreme, so after every 12h quarantine the entry gate
+                # re-selects the same squeeze. A SECOND stop inside
+                # REPEAT_STOP_WINDOW_D escalates the quarantine to
+                # REPEAT_STOP_COOLDOWN_H (72h default). Restrict-only
+                # seatbelt: it can only ever skip re-entering a coin that
+                # just stopped twice.
+                stop_hist[coin] = [ts for ts in stop_hist.get(coin, [])
+                                   if t0 - ts <= REPEAT_STOP_WINDOW_D * 86400]
+                stop_hist[coin].append(t0)
+                _cd_h = (REPEAT_STOP_COOLDOWN_H
+                         if len(stop_hist[coin]) >= 2 else STOP_COOLDOWN_H)
+                cooldown[coin] = t0 + _cd_h * 3600.0
+                if _cd_h != STOP_COOLDOWN_H:
+                    log.warning("%s: %d stops inside %gd — quarantine "
+                                "ESCALATED to %gh", coin,
+                                len(stop_hist[coin]),
+                                REPEAT_STOP_WINDOW_D, _cd_h)
 
         # ---- persistence clock over the whole funding map (uses the SAME gate the
         # scanner enters on, else persistence would never arm at the wider gate) ----

@@ -138,17 +138,30 @@ class Howard:
                 bot = r.get("bot")
                 if not bot or bot in own:
                     continue    # our own closes are already first-class rows
-                closed = r.get("closed_at")
-                closed_ts = None
-                if closed:
-                    closed_ts = datetime.fromisoformat(
-                        str(closed).replace("Z", "+00:00")).timestamp()
+                # [2026-07-21 AUDIT FIX — caught by two independent reviewers
+                # on day one] fetch_paper_trades returns NORMALIZED keys
+                # (close_ts/profit_abs/enter_tag/exit_reason/open_rate/
+                # close_rate; there is no trade_id/side/tag/size at all).
+                # This ingest read the RAW column names, so every field was
+                # None and all of a bot's trades collapsed onto the single id
+                # 'fleet-<bot>-None' — "the fleet learns from day one" was a
+                # total silent no-op. Keys fixed to the normalized contract;
+                # the id is (bot, pair, close_ts) — stable per close, so the
+                # upsert dedupes re-fetches instead of collapsing history.
+                closed = r.get("close_ts")
+                if not closed:
+                    continue    # open rows carry no outcome to learn from
+                closed_ts = datetime.fromisoformat(
+                    str(closed).strip().replace(" UTC", "+00:00")
+                    .replace("Z", "+00:00")).timestamp()
+                tag = r.get("enter_tag")            # 'long'/'short-<lens>'/None
+                side = (tag or "").split("-", 1)[0] or None
                 self.db.record_trade(
-                    f"fleet-{bot}-{r.get('trade_id')}", bot, "fleet",
-                    (r.get("pair") or "").split("/")[0] or None,
-                    r.get("side"), r.get("tag"), 0.0, closed_ts,
-                    r.get("entry_price"), r.get("exit_price"), r.get("size"),
-                    r.get("pnl_abs"), r.get("reason"), None)
+                    f"fleet-{bot}-{r.get('pair')}-{int(closed_ts)}", bot,
+                    "fleet", (r.get("pair") or "").split("/")[0] or None,
+                    side, tag, 0.0, closed_ts,
+                    r.get("open_rate"), r.get("close_rate"), None,
+                    r.get("profit_abs"), r.get("exit_reason"), None)
                 n += 1
             except Exception:  # noqa: BLE001
                 continue

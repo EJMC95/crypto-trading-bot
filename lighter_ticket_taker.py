@@ -183,6 +183,20 @@ BRK_RANGE = float(os.environ.get("TT_BRK_RANGE", "0.95"))  # at the daily high
 BRK_VOL_M = float(os.environ.get("TT_BRK_VOL_M", "1.0"))   # >= $1M/day
 DIP_RANGE = float(os.environ.get("TT_DIP_RANGE", "0.05"))  # pinned to the low
 MOMO_CHG = float(os.environ.get("TT_MOMO_CHG", "5.0"))     # >= +5% day
+# [2026-07-21] hours a symbol stays entry-blocked after ITS OWN stop-loss
+# close (0 disables). Measured basis: same-minute SL->re-enter churn, every
+# instance a loser (NBIS -$5.37/8, BOT -$4.60/3 on the 17-20 Jul tape).
+SL_COOLDOWN_H = float(os.environ.get("TT_SL_COOLDOWN_H", "2.0"))
+
+
+def _sl_active(until_iso, t_now):
+    """True while a post-stop cooldown stamp is still in the future. Junk
+    stamps read as inactive (fail-open — a corrupt stamp must not embargo a
+    symbol forever). Pure; selftested."""
+    try:
+        return parse_ts(until_iso) > t_now
+    except (ValueError, TypeError):
+        return False
 MOMO_VOL_M = float(os.environ.get("TT_MOMO_VOL_M", "2.0")) # >= $2M/day
 # [2026-07-14b] Divergence lens: receive Lighter's funding when it diverges
 # this hard (percentage points of APR) from the cross-venue median.
@@ -690,6 +704,16 @@ def main(_ctx=None):
         or {"total": 0.0, "events": []}
     meta = saved.get("meta") or {}          # sym -> {lens, opened, accrued_to}
     stats = saved.get("stats") or {"closed": 0, "wins": 0, "losses": 0}
+    # [2026-07-21 AUDIT FIX] post-STOP re-entry cooldown: closes run before
+    # entries each cycle and the only re-entry guard was 'sym in pos', so a
+    # symbol whose stop-loss just fired was IMMEDIATELY eligible while the
+    # scout's ticket still stood — measured churn on the shadow tape: NBIS
+    # SL'd and re-opened in the SAME minute, 8 closes -$5.37; BOT 3 closes
+    # -$4.60; every same-cycle re-entry lost. A stopped symbol now waits
+    # TT_SL_COOLDOWN_H (persisted, both arms; tp/hold closes unaffected —
+    # winners may re-enter freely).
+    sl_block = {s: t for s, t in (saved.get("sl_block") or {}).items()
+                if _sl_active(t, t_now)}
     # ShadowBroker's cost is the CROSSED SPREAD, already inside the fill price
     # (fee_bps=0 — Lighter charges no perp fee). Charging a flat fee on top
     # would double-count it; the legacy paper arm still models one. LIVE pays
@@ -1231,6 +1255,11 @@ def main(_ctx=None):
         _book_close(sym, m, size, entry, mark, pnl, reason, decision_px=_dpx,
                     measured=_meas, fill_reason=_why)
         pos.pop(sym, None)
+        if reason == "sl" and SL_COOLDOWN_H > 0:
+            sl_block[sym] = iso(t_now + timedelta(hours=SL_COOLDOWN_H))
+            print(f"[ticket-taker] {iso(t_now)} {sym} entry-blocked "
+                  f"{SL_COOLDOWN_H:g}h post-stop (same-cycle re-entry churn "
+                  f"guard)")
 
     # 3) entries — only from a FRESH scout snapshot, only the incredible subset
     # [2026-07-17 AUDIT] ...and never onto a DIRTY account. The old guard's
@@ -1275,7 +1304,36 @@ def main(_ctx=None):
                 long_budget_full = True
     except (ValueError, TypeError):
         gov = 1.0
-    if gov < 1.0:
+    # [2026-07-21 AUDIT FIX] the LIVE arm now honors live.clip_scale — the
+    # board's ONLY live restrict lever. CLAUDE.md's live-lane contract
+    # ("covers ... both live bots' clip") was half-true: the Funding Farmer
+    # reads it via VenueContext.order_usd, but this bot builds LighterClient
+    # directly and sized off TT_CLIP_* alone, so the board's real-money
+    # down-scale (and the proprioception hurting-revert riding get_lever's
+    # central hook) never reached the live Ticket Taker. get_lever carries
+    # the whole fail-safe stack: registry clamp [0.5,1.5], TTL expiry,
+    # immune quarantine, hurting-revert, ENACT_LANES kill.
+    # [2026-07-21b, same-day verify catch] the lever REPLACES the fleet-risk
+    # drawdown governor on the live arm rather than compounding with it:
+    # CLAUDE.md's contract is explicit — the fleet clip_scale "reaches only
+    # shadow consumers (family/taker); the live bots size off the separate
+    # live.clip_scale lever" — and this arm consuming BOTH would double-
+    # restrict through two organs' opinions of the same drawdown. Shadow
+    # arm keeps the fleet governor unchanged (its book is the lens-grading
+    # instrument).
+    if not dry_run:
+        live_scale = 1.0
+        if tuning is not None:
+            try:
+                live_scale = float(tuning.get_lever("live.clip_scale", 1.0))
+            except Exception:  # noqa: BLE001
+                live_scale = 1.0
+        gov = live_scale
+        if live_scale != 1.0:
+            print(f"[ticket-taker] {iso(t_now)} LIVE CLIP SCALE — "
+                  f"x{live_scale} (live.clip_scale; fleet governor is "
+                  f"shadow-lane per contract)")
+    elif gov < 1.0:
         print(f"[ticket-taker] {iso(t_now)} DRAWDOWN GOVERNOR — clips x{gov}")
     if long_budget_full:
         print(f"[ticket-taker] {iso(t_now)} FLEET LONG-BUDGET VETO — "
@@ -1311,7 +1369,8 @@ def main(_ctx=None):
                 continue          # brain veto stays SENIOR (restrict-only)
             # one NEW position per lens per cycle; never add to a held symbol
             if (not sym or sym in pos or sym in opened_syms
-                    or lens in opened_lenses):
+                    or lens in opened_lenses
+                    or _sl_active(sl_block.get(sym), t_now)):
                 continue
             if len(pos) >= MAX_OPEN:
                 break
@@ -1431,7 +1490,7 @@ def main(_ctx=None):
         pnl_abs = equity - START_EQUITY
         pnl_pct = equity / START_EQUITY - 1.0
         store.save_state(STATE_KEY, {"broker": broker.to_state(), "meta": meta,
-                                     "stats": stats})
+                                     "stats": stats, "sl_block": sl_block})
     else:
         # re-read AFTER trading: the loop-top print fed the rails, this one is
         # what the row reports. A failed re-read keeps the loop-top value
@@ -1440,6 +1499,13 @@ def main(_ctx=None):
             equity = account_value()
         except Exception:  # noqa: BLE001
             pass
+        # [2026-07-21 AUDIT FIX] fold AGAIN before persisting: the guard can
+        # record a capital move on the two LATER same-cycle reads (the rails'
+        # confirm_daily_loss re-read and the line above) — a run-once process
+        # that only folded at loop-top exited with those moves un-persisted,
+        # so the next run's fresh guard had lost them and the P&L baseline
+        # silently absorbed the operator's deposit as "trading profit".
+        _fold_capital_moves()
         if live_baseline is None and equity is not None:
             live_baseline = equity
         # [2026-07-21 D1] capital-adjusted: deposits are the operator's money
@@ -1461,7 +1527,7 @@ def main(_ctx=None):
         # by page rather than by reading the P&L.
         if not store.save_state(LIVE_STATE_KEY, {
                 "initial_equity": live_baseline, "meta": meta, "stats": stats,
-                "capital_adjust": capital_adjust,
+                "capital_adjust": capital_adjust, "sl_block": sl_block,
                 "day_start": {"day": cur_day, "equity": day_start_equity}}):
             store.set_status(BOT_ROW, "error")
             print(f"[ticket-taker] {iso(t_now)} CRITICAL: live state WRITE "
@@ -1674,6 +1740,14 @@ def selftest():
     # raw-unit markets keep their size multiplier (PEPE != kPEPE)
     assert to_lighter("PEPE") == ("1000PEPE", 0.001)
     assert to_lighter("kPEPE") == ("1000PEPE", 1.0)
+
+    # [2026-07-21] post-stop cooldown stamps: active in the future, inactive
+    # in the past, fail-OPEN on junk/absent (a corrupt stamp must never
+    # embargo a symbol forever)
+    _ct = datetime(2026, 7, 14, 12, 0, tzinfo=timezone.utc)
+    assert _sl_active(iso(_ct + timedelta(hours=1)), _ct)
+    assert not _sl_active(iso(_ct - timedelta(hours=1)), _ct)
+    assert not _sl_active(None, _ct) and not _sl_active("junk", _ct)
 
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
           "long/short exits, signed funding on the TRUE 8h basis, "

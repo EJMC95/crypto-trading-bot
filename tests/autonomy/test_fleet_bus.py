@@ -5,9 +5,10 @@ fail-safe contract lives here — and it was the shallowest-tested file on the
 autonomy surface (its selftest covers only lever_outcome). The untested pieces
 are the ones that actually bound real trading:
 
-  * stake_multiplier's reduce-only [0.5, 1.0] clamp — the last guarantee the
-    brain can "never size above full stake / below half". compute_stake_mults
-    adds no clamp of its own, so this line is the backstop.
+  * stake_multiplier's TWO-WAY [0.5, 1.5] clamp (reduce-only [0.5, 1.0]
+    until 21-Jul) — the last guarantee the brain sizes inside the documented
+    band. compute_stake_mults adds no clamp of its own, so this line is the
+    backstop.
   * long_entries_blocked — the L2 long-budget veto, including the enforce-mode
     gate (FLEET_RISK_MODE=advisory is the central kill switch) and the
     stale -> fail-OPEN behaviour (never dead-man-switch the fleet on an outage).
@@ -140,3 +141,103 @@ def test_is_fresh_false_on_missing_fields():
     assert fleet_bus.is_fresh({}, NOW) is False                       # no updated
     # missing ttl_sec defaults to 0, so any elapsed time reads as stale
     assert fleet_bus.is_fresh({"updated": _iso(NOW - timedelta(seconds=1))}, NOW) is False
+
+
+# ── entry_regime_gated (BRAIN ACTS, 21-Jul) ─────────────────────────────────
+def _diag(mode="enforce", actions=None):
+    return {"updated": _iso(NOW), "ttl_sec": 26000, "actions_mode": mode,
+            "actions": actions if actions is not None else {
+                "freqtrade-georgia-lshadow": {
+                    "long-trend-breakout": {"action": "regime_gate"}}}}
+
+
+def _oracle(read="risk-off"):
+    return {"updated": _iso(NOW), "ttl_sec": 3600, "fleet": {"read": read}}
+
+
+def test_regime_gate_bites_on_actionable_plus_riskoff():
+    _prime("brain-diagnosis", _diag())
+    _prime("regime-oracle", _oracle("risk-off"))
+    assert fleet_bus.entry_regime_gated(
+        "freqtrade-georgia-lshadow", "long-trend-breakout", NOW) is True
+
+
+def test_regime_gate_lifts_when_regime_turns():
+    _prime("brain-diagnosis", _diag())
+    _prime("regime-oracle", _oracle("risk-on"))
+    assert fleet_bus.entry_regime_gated(
+        "freqtrade-georgia-lshadow", "long-trend-breakout", NOW) is False
+
+
+def test_regime_gate_advisory_mode_is_the_kill_switch():
+    _prime("brain-diagnosis", _diag(mode="advisory"))
+    _prime("regime-oracle", _oracle("risk-off"))
+    assert fleet_bus.entry_regime_gated(
+        "freqtrade-georgia-lshadow", "long-trend-breakout", NOW) is False
+
+
+def test_regime_gate_fails_open_on_stale_brain():
+    d = _diag()
+    d["updated"] = _iso(NOW - timedelta(hours=10))
+    _prime("brain-diagnosis", d)
+    _prime("regime-oracle", _oracle("risk-off"))
+    assert fleet_bus.entry_regime_gated(
+        "freqtrade-georgia-lshadow", "long-trend-breakout", NOW) is False
+
+
+def test_regime_gate_fails_open_on_stale_oracle():
+    _prime("brain-diagnosis", _diag())
+    o = _oracle("risk-off")
+    o["updated"] = _iso(NOW - timedelta(hours=10))
+    _prime("regime-oracle", o)
+    assert fleet_bus.entry_regime_gated(
+        "freqtrade-georgia-lshadow", "long-trend-breakout", NOW) is False
+
+
+def test_regime_gate_other_tags_untouched():
+    _prime("brain-diagnosis", _diag())
+    _prime("regime-oracle", _oracle("risk-off"))
+    assert fleet_bus.entry_regime_gated(
+        "freqtrade-georgia-lshadow", "long-range-on", NOW) is False
+    assert fleet_bus.entry_regime_gated(
+        "freqtrade-mum-lshadow", "long-trend-breakout", NOW) is False
+
+
+# ── long_symbol_blocked (pileup cap, 21-Jul) ────────────────────────────────
+def _risk_symcap(mode="enforce", cap=3, by_symbol=None):
+    return {"updated": _iso(NOW), "ttl_sec": 900,
+            "symbol_cap": {"mode": mode, "cap": cap,
+                           "long_by_symbol": by_symbol or {}}}
+
+
+def test_symbol_cap_blocks_at_cap():
+    _prime("fleet-risk", _risk_symcap(by_symbol={"ETH": 3}))
+    assert fleet_bus.long_symbol_blocked("ETH", NOW) is True
+    assert fleet_bus.long_symbol_blocked("ETH/USDC", NOW) is True   # base split
+
+
+def test_symbol_cap_open_below_cap_and_for_unlisted():
+    _prime("fleet-risk", _risk_symcap(by_symbol={"ETH": 2}))
+    assert fleet_bus.long_symbol_blocked("ETH", NOW) is False
+    assert fleet_bus.long_symbol_blocked("BTC", NOW) is False
+
+
+def test_symbol_cap_advisory_mode_inert():
+    _prime("fleet-risk", _risk_symcap(mode="advisory", by_symbol={"ETH": 9}))
+    assert fleet_bus.long_symbol_blocked("ETH", NOW) is False
+
+
+def test_symbol_cap_fails_open_stale_or_capzero():
+    stale = _risk_symcap(by_symbol={"ETH": 9})
+    stale["updated"] = _iso(NOW - timedelta(hours=10))
+    _prime("fleet-risk", stale)
+    assert fleet_bus.long_symbol_blocked("ETH", NOW) is False
+    _prime("fleet-risk", _risk_symcap(cap=0, by_symbol={"ETH": 9}))
+    assert fleet_bus.long_symbol_blocked("ETH", NOW) is False
+
+
+def test_symbol_cap_cap1_enforces_on_single_long():
+    # [2026-07-21] the cap=1 case that under-enforced before fleet_risk
+    # published counts >= min(2, cap): a single held long must block the 2nd
+    _prime("fleet-risk", _risk_symcap(cap=1, by_symbol={"ETH": 1}))
+    assert fleet_bus.long_symbol_blocked("ETH", NOW) is True

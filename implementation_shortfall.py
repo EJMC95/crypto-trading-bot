@@ -39,6 +39,11 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 
+try:
+    import fleet_proposals as fprop      # organ proposal channel (optional)
+except Exception:  # noqa: BLE001
+    fprop = None
+
 KEY = "impl-shortfall"
 TTL_SEC = int(os.environ.get("SHORTFALL_TTL_SEC", "3600"))
 LIVE = os.environ.get("SHORTFALL_LIVE", "perps-funding-lighter-lighter")
@@ -273,6 +278,31 @@ def _fetch_order_slip():
                     "measurable": bool(n_slip) and n_echo < n,
                     "echoed_decision": n_echo,
                 }
+            # [2026-07-21 AUDIT] surface the WHY: both live arms have written
+            # fill_src into raw since 17-Jul (49/49 Farmer + 12/12 taker live
+            # orders currently carry NO measured slip), but nothing ever
+            # aggregated it — the one field that says WHICH failure mode
+            # (no-match, no-detail-api, caller-error…) blocks the measurement
+            # was reachable only by hand-querying raw JSON. Histogram per
+            # arm, so /bus.json shows the blocker by name.
+            try:
+                # own transaction scope: a raw-column type surprise (json vs
+                # jsonb) must degrade THIS histogram, never the measurement
+                # above it
+                cur.execute(
+                    """SELECT bot, raw::jsonb->>'fill_src', COUNT(*)
+                       FROM venue_orders
+                       WHERE bot = ANY(%s)
+                         AND at >= now() - (%s || ' days')::interval
+                         AND raw::jsonb->>'fill_src' IS NOT NULL
+                       GROUP BY bot, raw::jsonb->>'fill_src'""",
+                    (list(roster), str(WINDOW_DAYS)))
+                for bot, src, cnt in cur.fetchall():
+                    arm = roster.get(bot) or bot
+                    if arm in out:
+                        out[arm].setdefault("fill_src", {})[str(src)] = int(cnt)
+            except Exception:  # noqa: BLE001
+                conn.rollback()
     except Exception as e:  # noqa: BLE001 — measurement-only, never raise
         print(f"[impl-shortfall] order-slip fetch failed: {e}", flush=True)
         return {}
@@ -437,6 +467,40 @@ def run_once():
                      f"over {rep['n_overlap']} coins{exitmsg}"):
             payload["last_push"] = now
             store.save_state(KEY, payload)
+
+    # [2026-07-21 ORGAN PROPOSALS] a SUSTAINED slip is this organ's measured
+    # case that live execution is not delivering the promoted edge — forward
+    # it as RESTRICT proposals on EVERY promotable live.funding.* lever (the
+    # judge's proposal_fade matches the promoted lever exactly, and this
+    # organ measures EXECUTION, not one knob — a tp-0.06 promotion must be
+    # releasable on the same slip evidence as an enter_apr one; caught by
+    # same-day audit: the single-lever v1 could not fade the only queued
+    # candidate). The judge (the only writer of live.funding.*) consumes it
+    # as an early-release signal; this organ never touches a lever.
+    # Re-asserted while the slip sustains; expires on its own when it
+    # clears. Fail-soft: a dark channel drops the proposal, never the
+    # measurement.
+    if streak >= SUSTAIN and fprop is not None:
+        try:
+            _why = (f"live slipping {rep['gap_pp']}pp/trade for "
+                    f"{streak} cycles")
+            _ev = (f"{rep['paired_closes']} paired closes over "
+                   f"{rep['n_overlap']} coins; entry-slip "
+                   f"{rep['entry_slip_bps']}bps exit-slip "
+                   f"{rep['exit_slip_bps']}bps")
+            fprop.propose({
+                "live.funding.enter_apr": {
+                    "value": 0.0625, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+                "live.funding.take_profit": {
+                    "value": 0.03, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+                "live.funding.max_hold_h": {
+                    "value": 24.0, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+            }, set_by="impl-shortfall", now_ts=now)
+        except Exception:      # noqa: BLE001
+            pass
 
     d = (f" exit-slip {rep['exit_slip_bps']}bps" if rep["exit_slip_bps"] is not None else "")
     print(f"[impl-shortfall] {_iso(now)} verdict={rep['verdict']} "

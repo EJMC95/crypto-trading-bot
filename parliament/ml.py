@@ -292,6 +292,7 @@ class MLEngine:
         self.acc = {m.name: 0.5 for m in self.models}   # decayed OOS accuracy
         self.n_seen = 0
         self._trained_ids: set[str] = set()
+        self._trained_order: list[str] = []   # insertion order for the trim
 
     # -- inference ------------------------------------------------------------
     def predict(self, features: dict) -> tuple[float, bool]:
@@ -344,8 +345,17 @@ class MLEngine:
         for r in rows:
             self.learn(r["features"], r["pnl_abs"] > 0)
             self._trained_ids.add(r["trade_id"])
-        if len(self._trained_ids) > 20000:   # bounded memory
-            self._trained_ids = set(list(self._trained_ids)[-10000:])
+            self._trained_order.append(r["trade_id"])
+        # [2026-07-21 AUDIT FIX] bounded memory must drop the OLDEST ids —
+        # trimming via set order kept an ARBITRARY half, so dropped ids still
+        # inside the 30d fetch window were re-learned every 300s pass,
+        # double-training samples and flattering the prequential accuracy.
+        # An insertion-order list drives the trim; the set stays the O(1)
+        # membership test.
+        if len(self._trained_order) > 20000:
+            keep = self._trained_order[-10000:]
+            self._trained_order = keep
+            self._trained_ids = set(keep)
         return len(rows)
 
     # -- reporting ------------------------------------------------------------

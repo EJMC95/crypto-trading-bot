@@ -63,6 +63,9 @@ WATCH_CORE = [s.strip().upper() for s in
               os.environ.get("PARL_WATCH", "BTC,ETH,SOL").split(",") if s.strip()]
 WATCH_TOP_N = int(os.environ.get("PARL_WATCH_TOP_N", "9"))
 MIN_QVOL = float(os.environ.get("PARL_MIN_QVOL", "1000000"))  # $1M/day
+# [2026-07-21] funding cache TTL — past this with no successful funding-rates
+# fetch, cached APRs are dropped rather than served as live (fail-safe absent)
+FUNDING_TTL_SEC = float(os.environ.get("PARL_FUNDING_TTL_SEC", "1800"))
 CANDLE_BARS = int(os.environ.get("PARL_CANDLE_BARS", "160"))
 
 
@@ -185,6 +188,18 @@ class LighterData:
         self.market = market
         if fund_raw is not None:
             self.funding = parse_funding(fund_raw)
+            self.funding_ts = time.time()
+        # [2026-07-21 AUDIT FIX] the funding cache had NO staleness gate: a
+        # persistently failing funding-rates endpoint (while orderBookDetails
+        # keeps succeeding, so data.fresh() stays True) served week-old APRs
+        # as live to scan_funding_extreme ENTRIES and pm-rudd's fade exit.
+        # Past the TTL the cache empties — consumers treat absent as absent
+        # (fail-safe), never stale-as-fresh.
+        elif self.funding and time.time() - getattr(self, "funding_ts", 0.0) \
+                > FUNDING_TTL_SEC:
+            log.warning("funding cache stale >%.0fs — dropping %d APRs "
+                        "(fail-safe absent)", FUNDING_TTL_SEC, len(self.funding))
+            self.funding = {}
         self.market_ts = time.time()
         self.cycles += 1
         self._rebuild_watchlist(prev)
