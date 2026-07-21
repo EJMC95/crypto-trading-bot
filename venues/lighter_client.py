@@ -557,6 +557,13 @@ class LighterClient(VenueClient):
         except EquityRejected as e:
             raise VenueError(str(e))
 
+    def pop_capital_moves(self):
+        """[2026-07-21 D1] Guard-detected deposits/withdrawals accepted since
+        the last pop (see EquityGuard.pop_capital_moves). [] when the guard is
+        off — callers fold these into their persisted capital ledger so a
+        deposit never prints as trading P&L."""
+        return self._guard.pop_capital_moves() if self._guard is not None else []
+
     def positions(self):
         return self._positions_from(self._account_payload())
 

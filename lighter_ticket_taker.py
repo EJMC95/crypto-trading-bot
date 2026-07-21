@@ -149,6 +149,14 @@ SCOUT_KEY = "lighter-market"
 API_BASE = os.environ.get("LIGHTER_API_BASE", "https://mainnet.zklighter.elliot.ai")
 
 START_EQUITY = 1000.0
+# [2026-07-21 D1] CAPITAL IS NOT P&L. The EquityGuard records the deposits/
+# withdrawals it accepts (pop_capital_moves); they accumulate in the persisted
+# LIVE_STATE_KEY blob, and this env knob backfills moves that predate the
+# mechanism. Default = this book's 18-Jul deposit as measured in the
+# fleet-equity series (+$32.22 @ 07:37Z — review 2026-07-21 N1; printed as
+# profit until this fix). Override with the exact figure if known; set to 0
+# if initial_equity is ever re-baselined by hand.
+CAPITAL_ADJUST_USD = float(os.environ.get("CAPITAL_ADJUST_USD", "32.22"))
 CLIP_USD = float(os.environ.get("TT_CLIP_USD", "50"))   # fallback when no vol data
 MAX_OPEN = int(os.environ.get("TT_MAX_OPEN", "6"))
 # [2026-07-14c CONSTANT-RISK SIZING] Fixed $ clips carry wildly different risk
@@ -629,6 +637,11 @@ def main(_ctx=None):
                 "still flattens (the kill switch runs above this).")
         saved = _saved or {}
         live_baseline = saved.get("initial_equity")
+    # [2026-07-21 D1] persisted capital ledger — deposits the guard accepted;
+    # pnl_abs subtracts it (+ the CAPITAL_ADJUST_USD backfill) so the
+    # operator's own money never prints as trading profit. {} for dry_run.
+    capital_adjust = (saved.get("capital_adjust") if live else None) \
+        or {"total": 0.0, "events": []}
     meta = saved.get("meta") or {}          # sym -> {lens, opened, accrued_to}
     stats = saved.get("stats") or {"closed": 0, "wins": 0, "losses": 0}
     # ShadowBroker's cost is the CROSSED SPREAD, already inside the fill price
@@ -637,6 +650,21 @@ def main(_ctx=None):
     # the venue's real fee (zero) and its spread is inside the real fill, so
     # its modelled fee is zero for the same reason the shadow arm's is.
     fee_rate = broker.fee if dry_run else 0.0
+
+    def _fold_capital_moves():
+        """[2026-07-21 D1] Fold guard-detected deposits/withdrawals into the
+        persisted capital ledger (fail-safe: no guard / no moves -> no-op).
+        Run-once process: the same run that heals a deposit folds it, and the
+        loop-bottom save_state persists it."""
+        if not live:
+            return
+        for _mv in getattr(venue, "pop_capital_moves", lambda: [])():
+            capital_adjust["total"] = round(capital_adjust["total"] + _mv["delta"], 2)
+            capital_adjust["events"] = (capital_adjust.get("events") or [])[-19:] + [_mv]
+            print(f"[ticket-taker] capital ledger: ${_mv['delta']:+.2f} "
+                  f"({_mv['how']}) -> lifetime ${capital_adjust['total']:+.2f} "
+                  f"(+${CAPITAL_ADJUST_USD:.2f} env backfill) — P&L baseline "
+                  f"absorbed it.", flush=True)
 
     def account_value():
         """Equity. dry_run: the local broker. live: the VENUE, vetted by the
@@ -890,6 +918,7 @@ def main(_ctx=None):
     except Exception as e:  # noqa: BLE001 — guard rejected, or venue down
         print(f"[ticket-taker] {iso(t_now)} account value unavailable: {e!r}")
         equity = None
+    _fold_capital_moves()   # D1: a deposit accepted on that read is capital
 
     if live:
         if day_start_equity is None and equity is not None:
@@ -929,6 +958,7 @@ def main(_ctx=None):
                 _flatten_all("daily_loss")
             store.save_state(LIVE_STATE_KEY, {
                 "initial_equity": live_baseline, "meta": meta, "stats": stats,
+                "capital_adjust": capital_adjust,
                 "day_start": {"day": cur_day, "equity": day_start_equity}})
             # Report what the VENUE actually holds, not 0. A flatten can fail
             # (rate-limit storm, venue blip) and publishing open_trades=0 while
@@ -941,7 +971,8 @@ def main(_ctx=None):
                 _still = None
             store.publish(
                 BOT_ROW, status="halted", equity=equity,
-                pnl_abs=((equity - live_baseline)
+                pnl_abs=((equity - live_baseline - capital_adjust["total"]
+                          - CAPITAL_ADJUST_USD)   # D1: capital-adjusted
                          if (equity is not None and live_baseline is not None)
                          else None),
                 open_trades=_still, closed_trades=stats["closed"],
@@ -1353,7 +1384,10 @@ def main(_ctx=None):
             pass
         if live_baseline is None and equity is not None:
             live_baseline = equity
-        pnl_abs = ((equity - live_baseline)
+        # [2026-07-21 D1] capital-adjusted: deposits are the operator's money
+        # moving, not trading results. Reporting-only — no rail reads pnl_abs.
+        pnl_abs = ((equity - live_baseline - capital_adjust["total"]
+                    - CAPITAL_ADJUST_USD)
                    if (equity is not None and live_baseline is not None) else None)
         pnl_pct = ((pnl_abs / live_baseline)
                    if (pnl_abs is not None and live_baseline) else None)
@@ -1369,6 +1403,7 @@ def main(_ctx=None):
         # by page rather than by reading the P&L.
         if not store.save_state(LIVE_STATE_KEY, {
                 "initial_equity": live_baseline, "meta": meta, "stats": stats,
+                "capital_adjust": capital_adjust,
                 "day_start": {"day": cur_day, "equity": day_start_equity}}):
             store.set_status(BOT_ROW, "error")
             print(f"[ticket-taker] {iso(t_now)} CRITICAL: live state WRITE "
@@ -1387,6 +1422,10 @@ def main(_ctx=None):
         closed_trades=stats["closed"], wins=stats["wins"], losses=stats["losses"],
         extra={"venue": TT_VENUE,
                "strategy": f"scout tickets ({'live' if live else 'shadow'})",
+               # D1: total capital excluded from pnl_abs — self-describing
+               **({"capital_adjust": round(capital_adjust["total"]
+                                           + CAPITAL_ADJUST_USD, 2)}
+                  if live else {}),
                "open_pos": [{"pair": f"{s}/USDC",
                              "tag": (("long-" if pos[s]["size"] > 0 else "short-")
                                      + (meta.get(s) or {}).get("lens", "ticket"))}

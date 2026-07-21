@@ -81,14 +81,16 @@ COOLDOWN_H = float(os.environ.get("XPJ_COOLDOWN_H", "48"))
 # back to env defaults) must win over an indefinitely-blind promotion.
 BLIND_MAX = int(os.environ.get("XPJ_BLIND_MAX_CYCLES", "24"))
 
-# One candidate at a time, in order. First: the gate widening the 11-Jul
-# scanner review explicitly queued as "opt-in, shadow-validate first".
+# One candidate at a time, in order.
 CANDIDATES = [
-    # [2026-07-17 BASIS FIX] /8 with the fleet funding basis. This candidate
-    # is the 11-Jul "opt-in, shadow-validate" gate WIDENING: 0.30 old units
-    # == 0.0375 TRUE apr, still a widening vs the 0.05 TRUE env default.
-    # The experiment is unchanged; only its denomination is.
-    {"name": "enter-gate-0.0375", "levers": {"xp.funding.enter_apr": 0.0375}},
+    # [2026-07-21 REVIEW D2] the gate WIDENING (11-Jul "opt-in, shadow-validate",
+    # re-denominated 17-Jul to enter-gate-0.0375) is DROPPED from the queue:
+    # scripts/backtest_funding_lighter.py measured the 0.03-0.08 TRUE region as
+    # the WORST on the gate curve (0.03 loses -$76 / 0.05 -$42 on 150d, both
+    # halves) — spending a 7-day judge slot re-testing a widening the venue's
+    # own tape refutes contradicts the evidence. The gate direction the tape
+    # DOES support (tightening toward the 0.122 friction breakeven) is already
+    # running as the re-spec'd 0.075 candidate (see _respec_clamped).
     {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
     {"name": "hold-48",         "levers": {"xp.funding.max_hold_h": 48.0}},
 ]
@@ -496,6 +498,43 @@ def _needs_reset(phase, current, spec):
     return any(k not in XP_TO_LIVE for k in spec["levers"])
 
 
+def _respec_clamped(cand, clamp=None):
+    """[2026-07-21 REVIEW D2/N2] A RUNNING candidate whose stored lever values
+    differ from their registry clamp is running a DIFFERENT experiment than its
+    spec claims. MEASURED live: `enter-gate-0.30` (a gate WIDENING, 0.30
+    pre-basis-fix units) kept asserting 0.30 into the re-denominated registry
+    (hi=0.075), the write clamped to 0.075 TRUE — a gate TIGHTENING — and the
+    arm's receipts stamped 0.075 while ran_candidate demanded 0.30, so the
+    skew gate excluded EVERY close since 17-Jul: 20 valid-receipt closes,
+    zero accrued, an experiment that could never finish under a name that
+    lied about its direction.
+
+    Returns (cand', changed) where changed maps lever -> (stored, clamped);
+    {} means no re-spec needed. The caller restarts the window (started_ts) —
+    pre-clamp closes must not mix into the paired bar — and the new name
+    carries the truth. An unclampable lever returns unchanged: _needs_reset /
+    the INVALID path own that failure, not this migration. Pure — selftested."""
+    clamp = clamp or tuning.clamp
+    levers = cand.get("levers") or {}
+    clamped, changed = {}, {}
+    for k, v in levers.items():
+        cv = clamp(k, v)
+        if cv is None:
+            return cand, {}
+        clamped[k] = cv
+        try:
+            if abs(float(cv) - float(v)) > 1e-9:
+                changed[k] = (v, cv)
+        except (TypeError, ValueError):
+            return cand, {}
+    if not changed:
+        return cand, {}
+    new_name = (str(cand.get("name")) + "@"
+                + ",".join(f"{k.split('.')[-1]}={clamped[k]:g}"
+                           for k in sorted(changed)))
+    return {**cand, "name": new_name, "levers": clamped}, changed
+
+
 def run_once():
     now = now_ts()
     # [2026-07-17 AUDIT] A FAILED READ IS NOT AN EMPTY JUDGE. `load_state`
@@ -648,6 +687,21 @@ def run_once():
     cand = spec
 
     if phase == "running":
+        # [2026-07-21 D2] a candidate the registry clamp has rewritten under us
+        # is a different experiment wearing the old spec — re-spec to the
+        # clamped truth with a FRESH window (pre-clamp closes must not mix into
+        # the paired bar; the arm's receipts already stamp the clamped values,
+        # so accrual starts immediately). Idempotent: post-re-spec the stored
+        # values equal their clamp and this never fires again.
+        _cand2, _changed = _respec_clamped(cand)
+        if _changed:
+            send_push(f"experiment RE-SPEC'd: {cand['name']} -> {_cand2['name']}",
+                      f"registry clamp changed the running values {_changed}; "
+                      f"window restarted so the skew gate can accrue receipts")
+            return save(phase="running", current=_cand2["name"], spec=_cand2,
+                        started_ts=now,
+                        note=f"RE-SPEC {cand['name']} -> {_cand2['name']} "
+                             f"(registry clamp {_changed}); window restarted")
         started = _num(st.get("started_ts"), now)
         rc = _assert_levers(cand["levers"], f"experiment {cand['name']} running",
                             f"started {iso(started)}")
@@ -930,15 +984,15 @@ def _selftest():
     # candidate_pool: static first, then admitted incubator proposals; an
     # offspring with an UNKNOWN lever is rejected (can't smuggle a lever past)
     q = {"candidates": [
-        {"name": "enter-gate-0.0375", "levers": {"xp.funding.enter_apr": 0.0375}},  # dup static
+        {"name": "tp-0.06", "levers": {"xp.funding.take_profit": 0.06}},        # dup static
         {"name": "xp-tp-0.05", "levers": {"xp.funding.take_profit": 0.05}},     # ok
-        {"name": "evil", "levers": {"xp.funding.enter_apr": 0.3, "bad.lever": 1}},  # reject
+        {"name": "evil", "levers": {"xp.funding.enter_apr": 0.06, "bad.lever": 1}},  # reject
     ]}
     pool = candidate_pool(q)
     names = [c["name"] for c in pool]
-    assert names[:3] == ["enter-gate-0.0375", "tp-0.06", "hold-48"], names  # static order
+    assert names[:2] == ["tp-0.06", "hold-48"], names  # static order
     assert "xp-tp-0.05" in names and "evil" not in names, names
-    assert names.count("enter-gate-0.0375") == 1, "dup name deduped"
+    assert names.count("tp-0.06") == 1, "dup name deduped"
 
     # [2026-07-17 AUDIT] NEGATIVE FIXTURE for the signature dedup — the shape
     # the incubator ACTUALLY emits: same experiment, name it can never share
@@ -947,14 +1001,12 @@ def _selftest():
     # float normalisation; the last row proves a genuinely NEW experiment
     # still gets in (dedup must not become a wall).
     q2 = {"candidates": [
-        {"name": "xp-enter_apr-0.0375", "levers": {"xp.funding.enter_apr": 0.0375}},
         {"name": "xp-take_profit-0.06", "levers": {"xp.funding.take_profit": 0.06}},
         {"name": "xp-max_hold_h-48", "levers": {"xp.funding.max_hold_h": 48}},  # int vs 48.0
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]}
     n2 = [c["name"] for c in candidate_pool(q2)]
-    assert n2 == ["enter-gate-0.0375", "tp-0.06", "hold-48",
-                  "xp-enter_apr-0.0625"], n2
+    assert n2 == ["tp-0.06", "hold-48", "xp-enter_apr-0.0625"], n2
     # two offspring proposing the SAME novel experiment: first wins, no dup slot
     q3 = {"candidates": [
         {"name": "child-a", "levers": {"xp.funding.enter_apr": 0.0625}},
@@ -965,9 +1017,26 @@ def _selftest():
     assert _lever_sig({"a": 1}) == _lever_sig({"a": 1.0})
     assert _lever_sig({"a": "x"}) == (("a", "x"),)      # non-numeric survives
     # next_candidate: skips done + current, name-based (pool may grow)
-    assert next_candidate(pool, [], None)["name"] == "enter-gate-0.0375"
-    assert next_candidate(pool, ["enter-gate-0.0375"], "tp-0.06")["name"] == "hold-48"
+    assert next_candidate(pool, [], None)["name"] == "tp-0.06"
+    assert next_candidate(pool, ["tp-0.06"], "hold-48")["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
+
+    # ---- [2026-07-21 D2] re-spec migration: the clamp-inverted candidate ----
+    # The live defect verbatim: enter-gate-0.30 stored 0.30, registry clamps to
+    # 0.075 -> re-spec renames honestly, rewrites levers, reports the change.
+    _c, _ch = _respec_clamped({"name": "enter-gate-0.30",
+                               "levers": {"xp.funding.enter_apr": 0.30}})
+    assert _ch == {"xp.funding.enter_apr": (0.30, 0.075)}, _ch
+    assert _c["levers"] == {"xp.funding.enter_apr": 0.075}, _c
+    assert _c["name"] == "enter-gate-0.30@enter_apr=0.075", _c["name"]
+    # idempotent: the re-spec'd candidate needs no further re-spec
+    _c2, _ch2 = _respec_clamped(_c)
+    assert _ch2 == {} and _c2 == _c, (_c2, _ch2)
+    # in-bounds candidate untouched; unclampable lever left for INVALID path
+    assert _respec_clamped({"name": "tp-0.06",
+                            "levers": {"xp.funding.take_profit": 0.06}})[1] == {}
+    assert _respec_clamped({"name": "bad",
+                            "levers": {"no.such.lever": 1}})[1] == {}
 
     # migration guard: OLD index-based state (running phase, no current/spec)
     # must trigger a reset instead of KeyError on cand['levers']
