@@ -560,6 +560,144 @@ def funding_proposals(judge_state, incubator_state, hurting=None):
     return props[:6]
 
 
+# ---------------------------------------------------------------------------
+# the PROSPECT REGISTER (2026-07-22, operator: "the incubator has no list of
+# the prospective bots its created and their stats — can this be fixed").
+# Until now each cycle scored a whole population and published only the ≤4
+# viable gametes + one champion; everything else it bred was DISCARDED at
+# publish, and the funding proposals were bare names with no judge outcome.
+# The register is the durable answer: every genotype ever scored, merged
+# across cycles with latest + best-ever stats, and every funding candidate
+# joined to its judge lifecycle. Publish-only — nothing reads it to trade.
+# ---------------------------------------------------------------------------
+
+PROSPECT_CAP = int(os.environ.get("INCUBATOR_PROSPECT_CAP", "64"))
+
+
+def _sig(gt):
+    """Canonical genotype signature — stable across cycles and float reprs
+    (0.05 and 0.05000000001 must not mint two prospects)."""
+    return "|".join(f"{k}={v:g}" if isinstance(v, (int, float)) else f"{k}={v}"
+                    for k, v in sorted((gt or {}).items()))
+
+
+def update_prospects(prior_list, scored, seeds, default_gt, champion, elite,
+                     now_iso, cap=None):
+    """Merge this cycle's scored population into the durable register.
+
+    Per entry: latest replay stats (net/h1/h2/closes/lcb/both_halves_pos),
+    best-ever net + lcb (never regress on a worse re-score), born /
+    last_seen / cycles, origin FIXED at first sighting (default genome |
+    seed axis-probe | bred offspring), and a role recomputed every cycle:
+    fittest (rank 1 this cycle) / gamete (breeding elite) / scored /
+    unmeasured (0 closes). Entries absent from this cycle's population go
+    'dormant' (the gene set drifted, or they fell out of the bred pool) and
+    compete for the remaining slots by best-ever lcb — evidence-first, the
+    same lower-bound doctrine rank() uses. Pure; bounded at `cap`; output
+    order = this cycle's rank order, then dormants."""
+    cap = PROSPECT_CAP if cap is None else cap
+    by_sig = {}
+    for e in (prior_list or []):
+        if isinstance(e, dict) and isinstance(e.get("genotype"), dict):
+            by_sig[_sig(e["genotype"])] = e
+    seed_sigs = {_sig(g) for g in (seeds or [])}
+    default_sig = _sig(default_gt) if default_gt else None
+    champ_sig = (_sig((champion or {}).get("genotype"))
+                 if isinstance((champion or {}).get("genotype"), dict) else None)
+    elite_sigs = {_sig(e.get("genotype")) for e in (elite or [])
+                  if isinstance(e, dict) and isinstance(e.get("genotype"), dict)}
+
+    out, current = [], set()
+    for s in (scored or []):
+        gt = s.get("genotype")
+        if not isinstance(gt, dict):
+            continue
+        k = _sig(gt)
+        current.add(k)
+        pe = by_sig.get(k) or {}
+        net, lcb = s.get("net"), s.get("lcb")
+        bests = [x for x in (net, pe.get("best_net")) if isinstance(x, (int, float))]
+        bestl = [x for x in (lcb, pe.get("best_lcb")) if isinstance(x, (int, float))]
+        out.append({
+            "genotype": gt,
+            "born": pe.get("born") or now_iso,
+            "last_seen": now_iso,
+            "cycles": int(pe.get("cycles") or 0) + 1,
+            "origin": (pe.get("origin")
+                       or ("default" if k == default_sig
+                           else "seed" if k in seed_sigs else "bred")),
+            "net": net, "h1": s.get("h1"), "h2": s.get("h2"),
+            "closes": s.get("closes"), "lcb": lcb,
+            "both_halves_pos": bool(s.get("both_halves_pos")),
+            "best_net": max(bests) if bests else None,
+            "best_lcb": max(bestl) if bestl else None,
+            "role": ("fittest" if champ_sig and k == champ_sig
+                     else "gamete" if k in elite_sigs
+                     else "scored" if (s.get("closes") or 0) > 0
+                     else "unmeasured"),
+        })
+    dorm = [dict(e, role="dormant") for k, e in by_sig.items()
+            if k not in current]
+    dorm.sort(key=lambda d: (d["best_lcb"]
+                             if isinstance(d.get("best_lcb"), (int, float))
+                             else float("-inf")), reverse=True)
+    return (out + dorm[:max(0, cap - len(out))])[:cap]
+
+
+def funding_prospects_view(proposed, queue_candidates, judge_state):
+    """The funding substrate's prospect list: each proposal joined to its
+    judge lifecycle. Status precedence: running/promoted (the judge's
+    CURRENT candidate) > a verdict row (promoted/abandoned/faded/invalid,
+    latest wins) > completed (in `done` but the verdict aged out of the
+    judge's last-10 window) > queued (sitting in xp-queue) > proposed.
+    Stats are the judge's own eval numbers, whitelisted. Pure; tolerant of
+    absent/partial/junk states (dark judge -> everything reads 'proposed'
+    or 'queued', never raises)."""
+    js = judge_state if isinstance(judge_state, dict) else {}
+    phase, current = js.get("phase"), js.get("current")
+    done = {d for d in (js.get("done") or []) if isinstance(d, str)}
+    queued = {c.get("name") for c in (queue_candidates or [])
+              if isinstance(c, dict)}
+    latest_v = {}
+    for v in (js.get("verdicts") or []):    # chronological — last wins
+        if isinstance(v, dict) and v.get("name"):
+            latest_v[v["name"]] = v
+    KEEP = ("why", "n_shadow", "n_live", "shadow_mean_pct", "live_mean_pct")
+
+    def _stats(ev):
+        return ({k: ev[k] for k in KEEP if k in ev}
+                if isinstance(ev, dict) else None)
+
+    out = []
+    for p in (proposed or []):
+        if not isinstance(p, dict) or not p.get("name"):
+            continue
+        name = p["name"]
+        e = {"name": name, "levers": p.get("levers") or {}}
+        if p.get("at"):
+            e["at"] = p["at"]
+        stats = ts = None
+        if name == current and phase in ("running", "promoted"):
+            e["status"] = phase
+            stats = _stats(js.get("last_eval"))
+        elif name in latest_v:
+            v = latest_v[name]
+            e["status"] = str(v.get("verdict") or "done").lower()
+            ts, stats = v.get("ts"), _stats(v.get("eval"))
+        elif name in done:
+            e["status"] = "completed"
+        elif name in queued:
+            e["status"] = "queued"
+        else:
+            e["status"] = "proposed"
+        if ts:
+            e["ts"] = ts
+        if stats:
+            e["stats"] = stats
+        out.append(e)
+    return out
+
+
 def run_once():
     now = now_ts()
     prior = store.load_state(KEY) or {}
@@ -592,7 +730,8 @@ def run_once():
                   f"bot that does not exist)", flush=True)
         prior_elite = conform([e.get("genotype") for e in
                                (prior.get("elite") or [])], genes)
-        population = dedupe(seed_population(genes) + breed(prior_elite, genes))
+        seeds = seed_population(genes)
+        population = dedupe(seeds + breed(prior_elite, genes))
         scored = rank(population, tape, allowed)
         # [2026-07-17] GAMETES (who breeds) and the CHAMPION (what we would
         # trust) are now separate questions. The elite are robustness-filtered
@@ -621,9 +760,20 @@ def run_once():
         print(f"[incubator] gametes: {len(leaderboard)}/{len(scored)} genotypes "
               f"viable (>= {MIN_GT_CLOSES} closes AND both halves >= "
               f"${HALF_MARGIN:.2f})", flush=True)
+        # [2026-07-22] the PROSPECT REGISTER: every genotype this cycle
+        # scored, merged into the durable across-cycles list (see
+        # update_prospects) — the population is no longer discarded at
+        # publish.
+        prospects = update_prospects(prior.get("prospects"), scored, seeds,
+                                     default_gt, champion, leaderboard,
+                                     _iso(now))
     else:
         print(f"[incubator] tape too short ({len(tape)}/{MIN_SNAPS}) — "
               f"skipping taker breeding", flush=True)
+        # nothing scored: carry the register unchanged (a short tape must
+        # not demote or age anyone)
+        prospects = [e for e in (prior.get("prospects") or [])
+                     if isinstance(e, dict)]
 
     # --- FUNDING proposals (live-reachable, JUDGE-gated) -------------------
     judge_state = store.load_state("xp-judge") or {}
@@ -638,17 +788,23 @@ def run_once():
     if hurting:
         print(f"[incubator] 🦾 proprioception hurting levers honored: "
               f"{sorted(hurting)}", flush=True)
+    q = store.load_state(QUEUE_KEY) or {}
+    candidates_now = q.get("candidates") or []
     if props:
-        q = store.load_state(QUEUE_KEY) or {}
-        existing = {p["name"] for p in (q.get("candidates") or [])}
-        merged = (q.get("candidates") or []) + [p for p in props
-                                                if p["name"] not in existing]
+        existing = {p["name"] for p in candidates_now}
+        merged = candidates_now + [p for p in props
+                                   if p["name"] not in existing]
+        candidates_now = merged[:20]
         store.save_state(QUEUE_KEY, {"updated": _iso(now), "ttl_sec": TTL_SEC,
-                                     "candidates": merged[:20],
+                                     "candidates": candidates_now,
                                      "source": "strategy-incubator"})
         print(f"[incubator] proposed {len(props)} funding candidate(s) to "
               f"xp-queue (judge-gated): {[p['name'] for p in props]}", flush=True)
 
+    # the incubator's OWN proposed ledger stamps birth time; the queue copy
+    # stays exactly {name, levers} (the judge's contract, untouched)
+    proposed_all = ((prior.get("proposed") or [])
+                    + [dict(p, at=_iso(now)) for p in props])[-20:]
     payload = {
         "updated": _iso(now), "ttl_sec": TTL_SEC,
         "tape_snaps": len(tape), "tape_source": used,
@@ -657,19 +813,28 @@ def run_once():
         # means nothing without the lens set the live taker could fill.
         "lenses_scored": sorted(scored_lenses),
         "lenses_vetoed": sorted(set(LENS_GENE) - scored_lenses),
-        "proposed": (prior.get("proposed") or []) + props,
+        "proposed": proposed_all,
+        # [2026-07-22] the PROSPECT REGISTER (operator: "no list of the
+        # prospective bots its created and their stats") — both substrates:
+        # every taker genotype ever scored (durable, stats + best-ever),
+        # and every funding proposal joined to its judge lifecycle.
+        "prospects": prospects,
+        "funding_prospects": funding_prospects_view(proposed_all,
+                                                    candidates_now,
+                                                    judge_state),
     }
-    payload["proposed"] = payload["proposed"][-20:]
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
         try:
             store.save_history(KEY, {"updated": payload["updated"],
                                      "top_net": leaderboard[0]["net"] if leaderboard else None,
-                                     "n_proposed": len(props)})
+                                     "n_proposed": len(props),
+                                     "n_prospects": len(prospects)})
         except Exception:
             pass
     print(f"[incubator] {_iso(now)} elite={len(leaderboard)} "
-          f"funding_proposed={len(props)}", flush=True)
+          f"prospects={len(prospects)} funding_proposed={len(props)}",
+          flush=True)
     return payload
 
 
@@ -918,11 +1083,88 @@ def _selftest():
     _, streak6, stable6, _, _ = assess_champion(other, 0.0, 200, {"A": 2}, 5)
     assert streak6 == 1 and not stable6
 
+    # [2026-07-22] PROSPECT REGISTER (operator: "the incubator has no list of
+    # the prospective bots its created and their stats"). Merge across
+    # cycles; origin sticks at birth; roles recompute; best-ever never
+    # regresses; dormants kept by best-lcb; cap keeps the current cycle
+    # whole; junk tolerated.
+    assert _sig({"B": 10, "A": 0.05}) == "A=0.05|B=10"
+    assert _sig({"A": 0.05}) == _sig({"A": 0.05 + 1e-13}), "float repr stable"
+    sc1 = [{"genotype": {"A": 2, "B": 10}, "net": 5.0, "h1": 2.0, "h2": 3.0,
+            "closes": 20, "lcb": 4.0, "both_halves_pos": True},
+           {"genotype": {"A": 1, "B": 10}, "net": 1.0, "h1": 0.5, "h2": 0.5,
+            "closes": 8, "lcb": 0.4, "both_halves_pos": False},
+           {"genotype": {"A": 3, "B": 20}, "net": 0.0, "h1": 0.0, "h2": 0.0,
+            "closes": 0, "lcb": 0.0, "both_halves_pos": False}]
+    seeds1 = [{"A": 1, "B": 10}, {"A": 2, "B": 10}]
+    p1 = update_prospects(None, sc1, seeds1, {"A": 1, "B": 10},
+                          {"genotype": {"A": 2, "B": 10}},
+                          [{"genotype": {"A": 2, "B": 10}}], "T1")
+    assert [e["role"] for e in p1] == ["fittest", "scored", "unmeasured"], p1
+    assert [e["origin"] for e in p1] == ["seed", "default", "bred"], p1
+    assert all(e["born"] == "T1" and e["cycles"] == 1 for e in p1)
+    # cycle 2: new fittest; the old one leaves the population -> dormant,
+    # ranked by best lcb; born/cycles/best-ever carry forward
+    sc2 = [{"genotype": {"A": 1, "B": 10}, "net": 6.0, "h1": 3.0, "h2": 3.0,
+            "closes": 30, "lcb": 5.0, "both_halves_pos": True}]
+    p2 = update_prospects(p1, sc2, seeds1, {"A": 1, "B": 10},
+                          {"genotype": {"A": 1, "B": 10}}, [], "T2")
+    top2 = p2[0]
+    assert (top2["cycles"] == 2 and top2["born"] == "T1"
+            and top2["last_seen"] == "T2" and top2["role"] == "fittest")
+    assert top2["best_net"] == 6.0 and top2["best_lcb"] == 5.0
+    dorm = [e for e in p2 if e["role"] == "dormant"]
+    assert [d["genotype"] for d in dorm] == [{"A": 2, "B": 10},
+                                             {"A": 3, "B": 20}], dorm
+    # a worse re-score updates latest but never the best-ever
+    sc3 = [{"genotype": {"A": 1, "B": 10}, "net": -2.0, "h1": -1.0,
+            "h2": -1.0, "closes": 35, "lcb": -3.0, "both_halves_pos": False}]
+    p3 = update_prospects(p2, sc3, seeds1, {"A": 1, "B": 10}, None, [], "T3")
+    assert p3[0]["net"] == -2.0 and p3[0]["best_net"] == 6.0
+    assert p3[0]["best_lcb"] == 5.0 and p3[0]["role"] == "scored"
+    # cap: current cycle survives whole, dormants fill what remains
+    many = [{"genotype": {"A": i, "B": 0}, "net": 0.0, "h1": 0.0, "h2": 0.0,
+             "closes": 1, "lcb": float(-i), "both_halves_pos": False}
+            for i in range(10)]
+    pc = update_prospects(p3, many, [], {}, None, [], "T4", cap=6)
+    assert len(pc) == 6 and all(e["last_seen"] == "T4" for e in pc), pc
+    # junk prior entries are dropped, not fatal
+    pj = update_prospects([{"nope": 1}, None, 42], sc2, [], {}, None, [], "T")
+    assert pj[0]["cycles"] == 1 and len(pj) == 1
+
+    # funding prospect view: status precedence + stats whitelist + dark states
+    fp = funding_prospects_view(
+        [{"name": "xp-a", "levers": {"xp.funding.take_profit": 0.05},
+          "at": "T0"},
+         {"name": "xp-b", "levers": {}}, {"name": "xp-c", "levers": {}},
+         {"name": "xp-d", "levers": {}}, {"name": "xp-e", "levers": {}},
+         "junk", {"levers": {}}],
+        [{"name": "xp-c"}],
+        {"phase": "running", "current": "xp-a",
+         "last_eval": {"why": "warming", "n_shadow": 12, "promote": False},
+         "done": ["xp-d"],
+         "verdicts": [{"name": "xp-b", "verdict": "ABANDONED", "ts": "V1",
+                       "eval": {"why": "14d"}},
+                      {"name": "xp-b", "verdict": "PROMOTED", "ts": "V2",
+                       "eval": {"n_live": 11, "bogus": 9}}]})
+    by = {e["name"]: e for e in fp}
+    assert len(fp) == 5, fp
+    assert by["xp-a"]["status"] == "running" and by["xp-a"]["at"] == "T0"
+    assert by["xp-a"]["stats"] == {"why": "warming", "n_shadow": 12}
+    assert by["xp-b"]["status"] == "promoted" and by["xp-b"]["ts"] == "V2"
+    assert by["xp-b"]["stats"] == {"n_live": 11}, "stats are whitelisted"
+    assert by["xp-c"]["status"] == "queued"
+    assert by["xp-d"]["status"] == "completed"
+    assert by["xp-e"]["status"] == "proposed"
+    fp2 = funding_prospects_view([{"name": "x", "levers": {}}], None, None)
+    assert fp2[0]["status"] == "proposed" and "stats" not in fp2[0]
+
     print("strategy_incubator selftest OK (seed, dedupe, crossover+mutation "
           "on-grid, lever mapping/clamp, judge-gated funding proposals, "
           "proprioception hurting-gene skip, IMB-10 marked/reachable-holds, "
           "t-LCB winner's-curse ranking, gamete selection, anti-overfit "
-          "champion gate incl. the closes floor)")
+          "champion gate incl. the closes floor, prospect register "
+          "merge/roles/best-ever/cap, funding prospect lifecycle join)")
 
 
 if __name__ == "__main__":
