@@ -199,6 +199,18 @@ LEVERS = {
     "taker.max_hold_h": {
         "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
         "note": "max hold hours; default 48"},
+    # [2026-07-21] post-stop re-entry cooldown (TT_SL_COOLDOWN_H, default
+    # 2.0h — the same-day churn fix: NBIS -$5.37/8, BOT -$4.60/3, every
+    # same-minute re-entry a loser). Registered so the proposal channel and
+    # the tuner can move it within bounds. Replay ladders are window-
+    # sensitive: the 16→21-Jul tape scored 2-8h clearly positive (full
+    # -0.47 -> +5.97) while the next morning's 120h window scored 2-4h
+    # marked-NEUTRAL (the churn episodes aged out) — a widening proposal
+    # must clear the improve bar on the tape of ITS day. 0 = off.
+    "taker.sl_cooldown_h": {
+        "kind": "float", "lo": 0.0, "hi": 24.0, "lane": "lighter-taker",
+        "note": "hours a symbol stays entry-blocked after its own sl close; "
+                "default 2.0, 0 = off"},
     # LIVE lane 💰 — one lever, a multiplier on the env clip (LIGHTER_ORDER_USD).
     # SafetyRails' notional cap stays senior at order time: this reshapes
     # clips, it can never raise total live exposure.

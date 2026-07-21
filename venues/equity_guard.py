@@ -299,7 +299,25 @@ class EquityGuard:
         now = self._now()
         held = {c: p for c, p in positions.items() if p.get("size")}
         if not held:
-            # flat account: no marks exist to dislocate; accept + (re)baseline
+            # flat account: no marks exist to dislocate; accept + (re)baseline.
+            # [2026-07-21 D1 gap] FLAT->FLAT is the one accept path where a
+            # deposit/withdrawal used to slip through unrecorded: with no
+            # positions there is no mark P&L and no funding accrual, so a
+            # ledger-collateral jump between two consecutive FLAT reads is
+            # CAPITAL, not P&L — record it before re-baselining, or the
+            # frequently-flat Taker reprints the operator's cash as profit
+            # (the exact 18-Jul incident class D1 closed for held books).
+            # Declared residual: a full open->close round trip BETWEEN two
+            # flat reads books its realized P&L into the same delta — rare at
+            # the run-once cadence, logged for audit, reconcilable against
+            # the trade ledger.
+            last = self._last
+            if (last is not None and not (last.get("sizes") or {})
+                    and collateral is not None
+                    and last.get("collateral") is not None):
+                d_coll = float(collateral) - float(last["collateral"])
+                if abs(d_coll) > self.tolerance(0.0, venue_total):
+                    self._record_capital_move(now, d_coll, "flat-cash")
             return self._accept(now, venue_total, collateral, {}, {}, "flat")
         mids = {c: m for c, m in (self._mids_cached(list(held)) or {}).items() if m}
         problem = self._judge(now, venue_total, collateral, held, mids)

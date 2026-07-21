@@ -889,6 +889,44 @@ def derive_actions(hypotheses):
     return actions
 
 
+# [2026-07-21 ORGAN CHANNEL] lens -> (lever, tighten direction sign on the
+# registry span). entry_quality's prose has always SAID "tighten the entry
+# gates"; this is that sentence as data, for the taker's four lenses only
+# (the family bots' bars are not registry levers).
+TAKER_TIGHTEN = {
+    "divergence": ("taker.div_gap_pp", +1.0),
+    "dip": ("taker.dip_range", -1.0),
+    "breakout": ("taker.brk_range", +1.0),
+    "momentum": ("taker.momo_chg", +1.0),
+}
+
+
+def derive_proposals(hypotheses):
+    """[2026-07-21 ORGAN CHANNEL] ACTIONABLE `diag_entry_quality` findings on
+    the Ticket Taker become QUEUED lever proposals: one notch tighter
+    (0.25 x registry span) on that lens's conviction bar. Pure — returns
+    [(lever, sign, bot, tag)]; the caller queues via fleet_proposals and the
+    scout tuner enacts only if its replay gate agrees (bounded, TTL'd,
+    auto-reverting; brain veto + proprioception stay senior downstream).
+    Same streak-hardening as derive_actions: only ACTIONABLE entries (the
+    PROMOTE_RUNS persistence) ever leave the ledger."""
+    out = []
+    for hk, e in (hypotheses or {}).items():
+        if e.get("status") != "ACTIONABLE" or e.get("kind") != "diag_entry_quality":
+            continue
+        try:
+            hb, htag = hk.split("|tag:", 1)
+        except ValueError:
+            continue
+        if not hb.startswith("lighter-ticket-taker"):
+            continue
+        lens = htag.split("-", 1)[1] if "-" in htag else htag
+        pair = TAKER_TIGHTEN.get(lens)
+        if pair:
+            out.append((pair[0], pair[1], hb, htag))
+    return out
+
+
 def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
                         engine=None):
     """[2026-07-14 L4, 2026-07-16 v3, 2026-07-21 TWO-WAY] Per-(bot, tag)
@@ -1398,6 +1436,34 @@ def main():
             pass
     except Exception:
         pass
+    # [2026-07-21 ORGAN CHANNEL] entry_quality findings on the taker QUEUE a
+    # tighter-bar proposal (fleet_proposals) — the scout tuner enacts only if
+    # its replay gate agrees. Failure-neutral: a dark channel drops nothing
+    # but the appetite.
+    try:
+        import fleet_proposals as _fp
+        import fleet_tuning as _ft
+        import lighter_ticket_taker as _tt
+        _defaults = {"taker.div_gap_pp": _tt.DIV_GAP_PP,
+                     "taker.dip_range": _tt.DIP_RANGE,
+                     "taker.brk_range": _tt.BRK_RANGE,
+                     "taker.momo_chg": _tt.MOMO_CHG}
+        _want = {}
+        for _lever, _sign, _hb, _htag in derive_proposals(state.get("hypotheses")):
+            _spec = _ft.LEVERS.get(_lever) or {}
+            if _spec.get("lo") is None or _lever not in _defaults:
+                continue
+            _want[_lever] = {
+                "value": _defaults[_lever] + _sign * 0.25 * (_spec["hi"] - _spec["lo"]),
+                "direction": "restrict",
+                "reason": f"ACTIONABLE entry_quality on {_hb} {_htag} — "
+                          f"tighten the lens's conviction bar one notch",
+                "evidence": "hypothesis ledger (PROMOTE_RUNS-hardened); "
+                            "replay gate decides"}
+        if _want:
+            _fp.propose(_want, set_by="brain")
+    except Exception:  # noqa: BLE001
+        pass
     state["diagnoses"] = diagnoses
 
     # [2026-07-15 LENS-FORWARD] grade the scout's lenses on every ticket and
@@ -1745,6 +1811,24 @@ def _selftest():
        "avo" not in _acts)
     ck("malformed key skipped, no crash", "malformed-key-no-sep" not in _acts)
     ck("empty/None ledger -> no actions", derive_actions(None) == {})
+
+    # [2026-07-21 ORGAN CHANNEL] derive_proposals: ACTIONABLE entry_quality on
+    # a TAKER row maps lens -> tighter-bar lever; family rows, other kinds,
+    # and non-ACTIONABLE states propose nothing
+    _hyp2 = {
+        "lighter-ticket-taker-lshadow|tag:short-divergence":
+            {"status": "ACTIONABLE", "kind": "diag_entry_quality"},
+        "lighter-ticket-taker-lshadow|tag:long-dip":
+            {"status": "candidate", "kind": "diag_entry_quality"},
+        "freqtrade-georgia-lshadow|tag:long-trend-breakout":
+            {"status": "ACTIONABLE", "kind": "diag_entry_quality"},
+        "lighter-ticket-taker-lshadow|tag:long-breakout":
+            {"status": "ACTIONABLE", "kind": "diag_regime_timing"},
+    }
+    _props = derive_proposals(_hyp2)
+    ck("taker entry_quality -> tighter div bar proposal",
+       [(p[0], p[1]) for p in _props] == [("taker.div_gap_pp", +1.0)])
+    ck("empty/None ledger -> no proposals", derive_proposals(None) == [])
 
     print("selftest: %d checks, %d FAILED%s"
           % (len(ran), len(fails), (" -> " + ", ".join(fails)) if fails else ""))

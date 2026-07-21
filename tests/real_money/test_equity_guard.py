@@ -629,6 +629,43 @@ def test_cash_escape_records_a_withdrawal_negative():
     moves = g.pop_capital_moves()
     assert len(moves) == 1 and moves[0]["delta"] == pytest.approx(-30.0)
 
+def test_flat_to_flat_deposit_records_capital_move():
+    # [2026-07-21 D1 gap] deposit landing while FLAT: two consecutive flat
+    # reads, ledger collateral jumps $32 — capital, not P&L. The frequently-
+    # flat Taker is the book this protects.
+    g = _guard({})
+    assert g.evaluate(100.0, 100.0, {}).accepted     # flat baseline
+    assert g.pop_capital_moves() == []
+    v = g.evaluate(132.0, 132.0, {})                 # flat + $32 deposit
+    assert v.accepted and v.reason == "flat"
+    moves = g.pop_capital_moves()
+    assert len(moves) == 1 and moves[0]["delta"] == pytest.approx(32.0)
+    assert moves[0]["how"] == "flat-cash"
+
+def test_flat_to_flat_withdrawal_records_negative():
+    g = _guard({})
+    assert g.evaluate(100.0, 100.0, {}).accepted
+    v = g.evaluate(70.0, 70.0, {})
+    assert v.accepted
+    moves = g.pop_capital_moves()
+    assert len(moves) == 1 and moves[0]["delta"] == pytest.approx(-30.0)
+
+def test_flat_to_flat_dust_records_nothing():
+    # inside tolerance (tol_abs $1): no capital event
+    g = _guard({})
+    assert g.evaluate(100.0, 100.0, {}).accepted
+    assert g.evaluate(100.6, 100.6, {}).accepted
+    assert g.pop_capital_moves() == []
+
+def test_held_to_flat_records_nothing():
+    # the close's realized P&L moves collateral between a HELD read and a
+    # flat read — that is trading, not capital; the flat-cash path must not
+    # fire when the last accepted read had positions.
+    g = _guard({"BTC": 100.0})
+    assert g.evaluate(95.0, 95.0, {"BTC": _pos(1, 100, upnl=0.0)}).accepted
+    assert g.evaluate(104.0, 104.0, {}).accepted     # closed; realized moved cash
+    assert g.pop_capital_moves() == []
+
 def test_collateral_stable_rebase_records_capital_move():
     # the (ao) heal path: deposit heals via coll_stable on a drifting book —
     # the recorded delta is collateral vs the LAST TRUSTED read (100 -> 130).

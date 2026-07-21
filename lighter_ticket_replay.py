@@ -111,6 +111,14 @@ def replay(tape, clip_usd=None, max_open=None):
                                       "exits": defaultdict(int)})
     seen = defaultdict(int)             # raw tickets seen per lens
     vetoed_cycles = 0
+    # [2026-07-21 PARITY] mirror of the live loop's post-STOP cooldown
+    # (sl_block, TT_SL_COOLDOWN_H — ON by default since the same-day churn
+    # fix). Without this the replay judged every lever/study on rules the
+    # production taker no longer runs: a candidate could earn its enactment
+    # partly from re-entry churn the real bot now refuses. Same semantics:
+    # per-SYMBOL, sl exits only (tp/hold re-enter freely), module attr read
+    # at stamp time so replay_with(..., {"SL_COOLDOWN_H": x}) ladders it.
+    sl_until = {}     # sym -> datetime the entry embargo lifts
     for snap_dt, p in tape:
         marks = p.get("marks") or {}
         # 1) exits — same rule object the live loop uses
@@ -131,6 +139,8 @@ def replay(tape, clip_usd=None, max_open=None):
             s["pnl_pcts"].append(net / m["clip"])
             s["nets"].append(net)
             s["exits"][reason] += 1
+            if reason == "sl" and tt.SL_COOLDOWN_H > 0:
+                sl_until[sym] = snap_dt + timedelta(hours=tt.SL_COOLDOWN_H)
             del pos[sym]
         # 2) entries — stress veto + the taker's own conviction bars
         tickets = p.get("tickets") or {}
@@ -151,6 +161,8 @@ def replay(tape, clip_usd=None, max_open=None):
             mark = marks.get(sym)
             if not mark:
                 continue
+            if sym in sl_until and snap_dt < sl_until[sym]:
+                continue          # post-stop cooldown — the live loop's rule
             side = "short" if str(t.get("side", "long")) == "short" else "long"
             pos[sym] = {"lens": lens, "side": side, "entry": mark,
                         "opened": snap_dt, "clip": clip_usd}
@@ -271,8 +283,28 @@ def selftest():
     ddd_net = 50 * (202.0 / 200.0 - 1) - 2 * 50 * FEE
     assert abs(rep["closed_net"] - round(aaa_net + bbb_net + ddd_net, 2)) < 0.02, rep
     assert rep["open"] == [] and rep["unrealized"] == 0.0, rep["open"]
+
+    # [2026-07-21 PARITY] cooldown mirror: BBB stops out at t2; the SAME
+    # momentum ticket re-offered 45 minutes later must be refused at the
+    # production default (2h) and taken with the cooldown off — the replay
+    # now runs the live loop's post-stop rule, so lever candidates are
+    # judged on the code that would run them.
+    tape_cd = tape[:4] + [snap(2, {"BBB": 100.0, "DDD": 201.0, "AAA": 105.0},
+                               {"momentum": [momo]}, mi=45)] + tape[4:]
+    _saved_cd = tt.SL_COOLDOWN_H
+    try:
+        tt.SL_COOLDOWN_H = 0.0
+        assert replay(tape_cd, clip_usd=50.0,
+                      max_open=6)["lenses"]["momentum"]["taken"] == 2, \
+            "cooldown 0 must fill the re-offer (baseline behaviour)"
+        tt.SL_COOLDOWN_H = 2.0
+        rep_cd = replay(tape_cd, clip_usd=50.0, max_open=6)
+        assert rep_cd["lenses"]["momentum"]["taken"] == 1, \
+            "re-entry 45m after the sl must be refused at the 2h default"
+    finally:
+        tt.SL_COOLDOWN_H = _saved_cd
     print("[replay] selftest OK (tp/sl/hold, dip bar, stress veto, "
-          "one-per-lens, fee accounting)")
+          "one-per-lens, fee accounting, sl-cooldown mirror)")
 
 
 def main():

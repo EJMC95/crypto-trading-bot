@@ -203,7 +203,13 @@ def test_no_unregistered_selftest():
     markers = ("--selftest", "def _selftest", "def selftest")
     found = set()
     for py in ROOT.rglob("*.py"):
-        if "/tests/" in py.as_posix() or py.name == "conftest.py":
+        rel = py.as_posix()
+        if "/tests/" in rel or py.name == "conftest.py":
+            continue
+        # [2026-07-21] .claude/worktrees/* are per-session git worktrees —
+        # full repo COPIES whose files are duplicates by construction; a
+        # stale one made this test fail on every file it already registers.
+        if "/.claude/" in rel:
             continue
         try:
             text = py.read_text(encoding="utf-8", errors="ignore")
