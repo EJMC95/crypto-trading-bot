@@ -188,6 +188,18 @@ MOMO_VOL_M = float(os.environ.get("TT_MOMO_VOL_M", "2.0")) # >= $2M/day
 # this hard (percentage points of APR) from the cross-venue median.
 # [2026-07-17] /8 with the fleet basis fix — same decision, true units.
 DIV_GAP_PP = float(os.environ.get("TT_DIV_GAP", "62.5"))
+# [2026-07-21 DIAGNOSIS] divergence was the ONLY conviction bar with no
+# liquidity check (breakout >= $1M, momentum >= $2M, divergence: none) while
+# being the only lens LIVE money fills — 79% of bar-clearing divergence
+# tickets sat on books under $1M/day. SHIPPED DISABLED (0 = off), and the
+# fill-ledger counterfactual (scripts/study_div_vol_floor.py, 37 shadow +
+# 5 live closes, volumes matched at open time 42/42) REJECTS every tested
+# floor {0.25, 0.5, 1.0, 2.0}: none improves both halves — the seductive
+# full-window winner (1.0: +$10.32 vs +$2.21) is a pure second-half effect,
+# and thin-print P&L flips sign between halves, so volume is not a stable
+# loss predictor on this tape. The knob exists for the day the evidence
+# supports it (re-test at ~n>=60 per the script header); until then 0.
+DIV_VOL_M = float(os.environ.get("TT_DIV_VOL_M", "0"))
 # [2026-07-14b] Stress veto: when the venue-wide |premium| median is at or
 # above this (bps), the whole venue is dislocated — take NO new entries this
 # cycle (exits keep running). Normal tape prints ~6bps median.
@@ -404,7 +416,8 @@ def incredible(tickets):
         if t.get("chg_pct", 0) >= MOMO_CHG and t.get("vol_m", 0) >= MOMO_VOL_M:
             out.append(("momentum", t))
     for t in (tickets.get("divergence") or []):
-        if abs(t.get("gap_pct") or 0) >= DIV_GAP_PP:
+        if (abs(t.get("gap_pct") or 0) >= DIV_GAP_PP
+                and (DIV_VOL_M <= 0 or t.get("vol_m", 0) >= DIV_VOL_M)):
             out.append(("divergence", t))
     return out
 
@@ -854,7 +867,19 @@ def main(_ctx=None):
             reason=f"{side}-{lens}_{reason}",
             # [2026-07-15 AUDIT FIX] provenance: venue + arm on every row —
             # venue NULL claimed the pre-Gate-0 HL-paper era.
-            venue="lighter", shadow=dry_run)
+            venue="lighter", shadow=dry_run,
+            # [2026-07-21 ATTRIBUTION] bars in force at close, the funding
+            # bot's existing extra.bars pattern ported: 0 of 53 taker closes
+            # stamped their params while the shadow twin traded tuner levers
+            # (sl -0.04 / tp 0.06) against live's env bars (-0.03 / +0.04) —
+            # so live-vs-shadow gaps could not be attributed to execution vs
+            # different rules. Close-time values (a mid-hold lever change
+            # stamps the exit's bars — same caveat as the funding bot).
+            extra={"bars": {"tp": TAKE_PROFIT, "sl": STOP_LOSS,
+                            "max_hold_h": MAX_HOLD_H,
+                            "div_gap_pp": DIV_GAP_PP, "div_vol_m": DIV_VOL_M,
+                            "dip_range": DIP_RANGE, "brk_range": BRK_RANGE,
+                            "momo_chg": MOMO_CHG}})
         if not dry_run:
             try:
                 store.publish_venue_order(

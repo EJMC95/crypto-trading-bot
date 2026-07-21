@@ -468,10 +468,36 @@ money), or explicitly deferred with a date.
   lighter` on the bus after run 187's funding-carry redeploy — the stale
   container was the cause, as diagnosed).
 
+## D4 PRE-COMMITMENT (added 21-Jul evening, follow-up session) — the 28-Jul thresholds, fixed BEFORE the number is read
+
+`order_slip` is now on `/bus.json` (no-auth) and the `venue_orders_24h`
+heartbeat is fixed (`seen_at`→`at` — it had silently never rendered). So the
+28-Jul Farmer decision is mechanical, and to keep it honest the thresholds
+are committed NOW, before anyone sees the number. Basis: the measured
++6.18bps/trade gross edge (1,911 replay trades, both halves, TP 0.04 /
+STOP 0.03 / hold 72h at gate 0.05 TRUE — the ONLY surviving config), so:
+
+- **round-trip slip < 6bps** → the config nets positive gross-of-carry:
+  proceed with the queued `STOP 0.10→0.03` via the doctrine path (registry
+  `hard_stop` lever addition → shadow twin → judge's paired bar).
+- **6–10bps** → net ≈ zero-to-negative (at exactly ~6.2bps net is zero, not
+  positive): do NOT tune the stop; the work is EXECUTION — post-only/maker
+  entries (the shadow spread is ~1.7bps; the edge only exists if fills stop
+  crossing) — or shrink.
+- **≥ 10bps** → the assumed-slip backtest verdict was right: park, or
+  re-justify the book as the TP/stop bot its record says it is (then its
+  TP/stop bars are the object of tuning, not the funding gate).
+- Validity precondition: the shadow twin must be redeployed first (its
+  build is 18-Jul; `arm-drift` verdict stands until the builds converge in
+  `pnl.json extra.build`) and the read needs ≥~20 measured exit fills
+  (pace ~2.8/day says ~30 by 28-Jul).
+
 ## R. Residuals this session could not reach (no DB / no dashboard login)
 
 - `impl-shortfall.order_slip.live.slip_bps` — the item-17 deciding number.
   Read via the /learning page or a DB query next session.
+  **→ 21-Jul evening: unblocked — served on `/bus.json` (no-auth) from the
+  next dashboard deploy; thresholds pre-committed above.**
 - fleet-clock transitions log for 17/18-Jul + the weekend gap (the 17-Jul
   pre-grade PASS stands unrefuted; the live payload was sane at read time).
 - xp-judge full state (phase details beyond the vitals one-liner) — needed

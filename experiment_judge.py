@@ -92,7 +92,15 @@ CANDIDATES = [
     # DOES support (tightening toward the 0.122 friction breakeven) is already
     # running as the re-spec'd 0.075 candidate (see _respec_clamped).
     {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
-    {"name": "hold-48",         "levers": {"xp.funding.max_hold_h": 48.0}},
+    # [2026-07-21 DIAGNOSIS] hold-48 REPLACED by hold-96: the carry twin's
+    # only measured repeated edge is its decay_paid exits (15-0, +$46.21)
+    # whose winners hold a MEDIAN 78.9h — past the Farmer's 72h cap (SOXL
+    # closed 99h, SNDK 88h). hold-48 pointed the opposite way on no
+    # evidence: the Lighter backtest's "hold longer doesn't help" was
+    # measured AT the current exit semantics and gate, while the carry
+    # evidence is about letting accrual outrun round-trip cost. 96.0 is the
+    # registry ceiling on both xp and live lanes; the paired bar unchanged.
+    {"name": "hold-96",         "levers": {"xp.funding.max_hold_h": 96.0}},
 ]
 XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               "xp.funding.take_profit": "live.funding.take_profit",
@@ -990,7 +998,7 @@ def _selftest():
     ]}
     pool = candidate_pool(q)
     names = [c["name"] for c in pool]
-    assert names[:2] == ["tp-0.06", "hold-48"], names  # static order
+    assert names[:2] == ["tp-0.06", "hold-96"], names  # static order
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -1002,11 +1010,11 @@ def _selftest():
     # still gets in (dedup must not become a wall).
     q2 = {"candidates": [
         {"name": "xp-take_profit-0.06", "levers": {"xp.funding.take_profit": 0.06}},
-        {"name": "xp-max_hold_h-48", "levers": {"xp.funding.max_hold_h": 48}},  # int vs 48.0
+        {"name": "xp-max_hold_h-96", "levers": {"xp.funding.max_hold_h": 96}},  # int vs 96.0
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]}
     n2 = [c["name"] for c in candidate_pool(q2)]
-    assert n2 == ["tp-0.06", "hold-48", "xp-enter_apr-0.0625"], n2
+    assert n2 == ["tp-0.06", "hold-96", "xp-enter_apr-0.0625"], n2
     # two offspring proposing the SAME novel experiment: first wins, no dup slot
     q3 = {"candidates": [
         {"name": "child-a", "levers": {"xp.funding.enter_apr": 0.0625}},
@@ -1018,7 +1026,7 @@ def _selftest():
     assert _lever_sig({"a": "x"}) == (("a", "x"),)      # non-numeric survives
     # next_candidate: skips done + current, name-based (pool may grow)
     assert next_candidate(pool, [], None)["name"] == "tp-0.06"
-    assert next_candidate(pool, ["tp-0.06"], "hold-48")["name"] == "xp-tp-0.05"
+    assert next_candidate(pool, ["tp-0.06"], "hold-96")["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
     # ---- [2026-07-21 D2] re-spec migration: the clamp-inverted candidate ----
