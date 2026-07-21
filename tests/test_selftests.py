@@ -106,6 +106,13 @@ SELFTEST_EXCLUDE = {
     # verdict (NO CHANGE at any stop width; bleed is entry-side) lives in
     # its header; re-run with --refresh, never re-argue from prose.
     "scripts/study_intraday_tsl_reclaim_lighter.py",
+    # [2026-07-21] regime-gate counterfactual on the same harness (imports
+    # the study above — same exclusion reasons). Verdict in header: both
+    # gate variants cut the bleed on both halves but neither flips the book
+    # positive; the wired brain regime_gate is the mechanism and its
+    # measured benefit is an UPPER bound (the actuator also needs a
+    # standing ACTIONABLE finding).
+    "scripts/study_intraday_regime_gate.py",
     # Their selfcheck() blocks run INSIDE `parliament_main --selftest` (which
     # IS registered above) — the marker hit here is the docstring saying so.
     "parliament/bus.py",
