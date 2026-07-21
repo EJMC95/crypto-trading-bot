@@ -415,7 +415,29 @@ def desired_scout_levers(lens_fwd, helping=None):
             log.append(f"{lens}: graded n={graded} under floor — scout "
                        f"emission {lever} -> {val} (grading diet, not trading"
                        + (", deeper: proprio-helping" if deeper else "") + ")")
-        # else: floor reached — stop asserting, lever expires to default
+        elif _avg is not None and _avg > 0 and (_hit or 0) >= 0.5:
+            # [2026-07-21b AUDIT FIX] the WINNER path — the exact state
+            # IMB-20 shipped scout.div_gap_pp FOR (divergence: floor met,
+            # positive at every horizon) was UNREACHABLE: the diet only
+            # widened UNDER the floor, so a graded winner's emission lever
+            # never engaged. A lens POSITIVE at the ruling floor (the same
+            # bar the taker-bar winner walk uses) now holds ONE widening
+            # notch (deeper if proprio-helping): more advisory tickets from
+            # a proven lens = more brain grading + more taker opportunity;
+            # fills stay gated by the taker's own bars. Stops asserting the
+            # moment the grade drops — TTL reverts.
+            beyond = next_notches(ladder, default)
+            if not beyond:
+                continue
+            deeper = lever in helping and len(beyond) > 1
+            val = beyond[1] if deeper else beyond[0]
+            out[lever] = val
+            log.append(f"{lens}: WINNER at floor (n={graded}, avg "
+                       f"{_avg:+.2f}%, hit {(_hit or 0):.0%}) — scout "
+                       f"emission {lever} -> {val} (winner diet"
+                       + (", deeper: proprio-helping" if deeper else "") + ")")
+        # else: floor reached without a positive grade — stop asserting,
+        # lever expires to default
     lever, default, ladder = TOP_N_LADDER
     hungry = any(not tt.lens_evidence((lens_fwd or {}).get(l),
                                       min_n=LENS_FLOOR)[1]
@@ -840,12 +862,24 @@ def _selftest():
     assert sl.get("scout.dip_range_max") == 0.15, (sl, slog2)
     assert "scout.brk_range_min" not in sl, sl
     assert sl.get("scout.ticket_top_n") == 9, sl
-    sl2, _ = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": 1.0,
-                                           "hit4h": 0.6},
-                                   "breakout": {"n4h": 100},
-                                   "momentum": {"n4h": 100},
-                                   "divergence": dict(_fed)})
-    assert sl2 == {}, sl2
+    # [2026-07-21b] a lens POSITIVE at the floor now earns the WINNER diet
+    # (one notch) — the pre-fix contract ({} here) was exactly the IMB-20
+    # gap: the winner lens's emission lever was unreachable at the floor.
+    # Lenses at the floor WITHOUT a positive grade still release to default.
+    sl2, sl2log = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": 1.0,
+                                                "hit4h": 0.6},
+                                        "breakout": {"n4h": 100},
+                                        "momentum": {"n4h": 100},
+                                        "divergence": dict(_fed)})
+    assert sl2 == {"scout.dip_range_max": 0.15}, sl2
+    assert any("WINNER at floor" in l for l in sl2log), sl2log
+    # ...and a floor-met lens with a NEGATIVE grade gets nothing
+    sl2b, _ = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": -0.2,
+                                            "hit4h": 0.6},
+                                    "breakout": {"n4h": 100},
+                                    "momentum": {"n4h": 100},
+                                    "divergence": dict(_fed)})
+    assert sl2b == {}, sl2b
     # a vetoed lens gets NO extra diet either
     sl3, _ = desired_scout_levers({"dip": {"n4h": 80, "avg4h_pct": -1.0,
                                            "hit4h": 0.3},

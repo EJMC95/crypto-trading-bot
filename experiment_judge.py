@@ -374,24 +374,52 @@ def prop_fade(prop_state, live_levers, now):
     return False, None
 
 
+# [2026-07-21b] proposal_fade's release-direction safety: releasing a
+# promotion reverts the lever to the OPERATOR'S ENV DEFAULT, so a release is
+# only a RESTRICT outcome when that default is tighter-or-equal than the
+# promoted value. Orientation: 'up' = higher is tighter (an entry bar),
+# 'down' = lower is tighter (an exposure/hold cap). Values are the fleet's
+# documented live defaults (FUNDING_ENTER_APR 0.05 TRUE / TP 0.04 / 72h) —
+# the registry notes carry the same numbers.
+LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
+                     "live.funding.take_profit": (0.04, "down"),
+                     "live.funding.max_hold_h": (72.0, "down")}
+
+
 def proposal_fade(proposals, live_levers, now):
     """[2026-07-21 ORGAN PROPOSALS, operator: organs must "implement changes
     to forward onto the tuners to act on"] The organs' release path: a fresh
     RESTRICT-direction proposal (fleet_proposals) on a promoted live lever —
     e.g. implementation-shortfall measuring sustained live slip — is an
     organ's measured case against the promotion, so release it early rather
-    than ride the lever to the absolute fade bar. Restrict-only by
-    construction (an extra release path can only pull a lever OFF real
-    money); the judge stays the ONLY writer of live.funding.*; a proposal is
-    evidence in, never a hand on the lever. Fail-safe False on an empty/
-    dark channel (fresh_proposals already age-gates). Pure — selftested."""
+    than ride the lever to the absolute fade bar.
+
+    [2026-07-21b AUDIT FIX, caught same-day] restrict-only now holds in
+    OUTCOME, not just intent: releasing a promoted TIGHTENING (e.g. the
+    re-spec'd enter-gate 0.075 vs the 0.05 env default) would WIDEN the
+    live gate on 'restrict' evidence — exactly backwards. `live_levers` is
+    now the {name: promoted_value} dict and a proposal releases only when
+    reverting to the env default moves the lever in the tighter direction
+    (LIVE_ENV_DEFAULTS). The judge stays the ONLY writer of live.funding.*;
+    a proposal is evidence in, never a hand on the lever. Fail-safe False
+    on an empty/dark channel or an unmapped lever. Pure — selftested."""
     try:
         for p in proposals or []:
-            if (p.get("lever") in (live_levers or set())
-                    and p.get("direction") == "restrict"):
-                return True, (f"organ proposal: {p.get('set_by')} proposes "
-                              f"restrict {p['lever']} "
-                              f"({str(p.get('reason') or '')[:120]})")
+            name = p.get("lever")
+            if name not in (live_levers or {}) or p.get("direction") != "restrict":
+                continue
+            ref = LIVE_ENV_DEFAULTS.get(name)
+            if ref is None:
+                continue        # unmapped lever: never release on a guess
+            default, tighter = ref
+            promoted_v = float(live_levers[name])
+            release_tightens = (default >= promoted_v if tighter == "up"
+                                else default <= promoted_v)
+            if not release_tightens:
+                continue        # releasing would WIDEN — refuse
+            return True, (f"organ proposal: {p.get('set_by')} proposes "
+                          f"restrict {name} "
+                          f"({str(p.get('reason') or '')[:120]})")
     except Exception:
         return False, None
     return False, None
@@ -904,7 +932,7 @@ def run_once():
         if fprop is not None:
             try:
                 ofading, owhy = proposal_fade(fprop.fresh_proposals(),
-                                              set(live_levers), now)
+                                              live_levers, now)
             except Exception:
                 ofading, owhy = (False, None)
         if fading or pfading or ofading:
@@ -1030,19 +1058,31 @@ def _selftest():
     assert prop_fade(None, {"live.funding.enter_apr"}, t0) == (False, None)
 
     # 🗞️ proposal_fade (21-Jul organ proposals): a fresh RESTRICT proposal on
-    # a promoted lever releases; expand/unrelated/empty do nothing
+    # a promoted lever releases — but ONLY when the release itself tightens
+    # (21-Jul-b: releasing a promoted TIGHTENING would widen on 'restrict'
+    # evidence). expand/unrelated/unmapped/empty do nothing.
     props = [{"lever": "live.funding.enter_apr", "value": 0.0625,
               "direction": "restrict", "set_by": "impl-shortfall",
               "reason": "sustained live slip"}]
-    oko, whyo = proposal_fade(props, {"live.funding.enter_apr"}, t0)
+    # promotion WIDENED the gate (0.0375 < env 0.05): release tightens -> fade
+    oko, whyo = proposal_fade(props, {"live.funding.enter_apr": 0.0375}, t0)
     assert oko and "impl-shortfall" in whyo, (oko, whyo)
-    assert not proposal_fade(props, {"live.funding.take_profit"}, t0)[0], \
+    # promotion TIGHTENED the gate (0.075 > env 0.05): release would WIDEN ->
+    # the restrict proposal must NOT release it
+    assert not proposal_fade(props, {"live.funding.enter_apr": 0.075}, t0)[0], \
+        "releasing a promoted tightening is a WIDENING — refuse"
+    # tp promotion (0.06 > env 0.04, 'down' = lower tighter): release tightens
+    assert proposal_fade(
+        [dict(props[0], lever="live.funding.take_profit")],
+        {"live.funding.take_profit": 0.06}, t0)[0]
+    assert not proposal_fade(props, {"live.funding.take_profit": 0.06}, t0)[0], \
         "unrelated lever must not fade"
     assert not proposal_fade(
         [dict(props[0], direction="expand")],
-        {"live.funding.enter_apr"}, t0)[0], "expand proposal must NEVER release"
-    assert proposal_fade([], {"live.funding.enter_apr"}, t0) == (False, None)
-    assert proposal_fade(None, {"live.funding.enter_apr"}, t0) == (False, None)
+        {"live.funding.enter_apr": 0.0375}, t0)[0], \
+        "expand proposal must NEVER release"
+    assert proposal_fade([], {"live.funding.enter_apr": 0.0375}, t0) == (False, None)
+    assert proposal_fade(None, {"live.funding.enter_apr": 0.0375}, t0) == (False, None)
 
     # every candidate's levers are registered, in-bounds, and map to a live twin
     for c in CANDIDATES:

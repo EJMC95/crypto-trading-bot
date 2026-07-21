@@ -1283,18 +1283,29 @@ def main(_ctx=None):
     # down-scale (and the proprioception hurting-revert riding get_lever's
     # central hook) never reached the live Ticket Taker. get_lever carries
     # the whole fail-safe stack: registry clamp [0.5,1.5], TTL expiry,
-    # immune quarantine, hurting-revert, ENACT_LANES kill. Shadow arm
-    # unchanged (its book is the lens-grading instrument).
-    live_scale = 1.0
-    if not dry_run and tuning is not None:
-        try:
-            live_scale = float(tuning.get_lever("live.clip_scale", 1.0))
-        except Exception:  # noqa: BLE001
-            live_scale = 1.0
-    gov = gov * live_scale
-    if gov < 1.0 or live_scale != 1.0:
-        print(f"[ticket-taker] {iso(t_now)} CLIP SCALE — governor x drawdown "
-              f"= x{gov:.2f} (live.clip_scale {live_scale})")
+    # immune quarantine, hurting-revert, ENACT_LANES kill.
+    # [2026-07-21b, same-day verify catch] the lever REPLACES the fleet-risk
+    # drawdown governor on the live arm rather than compounding with it:
+    # CLAUDE.md's contract is explicit — the fleet clip_scale "reaches only
+    # shadow consumers (family/taker); the live bots size off the separate
+    # live.clip_scale lever" — and this arm consuming BOTH would double-
+    # restrict through two organs' opinions of the same drawdown. Shadow
+    # arm keeps the fleet governor unchanged (its book is the lens-grading
+    # instrument).
+    if not dry_run:
+        live_scale = 1.0
+        if tuning is not None:
+            try:
+                live_scale = float(tuning.get_lever("live.clip_scale", 1.0))
+            except Exception:  # noqa: BLE001
+                live_scale = 1.0
+        gov = live_scale
+        if live_scale != 1.0:
+            print(f"[ticket-taker] {iso(t_now)} LIVE CLIP SCALE — "
+                  f"x{live_scale} (live.clip_scale; fleet governor is "
+                  f"shadow-lane per contract)")
+    elif gov < 1.0:
+        print(f"[ticket-taker] {iso(t_now)} DRAWDOWN GOVERNOR — clips x{gov}")
     if long_budget_full:
         print(f"[ticket-taker] {iso(t_now)} FLEET LONG-BUDGET VETO — "
               f"{fr.get('long_positions')}/{fr.get('long_budget')} directional "
