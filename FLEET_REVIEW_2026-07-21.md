@@ -431,6 +431,11 @@ money), or explicitly deferred with a date.
   per-asset-regime build order (18.3). *Recommended: yes.*
 - **D6 (ops, 2 min each): confirm `DASH_PASS` is set on Railway; add the
   custom domain DNS record if wanted; flip nothing else on item 19.**
+  **✅ HALF-SHIPPED same day (operator: "set the DASH_PASS and custom domain
+  next") — CHANGELOG (at):** `dashboard-auth-rotate.yml` rotates DASH_PASS to
+  a run-generated masked secret whose only home is Railway's Variables tab;
+  re-dispatch to rotate any time. The domain half waits on the one fact only
+  the operator holds — the hostname.
 - **D7 (informational): the long-budget saturation (N3)** — no action
   recommended this week; flag if you want the pileup cap designed.
 - **Paper-lane code changes sanctioned by this review** (no operator
