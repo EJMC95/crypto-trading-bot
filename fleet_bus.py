@@ -181,10 +181,15 @@ def long_symbol_blocked(base, current_time=None):
     'advisory' = this function is inert fleet-wide), restrict-only, and
     fail-safe OPEN — stale/missing payload, absent block, cap<=0, or any
     parse error all return False. Rationale measured over 168h: 20 long
-    slots behaving as ~7.7 independent bets, 4-stacks on ETH/LTC/LINK/NEAR
-    in 37.1% of samples — de-pileup frees budget without raising gross.
+    slots behaving as ~7.7 independent bets; true LONG-side 4-stacks in
+    ~8.7% of samples (the first-draft 37.1% was side-blind — corrected same
+    day; see fleet_risk.py) — de-pileup frees budget without raising gross.
     NO consumer is wired by this commit: strategies/bots adopt it when a
-    review sanctions the wiring (the fleet-clock lesson).
+    review sanctions the wiring (the fleet-clock lesson). Review caution,
+    on record from the verify pass: do NOT wire the shadow TAKER to this
+    cap — its book is the lens-grading instrument, and crowding-capped
+    entries would starve the episode floors and skew the live-vs-shadow
+    baselines that steer real money. Family/strategy lanes only.
     """
     try:
         p = _load("fleet-risk", current_time)

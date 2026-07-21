@@ -92,15 +92,25 @@ CANDIDATES = [
     # DOES support (tightening toward the 0.122 friction breakeven) is already
     # running as the re-spec'd 0.075 candidate (see _respec_clamped).
     {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
-    # [2026-07-21 DIAGNOSIS] hold-48 REPLACED by hold-96: the carry twin's
-    # only measured repeated edge is its decay_paid exits (15-0, +$46.21)
-    # whose winners hold a MEDIAN 78.9h — past the Farmer's 72h cap (SOXL
-    # closed 99h, SNDK 88h). hold-48 pointed the opposite way on no
-    # evidence: the Lighter backtest's "hold longer doesn't help" was
-    # measured AT the current exit semantics and gate, while the carry
-    # evidence is about letting accrual outrun round-trip cost. 96.0 is the
-    # registry ceiling on both xp and live lanes; the paired bar unchanged.
-    {"name": "hold-96",         "levers": {"xp.funding.max_hold_h": 96.0}},
+    # [2026-07-21, corrected same day] BOTH hold-cap candidates (hold-48,
+    # and the hold-96 that briefly replaced it) are WITHDRAWN — refuted by
+    # adversarial verify against the fleet's own recorded evidence:
+    #   (1) scripts/backtest_funding_lighter.py §3b: "'hold longer' REFUTED,
+    #       recorded so nobody re-runs it" (72->720h moves funding earned by
+    #       $0.20 and makes P&L WORSE; the cap never binds — max_hold is
+    #       ~5% of exits, median hold 8h). hold-96 re-ran a recorded-refuted
+    #       hypothesis; hold-48 tests the same inert knob the other way.
+    #   (2) The lever is inert where it acts: on the Farmer twin only 2/59
+    #       closes hit max_hold — no cap value can move the paired mean by
+    #       the judge's +0.5pp bar on >=30 closes. A 7-day slot is wasted by
+    #       construction at ANY hold number.
+    #   (3) The +$46.21 decay_paid family that motivated hold-96 belongs to
+    #       the HEDGED carry bot, where the fee-payback EXIT (shipped 07-07,
+    #       FEE_PAYBACK_MARGIN) is the mechanism — an exit-architecture
+    #       question for a future candidate, not a cap number; and on a
+    #       hedged book "close only when paid" records wins by construction.
+    # tp-0.06 stands: take_profit IS the Farmer's measured-positive exit
+    # family (shadow 11-0 +$14.96, live 9-0 +$8.11).
 ]
 XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               "xp.funding.take_profit": "live.funding.take_profit",
@@ -998,7 +1008,7 @@ def _selftest():
     ]}
     pool = candidate_pool(q)
     names = [c["name"] for c in pool]
-    assert names[:2] == ["tp-0.06", "hold-96"], names  # static order
+    assert names[:1] == ["tp-0.06"], names  # static order (holds withdrawn)
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -1010,11 +1020,13 @@ def _selftest():
     # still gets in (dedup must not become a wall).
     q2 = {"candidates": [
         {"name": "xp-take_profit-0.06", "levers": {"xp.funding.take_profit": 0.06}},
-        {"name": "xp-max_hold_h-96", "levers": {"xp.funding.max_hold_h": 96}},  # int vs 96.0
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]}
     n2 = [c["name"] for c in candidate_pool(q2)]
-    assert n2 == ["tp-0.06", "hold-96", "xp-enter_apr-0.0625"], n2
+    assert n2 == ["tp-0.06", "xp-enter_apr-0.0625"], n2
+    # the int-vs-float signature normalisation stays pinned by the direct
+    # _lever_sig asserts below (the hold statics that used to pin it via a
+    # 96-vs-96.0 dedup are withdrawn — see CANDIDATES)
     # two offspring proposing the SAME novel experiment: first wins, no dup slot
     q3 = {"candidates": [
         {"name": "child-a", "levers": {"xp.funding.enter_apr": 0.0625}},
@@ -1026,7 +1038,7 @@ def _selftest():
     assert _lever_sig({"a": "x"}) == (("a", "x"),)      # non-numeric survives
     # next_candidate: skips done + current, name-based (pool may grow)
     assert next_candidate(pool, [], None)["name"] == "tp-0.06"
-    assert next_candidate(pool, ["tp-0.06"], "hold-96")["name"] == "xp-tp-0.05"
+    assert next_candidate(pool, ["tp-0.06"], None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
     # ---- [2026-07-21 D2] re-spec migration: the clamp-inverted candidate ----

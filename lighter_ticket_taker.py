@@ -188,10 +188,11 @@ MOMO_VOL_M = float(os.environ.get("TT_MOMO_VOL_M", "2.0")) # >= $2M/day
 # this hard (percentage points of APR) from the cross-venue median.
 # [2026-07-17] /8 with the fleet basis fix — same decision, true units.
 DIV_GAP_PP = float(os.environ.get("TT_DIV_GAP", "62.5"))
-# [2026-07-21 DIAGNOSIS] divergence was the ONLY conviction bar with no
-# liquidity check (breakout >= $1M, momentum >= $2M, divergence: none) while
-# being the only lens LIVE money fills — 79% of bar-clearing divergence
-# tickets sat on books under $1M/day. SHIPPED DISABLED (0 = off), and the
+# [2026-07-21 DIAGNOSIS; corrected same day] divergence has no liquidity
+# check (breakout >= $1M, momentum >= $2M; dip has none either — the
+# original "ONLY bar without one" claim was wrong) while being the only
+# lens LIVE money fills — 79% of bar-clearing divergence tickets sat on
+# books under $1M/day. SHIPPED DISABLED (0 = off), and the
 # fill-ledger counterfactual (scripts/study_div_vol_floor.py, 37 shadow +
 # 5 live closes, volumes matched at open time 42/42) REJECTS every tested
 # floor {0.25, 0.5, 1.0, 2.0}: none improves both halves — the seductive

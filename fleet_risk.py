@@ -435,15 +435,21 @@ def main():
 
     # [2026-07-21 PER-SYMBOL PILEUP CAP — advisory-first, N3 follow-through]
     # A week of 168h history (n=2,019) showed the 20-slot long budget binding
-    # 41.5% of the time while behaving as only ~7.7 independent bets (1/HHI):
-    # ETH/LTC/LINK/NEAR each stacked 4 same-symbol longs, a >=4 stack existed
-    # in 37.1% of samples. The budget, not the signals, throttles entries —
-    # so the lever is DE-PILEUP, not a bigger budget. Design mirrors the
-    # long-budget veto exactly: this file only PUBLISHES; the only consumer
-    # surface is fleet_bus.long_symbol_blocked(base), which enforces solely
-    # when FLEET_SYMBOL_CAP_MODE=enforce (env default: advisory — zero
-    # behavior change until a review flips it; restrict-only; fail-safe open
-    # on stale/missing payload, same contract as long_entries_blocked).
+    # 41.5% of the time while behaving as only ~7.7 independent bets (1/HHI).
+    # EVIDENCE CORRECTED same day by adversarial verify: the first-draft
+    # "4-stacks in 37.1% of samples" was computed on side-blind hot_pairs —
+    # the Farmer's live SHORTS were being counted into "long pileups" (ETH's
+    # 4th position was a short, i.e. a partial HEDGE, the opposite of pileup
+    # risk). On the honest LONG-side basis a true 4-stack existed in ~8.7%
+    # of samples (~17% of red ones). The cap is therefore future-proofing
+    # against a tail, not a frequent binder — kept because the budget, not
+    # signal, still throttles entries (red 41.5%) and de-pileup beats a
+    # bigger budget when it does bind. Design mirrors the long-budget veto:
+    # this file only PUBLISHES; the only consumer surface is
+    # fleet_bus.long_symbol_blocked(base), enforcing solely when
+    # FLEET_SYMBOL_CAP_MODE=enforce (env default: advisory — zero behavior
+    # change until a review flips it; restrict-only; fail-safe open, same
+    # contract as long_entries_blocked).
     # hot_pairs mixes sides, so the cap counts the LONG side alone from expo.
     SYMBOL_CAP = int(os.environ.get("FLEET_SYMBOL_CAP", "3"))
     long_by_symbol = {}
