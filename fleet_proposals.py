@@ -127,10 +127,16 @@ def propose(proposals, set_by, now_ts=None, ttl_sec=None):
         return None
 
     def _merge(prev):
+        # [2026-07-21, caught by same-day audit] per-LEVER replacement, as
+        # the docstring promises: the first cut dropped ALL of the calling
+        # author's prior proposals (set_by filter), so an organ making two
+        # propose() calls in one cycle silently lost the first. Keys are
+        # '<author>:<lever>', so merged.update(out) replaces exactly the
+        # re-proposed stances; the author's other levers ride to expiry (or
+        # withdraw()).
         merged = {k: v for k, v in ((prev or {}).get("proposals") or {}).items()
                   if isinstance(v, dict) and k not in out
-                  and v.get("set_by") != set_by and _alive(v, now_ts)
-                  and v.get("lever") in tuning.LEVERS}
+                  and _alive(v, now_ts) and v.get("lever") in tuning.LEVERS}
         merged.update(out)
         if len(merged) > MAX_PROPOSALS:              # newest expiry survives
             keep = sorted(merged.items(),
@@ -325,7 +331,8 @@ def _selftest():
         keys = set(p["proposals"])
         assert "me:taker.momo_chg" in keys, keys           # mine written
         assert "other:taker.tp" in keys, keys              # other author kept
-        assert "me:taker.sl" not in keys, keys             # my re-propose replaces my old stance
+        assert "me:taker.sl" in keys, \
+            f"per-LEVER replacement: an un-re-proposed lever survives ({keys})"
         assert p["proposals"]["me:taker.momo_chg"]["value"] == 6.0   # clamped
         # withdraw: my named proposal goes, the other author's survives
         store.load_state = lambda k: dict(p)

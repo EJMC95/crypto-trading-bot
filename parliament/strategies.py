@@ -160,16 +160,34 @@ class PMBot:
         self.halted_today = False
         self._restored = False
         self.last_skip = ""                        # observability: why no trade
+        self.fund_realized = 0.0                   # funding accrued, book-life
+        self._fund_ts = None                       # last accrual timestamp
 
     # -- durable state --------------------------------------------------------
     def restore(self) -> None:
-        self._restored = True
+        """[2026-07-21 AUDIT FIX] read-FAILED is not fresh-book: the old
+        load_state read collapsed the two (the exact trap its own docstring
+        warns about — the 17-Jul perp-sniper incident), so a transient
+        Postgres blip on first cycle started a fresh $1000 book and the
+        unconditional save() then OVERWROTE the durable equity curve.
+        load_state_checked distinguishes them; on a failed read we stay
+        un-restored (save() refuses until a clean read) and retry next
+        cycle."""
         if store is None or self.broker is None:
+            self._restored = True
             return
         try:
-            st = store.load_state(self.bot_id)
+            if hasattr(store, "load_state_checked"):
+                ok, st = store.load_state_checked(self.bot_id)
+            else:
+                ok, st = True, store.load_state(self.bot_id)
         except Exception:  # noqa: BLE001
-            st = None
+            ok, st = False, None
+        if not ok:
+            log.warning("%s state read FAILED — not seeding a fresh book "
+                        "over a blip; retrying next cycle", self.bot_id)
+            return
+        self._restored = True
         if not st:
             return
         try:
@@ -181,6 +199,7 @@ class PMBot:
                               (st.get("open_meta") or {}).items()}
             self.day = st.get("day") or self.day
             self.day_anchor = float(st.get("day_anchor", 0.0))
+            self.fund_realized = float(st.get("fund_realized", 0.0))
             log.info("%s restored: eq=%.2f open=%d closed=%d",
                      self.bot_id, self.broker.equity(), len(self.broker.pos),
                      self.wins + self.losses)
@@ -190,12 +209,15 @@ class PMBot:
     def save(self) -> None:
         if store is None or self.broker is None:
             return
+        if not self._restored:
+            return      # never overwrite durable state we could not read
         try:
             store.save_state(self.bot_id, {
                 "broker": self.broker.to_state(),
                 "wins": self.wins, "losses": self.losses,
                 "open_meta": self.open_meta,
                 "day": self.day, "day_anchor": self.day_anchor,
+                "fund_realized": round(self.fund_realized, 6),
             })
         except Exception:  # noqa: BLE001
             pass
@@ -303,8 +325,13 @@ class PMBot:
                     continue
             elif self.strategy == "funding":
                 st = self.data.stats(sym) or {}
-                # sanity: don't hold against a >2%/day trend just for carry
-                if abs(st.get("chg") or 0.0) > 0.10:
+                # sanity: don't hold against a >2%/day trend just for carry.
+                # [2026-07-21 AUDIT FIX] `chg` is the venue's daily change in
+                # PERCENT units (the scout's dip lens reads -8.0..-1.0 on the
+                # same field) — the original 0.10 bar therefore vetoed any
+                # book moving more than 0.1%/day, i.e. essentially all of
+                # them, and starved the Funding Diplomat at birth.
+                if abs(st.get("chg") or 0.0) > 2.0:
                     continue
             out.append((sym, direction, sig))
         return out
@@ -325,11 +352,17 @@ class PMBot:
                 stake_mult = 0.6            # tepid conviction -> smaller clip
         tag = f"{'long' if direction > 0 else 'short'}-{self.lens}"
         if fleet_bus is not None:
-            try:  # the fleet brain's reduce-only per-(bot, tag) multiplier
+            try:  # the fleet brain's TWO-WAY per-(bot, tag) multiplier
                 stake_mult *= fleet_bus.stake_multiplier(self.bot_id, tag)
             except Exception:  # noqa: BLE001
                 pass
-        usd = ORDER_USD * max(0.3, min(1.0, stake_mult))
+        # [2026-07-21 AUDIT FIX, same day as BRAIN WIDENS] the ceiling was
+        # min(1.0), which silently truncated the brain's new 1.25x/1.5x
+        # expand mults in all six PM books on the very day the operator
+        # mandated the widening. Cap at the bus's own documented consumer
+        # ceiling (1.5 — fleet_bus.MULT_CEIL), floor unchanged.
+        _ceil = getattr(fleet_bus, "MULT_CEIL", 1.5) if fleet_bus else 1.5
+        usd = ORDER_USD * max(0.3, min(_ceil, stake_mult))
         px = self._fill_px(sym, direction > 0)
         if px is None:
             return False
@@ -362,9 +395,22 @@ class PMBot:
     def _exit_reason(self, sym: str, meta: dict) -> str | None:
         st = self.data.stats(sym)
         if not st:
+            # [2026-07-21 AUDIT FIX] a sym that leaves the market map
+            # (delisting / rename / inactive) used to return None HERE,
+            # above every exit check — tp/sl/hold/conv/fade/flip all
+            # unreachable, so the position sat as a zombie holding a
+            # MAX_OPEN slot forever (the Trail-Blazer zombie class,
+            # DELIST_GIVEUP_H elsewhere in the fleet). The deadline is
+            # data-free, so it stays reachable; past it, close as 'hold'
+            # (the broker exits at its last mark — the only price a
+            # delisted book has).
+            if time.time() >= meta["deadline"]:
+                return "hold"
             return None
         px = st["last"] or st["mark"]
         if px <= 0:
+            if time.time() >= meta["deadline"]:
+                return "hold"
             return None
         direction = 1 if meta["tag"].startswith("long") else -1
         if (px - meta["tp"]) * direction >= 0:
@@ -394,6 +440,11 @@ class PMBot:
         if px is None:
             px = self.broker.marks.get(sym, meta["entry_px"])
         pnl = self.broker.close(sym, px)
+        # [2026-07-21] grade price + carry together: broker equity already
+        # carries fund_acc (accrued into realized as it happened) — the
+        # RECORDED pnl adds it once here so the ledger/DB/win-loss call sees
+        # the trade the way the book experienced it.
+        pnl += float(meta.get("fund_acc") or 0.0)
         if pnl > 0:
             self.wins += 1
         else:
@@ -448,11 +499,46 @@ class PMBot:
                 extra={"mode": "lighter_shadow", "strategy": self.strategy,
                        "label": PM_BOTS[self.base][0],
                        "params": {k: round(v, 4) for k, v in self.params.items()},
+                       "fund_realized": round(self.fund_realized, 2),
                        "last_skip": self.last_skip})
         except Exception:  # noqa: BLE001
             pass
 
     # -- one cycle ------------------------------------------------------------
+    def _accrue_funding(self) -> None:
+        """[2026-07-21 AUDIT FIX] Shadow books never accrued funding — the
+        Funding Diplomat's ENTIRE edge (received carry) and every book's
+        funding drag were invisible to their own P&L, and therefore to the
+        ML labels, Howard's grading, and the tuners' replays. Accrue
+        per-cycle at the venue's TRUE apr (data.parse_funding, percent):
+        positive apr = longs pay shorts (the Farmer's own convention —
+        'short_perp if rate > 0' receives). Books equity through
+        broker.realized as it accrues; per-position attribution rides
+        open_meta['fund_acc'] so _close can grade price+carry together.
+        dt capped at 2h so a restart gap never backfills unbounded."""
+        now = time.time()
+        dt_h = (min(2.0, max(0.0, (now - self._fund_ts) / 3600.0))
+                if self._fund_ts else 0.0)
+        self._fund_ts = now
+        if not dt_h or self.broker is None:
+            return
+        fund = getattr(self.data, "funding", None) or {}
+        for sym, (size, entry) in list(self.broker.pos.items()):
+            apr_pct = fund.get(sym)
+            if apr_pct is None:
+                continue
+            mark = self.broker.marks.get(sym) or entry
+            notional = abs(size) * mark
+            recv = -1.0 if size > 0 else 1.0        # longs pay positive apr
+            acc = recv * (float(apr_pct) / 100.0) / 8760.0 * notional * dt_h
+            if not acc:
+                continue
+            self.broker.realized += acc
+            self.fund_realized += acc
+            meta = self.open_meta.get(sym)
+            if meta is not None:
+                meta["fund_acc"] = float(meta.get("fund_acc") or 0.0) + acc
+
     async def cycle(self, effective_params=None) -> None:
         if not self._restored:
             self.restore()
@@ -461,6 +547,12 @@ class PMBot:
         await self._ingest()
         if self.broker is None:
             return
+        # [2026-07-21 AUDIT FIX] the day used to roll only inside
+        # _entry_blocked (i.e. only when candidates existed), so a quiet
+        # book published multi-day P&L as "daily" across UTC midnights.
+        # Roll unconditionally, every cycle.
+        self._day_roll()
+        self._accrue_funding()
         # mark + exits first — risk comes off before it goes on
         for sym in list(self.broker.pos):
             st = self.data.stats(sym)
@@ -482,11 +574,37 @@ class PMBot:
         st = self.data.stats(sym)
         px = (st["last"] or st["mark"]) if st else None
         if px:
+            side_long = self.broker.pos.get(sym, (0.0, 0.0))[0] > 0
             pnl = self.broker.close(sym, px)
             self.losses += 1 if pnl <= 0 else 0
             self.wins += 1 if pnl > 0 else 0
             log.warning("%s flattened meta-less position %s (pnl %+.2f)",
                         self.bot_id, sym, pnl)
+            # [2026-07-21 AUDIT FIX] this defensive flatten counted into
+            # wins/losses but wrote NO ledger row — the dashboard's closed
+            # count drifted permanently ahead of the durable ledger and the
+            # brain never saw the close. Record it under its own honest tag.
+            now = time.time()
+            side = "long" if side_long else "short"
+            if self.db is not None:
+                try:
+                    self.db.record_trade(
+                        f"{self.bot_id}-{sym}-naked-{int(now)}", self.base,
+                        "parliament", sym, side, side, 0.0, now, px, px,
+                        0.0, pnl, "naked_flatten", None)
+                except Exception:  # noqa: BLE001
+                    pass
+            if store is not None:
+                try:
+                    store.publish_paper_trade(
+                        self.bot_id, f"{self.bot_id}-{sym}-naked-{int(now)}",
+                        round(pnl, 4), pair=f"{sym}/USD",
+                        closed_at=datetime.fromtimestamp(
+                            now, tz=timezone.utc).isoformat(),
+                        reason=f"{side}_naked_flatten", venue="lighter",
+                        shadow=True)
+                except Exception:  # noqa: BLE001
+                    pass
 
     async def run_forever(self, interval: float = 60.0, beat=None,
                           params_fn=None):

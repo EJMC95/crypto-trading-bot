@@ -445,22 +445,35 @@ def run_once():
 
     # [2026-07-21 ORGAN PROPOSALS] a SUSTAINED slip is this organ's measured
     # case that live execution is not delivering the promoted edge — forward
-    # it as a RESTRICT proposal on the promoted funding gate. The judge (the
-    # only writer of live.funding.*) consumes it as an early-release signal
-    # (proposal_fade); this organ never touches a lever. Re-asserted while
-    # the slip sustains; expires on its own when it clears. Fail-soft: a
-    # dark channel drops the proposal, never the measurement.
+    # it as RESTRICT proposals on EVERY promotable live.funding.* lever (the
+    # judge's proposal_fade matches the promoted lever exactly, and this
+    # organ measures EXECUTION, not one knob — a tp-0.06 promotion must be
+    # releasable on the same slip evidence as an enter_apr one; caught by
+    # same-day audit: the single-lever v1 could not fade the only queued
+    # candidate). The judge (the only writer of live.funding.*) consumes it
+    # as an early-release signal; this organ never touches a lever.
+    # Re-asserted while the slip sustains; expires on its own when it
+    # clears. Fail-soft: a dark channel drops the proposal, never the
+    # measurement.
     if streak >= SUSTAIN and fprop is not None:
         try:
-            fprop.propose({"live.funding.enter_apr": {
-                "value": 0.0625, "direction": "restrict",
-                "reason": f"live slipping {rep['gap_pp']}pp/trade for "
-                          f"{streak} cycles",
-                "evidence": f"{rep['paired_closes']} paired closes over "
-                            f"{rep['n_overlap']} coins; entry-slip "
-                            f"{rep['entry_slip_bps']}bps exit-slip "
-                            f"{rep['exit_slip_bps']}bps",
-                "ttl_sec": 5400}}, set_by="impl-shortfall", now_ts=now)
+            _why = (f"live slipping {rep['gap_pp']}pp/trade for "
+                    f"{streak} cycles")
+            _ev = (f"{rep['paired_closes']} paired closes over "
+                   f"{rep['n_overlap']} coins; entry-slip "
+                   f"{rep['entry_slip_bps']}bps exit-slip "
+                   f"{rep['exit_slip_bps']}bps")
+            fprop.propose({
+                "live.funding.enter_apr": {
+                    "value": 0.0625, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+                "live.funding.take_profit": {
+                    "value": 0.03, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+                "live.funding.max_hold_h": {
+                    "value": 24.0, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+            }, set_by="impl-shortfall", now_ts=now)
         except Exception:      # noqa: BLE001
             pass
 

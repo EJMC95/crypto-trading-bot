@@ -100,7 +100,13 @@ MULT_SOFT_N = 15      # era trades before a 0.75x may publish
 # dedicated switch stands down just the widening while reductions keep
 # working. Consumers clamp at fleet_bus.MULT_CEIL (1.5) and only SHADOW
 # books read mults — no live bot consumes them.
-MULT_EXPAND = os.environ.get("BRAIN_MULT_EXPAND", "on").lower() != "off"
+# [2026-07-21 AUDIT FIX] accept the full stand-down synonym set (+strip):
+# the original `!= "off"` meant BRAIN_MULT_EXPAND=false / 0 / no / disabled
+# / 'off ' all silently LEFT EXPANSION ARMED — a kill switch that only
+# worked for one exact string (the PARLIAMENT_ENABLED / BRAIN_MULT_ENGINE
+# typo class).
+MULT_EXPAND = os.environ.get("BRAIN_MULT_EXPAND", "on").strip().lower() \
+    not in ("off", "0", "false", "no", "disabled")
 MULT_KEY = "brain-stake-mults"
 MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
 
@@ -973,6 +979,16 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
             key = f"{bot}|{tag}"
             seen.add(key)
             e = streaks.setdefault(key, {"streak": 0, "first_run": run_no})
+            # [2026-07-21 AUDIT FIX] the streak is DIRECTION-SCOPED: one
+            # counter per (bot,tag) meant 3 reduce-qualifying runs followed
+            # by an expand qualification published the 1.25x on its FIRST
+            # qualifying run — the exact opposite of (bh)'s "identical 3-run
+            # streak gate" for the widening. A direction flip restarts the
+            # count; severity moves within a direction keep it.
+            dirn = "expand" if mult > 1.0 else "reduce"
+            if e.get("dirn") != dirn:
+                e["streak"] = 0
+                e["dirn"] = dirn
             e["streak"] += 1
             e["last_run"] = run_no
             e.update({"mult": mult, "n": n, "wr": round(wr * 100, 1),
@@ -1006,8 +1022,16 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
     return dict(published), vitals
 
 
-def _publish_stake_mults(published):
-    """Write the multiplier payload to bot_state (+history) — guarded."""
+def _publish_stake_mults(published, effective_engine=None):
+    """Write the multiplier payload to bot_state (+history) — guarded.
+
+    [2026-07-21 AUDIT FIX] engine/mode are stamped from the engine the run
+    ACTUALLY USED (compute_stake_mults downgrades to v2 at runtime when
+    brain_stats is unimportable or the era-trades fetch fails), not the
+    module constants — a degraded run used to publish engine=v3/mode=two-way
+    while computing on v2 rules, an honest-label lie on the exact field the
+    immune organ's engine-mismatch detector reads."""
+    eng = effective_engine or MULT_ENGINE
     try:
         import bot_pnl_store as store
         payload = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -1015,10 +1039,10 @@ def _publish_stake_mults(published):
                    # [2026-07-21] two-way when the expand side is armed (v3 +
                    # BRAIN_MULT_EXPAND) — the mode string is the honest label
                    # consumers and dashboards read, not a behavior switch.
-                   "mode": ("two-way" if (MULT_EXPAND and MULT_ENGINE == "v3")
+                   "mode": ("two-way" if (MULT_EXPAND and eng == "v3")
                             else "reduce-only"),
                    "min_n": MULT_MIN_N, "promote_runs": PROMOTE_RUNS,
-                   "engine": MULT_ENGINE, "half_life_days": HALF_LIFE_DAYS,
+                   "engine": eng, "half_life_days": HALF_LIFE_DAYS,
                    "mults": published}
         ok = store.save_state(MULT_KEY, payload)
         try:
@@ -1254,6 +1278,22 @@ def main():
     hstate = state.setdefault("hypotheses", {})
     for h in all_hyps:
         e = hstate.setdefault(h["key"], {"first_run": run_no, "seen": 0, "status": "candidate"})
+        # [2026-07-21 AUDIT FIX x2, promotion semantics tightened now that
+        # ACTIONABLE findings ACT (the (bc) regime_gate):
+        #   RESURRECT — a retired pattern that REAPPEARS starts a fresh
+        #   candidacy (seen=0, new first_run) instead of staying dead
+        #   forever: one fade cycle used to permanently disarm the actuator
+        #   for that finding, because 'retired' was terminal.
+        #   CONSECUTIVE — a candidate's persistence count restarts after a
+        #   missed run: seen accumulated across gaps (seen on runs 1,3,5
+        #   promoted), so the gate was weaker than the streak gate it
+        #   mirrors. ACTIONABLE entries keep retirement as their fade path.
+        if e.get("status") == "retired":
+            e.update({"status": "candidate", "seen": 0, "first_run": run_no})
+        elif (e.get("status") == "candidate"
+              and e.get("last_run") is not None
+              and run_no - e["last_run"] > 1):
+            e["seen"] = 0
         e["seen"] += 1
         e["last_run"] = run_no
         e["evidence"] = h["evidence"]
@@ -1277,7 +1317,8 @@ def main():
     alive_trades = {b: era_trades[b] for b in alive_cards if b in era_trades}
     published_mults, mult_vitals = compute_stake_mults(
         alive_cards, state, run_no, era_trades=alive_trades, now_ts=now_ts)
-    mults_saved = _publish_stake_mults(published_mults)
+    mults_saved = _publish_stake_mults(published_mults,
+                                       effective_engine=mult_vitals.get("engine"))
 
     # [2026-07-16 v3 REGIME SPLITS] Per-(bot, tag) win/pnl conditioned on the
     # oracle regime at entry — the evidence that decides whether a tag is

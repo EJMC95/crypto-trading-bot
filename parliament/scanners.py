@@ -34,7 +34,13 @@ import time
 
 log = logging.getLogger("parliament.scanners")
 
-COOLDOWN_SEC = float(os.environ.get("PARL_SIGNAL_COOLDOWN_SEC", "900"))
+# [2026-07-21 AUDIT FIX] 600, was 900: cooldown == the consumers' 900s
+# signal TTL created periodic BLIND windows for persisting conditions — a
+# signal emitted at t was cooldown-suppressed until t+900 while its TTL also
+# lapsed at t+900, so consumers (including pm-turnbull's expanding-vol VETO)
+# saw no fresh signal until the next scan pass. Re-emission now lands before
+# the previous signal expires.
+COOLDOWN_SEC = float(os.environ.get("PARL_SIGNAL_COOLDOWN_SEC", "600"))
 FUNDING_BAR_APR = float(os.environ.get("PARL_FUNDING_BAR_APR", "20"))
 DISLOC_BAR_BPS = float(os.environ.get("PARL_DISLOC_BAR_BPS", "25"))
 IMB_BAR = float(os.environ.get("PARL_IMB_BAR", "0.35"))

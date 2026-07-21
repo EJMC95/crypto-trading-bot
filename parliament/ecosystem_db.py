@@ -88,8 +88,24 @@ class EcosystemDB:
                         "(state will not survive restart)", self.path, e)
             self.path = ":memory:"
             self._conn = sqlite3.connect(self.path, check_same_thread=False)
-        with self._lock, self._conn:
-            self._conn.executescript(_SCHEMA)
+        # [2026-07-21 AUDIT FIX] schema creation joins the fallback: a
+        # CONNECTABLE-but-broken file (corrupt db, full persist volume, WAL
+        # lock from a not-yet-dead predecessor) passed the connect guard and
+        # then crashed here, sending build_chamber into run_all's 30s
+        # relaunch loop — the crash-loop class the idle guard exists for.
+        try:
+            with self._lock, self._conn:
+                self._conn.executescript(_SCHEMA)
+        except Exception as e:  # noqa: BLE001
+            if self.path != ":memory:":
+                log.warning("ecosystem DB schema failed at %s (%s) — "
+                            "running in-memory", self.path, e)
+                self.path = ":memory:"
+                self._conn = sqlite3.connect(self.path, check_same_thread=False)
+                with self._lock, self._conn:
+                    self._conn.executescript(_SCHEMA)
+            else:
+                raise
 
     # -- generic helpers ------------------------------------------------------
     def _exec(self, sql: str, args: tuple = ()) -> None:

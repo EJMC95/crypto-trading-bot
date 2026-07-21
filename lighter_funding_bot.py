@@ -896,11 +896,20 @@ def main():
             _last_moved = sorted(_moved)
         now = datetime.now(timezone.utc)
         if now.date() != cur_day:
-            cur_day, halted_today = now.date(), False
+            # [2026-07-21 AUDIT FIX] roll the day ONLY on a successful
+            # baseline read. The old order stamped cur_day first, so a failed
+            # account_value() left YESTERDAY's day_start_equity filed under
+            # today — and the D3 restart-durable restore then trusted that
+            # stale baseline across restarts (pre-D3 a restart re-read fresh
+            # boot equity; D3 made the corruption durable). Failing the read
+            # keeps yesterday's stamp so the roll retries next loop;
+            # halted_today stays conservative until the roll lands.
             try:
                 day_start_equity = account_value()
+                cur_day, halted_today = now.date(), False
             except Exception:
-                pass
+                log.warning("day-roll equity read failed — keeping the %s "
+                            "baseline; retrying next loop", cur_day)
 
         # kill switch (live) — flatten every held coin and halt on arm.
         if not dry_run and ctx.rails.kill_check():

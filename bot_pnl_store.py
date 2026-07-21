@@ -980,9 +980,16 @@ def fetch_paper_trades(limit=2000):
             # (the brain now refuses to price a Lighter close off any other
             # book). Additive, like the 16-Jul `extra` fix above: every other
             # consumer ignores unknown keys.
+            # [2026-07-21 AUDIT FIX] `tag` joins the SELECT: the (bb) "brain
+            # jurisdiction over the Farmer" change stamps tag on every
+            # Farmer close, but this fetch — the brain's ONLY paper-ledger
+            # ingest — never selected the column, so the stamped tag reached
+            # no consumer and the jurisdiction was a silent no-op (the same
+            # written-but-never-SELECTed class as the 17-Jul entry_price/
+            # exit_price fix directly above). Additive as ever.
             cur.execute(
                 "SELECT bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, "
-                "reason, extra, venue, entry_price, exit_price "
+                "reason, extra, venue, entry_price, exit_price, tag "
                 "FROM paper_trades WHERE side IS DISTINCT FROM 'skip' "
                 "ORDER BY closed_at DESC NULLS LAST LIMIT %s",
                 (int(limit),),
@@ -991,8 +998,16 @@ def fetch_paper_trades(limit=2000):
         from datetime import datetime
         out = []
         for (bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason,
-             extra, venue, entry_price, exit_price) in rows:
+             extra, venue, entry_price, exit_price, tag) in rows:
             direction, exit_reason = split_reason(reason)
+            # a stored tag is richer than the reason prefix ('long-funding'
+            # beats 'long'); split_reason strips any '_exit' suffix a
+            # publisher folded in (the Parliament stamps tag=full_tag), so
+            # the bucket key is always entry-side only. Reason-derived
+            # direction stays the fallback for pre-stamp rows.
+            if tag:
+                _tdir, _ = split_reason(tag)
+                direction = _tdir or direction
             # [2026-07-15 AUDIT FIX] tolerant timestamp parse — the listing
             # sniper writes '2026-07-13 15:05:04 UTC', which fromisoformat
             # rejects, so its 337 rows carried duration_min=None forever.

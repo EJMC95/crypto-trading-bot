@@ -459,9 +459,15 @@ def main():
     symbol_cap = {
         "cap": SYMBOL_CAP,
         "mode": os.environ.get("FLEET_SYMBOL_CAP_MODE", "advisory"),
+        # [2026-07-21 AUDIT FIX] publish every count that could BIND at this
+        # cap (was a flat `v >= 2` noise filter): with FLEET_SYMBOL_CAP=1 a
+        # symbol holding exactly 1 long was absent from the payload, so
+        # long_symbol_blocked read held=0 < 1 and admitted the SECOND long —
+        # the cap under-enforced by exactly one position at its tightest
+        # setting. `min(2, cap)` keeps the noise filter at cap>=2.
         "long_by_symbol": {k: v for k, v in sorted(long_by_symbol.items(),
                                                    key=lambda kv: -kv[1])
-                           if v >= 2},
+                           if v >= min(2, SYMBOL_CAP)},
         "at_cap": sorted(b for b, c in long_by_symbol.items()
                          if SYMBOL_CAP > 0 and c >= SYMBOL_CAP),
     } if SYMBOL_CAP > 0 else {"cap": 0, "mode": "disabled",

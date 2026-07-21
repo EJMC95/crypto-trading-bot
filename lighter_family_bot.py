@@ -98,11 +98,12 @@ def ledger_reason(tag, exit_reason):
 
 
 def brain_stake_mult(bot_id, tag):
-    """The brain's reduce-only per-(bot, tag) stake multiplier for an entry,
-    looked up under EXACTLY the identity this book's ledger rows carry
-    (bot_id row name + ledger_tag). fleet_bus owns the fail-safe contract
-    (fresh payload only, clamp [0.5, 1.0], neutral 1.0 on any doubt); the
-    guard here only covers an image built without fleet_bus.py."""
+    """The brain's TWO-WAY per-(bot, tag) stake multiplier for an entry
+    (reduce-only until 21-Jul), looked up under EXACTLY the identity this
+    book's ledger rows carry (bot_id row name + ledger_tag). fleet_bus owns
+    the fail-safe contract (fresh payload only, clamp [0.5, 1.5], neutral
+    1.0 on any doubt); the guard here only covers an image built without
+    fleet_bus.py."""
     try:
         import fleet_bus
         return float(fleet_bus.stake_multiplier(bot_id, ledger_tag(tag)))

@@ -112,6 +112,12 @@ SELFTEST_EXCLUDE = {
     # in its header: NO exit change (magnitude bar is a no-op on the real
     # episodes, 8h grace is deferral), the queued follow-up is the ENTRY gate.
     "scripts/study_carry_flip_grace_lighter.py",
+    # [2026-07-21] carry entry-gate sweep (the flip study's queued follow-up):
+    # --selftest offline-green; full run pages the venue's funding API.
+    # Verdict in its header: shipped 5%-TRUE gate = -$93/150d structural
+    # bleed; 0.20 TRUE passes both halves — ENACTED as CARRY_ENTER_APR
+    # default 1.60. Re-run with --refresh, never re-argue from prose.
+    "scripts/backtest_carry_gate_lighter.py",
     # Their selfcheck() blocks run INSIDE `parliament_main --selftest` (which
     # IS registered above) — the marker hit here is the docstring saying so.
     "parliament/bus.py",

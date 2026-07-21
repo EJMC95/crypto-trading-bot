@@ -1275,8 +1275,26 @@ def main(_ctx=None):
                 long_budget_full = True
     except (ValueError, TypeError):
         gov = 1.0
-    if gov < 1.0:
-        print(f"[ticket-taker] {iso(t_now)} DRAWDOWN GOVERNOR — clips x{gov}")
+    # [2026-07-21 AUDIT FIX] the LIVE arm now honors live.clip_scale — the
+    # board's ONLY live restrict lever. CLAUDE.md's live-lane contract
+    # ("covers ... both live bots' clip") was half-true: the Funding Farmer
+    # reads it via VenueContext.order_usd, but this bot builds LighterClient
+    # directly and sized off TT_CLIP_* alone, so the board's real-money
+    # down-scale (and the proprioception hurting-revert riding get_lever's
+    # central hook) never reached the live Ticket Taker. get_lever carries
+    # the whole fail-safe stack: registry clamp [0.5,1.5], TTL expiry,
+    # immune quarantine, hurting-revert, ENACT_LANES kill. Shadow arm
+    # unchanged (its book is the lens-grading instrument).
+    live_scale = 1.0
+    if not dry_run and tuning is not None:
+        try:
+            live_scale = float(tuning.get_lever("live.clip_scale", 1.0))
+        except Exception:  # noqa: BLE001
+            live_scale = 1.0
+    gov = gov * live_scale
+    if gov < 1.0 or live_scale != 1.0:
+        print(f"[ticket-taker] {iso(t_now)} CLIP SCALE — governor x drawdown "
+              f"= x{gov:.2f} (live.clip_scale {live_scale})")
     if long_budget_full:
         print(f"[ticket-taker] {iso(t_now)} FLEET LONG-BUDGET VETO — "
               f"{fr.get('long_positions')}/{fr.get('long_budget')} directional "
@@ -1440,6 +1458,13 @@ def main(_ctx=None):
             equity = account_value()
         except Exception:  # noqa: BLE001
             pass
+        # [2026-07-21 AUDIT FIX] fold AGAIN before persisting: the guard can
+        # record a capital move on the two LATER same-cycle reads (the rails'
+        # confirm_daily_loss re-read and the line above) — a run-once process
+        # that only folded at loop-top exited with those moves un-persisted,
+        # so the next run's fresh guard had lost them and the P&L baseline
+        # silently absorbed the operator's deposit as "trading profit".
+        _fold_capital_moves()
         if live_baseline is None and equity is not None:
             live_baseline = equity
         # [2026-07-21 D1] capital-adjusted: deposits are the operator's money

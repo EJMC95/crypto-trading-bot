@@ -57,7 +57,15 @@ MIN_DAY_VOLUME = 2e6      # only coins with >= $2M 24h notional volume [2026-07-
 # HYPERLIQUID basis (hourly rate * 24 * 365) and are NOT the numbers either arm
 # compares against — `_basis()` below rescales them per venue. Hyperliquid's
 # baseline funding is ~0.0000125/h ~= 11%/yr; we want clearly-hot funding.
-ENTER_APR = 0.40          # open when |annualized funding| >= 40% [2026-07-06 raised from 20% to avoid fee bleed on fast-decaying rates]
+# [2026-07-21 ENTRY GATE, measured on Lighter's OWN 150d tape —
+# scripts/backtest_carry_gate_lighter.py] The 0.40 bar (5% TRUE on Lighter)
+# was STRUCTURAL BLEED: -$93.31/150d, 20% win rate, and the week's *_flip
+# closes ran 0W/23 — at 5% TRUE, the 29bps round trip needs 508h of accrual
+# vs the 336h MAX_HOLD, so an entry AT the bar cannot pay for itself. The
+# sweep was monotone and only 1.60 (20% TRUE) beat shipped on the full
+# window AND both halves (+$55.93; h1 +17.48 / h2 +34.00). Env-tunable so
+# the operator (or a future judge lane) can move it without a deploy.
+ENTER_APR = float(os.environ.get("CARRY_ENTER_APR", "1.60"))  # 20% TRUE on Lighter [2026-07-06: 0.20->0.40; 2026-07-21: 0.40->1.60 per the gate sweep]
 EXIT_APR = 0.15           # close when it decays below 15% [2026-07-06 raised from 8% to exit before fees eat accrual]
 MAX_HOLD_H = 14 * 24      # recycle capital after 2 weeks [2026-07-06 extended from 7d to let high-rate carries compound]
 # [2026-07-16 ZOMBIE GUARD] close a carry whose coin has been continuously
@@ -605,11 +613,19 @@ def _selftest_basis():
     assert H_hl == HOURS_PER_YEAR, H_hl
     assert en_hl == ENTER_APR and ex_hl == EXIT_APR, (en_hl, ex_hl)
 
-    # 2) the LIGHTER arm is exactly 1/8 — and 8.0 is the defect's own signature
+    # 2) the LIGHTER arm is exactly 1/8 — and 8.0 is the defect's own signature.
+    #    [2026-07-21] entry pin re-aimed at the NEW contract: ENTER_APR/8 with
+    #    the default 1.60 -> 0.20 TRUE (the gate-sweep verdict, see the
+    #    constant). The RATIO is the invariant this proof defends, so the pin
+    #    tracks ENTER_APR rather than a literal — a dropped `* _scale` still
+    #    fails it at any default.
     H_lt, en_lt, ex_lt = _bars("lighter_shadow")
     assert H_lt == 3 * 365, H_lt
     assert HOURS_PER_YEAR / H_lt == 8.0, "the 8x is exactly 8760/1095"
-    assert en_lt == 0.05 and ex_lt == 0.01875, (en_lt, ex_lt)
+    assert abs(en_lt - ENTER_APR / 8.0) < 1e-12 and ex_lt == 0.01875, \
+        (en_lt, ex_lt)
+    assert abs(en_lt - 0.20) < 1e-12, \
+        "shipped default: 1.60 published = 20% TRUE (backtest_carry_gate_lighter)"
 
     # 3) THE PROOF: every gate decides IDENTICALLY on both arms, for every rate.
     #    Uses _bars() — the SAME call main() makes — so dropping the rescale at

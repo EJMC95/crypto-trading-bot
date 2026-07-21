@@ -25,10 +25,11 @@ from datetime import datetime, timedelta, timezone
 CACHE_SEC = 300
 _cache = {}   # key -> {"ts": datetime, "payload": dict|None}
 
-# Reduce-only guardrails for the brain's L4 stake multipliers: whatever the
-# brain publishes, a strategy will never size below half stake and never
-# above full stake. Boosting (>1.0x) must earn its way in with more ledger
-# evidence — see bot_learn.py MULT rules.
+# TWO-WAY guardrails for the brain's L4 stake multipliers (reduce-only
+# until 21-Jul): whatever the brain publishes, a strategy sizes inside
+# [0.5, 1.5] — reductions as before, boosts only on the v3 mirror bars
+# (Wilson LOWER bound + t, full n floor, 3-run streak — bot_learn/
+# brain_stats EXP_*). Neutral 1.0 on any doubt.
 MULT_FLOOR = 0.5
 # [2026-07-21 TWO-WAY MULTS — operator: "brain needs to be able to widen
 # too"] Ceiling raised 1.0 -> 1.5: the brain may now publish EXPAND mults
