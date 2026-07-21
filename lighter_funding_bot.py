@@ -576,6 +576,14 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_l
             pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
             reason=("long_" if was_long else "short_") + reason,
             venue=venue, shadow=shadow,
+            # [2026-07-21 BRAIN JURISDICTION] entry-side tag: every close row
+            # carried tag=null, so the brain's per-(bot, enter_tag) buckets
+            # had nothing to key on — it structurally COULD NOT form a
+            # reduce-only opinion on the fleet's largest real-money book even
+            # if it turned bad. `<side>-funding` matches the taker's
+            # `<side>-<lens>` convention the brain already parses. Reporting
+            # field only: no entry/exit decision reads it.
+            tag=("long-funding" if was_long else "short-funding"),
             # [2026-07-15] record fill prices + side so the implementation-
             # shortfall tracker can attribute the live-vs-shadow gap to the
             # ENTRY vs EXIT side (live = real fills, shadow = mark fills).

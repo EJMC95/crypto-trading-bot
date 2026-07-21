@@ -2614,8 +2614,12 @@ def fetch_flow_vitals():
                                 "WHERE ts > now() - interval '24 hours'")
                     out["equity_samples_24h"] = int(cur.fetchone()[0])
                 if vo:
+                    # [2026-07-21] the column is `at` (bot_pnl_store.py:1333);
+                    # `seen_at` raised here on every call since the counter
+                    # shipped, so venue_orders_24h silently never rendered —
+                    # the fill-telemetry heartbeat the 28-Jul D4 read needs.
                     cur.execute("SELECT COUNT(*) FROM venue_orders "
-                                "WHERE seen_at > now() - interval '24 hours'")
+                                "WHERE at > now() - interval '24 hours'")
                     out["venue_orders_24h"] = int(cur.fetchone()[0])
         finally:
             conn.close()
@@ -4160,13 +4164,22 @@ class H(BaseHTTPRequestHandler):
                         # (books/ML/tuners/health) + active tuner levers must
                         # be reachable off-Railway like every other organ —
                         # "verify a module by its OWN published output".
+                        # [2026-07-21 D4 unblock] impl-shortfall added: the
+                        # order_slip block (per-fill decision-vs-fill bps from
+                        # venue_orders) is THE deciding number for the 28-Jul
+                        # Funding Farmer call, and it had no no-auth surface —
+                        # DB/dashboard-login gated from every review seat.
+                        # xp-judge + scout-tuner added on the same rule: the
+                        # promotion pipeline's phase and the growth rail's
+                        # active levers were only inferable, not readable.
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
                             "'learning-brain', 'brain-stake-mults', "
                             "'brain-diagnosis', 'brain-lens-forward', "
                             "'lighter-market', 'fleet-proprioception', "
-                            "'parliament', 'parliament-tuning')")
+                            "'parliament', 'parliament-tuning', "
+                            "'impl-shortfall', 'xp-judge', 'scout-tuner')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -4181,7 +4194,8 @@ class H(BaseHTTPRequestHandler):
                                 "WHERE key IN ('fleet-risk', 'signal-bus', "
                                 "'brain-stake-mults', 'brain-diagnosis', "
                                 "'brain-lens-forward', 'lighter-market', "
-                                "'fleet-proprioception', 'parliament') "
+                                "'fleet-proprioception', 'parliament', "
+                                "'impl-shortfall', 'xp-judge', 'scout-tuner') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
                             hist = [{"key": k,
@@ -4203,6 +4217,9 @@ class H(BaseHTTPRequestHandler):
                                    "proprioception": live.get("fleet-proprioception"),
                                    "parliament": live.get("parliament"),
                                    "parliament_tuning": live.get("parliament-tuning"),
+                                   "impl_shortfall": live.get("impl-shortfall"),
+                                   "xp_judge": live.get("xp-judge"),
+                                   "scout_tuner": live.get("scout-tuner"),
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
             except Exception as e:
