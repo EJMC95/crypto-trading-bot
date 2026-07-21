@@ -356,6 +356,12 @@ async def _selftest_async() -> None:
     assert payload["books"]["pm-albanese"]["closed"] == 1
     assert payload["roster"]["brain"] == "howard"
     assert len(payload["roster"]["books"]) == 6
+    bench = payload["scanners"]["bench"]
+    assert len(bench) == 10, "all 10 scanners must appear, quiet ones included"
+    assert all(b["runs"] >= 1 for b in bench.values()), \
+        "every scanner must have run"
+    assert bench["trend_alignment"]["n"] >= 1 and \
+        bench["trend_alignment"]["last_sym"] == "BTC"
     from parliament.brain import EXPECTED_BEATS
     howard.started = time.time() - 10 * 3600
     stalled = howard.stalled()

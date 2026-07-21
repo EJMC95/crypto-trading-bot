@@ -312,12 +312,19 @@ class ScannerEngine:
         self.db = db
         self._last: dict[tuple, tuple[float, float]] = {}  # (scanner,sym) -> (ts, strength)
         self.emitted = 0
+        # Per-scanner telemetry, pre-seeded so a QUIET scanner is still a
+        # visible row in Howard's vitals (a bench member that never fires
+        # must look quiet, not absent — absent is how gaps hide).
+        self.by_scanner: dict[str, dict] = {
+            name: {"emitted": 0, "last_ts": None, "last_sym": None, "runs": 0}
+            for name in SCANNERS}
 
     def run_once(self) -> list[dict]:
         if not self.data.fresh():
             return []
         emitted = []
         for name, fn in SCANNERS.items():
+            self.by_scanner[name]["runs"] += 1
             try:
                 signals = fn(self.data)
             except Exception as e:  # noqa: BLE001 — one bad scanner never
@@ -331,6 +338,10 @@ class ScannerEngine:
                         and sig["strength"] < prev[1] * 1.25:
                     continue
                 self._last[key] = (now, sig["strength"])
+                bench = self.by_scanner[name]
+                bench["emitted"] += 1
+                bench["last_ts"] = now
+                bench["last_sym"] = sig["sym"]
                 emitted.append(sig)
                 if self.bus is not None:
                     self.bus.publish(f"signals.{name}", sig)
