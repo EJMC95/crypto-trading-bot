@@ -110,6 +110,24 @@ def brain_stake_mult(bot_id, tag):
         return 1.0
 
 
+def brain_entry_gated(bot_id, tag):
+    """[2026-07-21 BRAIN ACTS — operator mandate] True when the brain's
+    streak-hardened regime_timing finding for THIS (bot, tag) is active AND
+    the regime oracle currently reads risk-off — the measured condition under
+    which the tag's losses clustered (e.g. georgia|long-trend-breakout: 100%
+    of matched losses opened counter-regime). Restrict-only: it can only
+    SKIP a new entry; exits, sizing and every other tag are untouched, and
+    the gate lifts on its own when the regime turns or the finding retires.
+    Same keying as the mults (bot_id + ledger_tag); fleet_bus owns freshness
+    + the BRAIN_ACTIONS_MODE kill switch; fail-safe OPEN (dark bus = no
+    gate), incl. an image built without fleet_bus.py."""
+    try:
+        import fleet_bus
+        return bool(fleet_bus.entry_regime_gated(bot_id, ledger_tag(tag)))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 LOG_FILE = os.environ.get("FAMILY_LOG_FILE", "lighter_family_bot.log")
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
@@ -964,6 +982,16 @@ def main():
                              DayTraderGated.MAX_ENTRIES_PER_HOUR)
                     continue
                 tag = sig["enter"]
+                # [2026-07-21 BRAIN ACTS] the brain's regime_timing finding
+                # now IMPLEMENTS itself: skip this NEW entry while the
+                # oracle reads risk-off and the finding stands. Everything
+                # else (exits, other tags, sizing) untouched; fail-safe open.
+                if brain_entry_gated(b.bot_id, tag):
+                    log.info("%s %s entry SKIPPED — brain regime_gate on %s "
+                             "(risk-off now; lifts when regime turns or the "
+                             "finding retires)",
+                             b.bot_id, coin, ledger_tag(tag))
+                    continue
                 # [2026-07-15 L4 CONSUMER] apply the brain's reduce-only
                 # multiplier — restores the loop the Kraken retirement cut
                 # (the only prior consumers were the stopped freqtrade

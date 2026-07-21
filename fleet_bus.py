@@ -137,6 +137,71 @@ def long_entries_blocked(current_time=None):
         return False
 
 
+def entry_regime_gated(bot, entry_tag, current_time=None):
+    """[2026-07-21 BRAIN ACTS] True when the brain has an ACTIONABLE
+    regime_timing finding for (bot, entry_tag) AND the regime oracle
+    currently reads risk-off — i.e. the exact condition under which this
+    tag's losses were measured to cluster (counter_share >= 0.7, streak-
+    hardened across PROMOTE_RUNS brain runs before it ever acts).
+
+    Restrict-only (can only SKIP a new entry, never take one), and the gate
+    lifts by itself two ways: the oracle turns risk-on (condition ends), or
+    the finding retires from the hypothesis ledger (evidence faded). Uses
+    the SAME oracle signal the diagnosis measured (`fleet.read` risk-off) —
+    never a different regime proxy (the SPY-vs-btc_regime_up lesson).
+
+    Fail-safe OPEN everywhere: stale/missing brain payload, actions_mode !=
+    'enforce' (BRAIN_ACTIONS_MODE=advisory is the central kill switch), no
+    action for the pair, stale/missing oracle, or any parse error -> False.
+    """
+    try:
+        p = _load("brain-diagnosis", current_time)
+        if not p or not is_fresh(p, current_time):
+            return False
+        if str(p.get("actions_mode")) != "enforce":
+            return False
+        act = ((p.get("actions") or {}).get(str(bot)) or {}).get(str(entry_tag))
+        if not act or act.get("action") != "regime_gate":
+            return False
+        o = _load("regime-oracle", current_time)
+        if not o or not is_fresh(o, current_time):
+            return False
+        return str((o.get("fleet") or {}).get("read") or "").startswith("risk-off")
+    except Exception:
+        return False
+
+
+def long_symbol_blocked(base, current_time=None):
+    """[2026-07-21 PER-SYMBOL PILEUP CAP] True when opening ANOTHER long on
+    `base` would stack past the fleet's per-symbol cap.
+
+    Companion to long_entries_blocked with the identical contract: enforces
+    ONLY when fleet_risk publishes symbol_cap.mode='enforce' (env
+    FLEET_SYMBOL_CAP_MODE on the fleet-risk service; shipped default
+    'advisory' = this function is inert fleet-wide), restrict-only, and
+    fail-safe OPEN — stale/missing payload, absent block, cap<=0, or any
+    parse error all return False. Rationale measured over 168h: 20 long
+    slots behaving as ~7.7 independent bets, 4-stacks on ETH/LTC/LINK/NEAR
+    in 37.1% of samples — de-pileup frees budget without raising gross.
+    NO consumer is wired by this commit: strategies/bots adopt it when a
+    review sanctions the wiring (the fleet-clock lesson).
+    """
+    try:
+        p = _load("fleet-risk", current_time)
+        if not p or not is_fresh(p, current_time):
+            return False
+        sc = p.get("symbol_cap") or {}
+        if str(sc.get("mode")) != "enforce":
+            return False
+        cap = int(sc.get("cap") or 0)
+        if cap <= 0:
+            return False
+        held = (sc.get("long_by_symbol") or {}).get(str(base).split("/")[0], 0)
+        return int(held) >= cap
+    except Exception:
+        return False
+
+
 if __name__ == "__main__":
     # offline selftest: prime the cache directly, exercise the fail-safe
     # contract (no DB touched)
@@ -155,4 +220,65 @@ if __name__ == "__main__":
     assert lever_outcome("taker.dip_range", _now) is None, "stale -> None"
     _cache["fleet-proprioception"] = {"ts": _now, "payload": None}
     assert lever_outcome("taker.dip_range", _now) is None, "absent -> None"
-    print("fleet_bus selftest OK (lever_outcome fresh/unknown/stale/absent)")
+
+    # [2026-07-21] per-symbol pileup cap accessor: fail-safe open everywhere
+    _risk = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 900,
+             "symbol_cap": {"cap": 3, "mode": "enforce",
+                            "long_by_symbol": {"ETH": 3, "LTC": 2}}}
+    _cache["fleet-risk"] = {"ts": _now, "payload": _risk}
+    assert long_symbol_blocked("ETH", _now) is True, "at cap + enforce -> True"
+    assert long_symbol_blocked("ETH/USDT", _now) is True, "base-normalizes"
+    assert long_symbol_blocked("LTC", _now) is False, "under cap -> False"
+    assert long_symbol_blocked("BTC", _now) is False, "unheld -> False"
+    _cache["fleet-risk"] = {"ts": _now, "payload": dict(
+        _risk, symbol_cap=dict(_risk["symbol_cap"], mode="advisory"))}
+    assert long_symbol_blocked("ETH", _now) is False, "advisory -> inert"
+    _cache["fleet-risk"] = {"ts": _now, "payload": dict(
+        _risk, symbol_cap=dict(_risk["symbol_cap"], cap=0))}
+    assert long_symbol_blocked("ETH", _now) is False, "cap 0 -> disabled"
+    _cache["fleet-risk"] = {"ts": _now, "payload": dict(
+        _risk, updated="2020-01-01T00:00:00+00:00")}
+    assert long_symbol_blocked("ETH", _now) is False, "stale -> open"
+    _cache["fleet-risk"] = {"ts": _now, "payload": None}
+    assert long_symbol_blocked("ETH", _now) is False, "absent -> open"
+
+    # [2026-07-21 BRAIN ACTS] entry_regime_gated: gates ONLY when the brain's
+    # streak-hardened action exists AND the oracle reads risk-off right now
+    _diag = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 26000,
+             "actions_mode": "enforce",
+             "actions": {"freqtrade-georgia-lshadow":
+                         {"long-trend-breakout": {"action": "regime_gate"}}}}
+    _orc_off = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 14400,
+                "fleet": {"read": "risk-off downtrend"}}
+    _orc_on = dict(_orc_off, fleet={"read": "risk-on uptrend"})
+    _cache["brain-diagnosis"] = {"ts": _now, "payload": _diag}
+    _cache["regime-oracle"] = {"ts": _now, "payload": _orc_off}
+    assert entry_regime_gated("freqtrade-georgia-lshadow", "long-trend-breakout",
+                              _now) is True, "action + risk-off -> gated"
+    assert entry_regime_gated("freqtrade-georgia-lshadow", "long-range-on",
+                              _now) is False, "no action for tag -> open"
+    assert entry_regime_gated("freqtrade-mum-lshadow", "long-trend-breakout",
+                              _now) is False, "no action for bot -> open"
+    _cache["regime-oracle"] = {"ts": _now, "payload": _orc_on}
+    assert entry_regime_gated("freqtrade-georgia-lshadow", "long-trend-breakout",
+                              _now) is False, "risk-on -> gate lifts"
+    _cache["regime-oracle"] = {"ts": _now, "payload": dict(
+        _orc_off, updated="2020-01-01T00:00:00+00:00")}
+    assert entry_regime_gated("freqtrade-georgia-lshadow", "long-trend-breakout",
+                              _now) is False, "stale oracle -> open"
+    _cache["regime-oracle"] = {"ts": _now, "payload": _orc_off}
+    _cache["brain-diagnosis"] = {"ts": _now, "payload": dict(
+        _diag, actions_mode="advisory")}
+    assert entry_regime_gated("freqtrade-georgia-lshadow", "long-trend-breakout",
+                              _now) is False, "advisory kill switch -> open"
+    _cache["brain-diagnosis"] = {"ts": _now, "payload": dict(
+        _diag, updated="2020-01-01T00:00:00+00:00")}
+    assert entry_regime_gated("freqtrade-georgia-lshadow", "long-trend-breakout",
+                              _now) is False, "stale brain -> open"
+    _cache["brain-diagnosis"] = {"ts": _now, "payload": None}
+    assert entry_regime_gated("freqtrade-georgia-lshadow", "long-trend-breakout",
+                              _now) is False, "absent brain -> open"
+    print("fleet_bus selftest OK (lever_outcome fresh/unknown/stale/absent; "
+          "long_symbol_blocked enforce/advisory/cap0/stale/absent; "
+          "entry_regime_gated act+off/no-tag/no-bot/risk-on/stale-oracle/"
+          "advisory/stale-brain/absent)")

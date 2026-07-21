@@ -100,6 +100,12 @@ GUARD_ONLY_AUDITS = [
 SELFTEST_EXCLUDE = {
     # Research backtest: needs historical market data / network, not a unit test.
     "scripts/backtest_georgia_short_sleeve.py",
+    # [2026-07-21] TSL reclaim study: --selftest IS offline-green, but the
+    # module's import pulls the family bot's full strategy surface and its
+    # full run needs the venue API — a research script, not an organ. Its
+    # verdict (NO CHANGE at any stop width; bleed is entry-side) lives in
+    # its header; re-run with --refresh, never re-argue from prose.
+    "scripts/study_intraday_tsl_reclaim_lighter.py",
     # Their selfcheck() blocks run INSIDE `parliament_main --selftest` (which
     # IS registered above) — the marker hit here is the docstring saying so.
     "parliament/bus.py",

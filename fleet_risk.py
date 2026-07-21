@@ -433,6 +433,34 @@ def main():
                                          key=lambda kv: -kv[1]) if v >= 2}
     exposure = exposure_concentration(expo, uncovered=expo_uncovered)
 
+    # [2026-07-21 PER-SYMBOL PILEUP CAP — advisory-first, N3 follow-through]
+    # A week of 168h history (n=2,019) showed the 20-slot long budget binding
+    # 41.5% of the time while behaving as only ~7.7 independent bets (1/HHI):
+    # ETH/LTC/LINK/NEAR each stacked 4 same-symbol longs, a >=4 stack existed
+    # in 37.1% of samples. The budget, not the signals, throttles entries —
+    # so the lever is DE-PILEUP, not a bigger budget. Design mirrors the
+    # long-budget veto exactly: this file only PUBLISHES; the only consumer
+    # surface is fleet_bus.long_symbol_blocked(base), which enforces solely
+    # when FLEET_SYMBOL_CAP_MODE=enforce (env default: advisory — zero
+    # behavior change until a review flips it; restrict-only; fail-safe open
+    # on stale/missing payload, same contract as long_entries_blocked).
+    # hot_pairs mixes sides, so the cap counts the LONG side alone from expo.
+    SYMBOL_CAP = int(os.environ.get("FLEET_SYMBOL_CAP", "3"))
+    long_by_symbol = {}
+    for _name, _base, _side in expo:
+        if _side == "long":
+            long_by_symbol[_base] = long_by_symbol.get(_base, 0) + 1
+    symbol_cap = {
+        "cap": SYMBOL_CAP,
+        "mode": os.environ.get("FLEET_SYMBOL_CAP_MODE", "advisory"),
+        "long_by_symbol": {k: v for k, v in sorted(long_by_symbol.items(),
+                                                   key=lambda kv: -kv[1])
+                           if v >= 2},
+        "at_cap": sorted(b for b, c in long_by_symbol.items()
+                         if SYMBOL_CAP > 0 and c >= SYMBOL_CAP),
+    } if SYMBOL_CAP > 0 else {"cap": 0, "mode": "disabled",
+                              "long_by_symbol": {}, "at_cap": []}
+
     sniper = by_bot.get("event-listing-sniper") or {}
     if not row_fresh(sniper):
         sniper = {}
@@ -535,6 +563,10 @@ def main():
         "pair_concentration": hot_pairs,   # same base held by >=2 bots
         # [2026-07-15 EXPOSURE VIEW] how many independent bets the count is.
         "exposure": exposure,
+        # [2026-07-21] per-symbol long pileup cap (advisory until the env
+        # flips — see the SYMBOL_CAP block above; consumers go through
+        # fleet_bus.long_symbol_blocked only).
+        "symbol_cap": symbol_cap,
         "by_bot": per_bot,
         # [no-miss-sync] which venue each directional bot's REAL book is on, so
         # the risk view is explicit about counting live Lighter over paper.
@@ -554,7 +586,11 @@ def main():
                                       "crypto": exposure["long_crypto"],
                                       "equity": exposure["long_equity"],
                                       "max_share": exposure["long_max_share"],
-                                      "unseen": exposure["sym_uncovered"]}})
+                                      "unseen": exposure["sym_uncovered"]},
+                                  # [2026-07-21] pileup-at-cap in history so
+                                  # saturation DURATION is measurable next
+                                  # review, not just the instantaneous view
+                                  "sym_at_cap": symbol_cap["at_cap"]})
 
     # ---- Layer 3: signal bus -------------------------------------------
     bus = {"updated": now_iso(), "ttl_sec": TTL_SEC}
@@ -578,7 +614,12 @@ def main():
     fc = fc_row.get("extra") or {}
     if fc.get("hottest_funding_apr"):
         bus["funding_hottest_apr"] = fc["hottest_funding_apr"]
-        bus["funding_source"] = fc.get("venue") or "hyperliquid"
+        # [2026-07-21] absence of the venue stamp must never REPORT a venue:
+        # the old default ("hyperliquid") printed a foreign venue on a
+        # Lighter-only bus for 3+ days whenever a pre-contract container was
+        # running (N4 — 277 of 288 trailing-24h snapshots said hyperliquid
+        # right up to the 21-Jul redeploy). "unstamped" is a tell, not a lie.
+        bus["funding_source"] = fc.get("venue") or "unstamped"
     # [2026-07-17 LIGHTER-ONLY — operator: "i only want things running on
     # lighter"] The Lighter venue premium now comes from the MARKET SCOUT, not
     # Gap Scout. Both read mark/index off the SAME Lighter endpoint, so this is

@@ -43,6 +43,13 @@ KEY = "impl-shortfall"
 TTL_SEC = int(os.environ.get("SHORTFALL_TTL_SEC", "3600"))
 LIVE = os.environ.get("SHORTFALL_LIVE", "perps-funding-lighter-lighter")
 SHADOW = os.environ.get("SHORTFALL_SHADOW", "perps-funding-lighter-lshadow")
+# [2026-07-21] the SECOND real-money book joins the order-slip read: the live
+# Ticket Taker publishes real fills (entry + close paths since 17-Jul) but
+# nothing graded them — order_slip was Farmer-only. Same measurement, two more
+# rows; the farmer keys ('live'/'shadow') are UNCHANGED for every existing
+# consumer, the taker lands under 'taker_live'/'taker_shadow'.
+TAKER_LIVE = os.environ.get("SHORTFALL_TAKER_LIVE", "lighter-ticket-taker-lighter")
+TAKER_SHADOW = os.environ.get("SHORTFALL_TAKER_SHADOW", "lighter-ticket-taker-lshadow")
 # [2026-07-17 AUDIT] The judge's experiment arm, read from ITS OWN env var with
 # ITS OWN default — so if the operator re-points either organ, they still agree
 # about whether SHADOW is a control or an experiment. Hard-coding the row here
@@ -234,6 +241,9 @@ def _fetch_order_slip():
     if conn is None:
         return {}
     out = {}
+    # roster: farmer keeps its original keys; taker rows get their own
+    roster = {LIVE: "live", SHADOW: "shadow",
+              TAKER_LIVE: "taker_live", TAKER_SHADOW: "taker_shadow"}
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -246,12 +256,12 @@ def _fetch_order_slip():
                                     AND px_decision IS NOT NULL
                                     AND px_fill = px_decision THEN 1 ELSE 0 END)
                    FROM venue_orders
-                   WHERE bot IN (%s, %s)
+                   WHERE bot = ANY(%s)
                      AND at >= now() - (%s || ' days')::interval
                    GROUP BY bot""",
-                (LIVE, SHADOW, str(WINDOW_DAYS)))
+                (list(roster), str(WINDOW_DAYS)))
             for bot, n, n_slip, slip, spread, n_echo in cur.fetchall():
-                arm = "live" if bot == LIVE else "shadow"
+                arm = roster.get(bot) or bot
                 n, n_slip, n_echo = int(n), int(n_slip or 0), int(n_echo or 0)
                 out[arm] = {
                     "orders": n,
