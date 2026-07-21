@@ -2365,10 +2365,20 @@ def _organ_vital(key, st):
             # here. Pre-swap payloads carry no `coverage` — hence the guards.
             cov = st.get("coverage") or {}
             miss = cov.get("missing") or {}
-            return _v("{} majors tracked{}", len(st.get("pairs") or {}),
+            # [2026-07-21 item 18] `pairs` now carries the non-crypto books
+            # too — counting it as "majors" would blend asset classes, the
+            # exact read the per-asset build exists to avoid. Majors come
+            # from the coverage block (crypto contract, n_published); the
+            # non-crypto coverage gets its own tail. Payloads predating
+            # either addition render exactly as before (both guards).
+            nc = st.get("noncrypto") or {}
+            n_major = cov.get("n_published", len(st.get("pairs") or {}))
+            return _v("{} majors tracked{}{}", n_major,
                       (f" · MISSING {', '.join(sorted(miss))}" if miss else
                        (f" · coverage {cov.get('n_published')}/"
-                        f"{cov.get('universe')}" if cov else "")))
+                        f"{cov.get('universe')}" if cov else "")),
+                      (f" · non-crypto {nc.get('n_published')}/"
+                       f"{nc.get('universe')}" if nc else ""))
         if key == "fleet-alerts":
             al = st.get("alerts") or []
             return _v("{} alerts total · last: {}", len(al),

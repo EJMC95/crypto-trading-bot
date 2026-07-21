@@ -310,6 +310,11 @@ deciding blind.
    entry on ITS OWN asset's regime, never BTC's.** Build order: oracle
    coverage → family-bot gate consumes it → only then any universe
    widening.
+   **✅ STEP 1 SHIPPED same day (operator: "do the oracle per-asset build
+   next") — CHANGELOG (az):** 10 non-crypto books tracked per-asset,
+   publish-only, `fleet.read` pinned crypto-only (bot_learn's risk_off
+   join protected); 4/10 grade at ship, the rest graduate with the tape.
+   Steps 2 (gate consumes) and 3 (universe) remain review-gated.
 
 ### Item 19 — "Filter" → **auth verified fixed; two operator actions remain**
 
