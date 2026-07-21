@@ -676,6 +676,13 @@ def fetch_paper_rows(bot=None, limit=500):
             if bot:
                 clauses.append("bot = %s")
                 params.append(bot)
+            else:
+                # [2026-07-21 AUDIT FIX] the default window excludes the
+                # sniper's side='skip' gate-log rows: 278 of the newest 500
+                # were skip diagnostics of a RETIRED bot, crowding real
+                # fleet history out of the very endpoint reviews read.
+                # Still reachable explicitly via ?bot=<name>-skips.
+                clauses.append("side IS DISTINCT FROM 'skip'")
             where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
             params.append(int(limit))
             # [2026-07-15 EVIDENCE] widened columns (side/tag/prices/size/extra)
@@ -2400,8 +2407,14 @@ def _organ_vital(key, st):
     """One-line vital sign per organ — the number you'd ask for first."""
     try:
         if key == "fleet-risk":
+            # [2026-07-21 AUDIT FIX] the 'L' slot renders long_positions —
+            # `gross` includes shorts, so this read "23L/20" while longs
+            # were 22 (a short inflating a LONG budget readout). gross stays
+            # as the fallback for payloads predating long_positions.
             return _v("light {} · {}L/{} · clip {}x · 7d dd {:+.2f}%",
-                      st.get("light"), st.get("gross"), st.get("long_budget"),
+                      st.get("light"),
+                      st.get("long_positions", st.get("gross")),
+                      st.get("long_budget"),
                       st.get("clip_scale"), 100 * (st.get("fleet_dd_7d") or 0))
         if key == "lighter-market":
             s = st.get("stress") or {}

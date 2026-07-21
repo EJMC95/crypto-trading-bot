@@ -819,6 +819,18 @@ def main():
         # skip NEW entries; anything missing/stale fails OPEN (never blocks).
         fleet_long_veto = False
         fleet_gov = 1.0
+        # [2026-07-21 AUDIT FIX] in-cycle HEADROOM: one veto read covers all
+        # seven books' entries, so a single green check could admit up to 7
+        # longs in one cycle and push the fleet past the budget (measured
+        # live: 22 longs against the 20 budget — the overshoot mechanism
+        # behind the watchdog's standing warning). Track the remaining slots
+        # from the same read and stop admitting when THIS CYCLE has used
+        # them; the cross-process race with other consumers stays (only the
+        # publisher can close it) but the single biggest overshoot source —
+        # this process's own batch — is bounded. None = fail-open unlimited
+        # (advisory mode / stale state), exactly the old contract.
+        fleet_long_headroom = None
+        cycle_admitted = 0
         try:
             _fr = store.load_state("fleet-risk") or {}
             _upd = datetime.fromisoformat(
@@ -827,6 +839,9 @@ def main():
             _lb = _fr.get("long_budget")
             _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
             if _age <= float(_fr.get("ttl_sec") or 900):
+                if _fr.get("mode") == "enforce":
+                    fleet_long_headroom = max(
+                        0, _lb - int(_fr.get("long_positions") or 0))
                 if (_fr.get("mode") == "enforce"
                         and (_fr.get("long_positions") or 0) >= _lb):
                     fleet_long_veto = True
@@ -844,6 +859,7 @@ def main():
                              fleet_gov)
         except Exception:  # noqa: BLE001 — fail-safe open
             fleet_long_veto = False
+            fleet_long_headroom = None
             fleet_gov = 1.0
 
         for b in books:
@@ -974,6 +990,12 @@ def main():
                     continue
                 if fleet_long_veto:
                     continue      # L2: fleet directional-long budget is full
+                if (fleet_long_headroom is not None
+                        and cycle_admitted >= fleet_long_headroom):
+                    log.info("%s %s entry SKIPPED — in-cycle budget headroom "
+                             "used (%d admitted this cycle)", b.bot_id, coin,
+                             cycle_admitted)
+                    continue      # L2: this cycle already used the free slots
                 if b.broker.open_count() >= b.s.max_open:
                     continue
                 if t0 < b.cooldown.get(coin, 0.0):
@@ -1013,6 +1035,7 @@ def main():
                     stop_px = entry_px * (1 - dist)
                 b.meta[coin] = {"entry": entry_px, "opened_ts": t0, "tag": tag,
                                 "accrued": 0.0, "stop_px": stop_px}
+                cycle_admitted += 1
                 log.info("%s OPEN %s long $%.0f @ %.6g [%s]",
                          b.bot_id, coin, stake, entry_px, tag)
 

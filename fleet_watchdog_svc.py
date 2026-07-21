@@ -156,9 +156,38 @@ def evaluate(data):
             continue                      # delta-neutral / stocks / event-class
         dir_opens += n
     max_open = int(os.environ.get("WATCHDOG_MAX_OPEN", "20"))
-    if dir_opens > max_open:
+    # [2026-07-21 AUDIT FIX] prefer fleet_risk's OWN published LONG count +
+    # budget: the local recompute was side-blind (the live Farmer's SHORTS
+    # counted against the 20-LONG budget) and its cohort a superset of the
+    # budget's (pm-* Parliament books, dislocation, perp-sniper — none
+    # budgeted by fleet_risk), so the warning could fire while the budgeted
+    # cohort was fine — and WATCHDOG_MAX_OPEN could silently drift from
+    # LONG_BUDGET. One authority, apples to apples; the local count stays
+    # the fallback when the fleet-risk state is dark/stale (a dead publisher
+    # must not blind the watchdog).
+    _fr_longs = _fr_budget = None
+    try:
+        import bot_pnl_store as _store
+        _fr = _store.load_state("fleet-risk") or {}
+        _u = dt.datetime.fromisoformat(
+            str(_fr.get("updated")).replace("Z", "+00:00"))
+        if _u.tzinfo is None:
+            _u = _u.replace(tzinfo=dt.timezone.utc)
+        if (dt.datetime.now(dt.timezone.utc) - _u).total_seconds() \
+                <= float(_fr.get("ttl_sec") or 900):
+            _fr_longs = int(_fr.get("long_positions"))
+            _fr_budget = int(_fr.get("long_budget"))
+    except Exception:  # noqa: BLE001
+        _fr_longs = _fr_budget = None
+    if _fr_longs is not None and _fr_budget is not None:
+        if _fr_longs > _fr_budget:
+            warnings.append(f"directional longs {_fr_longs} exceed the "
+                            f"{_fr_budget}-long budget (fleet_risk cohort; "
+                            f"{opens} gross incl. shadows)")
+    elif dir_opens > max_open:
         warnings.append(f"directional positions {dir_opens} exceed the "
-                        f"{max_open}-position budget ({opens} gross incl. shadows)")
+                        f"{max_open}-position budget ({opens} gross incl. "
+                        f"shadows; fleet-risk state dark — local count)")
     loss_floor = float(os.environ.get("WATCHDOG_DAILY_LOSS_ALERT", "-100"))
     big = [f"{b.get('bot')} ({b.get('pnl_daily'):+.1f})" for b in bots
            if isinstance(b.get("pnl_daily"), (int, float)) and b["pnl_daily"] < loss_floor]
