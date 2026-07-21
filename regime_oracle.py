@@ -348,6 +348,118 @@ def summarize(pairs):
     return fleet, noncrypto
 
 
+# ---------------------------------------------------------------------------
+# [2026-07-22] SELF-GRADING — the module's own 07-07 promise, finally built:
+# "after a week of history we compare its calls against what bots did (the
+# enforcement decision is data, not vibes)", and the 17-Jul swap header's
+# admission that nothing here ranks a regime call as RIGHT — "that needs the
+# calls joined to outcomes". Fifteen days of archive later, no join existed.
+# This is it, prequentially and per asset: every DIRECTIONAL call (LONG/
+# SHORT-window) on a new closed daily bar becomes one pending evidence unit,
+# graded against the pair's OWN later closes at +1 and +3 bars. It is also
+# exactly the evidence the review-gated step 2 (per-asset gate consumes)
+# needs on the table: does SPY's own regime call predict SPY's forward
+# return on this venue's tape, per asset, out of sample by construction.
+# PUBLISH-ONLY: no consumer reads grades; the (bc) regime gate keeps gating
+# on fleet.read exactly as evidenced. Same venue-purity as everything here —
+# the grade compares Lighter closes to Lighter closes.
+# ---------------------------------------------------------------------------
+
+GRADE_BARS = (1, 3)        # horizons in CLOSED DAILY BARS (this is a 1d method)
+PENDING_MAX_D = 10         # a sym that left coverage ages out of pending
+PENDING_CAP = 200          # global hard bound on carried state
+
+
+def grade_pairs(prev_grading, pairs, now=None):
+    """(grading_state, grades_display) — one prequential pass.
+
+    One evidence unit per (sym, closed daily bar): when a pair shows a NEW
+    `asof` with a DIRECTIONAL verdict, the call is recorded at that bar's
+    close; it is graded at the first later observation >= h bars ahead (a
+    missed cycle grades on a wider move — recorded, not idealized). hit =
+    the close moved the CALLED way; avg_pp is signed INTO the call (a SHORT
+    call on a book that falls 1.2% scores +1.2pp), so positive avg_pp always
+    means "the oracle's directional calls made money-shaped moves". dir-flat
+    / chop-gated are never graded — the oracle claims no direction there.
+    Pure, bounded (PENDING_CAP / PENDING_MAX_D), tolerant of malformed prior
+    state; a sym absent today keeps its pending calls until they age out.
+    """
+    g = prev_grading if isinstance(prev_grading, dict) else {}
+    day_ms = 86400 * 1000
+    now_ms = int(now if now is not None else time.time()) * 1000
+    scores = {}
+    for s, sc in (g.get("scores") or {}).items():
+        if isinstance(sc, dict):
+            keep_h = {h: dict(b) for h, b in sc.items()
+                      if isinstance(b, dict) and b.get("n")}
+            if keep_h:
+                scores[s] = keep_h
+    pending = [p for p in (g.get("pending") or [])
+               if isinstance(p, dict) and p.get("sym")]
+
+    # 1. record new calls — one per (sym, asof), directional verdicts only
+    have = {(p.get("sym"), str(p.get("asof"))) for p in pending}
+    for sym, v in sorted((pairs or {}).items()):
+        if not isinstance(v, dict):
+            continue
+        if v.get("verdict") not in ("LONG-window", "SHORT-window"):
+            continue
+        if (sym, str(v.get("asof"))) in have:
+            continue
+        pending.append({"sym": sym, "asof": str(v.get("asof")),
+                        "close": v.get("close"),
+                        "dir": 1 if v["verdict"] == "LONG-window" else -1,
+                        "done": []})
+
+    # 2. grade matured calls against the pair's CURRENT close
+    keep = []
+    for p in pending:
+        cur = (pairs or {}).get(p["sym"])
+        try:
+            asof_p = int(float(p.get("asof")))
+            c0 = float(p.get("close"))
+        except (TypeError, ValueError):
+            continue                       # malformed call — drop, not crash
+        if not isinstance(cur, dict):
+            if now_ms - asof_p <= PENDING_MAX_D * day_ms:
+                keep.append(p)             # out of coverage today; wait
+            continue
+        try:
+            asof_c = int(float(cur.get("asof")))
+            c1 = float(cur.get("close"))
+        except (TypeError, ValueError):
+            keep.append(p)
+            continue
+        bars_fwd = (asof_c - asof_p) // day_ms
+        done = {int(h) for h in (p.get("done") or [])}
+        if bars_fwd > 0 and c0 > 0:
+            fwd_pp = (c1 / c0 - 1.0) * 100.0
+            signed = fwd_pp * (1 if p.get("dir", 1) >= 0 else -1)
+            for h in GRADE_BARS:
+                if bars_fwd >= h and h not in done:
+                    b = scores.setdefault(p["sym"], {}).setdefault(
+                        f"d{h}", {"n": 0, "hits": 0, "sum_pp": 0.0})
+                    b["n"] += 1
+                    b["hits"] += 1 if signed > 0 else 0
+                    b["sum_pp"] = round(b["sum_pp"] + signed, 4)
+                    done.add(h)
+        if len(done) < len(GRADE_BARS):
+            keep.append(dict(p, done=sorted(done)))
+    pending = keep[-PENDING_CAP:]
+
+    grades = {}
+    for sym, sc in scores.items():
+        out = {}
+        for h in sorted(sc):
+            b = sc[h]
+            if b.get("n"):
+                out[h] = {"n": b["n"], "hit": round(b["hits"] / b["n"], 3),
+                          "avg_pp": round(b["sum_pp"] / b["n"], 3)}
+        if out:
+            grades[sym] = out
+    return {"pending": pending, "scores": scores}, grades
+
+
 def main():
     prev = store.load_state(KEY) or {}
     prev_pairs = prev.get("pairs", {})
@@ -415,6 +527,9 @@ def main():
     n_long, n_short = fleet["n_long"], fleet["n_short"]
     n_idle, read = fleet["n_flat_or_chop"], fleet["read"]
     n_crypto = len(pairs) - noncrypto["n_published"]
+    # [2026-07-22] self-grading: join this cycle's calls to prior calls'
+    # outcomes (publish-only — see grade_pairs). State rides the payload.
+    grading, grades = grade_pairs(prev.get("grading"), pairs)
     payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC,
         "params": {"adx_trend": ADX_TREND, "adx_chop": ADX_CHOP,
@@ -427,6 +542,13 @@ def main():
         # per-asset gate is the next, review-gated step.
         "noncrypto": dict(noncrypto, missing=missing_nc,
                           universe=len(NONCRYPTO)),
+        # [2026-07-22 SELF-GRADE, publish-only] per-asset forward alignment
+        # of the oracle's OWN directional calls (grade_pairs): grades[sym] =
+        # {d1/d3: {n, hit, avg_pp signed INTO the call}}. `grading` is the
+        # carried state (pending calls + running sums), not a signal. NO
+        # consumer reads either; the step-2 review reads `grades`.
+        "grades": grades,
+        "grading": grading,
         "errors": errors,
         # [2026-07-17] ADDITIVE — the swap's real cost, made visible. A coin
         # Lighter cannot grade (young book, delisting, dead fetch) is NAMED
@@ -465,6 +587,13 @@ def main():
           + (f"; young/missing " + ", ".join(f"{k}({v})"
                                              for k, v in missing_nc.items())
              if missing_nc else " — complete"))
+    n_d1 = sum(1 for g in grades.values() if "d1" in g)
+    print(f"[regime-oracle]   SELF-GRADE: {len(grading['pending'])} calls "
+          f"pending; d1 outcomes on {n_d1} syms"
+          + ("" if not grades else " | " + " ".join(
+              f"{s}:{g['d1']['hit']:.0%}/{g['d1']['avg_pp']:+.2f}pp"
+              f"(n{g['d1']['n']})"
+              for s, g in sorted(grades.items()) if "d1" in g)[:220]))
 
 
 def _selftest():
@@ -597,7 +726,8 @@ def _selftest():
         published["coverage"]["missing"]
     assert "BTC" in published["pairs"], "the healthy book must still publish"
     # the consumer-facing shape must be intact + honest about its source
-    for k in ("updated", "ttl_sec", "params", "pairs", "fleet", "errors"):
+    for k in ("updated", "ttl_sec", "params", "pairs", "fleet", "errors",
+              "grades", "grading"):
         assert k in published, f"payload lost {k}"
     assert published["params"]["source"] == "lighter-1d", published["params"]
     assert published["ttl_sec"] == TTL_SEC and published["updated"]
@@ -636,11 +766,79 @@ def _selftest():
     _f2, _nc2 = summarize(dict(_crypto_up))
     assert _nc2["n_published"] == 0 and _f2["read"] == "risk-on uptrend"
 
+    # ---- [2026-07-22] SELF-GRADING: calls joined to outcomes --------------
+    DAY_MS = 86400 * 1000
+    T0 = 1_752_000_000_000 - (1_752_000_000_000 % DAY_MS)
+    T1, T3 = T0 + DAY_MS, T0 + 3 * DAY_MS
+
+    def _pv(verdict, close, asof):
+        return {"verdict": verdict, "close": close, "asof": str(asof)}
+
+    c1_pairs = {"BTC": _pv("LONG-window", 100.0, T0),
+                "SPY": _pv("SHORT-window", 500.0, T0),
+                "ETH": _pv("dir-flat", 10.0, T0),
+                "SOL": _pv("chop-gated", 20.0, T0)}
+    g1, gr1 = grade_pairs(None, c1_pairs, now=T0 // 1000)
+    assert {p["sym"] for p in g1["pending"]} == {"BTC", "SPY"}, \
+        "directional calls only — the oracle claims no direction elsewhere"
+    assert gr1 == {}, "nothing matured on cycle 1"
+    # same bar re-observed (intra-day cycle): no duplicate evidence unit
+    g1b, _ = grade_pairs(g1, c1_pairs, now=T0 // 1000)
+    assert len(g1b["pending"]) == 2, "one call per (sym, closed bar)"
+    # +1 bar: LONG on a riser = HIT +3pp; SHORT on a riser = MISS -1pp —
+    # the MIRROR check (grade the direction CALLED, never long semantics;
+    # the brain's drift grader was direction-blind once — never again)
+    c2_pairs = {"BTC": _pv("LONG-window", 103.0, T1),
+                "SPY": _pv("LONG-window", 505.0, T1)}
+    g2, gr2 = grade_pairs(g1b, c2_pairs, now=T1 // 1000)
+    assert gr2["BTC"]["d1"] == {"n": 1, "hit": 1.0, "avg_pp": 3.0}, gr2
+    assert gr2["SPY"]["d1"]["hit"] == 0.0 and gr2["SPY"]["d1"]["avg_pp"] == -1.0
+    assert len(g2["pending"]) == 4, \
+        "d1-graded calls wait for d3; the new T1 bars are fresh calls"
+    # the true mirror: a SHORT call on a FALLING book scores POSITIVE pp
+    gm, grm = grade_pairs(
+        {"pending": [{"sym": "XAU", "asof": str(T0), "close": 200.0,
+                      "dir": -1, "done": []}], "scores": {}},
+        {"XAU": _pv("SHORT-window", 196.0, T1)}, now=T1 // 1000)
+    assert grm["XAU"]["d1"] == {"n": 1, "hit": 1.0, "avg_pp": 2.0}, grm
+    # +3 bars (cycle missed a day — graded at first observation >= h):
+    # d3 lands, the T0 calls drain from pending, sums accumulate
+    c3_pairs = {"BTC": _pv("LONG-window", 99.0, T3),
+                "SPY": _pv("SHORT-window", 490.0, T3)}
+    g3, gr3 = grade_pairs(g2, c3_pairs, now=T3 // 1000)
+    assert gr3["BTC"]["d3"]["n"] == 1 and gr3["BTC"]["d3"]["avg_pp"] == -1.0
+    assert gr3["SPY"]["d3"]["avg_pp"] == 2.0, "short mirror on d3 too"
+    assert gr3["BTC"]["d1"]["n"] == 2, "T1's call graded d1 against T3"
+    assert not any(p["asof"] == str(T0) for p in g3["pending"]), \
+        "fully-graded calls must drain"
+    # coverage loss: young pending kept, stale pending aged out
+    lost = {"pending": [{"sym": "GONE", "asof": str(T0), "close": 5.0,
+                         "dir": 1, "done": []}], "scores": {}}
+    gk, _ = grade_pairs(lost, {}, now=(T0 + 2 * DAY_MS) // 1000)
+    assert len(gk["pending"]) == 1, "young out-of-coverage call waits"
+    gd, _ = grade_pairs(lost, {}, now=(T0 + 11 * DAY_MS) // 1000)
+    assert gd["pending"] == [], "out-of-coverage call ages out"
+    # malformed prior state -> clean start; junk pending dropped; cap holds
+    gjunk, _ = grade_pairs("garbage", c1_pairs, now=T0 // 1000)
+    assert len(gjunk["pending"]) == 2
+    gj2, _ = grade_pairs({"pending": [{"sym": "X", "asof": "nope",
+                                       "close": "?"}, "junk"],
+                          "scores": {"X": "junk"}},
+                         c1_pairs, now=T0 // 1000)
+    assert {p["sym"] for p in gj2["pending"]} == {"BTC", "SPY"}
+    big = {"pending": [{"sym": f"S{i}", "asof": str(T0), "close": 1.0,
+                        "dir": 1, "done": []} for i in range(PENDING_CAP + 40)],
+           "scores": {}}
+    gcap, _ = grade_pairs(big, {}, now=T0 // 1000)
+    assert len(gcap["pending"]) <= PENDING_CAP
+
     print("regime_oracle selftest OK (closed-bars-by-timestamp, ms stamps, "
           "500-bar paging + termination, young-book NAMED not dropped, "
           "unlisted coin NAMED, FROZEN tape NAMED not graded, payload shape "
           "held, dark venue publishes nothing, per-asset non-crypto coverage "
-          "additive + fleet.read stays crypto-only)")
+          "additive + fleet.read stays crypto-only, self-grading: directional-"
+          "only, per-bar dedupe, MIRROR-correct short scoring, d1/d3 "
+          "accumulate+drain, age-out, cap)")
 
 
 if __name__ == "__main__":
