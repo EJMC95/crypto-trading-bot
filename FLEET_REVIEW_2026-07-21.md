@@ -412,11 +412,18 @@ money), or explicitly deferred with a date.
 - **D1 (real money, reporting): fix N1** — deposit-aware baseline bump +
   backfill the two 18-Jul deposits. Until then the live P&L headline
   over-reports by ~$64.77. *Recommended: yes, this week.*
+  **✅ SHIPPED same day (operator: "do D1-D3 now") — CHANGELOG (as).**
+  While shipping it the D2 finding got WORSE: the judge's clamp-inverted
+  candidate wasn't just mislabeled, it was DEADLOCKED — its own skew gate
+  excluded every receipt-stamped close since 17-Jul (20 closes, zero
+  accrued). Deploy: `railway up` Farmer + Taker + freqtrade-bots.
 - **D2 (real money, judge): re-specify the running candidate per N2**
   (rename to 0.075, fix the promotion mapping, drop 0.0375 from the
-  queue). *Recommended: yes.*
+  queue). *Recommended: yes.* **✅ SHIPPED same day — CHANGELOG (as).**
 - **D3 (real money, rails): ship the day-start-equity persisted baseline
   to the live pair** (item 15 residual). *Recommended: yes.*
+  **✅ SHIPPED same day — CHANGELOG (as)** (the Taker already carried the
+  pattern; the Farmer now matches).
 - **D4 (real money, farmer): one more week of slip measurement before the
   park/fix/re-justify call** (item 17). *Recommended: measure, then
   decide at the 28-Jul review.*
