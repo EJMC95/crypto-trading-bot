@@ -113,3 +113,37 @@ def test_howard_publish_carries_the_freshness_contract():
     # a consumer applying fleet_bus.is_fresh must accept it right now
     import fleet_bus
     assert fleet_bus.is_fresh(payload, None)
+
+
+def test_dashboard_parliament_card_renders(monkeypatch):
+    """The main-page 🏛️ card: fresh chamber renders Howard + full bench with
+    quiet rows visible; dark chamber hides the card; stale renders dimmed."""
+    import datetime as _dt
+    import pnl_dashboard as pd
+
+    now = _dt.datetime.now(_dt.timezone.utc).isoformat()
+    fixture = {
+        "parliament": {
+            "updated": now, "ttl_sec": 900,
+            "health": {"stalled": []},
+            "stress": {"med_bps": 6.1, "pause": False},
+            "data": {"books": 201},
+            "books": {"pm-abbott": {"closed": 3}},
+            "ml": {"enabled": True, "ready": False, "n_seen": 42,
+                   "oos_acc": {"logit": 0.52}},
+            "scanners": {"bench": {
+                "dislocation": {"n": 2, "runs": 9, "last_sym": "BTC",
+                                "last_age_sec": 300},
+                "breakout": {"n": 0, "runs": 9}}}},
+        "parliament-tuning": {"updated": now, "ttl_sec": 900,
+                              "active": {"pm-gillard": [
+                                  {"param": "entry_bar", "value": 0.425}]}},
+    }
+    monkeypatch.setattr(pd, "fetch_states",
+                        lambda keys: {k: fixture.get(k) for k in keys})
+    card = pd.parliament_card()
+    assert "🏛️ Parliament" in card and "🧠 Howard" in card
+    assert "quiet" in card, "a quiet scanner must be a visible row"
+    assert "gillard:entry_bar=0.425" in card
+    monkeypatch.setattr(pd, "fetch_states", lambda keys: {})
+    assert pd.parliament_card() == ""

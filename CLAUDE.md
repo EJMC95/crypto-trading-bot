@@ -326,7 +326,7 @@ its row is dashboard-retired regardless; stop the process when found.
   gate). Expand is v3-ONLY (`BRAIN_MULT_ENGINE=v2` zeroes it) with its own
   kill switch `BRAIN_MULT_EXPAND=off`; consumers clamp [0.5, **1.5**]
   (`fleet_bus.MULT_CEIL` — was 1.0; deliberate documented-contract scope
-  expansion, CHANGELOG (bf)). Payload stamps `mode: two-way|reduce-only`.
+  expansion, CHANGELOG (bh)). Payload stamps `mode: two-way|reduce-only`.
   Consumers: `lighter_family_bot.py` at entry (keyed `<bot_id>` +
   `long-<tag hyphenated>`, 15-Jul) and the freqtrade strategies'
   `custom_stake_amount` — both via `fleet_bus.py`; SHADOW books only, no
