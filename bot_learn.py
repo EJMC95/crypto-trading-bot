@@ -964,6 +964,17 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
                 if (mult is None and n >= 8 and ev["pnl_w"] < 0
                         and ev["post_wr"] < bstats.SOFT_POST_WR):
                     watchlist.append({"bot": bot, "tag": tag, "n": n, **ev})
+                # [2026-07-21 AUDIT] the EXPAND mirror: L4 has published zero
+                # mults in its life (measured: mults={} in all 31 payloads
+                # over 48h — floors-vs-volume, largest bucket n=25 vs the 30
+                # floor), and with two-way shipping today the operator needs
+                # to SEE what is warming toward a boost, not just toward a
+                # throttle. Advisory only, same sub-floor visibility rule.
+                elif (mult is None and MULT_EXPAND and n >= 8
+                        and ev["pnl_w"] > 0
+                        and ev["post_wr"] > bstats.EXP_SOFT_POST_WR):
+                    watchlist.append({"bot": bot, "tag": tag, "n": n,
+                                      "warming": "expand", **ev})
             else:
                 mult = (bstats.qualify_v2(n, w, pnl, MULT_MIN_N, MULT_SOFT_N)
                         if bstats else None)

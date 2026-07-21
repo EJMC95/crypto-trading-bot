@@ -429,6 +429,35 @@ def main():
     light = max(light_for(fleet_long, LONG_BUDGET),
                 light_for(fleet_short, SHORT_BUDGET),
                 key=["green", "yellow", "red"].index)
+
+    # [2026-07-21 AUDIT FIX] EXPOSURE-ONLY extras: equities-regime (the
+    # fleet's only dedicated equity book — the crypto/equity split this view
+    # EXISTS for structurally could not see it: long_equity read 0 while
+    # QQQ+SPY were held), the dislocation fader, and the six Parliament
+    # books (they CONSUME the long-budget veto but contributed nothing to
+    # any count). These join the ADVISORY exposure/pileup view only — the
+    # BUDGET cohort (fleet_long above, the enforced veto) is unchanged:
+    # redefining who the 20-slot budget covers changes what 20 means, and
+    # that is a review decision, not an audit's (evidence filed on the
+    # 21-Jul agenda). Same authoritative-row + freshness rules as the light.
+    EXPOSURE_EXTRA_BOTS = ["equities-regime", "lighter-dislocation",
+                           "pm-albanese", "pm-morrison", "pm-turnbull",
+                           "pm-abbott", "pm-rudd", "pm-gillard"]
+    for base in EXPOSURE_EXTRA_BOTS:
+        row, _venue = authoritative_row(base, by_bot)
+        if not row:
+            continue
+        held = ((row.get("extra") or {}).get("held")) or {}
+        for coin, v in held_items(held):
+            b = str(coin).split("/")[0]
+            if not b:
+                continue
+            t = str(v)
+            side = "short" if (t.upper().startswith("S")
+                               or "short" in t.lower()) else "long"
+            pair_count[b] = pair_count.get(b, 0) + 1
+            expo.append((base, b, side))
+
     hot_pairs = {k: v for k, v in sorted(pair_count.items(),
                                          key=lambda kv: -kv[1]) if v >= 2}
     exposure = exposure_concentration(expo, uncovered=expo_uncovered)

@@ -249,6 +249,9 @@ def main():
     meta = {}            # coin -> {is_long, entry, opened_ts, ref_at_entry}
     census = {}          # coin -> {count, max_bps, last_iso}
     pend = {}            # coin -> consecutive loops the entry signal has held
+    noconv = {}          # coin -> ts of a max_hold (non-converged) close;
+                         # entry-embargoed until |dev| first dips below
+                         # EXIT_BPS (21-Jul: the APEX 6-round-trip lesson)
     _saved = store.load_state(bot_id)
     if _saved:
         if broker is not None and broker.restore_state(_saved.get("broker") or {}):
@@ -410,6 +413,21 @@ def main():
                         log.info("CLOSE %s %s $%+.3f [%s] dev now %+.0fbps",
                                  coin, "long" if is_long else "short", pnl,
                                  reason, dev_bps)
+                        # [2026-07-21 AUDIT FIX] a max_hold close means the
+                        # dislocation did NOT converge inside the hold — a
+                        # PERSISTENT basis, not a fade opportunity. The old
+                        # code re-armed pend[] immediately (dev still >=
+                        # ENTER_BPS every loop), so the bot round-tripped
+                        # the same standing basis over and over: measured
+                        # 20-21 Jul, SIX consecutive APEX max_hold cycles in
+                        # 16h, 5 losses, re-entry ~3.5min after each exit.
+                        # The coin now sits out until its deviation first
+                        # falls back BELOW EXIT_BPS (proof the basis
+                        # actually cleared) — the same shape as the taker's
+                        # post-stop cooldown, expressed in the bot's own
+                        # signal domain.
+                        if reason == "max_hold":
+                            noconv[coin] = time.time()
                         _record_close(bot_id, coin, ent, held["opened_ts"],
                                       exit_px, pnl, is_long, reason,
                                       venue="lighter", shadow=shadow_tag)
@@ -429,6 +447,16 @@ def main():
                     continue
 
                 # ---- entry: confirmed, deep, tradeable dislocation ----
+                # [2026-07-21] non-convergence quarantine: after a max_hold
+                # close the coin is only eligible again once |dev| has been
+                # seen BELOW EXIT_BPS (the basis cleared) — see the close
+                # path above.
+                if coin in noconv:
+                    if abs(dev_bps) <= EXIT_BPS:
+                        noconv.pop(coin, None)   # basis cleared — re-armed
+                    else:
+                        pend[coin] = 0
+                        continue
                 tradeable = abs(dev_bps) >= ENTER_BPS
                 pend[coin] = pend.get(coin, 0) + 1 if tradeable else 0
                 if not tradeable or pend[coin] < CONFIRM_LOOPS:

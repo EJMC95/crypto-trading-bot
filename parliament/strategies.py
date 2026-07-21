@@ -500,6 +500,11 @@ class PMBot:
                        "label": PM_BOTS[self.base][0],
                        "params": {k: round(v, 4) for k, v in self.params.items()},
                        "fund_realized": round(self.fund_realized, 2),
+                       # [2026-07-21] the fleet-risk exposure view's held-map
+                       # contract ({sym: tag}, tag prefix carries the side)
+                       "held": {s: (self.open_meta.get(s) or {}).get(
+                                    "tag", "long")
+                                for s in self.broker.pos},
                        "last_skip": self.last_skip})
         except Exception:  # noqa: BLE001
             pass

@@ -278,6 +278,31 @@ def _fetch_order_slip():
                     "measurable": bool(n_slip) and n_echo < n,
                     "echoed_decision": n_echo,
                 }
+            # [2026-07-21 AUDIT] surface the WHY: both live arms have written
+            # fill_src into raw since 17-Jul (49/49 Farmer + 12/12 taker live
+            # orders currently carry NO measured slip), but nothing ever
+            # aggregated it — the one field that says WHICH failure mode
+            # (no-match, no-detail-api, caller-error…) blocks the measurement
+            # was reachable only by hand-querying raw JSON. Histogram per
+            # arm, so /bus.json shows the blocker by name.
+            try:
+                # own transaction scope: a raw-column type surprise (json vs
+                # jsonb) must degrade THIS histogram, never the measurement
+                # above it
+                cur.execute(
+                    """SELECT bot, raw::jsonb->>'fill_src', COUNT(*)
+                       FROM venue_orders
+                       WHERE bot = ANY(%s)
+                         AND at >= now() - (%s || ' days')::interval
+                         AND raw::jsonb->>'fill_src' IS NOT NULL
+                       GROUP BY bot, raw::jsonb->>'fill_src'""",
+                    (list(roster), str(WINDOW_DAYS)))
+                for bot, src, cnt in cur.fetchall():
+                    arm = roster.get(bot) or bot
+                    if arm in out:
+                        out[arm].setdefault("fill_src", {})[str(src)] = int(cnt)
+            except Exception:  # noqa: BLE001
+                conn.rollback()
     except Exception as e:  # noqa: BLE001 — measurement-only, never raise
         print(f"[impl-shortfall] order-slip fetch failed: {e}", flush=True)
         return {}
