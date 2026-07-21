@@ -459,7 +459,7 @@ money), or explicitly deferred with a date.
   allowed→vetoed on the dedup'd grade — shadow book only), IMB-20
   `scout.div_gap_pp` lever + tuner ladder. G1 was found ALREADY SHIPPED
   17-Jul (correction above).
-  **✅ SECOND PASS (av):** the zombie "port" dissolved on inspection —
+  **✅ SECOND PASS (aw):** the zombie "port" dissolved on inspection —
   all four targets already carried the guard since 16-Jul (correction in
   item 13 above); **IMB-18 RESOLVED and shipped** (a dark brain now
   suppresses the lens-keyed taker-bar walks — the veto set is unknowable

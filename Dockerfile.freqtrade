@@ -92,6 +92,13 @@ COPY strategy_incubator.py /freqtrade/strategy_incubator.py
 COPY fleet_respiration.py /freqtrade/fleet_respiration.py
 # live-vs-shadow execution-quality tracker (implementation shortfall)
 COPY implementation_shortfall.py /freqtrade/implementation_shortfall.py
+# [2026-07-21] 🏛️ the Parliament — the six-layer PM shadow fleet (six $1k
+# books + scanners + ML + tuners + brain), launched from run_all.sh. Imports
+# bot_pnl_store / fleet_bus / funding_basis / paper_broker — all COPY'd above
+# (audit_image_imports verifies; that guard exists because of three born-dark
+# incidents in this exact image).
+COPY parliament/ /freqtrade/parliament/
+COPY parliament_main.py /freqtrade/parliament_main.py
 RUN chmod +x /freqtrade/run_all.sh && chown -R ftuser:ftuser /freqtrade/user_data /freqtrade/run_all.sh /freqtrade/dashboard_server.py /freqtrade/bot_pnl_store.py /freqtrade/freqtrade_pnl_poller.py /freqtrade/market_pulse.py
 # Persistent DB dir for the freqtrade sqlite files. Mount a Railway VOLUME at
 # /freqtrade/persist so open paper trades survive redeploys; without a volume

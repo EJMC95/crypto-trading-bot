@@ -64,6 +64,7 @@ SELFTEST_MODULES = [
     "market_context",
     "market_pulse",
     "paper_broker",
+    "parliament_main",
     "regime_oracle",
     "strategy_incubator",
     "triangular_arb",
@@ -99,6 +100,10 @@ GUARD_ONLY_AUDITS = [
 SELFTEST_EXCLUDE = {
     # Research backtest: needs historical market data / network, not a unit test.
     "scripts/backtest_georgia_short_sleeve.py",
+    # Their selfcheck() blocks run INSIDE `parliament_main --selftest` (which
+    # IS registered above) — the marker hit here is the docstring saying so.
+    "parliament/bus.py",
+    "parliament/ecosystem_db.py",
 }
 
 
