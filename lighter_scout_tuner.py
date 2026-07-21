@@ -209,7 +209,7 @@ def vetoed_lenses(lens_fwd):
     return tt.vetoed_lenses(lens_fwd, min_n=LENS_FLOOR)
 
 
-def desired_taker_bars(tape, baseline, lens_fwd, helping=None):
+def desired_taker_bars(tape, baseline, lens_fwd, helping=None, lens_fresh=True):
     """Walk each lens's conviction-bar ladder from the DEFAULT. Three rules:
 
     STARVING (seen tickets, zero fills, under the brain's ruling floor):
@@ -227,7 +227,21 @@ def desired_taker_bars(tape, baseline, lens_fwd, helping=None):
       floor. Every notch still needs the improve-both-halves margin, and
       the brain's veto stays senior — helping never overrides a veto.
 
+    [2026-07-21 IMB-18 RESOLVED (was contested 2/3)] lens_fresh=False means
+    the brain is DARK (stale/absent lens-forward), which is a DIFFERENT state
+    from "fresh brain with no grades yet" (lens_fwd={}): dark makes the veto
+    set UNKNOWABLE, so "the brain's veto stays senior / never widen a vetoed
+    lens" cannot be honored — and before this fix the starving walk kept
+    widening anyway (the veto simply failed open). A dark brain now earns
+    nothing on the LENS-KEYED walks, the same contract proprioception already
+    states; the lens-AGNOSTIC exit sweep is unaffected (it never consults the
+    brain), and the scout-diet walk was already guarded at the call site.
+
     Returns ({tt attr: value} that differ from default, log list)."""
+    if not lens_fresh:
+        return {}, ["brain dark (lens-forward stale/absent) — lens-keyed bar "
+                    "walks suppressed (IMB-18): the veto set is unknowable, so "
+                    "a dark brain earns nothing; exit sweep unaffected"]
     h1, h2 = halves(tape)
     if not h1 or not h2:
         return {}, ["tape too short to halve — no taker-bar changes"]
@@ -464,7 +478,8 @@ def run_once():
     helping = set(proprio.helping_levers(prop_state, prop_now)) if proprio else set()
 
     baseline = replay_with(tape, DEFAULTS)
-    bars, log1 = desired_taker_bars(tape, baseline, lens_fwd, helping=helping)
+    bars, log1 = desired_taker_bars(tape, baseline, lens_fwd, helping=helping,
+                                    lens_fresh=lf_fresh)
     exits, log2 = sweep_exits(tape, baseline)
     # [2026-07-16 AUDIT FIX] bars were validated against DEFAULT exits and
     # exits against DEFAULT bars — the deployed COMBINATION was never on the
@@ -638,6 +653,11 @@ def _selftest():
     # WINNER expansion: a lens graded POSITIVE at the ruling floor gets its
     # bar widened while each notch IMPROVES the replayed net on both halves
     lf_winner = {"dip": {"n4h": 100, "avg4h_pct": +0.5, "hit4h": 0.6}}
+    # [2026-07-21 IMB-18] a DARK brain suppresses every lens-keyed walk —
+    # even on a tape where the starving walk would otherwise widen
+    bars_dark, log_dark = desired_taker_bars(win_tape, base, {}, lens_fresh=False)
+    assert bars_dark == {} and "brain dark" in log_dark[0], (bars_dark, log_dark)
+
     bars_w, log_w = desired_taker_bars(win_tape, base, lf_winner)
     assert bars_w.get("DIP_RANGE") == 0.08, (bars_w, log_w)
     # ...but a positive grade never expands into replay LOSSES

@@ -157,14 +157,19 @@ first week at the next review.
 
 Verified in code this session:
 
-- **(i) zombie positions — STILL OPEN, the one real decision.** The guard
-  exists only in the sniper (`lighter_perp_sniper.py`, 6 sites); none of
-  the six named bots got the port. **RECOMMEND: sanction the port** (close
-  at last mark after N missing cycles) — paper-only bots, replay-gated per
-  doctrine. It is the remaining hole from an audit everything else in
-  which has shipped.
-- **(ii) replay mark universe** — documented divergence stands; the fix
-  (record all-book marks on the scout tape) remains queued. Keep.
+- **(i) zombie positions — ~~STILL OPEN~~ CORRECTION (same day, caught at
+  implementation): SHIPPED 16-Jul, everywhere.** All four "port targets"
+  already carry the guard under `DELIST_GIVEUP_H` naming (Harvester
+  `funding_carry_bot.py:378`, family-bot orphan close `:989`, Index Rider
+  `:98/:355/:448`, Snap Back `:81/:476`), the taker has its delist
+  give-up, the sniper the original. This review graded the item off a
+  grep for the sniper's word ("zombie") instead of the agenda's own
+  STATUS UPDATE, which listed (i) as shipped in (al). Same lesson as the
+  G1 correction, second occurrence: **grep the fix's NAME, not your
+  name for it — and read the status update you are grading against.**
+- **(ii) replay mark universe — ~~remains queued~~ CORRECTION: also
+  SHIPPED 16-Jul per the same status update** (the scout records marks on
+  the tape; the `lighter-market` payload carries `marks`).
 - **(iii) per-bot clips** — shipped in code ✓. **(iv) census
   double-count** — shipped, then mooted by Gap Scout's retirement ✓.
   **(v) merge race** — shipped (am); no lock incidents visible in a week
@@ -453,10 +458,15 @@ money), or explicitly deferred with a date.
   (episode basis with raw fallback; measured consequence: dip flips
   allowed→vetoed on the dedup'd grade — shadow book only), IMB-20
   `scout.div_gap_pp` lever + tuner ladder. G1 was found ALREADY SHIPPED
-  17-Jul (correction above). Zombie-guard port DEFERRED with the survey
-  done: taker + sniper already carry give-ups; the remaining four
-  (Yield Harvester, family bot, Index Rider, Snap Back) are the port
-  targets for a replay-gated follow-up session.
+  17-Jul (correction above).
+  **✅ SECOND PASS (av):** the zombie "port" dissolved on inspection —
+  all four targets already carried the guard since 16-Jul (correction in
+  item 13 above); **IMB-18 RESOLVED and shipped** (a dark brain now
+  suppresses the lens-keyed taker-bar walks — the veto set is unknowable
+  when dark, so a dark brain earns nothing; exit sweep and the already-
+  guarded diet walk unchanged); **N4 self-healed** (`funding_source:
+  lighter` on the bus after run 187's funding-carry redeploy — the stale
+  container was the cause, as diagnosed).
 
 ## R. Residuals this session could not reach (no DB / no dashboard login)
 
