@@ -835,6 +835,84 @@ def synthesize_proprioception(prop_state, now_ts):
     return out
 
 
+def synthesize_parliament(parl_state, tuning_state, now_ts):
+    """[2026-07-21] 🏛️ the Parliament on the triage board (operator-sanctioned
+    consumer — "proceed with your invention"). Restrict-first, three item
+    classes, all level-triggered off Howard's published vitals:
+      * STALLED chamber organs -> warn (the board's corroboration + phone
+        machinery on top of the watchdog's staleness eye)
+      * a book's drawdown approaching/beyond the GO-LIVE GATE bar (maxDD<15%
+        is the promotion gate; a shadow book bleeding toward it is the
+        earliest restrict evidence this fleet recognises) -> warn at -10%,
+        action at -15%
+      * the ML bench earning a MEASURED out-of-sample edge -> info, expand
+        direction (review evidence only; the gate stays reduce-only)
+    Stale/absent organ emits NOTHING (fail-safe — a dark chamber is the
+    watchdog's finding, not this one's). Pure — selftested offline."""
+    out = []
+    if not parl_state or not _fresh(parl_state, max_age_s=float(
+            parl_state.get("ttl_sec") or 900)):
+        return out
+    stalled = (parl_state.get("health") or {}).get("stalled") or []
+    if stalled:
+        out.append({"key": "board:parliament-stalled", "severity": "warn",
+                    "msg": f"🏛️ Parliament organ(s) STALLED: {', '.join(stalled)} "
+                           f"— alive-but-quiet inside a fresh chamber payload",
+                    "proposal": "check the freqtrade-bots container logs; "
+                                "PARLIAMENT_ENABLED=0 idles the chamber if it "
+                                "is sick (restrict-only kill switch)",
+                    "lever": "parliament", "ts": now_ts, "source": "board"})
+    for bot, b in sorted((parl_state.get("books") or {}).items()):
+        try:
+            pnl_pct = float(b.get("pnl", 0.0)) / 1000.0
+        except (TypeError, ValueError):
+            continue
+        if pnl_pct <= -0.15:
+            sev, band = "action", "BEYOND the 15% go-live gate bar"
+        elif pnl_pct <= -0.10:
+            sev, band = "warn", "approaching the 15% go-live gate bar"
+        else:
+            continue
+        out.append({"key": f"board:parliament-drawdown:{bot}",
+                    "severity": sev,
+                    "msg": f"🏛️ {bot} down {pnl_pct:.1%} from its $1k start — "
+                           f"{band} (closed {b.get('closed')}, "
+                           f"open {b.get('open')})",
+                    "proposal": "restrict-only options: let the daily-loss "
+                                "halt + tuner grading work, or idle the "
+                                "chamber; a book at the gate bar cannot "
+                                "promote and argues for lens review",
+                    "lever": "parliament", "ts": now_ts, "source": "board"})
+    ml = parl_state.get("ml") or {}
+    accs = ml.get("oos_acc") or {}
+    if ml.get("ready") and accs and max(accs.values()) >= 0.55:
+        best = max(accs, key=accs.get)
+        out.append({"key": "board:parliament-ml-edge", "severity": "info",
+                    "msg": f"🏛️ Keating's ML bench has a MEASURED edge: "
+                           f"{best} at {accs[best]:.1%} prequential OOS "
+                           f"accuracy (n={ml.get('n_seen')}) — ensemble gate "
+                           f"active, reduce-only",
+                    "proposal": "review evidence — the gate can only "
+                                "skip/shrink; any authority expansion is a "
+                                "review decision",
+                    "lever": "parliament", "ts": now_ts, "source": "board",
+                    "direction": "expand"})
+    n_levers = 0
+    if tuning_state and _fresh(tuning_state, max_age_s=float(
+            tuning_state.get("ttl_sec") or 900)):
+        n_levers = sum(len(v) for v in (tuning_state.get("active") or
+                                        {}).values() if isinstance(v, list))
+    if n_levers >= 4:
+        out.append({"key": "board:parliament-tuner-breadth", "severity": "info",
+                    "msg": f"🏛️ {n_levers} Parliament tuner levers active at "
+                           f"once (one-per-book cap is 6) — unusually broad "
+                           f"self-tuning; all TTL'd, all inside PARAM_BOUNDS",
+                    "proposal": "watch item only — expiry auto-reverts every "
+                                "lever; episode grading will verdict them",
+                    "lever": "parliament", "ts": now_ts, "source": "board"})
+    return out
+
+
 def detect_veto_flap(alerts_48h_plus, now_ts, window_d=7, min_events=3):
     """A coin appearing in >= min_events veto-change alerts inside window_d
     days is oscillating across its threshold. Restrict-only so harmless, but
@@ -951,6 +1029,11 @@ def run_once():
     # 🦾 proprioception: what the autonomy stack's own movements measured
     prop_b = _g("fleet-proprioception")
     synth += synthesize_proprioception(prop_b, now)
+
+    # 🏛️ the Parliament: chamber health, book drawdown vs the go-live gate,
+    # ML-edge evidence (operator-sanctioned consumer, 21-Jul)
+    synth += synthesize_parliament(_g("parliament"), _g("parliament-tuning"),
+                                   now)
 
     # implementation shortfall (live execution quality) — its own tracker
     # pushes the phone alert; the board only SURFACES the verdict (dedicated-
@@ -1371,6 +1454,42 @@ def _selftest():
         dict(prop, updated="2020-01-01T00:00:00+00:00"), _now()) == []
     assert synthesize_proprioception({}, _now()) == []
     assert synthesize_proprioception(None, _now()) == []
+
+    # 🏛️ Parliament synthesis: stalled=warn, drawdown warn@-10%/action@-15%,
+    # ML edge=expand info, healthy chamber emits nothing, stale emits nothing
+    parl = {"updated": fresh, "ttl_sec": 900,
+            "health": {"stalled": ["data.market"]},
+            "books": {"pm-abbott": {"pnl": -101.0, "closed": 12, "open": 1},
+                      "pm-rudd": {"pnl": -151.0, "closed": 8, "open": 0},
+                      "pm-gillard": {"pnl": 4.0, "closed": 3, "open": 1}},
+            "ml": {"ready": True, "n_seen": 400,
+                   "oos_acc": {"logit": 0.57, "knn": 0.51}}}
+    parl_t = {"updated": fresh, "ttl_sec": 900,
+              "active": {"pm-a": [1, 2], "pm-b": [3], "pm-c": [4]}}
+    git = synthesize_parliament(parl, parl_t, _now())
+    gk = {g["key"]: g for g in git}
+    assert set(gk) == {"board:parliament-stalled",
+                       "board:parliament-drawdown:pm-abbott",
+                       "board:parliament-drawdown:pm-rudd",
+                       "board:parliament-ml-edge",
+                       "board:parliament-tuner-breadth"}, gk
+    assert gk["board:parliament-stalled"]["severity"] == "warn"
+    assert gk["board:parliament-drawdown:pm-abbott"]["severity"] == "warn"
+    assert gk["board:parliament-drawdown:pm-rudd"]["severity"] == "action"
+    assert gk["board:parliament-ml-edge"]["direction"] == "expand"
+    assert "logit" in gk["board:parliament-ml-edge"]["msg"]
+    healthy = {"updated": fresh, "ttl_sec": 900, "health": {"stalled": []},
+               "books": {"pm-gillard": {"pnl": 4.0, "closed": 3, "open": 1}},
+               "ml": {"ready": False, "n_seen": 0, "oos_acc": {}}}
+    assert synthesize_parliament(healthy, None, _now()) == [], \
+        "a healthy chamber must add NOTHING to the board"
+    assert synthesize_parliament(
+        dict(parl, updated="2020-01-01T00:00:00+00:00"), parl_t, _now()) == []
+    assert synthesize_parliament(None, parl_t, _now()) == []
+    # a stale tuning payload cannot mint the breadth item on its own
+    few = synthesize_parliament(
+        healthy, dict(parl_t, updated="2020-01-01T00:00:00+00:00"), _now())
+    assert few == [], few
 
     # LIVE lane: earn-up ladder + cooldown, instant down, fail-safe absent.
     # The rows mirror the REAL cohort shape (16-Jul balance pass): Tide Rider
