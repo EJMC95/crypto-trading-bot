@@ -67,6 +67,9 @@ COPY venues/ /freqtrade/venues/
 COPY evidence_board.py /freqtrade/evidence_board.py
 # fleet_tuning: the bounded growth rail (board + scout tuner = authors)
 COPY fleet_tuning.py /freqtrade/fleet_tuning.py
+# [2026-07-21] the organs' proposal channel to the tuners (operator mandate);
+# consumed by scout tuner / judge, written by sentinel / shortfall / respiration
+COPY fleet_proposals.py /freqtrade/fleet_proposals.py
 # the Lighter loop's replay harness + self-tuning organ (scout tape ->
 # taker's real code -> bounded lever enactments)
 COPY lighter_ticket_replay.py /freqtrade/lighter_ticket_replay.py

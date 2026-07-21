@@ -987,6 +987,7 @@ def autonomy_rail_card():
             "strategy-incubator", "xp-queue",
             "xp-judge", "fleet-immune", "fleet-regen", "fleet-respiration",
             "fleet-clock", "impl-shortfall", "gapscout-census",
+            "tuning-proposals",
         ])
         G, R, Y, M = "#1a7f37", "#d1242f", "#d29922", "#8b949e"
 
@@ -1129,13 +1130,33 @@ def autonomy_rail_card():
                        f'{n_hurt} hurting',
                        Y if n_hurt else (G if (pc.get("graded") or 0) else None))
 
+        def b_proposals():
+            # [2026-07-21] the organs' proposal channel: what the wider
+            # organism is ASKING the tuners for right now (the tuners' own
+            # gates decide). Summarized by author so one glance shows who is
+            # proposing; dark/empty channel omits the row.
+            tp = s.get("tuning-proposals") or {}
+            props = [p for p in (tp.get("proposals") or {}).values()
+                     if isinstance(p, dict) and _lever_unexpired(p)]
+            if not props:
+                return None
+            by = {}
+            for p in props:
+                by.setdefault(str(p.get("set_by") or "?"), []).append(p)
+            n_r = sum(1 for p in props if p.get("direction") == "restrict")
+            txt = (f'{len(props)} open ({n_r} restrict / '
+                   f'{len(props) - n_r} expand) · '
+                   + " · ".join(f'{a}×{len(v)}' for a, v in sorted(by.items())))
+            return row("tuning-proposals", "🗳️ Organ proposals", txt,
+                       Y if n_r else None)
+
         rows = []
         # [2026-07-16 AUDIT FIX] one organ's odd-shaped payload used to throw
         # inside the single outer try and silently vanish the WHOLE card —
         # indistinguishable from "autonomy stack not running". Each row now
         # degrades alone.
-        for build in (b_tuning, b_tuner, b_proprio, b_incubator, b_queue,
-                      b_judge, b_immune, b_regen, b_resp, b_clock,
+        for build in (b_tuning, b_tuner, b_proposals, b_proprio, b_incubator,
+                      b_queue, b_judge, b_immune, b_regen, b_resp, b_clock,
                       b_shortfall, b_census):
             try:
                 rows.append(build())
@@ -4264,6 +4285,9 @@ class H(BaseHTTPRequestHandler):
                         # xp-judge + scout-tuner added on the same rule: the
                         # promotion pipeline's phase and the growth rail's
                         # active levers were only inferable, not readable.
+                        # [2026-07-21] tuning-proposals added: the organs'
+                        # proposal channel to the tuners must be visible on
+                        # the same surface its enactments are.
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
@@ -4271,7 +4295,8 @@ class H(BaseHTTPRequestHandler):
                             "'brain-diagnosis', 'brain-lens-forward', "
                             "'lighter-market', 'fleet-proprioception', "
                             "'parliament', 'parliament-tuning', "
-                            "'impl-shortfall', 'xp-judge', 'scout-tuner')")
+                            "'impl-shortfall', 'xp-judge', 'scout-tuner', "
+                            "'tuning-proposals')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -4312,6 +4337,7 @@ class H(BaseHTTPRequestHandler):
                                    "impl_shortfall": live.get("impl-shortfall"),
                                    "xp_judge": live.get("xp-judge"),
                                    "scout_tuner": live.get("scout-tuner"),
+                                   "tuning_proposals": live.get("tuning-proposals"),
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
             except Exception as e:

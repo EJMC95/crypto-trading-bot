@@ -56,6 +56,11 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 import fleet_tuning as tuning
 
+try:
+    import fleet_proposals as fprop      # organ proposal channel (optional)
+except Exception:  # noqa: BLE001
+    fprop = None
+
 KEY = "xp-judge"
 TTL_SEC = int(os.environ.get("XPJ_TTL_SEC", "10800"))
 LEVER_TTL = int(os.environ.get("XPJ_LEVER_TTL", "7800"))      # ~2h re-assert
@@ -364,6 +369,29 @@ def prop_fade(prop_state, live_levers, now):
                 return True, (f"proprioception: {k} graded HURTING "
                               f"(bad {v.get('bad')}/{v.get('n')} episodes vs "
                               f"pre-window + shadow twin)")
+    except Exception:
+        return False, None
+    return False, None
+
+
+def proposal_fade(proposals, live_levers, now):
+    """[2026-07-21 ORGAN PROPOSALS, operator: organs must "implement changes
+    to forward onto the tuners to act on"] The organs' release path: a fresh
+    RESTRICT-direction proposal (fleet_proposals) on a promoted live lever —
+    e.g. implementation-shortfall measuring sustained live slip — is an
+    organ's measured case against the promotion, so release it early rather
+    than ride the lever to the absolute fade bar. Restrict-only by
+    construction (an extra release path can only pull a lever OFF real
+    money); the judge stays the ONLY writer of live.funding.*; a proposal is
+    evidence in, never a hand on the lever. Fail-safe False on an empty/
+    dark channel (fresh_proposals already age-gates). Pure — selftested."""
+    try:
+        for p in proposals or []:
+            if (p.get("lever") in (live_levers or set())
+                    and p.get("direction") == "restrict"):
+                return True, (f"organ proposal: {p.get('set_by')} proposes "
+                              f"restrict {p['lever']} "
+                              f"({str(p.get('reason') or '')[:120]})")
     except Exception:
         return False, None
     return False, None
@@ -870,12 +898,21 @@ def run_once():
         # 🦾 the earlier fade signal: the live lane's own paired grades
         pfading, pwhy = prop_fade(store.load_state("fleet-proprioception") or {},
                                   set(live_levers), now)
-        if fading or pfading:
+        # 🗞️ the organs' release path (21-Jul): a fresh restrict proposal on
+        # a promoted lever (e.g. impl-shortfall's sustained-slip case)
+        ofading, owhy = (False, None)
+        if fprop is not None:
+            try:
+                ofading, owhy = proposal_fade(fprop.fresh_proposals(),
+                                              set(live_levers), now)
+            except Exception:
+                ofading, owhy = (False, None)
+        if fading or pfading or ofading:
             why = (f"live arm {m:+.2f}%/trade on the recent window (n={n} "
                    f"since promotion"
                    + (f"; pre-promotion baseline {baseline:+.2f}%"
                       if isinstance(baseline, (int, float)) else "") + ")"
-                   if fading else pwhy)
+                   if fading else (pwhy if pfading else owhy))
             verdicts.append({"name": cand["name"], "verdict": "FADED",
                              "ts": iso(now), "live_n": n, "live_mean_pct": m,
                              "why": why})
@@ -991,6 +1028,21 @@ def _selftest():
         "stale organ must not fade"
     assert prop_fade({}, {"live.funding.enter_apr"}, t0) == (False, None)
     assert prop_fade(None, {"live.funding.enter_apr"}, t0) == (False, None)
+
+    # 🗞️ proposal_fade (21-Jul organ proposals): a fresh RESTRICT proposal on
+    # a promoted lever releases; expand/unrelated/empty do nothing
+    props = [{"lever": "live.funding.enter_apr", "value": 0.0625,
+              "direction": "restrict", "set_by": "impl-shortfall",
+              "reason": "sustained live slip"}]
+    oko, whyo = proposal_fade(props, {"live.funding.enter_apr"}, t0)
+    assert oko and "impl-shortfall" in whyo, (oko, whyo)
+    assert not proposal_fade(props, {"live.funding.take_profit"}, t0)[0], \
+        "unrelated lever must not fade"
+    assert not proposal_fade(
+        [dict(props[0], direction="expand")],
+        {"live.funding.enter_apr"}, t0)[0], "expand proposal must NEVER release"
+    assert proposal_fade([], {"live.funding.enter_apr"}, t0) == (False, None)
+    assert proposal_fade(None, {"live.funding.enter_apr"}, t0) == (False, None)
 
     # every candidate's levers are registered, in-bounds, and map to a live twin
     for c in CANDIDATES:

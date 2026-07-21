@@ -39,6 +39,11 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 
+try:
+    import fleet_proposals as fprop      # organ proposal channel (optional)
+except Exception:  # noqa: BLE001
+    fprop = None
+
 KEY = "impl-shortfall"
 TTL_SEC = int(os.environ.get("SHORTFALL_TTL_SEC", "3600"))
 LIVE = os.environ.get("SHORTFALL_LIVE", "perps-funding-lighter-lighter")
@@ -437,6 +442,27 @@ def run_once():
                      f"over {rep['n_overlap']} coins{exitmsg}"):
             payload["last_push"] = now
             store.save_state(KEY, payload)
+
+    # [2026-07-21 ORGAN PROPOSALS] a SUSTAINED slip is this organ's measured
+    # case that live execution is not delivering the promoted edge — forward
+    # it as a RESTRICT proposal on the promoted funding gate. The judge (the
+    # only writer of live.funding.*) consumes it as an early-release signal
+    # (proposal_fade); this organ never touches a lever. Re-asserted while
+    # the slip sustains; expires on its own when it clears. Fail-soft: a
+    # dark channel drops the proposal, never the measurement.
+    if streak >= SUSTAIN and fprop is not None:
+        try:
+            fprop.propose({"live.funding.enter_apr": {
+                "value": 0.0625, "direction": "restrict",
+                "reason": f"live slipping {rep['gap_pp']}pp/trade for "
+                          f"{streak} cycles",
+                "evidence": f"{rep['paired_closes']} paired closes over "
+                            f"{rep['n_overlap']} coins; entry-slip "
+                            f"{rep['entry_slip_bps']}bps exit-slip "
+                            f"{rep['exit_slip_bps']}bps",
+                "ttl_sec": 5400}}, set_by="impl-shortfall", now_ts=now)
+        except Exception:      # noqa: BLE001
+            pass
 
     d = (f" exit-slip {rep['exit_slip_bps']}bps" if rep["exit_slip_bps"] is not None else "")
     print(f"[impl-shortfall] {_iso(now)} verdict={rep['verdict']} "

@@ -244,6 +244,24 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   bot_state `parliament` + `parliament-tuning`. Redis mirror optional
   (`REDIS_URL`); in-process bus is primary. Shadow-only forever until the
   standard go-live gate.
+- `fleet_proposals.py` 🗳️ — the organs' PROPOSAL channel to the tuners
+  (21-Jul, operator: "the organs need more ability to implement changes to
+  forward onto the tuners to act on"). Any organ proposes a bounded change
+  to a REGISTERED lever → `tuning-proposals` (locked multi-author merge,
+  per-proposal expiry, clamped at write AND read, declared
+  direction restrict|expand). Proposals NEVER enact: the scout tuner gates
+  each through ITS OWN replay (restrict = not-worse both halves; expand =
+  the full winner bar, brain veto senior, ≤3/cycle, provenance
+  `organ-proposal:<author>`), and the judge treats a fresh restrict proposal
+  on a promoted live lever as a third release path (`proposal_fade`,
+  restrict-only; judge stays the only live.funding.* writer). First
+  proposers: event sentinel (risk-off crouch / graded-playbook expand),
+  impl-shortfall (sustained slip → live.funding.enter_apr restrict),
+  respiration (confirmed hypoxia → crouch). The sentinel's own
+  `event-sentinel` lane is now enactable + author-bound (detection
+  sensitivity only — it was registered but UNREACHABLE since 16-Jul).
+  Fail-safe: dark channel proposes nothing, consumers ignore stale/junk.
+  → bot_state `tuning-proposals` (+ /bus.json, 🗳️ Autonomy-card row)
 - `regime_oracle.py`, `market_pulse.py` (history appends every 30 min, 15-Jul),
   `cleanup_legacy_bots.py` (boot prune of retired rows)
 

@@ -43,6 +43,7 @@ SELFTEST_MODULES = [
     "fleet_bus",
     "fleet_clock",
     "fleet_immune",
+    "fleet_proposals",
     "fleet_proprioception",
     "fleet_regen",
     "fleet_respiration",

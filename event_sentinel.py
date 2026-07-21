@@ -619,6 +619,87 @@ def main():
             pass
     except Exception:
         pass
+
+    # [2026-07-21 ORGAN PROPOSALS, operator mandate] the sentinel's bias
+    # finally reaches an actuator — as PROPOSALS the scout tuner gates with
+    # its own replay evidence (fleet_proposals; nothing here writes a lever).
+    #   RISK-OFF (market_bias <= -0.3 from a severity-frozen event): propose
+    #     tightening the taker's entry bars + shortening max hold for the
+    #     event window. The tuner enacts only if the tape says the
+    #     tightening is not-worse — a free protective crouch, never a paid one.
+    #   RISK-ON (market_bias >= +0.3 AND the playbook class is GRADED
+    #     accurate, n>=10 hit>=0.55): propose widening the momentum bar one
+    #     step; the tuner's winner bar (improve BOTH halves + brain veto
+    #     senior) decides. An ungraded playbook proposes nothing — the organ
+    #     earns actuation with its own graded history.
+    # Short TTL (1800s): three missed 10-min cycles and every proposal is
+    # gone on its own. Fail-soft: a dark channel drops proposals only.
+    _bias = float(sector_bias.get("all", 0.0) or 0.0)
+    try:
+        import fleet_proposals as fprop
+        if _bias <= -0.3:
+            _evtypes = sorted({e["type"] for e in active
+                               if e.get("fresh") and e.get("pred")})
+            _why = f"risk-off bias {_bias:+.2f} ({', '.join(_evtypes)[:80]})"
+            fprop.propose({
+                "taker.brk_range":  {"value": 0.97, "direction": "restrict",
+                                     "reason": _why, "ttl_sec": 1800},
+                "taker.momo_chg":   {"value": 6.0,  "direction": "restrict",
+                                     "reason": _why, "ttl_sec": 1800},
+                "taker.max_hold_h": {"value": 24.0, "direction": "restrict",
+                                     "reason": _why, "ttl_sec": 1800},
+            }, set_by="event-sentinel", now_ts=now_ts)
+        elif _bias >= 0.3:
+            _graded_ok = [
+                e["type"] for e in active if e.get("fresh") and e.get("pred")
+                and (payload["playbook_grades"].get(e["type"]) or {}).get("n", 0) >= 10
+                and ((payload["playbook_grades"].get(e["type"]) or {})
+                     .get("hit_rate") or 0) >= 0.55]
+            if _graded_ok:
+                fprop.propose({"taker.momo_chg": {
+                    "value": 4.5, "direction": "expand",
+                    "reason": f"risk-on bias {_bias:+.2f}, graded playbook "
+                              f"({', '.join(sorted(set(_graded_ok)))[:80]})",
+                    "evidence": json.dumps(payload["playbook_grades"])[:280],
+                    "ttl_sec": 1800}}, set_by="event-sentinel", now_ts=now_ts)
+    except Exception:
+        pass
+
+    # [2026-07-21] SELF-TUNING of the detection bars (lane 'event-sentinel',
+    # now enactable + author-bound — until today these levers were registered
+    # but unreachable). Stateless from the ENV defaults each cycle, moved
+    # only by the organ's OWN graded record; no grades -> no write -> TTL
+    # reverts. Detection sensitivity only — zero trading surface.
+    #   measured INACCURATE (n>=20, hit<0.45): demand more corroboration
+    #     (min_sources +1, severity_bar +0.10) — fewer, better-attested
+    #     anticipations.
+    #   measured ACCURATE (n>=30, hit>=0.60): lower the freeze bar one step
+    #     (severity_bar -0.10) — more anticipations get frozen and graded,
+    #     the organ learns faster on a playbook that is earning it.
+    try:
+        import fleet_tuning
+        _tn = sum(v["n"] for v in grade_summary.values())
+        _th = sum(v["hit"] for v in grade_summary.values())
+        _hr = (_th / _tn) if _tn else None
+        _sd = {}
+        if _tn >= 20 and _hr is not None and _hr < 0.45:
+            _sd = {"evsent.min_sources": {
+                       "value": min(5, MIN_SOURCES_DEFAULT + 1),
+                       "reason": f"playbook measured inaccurate "
+                                 f"(hit {_hr:.2f} over n={_tn})"},
+                   "evsent.severity_bar": {
+                       "value": min(0.80, SEVERITY_BAR_DEFAULT + 0.10),
+                       "reason": f"playbook measured inaccurate "
+                                 f"(hit {_hr:.2f} over n={_tn})"}}
+        elif _tn >= 30 and _hr is not None and _hr >= 0.60:
+            _sd = {"evsent.severity_bar": {
+                       "value": max(0.30, SEVERITY_BAR_DEFAULT - 0.10),
+                       "reason": f"playbook measured accurate "
+                                 f"(hit {_hr:.2f} over n={_tn})"}}
+        if _sd:
+            fleet_tuning.write_levers(_sd, set_by="event-sentinel")
+    except Exception:
+        pass
     save_state(state)
     print(f"[event_sentinel] {payload['counts']['headlines']} headlines, "
           f"{len(events)} tracked events "

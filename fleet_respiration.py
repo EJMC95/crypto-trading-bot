@@ -202,6 +202,31 @@ def run_once():
             payload["last_push"] = now
             store.save_state(KEY, payload)
 
+    # [2026-07-21 ORGAN PROPOSALS] CONFIRMED hypoxia (streak >= 2): trading
+    # decisions are being made on a starved data supply, so propose the
+    # protective crouch — tighter entry bars, shorter hold — via
+    # fleet_proposals. The scout tuner enacts only what its replay says is
+    # not-worse; this organ never touches a lever. Re-asserted while hypoxia
+    # sustains; short TTL clears it on recovery. A BLIND cycle proposes
+    # nothing (its own eyes failing is not fleet starvation).
+    if streak >= 2 and not blind:
+        try:
+            import fleet_proposals as fprop
+            _why = (f"HYPOXIA SpO2 {spo2:.0%}: "
+                    + ", ".join(hypoxic)[:120])
+            fprop.propose({
+                "taker.brk_range":  {"value": 0.97, "direction": "restrict",
+                                     "reason": _why, "ttl_sec": 1800},
+                "taker.momo_chg":   {"value": 6.0,  "direction": "restrict",
+                                     "reason": _why, "ttl_sec": 1800},
+                "taker.div_gap_pp": {"value": 87.5, "direction": "restrict",
+                                     "reason": _why, "ttl_sec": 1800},
+                "taker.max_hold_h": {"value": 24.0, "direction": "restrict",
+                                     "reason": _why, "ttl_sec": 1800},
+            }, set_by="fleet-respiration", now_ts=now)
+        except Exception:      # noqa: BLE001 — a dark channel drops proposals only
+            pass
+
     print(f"[fleet-respiration] {_iso(now)} SpO2 {spo2:.0%} {state} "
           f"hypoxic={hypoxic or '—'}", flush=True)
     return payload

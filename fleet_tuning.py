@@ -76,9 +76,17 @@ CACHE_SEC = 60.0
 #                   operator-only forever.
 #   lighter-xp    — the Funding Farmer SHADOW twin's experiment arm (the
 #                   judge's candidate parameters; zero real money)
+#   event-sentinel — [2026-07-21 operator mandate: organs must be able to
+#                   implement changes] the sentinel's OWN detection bars
+#                   (evsent.min_sources / evsent.severity_bar): sensitivity
+#                   of an ADVISORY news organ, zero trading surface — the
+#                   same class as paper-scanner. Until today this lane was
+#                   registered but unreachable: not enactable AND no author
+#                   bound, so the levers could never move at all.
 ENACT_LANES = {s.strip() for s in os.environ.get(
     "FLEET_TUNING_ENACT_LANES",
-    "paper-scanner,lighter-scout,lighter-taker,lighter-live,lighter-xp"
+    "paper-scanner,lighter-scout,lighter-taker,lighter-live,lighter-xp,"
+    "event-sentinel"
     ).split(",") if s.strip()}
 
 # [2026-07-16 AUDIT FIX] author -> lanes each author may WRITE. "The judge is
@@ -93,6 +101,8 @@ AUTHOR_LANES = {
                          "lighter-live"},
     "scout-tuner":      {"lighter-scout", "lighter-taker"},
     "experiment-judge": {"lighter-xp", "lighter-live"},
+    # [2026-07-21] the sentinel tunes ONLY its own detection lane
+    "event-sentinel":   {"event-sentinel"},
 }
 _LIVE_PREFIX_OWNERS = {"live.clip_scale": "evidence-board",
                        "live.funding.": "experiment-judge"}
