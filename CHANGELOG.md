@@ -1,3 +1,8 @@
+## 2026-07-21 (aw) — Howard's vitals reach /bus.json: the Parliament's organ keys join the off-Railway bus window
+
+- `/bus.json` served a fixed bot_state key list that predates the Parliament, so `parliament` (Howard's vitals: books, ML bench accuracy, active tuner levers, organ health) and `parliament-tuning` were publishing into Postgres with no off-Railway reader — the (av) build verified the BOOKS by their dashboard rows, but the ORGAN's own payload wasn't reachable, and "verify a module by its OWN published output" needs the window. Both keys added to the live read + the output dict, and `parliament` to the history read (same pattern as fleet-proprioception's 16-Jul addition).
+- Display-only change to the dashboard's read-only endpoint; no trading surface touched. Rides the pnl-dashboard auto-deploy path on merge.
+
 ## 2026-07-21 (av) — 🏛️ THE PARLIAMENT: the six-layer self-evolving Lighter shadow fleet, named for the last 8 Australian PMs (operator ask)
 
 - **WHAT SHIPPED: `parliament/` + `parliament_main.py`** — one asyncio process carrying six layers, launched from `run_all.sh` in the freqtrade-bots container (COPY'd in `Dockerfile.freqtrade`; both files are on the auto-redeploy path list, so merge → deploy). SHADOW-ONLY: no keys, no signing, no orders — six $1,000 books (fleet rules: no top-ups, paper until the 30d WR>55% / maxDD<15% gate).
