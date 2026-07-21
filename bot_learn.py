@@ -92,6 +92,15 @@ PROMOTE_RUNS = 3      # a hypothesis must survive this many runs to be ACTIONABL
 # 15 for the soft one because it only shaves a quarter of the stake.
 MULT_MIN_N = 30       # era trades on a tag before a 0.5x may publish
 MULT_SOFT_N = 15      # era trades before a 0.75x may publish
+# [2026-07-21 EXPAND — operator: "brain needs to be able to widen too"]
+# Two-way mults: a PROVEN tag may earn 1.25x/1.5x on brain_stats' mirror
+# bars (Wilson LOWER bound, t >= +2.0/+2.5, full n floor, no family
+# inheritance, no urgent path — see EXP_* there). v3-ONLY: the
+# BRAIN_MULT_ENGINE=v2 kill switch zeroes the expand side too, and this
+# dedicated switch stands down just the widening while reductions keep
+# working. Consumers clamp at fleet_bus.MULT_CEIL (1.5) and only SHADOW
+# books read mults — no live bot consumes them.
+MULT_EXPAND = os.environ.get("BRAIN_MULT_EXPAND", "on").lower() != "off"
 MULT_KEY = "brain-stake-mults"
 MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
 
@@ -876,7 +885,11 @@ def derive_actions(hypotheses):
 
 def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
                         engine=None):
-    """[2026-07-14 L4, 2026-07-16 v3] Reduce-only per-(bot, tag) stake mults.
+    """[2026-07-14 L4, 2026-07-16 v3, 2026-07-21 TWO-WAY] Per-(bot, tag)
+    stake mults — reduce-only until 21-Jul; now also EXPAND (1.25x/1.5x) on
+    brain_stats' mirror bars when the v3 engine runs with BRAIN_MULT_EXPAND
+    armed (see MULT_EXPAND above). Expand rides the identical streak gate;
+    it has no urgent fast-path by design.
 
     v2 rule table (frozen in brain_stats.qualify_v2, era trades only):
         n >= MULT_MIN_N,  pnl < 0, wr < 25%          -> 0.50x
@@ -933,7 +946,8 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
                     [s for tt, s in bot_pool.get(bot, []) if tt != tag],
                     [s for s in all_buckets if s is not st])
                 mult, ev = bstats.qualify_v3(st, prior,
-                                             min_n=MULT_MIN_N, soft_n=MULT_SOFT_N)
+                                             min_n=MULT_MIN_N, soft_n=MULT_SOFT_N,
+                                             expand=MULT_EXPAND)
                 priors_out[f"{bot}|{tag}"] = {
                     "mu": ev["prior_mu"], "kappa": ev["prior_kappa"],
                     "src": ev["prior_src"]}
@@ -997,7 +1011,12 @@ def _publish_stake_mults(published):
     try:
         import bot_pnl_store as store
         payload = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                   "ttl_sec": MULT_TTL_SEC, "mode": "reduce-only",
+                   "ttl_sec": MULT_TTL_SEC,
+                   # [2026-07-21] two-way when the expand side is armed (v3 +
+                   # BRAIN_MULT_EXPAND) — the mode string is the honest label
+                   # consumers and dashboards read, not a behavior switch.
+                   "mode": ("two-way" if (MULT_EXPAND and MULT_ENGINE == "v3")
+                            else "reduce-only"),
                    "min_n": MULT_MIN_N, "promote_runs": PROMOTE_RUNS,
                    "engine": MULT_ENGINE, "half_life_days": HALF_LIFE_DAYS,
                    "mults": published}

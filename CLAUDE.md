@@ -78,8 +78,9 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   engine (16-Jul, `brain_stats.py`)**: decay-weighted buckets (14d half-life
   forgetting), empirical-Bayes pooling (tag-family → bot → fleet priors),
   Wilson/t evidence bars, regime splits, episode-deduped lens grading (raw
-  fields unchanged — consumer contracts held); floors/streaks/reduce-only
-  UNCHANGED (authority did not move); validated by `brain_replay.py`
+  fields unchanged — consumer contracts held); floors/streaks UNCHANGED;
+  reduce-only until 21-Jul, then TWO-WAY (see `brain-stake-mults` below —
+  operator-mandated expand, v3-only, mirror bars); validated by `brain_replay.py`
   (ledger no-regression + 6-scenario synthetic discrimination, header has
   the verdict); kill switch `BRAIN_MULT_ENGINE=v2`. **Fast-path (16-Jul
   "no-brainer window")**: EMER_* bars (n≥40, t≤−2.5, post_wr<0.20) skip the
@@ -316,11 +317,20 @@ its row is dashboard-retired regardless; stop the process when found.
   ShadowBroker, lighter_family_bot.py); its services deploy from there
 
 ## Cross-Bot Intelligence (bot_state keys — since 2026-07-14 CONSUMED, not just published)
-- `brain-stake-mults` — bot_learn's L4 reduce-only per-(bot, enter_tag) stake
-  multipliers (floors: n≥30 era trades / 3 consecutive runs; never >1.0).
+- `brain-stake-mults` — bot_learn's L4 per-(bot, enter_tag) stake
+  multipliers. **TWO-WAY since 21-Jul (operator: "brain needs to be able to
+  widen too")** — reduce (0.5/0.75, floors n≥30 era trades / 3 consecutive
+  runs, unchanged since 14-Jul) AND expand (1.25/1.5 on the v3 MIRROR bars:
+  Wilson LOWER bound, t ≥ +2.0/+2.5, full n floor only, no family-praise
+  inheritance, no urgent fast-path — `brain_stats.EXP_*`; same 3-run streak
+  gate). Expand is v3-ONLY (`BRAIN_MULT_ENGINE=v2` zeroes it) with its own
+  kill switch `BRAIN_MULT_EXPAND=off`; consumers clamp [0.5, **1.5**]
+  (`fleet_bus.MULT_CEIL` — was 1.0; deliberate documented-contract scope
+  expansion, CHANGELOG (bf)). Payload stamps `mode: two-way|reduce-only`.
   Consumers: `lighter_family_bot.py` at entry (keyed `<bot_id>` +
   `long-<tag hyphenated>`, 15-Jul) and the freqtrade strategies'
-  `custom_stake_amount` — both via `fleet_bus.py`.
+  `custom_stake_amount` — both via `fleet_bus.py`; SHADOW books only, no
+  live bot reads mults.
 - `fleet-risk` — L2 traffic light, mode **enforce**: strategies veto NEW long
   entries at long-budget (20). Kill switch: `FLEET_RISK_MODE=advisory`.
 - `signal-bus`, `regime-oracle`, `market-pulse` — published context (funding

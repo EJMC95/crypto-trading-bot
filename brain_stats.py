@@ -57,6 +57,21 @@ HARD_T = -1.0                # ...and PnL negative at >= 1 sigma
 SOFT_POST_WR = 0.42          # 0.75x: the v2 wr<0.40 rule, shrinkage-adjusted
 SOFT_W_HI = 0.60
 SOFT_T = -0.7
+# [2026-07-21 EXPAND — operator: "brain needs to be able to widen too"]
+# The MIRROR bars for growing a PROVEN tag above 1.0x. Stricter by design
+# than their reduce twins: the condemnation side uses the OPTIMISTIC Wilson
+# bound (benefit of the doubt before shrinking someone), the expand side
+# uses the PESSIMISTIC one (a raise must survive the worst plausible read).
+# No soft-n path (pooling may condemn a thin tag via its family, but praise
+# does not inherit — a sibling's win rate is not this tag's), and no EMER
+# fast-path (urgency exists to stop bleeding; there is no urgent reason to
+# size UP — expand always waits out the full streak gate).
+EXP_SOFT_POST_WR = 0.55      # 1.25x: shrunk wr above this...
+EXP_SOFT_W_LO = 0.50         # ...with even the pessimistic bound past coin-flip
+EXP_SOFT_T = 2.0             # ...and PnL positive at >= 2 sigma
+EXP_HARD_POST_WR = 0.60      # 1.5x: the ceiling step
+EXP_HARD_W_LO = 0.55
+EXP_HARD_T = 2.5
 MIN_N_EFF_HARD = 18.0        # decayed evidence floor under the raw n>=30 floor
 MIN_N_EFF_SOFT = 9.0         # under the raw n>=15 floor
 KAPPA_MIN, KAPPA_MAX = 5.0, 15.0
@@ -235,25 +250,42 @@ def qualify_v2(n, w, pnl, min_n=30, soft_n=15):
     return None
 
 
-def qualify_v3(stats, prior, min_n=30, soft_n=15):
+def qualify_v3(stats, prior, min_n=30, soft_n=15, expand=False):
     """(mult|None, evidence dict). stats from weighted_bucket, prior from
     eb_prior. Raw-count floors are unchanged from v2 (necessary, never
     sufficient); on top of them the decayed EV must be negative at
     t-stat strength AND the shrunk win rate AND its Wilson upper bound
     must clear the bars. Every number that decided the call is returned
     so the published payload carries its own audit trail.
+
+    [2026-07-21 EXPAND] With expand=True a POSITIVE bucket can qualify for
+    1.25x/1.5x on the mirror bars (EXP_*): Wilson LOWER bound, positive t,
+    full n floor only, no family inheritance, no urgent path. The caller
+    owns the switch (bot_learn: v3 engine AND BRAIN_MULT_EXPAND on) so the
+    replay harness and the v2 kill switch both zero the expand side.
     """
     n, n_eff = stats["n"], stats["n_eff"]
     mu, kappa, src = prior
     post = posterior_wr(stats["wr_w"], n_eff, mu, kappa)
-    _, w_hi = wilson(stats["wr_w"], n_eff)
+    w_lo, w_hi = wilson(stats["wr_w"], n_eff)
     t = stats["t"]
     ev = {"n_eff": round(n_eff, 1), "wr_w": round(stats["wr_w"], 3),
           "post_wr": round(post, 3), "w_hi": round(w_hi, 3),
+          "w_lo": round(w_lo, 3),
           "t": round(t, 2), "pnl_w": round(stats["pnl_w"], 2),
           "prior_mu": round(mu, 3), "prior_kappa": round(kappa, 1),
           "prior_src": src, "urgent": False}
     if stats["pnl_w"] >= 0:
+        if not expand:
+            return None, ev
+        if (n >= min_n and n_eff >= MIN_N_EFF_HARD and stats["pnl_w"] > 0
+                and post > EXP_HARD_POST_WR and w_lo > EXP_HARD_W_LO
+                and t >= EXP_HARD_T):
+            return 1.5, ev
+        if (n >= min_n and n_eff >= MIN_N_EFF_HARD and stats["pnl_w"] > 0
+                and post > EXP_SOFT_POST_WR and w_lo > EXP_SOFT_W_LO
+                and t >= EXP_SOFT_T):
+            return 1.25, ev
         return None, ev
     if (n >= min_n and n_eff >= MIN_N_EFF_HARD
             and post < HARD_POST_WR and w_hi < HARD_W_HI and t <= HARD_T):
@@ -345,6 +377,33 @@ def _selftest():
         assert f(40, 5, -10.0) == 0.5 and f(40, 14, -10.0) == 0.75
     assert all(x in (None, 0.5, 0.75) for x in
                [qualify_v2(n, w, p) for n in (5, 20, 40) for w in (0, 10) for p in (-5, 5)])
+
+    # [2026-07-21 EXPAND] two-way mults: the mirror bars.
+    # A strong fresh winner clears the 1.5x hard bar — but ONLY when the
+    # caller arms expand; the default path preserves the reduce-only grid.
+    strong = weighted_bucket([mk(2.0, d % 3, 0.02) for d in range(26)]
+                             + [mk(-1.0, d % 3, -0.01) for d in range(4)], now)
+    assert qualify_v3(strong, eb_prior([], [], []))[0] is None  # default: no expand
+    m_s, ev_s = qualify_v3(strong, eb_prior([], [], []), expand=True)
+    assert m_s == 1.5, (m_s, ev_s)
+    assert ev_s["urgent"] is False        # expand never fast-paths
+    # A decent-but-not-overwhelming winner lands the 1.25x soft step (its
+    # pessimistic Wilson bound clears coin-flip but not the 0.55 hard bar).
+    decent = weighted_bucket([mk(1.0, d % 3, 0.01) for d in range(19)]
+                             + [mk(-0.6, d % 3, -0.006) for d in range(11)], now)
+    m_dc, ev_dc = qualify_v3(decent, eb_prior([], [], []), expand=True)
+    assert m_dc == 1.25, (m_dc, ev_dc)
+    # Small positive samples never expand (full n floor, no soft-n path)...
+    small_win = weighted_bucket([mk(1.5, 1)] * 12 + [mk(-0.5, 1)] * 3, now)
+    assert qualify_v3(small_win, eb_prior([], [], []), expand=True)[0] is None
+    # ...and family praise does NOT inherit: a mediocre own sample under a
+    # glowing tag-family prior stays at 1.0 (w_lo + t are own-sample bars).
+    mediocre = weighted_bucket([mk(0.8, 1) if i % 2 == 0 else mk(-0.8, 1)
+                                for i in range(30)], now)
+    assert qualify_v3(mediocre, (0.85, KAPPA_MAX, "tag-family"),
+                      expand=True)[0] is None
+    # Reduce side is untouched by the expand switch: the bleeder still 0.5x.
+    assert qualify_v3(bad, eb_prior([], [], []), expand=True)[0] == 0.5
 
     # Family condemnation: weak own dollars (t between FAM_T and HARD_T)
     # fire ONLY when the tag family is big and bad — and never on the

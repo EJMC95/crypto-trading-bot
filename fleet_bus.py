@@ -30,7 +30,14 @@ _cache = {}   # key -> {"ts": datetime, "payload": dict|None}
 # above full stake. Boosting (>1.0x) must earn its way in with more ledger
 # evidence — see bot_learn.py MULT rules.
 MULT_FLOOR = 0.5
-MULT_CEIL = 1.0
+# [2026-07-21 TWO-WAY MULTS — operator: "brain needs to be able to widen
+# too"] Ceiling raised 1.0 -> 1.5: the brain may now publish EXPAND mults
+# (1.25/1.5) for tags proving out on the v3 mirror bars (Wilson LOWER
+# bound, t >= +2, full n floor, streak-gated, no urgent path — brain_stats
+# EXP_*). The clamp still bounds whatever arrives; only SHADOW books read
+# mults. Deliberate scope expansion of the documented reduce-only
+# contract, recorded in CLAUDE.md the same day.
+MULT_CEIL = 1.5
 
 
 def _now_utc(current_time):
@@ -283,6 +290,21 @@ if __name__ == "__main__":
     _cache["brain-diagnosis"] = {"ts": _now, "payload": None}
     assert entry_regime_gated("freqtrade-georgia-lshadow", "long-trend-breakout",
                               _now) is False, "absent brain -> open"
+
+    # [2026-07-21 TWO-WAY MULTS] the clamp passes expand values and still
+    # bounds both directions
+    _mults = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 26000,
+              "mults": {"freqtrade-avo-maria-lshadow":
+                        {"long-swing-dip": {"mult": 1.25},
+                         "long-big": {"mult": 2.0},
+                         "long-bad": {"mult": 0.25}}}}
+    _cache["brain-stake-mults"] = {"ts": _now, "payload": _mults}
+    assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-swing-dip",
+                            _now) == 1.25, "expand mult passes the clamp"
+    assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-big",
+                            _now) == 1.5, "over-ceiling clamps to 1.5"
+    assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-bad",
+                            _now) == 0.5, "under-floor clamps to 0.5"
     print("fleet_bus selftest OK (lever_outcome fresh/unknown/stale/absent; "
           "long_symbol_blocked enforce/advisory/cap0/stale/absent; "
           "entry_regime_gated act+off/no-tag/no-bot/risk-on/stale-oracle/"
