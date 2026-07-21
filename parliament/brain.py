@@ -207,7 +207,20 @@ class Howard:
                      "watchlist": list(getattr(data, "watchlist", []) or []),
                      "cycles": getattr(data, "cycles", 0),
                      "errors": getattr(data, "errors", 0)} if data else {},
-            "scanners": {"emitted": getattr(scanners, "emitted", 0)},
+            "scanners": {"emitted": getattr(scanners, "emitted", 0),
+                         # the full 10-scanner bench, quiet members included —
+                         # per-scanner counts/last-fire so no scanner can go
+                         # dark invisibly behind the lump-sum number
+                         "bench": {
+                             name: {"n": b.get("emitted", 0),
+                                    "runs": b.get("runs", 0),
+                                    "last_sym": b.get("last_sym"),
+                                    "last_age_sec": (
+                                        int(time.time() - b["last_ts"])
+                                        if b.get("last_ts") else None)}
+                             for name, b in sorted(
+                                 (getattr(scanners, "by_scanner", None)
+                                  or {}).items())}},
             "health": {"stalled": stalled,
                        "beats": {k: int(time.time() - v[0])
                                  for k, v in sorted(self.beats.items())}},

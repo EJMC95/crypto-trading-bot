@@ -2421,6 +2421,25 @@ def _organ_vital(key, st):
         if key == "gapscout-census":
             return _v("{} episodes open · quiet {}h",
                       st.get("episodes_open"), st.get("quiet_hours"))
+        if key == "parliament":
+            books = st.get("books") or {}
+            sc = st.get("scanners") or {}
+            bench = sc.get("bench") or {}
+            quiet = sum(1 for b in bench.values()
+                        if isinstance(b, dict) and not b.get("n"))
+            stalled = (st.get("health") or {}).get("stalled") or []
+            return _v("{} books · {} closed · {} signals/{} scanners{}{}",
+                      len(books),
+                      sum(int(b.get("closed") or 0) for b in books.values()
+                          if isinstance(b, dict)),
+                      sc.get("emitted"), len(bench) or "—",
+                      f" · {quiet} quiet" if bench and quiet else "",
+                      f" · STALLED {','.join(stalled)}" if stalled else "")
+        if key == "parliament-tuning":
+            act = st.get("active") or {}
+            n = sum(len(v) for v in act.values() if isinstance(v, list))
+            return _v("{} active levers · {} enacted lifetime",
+                      n, st.get("enacted"))
     except Exception:  # noqa: BLE001
         pass
     return "—"
@@ -2495,6 +2514,14 @@ ORGAN_SPECS = [
     # is ever resurrected (GAPSCOUT_RETIRED_OVERRIDE=run) restore this line.
     ("fleet-alerts",       "🔔 Alert feed (event-driven)",            False, None),
     ("evidence-review",    "🧾 Evidence review (daily + operator)",   False, None),
+    # [2026-07-21] 🏛️ the Parliament — Howard's vitals (6 books, 10-scanner
+    # bench, 5-model ML, per-organ beats) + the tuner bench's active levers.
+    # Non-critical for the first rollout per the growth-rail bedding-in
+    # doctrine above; promote once a few quiet weeks prove the baseline.
+    # Both keys are UNCONDITIONAL per-cycle publishes (never event-typed),
+    # so a stale row here really is a sick chamber.
+    ("parliament",         "🏛️ Parliament — six PM books + organs",   False, 900),
+    ("parliament-tuning",  "🎚️🏛️ Parliament tuners — active levers",  False, 900),
 ]
 
 # The consumption matrix: (signal, publisher, consumers, mode, freshness key).
