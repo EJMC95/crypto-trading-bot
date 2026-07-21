@@ -35,6 +35,14 @@ Operator ask: "full audit of todays works … fix where bots have made mistakes 
 - CHANGELOG letter collisions repaired: the second "(az)" → (bj), the second "(ax)" → (bf); cross-references verified still pointing at their intended entries.
 - Docstring rot: `fleet_bus` header, family-bot `brain_stake_mult`, test-file header all said "[0.5, 1.0] reduce-only" after the contract moved to [0.5, 1.5] two-way.
 
+**WAVE 3 — the verify pass catches the day twice more, including this audit's own fixes:**
+- `regime_oracle`'s dark-venue publish guard now gates on CRYPTO pairs: the (az) non-crypto widening let an all-crypto-failure cycle PUBLISH a fresh crypto-empty fleet read — consumers of the (bc) regime gate would read fresh "no signal" instead of going TTL-neutral, against the module's own pinned contract.
+- `proposal_fade` holds restrict-only in OUTCOME, not just intent: releasing a promoted TIGHTENING (the re-spec'd 0.075 gate vs the 0.05 env default) would have WIDENED the live gate on 'restrict' evidence. A release now requires the env default to be the tighter side (`LIVE_ENV_DEFAULTS` orientation map).
+- The WINNER diet path: IMB-20's `scout.div_gap_pp` was UNREACHABLE in the exact state it shipped for — the diet only widened UNDER the ruling floor, and divergence (the winner it was built for) has MET it. A lens positive at the floor now holds one widening notch; released the moment the grade drops.
+- The live Ticket Taker's sizing follows the documented contract: `live.clip_scale` REPLACES the fleet drawdown governor on the live arm (this session's own wiring had it compounding; the fleet clip_scale is shadow-lane per the 17-Jul rule). Shadow arm unchanged.
+- The board's Parliament "go-live gate" item says what it measures (P&L-from-start — a LOWER BOUND on maxDD, so the action band fires conservatively-correctly) instead of claiming maxDD; the DASH_PASS rotation discards `railway variables --set` output (the password was masked; the service's other variables were not).
+- The watchdog's budget warning decomposed (the live "24 vs 20"): the family bot read the veto ONCE per cycle for seven books (in-cycle headroom counter added — the overshoot mechanism), and the watchdog compared a side-blind superset cohort against the LONG budget (it now reads fleet_risk's own published long count as the single authority, local count only as the dark fallback).
+
 Tests: full pytest suite green (190), every touched module's selftest green, `brain_replay` PASS, born-dark + deploy-coverage + venue-purity guards green. The dashboard row inventory was verified against the live endpoints: all 23 fleet-table rows present/fresh, zero missing, zero extra; Parliament publishing on /bus.json.
 
 ## 2026-07-21 (bi) — 🗳️ ORGANS PROPOSE, TUNERS DISPOSE (operator: "the organs need more ability to implement changes to forward onto the tuners to act on"): the fleet-wide proposal channel
