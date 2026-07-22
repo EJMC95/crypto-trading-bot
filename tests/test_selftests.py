@@ -132,6 +132,26 @@ SELFTEST_EXCLUDE = {
     # filter is EXHAUSTED as a diagnosis for divergence's bleed — the big
     # losers were the highest-conviction tickets (all |gap| >= 101).
     "scripts/study_div_gap_tighten.py",
+    # [2026-07-22] breakout LEVEL-vs-EVENT entry study: --selftest offline-green
+    # (fixtures only); full run pages the venue's 4h candles for 25 coins.
+    # Header verdict: DO NOT ENACT — crossing entry fails both halves in both
+    # books, the 14-Jul "boot burst" re-attributes to a market-wide fresh
+    # breakout candle, and the stale entries a crossing rule removes are
+    # net-POSITIVE. Re-run with --refresh, never re-argue from prose.
+    "scripts/study_breakout_boot_entry.py",
+    # [2026-07-22] taker realized-SL study: --selftest offline-green; full run
+    # reads the bus tape + paper ledger. Header verdict: NO CHANGE — the
+    # replay already prices SL at the breaching mark; the filed −3.55% mixed
+    # bars-in-force (−4% lever windows). The real follow-up is LEVER FLAP
+    # (expiry snapping a tighter bar onto in-flight positions), filed for the
+    # tuner/TTL semantics review.
+    "scripts/study_taker_sl_realized.py",
+    # [2026-07-22] swing-daily dormancy study: --selftest offline-green; full
+    # run pages the venue's 1d candles. Header verdict: GENUINE DORMANCY, not
+    # a data-depth bug — the 240-bar fetch reproduces the full-depth signal
+    # stream 25/25; the would-be entries lost money, the gate's silence
+    # protected the book.
+    "scripts/study_swing_daily_dormancy.py",
     # Their selfcheck() blocks run INSIDE `parliament_main --selftest` (which
     # IS registered above) — the marker hit here is the docstring saying so.
     "parliament/bus.py",
