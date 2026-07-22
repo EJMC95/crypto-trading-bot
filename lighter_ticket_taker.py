@@ -480,18 +480,70 @@ def delist_due(no_mark_since_iso, t_now, giveup_h=None):
     return gone_h >= (DELIST_GIVEUP_H if giveup_h is None else giveup_h)
 
 
-def exit_reason(entry, mark, opened, t_now, is_long=True):
-    """tp / sl / hold / None for a position held from `opened`."""
+def exit_reason(entry, mark, opened, t_now, is_long=True, bars=None):
+    """tp / sl / hold / None for a position held from `opened`.
+
+    `bars` is an optional (tp, sl, max_hold_h) tuple — the position's OWN
+    governing bars (see pos_bars). None = the module's current bars, the
+    pre-(by) behavior every existing caller keeps."""
     if not entry or entry <= 0 or not mark or mark <= 0:
         return None
+    tp, sl, hold_h = bars if bars else (TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H)
     ret = (mark / entry - 1.0) * (1.0 if is_long else -1.0)
-    if ret >= TAKE_PROFIT:
+    if ret >= tp:
         return "tp"
-    if ret <= STOP_LOSS:
+    if ret <= sl:
         return "sl"
-    if (t_now - opened).total_seconds() >= MAX_HOLD_H * 3600:
+    if (t_now - opened).total_seconds() >= hold_h * 3600:
         return "hold"
     return None
+
+
+# [2026-07-22 LEVER FLAP FIX — operator: "implement the flap to all those who
+# need it"] The (bw) taker-SL study measured the defect this closes: 9/22 SL
+# closes were "already past the close-time bar" because a WIDER lever (sl
+# -0.04) EXPIRED mid-position and the snapped-back default (-0.03) booked the
+# whole gap instantly (delays up to 58m). The rule now: THE BARS PRICED AT
+# ENTRY GOVERN THE TRADE. Entries stamp the bars in force into position meta;
+# exits check the stamp, so a lever expiry can only change the bars of NEW
+# positions. This also makes the runtime match every instrument that already
+# assumes per-trade constant bars (replay sweep, judge receipts,
+# proprioception counterfactuals). Entry GATES (dip/brk/momo/div) still read
+# live levers — a crouch still bites new entries immediately; and the
+# post-close SL_COOLDOWN_H deliberately stays close-time (it is close-side
+# policy, not a bar the position was priced at). Stamps are written even with
+# the switch off (attribution is free); LEVER_GRANDFATHER=off reverts the
+# BEHAVIOR to close-time bars.
+LEVER_GRANDFATHER = os.environ.get("LEVER_GRANDFATHER", "on").strip().lower() \
+    not in ("off", "0", "no", "false", "disabled")
+
+
+def entry_bars():
+    """The bars in force RIGHT NOW, stamped into a new position's meta —
+    exit bars (governing) plus the entry filters that admitted it
+    (attribution; the filters never re-apply mid-position)."""
+    return {"tp": TAKE_PROFIT, "sl": STOP_LOSS, "max_hold_h": MAX_HOLD_H,
+            "div_gap_pp": DIV_GAP_PP, "div_vol_m": DIV_VOL_M,
+            "dip_range": DIP_RANGE, "brk_range": BRK_RANGE,
+            "momo_chg": MOMO_CHG}
+
+
+def pos_bars(m):
+    """(tp, sl, max_hold_h) GOVERNING an open position: its entry stamp when
+    grandfathering is on and the stamp is sane, else the module's current
+    bars. Fail-safe: an unstamped/legacy/junk position behaves exactly as
+    before this fix."""
+    try:
+        if LEVER_GRANDFATHER:
+            b = (m or {}).get("bars") or {}
+            tp = float(b["tp"])
+            sl = float(b["sl"])
+            hold_h = float(b["max_hold_h"])
+            if sl < 0.0 < tp and hold_h > 0.0:
+                return tp, sl, hold_h
+    except (KeyError, TypeError, ValueError):
+        pass
+    return TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H
 
 
 # ---------------------------------------------------------------------------
@@ -898,18 +950,18 @@ def main(_ctx=None):
             # [2026-07-15 AUDIT FIX] provenance: venue + arm on every row —
             # venue NULL claimed the pre-Gate-0 HL-paper era.
             venue="lighter", shadow=dry_run,
-            # [2026-07-21 ATTRIBUTION] bars in force at close, the funding
-            # bot's existing extra.bars pattern ported: 0 of 53 taker closes
-            # stamped their params while the shadow twin traded tuner levers
-            # (sl -0.04 / tp 0.06) against live's env bars (-0.03 / +0.04) —
-            # so live-vs-shadow gaps could not be attributed to execution vs
-            # different rules. Close-time values (a mid-hold lever change
-            # stamps the exit's bars — same caveat as the funding bot).
-            extra={"bars": {"tp": TAKE_PROFIT, "sl": STOP_LOSS,
-                            "max_hold_h": MAX_HOLD_H,
-                            "div_gap_pp": DIV_GAP_PP, "div_vol_m": DIV_VOL_M,
-                            "dip_range": DIP_RANGE, "brk_range": BRK_RANGE,
-                            "momo_chg": MOMO_CHG}})
+            # [2026-07-21 ATTRIBUTION; 2026-07-22 FLAP FIX] bars on every
+            # close row. Since the flap fix these are the ENTRY-time stamp —
+            # the bars that actually GOVERNED the trade (the 21-Jul
+            # close-time caveat "a mid-hold lever change stamps the exit's
+            # bars" is exactly the contamination the (bw) study had to
+            # reconstruct around: 11/22 SL closes ran under a different bar
+            # than the one stamped/assumed). Legacy positions opened before
+            # the stamp existed fall back to close-time values, labelled so.
+            extra={"bars": (m.get("bars") if isinstance(m.get("bars"), dict)
+                            and m.get("bars") else entry_bars()),
+                   "bars_basis": ("entry" if isinstance(m.get("bars"), dict)
+                                  and m.get("bars") else "close-legacy")})
         if not dry_run:
             try:
                 store.publish_venue_order(
@@ -1209,7 +1261,8 @@ def main(_ctx=None):
             m.pop("no_mark_since", None)     # priceable again — reset the clock
             m["last_mark"] = mark
             meta[sym] = m
-            reason = exit_reason(entry, mark, opened, t_now, is_long)
+            reason = exit_reason(entry, mark, opened, t_now, is_long,
+                                 bars=pos_bars(m))
         else:
             # [2026-07-16 ZOMBIE GUARD] book missing from the active universe
             first = m.get("no_mark_since")
@@ -1484,7 +1537,10 @@ def main(_ctx=None):
             meta[sym] = {"lens": lens, "opened": iso(t_now), "clip": clip,
                          "entry": entry_px,
                          "accrued_to": iso(t_now), "funding_paid": 0.0,
-                         "evidence": ev}
+                         "evidence": ev,
+                         # [2026-07-22 FLAP FIX] the bars priced at entry
+                         # govern this trade — see pos_bars/entry_bars.
+                         "bars": entry_bars()}
             opened_syms.add(sym)
             opened_lenses.add(lens)
             print(f"[ticket-taker] {iso(t_now)} OPEN "
@@ -1602,6 +1658,37 @@ def selftest():
     assert exit_reason(100.0, 101.0, t0, t0) is None
     assert exit_reason(100.0, 95.9, t0, t0, is_long=False) == "tp"   # short profits down
     assert exit_reason(100.0, 103.1, t0, t0, is_long=False) == "sl"
+
+    # [2026-07-22 FLAP FIX] the bars priced at entry govern the trade.
+    # A position stamped under a WIDER sl (-0.04) does NOT book "sl" when the
+    # module bar has snapped back to -0.03 — the measured 9/22 flap class.
+    _wide = {"bars": {"tp": 0.06, "sl": -0.04, "max_hold_h": 72}}
+    assert pos_bars(_wide) == (0.06, -0.04, 72.0)
+    assert exit_reason(100.0, 96.5, t0, t0, bars=pos_bars(_wide)) is None, \
+        "-3.5% under a grandfathered -4% bar -> still holding, no gap booked"
+    assert exit_reason(100.0, 95.9, t0, t0, bars=pos_bars(_wide)) == "sl", \
+        "the grandfathered bar itself still fires"
+    assert exit_reason(100.0, 101.0, t0 - timedelta(hours=50), t0,
+                       bars=pos_bars(_wide)) is None, \
+        "grandfathered 72h hold outlives the module's 48h"
+    # fail-safe: unstamped/legacy/junk positions behave exactly as before
+    assert pos_bars({}) == (TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H)
+    assert pos_bars(None) == (TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H)
+    assert pos_bars({"bars": {"tp": "x"}}) == \
+        (TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H), "junk stamp -> current bars"
+    assert pos_bars({"bars": {"tp": -0.06, "sl": 0.04, "max_hold_h": 72}}) \
+        == (TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H), "nonsense signs -> current"
+    # kill switch: LEVER_GRANDFATHER=off reverts behavior to close-time bars
+    global LEVER_GRANDFATHER
+    _lg = LEVER_GRANDFATHER
+    LEVER_GRANDFATHER = False
+    assert pos_bars(_wide) == (TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H), \
+        "switch off -> stamps ignored, pre-fix behavior"
+    LEVER_GRANDFATHER = _lg
+    # entry_bars stamps every TUNABLE the trade was admitted/priced under
+    assert set(entry_bars()) == {"tp", "sl", "max_hold_h", "div_gap_pp",
+                                 "div_vol_m", "dip_range", "brk_range",
+                                 "momo_chg"}
 
     # accounting round-trip incl. funding drag (long pays, short receives)
     b = PaperBroker(start_equity=1000.0, fee_bps=4.0)

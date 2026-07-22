@@ -146,6 +146,13 @@ SELFTEST_EXCLUDE = {
     # (expiry snapping a tighter bar onto in-flight positions), filed for the
     # tuner/TTL semantics review.
     "scripts/study_taker_sl_realized.py",
+    # [2026-07-22] family time-stop study: --selftest offline-green; full run
+    # pages the venue's 4h+1d candles. Header verdict: DO NOT ENACT — max
+    # slot-day relief anywhere on the grid is -6.1% (bar >=20%) because
+    # level-condition entries refill a freed slot within ~2 bars; 97-100% of
+    # time-stopped positions exit via the shipped rules anyway. The real
+    # budget lever is entry-side (max_open / allocation) — review item.
+    "scripts/study_family_time_stop.py",
     # [2026-07-22] swing-daily dormancy study: --selftest offline-green; full
     # run pages the venue's 1d candles. Header verdict: GENUINE DORMANCY, not
     # a data-depth bug — the 240-bar fetch reproduces the full-depth signal
