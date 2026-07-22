@@ -719,6 +719,14 @@ def main():
         if _saved and broker is not None and broker.restore_state(_saved.get("broker") or {}):
             meta = {str(k): v for k, v in (_saved.get("meta") or {}).items()}
             fund_realized = float(_saved.get("fund_realized") or 0.0)
+            _cd, _sh = _saved.get("cooldown") or {}, _saved.get("stop_hist") or {}
+            if isinstance(_cd, dict):
+                cooldown = {str(k): float(v) for k, v in _cd.items()
+                            if isinstance(v, (int, float))}
+            if isinstance(_sh, dict):
+                stop_hist = {str(k): [float(t) for t in v
+                                      if isinstance(t, (int, float))]
+                             for k, v in _sh.items() if isinstance(v, list)}
             log.info("restored paper state: equity $%.2f, %d open", broker.equity(),
                      broker.open_count())
     else:
@@ -1530,8 +1538,22 @@ def main():
         # persist state (dry_run: full paper account; live: baseline + open meta)
         try:
             if dry_run:
-                store.save_state(bot_id, {"broker": broker.to_state(), "meta": meta,
-                                          "fund_realized": fund_realized})
+                store.save_state(bot_id, {
+                    "broker": broker.to_state(), "meta": meta,
+                    "fund_realized": fund_realized,
+                    # [2026-07-22 ARM PARITY] the same quarantine the LIVE
+                    # branch persists. Shipping it on one arm only is what the
+                    # agronomy scan caught: this twin is the JUDGE'S CONTROL
+                    # ARM, so a cooldown that survives a restart on live and
+                    # not here makes the paired promotion bar compare two
+                    # different rules (measured: 3 cooldown + 5 stop_hist leaks
+                    # over 6 stop events on this arm while live leaked 1 of 2).
+                    "cooldown": {c: t for c, t in cooldown.items()
+                                 if t > time.time()},
+                    "stop_hist": {c: ts for c, ts in (
+                        (c, [t for t in v
+                             if time.time() - t <= REPEAT_STOP_WINDOW_D * 86400])
+                        for c, v in stop_hist.items()) if ts}})
             elif live_baseline is not None:
                 store.save_state(bot_id + ":live", {
                     "initial_equity": live_baseline, "meta": meta,

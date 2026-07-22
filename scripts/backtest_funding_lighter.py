@@ -33,6 +33,22 @@ scripts/backtest_funding_lighter.py — the Funding Farmer, backtested ON LIGHTE
 ║    none of them worked, and concluded the STRATEGY was dead. **I never    ║
 ║    swept the STOP.** At 0.86bps, TP.04/**STOP.03** takes the same 150d to ║
 ║    **+$21.32, both halves positive, n=1911** — a 10% stop against a 4%    ║
+║                                                                          ║
+║ ██ [2026-07-22] THE +$21.32 ABOVE IS WITHDRAWN — THIS HARNESS PRODUCED IT ██║
+║ ██ FROM A BUG, AND THE CORRECTED NUMBER IS **-$11.57, BOTH HALVES      ██║
+║ ██ NEGATIVE**. The bug: this file never cleared `hot` on a close, while  ██║
+║ ██ the live bot pops `hot_since` on EVERY close (lighter_funding_bot.py  ██║
+║ ██ :940, :1226). So PERSIST_H bit ONCE per hot run here and every time   ██║
+║ ██ in production — 32-44% of the trades behind that +$21.32 were instant ██║
+║ ██ re-entries the real bot REFUSES. Fixed at the `hot.pop(sym, None)`    ██║
+║ ██ below; the STOP is no longer a supported fix, and the sweep of gates  ██║
+║ ██ built on this harness has h2 NEGATIVE at every level 0.03..0.40.      ██║
+║ ██ THE REFUTATION ABOVE ("I never swept the STOP") STILL STANDS as a     ██║
+║ ██ lesson about generalising from four knobs — but its replacement       ██║
+║ ██ verdict was itself an artifact. A harness that does not mirror the    ██║
+║ ██ production rule does not produce a weaker answer; it produces a       ██║
+║ ██ WRONG one, with the same confident sign. Re-derive anything citing    ██║
+║ ██ this file before 2026-07-22.                                          ██║
 ║    take-profit lets losers run 2.5x further than winners are allowed,     ║
 ║    backwards for a mean-reversion book. "I tested every knob I thought    ║
 ║    of" is NOT "no knob works", and the header even listed the four knobs  ║
@@ -372,6 +388,21 @@ def run(mk, enter_apr, t0, t1):
                     holds.append(held_h)
                     cool[sym] = t + 12 * 3600 if why == "stop" else 0
                     pos.pop(sym)
+                    # [2026-07-22 PERSISTENCE PARITY — this harness was WRONG
+                    # and it inverted a SHIPPED verdict.] The live bot pops
+                    # hot_since on EVERY close (lighter_funding_bot.py:940 and
+                    # :1226 — "force a fresh persistence wait, no instant
+                    # re-entry"). This harness never cleared `hot`, so a book
+                    # that stays hot was re-entered the very next hour and
+                    # PERSIST_H only ever bit ONCE per hot run. Every gate
+                    # sweep and every exit-ladder study built on this file
+                    # judged candidates on rules production does not run, with
+                    # 32-44% of their trades being instant re-entries the real
+                    # bot refuses. WHAT IT COST: the STOP 0.03 verdict flips
+                    # from +$21.32 / both halves positive to **-$11.57 / both
+                    # halves NEGATIVE** once this line exists. Do not remove it
+                    # without re-deriving every verdict that cites this harness.
+                    hot.pop(sym, None)
                 continue
             # ---- entry: hot for PERSIST_H, gate on TRUE apr, slots free ----
             if abs(apr) >= enter_apr:
