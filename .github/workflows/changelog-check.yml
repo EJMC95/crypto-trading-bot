@@ -58,6 +58,45 @@ jobs:
       - name: The guard must still be able to see (negative fixture)
         run: python3 scripts/audit_venue_purity.py --selftest
 
+  conflict-markers:
+    name: No unresolved merge/stash markers in the tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-22] CHANGELOG.md — the sync channel between parallel Claude
+      # sessions — carried three COMMITTED stash-conflict markers for SEVEN
+      # commits (31cf1ca 18:26 Sydney through c86621a), and this workflow
+      # reported `completed/success` on every one of them. The reason is
+      # structural: the `changelog` job below only asserts CHANGELOG.md APPEARS
+      # in the changed-file list — it never reads a byte of content. A guard
+      # that checks EXISTENCE, not CONTENT, is not a guard.
+      # Scans every tracked file, not just the changelog: an unresolved marker
+      # is a defect anywhere, and in a .py file it is a SyntaxError that would
+      # ship to a real-money image.
+      - name: A committed conflict marker must fail the build
+        run: |
+          set -uo pipefail
+          if git grep -nE '^(<<<<<<<|>>>>>>>|=======$)' -- . ; then
+            echo "::error::Unresolved merge/stash conflict markers are committed (listed above)."
+            echo "Resolve them. NOTE: when a marker line sits between a bullet and a '## ' header,"
+            echo "REPLACE it with a blank line rather than deleting it, or the entry renders glued"
+            echo "into the previous one (the (bq) bug, 2026-07-22)."
+            exit 1
+          fi
+          echo "OK: no conflict markers in any tracked file."
+      - name: The guard must still be able to see (negative fixture)
+        run: |
+          set -uo pipefail
+          tmp="$(mktemp -d)"
+          printf '%s\n' '<<<<<<< Updated upstream' 'a' '=======' 'b' '>>>>>>> Stashed changes' > "$tmp/fixture.md"
+          git -C "$tmp" init -q . && git -C "$tmp" add fixture.md
+          if git -C "$tmp" grep -nE '^(<<<<<<<|>>>>>>>|=======$)' -- . >/dev/null; then
+            echo "OK: guard detects planted markers."
+          else
+            echo "::error::Guard is BLIND — it failed to flag a planted conflict marker."
+            exit 1
+          fi
+
   changelog:
     runs-on: ubuntu-latest
     steps:

@@ -40,6 +40,7 @@ SELFTEST_MODULES = [
     "event_sentinel",
     "evidence_board",
     "experiment_judge",
+    "fleet_agronomy",
     "fleet_bus",
     "fleet_clock",
     "fleet_immune",
@@ -93,6 +94,14 @@ ENFORCED_AUDITS = [
 ]
 GUARD_ONLY_AUDITS = [
     "scripts/audit_deploy_coverage.py", # deploy-route census (informational)
+    # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can
+    # change BEHAVIOUR, not merely whether a value is inside it. Its bare run
+    # exits 1 on 5 open findings (live.funding.enter_apr's hi sits below the
+    # venue's modal funding; FUNDING_HARD_STOP / FUNDING_EXIT_APR carry the
+    # live book's loss with no lever at all), so it is INFORMATIONAL until
+    # those are triaged — same footing as the deploy census. Only its
+    # `--selftest` negative fixture runs here.
+    "scripts/audit_lever_authority.py",
 ]
 
 # Files that carry a `--selftest` marker but are deliberately NOT in the CI

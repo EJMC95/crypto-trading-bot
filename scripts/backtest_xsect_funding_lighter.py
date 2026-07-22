@@ -80,7 +80,12 @@ VERDICT (17 Jul 2026, 150d ending 17 Jul, 25 coins, 3585 hourly bars)
 
   DO NOT say this "killed the Funding Farmer and vindicates Counterweight". The
   Funding Farmer's verdict was itself REVISED the same day (its HARD_STOP, not
-  its gate, was the defect: STOP 0.03 -> +$21.32, both halves positive, n=1911).
+  its gate, was said to be the defect: STOP 0.03 -> +$21.32, both halves
+  positive, n=1911). ⛔ [2026-07-22] THAT REVISION IS ITSELF WITHDRAWN — the
+  +$21.32 was a harness artifact (un-cleared `hot` on close => instant
+  re-entries production refuses); corrected it is -$11.57, BOTH halves
+  NEGATIVE. So the Farmer's stop was never shown to be the defect either. The
+  point below is unaffected ([[harness-must-mirror-productions-close-path]]).
   What the re-test does is replace a HYPOTHESIS with a MEASUREMENT; the answer
   here happened to be favourable. maxDD 10.1% also clears the 15% go-live gate —
   but a backtest is not a shadow record, and go-live remains a separate decision

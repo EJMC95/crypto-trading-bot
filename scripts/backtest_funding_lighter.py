@@ -235,7 +235,9 @@ ORDER_USD = 25.0
 #   0.000086 (0.86bps) — the SHADOW arm's ShadowBroker MODEL (venue_orders,
 #                     bot=perps-funding-lighter-lshadow, shadow=TRUE, n=160).
 #                     A modelled fill against the real book — a hypothesis about
-#                     friction, not a fill anyone got. It produces "+$21.32".
+#                     friction, not a fill anyone got. It produced the WITHDRAWN
+#                     "+$21.32" (see the banner: that was this harness's own
+#                     `hot` bug, corrected to -$11.57 both halves negative).
 #   REAL    — UNKNOWN. The live book has 49 real orders (07-11→07-17) and
 #             slippage_bps is NULL on every one: px_fill == px_decision exactly,
 #             because the entry leg still records the decision price as the fill

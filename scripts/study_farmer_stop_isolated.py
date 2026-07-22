@@ -4,6 +4,26 @@ scripts/study_farmer_stop_isolated.py — the STOP 0.10 -> 0.03 decision for the
 LIVE Funding Farmer (lighter_funding_bot.py), ISOLATED, on Lighter's own tape.
 
 ╔══════════════════════════════════════════════════════════════════════════╗
+║ ⛔ [2026-07-22] EVERY NUMBER BELOW PREDATES A HARNESS FIX — RE-RUN BEFORE ║
+║ CITING. This file imports `backtest_funding_lighter` (:113) and calls     ║
+║ `H.run()` (:133). That harness never cleared its `hot` dict on a close,   ║
+║ while the live bot pops `hot_since` on EVERY close, so it admitted        ║
+║ instant re-entries production refuses (22.0% of trades at the headline    ║
+║ config). Fixed 22-Jul at backtest_funding_lighter.py:405 — the fix        ║
+║ arrives here automatically on the next run, but the levels printed below  ║
+║ were produced BEFORE it and are stale.                                    ║
+║                                                                          ║
+║ WHAT SURVIVES: the VERDICT — "STOP 0.03 DOES NOT SHIP" — is unchanged and ║
+║ now holds MORE strongly, because the corrected sweep puts STOP 0.03 at    ║
+║ −$11.57 with BOTH HALVES NEGATIVE (it was recorded +$21.32/both-positive).║
+║ WHAT DIES: the "REPRO NOTE" claim below that "the DIRECTION is preserved  ║
+║ (0.03 beats 0.10 by ~$22 @0.86bps, both runs)". That direction was the    ║
+║ artifact. Do not cite it, and do not treat this file's levels as evidence ║
+║ for or against a live stop change until it is re-run.                     ║
+║ See [[harness-must-mirror-productions-close-path]].                       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════╗
 ║ VERDICT (2026-07-21 run, 150d 2026-02-21→07-21, 25 markets, live config   ║
 ║ gate 0.05 TRUE / TP 0.04 / hold 72h — STOP is the ONLY variable):         ║
 ║                                                                          ║
@@ -244,8 +264,14 @@ def main():
         print()
 
     # ---- reproduction check vs the 17-Jul harness rows ----------------------
+    # [2026-07-22] The 17-Jul reference rows below are WITHDRAWN (harness
+    # artifact — un-cleared `hot` on close; corrected STOP 0.03 = -$11.57, both
+    # halves negative). Kept only so a re-run shows the DELTA against what was
+    # once believed; do not read agreement with them as validation.
     print(f"repro @{REPRO_BPS}bps (17-Jul harness header said stop 0.10 -> -15.85, "
-          f"0.03 -> +21.32, n=1911; window has since slid ~4d):")
+          f"0.03 -> +21.32, n=1911 — ** THOSE ROWS ARE WITHDRAWN, harness "
+          f"artifact; corrected 0.03 = -11.57 both halves negative **; "
+          f"window has since slid ~4d):")
     for stop in (0.10, 0.03):
         f, h1, h2 = res[(stop, REPRO_BPS)]
         print(f"  stop {stop:.2f}: {f['pnl']:>8.2f}  n={f['n']}  "

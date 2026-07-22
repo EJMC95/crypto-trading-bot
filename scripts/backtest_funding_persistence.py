@@ -8,9 +8,15 @@ scripts/backtest_funding_persistence.py — is the CARRY'S SURVIVAL predictable?
    measured here and none is the problem." Two things are wrong with that:
    1. THE LEAP. Those four ARE measured here and none of them is the problem —
       that part is fine. The error is generalising from "the four knobs I
-      thought of fail" to "the STRATEGY is dead". **The STOP was never swept**,
-      and it is the one that works: at 0.86bps, TP.04/STOP.03 takes 150d from
-      −$15.85 to +$21.32, both halves, n=1911 ([[funding-farmer-stop-is-the-bug]]).
+      thought of fail" to "the STRATEGY is dead". **The STOP was never swept.**
+      ⛔ [2026-07-22] This paragraph used to add "and it is the one that works:
+      at 0.86bps, TP.04/STOP.03 takes 150d from −$15.85 to +$21.32, both
+      halves, n=1911". **WITHDRAWN** — that came from a harness that never
+      cleared `hot` on a close, so it admitted instant re-entries the live bot
+      refuses; corrected, STOP 0.03 is −$11.57 with BOTH HALVES NEGATIVE
+      ([[funding-farmer-stop-is-the-bug]],
+      [[harness-must-mirror-productions-close-path]]). The REASONING error
+      stands — only its worked example is gone:
       "I tested every knob I thought of" is not "no knob works".
    2. THE CONSTANT. Every $/yr figure here is denominated in an ASSUMED 10bps
       round trip, which this file's own LIMITATIONS calls "the load-bearing

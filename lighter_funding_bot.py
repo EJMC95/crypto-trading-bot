@@ -133,31 +133,43 @@ MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-s
 # a tight stop whipsaws out before funding + mean-reversion pay, LOSING more" —
 # is HYPERLIQUID'S. It is the ONLY justification this live stop has ever had.
 #
-# [2026-07-17] LIGHTER'S OWN TAPE INVERTS IT. Same 150d, same code, gate 0.05,
-# HARD_STOP swept (scripts/backtest_funding_lighter.py):
+# [2026-07-17, ⛔ WITHDRAWN 2026-07-22] This block used to say "LIGHTER'S OWN
+# TAPE INVERTS IT" and print a sweep in which STOP 0.03 returned **+$21.32,
+# both halves positive, n=1911** at 0.86bps. **That number was a HARNESS
+# ARTIFACT and the claim is withdrawn.**
 #
-#     STOP   @0.86bps (model)   h1/h2      @5bps (assumed)   h1/h2
-#     0.10        -15.85      -5.66/-1.34      -41.95     -21.40/-11.40   <- LIVE
-#     0.06        +11.59      +2.41/+15.78     -18.55     -15.04/+3.18
-#     0.03        +21.32     +12.05/+9.31      -18.24      -9.23/-8.91
+# THE BUG: scripts/backtest_funding_lighter.py never cleared its `hot` dict on a
+# close, while THIS bot pops `hot_since` on EVERY close (see :940 and :1226 —
+# "force a fresh persistence wait — no instant re-entry"). So PERSIST_H bit once
+# per hot run in the backtest and every time in production; 22.0% of the trades
+# behind that +$21.32 (420/1911) were instant re-entries this bot refuses.
 #
-# At 0.86bps the TIGHT stop wins by $37 with both halves positive (n=1911) —
-# the exact opposite of the HL claim above. A 10% stop against a 4% TP lets
-# losers run 2.5x further than winners are allowed, backwards for a
-# mean-reversion book. At the live gate the stop is only 7.1% of trades but
-# -$223.65 of P&L, the single biggest losing bucket, at -$2.49/trade.
+#     STOP 0.03 @0.86bps:   recorded +$21.32 (h1/h2 +12.05/+9.31)
+#                          CORRECTED  −$11.57, BOTH HALVES NEGATIVE
 #
-# NOT CHANGED, and the reason is the whole point: at 5bps EVERY stop value is
-# negative. The verdict flips on a friction NOBODY HAS MEASURED — so the tight
-# stop is a hypothesis conditional on the shadow's MODEL, not a finding. This is
-# the same error one knob to the right: a friction-dependent GATE verdict was
-# replaced by a friction-dependent STOP verdict and the second was called solid.
-# FUNDING_HARD_STOP=0.03 is set on funding-farmer-shadow ONLY as the A/B arm;
-# live keeps 0.10 as the control. Promote through the judge's paired bar, never
-# by flipping the env — and NEVER tighten a live stop with positions open (it is
-# evaluated against them on the next loop and liquidates anything already >3%
-# adverse). See [[funding-farmer-stop-is-the-bug]].
-HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — HL-fitted; Lighter disagrees (above)
+# So Lighter's tape does NOT invert the Hyperliquid claim above — the inversion
+# was the artifact. Both of that harness's headline verdicts were artifacts:
+# first "the strategy is dead" (an unmeasured 5bps), then "the stop is the bug"
+# (this). Nothing currently supports tightening this stop.
+#
+# HARD_STOP stays 0.10 — unchanged since 17-Jul, but now for a better reason:
+# the evidence that argued for tightening it no longer exists. The friction
+# caveat also still stands on its own — Lighter's real per-book slippage has
+# never been measured (0 measured fills to date), and every stop verdict here
+# turns on it.
+#
+# ⚠️ OPEN OPERATOR DECISION: FUNDING_HARD_STOP=0.03 is still set on
+# funding-farmer-shadow, where it was set 17-Jul on the strength of the
+# withdrawn number. That arm is the EXPERIMENT JUDGE'S CONTROL ARM, so the
+# paired promotion bar — the fleet's only path to live.funding.* — is currently
+# comparing arms that differ by the xp candidate AND by the stop. Deliberately
+# not unset here: unsetting destroys the accumulated live A/B evidence, and the
+# call is which evidence you would rather keep.
+# Loosening 0.03 -> 0.10 is safe with positions open; NEVER TIGHTEN a live stop
+# with positions open (it is evaluated against them on the next loop and
+# liquidates anything already >3% adverse).
+# See [[funding-farmer-stop-is-the-bug]], [[harness-must-mirror-productions-close-path]].
+HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — HL-fitted; the Lighter counter-evidence was WITHDRAWN 22-Jul (above)
 TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% — lock the reversion pop
 DAILY_LOSS_LIMIT = float(os.environ.get("FUNDING_DAILY_LOSS", "0.05"))
 STOP_COOLDOWN_H = float(os.environ.get("FUNDING_STOP_COOLDOWN_H", "12"))  # quarantine after a stop
@@ -650,6 +662,44 @@ def _close_bars_extra(bars):
     return {"bars": out, "bars_basis": basis} if out else None
 
 
+def parse_quarantine(st):
+    """state dict -> (cooldown, stop_hist), tolerant of junk/absent fields."""
+    st = st or {}
+    _cd = st.get("cooldown") or {}
+    _sh = st.get("stop_hist") or {}
+    cd = ({str(k): float(v) for k, v in _cd.items()
+           if isinstance(v, (int, float)) and not isinstance(v, bool)}
+          if isinstance(_cd, dict) else {})
+    sh = ({str(k): [float(t) for t in v
+                    if isinstance(t, (int, float)) and not isinstance(t, bool)]
+           for k, v in _sh.items() if isinstance(v, list)}
+          if isinstance(_sh, dict) else {})
+    return cd, sh
+
+
+def read_quarantine(load_checked, key, tries=3, backoff=2.0, sleep=None):
+    """(ok, cooldown, stop_hist) — ok=False ONLY when the READ ITSELF failed.
+
+    [2026-07-22] (cb) made the post-stop quarantine durable but restored it with
+    the UNCHECKED load_state(), which collapses "no row" and "read failed" into
+    the same None ([[load-state-seeds-durable-state-on-a-failed-read]]). A
+    Postgres blip at boot then looked exactly like a first run and silently
+    re-armed every stopped coin — the precise failure (cb) exists to prevent,
+    reintroduced one layer down. Bounded retry absorbs a transient blip;
+    ok=False is a REAL failure and the caller must fail CLOSED (block new
+    entries), never treat it as "nothing quarantined".
+    """
+    _sleep = sleep or time.sleep
+    for attempt in range(max(1, tries)):
+        ok, st = load_checked(key)
+        if ok:
+            cd, sh = parse_quarantine(st)
+            return True, cd, sh
+        if attempt < tries - 1:
+            _sleep(backoff * (attempt + 1))
+    return False, {}, {}
+
+
 def main():
     p = argparse.ArgumentParser(description="Yield Harvester — Lighter directional funding")
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
@@ -714,19 +764,37 @@ def main():
     miss = {}          # coin -> consecutive fresh-price misses (live fail-safe)
     fund_realized = 0.0  # dry_run only: cumulative realized funding (price P&L is in broker)
 
+    # [2026-07-22] QUARANTINE READ MUST DISTINGUISH "empty" FROM "unreadable".
+    # (cb) made cooldown/stop_hist durable, but the restore used the UNCHECKED
+    # load_state(), which collapses "no row" and "read failed" into the same
+    # None ([[load-state-seeds-durable-state-on-a-failed-read]] — the same trap
+    # that wiped a 7d live promotion). A Postgres blip at boot therefore looked
+    # exactly like a first run and silently re-armed every stopped coin — the
+    # very failure (cb) was written to close. Bounded retry converts a transient
+    # blip into a good read; a genuinely failed read sets quarantine_blind, and
+    # the entry gate then refuses NEW entries (restrict-only: exits and position
+    # management are untouched) until a later cycle reads it successfully.
+    quarantine_blind = False
+
+    def _read_quarantine(key, tries=3, backoff=2.0):
+        ok, cd, sh = read_quarantine(store.load_state_checked, key,
+                                     tries=tries, backoff=backoff)
+        if not ok:
+            log.error("QUARANTINE READ FAILED for %s after %d attempt(s) — cannot "
+                      "tell 'nothing quarantined' from 'could not read it'. "
+                      "Blocking NEW entries until a clean read; exits unaffected.",
+                      key, tries)
+        return ok, cd, sh
+
     if dry_run:
         _saved = store.load_state(bot_id)
         if _saved and broker is not None and broker.restore_state(_saved.get("broker") or {}):
             meta = {str(k): v for k, v in (_saved.get("meta") or {}).items()}
             fund_realized = float(_saved.get("fund_realized") or 0.0)
-            _cd, _sh = _saved.get("cooldown") or {}, _saved.get("stop_hist") or {}
-            if isinstance(_cd, dict):
-                cooldown = {str(k): float(v) for k, v in _cd.items()
-                            if isinstance(v, (int, float))}
-            if isinstance(_sh, dict):
-                stop_hist = {str(k): [float(t) for t in v
-                                      if isinstance(t, (int, float))]
-                             for k, v in _sh.items() if isinstance(v, list)}
+            _qok, _qcd, _qsh = _read_quarantine(bot_id)
+            cooldown, stop_hist = _qcd, _qsh
+            if not _qok:
+                quarantine_blind = True
             log.info("restored paper state: equity $%.2f, %d open", broker.equity(),
                      broker.open_count())
     else:
@@ -746,14 +814,10 @@ def main():
         # the venue's top extreme, so the gate re-selects it every cycle.
         # Same class as the flatten/halt redeploy incident: a memory-only guard
         # on a bot whose container is not.
-        _cd = _live.get("cooldown") or {}
-        _sh = _live.get("stop_hist") or {}
-        if isinstance(_cd, dict):
-            cooldown = {str(k): float(v) for k, v in _cd.items()
-                        if isinstance(v, (int, float))}
-        if isinstance(_sh, dict):
-            stop_hist = {str(k): [float(t) for t in v if isinstance(t, (int, float))]
-                         for k, v in _sh.items() if isinstance(v, list)}
+        _qok, _qcd, _qsh = _read_quarantine(bot_id + ":live")
+        cooldown, stop_hist = _qcd, _qsh
+        if not _qok:
+            quarantine_blind = True
         if cooldown or stop_hist:
             _still = sum(1 for t in cooldown.values() if t > time.time())
             log.info("restored post-stop quarantine: %d cooldown(s) (%d still "
@@ -1365,7 +1429,27 @@ def main():
 
         # ---- scan for new entries — cheap funding prefilter, then deep-scan ----
         open_now = sum(1 for v in pos.values() if (v.get("size") if isinstance(v, dict) else v))
-        if open_now < max_open:
+        # [2026-07-22] If the post-stop quarantine could not be READ at boot, we
+        # do not know which coins are quarantined — so we must not open anything.
+        # Re-attempt every cycle; a transient Postgres blip self-heals here and
+        # trading resumes. Restrict-only by construction: exits, stops, funding
+        # accrual and position management below are untouched.
+        if quarantine_blind:
+            _qok, _qcd, _qsh = _read_quarantine(
+                bot_id if dry_run else bot_id + ":live", tries=1)
+            if _qok:
+                quarantine_blind = False
+                for _c, _t in _qcd.items():
+                    cooldown.setdefault(_c, _t)
+                for _c, _ts in _qsh.items():
+                    stop_hist.setdefault(_c, _ts)
+                log.warning("quarantine re-read OK — %d cooldown(s) recovered; "
+                            "entries re-enabled", len(_qcd))
+            else:
+                log.warning("QUARANTINE BLIND — skipping all NEW entries this "
+                            "cycle (exits unaffected)")
+
+        if open_now < max_open and not quarantine_blind:
             # cheap prefilter: hard SAFETY gates on the funding map only (no network)
             prelim = []
             for c, f in fund.items():
@@ -1764,11 +1848,50 @@ def _selftest_flap():
     print("lighter_funding_bot _selftest_flap OK")
 
 
+def _selftest_quarantine():
+    """[2026-07-22] The post-stop quarantine must distinguish "genuinely no
+    quarantine" from "could not read it". (cb) made it durable; it was still
+    restored through the UNCHECKED load_state, so a Postgres blip at boot
+    re-armed every stopped coin — exactly the failure (cb) closed."""
+    # (1) a good read round-trips, and junk is dropped without killing the read
+    st = {"cooldown": {"LIT": 1000.0, "BAD": "x", "T": True},
+          "stop_hist": {"LIT": [1.0, 2.0, "x"], "NOPE": "notalist"}}
+    ok, cd, sh = read_quarantine(lambda k: (True, st), "b")
+    assert ok and cd == {"LIT": 1000.0} and sh == {"LIT": [1.0, 2.0]}, (ok, cd, sh)
+
+    # (2) READ SUCCEEDED, genuinely empty -> ok=True, empty. Trading continues.
+    ok, cd, sh = read_quarantine(lambda k: (True, None), "b")
+    assert ok and cd == {} and sh == {}, (ok, cd, sh)
+
+    # (3) THE REGRESSION: read FAILED -> ok=False. Must NOT look like (2).
+    calls = []
+    def _fail(k):
+        calls.append(k)
+        return False, None
+    ok, cd, sh = read_quarantine(_fail, "b", tries=3, backoff=0, sleep=lambda s: None)
+    assert ok is False and cd == {} and sh == {}, (ok, cd, sh)
+    assert len(calls) == 3, f"must retry a transient blip, got {len(calls)}"
+
+    # (4) a blip that clears on retry recovers WITHOUT going blind
+    seq = [(False, None), (False, None), (True, {"cooldown": {"LIT": 5.0}})]
+    ok, cd, sh = read_quarantine(lambda k: seq.pop(0), "b", tries=3, backoff=0,
+                                 sleep=lambda s: None)
+    assert ok and cd == {"LIT": 5.0}, (ok, cd, sh)
+
+    # (5) the two states are DISTINGUISHABLE — the whole point. A caller that
+    #     cannot tell them apart re-arms a stopped coin on a DB blip.
+    empty_ok, _, _ = read_quarantine(lambda k: (True, None), "b")
+    failed_ok, _, _ = read_quarantine(lambda k: (False, None), "b", tries=1)
+    assert empty_ok != failed_ok, "empty and unreadable must not be the same"
+    print("lighter_funding_bot _selftest_quarantine OK")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_notional()
         _selftest_fill_read()
         _selftest_flap()
+        _selftest_quarantine()
         sys.exit(0)
     try:
         _supervised()
