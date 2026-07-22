@@ -52,7 +52,9 @@ MAX_SNAPSHOT_AGE_H = float(os.environ.get("REGEN_MAX_SNAP_AGE_H", "24"))
 REPAIRABLE = {
     "xp-judge": {"phase": "idle"},          # phase machine -> back to idle
     "scout-tuner": {},                       # stateless-ish; empty restart
-    "gapscout-census": {},
+    # [2026-07-22] gapscout-census removed: Gap Scout retired 17-Jul, so there
+    # is no publisher to regenerate a snapshot from — a dead organ is not
+    # repairable, it is gone. See fleet_immune (same sweep).
 }
 
 

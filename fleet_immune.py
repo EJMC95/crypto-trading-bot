@@ -270,11 +270,39 @@ def organ_invariants(states, now):
             if isinstance(hit, (int, float)) and not (0.0 <= hit <= 1.0):
                 sick("brain-lens-forward", f"lens {lens} hit4h {hit} outside [0,1]")
 
-    cen = states.get("gapscout-census") or {}
-    if _fresh(cen, now):
-        eo = cen.get("episodes_open")
-        if isinstance(eo, int) and eo < 0:
-            sick("gapscout-census", f"episodes_open {eo} < 0")
+    # [2026-07-22] gapscout-census removed: Gap Scout retired 17-Jul, so that
+    # key is never published again and its check was permanently dead (`_fresh`
+    # is always False for a retired publisher). A dead sensor left in the body
+    # is exactly the rot this organ exists to catch — so it goes.
+    # regime-oracle takes its place. The oracle self-grades its own directional
+    # calls (`grades[sym][d{h}] = {n, hit, avg_pp}`) and those grades feed the
+    # 28-Jul review's item-18 decision; a fresh-but-WRONG grade would corrupt
+    # that evidence. Impossible values only, same shape as brain-lens-forward
+    # (a hit-RATE outside [0,1], a negative count). Page-only — organ_invariants
+    # findings notify; they never quarantine a lever (that is lever_sickness).
+    ro = states.get("regime-oracle") or {}
+    if _fresh(ro, now):
+        for sym, horizons in (ro.get("grades") or {}).items():
+            if not isinstance(horizons, dict):
+                continue
+            for h, g in horizons.items():
+                if not isinstance(g, dict):
+                    continue
+                n, hit = g.get("n"), g.get("hit")
+                if isinstance(n, (int, float)) and n < 0:
+                    sick("regime-oracle", f"grade {sym}.{h} n {n} < 0")
+                if isinstance(hit, (int, float)) and not (0.0 <= hit <= 1.0):
+                    sick("regime-oracle", f"grade {sym}.{h} hit {hit} outside [0,1]")
+        cov = ro.get("coverage") or {}
+        npub, nmiss = cov.get("n_published"), cov.get("n_missing")
+        uni = cov.get("universe")
+        if isinstance(npub, int) and npub < 0:
+            sick("regime-oracle", f"coverage.n_published {npub} < 0")
+        if isinstance(nmiss, int) and nmiss < 0:
+            sick("regime-oracle", f"coverage.n_missing {nmiss} < 0")
+        if isinstance(npub, int) and isinstance(uni, int) and npub > uni:
+            sick("regime-oracle",
+                 f"coverage.n_published {npub} > universe {uni} (impossible)")
 
     xp = states.get("xp-judge") or {}
     if _fresh(xp, now):
@@ -410,9 +438,10 @@ def run_once():
 
     # one batched beat instead of five round-trips (fail-safe: batch {} on
     # DB failure -> every organ reads as absent, same as load_state failing)
-    _keys = ("lighter-market", "brain-lens-forward", "gapscout-census",
+    _keys = ("lighter-market", "brain-lens-forward", "regime-oracle",
              "xp-judge", "fleet-tuning", "fleet-proprioception",
              "brain-vitals")     # [2026-07-17] born-dark detector, see above
+                                 # [2026-07-22] gapscout-census -> regime-oracle
     _batch = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     states = {k: (_batch.get(k) or store.load_state(k) or {}) for k in _keys} \
         if not _batch else {k: (_batch.get(k) or {}) for k in _keys}
@@ -592,7 +621,13 @@ def _selftest():
                            "stress": {"med": -3}},                    # impossible
         "brain-lens-forward": {"updated": fresh, "ttl_sec": 26000,
                                "lenses": {"dip": {"n4h": -5, "hit4h": 1.4}}},
-        "gapscout-census": {"updated": fresh, "ttl_sec": 3600, "episodes_open": -1},
+        "regime-oracle": {"updated": fresh, "ttl_sec": 5400,
+                          # impossible: hit-rate 1.4 outside [0,1], n < 0
+                          "grades": {"BTC": {"d1": {"n": -2, "hit": 1.4}},
+                                     "SPY": {"d1": {"n": 10, "hit": 0.6}}},  # fine
+                          # impossible: more published than the universe
+                          "coverage": {"universe": 12, "n_published": 15,
+                                       "n_missing": -1}},
         "xp-judge": {"updated": fresh, "ttl_sec": 10800, "phase": "haywire"},
         "fleet-proprioception": {"updated": fresh, "ttl_sec": 2700,
                                  "episodes": [{"group": "taker", "start": 100.0,
@@ -607,8 +642,27 @@ def _selftest():
     inv = organ_invariants(states, now)
     organs = {i["organ"] for i in inv}
     assert organs == {"lighter-market", "brain-lens-forward",
-                      "gapscout-census", "xp-judge",
+                      "regime-oracle", "xp-judge",
                       "fleet-proprioception"}, organs
+    # regime-oracle must flag ALL FOUR impossible values in the fixture and
+    # NONE of the fine ones (SPY's valid grade must not trip)
+    _ro = [i["detail"] for i in inv if i["organ"] == "regime-oracle"]
+    assert len(_ro) == 4, _ro
+    assert any("n -2 < 0" in d for d in _ro), _ro
+    assert any("hit 1.4 outside" in d for d in _ro), _ro
+    assert any("n_missing -1 < 0" in d for d in _ro), _ro
+    assert any("> universe" in d for d in _ro), _ro
+    assert not any("SPY" in d for d in _ro), _ro
+    # a HEALTHY oracle payload must be silent (the fresh-but-right case)
+    _ok = organ_invariants({"regime-oracle": {
+        "updated": fresh, "ttl_sec": 5400,
+        "grades": {"BTC": {"d1": {"n": 8, "hit": 0.5}, "d3": {"n": 8, "hit": 0.75}}},
+        "coverage": {"universe": 12, "n_published": 9, "n_missing": 3}}}, now)
+    assert _ok == [], _ok
+    # a STALE oracle is the watchdog's job, not sickness
+    assert organ_invariants({"regime-oracle": {
+        "updated": "2020-01-01T00:00:00+00:00", "ttl_sec": 900,
+        "grades": {"BTC": {"d1": {"n": -9, "hit": 5.0}}}}}, now) == []
 
     # [2026-07-17 BORN-DARK DETECTOR] engine=v2 without the operator asking
     # for v2 is sickness (the 17-Jul brain_stats postmortem: a missing COPY
