@@ -1499,7 +1499,21 @@ def main(_ctx=None):
             # the scout emits a bare base ("BOT") while the ledger records a
             # pair ("BOT/USDC"); matching only one form would make this veto
             # silently inert — the exact failure mode it exists to fix.
-            if coin_vetoed and str(sym or "").split("/")[0] in coin_vetoed:
+            # ALSO fold the venue's 1000X spelling into the fleet-canonical kX
+            # via _fleet(): coin_quality now publishes the veto set keyed by the
+            # fleet form (from_lighter), and this arm writes '1000BONK', so an
+            # un-normalised lookup here would miss its own coin's veto for all
+            # six 1000-markets. _fleet() is identity for a coin with no 1000
+            # prefix, so ordinary coins are unaffected. Check BOTH the canonical
+            # AND the raw base so this is robust to deploy ORDER: market_context
+            # auto-deploys (new canonical payload) while this LIVE arm needs a
+            # manual dispatch, so for a window the payload is canonical and the
+            # code old, or vice-versa — matching either form vetoes correctly
+            # throughout the transition. Restrict-only, so an extra match only
+            # ever SKIPS an entry, never forces one.
+            _vbase = str(sym or "").split("/")[0]
+            if coin_vetoed and (_fleet(_vbase) in coin_vetoed
+                                or _vbase in coin_vetoed):
                 continue          # measured slippage over the bar (fail-open)
             # one NEW position per lens per cycle; never add to a held symbol
             if (not sym or sym in pos or sym in opened_syms

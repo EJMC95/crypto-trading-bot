@@ -593,6 +593,49 @@ def check_live_freshness():
         save_alerts(alerts)
 
 
+def _fold_coin_quality(venue_rows, paper_rows):
+    """PURE fold of raw venue_orders + paper_trades rows -> {coin: stats},
+    canonicalising the coin namespace so the same coin's evidence pools.
+
+    [2026-07-22] The Ticket Taker writes '1000BONK' to venue_orders/paper_trades
+    while the funding/momo bots write 'kBONK' (the fleet form, `from_lighter`),
+    so a raw `GROUP BY` SPLIT the same coin's evidence — measured 7 (taker) vs
+    12 (fleet) for BONK — and the veto this feeds, whose own receipt says
+    "pooled fleet-wide", saw neither's full picture. Normalise on read via
+    `from_lighter` (the single source of truth — no second copy of the mapping)
+    and re-aggregate from the raw SUMS so the weighted slippage/spread AVERAGE
+    is correct across merged spellings. `measured_14d` (count of NON-NULL
+    slippage) stays the veto's n-floor; a live-arm row with NULL slippage is
+    not evidence. Extracted from coin_quality() so the fold is unit-tested
+    offline (the DB queries stay in the caller).
+
+    venue_rows: (coin, orders, sum|slip|, n_slip, sum_spread, n_spread)
+    paper_rows: (base_coin, closes, wins, stops)
+    """
+    _agg = {}
+    for coin, orders, sum_sl, n_sl, sum_sp, n_sp in venue_rows:
+        k = from_lighter(coin or "")[0]
+        a = _agg.setdefault(k, {"orders": 0, "s_sl": 0.0, "n_sl": 0,
+                                "s_sp": 0.0, "n_sp": 0})
+        a["orders"] += orders or 0
+        a["s_sl"] += float(sum_sl or 0.0); a["n_sl"] += n_sl or 0
+        a["s_sp"] += float(sum_sp or 0.0); a["n_sp"] += n_sp or 0
+    q = {k: {"orders_14d": a["orders"],
+             "slip_bps": round(a["s_sl"] / a["n_sl"], 2) if a["n_sl"] else None,
+             "spread_bps": round(a["s_sp"] / a["n_sp"], 2) if a["n_sp"] else None,
+             "measured_14d": a["n_sl"]}
+         for k, a in _agg.items()}
+    # [2026-07-15] keys already base-coin so they merge with venue_orders'
+    # namespace; [2026-07-22] ALSO fold 1000X->kX and ACCUMULATE (two spellings
+    # can land on one canonical key, so update() would drop the first).
+    for pair, closes, wins, stops in paper_rows:
+        rec = q.setdefault(from_lighter(pair or "")[0], {})
+        rec["closes_30d"] = rec.get("closes_30d", 0) + closes
+        rec["wins_30d"] = rec.get("wins_30d", 0) + wins
+        rec["stops_30d"] = rec.get("stops_30d", 0) + stops
+    return q
+
+
 def coin_quality():
     """The fleet's own measured per-coin stats (validated by construction):
     execution costs from venue_orders (14d) + outcomes from paper_trades (30d)."""
@@ -602,33 +645,19 @@ def coin_quality():
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT coin, count(*), avg(abs(slippage_bps)), avg(spread_bps),
-                       count(slippage_bps)
+                SELECT coin, count(*), sum(abs(slippage_bps)), count(slippage_bps),
+                       sum(spread_bps), count(spread_bps)
                 FROM venue_orders WHERE at > now() - interval '14 days'
                 GROUP BY coin""")
-            # [2026-07-22] `measured_14d` (count of NON-NULL slippage) is now
-            # carried alongside `orders_14d` (count of rows). The veto gates on
-            # the former: a live-arm row with NULL slippage is not evidence, and
-            # counting it made the n-floor a lie. Both keys are published so any
-            # consumer can see how much of a book's history is actually measured.
-            q = {r[0]: {"orders_14d": r[1],
-                        "slip_bps": round(float(r[2]), 2) if r[2] is not None else None,
-                        "spread_bps": round(float(r[3]), 2) if r[3] is not None else None,
-                        "measured_14d": r[4]}
-                 for r in cur.fetchall()}
+            venue_rows = cur.fetchall()
             cur.execute("""
                 SELECT split_part(pair, '/', 1), count(*),
                        sum(case when pnl_abs > 0 then 1 else 0 end),
                        sum(case when reason like '%%stop%%' then 1 else 0 end)
                 FROM paper_trades WHERE closed_at > (now() - interval '30 days')::text
                 GROUP BY 1""")
-            # [2026-07-15 AUDIT FIX] keys normalized to base coin so they merge
-            # with venue_orders' coin namespace ('NEAR', not 'NEAR/USDC')
-            for pair, closes, wins, stops in cur.fetchall():
-                rec = q.setdefault(pair, {})
-                rec.update({"closes_30d": closes, "wins_30d": wins,
-                            "stops_30d": stops})
-        return q
+            paper_rows = cur.fetchall()
+        return _fold_coin_quality(venue_rows, paper_rows)
     except Exception as e:  # noqa: BLE001
         log.warning("coin-quality query failed: %s", e)
         return None
@@ -917,10 +946,41 @@ def _selftest():
     except ImportError:      # not in this image — the guard is best-effort
         pass
 
+    # --- coin_quality fold: 1000X and kX are the SAME coin, must POOL --------
+    # [2026-07-22] Regression guard for the veto's evidence base. The Ticket
+    # Taker writes '1000BONK'; the fleet writes 'kBONK'; a raw GROUP BY split
+    # them. The fold must merge the evidence AND weight the slippage average
+    # correctly across spellings (not average-of-averages).
+    venue = [
+        # (coin, orders, sum|slip|, n_slip, sum_spread, n_spread)
+        ("1000BONK", 9, 35.0, 7, 40.0, 7),     # taker spelling: 5.0 bps avg
+        ("kBONK",   14, 112.0, 12, 90.0, 12),  # fleet spelling: 9.33 bps avg
+        ("ETH",     10, 20.0, 10, 30.0, 10),   # a plain coin: unaffected
+    ]
+    paper = [
+        ("1000BONK", 7, 4, 3),   # taker closes
+        ("kBONK",   23, 10, 5),  # fleet closes
+        ("ETH",      8, 5, 1),
+    ]
+    cq = _fold_coin_quality(venue, paper)
+    assert "1000BONK" not in cq, "1000X spelling must fold away"
+    assert set(cq) == {"kBONK", "ETH"}, cq
+    b = cq["kBONK"]
+    # evidence POOLED: 9+14 orders, 7+12 measured, 7+23 closes
+    assert b["orders_14d"] == 23 and b["measured_14d"] == 19, b
+    assert b["closes_30d"] == 30 and b["wins_30d"] == 14 and b["stops_30d"] == 8, b
+    # WEIGHTED slip = (35+112)/(7+12) = 7.74, NOT (5.0+9.33)/2 = 7.17
+    assert b["slip_bps"] == round(147.0 / 19, 2) == 7.74, b["slip_bps"]
+    assert cq["ETH"]["slip_bps"] == 2.0 and cq["ETH"]["measured_14d"] == 10, cq["ETH"]
+    # a coin with orders but ZERO measured slippage -> slip None, n-floor 0
+    z = _fold_coin_quality([("XYZ", 5, 0.0, 0, 0.0, 0)], [])
+    assert z["XYZ"]["slip_bps"] is None and z["XYZ"]["measured_14d"] == 0, z
+
     print("market_context self-tests passed (LIGHTER-native: 8h funding basis "
           "via funding_basis, mark-vs-index premium, BASE-unit OI, fleet "
           "symbols, coverage explicit, output contract held; live-freshness "
-          "detector fires + unlisted live rows watched + no retired cadence).")
+          "detector fires + unlisted live rows watched + no retired cadence; "
+          "coin_quality folds 1000X->kX with a correctly-weighted slip avg).")
 
 
 if __name__ == "__main__":
