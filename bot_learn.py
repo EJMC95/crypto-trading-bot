@@ -107,6 +107,15 @@ MULT_SOFT_N = 15      # era trades before a 0.75x may publish
 # typo class).
 MULT_EXPAND = os.environ.get("BRAIN_MULT_EXPAND", "on").strip().lower() \
     not in ("off", "0", "false", "no", "disabled")
+# [2026-07-22] EPISODE BASIS for the v3 evidence layer (the (bb) deferred
+# item, brain_replay-validated): trades whose closes chain within this gap
+# are ONE market event — dad+breakout-4h's "10 losses ≈ 1 correlated
+# episode, identical pairs closed within 4 minutes". Raw floors stay on
+# TRADES (the design doc's non-negotiable); only n_eff/wr_w/t collapse.
+# Protects BOTH directions: a correlated loss-burst cannot condemn alone,
+# a correlated win-burst cannot buy a (bh) raise. 0 = trade basis (the
+# knob is its own kill switch); v2 engine never touches this path.
+EP_GAP_SEC = float(os.environ.get("BRAIN_EP_GAP_SEC", "600"))
 MULT_KEY = "brain-stake-mults"
 MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
 
@@ -968,8 +977,10 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
                 if tag != "(untagged)":
                     by_tag[tag].append(t)
             for tag, bucket in by_tag.items():
-                wstats[(bot, tag)] = bstats.weighted_bucket(
-                    bucket, now_ts, HALF_LIFE_DAYS)
+                # [2026-07-22] evidence on the EPISODE basis (see EP_GAP_SEC;
+                # raw floors keep the trade count inside the stats dict)
+                wstats[(bot, tag)] = bstats.weighted_bucket_episodes(
+                    bucket, now_ts, HALF_LIFE_DAYS, EP_GAP_SEC)
         tag_pool, bot_pool = defaultdict(list), defaultdict(list)
         for (bot, tag), st in wstats.items():
             tag_pool[tag].append((bot, st))

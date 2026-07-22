@@ -261,7 +261,9 @@ def synthetic_scenarios(t0):
     # F. flash collapse: 20 harmless trades over 6 days, then 25 straight
     #    losses inside half a day. v2 qualifies but waits out the 3-run
     #    streak; v3's EMERGENCY fast-path (n>=40, t<=-2.5, post_wr<0.20)
-    #    publishes on the first qualifying run.
+    #    publishes on the first qualifying run. (Loss spacing 0.016d =
+    #    23min > the 10-min episode gap — a flash CASCADE of distinct
+    #    closes, deliberately NOT one burst; G below covers bursts.)
     S += _syn("syn-flash", "long-flash",
               t0, [(d * 0.3, (1.0 if i % 3 == 0 else -0.1))
                    for i, d in enumerate(range(20))]
@@ -290,6 +292,33 @@ def synthetic_scenarios(t0):
                                   f"first v2={f2} v3={f3}")),
     ]
     return S, checks
+
+
+def synthetic_scenarios_isolated(t0):
+    """[2026-07-22] Scenarios that must run in their OWN universe. The
+    global fleet prior pools EVERY bucket in a simulate() pass, so adding
+    a bucket to the A-F universe moves their priors — measured while
+    adding G: its positive episode win rate nudged the fleet mu enough to
+    cross F's EMER_POST_WR knife-edge and cost the fast-path its latency
+    win. A-F stay byte-identical to the validated 16-Jul universe; each
+    entry here is a (trades, checks) universe simulated separately.
+
+    G. correlated burst (the (bb) deferred item, built 22-Jul): the same
+       loss dollars as a condemnable bleeder, arriving as 3 same-minute
+       multi-fill bursts (the recorded dad+breakout-4h shape: "identical
+       pairs closed within 4 minutes"). Raw counts read n=40 wr 17.5%
+       -$59 -> v2 fires; the episode basis reads 3 loss EVENTS among 10
+       episodes and must refuse — 10 fills of one dump are not 10 units
+       of evidence."""
+    G = _syn("syn-burst", "long-burst",
+             t0, [(3.0 + b * 2 + i * 0.002, -2.0)
+                  for b in range(3) for i in range(11)]
+             + [(d * 0.9, 1.0) for d in range(7)])
+    g_check = [("G correlated burst: v2 raw-counts fire, v3 episode basis "
+                "refuses", "syn-burst", "long-burst",
+                lambda e2, e3, f2, f3: (f2 is not None and f3 is None,
+                                        f"first v2={f2} v3={f3}"))]
+    return [(G, g_check)]
 
 
 def bucket_timeline(timeline, bot, tag):
@@ -352,6 +381,18 @@ def main():
         ok, note = fn(e2, e3, rel(f2), rel(f3))
         syn_ok &= bool(ok)
         print(f"  [{'PASS' if ok else 'FAIL'}] {name}  ({note})")
+    # isolated universes (see synthetic_scenarios_isolated's docstring)
+    for iso_trades, iso_checks in synthetic_scenarios_isolated(t0):
+        iso_tl = {}
+        for engine in ("v2", "v3"):
+            iso_tl[engine], _ = simulate(iso_trades, engine, half_life=14.0)
+        for name, bot, tag, fn in iso_checks:
+            f2, e2 = bucket_timeline(iso_tl["v2"], bot, tag)
+            f3, e3 = bucket_timeline(iso_tl["v3"], bot, tag)
+            rel = lambda f: None if f is None else round((f - t0) / 86400.0, 2)
+            ok, note = fn(e2, e3, rel(f2), rel(f3))
+            syn_ok &= bool(ok)
+            print(f"  [{'PASS' if ok else 'FAIL'}] {name}  ({note})")
 
     verdict = "PASS" if (ok_total and ok_halves and ok_forgone and syn_ok) else "FAIL"
     print(f"\nVERDICT: {verdict}  (ledger total {'ok' if ok_total else 'WORSE'}, "

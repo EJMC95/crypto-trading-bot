@@ -104,6 +104,16 @@ EMER_T = -2.5                # dollars negative at >= 2.5 sigma
 # when the same (lens, sym) has been absent longer than this gap.
 EPISODE_GAP_SEC = 1800
 
+# [2026-07-22] Close-burst episode gap for the STAKE-MULT evidence layer
+# (the (bb) deferred item, built): a family bot closing five alts on one
+# candle — or a strategy twin closing the identical pairs 4 minutes apart
+# (dad+breakout-4h, "10 losses ≈ 1 correlated episode") — is ONE market
+# event, not five/ten units of evidence. Distinct from EPISODE_GAP_SEC
+# (scout re-emissions, 30 min): close bursts are candle-synchronized, so
+# 10 min separates distinct 15m bars while collapsing same-event fills.
+# bot_learn overrides via BRAIN_EP_GAP_SEC; 0 disables (trade basis).
+EPISODE_GAP_CLOSE_SEC = 600.0
+
 
 # ---------------------------------------------------------------------------
 # weighted bucket statistics
@@ -274,7 +284,10 @@ def qualify_v3(stats, prior, min_n=30, soft_n=15, expand=False):
           "w_lo": round(w_lo, 3),
           "t": round(t, 2), "pnl_w": round(stats["pnl_w"], 2),
           "prior_mu": round(mu, 3), "prior_kappa": round(kappa, 1),
-          "prior_src": src, "urgent": False}
+          "prior_src": src, "urgent": False,
+          # [2026-07-22] episode basis: how many market EVENTS the evidence
+          # fields were computed on (None for plain weighted_bucket callers)
+          "n_ep": stats.get("n_episodes")}
     if stats["pnl_w"] >= 0:
         if not expand:
             return None, ev
@@ -323,6 +336,74 @@ def episode_firsts(timestamps, gap_sec=EPISODE_GAP_SEC):
             firsts.add(ts)
         prev = ts
     return firsts
+
+
+def cluster_episodes(trades, gap_sec=EPISODE_GAP_CLOSE_SEC):
+    """[2026-07-22, the (bb) deferred item] Collapse a bucket's closed
+    trades into market-event EPISODES by chain-linked close time: a trade
+    whose close falls within gap_sec of the episode's latest close joins
+    it, ANY pair — the recorded evidence is time-correlation, not pair
+    identity (a multi-pair dump closes on one candle; twins close the
+    identical pairs minutes apart). An episode's pseudo-trade: profit_abs
+    = Σ members, profit_ratio = Σ members' ratios (the event's total book
+    move; None when no member carries one), _close_epoch = the LAST
+    member's close (the evidence resolves when the event ends). A
+    single-member episode returns the ORIGINAL trade dict, so a bucket
+    with no bursts is BIT-IDENTICAL to its trade list. Trades without
+    _close_epoch cannot be time-clustered and stay single-trade episodes
+    (no free correlation assumption in either direction). gap_sec <= 0 or
+    None disables. Pure; order-independent; mutates nothing."""
+    if not gap_sec or gap_sec <= 0:
+        return list(trades)
+    timed = [t for t in trades if t.get("_close_epoch") is not None]
+    untimed = [t for t in trades if t.get("_close_epoch") is None]
+    groups, cur = [], []
+    for t in sorted(timed, key=lambda x: x["_close_epoch"]):
+        if cur and t["_close_epoch"] - cur[-1]["_close_epoch"] > gap_sec:
+            groups.append(cur)
+            cur = []
+        cur.append(t)
+    if cur:
+        groups.append(cur)
+    out = []
+    for grp in groups:
+        if len(grp) == 1:
+            out.append(grp[0])
+            continue
+        ratios = [t["profit_ratio"] for t in grp
+                  if t.get("profit_ratio") is not None]
+        out.append({"profit_abs": sum((t.get("profit_abs") or 0.0)
+                                      for t in grp),
+                    "profit_ratio": sum(ratios) if ratios else None,
+                    "_close_epoch": grp[-1]["_close_epoch"],
+                    "_n_trades": len(grp)})
+    return out + untimed
+
+
+def weighted_bucket_episodes(trades, now_ts, half_life=HALF_LIFE_DAYS,
+                             gap_sec=EPISODE_GAP_CLOSE_SEC):
+    """weighted_bucket with the v3 STATISTICAL layer computed on EPISODES.
+
+    The raw-count fields keep their TRADE meaning — n/w/pnl (qualify_v3's
+    raw floors read stats['n']: the design doc's non-negotiable, unmoved),
+    exp_pct, pf, max_consec_loss. The evidence fields — n_eff, wr_w,
+    pnl_w, mean_w, sd_w, t — come from the episode bucket: ten fills of
+    one market event are ONE unit of evidence, for a condemnation AND for
+    a raise (the (bh) expand bars inherit the same protection — a
+    correlated win-burst cannot inflate its own t-stat). Episode decay
+    weighs at the event's last close; members span minutes, so the skew
+    vs per-trade decay is negligible and documented rather than modeled.
+    Adds n_episodes. gap_sec=0 (or a burst-free bucket) is BIT-IDENTICAL
+    to weighted_bucket — the knob is its own kill switch."""
+    base = weighted_bucket(trades, now_ts, half_life)
+    eps = cluster_episodes(trades, gap_sec)
+    base["n_episodes"] = len(eps)
+    if len(eps) == len(trades):
+        return base
+    ep = weighted_bucket(eps, now_ts, half_life)
+    for k in ("n_eff", "wr_w", "pnl_w", "mean_w", "sd_w", "t"):
+        base[k] = ep[k]
+    return base
 
 
 # ---------------------------------------------------------------------------
@@ -429,7 +510,71 @@ def _selftest():
     # Episodes: 3 tight emissions + one after a gap = 2 episodes.
     f = episode_firsts([0, 60, 120, 9000])
     assert f == {0, 9000}
-    print("brain_stats selftest OK")
+
+    # [2026-07-22] CLOSE-BURST EPISODE BASIS (the (bb) deferred item).
+    # Identity: a burst-free bucket is BIT-IDENTICAL to the trade basis.
+    spread = [mk(-2.0, d) for d in range(20)] + [mk(1.0, d + 0.5) for d in range(8)]
+    wb, wbe = weighted_bucket(spread, now), weighted_bucket_episodes(spread, now)
+    assert wbe.pop("n_episodes") == len(spread) and wbe == wb, "identity broken"
+    # gap 0 disables even on a burst
+    burst_day = 3.0
+    burst = ([mk(-2.0, burst_day + i * 1e-4) for i in range(10)]
+             + [mk(1.5, 10 + d) for d in range(4)])
+    z = weighted_bucket_episodes(burst, now, gap_sec=0)
+    assert z["n_episodes"] == len(burst)
+    # a 10-fill burst is ONE event: raw n keeps the trade count (floors
+    # unmoved), the evidence layer collapses
+    be = weighted_bucket_episodes(burst, now)
+    assert be["n"] == 14 and be["n_episodes"] == 5, be["n_episodes"]
+    assert be["n_eff"] < weighted_bucket(burst, now)["n_eff"] / 2
+    assert be["pnl"] == weighted_bucket(burst, now)["pnl"], "raw $ untouched"
+    # cluster mechanics: ratios sum, last close stamps, member count kept,
+    # untimed trades stay singles, pair-blind chaining
+    grp = cluster_episodes([
+        {"profit_abs": -1.0, "profit_ratio": -0.01, "_close_epoch": 1000},
+        {"profit_abs": -2.0, "profit_ratio": None, "_close_epoch": 1200},
+        {"profit_abs": 3.0, "profit_ratio": 0.03, "_close_epoch": 1500},
+        {"profit_abs": 9.0, "profit_ratio": 0.09, "_close_epoch": 99999},
+        {"profit_abs": 5.0, "profit_ratio": 0.05}])
+    assert len(grp) == 3, grp
+    e0 = [g for g in grp if g.get("_n_trades")][0]
+    assert e0["profit_abs"] == 0.0 and abs(e0["profit_ratio"] - 0.02) < 1e-9
+    assert e0["_close_epoch"] == 1500 and e0["_n_trades"] == 3
+    assert {g["profit_abs"] for g in grp} == {0.0, 9.0, 5.0}
+    # THE RECORDED CASE, both directions. dad+breakout-4h's "10 losses in
+    # 4 minutes": on the trade basis this bucket condemns; on the episode
+    # basis 5 events cannot clear the bars — the burst may not condemn...
+    burst_bad = ([mk(-2.0, 2.0 + i * 1e-4) for i in range(14)]
+                 + [mk(-2.0, 5.0 + i * 1e-4) for i in range(14)]
+                 + [mk(1.0, 8 + d * 0.5) for d in range(5)])
+    tb = weighted_bucket(burst_bad, now)
+    assert qualify_v3(tb, eb_prior([], [], []), min_n=30, soft_n=15)[0] is not None, \
+        "fixture must condemn on the trade basis or it proves nothing"
+    eb = weighted_bucket_episodes(burst_bad, now)
+    m_eb, ev_eb = qualify_v3(eb, eb_prior([], [], []), min_n=30, soft_n=15)
+    assert m_eb is None and ev_eb["n_ep"] == 7, (m_eb, ev_eb)
+    # ...and the MIRROR: a correlated WIN-burst may not buy a raise (the
+    # (bh) expand bars inherit the same de-correlation), while the same
+    # totals spread out still can.
+    # (0.35d spacing — genuinely spread in CLOSE time; the (bh) fixture's
+    # `d % 3` ages put 30 trades on 3 epochs, which IS a burst here)
+    win_spread = ([mk(2.0, d * 0.35, 0.02) for d in range(26)]
+                  + [mk(-1.0, 9 + d * 0.35, -0.01) for d in range(4)])
+    assert qualify_v3(weighted_bucket_episodes(win_spread, now),
+                      eb_prior([], [], []), expand=True)[0] == 1.5, \
+        "spread winners must still expand on the episode basis"
+    win_burst = ([mk(2.0, 1.0 + i * 1e-4, 0.02) for i in range(26)]
+                 + [mk(-1.0, 5 + d, -0.01) for d in range(4)])
+    assert qualify_v3(weighted_bucket(win_burst, now),
+                      eb_prior([], [], []), expand=True)[0] is not None, \
+        "fixture must expand on the trade basis or it proves nothing"
+    assert qualify_v3(weighted_bucket_episodes(win_burst, now),
+                      eb_prior([], [], []), expand=True)[0] is None, \
+        "one lucky market event bought a 1.5x raise"
+
+    print("brain_stats selftest OK (incl. close-burst episode basis: "
+          "identity, gap-0 kill, raw-floor preservation, recorded "
+          "dad+breakout case, expand mirror)")
 
 
 if __name__ == "__main__":

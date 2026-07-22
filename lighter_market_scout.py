@@ -196,7 +196,38 @@ def historized(payload):
     return {k: v for k, v in payload.items() if k != "_marks"}
 
 
-def strategy_tickets(stats, lighter_apr, divergence=None):
+def oracle_regimes(oracle_state, now_ts=None):
+    """[2026-07-22] {sym: {"v": verdict, "dir": dir}} from a FRESH
+    regime-oracle payload — the per-asset regime stamps for tickets.
+
+    WHY: today a regime-aware taker rule is UNREPLAYABLE — the recorded
+    tape carries no regime, so any future "gate lens X in risk-off" idea
+    has no evidence to be judged on. Stamping each ticket with the regime
+    THE ASSET was in at emission starts that tape now, at a few bytes per
+    ticket. Consumes the oracle's `pairs` — the per-asset surface the (az)
+    build published (crypto majors AND non-crypto, each graded on its OWN
+    tape); a sym the oracle does not grade gets NO stamp — absence, never
+    a wrong-class guess (the item-18 contract). Stale/absent/malformed
+    oracle -> {} and tickets simply go unstamped (fail-safe). ADVISORY:
+    zero consumers read the stamp; it accrues for the replay/tuner
+    evidence machinery to condition on once the sample earns it."""
+    st = oracle_state if isinstance(oracle_state, dict) else {}
+    try:
+        upd = datetime.fromisoformat(str(st.get("updated")))
+        now = (now_ts if now_ts is not None
+               else datetime.now(timezone.utc).timestamp())
+        if now - upd.timestamp() > float(st.get("ttl_sec") or 0):
+            return {}
+    except (TypeError, ValueError):
+        return {}
+    out = {}
+    for sym, p in (st.get("pairs") or {}).items():
+        if isinstance(p, dict) and p.get("verdict"):
+            out[sym] = {"v": p["verdict"], "dir": p.get("dir")}
+    return out
+
+
+def strategy_tickets(stats, lighter_apr, divergence=None, regimes=None):
     """[2026-07-14 user ask] Per-strategy candidate TICKETS — the scanner
     hunting each bot family's setup across the WHOLE venue instead of a fixed
     whitelist. v1 lenses use only today's keyless fields (range position, day
@@ -257,6 +288,15 @@ def strategy_tickets(stats, lighter_apr, divergence=None):
                                   "xvenue_apr": d.get("xvenue_apr"),
                                   "vol_m": round((v.get("qvol") or 0) / 1e6, 2),
                                   "prem_bps": prem})
+    # [2026-07-22] per-asset regime stamp (see oracle_regimes): additive,
+    # only where the oracle grades the sym on its OWN tape; one place for
+    # all four lenses so no lens can silently miss it.
+    if regimes:
+        for rows in out.values():
+            for r in rows:
+                reg = regimes.get(r["sym"])
+                if reg:
+                    r["regime"] = reg
     out["breakout"].sort(key=lambda r: (-r["range_pos"], -r["vol_m"]))
     out["dip"].sort(key=lambda r: (r["range_pos"], r["chg_pct"]))
     out["momentum"].sort(key=lambda r: -r["chg_pct"])
@@ -264,9 +304,10 @@ def strategy_tickets(stats, lighter_apr, divergence=None):
     return {k: v[:TICKET_TOP_N] for k, v in out.items()}
 
 
-def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
+def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None):
     """Assemble the published payload from the pure inputs.
-    prev_marks: {sym: [qvol, oi]} from the previous snapshot ({} first run)."""
+    prev_marks: {sym: [qvol, oi]} from the previous snapshot ({} first run).
+    regimes: oracle_regimes() output ({} / None -> unstamped tickets)."""
     liquid = {s: v for s, v in stats.items() if v["liquid"]}
     prems = sorted(abs(v["prem_bps"]) for v in liquid.values())
     stress = None
@@ -315,7 +356,7 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks):
     payload = {
         "updated": now_iso(), "ttl_sec": TTL_SEC,
         "n_books": len(stats), "n_liquid": len(liquid),
-        "tickets": strategy_tickets(stats, lighter_apr, divergence),
+        "tickets": strategy_tickets(stats, lighter_apr, divergence, regimes),
         "stress": stress,
         "prem_outliers": prem_outliers,
         "funding_extremes": funding_extremes,
@@ -418,7 +459,9 @@ def main():
     lighter_apr, other_aprs = funding_aprs(fr.get("funding_rates") or [])
 
     prev = store.load_state(KEY) or {}
-    payload = build_snapshot(stats, lighter_apr, other_aprs, prev.get("_marks") or {})
+    regimes = oracle_regimes(store.load_state("regime-oracle"))
+    payload = build_snapshot(stats, lighter_apr, other_aprs,
+                             prev.get("_marks") or {}, regimes)
     store.save_state(KEY, payload)
     store.save_history(KEY, historized(payload))
 
@@ -434,7 +477,8 @@ def main():
           f"| funding: {fx} | diverge: {dv} "
           f"| tickets: brk={len(tk['breakout'])} dip={len(tk['dip'])} "
           f"momo={len(tk['momentum'])} div={len(tk.get('divergence') or [])} "
-          f"| new={len(payload['new_listings'])} surge={len(payload['vol_surges'])}")
+          f"| new={len(payload['new_listings'])} surge={len(payload['vol_surges'])} "
+          f"| regime-stamps from {len(regimes)} oracle-graded books")
 
 
 # ---------------------------------------------------------------------------
@@ -541,7 +585,40 @@ def selftest():
     got = {(r["sym"], r["side"]) for r in tkd}
     assert got == {("BRK", "short"), ("DIPX", "long")}, tkd
 
-    print("All Lighter Scout self-tests passed (stats, funding, diffs, tickets).")
+    # 6) [2026-07-22] Per-asset regime stamps on tickets (oracle_regimes).
+    # Fresh oracle + covered sym -> stamped on EVERY lens incl. divergence;
+    # uncovered sym -> NO stamp (absence, never a wrong-class guess);
+    # stale/absent/malformed oracle -> {} and tickets identical to today.
+    _now = datetime.now(timezone.utc).timestamp()
+    _ost = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "ttl_sec": 7200,
+            "pairs": {"BRK": {"verdict": "SHORT-window", "dir": -1,
+                              "adx": 30.0, "class": "crypto"},
+                      "MOMO": {"verdict": "LONG-window", "dir": 1}}}
+    regs = oracle_regimes(_ost, now_ts=_now)
+    assert regs == {"BRK": {"v": "SHORT-window", "dir": -1},
+                    "MOMO": {"v": "LONG-window", "dir": 1}}, regs
+    tk_r = strategy_tickets(tstats, {"BRK": 10.0, "MOMO": 20.0}, div, regs)
+    _brk = [r for r in tk_r["breakout"] if r["sym"] == "BRK"][0]
+    _momo = [r for r in tk_r["momentum"] if r["sym"] == "MOMO"][0]
+    _dbrk = [r for r in tk_r["divergence"] if r["sym"] == "BRK"][0]
+    assert _brk["regime"]["v"] == "SHORT-window" and _brk["regime"]["dir"] == -1
+    assert _momo["regime"]["v"] == "LONG-window"
+    assert _dbrk["regime"]["v"] == "SHORT-window", "divergence lens stamped too"
+    _dipx = [r for r in tk_r["divergence"] if r["sym"] == "DIPX"][0]
+    assert "regime" not in _dipx, "uncovered sym must carry NO stamp"
+    # stale / absent / malformed oracle: no stamps, tickets bit-identical
+    assert oracle_regimes(dict(_ost, updated="2026-01-01T00:00:00+00:00"),
+                          now_ts=_now) == {}
+    assert oracle_regimes(None) == {} and oracle_regimes({}) == {}
+    assert oracle_regimes({"updated": "garbage", "ttl_sec": 900,
+                           "pairs": {"X": {"verdict": "LONG-window"}}}) == {}
+    assert strategy_tickets(tstats, {"BRK": 10.0, "MOMO": 20.0}, div, {}) == \
+        strategy_tickets(tstats, {"BRK": 10.0, "MOMO": 20.0}, div), \
+        "no oracle -> tickets exactly as before"
+
+    print("All Lighter Scout self-tests passed (stats, funding, diffs, "
+          "tickets, per-asset regime stamps incl. fail-safe dark-oracle).")
 
 
 if __name__ == "__main__":
