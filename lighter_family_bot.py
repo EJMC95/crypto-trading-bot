@@ -129,6 +129,49 @@ def brain_entry_gated(bot_id, tag):
         return False
 
 
+def symcap_state(fr):
+    """[2026-07-22 SYMBOL CAP ENFORCED — operator: "can we fix the budget
+    saturation"] Parse the already-loaded fleet-risk payload's per-symbol
+    pileup cap into (cap, {base: fleet-wide long count}) — or None when the
+    cap does not enforce (advisory/disabled/absent/junk), which every caller
+    must treat as OPEN. The caller owns freshness (this bot's fleet-risk
+    read already gates on updated+ttl_sec); this stays pure so the selftest
+    can pin the whole contract offline. Counts below fleet_risk's noise
+    filter (min(2, cap)) are absent from the payload and read as 0 — at
+    cap>=2 that can never mask a bind."""
+    try:
+        sc = (fr or {}).get("symbol_cap") or {}
+        if str(sc.get("mode")) != "enforce":
+            return None
+        cap = int(sc.get("cap") or 0)
+        if cap <= 0:
+            return None
+        held = {str(k): int(v) for k, v in
+                (sc.get("long_by_symbol") or {}).items()}
+        return cap, held
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def symcap_blocked(state, coin, cycle_sym):
+    """True when opening ANOTHER long on `coin` would stack past the fleet's
+    per-symbol cap, counting BOTH the published fleet-wide holds and the
+    longs THIS process already admitted this cycle (`cycle_sym` — the same
+    in-cycle race the 21-Jul budget-headroom fix bounds: seven books share
+    one payload read, so without the local count one cycle could stack a
+    symbol straight past the cap). Restrict-only, fail-safe OPEN on any
+    parse error or state=None."""
+    try:
+        if state is None:
+            return False
+        cap, held = state
+        base = str(coin).split("/")[0]
+        return (int(held.get(base, 0))
+                + int((cycle_sym or {}).get(base, 0))) >= cap
+    except Exception:  # noqa: BLE001
+        return False
+
+
 LOG_FILE = os.environ.get("FAMILY_LOG_FILE", "lighter_family_bot.log")
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
@@ -831,6 +874,13 @@ def main():
         # (advisory mode / stale state), exactly the old contract.
         fleet_long_headroom = None
         cycle_admitted = 0
+        # [2026-07-22 SYMBOL CAP] per-symbol pileup cap (fleet_risk publishes,
+        # enforced by default since today — operator call with saturation
+        # re-measured worse). None = open; cycle_sym counts THIS cycle's own
+        # admits per base so seven books can't stack one symbol past the cap
+        # on a single payload read.
+        fleet_symcap = None
+        cycle_sym = {}
         try:
             _fr = store.load_state("fleet-risk") or {}
             _upd = datetime.fromisoformat(
@@ -857,10 +907,15 @@ def main():
                 if fleet_gov < 1.0:
                     log.info("FLEET DRAWDOWN GOVERNOR — new-entry stakes x%.2f",
                              fleet_gov)
+                # [2026-07-22 SYMBOL CAP] same fresh payload, same fail-open
+                # contract; symcap_state returns None unless the published
+                # mode enforces.
+                fleet_symcap = symcap_state(_fr)
         except Exception:  # noqa: BLE001 — fail-safe open
             fleet_long_veto = False
             fleet_long_headroom = None
             fleet_gov = 1.0
+            fleet_symcap = None
 
         for b in books:
             store.heartbeat(b.bot_id)
@@ -998,6 +1053,11 @@ def main():
                     continue      # L2: this cycle already used the free slots
                 if b.broker.open_count() >= b.s.max_open:
                     continue
+                if symcap_blocked(fleet_symcap, coin, cycle_sym):
+                    log.info("%s %s entry SKIPPED — fleet per-symbol cap %d "
+                             "reached on %s (fleet-wide incl. this cycle)",
+                             b.bot_id, coin, fleet_symcap[0], coin)
+                    continue      # L2: de-pileup — cap longs per symbol
                 if t0 < b.cooldown.get(coin, 0.0):
                     continue
                 if not b.throttle_ok(t0):
@@ -1036,6 +1096,8 @@ def main():
                 b.meta[coin] = {"entry": entry_px, "opened_ts": t0, "tag": tag,
                                 "accrued": 0.0, "stop_px": stop_px}
                 cycle_admitted += 1
+                _base = str(coin).split("/")[0]
+                cycle_sym[_base] = cycle_sym.get(_base, 0) + 1
                 log.info("%s OPEN %s long $%.0f @ %.6g [%s]",
                          b.bot_id, coin, stake, entry_px, tag)
 
@@ -1130,6 +1192,28 @@ def _selftest():
     g = DayTraderGated("t", tf="15m", stoploss=-0.05, max_open=5, style="t")
     rung = max((k for k in g.roi if k <= 200), default=None)
     assert g.roi[rung] == 0.012
+    # [2026-07-22] per-symbol cap consumer contract (pure, offline).
+    _enf = {"symbol_cap": {"mode": "enforce", "cap": 3,
+                           "long_by_symbol": {"ETH": 3, "LTC": 2}}}
+    st = symcap_state(_enf)
+    assert st == (3, {"ETH": 3, "LTC": 2}), st
+    assert symcap_blocked(st, "ETH", {}) is True, "at cap -> blocked"
+    assert symcap_blocked(st, "ETH/USDT", {}) is True, "base-normalizes"
+    assert symcap_blocked(st, "LTC", {}) is False, "under cap -> open"
+    assert symcap_blocked(st, "LTC", {"LTC": 1}) is True, \
+        "fleet 2 + this cycle 1 = 3 -> blocked (in-cycle stacking counted)"
+    assert symcap_blocked(st, "BTC", {"BTC": 2}) is False, \
+        "unheld fleet-wide, 2 this cycle -> still under cap"
+    assert symcap_blocked(st, "BTC", {"BTC": 3}) is True, \
+        "a single cycle alone can reach the cap"
+    # fail-open: advisory mode, disabled cap, junk payloads, None state.
+    assert symcap_state({"symbol_cap": {"mode": "advisory", "cap": 3,
+                                        "long_by_symbol": {"ETH": 9}}}) is None
+    assert symcap_state({"symbol_cap": {"mode": "enforce", "cap": 0}}) is None
+    assert symcap_state({}) is None and symcap_state(None) is None
+    assert symcap_state({"symbol_cap": {"mode": "enforce", "cap": "x"}}) is None
+    assert symcap_blocked(None, "ETH", {"ETH": 99}) is False, \
+        "no enforcing state -> always open"
     print("lighter_family_bot self-test: OK")
 
 

@@ -184,20 +184,25 @@ def long_symbol_blocked(base, current_time=None):
     `base` would stack past the fleet's per-symbol cap.
 
     Companion to long_entries_blocked with the identical contract: enforces
-    ONLY when fleet_risk publishes symbol_cap.mode='enforce' (env
-    FLEET_SYMBOL_CAP_MODE on the fleet-risk service; shipped default
-    'advisory' = this function is inert fleet-wide), restrict-only, and
-    fail-safe OPEN — stale/missing payload, absent block, cap<=0, or any
-    parse error all return False. Rationale measured over 168h: 20 long
-    slots behaving as ~7.7 independent bets; true LONG-side 4-stacks in
-    ~8.7% of samples (the first-draft 37.1% was side-blind — corrected same
-    day; see fleet_risk.py) — de-pileup frees budget without raising gross.
-    NO consumer is wired by this commit: strategies/bots adopt it when a
-    review sanctions the wiring (the fleet-clock lesson). Review caution,
-    on record from the verify pass: do NOT wire the shadow TAKER to this
-    cap — its book is the lens-grading instrument, and crowding-capped
-    entries would starve the episode floors and skew the live-vs-shadow
-    baselines that steer real money. Family/strategy lanes only.
+    ONLY when fleet_risk publishes symbol_cap.mode='enforce', restrict-only,
+    and fail-safe OPEN — stale/missing payload, absent block, cap<=0, or any
+    parse error all return False. [2026-07-22] The published default is now
+    ENFORCE — the operator made the review call ("can we fix the budget
+    saturation") after (bw) re-measured saturation worse (red 55.9%/48h,
+    16/20 slots on 5 symbols); FLEET_SYMBOL_CAP_MODE=advisory on the
+    fleet-risk service is the kill switch, and FLEET_RISK_MODE=advisory
+    stays SENIOR (a stood-down risk layer publishes the cap as advisory).
+    Rationale measured over 168h: 20 long slots behaving as ~7.7 independent
+    bets; true LONG-side 4-stacks in ~8.7% of samples (the first-draft 37.1%
+    was side-blind — corrected same day; see fleet_risk.py) — de-pileup
+    frees budget without raising gross. Wired consumer: the family bot
+    (lighter_family_bot.symcap_state/symcap_blocked — same payload plus
+    in-cycle stacking awareness across its seven books). Review caution, on
+    record from the verify pass and STILL HONOURED: do NOT wire the shadow
+    TAKER to this cap — its book is the lens-grading instrument, and
+    crowding-capped entries would starve the episode floors and skew the
+    live-vs-shadow baselines that steer real money. Family/strategy lanes
+    only.
     """
     try:
         p = _load("fleet-risk", current_time)
