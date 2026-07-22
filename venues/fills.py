@@ -12,6 +12,7 @@ verdict (`measured_from_reason`), and the slippage rule (`slip_bps_of`).
 Imported by lighter_funding_bot (Funding Farmer, LIVE) and
 lighter_ticket_taker (Ticket Taker, LIVE).
 
+
 WHAT DOES NOT. `lighter_trend_bot._real_exit` and `lighter_perp_sniper._real_exit`
 are NOT copies of this despite looking like it — they call the legacy `last_fill`,
 thread no client id, and publish no `slippage_bps` at all (neither file writes a
@@ -25,7 +26,19 @@ is caught and every failure is NAMED — "no fill found" and "the read exploded"
 must never collapse into the same None, which is how the fleet went 58 real
 orders without a single measured fill.
 """
+
 from __future__ import annotations
+
+
+import os
+import time
+
+# [2026-07-22] hard ceiling on the post-submit settle wait. The venue's own
+# predicted_execution_time_ms drives the wait; this clamps it so a garbage or
+# hostile value can never stall a trading loop. Telemetry may cost a second of
+# measurement latency; it may never cost an exit.
+SETTLE_CAP_MS = float(os.environ.get("FILL_SETTLE_CAP_MS", "2500"))
+
 
 
 def measured_from_reason(px, reason):
@@ -48,7 +61,8 @@ def measured_from_reason(px, reason):
     return px is not None and "approx" not in (reason or "")
 
 
-def read_fill(detail_fn, coin, is_ask, since_ts, client_id, tx_hash=None):
+def read_fill(detail_fn, coin, is_ask, since_ts, client_id, tx_hash=None,
+              settle_ms=None):
     """(px_or_None, measured, reason) — the id first, the heuristic as a net.
 
     THE ESCALATION, and why it cannot live one layer down in
@@ -82,6 +96,28 @@ def read_fill(detail_fn, coin, is_ask, since_ts, client_id, tx_hash=None):
     """
     if detail_fn is None:
         return None, False, "no-detail-fn"
+    # [2026-07-22 SETTLE WAIT — the blocker underneath every identity tier]
+    # MEASURED: 0 of 81 live orders ever produced a measured fill. Both the tx
+    # tier and the id tier report `no-match:both`, i.e. both tapes WERE read and
+    # our fill was not on either — and no naming scheme fixes a tape that does
+    # not contain the trade yet. There is no wait anywhere on either bot's order
+    # path: `read_fill` fires immediately after submission and retries up to 6
+    # tape reads back-to-back, all inside the window the venue itself says the
+    # transaction needs. The venue TELLS us how long that is —
+    # `RespSendTx.predicted_execution_time_ms`, returned to the caller on every
+    # order — and it had ZERO references in this repo.
+    # Bounded on purpose: a venue value of 0/absent/garbage must never stall a
+    # trading loop, so the wait is clamped to SETTLE_CAP_MS and only ever
+    # happens AFTER the order is already submitted (it delays the measurement,
+    # never the order). settle_ms=None reproduces the pre-22-Jul behaviour
+    # exactly, so every existing caller and fixture is unchanged.
+    if settle_ms:
+        try:
+            _w = min(float(settle_ms), SETTLE_CAP_MS) / 1000.0
+            if _w > 0:
+                time.sleep(_w)
+        except (TypeError, ValueError):
+            pass
     # [2026-07-21 TX TIER] the transaction hash is the STRONGEST exact name
     # (measured live: the venue does not echo client_order_index into the
     # tape — 0 of 61 real orders ever id-matched — but every trade row

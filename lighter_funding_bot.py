@@ -815,7 +815,8 @@ def main():
             return {c: {"size": sz, "entry": en} for c, (sz, en) in broker.pos.items()}
         return ctx.venue.positions()
 
-    def _real_exit(coin, is_short, fallback, client_id=None, tx_hash=None):
+    def _real_exit(coin, is_short, fallback, client_id=None, tx_hash=None,
+                   settle_ms=None):
         """[2026-07-17 FILL READ] (px, measured, reason) — REAL exit fill (venue
         trades read; closing a long SELLS -> is_ask=True) or the decision price.
 
@@ -834,7 +835,7 @@ def main():
         px, measured, reason = _read_fill(
             getattr(ctx.venue, "last_fill_detail", None), coin,
             is_ask=not is_short, since_ts=time.time() - 180, client_id=client_id,
-            tx_hash=tx_hash)
+            tx_hash=tx_hash, settle_ms=settle_ms)
         if px is not None:
             log.info("%s exit fill (venue): %.6g (decision %.6g) [%s%s]", coin,
                      px, fallback or 0.0, reason,
@@ -843,7 +844,8 @@ def main():
             log.info("%s exit fill: no read [%s] — slippage NULL", coin, reason)
         return (px if px is not None else fallback), measured, reason
 
-    def _real_entry(coin, is_short, fallback, client_id=None, tx_hash=None):
+    def _real_entry(coin, is_short, fallback, client_id=None, tx_hash=None,
+                   settle_ms=None):
         """[2026-07-17 FILL READ] (px_or_None, measured, reason) — REAL entry
         fill (OPENING a short SELLS -> is_ask=True).
 
@@ -863,7 +865,7 @@ def main():
             # opening a SHORT sells -> is_ask=True (the exact inverse of the
             # close leg's `is_ask=not is_short`).
             is_ask=is_short, since_ts=time.time() - 180, client_id=client_id,
-            tx_hash=tx_hash)
+            tx_hash=tx_hash, settle_ms=settle_ms)
         if px is not None:
             log.info("%s entry fill (venue): %.6g (decision %.6g) [%s%s]", coin,
                      px, fallback or 0.0, reason,
@@ -899,7 +901,8 @@ def main():
             # -> REAL venue fill if readable, named by the order's own client id
             px, _meas, _src = _real_exit(
                 c, is_short, px, client_id=(_res or {}).get("client_order_index"),
-                tx_hash=(_res or {}).get("tx_hash"))
+                tx_hash=(_res or {}).get("tx_hash"),
+                settle_ms=(_res or {}).get("settle_ms"))
             price_pnl = abs(held) * ((px - entry) if not is_short else (entry - px))
             n_closed += 1
             n_wins += 1 if price_pnl > 0 else 0
@@ -1200,7 +1203,8 @@ def main():
                         _bpx, _, _ = _real_exit(
                             coin, is_short, entry,
                             client_id=(_res or {}).get("client_order_index"),
-                tx_hash=(_res or {}).get("tx_hash"))
+                tx_hash=(_res or {}).get("tx_hash"),
+                settle_ms=(_res or {}).get("settle_ms"))
                         _bpnl = abs(held) * ((_bpx - entry) if not is_short
                                              else (entry - _bpx))
                         _record_close(bot_id, coin, entry, opened_ts, _bpx, _bpnl,
@@ -1288,7 +1292,8 @@ def main():
                 px, _meas, _src = _real_exit(
                     coin, is_short, px,
                     client_id=(_res or {}).get("client_order_index"),
-                tx_hash=(_res or {}).get("tx_hash"))
+                tx_hash=(_res or {}).get("tx_hash"),
+                settle_ms=(_res or {}).get("settle_ms"))
                 price_pnl = (abs(held) * (px - entry)) if not is_short \
                     else (abs(held) * (entry - px))
             realized += (price_pnl + fund_pnl) if dry_run else 0.0
@@ -1476,7 +1481,8 @@ def main():
                     _fill_px, _meas, _src = _real_entry(
                         coin, is_short, px,
                         client_id=(_res or {}).get("client_order_index"),
-                tx_hash=(_res or {}).get("tx_hash"))
+                tx_hash=(_res or {}).get("tx_hash"),
+                settle_ms=(_res or {}).get("settle_ms"))
                     raw["measured"] = _meas
                     raw["fill_src"] = _src
                     store.publish_venue_order(

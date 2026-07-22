@@ -50,6 +50,32 @@ from .symbol_map import to_lighter
 log = logging.getLogger("venues.lighter")
 
 
+def _settle_ms_of(resp):
+    """The venue's OWN estimate of how long this tx needs, in ms, or None.
+
+    [2026-07-22] `RespSendTx.predicted_execution_time_ms` is returned on every
+    order and had ZERO references in this repo. That is the blocker underneath
+    every fill-identity tier: 0 of 81 live orders ever produced a measured fill,
+    with BOTH the tx and id tiers reporting `no-match:both` — the tapes were read
+    and our trade was not on them YET, because the read fires with no wait at all.
+    No naming scheme fixes a tape that does not contain the trade.
+
+    Probed across shapes like `_tx_hash_of`, for the same reason: a None here
+    only costs the settle wait (i.e. today's behaviour), never an error.
+    """
+    for attr in ("predicted_execution_time_ms", "predictedExecutionTimeMs"):
+        v = getattr(resp, attr, None)
+        if v is None and isinstance(resp, dict):
+            v = resp.get(attr)
+        if v is not None:
+            try:
+                f = float(v)
+                return f if f > 0 else None
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
 def _tx_hash_of(tx, resp):
     """Best-effort tx hash from the signer's (tx, resp) pair, or None.
 
@@ -627,6 +653,10 @@ class LighterClient(VenueClient):
         return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
                 "resp": getattr(resp, "to_dict", lambda: str(resp))(),
                 "client_order_index": _cid,
+                # [2026-07-22] the venue's own settle estimate — read_fill waits
+                # this long before looking for the fill (bounded by
+                # fills.SETTLE_CAP_MS). Was returned and never read.
+                "settle_ms": _settle_ms_of(resp),
                 # [2026-07-21] the fill's OTHER exact name: every venue trade
                 # row stamps the taker's tx_hash, so OUR submission's hash
                 # matches OUR fills without depending on the venue echoing
@@ -825,6 +855,7 @@ class LighterClient(VenueClient):
         return {"tx": getattr(tx, "to_dict", lambda: str(tx))(),
                 "resp": getattr(resp, "to_dict", lambda: str(resp))(),
                 "client_order_index": _cid,
+                "settle_ms": _settle_ms_of(resp),   # see market_open
                 "tx_hash": _tx_hash_of(tx, resp)}   # see market_open
 
 

@@ -843,7 +843,7 @@ def main(_ctx=None):
         return {to_lighter(c)[0]: v for c, v in (venue.positions() or {}).items()}
 
     def _real_fill(sym, is_ask, fallback, leg, client_id=None,
-                   tx_hash=None):
+                   tx_hash=None, settle_ms=None):
         """REAL fill price from the venue's own trade tape as (price, measured,
         reason). is_ask=True when WE sold (opening a SHORT / closing a LONG).
         `price` is the decision price when `measured` is False, so every caller
@@ -896,7 +896,7 @@ def main(_ctx=None):
         if detail is not None:
             px, measured, reason = read_fill(
                 detail, sym, is_ask=is_ask, since_ts=time.time() - 180,
-                client_id=client_id, tx_hash=tx_hash)
+                client_id=client_id, tx_hash=tx_hash, settle_ms=settle_ms)
         else:
             # LEGACY venue: no reason channel and no id round trip, so this read
             # can only ever be a (side, since_ts) blend. It is labelled `approx`
@@ -1041,7 +1041,8 @@ def main(_ctx=None):
             px, _meas, _why = _real_fill(
                 sym, is_ask=is_long, fallback=px, leg="exit",
                 client_id=(_res or {}).get("client_order_index"),
-                tx_hash=(_res or {}).get("tx_hash"))
+                tx_hash=(_res or {}).get("tx_hash"),
+                settle_ms=(_res or {}).get("settle_ms"))
             pnl = abs(size) * ((px - entry) if is_long else (entry - px))
             _book_close(sym, m, size, entry, px, pnl, reason, decision_px=_dpx,
                         measured=_meas, fill_reason=_why)
@@ -1331,7 +1332,8 @@ def main(_ctx=None):
             mark, _meas, _why = _real_fill(
                 sym, is_ask=is_long, fallback=mark, leg="exit",
                 client_id=(_res or {}).get("client_order_index"),
-                tx_hash=(_res or {}).get("tx_hash"))
+                tx_hash=(_res or {}).get("tx_hash"),
+                settle_ms=(_res or {}).get("settle_ms"))
             pnl = abs(size) * ((mark - entry) if is_long else (entry - mark))
         _book_close(sym, m, size, entry, mark, pnl, reason, decision_px=_dpx,
                     measured=_meas, fill_reason=_why)
@@ -1565,7 +1567,8 @@ def main(_ctx=None):
                 _fill_px, _meas, _why = _real_fill(
                     sym, is_ask=not is_long, fallback=mark, leg="entry",
                     client_id=(_res or {}).get("client_order_index"),
-                tx_hash=(_res or {}).get("tx_hash"))
+                tx_hash=(_res or {}).get("tx_hash"),
+                settle_ms=(_res or {}).get("settle_ms"))
                 try:
                     store.publish_venue_order(
                         BOT_ROW, venue="lighter", shadow=False, coin=sym,
