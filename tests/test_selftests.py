@@ -146,6 +146,19 @@ SELFTEST_EXCLUDE = {
     # (expiry snapping a tighter bar onto in-flight positions), filed for the
     # tuner/TTL semantics review.
     "scripts/study_taker_sl_realized.py",
+    # [2026-07-22] MomoBreakout BTC-tide parity study: --selftest offline-green;
+    # full run pages the venue's 4h candles. Header verdict: ENACT (operator-
+    # approved) — the port was missing MomoBreakoutV1's 14-Jul BTC-tide gate;
+    # restoring it cuts the falling-half bleed ~46-71% in both books. Strict
+    # both-halves not met (H1 gives back ~14-17%, stays positive); shipped on
+    # the directional-restrict reading with operator sign-off + kill switch.
+    "scripts/study_breakout_tide_gate.py",
+    # [2026-07-22] entry-side budget allocation study: --selftest offline-green;
+    # full run reuses the family caches. Header verdict: EVIDENCE ONLY for the
+    # review (budget is 2.4x over-subscribed; the three parkers hold 14/20
+    # slots for 0 realized wins). No cut is not-worse-both-halves except
+    # breakout 6->5; re-sizing the budget is the operator's review call.
+    "scripts/study_budget_allocation.py",
     # [2026-07-22] family time-stop study: --selftest offline-green; full run
     # pages the venue's 4h+1d candles. Header verdict: DO NOT ENACT — max
     # slot-day relief anywhere on the grid is -6.1% (bar >=20%) because

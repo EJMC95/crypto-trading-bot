@@ -474,6 +474,17 @@ class MomoBreakout(Carrier):
         if ema_t[i] is None or dc_high is None or dc_low is None:
             return None
         enter = (c[i] > dc_high and c[i] > ema_t[i] and v[i] > 0)
+        # [2026-07-22 PARITY 14-Jul] MomoBreakoutV1's BTC-tide gate: block a
+        # breakout while BTC is under its OWN 4h EMA200 (the market-wide
+        # fakeout filter the freqtrade original gained 14-Jul but the port
+        # never received — 3-13 Jul both carriers went 2W/9L as 11 pairs broke
+        # above their own 200-EMA and died in a market fakeout). Present key
+        # GATES (fail-safe closed on a falsey tide); absent key (stake_mult's
+        # signals(bars, None) and the replay/study harnesses) leaves it
+        # ungated, so no baseline regresses. Operator-approved 22-Jul on the
+        # falling-half evidence; kill switch MOMO_TIDE_GATE=off omits the key.
+        if extra and "btc_tide_up" in extra:
+            enter = enter and bool(extra["btc_tide_up"])
         exit_ = (c[i] < dc_low and v[i] > 0)
         atr = atr_series(h, l, c, 14)
         return {"enter": "breakout" if enter else None,
@@ -795,6 +806,24 @@ def btc_regime_up(cache):
     return bool(e50[-1] and e200[-1] and e50[-1] > e200[-1])
 
 
+# [2026-07-22] MomoBreakout's BTC-TIDE gate kill switch (MOMO_TIDE_GATE=off
+# reverts to the pre-parity, ungated port).
+MOMO_TIDE_GATE = os.environ.get("MOMO_TIDE_GATE", "on").strip().lower() \
+    not in ("off", "0", "no", "false", "disabled")
+
+
+def btc_tide_up(cache):
+    """BTC 4h close > EMA200 on the last closed bar — MomoBreakoutV1's 14-Jul
+    market-tide gate, ported EXACTLY (this is close>EMA200, deliberately NOT
+    btc_regime_up's EMA50>EMA200). Fail-safe False (off-tide), the original's
+    documented conservative default when the series is missing."""
+    bars = cache.get("BTC", "4h")
+    if not bars or len(bars["c"]) < 210:
+        return False
+    e200 = ema_series(bars["c"], 200)
+    return bool(e200[-1] and bars["c"][-1] > e200[-1])
+
+
 def main():
     p = argparse.ArgumentParser(description="Family bots — Lighter shadow books")
     p.add_argument("--once", action="store_true", help="Single loop then exit.")
@@ -854,6 +883,7 @@ def main():
             log.warning("funding fetch failed (%s); accrual paused this loop", e)
             fund = {}
         regime = btc_regime_up(cache)
+        tide = btc_tide_up(cache)     # [2026-07-22 PARITY] MomoBreakout gate
 
         # [2026-07-15 AUDIT FIX] L2 fleet long-budget veto, checked once per
         # cycle. The 14-Jul enforcement was wired only into the retired Kraken
@@ -965,8 +995,14 @@ def main():
                     continue
                 sig_ts = bars["t"][-1]
                 new_candle = b.last_sig_ts.get(coin) != sig_ts
-                sig = b.s.signals(bars, {"btc_regime_up": regime}) \
-                    if new_candle else None
+                # [2026-07-22 PARITY] pass the BTC tide only when the gate is
+                # ON — MOMO_TIDE_GATE=off omits the key so MomoBreakout runs
+                # ungated (pre-parity behavior); the other three strategies
+                # ignore the key regardless.
+                _extra = {"btc_regime_up": regime}
+                if MOMO_TIDE_GATE:
+                    _extra["btc_tide_up"] = tide
+                sig = b.s.signals(bars, _extra) if new_candle else None
                 if new_candle:
                     b.last_sig_ts[coin] = sig_ts
 
@@ -1192,6 +1228,24 @@ def _selftest():
     g = DayTraderGated("t", tf="15m", stoploss=-0.05, max_open=5, style="t")
     rung = max((k for k in g.roi if k <= 200), default=None)
     assert g.roi[rung] == 0.012
+    # [2026-07-22 PARITY] MomoBreakout BTC-tide gate: present key gates,
+    # absent key leaves it ungated (harness/stake_mult safety).
+    mb = MomoBreakout("t", tf="4h", stoploss=-0.12, max_open=6, style="s")
+    _n = mb.min_bars + 5
+    # a clean breakout bar: last close above the prior-20 high and above EMA200
+    _c = [100.0] * (_n - 1) + [130.0]
+    _h = [101.0] * (_n - 1) + [130.0]
+    _l = [99.0] * _n
+    _v = [1.0] * _n
+    _bars = {"c": _c, "h": _h, "l": _l, "v": _v, "t": list(range(_n))}
+    assert mb.signals(_bars, {"btc_tide_up": True})["enter"] == "breakout", \
+        "tide up -> breakout admitted"
+    assert mb.signals(_bars, {"btc_tide_up": False})["enter"] is None, \
+        "tide down -> breakout blocked (fail-safe closed on falsey tide)"
+    assert mb.signals(_bars, {"btc_regime_up": 1})["enter"] == "breakout", \
+        "absent tide key -> ungated (harness/replay contract)"
+    assert mb.signals(_bars, None)["enter"] == "breakout", \
+        "extra=None (stake_mult path) -> ungated, no crash"
     # [2026-07-22] per-symbol cap consumer contract (pure, offline).
     _enf = {"symbol_cap": {"mode": "enforce", "cap": 3,
                            "long_by_symbol": {"ETH": 3, "LTC": 2}}}
