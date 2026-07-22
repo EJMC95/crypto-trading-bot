@@ -47,8 +47,13 @@ SEEDED HISTORY (the playbook priors encode these real episodes)
   tariff shock Apr-2025 (risk-off, equities led, crypto followed).
 
 DOCTRINE
-  ADVISORY-FIRST: publishes bot_state 'event-sentinel'; NOTHING trades on
-  it until a review wires a consumer (restrict-only first, as ever).
+  ADVISORY-FIRST: publishes bot_state 'event-sentinel'. [22-Jul: it now has a
+  consumer path — it PROPOSES taker.* bar changes (via fleet_proposals) that
+  the scout tuner replay-gates and enacts on the `lighter-taker` lane. That
+  lane is the $1k SHADOW taker (lighter_ticket_taker.py: "NOT ON REAL MONEY"),
+  so the sentinel steers a shadow book, NOT real money — no live.* lever is
+  reachable from here. "Nothing trades on it" is therefore stale; "nothing REAL
+  MONEY trades on it" is the accurate rule, restrict-first as ever.]
   Fail-soft everywhere: a dark feed, dark DB or dark scout leaves the
   sentinel publishing what it can or nothing — never crashing the loop.
   Tuning: evsent.* levers (fleet_tuning registry, lane 'event-sentinel')

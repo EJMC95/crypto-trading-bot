@@ -37,9 +37,11 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   `restartPolicy=always` turns an exit into a permanent crash-loop (the Trail
   Blazer pattern, `hyperliquid_momo_bot.py` 15-Jul).
 - **funding-carry does NOT idle**: it `raise SystemExit`s unless
-  `VENUE=lighter_shadow`. Its service is still pinned `VENUE=hl_paper`, so it
-  will exit-loop until the operator flips that env var — deliberately LOUD, not
-  a silent row that just stops moving. **This one needs an operator action.**
+  `VENUE=lighter_shadow`. It was pinned `VENUE=hl_paper`, exit-looping LOUD (by
+  design — not a silent row that just stops moving) until the operator flipped
+  the env var. **[22-Jul (ci): DONE — `railway variables --service
+  funding-carry` now reads `VENUE=lighter_shadow`; the row runs its Lighter
+  shadow arm and no longer exit-loops. No operator action outstanding.]**
 
 | Row (retired) | File | Was trading | Resurrect with |
 |---|---|---|---|
@@ -47,7 +49,7 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
 | scanner-cross-exchange-arb 🔀 Gap Scout | `cross_exchange_arb.py` | arb BETWEEN Kraken/Binance/Coinbase | `GAPSCOUT_RETIRED_OVERRIDE=run` |
 | scanner-triangular-arb | `triangular_arb.py` | Kraken | `ARB_RETIRED_OVERRIDE=run` |
 | perps-rsi-meanrev 🪃 Bounce Catcher | `hyperliquid_perps_bot.py` | Hyperliquid | `PERPS_RETIRED_OVERRIDE=run` |
-| perps-funding-carry 🌾 (HL arm only) | `funding_carry_bot.py` | `VENUE=hl_paper` | set `VENUE=lighter_shadow` on the service |
+| perps-funding-carry 🌾 (HL arm only) | `funding_carry_bot.py` | `VENUE=hl_paper` | ✅ DONE 22-Jul — service now `VENUE=lighter_shadow` |
 
 - **The Launch Sniper was the one nobody switched off.** `lighter_perp_sniper.py`
   was built 9-Jul *"to replace the spot sniper (which can't run on a fixed-market
@@ -234,13 +236,17 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   chained from the scout's marks, and the playbook confidence LEARNS
   (EB blend; a wrong playbook decays toward zero bias — direction never
   auto-flips without review). ~~ADVISORY: zero consumers~~ **[22-Jul: THE
-  "ZERO CONSUMERS" CLAIM IS STALE.** The sentinel is steering the live taker
-  today — `fleet-tuning` carries `taker.momo_chg=6.0` and `taker.brk_range=0.97`
+  "ZERO CONSUMERS" CLAIM IS STALE — but it steers a SHADOW book, NOT real
+  money.** `fleet-tuning` carries `taker.momo_chg=6.0` and `taker.brk_range=0.97`
   on the `lighter-taker` lane, both stamped
-  `reason: "organ-proposal:event-sentinel (replay-gated at this tuner)"`. It
-  proposes; the scout tuner replay-gates and enacts. That is a real consumer
-  path, and a doc that says "advisory, zero consumers" hides an organ with
-  actuator reach.] Tuning: `evsent.*` levers, lane
+  `reason: "organ-proposal:event-sentinel (replay-gated at this tuner)"`. The
+  sentinel proposes; the scout tuner replay-gates and enacts. That is a real
+  consumer path — so "advisory, zero consumers" was stale. BUT `lighter-taker`
+  is the **$1k SHADOW** lane (`lighter_ticket_taker.py:272` "NOT ON REAL
+  MONEY"; only `live.*` levers may steer the live book), so an earlier
+  "steering the LIVE taker" note here over-corrected — verified 22-Jul (ci).
+  The sentinel has actuator reach into a shadow book; it does not touch real
+  money.] Tuning: `evsent.*` levers, lane
   `event-sentinel`. → bot_state `event-sentinel` (+ `-state`)
 - `parliament_main.py` 🏛️ — the Parliament's supervisor (21-Jul): six asyncio
   layers in one process — `parliament/` data (Lighter REST+ws ONLY),
@@ -573,10 +579,15 @@ All new bots:
 - **LIVE BOTS ALWAYS IN AUDIT SCOPE (operator rule, 16-Jul).** Every audit,
   bug-scan, code-review, or security-review — WHATEVER its nominal scope —
   MUST also check the LIVE REAL-MONEY bots in the same pass: Funding Farmer
-  (`lighter_funding_bot.py` → `perps-funding-lighter-lighter`) and Tide Rider
-  (`lighter_trend_bot.py` → `crypto-trend-daily-lighter`), plus their shared
-  real-money surface (`venues/` SafetyRails / notional caps / equity guard,
-  `order_usd`, and the `live.*` lever consumers). Why: real money lives there,
-  and the 15-Jul cap breach proved a change ELSEWHERE (the growth rail) can
-  break the live bots even when the audit isn't "about" them. Never let an
-  audit exclude the live bots.
+  (`lighter_funding_bot.py` → `perps-funding-lighter-lighter`) and the **Ticket
+  Taker** (`lighter_ticket_taker.py` → `lighter-ticket-taker-lighter`), plus
+  their shared real-money surface (`venues/` SafetyRails / notional caps /
+  equity guard, `order_usd`, and the `live.*` lever consumers). Why: real money
+  lives there, and the 15-Jul cap breach proved a change ELSEWHERE (the growth
+  rail) can break the live bots even when the audit isn't "about" them. Never
+  let an audit exclude the live bots. **[22-Jul (ci) CORRECTION: this rule
+  named the RETIRED Tide Rider (`lighter_trend_bot.py` →
+  `crypto-trend-daily-lighter`) — which the 🎫 Ticket Taker replaced on the
+  same slot 17-Jul. A standing audit rule that names a retired bot sends every
+  future audit to check the wrong file; the live pair is Farmer + Ticket
+  Taker.]**

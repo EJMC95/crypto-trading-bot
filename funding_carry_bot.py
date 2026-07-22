@@ -285,11 +285,11 @@ def main():
     # that matters continues uninterrupted; only the foreign-data arm stops.
     # The delta-neutral refusal below is UNCHANGED and still senior: this bot
     # has no hedge leg, so every order-sending mode stays refused regardless.
-    # OPERATOR ACTION: set VENUE=lighter_shadow on the funding-carry service.
-    # It is currently pinned to VENUE=hl_paper (see CLAUDE.md), so it will hit
-    # the refusal below until that env var is flipped — deliberately loud, not
-    # silent, because a foreign-venue arm going quiet must be a decision you
-    # see rather than a row that just stops moving.
+    # [22-Jul: DONE] The service now runs VENUE=lighter_shadow (verified via
+    # `railway variables --service funding-carry`), so it no longer hits the
+    # refusal below. Kept the loud SystemExit guard regardless: it is the
+    # tripwire if the env is ever changed back — a foreign-venue arm going quiet
+    # must be a decision you see, not a row that just stops moving.
     _mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     if _mode not in ("lighter_shadow",):
         raise SystemExit(
