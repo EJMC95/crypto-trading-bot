@@ -391,8 +391,55 @@ def evaluate_evidence(quality):
     # --- coin-quality vetoes (the ONLY automated action, restrict-only) ---
     vetoes = {}
     for coin, q in (quality or {}).items():
-        if (q.get("orders_14d") or 0) >= 5 and (q.get("slip_bps") or 0) > 15:
-            vetoes[coin] = f"measured slip {q['slip_bps']}bps > 15 (n={q['orders_14d']})"
+        # [2026-07-22] gate on MEASURED orders, not row count. `orders_14d` is
+        # count(*) while slip_bps is avg() over the non-NULL rows only, so a
+        # book whose LIVE rows carry no slippage (both live arms: 0 measured of
+        # 93) inflates n without contributing a single measurement. Measured
+        # today: LIT rows_14d 66 / with_slip 30, SOL 90/48, ETH 80/44 — the
+        # gate was counting evidence it did not have.
+        _n = q.get("measured_14d")
+        if _n is None:
+            _n = q.get("orders_14d") or 0        # older payload: degrade, do not crash
+        if _n >= 5 and (q.get("slip_bps") or 0) > 15:
+            vetoes[coin] = f"measured slip {q['slip_bps']}bps > 15 (n={_n})"
+        # [2026-07-22 RATIO BAR] the discriminator the absolute bar is missing.
+        # avg|slip| / avg(spread) sits at ~0.50 for essentially every book — a
+        # taker crossing half the book, which is what taking liquidity COSTS and
+        # is not a defect. Exactly two books break it, and they are the two that
+        # hurt: BOT 747.61/81.90 = 9.13x and SOXL 17.91/8.41 = 2.13x, against
+        # NBIS 0.69 and APEX 0.11. The absolute 15bps bar needed 93 BOT orders
+        # to fire and STILL flags merely-WIDE books (NBIS's -$6.98 is
+        # directional, uncatchable by any slippage veto); the ratio fires on the
+        # books that are executing badly RELATIVE to their own spread, which is
+        # the actual defect, and it would have caught BOT far sooner.
+        # The ratio needs an ABSOLUTE FLOOR or it vetoes cheap books for being
+        # tight. Caught in the dry-run BEFORE shipping: at ratio>1.0 with no
+        # floor the rule vetoed WTI — 2.97bps slip against a 1.35bps spread.
+        # 2.97bps is among the CHEAPEST execution on the venue; it trips the
+        # ratio only because the book is tight, and a book that costs 3bps is
+        # not a defect at any ratio. Floors: 2.0x AND >5bps absolute.
+        #
+        # HONEST STATUS — this bar currently fires on NOTHING. Dry-run over all
+        # 720 books: it adds zero vetoes beyond the absolute bar's {BOT, SOXL},
+        # and the whole near-miss band sits at ratio <=0.81 (kBONK 0.81, DOT
+        # 0.76, NBIS 0.69, APEX 0.11) — i.e. every other book slips LESS than
+        # half its own spread, which is what taking liquidity normally costs and
+        # is not a defect. I first justified this bar as "would have caught BOT
+        # sooner"; that was WRONG and the dry-run says so — BOT's 747.61bps
+        # clears the absolute bar at the same n. What actually delayed BOT was
+        # the n-floor counting UNMEASURED rows, fixed just above.
+        # It is kept as a LATENT guard for the sub-15bps band the absolute bar
+        # cannot see (a book executing badly relative to its OWN liquidity), and
+        # it is restrict-only with conservative floors. Note the distinction
+        # from the inert-lever class found the same day: an untriggered GUARD is
+        # normal (guards should mostly not fire); an inert LEVER is a bug,
+        # because its whole reachable range cannot change behaviour. This is the
+        # former. If it has still fired on nothing by the 28-Jul review, delete it.
+        _sl, _sp = q.get("slip_bps"), q.get("spread_bps")
+        if (_n >= 5 and _sl is not None and _sl > 5.0 and _sp and _sp > 0
+                and _sl / _sp > 2.0 and coin not in vetoes):
+            vetoes[coin] = (f"slip/spread {_sl / _sp:.1f}x > 2.0 "
+                            f"({_sl}bps vs {_sp}bps spread, n={_n})")
         closes = q.get("closes_30d") or 0
         stops = q.get("stops_30d") or 0
         if closes >= 5 and stops / closes >= 0.5:
@@ -555,12 +602,19 @@ def coin_quality():
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT coin, count(*), avg(abs(slippage_bps)), avg(spread_bps)
+                SELECT coin, count(*), avg(abs(slippage_bps)), avg(spread_bps),
+                       count(slippage_bps)
                 FROM venue_orders WHERE at > now() - interval '14 days'
                 GROUP BY coin""")
+            # [2026-07-22] `measured_14d` (count of NON-NULL slippage) is now
+            # carried alongside `orders_14d` (count of rows). The veto gates on
+            # the former: a live-arm row with NULL slippage is not evidence, and
+            # counting it made the n-floor a lie. Both keys are published so any
+            # consumer can see how much of a book's history is actually measured.
             q = {r[0]: {"orders_14d": r[1],
                         "slip_bps": round(float(r[2]), 2) if r[2] is not None else None,
-                        "spread_bps": round(float(r[3]), 2) if r[3] is not None else None}
+                        "spread_bps": round(float(r[3]), 2) if r[3] is not None else None,
+                        "measured_14d": r[4]}
                  for r in cur.fetchall()}
             cur.execute("""
                 SELECT split_part(pair, '/', 1), count(*),

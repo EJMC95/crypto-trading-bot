@@ -233,8 +233,14 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   GRADES its own anticipations at 4h/24h/72h against sector indices
   chained from the scout's marks, and the playbook confidence LEARNS
   (EB blend; a wrong playbook decays toward zero bias — direction never
-  auto-flips without review). ADVISORY: zero consumers until a review
-  wires one (restrict-only first). Tuning: `evsent.*` levers, lane
+  auto-flips without review). ~~ADVISORY: zero consumers~~ **[22-Jul: THE
+  "ZERO CONSUMERS" CLAIM IS STALE.** The sentinel is steering the live taker
+  today — `fleet-tuning` carries `taker.momo_chg=6.0` and `taker.brk_range=0.97`
+  on the `lighter-taker` lane, both stamped
+  `reason: "organ-proposal:event-sentinel (replay-gated at this tuner)"`. It
+  proposes; the scout tuner replay-gates and enacts. That is a real consumer
+  path, and a doc that says "advisory, zero consumers" hides an organ with
+  actuator reach.] Tuning: `evsent.*` levers, lane
   `event-sentinel`. → bot_state `event-sentinel` (+ `-state`)
 - `parliament_main.py` 🏛️ — the Parliament's supervisor (21-Jul): six asyncio
   layers in one process — `parliament/` data (Lighter REST+ws ONLY),
@@ -437,10 +443,23 @@ All new bots:
   (`funding_carry_bot.py`, `Dockerfile.funding`), plus shared
   `bot_pnl_store.py` / `freqtrade_pnl_poller.py` / `market_pulse.py`.
   **Anything not on that list ships only when a human runs `railway up`** —
-  the whole intelligence layer, `fleet_tuning`, `funding_basis`, and BOTH
-  LIVE BOTS (`lighter_funding_bot.py`, `lighter_ticket_taker.py`,
-  `venues/**`). The RETIRED HL funding-carry arm auto-deploys; the LIVE
-  Funding Farmer does not.
+  `fleet_tuning`, `funding_basis`, and the LIVE Funding Farmer
+  (`lighter_funding_bot.py`). The RETIRED HL funding-carry arm auto-deploys;
+  the LIVE Funding Farmer does not.
+  **[2026-07-22 CORRECTION — this paragraph was WRONG about two of them.]** The
+  `paths:` filter DOES carry `lighter_ticket_taker.py`, `lighter_ticket_replay.py`,
+  `venues/**` and most of the intelligence layer (`lighter_market_scout`,
+  `lighter_scout_tuner`, `fleet_*`, `bot_learn`, `brain_stats`, `evidence_board`,
+  `experiment_judge`, `strategy_incubator`, `event_sentinel`, `regime_oracle`,
+  `implementation_shortfall`, `parliament/`) — verified against the workflow file,
+  not inferred. What is manual is the *service*, not the *file*: those paths
+  deploy **freqtrade-bots** (where the SHADOW taker and the organs run), while the
+  two REAL-MONEY services — `trail-blazer-live` (= the Farmer; service names lie)
+  and `tide-rider-lighter-live` (= the Ticket Taker) — are on NO auto path and
+  need an explicit dispatch:
+  `gh workflow run 305025607 -f services="trail-blazer-live,tide-rider-lighter-live"`
+  (address it by workflow ID — the filename form did not resolve in this repo).
+  Then MARKER-GREP both containers; a green run has never implied a container took it.
   **What it cost:** six fill-telemetry commits landed 04:27→10:52 UTC 17-Jul;
   the funding container booted 04:34 and picked up NONE of them — 58 real
   orders, 0 measured fills. The code was right and was never running. This is
