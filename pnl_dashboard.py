@@ -2593,12 +2593,18 @@ def _organ_vital(key, st):
             # either addition render exactly as before (both guards).
             nc = st.get("noncrypto") or {}
             n_major = cov.get("n_published", len(st.get("pairs") or {}))
-            return _v("{} majors tracked{}{}", n_major,
+            # [2026-07-22 (bs)] self-grade tail: a COUNT only — a pooled
+            # hit rate across crypto+SPY would blend classes (item 18).
+            _gr = st.get("grades") or {}
+            _ng = sum(1 for g in _gr.values()
+                      if isinstance(g, dict) and (g.get("d1") or {}).get("n"))
+            return _v("{} majors tracked{}{}{}", n_major,
                       (f" · MISSING {', '.join(sorted(miss))}" if miss else
                        (f" · coverage {cov.get('n_published')}/"
                         f"{cov.get('universe')}" if cov else "")),
                       (f" · non-crypto {nc.get('n_published')}/"
-                       f"{nc.get('universe')}" if nc else ""))
+                       f"{nc.get('universe')}" if nc else ""),
+                      (f" · self-grade d1 on {_ng}" if _ng else ""))
         if key == "fleet-alerts":
             al = st.get("alerts") or []
             return _v("{} alerts total · last: {}", len(al),
@@ -4208,16 +4214,38 @@ def render_market():
     if ro:
         fleet = ro.get("fleet") or {}
         pairs = ro.get("pairs") or {}
+        # [2026-07-22 (bs) receipt] the oracle's SELF-GRADE, per asset —
+        # never pooled across pairs (a blended hit rate across BTC and SPY
+        # is the exact class-mixing item 18 removed). Payloads predating
+        # the grader render exactly as before.
+        grades = ro.get("grades") or {}
+
+        def _d1(sym):
+            g = grades.get(sym)
+            g = g.get("d1") if isinstance(g, dict) else None
+            if not isinstance(g, dict) or not g.get("n"):
+                return "—"
+            return (f'{(g.get("hit") or 0) * 100:.0f}% · '
+                    f'{(g.get("avg_pp") or 0):+.1f}pp (n{g["n"]})')
         prow = "".join(
             f'<tr><td>{html.escape(c)}</td>'
             f'<td>{html.escape(str((p or {}).get("verdict", "?")))}</td>'
-            f'<td>{(p or {}).get("adx", 0):.0f}</td></tr>'
+            f'<td>{(p or {}).get("adx", 0):.0f}</td>'
+            f'<td>{html.escape(_d1(c))}</td></tr>'
             for c, p in sorted(pairs.items()))
+        n_g = sum(1 for g in grades.values()
+                  if isinstance(g, dict) and (g.get("d1") or {}).get("n"))
+        n_pend = len((ro.get("grading") or {}).get("pending") or [])
+        grade_line = ((f'<div class="muted">self-grade: d1 outcomes on '
+                       f'{n_g}/{len(pairs)} pairs · {n_pend} calls pending '
+                       f'(hit/avg-pp are per-asset, signed into the call)</div>')
+                      if (n_g or n_pend) else "")
         oracle_card = f'''<div class="card">
   <h2>🧭 Regime oracle <span class="muted">— {html.escape(str(fleet.get("read", "?")))}</span></h2>
   <div class="row"><span>Windows</span><b>{fleet.get("n_long", 0)} long ·
     {fleet.get("n_short", 0)} short · {fleet.get("n_flat_or_chop", 0)} flat/chop</b></div>
-  <table class="tbl"><tr><th>coin</th><th>window</th><th>ADX</th></tr>{prow}</table>
+  {grade_line}
+  <table class="tbl"><tr><th>coin</th><th>window</th><th>ADX</th><th>d1 self-grade</th></tr>{prow}</table>
 </div>'''
     else:
         oracle_card = ('<div class="card"><h2>🧭 Regime oracle</h2>'
