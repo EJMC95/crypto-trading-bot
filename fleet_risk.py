@@ -474,10 +474,15 @@ def main():
     # against a tail, not a frequent binder — kept because the budget, not
     # signal, still throttles entries (red 41.5%) and de-pileup beats a
     # bigger budget when it does bind. Design mirrors the long-budget veto:
-    # this file only PUBLISHES; the only consumer surface is
-    # fleet_bus.long_symbol_blocked(base), enforcing solely when
-    # FLEET_SYMBOL_CAP_MODE=enforce (env default: advisory — zero behavior
-    # change until a review flips it; restrict-only; fail-safe open, same
+    # this file only PUBLISHES; the consumer surfaces are
+    # fleet_bus.long_symbol_blocked(base) and the family bot's in-cycle
+    # variant (lighter_family_bot.symcap_state — same payload, plus
+    # same-cycle stacking awareness), enforcing solely when the published
+    # mode is 'enforce'. [2026-07-22] Default flipped advisory->ENFORCE on
+    # the operator's call ("can we fix the budget saturation") with the
+    # saturation re-measured worse (CHANGELOG (bw): red 55.9%/48h, 16/20
+    # slots on 5 symbols, ETH one OVER this cap). FLEET_SYMBOL_CAP_MODE=
+    # advisory is the kill switch (restrict-only; fail-safe open, same
     # contract as long_entries_blocked).
     # hot_pairs mixes sides, so the cap counts the LONG side alone from expo.
     SYMBOL_CAP = int(os.environ.get("FLEET_SYMBOL_CAP", "3"))
@@ -487,7 +492,12 @@ def main():
             long_by_symbol[_base] = long_by_symbol.get(_base, 0) + 1
     symbol_cap = {
         "cap": SYMBOL_CAP,
-        "mode": os.environ.get("FLEET_SYMBOL_CAP_MODE", "advisory"),
+        # [2026-07-22] FLEET_RISK_MODE=advisory stays SENIOR (the IMB-16
+        # contract: the central switch releases EVERY actuator) — a stood-
+        # down risk layer publishes the cap as advisory no matter what the
+        # cap's own env says.
+        "mode": ("advisory" if MODE != "enforce" else
+                 os.environ.get("FLEET_SYMBOL_CAP_MODE", "enforce")),
         # [2026-07-21 AUDIT FIX] publish every count that could BIND at this
         # cap (was a flat `v >= 2` noise filter): with FLEET_SYMBOL_CAP=1 a
         # symbol holding exactly 1 long was absent from the payload, so
