@@ -158,16 +158,19 @@ MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-s
 # never been measured (0 measured fills to date), and every stop verdict here
 # turns on it.
 #
-# ⚠️ OPEN OPERATOR DECISION: FUNDING_HARD_STOP=0.03 is still set on
-# funding-farmer-shadow, where it was set 17-Jul on the strength of the
-# withdrawn number. That arm is the EXPERIMENT JUDGE'S CONTROL ARM, so the
-# paired promotion bar — the fleet's only path to live.funding.* — is currently
-# comparing arms that differ by the xp candidate AND by the stop. Deliberately
-# not unset here: unsetting destroys the accumulated live A/B evidence, and the
-# call is which evidence you would rather keep.
-# Loosening 0.03 -> 0.10 is safe with positions open; NEVER TIGHTEN a live stop
-# with positions open (it is evaluated against them on the next loop and
-# liquidates anything already >3% adverse).
+# ✅ RESOLVED 2026-07-22 (operator: "unset to 0.10 — clean the A/B"). The
+# EXPERIMENT JUDGE'S CONTROL ARM (funding-farmer-shadow) had carried
+# FUNDING_HARD_STOP=0.03 since 17-Jul, set on the strength of the number
+# withdrawn above — so the paired promotion bar, the fleet's only path to
+# live.funding.*, was comparing arms that differed by the xp candidate AND by
+# the stop. The env var was found already REMOVED from the service; the shadow
+# was restarted 22:06 Sydney and now boots at the 0.10 default (verified in its
+# banner). Both arms are now at 0.10, so the A/B varies only the intended
+# xp.funding.enter_apr candidate. The prior "accumulated evidence" was itself
+# confounded, so nothing valid was lost. (Operational rule retained: loosening
+# a stop is safe with positions open; NEVER TIGHTEN a live stop with positions
+# open — it is evaluated against them on the next loop and liquidates anything
+# already >3% adverse.)
 # See [[funding-farmer-stop-is-the-bug]], [[harness-must-mirror-productions-close-path]].
 HARD_STOP = float(os.environ.get("FUNDING_HARD_STOP", "0.10"))     # 10% — HL-fitted; the Lighter counter-evidence was WITHDRAWN 22-Jul (above)
 TAKE_PROFIT = float(os.environ.get("FUNDING_TAKE_PROFIT", "0.04"))  # 4% — lock the reversion pop
