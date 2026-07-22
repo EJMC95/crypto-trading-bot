@@ -54,3 +54,8 @@ scripts/.*.json
 .pytest_cache/
 htmlcov/
 __pycache__/
+
+# machine-local Claude permission list — it stores commands VERBATIM, so any
+# command containing a secret becomes a stored secret. Untracked 2026-07-22
+# after a live DB password accumulated into it (see CHANGELOG cc).
+.claude/settings.local.json
