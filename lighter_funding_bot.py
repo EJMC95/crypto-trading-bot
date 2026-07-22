@@ -251,6 +251,39 @@ def apply_levers(mode):
                          "arm": mode or "paper", "tuned": sorted(moved)})
     return moved
 
+
+# [2026-07-22 LEVER FLAP FIX — operator: "implement the flap to all those who
+# need it"] The (bw) taker study measured the class on the sibling book: a
+# WIDER lever expiring mid-position snaps the tighter default onto an
+# in-flight trade and books the whole gap instantly. This bot's lever-driven
+# exit bars are take_profit and max_hold_h, on BOTH arms (xp.* on the shadow
+# twin, live.funding.* on real money): a judge promotion starting/fading
+# mid-hold is exactly such a snap. The rule now: THE BARS PRICED AT ENTRY
+# GOVERN THE TRADE — entries stamp them into meta, exits read the stamp.
+# enter_apr stays live-read (it gates NEW entries only); HARD_STOP / EXIT_APR
+# / flip are env-only, never levers, unchanged. This also makes the judge's
+# ran_candidate receipt strictly truthful: a row stamped with candidate bars
+# now provably RAN them to its exit. Unstamped/legacy positions keep the old
+# close-time behavior; LEVER_GRANDFATHER=off reverts it everywhere.
+LEVER_GRANDFATHER = os.environ.get("LEVER_GRANDFATHER", "on").strip().lower() \
+    not in ("off", "0", "no", "false", "disabled")
+
+
+def pos_bars(m):
+    """(take_profit, max_hold_h) GOVERNING an open position: its entry stamp
+    when grandfathering is on and sane, else the module's current bars
+    (fail-safe: legacy/junk behaves exactly as before)."""
+    try:
+        if LEVER_GRANDFATHER:
+            b = (m or {}).get("bars") or {}
+            tp = float(b["take_profit"])
+            mh = float(b["max_hold_h"])
+            if tp > 0.0 and mh > 0.0:
+                return tp, mh
+    except (KeyError, TypeError, ValueError):
+        pass
+    return TAKE_PROFIT, MAX_HOLD_H
+
 # ---- funding-SLOPE entry gate (2026-07-11) — only enter while the rate is
 # still BUILDING (|apr| >= |apr LOOKBACK_H ago|). Backtested on the 150d
 # portfolio sim (scripts/backtest_funding_leverage.py): at the live 2x config
@@ -566,7 +599,8 @@ _slip_bps_of = slip_bps_of
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
-                  reason, order_usd=ORDER_USD, venue=None, shadow=None):
+                  reason, order_usd=ORDER_USD, venue=None, shadow=None,
+                  bars=None):
     """Mirror a realized directional funding trade to the paper_trades ledger.
     pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip
     (the ENTRY clip — callers pass meta['clip'], not the current loop's clip,
@@ -594,12 +628,26 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_l
             # ENTRY vs EXIT side (live = real fills, shadow = mark fills).
             side=("long" if was_long else "short"),
             entry_price=ent_px, exit_price=exit_px,
-            # [2026-07-15 XP] stamp the bars this arm was running — the
-            # experiment judge's paired evaluation needs unambiguous
-            # which-params-produced-what attribution on every row.
-            extra={"bars": dict(_ACTIVE_BARS)} if _ACTIVE_BARS else None)
+            # [2026-07-15 XP; 2026-07-22 FLAP FIX] stamp the bars this trade
+            # RAN — since the flap fix that is the position's ENTRY stamp
+            # (`bars` from meta), overlaid on the arm context; a trade that
+            # opened before the stamp existed falls back to close-time
+            # _ACTIVE_BARS, labelled via bars_basis. The judge's
+            # ran_candidate receipt reads these values.
+            extra=_close_bars_extra(bars))
     except Exception:
         pass
+
+
+def _close_bars_extra(bars):
+    """extra payload for a close row: arm context from _ACTIVE_BARS with the
+    position's entry-stamped bar VALUES overlaid when present."""
+    out = dict(_ACTIVE_BARS) if _ACTIVE_BARS else {}
+    basis = "close-legacy"
+    if isinstance(bars, dict) and bars:
+        out.update({k: v for k, v in bars.items()})
+        basis = "entry"
+    return {"bars": out, "bars_basis": basis} if out else None
 
 
 def main():
@@ -832,7 +880,8 @@ def main():
             _record_close(bot_id, c, entry, opened_ts, px, price_pnl, m.get("accrued", 0.0),
                           was_long=not is_short, reason=reason,
                           order_usd=float((m or {}).get("clip") or order_usd),
-                          venue=venue_tag, shadow=shadow_tag)
+                          venue=venue_tag, shadow=shadow_tag,
+                          bars=(m or {}).get("bars"))
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was px_decision — the
                 # decision price echoed back, so slippage_bps was NULL on every
@@ -1132,7 +1181,8 @@ def main():
                                       m.get("accrued", 0.0), was_long=not is_short,
                                       reason="stop_blind",
                                       order_usd=float((m or {}).get("clip") or order_usd),
-                                      venue=venue_tag, shadow=shadow_tag)
+                                      venue=venue_tag, shadow=shadow_tag,
+                                      bars=(m or {}).get("bars"))
                         n_closed += 1
                         meta.pop(coin, None)
                         hot_since.pop(coin, None)
@@ -1168,16 +1218,19 @@ def main():
             favour = -adverse
             flipped = (apr is not None) and ((is_short and apr < 0) or (not is_short and apr > 0))
 
+            # [2026-07-22 FLAP FIX] tp/hold from the position's OWN entry
+            # stamp (pos_bars); stop/flip/decay bars are env-only, unchanged.
+            _tp, _mh = pos_bars(m)
             decision = None
             if adverse >= HARD_STOP:
                 decision = "stop"
-            elif favour >= TAKE_PROFIT:
+            elif favour >= _tp:
                 decision = "take_profit"
             elif flipped:
                 decision = "flip"
             elif apr is not None and abs(apr) < EXIT_APR:
                 decision = "decay"
-            elif held_h >= MAX_HOLD_H:
+            elif held_h >= _mh:
                 decision = "max_hold"
             if decision is None:
                 continue
@@ -1221,7 +1274,8 @@ def main():
             _record_close(bot_id, coin, entry, opened_ts, px, price_pnl, fund_pnl,
                           was_long=not is_short, reason=decision,
                           order_usd=float((m or {}).get("clip") or order_usd),
-                          venue=venue_tag, shadow=shadow_tag)
+                          venue=venue_tag, shadow=shadow_tag,
+                          bars=(m or {}).get("bars"))
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was the decision price
                 # echoed back -> slippage_bps NULL on every live order.
@@ -1362,7 +1416,13 @@ def main():
                     log.error("open %s failed: %s", coin, e)
                     continue
                 meta[coin] = {"is_short": is_short, "entry": px, "opened_ts": t0,
-                              "accrued": 0.0, "clip": order_usd}   # deployed clip
+                              "accrued": 0.0, "clip": order_usd,   # deployed clip
+                              # [2026-07-22 FLAP FIX] the bars priced at
+                              # entry govern this trade (enter_apr is the
+                              # admission gate, attribution only).
+                              "bars": {"enter_apr": ENTER_APR,
+                                       "take_profit": TAKE_PROFIT,
+                                       "max_hold_h": MAX_HOLD_H}}
                 open_now += 1
                 opened_this_loop += 1
                 log.info("OPEN %s %s $%.0f | funding %+.1f%% APR | px %.6g | spread %.0fbps%s",
@@ -1604,10 +1664,47 @@ def _selftest_fill_read():
     print("lighter_funding_bot _selftest_fill_read OK")
 
 
+def _selftest_flap():
+    """[2026-07-22] The bars priced at entry govern the trade (lever-flap
+    fix). A judge fade releasing live.funding.take_profit mid-position must
+    not snap the tighter default onto an in-flight trade."""
+    global LEVER_GRANDFATHER
+    # position stamped under a PROMOTED (wider-hold, tighter-tp) candidate
+    m = {"bars": {"enter_apr": 0.60, "take_profit": 0.06, "max_hold_h": 96}}
+    assert pos_bars(m) == (0.06, 96.0), pos_bars(m)
+    # unstamped/legacy/junk -> the module's current bars, exactly as before
+    assert pos_bars({}) == (TAKE_PROFIT, MAX_HOLD_H)
+    assert pos_bars(None) == (TAKE_PROFIT, MAX_HOLD_H)
+    assert pos_bars({"bars": {"take_profit": "x"}}) == (TAKE_PROFIT, MAX_HOLD_H)
+    assert pos_bars({"bars": {"take_profit": -0.04, "max_hold_h": 96}}) == \
+        (TAKE_PROFIT, MAX_HOLD_H), "nonsense sign -> current bars"
+    # kill switch reverts behavior (stamps stay written regardless)
+    _lg = LEVER_GRANDFATHER
+    LEVER_GRANDFATHER = False
+    assert pos_bars(m) == (TAKE_PROFIT, MAX_HOLD_H)
+    LEVER_GRANDFATHER = _lg
+    # close-row attribution: entry stamp overlays the arm context and is
+    # labelled; a legacy close keeps close-time values, labelled so.
+    _ACTIVE_BARS.clear()
+    _ACTIVE_BARS.update({"enter_apr": 1.60, "take_profit": 0.04,
+                         "max_hold_h": 72, "arm": "lighter_live",
+                         "tuned": []})
+    e = _close_bars_extra(m["bars"])
+    assert e["bars_basis"] == "entry" and e["bars"]["take_profit"] == 0.06 \
+        and e["bars"]["max_hold_h"] == 96 and e["bars"]["arm"] == "lighter_live", e
+    e2 = _close_bars_extra(None)
+    assert e2["bars_basis"] == "close-legacy" \
+        and e2["bars"]["take_profit"] == 0.04, e2
+    _ACTIVE_BARS.clear()
+    assert _close_bars_extra(None) is None, "no context, no stamp -> None"
+    print("lighter_funding_bot _selftest_flap OK")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_notional()
         _selftest_fill_read()
+        _selftest_flap()
         sys.exit(0)
     try:
         _supervised()
