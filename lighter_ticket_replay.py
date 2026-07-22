@@ -101,8 +101,15 @@ def load_tape(source="auto", hours=48, limit=2200):
 # Replay core (pure — unit-tested via --selftest)
 # ---------------------------------------------------------------------------
 
-def replay(tape, clip_usd=None, max_open=None):
-    """Run the taker's decision code over the tape. Returns the report dict."""
+def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
+    """Run the taker's decision code over the tape. Returns the report dict.
+
+    `coin_veto`: an iterable of coin bases the production taker would refuse
+    (bot_state 'coin-vetoes'). PASSED IN, never read from live state here —
+    applying TODAY's veto set to HISTORICAL tape would be an anachronism that
+    silently rewrites the past. Default None = no veto, which reproduces the
+    pre-22-Jul taker exactly, so existing callers are unchanged.
+    """
     clip_usd = clip_usd or tt.CLIP_USD
     max_open = max_open or tt.MAX_OPEN
     pos = {}          # sym -> {lens, side, entry, opened(dt), clip}
@@ -119,6 +126,15 @@ def replay(tape, clip_usd=None, max_open=None):
     # per-SYMBOL, sl exits only (tp/hold re-enter freely), module attr read
     # at stamp time so replay_with(..., {"SL_COOLDOWN_H": x}) ladders it.
     sl_until = {}     # sym -> datetime the entry embargo lifts
+    # [2026-07-22 PARITY] mirror of the live loop's COIN-QUALITY veto, added
+    # the same day the taker gained it. This is the SECOND time this exact
+    # class has bitten: the 21-Jul sl_block parity note above records the
+    # first. Any rule the production taker gains must land here in the same
+    # commit, or every replay-gated actuator downstream — scout tuner walks,
+    # fleet_proprioception's $ counterfactual (the ONLY lane with one), the
+    # incubator's offspring scores — silently grades candidates on rules the
+    # real bot no longer runs. Normalised the same way the taker does.
+    _veto = {str(c).split("/")[0] for c in (coin_veto or ())}
     for snap_dt, p in tape:
         marks = p.get("marks") or {}
         # 1) exits — same rule object the live loop uses
@@ -163,6 +179,8 @@ def replay(tape, clip_usd=None, max_open=None):
                 continue
             if sym in sl_until and snap_dt < sl_until[sym]:
                 continue          # post-stop cooldown — the live loop's rule
+            if _veto and str(sym).split("/")[0] in _veto:
+                continue          # coin-quality veto — the live loop's rule
             side = "short" if str(t.get("side", "long")) == "short" else "long"
             pos[sym] = {"lens": lens, "side": side, "entry": mark,
                         "opened": snap_dt, "clip": clip_usd}
@@ -303,8 +321,51 @@ def selftest():
             "re-entry 45m after the sl must be refused at the 2h default"
     finally:
         tt.SL_COOLDOWN_H = _saved_cd
+    # [2026-07-22 PARITY] coin-quality veto mirror. AAA takes a breakout at t0
+    # in the baseline; with AAA vetoed the entry must be REFUSED, and the veto
+    # must be inert when empty (so every existing caller is unchanged) and
+    # normalise a pair form the same way the taker does.
+    base_taken = replay(tape, clip_usd=50.0, max_open=6)["lenses"]["breakout"]["taken"]
+    assert base_taken >= 1, "fixture must take a breakout to be non-vacuous"
+    assert replay(tape, clip_usd=50.0, max_open=6,
+                  coin_veto=None)["lenses"]["breakout"]["taken"] == base_taken, \
+        "coin_veto=None must reproduce the pre-22-Jul taker exactly"
+    assert replay(tape, clip_usd=50.0, max_open=6,
+                  coin_veto=set())["lenses"]["breakout"]["taken"] == base_taken, \
+        "an EMPTY veto set must veto nothing (fail-open)"
+    # NOTE the tape carries TWO breakout tickets (AAA at t0, DDD at t2), so
+    # vetoing AAA drops the count by exactly one — it does not zero it. The
+    # first draft of this fixture asserted ==0 and failed IDENTICALLY with and
+    # without the guard, which is the fingerprint of an assertion that never
+    # depended on the code under test. Vet both the partial and the total case.
+    for veto in ({"AAA"}, {"AAA/USDC"}):
+        rep_cv = replay(tape, clip_usd=50.0, max_open=6, coin_veto=veto)
+        assert rep_cv["lenses"]["breakout"]["taken"] == base_taken - 1, \
+            f"vetoing AAA must refuse exactly its own entry (veto={veto})"
+        assert "AAA" not in {o["sym"] for o in rep_cv["open"]}, rep_cv["open"]
+    rep_all = replay(tape, clip_usd=50.0, max_open=6, coin_veto={"AAA", "DDD"})
+    assert rep_all["lenses"].get("breakout", {}).get("taken", 0) == 0, \
+        "vetoing every breakout coin must leave the lens with no entries"
+    # The veto SET is normalised at construction, so a bare-symbol tape can
+    # never exercise the SYMBOL-side split — mutation-testing proved it (break
+    # the symbol normalisation and every assertion above still passes). Today
+    # the scout emits bare bases and 0/719 coin-quality keys carry a '/', so
+    # that half is defensive; this fixture is what keeps it from being
+    # defensive AND unverified, which is how dead guards rot into false comfort.
+    pair_brk = {"sym": "FFF/USDC", "range_pos": 0.99, "vol_m": 5.0}
+    tape_pair = [snap(0, {"FFF/USDC": 100.0}, {"breakout": [pair_brk]}),
+                 snap(1, {"FFF/USDC": 101.0})]
+    assert replay(tape_pair, clip_usd=50.0,
+                  max_open=6)["lenses"]["breakout"]["taken"] == 1, \
+        "pair-form fixture must be non-vacuous (it enters when unvetoed)"
+    assert replay(tape_pair, clip_usd=50.0, max_open=6,
+                  coin_veto={"FFF"})["lenses"].get("breakout", {}).get("taken", 0) == 0, \
+        "a BARE veto key must refuse a PAIR-form ticket symbol (FFF vs FFF/USDC)"
+    assert replay(tape, clip_usd=50.0, max_open=6,
+                  coin_veto={"ZZZ"})["lenses"]["breakout"]["taken"] == base_taken, \
+        "vetoing an unrelated coin must not change anything"
     print("[replay] selftest OK (tp/sl/hold, dip bar, stress veto, "
-          "one-per-lens, fee accounting, sl-cooldown mirror)")
+          "one-per-lens, fee accounting, sl-cooldown mirror, coin-veto mirror)")
 
 
 def main():

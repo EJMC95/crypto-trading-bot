@@ -202,6 +202,27 @@ MOMO_VOL_M = float(os.environ.get("TT_MOMO_VOL_M", "2.0")) # >= $2M/day
 # this hard (percentage points of APR) from the cross-venue median.
 # [2026-07-17] /8 with the fleet basis fix — same decision, true units.
 DIV_GAP_PP = float(os.environ.get("TT_DIV_GAP", "62.5"))
+# [2026-07-22 COIN-QUALITY VETO — the third "kill switch that never reached the
+# consumer"] market_context publishes bot_state 'coin-vetoes'. TWO bars, not one
+# (market_context.py:396-399): measured |slip| > 15bps over >=5 orders in 14d,
+# **OR** stop-rate >= 50% over >=5 closes in 30d — pooled FLEET-WIDE across every
+# bot, so a coin can arrive here on another book's stop-outs with clean slippage
+# of its own (ADA today: stop-rate veto, 3.65bps slip). Do not describe this set
+# as "slippage" anywhere the operator reads it. It was the fleet's
+# one automated restrict-only actuator, and until now its ONLY consumer was
+# lighter_funding_bot.py:1033 — the taker never read it.
+# WHAT THAT COST, measured 22-Jul: BOT/USDC carries **747.6 bps** mean absolute
+# slippage over 93 taker orders (81.9bps spread); the next-worst book it trades
+# is SOXL at 20.9. On 22-Jul the taker put 44 of its 52 closes through BOT, and
+# the short-divergence lens' realised mean went to -0.695%/trade — while the
+# BRAIN still grades the divergence SIGNAL positive (ehit4h 0.536 [0.516,0.557],
+# n=10522) because it grades tickets counterfactually, not slipped fills.
+# The lens never decayed. One un-vetoed book was eating it.
+# Contract mirrors the Farmer's verbatim: RESTRICT-ONLY, fail-OPEN on a missing
+# or STALE payload (a fossil veto set is not evidence), kill switch below.
+QUALITY_VETO = os.environ.get("TT_QUALITY_VETO", "on").strip().lower() \
+    not in ("0", "off", "false", "no")
+QUALITY_VETO_TTL_S = float(os.environ.get("TT_VETO_TTL_S", "3600"))
 # [2026-07-21 DIAGNOSIS; corrected same day] divergence has no liquidity
 # check (breakout >= $1M, momentum >= $2M; dip has none either — the
 # original "ONLY bar without one" claim was wrong) while being the only
@@ -1415,6 +1436,51 @@ def main(_ctx=None):
         print(f"[ticket-taker] {iso(t_now)} LENS VETO — brain grades "
               f"{sorted(lens_vetoed)} negative at sample size; skipping their "
               f"tickets (restrict-only; recovers when the grade does)")
+    # [2026-07-22 COIN-QUALITY VETO] Same contract as the Farmer's
+    # (lighter_funding_bot.py:1033), transcribed so the two cannot drift:
+    # RESTRICT-ONLY, and a missing OR STALE payload yields NO vetoes (fail
+    # OPEN). Staleness matters in both directions — a dead market-context
+    # either vetoes forever or, if it died empty, silently disables the veto
+    # forever; only an age check distinguishes them.
+    coin_vetoed = {}
+    if QUALITY_VETO:
+        try:
+            _vp = store.load_state("coin-vetoes") or {}
+            _cv = _vp.get("coins") or {}
+            # a veto set is a coin->reason MAP; anything else is not evidence
+            if not isinstance(_cv, dict):
+                _cv = {}
+            _vts = _vp.get("updated") or _vp.get("ts")
+            _vttl = float(_vp.get("ttl_sec") or QUALITY_VETO_TTL_S)
+            _vage = ((t_now - parse_ts(_vts)).total_seconds() if _vts else None)
+            if _vage is not None and 0 <= _vage <= _vttl:
+                coin_vetoed = _cv
+                if coin_vetoed:
+                    # Print each coin's OWN reason. The set is NOT slippage-only
+                    # — market_context.py:396-399 has two branches (slip > 15bps
+                    # over >=5 orders/14d, OR stop-rate >=50% over >=5 closes/
+                    # 30d, pooled fleet-wide) — and today's live set proves it:
+                    # ADA is a STOP-RATE veto whose own slip is 3.65bps. A log
+                    # line saying "measured slippage [ADA, BOT, SOXL]" is this
+                    # repo's own self-describing-label failure, in the actuator's
+                    # own receipt. Say what each one actually is.
+                    print(f"[ticket-taker] {iso(t_now)} COIN VETO — "
+                          + "; ".join(f"{c}: {coin_vetoed[c]}"
+                                      for c in sorted(coin_vetoed))
+                          + "  (restrict-only for NEW entries; exits, stops and "
+                            "held positions untouched)")
+            elif _cv:
+                print(f"[ticket-taker] {iso(t_now)} coin-vetoes STALE "
+                      f"(age {_vage if _vage is None else round(_vage)}s > "
+                      f"ttl {_vttl:.0f}s) — discarding {len(_cv)} veto(s); "
+                      f"quality veto fails OPEN until the publisher returns")
+        except Exception:  # noqa: BLE001 — the Farmer's ACTUAL contract
+            # Widened from (ValueError, TypeError, AttributeError): the Farmer
+            # catches bare Exception, and a narrower tuple here is exactly the
+            # silent drift this change exists to prevent. On the LIVE run-once
+            # arm an escape here would abort the cycle before the durable write,
+            # losing day_start and re-baselining the daily-loss rail.
+            coin_vetoed = {}
     opened_syms, opened_lenses = set(), set()
     # [2026-07-17] Hard mode allow-list, evaluated ONCE and independently of any
     # bus payload. Live = divergence only; shadow keeps filling all four so the
@@ -1427,6 +1493,12 @@ def main(_ctx=None):
                 continue          # mode allow-list — FAIL-CLOSED, reads no bus
             if lens in lens_vetoed:
                 continue          # brain veto stays SENIOR (restrict-only)
+            # [2026-07-22] coin-quality veto. Symbol form is normalised because
+            # the scout emits a bare base ("BOT") while the ledger records a
+            # pair ("BOT/USDC"); matching only one form would make this veto
+            # silently inert — the exact failure mode it exists to fix.
+            if coin_vetoed and str(sym or "").split("/")[0] in coin_vetoed:
+                continue          # measured slippage over the bar (fail-open)
             # one NEW position per lens per cycle; never add to a held symbol
             if (not sym or sym in pos or sym in opened_syms
                     or lens in opened_lenses

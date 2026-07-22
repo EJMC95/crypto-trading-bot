@@ -17,13 +17,38 @@ WHAT / WHY (2026-07-13)
   flat), so the port trades exactly what the original trades.
 
   EXECUTION is Lighter: ShadowBroker fills crossing the live book, hourly
-  funding accrual (SPY/QQQ funding printed ~28% APR at probe time — a LONG
-  PAYS it; whether the regime edge survives that drag is the exact question
-  this shadow book exists to answer, like Tide Rider's +52%->+40% study).
+  funding accrual.
 
-  UNVALIDATED on this venue: VENUE=lighter_live REFUSES to start in v1. The
-  IBKR paper bot keeps running as the control arm until the record earns a
-  decommission (or the user cuts it early).
+  [2026-07-22 THE FOUNDING QUESTION IS ANSWERED — AND THE ANSWER IS "NO"]
+  This file used to say SPY/QQQ funding "printed ~28% APR at probe — whether
+  the regime edge survives that drag is the exact question this shadow book
+  exists to answer". **That 28% was the 8x pre-basis-fix artifact** (the
+  /funding-rates endpoint quotes an 8-HOUR fraction that was annualised as if
+  hourly; corrected 17-Jul, funding_basis.py). Funding does NOT threaten this
+  sleeve, and three independent measurements agree:
+      source                                    SPY     QQQ     XAU
+      60d SETTLED /api/v1/fundings (22-Jul)    +2.4%   +7.8%   +7.6%
+      funding_basis.py:18 anchor          published 28.0% -> settled 3.50%
+      this bot's OWN accrual (-$0.405 on ~$500 over ~9d)   ~3.3% apr
+      its stated BREAKEVEN (below)             +9.2%  +16.6%  +12.0%
+  Every measured number is well under its breakeven. Do NOT rebuild a
+  funding-drag study to re-answer this; it is answered three ways.
+
+  WHAT IS STILL UNKNOWN is the regime edge itself — and this book cannot tell
+  you, because it barely trades: **0 closed trades in its first ~9 days**,
+  holding SPY+QQQ with XAU flat. That is BY DESIGN (a 200d filter with a ±1%
+  band switches ~2.3-2.8x/YEAR), and it means the fleet's ">=20 trades/30d"
+  go-live gate is UNREACHABLE BY CONSTRUCTION for this bot. It needs Tide
+  Rider's exemption (CLAUDE.md: "trades too rarely to judge; stays
+  backtest-validated"), not the trade-count gate.
+
+  UNVALIDATED on this venue: VENUE=lighter_live REFUSES to start in v1.
+  [2026-07-22] The IBKR paper twin named here as the control arm was RETIRED
+  14-Jul in the Lighter-first cut, so the go-live rule as originally written
+  has NO COMPARATOR — and the twin also doubled as the raw-vs-banded control,
+  which is likewise gone. Any go-live decision must therefore rest on the 15y
+  backtest + the now-measured funding drag, reviewed explicitly. Do not read
+  the absence of a control arm as the record having "earned" anything.
 
   Reference-blind rule (Snap Back doctrine): no stooq daily history -> no NEW
   decisions this loop; held positions keep their marks/seatbelt.
@@ -72,7 +97,12 @@ REGIME_SMA = int(os.environ.get("INDEX_REGIME_SMA", "200"))
 # NATGAS (broken funding print, decay); US500/US100 (duplicate SPY/QQQ);
 # single names (the IBKR bot's own docs: timing rules fit indices, not
 # stocks). Breakeven funding: SPY +9.2%apr, QQQ +16.6%, XAU-cross +12.0% —
-# the venue printed ~28%apr at probe; the shadow measures the REAL average.
+# [2026-07-22 MEASURED, supersedes the "~28%apr at probe" that stood here]
+# realized 60d SETTLED funding is SPY +2.4% / QQQ +7.8% / XAU +7.6% apr, i.e.
+# 26% / 47% / 63% of breakeven. The 28% was the 8x basis artifact. The drag is
+# real but it does NOT eat the edge. (These breakevens were also computed
+# against RAW regime200, not the shipped ±1% band, which has higher CAGR and
+# marginally higher time-in-market — so they are mildly conservative.)
 # [2026-07-13 ENHANCEMENT LAB — scratchpad index_enhance_backtest.py]
 # regime + ±1% HYSTERESIS BAND on the index sleeves: enter > SMA200*1.01,
 # exit < SMA200*0.99. 15y: SPY +8.4%/20.2%DD (raw daily200 +7.7%/22.5%),
@@ -220,8 +250,14 @@ def main():
     args = p.parse_args()
 
     mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
-    # [v1 GATE] UNVALIDATED on this venue — shadow only; the funding-drag
-    # record vs the IBKR control arm earns (or kills) any go-live.
+    # [v1 GATE] UNVALIDATED on this venue — shadow only.
+    # [2026-07-22] The original rule read "the funding-drag record vs the IBKR
+    # control arm earns (or kills) any go-live". BOTH halves of that are now
+    # void: the funding-drag question is ANSWERED (measured well under
+    # breakeven, see the module docstring) and the IBKR control arm was
+    # RETIRED 14-Jul, so there is no comparator. This guard stays regardless —
+    # a bot with 0 closed trades in 9 days has produced no record at all, and
+    # "no evidence against" is not evidence for.
     if mode != "lighter_shadow":
         raise SystemExit("equities-regime runs VENUE=lighter_shadow ONLY in v1 "
                          "— the stock-perp port is unvalidated; the shadow "

@@ -726,6 +726,32 @@ def main():
         # a redeploy instead of resetting to now.
         _live = store.load_state(bot_id + ":live") or {}
         meta = {str(k): v for k, v in (_live.get("meta") or {}).items()}
+        # [2026-07-22 COOLDOWN DURABILITY — a MEASURED real-money guard failure]
+        # `cooldown` and `stop_hist` were memory-only, so EVERY restart silently
+        # cleared the post-stop quarantine. Measured on the live book: LIT was
+        # stopped 21-Jul 11:23:12Z and RE-OPENED 16:03:29Z — 4h40m against a
+        # 12h COOLDOWN, and it should have been the 72h repeat escalation
+        # (LIT's 2nd stop inside REPEAT_STOP_WINDOW_D). The shadow twin, same
+        # code, honoured 12.00h exactly on both of its stops — the difference is
+        # that the LIVE service restarts constantly (11 deploys on 22-Jul alone).
+        # LIT is 55.4% of the live book's gross loss and its funding is still
+        # the venue's top extreme, so the gate re-selects it every cycle.
+        # Same class as the flatten/halt redeploy incident: a memory-only guard
+        # on a bot whose container is not.
+        _cd = _live.get("cooldown") or {}
+        _sh = _live.get("stop_hist") or {}
+        if isinstance(_cd, dict):
+            cooldown = {str(k): float(v) for k, v in _cd.items()
+                        if isinstance(v, (int, float))}
+        if isinstance(_sh, dict):
+            stop_hist = {str(k): [float(t) for t in v if isinstance(t, (int, float))]
+                         for k, v in _sh.items() if isinstance(v, list)}
+        if cooldown or stop_hist:
+            _still = sum(1 for t in cooldown.values() if t > time.time())
+            log.info("restored post-stop quarantine: %d cooldown(s) (%d still "
+                     "active), %d coin(s) with stop history — a restart no "
+                     "longer re-arms a stopped coin", len(cooldown), _still,
+                     len(stop_hist))
     live_baseline = (store.load_state(bot_id + ":live") or {}).get("initial_equity") \
         if not dry_run else None
     # [2026-07-21 D1] persisted capital ledger: guard-detected deposits/
@@ -1507,7 +1533,17 @@ def main():
                     "capital_adjust": capital_adjust,
                     # D3: same-UTC-day rail baseline survives a pre-halt restart
                     "day_start": {"day": cur_day.isoformat(),
-                                  "equity": day_start_equity}})
+                                  "equity": day_start_equity},
+                    # [2026-07-22] the post-stop quarantine, so a redeploy cannot
+                    # re-arm a coin the bot just stopped out of. Pruned on write:
+                    # expired cooldowns and stops outside REPEAT_STOP_WINDOW_D
+                    # are dropped, so this cannot grow without bound.
+                    "cooldown": {c: t for c, t in cooldown.items()
+                                 if t > time.time()},
+                    "stop_hist": {c: ts for c, ts in (
+                        (c, [t for t in v
+                             if time.time() - t <= REPEAT_STOP_WINDOW_D * 86400])
+                        for c, v in stop_hist.items()) if ts}})
         except Exception:
             pass
 
