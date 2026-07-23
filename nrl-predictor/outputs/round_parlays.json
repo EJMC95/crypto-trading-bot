@@ -1,8 +1,8 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1034,
-  "fair_price": 9.67,
+  "p_joint": 0.1033,
+  "fair_price": 9.68,
   "legs": [
    "Penrith Panthers to win",
    "Canberra Raiders to win",
@@ -12,8 +12,8 @@
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0331,
-  "fair_price": 30.26,
+  "p_joint": 0.0288,
+  "fair_price": 34.74,
   "legs": [
    "Penrith Panthers win & Thomas Jenkins try",
    "Canberra Raiders win & Xavier Savage try",

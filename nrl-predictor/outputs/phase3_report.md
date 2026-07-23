@@ -1,6 +1,6 @@
 # Phase 3 report — Poisson + GBM vs Elo and the closing line
 
-_Generated 2026-07-20. Walk-forward 2015–2025; Poisson refits before every round (Dixon–Coles decay ξ=1.0, 5y window); GBM retrains before every season on strictly-prior matches; stacked probability features are themselves walk-forward outputs. Draws score 0.5._
+_Generated 2026-07-23. Walk-forward 2015–2025; Poisson refits before every round (Dixon–Coles decay ξ=1.0, 5y window); GBM retrains before every season on strictly-prior matches; stacked probability features are themselves walk-forward outputs. Draws score 0.5._
 
 ## Overall 2015–2025 (Brier / log loss)
 
@@ -49,11 +49,11 @@ _Generated 2026-07-20. Walk-forward 2015–2025; Poisson refits before every rou
 |:---------|:--------------------|:---------------------------------|:------------------------------|:---------------------------|-------------:|-----------------:|-------------:|---------------:|------------------:|-------------------:|
 | Round 21 | 2026-07-23 19:50:00 | CommBank Stadium                 | Parramatta Eels               | Penrith Panthers           |       0.3251 |           0.3731 |       0.4223 |         0.2412 |              -5.2 |               47.5 |
 | Round 21 | 2026-07-24 18:00:00 | McDonald Jones Stadium           | Newcastle Knights             | Sydney Roosters            |       0.4336 |           0.4588 |       0.6215 |         0.4075 |              -1.6 |               48.6 |
-| Round 21 | 2026-07-24 20:00:00 | Accor Stadium                    | South Sydney Rabbitohs        | Melbourne Storm            |       0.5177 |           0.5192 |       0.5492 |         0.51   |               0.9 |               48.2 |
-| Round 21 | 2026-07-25 15:00:00 | GIO Stadium                      | Canberra Raiders              | Wests Tigers               |       0.6987 |           0.5607 |       0.7563 |         0.6986 |               2.7 |               48.1 |
-| Round 21 | 2026-07-25 17:30:00 | Accor Stadium                    | Canterbury-Bankstown Bulldogs | New Zealand Warriors       |       0.4517 |           0.4511 |       0.4614 |         0.4177 |              -1.9 |               44.4 |
-| Round 21 | 2026-07-25 19:35:00 | Queensland Country Bank Stadium  | North Queensland Cowboys      | Brisbane Broncos           |       0.6205 |           0.5325 |       0.5466 |         0.6304 |               1.4 |               48.2 |
-| Round 21 | 2026-07-26 14:00:00 | St George Venues Jubilee Stadium | St George Illawarra Dragons   | Gold Coast Titans          |       0.5508 |           0.4744 |       0.5489 |         0.5233 |              -0.8 |               47.4 |
-| Round 21 | 2026-07-26 16:05:00 | 4 Pines Park                     | Manly-Warringah Sea Eagles    | Cronulla-Sutherland Sharks |       0.5078 |           0.5302 |       0.542  |         0.5164 |               1.3 |               47.2 |
+| Round 21 | 2026-07-24 20:00:00 | Accor Stadium                    | South Sydney Rabbitohs        | Melbourne Storm            |       0.5177 |           0.5193 |       0.5492 |         0.5101 |               0.9 |               48.2 |
+| Round 21 | 2026-07-25 15:00:00 | GIO Stadium                      | Canberra Raiders              | Wests Tigers               |       0.6987 |           0.5655 |       0.7339 |         0.6997 |               2.7 |               48.1 |
+| Round 21 | 2026-07-25 17:30:00 | Accor Stadium                    | Canterbury-Bankstown Bulldogs | New Zealand Warriors       |       0.4517 |           0.4521 |       0.4637 |         0.4179 |              -1.9 |               44.4 |
+| Round 21 | 2026-07-25 19:35:00 | Queensland Country Bank Stadium  | North Queensland Cowboys      | Brisbane Broncos           |       0.6205 |           0.5305 |       0.5489 |         0.6299 |               1.4 |               48.2 |
+| Round 21 | 2026-07-26 14:00:00 | St George Venues Jubilee Stadium | St George Illawarra Dragons   | Gold Coast Titans          |       0.5508 |           0.4774 |       0.5141 |         0.5242 |              -0.8 |               47.4 |
+| Round 21 | 2026-07-26 16:05:00 | 4 Pines Park                     | Manly-Warringah Sea Eagles    | Cronulla-Sutherland Sharks |       0.5078 |           0.5311 |       0.5397 |         0.5166 |               1.3 |               47.2 |
 
 _Margin/total expectations come from the tier-2 Monte Carlo; the blend is a logistic stack of Elo+Poisson with weights learned on 2010–2014 only. GBM is reported but not blended (no pre-2015 out-of-sample output to learn a weight from) — revisit when lineup/weather features land in Phase 5._
