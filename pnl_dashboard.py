@@ -1444,6 +1444,64 @@ def incubator_card():
         return ""
 
 
+def radar_card():
+    """📡 [2026-07-23] Edge radar (bot_state 'fleet-radar'): every LIVING book
+    graded on a constellation of sensors — significance (t), both-halves,
+    median/jackknife robustness, trade rate — with an ETA to a |t|>=2 verdict.
+    Read-only; the organ lives in fleet_radar.py on the freqtrade-bots
+    container. Fail-silent — no state hides the card (it first publishes ~11 min
+    after that container boots, then every 30 min)."""
+    try:
+        r = fetch_states(["fleet-radar"]).get("fleet-radar") or {}
+        books = [b for b in (r.get("books") or []) if isinstance(b, dict)]
+        if not books:
+            return ""
+        summ = r.get("summary") or {}
+        CLS = {"real_edge": ("🟢", "#1a7f37"), "plausible": ("🟡", "#d29922"),
+               "artifact": ("🟠", "#e3742f"), "weak": ("⚪", "#8b949e"),
+               "noise": ("⚫", "#6e7681"), "losing": ("🔴", "#d1242f"),
+               "starved": ("🌫️", "#6a8ba8")}
+        order = ["real_edge", "plausible", "artifact", "weak", "noise",
+                 "losing", "starved"]
+        rows = []
+        for b in books:
+            cls = str(b.get("class") or "")
+            ic, col = CLS.get(cls, ("·", "#8b949e"))
+            t = b.get("radar_t")
+            t = t if isinstance(t, (int, float)) else 0.0
+            rows.append(
+                '<div style="display:flex;gap:6px;font-size:.85em;padding:1px 0;'
+                'white-space:nowrap">'
+                f'<span style="width:70px;color:{col}">{ic} {html.escape(cls)}</span>'
+                f'<span style="flex:1;overflow:hidden;text-overflow:ellipsis">'
+                f'{html.escape(str(b.get("bot")))}</span>'
+                f'<span class="muted" style="width:34px;text-align:right">'
+                f'n{b.get("n")}</span>'
+                f'<span style="width:46px;text-align:right;color:{col}">'
+                f't{t:+.1f}</span>'
+                f'<span class="muted" style="width:236px;overflow:hidden;'
+                f'text-overflow:ellipsis">{html.escape(str(b.get("eta") or ""))}'
+                '</span></div>')
+        cnt = " · ".join(f'{CLS[c][0]}{len(summ.get(c) or [])}'
+                         for c in order if summ.get(c))
+        age = ""
+        try:
+            _u = _iso_dt(r.get("updated"))
+            if _u:
+                _m = int((dt.datetime.now(dt.timezone.utc) - _u).total_seconds() // 60)
+                age = f' · {_m}m ago'
+        except Exception:
+            pass
+        return (f'<div class="card"><h2>📡 Edge radar '
+                f'<span class="dot on"></span></h2>'
+                f'<div class="muted">{r.get("n_books")} living books · {cnt}{age}'
+                f' — significance + both-halves + median/jackknife + '
+                f'ETA-to-verdict (publish-only, no consumer yet)</div>'
+                f'{"".join(rows)}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def brain_card_html():
     """Compact card for the learning loop's current state (bot_state 'learning-brain')."""
     try:
@@ -1949,7 +2007,7 @@ def render():
         enrich = {}
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
-    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card()
+    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card() + radar_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}
@@ -2575,6 +2633,15 @@ def _organ_vital(key, st):
                 _sym = max(_pr, key=lambda k: abs(_pr[k] or 0))
                 _top = f"{_sym} {_pr[_sym]:+.0f}bps"
             return _v("stress med {}bps · widest {}", _med, _top)
+        if key == "fleet-radar":
+            su = st.get("summary") or {}
+
+            def _n(*cs):
+                return sum(len(su.get(c) or []) for c in cs)
+            return _v("{} books · {} plausible/edge · {} artifact · {} noise · "
+                      "{} losing · {} starved", st.get("n_books"),
+                      _n("plausible", "real_edge"), _n("artifact"),
+                      _n("noise", "weak"), _n("losing"), _n("starved"))
         if key == "regime-oracle":
             # [2026-07-17] This counted TOP-LEVEL PAYLOAD KEYS, not majors —
             # params/pairs/fleet/errors made it read "4 majors tracked" for a
@@ -2730,6 +2797,9 @@ ORGAN_SPECS = [
     # enactments (out-of-sample); the tuner consumes hurting verdicts.
     ("fleet-proprioception", "🦾 Proprioception — enactment outcomes", False, 2700),
     ("strategy-incubator", "🧬 Incubator — champion genotype",        False, 10800),
+    # [2026-07-23] edge radar — per-book significance/both-halves/median/ETA.
+    # Publish-only, 30-min loop; a fresh row attests the fleet_radar organ ran.
+    ("fleet-radar",        "📡 Edge radar — book verdicts + ETA",     False, 5400),
     # [2026-07-16] EVENT for the same reason: the incubator's only
     # save_state('xp-queue') is guarded by `if props:`, so an empty queue is
     # never rewritten. Silence = "nothing new to propose" = normal. The
