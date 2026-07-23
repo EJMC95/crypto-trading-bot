@@ -35,6 +35,7 @@ TIMEOUT = 120
 SELFTEST_MODULES = [
     "bot_learn",
     "bot_pnl_store",
+    "brain_replay",
     "brain_stats",
     "cross_exchange_arb",
     "event_sentinel",
