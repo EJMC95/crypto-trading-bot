@@ -1,61 +1,82 @@
 # Live Funding Farmer — gate sweep on LIGHTER's own tape (2026-07-23)
 
-Run: `scripts/backtest_funding_lighter.py --days 180 --universe 25 --refresh`
+Run: `scripts/backtest_funding_lighter.py --days 180 --universe 25`
 against `mainnet.zklighter.elliot.ai` (settled hourly fundings + candles).
-180d, 25 markets, 2026-01-24 → 2026-07-23, clip $25 × 6 slots, 5bps/fill slip,
-exit = enter × 0.375. **Lighter-only, per doctrine.** This is the evidence the
-"fix the brakes, then widen" plan gated the real-money widening on.
+180d, 25 markets, 2026-01-24 → 2026-07-23, clip $25 × 6 slots, exit = enter ×
+0.375. **Lighter-only, per doctrine.**
 
-## The gate curve (TRUE apr = annualised funding at entry)
+## ⚠️ THE VERDICT TURNS ENTIRELY ON EXECUTION COST — and the real cost is ~0.5bps, not 5
 
-| gate | P&L $ | fund $ | price $ | n | win% | maxDD $ | 1st half | 2nd half | both agree? |
-|------|-------|--------|---------|---|------|---------|----------|----------|-------------|
-| 0.02 | **+19.82** | 14.74 | 5.11 | 1140 | 56.1 | −61.23 | +14.74 | +8.71 | ✅ both + |
-| 0.03 | +3.18 | 15.26 | −12.03 | 1147 | 53.8 | −61.40 | −0.26 | +9.95 | ❌ h1 − |
-| **0.05 (LIVE)** | **+3.57** | 16.54 | −12.93 | 1329 | 56.8 | −55.21 | +6.79 | +1.33 | ✅ both + |
-| 0.08 | −10.54 | 17.09 | −27.57 | 1223 | 56.0 | −65.12 | −13.64 | +2.38 | ❌ |
-| 0.12 | −47.14 | 20.61 | −67.74 | 887 | 47.5 | −50.13 | −18.33 | −28.60 | ❌ both − |
-| 0.20 | −28.38 | 19.49 | −47.86 | 685 | 49.9 | −30.95 | −10.90 | −18.05 | ❌ both − |
-| 0.30 | −24.78 | 17.08 | −41.86 | 520 | 47.9 | −28.15 | −17.75 | −7.02 | ❌ both − |
-| 0.40 | −12.79 | 15.76 | −28.55 | 394 | 49.5 | −21.24 | −13.94 | +1.15 | ❌ (HL-fitted) |
+`SLIP` is the load-bearing constant (`backtest_funding_lighter.py:230`) and it
+was never measured — the default 5bps came from "nothing" (the file's own
+comment). The fleet's fill-telemetry has since **measured the live Farmer's
+round-trip slip at ~0.47–0.54 bps/fill** (`impl_shortfall.order_slip.live`,
+"live executes TIGHTER than its own shadow model ~0.87bps"). At the real cost
+the arm is a genuine, modest positive-carry edge — my first pass (5bps) made it
+look dead, which was an artifact of the unfounded assumption, NOT the venue.
+
+### Gate 0.05 (what the live bot does today) across the plausible slip band
+
+| slip/fill | P&L 180d | 1st half | 2nd half | win% | maxDD |
+|---|---|---|---|---|---|
+| **0.5 bps (MEASURED live)** | **+$33.47** | +24.74 | +13.12 | 59.3 | −44.76 |
+| 0.86 bps (shadow model) | +$31.08 | +23.30 | +12.18 | 59.0 | −45.20 |
+| 1.0 bps | +$30.15 | +22.75 | +11.81 | 59.0 | −45.37 |
+| 2.0 bps | +$23.50 | +18.76 | +9.19 | 58.2 | −47.12 |
+| 5.0 bps (my earlier ASSUMPTION) | +$3.57 | +6.79 | +1.33 | 56.8 | −55.21 |
+
+At the measured cost the live gate is **both-halves-positive with a real margin**
+(+$33/180d ≈ +2.2% on the $1.5k deployed, 59% win) — and it stays positive and
+both-halves-robust all the way out to 2bps. It only collapses toward zero as
+slip approaches the unfounded 5bps.
+
+## The gate curve at the measured slip (0.5bps/fill)
+
+| gate | P&L $ | 1st half | 2nd half | both agree? |
+|------|-------|----------|----------|-------------|
+| 0.02 | +$45.47 | +29.25 | +20.25 | ✅ (deeper DD −56) |
+| 0.03 | +$28.98 | +14.16 | +21.25 | ✅ |
+| **0.05 (LIVE)** | **+$33.47** | +24.74 | +13.12 | ✅ (DD −45, win 59%) |
+| 0.08 | +$16.98 | +2.16 | +13.81 | ✅ (marginal) |
+| 0.12 | −$27.18 | −9.51 | −17.50 | ❌ both − |
+| 0.20 | −$12.97 | −4.26 | −9.32 | ❌ both − |
+| 0.30 | −$13.08 | −13.12 | +0.04 | ❌ |
+| 0.40 | −$3.93 | −10.61 | +6.68 | ❌ (HL-fitted) |
 
 ## What this actually says
 
-1. **Widening the entry gate UP loses money — decisively.** Every gate ≥ 0.08 is
-   negative, most in BOTH halves. The premise "the lever needs more space to
-   operate" is, for this lever, backwards: more space upward = more loss. The
-   lever-authority audit's "the decisive value ~10.5% sits above the 0.075
-   ceiling" is real, but reaching it is a LOSS — the tight ceiling is
-   PROTECTIVE, not a defect.
+1. **The live funding arm is NOT dead — it is a modest, real, both-halves-positive
+   carry edge at the measured execution cost.** Do NOT idle it. (An earlier read
+   here said "cost-bound, idle it"; that was the 5bps artifact — corrected.)
 
-2. **The current live gate (0.05) is marginally POSITIVE in simulation — not the
-   "negative both halves" an earlier read of the live LEDGER suggested.** +3.57
-   over 180d, both halves + (+6.79 / +1.33). The live realised book is negative
-   (radar `cn`: ZEC+HYPE concentration, t 1.10→−0.32) because of execution +
-   coin concentration + the specific window — but the GATE itself is not
-   inherently a both-halves loser in simulation. Both are true; they measure
-   different things.
+2. **Widening the entry gate UP still LOSES — at EVERY slip level.** Every gate
+   ≥ 0.12 is negative in both halves whether slip is 0.5 or 5bps. The premise
+   "the lever needs more space upward" stays refuted; the tight ceiling is
+   protective. This conclusion is slip-invariant and robust.
 
-3. **THE STRUCTURAL FINDING (matters more than the sweep): the strategy is
-   COST-BOUND, not gate-bound.** At gate 0.05: median hold 9h, carry earned over
-   that hold = **0.5 bps vs a 10 bps round-trip slip**. **Operative breakeven =
-   0.97 TRUE apr (97% APR)** — the venue floor is 3.5%, ETH ~8%. Funding almost
-   never reaches the level this needs to clear its own transaction cost. 56% of
-   trades exit because the funding signal EVAPORATED (flip+cold) before enough
-   carry accrued. The tiny positive rows (0.02, 0.05) are a handful of tp
-   winners barely out-running slippage — noise around zero, not a durable edge.
+3. **The arm's edge IS its execution quality.** Because carry is thin, the whole
+   P&L is a function of slip: viable at ≤~2bps, dead toward 5bps. The productive
+   lever is therefore NOT the gate or the strategy — it is KEEPING SLIP LOW, and
+   the fleet already monitors exactly this (`implementation_shortfall` /
+   fill-telemetry). If measured live slip ever drifts up past ~2bps, the arm's
+   edge is gone and it should idle. That monitor is load-bearing.
 
-## The real-money recommendation (operator authority)
+4. **The current gate (0.05) is a sound, slightly-conservative choice.** Lower
+   gates (0.02/0.03) earn marginally more but with deeper drawdown (−56 vs −45);
+   0.05 has the best win% and shallowest DD of the positive rows. No change to
+   the live gate is indicated — it is already at a good value.
 
-- **Do NOT widen `live.funding.enter_apr` upward.** Measured: it loses. The
-  bound's tight ceiling is correct and should stay.
-- **The live arm is scratching around breakeven at best, negative in live
-  realisation.** The productive lever is NOT the gate — it is COST: longer holds
-  on genuinely high-funding coins only (fewer flips), or tighter execution. Absent
-  that, idling the live funding arm loses nothing real.
-- **Where autonomy CAN still earn:** the shadow books and execution-cost work —
-  not gate-widening on a cost-bound live book. The brakes (cq–ct) make that
-  autonomy trustworthy; this evidence says where it should and should NOT reach.
+## Recommendation (operator authority — surfaced, not taken)
 
-Full-tape (438d) re-run is a follow-up, but the conclusion is STRUCTURAL
-(0.5bps carry vs 10bps slip → 97% breakeven) and does not turn on window length.
+- **KEEP the live funding arm and its 0.05 gate.** It earns at the real cost.
+- **Do NOT widen the gate up** (loses at all slip levels) and **do NOT idle**
+  (it works) — unless measured live slip drifts up past ~2bps, which is the one
+  condition that kills it; watch `impl_shortfall.order_slip.live`.
+- The `SLIP=5.0` default in the backtest is an unfounded pessimistic constant —
+  future runs must use the measured ~0.5bps (the fill-telemetry number) or they
+  will repeat the "it's dead" artifact. The live-slip measurement is owned by
+  the fill-telemetry work (its final n is still accumulating); this doc uses it
+  as a band (0.5–2bps), not a single point.
+
+Full-tape (438d) re-run is a follow-up; the slip-sensitivity conclusion is
+structural and holds across the window.
