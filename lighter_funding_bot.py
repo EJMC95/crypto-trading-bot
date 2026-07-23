@@ -972,6 +972,13 @@ def main():
             except Exception as e:
                 log.error("flatten %s: %s", c, e)
                 continue
+            if _res is None:
+                # [2026-07-23 AUDIT] no position under this key — already flat
+                # (the flatten's own goal). Don't book a phantom close on the
+                # stale size; the manage loop reconciles meta next cycle.
+                log.warning("flatten %s: no position to close (already flat) — "
+                            "not booking a phantom close", c)
+                continue
             _decision_px = px                      # mid at the close decision
             # -> REAL venue fill if readable, named by the order's own client id
             px, _meas, _src = _real_exit(
@@ -1275,23 +1282,31 @@ def main():
                     log.error("%s: stop unverifiable %dx — fail-safe flatten", coin, miss[coin])
                     try:
                         _res = ctx.venue.market_close(coin)
-                        _bpx, _, _ = _real_exit(
-                            coin, is_short, entry,
-                            client_id=(_res or {}).get("client_order_index"),
-                tx_hash=(_res or {}).get("tx_hash"),
-                settle_ms=(_res or {}).get("settle_ms"))
-                        _bpnl = abs(held) * ((_bpx - entry) if not is_short
-                                             else (entry - _bpx))
-                        _record_close(bot_id, coin, entry, opened_ts, _bpx, _bpnl,
-                                      m.get("accrued", 0.0), was_long=not is_short,
-                                      reason="stop_blind",
-                                      order_usd=float((m or {}).get("clip") or order_usd),
-                                      venue=venue_tag, shadow=shadow_tag,
-                                      bars=(m or {}).get("bars"))
-                        n_closed += 1
-                        meta.pop(coin, None)
-                        hot_since.pop(coin, None)
-                        miss.pop(coin, None)
+                        if _res is None:
+                            # [2026-07-23 AUDIT] already flat — don't fabricate a
+                            # blind-stop close on the stale held size (corrupts
+                            # n_closed/n_wins); meta reconciles next loop.
+                            log.warning("%s: fail-safe flatten found no position "
+                                        "(already flat) — not booking a phantom "
+                                        "close", coin)
+                        else:
+                            _bpx, _, _ = _real_exit(
+                                coin, is_short, entry,
+                                client_id=(_res or {}).get("client_order_index"),
+                    tx_hash=(_res or {}).get("tx_hash"),
+                    settle_ms=(_res or {}).get("settle_ms"))
+                            _bpnl = abs(held) * ((_bpx - entry) if not is_short
+                                                 else (entry - _bpx))
+                            _record_close(bot_id, coin, entry, opened_ts, _bpx, _bpnl,
+                                          m.get("accrued", 0.0), was_long=not is_short,
+                                          reason="stop_blind",
+                                          order_usd=float((m or {}).get("clip") or order_usd),
+                                          venue=venue_tag, shadow=shadow_tag,
+                                          bars=(m or {}).get("bars"))
+                            n_closed += 1
+                            meta.pop(coin, None)
+                            hot_since.pop(coin, None)
+                            miss.pop(coin, None)
                     except Exception as e:
                         log.error("fail-safe close %s: %s", coin, e)
                 continue
@@ -1362,6 +1377,18 @@ def main():
                     _res = ctx.venue.market_close(coin)
                 except Exception as e:
                     log.error("close %s failed: %s — leaving position, retry next loop", coin, e)
+                    continue
+                if _res is None:
+                    # [2026-07-23 AUDIT] None = the venue holds NO position under
+                    # this key (already flat / externally closed / liquidated
+                    # between the positions() read and here). Booking a close now
+                    # fabricates price_pnl on the STALE held size and corrupts
+                    # n_closed/n_wins — the exact data the promotion judge and the
+                    # brain rest on. The Ticket Taker already treats None as a
+                    # FAILED close; mirror it. Don't pop meta — the top-of-loop
+                    # reconciliation (held==0 -> meta.pop) or a retry handles it.
+                    log.warning("%s: close returned no position — NOT booking a "
+                                "phantom close; reconciles next loop", coin)
                     continue
                 # -> REAL venue fill if readable, named by the order's client id
                 px, _meas, _src = _real_exit(
