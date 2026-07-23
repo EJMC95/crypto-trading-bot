@@ -1463,23 +1463,33 @@ def radar_card():
                "starved": ("🌫️", "#6a8ba8")}
         order = ["real_edge", "plausible", "artifact", "weak", "noise",
                  "losing", "starved"]
+        ARR = {"decaying": ("↓", "#d1242f"), "emerging": ("↑", "#1a7f37"),
+               "stable": ("→", "#8b949e"), "insufficient": ("·", "#6e7681")}
         rows = []
         for b in books:
             cls = str(b.get("class") or "")
             ic, col = CLS.get(cls, ("·", "#8b949e"))
             t = b.get("radar_t")
             t = t if isinstance(t, (int, float)) else 0.0
+            aic, acol = ARR.get(str(b.get("trajectory")), ("·", "#6e7681"))
+            cav = list(b.get("caveats") or [])
+            if b.get("twin_role") == "control":
+                cav.append("twin")
+            flag = (f'<span style="color:#d29922"> ⚠{html.escape(",".join(cav))}</span>'
+                    if cav else "")
             rows.append(
                 '<div style="display:flex;gap:6px;font-size:.85em;padding:1px 0;'
                 'white-space:nowrap">'
                 f'<span style="width:70px;color:{col}">{ic} {html.escape(cls)}</span>'
                 f'<span style="flex:1;overflow:hidden;text-overflow:ellipsis">'
-                f'{html.escape(str(b.get("bot")))}</span>'
-                f'<span class="muted" style="width:34px;text-align:right">'
+                f'{html.escape(str(b.get("bot")))}{flag}</span>'
+                f'<span class="muted" style="width:30px;text-align:right">'
                 f'n{b.get("n")}</span>'
-                f'<span style="width:46px;text-align:right;color:{col}">'
+                f'<span style="width:44px;text-align:right;color:{col}">'
                 f't{t:+.1f}</span>'
-                f'<span class="muted" style="width:236px;overflow:hidden;'
+                f'<span style="width:14px;text-align:center;color:{acol}" '
+                f'title="trajectory: {html.escape(str(b.get("trajectory")))}">{aic}</span>'
+                f'<span class="muted" style="width:224px;overflow:hidden;'
                 f'text-overflow:ellipsis">{html.escape(str(b.get("eta") or ""))}'
                 '</span></div>')
         cnt = " · ".join(f'{CLS[c][0]}{len(summ.get(c) or [])}'

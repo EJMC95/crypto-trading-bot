@@ -85,7 +85,31 @@ def _t(xs):
     m = _mean(xs)
     var = sum((x - m) ** 2 for x in xs) / n     # population sd (matches the fleet's other scorers)
     sd = math.sqrt(var)
-    return (m / (sd / math.sqrt(n))) if sd > 0 else 0.0
+    # sd > 1e-9, not > 0: identical values give a FLOAT-NOISE sd ~1e-17 (0.05
+    # is not exactly representable), which would explode m/(sd/√n) to ~1e16. A
+    # real pnl_pct sd is >1e-4, so the guard cleanly separates noise from signal.
+    return (m / (sd / math.sqrt(n))) if sd > 1e-9 else 0.0
+
+
+def _slope_t(xs):
+    """t-stat of the OLS slope of xs against its own index (0..n-1) — is the
+    per-trade return TRENDING up or down over the book's life? 0.0 undefined."""
+    n = len(xs)
+    if n < 3:
+        return 0.0
+    xbar = (n - 1) / 2.0
+    ybar = _mean(xs)
+    sxx = sum((i - xbar) ** 2 for i in range(n))
+    sxy = sum((i - xbar) * (xs[i] - ybar) for i in range(n))
+    if sxx <= 0:
+        return 0.0
+    b = sxy / sxx
+    a = ybar - b * xbar
+    sse = sum((xs[i] - (a + b * i)) ** 2 for i in range(n))
+    if sse <= 0 or n <= 2:
+        return 0.0
+    se = math.sqrt((sse / (n - 2)) / sxx)
+    return (b / se) if se > 1e-9 else 0.0     # float-noise se guard (see _t)
 
 
 def _eta(n, t, rate_per_day):
@@ -113,6 +137,11 @@ def _eta(n, t, rate_per_day):
 def diagnose_book(bot, trades, now_ts=None):
     """PURE. trades: list of {profit_ratio, profit_abs, pair/coin, close_ts}.
     Returns the full multi-sensor reading + class + ETA for one book."""
+    # OLDEST-FIRST — the ledger fetch is closed_at DESC (newest first), which
+    # would invert every time-ordered read: the trajectory's "recent half" would
+    # be the OLD half and a decaying edge would read as stable. Sort ascending so
+    # rets[mid:] really is the recent half. (Missing close_ts -> 0, sorts first.)
+    trades = sorted(trades, key=lambda tr: _parse_ts(tr.get("close_ts")) or 0.0)
     rets = [float(t["profit_ratio"]) for t in trades if t.get("profit_ratio") is not None]
     n = len(rets)
     abss = [float(t.get("profit_abs") or 0.0) for t in trades]
@@ -144,6 +173,52 @@ def diagnose_book(bot, trades, now_ts=None):
     # 📶 STARLINK — traffic (closes/day over the last 7d)
     rate = _rate_per_day(trades, now_ts)
 
+    # 🧭 TRAJECTORY — velocity, not just position. The ETA below assumes a
+    # CONSTANT effect size; a real radar tracks whether the target is CLOSING on
+    # its destination or DRIFTING away. Measured 23-Jul: the Farmer's t=1.73 is
+    # a fading average — thirds t 3.28/1.10/-0.54, recent-half median NEGATIVE —
+    # so a constant-effect ETA projects convergence on an edge that already died.
+    # Needs enough per-half depth to compare (>=12 each).
+    traj, traj_delta, t_recent, med_recent, decay_ratio, slope_t = \
+        "insufficient", None, None, None, None, None
+    if n >= 24:
+        rh = rets[mid:]                       # recent half, close-ordered
+        t_recent, med_recent = _t(rh), _median(rh)
+        traj_delta = round(t_recent - t, 2)
+        m_full = _mean(rets)
+        m_recent = _mean(rets[-min(15, mid):])
+        decay_ratio = round(m_recent / m_full, 2) if m_full > 0 else None
+        slope_t = round(_slope_t(rets), 2)
+        _faded = (m_full > 0 and m_recent < 0.5 * m_full)   # recent < half the full mean
+        if traj_delta <= -1.0 and (med_recent < 0 or _faded):
+            traj = "decaying"
+        elif traj_delta >= 1.0 and med_recent > 0:
+            traj = "emerging"
+        else:
+            traj = "stable"
+
+    # 🌐 SATELLITE (deep) — pnl-weighted LEAVE-ONE/TWO-COIN-OUT. A count-based
+    # HHI HIDES concentration; only removing the top coins' PnL exposes it. The
+    # live Farmer's whole edge is ZEC+HYPE (drop them and t: 1.10 -> -0.32).
+    # By COIN only — NEVER an exit-inclusive reason (a *_tp cell is
+    # tautologically positive).
+    coin_pnl = defaultdict(float)
+    for tr in trades:
+        c = (tr.get("coin") or str(tr.get("pair") or "").split("/")[0])
+        if tr.get("profit_ratio") is not None:
+            coin_pnl[c] += float(tr["profit_ratio"])
+    ranked = sorted(coin_pnl, key=lambda c: coin_pnl[c], reverse=True)
+    tot_pp = sum(coin_pnl.values())
+    top_coin_share = round(max(coin_pnl.values()) / tot_pp, 2) if tot_pp > 0 else None
+
+    def _t_drop(drop):
+        keep = [float(tr["profit_ratio"]) for tr in trades
+                if tr.get("profit_ratio") is not None
+                and (tr.get("coin") or str(tr.get("pair") or "").split("/")[0]) not in drop]
+        return _t(keep) if len(keep) >= 2 else 0.0
+    loco_t1 = round(_t_drop(set(ranked[:1])), 2) if len(ranked) >= 2 else round(t, 2)
+    loco_t2 = round(_t_drop(set(ranked[:2])), 2) if len(ranked) >= 3 else loco_t1
+
     # --- classify from the CONSTELLATION, not one sensor ---
     if n < MIN_N:
         cls = "starved"
@@ -162,10 +237,21 @@ def diagnose_book(bot, trades, now_ts=None):
     else:
         cls = "weak"
 
+    # CAVEATS sharpen a plausible/real_edge verdict WITHOUT demoting the class
+    # (per-book slopes are weak, |t|<1.1 — flag, don't overclaim). A "plausible"
+    # book that is fading and/or carried by two coins is the live-Farmer trap.
+    caveats = []
+    if cls in ("plausible", "real_edge"):
+        if traj == "decaying":
+            caveats.append("fading")
+        if (loco_t1 is not None and loco_t1 < 1.0) or \
+           (loco_t2 is not None and loco_t2 < 1.0):
+            caveats.append("2-coin")
+
     more, days, eta_note = _eta(n, t, rate)
-    # the ETA must respect the CLASS — a starved book has NOT "arrived" however
-    # high its tiny-n t (avo-maria n=3 t=4.5 is starved, not proven); a noise
-    # book has no destination to time.
+    # the ETA must respect the CLASS and the TRAJECTORY — a starved book has NOT
+    # "arrived" however high its tiny-n t; a noise book has no destination; and a
+    # DECAYING edge must NEVER be shown a climbing ETA (the constant-effect lie).
     if cls == "starved":
         need = MIN_N - n
         d2 = (need / rate) if rate and rate > 0 else None
@@ -176,6 +262,8 @@ def diagnose_book(bot, trades, now_ts=None):
         more, days, eta_note = None, None, "no destination — not converging (noise)"
     elif cls == "losing" and t <= -T_VERDICT:
         more, days, eta_note = 0, 0.0, "verdict: significantly NEGATIVE — no edge here"
+    elif traj == "decaying":
+        more, days, eta_note = None, None, "DIVERGING — effect shrinking; no verdict on this trajectory"
     return {
         "bot": bot, "class": cls, "n": n, "net": net,
         "win_pct": round(100 * wins / n) if n else 0,
@@ -183,6 +271,14 @@ def diagnose_book(bot, trades, now_ts=None):
         "lidar_t": [round(ta, 2), round(tb, 2)], "stable": bool(both_pos or both_neg),
         "jackknife_t": round(jt, 2), "conc_pct": conc,
         "rate_per_day": round(rate, 2),
+        # 🧭 trajectory / velocity
+        "trajectory": traj, "traj_delta": traj_delta,
+        "t_recent": (round(t_recent, 2) if t_recent is not None else None),
+        "median_recent_pct": (round(med_recent, 3) if med_recent is not None else None),
+        "decay_ratio": decay_ratio, "slope_t": slope_t,
+        # 🌐 concentration fragility
+        "top_coin_share": top_coin_share, "loco_t1": loco_t1, "loco_t2": loco_t2,
+        "caveats": caveats,
         "eta_trades": more, "eta_days": days, "eta": eta_note,
     }
 
@@ -223,6 +319,23 @@ def scan(all_trades, now_ts=None):
     for tr in all_trades:
         by_bot[tr.get("bot")].append(tr)
     books = [diagnose_book(b, trs, now_ts) for b, trs in by_bot.items() if b]
+    # TWIN DEDUP — a live book and its own '-lshadow' control arm are ONE edge
+    # (measured 23-Jul: +0.795 correlated, same coins same days). Never present
+    # them as two independent plausible rows, and never let a consumer POOL
+    # them (n=110, t=1.98 LOOKS like it clears |t|>=2 — a double-counted
+    # mirage). Name-based, no correlation math: same base once the venue suffix
+    # is stripped. The LIVE arm is authoritative; the shadow is tagged control.
+    def _base(b):
+        for suf in ("-lighter", "-lshadow"):
+            if b.endswith(suf):
+                return b[: -len(suf)]
+        return b
+    live_bases = {_base(d["bot"]) for d in books if str(d["bot"]).endswith("-lighter")}
+    for d in books:
+        b = d["bot"]
+        if str(b).endswith("-lshadow") and _base(b) in live_bases:
+            d["twin_of"] = _base(b) + "-lighter"     # its live authority
+            d["twin_role"] = "control"
     books.sort(key=lambda d: (_ORDER.index(d["class"]) if d["class"] in _ORDER else 9,
                               -d["radar_t"]))
     summary = {c: [d["bot"] for d in books if d["class"] == c] for c in _ORDER}
@@ -279,17 +392,20 @@ def _report(payload):
     if not payload:
         print("[fleet-radar] no DB — nothing to scan"); return
     print(f"📡 FLEET RADAR — {payload['n_books']} books  ({payload['updated'][:16]})\n")
-    print(f"{'':2s} {'class':10s} {'book':32s} {'n':>4} {'net$':>8} {'t':>6} "
-          f"{'halves':>13} {'jk_t':>6} {'conc':>5} {'ETA':<34}")
-    print("-" * 128)
+    print(f"{'':2s} {'class':10s} {'book':30s} {'n':>4} {'t':>6} {'tr':>2} "
+          f"{'flags':>12} {'ETA':<44}")
+    print("-" * 118)
+    _ARR = {"decaying": "↓", "emerging": "↑", "stable": "→", "insufficient": "·"}
     last = None
     for d in payload["books"]:
         if d["class"] != last:
             print(); last = d["class"]
-        hv = f"[{d['lidar_t'][0]:+.1f},{d['lidar_t'][1]:+.1f}]"
-        print(f"{_ICON.get(d['class'],'?'):2s} {d['class']:10s} {d['bot'][:32]:32s} "
-              f"{d['n']:>4} {d['net']:>+8.2f} {d['radar_t']:>+6.2f} {hv:>13} "
-              f"{d['jackknife_t']:>+6.2f} {d['conc_pct']:>4.0f}% {str(d['eta'])[:34]:<34}")
+        flags = ",".join(d.get("caveats") or [])
+        if d.get("twin_role") == "control":
+            flags = (flags + " twin").strip(" ,") if flags else "twin"
+        print(f"{_ICON.get(d['class'],'?'):2s} {d['class']:10s} {d['bot'][:30]:30s} "
+              f"{d['n']:>4} {d['radar_t']:>+6.2f} {_ARR.get(d.get('trajectory'),'·'):>2} "
+              f"{('⚠'+flags if flags else ''):>12} {str(d['eta'])[:44]:<44}")
 
 
 def _selftest():
@@ -369,9 +485,53 @@ def _selftest():
     more2, days2, _ = _eta(50, 1.0, 0.0)
     _ck(more2 == 150 and days2 is None, "an idle book gets a trade count but no ETA days")
 
+    # time-ordered fixture: close_ts increases with index so oldest sorts first
+    def mkt(rets, coins=None):
+        now = 1_000_000.0
+        coins = coins or ["A"] * len(rets)
+        nn = len(rets)
+        out = [{"profit_ratio": r, "profit_abs": r * 100,
+                "coin": coins[i % len(coins)], "pair": coins[i % len(coins)] + "/USDC",
+                "close_ts": now - (nn - i) * 3600.0}   # oldest first, within nn hours
+               for i, r in enumerate(rets)]
+        return out, now
+
+    # 8. TRAJECTORY DECAYING: strong-early, dead-late (the Farmer shape). The ETA
+    # must NOT show a climbing verdict on a shrinking effect.
+    tr, now = mkt([0.8] * 15 + [-0.3] * 15, [f"C{i%9}" for i in range(30)])
+    d = diagnose_book("decay-bot", tr, now)
+    _ck(d["trajectory"] == "decaying",
+        f"strong-early/dead-late must be DECAYING, got {d['trajectory']} Δ={d['traj_delta']}")
+    _ck("DIVERG" in d["eta"] or d["class"] in ("noise", "losing"),
+        f"a decaying book must not show a climbing ETA, got {d['eta']}")
+
+    # 9. INVERSION GUARD: reverse the SAME series (newest-first, as the ledger
+    # fetch delivers) — the sort must recover the same decaying verdict, never
+    # flip it to emerging.
+    tr_rev = list(reversed(tr))
+    d9 = diagnose_book("decay-bot-rev", tr_rev, now)
+    _ck(d9["trajectory"] == "decaying",
+        f"decay must survive a reversed fetch order (the closed_at DESC trap), got {d9['trajectory']}")
+
+    # 10. CONCENTRATION: one coin carries the edge -> dropping it collapses t.
+    tr, now = mkt([0.05] * 20 + [3.0, 3.0, 3.0], ["A"] * 20 + ["MOON"] * 3)
+    d = diagnose_book("conc-bot", tr, now)
+    _ck(d["loco_t1"] < d["radar_t"],
+        f"dropping the top-pnl coin must lower t, got loco1={d['loco_t1']} t={d['radar_t']}")
+
+    # 11. TWIN DEDUP: a -lshadow with a live -lighter base is tagged control.
+    live_tr, now = mkt([0.5] * 20, [f"C{i}" for i in range(20)])
+    shad_tr, _ = mkt([0.4] * 20, [f"C{i}" for i in range(20)])
+    pay = scan([dict(t, bot="foo-lighter") for t in live_tr]
+               + [dict(t, bot="foo-lshadow") for t in shad_tr])
+    twin = [b for b in pay["books"] if b["bot"] == "foo-lshadow"][0]
+    _ck(twin.get("twin_role") == "control" and twin.get("twin_of") == "foo-lighter",
+        f"a -lshadow twin of a live book must be tagged control, got {twin.get('twin_role')}")
+
     if all(ok):
         print(f"fleet_radar selftest OK — {len(ok)} checks (noise/real/artifact/plausible/"
-              "losing/starved classes, jackknife robustness, ETA math + idle)")
+              "losing/starved classes, jackknife robustness, ETA math + idle, trajectory "
+              "decay + inversion guard, coin-concentration, twin-dedup)")
         return True
     print("fleet_radar SELFTEST FAILED")
     return False
