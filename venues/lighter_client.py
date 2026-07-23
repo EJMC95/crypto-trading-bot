@@ -780,11 +780,22 @@ class LighterClient(VenueClient):
                     reason = f"auth-failed:{str(_err)[:60] or 'empty-token'}"
                     auth = None
             if auth:
+                # [2026-07-23 AUDIT] gov_timeout=0 -> NON-BLOCKING, same as the
+                # tape-2 fallback below and this module's own invariant
+                # ("TELEMETRY MUST NEVER STARVE AN ORDER"). Previously this
+                # authoritative read used the default 120s blocking acquire, so
+                # in a 429/405 cooldown a post-close FILL MEASUREMENT could stall
+                # the single-threaded live loop up to ~120s x3 — no stops
+                # evaluated on other held coins, kill/daily-loss checks delayed —
+                # in exactly the storm where risk management matters most. On an
+                # empty bucket this now raises VenueError (caught just below) and
+                # falls through to the spare-budget tape-2 peek. Fill precision
+                # under contention is the documented, intended trade-off.
                 r = self._run(self._order_api.trades(
                     sort_by="timestamp", sort_dir="desc",
                     limit=max(1, min(int(lookback), 100)),
                     authorization=auth, market_id=m["id"],
-                    account_index=self.account_index))
+                    account_index=self.account_index), gov_timeout=0)
                 trades = getattr(r, "trades", None) or []
                 px = self._our_fills(trades, is_ask, since_ts, client_id,
                                      tx_hash=tx_hash)

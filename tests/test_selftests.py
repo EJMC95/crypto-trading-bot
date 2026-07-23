@@ -83,18 +83,24 @@ LIVE_SELFTESTS = [
 ]
 
 # Structural guards. The CI-gating ones are green on main — their FULL scan is
-# asserted here too. deploy-coverage is informational (its full scan reports a
-# census, not a pass/fail), so it runs only its negative `--selftest` fixture.
+# asserted here too.
 # [2026-07-18] venue-purity's shipped-code scan was made green (compile_market_data
 # declared as a dashboard display panel; the 2 retired bots declared) and wired
 # into CI, so it moves up to ENFORCED. Its BACKTEST section stays advisory.
+# [2026-07-23] deploy-coverage moves to ENFORCED. The old comment here — "it's
+# informational, a census not a pass/fail" — was FACTUALLY WRONG: audit_deploy_
+# coverage.main() returns 1 on an orphan and 0 otherwise (it IS pass/fail), and
+# that mis-classification is exactly why the fleet_radar orphan (cl/cm/cn) shipped
+# unblocked — the guard existed but ran nowhere. It is now green on main (radar
+# added to the deploy paths) and CI-gating (changelog-check.yml), so its full
+# scan is asserted here too. The live bots are declared in DEPLOY_COVERAGE_OK.
 ENFORCED_AUDITS = [
-    "scripts/audit_image_imports.py",   # born-dark guard (CI-gating)
-    "scripts/audit_sdk_pin.py",         # real-money wheel pin (CI-gating)
-    "scripts/audit_venue_purity.py",    # LIGHTER-first, shipped-code scan (CI-gating)
+    "scripts/audit_image_imports.py",     # born-dark guard (CI-gating)
+    "scripts/audit_sdk_pin.py",           # real-money wheel pin (CI-gating)
+    "scripts/audit_venue_purity.py",      # LIGHTER-first, shipped-code scan (CI-gating)
+    "scripts/audit_deploy_coverage.py",   # every shipped file has a deploy path (CI-gating)
 ]
 GUARD_ONLY_AUDITS = [
-    "scripts/audit_deploy_coverage.py", # deploy-route census (informational)
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can
     # change BEHAVIOUR, not merely whether a value is inside it. Its bare run
     # exits 1 on 5 open findings (live.funding.enter_apr's hi sits below the

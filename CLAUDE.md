@@ -174,8 +174,16 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   `apply_levers` + both live bots' clip via venues) — a measured-bad
   lever stops steering real money immediately instead of waiting out the
   board/judge cycle or the lever TTL; live-lane only (shadow lanes keep
-  TTL semantics), fail-safe open, restrict-only by construction. Review
-  grades both sides — agenda item 12. → bot_state `fleet-proprioception`
+  TTL semantics), fail-safe open, restrict-only by construction. **[23-Jul
+  audit CORRECTION: the clip HOOK is wired at the consumer, but
+  `live.clip_scale` can NEVER actually receive a `hurting` verdict —
+  `fleet_proprioception.grade_live` returns `recorded` for the `live-clip`
+  group because the per-trade metric is invariant to clip size — so this
+  auto-revert only ever FIRES for `live.funding.*`. The clip's real
+  protections are the board's DOWN reflex + lever TTL + the SafetyRails cap.
+  "covers ... both live bots' clip" describes the plumbing, not a revert
+  that can fire.]** Review grades both sides — agenda item 12.
+  → bot_state `fleet-proprioception`
 - `experiment_judge.py` 🧪⚖️ — the shadow→live PROMOTION pipeline (15-Jul
   user mandate: shadow wins must "carry across to the real money bots").
   Hourly, ONE candidate at a time on the Funding Farmer's -lshadow twin
