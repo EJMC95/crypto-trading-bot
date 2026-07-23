@@ -58,6 +58,24 @@ jobs:
       - name: The guard must still be able to see (negative fixture)
         run: python3 scripts/audit_venue_purity.py --selftest
 
+  deploy-coverage:
+    name: Every shipped file has a deploy path (no silent orphans)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-23] fleet_radar.py shipped in the freqtrade-bots image (cl/cm/cn)
+      # but was in NEITHER railway-redeploy.yml `paths:` NOR its service grep, so
+      # editing it was a silent no-op: green CI, old code still running. The
+      # audit that catches this (audit_deploy_coverage.py) EXISTED and had a
+      # --selftest, but — exactly like venue-purity before 18-Jul — was never
+      # RUN by CI, so it rotted undetected. A detective control nobody executes
+      # is not a control. Now enforced: a file that ships but cannot deploy fails
+      # the build (declare intentional omissions in DEPLOY_COVERAGE_OK).
+      - name: A file in an auto-deployed image must be reachable by a push path
+        run: python3 scripts/audit_deploy_coverage.py
+      - name: The guard must still be able to see (negative fixture)
+        run: python3 scripts/audit_deploy_coverage.py --selftest
+
   conflict-markers:
     name: No unresolved merge/stash markers in the tree
     runs-on: ubuntu-latest
