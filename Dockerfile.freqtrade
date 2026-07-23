@@ -95,6 +95,11 @@ COPY strategy_incubator.py /freqtrade/strategy_incubator.py
 COPY fleet_respiration.py /freqtrade/fleet_respiration.py
 # live-vs-shadow execution-quality tracker (implementation shortfall)
 COPY implementation_shortfall.py /freqtrade/implementation_shortfall.py
+# [2026-07-23] 📡 the edge RADAR — grades every LIVING book by significance +
+# both-halves + median/jackknife robustness + an ETA to verdict, so feed/park/
+# cull writes itself. Imports bot_pnl_store + cleanup_legacy_bots (both COPY'd);
+# audit_image_imports verifies. Publish-only, --publish gated.
+COPY fleet_radar.py /freqtrade/fleet_radar.py
 # [2026-07-21] 🏛️ the Parliament — the six-layer PM shadow fleet (six $1k
 # books + scanners + ML + tuners + brain), launched from run_all.sh. Imports
 # bot_pnl_store / fleet_bus / funding_basis / paper_broker — all COPY'd above

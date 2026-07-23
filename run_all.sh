@@ -296,6 +296,20 @@ done &
     sleep "${SHORTFALL_INTERVAL_SEC:-1800}"
   done ) &
 
+# [2026-07-23 EDGE RADAR] 📡 grades every LIVING book on a constellation of
+# independent sensors — significance (t-stat), both-halves stability,
+# median/jackknife robustness (the median catches the funding-carry false
+# positive a lone t-stat waved through), concentration, trade rate — plus an
+# ETA to a |t|>=2 verdict at the current effect size -> bot_state 'fleet-radar'.
+# The standing version of the 22/23-Jul edge analysis, so feed/park/cull is a
+# read rather than a re-derivation. PUBLISH-ONLY: no consumer, no actuator;
+# --publish is explicit so a bare run never writes the live bus.
+( sleep 660
+  while true; do
+    python3 /freqtrade/fleet_radar.py --publish || true
+    sleep "${RADAR_INTERVAL_SEC:-1800}"
+  done ) &
+
 # [2026-07-21 PARLIAMENT] 🏛️ the six-layer PM shadow fleet (operator ask:
 # comprehensive self-evolving system, bots named for the last 8 Australian
 # PMs). ONE asyncio process carrying all six layers: Lighter-only data,
