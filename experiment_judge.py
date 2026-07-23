@@ -381,6 +381,13 @@ def prop_fade(prop_state, live_levers, now):
 # 'down' = lower is tighter (an exposure/hold cap). Values are the fleet's
 # documented live defaults (FUNDING_ENTER_APR 0.05 TRUE / TP 0.04 / 72h) —
 # the registry notes carry the same numbers.
+# [2026-07-23 AUDIT] This is a HARDCODED COPY of the live funding bot's env
+# defaults (the judge runs in a different process and can't read that service's
+# env at runtime). A selftest drift guard pins these to the funding bot's SOURCE
+# defaults so they can't diverge in CODE. But a per-service ENV OVERRIDE (e.g.
+# the operator setting FUNDING_MAX_HOLD_H=96 on the live service) is INVISIBLE
+# here — if you set one, update this dict too, or proposal_fade's restrict-only
+# guarantee (release only when reverting TIGHTENS) can be defeated on that lever.
 LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
                      "live.funding.take_profit": (0.04, "down"),
                      "live.funding.max_hold_h": (72.0, "down")}
@@ -1096,6 +1103,32 @@ def _selftest():
         "expand proposal must NEVER release"
     assert proposal_fade([], {"live.funding.enter_apr": 0.0375}, t0) == (False, None)
     assert proposal_fade(None, {"live.funding.enter_apr": 0.0375}, t0) == (False, None)
+
+    # [2026-07-23 AUDIT — LIVE_ENV_DEFAULTS drift guard] proposal_fade rules a
+    # release "restrict-only" by reverting to the funding bot's env DEFAULT,
+    # which it keeps as a HARDCODED COPY (LIVE_ENV_DEFAULTS). If that copy drifts
+    # from the live bot's actual default, a 'restrict' proposal could WIDEN a
+    # real-money lever (operator raises FUNDING_MAX_HOLD_H -> judge still thinks
+    # 72 -> releases -> live reverts WIDER on 'restrict' evidence). The judge
+    # runs in a different process from the live Farmer so it cannot read that
+    # env at runtime, but it CAN pin its copy to the funding bot's SOURCE
+    # defaults so the two literals never silently drift in code. (A per-service
+    # env OVERRIDE stays the operator's job to mirror — see LIVE_ENV_DEFAULTS.)
+    import re as _re
+    import pathlib as _pl
+    _fb_src = _pl.Path(__file__).with_name("lighter_funding_bot.py").read_text()
+    _src_def = {}
+    for _var, _key in (("FUNDING_ENTER_APR", "live.funding.enter_apr"),
+                       ("FUNDING_TAKE_PROFIT", "live.funding.take_profit"),
+                       ("FUNDING_MAX_HOLD_H", "live.funding.max_hold_h")):
+        _mm = _re.search(_var + r'"\s*,\s*"([0-9.]+)"', _fb_src)
+        assert _mm, f"could not read {_var} default from lighter_funding_bot.py"
+        _src_def[_key] = float(_mm.group(1))
+    for _key, (_v, _dir) in LIVE_ENV_DEFAULTS.items():
+        assert _src_def[_key] == _v, (
+            f"LIVE_ENV_DEFAULTS[{_key}]={_v} has DRIFTED from the funding bot's "
+            f"source default {_src_def[_key]}; a restrict proposal could widen a "
+            f"real-money lever. Sync the two.")
 
     # every candidate's levers are registered, in-bounds, and map to a live twin
     for c in CANDIDATES:

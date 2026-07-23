@@ -123,8 +123,12 @@ def load_trades():
 def era_filter(trades):
     out = []
     for t in trades:
-        era = bot_learn.ERA_START.get(t.get("bot"))
-        if era and str(t.get("open_ts") or "") < era:
+        # [2026-07-23 AUDIT FIX] same bug the production path had: the ledger id
+        # carries a '-lshadow'/'-lighter' suffix so the bare-name lookup missed,
+        # and the string compare mis-ranked a ' UTC' stamp. Use the shared,
+        # suffix-stripping, epoch-comparing helper.
+        era_epoch = bot_learn.era_epoch_for(t.get("bot"))
+        if era_epoch and (bot_learn._epoch(t.get("open_ts")) or 0.0) < era_epoch:
             continue
         out.append(t)
     return out
