@@ -60,3 +60,33 @@ and it's pure research (no real money).
 
 Standing this up as a shadow book is an operator decision (a new book on the
 fleet) — surfaced, not taken.
+
+## REFINEMENT (2026-07-23): the liquidity filter did NOT clean it up — it HUMBLED the headline
+
+Added `--max-spread-bps` and re-ran dropping the 6 illiquid books (URA 101.8,
+ASML 26.8, XPD 7.9, IWM 7.9, AMD 5.3, AMZN 5.1). The hypothesis was that the
+illiquid tail drove the −7.4% quarter. **It did not — and the result cuts the
+other way:**
+
+| universe | shipped-config full | h2 | dies at |
+|---|---|---|---|
+| full 26 books (flat 5bps) | +11.2% | +2.9% | 15bps |
+| **deep 20 books (≤5bps)** | **+7.6%** | +1.3% | **10bps** |
+
+Dropping the wide books LOWERED the return (+11.2% → +7.6%) and made it MORE
+cost-sensitive (now negative at 10bps, not 15). Why: the flat-5bps assumption was
+**under-charging** the illiquid books (URA was charged 5bps when it really costs
+102bps), so the +11.2% headline **credited alpha the fleet could never actually
+capture at those spreads.** The deep-universe +7.6% (fairly charged, since all
+remaining books are ≤5bps; +9.9% at the median 2.26bps) is the **honest tradeable
+number** — and it is thinner and more fragile than the first read implied.
+
+**Corrected verdict:** the non-crypto factor IS a real, diversifying, both-halves-
+positive market-neutral edge — but on the honestly-tradeable universe it is
+**modest (+7.6% to +9.9%) and cost-sensitive (dies ~10bps)**, not the +11–18%
+the flat-slip headline suggested. The −7.4% quarter is a genuine factor drawdown,
+not a friction artifact. Still a **shadow-validate candidate** — but stood up on
+the honest numbers, with no expectation it doubles the crypto arm. The real
+next step before any shadow go-live is a **per-book-spread backtest** (charge each
+book its measured half-spread, not a flat 5bps) so the number is trustworthy end
+to end.

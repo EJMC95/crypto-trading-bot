@@ -231,9 +231,24 @@ def main():
     # intersects common hours across the whole universe, so one 42d book
     # silently truncates a 150d study to 42d. Learned the hard way, 22-Jul.
     ap.add_argument("--min-days", type=int, default=140)
+    # [2026-07-23] tradeable-liquidity filter: drop books whose live half-spread
+    # exceeds this (bps/side). Friction is NOT homogeneous — URA 102bps / ASML
+    # 27bps drag a flat-5bps read, and the illiquid tail is a plausible driver of
+    # the worst quarter. Default None = the full universe (unchanged behaviour).
+    ap.add_argument("--max-spread-bps", type=float, default=None,
+                    help="drop books with live half-spread > this (bps/side)")
     a = ap.parse_args()
 
     mk, spread = load(a.days, a.refresh, a.min_days * 24)
+    if a.max_spread_bps is not None:
+        wide = {c: spread[c] for c in list(mk)
+                if spread.get(c) is not None and spread[c] > a.max_spread_bps}
+        for c in wide:
+            del mk[c]
+        print(f"LIQUIDITY FILTER: dropped {len(wide)} book(s) > "
+              f"{a.max_spread_bps}bps/side: "
+              + ", ".join(f"{c} {wide[c]:.1f}"
+                          for c in sorted(wide, key=lambda x: -wide[x])))
     if len(mk) < 12:
         sys.exit(f"only {len(mk)} books with paired history — not a cross-section")
     coins, ts, px, fund = align(mk)
