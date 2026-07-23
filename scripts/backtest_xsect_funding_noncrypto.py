@@ -237,6 +237,12 @@ def main():
     # the worst quarter. Default None = the full universe (unchanged behaviour).
     ap.add_argument("--max-spread-bps", type=float, default=None,
                     help="drop books with live half-spread > this (bps/side)")
+    # [2026-07-23] the honest cost model: charge each book its OWN measured
+    # half-spread per leg instead of a flat 5bps. The flat read over-credits the
+    # illiquid tail (URA billed 5bps vs its real 102) and under-credits the deep
+    # core (XAU 0.3) — a per-book charge is trustworthy end to end.
+    ap.add_argument("--per-book-slip", action="store_true",
+                    help="charge each book its own measured half-spread")
     a = ap.parse_args()
 
     mk, spread = load(a.days, a.refresh, a.min_days * 24)
@@ -253,8 +259,16 @@ def main():
         sys.exit(f"only {len(mk)} books with paired history — not a cross-section")
     coins, ts, px, fund = align(mk)
     span = (ts[-1] - ts[0]) / 86400
+    if a.per_book_slip:
+        slip_arg = {c: spread[c] / 1e4 for c in coins if spread.get(c) is not None}
+        _bps = sorted(v * 1e4 for v in slip_arg.values())
+        slip_desc = (f"PER-BOOK measured (median {_bps[len(_bps)//2]:.2f}bps, "
+                     f"max {max(_bps):.1f}bps)")
+    else:
+        slip_arg = SLIP
+        slip_desc = f"flat {SLIP*1e4:.0f}bps/side"
     print(f"\nuniverse {len(coins)} NON-CRYPTO Lighter books, {len(ts)} hourly "
-          f"bars ({span:.0f}d), clip ${ORDER_USD:.0f}, slip {SLIP*1e4:.0f}bps/side")
+          f"bars ({span:.0f}d), clip ${ORDER_USD:.0f}, slip {slip_desc}")
     print("SIGNED settled Lighter funding (direction applied). Arithmetic is "
           "backtest_xsect_funding_lighter's, imported verbatim.\n")
 
@@ -274,7 +288,7 @@ def main():
                 def mk_rank(seg, fl=fl_h):
                     return base(seg, fl)
 
-                r = gate(coins, ts, px, fund, mk_rank, warm, k, reb)
+                r = gate(coins, ts, px, fund, mk_rank, warm, k, reb, slip=slip_arg)
                 both = r["h1"]["ret"] > 0 and r["h2"]["ret"] > 0
                 ok = both and r["full"]["ret"] > 0 and r["mirror"]["price"] < 0
                 if ok:

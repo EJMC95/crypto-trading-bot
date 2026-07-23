@@ -90,3 +90,30 @@ the honest numbers, with no expectation it doubles the crypto arm. The real
 next step before any shadow go-live is a **per-book-spread backtest** (charge each
 book its measured half-spread, not a flat 5bps) so the number is trustworthy end
 to end.
+
+## PER-BOOK COST — the honest end-to-end number (2026-07-23)
+
+Added `--per-book-slip`: `simulate()` now accepts a `{book: half_spread}` dict
+(backward-compatible — a scalar behaves exactly as before; the flat-5bps run still
+reproduces +11.2% to the decimal). Each leg is charged its OWN measured spread.
+
+| universe · cost | shipped-config full | h2 | maxDD | pass |
+|---|---|---|---|---|
+| full 26 · flat 5bps | +11.2% | +2.9% | 7.6% | 4/12 — **inflated** (illiquid tail billed 5bps) |
+| deep 20 · flat 5bps | +7.6% | +1.3% | 8.6% | 5/12 — **deflated** (deep books over-billed at 5) |
+| full 26 · per-book | +8.7% | +1.8% | 9.0% | 4/12 — honest; illiquid tail correctly drags |
+| **deep 20 · per-book** | **+10.1%** | **+2.5%** | **8.5%** | **5/12 — THE HONEST TRADEABLE NUMBER** |
+
+**Final verdict.** Charging each book its real spread RECOVERS most of the edge the
+flat-5bps filter had wrongly discarded — because flat-5bps was *over*-charging the
+deep core (real median 2.26bps). The honest, trustworthy result on the tradeable
+deep-liquidity universe is **+10.1% / 142d, both halves positive (h2 +2.5%),
+maxDD 8.5%, market-neutral** — a genuine diversifying edge, comparable to the
+crypto arm (+13.6%) at LOWER drawdown (8.5% vs 10.1%) and on an uncorrelated
+universe. This is a solid **shadow-validate candidate** at an honest number.
+
+Remaining before shadow go-live: re-check the D6 quarterly durability under the
+per-book cost on the deep universe (the −7.4% quarter was a flat-slip/full-universe
+figure), and — for a fully fair head-to-head — re-run the merged crypto-vs-non-crypto
+with per-book slip on BOTH arms (the +13.6% crypto number here is still flat-5bps).
+Both are pure research. Standing up the book is an operator decision — surfaced, not taken.

@@ -174,9 +174,21 @@ def align(mk):
     return coins, common, px, fund
 
 
+def _slip_of(slip, c):
+    """Per-book slip when `slip` is a {book: fraction} dict, else the scalar.
+    [2026-07-23] The factor charged a FLAT slip to every book, which under-charged
+    the illiquid tail (a 102bps book billed 5bps). Passing a {book: half_spread}
+    dict charges each leg its OWN measured friction. Backward-compatible: a float
+    behaves exactly as before. A book missing from the dict falls back to the
+    module SLIP (never free)."""
+    return slip.get(c, SLIP) if isinstance(slip, dict) else slip
+
+
 def simulate(coins, ts, px, fund, rank_fn, warm_h, k, reb_h, invert=False,
              slip=SLIP):
-    """The HL lab's simulate(), transcribed. Only `fund` differs in origin."""
+    """The HL lab's simulate(), transcribed. Only `fund` differs in origin.
+    `slip` is a scalar fraction OR a {book: fraction} per-book dict (see
+    _slip_of)."""
     book, cash, price_pnl, fund_pnl = {}, 0.0, 0.0, 0.0
     trips = wins = 0
     eq = []
@@ -199,22 +211,23 @@ def simulate(coins, ts, px, fund, rank_fn, warm_h, k, reb_h, invert=False,
                     if want.get(c) != book[c]["side"]:
                         p = book.pop(c)
                         pnl = p["side"] * (px[c][t] / p["entry"] - 1.0) * ORDER_USD \
-                            - slip * ORDER_USD
+                            - _slip_of(slip, c) * ORDER_USD
                         cash += pnl
                         price_pnl += pnl
                         trips += 1
                         wins += 1 if pnl > 0 else 0
                 for c, side in want.items():
                     if c not in book:
-                        cash -= slip * ORDER_USD
-                        price_pnl -= slip * ORDER_USD
+                        cash -= _slip_of(slip, c) * ORDER_USD
+                        price_pnl -= _slip_of(slip, c) * ORDER_USD
                         book[c] = {"side": side, "entry": px[c][t]}
         u = sum(p["side"] * (px[c][t] / p["entry"] - 1.0) * ORDER_USD
                 for c, p in book.items())
         eq.append(cash + u)
     t = ts[-1]
     for c, p in book.items():
-        pnl = p["side"] * (px[c][t] / p["entry"] - 1.0) * ORDER_USD - slip * ORDER_USD
+        pnl = p["side"] * (px[c][t] / p["entry"] - 1.0) * ORDER_USD \
+            - _slip_of(slip, c) * ORDER_USD
         cash += pnl
         price_pnl += pnl
         trips += 1
