@@ -94,6 +94,38 @@ def _valid(lever, entry):
     return v
 
 
+# [2026-07-23 AUTONOMY BRAKE] author -> lanes each organ may PROPOSE on. The
+# proposal channel shipped with NO author binding (unlike
+# fleet_tuning.write_levers): ANY organ could propose ANY registered lever,
+# including live.funding.* — and the judge's proposal_fade treats a fresh
+# RESTRICT proposal on a promoted live lever as an EARLY RELEASE, so a buggy or
+# spurious proposal from any importer was an unauthenticated hand on a
+# real-money release. This is the PROPOSE-side twin of AUTHOR_LANES, and
+# DELIBERATELY DISTINCT from it: proposing is evidence-in (a tuner/judge still
+# gates it), so the shadow proposers are broader than the WRITE authors — e.g.
+# event-sentinel writes only its own detection lane but legitimately PROPOSES
+# taker.*. A live-lane proposal requires an explicitly sanctioned author; an
+# unlisted author may propose only non-live (shadow) lanes — the same fail-safe
+# shape as fleet_tuning's unbound-author rule (never reaches real money).
+PROPOSAL_AUTHOR_LANES = {
+    "brain":             {"lighter-taker"},
+    "event-sentinel":    {"lighter-taker"},
+    "fleet-respiration": {"lighter-taker"},
+    "impl-shortfall":    {"lighter-live"},   # the ONLY sanctioned live proposer
+}
+
+
+def _author_may_propose(lever, set_by):
+    """Lane authorization for one proposal. Live-lane proposals require an
+    explicitly sanctioned author; unlisted authors get shadow lanes only
+    (fail-safe: an unbound author can never propose a real-money release)."""
+    lane = (tuning.LEVERS.get(lever) or {}).get("lane")
+    allowed = PROPOSAL_AUTHOR_LANES.get(str(set_by))
+    if allowed is not None:
+        return lane in allowed
+    return not (lane == "lighter-live" or str(lever).startswith("live."))
+
+
 def propose(proposals, set_by, now_ts=None, ttl_sec=None):
     """Author proposal entries, MERGED with other authors' live proposals
     (same locked read->merge->write pattern as fleet_tuning.write_levers —
@@ -107,6 +139,8 @@ def propose(proposals, set_by, now_ts=None, ttl_sec=None):
     out = {}
     for lever, entry in (proposals or {}).items():
         entry = entry or {}
+        if not _author_may_propose(lever, set_by):
+            continue                     # author not sanctioned for this lane
         v = _valid(lever, entry)
         if v is None:
             continue
@@ -247,6 +281,12 @@ def fresh_proposals(now_ts=None):
             if not isinstance(entry, dict) or not _alive(entry, now_ts):
                 continue
             lever = entry.get("lever")
+            # [2026-07-23 BRAKE] re-check authorship on READ too (defense in
+            # depth): a live.* proposal from an unsanctioned author — stale, or
+            # written before this brake, or via a direct DB poke — must never
+            # reach a consumer (the judge's early-release path reads this).
+            if not _author_may_propose(lever, entry.get("set_by")):
+                continue
             v = _valid(lever, entry)
             if v is None:
                 continue
@@ -283,6 +323,28 @@ def _selftest():
     assert _valid("taker.momo_chg", {"value": 5.5, "direction": "sideways"}) is None
     assert _valid("not.a.lever", {"value": 1, "direction": "restrict"}) is None
     assert _valid("taker.momo_chg", {"value": "junk", "direction": "expand"}) is None
+
+    # [2026-07-23 BRAKE] author-lane binding: live.* only from a sanctioned
+    # author, shadow lanes open to shadow proposers, unlisted author -> no live.
+    assert _author_may_propose("taker.momo_chg", "brain")
+    assert _author_may_propose("taker.brk_range", "event-sentinel")
+    assert _author_may_propose("taker.div_gap_pp", "fleet-respiration")
+    assert _author_may_propose("live.funding.enter_apr", "impl-shortfall")
+    assert not _author_may_propose("live.funding.enter_apr", "brain")
+    assert not _author_may_propose("live.funding.enter_apr", "event-sentinel")
+    assert not _author_may_propose("live.funding.max_hold_h", "rogue-organ")
+    assert _author_may_propose("taker.momo_chg", "rogue-organ")   # shadow open
+    assert not _author_may_propose("taker.momo_chg", "impl-shortfall")  # not its lane
+    # an unsanctioned live proposal is DROPPED at write and never read back
+    _cache.update(ts=now, payload={
+        "updated": fresh_iso, "ttl_sec": 7200, "proposals": {
+            "rogue:live.funding.enter_apr": {
+                "lever": "live.funding.enter_apr", "value": 0.0625,
+                "direction": "restrict", "set_by": "rogue",
+                "expires": _iso(now + 3600)}}})
+    assert fresh_proposals(now_ts=now) == [], \
+        "an unsanctioned live.* proposal must not survive the read filter"
+    _cache.update(ts=0.0, payload=None)
 
     # reader: stale payload -> []; fresh -> validated entries only
     _cache.update(ts=now, payload={
