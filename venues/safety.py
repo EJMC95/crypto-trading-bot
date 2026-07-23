@@ -181,9 +181,49 @@ def open_notional(pos, meta, open_now, order_usd):
     return held + max(0, int(open_now) - n) * float(order_usd)
 
 
+def capital_adjusted_day_start(day_start, cap_delta):
+    """Net-of-capital daily-loss baseline — the ONE rule both live bots share.
+
+    A deposit/withdrawal the EquityGuard just healed lands in the RAW equity
+    read, and the daily-loss rail compares that raw equity to `day_start`. So
+    unless day_start moves by the SAME amount, a same-day DEPOSIT masks a real
+    drawdown (raw equity rises, day_start doesn't -> the rail can't fire) and a
+    WITHDRAWAL fabricates a phantom flatten+halt (raw equity falls, day_start
+    doesn't -> the rail flattens on the operator's own cash-out). The leash is
+    NET of deposits/withdrawals (operator, 2026-07-23) — measured latent on
+    BOTH real-money bots' $2/day leash vs a deposit-driven ~$67 book.
+
+    Returns (day_start, shifted). Shift by `cap_delta` ONLY when a baseline
+    already exists AND a move actually folded, so the move cancels in the rail's
+    (day_start - equity). When day_start is None the caller adopts the
+    capital-INCLUSIVE `equity` as the baseline and must NOT shift it again (that
+    would double-count the move). Pure — this is the extracted single source of
+    the shift arithmetic the Ticket Taker (two fold sites) and Funding Farmer
+    each used to carry inline; the Farmer's `while True` main() has no test
+    harness, so extracting it here is what gives that rail a real test.
+    Unit-tested in _selftest() below and exercised end-to-end through
+    production code by the taker's --selftest-live 4b/4c."""
+    if day_start is not None and cap_delta:
+        return round(float(day_start) + float(cap_delta), 2), True
+    return day_start, False
+
+
 def _selftest():
     """The 15-Jul breach scenario + the cases the two copies tested between
     them (neither tested all of them alone — see open_notional's docstring)."""
+    # capital_adjusted_day_start — the net-of-capital rail baseline (23-Jul).
+    # deposit: a +100 move shifts the baseline UP so the rail still sees the loss
+    assert capital_adjusted_day_start(1000.0, 100.0) == (1100.0, True)
+    # withdrawal: a -30 move shifts the baseline DOWN so a cash-out is not a loss
+    assert capital_adjusted_day_start(1000.0, -30.0) == (970.0, True)
+    # no move -> untouched, not flagged as shifted
+    assert capital_adjusted_day_start(1000.0, 0.0) == (1000.0, False)
+    assert capital_adjusted_day_start(1000.0, None) == (1000.0, False)
+    # no baseline yet -> caller adopts capital-inclusive equity; NEVER shift here
+    assert capital_adjusted_day_start(None, 100.0) == (None, False)
+    assert capital_adjusted_day_start(None, 0.0) == (None, False)
+    # rounds to 2dp like the ledger (66.87 + 32.22 = 99.09, the book's own numbers)
+    assert capital_adjusted_day_start(66.87, 32.22) == (99.09, True)
     pos = {c: {"size": 1.0, "entry": 30.0} for c in "ABCDE"}
     meta = {c: {"clip": 30.0, "entry": 30.0} for c in "ABCDE"}
     # cap $150, five $30 positions, growth-rail down-scale to clip 22.50: the
@@ -209,7 +249,8 @@ def _selftest():
     assert r.notional_ok(120.0, 30.01) is False    # one cent over
     r.max_notional = None
     assert r.notional_ok(1e9, 1e9) is True
-    print("venues.safety self-tests passed (open_notional + notional_ok).")
+    print("venues.safety self-tests passed (open_notional + notional_ok + "
+          "capital_adjusted_day_start).")
 
 
 if __name__ == "__main__":

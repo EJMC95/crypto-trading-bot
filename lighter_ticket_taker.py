@@ -79,7 +79,7 @@ def _fleet(sym):
 # reads static imports, and a money rule that only materialises on the live
 # path is a money rule the image audit cannot see. venues/safety.py is
 # dependency-free — no SDK, no network — so this costs the shadow arm nothing.
-from venues.safety import open_notional
+from venues.safety import capital_adjusted_day_start, open_notional
 
 # [2026-07-17 LIVE PATH] The taker was PAPER-ONLY BY CONSTRUCTION: PaperBroker
 # modelling its own fills at a flat 4bps, a hardcoded -lshadow row, and no
@@ -236,6 +236,31 @@ QUALITY_VETO_TTL_S = float(os.environ.get("TT_VETO_TTL_S", "3600"))
 # loss predictor on this tape. The knob exists for the day the evidence
 # supports it (re-test at ~n>=60 per the script header); until then 0.
 DIV_VOL_M = float(os.environ.get("TT_DIV_VOL_M", "0"))
+# [2026-07-23 SPREAD GATE — the proactive execution-cost guard, SHIPPED DISABLED]
+# The 23-Jul taker root-cause landed here: the divergence SIGNAL is intact (the
+# brain grades it forward-positive at n>11k) but realised P&L is eaten by
+# EXECUTION on wide-QUOTE books. Measured (n=99 divergence closes + 179 taker
+# fills carrying a recorded spread_bps): the quoted spread AT DECISION predicts
+# realised slippage (pearson r=+0.44, and it HOLDS ex-BOT at r=+0.42: BOT quote
+# 74bps -> 747 slip, STRC 98 -> 46, SOXL 24 -> 78), and a per-entry gate at
+# spread <= ~20bps is the ONLY gate (spread OR volume) that improves BOTH halves
+# ex-BOT while excluding ONLY losers (ex-BOT +$14.15 vs +$8.96 baseline, t=+1.30).
+# It catches a wide-quote FRESH listing on its FIRST fill — the exact class the
+# reactive coin-quality veto (needs >=5 orders/14d) is structurally blind to.
+# The VOLUME floor (DIV_VOL_M) was RE-REJECTED at this n: its apparent win was a
+# BOT mark-pathology artifact and it fails both-halves ex-BOT. Evidence table:
+# scripts/study_taker_spread_gate.py.
+#
+# SHIPPED DISABLED (0 = off). Three reasons it is dormant, not on: the edge it
+# protects is not yet significant (t=1.30 < 2), enabling changes REAL-MONEY
+# entries (operator-only), and the LIVE arm records no spread yet. Staged
+# rollout on ONE knob: 0 = fully dormant (no book fetch); a HIGH value (e.g.
+# 9999) = RECORD-ONLY (fetch + log the spread on live fills to validate the gate
+# on the live arm's own tape, blocking nothing); a moderate value (e.g. 20) =
+# ACTIVE gate. Fail-OPEN — a missing/empty book NEVER blocks (same contract as
+# the coin-quality veto; the delisted-book case is owned by other guards).
+# RESTRICT-ONLY: an over-wide spread can only SKIP an entry, never force one.
+SPREAD_GATE_BPS = float(os.environ.get("TT_SPREAD_GATE_BPS", "0"))
 # [2026-07-14b] Stress veto: when the venue-wide |premium| median is at or
 # above this (bps), the whole venue is dislocated — take NO new entries this
 # cycle (exits keep running). Normal tape prints ~6bps median.
@@ -353,6 +378,32 @@ def vol_clip(day_range_pct):
         return CLIP_USD
     adverse = max(day_range_pct / 2.0, 0.5) / 100.0
     return round(min(CLIP_MAX, max(CLIP_MIN, RISK_USD / adverse)), 2)
+
+
+def book_spread_bps(book):
+    """Top-of-book bid/ask spread in bps, or None if the book is missing/empty.
+    Mirrors the ShadowBroker's fill-time computation (venues/shadow.py) EXACTLY,
+    so the gate reads the same number the ledger records. None is the fail-open
+    signal — the caller must treat 'unknown spread' as 'do not block'."""
+    try:
+        bids, asks = book.get("bids"), book.get("asks")
+        if not bids or not asks:
+            return None
+        bid, ask = bids[0][0], asks[0][0]
+        mid = (bid + ask) / 2.0
+        return (ask - bid) / mid * 1e4 if mid else None
+    except (AttributeError, TypeError, IndexError, ZeroDivisionError):
+        return None
+
+
+def spread_gate_blocks(spread_bps, threshold_bps):
+    """True iff the gate is ENABLED (threshold > 0), the spread is KNOWN, AND it
+    exceeds the threshold. Fail-open on BOTH a disabled gate (threshold <= 0 —
+    the shipped default) and an unknown spread (None). Restrict-only: this can
+    only ever cause a SKIP, never force an entry."""
+    if threshold_bps <= 0 or spread_bps is None:
+        return False
+    return spread_bps > threshold_bps
 
 
 ALL_LENSES = frozenset({"breakout", "dip", "momentum", "divergence"})
@@ -802,16 +853,29 @@ def main(_ctx=None):
         """[2026-07-21 D1] Fold guard-detected deposits/withdrawals into the
         persisted capital ledger (fail-safe: no guard / no moves -> no-op).
         Run-once process: the same run that heals a deposit folds it, and the
-        loop-bottom save_state persists it."""
+        loop-bottom save_state persists it.
+
+        [2026-07-23] Returns the NET $ folded this call (0.0 if none). The caller
+        shifts the daily-loss rail's day_start by the same amount so a capital
+        move lands in BOTH the equity read and the rail baseline. Otherwise a
+        deposit MASKS a real drawdown (raw equity rises, day_start doesn't -> the
+        rail can't fire) and a withdrawal FABRICATES a halt (raw equity falls,
+        day_start doesn't -> the rail flattens on the operator's own cash-out).
+        The leash is NET of deposits/withdrawals (operator, 2026-07-23). This
+        ledger stays DISPLAY-only — no rail reads it; the caller reads the
+        return value."""
         if not live:
-            return
+            return 0.0
+        _net = 0.0
         for _mv in getattr(venue, "pop_capital_moves", lambda: [])():
             capital_adjust["total"] = round(capital_adjust["total"] + _mv["delta"], 2)
             capital_adjust["events"] = (capital_adjust.get("events") or [])[-19:] + [_mv]
+            _net += _mv["delta"]
             print(f"[ticket-taker] capital ledger: ${_mv['delta']:+.2f} "
                   f"({_mv['how']}) -> lifetime ${capital_adjust['total']:+.2f} "
                   f"(+${CAPITAL_ADJUST_USD:.2f} env backfill) — P&L baseline "
                   f"absorbed it.", flush=True)
+        return round(_net, 2)
 
     def account_value():
         """Equity. dry_run: the local broker. live: the VENUE, vetted by the
@@ -1080,16 +1144,31 @@ def main(_ctx=None):
     except Exception as e:  # noqa: BLE001 — guard rejected, or venue down
         print(f"[ticket-taker] {iso(t_now)} account value unavailable: {e!r}")
         equity = None
-    _fold_capital_moves()   # D1: a deposit accepted on that read is capital
+    _cap_delta = _fold_capital_moves()   # D1: a deposit accepted on that read is capital
 
     if live:
         if day_start_equity is None and equity is not None:
             # [2026-07-11 LATE BASELINE] if the boot/day-roll capture failed
             # (venue down, or the guard vetoed a dislocated print) the rail
             # used to stay OFF all day. Adopt the first credible read instead.
+            # This read is already capital-inclusive (the just-folded move is
+            # inside `equity`), so it is NOT also shifted below.
             day_start_equity = equity
             print(f"[ticket-taker] {iso(t_now)} day-start equity for {cur_day}: "
                   f"{equity:.2f}")
+        else:
+            # [2026-07-23] keep day_start on the SAME raw footing as `equity` so a
+            # capital move folded mid-day cancels in the rail's (day_start - equity)
+            # — the leash measures TRADING P&L only (net of deposits/withdrawals).
+            # capital_adjusted_day_start is the shared rule (venues/safety.py); it
+            # shifts only when a baseline exists AND a move folded. Persisted with
+            # day_start below, so the next run-once cycle restores the shifted one.
+            day_start_equity, _shifted = capital_adjusted_day_start(
+                day_start_equity, _cap_delta)
+            if _shifted:
+                print(f"[ticket-taker] {iso(t_now)} day-start equity shifted "
+                      f"${_cap_delta:+.2f} for a capital move -> {day_start_equity:.2f} "
+                      f"(daily-loss rail stays net of deposits/withdrawals)")
         _fleet_loss = rails.daily_loss_hit(day_start_equity, equity)
         if (not halted_today and equity is not None and day_start_equity
                 and (equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT)
@@ -1529,6 +1608,23 @@ def main(_ctx=None):
             mark = marks.get(sym)
             if not mark:
                 continue
+            # [2026-07-23] SPREAD GATE — proactive execution-cost veto, default
+            # OFF. The book is fetched ONLY when the gate is enabled and ONLY for
+            # a candidate that has already cleared every cheap filter above, so
+            # the shipped default (0) adds ZERO network calls and an enabled gate
+            # fetches at most ~MAX_OPEN books per cycle. spread_bps stays defined
+            # (None) for the publish below whether or not the gate ran. Fail-OPEN:
+            # a book fetch blip must never halt entries. See SPREAD_GATE_BPS.
+            spread_bps = None
+            if SPREAD_GATE_BPS > 0:
+                try:
+                    spread_bps = book_spread_bps(venue.orderbook(sym))
+                except Exception:  # noqa: BLE001 — read blip is not a stop
+                    spread_bps = None
+                if spread_gate_blocks(spread_bps, SPREAD_GATE_BPS):
+                    print(f"[ticket-taker] {iso(t_now)} {sym} SPREAD_GATE_SKIP "
+                          f"(quoted {spread_bps:.1f}bps > {SPREAD_GATE_BPS:.0f})")
+                    continue
             is_long = t.get("side", "long") != "short"
             if is_long and long_budget_full:
                 continue          # L2 veto: fleet long budget is full
@@ -1595,6 +1691,14 @@ def main(_ctx=None):
                         slippage_bps=_slip_bps_of(mark, _fill_px,
                                                   is_buy=is_long,
                                                   measured=_meas),
+                        # [2026-07-23] the LIVE arm records no spread today (the
+                        # order goes via market_open, not a book walk). When the
+                        # spread gate is enabled (incl. record-only mode) it has
+                        # already fetched the decision-time book, so log it here
+                        # too — closing the live-spread telemetry gap the gate
+                        # needs to be validated on the live arm's own tape. None
+                        # (gate off) is identical to prior behaviour.
+                        spread_bps=spread_bps,
                         raw={"lens": lens, "leg": "open", "clip": clip,
                              "evidence": ev,
                              "measured": _meas, "fill_src": _why})
@@ -1662,7 +1766,17 @@ def main(_ctx=None):
         # that only folded at loop-top exited with those moves un-persisted,
         # so the next run's fresh guard had lost them and the P&L baseline
         # silently absorbed the operator's deposit as "trading profit".
-        _fold_capital_moves()
+        _cap_delta2 = _fold_capital_moves()
+        # [2026-07-23] a move detected on those LATER reads lands after the rail
+        # already ran this cycle — shift day_start now and persist it (below) so
+        # the next cycle restores a baseline still on raw footing with equity.
+        # Without this the move reaches the DISPLAY ledger but never the rail
+        # baseline, permanently skewing the leash by that one move.
+        day_start_equity, _shifted2 = capital_adjusted_day_start(
+            day_start_equity, _cap_delta2)
+        if _shifted2:
+            print(f"[ticket-taker] {iso(t_now)} day-start equity shifted "
+                  f"${_cap_delta2:+.2f} (late capital move) -> {day_start_equity:.2f}")
         if live_baseline is None and equity is not None:
             live_baseline = equity
         # [2026-07-21 D1] capital-adjusted: deposits are the operator's money
@@ -1937,11 +2051,34 @@ def selftest():
     assert not _sl_active(iso(_ct - timedelta(hours=1)), _ct)
     assert not _sl_active(None, _ct) and not _sl_active("junk", _ct)
 
+    # ---- SPREAD GATE — proactive execution-cost veto, default OFF -----------
+    # A guard that never fires is not a guard; a DORMANT guard that fires by
+    # default is worse. Both directions pinned + mutation-noted.
+    _tight = {"bids": [(100.0, 5)], "asks": [(100.2, 5)]}   # ~20 bps
+    _wide = {"bids": [(100.0, 5)], "asks": [(101.0, 5)]}    # ~99.5 bps
+    assert abs(book_spread_bps(_tight) - 19.98) < 0.1, book_spread_bps(_tight)
+    assert abs(book_spread_bps(_wide) - 99.50) < 0.5, book_spread_bps(_wide)
+    # missing / empty / junk book -> None (the fail-open signal, never a 0 spread
+    # that would read as "tight" and wave a dark book through)
+    assert book_spread_bps({"bids": [], "asks": []}) is None
+    assert book_spread_bps({}) is None and book_spread_bps(None) is None
+    # the SHIPPED DEFAULT (threshold 0 = disabled) blocks NOTHING, even a
+    # pathological quote — deleting the `threshold <= 0` short-circuit trips this.
+    assert not spread_gate_blocks(9999.0, 0.0)
+    assert not spread_gate_blocks(book_spread_bps(_wide), 0.0)
+    # an ENABLED gate: unknown spread fails OPEN, a within-bar quote passes, an
+    # over-bar quote BLOCKS — deleting the `is None` short-circuit trips the
+    # fail-open assert.
+    assert not spread_gate_blocks(None, 20.0)
+    assert not spread_gate_blocks(19.98, 20.0)
+    assert spread_gate_blocks(99.5, 20.0)
+    assert spread_gate_blocks(book_spread_bps(_wide), 20.0)
+
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
           "long/short exits, signed funding on the TRUE 8h basis, "
           "constant-risk sizing, delist give-up, LIVE lens allow-list "
           "fail-CLOSED vs a dark brain, symbol round-trip for all six "
-          "1000-markets).")
+          "1000-markets, spread gate default-OFF + fail-open).")
 
 
 # ---------------------------------------------------------------------------
@@ -1969,8 +2106,12 @@ class _StubVenue:
     is missing a method does not fail — it silently tests something else."""
 
     def __init__(self, equity=1000.0, pos=None, fills=None, fill_reason=None,
-                 echo_ids=True):
+                 echo_ids=True, cap_moves=None):
         self._equity = equity
+        # [2026-07-23] guard-recorded capital moves this venue will report ONCE
+        # via pop_capital_moves (the EquityGuard's real contract), so the
+        # daily-loss rail's net-of-capital shift is exercised end-to-end.
+        self._cap_moves = list(cap_moves or [])
         self._pos = dict(pos or {})
         self._fills = dict(fills or {})     # sym -> REAL fill px the tape returns
         self._fill_reason = fill_reason     # reason reported when there is no fill
@@ -1990,6 +2131,12 @@ class _StubVenue:
     def account_value(self):
         self.value_reads += 1
         return self._equity
+
+    def pop_capital_moves(self):
+        """Mirror EquityGuard.pop_capital_moves: return queued moves once, then
+        empty. Item shape is the guard's {ts, delta, how}."""
+        out, self._cap_moves = self._cap_moves, []
+        return out
 
     def positions(self):
         return {s: dict(v) for s, v in self._pos.items() if v.get("size")}
@@ -2246,6 +2393,67 @@ def _selftest_live():
         main(_ctx={"venue": v2, "rails": r2, "broker": None})
         assert v2.opens == [], "a restored halt must still block entries"
         store.load_daily_halt = lambda bot, day: None
+
+        # ================================================================
+        # 4b) DEPOSIT must NOT MASK a real drawdown. The daily-loss rail is
+        #     NET of capital (operator 2026-07-23): a +$100 deposit that lands
+        #     the SAME day exactly offsets a -$100 (-10%) trading loss, so RAW
+        #     equity is flat at 1000 vs a day_start of 1000. Pre-fix the rail
+        #     saw 1000 vs 1000 and never fired — the operator's own money hid a
+        #     10% loss. The fix shifts day_start +100 -> 1100, so 1000 <= 1045
+        #     trips and the book is flattened.
+        # ================================================================
+        captured["state"].clear()
+        captured["halts"].clear()
+        _stub_market(marks={"DEP": 100.0}, funding={}, ranges={"DEP": 6.0})
+        _scout({})
+        v = _StubVenue(equity=1000.0, pos={"YYY": {"size": 1.0, "entry": 90.0}},
+                       fills={"YYY": 90.0},
+                       cap_moves=[{"ts": 0.0, "delta": 100.0, "how": "cash-escape"}])
+        r = _StubRails(max_notional=150.0)
+        captured["state"][LIVE_STATE_KEY] = {
+            "initial_equity": 900.0, "capital_adjust": {"total": 0.0, "events": []},
+            "meta": {"YYY": {"clip": 90.0, "lens": "divergence",
+                             "opened": iso(now()), "funding_paid": 0.0}},
+            "stats": {"closed": 0, "wins": 0, "losses": 0},
+            "day_start": {"day": now().date().isoformat(), "equity": 1000.0}}
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert v.closes == ["YYY"], \
+            f"a deposit masked a real drawdown — rail failed to flatten: {v.closes}"
+        assert captured["halts"] and captured["halts"][0][0] == BOT_ROW, \
+            "a masked drawdown must still halt for the day"
+        # day_start was shifted onto raw footing and persisted for the next cycle
+        assert captured["state"][LIVE_STATE_KEY]["day_start"]["equity"] == 1100.0, \
+            captured["state"][LIVE_STATE_KEY]["day_start"]
+
+        # ================================================================
+        # 4c) WITHDRAWAL must NOT FABRICATE a halt. A -$30 withdrawal drops RAW
+        #     equity 1000 -> 970 with zero trading loss; the absolute fleet rail
+        #     ($30) saw 1000-970 >= 30 and flattened the book pre-fix. The fix
+        #     shifts day_start -30 -> 970, so 970-970 = 0 and nothing fires.
+        # ================================================================
+        captured["state"].clear()
+        captured["halts"].clear()
+        _stub_market(marks={"WWW": 100.0}, funding={}, ranges={"WWW": 6.0})
+        _scout({})
+        v = _StubVenue(equity=970.0, pos={"WWW": {"size": 1.0, "entry": 100.0}},
+                       fills={"WWW": 100.0},
+                       cap_moves=[{"ts": 0.0, "delta": -30.0, "how": "cash-escape"}])
+        r = _StubRails(max_notional=150.0, max_daily_loss=30.0)
+        captured["state"][LIVE_STATE_KEY] = {
+            "initial_equity": 1000.0, "capital_adjust": {"total": 0.0, "events": []},
+            "meta": {"WWW": {"clip": 100.0, "lens": "divergence",
+                             "opened": iso(now()), "funding_paid": 0.0}},
+            "stats": {"closed": 0, "wins": 0, "losses": 0},
+            "day_start": {"day": now().date().isoformat(), "equity": 1000.0}}
+        main(_ctx={"venue": v, "rails": r, "broker": None})
+        assert v.closes == [], \
+            f"a withdrawal fabricated a phantom flatten: {v.closes}"
+        assert not captured["halts"], \
+            "a withdrawal is the operator's cash-out, not a trading loss — no halt"
+        assert not r.confirmed, "no breach should even be read on a withdrawal"
+        assert captured["state"][LIVE_STATE_KEY]["day_start"]["equity"] == 970.0, \
+            captured["state"][LIVE_STATE_KEY]["day_start"]
 
         # ================================================================
         # 5) A FAILED CLOSE never books a phantom exit

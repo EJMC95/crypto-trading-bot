@@ -164,6 +164,25 @@ jobs:
             if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|venues/|cleanup_legacy_bots\.py$)'; then
               svcs="${svcs:+$svcs,}market-context"
             fi
+            # [2026-07-24] OPT-IN LIVE-TAKER auto-deploy. The two REAL-MONEY
+            # services (tide-rider-lighter-live = 🎫 Ticket Taker, trail-blazer-live
+            # = 💸 Funding Farmer — service names lie) are DELIBERATELY off the
+            # blanket auto-path: an unmarked WIP/held push must never auto-restart
+            # a real-money book. That barrier is exactly what stopped the (cp) rail
+            # fix from surprise-deploying before the operator said "go ahead".
+            # This adds auto-deploy CONVENIENCE without removing the barrier: a push
+            # that changes the taker's own code AND carries the explicit marker
+            # [deploy-live-taker] in ANY commit message in the range ALSO deploys
+            # the live taker. No marker -> only the SHADOW (freqtrade-bots) ships,
+            # exactly as before. Restrict-by-construction: no marker, no real-money
+            # deploy. Verify the running container's build stamp after (a green run
+            # never implied the container took it — [[railway-cli-frozen-services]]).
+            if echo "$changed" | grep -qE '^(lighter_ticket_taker\.py$|venues/)' \
+               && printf '%s' "$(git log --format='%B' ${range/ /..} 2>/dev/null)" \
+                  | grep -qF '[deploy-live-taker]'; then
+              svcs="${svcs:+$svcs,}tide-rider-lighter-live"
+              echo "-> [deploy-live-taker] marker present: including tide-rider-lighter-live (REAL MONEY)"
+            fi
           fi
           echo "services=$svcs" >> "$GITHUB_OUTPUT"
           echo "-> will deploy: ${svcs:-<none>}"
