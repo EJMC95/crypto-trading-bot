@@ -146,3 +146,30 @@ applies. **Recommendation: one more rigorous validation pass (multiple windows /
 true out-of-sample on the deep+per-book spec) before overriding the standing verdict
 by standing up a book** — or stand up the $0 shadow book explicitly AS that
 out-of-sample test, knowing it revisits a do-not-build. Operator's call.
+
+## ROBUSTNESS BATTERY (Part 1 continued, operator: "validate more windows first") — VERDICT: DO NOT BUILD (confirms the standing verdict)
+
+Four independent robustness tests on the deep+per-book candidate (72/5/24):
+
+| test | result | read |
+|---|---|---|
+| **Jackknife** (drop each book) | worst +3.0% (drop MSTR) .. best +24.0% (drop WTI); positive dropping ANY book | ✓ clean — NOT concentrated in one book |
+| **Cell-plateau** (12 cells) | 5/12 pass; coherent on the 72h-lookback row but many cells h2-negative | ~ moderate — config-sensitive |
+| **Liquidity-cutoff** | **≤3bps → +0.6%**, ≤5bps +10.1%, ≤8bps +12.3% | ✗ FRAGILE — edge nearly vanishes in the deepest books; lives in the 3-5bps tail (possible microstructure artifact + my 5bps cutoff did the work) |
+| **Non-overlapping thirds** | **+8.1% → +5.1% → +0.2%** | ✗ DECAYING — the recent ~50 days is ~zero |
+
+**VERDICT: do NOT build the shadow book.** The multi-window / OOS view CONFIRMS the
+standing verdict rather than overturning it. Two independent failures: the edge is
+(1) DECAYING (the most recent third ≈ 0, matching the verdict's monotone-decay and
+the front-loaded h2), and (2) CUTOFF-FRAGILE (≈0 in the tightest books; the +10.1%
+depends on the arbitrary ≤5bps line). The D6 "pass" (worst quarter −0.4%) was a
+technicality — the trend is clearly to zero. Jackknife-cleanness is the one genuine
+positive, but it doesn't rescue a fading, cutoff-dependent edge.
+
+**What holds up regardless (the real contributions):** (a) the per-book cost model
+(`_slip_of` / `--per-book-slip` / `--max-spread-bps`) is reusable tooling that fixes
+a friction-accounting error in the fleet's factor backtests; (b) a fresh, documented
+"do not build" corroborating the 22-Jul verdict with per-book + multi-window
+evidence. **Revisit condition (unchanged from the standing verdict): more non-crypto
+tape (~Oct 2026)** — the books are only ~150d old, too young for a durable read, and
+the decay may be a young-tape artifact as easily as a dying edge. Not never; not now.

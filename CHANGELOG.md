@@ -1,3 +1,11 @@
+## 2026-07-23 (da) — ROBUSTNESS BATTERY: the multi-window view CONFIRMS "do not build" — the non-crypto edge is decaying + cutoff-fragile (operator: "validate more windows first")
+
+- **VERDICT: do NOT stand up the Tamerlane shadow book.** The operator chose to validate across more windows before overriding the standing verdict; the battery confirms it.
+- Four tests on the deep+per-book candidate (72/5/24): **Jackknife ✓** (worst +3.0% dropping MSTR .. +24.0% dropping WTI — not concentrated in one book); **cell-plateau ~** (5/12 pass, coherent 72h row but many h2-negative cells); **liquidity-cutoff ✗** (≤3bps +0.6% / ≤5bps +10.1% / ≤8bps +12.3% — the edge nearly VANISHES in the tightest books, so the +10.1% depends on the arbitrary ≤5bps line — a microstructure/researcher-DoF red flag); **non-overlapping thirds ✗** (+8.1% → +5.1% → **+0.2%** — the recent ~50d is ~zero, DECAYING, matching the standing verdict's monotone-decay).
+- **The D6 "pass" (cz) was a technicality** — worst quarter −0.4% cleared the −5% bar, but the trend is clearly to zero. Two independent failures (decay + cutoff-fragility) confirm the 22-Jul "do not build" with fresh per-book + multi-window evidence.
+- **What holds up regardless:** the per-book cost model (`_slip_of` / `--per-book-slip` / `--max-spread-bps`) is a real, reusable tooling fix for a friction-accounting error in the fleet's factor backtests. **Revisit condition: more non-crypto tape (~Oct 2026)** — the books are ~150d old, too young for a durable read; the decay may be a young-tape artifact. Not never, not now.
+- Discipline note: the validation did its job — it stopped a book being built on a fading, cutoff-dependent edge against a pre-registered verdict. Research/doc only; no real money, no book stood up. Lands on the draft PR.
+
 ## 2026-07-23 (cz) — VALIDATION: the deep+per-book candidate PASSES D6 durability — but a STANDING "do not build Tamerlane" verdict exists; the build is now an informed operator call (operator: "1 and 2")
 
 - **D6 durability on the deep + per-book standalone (72/5/24): PASS.** Quarters +3.7 / +9.8 / +1.6 / −0.4 — worst −0.4% (vs the −5% bar), not monotone. Better than the standing verdict's full-universe-flat D6 fail.
