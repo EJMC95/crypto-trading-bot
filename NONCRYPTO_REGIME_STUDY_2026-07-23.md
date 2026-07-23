@@ -117,3 +117,32 @@ per-book cost on the deep universe (the −7.4% quarter was a flat-slip/full-uni
 figure), and — for a fully fair head-to-head — re-run the merged crypto-vs-non-crypto
 with per-book slip on BOTH arms (the +13.6% crypto number here is still flat-5bps).
 Both are pure research. Standing up the book is an operator decision — surfaced, not taken.
+
+## VALIDATION (Part 1, 2026-07-23) — passes durability on the principled spec, but a STANDING "do not build" verdict exists
+
+**D6 durability on the deep + per-book standalone (cell 72/5/24): PASS.**
+Quarters **+3.7 / +9.8 / +1.6 / −0.4** — worst −0.4% (ok vs the −5% bar), NOT
+monotone. Materially better than the standing verdict's full-universe-flat D6 fail.
+
+**D5 friction: MARGINAL.** per-book real (2.3bps) +10.1%; a principled 3× stress
+(6.9bps) +6.5% but h2 thins to +0.7; the literal 15bps doctrine bar FAILS (h2 −2.9).
+15bps is ~6.5× this universe's real cost — arguably too harsh — but the thin stressed
+h2 is a genuine fragility signal.
+
+**THE STANDING VERDICT (`backtest_xsect_funding_merged.py`, 22-Jul):** *"🏹 Tamerlane
+is DEAD — do not build it."* It failed D5/D6/D7 — but on the **full** non-crypto
+universe at **flat** 5bps, MERGED into crypto (D7: merging degrades the crypto book
+11/12 → 5/12 cells). My candidate differs in three **principled** ways it did NOT
+evaluate: (1) DEEP universe (drop the >5bps untradeable tail), (2) PER-BOOK honest
+cost, (3) STANDALONE (a separate book, so D7's "degrades crypto" is moot). On that
+spec, D6 passes and it's +10.1% both-halves-positive.
+
+**HONEST TENSION — this is a genuine judgement call, not a clean pass.** For:
+principled spec, D6 pass, market-neutral, $0-risk shadow is exactly the tool to
+resolve overfit-vs-real out of sample. Against: a documented pre-registered "do not
+build", D5 marginal (thin stressed h2), multiple-comparisons risk (several specs
+tried), one window, and the verdict's overfit-fingerprint warning (weak h2) partly
+applies. **Recommendation: one more rigorous validation pass (multiple windows /
+true out-of-sample on the deep+per-book spec) before overriding the standing verdict
+by standing up a book** — or stand up the $0 shadow book explicitly AS that
+out-of-sample test, knowing it revisits a do-not-build. Operator's call.
