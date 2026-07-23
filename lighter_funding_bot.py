@@ -48,7 +48,7 @@ import bot_pnl_store as store
 import funding_basis
 from venues import marks, venue_context
 from venues.fills import measured_from_reason, read_fill, slip_bps_of
-from venues.safety import open_notional
+from venues.safety import capital_adjusted_day_start, open_notional
 
 BOT = "perps-funding-lighter"
 # [2026-07-17 BASIS FIX — behaviour-NEUTRAL, see funding_basis.py]
@@ -1105,16 +1105,20 @@ def main():
         if day_start_equity is None and equity is not None:
             day_start_equity = equity
             log.warning("day-start equity adopted late: %.2f", equity)
-        elif _cap_delta and day_start_equity is not None:
+        else:
             # [2026-07-23] keep day_start on the SAME raw footing as `equity` so a
-            # capital move folded mid-day cancels in the rail's
-            # (day_start - equity) — the leash measures TRADING P&L only (operator,
-            # net of deposits/withdrawals). The in-memory value carries across the
-            # `while True` loop and is persisted for restart-durability.
-            day_start_equity = round(day_start_equity + _cap_delta, 2)
-            log.warning("day-start equity shifted $%+.2f for a capital move -> "
-                        "%.2f (daily-loss rail stays net of deposits/withdrawals)",
-                        _cap_delta, day_start_equity)
+            # capital move folded mid-day cancels in the rail's (day_start - equity)
+            # — the leash measures TRADING P&L only (net of deposits/withdrawals).
+            # capital_adjusted_day_start is the shared rule (venues/safety.py); it
+            # shifts only when a baseline exists AND a move folded. The in-memory
+            # value carries across the `while True` loop and is persisted for
+            # restart-durability.
+            day_start_equity, _shifted = capital_adjusted_day_start(
+                day_start_equity, _cap_delta)
+            if _shifted:
+                log.warning("day-start equity shifted $%+.2f for a capital move -> "
+                            "%.2f (daily-loss rail stays net of deposits/withdrawals)",
+                            _cap_delta, day_start_equity)
 
         _fleet_loss = (not dry_run and ctx.rails.daily_loss_hit(day_start_equity, equity))
         if (not halted_today and equity is not None and day_start_equity

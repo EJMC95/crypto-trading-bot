@@ -79,7 +79,7 @@ def _fleet(sym):
 # reads static imports, and a money rule that only materialises on the live
 # path is a money rule the image audit cannot see. venues/safety.py is
 # dependency-free — no SDK, no network — so this costs the shadow arm nothing.
-from venues.safety import open_notional
+from venues.safety import capital_adjusted_day_start, open_notional
 
 # [2026-07-17 LIVE PATH] The taker was PAPER-ONLY BY CONSTRUCTION: PaperBroker
 # modelling its own fills at a flat 4bps, a hardcoded -lshadow row, and no
@@ -1156,16 +1156,19 @@ def main(_ctx=None):
             day_start_equity = equity
             print(f"[ticket-taker] {iso(t_now)} day-start equity for {cur_day}: "
                   f"{equity:.2f}")
-        elif _cap_delta and day_start_equity is not None:
+        else:
             # [2026-07-23] keep day_start on the SAME raw footing as `equity` so a
-            # capital move folded mid-day cancels in the rail's
-            # (day_start - equity) — the leash measures TRADING P&L only (operator,
-            # net of deposits/withdrawals). Persisted with day_start below, so the
-            # next run-once cycle restores the shifted baseline.
-            day_start_equity = round(day_start_equity + _cap_delta, 2)
-            print(f"[ticket-taker] {iso(t_now)} day-start equity shifted "
-                  f"${_cap_delta:+.2f} for a capital move -> {day_start_equity:.2f} "
-                  f"(daily-loss rail stays net of deposits/withdrawals)")
+            # capital move folded mid-day cancels in the rail's (day_start - equity)
+            # — the leash measures TRADING P&L only (net of deposits/withdrawals).
+            # capital_adjusted_day_start is the shared rule (venues/safety.py); it
+            # shifts only when a baseline exists AND a move folded. Persisted with
+            # day_start below, so the next run-once cycle restores the shifted one.
+            day_start_equity, _shifted = capital_adjusted_day_start(
+                day_start_equity, _cap_delta)
+            if _shifted:
+                print(f"[ticket-taker] {iso(t_now)} day-start equity shifted "
+                      f"${_cap_delta:+.2f} for a capital move -> {day_start_equity:.2f} "
+                      f"(daily-loss rail stays net of deposits/withdrawals)")
         _fleet_loss = rails.daily_loss_hit(day_start_equity, equity)
         if (not halted_today and equity is not None and day_start_equity
                 and (equity <= day_start_equity * (1 - DAILY_LOSS_LIMIT)
@@ -1765,8 +1768,9 @@ def main(_ctx=None):
         # the next cycle restores a baseline still on raw footing with equity.
         # Without this the move reaches the DISPLAY ledger but never the rail
         # baseline, permanently skewing the leash by that one move.
-        if _cap_delta2 and day_start_equity is not None:
-            day_start_equity = round(day_start_equity + _cap_delta2, 2)
+        day_start_equity, _shifted2 = capital_adjusted_day_start(
+            day_start_equity, _cap_delta2)
+        if _shifted2:
             print(f"[ticket-taker] {iso(t_now)} day-start equity shifted "
                   f"${_cap_delta2:+.2f} (late capital move) -> {day_start_equity:.2f}")
         if live_baseline is None and equity is not None:
