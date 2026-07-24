@@ -2040,6 +2040,14 @@ def main(_ctx=None):
                # "the env var is set on the service" (self-describing-labels-lie:
                # a var on the service does not prove the process read it as on).
                "bull": BULL_MODE,
+               # [2026-07-24 (dh)] the RUNNING process's OWN effective RISK CONFIG
+               # — the slot count and the SafetyRails notional cap it is actually
+               # using. Published so an operator env change (TT_MAX_OPEN,
+               # LIGHTER_TICKET_TAKER_MAX_NOTIONAL) is verifiable by output, and
+               # so a config-as-code override that silently beats the env var is
+               # caught (railway-config-as-code-overrides-env).
+               "max_open": MAX_OPEN,
+               "cap_usd": (rails.max_notional if rails is not None else None),
                # D1: total capital excluded from pnl_abs — self-describing
                **({"capital_adjust": round(capital_adjust["total"]
                                            + CAPITAL_ADJUST_USD, 2)}
@@ -2955,6 +2963,11 @@ def _selftest_live():
         # [2026-07-24 (df)] the heartbeat emits the process's OWN bull-mode read
         # (KeyError if the marker is dropped; mismatch if it is hardcoded).
         assert _pub["extra"]["bull"] == BULL_MODE
+        # [2026-07-24 (dh)] the heartbeat emits the process's OWN effective risk
+        # config: the slot count is the module global; cap is None here (rails is
+        # None in this shadow-path test) but the KEY must always be present.
+        assert _pub["extra"]["max_open"] == MAX_OPEN
+        assert "cap_usd" in _pub["extra"] and _pub["extra"]["cap_usd"] is None
         assert abs(b2.fees - 0.1848) < 1e-4, b2.fees
         # THE basis detector: with the 8x bug the funding leg alone was 0.6656
         # and this total would be 0.7672. This assertion is what fails if
