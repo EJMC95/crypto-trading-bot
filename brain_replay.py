@@ -53,6 +53,21 @@ VERDICT (run 2026-07-16, ledger 2026-07-03..07-15, 763 closed era trades,
                           correctly get NO fast-path
   => v3 SHIPPED as default engine; BRAIN_MULT_ENGINE=v2 remains the
   kill switch.
+
+ADDENDUM (2026-07-23): the 16-Jul verdict validated only the REDUCE half —
+`score()` dropped every `m >= 1.0`, so the two-way EXPAND direction (shipped
+21-Jul) had ZERO harness coverage and this VERDICT predated it. Now covered
+BOTH ways, and runnable OFFLINE via `--selftest` (registered in
+tests/test_selftests.py, so the widen direction is under continuous test, not
+just this network-requiring main()):
+  H strong winner:  v3 EXPANDS a clean n=40 / ~90%-wr bucket to 1.5x (EXP_HARD
+                    bars); v2 has no expand path -> the discrimination. score()
+                    books it as gained>0 (amplified wins), never a reduce.
+  I thin winner:    the SAME 90%-wr shape at n=20 < the full-30 expand floor —
+                    v3 REFUSES to widen (no soft-n path). The brake that stops
+                    the widen direction acting before it has the evidence.
+The ledger LEG still needs a fresh online run to re-attest no-regression with
+expand armed; the SYNTHETIC leg (A-I) is green offline.
 """
 import json
 import sys
@@ -108,8 +123,12 @@ def load_trades():
 def era_filter(trades):
     out = []
     for t in trades:
-        era = bot_learn.ERA_START.get(t.get("bot"))
-        if era and str(t.get("open_ts") or "") < era:
+        # [2026-07-23 AUDIT FIX] same bug the production path had: the ledger id
+        # carries a '-lshadow'/'-lighter' suffix so the bare-name lookup missed,
+        # and the string compare mis-ranked a ' UTC' stamp. Use the shared,
+        # suffix-stripping, epoch-comparing helper.
+        era_epoch = bot_learn.era_epoch_for(t.get("bot"))
+        if era_epoch and (bot_learn._epoch(t.get("open_ts")) or 0.0) < era_epoch:
             continue
         out.append(t)
     return out
@@ -171,6 +190,17 @@ def mult_at(timeline, bot, tag, when):
 def score(trades, timeline):
     saved = h1 = h2 = forgone = 0.0
     throttled = 0
+    # [2026-07-23 EXPAND-SIDE ACCOUNTING] the two-way WIDEN direction (shipped
+    # 21-Jul) was INVISIBLE to this harness: the old `if m >= 1.0: continue`
+    # dropped every expansion, so brain_replay validated only the REDUCE half
+    # and its VERDICT predated the expand feature by 5 days. Expand is now
+    # scored in a PARALLEL set of metrics — the reduce accounting below is
+    # byte-identical (m<1 branch), so the ledger no-regression and the A-F/G
+    # assertions are unchanged. Same sign convention both ways: s>0 = the mult
+    # HELPED (reduce dodged a loss / expand amplified a win), s<0 = it HURT
+    # (reduce forfeited a win / expand amplified a loss).
+    expanded = 0
+    gained = eh1 = eh2 = squandered = 0.0
     per_bucket = defaultdict(lambda: {"trades": 0, "saved": 0.0})
     mid = (min(t["_open_epoch"] for t in trades)
            + max(t["_open_epoch"] for t in trades)) / 2.0
@@ -179,23 +209,36 @@ def score(trades, timeline):
         if tag == "(untagged)":
             continue
         m = mult_at(timeline, t.get("bot"), tag, t["_open_epoch"])
-        if m >= 1.0:
+        if m == 1.0:
             continue
         pnl = t.get("profit_abs") or 0.0
         s = (1.0 - m) * (-pnl)
-        throttled += 1
-        saved += s
-        if s < 0:
-            forgone += s
-        if t["_open_epoch"] <= mid:
-            h1 += s
-        else:
-            h2 += s
-        k = f"{t.get('bot')}|{tag}"
-        per_bucket[k]["trades"] += 1
-        per_bucket[k]["saved"] += s
+        first_half = t["_open_epoch"] <= mid
+        if m < 1.0:                          # REDUCE — accounting unchanged
+            throttled += 1
+            saved += s
+            if s < 0:
+                forgone += s
+            if first_half:
+                h1 += s
+            else:
+                h2 += s
+            k = f"{t.get('bot')}|{tag}"
+            per_bucket[k]["trades"] += 1
+            per_bucket[k]["saved"] += s
+        else:                                # EXPAND (m > 1.0) — new accounting
+            expanded += 1
+            gained += s
+            if s < 0:
+                squandered += s
+            if first_half:
+                eh1 += s
+            else:
+                eh2 += s
     return {"throttled": throttled, "saved": saved, "h1": h1, "h2": h2,
-            "forgone": forgone, "buckets": dict(per_bucket)}
+            "forgone": forgone, "buckets": dict(per_bucket),
+            "expanded": expanded, "gained": gained, "eh1": eh1, "eh2": eh2,
+            "squandered": squandered}
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +361,33 @@ def synthetic_scenarios_isolated(t0):
                 "refuses", "syn-burst", "long-burst",
                 lambda e2, e3, f2, f3: (f2 is not None and f3 is None,
                                         f"first v2={f2} v3={f3}"))]
-    return [(G, g_check)]
+    # H. genuine strong winner — the EXPAND direction's POSITIVE case (23-Jul,
+    #    the widen half the 21-Jul two-way ship added and this harness never
+    #    tested). 40 trades over 10d, ~90% wr, winners +2.0 / losers -1.0: n
+    #    clears the full-30 expand floor and post_wr / Wilson-lo / t all pass
+    #    the 1.5x mirror bars (EXP_HARD_*), so v3 EXPANDS. v2 has NO expand
+    #    path, so it does nothing — the discrimination.
+    H = _syn("syn-strong", "long-strong",
+             t0, [(d * 0.25, (2.0 if i % 10 else -1.0))
+                  for i, d in enumerate(range(40))])
+    h_check = [("H strong winner: v3 EXPANDS (>1x), v2 has no expand path",
+                "syn-strong", "long-strong",
+                lambda e2, e3, f2, f3: (e2 is None and e3 is not None
+                                        and e3 > 1.0,
+                                        f"end v2={e2} v3={e3}"))]
+    # I. strong but THIN — the floor GUARD (the brake that stops the widen
+    #    direction acting before it has the sample). SAME 90%-wr shape at n=20
+    #    < the full-30 expand floor. Expand has no soft-n path, so v3 must
+    #    REFUSE to widen; v2 does nothing either. A widen that fired here would
+    #    be exactly the "authority without evidence" failure to avoid.
+    I = _syn("syn-thin", "long-thin",
+             t0, [(d * 0.4, (2.0 if i % 10 else -1.0))
+                  for i, d in enumerate(range(20))])
+    i_check = [("I thin winner: v3 REFUSES to expand (full-30 floor holds)",
+                "syn-thin", "long-thin",
+                lambda e2, e3, f2, f3: (e2 is None and e3 is None,
+                                        f"end v2={e2} v3={e3}"))]
+    return [(G, g_check), (H, h_check), (I, i_check)]
 
 
 def bucket_timeline(timeline, bot, tag):
@@ -330,6 +399,66 @@ def bucket_timeline(timeline, bot, tag):
             first = T
         end = snap.get((bot, tag))
     return first, end
+
+
+def run_synthetic_suite(t0):
+    """Run the synthetic discrimination suite (A-F pooled + G/H/I isolated)
+    against t0. Returns (ok, lines). Fully OFFLINE — no ledger fetch — so
+    `--selftest` and the test harness can exercise BOTH directions (reduce AND
+    the 21-Jul expand) without network; main() reuses it after the fetch."""
+    lines = []
+    rel = lambda f: None if f is None else round((f - t0) / 86400.0, 2)
+    syn_trades, checks = synthetic_scenarios(t0)
+    syn_tl = {}
+    for engine in ("v2", "v3"):
+        syn_tl[engine], _ = simulate(syn_trades, engine, half_life=14.0)
+    syn_ok = True
+    for name, bot, tag, fn in checks:
+        f2, e2 = bucket_timeline(syn_tl["v2"], bot, tag)
+        f3, e3 = bucket_timeline(syn_tl["v3"], bot, tag)
+        ok, note = fn(e2, e3, rel(f2), rel(f3))
+        syn_ok &= bool(ok)
+        lines.append(f"  [{'PASS' if ok else 'FAIL'}] {name}  ({note})")
+    # isolated universes (see synthetic_scenarios_isolated's docstring)
+    for iso_trades, iso_checks in synthetic_scenarios_isolated(t0):
+        iso_tl = {}
+        for engine in ("v2", "v3"):
+            iso_tl[engine], _ = simulate(iso_trades, engine, half_life=14.0)
+        for name, bot, tag, fn in iso_checks:
+            f2, e2 = bucket_timeline(iso_tl["v2"], bot, tag)
+            f3, e3 = bucket_timeline(iso_tl["v3"], bot, tag)
+            ok, note = fn(e2, e3, rel(f2), rel(f3))
+            syn_ok &= bool(ok)
+            lines.append(f"  [{'PASS' if ok else 'FAIL'}] {name}  ({note})")
+    return syn_ok, lines
+
+
+def selftest():
+    """[2026-07-23] OFFLINE validation — no ledger fetch — so the WIDEN
+    direction is under continuous test (registered in tests/test_selftests.py),
+    not only in the network-requiring main(). Exercises reduce (A-F/G) AND
+    expand (H/I), then pins the expand-accounting sign in score(): the H
+    universe's winners, expanded 1.5x, must register as GAINED>0 and NEVER as
+    a reduce 'saved'/'throttled'."""
+    T0 = 1_700_000_000            # fixed epoch: deterministic, no wall clock
+    ok, lines = run_synthetic_suite(T0)
+    print("brain_replay synthetic discrimination suite (offline):")
+    for ln in lines:
+        print(ln)
+    assert ok, "synthetic discrimination suite FAILED (see above)"
+    hu = next((tr for tr, ch in synthetic_scenarios_isolated(T0)
+               if any(c[1] == "syn-strong" for c in ch)), None)
+    assert hu is not None, "H (expand) universe missing"
+    tl, _ = simulate(hu, "v3", half_life=14.0)
+    sc = score(hu, tl)
+    assert sc["expanded"] > 0 and sc["gained"] > 0, \
+        f"expand accounting wrong (expected expanded>0, gained>0): {sc}"
+    assert sc["throttled"] == 0 and sc["saved"] == 0.0, \
+        f"a winning bucket must NEVER throttle: {sc}"
+    print(f"expand accounting OK: expanded={sc['expanded']} "
+          f"gained=${sc['gained']:+.2f} throttled={sc['throttled']}")
+    print("brain_replay --selftest OK")
+    return 0
 
 
 def main():
@@ -368,31 +497,10 @@ def main():
 
     # ---- synthetic discrimination suite ------------------------------------
     t0 = min(t["_close_epoch"] for t in trades)
-    syn_trades, checks = synthetic_scenarios(t0)
-    syn_tl = {}
-    for engine in ("v2", "v3"):
-        syn_tl[engine], _ = simulate(syn_trades, engine, half_life=14.0)
+    syn_ok, syn_lines = run_synthetic_suite(t0)
     print("\nsynthetic discrimination suite:")
-    syn_ok = True
-    for name, bot, tag, fn in checks:
-        f2, e2 = bucket_timeline(syn_tl["v2"], bot, tag)
-        f3, e3 = bucket_timeline(syn_tl["v3"], bot, tag)
-        rel = lambda f: None if f is None else round((f - t0) / 86400.0, 2)
-        ok, note = fn(e2, e3, rel(f2), rel(f3))
-        syn_ok &= bool(ok)
-        print(f"  [{'PASS' if ok else 'FAIL'}] {name}  ({note})")
-    # isolated universes (see synthetic_scenarios_isolated's docstring)
-    for iso_trades, iso_checks in synthetic_scenarios_isolated(t0):
-        iso_tl = {}
-        for engine in ("v2", "v3"):
-            iso_tl[engine], _ = simulate(iso_trades, engine, half_life=14.0)
-        for name, bot, tag, fn in iso_checks:
-            f2, e2 = bucket_timeline(iso_tl["v2"], bot, tag)
-            f3, e3 = bucket_timeline(iso_tl["v3"], bot, tag)
-            rel = lambda f: None if f is None else round((f - t0) / 86400.0, 2)
-            ok, note = fn(e2, e3, rel(f2), rel(f3))
-            syn_ok &= bool(ok)
-            print(f"  [{'PASS' if ok else 'FAIL'}] {name}  ({note})")
+    for ln in syn_lines:
+        print(ln)
 
     verdict = "PASS" if (ok_total and ok_halves and ok_forgone and syn_ok) else "FAIL"
     print(f"\nVERDICT: {verdict}  (ledger total {'ok' if ok_total else 'WORSE'}, "
@@ -403,4 +511,6 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        sys.exit(selftest())
     sys.exit(main())

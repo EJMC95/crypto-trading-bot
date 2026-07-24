@@ -64,6 +64,10 @@ on:
       - 'fleet_bus.py'
       - 'fleet_tuning.py'
       - 'fleet_proposals.py'
+      # 📡 edge radar — COPY'd into Dockerfile.freqtrade + looped in run_all.sh
+      # (`--publish`, 30-min). Added 2026-07-23: it shipped in the image via
+      # (cl)/(cm)/(cn) but was absent from BOTH lists here, so it was
+      # deploy-orphaned — a silent no-op that audit_deploy_coverage.py caught.
       - 'fleet_radar.py'
       - 'experiment_judge.py'
       - 'strategy_incubator.py'

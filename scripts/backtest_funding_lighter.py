@@ -238,13 +238,21 @@ ORDER_USD = 25.0
 #                     friction, not a fill anyone got. It produced the WITHDRAWN
 #                     "+$21.32" (see the banner: that was this harness's own
 #                     `hot` bug, corrected to -$11.57 both halves negative).
-#   REAL    — UNKNOWN. The live book has 49 real orders (07-11→07-17) and
-#             slippage_bps is NULL on every one: px_fill == px_decision exactly,
-#             because the entry leg still records the decision price as the fill
-#             (lighter_funding_bot.py:1127; the close legs were fixed in
-#             445e189, the entry leg was not — a round trip needs both).
+#   REAL    — NOW MEASURED (2026-07-23): the fill-telemetry organ reads the live
+#             Farmer's round-trip slip at ~0.47-0.54 bps/fill on real settled
+#             fills (impl_shortfall.order_slip.live; "live executes TIGHTER than
+#             its own shadow model ~0.87bps"). That is ~10x below this default,
+#             and it FLIPS THE VERDICT: at 0.5bps the live gate 0.05 is +$33.47
+#             / 180d BOTH HALVES POSITIVE (win 59%), not the near-dead +$3.57 the
+#             5bps default prints. See FUNDING_GATE_LIGHTER_2026-07-23.md.
+#             DEFAULT LEFT AT 5.0 deliberately (pessimistic reference; the live
+#             measurement's final n is owned by the fill-telemetry work) — but
+#             run `BT_SLIP_BPS=0.5` for the REAL verdict. Widening the gate up
+#             (>=0.12) loses in both halves at EVERY slip level, so that
+#             conclusion is slip-invariant.
 # Override it and re-run rather than trusting any single row: the sweep is a
-# SENSITIVITY ANALYSIS until a real round trip is measured on the live book.
+# SENSITIVITY ANALYSIS, and the P&L is dominated by THIS constant — use the
+# measured ~0.5bps, not the unfounded 5, for any real read.
 SLIP = float(os.environ.get("BT_SLIP_BPS", "5.0")) / 1e4
 EXIT_RATIO = 0.375       # live EXIT_APR/ENTER_APR = 0.15/0.40 — held across the sweep
 PERSIST_H = 4

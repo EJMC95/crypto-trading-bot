@@ -385,7 +385,9 @@ def get_lever(name, default, now_ts=None):
         # FIRST, so a killed lane short-circuits every other read. `not spec`
         # keeps the old behaviour for unregistered names (they fell through to
         # clamp() -> None -> default anyway). Inert by default: the shipped
-        # ENACT_LANES contains all five lanes.
+        # ENACT_LANES contains all six lanes (paper-scanner, lighter-scout,
+        # lighter-taker, lighter-live, lighter-xp, event-sentinel — the last
+        # added 21-Jul; this comment said "five" until the 23-Jul audit).
         if not spec or spec.get("lane") not in ENACT_LANES:
             return default                   # lane switched off -> operator default
         if name in _quarantined(now_ts):

@@ -340,6 +340,14 @@ LEVER_AUTHORITY_OK = {
         "measured shape corroborates the refusal: all 24 *_take_profit closes "
         "across both funding arms carry exactly $0.00 of gross loss, which is "
         "what censoring at the bar looks like, not evidence of a good bar."),
+    # NOTE (2026-07-23): live/xp.funding.enter_apr's INERT-PINNED finding is
+    # deliberately LEFT OPEN, not declared here — the guard's own --selftest
+    # uses these two as its INERT/stale-detection fixtures (see _selftest), and
+    # burying an informational finding isn't worth rewiring that test. Why the
+    # tight ceiling is CORRECT (widening up is measured to lose on Lighter's own
+    # tape; the strategy is cost-bound, ~97% apr breakeven) is documented in
+    # FUNDING_GATE_LIGHTER_2026-07-23.md — the visible finding + the evidence
+    # doc say more together than a silent declaration would.
     "lever:scout.brk_range_min": (
         "EMISSION-TRUNCATED, so measuring it against the tape would be "
         "measuring this lever against its own current value. The scout only "

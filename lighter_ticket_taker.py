@@ -1435,7 +1435,11 @@ def main(_ctx=None):
     fresh = False
     try:
         age = (t_now - parse_ts(scout.get("updated"))).total_seconds()
-        fresh = age <= float(scout.get("ttl_sec") or 900)
+        # [2026-07-23 AUDIT] bound BELOW too: a future-dated payload (clock skew
+        # / bad publisher) must read STALE, not fresh — matching fleet_bus.is_fresh
+        # and this bot's own coin-veto read (0 <= age <= ttl). Without the lower
+        # bound a future stamp passed as fresh and its stress value was used.
+        fresh = 0 <= age <= float(scout.get("ttl_sec") or 900)
     except (ValueError, TypeError):
         fresh = False
     # [2026-07-14b] Stress veto: a venue-wide |premium| blowout means marks
@@ -1454,7 +1458,7 @@ def main(_ctx=None):
     try:
         fr = store.load_state("fleet-risk") or {}
         fr_age = (t_now - parse_ts(fr.get("updated"))).total_seconds()
-        if fr_age <= float(fr.get("ttl_sec") or 900):
+        if 0 <= fr_age <= float(fr.get("ttl_sec") or 900):  # [2026-07-23] future-stamp-safe
             gov = max(0.25, min(1.0, float(fr.get("clip_scale") or 1.0)))
             # [2026-07-15 AUDIT FIX] L2 long-budget veto now has a consumer in
             # the RUNNING fleet (it was wired only into the retired Kraken
@@ -1509,7 +1513,7 @@ def main(_ctx=None):
     try:
         lf = store.load_state("brain-lens-forward") or {}
         lf_age = (t_now - parse_ts(lf.get("updated"))).total_seconds()
-        if lf_age <= float(lf.get("ttl_sec") or 26000):
+        if 0 <= lf_age <= float(lf.get("ttl_sec") or 26000):  # [2026-07-23] future-stamp-safe
             lens_vetoed = vetoed_lenses(lf.get("lenses"))
     except (ValueError, TypeError):
         lens_vetoed = set()

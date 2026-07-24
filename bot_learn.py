@@ -194,6 +194,27 @@ ERA_START = {
     "freqtrade-dad":       "2026-07-14T00:00",   # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier)
 }
 
+
+def era_epoch_for(bot):
+    """Era-start EPOCH for a ledger bot id, or None (= grade all-time).
+
+    [2026-07-23 AUDIT FIX] Two bugs made era-awareness a fleet-wide NO-OP:
+    (1) the ledger `bot` field carries a venue/shadow suffix — the family bots
+        publish as `strat.bot + "-lshadow"` (lighter_family_bot.py) and live
+        rows are `-lighter` — but ERA_START is keyed on the BARE names, so every
+        `ERA_START.get(bot)` missed and every bot was graded on its WHOLE
+        retained ledger (today's strategy prosecuted for yesterday's crimes —
+        exactly what the era block exists to prevent).
+    (2) callers compared `str(open_ts) >= era_string`; a space-formatted
+        `"2026-07-14 15:.. UTC"` stamp (the listing sniper's format) sorts BELOW
+        a `"2026-07-14T00:00"` era at char 10 (`' '` < `'T'`) and was wrongly
+        excluded. Comparing PARSED epochs fixes both — every stamp normalises
+        through `_epoch` regardless of format.
+    """
+    base = str(bot).rsplit("-lshadow", 1)[0].rsplit("-lighter", 1)[0]
+    era = ERA_START.get(base)
+    return _epoch(era) if era else None
+
 # [2026-07-15 LIVENESS] Generate hypotheses/diagnoses/multipliers ONLY for
 # bots that are still part of the living fleet: not officially retired AND
 # with a ledger close inside LIVENESS_DAYS. Before this, retired bots' rows
@@ -1285,8 +1306,14 @@ def main():
     now_ts = datetime.now(timezone.utc).timestamp()
     cards, all_hyps, era_trades = {}, [], {}
     for bot, trs in sorted(by_bot.items()):
-        era = ERA_START.get(bot)
-        trs_era = [t for t in trs if str(t.get("open_ts") or "") >= era] if era else trs
+        # [2026-07-23 AUDIT FIX] suffix-stripped, epoch-compared (see
+        # era_epoch_for) — the old `ERA_START.get(bot)` + string compare made
+        # era-filtering a fleet-wide no-op.
+        _era_base = str(bot).rsplit("-lshadow", 1)[0].rsplit("-lighter", 1)[0]
+        era = ERA_START.get(_era_base)
+        era_epoch = era_epoch_for(bot)
+        trs_era = ([t for t in trs if (_epoch(t.get("open_ts")) or 0.0) >= era_epoch]
+                   if era_epoch else trs)
         era_trades[bot] = trs_era
         cards[bot], hyps = analyse_bot(bot, trs_era, pulse_hist)
         cards[bot]["n_lifetime"] = len(trs)
