@@ -36,7 +36,6 @@ Usage:
     python lighter_funding_bot.py --once     # single scan then exit (smoke test)
 """
 import argparse
-import hashlib
 import logging
 import math
 import os
@@ -50,14 +49,6 @@ import funding_basis
 from venues import marks, venue_context
 from venues.fills import measured_from_reason, read_fill, slip_bps_of
 from venues.safety import capital_adjusted_day_start, open_notional
-
-# source-byte build marker — logged at boot so a deploy can be MARKER-GREPPED in
-# the RUNNING container (a green deploy has never implied the container took it).
-try:
-    with open(__file__, "rb") as _bf:
-        _BUILD = hashlib.sha256(_bf.read()).hexdigest()[:10]
-except Exception:      # noqa: BLE001
-    _BUILD = "unknown"
 
 BOT = "perps-funding-lighter"
 # [2026-07-17 BASIS FIX — behaviour-NEUTRAL, see funding_basis.py]
@@ -837,8 +828,8 @@ def main():
     venue_tag = None if ctx.mode == "hl_paper" else "lighter"
     shadow_tag = ctx.mode == "lighter_shadow"
     log.info("BOOT lighter_funding_bot build=%s bot=%s VENUE=%s clip=$%.2f max_open=%d "
-             "| explore_k=%d conviction=%s", _BUILD, bot_id, ctx.mode, order_usd,
-             max_open, SCAN_EXPLORE_K, CONVICTION_MODE)
+             "| explore_k=%d conviction=%s", store.build_code_id(), bot_id, ctx.mode,
+             order_usd, max_open, SCAN_EXPLORE_K, CONVICTION_MODE)
 
     # Cumulative realized P&L survives restarts via the ledger.
     realized, n_closed, n_wins = 0.0, 0, 0
@@ -1783,9 +1774,8 @@ def main():
                 equity=pub_equity, pnl_abs=pub_pnl, open_trades=pub_open,
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": ctx.mode, "venue": ctx.mode, "style": "directional-funding",
-                       # build + lever state PUBLISHED (not just logged) so a deploy
-                       # is confirmable from the bot's own output via Postgres.
-                       "build": _BUILD,
+                       # lever state PUBLISHED (bot_pnl_store already stamps
+                       # extra.build) so a deploy is confirmable from Postgres.
                        "levers": {"explore_k": SCAN_EXPLORE_K, "conviction": CONVICTION_MODE},
                        "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                 for c in meta},
