@@ -569,9 +569,10 @@ def up_read(venue, sym, now_ts, ttl_s=3600.0):
     """Cached candle-derived up-regime for `sym`: fetch ~EMA_N+6 DAILY closes off
     the venue and run up_regime(). This is the COVERAGE FIX — it works for ANY
     book, not the oracle's ~8% graded set. Tri-state (True/False/None); any fetch
-    failure -> None -> the long is fail-CLOSED. TTL'd so a cycle fetches each
-    book's candles at most once an hour, and only breakout candidates trigger it
-    (the caller gates on lens)."""
+    failure -> None -> the long is fail-CLOSED. Cached with a TTL, but the bot is
+    RUN-ONCE (a fresh process each cycle) so the cache is effectively intra-cycle;
+    a recurring candidate re-fetches next boot. Only breakout candidates trigger
+    it (the caller gates on lens)."""
     hit = _UP_CACHE.get(sym)
     if hit and hit[1] > now_ts:
         return hit[0]
@@ -582,6 +583,13 @@ def up_read(venue, sym, now_ts, ttl_s=3600.0):
         # venue.candles returns Lighter's candle DICTS ({t,o,h,l,c,v,...}); the
         # close is c["c"]. Handle a bare-float shape too (defensive).
         raw = venue.candles(sym, "1d", start_ms, end_ms) or []
+        # DROP the still-forming daily bar (end_ms=now): the sibling daily-regime
+        # reads do the same (lighter_trend_bot `candles[:-1]`, family parse_candles).
+        # A partial bar makes closes[-1] the LIVE price, which collapses up_regime's
+        # "close>EMA AND EMA rising" into the single test "price>yesterday's EMA" —
+        # the "rising" half is algebraically lost. Completed bars only, matching
+        # the bull-engine research's own completed-bar EMA20 up-regime definition.
+        raw = raw[:-1] if raw else raw
         closes = [float(c["c"]) if isinstance(c, dict) else float(c) for c in raw]
         up = up_regime(closes)
     except Exception:  # noqa: BLE001 — a candle blip fails CLOSED, never a crash
@@ -1534,20 +1542,33 @@ def main(_ctx=None):
             m["last_mark"] = mark
             # [2026-07-24 (de) TREND EXIT in the LIVE/shadow manager] track the
             # peak favourable return so a breakout can trail from its high, and
-            # route the exit per lens. No-op when BULL_MODE is off OR the lens is
-            # not breakout: bull_exit -> (None, None) -> bars=pos_bars(m) +
-            # trail=None -> exit_reason's fixed bracket, byte-for-byte. This
-            # MIRRORS the replay's peak-track (lighter_ticket_replay.py) so the
-            # capturability read and the live manager exit identically.
+            # route the exit per lens. MIRRORS the replay's peak-track
+            # (lighter_ticket_replay.py) so the capturability read and the live
+            # manager exit identically.
             _sgn = 1.0 if is_long else -1.0
             _ret = (mark / entry - 1.0) * _sgn if entry else 0.0
             if _ret > m.get("peak_ret", 0.0):
                 m["peak_ret"] = _ret
             meta[sym] = m
             _ebars, _etrail = bull_exit(m.get("lens"))
+            if _ebars is not None:
+                # [(dg) FLAP-FIX for breakout] the breakout runs the TREND policy
+                # (no-TP cap 999, wide BRK_SL) BUT its max-hold must stay the
+                # ENTRY-STAMPED bar — MAX_HOLD_H is a growth-rail lever, and the
+                # (bw) invariant is "bars priced at entry govern the trade". Graft
+                # the stamped hold onto the trend tp/sl so a mid-position lever
+                # move cannot re-time an open breakout.
+                _ebars = (_ebars[0], _ebars[1], pos_bars(m)[2])
+            # [(dg) INERTNESS GUARD] when bull is off bull_exit -> (None, None);
+            # pass trail=0.0 (NOT None) so exit_reason cannot fall back to the
+            # global TT_TRAIL_PCT and silently trend-exit a REAL-MONEY position.
+            # The real guard is BULL_MODE — this makes the code match that claim
+            # (pre-(de) main() never passed peak_ret, so TT_TRAIL_PCT was dormant
+            # here; (de) began passing it, which this restores to inert).
+            _trail = _etrail if _etrail is not None else 0.0
             reason = exit_reason(entry, mark, opened, t_now, is_long,
                                  bars=(_ebars or pos_bars(m)),
-                                 peak_ret=m.get("peak_ret"), trail=_etrail)
+                                 peak_ret=m.get("peak_ret"), trail=_trail)
         else:
             # [2026-07-16 ZOMBIE GUARD] book missing from the active universe
             first = m.get("no_mark_since")
@@ -2350,6 +2371,12 @@ def selftest():
     globals()["_UP_CACHE"] = {}
     assert up_read(_BadV(), "SOL", 1.7e9) is None          # fetch error -> fail-CLOSED
     globals()["_UP_CACHE"] = {}
+    # [(dg) FORMING-BAR DROP] up_read must ignore the still-forming daily bar. A
+    # FALLING history with a spiking partial bar reads DOWN (the spike is dropped);
+    # WITHOUT the drop the leaked partial bar flips it UP — so this pins the fix.
+    assert up_read(_StubV([float(40 - i) for i in range(0, 38)] + [100.0]),
+                   "SPIKE", 1.7e9) is False
+    globals()["_UP_CACHE"] = {}
     # exit_reason trail OVERRIDE (per-lens): divergence keeps its +4% TP cap while
     # the trend exit is on globally; breakout runs past it
     globals()["TRAIL_PCT"] = 0.06
@@ -2366,9 +2393,15 @@ def selftest():
     # breakout must run PAST the +4% cap, TRAIL off its peak, and stop at the
     # WIDE -7% breakout SL; divergence keeps its fixed reversion bracket.
     def _mgr_exit(lens, entry, mark, is_long, peak_ret, pbars):
+        # mirrors main()'s exit loop EXACTLY: graft the entry-stamped max-hold
+        # onto the breakout trend bars, and pass trail=0.0 (never None) when bull
+        # is off so the fixed bracket holds regardless of the global TT_TRAIL_PCT.
         _eb, _et = bull_exit(lens)
+        if _eb is not None:
+            _eb = (_eb[0], _eb[1], pbars[2])
+        _tr = _et if _et is not None else 0.0
         return exit_reason(entry, mark, _to, _ten, is_long,
-                           bars=(_eb or pbars), peak_ret=peak_ret, trail=_et)
+                           bars=(_eb or pbars), peak_ret=peak_ret, trail=_tr)
     _pb = (0.04, -0.03, 48)                        # a normal divergence stamp
     globals()["BULL_MODE"] = True
     try:
@@ -2377,11 +2410,26 @@ def selftest():
         assert _mgr_exit("breakout", 100.0, 96.5, True, 0.0, _pb) is None     # -3.5% > wide SL
         assert _mgr_exit("breakout", 100.0, 92.9, True, 0.0, _pb) == "sl"     # -7.1% <= -7%
         assert _mgr_exit("divergence", 100.0, 104.1, True, 0.0, _pb) == "tp"  # fixed bracket
+        # [(dg) FLAP-FIX] a breakout honours its ENTRY-STAMPED max-hold, not the
+        # live 48h default: a 1h-old flat breakout stamped hold=1h must "hold"
+        # (without the graft it reads the 48h default and does NOT exit).
+        assert _mgr_exit("breakout", 100.0, 100.5, True, 0.0, (0.04, -0.03, 1)) == "hold"
     finally:
         globals()["BULL_MODE"] = False
     # MUTATION: bull OFF, the SAME breakout path hits the fixed +4% TP — proving
     # the routing (not the price path) is what let the winner run above.
     assert _mgr_exit("breakout", 100.0, 108.0, True, 0.10, _pb) == "tp"
+    # [(dg) INERTNESS GUARD] with bull OFF the manager exit stays the FIXED bracket
+    # even when the global TT_TRAIL_PCT>0 — the real-money exit's guard is
+    # BULL_MODE, not TRAIL_PCT (else a live redeploy + a stray TT_TRAIL_PCT would
+    # silently trend-exit real positions). Without the trail=0.0-when-off fix the
+    # first assert 'trail's instead of None.
+    globals()["TRAIL_PCT"] = 0.06
+    try:
+        assert _mgr_exit("divergence", 100.0, 103.5, True, 0.10, _pb) is None   # would 'trail' if leaked
+        assert _mgr_exit("divergence", 100.0, 104.1, True, 0.10, _pb) == "tp"    # fixed +4% still fires
+    finally:
+        globals()["TRAIL_PCT"] = 0.0
 
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
           "long/short exits, signed funding on the TRUE 8h basis, "

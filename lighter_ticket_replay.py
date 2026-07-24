@@ -197,8 +197,14 @@ def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
                 continue          # coin-quality veto — the live loop's rule
             side = "short" if str(t.get("side", "long")) == "short" else "long"
             # [2026-07-24] BULL DUAL-MODE gate parity (no-op unless TT_BULL_MODE):
-            # long-breakout(up-regime) + short-divergence, crypto-only.
-            if tt.BULL_MODE and not tt.bull_entry_ok(lens, side, t):
+            # short-divergence uses the ticket's oracle regime stamp (up=None ->
+            # _up_from_ticket). BREAKOUT is forced INERT here (up=False -> long
+            # refused): the shadow arm gates breakout on up_read's CANDLE-EMA
+            # regime, which the replay cannot reproduce (no venue.candles), so a
+            # stamp-gated breakout leg would be non-comparable and would pollute
+            # the tuner's leaderboard. The shadow arm is the breakout instrument.
+            _up = False if lens == "breakout" else None
+            if tt.BULL_MODE and not tt.bull_entry_ok(lens, side, t, up=_up):
                 continue
             pos[sym] = {"lens": lens, "side": side, "entry": mark,
                         "opened": snap_dt, "clip": clip_usd, "peak_ret": 0.0}
