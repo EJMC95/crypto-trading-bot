@@ -1532,9 +1532,22 @@ def main(_ctx=None):
         if mark:
             m.pop("no_mark_since", None)     # priceable again — reset the clock
             m["last_mark"] = mark
+            # [2026-07-24 (de) TREND EXIT in the LIVE/shadow manager] track the
+            # peak favourable return so a breakout can trail from its high, and
+            # route the exit per lens. No-op when BULL_MODE is off OR the lens is
+            # not breakout: bull_exit -> (None, None) -> bars=pos_bars(m) +
+            # trail=None -> exit_reason's fixed bracket, byte-for-byte. This
+            # MIRRORS the replay's peak-track (lighter_ticket_replay.py) so the
+            # capturability read and the live manager exit identically.
+            _sgn = 1.0 if is_long else -1.0
+            _ret = (mark / entry - 1.0) * _sgn if entry else 0.0
+            if _ret > m.get("peak_ret", 0.0):
+                m["peak_ret"] = _ret
             meta[sym] = m
+            _ebars, _etrail = bull_exit(m.get("lens"))
             reason = exit_reason(entry, mark, opened, t_now, is_long,
-                                 bars=pos_bars(m))
+                                 bars=(_ebars or pos_bars(m)),
+                                 peak_ret=m.get("peak_ret"), trail=_etrail)
         else:
             # [2026-07-16 ZOMBIE GUARD] book missing from the active universe
             first = m.get("no_mark_since")
@@ -2340,6 +2353,30 @@ def selftest():
         assert exit_reason(100.0, 105.0, _to, _ten, True, peak_ret=0.10, trail=0.06) is None
     finally:
         globals()["TRAIL_PCT"] = 0.0
+
+    # [2026-07-24 (de)] The LIVE/shadow position-manager COMPOSITION: the exit
+    # loop now calls bull_exit(lens) and threads (bars, peak_ret, trail) into
+    # exit_reason exactly as reproduced here. Guard the composition, not just the
+    # parts — this is a real-money surface (live-bots-always-in-audit-scope). A
+    # breakout must run PAST the +4% cap, TRAIL off its peak, and stop at the
+    # WIDE -7% breakout SL; divergence keeps its fixed reversion bracket.
+    def _mgr_exit(lens, entry, mark, is_long, peak_ret, pbars):
+        _eb, _et = bull_exit(lens)
+        return exit_reason(entry, mark, _to, _ten, is_long,
+                           bars=(_eb or pbars), peak_ret=peak_ret, trail=_et)
+    _pb = (0.04, -0.03, 48)                        # a normal divergence stamp
+    globals()["BULL_MODE"] = True
+    try:
+        assert _mgr_exit("breakout", 100.0, 108.0, True, 0.10, _pb) is None   # runs past +4%
+        assert _mgr_exit("breakout", 100.0, 103.5, True, 0.10, _pb) == "trail"  # give back 6%
+        assert _mgr_exit("breakout", 100.0, 96.5, True, 0.0, _pb) is None     # -3.5% > wide SL
+        assert _mgr_exit("breakout", 100.0, 92.9, True, 0.0, _pb) == "sl"     # -7.1% <= -7%
+        assert _mgr_exit("divergence", 100.0, 104.1, True, 0.0, _pb) == "tp"  # fixed bracket
+    finally:
+        globals()["BULL_MODE"] = False
+    # MUTATION: bull OFF, the SAME breakout path hits the fixed +4% TP — proving
+    # the routing (not the price path) is what let the winner run above.
+    assert _mgr_exit("breakout", 100.0, 108.0, True, 0.10, _pb) == "tp"
 
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
           "long/short exits, signed funding on the TRUE 8h basis, "
