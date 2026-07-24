@@ -151,8 +151,12 @@ def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
                 _r = (mark / m["entry"] - 1.0) * _sgn
                 if _r > m.get("peak_ret", 0.0):
                     m["peak_ret"] = _r
+            # [2026-07-24] per-lens exit under BULL_MODE (breakout -> trend exit,
+            # others -> fixed bracket); (None, None) otherwise = unchanged.
+            _ebars, _etrail = tt.bull_exit(m["lens"])
             reason = tt.exit_reason(m["entry"], mark, m["opened"], snap_dt,
-                                    m["side"] == "long", peak_ret=m.get("peak_ret"))
+                                    m["side"] == "long", bars=_ebars,
+                                    peak_ret=m.get("peak_ret"), trail=_etrail)
             if not reason:
                 continue
             sign = 1.0 if m["side"] == "long" else -1.0
@@ -192,6 +196,10 @@ def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
             if _veto and str(sym).split("/")[0] in _veto:
                 continue          # coin-quality veto — the live loop's rule
             side = "short" if str(t.get("side", "long")) == "short" else "long"
+            # [2026-07-24] BULL DUAL-MODE gate parity (no-op unless TT_BULL_MODE):
+            # long-breakout(up-regime) + short-divergence, crypto-only.
+            if tt.BULL_MODE and not tt.bull_entry_ok(lens, side, t):
+                continue
             pos[sym] = {"lens": lens, "side": side, "entry": mark,
                         "opened": snap_dt, "clip": clip_usd, "peak_ret": 0.0}
             lens_stats[lens]["taken"] += 1

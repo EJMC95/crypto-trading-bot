@@ -456,6 +456,82 @@ def allowed_lenses(mode):
     return LIVE_LENSES if mode == "lighter_live" else ALL_LENSES
 
 
+# [2026-07-24 BULL DUAL-MODE — long-breakout(up-regime) + short-divergence,
+# crypto-only, SHADOW-only. The bull-engine research settled the shape:
+# divergence's only real side is SHORT and its only clean universe is CRYPTO
+# (tradfi contaminates the read); the sole hint of a long edge is BREAKOUT, and
+# it pays only in a per-asset UP regime with a TREND exit (TT_TRAIL_PCT). This
+# mode fuses those into ONE entry policy. DEFAULT OFF: the gate only runs when
+# TT_BULL_MODE is on, so it is a pure no-op otherwise. RESTRICT-ONLY (it can only
+# SKIP an entry the base filters already admitted). Going live is operator-only
+# AND gated on a SHADOW capturability proof first — the breakout edge is
+# delay-0-only and may not survive the async taker's intraday fills.]
+BULL_MODE = os.environ.get("TT_BULL_MODE", "off").strip().lower() \
+    in ("on", "1", "true", "yes")
+# the ONLY (lens, side) pairs the bull arm fills.
+BULL_LENS_SIDES = frozenset({("breakout", "long"), ("divergence", "short")})
+
+
+# Tradfi (tokenized equity / commodity / FX) bases. Kept LOCAL + env-driven —
+# mirrors fleet_risk.EQUITY_BASES's own pattern — deliberately NOT imported from
+# fleet_risk/regime_oracle, to keep the lean live-taker image (Dockerfile.
+# tickettaker) free of their pandas dependency chain (a cross-import there would
+# fail and silently under-restrict, the exact born-dark trap). Default = the
+# fleet's equity set + the oracle's commodities + FX + the pre-IPO tokenised
+# equities that bled the live book; override via TT_TRADFI_BASES.
+TRADFI_BASES = {s.strip().upper() for s in os.environ.get(
+    "TT_TRADFI_BASES",
+    "SPY,QQQ,IWM,US100,US500,SOXL,AMD,MU,HOOD,RKLB,TSLA,NVDA,AAPL,MSFT,META,"
+    "GOOGL,GOOG,AMZN,COIN,MSTR,PLTR,TSM,INTC,SKHYNIX,AMAT,EWY,LITE,CRCL,BMNR,"
+    "SNDK,NBIS,MRVL,ASML,BABA,DELL,ORCL,QCOM,AVGO,ARM,SMCI,SPCX,ZHIPU,CBRS,"
+    "WTI,BRENTOIL,NATGAS,USOIL,XAU,XAG,XCU,XPD,XPT,PAXG,WHEAT,CORN,"
+    "USDJPY,AUDUSD,EURUSD,GBPUSD,USDCNH").split(",") if s.strip()}
+
+
+def _is_crypto(sym):
+    """True unless `sym` is a Lighter tokenized-equity/commodity/FX book
+    (TRADFI_BASES). The divergence short edge and the breakout edge both live in
+    CRYPTO; tradfi contaminates the read — so the bull arm is crypto-only."""
+    return str(sym or "").split("/")[0].upper() not in TRADFI_BASES
+
+
+def bull_entry_ok(lens, side, ticket):
+    """The bull dual-mode entry gate (RESTRICT-ONLY; only applied when
+    BULL_MODE). Admits ONLY long-breakout + short-divergence, crypto-only, with a
+    per-asset regime gate: a LONG needs a CONFIRMED up-regime (dir==+1; no stamp
+    -> skip, since buying up-regime alone LOSES and the signal needs the
+    confirmation), and a SHORT is refused only INTO a confirmed up-regime — else
+    the funding screen carries it. Fail-safe on an absent regime: a long without
+    a stamp is skipped, a short without one is kept."""
+    if (lens, side) not in BULL_LENS_SIDES:
+        return False
+    if not _is_crypto(ticket.get("sym")):
+        return False
+    d = (ticket.get("regime") or {}).get("dir")
+    if side == "long":
+        return d == 1
+    return d != 1        # short: allowed unless a confirmed up-regime
+
+
+# The breakout arm's TREND exit params (only used under BULL_MODE): a WIDE hard
+# stop (the -3% bracket churns the pop; entries draw -3.4% before running) + a
+# trailing give-back off the peak, and NO fixed TP cap.
+BRK_TRAIL = float(os.environ.get("TT_BRK_TRAIL", "0.06"))   # trail 6% off peak
+BRK_SL = float(os.environ.get("TT_BRK_SL", "-0.07"))        # wide hard stop
+
+
+def bull_exit(lens):
+    """Per-lens exit routing under BULL_MODE, returned as (bars_or_None, trail)
+    for exit_reason: BREAKOUT runs the TREND exit (no TP cap, wide SL, trail);
+    every other lens (i.e. divergence) keeps its fixed reversion bracket. When
+    BULL_MODE is off returns (None, None) = the module default, unchanged."""
+    if not BULL_MODE:
+        return None, None
+    if lens == "breakout":
+        return (999.0, BRK_SL, MAX_HOLD_H), BRK_TRAIL
+    return None, 0.0        # divergence: fixed bracket, no trail
+
+
 def lens_evidence(o, min_n=None):
     """(n, floor_met, avg_pct, hit) for one lens grade — EPISODE basis when
     the brain's v3 fields are present, RAW fallback otherwise.
@@ -569,7 +645,8 @@ def delist_due(no_mark_since_iso, t_now, giveup_h=None):
     return gone_h >= (DELIST_GIVEUP_H if giveup_h is None else giveup_h)
 
 
-def exit_reason(entry, mark, opened, t_now, is_long=True, bars=None, peak_ret=None):
+def exit_reason(entry, mark, opened, t_now, is_long=True, bars=None,
+                peak_ret=None, trail=None):
     """tp / sl / hold / trail / None for a position held from `opened`.
 
     `bars` is an optional (tp, sl, max_hold_h) tuple — the position's OWN
@@ -587,10 +664,11 @@ def exit_reason(entry, mark, opened, t_now, is_long=True, bars=None, peak_ret=No
         return None
     tp, sl, hold_h = bars if bars else (TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H)
     ret = (mark / entry - 1.0) * (1.0 if is_long else -1.0)
-    if TRAIL_PCT > 0 and peak_ret is not None:
-        # TREND mode: give back TRAIL_PCT from a peak that is in profit -> bank
-        # the trend; else the wide hard stop; else max-hold. No TP cap.
-        if peak_ret > 0 and ret <= peak_ret - TRAIL_PCT:
+    _trail = TRAIL_PCT if trail is None else trail   # per-lens/per-call override
+    if _trail > 0 and peak_ret is not None:
+        # TREND mode: give back _trail from a peak that is in profit -> bank the
+        # trend; else the wide hard stop; else max-hold. No TP cap.
+        if peak_ret > 0 and ret <= peak_ret - _trail:
             return "trail"
         if ret <= sl:
             return "sl"
@@ -1613,6 +1691,14 @@ def main(_ctx=None):
                 continue          # mode allow-list — FAIL-CLOSED, reads no bus
             if lens in lens_vetoed:
                 continue          # brain veto stays SENIOR (restrict-only)
+            # [2026-07-24] BULL DUAL-MODE gate — no-op unless TT_BULL_MODE.
+            # Restrict-only: admits ONLY long-breakout(up-regime) + short-
+            # divergence, crypto-only. SHADOW-only until it proves capturable.
+            if BULL_MODE:
+                _bside = "short" if str(t.get("side", "long")) == "short" \
+                    else "long"
+                if not bull_entry_ok(lens, _bside, t):
+                    continue
             # [2026-07-22] coin-quality veto. Symbol form is normalised because
             # the scout emits a bare base ("BOT") while the ledger records a
             # pair ("BOT/USDC"); matching only one form would make this veto
@@ -2131,6 +2217,33 @@ def selftest():
         assert exit_reason(_te, 101.0, _to, _ten, True, bars=(0.04, -0.07, 48), peak_ret=0.0) is None
         # unknown peak fails SAFE to the fixed bracket even when enabled
         assert exit_reason(_te, 105.0, _to, _ten, True, peak_ret=None) == "tp"
+    finally:
+        globals()["TRAIL_PCT"] = 0.0
+
+    # ---- BULL DUAL-MODE gate — long-breakout(up) + short-divergence, crypto ---
+    _up = {"regime": {"dir": 1}}
+    _dn = {"regime": {"dir": -1}}
+    _bt = lambda ls, sd, ex: bull_entry_ok(ls, sd, {**ex, "sym": "SOL"})
+    # the ONLY two admitted pairs
+    assert _bt("breakout", "long", _up)            # long-breakout in up-regime
+    assert _bt("divergence", "short", _dn)         # short-divergence in down
+    assert not _bt("divergence", "long", _up)      # long-divergence NEVER
+    assert not _bt("breakout", "short", _dn)       # short-breakout NEVER
+    assert not _bt("dip", "long", _up) and not _bt("momentum", "long", _up)
+    # regime gate: LONG needs a CONFIRMED up; SHORT refused only INTO a confirmed up
+    assert not _bt("breakout", "long", _dn)        # long in down -> skip
+    assert not _bt("breakout", "long", {})         # long unstamped -> skip (fail-CLOSED)
+    assert _bt("divergence", "short", {})          # short unstamped -> kept (funding screen)
+    assert not _bt("divergence", "short", _up)     # short INTO confirmed up -> skip
+    # crypto-only: a tokenized equity (regime_oracle.NONCRYPTO) is refused
+    assert not bull_entry_ok("breakout", "long", {"sym": "AMD", "regime": {"dir": 1}})
+    assert bull_entry_ok("divergence", "short", {"sym": "SOL", "regime": {"dir": -1}})
+    # exit_reason trail OVERRIDE (per-lens): divergence keeps its +4% TP cap while
+    # the trend exit is on globally; breakout runs past it
+    globals()["TRAIL_PCT"] = 0.06
+    try:
+        assert exit_reason(100.0, 105.0, _to, _ten, True, peak_ret=0.10, trail=0.0) == "tp"
+        assert exit_reason(100.0, 105.0, _to, _ten, True, peak_ret=0.10, trail=0.06) is None
     finally:
         globals()["TRAIL_PCT"] = 0.0
 
