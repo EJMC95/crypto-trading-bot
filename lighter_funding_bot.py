@@ -36,6 +36,7 @@ Usage:
     python lighter_funding_bot.py --once     # single scan then exit (smoke test)
 """
 import argparse
+import hashlib
 import logging
 import math
 import os
@@ -49,6 +50,14 @@ import funding_basis
 from venues import marks, venue_context
 from venues.fills import measured_from_reason, read_fill, slip_bps_of
 from venues.safety import capital_adjusted_day_start, open_notional
+
+# source-byte build marker — logged at boot so a deploy can be MARKER-GREPPED in
+# the RUNNING container (a green deploy has never implied the container took it).
+try:
+    with open(__file__, "rb") as _bf:
+        _BUILD = hashlib.sha256(_bf.read()).hexdigest()[:10]
+except Exception:      # noqa: BLE001
+    _BUILD = "unknown"
 
 BOT = "perps-funding-lighter"
 # [2026-07-17 BASIS FIX — behaviour-NEUTRAL, see funding_basis.py]
@@ -827,6 +836,9 @@ def main():
     max_open = ctx.max_open_positions(MAX_OPEN_POSITIONS)
     venue_tag = None if ctx.mode == "hl_paper" else "lighter"
     shadow_tag = ctx.mode == "lighter_shadow"
+    log.info("BOOT lighter_funding_bot build=%s bot=%s VENUE=%s clip=$%.2f max_open=%d "
+             "| explore_k=%d conviction=%s", _BUILD, bot_id, ctx.mode, order_usd,
+             max_open, SCAN_EXPLORE_K, CONVICTION_MODE)
 
     # Cumulative realized P&L survives restarts via the ledger.
     realized, n_closed, n_wins = 0.0, 0, 0
