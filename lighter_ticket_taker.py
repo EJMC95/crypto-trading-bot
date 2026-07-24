@@ -722,6 +722,50 @@ def vetoed_lenses(lens_fwd, min_n=None):
     return out
 
 
+# [2026-07-24 (dm) INCREMENT B] 'breakoutup' earns its OWN veto — from its own
+# realized closes, NOT the 4h forward grade (dk) proved misjudges it.
+#
+# WHY a SEPARATE path from vetoed_lenses() above (which is otherwise THE single
+# veto authority): that one reads 'brain-lens-forward', which grades the SCOUT's
+# tickets on FORWARD marks and is keyed by SCOUT lens name. 'breakoutup' is a
+# taker-internal relabel — it is NOT a scout lens and can NEVER appear there
+# (verified: the scout hardcodes {breakout,dip,momentum,divergence}). The only
+# brain payload keyed by CLOSE-TAG is 'brain-stake-mults': mults[bot]['long-
+# breakoutup'] is published ONLY once the brain has graded that tag's own closes
+# a loser at its floor and REDUCED it (bot_learn.py:1058 `if mult is None:
+# continue`; MULT_MIN_N=30 for a 0.5x). So a reduce to the FLOOR (mult<=0.5 =
+# wr<0.25, pnl<0 at n>=30) is the brain's DECISIVE "this lens loses" verdict ->
+# veto. A MILD reduce (0.75) or an expand (winner) does NOT veto, so those keep
+# collecting for the (dj) quality refinement — the veto harmonises with the
+# quality pipeline instead of starving it. Realized closes reflect the TREND-exit
+# hold, so this is graded at the right horizon BY CONSTRUCTION (no 4h/24h trap).
+#
+# RESTRICT-ONLY + fail-OPEN: an absent / thin / mild / positive grade vetoes
+# nothing. SHADOW-ONLY by construction: breakoutup never exists on the live arm
+# (LIVE_LENSES={divergence} filters breakout before the relabel), and BOT_ROW
+# there is '<bot>-lighter', whose 'long-breakoutup' bucket is always empty.
+BRKUP_VETO_MULT = float(os.environ.get("TT_BRKUP_VETO_MULT", "0.5"))  # <=0 disables
+BRKUP_VETO_MIN_N = int(os.environ.get("TT_BRKUP_VETO_MIN_N", "30"))   # = MULT_MIN_N
+
+
+def breakoutup_self_vetoed(mults_payload, bot_row):
+    """True iff the brain has DECISIVELY graded this bot's OWN 'long-breakoutup'
+    closes a loser: a floor-met (n>=BRKUP_VETO_MIN_N) reduce to <=BRKUP_VETO_MULT.
+    Pure; fail-OPEN on any missing/thin field. Disabled when BRKUP_VETO_MULT<=0.
+    The CALLER owns freshness (mirrors the lens-forward veto loop)."""
+    if BRKUP_VETO_MULT <= 0:
+        return False
+    entry = ((mults_payload or {}).get("mults") or {}).get(bot_row) or {}
+    if not isinstance(entry, dict):
+        return False
+    tag = entry.get("long-breakoutup")
+    if not isinstance(tag, dict):
+        return False
+    if (tag.get("n") or 0) < BRKUP_VETO_MIN_N:
+        return False               # below the brain's floor — keep collecting
+    return (tag.get("mult") or 1.0) <= BRKUP_VETO_MULT
+
+
 def incredible(tickets):
     """The high-conviction subset of the scout's tickets, per lens."""
     out = []
@@ -1795,6 +1839,25 @@ def main(_ctx=None):
         print(f"[ticket-taker] {iso(t_now)} LENS VETO — brain grades "
               f"{sorted(lens_vetoed)} negative at sample size; skipping their "
               f"tickets (restrict-only; recovers when the grade does)")
+    # [2026-07-24 (dm) INCREMENT B] breakoutup earns its OWN veto from its own
+    # 'long-breakoutup' closes. brain-lens-forward can never carry breakoutup
+    # (it grades SCOUT lenses' forward marks) — the per-close-tag grade lives in
+    # brain-stake-mults, read here (freshness-checked like the lens-forward read
+    # above; fail-OPEN on missing/stale). breakoutup_self_vetoed() bites only on
+    # the brain's DECISIVE floor-reduce; it folds into the SAME lens_vetoed set
+    # the entry loop checks AFTER the relabel (:~1871), so no entry-loop change.
+    # Inert on the live arm: breakoutup never fills there, so its bucket is empty.
+    try:
+        sm = store.load_state("brain-stake-mults") or {}
+        sm_age = (t_now - parse_ts(sm.get("updated"))).total_seconds()
+        if 0 <= sm_age <= float(sm.get("ttl_sec") or 26000):  # future-stamp-safe
+            if breakoutup_self_vetoed(sm, BOT_ROW):
+                lens_vetoed.add("breakoutup")
+                print(f"[ticket-taker] {iso(t_now)} BREAKOUTUP SELF-VETO — brain "
+                      f"reduced long-breakoutup to its floor on its own closes; "
+                      f"pausing the lens (restrict-only; recovers when it does)")
+    except (ValueError, TypeError):
+        pass
     # [2026-07-22 COIN-QUALITY VETO] Same contract as the Farmer's
     # (lighter_funding_bot.py:1033), transcribed so the two cannot drift:
     # RESTRICT-ONLY, and a missing OR STALE payload yields NO vetoes (fail
@@ -1857,7 +1920,9 @@ def main(_ctx=None):
             # subset before up_read ever runs — and that subset is positive at the
             # bull horizon (eavg24h +0.314). 'breakoutup' is not scout-graded, so
             # it starts OUT of lens_vetoed => fires + collects data (the unblock);
-            # it earns its OWN veto from its 'long-breakoutup' closes (Increment B).
+            # it earns its OWN veto from its 'long-breakoutup' closes — WIRED in
+            # (dm) above (breakoutup_self_vetoed reads brain-stake-mults and adds
+            # 'breakoutup' to lens_vetoed on the brain's decisive floor-reduce).
             # A NON-up breakout stays 'breakout' and correctly hits the veto below.
             # Bull + breakout only; the LIVE arm never reaches here (allowed_lenses
             # filtered breakout above), so real money is untouched. up_read is done
@@ -2358,6 +2423,34 @@ def selftest():
                if l in allowed_lenses("lighter_live")
                and l not in {"divergence"}}
     assert _senior == set(), _senior
+
+    # ---- (dm) breakoutup SELF-VETO: the brain's per-close-tag grade ----------
+    # Bites ONLY on a floor-met DECISIVE reduce (mult<=0.5 at n>=floor) of the
+    # bot's OWN long-breakoutup closes; mild / positive / thin / absent => open.
+    _bot = "b-lshadow"
+
+    def _sm(tag):
+        return {"mults": {_bot: {"long-breakoutup": tag}}}
+    assert breakoutup_self_vetoed(_sm({"mult": 0.5, "n": 30}), _bot)   # decisive
+    assert breakoutup_self_vetoed(_sm({"mult": 0.5, "n": 99}), _bot)
+    assert not breakoutup_self_vetoed(_sm({"mult": 0.75, "n": 99}), _bot)  # mild -> collect
+    assert not breakoutup_self_vetoed(_sm({"mult": 1.5, "n": 99}), _bot)   # expand (winner)
+    assert not breakoutup_self_vetoed(_sm({"mult": 0.5, "n": 29}), _bot)   # below floor
+    assert not breakoutup_self_vetoed(_sm({"mult": 0.5}), _bot)            # no n field
+    assert not breakoutup_self_vetoed({"mults": {_bot: {}}}, _bot)         # tag absent
+    assert not breakoutup_self_vetoed({"mults": {}}, _bot)                 # bot absent
+    assert not breakoutup_self_vetoed({}, _bot)                           # empty payload
+    assert not breakoutup_self_vetoed(None, _bot)                         # dark brain
+    # a DIFFERENT bot's bad grade never vetoes THIS bot (the live arm's empty
+    # bucket can't be poisoned by the shadow twin's losses)
+    assert not breakoutup_self_vetoed(_sm({"mult": 0.5, "n": 99}), "other-lighter")
+    # kill switch: TT_BRKUP_VETO_MULT<=0 disables entirely
+    _saved_bvm = globals()["BRKUP_VETO_MULT"]
+    try:
+        globals()["BRKUP_VETO_MULT"] = 0.0
+        assert not breakoutup_self_vetoed(_sm({"mult": 0.5, "n": 99}), _bot)
+    finally:
+        globals()["BRKUP_VETO_MULT"] = _saved_bvm
 
     # ---- SYMBOL SPACE — the live-only stranding bug, pinned -----------------
     # This bot keys everything venue-native ("1000BONK"); LighterClient speaks
@@ -3162,6 +3255,33 @@ def _selftest_live():
             assert _lens == "breakoutup", f"expected relabel to breakoutup, got {_lens!r}"
             # and it carries the captured quality (di) for later criteria derivation
             assert (_meta.get("SOL") or {}).get("evidence", {}).get("brk_quality") is not None
+        finally:
+            globals()["BULL_MODE"] = False
+
+        # ================================================================
+        # 9c) breakoutup SELF-VETO end-to-end (dm, Increment B): the SAME
+        #     up-regime breakout that opened in 9b is SKIPPED once the brain has
+        #     decisively reduced long-breakoutup on its own closes (mult<=0.5 at
+        #     n>=floor) via brain-stake-mults. Mutation-verifies the wiring: with
+        #     the veto disarmed, SOL opens (9b); with the grade present, it must
+        #     not. Restrict-only, shadow-only.
+        # ================================================================
+        globals()["BULL_MODE"] = True
+        try:
+            captured["state"].clear()
+            captured["paper"].clear()
+            _stub_market(marks={"SOL": 100.0}, funding={}, ranges={"SOL": 6.0})
+            _scout({"breakout": [{"sym": "SOL", "range_pos": 0.98,
+                                  "chg_pct": 2.0, "vol_m": 5.0}]})
+            captured["state"]["brain-stake-mults"] = {
+                "updated": iso(now()), "ttl_sec": 26000,
+                "mults": {BOT_ROW: {"long-breakoutup": {"mult": 0.5, "n": 30}}}}
+            _bv = _StubVenue(equity=1000.0)
+            _b4 = PaperBroker(start_equity=1000.0, fee_bps=4.0)
+            main(_ctx={"venue": _bv, "rails": None, "broker": _b4})
+            _meta = (captured["state"].get(STATE_KEY) or {}).get("meta") or {}
+            assert "SOL" not in _meta, \
+                f"breakoutup must be self-vetoed, but opened {_meta.get('SOL')!r}"
         finally:
             globals()["BULL_MODE"] = False
 
