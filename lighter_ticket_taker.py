@@ -423,7 +423,13 @@ def spread_gate_blocks(spread_bps, threshold_bps):
     return spread_bps > threshold_bps
 
 
-ALL_LENSES = frozenset({"breakout", "dip", "momentum", "divergence"})
+# [2026-07-24 (dk)] 'breakoutup' is the taker-internal lens for an UP-REGIME
+# crypto breakout (the entry loop relabels a candle-up breakout to it BEFORE the
+# brain veto, so the broad 4h 'breakout' veto — right for un-gated breakouts —
+# does not kill the up-regime subset). It is NOT scout-emitted; it exists so the
+# up-regime population is graded + vetoed on its OWN closes (tag 'long-breakoutup')
+# instead of the broad breakout grade. Shadow-only: NOT in LIVE_LENSES.
+ALL_LENSES = frozenset({"breakout", "breakoutup", "dip", "momentum", "divergence"})
 # [2026-07-17 LIVE = DIVERGENCE ONLY — operator decision] The live arm may fill
 # ONE lens. The brain grades the other three NEGATIVE at n=1279-2620 with
 # hit-rate 95% CIs entirely below 50% (dip -0.471%/.392, breakout -0.210%/.399,
@@ -468,8 +474,10 @@ def allowed_lenses(mode):
 # delay-0-only and may not survive the async taker's intraday fills.]
 BULL_MODE = os.environ.get("TT_BULL_MODE", "off").strip().lower() \
     in ("on", "1", "true", "yes")
-# the ONLY (lens, side) pairs the bull arm fills.
-BULL_LENS_SIDES = frozenset({("breakout", "long"), ("divergence", "short")})
+# the ONLY (lens, side) pairs the bull arm fills. 'breakoutup' (dk) is the
+# relabelled up-regime breakout — long only, like 'breakout'.
+BULL_LENS_SIDES = frozenset({("breakout", "long"), ("breakoutup", "long"),
+                             ("divergence", "short")})
 
 
 # Tradfi (tokenized equity / commodity / FX) bases. Kept LOCAL + env-driven —
@@ -607,7 +615,7 @@ def bull_exit(lens):
     BULL_MODE is off returns (None, None) = the module default, unchanged."""
     if not BULL_MODE:
         return None, None
-    if lens == "breakout":
+    if lens in ("breakout", "breakoutup"):      # (dk) up-regime breakout too
         return (999.0, BRK_SL, MAX_HOLD_H), BRK_TRAIL
     return None, 0.0        # divergence: fixed bracket, no trail
 
@@ -1842,6 +1850,24 @@ def main(_ctx=None):
             sym = t.get("sym")
             if lens not in _allowed:
                 continue          # mode allow-list — FAIL-CLOSED, reads no bus
+            # [2026-07-24 (dk) breakout_up RELABEL — BEFORE the veto] An UP-REGIME
+            # crypto breakout becomes its own lens 'breakoutup' HERE, ahead of the
+            # brain veto: the broad 4h 'breakout' veto is correct for un-gated
+            # breakouts (eavg4h -0.042) but would otherwise skip the up-regime
+            # subset before up_read ever runs — and that subset is positive at the
+            # bull horizon (eavg24h +0.314). 'breakoutup' is not scout-graded, so
+            # it starts OUT of lens_vetoed => fires + collects data (the unblock);
+            # it earns its OWN veto from its 'long-breakoutup' closes (Increment B).
+            # A NON-up breakout stays 'breakout' and correctly hits the veto below.
+            # Bull + breakout only; the LIVE arm never reaches here (allowed_lenses
+            # filtered breakout above), so real money is untouched. up_read is done
+            # here (pre-veto) and REUSED in the bull block — no double fetch.
+            _bull_up = None
+            if BULL_MODE and lens == "breakout" \
+                    and str(t.get("side", "long")) != "short":
+                _bull_up = up_read(venue, sym, t_now.timestamp())
+                if _bull_up is True and _is_crypto(sym):
+                    lens = "breakoutup"
             if lens in lens_vetoed:
                 continue          # brain veto stays SENIOR (restrict-only)
             # [2026-07-24] BULL DUAL-MODE gate — no-op unless TT_BULL_MODE.
@@ -1850,21 +1876,20 @@ def main(_ctx=None):
             if BULL_MODE:
                 _bside = "short" if str(t.get("side", "long")) == "short" \
                     else "long"
-                # candle up-regime read (COVERAGE FIX) — only for a breakout
-                # LONG, where the oracle stamp is ~8% covered; divergence-short
-                # uses the funding-screen fallback (up=None).
-                _up = up_read(venue, sym, t_now.timestamp()) \
-                    if lens == "breakout" else None
+                # 'breakoutup' is up-confirmed by construction (relabelled above);
+                # a plain 'breakout' reuses the pre-veto read (None for a non-
+                # breakout lens -> divergence's funding-screen fallback).
+                _up = True if lens == "breakoutup" else _bull_up
                 if not bull_entry_ok(lens, _bside, t, up=_up):
                     continue
-                # [2026-07-24 (di) SCANNER SIDEKICK] breakout QUALITY score.
-                # Reuses up_read's cached strength (NO extra fetch); applies the
-                # ADVISORY, default-off TT_BRK_QUALITY_MIN gate (restrict-only,
-                # inert at 0.0). Stashes the score + up-strength on the ticket so
-                # they are CAPTURED on the entry (evidence, below) -> the close
-                # row -> the winning breakout criteria can be DERIVED from shadow
-                # outcomes rather than guessed. Divergence is untouched.
-                if lens == "breakout":
+                # [2026-07-24 (di) SCANNER SIDEKICK] breakout QUALITY score — for
+                # a plain 'breakout' AND the relabelled 'breakoutup'. Reuses
+                # up_read's cached strength (NO extra fetch); applies the ADVISORY,
+                # default-off TT_BRK_QUALITY_MIN gate (restrict-only, inert at 0.0).
+                # Stashes the score + up-strength on the ticket so they are CAPTURED
+                # on the entry (evidence, below) -> the close row -> the winning
+                # criteria can be DERIVED from outcomes. Divergence is untouched.
+                if lens in ("breakout", "breakoutup"):
                     _ustr = up_read_strength(sym)
                     _q = breakout_quality(_ustr, t.get("range_pos"),
                                           t.get("vol_m"))
@@ -2440,6 +2465,21 @@ def selftest():
     assert not bull_entry_ok("breakout", "long", {"sym": "SOL"}, up=None)   # unknown -> skip
     assert not bull_entry_ok("divergence", "short", {"sym": "SOL"}, up=True)  # short refused into up
     assert bull_entry_ok("divergence", "short", {"sym": "SOL"}, up=False)
+    # [(dk)] 'breakoutup' is the relabelled up-regime crypto breakout: long-only,
+    # crypto-only, up-confirmed (the entry loop passes up=True by construction).
+    assert bull_entry_ok("breakoutup", "long", {"sym": "SOL"}, up=True)
+    assert not bull_entry_ok("breakoutup", "long", {"sym": "AMD"}, up=True)   # tradfi refused
+    assert not bull_entry_ok("breakoutup", "short", {"sym": "SOL"}, up=True)  # long-only
+    assert "breakoutup" in ALL_LENSES and "breakoutup" not in LIVE_LENSES     # shadow-only
+    # bull_exit routes 'breakoutup' to the TREND exit exactly like 'breakout'
+    globals()["BULL_MODE"] = True
+    try:
+        assert bull_exit("breakoutup")[1] == BRK_TRAIL          # trail, not fixed
+        assert bull_exit("breakoutup")[0][1] == BRK_SL          # wide stop
+        assert bull_exit("divergence") == (None, 0.0)           # unchanged
+    finally:
+        globals()["BULL_MODE"] = False
+    assert bull_exit("breakoutup") == (None, None)             # off -> module default
     # up_read: candle fetch -> up_regime, cached. The stub returns Lighter's REAL
     # candle DICT shape ({t,o,h,l,c,v}), NOT bare floats — so this exercises the
     # c["c"] extraction (a float-only stub passed green while the live dict shape
@@ -2610,6 +2650,16 @@ class _StubVenue:
     def account_value(self):
         self.value_reads += 1
         return self._equity
+
+    def candles(self, coin, interval, s, e):
+        # [(dk)] the bull path calls this for a breakout up-regime read; a stub
+        # missing it would fail up_read CLOSED and silently skip the relabel. Real
+        # Lighter candle DICT shape. Default = monotone-UP daily closes (so a bull
+        # breakout RELABELS to breakoutup); set `_candles` for a down-regime case.
+        cs = getattr(self, "_candles", None)
+        if cs is None:
+            cs = [float(i) for i in range(1, 40)]
+        return [{"t": 0, "o": c, "h": c, "l": c, "c": c, "v": 1.0} for c in cs]
 
     def pop_capital_moves(self):
         """Mirror EquityGuard.pop_capital_moves: return queued moves once, then
@@ -3088,6 +3138,32 @@ def _selftest_live():
         assert abs(b2.fees - 0.7672) > 1e-2, "8x funding over-accrual is BACK"
         # and it still takes new tickets (the entry pass survived the refactor)
         assert _pub["open_trades"] == 1, _pub["open_trades"]
+
+        # ================================================================
+        # 9b) breakout_up RELABEL end-to-end (dk): a CRYPTO breakout ticket, in a
+        #     candle up-regime, under bull, opens as lens 'breakoutup' (relabelled
+        #     BEFORE the veto) — proving it fires (not scout-graded => not vetoed)
+        #     and is tagged distinctly so the brain grades it on its OWN closes.
+        #     up_read needs a venue for candles even on the shadow arm, so drive
+        #     with the candle-stub venue + the broker.
+        # ================================================================
+        globals()["BULL_MODE"] = True
+        try:
+            captured["state"].clear()
+            captured["paper"].clear()
+            _stub_market(marks={"SOL": 100.0}, funding={}, ranges={"SOL": 6.0})
+            _scout({"breakout": [{"sym": "SOL", "range_pos": 0.98,
+                                  "chg_pct": 2.0, "vol_m": 5.0}]})
+            _bv = _StubVenue(equity=1000.0)      # default candles() = up-regime
+            _b3 = PaperBroker(start_equity=1000.0, fee_bps=4.0)
+            main(_ctx={"venue": _bv, "rails": None, "broker": _b3})
+            _meta = (captured["state"].get(STATE_KEY) or {}).get("meta") or {}
+            _lens = (_meta.get("SOL") or {}).get("lens")
+            assert _lens == "breakoutup", f"expected relabel to breakoutup, got {_lens!r}"
+            # and it carries the captured quality (di) for later criteria derivation
+            assert (_meta.get("SOL") or {}).get("evidence", {}).get("brk_quality") is not None
+        finally:
+            globals()["BULL_MODE"] = False
 
         # ================================================================
         # 10) A CRASH MUST MARK THE ROW. The negative fixture is the REAL
