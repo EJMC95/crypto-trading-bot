@@ -2014,6 +2014,11 @@ def main(_ctx=None):
         closed_trades=stats["closed"], wins=stats["wins"], losses=stats["losses"],
         extra={"venue": TT_VENUE,
                "strategy": f"scout tickets ({'live' if live else 'shadow'})",
+               # [2026-07-24 (df)] the RUNNING process's OWN bull-mode read —
+               # emit it so enablement is verifiable by published output, not by
+               # "the env var is set on the service" (self-describing-labels-lie:
+               # a var on the service does not prove the process read it as on).
+               "bull": BULL_MODE,
                # D1: total capital excluded from pnl_abs — self-describing
                **({"capital_adjust": round(capital_adjust["total"]
                                            + CAPITAL_ADJUST_USD, 2)}
@@ -2899,6 +2904,9 @@ def _selftest_live():
         # + 0.0200  entry fee on the new divergence short (50/104 @ 104)
         _pub = captured["published"][-1][1]
         assert _pub["extra"]["venue"] == "lighter_shadow"
+        # [2026-07-24 (df)] the heartbeat emits the process's OWN bull-mode read
+        # (KeyError if the marker is dropped; mismatch if it is hardcoded).
+        assert _pub["extra"]["bull"] == BULL_MODE
         assert abs(b2.fees - 0.1848) < 1e-4, b2.fees
         # THE basis detector: with the 8x bug the funding leg alone was 0.6656
         # and this total would be 0.7672. This assertion is what fails if
