@@ -190,9 +190,19 @@ def diagnose_book(bot, trades, now_ts=None):
         decay_ratio = round(m_recent / m_full, 2) if m_full > 0 else None
         slope_t = round(_slope_t(rets), 2)
         _faded = (m_full > 0 and m_recent < 0.5 * m_full)   # recent < half the full mean
-        if traj_delta <= -1.0 and (med_recent < 0 or _faded):
+        # TREND GATE = slope_t, NOT traj_delta. traj_delta (t_recent - t_full)
+        # compares a HALF-sample t-stat to a FULL-sample one, so it is biased
+        # NEGATIVE by ~(1/sqrt2 - 1)*t from sample size ALONE — a same-level book
+        # whose recent half is merely NOISIER (lower t, not lower mean) trips it
+        # with zero real decay. Measured 23-Jul (Monte-Carlo): ~15% of
+        # CONSTANT-effect books read "decaying" on traj_delta; slope_t (a
+        # calibrated OLS-slope t-stat, ~N(0,1) under a constant effect, -14 on the
+        # real Farmer shape) cuts that to ~2%. traj_delta stays a reported
+        # diagnostic; it no longer gates the label. (Validate on the live Lighter
+        # tape before trusting the label on a marginal book — synthetic-only here.)
+        if slope_t is not None and slope_t <= -2.0 and (med_recent < 0 or _faded):
             traj = "decaying"
-        elif traj_delta >= 1.0 and med_recent > 0:
+        elif slope_t is not None and slope_t >= 2.0 and med_recent > 0:
             traj = "emerging"
         else:
             traj = "stable"
@@ -513,6 +523,20 @@ def _selftest():
     _ck(d9["trajectory"] == "decaying",
         f"decay must survive a reversed fetch order (the closed_at DESC trap), got {d9['trajectory']}")
 
+    # 9b. SLOPE-GATE (not the biased traj_delta): a SAME-LEVEL book whose recent
+    # half is merely NOISIER — lower t, NOT lower mean — trips traj_delta<=-1 via
+    # the half-vs-full sample-size bias, yet has ZERO real decay (slope_t~0). The
+    # trend label must gate on slope_t and read STABLE. Reverting the gate to
+    # traj_delta flips this to "decaying" — the ~15%->~2% false-positive fix.
+    tr, now = mkt([0.5] * 12 + [-0.5, 2.5, -0.5, -0.5, 2.5, -0.5, -0.5, 2.5, -0.5, -0.5, 2.5, -0.5],
+                  [f"C{i%9}" for i in range(24)])
+    d9b = diagnose_book("noisy-recent-bot", tr, now)
+    _ck(d9b["traj_delta"] <= -1.0 and d9b["median_recent_pct"] < 0,
+        f"fixture must sit in traj_delta's false-positive zone, got Δ={d9b['traj_delta']} med={d9b['median_recent_pct']}")
+    _ck(d9b["trajectory"] == "stable",
+        f"same-level noisier-recent book must be STABLE (slope_t gate), not decaying; "
+        f"got {d9b['trajectory']} slope_t={d9b['slope_t']} Δ={d9b['traj_delta']}")
+
     # 10. CONCENTRATION: one coin carries the edge -> dropping it collapses t.
     tr, now = mkt([0.05] * 20 + [3.0, 3.0, 3.0], ["A"] * 20 + ["MOON"] * 3)
     d = diagnose_book("conc-bot", tr, now)
@@ -531,7 +555,7 @@ def _selftest():
     if all(ok):
         print(f"fleet_radar selftest OK — {len(ok)} checks (noise/real/artifact/plausible/"
               "losing/starved classes, jackknife robustness, ETA math + idle, trajectory "
-              "decay + inversion guard, coin-concentration, twin-dedup)")
+              "decay + inversion + slope-gate, coin-concentration, twin-dedup)")
         return True
     print("fleet_radar SELFTEST FAILED")
     return False
