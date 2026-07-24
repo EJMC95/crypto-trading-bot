@@ -44,7 +44,7 @@ def _rows_from_db(url, since_iso):
         cur.execute(
             "select (extra->>'brk_quality')::float, (extra->>'up_strength')::float,"
             " pnl_abs, closed_at from paper_trades"
-            " where bot=%s and reason like 'long-breakout%%'"
+            " where bot=%s and reason like 'long-breakoutup%%'"
             "   and extra ? 'brk_quality' and closed_at >= %s"
             " order by closed_at",
             (BOT, since_iso))
@@ -65,11 +65,11 @@ def _fired_count(url, since_iso):
     try:
         c = psycopg2.connect(url); cur = c.cursor()
         cur.execute("select count(*) from paper_trades where bot=%s"
-                    " and reason like 'long-breakout%%' and closed_at >= %s",
+                    " and reason like 'long-breakoutup%%' and closed_at >= %s",
                     (BOT, since_iso))
         allc = cur.fetchone()[0]
         cur.execute("select count(*) from paper_trades where bot=%s"
-                    " and reason like 'long-breakout%%' and extra ? 'brk_quality'"
+                    " and reason like 'long-breakoutup%%' and extra ? 'brk_quality'"
                     " and closed_at >= %s", (BOT, since_iso))
         withq = cur.fetchone()[0]
         c.close()
@@ -130,13 +130,15 @@ def derive_threshold(rows):
 
 
 def _report(rows, withq, allc):
-    print(f"=== breakout scanner-sidekick quality analysis ({BOT}) ===")
-    print(f"bull-era long-breakout closes: {allc} total, {withq} carry a captured "
+    print(f"=== breakoutup scanner-sidekick quality analysis ({BOT}) ===")
+    print(f"'long-breakoutup' closes: {allc} total, {withq} carry a captured "
           f"quality, {len(rows)} usable")
     if allc == 0:
-        print("VERDICT: the breakout arm has taken ZERO bull-era closes — the read "
-              "is NOT collecting. Check the brain veto (breakout graded negative "
-              "=> vetoed) / regime sparsity BEFORE reading anything into quality.")
+        print("VERDICT: ZERO 'long-breakoutup' closes yet. Pre-(dk) this meant the "
+              "brain veto blocked breakout entirely; post-(dk) the up-regime subset "
+              "relabels to 'breakoutup' and fires un-vetoed, so a zero here now means "
+              "up-regime crypto breakouts are genuinely SPARSE this window (falling "
+              "market), not blocked. Nothing to grade — let it accrue.")
         return
     if len(rows) < MIN_N:
         print(f"VERDICT: INSUFFICIENT ({len(rows)} < {MIN_N}). Keep the gate OFF; "
