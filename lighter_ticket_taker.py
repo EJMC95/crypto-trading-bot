@@ -170,6 +170,23 @@ CLIP_MAX = float(os.environ.get("TT_CLIP_MAX", "80"))
 TAKE_PROFIT = float(os.environ.get("TT_TP", "0.04"))       # +4%
 STOP_LOSS = float(os.environ.get("TT_SL", "-0.03"))        # -3%
 MAX_HOLD_H = float(os.environ.get("TT_MAX_HOLD_H", "48"))
+# [2026-07-24 TREND EXIT — the breakout arm's missing exit, SHIPPED DISABLED]
+# The bull-engine research landed here: long-breakout in a per-asset up-regime is
+# a REAL crypto-native continuation edge (beats a LOSING up-regime baseline by
+# +0.75-1.5%/trade, both-halves-positive, 54 effective bets, ex-memecoin robust)
+# — but the fixed TP+4%/SL-3% ladder CHURNS it to zero: the median breakout trade
+# exits at the -3% stop itself, because the entries routinely draw -3.4% before
+# they run. A TREND entry needs a TREND exit, not a reversion bracket (the
+# infinity-grid insight, now measured): let it run, trail off the peak, bank
+# before the ~1-week reversion. `TT_TRAIL_PCT`>0 enables a trailing-from-peak
+# exit (the caller supplies peak_ret); with it OFF (default 0) exit_reason is
+# byte-for-byte the old fixed bracket for every existing caller.
+# CAPTURABILITY IS UNPROVEN, BY CONSTRUCTION: the daily-tape edge is delay-0 ONLY
+# (a one-bar entry delay flips it negative) and this taker fills INTRADAY, inside
+# that danger zone — so whether THIS async taker can actually capture the pop is
+# unknown, and ONLY a SHADOW run with the taker's real fill timing can settle it.
+# This is a SHADOW-only capturability TEST. It never touches real money.
+TRAIL_PCT = float(os.environ.get("TT_TRAIL_PCT", "0"))
 # [2026-07-16 ZOMBIE GUARD] a delisted/vanished book used to mean "hold
 # forever" (exit_reason needs a mark, so even max-hold was unreachable) —
 # the position froze at its last mark and ate a MAX_OPEN slot for good.
@@ -552,16 +569,34 @@ def delist_due(no_mark_since_iso, t_now, giveup_h=None):
     return gone_h >= (DELIST_GIVEUP_H if giveup_h is None else giveup_h)
 
 
-def exit_reason(entry, mark, opened, t_now, is_long=True, bars=None):
-    """tp / sl / hold / None for a position held from `opened`.
+def exit_reason(entry, mark, opened, t_now, is_long=True, bars=None, peak_ret=None):
+    """tp / sl / hold / trail / None for a position held from `opened`.
 
     `bars` is an optional (tp, sl, max_hold_h) tuple — the position's OWN
     governing bars (see pos_bars). None = the module's current bars, the
-    pre-(by) behavior every existing caller keeps."""
+    pre-(by) behavior every existing caller keeps.
+
+    [2026-07-24] `peak_ret` = the best FAVOURABLE return reached since entry
+    (the caller tracks it across cycles). When TRAIL_PCT>0 AND peak_ret is
+    supplied, the position runs a TREND exit — trail TRAIL_PCT off the peak once
+    it is in profit, plus the (deliberately WIDE for a trend book) hard `sl` and
+    max-hold, and NO fixed TP so the trend can run. Default (TRAIL_PCT=0 or
+    peak_ret=None) = the fixed bracket, byte-for-byte unchanged for every caller
+    that does not opt in. Restrict-safe: an unknown peak never trails."""
     if not entry or entry <= 0 or not mark or mark <= 0:
         return None
     tp, sl, hold_h = bars if bars else (TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H)
     ret = (mark / entry - 1.0) * (1.0 if is_long else -1.0)
+    if TRAIL_PCT > 0 and peak_ret is not None:
+        # TREND mode: give back TRAIL_PCT from a peak that is in profit -> bank
+        # the trend; else the wide hard stop; else max-hold. No TP cap.
+        if peak_ret > 0 and ret <= peak_ret - TRAIL_PCT:
+            return "trail"
+        if ret <= sl:
+            return "sl"
+        if (t_now - opened).total_seconds() >= hold_h * 3600:
+            return "hold"
+        return None
     if ret >= tp:
         return "tp"
     if ret <= sl:
@@ -2074,11 +2109,37 @@ def selftest():
     assert spread_gate_blocks(99.5, 20.0)
     assert spread_gate_blocks(book_spread_bps(_wide), 20.0)
 
+    # ---- TREND EXIT — trailing-from-peak, default OFF (shadow capturability) --
+    # Must be the fixed bracket byte-for-byte at TRAIL_PCT=0, and let a winner
+    # RUN past the +4% cap once enabled — the whole reason it exists.
+    _te, _to = 100.0, datetime(2026, 7, 14, 12, 0, tzinfo=timezone.utc)
+    _ten = _to + timedelta(hours=1)
+    assert TRAIL_PCT == 0.0, TRAIL_PCT
+    # DEFAULT (off): fixed bracket even when a peak is supplied
+    assert exit_reason(_te, 105.0, _to, _ten, True, peak_ret=0.10) == "tp"
+    assert exit_reason(_te, 96.0, _to, _ten, True, peak_ret=0.10) == "sl"
+    assert exit_reason(_te, 101.0, _to, _ten, True, peak_ret=0.10) is None
+    globals()["TRAIL_PCT"] = 0.06
+    try:
+        # peaked +10%, back to +3% -> gave back 7%>6% -> trail
+        assert exit_reason(_te, 103.0, _to, _ten, True, peak_ret=0.10) == "trail"
+        # peaked +10%, at +5% -> gave back 5%<6% -> RUNS (a fixed +4% TP would
+        # have wrongly banked here; deleting the TP-skip regresses this)
+        assert exit_reason(_te, 105.0, _to, _ten, True, peak_ret=0.10) is None
+        # wide hard stop still bites; never-in-profit never trails
+        assert exit_reason(_te, 92.0, _to, _ten, True, bars=(0.04, -0.07, 48), peak_ret=0.0) == "sl"
+        assert exit_reason(_te, 101.0, _to, _ten, True, bars=(0.04, -0.07, 48), peak_ret=0.0) is None
+        # unknown peak fails SAFE to the fixed bracket even when enabled
+        assert exit_reason(_te, 105.0, _to, _ten, True, peak_ret=None) == "tp"
+    finally:
+        globals()["TRAIL_PCT"] = 0.0
+
     print("All Ticket Taker self-tests passed (bars incl. divergence, "
           "long/short exits, signed funding on the TRUE 8h basis, "
           "constant-risk sizing, delist give-up, LIVE lens allow-list "
           "fail-CLOSED vs a dark brain, symbol round-trip for all six "
-          "1000-markets, spread gate default-OFF + fail-open).")
+          "1000-markets, spread gate default-OFF + fail-open, trend exit "
+          "default-OFF + let-winner-run).")
 
 
 # ---------------------------------------------------------------------------

@@ -141,8 +141,18 @@ def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
         for sym in list(pos):
             m = pos[sym]
             mark = marks.get(sym)
+            # [2026-07-24 TREND EXIT PARITY] track the peak FAVOURABLE return so
+            # exit_reason can run its trailing-from-peak exit (TT_TRAIL_PCT). A
+            # position's peak only ratchets up. Harmless when the trend exit is
+            # OFF (TRAIL_PCT=0): exit_reason ignores peak_ret, so this reproduces
+            # the fixed-bracket replay byte-for-byte for every existing caller.
+            if mark:
+                _sgn = 1.0 if m["side"] == "long" else -1.0
+                _r = (mark / m["entry"] - 1.0) * _sgn
+                if _r > m.get("peak_ret", 0.0):
+                    m["peak_ret"] = _r
             reason = tt.exit_reason(m["entry"], mark, m["opened"], snap_dt,
-                                    m["side"] == "long")
+                                    m["side"] == "long", peak_ret=m.get("peak_ret"))
             if not reason:
                 continue
             sign = 1.0 if m["side"] == "long" else -1.0
@@ -183,7 +193,7 @@ def replay(tape, clip_usd=None, max_open=None, coin_veto=None):
                 continue          # coin-quality veto — the live loop's rule
             side = "short" if str(t.get("side", "long")) == "short" else "long"
             pos[sym] = {"lens": lens, "side": side, "entry": mark,
-                        "opened": snap_dt, "clip": clip_usd}
+                        "opened": snap_dt, "clip": clip_usd, "peak_ret": 0.0}
             lens_stats[lens]["taken"] += 1
             opened_syms.add(sym)
             opened_lenses.add(lens)
