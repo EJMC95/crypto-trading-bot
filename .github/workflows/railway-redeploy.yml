@@ -82,6 +82,16 @@ on:
       - 'dashboard_server.py'
       - 'paper_broker.py'
       - 'venues/**'
+      # [2026-07-25] LIVE-BOT MARKER-PATH TRIGGER. lighter_funding_bot.py is the
+      # live Farmer's OWN code (service trail-blazer-live, Dockerfile.fundinglighter
+      # — NOT a freqtrade-bots file). It is listed here ONLY so a funding push RUNS
+      # this workflow, where the decide step's [deploy-live-farmer]/[deploy-live]
+      # marker gate decides whether to deploy the real-money Farmer. No marker ->
+      # the job runs and deploys NOTHING (svcs stays empty; the deploy step is
+      # skipped). lighter_ticket_taker.py + venues/** above already trigger it for
+      # the taker's own marker path. BOTH lists bind (audit_deploy_coverage.py):
+      # paths gates whether the job runs, the decide grep picks the service.
+      - 'lighter_funding_bot.py'
       # [2026-07-21] 🏛️ the Parliament (runs inside freqtrade-bots via
       # run_all.sh). Added the same day it shipped — the 17-Jul lesson: a
       # module COPY'd into the image but absent from THIS list merges green
@@ -164,24 +174,43 @@ jobs:
             if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|venues/|cleanup_legacy_bots\.py$)'; then
               svcs="${svcs:+$svcs,}market-context"
             fi
-            # [2026-07-24] OPT-IN LIVE-TAKER auto-deploy. The two REAL-MONEY
-            # services (tide-rider-lighter-live = 🎫 Ticket Taker, trail-blazer-live
-            # = 💸 Funding Farmer — service names lie) are DELIBERATELY off the
-            # blanket auto-path: an unmarked WIP/held push must never auto-restart
-            # a real-money book. That barrier is exactly what stopped the (cp) rail
-            # fix from surprise-deploying before the operator said "go ahead".
-            # This adds auto-deploy CONVENIENCE without removing the barrier: a push
-            # that changes the taker's own code AND carries the explicit marker
-            # [deploy-live-taker] in ANY commit message in the range ALSO deploys
-            # the live taker. No marker -> only the SHADOW (freqtrade-bots) ships,
-            # exactly as before. Restrict-by-construction: no marker, no real-money
-            # deploy. Verify the running container's build stamp after (a green run
-            # never implied the container took it — [[railway-cli-frozen-services]]).
+            # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
+            # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
+            # trail-blazer-live = 💸 Funding Farmer — service names lie) are
+            # DELIBERATELY off the blanket auto-path: an unmarked WIP/held push must
+            # never auto-restart a real-money book. That barrier stopped the (cp)
+            # rail fix from surprise-deploying before the operator said "go ahead",
+            # and for the FARMER it guards a MEASURED restart hazard — its slope gate
+            # fails open ~1h after boot, and a restart once wiped a memory-only halt
+            # and re-bought HYPE 37s later (lighter-flatten-silent-halt-redeploy-
+            # incident). Phase 2 fixes that hazard; until then the marker keeps every
+            # Farmer deploy DELIBERATE.
+            # This adds CONVENIENCE without removing the barrier: a push that changes
+            # a live bot's OWN code (or the shared venues/ surface) AND carries an
+            # explicit marker in ANY commit message in the range ALSO deploys that
+            # bot from CLEAN main (the checkout above is ref: main), exactly like a
+            # manual workflow_dispatch — just triggered by a commit tag:
+            #   [deploy-live-taker]  -> tide-rider-lighter-live
+            #   [deploy-live-farmer] -> trail-blazer-live
+            #   [deploy-live]        -> BOTH, but each still gated on ITS OWN files
+            #                           changing (a farmer-only push won't restart the
+            #                           taker, and vice-versa).
+            # No marker -> only the SHADOW (freqtrade-bots) ships, exactly as before.
+            # Restrict-by-construction: no marker, no real-money deploy. Verify the
+            # running container's build stamp after (a green run never implied the
+            # container took it — [[railway-cli-frozen-services]]).
+            msgs="$(git log --format='%B' ${range/ /..} 2>/dev/null)"
+            live_all=0
+            if printf '%s' "$msgs" | grep -qF '[deploy-live]'; then live_all=1; fi
             if echo "$changed" | grep -qE '^(lighter_ticket_taker\.py$|venues/)' \
-               && printf '%s' "$(git log --format='%B' ${range/ /..} 2>/dev/null)" \
-                  | grep -qF '[deploy-live-taker]'; then
+               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-taker]'; }; then
               svcs="${svcs:+$svcs,}tide-rider-lighter-live"
-              echo "-> [deploy-live-taker] marker present: including tide-rider-lighter-live (REAL MONEY)"
+              echo "-> live-taker marker: including tide-rider-lighter-live (REAL MONEY)"
+            fi
+            if echo "$changed" | grep -qE '^(lighter_funding_bot\.py$|venues/)' \
+               && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-farmer]'; }; then
+              svcs="${svcs:+$svcs,}trail-blazer-live"
+              echo "-> live-farmer marker: including trail-blazer-live (REAL MONEY)"
             fi
           fi
           echo "services=$svcs" >> "$GITHUB_OUTPUT"

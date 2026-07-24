@@ -75,9 +75,12 @@ DEPLOY_COVERAGE_OK = {
         "its own boot banner says the slope gate 'fails open for ~1h after "
         "restart'. lighter-flatten-silent-halt-redeploy-incident is what a "
         "restart did with positions open (a memory-only halt was wiped and HYPE "
-        "re-bought 37s after boot). Ship it DELIBERATELY via the workflow's "
-        "workflow_dispatch, which checks out clean main — never from a local "
-        "`railway up`, which uploads your desk (deploy-live-from-a-clean-worktree)."
+        "re-bought 37s after boot). Ship it DELIBERATELY — via the workflow's "
+        "workflow_dispatch OR the [deploy-live-farmer]/[deploy-live] commit marker "
+        "(both check out clean main), added 2026-07-25 — never on EVERY push, and "
+        "never from a local `railway up`, which uploads your desk "
+        "(deploy-live-from-a-clean-worktree). The marker keeps each Farmer deploy "
+        "DELIBERATE until Phase 2 fixes the restart hazard above."
     ),
     "lighter_trend_bot.py": (
         "Same restart hazard as lighter_funding_bot.py, and its service "
@@ -298,6 +301,87 @@ def main():
     return 0
 
 
+def _extract_live_marker_block():
+    """The decide step's OPT-IN live-bot marker logic, lifted verbatim from the
+    workflow: the lines from `msgs="$(git log ...` through the fi that closes the
+    trail-blazer-live (Farmer) block. Returns the raw lines (list). Raises if the
+    gate is missing/unclosed — a real-money deploy gate that vanished must not
+    read as 'nothing to test'."""
+    lines = _read(WORKFLOW).splitlines()
+    try:
+        start = next(i for i, l in enumerate(lines) if 'msgs="$(git log' in l)
+    except StopIteration:
+        raise AssertionError("live-bot marker block not found (no `msgs=$(git log` "
+                             "line) — the opt-in real-money deploy gate may be gone")
+    block, seen_farmer = [], False
+    for l in lines[start:]:
+        block.append(l)
+        if "trail-blazer-live" in l:
+            seen_farmer = True
+        if seen_farmer and l.strip() == "fi":
+            return block
+    raise AssertionError("live-bot marker block never closed (no Farmer `fi`)")
+
+
+def _marker_logic_selftest():
+    """Behavioral test of the OPT-IN live-bot deploy markers, BOUND to the real
+    decide-step bash (extracted above, run under bash) so a future edit that lets
+    an UNMARKED push deploy real money turns this RED. Synthetic INPUTS, real
+    LOGIC, safety-INVARIANT assertions — the covered() pattern applied to the
+    marker gate. 'No marker -> no real-money deploy' is a CONTRACT, not today's
+    tree state, so asserting it is not the good-news-fails trap _selftest() avoids
+    elsewhere. Skips only if bash is genuinely absent (never on a real assertion)."""
+    import shutil
+    import subprocess
+    if not shutil.which("bash"):
+        print("  (marker-logic test SKIPPED — no bash on this host)")
+        return
+    block = _extract_live_marker_block()
+    joined = "\n".join(block)
+    # sanity: we grabbed the REAL gate, not a gutted stub (else a mutation that
+    # deletes the block would make the behavioral cases vacuously pass)
+    for needle in ("[deploy-live-taker]", "[deploy-live-farmer]", "[deploy-live]",
+                   "tide-rider-lighter-live", "trail-blazer-live", "live_all"):
+        assert needle in joined, f"marker gate missing {needle!r} — refusing to vouch"
+    indent = min(len(l) - len(l.lstrip()) for l in block if l.strip())
+    body = [l[indent:] if len(l) >= indent else l for l in block]
+    body[0] = 'msgs="$2"'            # swap the git-log fetch for the fixture
+    script = ("set -uo pipefail\n"
+              'changed="$1"; svcs=""; live_all=0\n'
+              "{\n" + "\n".join(body) + "\n} >/dev/null\n"   # drop the '-> marker' echoes
+              'printf "%s" "$svcs"\n')
+
+    def decide(changed, msgs):
+        r = subprocess.run(["bash", "-c", script, "b", changed, msgs],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, f"decide bash failed ({r.returncode}): {r.stderr}"
+        return r.stdout.strip()
+
+    T, F = "tide-rider-lighter-live", "trail-blazer-live"
+    cases = [
+        # HAZARD — an unmarked push must NEVER deploy a real-money book
+        ("lighter_funding_bot.py", "fix funding slope", ""),
+        ("lighter_ticket_taker.py", "tweak taker", ""),
+        ("venues/safety.py", "rails tweak", ""),
+        (f"lighter_funding_bot.py\nvenues/safety.py", "Farmer WIP (dark)", ""),
+        # intended deploys
+        ("lighter_funding_bot.py", "ship [deploy-live-farmer]", F),
+        ("lighter_funding_bot.py", "both [deploy-live]", F),
+        ("lighter_ticket_taker.py", "ship [deploy-live-taker]", T),
+        ("lighter_ticket_taker.py", "ship [deploy-live]", T),
+        ("venues/safety.py", "shared [deploy-live]", f"{T},{F}"),
+        # isolation: a bot-only [deploy-live] must NOT restart the other bot
+        ("lighter_funding_bot.py", "farmer-only [deploy-live]", F),
+        ("lighter_ticket_taker.py", "taker-only [deploy-live]", T),
+        # wrong marker for the changed file does nothing
+        ("lighter_funding_bot.py", "wrong [deploy-live-taker]", ""),
+    ]
+    for changed, msgs, exp in cases:
+        got = decide(changed, msgs)
+        assert got == exp, (f"marker gate BROKEN: changed={changed!r} msgs={msgs!r} "
+                            f"-> {got!r}, want {exp!r}")
+
+
 def _selftest():
     """Drives the parser against SYNTHETIC fixtures, never against today's real
     violations — a test that asserts the current breakage still exists demands
@@ -379,8 +463,11 @@ def _selftest():
     assert declared("bot_learn.py") is None, "brain is NOT declared — it's a real gap"
     for k, v in DEPLOY_COVERAGE_OK.items():
         assert len(v) > 60, f"{k}: a reason must be a reason, not a label"
+    # the OPT-IN live-bot marker gate — bound to the real workflow bash
+    _marker_logic_selftest()
     print("audit_deploy_coverage _selftest OK "
-          "(parser + COPY reconstruction + declared-prefix, on fixtures)")
+          "(parser + COPY reconstruction + declared-prefix + live-bot marker gate, "
+          "on fixtures)")
 
 
 if __name__ == "__main__":
