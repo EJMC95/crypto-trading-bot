@@ -76,6 +76,45 @@ ORDER_USD = float(os.environ.get("FUNDING_ORDER_USD", "25"))   # small: directio
 MAX_OPEN_POSITIONS = int(os.environ.get("FUNDING_MAX_OPEN", "6"))
 MAX_NEW_PER_LOOP = int(os.environ.get("FUNDING_MAX_NEW_PER_LOOP", "2"))
 
+# [2026-07-24 CONVICTION SIZING — Lever 2 | operator: "reach higher highs"]
+# Size each entry by a bounded multiple of the flat clip, driven by funding
+# CONVICTION (|apr| vs a reference): the crowded/extreme funders — the ones the
+# gate sweep and the live book both say pay best — get a bigger clip; marginal
+# ones stay at (or below) base. Default OFF (multiplier ≡ 1.0) so it ships DARK
+# on the live arm and every existing decision stays byte-identical; enabled
+# per-arm by env (shadow twin first). VALIDATED on Lighter's own 150d tape
+# (scripts/backtest_farmer_breadth_lighter.py, measured 0.5bps): the allocation-
+# SKILL term (net − mean_mult×flat) is +$19.64 in 'scaled' bounds — bigger size
+# lands on the winners, separately from leverage, corroborated by the independent
+# gate sweep (hotter funding = better net). maxDD grows with size, so the
+# multiplier is BOUNDED here AND the venues/safety notional cap still enforces
+# the real-money ceiling — the entry cap check below sees the CONVICTION clip,
+# not the flat one. [[notional-cap-vs-variable-clip]]
+_CONV_RAW = os.environ.get("FUNDING_CONVICTION", "off").strip().lower()
+CONVICTION_MODE = _CONV_RAW if _CONV_RAW in ("scaled", "realloc") else (
+    "scaled" if _CONV_RAW in ("on", "1", "true", "yes") else "off")
+_CDLO, _CDHI = (0.6, 1.6) if CONVICTION_MODE == "realloc" else (1.0, 2.2)
+CONVICTION_LO = float(os.environ.get("FUNDING_CONVICTION_LO", str(_CDLO)))
+CONVICTION_HI = float(os.environ.get("FUNDING_CONVICTION_HI", str(_CDHI)))
+# reference |apr| where the multiplier ~ 1.0 — ~ the venue resting-funding
+# default (0.105 TRUE) / the live book's median entry |apr|. Above it -> size up.
+CONVICTION_REF = float(os.environ.get("FUNDING_CONVICTION_REF", "0.105"))
+
+
+def conviction_mult(apr):
+    """Bounded conviction multiplier on the base clip, from funding |apr|.
+    Returns 1.0 (a no-op) when disabled or misconfigured — the dark-default
+    contract, so an unset env leaves every clip exactly order_usd. Never
+    unbounded: clamped to [CONVICTION_LO, CONVICTION_HI] so a single position can
+    never eat the notional cap on its own (the cap is the outer guard)."""
+    if CONVICTION_MODE == "off" or CONVICTION_REF <= 0:
+        return 1.0
+    try:
+        m = abs(float(apr)) / CONVICTION_REF
+    except (TypeError, ValueError):
+        return 1.0
+    return max(CONVICTION_LO, min(CONVICTION_HI, m))
+
 # [2026-07-17 RE-DENOMINATED /8 with H above — the DECISION is unchanged.]
 # These were 0.40 / 0.15 against an 8x-inflated apr, i.e. they really admitted
 # at 5% / 1.875% TRUE. They now read 0.05 / 0.01875 against a TRUE apr: the
@@ -211,6 +250,26 @@ SCAN_VOL_LOOKBACK_H = int(os.environ.get("SCAN_VOL_LOOKBACK_H", "24"))
 SCAN_MOM_LOOKBACK_H = int(os.environ.get("SCAN_MOM_LOOKBACK_H", "6"))
 # (candle features are cached per CLOSED hourly bar — see _candle_features — so they
 # refresh the moment a new bar closes and are reused free within the hour; no TTL knob.)
+
+# [2026-07-24 EXPLORE BUCKET — Lever 1 | operator: "not restricted to what it
+# knows to win on" / "cut windows on the box so it's not starved"] The scanner
+# above is a pure EXPLOIT ranker — it deep-scans only the top SCAN_DEEP_MAX by
+# |apr|, so the book re-selects the same hottest funders (measured: ~2 coins) and
+# never evaluates a mid-funding, high-QUALITY coin. This reserves SCAN_EXPLORE_K
+# of the MAX_OPEN slots for COVERAGE-sampled coins ranked BELOW the exploit set —
+# least-recently-tried first, so exploration sweeps the eligible universe over
+# time. They pass the SAME Stage-B/C quality vetoes (vol / adverse / spread /
+# slip); breadth never means trading convulsing junk, and the funding FLOOR is
+# unchanged (no adverse-selection widening — that was measured to cost). Every
+# explore entry is stamped src=explore so the brain / radar / experiment-judge
+# grade the bucket's own P&L. Default 0 = OFF: ships DARK on the live arm and the
+# scanner's returned list stays byte-identical to today; enabled per-arm by env
+# (shadow twin first). Adds up to K candle+book fetches to the ~21/min governor
+# budget — keep K small. HONEST PRIOR: on 150d Lighter tape the explore slice
+# backtested NEGATIVE within the top-25 liquid set (a funding-harvest edge is
+# monotonic in funding extremity), so this is a SHADOW probe of whether a wider
+# universe hides breadth, not a proven earner.
+SCAN_EXPLORE_K = int(os.environ.get("SCAN_EXPLORE_K", "0"))
 
 # Entry gate. The DEFAULT KEEPS THE TUNED 0.40 SAFETY GATE — the scanner's mandate is to
 # pick better AMONG the survivors (veto stop-out traps + risk-adjusted rank), NOT to
@@ -512,7 +571,7 @@ def cross_venue_mult(f):
     return 0.5 + 0.7 * (agree / total)       # 0 agree -> 0.5, all agree -> 1.2
 
 
-def scan_candidates(ctx, prelim, order_usd, log):
+def scan_candidates(ctx, prelim, order_usd, log, last_tried=None):
     """Three governor-aware stages; returns finalists ranked best-first as
     (coin, f, apr, is_short, book_metrics, evidence). Fetch-cost is bounded so the
     scan can't drain the ~21 weight/min Lighter budget shared with order txs + sibling
@@ -525,60 +584,81 @@ def scan_candidates(ctx, prelim, order_usd, log):
          (vol / adverse-trend) and score survivors by |APR| x bounded risk discounts
          x cross-venue. This is the BACKTESTED core (scripts/backtest_scanner.py).
       C. BOOK-probe only the top SCAN_BOOK_PROBE survivors (ONE fetch each): spread +
-         clip-slippage gate + a small book-imbalance tiebreak. Live-only overlay."""
+         clip-slippage gate + a small book-imbalance tiebreak. Live-only overlay.
+
+    EXPLORE (Lever 1, SCAN_EXPLORE_K>0): additionally coverage-samples K coins from
+    BELOW the exploit cut (least-recently-tried first, via `last_tried`) and runs
+    them through the SAME B/C vetoes, tagged src=explore and returned AHEAD of the
+    exploit finalists so the entry loop's reservation holds under slot scarcity.
+    K=0 (default) returns exactly the exploit list — byte-identical to pre-Lever-1."""
     # STAGE A — free cross-venue-weighted prefilter over the whole eligible pool
     ranked_pre = sorted(prelim, key=lambda cfa: -abs(cfa[2]) * cross_venue_mult(cfa[1]))
 
-    # STAGE B — candle veto + core score on the top SCAN_DEEP_MAX (cached)
-    survivors = []
-    for coin, f, apr in ranked_pre[:SCAN_DEEP_MAX]:
-        feats = _candle_features(ctx, coin)
-        if feats is None:
-            log.info("%s SCAN_SKIP no-candles (risk unverifiable)", coin)
-            continue
-        is_short = apr > 0                       # funding>0 -> longs pay -> we SHORT
-        adverse = feats["ret_mom"] if is_short else -feats["ret_mom"]
-        if feats["vol"] > SCAN_VETO_VOL:
-            log.info("%s VETO vol %.2f%%/h > %.2f%%", coin, feats["vol"] * 100,
-                     SCAN_VETO_VOL * 100)
-            continue
-        if adverse > SCAN_VETO_ADVERSE:
-            log.info("%s VETO adverse-trend %+.1f%% (fresh move into our stop)",
-                     coin, adverse * 100)
-            continue
-        vol_disc = 1.0 / (1.0 + (feats["vol"] / SCAN_VETO_VOL) ** 2)  # (0,1], .5 at veto
-        adv_disc = math.exp(-6.0 * max(0.0, adverse))                 # (0,1]
-        xv = cross_venue_mult(f)                                      # [0.5,1.2]
-        core = abs(apr) * vol_disc * adv_disc * xv
-        survivors.append((core, coin, f, apr, is_short, feats, xv, adverse))
-    survivors.sort(key=lambda x: -x[0])
+    def _evaluate(cands, src):
+        """STAGE B (candle veto + core score) then STAGE C (book probe) over
+        `cands`; finalists best-first, ev tagged `src`. The vetoes do NOT bend for
+        breadth — exploit and explore clear the identical quality bar."""
+        survivors = []
+        for coin, f, apr in cands:
+            feats = _candle_features(ctx, coin)
+            if feats is None:
+                log.info("%s SCAN_SKIP no-candles (risk unverifiable)", coin)
+                continue
+            is_short = apr > 0                       # funding>0 -> longs pay -> we SHORT
+            adverse = feats["ret_mom"] if is_short else -feats["ret_mom"]
+            if feats["vol"] > SCAN_VETO_VOL:
+                log.info("%s VETO vol %.2f%%/h > %.2f%%", coin, feats["vol"] * 100,
+                         SCAN_VETO_VOL * 100)
+                continue
+            if adverse > SCAN_VETO_ADVERSE:
+                log.info("%s VETO adverse-trend %+.1f%% (fresh move into our stop)",
+                         coin, adverse * 100)
+                continue
+            vol_disc = 1.0 / (1.0 + (feats["vol"] / SCAN_VETO_VOL) ** 2)  # (0,1], .5 at veto
+            adv_disc = math.exp(-6.0 * max(0.0, adverse))                 # (0,1]
+            xv = cross_venue_mult(f)                                      # [0.5,1.2]
+            core = abs(apr) * vol_disc * adv_disc * xv
+            survivors.append((core, coin, f, apr, is_short, feats, xv, adverse))
+        survivors.sort(key=lambda x: -x[0])
 
-    # STAGE C — book-probe only the top finalists (bounded token spend)
-    finalists = []
-    for core, coin, f, apr, is_short, feats, xv, adverse in survivors[:SCAN_BOOK_PROBE]:
-        bm = book_metrics(ctx, coin, order_usd)
-        if bm is None or bm["spread_bps"] > MAX_SPREAD_BPS:
-            log.info("%s SPREAD/BOOK_SKIP (%s)", coin,
-                     f"{bm['spread_bps']:.0f}bps" if bm else "no book")
-            continue
-        slip = bm["sell_slip"] if is_short else bm["buy_slip"]
-        if slip is None or slip > SCAN_MAX_SLIP_BPS:
-            log.info("%s VETO clip-slip %s bps > %.0f", coin,
-                     f"{slip:.0f}" if slip is not None else "thin", SCAN_MAX_SLIP_BPS)
-            continue
-        # adverse near-touch imbalance: book leaning INTO our stop (short hurt by bids,
-        # long by asks). Small tiebreak only — noisy/spoofable, never a gate.
-        tot = bm["bid_depth"] + bm["ask_depth"]
-        imb = (((bm["bid_depth"] - bm["ask_depth"]) if is_short
-                else (bm["ask_depth"] - bm["bid_depth"])) / tot) if tot > 0 else 0.0
-        final = core * (1.0 - 0.30 * max(0.0, imb))
-        ev = {"score": round(final, 4), "vol": round(feats["vol"], 5),
-              "adverse": round(adverse, 4), "slip_bps": round(slip, 1),
-              "xv": round(xv, 2), "imb": round(imb, 2)}
-        finalists.append((final, coin, f, apr, is_short, bm, ev))
-    finalists.sort(key=lambda x: -x[0])
-    return [(c, f, apr, is_short, bm, ev)
-            for _, c, f, apr, is_short, bm, ev in finalists]
+        finalists = []
+        for core, coin, f, apr, is_short, feats, xv, adverse in survivors[:SCAN_BOOK_PROBE]:
+            bm = book_metrics(ctx, coin, order_usd)
+            if bm is None or bm["spread_bps"] > MAX_SPREAD_BPS:
+                log.info("%s SPREAD/BOOK_SKIP (%s)", coin,
+                         f"{bm['spread_bps']:.0f}bps" if bm else "no book")
+                continue
+            slip = bm["sell_slip"] if is_short else bm["buy_slip"]
+            if slip is None or slip > SCAN_MAX_SLIP_BPS:
+                log.info("%s VETO clip-slip %s bps > %.0f", coin,
+                         f"{slip:.0f}" if slip is not None else "thin", SCAN_MAX_SLIP_BPS)
+                continue
+            # adverse near-touch imbalance: book leaning INTO our stop (short hurt by bids,
+            # long by asks). Small tiebreak only — noisy/spoofable, never a gate.
+            tot = bm["bid_depth"] + bm["ask_depth"]
+            imb = (((bm["bid_depth"] - bm["ask_depth"]) if is_short
+                    else (bm["ask_depth"] - bm["bid_depth"])) / tot) if tot > 0 else 0.0
+            final = core * (1.0 - 0.30 * max(0.0, imb))
+            ev = {"score": round(final, 4), "vol": round(feats["vol"], 5),
+                  "adverse": round(adverse, 4), "slip_bps": round(slip, 1),
+                  "xv": round(xv, 2), "imb": round(imb, 2), "src": src}
+            finalists.append((final, coin, f, apr, is_short, bm, ev))
+        finalists.sort(key=lambda x: -x[0])
+        return [(c, f, apr, is_short, bm, ev)
+                for _, c, f, apr, is_short, bm, ev in finalists]
+
+    exploit = _evaluate(ranked_pre[:SCAN_DEEP_MAX], "exploit")
+    if SCAN_EXPLORE_K <= 0:
+        return exploit                       # DARK default — pre-Lever-1 behaviour
+    # STAGE A' — EXPLORE: coverage-sample K from BELOW the exploit cut, least-
+    # recently-tried first (never-tried == 0.0 sorts first), |apr| as tiebreak.
+    lt = last_tried or {}
+    tail = ranked_pre[SCAN_DEEP_MAX:]
+    tail.sort(key=lambda cfa: (lt.get(cfa[0], 0.0), -abs(cfa[2])))
+    explore = _evaluate(tail[:SCAN_EXPLORE_K], "explore")
+    # explore FIRST so the reservation survives slot scarcity; the entry loop caps
+    # explore opens at SCAN_EXPLORE_K and lets exploit overflow any unused window.
+    return explore + exploit
 
 
 # [2026-07-17] The cap rule now lives on the RAIL that enforces it
@@ -764,6 +844,7 @@ def main():
     hot_since = {}     # coin -> ts |apr| first >= ENTER_APR
     cooldown = {}      # coin -> ts until which re-entry is blocked (post-stop)
     stop_hist = {}     # coin -> [stop ts] inside the repeat window (21-Jul)
+    explore_seen = {}  # coin -> ts last opened as an EXPLORE pick (Lever 1 coverage cursor)
     miss = {}          # coin -> consecutive fresh-price misses (live fail-safe)
     fund_realized = 0.0  # dry_run only: cumulative realized funding (price P&L is in broker)
 
@@ -794,6 +875,8 @@ def main():
         if _saved and broker is not None and broker.restore_state(_saved.get("broker") or {}):
             meta = {str(k): v for k, v in (_saved.get("meta") or {}).items()}
             fund_realized = float(_saved.get("fund_realized") or 0.0)
+            explore_seen = {str(k): float(v) for k, v in
+                            (_saved.get("explore_seen") or {}).items()}
             _qok, _qcd, _qsh = _read_quarantine(bot_id)
             cooldown, stop_hist = _qcd, _qsh
             if not _qok:
@@ -805,6 +888,8 @@ def main():
         # a redeploy instead of resetting to now.
         _live = store.load_state(bot_id + ":live") or {}
         meta = {str(k): v for k, v in (_live.get("meta") or {}).items()}
+        explore_seen = {str(k): float(v) for k, v in
+                        (_live.get("explore_seen") or {}).items()}
         # [2026-07-22 COOLDOWN DURABILITY — a MEASURED real-money guard failure]
         # `cooldown` and `stop_hist` were memory-only, so EVERY restart silently
         # cleared the post-stop quarantine. Measured on the live book: LIT was
@@ -1532,7 +1617,7 @@ def main():
                 # Wrapped: a scanner bug must NEVER crash the loop that manages stops —
                 # degrade to no new entries this loop. [review 2026-07-11]
                 try:
-                    ranked = scan_candidates(ctx, prelim, order_usd, log)
+                    ranked = scan_candidates(ctx, prelim, order_usd, log, explore_seen)
                 except Exception as e:  # noqa: BLE001
                     log.error("scanner error (%s) — no new entries this loop", e)
                     ranked = []
@@ -1540,9 +1625,20 @@ def main():
                 # legacy: raw |apr|, book fetched per-candidate below (bm/ev = None)
                 ranked = [(c, f, apr, apr > 0, None, None) for c, f, apr in prelim]
 
+            # [2026-07-24 EXPLORE RESERVATION — Lever 1] cap TOTAL explore
+            # positions at SCAN_EXPLORE_K. Explore candidates arrive FIRST in
+            # `ranked`, so they claim their reserved windows and exploit overflows
+            # whatever explore doesn't use. K=0 -> no explore tags -> unchanged.
+            n_explore = sum(1 for mm in meta.values()
+                            if isinstance(mm, dict) and mm.get("src") == "explore")
+            # clamp so EXPLOIT always keeps >=1 slot even if K is misconfigured high
+            _expl_k = max(0, min(SCAN_EXPLORE_K, max_open - 1))
             for coin, f, apr, is_short, bm, ev in ranked:
                 if open_now >= max_open or opened_this_loop >= MAX_NEW_PER_LOOP:
                     break
+                src = (ev or {}).get("src", "exploit")
+                if src == "explore" and n_explore >= _expl_k:
+                    continue      # explore reservation full — leave the slot to exploit
                 # [2026-07-11 QUALITY VETO] fleet-measured toxicity, restrict-only
                 if coin in _vetoes:
                     log.info("%s VETO_SKIP (%s)", coin, _vetoes[coin])
@@ -1573,13 +1669,16 @@ def main():
                     px, spread_bps = bm["mid"], bm["spread_bps"]   # from the deep-scan fetch
                 if px is None:
                     continue
-                size = round(order_usd / px, 6)
+                clip = order_usd * conviction_mult(apr)   # Lever 2: dark default -> order_usd
+                size = round(clip / px, 6)
                 if not dry_run:
                     # [2026-07-15 AUDIT FIX v2] real deployed notional (held at
                     # their own clips + this loop's opens) — NOT open_now*clip,
                     # which breaches the cap when the growth rail moved the clip.
                     open_ntl = _open_notional(pos, meta, open_now, order_usd)
-                    if not ctx.rails.notional_ok(open_ntl, order_usd):
+                    # cap check sees the CONVICTION clip, not the flat one — a
+                    # bigger clip must be admitted against the cap it will fill.
+                    if not ctx.rails.notional_ok(open_ntl, clip):
                         log.info("%s NOTIONAL_CAP_SKIP", coin)
                         continue
                 _res = None
@@ -1595,7 +1694,8 @@ def main():
                     log.error("open %s failed: %s", coin, e)
                     continue
                 meta[coin] = {"is_short": is_short, "entry": px, "opened_ts": t0,
-                              "accrued": 0.0, "clip": order_usd,   # deployed clip
+                              "accrued": 0.0, "clip": clip,   # deployed clip (conviction-scaled)
+                              "src": src,                     # Lever 1: explore|exploit (grading)
                               # [2026-07-22 FLAP FIX] the bars priced at
                               # entry govern this trade (enter_apr is the
                               # admission gate, attribution only).
@@ -1604,12 +1704,16 @@ def main():
                                        "max_hold_h": MAX_HOLD_H}}
                 open_now += 1
                 opened_this_loop += 1
-                log.info("OPEN %s %s $%.0f | funding %+.1f%% APR | px %.6g | spread %.0fbps%s",
-                         coin, "short" if is_short else "long", order_usd, apr, px, spread_bps,
+                if src == "explore":
+                    n_explore += 1
+                    explore_seen[coin] = t0   # coverage cursor -> rotate this coin to the back
+                log.info("OPEN %s %s $%.2f | funding %+.1f%% APR | px %.6g | spread %.0fbps%s",
+                         coin, "short" if is_short else "long", clip, apr, px, spread_bps,
                          (" | " + " ".join(f"{k}={v}" for k, v in ev.items())) if ev else "")
                 try:
                     raw = {"apr": round(apr, 3), "spread_bps": round(spread_bps, 1),
                            "leg": "open", "mctx": _mctx_slice(_mctx, coin),
+                           "conv_mult": round(clip / order_usd, 3) if order_usd else 1.0,
                            "slope": {"apr_prev": (round(_slope_prev, 4)
                                                   if _slope_prev is not None else None),
                                      "lookback_h": SLOPE_LOOKBACK_H,
@@ -1693,7 +1797,12 @@ def main():
                     "stop_hist": {c: ts for c, ts in (
                         (c, [t for t in v
                              if time.time() - t <= REPEAT_STOP_WINDOW_D * 86400])
-                        for c, v in stop_hist.items()) if ts}})
+                        for c, v in stop_hist.items()) if ts},
+                    # [2026-07-24] explore coverage cursor (Lever 1). Pruned to a
+                    # 14d window: a coin not explored that long resets to never-
+                    # tried and regains priority — bounded + self-cleaning.
+                    "explore_seen": {c: t for c, t in explore_seen.items()
+                                     if time.time() - t <= 14 * 86400}})
             elif live_baseline is not None:
                 store.save_state(bot_id + ":live", {
                     "initial_equity": live_baseline, "meta": meta,
@@ -1711,7 +1820,11 @@ def main():
                     "stop_hist": {c: ts for c, ts in (
                         (c, [t for t in v
                              if time.time() - t <= REPEAT_STOP_WINDOW_D * 86400])
-                        for c, v in stop_hist.items()) if ts}})
+                        for c, v in stop_hist.items()) if ts},
+                    # [2026-07-24] explore cursor (Lever 1) — dark on live (K=0 ->
+                    # empty), persisted for arm parity with the shadow twin.
+                    "explore_seen": {c: t for c, t in explore_seen.items()
+                                     if time.time() - t <= 14 * 86400}})
         except Exception:
             pass
 
@@ -1942,12 +2055,82 @@ def _selftest_quarantine():
     print("lighter_funding_bot _selftest_quarantine OK")
 
 
+def _selftest_conviction():
+    """[2026-07-24 Lever 2] conviction_mult is DARK by default and BOUNDED. Each
+    assertion fails against a naive implementation (unbounded, sizes-down in
+    scaled, or not off-by-default) — a revert cannot pass silently."""
+    M = sys.modules[__name__]      # the globals conviction_mult actually reads
+    save = (M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI, M.CONVICTION_REF)
+    try:
+        M.CONVICTION_MODE = "off"                       # DARK: every clip == order_usd
+        assert M.conviction_mult(0.30) == 1.0 and M.conviction_mult(0.01) == 1.0
+        assert M.conviction_mult(None) == 1.0, "bad input is a no-op, never a crash"
+        M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI, M.CONVICTION_REF = \
+            "scaled", 1.0, 2.2, 0.105
+        assert M.conviction_mult(0.02) == 1.0, "scaled FLOORS at 1.0 — never sizes down"
+        assert abs(M.conviction_mult(0.21) - 2.0) < 1e-9, "2x ref -> 2.0x"
+        assert M.conviction_mult(9.99) == 2.2, "far above ref -> CAPPED, never unbounded"
+        assert M.conviction_mult(-0.30) == M.conviction_mult(0.30), "keys on |apr| (sign-free)"
+        M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI = "realloc", 0.6, 1.6
+        assert M.conviction_mult(0.02) == 0.6, "realloc may size DOWN to LO"
+        assert M.conviction_mult(9.99) == 1.6, "realloc still capped at HI"
+        M.CONVICTION_REF = 0.0
+        assert M.conviction_mult(0.30) == 1.0, "REF<=0 guard -> no-op (no div-by-zero)"
+    finally:
+        (M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI, M.CONVICTION_REF) = save
+    print("lighter_funding_bot _selftest_conviction OK")
+
+
+def _selftest_explore():
+    """[2026-07-24 Lever 1] the explore bucket: coverage-samples K coins from
+    BELOW the exploit cut, tags src, and returns them FIRST; K=0 is byte-identical
+    to the pre-Lever exploit-only list. Stubs only the fetch layer (the vetoes are
+    pinned by the scanner's own history) to isolate the SELECTION under test."""
+    M = sys.modules[__name__]
+    save_fns = (M._candle_features, M.book_metrics, M.cross_venue_mult)
+    save_cfg = (M.SCAN_EXPLORE_K, M.SCAN_DEEP_MAX, M.SCAN_BOOK_PROBE)
+    try:
+        M._candle_features = lambda ctx, coin: {"ret_mom": 0.0, "vol": 0.001}
+        M.book_metrics = lambda ctx, coin, ou: {
+            "spread_bps": 5.0, "sell_slip": 2.0, "buy_slip": 2.0,
+            "bid_depth": 1000.0, "ask_depth": 1000.0, "mid": 100.0}
+        M.cross_venue_mult = lambda f: 1.0
+        M.SCAN_DEEP_MAX, M.SCAN_BOOK_PROBE = 15, 8
+        # 20 coins, |apr| strictly descending: C00 hottest ... C19 coolest.
+        prelim = [(f"C{i:02d}", {"rate": 0.0}, 0.30 - i * 0.01) for i in range(20)]
+        lg = logging.getLogger("selftest-explore")
+        tail = {f"C{i:02d}" for i in range(15, 20)}     # the below-cut names
+
+        M.SCAN_EXPLORE_K = 0                             # DARK -> exploit-only
+        r0 = scan_candidates(None, list(prelim), 25.0, lg, {})
+        assert r0 and all(ev["src"] == "exploit" for *_, ev in r0), "K=0 must be all-exploit"
+        assert all(c not in tail for c, *_ in r0), "K=0 must never surface a below-cut coin"
+
+        M.SCAN_EXPLORE_K = 2                             # ACTIVE, all never-tried
+        r = scan_candidates(None, list(prelim), 25.0, lg, {})
+        exp = [c for c, f, a, s, bm, ev in r if ev["src"] == "explore"]
+        assert exp == ["C15", "C16"], f"2 explore from the tail, hottest first; got {exp}"
+        assert r[0][5]["src"] == "explore" and r[1][5]["src"] == "explore", "explore FIRST"
+        assert any(ev["src"] == "exploit" for *_, ev in r), "exploit must still follow"
+
+        # COVERAGE: recently-tried C15/C16 -> skipped for never-tried C17/C18
+        r2 = scan_candidates(None, list(prelim), 25.0, lg, {"C15": 1e9, "C16": 1e9})
+        exp2 = sorted(c for c, f, a, s, bm, ev in r2 if ev["src"] == "explore")
+        assert exp2 == ["C17", "C18"], f"coverage must avoid recently-tried; got {exp2}"
+    finally:
+        (M._candle_features, M.book_metrics, M.cross_venue_mult) = save_fns
+        (M.SCAN_EXPLORE_K, M.SCAN_DEEP_MAX, M.SCAN_BOOK_PROBE) = save_cfg
+    print("lighter_funding_bot _selftest_explore OK")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_notional()
         _selftest_fill_read()
         _selftest_flap()
         _selftest_quarantine()
+        _selftest_conviction()
+        _selftest_explore()
         sys.exit(0)
     try:
         _supervised()
