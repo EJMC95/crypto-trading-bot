@@ -292,7 +292,11 @@ except Exception:  # noqa: BLE001
     tuning = None
 
 _ENV_BARS = {"enter_apr": ENTER_APR, "scan_enter": SCAN_ENTER,
-             "take_profit": TAKE_PROFIT, "max_hold_h": MAX_HOLD_H}
+             "take_profit": TAKE_PROFIT, "max_hold_h": MAX_HOLD_H,
+             # Lever 1/2 growth knobs — env defaults so a lever's expiry reverts
+             # cleanly. explore_k numeric; conviction as (mode, lo, hi).
+             "explore_k": SCAN_EXPLORE_K,
+             "conviction": (CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI)}
 _ACTIVE_BARS = {}    # what this arm is running NOW — stamped on every close
 
 
@@ -301,10 +305,14 @@ def apply_levers(mode):
     (never from mutated state — expiry reverts cleanly). Returns the moved
     levers for the log; refreshes _ACTIVE_BARS either way."""
     global ENTER_APR, SCAN_ENTER, ENTER_GATE, TAKE_PROFIT, MAX_HOLD_H
+    global SCAN_EXPLORE_K, CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI
     prefix = {"lighter_shadow": "xp.funding.", "lighter_live": "live.funding."}.get(mode)
     moved = {}
     ENTER_APR, SCAN_ENTER = _ENV_BARS["enter_apr"], _ENV_BARS["scan_enter"]
     TAKE_PROFIT, MAX_HOLD_H = _ENV_BARS["take_profit"], _ENV_BARS["max_hold_h"]
+    # growth knobs revert to env each call; a live/xp lever overrides below
+    SCAN_EXPLORE_K = _ENV_BARS["explore_k"]
+    CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI = _ENV_BARS["conviction"]
     if tuning is not None and prefix:
         ea = tuning.get_lever(prefix + "enter_apr", ENTER_APR)
         if ea != ENTER_APR:
@@ -318,10 +326,22 @@ def apply_levers(mode):
         if mh != MAX_HOLD_H:
             MAX_HOLD_H = mh
             moved[prefix + "max_hold_h"] = mh
+        # Lever 1 — explore slots (registry-clamped int; entry loop caps at max_open-1)
+        ek = tuning.get_lever(prefix + "explore_k", None)
+        if ek is not None and int(ek) != SCAN_EXPLORE_K:
+            SCAN_EXPLORE_K = int(ek)
+            moved[prefix + "explore_k"] = SCAN_EXPLORE_K
+        # Lever 2 — conviction as a numeric up-cap: >1.0 => scaled(floor 1.0, cap hi).
+        # Only ever sizes UP on the live arm; the notional cap still bounds it.
+        ch = tuning.get_lever(prefix + "conviction_hi", None)
+        if ch is not None and float(ch) > 1.0:
+            CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI = "scaled", 1.0, float(ch)
+            moved[prefix + "conviction_hi"] = float(ch)
     ENTER_GATE = SCAN_ENTER if SCAN_ENABLED else ENTER_APR
     _ACTIVE_BARS.clear()
     _ACTIVE_BARS.update({"enter_apr": ENTER_APR, "take_profit": TAKE_PROFIT,
-                         "max_hold_h": MAX_HOLD_H,
+                         "max_hold_h": MAX_HOLD_H, "explore_k": SCAN_EXPLORE_K,
+                         "conviction": CONVICTION_MODE,
                          "arm": mode or "paper", "tuned": sorted(moved)})
     return moved
 
@@ -2129,6 +2149,47 @@ def _selftest_explore():
     print("lighter_funding_bot _selftest_explore OK")
 
 
+def _selftest_lever_consume():
+    """[2026-07-25] apply_levers consumes the PROMOTED explore_k + conviction_hi
+    on the live arm (dark when no lever); conviction_hi>1 => scaled capped at hi;
+    a live lever never leaks onto the no-prefix (paper) arm. Mutation-tested: each
+    assertion fails if the consumption is absent, unbounded, or leaks."""
+    M = sys.modules[__name__]
+    real_tuning = M.tuning
+
+    class _FakeT:
+        def __init__(self, d):
+            self.d = d
+        def get_lever(self, name, default):
+            return self.d.get(name, default)
+
+    save = (dict(M._ENV_BARS), M.SCAN_EXPLORE_K, M.CONVICTION_MODE,
+            M.CONVICTION_LO, M.CONVICTION_HI)
+    try:
+        M._ENV_BARS["explore_k"] = 0                      # live env defaults: dark
+        M._ENV_BARS["conviction"] = ("off", 1.0, 2.2)
+        M.tuning = _FakeT({})                             # 1) no lever -> DARK
+        M.apply_levers("lighter_live")
+        assert M.SCAN_EXPLORE_K == 0 and M.CONVICTION_MODE == "off", "no lever must be dark"
+        M.tuning = _FakeT({"live.funding.explore_k": 2,   # 2) judge promotes both
+                           "live.funding.conviction_hi": 2.2})
+        moved = M.apply_levers("lighter_live")
+        assert M.SCAN_EXPLORE_K == 2, M.SCAN_EXPLORE_K
+        assert (M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI) == ("scaled", 1.0, 2.2)
+        assert {"live.funding.explore_k", "live.funding.conviction_hi"} <= set(moved)
+        M.tuning = _FakeT({"live.funding.conviction_hi": 1.0})   # 3) hi<=1 -> stays OFF
+        M.apply_levers("lighter_live")
+        assert M.CONVICTION_MODE == "off", "conviction_hi<=1.0 must not enable sizing"
+        M.tuning = _FakeT({"live.funding.explore_k": 2})  # 4) no leak onto paper arm
+        M.apply_levers("hl_paper")
+        assert M.SCAN_EXPLORE_K == 0, "no-prefix arm must ignore live levers"
+    finally:
+        M.tuning = real_tuning
+        env, M.SCAN_EXPLORE_K, M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI = save
+        M._ENV_BARS.clear(); M._ENV_BARS.update(env)
+    print("lighter_funding_bot _selftest_lever_consume OK")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_notional()
@@ -2137,6 +2198,7 @@ if __name__ == "__main__":
         _selftest_quarantine()
         _selftest_conviction()
         _selftest_explore()
+        _selftest_lever_consume()
         sys.exit(0)
     try:
         _supervised()

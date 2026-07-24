@@ -245,6 +245,25 @@ LEVERS = {
     "live.funding.max_hold_h": {
         "kind": "float", "lo": 24.0, "hi": 96.0, "lane": "lighter-live",
         "note": "PROMOTED max hold; env default 72"},
+    # [2026-07-24/25] Farmer GROWTH levers (Lever 1 explore, Lever 2 conviction),
+    # promotable to real money by the experiment judge on the operator-chosen
+    # FASTER bar (~2-3d, net-positive + beats-live, tight fade-revert). explore_k
+    # reserves scan slots for coverage-sampled coins; conviction_hi is the numeric
+    # up-size cap (>1.0 => scaled sizing, floor 1.0) — ALWAYS bounded by the
+    # SafetyRails notional cap at order time, so it reshapes clips, never raises
+    # the ceiling. Same single-author rule: the judge alone writes live.funding.*.
+    "xp.funding.explore_k": {
+        "kind": "int", "lo": 0, "hi": 3, "lane": "lighter-xp",
+        "note": "shadow twin's explore slots; env default 0"},
+    "xp.funding.conviction_hi": {
+        "kind": "float", "lo": 1.0, "hi": 2.2, "lane": "lighter-xp",
+        "note": "shadow twin's conviction up-cap; 1.0 = off"},
+    "live.funding.explore_k": {
+        "kind": "int", "lo": 0, "hi": 3, "lane": "lighter-live",
+        "note": "PROMOTED explore slots; env default 0"},
+    "live.funding.conviction_hi": {
+        "kind": "float", "lo": 1.0, "hi": 2.2, "lane": "lighter-live",
+        "note": "PROMOTED conviction up-cap; 1.0 = off, env default off"},
 }
 
 
