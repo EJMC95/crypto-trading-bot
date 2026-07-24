@@ -1783,6 +1783,10 @@ def main():
                 equity=pub_equity, pnl_abs=pub_pnl, open_trades=pub_open,
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": ctx.mode, "venue": ctx.mode, "style": "directional-funding",
+                       # build + lever state PUBLISHED (not just logged) so a deploy
+                       # is confirmable from the bot's own output via Postgres.
+                       "build": _BUILD,
+                       "levers": {"explore_k": SCAN_EXPLORE_K, "conviction": CONVICTION_MODE},
                        "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                 for c in meta},
                        "hottest_apr": {c: f"{r*H:+.0%}" for c, r in top},
