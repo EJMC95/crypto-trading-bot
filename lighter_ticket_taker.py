@@ -516,6 +516,51 @@ def up_regime(closes, n=None):
     return closes[-1] > ema and ema > prev
 
 
+def up_strength(closes, n=None):
+    """A bounded UP-regime STRENGTH in [0,1] from DAILY closes (oldest->newest):
+    the bull-engine research's #1 winning-breakout feature, quantified for RANKING
+    (up_regime stays the boolean gate). 0.0 when not in a confirmed up-regime (or
+    too few bars), rising toward 1 as the last close sits further above a steeper-
+    rising EMA(n). Blends the close-vs-EMA margin (10%+ = full) and the EMA slope
+    (2%/day = full). Strength>0 <=> up_regime()==True by construction (same two
+    inequalities), so it never disagrees with the gate."""
+    n = EMA_N if n is None else n
+    if not closes or len(closes) < n + 2:
+        return None
+    k = 2.0 / (n + 1)
+    ema = closes[0]
+    prev = ema
+    for c in closes[1:]:
+        prev = ema
+        ema = c * k + ema * (1.0 - k)
+    if ema <= 0 or prev <= 0:
+        return 0.0
+    margin = closes[-1] / ema - 1.0        # last close above its EMA
+    slope = ema / prev - 1.0               # EMA rising?
+    if margin <= 0 or slope <= 0:
+        return 0.0                          # not a confirmed up -> zero strength
+    m = min(margin / 0.10, 1.0)            # 10%+ above EMA = full marks
+    s = min(slope / 0.02, 1.0)             # 2%/day EMA slope = full marks
+    return round(0.6 * m + 0.4 * s, 4)
+
+
+def breakout_quality(up_str, range_pos, vol_m):
+    """A bounded [0,1] QUALITY score for a breakout candidate — the scanner
+    'sidekick': it ranks admitted breakouts (so a scarce slot can go to the
+    highest-conviction one) and feeds the default-off TT_BRK_QUALITY_MIN gate.
+    Blends the research's winning features: up-regime STRENGTH (0.5, the #1
+    signal), nearness to the daily high (0.3), liquidity (0.2). ADVISORY — it
+    NEVER admits anything up_regime/bull_entry_ok refused; it only ranks/filters
+    within the admitted set. up_str None -> treated as 0 (unknown = worst). The
+    WEIGHTS are a research-seeded starting point; the entry-feature capture lets
+    the winning threshold be DERIVED from shadow outcomes rather than guessed."""
+    u = 0.0 if up_str is None else max(0.0, min(float(up_str), 1.0))
+    r = (max(0.0, min((float(range_pos) - 0.90) / 0.10, 1.0))
+         if range_pos is not None else 0.0)          # 0.90->0, 1.00->1
+    v = max(0.0, min(float(vol_m) / 5.0, 1.0)) if vol_m else 0.0   # $5M+ = full
+    return round(0.5 * u + 0.3 * r + 0.2 * v, 4)
+
+
 def _up_from_ticket(ticket):
     """Tri-state up-regime from the oracle's per-asset stamp on a ticket:
     dir==+1 -> True, dir==-1 -> False, absent -> None (ungraded)."""
@@ -548,6 +593,11 @@ def bull_entry_ok(lens, side, ticket, up=None):
 # trailing give-back off the peak, and NO fixed TP cap.
 BRK_TRAIL = float(os.environ.get("TT_BRK_TRAIL", "0.06"))   # trail 6% off peak
 BRK_SL = float(os.environ.get("TT_BRK_SL", "-0.07"))        # wide hard stop
+# The scanner sidekick's ADVISORY quality gate: skip a breakout whose
+# breakout_quality() < this. DEFAULT 0.0 = inert (blocks nothing) — the score is
+# CAPTURED on every breakout entry regardless, so the winning threshold can be
+# derived from shadow outcomes before it is ever raised. Restrict-only.
+BRK_QUALITY_MIN = float(os.environ.get("TT_BRK_QUALITY_MIN", "0"))
 
 
 def bull_exit(lens):
@@ -562,7 +612,7 @@ def bull_exit(lens):
     return None, 0.0        # divergence: fixed bracket, no trail
 
 
-_UP_CACHE = {}             # sym -> (up_tristate, expiry_epoch) — candle read TTL
+_UP_CACHE = {}             # sym -> (up_tristate, strength, expiry_epoch) — read TTL
 
 
 def up_read(venue, sym, now_ts, ttl_s=3600.0):
@@ -574,9 +624,10 @@ def up_read(venue, sym, now_ts, ttl_s=3600.0):
     a recurring candidate re-fetches next boot. Only breakout candidates trigger
     it (the caller gates on lens)."""
     hit = _UP_CACHE.get(sym)
-    if hit and hit[1] > now_ts:
+    if hit and hit[2] > now_ts:
         return hit[0]
     up = None
+    strength = None
     try:
         end_ms = int(now_ts * 1000)
         start_ms = end_ms - int((EMA_N + 6) * 86400 * 1000)
@@ -592,10 +643,20 @@ def up_read(venue, sym, now_ts, ttl_s=3600.0):
         raw = raw[:-1] if raw else raw
         closes = [float(c["c"]) if isinstance(c, dict) else float(c) for c in raw]
         up = up_regime(closes)
+        strength = up_strength(closes)     # cached alongside — one fetch, no extra
     except Exception:  # noqa: BLE001 — a candle blip fails CLOSED, never a crash
         up = None
-    _UP_CACHE[sym] = (up, now_ts + ttl_s)
+        strength = None
+    _UP_CACHE[sym] = (up, strength, now_ts + ttl_s)
     return up
+
+
+def up_read_strength(sym):
+    """The up-regime STRENGTH cached by the last up_read(sym) this cycle (None if
+    unread or the fetch failed). Companion accessor — NO extra fetch; the caller
+    that already ran up_read(sym) for the gate reads the strength for free."""
+    hit = _UP_CACHE.get(sym)
+    return hit[1] if hit else None
 
 
 def lens_evidence(o, min_n=None):
@@ -1796,6 +1857,20 @@ def main(_ctx=None):
                     if lens == "breakout" else None
                 if not bull_entry_ok(lens, _bside, t, up=_up):
                     continue
+                # [2026-07-24 (di) SCANNER SIDEKICK] breakout QUALITY score.
+                # Reuses up_read's cached strength (NO extra fetch); applies the
+                # ADVISORY, default-off TT_BRK_QUALITY_MIN gate (restrict-only,
+                # inert at 0.0). Stashes the score + up-strength on the ticket so
+                # they are CAPTURED on the entry (evidence, below) -> the close
+                # row -> the winning breakout criteria can be DERIVED from shadow
+                # outcomes rather than guessed. Divergence is untouched.
+                if lens == "breakout":
+                    _ustr = up_read_strength(sym)
+                    _q = breakout_quality(_ustr, t.get("range_pos"),
+                                          t.get("vol_m"))
+                    if _q < BRK_QUALITY_MIN:
+                        continue          # default 0.0 -> never blocks
+                    t = {**t, "_brk_quality": _q, "_up_strength": _ustr}
             # [2026-07-22] coin-quality veto. Symbol form is normalised because
             # the scout emits a bare base ("BOT") while the ledger records a
             # pair ("BOT/USDC"); matching only one form would make this veto
@@ -1850,6 +1925,12 @@ def main(_ctx=None):
             size = clip / mark
             ev = {k: t.get(k) for k in ("range_pos", "chg_pct", "vol_m",
                                         "prem_bps", "apr_pct", "gap_pct")}
+            # [2026-07-24 (di)] capture the scanner-sidekick features for a
+            # breakout entry (stashed by the bull gate above) so the close row
+            # carries them — the raw material for DERIVING the winning criteria.
+            if t.get("_brk_quality") is not None:
+                ev["brk_quality"] = t.get("_brk_quality")
+                ev["up_strength"] = t.get("_up_strength")
             entry_px = mark
             # [2026-07-17] BRACES to the allow-list's belt. The filter above is
             # the belt; this is the last statement before real money moves, so
@@ -2384,6 +2465,38 @@ def selftest():
     # WITHOUT the drop the leaked partial bar flips it UP — so this pins the fix.
     assert up_read(_StubV([float(40 - i) for i in range(0, 38)] + [100.0]),
                    "SPIKE", 1.7e9) is False
+    globals()["_UP_CACHE"] = {}
+    # [(di) SCANNER SIDEKICK] up_strength: bounded [0,1], 0 when not up, >0 EXACTLY
+    # when up_regime is True (same two inequalities); differentiates gentle vs steep.
+    assert up_strength([1.0, 2.0, 3.0]) is None                        # too few bars
+    _su = up_strength([float(i) for i in range(1, 40)])
+    assert _su is not None and 0.0 < _su <= 1.0
+    assert up_regime([float(i) for i in range(1, 40)]) is True          # consistent
+    assert up_strength([float(40 - i) for i in range(1, 40)]) == 0.0    # down -> 0
+    assert up_strength([100.0] * 40) == 0.0                            # flat -> 0
+    assert (up_strength([100.0 + 0.1 * i for i in range(40)])          # gentle up ...
+            < up_strength([float(i * i) for i in range(1, 41)]))       # ... < steep up
+    # breakout_quality: bounded [0,1], monotone in each feature, None up-str -> 0
+    assert breakout_quality(1.0, 1.0, 10.0) == 1.0                     # max
+    assert breakout_quality(0.0, 0.90, 0.0) == 0.0                     # min
+    assert breakout_quality(None, 0.95, 1.0) == breakout_quality(0.0, 0.95, 1.0)
+    assert breakout_quality(0.9, 0.95, 1.0) > breakout_quality(0.5, 0.95, 1.0)  # up_str
+    assert breakout_quality(0.5, 1.00, 1.0) > breakout_quality(0.5, 0.95, 1.0)  # range_pos
+    assert breakout_quality(0.5, 0.95, 5.0) > breakout_quality(0.5, 0.95, 1.0)  # volume
+    # up_read now caches the strength; up_read_strength() reads it with NO refetch,
+    # and the cache-hit path still returns the tri-state after the tuple reshape.
+    assert up_read_strength("NEVER") is None                          # unread -> None
+    globals()["_UP_CACHE"] = {}
+    assert up_read(_StubV([float(i) for i in range(1, 40)]), "UPS", 1.7e9) is True
+    assert (up_read_strength("UPS") or 0.0) > 0.0                      # cached strength
+    globals()["_UP_CACHE"] = {}
+    assert up_read(_StubV([float(40 - i) for i in range(1, 40)]), "DNS", 1.7e9) is False
+    assert up_read_strength("DNS") == 0.0
+    globals()["_UP_CACHE"] = {}
+    assert up_read(_BadV(), "ERRS", 1.7e9) is None
+    assert up_read_strength("ERRS") is None                           # fetch failed -> None
+    globals()["_UP_CACHE"] = {"HITSYM": (True, 0.5, 9.9e18)}          # pre-seeded cache
+    assert up_read(None, "HITSYM", 1.7e9) is True                     # served from cache, no venue
     globals()["_UP_CACHE"] = {}
     # exit_reason trail OVERRIDE (per-lens): divergence keeps its +4% TP cap while
     # the trend exit is on globally; breakout runs past it
