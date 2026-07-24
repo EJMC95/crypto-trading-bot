@@ -495,22 +495,52 @@ def _is_crypto(sym):
     return str(sym or "").split("/")[0].upper() not in TRADFI_BASES
 
 
-def bull_entry_ok(lens, side, ticket):
+EMA_N = int(os.environ.get("TT_REGIME_EMA_N", "20"))
+
+
+def up_regime(closes, n=None):
+    """Per-asset UP regime from DAILY closes (oldest->newest): the last close is
+    above its own EMA(n) AND the EMA is rising. Tri-state — True / False /
+    None(too few bars). This is the broad-coverage read the oracle's ~8% grading
+    lacks: it works for ANY book with a candle history. Matches the bull-engine
+    research's own 'close>EMA20 & rising' up-regime definition."""
+    n = EMA_N if n is None else n
+    if not closes or len(closes) < n + 2:
+        return None
+    k = 2.0 / (n + 1)
+    ema = closes[0]
+    prev = ema
+    for c in closes[1:]:
+        prev = ema
+        ema = c * k + ema * (1.0 - k)
+    return closes[-1] > ema and ema > prev
+
+
+def _up_from_ticket(ticket):
+    """Tri-state up-regime from the oracle's per-asset stamp on a ticket:
+    dir==+1 -> True, dir==-1 -> False, absent -> None (ungraded)."""
+    d = (ticket.get("regime") or {}).get("dir")
+    return True if d == 1 else (False if d == -1 else None)
+
+
+def bull_entry_ok(lens, side, ticket, up=None):
     """The bull dual-mode entry gate (RESTRICT-ONLY; only applied when
     BULL_MODE). Admits ONLY long-breakout + short-divergence, crypto-only, with a
-    per-asset regime gate: a LONG needs a CONFIRMED up-regime (dir==+1; no stamp
-    -> skip, since buying up-regime alone LOSES and the signal needs the
-    confirmation), and a SHORT is refused only INTO a confirmed up-regime — else
-    the funding screen carries it. Fail-safe on an absent regime: a long without
-    a stamp is skipped, a short without one is kept."""
+    per-asset regime gate. `up` is a tri-state up-regime read the caller supplies
+    (True/False/None) — the CANDLE-derived up_regime() for broad coverage; when
+    None it falls back to the oracle's sparse per-asset stamp. A LONG needs a
+    CONFIRMED up (fail-CLOSED: buying up-regime alone LOSES, the signal needs the
+    confirmation); a SHORT is refused only INTO a confirmed up — else the funding
+    screen carries it."""
     if (lens, side) not in BULL_LENS_SIDES:
         return False
     if not _is_crypto(ticket.get("sym")):
         return False
-    d = (ticket.get("regime") or {}).get("dir")
+    if up is None:
+        up = _up_from_ticket(ticket)
     if side == "long":
-        return d == 1
-    return d != 1        # short: allowed unless a confirmed up-regime
+        return up is True          # confirmed up required
+    return up is not True          # short: allowed unless a confirmed up
 
 
 # The breakout arm's TREND exit params (only used under BULL_MODE): a WIDE hard
@@ -530,6 +560,34 @@ def bull_exit(lens):
     if lens == "breakout":
         return (999.0, BRK_SL, MAX_HOLD_H), BRK_TRAIL
     return None, 0.0        # divergence: fixed bracket, no trail
+
+
+_UP_CACHE = {}             # sym -> (up_tristate, expiry_epoch) — candle read TTL
+
+
+def up_read(venue, sym, now_ts, ttl_s=3600.0):
+    """Cached candle-derived up-regime for `sym`: fetch ~EMA_N+6 DAILY closes off
+    the venue and run up_regime(). This is the COVERAGE FIX — it works for ANY
+    book, not the oracle's ~8% graded set. Tri-state (True/False/None); any fetch
+    failure -> None -> the long is fail-CLOSED. TTL'd so a cycle fetches each
+    book's candles at most once an hour, and only breakout candidates trigger it
+    (the caller gates on lens)."""
+    hit = _UP_CACHE.get(sym)
+    if hit and hit[1] > now_ts:
+        return hit[0]
+    up = None
+    try:
+        end_ms = int(now_ts * 1000)
+        start_ms = end_ms - int((EMA_N + 6) * 86400 * 1000)
+        # venue.candles returns Lighter's candle DICTS ({t,o,h,l,c,v,...}); the
+        # close is c["c"]. Handle a bare-float shape too (defensive).
+        raw = venue.candles(sym, "1d", start_ms, end_ms) or []
+        closes = [float(c["c"]) if isinstance(c, dict) else float(c) for c in raw]
+        up = up_regime(closes)
+    except Exception:  # noqa: BLE001 — a candle blip fails CLOSED, never a crash
+        up = None
+    _UP_CACHE[sym] = (up, now_ts + ttl_s)
+    return up
 
 
 def lens_evidence(o, min_n=None):
@@ -1697,7 +1755,12 @@ def main(_ctx=None):
             if BULL_MODE:
                 _bside = "short" if str(t.get("side", "long")) == "short" \
                     else "long"
-                if not bull_entry_ok(lens, _bside, t):
+                # candle up-regime read (COVERAGE FIX) — only for a breakout
+                # LONG, where the oracle stamp is ~8% covered; divergence-short
+                # uses the funding-screen fallback (up=None).
+                _up = up_read(venue, sym, t_now.timestamp()) \
+                    if lens == "breakout" else None
+                if not bull_entry_ok(lens, _bside, t, up=_up):
                     continue
             # [2026-07-22] coin-quality veto. Symbol form is normalised because
             # the scout emits a bare base ("BOT") while the ledger records a
@@ -2235,9 +2298,40 @@ def selftest():
     assert not _bt("breakout", "long", {})         # long unstamped -> skip (fail-CLOSED)
     assert _bt("divergence", "short", {})          # short unstamped -> kept (funding screen)
     assert not _bt("divergence", "short", _up)     # short INTO confirmed up -> skip
-    # crypto-only: a tokenized equity (regime_oracle.NONCRYPTO) is refused
+    # crypto-only: a tokenized equity (TRADFI_BASES) is refused
     assert not bull_entry_ok("breakout", "long", {"sym": "AMD", "regime": {"dir": 1}})
     assert bull_entry_ok("divergence", "short", {"sym": "SOL", "regime": {"dir": -1}})
+    # up_regime (candle-derived broad coverage): above a RISING ema -> True
+    assert up_regime([float(i) for i in range(1, 40)]) is True         # monotone up
+    assert up_regime([float(40 - i) for i in range(1, 40)]) is False   # monotone down
+    assert up_regime([1.0, 2.0, 3.0]) is None                          # too few bars
+    # the `up` override drives the gate REGARDLESS of the (absent) oracle stamp —
+    # the fix that lets long-breakout fire on the ~92% of ungraded symbols
+    assert bull_entry_ok("breakout", "long", {"sym": "SOL"}, up=True)
+    assert not bull_entry_ok("breakout", "long", {"sym": "SOL"}, up=False)
+    assert not bull_entry_ok("breakout", "long", {"sym": "SOL"}, up=None)   # unknown -> skip
+    assert not bull_entry_ok("divergence", "short", {"sym": "SOL"}, up=True)  # short refused into up
+    assert bull_entry_ok("divergence", "short", {"sym": "SOL"}, up=False)
+    # up_read: candle fetch -> up_regime, cached. The stub returns Lighter's REAL
+    # candle DICT shape ({t,o,h,l,c,v}), NOT bare floats — so this exercises the
+    # c["c"] extraction (a float-only stub passed green while the live dict shape
+    # crashed: a stub must encode SEMANTICS, not just the method name).
+    class _StubV:
+        def __init__(self, cs):
+            self._cs = [{"t": 0, "o": c, "h": c, "l": c, "c": c, "v": 1.0}
+                        for c in cs]
+        def candles(self, coin, interval, s, e): return self._cs
+
+    class _BadV:
+        def candles(self, *a):
+            raise RuntimeError("candle blip")
+    globals()["_UP_CACHE"] = {}
+    assert up_read(_StubV([float(i) for i in range(1, 40)]), "SOL", 1.7e9) is True
+    globals()["_UP_CACHE"] = {}
+    assert up_read(_StubV([float(40 - i) for i in range(1, 40)]), "X", 1.7e9) is False
+    globals()["_UP_CACHE"] = {}
+    assert up_read(_BadV(), "SOL", 1.7e9) is None          # fetch error -> fail-CLOSED
+    globals()["_UP_CACHE"] = {}
     # exit_reason trail OVERRIDE (per-lens): divergence keeps its +4% TP cap while
     # the trend exit is on globally; breakout runs past it
     globals()["TRAIL_PCT"] = 0.06
