@@ -1,9 +1,9 @@
 round,date,venue,home,away,p_home_elo,p_home_poisson,p_home_gbm,p_home_blend,exp_margin_home,exp_total_points
-Round 21,2026-07-23 19:50:00,CommBank Stadium,Parramatta Eels,Penrith Panthers,0.3251,0.3731,0.4223,0.2412,-5.2,47.5
-Round 21,2026-07-24 18:00:00,McDonald Jones Stadium,Newcastle Knights,Sydney Roosters,0.4336,0.4588,0.6215,0.4075,-1.6,48.6
-Round 21,2026-07-24 20:00:00,Accor Stadium,South Sydney Rabbitohs,Melbourne Storm,0.5177,0.5193,0.5492,0.5101,0.9,48.2
-Round 21,2026-07-25 15:00:00,GIO Stadium,Canberra Raiders,Wests Tigers,0.6987,0.5655,0.7339,0.6997,2.7,48.1
-Round 21,2026-07-25 17:30:00,Accor Stadium,Canterbury-Bankstown Bulldogs,New Zealand Warriors,0.4517,0.4521,0.4637,0.4179,-1.9,44.4
-Round 21,2026-07-25 19:35:00,Queensland Country Bank Stadium,North Queensland Cowboys,Brisbane Broncos,0.6205,0.5305,0.5489,0.6299,1.4,48.2
-Round 21,2026-07-26 14:00:00,St George Venues Jubilee Stadium,St George Illawarra Dragons,Gold Coast Titans,0.5508,0.4774,0.5141,0.5242,-0.8,47.4
-Round 21,2026-07-26 16:05:00,4 Pines Park,Manly-Warringah Sea Eagles,Cronulla-Sutherland Sharks,0.5078,0.5311,0.5397,0.5166,1.3,47.2
+Round 22,2026-07-30 19:50:00,Queensland Country Bank Stadium,North Queensland Cowboys,Sydney Roosters,0.4638,0.4722,0.5533,0.4371,-1.2,48.7
+Round 22,2026-07-31 18:00:00,WIN Stadium,St George Illawarra Dragons,Dolphins,0.302,0.3891,0.2851,0.2375,-4.8,48.8
+Round 22,2026-07-31 20:00:00,AAMI Park,Melbourne Storm,Canterbury-Bankstown Bulldogs,0.638,0.5811,0.5435,0.6556,3.2,46.0
+Round 22,2026-08-01 15:00:00,Cbus Super Stadium,Gold Coast Titans,New Zealand Warriors,0.3769,0.4344,0.4001,0.3348,-3.0,46.6
+Round 22,2026-08-01 17:30:00,Glen Willow Oval,Penrith Panthers,Canberra Raiders,0.7402,0.6611,0.7369,0.7883,6.6,46.0
+Round 22,2026-08-01 19:35:00,Suncorp Stadium,Brisbane Broncos,Newcastle Knights,0.5664,0.5427,0.49,0.5415,1.6,48.4
+Round 22,2026-08-02 14:00:00,Ocean Protect Stadium,Cronulla-Sutherland Sharks,South Sydney Rabbitohs,0.7164,0.5481,0.8298,0.6897,2.1,47.8
+Round 22,2026-08-02 16:05:00,CommBank Stadium,Wests Tigers,Parramatta Eels,0.5467,0.5067,0.451,0.5319,0.4,49.2
