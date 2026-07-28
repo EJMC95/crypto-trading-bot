@@ -27,29 +27,29 @@ jobs:
         run: |
           set -euo pipefail
           HEAD_SHA="${{ github.event.check_suite.head_sha || github.event.pull_request.head.sha }}"
-          [ -z "$HEAD_SHA" ] && exit 0
+          if [ -z "$HEAD_SHA" ]; then exit 0; fi
 
           PR=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number' 2>/dev/null || true)
-          [ -z "${PR:-}" ] || [ "$PR" = "null" ] && { echo "no PR for $HEAD_SHA"; exit 0; }
+          if [ -z "${PR:-}" ] || [ "$PR" = "null" ]; then echo "no PR for $HEAD_SHA"; exit 0; fi
 
           STATE=$(gh api "repos/$REPO/pulls/$PR" --jq '.mergeable_state')
           CONC=$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" \
-                  --jq '[.check_runs[] | select(.conclusion != null) | .conclusion] | unique | join(",")')
+                  --jq '[.check_runs[] | select(.conclusion != null) | select(.name != "notify") | .conclusion] | unique | join(",")')
           echo "PR #$PR mergeable_state=$STATE checks=$CONC"
 
-          # Deduplicate: only comment when the message would differ from our last one.
           MARK="<!-- ci-notify -->"
+          BODY=""
           case "$STATE" in
             clean)
-              [ "$CONC" = "success" ] && BODY="$MARK ✅ CI green and mergeable. Ready to merge." || BODY="" ;;
+              if [ "$CONC" = "success" ]; then BODY="$MARK ✅ CI green and mergeable. Ready to merge."; fi ;;
             dirty)
               BODY="$MARK ⚠️ Merge conflict — branch needs a re-merge with main." ;;
             blocked|unstable)
-              case "$CONC" in *failure*) BODY="$MARK 🔴 CI failed ($CONC) — blocked." ;; *) BODY="" ;; esac ;;
-            *) BODY="" ;;
+              case "$CONC" in *failure*) BODY="$MARK 🔴 CI failed ($CONC) — blocked." ;; esac ;;
           esac
-          [ -z "$BODY" ] && exit 0
+          if [ -z "$BODY" ]; then exit 0; fi
 
+          # Deduplicate: only comment when the message differs from our last one.
           LAST=$(gh api "repos/$REPO/issues/$PR/comments" --jq '[.[] | select(.body | startswith("<!-- ci-notify -->"))] | last | .body' 2>/dev/null || true)
-          [ "$LAST" = "$BODY" ] && { echo "unchanged; not repeating"; exit 0; }
+          if [ "$LAST" = "$BODY" ]; then echo "unchanged; not repeating"; exit 0; fi
           gh pr comment "$PR" --repo "$REPO" --body "$BODY"
