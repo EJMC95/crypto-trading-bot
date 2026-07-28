@@ -25,6 +25,12 @@ it is 1.74, median NEGATIVE). So the map triangulates from a constellation:
                   |t|>=2 verdict line — or "no destination" when it isn't
                   converging. Honest by construction: a noise book's ETA is
                   never, because its mean is ~0 and no amount of n moves it.
+  👓 BIFOCAL    — two focal lengths: the far lens is the full-history class,
+                  the near lens re-runs the SAME ladder on only the last
+                  NEAR_D days. focus = fading (far good, near dead) /
+                  emerging (far dead, near good) / blurry (near starved) /
+                  consistent. The far average blurs regime change; the near
+                  lens is where it shows first.
 
 PUBLISH-ONLY. It grades and publishes bot_state 'fleet-radar'; it enacts
 nothing, proposes nothing, vetoes nothing. A thermometer, not a treatment.
@@ -60,6 +66,7 @@ T_VERDICT = float(os.environ.get("RADAR_T_VERDICT", "2.0"))  # |t| that settles 
 CONC_CAP = float(os.environ.get("RADAR_CONC_CAP", "65"))     # top-2-coin % that flags concentration
 JACK_FLOOR = float(os.environ.get("RADAR_JACK_FLOOR", "1.5"))  # jackknife t an edge must keep
 ETA_MAX_TRADES = int(os.environ.get("RADAR_ETA_MAX", "1500"))  # beyond this = no realistic destination
+NEAR_D = float(os.environ.get("RADAR_NEAR_D", "45"))  # 👓 near-lens window (days)
 
 
 # --------------------------------------------------------------------------
@@ -132,6 +139,26 @@ def _eta(n, t, rate_per_day):
         return more, None, f"{more} more closes — but IDLE (0/day): no ETA until it trades"
     days = more / rate_per_day
     return more, round(days, 1), f"~{more} more closes ≈ {days:.1f}d at {rate_per_day:.1f}/day"
+
+
+def _classify(n, t, med, both_pos, both_neg, jt, conc):
+    """The ONE class ladder, shared by the far (full-history) and 👓 near
+    (recent-window) lenses — two focal lengths must never grade on two rulers."""
+    if n < MIN_N:
+        return "starved"
+    if t <= -T_VERDICT or (t < -1 and both_neg):
+        return "losing"
+    if t >= T_VERDICT and (med <= 0 or jt < JACK_FLOOR or conc >= CONC_CAP):
+        # significant MEAN, but the typical trade doesn't share it (a few
+        # winners carrying losers) — the funding-carry false positive
+        return "artifact"
+    if t >= T_VERDICT and both_pos and med > 0 and jt >= JACK_FLOOR and conc < CONC_CAP:
+        return "real_edge"
+    if t >= 1.0 and both_pos and jt >= 1.0:
+        return "plausible"
+    if abs(t) < 1.0:
+        return "noise"
+    return "weak"
 
 
 def diagnose_book(bot, trades, now_ts=None):
@@ -230,22 +257,48 @@ def diagnose_book(bot, trades, now_ts=None):
     loco_t2 = round(_t_drop(set(ranked[:2])), 2) if len(ranked) >= 3 else loco_t1
 
     # --- classify from the CONSTELLATION, not one sensor ---
-    if n < MIN_N:
-        cls = "starved"
-    elif t <= -T_VERDICT or (t < -1 and both_neg):
-        cls = "losing"
-    elif t >= T_VERDICT and (med <= 0 or jt < JACK_FLOOR or conc >= CONC_CAP):
-        # significant MEAN, but the typical trade doesn't share it (a few
-        # winners carrying losers) — the funding-carry false positive
-        cls = "artifact"
-    elif t >= T_VERDICT and both_pos and med > 0 and jt >= JACK_FLOOR and conc < CONC_CAP:
-        cls = "real_edge"
-    elif t >= 1.0 and both_pos and jt >= 1.0:
-        cls = "plausible"
-    elif abs(t) < 1.0:
-        cls = "noise"
+    cls = _classify(n, t, med, both_pos, both_neg, jt, conc)
+
+    # 👓 BIFOCAL — the NEAR lens: re-run the SAME ruler on only the last NEAR_D
+    # days of closes. The far (full-history) class is an average that BLURS
+    # regime change: a book that was good and is now dead, or was noise and is
+    # now working, both read as their lifetime blend. The near lens is an
+    # independent re-classification of the recent subpopulation — not a trend
+    # statistic (that is the trajectory sensor) but a full class at short focal
+    # length, with the same starved floor so a thin window can never overclaim.
+    now = now_ts if now_ts is not None else datetime.now(timezone.utc).timestamp()
+    near_cut = now - NEAR_D * 86400
+    near_trades = [tr for tr in trades
+                   if (_parse_ts(tr.get("close_ts")) or 0.0) >= near_cut]
+    nrets = [float(tr["profit_ratio"]) for tr in near_trades
+             if tr.get("profit_ratio") is not None]
+    nn = len(nrets)
+    nt, nmed = _t(nrets), _median(nrets)
+    nmid = nn // 2
+    nta, ntb = _t(nrets[:nmid]), _t(nrets[nmid:])
+    if nn >= 3:
+        ndrop = max(range(nn), key=lambda i: abs(nrets[i]))
+        njt = _t([r for i, r in enumerate(nrets) if i != ndrop])
     else:
-        cls = "weak"
+        njt = nt
+    ncoin = defaultdict(float)
+    for tr in near_trades:
+        c = (tr.get("coin") or str(tr.get("pair") or "").split("/")[0])
+        ncoin[c] += abs(float(tr.get("profit_abs") or 0.0))
+    ndenom = sum(ncoin.values())
+    nconc = round(100 * sum(sorted(ncoin.values(), reverse=True)[:2]) / ndenom, 0) if ndenom else 0.0
+    near_cls = _classify(nn, nt, nmed, nta > 0 and ntb > 0, nta < 0 and ntb < 0, njt, nconc)
+    # FOCUS: how the two lenses disagree. 'blurry' when the near lens is
+    # starved (thin recent window says nothing — never 'emerging' on tiny n).
+    _GOOD, _BAD = ("plausible", "real_edge"), ("noise", "losing", "weak", "artifact")
+    if near_cls == "starved" and cls != "starved":
+        focus = "blurry"
+    elif cls in _GOOD and near_cls in _BAD:
+        focus = "fading"
+    elif cls in _BAD and near_cls in _GOOD:
+        focus = "emerging"
+    else:
+        focus = "consistent"
 
     # CAVEATS sharpen a plausible/real_edge verdict WITHOUT demoting the class
     # (per-book slopes are weak, |t|<1.1 — flag, don't overclaim). A "plausible"
@@ -257,6 +310,11 @@ def diagnose_book(bot, trades, now_ts=None):
         if (loco_t1 is not None and loco_t1 < 1.0) or \
            (loco_t2 is not None and loco_t2 < 1.0):
             caveats.append("2-coin")
+    # 👓 a bifocal disagreement is a caveat on ANY class — the whole point is
+    # that the far average hides it. 'blurry' is deliberately NOT flagged
+    # (a thin recent window is normal for slow books, not a finding).
+    if focus in ("fading", "emerging"):
+        caveats.append(f"👓{focus}:near-{near_cls}")
 
     more, days, eta_note = _eta(n, t, rate)
     # the ETA must respect the CLASS and the TRAJECTORY — a starved book has NOT
@@ -288,6 +346,9 @@ def diagnose_book(bot, trades, now_ts=None):
         "decay_ratio": decay_ratio, "slope_t": slope_t,
         # 🌐 concentration fragility
         "top_coin_share": top_coin_share, "loco_t1": loco_t1, "loco_t2": loco_t2,
+        # 👓 bifocal — the near lens (last NEAR_D days) + the focus verdict
+        "near_class": near_cls, "near_n": nn, "near_t": round(nt, 2),
+        "near_median_pct": round(nmed, 3), "near_days": NEAR_D, "focus": focus,
         "caveats": caveats,
         "eta_trades": more, "eta_days": days, "eta": eta_note,
     }
@@ -415,7 +476,8 @@ def _report(payload):
             flags = (flags + " twin").strip(" ,") if flags else "twin"
         print(f"{_ICON.get(d['class'],'?'):2s} {d['class']:10s} {d['bot'][:30]:30s} "
               f"{d['n']:>4} {d['radar_t']:>+6.2f} {_ARR.get(d.get('trajectory'),'·'):>2} "
-              f"{('⚠'+flags if flags else ''):>12} {str(d['eta'])[:44]:<44}")
+              f"{str(d.get('near_class', ''))[:8]:>8} "
+              f"{('⚠'+flags if flags else ''):>22} {str(d['eta'])[:40]:<40}")
 
 
 def _selftest():
@@ -543,6 +605,53 @@ def _selftest():
     _ck(d["loco_t1"] < d["radar_t"],
         f"dropping the top-pnl coin must lower t, got loco1={d['loco_t1']} t={d['radar_t']}")
 
+    # ---- 👓 BIFOCAL fixtures: explicit ages, so the near window really cuts --
+    def mka(specs):
+        """specs: list of (ret, coin, age_days). Oldest ages sort first."""
+        now = 1_000_000.0
+        out = [{"profit_ratio": r, "profit_abs": r * 100, "coin": c,
+                "pair": c + "/USDC", "close_ts": now - age * 86400.0}
+               for r, c, age in specs]
+        return out, now
+
+    # 12. FADING: a long good history (50-100d ago) + a clearly bad recent 20d.
+    # Far lens: good (the average blurs the death). Near lens: losing. The
+    # focus must say FADING — and near_n must be the WINDOWED count (18), which
+    # is the mutation guard: break the window filter and near==far==consistent.
+    old_good = [(0.6 + (0.05 if i % 2 else -0.05), f"C{i%9}", 50 + i) for i in range(60)]
+    rec_bad = [(-0.2 + (0.1 if i % 2 else -0.1) / 2, f"C{i%9}", 1 + i) for i in range(18)]
+    tr, now = mka(old_good + rec_bad)
+    d12 = diagnose_book("fading-bot", tr, now)
+    _ck(d12["class"] in ("real_edge", "plausible", "artifact") and d12["class"] != "starved",
+        f"fading fixture's FAR lens must read good-ish on the lifetime blend, got {d12['class']}")
+    _ck(d12["near_n"] == 18,
+        f"near lens must see ONLY the {NEAR_D:.0f}d window (18 closes), got {d12['near_n']}")
+    _ck(d12["near_class"] in ("losing", "noise", "weak") and d12["focus"] == "fading",
+        f"good-far/dead-near must be FADING, got near={d12['near_class']} focus={d12['focus']}")
+    _ck(any(c.startswith("👓fading") for c in d12["caveats"]),
+        f"a fading book must carry the 👓 caveat, got {d12['caveats']}")
+
+    # 13. EMERGING: a dead history + a strong recent 20d. Far: bad. Near: good.
+    old_dead = [(-0.02 + (0.1 if i % 2 else -0.1), f"C{i%9}", 50 + i) for i in range(60)]
+    rec_good = [(0.5 + (0.06 if i % 2 else -0.06), f"C{i%9}", 1 + i) for i in range(20)]
+    tr, now = mka(old_dead + rec_good)
+    d13 = diagnose_book("emerging-bot", tr, now)
+    _ck(d13["near_class"] in ("real_edge", "plausible") and d13["focus"] == "emerging",
+        f"dead-far/strong-near must be EMERGING, got far={d13['class']} "
+        f"near={d13['near_class']} focus={d13['focus']}")
+
+    # 14. BLURRY, the anti-overclaim: 3 huge recent closes must NOT read
+    # emerging — a near window under MIN_N is starved, so the focus is blurry.
+    old_ok = [(0.35 + (0.04 if i % 2 else -0.04), f"C{i%9}", 60 + i) for i in range(40)]
+    rec_tiny = [(2.0, "M", 2), (2.2, "N", 4), (1.8, "O", 6)]
+    tr, now = mka(old_ok + rec_tiny)
+    d14 = diagnose_book("blurry-bot", tr, now)
+    _ck(d14["near_class"] == "starved" and d14["focus"] == "blurry",
+        f"a 3-close near window must be STARVED/blurry, never emerging; "
+        f"got near={d14['near_class']} focus={d14['focus']}")
+    _ck(not any("emerging" in c for c in d14["caveats"]),
+        f"blurry must not carry an emerging caveat, got {d14['caveats']}")
+
     # 11. TWIN DEDUP: a -lshadow with a live -lighter base is tagged control.
     live_tr, now = mkt([0.5] * 20, [f"C{i}" for i in range(20)])
     shad_tr, _ = mkt([0.4] * 20, [f"C{i}" for i in range(20)])
@@ -555,7 +664,8 @@ def _selftest():
     if all(ok):
         print(f"fleet_radar selftest OK — {len(ok)} checks (noise/real/artifact/plausible/"
               "losing/starved classes, jackknife robustness, ETA math + idle, trajectory "
-              "decay + inversion + slope-gate, coin-concentration, twin-dedup)")
+              "decay + inversion + slope-gate, coin-concentration, twin-dedup, "
+              "👓bifocal fading/emerging/blurry)")
         return True
     print("fleet_radar SELFTEST FAILED")
     return False
