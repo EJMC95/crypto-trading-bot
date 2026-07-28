@@ -13,6 +13,8 @@ on:
 
 permissions:
   contents: read
+  checks: read
+  statuses: read
   issues: write
   pull-requests: write
 
