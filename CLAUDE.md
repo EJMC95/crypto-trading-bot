@@ -599,3 +599,42 @@ All new bots:
   same slot 17-Jul. A standing audit rule that names a retired bot sends every
   future audit to check the wrong file; the live pair is Farmer + Ticket
   Taker.]**
+
+
+## Doctrine: Claude is the judgment layer, never the polling layer (added 28-Jul-2026)
+
+Context: 14–24 Jul 2026, Code sessions armed 48 `send_later` self-check-in
+wakeups (27 on 23-Jul alone; one PR-#91 chain re-arming ~hourly into a
+persistent session). Each firing replayed a full transcript to ask a yes/no
+question GitHub answers for free. Est. ~1.35M tokens in one day — ~40x the
+entire weekly admin load. All 48 spent triggers were deleted 28-Jul.
+
+**P1 — Never arm a wakeup chain to watch external state.** No `send_later`,
+`ScheduleWakeup`, or self-re-arming reminder to poll CI status, PR
+mergeability, deploy receipts, `/bus.json` / `/pnl.json` field changes, or
+container health. These are push-capable sources; wire the push instead.
+
+**P2 — The replacement is an Action, not a shorter interval.** CI/PR state →
+`ci-notify.yml` (posts transitions on the PR). Service state → extend
+`fleet-watchdog.yml` (probing pnl.json every ~30 min at $0 since 8-Jul).
+If it cannot be pushed, it is not important enough to poll.
+
+**P3 — A check-in chain may re-arm at most TWICE, then it must stop.** If a
+genuine wait is unavoidable (a human decision, a venue with no webhook), arm
+at most two check-ins, then report last known state and stop. Never re-arm
+silently. Never re-arm "until merged". Three firings = should have been an
+Action.
+
+**P4 — Never poll into a persistent session.** A persistent-session wakeup
+replays the whole transcript first, so cost grows with session age. If a
+wakeup is truly required, start a fresh session with a self-contained prompt.
+
+**P5 — Clean up after yourself.** Spent one-shot triggers inflate every later
+`list_triggers` read (28-Jul: one call returned 252,507 chars ≈ 63k tokens
+because 48 dead triggers still carried full prompt payloads). Delete a
+chain's triggers when the chain ends. The Weekly Admin task now self-audits
+the scheduler weekly and deletes >10 leftovers.
+
+**P6 — Escalate to the operator instead of waiting.** When blocked on Eamon's
+decision, say so once and stop. He would rather answer in the morning than
+pay for the wait.

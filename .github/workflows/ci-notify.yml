@@ -1,0 +1,57 @@
+name: ci-notify
+
+# Replaces send_later PR check-in chains (CLAUDE.md doctrine P1-P2).
+# Posts CI/merge transitions ON the PR; nothing wakes a Claude session.
+
+on:
+  check_suite:
+    types: [completed]
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  checks: read
+  statuses: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the transition on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          HEAD_SHA="${{ github.event.check_suite.head_sha || github.event.pull_request.head.sha }}"
+          if [ -z "$HEAD_SHA" ]; then exit 0; fi
+
+          PR=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number' 2>/dev/null || true)
+          if [ -z "${PR:-}" ] || [ "$PR" = "null" ]; then echo "no PR for $HEAD_SHA"; exit 0; fi
+
+          STATE=$(gh api "repos/$REPO/pulls/$PR" --jq '.mergeable_state')
+          CONC=$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" \
+                  --jq '[.check_runs[] | select(.conclusion != null) | select(.name != "notify") | .conclusion] | unique | join(",")')
+          echo "PR #$PR mergeable_state=$STATE checks=$CONC"
+
+          MARK="<!-- ci-notify -->"
+          BODY=""
+          case "$STATE" in
+            clean)
+              if [ "$CONC" = "success" ]; then BODY="$MARK ✅ CI green and mergeable. Ready to merge."; fi ;;
+            dirty)
+              BODY="$MARK ⚠️ Merge conflict — branch needs a re-merge with main." ;;
+            blocked|unstable)
+              case "$CONC" in *failure*) BODY="$MARK 🔴 CI failed ($CONC) — blocked." ;; esac ;;
+          esac
+          if [ -z "$BODY" ]; then exit 0; fi
+
+          # Deduplicate: only comment when the message differs from our last one.
+          LAST=$(gh api "repos/$REPO/issues/$PR/comments" --jq '[.[] | select(.body | startswith("<!-- ci-notify -->"))] | last | .body' 2>/dev/null || true)
+          if [ "$LAST" = "$BODY" ]; then echo "unchanged; not repeating"; exit 0; fi
+          gh pr comment "$PR" --repo "$REPO" --body "$BODY"
