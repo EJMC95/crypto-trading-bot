@@ -771,10 +771,23 @@ def scan_candidates(ctx, prelim, order_usd, log, last_tried=None):
         return exploit                       # DARK default — pre-Lever-1 behaviour
     # STAGE A' — EXPLORE: coverage-sample K from BELOW the exploit cut, least-
     # recently-tried first (never-tried == 0.0 sorts first), |apr| as tiebreak.
-    lt = last_tried or {}
+    # `last_tried` is the caller's explore_seen — use it BY REFERENCE. An empty
+    # dict is FALSY, so the old `or {}` swapped in a throwaway and the cursor
+    # never persisted (bug #1).
+    lt = last_tried if last_tried is not None else {}
     tail = ranked_pre[SCAN_DEEP_MAX:]
     tail.sort(key=lambda cfa: (lt.get(cfa[0], 0.0), -abs(cfa[2])))
-    explore = _evaluate(tail[:SCAN_EXPLORE_K], "explore")
+    picked = tail[:SCAN_EXPLORE_K]
+    # Advance the coverage cursor on EVALUATION, not just on a successful open
+    # (bug #2). Else, when the top-|apr| tail coins keep failing the Stage B/C
+    # vetoes (or any downstream entry gate), last_tried never moves and explore
+    # retries the SAME 2 coins every loop — the sweep never sweeps. MEASURED on
+    # the shadow: 4 days live, 0 explore opens, all-exploit. Stamp here so the
+    # cursor rotates whether or not the coin survives its vetoes or ever opens.
+    _seen_ts = time.time()
+    for _c, _f, _a in picked:
+        lt[_c] = _seen_ts
+    explore = _evaluate(picked, "explore")
     # explore FIRST so the reservation survives slot scarcity; the entry loop caps
     # explore opens at SCAN_EXPLORE_K and lets exploit overflow any unused window.
     return explore + exploit
@@ -2328,6 +2341,18 @@ def _selftest_explore():
         r2 = scan_candidates(None, list(prelim), 25.0, lg, {"C15": 1e9, "C16": 1e9})
         exp2 = sorted(c for c, f, a, s, bm, ev in r2 if ev["src"] == "explore")
         assert exp2 == ["C17", "C18"], f"coverage must avoid recently-tried; got {exp2}"
+
+        # CURSOR ADVANCES ON EVALUATION (the 4-day explore-zero fix). scan_candidates
+        # opens NOTHING, yet the caller's dict must advance BY REFERENCE so the sweep
+        # rotates even when explore never opens. Pre-fix: `seen` stays empty (or is a
+        # throwaway) and the 2nd call re-picks C15/C16 forever.
+        seen = {}
+        scan_candidates(None, list(prelim), 25.0, lg, seen)
+        assert sorted(seen) == ["C15", "C16"], f"cursor must advance by ref on eval; got {sorted(seen)}"
+        r4 = scan_candidates(None, list(prelim), 25.0, lg, seen)
+        exp4 = sorted(c for c, f, a, s, bm, ev in r4 if ev["src"] == "explore")
+        assert exp4 == ["C17", "C18"], f"cursor must SWEEP on the 2nd call; got {exp4} (stuck?)"
+        assert len(seen) == 4, f"cursor must accumulate across sweeps; got {sorted(seen)}"
     finally:
         (M._candle_features, M.book_metrics, M.cross_venue_mult) = save_fns
         (M.SCAN_EXPLORE_K, M.SCAN_DEEP_MAX, M.SCAN_BOOK_PROBE) = save_cfg
