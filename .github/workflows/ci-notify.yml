@@ -18,8 +18,14 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: ci-notify-${{ github.event.check_suite.head_sha || github.event.pull_request.head.sha || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   notify:
+    # main-branch suites are post-merge CI - no PR to notify. [28-Jul-2026 quota diet]
+    if: github.event.check_suite == null || github.event.check_suite.head_branch != 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Report the transition on the PR

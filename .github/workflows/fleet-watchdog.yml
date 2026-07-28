@@ -6,7 +6,7 @@ name: fleet-watchdog
 # future services (e.g. lighter-*) are covered automatically once they publish.
 on:
   schedule:
-    - cron: '7,37 * * * *'
+    - cron: '7 * * * *'  # hourly since 28-Jul-2026: twice-hourly emptied the Free-plan minute quota (Jul-28 billing lockout); pnl-dashboard's in-service 5-min watchdog is the fine-grained layer
   workflow_dispatch:
 
 permissions:
