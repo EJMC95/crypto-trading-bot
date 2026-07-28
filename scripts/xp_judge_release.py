@@ -63,6 +63,14 @@ def release_payload(st, name, why, now):
             "blind_cycles": st.get("blind_cycles") or 0,
             "skew_notified": bool(st.get("skew_notified")),
             "assert_fail_notified": bool(st.get("assert_fail_notified")),
+            # [2026-07-28 (dy) mirror] the drift-hold sticky flag + the
+            # growth promoter's own state ride save() now — a release that
+            # dropped them would wipe a standing growth promotion record
+            # (fade-watch loses its anchor) and re-arm the hourly drift push.
+            # Releasing the MAIN candidate must not touch the growth pair.
+            "drift_notified": bool(st.get("drift_notified")),
+            "growth": st.get("growth"),
+            "last_growth": st.get("last_growth"),
             "promote_baseline": st.get("promote_baseline"),
             "verdicts": verdicts[-10:], "last_eval": st.get("last_eval")}
 
@@ -83,6 +91,13 @@ def _selftest():
     assert p["verdicts"][-1]["why"] == "test reason"
     assert p["verdicts"][-1]["eval"] == {"promote": False, "why": "floors"}
     assert p["last_eval"] == {"promote": False, "why": "floors"}
+    # [2026-07-28] the growth pair + drift flag survive a main-candidate
+    # release (mutation check: dropping any pass-through turns this red)
+    st2 = dict(st, growth={"promoted": True, "promoted_ts": now - 86400},
+               last_growth={"kind": "reassert"}, drift_notified=True)
+    p2 = release_payload(st2, "cand-x", "r", now)
+    assert p2["growth"] == {"promoted": True, "promoted_ts": now - 86400}, p2
+    assert p2["last_growth"] == {"kind": "reassert"} and p2["drift_notified"] is True
     assert p["blind_cycles"] == 2
     # verdict cap mirrors save()'s [-10:]
     st2 = dict(st, verdicts=[{"name": f"v{i}"} for i in range(12)])

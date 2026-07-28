@@ -4537,6 +4537,14 @@ class H(BaseHTTPRequestHandler):
                         # [2026-07-21] tuning-proposals added: the organs'
                         # proposal channel to the tuners must be visible on
                         # the same surface its enactments are.
+                        # [2026-07-28 AUDIT FIX] serve list widened: a dozen
+                        # organ keys were unverifiable off-Railway (notably
+                        # regime-oracle — whose .grades the weekly item-18
+                        # re-read depends on — plus board/sentinel/immune/
+                        # tuning/queue/incubator/radar/respiration/clock/
+                        # regen/brain-vitals). Observable-only; these
+                        # payloads carry no secrets (the endpoint's standing
+                        # no-auth contract).
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
@@ -4545,7 +4553,12 @@ class H(BaseHTTPRequestHandler):
                             "'lighter-market', 'fleet-proprioception', "
                             "'parliament', 'parliament-tuning', "
                             "'impl-shortfall', 'xp-judge', 'scout-tuner', "
-                            "'tuning-proposals')")
+                            "'tuning-proposals', 'regime-oracle', "
+                            "'evidence-board', 'event-sentinel', "
+                            "'fleet-immune', 'fleet-tuning', 'xp-queue', "
+                            "'strategy-incubator', 'fleet-radar', "
+                            "'fleet-respiration', 'fleet-clock', "
+                            "'fleet-regen', 'brain-vitals')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -4561,7 +4574,11 @@ class H(BaseHTTPRequestHandler):
                                 "'brain-stake-mults', 'brain-diagnosis', "
                                 "'brain-lens-forward', 'lighter-market', "
                                 "'fleet-proprioception', 'parliament', "
-                                "'impl-shortfall', 'xp-judge', 'scout-tuner') "
+                                "'impl-shortfall', 'xp-judge', 'scout-tuner', "
+                                "'regime-oracle', 'evidence-board', "
+                                "'event-sentinel', 'fleet-immune', "
+                                "'fleet-radar', 'fleet-respiration', "
+                                "'brain-vitals') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
                             hist = [{"key": k,
@@ -4587,6 +4604,18 @@ class H(BaseHTTPRequestHandler):
                                    "xp_judge": live.get("xp-judge"),
                                    "scout_tuner": live.get("scout-tuner"),
                                    "tuning_proposals": live.get("tuning-proposals"),
+                                   "regime_oracle": live.get("regime-oracle"),
+                                   "evidence_board": live.get("evidence-board"),
+                                   "event_sentinel": live.get("event-sentinel"),
+                                   "fleet_immune": live.get("fleet-immune"),
+                                   "fleet_tuning": live.get("fleet-tuning"),
+                                   "xp_queue": live.get("xp-queue"),
+                                   "strategy_incubator": live.get("strategy-incubator"),
+                                   "fleet_radar": live.get("fleet-radar"),
+                                   "fleet_respiration": live.get("fleet-respiration"),
+                                   "fleet_clock": live.get("fleet-clock"),
+                                   "fleet_regen": live.get("fleet-regen"),
+                                   "brain_vitals": live.get("brain-vitals"),
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
             except Exception as e:
