@@ -202,11 +202,17 @@ def _mean_pct(trades):
 
 def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
                 min_closes=None, live_min=None, margin_pp=None,
-                cand_levers=None, drift=None):
+                cand_levers=None, drift=None, both_halves=True):
     """The promotion bar. Returns a verdict dict; verdict['promote'] is True
     only when the shadow arm is positive AND beats the live arm per-trade by
     margin_pp on the FULL window AND on BOTH halves (the doctrine's
     both-halves rule — a candidate that won one lucky week doesn't clear).
+
+    both_halves=False drops ONLY the per-half gate (the FASTER bar the operator
+    chose 25-Jul for the growth-lever pair: ~2-3d, positive + beats-live, no
+    both-halves). Every other guard — arm-drift, arm-skew, the full-window
+    floors, shadow-positive, and the full-window margin — is UNCHANGED, and the
+    tight fade-revert is what backstops the weaker gate.
 
     [2026-07-16] cand_levers gates the SHADOW arm on proof-of-application: a
     close counts only if its receipt shows the arm ran the candidate's bars.
@@ -275,7 +281,7 @@ def paired_eval(rows, start_ts, end_ts, shadow_bot=None, live_bot=None,
     # still clears; a lopsided one holds until the thin half fills in.
     half_sh_min = max(2, min_closes // 2)
     half_lv_min = max(3, live_min // 2)
-    for a, b, label in ((start_ts, mid, "h1"), (mid, end_ts, "h2")):
+    for a, b, label in (((start_ts, mid, "h1"), (mid, end_ts, "h2")) if both_halves else ()):
         sh_h = arm_trades(rows, shadow_bot, a, b, levers=cand_levers)
         lv_h = arm_trades(rows, live_bot, a, b)
         if len(sh_h) < half_sh_min or len(lv_h) < half_lv_min:
@@ -614,6 +620,49 @@ def _respec_clamped(cand, clamp=None):
                 + ",".join(f"{k.split('.')[-1]}={clamped[k]:g}"
                            for k in sorted(changed)))
     return {**cand, "name": new_name, "levers": clamped}, changed
+
+
+# --- Growth-lever promoter (Farmer explore + conviction) — the FASTER path ----
+# [2026-07-25] The operator's 2-3d auto-promotion for the two growth levers,
+# promoted as a PAIR and released together. Self-contained (NOT the one-at-a-time
+# xp queue): the shadow runs both levers via its OWN env, always on, so this
+# compares the shadow arm (levers on) vs the live arm (env-default off) on the
+# FASTER bar (both_halves=False). Still receipt-gated on the shadow (fail-CLOSED:
+# no promotion until the shadow's closes PROVE they ran the levers via extra.bars),
+# arm-drift-gated (same as every promotion), and TTL-asserted so a fade OR a dark
+# ledger reverts to env within LEVER_TTL. The tight fade-revert backstops the
+# weaker bar. The judge stays the SOLE writer of live.funding.*.
+GROWTH_CAND = {"xp.funding.explore_k": 2, "xp.funding.conviction_hi": 2.2}
+GROWTH_LIVE = {"live.funding.explore_k": 2, "live.funding.conviction_hi": 2.2}
+GROWTH_WINDOW_D = float(os.environ.get("XPJ_GROWTH_DAYS", "2.5"))
+GROWTH_MIN_CLOSES = int(os.environ.get("XPJ_GROWTH_MIN_CLOSES", "15"))
+GROWTH_LIVE_MIN = int(os.environ.get("XPJ_GROWTH_LIVE_MIN", "10"))
+
+
+def growth_promoter(rows, gstate, now, drift=None):
+    """Promote/keep/release the growth-lever PAIR on the faster bar. PURE: returns
+    (new_gstate, (kind, payload)); the caller does the _assert_levers / push / log
+    and persists gstate. kind in {'promote','reassert','release','eval'}."""
+    gstate = dict(gstate or {})
+    if gstate.get("promoted"):
+        pts = float(gstate.get("promoted_ts") or now)
+        fading, n, m = fade_check(rows, pts, now, live_bot=LIVE_BOT,
+                                  baseline_pct=gstate.get("baseline_pct"))
+        if fading:
+            return ({"promoted": False, "released_ts": now, "release_mean": m},
+                    ("release", {"why": f"fade: live rolling mean {m}%/trade (n={n})",
+                                 "levers": list(GROWTH_LIVE)}))
+        return (gstate, ("reassert", {"levers": GROWTH_LIVE, "n": n, "mean": m}))
+    start = now - GROWTH_WINDOW_D * 86400
+    v = paired_eval(rows, start, now, shadow_bot=SHADOW_BOT, live_bot=LIVE_BOT,
+                    min_closes=GROWTH_MIN_CLOSES, live_min=GROWTH_LIVE_MIN,
+                    cand_levers=GROWTH_CAND, drift=drift, both_halves=False)
+    v["candidate"] = "growth-levers"
+    if v.get("promote"):
+        return ({"promoted": True, "promoted_ts": now,
+                 "baseline_pct": v.get("live_mean_pct"), "gap_pp": v.get("gap_pp")},
+                ("promote", {"levers": GROWTH_LIVE, "why": v["why"], "ev": v}))
+    return (gstate, ("eval", v))
 
 
 def run_once():
@@ -1361,8 +1410,54 @@ def _selftest():
           "asserted-write guard)")
 
 
+def _selftest_growth():
+    """[2026-07-25] the growth-lever FASTER-bar promoter: promotes on receipt-
+    proven shadow beating live (no both-halves), reasserts while healthy, releases
+    on fade, and fail-CLOSES on arm-drift + missing receipts. Each assertion fails
+    against a naive promoter (no receipt gate, no drift gate, or no fade)."""
+    now = 1_000_000.0
+    span = GROWTH_WINDOW_D * 86400
+
+    def mk(bot, pnl, ts, receipt=False):
+        r = {"bot": bot, "profit_ratio": pnl, "close_ts": iso(ts)}
+        if receipt:
+            r["extra"] = {"bars": {"explore_k": 2, "conviction_hi": 2.2}}
+        return r
+
+    rows = []
+    for i in range(20):
+        t = now - span + (i + 1) * span / 21.0
+        rows.append(mk(SHADOW_BOT, 0.012, t, receipt=True))    # shadow +1.2%/trade
+        rows.append(mk(LIVE_BOT, 0.002, t))                    # live   +0.2%/trade
+    g, (kind, pay) = growth_promoter(rows, {}, now)
+    assert kind == "promote" and g["promoted"], (kind, g)
+    assert set(pay["levers"]) == set(GROWTH_LIVE), pay
+
+    _, (k2, _) = growth_promoter(rows, {}, now, drift={"live": "aa", "shadow": "bb"})
+    assert k2 == "eval", "arm-drift must fail CLOSED"
+
+    norcpt = []
+    for i in range(20):
+        t = now - span + (i + 1) * span / 21.0
+        norcpt.append(mk(SHADOW_BOT, 0.012, t, receipt=False))
+        norcpt.append(mk(LIVE_BOT, 0.002, t))
+    _, (k3, _) = growth_promoter(norcpt, {}, now)
+    assert k3 == "eval", "missing shadow receipt must NOT promote"
+
+    pstate = {"promoted": True, "promoted_ts": now - 86400, "baseline_pct": 0.2}
+    fade = [mk(LIVE_BOT, -0.01, now - 86400 + (i + 1) * 3600) for i in range(FADE_N + 2)]
+    g4, (k4, _) = growth_promoter(fade, pstate, now)
+    assert k4 == "release" and not g4["promoted"], k4
+
+    ok = [mk(LIVE_BOT, 0.005, now - 86400 + (i + 1) * 3600) for i in range(FADE_N + 2)]
+    g5, (k5, _) = growth_promoter(ok, pstate, now)
+    assert k5 == "reassert" and g5["promoted"], k5
+    print("experiment_judge _selftest_growth OK")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
+        _selftest_growth()
     else:
         run_once()
