@@ -1,3 +1,7 @@
+## 2026-07-28 (ed) — the entry-time growth-receipt overlay gets its mid-hold flap fixture (the audit verifier's last residual)
+
+- `_selftest_flap` now pins that a position's ENTRY-time `explore_k`/`conviction_hi`/`slope_gate` receipts outrank close-time `_ACTIVE_BARS` on the close row when a lever flips MID-HOLD (the (dy) entry-stamp fix shipped without this exact fixture — flagged by the audit's adversarial verify pass), and that a LEGACY position (no growth keys at entry) falls back to the close-time arm context as its `bars_basis` label admits. Mutation-honest: dropping the entry-time keys from the meta stamp turns it red. Test-only; no behavior change. Known forward-only residual restated: positions opened before the (dy) deploy lack the new entry keys and inherit close-time values until they cycle out (≤72h max hold).
+
 ## 2026-07-28 (ec) — every organ readable off-Railway + the operator-release tool carries the judge's new state
 
 - **/bus.json serves the WHOLE organ roster.** A dozen keys were unverifiable off-Railway — notably `regime-oracle` (whose `.grades` the weekly item-18 re-read depends on), plus evidence-board / event-sentinel / fleet-immune / fleet-tuning / xp-queue / strategy-incubator / fleet-radar / fleet-respiration / fleet-clock / fleet-regen / brain-vitals. All added to the live serve list (+ the deeper history set). Observable-only; the payloads carry no secrets (the endpoint's standing no-auth contract).

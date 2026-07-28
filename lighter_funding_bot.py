@@ -2362,6 +2362,28 @@ def _selftest_flap():
     e = _close_bars_extra(m["bars"])
     assert e["bars_basis"] == "entry" and e["bars"]["take_profit"] == 0.06 \
         and e["bars"]["max_hold_h"] == 96 and e["bars"]["arm"] == "lighter_live", e
+    # [2026-07-28 (ed)] the ENTRY-phase receipts survive a lever enacted (or
+    # released) MID-HOLD: a position stamped explore_k=0/conviction_hi=1.0
+    # at entry must keep those on its close row even when close-time
+    # _ACTIVE_BARS says the growth levers are ON — otherwise ran_candidate
+    # counts a pre-lever trade as PROOF the candidate ran, on the path to
+    # live.funding.*. Mutation check: dropping the entry-time keys from the
+    # meta stamp makes the close row inherit 2/2.2 here -> red. (The
+    # audit's adversarial verifier flagged this exact fixture as the
+    # missing half of the d32dd5a entry-stamp fix.)
+    m2 = {"bars": {"enter_apr": 0.60, "take_profit": 0.06, "max_hold_h": 96,
+                   "slope_gate": 1, "explore_k": 0, "conviction_hi": 1.0}}
+    _ACTIVE_BARS.update({"explore_k": 2, "conviction_hi": 2.2,
+                         "slope_gate": 0})     # levers flipped mid-hold
+    e3 = _close_bars_extra(m2["bars"])
+    assert e3["bars"]["explore_k"] == 0 and e3["bars"]["conviction_hi"] == 1.0 \
+        and e3["bars"]["slope_gate"] == 1, \
+        ("entry-time growth/slope receipts must outrank close-time "
+         "_ACTIVE_BARS on the close row", e3)
+    # ...and a LEGACY position (no growth keys at entry) falls back to the
+    # close-time arm context, exactly as the bars_basis label admits.
+    e4 = _close_bars_extra(m["bars"])
+    assert e4["bars"]["explore_k"] == 2 and e4["bars"]["conviction_hi"] == 2.2, e4
     e2 = _close_bars_extra(None)
     assert e2["bars_basis"] == "close-legacy" \
         and e2["bars"]["take_profit"] == 0.04, e2
