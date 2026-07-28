@@ -37,6 +37,33 @@ jobs:
           key: fleet-snapshot-${{ github.run_id }}
           restore-keys: fleet-snapshot-
 
+      # [2026-07-28 AUDIT FIX] the cache sits exactly at the 7-day eviction
+      # boundary on a weekly cron (saved once, next touched 7 days later),
+      # so eviction races the restore EVERY week and the OFF-FEED/NEW flags
+      # silently never fire. Zero-infra fallback: recover the previous
+      # service list from last week's issue table.
+      - name: Recover snapshot from last week's issue (cache evicted)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -f .fleet-snapshot ]; then echo "cache hit"; exit 0; fi
+          gh issue list --repo "$GITHUB_REPOSITORY" --label fleet-weekly \
+            --state all --limit 1 --json body --jq '.[0].body // empty' \
+            > prev_issue.md || true
+          python3 - <<'PY'
+          import json, re, pathlib
+          p = pathlib.Path('prev_issue.md')
+          body = p.read_text() if p.exists() else ''
+          names = re.findall(r'^\|\s*\d+\s*\|\s*`([^`]+)`', body, re.M)
+          if names:
+              pathlib.Path('.fleet-snapshot').write_text(
+                  json.dumps({'names': sorted(set(names))}))
+              print(f"recovered {len(set(names))} names from the last issue")
+          else:
+              print("no prior issue/table - first-run semantics")
+          PY
+
       - name: Build the scoreboard
         run: |
           python3 - <<'PY'
@@ -50,13 +77,17 @@ jobs:
                   v = b.get(k)
                   if isinstance(v, (int, float)): return float(v)
               return 0.0
+          # [2026-07-28 AUDIT FIX] read the feed's REAL keys (bot / pnl_abs /
+          # open_trades / live+venue_mode) — the first dispatch (issue #99)
+          # rendered all 23 rows as '?' at $0.00 marked 'paper' because none
+          # of the guessed keys exist on /pnl.json.
           rows = []
           for b in bots:
-              rows.append({'name': b.get('name') or b.get('service') or '?',
-                  'pnl': num(b, 'pnl', 'total_pnl', 'profit_abs'),
-                  'open': int(num(b, 'open_positions', 'open_trades')),
+              rows.append({'name': b.get('bot') or b.get('name') or b.get('service') or '?',
+                  'pnl': num(b, 'pnl_abs', 'pnl', 'total_pnl', 'profit_abs'),
+                  'open': int(num(b, 'open_trades', 'open_positions')),
                   'stale': bool(b.get('stale')),
-                  'live': str(b.get('mode','')).lower() in ('live','lighter_live')})
+                  'live': bool(b.get('live')) or str(b.get('venue_mode') or b.get('mode') or '').lower() == 'lighter_live'})
           rows.sort(key=lambda r: r['pnl'], reverse=True)
           names = {r['name'] for r in rows}
           total_pnl = sum(r['pnl'] for r in rows)

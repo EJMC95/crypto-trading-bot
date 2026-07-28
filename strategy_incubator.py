@@ -159,6 +159,26 @@ def _iso(ts=None):
     return datetime.fromtimestamp(ts or now_ts(), tz=timezone.utc).isoformat(timespec="seconds")
 
 
+def queue_carry(queue, now):
+    """[2026-07-28 §3b residual] Which stored xp-queue candidates carry
+    forward into this cycle's republish: the payload's OWN updated+ttl_sec
+    decides, fail-CLOSED — exactly the read the judge's candidate_pool now
+    does on the consumer side. A stale or unstamped queue carries NOTHING:
+    that is what retires dead entries (the 17-Jul tape-refuted rows the
+    28-Jul review found) instead of resurrecting them under a fresh stamp.
+    Pure — selftested."""
+    q = queue or {}
+    cands = [c for c in (q.get("candidates") or []) if isinstance(c, dict)]
+    try:
+        upd = datetime.fromisoformat(
+            str(q.get("updated")).replace("Z", "+00:00")).timestamp()
+        if float(now) - upd > float(q.get("ttl_sec") or 0):
+            return []
+    except Exception:      # noqa: BLE001
+        return []
+    return cands
+
+
 # ---------------------------------------------------------------------------
 # evidence (pure — selftested)
 # ---------------------------------------------------------------------------
@@ -788,18 +808,31 @@ def run_once():
     if hurting:
         print(f"[incubator] 🦾 proprioception hurting levers honored: "
               f"{sorted(hurting)}", flush=True)
-    q = store.load_state(QUEUE_KEY) or {}
-    candidates_now = q.get("candidates") or []
+    # [2026-07-28 §3b residual] QUEUE HEARTBEAT. The judge consumes xp-queue
+    # only while FRESH by its own updated+ttl_sec (fail-closed since today's
+    # review), so a queue written only on NEW proposals dies of old age in
+    # ~TTL and every still-endorsed candidate expires unseen while the judge
+    # is mid-candidate. Two halves, both restrict-safe: the READ carries
+    # forward only a still-fresh queue (queue_carry, fail-closed — retires
+    # dead entries rather than re-stamping them), and the WRITE now happens
+    # EVERY cycle, props or not, so the endorsed queue stays alive as long as
+    # this organ breathes (fresh-empty != dark, and the judge's statics are
+    # untouched either way). Accepted residual: an incubator outage > TTL
+    # loses queued names permanently (lifetime `proposed` memory dedups
+    # re-proposal); the only rebuild source is that same lifetime memory,
+    # which also holds tape-refuted names the judge never ran — fail-closed
+    # wins over a resurrection risk.
+    candidates_now = queue_carry(store.load_state(QUEUE_KEY), now)
     if props:
         existing = {p["name"] for p in candidates_now}
         merged = candidates_now + [p for p in props
                                    if p["name"] not in existing]
         candidates_now = merged[:20]
-        store.save_state(QUEUE_KEY, {"updated": _iso(now), "ttl_sec": TTL_SEC,
-                                     "candidates": candidates_now,
-                                     "source": "strategy-incubator"})
         print(f"[incubator] proposed {len(props)} funding candidate(s) to "
               f"xp-queue (judge-gated): {[p['name'] for p in props]}", flush=True)
+    store.save_state(QUEUE_KEY, {"updated": _iso(now), "ttl_sec": TTL_SEC,
+                                 "candidates": candidates_now,
+                                 "source": "strategy-incubator"})
 
     # the incubator's OWN proposed ledger stamps birth time; the queue copy
     # stays exactly {name, levers} (the judge's contract, untouched)
@@ -1158,6 +1191,23 @@ def _selftest():
     assert by["xp-e"]["status"] == "proposed"
     fp2 = funding_prospects_view([{"name": "x", "levers": {}}], None, None)
     assert fp2[0]["status"] == "proposed" and "stats" not in fp2[0]
+
+    # [2026-07-28 §3b residual] queue_carry — the heartbeat's fresh-gated
+    # read. Mutation check: dropping the staleness gate turns the stale/
+    # unstamped asserts red (dead entries would republish under a fresh
+    # stamp); dropping the carry turns the fresh assert red (every republish
+    # would orphan the endorsed queue).
+    _qn = now_ts()
+    _fresh_q = {"updated": _iso(_qn - 60), "ttl_sec": 10800,
+                "candidates": [{"name": "xp-a", "levers": {}}, "junk"]}
+    assert [c["name"] for c in queue_carry(_fresh_q, _qn)] == ["xp-a"], \
+        "a fresh queue carries its dict candidates (junk dropped, not fatal)"
+    _stale_q = dict(_fresh_q, updated=_iso(_qn - 11 * 86400))
+    assert queue_carry(_stale_q, _qn) == [], \
+        "a stale queue carries NOTHING (dead entries retire, not re-stamp)"
+    assert queue_carry({"candidates": _fresh_q["candidates"]}, _qn) == [], \
+        "an unstamped queue fails closed"
+    assert queue_carry(None, _qn) == [] and queue_carry({}, _qn) == []
 
     print("strategy_incubator selftest OK (seed, dedupe, crossover+mutation "
           "on-grid, lever mapping/clamp, judge-gated funding proposals, "

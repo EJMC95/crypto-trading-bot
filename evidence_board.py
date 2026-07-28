@@ -206,7 +206,14 @@ def corroborate(key, lighter_market):
             return True
         outliers = lighter_market.get("prem_outliers") or []
         for o in outliers:
-            sym = o.get("symbol") if isinstance(o, dict) else (o[0] if isinstance(o, (list, tuple)) and o else o)
+            # [2026-07-28 AUDIT FIX] the scout publishes {"sym": ...}
+            # (lighter_market_scout prem_outliers; fleet_risk reads o["sym"]
+            # too) — this read said o["symbol"], so for every real entry sym
+            # was None and the per-coin branch could NEVER return True: a
+            # disloc:<coin> alert only ever got corroborated via the
+            # venue-wide stress branch above. Accept both spellings.
+            sym = (o.get("sym") or o.get("symbol")) if isinstance(o, dict) \
+                else (o[0] if isinstance(o, (list, tuple)) and o else o)
             if str(sym).upper() == coin.upper():
                 return True
     return False
@@ -712,10 +719,27 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
 
 
 def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts,
-                      xp_state=None):
+                      xp_state=None, radar_state=None):
     """Board-authored EXPAND evidence. Same emit shape as synthesize(), every
-    item carrying direction='expand'. Pure — selftested offline."""
+    item carrying direction='expand'. Pure — selftested offline.
+
+    [2026-07-28] radar_state: the fleet-radar payload. The promotion watch
+    below is a NAIVE expectancy screen (lifetime n + $ total) — exactly the
+    read the radar's median/jackknife/concentration sensors were built to
+    correct, and the 28-Jul review measured the collision live (Yield
+    Harvester +$58.62 headline, radar `artifact`: three single closes are
+    $32.69 of it; "the radar is senior here by construction"). A fresh radar
+    class now rides every promotion-watch item: artifact/noise/losing/weak
+    DOWNGRADES the item (headline kept honest, promotion proposal replaced
+    by the radar's caveat), real_edge/plausible corroborates. Fail-open: a
+    dark/stale radar leaves the naive screen exactly as it was."""
     out = []
+    radar_by_bot = {}
+    if radar_state and _fresh(radar_state, max_age_s=float(
+            radar_state.get("ttl_sec") or 10800)):
+        for b in radar_state.get("books") or []:
+            if isinstance(b, dict) and b.get("bot"):
+                radar_by_bot[str(b["bot"])] = b
 
     def emit(key, msg, proposal=None, lever=None):
         out.append({"key": key, "severity": "info", "msg": msg,
@@ -759,14 +783,32 @@ def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts,
         closed = int(r.get("closed_trades") or 0)
         pnl = float(r.get("pnl_abs") or 0.0)
         if closed >= PROMO_MIN_CLOSED and pnl >= PROMO_MIN_PNL:
-            emit(f"board:promotion-watch:{bot}",
-                 f"🚀 {bot}: n={closed} closed, ${pnl:+.2f} — passes the "
-                 f"provisional expectancy screen (n≥{PROMO_MIN_CLOSED}, "
-                 f"≥${PROMO_MIN_PNL:g})",
-                 proposal="promotion-review candidate — run the agenda item-5 "
-                          "gate (expectancy + max-DD + profit factor) at the "
-                          "review; go-live stays operator-only",
-                 lever="promotion")
+            rb = radar_by_bot.get(bot)
+            rcls = (rb or {}).get("class")
+            rcav = ", ".join((rb or {}).get("caveats") or [])
+            if rcls in ("artifact", "noise", "losing", "weak"):
+                # the radar is SENIOR to this naive screen — keep the item
+                # (the headline exists and the operator will see it anyway)
+                # but let it tell the truth about itself.
+                emit(f"board:promotion-watch:{bot}",
+                     f"🔬 {bot}: n={closed} closed, ${pnl:+.2f} passes the "
+                     f"naive expectancy screen BUT radar classes it "
+                     f"'{rcls}'" + (f" ({rcav})" if rcav else ""),
+                     proposal="do NOT promote on the headline — the radar's "
+                              "median/jackknife read is senior (28-Jul "
+                              "review); revisit if its class improves",
+                     lever="promotion")
+            else:
+                emit(f"board:promotion-watch:{bot}",
+                     f"🚀 {bot}: n={closed} closed, ${pnl:+.2f} — passes the "
+                     f"provisional expectancy screen (n≥{PROMO_MIN_CLOSED}, "
+                     f"≥${PROMO_MIN_PNL:g})"
+                     + (f" · radar: {rcls}" + (f" ({rcav})" if rcav else "")
+                        if rcls else ""),
+                     proposal="promotion-review candidate — run the agenda item-5 "
+                              "gate (expectancy + max-DD + profit factor) at the "
+                              "review; go-live stays operator-only",
+                     lever="promotion")
 
     # 3b) The experiment judge's phase — the shadow→live promotion pipeline
     #     visible where the operator triages.
@@ -1034,7 +1076,8 @@ def run_once():
     except Exception:
         bot_rows = []
     synth += synthesize_expand((lf.get("lenses") or {}) if _fresh(lf, LENS_FRESH_S) else {},
-                               tuner_state, bot_rows, lm, now, xp_state)
+                               tuner_state, bot_rows, lm, now, xp_state,
+                               radar_state=_g("fleet-radar"))
 
     # 🦾 proprioception: what the autonomy stack's own movements measured
     prop_b = _g("fleet-proprioception")
@@ -1178,9 +1221,22 @@ def run_once():
         i["verdict"] = merged.get(i["key"], i["verdict"])
     items.sort(key=lambda i: -i["score"])
 
+    # [2026-07-28 AUDIT FIX] mode told the Autonomy surface every expand item
+    # was 'enact' — but the board's only actuators are the gapscout widen
+    # ladder and live.clip_scale; lens-positive / promotion-watch / xp-phase
+    # / stress-headroom / prop-helping are review SUGGESTIONS. A telemetry
+    # view that overclaims autonomy is the mirror image of the fleet_tuning
+    # doctrine hazard ("a telemetry view that disagrees with the actuator").
+    # 'enact' now only for items whose levers the board itself writes.
+    def _mode_of(s):
+        if s.get("direction") != "expand":
+            return MODE
+        return ("enact" if (s.get("key") == "board:gapscout-quiet"
+                            or s.get("lever") == "live.clip_scale")
+                else "suggest")
     proposals = [{"key": s["key"], "lever": s["lever"], "proposal": s["proposal"],
                   "direction": s.get("direction", "restrict"),
-                  "mode": "enact" if s.get("direction") == "expand" else MODE}
+                  "mode": _mode_of(s)}
                  for s in synth if s.get("proposal")]
 
     # ---- enact: ONE combined write per cycle (merge semantics keep other
@@ -1444,6 +1500,40 @@ def _selftest():
     k2 = {e["key"] for e in ex2}
     assert "board:tuner-enacted" not in k2 and "board:stress-headroom" not in k2
     assert "board:lens-positive:dip" in k2
+
+    # [2026-07-28] RADAR IS SENIOR to the naive promotion screen: an
+    # artifact-classed book keeps its item but the item tells the truth
+    # (🔬 + do-NOT-promote proposal); a real_edge class corroborates; a
+    # stale radar changes nothing (fail-open). Mutation check: dropping the
+    # radar read turns the artifact assert red; dropping the freshness gate
+    # turns the stale assert red.
+    _radar = {"updated": fresh, "ttl_sec": 3600, "books": [
+        {"bot": "lighter-dislocation-lshadow", "class": "artifact",
+         "caveats": ["3 closes are 80% of net"]}]}
+    ex3 = synthesize_expand({}, None, rows,
+                            {"updated": fresh, "stress": {"med": 20}}, _now(),
+                            radar_state=_radar)
+    _pw = next(e for e in ex3
+               if e["key"] == "board:promotion-watch:lighter-dislocation-lshadow")
+    assert "artifact" in _pw["msg"] and "🔬" in _pw["msg"], _pw
+    assert "NOT promote" in _pw["proposal"], _pw
+    _radar_good = {"updated": fresh, "ttl_sec": 3600, "books": [
+        {"bot": "lighter-dislocation-lshadow", "class": "real_edge",
+         "caveats": ["fading"]}]}
+    ex4 = synthesize_expand({}, None, rows,
+                            {"updated": fresh, "stress": {"med": 20}}, _now(),
+                            radar_state=_radar_good)
+    _pw4 = next(e for e in ex4
+                if e["key"] == "board:promotion-watch:lighter-dislocation-lshadow")
+    assert "real_edge" in _pw4["msg"] and "🚀" in _pw4["msg"], _pw4
+    _stale_radar = dict(_radar, updated="2020-01-01T00:00:00+00:00")
+    ex5 = synthesize_expand({}, None, rows,
+                            {"updated": fresh, "stress": {"med": 20}}, _now(),
+                            radar_state=_stale_radar)
+    _pw5 = next(e for e in ex5
+                if e["key"] == "board:promotion-watch:lighter-dislocation-lshadow")
+    assert "artifact" not in _pw5["msg"] and "🚀" in _pw5["msg"], \
+        "a stale radar must change nothing (fail-open)"
 
     # 🦾 proprioception synthesis: hurting=warn/restrict, helping=expand,
     # neutral silent, stale organ emits nothing

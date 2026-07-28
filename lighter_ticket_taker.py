@@ -1557,10 +1557,19 @@ def main(_ctx=None):
             # switch already flattened this same cycle.
             if not rails.kill_check():
                 _flatten_all("daily_loss")
-            store.save_state(LIVE_STATE_KEY, {
+            # [2026-07-28 AUDIT FIX] this save was missing sl_block, so every
+            # halted cycle overwrote LIVE_STATE_KEY without the post-stop
+            # cooldown map — a symbol that SL'd just before the halt was
+            # instantly re-eligible at the day roll. Same payload as the
+            # normal section-4 save; its False return is paged there, so
+            # page here too rather than failing silent.
+            _hsave_ok = store.save_state(LIVE_STATE_KEY, {
                 "initial_equity": live_baseline, "meta": meta, "stats": stats,
-                "capital_adjust": capital_adjust,
+                "capital_adjust": capital_adjust, "sl_block": sl_block,
                 "day_start": {"day": cur_day, "equity": day_start_equity}})
+            if _hsave_ok is False:
+                print("[taker] WARN: halted-day state save FAILED — sl_block/"
+                      "day_start may be stale on restart", flush=True)
             # Report what the VENUE actually holds, not 0. A flatten can fail
             # (rate-limit storm, venue blip) and publishing open_trades=0 while
             # real positions are still open would make the retry-every-cycle

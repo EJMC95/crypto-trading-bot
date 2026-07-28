@@ -116,10 +116,19 @@ CANDIDATES = [
     #       hedged book "close only when paid" records wins by construction.
     # tp-0.06 stands: take_profit IS the Farmer's measured-positive exit
     # family (shadow 11-0 +$14.96, live 9-0 +$8.11).
+    # [2026-07-28 D7] slope-gate-off — the (dp) Lighter backtest refuted the
+    # slope gate on this venue (live gate 0.05: durable-history -$14.90 vs
+    # gate-off +$34.07 @5bps; the gate is HL-validated, Lighter-negative), and
+    # the 28-Jul review queued it as "the natural next judge candidate after
+    # tp-0.06" (D7). Serial queue order does exactly that: tp-0.06 first,
+    # then this. The Farmer consumes xp.funding.slope_gate in apply_levers
+    # and stamps the receipt (`bars.slope_gate`), so the skew gate can accrue.
+    {"name": "slope-gate-off",  "levers": {"xp.funding.slope_gate": 0}},
 ]
 XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               "xp.funding.take_profit": "live.funding.take_profit",
-              "xp.funding.max_hold_h": "live.funding.max_hold_h"}
+              "xp.funding.max_hold_h": "live.funding.max_hold_h",
+              "xp.funding.slope_gate": "live.funding.slope_gate"}
 
 
 def now_ts():
@@ -396,7 +405,19 @@ def prop_fade(prop_state, live_levers, now):
 # guarantee (release only when reverting TIGHTENS) can be defeated on that lever.
 LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
                      "live.funding.take_profit": (0.04, "down"),
-                     "live.funding.max_hold_h": (72.0, "down")}
+                     "live.funding.max_hold_h": (72.0, "down"),
+                     # [2026-07-28] the growth pair + slope gate join the map
+                     # so the organ release paths (prop_fade/proposal_fade)
+                     # can reach every promotable live.funding.* lever —
+                     # before this, a promoted growth pair had NO organ
+                     # early-release (unmapped lever: "never release on a
+                     # guess"). Releasing tightens by construction: env
+                     # defaults are 0 explore slots (SCAN_EXPLORE_K "0"),
+                     # conviction OFF (FUNDING_CONVICTION "off" -> hi 1.0),
+                     # slope gate ON (FUNDING_SLOPE_GATE "on" -> 1).
+                     "live.funding.explore_k": (0.0, "down"),
+                     "live.funding.conviction_hi": (1.0, "down"),
+                     "live.funding.slope_gate": (1.0, "up")}
 
 
 def proposal_fade(proposals, live_levers, now):
@@ -658,6 +679,12 @@ GROWTH_LIVE = {"live.funding.explore_k": 2, "live.funding.conviction_hi": 2.2}
 GROWTH_WINDOW_D = float(os.environ.get("XPJ_GROWTH_DAYS", "2.5"))
 GROWTH_MIN_CLOSES = int(os.environ.get("XPJ_GROWTH_MIN_CLOSES", "15"))
 GROWTH_LIVE_MIN = int(os.environ.get("XPJ_GROWTH_LIVE_MIN", "10"))
+# [2026-07-28 AUDIT FIX] post-release cooldown — the main pipeline stamps
+# COOLDOWN_H after every FADED/ABANDONED for exactly this reason: without
+# it, a fade release (rolling live mean < 0) followed by a trailing-window
+# bar that still clears is an hourly promote/release oscillation, each
+# promote re-steering real money. Same default as the main path.
+GROWTH_COOLDOWN_H = float(os.environ.get("XPJ_GROWTH_COOLDOWN_H", "48"))
 
 
 def growth_promoter(rows, gstate, now, drift=None):
@@ -670,10 +697,18 @@ def growth_promoter(rows, gstate, now, drift=None):
         fading, n, m = fade_check(rows, pts, now, live_bot=LIVE_BOT,
                                   baseline_pct=gstate.get("baseline_pct"))
         if fading:
-            return ({"promoted": False, "released_ts": now, "release_mean": m},
+            return ({"promoted": False, "released_ts": now, "release_mean": m,
+                     "cooldown_until": now + GROWTH_COOLDOWN_H * 3600},
                     ("release", {"why": f"fade: live rolling mean {m}%/trade (n={n})",
                                  "levers": list(GROWTH_LIVE)}))
         return (gstate, ("reassert", {"levers": GROWTH_LIVE, "n": n, "mean": m}))
+    # [2026-07-28] post-release cooldown: a freshly-released pair must not
+    # re-clear on the same trailing window that just faded — the main
+    # pipeline's COOLDOWN_H rule, mirrored.
+    if _num(gstate.get("cooldown_until")) > now:
+        return (gstate, ("eval", {"promote": False,
+                                  "why": f"release cooldown until "
+                                         f"{iso(_num(gstate['cooldown_until']))}"}))
     start = now - GROWTH_WINDOW_D * 86400
     v = paired_eval(rows, start, now, shadow_bot=SHADOW_BOT, live_bot=LIVE_BOT,
                     min_closes=GROWTH_MIN_CLOSES, live_min=GROWTH_LIVE_MIN,
@@ -730,6 +765,127 @@ def _arm_drift_snapshot(rows, fetch=None):
         return None
 
 
+def growth_step(gstate, rows, have_ledger, now, drift=None,
+                assert_fn=None, asserted_fn=None, push=None,
+                prop_state=None, proposals=None):
+    """[2026-07-28 §3c] The growth-lever pair's cycle glue — the run_once
+    wiring growth_promoter was committed without (53c7e8c shipped the promoter
+    with its only callers in its own selftest; the 28-Jul review §3c mapped
+    this exact arming chain). PURE apart from the injected effects
+    (assert_fn/push default to the real rail + phone): returns
+    (new_gstate, last_growth); the caller persists new_gstate under
+    st['growth'].
+
+    Discipline mirrors the main pipeline branch-for-branch:
+    - the promotion IS the write — a promote whose live-lever write does not
+      land keeps the OLD (unpromoted) gstate so the bar re-evaluates next
+      cycle, pushes once per episode, and stamps nothing;
+    - reassert failure is fail-safe (the lever TTL-expires back to env
+      defaults) but never SILENT — one urgent push per episode;
+    - release pushes once (growth_promoter emits it only on the transition);
+    - a DARK LEDGER asserts nothing: the standing promotion stops
+      re-asserting immediately and the live lever expires within LEVER_TTL —
+      exactly the "a fade OR a dark ledger reverts to env within LEVER_TTL"
+      contract in the promoter's design block (deliberately TIGHTER than the
+      main path's BLIND_MAX: the faster bar earns less trust).
+    All promotion gates (receipts fail-closed, arm-drift, floors) live in
+    growth_promoter/paired_eval and are unchanged — this function only
+    carries verdicts to the rail. The judge stays the sole writer of
+    live.funding.*."""
+    assert_fn = assert_fn or _assert_levers
+    asserted_fn = asserted_fn or _asserted
+    push = push or send_push
+    gstate = dict(gstate or {})
+    if not have_ledger:
+        return gstate, {"kind": "dark",
+                        "why": "no ledger — asserting nothing (fail-safe)"}
+    g2, (kind, pay) = growth_promoter(rows, gstate, now, drift=drift)
+    if kind in ("promote", "reassert") and prop_state is None:
+        # resolve the organ evidence once: the promote path consults it
+        # BEFORE steering real money, the reassert path for early release
+        try:
+            prop_state = store.load_state("fleet-proprioception") or {}
+        except Exception:      # noqa: BLE001
+            prop_state = {}
+    if kind == "promote":
+        # [2026-07-28] never promote INTO a standing organ objection: a fresh
+        # proprioception HURTING on a growth lever is the live lane's own
+        # measurement that this knob is bad — the same evidence that would
+        # release the promotion one cycle later must block it one cycle
+        # earlier. Fail-safe False on a dark organ (promotes normally).
+        _pf, _pwhy = prop_fade(prop_state, set(GROWTH_LIVE), now)
+        if _pf:
+            return gstate, {"kind": "eval",
+                            "why": f"promote BLOCKED by organ verdict: {_pwhy}"}
+        rc = assert_fn(dict(GROWTH_LIVE),
+                       "growth-levers PROMOTED (faster bar)",
+                       str(pay.get("why") or "")[:280])
+        if not asserted_fn(rc, GROWTH_LIVE):
+            if not gstate.get("assert_fail_notified"):
+                push("growth PROMOTION WRITE FAILED",
+                     "the faster bar cleared but the live lever write did "
+                     "not land — nothing reached real money; retrying next "
+                     "cycle", priority="urgent")
+            gstate["assert_fail_notified"] = True
+            return gstate, {"kind": "promote-failed", "why": pay.get("why")}
+        g2 = dict(g2)
+        g2["assert_fail_notified"] = False
+        push("PROMOTED to LIVE: Farmer growth levers",
+             f"{pay.get('why')}\nlive levers: {json.dumps(GROWTH_LIVE)} "
+             f"(TTL'd; the tight fade-revert backstops the faster bar)",
+             priority="urgent")
+        return g2, {"kind": kind, "why": pay.get("why")}
+    if kind == "reassert":
+        # [2026-07-28] the organ release paths reach this promotion exactly
+        # as they reach the main pipeline's promoted phase: proprioception's
+        # HURTING verdict (the live lane's own paired grades) and a fresh
+        # organ restrict proposal each release EARLY, before the absolute
+        # fade bar. Restrict-only in outcome via LIVE_ENV_DEFAULTS
+        # orientation (releasing reverts to 0 explore slots / conviction
+        # off — tighter by construction); fail-safe False on a dark organ
+        # or channel. prop_state/proposals are injectable for the selftest;
+        # prop_state was resolved above (shared with the promote gate).
+        pfading, pwhy = prop_fade(prop_state, set(GROWTH_LIVE), now)
+        ofading, owhy = (False, None)
+        _props = proposals
+        if _props is None and fprop is not None:
+            try:
+                _props = fprop.fresh_proposals()
+            except Exception:      # noqa: BLE001
+                _props = None
+        if _props:
+            ofading, owhy = proposal_fade(_props, dict(GROWTH_LIVE), now)
+        if pfading or ofading:
+            why = pwhy if pfading else owhy
+            push("growth promotion RELEASED (organ signal)",
+                 f"{why} — levers released, env defaults return within "
+                 f"the TTL", priority="urgent")
+            return ({"promoted": False, "released_ts": now,
+                     "release_why": why,
+                     "cooldown_until": now + GROWTH_COOLDOWN_H * 3600},
+                    {"kind": "release", "why": why})
+        rc = assert_fn(dict(GROWTH_LIVE), "growth-levers promotion in force",
+                       f"live n={pay.get('n')} mean={pay.get('mean')}")
+        g2 = dict(g2)
+        if not asserted_fn(rc, GROWTH_LIVE):
+            if not g2.get("assert_fail_notified"):
+                push("growth re-assert FAILING",
+                     "the live growth-lever write is not landing — it will "
+                     "TTL-expire back to env defaults (fail-safe); "
+                     "fade-watch continues on live data", priority="urgent")
+            g2["assert_fail_notified"] = True
+        else:
+            g2["assert_fail_notified"] = False
+        return g2, {"kind": kind, "n": pay.get("n"), "mean": pay.get("mean")}
+    if kind == "release":
+        push("growth promotion RELEASED",
+             f"{pay.get('why')} — levers released, env defaults return "
+             f"within the TTL", priority="urgent")
+        return g2, {"kind": kind, "why": pay.get("why")}
+    ev = pay if isinstance(pay, dict) else {}
+    return g2, {"kind": kind, "why": ev.get("why")}
+
+
 def run_once():
     now = now_ts()
     # [2026-07-17 AUDIT] A FAILED READ IS NOT AN EMPTY JUDGE. `load_state`
@@ -778,6 +934,10 @@ def run_once():
     verdicts = st.get("verdicts") or []
     rows = store.fetch_paper_trades(limit=4000)
     have_ledger = bool(rows)
+    # [2026-07-28] ONE drift snapshot per cycle, shared by the growth step and
+    # the running phase — the drift check and the numbers it gates must never
+    # describe different moments (the 17-Jul same-snapshot doctrine).
+    _drift_snap = _arm_drift_snapshot(rows) if have_ledger else None
 
     def save(**kw):
         payload = {"updated": iso(now), "ttl_sec": TTL_SEC,
@@ -797,6 +957,15 @@ def run_once():
                    # push fires once per episode, not every 30 min forever.
                    "skew_notified": bool(kw.get("skew_notified",
                                                 st.get("skew_notified"))),
+                   # [2026-07-28 AUDIT FIX] the ARM-DRIFT hold's sticky flag
+                   # was passed as a save() kwarg but NEVER persisted (no key
+                   # here), so every drift-hold cycle re-read None: the
+                   # urgent push re-fired hourly AND the arms-re-matched
+                   # clock restart (`if st.get("drift_notified")`) could
+                   # never fire — the one recovery of the three that was
+                   # structurally dead. Mirrors skew_notified exactly.
+                   "drift_notified": bool(kw.get("drift_notified",
+                                                 st.get("drift_notified"))),
                    # [2026-07-16] same once-per-episode contract for failed
                    # rail writes (idle-start / re-assert / promote).
                    "assert_fail_notified": bool(kw.get("assert_fail_notified",
@@ -806,6 +975,11 @@ def run_once():
                    # promotions predating the stamp (absolute bar only).
                    "promote_baseline": kw.get("promote_baseline",
                                               st.get("promote_baseline")),
+                   # [2026-07-28 §3c] the growth-lever pair's own state +
+                   # last verdict — set on st by the growth step below
+                   # before any branch saves, so every exit persists it.
+                   "growth": kw.get("growth", st.get("growth")),
+                   "last_growth": kw.get("last_growth", st.get("last_growth")),
                    "verdicts": verdicts[-10:], "last_eval": kw.get("last_eval")}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
@@ -821,6 +995,19 @@ def run_once():
               f"candidate={payload['candidate']} "
               f"{kw.get('note') or ''}", flush=True)
         return payload
+
+    # [2026-07-28 §3c] the growth-lever pair runs its own self-contained
+    # promoter EVERY cycle, whatever the serial queue is doing (it is
+    # deliberately NOT one-at-a-time — the shadow runs both levers via its
+    # own env, always on). All effects go through the same rail + phone as
+    # the main path; state rides st['growth'] into every save() above.
+    # Fail-closed at every gate (receipts, drift, floors, write-lands) —
+    # see growth_step/growth_promoter.
+    _g2, _glast = growth_step(st.get("growth"), rows, have_ledger, now,
+                              drift=_drift_snap)
+    st["growth"], st["last_growth"] = _g2, _glast
+    if _glast.get("kind") not in (None, "eval"):
+        print(f"[xp-judge] growth-levers: {_glast}", flush=True)
 
     if phase == "idle":
         if _num(st.get("cooldown_until")) > now:
@@ -910,7 +1097,9 @@ def run_once():
         # [2026-07-28] ...and while the ledger rows carry no stamps at all,
         # _arm_drift_snapshot falls back HOLD-ONLY to the arms' current
         # bot_pnl builds — see its docstring for why the row feed was empty.
-        _drift = _arm_drift_snapshot(rows)
+        # [2026-07-28 §3c] hoisted to _drift_snap (one snapshot per cycle,
+        # shared with the growth step above).
+        _drift = _drift_snap
         ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"),
                           drift=_drift)
               if have_ledger else {"promote": False, "why": "no ledger"})
@@ -1232,10 +1421,23 @@ def _selftest():
     _src_def = {}
     for _var, _key in (("FUNDING_ENTER_APR", "live.funding.enter_apr"),
                        ("FUNDING_TAKE_PROFIT", "live.funding.take_profit"),
-                       ("FUNDING_MAX_HOLD_H", "live.funding.max_hold_h")):
+                       ("FUNDING_MAX_HOLD_H", "live.funding.max_hold_h"),
+                       ("SCAN_EXPLORE_K", "live.funding.explore_k")):
         _mm = _re.search(_var + r'"\s*,\s*"([0-9.]+)"', _fb_src)
         assert _mm, f"could not read {_var} default from lighter_funding_bot.py"
         _src_def[_key] = float(_mm.group(1))
+    # [2026-07-28] the two non-numeric env defaults pin the same way, via
+    # their documented mapping: FUNDING_CONVICTION default "off" is
+    # conviction_hi 1.0 (the numeric receipt apply_levers stamps for off);
+    # FUNDING_SLOPE_GATE default "on" is slope_gate 1.
+    _mm = _re.search(r'FUNDING_CONVICTION"\s*,\s*"(\w+)"', _fb_src)
+    assert _mm and _mm.group(1) == "off", \
+        "FUNDING_CONVICTION source default changed — re-derive conviction_hi"
+    _src_def["live.funding.conviction_hi"] = 1.0
+    _mm = _re.search(r'FUNDING_SLOPE_GATE"\s*,\s*"(\w+)"', _fb_src)
+    assert _mm and _mm.group(1) == "on", \
+        "FUNDING_SLOPE_GATE source default changed — re-derive slope_gate"
+    _src_def["live.funding.slope_gate"] = 1.0
     for _key, (_v, _dir) in LIVE_ENV_DEFAULTS.items():
         assert _src_def[_key] == _v, (
             f"LIVE_ENV_DEFAULTS[{_key}]={_v} has DRIFTED from the funding bot's "
@@ -1279,7 +1481,7 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["tp-0.06", "xp-enter_apr-0.0625"], n2
+    assert n2 == ["tp-0.06", "slope-gate-off", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
     # 96-vs-96.0 dedup are withdrawn — see CANDIDATES)
@@ -1352,7 +1554,11 @@ def _selftest():
     assert _lever_sig({"a": "x"}) == (("a", "x"),)      # non-numeric survives
     # next_candidate: skips done + current, name-based (pool may grow)
     assert next_candidate(pool, [], None)["name"] == "tp-0.06"
-    assert next_candidate(pool, ["tp-0.06"], None)["name"] == "xp-tp-0.05"
+    # [2026-07-28 D7] slope-gate-off is the SECOND static — the review's
+    # "natural next judge candidate after tp-0.06", by queue construction
+    assert next_candidate(pool, ["tp-0.06"], None)["name"] == "slope-gate-off"
+    assert next_candidate(pool, ["tp-0.06", "slope-gate-off"],
+                          None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
     # ---- [2026-07-21 D2] re-spec migration: the clamp-inverted candidate ----
@@ -1579,6 +1785,101 @@ def _selftest_growth():
     ok = [mk(LIVE_BOT, 0.005, now - 86400 + (i + 1) * 3600) for i in range(FADE_N + 2)]
     g5, (k5, _) = growth_promoter(ok, pstate, now)
     assert k5 == "reassert" and g5["promoted"], k5
+
+    # ---- growth_step: the run_once glue (2026-07-28 §3c) --------------------
+    # Each case fails against naive glue: one that stamps promoted on a failed
+    # write, asserts through a dark ledger, spams the phone every cycle, or
+    # drops the promoter's verdict on the floor.
+    def _ok_assert(levers, reason, evidence):
+        return {"levers": {k: {"value": v} for k, v in levers.items()}}
+
+    def _no_assert(levers, reason, evidence):
+        return None
+
+    pushes = []
+
+    def _push(title, body, priority="default"):
+        pushes.append(title)
+        return True
+
+    # (1) clear bar + write LANDS -> promoted state persists, one push
+    g, last = growth_step({}, rows, True, now, assert_fn=_ok_assert, push=_push)
+    assert g.get("promoted") and last["kind"] == "promote", (g, last)
+    assert any("PROMOTED" in t for t in pushes), pushes
+    # (2) clear bar + write FAILS -> the promotion did NOT happen: old
+    #     (unpromoted) state kept, one failure push, sticky flag set
+    pushes.clear()
+    g, last = growth_step({}, rows, True, now, assert_fn=_no_assert, push=_push)
+    assert not g.get("promoted") and last["kind"] == "promote-failed", (g, last)
+    assert g.get("assert_fail_notified") and len(pushes) == 1, (g, pushes)
+    g, last = growth_step(g, rows, True, now, assert_fn=_no_assert, push=_push)
+    assert len(pushes) == 1, "one failure push per EPISODE, not per cycle"
+    # (3) DARK LEDGER: nothing evaluated, nothing asserted — the standing
+    #     promotion's lever expires to env within LEVER_TTL (fail-safe)
+    calls = []
+    g, last = growth_step(dict(pstate), None, False, now,
+                          assert_fn=lambda *a: calls.append(a), push=_push)
+    assert last["kind"] == "dark" and not calls, (last, calls)
+    assert g.get("promoted"), "a blip must not RELEASE the promotion state"
+    # (4) healthy promotion -> reassert lands, sticky flag clears
+    g, last = growth_step(dict(pstate, assert_fail_notified=True), ok, True,
+                          now, assert_fn=_ok_assert, push=_push,
+                          prop_state={}, proposals=[])
+    assert last["kind"] == "reassert" and g["assert_fail_notified"] is False, (g, last)
+    # (4b) ORGAN RELEASE — proprioception HURTING on a growth lever releases
+    #      the promotion early (the main pipeline's prop_fade, same evidence)
+    _hurt = {"updated": iso(now), "ttl_sec": 3600,
+             "verdicts": {"live.funding.explore_k":
+                          {"verdict": "hurting", "bad": 3, "n": 4}}}
+    g, last = growth_step(dict(pstate), ok, True, now, assert_fn=_ok_assert,
+                          push=_push, prop_state=_hurt, proposals=[])
+    assert last["kind"] == "release" and not g.get("promoted"), (g, last)
+    # (4c) ORGAN RELEASE — a fresh restrict proposal (e.g. impl-shortfall
+    #      sustained slip) releases too; an expand proposal NEVER does
+    _prop = [{"lever": "live.funding.conviction_hi", "direction": "restrict",
+              "set_by": "impl-shortfall", "reason": "sustained slip"}]
+    g, last = growth_step(dict(pstate), ok, True, now, assert_fn=_ok_assert,
+                          push=_push, prop_state={}, proposals=_prop)
+    assert last["kind"] == "release" and not g.get("promoted"), (g, last)
+    g, last = growth_step(dict(pstate), ok, True, now, assert_fn=_ok_assert,
+                          push=_push, prop_state={},
+                          proposals=[dict(_prop[0], direction="expand")])
+    assert last["kind"] == "reassert", "an expand proposal must NEVER release"
+    # (5) fade -> release verdict carried through, state cleared, one push
+    pushes.clear()
+    g, last = growth_step(dict(pstate), fade, True, now,
+                          assert_fn=_ok_assert, push=_push)
+    assert last["kind"] == "release" and not g.get("promoted"), (g, last)
+    assert any("RELEASED" in t for t in pushes), pushes
+    # (6) drift -> the promoter's fail-closed eval passes straight through
+    g, last = growth_step({}, rows, True, now, drift={"live": "a", "shadow": "b"},
+                          assert_fn=_no_assert, push=_push)
+    assert last["kind"] == "eval" and not g.get("promoted"), (g, last)
+    # (7) POST-RELEASE COOLDOWN: a fade release stamps cooldown_until, and a
+    #     bar that still clears on the trailing window must NOT re-promote
+    #     inside it (the hourly promote/release oscillation this kills).
+    g7, (k7, _) = growth_promoter(fade, dict(pstate), now)
+    assert k7 == "release" and _num(g7.get("cooldown_until")) > now, g7
+    g, (k7b, p7b) = growth_promoter(rows, g7, now + 3600)
+    assert k7b == "eval" and "cooldown" in str(p7b.get("why")), (k7b, p7b)
+    _t2 = now + GROWTH_COOLDOWN_H * 3600 + 3600
+    rows2 = []
+    for i in range(20):
+        t = _t2 - span + (i + 1) * span / 21.0
+        rows2.append(mk(SHADOW_BOT, 0.012, t, receipt=True))
+        rows2.append(mk(LIVE_BOT, 0.002, t))
+    g, (k7c, _) = growth_promoter(rows2, g7, _t2)
+    assert k7c == "promote", "past the cooldown the bar clears again"
+    # organ release stamps the same cooldown
+    g7d, _l7d = growth_step(dict(pstate), ok, True, now, assert_fn=_ok_assert,
+                            push=_push, prop_state=_hurt, proposals=[])
+    assert _num(g7d.get("cooldown_until")) > now, g7d
+    # (8) PROMOTE BLOCKED by a standing organ verdict: the same HURTING that
+    #     would release one cycle later refuses the promotion one earlier
+    g, last = growth_step({}, rows, True, now, assert_fn=_ok_assert,
+                          push=_push, prop_state=_hurt, proposals=[])
+    assert last["kind"] == "eval" and "BLOCKED" in str(last.get("why")), last
+    assert not g.get("promoted"), g
     print("experiment_judge _selftest_growth OK")
 
 

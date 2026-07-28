@@ -132,6 +132,12 @@ PROPOSAL_TAKER = {
     "taker.momo_chg":   ("MOMO_CHG",   "up"),
     "taker.div_gap_pp": ("DIV_GAP_PP", "up"),
     "taker.max_hold_h": ("MAX_HOLD_H", "down"),   # shorter = tighter
+    # [2026-07-28 AUDIT] registered 21-Jul "so the proposal channel and the
+    # tuner can move it" but never added here — audit_lever_authority
+    # measured it DARK (no write path at all). Longer cooldown = tighter
+    # (the churn-fix direction: NBIS -$5.37/8, BOT -$4.60/3 same-minute
+    # re-entries). Replay gate + bounds + TTL stay senior, shadow lane only.
+    "taker.sl_cooldown_h": ("SL_COOLDOWN_H", "up"),
 }
 _ATTR_LENS = {attr: lens for lens, (attr, _lv, _lad) in TAKER_LADDERS.items()}
 MAX_PROPOSALS_CYCLE = int(os.environ.get("TUNER_MAX_PROPOSALS", "3"))

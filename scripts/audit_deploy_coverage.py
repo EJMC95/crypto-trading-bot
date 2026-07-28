@@ -204,7 +204,12 @@ def declared(path):
 # knows about can be covered at all; the rest are manual by construction.
 AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                "Dockerfile.dashboard": "pnl-dashboard",
-               "Dockerfile.funding": "funding-carry"}
+               "Dockerfile.funding": "funding-carry",
+               # [2026-07-28] auto-deployed by the workflow since 17-Jul
+               # (its own comment: "the fleet's ONLY cross-region check on
+               # the real-money books") but never audited here — a future
+               # COPY added to that image could go deploy-orphaned unseen.
+               "Dockerfile.marketcontext": "market-context"}
 
 
 _UNSET = object()   # "not supplied" — distinct from None, which means UNPARSEABLE

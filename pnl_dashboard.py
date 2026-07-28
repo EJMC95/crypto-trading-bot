@@ -640,7 +640,11 @@ def fetch_trades(bot=None, limit=500, include_open=False):
                 return []  # no bot has published trades yet
             clauses, params = [], []
             if not include_open:
-                clauses.append("is_open = FALSE")
+                # [2026-07-28] IS NOT TRUE, not = FALSE: the column is
+                # nullable and a feed omitting the key writes NULL — the
+                # fetch_bot_quality leg was deliberately fixed to this
+                # predicate; the union doctrine needs every reader on it.
+                clauses.append("is_open IS NOT TRUE")
             if bot:
                 clauses.append("bot = %s")
                 params.append(bot)
@@ -2032,8 +2036,14 @@ def render():
     # union of expected + whatever actually published. Hidden bots are already
     # out of `rows` (fetch_rows), but EXPECTED would resurrect a placeholder
     # card for them — filter here too so hide really means gone.
+    # [2026-07-28 AUDIT FIX] ...and filter RETIRED_ROWS too: EXPECTED still
+    # listed perps-funding-carry + event-listing-sniper (both retired
+    # 17-Jul), so every render produced two permanent 'no data yet' ghost
+    # cards — the Launch Sniper's with red go-live gate chips — for bots the
+    # fleet retired. A retirement must not leave a placeholder haunting the
+    # staged sections.
     names = [b for b in list(EXPECTED) + [b for b in rows if b not in EXPECTED]
-             if b not in hidden]
+             if b not in hidden and b not in RETIRED_ROWS]
     # [2026-07-10] Real-money Lighter bots get their OWN section at the top of the
     # page, not interspersed with the paper fleet. is_live_bot = <bot>-lighter rows.
     # [2026-07-15 LIFECYCLE SECTIONS] Everything else is grouped by promotion
@@ -2810,11 +2820,14 @@ ORGAN_SPECS = [
     # [2026-07-23] edge radar — per-book significance/both-halves/median/ETA.
     # Publish-only, 30-min loop; a fresh row attests the fleet_radar organ ran.
     ("fleet-radar",        "📡 Edge radar — book verdicts + ETA",     False, 5400),
-    # [2026-07-16] EVENT for the same reason: the incubator's only
-    # save_state('xp-queue') is guarded by `if props:`, so an empty queue is
-    # never rewritten. Silence = "nothing new to propose" = normal. The
-    # incubator's own 'strategy-incubator' payload above is its heartbeat.
-    ("xp-queue",           "📥 XP queue — candidates for the judge",  False, None),
+    # [2026-07-28] RE-TYPED heartbeat: the incubator now republishes the
+    # queue EVERY cycle (queue_carry heartbeat — the §3b residual fix), and
+    # the judge consumes it FAIL-CLOSED on its own updated+ttl_sec, so a
+    # stale queue is a REAL failure mode (candidates silently expiring
+    # unseen) that this card must show — the old EVENT typing ("silence ≠
+    # failure") described the pre-heartbeat publisher and would have hidden
+    # exactly the starvation the judge now enforces against.
+    ("xp-queue",           "📥 XP queue — candidates for the judge",  False, 10800),
     ("xp-judge",           "⚖️ XP judge — promotion state machine",   False, 10800),
     ("fleet-immune",       "🛡️ Fleet immune — sick/quarantine",       True,  2400),
     ("fleet-regen",        "🩹 Fleet regen — auto-heal",              False, 2400),
@@ -2995,11 +3008,14 @@ def vitals_payload():
             except Exception:
                 ttl = fb_ttl                   # a junk ttl_sec is not a dead organ
             if key in ("fleet-alerts", "evidence-review",
-                       # [2026-07-16 AUDIT FIX] both are written ON EVENTS
-                       # only (an enactment / a proposal) — in a healthy,
-                       # QUIET fleet they sat permanently DARK, training the
-                       # operator to ignore DARK.
-                       "fleet-tuning", "xp-queue"):
+                       # [2026-07-16 AUDIT FIX] written ON EVENTS only (an
+                       # enactment / a proposal) — in a healthy, QUIET fleet
+                       # they sat permanently DARK, training the operator to
+                       # ignore DARK. [2026-07-28] xp-queue REMOVED from this
+                       # set: the incubator heartbeats it every cycle now and
+                       # the judge fail-closes on staleness, so DARK/LATE is
+                       # a real, actionable state again.
+                       "fleet-tuning"):
                 ttl = None                     # event-driven: silence ≠ failure
             organs.append({
                 "key": key, "label": label, "critical": critical,
@@ -3642,7 +3658,7 @@ def fetch_gate_metrics(ttl=600):
                 parts = []
                 if has_bt:
                     parts.append("SELECT bot, close_ts, profit_abs FROM bot_trades "
-                                 "WHERE is_open = FALSE AND close_ts IS NOT NULL")
+                                 "WHERE is_open IS NOT TRUE AND close_ts IS NOT NULL")
                 if has_pt:
                     # [2026-07-16] exclude side='skip' + NULL pnl: those rows are
                     # the sniper's gate-REJECTION logs, not trades. They land
@@ -4054,7 +4070,7 @@ def fetch_period_pnl(period, limit_periods):
             parts = []
             if has_bt:
                 parts.append("SELECT bot, close_ts, profit_abs FROM bot_trades "
-                             "WHERE is_open = FALSE AND close_ts IS NOT NULL")
+                             "WHERE is_open IS NOT TRUE AND close_ts IS NOT NULL")
             if has_pt:
                 # closed_at is TEXT (iso strings from the venue layer) — cast,
                 # guarded by a real cast-validity check (PG16+) so one
@@ -4521,6 +4537,14 @@ class H(BaseHTTPRequestHandler):
                         # [2026-07-21] tuning-proposals added: the organs'
                         # proposal channel to the tuners must be visible on
                         # the same surface its enactments are.
+                        # [2026-07-28 AUDIT FIX] serve list widened: a dozen
+                        # organ keys were unverifiable off-Railway (notably
+                        # regime-oracle — whose .grades the weekly item-18
+                        # re-read depends on — plus board/sentinel/immune/
+                        # tuning/queue/incubator/radar/respiration/clock/
+                        # regen/brain-vitals). Observable-only; these
+                        # payloads carry no secrets (the endpoint's standing
+                        # no-auth contract).
                         cur.execute(
                             "SELECT bot, state, updated_at FROM bot_state "
                             "WHERE bot IN ('fleet-risk', 'signal-bus', "
@@ -4529,7 +4553,12 @@ class H(BaseHTTPRequestHandler):
                             "'lighter-market', 'fleet-proprioception', "
                             "'parliament', 'parliament-tuning', "
                             "'impl-shortfall', 'xp-judge', 'scout-tuner', "
-                            "'tuning-proposals')")
+                            "'tuning-proposals', 'regime-oracle', "
+                            "'evidence-board', 'event-sentinel', "
+                            "'fleet-immune', 'fleet-tuning', 'xp-queue', "
+                            "'strategy-incubator', 'fleet-radar', "
+                            "'fleet-respiration', 'fleet-clock', "
+                            "'fleet-regen', 'brain-vitals')")
                         live = {}
                         for b, s, u in cur.fetchall():
                             st = s if isinstance(s, dict) else json.loads(s)
@@ -4545,7 +4574,11 @@ class H(BaseHTTPRequestHandler):
                                 "'brain-stake-mults', 'brain-diagnosis', "
                                 "'brain-lens-forward', 'lighter-market', "
                                 "'fleet-proprioception', 'parliament', "
-                                "'impl-shortfall', 'xp-judge', 'scout-tuner') "
+                                "'impl-shortfall', 'xp-judge', 'scout-tuner', "
+                                "'regime-oracle', 'evidence-board', "
+                                "'event-sentinel', 'fleet-immune', "
+                                "'fleet-radar', 'fleet-respiration', "
+                                "'brain-vitals') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
                             hist = [{"key": k,
@@ -4571,6 +4604,18 @@ class H(BaseHTTPRequestHandler):
                                    "xp_judge": live.get("xp-judge"),
                                    "scout_tuner": live.get("scout-tuner"),
                                    "tuning_proposals": live.get("tuning-proposals"),
+                                   "regime_oracle": live.get("regime-oracle"),
+                                   "evidence_board": live.get("evidence-board"),
+                                   "event_sentinel": live.get("event-sentinel"),
+                                   "fleet_immune": live.get("fleet-immune"),
+                                   "fleet_tuning": live.get("fleet-tuning"),
+                                   "xp_queue": live.get("xp-queue"),
+                                   "strategy_incubator": live.get("strategy-incubator"),
+                                   "fleet_radar": live.get("fleet-radar"),
+                                   "fleet_respiration": live.get("fleet-respiration"),
+                                   "fleet_clock": live.get("fleet-clock"),
+                                   "fleet_regen": live.get("fleet-regen"),
+                                   "brain_vitals": live.get("brain-vitals"),
                                    "history_hours": hours,
                                    "history": hist}, default=str).encode()
             except Exception as e:

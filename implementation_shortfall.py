@@ -380,7 +380,16 @@ def arm_drift(rows, live=None, shadow=None):
     """
     live = live or LIVE
     shadow = shadow or SHADOW
-    by = {str(r.get("bot")): r for r in (rows or [])}
+    # [2026-07-28 AUDIT FIX] keep the FIRST row per bot, not the last. The
+    # docstring assumes bot_pnl (one row per bot — either rule identical),
+    # but experiment_judge._arm_drift_snapshot passes paper_trades rows,
+    # which arrive ORDER BY closed_at DESC — the old dict-comp kept the last
+    # occurrence, i.e. each arm's OLDEST close in the window (~1-2 weeks
+    # stale at fleet cadence): a sensor that masks drift the arms have NOW
+    # and asserts drift they no longer have. setdefault keeps the NEWEST.
+    by = {}
+    for r in (rows or []):
+        by.setdefault(str(r.get("bot")), r)
     a, b = by.get(live), by.get(shadow)
     if not a or not b:
         return None
@@ -497,6 +506,21 @@ def run_once():
                     "reason": _why, "evidence": _ev, "ttl_sec": 5400},
                 "live.funding.max_hold_h": {
                     "value": 24.0, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+                # [2026-07-28] "EVERY promotable live.funding.* lever" now
+                # includes the growth pair + slope gate (the 21-Jul same-day
+                # audit's own rationale: this organ measures EXECUTION, so a
+                # promoted explore/conviction/slope-gate-off must be
+                # releasable on the same slip evidence). Values are the env
+                # defaults — the tighter direction by construction.
+                "live.funding.explore_k": {
+                    "value": 0, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+                "live.funding.conviction_hi": {
+                    "value": 1.0, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+                "live.funding.slope_gate": {
+                    "value": 1, "direction": "restrict",
                     "reason": _why, "evidence": _ev, "ttl_sec": 5400},
             }, set_by="impl-shortfall", now_ts=now)
         except Exception:      # noqa: BLE001
@@ -648,6 +672,17 @@ def _selftest():
     # NEGATIVE 3: an arm missing entirely -> no claim (not both present)
     assert arm_drift([_row(LIVE, "aaaaaaaaaaaa")]) is None
     assert arm_drift([]) is None and arm_drift(None) is None
+    # [2026-07-28] NEWEST ROW RULES on multi-row (DESC) input — the judge
+    # passes paper_trades rows newest-first; the old dict-comp kept each
+    # arm's OLDEST row. Mutation check: reverting setdefault to last-wins
+    # turns both asserts red.
+    assert arm_drift([_row(LIVE, "nnnnnnnnnnnn"), _row(SHADOW, "nnnnnnnnnnnn"),
+                      _row(LIVE, "oooooooooooo"), _row(SHADOW, "pppppppppppp")]) \
+        is None, "converged NOW must be silent, whatever old rows say"
+    assert arm_drift([_row(LIVE, "nnnnnnnnnnnn"), _row(SHADOW, "mmmmmmmmmmmm"),
+                      _row(LIVE, "oooooooooooo"), _row(SHADOW, "oooooooooooo")]) \
+        == {"live": "nnnnnnnnnnnn", "shadow": "mmmmmmmmmmmm"}, \
+        "drift NOW must fire, however aligned the arms once were"
 
     # the VERDICT wiring: drift outranks xp-contamination and refuses the number
     _pair = {"BTC": {"live": {"avg_pct": 1.0, "n": 40}, "shadow": {"avg_pct": 1.0, "n": 40}},

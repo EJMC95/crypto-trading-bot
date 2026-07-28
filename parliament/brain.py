@@ -201,6 +201,29 @@ class Howard:
             slot["wins"] += 1 if t["pnl_abs"] > 0 else 0
         return out
 
+    def fleet_lens_rollup(self, days: float = 7.0) -> dict:
+        """[2026-07-28 AUDIT FIX] Per-tag expectancy of the WIDER fleet's
+        ingested closes (source='fleet') — the loop-closer the hourly ingest
+        never had. ingest_fleet_trades wrote up to 1000 rows/hour and
+        NOTHING consumed them (ML filters on features the fleet rows never
+        carry; tuners + lens_rollup filter source='parliament'): a
+        write-only table wearing a "Howard learns from every bot" claim.
+        This is the cheap, honest close: the fleet's per-tag expectancy on
+        the SAME cut and window as lens_7d, published side by side so the
+        two-brains comparison is a read, not a promise."""
+        if self.db is None:
+            return {}
+        out: dict[str, dict] = {}
+        for t in self.db.closed_trades(days=days):
+            if t.get("source") != "fleet" or t.get("pnl_abs") is None:
+                continue
+            key = str(t.get("tag") or "?")
+            slot = out.setdefault(key, {"n": 0, "pnl": 0.0, "wins": 0})
+            slot["n"] += 1
+            slot["pnl"] = round(slot["pnl"] + t["pnl_abs"], 4)
+            slot["wins"] += 1 if t["pnl_abs"] > 0 else 0
+        return out
+
     # -- publish --------------------------------------------------------------
     def publish(self, data=None, scanners=None) -> dict:
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -211,6 +234,7 @@ class Howard:
                        "books": list(PM_BOTS)},
             "books": self.book_summary(),
             "lens_7d": self.lens_rollup(),
+            "fleet_lens_7d": self.fleet_lens_rollup(),
             "ml": self.ml.snapshot() if self.ml else {"enabled": False},
             "tuning": self.tuners.snapshot() if self.tuners else {},
             "stress": {"med_bps": self.stress_med,

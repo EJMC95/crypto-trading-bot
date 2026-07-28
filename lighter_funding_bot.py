@@ -329,6 +329,7 @@ def apply_levers(mode):
     levers for the log; refreshes _ACTIVE_BARS either way."""
     global ENTER_APR, SCAN_ENTER, ENTER_GATE, TAKE_PROFIT, MAX_HOLD_H
     global SCAN_EXPLORE_K, CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI
+    global SLOPE_GATE
     prefix = {"lighter_shadow": "xp.funding.", "lighter_live": "live.funding."}.get(mode)
     moved = {}
     ENTER_APR, SCAN_ENTER = _ENV_BARS["enter_apr"], _ENV_BARS["scan_enter"]
@@ -336,6 +337,7 @@ def apply_levers(mode):
     # growth knobs revert to env each call; a live/xp lever overrides below
     SCAN_EXPLORE_K = _ENV_BARS["explore_k"]
     CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI = _ENV_BARS["conviction"]
+    SLOPE_GATE = bool(_ENV_BARS.get("slope_gate", 1))
     if tuning is not None and prefix:
         ea = tuning.get_lever(prefix + "enter_apr", ENTER_APR)
         if ea != ENTER_APR:
@@ -360,10 +362,20 @@ def apply_levers(mode):
         if ch is not None and float(ch) > 1.0:
             CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI = "scaled", 1.0, float(ch)
             moved[prefix + "conviction_hi"] = float(ch)
+        # [2026-07-28 D7] slope gate as a lever (0 = off, 1 = on) — the
+        # slope-gate-off judge candidate runs through here. Env default rules
+        # when no lever is in force.
+        sg = tuning.get_lever(prefix + "slope_gate", None)
+        if sg is not None and bool(int(sg)) != SLOPE_GATE:
+            SLOPE_GATE = bool(int(sg))
+            moved[prefix + "slope_gate"] = int(sg)
     ENTER_GATE = SCAN_ENTER if SCAN_ENABLED else ENTER_APR
     _ACTIVE_BARS.clear()
     _ACTIVE_BARS.update({"enter_apr": ENTER_APR, "take_profit": TAKE_PROFIT,
                          "max_hold_h": MAX_HOLD_H, "explore_k": SCAN_EXPLORE_K,
+                         # numeric receipt for the slope-gate-off candidate
+                         # (ran_candidate float-compares bars.slope_gate)
+                         "slope_gate": 1 if SLOPE_GATE else 0,
                          "conviction": CONVICTION_MODE,
                          # numeric receipt the judge's ran_candidate matches on
                          # (scaled -> the up-cap; else 1.0 = off). Stamped on every
@@ -417,6 +429,14 @@ def pos_bars(m):
 SLOPE_GATE = os.environ.get("FUNDING_SLOPE_GATE", "on").strip().lower() \
     not in ("off", "0", "false", "no")
 SLOPE_LOOKBACK_H = float(os.environ.get("FUNDING_SLOPE_LOOKBACK_H", "1"))
+# [2026-07-28 D7] the gate is JUDGE-reachable: xp/live.funding.slope_gate
+# (0 = off, 1 = on) overlays this env default in apply_levers — the (dp)
+# Lighter backtest refuted the gate on this venue (gate-off +$34.07 vs
+# durable-history -$14.90 at the live gate), so gate-OFF is a queued shadow
+# candidate on the judge's paired bar. Env default rules when no lever is
+# in force (TTL auto-revert = the resting state). Registered AFTER the env
+# parse because _ENV_BARS (defined above) is the revert baseline.
+_ENV_BARS["slope_gate"] = 1 if SLOPE_GATE else 0
 
 # ---- coin-quality VETO (2026-07-11 SELF-CORRECT, RESTRICT-ONLY) — skip entry
 # on coins the fleet's OWN measured evidence flags as toxic (slip > 15bps or
@@ -827,7 +847,7 @@ _slip_bps_of = slip_bps_of
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
                   reason, order_usd=ORDER_USD, venue=None, shadow=None,
-                  bars=None):
+                  bars=None, src=None):
     """Mirror a realized directional funding trade to the paper_trades ledger.
     pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip
     (the ENTRY clip — callers pass meta['clip'], not the current loop's clip,
@@ -861,7 +881,11 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_l
             # opened before the stamp existed falls back to close-time
             # _ACTIVE_BARS, labelled via bars_basis. The judge's
             # ran_candidate receipt reads these values.
-            extra=_close_bars_extra(bars))
+            # [2026-07-28 §3d] src=explore|exploit rides the close row too —
+            # it lived only on position meta + the venue_orders OPEN leg, so
+            # the graded ledger structurally could not identify the explore
+            # slice (brain/radar/judge all read closes). Telemetry only.
+            extra=_close_src_extra(_close_bars_extra(bars), src))
     except Exception:
         pass
 
@@ -875,6 +899,18 @@ def _close_bars_extra(bars):
         out.update({k: v for k, v in bars.items()})
         basis = "entry"
     return {"bars": out, "bars_basis": basis} if out else None
+
+
+def _close_src_extra(extra, src):
+    """[2026-07-28 §3d] merge the position's src (explore|exploit) into the
+    close row's extra. Additive only: never clobbers the bars stamp, never
+    turns a None extra into a bars claim, and a position with no src (legacy
+    meta) changes nothing — _close_bars_extra's own contract is untouched."""
+    if not src:
+        return extra
+    out = dict(extra or {})
+    out.setdefault("src", str(src))
+    return out
 
 
 def parse_quarantine(st):
@@ -994,6 +1030,10 @@ def main():
     # the entry gate then refuses NEW entries (restrict-only: exits and position
     # management are untouched) until a later cycle reads it successfully.
     quarantine_blind = False
+    # [2026-07-28] the ':live' blob's own blind flag (see the live restore
+    # below); always False on the paper/shadow arms.
+    live_state_blind = False
+    _live = {}
 
     def _read_quarantine(key, tries=3, backoff=2.0):
         ok, cd, sh = read_quarantine(store.load_state_checked, key,
@@ -1021,7 +1061,34 @@ def main():
     else:
         # Live: restore open-position meta so opened_ts (max-hold clock) survives
         # a redeploy instead of resetting to now.
-        _live = store.load_state(bot_id + ":live") or {}
+        # [2026-07-28 AUDIT FIX — [[load-state-seeds-durable-state-on-a-failed-
+        # read]] applied to the WHOLE ':live' blob] The quarantine got the
+        # checked+retried read on 22-Jul; meta / explore_seen / initial_equity /
+        # capital_adjust still came through the UNCHECKED load_state that
+        # collapses "no row" and "read failed" into None. One boot-time DB blip
+        # then (a) wiped every position's max-hold clock, entry bars, conviction
+        # clip and explore src, (b) re-based live_baseline to CURRENT equity on
+        # the first loop (lifetime P&L wiped to zero), (c) zeroed the D1
+        # capital ledger — and the loop's next save_state made all of it
+        # DURABLE. One checked read with the quarantine's own bounded retry;
+        # a genuinely failed read boots DEGRADED (live_state_blind): NEW
+        # entries blocked, the ':live' save suppressed (never overwrite a blob
+        # we failed to read), and the loop re-reads until it heals — the exact
+        # quarantine_blind pattern, one shelf up.
+        _lok = False
+        for _attempt in range(3):
+            _lok, _lv = store.load_state_checked(bot_id + ":live")
+            if _lok:
+                _live = _lv or {}
+                break
+            if _attempt < 2:
+                time.sleep(2.0 * (_attempt + 1))
+        live_state_blind = not _lok
+        if live_state_blind:
+            log.error("':live' state READ FAILED after 3 tries — booting "
+                      "DEGRADED: new entries BLOCKED and the ':live' blob "
+                      "will not be overwritten until a clean re-read lands "
+                      "(exits/stops keep running off venue truth).")
         meta = {str(k): v for k, v in (_live.get("meta") or {}).items()}
         explore_seen = {str(k): float(v) for k, v in
                         (_live.get("explore_seen") or {}).items()}
@@ -1047,12 +1114,15 @@ def main():
                      "active), %d coin(s) with stop history — a restart no "
                      "longer re-arms a stopped coin", len(cooldown), _still,
                      len(stop_hist))
-    live_baseline = (store.load_state(bot_id + ":live") or {}).get("initial_equity") \
-        if not dry_run else None
+    # [2026-07-28] both read from the ONE checked `_live` snapshot above —
+    # the old separate unchecked load_state calls could each independently
+    # blip, and a blip here re-based the published lifetime P&L / zeroed the
+    # capital ledger (see the live restore block).
+    live_baseline = _live.get("initial_equity") if not dry_run else None
     # [2026-07-21 D1] persisted capital ledger: guard-detected deposits/
     # withdrawals fold in here (loop below); pnl subtracts it + the env backfill.
-    capital_adjust = ((store.load_state(bot_id + ":live") or {}).get("capital_adjust")
-                      if not dry_run else None) or {"total": 0.0, "events": []}
+    capital_adjust = ((_live.get("capital_adjust") if not dry_run else None)
+                      or {"total": 0.0, "events": []})
 
     log.info("=" * 64)
     log.info("Yield Harvester (Lighter DIRECTIONAL funding) | venue=%s (%s)",
@@ -1218,12 +1288,15 @@ def main():
                 settle_ms=(_res or {}).get("settle_ms"))
             price_pnl = abs(held) * ((px - entry) if not is_short else (entry - px))
             n_closed += 1
-            n_wins += 1 if price_pnl > 0 else 0
+            # [2026-07-28 AUDIT FIX] win on TOTAL P&L (price + funding), the
+            # same rule as the normal close path and the ledger row this
+            # writes — price-only miscounted funding-carried flattens.
+            n_wins += 1 if (price_pnl + m.get("accrued", 0.0)) > 0 else 0
             _record_close(bot_id, c, entry, opened_ts, px, price_pnl, m.get("accrued", 0.0),
                           was_long=not is_short, reason=reason,
                           order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag,
-                          bars=(m or {}).get("bars"))
+                          bars=(m or {}).get("bars"), src=(m or {}).get("src"))
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was px_decision — the
                 # decision price echoed back, so slippage_bps was NULL on every
@@ -1249,6 +1322,12 @@ def main():
     except Exception as e:
         log.warning("account value unreadable (%s); loss-limit waits.", e)
         day_start_equity = None
+    # [2026-07-28 D1 AUDIT FIX] track whether the surviving baseline is the
+    # BOOT READ (capital-inclusive: the EquityGuard may have accepted a
+    # deposit/withdrawal on that very read and buffered it for the fold) or
+    # a PERSISTED pre-move value. The distinction decides whether the first
+    # loop's capital shift is a correction or a double-count — see below.
+    _baseline_is_boot_read = day_start_equity is not None
     cur_day = datetime.now(timezone.utc).date()
     halted_today = False
     # [2026-07-11 DURABLE HALT] a tripped daily-loss halt survives restarts —
@@ -1256,7 +1335,9 @@ def main():
     _halt = store.load_daily_halt(bot_id, cur_day.isoformat())
     if _halt:
         halted_today = True
-        day_start_equity = _halt.get("day_start_equity") or day_start_equity
+        if _halt.get("day_start_equity"):
+            day_start_equity = _halt["day_start_equity"]
+            _baseline_is_boot_read = False
         log.warning("daily-loss halt restored from state — halted for the rest of today.")
     elif not dry_run:
         # [2026-07-21 D3 — review item 15 residual] same-UTC-day persisted
@@ -1265,11 +1346,30 @@ def main():
         # the already-depressed boot equity, so the rail could no longer fire on
         # that day's real drawdown. The halt record above stays SENIOR; a
         # persisted day_start for TODAY beats the boot re-read.
-        _ds = (store.load_state(bot_id + ":live") or {}).get("day_start") or {}
+        # [2026-07-28] read off the checked `_live` snapshot (a blind boot has
+        # _live={} -> no persisted baseline -> the boot capture rules, which
+        # is self-consistent: entries are blocked while blind anyway).
+        _ds = _live.get("day_start") or {}
         if _ds.get("day") == cur_day.isoformat() and _ds.get("equity"):
             day_start_equity = float(_ds["equity"])
+            _baseline_is_boot_read = False
             log.info("day-start equity restored from state: $%.2f (%s)",
                      day_start_equity, cur_day)
+    if _baseline_is_boot_read and not dry_run:
+        # [2026-07-28 D1 AUDIT FIX] the boot capture above went through the
+        # EquityGuard, which can ACCEPT a deposit/withdrawal on that very
+        # read and buffer it via _record_capital_move — so the captured
+        # baseline is already capital-INCLUSIVE. Fold those buffered moves
+        # into the ledger NOW (the display P&L still absorbs them) so the
+        # first loop's capital_adjusted_day_start shift cannot move the
+        # baseline AGAIN for cash it already contains. Measured shape of the
+        # bug: deposit D on the boot read -> day_start=E+2D vs equity=E+D ->
+        # phantom 'loss' of D -> a D >= 10% of book FLATTENS + HALTS the
+        # live book on the operator's own deposit. When a PERSISTED pre-move
+        # baseline replaced the boot read above, the shift IS the correction
+        # and this drain must not run. (The taker folds before adopting its
+        # baseline and skips the shift on the adopt path — same rule.)
+        _fold_capital_moves()
     last_ts = time.time()
     _last_moved = None      # growth-rail bars log dedup
 
@@ -1307,6 +1407,14 @@ def main():
             try:
                 day_start_equity = account_value()
                 cur_day, halted_today = now.date(), False
+                # [2026-07-28 D1 AUDIT FIX] same rule as the boot capture: a
+                # capital move the guard accepted ON this roll read is already
+                # IN the fresh baseline — fold it into the ledger here so the
+                # shift a few lines below cannot double-count it. A move
+                # accepted on a LATER read this loop still shifts (the roll
+                # baseline predates it), which is the shift's real job.
+                if not dry_run:
+                    _fold_capital_moves()
             except Exception:
                 log.warning("day-roll equity read failed — keeping the %s "
                             "baseline; retrying next loop", cur_day)
@@ -1548,8 +1656,14 @@ def main():
                                           reason="stop_blind",
                                           order_usd=float((m or {}).get("clip") or order_usd),
                                           venue=venue_tag, shadow=shadow_tag,
-                                          bars=(m or {}).get("bars"))
+                                          bars=(m or {}).get("bars"),
+                                          src=(m or {}).get("src"))
                             n_closed += 1
+                            # [2026-07-28 AUDIT FIX] this path never counted a
+                            # win at all — a profitable stop_blind close always
+                            # published as a loss. Same total-P&L rule as the
+                            # normal close.
+                            n_wins += 1 if (_bpnl + m.get("accrued", 0.0)) > 0 else 0
                             meta.pop(coin, None)
                             hot_since.pop(coin, None)
                             miss.pop(coin, None)
@@ -1654,7 +1768,7 @@ def main():
                           was_long=not is_short, reason=decision,
                           order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag,
-                          bars=(m or {}).get("bars"))
+                          bars=(m or {}).get("bars"), src=(m or {}).get("src"))
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was the decision price
                 # echoed back -> slippage_bps NULL on every live order.
@@ -1725,7 +1839,52 @@ def main():
                 log.warning("QUARANTINE BLIND — skipping all NEW entries this "
                             "cycle (exits unaffected)")
 
-        if open_now < max_open and not quarantine_blind:
+        # [2026-07-28] ':live' blob self-heal — the same shape as the
+        # quarantine re-read above, one shelf up: while blind, entries stay
+        # blocked and the ':live' save stays suppressed; a clean re-read
+        # restores what boot could not (local state loses on conflict — with
+        # entries blocked since boot there is nothing of ours to protect).
+        if live_state_blind:
+            _lok2, _lv2 = store.load_state_checked(bot_id + ":live")
+            if _lok2:
+                _lv2 = _lv2 or {}
+                for _c, _m in (_lv2.get("meta") or {}).items():
+                    meta.setdefault(str(_c), _m)
+                for _c, _t in (_lv2.get("explore_seen") or {}).items():
+                    explore_seen.setdefault(str(_c), float(_t))
+                if live_baseline is None:
+                    live_baseline = _lv2.get("initial_equity")
+                if not capital_adjust.get("total") and not capital_adjust.get("events"):
+                    capital_adjust.update(_lv2.get("capital_adjust")
+                                          or {"total": 0.0, "events": []})
+                # halt record is SENIOR (a halted day must stay halted even
+                # though the blind boot could not see it); else the D3
+                # same-day persisted baseline beats the boot re-read. A
+                # capital move folded WHILE blind already shifted the boot
+                # baseline, so prefer the persisted value only when the
+                # ledger stayed quiet this run (conservative: the persisted
+                # pre-restart value is the higher rail anchor after losses).
+                _h2 = store.load_daily_halt(bot_id, cur_day.isoformat())
+                if _h2:
+                    halted_today = True
+                    if _h2.get("day_start_equity"):
+                        day_start_equity = _h2["day_start_equity"]
+                else:
+                    _ds2 = _lv2.get("day_start") or {}
+                    if (_ds2.get("day") == cur_day.isoformat()
+                            and _ds2.get("equity")):
+                        day_start_equity = float(_ds2["equity"])
+                live_state_blind = False
+                log.warning("':live' re-read OK — %d position meta restored, "
+                            "baseline %s; entries re-enabled",
+                            len(_lv2.get("meta") or {}),
+                            ("$%.2f" % live_baseline)
+                            if live_baseline is not None else "none")
+            else:
+                log.warning("LIVE-STATE BLIND — skipping all NEW entries this "
+                            "cycle; ':live' save suppressed (exits unaffected)")
+
+        if open_now < max_open and not quarantine_blind and not live_state_blind:
             # cheap prefilter: hard SAFETY gates on the funding map only (no network)
             prelim = []
             for c, f in fund.items():
@@ -1843,9 +2002,33 @@ def main():
                               # [2026-07-22 FLAP FIX] the bars priced at
                               # entry govern this trade (enter_apr is the
                               # admission gate, attribution only).
+                              # [2026-07-28 D7 + receipt audit] slope_gate,
+                              # explore_k and conviction_hi are ENTRY-phase
+                              # levers (selection/sizing, never exit) — the
+                              # entry-time value is the honest receipt. The
+                              # close-time _ACTIVE_BARS fallback let a trade
+                              # opened BEFORE the growth levers but closed
+                              # under them stamp explore_k=2/conviction_hi=2.2
+                              # and count as ran_candidate PROOF on the path
+                              # to live.funding.* (and vice versa on a fade).
                               "bars": {"enter_apr": ENTER_APR,
                                        "take_profit": TAKE_PROFIT,
-                                       "max_hold_h": MAX_HOLD_H}}
+                                       "max_hold_h": MAX_HOLD_H,
+                                       "slope_gate": 1 if SLOPE_GATE else 0,
+                                       "explore_k": SCAN_EXPLORE_K,
+                                       "conviction_hi": (CONVICTION_HI
+                                                         if CONVICTION_MODE == "scaled"
+                                                         else 1.0)}}
+                # [2026-07-28 AUDIT FIX] make this open visible to the REST of
+                # THIS loop's cap checks at its REAL clip: open_notional prices
+                # a position present in `pos` via meta['clip'] (conviction-
+                # scaled), while one counted only in open_now gets the FLAT
+                # order_usd — so the 2nd open of a loop under-counted the 1st
+                # by up to (conviction_hi-1)*order_usd ≈ $30 at hi=2.2, a cap
+                # breach armed for the day conviction promotes to live. Counts
+                # MORE notional, never less — restrict-direction only.
+                pos[coin] = {"size": (size if not is_short else -size),
+                             "entry": px}
                 open_now += 1
                 opened_this_loop += 1
                 if src == "explore":
@@ -1903,7 +2086,12 @@ def main():
             pub_equity = equity
             pub_open = sum(1 for v in pos.values()
                            if (v.get("size") if isinstance(v, dict) else v))
-            if live_baseline is None and equity is not None:
+            # [2026-07-28] never ADOPT a baseline while the ':live' read is
+            # blind — a boot blip left live_baseline None here, and adopting
+            # current equity re-based the book's lifetime P&L to zero (then
+            # the save below made it durable). The self-heal re-read restores
+            # the real baseline; a genuine first run adopts once healed.
+            if live_baseline is None and equity is not None and not live_state_blind:
                 live_baseline = equity
             pub_pnl = _live_pnl(equity)   # capital-adjusted (D1)
         top = sorted(((c, f.get("rate") or 0.0) for c, f in fund.items()),
@@ -1954,7 +2142,10 @@ def main():
                     # tried and regains priority — bounded + self-cleaning.
                     "explore_seen": {c: t for c, t in explore_seen.items()
                                      if time.time() - t <= 14 * 86400}})
-            elif live_baseline is not None:
+            elif live_baseline is not None and not live_state_blind:
+                # (the blind guard is belt-and-braces: while blind the
+                # baseline stays None above, but a state we failed to READ
+                # must never be OVERWRITTEN, whatever else changes here)
                 store.save_state(bot_id + ":live", {
                     "initial_equity": live_baseline, "meta": meta,
                     # D1: guard-recorded deposits/withdrawals (capital, not P&L)
@@ -2026,6 +2217,17 @@ def _selftest_notional():
     assert _open_notional({c: {"size": 1.0} for c in "ABCDE"}, {}, 5, 22.50) == 112.5
     # opens-this-loop not yet visible in pos count at the current clip
     assert _open_notional(pos, meta, 7, 22.50) == 195.0
+    # [2026-07-28] same-loop conviction-scaled open: inserted into pos with
+    # its meta clip, the cap input counts the REAL clip (A+B flat $30 + C's
+    # conviction $66 = $126)...
+    pos2 = {"A": {"size": 1.0, "entry": 30.0}, "B": {"size": 1.0, "entry": 30.0},
+            "C": {"size": 2.2, "entry": 30.0}}
+    meta2 = {"A": {"clip": 30.0}, "B": {"clip": 30.0}, "C": {"clip": 66.0}}
+    assert _open_notional(pos2, meta2, 3, 30.0) == 126.0
+    # ...while the OLD shape (C only in open_now, not in pos) under-counted
+    # it at the flat clip — the $36 gap this fix closes.
+    assert _open_notional({k: pos2[k] for k in "AB"},
+                          meta2, 3, 30.0) == 90.0
     # short at its own entry (size*entry, sign-independent)
     assert _open_notional({"Z": {"size": -2.0, "entry": 20.0}}, {}, 1, 30.0) == 40.0
     print("lighter_funding_bot _selftest_notional OK")
@@ -2165,6 +2367,17 @@ def _selftest_flap():
         and e2["bars"]["take_profit"] == 0.04, e2
     _ACTIVE_BARS.clear()
     assert _close_bars_extra(None) is None, "no context, no stamp -> None"
+    # [2026-07-28 §3d] src rides the close row without disturbing the bars
+    # contract: additive, never clobbers, absent-src is a strict no-op.
+    assert _close_src_extra(None, None) is None, "no src, no extra -> None"
+    assert _close_src_extra(None, "explore") == {"src": "explore"}
+    assert _close_src_extra({"bars": {"take_profit": 0.04}}, "exploit") == \
+        {"bars": {"take_profit": 0.04}, "src": "exploit"}
+    _e = {"bars": {"x": 1}, "src": "already"}
+    assert _close_src_extra(_e, "explore")["src"] == "already", \
+        "an existing src stamp must never be clobbered"
+    assert _close_src_extra({"bars": {"x": 1}}, None) == {"bars": {"x": 1}}, \
+        "legacy meta (no src) leaves the extra untouched"
     print("lighter_funding_bot _selftest_flap OK")
 
 
@@ -2393,6 +2606,26 @@ def _selftest_lever_consume():
         M.tuning = _FakeT({"live.funding.explore_k": 2})  # 4) no leak onto paper arm
         M.apply_levers("hl_paper")
         assert M.SCAN_EXPLORE_K == 0, "no-prefix arm must ignore live levers"
+        # 5) [2026-07-28 D7] slope_gate lever: 0 turns the gate OFF on the
+        #    levered arm, the receipt stamps the RUNNING value, expiry (no
+        #    lever) reverts to the env default, and no leak onto paper.
+        M._ENV_BARS["slope_gate"] = 1                     # env default: gate on
+        M.tuning = _FakeT({})
+        M.apply_levers("lighter_shadow")
+        assert M.SLOPE_GATE is True and M._ACTIVE_BARS["slope_gate"] == 1, \
+            "no lever -> env default (gate on), receipt says so"
+        M.tuning = _FakeT({"xp.funding.slope_gate": 0})
+        moved = M.apply_levers("lighter_shadow")
+        assert M.SLOPE_GATE is False, "slope_gate=0 lever must turn the gate off"
+        assert M._ACTIVE_BARS["slope_gate"] == 0, \
+            "the receipt must stamp the RUNNING value (ran_candidate reads it)"
+        assert "xp.funding.slope_gate" in moved, moved
+        M.tuning = _FakeT({})                             # lever expiry -> revert
+        M.apply_levers("lighter_shadow")
+        assert M.SLOPE_GATE is True, "expiry must revert to the env default"
+        M.tuning = _FakeT({"xp.funding.slope_gate": 0})   # no leak onto paper arm
+        M.apply_levers("hl_paper")
+        assert M.SLOPE_GATE is True, "no-prefix arm must ignore xp levers"
     finally:
         M.tuning = real_tuning
         env, M.SCAN_EXPLORE_K, M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI = save

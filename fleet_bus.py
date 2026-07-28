@@ -78,11 +78,18 @@ def is_fresh(payload, current_time):
 
 
 def stake_multiplier(bot, entry_tag, current_time=None):
-    """The brain's L4 per-(bot, enter_tag) stake multiplier, clamped reduce-only.
+    """The brain's L4 per-(bot, enter_tag) stake multiplier — TWO-WAY since
+    21-Jul (operator: "brain needs to be able to widen too"), clamped to
+    [MULT_FLOOR, MULT_CEIL] = [0.5, 1.5].
 
-    Published by bot_learn.py to bot_state 'brain-stake-mults' only after a
-    tag's negative expectancy clears the trade-count floor AND persists across
-    >= PROMOTE_RUNS consecutive brain runs. Neutral 1.0 on any doubt.
+    Published by bot_learn.py to bot_state 'brain-stake-mults'. Reduce side
+    (0.5/0.75): a tag's negative expectancy clears the trade-count floor AND
+    persists across >= PROMOTE_RUNS consecutive brain runs. Expand side
+    (1.25/1.5): the v3 MIRROR bars only (brain_stats.EXP_* — Wilson lower
+    bound, t >= +2.0/+2.5, full n floor, no family-praise inheritance, no
+    urgent fast-path; kill switches BRAIN_MULT_ENGINE=v2 /
+    BRAIN_MULT_EXPAND=off zero it). SHADOW books only — no live bot reads
+    mults. Neutral 1.0 on any doubt.
     """
     try:
         p = _load("brain-stake-mults", current_time)

@@ -160,6 +160,9 @@ class LighterData:
         self.candles: dict[tuple, list[dict]] = {}   # (sym, res) -> bars
         self.ws_books: dict[str, dict] = {}     # sym -> {ts, imb, spread_bps, mid}
         self.watchlist: list[str] = list(WATCH_CORE)
+        # [2026-07-28] books' own holdings the candle pass must follow —
+        # sym -> last-touch ts; bounded + self-expiring (see track()).
+        self.tracked: dict[str, float] = {}
         self.market_ts = 0.0
         self.errors = 0
         self.cycles = 0
@@ -231,11 +234,39 @@ class LighterData:
                 st["_new"] = False
 
     # -- candles --------------------------------------------------------------
+    # [2026-07-28 AUDIT FIX] the scanners range over the WHOLE market map but
+    # candles followed only the 12-book watchlist — so the PM books routinely
+    # held positions with NO tape: their tuners' replays silently dropped
+    # those closes (measured: 62 of gillard's last 149 closes off-watchlist —
+    # the losing book's self-repair loop starved by plumbing, not evidence)
+    # and ML candle features (ret4/rsi_n/vol_ratio/trend) read 0.0. track()
+    # lets a book register what it actually holds; entries expire after the
+    # tuner's own 7d replay window and the set is hard-capped.
+    TRACK_TTL_SEC = 7 * 86400
+    TRACK_CAP = 60
+
+    def track(self, sym: str) -> None:
+        """Follow `sym` in the candle pass (a book holds it, or closed it
+        within the replay window). Bounded, self-expiring, never raises."""
+        try:
+            self.tracked[str(sym)] = time.time()
+            if len(self.tracked) > self.TRACK_CAP:
+                for s, _ in sorted(self.tracked.items(),
+                                   key=lambda kv: kv[1])[
+                                   :len(self.tracked) - self.TRACK_CAP]:
+                    self.tracked.pop(s, None)
+        except Exception:  # noqa: BLE001
+            pass
+
     async def refresh_candles(self, resolution: str) -> int:
-        """One pass over the watchlist for `resolution`. Returns bars fetched."""
+        """One pass over the watchlist + tracked holdings for `resolution`.
+        Returns bars fetched."""
         res_sec = _RES_SEC.get(resolution, 3600)
         got = 0
-        for sym in list(self.watchlist):
+        cutoff = time.time() - self.TRACK_TTL_SEC
+        self.tracked = {s: ts for s, ts in self.tracked.items() if ts >= cutoff}
+        extras = [s for s in self.tracked if s not in self.watchlist]
+        for sym in list(self.watchlist) + extras:
             st = self.market.get(sym)
             if not st or st.get("market_id", -1) < 0:
                 continue
