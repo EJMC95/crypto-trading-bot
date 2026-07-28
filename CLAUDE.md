@@ -420,13 +420,16 @@ Each bot calls `bot_pnl_store.publish(...)` with:
   "wins": 8,
   "losses": 4,
   "pnl_daily": 5.20,               # optional — today's P&L
-  "pnl_weekly": 18.40,             # optional — 7d P&L
-  "pnl_monthly": 23.50,            # optional — 30d P&L
-  "max_drawdown": -0.045,          # optional — max drawdown %
-  "best_trade": 12.30,             # optional — best single trade $
-  "worst_trade": -8.10,            # optional — worst single trade $
+  "extra": {...},                  # optional — JSON-able context dict
 }
 ```
+**[2026-07-28 doc-truth]** That is the COMPLETE accepted set — `publish()`
+takes exactly `(bot, status, equity, pnl_abs, pnl_pct, open_trades,
+closed_trades, wins, losses, extra, pnl_daily)` and has no `**kwargs`. This
+block used to also list `pnl_weekly/pnl_monthly/max_drawdown/best_trade/
+worst_trade`; a bot following that doc raised `TypeError` AT THE CALL SITE
+in its trading loop (outside publish's never-raise guard). If those fields
+are ever wanted, extend `publish()` + `ALTER TABLE` first, then this doc.
 
 ## Freqtrade Bot Configs (new bots)
 All new bots:

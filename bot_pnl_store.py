@@ -882,7 +882,19 @@ def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
                     side=EXCLUDED.side, tag=EXCLUDED.tag,
                     entry_price=EXCLUDED.entry_price,
                     exit_price=EXCLUDED.exit_price, size=EXCLUDED.size,
-                    extra=EXCLUDED.extra, seen_at=now()
+                    -- [2026-07-28 AUDIT FIX] the FIRST build stamp is the
+                    -- truth about which code CLOSED the trade: a documented-
+                    -- idempotent re-publish after a redeploy (the recovery
+                    -- pattern this table exists for) used to restamp an old
+                    -- close with the NEW build id, corrupting the judge's
+                    -- row-based arm-drift evidence. Preserve it on conflict.
+                    extra=CASE
+                        WHEN paper_trades.extra ? 'build'
+                        THEN jsonb_set(COALESCE(EXCLUDED.extra, '{}'::jsonb),
+                                       '{build}', paper_trades.extra->'build')
+                        ELSE EXCLUDED.extra
+                    END,
+                    seen_at=now()
                 """,
                 (bot, str(trade_id), pair, pnl_abs, pnl_pct,
                  opened_at, closed_at, reason, venue, shadow, side, tag,

@@ -341,6 +341,23 @@ class PMBot:
         if why:
             self.last_skip = f"{sym}:{why}"
             return False
+        # [2026-07-28 BRAIN ACTS, Parliament lane] the brain's ACTIONABLE
+        # regime_gate finding finally has a consumer here — pm-gillard's
+        # long-disloc gate sat ACTIONABLE 77 consecutive runs (~6.4d, the
+        # fleet's loudest finding) steering nothing, because only the family
+        # bot ever wired entry_regime_gated. Identical semantics: restrict-
+        # only (skips a NEW entry when the brain measured this (bot, tag)'s
+        # losses clustering in risk-off AND the oracle reads risk-off NOW),
+        # fail-safe OPEN on stale brain/oracle, centrally kill-switched via
+        # BRAIN_ACTIONS_MODE=advisory. Shadow-only by construction.
+        _gate_tag = f"{'long' if direction > 0 else 'short'}-{self.lens}"
+        if fleet_bus is not None:
+            try:
+                if fleet_bus.entry_regime_gated(self.bot_id, _gate_tag):
+                    self.last_skip = f"{sym}:brain-regime-gate"
+                    return False
+            except Exception:  # noqa: BLE001
+                pass
         feats = featurize(sym, direction, self.data, sig)
         p_win, ready = self.ml.predict(feats) if self.ml else (0.5, False)
         stake_mult = 1.0

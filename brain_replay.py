@@ -68,6 +68,22 @@ just this network-requiring main()):
                     the widen direction acting before it has the evidence.
 The ledger LEG still needs a fresh online run to re-attest no-regression with
 expand armed; the SYNTHETIC leg (A-I) is green offline.
+
+ADDENDUM (2026-07-28): that fresh online run is DONE — the ledger leg is
+re-attested with expand armed. Run 2026-07-28, ledger window per era rules,
+1,582 closed era trades, 30 bots: PASS.
+  LEDGER LEG — v3 throttles 35 trades for +$0.02 saved (h1 +0.00 / h2 +0.02,
+  forgone only -$0.31) vs v2's 39 throttles for -$3.51 saved (v2 was NET
+  HARMFUL on this window — its biggest miss the taker's short-divergence,
+  10 throttled for -$3.26, where v3's episode dedup correctly refuses).
+  Per-bucket: v3's only active throttles are gillard's disloc pair, at
+  ~-$0.01 each — noise-scale, not regression. NO expand mult fired on the
+  real ledger (nothing clears the mirror bars — consistent with the live
+  payload's empty expand set; the brakes hold on real data, not just
+  fixture I). Half-life sweep: 14d best (+0.02), 7/28d within $0.06.
+  SYNTHETIC LEG — A-I all PASS (incl. H expand-fires / I expand-refuses).
+  => the two-way engine's no-regression claim now rests on a ledger run
+  that POST-DATES the expand arming; kill switches unchanged.
 """
 import json
 import sys

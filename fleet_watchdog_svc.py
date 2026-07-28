@@ -189,8 +189,24 @@ def evaluate(data):
                         f"{max_open}-position budget ({opens} gross incl. "
                         f"shadows; fleet-risk state dark — local count)")
     loss_floor = float(os.environ.get("WATCHDOG_DAILY_LOSS_ALERT", "-100"))
-    big = [f"{b.get('bot')} ({b.get('pnl_daily'):+.1f})" for b in bots
-           if isinstance(b.get("pnl_daily"), (int, float)) and b["pnl_daily"] < loss_floor]
+
+    # [2026-07-28 AUDIT FIX] publisher-sent pnl_daily stays SENIOR, but the
+    # only publisher that sends it is the Parliament — the two LIVE bots and
+    # every shadow book carried pnl_daily=None, so this backstop was dormant
+    # for exactly the rows real money lives on. Fall back to the feed's own
+    # computed enrich.today_pnl (the dashboard's UTC-day figure).
+    def _day_pnl(b):
+        v = b.get("pnl_daily")
+        if isinstance(v, (int, float)):
+            return v
+        v = (b.get("enrich") or {}).get("today_pnl")
+        return v if isinstance(v, (int, float)) else None
+
+    big = []
+    for b in bots:
+        v = _day_pnl(b)
+        if v is not None and v < loss_floor:
+            big.append(f"{b.get('bot')} ({v:+.1f})")
     if big:
         warnings.append("daily P&L below " + str(loss_floor) + ": " + ", ".join(big))
     snapshot = f"bots={len(bots)} open_positions={opens} freshest={meta.get('freshest_update_age_sec')}s"

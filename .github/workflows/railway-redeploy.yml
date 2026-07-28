@@ -202,12 +202,23 @@ jobs:
             msgs="$(git log --format='%B' ${range/ /..} 2>/dev/null)"
             live_all=0
             if printf '%s' "$msgs" | grep -qF '[deploy-live]'; then live_all=1; fi
-            if echo "$changed" | grep -qE '^(lighter_ticket_taker\.py$|venues/)' \
+            # [2026-07-28 AUDIT FIX] each grep now covers its live image's
+            # FULL COPY set (Dockerfile.tickettaker / .fundinglighter), not
+            # just the entrypoint + venues/: bot_pnl_store, paper_broker,
+            # fleet_tuning, funding_basis, the loop script and the
+            # Dockerfiles themselves all bake into the live images, and a
+            # marker push touching only those files silently deployed
+            # NOTHING (measured: 9476811's bot_pnl_store build-stamp — the
+            # drift sensor's own feed — could not reach either live arm via
+            # its marker).
+            taker_files='^(lighter_ticket_taker\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|tickettaker_loop\.sh$|Dockerfile\.tickettaker$)'
+            farmer_files='^(lighter_funding_bot\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|Dockerfile\.fundinglighter$)'
+            if echo "$changed" | grep -qE "$taker_files" \
                && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-taker]'; }; then
               svcs="${svcs:+$svcs,}tide-rider-lighter-live"
               echo "-> live-taker marker: including tide-rider-lighter-live (REAL MONEY)"
             fi
-            if echo "$changed" | grep -qE '^(lighter_funding_bot\.py$|venues/)' \
+            if echo "$changed" | grep -qE "$farmer_files" \
                && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-farmer]'; }; then
               svcs="${svcs:+$svcs,}trail-blazer-live"
               echo "-> live-farmer marker: including trail-blazer-live (REAL MONEY)"

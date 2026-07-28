@@ -172,7 +172,16 @@ LENS_FWD_KEY = "brain-lens-forward"
 LENS_HORIZONS = ((1, 3600), (4, 4 * 3600), (24, 24 * 3600))
 DIAG_DRIFT_MAX_PAIRS = 30  # cap Lighter candle fetches per run (1/pair, cached)
 STOPPISH = ("stop_loss", "trailing_stop_loss", "bleed_stop", "stoploss",
-            "liquidation", "force_exit")
+            "liquidation", "force_exit",
+            # [2026-07-28 AUDIT FIX] the LIGHTER books' actual stop names —
+            # the vocabulary above was freqtrade-era only, so rule 1
+            # (exit_too_tight) was UNREACHABLE for the Ticket Taker ('sl',
+            # split from '<side>-<lens>_sl'), the Farmer ('stop' /
+            # 'stop_blind', split from '<side>_stop*') and every Parliament
+            # book, regardless of drift evidence: 7 of 10 live diagnoses
+            # carried worst_exit='sl' and structurally could not reach the
+            # rule. The evidence bars (share/wr/reclaim/fwd) still gate.
+            "sl", "stop", "stop_blind")
 # Round-trip friction estimate per bot (fraction of stake). Kraken spot taker
 # 0.26%/side is the freqtrade default; the perps ledger documented ~29bps.
 FEE_RT_DEFAULT = 0.0052
@@ -827,8 +836,23 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
             counter += 1 if r["risk_off"] else 0
     counter_share = (counter / matched) if matched >= 8 else None
 
-    ab = venue_ab.get(bot) or {}
-    twin = ab.get("shadow") or ab.get("live") or {}
+    # [2026-07-28 AUDIT FIX] venue_ab is keyed by BASE name but `bot` here is
+    # the SUFFIXED ledger id (e.g. 'perps-funding-lighter-lshadow') — the old
+    # lookup missed by construction for every living book. Strip the suffix
+    # and read the OTHER arm (a shadow bucket's twin is the live row and
+    # vice versa); the bare-id lookup stays as the legacy fallback.
+    _ab_base = bot
+    for _suf in ("-lshadow", "-lighter"):
+        if _ab_base.endswith(_suf):
+            _ab_base = _ab_base[: -len(_suf)]
+            break
+    ab = venue_ab.get(_ab_base) or venue_ab.get(bot) or {}
+    if bot.endswith("-lshadow"):
+        twin = ab.get("live") or {}
+    elif bot.endswith("-lighter"):
+        twin = ab.get("shadow") or {}
+    else:
+        twin = ab.get("shadow") or ab.get("live") or {}
     twin_pnl = twin.get("pnl_abs")
     twin_n = (twin.get("wins") or 0) + (twin.get("losses") or 0)
 
@@ -1070,8 +1094,22 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
             if e.get("dirn") != dirn:
                 e["streak"] = 0
                 e["dirn"] = dirn
+                # a direction flip is a NEW claim — sticky publish (below)
+                # must not carry across it
+                e.pop("published", None)
             e["streak"] += 1
             e["last_run"] = run_no
+            # [2026-07-28 AUDIT FIX] engine-downgrade honesty for ALL v3
+            # fields, not just `urgent`: on the v2/fallback path ev={} and
+            # the update below left a PRIOR v3 run's evidence keys
+            # (post_wr/w_hi/t/priors/n_ep/...) dressed on an entry now
+            # stamped engine='v2' — the same stale-label class the 21-Jul
+            # fix closed for `urgent`, applied to its siblings.
+            if not ev:
+                for _k in ("post_wr", "w_hi", "w_lo", "t", "pnl_w", "n_eff",
+                           "wr_w", "prior_mu", "prior_kappa", "prior_src",
+                           "n_ep", "via"):
+                    e.pop(_k, None)
             e.update({"mult": mult, "n": n, "wr": round(wr * 100, 1),
                       "pnl": round(pnl, 2), "engine": engine, **ev})
             # urgent must be re-earned EVERY run: ev={} on the v2/fallback
@@ -1091,15 +1129,30 @@ def compute_stake_mults(cards, state, run_no, era_trades=None, now_ts=None,
     published = defaultdict(dict)
     urgent_now = []
     for key, e in streaks.items():
-        if e["streak"] >= PROMOTE_RUNS or e.get("urgent"):
+        # [2026-07-28 AUDIT FIX] sticky-within-qualification: an EMER entry
+        # that published on run 1 (urgent) but softened just past the EMER
+        # bar on run 2 (still qualifying the SAME direction, streak 2 < 3)
+        # used to DROP from the payload for a full brain interval — a one-run
+        # flap back to 1.0x on a bucket the engine still condemned, then
+        # republish on run 3. The fast-path was specified latency-only. Once
+        # published, an entry keeps publishing while it keeps qualifying in
+        # the same direction (a direction flip or a non-qualifying run still
+        # clears it — see the dirn reset and the `seen` sweep above).
+        if e["streak"] >= PROMOTE_RUNS or e.get("urgent") or e.get("published"):
             bot, tag = key.split("|", 1)
+            e["published"] = True
             published[bot][tag] = {k: v for k, v in e.items()
                                    if k not in ("first_run", "last_run")}
             if e.get("urgent") and e["streak"] < PROMOTE_RUNS:
                 urgent_now.append(key)
     vitals = {"engine": engine, "priors": priors_out,
               "urgent": urgent_now,
-              "watchlist": sorted(watchlist, key=lambda x: x.get("t", 0))[:20]}
+              # [2026-07-28 AUDIT FIX] strongest evidence first, EITHER
+              # direction — ascending-t sorted reduce-warming first and cut
+              # expand-warming entries at the [:20] cap, burying exactly what
+              # the 21-Jul expand-visibility change existed to surface.
+              "watchlist": sorted(watchlist,
+                                  key=lambda x: -abs(x.get("t") or 0))[:20]}
     return dict(published), vitals
 
 
@@ -1136,19 +1189,31 @@ def _publish_stake_mults(published, effective_engine=None):
 
 
 def venue_ab_report():
-    """[2026-07-14 REACH] Paper book vs Lighter shadow twin, from bot_pnl.
+    """[2026-07-14 REACH; 2026-07-28 RE-KEYED for the living fleet] A/B pairs
+    from bot_pnl, keyed by BASE name.
 
-    The shadow books (rows '<bot>-lshadow', live '<bot>-lighter') have been
-    collecting since 13 Jul — the first venue A/B data the fleet has. Same
-    strategy, different venue: a persistent gap is execution/funding, not
-    signal. Returns {base_bot: {"paper": {...}, "shadow": {...}, "gap_pnl"}}.
-    """
+    The original pairing required a BARE-named paper row as the anchor — and
+    every bare-named twin retired with the 14-Jul Kraken cut, so venue_ab has
+    been {} for two weeks and diagnose()'s venue_execution rule was dead with
+    it (double-dead: the rule also looked the map up by the SUFFIXED ledger
+    id — fixed there too). The living fleet's real A/B is '-lshadow' vs
+    '-lighter' on the same base (Farmer + Ticket Taker: same code, shadow
+    marks vs real fills — a persistent gap is execution/funding, not
+    signal). Both pairings emitted; legacy paper anchor kept for any bare
+    row that ever publishes again. gap_pnl is live-minus-shadow on a living
+    pair (negative = live underperforms its model)."""
     try:
         import bot_pnl_store as store
         rows = store.fetch_bot_pnl()
         if not rows:
             return {}
         by_bot = {r["bot"]: r for r in rows}
+
+        def _pick(row):
+            return {"equity": row.get("equity"), "pnl_abs": row.get("pnl_abs"),
+                    "wins": row.get("wins"), "losses": row.get("losses"),
+                    "open": row.get("open_trades")}
+
         out = {}
         for name, r in by_bot.items():
             for suffix in ("-lshadow", "-lighter"):
@@ -1158,17 +1223,28 @@ def venue_ab_report():
                 twin = by_bot.get(base)
                 if not twin:
                     continue
-
-                def _pick(row):
-                    return {"equity": row.get("equity"), "pnl_abs": row.get("pnl_abs"),
-                            "wins": row.get("wins"), "losses": row.get("losses"),
-                            "open": row.get("open_trades")}
                 e = out.setdefault(base, {"paper": _pick(twin)})
                 e["shadow" if suffix == "-lshadow" else "live"] = _pick(r)
                 try:
                     e["gap_pnl"] = round((r.get("pnl_abs") or 0) - (twin.get("pnl_abs") or 0), 2)
                 except Exception:
                     pass
+        # the LIVING twins: '-lshadow' vs '-lighter' on one base
+        for name, r in by_bot.items():
+            if not name.endswith("-lshadow"):
+                continue
+            base = name[: -len("-lshadow")]
+            live = by_bot.get(base + "-lighter")
+            if live is None:
+                continue
+            e = out.setdefault(base, {})
+            e["shadow"] = _pick(r)
+            e["live"] = _pick(live)
+            try:
+                e["gap_pnl"] = round((live.get("pnl_abs") or 0)
+                                     - (r.get("pnl_abs") or 0), 2)
+            except Exception:
+                pass
         return out
     except Exception:
         return {}
@@ -1755,6 +1831,37 @@ def _selftest():
     ck("missing open_rate -> None", _post_exit_drift(dict(good, open_rate=None)) is None)
     ck("missing close_rate -> None", _post_exit_drift(dict(good, close_rate=None)) is None)
     ck("missing close_ts -> None", _post_exit_drift(dict(good, close_ts=None)) is None)
+
+    # --- [2026-07-28] STOPPISH speaks Lighter: an 'sl'-worst bucket with the
+    # full drift evidence must reach rule 1 (exit_too_tight). Mutation check:
+    # removing 'sl' from STOPPISH drops this to mixed_unclear -> red. The
+    # discriminating fixture: share 1.0, wr 0.0, reclaim 1.0 (the ETH cache
+    # above reclaims), fwd +0.05 — every other rule's bar deliberately missed.
+    _diag_trades = (
+        [{"profit_abs": -10.0, "profit_ratio": -0.05, "exit_reason": "sl",
+          "pair": "ETH", "venue": "lighter", "close_ts": close_ts,
+          "open_rate": 100.0, "close_rate": 95.0, "enter_tag": "long"}
+         for _ in range(7)]
+        + [{"profit_abs": 2.0, "profit_ratio": 0.01, "exit_reason": "tp",
+            "pair": "ETH", "venue": "lighter", "close_ts": close_ts,
+            "open_rate": 100.0, "close_rate": 102.0, "enter_tag": "long"}
+           for _ in range(3)])
+    _dg = diagnose("some-bot", "long-dip", _diag_trades, [], {}, {"left": 120})
+    ck("'sl'-worst bucket reaches exit_too_tight (STOPPISH speaks Lighter)",
+       _dg is not None and _dg.get("primary") == "exit_too_tight")
+
+    # --- [2026-07-28] venue_ab re-key: a SUFFIXED ledger id must find its
+    # base-keyed twin, reading the OTHER arm. Mutation checks: reverting the
+    # base-strip lookup OR reading the same arm turns this red (the fixture
+    # only carries 'live', so a shadow bucket reading 'shadow' finds {}).
+    _ab_trades = [{"profit_abs": -5.0, "profit_ratio": -0.05,
+                   "exit_reason": "flip", "pair": "ETH", "venue": "hl",
+                   "enter_tag": "long"} for _ in range(10)]
+    _dg2 = diagnose("x-lshadow", "long-funding", _ab_trades, [],
+                    {"x": {"live": {"pnl_abs": 50.0, "wins": 6, "losses": 6}}},
+                    {"left": 0})
+    ck("suffixed bot finds base-keyed twin -> venue_execution reachable",
+       _dg2 is not None and _dg2.get("primary") == "venue_execution")
 
     # --- DIRECTION: the bug that made reclaim tautological -------------------
     # The tape rises to high=110 and never falls below low=90.

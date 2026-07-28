@@ -3,8 +3,16 @@ name: ci-notify
 # Replaces send_later PR check-in chains (CLAUDE.md doctrine P1-P2).
 # Posts CI/merge transitions ON the PR; nothing wakes a Claude session.
 
+# [2026-07-28 AUDIT FIX] check_suite NEVER fired: GitHub does not deliver
+# check_suite events for suites created by GitHub Actions ("to prevent
+# recursive workflows"), and every suite in this repo (Tests, Changelog
+# check) IS Actions — measured: 5 runs total, all event=pull_request, zero
+# check_suite, so the CI-TRANSITION half of this notifier was structurally
+# dead and the pull_request firings ran BEFORE checks finished (empty CONC).
+# workflow_run is the sanctioned pattern for exactly this.
 on:
-  check_suite:
+  workflow_run:
+    workflows: ["Tests", "Changelog check"]
     types: [completed]
   pull_request:
     types: [opened, synchronize, ready_for_review]
@@ -19,13 +27,13 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: ci-notify-${{ github.event.check_suite.head_sha || github.event.pull_request.head.sha || github.run_id }}
+  group: ci-notify-${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   notify:
-    # main-branch suites are post-merge CI - no PR to notify. [28-Jul-2026 quota diet]
-    if: github.event.check_suite == null || github.event.check_suite.head_branch != 'main'
+    # main-branch runs are post-merge CI - no PR to notify. [28-Jul-2026 quota diet]
+    if: github.event.workflow_run == null || github.event.workflow_run.head_branch != 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Report the transition on the PR
@@ -34,7 +42,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          HEAD_SHA="${{ github.event.check_suite.head_sha || github.event.pull_request.head.sha }}"
+          HEAD_SHA="${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}"
           if [ -z "$HEAD_SHA" ]; then exit 0; fi
 
           PR=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number' 2>/dev/null || true)
