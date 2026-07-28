@@ -348,14 +348,43 @@ def load(days, universe_n, refresh):
     return mk
 
 
-def run(mk, enter_apr, t0, t1, entry_ok=None):
+# [2026-07-25 SLOPE-GATE STUDY] the live bot's funding-SLOPE entry gate (enter
+# only while |apr| is still BUILDING, >= its value SLOPE_LOOKBACK_H ago) has NEVER
+# been measured on LIGHTER — it is validated ONLY on Hyperliquid
+# (backtest_funding_leverage.py), and this file's own line ~156 says the slope
+# gate is "not modelled". Mirrors lighter_funding_bot.SLOPE_LOOKBACK_H (default 1h).
+SLOPE_LOOKBACK_H = float(os.environ.get("FUNDING_SLOPE_LOOKBACK_H", "1"))
+
+
+def _in_restart_window(t, restarts_per_day, window_h=1.0):
+    """Deterministic model of the live slope-gate FAIL-OPEN. The live bot's
+    rate history is IN-PROCESS, so for ~window_h after each boot it cannot look
+    back SLOPE_LOOKBACK_H and the gate fails OPEN (no skip). The live service
+    restarts ~restarts_per_day times (11 on 22-Jul alone). Evenly-spaced restarts
+    (an idealisation — real deploys cluster) => a fail-open fraction of about
+    restarts_per_day*window_h/24. Deterministic (no RNG) so the study reproduces."""
+    if restarts_per_day <= 0:
+        return False
+    period = 86400.0 / restarts_per_day
+    return (t % period) < window_h * 3600.0
+
+
+def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None):
     """Replay the live bot's rules over [t0,t1). Returns a result dict.
 
     entry_ok: optional (sym, hour_ts) -> bool predicate consulted ONLY at the
     entry site (a coin-quality/character filter study hook). None (default)
     reproduces the unfiltered behaviour exactly — position management, funding
     accrual and every exit path are never filtered, so an open position is
-    always managed even if its coin later fails the predicate."""
+    always managed even if its coin later fails the predicate.
+
+    `slope` adds the funding-SLOPE entry gate (default OFF => the sweep verdict
+    in main() is byte-identical to before this study):
+      None       -> gate off (unchanged)
+      "active"   -> DURABLE history: gate always applied (the proposed fix)
+      "failopen" -> LIVE reality: gate applied EXCEPT in a post-restart window
+                    (restarts_per_day). The gap between active and failopen is
+                    exactly what making the slope history durable would recover."""
     exit_apr = enter_apr * EXIT_RATIO
     hours = sorted({t for m in mk.values() for t in m["fund"] if t0 <= t < t1})
     pos, hot, cool = {}, {}, {}
@@ -429,6 +458,19 @@ def run(mk, enter_apr, t0, t1, entry_ok=None):
                     and (t - hot[sym]) / 3600.0 >= PERSIST_H
                     and t >= cool.get(sym, 0)
                     and (entry_ok is None or entry_ok(sym, t))):
+                # [2026-07-25 SLOPE GATE] enter only while |apr| is still BUILDING
+                # (>= its value SLOPE_LOOKBACK_H ago). The funding TAPE is the
+                # history — apr 1h ago = m["fund"][t-3600] — and a MISSING value
+                # FAILS OPEN, exactly the live _slope_ref contract (a real tape gap
+                # IS the restart gap). `hot[sym]` is deliberately NOT cleared on a
+                # slope skip: the coin stays hot and is re-checked next hour, as
+                # the live loop does. Default slope=None keeps this a no-op.
+                if slope:
+                    prev = m["fund"].get(t - int(SLOPE_LOOKBACK_H * 3600))
+                    _fo = (slope == "failopen"
+                           and _in_restart_window(t, restarts_per_day))
+                    if prev is not None and not _fo and abs(apr) < abs(prev):
+                        continue          # rolling over — the gate's whole job
                 pos[sym] = {"px": close, "short": apr > 0, "t0": t,
                             "ntl": ORDER_USD, "fund": 0.0}
     med = sorted(holds)[len(holds) // 2] if holds else 0.0
@@ -442,11 +484,61 @@ def run(mk, enter_apr, t0, t1, entry_ok=None):
             "breakeven": (2 * SLIP * 8760 / med) if med else float("inf")}
 
 
+def _slope_study(mk, lo, mid, hi):
+    """The funding-slope gate meets LIGHTER — off / durable(always) / live-
+    failopen, at BOTH the assumed 5bps and the modelled 0.86bps slip (the
+    header's own discipline: a load-bearing constant belongs in the readout).
+    'durable' = the proposed fix (rate history survives restarts). 'failopen' =
+    today (gate off ~1h after each of ~11 daily restarts). The gap between them
+    is what making the slope history durable would recover. Both halves must
+    agree in sign or it is a window, not an edge worth protecting."""
+    global SLIP
+    _saved_slip = SLIP
+    rpd = int(os.environ.get("BT_RESTARTS_PER_DAY", "11"))
+    fo_frac = min(rpd * 1.0 / 24.0, 1.0)
+    print("\n" + "=" * 82)
+    print("SLOPE-GATE STUDY on LIGHTER — first measurement here (validated only on HL before)")
+    print(f"  rule: enter only while |apr| >= its value {SLOPE_LOOKBACK_H:.0f}h ago (still building)")
+    print(f"  fail-open: {rpd} restarts/day x 1h ~= {fo_frac*100:.0f}% of hours the gate is OFF")
+    print(f"  {len(mk)} markets | {(hi-lo)/86400:.0f}d | BOTH halves must agree in sign")
+    print("=" * 82)
+    modes = [("off", None), ("durable", "active"), ("failopen", "failopen")]
+    for slip_bps in (5.0, 0.86):
+        SLIP = slip_bps / 1e4
+        print(f"\n--- slip {slip_bps:.2f} bps/fill "
+              f"{'(assumed)' if slip_bps == 5.0 else '(modelled)'} ---")
+        hdr = (f"{'gate':>6s} {'mode':>9s} {'P&L $':>9s} {'fund$':>8s} {'price$':>8s} "
+               f"{'n':>5s} {'win%':>6s} {'maxDD':>8s} | {'h1':>8s} {'h2':>8s} {'both+':>6s}")
+        print(hdr); print("-" * len(hdr))
+        for g in (0.05, 0.20, 0.40):
+            for name, sl in modes:
+                full = run(mk, g, lo, hi + 1, slope=sl)
+                h1 = run(mk, g, lo, mid, slope=sl)
+                h2 = run(mk, g, mid, hi + 1, slope=sl)
+                both = "yes" if (full["pnl"] > 0 and h1["pnl"] > 0
+                                 and h2["pnl"] > 0) else "no"
+                tag = "  <- LIVE TODAY" if (g == 0.05 and name == "off") else ""
+                print(f"{g:>6.2f} {name:>9s} {full['pnl']:>9.2f} {full['fund']:>8.2f} "
+                      f"{full['price']:>8.2f} {full['n']:>5d} {full['win']:>6.1f} "
+                      f"{full['maxdd']:>8.2f} | {h1['pnl']:>8.2f} {h2['pnl']:>8.2f} "
+                      f"{both:>6s}{tag}")
+            print()
+    SLIP = _saved_slip
+    print("READOUT — two questions:")
+    print("  1) does DURABLE beat OFF? (is the slope gate a LIGHTER edge at all — it")
+    print("     is not, unless durable is both-halves-positive AND beats off)")
+    print("  2) DURABLE minus FAILOPEN = what durable slope history would RECOVER")
+    print("     (the actual Phase-2 fix). If ~0, the restart fail-open is not the")
+    print("     problem and the code change is not worth the real-money risk.")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=150)
     ap.add_argument("--universe", type=int, default=25)
     ap.add_argument("--refresh", action="store_true")
+    ap.add_argument("--slope-study", action="store_true",
+                    help="measure the funding-slope gate on Lighter (off/durable/failopen)")
     a = ap.parse_args()
 
     print(f"Fetching LIGHTER history — {a.days}d, top {a.universe} by daily quote volume")
@@ -456,6 +548,9 @@ def main():
     hours = sorted({t for m in mk.values() for t in m["fund"]})
     lo, hi = min(hours), max(hours)
     mid = lo + (hi - lo) // 2
+    if a.slope_study:
+        _slope_study(mk, lo, mid, hi)
+        return
     print(f"\n{len(mk)} markets | {time.strftime('%Y-%m-%d', time.gmtime(lo))} -> "
           f"{time.strftime('%Y-%m-%d', time.gmtime(hi))} ({(hi-lo)/86400:.0f}d)")
     print(f"clip ${ORDER_USD:.0f} x {MAX_OPEN} slots | slip {SLIP*1e4:.0f}bps/fill | "
