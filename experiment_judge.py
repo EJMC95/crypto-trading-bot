@@ -494,11 +494,24 @@ def _lever_sig(levers):
     return tuple(out)
 
 
-def candidate_pool(queue):
+def candidate_pool(queue, now=None):
     """The static CANDIDATES followed by fresh incubator proposals from
     'xp-queue', deduped by name AND by LEVER SIGNATURE (static wins). Only
     proposals whose levers are all registered xp.funding.* are admitted — an
     offspring can't smuggle an unknown lever past the judge. Pure — selftested.
+
+    [2026-07-28 REVIEW] The queue is consumed ONLY while fresh by its own
+    `updated`+`ttl_sec` — the same payload-self-TTL check prop_fade already
+    does, fail-CLOSED on a missing/unparseable stamp (the fleet bus contract:
+    consumers go neutral on stale). Found live: the judge was consuming an
+    11-day-stale queue (updated 17-Jul, ttl 3h) whose enter_apr-0.3/-0.5
+    entries the 23-Jul Lighter tape sweep had since refuted — each would have
+    clamped to 0.075 and burned a >=7d serial slot re-running the identical
+    experiment, plus the withdrawn hold-48/-96 pair: ~4 wasted slots (~a
+    month) on the fleet's only path to live.funding.*. Restrict-only: a stale
+    queue contributes zero candidates; the statics are untouched. Publisher
+    side (incubator republish-while-endorsed) is flagged in
+    FLEET_REVIEW_2026-07-28.md — this is the consumer's half of the contract.
 
     [2026-07-17 AUDIT] Signature dedup added. Name dedup ALONE was vacuous
     here: the incubator mints its own namespace (`xp-<gene>-<allele>`,
@@ -517,7 +530,15 @@ def candidate_pool(queue):
         pool.append(c)
         seen.add(c["name"])
         sigs.add(_lever_sig(c["levers"]))
-    for c in (queue or {}).get("candidates", []):
+    q = queue or {}
+    try:
+        _now = (datetime.now(timezone.utc).timestamp()
+                if now is None else float(now))
+        if _now - parse_ts(q.get("updated")) > float(q.get("ttl_sec") or 0):
+            return pool                     # stale queue: statics only
+    except Exception:                       # noqa: BLE001
+        return pool                         # unstampable queue: fail closed
+    for c in q.get("candidates", []):
         nm, lv = c.get("name"), c.get("levers") or {}
         if not nm or nm in seen:
             continue
@@ -665,6 +686,50 @@ def growth_promoter(rows, gstate, now, drift=None):
     return (gstate, ("eval", v))
 
 
+def _arm_drift_snapshot(rows, fetch=None):
+    """Arm-drift for paired_eval: row-based first, HOLD-ONLY fallback second.
+
+    [2026-07-28 REVIEW] The row-based check was structurally DARK from birth:
+    0 of 143 all-time Farmer paper_trades rows carried extra.build, because
+    publish_paper_trade never stamped it (fixed today in bot_pnl_store,
+    forward-only) — so arm_drift returned None on every eval while
+    impl-shortfall's bot_pnl read simultaneously reported the two arms on
+    different builds. A drift gate that cannot fire is a dead sensor
+    ([[a-dead-sensor-must-not-score-a-hit]]): the 2026-07-17 "one snapshot"
+    design was right, its feed was empty.
+
+    Semantics, in seniority order:
+    - If BOTH arms have build-stamped ledger rows, the row-based verdict is
+      final (same-snapshot doctrine: the drift check describes the same rows
+      the bar is computed from). None there means converged — no fallback.
+    - Only while either arm's rows are UNSTAMPED (the pre-fix ledger) do we
+      read the arms' CURRENT builds off bot_pnl. arm_drift claims drift only
+      on POSITIVE evidence (both stamps present and different), so this
+      fallback can only ADD a hold, never clear one — restrict-only — and it
+      retires by itself as stamped rows accrue on both arms. Fail-safe None
+      on any import/DB failure (a dark sensor costs nothing, claims nothing).
+    `fetch` is injectable for the selftest; defaults to store.fetch_bot_pnl."""
+    try:
+        import implementation_shortfall as _isf
+    except Exception:      # noqa: BLE001
+        return None
+    try:
+        d = _isf.arm_drift(rows, live=LIVE_BOT, shadow=SHADOW_BOT)
+        if d is not None:
+            return d
+
+        def _stamped(bot):
+            return any(((r.get("extra") or {}).get("build"))
+                       for r in (rows or []) if str(r.get("bot")) == bot)
+
+        if _stamped(LIVE_BOT) and _stamped(SHADOW_BOT):
+            return None                     # row verdict is final: converged
+        pnl_rows = (fetch or store.fetch_bot_pnl)() or []
+        return _isf.arm_drift(pnl_rows, live=LIVE_BOT, shadow=SHADOW_BOT)
+    except Exception:      # noqa: BLE001
+        return None
+
+
 def run_once():
     now = now_ts()
     # [2026-07-17 AUDIT] A FAILED READ IS NOT AN EMPTY JUDGE. `load_state`
@@ -762,7 +827,7 @@ def run_once():
             return save(note=f"cooldown until {iso(_num(st['cooldown_until']))}")
         if not have_ledger:
             return save(note="no ledger visible — asserting nothing (fail-safe)")
-        pool = candidate_pool(store.load_state("xp-queue") or {})
+        pool = candidate_pool(store.load_state("xp-queue") or {}, now=now)
         cand, _retried = pick_candidate(pool, done, done_at, current, now,
                                         DONE_RETRY_D * 86400)
         if cand is None:
@@ -842,12 +907,10 @@ def run_once():
         # gates can never describe different moments. Imported lazily and
         # guarded: implementation_shortfall is not in every image, and a dark
         # sensor must cost this organ nothing (it simply cannot claim drift).
-        _drift = None
-        try:
-            import implementation_shortfall as _isf
-            _drift = _isf.arm_drift(rows, live=LIVE_BOT, shadow=SHADOW_BOT)
-        except Exception:      # noqa: BLE001
-            _drift = None
+        # [2026-07-28] ...and while the ledger rows carry no stamps at all,
+        # _arm_drift_snapshot falls back HOLD-ONLY to the arms' current
+        # bot_pnl builds — see its docstring for why the row feed was empty.
+        _drift = _arm_drift_snapshot(rows)
         ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"),
                           drift=_drift)
               if have_ledger else {"promote": False, "why": "no ledger"})
@@ -1188,12 +1251,18 @@ def _selftest():
 
     # candidate_pool: static first, then admitted incubator proposals; an
     # offspring with an UNKNOWN lever is rejected (can't smuggle a lever past)
-    q = {"candidates": [
+    _qnow = datetime.now(timezone.utc).timestamp()
+
+    def _fresh(qq):
+        # [2026-07-28] fixtures carry the stamps the REAL payload always has
+        return dict(qq, updated=iso(_qnow), ttl_sec=10800)
+
+    q = _fresh({"candidates": [
         {"name": "tp-0.06", "levers": {"xp.funding.take_profit": 0.06}},        # dup static
         {"name": "xp-tp-0.05", "levers": {"xp.funding.take_profit": 0.05}},     # ok
         {"name": "evil", "levers": {"xp.funding.enter_apr": 0.06, "bad.lever": 1}},  # reject
-    ]}
-    pool = candidate_pool(q)
+    ]})
+    pool = candidate_pool(q, now=_qnow)
     names = [c["name"] for c in pool]
     assert names[:1] == ["tp-0.06"], names  # static order (holds withdrawn)
     assert "xp-tp-0.05" in names and "evil" not in names, names
@@ -1205,22 +1274,80 @@ def _selftest():
     # life, so it proved nothing about the real failure. 48 vs 48.0 pins the
     # float normalisation; the last row proves a genuinely NEW experiment
     # still gets in (dedup must not become a wall).
-    q2 = {"candidates": [
+    q2 = _fresh({"candidates": [
         {"name": "xp-take_profit-0.06", "levers": {"xp.funding.take_profit": 0.06}},
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
-    ]}
-    n2 = [c["name"] for c in candidate_pool(q2)]
+    ]})
+    n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
     assert n2 == ["tp-0.06", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
     # 96-vs-96.0 dedup are withdrawn — see CANDIDATES)
     # two offspring proposing the SAME novel experiment: first wins, no dup slot
-    q3 = {"candidates": [
+    q3 = _fresh({"candidates": [
         {"name": "child-a", "levers": {"xp.funding.enter_apr": 0.0625}},
         {"name": "child-b", "levers": {"xp.funding.enter_apr": 0.0625}},
-    ]}
-    assert [c["name"] for c in candidate_pool(q3)][-1] == "child-a"
-    assert len(candidate_pool(q3)) == len(CANDIDATES) + 1
+    ]})
+    assert [c["name"] for c in candidate_pool(q3, now=_qnow)][-1] == "child-a"
+    assert len(candidate_pool(q3, now=_qnow)) == len(CANDIDATES) + 1
+
+    # [2026-07-28 REVIEW] QUEUE FRESHNESS, fail-closed — the live defect shape:
+    # an 11-day-stale queue (its own ttl_sec 3h) must contribute NOTHING, and
+    # a payload with no freshness stamp at all must be treated the same way.
+    # Mutation check: bypassing the staleness gate turns the first assert red
+    # (the stale child would appear in the pool).
+    q4 = dict(q3, updated=iso(_qnow - 11 * 86400))          # 11d old, ttl 3h
+    assert [c["name"] for c in candidate_pool(q4, now=_qnow)] == \
+        [c["name"] for c in CANDIDATES], "stale queue must yield statics only"
+    q5 = {"candidates": q3["candidates"]}                    # no stamp at all
+    assert [c["name"] for c in candidate_pool(q5, now=_qnow)] == \
+        [c["name"] for c in CANDIDATES], "unstamped queue must fail closed"
+    # boundary: just inside TTL is still fresh (10799 not 10800 — iso()
+    # truncates to whole seconds, so the exact edge rounds stale)
+    q6 = dict(q3, updated=iso(_qnow - 10799))
+    assert "child-a" in [c["name"] for c in candidate_pool(q6, now=_qnow)]
+
+    # [2026-07-28 REVIEW] _arm_drift_snapshot: the drift sensor must FIRE on
+    # unstamped ledger rows when the arms' CURRENT builds differ (the defect:
+    # 0/143 rows stamped -> row-based None forever -> the HOLD never fired on
+    # a live build divergence impl-shortfall was reporting simultaneously).
+    # Mutation check: removing the fallback turns the first assert red;
+    # removing the _stamped seniority guard turns the third red.
+    try:
+        import implementation_shortfall as _isf_probe   # noqa: F401
+        _isf_ok = True
+    except Exception:      # noqa: BLE001
+        _isf_ok = False
+    _r_unstamped = [{"bot": LIVE_BOT, "extra": {"bars": {}}},
+                    {"bot": SHADOW_BOT, "extra": {"bars": {}}}]
+    _pnl_drift = [{"bot": LIVE_BOT, "extra": {"build": "aaa"}},
+                  {"bot": SHADOW_BOT, "extra": {"build": "bbb"}}]
+    _pnl_same = [{"bot": LIVE_BOT, "extra": {"build": "ccc"}},
+                 {"bot": SHADOW_BOT, "extra": {"build": "ccc"}}]
+    if _isf_ok:
+        # fallback fires: unstamped rows + drifted current builds -> HOLD
+        assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_drift) == \
+            {"live": "aaa", "shadow": "bbb"}
+        # fallback stays quiet when current builds match (no false hold)
+        assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_same) is None
+        # ROW SENIORITY: both arms stamped-and-matching is a positive
+        # all-clear — the bot_pnl fallback must NOT override it (a deploy
+        # after the window's trades is not drift in those trades)
+        _r_same = [{"bot": LIVE_BOT, "extra": {"build": "x"}},
+                   {"bot": SHADOW_BOT, "extra": {"build": "x"}}]
+        assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_drift) is None
+        # row-based POSITIVE drift is returned untouched (senior path)
+        _r_drift = [{"bot": LIVE_BOT, "extra": {"build": "p"}},
+                    {"bot": SHADOW_BOT, "extra": {"build": "q"}}]
+        assert _arm_drift_snapshot(_r_drift, fetch=lambda: _pnl_same) == \
+            {"live": "p", "shadow": "q"}
+        # a dead fetch costs nothing, claims nothing
+        def _boom():
+            raise RuntimeError("db down")
+        assert _arm_drift_snapshot(_r_unstamped, fetch=_boom) is None
+    else:
+        # image without the organ: the sensor is dark and must claim nothing
+        assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_drift) is None
     assert _lever_sig({"a": 1}) == _lever_sig({"a": 1.0})
     assert _lever_sig({"a": "x"}) == (("a", "x"),)      # non-numeric survives
     # next_candidate: skips done + current, name-based (pool may grow)

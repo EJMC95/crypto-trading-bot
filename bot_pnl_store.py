@@ -857,6 +857,14 @@ def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
     conn = _get_conn()
     if conn is None or trade_id is None:
         return False
+    # [2026-07-28 REVIEW] Stamp extra.build on the CLOSE ROW too. The
+    # experiment judge's arm-drift gate reads builds off paper_trades rows
+    # (one snapshot with the numbers it gates) — but only bot_pnl publishes
+    # were ever stamped, so 0 of 143 all-time Farmer rows carried a build and
+    # the drift HOLD structurally could not fire while the two arms ran
+    # different code. Forward-only; _stamp_build never raises and never
+    # overwrites a caller's key.
+    extra = _stamp_build(extra)
     try:
         _ensure_paper_trades_table(conn)
         with conn.cursor() as cur:
@@ -1110,6 +1118,17 @@ def _selftest_build():
     assert e["build"] == build_code_id() and e["venue"] == "lighter_live", e
     assert _stamp_build(None)["build"] == build_code_id()
     assert _stamp_build({"build": "caller"})["build"] == "caller"
+    # [2026-07-28 REVIEW] the PAPER-TRADE write path must stamp too — the
+    # judge's arm-drift gate reads builds off paper_trades rows and was dark
+    # for its whole life because only bot_pnl publishes were stamped (0/143
+    # Farmer rows carried a build). The DB path can't run here, so pin the
+    # call the way the drift guard pins env defaults: by source — on the
+    # exact CALL expression, not the bare name (a docstring/comment mention
+    # must never satisfy this; that near-miss was caught by its own mutation
+    # run). Mutation check: deleting the call line reddens.
+    import inspect as _ins
+    assert "extra = _stamp_build(extra)" in _ins.getsource(publish_paper_trade), \
+        "publish_paper_trade must stamp extra.build (arm-drift's row feed)"
     print(f"bot_pnl_store selftest OK (build id: deterministic, byte-sensitive, "
           f"path-independent, entry counts; stamp preserves caller keys) "
           f"build={a} over {n} files")

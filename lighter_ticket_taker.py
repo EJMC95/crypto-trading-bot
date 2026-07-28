@@ -667,6 +667,46 @@ def up_read_strength(sym):
     return hit[1] if hit else None
 
 
+# [2026-07-24 (dm) CROSS-CYCLE up-regime CACHE] The bot is RUN-ONCE (a fresh
+# process every ~5 min), so `_UP_CACHE`'s TTL died at boot and up_read re-fetched
+# each book's DAILY candles every cycle — ~12x/hour for a signal that only moves
+# once a day. Worse since (dk): up_read now runs for EVERY breakout ticket
+# pre-veto. Persisting the cache across boots collapses that to ~1 fetch/book/TTL,
+# cutting REST-throttle pressure. Shadow-only in effect (up_read never runs on the
+# live arm — breakout is filtered by allowed_lenses). Cache-only + fail-safe: a
+# dark read seeds nothing (up_read fetches fresh), a dark write drops nothing.
+def upregime_cache_key(bot_row):
+    return f"{bot_row}-upregime"
+
+
+def load_upregime_cache(store, bot_row, now_ts):
+    """Seed _UP_CACHE from the persisted cross-cycle cache — only UNEXPIRED
+    entries (each is [up, strength, expiry_epoch]). Fail-safe: any read problem
+    seeds nothing, so up_read simply fetches fresh (no regression, no stale gate)."""
+    try:
+        raw = store.load_state(upregime_cache_key(bot_row)) or {}
+        for sym, v in (raw.get("syms") or {}).items():
+            if (isinstance(v, (list, tuple)) and len(v) == 3
+                    and isinstance(v[2], (int, float)) and float(v[2]) > now_ts):
+                _UP_CACHE[sym] = (v[0], v[1], float(v[2]))
+    except Exception:  # noqa: BLE001 — a dark cache read is never a stop
+        pass
+
+
+def save_upregime_cache(store, bot_row, now_ts):
+    """Persist the UNEXPIRED up-regime cache for the next run-once boot. Skips a
+    write when there is nothing live to save (e.g. the live arm, which never
+    populates the cache). Fail-safe: a write problem drops the cache, not the run."""
+    try:
+        syms = {s: [v[0], v[1], v[2]] for s, v in _UP_CACHE.items()
+                if isinstance(v, tuple) and len(v) == 3 and float(v[2]) > now_ts}
+        if syms:
+            store.save_state(upregime_cache_key(bot_row),
+                             {"syms": syms, "updated": iso(now())})
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def lens_evidence(o, min_n=None):
     """(n, floor_met, avg_pct, hit) for one lens grade — EPISODE basis when
     the brain's v3 fields are present, RAW fallback otherwise.
@@ -908,6 +948,29 @@ def pos_bars(m):
     except (KeyError, TypeError, ValueError):
         pass
     return TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H
+
+
+def _close_extra(m):
+    """The close row's extra: the governing bars stamp PLUS the entry-time
+    evidence. Pure — selftested.
+
+    [2026-07-28 REVIEW] (di) captures brk_quality/up_strength into
+    meta["evidence"] precisely so winning-breakout criteria can be DERIVED
+    from realized closes — but the capture stopped at meta, so
+    analyze_breakout_quality.py's `extra ? 'brk_quality'` matched ZERO rows
+    on any build and the first 6 breakoutup closes shipped without their
+    features (unrecoverable from the ledger). Evidence keys merge with
+    setdefault so bars/bars_basis can never be clobbered; non-dict/absent
+    evidence degrades to exactly the old payload. Observable-only."""
+    m = m or {}
+    stamped = isinstance(m.get("bars"), dict) and m.get("bars")
+    out = {"bars": (m.get("bars") if stamped else entry_bars()),
+           "bars_basis": ("entry" if stamped else "close-legacy")}
+    ev = m.get("evidence")
+    if isinstance(ev, dict):
+        for k, v in ev.items():
+            out.setdefault(k, v)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1335,10 +1398,15 @@ def main(_ctx=None):
             # reconstruct around: 11/22 SL closes ran under a different bar
             # than the one stamped/assumed). Legacy positions opened before
             # the stamp existed fall back to close-time values, labelled so.
-            extra={"bars": (m.get("bars") if isinstance(m.get("bars"), dict)
-                            and m.get("bars") else entry_bars()),
-                   "bars_basis": ("entry" if isinstance(m.get("bars"), dict)
-                                  and m.get("bars") else "close-legacy")})
+            # [2026-07-28 REVIEW] ...and the ENTRY EVIDENCE rides the close
+            # row. (di) captured brk_quality/up_strength into meta["evidence"]
+            # so the winning-breakout criteria could be DERIVED from closes —
+            # but the capture stopped at meta: analyze_breakout_quality.py
+            # filters `extra ? 'brk_quality'` and matched ZERO rows forever
+            # (the first 6 breakoutup closes' features are unrecoverable).
+            # Merge is setdefault-shaped: bars/bars_basis can never be
+            # clobbered by an evidence key. Observable-only, both arms.
+            extra=_close_extra(m))
         if not dry_run:
             try:
                 store.publish_venue_order(
@@ -1908,6 +1976,9 @@ def main(_ctx=None):
     # bus payload. Live = divergence only; shadow keeps filling all four so the
     # control arm still grades them. See allowed_lenses().
     _allowed = allowed_lenses(TT_VENUE)
+    # [(dm)] seed the up-regime cache from the last boot BEFORE the entry loop's
+    # up_read calls — turns ~12 daily-candle fetches/book/hour into ~1. Fail-safe.
+    load_upregime_cache(store, BOT_ROW, t_now.timestamp())
     if fresh and not stressed:
         for lens, t in incredible(scout.get("tickets") or {}):
             sym = t.get("sym")
@@ -2529,6 +2600,26 @@ def selftest():
     finally:
         globals()["TRAIL_PCT"] = 0.0
 
+    # ---- close-row extra: bars stamp + entry evidence ride together --------
+    # [2026-07-28 REVIEW] the (di) capture must SURVIVE to the ledger row the
+    # analyzer reads (`extra ? 'brk_quality'`). Mutation check: dropping the
+    # evidence merge in _close_extra (or reverting _book_close to the bare
+    # bars dict) turns these red.
+    _cm = {"bars": {"tp": 0.04, "sl": -0.07, "max_hold_h": 24},
+           "evidence": {"brk_quality": 0.42, "up_strength": 0.13}}
+    _cx = _close_extra(_cm)
+    assert _cx["bars"] == _cm["bars"] and _cx["bars_basis"] == "entry", _cx
+    assert _cx["brk_quality"] == 0.42 and _cx["up_strength"] == 0.13, _cx
+    # legacy/absent evidence degrades to exactly the old payload
+    _cl = _close_extra({})
+    assert set(_cl) == {"bars", "bars_basis"} and _cl["bars_basis"] == "close-legacy"
+    assert set(_close_extra({"bars": _cm["bars"], "evidence": "junk"})) == \
+        {"bars", "bars_basis"}, "non-dict evidence must add nothing"
+    # an evidence key can never clobber the bars stamp
+    _cc = _close_extra({"bars": _cm["bars"],
+                        "evidence": {"bars": "EVIL", "gap_pp": 9.0}})
+    assert _cc["bars"] == _cm["bars"] and _cc["gap_pp"] == 9.0, _cc
+
     # ---- BULL DUAL-MODE gate — long-breakout(up) + short-divergence, crypto ---
     _up = {"regime": {"dir": 1}}
     _dn = {"regime": {"dir": -1}}
@@ -3113,11 +3204,20 @@ def _selftest_live():
             "initial_equity": 1000.0,
             "meta": {"FFF": {"clip": 100.0, "lens": "breakout",
                              "opened": _opened, "accrued_to": _opened,
-                             "funding_paid": 0.0}},
+                             "funding_paid": 0.0,
+                             # [2026-07-28] entry evidence must ride the row
+                             "evidence": {"brk_quality": 0.42,
+                                          "up_strength": 0.13}}},
             "stats": {"closed": 0, "wins": 0, "losses": 0}}
         main(_ctx={"venue": v, "rails": r, "broker": None})
         assert len(captured["paper"]) == 1, captured["paper"]
         _p = captured["paper"][0][1]
+        # [2026-07-28 REVIEW] the close ROW carries the (di) capture — the
+        # analyzer's filter is `extra ? 'brk_quality'` and it matched zero
+        # rows for the first 6 breakoutup closes. Mutation check: reverting
+        # _book_close's extra to the bare bars dict turns this red.
+        assert _p["extra"]["brk_quality"] == 0.42, _p["extra"]
+        assert "bars" in _p["extra"], _p["extra"]
         # price +4 on a long; funding on the TRUE 8h basis = 1*104*1e-4*8 = 0.0832
         # (the 8x bug would have charged 0.6656). net = 4 - 0.0832 - 0 (no fee).
         assert abs(_p["pnl_abs"] - (4.0 - 0.0832)) < 1e-4, _p["pnl_abs"]
