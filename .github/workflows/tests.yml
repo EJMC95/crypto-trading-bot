@@ -13,6 +13,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true  # [28-Jul-2026] a superseded push's run is pure quota burn
+
 jobs:
   pytest:
     name: pytest (selftests + real-money / financial / autonomy)
