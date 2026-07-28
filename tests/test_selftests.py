@@ -33,6 +33,11 @@ TIMEOUT = 120
 # `python -m <dotted> --selftest`. Keep this list in sync with the codebase —
 # the rot guard below fails the build if a new selftest module is missing.
 SELFTEST_MODULES = [
+    # [2026-07-28] breakout-quality study: --selftest is offline-green &
+    # stdlib-only (verified `python -m scripts.analyze_breakout_quality
+    # --selftest` on a bare interpreter); registering it here fixes the
+    # test_no_unregistered_selftest red on main since 24-Jul.
+    "scripts.analyze_breakout_quality",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",
