@@ -342,6 +342,10 @@ def apply_levers(mode):
     _ACTIVE_BARS.update({"enter_apr": ENTER_APR, "take_profit": TAKE_PROFIT,
                          "max_hold_h": MAX_HOLD_H, "explore_k": SCAN_EXPLORE_K,
                          "conviction": CONVICTION_MODE,
+                         # numeric receipt the judge's ran_candidate matches on
+                         # (scaled -> the up-cap; else 1.0 = off). Stamped on every
+                         # close via _close_bars_extra -> promotion is provable.
+                         "conviction_hi": (CONVICTION_HI if CONVICTION_MODE == "scaled" else 1.0),
                          "arm": mode or "paper", "tuned": sorted(moved)})
     return moved
 
