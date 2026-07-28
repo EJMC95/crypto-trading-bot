@@ -173,11 +173,16 @@ MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-s
 # both halves balanced-positive at both slips, maxDD -54 -> -18. The variable
 # is the (ce)-verdict's PERSISTENT character trait (vol +0.83 across halves) —
 # never per-coin P&L, which (ce) proved is noise. RESTRICT-ONLY (skips NEW
-# entries; exits/stops/accrual untouched) and DEFAULT OFF: enablement is the
-# experiment judge's shadow candidate path, not a default. Fail-OPEN per coin
-# (a candle outage must not starve the book — the study failed CLOSED there;
-# difference is deliberate and documented in the study doc).
-VOL_FILTER = os.environ.get("FUNDING_VOL_FILTER", "off").strip().lower() in ("on", "1", "true")
+# entries; exits/stops/accrual untouched). Fail-OPEN per coin (a candle outage
+# must not starve the book — the study failed CLOSED there; difference is
+# deliberate and documented in the study doc).
+# [2026-07-25 (ds) DEFAULT ON — OPERATOR GO-LIVE DECISION ("merge and send
+# live"), skipping the judge's shadow lap by explicit operator authority.
+# Deployed to BOTH Farmer arms in the same push (arm parity — a one-sided
+# deploy of a shared rule is the (cd) arm-drift defect). KILL SWITCH:
+# FUNDING_VOL_FILTER=off on the service restores the unfiltered book;
+# restrict-only means worst case is FEWER entries, never more exposure.]
+VOL_FILTER = os.environ.get("FUNDING_VOL_FILTER", "on").strip().lower() in ("on", "1", "true")
 VOL_FILTER_WIN_H = int(os.environ.get("FUNDING_VOL_FILTER_WIN_H", "336"))   # 14d, = the study
 VOL_FILTER_MIN_H = 72          # rets needed before a vol is trusted (= the study)
 VOL_FILTER_MIN_XS = 8          # cross-section floor below which the filter is inert (= the study)
@@ -2251,9 +2256,12 @@ def _selftest_vol_filter():
     veto = _vol_filter_veto(_Ctx(_Venue(thin)), fundt, now_ts=NOW)
     assert "THIN" not in veto, "under-history coin must fail OPEN"
 
-    # (5) DEFAULT OFF: with the env unset the switch must be False (code inert)
+    # (5) DEFAULT ON since (ds) — the operator's go-live decision. With the env
+    #     unset the switch must be True; FUNDING_VOL_FILTER=off is the kill
+    #     switch (asserting the default pins the go-live state against a silent
+    #     revert, exactly as the old default-OFF assert pinned inertness).
     if "FUNDING_VOL_FILTER" not in os.environ:
-        assert VOL_FILTER is False, "FUNDING_VOL_FILTER must default OFF"
+        assert VOL_FILTER is True, "FUNDING_VOL_FILTER must default ON (ds go-live)"
     _vf_cache.clear()
     print("lighter_funding_bot _selftest_vol_filter OK")
 
