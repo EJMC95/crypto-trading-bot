@@ -45,6 +45,9 @@ log = logging.getLogger("parliament.tuners")
 TUNE_INTERVAL_SEC = float(os.environ.get("PARL_TUNE_INTERVAL_SEC", "3600"))
 LEVER_TTL_SEC = float(os.environ.get("PARL_LEVER_TTL_SEC", "21600"))   # 6h
 MIN_REPLAY_TRADES = int(os.environ.get("PARL_TUNE_MIN_TRADES", "10"))
+# [2026-07-28] per-half floor on REPLAYABLE trades — without it a half with
+# zero replayables passed the both-halves gate trivially (0.0 >= 0.0).
+MIN_HALF_REPLAY = int(os.environ.get("PARL_TUNE_MIN_HALF", "3"))
 MIN_IMPROVE_USD = float(os.environ.get("PARL_TUNE_MIN_IMPROVE_USD", "2.0"))
 STARVING_CLOSES_7D = int(os.environ.get("PARL_STARVING_CLOSES_7D", "5"))
 GRADE_MIN_TRADES = 5
@@ -106,6 +109,9 @@ class TunerBench:
         self.data = data
         self.cycles = 0
         self.enacted = 0
+        # [2026-07-28] per-bot replay coverage (n7d vs with_tape) — tape
+        # starvation as a number, not a silent continue
+        self.coverage: dict = {}
 
     # -- the read side bots use every cycle -----------------------------------
     def effective_params(self, bot: str, base: dict) -> dict:
@@ -170,6 +176,12 @@ class TunerBench:
             sym = t["sym"]
             if sym not in tapes:
                 tapes[sym] = self.db.get_candles(sym, resolution, limit=2000)
+        # [2026-07-28 AUDIT FIX] replay COVERAGE is now a visible number —
+        # tape starvation used to be a silent `continue` (measured: ~40% of
+        # gillard's closes off the candled watchlist, dropped invisibly).
+        self.coverage[bot] = {
+            "n7d": len(trades),
+            "with_tape": sum(1 for t in trades if tapes.get(t["sym"]))}
         cur = clamp_params(base)
         best = None
         for param, mult in SWEEP:
@@ -180,10 +192,16 @@ class TunerBench:
             if abs(value - cur[param]) < 1e-9:
                 continue
             variant = dict(cur, **{param: value})
-            base_h1 = base_h2 = var_h1 = var_h2 = 0.0
-            n = 0
-            half = len(trades) // 2
-            for i, t in enumerate(trades):
+            # [2026-07-28 AUDIT FIX] split by REPLAYABLE index with a
+            # per-half floor. The old split indexed over ALL trades and had
+            # no per-half n floor, so 0.0 >= 0.0 passed a half that
+            # contributed ZERO replayable trades — and tape coverage is
+            # watchlist-biased, so replayables genuinely cluster: a variant
+            # could clear the both-halves doctrine bar on what was
+            # effectively a one-half, in-sample read (the fleet's
+            # episodes-not-trades honest-denominator rule, applied here).
+            pairs = []
+            for t in trades:
                 tape = tapes.get(t["sym"]) or []
                 b = replay_pnl_usd(t, tape, cur["tp_pct"], cur["sl_pct"],
                                    cur["max_hold_hr"])
@@ -191,15 +209,17 @@ class TunerBench:
                                    variant["sl_pct"], variant["max_hold_hr"])
                 if b is None or v is None:
                     continue     # dropped from BOTH arms — fair comparison
-                n += 1
-                if i < half:
-                    base_h1 += b
-                    var_h1 += v
-                else:
-                    base_h2 += b
-                    var_h2 += v
+                pairs.append((b, v))
+            n = len(pairs)
             if n < MIN_REPLAY_TRADES:
                 continue
+            half = n // 2
+            if half < MIN_HALF_REPLAY or (n - half) < MIN_HALF_REPLAY:
+                continue
+            base_h1 = sum(b for b, _ in pairs[:half])
+            var_h1 = sum(v for _, v in pairs[:half])
+            base_h2 = sum(b for b, _ in pairs[half:])
+            var_h2 = sum(v for _, v in pairs[half:])
             improve = (var_h1 + var_h2) - (base_h1 + base_h2)
             if improve >= MIN_IMPROVE_USD and var_h1 >= base_h1 \
                     and var_h2 >= base_h2:
@@ -294,7 +314,8 @@ class TunerBench:
 
     # -- reporting for Howard -------------------------------------------------
     def snapshot(self) -> dict:
-        out = {"cycles": self.cycles, "enacted": self.enacted, "active": {}}
+        out = {"cycles": self.cycles, "enacted": self.enacted, "active": {},
+               "replay_coverage": dict(self.coverage)}
         if self.db is not None:
             try:
                 for lever in self.db.active_levers():
@@ -316,8 +337,13 @@ class TunerBench:
                 try:
                     self.tune_bot(bot.base,
                                   base_params(bot.strategy, bot.base))
+                    # [2026-07-28 AUDIT FIX] beat INSIDE the try — outside
+                    # it, a tune_bot throwing every cycle still beat 'ok'
+                    # hourly forever (loud in the log, invisible to Howard,
+                    # whose whole job is noticing exactly this). The bots'
+                    # own run_forever is the precedent.
+                    if beat:
+                        beat(f"tuner.{bot.base}", "ok")
                 except Exception as e:  # noqa: BLE001
                     log.exception("%s-tuner cycle failed (%s)", bot.base, e)
-                if beat:
-                    beat(f"tuner.{bot.base}", "ok")
                 await asyncio.sleep(stagger)

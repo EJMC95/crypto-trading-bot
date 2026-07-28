@@ -73,6 +73,14 @@ PARAM_BOUNDS = {
     "sl_pct":      (0.005, 0.05),
     "max_hold_hr": (2.0, 96.0),
     "entry_bar":   (0.20, 0.90),
+    # [2026-07-28 honesty note] ml_gate is REGISTERED (the cage clamps any
+    # future author) but currently has NO autonomous author: the exit-replay
+    # sweep walks tp/sl/hold only (it structurally cannot judge an entry
+    # filter), and entry_bar's sole author is the starving widen. Until an
+    # entry-side harness exists (replay stored entry features through the
+    # CURRENT model at candidate gate values), ml_gate moves by env only —
+    # the registry advertises reach, this line keeps it from advertising a
+    # self-tuning capability that does not exist.
     "ml_gate":     (0.35, 0.60),
 }
 
@@ -380,6 +388,14 @@ class PMBot:
         # ceiling (1.5 — fleet_bus.MULT_CEIL), floor unchanged.
         _ceil = getattr(fleet_bus, "MULT_CEIL", 1.5) if fleet_bus else 1.5
         usd = ORDER_USD * max(0.3, min(_ceil, stake_mult))
+        # [2026-07-28 AUDIT FIX] re-check the cap with the REAL clip:
+        # _entry_blocked gated on flat ORDER_USD but the brain mult can size
+        # this entry up to 1.5x — the exact never-count*current-clip class
+        # venues/safety.py exists for. Unreachable at today's defaults
+        # (3 x $37.50 < $150) but armed the day PARL_ORDER_USD/MAX_OPEN move.
+        if self._open_notional() + usd > MAX_NOTIONAL:
+            self.last_skip = f"{sym}:notional-cap(mult)"
+            return False
         px = self._fill_px(sym, direction > 0)
         if px is None:
             return False
@@ -575,6 +591,17 @@ class PMBot:
         # Roll unconditionally, every cycle.
         self._day_roll()
         self._accrue_funding()
+        # [2026-07-28 AUDIT FIX] ask the candle layer to FOLLOW what this
+        # book actually holds: the scanners range over the whole ~215-book
+        # map while candles tracked only the 12-book watchlist, so a book
+        # like gillard (62 of its last 149 closes off-watchlist) generated
+        # closes its own tuner could not replay (silent drop, no counter)
+        # and ML candle features read 0.0. track() is bounded + 7d-expiring,
+        # so a closed position stays followed exactly as long as the tuner's
+        # 7d replay window needs its tape.
+        if hasattr(self.data, "track"):
+            for sym in list(self.broker.pos):
+                self.data.track(sym)
         # mark + exits first — risk comes off before it goes on
         for sym in list(self.broker.pos):
             st = self.data.stats(sym)
