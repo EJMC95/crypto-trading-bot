@@ -70,17 +70,19 @@ WORKFLOW = os.path.join(ROOT, ".github", "workflows", "railway-redeploy.yml")
 # ---------------------------------------------------------------------------
 DEPLOY_COVERAGE_OK = {
     "lighter_funding_bot.py": (
-        "LIVE REAL MONEY (trail-blazer-live). Auto-deploy on every push is "
-        "UNSAFE here, not merely unnecessary: a redeploy restarts the bot, and "
-        "its own boot banner says the slope gate 'fails open for ~1h after "
-        "restart'. lighter-flatten-silent-halt-redeploy-incident is what a "
-        "restart did with positions open (a memory-only halt was wiped and HYPE "
-        "re-bought 37s after boot). Ship it DELIBERATELY — via the workflow's "
-        "workflow_dispatch OR the [deploy-live-farmer]/[deploy-live] commit marker "
-        "(both check out clean main), added 2026-07-25 — never on EVERY push, and "
-        "never from a local `railway up`, which uploads your desk "
-        "(deploy-live-from-a-clean-worktree). The marker keeps each Farmer deploy "
-        "DELIBERATE until Phase 2 fixes the restart hazard above."
+        "LIVE REAL MONEY (trail-blazer-live). Auto-deploy on EVERY push stays "
+        "marker-gated for two CURRENT reasons: (1) a push may carry unfinished "
+        "WIP and a redeploy RESTARTS a real-money book; (2) the slope gate 'fails "
+        "open ~1h after restart' (in-process history), so each restart relaxes a "
+        "validated ENTRY refinement. The earlier memory-only-halt hazard "
+        "(lighter-flatten-silent-halt-redeploy-incident: a halt wiped, HYPE "
+        "re-bought 37s after boot) is NO LONGER the reason — it was FIXED: the "
+        "daily-loss halt (07-11), day-start baseline (07-21 D3), and post-stop "
+        "quarantine (07-22) all survive restarts now ('a restart no longer "
+        "re-arms a stopped coin'). Ship DELIBERATELY via workflow_dispatch OR the "
+        "[deploy-live-farmer]/[deploy-live] commit marker (both check out clean "
+        "main; added 2026-07-25) — never on EVERY push, never from a local "
+        "`railway up` which uploads your desk (deploy-live-from-a-clean-worktree)."
     ),
     "lighter_trend_bot.py": (
         "Same restart hazard as lighter_funding_bot.py, and its service "
