@@ -667,7 +667,7 @@ def up_read_strength(sym):
     return hit[1] if hit else None
 
 
-# [2026-07-24 (dm) CROSS-CYCLE up-regime CACHE] The bot is RUN-ONCE (a fresh
+# [2026-07-28 (dv) CROSS-CYCLE up-regime CACHE] The bot is RUN-ONCE (a fresh
 # process every ~5 min), so `_UP_CACHE`'s TTL died at boot and up_read re-fetched
 # each book's DAILY candles every cycle — ~12x/hour for a signal that only moves
 # once a day. Worse since (dk): up_read now runs for EVERY breakout ticket
@@ -1976,9 +1976,12 @@ def main(_ctx=None):
     # bus payload. Live = divergence only; shadow keeps filling all four so the
     # control arm still grades them. See allowed_lenses().
     _allowed = allowed_lenses(TT_VENUE)
-    # [(dm)] seed the up-regime cache from the last boot BEFORE the entry loop's
-    # up_read calls — turns ~12 daily-candle fetches/book/hour into ~1. Fail-safe.
-    load_upregime_cache(store, BOT_ROW, t_now.timestamp())
+    # [(dv)] seed the up-regime cache from the last boot BEFORE the entry loop's
+    # up_read calls — turns ~12 daily-candle fetches/book/hour into ~1. Gated to
+    # the arm that can actually fill breakout (live filters it at the allow-list,
+    # so this is a pure no-op there — not even the state read). Fail-safe.
+    if BULL_MODE and "breakout" in _allowed:
+        load_upregime_cache(store, BOT_ROW, t_now.timestamp())
     if fresh and not stressed:
         for lens, t in incredible(scout.get("tickets") or {}):
             sym = t.get("sym")
@@ -2204,6 +2207,12 @@ def main(_ctx=None):
                   f"{'long' if is_long else 'SHORT'} {sym} ({lens}) "
                   f"${clip} @ {entry_px} (range {round(ranges.get(sym) or 0, 1)}%) "
                   f"evidence={ev}")
+
+    # [(dv)] persist the up-regime cache for the next run-once boot — same gate
+    # as the load; the helper itself skips an empty cache, so this never writes
+    # a row on an arm that took no candle reads.
+    if BULL_MODE and "breakout" in _allowed:
+        save_upregime_cache(store, BOT_ROW, t_now.timestamp())
 
     # 4) persist + publish
     if dry_run:
@@ -2721,6 +2730,45 @@ def selftest():
     assert up_read_strength("ERRS") is None                           # fetch failed -> None
     globals()["_UP_CACHE"] = {"HITSYM": (True, 0.5, 9.9e18)}          # pre-seeded cache
     assert up_read(None, "HITSYM", 1.7e9) is True                     # served from cache, no venue
+    globals()["_UP_CACHE"] = {}
+    # [(dv) CROSS-CYCLE CACHE] save -> load round-trip through a stub store: the
+    # next run-once boot must be served from the persisted cache (up_read with NO
+    # venue), expired entries must be dropped at BOTH ends, and a dark store must
+    # seed nothing / drop nothing — never a crash.
+    class _MemStore:
+        def __init__(self): self.d = {}
+        def save_state(self, k, v): self.d[k] = v
+        def load_state(self, k): return self.d.get(k)
+
+    class _DarkStore:
+        def save_state(self, k, v): raise RuntimeError("db down")
+        def load_state(self, k): raise RuntimeError("db down")
+    _ms = _MemStore()
+    globals()["_UP_CACHE"] = {"SOL": (True, 0.7, 2.0e9),       # live entry
+                              "OLD": (False, 0.0, 1.0e9)}      # expired at save
+    save_upregime_cache(_ms, "row-x", 1.7e9)
+    assert "SOL" in _ms.d["row-x-upregime"]["syms"]
+    assert "OLD" not in _ms.d["row-x-upregime"]["syms"], "expired must not persist"
+    globals()["_UP_CACHE"] = {}                                # fresh boot
+    load_upregime_cache(_ms, "row-x", 1.7e9)
+    assert up_read(None, "SOL", 1.7e9) is True                 # served, no venue call
+    assert up_read_strength("SOL") == 0.7                      # strength round-trips
+    # an entry that EXPIRED between boots is dropped at load
+    _ms.d["row-x-upregime"]["syms"]["SOL"][2] = 1.6e9
+    globals()["_UP_CACHE"] = {}
+    load_upregime_cache(_ms, "row-x", 1.7e9)
+    assert "SOL" not in _UP_CACHE, "expired must not seed"
+    # dark store: load seeds nothing, save drops silently — no crash either way
+    globals()["_UP_CACHE"] = {}
+    load_upregime_cache(_DarkStore(), "row-x", 1.7e9)
+    assert _UP_CACHE == {}
+    globals()["_UP_CACHE"] = {"SOL": (True, 0.7, 2.0e9)}
+    save_upregime_cache(_DarkStore(), "row-x", 1.7e9)          # must not raise
+    # junk payload shapes seed nothing (fail-safe on a corrupt row)
+    _ms.d["row-x-upregime"] = {"syms": {"BAD": "junk", "ALSO": [1], "N": [True, 0.5, "x"]}}
+    globals()["_UP_CACHE"] = {}
+    load_upregime_cache(_ms, "row-x", 1.7e9)
+    assert _UP_CACHE == {}, "junk shapes must not seed"
     globals()["_UP_CACHE"] = {}
     # exit_reason trail OVERRIDE (per-lens): divergence keeps its +4% TP cap while
     # the trend exit is on globally; breakout runs past it
