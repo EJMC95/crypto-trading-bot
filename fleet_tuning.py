@@ -264,6 +264,19 @@ LEVERS = {
     "live.funding.conviction_hi": {
         "kind": "float", "lo": 1.0, "hi": 2.2, "lane": "lighter-live",
         "note": "PROMOTED conviction up-cap; 1.0 = off, env default off"},
+    # [2026-07-28 D7] Farmer slope gate as a JUDGE-reachable lever (0 = off,
+    # 1 = on; env default FUNDING_SLOPE_GATE=on). The (dp) Lighter backtest
+    # refuted the gate on this venue (live gate 0.05: durable-history -$14.90
+    # vs gate-off +$34.07 @5bps — the gate is HL-validated, Lighter-negative),
+    # so gate-OFF is the natural next shadow candidate after tp-0.06. Doctrine
+    # path, not an env flip: the judge runs it on the paired bar and alone
+    # writes the live twin.
+    "xp.funding.slope_gate": {
+        "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-xp",
+        "note": "shadow twin's funding slope gate; 0 = off, env default on"},
+    "live.funding.slope_gate": {
+        "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-live",
+        "note": "PROMOTED slope gate; 0 = off, env default on"},
 }
 
 
