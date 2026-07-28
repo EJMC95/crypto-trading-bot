@@ -260,14 +260,14 @@ every step; nothing to undo.
 **3d. Explore is ON but has opened ZERO trades in ~3 days — two stacked causes,
 adversarially verified.** (1) **Zero explore entries ever opened** (`explore_seen`
 is empty; all 9 scanned opens since 24-Jul stamp `src='exploit'`, all on
-BTC/ETH/SOL/HYPE). Most likely mechanism: explore samples only the tail BELOW
-the top-15 deep-scan cut, but the prelim gates (|apr| ≥ the 7.5% xp-levered
-gate + $10M turnover + 4h persistence) rarely leave more than 15 coins on
-Lighter — **the explore tail is usually empty by construction**; survivors then
-face the same Stage-B/C vetoes and entry-loop gates. Container logs would split
-those sub-causes. Design question for the growth-lever session: explore that
-samples only below the exploit cut can't explore when the cut swallows the
-whole qualifying pool. (2) **`src=explore` never lands on the paper_trades
+BTC/ETH/SOL/HYPE). This review's agents ranked tail-starvation as the likely
+mechanism (explore samples only below the top-15 deep-scan cut) with an
+explicit "container logs would settle it" caveat — **and the growth-lever
+session settled it within the hour: `f7cad49` found the coverage CURSOR never
+swept (two bugs, measured 4 days / 0 opens) and fixed it.** The concrete
+cursor defect supersedes the starvation inference as the primary cause; the
+design question (explore that can only sample below the exploit cut) remains
+worth an eye once opens start flowing. (2) **`src=explore` never lands on the paper_trades
 close row on ANY build including HEAD** — it lives on position meta and the
 venue_orders OPEN leg only. The design intent "stamped on meta + close for
 brain/radar/judge grading of the explore slice" is half-built: even when
