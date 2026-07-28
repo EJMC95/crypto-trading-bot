@@ -38,6 +38,12 @@ SELFTEST_MODULES = [
     # --selftest` on a bare interpreter); registering it here fixes the
     # test_no_unregistered_selftest red on main since 24-Jul.
     "scripts.analyze_breakout_quality",
+    # [2026-07-28 (dx)] judge operator-release tool: --selftest is offline/pure
+    # (transition-mirror + refusal guards, no DB). Registered the same day it
+    # shipped — (dw) landed during the Actions billing lockout, so the very
+    # guard that enforces this registration never ran on that push; the first
+    # local CI-stand-in run caught it.
+    "scripts.xp_judge_release",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",
