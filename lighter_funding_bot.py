@@ -165,6 +165,29 @@ MAX_HOLD_H = float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))  # recycle after 
 MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "10e6"))      # 24h turnover floor
 MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-spread gate
 
+# ---- 🧪 COIN-QUALITY (vol-character) ENTRY FILTER — DEFAULT OFF -------------
+# [2026-07-24 (dp)] Measured on Lighter's own 180d tape at the live gate 0.05
+# (scripts/study_funding_vol_filter.py + FUNDING_VOL_FILTER_2026-07-24.md):
+# entering only coins in the CALM HALF of the cross-section by trailing-14d
+# realized vol turned +$2.44 -> +$44.52 @0.5bps and -$7.37 -> +$36.86 @2bps,
+# both halves balanced-positive at both slips, maxDD -54 -> -18. The variable
+# is the (ce)-verdict's PERSISTENT character trait (vol +0.83 across halves) —
+# never per-coin P&L, which (ce) proved is noise. RESTRICT-ONLY (skips NEW
+# entries; exits/stops/accrual untouched). Fail-OPEN per coin (a candle outage
+# must not starve the book — the study failed CLOSED there; difference is
+# deliberate and documented in the study doc).
+# [2026-07-25 (ds) DEFAULT ON — OPERATOR GO-LIVE DECISION ("merge and send
+# live"), skipping the judge's shadow lap by explicit operator authority.
+# Deployed to BOTH Farmer arms in the same push (arm parity — a one-sided
+# deploy of a shared rule is the (cd) arm-drift defect). KILL SWITCH:
+# FUNDING_VOL_FILTER=off on the service restores the unfiltered book;
+# restrict-only means worst case is FEWER entries, never more exposure.]
+VOL_FILTER = os.environ.get("FUNDING_VOL_FILTER", "on").strip().lower() in ("on", "1", "true")
+VOL_FILTER_WIN_H = int(os.environ.get("FUNDING_VOL_FILTER_WIN_H", "336"))   # 14d, = the study
+VOL_FILTER_MIN_H = 72          # rets needed before a vol is trusted (= the study)
+VOL_FILTER_MIN_XS = 8          # cross-section floor below which the filter is inert (= the study)
+VOL_FILTER_UNIVERSE_MAX = int(os.environ.get("FUNDING_VOL_FILTER_UNIVERSE_MAX", "40"))
+
 # Directional risk controls, TUNED on scripts/backtest_directional_funding.py
 # (real HYPERLIQUID funding+price, 150d, 30 coins). Key finding: funding capture
 # is real (+) but directional price risk eats it (-), so the strategy is only
@@ -528,6 +551,78 @@ def _candle_features(ctx, coin):
     feats = {"vol": vol, "ret_mom": ret_mom}
     _feat_cache[coin] = (last_closed, feats)
     return feats
+
+
+# ---- 🧪 vol-character filter helpers (see the VOL_FILTER block above) -------
+_vf_cache = {}   # coin -> (last_closed_hour, trailing_vol or None)
+
+
+def _trailing_vol(ctx, coin, now_ts=None):
+    """Trailing VOL_FILTER_WIN_H-hour realized vol of hourly LOG returns
+    (population stdev — mirrors scripts/study_funding_vol_filter.py EXACTLY,
+    the (cf) lesson: the live rule and the harness must be the same rule).
+    None when unavailable or when history < VOL_FILTER_MIN_H returns (the
+    study's trust floor). Forming bar dropped; cache keyed on the last CLOSED
+    hour like _feat_cache."""
+    now = now_ts if now_ts is not None else time.time()
+    last_closed = int(now // 3600) * 3600 - 3600
+    hit = _vf_cache.get(coin)
+    if hit and hit[0] == last_closed:
+        return hit[1]
+    v = None
+    try:
+        end_ms = int(now * 1000)
+        rows = ctx.venue.candles(
+            coin, "1h", end_ms - (VOL_FILTER_WIN_H + 6) * 3600 * 1000, end_ms)
+        bars = []
+        for c in rows or []:
+            try:
+                t_s = int(c["t"]) // 1000
+                cl = float(c["c"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if t_s > last_closed or cl <= 0:
+                continue
+            bars.append((t_s, cl))
+        bars.sort()
+        closes = [cl for _, cl in bars]
+        rets = [math.log(closes[i] / closes[i - 1])
+                for i in range(1, len(closes)) if closes[i - 1] > 0]
+        rets = rets[-VOL_FILTER_WIN_H:]
+        if len(rets) >= VOL_FILTER_MIN_H:
+            mu = sum(rets) / len(rets)
+            v = math.sqrt(max(sum(r * r for r in rets) / len(rets) - mu * mu, 0.0))
+    except Exception:      # noqa: BLE001 — no read is a None, never a crash
+        v = None
+    _vf_cache[coin] = (last_closed, v)
+    return v
+
+
+def _vol_filter_veto(ctx, fund, now_ts=None):
+    """The coins VETOED this loop by the calm-half rule: rank the bot's own
+    liquid universe by trailing vol and veto those ABOVE the cross-sectional
+    median. Mirrors the study's lowvol50: percentile vs the population the bot
+    actually considers, point-in-time. Fail-safe three ways: a coin with NO vol
+    read is never vetoed (fail-open), a cross-section under VOL_FILTER_MIN_XS
+    is inert (= the study's <8 skip), and ANY error returns an empty veto —
+    this filter may only ever SKIP an entry, never block the loop."""
+    try:
+        uni = sorted((c for c, f in fund.items()
+                      if (f.get("vol") or 0.0) >= MIN_VOL and ctx.supports(c)),
+                     key=lambda c: -(fund[c].get("vol") or 0.0))[:VOL_FILTER_UNIVERSE_MAX]
+        have = {}
+        for c in uni:
+            v = _trailing_vol(ctx, c, now_ts)
+            if v is not None:
+                have[c] = v
+        if len(have) < VOL_FILTER_MIN_XS:
+            return set()
+        vs = sorted(have.values())
+        m = len(vs) // 2
+        med = vs[m] if len(vs) % 2 else (vs[m - 1] + vs[m]) / 2.0
+        return {c for c, v in have.items() if v > med}
+    except Exception:      # noqa: BLE001
+        return set()
 
 
 def book_metrics(ctx, coin, order_usd):
@@ -1652,6 +1747,10 @@ def main():
                 # legacy: raw |apr|, book fetched per-candidate below (bm/ev = None)
                 ranked = [(c, f, apr, apr > 0, None, None) for c, f, apr in prelim]
 
+            # 🧪 vol-character filter: one cross-sectional read per loop, only
+            # when ON and there are candidates (OFF = zero fetches, inert).
+            vol_veto = _vol_filter_veto(ctx, fund) if (VOL_FILTER and ranked) else set()
+
             # [2026-07-24 EXPLORE RESERVATION — Lever 1] cap TOTAL explore
             # positions at SCAN_EXPLORE_K. Explore candidates arrive FIRST in
             # `ranked`, so they claim their reserved windows and exploit overflows
@@ -1666,6 +1765,11 @@ def main():
                 src = (ev or {}).get("src", "exploit")
                 if src == "explore" and n_explore >= _expl_k:
                     continue      # explore reservation full — leave the slot to exploit
+                if coin in vol_veto:
+                    log.info("%s VOL_FILTER skip — trailing %dh vol above the "
+                             "cross-sectional median (calm-half rule)",
+                             coin, VOL_FILTER_WIN_H)
+                    continue
                 # [2026-07-11 QUALITY VETO] fleet-measured toxicity, restrict-only
                 if coin in _vetoes:
                     log.info("%s VETO_SKIP (%s)", coin, _vetoes[coin])
@@ -1800,7 +1904,11 @@ def main():
                 extra={"mode": ctx.mode, "venue": ctx.mode, "style": "directional-funding",
                        # lever state PUBLISHED (bot_pnl_store already stamps
                        # extra.build) so a deploy is confirmable from Postgres.
+                       # vol_filter is the PROCESS'S OWN read of the env (the
+                       # (df) lesson: enablement is verified by published
+                       # output, never by "the var is set on the service").
                        "levers": {"explore_k": SCAN_EXPLORE_K, "conviction": CONVICTION_MODE},
+                       "vol_filter": VOL_FILTER,
                        "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                 for c in meta},
                        "hottest_apr": {c: f"{r*H:+.0%}" for c, r in top},
@@ -2085,6 +2193,79 @@ def _selftest_quarantine():
     print("lighter_funding_bot _selftest_quarantine OK")
 
 
+def _selftest_vol_filter():
+    """[2026-07-24 (dp)] The coin-quality (vol-character) filter: calm-half rule,
+    fail-open on a missing read, inert under the cross-section floor, DEFAULT
+    OFF. Fixtures use the venue's REAL candle dict shape ({t,o,h,l,c,v}) — the
+    (dd) stub lesson: a bare-float stub passes green while live crashes."""
+    NOW = 1_800_000_000.0                       # aligned test clock
+    last_closed = int(NOW // 3600) * 3600 - 3600
+
+    def mkcand(step_pct, n=420):
+        """n hourly closes ending at last_closed; price alternates +-step_pct."""
+        out, px = [], 100.0
+        for i in range(n):
+            px *= (1 + (step_pct if i % 2 else -step_pct))
+            t_ms = (last_closed - (n - 1 - i) * 3600) * 1000
+            out.append({"t": t_ms, "o": px, "h": px, "l": px, "c": px, "v": 1.0})
+        return out
+
+    class _Venue:
+        def __init__(self, series, boom=()):
+            self.series, self.boom = series, set(boom)
+        def candles(self, coin, interval, s_ms, e_ms):
+            if coin in self.boom:
+                raise RuntimeError("candle outage")
+            return self.series[coin]
+
+    class _Ctx:
+        def __init__(self, venue):
+            self.venue = venue
+        def supports(self, c):
+            return True
+
+    calm = {f"CALM{i}": mkcand(0.001) for i in range(5)}
+    wild = {f"WILD{i}": mkcand(0.05) for i in range(5)}
+    fund = {c: {"vol": 20e6} for c in list(calm) + list(wild)}   # all clear MIN_VOL
+
+    # (1) calm-half rule: exactly the wild half is vetoed
+    _vf_cache.clear()
+    veto = _vol_filter_veto(_Ctx(_Venue({**calm, **wild})), fund, now_ts=NOW)
+    assert veto == set(wild), f"calm-half rule must veto the wild half, got {veto}"
+
+    # (2) FAIL-OPEN: a wild coin whose candles ERROR is never vetoed (a data
+    #     blip must not starve the book) — and the call must not raise.
+    _vf_cache.clear()
+    veto = _vol_filter_veto(_Ctx(_Venue({**calm, **wild}, boom={"WILD0"})),
+                            fund, now_ts=NOW)
+    assert "WILD0" not in veto, "no vol read must NEVER veto (fail-open)"
+    assert veto == set(wild) - {"WILD0"}, veto
+
+    # (3) INERT under the cross-section floor (< VOL_FILTER_MIN_XS vols)
+    _vf_cache.clear()
+    small = {c: ({**calm, **wild})[c] for c in list(calm)[:3] + list(wild)[:2]}
+    fund5 = {c: {"vol": 20e6} for c in small}
+    veto = _vol_filter_veto(_Ctx(_Venue(small)), fund5, now_ts=NOW)
+    assert veto == set(), f"a {len(small)}-coin cross-section must be INERT, got {veto}"
+
+    # (4) history under the trust floor -> None -> fail-open (never vetoed)
+    _vf_cache.clear()
+    thin = {**{c: calm[c] for c in calm}, **{c: wild[c] for c in wild},
+            "THIN": mkcand(0.05, n=40)}        # 40h < VOL_FILTER_MIN_H
+    fundt = {c: {"vol": 20e6} for c in thin}
+    veto = _vol_filter_veto(_Ctx(_Venue(thin)), fundt, now_ts=NOW)
+    assert "THIN" not in veto, "under-history coin must fail OPEN"
+
+    # (5) DEFAULT ON since (ds) — the operator's go-live decision. With the env
+    #     unset the switch must be True; FUNDING_VOL_FILTER=off is the kill
+    #     switch (asserting the default pins the go-live state against a silent
+    #     revert, exactly as the old default-OFF assert pinned inertness).
+    if "FUNDING_VOL_FILTER" not in os.environ:
+        assert VOL_FILTER is True, "FUNDING_VOL_FILTER must default ON (ds go-live)"
+    _vf_cache.clear()
+    print("lighter_funding_bot _selftest_vol_filter OK")
+
+
 def _selftest_conviction():
     """[2026-07-24 Lever 2] conviction_mult is DARK by default and BOUNDED. Each
     assertion fails against a naive implementation (unbounded, sizes-down in
@@ -2200,6 +2381,7 @@ if __name__ == "__main__":
         _selftest_fill_read()
         _selftest_flap()
         _selftest_quarantine()
+        _selftest_vol_filter()
         _selftest_conviction()
         _selftest_explore()
         _selftest_lever_consume()

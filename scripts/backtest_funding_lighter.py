@@ -348,8 +348,14 @@ def load(days, universe_n, refresh):
     return mk
 
 
-def run(mk, enter_apr, t0, t1):
-    """Replay the live bot's rules over [t0,t1). Returns a result dict."""
+def run(mk, enter_apr, t0, t1, entry_ok=None):
+    """Replay the live bot's rules over [t0,t1). Returns a result dict.
+
+    entry_ok: optional (sym, hour_ts) -> bool predicate consulted ONLY at the
+    entry site (a coin-quality/character filter study hook). None (default)
+    reproduces the unfiltered behaviour exactly — position management, funding
+    accrual and every exit path are never filtered, so an open position is
+    always managed even if its coin later fails the predicate."""
     exit_apr = enter_apr * EXIT_RATIO
     hours = sorted({t for m in mk.values() for t in m["fund"] if t0 <= t < t1})
     pos, hot, cool = {}, {}, {}
@@ -421,7 +427,8 @@ def run(mk, enter_apr, t0, t1):
                 hot[sym] = None
             if (len(pos) < MAX_OPEN and hot.get(sym)
                     and (t - hot[sym]) / 3600.0 >= PERSIST_H
-                    and t >= cool.get(sym, 0)):
+                    and t >= cool.get(sym, 0)
+                    and (entry_ok is None or entry_ok(sym, t))):
                 pos[sym] = {"px": close, "short": apr > 0, "t0": t,
                             "ntl": ORDER_USD, "fund": 0.0}
     med = sorted(holds)[len(holds) // 2] if holds else 0.0
