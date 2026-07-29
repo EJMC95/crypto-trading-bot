@@ -260,6 +260,34 @@ def organ_invariants(states, now):
         med = ((lm.get("stress") or {}).get("med"))
         if isinstance(med, (int, float)) and med < 0:
             sick("lighter-market", f"stress.med {med} < 0 (|premium| can't be negative)")
+        # [2026-07-30] A FRESH scout reporting ZERO liquid books is the shape
+        # that silently starves the LIVE Ticket Taker: every lens's tickets are
+        # built from `liquid`, so `n_liquid == 0` publishes a healthy-looking
+        # payload with an empty opportunity set and the live arm simply stops
+        # entering. `n_liquid > n_books` above catches the impossible; this
+        # catches the merely CATASTROPHIC, which no check covered.
+        if isinstance(nb, int) and isinstance(nl, int) and nb > 0 and nl == 0:
+            sick("lighter-market",
+                 f"n_liquid 0 of {nb} books — every lens's ticket supply is "
+                 f"empty and the LIVE taker cannot enter")
+        # [2026-07-30] `vols` decides what FIVE books trade (it is what
+        # fleet_bus.scout_universe ranks), and until now no organ asserted
+        # anything about it. The dangerous shape is not an ABSENT map — every
+        # consumer reads empty as "keep my configured list" — but a fresh,
+        # TRUNCATED, non-empty one: that silently re-points five books' orders
+        # at a sliver of the venue while looking perfectly healthy.
+        vols = lm.get("vols")
+        if isinstance(vols, dict) and vols and isinstance(nb, int) and nb > 0:
+            if len(vols) < nb // 2:
+                sick("lighter-market",
+                     f"vols covers {len(vols)} of {nb} books (<50%) — five "
+                     f"books rank their universe off this map")
+            _neg = [k for k, v in vols.items()
+                    if isinstance(v, (int, float)) and v < 0]
+            if _neg:
+                sick("lighter-market",
+                     f"vols has negative turnover for {sorted(_neg)[:3]} "
+                     f"(24h $volume cannot be negative)")
 
     lf = states.get("brain-lens-forward") or {}
     if _fresh(lf, now):
@@ -618,7 +646,10 @@ def _selftest():
     states = {
         "lighter-market": {"updated": fresh, "ttl_sec": 900,
                            "n_books": 100, "n_liquid": 150,           # impossible
-                           "stress": {"med": -3}},                    # impossible
+                           "stress": {"med": -3},                     # impossible
+                           # [2026-07-30] truncated + negative turnover: the
+                           # map five books rank their universe off
+                           "vols": {"BTC": 10.0, "ETH": -1.0}},
         "brain-lens-forward": {"updated": fresh, "ttl_sec": 26000,
                                "lenses": {"dip": {"n4h": -5, "hit4h": 1.4}}},
         "regime-oracle": {"updated": fresh, "ttl_sec": 5400,
@@ -646,6 +677,26 @@ def _selftest():
                       "fleet-proprioception"}, organs
     # regime-oracle must flag ALL FOUR impossible values in the fixture and
     # NONE of the fine ones (SPY's valid grade must not trip)
+    # [2026-07-30] the scout's new invariants must FIRE on the fixture above
+    _lm = [i["detail"] for i in inv if i["organ"] == "lighter-market"]
+    assert any("vols covers 2 of 100" in d for d in _lm), _lm
+    assert any("negative turnover" in d for d in _lm), _lm
+    # ...and the ZERO-LIQUID case, which is the one that starves the live taker
+    _zero = organ_invariants({"lighter-market": {
+        "updated": fresh, "ttl_sec": 900, "n_books": 202, "n_liquid": 0}}, now)
+    assert any("n_liquid 0 of 202" in i["detail"] for i in _zero), _zero
+    # a HEALTHY scout payload must be SILENT — including an ABSENT vols map,
+    # which is the documented fail-safe (consumers keep their configured list)
+    _lm_ok = organ_invariants({"lighter-market": {
+        "updated": fresh, "ttl_sec": 900, "n_books": 4, "n_liquid": 3,
+        "stress": {"med": 7.5}}}, now)
+    assert _lm_ok == [], _lm_ok
+    _lm_ok2 = organ_invariants({"lighter-market": {
+        "updated": fresh, "ttl_sec": 900, "n_books": 4, "n_liquid": 3,
+        "stress": {"med": 7.5},
+        "vols": {"A": 1.0, "B": 2.0, "C": 0.0, "D": 5.0}}}, now)
+    assert _lm_ok2 == [], "a full, non-negative vols map is healthy"
+
     _ro = [i["detail"] for i in inv if i["organ"] == "regime-oracle"]
     assert len(_ro) == 4, _ro
     assert any("n -2 < 0" in d for d in _ro), _ro

@@ -503,3 +503,66 @@ def test_every_two_sided_book_publishes_the_sided_shape():
         src = inspect.getsource(mod.main)
         if two_sided:
             assert '"held": {' in src, f"{mod.__name__} must publish a sided map"
+
+
+# --------------------------------------------------------------------------
+# 11. The sniper's ledger must FORGET, and its age source must be exact.
+# --------------------------------------------------------------------------
+
+def test_offered_ledger_forgets_after_its_cooldown():
+    """`surge_done` was a monotone SET that only grew, so every book offered
+    once was excluded FOREVER — over weeks both new candidate sources decay to
+    silence, a slow-acting version of the exact starvation the source was
+    added to fix. A surge is an EVENT; the ledger must expire."""
+    now = 1_000_000.0
+    hour = 3600.0
+    done = {"OLD": now - 200 * hour, "RECENT": now - 2 * hour}
+    live = sniper.active_done(done, now, cooldown_h=168)
+    assert live == {"RECENT"}, live
+    # ...and PRUNED in place, so the persisted payload cannot grow unbounded
+    assert "OLD" not in done and "RECENT" in done
+
+
+def test_offered_ledger_tolerates_junk_and_the_old_list_format():
+    now = 1_000_000.0
+    done = {"BAD": "not-a-timestamp", "GOOD": now}
+    assert sniper.active_done(done, now, cooldown_h=168) == {"GOOD"}
+    assert "BAD" not in done, "unparseable entries are dropped, not kept forever"
+
+
+def test_young_source_prefers_the_exact_venue_age_over_the_probe():
+    """The scout publishes `ages_d` from the venue's own `created_at`. That is
+    exact, covers every book at once, and costs no extra REST — the candle
+    probe is only a fallback for a dark scout."""
+    import inspect
+    src = inspect.getsource(sniper.main)
+    assert '_sp2.get("ages_d")' in src, "the sniper must read the scout's ages"
+    assert "or bar_counts" in src, "the probe cache must remain the fallback"
+    # and the probe must SKIP anything the scout already answered, so the
+    # REST cost goes to zero once ages_d is flowing
+    assert "s not in _scout_ages" in src
+
+
+def test_scout_publishes_ages_and_never_guesses_new():
+    """A book whose timestamp will not parse must be ABSENT from `ages_d` —
+    'age unknown' must never read as 'brand new', which would hand the sniper
+    every unparseable book as a debut candidate."""
+    import lighter_market_scout as scout
+    now_ms = 1_700_000_000_000.0
+    day = 86_400_000.0
+    books = [
+        {"status": "active", "symbol": "NEW", "mark_price": 1.0,
+         "index_price": 1.0, "daily_quote_token_volume": 1e6,
+         "created_at": now_ms - 5 * day},
+        {"status": "active", "symbol": "OLD", "mark_price": 1.0,
+         "index_price": 1.0, "daily_quote_token_volume": 1e6,
+         "created_at": now_ms - 400 * day},
+        {"status": "active", "symbol": "JUNK", "mark_price": 1.0,
+         "index_price": 1.0, "daily_quote_token_volume": 1e6,
+         "created_at": "not-a-number"},
+    ]
+    stats = scout.book_stats(books, 1e5)
+    snap = scout.build_snapshot(stats, {}, {}, {}, now_ms=now_ms)
+    ages = snap["ages_d"]
+    assert ages["NEW"] == 5.0 and ages["OLD"] == 400.0
+    assert "JUNK" not in ages, "unparseable age must be ABSENT, never 0 (=new)"

@@ -158,6 +158,15 @@ def book_stats(books, min_qvol):
                 "high": float(b.get("daily_price_high") or 0.0),
                 "low": float(b.get("daily_price_low") or 0.0),
                 "chg": float(b.get("daily_price_change") or 0.0),
+                # [2026-07-30] the venue's own LISTING TIMESTAMP (epoch ms).
+                # It was on every row of this endpoint and thrown away, while
+                # the perp sniper burned 4 candle REST probes per loop to
+                # APPROXIMATE the same fact from a bar count. Exact beats a
+                # proxy, costs nothing extra (this response is already
+                # fetched), and covers all ~202 books at once instead of
+                # four-per-loop. 0 = unparseable, which consumers treat as
+                # "age unknown", never as "brand new".
+                "created_ms": float(b.get("created_at") or 0.0),
             }
         except (TypeError, ValueError):
             continue
@@ -316,7 +325,8 @@ def strategy_tickets(stats, lighter_apr, divergence=None, regimes=None):
     return {k: v[:TICKET_TOP_N] for k, v in out.items()}
 
 
-def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None):
+def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
+                   now_ms=None):
     """Assemble the published payload from the pure inputs.
     prev_marks: {sym: [qvol, oi]} from the previous snapshot ({} first run).
     regimes: oracle_regimes() output ({} / None -> unstamped tickets)."""
@@ -361,6 +371,10 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None):
     surges.sort(key=lambda d: -d["ratio"])
     oi_moves.sort(key=lambda d: -abs(d["oi_chg_pct"]))
 
+    # [2026-07-30] injectable clock so `ages_d` below stays offline-testable —
+    # the selftest passes a fixed now_ms rather than reading the wall clock.
+    if now_ms is None:
+        now_ms = datetime.now(timezone.utc).timestamp() * 1000.0
     prev_syms = set(prev_marks)
     new_listings = sorted(set(stats) - prev_syms) if prev_syms else []
     delisted = sorted(prev_syms - set(stats)) if prev_syms else []
@@ -456,6 +470,15 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None):
         # of the scout's next deploy is not dark in the meantime.
         "vols": {s: round((v.get("qvol") or 0.0) / 1e6, 4)
                  for s, v in stats.items()},
+        # [2026-07-30] listing age in DAYS per active book, from the venue's
+        # own `created_at`. Measured at ship: majors read 558.6d and exactly 4
+        # books sit under 21d — so "young" is now an exact, venue-sourced fact
+        # rather than a candle-count proxy. Rounded to 0.1d; a book whose
+        # timestamp will not parse is simply absent (age unknown != new).
+        "ages_d": {s: round((now_ms - v["created_ms"]) / 86_400_000.0, 1)
+                   for s, v in stats.items()
+                   if (v.get("created_ms") or 0) > 0
+                   and now_ms > v["created_ms"]},
         # compact diff base for the NEXT run (all active books, not just liquid,
         # so listings/delistings diff over the full set)
         "_marks": {s: [round(v["qvol"], 2), round(v["oi"], 4)]

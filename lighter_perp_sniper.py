@@ -93,6 +93,9 @@ YOUNG_MIN_VOL_M = float(os.environ.get("SNIPER_YOUNG_MIN_VOL_M", "0.25"))
 # Candle probes per loop for unknown books. Small on purpose: the venue REST
 # budget is shared, and the cache is monotone so the cost decays to zero.
 YOUNG_PROBE_BUDGET = int(os.environ.get("SNIPER_YOUNG_PROBE_BUDGET", "4"))
+# How long a book stays on the offered-ledger before it may be offered again.
+# A surge is an EVENT, not a permanent property, so the ledger must forget.
+SURGE_COOLDOWN_H = float(os.environ.get("SNIPER_SURGE_COOLDOWN_H", "168"))
 LOOP_SECONDS = 60          # poll the market list every minute
 DIRECTION_LONG = os.environ.get("SNIPER_DIRECTION", "long").lower() != "short"
 # [2026-07-17 RETRY FIX] `baseline |= set(new_listings)` used to run
@@ -163,6 +166,30 @@ def _snipe_price(orderbook_fn, sym):
 # on their own, so auto-revert is the resting state"). Shipped broken in
 # (fz); it was inert only because nothing authored the lane yet.
 _ENV_DEFAULTS = {"SURGE_MULT": SURGE_MULT}
+
+
+def active_done(done, now_ts, cooldown_h=None):
+    """The offered-ledger entries still inside their cooldown, as a SET.
+
+    Everything older has been forgotten deliberately: a book that surged two
+    weeks ago and surges again is a new event. Also PRUNES `done` in place so
+    the persisted payload cannot grow without bound. Tolerates the (ga) list
+    format and junk timestamps.
+    """
+    h = SURGE_COOLDOWN_H if cooldown_h is None else cooldown_h
+    cutoff = float(now_ts) - float(h) * 3600.0
+    live = set()
+    for sym in list(done or ()):
+        try:
+            ts = float(done[sym])
+        except (TypeError, ValueError, KeyError):
+            done.pop(sym, None)
+            continue
+        if ts >= cutoff:
+            live.add(str(sym))
+        else:
+            done.pop(sym, None)          # forgotten — offerable again
+    return live
 
 
 def apply_tuning():
@@ -351,7 +378,15 @@ def main():
     # Persisted with the rest of the state: a restart that forgot it would
     # re-offer every book that has ever surged, which is the retry-forever bug
     # baseline cannot prevent for this source.
-    surge_done = set()
+    # [2026-07-30 COOLDOWN, not a tombstone] `surge_done` was a monotone SET
+    # that only ever grew, so every book that surged or was young once was
+    # excluded FOREVER — over weeks both new candidate sources decay to
+    # silence, which is a slow-acting version of the exact starvation (ga)
+    # set out to fix. It is now {sym: last_offered_ts} with a cooldown: a
+    # book that surged a fortnight ago and surges again is a GENUINE new
+    # event, not a duplicate. `not_young` stays permanent — that one is
+    # correct, because books only ever age.
+    surge_done = {}
     # [2026-07-30] young-book probe cache. `bar_counts` holds measured daily-bar
     # counts for books still under the young bar; `not_young` is the permanent
     # exclusion set (a book that has aged past the bar can never re-enter).
@@ -428,7 +463,19 @@ def main():
         # is not self-healing the way a dropped `pending` entry is — the symbol
         # is in `baseline`, so nothing else would stop it being re-offered.
         try:
-            surge_done.update(str(x) for x in (_saved.get("surge_done") or []))
+            _sd = _saved.get("surge_done")
+            if isinstance(_sd, dict):
+                for _k, _v in _sd.items():
+                    try:
+                        surge_done[str(_k)] = float(_v)
+                    except (TypeError, ValueError):
+                        continue
+            else:
+                # the (ga) format was a bare list with no timestamps. Treat
+                # those as offered NOW rather than dropping them: a restart
+                # must not re-offer everything at once.
+                for _x in (_sd or []):
+                    surge_done[str(_x)] = time.time()
             not_young.update(str(x) for x in (_saved.get("not_young") or []))
             for _k, _v in (_saved.get("bar_counts") or {}).items():
                 bar_counts[str(_k)] = int(_v)
@@ -564,7 +611,7 @@ def main():
             store.save_state(bot_id, {"baseline": sorted(baseline),
                                       "broker": broker.to_state() if dry_run else None,
                                       "entry_ts": entry_ts, "pending": pending,
-                                      "surge_done": sorted(surge_done),
+                                      "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
                                       "bar_counts": bar_counts,
                                       "not_young": sorted(not_young)})
             log.info("seeded baseline with %d active markets — sniping only NEW "
@@ -616,14 +663,16 @@ def main():
             try:
                 _sp = fleet_bus._load("lighter-market", None) or {}
                 if fleet_bus.is_fresh(_sp, None):
+                    _live_done = active_done(surge_done, now.timestamp())
                     _surge = surge_candidates(_sp.get("vol_surges"), SURGE_MULT,
-                                              surge_done | set(pending))
+                                              _live_done | set(pending))
             except Exception:  # noqa: BLE001
                 _surge = []
             if _surge:
                 log.info("SURGE CANDIDATES (>=%.1fx 24h volume): %s",
                          SURGE_MULT, ", ".join(_surge))
-                surge_done.update(_surge)
+                for _s in _surge:
+                    surge_done[_s] = now.timestamp()
         # [2026-07-30] THIRD SOURCE — books still inside their debut regime.
         # The candle probe is GOVERNED and MONOTONE: at most YOUNG_PROBE_BUDGET
         # unknown symbols per loop, and a book measured older than the young bar
@@ -631,9 +680,21 @@ def main():
         # so the probe cost decays to zero once the venue has been walked.
         _young = []
         if YOUNG_MAX_BARS > 0:
+            # [2026-07-30] probe ONLY what the scout could not tell us. Once
+            # `ages_d` is flowing this list is empty and the candle probes stop
+            # entirely — the fallback costs nothing when it is not needed.
+            _scout_ages = {}
+            if fleet_bus is not None:
+                try:
+                    _sp0 = fleet_bus._load("lighter-market", None) or {}
+                    if fleet_bus.is_fresh(_sp0, None):
+                        _scout_ages = _sp0.get("ages_d") or {}
+                except Exception:  # noqa: BLE001
+                    _scout_ages = {}
             _unknown = [s for s in sorted(active)
                         if s not in not_young and s not in bar_counts
-                        and s not in surge_done]
+                        and s not in _scout_ages
+                        and s not in active_done(surge_done, now.timestamp())]
             for _sym in _unknown[:YOUNG_PROBE_BUDGET]:
                 try:
                     _cs = ctx.venue.candles(
@@ -646,22 +707,37 @@ def main():
                     not_young.add(_sym)      # permanent: it can only age
                 else:
                     bar_counts[_sym] = _n
-            _vols = {}
+            _vols, _ages = {}, {}
             if fleet_bus is not None:
                 try:
                     _sp2 = fleet_bus._load("lighter-market", None) or {}
                     if fleet_bus.is_fresh(_sp2, None):
                         _vols = _sp2.get("vols") or {}
+                        # [2026-07-30] EXACT listing age from the venue's own
+                        # `created_at`, published by the scout. Strictly better
+                        # than the candle probe below: exact rather than a
+                        # bar-count proxy, all ~202 books at once rather than
+                        # 4/loop, and zero extra REST (the scout already
+                        # fetches that response). Measured at ship: majors read
+                        # 558.6d, exactly 4 books under 21d.
+                        _ages = _sp2.get("ages_d") or {}
                 except Exception:  # noqa: BLE001
-                    _vols = {}
-            _young = young_candidates(bar_counts, YOUNG_MAX_BARS, _vols,
+                    _vols, _ages = {}, {}
+            # Prefer the scout's exact ages; the probe cache is the FALLBACK
+            # for a dark/stale scout (age in days vs the bar bar — one daily
+            # candle per day, so the two units are directly comparable).
+            _age_src = ({s: a for s, a in _ages.items()
+                         if s not in not_young} or bar_counts)
+            _young = young_candidates(_age_src, YOUNG_MAX_BARS, _vols,
                                       YOUNG_MIN_VOL_M,
-                                      surge_done | set(pending), YOUNG_MAX_PER_LOOP)
+                                      active_done(surge_done, now.timestamp())
+                                      | set(pending), YOUNG_MAX_PER_LOOP)
             if _young:
                 log.info("YOUNG-BOOK CANDIDATES (<=%d daily bars): %s",
                          YOUNG_MAX_BARS,
                          ", ".join(f"{s}({bar_counts.get(s)}d)" for s in _young))
-                surge_done.update(_young)
+                for _s in _young:
+                    surge_done[_s] = now.timestamp()
         open_now, _sniped, _abandoned = run_snipe_pass(
             candidates=new_listings + _surge + _young, pending=pending,
             baseline=baseline,
@@ -825,7 +901,7 @@ def main():
                                   "broker": broker.to_state() if dry_run else None,
                                   "entry_ts": entry_ts,
                                   "pending": pending,
-                                  "surge_done": sorted(surge_done),
+                                  "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
                                   "bar_counts": bar_counts,
                                   "not_young": sorted(not_young)})
 
