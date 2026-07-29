@@ -453,7 +453,9 @@ def main():
                         closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                         extra={"mode": ctx.mode, "venue": ctx.mode,
                                "style": "trend-1x-long",
-                               "held": sorted(meta.keys()), "coins": COINS})
+                               "held": sorted(meta.keys()), "coins": COINS,
+                               "caps": {"rank_by_funding": RANK_BY_FUNDING,
+                                        "universe": len(COINS)}})
                 except Exception:
                     pass
             if args.once:
@@ -642,7 +644,9 @@ def main():
                     equity=pub_equity, pnl_abs=pub_pnl, open_trades=pub_open,
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": ctx.mode, "venue": ctx.mode, "style": "trend-1x-long",
-                           "held": sorted(meta.keys()), "coins": COINS})
+                           "held": sorted(meta.keys()), "coins": COINS,
+                               "caps": {"rank_by_funding": RANK_BY_FUNDING,
+                                        "universe": len(COINS)}})
             except Exception:
                 pass
         try:

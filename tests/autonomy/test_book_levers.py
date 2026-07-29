@@ -566,3 +566,83 @@ def test_scout_publishes_ages_and_never_guesses_new():
     ages = snap["ages_d"]
     assert ages["NEW"] == 5.0 and ages["OLD"] == 400.0
     assert "JUNK" not in ages, "unparseable age must be ABSENT, never 0 (=new)"
+
+
+# --------------------------------------------------------------------------
+# [2026-07-30 (go)] EVERY LEVERED BOOK MUST PUBLISH ITS EFFECTIVE CAP.
+#
+# The receipt I used to prove the (fz) deploy had landed was "`extra.caps`
+# present on the row" — and it was WRONG for half the cohort: only carry,
+# fundspread and index ever emitted `caps`. Dislocation, sniper and trend never
+# did, so for those three the receipt could not appear no matter how many times
+# they deployed, and the evidence board's saturation check had to fall back to
+# the REGISTRY value — unable to tell "at the cap" from "at the cap it set
+# itself last cycle", the exact ambiguity (gd) added the field to remove.
+#
+# Two things now depend on it, which is why this is a test and not a comment:
+# the board reads it to decide whether to widen, and a human reads it to tell a
+# landed deploy from a stale container.
+# --------------------------------------------------------------------------
+
+LEVERED_BOOK_MODULES = [
+    "funding_carry_bot",
+    "lighter_funding_spread_bot",
+    "lighter_index_bot",
+    "lighter_dislocation_bot",
+    "lighter_perp_sniper",
+    "lighter_trend_bot",
+]
+
+
+@pytest.mark.parametrize("mod", LEVERED_BOOK_MODULES)
+def test_every_levered_book_publishes_its_effective_caps(mod):
+    """A book with registered levers and no published cap is observable only
+    through the registry, i.e. through the value the tuner may just have
+    changed. That is not an observation."""
+    import pathlib as _pl
+    root = _pl.Path(__file__).resolve().parents[2]
+    src = (root / f"{mod}.py").read_text()
+    assert '"caps"' in src, (
+        f"{mod} registers levers but never publishes extra.caps — the board "
+        "must fall back to the registry, and a deploy cannot be verified")
+
+
+@pytest.mark.parametrize("mod", LEVERED_BOOK_MODULES)
+def test_the_published_caps_sit_inside_a_publish_payload(mod):
+    """Not merely present in the file — present in the `extra=` dict of a real
+    `store.publish(...)` call. A `caps` dict built and never published is the
+    registered-but-inert failure one layer along.
+
+    Checked by AST, not by text proximity. The first version of this test
+    searched a 2,000-character window before each `"caps"` for `extra={` and
+    `publish(` — and failed on `lighter_perp_sniper`, whose payload carries a
+    long explanatory comment block that pushed the call out of the window. The
+    code was correct; the heuristic was not. A structural claim wants a
+    structural check."""
+    import ast
+    import pathlib as _pl
+    root = _pl.Path(__file__).resolve().parents[2]
+    tree = ast.parse((root / f"{mod}.py").read_text())
+
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+        if name != "publish":
+            continue
+        for kw in node.keywords:
+            if kw.arg != "extra" or not isinstance(kw.value, ast.Dict):
+                continue
+            keys = [k.value for k in kw.value.keys
+                    if isinstance(k, ast.Constant)]
+            if "caps" in keys:
+                found.append(keys)
+
+    assert found, (
+        f"{mod}: no store.publish(extra={{...}}) call carries a 'caps' key — "
+        "a cap that is computed but never published is invisible to the board")
+    # the cap must be a dict of NAMED gates, not a bare number — the board
+    # looks levers up by name
+    assert all(isinstance(k, str) for keys in found for k in keys), found

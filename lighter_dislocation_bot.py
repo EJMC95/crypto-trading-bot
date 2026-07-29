@@ -492,7 +492,9 @@ def main():
                               closed_trades=n_closed, wins=n_wins,
                               losses=n_closed - n_wins,
                               extra={"mode": ctx.mode, "venue": ctx.mode,
-                                     "style": "dislocation"})
+                                     "style": "dislocation",
+                                     "caps": {"enter_pct": ENTER_PCT,
+                                              "universe": len(COINS)}})
             except Exception:  # noqa: BLE001
                 pass
             if args.once:
@@ -693,6 +695,8 @@ def main():
                 open_trades=broker.open_count(),
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": ctx.mode, "venue": ctx.mode, "style": "dislocation",
+                       "caps": {"enter_pct": ENTER_PCT,
+                                "universe": len(COINS)},
                        # [2026-07-30 SIGN BUG] was `sorted(meta.keys())` — a
                        # bare LIST, which fleet_risk's held_items() maps to
                        # side "" and classifies as LONG (correct for the

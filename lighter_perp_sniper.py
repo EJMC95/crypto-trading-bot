@@ -887,7 +887,21 @@ def main():
                                  # fleet exposure/concentration view can see
                                  # this book (it was sym_uncovered before).
                                  "held": {c: ("L" if DIRECTION_LONG else "S")
-                                          for c in _held_syms}})
+                                          for c in _held_syms},
+                                 # [2026-07-30 (go)] the EFFECTIVE gate this
+                                 # loop is running. Three of the six books that
+                                 # gained levers in (fz) never published one, so
+                                 # the evidence board fell back to the REGISTRY
+                                 # value — which cannot tell "at the cap" from
+                                 # "at the cap it set itself last cycle", the
+                                 # exact ambiguity (gd) added this field to
+                                 # remove. It also means `extra.caps` is a
+                                 # usable deploy receipt for this book, which it
+                                 # was NOT: `caps` present proves the container
+                                 # is running code that carries apply_tuning.
+                                 # Publish-only; no gate moves.
+                                 "caps": {"surge_mult": SURGE_MULT,
+                                          "max_open": MAX_OPEN}})
         except Exception as e:  # noqa: BLE001
             # Never let telemetry kill the trading loop — but never let it fail
             # in silence either: a bare `except: pass` here is what hid the

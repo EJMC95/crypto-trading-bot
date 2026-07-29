@@ -51,7 +51,20 @@ This is their state **before** any of it reaches a container, so that in 30 days
 > **The receipt, per book, not per merge:** `extra.caps` present on the row.
 > That field exists (`(gd)`) so saturation is observable, and its absence on all
 > six is what proved nothing had deployed the first time. A book with no `caps`
-> has not started its window, whatever the git log says. The 🚦 go-live card
+> has not started its window, whatever the git log says.
+>
+> **[CORRECTION, same day — the receipt only became valid for all six in
+> `(go)`.]** When first written, this criterion was wrong for HALF the cohort:
+> only 🌾 carry, ⚖️ Counterweight and 📊 Index Rider ever published `caps`.
+> 🧲 Snap Back, 🎯 Perp Sniper and 🌊 Tide Rider never did, so no number of
+> deploys could make the receipt appear for them — and the evidence board's
+> saturation check had to fall back to the REGISTRY value for those three,
+> unable to distinguish "at the cap" from "at the cap it set itself last
+> cycle". `(go)` adds the publish to all three (publish-only; no gate moves),
+> and `tests/autonomy/test_book_levers.py` now asserts by AST that every
+> levered book carries `caps` inside a real `store.publish(extra=…)` call. Read
+> `caps` as a receipt only for rows published AFTER `(go)` reaches that book's
+> container. The 🚦 go-live card
 > (`(gk)`) now publishes each book's per-bar map 6-hourly, so `days` is readable
 > without recomputing it by hand — but the card measures the TAPE, not the
 > config, so this table stays the authority on which window is which.
