@@ -316,6 +316,14 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
             pnl_pct=pnl_pct, pair=coin, opened_at=oa,
             closed_at=datetime.now(timezone.utc).isoformat(),
             reason=("long_" if was_long else "short_") + reason,
+            # [2026-07-30 (gr)] EXIT TELEMETRY — computed above for pnl_pct,
+            # then discarded. publish_paper_trade has accepted these since
+            # 17-Jul, the DB column exists, the reader SELECTs them and
+            # /trades.json exposes them: 8 of 9 bots never filled the pipe.
+            # Without the prices no exit rule can be counterfactually
+            # tested — the price PATH cannot be joined to the trade.
+            # Telemetry only; no gate moves.
+            entry_price=ent_px, exit_price=exit_px,
             venue="lighter", shadow=shadow)
     except Exception:  # noqa: BLE001
         pass

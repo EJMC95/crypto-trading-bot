@@ -800,6 +800,11 @@ class Book:
                     m.get("opened_ts") or time.time(), tz=timezone.utc).isoformat(),
                 closed_at=datetime.now(timezone.utc).isoformat(),
                 reason=ledger_reason(m.get("tag"), reason),
+                # [2026-07-30 (gr)] EXIT TELEMETRY — `px` (the exit mark) and
+                # m["entry"] were both in scope and neither reached the row, so
+                # no exit rule on these four books could be counterfactually
+                # tested. Telemetry only; no gate moves.
+                entry_price=m.get("entry"), exit_price=px,
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass
