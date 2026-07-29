@@ -92,6 +92,21 @@ loud, declared exception rather than the permanent quiet state.
 
 ### 2. `pnl_dashboard.py` — 9% on the fleet's money scoreboard (biggest file: 4,945 lines, 2,169 stmts, 1,971 missed)
 
+**[2026-07-29 FIRST SLICE SHIPPED (ek):** `tests/financial/test_dashboard_money.py`
+— 16 tests, handler driven without a socket, fetchers without a DB (a fake
+psycopg2 for `fetch_rows`). Pins: the read-time retirement filter at its choke
+point (the retired Tide-Rider live row is dropped while the Ticket Taker row
+passes — the $34.67 class; plus the ex-Kraken double-life, a bare base RETIRED
+while its `-lshadow` variant passes), the `/pnl.json` live-fleet subtotal
+(shadow twins never counted; None-money rows contribute zero instead of
+corrupting the sum), per-bot stale flags + the all-must-be-stale `feed_stale`
+contract, the 500-on-DB-error path, `/trades.json` clamping/routing, the
+fail-closed auth gate (no secret ⇒ no access, the committed-default incident),
+and formatter None-safety. Measured 9% → 15% — a modest % on a 2,169-stmt file
+by design: the slice targets the money choke points, not line count. The
+aggregation inside `render()` (stage subtotals, health checks) remains
+untested — the seam-extraction recipe applies when it is next touched.]**
+
 This is the file Eamon reads money from, and the file with the double-count
 incident history. What's tested today: the retirement constant sets and
 `parliament_card`. What isn't: everything that computes a number.
@@ -120,6 +135,23 @@ here and only here: the dashboard is the one big file whose failures are
 *silent wrong numbers* rather than crashes.
 
 ### 3. `venues/lighter_client.py` — 37% on the code that signs real orders
+
+**[2026-07-29 SHIPPED (ek):** `tests/real_money/test_lighter_client_parsing.py`
+— 20 tests on a bare client, venue-shaped fixtures, no SDK/network. Pins:
+`_positions_from` (sign→signed size, flat rows dropped, `1000BONK`→`kBONK` —
+the kNOT round-trip class, junk-upnl tolerance), `_equity_fields`
+(total→collateral fallback; unreadable equity raises `VenueError`, never a
+silent 0.0 into the loss rail), `funding_map` (lighter rate vs `_bench` rows,
+None-rate coercion, mark/vol enrichment), `_rest_book` (the UNSORTED-snapshot
+fix: best bid highest/best ask lowest; TTL cache + `force=`), `_our_fills`
+(ownership is checked on EVERY tier — "the id narrows, it never authorises" —
+tx-hash VWAP over partials, client-id blend exclusion, ms→s window fallback),
+`_resolve`/`supports` (inactive ≠ tradable), candles non-200, interval math.
+The sort and ownership guards are mutation-verified. Measured 37% → 65% on
+the full suite as CI now runs it (the (ej) live-harness job contributes; the
+pytest tiers alone stand at 44%). Still open on this file: `_run`/governor
+error paths, ws `_BookCache`, `last_fill_detail`'s two-tape reason
+strings.]**
 
 `test_lighter_client_orders.py` covers the order path well (sizing, ±2% guard,
 side pick, reduce-only flatten). The missing 315 statements are the **response
@@ -299,6 +331,8 @@ invokes them. Nobody can see drift.
    — see the stamps above.]**
 2. **Next:** Finding 2 endpoint/aggregation tests and Finding 3 parsing
    fixtures — the two places silent wrong numbers reach money decisions.
+   **[First slices SHIPPED 2026-07-29 (ek) — see the stamps above; render()'s
+   internal aggregation and the client's fill-read reason strings remain.]**
 3. **Then:** Findings 4–5 seam extractions (one per week, (ef)-style),
    Finding 7 selftest parity, Finding 8 substrate tests.
 4. **Standing:** Finding 9's CI ratchet, so none of the above regresses.
