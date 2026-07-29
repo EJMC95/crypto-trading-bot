@@ -193,6 +193,15 @@ that can place or close a real order is reachable from some test.
 
 ### 5. `fleet_risk.py` — 37%; the enforcement authority's core function is untested
 
+**[2026-07-29 FIRST SLICE SHIPPED (el):** `tests/autonomy/test_fleet_risk_light.py`
+— `light_for` pinned at the documented thresholds (yellow exactly at 70% of
+budget, red AT budget = the veto boundary, so the light can never show green
+while strategies are being refused), and `governed_clip_scale`'s
+advisory-releases-the-clip contract (published 1.0 / raw kept; ANY non-enforce
+mode fails open to full clip — the 15-Jul false-down-scale class). Both
+mutation-verified. `main()`'s 400-statement assembly remains — the seam
+recipe applies when next touched.]**
+
 `light_for()` — the function that actually computes GREEN/AMBER/RED — is in
 the missed lines (300–304), and `main()` (321–721) is a 400-statement monolith
 covering budget counting, exposure assembly, premium mirroring, and publishing.
@@ -266,6 +275,17 @@ curves feed the brain, the risk light, and ultimately go-live decisions.
 publish-schema fields, and the `lighter_live`-refusal guard the momentum bot
 already models), and register them in `SELFTEST_MODULES`. The rot guard will
 then hold the line.
+**[2026-07-29 SHIPPED (el):** both bots now carry offline `--selftest` blocks,
+registered in `SELFTEST_MODULES` the day they shipped. Index Rider: sma
+warmup, regime flip, the band-HYSTERESIS hold (asserted to differ from plain
+regime on the same bar — the whipsaw filter as one assertion), sleeve
+dispatch, and the ledger-row shape (`long_<reason>` tag, price+funding sum,
+zero-notional → None pct, publish guard never raises). Counterweight:
+`fresh_mid` on an unsorted book (max-bid/min-ask, never [0]), one-sided book
+and venue-down → None, and the ledger row's SHORT-side pct profiting down
+(`short_<reason>` tag). CI runs them from the repo on every push; the bots'
+own services pick the blocks up on their next deploy — inert until then, and
+the selftest changes nothing at runtime either way.]**
 
 ### 8. `bot_pnl_store.py` — 28%: the substrate every contract rides on
 
@@ -282,6 +302,18 @@ asserting `updated`/`ttl_sec` stamping; pin the **never-raise** guarantee (a
 raising conn must return False/None — an exception here lands inside a live
 trading loop); assert `fetch_trades`' open/closed filtering including
 NULL `is_open` rows (locking the (ee) fix).
+**[2026-07-29 SHIPPED (el):** `tests/financial/test_bot_state_substrate.py`
+— 13 tests at the `_get_conn` seam. (Naming correction: the bus functions are
+`save_state`/`load_state`/`fetch_states` on the bot_state table — this
+finding's `set/get_bot_state` names came from the conftest docstring and
+don't exist.) Pinned: the never-raise + cached-conn-reset contract on a DB
+failure, dead-DB returns (False/None/{}/0/[]) across all seven substrate
+functions, `load_state_checked`'s three-state read (the perp-sniper
+false-seed incident), `fetch_states` NULL-skip + empty-short-circuit,
+`publish_trades` open-ts skip / epoch-ms→aware-UTC / trade_duration
+precedence, the `fetch_trades` `is_open IS NOT TRUE` union doctrine
+(mutation-verified against the `= FALSE` revert), and heartbeat's
+SET-only-updated_at (never clobbers the money snapshot).]**
 
 ### 9. CI measures nothing about coverage — add the ratchet
 
@@ -335,6 +367,9 @@ invokes them. Nobody can see drift.
    internal aggregation and the client's fill-read reason strings remain.]**
 3. **Then:** Findings 4–5 seam extractions (one per week, (ef)-style),
    Finding 7 selftest parity, Finding 8 substrate tests.
+   **[Finding 5's pure-function slice, Finding 7, and Finding 8 SHIPPED
+   2026-07-29 (el) — see the stamps above. Still open here: Finding 4's
+   live-bot `main()` seams and `fleet_risk.main()`'s assembly.]**
 4. **Standing:** Finding 9's CI ratchet, so none of the above regresses.
 
 *Measured on branch `claude/test-coverage-analysis-yn0mfs` at e8076a5; suite

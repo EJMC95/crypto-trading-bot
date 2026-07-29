@@ -534,6 +534,64 @@ def main():
         time.sleep(max(1.0, LOOP_SECONDS - (time.time() - t0)))
 
 
+def _selftest():
+    """Offline checks of the signal math + the ledger row shape. No network,
+    no DB, no venue — the bot ran with ZERO tests until 2026-07-29 (coverage
+    Finding 7); this is the fleet's minimum selftest parity."""
+    # sma: warmup Nones, then the rolling mean
+    assert sma([1.0, 2.0, 3.0, 4.0], 2) == [None, 1.5, 2.5, 3.5]
+
+    # plain regime: above SMA = 1, at-or-below = 0
+    closes = [100.0, 100.0, 105.0, 90.0]
+    assert pos_regime(closes, period=2) == [0, 0, 1, 0]
+
+    # band hysteresis: INSIDE the band the previous state HOLDS — the whipsaw
+    # filter. Series crafted so bar 3 sits inside the ±1% band around its
+    # SMA2: plain regime flips to 0 there, the band variant must hold 1.
+    hyst = [100.0, 100.0, 105.0, 103.0, 90.0]
+    assert pos_regime(hyst, period=2)[3] == 0
+    band = pos_regime_band(hyst, period=2, band=0.01)
+    assert band == [0, 0, 1, 1, 0], band     # bar 3 held long; bar 4 exits
+
+    # sleeve dispatch: each rule reachable, unknown symbol -> plain regime
+    saved = dict(SLEEVES)
+    try:
+        SLEEVES.clear()
+        SLEEVES.update({"T_BAND": ("regime_band", (2, 0.01)),
+                        "T_X": ("sma_cross", (1, 2))})
+        assert want_position("T_BAND", hyst[:4]) == 1     # held by the band
+        assert want_position("T_X", [1.0, 2.0, 3.0]) == 1  # fast>slow rising
+        assert want_position("UNKNOWN", [1.0] * (REGIME_SMA + 1)) == 0
+    finally:
+        SLEEVES.clear()
+        SLEEVES.update(saved)
+
+    # ledger row: tag/venue/shadow shape + the price+funding sum, and the
+    # publish guard never raises into the trading loop
+    cap = {}
+    _orig = store.publish_paper_trade
+    store.publish_paper_trade = lambda bot_id, **kw: cap.update(bot=bot_id, **kw)
+    try:
+        _record_close("equities-regime-lshadow", "SPY", 500.0, 1_700_000_000,
+                      510.0, price_pnl=2.0, fund_pnl=-0.5, reason="tp",
+                      notional=100.0)
+        assert cap["reason"] == "long_tp"            # sleeve is long-only
+        assert cap["pnl_abs"] == 1.5                 # price + funding, signed
+        assert cap["pnl_pct"] == 0.015
+        assert cap["venue"] == "lighter" and cap["shadow"] is True
+        _record_close("b", "SPY", 500.0, None, 510.0, 1.0, 0.0, "stop", 0.0)
+        assert cap["pnl_pct"] is None                # zero notional -> no pct
+        assert cap["opened_at"] is None              # no entry ts -> honest None
+
+        def _boom(bot_id, **kw):
+            raise RuntimeError("db down")
+        store.publish_paper_trade = _boom
+        _record_close("b", "SPY", 500.0, 1, 510.0, 1.0, 0.0, "tp", 100.0)
+    finally:
+        store.publish_paper_trade = _orig
+    print("[index-rider] selftest OK (sma/regime/band-hysteresis/dispatch/ledger-row)")
+
+
 def _supervised():
     while True:
         try:
@@ -551,6 +609,9 @@ def _supervised():
 
 
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
+        raise SystemExit(0)
     try:
         _supervised()
     except KeyboardInterrupt:
