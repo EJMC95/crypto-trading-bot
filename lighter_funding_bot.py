@@ -519,6 +519,86 @@ def flatten_pnl(held, is_short, entry, accrued, px_fill):
                              else (entry - px_fill))
     return price_pnl, (price_pnl + (accrued or 0.0)) > 0
 
+
+def entry_admission(coin, src, is_short, apr, st):
+    """The entry tick's per-candidate ADMISSION ladder, pure — the ordered
+    veto chain between a ranked candidate and the book/price stage.
+
+    [2026-07-30 (es) SEAM — Finding 4, seam 3, the (ef) recipe] Every
+    real-money open ran this chain inline in main()'s scan block with no
+    test seam. The orchestration (scan_candidates, the rate-history read,
+    book/price fetch, notional cap, market_open, fill telemetry) stays in
+    the closure; this is the decision layer, called with the same values in
+    the same order. Behavior identical, pinned by
+    `_selftest_entry_admission`:
+
+      * ORDER IS BEHAVIOR (skip reasons feed logs and lever grading):
+        slots/loop-cap -> explore reservation -> vol filter -> quality veto
+        -> fleet long veto -> slope gate.
+      * 'break' vs 'skip': slots/loop-cap end the WHOLE candidate pass
+        (`ranked` is sorted, so nothing later can be admitted either);
+        every other veto skips THIS candidate and lets the next through.
+      * explore reservation full (n_explore >= expl_k) skips EXPLORE
+        candidates only — exploit never consumes explore's cap, and an
+        exploit candidate is never blocked by it (Lever 1, 24-Jul).
+      * fleet long veto hits LONGS only — the funding mandate's shorts and
+        every exit path are untouched (IMB-17).
+      * slope gate: skip iff a lookback read EXISTS and |apr| < |prev| —
+        fail-OPEN on missing history (restart gap), and at-the-bar
+        equality still enters (>= is "still building").
+
+    st keys: open_now, max_open, opened_this_loop, max_new_per_loop,
+    n_explore, expl_k, vol_veto (set), vetoes (dict), fleet_long_veto,
+    slope_prev (float|None — the caller resolves history; SLOPE_GATE off
+    passes None, which fails open here by construction).
+    Returns (action, reason): ('break','slots') | ('skip',<reason>) |
+    ('open', None).
+    """
+    if st["open_now"] >= st["max_open"] \
+            or st["opened_this_loop"] >= st["max_new_per_loop"]:
+        return "break", "slots"
+    if src == "explore" and st["n_explore"] >= st["expl_k"]:
+        return "skip", "explore_reserved"
+    if coin in st["vol_veto"]:
+        return "skip", "vol_filter"
+    if coin in st["vetoes"]:
+        return "skip", "quality_veto"
+    if not is_short and st["fleet_long_veto"]:
+        return "skip", "fleet_long"
+    sp = st.get("slope_prev")
+    if sp is not None and abs(apr) < abs(sp):
+        return "skip", "slope"
+    return "open", None
+
+
+def entry_stamp(is_short, px, now_ts, clip, src):
+    """The position's ENTRY receipt, pure — the meta dict every exit,
+    grader and lever audit reads.
+
+    [2026-07-30 (es) SEAM] Pins the 22-Jul FLAP FIX + 28-Jul D7 receipt
+    honesty in one place: `bars` is stamped from the module's lever state
+    AT ENTRY (enter_apr is the admission gate — attribution only; tp/
+    max_hold govern the trade via pos_bars(); slope_gate/explore_k/
+    conviction_hi are ENTRY-phase levers whose entry-time value is the
+    honest receipt — the close-time fallback this replaced let a trade
+    opened before the growth levers count as their proof). `entry` is the
+    DECISION mid — fill telemetry is recorded separately and never
+    rewrites it; `accrued` starts at zero; `src` (explore|exploit) is
+    carried for Lever-1 grading; `clip` is the deployed conviction-scaled
+    notional the cap accounting re-reads.
+    """
+    return {"is_short": is_short, "entry": px, "opened_ts": now_ts,
+            "accrued": 0.0, "clip": clip, "src": src,
+            "bars": {"enter_apr": ENTER_APR,
+                     "take_profit": TAKE_PROFIT,
+                     "max_hold_h": MAX_HOLD_H,
+                     "slope_gate": 1 if SLOPE_GATE else 0,
+                     "explore_k": SCAN_EXPLORE_K,
+                     "conviction_hi": (CONVICTION_HI
+                                       if CONVICTION_MODE == "scaled"
+                                       else 1.0)}}
+
+
 # ---- funding-SLOPE entry gate (2026-07-11) — only enter while the rate is
 # still BUILDING (|apr| >= |apr LOOKBACK_H ago|). Backtested on the 150d
 # portfolio sim (scripts/backtest_funding_leverage.py): at the live 2x config
@@ -2081,34 +2161,42 @@ def main():
             # clamp so EXPLOIT always keeps >=1 slot even if K is misconfigured high
             _expl_k = max(0, min(SCAN_EXPLORE_K, max_open - 1))
             for coin, f, apr, is_short, bm, ev in ranked:
-                if open_now >= max_open or opened_this_loop >= MAX_NEW_PER_LOOP:
-                    break
                 src = (ev or {}).get("src", "exploit")
-                if src == "explore" and n_explore >= _expl_k:
-                    continue      # explore reservation full — leave the slot to exploit
-                if coin in vol_veto:
-                    log.info("%s VOL_FILTER skip — trailing %dh vol above the "
-                             "cross-sectional median (calm-half rule)",
-                             coin, VOL_FILTER_WIN_H)
-                    continue
-                # [2026-07-11 QUALITY VETO] fleet-measured toxicity, restrict-only
-                if coin in _vetoes:
-                    log.info("%s VETO_SKIP (%s)", coin, _vetoes[coin])
-                    continue
-                # [2026-07-17 IMB-17] fleet long budget (computed above) —
-                # NEW directional longs only; the funding mandate's shorts
-                # and every exit path are untouched
-                if not is_short and fleet_long_veto:
-                    log.info("%s FLEET_LONG_VETO_SKIP", coin)
-                    continue
-                # [2026-07-11 SLOPE GATE] only enter while crowding still builds
-                # (validated: see config block). Fails open with no history.
+                # [2026-07-11 SLOPE GATE] the in-process history READ stays
+                # here; the decision is entry_admission's. Fails open with
+                # no history (restart gap). _slope_ref is a pure read, so
+                # resolving it before the ladder changes nothing a veto
+                # would have skipped.
                 _slope_prev = (_slope_ref(rate_hist.get(coin), t0,
                                           SLOPE_LOOKBACK_H * 3600)
                                if SLOPE_GATE else None)
-                if _slope_prev is not None and abs(apr) < abs(_slope_prev):
-                    log.info("%s SLOPE_SKIP (apr %+.1f%% < %+.1f%% %gh ago — rolling over)",
-                             coin, apr * 100, _slope_prev * 100, SLOPE_LOOKBACK_H)
+                # [2026-07-30 (es) SEAM] the ordered veto chain, extracted
+                # pure (slots -> explore reservation -> vol filter ->
+                # quality veto [2026-07-11] -> fleet long veto [IMB-17] ->
+                # slope gate). Reasons drive the same logs as before.
+                _act, _why = entry_admission(
+                    coin, src, is_short, apr,
+                    {"open_now": open_now, "max_open": max_open,
+                     "opened_this_loop": opened_this_loop,
+                     "max_new_per_loop": MAX_NEW_PER_LOOP,
+                     "n_explore": n_explore, "expl_k": _expl_k,
+                     "vol_veto": vol_veto, "vetoes": _vetoes,
+                     "fleet_long_veto": fleet_long_veto,
+                     "slope_prev": _slope_prev})
+                if _act == "break":
+                    break
+                if _act == "skip":
+                    if _why == "vol_filter":
+                        log.info("%s VOL_FILTER skip — trailing %dh vol above the "
+                                 "cross-sectional median (calm-half rule)",
+                                 coin, VOL_FILTER_WIN_H)
+                    elif _why == "quality_veto":
+                        log.info("%s VETO_SKIP (%s)", coin, _vetoes[coin])
+                    elif _why == "fleet_long":
+                        log.info("%s FLEET_LONG_VETO_SKIP", coin)
+                    elif _why == "slope":
+                        log.info("%s SLOPE_SKIP (apr %+.1f%% < %+.1f%% %gh ago — rolling over)",
+                                 coin, apr * 100, _slope_prev * 100, SLOPE_LOOKBACK_H)
                     continue
                 if bm is None:
                     # legacy / scanner-off: spread gate + fresh mid (own book fetch)
@@ -2145,29 +2233,10 @@ def main():
                 except Exception as e:
                     log.error("open %s failed: %s", coin, e)
                     continue
-                meta[coin] = {"is_short": is_short, "entry": px, "opened_ts": t0,
-                              "accrued": 0.0, "clip": clip,   # deployed clip (conviction-scaled)
-                              "src": src,                     # Lever 1: explore|exploit (grading)
-                              # [2026-07-22 FLAP FIX] the bars priced at
-                              # entry govern this trade (enter_apr is the
-                              # admission gate, attribution only).
-                              # [2026-07-28 D7 + receipt audit] slope_gate,
-                              # explore_k and conviction_hi are ENTRY-phase
-                              # levers (selection/sizing, never exit) — the
-                              # entry-time value is the honest receipt. The
-                              # close-time _ACTIVE_BARS fallback let a trade
-                              # opened BEFORE the growth levers but closed
-                              # under them stamp explore_k=2/conviction_hi=2.2
-                              # and count as ran_candidate PROOF on the path
-                              # to live.funding.* (and vice versa on a fade).
-                              "bars": {"enter_apr": ENTER_APR,
-                                       "take_profit": TAKE_PROFIT,
-                                       "max_hold_h": MAX_HOLD_H,
-                                       "slope_gate": 1 if SLOPE_GATE else 0,
-                                       "explore_k": SCAN_EXPLORE_K,
-                                       "conviction_hi": (CONVICTION_HI
-                                                         if CONVICTION_MODE == "scaled"
-                                                         else 1.0)}}
+                # [2026-07-30 (es) SEAM] the entry receipt, extracted pure —
+                # carries the 22-Jul flap fix + 28-Jul D7 entry-time bars
+                # contract (see entry_stamp's docstring for the history).
+                meta[coin] = entry_stamp(is_short, px, t0, clip, src)
                 # [2026-07-28 AUDIT FIX] make this open visible to the REST of
                 # THIS loop's cap checks at its REAL clip: open_notional prices
                 # a position present in `pos` via meta['clip'] (conviction-
@@ -2441,6 +2510,100 @@ def _selftest_exit_decision():
     assert exit_decision(True, 100.0, 200.0, None, 0.0, 9e9, 9e9) == "stop", \
         "+100% adverse must breach the module HARD_STOP via the defaults"
     print("lighter_funding_bot _selftest_exit_decision OK")
+
+
+def _selftest_entry_admission():
+    """[2026-07-30 (es)] The entry admission ladder + entry receipt, pinned.
+    Gate state passed explicitly so fixtures are env-independent; the
+    receipt cases pin entry_stamp's wiring to the module's LIVE lever
+    globals (the D7 entry-time contract). Every case names what it
+    protects."""
+    global SCAN_EXPLORE_K
+
+    def st(**over):
+        base = {"open_now": 0, "max_open": 6, "opened_this_loop": 0,
+                "max_new_per_loop": 3, "n_explore": 0, "expl_k": 2,
+                "vol_veto": set(), "vetoes": {}, "fleet_long_veto": False,
+                "slope_prev": None}
+        base.update(over)
+        return base
+
+    A = entry_admission
+
+    # CLEAN CANDIDATE OPENS — the ladder's default is admission
+    assert A("ETH", "exploit", True, 0.10, st()) == ("open", None)
+
+    # BREAK vs SKIP — slots/loop-cap end the WHOLE pass (ranked is sorted,
+    # nothing later can be admitted); every other veto skips one candidate
+    assert A("ETH", "exploit", True, 0.10, st(open_now=6)) == ("break", "slots")
+    assert A("ETH", "exploit", True, 0.10,
+             st(opened_this_loop=3)) == ("break", "slots")
+    assert A("ETH", "exploit", True, 0.10,
+             st(open_now=5))[0] == "open", "one slot left still admits"
+
+    # EXPLORE RESERVATION — full cap (== boundary) skips EXPLORE only;
+    # exploit never consumes and is never blocked by it (Lever 1)
+    assert A("X", "explore", True, 0.10,
+             st(n_explore=2)) == ("skip", "explore_reserved")
+    assert A("X", "explore", True, 0.10, st(n_explore=1))[0] == "open"
+    assert A("X", "exploit", True, 0.10, st(n_explore=2))[0] == "open", \
+        "a full explore reservation must never block exploit"
+
+    # VOL FILTER + QUALITY VETO — membership, in ladder order
+    assert A("WILD", "exploit", True, 0.10,
+             st(vol_veto={"WILD"})) == ("skip", "vol_filter")
+    assert A("TOX", "exploit", True, 0.10,
+             st(vetoes={"TOX": "slip>15bps"})) == ("skip", "quality_veto")
+    assert A("TOX", "exploit", True, 0.10,
+             st(vol_veto={"TOX"}, vetoes={"TOX": "x"})) == \
+        ("skip", "vol_filter"), "ladder order: vol filter outranks quality"
+
+    # FLEET LONG VETO — longs only; the funding mandate's SHORTS sail
+    # through a red fleet light (IMB-17)
+    assert A("ETH", "exploit", False, -0.10,
+             st(fleet_long_veto=True)) == ("skip", "fleet_long")
+    assert A("ETH", "exploit", True, 0.10,
+             st(fleet_long_veto=True))[0] == "open"
+
+    # SLOPE GATE — skip only while ROLLING OVER: missing history fails
+    # OPEN, at-the-bar equality is "still building" and enters, and the
+    # comparison is |apr| (a deepening negative rate is building too)
+    assert A("ETH", "exploit", True, 0.08,
+             st(slope_prev=0.10)) == ("skip", "slope")
+    assert A("ETH", "exploit", True, 0.10, st(slope_prev=0.10))[0] == "open"
+    assert A("ETH", "exploit", True, 0.12, st(slope_prev=0.10))[0] == "open"
+    assert A("ETH", "exploit", True, -0.12,
+             st(slope_prev=-0.10))[0] == "open", "slope compares |apr|"
+    assert A("ETH", "exploit", True, -0.08,
+             st(slope_prev=0.10)) == ("skip", "slope"), \
+        "sign-agnostic rollover still skips"
+
+    # ENTRY RECEIPT — decision mid, zeroed accrual, src carried, and the
+    # bars stamped from the module's lever state AT ENTRY (D7)
+    m = entry_stamp(True, 123.45, 1700000000.0, 55.0, "explore")
+    assert m["is_short"] is True and m["entry"] == 123.45
+    assert m["opened_ts"] == 1700000000.0 and m["accrued"] == 0.0
+    assert m["clip"] == 55.0 and m["src"] == "explore"
+    b = m["bars"]
+    assert b["enter_apr"] == ENTER_APR and b["take_profit"] == TAKE_PROFIT
+    assert b["max_hold_h"] == MAX_HOLD_H
+    assert b["slope_gate"] == (1 if SLOPE_GATE else 0)
+    assert b["explore_k"] == SCAN_EXPLORE_K
+    assert b["conviction_hi"] == (CONVICTION_HI
+                                  if CONVICTION_MODE == "scaled" else 1.0)
+    # the FLAP-FIX shape: a lever moved AFTER the stamp changes new
+    # receipts, never an already-written one
+    _saved = SCAN_EXPLORE_K
+    try:
+        SCAN_EXPLORE_K = _saved + 7
+        m2 = entry_stamp(False, 1.0, 0.0, 25.0, "exploit")
+        assert m2["bars"]["explore_k"] == _saved + 7, \
+            "bars read the module lever state AT stamp time"
+        assert m["bars"]["explore_k"] == _saved, \
+            "an already-stamped receipt never moves with a later lever"
+    finally:
+        SCAN_EXPLORE_K = _saved
+    print("lighter_funding_bot _selftest_entry_admission OK")
 
 
 def _selftest_notional():
@@ -2992,6 +3155,7 @@ if __name__ == "__main__":
         _selftest_heal()
         _selftest_exit_decision()
         _selftest_flatten_fields()
+        _selftest_entry_admission()
         sys.exit(0)
     try:
         _supervised()

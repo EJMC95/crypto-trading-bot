@@ -1,5 +1,18 @@
 # Next Session — prepared 2026-07-29 evening (AEST)
 
+> **[2026-07-30 session — outcome stamps]** §1 research tail: ALL THREE
+> done same-day — explore options 2/3 measured (option 2 rejected by
+> occupancy; §30-Jul of the diagnosis doc), the 455d vol run CLOSED (KEEP
+> stands; bar ungradeable at depth, decomposed in the filter doc), the
+> per-asset gate study shipped as an evidence-backed HOLD
+> (`REGIME_GATE_PER_ASSET_2026-07-30.md` — wiring stays review-gated per
+> 28-Jul; SPY/QQQ graduate ~mid-Aug). §2 seam 3 DONE: `entry_admission()` +
+> `entry_stamp()` extracted pure, battery block #12, 4 mutations killed;
+> the full stub-venue tick driver remains the calmer-week cut. §3 review
+> prep: three read-and-decide items appended to the triage doc's agenda
+> (items 4–6). §5 health: clean at session start (watchdog zero problems,
+> both Farmer arms online on `89c2c56b2da5`).
+
 Handoff from the 29-Jul campaign (PRs #105–#113, all merged). State at
 sign-off: suite **299 passed / 0 skipped**, 19 ratchet floors armed, both
 Farmer arms **hash-verified converged on `89c2c56b2da5`** (live money runs

@@ -84,3 +84,28 @@ engineering pass; until then the census stays honest about not knowing.
    standing practice. The blind-selftest lesson (bot_learn: lines executed,
    semantics unguarded — proven by mutation) is the argument for assertion-
    depth over line-% in future coverage claims.
+
+**Added by the 30-Jul research session (evidence in the named docs; all
+three are READ-AND-DECIDE items, no code is waiting on them):**
+
+4. **Vol filter, full-depth run CLOSED** (`FUNDING_VOL_FILTER_2026-07-24.md`
+   §30-Jul): 455d/n=1390 — halves positive at both slips, maxDD −16 vs
+   baseline −53, reverse control h2-negative; the all-thirds bar is
+   UNGRADEABLE at depth (the venue's first ~5 months predate a rankable
+   cross-section — n=0, stamped `(n0)`). KEEP stands; magnitude stays
+   non-canon. Nothing to decide unless the review wants the bar re-specified
+   for full-tape windows.
+5. **Explore A/B design — all three options now have numbers on one tape**
+   (`EXPLORE_ZERO_DIAGNOSIS_2026-07-29.md` §30-Jul): option 2 (DEEP_MAX
+   15→8) REJECTED by measurement (tail occupied 4.1% of hours, n=57/180d,
+   h1 empty — a relabel, not coverage); option 1 stands as shipped ($2M
+   shadow floor; n=787 on genuinely new books, positive at every slip this
+   tape); option 3 is the honest fallback. Decision: confirm option 1's
+   shadow activation as THE design (or name the fallback).
+6. **Per-asset regime gate — evidence-backed HOLD**
+   (`REGIME_GATE_PER_ASSET_2026-07-30.md`): disagreement 19–28%/book at
+   depth; damage cell decisively protective on TSLA (−2.60/−7.87pp,
+   n=7), mildly costly on metals, and SPY/QQQ (the books that motivated
+   D5) still ungraded until ~mid-Aug. Recommendation: hold step-2 wiring
+   (unchanged from 28-Jul), re-run at SPY/QQQ graduation; keep fail-closed
+   (never BTC's gate) for any future non-crypto entry.

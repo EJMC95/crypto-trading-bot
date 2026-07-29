@@ -129,3 +129,48 @@ Run per the operator's "proceed" (29-Jul): fresh 180d/top-25 fetch (no cache
   438d-tape run (needs a longer fetch window than a live session should
   spend); the fail-open fresh-listing cohort divergence stands as
   documented above.
+
+### [2026-07-30 FULL-DEPTH RUN — the outstanding 438d item, CLOSED]
+
+Run per the block above (fresh full-tape fetch: `--days 455 --refresh`, own
+cache; the venue's settled history reaches 2025-05, so this is everything).
+Universe = today's top-25 by turnover = 24 loaded books — **~15 of them
+non-crypto** (SPY/QQQ/US100/WTI/XAU/XAG/BRENTOIL + single stocks + ETFs);
+the venue's turnover profile has shifted materially since the 180d studies,
+and the cross-section the filter ranks is now multi-asset-class.
+
+| read | baseline | lowvol50 (LIVE) | lowvol75 | highvol50 (reverse) |
+|---|---|---|---|---|
+| P&L @0.5bps | +$7.83 | **+$63.31** | +$62.11 | +$15.47 |
+| P&L @2bps | −$15.73 | **+$52.89** | +$47.55 | +$0.92 |
+| halves @0.5 | +1.3/+12.7 | **+30.6/+31.8 ✅** | +49.3/+13.5 | +32.5/**−15.9** ❌ |
+| halves @2 | −8.9/−0.7 ❌ | **+28.3/+23.6 ✅** | +45.8/+2.4 | +29.3/**−27.2** ❌ |
+| maxDD @0.5/@2 | −53.5/−63.8 | **−16.4/−17.9** | −29.4/−34.2 | −68.1/−76.9 |
+| n | 3142 | 1390 | 1942 | 1940 |
+
+- **The registered all-thirds bar is UNGRADEABLE at full depth — not
+  failed.** The first third ends 2025-09-28, but the venue's first
+  rankable ≥8-book cross-section only exists from **2025-10-06**
+  (measured): every filtered variant is structurally out of the market for
+  the entire first third (n=0 — the script now stamps `(n0)` in the thirds
+  column so 0.0 can never be misread as flat performance; baseline traded
+  720 times there for −$20.14). The script's verdict block therefore
+  prints `not robust` for every filter on this window — read that as "bar
+  not gradeable", per this decomposition.
+- **Everything the full tape CAN grade, the filter passes**: both halves
+  positive at both slips (the halves split ~mid-Dec-2025, so h1 carries
+  the dead first era and is still +30.6/+28.3), and BOTH gradeable thirds
+  positive at both slips (mid +38.2/+33.2, last +25.6/+20.2).
+- **The risk shape is confirmed at depth**: maxDD −16/−18 vs baseline
+  −53/−64 — the same ~3x cut all three 180d snapshots showed, now on 455d
+  with n=1390.
+- **The reverse control still loses where it matters**: h2 NEGATIVE at
+  both slips (−15.9/−27.2) with the worst maxDD on the table (−68/−77).
+  Dose-response ordering (lowvol50 > lowvol75 > highvol50) holds on h2,
+  maxDD and headline P&L.
+- **Verdict: KEEP `FUNDING_VOL_FILTER=on` — the full-depth item is
+  CLOSED.** Four independent fetches (23-Jul, 24-Jul, 29-Jul, 30-Jul
+  full-depth) agree on direction and risk; the magnitude stays NON-CANON
+  per the standing rule (baseline printed +$33.47 / +$2.44 / +$10.65 /
+  +$7.83 across them). The fail-open fresh-listing cohort divergence
+  stands as documented above.

@@ -11,14 +11,30 @@ stdev) ranked cross-sectionally against every coin with data at that hour.
   highvol50 — enter only if vol >  median      (REVERSE control: must be worse
               for the mechanism story to hold)
 Gate 0.05 TRUE (the live gate). Bar: both-halves AND all-thirds positive at
-BOTH 0.5 and 2.0 bps slip. Multiplicity: 3 filters tested, stated."""
-import math, os, sys
+BOTH 0.5 and 2.0 bps slip. Multiplicity: 3 filters tested, stated.
+
+Depth: --days 180 (default) reproduces the 24-Jul/29-Jul snapshots; the
+full-tape run is --days 455 --refresh --cache <own-path> (Lighter's settled
+history reaches back to 2025-05-05, so ~450d is "everything"; the fetch stops
+at genesis on its own). Use --cache for deep runs so the shared 180d fetch
+cache is not clobbered for the other studies."""
+import argparse, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import backtest_funding_lighter as bt
 
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--days", type=int, default=180)
+_ap.add_argument("--universe", type=int, default=25)
+_ap.add_argument("--refresh", action="store_true")
+_ap.add_argument("--cache", default=None,
+                 help="own cache path for deep runs (default: the shared one)")
+_a = _ap.parse_args()
+if _a.cache:
+    bt.CACHE = _a.cache
+
 GATE = 0.05
 WIN_H = 336                      # 14d trailing window
-mk = bt.load(180, 25, refresh=False)
+mk = bt.load(_a.days, _a.universe, refresh=_a.refresh)
 hours_all = sorted({t for m in mk.values() for t in m["fund"]})
 lo, hi = min(hours_all), max(hours_all)
 mid = lo + (hi - lo) // 2
@@ -75,10 +91,16 @@ def ev(pred, slip_bps):
     f = bt.run(mk, GATE, lo, hi + 1, entry_ok=pred)
     h = [bt.run(mk, GATE, lo, mid, entry_ok=pred)["pnl"],
          bt.run(mk, GATE, mid, hi + 1, entry_ok=pred)["pnl"]]
-    t3 = [bt.run(mk, GATE, lo, a3, entry_ok=pred)["pnl"],
-          bt.run(mk, GATE, a3, b3, entry_ok=pred)["pnl"],
-          bt.run(mk, GATE, b3, hi + 1, entry_ok=pred)["pnl"]]
-    return f, h, t3
+    # thirds carry (pnl, n): a 0-trade third is NO-EVIDENCE, not a flat
+    # result — at full tape depth the venue's first ~5 months predate a
+    # rankable >=8-book cross-section, so every filtered variant is
+    # structurally out of the market there (measured 2026-07-30: first
+    # rankable hour 2025-10-06; the registered bar still counts such a
+    # third as a fail — the printout just makes WHY visible).
+    t3 = [bt.run(mk, GATE, lo, a3, entry_ok=pred),
+          bt.run(mk, GATE, a3, b3, entry_ok=pred),
+          bt.run(mk, GATE, b3, hi + 1, entry_ok=pred)]
+    return f, h, [(r["pnl"], r["n"]) for r in t3]
 
 print(f"tape: {len(mk)} markets {(hi-lo)/86400:.0f}d | gate {GATE} TRUE | "
       f"trailing {WIN_H//24}d vol, cross-sectional pct | 3 filters + baseline + reverse control\n")
@@ -91,11 +113,13 @@ for kind in ("baseline", "lowvol50", "lowvol75", "highvol50"):
     rob = True
     for slip in (0.5, 2.0):
         f, h, t3 = ev(pred, slip)
-        ok = all(x > 0 for x in h) and all(x > 0 for x in t3)
+        ok = all(x > 0 for x in h) and all(p > 0 for p, _ in t3)
         rob = rob and ok
+        t3s = "[" + ", ".join(f"{p:.1f}" + ("(n0)" if n == 0 else "")
+                              for p, n in t3) + "]"
         print(f"{kind:>10} {slip:>5.1f} | {f['pnl']:>8.2f} {f['n']:>5d} {f['win']:>5.1f} "
               f"{f['maxdd']:>7.1f} {str([round(x,1) for x in h]):>16} "
-              f"{str([round(x,1) for x in t3]):>22} {'YES' if ok else 'no':>8}")
+              f"{t3s:>22} {'YES' if ok else 'no':>8}")
     verdicts[kind] = rob
     print()
 
