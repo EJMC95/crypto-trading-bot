@@ -293,6 +293,21 @@ SCAN_MOM_LOOKBACK_H = int(os.environ.get("SCAN_MOM_LOOKBACK_H", "6"))
 # monotonic in funding extremity), so this is a SHADOW probe of whether a wider
 # universe hides breadth, not a proven earner.
 SCAN_EXPLORE_K = int(os.environ.get("SCAN_EXPLORE_K", "0"))
+# [2026-07-29 EXPLORE POOL WIDENING — operator "proceed", from
+# EXPLORE_ZERO_DIAGNOSIS_2026-07-29.md] Measured: explore's tail
+# (`prelim[SCAN_DEEP_MAX:]`) has structurally NEVER had a member — the whole
+# venue holds ~11 books above the $10M MIN_VOL floor and only ~3 pass it
+# together with the 5% gate, vs a deep-scan cut of 15. Coverage-sampling an
+# empty set is why every close ever stamped src=exploit. This floor widens
+# the EXPLORE POOL ONLY: coins passing the SAME |apr| gate + persistence +
+# support checks whose 24h turnover sits in [EXPLORE_MIN_VOL, MIN_VOL) become
+# explore-sampleable (still through the identical Stage-B/C vetoes, the
+# vol-character filter, quality veto, slope gate, spread/slip and caps —
+# the pool widens, no quality bar moves). EXPLOIT is untouched: entries that
+# size real conviction still require the full MIN_VOL. 0/unset = OFF —
+# byte-identical to today; activation is per-arm env (shadow twin first,
+# the same route SCAN_EXPLORE_K took). Backtest note in the diagnosis doc.
+EXPLORE_MIN_VOL = float(os.environ.get("FUNDING_EXPLORE_MIN_VOL", "0") or 0)
 
 # Entry gate. The DEFAULT KEEPS THE TUNED 0.40 SAFETY GATE — the scanner's mandate is to
 # pick better AMONG the survivors (veto stop-out traps + risk-adjusted rank), NOT to
@@ -710,7 +725,8 @@ def cross_venue_mult(f):
     return 0.5 + 0.7 * (agree / total)       # 0 agree -> 0.5, all agree -> 1.2
 
 
-def scan_candidates(ctx, prelim, order_usd, log, last_tried=None):
+def scan_candidates(ctx, prelim, order_usd, log, last_tried=None,
+                    explore_pool=None):
     """Three governor-aware stages; returns finalists ranked best-first as
     (coin, f, apr, is_short, book_metrics, evidence). Fetch-cost is bounded so the
     scan can't drain the ~21 weight/min Lighter budget shared with order txs + sibling
@@ -795,7 +811,14 @@ def scan_candidates(ctx, prelim, order_usd, log, last_tried=None):
     # dict is FALSY, so the old `or {}` swapped in a throwaway and the cursor
     # never persisted (bug #1).
     lt = last_tried if last_tried is not None else {}
-    tail = ranked_pre[SCAN_DEEP_MAX:]
+    # [2026-07-29 POOL WIDENING] the tail is prelim-below-the-cut PLUS the
+    # caller's widened explore pool (coins passing the same gate/persistence
+    # with turnover in [EXPLORE_MIN_VOL, MIN_VOL) — disjoint from prelim by
+    # construction). Measured before this: prelim never exceeds the cut, so
+    # the old tail was structurally EMPTY and explore sampled nothing, ever
+    # (EXPLORE_ZERO_DIAGNOSIS_2026-07-29.md). Pool coins face the identical
+    # Stage-B/C vetoes below — the pool widens, no quality bar moves.
+    tail = ranked_pre[SCAN_DEEP_MAX:] + list(explore_pool or [])
     tail.sort(key=lambda cfa: (lt.get(cfa[0], 0.0), -abs(cfa[2])))
     picked = tail[:SCAN_EXPLORE_K]
     # Advance the coverage cursor on EVALUATION, not just on a successful open
@@ -1925,7 +1948,13 @@ def main():
 
         if open_now < max_open and not quarantine_blind and not live_state_blind:
             # cheap prefilter: hard SAFETY gates on the funding map only (no network)
-            prelim = []
+            prelim, explore_pool = [], []
+            # [2026-07-29] the widened explore floor is live only when explore
+            # itself is on AND the floor is set strictly below MIN_VOL —
+            # anything else keeps the pool empty (fail-safe inert).
+            _ex_floor = (EXPLORE_MIN_VOL
+                         if SCAN_EXPLORE_K > 0 and 0 < EXPLORE_MIN_VOL < MIN_VOL
+                         else None)
             for c, f in fund.items():
                 if c in meta or c in pos:
                     continue
@@ -1935,13 +1964,17 @@ def main():
                 if r is None:
                     continue
                 apr = r * H
-                if abs(apr) < ENTER_GATE or (f.get("vol") or 0.0) < MIN_VOL:
+                vol24 = f.get("vol") or 0.0
+                if abs(apr) < ENTER_GATE:
+                    continue
+                main_ok = vol24 >= MIN_VOL
+                if not main_ok and (_ex_floor is None or vol24 < _ex_floor):
                     continue
                 if (t0 - hot_since.get(c, t0)) / 3600.0 < PERSIST_H:
                     continue
                 if not ctx.supports(c):
                     continue
-                prelim.append((c, f, apr))
+                (prelim if main_ok else explore_pool).append((c, f, apr))
             prelim.sort(key=lambda x: -abs(x[2]))
 
             if SCAN_ENABLED:
@@ -1950,7 +1983,9 @@ def main():
                 # Wrapped: a scanner bug must NEVER crash the loop that manages stops —
                 # degrade to no new entries this loop. [review 2026-07-11]
                 try:
-                    ranked = scan_candidates(ctx, prelim, order_usd, log, explore_seen)
+                    ranked = scan_candidates(ctx, prelim, order_usd, log,
+                                             explore_seen,
+                                             explore_pool=explore_pool)
                 except Exception as e:  # noqa: BLE001
                     log.error("scanner error (%s) — no new entries this loop", e)
                     ranked = []
@@ -2634,6 +2669,31 @@ def _selftest_explore():
         exp4 = sorted(c for c, f, a, s, bm, ev in r4 if ev["src"] == "explore")
         assert exp4 == ["C17", "C18"], f"cursor must SWEEP on the 2nd call; got {exp4} (stuck?)"
         assert len(seen) == 4, f"cursor must accumulate across sweeps; got {sorted(seen)}"
+
+        # [2026-07-29 POOL WIDENING] the widened explore pool joins the tail:
+        # with prelim ENTIRELY inside the cut (the measured live shape — the
+        # old tail is empty), explore picks come from the pool; without a pool
+        # the below-cut starvation reproduces (mutation check: dropping the
+        # `+ explore_pool` concat turns the first assert red).
+        small = [(f"C{i:02d}", {"rate": 0.0}, 0.30 - i * 0.01) for i in range(10)]
+        pool = [(f"P{i}", {"rate": 0.0}, 0.10 - i * 0.01) for i in range(3)]
+        r5 = scan_candidates(None, list(small), 25.0, lg, {},
+                             explore_pool=list(pool))
+        exp5 = [c for c, f, a, s, bm, ev in r5 if ev["src"] == "explore"]
+        assert exp5 == ["P0", "P1"], f"pool must feed an empty tail; got {exp5}"
+        r6 = scan_candidates(None, list(small), 25.0, lg, {})
+        assert not any(ev["src"] == "explore" for *_, ev in r6), \
+            "no pool + prelim inside the cut -> explore starves (the old shape)"
+        # pool coins face the SAME Stage-B vetoes — a convulsing pool coin is
+        # refused exactly like an exploit candidate
+        M._candle_features = lambda ctx, coin: (
+            {"ret_mom": 0.0, "vol": 0.9} if coin == "P0"
+            else {"ret_mom": 0.0, "vol": 0.001})
+        r7 = scan_candidates(None, list(small), 25.0, lg, {},
+                             explore_pool=list(pool))
+        exp7 = [c for c, f, a, s, bm, ev in r7 if ev["src"] == "explore"]
+        assert "P0" not in exp7 and exp7 == ["P1"], \
+            f"a vetoed pool coin must not pass; got {exp7}"
     finally:
         (M._candle_features, M.book_metrics, M.cross_venue_mult) = save_fns
         (M.SCAN_EXPLORE_K, M.SCAN_DEEP_MAX, M.SCAN_BOOK_PROBE) = save_cfg
