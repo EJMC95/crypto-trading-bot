@@ -1,0 +1,98 @@
+name: Taker BULL dual-mode
+
+# [2026-07-29 (fl)] Set TT_BULL_MODE on a Ticket Taker arm — the 24-Jul
+# bull-engine research shipped this gate DEFAULT OFF pending an operator call,
+# and the operator made it ("optimise the taker completely ... implement
+# immediately to real money with full permission").
+#
+# WHAT IT DOES: RESTRICT-ONLY. `bull_entry_ok` can only SKIP an entry the base
+# filters already admitted. It admits only (breakout,long) / (breakoutup,long) /
+# (divergence,short), crypto-only (tradfi contaminates the read), with a
+# per-asset regime gate — a LONG needs a CONFIRMED up, a SHORT is refused only
+# INTO a confirmed up. It cannot open anything the bot would not otherwise open,
+# cannot enlarge a clip, and cannot loosen a stop.
+#
+# EVIDENCE (lighter_ticket_replay.py, the taker's OWN decision code, recorded
+# scout tape, 2026-07-29): positive at EVERY window tested, vs a live baseline
+# negative at every one —
+#     72h  live -13.42  ->  BULL +6.86
+#    120h  live -21.88  ->  BULL +8.27
+#    168h  live -18.92  ->  BULL +9.29
+#    200h                    BULL +6.81   (38 closes, 50% wr, +0.358%/trade,
+#                                          19 tp / 18 sl / 1 hold)
+# On this tape it resolves to short-divergence-only, crypto-only — which is what
+# BOTH arms' real ledgers independently said was the only edge (shadow:
+# short-divergence +$15.64 of a +$5.11 book; live: every long-divergence trade
+# lost, 3/3). The replay accrues NO funding, and collecting the funding credit is
+# the divergence short's whole thesis, so these numbers UNDERSTATE the change.
+#
+# NO CODE DEPLOY NEEDED: `lighter_ticket_taker.py` is byte-identical between the
+# live arm's build era and HEAD, so the live image already carries the gate; only
+# the env var is missing. Env is read at import, hence the redeploy.
+#
+# REVERSIBLE IN ONE DISPATCH: run again with mode=off.
+# VERIFY BY PUBLISHED OUTPUT (the (df) rule): the row's extra must show the lens
+# mix collapse to short-divergence; `extra.bars` and `extra.build` are unchanged
+# by this (it is an env gate, not a bar), so watch the CLOSES, not the bars.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arm:
+        description: "Which Ticket Taker arm"
+        required: true
+        default: "tide-rider-lighter-live"
+        type: choice
+        options:
+          - "tide-rider-lighter-live"   # REAL MONEY
+          - "lighter-ticket-taker"      # the $1k shadow twin (control arm)
+      mode:
+        description: "TT_BULL_MODE"
+        required: true
+        default: "on"
+        type: choice
+        options:
+          - "on"
+          - "off"
+
+concurrency:
+  group: railway-deploy     # serialize with Railway Redeploy — same service surface
+  cancel-in-progress: false
+
+jobs:
+  set-bull-mode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Set TT_BULL_MODE and redeploy the arm
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          ARM_IN: ${{ github.event.inputs.arm }}
+          MODE_IN: ${{ github.event.inputs.mode }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set."; exit 1
+          fi
+          case "${ARM_IN}" in
+            tide-rider-lighter-live|lighter-ticket-taker) ;;
+            *) echo "::error::arm must be one of the two taker services — refusing"; exit 1 ;;
+          esac
+          case "${MODE_IN}" in
+            on|off) ;;
+            *) echo "::error::mode must be on|off — refusing"; exit 1 ;;
+          esac
+          if [ "${ARM_IN}" = "tide-rider-lighter-live" ]; then
+            echo "::warning::Setting TT_BULL_MODE=${MODE_IN} on the REAL-MONEY Ticket Taker."
+          fi
+          # output discarded: `railway variables` may echo the service's FULL
+          # variable table (DATABASE_URL, signer keys) unmasked into the log —
+          # the dashboard-auth-rotate lesson.
+          railway variables --service "${ARM_IN}" --skip-deploys \
+            --set "TT_BULL_MODE=${MODE_IN}" > /dev/null 2>&1
+          railway redeploy --service "${ARM_IN}" --yes
+          echo "TT_BULL_MODE=${MODE_IN} set on ${ARM_IN}; service redeployed."
+          echo "Verify by PUBLISHED OUTPUT: the arm's closes should collapse to"
+          echo "short-divergence (crypto-only). Bars/build are unchanged by design."
