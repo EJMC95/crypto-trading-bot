@@ -44,6 +44,12 @@ SELFTEST_MODULES = [
     # guard that enforces this registration never ran on that push; the first
     # local CI-stand-in run caught it.
     "scripts.xp_judge_release",
+    # [2026-07-28 (dy)] daily evidence review as code (fail-soft sections; sole
+    # write bot_state['evidence-review']): authored by the Daily-evidence-review
+    # scheduled session, found stranded UNTRACKED in the shared tree (tripping
+    # this very guard locally, 1/200 red). Landed + registered here on the
+    # review session's own flag — --selftest is offline-green, no DB.
+    "scripts.evidence_review",
     # [2026-07-29 (ev)] the Farmer TAKE_PROFIT study — --selftest is offline
     # (universe-slice + grid/slip invariants + harness identity; no network,
     # no cache read). It pins the constants the recorded tp-0.06 verdict is
