@@ -486,6 +486,10 @@ def main():
                               closed_trades=n_closed, wins=n_wins,
                               losses=n_closed - n_wins,
                               extra={"mode": ctx.mode, "venue": ctx.mode,
+                       # [2026-07-30] effective cap — see funding_carry_bot
+                       "caps": {"k": K, "legs": 2 * K,
+                                "universe_n": UNIVERSE_N,
+                                "universe": len(COINS)},
                                      "style": "xsect-funding-spread"})
             except Exception:  # noqa: BLE001
                 pass

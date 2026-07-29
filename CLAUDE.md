@@ -616,6 +616,23 @@ All new bots:
   (the Parliament pattern), not something the incubator does on its own — it
   breeds genotypes replayed against an EXISTING book's tape and can never
   create a row. See [[incubator-cannot-mint-books]].
+- **THE CAGE MUST FIT THE VALUE (30-Jul, operator: "if the bounds don't
+  correlate properly then recalibrate individually").** A lever is THREE
+  things that must agree: the registry cage (`LEVERS[name]["lo"/"hi"]`), the
+  declared default (`env_default`), and the `os.environ.get` default the
+  consumer ACTUALLY runs. Until 30-Jul only the cage was machine-readable —
+  the default lived in PROSE inside each lever's `note` and the real value
+  lived in another file, so the three could not be compared and had already
+  drifted (`scout.ticket_top_n` moved 6 → 12 in code with its note still
+  saying 6, the same afternoon). All 42 levers now carry `env_default`;
+  `scripts/audit_lever_bounds.py` enforces on every push that each default is
+  INSIDE its cage, that no cage is degenerate, that every book lever's `step`
+  moves and terminates, and — the drift arm, mutation-verified — that the
+  registry default MATCHES the consumer's code. A registry that misdescribes
+  the running value is worse than none: every organ reasoning about headroom
+  reasons from the wrong number. One-sided cages (default pinned at a bound)
+  are REPORTED, not failed — an emission bar at its most restrictive end has
+  all its room in the growth direction, which is usually correct.
 - **BORN-DARK GUARD (17-Jul, after THREE incidents: `fleet_bus` 15-Jul,
   `event_sentinel` 16-Jul, `brain_stats` 17-Jul).** Adding a module, an
   import to shipped code, or a COPY means running

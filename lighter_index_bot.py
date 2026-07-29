@@ -572,6 +572,9 @@ def main():
                 open_trades=broker.open_count(),
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": mode, "venue": mode, "style": "stock-perp-regime",
+                       # [2026-07-30] effective cap — see funding_carry_bot
+                       "caps": {"max_open": MAX_OPEN,
+                                "universe": len(SYMBOLS)},
                        "held": sorted(meta.keys()),
                        "sleeves": {s: SLEEVES.get(s, ("regime", REGIME_SMA))[0]
                                    for s in symbols},

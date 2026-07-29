@@ -628,6 +628,17 @@ def main():
                     open_trades=len(positions),
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": "dry-run", "open_pnl": round(open_pnl, 2),
+                           # [2026-07-30] the EFFECTIVE cap this loop is
+                           # running, so the board can SEE saturation
+                           # instead of inferring it from occupancy alone —
+                           # and can tell "at the cap" from "at the cap it
+                           # set itself last cycle".
+                           # `_enter_apr`, NOT the raw module constant: the
+                           # raw one is HL-denominated and main() is guarded
+                           # against touching it (the 8x-basis defect). The
+                           # board must see the bar this arm ACTUALLY gates on.
+                           "caps": {"max_positions": MAX_POSITIONS,
+                                    "enter_apr": _enter_apr},
                            # NOT "positions": the dashboard reserves that key for
                            # the stock bots' list-of-dicts holdings format.
                            "carries": {c: f"{p['side']}@{p['entry_apr']:+.0%}"

@@ -942,11 +942,25 @@ def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None)
                 "ts": now_ts, "source": "board"})
             return True
 
+        # [2026-07-30] Prefer the cap the BOOK PUBLISHED (`extra.caps`) over
+        # the cap the registry thinks it enacted. They can legitimately differ
+        # — a bot that has not redeployed, a quarantined lever, a TTL that
+        # lapsed between the write and this read — and the book's own number
+        # is the one that actually gated its trades. Reading the registry
+        # alone risks the author judging saturation against a cap it set
+        # itself and the bot never adopted.
         cap = None
         if cap_lever:
-            _spec = (tuning_mod.LEVERS or {}).get(cap_lever) or {}
-            cap = tuning_mod.get_lever(cap_lever, _spec.get("env_default"),
-                                       now_ts=now_ts)
+            _caps = (r.get("extra") or {}).get("caps") or {}
+            _key = cap_lever.split(".", 1)[1]
+            try:
+                cap = float(_caps[_key]) if _key in _caps else None
+            except (TypeError, ValueError):
+                cap = None
+            if cap is None:
+                _spec = (tuning_mod.LEVERS or {}).get(cap_lever) or {}
+                cap = tuning_mod.get_lever(cap_lever, _spec.get("env_default"),
+                                           now_ts=now_ts)
         if cap_lever and cap and open_n >= int(cap):
             _step(cap_lever, f"SATURATED at {open_n}/{int(cap)}")
         elif (gate_lever and open_n == 0 and closed_n == prev_closed
@@ -2131,6 +2145,24 @@ def _selftest():
                              {_CB: {"closed": 80, "ts": _bnow - 3600}}, {},
                              _bnow, tuning_mod=_T)
     assert lv == {}, "the starvation window must actually elapse"
+
+    # THE PUBLISHED CAP is preferred over the registry's. A book that has not
+    # adopted a lever (not redeployed, lever quarantined, TTL lapsed) still
+    # gates on ITS number, and judging saturation against a cap the bot never
+    # took is how an author talks itself into widening forever.
+    _T.vals = {"carry.max_positions": 18}       # registry thinks 18...
+    lv, _ = synthesize_books(
+        [{"bot": _CB, "open_trades": 12, "closed_trades": 80,
+          "extra": {"caps": {"max_positions": 12}}}],   # ...the BOOK runs 12
+        {}, {}, _bnow, tuning_mod=_T)
+    assert lv.get("carry.max_positions", {}).get("value") == 20, \
+        "saturation must be judged against the cap the BOOK published"
+    lv, _ = synthesize_books(
+        [{"bot": _CB, "open_trades": 12, "closed_trades": 80,
+          "extra": {"caps": {"max_positions": 18}}}],
+        {}, {}, _bnow, tuning_mod=_T)
+    assert lv == {}, "published cap 18 with 12 open is NOT saturated"
+    _T.vals = {}
 
     # A MISSING ROW proposes nothing. Absence of evidence is not "widen" —
     # this is the guard that stops a publish outage from ratcheting every
