@@ -265,6 +265,19 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   Verdict clean/live-ahead/live-slipping/insufficient; sustained slip →
   phone. Answers "is the live book slipping, and on entry or exit?". →
   `impl-shortfall`
+- `scripts/golive_readiness.py` 🚦 — the GO-LIVE GRADER, an ORGAN since
+  2026-07-30 (gk). Grades every LIVING book against the `(fk)` bar and
+  publishes → `golive-readiness` (6-hourly `--publish` loop in `run_all.sh`;
+  the ONLY file under `scripts/` that ships in an image). **It had no
+  publisher and no schedule until (gk)** — the rule governing real money ran
+  only when a human typed the command, so nobody could see that 🌾 carry was
+  five of six bars from the gate. Publishes a machine-readable per-bar map
+  (`bars` / `BAR_NAMES` = window/closes/mean/t/halves/maxdd) so no consumer
+  string-matches prose; `bar_map` is selftest-BOUND to be exactly equivalent
+  to `grade` (a `maxDD` that cannot be computed FAILS — fail-closed).
+  Rendered as the 🚦 dashboard card (✦ = passes the new bar where the retired
+  win-rate rule would have rejected it). PUBLISH-ONLY: promotes nothing,
+  writes no lever; go-live stays an explicit operator act.
 - `fleet_respiration.py` 🫁 — RESPIRATION / blood-oxygen: OXYGEN = fresh
   market data; LUNGS = the venue-fetch layer. Measures SpO2 (weighted
   fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA
@@ -350,8 +363,10 @@ Doing one hides your own omission.
 ### Read-only endpoints (no auth)
 `/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger)
 `/bus.json` (risk light + signal bus + brain keys + lighter-market +
-fleet-proprioception, `?hours=` history) `/pulse.json` `/disloc.json`
-`/watchdog.json`
+fleet-proprioception + **golive-readiness** (30-Jul (gk) — the go-live bars
+per book, live AND `?hours=` history, so a review seat with no Railway login
+can read the gate that governs real money), `?hours=` history)
+`/pulse.json` `/disloc.json` `/watchdog.json`
 
 ### 15-Jul reconciliation (this repo's git now matches what runs)
 The 14-Jul pivot shipped from branch `claude/gapscout-profitable-trades-ebrprj`
@@ -546,10 +561,24 @@ All new bots:
   from this repo** (the only names recorded anywhere are funding-carry,
   pnl-dashboard, market-context and the two live bots), so the deploy step now
   RESOLVES each target against `railway service list` and reports an
-  unresolvable name as a loud ::warning:: instead of red-failing the build —
-  and prints the real service list, which is how the next session corrects any
-  name in one pass with data instead of another guess. **Check that warning
-  after the first run of this workflow.]**
+  unresolvable name as a loud ::warning:: instead of red-failing the build.
+  **[2026-07-30 (gl) — CHECKED, and FOUR of the six names were WRONG.** Run
+  `30492918936` deployed only `equities-regime-shadow` + `family-lighter-shadow`
+  and warned UNRESOLVED on the rest, so the levers `(fz)` registered for those
+  four books reached NO container. Railway's names follow the **emoji
+  nickname**, not the dashboard row id: `snap-back-shadow` 🧲,
+  `counterweight-shadow` ⚖️, `perp-sniper-shadow` 🎯,
+  `tide-rider-lighter-shadow` 🌊. Fixed, and `audit_deploy_coverage.py` now
+  carries all six in `AUTO_IMAGES` (it was green throughout because it checked
+  no rule for any of them, and because its parser could not read a
+  `$_shared`-interpolating grep at all — both fixed). LESSON: **a guard whose
+  only output is a ::warning:: on a passing run is not a guard** — a green
+  build with a warning is indistinguishable from a green build. STILL
+  RESOLVED BY THE OPERATOR: a `yield-harvester-shadow` service exists beside
+  `funding-carry` and this repo cannot tell which publishes the
+  `perps-funding-carry-lshadow` row, so the rule now deploys **BOTH** (his
+  call) — neither has a volume, and a redundant redeploy is far cheaper than
+  🌾 silently missing every lever it was given.]**
   **[2026-07-22 CORRECTION — this paragraph was WRONG about two of them.]** The
   `paths:` filter DOES carry `lighter_ticket_taker.py`, `lighter_ticket_replay.py`,
   `venues/**` and most of the intelligence layer (`lighter_market_scout`,
@@ -634,6 +663,19 @@ All new bots:
      `NEXT_SESSION_2026-07-30.md`; git said 29-Jul in both UTC and Sydney).
   Enforced by `scripts/audit_changelog_letters.py` on every push/PR (scoped
   to ≥18-Jul so the deliberate restart cannot fail the build).
+- **THE FARNHAM SIX (operator, 30-Jul: "name them something hilarious").** The
+  six books that received the growth system in `(fz)`–`(gh)` — 🌾 Yield
+  Harvester, ⚖️ Counterweight, 🧲 Snap Back, 📊 Index Rider, 🌊 Tide Rider,
+  🎯 Perp Sniper — are collectively **The Farnham Six**, after John Farnham,
+  undisputed national champion of the farewell tour that isn't. The joke earns
+  its place: two of them (Index Rider, Tide Rider) have **zero closed trades**
+  and are standing retirement candidates that keep not retiring, and 🌾 carry
+  is a genuine comeback story sitting five of six bars from go-live. *The Last
+  Time* was not, in fact, the last time. Respects the Australian-musician
+  convention below WITHOUT renaming anything: these are existing books with
+  existing emoji identities, so this is a COHORT label for referring to the six
+  as a group (see `SIX_BOOKS_BASELINE_2026-07-30.md`), not a rename and not a
+  licence to mint rows.
 - **NAMING THE NEXT COHORT: famous AUSTRALIAN MUSICIANS (operator, 29-Jul).**
   The 🏛️ Parliament took the last Australian PMs; the NEXT cohort of books
   that earns its own dashboard rows is named for Australian musicians

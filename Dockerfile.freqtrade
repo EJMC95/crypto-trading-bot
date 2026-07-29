@@ -100,6 +100,16 @@ COPY implementation_shortfall.py /freqtrade/implementation_shortfall.py
 # cull writes itself. Imports bot_pnl_store + cleanup_legacy_bots (both COPY'd);
 # audit_image_imports verifies. Publish-only, --publish gated.
 COPY fleet_radar.py /freqtrade/fleet_radar.py
+# [2026-07-30] 🚦 the GO-LIVE GRADER becomes an organ. It implements the (fk)
+# bar — the ONE rule that decides whether a shadow book may ever hold real
+# money — and until now it shipped in no image and ran on no schedule, so its
+# verdicts existed only when a human remembered to type the command. Kept at
+# its repo path (`scripts/`) because the module inserts its parent on sys.path
+# to import bot_pnl_store / experiment_judge / cleanup_legacy_bots (all COPY'd
+# above); moving it to /freqtrade would silently insert `/` instead.
+# Publish-only and --publish gated, exactly like the radar: it grades, it
+# promotes nothing, and go-live stays an explicit operator act.
+COPY scripts/golive_readiness.py /freqtrade/scripts/golive_readiness.py
 # [2026-07-21] 🏛️ the Parliament — the six-layer PM shadow fleet (six $1k
 # books + scanners + ML + tuners + brain), launched from run_all.sh. Imports
 # bot_pnl_store / fleet_bus / funding_basis / paper_broker — all COPY'd above

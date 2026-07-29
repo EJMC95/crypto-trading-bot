@@ -90,6 +90,11 @@ on:
       # (cl)/(cm)/(cn) but was absent from BOTH lists here, so it was
       # deploy-orphaned — a silent no-op that audit_deploy_coverage.py caught.
       - 'fleet_radar.py'
+      # 🚦 go-live grader — COPY'd into Dockerfile.freqtrade + looped in
+      # run_all.sh (`--publish`, 6-hourly) as of 2026-07-30. It is the ONLY
+      # file under `scripts/` that ships in an image, which is exactly why it
+      # needs an explicit entry here and in the service grep below.
+      - 'scripts/golive_readiness.py'
       - 'experiment_judge.py'
       - 'strategy_incubator.py'
       - 'implementation_shortfall.py'
@@ -185,7 +190,7 @@ jobs:
             # the dry-run paper DBs (the reason for the 2026-07-01 freeze).
             # Keep in sync with the `paths:` filter above — both gate the same
             # deploy. scripts/audit_deploy_coverage.py enforces both against the Dockerfiles.
-            if echo "$changed" | grep -qE '^(user_data/|venues/|parliament/|parliament_main\.py$|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$|bot_learn\.py$|brain_stats\.py$|evidence_board\.py$|fleet_immune\.py$|fleet_regen\.py$|fleet_proprioception\.py$|fleet_respiration\.py$|fleet_clock\.py$|fleet_bus\.py$|fleet_tuning\.py$|fleet_proposals\.py$|fleet_radar\.py$|experiment_judge\.py$|strategy_incubator\.py$|implementation_shortfall\.py$|event_sentinel\.py$|lighter_market_scout\.py$|lighter_ticket_taker\.py$|lighter_scout_tuner\.py$|lighter_ticket_replay\.py$|cleanup_legacy_bots\.py$|funding_basis\.py$|dashboard_server\.py$|paper_broker\.py$)'; then
+            if echo "$changed" | grep -qE '^(user_data/|venues/|parliament/|parliament_main\.py$|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$|bot_learn\.py$|brain_stats\.py$|evidence_board\.py$|fleet_immune\.py$|fleet_regen\.py$|fleet_proprioception\.py$|fleet_respiration\.py$|fleet_clock\.py$|fleet_bus\.py$|fleet_tuning\.py$|fleet_proposals\.py$|fleet_radar\.py$|scripts/golive_readiness\.py$|experiment_judge\.py$|strategy_incubator\.py$|implementation_shortfall\.py$|event_sentinel\.py$|lighter_market_scout\.py$|lighter_ticket_taker\.py$|lighter_scout_tuner\.py$|lighter_ticket_replay\.py$|cleanup_legacy_bots\.py$|funding_basis\.py$|dashboard_server\.py$|paper_broker\.py$)'; then
               svcs="freqtrade-bots"
             fi
             if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$|fleet_watchdog_svc\.py$)'; then
@@ -203,8 +208,22 @@ jobs:
             # would be a silent no-op for funding-carry — caught by
             # audit_deploy_coverage.py before it shipped, which is the whole
             # point of that guard.
-            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$)'; then
+            # [2026-07-30 (gl)] BOTH carry services, on the operator's call.
+            # The project has `funding-carry` AND `yield-harvester-shadow`, and
+            # nothing in this repo determines which publishes the
+            # perps-funding-carry-lshadow row. 🌾 is the book FIVE OF SIX BARS
+            # from go-live, so "probably the right one" is not good enough:
+            # both run carry code, neither carries a volume, so an extra
+            # redeploy costs nothing while a wrong guess costs that book every
+            # lever it was given. This is the same guess that cost four books
+            # their shot earlier in this pass — resolved by covering both
+            # rather than by picking.
+            _carry='funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$'
+            if echo "$changed" | grep -qE "^($_carry)"; then
               svcs="${svcs:+$svcs,}funding-carry"
+            fi
+            if echo "$changed" | grep -qE "^($_carry)"; then
+              svcs="${svcs:+$svcs,}yield-harvester-shadow"
             fi
             # market-context service (🛰️ instrument collector). Its live-bot
             # freshness watchdog is the fleet's ONLY cross-region check on the
@@ -225,21 +244,47 @@ jobs:
             # Names are RESOLVED against the live Railway service list below,
             # so a name that does not exist warns instead of red-failing the
             # build (the "Service not found x3" failure mode noted above).
+            #
+            # [2026-07-30 (gl) NAMES NOW VERIFIED — four of these six were
+            # WRONG.] (fz) shipped this block with the names GUESSED from the
+            # dashboard row ids, and the resolver did its job: run 30492918936
+            # deployed equities-regime-shadow + family-lighter-shadow and
+            # warned UNRESOLVED on the other four, so those books never
+            # received the levers (fz) registered for them. Railway's names
+            # follow the EMOJI NICKNAME, not the row id, which is why the
+            # guesses failed in one direction:
+            #   lighter-dislocation      -> snap-back-shadow            🧲
+            #   perps-funding-spread     -> counterweight-shadow        ⚖️
+            #   lighter-perp-sniper      -> perp-sniper-shadow          🎯
+            #   crypto-trend-daily-shadow-> tide-rider-lighter-shadow   🌊
+            # Read off `railway service list` (run 30494145090, dispatched
+            # with a deliberately bogus service so it enumerated and deployed
+            # nothing). audit_deploy_coverage.py now carries the same six in
+            # AUTO_IMAGES, so a future rename is caught by the guard rather
+            # than by a warning nobody reads.
+            #
+            # STILL UNVERIFIED, and NOT guessed here: the project also has a
+            # `yield-harvester-shadow` service alongside `funding-carry`, and
+            # this repo cannot tell which of the two publishes the
+            # perps-funding-carry-lshadow row. Both run carry code, so the
+            # funding-carry rule above may be deploying the wrong one. Left
+            # for the operator rather than resolved by guessing — the guess is
+            # what cost four books their shot.
             _shared='bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|venues/|requirements\.txt$'
             if echo "$changed" | grep -qE "^(lighter_dislocation_bot\.py$|Dockerfile\.dislocation$|$_shared)"; then
-              svcs="${svcs:+$svcs,}lighter-dislocation"
+              svcs="${svcs:+$svcs,}snap-back-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_funding_spread_bot\.py$|Dockerfile\.fundspread$|$_shared)"; then
-              svcs="${svcs:+$svcs,}perps-funding-spread"
+              svcs="${svcs:+$svcs,}counterweight-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_index_bot\.py$|Dockerfile\.indexshadow$|$_shared)"; then
               svcs="${svcs:+$svcs,}equities-regime-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_perp_sniper\.py$|Dockerfile\.psniper$|$_shared)"; then
-              svcs="${svcs:+$svcs,}lighter-perp-sniper"
+              svcs="${svcs:+$svcs,}perp-sniper-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_trend_bot\.py$|Dockerfile\.trendlighter$|$_shared)"; then
-              svcs="${svcs:+$svcs,}crypto-trend-daily-shadow"
+              svcs="${svcs:+$svcs,}tide-rider-lighter-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_family_bot\.py$|Dockerfile\.familyshadow$|$_shared)"; then
               svcs="${svcs:+$svcs,}family-lighter-shadow"

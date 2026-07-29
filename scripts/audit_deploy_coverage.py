@@ -112,17 +112,47 @@ def _read(p):
         return f.read()
 
 
+def _shell_vars(src):
+    """Single-quoted shell assignments in the decide step, e.g.
+    `_shared='a\\.py$|venues/'` — so a grep that INTERPOLATES one can still be
+    parsed. Longest name first, so `$taker_files` is not clipped by `$taker`."""
+    return dict(sorted(re.findall(r"(\w+)='([^']+)'", src),
+                       key=lambda kv: -len(kv[0])))
+
+
 def workflow_filters():
     """(service -> compiled path regex) from the `grep -qE` lines in the decide
-    step — the list that chooses WHICH SERVICE gets deployed."""
+    step — the list that chooses WHICH SERVICE gets deployed.
+
+    [2026-07-30 (gl)] Reads the DOUBLE-quoted, variable-interpolating form too.
+    The six shadow services' rules are written
+    `grep -qE "^(lighter_x\\.py$|Dockerfile\\.x$|$_shared)"`, which the
+    single-quote-only parser could not see at all — so this guard reported them
+    as having no rule whatsoever, which is the same blindness
+    `live_marker_filters()` exists to fix, recurring one pass later. The fix is
+    here rather than by inlining `$_shared` six times, because the guard being
+    unable to read a legitimate shell idiom is the defect."""
     src = _read(WORKFLOW)
+    var = _shell_vars(src)
     out = {}
-    # grep -qE '<regex>'; then svcs="<name>"  /  svcs="${svcs:+$svcs,}<name>"
+    # grep -qE '<regex>' | "<regex>"; then svcs="..." / svcs="${svcs:+$svcs,}..."
     for m in re.finditer(
-        r"grep\s+-qE\s+'([^']+)'.*?\n\s*svcs=\"(?:\$\{svcs:\+\$svcs,\})?([a-z0-9-]+)\"",
+        r"grep\s+-qE\s+(?:'([^']+)'|\"([^\"]+)\")"
+        r".*?\n\s*svcs=\"(?:\$\{svcs:\+\$svcs,\})?([a-z0-9-]+)\"",
         src, re.S,
     ):
-        rx, svc = m.group(1), m.group(2)
+        rx, svc = (m.group(1) or m.group(2)), m.group(3)
+        # A pattern that is ONLY a variable reference is the live-bot marker
+        # form, handled by live_marker_filters() — leave it to that parser.
+        if re.fullmatch(r"\$\w+", rx.strip()):
+            continue
+        for name, val in var.items():
+            rx = rx.replace(f"${name}", val)
+        if "$" in re.sub(r"\$\)|\$\||\$\"|\$$", "", rx):
+            # an UNRESOLVED interpolation would silently compile to a regex
+            # that matches nothing — refuse it loudly rather than pass green
+            raise SystemExit(f"audit_deploy_coverage: unresolved shell "
+                             f"interpolation in the '{svc}' grep: {rx!r}")
         out.setdefault(svc, []).append(re.compile(rx))
     return out
 
@@ -272,7 +302,22 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                # (its own comment: "the fleet's ONLY cross-region check on
                # the real-money books") but never audited here — a future
                # COPY added to that image could go deploy-orphaned unseen.
-               "Dockerfile.marketcontext": "market-context"}
+               "Dockerfile.marketcontext": "market-context",
+               # [2026-07-30 (gl)] THE SIX SHADOW IMAGES. They gained deploy
+               # rules in (fz) but were never listed here, so this guard was
+               # green while FOUR of their service names did not resolve at
+               # all — the guard can only check images it knows about, and
+               # "has a rule" is not "has a working rule". Names verified
+               # against the live `railway service list` printed by run
+               # 30494145090, not inferred from the dashboard row ids (the
+               # Railway names follow the EMOJI NICKNAME, which is exactly
+               # why four of the five guesses were wrong).
+               "Dockerfile.dislocation": "snap-back-shadow",
+               "Dockerfile.fundspread": "counterweight-shadow",
+               "Dockerfile.indexshadow": "equities-regime-shadow",
+               "Dockerfile.psniper": "perp-sniper-shadow",
+               "Dockerfile.trendlighter": "tide-rider-lighter-shadow",
+               "Dockerfile.familyshadow": "family-lighter-shadow"}
 
 
 _UNSET = object()   # "not supplied" — distinct from None, which means UNPARSEABLE
