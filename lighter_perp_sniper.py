@@ -78,6 +78,21 @@ MAX_OPEN = 4               # global cap on concurrent snipes
 # Set SNIPER_SURGE_MULT=0 to disable the second source entirely.
 SURGE_MULT = float(os.environ.get("SNIPER_SURGE_MULT", "3.0"))
 SURGE_MAX_PER_LOOP = int(os.environ.get("SNIPER_SURGE_MAX_PER_LOOP", "3"))
+# [2026-07-30 SCOPE — THE THIRD SOURCE, and the one that actually reaches] A
+# book is YOUNG until it has this many daily candles. Measured on the venue:
+# the majors carry ~402 daily bars, so a book with a handful is genuinely in
+# its debut regime — the same phenomenon "new listing" names, but observable
+# for WEEKS instead of for the single loop in which the market-set diff fires.
+# That single-loop window is why this bot has n=1 in weeks: not a bad thesis,
+# an unobservable event. This source reaches back over the whole young cohort.
+YOUNG_MAX_BARS = int(os.environ.get("SNIPER_YOUNG_MAX_BARS", "21"))
+YOUNG_MAX_PER_LOOP = int(os.environ.get("SNIPER_YOUNG_MAX_PER_LOOP", "2"))
+# A young book still has to be TRADABLE — a debut with no turnover is a
+# ghost print, and the sniper's own history is full of one-sided debut books.
+YOUNG_MIN_VOL_M = float(os.environ.get("SNIPER_YOUNG_MIN_VOL_M", "0.25"))
+# Candle probes per loop for unknown books. Small on purpose: the venue REST
+# budget is shared, and the cache is monotone so the cost decays to zero.
+YOUNG_PROBE_BUDGET = int(os.environ.get("SNIPER_YOUNG_PROBE_BUDGET", "4"))
 LOOP_SECONDS = 60          # poll the market list every minute
 DIRECTION_LONG = os.environ.get("SNIPER_DIRECTION", "long").lower() != "short"
 # [2026-07-17 RETRY FIX] `baseline |= set(new_listings)` used to run
@@ -192,6 +207,49 @@ def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP):
     return out
 
 
+def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit):
+    """Books still inside their DEBUT REGIME, as snipe candidates.
+
+    [2026-07-30 THE SCOPE FIX] `new_listings` is a market-set DIFF: a symbol
+    qualifies for exactly the one loop in which it first appears, and only if
+    this process is running and its baseline is warm at that moment. That is
+    why the book has n=1 in weeks with `new_listings: []` on the bus — the
+    thesis (violent repricing in a book with no settled history) is fine; the
+    TRIGGER was unobservable. A book with `< max_bars` daily candles is in the
+    same state and stays observable for weeks, so the same edge finally gets a
+    population to be measured on.
+
+    Pure — the caller supplies the bar counts and the volume map. Ordered
+    YOUNGEST first (fewest bars = closest to the debut, where the move is),
+    filtered to books with real turnover, deduped against `already` (the same
+    ledger the surge source uses: a young book is in `baseline`, so baseline
+    cannot dedup it), and bounded by `limit`.
+    """
+    rows = []
+    for sym, n in (bar_counts or {}).items():
+        # `str(sym)` alone is too permissive — a None key coerces to the
+        # string "NONE" and becomes a tradable-looking candidate. Caught by
+        # test_young_candidates_tolerates_junk; require a real string.
+        if not isinstance(sym, str):
+            continue
+        try:
+            bars = int(n)
+        except (TypeError, ValueError):
+            continue
+        s = sym.strip().upper()
+        if not s or s in (already or set()) or bars > int(max_bars):
+            continue
+        try:
+            vol = float((vols or {}).get(s, 0.0) or 0.0)
+        except (TypeError, ValueError):
+            vol = 0.0
+        if vol < float(min_vol_m):
+            continue
+        rows.append((bars, -vol, s))
+    rows.sort()
+    return [s for _, _, s in rows[:int(limit)]]
+
+
 def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
                    try_snipe, is_held=lambda s: False,
                    max_attempts=PENDING_MAX_ATTEMPTS,
@@ -283,6 +341,11 @@ def main():
     # re-offer every book that has ever surged, which is the retry-forever bug
     # baseline cannot prevent for this source.
     surge_done = set()
+    # [2026-07-30] young-book probe cache. `bar_counts` holds measured daily-bar
+    # counts for books still under the young bar; `not_young` is the permanent
+    # exclusion set (a book that has aged past the bar can never re-enter).
+    bar_counts = {}
+    not_young = set()
     no_px_since = {}      # coin -> first ts the book was unpriceable (zombie clock)
     last_px = {}          # coin -> last seen mid (zombie exit price)
     # [2026-07-17 SEED GUARD] The seed below (`if not baseline`) absorbs every
@@ -355,6 +418,9 @@ def main():
         # is in `baseline`, so nothing else would stop it being re-offered.
         try:
             surge_done.update(str(x) for x in (_saved.get("surge_done") or []))
+            not_young.update(str(x) for x in (_saved.get("not_young") or []))
+            for _k, _v in (_saved.get("bar_counts") or {}).items():
+                bar_counts[str(_k)] = int(_v)
         except Exception:  # noqa: BLE001
             pass
         if pending:
@@ -487,7 +553,9 @@ def main():
             store.save_state(bot_id, {"baseline": sorted(baseline),
                                       "broker": broker.to_state() if dry_run else None,
                                       "entry_ts": entry_ts, "pending": pending,
-                                      "surge_done": sorted(surge_done)})
+                                      "surge_done": sorted(surge_done),
+                                      "bar_counts": bar_counts,
+                                      "not_young": sorted(not_young)})
             log.info("seeded baseline with %d active markets — sniping only NEW "
                      "listings from here.", len(baseline))
             if args.once:
@@ -538,8 +606,47 @@ def main():
                 log.info("SURGE CANDIDATES (>=%.1fx 24h volume): %s",
                          SURGE_MULT, ", ".join(_surge))
                 surge_done.update(_surge)
+        # [2026-07-30] THIRD SOURCE — books still inside their debut regime.
+        # The candle probe is GOVERNED and MONOTONE: at most YOUNG_PROBE_BUDGET
+        # unknown symbols per loop, and a book measured older than the young bar
+        # is recorded in `not_young` FOREVER (books get older, never younger),
+        # so the probe cost decays to zero once the venue has been walked.
+        _young = []
+        if YOUNG_MAX_BARS > 0:
+            _unknown = [s for s in sorted(active)
+                        if s not in not_young and s not in bar_counts
+                        and s not in surge_done]
+            for _sym in _unknown[:YOUNG_PROBE_BUDGET]:
+                try:
+                    _cs = ctx.venue.candles(
+                        _sym, "1d", int((now.timestamp() - 400 * 86400) * 1000),
+                        int(now.timestamp() * 1000))
+                    _n = len(_cs or [])
+                except Exception:  # noqa: BLE001 — budget/venue hiccup, retry later
+                    continue
+                if _n > YOUNG_MAX_BARS:
+                    not_young.add(_sym)      # permanent: it can only age
+                else:
+                    bar_counts[_sym] = _n
+            _vols = {}
+            if fleet_bus is not None:
+                try:
+                    _sp2 = fleet_bus._load("lighter-market", None) or {}
+                    if fleet_bus.is_fresh(_sp2, None):
+                        _vols = _sp2.get("vols") or {}
+                except Exception:  # noqa: BLE001
+                    _vols = {}
+            _young = young_candidates(bar_counts, YOUNG_MAX_BARS, _vols,
+                                      YOUNG_MIN_VOL_M,
+                                      surge_done | set(pending), YOUNG_MAX_PER_LOOP)
+            if _young:
+                log.info("YOUNG-BOOK CANDIDATES (<=%d daily bars): %s",
+                         YOUNG_MAX_BARS,
+                         ", ".join(f"{s}({bar_counts.get(s)}d)" for s in _young))
+                surge_done.update(_young)
         open_now, _sniped, _abandoned = run_snipe_pass(
-            candidates=new_listings + _surge, pending=pending, baseline=baseline,
+            candidates=new_listings + _surge + _young, pending=pending,
+            baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
             try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n),
             is_held=lambda s: s in _held_now)
@@ -700,7 +807,9 @@ def main():
                                   "broker": broker.to_state() if dry_run else None,
                                   "entry_ts": entry_ts,
                                   "pending": pending,
-                                  "surge_done": sorted(surge_done)})
+                                  "surge_done": sorted(surge_done),
+                                  "bar_counts": bar_counts,
+                                  "not_young": sorted(not_young)})
 
         if args.once:
             log.info("--once complete: watching %d markets, %d pending, %d open.",

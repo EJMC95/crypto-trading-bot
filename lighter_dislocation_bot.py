@@ -223,6 +223,31 @@ def adaptive_enter_bps(devs, pct, exit_bps, floor_mult, fallback, min_n):
                      float(fallback)))
 
 
+def prune_dead(coins, supports):
+    """Drop configured symbols the venue does not actually list.
+
+    [2026-07-30 SCOPE HYGIENE] Measured against the live venue: 5 of this
+    book's 30 configured names (INJ, RUNE, STX, GALA, W) and 2 of the family
+    bot's 15 (ATOM, ALGO) are NOT LISTED on Lighter. They were typed when the
+    venue carried a different set and never re-checked. Dead names cost a
+    backfill call each, make `len(COINS)` a lie in every log line, and — on a
+    book that needs `2*K` rankable coins to rebalance at all — can be the
+    difference between rebalancing and skipping.
+
+    `supports` is injected (the venue's own `ctx.supports`) so this is pure and
+    offline-testable. A supports() that RAISES keeps the coin: an unreachable
+    venue must never silently empty a book's universe.
+    """
+    live, dead = [], []
+    for c in coins:
+        try:
+            ok = bool(supports(c))
+        except Exception:  # noqa: BLE001
+            ok = True                 # venue unreachable -> keep, never prune blind
+        (live if ok else dead).append(c)
+    return live, dead
+
+
 def resolve_universe(configured, width, min_vol_m, current_time=None):
     """Configured coins first (the validated core, order preserved), then the
     scout's most-liquid books up to `width`. A dark/stale scout, a raising
@@ -405,6 +430,10 @@ def main():
     # only takes over once a loop has actually measured a distribution.
     _moved = apply_tuning()
     COINS = resolve_universe(COINS, UNIVERSE_N, UNIVERSE_MIN_VOL_M)
+    COINS, _dead = prune_dead(COINS, ctx.supports)
+    if _dead:
+        log.warning("pruned %d symbol(s) the venue does not list: %s",
+                    len(_dead), ", ".join(_dead))
     enter_bps_eff = ENTER_BPS
     log.info("universe: %d coins | entry gate starts at %.0fbps "
              "(adaptive p%.1f, floored at %.0fbps)%s",

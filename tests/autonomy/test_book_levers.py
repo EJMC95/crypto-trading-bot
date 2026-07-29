@@ -314,3 +314,71 @@ def test_sniper_lever_moves_the_multiple(monkeypatch):
         assert sniper.SURGE_MULT == 6.0
     finally:
         sniper.SURGE_MULT = original
+
+
+# --------------------------------------------------------------------------
+# 7. Scope hygiene — configured universes that contain symbols the venue
+#    does not list (measured 2026-07-30: family 2/15 dead, spread 5/30 dead).
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("mod", [spread, disloc])
+def test_prune_dead_drops_unlisted_symbols(mod):
+    live, dead = mod.prune_dead(["BTC", "ATOM", "ETH", "ALGO"],
+                                lambda c: c in {"BTC", "ETH"})
+    assert live == ["BTC", "ETH"] and dead == ["ATOM", "ALGO"]
+
+
+@pytest.mark.parametrize("mod", [spread, disloc])
+def test_prune_dead_never_empties_a_book_on_a_venue_error(mod):
+    """An unreachable venue must not silently prune the whole universe — a
+    book with no coins trades nothing, which is the failure this work exists
+    to remove, not create."""
+    def _boom(_c):
+        raise RuntimeError("venue unreachable")
+
+    live, dead = mod.prune_dead(["BTC", "ETH"], _boom)
+    assert live == ["BTC", "ETH"] and dead == []
+
+
+# --------------------------------------------------------------------------
+# 8. The Perp Sniper's THIRD source — the debut-regime cohort.
+# --------------------------------------------------------------------------
+
+def test_young_candidates_prefers_the_youngest_liquid_book():
+    bars = {"NEWA": 3, "NEWB": 10, "OLD": 400}
+    vols = {"NEWA": 1.0, "NEWB": 2.0, "OLD": 50.0}
+    assert sniper.young_candidates(bars, 21, vols, 0.25, set(), 5) == \
+        ["NEWA", "NEWB"], "youngest first; a book past the bar is excluded"
+
+
+def test_young_candidates_requires_real_turnover():
+    """A debut with no turnover is a ghost print — this bot's own history is
+    full of one-sided debut books it could not fill."""
+    bars = {"GHOST": 2, "REAL": 4}
+    vols = {"GHOST": 0.0, "REAL": 1.0}
+    assert sniper.young_candidates(bars, 21, vols, 0.25, set(), 5) == ["REAL"]
+
+
+def test_young_candidates_dedups_and_bounds():
+    bars = {f"S{i}": 2 for i in range(10)}
+    vols = {f"S{i}": 1.0 for i in range(10)}
+    assert len(sniper.young_candidates(bars, 21, vols, 0.25, set(), 2)) == 2
+    got = sniper.young_candidates(bars, 21, vols, 0.25, {"S0", "S1"}, 10)
+    assert "S0" not in got and "S1" not in got, \
+        "a young book is in `baseline`, so it needs the same dedup ledger"
+
+
+def test_young_candidates_tolerates_junk():
+    assert sniper.young_candidates(None, 21, {}, 0.0, set(), 5) == []
+    assert sniper.young_candidates({"A": "x", None: 3}, 21, {"A": 9}, 0.0,
+                                   set(), 5) == []
+
+
+def test_sniper_probe_cache_is_monotone_by_construction():
+    """A book gets older, never younger — so `not_young` may be permanent, and
+    that is what keeps the candle-probe cost decaying to zero."""
+    import inspect
+    src = inspect.getsource(sniper.main)
+    assert "not_young.add" in src and "YOUNG_PROBE_BUDGET" in src, \
+        "the probe must be governed and its exclusion set permanent"
+    assert sniper.YOUNG_MAX_BARS == 21 and sniper.YOUNG_PROBE_BUDGET == 4
