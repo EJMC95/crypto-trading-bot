@@ -51,6 +51,12 @@ scripts/.*.json
 
 # test artifacts
 .coverage
+# [2026-07-30 (gp)] coverage.json is a BUILD ARTIFACT. CI generates it
+# (tests.yml: `coverage json -o coverage.json`) and passes it to
+# audit_coverage_floors.py explicitly. A committed one is junk at best:
+# I committed a 1-module, 10.6% run by accident via `git add -A`, and a
+# local audit run would then grade the real-money floors against it.
+coverage.json
 .pytest_cache/
 htmlcov/
 __pycache__/
