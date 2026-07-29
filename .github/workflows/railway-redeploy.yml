@@ -230,21 +230,47 @@ jobs:
             # Names are RESOLVED against the live Railway service list below,
             # so a name that does not exist warns instead of red-failing the
             # build (the "Service not found x3" failure mode noted above).
+            #
+            # [2026-07-30 (gl) NAMES NOW VERIFIED — four of these six were
+            # WRONG.] (fz) shipped this block with the names GUESSED from the
+            # dashboard row ids, and the resolver did its job: run 30492918936
+            # deployed equities-regime-shadow + family-lighter-shadow and
+            # warned UNRESOLVED on the other four, so those books never
+            # received the levers (fz) registered for them. Railway's names
+            # follow the EMOJI NICKNAME, not the row id, which is why the
+            # guesses failed in one direction:
+            #   lighter-dislocation      -> snap-back-shadow            🧲
+            #   perps-funding-spread     -> counterweight-shadow        ⚖️
+            #   lighter-perp-sniper      -> perp-sniper-shadow          🎯
+            #   crypto-trend-daily-shadow-> tide-rider-lighter-shadow   🌊
+            # Read off `railway service list` (run 30494145090, dispatched
+            # with a deliberately bogus service so it enumerated and deployed
+            # nothing). audit_deploy_coverage.py now carries the same six in
+            # AUTO_IMAGES, so a future rename is caught by the guard rather
+            # than by a warning nobody reads.
+            #
+            # STILL UNVERIFIED, and NOT guessed here: the project also has a
+            # `yield-harvester-shadow` service alongside `funding-carry`, and
+            # this repo cannot tell which of the two publishes the
+            # perps-funding-carry-lshadow row. Both run carry code, so the
+            # funding-carry rule above may be deploying the wrong one. Left
+            # for the operator rather than resolved by guessing — the guess is
+            # what cost four books their shot.
             _shared='bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|venues/|requirements\.txt$'
             if echo "$changed" | grep -qE "^(lighter_dislocation_bot\.py$|Dockerfile\.dislocation$|$_shared)"; then
-              svcs="${svcs:+$svcs,}lighter-dislocation"
+              svcs="${svcs:+$svcs,}snap-back-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_funding_spread_bot\.py$|Dockerfile\.fundspread$|$_shared)"; then
-              svcs="${svcs:+$svcs,}perps-funding-spread"
+              svcs="${svcs:+$svcs,}counterweight-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_index_bot\.py$|Dockerfile\.indexshadow$|$_shared)"; then
               svcs="${svcs:+$svcs,}equities-regime-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_perp_sniper\.py$|Dockerfile\.psniper$|$_shared)"; then
-              svcs="${svcs:+$svcs,}lighter-perp-sniper"
+              svcs="${svcs:+$svcs,}perp-sniper-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_trend_bot\.py$|Dockerfile\.trendlighter$|$_shared)"; then
-              svcs="${svcs:+$svcs,}crypto-trend-daily-shadow"
+              svcs="${svcs:+$svcs,}tide-rider-lighter-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_family_bot\.py$|Dockerfile\.familyshadow$|$_shared)"; then
               svcs="${svcs:+$svcs,}family-lighter-shadow"

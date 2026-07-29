@@ -561,10 +561,22 @@ All new bots:
   from this repo** (the only names recorded anywhere are funding-carry,
   pnl-dashboard, market-context and the two live bots), so the deploy step now
   RESOLVES each target against `railway service list` and reports an
-  unresolvable name as a loud ::warning:: instead of red-failing the build —
-  and prints the real service list, which is how the next session corrects any
-  name in one pass with data instead of another guess. **Check that warning
-  after the first run of this workflow.]**
+  unresolvable name as a loud ::warning:: instead of red-failing the build.
+  **[2026-07-30 (gl) — CHECKED, and FOUR of the six names were WRONG.** Run
+  `30492918936` deployed only `equities-regime-shadow` + `family-lighter-shadow`
+  and warned UNRESOLVED on the rest, so the levers `(fz)` registered for those
+  four books reached NO container. Railway's names follow the **emoji
+  nickname**, not the dashboard row id: `snap-back-shadow` 🧲,
+  `counterweight-shadow` ⚖️, `perp-sniper-shadow` 🎯,
+  `tide-rider-lighter-shadow` 🌊. Fixed, and `audit_deploy_coverage.py` now
+  carries all six in `AUTO_IMAGES` (it was green throughout because it checked
+  no rule for any of them, and because its parser could not read a
+  `$_shared`-interpolating grep at all — both fixed). LESSON: **a guard whose
+  only output is a ::warning:: on a passing run is not a guard** — a green
+  build with a warning is indistinguishable from a green build. STILL
+  UNRESOLVED: a `yield-harvester-shadow` service exists beside `funding-carry`
+  and this repo cannot tell which publishes the `perps-funding-carry-lshadow`
+  row — operator call, deliberately not guessed again.]**
   **[2026-07-22 CORRECTION — this paragraph was WRONG about two of them.]** The
   `paths:` filter DOES carry `lighter_ticket_taker.py`, `lighter_ticket_replay.py`,
   `venues/**` and most of the intelligence layer (`lighter_market_scout`,

@@ -302,3 +302,73 @@ def test_the_publish_block_cannot_fail_the_grade():
     src = (_ROOT / "scripts/golive_readiness.py").read_text()
     block = src[src.index("if a.publish:"):]
     assert "except Exception" in block.split("print(\"Go-live remains")[0]
+
+
+# --------------------------------------------------------------------------
+# 6. THE SHADOW SERVICES' REAL NAMES — (gl). The deploy rules were shipped
+#    with GUESSED Railway names and four of six were wrong, so four of the
+#    Farnham Six never received the levers registered for them. The resolver
+#    warned; nobody was watching. These pin the verified names in a place that
+#    FAILS rather than warns.
+# --------------------------------------------------------------------------
+
+#: Verified against the live `railway service list` (run 30494145090).
+#: Railway names follow the EMOJI NICKNAME, not the dashboard row id — the
+#: mismatch that caused the misses.
+SHADOW_SERVICES = {
+    "Dockerfile.dislocation": "snap-back-shadow",
+    "Dockerfile.fundspread": "counterweight-shadow",
+    "Dockerfile.indexshadow": "equities-regime-shadow",
+    "Dockerfile.psniper": "perp-sniper-shadow",
+    "Dockerfile.trendlighter": "tide-rider-lighter-shadow",
+    "Dockerfile.familyshadow": "family-lighter-shadow",
+}
+
+#: Names the workflow used to carry. Each one resolved to NOTHING at Railway,
+#: so a push matching its rule deployed that book's image nowhere.
+DEAD_SERVICE_NAMES = ("lighter-dislocation", "perps-funding-spread",
+                      "lighter-perp-sniper", "crypto-trend-daily-shadow")
+
+
+@pytest.mark.parametrize("dockerfile,service", sorted(SHADOW_SERVICES.items()))
+def test_each_shadow_image_deploys_its_verified_service(dockerfile, service):
+    wf = (_ROOT / ".github/workflows/railway-redeploy.yml").read_text()
+    assert f"svcs,}}{service}\"" in wf, f"{dockerfile} has no rule for {service}"
+    assert f"'{dockerfile}'" in wf, f"{dockerfile} missing from paths:"
+
+
+@pytest.mark.parametrize("dead", DEAD_SERVICE_NAMES)
+def test_the_unresolvable_names_are_gone(dead):
+    """A rule pointing at a non-existent service is worse than no rule: it
+    reads as covered, warns once in a log, and deploys nothing."""
+    wf = (_ROOT / ".github/workflows/railway-redeploy.yml").read_text()
+    assert f'svcs,}}{dead}"' not in wf, (
+        f"{dead} does not exist at Railway — a push matching its rule deploys "
+        "that book's image nowhere")
+
+
+def test_the_deploy_guard_knows_about_these_images():
+    """The guard was GREEN while four names were dead, because it only checks
+    images listed in AUTO_IMAGES and these six were not in it. A guard that
+    cannot see the rule cannot validate the rule."""
+    sys.path.insert(0, str(_ROOT / "scripts"))
+    import audit_deploy_coverage as adc
+    for dockerfile, service in SHADOW_SERVICES.items():
+        assert adc.AUTO_IMAGES.get(dockerfile) == service, dockerfile
+
+
+def test_the_guard_can_read_a_variable_interpolating_grep():
+    """The six rules interpolate `$_shared`. The parser read only the
+    single-quoted inline form, so it saw NO rule for any of them — the same
+    blindness live_marker_filters() was written to fix, one pass later. If this
+    regresses, the guard silently stops checking six services."""
+    sys.path.insert(0, str(_ROOT / "scripts"))
+    import audit_deploy_coverage as adc
+    filters = adc.workflow_filters()
+    for service in SHADOW_SERVICES.values():
+        rxs = filters.get(service)
+        assert rxs, f"parser sees no rule at all for {service}"
+        # the SHARED modules must be reachable — that is what $_shared carries,
+        # and it is how a lever-registry change reaches these books
+        assert any(rx.search("fleet_tuning.py") for rx in rxs), service
+        assert any(rx.search("bot_pnl_store.py") for rx in rxs), service

@@ -1,3 +1,24 @@
+## 2026-07-30 (gl) — FOUR OF THE FARNHAM SIX NEVER GOT THEIR SHOT: the deploy names were guessed, and the guard could not read the rules
+
+- **MEASURED, from deploy run `30492918936`** (the merge of `(fz)`–`(gh)`): `equities-regime-shadow` and `family-lighter-shadow` deployed; the other four warned **`UNRESOLVED service names (no deploy happened for these)`**. So the levers, widened universes and adaptive gate that pass built *specifically for those books* reached **no container**, exactly as `(fz)`'s own note feared — "the code was right and was never running", one commit after documenting the class.
+- **WHY**: `(fz)` guessed the Railway names from the **dashboard row ids**. Railway names follow the **emoji nickname**. Read off the live `railway service list` (run `30494145090`, dispatched with a deliberately bogus service so it enumerated and deployed nothing):
+
+  | row id guessed | real Railway service |
+  |---|---|
+  | `lighter-dislocation` | **`snap-back-shadow`** 🧲 |
+  | `perps-funding-spread` | **`counterweight-shadow`** ⚖️ |
+  | `lighter-perp-sniper` | **`perp-sniper-shadow`** 🎯 |
+  | `crypto-trend-daily-shadow` | **`tide-rider-lighter-shadow`** 🌊 |
+
+  `equities-regime-shadow` and `family-lighter-shadow` were right, which is exactly why the failure was quiet: two of six worked.
+- **THE RESOLVER WORKED — AND THAT IS THE UNCOMFORTABLE PART.** `(fz)` deliberately chose "warn loudly, don't red-fail" *because* the names were unverified, and wrote "check that warning after the first run of this workflow". It warned. The build went green. A green build with a `::warning::` is indistinguishable from a green build, so the safeguard degraded into a note nobody was obliged to read. **A guard whose only output is a warning on a passing run is not a guard.** Hence the second half of this entry.
+- **THE GUARD WAS GREEN THROUGHOUT, TWICE OVER.** `audit_deploy_coverage.py` could not have caught it:
+  1. `AUTO_IMAGES` never listed the six shadow images, so the guard checked no rule for any of them. Now it does — a future rename fails the build.
+  2. Adding them exposed the real defect: `workflow_filters()` parsed only the **single-quoted inline** `grep -qE '...'` form, while all six shadow rules use the double-quoted, `$_shared`-interpolating form. The parser saw **no rule at all** for six services — the identical blindness `live_marker_filters()` was written to fix on 29-Jul, recurring one pass later. Fixed in the parser (both quote forms, shell-variable expansion, longest-name-first so `$taker_files` is not clipped by `$taker`) rather than by inlining `$_shared` six times: the guard being unable to read a legitimate shell idiom **is** the defect. An unresolved interpolation now `SystemExit`s instead of compiling to a regex that matches nothing — mutation-verified in both directions (drop a `paths:` entry → 1 named orphan; typo a variable → loud refusal).
+- **PINNED IN A PLACE THAT FAILS**: `tests/autonomy/test_golive_organ.py` §6 asserts each shadow image's verified service name is present in BOTH lists, that each of the four dead names is **absent**, that `AUTO_IMAGES` carries all six, and that the parser can actually see `fleet_tuning.py`/`bot_pnl_store.py` through `$_shared` for every one of them — that last assertion is what fails if the parser regresses and silently stops checking six services.
+- **NOT GUESSED, DELIBERATELY**: the project also has a **`yield-harvester-shadow`** service beside `funding-carry`, and nothing in this repo says which of the two publishes the `perps-funding-carry-lshadow` row. Both run carry code, so the `funding-carry` rule may be pointing at the wrong one — 🌾 is the book five of six bars from go-live, so this matters. Recorded in the workflow and escalated rather than resolved by another guess. **Guessing is what cost four books their shot.**
+- Suite green; six audits green; the workflow's YAML parses.
+
 ## 2026-07-30 (gk) — THE GO-LIVE GATE HAD NO PUBLISHER: the rule that governs real money ran only when a human typed it
 
 *(Dated 30-Jul to sit with its `(fz)`–`(gj)` siblings and the operator's Sydney clock; git's UTC clock read 29-Jul at commit time. Noted per the rule-5 convention rather than left to be re-discovered.)*
