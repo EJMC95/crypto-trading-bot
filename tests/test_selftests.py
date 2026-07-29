@@ -55,6 +55,10 @@ SELFTEST_MODULES = [
     # no cache read). It pins the constants the recorded tp-0.06 verdict is
     # quoted against, so a silent grid edit cannot orphan the header.
     "scripts.study_farmer_take_profit",
+    # [2026-07-29 (ex)] prospect-admission test — --selftest is offline (veto
+    # reduction, signature dedupe, ordering, empty-state); the full run needs
+    # the tape + register from the DB.
+    "scripts.study_prospect_admission",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",
