@@ -52,6 +52,21 @@ both right; the resolution is to make the omission DECLARED:
    was the lever for carry — the Farmer's decay-exit bar deserves the same
    measured look before anyone argues from prose). Study only; no lever.
 
+**[2026-07-30 — half 2 RUN (`scripts/study_decay_exit.py`, 455d cache +
+trailing-180d, 8 variants, multiplicity stated): THE LIVE BAR SURVIVES ITS
+OWN AUDIT.** Ratio 0.375 is the only variant passing both halves at both
+slips on the trailing 180d (+$29.08 / +$17.96) and the only both-halves
+pass at 0.5bps on the full tape. Removing the decay exit is catastrophic
+(ratio 0: −$16.60/−$38.04 full-tape, h2 negative both windows), the
+funding_carry-style persistence variants effectively DISABLE it (cold%
+20.2→0.7/0.1) and lose the same way, and wider ratios (0.75/1.0) lose too.
+Ratio 0.5 produces byte-identical trades to 0.375 (funding moves
+discretely past both bars) — the live constant sits on a plateau, not a
+knife-edge. Funding earned is ~equal across variants (~$39 full-tape); the
+decay exit's whole value is PRICE-side, consistent with the original "it
+is not a funding bot" verdict. A2's answer for the review: **the constant
+stands — declare env-only and move on**; nothing here argues for a lever.]
+
 ## B. Engineering — measurement plumbing (safe to ship without the review)
 
 `conviction_hi`, `explore_k`, `slope_gate` (live + xp): **UNMEASURED** — "no
@@ -75,7 +90,11 @@ engineering pass; until then the census stays honest about not knowing.
 
 1. **A1**: widen `live.funding.enter_apr` hi → 0.12 (+ xp twin) — yes/no.
 2. **A2**: declare `EXIT_APR`/`HARD_STOP` in `LEVER_AUTHORITY_OK` (flap-fix
-   reasoning) + queue the decay-exit backtest — yes/no.
+   reasoning) — yes/no. The queued decay-exit backtest is now RUN (30-Jul,
+   see the §A2 stamp): the live 0.375 bar is the table's only
+   both-halves-both-slips pass on the trailing window and sits on a
+   plateau; no variant argues for a change or a lever. The declaration is
+   all that remains.
 3. **Testing campaign ratification** (2026-07-29, PRs #105–#112): the suite
    is 200→299 with 19 ratchet floors and the publish-without-tests policy;
    the live harness runs on every push; Finding-4 seams proceed weekly

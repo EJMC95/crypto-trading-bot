@@ -1,0 +1,68 @@
+name: Explore Floor (shadow arm)
+
+# [2026-07-30 (eu)] Set FUNDING_EXPLORE_MIN_VOL on funding-farmer-shadow —
+# the operator-sanctioned explore activation (EXPLORE_ZERO_DIAGNOSIS
+# "proceed with 1", pre-registered $2M floor, SHADOW ARM ONLY; the 30-Jul
+# three-option study re-confirmed option 1 as the only one producing real
+# coverage). Modelled on dashboard-auth-rotate.yml: same project token,
+# same serialize-with-redeploys concurrency, same output-discard (the
+# `railway variables` echo can print the service's FULL variable table —
+# DATABASE_URL included — unmasked into the log).
+#
+# SCOPE, deliberately narrow: ONE hardcoded service (the shadow arm), ONE
+# variable, TWO allowed values. The LIVE Farmer is unreachable from this
+# tool by construction — `live.funding.explore_k` stays behind the growth
+# promoter's paired bar, and live env stays operator-only.
+#
+# VERIFY after dispatch (the (df) lesson — published output, never "the
+# var is set"): the perps-funding-lighter-lshadow row's
+# extra.levers.explore_floor must read the value set here once the (eu)
+# image is on the service; before that image, verify via the pool receipts
+# (funding-scan-shadow explore.floor) or container logs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      floor:
+        description: "FUNDING_EXPLORE_MIN_VOL for the SHADOW arm"
+        required: true
+        default: "2000000"
+        type: choice
+        options:
+          - "2000000"   # the pre-registered $2M activation
+          - "0"         # deactivate (explore pool empty again — fail-safe inert)
+
+concurrency:
+  group: railway-deploy     # serialize with Railway Redeploy — same service surface
+  cancel-in-progress: false
+
+jobs:
+  set-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Set FUNDING_EXPLORE_MIN_VOL on funding-farmer-shadow, then redeploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          FLOOR_IN: ${{ github.event.inputs.floor }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          case "${FLOOR_IN}" in
+            2000000|0) ;;
+            *) echo "::error::floor must be 2000000 or 0 — refusing (the choice list is the whole authority)"; exit 1 ;;
+          esac
+          # output discarded: the variables echo may print the service's full
+          # variable table (DATABASE_URL, keys) unmasked — the rotate
+          # workflow's recorded lesson.
+          railway variables --service funding-farmer-shadow --skip-deploys \
+            --set "FUNDING_EXPLORE_MIN_VOL=${FLOOR_IN}" > /dev/null 2>&1
+          # env is read at boot — restart on the new value (same image).
+          railway redeploy --service funding-farmer-shadow --yes
+          echo "FUNDING_EXPLORE_MIN_VOL=${FLOOR_IN} set on funding-farmer-shadow; service redeployed."
+          echo "Verify by PUBLISHED OUTPUT: the -lshadow row's extra.levers.explore_floor (post-(eu) image)."

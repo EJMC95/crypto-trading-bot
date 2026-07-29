@@ -369,7 +369,8 @@ def _in_restart_window(t, restarts_per_day, window_h=1.0):
     return (t % period) < window_h * 3600.0
 
 
-def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None):
+def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None,
+        decay_persist_h=0):
     """Replay the live bot's rules over [t0,t1). Returns a result dict.
 
     entry_ok: optional (sym, hour_ts) -> bool predicate consulted ONLY at the
@@ -377,6 +378,16 @@ def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None):
     reproduces the unfiltered behaviour exactly — position management, funding
     accrual and every exit path are never filtered, so an open position is
     always managed even if its coin later fails the predicate.
+
+    decay_persist_h: [2026-07-30 DECAY-EXIT STUDY hook] the cold exit fires
+    only after the rate has read decayed (|apr| < exit_apr) for MORE than
+    this many CONSECUTIVE hourly reads. 0 (default) = first decayed read
+    exits — byte-identical to the shipped behaviour (the counter reaches 1 >
+    0 on the same hour the old inline check fired). A missing apr skips the
+    position's management hour wholesale (this harness's existing contract,
+    mirroring the ladder's apr=None-disables-decay), so the streak neither
+    extends nor resets there. Ladder precedence is untouched: stop > tp >
+    flip > cold > max_hold.
 
     `slope` adds the funding-SLOPE entry gate (default OFF => the sweep verdict
     in main() is byte-identical to before this study):
@@ -408,13 +419,17 @@ def run(mk, enter_apr, t0, t1, slope=None, restarts_per_day=11, entry_ok=None):
                 adverse = ((hi - p["px"]) / p["px"]) if p["short"] else ((p["px"] - lo) / p["px"])
                 favour = ((p["px"] - lo) / p["px"]) if p["short"] else ((hi - p["px"]) / p["px"])
                 out_px, why = None, None
+                # decay streak: consecutive hourly reads under the exit bar
+                # (0-persist reproduces the old immediate check exactly)
+                p["cold_n"] = (p.get("cold_n", 0) + 1) if abs(apr) < exit_apr \
+                    else 0
                 if adverse >= HARD_STOP:                       # stop first = conservative
                     out_px, why = p["px"] * (1 + HARD_STOP if p["short"] else 1 - HARD_STOP), "stop"
                 elif favour >= TAKE_PROFIT:
                     out_px, why = p["px"] * (1 - TAKE_PROFIT if p["short"] else 1 + TAKE_PROFIT), "tp"
                 elif (p["short"] and apr < 0) or (not p["short"] and apr > 0):
                     out_px, why = close, "flip"
-                elif abs(apr) < exit_apr:
+                elif p["cold_n"] > decay_persist_h:
                     out_px, why = close, "cold"
                 elif held_h >= MAX_HOLD_H:
                     out_px, why = close, "max_hold"
