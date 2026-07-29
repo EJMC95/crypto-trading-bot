@@ -39,6 +39,11 @@ FLOORS = {
     "venues/governor.py": 77,          # measured 79
     "venues/fills.py": 62,             # measured 64
     "venues/symbol_map.py": 95,        # measured 100 (12 stmts; one lost line trips)
+    # [2026-07-29 (eo)] Finding 6 completed — the promotion-evidence fill
+    # model and the shared mid helpers gained their tests and enter the
+    # ratchet at 95 (both measured 100; small files, 1-2 lines of slack).
+    "venues/shadow.py": 95,            # measured 100 — every -lshadow curve's fills
+    "venues/marks.py": 95,             # measured 100 — the equity guard's mid
     "funding_basis.py": 93,            # measured 95 (the 8x anchor)
     # the money pipeline + enforcement organs
     "bot_pnl_store.py": 40,            # measured 42
