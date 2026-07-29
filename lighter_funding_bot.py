@@ -603,7 +603,7 @@ RECEIPTS_CAP = 200        # per-cycle list bound — prelim is ~a dozen books
 
 
 def scan_receipts(shadow, slope_ratios, slope_noref, conv_raws,
-                  pool_n, prelim_n, held_explore, expl_k):
+                  pool_n, prelim_n, held_explore, expl_k, pool_active):
     """One scan cycle's DECISION-TIME quantities as a bot_state payload —
     (key, payload) for save_state + save_history.
 
@@ -626,6 +626,14 @@ def scan_receipts(shadow, slope_ratios, slope_noref, conv_raws,
         (vs prelim_n, the exploit set); explore_k's authority is the share
         of cycles with pool_n >= k, which entries alone can never show
         (the explore-zero diagnosis, as a standing measurement).
+        [2026-07-30 (fd)] PUBLISHED ONLY WHEN THE POOL IS LIVE
+        (`pool_active` — the caller's own `_ex_floor is not None`, so the
+        predicate has ONE source). With explore off (the live arm: k=0) the
+        prefilter never populates the pool at all, so a published 0 would
+        not mean "no candidates today" — it would mean "not measured", and
+        a constant-0 sample reads to the census as a real distribution with
+        full swing. Absent instead ⇒ n=0 ⇒ DARK, the honest verdict for a
+        lever that is switched off.
 
     Pure and bounded (lists capped at RECEIPTS_CAP); the caller publishes
     under the never-raise guard. Keys are arm-scoped so the census can
@@ -642,10 +650,13 @@ def scan_receipts(shadow, slope_ratios, slope_noref, conv_raws,
                                 for m in list(conv_raws)[:RECEIPTS_CAP]],
                        "mode": CONVICTION_MODE, "ref": CONVICTION_REF,
                        "hi": CONVICTION_HI},
-        "explore": {"pool_n": int(pool_n), "prelim_n": int(prelim_n),
-                    "held": int(held_explore), "k": int(expl_k),
-                    "floor": EXPLORE_MIN_VOL},
+        "explore": {"prelim_n": int(prelim_n), "held": int(held_explore),
+                    "k": int(expl_k), "floor": EXPLORE_MIN_VOL},
     }
+    if pool_active:
+        payload["explore"]["pool_n"] = int(pool_n)
+    else:
+        payload["explore"]["off"] = True
     return key, payload
 
 
@@ -2225,13 +2236,6 @@ def main():
                 _slope_prev = (_slope_ref(rate_hist.get(coin), t0,
                                           SLOPE_LOOKBACK_H * 3600)
                                if SLOPE_GATE else None)
-                # [(eu) receipts] the slope decision's quantity, admitted OR
-                # skipped — a 0.0 reference can't bite, so it counts no_ref
-                if SLOPE_GATE:
-                    if _slope_prev:
-                        _rx_slope.append(abs(apr) / abs(_slope_prev))
-                    else:
-                        _rx_noref += 1
                 # [2026-07-30 (es) SEAM] the ordered veto chain, extracted
                 # pure (slots -> explore reservation -> vol filter ->
                 # quality veto [2026-07-11] -> fleet long veto [IMB-17] ->
@@ -2245,6 +2249,20 @@ def main():
                      "vol_veto": vol_veto, "vetoes": _vetoes,
                      "fleet_long_veto": fleet_long_veto,
                      "slope_prev": _slope_prev})
+                # [2026-07-30 (fd) RECEIPT FIX] the slope quantity is recorded
+                # only for candidates the slope gate ACTUALLY ADJUDICATED —
+                # i.e. those that cleared every earlier veto: the ones that
+                # opened, plus the ones the slope gate itself skipped. The
+                # (eu) cut recorded EVERY ranked candidate, including ones
+                # vetoed upstream that the gate never saw, which inflated n
+                # and skewed the distribution the census measures authority
+                # from. Same emission-truncation family as the scout diet
+                # levers, in the opposite direction.
+                if SLOPE_GATE and (_act == "open" or _why == "slope"):
+                    if _slope_prev:
+                        _rx_slope.append(abs(apr) / abs(_slope_prev))
+                    else:
+                        _rx_noref += 1
                 if _act == "break":
                     break
                 if _act == "skip":
@@ -2272,9 +2290,6 @@ def main():
                 if px is None:
                     continue
                 clip = order_usd * conviction_mult(apr)   # Lever 2: dark default -> order_usd
-                if CONVICTION_REF > 0:
-                    # [(eu) receipts] the UNCLAMPED score — where the cap binds
-                    _rx_conv.append(abs(apr) / CONVICTION_REF)
                 size = round(clip / px, 6)
                 if not dry_run:
                     # [2026-07-15 AUDIT FIX v2] real deployed notional (held at
@@ -2298,6 +2313,15 @@ def main():
                 except Exception as e:
                     log.error("open %s failed: %s", coin, e)
                     continue
+                # [2026-07-30 (fd) RECEIPT FIX] the conviction quantity is
+                # recorded HERE — after the notional cap AND after the order
+                # actually filled — because its docstring promises "per
+                # ADMITTED entry". The (eu) cut appended it at clip time, so
+                # a cap-rejected or order-failed candidate counted as an
+                # admitted entry and the census would have measured the cap's
+                # binding share against a population that was never sized.
+                if CONVICTION_REF > 0:
+                    _rx_conv.append(abs(apr) / CONVICTION_REF)
                 # [2026-07-30 (es) SEAM] the entry receipt, extracted pure —
                 # carries the 22-Jul flap fix + 28-Jul D7 entry-time bars
                 # contract (see entry_stamp's docstring for the history).
@@ -2366,7 +2390,8 @@ def main():
             try:
                 _rk, _rp = scan_receipts(
                     shadow_tag, _rx_slope, _rx_noref, _rx_conv,
-                    len(explore_pool), len(prelim), n_explore, _expl_k)
+                    len(explore_pool), len(prelim), n_explore, _expl_k,
+                    _ex_floor is not None)
                 store.save_state(_rk, _rp)
                 store.save_history(_rk, _rp)
             except Exception:  # noqa: BLE001
@@ -2694,9 +2719,9 @@ def _selftest_scan_receipts():
     keys, freshness stamps, bounded lists, and the no_ref/ratio split that
     keeps a fail-open slope decision from polluting the measured ratio
     distribution."""
-    k, p = scan_receipts(False, [1.25, 0.8], 3, [2.5], 4, 11, 1, 2)
+    k, p = scan_receipts(False, [1.25, 0.8], 3, [2.5], 4, 11, 1, 2, True)
     assert k == "funding-scan-live", k
-    k2, _ = scan_receipts(True, [], 0, [], 0, 0, 0, 0)
+    k2, _ = scan_receipts(True, [], 0, [], 0, 0, 0, 0, False)
     assert k2 == "funding-scan-shadow", k2
     assert p["updated"] and p["ttl_sec"] == 7200, "freshness contract keys"
     assert p["slope"]["ratios"] == [1.25, 0.8] and p["slope"]["no_ref"] == 3, \
@@ -2706,8 +2731,20 @@ def _selftest_scan_receipts():
     assert p["conviction"]["ref"] == CONVICTION_REF
     assert p["explore"] == {"pool_n": 4, "prelim_n": 11, "held": 1, "k": 2,
                             "floor": EXPLORE_MIN_VOL}, p["explore"]
+    # [2026-07-30 (fd)] POOL OFF -> pool_n ABSENT, not 0. A published 0 would
+    # read to the census as a MEASURED constant (admitting across the whole
+    # bound = spurious authority) when the truth is "explore is switched off
+    # and the prefilter never populated the pool at all". Absent -> n=0 ->
+    # DARK, which is the honest verdict for a lever that is off. This is the
+    # live arm's actual state (k=0), so without it the census's first
+    # --measure would have scored the LIVE explore_k off a constant.
+    _k4, p4 = scan_receipts(False, [], 0, [], 0, 9, 0, 0, False)
+    assert "pool_n" not in p4["explore"], p4["explore"]
+    assert p4["explore"]["off"] is True and p4["explore"]["prelim_n"] == 9, \
+        "the rest of the explore block still reports when the pool is off"
+    assert "off" not in p["explore"], "an ACTIVE pool must not claim to be off"
     # bounded: a runaway cycle can never publish an unbounded payload
-    _k3, p3 = scan_receipts(False, [1.0] * 1000, 0, [1.0] * 1000, 0, 0, 0, 0)
+    _k3, p3 = scan_receipts(False, [1.0] * 1000, 0, [1.0] * 1000, 0, 0, 0, 0, True)
     assert len(p3["slope"]["ratios"]) == RECEIPTS_CAP, "slope list capped"
     assert len(p3["conviction"]["raws"]) == RECEIPTS_CAP, "conv list capped"
     print("lighter_funding_bot _selftest_scan_receipts OK")

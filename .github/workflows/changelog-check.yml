@@ -76,6 +76,25 @@ jobs:
       - name: The guard must still be able to see (negative fixture)
         run: python3 scripts/audit_deploy_coverage.py --selftest
 
+  changelog-letters:
+    name: CHANGELOG entry letters are unique (citations must resolve)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-29 (fd)] Entries cite each other BY LETTER, and tracked CODE
+      # cites them too (railway-redeploy.yml -> "(ff)", test_selftests.py ->
+      # "(ex)"), so a duplicate makes every such reference ambiguous. It has
+      # happened at least SEVEN times — including a 23-Jul QUADRUPLE whose own
+      # merge note promised a follow-up that then sat unrepaired for six days,
+      # and twice in one afternoon on 29-Jul. Every instance was caught by a
+      # human reading the file, and the rule was written nowhere a session
+      # reads BEFORE writing: the control that kept failing was "remember to
+      # check". Same shape as born-dark, same answer — run the detector.
+      - name: A duplicated entry letter must fail the build
+        run: python3 scripts/audit_changelog_letters.py
+      - name: The guard must still be able to see (negative fixture)
+        run: python3 scripts/audit_changelog_letters.py --selftest
+
   conflict-markers:
     name: No unresolved merge/stash markers in the tree
     runs-on: ubuntu-latest

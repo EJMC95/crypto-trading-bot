@@ -193,7 +193,7 @@ jobs:
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
             # trail-blazer-live = 💸 Funding Farmer — service names lie) are
             # DELIBERATELY off the blanket auto-path: an unmarked WIP/held push must
-            # never auto-restart a real-money book. That barrier stopped the (cp)
+            # never auto-restart a real-money book. That barrier stopped the (ff)
             # rail fix from surprise-deploying before the operator said "go ahead",
             # and for the FARMER it guards a MEASURED restart hazard — its slope gate
             # fails open ~1h after boot, and a restart once wiped a memory-only halt

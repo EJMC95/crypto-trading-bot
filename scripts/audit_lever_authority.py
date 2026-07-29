@@ -278,7 +278,12 @@ QUANTITIES = {
         "note": "per-cycle explore-eligible candidate count: admitted-share "
                 "at k = share of cycles where the FULL reservation is usable; "
                 "a mode at 0 is the explore-zero diagnosis as a standing "
-                "measurement"},
+                "measurement. [2026-07-30 (fd)] The Farmer publishes pool_n "
+                "ONLY while the pool is live (explore on AND a floor below "
+                "MIN_VOL); with explore off it publishes explore.off instead, "
+                "so this reads n=0 -> DARK rather than scoring the lever "
+                "against a constant 0 — which the ladder would have seen as "
+                "full swing, i.e. spurious authority on a switched-off lever"},
     "xp.funding.explore_k": {
         "source": "state:funding-scan-shadow", "extract": ("field", ("explore", "pool_n")),
         "abs": False, "dir": "ge", "to_q": 1.0, "unit": "pool_n",

@@ -276,7 +276,7 @@ growth-lever session (it owns the receipt pipeline; same file, same seam as
 5bef0f0). Not fixed here — that file was the concurrent session's active WIP.
 
 **3e. Arm drift, precisely dated — and RESOLVED mid-review.** At review time the
-live Farmer ran the build of `ab97ddf` (cq refactor, 24-Jul 00:16 AEST) —
+live Farmer ran the build of `ab97ddf` (fg refactor, 24-Jul 00:16 AEST) —
 predating the (ct) phantom-close fix, the (cr/cs) brakes, and the growth-lever
 consume (i.e. the live arm could still book phantom closes into the judge's own
 evidence); the shadow ran exactly `23b321d` (explore engine, no lever-consume,

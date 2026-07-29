@@ -177,6 +177,24 @@ def _build_rel(path):
 
 
 def _build_files(entry=None):
+    """The hashed set: the entry module + whatever _BUILD_SHARED names EXIST.
+
+    [2026-07-29 (fd)] A declared-but-ABSENT name is silently skipped, and that
+    is deliberate — images legitimately carry different subsets (the shadow
+    images do not COPY fleet_tuning.py at all: the growth-rail clip lever must
+    not size a book outside the board's LIVE_ROWS, declared in
+    audit_image_imports.BORN_DARK_OK). But the silence has a cost that bit on
+    the day fleet_tuning.py joined the set: the SAME source tree stamps
+    6de64508c304 over 15 files in an image that carries it and 74d3b3178fa8
+    over 14 in one that does not, so a hash predicted from the REPO reads as
+    "the deploy never landed" on a perfectly converged shadow service.
+    The born-dark guard cannot catch this class: fleet_tuning.py is a DATA
+    dependency of the stamp, not an import of the entry module.
+    THE FIX IS NOT to hash absent files (that would make every image's id
+    depend on files it does not run); it is to publish the COUNT alongside the
+    id — see _stamp_build — so a short set is self-describing and a reader can
+    tell "different file set" from "different code".
+    """
     out = []
     if entry and os.path.isfile(entry):
         out.append(os.path.abspath(entry))
@@ -222,15 +240,30 @@ def build_code_id():
     return _BUILD_CACHE[0]
 
 
+def build_code_files():
+    """How many files the cached id was computed over — the id's other half.
+
+    [2026-07-29 (fd)] Published as `extra.build_n` so a row says which SET it
+    hashed, not just the digest (see _build_files for the incident)."""
+    global _BUILD_CACHE
+    if _BUILD_CACHE is None:
+        _BUILD_CACHE = build_compute()
+    return _BUILD_CACHE[1]
+
+
 def _stamp_build(extra):
-    """Stamp `extra.build` on every publish. Never raises, never overwrites a
-    caller's key: telemetry must not break a publish that reports real money."""
+    """Stamp `extra.build` (+ `extra.build_n`) on every publish. Never raises,
+    never overwrites a caller's key: telemetry must not break a publish that
+    reports real money."""
     try:
         cid = build_code_id()
         if not cid:
             return extra
         out = dict(extra or {})
         out.setdefault("build", cid)
+        n = build_code_files()
+        if n:
+            out.setdefault("build_n", n)
         return out
     except Exception:      # noqa: BLE001
         return extra
@@ -1096,6 +1129,7 @@ def _selftest_build():
     """The build-id contract. It had its own module and its own suite for ten
     minutes; the born-dark guard sent it in here, so the suite comes too — a
     guard that moves house without its tests is how `brain_stats` shipped."""
+    global _BUILD_ROOT, _BUILD_SHARED, _BUILD_CACHE
     import tempfile
     a, n = build_compute(__file__)
     assert a and n >= 2, (a, n)
@@ -1135,11 +1169,39 @@ def _selftest_build():
         assert _with and _without and _with != _without, \
             f"the entry file must change the id: {_with} vs {_without}"
 
-    # the stamp: adds `build`, preserves caller keys, never overwrites one
+    # [2026-07-29 (fd) THE SHORT-SET INCIDENT] A DECLARED-but-ABSENT shared file
+    # is skipped silently. That is legitimate — images carry different subsets
+    # on purpose (the shadow images never COPY fleet_tuning.py) — but it means
+    # ONE source tree stamps TWO ids, and on the day fleet_tuning.py joined the
+    # set a hash predicted from the repo read as "the deploy never landed" on a
+    # perfectly converged shadow service. The id alone cannot say which set it
+    # hashed. The COUNT can, so the count is published — and pinned here.
+    _saved_bs = (_BUILD_ROOT, _BUILD_SHARED, _BUILD_CACHE)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            _BUILD_ROOT, _BUILD_SHARED, _BUILD_CACHE = d, ("shared_a.py",), None
+            open(os.path.join(d, "entry.py"), "w").write("E = 1\n")
+            open(os.path.join(d, "shared_a.py"), "w").write("S = 1\n")
+            _full, _nfull = build_compute(os.path.join(d, "entry.py"))
+            os.remove(os.path.join(d, "shared_a.py"))
+            _short, _nshort = build_compute(os.path.join(d, "entry.py"))
+            assert (_nfull, _nshort) == (2, 1), (_nfull, _nshort)
+            assert _full and _short and _full != _short, \
+                "a missing shared file changes the id — silently, which is the trap"
+            assert _nshort < _nfull, \
+                "the COUNT is what makes a short set self-describing; publish it"
+    finally:
+        _BUILD_ROOT, _BUILD_SHARED, _BUILD_CACHE = _saved_bs
+
+    # the stamp: adds `build` + `build_n`, preserves caller keys, never
+    # overwrites one
     e = _stamp_build({"venue": "lighter_live"})
     assert e["build"] == build_code_id() and e["venue"] == "lighter_live", e
+    assert e["build_n"] == build_code_files() == n, e
     assert _stamp_build(None)["build"] == build_code_id()
     assert _stamp_build({"build": "caller"})["build"] == "caller"
+    assert _stamp_build({"build_n": 99})["build_n"] == 99, \
+        "a caller's own key wins — build_n follows build's contract"
     # [2026-07-28 REVIEW] the PAPER-TRADE write path must stamp too — the
     # judge's arm-drift gate reads builds off paper_trades rows and was dark
     # for its whole life because only bot_pnl publishes were stamped (0/143
@@ -1152,8 +1214,8 @@ def _selftest_build():
     assert "extra = _stamp_build(extra)" in _ins.getsource(publish_paper_trade), \
         "publish_paper_trade must stamp extra.build (arm-drift's row feed)"
     print(f"bot_pnl_store selftest OK (build id: deterministic, byte-sensitive, "
-          f"path-independent, entry counts; stamp preserves caller keys) "
-          f"build={a} over {n} files")
+          f"path-independent, entry counts, short-set self-describing; stamp "
+          f"preserves caller keys) build={a} over {n} files")
     return 0
 
 

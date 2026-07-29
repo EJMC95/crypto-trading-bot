@@ -493,7 +493,21 @@ All new bots:
   content hash — recompute locally with
   `python3 -c "import bot_pnl_store as b; print(b.build_compute('<entry>.py'))"`
   and compare to the row (how the 29-Jul audit proved both live containers
-  ran 633e8a1 without container access). `audit_deploy_coverage` now also
+  ran 633e8a1 without container access).
+  **[2026-07-29 (fd) — READ THE COUNT, NOT JUST THE DIGEST.** `build_compute`
+  returns `(id, n_files)` and hashes only the `_BUILD_SHARED` names that
+  EXIST, so the SAME tree stamps different ids in images carrying different
+  subsets. Measured the day `fleet_tuning.py` joined the set: the family
+  image never COPYs it (deliberate — the clip lever must not size a shadow
+  book), so a converged `family-lighter-shadow` published `74d3b3178fa8`
+  over 14 files while the repo computed `6de64508c304` over 15 — and the
+  repo-side prediction read as "the deploy never landed". Rows now publish
+  `extra.build_n` beside `extra.build`: **compare BOTH**, and when they
+  disagree check `n` first — a different count means a different FILE SET,
+  not drifted code. To predict an image's id, compute against that image's
+  own COPY set (see its `Dockerfile.*`), not the repo tree. The born-dark
+  guard cannot catch this class: these are DATA dependencies of the stamp,
+  not imports.] `audit_deploy_coverage` now also
   cross-checks the live marker greps against `paths:` (the 28-Jul grep
   widening added files the paths: block didn't carry — a marker push touching
   only those deployed nothing, invisibly to the then-guard).
@@ -509,6 +523,30 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **CHANGELOG ENTRY LETTERS — the convention, finally written down (29-Jul (fd)).**
+  Entries are tagged `## <date> (<letter>)` and cite each other BY LETTER
+  ("the (co) paths fix"), including from TRACKED CODE
+  (`railway-redeploy.yml` cites `(ff)`; `tests/test_selftests.py` cites
+  `(ex)`), so a duplicated letter silently makes every such reference
+  ambiguous. The rules:
+  1. **The sequence is CONTINUOUS, not per-day** — it runs straight through
+     date boundaries (it restarted once, at (a) on 17-Jul; that day carries
+     both sequences deliberately).
+  2. **Pick your letter at PUSH time, not at write time.** Parallel sessions
+     both pick "next free" from a stale snapshot — that is the whole failure
+     mode, and it has bitten at least SEVEN times (21-Jul (av)→(aw)→(ax),
+     (bn) ×2, (br) ×2, 22-Jul (ca)/(cb), the 23-Jul (co)-(cr) quadruple, and
+     29-Jul twice in one afternoon).
+  3. **On a collision the CITED entry keeps the letter**; the other moves to
+     the next free one. Decide by grepping the tree, not by who pushed first.
+  4. **A renumber is recorded INLINE** in the moved entry — and note that
+     `git log` subjects keep the OLD letter, so **the commit log is not a
+     reliable letter index**; grep the CHANGELOG headers.
+  5. Date an entry by **git's clock, not by the handoff you are executing**
+     (29-Jul: five entries were dated 30-Jul because the session was running
+     `NEXT_SESSION_2026-07-30.md`; git said 29-Jul in both UTC and Sydney).
+  Enforced by `scripts/audit_changelog_letters.py` on every push/PR (scoped
+  to ≥18-Jul so the deliberate restart cannot fail the build).
 - **NAMING THE NEXT COHORT: famous AUSTRALIAN MUSICIANS (operator, 29-Jul).**
   The 🏛️ Parliament took the last Australian PMs; the NEXT cohort of books
   that earns its own dashboard rows is named for Australian musicians
