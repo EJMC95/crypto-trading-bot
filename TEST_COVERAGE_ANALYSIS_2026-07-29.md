@@ -384,6 +384,20 @@ invokes them. Nobody can see drift.
   mainly by `brain_replay` (69%) rather than unit tests. Consumers are
   shadow-only; medium priority. Synthetic-ledger fixtures for the EMER
   fast-path gate and the two-way expand bars would be the first picks.
+  **[2026-07-29 FIRST SLICE SHIPPED (ep):**
+  `tests/autonomy/test_brain_mults.py` — 7 tests driving
+  `compute_stake_mults` through its own documented replay seam (the `engine`
+  param). Real-brain_stats: the frozen v2 rule table at both floors, winning
+  tags never throttled, `(untagged)` never multed, publish-on-run-3 +
+  same-run forgiveness. Scripted-qualifier choreography (module-seam stubs;
+  the pipeline stays real): the DIRECTION-SCOPED streak (reduce credit can
+  never early-publish an expand — 21-Jul fix), the EMER fast-path publishing
+  on run 1 with the key on vitals.urgent, sticky-within-qualification (no
+  one-run flap — 28-Jul fix), and kill-switch honesty (`urgent` re-earned
+  every run + v3 evidence keys STRIPPED on a v2-stamped entry — the sticky
+  urgent and single-counter-streak mutations kill three tests between
+  them). Remaining in this file: analyse_bot/diagnose, the lens grading,
+  main()'s assembly.]**
 * `parliament/data.py` 25%: ws/REST network code; fixture-test its parsers
   when convenient. The rest of the Parliament is well covered (74–86%).
 * Display/report layer at 0%: `report_emailer.py` and `compile_market_data.py`
