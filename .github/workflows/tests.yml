@@ -59,3 +59,36 @@ jobs:
         run: python -c "import lighter, importlib.metadata as m; print('lighter-sdk', m.version('lighter-sdk'))"
       - name: Run the live-order harness (LIVE_SELFTESTS registry)
         run: python -m pytest tests/test_selftests.py -k test_module_selftest_live -q -p no:cacheprovider
+
+  # [2026-07-29 (em)] Finding 9's ratchet: the whole suite runs under
+  # subprocess-aware coverage (the selftest subprocesses count), then
+  # audit_coverage_floors.py holds the real-money surface at its measured
+  # floors. The SDK is installed so the live harness contributes — floors
+  # were SET in that configuration; without it the taker reads ~38%, not
+  # ~92%, and every run would false-trip. The import check above the run
+  # guards that, same as the selftest-live job.
+  coverage-floors:
+    name: coverage floors (real-money surface only ratchets UP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test deps + the PINNED signer wheel
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+          grep -E '^(lighter-sdk|websockets)' requirements.txt | sed 's/#.*//' | xargs pip install
+          python -c "import lighter"
+      - name: Run the suite under subprocess-aware coverage
+        run: |
+          mkdir -p /tmp/covhook
+          printf 'import coverage\ncoverage.process_startup()\n' > /tmp/covhook/sitecustomize.py
+          printf '[run]\nparallel = true\nsource = %s\nomit =\n    */tests/*\n    */conftest.py\n' "$GITHUB_WORKSPACE" > /tmp/coveragerc
+          COVERAGE_PROCESS_START=/tmp/coveragerc PYTHONPATH=/tmp/covhook python -m coverage run --rcfile=/tmp/coveragerc -m pytest -p no:cacheprovider
+          python -m coverage combine --rcfile=/tmp/coveragerc
+          python -m coverage report --rcfile=/tmp/coveragerc
+          python -m coverage json --rcfile=/tmp/coveragerc -o coverage.json
+      - name: Hold the floors
+        run: python scripts/audit_coverage_floors.py coverage.json

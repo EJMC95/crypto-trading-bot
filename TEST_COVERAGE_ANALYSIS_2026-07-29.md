@@ -317,6 +317,25 @@ SET-only-updated_at (never clobbers the money snapshot).]**
 
 ### 9. CI measures nothing about coverage — add the ratchet
 
+**[2026-07-29 SHIPPED (em):** three pieces. (1) `tests.yml` gains a
+`coverage-floors` job — the full suite under subprocess-aware coverage
+(selftest subprocesses measured), SDK installed so the live harness
+contributes, then `scripts/audit_coverage_floors.py` holds **17 floors** on
+the real-money surface at measured-minus-~2pp (taker 90, farmer 45, safety
+92, equity-guard 93, client 63, factory 86, …). Floors only ratchet UP;
+lowering one is an operator decision with a CHANGELOG entry; a floored file
+going MISSING from the measurement is itself a breach. Detector
+selftest-verified (breach + hold + missing all seen) and registered in
+`GUARD_ONLY_AUDITS`. (2) `tests/test_coverage_policy.py` — the born-dark
+pattern applied to tests: every module calling `publish`/`publish_paper_trade`
+must be in `SELFTEST_MODULES`, imported by `tests/`, or DECLARED in
+`PUBLISH_TEST_OK` with a reason; only RETIRED bots may be declared, stale
+declarations fail, and the roster is scanned, never hand-maintained — the
+Finding-7 class is now structurally unreintroducible. (3) Measured at ship
+time with the SDK present: the live harness alone carries the **Ticket Taker
+to 92%** and the tx governor to 79% — numbers the pre-(ej) suite could never
+see. Fleet total at ship: 54%.]**
+
 `requirements-test.txt` installs `pytest-cov` and `coverage`; `tests.yml` never
 invokes them. Nobody can see drift.
 
@@ -371,6 +390,10 @@ invokes them. Nobody can see drift.
    2026-07-29 (el) — see the stamps above. Still open here: Finding 4's
    live-bot `main()` seams and `fleet_risk.main()`'s assembly.]**
 4. **Standing:** Finding 9's CI ratchet, so none of the above regresses.
+   **[SHIPPED 2026-07-29 (em) — the ratchet holds 17 floors on every push.
+   Of the original nine findings, the only work left open is Finding 4's
+   live-bot `main()` seam extractions (deliberately one per week) and the
+   opportunistic Finding-10 items.]**
 
 *Measured on branch `claude/test-coverage-analysis-yn0mfs` at e8076a5; suite
 green (200 passed, 1 skipped) before and throughout.*
