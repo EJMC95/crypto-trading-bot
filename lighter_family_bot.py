@@ -824,6 +824,62 @@ def btc_tide_up(cache):
     return bool(e200[-1] and bars["c"][-1] > e200[-1])
 
 
+# [2026-07-30 PER-ASSET REGIME — item-18 step 2, operator call.] The family
+# gate now CONSUMES the oracle's per-asset coverage, honouring the declared
+# build order (oracle coverage → the gate consumes it → only then the
+# universe). STATIC classification, deliberately: if this set were read from
+# the oracle's payload, a dark oracle would silently re-classify SPY as
+# crypto and hand it BTC's gate — the exact state D5 forbids. Mirrors
+# regime_oracle.NONCRYPTO; the selftest drift-guards the two sets.
+# INERT TODAY: no family universe lists a non-crypto symbol — the universe
+# widening (step 3) stays a review decision (evidence:
+# REGIME_GATE_PER_ASSET_2026-07-30.md; re-runs at SPY/QQQ graduation).
+NONCRYPTO_SYMS = frozenset({
+    "SPY", "QQQ", "IWM", "NVDA", "TSLA", "MSTR", "WTI", "XAU", "XAG", "XCU"})
+
+# Kill switch: 'off' closes non-crypto entries entirely (both gates False).
+# There is deliberately NO value that routes a non-crypto book to BTC's
+# gates — the switch chooses between "asset's own regime" and "no entries",
+# never the incoherent third option.
+FAMILY_PER_ASSET_REGIME = os.environ.get(
+    "FAMILY_PER_ASSET_REGIME", "oracle").strip().lower()
+
+
+def regime_inputs_for(coin, btc_regime, btc_tide, oracle_verdicts):
+    """(regime_up, tide_up) a coin's strategy signals should see.
+
+    CRYPTO (everything outside NONCRYPTO_SYMS): the validated BTC 4h gates,
+    passed through untouched — this function is a no-op for today's whole
+    universe, and the selftest pins that.
+
+    NON-CRYPTO: the asset's OWN oracle verdict (fleet_bus.
+    oracle_asset_regimes) — LONG-window ⇒ both gates up; any other verdict,
+    an ungraded book, or a dark/stale oracle ⇒ fail-CLOSED (False, False).
+    Both gates ride one verdict deliberately: the oracle's LONG-window
+    already requires trend + direction, and inventing a second per-asset
+    tide flavour nothing trades yet would be an untested gate. The strategy
+    `extra` keys keep their btc_* names for port compatibility; for a
+    non-crypto coin they carry the asset's own read.
+    """
+    if coin not in NONCRYPTO_SYMS:
+        return btc_regime, btc_tide
+    if FAMILY_PER_ASSET_REGIME == "off":
+        return False, False
+    up = (oracle_verdicts or {}).get(coin) == "LONG-window"
+    return up, up
+
+
+def noncrypto_regimes():
+    """Per-asset verdict map for the gate above, fetched once per cycle —
+    {} on any doubt (which regime_inputs_for treats as fail-closed for
+    non-crypto). Same image-safety guard as the other fleet_bus wrappers."""
+    try:
+        import fleet_bus
+        return fleet_bus.oracle_asset_regimes()
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def main():
     p = argparse.ArgumentParser(description="Family bots — Lighter shadow books")
     p.add_argument("--once", action="store_true", help="Single loop then exit.")
@@ -868,6 +924,12 @@ def main():
     for b in books:
         b.day_start_equity = b.equity()
 
+    # [2026-07-30 PER-ASSET REGIME] one boot-time read of the universe: the
+    # oracle fetch below runs only when some book actually lists a
+    # non-crypto symbol — today none does, so the wiring adds ZERO reads
+    # until the universe decision (step 3) lands.
+    has_noncrypto = any(c in NONCRYPTO_SYMS for b in books for c in b.coins)
+
     while True:
         t0 = time.time()
         now = datetime.now(timezone.utc)
@@ -884,6 +946,9 @@ def main():
             fund = {}
         regime = btc_regime_up(cache)
         tide = btc_tide_up(cache)     # [2026-07-22 PARITY] MomoBreakout gate
+        # [2026-07-30 PER-ASSET REGIME] verdicts for any non-crypto pairs,
+        # once per cycle; {} when none listed (today) or the oracle is dark
+        nc_verdicts = noncrypto_regimes() if has_noncrypto else {}
 
         # [2026-07-15 AUDIT FIX] L2 fleet long-budget veto, checked once per
         # cycle. The 14-Jul enforcement was wired only into the retired Kraken
@@ -999,9 +1064,15 @@ def main():
                 # ON — MOMO_TIDE_GATE=off omits the key so MomoBreakout runs
                 # ungated (pre-parity behavior); the other three strategies
                 # ignore the key regardless.
-                _extra = {"btc_regime_up": regime}
+                # [2026-07-30 PER-ASSET REGIME] inputs resolved per coin:
+                # crypto = the BTC values above, byte-identical; a non-crypto
+                # coin gets its OWN oracle verdict, fail-closed (key names
+                # kept for the strategy ports).
+                _r_up, _t_up = regime_inputs_for(coin, regime, tide,
+                                                 nc_verdicts)
+                _extra = {"btc_regime_up": _r_up}
                 if MOMO_TIDE_GATE:
-                    _extra["btc_tide_up"] = tide
+                    _extra["btc_tide_up"] = _t_up
                 sig = b.s.signals(bars, _extra) if new_candle else None
                 if new_candle:
                     b.last_sig_ts[coin] = sig_ts
@@ -1268,6 +1339,49 @@ def _selftest():
     assert symcap_state({"symbol_cap": {"mode": "enforce", "cap": "x"}}) is None
     assert symcap_blocked(None, "ETH", {"ETH": 99}) is False, \
         "no enforcing state -> always open"
+    # [2026-07-30 PER-ASSET REGIME — item-18 step 2] regime_inputs_for:
+    # crypto is a byte-identical passthrough; non-crypto rides its OWN
+    # verdict, fail-CLOSED everywhere else; BTC's gates NEVER leak in.
+    global FAMILY_PER_ASSET_REGIME
+    assert regime_inputs_for("BTC", True, False, {}) == (True, False), \
+        "crypto passthrough keeps regime and tide independent"
+    assert regime_inputs_for("ETH", False, True,
+                             {"ETH": "LONG-window"}) == (False, True), \
+        "a crypto symbol NEVER reads the oracle map — BTC gates rule"
+    assert regime_inputs_for("SPY", False, False,
+                             {"SPY": "LONG-window"}) == (True, True), \
+        "non-crypto LONG-window opens BOTH gates off its own verdict"
+    for _v in ("SHORT-window", "dir-flat", "chop-gated"):
+        assert regime_inputs_for("SPY", True, True, {"SPY": _v}) == \
+            (False, False), f"non-directional/short verdict closes ({_v})"
+    assert regime_inputs_for("SPY", True, True, {}) == (False, False), \
+        "ungraded book fails CLOSED — never BTC's regime for SPY (D5)"
+    assert regime_inputs_for("XAU", True, True, None) == (False, False), \
+        "dark oracle (None map) fails CLOSED"
+    _saved_par = FAMILY_PER_ASSET_REGIME
+    try:
+        FAMILY_PER_ASSET_REGIME = "off"
+        assert regime_inputs_for("SPY", True, True,
+                                 {"SPY": "LONG-window"}) == (False, False), \
+            "kill switch closes non-crypto entirely — never re-routes to BTC"
+        assert regime_inputs_for("BTC", True, True, {}) == (True, True), \
+            "kill switch never touches crypto"
+    finally:
+        FAMILY_PER_ASSET_REGIME = _saved_par
+    # today's whole configured universe is crypto -> the wiring is inert
+    # (this is the parity claim, asserted against the real strategy configs)
+    _all_coins = set(COINS) | {c for s in STRATEGIES for c in (s.coins or [])}
+    assert not (_all_coins & NONCRYPTO_SYMS), \
+        "a non-crypto symbol entered the family universe — that is the " \
+        "review-gated step 3, not a config edit (see " \
+        "REGIME_GATE_PER_ASSET_2026-07-30.md)"
+    # drift guard: the static classification mirrors the oracle's set
+    try:
+        import regime_oracle as _ro
+        assert NONCRYPTO_SYMS == frozenset(_ro.NONCRYPTO), \
+            "NONCRYPTO_SYMS drifted from regime_oracle.NONCRYPTO"
+    except ImportError:
+        pass  # oracle module absent from this image — the static set stands
     print("lighter_family_bot self-test: OK")
 
 

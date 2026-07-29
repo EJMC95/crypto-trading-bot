@@ -73,3 +73,32 @@ only admissible one); BTC-up base rate is only 18–26% over these windows
 (the known one-regime tape), so the damage cell's n is structurally small
 yet; young books dominate. Venue-pure: Lighter candles only, the oracle's
 own fetch path.*
+
+## [2026-07-30 CONSUMER WIRED — operator call, same day]
+
+The operator overrode the hold on the WIRING half ("per asset have
+consumer"): **step 2 of the build order is now BUILT**, shipped inert.
+
+- `fleet_bus.oracle_asset_regimes()` — the supported accessor ({sym:
+  verdict}, standard fail-safe: dark/stale/absent → {}).
+- `lighter_family_bot.regime_inputs_for(coin, btc_regime, btc_tide,
+  verdicts)` — crypto pairs: byte-identical passthrough of the validated
+  BTC 4h gates (selftest-pinned). Non-crypto pairs: the asset's OWN
+  verdict, LONG-window ⇒ both gates up, anything else / ungraded / dark ⇒
+  fail-CLOSED. Classification is STATIC (`NONCRYPTO_SYMS`, drift-guarded
+  against `regime_oracle.NONCRYPTO`) so a dark oracle can never re-route
+  SPY to BTC's gate. Kill switch `FAMILY_PER_ASSET_REGIME=off` closes
+  non-crypto entirely — there is deliberately no value that yields BTC.
+- **Inert today, asserted**: the selftest checks the configured family
+  universe contains no NONCRYPTO_SYMS member — the oracle fetch runs zero
+  times until step 3. Four mutations (classification inversion, fail-open
+  revert, kill-switch-to-BTC, stale-trusting accessor) each turn their
+  named assertion red.
+
+**What this changes about the recommendation above:** nothing about the
+evidence. The HOLD verdict applied to the wiring decision — the operator
+made that call. The study's per-book cells now inform **step 3 (the
+universe)**, which remains review-gated: TSLA-class books look protected,
+metals argue for a class-scoped or verdict-quality-gated widening, and the
+index books still need their ~mid-Aug graduation re-run before they can be
+candidates at all.
