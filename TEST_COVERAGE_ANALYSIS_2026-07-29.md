@@ -450,3 +450,248 @@ invokes them. Nobody can see drift.
 
 *Measured on branch `claude/test-coverage-analysis-yn0mfs` at e8076a5; suite
 green (200 passed, 1 skipped) before and throughout.*
+
+---
+
+# Second pass — same day, at HEAD `3761620` (after (ei)…(fw))
+
+**Why a second pass.** Everything above was measured at `e8076a5`. Between then
+and now the fleet shipped ~20 more commits (through (fw)) — including ~100 new
+tests, the (en)/(eq) Farmer seams, and substantial NEW code (the incubator's
+whole-space search, the judge's growth step, the Taker's bull dual-mode and
+side-aware lens veto). This pass re-measures rather than trusting the stamps,
+and asks the question the first pass could not: **what did the first pass not
+see?**
+
+**Method identical to the first pass** (subprocess-aware coverage over the full
+suite, signer SDK installed so the live harness contributes — the configuration
+`tests.yml`'s `coverage-floors` job uses). Result at HEAD:
+
+> **305 passed, 0 skipped. 29,581 statements, 55% line coverage** (13,378 lines
+> never executed). All **19 coverage floors held.**
+
+Against the morning's 200 passed / 48% / 27,708 statements. Note the statement
+count grew by 1,873 while coverage rose 7pp — the suite outran new code, which
+is the thing a ratchet is supposed to buy. The two honesty caveats from the
+first pass still apply verbatim, and the first one — *selftest line-% overstates
+assertion depth* — is the load-bearing caveat for Finding 12 below.
+
+Live real-money surface checked explicitly again per the standing 16-Jul rule.
+The **Ticket Taker is in genuinely good shape** (92%; `vetoed_lenses`, the (fn)
+side-aware veto authority, is covered; its residual uncovered clusters are all
+<25 lines). Findings 11 and 12 are where the money and the rows actually are.
+
+---
+
+### 11. The LIVE Farmer's book/slip math has **zero** body coverage — top priority
+
+Not a "low percentage" — literally zero. Measured at HEAD, inside
+`lighter_funding_bot.py`:
+
+| Function | Lines executed by the entire suite |
+|---|---|
+| `book_metrics()` :891 (~45 lines) | **just line 891 — the `def` itself, at import** |
+| its inner `vwap_slip()` :913 (15 lines) | **none. 913–927 all missed** |
+
+`book_metrics` is called at `:1009` inside `scan_candidates` — the LIVE entry
+gate. It computes the spread, the clip's buy/sell VWAP slip, and the ±0.5%
+near-touch depth that breaks ties between candidates. Every real order the
+Funding Farmer places is sized and selected downstream of numbers this function
+produces, and no test has ever executed a single line of its body.
+
+**Why this is the top item and not a rounding error:** the identical invariant —
+*a REST book snapshot arrives UNSORTED, so `bids[0]` is not the best bid* — has
+bitten this fleet and been fixed three separate times, and each fix was pinned
+with a test:
+
+* `venues/lighter_client._rest_book` — mutation-verified, (ek)
+* `venues/marks.py` — 100%, (eo)
+* `lighter_funding_spread_bot.fresh_mid` — "max-bid/min-ask, never `[0]`", (el)
+
+`book_metrics` carries its own sort (with a `[review 2026-07-11]` comment
+proving someone already found this exact edge here) — and it is the **one copy
+of the pattern on real money that nobody pinned.** The first pass ranked this
+file at 47% overall and moved on to `main()`; the pure function sitting beside
+`main()` never got named.
+
+The same class, one tier down in money: **`lighter_dislocation_bot.book_view()`
+:160 and its `vwap()` :178 — also zero body coverage** (only lines 160 and 204
+execute). Snap Back is a *running* shadow book, and the first pass never
+mentioned this module at all. Its Finding 7 named Index Rider, Counterweight and
+Tide Rider as the under-tested running bots; Snap Back (27%) was missed.
+
+**Proposal — cheapest high-value tests in the repo.** Both are pure functions of
+`(book dict, order_usd) → dict`. No venue, no SDK, no DB. Add
+`_selftest_book_metrics` as the Farmer's battery block **#14** (it already has
+13, and (en)/(eq) established exactly this pattern), asserting:
+
+* **sort-independence** — a shuffled book gives byte-identical output to a
+  sorted one (this is the mutation that reverts the three prior fixes);
+* **slip is adverse-POSITIVE on both sides** — buying pays up, selling pays
+  down; the sign convention `venues/shadow.py`'s tests already pin for the
+  shadow twin, so live and shadow agree on what "slip" means;
+* **thin book → `None`, never `0.0`** — a zero would read downstream as *free
+  execution* and admit a coin the depth gate exists to refuse;
+* the ±0.5% depth band edges, and `cross_venue_mult`'s documented [0.5, 1.2]
+  bound (9 more uncovered lines, same call path).
+
+Then the equivalent block for `book_view` in the dislocation bot, and add both
+files' new figures to the ratchet. Estimate: an afternoon for both.
+
+### 12. `lighter_family_bot.py` — 35%, and it is the module behind **seven** rows
+
+The single largest untested surface in the shadow fleet, and the first pass
+never named it. One module backs more dashboard rows than any other file:
+`freqtrade-{mum,dad,avo-maria,georgia}-lshadow` **plus** the three
+`crypto-{intraday-15m,swing-daily,breakout-4h}-lshadow` spot ports — seven books
+whose curves feed the brain's stake multipliers, the risk light, and ultimately
+go-live decisions.
+
+It **is** registered in `SELFTEST_MODULES`, and its selftest is genuinely good
+where it reaches: indicator math (EMA/RSI/ATR/ADX/stdev), the symbol-cap
+consumer contract, and the new per-asset regime gate (the 30-Jul step-2/3 work
+is properly pinned, fail-closed assertions included). So every structural guard
+in the repo reads this file as **covered**. What the guards cannot see:
+
+| Untested | Missed | Why it matters |
+|---|---|---|
+| `TrendMomo.signals` :452 | 11/14 | 👩 mum's entry decision |
+| `SwingDip.signals` :527 | 20/22 | 🙏 avo-maria's entry decision |
+| `DayTraderGated.signals` :566 | 31/44 | 🔮 georgia's entry decision |
+| `Book.entries_locked` :737 | 24/28 | **StoplossGuard + MaxDrawdown — the book's own risk brake** |
+| `Book.restore` :690 | 23/30 | crash rehydration |
+| `Book.record_close` :778 | 17/29 | the ledger row every brain grade rides on |
+| `Book.stake_mult` :507 | 8/10 | the `brain-stake-mults` consumer (a documented CLAUDE.md contract) |
+| `throttle_ok` :766 | 9/10 | DayTrader's per-hour entry cap |
+
+**Three of the four family strategies have no signal-level assertion at all.**
+Only `MomoBreakout` does, and only for its BTC-tide gate — the (22-Jul) parity
+work. This is the first pass's own caveat ("importing a module marks all its
+module-level code covered") landing on the biggest shadow surface: the selftest
+asserts the *indicators*, never the *strategies built on them*.
+
+`entries_locked` deserves separate emphasis. It is the same **category** of
+control as `venues/safety.py` — the thing that stops a book trading when it is
+losing — and safety.py sits at 94% with every branch pinned because real money
+rides it. The family books' equivalent brake has never been executed by a test.
+These are $1k paper books, so it ranks below Finding 11; but a silently broken
+drawdown brake corrupts the very curves the go-live gate reads.
+
+**Proposal:** `Book` is constructible offline (`ShadowBroker` + `SafetyRails`,
+both already 94–100% tested), or bypassable with the `__new__` pattern the
+client-order tests already use. Two slices:
+
+1. **Protections** — fixture-drive `entries_locked` across the StoplossGuard
+   boundary (n−1/n stops in window), the MaxDrawdown peak-to-trough walk at the
+   `dd` boundary, and guard *expiry* (a lock must lift). Plus `throttle_ok`'s
+   hour-bucket rollover.
+2. **Strategy signals** — one synthetic-bar fixture per strategy asserting the
+   documented entry AND its refusal (the `MomoBreakout` selftest is the recipe:
+   admit, block, ungated-on-absent-key, `extra=None` no-crash). Pin
+   `stake_mult`'s inverse-vol clamp at its 0.3 floor and 1.0 ceiling while
+   there — it is a documented consumer contract.
+
+### 13. `main()` is where the fleet's untested code lives — make the seam recipe a standing rule
+
+The first pass treated this as a per-file finding (Findings 4 and 5, "one seam
+per week"). Measured across the whole tree it is the fleet's **dominant**
+coverage shape, not a property of two bots:
+
+| Function | Uncovered stmts |
+|---|---|
+| `lighter_funding_bot.main` | 535 |
+| `pnl_dashboard.render` + `do_GET` | 334 |
+| `lighter_family_bot.main` | 238 |
+| `bot_learn.main` | 229 |
+| `lighter_index_bot.main` | 194 |
+| `lighter_dislocation_bot.main` | 194 |
+| `lighter_funding_spread_bot.main` | 186 |
+| `experiment_judge.run_once` | 153 |
+
+**~2,060 uncovered statements in eight functions — roughly 15% of every missed
+line in the repo.** No test-writing sprint clears that; it is a structural
+property of long-lived loops that own their decisions inline.
+
+The repo has already proven the remedy three times in one day: (ef) `_heal_merge`,
+(en) `exit_decision`, (eq) `flatten_identity`/`flatten_pnl` — extract the
+decision into a pure function, pin it with a selftest, leave the orchestration
+in the loop. It took the Farmer 47% → **52.7%** without a single behavior change.
+
+**Proposal — promote it from a weekly chore to a standing rule:** *a change
+inside any `main()` extracts the decision it touches into a pure function with a
+selftest, in the same commit.* That converts an unbounded backlog into bounded
+per-touch work and stops the monoliths growing. Named next seams, in money
+order: (a) the Farmer's entry tick (scan → gate → order → fill-verify →
+publish), (b) the family bot's entry/exit tick, (c) `render()`'s stage
+subtotals — the one remaining money-aggregation path from Finding 2.
+
+### 14. One floor has gone stale — the ratchet's own doctrine wasn't applied
+
+`audit_coverage_floors.py` states it plainly: floors sit **~2 points** under
+measured, and *"when a file's coverage durably rises, raise its floor in the
+same PR that raised it."* At HEAD:
+
+```
+lighter_funding_bot.py    52.7%   (floor 45)    ← 7.7pp of slack
+```
+
+The (en) exit-ladder and (eq) flatten-field seams raised the Farmer ~6pp and the
+floor did not move with them. It is the **live real-money bot**, so it is the
+worst file to carry slack: today a change could delete every one of those new
+assertions and CI would still pass green. Every other floor is within doctrine
+(next widest: `bot_pnl_store` 43.4 vs 40).
+
+**Proposal:** raise it to **50** — a one-line change, and the discipline the
+ratchet exists to enforce. Worth adding a line to the guard's docstring making
+"raise the floor in the same PR" checkable rather than aspirational: the guard
+could *warn* (not fail) when measured exceeds floor by >5pp, so stale slack
+surfaces itself instead of waiting for a reader to notice.
+
+### 15. "Advisory" is doing real work in some justifications
+
+The first pass deferred several organs as advisory/monitoring. Two are worth
+re-classifying:
+
+* **`market_context.py` — 42%.** Not advisory in the deployment sense: it has
+  its OWN Railway service and gained an auto-deploy rule 17-Jul (CLAUDE.md's
+  29-Jul correction: the workflow deploys *four* services, and this is the
+  fourth). `evaluate_evidence()` (64/181 missed) and `check_live_freshness()`
+  (18/25) form judgments *about the live books*. A deployed service that
+  evaluates live evidence deserves better than a 42% read.
+* **`parliament/data.py` — 25%.** The Parliament's sole data source (Lighter
+  REST + ws) and the layer the other well-covered Parliament modules (74–86%)
+  entirely depend on. It also contains **two more unsorted-book sites** — the
+  Finding 11 class, third instance. Fixture-test the parsers; no network needed.
+* `fleet_agronomy.py` is 71% overall but `check_lever_authority()` (28/101) and
+  `_lever_quantity()` (36/40) are cold — that is the growth rail's *authority*
+  check, i.e. the guard on the guards.
+
+---
+
+## Revised sequencing
+
+1. **First (an afternoon each, both pure functions, no fixtures):** Finding 11's
+   `book_metrics`/`vwap_slip` block on the LIVE Farmer, then `book_view`/`vwap`
+   on Snap Back. Highest money-per-line-of-test in the repo, and it closes a
+   three-time-repeat incident class on its last unpinned copy.
+2. **Same PR, one line:** Finding 14's floor raise to 50.
+3. **Next:** Finding 12's two family-bot slices — protections first (the brake),
+   then the three unasserted strategies.
+4. **Standing:** Finding 13's extract-on-touch rule, applied to the Farmer's
+   entry tick first.
+5. **Opportunistic:** Finding 15, and the first pass's Finding 10 items.
+
+**What is genuinely healthy and should be left alone:** the Ticket Taker (92%),
+`venues/` (safety 94, equity-guard 95, shadow/marks/symbol-map 100, factory 88),
+`brain_stats` (98.5), `paper_broker` (98.7), `fleet_bus` (90), `fleet_tuning`
+(89). The (em) ratchet and the (ep) coverage-policy guard are both doing their
+job — 19 floors held while 105 tests and 1,873 statements landed, and the
+Finding-7 class (a running book publishing money with no test surface) is now
+structurally unreintroducible.
+
+*Second pass measured on branch `claude/test-coverage-analysis-efv3hp`, rebased
+onto `3761620`; suite green (305 passed, 0 skipped, signer SDK present) and all
+19 floors held before and throughout. Every finding below was re-verified at
+that base after `#128` landed mid-write — the Farmer's `book_metrics` still
+executes line 891 alone, the family bot still reads 35.3%, the Farmer 52.7%. No
+production code changed by this pass — analysis only.*
