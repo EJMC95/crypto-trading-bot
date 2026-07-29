@@ -599,6 +599,56 @@ def entry_stamp(is_short, px, now_ts, clip, src):
                                        else 1.0)}}
 
 
+RECEIPTS_CAP = 200        # per-cycle list bound — prelim is ~a dozen books
+
+
+def scan_receipts(shadow, slope_ratios, slope_noref, conv_raws,
+                  pool_n, prelim_n, held_explore, expl_k):
+    """One scan cycle's DECISION-TIME quantities as a bot_state payload —
+    (key, payload) for save_state + save_history.
+
+    [2026-07-30 (eu) §B RECEIPTS — LEVER_AUTHORITY_TRIAGE §B: conviction_hi
+    / explore_k / slope_gate were UNMEASURED, "no recorded quantity
+    binding". This records what each lever's decision actually SAW, so the
+    census can measure authority instead of shrugging:]
+
+      * slope.ratios — |apr| / |apr_prev| for EVERY candidate that reached
+        the slope decision, admitted AND skipped (the scout-lever lesson:
+        a receipt recorded only on admitted entries is emission-truncated —
+        a picture of the bar, not of the market). slope.no_ref counts
+        fail-open decisions (no usable lookback: missing history or a 0.0
+        reference the gate cannot bite on).
+      * conviction.raws — the UNCLAMPED score |apr|/CONVICTION_REF per
+        ADMITTED entry. The clamped mult is censored AT the cap (the
+        taker.tp class); the raw is where CONVICTION_HI's authority lives
+        (share of entries with raw >= hi = where the cap binds).
+      * explore.pool_n — the explore-eligible candidate count this cycle
+        (vs prelim_n, the exploit set); explore_k's authority is the share
+        of cycles with pool_n >= k, which entries alone can never show
+        (the explore-zero diagnosis, as a standing measurement).
+
+    Pure and bounded (lists capped at RECEIPTS_CAP); the caller publishes
+    under the never-raise guard. Keys are arm-scoped so the census can
+    read live and xp separately."""
+    key = "funding-scan-shadow" if shadow else "funding-scan-live"
+    payload = {
+        "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "ttl_sec": 7200,
+        "slope": {"ratios": [round(float(r), 4)
+                             for r in list(slope_ratios)[:RECEIPTS_CAP]],
+                  "no_ref": int(slope_noref),
+                  "gate_on": 1 if SLOPE_GATE else 0},
+        "conviction": {"raws": [round(float(m), 4)
+                                for m in list(conv_raws)[:RECEIPTS_CAP]],
+                       "mode": CONVICTION_MODE, "ref": CONVICTION_REF,
+                       "hi": CONVICTION_HI},
+        "explore": {"pool_n": int(pool_n), "prelim_n": int(prelim_n),
+                    "held": int(held_explore), "k": int(expl_k),
+                    "floor": EXPLORE_MIN_VOL},
+    }
+    return key, payload
+
+
 # ---- funding-SLOPE entry gate (2026-07-11) — only enter while the rate is
 # still BUILDING (|apr| >= |apr LOOKBACK_H ago|). Backtested on the 150d
 # portfolio sim (scripts/backtest_funding_leverage.py): at the live 2x config
@@ -2104,6 +2154,11 @@ def main():
         if open_now < max_open and not quarantine_blind and not live_state_blind:
             # cheap prefilter: hard SAFETY gates on the funding map only (no network)
             prelim, explore_pool = [], []
+            # [2026-07-30 (eu) §B RECEIPTS] this cycle's decision-time
+            # quantities (slope ratios incl. skips, unclamped conviction
+            # scores, explore pool size) — published at the end of the
+            # scan block via scan_receipts()
+            _rx_slope, _rx_noref, _rx_conv = [], 0, []
             # [2026-07-29] the widened explore floor is live only when explore
             # itself is on AND the floor is set strictly below MIN_VOL —
             # anything else keeps the pool empty (fail-safe inert).
@@ -2170,6 +2225,13 @@ def main():
                 _slope_prev = (_slope_ref(rate_hist.get(coin), t0,
                                           SLOPE_LOOKBACK_H * 3600)
                                if SLOPE_GATE else None)
+                # [(eu) receipts] the slope decision's quantity, admitted OR
+                # skipped — a 0.0 reference can't bite, so it counts no_ref
+                if SLOPE_GATE:
+                    if _slope_prev:
+                        _rx_slope.append(abs(apr) / abs(_slope_prev))
+                    else:
+                        _rx_noref += 1
                 # [2026-07-30 (es) SEAM] the ordered veto chain, extracted
                 # pure (slots -> explore reservation -> vol filter ->
                 # quality veto [2026-07-11] -> fleet long veto [IMB-17] ->
@@ -2210,6 +2272,9 @@ def main():
                 if px is None:
                     continue
                 clip = order_usd * conviction_mult(apr)   # Lever 2: dark default -> order_usd
+                if CONVICTION_REF > 0:
+                    # [(eu) receipts] the UNCLAMPED score — where the cap binds
+                    _rx_conv.append(abs(apr) / CONVICTION_REF)
                 size = round(clip / px, 6)
                 if not dry_run:
                     # [2026-07-15 AUDIT FIX v2] real deployed notional (held at
@@ -2294,6 +2359,19 @@ def main():
                 except Exception:
                     pass
 
+            # [2026-07-30 (eu) §B RECEIPTS] one compact row per scan cycle
+            # (state + history) — the census's measurement substrate for
+            # conviction_hi/explore_k/slope_gate. Never-raise: telemetry
+            # must not touch the loop that manages stops.
+            try:
+                _rk, _rp = scan_receipts(
+                    shadow_tag, _rx_slope, _rx_noref, _rx_conv,
+                    len(explore_pool), len(prelim), n_explore, _expl_k)
+                store.save_state(_rk, _rp)
+                store.save_history(_rk, _rp)
+            except Exception:  # noqa: BLE001
+                pass
+
         # ---- publish snapshot ----
         if dry_run:
             open_fund = sum((meta.get(c) or {}).get("accrued", 0.0) for c in meta)
@@ -2326,7 +2404,12 @@ def main():
                        # vol_filter is the PROCESS'S OWN read of the env (the
                        # (df) lesson: enablement is verified by published
                        # output, never by "the var is set on the service").
-                       "levers": {"explore_k": SCAN_EXPLORE_K, "conviction": CONVICTION_MODE},
+                       # [(eu)] explore_floor: the (df) lesson — activation
+                       # (FUNDING_EXPLORE_MIN_VOL) is verified by published
+                       # output, never by "the var is set on the service"
+                       "levers": {"explore_k": SCAN_EXPLORE_K,
+                                  "conviction": CONVICTION_MODE,
+                                  "explore_floor": EXPLORE_MIN_VOL},
                        "vol_filter": VOL_FILTER,
                        # [2026-07-29 audit R5] a blind boot was LOG-ONLY: the
                        # row said "online" while entries were blocked and the
@@ -2604,6 +2687,30 @@ def _selftest_entry_admission():
     finally:
         SCAN_EXPLORE_K = _saved
     print("lighter_funding_bot _selftest_entry_admission OK")
+
+
+def _selftest_scan_receipts():
+    """[2026-07-30 (eu)] The §B decision-time receipts, pinned: arm-scoped
+    keys, freshness stamps, bounded lists, and the no_ref/ratio split that
+    keeps a fail-open slope decision from polluting the measured ratio
+    distribution."""
+    k, p = scan_receipts(False, [1.25, 0.8], 3, [2.5], 4, 11, 1, 2)
+    assert k == "funding-scan-live", k
+    k2, _ = scan_receipts(True, [], 0, [], 0, 0, 0, 0)
+    assert k2 == "funding-scan-shadow", k2
+    assert p["updated"] and p["ttl_sec"] == 7200, "freshness contract keys"
+    assert p["slope"]["ratios"] == [1.25, 0.8] and p["slope"]["no_ref"] == 3, \
+        "ratios and fail-open counts are SEPARATE — no_ref never enters the " \
+        "measured distribution"
+    assert p["conviction"]["raws"] == [2.5], p["conviction"]
+    assert p["conviction"]["ref"] == CONVICTION_REF
+    assert p["explore"] == {"pool_n": 4, "prelim_n": 11, "held": 1, "k": 2,
+                            "floor": EXPLORE_MIN_VOL}, p["explore"]
+    # bounded: a runaway cycle can never publish an unbounded payload
+    _k3, p3 = scan_receipts(False, [1.0] * 1000, 0, [1.0] * 1000, 0, 0, 0, 0)
+    assert len(p3["slope"]["ratios"]) == RECEIPTS_CAP, "slope list capped"
+    assert len(p3["conviction"]["raws"]) == RECEIPTS_CAP, "conv list capped"
+    print("lighter_funding_bot _selftest_scan_receipts OK")
 
 
 def _selftest_notional():
@@ -3156,6 +3263,7 @@ if __name__ == "__main__":
         _selftest_exit_decision()
         _selftest_flatten_fields()
         _selftest_entry_admission()
+        _selftest_scan_receipts()
         sys.exit(0)
     try:
         _supervised()

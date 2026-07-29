@@ -233,7 +233,104 @@ QUANTITIES = {
         "abs": False, "dir": "ge", "to_q": 1.0, "unit": "hours",
         "min_n": MIN_N_LEDGER, "precision": 0.01, "censor_at": 72.0,
         "gate": "hold hours at close (shadow twin)"},
+    # ------ [2026-07-30 (eu) §B RECEIPTS] the three formerly-UNMEASURED
+    # growth levers, per arm, off the Farmer's new funding-scan-* payloads
+    # (scan_receipts: slope ratios recorded for EVERY decision incl. skips,
+    # UNCLAMPED conviction scores, per-cycle explore pool size). Entries
+    # stay honestly UNMEASURED until the next --measure run accrues n. ----
+    "live.funding.slope_gate": {
+        "source": "state:funding-scan-live", "extract": ("list", ("slope", "ratios")),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "slope_ratio",
+        "min_n": MIN_N_TAPE, "precision": 0.01,
+        "gate": "lighter_funding_bot.py entry_admission — skip iff ratio < 1 "
+                "while the gate is 1",
+        "note": "a 0/1 lever mapped onto the ratio distribution: threshold 0 "
+                "= admit-all (gate off), threshold 1 = the real bar; recorded "
+                "for admitted AND skipped candidates (no emission truncation)"},
+    "xp.funding.slope_gate": {
+        "source": "state:funding-scan-shadow", "extract": ("list", ("slope", "ratios")),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "slope_ratio",
+        "min_n": MIN_N_TAPE, "precision": 0.01,
+        "gate": "shadow twin, same code",
+        "note": "see live.funding.slope_gate"},
+    "live.funding.conviction_hi": {
+        "source": "state:funding-scan-live", "extract": ("list", ("conviction", "raws")),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "conv_raw",
+        "min_n": MIN_N_LEDGER, "precision": 0.01,
+        "gate": "lighter_funding_bot.py conviction_mult — clip x min(hi, raw)",
+        "note": "the UNCLAMPED score per admitted entry: admitted-share at hi "
+                "= share of entries where the cap BINDS. The clamped mult is "
+                "censored at the bar (the taker.tp class) and is deliberately "
+                "not the recorded quantity. One value per entry, so n accrues "
+                "at ledger pace — MIN_N_LEDGER"},
+    "xp.funding.conviction_hi": {
+        "source": "state:funding-scan-shadow", "extract": ("list", ("conviction", "raws")),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "conv_raw",
+        "min_n": MIN_N_LEDGER, "precision": 0.01,
+        "gate": "shadow twin, same code",
+        "note": "see live.funding.conviction_hi"},
+    "live.funding.explore_k": {
+        "source": "state:funding-scan-live", "extract": ("field", ("explore", "pool_n")),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "pool_n",
+        "min_n": MIN_N_TAPE, "precision": 1.0,
+        "gate": "explore reservation fills from the pool — opens/cycle <= "
+                "min(k, pool_n)",
+        "note": "per-cycle explore-eligible candidate count: admitted-share "
+                "at k = share of cycles where the FULL reservation is usable; "
+                "a mode at 0 is the explore-zero diagnosis as a standing "
+                "measurement"},
+    "xp.funding.explore_k": {
+        "source": "state:funding-scan-shadow", "extract": ("field", ("explore", "pool_n")),
+        "abs": False, "dir": "ge", "to_q": 1.0, "unit": "pool_n",
+        "min_n": MIN_N_TAPE, "precision": 1.0,
+        "gate": "shadow twin, same code (the arm the growth A/B runs on)",
+        "note": "see live.funding.explore_k"},
 }
+
+
+def _extract_state(payload, kind, arg):
+    """Per-payload quantity extraction for `state:` sources, pure — split
+    out of _measure so the extract kinds are selftestable offline.
+
+    kinds: 'map'    -> payload[arg] is {sym: value}          (one per sym)
+           'ticket' -> payload['tickets'][lens][field]       (one per ticket)
+           'list'   -> payload[section][field] is [values]   ((eu) receipts)
+           'field'  -> payload[section][field] is one value  ((eu) receipts)
+    Junk values are skipped, never raised — a malformed payload thins the
+    sample, it does not kill the census."""
+    vals = []
+    if kind == "map":
+        for v in ((payload or {}).get(arg) or {}).values():
+            try:
+                vals.append(float(v))
+            except (TypeError, ValueError):
+                pass
+    elif kind == "ticket":
+        lens, field = arg
+        for t in ((payload or {}).get("tickets") or {}).get(lens) or []:
+            v = t.get(field)
+            if v is None:
+                continue
+            try:
+                vals.append(float(v))
+            except (TypeError, ValueError):
+                pass
+    elif kind == "list":
+        sec, field = arg
+        for v in (((payload or {}).get(sec) or {}).get(field) or []):
+            try:
+                vals.append(float(v))
+            except (TypeError, ValueError):
+                pass
+    elif kind == "field":
+        sec, field = arg
+        v = ((payload or {}).get(sec) or {}).get(field)
+        if v is not None:
+            try:
+                vals.append(float(v))
+            except (TypeError, ValueError):
+                pass
+    return vals
 
 
 # ---------------------------------------------------------------------------
@@ -1050,9 +1147,17 @@ def _measure(dsn):                                        # pragma: no cover
     import fleet_tuning
     conn = psycopg2.connect(dsn)
     cur = conn.cursor()
-    cur.execute("SELECT payload FROM bot_state_history WHERE key='lighter-market' "
-                "ORDER BY ts")
-    tape = [r[0] for r in cur.fetchall()]
+
+    # [2026-07-30 (eu)] tapes are per state KEY now (funding-scan-live /
+    # funding-scan-shadow joined lighter-market), fetched lazily once each
+    _tapes = {}
+
+    def tape_for(key):
+        if key not in _tapes:
+            cur.execute("SELECT payload FROM bot_state_history WHERE key=%s "
+                        "ORDER BY ts", (key,))
+            _tapes[key] = [r[0] for r in cur.fetchall()]
+        return _tapes[key]
 
     def ledger(bot):
         cur.execute("SELECT pair, opened_at, closed_at, reason, pnl_abs FROM "
@@ -1070,24 +1175,10 @@ def _measure(dsn):                                        # pragma: no cover
         kind, arg = q["extract"]
         vals, groups = [], 0
         if q["source"].startswith("state:"):
+            tape = tape_for(q["source"].split(":", 1)[1])
             groups = len(tape)
             for p in tape:
-                if kind == "map":
-                    for v in ((p or {}).get(arg) or {}).values():
-                        try:
-                            vals.append(float(v))
-                        except (TypeError, ValueError):
-                            pass
-                elif kind == "ticket":
-                    lens, field = arg
-                    for t in ((p or {}).get("tickets") or {}).get(lens) or []:
-                        v = t.get(field)
-                        if v is None:
-                            continue
-                        try:
-                            vals.append(float(v))
-                        except (TypeError, ValueError):
-                            pass
+                vals.extend(_extract_state(p, kind, arg))
         else:
             groups = 1
             rows = [r for r in ledger(q["source"].split(":", 1)[1]) if r[1]]
@@ -1206,6 +1297,23 @@ def _selftest():
     for n, q in QUANTITIES.items():
         assert "to_q" in q and "unit" in q and "dir" in q, n
         assert q["dir"] in ("ge", "le"), n
+
+    # --- 4b. [2026-07-30 (eu)] state-extract kinds, incl. the receipt
+    # shapes, on fixture payloads — junk thins the sample, never raises
+    _fx = {"funding": {"A": "1.5", "B": None, "C": "junk"},
+           "tickets": {"dip": [{"range_pos": 0.1}, {"range_pos": None}]},
+           "slope": {"ratios": [1.25, "0.8", "x"], "no_ref": 4},
+           "conviction": {"raws": [2.5]},
+           "explore": {"pool_n": 7, "prelim_n": 11}}
+    assert _extract_state(_fx, "map", "funding") == [1.5]
+    assert _extract_state(_fx, "ticket", ("dip", "range_pos")) == [0.1]
+    assert _extract_state(_fx, "list", ("slope", "ratios")) == [1.25, 0.8], \
+        "receipt lists coerce floats and drop junk"
+    assert _extract_state(_fx, "field", ("explore", "pool_n")) == [7.0], \
+        "per-cycle scalars yield exactly one sample per payload"
+    assert _extract_state(None, "list", ("slope", "ratios")) == []
+    assert _extract_state({}, "field", ("explore", "pool_n")) == []
+    assert _extract_state({"explore": {}}, "field", ("explore", "pool_n")) == []
 
     # --- 5. KNOB CENSUS + LEVERED detection, on a fixture that reproduces the
     # Farmer's two-hop shape (`ea = get_lever(...)` then `A = B = ea`).
