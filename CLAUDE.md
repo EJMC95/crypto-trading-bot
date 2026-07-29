@@ -477,6 +477,26 @@ All new bots:
   `gh workflow run 305025607 -f services="trail-blazer-live,tide-rider-lighter-live"`
   (address it by workflow ID — the filename form did not resolve in this repo).
   Then MARKER-GREP both containers; a green run has never implied a container took it.
+  **[2026-07-29 CORRECTION — the auto-deploy surface has since GROWN in three
+  ways this paragraph pre-dates; verified against the workflow at HEAD.]**
+  (1) The workflow auto-deploys **FOUR** services, not three — `market-context`
+  gained a deploy rule 17-Jul — and the pnl-dashboard path list also carries
+  `fleet_watchdog_svc.py`. (2) `fleet_tuning.py`, `funding_basis.py` and
+  `lighter_funding_bot.py` are ALL on `paths:` now — the "ships only when a
+  human runs `railway up`" list above is empty today. (3) The two REAL-MONEY
+  services are no longer dispatch-only: since 24/25-Jul a push whose commit
+  message carries **`[deploy-live-taker]` / `[deploy-live-farmer]` /
+  `[deploy-live]`** AND touches that live image's own files auto-deploys that
+  live service from clean main (no marker → shadow only, exactly as before).
+  The dispatch command above still works and remains the no-marker route.
+  Verify a live deploy landed by the bot_pnl `extra.build` stamp: it is a
+  content hash — recompute locally with
+  `python3 -c "import bot_pnl_store as b; print(b.build_compute('<entry>.py'))"`
+  and compare to the row (how the 29-Jul audit proved both live containers
+  ran 633e8a1 without container access). `audit_deploy_coverage` now also
+  cross-checks the live marker greps against `paths:` (the 28-Jul grep
+  widening added files the paths: block didn't carry — a marker push touching
+  only those deployed nothing, invisibly to the then-guard).
   **What it cost:** six fill-telemetry commits landed 04:27→10:52 UTC 17-Jul;
   the funding container booted 04:34 and picked up NONE of them — 58 real
   orders, 0 measured fills. The code was right and was never running. This is
@@ -619,7 +639,9 @@ container health. These are push-capable sources; wire the push instead.
 
 **P2 — The replacement is an Action, not a shorter interval.** CI/PR state →
 `ci-notify.yml` (posts transitions on the PR). Service state → extend
-`fleet-watchdog.yml` (probing pnl.json every ~30 min at $0 since 8-Jul).
+`fleet-watchdog.yml` (probing pnl.json; HOURLY since 28-Jul — the billing
+lockout retired both the old ~30-min cadence and the "$0" claim; the
+dashboard's in-service 5-min watchdog is the fine-grained layer).
 If it cannot be pushed, it is not important enough to poll.
 
 **P3 — A check-in chain may re-arm at most TWICE, then it must stop.** If a

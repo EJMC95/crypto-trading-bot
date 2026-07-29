@@ -66,6 +66,13 @@ jobs:
           if [ -z "$BODY" ]; then exit 0; fi
 
           # Deduplicate: only comment when the message differs from our last one.
-          LAST=$(gh api "repos/$REPO/issues/$PR/comments" --jq '[.[] | select(.body | startswith("<!-- ci-notify -->"))] | last | .body' 2>/dev/null || true)
+          # [2026-07-29 AUDIT] --paginate: without it gh returns PAGE 1 ONLY
+          # (30 oldest comments), so on any PR past 30 comments the latest
+          # ci-notify marker was off-page and the same transition re-posted
+          # on every trigger — the dedup silently became a spammer on
+          # exactly the long-lived PRs it exists for.
+          # Stream matches (one line per marker comment — our bodies are
+          # single-line by construction) and take the newest across ALL pages.
+          LAST=$(gh api --paginate "repos/$REPO/issues/$PR/comments" --jq '.[] | select(.body | startswith("<!-- ci-notify -->")) | .body' 2>/dev/null | tail -n 1 || true)
           if [ "$LAST" = "$BODY" ]; then echo "unchanged; not repeating"; exit 0; fi
           gh pr comment "$PR" --repo "$REPO" --body "$BODY"

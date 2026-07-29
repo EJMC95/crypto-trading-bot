@@ -735,8 +735,14 @@ def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts,
     dark/stale radar leaves the naive screen exactly as it was."""
     out = []
     radar_by_bot = {}
-    if radar_state and _fresh(radar_state, max_age_s=float(
-            radar_state.get("ttl_sec") or 10800)):
+    # [2026-07-29 AUDIT] plain numeric ceiling — _fresh already min()s in the
+    # payload's own guarded ttl_sec. The old inline float(ttl_sec) was the one
+    # UNGUARDED parse on this path: a sick radar payload carrying a
+    # non-numeric ttl_sec raised before _fresh ran, and because run_once
+    # calls synthesize_expand unwrapped, ONE bad organ payload aborted the
+    # whole board cycle (including the live.clip_scale re-assert loop),
+    # silently, every cycle until the radar healed.
+    if radar_state and _fresh(radar_state, max_age_s=10800):
         for b in radar_state.get("books") or []:
             if isinstance(b, dict) and b.get("bot"):
                 radar_by_bot[str(b["bot"])] = b

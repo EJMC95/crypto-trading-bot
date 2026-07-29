@@ -61,3 +61,42 @@ entries, never force one). The designed pipeline for exactly this class of win:
 entry_ok=None)` — an optional entry-site predicate, default None = byte-identical
 behaviour (the baseline row above reproduces the unfiltered +$2.44/−$7.37
 exactly, which is the parity proof).*
+
+## [2026-07-29 AUDIT CORRECTION — read before citing the +$44.52]
+
+The 29-Jul work-audit's adversarial re-review (methodology agent, findings
+CONFIRMED against the scripts) tightened three things about this document,
+none of which was honoured by the go-live citation trail ((dq)/(ds), PR #95,
+28-Jul review §1 config note):
+
+1. **The baseline is unstable by the size of the whole claimed edge.** The
+   SAME harness, gate, slip and nominal window produced baseline **+$33.47**
+   on the 23-Jul fetch (`FUNDING_GATE_LIGHTER_2026-07-23.md`, halves both
+   positive) and **+$2.44** on this doc's 24-Jul fetch (h1 NEGATIVE) — the
+   harness commits in between are comment-only, so a one-day universe
+   recomposition + window slide moved the baseline ~$31 and flipped a half's
+   sign. The "needs to survive a re-fetch" caveat above was written and then
+   never exercised: **no re-fetch was run before the filter went live on both
+   real-money arms.** The +$42 improvement is the same order as the harness's
+   own day-to-day sampling noise.
+2. **The pre-registered bar FAILED; the go-live claim substituted a weaker
+   one.** `study_funding_vol_filter.py` pre-registers "both-halves AND
+   all-thirds positive at BOTH slips" and its own verdict block prints
+   `lowvol50: not robust` / mechanism `NOT supported` (middle third −$5.3).
+   The citing docs carried "both halves, both slips" — the relaxed bar —
+   under a "REAL mechanism" headline. Any future citation should carry the
+   script's own printed verdict.
+3. **The shipped rule diverges from the measured rule on the wildest
+   cohort.** The study fails CLOSED on a missing vol read (fresh listings'
+   first ~3d mechanically excluded from every filtered variant); the live
+   `_vol_filter_veto` fails OPEN (no read → never vetoed) — deliberate and
+   fail-safe, but it means the measured +$44.52 never included the coins the
+   live rule admits blind.
+
+**What stands:** direction (calm-half helps, reverse control loses),
+methodology (no lookahead, cost-consistent, point-in-time percentile), and
+the risk shape (entry-skip only, kill switch `FUNDING_VOL_FILTER`, SafetyRails
+senior). **What does not:** the magnitude as canon. Operator options: leave ON
+(bounded downside — it can only skip entries) and treat the magnitude as
+unproven, or route the re-validation (≥2 fresh fetches + the 438d tape, the
+audit's O-item) before the next config decision leans on this number.

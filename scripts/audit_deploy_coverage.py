@@ -127,6 +127,69 @@ def workflow_filters():
     return out
 
 
+def live_marker_filters():
+    """(service -> raw regex string) for the OPT-IN live-bot marker path.
+
+    [2026-07-29 AUDIT] #100 moved the live greps into shell VARIABLES
+    (`taker_files='^(...)'` … `grep -qE "$taker_files"`), which the
+    inline-quoted parser in workflow_filters() cannot see — so the parsed
+    filter map silently lost both live services, and the audit had no way
+    to apply any rule to the marker path at all. This parser reads the
+    variable form; marker_orphans() below applies the both-lists rule to
+    it (the live images are still deliberately NOT in AUTO_IMAGES — the
+    marker path is opt-in, but its file set must still be reachable, and
+    `paths:` is what makes it reachable)."""
+    src = _read(WORKFLOW)
+    vars_ = dict(re.findall(r"(\w+_files)='([^']+)'", src))
+    out = {}
+    for var, svc in re.findall(
+            r'grep\s+-qE\s+"\$(\w+_files)".*?\n\s*svcs="\$\{svcs:\+\$svcs,\}'
+            r'([a-z0-9-]+)"', src, re.S):
+        if var in vars_:
+            out[svc] = vars_[var]
+    return out
+
+
+def marker_atoms(pattern):
+    """(files, prefixes) — the concrete path atoms inside a `^(a\\.py$|dir/)`
+    alternation. File atoms end `$` (unescaped to plain paths); prefix atoms
+    end `/`. Anything else is ignored (fail-open per atom — the both-lists
+    check is advisory-shaped, the greps stay authoritative for MATCHING)."""
+    body = pattern
+    if body.startswith("^(") and body.endswith(")"):
+        body = body[2:-1]
+    files, prefixes = [], []
+    for alt in body.split("|"):
+        alt = alt.strip()
+        if alt.endswith("$"):
+            files.append(alt[:-1].replace(r"\.", "."))
+        elif alt.endswith("/"):
+            prefixes.append(alt)
+    return files, prefixes
+
+
+def marker_orphans(marker_map, globs):
+    """[(service, atom)] for every marker-grep atom the `paths:` block cannot
+    reach. `paths:` gates whether the job RUNS; a file in a live marker grep
+    but absent from `paths:` means a marker push touching only that file
+    fires NO workflow — the marker can never work for it. That is the exact
+    both-lists class this guard exists for, on the real-money path: measured
+    2026-07-29 (the 28-Jul grep widening added tickettaker_loop.sh, the two
+    live Dockerfiles and later requirements.txt to the greps only)."""
+    if globs is None:
+        return [("<unparseable>", "paths:")]      # fail closed
+    out = []
+    for svc, pattern in sorted((marker_map or {}).items()):
+        files, prefixes = marker_atoms(pattern)
+        for f in files:
+            if not _path_listed(f, globs):
+                out.append((svc, f))
+        for pre in prefixes:
+            if not _path_listed(pre + "x.py", globs):
+                out.append((svc, pre + "**"))
+    return out
+
+
 def workflow_paths():
     """The `on: push: paths:` globs — the list that decides whether the job RUNS
     AT ALL.
@@ -275,6 +338,24 @@ def main():
         and os.path.exists(os.path.join(ROOT, o))
     )
 
+    # [2026-07-29] the live-bot MARKER path's both-lists rule: every file a
+    # marker grep can match must also be in `paths:`, or the marker push
+    # never starts the workflow (real-money deploys silently skipped).
+    m_orphans = marker_orphans(live_marker_filters(), globs)
+    if m_orphans:
+        print("MARKER-ORPHANED — these files are in a LIVE-bot marker grep "
+              "but NOT in `paths:`.\nA [deploy-live-*] push touching only "
+              "one of them fires NO workflow at all —\nthe real-money deploy "
+              "is silently skipped.\n")
+        for svc, atom in m_orphans:
+            print(f"  {atom:<32} live marker grep -> service {svc}")
+        print("\n  Fix: add the path to the `paths:` block in "
+              ".github/workflows/railway-redeploy.yml.\n")
+
+    if m_orphans and not (orphans or organ_orphans):
+        print(f"audit_deploy_coverage: {len(m_orphans)} MARKER-ORPHANED "
+              f"file(s); {len(ok_declared)} declared exception(s).")
+        return 1
     if orphans or organ_orphans:
         print("DEPLOY-ORPHANED — these ship in an auto-deployed image but no "
               "push can move them.\nEditing one is a SILENT NO-OP: green CI, "
@@ -464,6 +545,23 @@ def _selftest():
         "unparseable paths: must fail CLOSED, never open"
     assert covered("nope", "a.py", F, ["a.py"]) is False, "unknown service"
 
+    # [2026-07-29] the live-bot MARKER both-lists rule — fixtures first
+    # (the rule must be provable on a gap that cannot be fixed out from
+    # under the test), then the real workflow's parser shape.
+    fx, pfx = marker_atoms(r"^(a\.py$|venues/|Dockerfile\.x$|junk)")
+    assert fx == ["a.py", "Dockerfile.x"] and pfx == ["venues/"], (fx, pfx)
+    mm = {"svc-live": r"^(a\.py$|venues/|loop\.sh$)"}
+    assert marker_orphans(mm, ["a.py", "venues/**", "loop.sh"]) == [], \
+        "all atoms in paths: -> no orphans"
+    assert marker_orphans(mm, ["a.py", "venues/**"]) == [("svc-live", "loop.sh")], \
+        "a grep-only file must be reported — the marker can never fire for it"
+    assert marker_orphans(mm, ["a.py", "loop.sh"]) == [("svc-live", "venues/**")], \
+        "a grep-only PREFIX must be reported too"
+    assert marker_orphans(mm, None), "unparseable paths: must fail CLOSED"
+    lm = live_marker_filters()
+    assert "tide-rider-lighter-live" in lm and "trail-blazer-live" in lm, (
+        "variable-form marker greps must parse — #100 moved them into shell "
+        f"vars and the old parser lost both live services: {sorted(lm)}")
     # declared(): longest-prefix, so venues/ covers its children
     assert declared("venues/lighter_client.py"), "venues/ prefix must cover children"
     assert declared("lighter_funding_bot.py")
