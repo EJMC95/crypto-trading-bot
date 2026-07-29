@@ -262,6 +262,18 @@ Small files, outsized blast radius, and two of them have shipped incidents:
   fill-model bug here corrupts the judge's paired bar silently. **Proposal:**
   open/mark/close round-trip vs `paper_broker` (96%) semantics, fee and
   funding-sign parity.
+  **[2026-07-29 SHIPPED (eo):** `tests/real_money/test_shadow_and_marks.py`
+  — 14 tests: the spread-crossing walk (buys UP the asks, sells DOWN the
+  bids, VWAP over consumed levels — mutation-verified against a
+  top-of-book-optimistic revert), slippage ADVERSE-POSITIVE on both sides
+  (mutation-verified against the dropped sign flip), dead-venue/thin-book
+  fallback to decision px without raising into the loop, accounting at the
+  FILL price, the zero-fee round trip costing exactly the crossed spread,
+  short-cover walking the asks, close-unknown publishing nothing; plus
+  `venues/marks.py`'s max/min unsorted-book reduction, junk filtering, and
+  `mid_map` absent-not-None. Both files measured **100%**; entered the
+  ratchet at floor 95. `venues/base.py`'s residue is `NotImplementedError`
+  stubs — deliberately not tested or floored. Finding 6 is COMPLETE.]**
 * `venues/fills.py` (64%): the untested branches are the degraded reads
   (missing detail, tx-hash fallback) — the measured-fills telemetry the 17-Jul
   "58 orders, 0 measured fills" incident was about.
