@@ -59,6 +59,10 @@ SELFTEST_MODULES = [
     # reduction, signature dedupe, ordering, empty-state); the full run needs
     # the tape + register from the DB.
     "scripts.study_prospect_admission",
+    # [2026-07-29 (fb)] secret-leak guard, landed in f6d7a2a without its
+    # registration — the rot guard named it on the next local run. Its
+    # --selftest is offline (8/8 planted secrets caught, no network, no DB).
+    "scripts.audit_secret_leak",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",

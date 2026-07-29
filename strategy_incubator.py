@@ -362,6 +362,72 @@ def seed_population(genes):
     return dedupe(pop)
 
 
+# [2026-07-29] JOINT-SPACE EXPLORATION (operator: "give it everything it needs
+# to explore every option possible").
+#
+# THE BLOCKER, measured before building: the organ was searching ONE DIMENSION
+# from ONE POINT, forever. seed_population emits the default genome plus its
+# single-gene AXIS PROBES — it never varies two genes at once — and the only
+# thing that explores interactions is breed(), which returns [] when the elite
+# is empty. select_elite demands both_halves_pos, and no genotype on this tape
+# clears it (the whole taker surface is negative), so the elite IS empty and
+# the population collapses to 11 axis probes per cycle. Gene INTERACTIONS were
+# unreachable by construction.
+#
+# And the budget was never the constraint: one evaluate() is ~32ms on a
+# 2200-snap tape, so the old cycle spent ~0.4s of an hourly (3600s) loop. The
+# full 7-gene product is 11,520 genotypes — ~370s, comfortably affordable.
+#
+# So: enumerate the JOINT product deterministically and walk it with a
+# persistent CURSOR, covering a bounded slice each cycle and wrapping. Over
+# successive cycles the organ sweeps the ENTIRE legal space rather than
+# resampling one neighbourhood — the same coverage-cursor pattern the fleet
+# already uses, and the reason the (f7cad49) explore-zero bug is worth not
+# repeating: a cursor that never sweeps is a search that never explores.
+# Deterministic (no RNG — reproducible, and the runtime has no seeded source
+# this organ should depend on).
+EXPLORE_N = int(os.environ.get("INCUBATOR_EXPLORE_N", "1500"))
+# what lands in the durable register per cycle; the rest are scored, ranked
+# and discarded. Without this a 1500-genotype cycle would evict every dormant
+# entry and the register would stop being durable.
+REGISTER_TOP_N = int(os.environ.get("INCUBATOR_REGISTER_TOP_N", "24"))
+
+
+def joint_space_size(genes):
+    """How many genotypes the full product contains. Pure."""
+    n = 1
+    for _g, (_lever, grid) in sorted(genes.items()):
+        n *= max(1, len(grid))
+    return n
+
+
+def explore_slice(genes, cursor, n):
+    """(population, next_cursor, space_size) — the next `n` genotypes of the
+    JOINT gene product, walked deterministically from `cursor` and wrapping.
+
+    Enumeration is over sorted gene names and their grids, so the order is
+    stable across cycles and processes: the cursor means the same thing next
+    hour as it did this hour. `n <= 0` explores nothing (a clean kill switch);
+    a space smaller than `n` is returned once, whole, with the cursor advanced
+    modulo the space so coverage keeps its meaning. Pure — selftested."""
+    if not genes or n <= 0:
+        return [], int(cursor or 0), joint_space_size(genes or {})
+    names = sorted(genes)
+    grids = [genes[g][1] for g in names]
+    size = joint_space_size(genes)
+    start = int(cursor or 0) % size
+    take = min(n, size)
+    pop = []
+    for k in range(take):
+        idx = (start + k) % size
+        gt, rem = {}, idx
+        for name, grid in zip(names, grids):
+            gt[name] = grid[rem % len(grid)]
+            rem //= len(grid)
+        pop.append(gt)
+    return dedupe(pop), (start + take) % size, size
+
+
 def dedupe(pop):
     seen, out = set(), []
     for gt in pop:
@@ -947,7 +1013,19 @@ def run_once():
         prior_elite = conform([e.get("genotype") for e in
                                (prior.get("elite") or [])], genes)
         seeds = seed_population(genes)
-        population = dedupe(seeds + breed(prior_elite, genes))
+        # [2026-07-29] JOINT-SPACE sweep alongside the axis probes and the
+        # elite's offspring. This is what makes gene INTERACTIONS reachable at
+        # all: breed() is empty whenever no genotype clears both_halves_pos,
+        # which is the standing state on a negative surface, so without this
+        # the population is the 11 axis probes and nothing else.
+        explored, explore_cursor, space_size = explore_slice(
+            genes, prior.get("explore_cursor"), EXPLORE_N)
+        population = dedupe(seeds + breed(prior_elite, genes) + explored)
+        print(f"[incubator] 🔍 exploring {len(population)} genotypes "
+              f"({len(seeds)} axis probes + {len(explored)} joint-space, "
+              f"cursor -> {explore_cursor}/{space_size} = "
+              f"{100.0 * min(explore_cursor or space_size, space_size) / space_size:.0f}% "
+              f"of the legal space swept)", flush=True)
         scored = rank(population, tape, allowed)
         # [2026-07-17] GAMETES (who breeds) and the CHAMPION (what we would
         # trust) are now separate questions. The elite are robustness-filtered
@@ -980,7 +1058,14 @@ def run_once():
         # scored, merged into the durable across-cycles list (see
         # update_prospects) — the population is no longer discarded at
         # publish.
-        prospects = update_prospects(prior.get("prospects"), scored, seeds,
+        # [2026-07-29] Only the RANKED TOP land in the durable register. With
+        # a 1500-genotype sweep, registering every scored genome would fill
+        # the cap with one cycle's population and evict every dormant entry —
+        # the register would stop being the durable "every genotype and its
+        # stats" the 22-Jul ask asked for. rank() already sorts, so this is
+        # the best of the sweep, not an arbitrary slice.
+        prospects = update_prospects(prior.get("prospects"),
+                                     scored[:REGISTER_TOP_N], seeds,
                                      default_gt, champion, leaderboard,
                                      _iso(now))
         # [2026-07-29] HYGIENE: collapse what the current gene set can no
@@ -996,6 +1081,10 @@ def run_once():
         prospects = [e for e in (prior.get("prospects") or [])
                      if isinstance(e, dict)]
         prune = {"skipped": "tape too short — no scoring, no disposal"}
+        # the cursor must NOT advance on a cycle that scored nothing, or the
+        # sweep would skip a slice it never actually measured
+        explore_cursor = prior.get("explore_cursor") or 0
+        space_size, explored = 0, []
 
     # --- FUNDING proposals (live-reachable, JUDGE-gated) -------------------
     judge_state = store.load_state("xp-judge") or {}
@@ -1077,6 +1166,16 @@ def run_once():
         # silent (an organ that quietly deletes its own evidence is worse
         # than one that hoards it). See prune_register().
         "register_hygiene": prune,
+        # [2026-07-29] the joint-space sweep: where the cursor is, how big the
+        # legal space is, and how much of it this cycle covered. A search that
+        # cannot be seen to be sweeping is indistinguishable from one that has
+        # silently stopped (the explore-zero lesson). See explore_slice().
+        "explore_cursor": explore_cursor,
+        "exploration": {"space_size": space_size, "swept_this_cycle": len(explored),
+                        "cursor": explore_cursor, "budget_n": EXPLORE_N,
+                        "coverage_pct": (round(100.0 * min(explore_cursor or space_size,
+                                                           space_size) / space_size, 1)
+                                         if space_size else None)},
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -1446,6 +1545,55 @@ def _selftest():
     s_c = update_prospects(s_a, sc2, seeds1, {"A": 1, "B": 10}, None, [], "T2")
     assert all(e["stats_age_h"] is None for e in s_c
                if e["role"] == "dormant"), "unparseable => None, not 0.0"
+
+    # [2026-07-29] JOINT-SPACE SWEEP. The property that matters is COVERAGE:
+    # walking the cursor must eventually visit EVERY genotype in the product,
+    # deterministically, and gene INTERACTIONS must be reachable (the axis
+    # probes alone can never produce a genotype with two genes off-default).
+    _g2 = {"A": ("l.a", [1, 2, 3]), "B": ("l.b", [10, 20])}
+    assert joint_space_size(_g2) == 6
+    # a full sweep in slices covers the space EXACTLY once, then wraps
+    seen_all, cur = [], 0
+    for _ in range(3):
+        pop, cur, size = explore_slice(_g2, cur, 2)
+        seen_all += [tuple(sorted(g.items())) for g in pop]
+    assert size == 6 and len(seen_all) == 6, seen_all
+    assert len(set(seen_all)) == 6, "every genotype visited exactly once"
+    assert cur == 0, "cursor wraps to the start after a full sweep"
+    # DETERMINISM ACROSS PROCESSES, pinned STRUCTURALLY. Comparing two calls
+    # in one process is not enough — that passes even with `set()` ordering
+    # (caught by mutation: the intra-process check survived it). A persisted
+    # cursor must mean the same genotype NEXT hour, in a fresh interpreter,
+    # so the enumeration is pinned to sorted gene names with the first name
+    # varying fastest — a property `set()` iteration cannot satisfy.
+    assert explore_slice(_g2, 0, 1)[0] == [{"A": 1, "B": 10}], "index 0"
+    assert explore_slice(_g2, 1, 1)[0] == [{"A": 2, "B": 10}], "A varies fastest"
+    assert explore_slice(_g2, 3, 1)[0] == [{"A": 1, "B": 20}], "then B rolls"
+    assert explore_slice(_g2, 2, 3)[0] == explore_slice(_g2, 2, 3)[0]
+    # ...and it is a JOINT sweep — genotypes with BOTH genes off-default exist,
+    # which is exactly what seed_population's axis probes can never emit
+    full = explore_slice(_g2, 0, 99)[0]
+    dflt = {"A": 1, "B": 10}
+    assert any(g["A"] != dflt["A"] and g["B"] != dflt["B"] for g in full), \
+        "joint space must reach gene INTERACTIONS, not just axes"
+    # the mirror half, on REAL genes (seed_population reads tt for defaults):
+    # no axis probe ever varies two genes at once, so the interaction above is
+    # unreachable without the joint sweep.
+    _gr = {g: TAKER_GENES[g] for g in ("DIP_RANGE", "TAKE_PROFIT")}
+    _rd = {g: getattr(tt, g) for g in _gr}
+    assert not any(gt["DIP_RANGE"] != _rd["DIP_RANGE"]
+                   and gt["TAKE_PROFIT"] != _rd["TAKE_PROFIT"]
+                   for gt in seed_population(_gr)), "axis probes vary ONE gene"
+    assert any(gt["DIP_RANGE"] != _rd["DIP_RANGE"]
+               and gt["TAKE_PROFIT"] != _rd["TAKE_PROFIT"]
+               for gt in explore_slice(_gr, 0, 999)[0]), "the sweep reaches them"
+    # a space smaller than the budget returns whole, cursor still meaningful
+    pop_s, cur_s, _ = explore_slice(_g2, 0, 1000)
+    assert len(pop_s) == 6 and cur_s == 0
+    # kill switch + empty genes claim nothing and cannot raise
+    assert explore_slice(_g2, 0, 0)[0] == []
+    assert explore_slice({}, 0, 10)[0] == []
+    assert explore_slice(_g2, None, 2)[1] == 2, "None cursor starts at 0"
 
     # [2026-07-29] REGISTER HYGIENE — dedupe / dispose / re-rank.
     def _pe(gt, net, lcb, cycles, age, current=False):
