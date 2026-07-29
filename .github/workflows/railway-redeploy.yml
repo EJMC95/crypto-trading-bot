@@ -215,22 +215,32 @@ jobs:
             # would be a silent no-op for funding-carry — caught by
             # audit_deploy_coverage.py before it shipped, which is the whole
             # point of that guard.
-            # [2026-07-30 (gl)] BOTH carry services, on the operator's call.
-            # The project has `funding-carry` AND `yield-harvester-shadow`, and
-            # nothing in this repo determines which publishes the
-            # perps-funding-carry-lshadow row. 🌾 is the book FIVE OF SIX BARS
-            # from go-live, so "probably the right one" is not good enough:
-            # both run carry code, neither carries a volume, so an extra
-            # redeploy costs nothing while a wrong guess costs that book every
-            # lever it was given. This is the same guess that cost four books
-            # their shot earlier in this pass — resolved by covering both
-            # rather than by picking.
-            _carry='funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$'
-            if echo "$changed" | grep -qE "^($_carry)"; then
+            # [2026-07-30 (gn) REVERTED — "deploy both" was WRONG, and the
+            # reason I gave for it was the wrong reason.]
+            # (gl) added `yield-harvester-shadow` beside `funding-carry` on the
+            # operator's call, on my argument that "neither carries a volume, so
+            # a redundant redeploy costs nothing". The volume was never the risk.
+            # BOTH SERVICES PUBLISH THE SAME `bot_pnl` ROW
+            # (`perps-funding-carry-lshadow`), so they are not redundant — they
+            # are two writers of one key, and the row becomes whoever published
+            # last. MEASURED within minutes of the catch-up dispatch: the row
+            # flipped from n=82 with `extra.caps` present to **n=71 with
+            # caps=None** and no build stamp, i.e. a publisher running code that
+            # predates (gd) stomped the good one. `funding_carry_bot.py` emits
+            # `caps` unconditionally every loop, so caps=None is proof the
+            # winning writer is not running HEAD.
+            # WHAT IS *NOT* DAMAGED, checked rather than assumed: the paper
+            # LEDGER is clean — 82 closes for this row, ZERO duplicate
+            # trade_ids. The go-live grader and the 30-day baseline read that
+            # ledger, so the EVIDENCE is intact; the casualty is the summary
+            # row (and `extra.caps`, which the evidence board reads to detect
+            # saturation).
+            # A deploy rule cannot fix this: both services are running
+            # regardless of what this workflow does, so one of them must be
+            # STOPPED in Railway — an operator action. Reverting here at least
+            # stops this repo from re-waking the duplicate on every push.
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}funding-carry"
-            fi
-            if echo "$changed" | grep -qE "^($_carry)"; then
-              svcs="${svcs:+$svcs,}yield-harvester-shadow"
             fi
             # market-context service (🛰️ instrument collector). Its live-bot
             # freshness watchdog is the fleet's ONLY cross-region check on the

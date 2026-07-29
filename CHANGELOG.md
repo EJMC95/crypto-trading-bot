@@ -1,3 +1,19 @@
+## 2026-07-30 (gn) — "DEPLOY BOTH CARRY SERVICES" WAS WRONG, and my reason for it was the wrong reason
+
+- **What I told the operator in `(gl)`**, recommending we deploy both `funding-carry` and `yield-harvester-shadow`: *"neither carries a volume, so a redundant redeploy costs nothing while a wrong guess costs that book every lever it was given."* He agreed on that basis. **The volume was never the risk, and I never reasoned about the actual one.**
+- **THE ACTUAL RISK: both services publish the SAME `bot_pnl` row** (`perps-funding-carry-lshadow`). They are therefore not redundant — they are **two writers of one key**, and the row is whoever published last. "Deploy both" does not cover the ambiguity; it guarantees the collision.
+- **MEASURED, within six minutes of the catch-up dispatch waking the second one.** The row went from
+
+      n=82 · extra.caps = {enter_apr: 0.2, max_positions: …}
+  to
+      n=71 · caps=None · build=None · equity 1085.96
+
+  and held there across three consecutive samples. `funding_carry_bot.py` emits `caps` **unconditionally** inside its publish payload every loop, so `caps=None` on a live row is proof the winning writer **is not running HEAD** — a publisher predating `(gd)` stomped the good one. That detector is the only reason this was diagnosable from outside a container, and a test now pins that `caps` stays unconditional.
+- **WHAT IS NOT DAMAGED — checked, not assumed.** The paper LEDGER for that row is **clean: 82 closes, ZERO duplicate `trade_id`s**, latest close 15:44 UTC. The `(fk)` go-live grader and the 30-day baseline both read the ledger, so **the evidence base is intact** and no grade is contaminated. The casualties are the summary row and `extra.caps` — the field the evidence board reads to detect saturation, on the fleet's best-evidenced book, twelve days from a go-live decision.
+- **REVERTED**: the `yield-harvester-shadow` rule is gone; `funding-carry` is again the single target. The test that asserted "both are covered" has been replaced by its **opposite**, carrying this whole account, so the next session cannot re-derive the same wrong conclusion from the same true premise (that the repo can't tell which service owns the row).
+- **STILL OPEN, AND ONLY THE OPERATOR CAN CLOSE IT**: a deploy rule cannot fix a duplicate that is already running. `yield-harvester-shadow` was `● Online` before the dispatch — the landmine predates me; the dispatch stepped on it. **One of the two services must be STOPPED in Railway**, and until then the row will flap to whichever loops last. Reverting here only stops this repo from re-waking it on every push.
+- **THE LESSON, which is not "check service names"**: I reasoned about the cost of a redundant *deploy* and never asked what the two services would both *write*. A duplicate publisher is not a duplicate deploy. When two services can be pointed at one image, the question is not "is redeploying cheap?" — it is **"do they share a key?"**
+
 ## 2026-07-30 (gm) — A ROUTING FIX CANNOT DEPLOY ITSELF; and the Farmer's book gate was fail-OPEN on negative prices
 
 ### Part 1 — the deploy fix that deployed nothing

@@ -374,18 +374,50 @@ def test_the_guard_can_read_a_variable_interpolating_grep():
         assert any(rx.search("bot_pnl_store.py") for rx in rxs), service
 
 
-def test_both_carry_services_are_covered():
-    """(gl), operator's call. The project has `funding-carry` AND
-    `yield-harvester-shadow` and this repo cannot determine which publishes the
-    perps-funding-carry-lshadow row. 🌾 is five of six bars from go-live, so
-    both are deployed rather than one guessed — the same guess that cost four
-    books their shot earlier in this pass."""
+def test_only_ONE_service_deploys_the_carry_row():
+    """[2026-07-30 (gn) — this test replaces its own opposite, and the reason
+    matters more than the assertion.]
+
+    `(gl)` deployed BOTH `funding-carry` and `yield-harvester-shadow`, on my
+    argument to the operator that "neither carries a volume, so a redundant
+    redeploy costs nothing". **The volume was never the risk.** Both services
+    publish the SAME `bot_pnl` row (`perps-funding-carry-lshadow`), so they are
+    not redundant — they are two writers of one key, and the row is whoever
+    published last.
+
+    MEASURED minutes after the catch-up dispatch woke the second one: the row
+    went from n=82 with `extra.caps` present to **n=71, caps=None**, no build
+    stamp. `funding_carry_bot.py` emits `caps` unconditionally every loop, so
+    caps=None proves the winning writer is not running HEAD.
+
+    The paper LEDGER was checked and is clean (82 closes, zero duplicate
+    trade_ids), so the go-live grade and the 30-day baseline — which read the
+    ledger — are intact. The casualty is the summary row and `extra.caps`, which
+    the evidence board reads to detect saturation on the fleet's best book.
+
+    A deploy rule cannot fix a duplicate that is already running; stopping one
+    service is an operator action. What this test prevents is this repo waking
+    the duplicate again."""
     sys.path.insert(0, str(_ROOT / "scripts"))
     import audit_deploy_coverage as adc
     filters = adc.workflow_filters()
-    for service in ("funding-carry", "yield-harvester-shadow"):
-        rxs = filters.get(service)
-        assert rxs, f"no parseable rule for {service}"
-        # the lever registry must reach BOTH, or a carry lever lands nowhere
-        assert any(rx.search("fleet_tuning.py") for rx in rxs), service
-        assert any(rx.search("funding_carry_bot.py") for rx in rxs), service
+    assert "yield-harvester-shadow" not in filters, (
+        "two services publishing one bot_pnl row is not redundancy, it is a "
+        "non-deterministic row — see the measured n=82 -> n=71 flip")
+    rxs = filters.get("funding-carry")
+    assert rxs, "the carry image still needs exactly one deploy target"
+    assert any(rx.search("fleet_tuning.py") for rx in rxs)
+    assert any(rx.search("funding_carry_bot.py") for rx in rxs)
+
+
+def test_the_carry_bot_always_publishes_its_caps():
+    """The detector that made the above diagnosable in one read. `caps` is
+    emitted unconditionally, so `caps=None` on a live row can only mean the
+    publisher is not running HEAD — which is what identified the stale writer
+    without any container access."""
+    src = (_ROOT / "funding_carry_bot.py").read_text()
+    pub = src[src.index("store.publish("):]
+    pub = pub[:pub.index("carries")]
+    assert '"caps"' in pub, (
+        "caps must be inside the unconditional publish payload — it is the "
+        "field that identifies a stale publisher from the outside")
