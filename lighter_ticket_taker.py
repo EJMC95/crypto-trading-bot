@@ -735,7 +735,25 @@ def lens_evidence(o, min_n=None):
     return n, n >= min_n, (o.get("avg4h_pct") or 0), (o.get("hit4h") or 0)
 
 
-def vetoed_lenses(lens_fwd, min_n=None):
+# [2026-07-29 (fn)] Which SINGLE side of each lens is this arm allowed to take?
+# Under TT_BULL_MODE the entry gate admits only (breakout,long)/(breakoutup,long)
+# /(divergence,short), so `divergence` is a SHORT-ONLY lens here — and grading it
+# on a population that is 69% long is grading a book this arm does not trade.
+# Returns {} when bull mode is off (both sides reachable => pooled is correct).
+def restricted_sides():
+    if not BULL_MODE:
+        return {}
+    by_lens = {}
+    for lens, side in BULL_LENS_SIDES:
+        by_lens.setdefault(lens, set()).add(side)
+    return {lens: next(iter(s)) for lens, s in by_lens.items() if len(s) == 1}
+
+
+SIDE_AWARE_VETO = os.environ.get(
+    "TT_LENS_VETO_SIDE_AWARE", "on").strip().lower() not in ("off", "0", "false", "no")
+
+
+def vetoed_lenses(lens_fwd, min_n=None, sides=None):
     """THE lens veto rule, and the single authority for it (2026-07-17): a
     lens the brain grades negative at sample size stops getting fills.
 
@@ -753,10 +771,29 @@ def vetoed_lenses(lens_fwd, min_n=None):
     allowed_lenses is divergence-only regardless).
 
     RESTRICT-ONLY and fail-safe open: an empty/missing grade set vetoes
-    nothing (freshness is the CALLER's job — see the loop and the tuner)."""
+    nothing (freshness is the CALLER's job — see the loop and the tuner).
+
+    [2026-07-29 (fn) SIDE-AWARE] `sides` maps lens -> the ONE side this arm may
+    trade (restricted_sides()). When the brain publishes a `by_side` grade for
+    that side AND it meets the same floor, the verdict is taken from THAT
+    sub-population instead of the pooled one — because the pooled grade answers
+    a question about trades this arm cannot make. Measured on the 200h tape:
+    pooled divergence ehit4h 0.483 / eavg -0.093% (VETO) while the short side
+    the live arm actually trades is 0.513 / +0.139% and short+crypto is 0.525 /
+    +0.289%; the long side (69% of episodes) is what fails, at 0.470 / -0.199%.
+    This is NOT a loosening — it cuts BOTH ways: an arm restricted to a side
+    that grades badly inside a healthy pool now gets vetoed where it did not.
+    Fail-safe to the pre-(fn) rule in every degraded case: no `sides`, no
+    `by_side` block, an unmet sub-floor, or TT_LENS_VETO_SIDE_AWARE=off all
+    fall back to the pooled grade byte-for-byte."""
     out = set()
     for lens, o in (lens_fwd or {}).items():
-        _n, floor_met, avg, hit = lens_evidence(o, min_n=min_n)
+        graded = o
+        if SIDE_AWARE_VETO and sides and lens in (sides or {}):
+            sub = ((o or {}).get("by_side") or {}).get(sides[lens])
+            if isinstance(sub, dict) and lens_evidence(sub, min_n=min_n)[1]:
+                graded = sub
+        _n, floor_met, avg, hit = lens_evidence(graded, min_n=min_n)
         if floor_met and avg < 0 and hit < 0.5:
             out.add(lens)
     return out
@@ -1909,7 +1946,8 @@ def main(_ctx=None):
         lf = store.load_state("brain-lens-forward") or {}
         lf_age = (t_now - parse_ts(lf.get("updated"))).total_seconds()
         if 0 <= lf_age <= float(lf.get("ttl_sec") or 26000):  # [2026-07-23] future-stamp-safe
-            lens_vetoed = vetoed_lenses(lf.get("lenses"))
+            lens_vetoed = vetoed_lenses(lf.get("lenses"),
+                                        sides=restricted_sides())
     except (ValueError, TypeError):
         lens_vetoed = set()
     if lens_vetoed:
@@ -2497,6 +2535,52 @@ def selftest():
     assert vetoed_lenses({"dip": _dip}) == {"dip"}
     assert vetoed_lenses({"dip": {k: v for k, v in _dip.items()
                                   if not k.startswith(("e", "n_s"))}}) == set()
+
+    # ---- (fn) SIDE-AWARE VETO — the pooled grade is not this arm's grade ----
+    # Fixture built from the MEASURED 200h tape: pooled divergence fails the bar
+    # (ehit 0.483 / eavg -0.093) while the SHORT side the bull-mode arm actually
+    # trades passes (0.513 / +0.139) and the LONG side is what drags it under
+    # (0.470 / -0.199).
+    _div = {"eps4h": 1006, "n_syms": 90, "eavg4h_pct": -0.093, "ehit4h": 0.483,
+            "by_side": {
+                "long": {"eps4h": 692, "n_syms": 74,
+                         "eavg4h_pct": -0.199, "ehit4h": 0.470},
+                "short": {"eps4h": 314, "n_syms": 45,
+                          "eavg4h_pct": 0.139, "ehit4h": 0.513}}}
+    # pooled verdict, i.e. every consumer that does NOT pass `sides`: unchanged
+    assert vetoed_lenses({"divergence": _div}) == {"divergence"}
+    # the bull-mode arm trades short-divergence only -> graded on the short side
+    assert vetoed_lenses({"divergence": _div},
+                         sides={"divergence": "short"}) == set()
+    # ...and it CUTS BOTH WAYS: an arm restricted to the LONG side is vetoed on
+    # the long grade even though a healthier pool might have carried it. This is
+    # the assertion that stops (fn) from being a one-directional loosening.
+    _healthy = dict(_div, eavg4h_pct=0.120, ehit4h=0.540)
+    assert vetoed_lenses({"divergence": _healthy}) == set()
+    assert vetoed_lenses({"divergence": _healthy},
+                         sides={"divergence": "long"}) == {"divergence"}
+    # FAIL-SAFE to the pooled rule in every degraded case
+    _nosub = {k: v for k, v in _div.items() if k != "by_side"}
+    assert vetoed_lenses({"divergence": _nosub},
+                         sides={"divergence": "short"}) == {"divergence"}
+    _thin = dict(_div, by_side={"short": dict(_div["by_side"]["short"],
+                                              eps4h=3, n_syms=1)})
+    assert vetoed_lenses({"divergence": _thin},          # sub-floor unmet
+                         sides={"divergence": "short"}) == {"divergence"}
+    assert vetoed_lenses({"divergence": _div},           # side absent from block
+                         sides={"divergence": "sideways"}) == {"divergence"}
+    # restricted_sides() derives the map from BULL_LENS_SIDES, and is EMPTY
+    # (=> pooled everywhere) whenever bull mode is off
+    _was = globals()["BULL_MODE"]
+    try:
+        globals()["BULL_MODE"] = False
+        assert restricted_sides() == {}, restricted_sides()
+        globals()["BULL_MODE"] = True
+        _rs = restricted_sides()
+        assert _rs["divergence"] == "short", _rs
+        assert _rs["breakout"] == "long" and _rs["breakoutup"] == "long", _rs
+    finally:
+        globals()["BULL_MODE"] = _was
 
     _dark = vetoed_lenses({})
     assert _dark == set(), _dark                    # confirms the fail-open premise
