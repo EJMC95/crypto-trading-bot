@@ -11,10 +11,14 @@ name: Taker exit bracket
 # and the two arms had silently diverged for days.
 #
 # THIS IS NOT RESTRICT-ONLY. Widening TT_SL widens a real-money stop: each
-# loser can lose more. Bounded by the untouched $40 notional cap / 4 slots
-# (worst-case simultaneous stop-out $1.20 -> $1.60 at -0.03 -> -0.04 on a ~$66
-# book), the SafetyRails daily-loss halt, and the kill switch. Treat a change
-# here as a real-money risk decision, not a tuning nudge.
+# loser can lose more. And the stop does NOT hold at the stop — it is checked on
+# the snapshot cadence, so it overshoots: MEASURED on the 200h tape, the -0.03
+# bracket's worst realised trade is -5.12% and the -0.04 bracket's is -7.42%
+# (both ~2pp past their bar). Size the risk off the OVERSHOOT, not the bar:
+# worst-case across 4 slots is ~$2.05 -> ~$2.97 at -0.03 -> -0.04 on a ~$66 book.
+# Bounded by the untouched $40 notional cap, the SafetyRails daily-loss halt and
+# the kill switch. Treat a change here as a real-money risk decision, not a
+# tuning nudge.
 #
 # EVIDENCE for the 2026-07-29 values (lighter_ticket_replay + the taker's own
 # exit_reason/bull_exit on the live path, max_open=4, $10 clips) — the twin's
