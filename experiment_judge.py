@@ -767,7 +767,7 @@ def _arm_drift_snapshot(rows, fetch=None):
 
 def growth_step(gstate, rows, have_ledger, now, drift=None,
                 assert_fn=None, asserted_fn=None, push=None,
-                prop_state=None, proposals=None):
+                prop_state=None, proposals=None, serial_phase=None):
     """[2026-07-28 §3c] The growth-lever pair's cycle glue — the run_once
     wiring growth_promoter was committed without (53c7e8c shipped the promoter
     with its only callers in its own selftest; the 28-Jul review §3c mapped
@@ -808,6 +808,22 @@ def growth_step(gstate, rows, have_ledger, now, drift=None,
         except Exception:      # noqa: BLE001
             prop_state = {}
     if kind == "promote":
+        # [2026-07-29 AUDIT F1] promote HELD while the SERIAL pipeline is
+        # mid-candidate. The growth window compares shadow-vs-live on a
+        # rolling 2.5d read, and a running serial candidate changes the
+        # shadow arm's config INSIDE that window — the same multi-variable
+        # confound the operator released the 0.075 candidate over (D3):
+        # `ran_candidate` subset-matches the growth levers and cannot see
+        # the extra lever. Evaluation continues every cycle (last_growth
+        # stays honest) and reassert/fade/organ-release above/below are
+        # untouched — only the WRITE that steers real money waits for a
+        # clean window. Fail-safe: unknown/absent phase promotes normally.
+        if serial_phase == "running":
+            return gstate, {"kind": "eval",
+                            "why": "promote HELD: serial candidate running — "
+                                   "the shadow window is a multi-variable "
+                                   "confound (D3 class); re-evaluating each "
+                                   "cycle until the slot clears"}
         # [2026-07-28] never promote INTO a standing organ objection: a fresh
         # proprioception HURTING on a growth lever is the live lane's own
         # measurement that this knob is bad — the same evidence that would
@@ -817,6 +833,23 @@ def growth_step(gstate, rows, have_ledger, now, drift=None,
         if _pf:
             return gstate, {"kind": "eval",
                             "why": f"promote BLOCKED by organ verdict: {_pwhy}"}
+        # [2026-07-29 AUDIT F4] ...and never INTO a standing organ PROPOSAL:
+        # the reassert path already honors a fresh restrict proposal on the
+        # pair (early release); promote-time must consult the same channel or
+        # a promotion steers real money for one cycle before the very organ
+        # evidence that releases it. Fail-safe on a dark channel.
+        _props = proposals
+        if _props is None and fprop is not None:
+            try:
+                _props = fprop.fresh_proposals()
+            except Exception:      # noqa: BLE001
+                _props = None
+        if _props:
+            _of, _owhy = proposal_fade(_props, dict(GROWTH_LIVE), now)
+            if _of:
+                return gstate, {"kind": "eval",
+                                "why": f"promote BLOCKED by organ proposal: "
+                                       f"{_owhy}"}
         rc = assert_fn(dict(GROWTH_LIVE),
                        "growth-levers PROMOTED (faster bar)",
                        str(pay.get("why") or "")[:280])
@@ -1002,9 +1035,11 @@ def run_once():
     # own env, always on). All effects go through the same rail + phone as
     # the main path; state rides st['growth'] into every save() above.
     # Fail-closed at every gate (receipts, drift, floors, write-lands) —
-    # see growth_step/growth_promoter.
+    # see growth_step/growth_promoter. [2026-07-29 AUDIT F1] serial_phase
+    # passes the queue's state so the promote WRITE holds while a serial
+    # candidate contaminates the shadow window; evaluation never stops.
     _g2, _glast = growth_step(st.get("growth"), rows, have_ledger, now,
-                              drift=_drift_snap)
+                              drift=_drift_snap, serial_phase=phase)
     st["growth"], st["last_growth"] = _g2, _glast
     if _glast.get("kind") not in (None, "eval"):
         print(f"[xp-judge] growth-levers: {_glast}", flush=True)
@@ -1880,6 +1915,38 @@ def _selftest_growth():
                           push=_push, prop_state=_hurt, proposals=[])
     assert last["kind"] == "eval" and "BLOCKED" in str(last.get("why")), last
     assert not g.get("promoted"), g
+    # (9) [2026-07-29 AUDIT F1] PROMOTE HELD while the serial pipeline runs:
+    #     a mid-candidate shadow arm makes the growth window a multi-variable
+    #     confound (the D3 class), so the WRITE waits — no assert, no push,
+    #     state unpromoted, verdict says HELD. Idle/absent phase promotes
+    #     (case 1); an EXISTING promotion still reasserts through it (the
+    #     hold is promote-only — release paths must never wait).
+    calls9 = []
+    g, last = growth_step({}, rows, True, now,
+                          assert_fn=lambda *a: calls9.append(a) or
+                          _ok_assert(*a), push=_push,
+                          prop_state={}, proposals=[],
+                          serial_phase="running")
+    assert last["kind"] == "eval" and "HELD" in str(last.get("why")), last
+    assert not g.get("promoted") and not calls9, (g, calls9)
+    g, last = growth_step(dict(pstate), ok, True, now, assert_fn=_ok_assert,
+                          push=_push, prop_state={}, proposals=[],
+                          serial_phase="running")
+    assert last["kind"] == "reassert", \
+        "an existing promotion must keep reasserting through a serial run"
+    # (10) [2026-07-29 AUDIT F4] PROMOTE BLOCKED by a fresh restrict organ
+    #      PROPOSAL — the reassert path honored the channel, promote-time
+    #      did not: a promotion could steer real money for one cycle before
+    #      the very proposal that releases it. An expand proposal never blocks.
+    g, last = growth_step({}, rows, True, now, assert_fn=_ok_assert,
+                          push=_push, prop_state={}, proposals=_prop)
+    assert last["kind"] == "eval" and "organ proposal" in str(last.get("why")), last
+    assert not g.get("promoted"), g
+    g, last = growth_step({}, rows, True, now, assert_fn=_ok_assert,
+                          push=_push, prop_state={},
+                          proposals=[dict(_prop[0], direction="expand")])
+    assert last["kind"] == "promote", \
+        "an expand proposal must never block a promotion"
     print("experiment_judge _selftest_growth OK")
 
 

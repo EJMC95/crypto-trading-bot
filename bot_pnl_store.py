@@ -747,7 +747,11 @@ def fetch_trades(strategy_bot_names):
                 SELECT bot, open_ts, pair, profit_ratio, profit_abs, close_ts,
                        duration_min, enter_tag, exit_reason
                 FROM bot_trades
-                WHERE bot = ANY(%s) AND is_open = FALSE
+                -- [2026-07-29 AUDIT] IS NOT TRUE, not = FALSE: the (ea)
+                -- union doctrine (NULL is_open == closed) reached every
+                -- dashboard reader but skipped this one — trade_analyzer
+                -- silently dropped NULL-is_open closed rows.
+                WHERE bot = ANY(%s) AND is_open IS NOT TRUE
                 ORDER BY close_ts DESC NULLS LAST
                 """,
                 (list(strategy_bot_names),),

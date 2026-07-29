@@ -92,6 +92,21 @@ on:
       # the taker's own marker path. BOTH lists bind (audit_deploy_coverage.py):
       # paths gates whether the job runs, the decide grep picks the service.
       - 'lighter_funding_bot.py'
+      # [2026-07-29 AUDIT] the live images' FULL COPY sets — the paths: half.
+      # #100 widened the DECIDE greps (taker_files/farmer_files) to cover
+      # every file baked into the live images, but left these four off THIS
+      # list — and paths: gates whether the job runs AT ALL, so a marker
+      # push touching only e.g. tickettaker_loop.sh (the live Taker's
+      # restart/backoff wrapper) fired no workflow and deployed nothing,
+      # silently: the exact both-lists class the comment above warns about,
+      # reintroduced by the fix that widened one list. requirements.txt
+      # carries the real-money signer pin (lighter-sdk) COPY'd into every
+      # live/funding/market-context image. audit_deploy_coverage now
+      # cross-checks the marker greps against this list.
+      - 'tickettaker_loop.sh'
+      - 'Dockerfile.tickettaker'
+      - 'Dockerfile.fundinglighter'
+      - 'requirements.txt'
       # [2026-07-21] 🏛️ the Parliament (runs inside freqtrade-bots via
       # run_all.sh). Added the same day it shipped — the 17-Jul lesson: a
       # module COPY'd into the image but absent from THIS list merges green
@@ -161,7 +176,7 @@ jobs:
             # bot_pnl_store.py change — two red runs + failure emails on
             # 16-Jul while every LIVING service deployed fine.
             # funding-carry service
-            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|venues/)'; then
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|venues/|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}funding-carry"
             fi
             # market-context service (🛰️ instrument collector). Its live-bot
@@ -171,7 +186,7 @@ jobs:
             # A change here that does not deploy is a blind spot on real money.
             # [2026-07-17] This service had NO deploy rule at all; market_context.py
             # had only ever shipped via a manual `railway up`.
-            if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|venues/|cleanup_legacy_bots\.py$)'; then
+            if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|venues/|cleanup_legacy_bots\.py$|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}market-context"
             fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
@@ -211,8 +226,8 @@ jobs:
             # NOTHING (measured: 9476811's bot_pnl_store build-stamp — the
             # drift sensor's own feed — could not reach either live arm via
             # its marker).
-            taker_files='^(lighter_ticket_taker\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|tickettaker_loop\.sh$|Dockerfile\.tickettaker$)'
-            farmer_files='^(lighter_funding_bot\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|Dockerfile\.fundinglighter$)'
+            taker_files='^(lighter_ticket_taker\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|tickettaker_loop\.sh$|Dockerfile\.tickettaker$|requirements\.txt$)'
+            farmer_files='^(lighter_funding_bot\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|Dockerfile\.fundinglighter$|requirements\.txt$)'
             if echo "$changed" | grep -qE "$taker_files" \
                && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-taker]'; }; then
               svcs="${svcs:+$svcs,}tide-rider-lighter-live"

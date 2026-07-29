@@ -1848,22 +1848,55 @@ def main():
             _lok2, _lv2 = store.load_state_checked(bot_id + ":live")
             if _lok2:
                 _lv2 = _lv2 or {}
+                # [2026-07-29 AUDIT] persisted meta OVERWRITES, never
+                # setdefault: entries are BLOCKED while blind, so every meta
+                # entry present at heal time is a manage-pass reseed
+                # (opened_ts=boot, accrued=0, no clip/bars/src) — setdefault
+                # kept the junk and the next save made it durable (max-hold
+                # clock reset, carry under-count, judge receipts degraded).
+                # The seeded copy holds ONE real datum — funding accrued
+                # since boot — so fold it into the persisted figure (the two
+                # windows are disjoint: persisted covers open→last-save,
+                # the seed covers boot→heal). A persisted entry for a coin
+                # a stop closed while blind is inert (nothing iterates meta
+                # for unheld coins; an open replaces it wholesale).
                 for _c, _m in (_lv2.get("meta") or {}).items():
-                    meta.setdefault(str(_c), _m)
+                    _seed = meta.get(str(_c))
+                    if _seed and isinstance(_m, dict):
+                        _m = {**_m, "accrued": (float(_m.get("accrued") or 0.0)
+                                                + float(_seed.get("accrued") or 0.0))}
+                    meta[str(_c)] = _m
                 for _c, _t in (_lv2.get("explore_seen") or {}).items():
                     explore_seen.setdefault(str(_c), float(_t))
                 if live_baseline is None:
                     live_baseline = _lv2.get("initial_equity")
-                if not capital_adjust.get("total") and not capital_adjust.get("events"):
-                    capital_adjust.update(_lv2.get("capital_adjust")
-                                          or {"total": 0.0, "events": []})
+                # [2026-07-29 AUDIT] MERGE the capital ledger, don't
+                # restore-if-quiet: the blind boot started this run's ledger
+                # EMPTY, so everything in it was folded this run and the
+                # persisted blob is the lifetime history — the old guard
+                # dropped the whole history the moment one move folded while
+                # blind (lifetime P&L off by the entire prior capital total,
+                # durably, after the next save). Same 20-event audit cap as
+                # _fold_capital_moves.
+                _ca_run_total = round(float(capital_adjust.get("total") or 0.0), 2)
+                _ca_run_events = list(capital_adjust.get("events") or [])
+                _p_ca = _lv2.get("capital_adjust") or {}
+                capital_adjust["total"] = round(
+                    float(_p_ca.get("total") or 0.0) + _ca_run_total, 2)
+                capital_adjust["events"] = (list(_p_ca.get("events") or [])
+                                            + _ca_run_events)[-20:]
                 # halt record is SENIOR (a halted day must stay halted even
                 # though the blind boot could not see it); else the D3
-                # same-day persisted baseline beats the boot re-read. A
-                # capital move folded WHILE blind already shifted the boot
-                # baseline, so prefer the persisted value only when the
-                # ledger stayed quiet this run (conservative: the persisted
-                # pre-restart value is the higher rail anchor after losses).
+                # same-day persisted baseline beats the boot re-read.
+                # [2026-07-29 AUDIT] A capital move folded WHILE blind lives
+                # in the boot-read baseline but NOT in the persisted pre-move
+                # day_start — the old code stated this condition in a comment
+                # and then adopted the persisted value unconditionally, so a
+                # blind-window withdrawal re-armed the phantom-halt and a
+                # deposit masked the rail by its size. Now the persisted
+                # anchor is SHIFTED by the net folded this run (deposit +D /
+                # withdrawal −D land in both the equity read and the rail
+                # baseline — the same rule _fold_capital_moves documents).
                 _h2 = store.load_daily_halt(bot_id, cur_day.isoformat())
                 if _h2:
                     halted_today = True
@@ -1873,7 +1906,7 @@ def main():
                     _ds2 = _lv2.get("day_start") or {}
                     if (_ds2.get("day") == cur_day.isoformat()
                             and _ds2.get("equity")):
-                        day_start_equity = float(_ds2["equity"])
+                        day_start_equity = float(_ds2["equity"]) + _ca_run_total
                 live_state_blind = False
                 log.warning("':live' re-read OK — %d position meta restored, "
                             "baseline %s; entries re-enabled",
