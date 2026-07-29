@@ -913,6 +913,63 @@ def _close_src_extra(extra, src):
     return out
 
 
+def _heal_merge(persisted, meta, explore_seen, live_baseline, capital_adjust,
+                day_start_equity, halt_rec, cur_day_iso):
+    """[2026-07-29 audit R6] The ':live' blind→heal MERGE, extracted PURE so
+    fixtures can pin it — the 29-Jul audit fixed three defects in this logic
+    while it lived inline in main() with no test seam; this is the seam.
+    Mutates meta / explore_seen / capital_adjust IN PLACE; returns
+    (live_baseline, day_start_equity, halted_from_record).
+
+    Semantics (each carries a 29-Jul audit finding):
+    - meta: persisted OVERWRITES the manage-pass reseed — entries are blocked
+      while blind, so every meta entry present at heal time is a seed
+      (opened_ts=boot, accrued=0, no clip/bars/src); setdefault kept the junk
+      and the next save made it durable. The seed's one real datum — funding
+      accrued boot→heal — is folded into the persisted figure (disjoint
+      windows). A persisted entry for a coin closed while blind is inert.
+    - capital ledger: MERGE, never restore-if-quiet — the blind boot starts
+      this run's ledger empty, so everything in it was folded THIS RUN and
+      the persisted blob is the lifetime history. Same 20-event cap as
+      _fold_capital_moves.
+    - day_start: the halt record is SENIOR (a halted day stays halted); else
+      the persisted same-day anchor is adopted SHIFTED by the net capital
+      folded this run — unconditional adoption re-armed the phantom-halt
+      (withdrawal) / masked-rail (deposit) pair on the blind path.
+    """
+    persisted = persisted or {}
+    for _c, _m in (persisted.get("meta") or {}).items():
+        _seed = meta.get(str(_c))
+        if _seed and isinstance(_m, dict):
+            _m = {**_m, "accrued": (float(_m.get("accrued") or 0.0)
+                                    + float(_seed.get("accrued") or 0.0))}
+        meta[str(_c)] = _m
+    for _c, _t in (persisted.get("explore_seen") or {}).items():
+        try:
+            explore_seen.setdefault(str(_c), float(_t))
+        except (TypeError, ValueError):
+            pass
+    if live_baseline is None:
+        live_baseline = persisted.get("initial_equity")
+    _run_total = round(float(capital_adjust.get("total") or 0.0), 2)
+    _run_events = list(capital_adjust.get("events") or [])
+    _p_ca = persisted.get("capital_adjust") or {}
+    capital_adjust["total"] = round(
+        float(_p_ca.get("total") or 0.0) + _run_total, 2)
+    capital_adjust["events"] = (list(_p_ca.get("events") or [])
+                                + _run_events)[-20:]
+    halted = False
+    if halt_rec:
+        halted = True
+        if halt_rec.get("day_start_equity"):
+            day_start_equity = halt_rec["day_start_equity"]
+    else:
+        _ds2 = persisted.get("day_start") or {}
+        if _ds2.get("day") == cur_day_iso and _ds2.get("equity"):
+            day_start_equity = float(_ds2["equity"]) + _run_total
+    return live_baseline, day_start_equity, halted
+
+
 def parse_quarantine(st):
     """state dict -> (cooldown, stop_hist), tolerant of junk/absent fields."""
     st = st or {}
@@ -1848,65 +1905,14 @@ def main():
             _lok2, _lv2 = store.load_state_checked(bot_id + ":live")
             if _lok2:
                 _lv2 = _lv2 or {}
-                # [2026-07-29 AUDIT] persisted meta OVERWRITES, never
-                # setdefault: entries are BLOCKED while blind, so every meta
-                # entry present at heal time is a manage-pass reseed
-                # (opened_ts=boot, accrued=0, no clip/bars/src) — setdefault
-                # kept the junk and the next save made it durable (max-hold
-                # clock reset, carry under-count, judge receipts degraded).
-                # The seeded copy holds ONE real datum — funding accrued
-                # since boot — so fold it into the persisted figure (the two
-                # windows are disjoint: persisted covers open→last-save,
-                # the seed covers boot→heal). A persisted entry for a coin
-                # a stop closed while blind is inert (nothing iterates meta
-                # for unheld coins; an open replaces it wholesale).
-                for _c, _m in (_lv2.get("meta") or {}).items():
-                    _seed = meta.get(str(_c))
-                    if _seed and isinstance(_m, dict):
-                        _m = {**_m, "accrued": (float(_m.get("accrued") or 0.0)
-                                                + float(_seed.get("accrued") or 0.0))}
-                    meta[str(_c)] = _m
-                for _c, _t in (_lv2.get("explore_seen") or {}).items():
-                    explore_seen.setdefault(str(_c), float(_t))
-                if live_baseline is None:
-                    live_baseline = _lv2.get("initial_equity")
-                # [2026-07-29 AUDIT] MERGE the capital ledger, don't
-                # restore-if-quiet: the blind boot started this run's ledger
-                # EMPTY, so everything in it was folded this run and the
-                # persisted blob is the lifetime history — the old guard
-                # dropped the whole history the moment one move folded while
-                # blind (lifetime P&L off by the entire prior capital total,
-                # durably, after the next save). Same 20-event audit cap as
-                # _fold_capital_moves.
-                _ca_run_total = round(float(capital_adjust.get("total") or 0.0), 2)
-                _ca_run_events = list(capital_adjust.get("events") or [])
-                _p_ca = _lv2.get("capital_adjust") or {}
-                capital_adjust["total"] = round(
-                    float(_p_ca.get("total") or 0.0) + _ca_run_total, 2)
-                capital_adjust["events"] = (list(_p_ca.get("events") or [])
-                                            + _ca_run_events)[-20:]
-                # halt record is SENIOR (a halted day must stay halted even
-                # though the blind boot could not see it); else the D3
-                # same-day persisted baseline beats the boot re-read.
-                # [2026-07-29 AUDIT] A capital move folded WHILE blind lives
-                # in the boot-read baseline but NOT in the persisted pre-move
-                # day_start — the old code stated this condition in a comment
-                # and then adopted the persisted value unconditionally, so a
-                # blind-window withdrawal re-armed the phantom-halt and a
-                # deposit masked the rail by its size. Now the persisted
-                # anchor is SHIFTED by the net folded this run (deposit +D /
-                # withdrawal −D land in both the equity read and the rail
-                # baseline — the same rule _fold_capital_moves documents).
+                # merge semantics + the three 29-Jul audit findings live in
+                # _heal_merge (pure, fixture-tested — _selftest_heal).
                 _h2 = store.load_daily_halt(bot_id, cur_day.isoformat())
-                if _h2:
+                live_baseline, day_start_equity, _h_halt = _heal_merge(
+                    _lv2, meta, explore_seen, live_baseline, capital_adjust,
+                    day_start_equity, _h2, cur_day.isoformat())
+                if _h_halt:
                     halted_today = True
-                    if _h2.get("day_start_equity"):
-                        day_start_equity = _h2["day_start_equity"]
-                else:
-                    _ds2 = _lv2.get("day_start") or {}
-                    if (_ds2.get("day") == cur_day.isoformat()
-                            and _ds2.get("equity")):
-                        day_start_equity = float(_ds2["equity"]) + _ca_run_total
                 live_state_blind = False
                 log.warning("':live' re-read OK — %d position meta restored, "
                             "baseline %s; entries re-enabled",
@@ -2627,6 +2633,65 @@ def _selftest_explore():
     print("lighter_funding_bot _selftest_explore OK")
 
 
+def _selftest_heal():
+    """[2026-07-29 audit R6] Fixtures for _heal_merge — the blind→heal logic
+    the 29-Jul audit fixed three defects in while it was untestable inline.
+    Mutation-honest: reverting overwrite→setdefault, merge→restore-if-quiet,
+    or dropping the day_start shift each turns a case red."""
+    day = "2026-07-29"
+    # (1) persisted meta OVERWRITES the manage-pass reseed; the seed's
+    #     boot→heal accrued folds into the persisted figure
+    meta = {"BTC": {"opened_ts": 2000.0, "accrued": 0.4, "is_short": True}}
+    persisted = {"meta": {"BTC": {"opened_ts": 100.0, "accrued": 1.0,
+                                  "is_short": True, "clip": 60.0,
+                                  "src": "explore"},
+                          "ETH": {"opened_ts": 50.0, "accrued": 0.2,
+                                  "is_short": False}},
+                 "initial_equity": 95.0,
+                 "capital_adjust": {"total": 50.0, "events": [{"delta": 50.0}]},
+                 "day_start": {"day": day, "equity": 100.0}}
+    es, ca = {}, {"total": 0.0, "events": []}
+    lb, ds, halted = _heal_merge(persisted, meta, es, None, ca, 111.0, None, day)
+    m = meta["BTC"]
+    assert m["opened_ts"] == 100.0 and m["clip"] == 60.0 and m["src"] == "explore", \
+        f"persisted meta must WIN over the reseed: {m}"
+    assert abs(m["accrued"] - 1.4) < 1e-9, f"accrued must fold seed+persisted: {m}"
+    assert meta["ETH"]["opened_ts"] == 50.0, "closed-while-blind coin restored inert"
+    assert lb == 95.0 and halted is False
+    # quiet ledger + same-day anchor -> adopted unshifted
+    assert ds == 100.0, ds
+    assert ca["total"] == 50.0 and len(ca["events"]) == 1, ca
+    # (2) capital MERGE: a move folded while blind must not drop the
+    #     persisted lifetime history (and the anchor shifts by the net)
+    ca2 = {"total": -20.0, "events": [{"delta": -20.0}]}
+    _, ds2, _ = _heal_merge(persisted, {}, {}, 90.0, ca2, 111.0, None, day)
+    assert ca2["total"] == 30.0 and len(ca2["events"]) == 2, \
+        f"merge, not restore-if-quiet: {ca2}"
+    assert ds2 == 80.0, f"withdrawal folded while blind must SHIFT the anchor: {ds2}"
+    # (3) halt record is SENIOR over the persisted day_start
+    _, ds3, h3 = _heal_merge(persisted, {}, {}, 90.0,
+                             {"total": 0.0, "events": []}, 111.0,
+                             {"day_start_equity": 88.0}, day)
+    assert h3 is True and ds3 == 88.0, (h3, ds3)
+    # (4) a different-day persisted anchor changes nothing
+    _, ds4, _ = _heal_merge({"day_start": {"day": "2026-07-28", "equity": 70.0}},
+                            {}, {}, 90.0, {"total": 0.0, "events": []},
+                            111.0, None, day)
+    assert ds4 == 111.0, ds4
+    # (5) events cap holds at 20 (the _fold_capital_moves audit cap)
+    big = {"capital_adjust": {"total": 1.0,
+                              "events": [{"delta": 1.0}] * 19}}
+    ca5 = {"total": 0.0, "events": [{"delta": 2.0}] * 5}
+    _heal_merge(big, {}, {}, 90.0, ca5, 111.0, None, day)
+    assert len(ca5["events"]) == 20, len(ca5["events"])
+    # (6) junk explore_seen values are skipped, sane ones kept
+    es6 = {}
+    _heal_merge({"explore_seen": {"BTC": "junk", "ETH": 123.0}},
+                {}, es6, 90.0, {"total": 0.0, "events": []}, 111.0, None, day)
+    assert es6 == {"ETH": 123.0}, es6
+    print("lighter_funding_bot _selftest_heal OK")
+
+
 def _selftest_lever_consume():
     """[2026-07-25] apply_levers consumes the PROMOTED explore_k + conviction_hi
     on the live arm (dark when no lever); conviction_hi>1 => scaled capped at hi;
@@ -2698,6 +2763,7 @@ if __name__ == "__main__":
         _selftest_conviction()
         _selftest_explore()
         _selftest_lever_consume()
+        _selftest_heal()
         sys.exit(0)
     try:
         _supervised()
