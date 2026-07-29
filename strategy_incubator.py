@@ -646,6 +646,20 @@ def _sig(gt):
                     for k, v in sorted((gt or {}).items()))
 
 
+def _age_h(then_iso, now_iso):
+    """Hours between two register stamps; None if either is unparseable.
+
+    [2026-07-29] Exists so a DORMANT entry's frozen stats cannot be read as a
+    current measurement. Fail-safe to None rather than 0.0: an unknown age
+    must not read as 'fresh' — that is the whole failure this stamp prevents."""
+    try:
+        a = datetime.fromisoformat(str(then_iso).replace("Z", "+00:00"))
+        b = datetime.fromisoformat(str(now_iso).replace("Z", "+00:00"))
+        return round((b - a).total_seconds() / 3600.0, 2)
+    except Exception:      # noqa: BLE001
+        return None
+
+
 def update_prospects(prior_list, scored, seeds, default_gt, champion, elite,
                      now_iso, cap=None):
     """Merge this cycle's scored population into the durable register.
@@ -659,7 +673,22 @@ def update_prospects(prior_list, scored, seeds, default_gt, champion, elite,
     'dormant' (the gene set drifted, or they fell out of the bred pool) and
     compete for the remaining slots by best-ever lcb — evidence-first, the
     same lower-bound doctrine rank() uses. Pure; bounded at `cap`; output
-    order = this cycle's rank order, then dormants."""
+    order = this cycle's rank order, then dormants.
+
+    [2026-07-29 STALENESS IS STAMPED — a dormant carry is NOT a measurement.]
+    A dormant entry keeps the net/h1/h2/closes/lcb it had when it was last
+    scored; only `role` used to change. Read straight off the payload those
+    frozen numbers are indistinguishable from a current reading, and they are
+    not close: measured today by scripts/study_prospect_admission.py, the top
+    dormant's carried net **+$39.81** re-scores to **-$11.12** on the live
+    tape — a ~$51 gap in a field that looks current. `last_seen` always made
+    the staleness DERIVABLE (compare it to the payload's `updated`), but every
+    consumer had to think of it; one that did not simply read a stale number
+    confidently. Now every entry states it: `stats_current` (scored this
+    cycle?) and `stats_age_h` (hours since `last_seen`, None if unparseable —
+    unknown must never read as fresh). Publish-only; nothing trades on it.
+    `best_net`/`best_lcb` remain HIGH-WATER MARKS by design ("never regress on
+    a worse re-score") — right for a register, never an admission decision."""
     cap = PROSPECT_CAP if cap is None else cap
     by_sig = {}
     for e in (prior_list or []):
@@ -694,6 +723,10 @@ def update_prospects(prior_list, scored, seeds, default_gt, champion, elite,
             "net": net, "h1": s.get("h1"), "h2": s.get("h2"),
             "closes": s.get("closes"), "lcb": lcb,
             "both_halves_pos": bool(s.get("both_halves_pos")),
+            # [2026-07-29] scored THIS cycle — the stats below are current.
+            # The dormant carry stamps the opposite; see _age_h.
+            "stats_current": True,
+            "stats_age_h": 0.0,
             "best_net": max(bests) if bests else None,
             "best_lcb": max(bestl) if bestl else None,
             "role": ("fittest" if champ_sig and k == champ_sig
@@ -701,8 +734,10 @@ def update_prospects(prior_list, scored, seeds, default_gt, champion, elite,
                      else "scored" if (s.get("closes") or 0) > 0
                      else "unmeasured"),
         })
-    dorm = [dict(e, role="dormant") for k, e in by_sig.items()
-            if k not in current]
+    dorm = [dict(e, role="dormant",
+                 stats_current=False,
+                 stats_age_h=_age_h(e.get("last_seen"), now_iso))
+            for k, e in by_sig.items() if k not in current]
     dorm.sort(key=lambda d: (d["best_lcb"]
                              if isinstance(d.get("best_lcb"), (int, float))
                              else float("-inf")), reverse=True)
@@ -1250,6 +1285,34 @@ def _selftest():
     # junk prior entries are dropped, not fatal
     pj = update_prospects([{"nope": 1}, None, 42], sc2, [], {}, None, [], "T")
     assert pj[0]["cycles"] == 1 and len(pj) == 1
+
+    # [2026-07-29] STALENESS STAMP — a dormant carry must not read as a
+    # measurement. Live shape: a dormant's carried net was +$39.81 while a
+    # re-score on the same day's tape read -$11.12.
+    t0, t1 = "2026-07-28T01:45:00+00:00", "2026-07-29T07:45:00+00:00"
+    s_a = update_prospects(None, sc1, seeds1, {"A": 1, "B": 10},
+                           {"genotype": {"A": 2, "B": 10}}, [], t0)
+    assert all(e["stats_current"] is True and e["stats_age_h"] == 0.0
+               for e in s_a), "scored this cycle => current, age 0"
+    s_b = update_prospects(s_a, sc2, seeds1, {"A": 1, "B": 10},
+                           {"genotype": {"A": 1, "B": 10}}, [], t1)
+    fresh = [e for e in s_b if e["role"] != "dormant"]
+    stale = [e for e in s_b if e["role"] == "dormant"]
+    assert fresh and stale, s_b
+    assert all(e["stats_current"] is True and e["stats_age_h"] == 0.0
+               for e in fresh)
+    assert all(e["stats_current"] is False for e in stale)
+    assert all(e["stats_age_h"] == 30.0 for e in stale), stale   # t0 -> t1
+    # the frozen numbers themselves are UNCHANGED — the stamp is the fix,
+    # not a rewrite of history (best-ever semantics stay intact)
+    d_old = [e for e in s_a if e["genotype"] == {"A": 2, "B": 10}][0]
+    d_new = [e for e in stale if e["genotype"] == {"A": 2, "B": 10}][0]
+    assert d_new["net"] == d_old["net"] and d_new["best_net"] == d_old["best_net"]
+    # UNKNOWN age must never read as fresh (the whole point of the stamp)
+    assert _age_h("not-a-date", t1) is None and _age_h(t0, None) is None
+    s_c = update_prospects(s_a, sc2, seeds1, {"A": 1, "B": 10}, None, [], "T2")
+    assert all(e["stats_age_h"] is None for e in s_c
+               if e["role"] == "dormant"), "unparseable => None, not 0.0"
 
     # funding prospect view: status precedence + stats whitelist + dark states
     fp = funding_prospects_view(
