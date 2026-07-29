@@ -744,6 +744,122 @@ def update_prospects(prior_list, scored, seeds, default_gt, champion, elite,
     return (out + dorm[:max(0, cap - len(out))])[:cap]
 
 
+# [2026-07-29] REGISTER HYGIENE — "learning ... so it doesn't make or
+# duplicate bots that don't achieve anything, dead genotypes disposed of"
+# (operator). Three measured defects, all in the REGISTER (the breeding side
+# was already protected: select_elite demands both_halves_pos, so a losing
+# genotype cannot become a gamete):
+#
+#  1. DUPLICATES. 30 register rows were 16 distinct experiments — the rest
+#     differed ONLY in genes the current veto makes unevolvable (measured by
+#     scripts/study_prospect_admission.py). Two genotypes the organ can no
+#     longer tell apart are one candidate, and showing both invents a roster.
+#  2. NO DISPOSAL. Nothing ever left the register except by cap pressure.
+#  3. IMMORTAL CORPSES — the worst of the three. Cap eviction sorted dormants
+#     by `best_lcb`, a HIGH-WATER MARK: one lucky historical score outranked
+#     every recently-measured genotype forever. Combined with (2), the
+#     register fills with the luckiest dead entries and crowds out live ones.
+#
+# Disposal is denominated in the fleet's own units — CYCLES seen (PERSIST-
+# style repetition) and the LATEST reading, never the best-ever — and it is
+# REPORTED, never silent: the payload carries what was retired and why.
+DEAD_MIN_CYCLES = int(os.environ.get("INCUBATOR_DEAD_CYCLES", "3"))
+DEAD_AGE_H = float(os.environ.get("INCUBATOR_DEAD_AGE_H", "24"))
+
+
+def prune_register(entries, live_genes, now_iso, min_cycles=None,
+                   dead_age_h=None, cap=None):
+    """(kept, summary) — collapse duplicates, dispose of dead genotypes, and
+    rank the survivors on RECENT evidence instead of a high-water mark.
+
+    `live_genes` is the set of gene NAMES currently evolvable (run_once has it
+    from evolvable_genes); entries are compared on their genotype REDUCED to
+    those genes, so two rows the organ can no longer distinguish collapse into
+    one — the survivor being the one with the most recent scoring, then the
+    better latest lcb.
+
+    A genotype is DEAD when it is dormant (not scored this cycle), has been
+    seen >= `min_cycles`, is staler than `dead_age_h`, and its LATEST reading
+    lost (net <= 0). Latest, never best_net: the whole failure this fixes is a
+    lucky historical score outliving the measurement that refuted it.
+
+    Fail-safe: an entry whose staleness is UNKNOWN (`stats_age_h` None) is
+    never retired — disposal must not run on data it cannot read. Entries
+    scored THIS cycle are never retired regardless of result; one bad read is
+    not a verdict. Pure; selftested."""
+    min_cycles = DEAD_MIN_CYCLES if min_cycles is None else min_cycles
+    dead_age_h = DEAD_AGE_H if dead_age_h is None else dead_age_h
+    cap = PROSPECT_CAP if cap is None else cap
+    rows = [e for e in (entries or [])
+            if isinstance(e, dict) and isinstance(e.get("genotype"), dict)]
+
+    def _num(x):
+        return x if isinstance(x, (int, float)) else None
+
+    def _reduced(e):
+        return _sig({g: v for g, v in e["genotype"].items() if g in live_genes})
+
+    # ---- 1. collapse duplicates under the CURRENT gene set ----------------
+    groups = {}
+    for e in rows:
+        groups.setdefault(_reduced(e), []).append(e)
+    collapsed, merged = [], 0
+    for _k, grp in groups.items():
+        if len(grp) > 1:
+            merged += len(grp) - 1
+        # freshest first (age None sorts last), then better latest lcb
+        grp.sort(key=lambda e: (e.get("stats_current") is True,
+                                -(e.get("stats_age_h")
+                                  if _num(e.get("stats_age_h")) is not None
+                                  else 1e9),
+                                _num(e.get("lcb")) if _num(e.get("lcb"))
+                                is not None else float("-inf")),
+                 reverse=True)
+        rep = dict(grp[0])
+        if len(grp) > 1:
+            rep["merged_dupes"] = len(grp) - 1
+        collapsed.append(rep)
+
+    # ---- 2. dispose of the measured dead ---------------------------------
+    kept, retired = [], []
+    for e in collapsed:
+        age = _num(e.get("stats_age_h"))
+        net = _num(e.get("net"))
+        cycles = int(e.get("cycles") or 0)
+        closes = _num(e.get("closes"))
+        dead = (not e.get("stats_current")
+                and age is not None and age >= dead_age_h
+                and cycles >= min_cycles
+                and net is not None and net <= 0)
+        if dead:
+            # WHICH kind of dead, because they are not the same failure and
+            # an operator reading the disposal log needs to tell them apart:
+            # INERT never fired at all (achieves nothing), LOSING fired and
+            # lost (achieves worse than nothing).
+            kind = "INERT" if not closes else "LOSING"
+            why = (f"{kind}: dormant {age:.0f}h over {cycles} cycles, "
+                   + (f"never traded (0 closes)" if kind == "INERT"
+                      else f"last measured net {net:+.2f} on {closes:g} closes"))
+            retired.append({"genotype": e["genotype"], "net": net,
+                            "cycles": cycles, "age_h": age, "kind": kind,
+                            "closes": closes, "why": why})
+        else:
+            kept.append(e)
+
+    # ---- 3. rank on RECENT evidence, not the high-water mark -------------
+    def _rank_key(e):
+        cur = 1 if e.get("stats_current") else 0
+        lcb = _num(e.get("lcb"))
+        return (cur, lcb if lcb is not None else float("-inf"))
+
+    kept.sort(key=_rank_key, reverse=True)
+    summary = {"in": len(rows), "kept": len(kept), "merged_dupes": merged,
+               "retired": len(retired),
+               "distinct_experiments": len(groups),
+               "examples": retired[:5]}
+    return kept[:cap], summary
+
+
 def funding_prospects_view(proposed, queue_candidates, judge_state):
     """The funding substrate's prospect list: each proposal joined to its
     judge lifecycle. Status precedence: running/promoted (the judge's
@@ -867,6 +983,11 @@ def run_once():
         prospects = update_prospects(prior.get("prospects"), scored, seeds,
                                      default_gt, champion, leaderboard,
                                      _iso(now))
+        # [2026-07-29] HYGIENE: collapse what the current gene set can no
+        # longer tell apart, dispose of the measured dead, and re-rank on the
+        # LATEST reading. Only runs when we actually scored — pruning off a
+        # dark cycle would retire genotypes on data we did not take.
+        prospects, prune = prune_register(prospects, set(genes), _iso(now))
     else:
         print(f"[incubator] tape too short ({len(tape)}/{MIN_SNAPS}) — "
               f"skipping taker breeding", flush=True)
@@ -874,6 +995,7 @@ def run_once():
         # not demote or age anyone)
         prospects = [e for e in (prior.get("prospects") or [])
                      if isinstance(e, dict)]
+        prune = {"skipped": "tape too short — no scoring, no disposal"}
 
     # --- FUNDING proposals (live-reachable, JUDGE-gated) -------------------
     judge_state = store.load_state("xp-judge") or {}
@@ -950,6 +1072,11 @@ def run_once():
         # [2026-07-29] can this organ still mint a NEW funding experiment?
         # Publish-only; nothing trades on it. See proposal_capacity().
         "proposal_capacity": capacity,
+        # [2026-07-29] what register hygiene did this cycle — merged dupes,
+        # retired dead genotypes and why. Disposal must be auditable, never
+        # silent (an organ that quietly deletes its own evidence is worse
+        # than one that hoards it). See prune_register().
+        "register_hygiene": prune,
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -960,6 +1087,12 @@ def run_once():
                                      "n_prospects": len(prospects)})
         except Exception:
             pass
+    if prune.get("retired") or prune.get("merged_dupes"):
+        print(f"[incubator] 🧹 register hygiene: {prune['in']} entries -> "
+              f"{prune['kept']} kept ({prune['merged_dupes']} duplicate(s) "
+              f"collapsed under the current gene set, {prune['retired']} "
+              f"retired as measured-dead). Retired: "
+              f"{[r['why'] for r in prune['examples']]}", flush=True)
     print(f"[incubator] {_iso(now)} elite={len(leaderboard)} "
           f"prospects={len(prospects)} funding_proposed={len(props)}",
           flush=True)
@@ -1313,6 +1446,62 @@ def _selftest():
     s_c = update_prospects(s_a, sc2, seeds1, {"A": 1, "B": 10}, None, [], "T2")
     assert all(e["stats_age_h"] is None for e in s_c
                if e["role"] == "dormant"), "unparseable => None, not 0.0"
+
+    # [2026-07-29] REGISTER HYGIENE — dedupe / dispose / re-rank.
+    def _pe(gt, net, lcb, cycles, age, current=False):
+        return {"genotype": gt, "net": net, "lcb": lcb, "cycles": cycles,
+                "stats_age_h": age, "stats_current": current}
+    # (a) DEDUPE: two entries differing only in a gene that is NOT evolvable
+    #     are ONE experiment. The freshest representative survives.
+    dup = [_pe({"BRK_RANGE": 0.95, "DIP_RANGE": 0.05}, 5.0, 4.0, 5, 40.0),
+           _pe({"BRK_RANGE": 0.90, "DIP_RANGE": 0.05}, 9.0, 8.0, 5, 2.0)]
+    kept, sm = prune_register(dup, {"DIP_RANGE"}, "T", dead_age_h=1e9)
+    assert len(kept) == 1 and sm["merged_dupes"] == 1, (kept, sm)
+    assert kept[0]["genotype"]["BRK_RANGE"] == 0.90, "freshest survives"
+    assert kept[0]["merged_dupes"] == 1
+    # ...and with that gene evolvable they stay two distinct candidates
+    kept2, sm2 = prune_register(dup, {"BRK_RANGE", "DIP_RANGE"}, "T",
+                                dead_age_h=1e9)
+    assert len(kept2) == 2 and sm2["merged_dupes"] == 0, sm2
+    # (b) DISPOSAL is on the LATEST reading, never the high-water mark: this
+    #     entry's best_net is glorious and its last measurement lost.
+    corpse = _pe({"A": 1}, -4.0, -6.0, 5, 48.0)
+    corpse["best_net"], corpse["best_lcb"] = 99.0, 99.0
+    corpse["closes"] = 12
+    kept3, sm3 = prune_register([corpse], {"A"}, "T")
+    assert kept3 == [] and sm3["retired"] == 1, (kept3, sm3)
+    assert sm3["examples"][0]["kind"] == "LOSING", sm3
+    assert "last measured net -4.00 on 12 closes" in sm3["examples"][0]["why"], sm3
+    # INERT vs LOSING are distinguished — "never fired" and "fired and lost"
+    # are different failures and the disposal log must say which.
+    inert = _pe({"A": 2}, 0.0, 0.0, 5, 48.0); inert["closes"] = 0
+    _k, sm3b = prune_register([inert], {"A"}, "T")
+    assert sm3b["examples"][0]["kind"] == "INERT", sm3b
+    assert "never traded" in sm3b["examples"][0]["why"], sm3b
+    # (c) FAIL-SAFES: never retire on unknown staleness, on a fresh scoring,
+    #     on too few cycles, or on a positive latest reading.
+    for e, why in ((_pe({"A": 1}, -4.0, -6.0, 5, None), "unknown age"),
+                   (_pe({"A": 1}, -4.0, -6.0, 5, 48.0, current=True), "scored now"),
+                   (_pe({"A": 1}, -4.0, -6.0, 1, 48.0), "too few cycles"),
+                   (_pe({"A": 1}, 4.0, 2.0, 5, 48.0), "latest is positive"),
+                   (_pe({"A": 1}, -4.0, -6.0, 5, 2.0), "not stale yet")):
+        k, s = prune_register([e], {"A"}, "T")
+        assert len(k) == 1 and s["retired"] == 0, (why, k, s)
+    # (d) RANKING is by the LATEST lcb — a lucky best-ever must not outrank a
+    #     currently-better genotype (the immortal-corpse bug).
+    lucky = _pe({"A": 1}, 0.5, 0.5, 9, 5.0); lucky["best_lcb"] = 99.0
+    good = _pe({"A": 2}, 8.0, 7.0, 2, 5.0); good["best_lcb"] = 7.0
+    kept4, _ = prune_register([lucky, good], {"A"}, "T", dead_age_h=1e9)
+    assert kept4[0]["genotype"] == {"A": 2}, kept4
+    # entries scored THIS cycle outrank any dormant, whatever its lcb
+    fresh_lo = _pe({"A": 3}, -1.0, -1.0, 1, 0.0, current=True)
+    kept5, _ = prune_register([lucky, fresh_lo], {"A"}, "T", dead_age_h=1e9)
+    assert kept5[0]["genotype"] == {"A": 3}, kept5
+    # (e) junk in, no crash; cap honoured
+    assert prune_register(None, {"A"}, "T")[0] == []
+    assert prune_register([{"nope": 1}, None, 7], {"A"}, "T")[0] == []
+    many = [_pe({"A": i}, 1.0, float(i), 1, 1.0) for i in range(10)]
+    assert len(prune_register(many, {"A"}, "T", cap=4)[0]) == 4
 
     # funding prospect view: status precedence + stats whitelist + dark states
     fp = funding_prospects_view(
