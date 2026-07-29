@@ -96,7 +96,29 @@ CANDIDATES = [
     # own tape refutes contradicts the evidence. The gate direction the tape
     # DOES support (tightening toward the 0.122 friction breakeven) is already
     # running as the re-spec'd 0.075 candidate (see _respec_clamped).
-    {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
+    #
+    # [2026-07-29 (ev) ORDER REVERSED — slope-gate-off now runs FIRST.] The
+    # 28-Jul review (D7) queued slope-gate-off as "the natural next judge
+    # candidate AFTER tp-0.06", and that ordering was correct ON ITS PREMISE:
+    # tp-0.06 was believed evidence-backed because "take_profit IS the
+    # Farmer's measured-positive exit family". scripts/study_farmer_take_profit
+    # measured that premise on Lighter's own tape and it does NOT survive:
+    #   * the exit-family claim is TRUE but does not imply raising the bar —
+    #     TP exits are the only positive family ($1.010/trade at 0.04) and
+    #     raising 0.04 -> 0.06 cuts them 224 -> 117, pushing those trades into
+    #     flip/cold/max_hold. Two different populations; a non-sequitur.
+    #   * NO take_profit value is both-halves positive, at either universe or
+    #     either slip (h1 is negative in every row).
+    #   * tp-0.06 vs the live 0.04 is +$13.89 on the canonical top-25 and
+    #     -$50.43 on all-79 — the UNIVERSE flips the sign. Unresolvable here.
+    # tp-0.06 is therefore UNSUPPORTED, not refuted, and it is NOT deleted:
+    # the judge's paired live-vs-shadow bar is independent forward evidence,
+    # and a mute backtest is not a negative one. But the SERIAL queue is the
+    # fleet's only path to live.funding.* at >=7d per slot, so the slot goes
+    # to the candidate the venue's own tape actually supports. Reordering is
+    # restrict-safe: no bar moves, no lever changes, the paired bar still
+    # gates every promotion.
+    {"name": "slope-gate-off",  "levers": {"xp.funding.slope_gate": 0}},
     # [2026-07-21, corrected same day] BOTH hold-cap candidates (hold-48,
     # and the hold-96 that briefly replaced it) are WITHDRAWN — refuted by
     # adversarial verify against the fleet's own recorded evidence:
@@ -114,16 +136,20 @@ CANDIDATES = [
     #       FEE_PAYBACK_MARGIN) is the mechanism — an exit-architecture
     #       question for a future candidate, not a cap number; and on a
     #       hedged book "close only when paid" records wins by construction.
-    # tp-0.06 stands: take_profit IS the Farmer's measured-positive exit
-    # family (shadow 11-0 +$14.96, live 9-0 +$8.11).
-    # [2026-07-28 D7] slope-gate-off — the (dp) Lighter backtest refuted the
-    # slope gate on this venue (live gate 0.05: durable-history -$14.90 vs
-    # gate-off +$34.07 @5bps; the gate is HL-validated, Lighter-negative), and
-    # the 28-Jul review queued it as "the natural next judge candidate after
-    # tp-0.06" (D7). Serial queue order does exactly that: tp-0.06 first,
-    # then this. The Farmer consumes xp.funding.slope_gate in apply_levers
-    # and stamps the receipt (`bars.slope_gate`), so the skew gate can accrue.
-    {"name": "slope-gate-off",  "levers": {"xp.funding.slope_gate": 0}},
+    # [2026-07-28 D7] slope-gate-off's own evidence, and why it took the slot:
+    # the (dp) Lighter backtest refuted the slope gate ON THIS VENUE (live gate
+    # 0.05: durable-history -$14.90 vs gate-off +$34.07 @5bps; the gate is
+    # HL-validated, Lighter-NEGATIVE). That is a real prior in the supported
+    # direction, on the tape that holds the money — the thing tp-0.06 lacks.
+    # The Farmer consumes xp.funding.slope_gate in apply_levers and stamps the
+    # receipt (`bars.slope_gate`), so the skew gate can accrue.
+    #
+    # tp-0.06 keeps its slot HERE (second), on the reasoning recorded above.
+    # Its original rationale line — "take_profit IS the Farmer's
+    # measured-positive exit family (shadow 11-0 +$14.96, live 9-0 +$8.11)" —
+    # is kept verbatim on purpose: the numbers are real, the INFERENCE from
+    # them to "raise the bar" is what the 29-Jul study falsified.
+    {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
 ]
 XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               "xp.funding.take_profit": "live.funding.take_profit",
@@ -1702,7 +1728,11 @@ def _selftest():
     ]})
     pool = candidate_pool(q, now=_qnow)
     names = [c["name"] for c in pool]
-    assert names[:1] == ["tp-0.06"], names  # static order (holds withdrawn)
+    # [2026-07-29 (ev)] statics lead, and slope-gate-off leads THEM: the
+    # 28-Jul D7 order was reversed once the 29-Jul TP study falsified
+    # tp-0.06's premise. Pinned so a silent re-shuffle of the fleet's only
+    # path to live.funding.* cannot pass unnoticed.
+    assert names[:2] == ["slope-gate-off", "tp-0.06"], names
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -1717,7 +1747,7 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["tp-0.06", "slope-gate-off", "xp-enter_apr-0.0625"], n2
+    assert n2 == ["slope-gate-off", "tp-0.06", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
     # 96-vs-96.0 dedup are withdrawn — see CANDIDATES)
@@ -1805,11 +1835,12 @@ def _selftest():
     assert _lever_sig({"a": 1}) == _lever_sig({"a": 1.0})
     assert _lever_sig({"a": "x"}) == (("a", "x"),)      # non-numeric survives
     # next_candidate: skips done + current, name-based (pool may grow)
-    assert next_candidate(pool, [], None)["name"] == "tp-0.06"
-    # [2026-07-28 D7] slope-gate-off is the SECOND static — the review's
-    # "natural next judge candidate after tp-0.06", by queue construction
-    assert next_candidate(pool, ["tp-0.06"], None)["name"] == "slope-gate-off"
-    assert next_candidate(pool, ["tp-0.06", "slope-gate-off"],
+    # [2026-07-29 (ev)] slope-gate-off is FIRST — it is the only static with a
+    # Lighter-tape prior in the supported direction (gate-on -$14.90 vs
+    # gate-off +$34.07); tp-0.06 follows, unsupported-but-not-refuted.
+    assert next_candidate(pool, [], None)["name"] == "slope-gate-off"
+    assert next_candidate(pool, ["slope-gate-off"], None)["name"] == "tp-0.06"
+    assert next_candidate(pool, ["slope-gate-off", "tp-0.06"],
                           None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
