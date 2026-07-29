@@ -70,6 +70,11 @@ SELFTEST_MODULES = [
     "lighter_dislocation_bot",
     "lighter_family_bot",
     "lighter_funding_bot",
+    # [2026-07-29 (el)] Finding 7: the two RUNNING shadow bots that had zero
+    # tests and no selftest at all (Index Rider, Counterweight) get the
+    # fleet's minimum selftest parity, registered the day they shipped.
+    "lighter_funding_spread_bot",
+    "lighter_index_bot",
     "lighter_market_scout",
     "lighter_perp_sniper",
     "lighter_scout_tuner",

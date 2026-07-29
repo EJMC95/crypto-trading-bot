@@ -494,6 +494,61 @@ def main():
         time.sleep(max(1.0, LOOP_SECONDS - (time.time() - t0)))
 
 
+def _selftest():
+    """Offline checks of the mid read + the ledger row shape. No network, no
+    DB, no venue — the bot ran with ZERO tests until 2026-07-29 (coverage
+    Finding 7); this is the fleet's minimum selftest parity."""
+    class _Ctx:
+        class venue:
+            @staticmethod
+            def orderbook(coin):
+                # UNSORTED on purpose: fresh_mid must take max(bid)/min(ask),
+                # never trust [0] as top-of-book
+                return {"bids": [(99.0, 1.0), (101.0, 2.0), (0.0, 5.0)],
+                        "asks": [(104.0, 1.0), (102.0, 3.0), (103.0, 0.0)]}
+    assert fresh_mid(_Ctx(), "BTC") == (101.0 + 102.0) / 2.0
+
+    class _Empty:
+        class venue:
+            @staticmethod
+            def orderbook(coin):
+                return {"bids": [], "asks": [(102.0, 1.0)]}
+    assert fresh_mid(_Empty(), "BTC") is None    # one-sided book = unreadable
+
+    class _Down:
+        class venue:
+            @staticmethod
+            def orderbook(coin):
+                raise RuntimeError("venue down")
+    assert fresh_mid(_Down(), "BTC") is None     # never mark on a stale print
+
+    # ledger row: the SHORT leg's pct must profit DOWN, and both legs carry
+    # their side in the reason tag (the brain grades per side_lens)
+    cap = {}
+    _orig = store.publish_paper_trade
+    store.publish_paper_trade = lambda bot, **kw: cap.update(bot=bot, **kw)
+    try:
+        _record_close("perps-funding-spread-lshadow", "ETH", 100.0,
+                      1_700_000_000, 90.0, total_pnl=2.0, was_long=False,
+                      reason="flip", shadow=True)
+        assert cap["reason"] == "short_flip"
+        assert abs(cap["pnl_pct"] - 0.10) < 1e-12     # short: (ent-exit)/ent
+        assert cap["pnl_abs"] == 2.0                  # funding-inclusive total
+        _record_close("b", "ETH", 100.0, 1, 110.0, 1.0, True, "tp", True)
+        assert cap["reason"] == "long_tp"
+        assert abs(cap["pnl_pct"] - 0.10) < 1e-12     # long: (exit-ent)/ent
+        _record_close("b", "ETH", 0.0, 1, 110.0, 1.0, True, "tp", True)
+        assert cap["pnl_pct"] is None                 # no entry px -> honest None
+
+        def _boom(bot, **kw):
+            raise RuntimeError("db down")
+        store.publish_paper_trade = _boom
+        _record_close("b", "ETH", 100.0, 1, 90.0, 1.0, False, "tp", True)
+    finally:
+        store.publish_paper_trade = _orig
+    print("[counterweight] selftest OK (fresh-mid/one-sided/venue-down/ledger-row)")
+
+
 def _supervised():
     """Unhandled exception -> log, mark row ERROR, restart in 60s (state
     re-hydrates). SystemExit/Ctrl-C pass through. (GO-GREEN furniture.)"""
@@ -513,6 +568,9 @@ def _supervised():
 
 
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
+        raise SystemExit(0)
     try:
         _supervised()
     except KeyboardInterrupt:
