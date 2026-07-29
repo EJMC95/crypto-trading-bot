@@ -147,7 +147,15 @@ FUNDING_GENES = {
     # registry bounds 0.03125-0.075, which these do (0.0375/0.05/0.0625).
     "enter_apr": ("xp.funding.enter_apr", [0.0375, 0.05, 0.0625]),
     "take_profit": ("xp.funding.take_profit", [0.04, 0.05, 0.06]),
-    "max_hold_h": ("xp.funding.max_hold_h", [48.0, 72.0, 96.0]),
+    # [2026-07-29 AUDIT R2] max_hold_h REMOVED from the grid. The hold-cap
+    # knob is refuted at ANY number (21-Jul review + CHANGELOG: "2/59 twin
+    # closes hit max_hold; no cap value can move the paired mean by the
+    # judge's +0.5pp bar — a 7-day slot wasted at ANY number"). The 28-Jul
+    # queue-TTL fix retired the STORED hold-48/-96 candidates, but this grid
+    # could REGENERATE them under the same names once the rolling dedup caps
+    # (judge verdicts[-10:], incubator memory[-20:]) overflow — permanence
+    # must be structural, not two rolling windows. Selftest pins the absence;
+    # re-adding the gene is a deliberate act against a recorded refutation.
 }
 
 
@@ -931,6 +939,14 @@ def _selftest():
     assert any("take_profit" in p["name"] for p in ph), ph
     assert funding_proposals({}, {}, hurting=set()) == funding_proposals({}, {})
     assert funding_proposals({}, {}, hurting=None) == funding_proposals({}, {})
+    # [2026-07-29 AUDIT R2] the refuted hold-cap knob can NEVER be proposed
+    # again — the 28-Jul TTL fix retired the stored candidates, this pins the
+    # SOURCE: no grid, no regeneration under the rolling dedup caps.
+    assert not any(p["name"].startswith("xp-max_hold_h")
+                   for p in funding_proposals({}, {})), \
+        "hold-cap candidates are refuted at ANY number (21-Jul review)"
+    assert "max_hold_h" not in FUNDING_GENES, \
+        "re-adding the hold gene needs the recorded refutation overturned first"
     # [2026-07-17] LENS VETO: the incubator must not breed a lens the live
     # taker refuses to fill. These are the REAL 16-Jul grades.
     real_lf = {"breakout": {"n4h": 2241, "avg4h_pct": -0.184, "hit4h": 0.405},

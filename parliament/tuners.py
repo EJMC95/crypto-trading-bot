@@ -162,13 +162,25 @@ class TunerBench:
         self.grade_episodes(bot)
         if self.db is None:
             return None
+        # [2026-07-29 AUDIT] coverage is written on EVERY path, not only the
+        # full sweep — the 28-Jul fix made tape starvation "a number, not a
+        # silent continue", but the number was only ever written when a full
+        # sweep ran: an episode-active or starving book (exactly the books
+        # the number exists to expose) kept republishing its LAST sweep's
+        # coverage, or none at all, with nothing saying why.
         if self.db.active_levers(bot):
+            self.coverage[bot] = {"n7d": None, "with_tape": None,
+                                  "why": "episode-active"}
             return None      # one lever at a time; let the episode finish
         trades = [t for t in self.db.closed_trades(bot=bot, days=7.0)
                   if t.get("source") == "parliament"]
         if len(trades) < STARVING_CLOSES_7D:
+            self.coverage[bot] = {"n7d": len(trades), "with_tape": None,
+                                  "why": "starving"}
             return self._starving_widen(bot, base)
         if len(trades) < MIN_REPLAY_TRADES:
+            self.coverage[bot] = {"n7d": len(trades), "with_tape": None,
+                                  "why": "below-replay-floor"}
             return None
         trades.sort(key=lambda t: t["closed_ts"] or 0)
         tapes = {}

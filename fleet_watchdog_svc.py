@@ -114,6 +114,19 @@ def evaluate(data):
         problems.append("NOT ONLINE: " + ", ".join(off))
     if halted:
         warnings.append("halted (daily-loss rule): " + ", ".join(halted))
+    # [2026-07-29 audit R5] a live bot's DEGRADED boot (':live' state read
+    # failed: entries blocked, save suppressed, exits still running) was
+    # log-only — the row said "online" and only container logs said why. The
+    # Farmer now publishes extra.live_state_blind while degraded; a PROBLEM
+    # (pages) because it means the bot cannot heal its durable state and a
+    # restart in that window loses stop-quarantine changes. Self-clears on
+    # heal (the key is absent when healthy).
+    blind = sorted(b.get("bot", "?") for b in bots
+                   if isinstance(b.get("extra"), dict)
+                   and b["extra"].get("live_state_blind"))
+    if blind:
+        problems.append("LIVE-STATE BLIND (entries blocked, state save "
+                        "suppressed): " + ", ".join(blind))
     # [2026-07-14 APPLES-TO-APPLES FIX] The budget warning summed open_trades
     # over EVERYTHING — shadow twins (modelled copies of their originals),
     # delta-neutral funding books, stocks, the event sniper — and compared
@@ -375,4 +388,17 @@ if __name__ == "__main__":
             assert send_push("t", "b") is False                                     # failure -> False, never raises
     finally:
         urllib.request.urlopen = _real
-    print("fleet_watchdog_svc selftest OK (push channel)")
+    # [2026-07-29 audit R5] evaluate() fixtures for the LIVE-STATE BLIND rule:
+    # a degraded live boot must PAGE (problem), a healthy row must not, and a
+    # junk/string extra must never crash the evaluator (fail-safe skip).
+    _base = {"bot": "perps-funding-lighter-lighter", "status": "online",
+             "stale": False, "extra": {}}
+    p0, _w0, _ = evaluate({"meta": {}, "bots": [dict(_base)]})
+    assert not any("BLIND" in x for x in p0), p0
+    p1, _w1, _ = evaluate({"meta": {}, "bots": [
+        dict(_base, extra={"live_state_blind": True})]})
+    assert any("LIVE-STATE BLIND" in x for x in p1), p1
+    p2, _w2, _ = evaluate({"meta": {}, "bots": [
+        dict(_base, extra="junk-string")]})
+    assert not any("BLIND" in x for x in p2), "string extra must fail-safe skip"
+    print("fleet_watchdog_svc selftest OK (push channel + live-state-blind rule)")

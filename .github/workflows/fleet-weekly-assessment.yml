@@ -131,6 +131,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # [2026-07-29 AUDIT R8] ensure the label exists first (the
+          # fleet-watchdog pattern): a deleted `fleet-weekly` label made
+          # `gh issue create --label` fail the run — visible-red, but the
+          # weekly report silently stops until someone reads the failure
+          # email. Idempotent; `|| true` because an already-existing label
+          # returns non-zero.
+          gh label create fleet-weekly --color 1D76DB \
+            --description "automated weekly fleet assessment" 2>/dev/null || true
           gh issue create \
             --title "Fleet weekly assessment - $(date -u +%Y-%m-%d)" \
             --label "fleet-weekly" \
