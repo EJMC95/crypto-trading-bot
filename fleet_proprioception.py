@@ -158,6 +158,48 @@ LIVE_ROWS = {s.strip() for s in os.environ.get(
     "perps-funding-lighter-lighter").split(",")
     if s.strip()}
 
+# [2026-07-30 THE SHADOW BOOKS LEARN — operator: "grow into what works"]
+# Six books gained growth-rail levers and their episodes fell through to
+# `other:*`, i.e. RECORDED and never graded — so the tuner's hurting-refusal
+# and the board's helping-walk could never fire for them. The rail could move
+# their knobs and never find out whether it helped. These maps close that.
+#
+# lever prefix -> the bot_pnl row the lever actually steers. A lever graded
+# against a book it cannot move is precisely the defect grade_live documents
+# for live.clip_scale, so this mapping is the load-bearing part.
+BOOK_LEVER_BOTS = {
+    "carry": "perps-funding-carry-lshadow",
+    "fundspread": "perps-funding-spread-lshadow",
+    "disloc": "lighter-dislocation-lshadow",
+    "index": "equities-regime-lshadow",
+    "trend": "crypto-trend-daily-lshadow",
+    "sniper": "lighter-perp-sniper-lshadow",
+}
+# SELECTION vs CAPACITY, and the distinction is not cosmetic — it decides
+# which QUESTION the evidence can answer.
+#
+#   SELECTION levers change WHICH trades are taken (a gate, a ranking, a
+#   universe). Per-trade return moves with them, so "did the mean improve?"
+#   is a well-posed question.
+#
+#   CAPACITY levers change HOW MANY concurrent positions the book may hold.
+#   grade_live's hard-won lesson applies but does NOT transfer wholesale:
+#   `live.clip_scale` is MATHEMATICALLY invariant to per-trade pnl_pct (the
+#   clip cancels top and bottom — measured, one distinct value across the
+#   whole range), so it fails closed. A capacity lever is different: carry
+#   prices every trade against a per-position NOTIONAL constant
+#   (funding_carry_bot.py:467 `pnl_pct = pnl / pos["notional"]`), so the
+#   metric does not mechanically cancel — but the COMPOSITION changes,
+#   because slots 9..12 are filled with the 9th..12th best candidates.
+#   The honest question for capacity is therefore NOT "did the mean rise"
+#   (it should not; a ranked selector reaching deeper takes worse names) but
+#   "did quality HOLD while throughput rose?" — dilution is the real failure
+#   mode of widening a ranked book, and it IS detectable.
+BOOK_CAPACITY_LEVERS = {"carry.max_positions", "fundspread.k", "index.max_open"}
+BOOK_EP_MIN_N = int(os.environ.get("PROP_BOOK_EP_MIN_N", "5"))
+BOOK_BASE_MIN_N = int(os.environ.get("PROP_BOOK_BASE_MIN_N", "5"))
+BOOK_MARGIN_PP = float(os.environ.get("PROP_BOOK_MARGIN_PP", "0.30"))
+
 # taker lever -> the tt module attr the replay patches (same map the tuner uses)
 TAKER_ATTR = {"taker.dip_range": "DIP_RANGE", "taker.brk_range": "BRK_RANGE",
               "taker.momo_chg": "MOMO_CHG", "taker.div_gap_pp": "DIV_GAP_PP",
@@ -223,6 +265,13 @@ def group_of(name):
         return "live"
     if name.startswith("xp."):
         return "xp"
+    # [2026-07-30 THE SHADOW BOOKS LEARN] Each book lever stands alone: they
+    # steer six SEPARATE books, so lumping them (as `other:carry` did) would
+    # blame one book's movement on another's lever. Grouping per-lever also
+    # keeps the counterfactual honest — the baseline is that ONE book's own
+    # pre-episode window.
+    if name.split(".")[0] in BOOK_LEVER_BOTS:
+        return f"book:{name}"
     return f"other:{name.split('.')[0]}"
 
 
@@ -523,6 +572,70 @@ def grade_live(ep, trades, group="live-clip"):
     return {"status": "graded", "signal": sig, **rec}
 
 
+def grade_book(ep, trades):
+    """Grade ONE shadow-book lever episode against that book's own pre-episode
+    window. Two questions, chosen by lever kind — see BOOK_CAPACITY_LEVERS.
+
+    SELECTION (a gate / ranking / universe): did per-trade return improve?
+      good  -> mean_during > mean_before + margin
+      bad   -> mean_during < mean_before - margin
+
+    CAPACITY (more concurrent slots): did QUALITY HOLD while throughput rose?
+      A ranked book reaching deeper takes worse names by construction, so
+      demanding a higher mean would reject every capacity widening that ever
+      worked. The failure mode worth catching is DILUTION.
+      good  -> throughput rose AND mean held within the margin
+      bad   -> mean fell by more than the margin (the extra slots are being
+               filled with materially worse candidates)
+
+    Thin data -> 'recorded' (no signal, no verdict), same contract as every
+    other lane. Shadow books, so the floors sit below the live lane's.
+    """
+    lever = ep.get("lever") or ""
+    bot = BOOK_LEVER_BOTS.get(lever.split(".")[0])
+    start, end = ep["start"], ep["end"]
+    span = max(1.0, float(end - start))
+
+    def stats(a, b):
+        pcts = [float(r["profit_ratio"]) for r in trades or []
+                if str(r.get("bot")) == bot
+                and r.get("profit_ratio") is not None
+                and a <= (_parse_ts(r.get("close_ts")) or -1) < b]
+        return (len(pcts),
+                round(100.0 * sum(pcts) / len(pcts), 3) if pcts else None)
+
+    n_in, m_in = stats(start, end)
+    n_pre, m_pre = stats(start - span, start)
+    rec = {"bot": bot, "n_during": n_in, "mean_pct_during": m_in,
+           "n_before": n_pre, "mean_pct_before": m_pre}
+    if not bot:
+        # an unmapped lever must never be graded against SOME book — that is
+        # the grade_live defect (grading a lever on a book it cannot move).
+        return {"status": "recorded", "reason": "unmapped-lever", **rec}
+    if (n_in < BOOK_EP_MIN_N or n_pre < BOOK_BASE_MIN_N
+            or m_in is None or m_pre is None or span < MIN_EP_H * 3600):
+        return {"status": "recorded", **rec}
+
+    if lever in BOOK_CAPACITY_LEVERS:
+        # throughput per unit time, so a longer episode cannot fake a rise
+        rate_in, rate_pre = n_in / span, n_pre / span
+        rec["rate_during"], rec["rate_before"] = rate_in, rate_pre
+        if m_in < m_pre - BOOK_MARGIN_PP:
+            sig = "bad"                      # diluted: deeper = materially worse
+        elif rate_in > rate_pre and m_in >= m_pre - BOOK_MARGIN_PP:
+            sig = "good"                     # more bets, quality held
+        else:
+            sig = "flat"
+    else:
+        if m_in > m_pre + BOOK_MARGIN_PP:
+            sig = "good"
+        elif m_in < m_pre - BOOK_MARGIN_PP:
+            sig = "bad"
+        else:
+            sig = "flat"
+    return {"status": "graded", "signal": sig, **rec}
+
+
 def grade_episode(ep, feeds):
     g = ep["group"]
     if g == "taker":
@@ -533,6 +646,8 @@ def grade_episode(ep, feeds):
         return grade_gapscout(ep, feeds.get("census"))
     if g in ("live-clip", "live-funding", "live"):
         return grade_live(ep, feeds.get("trades"), group=g)
+    if g.startswith("book:"):
+        return grade_book(ep, feeds.get("trades"))
     if g == "xp":
         return {"status": "recorded"}   # the judge's paired arms grade xp
     return {"status": "recorded"}
@@ -723,7 +838,14 @@ def run_once():
         except Exception as e:  # noqa: BLE001
             print(f"[proprioception] tape load failed: {type(e).__name__}: {e}",
                   flush=True)
+    # [2026-07-30] `book:*` MUST be in this predicate. The grader reads
+    # feeds["trades"], and without this the fetch never fires for a book
+    # episode, so grade_book would return "recorded" forever — a grader that
+    # is wired, tested, and structurally incapable of ever grading anything.
+    # That is the same registered-but-inert class this whole pass exists to
+    # remove, and it would have shipped silently.
     if any(c["group"] in ("live-clip", "live-funding", "live", "xp")
+           or str(c["group"]).startswith("book:")
            for c in closed):
         try:
             feeds["trades"] = store.fetch_paper_trades(limit=4000)
@@ -1185,12 +1307,85 @@ def _selftest():
     for lever in list(TAKER_ATTR) + [k for k in SCOUT_LENS]:
         assert lever in tuning.LEVERS, lever
 
+    # ---- [2026-07-30] THE SHADOW BOOKS LEARN ------------------------------
+    # grouping: each book lever stands alone, mapped to the book it steers.
+    assert group_of("carry.enter_apr") == "book:carry.enter_apr"
+    assert group_of("sniper.surge_mult") == "book:sniper.surge_mult"
+    assert group_of("taker.tp") == "taker", "existing lanes unchanged"
+    # every book lever is registry-known AND maps to a bot — a rename in
+    # either place must break HERE rather than silently stop grading.
+    for _lv, _spec in tuning.LEVERS.items():
+        if _spec.get("lane") == "lighter-books":
+            assert _lv.split(".")[0] in BOOK_LEVER_BOTS, _lv
+            assert group_of(_lv).startswith("book:"), _lv
+
+    def _bk(lever, start, end, rows):
+        return grade_book({"lever": lever, "start": start, "end": end,
+                           "stance": {lever}, "group": f"book:{lever}"}, rows)
+
+    # real ledger rows carry ISO close_ts (that is what _parse_ts accepts) —
+    # an epoch-int fixture would make every assertion below read "recorded"
+    # and quietly prove nothing.
+    _S = datetime(2026, 7, 20, tzinfo=timezone.utc).timestamp()
+    _E = _S + 6 * 3600
+
+    def _tr(bot, ts, pct):
+        return {"bot": bot,
+                "close_ts": datetime.fromtimestamp(ts, timezone.utc).isoformat(),
+                "profit_ratio": pct}
+    _CB = BOOK_LEVER_BOTS["carry"]
+
+    # SELECTION lever: the question is "did per-trade return improve?"
+    _before = [_tr(_CB, _S - 6 * 3600 + i * 60, 0.001) for i in range(6)]
+    _better = [_tr(_CB, _S + i * 60, 0.02) for i in range(6)]
+    _worse = [_tr(_CB, _S + i * 60, -0.02) for i in range(6)]
+    assert _bk("carry.enter_apr", _S, _E, _before + _better)["signal"] == "good"
+    assert _bk("carry.enter_apr", _S, _E, _before + _worse)["signal"] == "bad"
+
+    # CAPACITY lever: the question is "did QUALITY HOLD while throughput rose?"
+    # More trades at the SAME quality is the win condition — demanding a higher
+    # mean would reject every capacity widening that ever worked, because a
+    # ranked book reaching deeper takes worse names by construction.
+    _more_same = [_tr(_CB, _S + i * 60, 0.001) for i in range(12)]
+    _g = _bk("carry.max_positions", _S, _E, _before + _more_same)
+    assert _g["signal"] == "good", _g
+    assert _g["rate_during"] > _g["rate_before"]
+    # ...and the same rise in throughput with DILUTED quality is the failure
+    # mode capacity grading exists to catch.
+    _more_worse = [_tr(_CB, _S + i * 60, -0.02) for i in range(12)]
+    assert _bk("carry.max_positions", _S, _E,
+               _before + _more_worse)["signal"] == "bad"
+    # FEWER trades at the same quality is not a win (the lever bought nothing)
+    _fewer_same = [_tr(_CB, _S + i * 60, 0.001) for i in range(5)]
+    assert _bk("carry.max_positions", _S, _E,
+               _before + _fewer_same)["signal"] == "flat"
+
+    # thin data and an unmapped lever both REFUSE to grade
+    assert _bk("carry.enter_apr", _S, _E, _before)["status"] == "recorded"
+    assert _bk("nosuch.lever", _S, _E, _before + _better) == {
+        "status": "recorded", "reason": "unmapped-lever", "bot": None,
+        "n_during": 0, "mean_pct_during": None,
+        "n_before": 0, "mean_pct_before": None}
+    # a book lever must never be graded on ANOTHER book's trades
+    assert _bk("sniper.surge_mult", _S, _E,
+               _before + _better)["status"] == "recorded", \
+        "carry's rows must not grade the sniper's lever"
+
+    # THE FEED GATE. grade_book reads feeds["trades"]; if run_once does not
+    # fetch them for a book episode the grader is structurally incapable of
+    # ever grading. Assert the predicate names book groups.
+    import inspect as _insp
+    _src = _insp.getsource(run_once)
+    assert 'startswith("book:")' in _src, \
+        "run_once must fetch trades for book episodes or grade_book is inert"
+
     print("fleet_proprioception selftest OK (grouping, episode lifecycle "
           "incl. backdated release + daily slice, replay counterfactual "
           "win/lose/too-short/too-few-trades (marked), scout throughput, "
           "gapscout activity, live "
           "paired-learning (bad/flat/good vs pre-window+twin, funding split), "
-          "verdict floors + joint blame, fail-safe hurting+helping hooks)")
+          "verdict floors + joint blame, fail-safe hurting+helping hooks, "
+          "BOOK selection-vs-capacity grading + feed gate)")
 
 
 if __name__ == "__main__":

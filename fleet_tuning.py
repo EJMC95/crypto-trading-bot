@@ -331,19 +331,19 @@ LEVERS = {
         # that is currently winning — a tail-seeking bar is the carry book's
         # whole thesis and it has never been measured against its neighbours.
         "kind": "float", "lo": 0.80, "hi": 3.20, "lane": "lighter-books",
-        "note": "Yield Harvester funding entry gate; env default 1.60 (=20% TRUE)"},
+        "note": "Yield Harvester funding entry gate; env default 1.60 (=20% TRUE)", "env_default": 1.6, "step": -0.2},
     "carry.max_positions": {
         # measured AT 7 open of 8 — the fleet's biggest earner is one slot
         # from full and cannot take the eighth-best carry it has graded.
         "kind": "int", "lo": 6, "hi": 20, "lane": "lighter-books",
-        "note": "Yield Harvester concurrent carries; env default 12"},
+        "note": "Yield Harvester concurrent carries; env default 12", "env_default": 12, "step": 2},
     "fundspread.k": {
         # measured AT its cap: 10 open = exactly K=5 x 2 legs.
         "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
-        "note": "Counterweight legs per side; env default 8"},
+        "note": "Counterweight legs per side; env default 8", "env_default": 8, "step": 1},
     "fundspread.universe_n": {
         "kind": "int", "lo": 20, "hi": 90, "lane": "lighter-books",
-        "note": "Counterweight scout-universe width; env default 60"},
+        "note": "Counterweight scout-universe width; env default 60", "env_default": 60, "step": 10},
     "disloc.enter_pct": {
         # Snap Back's gate was a FIXED 150bps against a measured median
         # residual of 3.8bps — ~40x the middle of its own signal, which is
@@ -351,23 +351,23 @@ LEVERS = {
         # distribution, so it tracks the venue instead of a constant
         # inherited from the Hyperliquid-referenced era.
         "kind": "float", "lo": 0.90, "hi": 0.999, "lane": "lighter-books",
-        "note": "Snap Back entry percentile of the live residual; default 0.98"},
+        "note": "Snap Back entry percentile of the live residual; default 0.98", "env_default": 0.98, "step": -0.01},
     "disloc.universe_n": {
         "kind": "int", "lo": 10, "hi": 60, "lane": "lighter-books",
-        "note": "Snap Back scout-universe width; env default 40"},
+        "note": "Snap Back scout-universe width; env default 40", "env_default": 40, "step": 10},
     "index.max_open": {
         "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
-        "note": "Index Rider concurrent sleeves; env default = universe size"},
+        "note": "Index Rider concurrent sleeves; env default = universe size", "env_default": 10, "step": 2},
     "trend.rank_by_funding": {
         "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-books",
-        "note": "Tide Rider ranks candidates by funding; env default 1 (on)"},
+        "note": "Tide Rider ranks candidates by funding; env default 1 (on)", "env_default": 1, "step": 0},
     "sniper.surge_mult": {
         # the sniper's event (a brand-new listing) is too rare to grade —
         # n=1 in weeks, and `new_listings` is empty on the bus right now.
         # This widens the TRIGGER to the adjacent population (young book +
         # volume surge) rather than widening any risk bound.
         "kind": "float", "lo": 2.0, "hi": 8.0, "lane": "lighter-books",
-        "note": "Perp Sniper volume-surge trigger multiple; env default 3.0"},
+        "note": "Perp Sniper volume-surge trigger multiple; env default 3.0", "env_default": 3.0, "step": -0.5},
 }
 
 
