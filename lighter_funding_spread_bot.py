@@ -150,6 +150,17 @@ def lighter_market_ids():
         return {}
 
 
+# [2026-07-30 AUTO-REVERT FIX] The operator's env defaults, snapshotted at
+# IMPORT. apply_tuning() must hand THESE to get_lever, never the current
+# global: get_lever returns its `default` when the lever is absent, expired
+# or quarantined, so passing the already-moved value made the rail a ONE-WAY
+# RATCHET — a widened lever could never revert, and auto-revert-on-expiry is
+# the growth rail's central safety property ("levers EXPIRE back to defaults
+# on their own, so auto-revert is the resting state"). Shipped broken in
+# (fz); it was inert only because nothing authored the lane yet.
+_ENV_DEFAULTS = {"K": K, "UNIVERSE_N": UNIVERSE_N}
+
+
 def apply_tuning():
     """Growth-rail levers over the env defaults. Bounded by the fleet_tuning
     registry; expired/absent/quarantined levers leave the defaults intact.
@@ -162,7 +173,7 @@ def apply_tuning():
                         ("fundspread.universe_n", "UNIVERSE_N")):
         cur = globals()[attr]
         try:
-            val = tuning.get_lever(lever, cur)
+            val = tuning.get_lever(lever, _ENV_DEFAULTS[attr])
         except Exception:  # noqa: BLE001
             continue
         if val != cur:

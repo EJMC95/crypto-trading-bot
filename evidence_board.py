@@ -1152,9 +1152,17 @@ def run_once():
     # [2026-07-15 BLOODSTREAM] one batched beat for the board's whole working
     # set (was ~8 individual round-trips per cycle). Fall back to per-key reads
     # only if the batch came back empty (DB down).
+    # [2026-07-30] fleet-radar / parliament / parliament-tuning were READ via
+    # _g() but never FETCHED here. `_g` returns `_b.get(k) or {}` whenever the
+    # batch read succeeded, so on every HEALTHY cycle those three came back
+    # empty — the radar's per-book edge classification (the senior corrective
+    # on the naive promotion screen) and the whole Parliament section were
+    # silently inert, and only worked when fetch_states FAILED and _g fell
+    # through to per-key load_state. Exactly the shape of a dark consumer.
     _keys = ["fleet-alerts", "evidence-review", "lighter-market", "fleet-risk",
              "brain-lens-forward", "scout-tuner", "xp-judge", "gapscout-census",
-             "impl-shortfall", "fleet-proprioception"]
+             "impl-shortfall", "fleet-proprioception",
+             "fleet-radar", "parliament", "parliament-tuning"]
     _b = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     _ok = bool(_b)
     def _g(k):

@@ -382,3 +382,78 @@ def test_sniper_probe_cache_is_monotone_by_construction():
     assert "not_young.add" in src and "YOUNG_PROBE_BUDGET" in src, \
         "the probe must be governed and its exclusion set permanent"
     assert sniper.YOUNG_MAX_BARS == 21 and sniper.YOUNG_PROBE_BUDGET == 4
+
+
+# --------------------------------------------------------------------------
+# 9. AUTO-REVERT — the growth rail's central safety property.
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("mod,lever,attr,moved", [
+    (carry, "carry.enter_apr", "ENTER_APR", 2.40),
+    (carry, "carry.max_positions", "MAX_POSITIONS", 16),
+    (spread, "fundspread.k", "K", 10),
+    (disloc, "disloc.enter_pct", "ENTER_PCT", 0.95),
+    (index_bot, "index.max_open", "MAX_OPEN", 7),
+    (sniper, "sniper.surge_mult", "SURGE_MULT", 6.0),
+])
+def test_an_expired_lever_reverts_to_the_operator_default(monkeypatch, mod,
+                                                          lever, attr, moved):
+    """THE ONE-WAY RATCHET. `get_lever` returns its `default` when a lever is
+    absent, expired or quarantined. The first cut of every apply_tuning()
+    passed the CURRENT global as that default, so once a lever moved it could
+    never come back — auto-revert-on-expiry is the growth rail's central
+    safety property ("levers EXPIRE back to defaults on their own, so
+    auto-revert is the resting state"), and it was broken on all six books.
+
+    Mutation that turns this red: pass `cur` instead of `_ENV_DEFAULTS[attr]`.
+    """
+    env_default = getattr(mod, attr)
+
+    class _Live:
+        @staticmethod
+        def get_lever(name, default, now_ts=None):
+            return moved if name == lever else default
+
+    class _Expired:
+        """what fleet_tuning does once the TTL lapses: hand back the default"""
+        @staticmethod
+        def get_lever(name, default, now_ts=None):
+            return default
+
+    try:
+        monkeypatch.setattr(mod, "tuning", _Live)
+        mod.apply_tuning()
+        assert getattr(mod, attr) == moved, "the lever must reach the bot"
+        monkeypatch.setattr(mod, "tuning", _Expired)
+        mod.apply_tuning()
+        assert getattr(mod, attr) == env_default, (
+            f"{lever} did NOT revert on expiry — the rail is a one-way ratchet")
+    finally:
+        setattr(mod, attr, env_default)
+
+
+def test_trend_bool_lever_also_reverts(monkeypatch):
+    original = trend.RANK_BY_FUNDING
+
+    class _Expired:
+        @staticmethod
+        def get_lever(name, default, now_ts=None):
+            return default
+
+    try:
+        trend.RANK_BY_FUNDING = False          # as if a lever had moved it
+        monkeypatch.setattr(trend, "tuning", _Expired)
+        trend.apply_tuning()
+        assert trend.RANK_BY_FUNDING is True, "bool lever must revert too"
+    finally:
+        trend.RANK_BY_FUNDING = original
+
+
+@pytest.mark.parametrize("mod", [carry, spread, disloc, index_bot, sniper])
+def test_every_lever_consumer_has_a_call_site(mod):
+    """A defined-but-never-called apply_tuning is the registered-but-inert
+    class. The sniper shipped exactly that: the function existed and no loop
+    invoked it, so its lever could never reach the bot."""
+    import inspect
+    src = inspect.getsource(mod.main)
+    assert "apply_tuning()" in src, f"{mod.__name__}.main never calls apply_tuning"

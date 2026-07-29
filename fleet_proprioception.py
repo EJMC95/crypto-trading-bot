@@ -591,7 +591,14 @@ def grade_book(ep, trades):
     Thin data -> 'recorded' (no signal, no verdict), same contract as every
     other lane. Shadow books, so the floors sit below the live lane's.
     """
-    lever = ep.get("lever") or ""
+    # THE EPISODE CARRIES `stance` (a {lever: value} dict), NOT `lever` — see
+    # the tracker at :368/:379 and grade_scout's own `next(iter(ep["stance"]))`
+    # at :458. An earlier cut of this read ep["lever"], which is absent on every
+    # real episode, so `bot` was always None and this grader would have returned
+    # "unmapped-lever" forever — born inert, exactly the class it exists to fix.
+    # Its selftest passed because the fixture invented an episode shape the
+    # tracker never produces. Derive it the way the sibling graders do.
+    lever = next(iter(ep.get("stance") or ()), "") or (ep.get("lever") or "")
     bot = BOOK_LEVER_BOTS.get(lever.split(".")[0])
     start, end = ep["start"], ep["end"]
     span = max(1.0, float(end - start))
@@ -726,6 +733,21 @@ def lever_verdicts(episodes, now=None):
                 else "neutral"
             out[lever] = {"verdict": v, "n": n, "n_found": n_found,
                           "basis": "census-activity"}
+        elif lever.split(".")[0] in BOOK_LEVER_BOTS:
+            # [2026-07-30] Without this branch a book episode could be graded
+            # perfectly and still yield NO verdict, so no consumer hook — the
+            # board's hurting-refusal, the tuner's skip — could ever fire.
+            # Same good/bad episode-vote shape as the live lane (grade_book
+            # emits the same `signal` field), at the shadow-lane floor.
+            goods = sum(1 for e in eps if e.get("signal") == "good")
+            bads = sum(1 for e in eps if e.get("signal") == "bad")
+            v = "neutral"
+            if bads >= MIN_EPISODES and bads > goods:
+                v = "hurting"
+            elif goods >= MIN_EPISODES and goods > bads:
+                v = "helping"
+            out[lever] = {"verdict": v, "n": n, "good": goods, "bad": bads,
+                          "basis": "book-paired"}
         elif lever.startswith("live."):
             goods = sum(1 for e in eps if e.get("signal") == "good")
             bads = sum(1 for e in eps if e.get("signal") == "bad")
@@ -864,7 +886,18 @@ def run_once():
         print(f"[proprioception] episode CLOSED {rec['group']} "
               f"({rec['reason']}, {rec['hours']}h) {rec['stance']} -> "
               f"{grade}", flush=True)
-    episodes = episodes[-EP_CAP:]
+    # [2026-07-30] EP_CAP was a GLOBAL FIFO: a burst of ungradeable
+    # ("recorded") episodes could evict GRADED ones, and graded episodes are
+    # the only rows lever_verdicts can use — including the live-lane rows
+    # whose verdicts revert a real-money lever. Six new book lanes make that
+    # burst likely rather than theoretical. Graded rows now hold the budget
+    # first; recorded rows fill what is left. Chronological order restored so
+    # every downstream "newest episode" read is unchanged.
+    _graded = [e for e in episodes if e.get("status") == "graded"][-EP_CAP:]
+    _rest = [e for e in episodes if e.get("status") != "graded"]
+    _room = max(0, EP_CAP - len(_graded))
+    episodes = sorted(_graded + _rest[-_room:] if _room else _graded,
+                      key=lambda e: float(e.get("end") or 0))
 
     # stamp start metrics on newly opened groups (feed reads done above)
     for g, cur in open_next.items():
@@ -1320,8 +1353,10 @@ def _selftest():
             assert group_of(_lv).startswith("book:"), _lv
 
     def _bk(lever, start, end, rows):
-        return grade_book({"lever": lever, "start": start, "end": end,
-                           "stance": {lever}, "group": f"book:{lever}"}, rows)
+        # the REAL tracker shape: `stance` is a {lever: value} dict and there
+        # is NO "lever" key. Building the fixture any other way proves nothing.
+        return grade_book({"start": start, "end": end,
+                           "stance": {lever: 1}, "group": f"book:{lever}"}, rows)
 
     # real ledger rows carry ISO close_ts (that is what _parse_ts accepts) —
     # an epoch-int fixture would make every assertion below read "recorded"
@@ -1360,6 +1395,15 @@ def _selftest():
     assert _bk("carry.max_positions", _S, _E,
                _before + _fewer_same)["signal"] == "flat"
 
+    # THE SHAPE ITSELF: a real episode has no "lever" key at all, and the
+    # grader must still find its book. This is the assertion that turns red
+    # if grade_book ever goes back to reading ep["lever"].
+    _real_ep = {"start": _S, "end": _E, "stance": {"carry.enter_apr": 1.4},
+                "group": "book:carry.enter_apr"}
+    assert "lever" not in _real_ep
+    assert grade_book(_real_ep, _before + _better)["signal"] == "good", \
+        "grade_book must derive its lever from `stance`, not a `lever` key"
+
     # thin data and an unmapped lever both REFUSE to grade
     assert _bk("carry.enter_apr", _S, _E, _before)["status"] == "recorded"
     assert _bk("nosuch.lever", _S, _E, _before + _better) == {
@@ -1370,6 +1414,26 @@ def _selftest():
     assert _bk("sniper.surge_mult", _S, _E,
                _before + _better)["status"] == "recorded", \
         "carry's rows must not grade the sniper's lever"
+
+    # THE VERDICT BRANCH. A perfectly graded book episode must yield a
+    # verdict, or no consumer hook (the board's hurting-refusal, the tuner's
+    # skip) can ever fire — the grader would be a dead end.
+    # the REAL record shape lever_verdicts consumes: status="graded" plus a
+    # `levers` LIST (see run_once's rec assembly), not a singular "lever".
+    _beps = [{"status": "graded", "levers": ["carry.max_positions"],
+              "signal": "bad", "end": _E} for _ in range(2)]
+    _v = lever_verdicts(_beps, now=_E + 60)
+    assert _v["carry.max_positions"]["verdict"] == "hurting", _v
+    assert _v["carry.max_positions"]["basis"] == "book-paired"
+    _geps = [{"status": "graded", "levers": ["carry.enter_apr"],
+              "signal": "good", "end": _E} for _ in range(2)]
+    assert lever_verdicts(_geps, now=_E + 60)["carry.enter_apr"]["verdict"] \
+        == "helping"
+    # and it must reach the CONSUMER hook the board reads
+    _state = {"updated": _iso(_E + 60), "ttl_sec": 3600,
+              "verdicts": lever_verdicts(_beps, now=_E + 60)}
+    assert "carry.max_positions" in hurting_levers(_state, _E + 60), \
+        "a hurting book lever must reach hurting_levers() or nothing refuses it"
 
     # THE FEED GATE. grade_book reads feeds["trades"]; if run_once does not
     # fetch them for a book episode the grader is structurally incapable of

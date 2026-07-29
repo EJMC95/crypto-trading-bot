@@ -144,6 +144,10 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, reaso
         pass
 
 
+# [2026-07-30 AUTO-REVERT FIX] see the sibling books.
+_ENV_DEFAULT_RANK = 1 if RANK_BY_FUNDING else 0
+
+
 def apply_tuning():
     """Growth-rail levers over the env defaults; {} when the rail is dark."""
     global RANK_BY_FUNDING
@@ -152,7 +156,10 @@ def apply_tuning():
     moved = {}
     cur = 1 if RANK_BY_FUNDING else 0
     try:
-        val = tuning.get_lever("trend.rank_by_funding", cur)
+        # the ENV default, never the current global — see the auto-revert
+        # note in the sibling books: passing `cur` makes the rail a one-way
+        # ratchet, because get_lever returns its default on expiry.
+        val = tuning.get_lever("trend.rank_by_funding", _ENV_DEFAULT_RANK)
     except Exception:  # noqa: BLE001
         return {}
     if int(val) != cur:

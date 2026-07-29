@@ -154,6 +154,17 @@ def _snipe_price(orderbook_fn, sym):
     return px, None
 
 
+# [2026-07-30 AUTO-REVERT FIX] The operator's env defaults, snapshotted at
+# IMPORT. apply_tuning() must hand THESE to get_lever, never the current
+# global: get_lever returns its `default` when the lever is absent, expired
+# or quarantined, so passing the already-moved value made the rail a ONE-WAY
+# RATCHET — a widened lever could never revert, and auto-revert-on-expiry is
+# the growth rail's central safety property ("levers EXPIRE back to defaults
+# on their own, so auto-revert is the resting state"). Shipped broken in
+# (fz); it was inert only because nothing authored the lane yet.
+_ENV_DEFAULTS = {"SURGE_MULT": SURGE_MULT}
+
+
 def apply_tuning():
     """Growth-rail levers over the env defaults; {} when the rail is dark."""
     global SURGE_MULT
@@ -161,7 +172,7 @@ def apply_tuning():
         return {}
     cur = SURGE_MULT
     try:
-        val = tuning.get_lever("sniper.surge_mult", cur)
+        val = tuning.get_lever("sniper.surge_mult", _ENV_DEFAULTS["SURGE_MULT"])
     except Exception:  # noqa: BLE001
         return {}
     if val != cur:
@@ -593,6 +604,13 @@ def main():
         # book is already in `baseline` (it is seeded with all active markets),
         # so baseline cannot dedup them, and a surging book would otherwise
         # re-enter `pending` on every loop for as long as it kept surging.
+        # [2026-07-30] growth rail, every loop. This call site was MISSING
+        # when the lever shipped: apply_tuning() was defined, registered and
+        # never invoked, so `sniper.surge_mult` could never reach this bot —
+        # the same registered-but-inert class the whole pass exists to remove.
+        _lv = apply_tuning()
+        if _lv:
+            log.info("levers applied %s", _lv)
         _surge = []
         if SURGE_MULT > 0 and fleet_bus is not None:
             try:
