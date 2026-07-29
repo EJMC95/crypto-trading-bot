@@ -1312,6 +1312,17 @@ def grade_scout_lenses(max_snapshots=2200):
     agg = {}
     eagg = {}
     esyms = {}
+    # [2026-07-29 (fn) BY-SIDE] The same episode aggregation, additionally keyed
+    # by (lens, SIDE). A lens that emits BOTH directions gets ONE pooled grade
+    # today, and `divergence` is 69% long / 31% short — so the losing long side
+    # drags the pool under the veto's 0.500 bar and takes the winning short side
+    # with it. That matters because a consumer can be restricted to ONE side
+    # (the live Ticket Taker under TT_BULL_MODE trades short-divergence ONLY),
+    # in which case the pooled grade is a verdict on a population it does not
+    # trade. Published as a NESTED `by_side` block; every existing field keeps
+    # its exact meaning, so no current consumer changes behaviour.
+    esagg = {}
+    essyms = {}
     for ts, marks, tickets in snaps:
         for lens, arr in (tickets or {}).items():
             for t in arr or []:
@@ -1319,7 +1330,8 @@ def grade_scout_lenses(max_snapshots=2200):
                 entry = marks.get(sym)
                 if not sym or not entry:
                     continue
-                sign = -1.0 if str(t.get("side", "long")) == "short" else 1.0
+                side = "short" if str(t.get("side", "long")) == "short" else "long"
+                sign = -1.0 if side == "short" else 1.0
                 is_first = ts in ep_firsts.get((lens, sym), ())
                 for label, hsec in LENS_HORIZONS:
                     if ts + hsec > last_ts + 900:
@@ -1340,6 +1352,12 @@ def grade_scout_lenses(max_snapshots=2200):
                         ge["hit"] += 1 if fwd > 0 else 0
                         ge["sum"] += fwd
                         esyms.setdefault(lens, set()).add(sym)
+                        gs = esagg.setdefault((lens, side), {}).setdefault(
+                            label, {"n": 0, "hit": 0, "sum": 0.0})
+                        gs["n"] += 1
+                        gs["hit"] += 1 if fwd > 0 else 0
+                        gs["sum"] += fwd
+                        essyms.setdefault((lens, side), set()).add(sym)
     out = {}
     for lens, hz in agg.items():
         o = {}
@@ -1360,6 +1378,29 @@ def grade_scout_lenses(max_snapshots=2200):
                     o["ehit4h_hi"] = round(hi, 3)
         o["n_syms"] = len(esyms.get(lens) or ())
         out[lens] = o
+    # [2026-07-29 (fn)] attach the per-side episode grades. Same field names as
+    # the lens level so a consumer can hand either dict to the SAME evidence
+    # reader; only lenses that actually emitted that side get a block, so a
+    # single-direction lens (breakout/dip/momentum are long-only) carries just
+    # the one and a consumer's fallback never fires spuriously.
+    for (lens, side), hz in esagg.items():
+        if lens not in out:
+            continue
+        s = {}
+        for label, g in hz.items():
+            if not g["n"]:
+                continue
+            ehit = g["hit"] / g["n"]
+            s[f"eps{label}h"] = g["n"]
+            s[f"ehit{label}h"] = round(ehit, 3)
+            s[f"eavg{label}h_pct"] = round(100.0 * g["sum"] / g["n"], 3)
+            if bstats is not None and label == 4:
+                lo, hi = bstats.wilson(ehit, g["n"])
+                s["ehit4h_lo"] = round(lo, 3)
+                s["ehit4h_hi"] = round(hi, 3)
+        if s:
+            s["n_syms"] = len(essyms.get((lens, side)) or ())
+            out[lens].setdefault("by_side", {})[side] = s
     return out
 
 
@@ -1974,6 +2015,69 @@ def _selftest():
     ck("taker entry_quality -> tighter div bar proposal",
        [(p[0], p[1]) for p in _props] == [("taker.div_gap_pp", +1.0)])
     ck("empty/None ledger -> no proposals", derive_proposals(None) == [])
+
+    # --- (fn) BY-SIDE lens grades -------------------------------------------
+    # A lens that emits both directions must publish a per-side grade, because
+    # a consumer restricted to ONE side (the bull-mode Ticket Taker trades
+    # short-divergence only) is otherwise judged on trades it cannot make.
+    # OFFLINE: the history fetch is stubbed, prices fall monotonically, so
+    # every long grades negative and every short grades positive by
+    # construction — the pooled number lands between them.
+    import sys as _sys
+    from datetime import timedelta
+    _store = _sys.modules.get("bot_pnl_store")
+    _real_fetch = getattr(_store, "fetch_state_history", None) if _store else None
+    try:
+        if _store is None:
+            import bot_pnl_store as _store          # noqa: F811
+            _real_fetch = _store.fetch_state_history
+        _t0 = datetime(2026, 7, 20, tzinfo=timezone.utc)
+        _syms = [f"L{i}" for i in range(6)] + [f"S{i}" for i in range(3)]
+        _hist = []
+        for i in range(24):                          # 24 x 30min = 11.5h span
+            _ts = _t0 + timedelta(minutes=30 * i)
+            _marks = {s: 100.0 * (0.99 ** i) for s in _syms}   # everything falls
+            _tk = []
+            if i < 12:            # emit each sym ONCE -> every emission is an
+                for s in _syms:   # episode first, so eps == n emissions graded
+                    if s.startswith("L" if i % 2 == 0 else "S"):
+                        _tk.append({"sym": s, "side":
+                                    "long" if s[0] == "L" else "short"})
+            _hist.append({"ts": _ts.isoformat(),
+                          "payload": {"marks": _marks,
+                                      "tickets": {"divergence": _tk}}})
+        _store.fetch_state_history = lambda key, limit=None: list(reversed(_hist))
+        _g = grade_scout_lenses()
+        _d = (_g or {}).get("divergence") or {}
+        _bs = _d.get("by_side") or {}
+        ck("by_side published for a two-sided lens",
+           set(_bs) == {"long", "short"})
+        ck("falling tape: long side grades NEGATIVE",
+           (_bs.get("long") or {}).get("eavg4h_pct", 0) < 0)
+        ck("falling tape: short side grades POSITIVE",
+           (_bs.get("short") or {}).get("eavg4h_pct", 0) > 0)
+        ck("per-side episodes sum to the pooled count",
+           (_bs.get("long", {}).get("eps4h", 0)
+            + _bs.get("short", {}).get("eps4h", 0)) == _d.get("eps4h"))
+        ck("pooled fields still published unchanged (no consumer breaks)",
+           _d.get("n4h") and _d.get("ehit4h") is not None
+           and _d.get("n_syms") == len(_syms))
+        # the taker's rule must read it: same payload, opposite verdicts
+        import lighter_ticket_taker as _tt
+        _pool_bad = {"divergence": {"eps4h": 100, "n_syms": 20,
+                                    "eavg4h_pct": -0.09, "ehit4h": 0.483,
+                                    "by_side": {"short": {
+                                        "eps4h": 40, "n_syms": 15,
+                                        "eavg4h_pct": 0.14, "ehit4h": 0.513}}}}
+        ck("taker vetoes on the pooled grade without `sides`",
+           _tt.vetoed_lenses(_pool_bad) == {"divergence"})
+        ck("taker clears it when graded on the side it trades",
+           _tt.vetoed_lenses(_pool_bad, sides={"divergence": "short"}) == set())
+    except Exception as _ex:                          # noqa: BLE001
+        ck(f"by_side selftest ran without error ({_ex!r})", False)
+    finally:
+        if _store is not None and _real_fetch is not None:
+            _store.fetch_state_history = _real_fetch
 
     print("selftest: %d checks, %d FAILED%s"
           % (len(ran), len(fails), (" -> " + ", ".join(fails)) if fails else ""))
