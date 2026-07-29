@@ -574,9 +574,11 @@ All new bots:
   `$_shared`-interpolating grep at all — both fixed). LESSON: **a guard whose
   only output is a ::warning:: on a passing run is not a guard** — a green
   build with a warning is indistinguishable from a green build. STILL
-  UNRESOLVED: a `yield-harvester-shadow` service exists beside `funding-carry`
-  and this repo cannot tell which publishes the `perps-funding-carry-lshadow`
-  row — operator call, deliberately not guessed again.]**
+  RESOLVED BY THE OPERATOR: a `yield-harvester-shadow` service exists beside
+  `funding-carry` and this repo cannot tell which publishes the
+  `perps-funding-carry-lshadow` row, so the rule now deploys **BOTH** (his
+  call) — neither has a volume, and a redundant redeploy is far cheaper than
+  🌾 silently missing every lever it was given.]**
   **[2026-07-22 CORRECTION — this paragraph was WRONG about two of them.]** The
   `paths:` filter DOES carry `lighter_ticket_taker.py`, `lighter_ticket_replay.py`,
   `venues/**` and most of the intelligence layer (`lighter_market_scout`,

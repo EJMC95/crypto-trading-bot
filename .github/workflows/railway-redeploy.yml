@@ -208,8 +208,22 @@ jobs:
             # would be a silent no-op for funding-carry — caught by
             # audit_deploy_coverage.py before it shipped, which is the whole
             # point of that guard.
-            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$)'; then
+            # [2026-07-30 (gl)] BOTH carry services, on the operator's call.
+            # The project has `funding-carry` AND `yield-harvester-shadow`, and
+            # nothing in this repo determines which publishes the
+            # perps-funding-carry-lshadow row. 🌾 is the book FIVE OF SIX BARS
+            # from go-live, so "probably the right one" is not good enough:
+            # both run carry code, neither carries a volume, so an extra
+            # redeploy costs nothing while a wrong guess costs that book every
+            # lever it was given. This is the same guess that cost four books
+            # their shot earlier in this pass — resolved by covering both
+            # rather than by picking.
+            _carry='funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$'
+            if echo "$changed" | grep -qE "^($_carry)"; then
               svcs="${svcs:+$svcs,}funding-carry"
+            fi
+            if echo "$changed" | grep -qE "^($_carry)"; then
+              svcs="${svcs:+$svcs,}yield-harvester-shadow"
             fi
             # market-context service (🛰️ instrument collector). Its live-bot
             # freshness watchdog is the fleet's ONLY cross-region check on the

@@ -372,3 +372,20 @@ def test_the_guard_can_read_a_variable_interpolating_grep():
         # and it is how a lever-registry change reaches these books
         assert any(rx.search("fleet_tuning.py") for rx in rxs), service
         assert any(rx.search("bot_pnl_store.py") for rx in rxs), service
+
+
+def test_both_carry_services_are_covered():
+    """(gl), operator's call. The project has `funding-carry` AND
+    `yield-harvester-shadow` and this repo cannot determine which publishes the
+    perps-funding-carry-lshadow row. 🌾 is five of six bars from go-live, so
+    both are deployed rather than one guessed — the same guess that cost four
+    books their shot earlier in this pass."""
+    sys.path.insert(0, str(_ROOT / "scripts"))
+    import audit_deploy_coverage as adc
+    filters = adc.workflow_filters()
+    for service in ("funding-carry", "yield-harvester-shadow"):
+        rxs = filters.get(service)
+        assert rxs, f"no parseable rule for {service}"
+        # the lever registry must reach BOTH, or a carry lever lands nowhere
+        assert any(rx.search("fleet_tuning.py") for rx in rxs), service
+        assert any(rx.search("funding_carry_bot.py") for rx in rxs), service
