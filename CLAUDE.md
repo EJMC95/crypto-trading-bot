@@ -509,6 +509,15 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **NAMING THE NEXT COHORT: famous AUSTRALIAN MUSICIANS (operator, 29-Jul).**
+  The 🏛️ Parliament took the last Australian PMs; the NEXT cohort of books
+  that earns its own dashboard rows is named for Australian musicians
+  (`band-<surname>-lshadow` style, mirroring `pm-<surname>-lshadow`). This is
+  a naming rule, NOT a licence to mint books: a row is minted only when a
+  genotype/strategy has actually cleared its bar, and minting one is a BUILD
+  (the Parliament pattern), not something the incubator does on its own — it
+  breeds genotypes replayed against an EXISTING book's tape and can never
+  create a row. See [[incubator-cannot-mint-books]].
 - **BORN-DARK GUARD (17-Jul, after THREE incidents: `fleet_bus` 15-Jul,
   `event_sentinel` 16-Jul, `brain_stats` 17-Jul).** Adding a module, an
   import to shipped code, or a COPY means running
