@@ -1,3 +1,24 @@
+## 2026-07-29 (fo) — THE EXIT-BRACKET CHANGE IS REVERTED: its evidence was the (fj) artifact, caught by an adversarial test I should have run BEFORE shipping
+
+- **WHAT HAPPENED.** (fm) shipped `TT_TP 0.06 / TT_SL -0.04 / TT_MAX_HOLD_H 72` to the real-money Ticket Taker on a window-sensitivity table that looked strong (the twin's bars beat the deployed bars at every window, both halves positive at every window). Within the hour an independent adversarial agent extended the stop ladder PAST the edge of the grid I had swept, and the result kills it. **Reverted to the operator's deployed `0.04 / -0.03 / 48`.**
+- **THE TEST THAT KILLS IT — extend the ladder to NO STOP AT ALL** (live path, tp .06, hold 72h, $10 clips, 200h tape). Re-measured myself, not taken on the agent's word:
+
+  | stop | net $ | n | wr % | # sl | worst trade | worst MAE |
+  |---|---|---|---|---|---|---|
+  | -0.02 | +1.14 | 42 | 31.0 | 29 | -4.01% | -3.93% |
+  | -0.03 (deployed) | +4.14 | 34 | 47.1 | 18 | **-5.08%** | -5.00% |
+  | -0.04 (shipped by (fm)) | +7.83 | 21 | 76.2 | 4 | **-7.42%** | -7.34% |
+  | -0.06 | +9.22 | 18 | 88.9 | 1 | -7.42% | -7.34% |
+  | -0.12 | +9.51 | 16 | 93.8 | 0 | -3.35% | -8.46% |
+  | **NO STOP** | **+9.51** | 16 | 93.8 | **0** | **-3.35%** | -8.46% |
+
+- **THE SIGNATURE, and it is one this repo already named TODAY.** Net climbs to the no-stop limit with no interior optimum — the textbook *"a wider stop stops realising losses that later revert"* artifact that **(fj)** identified and withdrew this same morning on the incubator's STOP_LOSS signal. I read the -0.04/-0.05 pair as a PLATEAU and declined the argmax on that basis. It was not a plateau; it was noise on a monotone climb, and declining the argmax gave the reasoning a rigour it did not have.
+- **THE DECISIVE DETAIL: there is no tail in this window for a stop to cut.** With NO stop the worst realised trade is **-3.35%** — SMALLER than the deployed -3% stop's own worst trade (-5.08%) and less than HALF the -0.04 candidate's (-7.42%). On this tape the stop does not protect against the tail, it MANUFACTURES the realised loss: every adverse excursion reverted inside the hold. So the instrument cannot price a stop at all, and **every** `TT_SL` verdict drawn from it is void — the grid's, the agent's, and (fm)'s alike.
+- **WHY REVERT RATHER THAN KEEP AND WATCH.** Widening a real-money stop is risk-INCREASING and it now has no supporting evidence. The honest asymmetry: a wider stop looks better on a tail-free window BY CONSTRUCTION, and this window is measurably tail-free. Reverting restores the operator's own configuration, which is the correct default when the case for changing it collapses. TP and HOLD went back with it — their sweeps were noisy (no clean shape at any stop setting) and were run at stop settings whose effect dominates them, so nothing in that bracket was independently supported.
+- **WHAT SURVIVES, stated so the finding is not thrown out with the number.** `-0.03` IS measurably the worst point on its own surface, and its 72h window fails both halves. That is a reason to DOUBT the deployed stop — not a validated replacement for it. The right instrument is the experiment judge's paired live-vs-shadow bar, not an env dispatch off a replay that cannot price the knob. Queued as a review item, not shipped.
+- **PROCESS — the actual lesson, and it is the same one twice in one day.** (fm) was itself a retraction of (fl) for asserting a change without checking the receipt. (fo) is a retraction of (fm) for asserting a change without running the adversarial test that the repo's own doctrine already prescribes and that (fj) had demonstrated hours earlier on the very same knob. Both were caught, and both were caught by measurement rather than by review — but in each case the check existed and was run one step too late. **The sweep is not the evidence; the sweep plus the test that would falsify it is the evidence.**
+- The `(fn)` side-aware lens veto is UNAFFECTED and stands — it is an entry-gate correctness fix with its own mutation-verified tests, and the same adversarial agent independently named the entry veto (not the exits) as the binding constraint on the book.
+
 ## 2026-07-29 (fn) — THE TAKER IS NOT UNDER-TUNED, IT IS SWITCHED OFF: the live arm has been unable to take ANY entry for 33h, vetoed on a population it does not trade
 
 - **THE FINDING.** The live real-money Ticket Taker's effective allowed-lens set is **EMPTY**, and has been since 2026-07-28T02:40Z (~33h, 28 consecutive brain runs). `allowed_lenses("lighter_live")` is `{divergence}` (hard allow-list) and the brain's lens veto — which is SENIOR and applied on top — currently vetoes `divergence`. Empty set means the entry loop skips every ticket. `/pnl.json` corroborates: `open_trades: 0`, last live entry 28-Jul 00:43Z. **No amount of tuning matters while the gate is shut**; this is why the taker is not "taking off".

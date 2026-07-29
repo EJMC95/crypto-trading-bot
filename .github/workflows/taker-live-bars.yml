@@ -20,16 +20,24 @@ name: Taker exit bracket
 # the kill switch. Treat a change here as a real-money risk decision, not a
 # tuning nudge.
 #
-# EVIDENCE for the 2026-07-29 values (lighter_ticket_replay + the taker's own
-# exit_reason/bull_exit on the live path, max_open=4, $10 clips) — the twin's
-# bars beat the env defaults at every window AND are positive in both halves at
-# every window, which the defaults are not:
-#     72h  +1.37 (h2 -0.31)  ->  +2.94     168h  +1.86  ->  +7.20
-#    120h  +1.65             ->  +5.05     200h  +1.43  ->  +7.83
-# Mechanism is the STOP, not the target: at -0.03 the divergence short is
-# stopped 18x/200h, at -0.04 it is stopped 4x and win rate goes 50% -> 76%.
-# -0.04/-0.05 and hold 36-120h are PLATEAUS; the sweep's argmax (-0.06) is
-# declined on purpose as a fat-tail trap.
+# [2026-07-29 (fo)] THE REPLAY CANNOT PRICE A STOP ON THIS TAPE. Do not use it
+# to justify a TT_SL change. (fm) moved the live arm to 0.06/-0.04/72h on a
+# window-sensitivity table, and (fo) REVERTED it the same hour: extending the
+# stop ladder past the swept grid, net climbs monotonically with NO interior
+# optimum all the way to NO STOP AT ALL (+9.51 vs +7.83 at -0.04 vs +4.14 at the
+# deployed -0.03). That is the (fj) artifact — "a wider stop stops realising
+# losses that later revert". The decisive detail: with NO stop the worst
+# realised trade is -3.35%, SMALLER than the deployed -3% stop's own worst
+# (-5.08%) and less than half the -0.04 candidate's (-7.42%). This window
+# contains no tail for a stop to cut, so the stop MANUFACTURES the loss.
+#
+# WHAT SURVIVES: -0.03 is measurably the worst point on its own surface and its
+# 72h window fails both halves. That is a reason to DOUBT the deployed stop, not
+# a validated replacement. Route any stop change through the experiment judge's
+# paired live-vs-shadow bar — NOT through this workflow off a replay number.
+#
+# Before you dispatch: run the ladder to the no-stop limit. If it has no
+# interior optimum, the number you are about to ship is an artifact.
 #
 # VERIFY BY PUBLISHED OUTPUT (the (df) rule, applied BEFORE claiming a change —
 # see (fm) for what happens when it is applied after): `extra.bars` on the row
