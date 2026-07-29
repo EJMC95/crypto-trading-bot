@@ -59,10 +59,6 @@ SELFTEST_MODULES = [
     # reduction, signature dedupe, ordering, empty-state); the full run needs
     # the tape + register from the DB.
     "scripts.study_prospect_admission",
-    # [2026-07-29 (fb)] secret-leak guard, landed in f6d7a2a without its
-    # registration — the rot guard named it on the next local run. Its
-    # --selftest is offline (8/8 planted secrets caught, no network, no DB).
-    "scripts.audit_secret_leak",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",
@@ -135,6 +131,7 @@ ENFORCED_AUDITS = [
     "scripts/audit_sdk_pin.py",           # real-money wheel pin (CI-gating)
     "scripts/audit_venue_purity.py",      # LIGHTER-first, shipped-code scan (CI-gating)
     "scripts/audit_deploy_coverage.py",   # every shipped file has a deploy path (CI-gating)
+    "scripts/audit_changelog_letters.py",  # sync-channel citations resolve (CI-gating)
 ]
 GUARD_ONLY_AUDITS = [
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can
@@ -156,6 +153,19 @@ GUARD_ONLY_AUDITS = [
 # runner, with the reason. The rot guard consults this so an intentional
 # omission is DECLARED (the BORN_DARK_OK pattern), never silent.
 SELFTEST_EXCLUDE = {
+    # [2026-07-29 (fd)] secret-leak guard: BOTH its scan and its negative
+    # fixture shell out to the `gitleaks` binary and FAIL CLOSED when it is
+    # absent ("a missing scanner is not a pass" — correct). NOTE it was briefly
+    # registered in SELFTEST_MODULES instead (the (fb) session's own fix for
+    # the same rot-guard red) — that MAKES THE SUITE FAIL anywhere gitleaks is
+    # absent, and `tests.yml` never installs it, so the pytest job would have
+    # gone red on the next push. Measured, then moved here. The lean pytest
+    # environment has no gitleaks; its own changelog-check job installs a
+    # pinned, checksum-verified copy first and runs both modes there, so the
+    # guard IS enforced — just not from here. Registered because it shipped
+    # unregistered in f6d7a2a and turned this rot-guard red on main; declaring
+    # it is the pattern (a silent omission is what the guard exists to catch).
+    "scripts/audit_secret_leak.py",
     # Research backtest: needs historical market data / network, not a unit test.
     "scripts/backtest_georgia_short_sleeve.py",
     # [2026-07-21] TSL reclaim study: --selftest IS offline-green, but the

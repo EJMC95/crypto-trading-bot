@@ -81,9 +81,9 @@ COINS = os.environ.get(
 # XAG 12% — the gate is mostly closed, by the evidence's own shape).
 # Spot ports keep WIDE_COINS untouched (their s.coins override pins them).
 # Empty FAMILY_NONCRYPTO_COINS reverts the universe to crypto-only.
-NONCRYPTO_UNIVERSE = [c for c in os.environ.get(
+NONCRYPTO_UNIVERSE = [c.strip() for c in os.environ.get(
     "FAMILY_NONCRYPTO_COINS",
-    "SPY,QQQ,IWM,NVDA,TSLA,MSTR,WTI,XAU,XAG,XCU").split(",") if c]
+    "SPY,QQQ,IWM,NVDA,TSLA,MSTR,WTI,XAU,XAG,XCU").split(",") if c.strip()]
 CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
 
 
@@ -850,6 +850,19 @@ def btc_tide_up(cache):
 NONCRYPTO_SYMS = frozenset({
     "SPY", "QQQ", "IWM", "NVDA", "TSLA", "MSTR", "WTI", "XAU", "XAG", "XCU"})
 
+# [2026-07-30 (fd) FAIL-CLOSED CLASSIFICATION] The gate keys on the KNOWN set
+# above, but the UNIVERSE is env-driven (FAMILY_NONCRYPTO_COINS). Those two
+# could disagree: an operator adding a book the frozenset does not know — say
+# `FAMILY_NONCRYPTO_COINS=SPY,ARKK` — would have routed ARKK down the CRYPTO
+# path and handed it BTC's 4h gate. That is precisely the D5 violation this
+# whole build order exists to prevent, re-entering through a config edit.
+# So the EFFECTIVE non-crypto set is the union: anything the operator lists as
+# non-crypto IS treated as non-crypto, and since the oracle will not grade an
+# unknown book, the per-asset gate then fails CLOSED (no entries) instead of
+# silently substituting crypto's regime. Adding an unknown symbol can only
+# ever cost entries, never mis-gate one.
+NONCRYPTO_EFFECTIVE = NONCRYPTO_SYMS | set(NONCRYPTO_UNIVERSE)
+
 # Kill switch: 'off' closes non-crypto entries entirely (both gates False).
 # There is deliberately NO value that routes a non-crypto book to BTC's
 # gates — the switch chooses between "asset's own regime" and "no entries",
@@ -861,7 +874,7 @@ FAMILY_PER_ASSET_REGIME = os.environ.get(
 def regime_inputs_for(coin, btc_regime, btc_tide, oracle_verdicts):
     """(regime_up, tide_up) a coin's strategy signals should see.
 
-    CRYPTO (everything outside NONCRYPTO_SYMS): the validated BTC 4h gates,
+    CRYPTO (everything outside NONCRYPTO_EFFECTIVE): the validated BTC gates,
     passed through untouched — this function is a no-op for today's whole
     universe, and the selftest pins that.
 
@@ -874,7 +887,7 @@ def regime_inputs_for(coin, btc_regime, btc_tide, oracle_verdicts):
     `extra` keys keep their btc_* names for port compatibility; for a
     non-crypto coin they carry the asset's own read.
     """
-    if coin not in NONCRYPTO_SYMS:
+    if coin not in NONCRYPTO_EFFECTIVE:
         return btc_regime, btc_tide
     if FAMILY_PER_ASSET_REGIME == "off":
         return False, False
@@ -895,7 +908,7 @@ def noncrypto_regimes():
 
 def noncrypto_entry_blocked(coin, regime_up):
     """[2026-07-30 STEP 3] The uniform entry-site rule for non-crypto pairs:
-    a long entry on a NONCRYPTO_SYMS book requires the asset's OWN gate up.
+    a long entry on a NONCRYPTO_EFFECTIVE book requires its OWN gate up.
 
     WHY it lives at the ENTRY SITE and not only in the strategy extras:
     TrendMomo and SwingDip never read the regime keys — through the extras
@@ -906,7 +919,7 @@ def noncrypto_entry_blocked(coin, regime_up):
     uniformly. Restrict-only (it can only skip an entry), crypto pairs are
     never touched, and exits/holds are never gated — an open position is
     always managed."""
-    return coin in NONCRYPTO_SYMS and not regime_up
+    return coin in NONCRYPTO_EFFECTIVE and not regime_up
 
 
 def main():
@@ -959,7 +972,7 @@ def main():
     # oracle fetch below runs only when some book actually lists a
     # non-crypto symbol — today none does, so the wiring adds ZERO reads
     # until the universe decision (step 3) lands.
-    has_noncrypto = any(c in NONCRYPTO_SYMS for b in books for c in b.coins)
+    has_noncrypto = any(c in NONCRYPTO_EFFECTIVE for b in books for c in b.coins)
 
     while True:
         t0 = time.time()
@@ -1381,7 +1394,7 @@ def _selftest():
     # [2026-07-30 PER-ASSET REGIME — item-18 step 2] regime_inputs_for:
     # crypto is a byte-identical passthrough; non-crypto rides its OWN
     # verdict, fail-CLOSED everywhere else; BTC's gates NEVER leak in.
-    global FAMILY_PER_ASSET_REGIME
+    global FAMILY_PER_ASSET_REGIME, NONCRYPTO_UNIVERSE, NONCRYPTO_EFFECTIVE
     assert regime_inputs_for("BTC", True, False, {}) == (True, False), \
         "crypto passthrough keeps regime and tide independent"
     assert regime_inputs_for("ETH", False, True,
@@ -1409,15 +1422,33 @@ def _selftest():
         FAMILY_PER_ASSET_REGIME = _saved_par
     # [2026-07-30 STEP 3 — the inertness tripwire FLIPS, on the operator's
     # "run step 3 too"] the FAMILY universe (no-override strategies) now
-    # carries the non-crypto books; the spot ports' pinned lists stay pure
-    # crypto; and every listed non-crypto symbol is one the static
-    # classification KNOWS (an unknown symbol would ride the crypto path
-    # ungated — the exact hole the frozenset exists to close).
-    assert set(NONCRYPTO_UNIVERSE) <= NONCRYPTO_SYMS, \
-        "FAMILY_NONCRYPTO_COINS lists a symbol the gate cannot classify"
-    assert not any(set(s.coins or []) & NONCRYPTO_SYMS for s in STRATEGIES), \
+    # carries the non-crypto books; the spot ports' pinned lists stay crypto.
+    assert set(NONCRYPTO_UNIVERSE) <= NONCRYPTO_EFFECTIVE, \
+        "the effective set must cover the configured universe by construction"
+    assert not any(set(s.coins or []) & NONCRYPTO_EFFECTIVE
+                   for s in STRATEGIES), \
         "spot ports' pinned lists must stay crypto-only (step 3 scope = " \
         "the four family books)"
+    # [2026-07-30 (fd)] AN ENV-ADDED SYMBOL THE FROZENSET DOES NOT KNOW MUST
+    # FAIL CLOSED, never fall through to BTC's gate. Before the union, the
+    # classification was a hardcoded set while the universe was env-driven, so
+    # `FAMILY_NONCRYPTO_COINS=SPY,ARKK` routed ARKK down the CRYPTO path and
+    # handed it BTC's 4h regime — the D5 violation re-entering through config.
+    _saved_u = (NONCRYPTO_UNIVERSE, NONCRYPTO_EFFECTIVE)
+    try:
+        NONCRYPTO_UNIVERSE = ["SPY", "ARKK"]
+        NONCRYPTO_EFFECTIVE = NONCRYPTO_SYMS | set(NONCRYPTO_UNIVERSE)
+        assert "ARKK" not in NONCRYPTO_SYMS, "fixture must use an UNKNOWN book"
+        # unknown + ungraded by the oracle => no entry, and NEVER BTC's read
+        assert regime_inputs_for("ARKK", True, True, {}) == (False, False), \
+            "an unknown non-crypto book must fail CLOSED, not inherit BTC"
+        assert noncrypto_entry_blocked("ARKK", False) is True, \
+            "the entry-site rule must bind on an env-added book too"
+        # and it still rides its OWN verdict if the oracle ever grades it
+        assert regime_inputs_for("ARKK", False, False,
+                                 {"ARKK": "LONG-window"}) == (True, True)
+    finally:
+        NONCRYPTO_UNIVERSE, NONCRYPTO_EFFECTIVE = _saved_u
     # the uniform entry-site rule: non-crypto blocked outside its own
     # LONG-window, for EVERY strategy; crypto never touched
     assert noncrypto_entry_blocked("SPY", False) is True
