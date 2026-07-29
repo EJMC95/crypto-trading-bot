@@ -318,12 +318,38 @@ def fetch_candles(mid, days):
 
 
 def load(days, universe_n, refresh):
+    """Markets for the replay, from CACHE when it covers the request.
+
+    [2026-07-29 UNIVERSE TRAP — found live, and it silently re-specs studies.]
+    The cache-hit branch used to return the WHOLE cached market set regardless
+    of `universe_n`: a cache built at universe_n=80 served **79 books to every
+    caller asking for the canonical 25**, so the sweep printed a top-25 header
+    over a 79-book experiment. That is not a rounding difference — measured on
+    the TP sweep the same day, tp-0.06 vs the live 0.04 reads **+$13.89 on
+    top-25 and -$50.43 on all-79**: the universe flips the SIGN of the verdict.
+    Any study reusing this loader with a wider cache present was answering a
+    question it did not ask ([[ab-tests-must-vary-exactly-one-variable]]).
+
+    Now the cache is SLICED to the requested width and the correction is
+    PRINTED — a study may still run narrow, but it can no longer do so
+    silently. Caveat, stated because it is the honest one: the slice is over
+    the cached dict's insertion order (descending daily quote volume among the
+    books that SURVIVED the paired-history filter at build time), so a slice
+    of N is "the top N survivors", not "the survivors of the top N liquid".
+    Pass --refresh for an exactly-ranked universe.
+    """
     if os.path.exists(CACHE) and not refresh:
         d = json.load(open(CACHE))
         if d.get("days") >= days and d.get("universe_n") >= universe_n:
-            return {s: {"fund": {int(k): v for k, v in m["fund"].items()},
-                        "cand": {int(k): tuple(v) for k, v in m["cand"].items()}}
-                    for s, m in d["mk"].items()}
+            mk = {s: {"fund": {int(k): v for k, v in m["fund"].items()},
+                      "cand": {int(k): tuple(v) for k, v in m["cand"].items()}}
+                  for s, m in d["mk"].items()}
+            if len(mk) > universe_n:
+                print(f"  [cache] holds {len(mk)} books (built at "
+                      f"universe_n={d.get('universe_n')}); SLICING to the "
+                      f"requested top {universe_n} by cached volume order")
+                mk = {s: mk[s] for s in list(mk)[:universe_n]}
+            return mk
     obs = _get("/api/v1/orderBookDetails").get("order_book_details") or []
     liquid = sorted((o for o in obs if o.get("symbol")),
                     key=lambda o: -float(o.get("daily_quote_token_volume") or 0))

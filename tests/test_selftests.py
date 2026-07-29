@@ -44,6 +44,11 @@ SELFTEST_MODULES = [
     # guard that enforces this registration never ran on that push; the first
     # local CI-stand-in run caught it.
     "scripts.xp_judge_release",
+    # [2026-07-29 (ev)] the Farmer TAKE_PROFIT study — --selftest is offline
+    # (universe-slice + grid/slip invariants + harness identity; no network,
+    # no cache read). It pins the constants the recorded tp-0.06 verdict is
+    # quoted against, so a silent grid edit cannot orphan the header.
+    "scripts.study_farmer_take_profit",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",

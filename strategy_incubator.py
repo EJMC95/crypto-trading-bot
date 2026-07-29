@@ -547,15 +547,11 @@ def assess_champion(top, default_net, tape_hours, prior_champ, prior_streak):
 
 # ---------------------------------------------------------------------------
 
-def funding_proposals(judge_state, incubator_state, hurting=None):
-    """Novel FUNDING genotypes not already run/queued — proposed for the
-    experiment judge's paired bar. Diversity-ordered (single-gene changes
-    first). Never pre-scored (no funding replay); the judge is the filter.
-    [16-Jul consumer support] 🦾 a gene whose LIVE counterpart lever is
-    currently proprioception-graded HURTING is skipped this cycle — the
-    live lane just measured that knob bad; don't spend a 7-day judge slot
-    re-proposing it while the verdict holds. Restrict-only (only removes
-    proposals) and fail-safe (a dark organ skips nothing)."""
+def _funding_candidates(judge_state, incubator_state, hurting=None):
+    """(generatable_count, untried_props) — the SINGLE source of "what funding
+    experiments exist and which are still unminted". funding_proposals() and
+    proposal_capacity() both read it so the emitter and its capacity report
+    can never disagree about whether this organ is sterile. Pure."""
     # [2026-07-17 IMB-23] the baseline is the funding bot's OWN env defaults
     # (the same env names it reads), not a hard-coded snapshot: if the
     # operator drifts an env, an allele equal to the REAL baseline is a
@@ -573,19 +569,60 @@ def funding_proposals(judge_state, incubator_state, hurting=None):
     for p in (incubator_state.get("proposed") or []):
         tried.add(p.get("name"))
     hurting = set(hurting or ())
-    props = []
+    props, generatable = [], 0
     for g, (lever, grid) in FUNDING_GENES.items():
         if lever.replace("xp.", "live.", 1) in hurting:
             continue      # live lane measured this knob bad — wait it out
         for allele in grid:
             if allele == base[g]:
                 continue
+            generatable += 1
             name = f"xp-{g}-{allele:g}"
             if name in tried:
                 continue
             levers = {lever: allele}
             props.append({"name": name, "levers": levers})
-    return props[:6]
+    return generatable, props
+
+
+def funding_proposals(judge_state, incubator_state, hurting=None):
+    """Novel FUNDING genotypes not already run/queued — proposed for the
+    experiment judge's paired bar. Diversity-ordered (single-gene changes
+    first). Never pre-scored (no funding replay); the judge is the filter.
+    [16-Jul consumer support] 🦾 a gene whose LIVE counterpart lever is
+    currently proprioception-graded HURTING is skipped this cycle — the
+    live lane just measured that knob bad; don't spend a 7-day judge slot
+    re-proposing it while the verdict holds. Restrict-only (only removes
+    proposals) and fail-safe (a dark organ skips nothing)."""
+    return _funding_candidates(judge_state, incubator_state, hurting)[1][:6]
+
+
+def proposal_capacity(judge_state, incubator_state, hurting=None):
+    """Can this organ still mint a NEW funding experiment? — publish-only.
+
+    [2026-07-29] The reproduction organ can go STERILE in total silence, and
+    on 29-Jul it had: `funding_proposals` marks a name tried if it appears in
+    the incubator's own lifetime `proposed` ledger, that ledger held all 8
+    names ever minted, and those 8 cover EVERY name FUNDING_GENES can
+    generate — so props was [] on every cycle with nothing anywhere saying so.
+    The judge's serial pool quietly became "the two statics, then 28-day
+    retries of already-decided experiments" (pick_candidate's DONE_RETRY_D
+    fallback — the pipeline does not die, it stops learning anything new).
+
+    Deliberately NOT fixed by re-proposing from lifetime memory: 7 of those 8
+    names are refuted (0.3/0.5 clamp to the already-run 0.075, both hold-caps
+    are recorded-refuted, 0.0375/0.0625 sit in the region Lighter's own tape
+    measured worst), so a resurrection would spend 7-day judge slots
+    re-running known answers. Refilling needs NEW alleles with Lighter-tape
+    evidence ([[backtest-on-lighter-only]]) — a research decision, not a
+    config edit. This function only makes the state VISIBLE so it cannot rot
+    unnoticed. Pure; selftested."""
+    gen, props = _funding_candidates(judge_state, incubator_state, hurting)
+    return {"generatable": gen, "untried": len(props),
+            "names": [p["name"] for p in props],
+            # `gen` is 0 only when every gene is hurting-skipped — a transient
+            # organ verdict, not sterility, so it must not read as exhausted.
+            "exhausted": bool(gen) and not props}
 
 
 # ---------------------------------------------------------------------------
@@ -813,6 +850,18 @@ def run_once():
         except Exception:
             hurting = set()
     props = funding_proposals(judge_state, prior, hurting=hurting)
+    # [2026-07-29] STERILITY IS NOW REPORTED, not silent. props==[] used to be
+    # indistinguishable from "nothing new this cycle"; when the gene space runs
+    # out it is permanent, and the judge degrades to 28-day retries of decided
+    # experiments with nobody told. See proposal_capacity().
+    capacity = proposal_capacity(judge_state, prior, hurting=hurting)
+    if capacity["exhausted"]:
+        print(f"[incubator] ⚠️  FUNDING GENE SPACE EXHAUSTED — all "
+              f"{capacity['generatable']} generatable alleles are already in "
+              f"lifetime `proposed` memory; this organ can mint NO new funding "
+              f"experiment. The judge falls back to 28d retries of decided "
+              f"candidates. Refill needs NEW alleles with Lighter-tape "
+              f"evidence (a research decision, not a config edit).", flush=True)
     if hurting:
         print(f"[incubator] 🦾 proprioception hurting levers honored: "
               f"{sorted(hurting)}", flush=True)
@@ -863,6 +912,9 @@ def run_once():
         "funding_prospects": funding_prospects_view(proposed_all,
                                                     candidates_now,
                                                     judge_state),
+        # [2026-07-29] can this organ still mint a NEW funding experiment?
+        # Publish-only; nothing trades on it. See proposal_capacity().
+        "proposal_capacity": capacity,
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -947,6 +999,24 @@ def _selftest():
         "hold-cap candidates are refuted at ANY number (21-Jul review)"
     assert "max_hold_h" not in FUNDING_GENES, \
         "re-adding the hold gene needs the recorded refutation overturned first"
+    # [2026-07-29] STERILITY IS REPORTED. A fresh organ has capacity; an organ
+    # whose lifetime `proposed` memory already holds every generatable name is
+    # EXHAUSTED and must say so (this is the live 29-Jul state — 8 minted
+    # names covering all 4 non-baseline alleles, props == [] forever).
+    _cap0 = proposal_capacity({}, {})
+    assert _cap0["generatable"] > 0 and _cap0["untried"] == _cap0["generatable"]
+    assert _cap0["exhausted"] is False, _cap0
+    _all_minted = {"proposed": [{"name": n} for n in _cap0["names"]]}
+    _cap1 = proposal_capacity({}, _all_minted)
+    assert _cap1["untried"] == 0 and _cap1["exhausted"] is True, _cap1
+    assert _cap1["generatable"] == _cap0["generatable"], "capacity is the SPACE"
+    # emitter and reporter read ONE source — they cannot disagree about sterility
+    assert funding_proposals({}, _all_minted) == [], "emitter agrees: sterile"
+    # a fully-HURTING organ is transiently silent, NOT sterile: generatable
+    # collapses to 0, and 0 untried out of 0 must not read as exhaustion.
+    _cap2 = proposal_capacity({}, {}, hurting={"live.funding.enter_apr",
+                                               "live.funding.take_profit"})
+    assert _cap2["generatable"] == 0 and _cap2["exhausted"] is False, _cap2
     # [2026-07-17] LENS VETO: the incubator must not breed a lens the live
     # taker refuses to fill. These are the REAL 16-Jul grades.
     real_lf = {"breakout": {"n4h": 2241, "avg4h_pct": -0.184, "hit4h": 0.405},

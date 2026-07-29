@@ -687,6 +687,55 @@ GROWTH_LIVE_MIN = int(os.environ.get("XPJ_GROWTH_LIVE_MIN", "10"))
 GROWTH_COOLDOWN_H = float(os.environ.get("XPJ_GROWTH_COOLDOWN_H", "48"))
 
 
+GROWTH_REACH_LOOKBACK_D = float(os.environ.get("XPJ_GROWTH_REACH_LOOKBACK_D", "14"))
+
+
+def growth_reachable(rows, now, window_d=None, min_closes=None,
+                     lookback_d=None, shadow_bot=None):
+    """(reachable, detail) — can the shadow arm even PRODUCE `min_closes`
+    inside a `window_d` trailing window, at its OWN recent close rate?
+
+    [2026-07-29] WHY THIS EXISTS. The growth pair's faster bar is 15 shadow
+    closes in a 2.5d trailing window — a spec that silently encodes an assumed
+    ~6 closes/day. Measured on 29-Jul the Farmer's shadow arm was closing
+    ~1.6/day (4 in 2.5d, 19 in 7d, 58 in 14d), so the floor could not be met
+    and `last_growth` had been printing "floors: shadow N/15" indefinitely with
+    nothing distinguishing "not yet" from "not ever". That is the failure shape
+    this fleet keeps paying for: a gate whose bar sits on an unmeasured
+    assumption ([[unmeasured-assumptions-make-false-verdicts]]).
+
+    This REPORTS; it does not gate. Deliberately so — the 2.5d window is a
+    recorded operator preference ("the operator's 2-3d auto-promotion"), and
+    an organ must not quietly widen a real-money promotion window to make its
+    own bar easier. Surfacing the arithmetic is what lets the operator decide
+    whether to widen the window, accept the stall, or feed the arm.
+
+    Fail-safe: returns (None, ...) — UNKNOWN, never a stall claim — on a
+    missing/short ledger, so a dark feed can never manufacture an alarm
+    ([[a-dead-sensor-must-not-score-a-hit]]). The projection is deliberately
+    OPTIMISTIC (ungated by the candidate receipt the real floor also demands),
+    so `reachable is False` means *definitely* not, never merely 'probably'.
+    Pure — selftested."""
+    window_d = GROWTH_WINDOW_D if window_d is None else window_d
+    min_closes = GROWTH_MIN_CLOSES if min_closes is None else min_closes
+    lookback_d = GROWTH_REACH_LOOKBACK_D if lookback_d is None else lookback_d
+    shadow_bot = shadow_bot or SHADOW_BOT
+    seen = arm_trades(rows, shadow_bot, now - lookback_d * 86400, now)
+    n = len(seen)
+    detail = {"n_lookback": n, "lookback_d": lookback_d,
+              "window_d": window_d, "min_closes": min_closes}
+    if n < 2:
+        detail["why"] = "no usable close-rate sample — claiming nothing"
+        return None, detail
+    rate = n / float(lookback_d)
+    projected = rate * window_d
+    detail.update(rate_per_day=round(rate, 3), projected=round(projected, 2))
+    detail["why"] = (f"{shadow_bot} closes ~{rate:.2f}/day over the last "
+                     f"{lookback_d:g}d -> ~{projected:.1f} in a {window_d:g}d "
+                     f"window vs a {min_closes}-close floor")
+    return projected >= min_closes, detail
+
+
 def growth_promoter(rows, gstate, now, drift=None):
     """Promote/keep/release the growth-lever PAIR on the faster bar. PURE: returns
     (new_gstate, (kind, payload)); the caller does the _assert_levers / push / log
@@ -722,7 +771,7 @@ def growth_promoter(rows, gstate, now, drift=None):
 
 
 def _arm_drift_snapshot(rows, fetch=None):
-    """Arm-drift for paired_eval: row-based first, HOLD-ONLY fallback second.
+    """Arm-drift for paired_eval: EITHER source may raise a hold, neither clears.
 
     [2026-07-28 REVIEW] The row-based check was structurally DARK from birth:
     0 of 143 all-time Farmer paper_trades rows carried extra.build, because
@@ -733,16 +782,23 @@ def _arm_drift_snapshot(rows, fetch=None):
     ([[a-dead-sensor-must-not-score-a-hit]]): the 2026-07-17 "one snapshot"
     design was right, its feed was empty.
 
-    Semantics, in seniority order:
-    - If BOTH arms have build-stamped ledger rows, the row-based verdict is
-      final (same-snapshot doctrine: the drift check describes the same rows
-      the bar is computed from). None there means converged — no fallback.
-    - Only while either arm's rows are UNSTAMPED (the pre-fix ledger) do we
-      read the arms' CURRENT builds off bot_pnl. arm_drift claims drift only
-      on POSITIVE evidence (both stamps present and different), so this
-      fallback can only ADD a hold, never clear one — restrict-only — and it
-      retires by itself as stamped rows accrue on both arms. Fail-safe None
-      on any import/DB failure (a dark sensor costs nothing, claims nothing).
+    Semantics (2026-07-29 — the seniority rule that used to sit here is GONE):
+    - The row-based check runs first and a POSITIVE row verdict is returned
+      as-is: those rows really were produced by two different builds.
+    - A row verdict of None no longer ends it. The arms' CURRENT bot_pnl
+      builds are always consulted, and a positive verdict there raises the
+      hold too (stamped `source: bot_pnl-current`). WHY the reversal: the old
+      "both arms stamped => row verdict final" rule certified the Farmer pair
+      CONVERGED on ddd019900bf0 on 29-Jul while the containers were actually
+      running c2d0ccc64d7d and 89c2c56b2da5. The rows described the past
+      honestly; the promotion they gated spends money through the code running
+      NOW ([[self-describing-labels-lie]] — except build ids are bytes, so the
+      stamps were true and only the RULE reading them was wrong).
+    - Both sources claim drift only on POSITIVE evidence (two stamps present
+      and different), so this is RESTRICT-ONLY: it can add a hold, never clear
+      one, and "unknown" stays quiet (it must — treating unknown as drift
+      would fire on every rollout and train the operator to ignore it).
+      Fail-safe None on any import/DB failure (a dark sensor claims nothing).
     `fetch` is injectable for the selftest; defaults to store.fetch_bot_pnl."""
     try:
         import implementation_shortfall as _isf
@@ -753,14 +809,27 @@ def _arm_drift_snapshot(rows, fetch=None):
         if d is not None:
             return d
 
-        def _stamped(bot):
-            return any(((r.get("extra") or {}).get("build"))
-                       for r in (rows or []) if str(r.get("bot")) == bot)
-
-        if _stamped(LIVE_BOT) and _stamped(SHADOW_BOT):
-            return None                     # row verdict is final: converged
+        # [2026-07-29] The row verdict is no longer FINAL-on-converged, and the
+        # reason is a measured live state, not a theory. The old rule said: if
+        # both arms have build-stamped rows, a None from them means converged —
+        # skip the bot_pnl fallback (the "same-snapshot doctrine"). Measured
+        # today: both arms' NEWEST stamped rows carried ddd019900bf0 (28-Jul
+        # 20:00/20:02) while bot_pnl showed the arms live on c2d0ccc64d7d and
+        # 89c2c56b2da5 — TWO DIFFERENT builds, NEITHER of them the one the gate
+        # was certifying as converged. The seniority rule is right about the
+        # PAST (those rows really were produced by one build) and wrong about
+        # the DECISION: a promotion steers FUTURE real money through the code
+        # the containers are running NOW. So the current-build check is always
+        # consulted, and either source may raise a hold.
+        # RESTRICT-ONLY by construction: arm_drift claims only on POSITIVE
+        # evidence (two stamps present, two stamps different), so this can add
+        # a hold and never clear one, and "unknown" stays quiet exactly as
+        # before (it must — see the docstring on why unknown != drift).
         pnl_rows = (fetch or store.fetch_bot_pnl)() or []
-        return _isf.arm_drift(pnl_rows, live=LIVE_BOT, shadow=SHADOW_BOT)
+        cur = _isf.arm_drift(pnl_rows, live=LIVE_BOT, shadow=SHADOW_BOT)
+        if cur is not None:
+            cur = dict(cur, source="bot_pnl-current")
+        return cur
     except Exception:      # noqa: BLE001
         return None
 
@@ -1129,6 +1198,11 @@ def run_once():
                    # before any branch saves, so every exit persists it.
                    "growth": kw.get("growth", st.get("growth")),
                    "last_growth": kw.get("last_growth", st.get("last_growth")),
+                   # [2026-07-29] close-rate reachability of the growth floor
+                   # — report-only, so a multi-week "floors: N/15" can be told
+                   # apart from a bar that cannot be met. See growth_reachable.
+                   "growth_reach": kw.get("growth_reach",
+                                          st.get("growth_reach")),
                    "verdicts": verdicts[-10:], "last_eval": kw.get("last_eval")}
         store.save_state(KEY, payload)
         if hasattr(store, "save_history"):
@@ -1159,6 +1233,16 @@ def run_once():
     st["growth"], st["last_growth"] = _g2, _glast
     if _glast.get("kind") not in (None, "eval"):
         print(f"[xp-judge] growth-levers: {_glast}", flush=True)
+    # [2026-07-29] Is the growth floor even REACHABLE at the arm's own close
+    # rate? Report-only (see growth_reachable) — "floors: shadow N/15" for
+    # weeks must be distinguishable from a bar that cannot be met.
+    _reach, _reach_d = growth_reachable(rows, now)
+    st["growth_reach"] = dict(_reach_d, reachable=_reach)
+    if _reach is False and not _g2.get("promoted"):
+        print(f"[xp-judge] ⚠️  growth floor UNREACHABLE at the current rate: "
+              f"{_reach_d['why']} — the pair cannot promote until the arm "
+              f"closes faster or the operator re-specs the window "
+              f"(XPJ_GROWTH_DAYS); not auto-widened by design", flush=True)
 
     if phase == "idle":
         if _num(st.get("cooldown_until")) > now:
@@ -1245,9 +1329,10 @@ def run_once():
         # gates can never describe different moments. Imported lazily and
         # guarded: implementation_shortfall is not in every image, and a dark
         # sensor must cost this organ nothing (it simply cannot claim drift).
-        # [2026-07-28] ...and while the ledger rows carry no stamps at all,
-        # _arm_drift_snapshot falls back HOLD-ONLY to the arms' current
-        # bot_pnl builds — see its docstring for why the row feed was empty.
+        # [2026-07-29] ...and the arms' CURRENT bot_pnl builds are consulted
+        # too, always — not only when the rows are unstamped. One snapshot is
+        # still right for the NUMBERS; it was wrong for the DECISION, which
+        # spends future money through today's containers. See the docstring.
         # [2026-07-28 §3c] hoisted to _drift_snap (one snapshot per cycle,
         # shared with the growth step above).
         _drift = _drift_snap
@@ -1664,8 +1749,20 @@ def _selftest():
     # unstamped ledger rows when the arms' CURRENT builds differ (the defect:
     # 0/143 rows stamped -> row-based None forever -> the HOLD never fired on
     # a live build divergence impl-shortfall was reporting simultaneously).
-    # Mutation check: removing the fallback turns the first assert red;
-    # removing the _stamped seniority guard turns the third red.
+    #
+    # [2026-07-29 ROW SENIORITY WITHDRAWN — deliberate reversal of the assert
+    # that used to live here.] That rule made a stamped-and-matching row pair a
+    # FINAL all-clear that the current-build check could not override. Measured
+    # live the same day: both Farmer arms' newest stamped rows read
+    # ddd019900bf0 (28-Jul 20:00/20:02) while bot_pnl had them on
+    # c2d0ccc64d7d / 89c2c56b2da5 — two different builds, neither the certified
+    # one. The old assert was not testing a defect-free property; it was
+    # pinning the blind spot. A promotion spends FUTURE money through the code
+    # running NOW, so the current check always gets a vote. Restrict-only:
+    # arm_drift claims only on positive evidence, so this adds holds and clears
+    # none, and unknown stays quiet.
+    # Mutation check: dropping the bot_pnl consult turns asserts 1 AND 3 red;
+    # letting `unknown` count as drift turns assert 2 red.
     try:
         import implementation_shortfall as _isf_probe   # noqa: F401
         _isf_ok = True
@@ -1680,15 +1777,19 @@ def _selftest():
     if _isf_ok:
         # fallback fires: unstamped rows + drifted current builds -> HOLD
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_drift) == \
-            {"live": "aaa", "shadow": "bbb"}
+            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
         # fallback stays quiet when current builds match (no false hold)
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_same) is None
-        # ROW SENIORITY: both arms stamped-and-matching is a positive
-        # all-clear — the bot_pnl fallback must NOT override it (a deploy
-        # after the window's trades is not drift in those trades)
+        # THE 29-Jul REVERSAL, asserted: rows agree on a build, but the arms
+        # are on two different builds NOW -> HOLD. This is the exact live
+        # shape (rows ddd0199.., arms c2d0ccc.. vs 89c2c56..); the previous
+        # contract returned None here and let the promotion proceed.
         _r_same = [{"bot": LIVE_BOT, "extra": {"build": "x"}},
                    {"bot": SHADOW_BOT, "extra": {"build": "x"}}]
-        assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_drift) is None
+        assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_drift) == \
+            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+        # ...and converged rows + converged current builds still clear
+        assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_same) is None
         # row-based POSITIVE drift is returned untouched (senior path)
         _r_drift = [{"bot": LIVE_BOT, "extra": {"build": "p"}},
                     {"bot": SHADOW_BOT, "extra": {"build": "q"}}]
@@ -1919,6 +2020,35 @@ def _selftest_growth():
 
     _, (k2, _) = growth_promoter(rows, {}, now, drift={"live": "aa", "shadow": "bb"})
     assert k2 == "eval", "arm-drift must fail CLOSED"
+
+    # [2026-07-29] growth_reachable — REPORTS whether the floor can be met at
+    # the arm's own close rate. Each assertion fails against a detector that
+    # guesses instead of measuring, or that alarms on a dark feed.
+    #  (a) UNKNOWN on no sample: a dark ledger must claim nothing.
+    assert growth_reachable([], now)[0] is None
+    assert growth_reachable([mk(SHADOW_BOT, 0.01, now - 3600)], now)[0] is None, \
+        "n<2 is not a rate"
+    #  (b) the LIVE 29-Jul shape: ~1.6 closes/day cannot fill 15 in 2.5d.
+    slow = [mk(SHADOW_BOT, 0.01, now - i * 86400 / 1.6) for i in range(1, 23)]
+    ok, det = growth_reachable(slow, now, window_d=2.5, min_closes=15,
+                               lookback_d=14.0)
+    assert ok is False, det
+    assert det["projected"] < 15 and det["n_lookback"] >= 2, det
+    #  (c) a fast arm clears the same floor — the detector tracks the RATE,
+    #      it is not a constant dressed up as a measurement.
+    fast = [mk(SHADOW_BOT, 0.01, now - i * 3600.0) for i in range(1, 200)]
+    assert growth_reachable(fast, now, window_d=2.5, min_closes=15,
+                            lookback_d=14.0)[0] is True
+    #  (d) OPTIMISTIC by construction: unreceipted closes still count toward
+    #      the projection, so `False` means definitely-not, never merely-maybe
+    #      (the real floor gates on receipts too, and is therefore stricter).
+    bare = [mk(SHADOW_BOT, 0.01, now - i * 3600.0) for i in range(1, 200)]
+    assert all("extra" not in r for r in bare)
+    assert growth_reachable(bare, now, window_d=2.5, min_closes=15,
+                            lookback_d=14.0)[0] is True
+    #  (e) the LIVE arm's closes must not inflate the SHADOW arm's rate
+    assert growth_reachable([mk(LIVE_BOT, 0.01, now - i * 3600.0)
+                             for i in range(1, 200)], now)[0] is None
 
     norcpt = []
     for i in range(20):
