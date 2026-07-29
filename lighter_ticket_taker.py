@@ -1003,6 +1003,43 @@ def _close_extra(m):
     stamped = isinstance(m.get("bars"), dict) and m.get("bars")
     out = {"bars": (m.get("bars") if stamped else entry_bars()),
            "bars_basis": ("entry" if stamped else "close-legacy")}
+    # [2026-07-29 (fx) POLICY STAMP] The bars stamp records the EXIT bracket.
+    # It says nothing about which SIGNALS the bot was allowed to take — and
+    # that is the field whose absence caused three separate mis-gradings in one
+    # day. TT_BULL_MODE flipping on 24-Jul changed the lens set, the side and
+    # the crypto-only rule while leaving the bracket byte-identical, so the
+    # ledger's ONLY trace of a policy change was the `reason` tag flipping from
+    # long-divergence_* to short-divergence_* — a downstream symptom a grader
+    # has to already know to look for. Pooling across it produced BOTH
+    # "n=25, t=-0.26, no edge" (fs) and the over-corrected "pooled t=+2.86,
+    # the edge is real" (fv). Two opposite errors, one missing field.
+    # With this, any grader — golive_readiness, bot_learn, the experiment
+    # judge, fleet_proprioception or a human — can split eras MECHANICALLY.
+    # Observable-only: it changes no decision, and setdefault means it can
+    # never clobber bars/bars_basis or an evidence key.
+    # [2026-07-30] TICKET SUPPLY joins the stamp, and it belongs here for the
+    # same reason everything else does. (fx)/(gi) fixed era-pooling by
+    # recording the policy the taker ran — but the taker's CANDIDATE SET is set
+    # one level further up, by the scout's `TICKET_TOP_N`, and that moved 6 -> 12
+    # on 2026-07-30. A grader splitting eras "MECHANICALLY" would have pooled
+    # across a 2x change in the supply the arm chose from, with nothing in the
+    # ledger to see it by — the identical defect, one level upstream. Read from
+    # the lever registry so the stamp follows the real value rather than a
+    # second copy of it (the `env_default` field (gd) added is what makes that
+    # possible). Observable-only; setdefault still protects every other key.
+    _supply = None
+    try:
+        if tuning is not None:
+            _spec = (tuning.LEVERS.get("scout.ticket_top_n") or {})
+            _supply = tuning.get_lever("scout.ticket_top_n",
+                                       _spec.get("env_default"))
+    except Exception:  # noqa: BLE001
+        _supply = None
+    out.setdefault("policy", {"bull": BULL_MODE,
+                              "lenses": sorted(allowed_lenses(TT_VENUE)),
+                              "venue": TT_VENUE,
+                              "max_open": MAX_OPEN,
+                              "ticket_top_n": _supply})
     ev = m.get("evidence")
     if isinstance(ev, dict):
         for k, v in ev.items():
@@ -2714,9 +2751,41 @@ def selftest():
     assert _cx["brk_quality"] == 0.42 and _cx["up_strength"] == 0.13, _cx
     # legacy/absent evidence degrades to exactly the old payload
     _cl = _close_extra({})
-    assert set(_cl) == {"bars", "bars_basis"} and _cl["bars_basis"] == "close-legacy"
+    assert set(_cl) == {"bars", "bars_basis", "policy"} and \
+        _cl["bars_basis"] == "close-legacy"
     assert set(_close_extra({"bars": _cm["bars"], "evidence": "junk"})) == \
-        {"bars", "bars_basis"}, "non-dict evidence must add nothing"
+        {"bars", "bars_basis", "policy"}, "non-dict evidence must add nothing"
+
+    # [2026-07-29 (fx)] THE POLICY STAMP. The bars stamp is byte-identical
+    # across the 24-Jul bull flip, so without this a grader cannot see that the
+    # bot changed WHICH SIGNALS it takes — the blind spot behind both the
+    # "no edge" and the "edge is real" mis-gradings. Mutation-checked: dropping
+    # the setdefault, or dropping any of the four keys, turns these red.
+    _pol = _cx["policy"]
+    # [2026-07-30] `ticket_top_n` joined the stamp. The four original keys
+    # record the policy the TAKER ran; the candidate SET it chose from is set
+    # one level up by the scout, and that supply moved 6 -> 12 on 2026-07-30.
+    # Without it in the stamp a grader splitting eras "mechanically" would pool
+    # across a 2x change in the arm's opportunity set with nothing in the
+    # ledger to see it by — the identical defect (fx)/(gi) fixed, one level
+    # upstream. Mutation-checked: dropping any key turns these red.
+    assert set(_pol) == {"bull", "lenses", "venue", "max_open",
+                         "ticket_top_n"}, _pol
+    # the supply must be the REGISTRY's value, never a second hardcoded copy —
+    # audit_lever_bounds keeps the registry equal to the scout's real default,
+    # so this is the one number that cannot drift from what the scout emits
+    import fleet_tuning as _ft
+    assert _pol["ticket_top_n"] == (
+        _ft.LEVERS["scout.ticket_top_n"]["env_default"]), _pol
+    assert _pol["bull"] is BULL_MODE and _pol["venue"] == TT_VENUE, _pol
+    assert _pol["lenses"] == sorted(allowed_lenses(TT_VENUE)), _pol
+    # it must record the LENS SET, which is what the flip actually changed —
+    # and on the live venue that set is the allow-list, not everything
+    assert sorted(allowed_lenses("lighter_live")) == ["divergence"]
+    assert len(sorted(allowed_lenses("lighter_shadow"))) > 1
+    # and evidence must never be able to forge it
+    _cf = _close_extra({"bars": _cm["bars"], "evidence": {"policy": "EVIL"}})
+    assert _cf["policy"] != "EVIL", "evidence must not clobber the policy stamp"
     # an evidence key can never clobber the bars stamp
     _cc = _close_extra({"bars": _cm["bars"],
                         "evidence": {"bars": "EVIL", "gap_pp": 9.0}})

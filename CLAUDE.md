@@ -77,7 +77,11 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   to this number, and on the live bus `dip` and `divergence` both returned
   EXACTLY 6 (breakout/momentum returned 5); a lens returning exactly its cap
   is a lens whose cap binds. The lens behind it is the fleet's only measured
-  alpha (shadow short-divergence +3.035%/trade vs its own regime, t=+4.04) and
+  alpha — **RETRACTED: (gi) found a THIRD era-pooling error; the shadow arm's
+  10 closes span FOUR bar-sets, and the only clean single-policy sample is the
+  LIVE arm's 11 closes at +0.883%/trade, t=+0.73, 95% CI straddling zero. The
+  cap-binding fact stands and the widening stands, but the rationale is now
+  MORE SAMPLE FOR AN UNDECIDED LENS, not feeding a proven winner** — and
   it was being handed a 6-wide list from which to fill 4 slots. Every "closed
   question" on the Taker (`TT_MAX_OPEN`, `TT_DIV_GAP`, lens on/off, clip size,
   symbol eligibility) was about ALLOCATING that fixed supply; **none was about

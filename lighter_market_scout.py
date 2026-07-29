@@ -85,9 +85,15 @@ MOMO_CHG_MIN = float(os.environ.get("SCOUT_MOMO_CHG_MIN", "3.0"))
 # `strategy_tickets` truncates EVERY lens to this number, and on the live bus
 # `dip` and `divergence` both returned EXACTLY 6 while breakout/momentum
 # returned 5 — a lens returning exactly its cap is a lens whose cap binds.
-# The lens behind it is the fleet's only measured alpha (shadow
-# short-divergence: +3.035%/trade vs its own regime, t=+4.04), and it was
-# being handed a 6-wide candidate list from which to fill 4 slots. Every
+# The lens behind it was handed a 6-wide candidate list from which to fill 4
+# slots. NOTE, and this matters because it was the original justification:
+# the "+3.035%/trade vs regime, t=+4.04, the fleet's only measured alpha"
+# claim is RETRACTED. (gi) found a THIRD era-pooling error — the shadow arm's
+# 10 closes span FOUR distinct bar-sets — and the only clean single-policy
+# sample is the live arm's own 11 closes: +0.883%/trade, t=+0.73, 95% CI
+# [-1.81%, +3.57%] STRADDLING ZERO. The cap-binding fact below is unaffected
+# and this widening still stands, but on the weaker and honest rationale:
+# MORE SAMPLE FOR AN UNDECIDED LENS, not feeding a proven winner. Every
 # "closed question" on the Taker (`TT_MAX_OPEN`, `TT_DIV_GAP`, lens on/off,
 # clip size, symbol eligibility) was about ALLOCATING this fixed supply;
 # none of them was about ENLARGING it. Widening here changes no entry bar —
