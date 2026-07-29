@@ -646,3 +646,63 @@ def test_the_published_caps_sit_inside_a_publish_payload(mod):
     # the cap must be a dict of NAMED gates, not a bare number — the board
     # looks levers up by name
     assert all(isinstance(k, str) for keys in found for k in keys), found
+
+
+# --------------------------------------------------------------------------
+# [2026-07-30 (gs)] THE CAP MUST BE ON THE PATH THAT ACTUALLY RUNS.
+#
+# (go) asserted that every levered book carries `caps` inside a real
+# store.publish(extra=...) call, and ⚖️ Counterweight PASSED — because its caps
+# were in the `status="halted"` publish, the SafetyRails branch. A book that is
+# running normally never takes that path, so the field appeared exactly when the
+# book had STOPPED trading. Measured on the live row: caps=None at 23:50 with
+# the book online and full at 10 of 10 legs.
+#
+# The lesson is narrow and worth pinning: "present in a publish call" is not the
+# same claim as "present in the publish call the loop makes". The (go) test was
+# true and insufficient.
+# --------------------------------------------------------------------------
+
+def _publish_status(call):
+    """The literal `status=` of a store.publish call, or None if not literal."""
+    import ast as _a
+    for kw in call.keywords:
+        if kw.arg == "status" and isinstance(kw.value, _a.Constant):
+            return kw.value.value
+    return None
+
+
+@pytest.mark.parametrize("mod", LEVERED_BOOK_MODULES)
+def test_caps_ride_the_HEALTHY_publish_not_only_an_error_path(mod):
+    """At least one publish whose status is NOT a halted/error state must carry
+    caps. Otherwise the cap is observable only once the book has stopped."""
+    import ast as _a
+    import pathlib as _pl
+    root = _pl.Path(__file__).resolve().parents[2]
+    tree = _a.parse((root / f"{mod}.py").read_text())
+
+    UNHEALTHY = {"halted", "error", "stopped", "crashed", "down"}
+    healthy_with_caps, statuses_with_caps = False, []
+    for node in _a.walk(tree):
+        if not isinstance(node, _a.Call):
+            continue
+        fn = node.func
+        name = fn.attr if isinstance(fn, _a.Attribute) else getattr(fn, "id", "")
+        if name != "publish":
+            continue
+        for kw in node.keywords:
+            if kw.arg != "extra" or not isinstance(kw.value, _a.Dict):
+                continue
+            keys = [k.value for k in kw.value.keys if isinstance(k, _a.Constant)]
+            if "caps" not in keys:
+                continue
+            st = _publish_status(node)
+            statuses_with_caps.append(st)
+            if st is None or str(st).lower() not in UNHEALTHY:
+                healthy_with_caps = True
+
+    assert statuses_with_caps, f"{mod}: no publish carries caps at all"
+    assert healthy_with_caps, (
+        f"{mod}: caps appear ONLY on publish(status={statuses_with_caps}) — an "
+        "unhealthy/halted path. The cap would be visible only once the book had "
+        "stopped trading, which is precisely when it no longer matters.")

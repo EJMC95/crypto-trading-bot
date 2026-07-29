@@ -625,6 +625,21 @@ def main():
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": ctx.mode, "venue": ctx.mode,
                        "style": "xsect-funding-spread",
+                       # [2026-07-30 (gs)] `caps` on the ONLINE path. (gd) added
+                       # it to this bot's `status="halted"` publish only — the
+                       # SafetyRails branch — so the effective cap appeared
+                       # exactly when the book had STOPPED trading and never
+                       # while it ran. Measured: the row showed caps=None at
+                       # 23:50 with the book online and full at 10/10. The
+                       # evidence board prefers a published cap over the
+                       # registry precisely to tell "at its cap" from "at the
+                       # cap it set itself", so for this book it has been
+                       # falling back to the registry since (gd) — the same
+                       # blindness (go) fixed for three other books, in a
+                       # fourth I had already counted as done.
+                       "caps": {"k": K, "legs": 2 * K,
+                                "universe_n": UNIVERSE_N,
+                                "universe": len(COINS)},
                        "held": {c: ("S" if m.get("is_short") else "L")
                                 for c, m in meta.items()},
                        "fund_realized": round(fund_realized, 4),
