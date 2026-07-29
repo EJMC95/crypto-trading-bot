@@ -1,9 +1,18 @@
 name: Taker BULL dual-mode
 
-# [2026-07-29 (fl)] Set TT_BULL_MODE on a Ticket Taker arm — the 24-Jul
-# bull-engine research shipped this gate DEFAULT OFF pending an operator call,
-# and the operator made it ("optimise the taker completely ... implement
-# immediately to real money with full permission").
+# [2026-07-29 (fl)] Set TT_BULL_MODE on a Ticket Taker arm.
+#
+# [2026-07-29 (fm) CORRECTION — read this before believing the header below.]
+# This workflow was written believing the gate was still OFF on the live arm and
+# that dispatching it would turn bull mode on. IT WAS ALREADY ON: the operator
+# set TT_BULL_MODE=on on tide-rider-lighter-live on 24-Jul ((dh)), and on the
+# shadow arm on 24-Jul too ((df)). Both arms have published extra.bull=true ever
+# since. The first dispatch of this workflow was a NO-OP that bounced a
+# real-money container. The workflow itself is fine and remains the supported
+# way to flip the gate in EITHER direction — but the "EVIDENCE" block below is a
+# counterfactual for what bull mode bought when the OPERATOR enabled it, NOT a
+# pending change, and there is no bull-off control arm anywhere in the fleet.
+# CHECK extra.bull ON /pnl.json BEFORE DISPATCHING, not after.
 #
 # WHAT IT DOES: RESTRICT-ONLY. `bull_entry_ok` can only SKIP an entry the base
 # filters already admitted. It admits only (breakout,long) / (breakoutup,long) /

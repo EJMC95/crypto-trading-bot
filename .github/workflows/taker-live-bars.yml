@@ -1,0 +1,117 @@
+name: Taker exit bracket
+
+# [2026-07-29 (fm)] Set the Ticket Taker's exit bracket (TT_TP / TT_SL /
+# TT_MAX_HOLD_H) on one taker arm.
+#
+# WHY THIS EXISTS. With TT_BULL_MODE on, LIVE_LENSES={divergence} reduces the
+# live arm to short-divergence-crypto, so the bracket and the slot count are the
+# only knobs that still reach it. The growth-rail levers (taker.tp, taker.sl,
+# taker.max_hold_h) steer the SHADOW twin on the `lighter-taker` lane and
+# deliberately never reach `live.*` — so env is the only route to the live arm,
+# and the two arms had silently diverged for days.
+#
+# THIS IS NOT RESTRICT-ONLY. Widening TT_SL widens a real-money stop: each
+# loser can lose more. Bounded by the untouched $40 notional cap / 4 slots
+# (worst-case simultaneous stop-out $1.20 -> $1.60 at -0.03 -> -0.04 on a ~$66
+# book), the SafetyRails daily-loss halt, and the kill switch. Treat a change
+# here as a real-money risk decision, not a tuning nudge.
+#
+# EVIDENCE for the 2026-07-29 values (lighter_ticket_replay + the taker's own
+# exit_reason/bull_exit on the live path, max_open=4, $10 clips) — the twin's
+# bars beat the env defaults at every window AND are positive in both halves at
+# every window, which the defaults are not:
+#     72h  +1.37 (h2 -0.31)  ->  +2.94     168h  +1.86  ->  +7.20
+#    120h  +1.65             ->  +5.05     200h  +1.43  ->  +7.83
+# Mechanism is the STOP, not the target: at -0.03 the divergence short is
+# stopped 18x/200h, at -0.04 it is stopped 4x and win rate goes 50% -> 76%.
+# -0.04/-0.05 and hold 36-120h are PLATEAUS; the sweep's argmax (-0.06) is
+# declined on purpose as a fat-tail trap.
+#
+# VERIFY BY PUBLISHED OUTPUT (the (df) rule, applied BEFORE claiming a change —
+# see (fm) for what happens when it is applied after): `extra.bars` on the row
+# must show the new tp/sl/max_hold_h, and `extra.tuned` must stay `[]` on the
+# live arm (no growth-rail lever reaches it). Env is read at import, hence the
+# redeploy. No code deploy is involved.
+#
+# REVERSIBLE IN ONE DISPATCH: re-run with the previous values.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arm:
+        description: "Which Ticket Taker arm"
+        required: true
+        default: "tide-rider-lighter-live"
+        type: choice
+        options:
+          - "tide-rider-lighter-live"   # REAL MONEY
+          - "lighter-ticket-taker"      # the $1k shadow twin
+      tp:
+        description: "TT_TP take-profit, fraction (0.02-0.12)"
+        required: true
+        default: "0.06"
+      sl:
+        description: "TT_SL stop-loss, NEGATIVE fraction (-0.08 to -0.02)"
+        required: true
+        default: "-0.04"
+      max_hold_h:
+        description: "TT_MAX_HOLD_H hours (12-120)"
+        required: true
+        default: "72"
+
+concurrency:
+  group: railway-deploy     # serialize with Railway Redeploy — same service surface
+  cancel-in-progress: false
+
+jobs:
+  set-bars:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Validate, set the bracket, and redeploy the arm
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          ARM_IN: ${{ github.event.inputs.arm }}
+          TP_IN: ${{ github.event.inputs.tp }}
+          SL_IN: ${{ github.event.inputs.sl }}
+          HOLD_IN: ${{ github.event.inputs.max_hold_h }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set."; exit 1
+          fi
+          case "${ARM_IN}" in
+            tide-rider-lighter-live|lighter-ticket-taker) ;;
+            *) echo "::error::arm must be one of the two taker services — refusing"; exit 1 ;;
+          esac
+          # Strict format FIRST (rejects expressions, whitespace, exponents),
+          # then a numeric range check. Both must pass — a range test alone
+          # would accept things awk is willing to coerce.
+          num_ok() { printf '%s' "$1" | grep -Eq '^-?(0|[1-9][0-9]*)(\.[0-9]+)?$'; }
+          for v in "${TP_IN}" "${SL_IN}" "${HOLD_IN}"; do
+            num_ok "$v" || { echo "::error::'$v' is not a plain decimal number — refusing"; exit 1; }
+          done
+          in_range() {   # value lo hi
+            awk -v v="$1" -v lo="$2" -v hi="$3" \
+              'BEGIN{exit !(v+0 >= lo && v+0 <= hi)}'
+          }
+          in_range "${TP_IN}"   0.02  0.12 || { echo "::error::TT_TP ${TP_IN} outside [0.02, 0.12] — refusing"; exit 1; }
+          in_range "${SL_IN}"  -0.08 -0.02 || { echo "::error::TT_SL ${SL_IN} outside [-0.08, -0.02] — refusing"; exit 1; }
+          in_range "${HOLD_IN}" 12    120  || { echo "::error::TT_MAX_HOLD_H ${HOLD_IN} outside [12, 120] — refusing"; exit 1; }
+          if [ "${ARM_IN}" = "tide-rider-lighter-live" ]; then
+            echo "::warning::Setting the REAL-MONEY Ticket Taker's exit bracket to tp=${TP_IN} sl=${SL_IN} hold=${HOLD_IN}h. This WIDENS a live stop if sl moved down."
+          fi
+          # output discarded: `railway variables` may echo the service's FULL
+          # variable table (DATABASE_URL, signer keys) unmasked into the log —
+          # the dashboard-auth-rotate lesson.
+          railway variables --service "${ARM_IN}" --skip-deploys \
+            --set "TT_TP=${TP_IN}" \
+            --set "TT_SL=${SL_IN}" \
+            --set "TT_MAX_HOLD_H=${HOLD_IN}" > /dev/null 2>&1
+          railway redeploy --service "${ARM_IN}" --yes
+          echo "Set on ${ARM_IN}: TT_TP=${TP_IN} TT_SL=${SL_IN} TT_MAX_HOLD_H=${HOLD_IN}; redeployed."
+          echo "Verify by PUBLISHED OUTPUT: /pnl.json extra.bars must show"
+          echo "  taker.tp=${TP_IN} taker.sl=${SL_IN} taker.max_hold_h=${HOLD_IN}"
+          echo "and on the live arm extra.tuned must stay [] (no lever reaches live)."
