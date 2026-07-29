@@ -607,6 +607,17 @@ All new bots:
   SPY's bull run; the brain's Georgia diagnosis — 100% of losses opened in
   oracle risk-off — corroborates from independent data). Build order: oracle
   per-asset coverage → the gate consumes it → only then the universe.
+  **[2026-07-30: step 2 WIRED (operator call, "per asset have consumer").**
+  `fleet_bus.oracle_asset_regimes()` → `lighter_family_bot.regime_inputs_for()`:
+  crypto pairs byte-identical on the validated BTC gates; a NON-CRYPTO pair
+  rides its OWN oracle verdict, fail-CLOSED (ungraded book / dark-or-stale
+  oracle ⇒ no entry — never BTC's gate; classification is STATIC so a dark
+  oracle cannot re-route SPY to BTC; kill switch `FAMILY_PER_ASSET_REGIME=off`
+  closes non-crypto entirely, never re-routes). INERT until step 3: no family
+  universe lists a non-crypto symbol, and the selftest asserts exactly that.
+  The universe widening stays a review decision — evidence in
+  `REGIME_GATE_PER_ASSET_2026-07-30.md` (TSLA-protective / metals-mildly-costly
+  / SPY-QQQ ungraded to ~mid-Aug), which re-runs at SPY/QQQ graduation.]
 - **LIVE BOTS ALWAYS IN AUDIT SCOPE (operator rule, 16-Jul).** Every audit,
   bug-scan, code-review, or security-review — WHATEVER its nominal scope —
   MUST also check the LIVE REAL-MONEY bots in the same pass: Funding Farmer

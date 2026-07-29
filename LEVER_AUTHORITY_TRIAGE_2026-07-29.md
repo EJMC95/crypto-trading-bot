@@ -102,10 +102,14 @@ three are READ-AND-DECIDE items, no code is waiting on them):**
    shadow floor; n=787 on genuinely new books, positive at every slip this
    tape); option 3 is the honest fallback. Decision: confirm option 1's
    shadow activation as THE design (or name the fallback).
-6. **Per-asset regime gate — evidence-backed HOLD**
-   (`REGIME_GATE_PER_ASSET_2026-07-30.md`): disagreement 19–28%/book at
-   depth; damage cell decisively protective on TSLA (−2.60/−7.87pp,
-   n=7), mildly costly on metals, and SPY/QQQ (the books that motivated
-   D5) still ungraded until ~mid-Aug. Recommendation: hold step-2 wiring
-   (unchanged from 28-Jul), re-run at SPY/QQQ graduation; keep fail-closed
-   (never BTC's gate) for any future non-crypto entry.
+6. **Per-asset regime gate — step 2 WIRED same day (operator call); the
+   4-Aug question narrows to step 3, the universe**
+   (`REGIME_GATE_PER_ASSET_2026-07-30.md` + its consumer-wired stamp):
+   the consumer shipped inert (crypto byte-identical; non-crypto rides its
+   own verdict fail-closed, never BTC's gate; kill switch closes, never
+   re-routes; selftest asserts today's universe stays crypto-only). The
+   study's evidence now feeds the UNIVERSE decision: disagreement
+   19–28%/book, damage cell protective on TSLA (−2.60/−7.87pp, n=7),
+   mildly costly on metals, SPY/QQQ ungraded until ~mid-Aug. Review reads:
+   whether to queue any step-3 widening now (TSLA-class first?
+   class-scoped?) or wait for the SPY/QQQ graduation re-run.

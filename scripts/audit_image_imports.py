@@ -53,6 +53,20 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # listed is a finding.
 # ---------------------------------------------------------------------------
 BORN_DARK_OK = {
+    # [2026-07-30 PER-ASSET GATE step 2] the family selftest's DRIFT GUARD
+    # (`NONCRYPTO_SYMS == regime_oracle.NONCRYPTO`) imports regime_oracle
+    # only to compare two constant sets, guarded by except ImportError with
+    # a skip. The family image deliberately does NOT carry the oracle
+    # module (it consumes the oracle's PUBLISHED payload via fleet_bus /
+    # bot_state, never the module — and the image has no pandas/numpy, the
+    # oracle's hard deps). The drift check runs where both modules exist:
+    # the repo, on every CI push. Runtime behavior needs only the static
+    # set, which is present by definition.
+    ("Dockerfile.familyshadow", "regime_oracle"):
+        "selftest-only drift guard (static NONCRYPTO_SYMS vs the oracle's "
+        "set), except-ImportError'd; the gate consumes the oracle's "
+        "published payload via fleet_bus, never the module; CI runs the "
+        "real check on every push from the repo",
     # venues/__init__.py guards `import fleet_tuning` ("images without the
     # module: lever inert"). These images are SHADOW/paper books that are not
     # in the evidence board's LIVE_ROWS, so they must NOT be sized by

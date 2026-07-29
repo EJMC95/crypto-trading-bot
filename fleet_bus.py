@@ -186,6 +186,35 @@ def entry_regime_gated(bot, entry_tag, current_time=None):
         return False
 
 
+def oracle_asset_regimes(current_time=None):
+    """{sym: verdict} for every pair the regime oracle currently grades, or
+    {} when the oracle is dark/stale/absent/malformed.
+
+    [2026-07-30 PER-ASSET GATE — item-18 step 2, operator call] The ONE
+    supported read for a per-asset regime consumer (first: the family bot's
+    non-crypto gate). Verdicts are the oracle's own strings (LONG-window /
+    SHORT-window / dir-flat / chop-gated), passed through untouched.
+    Standard accessor fail-safe: any doubt -> {}. NOTE the consumer-side
+    rule for NON-CRYPTO entries is fail-CLOSED (a missing sym in this map
+    means NO entry — never a BTC fallback); that rule lives at the
+    consumer, because this accessor cannot know which symbols a caller
+    needs. Crypto consumers keep their own validated gates and should not
+    read this.
+    """
+    try:
+        p = _load("regime-oracle", current_time)
+        if not p or not is_fresh(p, current_time):
+            return {}
+        out = {}
+        for sym, v in (p.get("pairs") or {}).items():
+            vd = v.get("verdict") if isinstance(v, dict) else None
+            if isinstance(vd, str) and vd:
+                out[str(sym)] = vd
+        return out
+    except Exception:
+        return {}
+
+
 def long_symbol_blocked(base, current_time=None):
     """[2026-07-21 PER-SYMBOL PILEUP CAP] True when opening ANOTHER long on
     `base` would stack past the fleet's per-symbol cap.
@@ -304,6 +333,26 @@ if __name__ == "__main__":
     assert entry_regime_gated("freqtrade-georgia-lshadow", "long-trend-breakout",
                               _now) is False, "absent brain -> open"
 
+    # [2026-07-30 PER-ASSET GATE] oracle_asset_regimes: verdict map passes
+    # through fresh; junk rows skipped; stale/absent -> {} (the consumer
+    # fails CLOSED on a missing sym — pinned at the family bot's selftest)
+    _cache["regime-oracle"] = {"ts": _now, "payload": dict(_orc_off, pairs={
+        "SPY": {"verdict": "LONG-window", "class": "equity-index"},
+        "XAU": {"verdict": "SHORT-window", "class": "commodity"},
+        "BTC": {"verdict": "chop-gated", "class": "crypto"},
+        "JUNK": "not-a-dict", "EMPTY": {}, "NONE": {"verdict": None}})}
+    assert oracle_asset_regimes(_now) == {
+        "SPY": "LONG-window", "XAU": "SHORT-window", "BTC": "chop-gated"}, \
+        "fresh pairs pass through; junk/verdictless rows are skipped"
+    _cache["regime-oracle"] = {"ts": _now, "payload": dict(
+        _orc_off, pairs={"SPY": {"verdict": "LONG-window"}},
+        updated="2020-01-01T00:00:00+00:00")}
+    assert oracle_asset_regimes(_now) == {}, "stale oracle -> {}"
+    _cache["regime-oracle"] = {"ts": _now, "payload": _orc_off}
+    assert oracle_asset_regimes(_now) == {}, "no pairs block -> {}"
+    _cache["regime-oracle"] = {"ts": _now, "payload": None}
+    assert oracle_asset_regimes(_now) == {}, "absent oracle -> {}"
+
     # [2026-07-21 TWO-WAY MULTS] the clamp passes expand values and still
     # bounds both directions
     _mults = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 26000,
@@ -321,4 +370,5 @@ if __name__ == "__main__":
     print("fleet_bus selftest OK (lever_outcome fresh/unknown/stale/absent; "
           "long_symbol_blocked enforce/advisory/cap0/stale/absent; "
           "entry_regime_gated act+off/no-tag/no-bot/risk-on/stale-oracle/"
-          "advisory/stale-brain/absent)")
+          "advisory/stale-brain/absent; "
+          "oracle_asset_regimes fresh/junk-skip/stale/no-pairs/absent)")
