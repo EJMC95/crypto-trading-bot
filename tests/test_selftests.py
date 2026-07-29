@@ -126,6 +126,11 @@ GUARD_ONLY_AUDITS = [
     # those are triaged — same footing as the deploy census. Only its
     # `--selftest` negative fixture runs here.
     "scripts/audit_lever_authority.py",
+    # [2026-07-29 (em)] coverage-floor ratchet: its FULL run needs the
+    # coverage.json the tests.yml `coverage-floors` job produces (the suite
+    # under subprocess-aware coverage), so only the detector's negative
+    # fixture runs in the lean suite; the full check gates in its own job.
+    "scripts/audit_coverage_floors.py",
 ]
 
 # Files that carry a `--selftest` marker but are deliberately NOT in the CI
