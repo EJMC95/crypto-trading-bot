@@ -59,6 +59,11 @@ SELFTEST_MODULES = [
     # reduction, signature dedupe, ordering, empty-state); the full run needs
     # the tape + register from the DB.
     "scripts.study_prospect_admission",
+    # [2026-07-29 (fk)] go-live readiness grader — --selftest is offline
+    # (synthetic books: a clean pass, the low-win-rate/positive-expectancy
+    # "carry shape", the high-win-rate money-loser, window/DD bars). It pins
+    # that win rate is NOT a bar and that expectancy IS one.
+    "scripts.golive_readiness",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",

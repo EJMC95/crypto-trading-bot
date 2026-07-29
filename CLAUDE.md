@@ -604,7 +604,28 @@ All new bots:
   (they were never freeze rules). Freeze-window exceptions stay logged in
   FLEET_REVIEW_AGENDA_2026-07-21.md §8.
 - $1,000 starting balance per bot, NO top-ups
-- Paper trading only until 30-day win rate > 55% AND max drawdown < 15%
+- **GO-LIVE GATE (re-specified 29-Jul at operator request — "fix the gate that
+  would reject it"). A book stays on paper until, over >=30 days: >=30 closes,
+  mean per-trade > 0, t >= 2.0, BOTH halves positive, and max drawdown < 15%.**
+  Graded by `scripts/golive_readiness.py`; go-live remains an explicit
+  operator act, never an automatic consequence of passing.
+  - The rule this replaces was *"30-day win rate > 55% AND max drawdown <
+    15%"*. **Win rate is orthogonal to expectancy**, and the fleet's
+    best-evidenced book proved it: 🌾 `perps-funding-carry-lshadow` measured
+    t=2.42 on n=80, both halves positive (+42.42/+13.78), realised +$56.20 —
+    while winning **38.8%** of its trades. A win-rate bar would reject it
+    forever, and would equally admit a high-win-rate book that loses money on
+    the tails. Same non-sequitur shape as the tp-0.06 rationale, sitting in
+    the rule that governs real money.
+  - **NOT uniformly stricter, and that is stated rather than buried**: it
+    drops a bar carry fails and adds two the old rule never had (significance,
+    both-halves). Stricter for a high-win-rate loser; a real loosening for
+    carry, which is what makes go-live reachable for it at all.
+  - Win rate is still REPORTED — informative, just not a bar. The 30d window
+    and the 15% drawdown cap are the operator's originals, unchanged.
+  - REGIME CAVEAT applies (item 18): Lighter's tape is ONE falling-BTC regime,
+    so a DIRECTIONAL book passing this has passed in that regime only. Funding
+    books are largely direction-agnostic, so it bites them less.
 - Never modify bot logic without backtesting first
 - **BACKTEST ON LIGHTER ONLY — the venue we trade is the venue we measure
   (operator rule, 17-Jul: "Lighter needs to be the only exchange backtests run
