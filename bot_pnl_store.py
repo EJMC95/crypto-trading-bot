@@ -145,7 +145,13 @@ _BUILD_ROOT = os.path.dirname(os.path.abspath(__file__))
 # different ids and the detector would cry drift forever. The set must not
 # depend on the execution path — the same reason `if dry_run` branches cannot
 # be compared across arms.
-_BUILD_SHARED = ("venues", "funding_basis.py", "bot_pnl_store.py")
+# [2026-07-30 (ev)] fleet_tuning.py joined the set: it is the CLAMP CAGE at
+# every real-money lever consumer — a stamp that cannot see the cage cannot
+# see cage drift between arms (found when the A1 bound widening would have
+# deployed hash-invisibly). Adding a file shifts every build id at each
+# service's NEXT deploy — expected, documented here.
+_BUILD_SHARED = ("venues", "funding_basis.py", "bot_pnl_store.py",
+                 "fleet_tuning.py")
 _BUILD_CACHE = None
 
 

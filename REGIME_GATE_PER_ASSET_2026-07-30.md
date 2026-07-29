@@ -102,3 +102,28 @@ universe)**, which remains review-gated: TSLA-class books look protected,
 metals argue for a class-scoped or verdict-quality-gated widening, and the
 index books still need their ~mid-Aug graduation re-run before they can be
 candidates at all.
+
+## [2026-07-30 STEP 3 RUN — operator call, same day: "run step 3 too"]
+
+The universe half also shipped on the operator's word, and the gate's
+fail-closed construction is what makes that safe with the index books
+still ungraded:
+
+- The four FAMILY books list the oracle's 10 non-crypto symbols
+  (`FAMILY_NONCRYPTO_COINS`; empty string reverts to crypto-only). Spot
+  ports keep their pinned crypto lists — selftest-asserted.
+- **The gate binds at the entry site** (`noncrypto_entry_blocked`): a
+  non-crypto long needs the asset's OWN LONG-window regardless of which
+  strategy is asking — TrendMomo and SwingDip never read the regime
+  extras, and without this rule they would have bought SPY dips bare of
+  any gate (the Georgia diagnosis is the measured cost of that shape).
+  Mutation-verified both ways (inverted rule; crypto-blind rule).
+- What actually trades at ship: nothing new immediately. The six
+  short-history books sit listed-and-idle until the oracle grades them;
+  the four graded books admit only inside their own LONG-windows (NVDA
+  30% of bars, TSLA 2%, XAU 4%, XAG 12% at the 28-Jul read). The
+  widening's first real effect is that graduation (~mid-Aug) flows
+  straight into live shadow evidence instead of a hypothetical.
+- The ~mid-Aug re-run of this study now doubles as the first
+  LISTED-universe read: per-book cells against books that are actually
+  tradable, per-tag brain grades accruing from the family ledger.

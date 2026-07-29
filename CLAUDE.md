@@ -622,11 +622,20 @@ All new bots:
   rides its OWN oracle verdict, fail-CLOSED (ungraded book / dark-or-stale
   oracle ⇒ no entry — never BTC's gate; classification is STATIC so a dark
   oracle cannot re-route SPY to BTC; kill switch `FAMILY_PER_ASSET_REGIME=off`
-  closes non-crypto entirely, never re-routes). INERT until step 3: no family
-  universe lists a non-crypto symbol, and the selftest asserts exactly that.
-  The universe widening stays a review decision — evidence in
-  `REGIME_GATE_PER_ASSET_2026-07-30.md` (TSLA-protective / metals-mildly-costly
-  / SPY-QQQ ungraded to ~mid-Aug), which re-runs at SPY/QQQ graduation.]
+  closes non-crypto entirely, never re-routes).
+  **[2026-07-30 later: STEP 3 RUN (operator, "run step 3 too") — the build
+  order is COMPLETE.** The four FAMILY books' universe now carries the
+  oracle's 10 non-crypto books (`FAMILY_NONCRYPTO_COINS`, empty = revert);
+  spot ports stay pinned crypto-only. The gate governs: an ungraded book
+  (SPY/QQQ/IWM/WTI/XCU/MSTR until the 203-bar floor) admits NOTHING, a
+  graded book admits longs only in its OWN LONG-window, and the rule binds
+  at the ENTRY SITE (`noncrypto_entry_blocked`) so strategies that never
+  read the regime extras (TrendMomo/SwingDip) cannot buy SPY ungated. At
+  ship the gate is mostly closed by the evidence's own shape (NVDA
+  LONG-window 30% of bars, TSLA 2%, XAU 4%, XAG 12%). Evidence:
+  `REGIME_GATE_PER_ASSET_2026-07-30.md` — its study re-runs at SPY/QQQ
+  graduation (~mid-Aug), which now grades books that are LISTED and
+  waiting rather than hypothetical.]
 - **LIVE BOTS ALWAYS IN AUDIT SCOPE (operator rule, 16-Jul).** Every audit,
   bug-scan, code-review, or security-review — WHATEVER its nominal scope —
   MUST also check the LIVE REAL-MONEY bots in the same pass: Funding Farmer

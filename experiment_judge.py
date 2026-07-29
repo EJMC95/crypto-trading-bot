@@ -1845,13 +1845,19 @@ def _selftest():
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
     # ---- [2026-07-21 D2] re-spec migration: the clamp-inverted candidate ----
-    # The live defect verbatim: enter-gate-0.30 stored 0.30, registry clamps to
-    # 0.075 -> re-spec renames honestly, rewrites levers, reports the change.
+    # The live defect verbatim: enter-gate-0.30 stored 0.30, the registry
+    # clamps to its hi -> re-spec renames honestly, rewrites levers, reports
+    # the change. [2026-07-30 A1] the fixture reads the clamp ceiling FROM
+    # the registry rather than pinning 0.075: the operator-signed widening
+    # (hi -> 0.12) moved the cage, and this test pins the RE-SPEC MECHANISM,
+    # not the cage's width — the registry's own selftest owns the bounds.
+    import fleet_tuning as _ft
+    _hi = _ft.LEVERS["xp.funding.enter_apr"]["hi"]
     _c, _ch = _respec_clamped({"name": "enter-gate-0.30",
                                "levers": {"xp.funding.enter_apr": 0.30}})
-    assert _ch == {"xp.funding.enter_apr": (0.30, 0.075)}, _ch
-    assert _c["levers"] == {"xp.funding.enter_apr": 0.075}, _c
-    assert _c["name"] == "enter-gate-0.30@enter_apr=0.075", _c["name"]
+    assert _ch == {"xp.funding.enter_apr": (0.30, _hi)}, _ch
+    assert _c["levers"] == {"xp.funding.enter_apr": _hi}, _c
+    assert _c["name"] == f"enter-gate-0.30@enter_apr={_hi}", _c["name"]
     # idempotent: the re-spec'd candidate needs no further re-spec
     _c2, _ch2 = _respec_clamped(_c)
     assert _ch2 == {} and _c2 == _c, (_c2, _ch2)

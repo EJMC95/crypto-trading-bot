@@ -71,6 +71,19 @@ COINS = os.environ.get(
     "FAMILY_COINS",
     "BTC,ETH,SOL,XRP,ADA,DOT,AVAX,LINK,LTC,ATOM,NEAR,TRX,DOGE,ALGO,AAVE"
 ).split(",")
+# [2026-07-30 STEP 3 — operator: "run step 3 too".] The item-18/D5 build
+# order completes: the FOUR family books' universe now carries the venue's
+# non-crypto books, governed by the per-asset gate (regime_inputs_for +
+# the entry-site rule below): an UNGRADED book (SPY/QQQ/IWM/WTI/XCU/MSTR
+# until the oracle's 203-bar floor) admits NOTHING — it sits listed and
+# idle until the tape graduates it — and a graded book admits longs only
+# in its OWN LONG-window (at ship: NVDA 30% of bars, TSLA 2%, XAU 4%,
+# XAG 12% — the gate is mostly closed, by the evidence's own shape).
+# Spot ports keep WIDE_COINS untouched (their s.coins override pins them).
+# Empty FAMILY_NONCRYPTO_COINS reverts the universe to crypto-only.
+NONCRYPTO_UNIVERSE = [c for c in os.environ.get(
+    "FAMILY_NONCRYPTO_COINS",
+    "SPY,QQQ,IWM,NVDA,TSLA,MSTR,WTI,XAU,XAG,XCU").split(",") if c]
 CANDLE_LAG_S = 20          # wait this long after a boundary before refetching
 
 
@@ -880,6 +893,22 @@ def noncrypto_regimes():
         return {}
 
 
+def noncrypto_entry_blocked(coin, regime_up):
+    """[2026-07-30 STEP 3] The uniform entry-site rule for non-crypto pairs:
+    a long entry on a NONCRYPTO_SYMS book requires the asset's OWN gate up.
+
+    WHY it lives at the ENTRY SITE and not only in the strategy extras:
+    TrendMomo and SwingDip never read the regime keys — through the extras
+    alone they would buy SPY dips with NO gate at all (not the forbidden
+    BTC-gate, but bare of any gate; the Georgia diagnosis — 100% of losses
+    opened counter-regime — is the measured cost of exactly that shape).
+    This rule makes the per-asset gate binding for every strategy
+    uniformly. Restrict-only (it can only skip an entry), crypto pairs are
+    never touched, and exits/holds are never gated — an open position is
+    always managed."""
+    return coin in NONCRYPTO_SYMS and not regime_up
+
+
 def main():
     p = argparse.ArgumentParser(description="Family bots — Lighter shadow books")
     p.add_argument("--once", action="store_true", help="Single loop then exit.")
@@ -900,7 +929,9 @@ def main():
     cache = CandleCache(venue)
     books = []
     for s in STRATEGIES:
-        src = s.coins or COINS
+        # [2026-07-30 STEP 3] the four family books (no s.coins override)
+        # carry the non-crypto universe; spot ports pin their own lists
+        src = list(s.coins) if s.coins else list(COINS) + NONCRYPTO_UNIVERSE
         listed = [c for c in src if venue.supports(c)]
         s.skipped = [c for c in src if c not in listed]
         books.append(Book(s, venue, listed))
@@ -1150,6 +1181,14 @@ def main():
                 # ---- flat: consider an entry (new candle only) ----
                 if not sig or not sig.get("enter") or locked or not px:
                     continue
+                # [2026-07-30 STEP 3] non-crypto books enter ONLY inside
+                # their own LONG-window — binding for every strategy,
+                # including the ones that never read the regime extras
+                if noncrypto_entry_blocked(coin, _r_up):
+                    log.info("%s %s entry SKIPPED — non-crypto book outside "
+                             "its own LONG-window (per-asset gate, D5)",
+                             b.bot_id, coin)
+                    continue
                 if fleet_long_veto:
                     continue      # L2: fleet directional-long budget is full
                 if (fleet_long_headroom is not None
@@ -1368,13 +1407,24 @@ def _selftest():
             "kill switch never touches crypto"
     finally:
         FAMILY_PER_ASSET_REGIME = _saved_par
-    # today's whole configured universe is crypto -> the wiring is inert
-    # (this is the parity claim, asserted against the real strategy configs)
-    _all_coins = set(COINS) | {c for s in STRATEGIES for c in (s.coins or [])}
-    assert not (_all_coins & NONCRYPTO_SYMS), \
-        "a non-crypto symbol entered the family universe — that is the " \
-        "review-gated step 3, not a config edit (see " \
-        "REGIME_GATE_PER_ASSET_2026-07-30.md)"
+    # [2026-07-30 STEP 3 — the inertness tripwire FLIPS, on the operator's
+    # "run step 3 too"] the FAMILY universe (no-override strategies) now
+    # carries the non-crypto books; the spot ports' pinned lists stay pure
+    # crypto; and every listed non-crypto symbol is one the static
+    # classification KNOWS (an unknown symbol would ride the crypto path
+    # ungated — the exact hole the frozenset exists to close).
+    assert set(NONCRYPTO_UNIVERSE) <= NONCRYPTO_SYMS, \
+        "FAMILY_NONCRYPTO_COINS lists a symbol the gate cannot classify"
+    assert not any(set(s.coins or []) & NONCRYPTO_SYMS for s in STRATEGIES), \
+        "spot ports' pinned lists must stay crypto-only (step 3 scope = " \
+        "the four family books)"
+    # the uniform entry-site rule: non-crypto blocked outside its own
+    # LONG-window, for EVERY strategy; crypto never touched
+    assert noncrypto_entry_blocked("SPY", False) is True
+    assert noncrypto_entry_blocked("SPY", True) is False
+    assert noncrypto_entry_blocked("BTC", False) is False, \
+        "the entry-site rule must never gate a crypto pair"
+    assert noncrypto_entry_blocked("XAU", False) is True
     # drift guard: the static classification mirrors the oracle's set
     try:
         import regime_oracle as _ro
