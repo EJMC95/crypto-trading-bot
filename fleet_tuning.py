@@ -222,7 +222,13 @@ LEVERS = {
     # a candidate runs, the twin is an experiment arm, not a control arm.
     "xp.funding.enter_apr": {
         # [2026-07-17] bounds /8 with the BASIS FIX — TRUE apr now.
-        "kind": "float", "lo": 0.03125, "hi": 0.075, "lane": "lighter-xp",
+        # [2026-07-30 A1 — operator sign-off "widen"] hi 0.075 -> 0.12: the
+        # venue's modal funding (10.5% TRUE, 42.6% of observations) sat
+        # OUTSIDE the old ceiling, so an "enter only above modal" candidate
+        # was structurally unaskable. The widening moves no money by itself
+        # — any value inside still needs the judge's full paired bar, and
+        # THIS twin is where the experiment runs first.
+        "kind": "float", "lo": 0.03125, "hi": 0.12, "lane": "lighter-xp",
         "note": "shadow twin's funding entry gate (TRUE apr); env default 0.05"},
     "xp.funding.take_profit": {
         "kind": "float", "lo": 0.03, "hi": 0.08, "lane": "lighter-xp",
@@ -237,7 +243,11 @@ LEVERS = {
     # defaults when the judge stops re-asserting it.
     "live.funding.enter_apr": {
         # [2026-07-17] bounds /8 with the BASIS FIX — TRUE apr now. 💰
-        "kind": "float", "lo": 0.03125, "hi": 0.075, "lane": "lighter-live",
+        # [2026-07-30 A1 — operator sign-off "widen"] hi 0.075 -> 0.12,
+        # identical to the xp twin above (the twin runs the experiment; the
+        # judge remains the ONLY writer here, and its paired promotion bar
+        # is unchanged — the cage widened, the gatekeeper did not).
+        "kind": "float", "lo": 0.03125, "hi": 0.12, "lane": "lighter-live",
         "note": "PROMOTED funding entry gate (TRUE apr); env default 0.05"},
     "live.funding.take_profit": {
         "kind": "float", "lo": 0.03, "hi": 0.08, "lane": "lighter-live",

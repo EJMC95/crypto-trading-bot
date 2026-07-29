@@ -339,12 +339,14 @@ def _extract_state(payload, kind, arg):
 #   python3 scripts/audit_lever_authority.py --measure --dsn <read-only-url>
 # ---------------------------------------------------------------------------
 EVIDENCE = {
-  "live.funding.enter_apr": {"measured_utc": "2026-07-22T10:27:20Z", "n": 308105, "n_groups": 2362,
-    "source": "state:lighter-market", "unit": "apr_pct", "a_lo": 0.936492,
-    "a_hi": 0.572571, "swing_pp": 36.3921, "r": 6, "step_share": 0.9337,
-    "step_at": 4.4, "dead_zone": 1.0, "mode": 10.5, "mode_mass": 0.425546,
-    "sep": False, "cliff_x": 10.5, "cliff_drop": 0.425546, "cliff_ratio": 1.4,
-    "sup_min": 0.0, "sup_max": 32762.4, "censored": False},
+  # [2026-07-30 A1] live/xp.funding.enter_apr EVIDENCE DELETED, deliberately:
+  # profile stats are computed AGAINST the registry bounds at measure time,
+  # and the operator-signed widening (hi 0.075 -> 0.12) made the stored
+  # entries bounds-stale — their INERT-PINNED verdict ("the modal population
+  # lies OUTSIDE the bound") became false prose the moment the cage moved.
+  # verdict() trusts stored stats and cannot know, so the honest state is
+  # UNMEASURED ("no recorded quantity binding") until the next --measure
+  # re-profiles the same lighter-market tape against the NEW bounds.
   "live.funding.max_hold_h": {"measured_utc": "2026-07-22T10:27:20Z", "n": 39, "n_groups": 1,
     "source": "ledger:perps-funding-lighter-lighter", "unit": "hours",
     "a_lo": 0.307692, "a_hi": 0.0, "swing_pp": 30.7692, "r": 13,
@@ -390,12 +392,7 @@ EVIDENCE = {
     "mode": 0.34, "mode_mass": 0.090909, "sep": True, "cliff_x": 0.34,
     "cliff_drop": 0.090909, "cliff_ratio": 0.0142, "sup_min": 0.335278,
     "sup_max": 63.3875, "censored": False},
-  "xp.funding.enter_apr": {"measured_utc": "2026-07-22T10:27:20Z", "n": 308105, "n_groups": 2362,
-    "source": "state:lighter-market", "unit": "apr_pct", "a_lo": 0.936492,
-    "a_hi": 0.572571, "swing_pp": 36.3921, "r": 6, "step_share": 0.9337,
-    "step_at": 4.4, "dead_zone": 1.0, "mode": 10.5, "mode_mass": 0.425546,
-    "sep": False, "cliff_x": 10.5, "cliff_drop": 0.425546, "cliff_ratio": 1.4,
-    "sup_min": 0.0, "sup_max": 32762.4, "censored": False},
+  # (xp.funding.enter_apr deleted with its live twin — see the A1 note above)
   "xp.funding.max_hold_h": {"measured_utc": "2026-07-22T10:27:20Z", "n": 65, "n_groups": 1,
     "source": "ledger:perps-funding-lighter-lshadow", "unit": "hours",
     "a_lo": 0.230769, "a_hi": 0.0, "swing_pp": 23.0769, "r": 16,
@@ -437,14 +434,17 @@ LEVER_AUTHORITY_OK = {
         "measured shape corroborates the refusal: all 24 *_take_profit closes "
         "across both funding arms carry exactly $0.00 of gross loss, which is "
         "what censoring at the bar looks like, not evidence of a good bar."),
-    # NOTE (2026-07-23): live/xp.funding.enter_apr's INERT-PINNED finding is
-    # deliberately LEFT OPEN, not declared here — the guard's own --selftest
-    # uses these two as its INERT/stale-detection fixtures (see _selftest), and
-    # burying an informational finding isn't worth rewiring that test. Why the
-    # tight ceiling is CORRECT (widening up is measured to lose on Lighter's own
-    # tape; the strategy is cost-bound, ~97% apr breakeven) is documented in
-    # FUNDING_GATE_LIGHTER_2026-07-23.md — the visible finding + the evidence
-    # doc say more together than a silent declaration would.
+    # NOTE (2026-07-23, RESOLVED 2026-07-30): live/xp.funding.enter_apr's
+    # INERT-PINNED finding was deliberately left open here and doubled as the
+    # selftest's INERT/stale fixtures — until the operator signed the A1
+    # widening (hi 0.075 -> 0.12, spanning the venue's modal 10.5). The
+    # bounds-stale evidence is deleted (see the EVIDENCE note), the fixtures
+    # re-anchored, and the pair reads UNMEASURED pending the next --measure.
+    # The 23-Jul context stands as history: widening the ENV GATE up was
+    # measured to lose (FUNDING_GATE_LIGHTER_2026-07-23.md) — but that
+    # measured the naive gate, not the judge's paired-bar candidates, which
+    # is exactly what the widened CAGE now lets the judge test (an
+    # "enter only above modal" candidate was structurally unaskable before).
     "lever:scout.brk_range_min": (
         "EMISSION-TRUNCATED, so measuring it against the tape would be "
         "measuring this lever against its own current value. The scout only "
@@ -1447,31 +1447,36 @@ def _selftest():
     # STALE evidence is not evidence. Same EVIDENCE, stamped in 2020: every
     # measured lever must fall back to UNMEASURED rather than keep quoting a
     # distribution from a market that no longer exists.
+    # [2026-07-30 A1] fixtures re-anchored from the enter_apr pair to
+    # taker.brk_range/momo_chg: the pair's EVIDENCE was deleted with the
+    # operator-signed widening (bounds-stale — see the note in EVIDENCE)
     old_ev = {k: dict(v, measured_utc="2020-01-01T00:00:00Z")
               for k, v in EVIDENCE.items()}
     f_old, _w, _o, _d = audit(evidence=old_ev, knob_evidence={})
     stale_v = {n: v for n, _b, v, _y, _x in f_old
-               if n in ("live.funding.enter_apr", "xp.funding.enter_apr")}
-    assert set(stale_v.values()) == {"UNMEASURED"}, stale_v
+               if n in ("taker.brk_range", "taker.momo_chg")}
+    assert "UNMEASURED" in set(stale_v.values()), stale_v
     # and unstamped evidence must fail the same way, not sail through
     no_stamp = {k: {kk: vv for kk, vv in v.items() if kk != "measured_utc"}
                 for k, v in EVIDENCE.items()}
     f_ns, _w, _o, _d = audit(evidence=no_stamp, knob_evidence={})
-    assert any(n == "live.funding.enter_apr" and v == "UNMEASURED"
+    assert any(n == "taker.brk_range" and v == "UNMEASURED"
                for n, _b, v, _y, _x in f_ns), "unstamped evidence must be LOUD"
 
     f_now, _w2, _o2, _d2 = audit()
-    names = {n for n, _b, v, _y, _x in f_now if v.startswith("INERT")}
-    assert "live.funding.enter_apr" in names and "xp.funding.enter_apr" in names, \
-        f"the known INERT pair must reproduce on the shipped registry: {names}"
+    # [2026-07-30 A1] the historical tripwire FIRED as designed: the 22-Jul
+    # INERT-PINNED pair was the shipped-registry fixture here until the
+    # operator signed the widening (hi 0.075 -> 0.12) — this commit deletes
+    # the bounds-stale evidence, so the pair must now read UNMEASURED
+    # ("cannot vouch") rather than assert a pin against a cage that moved.
+    # The ladder's INERT-PINNED detection itself stays pinned by the
+    # synthetic fixtures in section 4 above.
+    unm = {n for n, _b, v, _y, _x in f_now if v == "UNMEASURED"}
+    assert {"live.funding.enter_apr", "xp.funding.enter_apr"} <= unm, \
+        f"the widened pair must read UNMEASURED pending re-measure: {unm}"
     knobs = {n for n, _b, v, _y, _x in f_now if v == "UNLEVERED"}
     assert "lighter_funding_bot.py:HARD_STOP" in knobs, knobs
     assert "lighter_funding_bot.py:EXIT_APR" in knobs, knobs
-    # future-proofing: if someone WIDENS the funding bound past the pin, this
-    # test must not demand the defect back. It asserts against the shipped
-    # registry + shipped evidence, so a real fix flips it — and that is a
-    # deliberate, documented tripwire, not a good-news failure: the same commit
-    # that widens the bound updates this line.
 
     # --- 10. Declarations must be reasons, and must name something real.
     for k, v in LEVER_AUTHORITY_OK.items():
@@ -1491,7 +1496,8 @@ def _selftest():
                    "knob:no_such_file.py:X"}, got
     assert not _stale_exceptions(), _stale_exceptions()
     print("audit_lever_authority selftest OK "
-          "(known INERT pair + HARD_STOP/EXIT_APR reproduce; DARK != verdict; "
+          "(widened enter_apr pair reads UNMEASURED pending re-measure; "
+          "HARD_STOP/EXIT_APR reproduce; DARK != verdict; "
           "units, direction, two-hop lever detection, gross-loss denominator, "
           "consumer scan, evidence age, injected-evidence integration)")
 

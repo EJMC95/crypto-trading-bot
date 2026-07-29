@@ -30,6 +30,22 @@ itself — any value inside it still needs the judge's full paired bar (≥7d,
 identical widening is what lets the experiment run first. **Operator
 sign-off required** (bounds are the cage; the review governs cage changes).
 
+**[2026-07-30 SIGNED OFF AND SHIPPED — operator: "widen".** Both entries'
+`hi` → 0.12 in `fleet_tuning.py` (lo unchanged; the judge stays the only
+live writer, its paired bar untouched). Consequences handled in the same
+commit: the census's 22-Jul enter_apr EVIDENCE was **bounds-stale** the
+moment the cage moved (its INERT-PINNED prose — "the modal population lies
+OUTSIDE the bound" — became false), so both entries are DELETED and the
+pair reads UNMEASURED pending the next `--measure`; the selftest's
+historical tripwire ("the same commit that widens the bound updates this
+line") fired as designed and the fixtures re-anchored. Also found while
+shipping: `fleet_tuning.py` was NOT in the build-stamp file set — the cage
+could drift between arms hash-invisibly — so `_BUILD_SHARED` now carries
+it (every build id shifts at each service's next deploy, documented).
+What this unlocks: the judge can finally QUEUE an "enter only above modal"
+candidate (e.g. 0.105–0.12) on the xp twin — a candidate that was
+structurally unaskable at hi=0.075.]
+
 ### A2. `EXIT_APR` and `HARD_STOP` are UNLEVERED — and that may be correct
 
 The census's sharpest numbers: `EXIT_APR` decides decay/flip exits = **67.3%
@@ -88,7 +104,10 @@ engineering pass; until then the census stays honest about not knowing.
 
 ## 04-Aug review agenda additions (from this triage + today's campaign)
 
-1. **A1**: widen `live.funding.enter_apr` hi → 0.12 (+ xp twin) — yes/no.
+1. **A1**: ~~widen `live.funding.enter_apr` hi → 0.12 (+ xp twin) — yes/no~~
+   **DONE 30-Jul (operator: "widen"; see the §A1 stamp).** Residual for the
+   review: whether to queue the above-modal xp candidate now or let the
+   running experiment finish first.
 2. **A2**: declare `EXIT_APR`/`HARD_STOP` in `LEVER_AUTHORITY_OK` (flap-fix
    reasoning) — yes/no. The queued decay-exit backtest is now RUN (30-Jul,
    see the §A2 stamp): the live 0.375 bar is the table's only
