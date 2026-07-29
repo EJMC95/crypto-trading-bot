@@ -76,3 +76,34 @@ load-bearing one and moves slowly (turnover is a 24h aggregate); the
 `prelim ≤ 15` conclusion held at every sensitivity checked ($1M/$2M/$5M
 floors). The ledger corroborates across 5 days: zero `src=explore` closes
 ever.*
+
+## [2026-07-29 PROCEEDED — mechanism shipped + the slice MEASURED on Lighter's tape]
+
+Operator: "proceed with 1." Shipped: `FUNDING_EXPLORE_MIN_VOL` (inert unless
+set below the $10M main floor) widens the EXPLORE pool only — same gate,
+persistence, Stage-B/C vetoes, vol filter, quality veto, slope gate,
+spread/slip and caps; exploit sizing untouched. Measured
+(`scripts/study_explore_slice.py`, 180d top-60, slices by today's turnover,
+live rules, both halves, 0.5/2/**5**bps — the pool books are thin, so 5bps
+is the honest row):
+
+| slice (n books) | 0.5bps | 2bps | 5bps | both halves? |
+|---|---|---|---|---|
+| EXPLOIT ≥$10M (11) | +$10.91 | +$2.13 | −$15.43 | no (h2 neg) |
+| **POOL $2–10M (9)** | +$20.02 | +$14.24 | +$2.67 | no (h1 −0.3/−3.5/−9.9) |
+| POOL $1–10M (22, sensitivity) | +$34.56 | +$25.70 | +$7.99 | **yes, at all three slips** |
+
+- The widened pool measures BETTER than the exploit set on this tape (which
+  is itself h2-negative this snapshot — consistent with the harness's known
+  day-to-day swing). The $1M sensitivity slice passes both-halves at every
+  slip tested, n=1181.
+- **Activation recommendation: the pre-registered $2M floor, SHADOW arm
+  only** — `FUNDING_EXPLORE_MIN_VOL=2000000` on `funding-farmer-shadow`
+  (one env; the code is already in the image after the next dispatch).
+  $1M scored better but was the sensitivity run — picking it post hoc is
+  the winner's-curse pattern; widening 2M→1M can follow the tuner/judge
+  evidence path once explore closes accrue.
+- Limits restated: one snapshot, today's-turnover slice membership, and
+  real thin-book slip is unmeasured (the 5bps row + the spread/clip-slip
+  entry gates + $1k shadow book bound the exposure). The growth promoter's
+  bar — not this study — remains the only path to `live.funding.explore_k`.

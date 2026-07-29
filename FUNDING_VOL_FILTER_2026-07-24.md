@@ -100,3 +100,32 @@ senior). **What does not:** the magnitude as canon. Operator options: leave ON
 (bounded downside — it can only skip entries) and treat the magnitude as
 unproven, or route the re-validation (≥2 fresh fetches + the 438d tape, the
 audit's O-item) before the next config decision leans on this number.
+
+### [2026-07-29 RE-VALIDATION — snapshot #3, independent fetch: the registered bar PASSES this time]
+
+Run per the operator's "proceed" (29-Jul): fresh 180d/top-25 fetch (no cache
+— a genuinely independent tape from both prior snapshots).
+
+| read | baseline | lowvol50 (LIVE) | highvol50 (reverse) |
+|---|---|---|---|
+| P&L @0.5bps | +$10.65 | **+$27.45** | +$27.04 |
+| P&L @2bps | −$0.49 | **+$21.49** | +$18.16 |
+| maxDD | −52.5 | **−14.3** | −60.9 |
+| halves+thirds at both slips | no | **YES — ROBUST** | no (mid third −50.3) |
+
+- **The pre-registered bar (halves + all-thirds at both slips) PASSES on an
+  independent fetch** — the 24-Jul failure is not reproduced; the script's
+  own verdict block prints `lowvol50: ROBUST` this time. The go-live
+  survives re-validation in direction AND, now, on its own registered bar.
+- **The honest shape of the edge moved**: baseline printed a THIRD different
+  number (+$33.47 → +$2.44 → +$10.65 — instability confirmed), and the
+  reverse control was headline-positive this snapshot (killed only by its
+  middle third). On this tape the filter's measured benefit is primarily
+  RISK (maxDD −14 vs −52/−61) with a ~2.5x P&L edge over baseline — not the
+  24-Jul "18x". Treat the filter as a validated drawdown-shaper with a
+  positive P&L tilt; no snapshot's magnitude is canon.
+- Verdict: **KEEP `FUNDING_VOL_FILTER=on`** (independent-fetch robust,
+  risk benefit consistent across all three snapshots). Outstanding: the
+  438d-tape run (needs a longer fetch window than a live session should
+  spend); the fail-open fresh-listing cohort divergence stands as
+  documented above.
