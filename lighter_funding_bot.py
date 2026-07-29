@@ -476,6 +476,49 @@ def exit_decision(is_short, entry, px, apr, held_h, tp, max_hold_h,
         return "max_hold"
     return None
 
+
+def flatten_identity(held, m, venue_entry, now_ts):
+    """The emergency flatten's per-position IDENTITY derivation, pure.
+
+    [2026-07-29 (eq) SEAM — Finding 4, seam 2, the (ef) recipe] `_flatten_all`
+    mirrors normal-close bookkeeping so forensic reconstruction stays
+    consistent with account equity — and that mirroring ran inline in a
+    closure with no test seam. The orchestration (scan → market_close →
+    fill read → publish) stays in the closure; the decision layer is these
+    two functions, called in the closure's own order (identity BEFORE the
+    close, P&L AFTER the real fill lands):
+
+      * side: the META stamp wins; a position with no stamp falls back to
+        the SIGN of the held size (short when held < 0);
+      * entry: meta → venue's own entry → 0.0 last resort (the caller's
+        decision px falls back to this same entry, so a FULLY unknown
+        position — no meta, no venue entry, no readable mid — books zero
+        price P&L rather than a fabricated one);
+      * opened_ts: meta → now (an unstamped position is at least honest
+        about when we noticed it).
+
+    Returns (is_short, entry, opened_ts).
+    """
+    m = m or {}
+    is_short = m.get("is_short", held < 0)
+    entry = m.get("entry") or venue_entry or 0.0
+    opened_ts = m.get("opened_ts") or now_ts
+    return is_short, entry, opened_ts
+
+
+def flatten_pnl(held, is_short, entry, accrued, px_fill):
+    """The flatten's P&L + win call, pure — priced at the REAL fill.
+
+      * price_pnl: |held| sized, long profits UP, short profits DOWN;
+      * win: on TOTAL P&L (price + accrued funding) — the 2026-07-28 fix:
+        price-only miscounted funding-carried flattens as losses.
+
+    Returns (price_pnl, win).
+    """
+    price_pnl = abs(held) * ((px_fill - entry) if not is_short
+                             else (entry - px_fill))
+    return price_pnl, (price_pnl + (accrued or 0.0)) > 0
+
 # ---- funding-SLOPE entry gate (2026-07-11) — only enter while the rate is
 # still BUILDING (|apr| >= |apr LOOKBACK_H ago|). Backtested on the 150d
 # portfolio sim (scripts/backtest_funding_leverage.py): at the live 2x config
@@ -1388,9 +1431,11 @@ def main():
             if not held:
                 continue
             m = meta.get(c) or {}
-            is_short = m.get("is_short", held < 0)
-            entry = m.get("entry") or (live_pos.get(c, {}) or {}).get("entry") or 0.0
-            opened_ts = m.get("opened_ts") or time.time()
+            # [2026-07-29 (eq)] identity via flatten_identity() — pure,
+            # fixture-tested (Finding 4 seam 2); P&L priced AFTER the real
+            # fill via flatten_pnl(), the closure's original order.
+            is_short, entry, opened_ts = flatten_identity(
+                held, m, (live_pos.get(c, {}) or {}).get("entry"), time.time())
             px = fresh_mid(ctx, c) or entry
             try:
                 _res = ctx.venue.market_close(c)
@@ -1410,12 +1455,13 @@ def main():
                 c, is_short, px, client_id=(_res or {}).get("client_order_index"),
                 tx_hash=(_res or {}).get("tx_hash"),
                 settle_ms=(_res or {}).get("settle_ms"))
-            price_pnl = abs(held) * ((px - entry) if not is_short else (entry - px))
+            # [2026-07-28 AUDIT FIX, extracted (eq)] win on TOTAL P&L (price
+            # + funding), the same rule as the normal close path — price-only
+            # miscounted funding-carried flattens. Priced at the REAL fill.
+            price_pnl, _win = flatten_pnl(held, is_short, entry,
+                                          m.get("accrued", 0.0), px)
             n_closed += 1
-            # [2026-07-28 AUDIT FIX] win on TOTAL P&L (price + funding), the
-            # same rule as the normal close path and the ledger row this
-            # writes — price-only miscounted funding-carried flattens.
-            n_wins += 1 if (price_pnl + m.get("accrued", 0.0)) > 0 else 0
+            n_wins += 1 if _win else 0
             _record_close(bot_id, c, entry, opened_ts, px, price_pnl, m.get("accrued", 0.0),
                           was_long=not is_short, reason=reason,
                           order_usd=float((m or {}).get("clip") or order_usd),
@@ -2313,6 +2359,40 @@ def _supervised():
             time.sleep(60)
 
 
+def _selftest_flatten_fields():
+    """[2026-07-29 (eq)] The flatten's bookkeeping seam, pinned. Identity
+    BEFORE the close; P&L AFTER the real fill — the closure's own order."""
+    NOW = 1_700_000_000.0
+
+    # META SENIORITY: the stamp wins even against the held sign (a stamped
+    # long being force-flattened at negative residual size stays a long in
+    # the ledger — the stamp is what the trade WAS)
+    s, e, o = flatten_identity(-2.0, {"is_short": False, "entry": 100.0,
+                                      "opened_ts": 123.0}, 90.0, NOW)
+    assert (s, e, o) == (False, 100.0, 123.0)
+    # no stamp: the sign speaks
+    assert flatten_identity(-2.0, {}, 90.0, NOW)[0] is True
+    assert flatten_identity(+2.0, None, 90.0, NOW)[0] is False
+    # entry chain: meta -> venue -> 0.0; falsy meta entry falls through
+    assert flatten_identity(1.0, {"entry": 0.0}, 90.0, NOW)[1] == 90.0
+    assert flatten_identity(1.0, {}, None, NOW)[1] == 0.0
+    # opened_ts: unstamped positions are honest about when we noticed them
+    assert flatten_identity(1.0, {}, None, NOW)[2] == NOW
+
+    # P&L at the REAL fill: long profits up, short profits down, |held| sized
+    pnl, win = flatten_pnl(2.0, False, 100.0, 0.0, 105.0)
+    assert pnl == 10.0 and win is True
+    pnl, win = flatten_pnl(-2.0, True, 100.0, 0.0, 105.0)
+    assert pnl == -10.0 and win is False
+    # [2026-07-28 AUDIT FIX] win on TOTAL P&L: a funding-carried flatten with
+    # a small adverse price move is a WIN, not a loss
+    pnl, win = flatten_pnl(1.0, True, 100.0, 2.0, 100.5)
+    assert pnl == -0.5 and win is True, "price-only would miscount this"
+    # accrued None tolerated; the fully-unknown position books zero
+    assert flatten_pnl(1.0, False, 0.0, None, 0.0) == (0.0, False)
+    print("lighter_funding_bot _selftest_flatten_fields OK")
+
+
 def _selftest_exit_decision():
     """[2026-07-29 (en)] The close ladder, pinned. Bars passed EXPLICITLY so
     the fixtures are independent of env; the last case pins the default
@@ -2911,6 +2991,7 @@ if __name__ == "__main__":
         _selftest_lever_consume()
         _selftest_heal()
         _selftest_exit_decision()
+        _selftest_flatten_fields()
         sys.exit(0)
     try:
         _supervised()

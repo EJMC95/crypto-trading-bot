@@ -204,6 +204,20 @@ named assertion red. Behavior identical; reaches the live container on the
 next deliberate `[deploy-live-farmer]` dispatch. Remaining Finding-4 seams:
 the Farmer's entry tick + flatten path, the Taker's SDK-free tick.]**
 
+**[2026-07-29 SEAM 2 SHIPPED (eq):** the flatten path's decision layer —
+`flatten_identity()` (meta-stamp seniority over the held sign; the
+entry/opened_ts fallback chains) and `flatten_pnl()` (|held|-sized,
+side-signed, and the 28-Jul TOTAL-P&L win rule: a funding-carried flatten
+with a small adverse price move is a WIN). Split in the closure's own order —
+identity BEFORE the close, P&L AFTER the real fill — after the first cut of
+this seam priced P&L pre-fill and was caught in self-review; the two-function
+shape IS the behavior-preservation. `_selftest_flatten_fields` is battery
+block #11; the price-only and sign-fallback mutations each turn their named
+assertion red. The flatten's ORCHESTRATION (scan → close → publish loop)
+stays in the closure deliberately — six captured dependencies make its
+extraction a bigger cut for a calmer week. Remaining: the entry tick, the
+Taker's SDK-free tick, the flatten loop itself.]**
+
 ### 5. `fleet_risk.py` — 37%; the enforcement authority's core function is untested
 
 **[2026-07-29 FIRST SLICE SHIPPED (el):** `tests/autonomy/test_fleet_risk_light.py`
