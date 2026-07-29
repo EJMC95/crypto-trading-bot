@@ -393,6 +393,133 @@ EXPLORE_N = int(os.environ.get("INCUBATOR_EXPLORE_N", "1500"))
 REGISTER_TOP_N = int(os.environ.get("INCUBATOR_REGISTER_TOP_N", "24"))
 
 
+# [2026-07-29] RESEARCH SPACE — exploring BEYOND the registry cage.
+#
+# WHY THIS IS SAFE, and the reasoning must survive: the incubator has NO
+# ACTUATOR. Its only consumer is the dashboard (verified: nothing outside
+# pnl_dashboard.py reads bot_state 'strategy-incubator'). The fleet_tuning
+# cages bound what the SCOUT TUNER may ENACT on the shadow taker; they were
+# never a bound on what this organ may MEASURE. Clamping the search to them
+# bought no safety and cost the whole out-of-cage question.
+#
+# WHAT IS ACTUALLY AT RISK is confusion, not money: an out-of-cage genotype
+# scoring well could be mistaken for something shippable. So every scored
+# genotype is stamped `enactable`, the published CHAMPION is drawn ONLY from
+# the enactable subset (the champion is the thing a human might act on), and
+# out-of-cage results are reported separately as the FRONTIER.
+#
+# The dividend is a question the fleet could not previously ask: IS THE CAGE
+# IN THE WRONG PLACE? If the best genotypes pile up against a bound, that
+# bound is binding and the evidence for moving it is right there — which is
+# how a cage widening should be justified, rather than by an argument about
+# what values are reachable (the A1 non-sequitur this session already found).
+#
+# Grids extend a step or two past each bound and are deliberately MODEST:
+# under today's vetoes the research space is ~900 genotypes (~29s), a full
+# sweep in one cycle. Kill switch: INCUBATOR_RESEARCH=off returns the search
+# to the cage exactly.
+RESEARCH_MODE = os.environ.get("INCUBATOR_RESEARCH", "on").lower() != "off"
+RESEARCH_GENES = {
+    "BRK_RANGE":   ("taker.brk_range",   [0.85, 0.90, 0.93, 0.95, 0.97, 0.99]),
+    "DIP_RANGE":   ("taker.dip_range",   [0.03, 0.05, 0.08, 0.11, 0.15, 0.20]),
+    "MOMO_CHG":    ("taker.momo_chg",    [2.0, 3.0, 4.0, 5.0, 6.0, 8.0]),
+    "DIV_GAP_PP":  ("taker.div_gap_pp",  [25.0, 37.5, 50.0, 62.5, 75.0, 87.5, 100.0]),
+    "TAKE_PROFIT": ("taker.tp",          [0.02, 0.03, 0.04, 0.05, 0.06, 0.08]),
+    "STOP_LOSS":   ("taker.sl",          [-0.06, -0.04, -0.03, -0.02, -0.015]),
+    "MAX_HOLD_H":  ("taker.max_hold_h",  [12.0, 24.0, 48.0, 72.0, 96.0]),
+}
+
+
+def is_enactable(genotype, genes=None):
+    """Could this genotype ever be ENACTED — i.e. does every allele survive
+    its lever's registry clamp unchanged? Pure; fail-CLOSED (an unknown gene
+    or an unclampable value reads NOT enactable, because the honest answer to
+    'could this ship?' under uncertainty is no)."""
+    genes = genes or TAKER_GENES
+    for g, v in (genotype or {}).items():
+        spec = genes.get(g) or RESEARCH_GENES.get(g)
+        if not spec:
+            return False
+        try:
+            if tuning.clamp(spec[0], v) != v:
+                return False
+        except Exception:      # noqa: BLE001
+            return False
+    return True
+
+
+def cage_analysis(scored, genes=None):
+    """Is the CAGE binding? For each gene: the best-scoring allele among
+    enactable genotypes, whether it sits ON a registry bound, and whether any
+    out-of-cage allele scored better. A gene whose best result is pinned to a
+    bound AND beaten from outside — BY A GENOTYPE WITH A POSITIVE LOWER BOUND
+    — is evidence that the bound, not the strategy, is the limit.
+
+    [2026-07-29] That lcb condition is not decoration; the first version of
+    this function lacked it and fired a FALSE "widen the cage" on its very
+    first live run. It flagged STOP_LOSS because -0.06 (out-of-cage) beat the
+    -0.04 bound on net. Adversarially checked: mean net improves MONOTONICALLY
+    as the stop widens, across all 180 configs per value (-15.10 at -0.015 ->
+    -2.37 at -0.06) — the textbook "a wider stop stops realising losses that
+    later revert" artifact, the same shape that produced and then WITHDREW the
+    funding STOP verdict. Even the widest stop is mean-NEGATIVE, so the bound
+    was never what stood between this book and an edge. Comparing MAX point
+    estimates over a large sweep is the winner's curse this file's own rank()
+    exists to avoid, so the bar is a positive LOWER bound: the evidence
+    doctrine that governs crowning a champion also governs asking to move a
+    cage. Publish-only; proposes nothing. Pure."""
+    genes = genes or TAKER_GENES
+    out = {}
+    for g, (lever, grid) in genes.items():
+        best_in = best_out = None
+        for s in (scored or []):
+            v = (s.get("genotype") or {}).get(g)
+            if v is None:
+                continue
+            net = s.get("net")
+            if not isinstance(net, (int, float)):
+                continue
+            try:
+                inside = tuning.clamp(lever, v) == v
+            except Exception:      # noqa: BLE001
+                inside = False
+            lcb = s.get("lcb")
+            lcb = lcb if isinstance(lcb, (int, float)) else None
+            # champion-grade = the bar for crowning, applied to the bar for
+            # asking to move a cage: positive in its own right, positive
+            # LOWER bound, and positive in BOTH halves.
+            grade = bool(net > 0 and lcb is not None and lcb > 0
+                         and s.get("both_halves_pos"))
+            cur = best_in if inside else best_out
+            if cur is None or net > cur[1]:
+                if inside:
+                    best_in = (v, net, lcb, grade)
+                else:
+                    best_out = (v, net, lcb, grade)
+        if best_in is None:
+            continue
+        lo, hi = min(grid), max(grid)
+        at_bound = best_in[0] in (lo, hi)
+        beaten = bool(best_out and best_out[1] > best_in[1])
+        # THE WINNER'S-CURSE GUARD. A MAX over a large sweep is not evidence,
+        # and a positive lower bound on that max is not enough either — pick
+        # the best of 900 and some lcb will be positive by chance. The claim
+        # is only earned by a CHAMPION-GRADE result (positive, positive lower
+        # bound, positive in both halves). Measured on the first live sweep:
+        # 17 of 900 genotypes were both-halves-positive and EVERY one had a
+        # negative lcb, so nothing in the research space clears this — which
+        # is the correct answer, not a missing feature.
+        credible = bool(best_out and best_out[3])
+        out[g] = {"best_in_cage": best_in[0], "net_in": round(best_in[1], 2),
+                  "at_cage_bound": at_bound,
+                  "best_out_of_cage": best_out[0] if best_out else None,
+                  "net_out": round(best_out[1], 2) if best_out else None,
+                  "lcb_out": (round(best_out[2], 2)
+                              if best_out and best_out[2] is not None else None),
+                  "cage_may_bind": bool(at_bound and beaten and credible)}
+    return out
+
+
 def joint_space_size(genes):
     """How many genotypes the full product contains. Pure."""
     n = 1
@@ -569,9 +696,19 @@ def select_elite(scored, n, min_closes):
 
     Diversity needs no explicit distance floor: seed_population re-injects the
     default plus every single-gene neighbour every cycle, so the pool cannot
-    inbreed toward a converged elite the way a pure elite-carry GA would."""
+    inbreed toward a converged elite the way a pure elite-carry GA would.
+
+    [2026-07-29] ENACTABILITY IS ENFORCED HERE, not at the call site. The
+    research sweep scores genotypes outside the registry cage, and a gamete
+    is by definition something the next generation inherits — so an
+    out-of-cage genome must never enter this list. Putting the filter in the
+    caller left the property untested and un-enforced: a mutation that passed
+    the unfiltered `scored` list survived the whole suite, because a selftest
+    cannot see run_once's argument. The rule belongs to the rule's function
+    ([[a-kill-switch-must-reach-the-consumer]])."""
     return [s for s in scored
-            if s["closes"] >= min_closes and s["both_halves_pos"]][:n]
+            if s["closes"] >= min_closes and s["both_halves_pos"]
+            and is_enactable(s.get("genotype"))][:n]
 
 
 def assess_champion(top, default_net, tape_hours, prior_champ, prior_streak):
@@ -1018,8 +1155,15 @@ def run_once():
         # all: breed() is empty whenever no genotype clears both_halves_pos,
         # which is the standing state on a negative surface, so without this
         # the population is the 11 axis probes and nothing else.
+        # [2026-07-29] the SWEEP may range over the RESEARCH space (beyond the
+        # registry cage); seeds and breeding stay IN-CAGE so the champion's
+        # lineage is shippable by construction and `conform` stays a no-op.
+        search_genes = genes
+        if RESEARCH_MODE:
+            r_all, _rdrop = evolvable_genes(RESEARCH_GENES, allowed)
+            search_genes = {g: spec for g, spec in r_all.items() if g in genes}
         explored, explore_cursor, space_size = explore_slice(
-            genes, prior.get("explore_cursor"), EXPLORE_N)
+            search_genes, prior.get("explore_cursor"), EXPLORE_N)
         population = dedupe(seeds + breed(prior_elite, genes) + explored)
         print(f"[incubator] 🔍 exploring {len(population)} genotypes "
               f"({len(seeds)} axis probes + {len(explored)} joint-space, "
@@ -1027,16 +1171,26 @@ def run_once():
               f"{100.0 * min(explore_cursor or space_size, space_size) / space_size:.0f}% "
               f"of the legal space swept)", flush=True)
         scored = rank(population, tape, allowed)
+        # [2026-07-29] stamp every result with whether it could EVER ship.
+        for s in scored:
+            s["enactable"] = is_enactable(s["genotype"])
+        enactable = [s for s in scored if s["enactable"]]
+        frontier = next((s for s in scored if not s["enactable"]), None)
         # [2026-07-17] GAMETES (who breeds) and the CHAMPION (what we would
         # trust) are now separate questions. The elite are robustness-filtered
         # so noise cannot reproduce; the fittest genotype is still assessed and
         # published either way, so its confidence reason explains WHY it is not
         # a champion instead of the card just going quiet.
-        leaderboard = select_elite(scored, ELITE_N, MIN_GT_CLOSES)
+        # [2026-07-29] BOTH are drawn from the ENACTABLE subset: the champion
+        # and the gametes are the two things a human or a later cycle might
+        # act on, so an out-of-cage genotype must never become either. The
+        # frontier is published separately, clearly marked, and acts on
+        # nothing.
+        leaderboard = select_elite(enactable, ELITE_N, MIN_GT_CLOSES)
         default_gt = {g: getattr(tt, g) for g in genes}
         default_net = next((s["net"] for s in scored
                             if s["genotype"] == default_gt), 0.0)
-        top = scored[0] if scored else None
+        top = enactable[0] if enactable else None
         is_champ, streak, stable, conf, why = assess_champion(
             top, default_net, tape_hours,
             (prior.get("champion") or {}).get("genotype"),
@@ -1073,6 +1227,13 @@ def run_once():
         # LATEST reading. Only runs when we actually scored — pruning off a
         # dark cycle would retire genotypes on data we did not take.
         prospects, prune = prune_register(prospects, set(genes), _iso(now))
+        cages = cage_analysis(scored, genes)
+        _bind = [g for g, c in cages.items() if c.get("cage_may_bind")]
+        if _bind:
+            print(f"[incubator] 🔓 cage may BIND on {_bind} — the best "
+                  f"in-cage allele sits ON a registry bound and an "
+                  f"out-of-cage allele scored better. Evidence for a bound "
+                  f"widening; enacts nothing.", flush=True)
     else:
         print(f"[incubator] tape too short ({len(tape)}/{MIN_SNAPS}) — "
               f"skipping taker breeding", flush=True)
@@ -1085,6 +1246,7 @@ def run_once():
         # sweep would skip a slice it never actually measured
         explore_cursor = prior.get("explore_cursor") or 0
         space_size, explored = 0, []
+        frontier, cages = None, {}
 
     # --- FUNDING proposals (live-reachable, JUDGE-gated) -------------------
     judge_state = store.load_state("xp-judge") or {}
@@ -1173,9 +1335,19 @@ def run_once():
         "explore_cursor": explore_cursor,
         "exploration": {"space_size": space_size, "swept_this_cycle": len(explored),
                         "cursor": explore_cursor, "budget_n": EXPLORE_N,
+                        "research_mode": RESEARCH_MODE,
                         "coverage_pct": (round(100.0 * min(explore_cursor or space_size,
                                                            space_size) / space_size, 1)
                                          if space_size else None)},
+        # [2026-07-29] the RESEARCH FRONTIER: the best genotype that could NOT
+        # be enacted (outside the registry cage), and the per-gene read on
+        # whether a cage BOUND is what is limiting results. Publish-only and
+        # deliberately kept OUT of `champion`/`elite` — nothing may act on it.
+        # A `cage_may_bind: true` gene is the evidence for a bound widening;
+        # widening remains an operator decision, and this is the argument it
+        # should be made from.
+        "frontier": frontier,
+        "cage_analysis": cages,
     }
     store.save_state(KEY, payload)
     if hasattr(store, "save_history"):
@@ -1419,14 +1591,27 @@ def _selftest():
 
     # GAMETE SELECTION: the noise genotype the champion gate rejects must not
     # BREED either, and an unmeasurable genotype is not a gamete however fit.
-    sc = [{"genotype": {"A": 1}, "net": 9.0, "h1": 0.01, "h2": 8.99,
+    # [2026-07-29] fixtures use REAL in-cage genes: select_elite now enforces
+    # enactability itself, so a synthetic gene name would (correctly) be
+    # filtered and the test would pass for the wrong reason.
+    _a1, _a2, _a3 = [{"TAKE_PROFIT": v} for v in TAKER_GENES["TAKE_PROFIT"][1][:3]]
+    sc = [{"genotype": _a1, "net": 9.0, "h1": 0.01, "h2": 8.99,
            "closes": 40, "lcb": 8.0, "both_halves_pos": False},   # one-half win
-          {"genotype": {"A": 3}, "net": 8.0, "h1": 4.0, "h2": 4.0,
+          {"genotype": _a3, "net": 8.0, "h1": 4.0, "h2": 4.0,
            "closes": 3, "lcb": 7.0, "both_halves_pos": True},     # 3 trades
-          {"genotype": {"A": 2}, "net": 5.0, "h1": 2.5, "h2": 2.5,
+          {"genotype": _a2, "net": 5.0, "h1": 2.5, "h2": 2.5,
            "closes": 40, "lcb": 4.0, "both_halves_pos": True}]    # robust
     el = select_elite(sc, 4, 12)
-    assert [e["genotype"] for e in el] == [{"A": 2}], el
+    assert [e["genotype"] for e in el] == [_a2], el
+    # ...and an OUT-OF-CAGE genotype is refused however fit — enforced by
+    # select_elite itself, so no call site can opt out (the mutation that
+    # passed an unfiltered list survived until this moved in here).
+    _oc = {"TAKE_PROFIT": max(RESEARCH_GENES["TAKE_PROFIT"][1])}
+    assert not is_enactable(_oc)
+    assert select_elite([{"genotype": _oc, "net": 99.0, "h1": 9.0, "h2": 9.0,
+                          "closes": 99, "lcb": 9.0,
+                          "both_halves_pos": True}], 4, 12) == [], \
+        "an out-of-cage genome must never become a gamete"
     assert select_elite(sc, 0, 12) == [], "elite cap honored"
     assert select_elite([], 4, 12) == []
 
@@ -1594,6 +1779,85 @@ def _selftest():
     assert explore_slice(_g2, 0, 0)[0] == []
     assert explore_slice({}, 0, 10)[0] == []
     assert explore_slice(_g2, None, 2)[1] == 2, "None cursor starts at 0"
+
+    # [2026-07-29] RESEARCH SPACE — search beyond the cage, but NEVER let an
+    # out-of-cage genotype become something a human might act on.
+    _in = {g: getattr(tt, g) for g in TAKER_GENES}
+    assert is_enactable(_in), "the shipped genome must be enactable"
+    for g, (lever, grid) in TAKER_GENES.items():
+        assert is_enactable({g: grid[0]}) and is_enactable({g: grid[-1]}), g
+    # every RESEARCH grid must extend BEYOND its cage — otherwise the research
+    # space is the cage wearing a different name and buys nothing
+    for g, (lever, rgrid) in RESEARCH_GENES.items():
+        assert any(not is_enactable({g: v}) for v in rgrid), \
+            f"{g}: research grid never leaves the cage"
+        assert any(is_enactable({g: v}) for v in rgrid), \
+            f"{g}: research grid must still contain shippable alleles"
+    # fail-CLOSED: unknown gene, or an unclampable value, is NOT enactable
+    assert is_enactable({"NOT_A_GENE": 1}) is False
+    assert is_enactable({"TAKE_PROFIT": 99.0}) is False
+    assert is_enactable({}) is True                      # nothing to violate
+    # cage_analysis: flags a bound as BINDING only when the best in-cage
+    # allele sits ON the bound AND an out-of-cage allele beat it.
+    _hi = max(TAKER_GENES["TAKE_PROFIT"][1])
+    _out = max(RESEARCH_GENES["TAKE_PROFIT"][1])
+    _tp = {"TAKE_PROFIT": TAKER_GENES["TAKE_PROFIT"]}
+    _ch = {"both_halves_pos": True}          # champion-grade out-of-cage win
+    binds = cage_analysis([
+        {"genotype": {"TAKE_PROFIT": _hi}, "net": 5.0, "lcb": 1.0, **_ch},
+        {"genotype": {"TAKE_PROFIT": _out}, "net": 9.0, "lcb": 3.0, **_ch},
+    ], _tp)
+    assert binds["TAKE_PROFIT"]["cage_may_bind"] is True, binds
+    assert binds["TAKE_PROFIT"]["best_out_of_cage"] == _out, binds
+    # ...and NOT when the out-of-cage allele lost (a bound that is not
+    # costing anything must not read as binding)
+    ok = cage_analysis([
+        {"genotype": {"TAKE_PROFIT": _hi}, "net": 5.0, "lcb": 1.0},
+        {"genotype": {"TAKE_PROFIT": _out}, "net": 1.0, "lcb": 0.5},
+    ], _tp)
+    assert ok["TAKE_PROFIT"]["cage_may_bind"] is False, ok
+    # ...nor when the best in-cage result is INTERIOR (bound not reached)
+    _mid = TAKER_GENES["TAKE_PROFIT"][1][1]
+    interior = cage_analysis([
+        {"genotype": {"TAKE_PROFIT": _mid}, "net": 5.0, "lcb": 1.0},
+        {"genotype": {"TAKE_PROFIT": _out}, "net": 9.0, "lcb": 3.0},
+    ], _tp)
+    assert interior["TAKE_PROFIT"]["cage_may_bind"] is False, interior
+    # THE WINNER'S-CURSE GUARD, and it is the assertion that matters most:
+    # a MAX over a big sweep with a NEGATIVE lower bound is not evidence.
+    # Without this the detector fired a false "widen the cage" on STOP_LOSS
+    # on its first live run — the wider-stop artifact wearing a good net.
+    curse = cage_analysis([
+        {"genotype": {"TAKE_PROFIT": _hi}, "net": 5.0, "lcb": -2.0},
+        {"genotype": {"TAKE_PROFIT": _out}, "net": 99.0, "lcb": -1.0},
+    ], _tp)
+    assert curse["TAKE_PROFIT"]["cage_may_bind"] is False, curse
+    assert curse["TAKE_PROFIT"]["net_out"] == 99.0, "still REPORTED, not hidden"
+    assert curse["TAKE_PROFIT"]["lcb_out"] == -1.0, curse
+    # a missing lcb is not a positive one (fail-closed on absent evidence)
+    nolcb = cage_analysis([
+        {"genotype": {"TAKE_PROFIT": _hi}, "net": 5.0},
+        {"genotype": {"TAKE_PROFIT": _out}, "net": 9.0},
+    ], _tp)
+    assert nolcb["TAKE_PROFIT"]["cage_may_bind"] is False, nolcb
+    # THE LIVE SHAPE that fooled v1: a big net and a POSITIVE lcb, but the
+    # halves disagree. Champion-grade means all three; two out of three is
+    # the wider-stop artifact, and it must not license moving a cage.
+    half = cage_analysis([
+        {"genotype": {"TAKE_PROFIT": _hi}, "net": 12.86, "lcb": -1.5,
+         "both_halves_pos": False},
+        {"genotype": {"TAKE_PROFIT": _out}, "net": 16.34, "lcb": 2.01,
+         "both_halves_pos": False},
+    ], _tp)
+    assert half["TAKE_PROFIT"]["cage_may_bind"] is False, half
+    # THE SAFETY PROPERTY: select_elite must never hand an out-of-cage
+    # genotype forward as a gamete. run_once filters to `enactable` first;
+    # this pins that an unfiltered list WOULD have leaked one, so the filter
+    # is load-bearing and not decorative.
+    _leak = {"genotype": {"TAKE_PROFIT": _out}, "net": 99.0, "lcb": 99.0,
+             "h1": 9.0, "h2": 9.0, "closes": 99, "both_halves_pos": True}
+    assert select_elite([_leak], 4, 1) == [], \
+        "select_elite itself refuses an out-of-cage gamete (see its own test)"
 
     # [2026-07-29] REGISTER HYGIENE — dedupe / dispose / re-rank.
     def _pe(gt, net, lcb, cycles, age, current=False):
