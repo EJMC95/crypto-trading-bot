@@ -693,7 +693,21 @@ def main():
                 open_trades=broker.open_count(),
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": ctx.mode, "venue": ctx.mode, "style": "dislocation",
-                       "held": sorted(meta.keys()),
+                       # [2026-07-30 SIGN BUG] was `sorted(meta.keys())` — a
+                       # bare LIST, which fleet_risk's held_items() maps to
+                       # side "" and classifies as LONG (correct for the
+                       # long-only publishers of that shape, wrong here: this
+                       # book is TWO-SIDED, `is_long = dev_bps < 0`). Its
+                       # SHORTS were therefore counted as longs in the
+                       # per-symbol pileup cap, which is published
+                       # mode=enforce and consumed by the family bot — so a
+                       # Snap Back short could veto a family LONG entry on the
+                       # same symbol. Latent while this book held nothing;
+                       # the 30-Jul gate/universe widening is exactly what
+                       # activates it. Same dict contract Counterweight and
+                       # the sniper already publish.
+                       "held": {c: ("L" if m.get("is_long") else "S")
+                                for c, m in meta.items()},
                        "census_events": sum(c["count"] for c in census.values()),
                        "census_max_bps": round(max((c["max_bps"] for c in census.values()),
                                                    default=0.0), 1)})

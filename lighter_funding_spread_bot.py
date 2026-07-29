@@ -461,6 +461,17 @@ def main():
         now = datetime.now(timezone.utc)
         t0 = time.time()
         store.heartbeat(bot_id)
+        # [2026-07-30] Levers EVERY loop, not only at boot. `apply_tuning()`
+        # was called once before this loop, so the board could author
+        # `fundspread.k` and this container would never see it until a
+        # redeploy — a lever that is registered, authored, graded and inert at
+        # the consumer. K is read at each REBALANCE below, so refreshing here
+        # is what makes the authored value reach a trade. (UNIVERSE_N stays a
+        # boot-time decision: widening the universe mid-run would rank coins
+        # whose funding history was never backfilled.)
+        _lv = apply_tuning()
+        if _lv:
+            log.info("levers applied %s (K=%d)", _lv, K)
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False
             day_start_equity = account_value()

@@ -457,3 +457,49 @@ def test_every_lever_consumer_has_a_call_site(mod):
     import inspect
     src = inspect.getsource(mod.main)
     assert "apply_tuning()" in src, f"{mod.__name__}.main never calls apply_tuning"
+
+
+# --------------------------------------------------------------------------
+# 10. The SIDE contract — a two-sided book must not report its shorts as longs.
+# --------------------------------------------------------------------------
+
+def test_snap_back_publishes_a_SIDED_held_map():
+    """Snap Back is two-sided (`is_long = dev_bps < 0`) but published
+    `sorted(meta.keys())` — a bare LIST, which fleet_risk.held_items maps to
+    side "" and classifies as LONG. Its shorts were therefore counted as longs
+    in the per-symbol pileup cap, which ships mode=enforce and is consumed by
+    the family bot — so a Snap Back SHORT could veto a family LONG on the same
+    symbol. Latent while the book held nothing; the 30-Jul gate/universe
+    widening is exactly what activates it.
+    """
+    import fleet_risk
+
+    def _sides(items):
+        out = []
+        for _c, v in items:
+            t = str(v)
+            out.append("short" if (t.upper().startswith("S")
+                                   or "short" in t.lower()) else "long")
+        return out
+
+    # the OLD shape mis-signs: this is the bug, pinned so it cannot return
+    assert _sides(fleet_risk.held_items(["BTC", "SOL"])) == ["long", "long"]
+    # the NEW shape the bot now publishes carries the side
+    assert _sides(fleet_risk.held_items({"BTC": "S", "SOL": "S"})) == \
+        ["short", "short"]
+
+    import inspect
+    src = inspect.getsource(disloc.main)
+    assert '"held": sorted(meta.keys())' not in src, \
+        "Snap Back must publish a SIDED held map, not a bare list"
+    assert '"L" if m.get("is_long") else "S"' in src
+
+
+def test_every_two_sided_book_publishes_the_sided_shape():
+    """The contract, applied across the fleet: a book that can hold BOTH
+    sides must publish {coin: L|S}. A long-only book may publish a list."""
+    import inspect
+    for mod, two_sided in ((disloc, True), (spread, True), (sniper, False)):
+        src = inspect.getsource(mod.main)
+        if two_sided:
+            assert '"held": {' in src, f"{mod.__name__} must publish a sided map"
