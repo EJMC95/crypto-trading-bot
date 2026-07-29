@@ -45,12 +45,29 @@ from datetime import datetime, timezone
 import bot_pnl_store as store  # guarded Postgres publisher (no-op without DATABASE_URL)
 from venues import venue_context  # [2026-07-09 LIGHTER GATE-0] venue abstraction
 
+# [2026-07-30] growth-rail client. Guarded like every optional organ: a dark
+# import leaves the operator's env defaults in force (apply_tuning() returns
+# {} on `tuning is None`), never a crash inside a trading loop. The COPY is
+# in Dockerfile.funding — added in the SAME commit as this import, because a
+# guarded import plus a missing COPY is precisely the born-dark failure this
+# fleet has shipped three times.
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
+
 BOT = "perps-funding-carry"
 
 # --------------------------- configuration ----------------------------------
 START_EQUITY = 1000.0
 NOTIONAL = 300.0          # quote notional per carry position [2026-07-06 raised from $200]
-MAX_POSITIONS = 8         # at most 8 concurrent carries [2026-07-06 raised from 5]
+# [2026-07-30 SLOT-BOUND — 8 -> 12] Measured at 7 open of 8: the fleet's
+# BIGGEST EARNER (+$56.20 realised on n=80, t=2.42, both halves positive) was
+# one slot from full and could not take the eighth-best carry it had already
+# graded. Its 38.8% win rate is not a defect — carry's return lives in the
+# tail, which is exactly why turning away graded candidates is expensive.
+# Now also a registry-bounded lever (`carry.max_positions`, [6, 20]).
+MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 MIN_DAY_VOLUME = 2e6      # only coins with >= $2M 24h notional volume [2026-07-06 lowered from $5M to capture hot-rate coins like ME/MINA]
 
 # Funding thresholds, ANNUALIZED. These are denominated in THIS FILE'S ORIGINAL
@@ -130,6 +147,47 @@ def _basis(mode):
     venue = _venue_of(mode)
     H = funding_basis.periods_per_year(venue)
     return H, H / float(HOURS_PER_YEAR)
+
+
+# [2026-07-30 AUTO-REVERT FIX] The operator's env defaults, snapshotted at
+# IMPORT. apply_tuning() must hand THESE to get_lever, never the current
+# global: get_lever returns its `default` when the lever is absent, expired
+# or quarantined, so passing the already-moved value made the rail a ONE-WAY
+# RATCHET — a widened lever could never revert, and auto-revert-on-expiry is
+# the growth rail's central safety property ("levers EXPIRE back to defaults
+# on their own, so auto-revert is the resting state"). Shipped broken in
+# (fz); it was inert only because nothing authored the lane yet.
+_ENV_DEFAULTS = {"ENTER_APR": ENTER_APR, "MAX_POSITIONS": MAX_POSITIONS}
+
+
+def apply_tuning():
+    """Growth-rail levers override the env defaults (bounded in the
+    fleet_tuning registry; expired/absent/quarantined levers leave the
+    defaults intact). Returns {lever: value} of whatever actually moved.
+
+    [2026-07-30] Until now this book had NO registered levers at all —
+    `carry.enter_apr` is the best-performing gate in the fleet and the
+    growth rail could not touch it. Mutating the module globals (rather
+    than threading values through) is deliberate: `_bars()` is the ONE
+    OWNER of the enter/exit derivation, so a lever applied here reaches
+    the gate through the same single path main() uses, and the basis
+    selftest keeps exercising the real call site.
+    """
+    global ENTER_APR, MAX_POSITIONS
+    if tuning is None:
+        return {}
+    moved = {}
+    for lever, attr in (("carry.enter_apr", "ENTER_APR"),
+                        ("carry.max_positions", "MAX_POSITIONS")):
+        cur = globals()[attr]
+        try:
+            val = tuning.get_lever(lever, _ENV_DEFAULTS[attr])
+        except Exception:  # noqa: BLE001
+            continue                      # a sick rail never stops the book
+        if val != cur:
+            globals()[attr] = val
+            moved[lever] = val
+    return moved
 
 
 def _bars(mode):
@@ -368,6 +426,17 @@ def main():
     last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
     while True:
         t0 = time.time()
+        # [2026-07-30] Re-read the growth rail EVERY loop, then RE-DERIVE the
+        # bars through the same one-owner `_bars()` call. Both halves matter:
+        # a lever that moved ENTER_APR without this re-derivation would be
+        # silently inert, because `_enter_apr` was computed once before the
+        # loop — the lever would appear enacted on the bus and change no
+        # trade. TTL expiry reverts to the operator default by the same path.
+        _moved = apply_tuning()
+        if _moved:
+            _H, _enter_apr, _exit_apr = _bars(_mode)
+            print(f"[{now_iso()}] levers applied {_moved} "
+                  f"| enter>={_enter_apr:.4f} max_open={MAX_POSITIONS}")
         try:
             fund = ctx.venue.funding_map()
         except Exception as e:
@@ -559,6 +628,17 @@ def main():
                     open_trades=len(positions),
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": "dry-run", "open_pnl": round(open_pnl, 2),
+                           # [2026-07-30] the EFFECTIVE cap this loop is
+                           # running, so the board can SEE saturation
+                           # instead of inferring it from occupancy alone —
+                           # and can tell "at the cap" from "at the cap it
+                           # set itself last cycle".
+                           # `_enter_apr`, NOT the raw module constant: the
+                           # raw one is HL-denominated and main() is guarded
+                           # against touching it (the 8x-basis defect). The
+                           # board must see the bar this arm ACTUALLY gates on.
+                           "caps": {"max_positions": MAX_POSITIONS,
+                                    "enter_apr": _enter_apr},
                            # NOT "positions": the dashboard reserves that key for
                            # the stock bots' list-of-dicts holdings format.
                            "carries": {c: f"{p['side']}@{p['entry_apr']:+.0%}"

@@ -1017,10 +1017,29 @@ def _close_extra(m):
     # judge, fleet_proprioception or a human — can split eras MECHANICALLY.
     # Observable-only: it changes no decision, and setdefault means it can
     # never clobber bars/bars_basis or an evidence key.
+    # [2026-07-30] TICKET SUPPLY joins the stamp, and it belongs here for the
+    # same reason everything else does. (fx)/(gi) fixed era-pooling by
+    # recording the policy the taker ran — but the taker's CANDIDATE SET is set
+    # one level further up, by the scout's `TICKET_TOP_N`, and that moved 6 -> 12
+    # on 2026-07-30. A grader splitting eras "MECHANICALLY" would have pooled
+    # across a 2x change in the supply the arm chose from, with nothing in the
+    # ledger to see it by — the identical defect, one level upstream. Read from
+    # the lever registry so the stamp follows the real value rather than a
+    # second copy of it (the `env_default` field (gd) added is what makes that
+    # possible). Observable-only; setdefault still protects every other key.
+    _supply = None
+    try:
+        if tuning is not None:
+            _spec = (tuning.LEVERS.get("scout.ticket_top_n") or {})
+            _supply = tuning.get_lever("scout.ticket_top_n",
+                                       _spec.get("env_default"))
+    except Exception:  # noqa: BLE001
+        _supply = None
     out.setdefault("policy", {"bull": BULL_MODE,
                               "lenses": sorted(allowed_lenses(TT_VENUE)),
                               "venue": TT_VENUE,
-                              "max_open": MAX_OPEN})
+                              "max_open": MAX_OPEN,
+                              "ticket_top_n": _supply})
     ev = m.get("evidence")
     if isinstance(ev, dict):
         for k, v in ev.items():
@@ -2743,7 +2762,21 @@ def selftest():
     # "no edge" and the "edge is real" mis-gradings. Mutation-checked: dropping
     # the setdefault, or dropping any of the four keys, turns these red.
     _pol = _cx["policy"]
-    assert set(_pol) == {"bull", "lenses", "venue", "max_open"}, _pol
+    # [2026-07-30] `ticket_top_n` joined the stamp. The four original keys
+    # record the policy the TAKER ran; the candidate SET it chose from is set
+    # one level up by the scout, and that supply moved 6 -> 12 on 2026-07-30.
+    # Without it in the stamp a grader splitting eras "mechanically" would pool
+    # across a 2x change in the arm's opportunity set with nothing in the
+    # ledger to see it by — the identical defect (fx)/(gi) fixed, one level
+    # upstream. Mutation-checked: dropping any key turns these red.
+    assert set(_pol) == {"bull", "lenses", "venue", "max_open",
+                         "ticket_top_n"}, _pol
+    # the supply must be the REGISTRY's value, never a second hardcoded copy —
+    # audit_lever_bounds keeps the registry equal to the scout's real default,
+    # so this is the one number that cannot drift from what the scout emits
+    import fleet_tuning as _ft
+    assert _pol["ticket_top_n"] == (
+        _ft.LEVERS["scout.ticket_top_n"]["env_default"]), _pol
     assert _pol["bull"] is BULL_MODE and _pol["venue"] == TT_VENUE, _pol
     assert _pol["lenses"] == sorted(allowed_lenses(TT_VENUE)), _pol
     # it must record the LENS SET, which is what the flip actually changed —

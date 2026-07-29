@@ -1,5 +1,20 @@
 # Fleet Offense Analysis — 2026-07-29
 
+> **[RETRACTION, 2026-07-30 — read before using any number below.]** This
+> document cites shadow short-divergence at **+3.035%/trade vs regime,
+> t=+4.04** as "the fleet's only measured alpha", and uses it to justify the
+> ticket-supply widening. **That figure is retracted.** `(gi)` found a THIRD
+> era-pooling error one level above the first two: the shadow arm's 10 closes
+> span **FOUR distinct bar-sets**, so pooling them was never legitimate. The
+> only clean single-policy sample that exists is the LIVE arm's own 11 closes —
+> **+0.883%/trade, t=+0.73, 95% CI [-1.81%, +3.57%], straddling zero.**
+>
+> What survives: the cap-binding observation (dip and divergence each returned
+> exactly 6 tickets) is a fact about the SCOUT, not about the edge. So the
+> `TICKET_TOP_N` 6 → 12 widening still stands — on the weaker, honest rationale
+> of **more sample for an UNDECIDED lens**, not feeding a proven winner. Every
+> other finding here was measured independently and is unaffected.
+
 *What metrics, gates, scanners, bounds and scope each bot actually carries today,
 and how each could **win more** — not lose less.*
 

@@ -145,6 +145,13 @@ ENFORCED_AUDITS = [
     "scripts/audit_venue_purity.py",      # LIGHTER-first, shipped-code scan (CI-gating)
     "scripts/audit_deploy_coverage.py",   # every shipped file has a deploy path (CI-gating)
     "scripts/audit_changelog_letters.py",  # sync-channel citations resolve (CI-gating)
+    # [2026-07-30] the cage must fit the value: every lever carries a
+    # machine-readable default, that default is INSIDE its own bounds, and it
+    # MATCHES the `os.environ.get` default its consumer actually runs. The
+    # drift arm is the point — `scout.ticket_top_n` was moved 6 -> 12 in code
+    # on 2026-07-30 and its registry note still said 6 the same afternoon, so
+    # every organ reasoning about that lever's headroom read the wrong number.
+    "scripts/audit_lever_bounds.py",
 ]
 GUARD_ONLY_AUDITS = [
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can

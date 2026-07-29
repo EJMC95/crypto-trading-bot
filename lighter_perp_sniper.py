@@ -44,6 +44,17 @@ import logging
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+
+# [2026-07-30] growth rail + the shared scout read; guarded, with both COPYs
+# added to Dockerfile.psniper in the same commit (born-dark doctrine).
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
+try:
+    import fleet_bus
+except Exception:  # noqa: BLE001
+    fleet_bus = None
 from venues import venue_context
 from venues.safety import open_notional
 
@@ -60,6 +71,31 @@ MAX_HOLD_SEC = 6 * 3600    # 6h — snipe the debut move, don't marry it
 # unpriceable; close at the last seen mid (entry if none).
 DELIST_GIVEUP_SEC = float(os.environ.get("SNIPER_DELIST_GIVEUP_SEC", str(6 * 3600)))
 MAX_OPEN = 4               # global cap on concurrent snipes
+# [2026-07-30] the SURGE trigger — see surge_candidates(). A book whose 24h
+# volume jumps by this multiple is treated as a snipe candidate alongside a
+# genuinely new listing. Registry-bounded lever `sniper.surge_mult` [2.0, 8.0];
+# the scout's own surge detector uses 3.0, so this starts aligned with it.
+# Set SNIPER_SURGE_MULT=0 to disable the second source entirely.
+SURGE_MULT = float(os.environ.get("SNIPER_SURGE_MULT", "3.0"))
+SURGE_MAX_PER_LOOP = int(os.environ.get("SNIPER_SURGE_MAX_PER_LOOP", "3"))
+# [2026-07-30 SCOPE — THE THIRD SOURCE, and the one that actually reaches] A
+# book is YOUNG until it has this many daily candles. Measured on the venue:
+# the majors carry ~402 daily bars, so a book with a handful is genuinely in
+# its debut regime — the same phenomenon "new listing" names, but observable
+# for WEEKS instead of for the single loop in which the market-set diff fires.
+# That single-loop window is why this bot has n=1 in weeks: not a bad thesis,
+# an unobservable event. This source reaches back over the whole young cohort.
+YOUNG_MAX_BARS = int(os.environ.get("SNIPER_YOUNG_MAX_BARS", "21"))
+YOUNG_MAX_PER_LOOP = int(os.environ.get("SNIPER_YOUNG_MAX_PER_LOOP", "2"))
+# A young book still has to be TRADABLE — a debut with no turnover is a
+# ghost print, and the sniper's own history is full of one-sided debut books.
+YOUNG_MIN_VOL_M = float(os.environ.get("SNIPER_YOUNG_MIN_VOL_M", "0.25"))
+# Candle probes per loop for unknown books. Small on purpose: the venue REST
+# budget is shared, and the cache is monotone so the cost decays to zero.
+YOUNG_PROBE_BUDGET = int(os.environ.get("SNIPER_YOUNG_PROBE_BUDGET", "4"))
+# How long a book stays on the offered-ledger before it may be offered again.
+# A surge is an EVENT, not a permanent property, so the ledger must forget.
+SURGE_COOLDOWN_H = float(os.environ.get("SNIPER_SURGE_COOLDOWN_H", "168"))
 LOOP_SECONDS = 60          # poll the market list every minute
 DIRECTION_LONG = os.environ.get("SNIPER_DIRECTION", "long").lower() != "short"
 # [2026-07-17 RETRY FIX] `baseline |= set(new_listings)` used to run
@@ -119,6 +155,137 @@ def _snipe_price(orderbook_fn, sym):
     if not px:
         return None, "no two-sided book yet"
     return px, None
+
+
+# [2026-07-30 AUTO-REVERT FIX] The operator's env defaults, snapshotted at
+# IMPORT. apply_tuning() must hand THESE to get_lever, never the current
+# global: get_lever returns its `default` when the lever is absent, expired
+# or quarantined, so passing the already-moved value made the rail a ONE-WAY
+# RATCHET — a widened lever could never revert, and auto-revert-on-expiry is
+# the growth rail's central safety property ("levers EXPIRE back to defaults
+# on their own, so auto-revert is the resting state"). Shipped broken in
+# (fz); it was inert only because nothing authored the lane yet.
+_ENV_DEFAULTS = {"SURGE_MULT": SURGE_MULT}
+
+
+def active_done(done, now_ts, cooldown_h=None):
+    """The offered-ledger entries still inside their cooldown, as a SET.
+
+    Everything older has been forgotten deliberately: a book that surged two
+    weeks ago and surges again is a new event. Also PRUNES `done` in place so
+    the persisted payload cannot grow without bound. Tolerates the (ga) list
+    format and junk timestamps.
+    """
+    h = SURGE_COOLDOWN_H if cooldown_h is None else cooldown_h
+    cutoff = float(now_ts) - float(h) * 3600.0
+    live = set()
+    for sym in list(done or ()):
+        try:
+            ts = float(done[sym])
+        except (TypeError, ValueError, KeyError):
+            done.pop(sym, None)
+            continue
+        if ts >= cutoff:
+            live.add(str(sym))
+        else:
+            done.pop(sym, None)          # forgotten — offerable again
+    return live
+
+
+def apply_tuning():
+    """Growth-rail levers over the env defaults; {} when the rail is dark."""
+    global SURGE_MULT
+    if tuning is None:
+        return {}
+    cur = SURGE_MULT
+    try:
+        val = tuning.get_lever("sniper.surge_mult", _ENV_DEFAULTS["SURGE_MULT"])
+    except Exception:  # noqa: BLE001
+        return {}
+    if val != cur:
+        SURGE_MULT = val
+        return {"sniper.surge_mult": val}
+    return {}
+
+
+def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP):
+    """Books the scout reports as volume-SURGING, as snipe candidates.
+
+    [2026-07-30 THE SNIPER'S POPULATION PROBLEM] This bot's event — a brand-new
+    perp listing — is too rare to grade: n=1 close in weeks, and the scout's
+    `new_listings` is routinely empty. A strategy that cannot accumulate a
+    sample cannot be validated, improved, or retired on evidence; it just sits
+    on a dashboard row. "New listing" is one instance of the thing this bot is
+    actually good at — a book repricing violently with no settled history — and
+    a volume surge is the same phenomenon in a book that listed last week.
+
+    Pure: the caller supplies the scout's `vol_surges` rows and the set of
+    symbols already handled. `already` is REQUIRED and does real work — every
+    surging book is in `baseline` (baseline is seeded with all active markets),
+    so baseline cannot dedup these the way it dedups listings, and without a
+    separate ledger a surging book would re-enter `pending` every loop forever.
+    Bounded by `limit` so one venue-wide volume event cannot flood the pass.
+    """
+    out = []
+    try:
+        rows = sorted(surges or [],
+                      key=lambda r: -float(r.get("ratio") or 0.0))
+    except (TypeError, ValueError, AttributeError):
+        return out
+    for r in rows:
+        if len(out) >= int(limit):
+            break
+        try:
+            sym = str(r.get("sym") or "").strip().upper()
+            ratio = float(r.get("ratio") or 0.0)
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if sym and sym not in already and ratio >= float(mult):
+            out.append(sym)
+    return out
+
+
+def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit):
+    """Books still inside their DEBUT REGIME, as snipe candidates.
+
+    [2026-07-30 THE SCOPE FIX] `new_listings` is a market-set DIFF: a symbol
+    qualifies for exactly the one loop in which it first appears, and only if
+    this process is running and its baseline is warm at that moment. That is
+    why the book has n=1 in weeks with `new_listings: []` on the bus — the
+    thesis (violent repricing in a book with no settled history) is fine; the
+    TRIGGER was unobservable. A book with `< max_bars` daily candles is in the
+    same state and stays observable for weeks, so the same edge finally gets a
+    population to be measured on.
+
+    Pure — the caller supplies the bar counts and the volume map. Ordered
+    YOUNGEST first (fewest bars = closest to the debut, where the move is),
+    filtered to books with real turnover, deduped against `already` (the same
+    ledger the surge source uses: a young book is in `baseline`, so baseline
+    cannot dedup it), and bounded by `limit`.
+    """
+    rows = []
+    for sym, n in (bar_counts or {}).items():
+        # `str(sym)` alone is too permissive — a None key coerces to the
+        # string "NONE" and becomes a tradable-looking candidate. Caught by
+        # test_young_candidates_tolerates_junk; require a real string.
+        if not isinstance(sym, str):
+            continue
+        try:
+            bars = int(n)
+        except (TypeError, ValueError):
+            continue
+        s = sym.strip().upper()
+        if not s or s in (already or set()) or bars > int(max_bars):
+            continue
+        try:
+            vol = float((vols or {}).get(s, 0.0) or 0.0)
+        except (TypeError, ValueError):
+            vol = 0.0
+        if vol < float(min_vol_m):
+            continue
+        rows.append((bars, -vol, s))
+    rows.sort()
+    return [s for _, _, s in rows[:int(limit)]]
 
 
 def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
@@ -207,6 +374,24 @@ def main():
     entry_ts = {}
     baseline = set()
     pending = {}          # sym -> {"first_seen": ts, "attempts": n} — detected, not yet sniped
+    # [2026-07-30] the SURGE source's own dedup ledger (see surge_candidates).
+    # Persisted with the rest of the state: a restart that forgot it would
+    # re-offer every book that has ever surged, which is the retry-forever bug
+    # baseline cannot prevent for this source.
+    # [2026-07-30 COOLDOWN, not a tombstone] `surge_done` was a monotone SET
+    # that only ever grew, so every book that surged or was young once was
+    # excluded FOREVER — over weeks both new candidate sources decay to
+    # silence, which is a slow-acting version of the exact starvation (ga)
+    # set out to fix. It is now {sym: last_offered_ts} with a cooldown: a
+    # book that surged a fortnight ago and surges again is a GENUINE new
+    # event, not a duplicate. `not_young` stays permanent — that one is
+    # correct, because books only ever age.
+    surge_done = {}
+    # [2026-07-30] young-book probe cache. `bar_counts` holds measured daily-bar
+    # counts for books still under the young bar; `not_young` is the permanent
+    # exclusion set (a book that has aged past the bar can never re-enter).
+    bar_counts = {}
+    not_young = set()
     no_px_since = {}      # coin -> first ts the book was unpriceable (zombie clock)
     last_px = {}          # coin -> last seen mid (zombie exit price)
     # [2026-07-17 SEED GUARD] The seed below (`if not baseline`) absorbs every
@@ -274,6 +459,28 @@ def main():
                                    "attempts": int(v.get("attempts") or 0)}
             except Exception:  # noqa: BLE001
                 continue
+        # [2026-07-30] the surge source's dedup ledger. A DROPPED entry here
+        # is not self-healing the way a dropped `pending` entry is — the symbol
+        # is in `baseline`, so nothing else would stop it being re-offered.
+        try:
+            _sd = _saved.get("surge_done")
+            if isinstance(_sd, dict):
+                for _k, _v in _sd.items():
+                    try:
+                        surge_done[str(_k)] = float(_v)
+                    except (TypeError, ValueError):
+                        continue
+            else:
+                # the (ga) format was a bare list with no timestamps. Treat
+                # those as offered NOW rather than dropping them: a restart
+                # must not re-offer everything at once.
+                for _x in (_sd or []):
+                    surge_done[str(_x)] = time.time()
+            not_young.update(str(x) for x in (_saved.get("not_young") or []))
+            for _k, _v in (_saved.get("bar_counts") or {}).items():
+                bar_counts[str(_k)] = int(_v)
+        except Exception:  # noqa: BLE001
+            pass
         if pending:
             log.info("restored %d pending listing(s) awaiting a snipeable book: %s",
                      len(pending), ", ".join(sorted(pending)))
@@ -403,7 +610,10 @@ def main():
             baseline = set(active)
             store.save_state(bot_id, {"baseline": sorted(baseline),
                                       "broker": broker.to_state() if dry_run else None,
-                                      "entry_ts": entry_ts, "pending": pending})
+                                      "entry_ts": entry_ts, "pending": pending,
+                                      "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
+                                      "bar_counts": bar_counts,
+                                      "not_young": sorted(not_young)})
             log.info("seeded baseline with %d active markets — sniping only NEW "
                      "listings from here.", len(baseline))
             if args.once:
@@ -436,8 +646,101 @@ def main():
         # ----- open snipes on genuinely new markets -----
         open_now = broker.open_count() if dry_run else len(ctx.venue.positions())
         _held_now = set(broker.pos) if dry_run else set(ctx.venue.positions())
+        # [2026-07-30] SECOND CANDIDATE SOURCE — surging books. `surge_done`
+        # is this source's own dedup ledger and is NOT optional: every surging
+        # book is already in `baseline` (it is seeded with all active markets),
+        # so baseline cannot dedup them, and a surging book would otherwise
+        # re-enter `pending` on every loop for as long as it kept surging.
+        # [2026-07-30] growth rail, every loop. This call site was MISSING
+        # when the lever shipped: apply_tuning() was defined, registered and
+        # never invoked, so `sniper.surge_mult` could never reach this bot —
+        # the same registered-but-inert class the whole pass exists to remove.
+        _lv = apply_tuning()
+        if _lv:
+            log.info("levers applied %s", _lv)
+        _surge = []
+        if SURGE_MULT > 0 and fleet_bus is not None:
+            try:
+                _sp = fleet_bus._load("lighter-market", None) or {}
+                if fleet_bus.is_fresh(_sp, None):
+                    _live_done = active_done(surge_done, now.timestamp())
+                    _surge = surge_candidates(_sp.get("vol_surges"), SURGE_MULT,
+                                              _live_done | set(pending))
+            except Exception:  # noqa: BLE001
+                _surge = []
+            if _surge:
+                log.info("SURGE CANDIDATES (>=%.1fx 24h volume): %s",
+                         SURGE_MULT, ", ".join(_surge))
+                for _s in _surge:
+                    surge_done[_s] = now.timestamp()
+        # [2026-07-30] THIRD SOURCE — books still inside their debut regime.
+        # The candle probe is GOVERNED and MONOTONE: at most YOUNG_PROBE_BUDGET
+        # unknown symbols per loop, and a book measured older than the young bar
+        # is recorded in `not_young` FOREVER (books get older, never younger),
+        # so the probe cost decays to zero once the venue has been walked.
+        _young = []
+        if YOUNG_MAX_BARS > 0:
+            # [2026-07-30] probe ONLY what the scout could not tell us. Once
+            # `ages_d` is flowing this list is empty and the candle probes stop
+            # entirely — the fallback costs nothing when it is not needed.
+            _scout_ages = {}
+            if fleet_bus is not None:
+                try:
+                    _sp0 = fleet_bus._load("lighter-market", None) or {}
+                    if fleet_bus.is_fresh(_sp0, None):
+                        _scout_ages = _sp0.get("ages_d") or {}
+                except Exception:  # noqa: BLE001
+                    _scout_ages = {}
+            _unknown = [s for s in sorted(active)
+                        if s not in not_young and s not in bar_counts
+                        and s not in _scout_ages
+                        and s not in active_done(surge_done, now.timestamp())]
+            for _sym in _unknown[:YOUNG_PROBE_BUDGET]:
+                try:
+                    _cs = ctx.venue.candles(
+                        _sym, "1d", int((now.timestamp() - 400 * 86400) * 1000),
+                        int(now.timestamp() * 1000))
+                    _n = len(_cs or [])
+                except Exception:  # noqa: BLE001 — budget/venue hiccup, retry later
+                    continue
+                if _n > YOUNG_MAX_BARS:
+                    not_young.add(_sym)      # permanent: it can only age
+                else:
+                    bar_counts[_sym] = _n
+            _vols, _ages = {}, {}
+            if fleet_bus is not None:
+                try:
+                    _sp2 = fleet_bus._load("lighter-market", None) or {}
+                    if fleet_bus.is_fresh(_sp2, None):
+                        _vols = _sp2.get("vols") or {}
+                        # [2026-07-30] EXACT listing age from the venue's own
+                        # `created_at`, published by the scout. Strictly better
+                        # than the candle probe below: exact rather than a
+                        # bar-count proxy, all ~202 books at once rather than
+                        # 4/loop, and zero extra REST (the scout already
+                        # fetches that response). Measured at ship: majors read
+                        # 558.6d, exactly 4 books under 21d.
+                        _ages = _sp2.get("ages_d") or {}
+                except Exception:  # noqa: BLE001
+                    _vols, _ages = {}, {}
+            # Prefer the scout's exact ages; the probe cache is the FALLBACK
+            # for a dark/stale scout (age in days vs the bar bar — one daily
+            # candle per day, so the two units are directly comparable).
+            _age_src = ({s: a for s, a in _ages.items()
+                         if s not in not_young} or bar_counts)
+            _young = young_candidates(_age_src, YOUNG_MAX_BARS, _vols,
+                                      YOUNG_MIN_VOL_M,
+                                      active_done(surge_done, now.timestamp())
+                                      | set(pending), YOUNG_MAX_PER_LOOP)
+            if _young:
+                log.info("YOUNG-BOOK CANDIDATES (<=%d daily bars): %s",
+                         YOUNG_MAX_BARS,
+                         ", ".join(f"{s}({bar_counts.get(s)}d)" for s in _young))
+                for _s in _young:
+                    surge_done[_s] = now.timestamp()
         open_now, _sniped, _abandoned = run_snipe_pass(
-            candidates=new_listings, pending=pending, baseline=baseline,
+            candidates=new_listings + _surge + _young, pending=pending,
+            baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
             try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n),
             is_held=lambda s: s in _held_now)
@@ -597,7 +900,10 @@ def main():
         store.save_state(bot_id, {"baseline": sorted(baseline),
                                   "broker": broker.to_state() if dry_run else None,
                                   "entry_ts": entry_ts,
-                                  "pending": pending})
+                                  "pending": pending,
+                                  "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
+                                  "bar_counts": bar_counts,
+                                  "not_young": sorted(not_young)})
 
         if args.once:
             log.info("--once complete: watching %d markets, %d pending, %d open.",

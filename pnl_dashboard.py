@@ -374,13 +374,13 @@ DESCRIPTIONS = {
     "crypto-breakout-4h":  "MomoBreakoutV1 · 4h — the validated Donchian breakout · 29 pairs, 6 slots",
     "perps-funding-lighter": "holds the side that RECEIVES funding when |APR|≥40%, vol-vetoed, stop-guarded · clip $20 × cap $80",
     "perps-funding-carry":  "funding-rate carry on HL data — the Funding Farmer's origin strategy",
-    "perps-funding-spread": "ranks 72h mean funding: LONG the 5 most-negative, SHORT the 5 most-positive, rebalances daily · $20/leg",
-    "lighter-dislocation":  "fades ≥150bps Lighter-vs-reference price dislocations across 36 coins; census-first evidence bot",
-    "lighter-perp-sniper":  "watches brand-new Lighter listings and snipes day-one momentum",
+    "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, rebalances daily · K=8, $20/leg [30-Jul: K 5→8, universe 30→60]",
+    "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
+    "lighter-perp-sniper":  "snipes debut-regime books: brand-new listings PLUS volume surges and any book under 21 daily candles [30-Jul — the listing diff alone was a one-loop trigger, hence n=1 in weeks]",
     "lighter-ticket-taker": "trades the Lighter Scout's high-conviction tickets · SHADOW arm takes all four lenses (breakout/dip/momentum/divergence) so the brain keeps grading them; the LIVE arm is DIVERGENCE-ONLY — the brain grades the other three negative at n≈1300–2600 · each close tagged by lens",
     "event-listing-sniper": "buys brand-new CEX listings — many tiny losses, occasional big wins by design",
     "scanner-cross-exchange-arb": "scans cross-exchange spreads and paper-fills observed gaps (optimistic basis, own subtotal)",
-    "equities-regime":      "SPY + QQQ long above the 200d SMA (±1% band) + gold on a 20/50 cross · $250 × 3 slots",
+    "equities-regime":      "the venue's 10 non-crypto books: index-likes long above the 200d SMA (±1% band), single names + commodities on a 20/50 cross · $100 × up to 10 slots [30-Jul: 3→10 books, clip $250→$100]",
     "equities-momentum":    "qualifies close>SMA200 & SMA20>SMA50, ranks by 42d return, holds top-5 of 25 (US stocks + gold/silver/oil + BTC/ETH), weekly rotation · $180 × 5 slots",
     "pm-albanese":  "Parliament 🏛️ · rides 15m+1h EMA(12/48) agreement confirmed by a momentum burst · ML-gated, $25 × 3 slots",
     "pm-morrison":  "Parliament 🏛️ · chases 48-bar Donchian breaks confirmed by a volume spike · ML-gated, $25 × 3 slots",
@@ -959,7 +959,8 @@ def evidence_board_card():
         return (f'<div class="card"><h2>⚖️ Evidence board <span class="dot on"></span></h2>'
                 f'<div class="muted">mode {html.escape(str(b.get("mode", "shadow")))} · '
                 f'{len(items)} items · {n_prop} shadow proposals{age} — '
-                f'restrict-only levers, nothing consumes proposals until a review promotes</div>'
+                f'{"restrict + EXPAND" if b.get("books") else "restrict-only"} levers · '
+                f'the growth rail authors the shadow books\' lanes</div>'
                 f'{"".join(rows_html)}</div>')
     except Exception:  # noqa: BLE001
         return ""

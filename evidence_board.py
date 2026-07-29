@@ -844,6 +844,132 @@ def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts,
     return out
 
 
+# [2026-07-30 THE BOOKS GET AN AUTHOR — operator: "grow into what works"]
+# The `lighter-books` lane was bound to this board as AUTHOR and NOTHING in
+# this file wrote it: `board_levers` was populated only from the (inert since
+# 17-Jul) gapscout ladder and live.clip_scale. A lane authored by nobody is
+# the exact mirror of the registered-but-not-consumed class — the levers were
+# registered, consumed by their bots, graded by proprioception, and could
+# never MOVE. This is the missing author.
+#
+# The rule is deliberately narrow, because a widening author that fires on
+# noise is worse than none:
+#   SATURATED  — the book is holding at its cap, so it is turning away
+#                candidates it already graded. Widen ONE step.
+#   STARVED    — the book holds nothing and has closed nothing in the window,
+#                so its gate is admitting nothing. Loosen ONE step.
+#   otherwise  — propose nothing. A book that is working is left alone.
+BOOK_AUTHOR = {
+    # bot row -> (capacity lever, gate lever, cap source)
+    "perps-funding-carry-lshadow":  ("carry.max_positions", "carry.enter_apr"),
+    "perps-funding-spread-lshadow": ("fundspread.k", "fundspread.universe_n"),
+    "lighter-dislocation-lshadow":  (None, "disloc.enter_pct"),
+    "equities-regime-lshadow":      ("index.max_open", None),
+    "lighter-perp-sniper-lshadow":  (None, "sniper.surge_mult"),
+}
+BOOK_STARVED_H = float(os.environ.get("EVBOARD_BOOK_STARVED_H", "24"))
+
+
+def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None):
+    """Board-authored BOOK levers. Returns (levers, items).
+
+    Pure apart from the injected `tuning_mod` (the registry + current values),
+    so it selftests offline. Guards, each of which exists for a reason:
+
+      * NEVER re-assert a lever proprioception currently grades HURTING —
+        the growth rail's own restrict-first contract. A book that got worse
+        under a widening does not get widened again on the next quiet cycle.
+      * ONE step per book per cycle, clamped by the registry. The rail moves
+        at the speed evidence accumulates, not at the speed of a loop.
+      * SATURATION needs the book to be AT its cap, not near it.
+      * STARVATION needs BOTH no open positions AND no closes in the window —
+        a book that is holding is not starved, it is patient.
+      * A book missing from `bot_rows` (dead row, stale publish) proposes
+        NOTHING. Absence of evidence must never read as "widen".
+    """
+    levers, items = {}, []
+    if tuning_mod is None:
+        return levers, items
+    # THE PAYLOAD SHAPE IS `verdicts: {lever: {"verdict": ...}}` — the same
+    # read synthesize_proprioception above already does. An earlier cut of
+    # this line read a `hurting_levers` key that DOES NOT EXIST, so the set
+    # was always empty and the single most important guard here — never
+    # re-widen a lever that measured worse — was silently dead. Its selftest
+    # passed because the fixture invented the same wrong key. Assert against
+    # the real shape, never against a shape you made up.
+    hurting = {str(k) for k, v in ((prop_state or {}).get("verdicts") or {}).items()
+               if isinstance(v, dict) and v.get("verdict") == "hurting"}
+    rows = {str(r.get("bot")): r for r in (bot_rows or []) if r.get("bot")}
+
+    for bot, (cap_lever, gate_lever) in sorted(BOOK_AUTHOR.items()):
+        r = rows.get(bot)
+        if not r:
+            continue                       # no row -> no opinion, ever
+        try:
+            open_n = int(r.get("open_trades") or 0)
+            closed_n = int(r.get("closed_trades") or 0)
+        except (TypeError, ValueError):
+            continue
+        prev = (prior_books or {}).get(bot) or {}
+        prev_closed = int(prev.get("closed") or 0)
+        prev_ts = float(prev.get("ts") or 0.0)
+
+        def _step(lever, why):
+            spec = (tuning_mod.LEVERS or {}).get(lever) or {}
+            if not spec or lever in hurting:
+                return False
+            cur = tuning_mod.get_lever(lever, spec.get("env_default"),
+                                       now_ts=now_ts)
+            step = spec.get("step") or 0
+            if cur is None or not step:
+                return False
+            want = tuning_mod.clamp(lever, cur + step)
+            # round the float ladder: 1.6 - 0.2 is 1.4000000000000001, and an
+            # unrounded value both reads badly in the payload and drifts as
+            # steps accumulate — the `want == cur` no-op check below depends
+            # on a step landing exactly where the previous one left off.
+            if isinstance(want, float):
+                want = round(want, 6)
+            if want is None or want == cur:
+                return False               # already at the bound: nothing to say
+            levers[lever] = {"value": want, "reason": why,
+                             "evidence": f"{bot}: open={open_n} closed={closed_n}"}
+            items.append({
+                "key": f"board:book-{lever}", "severity": "info",
+                "msg": f"🌱 {bot} {why} — {lever} {cur} → {want}",
+                "proposal": f"widen (ENACTED via fleet_tuning): {lever}={want}",
+                "lever": lever, "direction": "expand",
+                "ts": now_ts, "source": "board"})
+            return True
+
+        # [2026-07-30] Prefer the cap the BOOK PUBLISHED (`extra.caps`) over
+        # the cap the registry thinks it enacted. They can legitimately differ
+        # — a bot that has not redeployed, a quarantined lever, a TTL that
+        # lapsed between the write and this read — and the book's own number
+        # is the one that actually gated its trades. Reading the registry
+        # alone risks the author judging saturation against a cap it set
+        # itself and the bot never adopted.
+        cap = None
+        if cap_lever:
+            _caps = (r.get("extra") or {}).get("caps") or {}
+            _key = cap_lever.split(".", 1)[1]
+            try:
+                cap = float(_caps[_key]) if _key in _caps else None
+            except (TypeError, ValueError):
+                cap = None
+            if cap is None:
+                _spec = (tuning_mod.LEVERS or {}).get(cap_lever) or {}
+                cap = tuning_mod.get_lever(cap_lever, _spec.get("env_default"),
+                                           now_ts=now_ts)
+        if cap_lever and cap and open_n >= int(cap):
+            _step(cap_lever, f"SATURATED at {open_n}/{int(cap)}")
+        elif (gate_lever and open_n == 0 and closed_n == prev_closed
+              and prev_ts and (now_ts - prev_ts) >= BOOK_STARVED_H * 3600):
+            _step(gate_lever,
+                  f"STARVED {BOOK_STARVED_H:.0f}h (0 open, no new closes)")
+    return levers, items
+
+
 def synthesize_proprioception(prop_state, now_ts):
     """[2026-07-16] 🦾 proprioception verdicts on the triage board. HURTING
     (a lever whose graded real-world episodes measured net-negative — the
@@ -1040,9 +1166,17 @@ def run_once():
     # [2026-07-15 BLOODSTREAM] one batched beat for the board's whole working
     # set (was ~8 individual round-trips per cycle). Fall back to per-key reads
     # only if the batch came back empty (DB down).
+    # [2026-07-30] fleet-radar / parliament / parliament-tuning were READ via
+    # _g() but never FETCHED here. `_g` returns `_b.get(k) or {}` whenever the
+    # batch read succeeded, so on every HEALTHY cycle those three came back
+    # empty — the radar's per-book edge classification (the senior corrective
+    # on the naive promotion screen) and the whole Parliament section were
+    # silently inert, and only worked when fetch_states FAILED and _g fell
+    # through to per-key load_state. Exactly the shape of a dark consumer.
     _keys = ["fleet-alerts", "evidence-review", "lighter-market", "fleet-risk",
              "brain-lens-forward", "scout-tuner", "xp-judge", "gapscout-census",
-             "impl-shortfall", "fleet-proprioception"]
+             "impl-shortfall", "fleet-proprioception",
+             "fleet-radar", "parliament", "parliament-tuning"]
     _b = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     _ok = bool(_b)
     def _g(k):
@@ -1088,6 +1222,34 @@ def run_once():
     # 🦾 proprioception: what the autonomy stack's own movements measured
     prop_b = _g("fleet-proprioception")
     synth += synthesize_proprioception(prop_b, now)
+
+    # [2026-07-30] the shadow books' author. Reads their published rows, the
+    # registry's current lever values and proprioception's hurting set; emits
+    # at most ONE step per book per cycle. `prior_books` is this board's own
+    # memory of each book's close count, which is what makes "STARVED for
+    # BOOK_STARVED_H" measurable at all — a single snapshot cannot tell a
+    # quiet book from a dead one.
+    prior_books = (prior.get("books") or {})
+    book_levers, book_items = synthesize_books(
+        bot_rows, prior_books, prop_b, now, tuning_mod=tuning)
+    synth += book_items
+    books_out = {}
+    for _bot in BOOK_AUTHOR:
+        _r = next((r for r in (bot_rows or []) if str(r.get("bot")) == _bot), None)
+        if _r is None:
+            # keep the PRIOR memory rather than resetting the clock: a missing
+            # row is a publish gap, and resetting would restart the starvation
+            # window every time the DB blinked.
+            if _bot in prior_books:
+                books_out[_bot] = prior_books[_bot]
+            continue
+        _closed = int(_r.get("closed_trades") or 0)
+        _prev = prior_books.get(_bot) or {}
+        # the clock only RESTARTS when the close count actually moves
+        books_out[_bot] = ({"closed": _closed, "ts": now}
+                           if _closed != int(_prev.get("closed") or -1)
+                           else {"closed": _closed,
+                                 "ts": float(_prev.get("ts") or now)})
 
     # 🏛️ the Parliament: chamber health, book drawdown vs the go-live gate,
     # ML-edge evidence (operator-sanctioned consumer, 21-Jul)
@@ -1248,6 +1410,8 @@ def run_once():
     # ---- enact: ONE combined write per cycle (merge semantics keep other
     # authors' levers; the board's own set must arrive together) -------------
     board_levers = {}
+    if book_levers:
+        board_levers.update(book_levers)
     if growth_levers:
         board_levers.update(
             {k: {"value": v,
@@ -1400,6 +1564,7 @@ def run_once():
         # failed write at a step transition swallows the mandated push forever
         "growth_step": (growth_step if (_gs_enacted or not growth_levers)
                         else prior_step),
+        "books": books_out,
         "live_scale": live_scale_out,
         "live_released_ts": released_out,
         "enacted": ({k: v["value"] for k, v in enacted["levers"].items()
@@ -1902,8 +2067,120 @@ def _selftest():
     # push: unconfigured -> False, no crash
     os.environ.pop("NTFY_TOPIC", None)
     assert send_push("t", "b") is False
+    # ---- [2026-07-30] THE BOOKS' AUTHOR ----------------------------------
+    import fleet_tuning as _tn
+
+    class _T:
+        LEVERS = _tn.LEVERS
+        vals = {}
+
+        @staticmethod
+        def get_lever(name, default, now_ts=None):
+            return _T.vals.get(name, default)
+
+        @staticmethod
+        def clamp(name, value):
+            return _tn.clamp(name, value)
+
+    _bnow = 2_000_000.0
+    _CB = "perps-funding-carry-lshadow"
+    _sat = [{"bot": _CB, "open_trades": 12, "closed_trades": 80}]
+
+    # SATURATED at the cap -> widen the CAPACITY lever exactly one step
+    _T.vals = {}
+    lv, it = synthesize_books(_sat, {}, {}, _bnow, tuning_mod=_T)
+    assert lv.get("carry.max_positions", {}).get("value") == 14, lv
+    assert it and it[0]["direction"] == "expand"
+
+    # BELOW the cap -> say nothing. "Near" is not "at".
+    lv, _ = synthesize_books(
+        [{"bot": _CB, "open_trades": 11, "closed_trades": 80}], {}, {}, _bnow,
+        tuning_mod=_T)
+    assert lv == {}, "a book with a free slot is not saturated"
+
+    # HURTING -> never re-assert, even while saturated (restrict-first)
+    # NOTE the payload shape: `verdicts`, exactly as fleet_proprioception
+    # publishes it and as synthesize_proprioception reads it. A fixture that
+    # invents a key would make this assertion prove nothing.
+    lv, _ = synthesize_books(_sat, {}, {"verdicts": {
+        "carry.max_positions": {"verdict": "hurting"}}}, _bnow, tuning_mod=_T)
+    assert lv == {}, "a lever graded hurting must not be widened again"
+    # a HELPING verdict must NOT block the widening (symmetry check — an
+    # over-broad filter here would freeze the rail permanently)
+    lv, _ = synthesize_books(_sat, {}, {"verdicts": {
+        "carry.max_positions": {"verdict": "helping"}}}, _bnow, tuning_mod=_T)
+    assert lv.get("carry.max_positions", {}).get("value") == 14, \
+        "only HURTING blocks; helping must still widen"
+
+    # AT the registry bound -> nothing to say (clamp makes the step a no-op)
+    _T.vals = {"carry.max_positions": 20}
+    lv, _ = synthesize_books(
+        [{"bot": _CB, "open_trades": 20, "closed_trades": 80}], {}, {}, _bnow,
+        tuning_mod=_T)
+    assert lv == {}, "at the cage bound the author proposes nothing"
+    _T.vals = {}
+
+    # STARVED: 0 open AND no new closes for the window -> loosen the GATE
+    _prior = {_CB: {"closed": 80, "ts": _bnow - 30 * 3600}}
+    lv, _ = synthesize_books([{"bot": _CB, "open_trades": 0,
+                               "closed_trades": 80}], _prior, {}, _bnow,
+                             tuning_mod=_T)
+    assert lv.get("carry.enter_apr", {}).get("value") == 1.4, lv
+
+    # ...but a book that CLOSED something in the window is not starved
+    lv, _ = synthesize_books([{"bot": _CB, "open_trades": 0,
+                               "closed_trades": 81}], _prior, {}, _bnow,
+                             tuning_mod=_T)
+    assert lv == {}, "new closes mean the gate is admitting — leave it alone"
+
+    # ...and neither is a book that is merely HOLDING
+    lv, _ = synthesize_books([{"bot": _CB, "open_trades": 3,
+                               "closed_trades": 80}], _prior, {}, _bnow,
+                             tuning_mod=_T)
+    assert lv == {}, "a book holding positions is patient, not starved"
+
+    # ...nor one whose window has not elapsed yet
+    lv, _ = synthesize_books([{"bot": _CB, "open_trades": 0,
+                               "closed_trades": 80}],
+                             {_CB: {"closed": 80, "ts": _bnow - 3600}}, {},
+                             _bnow, tuning_mod=_T)
+    assert lv == {}, "the starvation window must actually elapse"
+
+    # THE PUBLISHED CAP is preferred over the registry's. A book that has not
+    # adopted a lever (not redeployed, lever quarantined, TTL lapsed) still
+    # gates on ITS number, and judging saturation against a cap the bot never
+    # took is how an author talks itself into widening forever.
+    _T.vals = {"carry.max_positions": 18}       # registry thinks 18...
+    lv, _ = synthesize_books(
+        [{"bot": _CB, "open_trades": 12, "closed_trades": 80,
+          "extra": {"caps": {"max_positions": 12}}}],   # ...the BOOK runs 12
+        {}, {}, _bnow, tuning_mod=_T)
+    assert lv.get("carry.max_positions", {}).get("value") == 20, \
+        "saturation must be judged against the cap the BOOK published"
+    lv, _ = synthesize_books(
+        [{"bot": _CB, "open_trades": 12, "closed_trades": 80,
+          "extra": {"caps": {"max_positions": 18}}}],
+        {}, {}, _bnow, tuning_mod=_T)
+    assert lv == {}, "published cap 18 with 12 open is NOT saturated"
+    _T.vals = {}
+
+    # A MISSING ROW proposes nothing. Absence of evidence is not "widen" —
+    # this is the guard that stops a publish outage from ratcheting every
+    # book wider on every cycle.
+    lv, _ = synthesize_books([], _prior, {}, _bnow, tuning_mod=_T)
+    assert lv == {}, "no row -> no opinion"
+    # a dark rail proposes nothing either
+    assert synthesize_books(_sat, {}, {}, _bnow, tuning_mod=None) == ({}, [])
+
+    # every authored lever must be on the books lane and writable by US —
+    # a lane/author drift here would be dropped silently by write_levers.
+    for _lever in set(list(_tn.LEVERS)) & {
+            l for pair in BOOK_AUTHOR.values() for l in pair if l}:
+        assert _tn.LEVERS[_lever]["lane"] == "lighter-books", _lever
+        assert _tn._author_may_write(_lever, "lighter-books", "evidence-board")
+
     print("evidence_board selftest OK (+ alerts-feed bloodstream: cadence-safe, "
-          "dark=warn, unstamped=info, producer ttl rules)")
+          "dark=warn, unstamped=info, producer ttl rules; BOOK author: saturate/starve/hurting-refusal/bound/missing-row)")
 
 
 if __name__ == "__main__":

@@ -81,7 +81,25 @@ TOP_N = 8
 BRK_RANGE_MIN = float(os.environ.get("SCOUT_BRK_RANGE_MIN", "0.9"))
 DIP_RANGE_MAX = float(os.environ.get("SCOUT_DIP_RANGE_MAX", "0.1"))
 MOMO_CHG_MIN = float(os.environ.get("SCOUT_MOMO_CHG_MIN", "3.0"))
-TICKET_TOP_N = int(os.environ.get("SCOUT_TICKET_TOP_N", "6"))
+# [2026-07-30 SUPPLY CAP — the fleet's tightest offense constraint] 6 -> 12.
+# `strategy_tickets` truncates EVERY lens to this number, and on the live bus
+# `dip` and `divergence` both returned EXACTLY 6 while breakout/momentum
+# returned 5 — a lens returning exactly its cap is a lens whose cap binds.
+# The lens behind it was handed a 6-wide candidate list from which to fill 4
+# slots. NOTE, and this matters because it was the original justification:
+# the "+3.035%/trade vs regime, t=+4.04, the fleet's only measured alpha"
+# claim is RETRACTED. (gi) found a THIRD era-pooling error — the shadow arm's
+# 10 closes span FOUR distinct bar-sets — and the only clean single-policy
+# sample is the live arm's own 11 closes: +0.883%/trade, t=+0.73, 95% CI
+# [-1.81%, +3.57%] STRADDLING ZERO. The cap-binding fact below is unaffected
+# and this widening still stands, but on the weaker and honest rationale:
+# MORE SAMPLE FOR AN UNDECIDED LENS, not feeding a proven winner. Every
+# "closed question" on the Taker (`TT_MAX_OPEN`, `TT_DIV_GAP`, lens on/off,
+# clip size, symbol eligibility) was about ALLOCATING this fixed supply;
+# none of them was about ENLARGING it. Widening here changes no entry bar —
+# the taker's own gates still judge every ticket — it only stops the scout
+# throwing away already-graded candidates. Registry-bounded at 15.
+TICKET_TOP_N = int(os.environ.get("SCOUT_TICKET_TOP_N", "12"))
 
 
 def apply_tuning():
@@ -146,6 +164,22 @@ def book_stats(books, min_qvol):
                 "high": float(b.get("daily_price_high") or 0.0),
                 "low": float(b.get("daily_price_low") or 0.0),
                 "chg": float(b.get("daily_price_change") or 0.0),
+                # [2026-07-30] the venue's own LISTING TIMESTAMP (epoch ms).
+                # It was on every row of this endpoint and thrown away, while
+                # the perp sniper burned 4 candle REST probes per loop to
+                # APPROXIMATE the same fact from a bar count. Exact beats a
+                # proxy, costs nothing extra (this response is already
+                # fetched), and covers all ~202 books at once instead of
+                # four-per-loop. 0 = unparseable, which consumers treat as
+                # "age unknown", never as "brand new".
+                "created_ms": float(b.get("created_at") or 0.0),
+                # [2026-07-30] the venue's OWN fee schedule, per book. Measured
+                # across all 203 active books: taker 0.0000, maker 0.0000, and
+                # `is_taker_fee_enabled` TRUE — i.e. the fee machinery is ON
+                # and the rate happens to be zero, so it CAN change. That is
+                # exactly why this is published rather than hardcoded anywhere.
+                "taker_fee": float(b.get("taker_fee") or 0.0),
+                "maker_fee": float(b.get("maker_fee") or 0.0),
             }
         except (TypeError, ValueError):
             continue
@@ -304,7 +338,8 @@ def strategy_tickets(stats, lighter_apr, divergence=None, regimes=None):
     return {k: v[:TICKET_TOP_N] for k, v in out.items()}
 
 
-def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None):
+def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
+                   now_ms=None):
     """Assemble the published payload from the pure inputs.
     prev_marks: {sym: [qvol, oi]} from the previous snapshot ({} first run).
     regimes: oracle_regimes() output ({} / None -> unstamped tickets)."""
@@ -349,6 +384,10 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None):
     surges.sort(key=lambda d: -d["ratio"])
     oi_moves.sort(key=lambda d: -abs(d["oi_chg_pct"]))
 
+    # [2026-07-30] injectable clock so `ages_d` below stays offline-testable —
+    # the selftest passes a fixed now_ms rather than reading the wall clock.
+    if now_ms is None:
+        now_ms = datetime.now(timezone.utc).timestamp() * 1000.0
     prev_syms = set(prev_marks)
     new_listings = sorted(set(stats) - prev_syms) if prev_syms else []
     delisted = sorted(prev_syms - set(stats)) if prev_syms else []
@@ -431,6 +470,42 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None):
                           "corrected": "2026-07-17",
                           "note": ("apr is TRUE from 2026-07-17; rows stamped "
                                    "8.0 predate the fix — divide those by 8")},
+        # [2026-07-30 FLEET UNIVERSE] PUBLIC per-symbol 24h $volume in $M, all
+        # active books. The data already existed in `_marks` below, but that
+        # key is documented as "compact diff base for the NEXT run" — a
+        # private implementation detail no consumer should bind to. Five
+        # books were carrying hand-typed watchlists (Counterweight ranked 30
+        # of 202, Snap Back 16, Tide Rider 6, Index Rider 3) purely because
+        # there was no supported read of "what does the venue actually
+        # trade, and how big is each book". `fleet_bus.scout_universe()` is
+        # that read; this is the field behind it. Prefer this key; the
+        # accessor still falls back to `_marks` so a consumer shipped ahead
+        # of the scout's next deploy is not dark in the meantime.
+        "vols": {s: round((v.get("qvol") or 0.0) / 1e6, 4)
+                 for s, v in stats.items()},
+        # [2026-07-30] listing age in DAYS per active book, from the venue's
+        # own `created_at`. Measured at ship: majors read 558.6d and exactly 4
+        # books sit under 21d — so "young" is now an exact, venue-sourced fact
+        # rather than a candle-count proxy. Rounded to 0.1d; a book whose
+        # timestamp will not parse is simply absent (age unknown != new).
+        # [2026-07-30 THE FEE IS MEASURED, NOT ASSUMED] The brain estimated
+        # round-trip friction from a CONSTANT — Kraken spot taker 0.26%/side,
+        # a RETIRED venue — and applied it to Lighter books. Publishing the
+        # venue's own number makes the estimate self-correcting: if Lighter
+        # ever switches its (already-enabled) fees on, the brain follows
+        # without a code change. MAX across books, not mean: a cost estimate
+        # should be conservative, and one expensive book must not hide behind
+        # 200 free ones.
+        "fees": {"taker": round(max((v.get("taker_fee") or 0.0)
+                                    for v in stats.values()), 6) if stats else None,
+                 "maker": round(max((v.get("maker_fee") or 0.0)
+                                    for v in stats.values()), 6) if stats else None,
+                 "n_books": len(stats),
+                 "basis": "max taker/maker fee across active books, fraction"},
+        "ages_d": {s: round((now_ms - v["created_ms"]) / 86_400_000.0, 1)
+                   for s, v in stats.items()
+                   if (v.get("created_ms") or 0) > 0
+                   and now_ms > v["created_ms"]},
         # compact diff base for the NEXT run (all active books, not just liquid,
         # so listings/delistings diff over the full set)
         "_marks": {s: [round(v["qvol"], 2), round(v["oi"], 4)]

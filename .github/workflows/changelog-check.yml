@@ -42,6 +42,21 @@ jobs:
       - name: The guard must still be able to see (negative fixture)
         run: python3 scripts/audit_sdk_pin.py --selftest
 
+  lever-bounds:
+    name: Every lever cage fits the value its consumer runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-30] A lever is three things that must agree: the registry
+      # cage, the declared default, and the `os.environ.get` default the bot
+      # actually runs. Only the cage was ever machine-readable; the default
+      # lived in prose and the consumer's value lived in another file, so
+      # drift was undetectable — and had already happened.
+      - name: Registry cage, declared default and consumer default must agree
+        run: python3 scripts/audit_lever_bounds.py
+      - name: The guard must still be able to see (negative fixtures)
+        run: python3 scripts/audit_lever_bounds.py --selftest
+
   venue-purity:
     name: LIGHTER-FIRST (no foreign market data in shipped code)
     runs-on: ubuntu-latest

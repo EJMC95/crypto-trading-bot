@@ -30,9 +30,30 @@ on:
       # funding-carry service
       - 'funding_carry_bot.py'
       - 'Dockerfile.funding'
+      # [2026-07-30] in this image since the carry book gained levers
+      - 'fleet_tuning.py'
       # market-context service
       - 'market_context.py'
       - 'Dockerfile.marketcontext'
+      # [2026-07-30 SHADOW BOTS GET A DEPLOY ROUTE] Until now these five
+      # services had NO auto-deploy rule at all — every change to them shipped
+      # only when a human remembered `railway up`. That is the "code was right
+      # and was never running" class this repo has documented repeatedly, and
+      # it silently applied to the (fz) offense pass: the levers, the widened
+      # universes and Snap Back's adaptive gate would all have sat in main,
+      # green, and never reached a container.
+      - 'lighter_dislocation_bot.py'
+      - 'Dockerfile.dislocation'
+      - 'lighter_funding_spread_bot.py'
+      - 'Dockerfile.fundspread'
+      - 'lighter_index_bot.py'
+      - 'Dockerfile.indexshadow'
+      - 'lighter_perp_sniper.py'
+      - 'Dockerfile.psniper'
+      - 'lighter_trend_bot.py'
+      - 'Dockerfile.trendlighter'
+      - 'lighter_family_bot.py'
+      - 'Dockerfile.familyshadow'
       # shared (freqtrade poller + dashboard + regime supervisor)
       - 'bot_pnl_store.py'
       - 'freqtrade_pnl_poller.py'
@@ -176,7 +197,13 @@ jobs:
             # bot_pnl_store.py change — two red runs + failure emails on
             # 16-Jul while every LIVING service deployed fine.
             # funding-carry service
-            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|venues/|requirements\.txt$)'; then
+            # [2026-07-30] fleet_tuning.py joined this image's COPY set when
+            # the carry book gained growth-rail levers. It must be in BOTH this
+            # grep and the `paths:` block above, or editing the lever registry
+            # would be a silent no-op for funding-carry — caught by
+            # audit_deploy_coverage.py before it shipped, which is the whole
+            # point of that guard.
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}funding-carry"
             fi
             # market-context service (🛰️ instrument collector). Its live-bot
@@ -188,6 +215,34 @@ jobs:
             # had only ever shipped via a manual `railway up`.
             if echo "$changed" | grep -qE '^(market_context\.py$|Dockerfile\.marketcontext$|bot_pnl_store\.py$|funding_basis\.py$|venues/|cleanup_legacy_bots\.py$|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}market-context"
+            fi
+            # [2026-07-30] THE SHADOW BOOKS. Each ships its own image, and each
+            # also carries the shared money/organ modules, so a change to
+            # bot_pnl_store, paper_broker, venues/, fleet_tuning or fleet_bus
+            # must redeploy them too — that is what the (fz) pass proved: it
+            # added fleet_tuning/fleet_bus to five of these images, and without
+            # this block the very levers it registered could never reach them.
+            # Names are RESOLVED against the live Railway service list below,
+            # so a name that does not exist warns instead of red-failing the
+            # build (the "Service not found x3" failure mode noted above).
+            _shared='bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|venues/|requirements\.txt$'
+            if echo "$changed" | grep -qE "^(lighter_dislocation_bot\.py$|Dockerfile\.dislocation$|$_shared)"; then
+              svcs="${svcs:+$svcs,}lighter-dislocation"
+            fi
+            if echo "$changed" | grep -qE "^(lighter_funding_spread_bot\.py$|Dockerfile\.fundspread$|$_shared)"; then
+              svcs="${svcs:+$svcs,}perps-funding-spread"
+            fi
+            if echo "$changed" | grep -qE "^(lighter_index_bot\.py$|Dockerfile\.indexshadow$|$_shared)"; then
+              svcs="${svcs:+$svcs,}equities-regime-shadow"
+            fi
+            if echo "$changed" | grep -qE "^(lighter_perp_sniper\.py$|Dockerfile\.psniper$|$_shared)"; then
+              svcs="${svcs:+$svcs,}lighter-perp-sniper"
+            fi
+            if echo "$changed" | grep -qE "^(lighter_trend_bot\.py$|Dockerfile\.trendlighter$|$_shared)"; then
+              svcs="${svcs:+$svcs,}crypto-trend-daily-shadow"
+            fi
+            if echo "$changed" | grep -qE "^(lighter_family_bot\.py$|Dockerfile\.familyshadow$|$_shared)"; then
+              svcs="${svcs:+$svcs,}family-lighter-shadow"
             fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
@@ -258,10 +313,38 @@ jobs:
             exit 1
           fi
           fail=0
+          # [2026-07-30 NAME RESOLUTION] Print the project's REAL service list
+          # once, and use it to classify each target. Six shadow-bot services
+          # gained deploy rules in this pass and their exact Railway names
+          # could not be verified from the repo — the only names recorded
+          # anywhere were funding-carry, pnl-dashboard, market-context and the
+          # two live bots. Hardcoding a guess would red-fail the build on
+          # "Service not found" (see the retry loop below), so instead: a
+          # target that does NOT appear in the live list is reported loudly as
+          # UNRESOLVED and skipped, while the resolvable ones still deploy.
+          # The printed list is how the next session fixes any name in one
+          # pass, with real data instead of another guess.
+          known=""
+          if known="$(railway service list 2>/dev/null || railway status --json 2>/dev/null)"; then
+            echo "::group::Railway services visible to this token"
+            echo "$known"
+            echo "::endgroup::"
+          else
+            echo "note: could not enumerate services; every target will be attempted."
+            known=""
+          fi
+          unresolved=""
           IFS=',' read -ra SVCS <<< "$SERVICES"
           for raw in "${SVCS[@]}"; do
             svc="$(echo "$raw" | xargs)"
             [ -z "$svc" ] && continue
+            if [ -n "$known" ] && ! echo "$known" | grep -qiF "$svc"; then
+              echo "::warning::service '$svc' is NOT in this project's service list — skipping it."
+              echo "  (a deploy rule exists for it, but the name does not resolve. Fix the"
+              echo "   name in .github/workflows/railway-redeploy.yml against the list above.)"
+              unresolved="${unresolved:+$unresolved,}$svc"
+              continue
+            fi
             echo "::group::railway up --service '$svc'"
             ok=0
             for attempt in 1 2 3; do
@@ -277,6 +360,9 @@ jobs:
             fi
             echo "::endgroup::"
           done
+          if [ -n "$unresolved" ]; then
+            echo "::warning::UNRESOLVED service names (no deploy happened for these): $unresolved"
+          fi
           if [ "$fail" -ne 0 ]; then
             echo "::error::One or more services failed to deploy."
             exit 1

@@ -17,12 +17,12 @@ guarded off on 17-Jul — see the LIGHTER-ONLY table after the fleet table.
 | crypto-{intraday-15m,swing-daily,breakout-4h}-lshadow | spot ports | same service, 29-pair whitelist |
 | crypto-trend-daily-lshadow | 🌊 Tide Rider | shadow only. Its LIVE row `crypto-trend-daily-lighter` was RETIRED 17-Jul — 🎫 Ticket Taker took the slot on the SAME service/keys/sub-account, so leaving both rows would DOUBLE-COUNT the same $34.67 of real money |
 | perps-funding-lighter-lighter / -lshadow | 💸 Funding Farmer | **LIVE** funding harvester + shadow |
-| perps-funding-carry-lshadow | 🌾 Yield Harvester | Lighter shadow. Its HL-data arm (`perps-funding-carry`) is RETIRED 17-Jul — see LIGHTER-ONLY below |
-| perps-funding-spread-lshadow | ⚖️ Counterweight | funding L/S book |
-| lighter-perp-sniper-lshadow | 🎯 Perp Sniper | new-listing sniper |
-| lighter-dislocation-lshadow | 🧲 Snap Back | dislocation fader — reference is LIGHTER'S OWN `index_price` since 17-Jul (was Hyperliquid mids) |
+| perps-funding-carry-lshadow | 🌾 Yield Harvester | Lighter shadow. **[30-Jul] `MAX_POSITIONS` 8 -> 12: measured at 7 of 8, i.e. the fleet's BIGGEST EARNER was one slot from full and turning away carries it had already graded. Its 38.8% win rate is not a defect — carry's return lives in the tail.** Its HL-data arm (`perps-funding-carry`) is RETIRED 17-Jul — see LIGHTER-ONLY below |
+| perps-funding-spread-lshadow | ⚖️ Counterweight | funding L/S book. **[30-Jul] K 5 -> 8 and the universe 30 -> up to 60 via `fleet_bus.scout_universe()`: measured AT its structural cap (10 open = exactly K=5 x 2 legs) while ranking 15% of the venue. Widening the candidate set does not loosen the rule — it still takes exactly top-K/bottom-K, from a real cross-section.**
+| lighter-perp-sniper-lshadow | 🎯 Perp Sniper | new-listing sniper **+ volume-surge AND young-book candidates (30-Jul)** — SCOPE FIX: `new_listings` is a market-set DIFF, so a symbol qualifies for exactly the ONE loop in which it first appears, and only if the process is running with a warm baseline at that moment. That unobservable trigger, not the thesis, is why the book has n=1 in weeks. `young_candidates()` adds every book in its debut regime. **[30-Jul] the age source is now the venue's OWN `created_at`** — it was on every `orderBookDetails` row all along, in a response the scout already fetches, while the sniper burned 4 candle REST probes/loop to approximate it (measured: majors 558.6d, exactly 4 books under 21d). Scout publishes `ages_d`; the candle probe is the fallback for a dark scout and stops entirely once `ages_d` flows. An unparseable timestamp is ABSENT from `ages_d`, never 0 — "age unknown" must not read as "brand new". **The offered-ledger (`surge_done`) is a COOLDOWN map, not a tombstone**: it was a monotone set, so every book offered once was excluded forever and both new sources decayed to silence over weeks — the same starvation on a longer fuse. `not_young` stays permanent, correctly: books only age — the same phenomenon, observable for WEEKS. Candle probe is GOVERNED (`YOUNG_PROBE_BUDGET`/loop) and MONOTONE (`not_young` is permanent — books only age), so probe cost decays to zero. Plus volume-surge candidates — its event was too rare to grade (n=1 in weeks), so `surge_candidates()` adds books surging >=`SNIPER_SURGE_MULT`x 24h volume. They need their OWN dedup ledger (`surge_done`, persisted): every surging book is already in `baseline`, so baseline cannot dedup this source |
+| lighter-dislocation-lshadow | 🧲 Snap Back | dislocation fader — reference is LIGHTER'S OWN `index_price` since 17-Jul (was Hyperliquid mids). **[30-Jul] the entry gate is now a PERCENTILE of the live residual distribution (`adaptive_enter_bps`), not a fixed 150bps — that constant was ~40x its own median residual (3.8bps) and predates the switch off Hyperliquid's mid. FLOORED at `EXIT_BPS * 1.5` and CAPPED at the operator constant: on today's tape the floor usually binds, so the practical effect is 150 -> ~60bps, not "the gate follows the median down". Universe 16 -> up to 40.**
 | lighter-ticket-taker-lshadow | 🎫 Ticket Taker | **trades Lighter Scout's high-conviction tickets** (breakout/dip/momentum long + divergence long/short); stress veto pauses entries at venue |prem| med ≥15bps; closes tagged `<side>-<lens>_<exit>` so the brain grades each lens |
-| equities-regime-lshadow | 📊 Index Rider | stock-perp port (IBKR original RETIRED 14-Jul). 🏆 Stock Leaders (`equities-momentum{,-lshadow}`) RETIRED 17-Jul — maxDD 37-44% vs the 15% go-live gate |
+| equities-regime-lshadow | 📊 Index Rider | stock-perp port (IBKR original RETIRED 14-Jul). **[30-Jul] universe 3 -> 10 (the venue's full non-crypto set, same books the family per-asset gate grades) and clip $250 -> $100 — it carried the LARGEST clip in the fleet on a book with ZERO closed trades. These are the fleet's only source of a regime that is not falling-BTC (SPY +8.1%, QQQ +12.2%, WTI +23.0% over the same window), which is what item 18 needs.** 🏆 Stock Leaders (`equities-momentum{,-lshadow}`) RETIRED 17-Jul — maxDD 37-44% vs the 15% go-live gate |
 | pm-{albanese,morrison,turnbull,abbott,rudd,gillard}-lshadow | 🏛️ the Parliament | six-layer self-evolving shadow fleet (21-Jul, operator ask; named for the last 8 Australian PMs — the other two are its organs: Keating 🔭 scanners+ML, Howard 🧠 ecosystem brain). `parliament_main.py` in the freqtrade-bots container; SQLite ecosystem DB on the persist volume; consumes scout stress + L2 veto + brain mults; closes tagged per lens; `PARLIAMENT_ENABLED=0` idles it |
 
 ### LIGHTER-ONLY (17-Jul, operator: "i only want things running on lighter")
@@ -72,7 +72,45 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
 ### Intelligence layer (main freqtrade-bots container, run_all.sh loops)
 - `lighter_market_scout.py` 🛰️ — ALL ~215 Lighter books: premium stress,
   liquid funding extremes, cross-venue funding divergence, vol/OI moves,
-  listings, **per-strategy tickets** → bot_state `lighter-market`
+  listings, **per-strategy tickets** → bot_state `lighter-market`.
+  **[30-Jul] `TICKET_TOP_N` 6 → 12** — `strategy_tickets` truncates EVERY lens
+  to this number, and on the live bus `dip` and `divergence` both returned
+  EXACTLY 6 (breakout/momentum returned 5); a lens returning exactly its cap
+  is a lens whose cap binds. The lens behind it is the fleet's only measured
+  alpha — **RETRACTED: (gi) found a THIRD era-pooling error; the shadow arm's
+  10 closes span FOUR bar-sets, and the only clean single-policy sample is the
+  LIVE arm's 11 closes at +0.883%/trade, t=+0.73, 95% CI straddling zero. The
+  cap-binding fact stands and the widening stands, but the rationale is now
+  MORE SAMPLE FOR AN UNDECIDED LENS, not feeding a proven winner** — and
+  it was being handed a 6-wide list from which to fill 4 slots. Every "closed
+  question" on the Taker (`TT_MAX_OPEN`, `TT_DIV_GAP`, lens on/off, clip size,
+  symbol eligibility) was about ALLOCATING that fixed supply; **none was about
+  ENLARGING it.** Widening changes no entry bar — the taker's gates still judge
+  every ticket. Also publishes **`vols`** (public per-symbol 24h $M), the field
+  behind `fleet_bus.scout_universe()`
+- **[2026-07-30 THE BRAIN'S FEE BASIS WAS CORRUPTING ITS DIAGNOSES — read
+  before touching `FEE_RT`.]** Three defects compounded: (1) `FEE_RT.get(bot,
+  ...)` was called with the SUFFIXED row name while every key is a BARE base,
+  so not one entry ever matched and every bot took the default — the identical
+  defect the 23-Jul audit fixed for `ERA_START`, five lines away in the same
+  function; (2) that default, `0.0052`, is **Kraken SPOT** taker round trip,
+  and Kraken retired 14-Jul; (3) **Lighter is zero-fee, MEASURED** — all 203
+  active books report `taker_fee 0.0000`/`maker_fee 0.0000`. So the phantom
+  cost was the whole estimate. **The damage was not a mis-report:**
+  `diagnose()` rule 3 fires at `fee_rt/med_loser >= 0.5` with
+  `med_loser <= 0.012` and RETURNS, so at 0.0052 ANY bucket whose median loser
+  is ≤1.04% was called `fee_bleed` — pre-empting rule 4 `regime_timing`, the
+  ONLY diagnosis kind carrying an actuator (`regime_gate`). The brain could
+  not recommend the one thing it can act on. **Fixed so it cannot recur:** the
+  fee is MEASURED, not asserted — the scout publishes the venue's own schedule
+  (`lighter-market.fees`, max across active books) and `bot_learn.fee_rt_for()`
+  is the single owner that prefers it. Note `is_taker_fee_enabled` is TRUE on
+  every book with the rate at zero, so the rate CAN change and a hardcoded 0.0
+  would be this same mistake mirrored; a dark scout falls back to a declared
+  per-venue constant, never another venue's. `tests/autonomy/
+  test_brain_fee_basis.py` pins the key form, the no-foreign-default rule, the
+  rule-3-shadows-rule-4 mechanism, that a REAL fee still earns `fee_bleed`,
+  and that a venue fee hike reaches the diagnosis with no code change.
 - `bot_learn.py` (brain) — L4 stake multipliers (family bot + strategies
   consume via `fleet_bus.py`), per-bucket DIAGNOSIS (exit/entry/fee/regime/
   venue), venue A/B, scout lens-forward grades (taker veto); generates for
@@ -393,7 +431,26 @@ its row is dashboard-retired regardless; stop the process when found.
   Lanes: paper-scanner (INERT — Gap Scout retired) / lighter-scout /
   lighter-taker / lighter-xp (zero
   real money) + lighter-live (`live.clip_scale` + the judge's PROMOTED
-  `live.funding.*` — see growth rail + experiment judge above).
+  `live.funding.*` — see growth rail + experiment judge above)
+  + **lighter-books (2026-07-30)**.
+  **[2026-07-30 THE SHADOW BOOKS GOT LEVERS — operator: "every bot needs every
+  tool at its disposal and every bot needs the ability to grow".** Six books
+  had ZERO registered levers, so the growth rail could not move a single knob
+  on any of them — including `carry.enter_apr`, the best-performing gate in
+  the fleet (+$56.20, n=80, t=2.42). "The ability to grow" is registry
+  membership PLUS a consumer that reads it; they had neither. New lane
+  `lighter-books` (author: evidence board only; the board gains NO new reach
+  into real money): `carry.enter_apr` / `carry.max_positions` /
+  `fundspread.k` / `fundspread.universe_n` / `disloc.enter_pct` /
+  `disloc.universe_n` / `index.max_open` / `trend.rank_by_funding` /
+  `sniper.surge_mult`. Every one is consumed by an `apply_tuning()` in its
+  bot, called each loop, tested in `tests/autonomy/test_book_levers.py` —
+  the registered-but-inert lever is the failure mode that tier exists to
+  prevent. Kill switch: drop `lighter-books` from `FLEET_TUNING_ENACT_LANES`
+  and every consumer reverts to its env default on the next read. Also new:
+  `xp.funding.min_vol` / `live.funding.min_vol` (the Farmer's liquidity floor,
+  judge-promotable — the $10M floor excluded 5 of the venue's 8 most extreme
+  funding books).]
   `gapscout-census` — Gap Scout's epoch-2 episode census; STALE FOREVER since
   17-Jul (bot retired), board's `quiet_hours` ladder fails safe on it. `scout-tuner` — the tuner's cycle log + enactments.
   `fleet-proprioception` — per-lever enactment outcome grades (episodes +
@@ -401,6 +458,18 @@ its row is dashboard-retired regardless; stop the process when found.
   helping-walk), board (🦾 items + live clip gates + gapscout ladder
   discount), judge (early fade), incubator (hurting-gene skip), anything
   else via `fleet_bus.lever_outcome` / `/bus.json`.
+- **`fleet_bus.scout_universe()` / `.scout_funding()` / `.venue_stress_bps()`
+  (2026-07-30)** — the ONE supported read of the venue's live universe, its
+  funding map and its premium stress, off the scout's `lighter-market` key.
+  Built because five books carried hand-typed watchlists written when Lighter
+  was much smaller: Counterweight ranked **30 of 202 books**, Snap Back 16,
+  Tide Rider 6, Index Rider 3. A ranked selector cannot pick a winner it never
+  sees. `scout_universe` reads the scout's new public `vols` map and falls back
+  to its private `_marks` diff base, so a consumer shipped ahead of the scout's
+  next deploy is not dark in the meantime. CONTRACT: any doubt returns
+  `[]`/`{}`/`None`, and **every caller must read empty as "keep my configured
+  list", never as "trade nothing"** — the widening is an enhancement, never a
+  dependency, and no organ outage may shrink a book's universe.
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).
 - Bot identity for multiplier lookup = `bot_name` in each freqtrade config
@@ -463,6 +532,24 @@ All new bots:
   `fleet_tuning`, `funding_basis`, and the LIVE Funding Farmer
   (`lighter_funding_bot.py`). The RETIRED HL funding-carry arm auto-deploys;
   the LIVE Funding Farmer does not.
+  **[2026-07-30 THE SHADOW BOTS GET AUTO-DEPLOY — operator: "find and implement
+  whatever auto deploys necessary so that changes can be implemented in real
+  time".** Six services had NO deploy rule at all — `lighter_dislocation_bot`,
+  `lighter_funding_spread_bot`, `lighter_index_bot`, `lighter_perp_sniper`,
+  `lighter_trend_bot`, `lighter_family_bot` — so every change to them shipped
+  only when a human remembered `railway up`. That silently applied to the (fz)
+  offense pass itself: its levers, widened universes and adaptive gate would
+  have sat in main, green, and reached no container. They now have `paths:`
+  entries AND service greps, including the SHARED modules each image carries
+  (`bot_pnl_store`, `paper_broker`, `venues/`, `fleet_tuning`, `fleet_bus`,
+  `funding_basis`). **Their exact Railway service names could NOT be verified
+  from this repo** (the only names recorded anywhere are funding-carry,
+  pnl-dashboard, market-context and the two live bots), so the deploy step now
+  RESOLVES each target against `railway service list` and reports an
+  unresolvable name as a loud ::warning:: instead of red-failing the build —
+  and prints the real service list, which is how the next session corrects any
+  name in one pass with data instead of another guess. **Check that warning
+  after the first run of this workflow.]**
   **[2026-07-22 CORRECTION — this paragraph was WRONG about two of them.]** The
   `paths:` filter DOES carry `lighter_ticket_taker.py`, `lighter_ticket_replay.py`,
   `venues/**` and most of the intelligence layer (`lighter_market_scout`,
@@ -556,6 +643,23 @@ All new bots:
   (the Parliament pattern), not something the incubator does on its own — it
   breeds genotypes replayed against an EXISTING book's tape and can never
   create a row. See [[incubator-cannot-mint-books]].
+- **THE CAGE MUST FIT THE VALUE (30-Jul, operator: "if the bounds don't
+  correlate properly then recalibrate individually").** A lever is THREE
+  things that must agree: the registry cage (`LEVERS[name]["lo"/"hi"]`), the
+  declared default (`env_default`), and the `os.environ.get` default the
+  consumer ACTUALLY runs. Until 30-Jul only the cage was machine-readable —
+  the default lived in PROSE inside each lever's `note` and the real value
+  lived in another file, so the three could not be compared and had already
+  drifted (`scout.ticket_top_n` moved 6 → 12 in code with its note still
+  saying 6, the same afternoon). All 42 levers now carry `env_default`;
+  `scripts/audit_lever_bounds.py` enforces on every push that each default is
+  INSIDE its cage, that no cage is degenerate, that every book lever's `step`
+  moves and terminates, and — the drift arm, mutation-verified — that the
+  registry default MATCHES the consumer's code. A registry that misdescribes
+  the running value is worse than none: every organ reasoning about headroom
+  reasons from the wrong number. One-sided cages (default pinned at a bound)
+  are REPORTED, not failed — an emission bar at its most restrictive end has
+  all its room in the growth direction, which is usually correct.
 - **BORN-DARK GUARD (17-Jul, after THREE incidents: `fleet_bus` 15-Jul,
   `event_sentinel` 16-Jul, `brain_stats` 17-Jul).** Adding a module, an
   import to shipped code, or a COPY means running

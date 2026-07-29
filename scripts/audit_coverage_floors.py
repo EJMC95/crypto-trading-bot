@@ -30,7 +30,13 @@ from pathlib import Path
 FLOORS = {
     # the two live real-money bots
     "lighter_ticket_taker.py": 90,     # measured 92 (the --selftest-live harness)
-    "lighter_funding_bot.py": 45,      # measured 47
+    # [2026-07-30] 45 -> 50. Finding 14 of the coverage second pass: the (en)
+    # exit-ladder and (eq) flatten seams raised this file ~6pp and NEITHER
+    # raised the floor, leaving 7.7pp of slack on the LIVE real-money bot —
+    # a change could have deleted every assertion those seams added and CI
+    # would still have passed green. Doctrine is "raise the floor in the same
+    # PR that raised the coverage"; this is that raise, late.
+    "lighter_funding_bot.py": 50,      # measured 52.7
     # the shared real-money surface
     "venues/safety.py": 92,            # measured 94
     "venues/equity_guard.py": 93,      # measured 95
@@ -53,6 +59,19 @@ FLOORS = {
     "fleet_tuning.py": 87,             # measured 89
     "brain_stats.py": 96,              # measured 98
     "paper_broker.py": 97,             # measured 99
+    # [2026-07-30 THE SHADOW BOOKS] These six had no pytest tier at all until
+    # they gained growth-rail levers, a widened universe and (Snap Back) an
+    # adaptive gate. They enter the ratchet WITH their first tests, per the
+    # doctrine above — a floor is ground held, never an aspiration. They are
+    # $1k shadow books, so these floors protect EVIDENCE quality rather than
+    # real money: every one of these curves feeds the brain, the risk light
+    # and ultimately a go-live decision.
+    "funding_carry_bot.py": 35,        # measured 37.5 — the fleet's best book
+    "lighter_funding_spread_bot.py": 38,   # measured 40.0
+    "lighter_dislocation_bot.py": 36,  # measured 38.8 (was 27 before the gate work)
+    "lighter_index_bot.py": 32,        # measured 34.6
+    "lighter_perp_sniper.py": 81,      # measured 83.5
+    "lighter_market_scout.py": 80,     # measured 82.5 — the fleet's signal source
 }
 
 

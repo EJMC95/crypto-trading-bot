@@ -11,7 +11,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY lighter_perp_sniper.py bot_pnl_store.py paper_broker.py ./
+COPY lighter_perp_sniper.py bot_pnl_store.py paper_broker.py fleet_tuning.py fleet_bus.py ./
 COPY venues/ ./venues/
 
 ENV PYTHONUNBUFFERED=1

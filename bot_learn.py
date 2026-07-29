@@ -184,9 +184,84 @@ STOPPISH = ("stop_loss", "trailing_stop_loss", "bleed_stop", "stoploss",
             "sl", "stop", "stop_blind")
 # Round-trip friction estimate per bot (fraction of stake). Kraken spot taker
 # 0.26%/side is the freqtrade default; the perps ledger documented ~29bps.
+#
+# [2026-07-30 THE BRAIN WAS DEGRADING HERE — read this before touching it.]
+# Three defects compounded, and the result was the brain attributing losses to
+# a cost that does not exist while SUPPRESSING its only actionable diagnosis:
+#
+#   1. WRONG KEY FORM. `FEE_RT.get(bot, ...)` was called with the SUFFIXED row
+#      name (`perps-funding-carry-lshadow`), while every table key is a BARE
+#      base name. So not one entry ever matched and EVERY bot fell through to
+#      the default. This is the identical defect the 23-Jul audit fixed for
+#      ERA_START — five lines away, in this same function (see the
+#      `_era_base` suffix-strip in main()).
+#   2. A RETIRED VENUE'S FEE AS THE FLEET DEFAULT. 0.0052 is Kraken SPOT taker
+#      round trip. Kraken was retired 14-Jul. Every Lighter book was being
+#      charged it.
+#   3. LIGHTER IS ZERO-FEE, MEASURED. All 203 active books report
+#      `taker_fee 0.0000` / `maker_fee 0.0000` (2026-07-30, via
+#      orderBookDetails). So the phantom cost was the WHOLE estimate.
+#
+# WHY IT CORRUPTED EVIDENCE RATHER THAN MERELY MIS-REPORTING: `diagnose()`
+# rule 3 fires when `fee_rt / med_loser >= 0.5` and `med_loser <= 0.012`, and
+# it RETURNS. With fee_rt = 0.0052 that condition holds for ANY bucket whose
+# median loser is <= 1.04% — an extremely common loss size — so rule 3
+# pre-empted rule 4 (`regime_timing`), which is the ONLY diagnosis kind
+# carrying an actuator (`regime_gate`, main():1568). The brain could not
+# recommend the one thing it is able to act on.
+#
+# HOW IT CANNOT CORRUPT AGAIN: the fee is now MEASURED, not asserted. The
+# scout publishes the venue's own schedule (`lighter-market.fees`, max across
+# active books) and `fee_rt_for()` prefers it. Note `is_taker_fee_enabled` is
+# TRUE on every book with the rate at zero — the machinery is ON and the rate
+# CAN change, so a hardcoded 0.0 would be this same mistake mirrored. A dark
+# scout falls back to the declared per-venue constant, never to another
+# venue's. `tests/autonomy/test_brain_fee_basis.py` pins all of it.
 FEE_RT_DEFAULT = 0.0052
 FEE_RT = {"perps-funding-carry": 0.0029, "perps-rsi-meanrev": 0.0029,
           "perps-donchian-breakout": 0.0029, "event-listing-sniper": 0.0060}
+# Fallback round-trip for a Lighter row when the scout is dark. Lighter is
+# measured zero-fee; this is deliberately NOT 0.0 so a dark scout cannot make
+# the brain claim certainty it has not measured — it is small enough never to
+# trip rule 3 on a realistic loser, and honest about being an estimate.
+LIGHTER_FEE_RT_FALLBACK = float(os.environ.get("BRAIN_LIGHTER_FEE_RT", "0.0002"))
+_LIGHTER_SUFFIXES = ("-lshadow", "-lighter", "-ltest")
+
+
+def fee_base(bot):
+    """The BARE bot name the FEE_RT table is keyed on — suffix-stripped, the
+    same normalisation main() already does for ERA_START."""
+    b = str(bot)
+    for suf in _LIGHTER_SUFFIXES:
+        if b.endswith(suf):
+            return b[: -len(suf)]
+    return b
+
+
+def is_lighter_row(bot):
+    return str(bot).endswith(_LIGHTER_SUFFIXES)
+
+
+def fee_rt_for(bot, venue_fees=None):
+    """Round-trip friction for `bot`, as a fraction of stake. ONE OWNER.
+
+    A LIGHTER row uses the venue's MEASURED schedule when the scout provides
+    one (`venue_fees` = the scout's `fees` block), else the declared Lighter
+    fallback. It must NEVER inherit a non-Lighter default — that inheritance
+    is precisely the defect documented above.
+
+    A non-Lighter row uses the FEE_RT table by BASE name, else FEE_RT_DEFAULT.
+    """
+    if is_lighter_row(bot):
+        try:
+            taker = (venue_fees or {}).get("taker")
+            if taker is not None:
+                # round trip = both sides; a taker-only estimate is optimistic
+                return max(0.0, float(taker) * 2.0)
+        except (TypeError, ValueError):
+            pass
+        return LIGHTER_FEE_RT_FALLBACK
+    return FEE_RT.get(fee_base(bot), FEE_RT_DEFAULT)
 
 # [ERA AWARENESS] Hypotheses must come from trades taken by the CURRENT code.
 # Without this the brain prosecutes today's strategy for yesterday's crimes
@@ -369,7 +444,9 @@ def _mood_at(history, open_ts):
 
 
 def analyse_bot(bot, trades, pulse_hist=None):
-    """Return (scorecard dict, list of candidate hypotheses)."""
+    """Return (scorecard dict, list of candidate hypotheses).
+
+"""
     n = len(trades)
     wins = sum(1 for t in trades if (t.get("profit_abs") or 0) > 0)
     pnl = sum(t.get("profit_abs") or 0 for t in trades)
@@ -779,7 +856,8 @@ def _median(xs):
     return xs[len(xs) // 2] if xs else None
 
 
-def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
+def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget,
+             venue_fees=None):
     """Classify WHY a negative (bot, tag) bucket loses. Returns a dict with
     'primary', 'proposal', and the evidence, or None below the sample floor.
     Rules are ordered by decisiveness; every piece of evidence is optional and
@@ -825,7 +903,7 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget):
 
     med_loser = _median([abs(t.get("profit_ratio") or 0) for t in losers
                          if t.get("profit_ratio") is not None])
-    fee_rt = FEE_RT.get(bot, FEE_RT_DEFAULT)
+    fee_rt = fee_rt_for(bot, venue_fees)
     fee_share = (fee_rt / med_loser) if med_loser else None
 
     matched = counter = 0
@@ -1452,6 +1530,22 @@ def main():
     # the persistence memory survives.
     venue_ab = venue_ab_report()
     regime_hist = _load_regime_history()
+    # [2026-07-30] the venue's MEASURED fee schedule, from the scout. Without
+    # this load the whole fee_rt_for() path would be another fed-by-nobody
+    # consumer: it would silently take the dark-scout fallback forever and the
+    # "measured, not asserted" claim above would be false. Fail-safe: any
+    # doubt leaves `venue_fees` None and fee_rt_for uses the declared
+    # per-venue fallback — never another venue's constant.
+    venue_fees = None
+    try:
+        _lm = store.load_state("lighter-market") or {}
+        _f = _lm.get("fees")
+        if isinstance(_f, dict) and _f.get("taker") is not None:
+            venue_fees = _f
+            print(f"  venue fees (measured, {_f.get('n_books')} books): "
+                  f"taker {_f['taker']} maker {_f.get('maker')}")
+    except Exception:  # noqa: BLE001
+        venue_fees = None
     drift_budget = {"left": 120}   # bounds Lighter candle work per run
     diagnoses = {}
     for bot, trs in sorted(era_trades.items()):
@@ -1461,7 +1555,8 @@ def main():
         for t in trs:
             buckets[str(t.get("enter_tag") or "(untagged)")].append(t)
         for tag, bucket in sorted(buckets.items()):
-            d = diagnose(bot, tag, bucket, regime_hist, venue_ab, drift_budget)
+            d = diagnose(bot, tag, bucket, regime_hist, venue_ab,
+                         drift_budget, venue_fees=venue_fees)
             if d is None:
                 continue
             diagnoses[f"{bot}|{tag}"] = d

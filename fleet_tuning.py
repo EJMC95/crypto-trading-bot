@@ -86,7 +86,7 @@ CACHE_SEC = 60.0
 ENACT_LANES = {s.strip() for s in os.environ.get(
     "FLEET_TUNING_ENACT_LANES",
     "paper-scanner,lighter-scout,lighter-taker,lighter-live,lighter-xp,"
-    "event-sentinel"
+    "event-sentinel,lighter-books"
     ).split(",") if s.strip()}
 
 # [2026-07-16 AUDIT FIX] author -> lanes each author may WRITE. "The judge is
@@ -97,8 +97,14 @@ ENACT_LANES = {s.strip() for s in os.environ.get(
 # judge owns live.funding.*). An author absent from this map keeps the old
 # behavior for NON-live lanes but can never write live.*.
 AUTHOR_LANES = {
+    # [2026-07-30] the board gains `lighter-books` — the six shadow books
+    # that had no lever surface at all. It is the fleet's general-purpose
+    # growth-rail author (bounded, TTL'd, auto-reverting) and these are
+    # $1k shadow books, so the blast radius is bounded twice over. The
+    # board still cannot write `live.funding.*` (that is the judge's, by
+    # name-prefix below) and gains no new reach into real money.
     "evidence-board":   {"paper-scanner", "lighter-scout", "lighter-taker",
-                         "lighter-live"},
+                         "lighter-live", "lighter-books"},
     "scout-tuner":      {"lighter-scout", "lighter-taker"},
     "experiment-judge": {"lighter-xp", "lighter-live"},
     # [2026-07-21] the sentinel tunes ONLY its own detection lane
@@ -134,17 +140,17 @@ LEVERS = {
     # "front-page only".
     "evsent.min_sources": {
         "kind": "int", "lo": 2, "hi": 5, "lane": "event-sentinel",
-        "note": "distinct headlines to activate an event; default 2"},
+        "note": "distinct headlines to activate an event; default 2", "env_default": 2},
     "evsent.severity_bar": {
         "kind": "float", "lo": 0.30, "hi": 0.80, "lane": "event-sentinel",
-        "note": "min severity to freeze a sector anticipation; default 0.45"},
+        "note": "min severity to freeze a sector anticipation; default 0.45", "env_default": 0.45},
     # Gap Scout (scanner-cross-exchange-arb): paper-only census organ.
     "gapscout.prefilter_gap": {
         "kind": "float", "lo": 0.0010, "hi": 0.0030, "lane": "paper-scanner",
-        "note": "stage-1 raw-gap bar for book-checking; default 0.0020"},
+        "note": "stage-1 raw-gap bar for book-checking; default 0.0020", "env_default": 0.002},
     "gapscout.max_book_fetches": {
         "kind": "int", "lo": 10, "hi": 60, "lane": "paper-scanner",
-        "note": "order books pulled per scan (2/pair); default 30"},
+        "note": "order books pulled per scan (2/pair); default 30", "env_default": 30},
     "gapscout.extra_exchanges": {
         "kind": "csv", "allowed": {"kucoin", "gateio", "mexc", "bitget", "htx"},
         "lane": "paper-scanner",
@@ -154,13 +160,15 @@ LEVERS = {
     # the brain), not what trades. Widening = faster lens learning.
     "scout.ticket_top_n": {
         "kind": "int", "lo": 6, "hi": 15, "lane": "lighter-scout",
-        "note": "tickets emitted per lens per scan; default 6"},
+        "note": "tickets emitted per lens per scan; default 12 (was 6 until "
+                "2026-07-30 — it was the supply cap on the fleet's only "
+                "measured alpha)", "env_default": 12},
     "scout.brk_range_min": {
         "kind": "float", "lo": 0.80, "hi": 0.90, "lane": "lighter-scout",
-        "note": "breakout lens: min range_pos to emit; default 0.90"},
+        "note": "breakout lens: min range_pos to emit; default 0.90", "env_default": 0.9},
     "scout.dip_range_max": {
         "kind": "float", "lo": 0.10, "hi": 0.25, "lane": "lighter-scout",
-        "note": "dip lens: max range_pos to emit; default 0.10"},
+        "note": "dip lens: max range_pos to emit; default 0.10", "env_default": 0.1},
     # [2026-07-21 IMB-20, review-sanctioned] divergence-ticket emission gap
     # (TRUE pp since the basis fix). The winner lens (only one positive at
     # every horizon, ehit4h Wilson lo 0.509) had no diet lever — the one
@@ -168,37 +176,37 @@ LEVERS = {
     # tickets; fills stay gated by the taker's bars.
     "scout.div_gap_pp": {
         "kind": "float", "lo": 20.0, "hi": 75.0, "lane": "lighter-scout",
-        "note": "divergence-ticket emission gap (TRUE pp); env default 37.5"},
+        "note": "divergence-ticket emission gap (TRUE pp); env default 37.5", "env_default": 37.5},
     "scout.momo_chg_min": {
         "kind": "float", "lo": 2.0, "hi": 3.0, "lane": "lighter-scout",
-        "note": "momentum lens: min day change %% to emit; default 3.0"},
+        "note": "momentum lens: min day change %% to emit; default 3.0", "env_default": 3.0},
     # Ticket Taker 🎫 (SHADOW $1k book) — conviction bars + exit ladder.
     # Bounds = the 21-Jul agenda's own sweep grids. The tuner only writes
     # these after the change beats/matches baseline on BOTH halves of the
     # recorded tape (lighter_ticket_replay through the taker's real code).
     "taker.dip_range": {
         "kind": "float", "lo": 0.05, "hi": 0.15, "lane": "lighter-taker",
-        "note": "dip conviction bar (range_pos <=); default 0.05"},
+        "note": "dip conviction bar (range_pos <=); default 0.05", "env_default": 0.05},
     "taker.brk_range": {
         "kind": "float", "lo": 0.90, "hi": 0.97, "lane": "lighter-taker",
-        "note": "breakout conviction bar (range_pos >=); default 0.95"},
+        "note": "breakout conviction bar (range_pos >=); default 0.95", "env_default": 0.95},
     "taker.momo_chg": {
         "kind": "float", "lo": 3.0, "hi": 6.0, "lane": "lighter-taker",
-        "note": "momentum conviction bar (day %% >=); default 5.0"},
+        "note": "momentum conviction bar (day %% >=); default 5.0", "env_default": 5.0},
     "taker.div_gap_pp": {
         # [2026-07-17] bounds /8 with the fleet-wide funding BASIS FIX: the
         # apr these pp are measured against was 8x TRUE. Same bar, true units.
         "kind": "float", "lo": 37.5, "hi": 87.5, "lane": "lighter-taker",
-        "note": "divergence conviction bar (|gap| pp >=); default 62.5"},
+        "note": "divergence conviction bar (|gap| pp >=); default 62.5", "env_default": 62.5},
     "taker.tp": {
         "kind": "float", "lo": 0.03, "hi": 0.06, "lane": "lighter-taker",
-        "note": "take-profit fraction; default 0.04"},
+        "note": "take-profit fraction; default 0.04", "env_default": 0.04},
     "taker.sl": {
         "kind": "float", "lo": -0.04, "hi": -0.02, "lane": "lighter-taker",
-        "note": "stop-loss fraction; default -0.03"},
+        "note": "stop-loss fraction; default -0.03", "env_default": -0.03},
     "taker.max_hold_h": {
         "kind": "float", "lo": 24.0, "hi": 72.0, "lane": "lighter-taker",
-        "note": "max hold hours; default 48"},
+        "note": "max hold hours; default 48", "env_default": 48.0},
     # [2026-07-21] post-stop re-entry cooldown (TT_SL_COOLDOWN_H, default
     # 2.0h — the same-day churn fix: NBIS -$5.37/8, BOT -$4.60/3, every
     # same-minute re-entry a loser). Registered so the proposal channel and
@@ -210,13 +218,13 @@ LEVERS = {
     "taker.sl_cooldown_h": {
         "kind": "float", "lo": 0.0, "hi": 24.0, "lane": "lighter-taker",
         "note": "hours a symbol stays entry-blocked after its own sl close; "
-                "default 2.0, 0 = off"},
+                "default 2.0, 0 = off", "env_default": 2.0},
     # LIVE lane 💰 — one lever, a multiplier on the env clip (LIGHTER_ORDER_USD).
     # SafetyRails' notional cap stays senior at order time: this reshapes
     # clips, it can never raise total live exposure.
     "live.clip_scale": {
         "kind": "float", "lo": 0.5, "hi": 1.5, "lane": "lighter-live",
-        "note": "live clip multiplier; 1.0 = the operator's env sizing"},
+        "note": "live clip multiplier; 1.0 = the operator's env sizing", "env_default": 1.0},
     # Funding Farmer EXPERIMENT arm 🧪 (the -lshadow twin ONLY — zero real
     # money). The experiment judge runs ONE candidate at a time here; while
     # a candidate runs, the twin is an experiment arm, not a control arm.
@@ -229,13 +237,13 @@ LEVERS = {
         # — any value inside still needs the judge's full paired bar, and
         # THIS twin is where the experiment runs first.
         "kind": "float", "lo": 0.03125, "hi": 0.12, "lane": "lighter-xp",
-        "note": "shadow twin's funding entry gate (TRUE apr); env default 0.05"},
+        "note": "shadow twin's funding entry gate (TRUE apr); env default 0.05", "env_default": 0.05},
     "xp.funding.take_profit": {
         "kind": "float", "lo": 0.03, "hi": 0.08, "lane": "lighter-xp",
-        "note": "shadow twin's TP; env default 0.04"},
+        "note": "shadow twin's TP; env default 0.04", "env_default": 0.04},
     "xp.funding.max_hold_h": {
         "kind": "float", "lo": 24.0, "hi": 96.0, "lane": "lighter-xp",
-        "note": "shadow twin's max hold; env default 72"},
+        "note": "shadow twin's max hold; env default 72", "env_default": 72.0},
     # …and their PROMOTED-to-live counterparts. Written by exactly ONE
     # author — the experiment judge — and only after the paired promotion
     # bar (>=7d, >=30 shadow closes, beats live per-trade on the window AND
@@ -248,13 +256,13 @@ LEVERS = {
         # judge remains the ONLY writer here, and its paired promotion bar
         # is unchanged — the cage widened, the gatekeeper did not).
         "kind": "float", "lo": 0.03125, "hi": 0.12, "lane": "lighter-live",
-        "note": "PROMOTED funding entry gate (TRUE apr); env default 0.05"},
+        "note": "PROMOTED funding entry gate (TRUE apr); env default 0.05", "env_default": 0.05},
     "live.funding.take_profit": {
         "kind": "float", "lo": 0.03, "hi": 0.08, "lane": "lighter-live",
-        "note": "PROMOTED TP; env default 0.04"},
+        "note": "PROMOTED TP; env default 0.04", "env_default": 0.04},
     "live.funding.max_hold_h": {
         "kind": "float", "lo": 24.0, "hi": 96.0, "lane": "lighter-live",
-        "note": "PROMOTED max hold; env default 72"},
+        "note": "PROMOTED max hold; env default 72", "env_default": 72.0},
     # [2026-07-24/25] Farmer GROWTH levers (Lever 1 explore, Lever 2 conviction),
     # promotable to real money by the experiment judge on the operator-chosen
     # FASTER bar (~2-3d, net-positive + beats-live, tight fade-revert). explore_k
@@ -264,16 +272,16 @@ LEVERS = {
     # the ceiling. Same single-author rule: the judge alone writes live.funding.*.
     "xp.funding.explore_k": {
         "kind": "int", "lo": 0, "hi": 3, "lane": "lighter-xp",
-        "note": "shadow twin's explore slots; env default 0"},
+        "note": "shadow twin's explore slots; env default 0", "env_default": 0},
     "xp.funding.conviction_hi": {
         "kind": "float", "lo": 1.0, "hi": 2.2, "lane": "lighter-xp",
-        "note": "shadow twin's conviction up-cap; 1.0 = off"},
+        "note": "shadow twin's conviction up-cap; 1.0 = off", "env_default": 2.2},
     "live.funding.explore_k": {
         "kind": "int", "lo": 0, "hi": 3, "lane": "lighter-live",
-        "note": "PROMOTED explore slots; env default 0"},
+        "note": "PROMOTED explore slots; env default 0", "env_default": 0},
     "live.funding.conviction_hi": {
         "kind": "float", "lo": 1.0, "hi": 2.2, "lane": "lighter-live",
-        "note": "PROMOTED conviction up-cap; 1.0 = off, env default off"},
+        "note": "PROMOTED conviction up-cap; 1.0 = off, env default off", "env_default": 2.2},
     # [2026-07-28 D7] Farmer slope gate as a JUDGE-reachable lever (0 = off,
     # 1 = on; env default FUNDING_SLOPE_GATE=on). The (dp) Lighter backtest
     # refuted the gate on this venue (live gate 0.05: durable-history -$14.90
@@ -283,10 +291,85 @@ LEVERS = {
     # writes the live twin.
     "xp.funding.slope_gate": {
         "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-xp",
-        "note": "shadow twin's funding slope gate; 0 = off, env default on"},
+        "note": "shadow twin's funding slope gate; 0 = off, env default on", "env_default": 1},
     "live.funding.slope_gate": {
         "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-live",
-        "note": "PROMOTED slope gate; 0 = off, env default on"},
+        "note": "PROMOTED slope gate; 0 = off, env default on", "env_default": 1},
+    # [2026-07-30 LIQUIDITY FLOOR as a lever] The Farmer's $10M floor
+    # EXCLUDES 5 of the venue's 8 most extreme funding books, including the
+    # two most extreme (measured: H100 -99.0% APR at $0.14M, XLM -89.4% at
+    # $0.26M, SKR -78.8% at $0.25M, XPD +47.3% at $0.11M, TRUMP -41.2% at
+    # $0.22M). Its own sibling, the carry book, runs a $2M floor and is the
+    # fleet's biggest earner. The floor is a CRUDE PROXY for the thing the
+    # scan already measures directly (SCAN_MAX_SLIP_BPS on the real clip),
+    # so lowering it is not "less risk control", it is deferring to the
+    # better instrument. Doctrine path: the shadow twin explores, the judge
+    # alone promotes. Env defaults untouched by this registration.
+    "xp.funding.min_vol": {
+        "kind": "float", "lo": 2e6, "hi": 20e6, "lane": "lighter-xp",
+        "note": "shadow twin's 24h $ turnover floor; env default 10e6", "env_default": 10000000.0},
+    "live.funding.min_vol": {
+        "kind": "float", "lo": 2e6, "hi": 20e6, "lane": "lighter-live",
+        "note": "PROMOTED turnover floor; env default 10e6", "env_default": 10000000.0},
+    # ---------------------------------------------------------------------
+    # [2026-07-30 THE SHADOW BOOKS GET LEVERS — operator: "every bot needs
+    # every tool at its disposal and every bot needs the ability to grow"]
+    #
+    # Until now SIX books had ZERO registered levers: the Yield Harvester,
+    # Counterweight, Snap Back, Index Rider, Tide Rider and the Perp Sniper.
+    # The growth rail could not move a single knob on any of them — including
+    # `carry.enter_apr`, which is the best-performing gate in the fleet
+    # (+$56.20 on n=80, t=2.42, both halves positive). "The ability to grow"
+    # is not a metaphor here; it is registry membership, and they had none.
+    #
+    # All six are $1,000 SHADOW books — zero real money — so this lane is
+    # bounded by construction as well as by these `lo`/`hi` pairs. Kill
+    # switch: drop `lighter-books` from FLEET_TUNING_ENACT_LANES and every
+    # consumer below reverts to its operator env default on the next read.
+    "carry.enter_apr": {
+        # env default 1.60 = 20% TRUE apr = the top ~14% of the venue's
+        # funding distribution (measured over all 202 books). Bounds span
+        # 10%-40% TRUE so the rail can test BOTH directions around the value
+        # that is currently winning — a tail-seeking bar is the carry book's
+        # whole thesis and it has never been measured against its neighbours.
+        "kind": "float", "lo": 0.80, "hi": 3.20, "lane": "lighter-books",
+        "note": "Yield Harvester funding entry gate; env default 1.60 (=20% TRUE)", "env_default": 1.6, "step": -0.2},
+    "carry.max_positions": {
+        # measured AT 7 open of 8 — the fleet's biggest earner is one slot
+        # from full and cannot take the eighth-best carry it has graded.
+        "kind": "int", "lo": 6, "hi": 20, "lane": "lighter-books",
+        "note": "Yield Harvester concurrent carries; env default 12", "env_default": 12, "step": 2},
+    "fundspread.k": {
+        # measured AT its cap: 10 open = exactly K=5 x 2 legs.
+        "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
+        "note": "Counterweight legs per side; env default 8", "env_default": 8, "step": 1},
+    "fundspread.universe_n": {
+        "kind": "int", "lo": 20, "hi": 90, "lane": "lighter-books",
+        "note": "Counterweight scout-universe width; env default 60", "env_default": 60, "step": 10},
+    "disloc.enter_pct": {
+        # Snap Back's gate was a FIXED 150bps against a measured median
+        # residual of 3.8bps — ~40x the middle of its own signal, which is
+        # why it has 10 closes. Now a PERCENTILE of the live residual
+        # distribution, so it tracks the venue instead of a constant
+        # inherited from the Hyperliquid-referenced era.
+        "kind": "float", "lo": 0.90, "hi": 0.999, "lane": "lighter-books",
+        "note": "Snap Back entry percentile of the live residual; default 0.98", "env_default": 0.98, "step": -0.01},
+    "disloc.universe_n": {
+        "kind": "int", "lo": 10, "hi": 60, "lane": "lighter-books",
+        "note": "Snap Back scout-universe width; env default 40", "env_default": 40, "step": 10},
+    "index.max_open": {
+        "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
+        "note": "Index Rider concurrent sleeves; env default = universe size", "env_default": 10, "step": 2},
+    "trend.rank_by_funding": {
+        "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-books",
+        "note": "Tide Rider ranks candidates by funding; env default 1 (on)", "env_default": 1, "step": 0},
+    "sniper.surge_mult": {
+        # the sniper's event (a brand-new listing) is too rare to grade —
+        # n=1 in weeks, and `new_listings` is empty on the bus right now.
+        # This widens the TRIGGER to the adjacent population (young book +
+        # volume surge) rather than widening any risk bound.
+        "kind": "float", "lo": 2.0, "hi": 8.0, "lane": "lighter-books",
+        "note": "Perp Sniper volume-surge trigger multiple; env default 3.0", "env_default": 3.0, "step": -0.5},
 }
 
 

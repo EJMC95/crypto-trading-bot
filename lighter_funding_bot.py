@@ -334,6 +334,10 @@ _ENV_BARS = {"enter_apr": ENTER_APR, "scan_enter": SCAN_ENTER,
              # Lever 1/2 growth knobs — env defaults so a lever's expiry reverts
              # cleanly. explore_k numeric; conviction as (mode, lo, hi).
              "explore_k": SCAN_EXPLORE_K,
+             # [2026-07-30] the liquidity floor is a lever now (xp/live
+             # .funding.min_vol) — snapshot the env value so an expiry reverts
+             # to the operator's number, never to whatever a lever left behind.
+             "min_vol": MIN_VOL,
              "conviction": (CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI)}
 _ACTIVE_BARS = {}    # what this arm is running NOW — stamped on every close
 
@@ -344,7 +348,7 @@ def apply_levers(mode):
     levers for the log; refreshes _ACTIVE_BARS either way."""
     global ENTER_APR, SCAN_ENTER, ENTER_GATE, TAKE_PROFIT, MAX_HOLD_H
     global SCAN_EXPLORE_K, CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI
-    global SLOPE_GATE
+    global SLOPE_GATE, MIN_VOL
     prefix = {"lighter_shadow": "xp.funding.", "lighter_live": "live.funding."}.get(mode)
     moved = {}
     ENTER_APR, SCAN_ENTER = _ENV_BARS["enter_apr"], _ENV_BARS["scan_enter"]
@@ -353,11 +357,21 @@ def apply_levers(mode):
     SCAN_EXPLORE_K = _ENV_BARS["explore_k"]
     CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI = _ENV_BARS["conviction"]
     SLOPE_GATE = bool(_ENV_BARS.get("slope_gate", 1))
+    MIN_VOL = _ENV_BARS["min_vol"]
     if tuning is not None and prefix:
         ea = tuning.get_lever(prefix + "enter_apr", ENTER_APR)
         if ea != ENTER_APR:
             ENTER_APR = SCAN_ENTER = ea         # one coherent gate
             moved[prefix + "enter_apr"] = ea
+        # [2026-07-30] `min_vol` was REGISTERED in (fz) and read by nobody:
+        # the judge could have promoted it, stamped the promotion, and the
+        # real-money liquidity floor would never have moved. A promotion that
+        # reports success while changing no behaviour is worse than an absent
+        # lever — it manufactures false evidence for the next decision.
+        mv = tuning.get_lever(prefix + "min_vol", MIN_VOL)
+        if mv != MIN_VOL:
+            MIN_VOL = mv
+            moved[prefix + "min_vol"] = mv
         tp = tuning.get_lever(prefix + "take_profit", TAKE_PROFIT)
         if tp != TAKE_PROFIT:
             TAKE_PROFIT = tp

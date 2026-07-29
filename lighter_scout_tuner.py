@@ -113,8 +113,28 @@ SCOUT_LADDERS = {
                    float(os.environ.get("SCOUT_DIV_GAP", "37.5")),
                    [37.5, 30.0, 25.0, 20.0]),
 }
+# [2026-07-30] The ladder's DEFAULT is read from the lever registry, not
+# hardcoded here. It was pinned at "6" while (fz) moved the scout's own
+# default to 12 — so this tuner computed its ladder position from 6, and
+# every cycle it "widened" to 9: a 25% CUT to the ticket supply feeding the
+# fleet's only measured alpha, logged as a widening. The registry now carries
+# a machine-readable `env_default` for every lever (audit_lever_bounds.py
+# keeps it equal to the consumer's real code default), so reading it here
+# makes this class of drift impossible rather than merely fixed once.
+def _registry_default(lever, fallback):
+    try:
+        import fleet_tuning as _ft
+        v = (_ft.LEVERS.get(lever) or {}).get("env_default")
+        return type(fallback)(v) if v is not None else fallback
+    except Exception:  # noqa: BLE001
+        return fallback
+
+
 TOP_N_LADDER = ("scout.ticket_top_n",
-                int(os.environ.get("SCOUT_TICKET_TOP_N", "6")), [6, 9, 12, 15])
+                int(os.environ.get(
+                    "SCOUT_TICKET_TOP_N",
+                    str(_registry_default("scout.ticket_top_n", 12)))),
+                [6, 9, 12, 15])
 # Exit-ladder sweep grid = the 21-Jul agenda item-2 grid, verbatim
 SWEEP_TP = [0.03, 0.04, 0.05, 0.06]
 # [2026-07-29 (fp)] THE STOP IS PINNED — this replay CANNOT price it.
@@ -886,7 +906,18 @@ def _selftest():
                                       "divergence": dict(_fed)})
     assert sl.get("scout.dip_range_max") == 0.15, (sl, slog2)
     assert "scout.brk_range_min" not in sl, sl
-    assert sl.get("scout.ticket_top_n") == 9, sl
+    # [2026-07-30] Assert the RULE — "one rung above whatever the scout's real
+    # default is" — not the literal 9. The hardcoded 9 was encoding the BUG:
+    # this ladder's default was pinned at 6 while (fz) moved the scout to 12,
+    # so the tuner computed from 6 and "widened" to 9 — a 25% CUT to the
+    # ticket supply feeding the fleet's only measured alpha, logged as a
+    # widening, with this assertion holding it in place. The default now comes
+    # from the lever registry (audit_lever_bounds keeps that equal to the
+    # scout's code), so this test follows the fleet instead of freezing it.
+    _dflt, _ladder = TOP_N_LADDER[1], TOP_N_LADDER[2]
+    _expect = next(v for v in _ladder if v > _dflt)
+    assert sl.get("scout.ticket_top_n") == _expect, (sl, _dflt, _expect)
+    assert _expect > _dflt, "a 'widening' that lowers the supply is a cut"
     # [2026-07-21b] a lens POSITIVE at the floor now earns the WINNER diet
     # (one notch) — the pre-fix contract ({} here) was exactly the IMB-20
     # gap: the winner lens's emission lever was unreachable at the floor.
@@ -913,7 +944,8 @@ def _selftest():
                                    "divergence": dict(_fed)})
     assert "scout.dip_range_max" not in sl3, sl3
     # HELPING diet levers walk one notch DEEPER while under the floor
-    # (0.15 -> 0.20, top_n 9 -> 12); un-helped levers keep the first notch
+    # (0.15 -> 0.20, and top_n one rung past its first); un-helped levers keep
+    # the first notch
     sl4, _ = desired_scout_levers({"dip": {"n4h": 25, "avg4h_pct": 1.1,
                                            "hit4h": 0.92},
                                    "breakout": {"n4h": 20},
@@ -923,7 +955,12 @@ def _selftest():
                                            "scout.ticket_top_n"})
     assert sl4.get("scout.dip_range_max") == 0.20, sl4
     assert sl4.get("scout.brk_range_min") == 0.87, sl4   # not helped: notch 1
-    assert sl4.get("scout.ticket_top_n") == 12, sl4
+    # [2026-07-30] the HELPING walk is "one notch deeper than the first" —
+    # expressed against the ladder, not frozen at 12 (which was the deeper
+    # rung only while this ladder's default was wrongly pinned at 6).
+    _deeper = [v for v in _ladder if v > _dflt]
+    assert sl4.get("scout.ticket_top_n") == (_deeper[1] if len(_deeper) > 1
+                                             else _deeper[-1]), sl4
     # [2026-07-21 IMB-20] a STARVING divergence lens finally has a diet lever
     # to widen (37.5 -> 30.0)…
     sl5, _ = desired_scout_levers({"dip": {"n4h": 100, "avg4h_pct": 1.0,

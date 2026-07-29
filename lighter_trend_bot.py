@@ -36,6 +36,12 @@ import time
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+
+# [2026-07-30] growth rail; Dockerfile.trendlighter already COPYs fleet_tuning.
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
 import funding_basis
 from venues import marks, venue_context
 from venues.safety import open_notional
@@ -55,7 +61,13 @@ MAX_OPEN_POSITIONS = int(os.environ.get("TREND_MAX_OPEN", "6"))
 # first (a long pays funding; high funding = crowded, frothy, prone to dump).
 # Walk-forward validated to beat first-come list order at 2-3 slots. OFF by default:
 # with 6 coins / 6 slots (or ample margin) it never binds and behaviour is identical.
-RANK_BY_FUNDING = os.environ.get("TREND_RANK_BY_FUNDING", "0").lower() in ("1", "true", "yes")
+# [2026-07-30 CONNECT IT TO THE PROVEN EDGE — default 0 -> 1] Every
+# profitable book in this fleet is a funding book; every purely directional
+# one is flat or negative on this one-regime tape. This book ranks its
+# candidates; ranking them by funding costs nothing, changes no entry gate,
+# and points the one free choice it makes at the signal class that actually
+# earns here. Registry-bounded lever `trend.rank_by_funding` (0/1).
+RANK_BY_FUNDING = os.environ.get("TREND_RANK_BY_FUNDING", "1").lower() in ("1", "true", "yes")
 CATASTROPHIC_STOP = float(os.environ.get("TREND_CATASTROPHIC_STOP", "0.35"))  # seatbelt
 DAILY_LOSS_LIMIT = float(os.environ.get("TREND_DAILY_LOSS", "0.10"))
 LOOP_SECONDS = int(os.environ.get("TREND_LOOP_SECONDS", "3600"))  # daily signal, hourly poll
@@ -130,6 +142,30 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, reaso
             reason="long_" + reason, venue=venue, shadow=shadow)
     except Exception:
         pass
+
+
+# [2026-07-30 AUTO-REVERT FIX] see the sibling books.
+_ENV_DEFAULT_RANK = 1 if RANK_BY_FUNDING else 0
+
+
+def apply_tuning():
+    """Growth-rail levers over the env defaults; {} when the rail is dark."""
+    global RANK_BY_FUNDING
+    if tuning is None:
+        return {}
+    moved = {}
+    cur = 1 if RANK_BY_FUNDING else 0
+    try:
+        # the ENV default, never the current global — see the auto-revert
+        # note in the sibling books: passing `cur` makes the rail a one-way
+        # ratchet, because get_lever returns its default on expiry.
+        val = tuning.get_lever("trend.rank_by_funding", _ENV_DEFAULT_RANK)
+    except Exception:  # noqa: BLE001
+        return {}
+    if int(val) != cur:
+        RANK_BY_FUNDING = bool(int(val))
+        moved["trend.rank_by_funding"] = int(val)
+    return moved
 
 
 def main():
@@ -330,6 +366,11 @@ def main():
         t0 = time.time()
         # [2026-07-12 GO-GREEN] loop-top liveness touch — see bot_pnl_store.heartbeat
         store.heartbeat(bot_id)
+        # [2026-07-30] growth rail, every loop (TTL expiry reverts by the
+        # same path that applied the lever).
+        _lv = apply_tuning()
+        if _lv:
+            log.info("levers applied %s", _lv)
         # [2026-07-15 GROWTH RAIL] live clip re-read each loop: the evidence
         # board's bounded live.clip_scale lever applies to NEW entries only
         # (open positions untouched); reverts with the lever's own expiry.
