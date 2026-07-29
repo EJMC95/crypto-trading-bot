@@ -54,6 +54,13 @@ on:
       - 'Dockerfile.trendlighter'
       - 'lighter_family_bot.py'
       - 'Dockerfile.familyshadow'
+      # [2026-07-30 (gm)] THIS WORKFLOW IS ITS OWN TRIGGER, for the six shadow
+      # books only (see the `_wf` note in the decide step). BOTH lists bind: the
+      # decide grep picks the service, but `paths:` decides whether the job runs
+      # at all — and without this line a routing fix would still deploy nothing,
+      # which is the exact failure (gl) hit. Adding it here means a workflow edit
+      # RUNS the job; the decide step then selects only the six.
+      - '.github/workflows/railway-redeploy.yml'
       # shared (freqtrade poller + dashboard + regime supervisor)
       - 'bot_pnl_store.py'
       - 'freqtrade_pnl_poller.py'
@@ -270,7 +277,31 @@ jobs:
             # funding-carry rule above may be deploying the wrong one. Left
             # for the operator rather than resolved by guessing — the guess is
             # what cost four books their shot.
-            _shared='bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|venues/|requirements\.txt$'
+            # [2026-07-30 (gm) A ROUTING FIX CANNOT DEPLOY ITSELF — measured.]
+            # (gl) corrected four wrong service names and merged as `ed5cce0`.
+            # That commit touched the workflow, the changelog, the dashboard and
+            # some tests — and NOT ONE of the six books' own files. So every
+            # corrected rule stayed silent and the run reported
+            # `Deployed: freqtrade-bots,pnl-dashboard`. The names were right and
+            # the books STILL had not received (fz)'s levers, two merges later.
+            # Fixing the route does not retroactively travel it.
+            # THE FIX: this workflow file is itself part of each shadow book's
+            # trigger set, so a change to the routing redeploys the services it
+            # routes to. Scoped to these six ON PURPOSE — they are $1k SHADOW
+            # books with no volumes and nothing to lose to a redeploy, and they
+            # are exactly the ones whose names were unverified. The live bots and
+            # freqtrade-bots are NOT included: the live pair must stay
+            # marker-gated (an unmarked WIP push must never ship real money), and
+            # freqtrade-bots should not rebuild on every workflow tweak.
+            # Kept as ONE single-quoted literal rather than composed from a
+            # second variable. The composed form needed double quotes to
+            # interpolate, and inside double quotes every `$` anchor has to be
+            # written `\$` — which is a LITERAL dollar in the regex, not an
+            # end-anchor, silently turning `bot_pnl_store\.py$` into a pattern
+            # that matches nothing. audit_deploy_coverage refused the composed
+            # version outright (unresolved interpolation), which is the guard
+            # from (gl) earning its keep an hour later on its own author.
+            _shared='bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|venues/|requirements\.txt$|\.github/workflows/railway-redeploy\.yml$'
             if echo "$changed" | grep -qE "^(lighter_dislocation_bot\.py$|Dockerfile\.dislocation$|$_shared)"; then
               svcs="${svcs:+$svcs,}snap-back-shadow"
             fi
