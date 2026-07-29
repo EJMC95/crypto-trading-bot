@@ -115,6 +115,38 @@ jobs:
             exit 1
           fi
 
+  secret-leak:
+    name: No credential reaches a commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-29] Credentials reached commits THREE times (14/15/16-Jul) via
+      # `.claude/settings.local.json`, which stores approved commands VERBATIM —
+      # a live Postgres URL accumulated into the working copy one `git add .`
+      # from being permanent. Gitignoring that file (b88be6b) stopped THAT
+      # bleed; nothing stopped the next one, and "remember not to paste secrets"
+      # is the same control that already failed 3x.
+      #
+      # The local pre-commit hook (scripts/install_git_hooks.sh) is the fast
+      # catch; .git/hooks is untracked, so it cannot be shipped by committing
+      # it — THIS job is the backstop for any clone/worktree that never ran the
+      # installer.
+      #
+      # MEASURED 29-Jul: gitleaks' DEFAULT ruleset scans a full Postgres
+      # connection URI carrying an inline password CLEAN — exactly the
+      # credential class that leaked here. .gitleaks.toml adds that rule (plus
+      # private-key, bare-AKIA and railway-token, all also missed by default).
+      - name: Install gitleaks (pinned + checksum-verified)
+        run: scripts/install_git_hooks.sh --with-gitleaks
+      - name: No secrets in the tree
+        run: python3 scripts/audit_secret_leak.py
+      # The guard must still be able to see. The FIRST draft of the allowlist
+      # matched the whole LINE against words like "example", and a live GitHub
+      # PAT trailing `# example config` sailed straight through. This fixture
+      # is what caught it — it is a regression test for a real near-miss.
+      - name: The guard must still be able to see (negative fixture)
+        run: python3 scripts/audit_secret_leak.py --selftest
+
   changelog:
     runs-on: ubuntu-latest
     steps:

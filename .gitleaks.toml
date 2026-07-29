@@ -1,0 +1,114 @@
+# gitleaks config — secret-leak guard for this repo.
+#
+# WHY THIS EXISTS: credentials reached commits three times (14/15/16-Jul-2026)
+# via `.claude/settings.local.json`, which stores approved commands VERBATIM.
+# Gitignoring that file stopped THAT bleed; nothing stopped the next one.
+# This is the "next one" guard.
+#
+# Run:  gitleaks git --staged   (the pre-commit hook does this for you)
+#       gitleaks dir .          (full working-tree sweep)
+# Install the hook:  scripts/install_git_hooks.sh
+#
+# DECLARED EXCEPTIONS follow the BORN_DARK_OK / VENUE_PURITY_OK convention:
+# an omission is DECLARED with a reason. Silence is not an option.
+
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# CUSTOM RULES — the default ruleset does NOT catch a database connection URI,
+# which is exactly the credential class that leaked here (a live Postgres URL
+# accumulated into `.claude/settings.local.json`). Mutation-tested 29-Jul:
+# without this rule a full `postgresql://user:pass@host/db` scanned CLEAN.
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "db-connection-uri"
+description = "Database connection URI with inline credentials"
+regex = '''(?i)\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|rediss|amqp|clickhouse|mssql|mariadb)://[^\s:/@'"]+:[^\s:/@'"]{3,}@[^\s/'"]+'''
+keywords = ["postgres", "postgresql", "mysql", "mongodb", "redis", "amqp", "clickhouse", "mssql", "mariadb"]
+entropy = 2.0
+
+[[rules]]
+id = "private-key-block"
+description = "Private key material (PEM/OpenSSH), including single-line escaped form"
+regex = '''-----BEGIN[ A-Z]*PRIVATE KEY( BLOCK)?-----'''
+keywords = ["BEGIN", "PRIVATE KEY"]
+
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS access key ID (default ruleset misses a bare AKIA string — verified 29-Jul)"
+regex = '''\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16})\b'''
+keywords = ["AKIA", "ASIA", "ABIA", "ACCA", "A3T"]
+
+[[rules]]
+id = "railway-token"
+description = "Railway API / project token"
+regex = '''(?i)\brailway[_-]?(api[_-]?)?token['"\s:=]{1,10}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'''
+keywords = ["railway"]
+
+# ---------------------------------------------------------------------------
+# EXCEPTION 1 — the freqtrade api_server credentials in config_*.json.
+#
+# REASON: `BOT_PASS` (and freqtrade's per-config jwt_secret_key / ws_token)
+# sit in 16 tracked config_*.json files. Measured 22-Jul + re-verified 29-Jul:
+# they guard the freqtrade REST API on ports 8080-8083, which are
+# PRIVATE-NETWORK ONLY on Railway, and those bots are `dry_run: true` PAPER
+# books. The real-money lighter_* bots do not use freqtrade's API at all.
+# Exposure is near-zero; rotating them is a coordinated ~15-file change that
+# must ship with a deploy, so it is deferred housekeeping, not a security fix.
+#
+# SCOPE IS DELIBERATELY NARROW: this allows ONLY those field names, ONLY in
+# those files. A new AWS key / private key / DB URL in the same file still
+# fails the commit.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "freqtrade api_server creds in config_*.json (paper bots, private-network ports) — see header"
+condition = "AND"
+paths = ['''(^|/)config_[A-Za-z0-9_]+\.json(\.disabled)?$''']
+regexTarget = "line"
+regexes = ['''"(password|username|jwt_secret_key|ws_token|api_key)"\s*:''']
+
+# ---------------------------------------------------------------------------
+# EXCEPTION 2 — local, never-committed working copies.
+# `.claude/worktrees/` are sibling-session worktrees; `.venv/` is the
+# interpreter. Neither is tracked, but `gitleaks dir .` walks them and the
+# duplicate findings drown the real signal.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "local untracked working copies — not part of the committed tree"
+paths = [
+  '''\.claude/worktrees/''',
+  '''\.venv/''',
+  '''node_modules/''',
+  '''\.git/''',
+  '''logs?/''',
+  '''(^|/)user_data/data/''',
+]
+
+# ---------------------------------------------------------------------------
+# EXCEPTION 3 — values that are THEMSELVES masked/placeholder text.
+#
+# MUTATION-TESTED 29-Jul. The first draft of this block matched the whole LINE
+# against words like "example"/"masked", and a live GitHub PAT with the trailing
+# comment `# example config` sailed straight through. That is the classic
+# allowlist failure: the attacker (or a careless paste) controls the comment.
+#
+# FIXED: the regex now matches the SECRET ITSELF (default regexTarget), so the
+# value must literally be a placeholder. A real token on a line that merely
+# mentions "example" is still caught.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "the matched secret is itself a mask/placeholder, not a real value"
+regexes = [
+  '''^\*{3,}''',                        # ***MASKED***
+  '''^<[A-Za-z0-9_-]+>$''',             # <YOUR_TOKEN>
+  '''^\$\{?[A-Z_][A-Z0-9_]*\}?$''',     # $DATABASE_URL / ${DASH_PASS}
+  '''^(?i)(x{4,}|placeholder|redacted|changeme|your[-_]?\w+here)$''',
+]
+
+# NOTE (29-Jul): this guard blocked its OWN first commit, because the CHANGELOG
+# and the CI comment both contained a literal `<scheme>://user:pass@host` while
+# explaining what the default ruleset misses. The fix was to REWORD the prose,
+# not to add an allowlist entry: every exception is permanent attack surface,
+# and prose can describe a connection URI without spelling one out. Prefer
+# rewording over exempting, every time.
