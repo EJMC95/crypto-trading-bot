@@ -53,6 +53,16 @@ Ranked by (real money at risk) × (size of gap) × (incident history).
 
 ### 1. The live-order harness (`--selftest-live`) runs NOWHERE automatically — top priority
 
+**[2026-07-29 SHIPPED, same day (ej):** `tests.yml` now carries a
+`selftest-live` job on every push/PR — it installs the wheel version straight
+out of `requirements.txt` (the pin `audit_sdk_pin.py` enforces; never
+hardcoded in the workflow), proves `import lighter` in its own loud step (so
+the job can never quietly regress to skipping — the exact rot this finding is
+about), then runs the harness via the `LIVE_SELFTESTS` registry so any future
+live harness is picked up automatically. Verified end-to-end on a bare Linux
+box before shipping: `lighter-sdk==1.1.2` installs clean and all 13 scenario
+groups pass. The paragraphs below are kept as the record of WHY.]**
+
 The Ticket Taker's offline selftest says it plainly at
 `lighter_ticket_taker.py:2449`: the funding-accrual block "PINS THE ARITHMETIC,
 it does NOT detect the bug… the only real detector is `--selftest-live` (tests
@@ -179,6 +189,17 @@ Small files, outsized blast radius, and two of them have shipped incidents:
   value: resulting mode, suffix, `dry_run`, broker type, and that unset/junk
   falls back to `lighter_shadow` and *never* to a live client; plus
   `order_usd` own-clip vs global-env precedence.
+  **[2026-07-29 SHIPPED, same day (ej):**
+  `tests/real_money/test_venue_factory.py` — 17 tests, all constructors
+  stubbed (no network/signer/DB): the full mode matrix incl. the never-live
+  fail-safe default and the typo'd-VENUE refusal, suffixing, the signer/
+  equity-guard wiring on live, the loud error-row on failed live auth,
+  own-clip vs anchor precedence, the live clip lever (and shadow's
+  non-consumption of it), and the 16-Jul slot-minting regression (a x0.5
+  lever must not double `max_open`). The default-flip and slot-anchor guards
+  are mutation-verified — each reverted fix turns exactly its test red.
+  Factory coverage measured 24% → 88% (the residue: the hl_paper
+  `live_flag` exchange arm and log-once plumbing).]**
 * `venues/governor.py` (28%): `TxBudgetGovernor` paces live order
   transactions. Pure arithmetic, no tests. Cheap to pin (budget consumption,
   refill, refusal at zero).
@@ -274,7 +295,8 @@ invokes them. Nobody can see drift.
 
 1. **This week:** Finding 1 (wire `--selftest-live` into CI or the image
    build — hours, closes the biggest incident-class hole) + Finding 6's
-   factory mode-matrix test (an afternoon).
+   factory mode-matrix test (an afternoon). **[Both SHIPPED 2026-07-29 (ej)
+   — see the stamps above.]**
 2. **Next:** Finding 2 endpoint/aggregation tests and Finding 3 parsing
    fixtures — the two places silent wrong numbers reach money decisions.
 3. **Then:** Findings 4–5 seam extractions (one per week, (ef)-style),
