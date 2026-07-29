@@ -107,3 +107,48 @@ is the honest row):
   real thin-book slip is unmeasured (the 5bps row + the spread/clip-slip
   entry gates + $1k shadow book bound the exposure). The growth promoter's
   bar — not this study — remains the only path to `live.funding.explore_k`.
+
+## [2026-07-30 ALL THREE OPTIONS MEASURED ON ONE TAPE — the design decision has numbers]
+
+The handoff asked for numbers on all three §3d options, not just option 1's
+pool. `scripts/study_explore_options.py` (fresh 180d/top-60 fetch, 30-Jul):
+option 2 modelled DYNAMICALLY — per-hour |apr| rank within the gated ≥$10M
+set (the live Stage-A sort, `lighter_funding_bot.py:2053`; `cross_venue_mult`
+is live-only by its own docstring), tail = ranks 9+; option 3 is the
+unfiltered ≥$10M book (= the conviction-only status quo, and the baseline).
+
+| row | 0.5bps | 2bps | 5bps | n | halves note |
+|---|---|---|---|---|---|
+| OPT3 = BASE ≥$10M (11 books) | +$23.86 | +$15.04 | −$2.60 | 1176 | h2 negative at all slips this tape |
+| OPT2 TAIL9+ (dynamic) | +$4.18 | +$3.76 | +$2.90 | **57** | **h1 = $0.00 (n=0)** — tail empty all half 1 |
+| OPT2 KEPT8 (exploit keeps) | +$24.32 | +$15.54 | −$2.03 | 1171 | ≈ BASE — removing the tail costs exploit ~nothing |
+| OPT1 POOL@2M (10 books) | +$21.64 | +$15.73 | +$3.93 | **787** | h1 −1.60/−7.96 at 2/5bps (yes-both at 0.5) |
+
+**Option-2 occupancy (the cadence read, measured over the whole window):**
+the gated ≥$10M set averages **5.4 books/h** (max 11); the rank-9+ tail is
+nonempty **4.1% of hours**, mean **0.05 books**. 57 harness trades in 180
+days is the UPPER bound of what DEEP_MAX=8 could ever feed explore (the
+harness enters greedily; live samples K=2) — and its first half is literally
+empty.
+
+**Readout, option by option:**
+- **Option 2 is REJECTED by measurement**: it manufactures a ~once-per-3-days
+  trickle of exploit's weakest-|apr| leftovers (not new coverage — the same
+  ≥$10M books), cannot lift shadow cadence (h1 empty), and its only mercy is
+  that it also costs nothing (KEPT8 ≈ BASE). The diagnosis's prose
+  ("re-labels exploit's leftovers; coverage barely widens") now has numbers.
+- **Option 1 stands as shipped** (operator's "proceed with 1", the PROCEEDED
+  block above): the only option whose candidates are NEW books — n=787 on a
+  disjoint pool, positive headline at every slip on this tape. The halves
+  swing with the snapshot (h1 negative at honest slip here; the 29-Jul fetch
+  had the same shape — the known day-to-day harness variance), which is
+  exactly why activation is SHADOW-arm-only at the pre-registered $2M floor
+  and why `live.funding.explore_k` stays behind the growth promoter's bar.
+- **Option 3 needs no code**: BASE is its row. Choosing it means renaming
+  the A/B honestly (conviction-only) and abandoning the coverage intent —
+  the fallback if the shadow probe disappoints, not the default.
+
+*Same limits as the PROCEEDED block (today's-turnover membership, one tape,
+greedy-entry rows measure slice quality not live cadence; occupancy is the
+cadence-honest number). Decision-grade: the three options now sit in one
+table on one tape.*
