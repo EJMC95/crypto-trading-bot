@@ -1,4 +1,10 @@
-# The Six Books — measured starting line, 2026-07-30
+# The Farnham Six — measured starting line, 2026-07-30
+
+> Named 30-Jul at the operator's request, after John Farnham: national champion
+> of the farewell tour that isn't. Two of these six have **zero closed trades**
+> and are standing retirement candidates that keep not retiring; carry is a real
+> comeback sitting five of six bars from go-live. *The Last Time* was not, in
+> fact, the last time. Cohort label only — nothing is renamed.
 
 The growth system built across `(fz)`–`(gg)` exists to help six specific books.
 This is their state **before** any of it reaches a container, so that in 30 days

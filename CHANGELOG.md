@@ -1,3 +1,9 @@
+## 2026-07-30 (gj) — The Farnham Six
+
+- Operator, on the six books that received the growth system in `(fz)`–`(gh)`: *"name them something hilarious."* They are collectively **The Farnham Six**, after John Farnham — undisputed national champion of the farewell tour that isn't.
+- **The joke earns its place**, which is the only reason it is going in a file that governs real money: two of the six (📊 Index Rider, 🌊 Tide Rider) have **zero closed trades** and are standing retirement candidates that keep not retiring, and 🌾 carry is a genuine comeback sitting five of six bars from go-live. *The Last Time* was not, in fact, the last time.
+- **Cohort label, not a rename.** All six keep their existing names and emoji; this is a handle for referring to the group (the baseline doc, the 30-day review). It respects the Australian-musician convention `(fd)` set for the NEXT cohort without minting a single row — and per that same rule, naming is not a licence to mint books.
+
 ## 2026-07-30 (gh) — THE SIX BOOKS' STARTING LINE, and a retraction that weakens my own justification
 
 - **THE ASK** (operator): *"lets give the 6 a shot with our new system in place."* Two things had to happen first, and one of them was a correction. Suite **406 passed**, 25 floors held, six guards green, `origin/main` merged in.

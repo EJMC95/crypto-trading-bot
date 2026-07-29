@@ -634,6 +634,19 @@ All new bots:
      `NEXT_SESSION_2026-07-30.md`; git said 29-Jul in both UTC and Sydney).
   Enforced by `scripts/audit_changelog_letters.py` on every push/PR (scoped
   to ≥18-Jul so the deliberate restart cannot fail the build).
+- **THE FARNHAM SIX (operator, 30-Jul: "name them something hilarious").** The
+  six books that received the growth system in `(fz)`–`(gh)` — 🌾 Yield
+  Harvester, ⚖️ Counterweight, 🧲 Snap Back, 📊 Index Rider, 🌊 Tide Rider,
+  🎯 Perp Sniper — are collectively **The Farnham Six**, after John Farnham,
+  undisputed national champion of the farewell tour that isn't. The joke earns
+  its place: two of them (Index Rider, Tide Rider) have **zero closed trades**
+  and are standing retirement candidates that keep not retiring, and 🌾 carry
+  is a genuine comeback story sitting five of six bars from go-live. *The Last
+  Time* was not, in fact, the last time. Respects the Australian-musician
+  convention below WITHOUT renaming anything: these are existing books with
+  existing emoji identities, so this is a COHORT label for referring to the six
+  as a group (see `SIX_BOOKS_BASELINE_2026-07-30.md`), not a rename and not a
+  licence to mint rows.
 - **NAMING THE NEXT COHORT: famous AUSTRALIAN MUSICIANS (operator, 29-Jul).**
   The 🏛️ Parliament took the last Australian PMs; the NEXT cohort of books
   that earns its own dashboard rows is named for Australian musicians
