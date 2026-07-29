@@ -55,6 +55,18 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 from venues import venue_context
 
+# [2026-07-30] Growth rail + the shared scout read. Guarded like every optional
+# organ: dark imports leave the operator's env defaults and the configured coin
+# list in force. Both COPYs land in Dockerfile.dislocation in this same commit.
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
+try:
+    import fleet_bus
+except Exception:  # noqa: BLE001
+    fleet_bus = None
+
 BOT = "lighter-dislocation"
 
 # --------------------------- configuration ----------------------------------
@@ -69,6 +81,30 @@ MAX_OPEN_POSITIONS = int(os.environ.get("DISLOC_MAX_OPEN", "3"))
 PRE_BPS = float(os.environ.get("DISLOC_PRE_BPS", "50"))       # census floor
 ENTER_BPS = float(os.environ.get("DISLOC_ENTER_BPS", "150"))  # tradeable gap
 EXIT_BPS = float(os.environ.get("DISLOC_EXIT_BPS", "40"))     # converged
+
+# [2026-07-30 ADAPTIVE GATE] `ENTER_BPS` was a FIXED 150bps against a measured
+# median residual of 3.8bps — roughly 40x the middle of its own signal, which
+# is why this book has ~10 closes. The constant is an inheritance from the era
+# when the reference was Hyperliquid's mid (the 17-Jul switch to Lighter's own
+# `index_price` made the residual systematically TIGHTER and the gate was never
+# re-based). It is now a PERCENTILE of the live residual distribution, so the
+# bar tracks the venue instead of a number from a different reference series.
+#
+# BE CLEAR ABOUT WHAT THIS DOES AND DOES NOT DO. It is floored at
+# `EXIT_BPS * ENTER_FLOOR_MULT` — entering closer than that to the exit bar
+# would book a capture smaller than the round trip that earns it, which is a
+# losing trade dressed as a signal. On today's tape that floor will USUALLY
+# BIND, so the practical effect is 150bps -> ~60bps, not "the gate follows the
+# median down". The percentile matters on the days the venue is genuinely
+# dislocated, which are the days this book exists for.
+ENTER_PCT = float(os.environ.get("DISLOC_ENTER_PCT", "0.98"))
+ENTER_FLOOR_MULT = float(os.environ.get("DISLOC_ENTER_FLOOR_MULT", "1.5"))
+ENTER_MIN_N = int(os.environ.get("DISLOC_ENTER_MIN_N", "20"))
+# Widen the 16-name hand list with the scout's most-liquid books: dislocations
+# are MORE common in thin books, which is exactly where the hand list had no
+# coverage. 0 disables the widening and restores the configured list.
+UNIVERSE_N = int(os.environ.get("DISLOC_UNIVERSE_N", "40"))
+UNIVERSE_MIN_VOL_M = float(os.environ.get("DISLOC_UNIVERSE_MIN_VOL_M", "0.5"))
 CONFIRM_LOOPS = int(os.environ.get("DISLOC_CONFIRM_LOOPS", "2"))
 MAX_ENTRY_SLIP_BPS = float(os.environ.get("DISLOC_MAX_ENTRY_SLIP_BPS", "30"))
 HARD_STOP = float(os.environ.get("DISLOC_HARD_STOP", "0.05"))
@@ -157,6 +193,79 @@ def reference_prices():
         return {}
 
 
+def adaptive_enter_bps(devs, pct, exit_bps, floor_mult, fallback, min_n):
+    """The entry bar for the NEXT loop: the `pct` percentile of |residual|
+    across every book scanned this loop, floored so a trade always clears its
+    own round trip.
+
+    Pure — the caller supplies the sample. Contract:
+      * fewer than `min_n` observations -> `fallback` (the configured constant).
+        A thin sample cannot describe a distribution, and guessing low here
+        would open trades on noise.
+      * the result is never below `exit_bps * floor_mult`: entering nearer the
+        exit bar than that books a capture smaller than the spread+slip that
+        earns it. This floor is what stops an adaptive gate from chasing a
+        calm venue all the way down to the median.
+      * never above `fallback` — this change is a re-basing DOWNWARD from a
+        stale constant, not a licence to widen past the operator's number.
+    """
+    try:
+        xs = sorted(abs(float(d)) for d in devs if d is not None)
+    except (TypeError, ValueError):
+        return float(fallback)
+    if len(xs) < int(min_n):
+        return float(fallback)
+    p = min(max(float(pct), 0.0), 1.0)
+    # nearest-rank; index is clamped so p=1.0 selects the max, not an overrun
+    idx = min(len(xs) - 1, max(0, int(round(p * (len(xs) - 1)))))
+    val = xs[idx]
+    return float(min(max(val, float(exit_bps) * float(floor_mult)),
+                     float(fallback)))
+
+
+def resolve_universe(configured, width, min_vol_m, current_time=None):
+    """Configured coins first (the validated core, order preserved), then the
+    scout's most-liquid books up to `width`. A dark/stale scout, a raising
+    bus, a born-dark import or `width <= 0` all return the configured list
+    UNCHANGED — the widening is an enhancement, never a dependency."""
+    out = list(dict.fromkeys(str(c).strip().upper() for c in configured if str(c).strip()))
+    if not width or int(width) <= 0 or fleet_bus is None:
+        return out
+    try:
+        extra = fleet_bus.scout_universe(min_vol_m=min_vol_m,
+                                         current_time=current_time)
+    except Exception:  # noqa: BLE001
+        return out
+    have = set(out)
+    for sym in extra:
+        if len(out) >= int(width):
+            break
+        s = str(sym).strip().upper()
+        if s and s not in have:
+            out.append(s)
+            have.add(s)
+    return out
+
+
+def apply_tuning():
+    """Growth-rail levers over the env defaults; {} when the rail is dark."""
+    global ENTER_PCT, UNIVERSE_N
+    if tuning is None:
+        return {}
+    moved = {}
+    for lever, attr in (("disloc.enter_pct", "ENTER_PCT"),
+                        ("disloc.universe_n", "UNIVERSE_N")):
+        cur = globals()[attr]
+        try:
+            val = tuning.get_lever(lever, cur)
+        except Exception:  # noqa: BLE001
+            continue
+        if val != cur:
+            globals()[attr] = val
+            moved[lever] = val
+    return moved
+
+
 def book_view(ctx, coin, clip_usd):
     """One read of the live Lighter book -> dict with mid, spread_bps and the
     clip's buy/sell VWAP + slip vs touch. None = unreadable (skip the coin).
@@ -218,6 +327,7 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason,
 
 
 def main():
+    global COINS          # widened from the scout below
     p = argparse.ArgumentParser(description="Snap Back — Lighter dislocation harvester")
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
     args = p.parse_args()
@@ -290,6 +400,18 @@ def main():
         log.warning("daily-loss halt restored from state — halted for the rest of today.")
     day_start_equity = account_value()
 
+    # [2026-07-30] Levers BEFORE the universe (UNIVERSE_N is itself a lever),
+    # and the entry bar starts at the operator's constant — the adaptive value
+    # only takes over once a loop has actually measured a distribution.
+    _moved = apply_tuning()
+    COINS = resolve_universe(COINS, UNIVERSE_N, UNIVERSE_MIN_VOL_M)
+    enter_bps_eff = ENTER_BPS
+    log.info("universe: %d coins | entry gate starts at %.0fbps "
+             "(adaptive p%.1f, floored at %.0fbps)%s",
+             len(COINS), enter_bps_eff, ENTER_PCT * 100,
+             EXIT_BPS * ENTER_FLOOR_MULT,
+             f" | levers {_moved}" if _moved else "")
+
     while True:
         now = datetime.now(timezone.utc)
         t0 = time.time()
@@ -355,6 +477,7 @@ def main():
                     "liq_5m": c.get("liq_5m"), "liq_1h": c.get("liq_1h")}
 
         events_this_loop = 0
+        devs_this_loop = []
         managed = set()   # held coins the manage block could actually price
         if ref:
             for coin in COINS:
@@ -366,6 +489,9 @@ def main():
                     continue
                 dev_bps = (bv["mid"] / r - 1) * 1e4
                 held = meta.get(coin)
+                # [2026-07-30] the sample the NEXT loop's adaptive gate is
+                # computed from — every book we could actually see this loop.
+                devs_this_loop.append(dev_bps)
 
                 # ---- census: every observed dislocation is evidence ----
                 if abs(dev_bps) >= PRE_BPS:
@@ -377,7 +503,7 @@ def main():
                     # [2026-07-14] Count ENTRY-GRADE events separately — the
                     # promotion review needs tradeable DENSITY, and count/max
                     # alone can't say how many prints cleared the entry gate.
-                    if abs(dev_bps) >= ENTER_BPS:
+                    if abs(dev_bps) >= enter_bps_eff:
                         rec["count_enter"] = int(rec.get("count_enter") or 0) + 1
                     rec["last_iso"] = now.isoformat()
                     rec["last_mctx"] = _mctx_slice(coin)
@@ -457,7 +583,7 @@ def main():
                     else:
                         pend[coin] = 0
                         continue
-                tradeable = abs(dev_bps) >= ENTER_BPS
+                tradeable = abs(dev_bps) >= enter_bps_eff
                 pend[coin] = pend.get(coin, 0) + 1 if tradeable else 0
                 if not tradeable or pend[coin] < CONFIRM_LOOPS:
                     continue
@@ -543,6 +669,22 @@ def main():
                  len(COINS), ", ".join(sorted(meta)) or "none",
                  sum(c["count"] for c in census.values()),
                  max((c["max_bps"] for c in census.values()), default=0.0))
+        # [2026-07-30] Re-base the entry bar from THIS loop's measured
+        # residual distribution, for the NEXT loop. Computed after the scan
+        # (never mid-scan) so every coin in one pass is judged against the
+        # same bar — a bar that moved between coins would make the book's own
+        # census unreadable. Levers are re-read here too, so a TTL expiry
+        # reverts the percentile without a restart.
+        apply_tuning()
+        _prev_gate = enter_bps_eff
+        enter_bps_eff = adaptive_enter_bps(
+            devs_this_loop, ENTER_PCT, EXIT_BPS, ENTER_FLOOR_MULT,
+            ENTER_BPS, ENTER_MIN_N)
+        if abs(enter_bps_eff - _prev_gate) >= 1.0:
+            log.info("entry gate %.0f -> %.0fbps (p%.1f of %d residuals, "
+                     "floor %.0f, cap %.0f)", _prev_gate, enter_bps_eff,
+                     ENTER_PCT * 100, len(devs_this_loop),
+                     EXIT_BPS * ENTER_FLOOR_MULT, ENTER_BPS)
         if args.once:
             log.info("--once complete.")
             break
@@ -650,9 +792,49 @@ def selftest():
     finally:
         urllib.request.urlopen = _real_open
 
+    # [2026-07-30 ADAPTIVE GATE] the bar must track the venue but never fall
+    # below the round trip that earns the capture, and a thin sample must
+    # never be treated as a distribution.
+    _many = [1.0] * 99 + [500.0]            # p98 of this sample is 1.0
+    assert adaptive_enter_bps(_many, 0.98, 40.0, 1.5, 150.0, 20) == 60.0, \
+        "a CALM venue floors at EXIT_BPS*mult (60), never chases the median"
+    _wide = [80.0] * 50 + [400.0] * 50       # p98 lands in the 400s
+    assert adaptive_enter_bps(_wide, 0.98, 40.0, 1.5, 150.0, 20) == 150.0, \
+        "a DISLOCATED venue is capped at the operator constant, never above"
+    _mid = [90.0] * 100
+    assert adaptive_enter_bps(_mid, 0.98, 40.0, 1.5, 150.0, 20) == 90.0, \
+        "between floor and cap the percentile itself is the bar"
+    assert adaptive_enter_bps([200.0] * 5, 0.98, 40.0, 1.5, 150.0, 20) == 150.0, \
+        "n below the floor -> the configured constant (never guess low)"
+    assert adaptive_enter_bps([], 0.98, 40.0, 1.5, 150.0, 20) == 150.0
+    assert adaptive_enter_bps([None, "x"], 0.98, 40.0, 1.5, 150.0, 20) == 150.0, \
+        "junk sample -> the configured constant"
+    assert adaptive_enter_bps([-90.0] * 100, 0.98, 40.0, 1.5, 150.0, 20) == 90.0, \
+        "the gate is on |residual| — a CHEAP book counts like a rich one"
+    # universe widening: adds to the core, never replaces or shrinks it
+    _savedb = globals().get("fleet_bus")
+    try:
+        class _FB:
+            out = ["SOL", "BTC"]
+
+            @staticmethod
+            def scout_universe(min_vol_m=0.0, current_time=None):
+                return _FB.out
+
+        globals()["fleet_bus"] = _FB
+        assert resolve_universe(["BTC"], 3, 0.5) == ["BTC", "SOL"], "adds, dedups"
+        assert resolve_universe(["BTC"], 0, 0.5) == ["BTC"], "0 = revert switch"
+        _FB.out = []
+        assert resolve_universe(["BTC"], 9, 0.5) == ["BTC"], "dark scout never shrinks"
+        globals()["fleet_bus"] = None
+        assert resolve_universe(["BTC"], 9, 0.5) == ["BTC"], "born-dark is safe"
+    finally:
+        globals()["fleet_bus"] = _savedb
+
     print("All Snap Back self-tests passed (Lighter index parses; inactive/"
           "zero/null/junk/negative refs are SKIPPED not traded; empty stays "
-          "reference-blind; 3.8bps reference drift cannot move a 150bps gate).")
+          "reference-blind; 3.8bps reference drift cannot move a 150bps gate; "
+          "adaptive gate floors/caps/thin-sample; universe widening).")
 
 
 if __name__ == "__main__":

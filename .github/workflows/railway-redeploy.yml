@@ -30,6 +30,8 @@ on:
       # funding-carry service
       - 'funding_carry_bot.py'
       - 'Dockerfile.funding'
+      # [2026-07-30] in this image since the carry book gained levers
+      - 'fleet_tuning.py'
       # market-context service
       - 'market_context.py'
       - 'Dockerfile.marketcontext'
@@ -176,7 +178,13 @@ jobs:
             # bot_pnl_store.py change — two red runs + failure emails on
             # 16-Jul while every LIVING service deployed fine.
             # funding-carry service
-            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|venues/|requirements\.txt$)'; then
+            # [2026-07-30] fleet_tuning.py joined this image's COPY set when
+            # the carry book gained growth-rail levers. It must be in BOTH this
+            # grep and the `paths:` block above, or editing the lever registry
+            # would be a silent no-op for funding-carry — caught by
+            # audit_deploy_coverage.py before it shipped, which is the whole
+            # point of that guard.
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}funding-carry"
             fi
             # market-context service (🛰️ instrument collector). Its live-bot

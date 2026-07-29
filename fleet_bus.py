@@ -256,6 +256,116 @@ def long_symbol_blocked(base, current_time=None):
         return False
 
 
+def scout_universe(min_vol_m=0.0, limit=None, current_time=None):
+    """[2026-07-30 FLEET UNIVERSE — operator: "full universe ... every bot
+    needs every tool"] The venue's LIVE tradable universe, as the market
+    scout sees it: `[sym, ...]` ordered by 24h $volume descending, filtered
+    to `min_vol_m` ($M) and truncated to `limit`.
+
+    WHY THIS EXISTS. Five books carried hand-typed watchlists written when
+    Lighter was much smaller — Counterweight ranked 30 of 202 books (15%),
+    Snap Back 16 (8%), Tide Rider 6, Index Rider 3. A ranked selector
+    cannot pick a winner it never sees, and unlike loosening a gate,
+    enlarging the candidate set does not weaken the selection rule at all:
+    Counterweight still takes its top-K/bottom-K, just from a real
+    cross-section. The scout already scans every book each cycle, so this
+    is a read of work already done — no extra venue load.
+
+    Standard accessor fail-safe: dark/stale/malformed scout -> `[]`, and
+    EVERY caller must treat `[]` as "keep my configured list", never as
+    "trade nothing". Delisted symbols are excluded (the scout publishes
+    them); that is the one filter applied here rather than at the consumer,
+    because trading a delisted book is never what any caller wants.
+    """
+    try:
+        p = _load("lighter-market", current_time)
+        if not p or not is_fresh(p, current_time):
+            return []
+        # `vols` is the public $M map (2026-07-30). `_marks` is the scout's
+        # private diff base, {sym: [qvol, oi]} in raw $ — read as a FALLBACK
+        # only, so a consumer shipped ahead of the scout's next deploy still
+        # sees the universe instead of going quietly dark.
+        vols = p.get("vols")
+        if not isinstance(vols, dict) or not vols:
+            vols = {}
+            for sym, row in (p.get("_marks") or {}).items():
+                try:
+                    vols[sym] = float(row[0]) / 1e6
+                except (TypeError, ValueError, IndexError, KeyError):
+                    continue
+        if not vols:
+            return []
+        dead = {str(s) for s in (p.get("delisted") or [])}
+        floor = float(min_vol_m or 0.0)
+        rows = []
+        for sym, vol in vols.items():
+            if str(sym) in dead:
+                continue
+            try:
+                vol = float(vol)
+            except (TypeError, ValueError):
+                continue
+            if vol >= floor:
+                rows.append((vol, str(sym)))
+        rows.sort(reverse=True)
+        out = [s for _, s in rows]
+        if limit is not None and int(limit) > 0:
+            out = out[:int(limit)]
+        return out
+    except Exception:
+        return []
+
+
+def scout_funding(current_time=None):
+    """{sym: apr_pct} — the scout's venue-wide funding map (annualised %,
+    signed: positive = longs pay shorts). `{}` on any doubt.
+
+    The single supported read for "what is funding doing across the whole
+    venue", so a book no longer has to fetch what the scout already has.
+    """
+    try:
+        p = _load("lighter-market", current_time)
+        if not p or not is_fresh(p, current_time):
+            return {}
+        f = p.get("funding")
+        if not isinstance(f, dict):
+            return {}
+        out = {}
+        for sym, apr in f.items():
+            try:
+                out[str(sym)] = float(apr)
+            except (TypeError, ValueError):
+                continue
+        return out
+    except Exception:
+        return {}
+
+
+def venue_stress_bps(current_time=None):
+    """The scout's venue premium stress in bps, or None when unreadable.
+
+    Same number the Ticket Taker's stress veto reads, so any book can crouch
+    on the SAME evidence instead of inventing its own. None = no opinion;
+    consumers must fail OPEN on it (a dark scout must never halt a book).
+    """
+    try:
+        p = _load("lighter-market", current_time)
+        if not p or not is_fresh(p, current_time):
+            return None
+        st = p.get("stress")
+        if isinstance(st, dict):
+            # the scout's own key is `med` (see lighter_market_scout.stress);
+            # the *_bps aliases are accepted so a future rename cannot
+            # silently turn this into a permanent None.
+            for k in ("med", "med_bps", "median_bps", "bps"):
+                if st.get(k) is not None:
+                    return float(st[k])
+            return None
+        return float(st) if st is not None else None
+    except Exception:
+        return None
+
+
 if __name__ == "__main__":
     # offline selftest: prime the cache directly, exercise the fail-safe
     # contract (no DB touched)
@@ -367,6 +477,47 @@ if __name__ == "__main__":
                             _now) == 1.5, "over-ceiling clamps to 1.5"
     assert stake_multiplier("freqtrade-avo-maria-lshadow", "long-bad",
                             _now) == 0.5, "under-floor clamps to 0.5"
+    # [2026-07-30 FLEET UNIVERSE] scout accessors: shape, ordering, the
+    # volume floor, delist exclusion, and the fail-safe EMPTY that every
+    # caller must read as "keep my configured list".
+    _scout = {"updated": _now.isoformat(timespec="seconds"), "ttl_sec": 900,
+              "vols": {"BTC": 120.0, "SOL": 30.0, "TINY": 0.2, "DEAD": 99.0,
+                       "JUNK": "x"},
+              "delisted": ["DEAD"],
+              "funding": {"BTC": 10.5, "SOL": -3.0, "BAD": "x"},
+              "stress": {"n": 98, "max": 50.3, "med": 3.8, "p90": 19.3}}
+    _cache["lighter-market"] = {"ts": _now, "payload": _scout}
+    assert scout_universe(current_time=_now) == ["BTC", "SOL", "TINY"], \
+        "vol-descending, delisted dropped, junk rows skipped"
+    assert scout_universe(min_vol_m=1.0, current_time=_now) == ["BTC", "SOL"], \
+        "volume floor applied"
+    assert scout_universe(limit=1, current_time=_now) == ["BTC"], "limit applied"
+    assert scout_funding(_now) == {"BTC": 10.5, "SOL": -3.0}, \
+        "funding map coerced, unparseable dropped"
+    # the scout's real key is `med` — this assertion is what would have
+    # caught the first cut of this accessor, which read a `med_bps` that
+    # does not exist and returned None against every real payload.
+    assert venue_stress_bps(_now) == 3.8, "stress read from the scout's own `med`"
+    # `_marks` FALLBACK: a scout that has not yet redeployed publishes no
+    # `vols`, and the consumer must still see the universe (raw $ -> $M).
+    _old = {k: v for k, v in _scout.items() if k != "vols"}
+    _old["_marks"] = {"BTC": [120e6, 1.0], "SOL": [30e6, 2.0], "BAD": ["x", 0]}
+    _cache["lighter-market"] = {"ts": _now, "payload": _old}
+    assert scout_universe(current_time=_now) == ["BTC", "SOL"], \
+        "pre-deploy scout: _marks fallback keeps the consumer alive"
+    _cache["lighter-market"] = {"ts": _now, "payload": _scout}
+    # fail-safe: a STALE scout must return neutral-empty, never a partial
+    # universe — a book widened onto this accessor falls back to its own
+    # configured list, it does not stop trading.
+    _stale = dict(_scout)
+    _stale["updated"] = (_now - timedelta(hours=3)).isoformat(timespec="seconds")
+    _cache["lighter-market"] = {"ts": _now, "payload": _stale}
+    assert scout_universe(current_time=_now) == [] and scout_funding(_now) == {}
+    assert venue_stress_bps(_now) is None, "stale scout has NO opinion on stress"
+    _cache["lighter-market"] = {"ts": _now, "payload": None}
+    assert scout_universe(current_time=_now) == [] and scout_funding(_now) == {}
+    assert venue_stress_bps(_now) is None
+
     print("fleet_bus selftest OK (lever_outcome fresh/unknown/stale/absent; "
           "long_symbol_blocked enforce/advisory/cap0/stale/absent; "
           "entry_regime_gated act+off/no-tag/no-bot/risk-on/stale-oracle/"

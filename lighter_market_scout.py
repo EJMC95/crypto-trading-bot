@@ -81,7 +81,19 @@ TOP_N = 8
 BRK_RANGE_MIN = float(os.environ.get("SCOUT_BRK_RANGE_MIN", "0.9"))
 DIP_RANGE_MAX = float(os.environ.get("SCOUT_DIP_RANGE_MAX", "0.1"))
 MOMO_CHG_MIN = float(os.environ.get("SCOUT_MOMO_CHG_MIN", "3.0"))
-TICKET_TOP_N = int(os.environ.get("SCOUT_TICKET_TOP_N", "6"))
+# [2026-07-30 SUPPLY CAP — the fleet's tightest offense constraint] 6 -> 12.
+# `strategy_tickets` truncates EVERY lens to this number, and on the live bus
+# `dip` and `divergence` both returned EXACTLY 6 while breakout/momentum
+# returned 5 — a lens returning exactly its cap is a lens whose cap binds.
+# The lens behind it is the fleet's only measured alpha (shadow
+# short-divergence: +3.035%/trade vs its own regime, t=+4.04), and it was
+# being handed a 6-wide candidate list from which to fill 4 slots. Every
+# "closed question" on the Taker (`TT_MAX_OPEN`, `TT_DIV_GAP`, lens on/off,
+# clip size, symbol eligibility) was about ALLOCATING this fixed supply;
+# none of them was about ENLARGING it. Widening here changes no entry bar —
+# the taker's own gates still judge every ticket — it only stops the scout
+# throwing away already-graded candidates. Registry-bounded at 15.
+TICKET_TOP_N = int(os.environ.get("SCOUT_TICKET_TOP_N", "12"))
 
 
 def apply_tuning():
@@ -431,6 +443,19 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None):
                           "corrected": "2026-07-17",
                           "note": ("apr is TRUE from 2026-07-17; rows stamped "
                                    "8.0 predate the fix — divide those by 8")},
+        # [2026-07-30 FLEET UNIVERSE] PUBLIC per-symbol 24h $volume in $M, all
+        # active books. The data already existed in `_marks` below, but that
+        # key is documented as "compact diff base for the NEXT run" — a
+        # private implementation detail no consumer should bind to. Five
+        # books were carrying hand-typed watchlists (Counterweight ranked 30
+        # of 202, Snap Back 16, Tide Rider 6, Index Rider 3) purely because
+        # there was no supported read of "what does the venue actually
+        # trade, and how big is each book". `fleet_bus.scout_universe()` is
+        # that read; this is the field behind it. Prefer this key; the
+        # accessor still falls back to `_marks` so a consumer shipped ahead
+        # of the scout's next deploy is not dark in the meantime.
+        "vols": {s: round((v.get("qvol") or 0.0) / 1e6, 4)
+                 for s, v in stats.items()},
         # compact diff base for the NEXT run (all active books, not just liquid,
         # so listings/delistings diff over the full set)
         "_marks": {s: [round(v["qvol"], 2), round(v["oi"], 4)]

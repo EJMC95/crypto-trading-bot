@@ -68,6 +68,13 @@ import urllib.request
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+
+# [2026-07-30] growth rail; guarded, COPY added to Dockerfile.indexshadow in
+# the same commit (born-dark doctrine).
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
 import funding_basis
 from venues import marks
 from venues.safety import SafetyRails
@@ -78,8 +85,22 @@ START_EQUITY = 1000.0
 # [2026-07-13 UTILIZATION] $50 -> $250/slot: at 3 sleeves the book deploys up
 # to 75% of its $1,000 instead of 15% — the IBKR original's biggest practical
 # flaw was 10% max deployment (5%/position x 2). Sizing only, not strategy.
-ORDER_USD = float(os.environ.get("INDEX_ORDER_USD", "250"))
-SYMBOLS = os.environ.get("INDEX_SYMBOLS", "SPY,QQQ,XAU").split(",")
+# [2026-07-30 SIZE vs EVIDENCE] $250 -> $100. This book carried the LARGEST
+# CLIP IN THE FLEET — 5x the family's $50, 10x the Farmer's $25 — on a book
+# with ZERO closed trades. That is maximum size on minimum evidence, the exact
+# inversion of how every other book here is sized. $100 across a widened
+# sleeve set deploys MORE of the book than $250 across three, while making
+# each individual bet survivable enough to be informative.
+ORDER_USD = float(os.environ.get("INDEX_ORDER_USD", "100"))
+# [2026-07-30 UNIVERSE] SPY,QQQ,XAU -> the venue's full non-crypto set (the
+# same ten books the family bot's per-asset gate grades). These are the
+# fleet's ONLY source of a regime that is not falling-BTC: over the same
+# window SPY +8.1%, QQQ +12.2%, WTI +23.0%. Item 18 says a directional book
+# validated on this tape has been validated in ONE regime; widening here is
+# the on-venue way to get a second one.
+SYMBOLS = [s.strip().upper() for s in os.environ.get(
+    "INDEX_SYMBOLS", "SPY,QQQ,IWM,NVDA,TSLA,MSTR,WTI,XAU,XAG,XCU").split(",")
+    if s.strip()]
 REGIME_SMA = int(os.environ.get("INDEX_REGIME_SMA", "200"))
 
 # [2026-07-13 UNIVERSE EXPANSION — evidence in the 13-Jul sweep, scratchpad
@@ -118,6 +139,18 @@ SLEEVES = {          # symbol -> (rule, param)
     "SPY": ("regime_band", (200, 0.01)),
     "QQQ": ("regime_band", (200, 0.01)),
     "XAU": ("sma_cross", (20, 50)),
+    # [2026-07-30] the widened set. Index-like books reuse the validated
+    # 200-day regime band; the single-name and commodity books use the
+    # faster SMA cross, matching how XAU was already treated. Deliberately
+    # NOT new rules — this widens the UNIVERSE the existing, validated
+    # rules are applied to, so the change is one variable, not two.
+    "IWM": ("regime_band", (200, 0.01)),
+    "NVDA": ("sma_cross", (20, 50)),
+    "TSLA": ("sma_cross", (20, 50)),
+    "MSTR": ("sma_cross", (20, 50)),
+    "WTI": ("sma_cross", (20, 50)),
+    "XAG": ("sma_cross", (20, 50)),
+    "XCU": ("sma_cross", (20, 50)),
 }
 YAHOO_REF = {"XAU": "GC=F", "XAG": "SI=F", "WTI": "CL=F",
              "BRENTOIL": "BZ=F", "XCU": "HG=F", "XPT": "PL=F"}
@@ -192,6 +225,24 @@ def want_position(symbol, closes):
 # keeps Yahoo's live bar too instead of dropping it.
 _ref_cache = {}      # symbol -> {"ts": epoch, "closes": [...], "last_date": iso}
 _REF_TTL_S = 6 * 3600      # refresh a few times a day, like the 2h IBKR poll
+
+
+def apply_tuning():
+    """Growth-rail levers over the env defaults; {} when the rail is dark."""
+    global MAX_OPEN
+    if tuning is None:
+        return {}
+    moved = {}
+    for lever, attr in (("index.max_open", "MAX_OPEN"),):
+        cur = globals()[attr]
+        try:
+            val = tuning.get_lever(lever, cur)
+        except Exception:  # noqa: BLE001
+            continue
+        if val != cur:
+            globals()[attr] = val
+            moved[lever] = val
+    return moved
 
 
 def ref_closes(symbol):
@@ -325,6 +376,11 @@ def main():
     while True:
         t0 = time.time()
         store.heartbeat(bot_id)
+        # [2026-07-30] growth rail, every loop; a TTL expiry reverts to the
+        # operator default by the same path that applied the lever.
+        _lv = apply_tuning()
+        if _lv:
+            log.info("levers applied %s", _lv)
         now = datetime.now(timezone.utc)
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False

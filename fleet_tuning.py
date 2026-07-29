@@ -86,7 +86,7 @@ CACHE_SEC = 60.0
 ENACT_LANES = {s.strip() for s in os.environ.get(
     "FLEET_TUNING_ENACT_LANES",
     "paper-scanner,lighter-scout,lighter-taker,lighter-live,lighter-xp,"
-    "event-sentinel"
+    "event-sentinel,lighter-books"
     ).split(",") if s.strip()}
 
 # [2026-07-16 AUDIT FIX] author -> lanes each author may WRITE. "The judge is
@@ -97,8 +97,14 @@ ENACT_LANES = {s.strip() for s in os.environ.get(
 # judge owns live.funding.*). An author absent from this map keeps the old
 # behavior for NON-live lanes but can never write live.*.
 AUTHOR_LANES = {
+    # [2026-07-30] the board gains `lighter-books` — the six shadow books
+    # that had no lever surface at all. It is the fleet's general-purpose
+    # growth-rail author (bounded, TTL'd, auto-reverting) and these are
+    # $1k shadow books, so the blast radius is bounded twice over. The
+    # board still cannot write `live.funding.*` (that is the judge's, by
+    # name-prefix below) and gains no new reach into real money.
     "evidence-board":   {"paper-scanner", "lighter-scout", "lighter-taker",
-                         "lighter-live"},
+                         "lighter-live", "lighter-books"},
     "scout-tuner":      {"lighter-scout", "lighter-taker"},
     "experiment-judge": {"lighter-xp", "lighter-live"},
     # [2026-07-21] the sentinel tunes ONLY its own detection lane
@@ -287,6 +293,81 @@ LEVERS = {
     "live.funding.slope_gate": {
         "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-live",
         "note": "PROMOTED slope gate; 0 = off, env default on"},
+    # [2026-07-30 LIQUIDITY FLOOR as a lever] The Farmer's $10M floor
+    # EXCLUDES 5 of the venue's 8 most extreme funding books, including the
+    # two most extreme (measured: H100 -99.0% APR at $0.14M, XLM -89.4% at
+    # $0.26M, SKR -78.8% at $0.25M, XPD +47.3% at $0.11M, TRUMP -41.2% at
+    # $0.22M). Its own sibling, the carry book, runs a $2M floor and is the
+    # fleet's biggest earner. The floor is a CRUDE PROXY for the thing the
+    # scan already measures directly (SCAN_MAX_SLIP_BPS on the real clip),
+    # so lowering it is not "less risk control", it is deferring to the
+    # better instrument. Doctrine path: the shadow twin explores, the judge
+    # alone promotes. Env defaults untouched by this registration.
+    "xp.funding.min_vol": {
+        "kind": "float", "lo": 2e6, "hi": 20e6, "lane": "lighter-xp",
+        "note": "shadow twin's 24h $ turnover floor; env default 10e6"},
+    "live.funding.min_vol": {
+        "kind": "float", "lo": 2e6, "hi": 20e6, "lane": "lighter-live",
+        "note": "PROMOTED turnover floor; env default 10e6"},
+    # ---------------------------------------------------------------------
+    # [2026-07-30 THE SHADOW BOOKS GET LEVERS — operator: "every bot needs
+    # every tool at its disposal and every bot needs the ability to grow"]
+    #
+    # Until now SIX books had ZERO registered levers: the Yield Harvester,
+    # Counterweight, Snap Back, Index Rider, Tide Rider and the Perp Sniper.
+    # The growth rail could not move a single knob on any of them — including
+    # `carry.enter_apr`, which is the best-performing gate in the fleet
+    # (+$56.20 on n=80, t=2.42, both halves positive). "The ability to grow"
+    # is not a metaphor here; it is registry membership, and they had none.
+    #
+    # All six are $1,000 SHADOW books — zero real money — so this lane is
+    # bounded by construction as well as by these `lo`/`hi` pairs. Kill
+    # switch: drop `lighter-books` from FLEET_TUNING_ENACT_LANES and every
+    # consumer below reverts to its operator env default on the next read.
+    "carry.enter_apr": {
+        # env default 1.60 = 20% TRUE apr = the top ~14% of the venue's
+        # funding distribution (measured over all 202 books). Bounds span
+        # 10%-40% TRUE so the rail can test BOTH directions around the value
+        # that is currently winning — a tail-seeking bar is the carry book's
+        # whole thesis and it has never been measured against its neighbours.
+        "kind": "float", "lo": 0.80, "hi": 3.20, "lane": "lighter-books",
+        "note": "Yield Harvester funding entry gate; env default 1.60 (=20% TRUE)"},
+    "carry.max_positions": {
+        # measured AT 7 open of 8 — the fleet's biggest earner is one slot
+        # from full and cannot take the eighth-best carry it has graded.
+        "kind": "int", "lo": 6, "hi": 20, "lane": "lighter-books",
+        "note": "Yield Harvester concurrent carries; env default 12"},
+    "fundspread.k": {
+        # measured AT its cap: 10 open = exactly K=5 x 2 legs.
+        "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
+        "note": "Counterweight legs per side; env default 8"},
+    "fundspread.universe_n": {
+        "kind": "int", "lo": 20, "hi": 90, "lane": "lighter-books",
+        "note": "Counterweight scout-universe width; env default 60"},
+    "disloc.enter_pct": {
+        # Snap Back's gate was a FIXED 150bps against a measured median
+        # residual of 3.8bps — ~40x the middle of its own signal, which is
+        # why it has 10 closes. Now a PERCENTILE of the live residual
+        # distribution, so it tracks the venue instead of a constant
+        # inherited from the Hyperliquid-referenced era.
+        "kind": "float", "lo": 0.90, "hi": 0.999, "lane": "lighter-books",
+        "note": "Snap Back entry percentile of the live residual; default 0.98"},
+    "disloc.universe_n": {
+        "kind": "int", "lo": 10, "hi": 60, "lane": "lighter-books",
+        "note": "Snap Back scout-universe width; env default 40"},
+    "index.max_open": {
+        "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
+        "note": "Index Rider concurrent sleeves; env default = universe size"},
+    "trend.rank_by_funding": {
+        "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-books",
+        "note": "Tide Rider ranks candidates by funding; env default 1 (on)"},
+    "sniper.surge_mult": {
+        # the sniper's event (a brand-new listing) is too rare to grade —
+        # n=1 in weeks, and `new_listings` is empty on the bus right now.
+        # This widens the TRIGGER to the adjacent population (young book +
+        # volume surge) rather than widening any risk bound.
+        "kind": "float", "lo": 2.0, "hi": 8.0, "lane": "lighter-books",
+        "note": "Perp Sniper volume-surge trigger multiple; env default 3.0"},
 }
 
 

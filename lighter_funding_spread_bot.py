@@ -68,15 +68,49 @@ import funding_basis
 from venues import venue_context
 from venues.symbol_map import to_lighter
 
+# [2026-07-30] Growth rail + the shared scout read. Guarded like every
+# optional organ — a dark import leaves the operator's env defaults and the
+# configured coin list in force, never a crash inside a trading loop. Both
+# COPYs land in Dockerfile.fundspread in this same commit (a guarded import
+# with a missing COPY is the born-dark failure mode this fleet has shipped
+# three times).
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
+try:
+    import fleet_bus
+except Exception:  # noqa: BLE001
+    fleet_bus = None
+
 BOT = "perps-funding-spread"
 
 # --------------------------- configuration ----------------------------------
 START_EQUITY = 1000.0
+# [2026-07-30 FULL UNIVERSE] `UNIVERSE_N` is how many of the venue's most
+# liquid books the scout may add to the hand-list below. This book is a
+# CROSS-SECTIONAL RANK — it longs the K most-negative and shorts the K
+# most-positive funders — and a cross-sectional rank over 30 of the venue's
+# 202 books (15%) is a weak version of itself. Widening the candidate set
+# does not loosen the selection rule at all: it still takes exactly top-K
+# and bottom-K, just from a real cross-section. Registry-bounded [20, 90];
+# 0 disables the widening and restores the hand-list exactly.
+UNIVERSE_N = int(os.environ.get("FUNDSPREAD_UNIVERSE_N", "60"))
+# Minimum 24h $M turnover for a scout-added book. Kept well above dust: this
+# book always holds BOTH sides, so an illiquid leg it cannot exit is a real
+# cost, unlike the Farmer's single-sided carry.
+UNIVERSE_MIN_VOL_M = float(os.environ.get("FUNDSPREAD_UNIVERSE_MIN_VOL_M", "1.0"))
+
 COINS = os.environ.get(
     "FUNDSPREAD_COINS",
     "BTC,ETH,SOL,BNB,XRP,DOGE,AVAX,LINK,ADA,LTC,DOT,NEAR,SUI,HYPE,AAVE,WIF,"
     "JUP,OP,ARB,TIA,ENA,SEI,APT,INJ,RUNE,STX,GALA,JTO,PYTH,W").split(",")
-K = int(os.environ.get("FUNDSPREAD_K", "5"))
+# [2026-07-30 SLOT-BOUND — 5 -> 8] Measured AT its structural cap: 10 open
+# positions = exactly K=5 x 2 legs. Every rebalance it graded a full
+# cross-section and could act on only the five extremes per side. K=8 with a
+# widened universe keeps the same selectivity RATIO while deploying the book
+# it already has. Registry-bounded [3, 12] (`fundspread.k`).
+K = int(os.environ.get("FUNDSPREAD_K", "8"))
 LOOKBACK_H = int(os.environ.get("FUNDSPREAD_LOOKBACK_H", "72"))
 REBALANCE_H = float(os.environ.get("FUNDSPREAD_REBALANCE_H", "24"))
 ORDER_USD = float(os.environ.get("FUNDSPREAD_ORDER_USD", "20"))
@@ -114,6 +148,61 @@ def lighter_market_ids():
     except Exception as e:  # noqa: BLE001
         log.warning("lighter market list failed: %s", e)
         return {}
+
+
+def apply_tuning():
+    """Growth-rail levers over the env defaults. Bounded by the fleet_tuning
+    registry; expired/absent/quarantined levers leave the defaults intact.
+    Returns {lever: value} of whatever actually moved."""
+    global K, UNIVERSE_N
+    if tuning is None:
+        return {}
+    moved = {}
+    for lever, attr in (("fundspread.k", "K"),
+                        ("fundspread.universe_n", "UNIVERSE_N")):
+        cur = globals()[attr]
+        try:
+            val = tuning.get_lever(lever, cur)
+        except Exception:  # noqa: BLE001
+            continue
+        if val != cur:
+            globals()[attr] = val
+            moved[lever] = val
+    return moved
+
+
+def resolve_universe(configured, width, min_vol_m, current_time=None):
+    """The coin list this book ranks: the CONFIGURED names first (order
+    preserved — they are the validated core), then the scout's most-liquid
+    books until `width` is reached.
+
+    Pure and offline-testable; the scout read is the caller's, injected as
+    `_scout_syms` in tests. Contract, deliberately:
+      * a dark or stale scout returns [] from the accessor, so this returns
+        the configured list UNCHANGED — widening is an enhancement, never a
+        dependency, and this book must not shrink because an organ is down;
+      * `width <= 0` disables the widening entirely (the revert switch);
+      * configured names are NEVER dropped, even when the scout ranks them
+        below the cut — they are the backtested core and their exclusion
+        would silently change what the book is.
+    """
+    out = list(dict.fromkeys(str(c).strip().upper() for c in configured if str(c).strip()))
+    if not width or int(width) <= 0 or fleet_bus is None:
+        return out
+    try:
+        extra = fleet_bus.scout_universe(min_vol_m=min_vol_m,
+                                         current_time=current_time)
+    except Exception:  # noqa: BLE001
+        return out
+    have = set(out)
+    for sym in extra:
+        if len(out) >= int(width):
+            break
+        s = str(sym).strip().upper()
+        if s and s not in have:
+            out.append(s)
+            have.add(s)
+    return out
 
 
 def lighter_backfill(market_id, hours):
@@ -218,6 +307,17 @@ def main():
     broker = ctx.broker
     order_usd = ctx.order_usd(ORDER_USD, own=True)   # backtested $20/leg clip
     shadow_tag = ctx.mode == "lighter_shadow"
+
+    # [2026-07-30] Levers first, THEN the universe — UNIVERSE_N is itself a
+    # lever, so resolving the universe before applying them would use last
+    # boot's width. The configured list is always kept; the scout only ever
+    # ADDS, and a dark scout leaves this exactly as it was.
+    global COINS
+    _moved = apply_tuning()
+    COINS = resolve_universe(COINS, UNIVERSE_N, UNIVERSE_MIN_VOL_M)
+    log.info("universe: %d coins (K=%d per side, width %d)%s",
+             len(COINS), K, UNIVERSE_N,
+             f" | levers {_moved}" if _moved else "")
 
     meta = {}            # coin -> {is_short, entry, opened_ts, accrued}
     fund_hist = {}       # coin -> [[epoch_s, hourly_rate], ...] (rolling window)
@@ -546,7 +646,47 @@ def _selftest():
         _record_close("b", "ETH", 100.0, 1, 90.0, 1.0, False, "tp", True)
     finally:
         store.publish_paper_trade = _orig
-    print("[counterweight] selftest OK (fresh-mid/one-sided/venue-down/ledger-row)")
+    # [2026-07-30 FULL UNIVERSE] resolve_universe — the widening must ADD to
+    # the validated core, never replace or reorder it, and must degrade to
+    # the configured list on every failure of the scout.
+    _cfg = ["BTC", "ETH"]
+    _saved_bus = globals().get("fleet_bus")
+    try:
+        class _FakeBus:
+            syms = ["SOL", "BTC", "DOGE"]      # BTC already configured -> dedup
+
+            @staticmethod
+            def scout_universe(min_vol_m=0.0, current_time=None):
+                return _FakeBus.syms
+
+        globals()["fleet_bus"] = _FakeBus
+        assert resolve_universe(_cfg, 4, 1.0) == ["BTC", "ETH", "SOL", "DOGE"], \
+            "configured names FIRST and in order; scout adds; duplicates dropped"
+        assert resolve_universe(_cfg, 3, 1.0) == ["BTC", "ETH", "SOL"], \
+            "width truncates the ADDED names"
+        assert resolve_universe(_cfg, 2, 1.0) == ["BTC", "ETH"], \
+            "a width at/below the core adds nothing and DROPS nothing"
+        assert resolve_universe(_cfg, 0, 1.0) == ["BTC", "ETH"], \
+            "width 0 = the revert switch, hand-list exactly"
+        _FakeBus.syms = []
+        assert resolve_universe(_cfg, 9, 1.0) == ["BTC", "ETH"], \
+            "DARK/STALE scout -> configured list unchanged (never shrink)"
+
+        class _RaisingBus:
+            @staticmethod
+            def scout_universe(min_vol_m=0.0, current_time=None):
+                raise RuntimeError("bus down")
+
+        globals()["fleet_bus"] = _RaisingBus
+        assert resolve_universe(_cfg, 9, 1.0) == ["BTC", "ETH"], \
+            "a RAISING bus is caught — the book keeps trading its core"
+        globals()["fleet_bus"] = None
+        assert resolve_universe(_cfg, 9, 1.0) == ["BTC", "ETH"], \
+            "born-dark import -> configured list, no AttributeError"
+    finally:
+        globals()["fleet_bus"] = _saved_bus
+    print("[counterweight] selftest OK (fresh-mid/one-sided/venue-down/"
+          "ledger-row/universe-widening)")
 
 
 def _supervised():

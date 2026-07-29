@@ -44,6 +44,17 @@ import logging
 from datetime import datetime, timezone
 
 import bot_pnl_store as store
+
+# [2026-07-30] growth rail + the shared scout read; guarded, with both COPYs
+# added to Dockerfile.psniper in the same commit (born-dark doctrine).
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001
+    tuning = None
+try:
+    import fleet_bus
+except Exception:  # noqa: BLE001
+    fleet_bus = None
 from venues import venue_context
 from venues.safety import open_notional
 
@@ -60,6 +71,13 @@ MAX_HOLD_SEC = 6 * 3600    # 6h — snipe the debut move, don't marry it
 # unpriceable; close at the last seen mid (entry if none).
 DELIST_GIVEUP_SEC = float(os.environ.get("SNIPER_DELIST_GIVEUP_SEC", str(6 * 3600)))
 MAX_OPEN = 4               # global cap on concurrent snipes
+# [2026-07-30] the SURGE trigger — see surge_candidates(). A book whose 24h
+# volume jumps by this multiple is treated as a snipe candidate alongside a
+# genuinely new listing. Registry-bounded lever `sniper.surge_mult` [2.0, 8.0];
+# the scout's own surge detector uses 3.0, so this starts aligned with it.
+# Set SNIPER_SURGE_MULT=0 to disable the second source entirely.
+SURGE_MULT = float(os.environ.get("SNIPER_SURGE_MULT", "3.0"))
+SURGE_MAX_PER_LOOP = int(os.environ.get("SNIPER_SURGE_MAX_PER_LOOP", "3"))
 LOOP_SECONDS = 60          # poll the market list every minute
 DIRECTION_LONG = os.environ.get("SNIPER_DIRECTION", "long").lower() != "short"
 # [2026-07-17 RETRY FIX] `baseline |= set(new_listings)` used to run
@@ -119,6 +137,59 @@ def _snipe_price(orderbook_fn, sym):
     if not px:
         return None, "no two-sided book yet"
     return px, None
+
+
+def apply_tuning():
+    """Growth-rail levers over the env defaults; {} when the rail is dark."""
+    global SURGE_MULT
+    if tuning is None:
+        return {}
+    cur = SURGE_MULT
+    try:
+        val = tuning.get_lever("sniper.surge_mult", cur)
+    except Exception:  # noqa: BLE001
+        return {}
+    if val != cur:
+        SURGE_MULT = val
+        return {"sniper.surge_mult": val}
+    return {}
+
+
+def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP):
+    """Books the scout reports as volume-SURGING, as snipe candidates.
+
+    [2026-07-30 THE SNIPER'S POPULATION PROBLEM] This bot's event — a brand-new
+    perp listing — is too rare to grade: n=1 close in weeks, and the scout's
+    `new_listings` is routinely empty. A strategy that cannot accumulate a
+    sample cannot be validated, improved, or retired on evidence; it just sits
+    on a dashboard row. "New listing" is one instance of the thing this bot is
+    actually good at — a book repricing violently with no settled history — and
+    a volume surge is the same phenomenon in a book that listed last week.
+
+    Pure: the caller supplies the scout's `vol_surges` rows and the set of
+    symbols already handled. `already` is REQUIRED and does real work — every
+    surging book is in `baseline` (baseline is seeded with all active markets),
+    so baseline cannot dedup these the way it dedups listings, and without a
+    separate ledger a surging book would re-enter `pending` every loop forever.
+    Bounded by `limit` so one venue-wide volume event cannot flood the pass.
+    """
+    out = []
+    try:
+        rows = sorted(surges or [],
+                      key=lambda r: -float(r.get("ratio") or 0.0))
+    except (TypeError, ValueError, AttributeError):
+        return out
+    for r in rows:
+        if len(out) >= int(limit):
+            break
+        try:
+            sym = str(r.get("sym") or "").strip().upper()
+            ratio = float(r.get("ratio") or 0.0)
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if sym and sym not in already and ratio >= float(mult):
+            out.append(sym)
+    return out
 
 
 def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
@@ -207,6 +278,11 @@ def main():
     entry_ts = {}
     baseline = set()
     pending = {}          # sym -> {"first_seen": ts, "attempts": n} — detected, not yet sniped
+    # [2026-07-30] the SURGE source's own dedup ledger (see surge_candidates).
+    # Persisted with the rest of the state: a restart that forgot it would
+    # re-offer every book that has ever surged, which is the retry-forever bug
+    # baseline cannot prevent for this source.
+    surge_done = set()
     no_px_since = {}      # coin -> first ts the book was unpriceable (zombie clock)
     last_px = {}          # coin -> last seen mid (zombie exit price)
     # [2026-07-17 SEED GUARD] The seed below (`if not baseline`) absorbs every
@@ -274,6 +350,13 @@ def main():
                                    "attempts": int(v.get("attempts") or 0)}
             except Exception:  # noqa: BLE001
                 continue
+        # [2026-07-30] the surge source's dedup ledger. A DROPPED entry here
+        # is not self-healing the way a dropped `pending` entry is — the symbol
+        # is in `baseline`, so nothing else would stop it being re-offered.
+        try:
+            surge_done.update(str(x) for x in (_saved.get("surge_done") or []))
+        except Exception:  # noqa: BLE001
+            pass
         if pending:
             log.info("restored %d pending listing(s) awaiting a snipeable book: %s",
                      len(pending), ", ".join(sorted(pending)))
@@ -403,7 +486,8 @@ def main():
             baseline = set(active)
             store.save_state(bot_id, {"baseline": sorted(baseline),
                                       "broker": broker.to_state() if dry_run else None,
-                                      "entry_ts": entry_ts, "pending": pending})
+                                      "entry_ts": entry_ts, "pending": pending,
+                                      "surge_done": sorted(surge_done)})
             log.info("seeded baseline with %d active markets — sniping only NEW "
                      "listings from here.", len(baseline))
             if args.once:
@@ -436,8 +520,26 @@ def main():
         # ----- open snipes on genuinely new markets -----
         open_now = broker.open_count() if dry_run else len(ctx.venue.positions())
         _held_now = set(broker.pos) if dry_run else set(ctx.venue.positions())
+        # [2026-07-30] SECOND CANDIDATE SOURCE — surging books. `surge_done`
+        # is this source's own dedup ledger and is NOT optional: every surging
+        # book is already in `baseline` (it is seeded with all active markets),
+        # so baseline cannot dedup them, and a surging book would otherwise
+        # re-enter `pending` on every loop for as long as it kept surging.
+        _surge = []
+        if SURGE_MULT > 0 and fleet_bus is not None:
+            try:
+                _sp = fleet_bus._load("lighter-market", None) or {}
+                if fleet_bus.is_fresh(_sp, None):
+                    _surge = surge_candidates(_sp.get("vol_surges"), SURGE_MULT,
+                                              surge_done | set(pending))
+            except Exception:  # noqa: BLE001
+                _surge = []
+            if _surge:
+                log.info("SURGE CANDIDATES (>=%.1fx 24h volume): %s",
+                         SURGE_MULT, ", ".join(_surge))
+                surge_done.update(_surge)
         open_now, _sniped, _abandoned = run_snipe_pass(
-            candidates=new_listings, pending=pending, baseline=baseline,
+            candidates=new_listings + _surge, pending=pending, baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
             try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n),
             is_held=lambda s: s in _held_now)
@@ -597,7 +699,8 @@ def main():
         store.save_state(bot_id, {"baseline": sorted(baseline),
                                   "broker": broker.to_state() if dry_run else None,
                                   "entry_ts": entry_ts,
-                                  "pending": pending})
+                                  "pending": pending,
+                                  "surge_done": sorted(surge_done)})
 
         if args.once:
             log.info("--once complete: watching %d markets, %d pending, %d open.",
