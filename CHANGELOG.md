@@ -1,3 +1,22 @@
+## 2026-07-29 (fr) — THE "CRYPTO-ONLY" BULL GATE IS 38% TRADFI — and the measurement says closing it would COST money, so it is documented, not shipped
+
+- **THE DEFECT, found independently by two separate multi-agent campaigns and then verified here against the venue's actual book names.** `_is_crypto()` (`lighter_ticket_taker.py:499`) documents the bull arm as **crypto-only** — *"tradfi contaminates the read"* — and enforces it with a 60-name `TRADFI_BASES` list. Measured over the 200h tape (188 distinct Lighter books): **10 of the 60 names match NO book on the venue** (`AMAT, ARM, AVGO, CORN, GOOG, QCOM, SKHYNIX, SMCI, USDCNH, USOIL`), and **21 books pass `_is_crypto()` while being shaped like equities/FX**. `SKHYNIX` is the clearest case: the venue's books are `SKHY` and `SKHYNIXUSD`, so the entry that exists specifically to exclude SK Hynix excludes neither.
+- **THE MAGNITUDE — this is not a rounding error.** Of the live arm's 734 admissible divergence ticket-rows, **278 (37.9%) come from books that are actually tradfi**. `CXMT` — a Chinese DRAM maker — is **211 of them (28.7%), the single largest supply source in the entire book**, ahead of every genuine crypto name except `BOT`. The rest: `SKHY` 35, `STRC` 16, `DRAM` 12, `TENCENT` 4.
+- **AND YET CLOSING IT MAKES THE LIVE BOOK WORSE ON EVERY WINDOW** (live path, deployed bracket `.04/-.03/48h`, max_open 4, $10 clips):
+
+  | window | as shipped (leaky) | leak closed |
+  |---|---|---|
+  | 72h  | +$1.42, n=16, +0.885%/trade, t=+0.83 | +$0.46, n=10, +0.457%, t=+0.36 |
+  | 120h | +$1.65, n=26, +0.636%/trade, t=+0.78 | +$0.66, n=20, +0.330%, t=+0.36 |
+  | 168h | +$1.86, n=30, +0.619%/trade, t=+0.83 | +$1.49, n=24, +0.619%, t=+0.76 |
+  | 200h | +$1.45, n=38, +0.383%/trade, t=+0.59 | +$0.68, n=31, +0.219%, t=+0.31 |
+
+  Lower net, lower per-trade and lower t at **every** window, and both-halves breaks at 120h (-0.13/+0.43) and 200h (+0.53/-0.26). **The premise the rule rests on — "tradfi contaminates the read" — is not supported by this tape; on it, tradfi is carrying part of the book.**
+- **WHY THE OTHER CAMPAIGN GOT THE OPPOSITE ANSWER, stated so the disagreement is not left hanging.** It measured in the SHADOW frame (all four lenses, `max_open` 6, $50 clips, with the `{ADA,BOT,SOXL}` coin-veto) and found per-trade and t RISING when the leak closed. Both results are correct for their own frame. The LIVE path is the one holding real money, and it is the one reported above.
+- **NOT SHIPPED, and that is the finding.** A restrict-only change is normally the safe kind — but this one cuts **38% of supply** from a book already at a 26% duty cycle with n=25 real closes, which directly lengthens the 30-day go-live window, and it does so **against** the measured direction. Every t here is below 1.0, so neither direction is significant: the honest verdict is *"no measured justification either way"*, not *"tradfi helps"*. Shipping a real-money entry-gate change on that would be the fourth ill-evidenced change of the day.
+- **WHAT IS ACTUALLY BROKEN is the CLAIM, not the behaviour.** The hazard is a reader trusting the docstring: anyone reasoning *"the bull arm is crypto-only, so equity risk cannot reach it"* is wrong by 38%. That belief is the thing to correct, and this entry corrects it. **Whether the bull arm SHOULD be crypto-only is a strategy question the operator owns** — the evidence does not settle it, so it goes to the 4-Aug review as a decision, not as a patch.
+- Publish-only: no code, no lever, no book, no real money. `TT_TRADFI_BASES` remains env-overridable, so the operator can close the leak in one dispatch if he decides the classification matters more than the sample.
+
 ## 2026-07-29 (fq) — THE DASHBOARD'S HEADLINE AND THE STRATEGY'S EDGE CAN DISAGREE IN SIGN, and the go-live gate reads BOTH bases at once
 
 - **THE MEASUREMENT.** `lighter-ticket-taker-lshadow`, n=135 closes: `/pnl.json` reports **+$6.93** — and the equal-weighted per-trade series sums to **-12.52pp** (mean **-0.093%/trade, t=-0.39**). Same book, same trades, **opposite signs**. The live arm's two bases happen to agree (-$0.18 / -0.183%/trade), which is exactly why the disagreement went unnoticed on the twin.
