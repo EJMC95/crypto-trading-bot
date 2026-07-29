@@ -1036,8 +1036,11 @@ def autonomy_rail_card():
             lv = {k: x for k, x in lv.items() if _lever_unexpired(x)}
             live = sum(1 for x in lv.values()
                        if isinstance(x, dict) and x.get("lane") == "lighter-live")
+            _brk = lever_lane_summary(lv)
             return row("fleet-tuning", "🎚️ Levers active",
-                       f'{len(lv)}' + (f' · {live} LIVE' if live else ''),
+                       f'{len(lv)}'
+                       + (f' — {_brk}' if _brk else '')
+                       + (f' · {live} LIVE' if live else ''),
                        Y if live else None)
 
         def b_tuner():
@@ -1512,6 +1515,125 @@ def radar_card():
                 f'<div class="muted">{r.get("n_books")} living books · {cnt}{age}'
                 f' — significance + both-halves + median/jackknife + '
                 f'ETA-to-verdict (publish-only, no consumer yet)</div>'
+                f'{"".join(rows)}</div>')
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+#: The six go-live bars, rendered left-to-right in the order
+#: `scripts/golive_readiness.BAR_NAMES` publishes them. Label + tooltip only —
+#: the PASS/FAIL decision is the grader's, never re-derived here (the dashboard
+#: re-deriving a rule is how the (fk) gate drifted from its own documentation).
+GOLIVE_BARS = [
+    ("window", "d", "window >= 30 days"),
+    ("closes", "n", "closes >= 30 — evidence is denominated in FILLS"),
+    ("mean", "μ", "mean per-trade > 0"),
+    ("t", "t", "t >= 2.0 — significance, not just a positive mean"),
+    ("halves", "½", "both halves positive"),
+    ("maxdd", "▽", "max drawdown < 15%"),
+]
+
+
+def golive_card():
+    """🚦 [2026-07-30] The go-live gate, made VISIBLE (bot_state
+    'golive-readiness', published 6-hourly by scripts/golive_readiness.py).
+
+    Why this card exists. The (fk) bar is the one rule that decides whether a
+    $1,000 shadow book may ever hold real money, and until today it had no
+    publisher and no schedule — it ran when a human typed the command, so
+    between reviews there was no way to see that (for instance) 🌾 Yield
+    Harvester was passing five of six bars and failing only the 30-day window.
+    A gate nobody can read is not a gate; it is a memory.
+
+    Renders each living book's six bars as chips, worst-first is NOT the sort —
+    CLOSEST FIRST is, because the operator's question is "who is next?". The
+    win-rate column is shown because the (fk) rewrite made it informative
+    rather than a bar, and 🌾 is the book that proves the difference.
+
+    Read-only, fail-silent, and it promotes NOTHING: go-live remains an
+    explicit operator act."""
+    try:
+        r = fetch_states(["golive-readiness"]).get("golive-readiness") or {}
+        books = r.get("books") or {}
+        if not isinstance(books, dict) or not books:
+            return ""
+        bar = r.get("bar") or {}
+        ready = set(r.get("ready") or [])
+        # closest to the bar first; ties broken by significance, then sample
+        order = sorted(books.items(),
+                       key=lambda kv: (-(kv[1].get("bars_passed") or 0),
+                                       -(kv[1].get("t") or 0),
+                                       -(kv[1].get("n") or 0)))
+        rows = []
+        for bot, b in order:
+            if not isinstance(b, dict):
+                continue
+            passed = b.get("bars") or {}
+            chips = []
+            for key, glyph, tip in GOLIVE_BARS:
+                on = bool(passed.get(key))
+                col = "#1a7f37" if on else "#6e7681"
+                bg = "rgba(26,127,55,.16)" if on else "rgba(110,118,129,.10)"
+                chips.append(
+                    f'<span title="{html.escape(tip)}: '
+                    f'{"PASS" if on else "not yet"}" style="color:{col};'
+                    f'background:{bg};border-radius:3px;padding:0 3px;'
+                    f'font-size:.8em">{glyph}</span>')
+            np_ = b.get("bars_passed") or 0
+            is_ready = bot in ready or b.get("ready")
+            # The (fk) divergence, shown rather than asserted: a book the NEW
+            # bar admits and the retired win-rate rule would have rejected.
+            note = ""
+            if is_ready and not b.get("legacy_ready"):
+                note = ('<span style="color:#1a7f37" title="passes the (fk) '
+                        'bar; the retired win-rate rule would have rejected '
+                        'it — this is the carry shape">✦</span>')
+            elif b.get("legacy_ready") and not is_ready:
+                note = ('<span style="color:#d1242f" title="the retired '
+                        'win-rate rule would have ADMITTED this book">⚠</span>')
+            miss = "; ".join(str(x) for x in (b.get("fails") or [])[:2])
+            col = ("#1a7f37" if is_ready else
+                   "#d29922" if np_ >= 5 else "#8b949e")
+            dd = b.get("max_dd_pct")
+            rows.append(
+                '<div style="display:flex;gap:6px;font-size:.85em;padding:1px 0;'
+                'white-space:nowrap">'
+                f'<span style="width:38px;color:{col};text-align:right">'
+                f'{np_}/6</span>'
+                f'<span style="width:62px">{"".join(chips)}</span>'
+                f'<span style="flex:1;overflow:hidden;text-overflow:ellipsis">'
+                f'{html.escape(str(bot))} {note}</span>'
+                f'<span class="muted" style="width:34px;text-align:right">'
+                f'n{b.get("n")}</span>'
+                f'<span style="width:44px;text-align:right;color:{col}">'
+                f't{(b.get("t") or 0):+.1f}</span>'
+                f'<span class="muted" style="width:46px;text-align:right" '
+                f'title="win rate — REPORTED, not a bar since (fk)">'
+                f'{(b.get("win_pct") or 0):.0f}%</span>'
+                f'<span class="muted" style="width:52px;text-align:right" '
+                f'title="max drawdown">'
+                f'{"n/a" if dd is None else f"{dd:.1f}%"}</span>'
+                f'<span class="muted" style="width:180px;overflow:hidden;'
+                f'text-overflow:ellipsis">{html.escape(miss)}</span></div>')
+        age = ""
+        try:
+            _u = _iso_dt(r.get("updated"))
+            if _u:
+                _m = int((dt.datetime.now(dt.timezone.utc) - _u).total_seconds() // 60)
+                age = f' · {_m}m ago'
+        except Exception:
+            pass
+        head = (f'{len(ready)} at the bar' if ready
+                else 'none at the bar yet')
+        return (f'<div class="card"><h2>🚦 Go-live grader '
+                f'<span class="dot on"></span></h2>'
+                f'<div class="muted">{len(rows)} graded books · {head}{age} — '
+                f'bar: &ge;{bar.get("min_days", 30):g}d, '
+                f'&ge;{bar.get("min_closes", 30)} closes, mean&gt;0, '
+                f't&ge;{bar.get("min_t", 2.0):g}, both halves +, maxDD&lt;'
+                f'{100 * (bar.get("max_dd") or 0.15):.0f}%. '
+                f'Win% is reported, NOT a bar. Grades only — go-live is an '
+                f'explicit operator act.</div>'
                 f'{"".join(rows)}</div>')
     except Exception:  # noqa: BLE001
         return ""
@@ -2022,7 +2144,10 @@ def render():
         enrich = {}
     sparks = build_sparks()
     pulse_strip, pulse_latest = fetch_pulse_strip()
-    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card() + radar_card()
+    # [2026-07-30] 🚦 the go-live grader sits directly after the radar: the
+    # radar says "is there an edge?", the grader says "has it earned real
+    # money?" — the same books, the next question.
+    brain_html = brain_card_html() + evidence_board_card() + autonomy_rail_card() + parliament_card() + incubator_card() + radar_card() + golive_card()
 
     # V5's regime-driven mode, so its card explains its own quietness/activity
     mode_notes = {}
@@ -2540,6 +2665,38 @@ def _v(fmt, *vals):
         return "—"
 
 
+def lever_lane_summary(levers, max_lanes=4):
+    """Compact per-LANE breakdown of the active levers, e.g.
+    "books carry×2, disloc×1 · live×1". Pure — selftested.
+
+    [2026-07-30] The autonomy card and the vitals row both showed only a COUNT.
+    That was adequate while the rail moved scout/taker bars, but `(fz)` added
+    nine `lighter-books` levers across SIX different books, so a bare integer
+    now hides the one thing the operator needs: WHICH book the rail just moved.
+    Lane names are shortened to the book prefix (`carry`, `fundspread`,
+    `disloc`, `index`, `trend`, `sniper`) because that is the identity that
+    matters — the lane alone would say "lighter-books" six different ways.
+    """
+    if not isinstance(levers, dict) or not levers:
+        return ""
+    books, other = {}, {}
+    for name, spec in levers.items():
+        lane = (spec or {}).get("lane") if isinstance(spec, dict) else None
+        if lane == "lighter-books":
+            books[str(name).split(".")[0]] = books.get(
+                str(name).split(".")[0], 0) + 1
+        else:
+            key = str(lane or "?").replace("lighter-", "")
+            other[key] = other.get(key, 0) + 1
+    parts = []
+    if books:
+        top = sorted(books.items(), key=lambda kv: (-kv[1], kv[0]))[:max_lanes]
+        parts.append("books " + ", ".join(f"{k}×{v}" for k, v in top))
+    for k, v in sorted(other.items(), key=lambda kv: (-kv[1], kv[0]))[:max_lanes]:
+        parts.append(f"{k}×{v}")
+    return " · ".join(parts)
+
+
 def _lever_unexpired(x):
     """[2026-07-16 AUDIT FIX] the dashboard counted EXPIRED levers as active
     (the payload lingers until the next author write) — including LIVE-flagged
@@ -2706,7 +2863,9 @@ def _organ_vital(key, st):
                   if _lever_unexpired(x)}
             live = sum(1 for x in lv.values()
                        if isinstance(x, dict) and x.get("lane") == "lighter-live")
-            return _v("{} active levers · {} lighter-live", len(lv), live)
+            _brk = lever_lane_summary(lv)
+            return _v("{} active levers · {} lighter-live{}", len(lv), live,
+                      f" — {_brk}" if _brk else "")
         if key == "scout-tuner":
             return _v("{} enacted · baseline net ${}",
                       len(st.get("enacted") or {}), st.get("baseline_net"))
@@ -2821,6 +2980,12 @@ ORGAN_SPECS = [
     # [2026-07-23] edge radar — per-book significance/both-halves/median/ETA.
     # Publish-only, 30-min loop; a fresh row attests the fleet_radar organ ran.
     ("fleet-radar",        "📡 Edge radar — book verdicts + ETA",     False, 5400),
+    # [2026-07-30] go-live grader — the (fk) bar, now an organ on a 6-hourly
+    # loop. Staleness matters here for a specific reason: this is the ONLY
+    # published view of how close a book is to holding real money, so a dark
+    # row means the operator is reading a frozen scoreboard. 8h allows one
+    # missed publish on a 6h cadence.
+    ("golive-readiness",   "🚦 Go-live grader — bars per book",       False, 28800),
     # [2026-07-28] RE-TYPED heartbeat: the incubator now republishes the
     # queue EVERY cycle (queue_carry heartbeat — the §3b residual fix), and
     # the judge consumes it FAIL-CLOSED on its own updated+ttl_sec, so a
@@ -4558,6 +4723,10 @@ class H(BaseHTTPRequestHandler):
                             "'evidence-board', 'event-sentinel', "
                             "'fleet-immune', 'fleet-tuning', 'xp-queue', "
                             "'strategy-incubator', 'fleet-radar', "
+                            # [2026-07-30] the go-live grader's verdicts must be
+                            # readable from a review seat with no Railway
+                            # login — it is the bar that governs real money.
+                            "'golive-readiness', "
                             "'fleet-respiration', 'fleet-clock', "
                             "'fleet-regen', 'brain-vitals')")
                         live = {}
@@ -4579,6 +4748,7 @@ class H(BaseHTTPRequestHandler):
                                 "'regime-oracle', 'evidence-board', "
                                 "'event-sentinel', 'fleet-immune', "
                                 "'fleet-radar', 'fleet-respiration', "
+                                "'golive-readiness', "
                                 "'brain-vitals') "
                                 "AND ts > now() - %s * interval '1 hour' "
                                 "ORDER BY ts", (hours,))
@@ -4613,6 +4783,7 @@ class H(BaseHTTPRequestHandler):
                                    "xp_queue": live.get("xp-queue"),
                                    "strategy_incubator": live.get("strategy-incubator"),
                                    "fleet_radar": live.get("fleet-radar"),
+                                   "golive_readiness": live.get("golive-readiness"),
                                    "fleet_respiration": live.get("fleet-respiration"),
                                    "fleet_clock": live.get("fleet-clock"),
                                    "fleet_regen": live.get("fleet-regen"),

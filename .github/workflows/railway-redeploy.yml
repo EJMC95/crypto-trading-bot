@@ -90,6 +90,11 @@ on:
       # (cl)/(cm)/(cn) but was absent from BOTH lists here, so it was
       # deploy-orphaned — a silent no-op that audit_deploy_coverage.py caught.
       - 'fleet_radar.py'
+      # 🚦 go-live grader — COPY'd into Dockerfile.freqtrade + looped in
+      # run_all.sh (`--publish`, 6-hourly) as of 2026-07-30. It is the ONLY
+      # file under `scripts/` that ships in an image, which is exactly why it
+      # needs an explicit entry here and in the service grep below.
+      - 'scripts/golive_readiness.py'
       - 'experiment_judge.py'
       - 'strategy_incubator.py'
       - 'implementation_shortfall.py'
@@ -185,7 +190,7 @@ jobs:
             # the dry-run paper DBs (the reason for the 2026-07-01 freeze).
             # Keep in sync with the `paths:` filter above — both gate the same
             # deploy. scripts/audit_deploy_coverage.py enforces both against the Dockerfiles.
-            if echo "$changed" | grep -qE '^(user_data/|venues/|parliament/|parliament_main\.py$|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$|bot_learn\.py$|brain_stats\.py$|evidence_board\.py$|fleet_immune\.py$|fleet_regen\.py$|fleet_proprioception\.py$|fleet_respiration\.py$|fleet_clock\.py$|fleet_bus\.py$|fleet_tuning\.py$|fleet_proposals\.py$|fleet_radar\.py$|experiment_judge\.py$|strategy_incubator\.py$|implementation_shortfall\.py$|event_sentinel\.py$|lighter_market_scout\.py$|lighter_ticket_taker\.py$|lighter_scout_tuner\.py$|lighter_ticket_replay\.py$|cleanup_legacy_bots\.py$|funding_basis\.py$|dashboard_server\.py$|paper_broker\.py$)'; then
+            if echo "$changed" | grep -qE '^(user_data/|venues/|parliament/|parliament_main\.py$|Dockerfile\.freqtrade$|run_all\.sh$|bot_pnl_store\.py$|market_pulse\.py$|freqtrade_pnl_poller\.py$|regime_oracle\.py$|fleet_risk\.py$|bot_learn\.py$|brain_stats\.py$|evidence_board\.py$|fleet_immune\.py$|fleet_regen\.py$|fleet_proprioception\.py$|fleet_respiration\.py$|fleet_clock\.py$|fleet_bus\.py$|fleet_tuning\.py$|fleet_proposals\.py$|fleet_radar\.py$|scripts/golive_readiness\.py$|experiment_judge\.py$|strategy_incubator\.py$|implementation_shortfall\.py$|event_sentinel\.py$|lighter_market_scout\.py$|lighter_ticket_taker\.py$|lighter_scout_tuner\.py$|lighter_ticket_replay\.py$|cleanup_legacy_bots\.py$|funding_basis\.py$|dashboard_server\.py$|paper_broker\.py$)'; then
               svcs="freqtrade-bots"
             fi
             if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$|fleet_watchdog_svc\.py$)'; then

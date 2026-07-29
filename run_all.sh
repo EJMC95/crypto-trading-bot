@@ -310,6 +310,20 @@ done &
     sleep "${RADAR_INTERVAL_SEC:-1800}"
   done ) &
 
+# [2026-07-30 GO-LIVE GRADER] 🚦 grades every living book against the (fk)
+# go-live bar (>=30d, >=30 closes, mean>0, t>=2.0, both halves +, maxDD<15%)
+# -> bot_state 'golive-readiness', which the dashboard renders. The rule that
+# governs REAL MONEY had no schedule and no publisher: it ran when a human
+# remembered, so between reviews nobody could see how close a book was. Same
+# "a rule nobody runs is not a control" class as the 38 unrun selftests.
+# 6-hourly is plenty — the bar's shortest term is a 30-DAY window. PUBLISH-
+# ONLY: promotes nothing, writes no lever; go-live is an operator act.
+( sleep 900
+  while true; do
+    python3 /freqtrade/scripts/golive_readiness.py --publish || true
+    sleep "${GOLIVE_INTERVAL_SEC:-21600}"
+  done ) &
+
 # [2026-07-21 PARLIAMENT] 🏛️ the six-layer PM shadow fleet (operator ask:
 # comprehensive self-evolving system, bots named for the last 8 Australian
 # PMs). ONE asyncio process carrying all six layers: Lighter-only data,

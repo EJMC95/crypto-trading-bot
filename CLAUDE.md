@@ -265,6 +265,19 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   Verdict clean/live-ahead/live-slipping/insufficient; sustained slip →
   phone. Answers "is the live book slipping, and on entry or exit?". →
   `impl-shortfall`
+- `scripts/golive_readiness.py` 🚦 — the GO-LIVE GRADER, an ORGAN since
+  2026-07-30 (gk). Grades every LIVING book against the `(fk)` bar and
+  publishes → `golive-readiness` (6-hourly `--publish` loop in `run_all.sh`;
+  the ONLY file under `scripts/` that ships in an image). **It had no
+  publisher and no schedule until (gk)** — the rule governing real money ran
+  only when a human typed the command, so nobody could see that 🌾 carry was
+  five of six bars from the gate. Publishes a machine-readable per-bar map
+  (`bars` / `BAR_NAMES` = window/closes/mean/t/halves/maxdd) so no consumer
+  string-matches prose; `bar_map` is selftest-BOUND to be exactly equivalent
+  to `grade` (a `maxDD` that cannot be computed FAILS — fail-closed).
+  Rendered as the 🚦 dashboard card (✦ = passes the new bar where the retired
+  win-rate rule would have rejected it). PUBLISH-ONLY: promotes nothing,
+  writes no lever; go-live stays an explicit operator act.
 - `fleet_respiration.py` 🫁 — RESPIRATION / blood-oxygen: OXYGEN = fresh
   market data; LUNGS = the venue-fetch layer. Measures SpO2 (weighted
   fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA
@@ -350,8 +363,10 @@ Doing one hides your own omission.
 ### Read-only endpoints (no auth)
 `/pnl.json` `/trades.json` (`?source=paper` for the paper_trades ledger)
 `/bus.json` (risk light + signal bus + brain keys + lighter-market +
-fleet-proprioception, `?hours=` history) `/pulse.json` `/disloc.json`
-`/watchdog.json`
+fleet-proprioception + **golive-readiness** (30-Jul (gk) — the go-live bars
+per book, live AND `?hours=` history, so a review seat with no Railway login
+can read the gate that governs real money), `?hours=` history)
+`/pulse.json` `/disloc.json` `/watchdog.json`
 
 ### 15-Jul reconciliation (this repo's git now matches what runs)
 The 14-Jul pivot shipped from branch `claude/gapscout-profitable-trades-ebrprj`

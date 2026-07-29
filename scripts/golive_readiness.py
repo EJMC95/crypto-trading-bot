@@ -69,6 +69,9 @@ GOLIVE_MIN_T = float(os.environ.get("GOLIVE_MIN_T", "2.0"))
 GOLIVE_MAX_DD = float(os.environ.get("GOLIVE_MAX_DD", "0.15"))
 GOLIVE_LEGACY_WIN = float(os.environ.get("GOLIVE_LEGACY_WIN", "0.55"))
 BOOK_USD = float(os.environ.get("GOLIVE_BOOK_USD", "1000"))
+# [2026-07-30] bot_state key + TTL for the published verdicts (see main()).
+KEY = "golive-readiness"
+TTL_SEC = int(os.environ.get("GOLIVE_TTL_SEC", "86400"))
 
 
 def stats(rows, book_usd=None):
@@ -104,6 +107,36 @@ def stats(rows, book_usd=None):
     return out
 
 
+#: The six bars, in the order the operator reads them. Names are the PUBLISHED
+#: contract (`golive-readiness.books.<bot>.bars`) — the dashboard renders these
+#: keys, so a rename here is a breaking change and `test_golive_readiness.py`
+#: pins them.
+BAR_NAMES = ("window", "closes", "mean", "t", "halves", "maxdd")
+
+
+def bar_map(s):
+    """{bar_name: passed} for one book — the same six conditions `grade()`
+    checks, in a form a CONSUMER can render without string-parsing `fails`.
+
+    Published rather than re-derived: the dashboard used to have no way to show
+    "5 of 6 bars, missing the window" except by matching prose, and prose is
+    exactly what drifts. `_selftest` asserts `all(bar_map(s).values()) is
+    grade(s)[0]` over every fixture, so the two cannot diverge silently. An
+    unmeasurable bar (maxDD with no book size) counts as NOT passed — the
+    fail-closed direction for a gate that governs real money."""
+    if s.get("n", 0) < 2:
+        return {k: False for k in BAR_NAMES}
+    dd = s.get("max_dd_frac")
+    return {
+        "window": s["days"] >= GOLIVE_MIN_DAYS,
+        "closes": s["n"] >= GOLIVE_MIN_CLOSES,
+        "mean": s["mean_pct"] > 0,
+        "t": s["t"] >= GOLIVE_MIN_T,
+        "halves": s["h1"] > 0 and s["h2"] > 0,
+        "maxdd": dd is not None and dd < GOLIVE_MAX_DD,
+    }
+
+
 def grade(s, legacy=False):
     """(passes, [failed_bar, ...]) for one book's stats dict.
 
@@ -115,7 +148,15 @@ def grade(s, legacy=False):
     fails = []
     if s["days"] < GOLIVE_MIN_DAYS:
         fails.append(f"window {s['days']:.1f}d < {GOLIVE_MIN_DAYS:g}d")
-    if s["max_dd_frac"] is not None and s["max_dd_frac"] >= GOLIVE_MAX_DD:
+    # [2026-07-30] An UNMEASURABLE drawdown now FAILS the bar rather than
+    # passing it. It was `is not None and >=`, i.e. a book whose drawdown could
+    # not be computed (no book size) sailed through the one bar the operator
+    # wrote himself. Fail-closed is the only defensible direction for a gate on
+    # real money, and it is what lets `bar_map` be exactly equivalent to this
+    # function (selftest-bound) instead of quietly kinder in one corner.
+    if s["max_dd_frac"] is None:
+        fails.append("maxDD unmeasurable")
+    elif s["max_dd_frac"] >= GOLIVE_MAX_DD:
         fails.append(f"maxDD {100*s['max_dd_frac']:.1f}% >= {100*GOLIVE_MAX_DD:.0f}%")
     if legacy:
         if s["win_rate"] <= GOLIVE_LEGACY_WIN:
@@ -203,6 +244,28 @@ def _selftest():
     # ungradeable input claims nothing, never raises
     assert grade(stats([]))[0] is False
     assert stats([])["n"] == 0 and "why" in stats([])
+
+    # [2026-07-30] THE PUBLISHED BAR MAP IS BOUND TO THE GRADE. `bar_map` is
+    # what the dashboard renders; if it could drift from `grade`, the operator
+    # would read six green chips on a book the gate rejects. Asserted over
+    # every fixture above INCLUDING the unmeasurable-drawdown corner, which is
+    # the one place the two used to disagree.
+    nodd = stats(mk([0.01] * 40), book_usd=0)
+    assert nodd["max_dd_frac"] is None, nodd
+    for name, s in [("good", good), ("carry", carry), ("tails", tails),
+                    ("noisy", noisy), ("lopsided", lopsided), ("thin", thin),
+                    ("short", short), ("deep", deep), ("empty", stats([])),
+                    ("nodd", nodd)]:
+        bm = bar_map(s)
+        assert set(bm) == set(BAR_NAMES), bm
+        assert all(bm.values()) == grade(s)[0], (name, bm, grade(s))
+        if s.get("n", 0) >= 2:
+            # every failed bar is exactly one dark chip, and vice versa
+            assert sum(bm.values()) == len(BAR_NAMES) - len(grade(s)[1]), \
+                (name, bm, grade(s)[1])
+        else:
+            assert sum(bm.values()) == 0, (name, bm)   # claims nothing at all
+    assert bar_map(nodd)["maxdd"] is False, "an unmeasured drawdown is not a pass"
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
           "high-win-rate loser, window/DD bars, ungradeable input)")
 
@@ -210,6 +273,8 @@ def _selftest():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--publish", action="store_true",
+                    help="write the verdicts to bot_state['golive-readiness']")
     ap.add_argument("--min-closes", type=int, default=10,
                     help="ignore books below this many closes")
     a = ap.parse_args()
@@ -242,7 +307,7 @@ def main():
     print(f"{'book':34s} {'n':>4s} {'days':>6s} {'mean%':>8s} {'t':>6s} "
           f"{'win%':>6s} {'maxDD%':>7s}  verdict")
     print("-" * 104)
-    ready = []
+    ready, payload_books = [], {}
     for bot in sorted(books):
         rs = sorted(books[bot], key=_key)
         parsed = []
@@ -265,14 +330,65 @@ def main():
             flag = "   <- passes the NEW bar, REJECTED by the win-rate rule"
         if ok_old and not ok:
             flag = "   <- old rule would have ADMITTED it"
+        dd_pct = (round(100 * s["max_dd_frac"], 1)
+                  if s.get("max_dd_frac") is not None else None)
+        bars = bar_map(s)
         print(f"{bot:34s} {s['n']:>4d} {s['days']:>6.1f} "
               f"{100*s['mean_pct']:>7.3f}% {s['t']:>6.2f} "
-              f"{100*s['win_rate']:>5.1f}% {100*s['max_dd_frac']:>6.1f}%  "
+              f"{100*s['win_rate']:>5.1f}% "
+              f"{('n/a' if dd_pct is None else f'{dd_pct:.1f}%'):>7s}  "
               f"{verdict}{flag}")
         if ok:
             ready.append(bot)
+        # [2026-07-30] collect for the PUBLISH below — see the note there.
+        # `bars` is the machine-readable per-bar map the dashboard renders; the
+        # prose `fails` stays for humans. Publishing both means no consumer has
+        # to string-match a message to know WHICH bar is dark.
+        payload_books[bot] = {
+            "n": s["n"], "days": round(s["days"], 1),
+            "mean_pct": round(100 * s["mean_pct"], 3),
+            "t": round(s["t"], 2), "win_pct": round(100 * s["win_rate"], 1),
+            "max_dd_pct": dd_pct,
+            "h1": round(s["h1"], 2), "h2": round(s["h2"], 2),
+            "bars": bars, "bar_names": list(BAR_NAMES),
+            "bars_passed": sum(bars.values()), "fails": fails,
+            "ready": bool(ok), "legacy_ready": bool(ok_old)}
     print()
     print(f"READY: {ready or 'none'}")
+
+    # [2026-07-30 THIS GRADER BECOMES AN ORGAN — operator: "make sure the PNL
+    # dashboard reflects all work done".] Until now it published NOTHING and was
+    # scheduled NOWHERE: the tool that decides whether a book has earned real
+    # money ran only when a human remembered, and its verdicts reached no
+    # organ, no dashboard and no review. That is the fleet's own "a rule nobody
+    # runs is not a control" class — the same shape as the 38 selftests before
+    # 18-Jul and `--selftest-live` before (ej). Publishing makes the gate
+    # VISIBLE between reviews; it changes no decision and promotes nothing.
+    # Go-live remains an explicit operator act.
+    if a.publish:
+        try:
+            import bot_pnl_store as _store
+            from datetime import datetime as _dt, timezone as _tz
+            payload = {
+                "updated": _dt.now(_tz.utc).isoformat(timespec="seconds"),
+                "ttl_sec": TTL_SEC,
+                "bar": {"min_days": GOLIVE_MIN_DAYS,
+                        "min_closes": GOLIVE_MIN_CLOSES,
+                        "min_t": GOLIVE_MIN_T, "max_dd": GOLIVE_MAX_DD},
+                "bar_names": list(BAR_NAMES),
+                "books": payload_books,
+                "ready": sorted(ready)}
+            ok_pub = _store.save_state(KEY, payload)
+            # HISTORY too, because the question the baseline document asks is a
+            # TRAJECTORY one — "is t moving toward 2.0 and n above 41?" — and a
+            # single current snapshot cannot answer it. 4 writes/day against a
+            # 60-day retention is ~240 rows; negligible against the ~400/day
+            # the organs already write.
+            _store.save_history(KEY, payload)
+            print(f"published {KEY}: {len(payload_books)} books, "
+                  f"{len(ready)} ready ({'ok' if ok_pub else 'WRITE FAILED'})")
+        except Exception as e:      # noqa: BLE001 — a publish must never fail the grade
+            print(f"publish skipped: {type(e).__name__}: {e}")
     print("Go-live remains an explicit operator act — this grades, it does not "
           "promote. Lighter's tape is ONE regime; a DIRECTIONAL book passing "
           "here has passed in that regime only.")
