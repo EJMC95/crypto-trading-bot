@@ -15,15 +15,26 @@ judge moved). The xp levers are deliberately NOT touched: the idle judge
 stops re-asserting them and they TTL-expire (~2h), reverting the twin to env
 defaults — the same fail-safe lapse the judge itself relies on.
 
-DRY-RUN by default (prints the payload it would write); --execute writes
-state + the fleet_regen history snapshot in one transaction. Judge stays the
-only writer of live.funding.* — this tool touches a SHADOW candidate's state
-only and refuses to run while phase == "promoted" (releasing a promotion is
-fade/proposal territory, not this tool's).
+[2026-07-29 audit R1 — the race is CLOSED by a request channel.] The original
+--execute wrote the judge's state directly under a row lock, but the judge's
+own hourly read→compute→save holds no lock: a release committed while a
+cycle was in flight was overwritten by the judge's stale save — the release,
+verdict and cooldown vanished AFTER this tool printed RELEASED. Now:
+DRY-RUN by default (prints the payload + preflight-refuses wrong phase/name);
+--execute QUEUES a TTL'd request row the judge consumes at its next cycle
+through its own save path (single-writer, race-free, ≤1h latency; outcome
+tombstoned on the request key, phone push on release); --execute-direct
+keeps the old direct write for the one case queuing cannot serve — a DEAD
+judge container — with the race caveat printed. The transition itself lives
+in experiment_judge.release_transition (single source; this tool and the
+judge cannot drift apart). Judge stays the only writer of live.funding.* —
+this releases a SHADOW candidate only and refuses phase == "promoted"
+(releasing a promotion is fade/proposal territory).
 
 Usage:
   python3 scripts/xp_judge_release.py --name <candidate> --why "<reason>"
   python3 scripts/xp_judge_release.py --name <candidate> --why "<reason>" --execute
+  python3 scripts/xp_judge_release.py --name <candidate> --why "<reason>" --execute-direct
   python3 scripts/xp_judge_release.py --selftest
 """
 import json
@@ -38,41 +49,21 @@ import experiment_judge as ej                      # noqa: E402  (KEY/TTL/COOLDO
 
 
 def release_payload(st, name, why, now):
-    """The judge's ABANDON transition as a pure function of current state —
-    mirrors experiment_judge.run_once's abandon `save(...)` field-for-field
-    (phase idle, done+name, done_at stamp, 48h cooldown, started_ts cleared,
-    verdicts appended + capped at 10, last_eval preserved). Pure — selftested."""
-    if st.get("phase") != "running":
-        raise SystemExit(f"REFUSED: judge phase is {st.get('phase')!r}, not "
-                         f"'running' — nothing to release (a promoted lever "
-                         f"releases via fade/proposal, not this tool)")
-    if st.get("current") != name:
-        raise SystemExit(f"REFUSED: running candidate is {st.get('current')!r}"
-                         f", not {name!r} — the judge moved; re-check")
-    done = list(st.get("done") or []) + [name]
-    done_at = dict(st.get("done_at") or {})
-    done_at[name] = now
-    verdicts = list(st.get("verdicts") or []) + [{
-        "name": name, "verdict": "RELEASED-OPERATOR", "ts": ej.iso(now),
-        "eval": st.get("last_eval"), "why": why}]
-    return {"updated": ej.iso(now), "ttl_sec": ej.TTL_SEC,
-            "phase": "idle", "current": None, "spec": {}, "candidate": None,
-            "done": done, "done_at": done_at,
-            "started_ts": None, "promoted_ts": st.get("promoted_ts"),
-            "cooldown_until": now + ej.COOLDOWN_H * 3600,
-            "blind_cycles": st.get("blind_cycles") or 0,
-            "skew_notified": bool(st.get("skew_notified")),
-            "assert_fail_notified": bool(st.get("assert_fail_notified")),
-            # [2026-07-28 (dy) mirror] the drift-hold sticky flag + the
-            # growth promoter's own state ride save() now — a release that
-            # dropped them would wipe a standing growth promotion record
-            # (fade-watch loses its anchor) and re-arm the hourly drift push.
-            # Releasing the MAIN candidate must not touch the growth pair.
-            "drift_notified": bool(st.get("drift_notified")),
-            "growth": st.get("growth"),
-            "last_growth": st.get("last_growth"),
-            "promote_baseline": st.get("promote_baseline"),
-            "verdicts": verdicts[-10:], "last_eval": st.get("last_eval")}
+    """[2026-07-29 audit R1] Thin wrapper over the SINGLE-SOURCE transition,
+    which moved into experiment_judge.release_transition — the judge's
+    request-consume path and this tool must produce byte-identical payloads,
+    and two copies of a state transition is how mirrors drift. This wrapper
+    only translates the pure function's ValueError refusals into the tool's
+    operator-facing SystemExit messages."""
+    try:
+        return ej.release_transition(st, name, why, now)
+    except ValueError as e:
+        msg = str(e)
+        if "phase" in msg:
+            raise SystemExit(f"REFUSED: {msg} — nothing to release (a "
+                             f"promoted lever releases via fade/proposal, "
+                             f"not this tool)")
+        raise SystemExit(f"REFUSED: {msg} — the judge moved; re-check")
 
 
 def _selftest():
@@ -128,6 +119,7 @@ def main():
     if not name or not why:
         raise SystemExit(__doc__)
     execute = "--execute" in sys.argv
+    direct = "--execute-direct" in sys.argv
     url = (os.environ.get("DATABASE_PUBLIC_URL")
            or os.environ.get("DATABASE_URL"))
     if not url:
@@ -142,23 +134,46 @@ def main():
     row = cu.fetchone()
     if not row:
         raise SystemExit(f"no bot_state row for {ej.KEY!r}")
-    payload = release_payload(row[0], name, why, now)
-    if not execute:
+    payload = release_payload(row[0], name, why, now)   # preflight: refuses
+    if not (execute or direct):                          # wrong phase/name NOW
         cn.rollback()
         print(json.dumps(payload, indent=1))
         print(f"\nDRY-RUN — would release {name!r} (cooldown to "
-              f"{ej.iso(payload['cooldown_until'])} UTC). "
-              f"Re-run with --execute to write.")
+              f"{ej.iso(payload['cooldown_until'])} UTC). Re-run with "
+              f"--execute to QUEUE the request for the judge's next cycle "
+              f"(race-free, ≤1h), or --execute-direct to write state "
+              f"directly (only if the judge container is DOWN — a judge "
+              f"cycle mid-write can overwrite a direct release).")
         return
-    cu.execute("UPDATE bot_state SET state=%s, updated_at=now() WHERE bot=%s",
-               (json.dumps(payload), ej.KEY))
-    cu.execute("INSERT INTO bot_state_history (key, ts, payload) "
-               "VALUES (%s, now(), %s)", (ej.KEY, json.dumps(payload)))
+    if direct:
+        # [2026-07-29 audit R1] the old path, kept ONLY for a dead judge
+        # container: the judge's own lockless read→compute→save can overwrite
+        # this write if a cycle is in flight — that race is WHY --execute now
+        # queues instead. If the judge is running, use --execute.
+        cu.execute("UPDATE bot_state SET state=%s, updated_at=now() WHERE bot=%s",
+                   (json.dumps(payload), ej.KEY))
+        cu.execute("INSERT INTO bot_state_history (key, ts, payload) "
+                   "VALUES (%s, now(), %s)", (ej.KEY, json.dumps(payload)))
+        cn.commit()
+        print(f"RELEASED {name!r} DIRECTLY: phase=idle, cooldown until "
+              f"{ej.iso(payload['cooldown_until'])} UTC. CAVEAT: if a judge "
+              f"cycle was in flight, its save can overwrite this — verify "
+              f"xp-judge.phase reads idle in a minute (/bus.json).")
+        return
+    # --execute: QUEUE the request; the judge (sole writer of its own state)
+    # consumes it at cycle start and performs the identical transition.
+    req = {"updated": ej.iso(now), "ttl_sec": ej.RELEASE_REQ_TTL,
+           "name": name, "why": why, "requested": ej.iso(now)}
+    cu.execute(
+        "INSERT INTO bot_state (bot, updated_at, state) VALUES (%s, now(), %s) "
+        "ON CONFLICT (bot) DO UPDATE SET updated_at=now(), state=EXCLUDED.state",
+        (ej.RELEASE_REQ_KEY, json.dumps(req)))
     cn.commit()
-    print(f"RELEASED {name!r}: phase=idle, cooldown until "
-          f"{ej.iso(payload['cooldown_until'])} UTC; the xp levers lapse on "
-          f"their own TTL (~2h) and the twin reverts to env defaults. "
-          f"State + regen history snapshot written.")
+    print(f"QUEUED release request for {name!r} (ttl {ej.RELEASE_REQ_TTL}s). "
+          f"The judge consumes it at its next hourly cycle and phones on "
+          f"release; outcome lands on bot_state {ej.RELEASE_REQ_KEY!r} "
+          f"(visible on /bus.json). If the judge is DOWN, use "
+          f"--execute-direct instead.")
 
 
 if __name__ == "__main__":

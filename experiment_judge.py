@@ -919,6 +919,86 @@ def growth_step(gstate, rows, have_ledger, now, drift=None,
     return g2, {"kind": kind, "why": ev.get("why")}
 
 
+# [2026-07-29 audit R1] the OPERATOR RELEASE-REQUEST channel. The (dw) tool
+# wrote the judge's state DIRECTLY under a row lock — but the judge's own
+# hourly read→compute→save holds no lock, so a release committed mid-cycle
+# could be overwritten by the judge's stale save seconds later: the release,
+# its verdict and the 48h cooldown vanish AFTER the tool printed RELEASED
+# (a tool-side compare-and-swap cannot fix this — the losing write is the
+# judge's). The race-free shape is single-writer: the tool queues a REQUEST
+# row; the judge — the only writer of its own state — consumes it at cycle
+# start through its own save path. The request honors the standing bus
+# contract (its own updated+ttl_sec, fail-closed): a request older than its
+# TTL must NOT fire — the world it described has moved.
+RELEASE_REQ_KEY = "xp-judge-release-request"
+RELEASE_REQ_TTL = int(os.environ.get("XPJ_RELEASE_REQ_TTL", "7200"))
+
+
+def release_transition(st, name, why, now):
+    """The judge's ABANDON transition with verdict RELEASED-OPERATOR, as a
+    pure function of current state — the SINGLE SOURCE for both the judge's
+    request-consume path and scripts/xp_judge_release (which imports this;
+    two copies of a state transition is how mirrors drift). Mirrors run_once's
+    abandon save() field-for-field: phase idle, done+name, done_at stamp,
+    COOLDOWN_H cooldown, started_ts cleared, verdicts appended + capped [-10:],
+    last_eval preserved, growth/drift/skew/promote_baseline passed through.
+    Raises ValueError on refusal (not-running / name mismatch) — callers
+    translate: the tool to SystemExit, the judge to a recorded outcome."""
+    if st.get("phase") != "running":
+        raise ValueError(f"judge phase is {st.get('phase')!r}, not 'running'")
+    if st.get("current") != name:
+        raise ValueError(f"running candidate is {st.get('current')!r}, "
+                         f"not {name!r}")
+    done = list(st.get("done") or []) + [name]
+    done_at = dict(st.get("done_at") or {})
+    done_at[name] = now
+    verdicts = list(st.get("verdicts") or []) + [{
+        "name": name, "verdict": "RELEASED-OPERATOR", "ts": iso(now),
+        "eval": st.get("last_eval"), "why": why}]
+    return {"updated": iso(now), "ttl_sec": TTL_SEC,
+            "phase": "idle", "current": None, "spec": {}, "candidate": None,
+            "done": done, "done_at": done_at,
+            "started_ts": None, "promoted_ts": st.get("promoted_ts"),
+            "cooldown_until": now + COOLDOWN_H * 3600,
+            "blind_cycles": st.get("blind_cycles") or 0,
+            "skew_notified": bool(st.get("skew_notified")),
+            "assert_fail_notified": bool(st.get("assert_fail_notified")),
+            "drift_notified": bool(st.get("drift_notified")),
+            "growth": st.get("growth"),
+            "last_growth": st.get("last_growth"),
+            "promote_baseline": st.get("promote_baseline"),
+            "verdicts": verdicts[-10:], "last_eval": st.get("last_eval")}
+
+
+def consume_release_request(req, phase, current, now):
+    """(verdict, detail) for a queued operator release-request. PURE.
+    verdict: 'none'        — no actionable request (absent / already consumed
+                             / no name): do nothing, write nothing;
+             'stale'       — request exists but is past its own updated+
+                             ttl_sec (or unstamped — fail-closed): tombstone
+                             it, do NOT release;
+             'not-running' — judge is not mid-candidate: tombstone;
+             'mismatch'    — running candidate differs from the request's:
+                             tombstone (the judge moved; operator re-checks);
+             'release'     — fresh + phase running + name match: caller
+                             performs release_transition through its own save."""
+    if not isinstance(req, dict) or req.get("consumed") or not req.get("name"):
+        return "none", None
+    try:
+        u = datetime.fromisoformat(str(req.get("updated")).replace("Z", "+00:00"))
+        age = now - u.timestamp()
+        ttl = float(req.get("ttl_sec") or 0)
+    except Exception:
+        return "stale", "unparseable updated stamp (fail-closed)"
+    if ttl <= 0 or age > ttl:
+        return "stale", f"request age {age:.0f}s > ttl {ttl:.0f}s"
+    if phase != "running":
+        return "not-running", f"judge phase is {phase!r}"
+    if current != req["name"]:
+        return "mismatch", f"running {current!r}, requested {req['name']!r}"
+    return "release", None
+
+
 def run_once():
     now = now_ts()
     # [2026-07-17 AUDIT] A FAILED READ IS NOT AN EMPTY JUDGE. `load_state`
@@ -965,6 +1045,42 @@ def run_once():
     current = st.get("current")
     spec = st.get("spec") or {}                 # full {name, levers} of current
     verdicts = st.get("verdicts") or []
+    # [2026-07-29 audit R1] consume a queued operator release-request FIRST —
+    # single-writer discipline: the tool queues, the judge acts through its
+    # own save. Ordering is the idempotency: judge state is written BEFORE
+    # the request tombstone, so a failed state write leaves the request
+    # unconsumed (retried next cycle, TTL permitting) and a failed tombstone
+    # write is self-healing (next cycle reads phase=idle → 'not-running' →
+    # tombstones then). A dark request channel consumes nothing.
+    try:
+        _req = store.load_state(RELEASE_REQ_KEY)
+    except Exception:      # noqa: BLE001
+        _req = None
+    _rq, _rq_why = consume_release_request(_req, phase, current, now)
+    if _rq != "none":
+        if _rq == "release":
+            payload = release_transition(st, _req["name"],
+                                         str(_req.get("why") or
+                                             "operator release"), now)
+            if not store.save_state(KEY, payload):
+                print("[xp-judge] release-request: state write FAILED — "
+                      "request left queued for next cycle", flush=True)
+                return
+            send_push("candidate RELEASED (operator request)",
+                      f"{_req['name']} released via the request channel: "
+                      f"{_req.get('why')}\ncooldown "
+                      f"{COOLDOWN_H:.0f}h; xp levers lapse on TTL",
+                      priority="urgent")
+            _rq_why = "released"
+        store.save_state(RELEASE_REQ_KEY,
+                         {"updated": iso(now), "ttl_sec": 7 * 86400,
+                          "consumed": True, "outcome": _rq,
+                          "detail": _rq_why,
+                          "request": {k: _req.get(k)
+                                      for k in ("name", "why", "requested")}})
+        print(f"[xp-judge] release-request: {_rq} ({_rq_why})", flush=True)
+        if _rq == "release":
+            return          # state just changed wholesale; resume next cycle
     rows = store.fetch_paper_trades(limit=4000)
     have_ledger = bool(rows)
     # [2026-07-28] ONE drift snapshot per cycle, shared by the growth step and
@@ -1947,7 +2063,52 @@ def _selftest_growth():
                           proposals=[dict(_prop[0], direction="expand")])
     assert last["kind"] == "promote", \
         "an expand proposal must never block a promotion"
-    print("experiment_judge _selftest_growth OK")
+    # ---- release-request channel (2026-07-29 audit R1) ----------------------
+    # The tool queues; the judge consumes; the transition is single-sourced.
+    _rst = {"phase": "running", "current": "cand-x",
+            "done": ["old"], "done_at": {"old": now - 9e5},
+            "started_ts": now - 3 * 86400,
+            "verdicts": [{"name": "old", "verdict": "ABANDONED"}],
+            "last_eval": {"promote": False, "why": "floors"},
+            "growth": {"promoted": True}, "drift_notified": True}
+    _rp = release_transition(_rst, "cand-x", "op reason", now)
+    assert _rp["phase"] == "idle" and _rp["current"] is None, _rp
+    assert _rp["done"] == ["old", "cand-x"] and _rp["done_at"]["cand-x"] == now
+    assert _rp["cooldown_until"] == now + COOLDOWN_H * 3600
+    assert _rp["verdicts"][-1]["verdict"] == "RELEASED-OPERATOR"
+    assert _rp["growth"] == {"promoted": True} and _rp["drift_notified"] is True, \
+        "a main-candidate release must not touch the growth record"
+    for bad_st, bad_nm in ((dict(_rst, phase="idle"), "cand-x"),
+                           (dict(_rst, phase="promoted"), "cand-x"),
+                           (_rst, "other")):
+        try:
+            release_transition(bad_st, bad_nm, "r", now)
+            raise AssertionError("must refuse")
+        except ValueError:
+            pass
+    _fresh_req = {"updated": iso(now - 60), "ttl_sec": 7200, "name": "cand-x",
+                  "why": "confounded window"}
+    assert consume_release_request(_fresh_req, "running", "cand-x", now) == \
+        ("release", None)
+    v, d = consume_release_request(dict(_fresh_req, updated=iso(now - 9000)),
+                                   "running", "cand-x", now)
+    assert v == "stale", (v, d)
+    v, _ = consume_release_request(dict(_fresh_req, ttl_sec=None),
+                                   "running", "cand-x", now)
+    assert v == "stale", "missing ttl must fail CLOSED"
+    v, _ = consume_release_request({"name": "x", "why": "y"},
+                                   "running", "x", now)
+    assert v == "stale", "missing updated stamp must fail CLOSED"
+    v, _ = consume_release_request(_fresh_req, "idle", None, now)
+    assert v == "not-running", v
+    v, _ = consume_release_request(_fresh_req, "running", "other", now)
+    assert v == "mismatch", v
+    for noop in (None, {}, {"consumed": True, "name": "cand-x",
+                            "updated": iso(now), "ttl_sec": 7200},
+                 {"updated": iso(now), "ttl_sec": 7200}):
+        assert consume_release_request(noop, "running", "cand-x", now)[0] \
+            == "none", noop
+    print("experiment_judge _selftest_growth OK (+ release-request channel)")
 
 
 if __name__ == "__main__":

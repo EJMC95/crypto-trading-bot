@@ -289,6 +289,13 @@ slip); the refutation's conclusion survives without the borrowed support.
   (build-verified), so §3d's structural hypothesis — explore samples only
   below the top-15 deep-scan cut — is now primary. Belongs to the next
   Farmer session; nothing in this audit changes scan behavior.
+  **[RESOLVED same day — measured, not hypothesized: the tail is EMPTY.
+  Only ~11 books on the whole venue clear the $10M turnover floor and only
+  3 clear it together with the 5% gate, vs a deep-scan cut of 15 — prelim
+  can essentially never exceed the cut, so explore has structurally never
+  had anything to sample and the growth A/B has really been measuring
+  conviction-only. Full funnel + routed fix options:
+  `EXPLORE_ZERO_DIAGNOSIS_2026-07-29.md`.]**
 - **O1, O2 — DONE** (verified §1). **O3–O6** unchanged, still routed.
 - **Vol-filter re-validation** joins the operator menu (§4.5 / the doc
   correction): leave ON with the magnitude treated as unproven, or re-run

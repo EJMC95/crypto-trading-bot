@@ -2149,6 +2149,13 @@ def main():
                        # output, never by "the var is set on the service").
                        "levers": {"explore_k": SCAN_EXPLORE_K, "conviction": CONVICTION_MODE},
                        "vol_filter": VOL_FILTER,
+                       # [2026-07-29 audit R5] a blind boot was LOG-ONLY: the
+                       # row said "online" while entries were blocked and the
+                       # ':live' save suppressed — only container logs said
+                       # why. Published so the watchdog (the fleet's phone)
+                       # can page on it; absent when healthy (no key churn).
+                       **({"live_state_blind": True} if live_state_blind
+                          else {}),
                        "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                 for c in meta},
                        "hottest_apr": {c: f"{r*H:+.0%}" for c, r in top},
