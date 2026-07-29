@@ -1,3 +1,26 @@
+## 2026-07-29 (fp) — THE AUTONOMOUS TUNER WAS RE-DERIVING THE ARTIFACT (fo) HAD JUST REVERTED: the stop is pinned and can no longer become a lever
+
+- **THE FINDING, and it is a self-repair failure rather than a tuning question.** `(fo)` reverted `TT_SL=-0.04` off the real-money Ticket Taker at ~10:30 UTC because the replay cannot price a stop on a tail-free tape. At **10:46 UTC** `/bus.json` showed `fleet-tuning` carrying `taker.sl = -0.04`, `set_by: scout-tuner`, `expires 12:46:15Z` — **re-enacted every cycle**. The growth rail was autonomously walking back to the exact value the operator's own doctrine had just ruled void, and it would have kept doing so indefinitely on a 2h TTL.
+- **VERIFIED IN THE SHADOW ARM'S OWN DEPLOYED FRAME** (bull on, tp .06, hold 72h, max_open 6, $50 clips, 200h/2397-snapshot Lighter tape) — not inherited from `(fo)`'s live-path measurement, re-run here because a different frame is a different surface:
+
+  | stop | net $ | closed | wr % | # sl exits |
+  |---|---|---|---|---|
+  | -0.02 | -19.34 | 41 | 22.0 | 21 |
+  | -0.03 | -15.10 | 31 | 29.0 | 12 |
+  | **-0.04 (what the tuner enacted)** | **+9.81** | 22 | 45.5 | 4 |
+  | -0.06 | +22.26 | 22 | 59.1 | 1 |
+  | -0.12 | +30.05 | 21 | 61.9 | **0** |
+  | **NO STOP** | **+30.05** | 21 | 61.9 | **0** |
+
+  Monotone to the degenerate limit, no interior optimum, and the ladder simply stops changing once no stop ever fires. `SWEEP_SL` was running inside this surface every cycle and, by construction, choosing the widest value in its grid.
+- **THE FIX — remove the actuator's authority over a knob its own instrument cannot measure.** Two independent protections, each separately asserted so removing EITHER turns the suite red:
+  1. `SWEEP_SL` is now **single-valued**, pinned to the taker's env-default stop (`TUNER_SWEEP_SL` restores a grid). The sweep still runs — it optimises TP and HOLD as before — it just never proposes a different stop.
+  2. `STOP_LOSS` has **no entry in `attr_to_lever`**, so a stop cannot become a `fleet-tuning` lever even if the grid is widened again later. The levers comprehension now skips an unmapped attr (`if a in attr_to_lever`) rather than raising, since the sweep's candidate dict always carries all three keys.
+- **RESTRICT-ONLY, SHADOW-ONLY, ZERO REAL MONEY.** `taker.*` levers live on the `lighter-taker` lane, which is the **$1k shadow** book; only `live.*` levers steer the live arm, and this touches none of them. It removes a capability, never adds one.
+- **EXPECT THE SHADOW ROW'S HEADLINE NUMBER TO FALL** — on this tape from +$29.90 at `-0.04` to about +$14.77 at `-0.03`. That drop is the artifact being removed, not edge being lost, and it should not be read as a regression. Second-order benefit: the shadow arm stops being a moving target, which is a precondition for it ever serving as the experiment judge's control arm.
+- **WHY THIS IS THE ONLY CHANGE SHIPPED FROM AN 11-AGENT OPTIMISATION CAMPAIGN.** The campaign's own verdict is that the taker is **capital-bound, not edge-bound**: the live arm holds $66.45 behind a $40 notional cap at ~$10 a clip, so even its measured per-trade rate is worth roughly **eleven cents a day**. Graded by the fleet's own `golive_readiness.py` against the real ledger, the live arm is `n=25, mean -0.183%/trade, t=-0.26, halves -$0.47/+$0.30` — it fails five of six go-live criteria, so there is no edge there to tune into. Every widening candidate was refuted. The one defensible action was to stop an autonomous organ from re-arming a known artifact.
+- **Tests**: 3 new assertions, each mutation-verified (re-widening `SWEEP_SL`, restoring the `STOP_LOSS` mapping, and making the comprehension raise instead of skip all turn the tuner selftest red). Suite green; born-dark 20, venue-purity 89.
+
 ## 2026-07-29 (fo) — THE EXIT-BRACKET CHANGE IS REVERTED: its evidence was the (fj) artifact, caught by an adversarial test I should have run BEFORE shipping
 
 - **WHAT HAPPENED.** (fm) shipped `TT_TP 0.06 / TT_SL -0.04 / TT_MAX_HOLD_H 72` to the real-money Ticket Taker on a window-sensitivity table that looked strong (the twin's bars beat the deployed bars at every window, both halves positive at every window). Within the hour an independent adversarial agent extended the stop ladder PAST the edge of the grid I had swept, and the result kills it. **Reverted to the operator's deployed `0.04 / -0.03 / 48`.**

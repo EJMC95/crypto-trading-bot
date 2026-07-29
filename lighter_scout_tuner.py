@@ -117,7 +117,20 @@ TOP_N_LADDER = ("scout.ticket_top_n",
                 int(os.environ.get("SCOUT_TICKET_TOP_N", "6")), [6, 9, 12, 15])
 # Exit-ladder sweep grid = the 21-Jul agenda item-2 grid, verbatim
 SWEEP_TP = [0.03, 0.04, 0.05, 0.06]
-SWEEP_SL = [-0.02, -0.03, -0.04]
+# [2026-07-29 (fp)] THE STOP IS PINNED — this replay CANNOT price it.
+# Measured in the shadow arm's OWN deployed frame (bull on, tp .06, hold 72h,
+# max_open 6, $50 clips, 200h tape): net climbs monotonically to the degenerate
+# limit with NO interior optimum -- -0.02 -$19.34 | -0.03 -$15.10 | -0.04 +$9.81
+# | -0.06 +$22.26 | -0.12 +$30.05 | NO STOP +$30.05 with ZERO stop exits. That
+# is the "a wider stop stops realising losses that later revert" artifact that
+# (fj) identified and (fo) REVERTED off the real-money arm the same day -- and
+# this sweep was re-deriving the very same -0.04 onto `taker.sl` every cycle
+# (measured live on /bus.json at 2026-07-29T10:46Z, set_by scout-tuner).
+# An actuator must not optimise a knob its own instrument cannot measure.
+# Single-valued = the sweep still runs, at the taker's env default stop
+# (lighter_ticket_taker.py:171), and simply never proposes a different one.
+# Restore the grid with TUNER_SWEEP_SL only if a tail-bearing tape exists.
+SWEEP_SL = [float(os.environ.get("TUNER_SWEEP_SL", "-0.03"))]
 SWEEP_HOLD = [24.0, 48.0, 72.0]
 
 # [2026-07-21 ORGAN PROPOSALS] levers this tuner will consider when another
@@ -654,7 +667,13 @@ def run_once():
                                              lens_fresh=lf_fresh)
 
     attr_to_lever = {attr: lever for _l, (attr, lever, _lad) in TAKER_LADDERS.items()}
-    attr_to_lever.update({"TAKE_PROFIT": "taker.tp", "STOP_LOSS": "taker.sl",
+    # [2026-07-29 (fp)] STOP_LOSS is deliberately ABSENT: with no mapping, a
+    # stop can never become a `fleet-tuning` lever even if SWEEP_SL is widened
+    # again later. Belt-and-braces with the pinned SWEEP_SL above -- the pin
+    # stops it being PROPOSED, this stops it being ENACTED. The comprehension
+    # below skips any attr with no lever, so `bars` keeping its STOP_LOSS key
+    # (the sweep's candidate dict always carries all three) is harmless.
+    attr_to_lever.update({"TAKE_PROFIT": "taker.tp",
                           "MAX_HOLD_H": "taker.max_hold_h"})
     levers = {attr_to_lever[a]: {
         "value": v,
@@ -663,7 +682,7 @@ def run_once():
                    "replay-gated widen/optimize (both-halves on the tape)"),
         "evidence": f"tape {baseline['span']} ({baseline['snapshots']} snaps); "
                     f"baseline net ${baseline['closed_net']}"}
-        for a, v in bars.items()}
+        for a, v in bars.items() if a in attr_to_lever}
     for lever, v in scout_levers.items():
         levers[lever] = {"value": v,
                          "reason": "lens starving — widen the brain's grading diet",
@@ -1035,6 +1054,24 @@ def _selftest():
         assert tuning.clamp("taker.sl", v) == v
     for v in SWEEP_HOLD:
         assert tuning.clamp("taker.max_hold_h", v) == v
+
+    # [2026-07-29 (fp)] THE STOP MUST STAY UNSWEPT AND UNENACTABLE. The replay
+    # cannot price a stop on a tail-free tape (net rises monotonically to the
+    # no-stop limit), so this tuner must never propose one. Two independent
+    # protections, each with its own assertion so removing EITHER turns the
+    # suite red rather than silently re-arming the artifact:
+    assert len(SWEEP_SL) == 1, (
+        "SWEEP_SL must stay single-valued — a multi-valued stop grid lets the "
+        "tuner optimise into the (fo) artifact. See TUNER_SWEEP_SL.")
+    _a2l = {attr: lever for _l, (attr, lever, _lad) in TAKER_LADDERS.items()}
+    _a2l.update({"TAKE_PROFIT": "taker.tp", "MAX_HOLD_H": "taker.max_hold_h"})
+    assert "STOP_LOSS" not in _a2l, (
+        "STOP_LOSS must have NO lever mapping — with one, a widened sweep grid "
+        "could enact taker.sl again.")
+    # and the levers comprehension must SKIP an unmapped attr rather than raise
+    _bars_with_sl = {"TAKE_PROFIT": 0.06, "STOP_LOSS": -0.04, "MAX_HOLD_H": 72.0}
+    _mapped = {_a2l[a]: v for a, v in _bars_with_sl.items() if a in _a2l}
+    assert "taker.sl" not in _mapped and len(_mapped) == 2, _mapped
     for v in TOP_N_LADDER[2]:
         assert tuning.clamp(TOP_N_LADDER[0], v) == v
 
