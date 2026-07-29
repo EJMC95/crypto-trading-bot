@@ -190,6 +190,19 @@ close all → halt record written; (c) Taker — an SDK-free offline tick (the
 `--selftest-live` fixtures minus the signer) so at least the decision layer of
 the loop runs in lean CI even after Finding 1 is fixed. Target: every line
 that can place or close a real order is reachable from some test.
+**[2026-07-29 FIRST SEAM SHIPPED (en):** the Farmer's EXIT LADDER —
+`exit_decision()` extracted pure from the inline block at main():1773-1796
+(every real-money close ran through it with no test seam), (ef) recipe.
+`_selftest_exit_decision` (battery block #10) pins: the sign convention
+(+adverse = against us, short hurt by UP / long by DOWN), the precedence
+stop > tp > flip > decay > max_hold (a flipped-and-decayed rate books FLIP —
+the flip is the information), apr=None disabling flip AND decay (price/time
+exits only on an unreadable funding read), at-the-bar triggers vs decay's
+strict <, zero-entry no-fabrication, and the default wiring to the env-only
+HARD_STOP/EXIT_APR. Precedence and sign mutations each turn exactly their
+named assertion red. Behavior identical; reaches the live container on the
+next deliberate `[deploy-live-farmer]` dispatch. Remaining Finding-4 seams:
+the Farmer's entry tick + flatten path, the Taker's SDK-free tick.]**
 
 ### 5. `fleet_risk.py` — 37%; the enforcement authority's core function is untested
 

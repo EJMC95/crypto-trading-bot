@@ -432,6 +432,50 @@ def pos_bars(m):
         pass
     return TAKE_PROFIT, MAX_HOLD_H
 
+
+def exit_decision(is_short, entry, px, apr, held_h, tp, max_hold_h,
+                  hard_stop=None, exit_apr=None):
+    """The live book's close ladder: 'stop' | 'take_profit' | 'flip' |
+    'decay' | 'max_hold' | None (= keep holding).
+
+    [2026-07-29 (en) SEAM] Extracted PURE from main()'s position loop
+    (coverage Finding 4, the (ef) `_heal_merge` recipe) — every real-money
+    close decision ran through an inline block with no test seam. Behavior
+    identical, and the load-bearing parts are now pinned by
+    `_selftest_exit_decision`:
+
+      * SIGN CONVENTION: +adverse == against us — a SHORT is hurt by price
+        UP (adverse = raw), a LONG by price DOWN (adverse = -raw).
+      * PRECEDENCE: stop > take_profit > flip > decay > max_hold. A flipped
+        book that is also past tp books "take_profit"; a flipped rate that
+        has also decayed books "flip" (the flip IS the information).
+      * apr=None (funding unreadable this loop) disables flip AND decay —
+        price/time exits only, never a decision off a fabricated read.
+      * Thresholds: stop/tp/max_hold trigger AT the bar (>=); decay is
+        strict < (a rate sitting exactly at EXIT_APR still earns).
+      * tp/max_hold arrive from the position's ENTRY stamp via pos_bars()
+        (the 22-Jul flap fix); hard_stop/exit_apr default to the module's
+        env-only bars at CALL time — they are deliberately not levers.
+    """
+    hard_stop = HARD_STOP if hard_stop is None else hard_stop
+    exit_apr = EXIT_APR if exit_apr is None else exit_apr
+    raw = (px - entry) / entry if entry else 0.0        # +ve = price rose
+    adverse = raw if is_short else -raw
+    favour = -adverse
+    flipped = (apr is not None) and ((is_short and apr < 0)
+                                     or (not is_short and apr > 0))
+    if adverse >= hard_stop:
+        return "stop"
+    if favour >= tp:
+        return "take_profit"
+    if flipped:
+        return "flip"
+    if apr is not None and abs(apr) < exit_apr:
+        return "decay"
+    if held_h >= max_hold_h:
+        return "max_hold"
+    return None
+
 # ---- funding-SLOPE entry gate (2026-07-11) — only enter while the rate is
 # still BUILDING (|apr| >= |apr LOOKBACK_H ago|). Backtested on the 150d
 # portfolio sim (scripts/backtest_funding_leverage.py): at the live 2x config
@@ -1771,27 +1815,12 @@ def main():
             meta[coin] = {**m, "is_short": is_short, "entry": entry, "opened_ts": opened_ts}
 
             held_h = (t0 - opened_ts) / 3600.0
-            raw = (px - entry) / entry if entry else 0.0        # +ve = price rose
-            # A SHORT loses when price rises (+raw is against us); a LONG loses
-            # when price falls (so its adverse is -raw). +ve adverse == against us.
-            adverse = raw if is_short else -raw
-            favour = -adverse
-            flipped = (apr is not None) and ((is_short and apr < 0) or (not is_short and apr > 0))
-
             # [2026-07-22 FLAP FIX] tp/hold from the position's OWN entry
             # stamp (pos_bars); stop/flip/decay bars are env-only, unchanged.
             _tp, _mh = pos_bars(m)
-            decision = None
-            if adverse >= HARD_STOP:
-                decision = "stop"
-            elif favour >= _tp:
-                decision = "take_profit"
-            elif flipped:
-                decision = "flip"
-            elif apr is not None and abs(apr) < EXIT_APR:
-                decision = "decay"
-            elif held_h >= _mh:
-                decision = "max_hold"
+            # [2026-07-29 (en)] the ladder itself is exit_decision() — pure,
+            # fixture-tested, precedence and sign convention pinned there.
+            decision = exit_decision(is_short, entry, px, apr, held_h, _tp, _mh)
             if decision is None:
                 continue
 
@@ -2282,6 +2311,56 @@ def _supervised():
             except Exception:  # noqa: BLE001
                 pass
             time.sleep(60)
+
+
+def _selftest_exit_decision():
+    """[2026-07-29 (en)] The close ladder, pinned. Bars passed EXPLICITLY so
+    the fixtures are independent of env; the last case pins the default
+    wiring to the module bars. Every case names what it protects."""
+    B = dict(tp=0.04, max_hold_h=72.0, hard_stop=0.05, exit_apr=0.05)
+
+    def d(is_short, px, apr=None, held_h=1.0, entry=100.0, **over):
+        kw = {**B, **over}
+        return exit_decision(is_short, entry, px, apr, held_h,
+                             kw["tp"], kw["max_hold_h"],
+                             hard_stop=kw["hard_stop"], exit_apr=kw["exit_apr"])
+
+    # SIGN CONVENTION — a SHORT is hurt by price UP, a LONG by price DOWN
+    assert d(True, 105.01) == "stop"          # short, +5.01% against
+    assert d(False, 94.99) == "stop"          # long, -5.01% against
+    assert d(True, 95.9) == "take_profit"     # short profits DOWN
+    assert d(False, 104.1) == "take_profit"   # long profits UP
+    assert d(True, 104.9) is None, "adverse under the stop holds"
+
+    # PRECEDENCE — stop > take_profit > flip > decay > max_hold
+    assert d(True, 106.0, apr=-1.0) == "stop", "stop outranks flip"
+    assert d(True, 95.0, apr=-1.0) == "take_profit", "tp outranks flip"
+    assert d(True, 100.0, apr=-0.01) == "flip", \
+        "a flipped-and-decayed rate books FLIP — the flip is the information"
+    assert d(True, 100.0, apr=+0.01, held_h=100.0) == "decay", \
+        "decay outranks max_hold"
+    assert d(True, 100.0, apr=+0.30, held_h=72.0) == "max_hold"
+
+    # apr=None (funding unreadable) — price/time exits ONLY, never a
+    # decision off a fabricated read
+    assert d(True, 100.0, apr=None, held_h=10.0) is None
+    assert d(True, 100.0, apr=None, held_h=72.0) == "max_hold"
+    assert d(True, 105.01, apr=None) == "stop"
+
+    # BOUNDARIES — stop/tp/max_hold trigger AT the bar; decay is strict <
+    assert d(True, 105.0) == "stop"                     # adverse == hard_stop
+    assert d(True, 96.0) == "take_profit"               # favour == tp
+    assert d(True, 100.0, apr=+0.05, held_h=1.0) is None, \
+        "a rate sitting exactly at exit_apr still earns (strict <)"
+
+    # ZERO ENTRY — no fabricated price P&L; time exit still live
+    assert d(True, 50.0, entry=0.0, held_h=1.0) is None
+    assert d(True, 50.0, entry=0.0, held_h=72.0) == "max_hold"
+
+    # DEFAULT WIRING — omitted hard_stop/exit_apr read the module bars
+    assert exit_decision(True, 100.0, 200.0, None, 0.0, 9e9, 9e9) == "stop", \
+        "+100% adverse must breach the module HARD_STOP via the defaults"
+    print("lighter_funding_bot _selftest_exit_decision OK")
 
 
 def _selftest_notional():
@@ -2831,6 +2910,7 @@ if __name__ == "__main__":
         _selftest_explore()
         _selftest_lever_consume()
         _selftest_heal()
+        _selftest_exit_decision()
         sys.exit(0)
     try:
         _supervised()
