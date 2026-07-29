@@ -84,6 +84,29 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   ENLARGING it.** Widening changes no entry bar — the taker's gates still judge
   every ticket. Also publishes **`vols`** (public per-symbol 24h $M), the field
   behind `fleet_bus.scout_universe()`
+- **[2026-07-30 THE BRAIN'S FEE BASIS WAS CORRUPTING ITS DIAGNOSES — read
+  before touching `FEE_RT`.]** Three defects compounded: (1) `FEE_RT.get(bot,
+  ...)` was called with the SUFFIXED row name while every key is a BARE base,
+  so not one entry ever matched and every bot took the default — the identical
+  defect the 23-Jul audit fixed for `ERA_START`, five lines away in the same
+  function; (2) that default, `0.0052`, is **Kraken SPOT** taker round trip,
+  and Kraken retired 14-Jul; (3) **Lighter is zero-fee, MEASURED** — all 203
+  active books report `taker_fee 0.0000`/`maker_fee 0.0000`. So the phantom
+  cost was the whole estimate. **The damage was not a mis-report:**
+  `diagnose()` rule 3 fires at `fee_rt/med_loser >= 0.5` with
+  `med_loser <= 0.012` and RETURNS, so at 0.0052 ANY bucket whose median loser
+  is ≤1.04% was called `fee_bleed` — pre-empting rule 4 `regime_timing`, the
+  ONLY diagnosis kind carrying an actuator (`regime_gate`). The brain could
+  not recommend the one thing it can act on. **Fixed so it cannot recur:** the
+  fee is MEASURED, not asserted — the scout publishes the venue's own schedule
+  (`lighter-market.fees`, max across active books) and `bot_learn.fee_rt_for()`
+  is the single owner that prefers it. Note `is_taker_fee_enabled` is TRUE on
+  every book with the rate at zero, so the rate CAN change and a hardcoded 0.0
+  would be this same mistake mirrored; a dark scout falls back to a declared
+  per-venue constant, never another venue's. `tests/autonomy/
+  test_brain_fee_basis.py` pins the key form, the no-foreign-default rule, the
+  rule-3-shadows-rule-4 mechanism, that a REAL fee still earns `fee_bleed`,
+  and that a venue fee hike reaches the diagnosis with no code change.
 - `bot_learn.py` (brain) — L4 stake multipliers (family bot + strategies
   consume via `fleet_bus.py`), per-bucket DIAGNOSIS (exit/entry/fee/regime/
   venue), venue A/B, scout lens-forward grades (taker veto); generates for

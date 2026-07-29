@@ -167,6 +167,13 @@ def book_stats(books, min_qvol):
                 # four-per-loop. 0 = unparseable, which consumers treat as
                 # "age unknown", never as "brand new".
                 "created_ms": float(b.get("created_at") or 0.0),
+                # [2026-07-30] the venue's OWN fee schedule, per book. Measured
+                # across all 203 active books: taker 0.0000, maker 0.0000, and
+                # `is_taker_fee_enabled` TRUE — i.e. the fee machinery is ON
+                # and the rate happens to be zero, so it CAN change. That is
+                # exactly why this is published rather than hardcoded anywhere.
+                "taker_fee": float(b.get("taker_fee") or 0.0),
+                "maker_fee": float(b.get("maker_fee") or 0.0),
             }
         except (TypeError, ValueError):
             continue
@@ -475,6 +482,20 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
         # books sit under 21d — so "young" is now an exact, venue-sourced fact
         # rather than a candle-count proxy. Rounded to 0.1d; a book whose
         # timestamp will not parse is simply absent (age unknown != new).
+        # [2026-07-30 THE FEE IS MEASURED, NOT ASSUMED] The brain estimated
+        # round-trip friction from a CONSTANT — Kraken spot taker 0.26%/side,
+        # a RETIRED venue — and applied it to Lighter books. Publishing the
+        # venue's own number makes the estimate self-correcting: if Lighter
+        # ever switches its (already-enabled) fees on, the brain follows
+        # without a code change. MAX across books, not mean: a cost estimate
+        # should be conservative, and one expensive book must not hide behind
+        # 200 free ones.
+        "fees": {"taker": round(max((v.get("taker_fee") or 0.0)
+                                    for v in stats.values()), 6) if stats else None,
+                 "maker": round(max((v.get("maker_fee") or 0.0)
+                                    for v in stats.values()), 6) if stats else None,
+                 "n_books": len(stats),
+                 "basis": "max taker/maker fee across active books, fraction"},
         "ages_d": {s: round((now_ms - v["created_ms"]) / 86_400_000.0, 1)
                    for s, v in stats.items()
                    if (v.get("created_ms") or 0) > 0
