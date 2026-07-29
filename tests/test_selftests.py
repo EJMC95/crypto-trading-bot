@@ -59,6 +59,14 @@ SELFTEST_MODULES = [
     # reduction, signature dedupe, ordering, empty-state); the full run needs
     # the tape + register from the DB.
     "scripts.study_prospect_admission",
+    # [2026-07-29 (fv)] alpha-vs-regime — the instrument item 18 has needed
+    # since 21-Jul. --selftest is fully offline (synthetic markets) and must
+    # discriminate BOTH directions: a drift strategy with a huge raw t and
+    # ~zero excess, genuine skill, NEGATIVE alpha, and the thin-cross-section
+    # refusal. A detector that can only ever say "no alpha" is not a detector,
+    # so the drift/skill pair is the load-bearing assertion. The full run needs
+    # a pickled scout tape (--tape) plus the dashboard ledger.
+    "scripts.study_alpha_vs_regime",
     # [2026-07-29 (fk)] go-live readiness grader — --selftest is offline
     # (synthetic books: a clean pass, the low-win-rate/positive-expectancy
     # "carry shape", the high-win-rate money-loser, window/DD bars). It pins
