@@ -291,6 +291,18 @@ ERA_START = {
     # any era lookup. Keyed EXACTLY, not by substring — substring-matching this
     # same pair is the (gr) near-miss that would have exempted the living twin.
     "perps-funding-carry": "2026-07-17T00:00",
+    # [2026-07-30 (hg)] 💸 Funding Farmer — the SAME accrual-basis fix, and this
+    # key covers a REAL-MONEY row. `era_epoch_for` strips both suffixes, so one
+    # entry scopes `perps-funding-lighter-lighter` (live) and `-lshadow`.
+    # The bot's own accrual comment: the pre-fix figure "reaches the per-trade
+    # ledger AND the win/loss call — an inflated carry credit inflates the win
+    # rate of a book that COLLECTS carry". The brain grades WIN RATE (post_wr,
+    # Wilson bounds, the whole v3 evidence stack) off that ledger, and it has
+    # had jurisdiction over the live Farmer's tag since (bb). Measured: the live
+    # row's win rate is 63% pooled and 50% in-era; the shadow twin's 56% -> 45%.
+    # A brain reasoning about a real-money book from an inflated win rate is the
+    # precise failure this table exists to prevent.
+    "perps-funding-lighter": "2026-07-17T00:00",
 }
 
 
@@ -309,9 +321,31 @@ def era_epoch_for(bot):
         a `"2026-07-14T00:00"` era at char 10 (`' '` < `'T'`) and was wrongly
         excluded. Comparing PARSED epochs fixes both — every stamp normalises
         through `_epoch` regardless of format.
+
+    [2026-07-30 (hg)] THIRD BUG, same function, and it needed a book whose OWN
+    NAME ends in a venue suffix to surface. The strip was
+    `.rsplit("-lshadow",1)[0].rsplit("-lighter",1)[0]` — two strips, always —
+    and 💸 Funding Farmer is named `perps-funding-lighter`:
+
+        perps-funding-lighter          -> 'perps-funding'          (misses itself)
+        perps-funding-lighter-lighter  -> 'perps-funding-lighter'  (hits)
+        perps-funding-lighter-lshadow  -> 'perps-funding'          (MISSES)
+
+    So one declaration would have scoped the LIVE row and left the SHADOW twin
+    pooled. Now: EXACT match first, then strip exactly ONE trailing suffix. No
+    existing entry changes — every other row carries a single suffix, so
+    one-strip and two-strip agree on all of them.
     """
-    base = str(bot).rsplit("-lshadow", 1)[0].rsplit("-lighter", 1)[0]
-    era = ERA_START.get(base)
+    b = str(bot)
+    if b in ERA_START:
+        era = ERA_START[b]
+    else:
+        base = b
+        for suf in ("-lshadow", "-lighter"):
+            if b.endswith(suf):
+                base = b[:-len(suf)]
+                break
+        era = ERA_START.get(base)
     return _epoch(era) if era else None
 
 # [2026-07-15 LIVENESS] Generate hypotheses/diagnoses/multipliers ONLY for

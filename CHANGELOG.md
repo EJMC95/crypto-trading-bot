@@ -1,3 +1,31 @@
+## 2026-07-30 (hg) — THE REAL-MONEY PAIR HAD THE SAME DEFECT, AND THE SUFFIX STRIP WOULD HAVE COVERED HALF OF IT
+
+- **Operator: "if things have been found that improve real money then implement immediately."** `(hc)`–`(hf)` were about a SHADOW book. Applied to the real-money surface, the same 17-Jul accrual-basis fix lands on **both live books**, and the bots say so themselves.
+- **💸 Funding Farmer**, at its own accrual line: *"this line accrued it PER HOUR = 8x. Live equity is honest (the venue charges the real thing) but this figure reaches the per-trade ledger AND the win/loss call — an inflated carry credit inflates the win rate of a book that COLLECTS carry."* The ledger is what every grader reads.
+
+  | boundary | n | t | h1 | h2 | win | bars |
+  |---|--:|--:|--:|--:|--:|--:|
+  | all-time | 85 | **+2.09** | +11.94 | +2.45 | 56% | **5/6** |
+  | ≥ 17-Jul | 47 | +0.74 | **−0.63** | +3.91 | 45% | 3/6 |
+  | ≥ 22-Jul | 20 | +1.07 | +2.95 | −0.58 | 55% | 2/6 |
+  | ≥ 28-Jul | 3 | +1.09 | +0.16 | +0.11 | 67% | 3/6 |
+
+  That is `perps-funding-lighter-lshadow` — **the book I named one hour ago as the fleet's new go-live frontrunner.** No post-fix boundary passes the t bar at all; all-time is the single window in which it looks ready, and `h1` goes negative. The **live** row moves in what it reports rather than its bar count: t +1.57 → +1.07 and **win rate 63% → 50%**, on the book that holds money and whose tag the brain has had jurisdiction over since `(bb)`.
+- **🎫 Ticket Taker too, and I had assumed otherwise.** I wrote a test asserting the Taker needs no era "because it is a price book" — **the test failed.** It DOES accrue: its divergence lens exists to collect the credit, it carried the same 8x defect *modelled inline* so the 17-Jul grep for the fixed call site missed it (*"the THIRD accruing book to carry this bug"*), and its own note says the inflated credit *"flattered the one number that could earn this bot a go-live"*. The live row has zero pre-fix closes so the era is a no-op for it today; its shadow twin goes 3/6 t=−0.39 → **2/6 t=−1.45**.
+- **THE BUG THAT WOULD HAVE MADE HALF OF THIS INERT.** The suffix strip — `.rsplit("-lshadow",1)[0].rsplit("-lighter",1)[0]`, copied from `bot_learn` — strips **twice, always**. And 💸 Funding Farmer **is itself named `perps-funding-lighter`**:
+
+  ```
+  perps-funding-lighter          -> 'perps-funding'          (misses ITSELF)
+  perps-funding-lighter-lighter  -> 'perps-funding-lighter'  (hits)
+  perps-funding-lighter-lshadow  -> 'perps-funding'          (MISSES)
+  ```
+
+  So one declaration would have scoped the **live** row and left the **shadow twin** — the row carrying the 5/6 artifact — pooled. Half-inert, in the registered-but-inert shape this repo keeps hitting. Now: **exact match first, then strip exactly ONE** trailing suffix. No existing entry moves; every other row carries a single suffix, so one-strip and two-strip agree on all of them. Fixed in **both** copies — and the brain's copy was NOT covered by the grader's tests (a mutation restoring its old strip left the suite green), which matters more, because the brain grades the live row.
+- **THE RULE, APPLIED UNIFORMLY INSTEAD OF CHERRY-PICKED.** The 17-Jul fix was fleet-wide, so membership is now rule-driven — *the publisher accrues funding AND the book has pre-fix closes* — giving six more books. **It is NOT uniformly restrictive, and that is the point:** four of the six read BETTER in-era, i.e. pooling was *punishing* them. ⚖️ Counterweight goes from mean +0.709% / win 56% to **+1.263% / win 68%** and now fails only on sample size — pooling was hiding the fleet's best expectancy. Books whose publisher does **not** accrue (🧲 Snap Back, 🎯 Perp Sniper) are deliberately excluded; an era declared "for symmetry" on a price book discards real evidence for nothing, and a test pins both halves of that.
+- **CHECKED, NOT ASSUMED — the promotion judge is era-safe by construction.** Every arm comparison goes through `arm_trades(rows, bot, start_ts, end_ts)` and its windows begin at the candidate's own `started_ts`, all of which postdate 17-Jul. So the pipeline that is the ONLY writer of `live.funding.*` was never contaminated. Pinned, so removing that windowing fails loudly.
+- **AND THE LIVE GATE IS DELIBERATELY NOT MOVED.** `FUNDING_ENTER_APR=0.05` is documented as *"the WORST value tested, at BOTH frictions, on the venue it trades"* — but the ranking is denominated in a friction nobody has measured, and **no gate passes both halves at either friction**, so the backtest supplies no value to move to. Moving it would swap one unmeasured constant for another. `(hb)`'s `exit_measured` telemetry, deployed today, is what will finally say whether the friction is knowable on this book.
+- Suite green (48 in this file), brain selftest 51/51, five audits green. Mutation-verified in both files: restoring the double-strip fails three grader tests and the new brain test.
+
 ## 2026-07-30 (hf) — THE GRADED LEDGER IS TWO BOOKS, AND MY OWN (gn) CHECK COULD NOT HAVE SHOWN OTHERWISE
 
 - **A correction of my own conclusion, first.** `(gn)` found that two Railway services — `funding-carry` and `yield-harvester-shadow` — both publish `perps-funding-carry-lshadow`, scanned the paper ledger for duplicate `trade_id`s, found none, and concluded: *"The paper LEDGER is CLEAN (82 closes, zero duplicate trade_ids) so the go-live grade and the baseline are intact."* **That check cannot detect the thing it was used to rule out.** Two independent processes open at different moments, so their ids (`{coin}:{opened_ts}`) never collide. A duplicate-id scan is blind to duplicate WRITERS by construction. When you test whether a shared key did damage, pick a test that *could* find the damage.

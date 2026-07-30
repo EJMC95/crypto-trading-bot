@@ -151,16 +151,153 @@ POLICY_ERA = {
         "venue's own per-8h settlement; for a funding book the accrual IS the "
         "P&L, so closes opened before it are denominated in a unit the book no "
         "longer uses. 25 closes at +$62.03 before, 57 at -$0.91 since."),
+    # [2026-07-30 (hg)] 💸 Funding Farmer — the SAME basis fix, on the pair that
+    # includes a REAL-MONEY book. One bare key covers both rows: `era_epoch_for`
+    # strips `-lighter` and `-lshadow`.
+    #
+    # THE BOT SAYS IT ITSELF, at `lighter_funding_bot.py`'s accrual line: *"this
+    # line accrued it PER HOUR = 8x. Live equity is honest (the venue charges
+    # the real thing) but this figure reaches the per-trade ledger AND the
+    # win/loss call — an inflated carry credit inflates the win rate of a book
+    # that COLLECTS carry."* The ledger is what every grader reads.
+    #
+    # MEASURED, and this is why it could not wait: `perps-funding-lighter-
+    # lshadow` was reported ONE HOUR AGO as the fleet's new go-live frontrunner
+    # at 5/6 bars, t=+2.09, both halves positive. Scoped to the post-fix era it
+    # is **3/6, t=+0.74, and h1 goes NEGATIVE** (-0.63). Its win rate falls 56%
+    # -> 45%, exactly the inflation the bot's comment predicts for a
+    # carry-collecting book.
+    #     boundary      n    t     h1      h2    win   bars
+    #     all-time     85  +2.09  +11.94  +2.45  56%   5/6   <- the only 5/6
+    #     >= 17-Jul    47  +0.74   -0.63  +3.91  45%   3/6
+    #     >= 22-Jul    20  +1.07   +2.95  -0.58  55%   2/6
+    #     >= 28-Jul     3  +1.09   +0.16  +0.11  67%   3/6
+    # **No post-fix boundary passes the t bar at all** (0.74 / 1.07 / 1.09 vs
+    # 2.0). All-time is the single window in which this book looks ready.
+    #
+    # THE LIVE ROW MOVES TOO, in what it REPORTS rather than in its bar count:
+    # 4/6 either way, but t +1.57 -> +1.07 and **win rate 63% -> 50%** on the
+    # book that actually holds money and whose tag the brain has jurisdiction
+    # over since (bb).
+    #
+    # NOT AFFECTED, checked rather than assumed: the promotion judge. Every arm
+    # comparison goes through `arm_trades(rows, bot, start_ts, end_ts)` and its
+    # windows begin at the candidate's own `started_ts`, all of which postdate
+    # 17-Jul — so the pipeline that is the ONLY writer of `live.funding.*` is
+    # era-safe by construction, not by luck. Pinned by a test.
+    "perps-funding-lighter": (
+        "2026-07-17",
+        "the same per-hour/per-8h accrual basis fix, on the Funding Farmer pair "
+        "— a REAL-MONEY book and its shadow twin. The bot's own comment: the "
+        "pre-fix figure 'reaches the per-trade ledger AND the win/loss call'. "
+        "Measured: the shadow twin reads 5/6 bars at t=+2.09 all-time and 3/6 "
+        "at t=+0.74 with h1 NEGATIVE in-era; no post-fix boundary passes the t "
+        "bar. The live row's win rate reads 63% pooled against 50% in-era."),
+    # [2026-07-30 (hg)] THE RULE, APPLIED UNIFORMLY. The 17-Jul basis fix was
+    # FLEET-WIDE — every `[2026-07-17 BASIS FIX]` in a shipped bot carries the
+    # same date — so declaring it for two books and not the rest would be
+    # cherry-picking the ones whose numbers I happened to look at. Membership is
+    # RULE-DRIVEN: the book's publisher accrues funding AND the book has closes
+    # opened before the fix. Books whose publisher does NOT accrue (🧲 Snap Back,
+    # 🎯 Perp Sniper) are deliberately absent — a price book's P&L cannot carry
+    # an accrual defect, and declaring an era "for symmetry" would discard real
+    # evidence for nothing.
+    #
+    # Measured effect (pooled -> in-era), so the direction is on the record:
+    #   lighter-ticket-taker-lshadow   3/6 t-0.39 win38%  ->  2/6 t-1.45 win34%
+    #   freqtrade-georgia-lshadow      3/6 t+0.03 win47%  ->  2/6 t-0.05 win46%
+    #   perps-funding-spread-lshadow   3/6 t+1.14 win56%  ->  3/6 t+1.30 win68%
+    #   crypto-intraday-15m-lshadow    2/6 t-0.66 win53%  ->  3/6 t+0.41 win59%
+    #   freqtrade-dad-lshadow          1/6 t-3.59 win20%  ->  1/6 t-1.90 win33%
+    #   crypto-breakout-4h-lshadow     1/6 t-4.09 win17%  ->  1/6 t-2.14 win33%
+    # NOTE it is NOT uniformly restrictive — four of those six read BETTER in-era,
+    # i.e. pooling was PUNISHING them. That is the point: the era is about which
+    # sample describes the book, not about being harsh. Stated because "we
+    # tightened everything" would be the easier and false summary.
+    "lighter-ticket-taker": (
+        "2026-07-17",
+        "🎫 Ticket Taker — a REAL-MONEY book. It DOES accrue funding (its "
+        "divergence lens exists to collect the credit) and carried the same 8x "
+        "defect, modelled inline so a grep for the fixed call site missed it: "
+        "'the THIRD accruing book to carry this bug'. Its own note — 'the "
+        "accrual still reaches the per-trade ledger and the win/loss call' — and "
+        "'it lands exactly where it hurts most: DIVERGENCE is the only lens with "
+        "a positive forward grade and the only one that COLLECTS carry, so the "
+        "inflated credit flattered the one number that could earn this bot a "
+        "go-live'. The LIVE row has ZERO pre-fix closes so this is a no-op for it "
+        "today and declared anyway; the shadow twin the brain grades goes 3/6 "
+        "t=-0.39 pooled to 2/6 t=-1.45 in-era."),
+    "perps-funding-spread": (
+        "2026-07-17",
+        "⚖️ Counterweight, the book whose own basis-fix note records that its "
+        "'entire reported profit was this artifact'. Same 17-Jul accrual fix, 20 "
+        "closes opened before it. Declared for correctness, NOT because pooling "
+        "flattered it: in-era it reads BETTER (3/6 t=+1.30 win 68% against 3/6 "
+        "t=+1.14 win 56%), so pooling was punishing this book."),
+    "freqtrade-georgia": (
+        "2026-07-17",
+        "family book on lighter_family_bot, which carries '[2026-07-17 BASIS FIX "
+        "ii]' on its accrual line. 12 closes opened before it; 3/6 t=+0.03 "
+        "pooled against 2/6 t=-0.05 in-era. Note the brain already scoped this "
+        "book from 13-Jul for a STRATEGY change — a book can have an earlier "
+        "hypothesis era than its accounting era, and the later of the two is "
+        "what a promotion sample may use."),
+    "freqtrade-dad": (
+        "2026-07-17",
+        "family book, same lighter_family_bot accrual fix, 4 closes opened "
+        "before it. In-era it reads BETTER (t=-1.90 against t=-3.59), so this is "
+        "a correctness declaration and not a tightening; it fails on 1/6 bars "
+        "either way."),
+    "crypto-intraday-15m": (
+        "2026-07-17",
+        "spot port on lighter_family_bot, same accrual fix, 6 closes opened "
+        "before it. In-era it reads BETTER — 3/6 t=+0.41 against 2/6 t=-0.66 — "
+        "so pooling the pre-fix rows was costing this book a bar."),
+    "crypto-breakout-4h": (
+        "2026-07-17",
+        "spot port on lighter_family_bot, same accrual fix, 6 closes opened "
+        "before it. In-era t=-2.14 against a pooled t=-4.09; 1/6 bars either "
+        "way, declared so the sample matches the code that produced it."),
 }
+
+
+#: Row suffixes, stripped ONE at a time. See era_base.
+_ROW_SUFFIXES = ("-lshadow", "-lighter")
+
+
+def era_base(bot):
+    """The bare book name a ledger row belongs to.
+
+    [2026-07-30 (hg)] EXACT MATCH FIRST, then strip exactly ONE trailing suffix.
+    The obvious implementation — `.rsplit("-lshadow",1)[0].rsplit("-lighter",1)[0]`,
+    copied from `bot_learn.era_epoch_for` — is WRONG for one book in this fleet,
+    and it is the book that holds real money: **💸 Funding Farmer is itself named
+    `perps-funding-lighter`**, so its own name ends in the venue suffix.
+
+        perps-funding-lighter          -> 'perps-funding'          (misses itself)
+        perps-funding-lighter-lighter  -> 'perps-funding-lighter'  (hits)
+        perps-funding-lighter-lshadow  -> 'perps-funding'          (MISSES)
+
+    So a single declaration would have scoped the LIVE row and silently left the
+    SHADOW twin pooled — and the twin is the row carrying the 5/6-bars artifact
+    this era exists to withdraw. Half-inert, in the same registered-but-inert
+    shape this repo keeps hitting, and caught only because the test asserted
+    both rows resolve to the same era rather than assuming the strip worked."""
+    b = str(bot)
+    if b in POLICY_ERA:
+        return b
+    for suf in _ROW_SUFFIXES:
+        if b.endswith(suf):
+            return b[:-len(suf)]
+    return b
 
 
 def era_epoch_for(bot):
     """(epoch, iso, why) for a ledger bot id's policy era, or (None, None, None).
 
-    Suffix-stripped like `bot_learn.era_epoch_for` — same table-keyed-bare,
-    ledger-keyed-suffixed hazard, and the same fix."""
-    base = str(bot).rsplit("-lshadow", 1)[0].rsplit("-lighter", 1)[0]
-    ent = POLICY_ERA.get(base)
+    Table keyed BARE, ledger keyed SUFFIXED — the hazard the brain shipped for
+    nine days. See `era_base` for why the strip is one-at-a-time."""
+    ent = POLICY_ERA.get(era_base(bot))
     if not ent:
         return None, None, None
     iso, why = ent
@@ -480,8 +617,18 @@ def _selftest():
         assert ep is not None and iso == "2026-07-17", (suffixed, ep, iso)
         assert why and len(why) > 60, f"{suffixed}: era needs a stated reason"
     # An undeclared book grades ALL-TIME — the pre-(hc) behaviour, unchanged.
-    assert era_epoch_for("freqtrade-mum-lshadow") == (None, None, None)
-    assert era_epoch_for("lighter-ticket-taker-lighter") == (None, None, None)
+    # Both of these are books whose publisher does NOT accrue funding, so the
+    # 17-Jul basis fix cannot have touched their P&L. (This line named the Ticket
+    # Taker until (hg): it DOES accrue — its divergence lens exists to collect
+    # the credit — and it is now declared.)
+    assert era_epoch_for("lighter-dislocation-lshadow") == (None, None, None)
+    assert era_epoch_for("lighter-perp-sniper-lshadow") == (None, None, None)
+    # ...and the Farmer's OWN NAME ends in a row suffix, so every one of its
+    # three spellings must resolve to the same era. This is the (hg) bug.
+    _fe = era_epoch_for("perps-funding-lighter")
+    assert _fe[0] is not None, "the bare key does not resolve to itself"
+    for _row in ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"):
+        assert era_epoch_for(_row) == _fe, (_row, era_epoch_for(_row), _fe)
 
     era_ep, _, _ = era_epoch_for("perps-funding-carry-lshadow")
     def _p(x):                      # stand-in for experiment_judge.parse_ts

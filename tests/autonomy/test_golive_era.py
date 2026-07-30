@@ -135,16 +135,141 @@ def test_the_same_stamp_is_INCLUDED_when_no_era_is_declared(bad):
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("bot", [
-    "perps-funding-lighter-lshadow",     # the fleet's frontrunner AFTER this fix
-    "lighter-ticket-taker-lighter",      # real money
-    "lighter-ticket-taker-lshadow",
+    # publishers that do NOT accrue funding — a price book's P&L cannot carry an
+    # accrual defect, so declaring an era for it would discard real evidence for
+    # nothing. Verified against the `[2026-07-17 BASIS FIX]` set.
+    "lighter-dislocation-lshadow",
+    "lighter-perp-sniper-lshadow",
     "pm-gillard-lshadow",
-    "freqtrade-mum-lshadow",
+    "pm-abbott-lshadow",
 ])
 def test_an_undeclared_book_still_grades_all_time(bot):
     assert g.era_epoch_for(bot) == (None, None, None), (
         f"{bot} gained a policy era — that changes its published verdict and "
         "needs its own declaration and measurement")
+
+
+# --------------------------------------------------------------------------
+# 4b. THE REAL-MONEY PAIR. [(hg)]
+# --------------------------------------------------------------------------
+
+FARMER_LIVE = "perps-funding-lighter-lighter"
+FARMER_SHADOW = "perps-funding-lighter-lshadow"
+
+
+@pytest.mark.parametrize("bot", [FARMER_LIVE, FARMER_SHADOW])
+def test_the_funding_farmer_pair_is_scoped_to_the_basis_fix(bot):
+    """💸 The same per-hour/per-8h accrual fix, on a pair that includes a
+    REAL-MONEY book. ONE bare key covers both rows — that is the whole reason
+    `era_epoch_for` strips suffixes, and getting it wrong here would scope the
+    shadow twin while leaving the live row pooled."""
+    ep, iso, why = g.era_epoch_for(bot)
+    assert ep is not None and iso == "2026-07-17", (bot, ep, iso)
+    assert "REAL-MONEY" in why or "real-money" in why, why
+
+
+def test_the_BRAINS_strip_handles_the_farmers_self_suffixed_name_too():
+    """`bot_learn.era_epoch_for` had its own copy of the double-strip, and the
+    grader's tests could not see it — a mutation restoring the old strip in
+    bot_learn.py left this file GREEN. That gap matters more than the grader's:
+    the brain grades the LIVE Farmer row and has had jurisdiction over its tag
+    since (bb), so a half-resolving era means the brain keeps forming hypotheses
+    from 8x-inflated win rates on a real-money book while the gate does not."""
+    import bot_learn
+    base = bot_learn.era_epoch_for("perps-funding-lighter")
+    assert base is not None, (
+        "the bare key does not resolve to itself — `-lighter` is part of this "
+        "book's NAME, so a two-strip mangles it to 'perps-funding'")
+    for row in ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"):
+        assert bot_learn.era_epoch_for(row) == base, (
+            f"{row} resolves to a different era than the bare key — the live row "
+            f"and its shadow twin would be graded on different samples")
+    # and no existing entry moved: every other row carries a single suffix
+    assert bot_learn.era_epoch_for("freqtrade-mum-lshadow") is not None
+    assert bot_learn.era_epoch_for("pm-gillard-lshadow") is None
+
+
+def test_the_farmer_declaration_records_that_no_post_fix_window_passes_t():
+    """The measurement that made this urgent rather than tidy. The shadow twin
+    was reported as the fleet's go-live frontrunner at 5/6 / t=+2.09; in-era it
+    is 3/6 / t=+0.74 with h1 NEGATIVE, and NO post-fix boundary clears t>=2.0.
+    All-time is the single window in which the book looks ready — which is the
+    signature of an artifact, not of an edge."""
+    _ep, _iso, why = g.era_epoch_for(FARMER_SHADOW)
+    assert "5/6" in why and "3/6" in why, why
+    assert "no post-fix boundary passes the t" in why.lower(), why
+
+
+def test_the_promotion_judge_is_era_safe_BY_CONSTRUCTION():
+    """Checked, not assumed — this is the pipeline that is the ONLY writer of
+    `live.funding.*` on a real-money book, so "probably fine" is not an answer.
+    Every arm comparison goes through `arm_trades(rows, bot, start_ts, end_ts)`
+    and the windows begin at the candidate's own `started_ts`, all of which
+    postdate 17-Jul. If that windowing is ever removed, the judge starts pooling
+    pre-fix rows into a paired real-money comparison and needs its own era."""
+    src = (_ROOT / "experiment_judge.py").read_text()
+    assert "arm_trades(rows, shadow_bot, start_ts, end_ts" in src
+    assert "arm_trades(rows, live_bot, start_ts, end_ts" in src, (
+        "the judge no longer windows the LIVE arm from the candidate's start — "
+        "it would now pool pre-basis-fix rows into a real-money promotion bar")
+
+
+def test_the_ticket_taker_IS_an_accruing_book_and_is_scoped_too():
+    """The other real-money book, and I had this WRONG. I first wrote this test
+    asserting the taker needs no era because "it is a price book" — and the test
+    failed, because it DOES accrue funding: its divergence lens exists to collect
+    the credit, and it carried the same 8x defect *modelled inline*, so the
+    17-Jul grep for the fixed call site missed it ("the THIRD accruing book to
+    carry this bug"). Its own note says the accrual "reaches the per-trade ledger
+    and the win/loss call" and "flattered the one number that could earn this bot
+    a go-live". The assumption was the defect; the test caught it."""
+    src = (_ROOT / "lighter_ticket_taker.py").read_text()
+    assert "funding_basis.to_hourly" in src, (
+        "the taker no longer accrues funding — re-read whether its era still "
+        "describes anything")
+    for row in ("lighter-ticket-taker-lighter", "lighter-ticket-taker-lshadow"):
+        ep, iso, _why = g.era_epoch_for(row)
+        assert ep is not None and iso == "2026-07-17", (row, ep, iso)
+
+
+@pytest.mark.parametrize("bot,publisher", [
+    ("perps-funding-carry", "funding_carry_bot.py"),
+    ("perps-funding-lighter", "lighter_funding_bot.py"),
+    ("lighter-ticket-taker", "lighter_ticket_taker.py"),
+    ("perps-funding-spread", "lighter_funding_spread_bot.py"),
+    ("freqtrade-georgia", "lighter_family_bot.py"),
+    ("freqtrade-dad", "lighter_family_bot.py"),
+    ("crypto-intraday-15m", "lighter_family_bot.py"),
+    ("crypto-breakout-4h", "lighter_family_bot.py"),
+])
+def test_every_basis_era_names_a_publisher_that_really_accrues(bot, publisher):
+    """Membership is RULE-DRIVEN, not a list I curated: the book's publisher must
+    carry the 17-Jul basis fix on an accrual line. Without this the table drifts
+    into "books whose numbers someone looked at", which is how a uniform rule
+    becomes cherry-picking."""
+    assert bot in g.POLICY_ERA, f"{bot} lost its era"
+    src = (_ROOT / publisher).read_text()
+    # The marker text is NOT uniform — `funding_carry_bot` labels its own as
+    # "[2026-07-17 THE SIXTH 8x BOT]" rather than "BASIS FIX". Matching on the
+    # DATE plus a real rate conversion is the invariant; matching on one house
+    # phrase was my test asserting a convention the fleet does not have.
+    assert "2026-07-17" in src, f"{publisher} carries no 17-Jul dated note"
+    assert ("to_hourly" in src or "_hourly(" in src), (
+        f"{publisher} does not convert a funding rate — if it never accrued, "
+        f"{bot}'s era describes nothing and should be removed")
+
+
+def test_the_non_accruing_books_are_excluded_ON_PURPOSE():
+    """The other half of the rule, and the more dangerous half to get wrong: an
+    era declared "for symmetry" on a price book throws away real evidence in
+    exchange for nothing."""
+    for publisher, row in (("lighter_dislocation_bot.py", "lighter-dislocation"),
+                           ("lighter_perp_sniper.py", "lighter-perp-sniper")):
+        src = (_ROOT / publisher).read_text()
+        assert "funding_basis.to_hourly" not in src, (
+            f"{publisher} now accrues funding — it needs an era declaration and "
+            f"this test needs re-reading")
+        assert row not in g.POLICY_ERA, f"{row} gained an era but does not accrue"
 
 
 def test_the_suffix_is_stripped_like_the_brains_table():
@@ -164,9 +289,16 @@ def test_every_declaration_is_parseable_and_reasoned():
         ep, got_iso, got_why = g.era_epoch_for(base)
         assert ep is not None and got_iso == iso, base
         assert len(why) > 80, f"{base}: the era's reason is too thin to review"
-        assert "-lshadow" not in base and "-lighter" not in base, (
-            f"{base} is keyed with a suffix — era_epoch_for strips it, so this "
-            "entry can never match a ledger row")
+        # A key must RESOLVE TO ITSELF. The old form of this test asserted
+        # `"-lighter" not in base`, which is wrong for the one book that matters:
+        # 💸 Funding Farmer is NAMED `perps-funding-lighter`. The real invariant
+        # is that `era_base` maps the key back to the key — that is what makes it
+        # reachable from a ledger row — and it is what catches a key typed with a
+        # row suffix as well.
+        assert g.era_base(base) == base, (
+            f"{base} does not resolve to itself — era_base maps it to "
+            f"{g.era_base(base)!r}, so this entry can never match a ledger row")
+        assert "-lshadow" not in base, f"{base} is keyed with a shadow suffix"
 
 
 # --------------------------------------------------------------------------
@@ -274,20 +406,35 @@ def test_the_brain_scopes_the_carry_book_to_the_same_era():
     assert bot_learn.era_epoch_for("perps-funding-carry-lshadow") is not None
 
 
-def test_the_two_era_tables_do_not_CONTRADICT_each_other():
-    """Two organs, two tables, one book. They may cover different sets — the
-    brain's era is about hypothesis generation and the gate's about promotion
-    eligibility — but where BOTH declare a book they must agree, or the fleet
-    reasons about two different histories of the same ledger and neither reader
-    can tell which one they are looking at."""
+def test_the_gates_sample_is_never_WIDER_than_the_brains():
+    """Two organs, two tables, one book — and they answer different questions,
+    so "must be equal" was the wrong invariant. `freqtrade-georgia` proves it:
+    the brain scopes from 13-Jul for a STRATEGY change and the gate from 17-Jul
+    for an ACCOUNTING one. Both are right about their own question.
+
+    The invariant that IS meaningful and directional: **the gate's era must be at
+    least as late as the brain's.** A promotion sample may never be wider than
+    the sample the brain is willing to form a hypothesis from — the gate decides
+    real money and must be the more conservative of the two.
+
+    STANDING FOLLOW-UP, recorded here rather than lost: four family/spot books
+    carry brain eras EARLIER than 17-Jul (georgia 13-Jul, dad 14-Jul, mum 14-Jul,
+    crypto-intraday-15m 13-Jul), so the brain still pools pre-basis-fix accrual
+    for them. Moving those to 17-Jul is strictly narrower and strictly more
+    correct, but it changes hypothesis generation on several shadow books and
+    deserves its own measured pass — not a side effect of a real-money commit."""
     import bot_learn
+    from datetime import datetime
     for base, (iso, _why) in g.POLICY_ERA.items():
         brain = bot_learn.ERA_START.get(base)
         if brain is None:
             continue
-        assert brain.startswith(iso), (
-            f"{base}: the go-live gate scopes from {iso} and the brain from "
-            f"{brain} — same ledger, two different books")
+        gate_d = datetime.fromisoformat(iso)
+        brain_d = datetime.fromisoformat(brain)
+        assert gate_d >= brain_d.replace(tzinfo=None), (
+            f"{base}: the go-live gate scopes from {iso}, EARLIER than the "
+            f"brain's {brain} — the gate decides real money and must never grade "
+            f"a wider sample than the brain will hypothesise from")
 
 
 # --------------------------------------------------------------------------
