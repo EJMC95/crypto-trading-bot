@@ -133,6 +133,39 @@ def check(path="coverage.json"):
         flag = "  BREACH" if (pct is None or pct < floor) else ""
         print(f"  {rel:<{width}}  {shown}  (floor {floor}%){flag}")
     if breaches:
+        # [2026-07-30 (hi)] DISTINGUISH "no coverage data" FROM "a real breach".
+        # When EVERY floored file reads NOT MEASURED, the coverage run simply
+        # never happened — the report is empty, not the tests. The old message
+        # said "Add tests to restore the floor" in that case, which sends a
+        # reader hunting for missing tests that exist. Still exits NON-ZERO,
+        # deliberately: in CI a missing measurement IS a broken guard, and a
+        # guard that passes when it measured nothing is the failure mode this
+        # whole file exists to prevent. Only the DIAGNOSIS changes.
+        # THE CONDITION HAS TO SEPARATE TWO THINGS, and my first two attempts
+        # each got one of them wrong:
+        #   * a STALE/EMPTY report (this worktree held an artifact measuring
+        #     exactly ONE module at 10.6%) — not a breach, a missing run;
+        #   * a DELETED or RENAMED floored file, where 24 of 25 are measured —
+        #     that IS a breach, and excusing it would let removing a file
+        #     silently remove its floor, which this guard's own comment calls out.
+        # `all(pct is None)` missed the first (one floor read as a real breach);
+        # `len(files) < len(FLOORS)` broke the second (the synthetic fixture
+        # writes only the floored files, so dropping one tripped the excuse).
+        # The invariant that holds for both: a report which measured FEWER THAN
+        # HALF the floored files cannot be speaking to the floors at all.
+        _measured = sum(1 for _r, p, _f in rows if p is not None)
+        if _measured * 2 < len(FLOORS):
+            print(f"\nPARTIAL OR ABSENT COVERAGE DATA — only {_measured} of "
+                  f"{len(FLOORS)} floored files are in the report ({len(files)} "
+                  f"file(s) total), so it cannot speak to the floors. This is an "
+                  f"EMPTY/STALE REPORT, not a breach.")
+            print("Generate it the way CI does (subprocess-aware, or the "
+                  "--selftest blocks driven as subprocesses are invisible):")
+            print("  COVERAGE_PROCESS_START=.coveragerc coverage run "
+                  "--source=. -m pytest tests/ -q && coverage json")
+            print("Then re-run this audit. Exiting non-zero: a coverage guard "
+                  "that passes without measuring anything is not a guard.")
+            return 1
         print("\nFLOORS BREACHED — the real-money surface only ratchets UP:")
         for b in breaches:
             print(f"  {b}")
@@ -144,7 +177,15 @@ def check(path="coverage.json"):
 
 
 def _selftest():
-    """The detector must still see a breach, a hold, and a missing file."""
+    """The detector must see a breach, a hold, a missing file — and, since
+    2026-07-30 (hi), must DIAGNOSE a stale report differently from a breach.
+
+    The exit-code assertions alone could not test that: both cases exit 1, so a
+    misdiagnosis passes silently. That is precisely the hole the (hi) change
+    exists to close, and it was open in this selftest until now — so the message
+    is asserted too."""
+    import contextlib
+    import io
     import tempfile
     with tempfile.TemporaryDirectory() as td:
         good = {rel: 99.0 for rel in FLOORS}
@@ -158,15 +199,45 @@ def _selftest():
                 for rel, p in percents.items() if rel != drop}
             fx.write_text(json.dumps({"files": files}))
 
+        def run():
+            """(exit_code, stdout) — the verdict AND the diagnosis."""
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = check(str(fx))
+            return rc, buf.getvalue()
+
         write(good)
-        assert check(str(fx)) == 0, "all-above-floor must pass"
+        assert run()[0] == 0, "all-above-floor must pass"
         bad = dict(good)
         bad["venues/safety.py"] = 10.0
         write(bad)
-        assert check(str(fx)) == 1, "a floored file below floor must fail"
+        rc, out = run()
+        assert rc == 1, "a floored file below floor must fail"
+        assert "FLOORS BREACHED" in out and "PARTIAL" not in out, out[-400:]
+
+        # A DELETED/RENAMED floored file is a BREACH, not an excused report —
+        # else removing a file silently removes its floor. 24 of 25 measured.
         write(good, drop="lighter_ticket_taker.py")
-        assert check(str(fx)) == 1, "a floored file MISSING must fail"
-    print("audit_coverage_floors --selftest OK (breach + hold + missing all seen)")
+        rc, out = run()
+        assert rc == 1, "a floored file MISSING must fail"
+        assert "FLOORS BREACHED" in out, "a deleted floor must read as a BREACH"
+        assert "PARTIAL" not in out, (
+            "dropping ONE floored file was misdiagnosed as a stale report — the "
+            "excuse would then hide every rename")
+
+        # A STALE/PARTIAL report (one module, the shape this worktree actually
+        # held) must be diagnosed as missing DATA and still exit non-zero: a
+        # coverage guard that passes without measuring anything is not a guard.
+        write({"lighter_funding_bot.py": 10.6})
+        rc, out = run()
+        assert rc == 1, "an empty report must still fail closed"
+        assert "PARTIAL OR ABSENT COVERAGE DATA" in out, out[-400:]
+        assert "FLOORS BREACHED" not in out, (
+            "a stale report was reported as a breach — this sends the reader "
+            "hunting for tests that already exist")
+        assert "coverage run" in out, "say how to generate the data"
+    print("audit_coverage_floors --selftest OK (breach + hold + missing "
+          "+ stale-vs-breach diagnosis)")
 
 
 if __name__ == "__main__":
