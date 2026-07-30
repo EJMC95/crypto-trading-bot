@@ -987,6 +987,38 @@ def pos_bars(m):
     return TAKE_PROFIT, STOP_LOSS, MAX_HOLD_H
 
 
+def _close_fill_extra(out, measured, fill_reason):
+    """[2026-07-30 (hb)] Stamp whether the exit price was a MEASURED fill or the
+    decision mark, on the LEDGER row.
+
+    `_book_close` already receives `measured`/`fill_reason` and already routes
+    them to the venue-order row — but the CLOSE row got only `_close_extra(m)`,
+    and `golive_readiness`, the brain and the judge all read
+    `fetch_paper_trades`. `raw.measured` lives on `venue_orders` and no grading
+    consumer joins that table, so every grading layer has been unable to tell a
+    measured round trip from an assumed one.
+
+    That is sharper here than on the Farmer: this book sets `fee_rate = 0.0` for
+    the live arm on the stated premise that "its spread is inside the real fill"
+    — the exact premise `venues/fills.py` measured false ("0 of 81 live orders
+    ever produced a measured fill"). So a live row can carry zero fee AND zero
+    spread. This change does NOT touch `fee_rate`: it makes the premise
+    CHECKABLE first, because deciding what the fee should be needs to start from
+    how many closes were actually measured. TELEMETRY ONLY.
+
+    setdefault-shaped so it can never clobber a bars/evidence key, and ABSENT
+    when unknown rather than defaulted to False — the shadow arm has no venue
+    fill and must not be recorded as an unmeasured live one.
+    """
+    if not isinstance(out, dict):
+        out = {}
+    if measured is not None:
+        out.setdefault("exit_measured", bool(measured))
+    if fill_reason:
+        out.setdefault("exit_fill_src", str(fill_reason))
+    return out
+
+
 def _close_extra(m):
     """The close row's extra: the governing bars stamp PLUS the entry-time
     evidence. Pure — selftested.
@@ -1487,7 +1519,7 @@ def main(_ctx=None):
             # (the first 6 breakoutup closes' features are unrecoverable).
             # Merge is setdefault-shaped: bars/bars_basis can never be
             # clobbered by an evidence key. Observable-only, both arms.
-            extra=_close_extra(m))
+            extra=_close_fill_extra(_close_extra(m), measured, fill_reason))
         if not dry_run:
             try:
                 store.publish_venue_order(
