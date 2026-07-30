@@ -446,6 +446,13 @@ def main():
                      broker.equity(), broker.open_count())
         baseline = set(_saved.get("baseline") or [])
         entry_ts = {str(k): float(v) for k, v in (_saved.get("entry_ts") or {}).items()}
+        # [2026-07-30 (ha)] restore the zombie clock — see save_state below.
+        # A missing entry is correct (the coin becomes priceable again and the
+        # clock is irrelevant); a RESET entry was the defect.
+        no_px_since.update({str(k): float(v) for k, v
+                            in (_saved.get("no_px_since") or {}).items()})
+        last_px.update({str(k): float(v) for k, v
+                        in (_saved.get("last_px") or {}).items() if v})
         # [2026-07-17 RETRY FIX] persist the retry budget: first_seen must
         # survive a restart or a give-up could never be reached across a
         # deploy loop. A dropped pending entry is self-healing (the symbol
@@ -493,9 +500,29 @@ def main():
              TAKE_PROFIT_PCT * 100, STOP_LOSS_PCT * 100, MAX_HOLD_SEC / 3600, max_open)
     log.info("=" * 64)
 
-    def record_close(coin, ent_px, ent_ts, exit_px, pnl, was_long, reason):
+    def record_close(coin, ent_px, ent_ts, exit_px, pnl, was_long, reason,
+                     notional=None):
+        # [2026-07-30 (ha)] ONE BASIS. This derived pnl_pct from the passed
+        # exit_px, which in the SHADOW branch is the decision MID — while `pnl`
+        # comes back from ShadowBroker.close, which re-fetches the book and
+        # crosses it (venues/shadow.py:93-96 -> _shadow_fill). And the entry
+        # `_ent` read out of broker.pos is itself a CROSSED fill. So the row
+        # carried pnl_abs net of BOTH spreads and pnl_pct net of the entry
+        # spread only — two different bases on one close.
+        # That is not cosmetic: scripts/golive_readiness.py grades mean/t/win
+        # off pnl_pct and halves/drawdown off pnl_abs, so this book was being
+        # judged on two inconsistent measures at once.
+        # Deriving the percentage FROM pnl makes both identical, and matches
+        # what two sibling books already do (lighter_index_bot.py:300
+        # `pnl_pct=(pnl / notional)`, lighter_ticket_taker.py:1460
+        # `net / clip_used`). Direction is RESTRICT-ONLY: adding the exit
+        # spread makes pnl_pct strictly worse, so every gate bar gets harder.
+        # The FUNDED branch is unaffected in value — it already computes pnl
+        # from exit_px, so pnl/notional returns the same number it did before.
         pnl_pct = None
-        if ent_px:
+        if notional:
+            pnl_pct = float(pnl) / float(notional)
+        elif ent_px:
             pnl_pct = ((exit_px - ent_px) / ent_px) if was_long else ((ent_px - exit_px) / ent_px)
         oa = datetime.fromtimestamp(ent_ts, tz=timezone.utc).isoformat() if ent_ts else None
         store.publish_paper_trade(
@@ -621,6 +648,24 @@ def main():
                                       "entry_ts": entry_ts, "pending": pending,
                                       "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
                                       "bar_counts": bar_counts,
+                                      # [2026-07-30 (ha)] the SEED path is a
+                                      # SECOND WRITER of this key with what was
+                                      # a DIFFERENT key set. In practice it runs
+                                      # only on a first-ever boot, when nothing
+                                      # is held and the clock is empty anyway —
+                                      # but if it ever ran with positions open
+                                      # (baseline lost while broker state
+                                      # restored) it would overwrite the saved
+                                      # state and silently ERASE the zombie
+                                      # clock, which is the only exit an
+                                      # unpriceable position has. Two writers of
+                                      # one key must write the same shape; the
+                                      # carry row proved that the expensive way
+                                      # earlier today ((gn)).
+                                      "no_px_since": {k: round(v, 0) for k, v
+                                                      in no_px_since.items()},
+                                      "last_px": {k: v for k, v
+                                                  in last_px.items() if v},
                                       "not_young": sorted(not_young)})
             log.info("seeded baseline with %d active markets — sniping only NEW "
                      "listings from here.", len(baseline))
@@ -823,7 +868,8 @@ def main():
                     _sz, _ent = broker.pos.get(coin, (0.0, 0.0))
                     pnl = broker.close(coin, px)
                     record_close(coin, _ent, entry_ts.pop(coin, None), px, pnl,
-                                 _sz > 0, reason)
+                                 _sz > 0, reason,
+                                 notional=abs(float(_sz)) * float(_ent))
                     n_closed += 1
                     n_wins += 1 if pnl > 0 else 0
                     no_px_since.pop(coin, None)
@@ -849,7 +895,8 @@ def main():
                     pnl = abs(float(sz)) * ((exit_px - ent_px) if was_long
                                             else (ent_px - exit_px))
                     record_close(coin, ent_px, entry_ts.pop(coin, None),
-                                 exit_px, pnl, was_long, reason)
+                                 exit_px, pnl, was_long, reason,
+                                 notional=abs(float(sz)) * float(ent_px))
                     n_closed += 1
                     n_wins += 1 if pnl > 0 else 0
                     no_px_since.pop(coin, None)
@@ -925,6 +972,25 @@ def main():
                                   "pending": pending,
                                   "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
                                   "bar_counts": bar_counts,
+                                  # [2026-07-30 (ha)] PERSIST THE ZOMBIE CLOCK.
+                                  # `no_px_since`/`last_px` were module-locals
+                                  # that reset to {} on every boot, so
+                                  # DELIST_GIVEUP_SEC (6h) required 6h of
+                                  # CONTINUOUS uptime. Worse than slow: the
+                                  # `continue` in the unpriceable branch
+                                  # short-circuits BEFORE the max-hold test, so
+                                  # while that clock is unexpired the durable
+                                  # entry_ts clock cannot rescue the position —
+                                  # the non-durable clock is the ONLY exit, and
+                                  # the wrong one of the two was persisted.
+                                  # Three sibling implementations of the same
+                                  # 16-Jul guard already keep it in persisted
+                                  # per-coin meta (dislocation, family, index);
+                                  # the sniper was the outlier.
+                                  "no_px_since": {k: round(v, 0) for k, v
+                                                  in no_px_since.items()},
+                                  "last_px": {k: v for k, v
+                                              in last_px.items() if v},
                                   "not_young": sorted(not_young)})
 
         if args.once:
