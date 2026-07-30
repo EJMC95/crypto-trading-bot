@@ -706,3 +706,77 @@ def test_caps_ride_the_HEALTHY_publish_not_only_an_error_path(mod):
         f"{mod}: caps appear ONLY on publish(status={statuses_with_caps}) — an "
         "unhealthy/halted path. The cap would be visible only once the book had "
         "stopped trading, which is precisely when it no longer matters.")
+
+
+# --------------------------------------------------------------------------
+# [2026-07-30 (gu)] THE FLEET'S FIRST EXIT LEVER.
+#
+# All nine pre-existing lighter-books levers were ENTRY or CAPACITY: the growth
+# rail could move what every book OPENS and nothing about what it CLOSES, on a
+# fleet whose exits (gq) showed decide the result. `disloc.exit_bps` is the
+# first, and it was chosen for a measured reason rather than convenience — it
+# throttles its own book's ENTRY.
+# --------------------------------------------------------------------------
+
+def test_the_books_lane_now_has_at_least_one_exit_lever():
+    """The asymmetry this closes: 0 of 9 governed an exit. If a refactor drops
+    it the lane silently returns to entry-only and nobody notices, because every
+    other test would still pass."""
+    exitish = [k for k, v in fleet_tuning.LEVERS.items()
+               if v.get("lane") == "lighter-books"
+               and any(t in k.split(".")[-1] for t in
+                       ("exit", "tp", "sl", "hold", "trail", "stop"))]
+    assert exitish, (
+        "the lighter-books lane governs no exit at all — the growth rail can "
+        "move what these books OPEN and nothing about what they CLOSE")
+    assert "disloc.exit_bps" in exitish, exitish
+
+
+def test_the_exit_cage_reaches_INSIDE_the_observed_residual_distribution():
+    """The whole point of the lever. Snap Back's convergence target is 40bps
+    while the live residual distribution measured median 7.9 / p90 21.8 / max
+    50.1 bps across 90 liquid books. A cage that cannot descend below the p90
+    would leave the target permanently outside what the tape delivers — so the
+    floor must reach the median region, and the ceiling must not exceed today's
+    operator default (this lever may LOOSEN the exit toward the measurement,
+    never tighten it past where the operator already has it)."""
+    spec = fleet_tuning.LEVERS["disloc.exit_bps"]
+    assert spec["lo"] <= 10.0, (
+        f"lo={spec['lo']} cannot reach the observed median (~8bps) — the target "
+        "would stay outside the distribution the book trades")
+    assert spec["hi"] == spec["env_default"] == 40.0, (
+        "the ceiling must be the operator's current default, so the rail can "
+        "only loosen toward the measurement")
+    assert spec["step"] < 0, "the useful direction is DOWN, toward the tape"
+
+
+def test_the_exit_lever_is_consumed_and_snapshotted():
+    """Registered-but-inert is this repo's signature failure, and there are TWO
+    ways to hit it here. The loop must read the lever, AND `_ENV_DEFAULTS` must
+    carry the attribute — `apply_tuning` does `_ENV_DEFAULTS[attr]`, and a
+    missing key raises a KeyError that its own `except Exception: continue`
+    swallows, leaving a lever that looks consumed and never moves."""
+    import pathlib as _pl
+    src = (_pl.Path(__file__).resolve().parents[2]
+           / "lighter_dislocation_bot.py").read_text()
+    assert '"disloc.exit_bps", "EXIT_BPS"' in src, "not read by apply_tuning"
+    i = src.index("_ENV_DEFAULTS = {")
+    snap = src[i:src.index("}", i)]
+    assert '"EXIT_BPS"' in snap, (
+        "EXIT_BPS missing from _ENV_DEFAULTS — apply_tuning would KeyError and "
+        "swallow it, and an expired lever could never revert (the (fz) ratchet)")
+
+
+def test_the_exit_constant_still_governs_the_entry_floor():
+    """The coupling that makes this lever unusual and worth a test: EXIT_BPS
+    also sets the adaptive entry gate's floor via ENTER_FLOOR_MULT. If that
+    coupling is ever removed, the lever's note becomes wrong and its cage
+    rationale (derived from the ENTRY side's distribution) stops applying."""
+    import pathlib as _pl
+    src = (_pl.Path(__file__).resolve().parents[2]
+           / "lighter_dislocation_bot.py").read_text()
+    assert "ENTER_FLOOR_MULT" in src
+    assert "EXIT_BPS" in src
+    note = fleet_tuning.LEVERS["disloc.exit_bps"]["note"]
+    assert "ENTER_FLOOR_MULT" in note or "entry" in note.lower(), (
+        "the note must record that this constant governs BOTH sides")
