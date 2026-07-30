@@ -83,6 +83,15 @@ SELFTEST_MODULES = [
     # conclusion the hold column exists to test), and that labelling a book
     # RETIRED changes no number.
     "scripts.study_exit_attribution",
+    # [2026-07-30 (gt)] the exit SWEEP — the counterfactual half. --selftest is
+    # fully offline (hand-built candle paths) and pins the properties that make
+    # it trustworthy rather than merely runnable: the adverse-first intra-bar
+    # rule, mirrored shorts, the position CAP actually skipping entries (both
+    # directions), max-drawdown and peak-concurrency floors that REFUSE the
+    # "delete the stop" artifact its own first real run produced, grid-edge
+    # detection, and the CALIBRATION gate — no reproduction of the observed
+    # result, no recommendation, fail-closed when no baseline is supplied.
+    "scripts.study_exit_sweep",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",
