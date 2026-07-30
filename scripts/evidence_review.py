@@ -55,10 +55,37 @@ ALERTS_KEY = "fleet-alerts"
 CA = "closed_at::timestamptz"
 
 START_EQUITY = 1000.0    # $1,000 per book, no top-ups (CLAUDE.md)
-GATE_MIN_TRADES = 20     # go-live gate: >=20 closes in 30d
-GATE_MIN_WR = 0.55       # go-live gate: win rate > 55%
-GATE_MAX_DD = 0.15       # go-live gate: max drawdown < 15%
 ALERT_WINDOW_D = 7
+
+# [LOAD-BEARING — 2026-07-30] The go-live gate is NOT re-implemented here. It is
+# imported from `scripts/golive_readiness.py`, the canonical grader CLAUDE.md
+# names, so the two can never drift.
+#
+# WHY, measured: this file carried its OWN copy of the gate
+# (GATE_MIN_TRADES=20 / GATE_MIN_WR=0.55 / GATE_MAX_DD=0.15) — the rule the
+# 29-Jul re-spec REPLACED (CHANGELOG (fk)). One day later the daily review
+# reproduced, in both directions, the exact pair of errors that re-spec was
+# written to eliminate:
+#   * it ADMITTED `perps-funding-spread-lshadow` as clearing the gate on
+#     WR 56.1% — a book whose t is 0.65, i.e. no measured edge at all; and
+#   * it REJECTED `perps-funding-carry-lshadow`, the fleet's best-evidenced
+#     book (t=2.60, n=82, both halves +), on WR 40.2% <= 55%.
+# Win rate is orthogonal to expectancy. A second copy of a rule that governs
+# real money is a second rule; the import is the fix, not new constants.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+for _p in (_HERE, os.path.dirname(_HERE)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+try:                                     # run as a script (sys.path[0]=scripts/)
+    from golive_readiness import (GOLIVE_MIN_CLOSES, GOLIVE_MIN_DAYS,
+                                  grade, stats)
+except ImportError:                      # run as `python -m scripts.evidence_review`
+    from scripts.golive_readiness import (GOLIVE_MIN_CLOSES, GOLIVE_MIN_DAYS,
+                                          grade, stats)
+
+# Cheap SQL prefilter before the per-book ledger read. It must never be STRICTER
+# than the real closes bar, or a genuine candidate is hidden before it is graded.
+CANDIDATE_MIN_CLOSES = min(10, GOLIVE_MIN_CLOSES)
 
 # Rows whose ledgers are HISTORY — retired bots keep closing nothing, but their
 # 30d window can still contain trades for a few weeks after the cut and they
@@ -139,15 +166,37 @@ def tstat(vals):
     return round(statistics.mean(v) / (sd / len(v) ** 0.5), 2)
 
 
-def gate_status(n, wr, dd):
-    """('pass'|'fail', reason) against the go-live gates. dd is a fraction <=0."""
-    if n < GATE_MIN_TRADES:
-        return "fail", f"n={n} < {GATE_MIN_TRADES}"
-    if wr <= GATE_MIN_WR:
-        return "fail", f"WR {wr:.1%} <= {GATE_MIN_WR:.0%}"
-    if dd is not None and abs(dd) >= GATE_MAX_DD:
-        return "fail", f"dd {dd:.1%} breaches {GATE_MAX_DD:.0%}"
-    return "pass", f"n={n}, WR {wr:.1%}, dd {dd:.1%}" if dd is not None else "pass"
+def gate_status(rows):
+    """('pass'|'fail', reason, stats) for one book, per the CANONICAL gate.
+
+    `rows` is [(pnl_pct, pnl_abs, closed_at_datetime)] oldest first — the shape
+    `golive_readiness.stats` takes. All bars (>=30d, >=30 closes, mean>0, t>=2,
+    both halves +, maxDD<15%) come from the imported grader; this function only
+    formats. Win rate is REPORTED and is not a bar (CHANGELOG (fk)).
+    """
+    s = stats(rows, book_usd=START_EQUITY)
+    passes, fails = grade(s)
+    if s.get("n", 0) < 2:
+        return "fail", s.get("why", "ungradeable"), s
+    why = (f"n={s['n']}, {s['days']:.1f}d, mean {100*s['mean_pct']:+.3f}%, "
+           f"t={s['t']:.2f}, halves {s['h1']:+.2f}/{s['h2']:+.2f}, "
+           f"WR {s['win_rate']:.1%} (reported, not a bar), "
+           f"maxDD {100*(s['max_dd_frac'] or 0):.1f}%")
+    return ("pass", why, s) if passes else ("fail", "; ".join(fails), s)
+
+
+def window_only(why):
+    """True when the 30-day WINDOW is the single remaining bar.
+
+    Such a book has cleared every EVIDENCE bar and is just accruing calendar —
+    it is the operator's lead time on a decision, so the review says how many
+    days are left. `grade` joins failed bars with '; ', so one bar means no
+    separator; anything else (thin AND short, say) must NOT read as "ready in
+    N days". Pure so the discrimination is testable, not inferred from a
+    string built three call-frames away.
+    """
+    w = str(why or "")
+    return w.startswith("window ") and ";" not in w
 
 
 def _assert_write_target(key):
@@ -337,26 +386,37 @@ def scan_new_evidence(cur, errors):
                 items.append(f"💰 LIVE {bot}: n={tot_n}, net ${tot:+.2f} — by lens {by_lens}")
 
     with Section(errors, "golive-gates"):
-        cur.execute(f"""SELECT bot, count(*), sum(CASE WHEN pnl_abs>0 THEN 1 ELSE 0 END)
-                          FROM paper_trades
-                         WHERE pnl_abs IS NOT NULL AND {CA} > now() - interval '30 days'
-                         GROUP BY 1 HAVING count(*) >= {GATE_MIN_TRADES} ORDER BY 2 DESC""")
-        cands = cur.fetchall()
-        passers = []
-        for bot, n, w in cands:
+        cur.execute(f"""SELECT bot, count(*) FROM paper_trades
+                         WHERE pnl_abs IS NOT NULL
+                         GROUP BY 1 HAVING count(*) >= {CANDIDATE_MIN_CLOSES}
+                         ORDER BY 2 DESC""")
+        cands = [r[0] for r in cur.fetchall()]
+        passers, near = [], []
+        for bot in cands:
             if bot in RETIRED or bot in LIVE_ROWS or bot in LIVE_TWINS:
                 continue
-            cur.execute(f"""SELECT pnl_abs FROM paper_trades
-                             WHERE bot=%s AND pnl_abs IS NOT NULL ORDER BY {CA}""", (bot,))
-            pnls = [r[0] for r in cur.fetchall()]
-            dd = ledger_drawdown(pnls)
-            status, why = gate_status(n, w / n, dd)
+            # The grader's own shape: (pnl_pct, pnl_abs, closed_at) oldest first.
+            cur.execute(f"""SELECT pnl_pct, pnl_abs, {CA} FROM paper_trades
+                             WHERE bot=%s AND pnl_abs IS NOT NULL AND closed_at IS NOT NULL
+                             ORDER BY {CA}""", (bot,))
+            rows = cur.fetchall()
+            status, why, s = gate_status(rows)
             if status == "pass":
                 passers.append(f"{bot} ({why})")
-        items.append("🚦 go-live gates (30d; retired, already-live and live-twin rows "
-                     "excluded; drawdown "
-                     "derived from the LEDGER since bot_pnl.extra.max_drawdown is "
-                     f"unpopulated): {'; '.join(passers) if passers else 'NO new candidate'}")
+            # A book that clears every EVIDENCE bar and waits only on the 30-day
+            # window is the operator's lead time — it is ~N days from a decision.
+            elif s.get("n", 0) >= 2 and window_only(why):
+                eta = GOLIVE_MIN_DAYS - s["days"]
+                near.append(f"{bot} (t={s['t']:.2f}, n={s['n']}, {s['days']:.1f}d — "
+                            f"evidence bars ALL clear, ~{eta:.1f}d from the window)")
+        items.append("🚦 go-live gates (CANONICAL grader golive_readiness.grade — "
+                     ">=30d, >=30 closes, mean>0, t>=2, both halves +, maxDD<15%; "
+                     "win rate reported, NOT a bar; retired, already-live and "
+                     "live-twin rows excluded; drawdown derived from the LEDGER "
+                     "since bot_pnl.extra.max_drawdown is unpopulated): "
+                     f"{'; '.join(passers) if passers else 'NO new candidate'}")
+        if near:
+            items.append("⏳ waiting only on the 30-day window: " + "; ".join(near))
 
     with Section(errors, "fleet-risk"):
         st, _ = load_state(cur, "fleet-risk")
@@ -407,13 +467,37 @@ def upsert(conn, payload):
     conn.commit()
 
 
+def action_items(evidence):
+    """The subset of evidence that demands a HUMAN decision today.
+
+    [2026-07-30] This replaces a detector that was dead THREE ways: `act` was
+    computed and never rendered; `"pass" in e` could never match, because the
+    gate section emits `gate_status`'s REASON string and discards the literal
+    "pass"; and `and` binds tighter than `or`, so the expression did not mean
+    what it read as. Net effect: "a bot newly READY for live" — one of the four
+    things the review is explicitly supposed to lead with — could not raise the
+    flag under any data. Kept as a pure function so each trigger is testable.
+    """
+    out = []
+    for e in evidence:
+        if "GOVERNOR" in e or "DIVERGING" in e:
+            out.append(e)
+        elif "go-live gates" in e and "NO new candidate" not in e:
+            out.append(e)
+        elif "arms DIVERGE" in e or "DRIFT" in e:
+            out.append(e)
+    return out
+
+
 def write_report(payload, repo_root):
     day = payload["reviewed_at"][:10]
     path = os.path.join(repo_root, "reports", f"evidence_review_{day}.md")
-    act = [e for e in payload["new_evidence"]
-           if "GOVERNOR" in e or "DIVERGING" in e or "NO new candidate" not in e and "go-live gates" in e and "pass" in e]
+    act = action_items(payload["new_evidence"])
     lines = [f"# Evidence Review — {day}", "",
              f"_Reviewed {payload['reviewed_at']}._", ""]
+    if act:
+        lines += ["## ⚠️ ACTION — needs an operator decision", ""]
+        lines += [f"- {e}" for e in act] + [""]
     if payload.get("errors"):
         lines += ["## ⚠️ Sections that failed (review still published)", ""]
         lines += [f"- `{e}`" for e in payload["errors"]] + [""]
@@ -506,12 +590,94 @@ def selftest():
     assert tstat([2.0, 2.0, 2.0]) is None, "zero variance is undefined"
     assert tstat([1.0, 2.0, 3.0]) is not None
 
-    # gate_status — each gate must be able to FAIL ALONE
-    assert gate_status(10, 0.9, -0.01)[0] == "fail"          # n
-    assert gate_status(50, 0.50, -0.01)[0] == "fail"         # wr
-    assert gate_status(50, 0.90, -0.20)[0] == "fail"         # dd
-    assert gate_status(50, 0.90, -0.01)[0] == "pass"
-    assert gate_status(50, 0.5501, -0.14)[0] == "pass", "just inside every gate"
+    # ---- gate_status: the CANONICAL gate, not a second copy of it ----------
+    # [2026-07-30] These pin the defect this section was rewritten for: on
+    # 29-Jul the gate was re-specified (CHANGELOG (fk)) and this file kept the
+    # OLD rule, so one day later the review published both errors the re-spec
+    # existed to remove. Each case below is a book shape, graded end-to-end.
+    _t0 = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+
+    def _mk(pcts, span_days=40.0):
+        """[(pnl_pct, pnl_abs, closed_at)] oldest first, evenly spaced."""
+        step = dt.timedelta(days=span_days / max(1, len(pcts) - 1))
+        return [(p, p * 10.0, _t0 + i * step) for i, p in enumerate(pcts)]
+
+    # (1) THE CARRY SHAPE — the book the OLD rule rejected forever. Low win
+    #     rate, real positive expectancy. 🌾 perps-funding-carry-lshadow
+    #     measured t=2.60 on n=82 while winning 40.2% of trades; the stale
+    #     WR>55% bar in this file rejected it on 30-Jul.
+    # NOTE the INTERLEAVE: a few big wins spread THROUGH many small losses is
+    # the carry shape. Front-loading the wins instead fails both-halves, which
+    # is a different (and correctly rejected) book — the one-window win.
+    carry = _mk([0.20, -0.03, -0.03] * 13 + [0.20])
+    st, why, s = gate_status(carry)
+    assert s["win_rate"] < 0.55 and s["mean_pct"] > 0, s
+    assert s["h1"] > 0 and s["h2"] > 0, s
+    assert st == "pass", f"the carry shape must clear the CURRENT gate: {why}"
+    assert "not a bar" in why, "win rate must be reported as a non-bar"
+
+    # (2) THE INVERSE the new bar buys: a HIGH win rate that LOSES money. The
+    #     old rule admitted this on win rate alone.
+    tails = _mk([0.01] * 34 + [-0.30] * 6)
+    st_t, why_t, s_t = gate_status(tails)
+    assert s_t["win_rate"] > 0.55 and s_t["mean_pct"] < 0, s_t
+    assert st_t == "fail" and "mean" in why_t, why_t
+
+    # (3) THE 30-JUL FALSE PASS, as its own case. ⚖️ perps-funding-spread-lshadow
+    #     was reported as CLEARING the gate on WR 56.1% with t=0.65 — a book
+    #     with no measured edge offered up for real money.
+    noisy = _mk([0.05, -0.045] * 20)
+    st_n, why_n, s_n = gate_status(noisy)
+    assert s_n["win_rate"] >= 0.5 and s_n["mean_pct"] > 0, s_n
+    assert st_n == "fail" and why_n == f"t {s_n['t']:.2f} < 2", why_n
+
+    # (4) EACH REMAINING BAR ALONE (a bar no case can fail is decoration).
+    thin = gate_status(_mk([0.02] * 10))           # closes floor only
+    assert thin[0] == "fail" and thin[1] == f"n 10 < {GOLIVE_MIN_CLOSES}", thin[1]
+    lop = gate_status(_mk([0.05] * 20 + [-0.01] * 20))   # both-halves only
+    assert lop[0] == "fail" and "halves" in lop[1] and ";" not in lop[1], lop[1]
+    win = gate_status(_mk([0.01] * 40, span_days=5.0))   # 30-day window only
+    assert win[0] == "fail" and win[1].startswith("window "), win[1]
+    # ungradeable input claims nothing and never raises
+    assert gate_status([])[0] == "fail"
+    assert gate_status([(0.01, 1.0, _t0)])[0] == "fail", "n=1 is ungradeable"
+
+    # (5) The near-miss classifier. Two books are ~11 days from a real go-live
+    #     decision (carry t=2.60, Farmer shadow t=2.09) and the 30-Jul review
+    #     mentioned NEITHER — it reported only the false passer. A book whose
+    #     sole remaining bar is calendar is the operator's lead time.
+    assert window_only(win[1]), win[1]
+    both = gate_status(_mk([0.02] * 10, span_days=5.0))[1]
+    assert ";" in both and not window_only(both), \
+        f"thin AND short must NOT read as 'waiting only on the window': {both}"
+    assert not window_only(lop[1]), "a halves failure is not a window failure"
+    assert not window_only(""), "no reason is not a near-miss"
+    assert not window_only(None), "None must not raise"
+
+    # ---- the ACTION detector, which was dead code until 30-Jul -------------
+    assert action_items(["🚦 go-live gates (...): NO new candidate"]) == []
+    assert len(action_items(["🚦 go-live gates (...): some-book (n=41, t=2.4)"])) == 1, \
+        "a NEW go-live candidate must raise the operator flag"
+    assert len(action_items(["🚦 fleet-risk ** DD GOVERNOR BEYOND -5% **"])) == 1
+    assert len(action_items(["📏 Farmer live-vs-shadow DIVERGING"])) == 1
+    assert action_items(["🧬 Farmer arms AGREE: live abc vs shadow abc"]) == []
+    assert len(action_items(["🧬 Taker arms DIVERGE: live abc vs shadow def"])) == 1
+
+    # the gate is IMPORTED, never redefined here — the whole point of (fk)
+    assert not any(k.startswith("GATE_MIN") for k in globals()), \
+        "a second copy of the go-live gate is a second RULE"
+    # [(hj)] ...and IMPORTED means the SAME OBJECTS, not a local re-implementation
+    # that happens to agree today. The name-prefix check above would stay green
+    # against a hand-rolled `grade()` pasted in here; this one cannot.
+    import golive_readiness as _gr
+    assert grade is _gr.grade and stats is _gr.stats, \
+        "gate_status must call the canonical grader, not a local copy"
+    assert GOLIVE_MIN_CLOSES is _gr.GOLIVE_MIN_CLOSES
+    assert GOLIVE_MIN_DAYS is _gr.GOLIVE_MIN_DAYS
+    # the SQL prefilter must never be stricter than the real bar, or a genuine
+    # candidate is dropped before it is ever graded (it is a speed hint, not a
+    # rule) — the failure would be silent and would look like "no candidates"
+    assert CANDIDATE_MIN_CLOSES <= GOLIVE_MIN_CLOSES, CANDIDATE_MIN_CLOSES
 
     # a live row's shadow twin is never a go-live candidate
     assert "perps-funding-lighter-lshadow" in LIVE_TWINS

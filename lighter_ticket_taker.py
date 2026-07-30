@@ -462,6 +462,68 @@ def allowed_lenses(mode):
     return LIVE_LENSES if mode == "lighter_live" else ALL_LENSES
 
 
+# [2026-07-30 (hj)] LIVE = DIVERGENCE **SHORT** ONLY. allowed_lenses() above was
+# only HALF the real-money rule, and the missing half was load-bearing.
+#
+# MEASURED, from this bot's own live ledger: the live arm has 25 closes and
+# **12 of them are `long-divergence`** (last 2026-07-24T13:53Z). The 17-Jul
+# go-live note in main() states the risk in as many words — "long-divergence has
+# ZERO realized fills and the live arm can take it" — and then it took twelve.
+#
+# What stopped it was NOT a gate. It was `TT_BULL_MODE` flipping on 24-Jul:
+# BULL_LENS_SIDES omits ("divergence","long"), but that set is only ever
+# consulted inside `if BULL_MODE:` at the entry loop. So the ONLY thing standing
+# between real money and the measured-losing side of this lens was an ENV VAR
+# that defaults to "off". Unset it, typo it, or deploy an image whose service
+# never had it, and the live arm silently re-opens long divergence — the side
+# the brain grades 0.470 ehit4h / -0.199%/4h, i.e. the half of the pool that
+# LOSES (the short side is what carries it: 0.517 / +0.289%).
+#
+# This is the identical shape allowed_lenses' own docstring was written about,
+# one level down: a restrict-only, fail-safe-OPEN path (BULL_MODE) used as the
+# sole guard on real money. The fix is the same fix — a hard, per-MODE,
+# fail-CLOSED allow-list that reads no env var and no bus payload.
+ALL_SIDES = frozenset({"long", "short"})
+LIVE_SIDES = {"divergence": frozenset({"short"})}
+
+
+def allowed_sides(mode, lens):
+    """Hard per-(MODE, LENS) side allow-list — the SIDE twin of allowed_lenses().
+
+    Returns the set of sides `lens` may be filled on in `mode`. Non-live modes
+    get BOTH sides: the shadow arm's job is to grade every (lens, side) pair,
+    and narrowing it would blind the very grade that justifies the live rule.
+
+    FAIL-CLOSED in the direction that matters: a lens with no LIVE_SIDES entry
+    returns the EMPTY set on the live arm, so a lens added to LIVE_LENSES
+    without a deliberate side decision fills NOTHING rather than both sides.
+    Adding real money to a new lens must be two explicit edits, not one.
+
+    `mode` is taken EXPLICITLY for the same reason allowed_lenses() takes it —
+    four modules import this one and must keep grading both sides on the shadow
+    tape regardless of the importing process's environment.
+
+    Deliberately independent of BULL_MODE and of bull_entry_ok(): that gate is
+    RESTRICT-ONLY and evaluated only when an env var is on, which is exactly why
+    it cannot be the thing protecting real money. The bull gate stays, and stays
+    senior on the shadow arm; this one cannot be turned off at all.
+    """
+    if mode != "lighter_live":
+        return ALL_SIDES
+    return LIVE_SIDES.get(lens, frozenset())
+
+
+def side_of(ticket):
+    """The ONE reading of a ticket's side, so belt and braces cannot disagree.
+
+    Mirrors the entry loop's `is_long` (`side != "short"` ⇒ long), which is what
+    actually drives `market_open`. A separate re-derivation here is how a gate
+    ends up guarding a value the order path never uses.
+    """
+    return "short" if str((ticket or {}).get("side", "long")) == "short" \
+        else "long"
+
+
 # [2026-07-24 BULL DUAL-MODE — long-breakout(up-regime) + short-divergence,
 # crypto-only, SHADOW-only. The bull-engine research settled the shape:
 # divergence's only real side is SHORT and its only clean universe is CRYPTO
@@ -1069,6 +1131,13 @@ def _close_extra(m):
         _supply = None
     out.setdefault("policy", {"bull": BULL_MODE,
                               "lenses": sorted(allowed_lenses(TT_VENUE)),
+                              # [(hj)] the SIDE half of the policy, stamped for
+                              # the same reason (gi) stamped the lens half: the
+                              # side rule changed on 30-Jul, so a grader pooling
+                              # across it would mix long+short divergence eras
+                              # exactly as the retracted alpha claim did.
+                              "sides": {l: sorted(allowed_sides(TT_VENUE, l))
+                                        for l in sorted(allowed_lenses(TT_VENUE))},
                               "venue": TT_VENUE,
                               "max_open": MAX_OPEN,
                               "ticket_top_n": _supply})
@@ -2110,6 +2179,14 @@ def main(_ctx=None):
             sym = t.get("sym")
             if lens not in _allowed:
                 continue          # mode allow-list — FAIL-CLOSED, reads no bus
+            # [(hj)] SIDE allow-list, the twin of the line above and evaluated
+            # in the same place for the same reason: independent of BULL_MODE,
+            # of the brain, and of every bus payload. On the live arm this is
+            # what keeps `long-divergence` — 12 of the live book's 25 closes,
+            # and the measured-losing side of the lens — off real money when
+            # TT_BULL_MODE is not set. No-op on shadow (both sides allowed).
+            if side_of(t) not in allowed_sides(TT_VENUE, lens):
+                continue
             # [2026-07-24 (dk) breakout_up RELABEL — BEFORE the veto] An UP-REGIME
             # crypto breakout becomes its own lens 'breakoutup' HERE, ahead of the
             # brain veto: the broad 4h 'breakout' veto is correct for un-gated
@@ -2229,6 +2306,19 @@ def main(_ctx=None):
                     f"live lens allow-list BREACHED: {lens!r} reached the order "
                     f"path on real money (allowed: {sorted(LIVE_LENSES)}). "
                     f"Halting rather than filling.")
+            # [(hj)] The SIDE braces. Checked against `is_long` — the variable
+            # that is actually handed to market_open — NOT against the ticket
+            # field the belt read, so a divergence between the two is caught
+            # here rather than filled. Same halt-don't-restart semantics.
+            if not dry_run:
+                _oside = "long" if is_long else "short"
+                _ok_sides = allowed_sides(TT_VENUE, lens)
+                if _oside not in _ok_sides:
+                    raise SystemExit(
+                        f"live SIDE allow-list BREACHED: {_oside} {lens!r} "
+                        f"reached the order path on real money (allowed: "
+                        f"{sorted(_ok_sides) or 'NOTHING'}). "
+                        f"Halting rather than filling.")
             if dry_run:
                 broker.open(sym, is_long, size, mark)
                 # ShadowBroker fills by WALKING the book, so the decision price
@@ -2586,6 +2676,45 @@ def selftest():
     # before this is ever reached)
     assert allowed_lenses("") == ALL_LENSES
 
+    # ---- LIVE SIDE ALLOW-LIST (hj) — the twin, same fail-closed contract ----
+    # THE INCIDENT THIS PINS: the live arm filled 12 `long-divergence` closes
+    # (of 25 total) up to 2026-07-24, and the only thing that stopped it was
+    # TT_BULL_MODE flipping on — an env var defaulting to "off".
+    assert allowed_sides("lighter_live", "divergence") == {"short"}
+    # the shadow arm MUST keep both sides — it is what grades the live rule
+    assert allowed_sides("lighter_shadow", "divergence") == ALL_SIDES
+    assert allowed_sides("lighter_paper", "breakout") == ALL_SIDES
+    assert allowed_sides("", "divergence") == ALL_SIDES      # unknown != live
+    # FAIL-CLOSED: a lens with no deliberate side decision fills NOTHING live.
+    # Adding a lens to LIVE_LENSES must be two explicit edits, not one.
+    assert allowed_sides("lighter_live", "breakout") == frozenset()
+    assert allowed_sides("lighter_live", "dip") == frozenset()
+    assert allowed_sides("lighter_live", "nonesuch") == frozenset()
+    # every lens real money may fill MUST carry a side decision — this is the
+    # assertion that turns red if LIVE_LENSES grows and LIVE_SIDES does not
+    assert all(allowed_sides("lighter_live", l) for l in LIVE_LENSES), LIVE_LENSES
+    # ...and no side decision may name a side that is not a real side
+    assert all(s <= ALL_SIDES for s in LIVE_SIDES.values()), LIVE_SIDES
+    # THE INDEPENDENCE CLAIM, asserted rather than described: the gate must not
+    # move when BULL_MODE does. A fixture that only ran at the current value
+    # would prove nothing about the config that caused the incident.
+    _wb = globals()["BULL_MODE"]
+    try:
+        for _bm in (True, False):
+            globals()["BULL_MODE"] = _bm
+            assert allowed_sides("lighter_live", "divergence") == {"short"}, _bm
+            assert allowed_sides("lighter_shadow", "divergence") == ALL_SIDES, _bm
+    finally:
+        globals()["BULL_MODE"] = _wb
+    # side_of() must agree with the entry loop's own is_long derivation, or
+    # belt and braces guard different values
+    assert side_of({"side": "short"}) == "short"
+    assert side_of({"side": "long"}) == "long"
+    assert side_of({}) == "long" and side_of(None) == "long"   # default long
+    assert side_of({"side": "SHORT"}) == "long"   # exact match, as is_long does
+    for _t_ in ({"side": "short"}, {"side": "long"}, {}, {"side": None}):
+        assert (side_of(_t_) == "long") is (_t_.get("side", "long") != "short")
+
     # THE POINT: a DARK brain vetoes NOTHING (fail-open by design), and the
     # allow-list must hold anyway. This is the fixture that proves live cannot
     # re-acquire a rejected lens when the brain goes down.
@@ -2808,8 +2937,19 @@ def selftest():
     # across a 2x change in the arm's opportunity set with nothing in the
     # ledger to see it by — the identical defect (fx)/(gi) fixed, one level
     # upstream. Mutation-checked: dropping any key turns these red.
-    assert set(_pol) == {"bull", "lenses", "venue", "max_open",
+    # [(hj)] `sides` joined it for the same reason: the SIDE rule changed on
+    # 2026-07-30 (live went divergence-SHORT-only by hard gate rather than by
+    # TT_BULL_MODE), so a grader pooling across that boundary would mix the
+    # long and short divergence eras — precisely the pooling error that
+    # retracted the alpha claim.
+    assert set(_pol) == {"bull", "lenses", "sides", "venue", "max_open",
                          "ticket_top_n"}, _pol
+    assert _pol["sides"] == {l: sorted(allowed_sides(TT_VENUE, l))
+                             for l in sorted(allowed_lenses(TT_VENUE))}, _pol
+    # every stamped lens carries a stamped side list — a lens whose sides are
+    # missing or empty in the stamp is a lens no grader can era-split
+    assert set(_pol["sides"]) == set(_pol["lenses"]), _pol
+    assert all(_pol["sides"].values()), _pol
     # the supply must be the REGISTRY's value, never a second hardcoded copy —
     # audit_lever_bounds keeps the registry equal to the scout's real default,
     # so this is the one number that cannot drift from what the scout emits
@@ -3280,6 +3420,53 @@ def _selftest_live():
         assert "broker" not in captured["state"][LIVE_STATE_KEY]
         # entry recorded at the REAL fill, not the decision price
         assert captured["state"][LIVE_STATE_KEY]["meta"]["AAA"]["entry"] == 100.5
+
+        # ================================================================
+        # 1b) [(hj)] LIVE SIDE ALLOW-LIST, end-to-end and BULL_MODE-BLIND.
+        #     THE INCIDENT: 12 of this book's 25 live closes are
+        #     `long-divergence`, and the only thing that stopped them was
+        #     TT_BULL_MODE flipping on 24-Jul — an env var that defaults OFF.
+        #     So the fixture that matters is the one that runs with BULL_MODE
+        #     *off*: the exact config under which real money took the losing
+        #     side. Driven through main() against the stub venue, because a
+        #     unit assertion on allowed_sides() would not have caught the
+        #     BULL_MODE-only wiring that caused this in the first place.
+        # ================================================================
+        _bm_was = globals()["BULL_MODE"]
+        try:
+            for _bm in (False, True):
+                globals()["BULL_MODE"] = _bm
+                captured["state"].clear()
+                captured["orders"].clear()
+                _stub_market(marks={"AAA": 100.0}, funding={},
+                             ranges={"AAA": 6.0})
+                # a LONG divergence ticket, otherwise identical to case 1 —
+                # same symbol, same conviction, same everything but the side
+                _scout({"divergence": [{"sym": "AAA", "side": "long",
+                                        "gap_pct": -99.0}]})
+                v = _StubVenue(equity=1000.0, fills={"AAA": 100.5})
+                r = _StubRails(max_notional=150.0)
+                main(_ctx={"venue": v, "rails": r, "broker": None})
+                assert v.opens == [], (
+                    f"long-divergence reached real money with BULL_MODE={_bm}: "
+                    f"{v.opens}")
+                assert captured["orders"] == [], captured["orders"]
+            # ...and the SHORT still fills with BULL_MODE off, or the gate has
+            # simply switched the book off rather than restricted its side.
+            # A guard that blocks everything is indistinguishable from a
+            # broken bot, so this half is not optional.
+            globals()["BULL_MODE"] = False
+            captured["state"].clear()
+            captured["orders"].clear()
+            _stub_market(marks={"AAA": 100.0}, funding={}, ranges={"AAA": 6.0})
+            _scout({"divergence": [{"sym": "AAA", "side": "short",
+                                    "gap_pct": 99.0}]})
+            v = _StubVenue(equity=1000.0, fills={"AAA": 100.5})
+            main(_ctx={"venue": v, "rails": _StubRails(max_notional=150.0),
+                       "broker": None})
+            assert v.opens == [("AAA", False, 0.5)], v.opens
+        finally:
+            globals()["BULL_MODE"] = _bm_was
 
         # ================================================================
         # 2) NOTIONAL CAP is senior — the cap-breaching entry never sends

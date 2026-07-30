@@ -21,7 +21,7 @@ guarded off on 17-Jul — see the LIGHTER-ONLY table after the fleet table.
 | perps-funding-spread-lshadow | ⚖️ Counterweight | funding L/S book. **[30-Jul] K 5 -> 8 and the universe 30 -> up to 60 via `fleet_bus.scout_universe()`: measured AT its structural cap (10 open = exactly K=5 x 2 legs) while ranking 15% of the venue. Widening the candidate set does not loosen the rule — it still takes exactly top-K/bottom-K, from a real cross-section.**
 | lighter-perp-sniper-lshadow | 🎯 Perp Sniper | new-listing sniper **+ volume-surge AND young-book candidates (30-Jul)** — SCOPE FIX: `new_listings` is a market-set DIFF, so a symbol qualifies for exactly the ONE loop in which it first appears, and only if the process is running with a warm baseline at that moment. That unobservable trigger, not the thesis, is why the book has n=1 in weeks. `young_candidates()` adds every book in its debut regime. **[30-Jul] the age source is now the venue's OWN `created_at`** — it was on every `orderBookDetails` row all along, in a response the scout already fetches, while the sniper burned 4 candle REST probes/loop to approximate it (measured: majors 558.6d, exactly 4 books under 21d). Scout publishes `ages_d`; the candle probe is the fallback for a dark scout and stops entirely once `ages_d` flows. An unparseable timestamp is ABSENT from `ages_d`, never 0 — "age unknown" must not read as "brand new". **The offered-ledger (`surge_done`) is a COOLDOWN map, not a tombstone**: it was a monotone set, so every book offered once was excluded forever and both new sources decayed to silence over weeks — the same starvation on a longer fuse. `not_young` stays permanent, correctly: books only age — the same phenomenon, observable for WEEKS. Candle probe is GOVERNED (`YOUNG_PROBE_BUDGET`/loop) and MONOTONE (`not_young` is permanent — books only age), so probe cost decays to zero. Plus volume-surge candidates — its event was too rare to grade (n=1 in weeks), so `surge_candidates()` adds books surging >=`SNIPER_SURGE_MULT`x 24h volume. They need their OWN dedup ledger (`surge_done`, persisted): every surging book is already in `baseline`, so baseline cannot dedup this source |
 | lighter-dislocation-lshadow | 🧲 Snap Back | dislocation fader — reference is LIGHTER'S OWN `index_price` since 17-Jul (was Hyperliquid mids). **[30-Jul] the entry gate is now a PERCENTILE of the live residual distribution (`adaptive_enter_bps`), not a fixed 150bps — that constant was ~40x its own median residual (3.8bps) and predates the switch off Hyperliquid's mid. FLOORED at `EXIT_BPS * 1.5` and CAPPED at the operator constant: on today's tape the floor usually binds, so the practical effect is 150 -> ~60bps, not "the gate follows the median down". Universe 16 -> up to 40.**
-| lighter-ticket-taker-lshadow | 🎫 Ticket Taker | **trades Lighter Scout's high-conviction tickets** (breakout/dip/momentum long + divergence long/short); stress veto pauses entries at venue |prem| med ≥15bps; closes tagged `<side>-<lens>_<exit>` so the brain grades each lens |
+| lighter-ticket-taker-lshadow | 🎫 Ticket Taker | **trades Lighter Scout's high-conviction tickets** (breakout/dip/momentum long + divergence long/short); stress veto pauses entries at venue |prem| med ≥15bps; closes tagged `<side>-<lens>_<exit>` so the brain grades each lens. **[30-Jul (hj)] THE SHADOW ARM TAKING LONGS IS CORRECT — the LIVE arm is now divergence-SHORT-only by HARD GATE.** `allowed_lenses` (live = divergence only, since 17-Jul) was only half the real-money rule: the SIDE restriction lived solely inside `if BULL_MODE:`, and `TT_BULL_MODE` defaults to **off**. Measured: the live row has 25 closes and **12 are `long-divergence`** (last 24-Jul); what stopped them was that env var being flipped on, not a gate. `LIVE_SIDES`/`allowed_sides(mode, lens)` is the fail-CLOSED twin — reads no env, no bus, independent of BULL_MODE; belt in the entry loop, braces at `market_open` checked against `is_long`. A lens with no `LIVE_SIDES` entry fills NOTHING live, so real money on a new lens is two explicit edits. Shadow keeps BOTH sides — that grade is what justifies the live rule. `policy.sides` is stamped on every close so graders can era-split the change |
 | equities-regime-lshadow | 📊 Index Rider | stock-perp port (IBKR original RETIRED 14-Jul). **[30-Jul] universe 3 -> 10 (the venue's full non-crypto set, same books the family per-asset gate grades) and clip $250 -> $100 — it carried the LARGEST clip in the fleet on a book with ZERO closed trades. These are the fleet's only source of a regime that is not falling-BTC (SPY +8.1%, QQQ +12.2%, WTI +23.0% over the same window), which is what item 18 needs.** 🏆 Stock Leaders (`equities-momentum{,-lshadow}`) RETIRED 17-Jul — maxDD 37-44% vs the 15% go-live gate |
 | pm-{albanese,morrison,turnbull,abbott,rudd,gillard}-lshadow | 🏛️ the Parliament | six-layer self-evolving shadow fleet (21-Jul, operator ask; named for the last 8 Australian PMs — the other two are its organs: Keating 🔭 scanners+ML, Howard 🧠 ecosystem brain). `parliament_main.py` in the freqtrade-bots container; SQLite ecosystem DB on the persist volume; consumes scout stress + L2 veto + brain mults; closes tagged per lens; `PARLIAMENT_ENABLED=0` idles it |
 
@@ -811,6 +811,42 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **A GUARD WHOSE ONLY OUTPUT IS A WARNING ON A PASSING RUN IS NOT A GUARD
+  (30-Jul (gl)/(hj), operator: "no more hiccups preventing situations such as
+  those found today").** A green build carrying a `::warning::` is
+  indistinguishable from a green build. `(fz)` chose warn-don't-fail on
+  unverified Railway names *because* they were unverified, and wrote "check
+  that warning after the first run" — it warned, four of six services never
+  deployed, and their levers reached no container for a day. If a condition
+  means the change did not land, it is an `::error::` and the run FAILS. If it
+  is genuinely tolerable, it does not need to be surfaced at all. The only
+  legitimate warning is one nobody has to act on.
+- **A CONSUMER IS TESTED AGAINST A PAYLOAD ITS PUBLISHER BUILT (30-Jul (hj)).**
+  Never hand-write a fixture that "looks like" the payload. Four defects in one
+  session were a consumer reading a key its publisher does not emit, each with
+  a GREEN selftest, because the fixture was written by whoever wrote the
+  consumer: `marks[sym]["vol_m"]` against a map of floats, `stress["med_bps"]`
+  vs `med`, `hurting_levers` vs `verdicts`, `ep["lever"]` vs `stance`. Call the
+  publisher (`scout.build_snapshot`, `prop.build_stances`→`track`) and assert
+  the consumer returns something **non-degenerate** — every one of those bugs
+  produced an empty/None a value-free test calls "fine".
+  `tests/autonomy/test_payload_contracts.py` is where these live. And when a
+  shape surprises you, CHECK THE ACCESSOR before calling it a bug: that file
+  records one tolerance (`venue_stress_bps` accepts a bare number + four key
+  aliases) that was deliberate and nearly "fixed".
+- **A SECOND COPY OF A RULE IS A SECOND RULE (30-Jul (hj)).** The go-live gate
+  lives in `scripts/golive_readiness.py` and is IMPORTED, never re-implemented
+  — `scripts/evidence_review.py` kept its own copy through the 29-Jul `(fk)`
+  re-spec and, one day later, admitted a t=0.65 book and rejected the fleet's
+  best-evidenced one on the retired win-rate bar. Pin re-use by **identity**
+  (`grade is golive_readiness.grade`), not by asserting constant names are
+  absent: a name check stays green against a hand-rolled copy. Same class as
+  the brain's `FEE_RT` key defect `(gg)`.
+- **PICK THE CHANGELOG LETTER AT PUSH TIME — now enforced across branches
+  (30-Jul (hj)).** `audit_changelog_letters` compares this branch against
+  `origin/main` and fails on a letter both used for a DIFFERENT title. Same
+  letter + same title is a rebase and stays quiet. Fail-safe open (no git / no
+  `origin/main` / on `main` ⇒ arm disabled).
 - **CHANGELOG ENTRY LETTERS — the convention, finally written down (29-Jul (fd)).**
   Entries are tagged `## <date> (<letter>)` and cite each other BY LETTER
   ("the (co) paths fix"), including from TRACKED CODE

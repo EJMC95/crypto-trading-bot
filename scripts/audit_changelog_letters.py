@@ -62,11 +62,82 @@ def scan(text):
     return entries, dups
 
 
+def cross_branch(mine, theirs):
+    """-> {letter: (my_title, their_title)} for letters BOTH sides used with
+    DIFFERENT titles. Pure, so the selftest can drive it.
+
+    WHY (2026-07-30 (hj)). The in-file check above cannot see the collision
+    that actually keeps happening: two sessions on two BRANCHES each pick "the
+    next free letter" from their own snapshot, and each file is internally
+    unique right up until the merge. That is the documented failure mode —
+    CLAUDE.md's rule 2 says pick the letter at PUSH time — and on 2026-07-30 it
+    bit again: main's entry and a branch's entry both landed as (fz), and the
+    loser had already been renumbered once before ((fx) -> (fz) -> (gi)).
+
+    SAME letter + SAME title is a merge/rebase of the same entry, not a
+    collision — comparing titles rather than letters alone is what keeps this
+    quiet on every ordinary branch.
+    """
+    theirs_by_letter = {l: t for _d, l, t in theirs}
+    out = {}
+    for _d, letter, title in mine:
+        other = theirs_by_letter.get(letter)
+        if other is not None and other != title:
+            out[letter] = (title, other)
+    return out
+
+
+def _baseline_changelog():
+    """origin/main's CHANGELOG, or None when it is unavailable/irrelevant.
+
+    Fail-SAFE OPEN and deliberately so: no git, a shallow clone with no
+    origin/main, or running ON main itself all return None and the guard keeps
+    its pre-existing in-file behaviour. This arm can only ADD a finding.
+    """
+    import subprocess
+    def _git(*a):
+        try:
+            r = subprocess.run(("git",) + a, cwd=ROOT, capture_output=True,
+                               text=True, timeout=20)
+        except Exception:                      # noqa: BLE001 — no git, no arm
+            return None
+        return r.stdout if r.returncode == 0 else None
+
+    base = (_git("rev-parse", "origin/main") or "").strip()
+    mine = (_git("rev-parse", "HEAD") or "").strip()
+    if not base or base == mine:
+        return None                            # nothing to compare against
+    # NOTE: deliberately NOT skipped when the local branch is called "main".
+    # My first cut excluded it, and that disabled this arm in the exact
+    # workflow this repo actually uses — sessions commit straight to local
+    # `main` and push. It was disabled on the very run that would have caught
+    # (gm) being taken by a concurrent session. What matters is whether HEAD
+    # has diverged from origin/main, not what the local ref is called.
+    return _git("show", "origin/main:CHANGELOG.md")
+
+
 def main():
     if not os.path.isfile(CHANGELOG):
         print("audit_changelog_letters: CHANGELOG.md not found", file=sys.stderr)
         return 1
     entries, dups = scan(open(CHANGELOG, encoding="utf-8").read())
+    base_text = _baseline_changelog()
+    if base_text:
+        clashes = cross_branch(entries, scan(base_text)[0])
+        if clashes:
+            print("\nCROSS-BRANCH CHANGELOG LETTER COLLISION — this branch and "
+                  "origin/main both used\nthese letters for DIFFERENT entries. "
+                  "Every citation to them is ambiguous after the merge:\n")
+            for letter, (mine_t, theirs_t) in sorted(clashes.items()):
+                print(f"  ({letter})")
+                print(f"      this branch : {mine_t[:84]}")
+                print(f"      origin/main : {theirs_t[:84]}")
+            print("\nFIX: the entry that is CITED FROM TRACKED CODE keeps the "
+                  "letter; the other moves\nto the next free one and records "
+                  "the move inline. Decide by grepping the tree:\n"
+                  "  grep -rn '(<letter>)' --include='*.md' --include='*.py' "
+                  "--include='*.yml' .\n")
+            return 1
     if dups:
         print(f"\nDUPLICATE CHANGELOG LETTERS (era >= {ERA_START}) — every "
               f"cross-reference to these is ambiguous:\n")
@@ -110,6 +181,29 @@ def _selftest():
 
     # letterless headers (pre-convention) must never crash or count
     assert scan("## 2026-07-14\n\nbody\n") == ([], {})
+
+    # ---- CROSS-BRANCH arm (hj): the collision the in-file check CANNOT see --
+    # Reproduces 2026-07-30 exactly: both sides internally unique, both used
+    # (fz) for a different entry.
+    _mine = scan("## 2026-07-30 (fz) — THE OFFENSE PASS\n\nb\n")[0]
+    _main = scan("## 2026-07-30 (fz) — a THIRD era-pooling error\n\nb\n")[0]
+    assert set(cross_branch(_mine, _main)) == {"fz"}, cross_branch(_mine, _main)
+    assert cross_branch(_mine, _main)["fz"] == (
+        "— THE OFFENSE PASS", "— a THIRD era-pooling error")
+    # SAME letter + SAME title is a rebase/merge of the same entry, NOT a
+    # collision. Without this the guard would fire on every ordinary branch
+    # that merged main in — i.e. it would be turned off within a day.
+    assert cross_branch(_mine, _mine) == {}
+    # a letter only one side has is not a collision either
+    _other = scan("## 2026-07-30 (hj) — something else\n\nb\n")[0]
+    assert cross_branch(_mine, _other) == {}
+    assert cross_branch([], _main) == {} and cross_branch(_mine, []) == {}
+    # the pre-era scope applies here too — 17-Jul's restart must not clash
+    _pre = scan("## 2026-07-17 (a) — restart head\n\nb\n")[0]
+    assert cross_branch(_pre, scan("## 2026-07-17 (a) — tail\n\nb\n")[0]) == {}
+    # fail-SAFE: the baseline arm must never raise, whatever git says here
+    _b = _baseline_changelog()
+    assert _b is None or isinstance(_b, str), type(_b)
 
     # and the REAL file must parse to something (a regex that matches nothing
     # would make this guard vacuously green forever)

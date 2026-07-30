@@ -444,10 +444,21 @@ jobs:
             svc="$(echo "$raw" | xargs)"
             [ -z "$svc" ] && continue
             if [ -n "$known" ] && ! echo "$known" | grep -qiF "$svc"; then
-              echo "::warning::service '$svc' is NOT in this project's service list — skipping it."
-              echo "  (a deploy rule exists for it, but the name does not resolve. Fix the"
-              echo "   name in .github/workflows/railway-redeploy.yml against the list above.)"
+              # [2026-07-30 (hj)] This was a ::warning:: and a skip. On
+              # 2026-07-30 run 30492918936 it warned for FOUR of the six
+              # Farnham Six services, the build went green, and the levers
+              # built for those books reached no container for a full day.
+              # A green build carrying a warning is indistinguishable from a
+              # green build. The names are no longer guesses — (gl) read every
+              # one off `railway service list` — so an unresolvable name now
+              # means a RENAME or a typo, and both must stop the run.
+              echo "::error::service '$svc' is NOT in this project's service list."
+              echo "  A deploy rule exists for it, but the name does not resolve, so"
+              echo "  NOTHING was deployed for it. Fix the name in"
+              echo "  .github/workflows/railway-redeploy.yml against the list above"
+              echo "  (and scripts/audit_deploy_coverage.py, which pins the same names)."
               unresolved="${unresolved:+$unresolved,}$svc"
+              fail=1
               continue
             fi
             echo "::group::railway up --service '$svc'"
@@ -466,7 +477,7 @@ jobs:
             echo "::endgroup::"
           done
           if [ -n "$unresolved" ]; then
-            echo "::warning::UNRESOLVED service names (no deploy happened for these): $unresolved"
+            echo "::error::UNRESOLVED service names (no deploy happened for these): $unresolved"
           fi
           if [ "$fail" -ne 0 ]; then
             echo "::error::One or more services failed to deploy."

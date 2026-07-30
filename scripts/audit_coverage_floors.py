@@ -85,6 +85,17 @@ FLOORS = {
     "lighter_index_bot.py": 32,        # measured 34.6
     "lighter_perp_sniper.py": 81,      # measured 83.5
     "lighter_market_scout.py": 80,     # measured 82.5 — the fleet's signal source
+    # [2026-07-30] THE PROMOTION SURFACE — the code deciding which $1k shadow
+    # book gets offered up for real money. Floored for the same reason as the
+    # books above: it governs a real-money decision without being real-money
+    # code. Incident: on 30-Jul the daily review published ⚖️ Counterweight as
+    # CLEARING the go-live gate on win rate 56.1% when its t is 0.65, and
+    # REJECTED 🌾 carry (t=2.60, the fleet's best-evidenced book) on win rate
+    # 40.2% — because `evidence_review` carried its OWN copy of the rule the
+    # (fk) re-spec had replaced the day before. It now IMPORTS the gate from
+    # `golive_readiness`; these floors hold the tests that pin that.
+    "scripts/golive_readiness.py": 67,  # measured 69.4 — the canonical gate
+    "scripts/evidence_review.py": 49,   # measured 51.0 — its daily consumer
 }
 
 

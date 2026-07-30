@@ -1,3 +1,53 @@
+## 2026-07-30 (hj) — THE LIVE TAKER'S SHORT-ONLY RULE WAS AN ENV VAR, and the four warn-only controls that let today's defects through
+
+*(RENUMBERED (gm) -> (hj) at push time. A concurrent session had taken (gm) through (hi) while this was being written; theirs is cited from the (gn)-(gv) chain and was already pushed, so per the convention it keeps the letter. Caught by THIS entry's own new cross-branch arm in `audit_changelog_letters` — on its first live run, against the exact class it was written for. Rule 2 exists because this keeps happening; it just happened again.)*
+
+- **THE ASK** (operator): *"work through items 1-5 ... we must correct anything that is hindering optimal operation"*, and — separately, from his own reading of the dashboard — *"the taker was told to only short but is still carrying long trades"*, then *"no more hiccups preventing situations such as those found today."* Suite **452 → 471**, six guards green, both taker selftest entry points green.
+
+### The taker: the operator was reading a real hole, one row over
+
+- **WHAT HE SAW WAS THE SHADOW ROW, and it is correct there.** `lighter-ticket-taker-lshadow` holds 3 `long-breakoutup` positions; the shadow arm's JOB is to grade every lens on both sides, which is what justifies the live rule. The LIVE row holds 2 positions, both `short-divergence`. So the literal report was about the control arm.
+- **BUT THE UNDERLYING WORRY WAS RIGHT, and worse than reported.** Measured from the live ledger: `lighter-ticket-taker-lighter` has 25 closes and **12 of them are `long-divergence`** (last 2026-07-24T13:53Z). The 17-Jul go-live note in `main()` states the exposure in as many words — *"long-divergence has ZERO realized fills and the live arm can take it"* — and then it took twelve.
+- **WHAT STOPPED IT WAS NOT A GATE.** `BULL_LENS_SIDES` omits `("divergence","long")`, but that set is consulted **only inside `if BULL_MODE:`** at the entry loop. `TT_BULL_MODE` defaults to **`"off"`**. So the only thing between real money and the measured-losing side of the lens was an env var that happened to be flipped on 24-Jul. Unset it, typo it, or deploy an image on a service that never had it, and the live arm silently resumes long divergence — the side the brain grades **0.470 ehit4h / −0.199%/4h**, while the short side is what carries the lens (0.517 / +0.289%).
+- This is the exact shape `allowed_lenses`' own docstring was written about, one level down: **a restrict-only, fail-safe-OPEN path used as the sole guard on real money.** The fix is the same fix.
+- **`LIVE_SIDES` + `allowed_sides(mode, lens)`** — a hard per-(mode, lens) allow-list that reads no env var and no bus payload, with the same belt-and-braces placement the lens rule already had: the **belt** in the entry loop beside the lens check, the **braces** at the last statement before `market_open`, checked against **`is_long`** (the variable actually handed to the venue) rather than the ticket field the belt read, so a divergence between the two halts instead of filling. **Fail-CLOSED**: a lens with no `LIVE_SIDES` entry fills **nothing** live, so putting real money on a new lens is two explicit edits, not one.
+- **MUTATION-VERIFIED IN BOTH DIRECTIONS, through `main()` against the stub venue** — a unit assertion on `allowed_sides()` would not have caught the BULL_MODE-only wiring that caused this:
+  - remove the belt → the braces fire: `live SIDE allow-list BREACHED: long 'divergence' reached the order path on real money`;
+  - remove belt **and** braces → the pre-fix code sends `('AAA', True, 0.5)` to the venue — `is_long=True`, the incident reproduced end-to-end.
+- The new live-path section runs **with `BULL_MODE` both on and off**, because the config that caused this is the one where it is off; and it asserts the SHORT still fills, since a guard that blocks everything is indistinguishable from a broken bot.
+- `policy.sides` joins the ledger stamp for the reason `(gi)` stamped `lenses` and `(gh)` stamped `ticket_top_n`: the side rule changed today, so a grader pooling across the boundary would mix long and short divergence eras — the pooling error that retracted the alpha claim. The policy key-set assertion caught the new field on the first run, which is that guard working.
+
+### Item 2 — a guard whose only output is a warning is not a guard
+
+- `railway-redeploy.yml` **warned** on an unresolvable service name and carried on. On run `30492918936` it warned for four of the Farnham Six, the build went green, and their levers reached no container for a day. The names are no longer guesses — `(gl)` read every one off `railway service list` — so an unresolvable name now means a rename or a typo, and both now **`::error::` and fail the run**.
+
+### Item 5 — the letter collision the in-file guard cannot see
+
+- `audit_changelog_letters` scanned one file, so it was structurally blind to the collision that actually keeps happening: two branches each pick "the next free letter" from their own snapshot and each file is internally unique right up to the merge. That is how `(fz)` collided today, and how one entry got renumbered **twice** (`(fx)` → `(fz)` → `(gi)`).
+- New arm compares this branch's letters against **`origin/main`'s** and fails on a letter both used for a **different title**. Same letter + same title is a rebase, not a collision — comparing titles is what keeps it quiet on every ordinary branch, i.e. what stops it being switched off within a day. Fail-safe open: no git, no `origin/main`, or running on `main` disables the arm entirely.
+
+### Item 4 — a second copy of a rule is a second rule
+
+- `scripts/evidence_review.py` carried its own `GATE_MIN_TRADES=20 / GATE_MIN_WR=0.55 / GATE_MAX_DD=0.15` — the rule `(fk)` **replaced on 29-Jul**. One day later the daily review reproduced both errors that re-spec exists to eliminate: it **admitted** ⚖️ Counterweight as clearing the go-live gate on **WR 56.1%** (t=**0.65**, no measured edge) and **rejected** 🌾 carry, the fleet's best-evidenced book (**t=2.60, n=82, both halves +**), on **WR 40.2%**.
+- It now **imports** `grade`/`stats`/the bars from `golive_readiness`, the canonical grader. The anti-drift assertion is an **identity** check (`grade is _gr.grade`), not a name-prefix check: the prefix check stays green against a hand-rolled `grade()` pasted in locally, which is precisely how this recurs. Plus: the SQL prefilter is asserted never stricter than the real closes bar (a stricter prefilter hides a candidate before it is graded, and the failure looks like "no candidates"), and a `window_only` classifier so a book whose sole remaining bar is calendar is reported as the operator's lead time.
+
+### Item 1 — the defect class that cost the most today
+
+- Four times in one session a consumer read a key its publisher does not emit, with a **green selftest**, because the fixture was hand-written by whoever wrote the consumer: `(fz)` `marks[sym]["vol_m"]` against a map of floats; `(fz)` `stress["med_bps"]` vs `med`; `(gb)` `prop["hurting_levers"]` vs `verdicts`; `(gc)` `ep["lever"]` vs `stance`. Every one was caught by a human diffing against live `/bus.json` — a control that is "remember to check".
+- **`tests/autonomy/test_payload_contracts.py` (19 tests)**: every consumer accessor is exercised against a payload produced by **calling the publisher** — `scout.build_snapshot`, `prop.build_stances` → `prop.track` → `run_once`'s own record construction. The assertions are about **non-degeneracy**, because all four defects produced an empty/None result that a value-free test calls "fine".
+- **MUTATION-VERIFIED**: re-introducing the `(fz)` stress-key bug turns it red; restoring it turns it green.
+- **IT CAUGHT ME FOUR TIMES WHILE I WROTE IT, and that is the entry's most useful line.** My own fixtures were wrong about `scout_universe`'s parameter name (`limit`, not `top_n`), about `build_snapshot` stamping `updated` from the wall clock rather than the injected `now_ms`, about `track()` returning a tuple, and about `lever_outcome` returning a verdict **string** rather than a dict. Each was found by running against the real code, not by reading it. A file about this defect class that had itself been written from assumption would have been the joke version of the fix.
+- It also records one thing that **looks** like a missing type check and is not: `venue_stress_bps` deliberately tolerates a bare numeric `stress` and four key aliases, so a future scout rename cannot turn it into a permanent `None`. Checked against the accessor before asserting it — my first cut had it down as a bug.
+- The published record's `levers` (list) and the in-flight episode's `stance` (dict) are **different shapes read by different consumers**; both are now pinned, since a test that only ever built one leaves the other unguarded.
+
+### Item 3 — shipping speed outran verification
+
+- Not separately actionable, and not pretended otherwise. `(gc)` found three defects in `(fz)`, `(ge)` two more, `(gf)` fixed `(ga)`'s slow-fuse version of the bug `(ga)` fixed. The mechanism that caught them (parallel adversarial audit) worked; the cheaper fix is fewer simultaneous surfaces per commit. Items 1, 2 and 5 above convert three of today's "remember to check" controls into CI failures, which is the part that can be enforced rather than resolved.
+
+### What this does NOT do
+
+- No lever moved, no gate loosened, no book widened, no `dry_run` touched. The taker change is **restrict-only on the live arm and a no-op on shadow** (both sides still allowed there, so the grade that justifies the live rule keeps accruing). The 12 historical `long-divergence` closes stay in the ledger — they are evidence, and `policy.sides` is what lets a grader split them out.
+
 ## 2026-07-30 (hi) — VERIFICATION PASS: the experiment's CONTROL ARM had no deploy route at all
 
 Operator asked to make sure everything works. Two real defects fell out of *checking* rather than building — which is the argument for the pass.
