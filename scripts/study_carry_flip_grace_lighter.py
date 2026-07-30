@@ -4,7 +4,65 @@ scripts/study_carry_flip_grace_lighter.py — the Yield Harvester's FLIP exits,
 counterfactualed on Lighter's OWN settled funding tape.
 
 ╔══════════════════════════════════════════════════════════════════════════╗
-║ VERDICT 2026-07-21, RUN ON THE REAL EPISODES: **NO EXIT CHANGE.** The     ║
+║ VERDICT 2026-07-30 (he) — **STILL NO EXIT CHANGE, BUT FOR THE OPPOSITE    ║
+║ REASON, AND THE 21-JUL VERDICT BELOW IS RETRACTED AS A SAMPLE.**          ║
+║                                                                           ║
+║ The 21-Jul run's own text authorised a re-run "with NEW evidence". Three   ║
+║ pieces arrived, and two of them are defects in THIS FILE:                  ║
+║  1. THE SELECTOR POOLED A RETIRED CROSS-VENUE ARM. `startswith(           ║
+║     "perps-funding-carry")` also matches the retired HYPERLIQUID-data     ║
+║     arm — 41 closes, **15 of them flips**, 2-Jul..14-Jul — and every one   ║
+║     was then replayed against LIGHTER's tape. That is the pool this        ║
+║     repo's own rule forbids, and the same prefix hazard as the (gr)        ║
+║     near-miss. Now matched EXACTLY (`LIVING_BOOK`).                        ║
+║  2. THE LEDGER FETCH WAS TRUNCATED. No `limit`, so it took the            ║
+║     endpoint's 500-row default — a few days of a 1,700-row fleet ledger.   ║
+║     "23 usable episodes" was bounded by that page, not by the book's       ║
+║     history. Measured: 20 episodes at the default vs **46 in-era flips**.  ║
+║  3. THE ACCRUAL BASIS CHANGED ON 17-JUL ((hc)). 11 of the flips predate    ║
+║     it. The era now comes from `golive_readiness.POLICY_ERA` — one owner.  ║
+║                                                                           ║
+║ Era-clean, arm-clean, untruncated: **44 usable episodes**, ledger -$15.13. ║
+║      variant          total      h1       h2   med hold  exits             ║
+║      V0 ship g1h     -35.22   -18.96   -16.26    10.9h   44 flip           ║
+║      V1 g8h          -18.90    -9.51    -9.39    71.9h   26 flip, 18 open  ║
+║      V2 g1h+mag      -35.23   -18.97   -16.27    10.9h   44 flip           ║
+║      V3 g8h+mag      -18.90    -9.51    -9.39    71.9h   25 flip, 19 open  ║
+║                                                                           ║
+║ ON THE CORRECTED SAMPLE THE 8H GRACE PASSES THE BAR IT WAS REJECTED ON —   ║
+║ +$16.32 total and BOTH halves better (-9.51 vs -18.96, -9.39 vs -16.26),   ║
+║ where 21-Jul recorded h2 improving by only +$0.25 and called it deferral.  ║
+║ **AND IT IS STILL NOT A RECOMMENDATION**, because the replay fails the new ║
+║ CALIBRATION GATE: V0-sim totals **-$35.22 against a ledger of -$15.13**,   ║
+║ i.e. it overstates the shipped rule's own losses by 2.3x. A variant        ║
+║ measured against a baseline that wrong tells you nothing. (gx)'s rule: a   ║
+║ harness that cannot reproduce what DID happen may not say what WOULD have. ║
+║ This study printed that anchor from day one and NOTHING WAS GATED ON IT —  ║
+║ the 21-Jul run's $0.46/episode drift is the SAME figure that fails today.  ║
+║                                                                           ║
+║ THE MISS IS SYSTEMATIC, NOT NOISE: mean|diff| $0.48 vs |mean diff| $0.46,  ║
+║ so the sim is biased, not merely imprecise. One candidate has been tested  ║
+║ and REFUTED: the window started at `open_ts - 3599` with a `... or 1.0`    ║
+║ dt fallback, booking a FULL hour of funding before the position existed —  ║
+║ a real bug, fixed, and it moved the total the WRONG way (-33.58 ->         ║
+║ -35.22), so it was not the cause. Remaining candidates: the modelled       ║
+║ 29bps round trip is a Hyperliquid taker fee + hedge cost on a venue this   ║
+║ repo has MEASURED zero-fee, while the bot charges a MEASURED perp leg;     ║
+║ and the sim accrues off SETTLED hourly rates where the bot accrues at the  ║
+║ live rate every 5 minutes.                                                 ║
+║                                                                           ║
+║ HOW TO SETTLE IT, and it is now possible for the first time: (gr) ships    ║
+║ `accrued` / `fees` / `held_h` / `entry_apr` / `exit_apr` on every carry     ║
+║ close. Once those rows accumulate, friction and accrual can be compared to ║
+║ the book's OWN recorded numbers SEPARATELY instead of only through their   ║
+║ difference. Do not move FLIP_GRACE_H before that: the flip rule is a live  ║
+║ open question, and the blocker is the replay's fidelity, not the sample.   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ SUPERSEDED — VERDICT 2026-07-21, RUN ON THE REAL EPISODES: **NO EXIT      ║
+║ CHANGE.** Kept because its REASONING about entry-side payback is still     ║
+║ correct and load-bearing; its SAMPLE is retracted per (he) above. The      ║
 ║ 23 usable *_flip episodes (0W/23 on the week, ledger -$10.30) replayed    ║
 ║ on Lighter's settled funding:                                             ║
 ║      variant          total      h1       h2     exits                    ║
@@ -120,13 +178,22 @@ def simulate(open_ts, side_mult, notional, fund, grace_h, mag_bar):
     close_fee = OPEN_COST * notional       # modelled exit side
     accrued = 0.0
     flipped_since = None
-    hours = sorted(t for t in fund if t >= open_ts - 3599)
+    # [2026-07-30 (he) FIDELITY FIX] This was `t >= open_ts - 3599` with a
+    # `... or 1.0` fallback on dt_h, which combined into an accrual for time the
+    # position did not exist: for an episode opened at 10:30 the 10:00
+    # settlement is in the window, `(t - last)` is NEGATIVE, `max(0.0, ...)` is
+    # 0.0, and `0.0 or 1.0` is **1.0** — a FULL hour of funding booked before the
+    # open. The settlement a position is actually exposed to is the first one at
+    # or after its open, pro-rated from the open, which is what the bot's own
+    # continuous live-rate accrual approximates. Measured effect on the 44
+    # era-clean episodes: see the calibration line in the run output.
+    hours = sorted(t for t in fund if t >= open_ts)
     if not hours:
         return None
     last = open_ts
     for t in hours:
         apr = fund[t]
-        dt_h = min(1.0, max(0.0, (t - last) / 3600.0)) or 1.0
+        dt_h = min(1.0, max(0.0, (t - last) / 3600.0))
         last = t
         accrued += side_mult * (apr / HOURS_PER_YEAR) * dt_h * notional
         held_h = (t - open_ts) / 3600.0
@@ -152,16 +219,65 @@ def simulate(open_ts, side_mult, notional, fund, grace_h, mag_bar):
     return accrued - (fees + close_fee), (hours[-1] - open_ts) / 3600.0, "open@end"
 
 
+#: The LIVING arm, named exactly. [2026-07-30 (he)] This was
+#: `startswith("perps-funding-carry")`, which also matches the RETIRED
+#: Hyperliquid-data arm `perps-funding-carry` — 41 closes, **15 of them flips**,
+#: 2-Jul..14-Jul — and every one of those episodes was then replayed against
+#: LIGHTER's settled funding tape. That is the cross-venue pool this repo's own
+#: rule forbids ("a backtest on another venue's data is not validation of a
+#: Lighter bot"), and it is the same prefix hazard as the (gr) near-miss, where
+#: a retired arm and its living twin share a name stem.
+LIVING_BOOK = "perps-funding-carry-lshadow"
+
+
+def era_since():
+    """The policy-era epoch this book may be studied from, or None.
+
+    ONE OWNER: read off `golive_readiness.POLICY_ERA` rather than retyped, so
+    the era the gate grades on and the era a study samples cannot drift apart.
+    `CARRY_ERA_SINCE=` (empty) deliberately disables the filter for anyone who
+    wants the pooled run back — with the pooling then stated in the output, not
+    silent."""
+    env = os.environ.get("CARRY_ERA_SINCE")
+    if env is not None:
+        iso = env.strip()
+    else:
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import golive_readiness as _g
+            iso = (_g.POLICY_ERA.get("perps-funding-carry") or ("", ""))[0]
+        except Exception:      # noqa: BLE001
+            return None
+    if not iso:
+        return None
+    d = datetime.fromisoformat(iso)
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
+
+
+#: [2026-07-30 (he)] The ledger fetch was `?source=paper` with NO limit, so it
+#: took whatever the endpoint's default page returns (500 rows) — a few days of
+#: a 1,700-row fleet ledger. This study therefore sampled "the most recent
+#: flips that happened to fit", and its 21-Jul verdict's "23 usable episodes"
+#: was bounded by that page, not by the book's history. Measured today: 20
+#: episodes at the default against 46 in-era flips in the ledger.
+LEDGER_LIMIT = int(os.environ.get("CARRY_STUDY_LIMIT", "5000"))
+
+
 def load_episodes():
-    url = f"{DASH}/trades.json?source=paper"
+    url = f"{DASH}/trades.json?source=paper&limit={LEDGER_LIMIT}"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=60) as r:
         d = json.loads(r.read())
     tr = d if isinstance(d, list) else d.get("trades") or []
+    era, dropped_arm, dropped_era = era_since(), 0, 0
     eps = []
     for t in tr:
-        if (t.get("bot") or "").startswith("perps-funding-carry") \
-                and str(t.get("reason", "")).endswith("flip"):
+        bot = t.get("bot") or ""
+        if bot != LIVING_BOOK and bot.startswith("perps-funding-carry"):
+            if str(t.get("reason", "")).endswith("flip"):
+                dropped_arm += 1
+            continue
+        if bot == LIVING_BOOK and str(t.get("reason", "")).endswith("flip"):
             reason = str(t["reason"])
             side_mult = 1 if reason.startswith("short") else -1
             try:
@@ -169,16 +285,71 @@ def load_episodes():
                 notional = abs(float(t["pnl_abs"]) / pct) if pct else 100.0
             except (TypeError, ValueError, ZeroDivisionError):
                 notional = 100.0
+            open_ts = int(datetime.fromisoformat(t["opened_at"]).timestamp())
+            # Keyed on the OPEN: the accrual basis that produced an episode is
+            # the one in force when it was opened, and a straddler accrued in
+            # both. Fail-closed, same contract as golive_readiness.in_era.
+            if era is not None and open_ts < era:
+                dropped_era += 1
+                continue
             eps.append({
                 "coin": str(t["pair"]).split("/")[0],
                 "side_mult": side_mult, "notional": notional,
-                "open_ts": int(datetime.fromisoformat(
-                    t["opened_at"]).timestamp()),
+                "open_ts": open_ts,
                 "close_ts": int(datetime.fromisoformat(
                     t["closed_at"]).timestamp()),
                 "actual_pnl": float(t["pnl_abs"]),
             })
+    # NO SILENT CAPS: say what was excluded and why, or a narrowed sample reads
+    # as a smaller venue rather than a deliberate scope.
+    if dropped_arm:
+        print(f"excluded {dropped_arm} flip episodes from the RETIRED "
+              f"Hyperliquid-data arm (cross-venue; would be replayed on "
+              f"Lighter's tape)")
+    if dropped_era:
+        it = datetime.fromtimestamp(era, timezone.utc).date().isoformat()
+        print(f"excluded {dropped_era} flip episodes opened before the "
+              f"{it} policy era (pre-accrual-fix accounting)")
     return sorted(eps, key=lambda e: e["open_ts"])
+
+
+#: [2026-07-30 (he)] THE CALIBRATION GATE, borrowed verbatim in spirit from
+#: `study_exit_sweep.calibrate` (gx): **a harness that cannot reproduce what DID
+#: happen may not say what WOULD have.** This study printed a "sanity anchor"
+#: from the start and nothing was ever gated on it — it was a number at the
+#: bottom of the output. Today it reads sim −13.61 against a ledger of −0.49 on
+#: the same 20 episodes: the shipped-rule replay is wrong by 27x on the total,
+#: so the ~$6 the 8h-grace variant appears to "save" is measured against a
+#: baseline that does not exist. Two candidate causes, neither established here:
+#: the sim charges a full modelled 29bps round trip (a Hyperliquid taker fee
+#: plus a hedge cost) on a venue this repo has MEASURED as zero-fee, and it
+#: accrues off the SETTLED hourly tape while the bot accrues at the live rate
+#: every 5-minute loop — which diverge most on exactly these short hot holds.
+#: Fail-CLOSED: beyond tolerance, the variant table still prints (it is the
+#: evidence for the miscalibration) but every recommendation is WITHHELD.
+CAL_TOL_PER_EP = float(os.environ.get("CARRY_CAL_TOL", "0.25"))   # $/episode
+CAL_TOL_TOTAL = float(os.environ.get("CARRY_CAL_TOL_TOTAL", "3.0"))   # $ total
+
+
+def calibrate(sim_total, ledger_total, n):
+    """(ok, why) — may this run make a recommendation at all?
+
+    Two bars because either failure mode alone invalidates a counterfactual: a
+    per-episode drift larger than the effect sizes being compared, or a total
+    that misses the book. Both are absolute dollars, not ratios — a ratio
+    against a near-zero ledger total is undefined exactly when it matters."""
+    if n < 5:
+        return False, f"only {n} usable episodes — too few to calibrate against"
+    per_ep = abs(sim_total - ledger_total) / n
+    if per_ep > CAL_TOL_PER_EP:
+        return False, (f"mean |sim-ledger| ${per_ep:.2f}/episode > "
+                       f"${CAL_TOL_PER_EP:.2f} tolerance")
+    if abs(sim_total - ledger_total) > CAL_TOL_TOTAL:
+        return False, (f"sim total {sim_total:+.2f} vs ledger "
+                       f"{ledger_total:+.2f} — off by "
+                       f"${abs(sim_total - ledger_total):.2f} > "
+                       f"${CAL_TOL_TOTAL:.2f}")
+    return True, f"mean |sim-ledger| ${per_ep:.2f}/episode over n={n}"
 
 
 def main():
@@ -224,10 +395,26 @@ def main():
                      fund[e["coin"]], *v0) for e in usable]
     pairs = [(e["actual_pnl"], s[0]) for e, s in zip(usable, sim0) if s]
     drift = sum(abs(a - b) for a, b in pairs) / max(1, len(pairs))
+    sim_tot, led_tot = sum(b for _, b in pairs), sum(a for a, _ in pairs)
     print(f"\nsanity anchor: V0-sim vs actual ledger, mean |diff| "
           f"${drift:.2f}/episode over n={len(pairs)} "
-          f"(sim total {sum(b for _, b in pairs):+.2f} vs "
-          f"ledger {sum(a for a, _ in pairs):+.2f})")
+          f"(sim total {sim_tot:+.2f} vs ledger {led_tot:+.2f})")
+    ok, why = calibrate(sim_tot, led_tot, len(pairs))
+    if ok:
+        print(f"CALIBRATED ({why}). The both-halves rule governs: a variant "
+              f"must beat V0 on the full window AND both halves before "
+              f"FLIP_GRACE_H moves, and friction is the bot's own modelled "
+              f"constant — the claim is the RELATIVE ordering.")
+    else:
+        print(f"\n*** UNCALIBRATED — EVERY RECOMMENDATION WITHHELD: {why} ***\n"
+              "The variant table above is printed as the EVIDENCE OF THE\n"
+              "MISCALIBRATION, not as a result. A harness that cannot\n"
+              "reproduce what DID happen may not say what WOULD have\n"
+              "((gx)'s rule, and this study had no gate on its own anchor).\n"
+              "Fix the replay before reading the columns: the two candidates\n"
+              "are the modelled 29bps round trip (a Hyperliquid taker fee +\n"
+              "hedge cost, on a venue MEASURED zero-fee) and accrual off the\n"
+              "SETTLED hourly tape versus the bot's live 5-minute loop.")
 
 
 # ---------------------------------------------------------------------------
@@ -277,8 +464,62 @@ def _selftest():
     _, held4, r4 = simulate(t0, +1, 1000.0, pause, 8.0, EXIT_APR_TRUE)
     assert r4 == "flip" and held4 <= 12, (r4, held4)
 
+    # 5) THE CALIBRATION GATE [(he)]. It is now the thing standing between a
+    #    miscalibrated replay and a recommendation about a real book's exit, so
+    #    it is selftested rather than trusted.
+    assert calibrate(-0.60, -0.49, 20)[0] is True, calibrate(-0.60, -0.49, 20)
+    #    today's ACTUAL numbers must be refused
+    ok, why = calibrate(-13.61, -0.49, 20)
+    assert ok is False and "episode" in why, (ok, why)
+    #    a total that misses the book fails even with a tiny per-episode drift
+    ok2, why2 = calibrate(+20.0, 0.0, 200)
+    assert ok2 is False and "total" in why2, (ok2, why2)
+    #    fail-CLOSED on a sample too thin to calibrate at all
+    assert calibrate(0.0, 0.0, 4)[0] is False
+    assert calibrate(0.0, 0.0, 5)[0] is True
+
+    # 6a) THE CONSTANTS ARE RETYPED FROM THE BOT — so assert they still match.
+    #     [(he)] Not imported, deliberately: this study must run offline with no
+    #     DB and no venue, and importing the bot drags its publisher stack in.
+    #     But a retyped constant is a constant that drifts, and a drifted one is
+    #     worse than absent because the harness then measures a rule the fleet
+    #     does not run. Measured today in the SIBLING study
+    #     `backtest_carry_gate_lighter.py`: it pins `MAX_POSITIONS = 8` while
+    #     the bot has shipped **12** since 30-Jul. Same class, caught by having
+    #     looked; this arm makes looking automatic. Drift-arm pattern from
+    #     `audit_lever_bounds`.
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))))
+        import funding_carry_bot as _bot
+    except Exception as _e:      # noqa: BLE001
+        print(f"  (drift check skipped: cannot import the bot: {_e})")
+    else:
+        assert OPEN_COST == _bot.OPEN_COST, (OPEN_COST, _bot.OPEN_COST)
+        assert MAX_HOLD_H == _bot.MAX_HOLD_H, (MAX_HOLD_H, _bot.MAX_HOLD_H)
+        assert FEE_PAYBACK_MARGIN == _bot.FEE_PAYBACK_MARGIN
+        assert BLEED_STOP_FRAC == _bot.BLEED_STOP_FRAC
+        #  the exit bar is the bot's HL-denominated EXIT_APR converted to the
+        #  lighter_shadow arm's TRUE basis (per-8h => /8), which is the ONE
+        #  place this file re-does the bot's `_bars()` arithmetic.
+        assert abs(EXIT_APR_TRUE - _bot.EXIT_APR / 8.0) < 1e-12, (
+            EXIT_APR_TRUE, _bot.EXIT_APR)
+        assert VARIANTS["V0 ship g1h"][0] == _bot.FLIP_GRACE_H, (
+            "V0 is supposed to BE the shipped rule; the bot's FLIP_GRACE_H "
+            f"moved to {_bot.FLIP_GRACE_H}")
+
+    # 6) the era is read from ONE owner, not retyped here.
+    src = open(os.path.abspath(__file__)).read()
+    assert "import golive_readiness" in src and "POLICY_ERA" in src, (
+        "the era must come from golive_readiness.POLICY_ERA, or the era a "
+        "study samples can drift from the era the gate grades on")
+    assert 'LIVING_BOOK = "perps-funding-carry-lshadow"' in src, (
+        "the RETIRED Hyperliquid arm shares this book's name stem — it must be "
+        "matched exactly, never by prefix")
+
     print("study_carry_flip_grace selftest OK (noise-flip held, hard-adverse "
-          "exits, magnitude bar + bleed backstop, pause-not-reset grace)")
+          "exits, magnitude bar + bleed backstop, pause-not-reset grace, "
+          "calibration gate, single-owner era + exact arm match)")
 
 
 if __name__ == "__main__":

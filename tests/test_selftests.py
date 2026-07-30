@@ -215,9 +215,15 @@ SELFTEST_EXCLUDE = {
     # its header; re-run with --refresh, never re-argue from prose.
     "scripts/study_intraday_tsl_reclaim_lighter.py",
     # [2026-07-21] carry flip-grace study: --selftest is offline-green (run it
-    # directly); the full run needs the venue API + dashboard ledger. Verdict
-    # in its header: NO exit change (magnitude bar is a no-op on the real
-    # episodes, 8h grace is deferral), the queued follow-up is the ENTRY gate.
+    # directly); the full run needs the venue API + dashboard ledger.
+    # [2026-07-30 (he)] Verdict UPDATED and the 21-Jul SAMPLE retracted: the
+    # selector pooled the retired Hyperliquid arm (15 flips), the ledger fetch
+    # was truncated to the endpoint's 500-row default, and 11 episodes predate
+    # the (hc) accrual era. Era-clean it is 44 episodes, and on those the 8h
+    # grace PASSES the both-halves bar it was rejected on — but the run is
+    # UNCALIBRATED (V0-sim -$35.22 vs a -$15.13 ledger) so every recommendation
+    # is withheld. Still NO exit change; the blocker is replay fidelity, not
+    # the sample. Do not move FLIP_GRACE_H from prose.
     "scripts/study_carry_flip_grace_lighter.py",
     # [2026-07-21] carry entry-gate sweep (the flip study's queued follow-up):
     # --selftest offline-green; full run pages the venue's funding API.
