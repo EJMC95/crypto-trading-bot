@@ -550,9 +550,13 @@ its row is dashboard-retired regardless; stop the process when found.
 - **`fleet_bus.scout_universe()` / `.scout_funding()` / `.venue_stress_bps()`
   (2026-07-30)** — the ONE supported read of the venue's live universe, its
   funding map and its premium stress, off the scout's `lighter-market` key.
-  Built because five books carried hand-typed watchlists written when Lighter
-  was much smaller: Counterweight ranked **30 of 202 books**, Snap Back 16,
-  Tide Rider 6, Index Rider 3. A ranked selector cannot pick a winner it never
+  Built because **four LIVING books** carried hand-typed watchlists written when
+  Lighter was much smaller: Counterweight ranked **30 of 202 books**, Snap Back
+  16, Tide Rider 6, Index Rider 3. (This said "five" and named four — the fifth
+  was retired Gap Scout's 6-symbol `LIGHTER_WATCH` in `cross_exchange_arb.py`,
+  which cannot be widened because the bot idles behind the LIGHTER-ONLY guard.
+  Corrected (gz): a count that does not match its own list sends the next reader
+  hunting a book that is not there.) A ranked selector cannot pick a winner it never
   sees. `scout_universe` reads the scout's new public `vols` map and falls back
   to its private `_marks` diff base, so a consumer shipped ahead of the scout's
   next deploy is not dark in the meantime. CONTRACT: any doubt returns
@@ -803,7 +807,7 @@ All new bots:
   the default lived in PROSE inside each lever's `note` and the real value
   lived in another file, so the three could not be compared and had already
   drifted (`scout.ticket_top_n` moved 6 → 12 in code with its note still
-  saying 6, the same afternoon). All 42 levers now carry `env_default`;
+  saying 6, the same afternoon). EVERY lever now carries `env_default` (43 of them at (gu); the count is deliberately not load-bearing here because it drifts — `audit_lever_bounds` FAILS if any lever lacks one, so the guard is the claim and this sentence is only a pointer);
   `scripts/audit_lever_bounds.py` enforces on every push that each default is
   INSIDE its cage, that no cage is degenerate, that every book lever's `step`
   moves and terminates, and — the drift arm, mutation-verified — that the

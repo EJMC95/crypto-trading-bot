@@ -1,3 +1,17 @@
+## 2026-07-30 (gz) — MISMATCH SWEEP: six suspects, TWO real, and four pieces of correct text I nearly broke
+
+- Asked to rectify all mismatches after `(gy)` found one, I swept CLAUDE.md's checkable numeric and naming claims against the registry, the code and the live rows. **The result is worth recording precisely because most of it was a false alarm** — the discipline that mattered was verifying each suspect BEFORE editing, not the edits themselves.
+- **REAL, FIXED (2):**
+  1. **"All 42 levers now carry `env_default`"** — 43 since `(gu)` added `disloc.exit_bps`. My own change made it stale within the hour. Rewritten so it cannot drift again: the sentence now points at the GUARD (`audit_lever_bounds` fails if any lever lacks one) instead of asserting a count, because the count is the part that rots and the guard is the part that is true.
+  2. **"five books carried hand-typed watchlists" — and it named FOUR.** The fifth is retired Gap Scout's 6-symbol `LIGHTER_WATCH` in `cross_exchange_arb.py`, which cannot be widened because the bot idles behind the LIGHTER-ONLY guard. Corrected to "four LIVING books" with the fifth identified. A count that does not match its own list sends the next reader hunting a book that is not there.
+- **NOT MISMATCHES — checked, left alone (4):**
+  * **`strategy_tickets` vs `tickets`.** The live scout payload key is `tickets`, so the doc looked wrong. It is not: `strategy_tickets` is the FUNCTION (`lighter_market_scout.py:264`) that publishes under `"tickets"` (`:398`), and CLAUDE.md is describing the function's truncation behaviour. **Renaming it in the doc would have made a correct sentence wrong.** No code reads a `strategy_tickets` key.
+  * **"All nine now record"** (`(gr)` telemetry) — nine BOTS. Correct.
+  * **"nine above are ENTRY or CAPACITY"** (`(gu)`) — the lane's nine PRE-EXISTING levers, correctly describing the state before `exit_bps` made it ten. Correct in context; changing it to "ten" would have broken the sentence's meaning.
+  * **Per-book universe claims** — live caps confirm them: Counterweight `51` inside "30 → up to 60", Snap Back `39` ≈ 40, Index Rider `10` = 10, Tide Rider `6` = 6 (as `(gy)` corrected).
+- **THE LESSON, which is the actual deliverable here.** Four of six suspects were correct text that a fast "rectify the mismatch" pass would have damaged — three of them because a NUMBER was right for a scope I had not read carefully (nine bots vs nine levers vs ten levers), and one because a doc referred to a FUNCTION where I assumed a KEY. **A mismatch sweep that does not verify each suspect against the source is a way of introducing mismatches**, and it would have felt like progress. Two-for-six is the honest yield.
+- Suite green, five audits green.
+
 ## 2026-07-30 (gy) — THE DEPLOY LANDED, VERIFIED BY PREDICTION; and CLAUDE.md overstated one widening
 
 - **BOTH REAL-MONEY CONTAINERS TOOK THE CODE, confirmed against a prediction made BEFORE the dispatch.** 💸 Farmer `128995c2fd76` → **`1f9918bfff63`/15**, 🎫 Taker `453186044772` → **`81fbceb5d06d`/15** — exactly the ids recomputed locally with `bot_pnl_store.build_compute`, with the file counts unchanged so the comparison is clean per `(fd)`. So the Farmer's negative-price **fail-open fix is live on real money**, and the Taker is recording exit prices. This is the receipt the fleet's own doctrine demands: a green Actions run has never implied a container took the code.
