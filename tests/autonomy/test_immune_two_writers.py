@@ -149,3 +149,56 @@ def test_an_absent_gate_key_is_not_sickness():
     """Fail-safe open: a dark grader means no claim about any ledger, not a
     fleet-wide alarm."""
     assert fi.organ_invariants({}, NOW) == []
+
+
+# --------------------------------------------------------------------------
+# 4. THE SEAM. Both halves passing separately is not the same as the join.
+# --------------------------------------------------------------------------
+
+def test_the_REAL_grader_payload_reaches_the_immune_organ(monkeypatch):
+    """Every test above builds the payload by hand, so a rename on the PUBLISHER
+    side (`integrity` -> `ledger`, `two_writers` -> `duplicate_writers`) would
+    leave this whole file green while the organ went blind. This drives the real
+    `golive_readiness.main(--publish)`, captures what it actually writes to
+    bot_state, and feeds THAT to the scanner.
+
+    Two producers, one contract, and nothing between them but a field name."""
+    import bot_pnl_store as store
+    import golive_readiness as gr
+
+    # a ledger with one compromised book and one clean one, in the DB's own shape
+    rows = []
+    for i in range(30):          # clean: sequential, distinct pairs
+        rows.append({"bot": "clean-book", "pair": f"C{i}", "profit_abs": 1.0,
+                     "profit_ratio": 0.003,
+                     "open_ts": f"2026-07-{1 + i % 28:02d}T00:00:00+00:00",
+                     "close_ts": f"2026-07-{1 + i % 28:02d}T06:00:00+00:00"})
+    for i in range(12):          # compromised: two holds overlap on one pair
+        rows.append({"bot": "dup-book", "pair": "HYPE", "profit_abs": 1.0,
+                     "profit_ratio": 0.003,
+                     "open_ts": f"2026-07-{10 + i:02d}T00:00:00+00:00",
+                     "close_ts": f"2026-07-{12 + i:02d}T00:00:00+00:00"})
+
+    saved = {}
+    monkeypatch.setattr(store, "fetch_paper_trades", lambda limit=2000: rows)
+    monkeypatch.setattr(store, "save_state",
+                        lambda k, v: saved.setdefault(k, v) is None or True)
+    monkeypatch.setattr(store, "save_history", lambda k, v: True)
+    monkeypatch.setattr(sys, "argv", ["golive_readiness.py", "--min-closes",
+                                      "10", "--publish"])
+    import io
+    import contextlib
+    with contextlib.redirect_stdout(io.StringIO()):
+        gr.main()
+
+    payload = saved.get("golive-readiness")
+    assert payload, "the grader published nothing — the seam has no left half"
+    assert "dup-book" in payload["books"], payload["books"].keys()
+
+    payload["updated"] = fi._iso(NOW)          # freshness is the organ's gate
+    out = fi.organ_invariants({"golive-readiness": payload}, NOW)
+    names = [o["detail"].split(":")[0] for o in out]
+    assert names == ["dup-book"], (
+        f"the organ read {names} off the grader's OWN payload — expected exactly "
+        "the compromised book. A field rename on either side lands here.")
+    assert "TWO WRITERS" in out[0]["detail"]

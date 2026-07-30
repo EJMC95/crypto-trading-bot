@@ -12,7 +12,8 @@ Three things `(hc)`–`(hg)` left doable, closed in one pass.
   - **A retyped constant is a constant that drifts** (`MAX_POSITIONS = 8` against a shipped 12).
   - **A finding no gate consumes is a note.**
   - **A "sanity anchor" nothing gates on is decoration** — generalising `(gx)`: the reproduction check must REFUSE, not report.
-- Suite green (628), four selftests green (brain 51/51, immune, grader, ledger audit), five audits green. 13 new immune tests, 49 in the era file.
+- **AND THE SEAM IS TESTED, not just both halves.** Every immune test above builds the payload by hand, so a rename on the PUBLISHER side (`integrity` → `ledger`, `two_writers` → `duplicate_writers`) would have left the whole file green while the organ went blind. One test drives the real `golive_readiness.main(--publish)`, captures what it actually writes to bot_state, and feeds THAT to the scanner. Mutation-verified: renaming the field on the publisher side only fails exactly that test. Two producers, one contract, nothing between them but a field name — which is the shape of most of this session's findings.
+- Suite green (629), four selftests green (brain 51/51, immune, grader, ledger audit), five audits green. 14 new immune tests, 49 in the era file.
 
 ## 2026-07-30 (hg) — THE REAL-MONEY PAIR HAD THE SAME DEFECT, AND THE SUFFIX STRIP WOULD HAVE COVERED HALF OF IT
 
