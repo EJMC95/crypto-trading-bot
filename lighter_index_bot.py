@@ -99,7 +99,9 @@ ORDER_USD = float(os.environ.get("INDEX_ORDER_USD", "100"))
 # validated on this tape has been validated in ONE regime; widening here is
 # the on-venue way to get a second one.
 SYMBOLS = [s.strip().upper() for s in os.environ.get(
-    "INDEX_SYMBOLS", "SPY,QQQ,IWM,NVDA,TSLA,MSTR,WTI,XAU,XAG,XCU").split(",")
+    # [(hk)] XAG REMOVED — see REJECTED_SLEEVES below: its reject note names
+    # the CROSS rule (fz) shipped it under, and 2y maxDD measures 38.7%.
+    "INDEX_SYMBOLS", "SPY,QQQ,IWM,NVDA,TSLA,MSTR,WTI,XAU,XCU").split(",")
     if s.strip()]
 REGIME_SMA = int(os.environ.get("INDEX_REGIME_SMA", "200"))
 
@@ -135,6 +137,32 @@ REGIME_SMA = int(os.environ.get("INDEX_REGIME_SMA", "200"))
 # REJECTED by the same lab (don't re-test): monthly-eval Faber timing (DD
 # 26-29% vs 20-22%), long/short regime (SPY +1.6%/46%DD), dual-momentum
 # SPY/QQQ rotation (+6.6% portfolio CAGR vs +9.9% shipped).
+# [2026-07-30 (hk)] THE REJECT LIST, MACHINE-READABLE. It sat in prose 25 lines
+# above the SLEEVES dict and (fz) shipped straight through it: XAG, WTI and XCU
+# were all added as sleeves while the note said "don't re-test".
+#   * XAG is REMOVED. Its reject note names the CROSS rule specifically
+#     ("55% DD cross") — the exact rule (fz) shipped it under — and an
+#     independent 2y measure corroborates at 38.7% maxDD, inside the 37-44%
+#     band that retired 🏆 Stock Leaders against a 15% gate.
+#   * WTI and XCU STAY, and the reasoning is recorded rather than assumed: both
+#     reject notes quote regime200 results (-4.4%, +0.4%) and both now ship
+#     under sma_cross, which the sweep did not test for them. That is a
+#     DIFFERENT rule, so the note does not cover them — but it is a judgement,
+#     not evidence, so they are declared here and owe a Lighter-tape backtest.
+# `value` is the rule the rejection applies to; a sleeve shipped under a
+# DIFFERENT rule needs an entry in SLEEVE_EXEMPT with a reason. Enforced by
+# _selftest_sleeves() and tests/autonomy/test_book_levers.py.
+REJECTED_SLEEVES = {
+    "XAG": "sma_cross", "WTI": "regime", "BRENT": "regime", "BRENTOIL": "regime",
+    "XCU": "regime", "XPT": "regime", "NATGAS": "regime",
+    "US500": "any", "US100": "any",
+}
+SLEEVE_EXEMPT = {
+    "WTI": "rejected on regime200 (-4.4%); ships as sma_cross, untested by that "
+           "sweep. Owes a Lighter-tape backtest before any go-live claim.",
+    "XCU": "rejected on regime200 (+0.4%); ships as sma_cross, untested by that "
+           "sweep. Owes a Lighter-tape backtest before any go-live claim.",
+}
 SLEEVES = {          # symbol -> (rule, param)
     "SPY": ("regime_band", (200, 0.01)),
     "QQQ": ("regime_band", (200, 0.01)),
@@ -149,7 +177,6 @@ SLEEVES = {          # symbol -> (rule, param)
     "TSLA": ("sma_cross", (20, 50)),
     "MSTR": ("sma_cross", (20, 50)),
     "WTI": ("sma_cross", (20, 50)),
-    "XAG": ("sma_cross", (20, 50)),
     "XCU": ("sma_cross", (20, 50)),
 }
 YAHOO_REF = {"XAU": "GC=F", "XAG": "SI=F", "WTI": "CL=F",
@@ -208,8 +235,36 @@ def pos_regime_band(close, period=200, band=0.01):
     return pos
 
 
+def min_bars_for(symbol):
+    """Bars this symbol's rule needs before its signal means anything."""
+    rule, param = SLEEVES.get(symbol, ("regime", REGIME_SMA))
+    if rule == "sma_cross":
+        return int(max(param))
+    if rule == "regime_band":
+        return int(param[0])
+    return int(param)
+
+
 def want_position(symbol, closes):
-    """Desired position for `symbol` on its sleeve's rule."""
+    """Desired position for `symbol`, or **None** when the series is too short
+    for its rule to have an opinion.
+
+    [2026-07-30 (hk)] THE NONE IS THE FIX. `sma()` returns None on a short
+    series and every rule below maps that to **0** — so "I have no data" was
+    byte-identical to "this book is in a downtrend". Seven of this book's ten
+    sleeves published `regime: 0` and there was no way, from the payload or the
+    logs, to tell a genuine downtrend from a dark feed. (Measured 30-Jul: those
+    seven were in fact genuinely below their crosses, so nothing was wrong
+    THAT day — which is exactly why this needed fixing before it mattered.
+    A false flat is silent, and on a book that trades ~17 times a year it
+    could sit undetected for months.)
+
+    None is fail-CLOSED in both directions: no entry (as before), and NO EXIT
+    — a held position must never be closed by a signal that does not exist.
+    The catastrophic stop runs ahead of this and stays armed.
+    """
+    if closes is None or len(closes) < min_bars_for(symbol):
+        return None
     rule, param = SLEEVES.get(symbol, ("regime", REGIME_SMA))
     if rule == "sma_cross":
         return pos_sma_cross(closes, *param)[-1]
@@ -451,6 +506,10 @@ def main():
         last_ts = t0
 
         regime = {}
+        # [(hk)] bars actually seen per sleeve, published so a DARK feed is
+        # distinguishable from a real downtrend on the dashboard, not just
+        # in the container log.
+        bars_seen = {}
         for s in symbols:
             px = marks.fresh_mid(venue, s)
             held = s in broker.pos
@@ -510,6 +569,17 @@ def main():
                 continue
             want = want_position(s, ref["closes"])
             regime[s] = want
+            bars_seen[s] = len(ref["closes"] or ())
+            if want is None:
+                # [(hk)] Too short for this sleeve's rule = NO OPINION, not
+                # flat. Skipping here means no entry AND no exit; the
+                # catastrophic stop above has already run.
+                log.warning("%-5s only %d bars, needs %d for %s — NO SIGNAL "
+                            "(holding %s, not exiting on a false flat)",
+                            s, bars_seen[s], min_bars_for(s),
+                            SLEEVES.get(s, ("regime",))[0],
+                            "yes" if held else "no")
+                continue
 
             if held and want == 0 and px:
                 m = meta.get(s) or {}
@@ -587,6 +657,7 @@ def main():
                        "sleeves": {s: SLEEVES.get(s, ("regime", REGIME_SMA))[0]
                                    for s in symbols},
                        "regime": {s: regime.get(s) for s in symbols},
+                       "bars": {s: bars_seen.get(s) for s in symbols},
                        "fund_realized": round(fund_realized, 4),
                        "fund_open": round(open_accr, 4),
                        "funding_apr": {s: round(funding_basis.to_apr_pct(
@@ -686,9 +757,57 @@ def _supervised():
             time.sleep(60)
 
 
+def _selftest_sleeves():
+    """[2026-07-30 (hk)] Two invariants this file violated in its own body.
+
+    1. NO SHIPPED SLEEVE IS ON THE REJECT LIST WITHOUT A DECLARED EXEMPTION.
+       The list lived in prose 25 lines above SLEEVES and (fz) shipped XAG,
+       WTI and XCU straight through it. XAG's note names the CROSS rule it was
+       shipped under; it is now removed. WTI/XCU are declared, with the reason
+       (their notes quote regime200, and they ship as sma_cross).
+    2. A SHORT SERIES IS `None`, NEVER 0. "No data" must not read as "this
+       book is in a downtrend" — they were byte-identical before.
+    """
+    shipped = set(SYMBOLS) | set(SLEEVES)
+    bad = sorted(s for s in shipped
+                 if s in REJECTED_SLEEVES and s not in SLEEVE_EXEMPT)
+    assert not bad, (
+        f"sleeve(s) {bad} are on REJECTED_SLEEVES with no SLEEVE_EXEMPT entry. "
+        f"Re-testing a rejected sleeve needs a REASON recorded, not a silent "
+        f"re-add — that is how XAG shipped against a 55%% cross drawdown.")
+    for s, why in SLEEVE_EXEMPT.items():
+        assert s in REJECTED_SLEEVES, f"{s} exempted but never rejected"
+        assert len(why) > 40, f"{s} exemption needs a real reason, got {why!r}"
+    # an exemption must not be able to hide behind a symbol nobody ships
+    assert set(SLEEVE_EXEMPT) <= shipped, "stale exemption for an unshipped sleeve"
+    assert "XAG" not in shipped, "XAG is rejected FOR THE CROSS RULE it ships under"
+
+    # every sleeve's rule is one the dispatcher actually implements
+    for s, (rule, _p) in SLEEVES.items():
+        assert rule in ("regime", "regime_band", "sma_cross"), (s, rule)
+
+    # --- the false-flat fix, in both directions ---
+    assert want_position("SPY", []) is None, "empty series must be None, not 0"
+    assert want_position("SPY", [100.0] * 10) is None, "10 bars < 200"
+    assert want_position("SPY", None) is None
+    assert min_bars_for("SPY") == 200 and min_bars_for("NVDA") == 50
+    # ...and a LONG ENOUGH series still returns a real 0/1, or the fix has
+    # simply switched the book off.
+    rising = [100.0 + i for i in range(260)]
+    falling = [100.0 + (260 - i) for i in range(260)]
+    assert want_position("SPY", rising) == 1, "a real uptrend must still be 1"
+    assert want_position("SPY", falling) == 0, "a real downtrend must still be 0"
+    assert want_position("NVDA", rising) == 1 and want_position("NVDA", falling) == 0
+    # the boundary: exactly enough bars is enough
+    assert want_position("NVDA", rising[:50]) is not None
+    assert want_position("NVDA", rising[:49]) is None
+    print("lighter_index_bot _selftest_sleeves OK")
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
+        _selftest_sleeves()
         raise SystemExit(0)
     try:
         _supervised()

@@ -8,7 +8,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 # funding_basis.py REQUIRED (unguarded import) — LIVE real-money book.
-COPY lighter_trend_bot.py bot_pnl_store.py paper_broker.py fleet_tuning.py funding_basis.py ./
+# [2026-07-30 (hk)] fleet_bus.py joins the set: the bot now reads the scout's
+# live universe. The import and this COPY MUST ship together — split across two
+# commits it is born-dark (the import is try/except-guarded, so a missing file
+# degrades silently to the hand-typed six instead of crashing). That is exactly
+# how (fz) "widened" this book and moved nothing.
+COPY lighter_trend_bot.py bot_pnl_store.py paper_broker.py fleet_tuning.py fleet_bus.py funding_basis.py ./
 COPY venues/ ./venues/
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "lighter_trend_bot.py"]

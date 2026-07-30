@@ -393,8 +393,44 @@ LEVERS = {
         "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
         "note": "Index Rider concurrent sleeves; env default = universe size", "env_default": 10, "step": 2},
     "trend.rank_by_funding": {
+        # [2026-07-30 (hk)] HONEST NOTE: this lever cannot change what this book
+        # trades. It only reorders ADMISSION, and it is inert whenever
+        # candidates <= slots — measured, the maximum number of simultaneously
+        # golden coins over 192 aligned days was ONE, against six slots. It is
+        # kept (it costs nothing and binds once the universe is wide enough to
+        # oversubscribe the slots) but `trend.universe_n` below is the lever
+        # that actually moves the trade rate. `step: 0` is deliberate and is
+        # why audit_lever_bounds exempts binary levers from the step rule.
         "kind": "int", "lo": 0, "hi": 1, "lane": "lighter-books",
         "note": "Tide Rider ranks candidates by funding; env default 1 (on)", "env_default": 1, "step": 0},
+    # [2026-07-30 (hk)] THE TWO LEVERS THAT CAN ACTUALLY MOVE TIDE RIDER'S RATE.
+    # Until now this book had exactly ONE registered lever and it was inert by
+    # construction (above) — i.e. it was in the registry without being able to
+    # grow, the failure this tier exists to prevent, one level subtler than the
+    # six books that had no levers at all.
+    "trend.universe_n": {
+        # The scan ceiling: configured core first, then the scout's most-liquid
+        # books. `golden()` needs 202 CLOSED daily bars so young books are
+        # skipped for free; the real cost of a wider N is one candle fetch per
+        # coin per loop, which is why hi is 60 and not 220.
+        "kind": "int", "lo": 6, "hi": 60, "lane": "lighter-books",
+        "note": "Tide Rider scan universe (configured core + scout's most liquid); env default 24",
+        "env_default": 24, "step": 4},
+    "trend.max_open": {
+        # The capacity lever, registered so the SATURATED branch of the board's
+        # book author has something to step once a 24-wide universe can actually
+        # oversubscribe six slots. Inert until then, by construction — with a
+        # 6-coin universe the book never held more than one position.
+        "kind": "int", "lo": 2, "hi": 12, "lane": "lighter-books",
+        "note": "Tide Rider concurrent long slots; env default 6",
+        "env_default": 6, "step": 1},
+    "trend.min_vol_m": {
+        # Liquidity floor on the SCOUT-added books only — the configured majors
+        # are never filtered out by it. Restrict direction is UP (a higher floor
+        # admits fewer books), so the growth step is negative.
+        "kind": "float", "lo": 1.0, "hi": 50.0, "lane": "lighter-books",
+        "note": "Tide Rider scout-universe 24h $M liquidity floor; env default 5.0",
+        "env_default": 5.0, "step": -1.0},
     "sniper.surge_mult": {
         # the sniper's event (a brand-new listing) is too rare to grade —
         # n=1 in weeks, and `new_listings` is empty on the bus right now.

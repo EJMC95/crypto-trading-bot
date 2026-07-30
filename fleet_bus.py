@@ -262,10 +262,21 @@ def scout_universe(min_vol_m=0.0, limit=None, current_time=None):
     scout sees it: `[sym, ...]` ordered by 24h $volume descending, filtered
     to `min_vol_m` ($M) and truncated to `limit`.
 
-    WHY THIS EXISTS. Five books carried hand-typed watchlists written when
+    WHY THIS EXISTS. Books carried hand-typed watchlists written when
     Lighter was much smaller — Counterweight ranked 30 of 202 books (15%),
-    Snap Back 16 (8%), Tide Rider 6, Index Rider 3. A ranked selector
-    cannot pick a winner it never sees, and unlike loosening a gate,
+    Snap Back 16 (8%), Tide Rider 6, Index Rider 3.
+
+    [2026-07-30 (hk) WHO ACTUALLY CONSUMES THIS — the earlier text implied all
+    four did.] Shipped consumers: lighter_dislocation_bot (Snap Back),
+    lighter_funding_spread_bot (Counterweight) and, since (hk),
+    lighter_trend_bot (Tide Rider, 6 -> 16 measured on the live bus).
+    lighter_index_bot (Index Rider) STILL DOES NOT: its signal comes from
+    Yahoo equity dailies, not Lighter candles, so a scout-added book without a
+    verified YAHOO_REF mapping would publish nulls behind a log warning. Its
+    universe is 10 of the venue's 94 non-crypto books and widening it is a
+    separate job with its own prerequisite.
+
+    A ranked selector cannot pick a winner it never sees, and unlike loosening a gate,
     enlarging the candidate set does not weaken the selection rule at all:
     Counterweight still takes its top-K/bottom-K, just from a real
     cross-section. The scout already scans every book each cycle, so this

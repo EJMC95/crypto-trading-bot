@@ -42,6 +42,12 @@ BOOK_LEVERS = [
     "fundspread.k", "fundspread.universe_n",
     "disloc.enter_pct", "disloc.universe_n",
     "index.max_open", "trend.rank_by_funding", "sniper.surge_mult",
+    # [2026-07-30 (hk)] Tide Rider's rate levers. `trend.rank_by_funding` was
+    # its ONLY lever and is inert by construction (it reorders admission, and
+    # candidates never exceeded slots — max simultaneously-golden coins over
+    # 192 aligned days was ONE against six). A book whose sole lever cannot
+    # change what it trades has no growth rail; these three can.
+    "trend.universe_n", "trend.min_vol_m", "trend.max_open",
 ]
 
 
@@ -251,10 +257,24 @@ def test_optimised_defaults_are_what_shipped():
     assert disloc.ENTER_PCT == 0.98 and disloc.UNIVERSE_N == 40
     # Index Rider carried the fleet's LARGEST clip on a book with zero closes.
     assert index_bot.ORDER_USD == 100.0
-    assert len(index_bot.SYMBOLS) == 10, "the venue's non-crypto set"
+    # [2026-07-30 (hk)] 10 -> 9: XAG REMOVED. (fz) added it under `sma_cross`
+    # while this same file's reject list said "don't re-test: XAG (+1.2%
+    # regime / 55% DD cross)" — naming the very rule it was shipped under —
+    # and an independent 2y measure corroborates 38.7% maxDD against a 15%
+    # gate. WTI/XCU stay: their reject notes quote regime200 and they ship as
+    # sma_cross, a rule that sweep never tested for them; both are DECLARED in
+    # SLEEVE_EXEMPT with that reasoning.
+    assert len(index_bot.SYMBOLS) == 9, "the venue's non-crypto set, less XAG"
+    assert "XAG" not in index_bot.SYMBOLS and "XAG" not in index_bot.SLEEVES
     # every widened sleeve must have a rule, or the symbol is dead weight
     for sym in index_bot.SYMBOLS:
         assert sym in index_bot.SLEEVES, f"{sym} has no sleeve rule"
+    # and no sleeve ships against its own reject list without a stated reason
+    for sym in index_bot.SYMBOLS:
+        if sym in index_bot.REJECTED_SLEEVES:
+            assert sym in index_bot.SLEEVE_EXEMPT, (
+                f"{sym} is on REJECTED_SLEEVES with no declared exemption — "
+                f"re-testing a rejected sleeve needs a recorded reason")
     # Tide Rider now ranks by the signal class that actually earns here.
     assert trend.RANK_BY_FUNDING is True
 
@@ -780,3 +800,135 @@ def test_the_exit_constant_still_governs_the_entry_floor():
     note = fleet_tuning.LEVERS["disloc.exit_bps"]["note"]
     assert "ENTER_FLOOR_MULT" in note or "entry" in note.lower(), (
         "the note must record that this constant governs BOTH sides")
+
+
+# ===========================================================================
+# [2026-07-30 (hk)] TIDE RIDER: the widening, its prerequisite, and its author.
+#
+# The book had ZERO closes in 20 days and that was CORRECT — the 50/200 signal
+# never flipped. What was NOT correct: it ranked 6 of 220 markets while (fz),
+# CLAUDE.md and fleet_bus' own docstring all claimed it had been widened off
+# the scout. Only two of the five named consumers ever shipped.
+# ===========================================================================
+class TestTideRiderUniverse:
+    CORE = ["BTC", "ETH", "SOL", "BNB", "XRP", "TRX"]
+
+    def _bus(self, out):
+        class _B:
+            def scout_universe(self, min_vol_m=0.0, current_time=None):
+                if isinstance(out, Exception):
+                    raise out
+                return list(out)
+        return _B()
+
+    def test_the_import_and_the_copy_shipped_together(self):
+        """A guarded import + a missing COPY is a SILENT degrade to the
+        hand-typed six — precisely how (fz) 'widened' this book and moved
+        nothing. Both halves, asserted together."""
+        import pathlib as _p
+        assert trend.fleet_bus is not None, "fleet_bus import is dark"
+        root = _p.Path(__file__).resolve().parents[2]
+        df = (root / "Dockerfile.trendlighter").read_text()
+        assert "fleet_bus.py" in df, "image does not carry fleet_bus.py"
+
+    def test_widening_is_additive_and_ordered(self, monkeypatch):
+        monkeypatch.setattr(trend, "fleet_bus", self._bus(["HYPE", "ZEC"]))
+        got = trend.resolve_universe(self.CORE, 24, 5.0)
+        assert got == self.CORE + ["HYPE", "ZEC"]
+
+    @pytest.mark.parametrize("bus", [None, "empty", "raises"])
+    def test_a_dark_organ_can_never_shrink_the_book(self, monkeypatch, bus):
+        """THE CONTRACT: the widening is an enhancement, never a dependency.
+        Empty must read as 'keep my configured list', never 'trade nothing'."""
+        monkeypatch.setattr(trend, "fleet_bus",
+                            None if bus is None else
+                            self._bus([] if bus == "empty"
+                                      else RuntimeError("down")))
+        assert trend.resolve_universe(self.CORE, 24, 5.0) == self.CORE
+
+    def test_a_held_coin_is_always_scanned(self, monkeypatch):
+        """THE PREREQUISITE. Exits are evaluated only for scanned coins, and
+        this book's only sweeper (_flatten_all) is `not dry_run`-gated, so the
+        SHADOW arm has none. Before this, a coin leaving the universe kept its
+        position with no exit, no stop and no seatbelt, permanently — and
+        making the universe DYNAMIC is what turns that latent trap into a live
+        one. The two must ship together."""
+        monkeypatch.setattr(trend, "fleet_bus", self._bus([]))
+        assert trend.scan_universe(["BTC"], ["DOGE"], 24, 5.0) == ["BTC", "DOGE"]
+        # and under every degraded bus, because that is when it matters most
+        monkeypatch.setattr(trend, "fleet_bus", self._bus(RuntimeError("x")))
+        assert "DOGE" in trend.scan_universe(self.CORE, ["DOGE"], 24, 5.0)
+
+    def test_held_coins_append_so_admission_order_is_unchanged(self, monkeypatch):
+        monkeypatch.setattr(trend, "fleet_bus", self._bus([]))
+        assert trend.scan_universe(self.CORE, ["DOGE"], 24, 5.0)[:6] == self.CORE
+
+    def test_supports_never_skips_a_held_position(self):
+        """`supports()` answers an ENTRY question. Skipping a held coin on a
+        delist removed its exit, its stop and its seatbelt in one line."""
+        assert trend.skip_coin(False, 0.0) is True     # flat + unsupported
+        assert trend.skip_coin(False, 1.0) is False    # HELD: never skipped
+
+    def test_exit_predicates_are_the_production_ones(self):
+        """Bound to the module's functions, not re-implemented here — a local
+        copy is what let a DISABLED death cross pass this suite (measured)."""
+        assert trend.exit_reason(False, 0.10) == "death_cross"
+        assert trend.exit_reason(False, -0.99) == "death_cross"   # checked first
+        assert trend.exit_reason(True, -trend.CATASTROPHIC_STOP) == "catastrophic_stop"
+        assert trend.exit_reason(True, 0.0) is None
+
+    def test_levers_reach_the_consumer_and_revert_on_expiry(self, monkeypatch):
+        """Registered-but-inert is the failure this tier exists to prevent."""
+        was = (trend.UNIVERSE_N, trend.MIN_VOL_M, trend.MAX_OPEN_POSITIONS)
+        vals = {"trend.universe_n": 40, "trend.min_vol_m": 2.0,
+                "trend.max_open": 9}
+
+        class _T:
+            LEVERS = fleet_tuning.LEVERS
+            @staticmethod
+            def get_lever(name, default, **kw):
+                return vals.get(name, default)
+        try:
+            monkeypatch.setattr(trend, "tuning", _T)
+            moved = trend.apply_tuning()
+            assert trend.UNIVERSE_N == 40 and trend.MIN_VOL_M == 2.0
+            assert trend.MAX_OPEN_POSITIONS == 9
+            assert set(vals) <= set(moved), moved
+            # EXPIRY: get_lever falls back to its `default`, and apply_tuning
+            # must hand it the ENV snapshot — passing the moved value is the
+            # one-way ratchet (gc) had to fix on all six books.
+            vals.clear()
+            trend.apply_tuning()
+            assert trend.UNIVERSE_N == trend._ENV_DEFAULTS["UNIVERSE_N"]
+            assert trend.MIN_VOL_M == trend._ENV_DEFAULTS["MIN_VOL_M"]
+            assert trend.MAX_OPEN_POSITIONS == trend._ENV_DEFAULTS["MAX_OPEN_POSITIONS"]
+        finally:
+            (trend.UNIVERSE_N, trend.MIN_VOL_M,
+             trend.MAX_OPEN_POSITIONS) = was
+
+    def test_the_board_can_actually_author_this_book(self):
+        """(gb) again, one level subtler: Tide Rider was ABSENT from
+        BOOK_AUTHOR, so even a perfectly registered+consumed lever could never
+        be moved by anything."""
+        import evidence_board
+        assert "crypto-trend-daily-lshadow" in evidence_board.BOOK_AUTHOR
+        cap, gate = evidence_board.BOOK_AUTHOR["crypto-trend-daily-lshadow"]
+        assert gate == "trend.universe_n", "the universe IS this book's gate"
+        for lv in (cap, gate):
+            assert lv in fleet_tuning.LEVERS, lv
+            assert fleet_tuning.LEVERS[lv].get("step"), f"{lv} step cannot act"
+
+    def test_tradfi_switch_filters_scout_adds_only(self, monkeypatch):
+        """The scout ranks by turnover, so 9 of the 10 books it adds here are
+        tokenised equities/commodities. Keeping that is a DECISION (item 18
+        wants non-BTC regimes, and the signal is per-asset by construction) —
+        so it gets an explicit, reversible switch, not a silent default."""
+        monkeypatch.setattr(trend, "fleet_bus",
+                            self._bus(["HYPE", "XAU", "SOXL", "ZEC"]))
+        monkeypatch.setattr(trend, "ALLOW_TRADFI", False)
+        assert trend.resolve_universe(self.CORE, 24, 5.0) == self.CORE + ["HYPE", "ZEC"]
+        # a CONFIGURED tradfi coin is the operator's choice and is never
+        # dropped — the filter applies to SCOUT-ADDED books only.
+        assert trend.resolve_universe(["XAU"], 24, 5.0)[0] == "XAU"
+        monkeypatch.setattr(trend, "ALLOW_TRADFI", True)
+        assert "XAU" in trend.resolve_universe(self.CORE, 24, 5.0)

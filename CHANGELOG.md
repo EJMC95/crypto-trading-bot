@@ -1,3 +1,53 @@
+## 2026-07-30 (hk) — THE TWO BOOKS THAT NEVER CLOSED: the guidance was fine, the missiles were never loaded
+
+- **THE ASK** (operator): *"deep dive index rider and tide rider, we need them operating, and operating efficiently … find out why machine guns and missiles arent firing or the guidance systems not working"*, then *"widen"*, *"all the bells and whistles"*, *"make things work"*, *"if its not reaching something find something for it to reach and then give it the power to make something of it"*. Suite **648 → 663**, six guards green.
+
+### The diagnosis: not a bug, and the order ledger settles it
+
+A 31-agent workflow (7 dissection lanes → adversarial refutation → synthesis) put every close-blocking hypothesis through a refuter. The decisive evidence is not a code read:
+
+| book | `venue_orders`, ever | `broker.realized` |
+|---|---|---|
+| 📊 equities-regime-lshadow | **3 rows, all `buy`, zero `sell`** | 0.0 |
+| 🌊 crypto-trend-daily-lshadow | **1 row, `buy`, zero `sell`** | 0.0 |
+
+`ShadowBroker.close` writes its `venue_orders` row BEFORE it realises P&L and BEFORE `_record_close`, so a swallowed publish would still leave sell rows. There are none. No close was ever *attempted*. That **positively excludes** exit-unreachable, state-lost and publish-noop rather than merely failing to find them — and one verifier ran `lighter_trend_bot` in-process with `golden()` forced False and got a real close, a sell leg and a well-formed `publish_paper_trade` call with every kwarg binding.
+
+Why the trigger never fired: 📊's exit is `close < SMA200*0.99` and SPY sits **5.1%** away, QQQ 3.6%, IWM 9.0% — with SPY/QQQ reading long continuously since 8-Apr and IWM since 31-Mar, *months before the book existed on 13-Jul*. Not one intraday low came within 3.5% of the band. 🌊's TRX went golden 28-Mar and the book bought an already-golden state on 10-Jul; EMA50/EMA200 = 1.0224. Across its entire 20-day life its six-coin universe produced **zero signal flips of any kind**. Measured rate: 📊 **17.2 closes/yr**, 🌊 **0.42 closes/30d** at one filled slot.
+
+**Two of my own reconnaissance suspicions were wrong and are retracted here:** the seven flat sleeves were genuinely flat, not dark; and `funding_apr: 3.5` is a real venue read (3.2e-05 per 8h × 1095 × 100 = 3.504%, Lighter's pinned resting rate — a missing key prints 0.0, so absent and resting were already distinguishable).
+
+### What WAS wrong: the two books with zero closes are exactly the two the widening skipped
+
+- **`(fz)` claimed five books were widened off `fleet_bus.scout_universe()`. Only TWO consumers ever shipped** — `lighter_dislocation_bot` and `lighter_funding_spread_bot`. `lighter_trend_bot.py` had **no `fleet_bus` import at all**, and `Dockerfile.trendlighter` did not COPY it. Index Rider's "the venue's full non-crypto set" is **10 of 94** non-crypto books. The claim is in the changelog, in CLAUDE.md **and in `fleet_bus`' own docstring**; all three are corrected here.
+- 🌊 now resolves its universe from the scout, additively: **measured against the live bus, 6 → 16 books**, ten added (XAU, HYPE, SKHYNIXUSD, SNDK, MU, WTI, LIT, SPCX, XAG, SOXL). Five books on that bus are golden right now; the book could previously see exactly one of them.
+- **THE PREREQUISITE SHIPPED WITH IT, not after.** Exits are evaluated only for scanned coins, and this book's only sweeper (`_flatten_all`) is `not dry_run`-gated — the SHADOW arm had **none at all**. A coin leaving the configured list kept its position with no exit, no stop and no seatbelt, permanently. Making the universe DYNAMIC is precisely what turns that latent trap into a live one, so `scan_universe()` (resolved universe ∪ every HELD coin) landed in the same commit. `supports()` also no longer skips a held position — that one line removed a delisted holding's exit, stop and seatbelt together.
+- **The widening changes what kind of book this is, and it says so.** Nine of the ten scout-added books are tokenised equities/commodities, so a row called `crypto-trend-daily` becomes a venue-wide trend follower. Kept ON deliberately — the signal is per-coin EMA50/200 off that coin's own candles, so it is per-asset **by construction** and cannot breach the item-18 prerequisite (never BTC's gate for SPY/XAU/WTI); item 18 actively wants non-falling-BTC regimes; and the 202-closed-bar floor admits only books with real history. `TREND_ALLOW_TRADFI=0` reverts to crypto-only. **Honest scope: the 2.7yr +52% validation behind this bot is six crypto majors on Kraken spot and says nothing about XAU or SOXL.** Those sleeves are unvalidated and are there to be graded, on a $1k shadow book.
+- **`trend.rank_by_funding` could never have helped, and that is now recorded in the registry.** It only reorders admission and is inert while candidates ≤ slots — measured, the maximum number of simultaneously-golden coins over 192 aligned days was **ONE**, against six slots. Three levers that CAN move the rate are registered, consumed every loop, and auto-revert off an import-time env snapshot: `trend.universe_n` (6-60, step 4), `trend.min_vol_m` (1-50, step -1), `trend.max_open` (2-12, step 1).
+- **`max_open` is now recomputed EVERY loop.** It previously refreshed only when the clip changed, so `trend.max_open` would have been registered, consumed-looking and INERT for as long as the clip held still — the exact defect `(ge)` found on `fundspread.k`.
+- **The book had no AUTHOR either.** `crypto-trend-daily-lshadow` was absent from `evidence_board.BOOK_AUTHOR`, so even a perfect lever could never be moved by anything — `(gb)`'s class, one level subtler. Added as `("trend.max_open", "trend.universe_n")`: this book has no entry threshold to loosen, so its GATE is the universe.
+
+### 📊 Index Rider: a false FLAT, and a sleeve shipped against its own reject list
+
+- **`want_position` returned 0 for "not enough bars".** `sma()` returns None on a short series and every rule mapped that to **0** — so "I have no data" was byte-identical to "this book is in a downtrend", across seven of ten sleeves. Measured 30-Jul those seven were genuinely below their crosses, so nothing was wrong *that day*, which is exactly why it needed fixing before it mattered: on a book that trades ~17 times a year a dark feed could sit undetected for months. It now returns **None** — fail-closed both ways (no entry, and **no exit**: a held position must never be closed by a signal that does not exist; the catastrophic stop runs ahead of it and stays armed) — and the row publishes `bars` per sleeve so a dark feed is visible from the dashboard rather than the container log.
+- **`(fz)` shipped XAG, WTI and XCU as sleeves while this same file's reject list, 25 lines above, said "REJECTED by the same sweep (don't re-test)".**
+  - **XAG is REMOVED.** Its note names the **cross** rule specifically ("55% DD cross") — the exact rule `(fz)` shipped it under — and an independent 2y measure corroborates **38.7% maxDD**, inside the 37-44% band that retired 🏆 Stock Leaders against a 15% gate.
+  - **WTI and XCU stay, declared.** Their notes quote *regime200* results (-4.4%, +0.4%) and they ship under *sma_cross*, which that sweep never tested for them. That is a judgement, not evidence, so both are in `SLEEVE_EXEMPT` with the reasoning and owe a Lighter-tape backtest before any go-live claim.
+  - The list is now **machine-readable** (`REJECTED_SLEEVES` / `SLEEVE_EXEMPT`) and `_selftest_sleeves()` fails the build on a rejected sleeve with no declared reason. Prose 25 lines from the code it governs is not a control.
+
+### Tests: mutation-proven, including one that caught ME
+
+- 🌊's `--selftest` covered **only notional arithmetic** — mutation-proven: disabling all three production exits left it GREEN. It now covers the universe contract, the orphan rule and the exit predicates. **My first cut of the exit tests re-implemented the predicates inline and stayed GREEN when the production death cross was deleted** — a test of my own reasoning, not of the bot, and the same defect class `(hj)` documented four hours earlier. Fixed by EXTRACTING `exit_reason` / `seatbelt_hit` / `skip_coin` so the loop and the tests bind the same code. All four exit mutations now go red; so do re-adding XAG, restoring the false flat, and emptying `SLEEVE_EXEMPT`.
+- `tests/autonomy/test_book_levers.py` gains `TestTideRiderUniverse` (11 tests), including the import-and-COPY-together assertion — a guarded import plus a missing COPY is a silent degrade to the hand-typed six, which is exactly how `(fz)` "widened" this book and moved nothing.
+
+### What this does NOT do
+
+No exit rule was touched on either book — three buys and zero sells proved there was nothing to fix, and adding a take-profit or time stop would manufacture closes by destroying the edge the book exists to measure. No lever left its cage, no `dry_run` flipped, no real money moved. **Neither book is now gradeable against the go-live gate and neither is claimed to be:** 📊 needs ~17-21 months to accumulate 30 closes and 🌊 reaches ~2.5/30d widened, still 12x short. What changed is that both can now produce evidence at all.
+
+### Still open, named rather than dropped
+
+Neither book has ever had a **book-level Lighter-tape backtest** (the 15y Index lab is off-venue, inadmissible under the Lighter-only rule). 📊's book-level maxDD after the widening is unmeasured — sleeve-level MSTR 44.6% and TSLA 32.9% may dilute under 15% at $100/slot across nine sleeves, and that replay should run before anyone acts on the sleeve-DD numbers. `railway variables --service tide-rider-lighter-shadow` returns only `DATABASE_URL`/`VENUE`, so every clip and `max_open` figure here is the CODE default, not the running config. And 🌊 still never persists `last_ts`, so its funding-accrual clock restarts at every boot — 📊 fixed exactly this on 16-Jul; it is material (TRX has accrued +$1.05 on a $30 notional) and is the next cheap win.
+
 ## 2026-07-30 (hj) — THE LIVE TAKER'S SHORT-ONLY RULE WAS AN ENV VAR, and the four warn-only controls that let today's defects through
 
 *(RENUMBERED (gm) -> (hj) at push time. A concurrent session had taken (gm) through (hi) while this was being written; theirs is cited from the (gn)-(gv) chain and was already pushed, so per the convention it keeps the letter. Caught by THIS entry's own new cross-branch arm in `audit_changelog_letters` — on its first live run, against the exact class it was written for. Rule 2 exists because this keeps happening; it just happened again.)*

@@ -866,6 +866,14 @@ BOOK_AUTHOR = {
     "lighter-dislocation-lshadow":  (None, "disloc.enter_pct"),
     "equities-regime-lshadow":      ("index.max_open", None),
     "lighter-perp-sniper-lshadow":  (None, "sniper.surge_mult"),
+    # [2026-07-30 (hk)] Tide Rider was ABSENT from this map entirely, so its
+    # one lever could never be authored — registered, consumed, and
+    # unreachable, which is the (gb) class one level subtler. Its GATE is the
+    # universe: this book has no entry threshold to loosen, so "starved" means
+    # "it cannot see enough books to find a golden one". Measured: max
+    # simultaneously-golden coins over 192 aligned days = 1, against 6 slots,
+    # so the cap is not what binds — the candidate set is.
+    "crypto-trend-daily-lshadow":   ("trend.max_open", "trend.universe_n"),
 }
 BOOK_STARVED_H = float(os.environ.get("EVBOARD_BOOK_STARVED_H", "24"))
 
