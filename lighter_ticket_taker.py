@@ -1549,6 +1549,41 @@ def main(_ctx=None):
         net = pnl - drag - fees
         stats["closed"] += 1
         stats["wins" if net > 0 else "losses"] += 1
+        # [2026-07-30 (hm)] THE BASIS INVARIANT. A `_tp` cannot book a LOSS,
+        # and an `_sl` cannot book a PROFIT, beyond funding and fees. Both
+        # would be contradictions — and 39 of this book's 70 short-divergence
+        # `_tp` rows were exactly that, undetected for nine days.
+        #
+        # THE MECHANISM, measured: `exit_reason(entry, mark)` is handed
+        # `entry` = the ShadowBroker's book-WALKED fill while `mark` = the
+        # venue's `mark_price`, and the P&L is then booked by re-walking the
+        # real book. On BOT/USDC the mark sat ~7.4% BELOW its own book top
+        # (mean |px_fill/px_decision - 1| = 747.6 bps over 93 orders, against
+        # a ~9 bps ledger median), so a short opened at the book fill was born
+        # ~+7.5% in profit ON THE MARK BASIS, tripped tp on the very next
+        # 5-minute cycle, and closed by crossing an 81.9 bps spread for ~-0.7%.
+        # `pos.pop()` then freed the slot and `SL_COOLDOWN_H` only gates
+        # re-entry after an `sl`, so it re-entered every loop: 43 closes in
+        # 4.5 hours, 42 of 43 with close[i] == open[i+1] TO THE SECOND. One
+        # episode, not 43 trades, and -$6.16.
+        #
+        # This is a DETECTOR, not a gate: it never blocks a close (the trade
+        # already happened and the ledger row must be written) — it stamps the
+        # row and shouts, so the next occurrence is visible on the day it
+        # happens rather than nine days later in an audit. The proactive half
+        # is the basis check at the ORDER site below.
+        _contradiction = None
+        if reason == "tp" and net < -abs(drag) - fees - 1e-9:
+            _contradiction = "tp_booked_a_loss"
+        elif reason == "sl" and net > abs(drag) + fees + 1e-9:
+            _contradiction = "sl_booked_a_profit"
+        if _contradiction:
+            print(f"[ticket-taker] {iso(t_now)} LEDGER CONTRADICTION on {sym}: "
+                  f"{_contradiction} — reason={reason!r} net={net:+.4f} "
+                  f"pnl={pnl:+.4f} drag={drag:+.4f} fees={fees:.4f} "
+                  f"entry={entry} exit={exit_px}. The exit rule and the P&L are "
+                  f"reading DIFFERENT PRICE BASES; this row is not gradeable.",
+                  flush=True)
         lens = m.get("lens") or "ticket"
         side = "long" if is_long else "short"
         # tag format <side>-<lens>_<exit>: the ledger's reason parser splits
@@ -1588,7 +1623,13 @@ def main(_ctx=None):
             # (the first 6 breakoutup closes' features are unrecoverable).
             # Merge is setdefault-shaped: bars/bars_basis can never be
             # clobbered by an evidence key. Observable-only, both arms.
-            extra=_close_fill_extra(_close_extra(m), measured, fill_reason))
+            extra={**_close_fill_extra(_close_extra(m), measured, fill_reason),
+                   # [(hm)] stamped so the corruption is QUERYABLE. Nine days
+                   # of BOT/USDC churn were only found by a human eyeballing
+                   # exit reasons against P&L signs; a column makes it a WHERE
+                   # clause. Absent on a healthy row, so it costs nothing.
+                   **({"basis_contradiction": _contradiction}
+                      if _contradiction else {})})
         if not dry_run:
             try:
                 store.publish_venue_order(
@@ -2675,6 +2716,30 @@ def selftest():
     # so it gets the shadow set — and TT_VENUE is validated against TT_MODES
     # before this is ever reached)
     assert allowed_lenses("") == ALL_LENSES
+
+    # ---- (hm) THE BASIS INVARIANT: a _tp cannot book a loss --------------
+    # Reproduces the BOT/USDC shape exactly: the exit rule fired on a mark
+    # 7.4% away from the book the P&L was booked against, so the reason is
+    # honest and the row is still a contradiction.
+    def _contra(reason, net, drag, fees):
+        if reason == "tp" and net < -abs(drag) - fees - 1e-9:
+            return "tp_booked_a_loss"
+        if reason == "sl" and net > abs(drag) + fees + 1e-9:
+            return "sl_booked_a_profit"
+        return None
+    assert _contra("tp", -0.60, 0.0, 0.0) == "tp_booked_a_loss"   # the BOT shape
+    assert _contra("sl", +0.42, 0.0008, 0.0) == "sl_booked_a_profit"  # CXMT
+    # a HEALTHY row must stay silent, or the detector is noise
+    assert _contra("tp", +2.17, 0.0, 0.01) is None
+    assert _contra("sl", -1.17, 0.0, 0.01) is None
+    assert _contra("hold", -0.60, 0.0, 0.0) is None   # only tp/sl are claims
+    assert _contra("trail", +0.60, 0.0, 0.0) is None
+    # funding and fees are EXCUSED, not evidence: a short CREDITS funding, so a
+    # tp that lands slightly negative purely from drag+fees is not a basis bug
+    assert _contra("tp", -0.05, 0.04, 0.02) is None
+    assert _contra("tp", -0.30, 0.04, 0.02) == "tp_booked_a_loss"
+    # exactly at the boundary is not a contradiction (float-safe)
+    assert _contra("tp", -0.06, 0.04, 0.02) is None
 
     # ---- LIVE SIDE ALLOW-LIST (hj) — the twin, same fail-closed contract ----
     # THE INCIDENT THIS PINS: the live arm filled 12 `long-divergence` closes
