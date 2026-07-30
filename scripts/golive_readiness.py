@@ -258,6 +258,29 @@ POLICY_ERA = {
         "spot port on lighter_family_bot, same accrual fix, 6 closes opened "
         "before it. In-era t=-2.14 against a pooled t=-4.09; 1/6 bars either "
         "way, declared so the sample matches the code that produced it."),
+    # [2026-07-30 (hh)] DECLARED BEFORE THE SAMPLE EXISTS. These three are below
+    # the report's min-closes floor today (mum, avo-maria n=4, swing-daily n=1),
+    # so no measurement is quoted — and that is exactly why they belong here now.
+    # The brain scopes all three; without these the GATE would grade them
+    # all-time, i.e. WIDER than the brain, on whatever day they first accumulate
+    # ten closes. An era that arrives after the sample does is an era that
+    # arrives too late, and nobody would think to add it then.
+    "freqtrade-mum": (
+        "2026-07-17",
+        "family book on lighter_family_bot, same 17-Jul accrual fix. Below the "
+        "report's min-closes floor today, so no effect is quoted; declared now "
+        "because the gate must never grade a wider sample than the brain, and "
+        "the brain scopes this book from the same date."),
+    "freqtrade-avo-maria": (
+        "2026-07-17",
+        "family book on lighter_family_bot, same 17-Jul accrual fix, n=4 closes "
+        "today. Declared ahead of the sample for the same reason as mum: an era "
+        "added after a book becomes gradeable is an era nobody remembers to add."),
+    "crypto-swing-daily": (
+        "2026-07-17",
+        "spot port on lighter_family_bot, same 17-Jul accrual fix, n=1 close "
+        "today. Declared ahead of the sample; the brain scopes it from the same "
+        "date and the gate must not be the looser of the two."),
 }
 
 

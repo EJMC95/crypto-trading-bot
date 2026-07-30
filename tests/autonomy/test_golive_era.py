@@ -437,6 +437,27 @@ def test_the_gates_sample_is_never_WIDER_than_the_brains():
             f"a wider sample than the brain will hypothesise from")
 
 
+def test_no_LIVING_book_is_scoped_by_the_brain_but_not_by_the_gate():
+    """[(hh)] The other direction, and the one that bites silently. A book the
+    brain scopes and the gate does NOT is a book the gate grades ALL-TIME — the
+    looser of the two, on the side that decides real money. It reads as fine
+    until the day the book crosses the report's min-closes floor, and nobody
+    thinks to add an era then. Retired books are excluded: they are history and
+    the liveness filter drops them before any lookup."""
+    import bot_learn
+    from cleanup_legacy_bots import LEGACY_BOTS
+    retired_bases = {g.era_base(b) for b in LEGACY_BOTS}
+    # the two entries deliberately frozen pre-accrual-fix are RETIRED strategies
+    frozen = {"crypto-trendmomo-4h", "perps-regime-switch"}
+    missing = [b for b in bot_learn.ERA_START
+               if b not in g.POLICY_ERA and b not in retired_bases
+               and b not in frozen]
+    assert not missing, (
+        f"the brain scopes {missing} and the go-live gate does not — the gate "
+        "would grade them all-time, i.e. wider than the brain, on whatever day "
+        "they become gradeable")
+
+
 # --------------------------------------------------------------------------
 # 7. The operator has to be able to SEE that the sample was scoped.
 # --------------------------------------------------------------------------

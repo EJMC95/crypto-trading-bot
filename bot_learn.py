@@ -267,15 +267,48 @@ def fee_rt_for(bot, venue_fees=None):
 # Without this the brain prosecutes today's strategy for yesterday's crimes
 # (e.g. flagging pairs the dead 15m scalper bled on). Trades opened before a
 # bot's era-start still show in lifetime tallies but generate no hypotheses.
+# [2026-07-30 (hh)] THE SIX FAMILY/SPOT ERAS WERE STILL EARLIER THAN THE ACCRUAL
+# FIX. Each was set for a STRATEGY change (13/14-Jul) and each was therefore
+# still pooling pre-17-Jul closes whose `accrued` was 8x — `lighter_family_bot`
+# publishes all six and carries "[2026-07-17 BASIS FIX ii]" on its accrual line.
+# (hg) left this as a stated follow-up rather than a side effect of a real-money
+# commit; this is that follow-up.
+#
+# THE RULE, so a future entry cannot get it wrong: **an era is the LATEST of
+# every invalidating change that applies to the book.** Two eras do not compose
+# into a range — a sample must exclude BOTH the old strategy and the old
+# accounting, and 17-Jul > 14-Jul does exactly that. Moving these dates FORWARD
+# therefore preserves each original reason instead of discarding it; the earlier
+# reason is kept in the comment because it is what the date must never go BELOW.
+# Strictly narrower, so strictly restrict-only: a bucket that falls under the
+# n>=30 floor stops generating hypotheses, which is the fail-closed direction.
 ERA_START = {
-    "crypto-intraday-15m": "2026-07-13T00:00",   # 13-Jul: range_meanrev retired + counter-trend stop 2.0->3.5x
-    "crypto-swing-daily":  "2026-07-03T06:00",   # ungated range -> validated dip + bounce
-    "crypto-breakout-4h":  "2026-07-14T00:00",   # 14-Jul: BTC-tide gate on breakout entries (backtest-validated)
-    "crypto-trendmomo-4h": "2026-07-03T06:00",   # 4h/20-alt -> 1d BTC+ETH 10/40 (retired 12-Jul)
-    "perps-regime-switch": "2026-07-03T10:00",   # EMA-cross -> Donchian entries (retired 12-Jul)
-    "freqtrade-georgia":   "2026-07-13T00:00",   # 13-Jul: same DayTraderV5Gated sleeve/stop changes
-    "freqtrade-mum":       "2026-07-14T00:00",   # 14-Jul: whitelist curated to the 10 backtest-positive pairs
-    "freqtrade-dad":       "2026-07-14T00:00",   # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier)
+    # 13-Jul: range_meanrev retired + counter-trend stop 2.0->3.5x; 17-Jul accrual basis
+    "crypto-intraday-15m": "2026-07-17T00:00",
+    # ungated range -> validated dip + bounce (3-Jul); 17-Jul accrual basis
+    "crypto-swing-daily":  "2026-07-17T00:00",
+    # 14-Jul: BTC-tide gate on breakout entries (backtest-validated); 17-Jul accrual basis
+    "crypto-breakout-4h":  "2026-07-17T00:00",
+    "crypto-trendmomo-4h": "2026-07-03T06:00",   # 4h/20-alt -> 1d BTC+ETH 10/40 (RETIRED 12-Jul — pre-dates the accrual fix entirely, left as history)
+    "perps-regime-switch": "2026-07-03T10:00",   # EMA-cross -> Donchian entries (RETIRED 12-Jul — same)
+    # 13-Jul: same DayTraderV5Gated sleeve/stop changes; 17-Jul accrual basis
+    "freqtrade-georgia":   "2026-07-17T00:00",
+    # 14-Jul: whitelist curated to the 10 backtest-positive pairs; 17-Jul accrual basis
+    "freqtrade-mum":       "2026-07-17T00:00",
+    # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier); 17-Jul accrual basis
+    "freqtrade-dad":       "2026-07-17T00:00",
+    # never had an era; same publisher, same accrual fix
+    "freqtrade-avo-maria": "2026-07-17T00:00",
+    # [2026-07-30 (hh)] 🎫 Ticket Taker — REAL MONEY, and it had no brain era at
+    # all while the go-live gate gained one in (hg). It accrues (its divergence
+    # lens exists to collect the credit) and carried the same 8x defect modelled
+    # inline. Its own note: the inflated credit "flattered the one number that
+    # could earn this bot a go-live" — and the brain's lens-forward grades are a
+    # taker VETO, so an inflated number here reaches an actuator.
+    "lighter-ticket-taker": "2026-07-17T00:00",
+    # [2026-07-30 (hh)] ⚖️ Counterweight — the book whose own basis-fix note says
+    # its "entire reported profit was this artifact". No brain era until now.
+    "perps-funding-spread": "2026-07-17T00:00",
     # [2026-07-30 (hd)] 🌾 Yield Harvester. Not a strategy change — an
     # ACCOUNTING one, which is the purest case this table exists for. The
     # lighter_shadow arm's accrual basis was fixed from per-hour to the venue's
