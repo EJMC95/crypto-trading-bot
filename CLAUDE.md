@@ -674,12 +674,34 @@ All new bots:
   Measured six minutes after the dispatch woke the second: n=82 with
   `extra.caps` → **n=71, caps=None, build=None**. `funding_carry_bot.py` emits
   `caps` unconditionally, so caps=None proves the winner is not running HEAD.
-  The paper LEDGER is CLEAN (82 closes, zero duplicate trade_ids) so the
-  go-live grade and the baseline are intact — the casualty is the summary row.
-  **OPERATOR ACTION OUTSTANDING: one of the two services must be STOPPED in
-  Railway**; a deploy rule cannot fix a duplicate that is already running, and
-  the row will flap until then. Lesson: a duplicate PUBLISHER is not a
-  duplicate DEPLOY — ask "do they share a key?", not "is redeploying cheap?"]**
+  ~~The paper LEDGER is CLEAN (82 closes, zero duplicate trade_ids) so the
+  go-live grade and the baseline are intact — the casualty is the summary row.~~
+  **[2026-07-30 (hf) — THAT SENTENCE WAS WRONG, and the check behind it could
+  not have shown what it was used to show.** Two independent processes open at
+  different moments, so their `trade_id`s (`{coin}:{opened_ts}`) never collide —
+  a duplicate-id scan is blind to duplicate WRITERS by construction. The
+  detector that works: a carry process keys `positions` by coin and enters only
+  `if c not in positions`, so **one process cannot hold two positions in the
+  same coin**. Measured across all 28 books / 1,706 episodes, same-pair
+  overlapping holds appear in exactly TWO — `perps-funding-carry-lshadow`
+  (7 overlaps, deepest **9.14h** on HYPE) and retired `event-listing-sniper`
+  (a pair-naming collision across ~100 CEXes, declared). Every other book reads
+  zero. Second, independent line: that ledger reaches **10 concurrent positions
+  on 27 occasions** while its own `MAX_POSITIONS` was **8** until 30-Jul. And
+  the STATE key is shared too — the bot persists `positions` to
+  `bot_state[bot_id]` and restores at boot, so two processes clobber one
+  position map and a single logical position can be closed by both. **So the
+  casualty is not just the summary row: the graded LEDGER is not one book's
+  record, and `t` scales with sqrt(n).** Guarded by
+  `scripts/audit_ledger_integrity.py` (registered selftest; exits non-zero on a
+  LIVING two-writer book).]**
+  **OPERATOR ACTION OUTSTANDING — now more than cosmetic: one of the two
+  services must be STOPPED in Railway**; a deploy rule cannot fix a duplicate
+  that is already running, a guard cannot un-pool closes two processes already
+  wrote, and every grade over this window inherits the pooling. Lesson: a
+  duplicate PUBLISHER is not a duplicate DEPLOY — ask "do they share a key?",
+  not "is redeploying cheap?" — and when you check whether a shared key did
+  damage, pick a test that COULD detect the damage.]**
   **[2026-07-22 CORRECTION — this paragraph was WRONG about two of them.]** The
   `paths:` filter DOES carry `lighter_ticket_taker.py`, `lighter_ticket_replay.py`,
   `venues/**` and most of the intelligence layer (`lighter_market_scout`,

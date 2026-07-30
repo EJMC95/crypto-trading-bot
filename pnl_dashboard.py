@@ -1609,6 +1609,25 @@ def golive_card():
                     f'style="color:#8250df;background:rgba(130,80,223,.14);'
                     f'border-radius:3px;padding:0 3px;font-size:.75em">'
                     f'era {html.escape(str(era.get("since"))[5:])}</span>')
+            # [2026-07-30 (hf)] LEDGER INTEGRITY. A book whose ledger shows a
+            # same-pair overlap cannot have come from one process, so its `n` is
+            # not one book's trades and none of the six bars means what it says.
+            # Rendered as a loud chip rather than folded into `fails`, because
+            # this invalidates the row rather than adding a reason to it.
+            integ = b.get("integrity") if isinstance(b.get("integrity"), dict) else None
+            if integ and integ.get("two_writers"):
+                era_chip += (
+                    f'<span title="TWO WRITERS: '
+                    f'{integ.get("same_pair_overlaps")} same-pair overlap(s), '
+                    f'deepest {integ.get("deepest_overlap_h")}h on '
+                    f'{html.escape(str(integ.get("deepest_overlap_pair")))}, peak '
+                    f'{integ.get("peak_concurrent")} concurrent. One process '
+                    f'cannot hold two positions in one symbol, so this ledger is '
+                    f'more than one book&#39;s record and n/t do not mean what '
+                    f'they say. Operator action: stop the duplicate service." '
+                    f'style="color:#d1242f;background:rgba(209,36,47,.14);'
+                    f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                    f'2 writers</span>')
             miss = "; ".join(str(x) for x in (b.get("fails") or [])[:2])
             col = ("#1a7f37" if is_ready else
                    "#d29922" if np_ >= 5 else "#8b949e")

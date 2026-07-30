@@ -255,6 +255,70 @@ def bar_map(s):
     }
 
 
+# ---------------------------------------------------------------------------
+# LEDGER INTEGRITY — is this book's ledger ONE book's record? [(hf)]
+# ---------------------------------------------------------------------------
+# These primitives live HERE, in the module that ships inside the freqtrade
+# image and does the grading, rather than in `audit_ledger_integrity.py` which
+# imports them. One owner, and the owner is the consumer that has to fail
+# closed: a grader that cannot tell a pooled ledger from a clean one will keep
+# reporting a `t` computed over two books' trades. (Importing the other
+# direction would put a non-shipped module inside the image's import graph — the
+# born-dark class the (17-Jul) guard exists for.)
+
+#: Below this, a same-pair "overlap" is a close-and-reopen inside ONE bot loop:
+#: the position is deleted and the entry block runs later in the same iteration,
+#: so open2 == close1 to the millisecond. Measured on the carry book those sit
+#: at 0.3s while the real overlaps are 2-9 HOURS.
+LEDGER_MIN_OVERLAP_S = float(os.environ.get("LEDGER_MIN_OVERLAP_S", "60"))
+
+
+def parse_stamp(s):
+    """Tolerant ISO parse. The listing sniper writes '2026-07-13 15:05:04 UTC',
+    which `fromisoformat` rejects — its 337 rows were unreadable for two days
+    over exactly this (15-Jul audit fix)."""
+    t = str(s).strip().replace("Z", "+00:00")
+    if t.endswith(" UTC"):
+        t = t[:-4] + "+00:00"
+    from datetime import datetime
+    return datetime.fromisoformat(t)
+
+
+def same_pair_overlaps(eps, min_gap_s=None):
+    """[(pair, hours_inside)] where one hold opens INSIDE another on the same
+    pair, deepest first.
+
+    Structural proof of a SECOND WRITER for any book whose position map is keyed
+    by symbol — which every Lighter book here is (`if c not in positions`). It is
+    the detector that `(gn)`'s duplicate-`trade_id` scan could not be: two
+    processes open at different moments, so their ids never collide."""
+    min_gap_s = LEDGER_MIN_OVERLAP_S if min_gap_s is None else min_gap_s
+    by = {}
+    for pair, o, c in eps:
+        by.setdefault(pair, []).append((o, c))
+    hits = []
+    for pair, v in by.items():
+        v.sort()
+        for i in range(len(v) - 1):
+            gap = (v[i][1] - v[i + 1][0]).total_seconds()
+            if gap > min_gap_s:
+                hits.append((pair, gap / 3600.0))
+    return sorted(hits, key=lambda x: -x[1])
+
+
+def peak_concurrency(eps):
+    """Most positions open at once, from the intervals alone. The SECOND
+    detector only — caps move (carry's went 8 -> 12 on 30-Jul) and the ledger
+    does not record which cap was in force, so an over-cap reading corroborates
+    and never accuses on its own."""
+    ev = sorted([(o, 1) for _p, o, _c in eps] + [(c, -1) for _p, _o, c in eps])
+    cur = mx = 0
+    for _t, d in ev:
+        cur += d
+        mx = max(mx, cur)
+    return mx
+
+
 def book_payload(s):
     """The published per-book numbers for one sample, tolerating n<2.
 
@@ -485,8 +549,18 @@ def main():
     for bot in sorted(books):
         rs = sorted(books[bot], key=_key)
         era_epoch, era_iso, era_why = era_epoch_for(bot)
-        parsed, parsed_all = [], []
+        parsed, parsed_all, integ_eps = [], [], []
         for r in rs:
+            # [(hf)] intervals for the integrity check, over the WHOLE ledger:
+            # a second writer is a property of the book's record, not of the era
+            # being graded, and narrowing to the era could hide it.
+            if r.get("open_ts") and r.get("close_ts"):
+                try:
+                    integ_eps.append((str(r.get("pair")),
+                                      parse_stamp(r["open_ts"]),
+                                      parse_stamp(r["close_ts"])))
+                except (TypeError, ValueError):
+                    pass
             try:
                 from experiment_judge import parse_ts
                 from datetime import datetime, timezone
@@ -507,7 +581,25 @@ def main():
         if s_all.get("n", 0) < a.min_closes:
             continue
         ok, fails = grade(s)
+        # [2026-07-30 (hf)] LEDGER INTEGRITY IS A PRECONDITION, not a bar. It
+        # does not join BAR_NAMES — that tuple is the published contract the
+        # dashboard renders and a seventh entry breaks every consumer — but a
+        # book whose ledger cannot have come from one process is NOT GRADEABLE,
+        # so it can never be READY. Fail-closed, and the reason is stated in
+        # `fails` where a human reads it.
+        overlaps = same_pair_overlaps(integ_eps)
+        if overlaps:
+            # FIRST in the list, not appended: the printed verdict shows
+            # `fails[:2]` and this is the one failure that invalidates the other
+            # five rather than adding to them. Buried at position three it was
+            # invisible in exactly the run that needed it.
+            fails = [f"LEDGER: {len(overlaps)} same-pair overlap(s), deepest "
+                     f"{overlaps[0][1]:.2f}h on {overlaps[0][0]} — TWO WRITERS, "
+                     f"n is not one book's trades"] + fails
+            ok = False
         ok_old, fails_old = grade(s, legacy=True)
+        if overlaps:
+            ok_old = False
         verdict = "READY" if ok else "; ".join(fails[:2])
         flag = ""
         if ok and not ok_old:
@@ -550,7 +642,16 @@ def main():
             "era": ({"since": era_iso, "why": era_why,
                      "closes_in_era": s.get("n", 0),
                      "closes_all_time": s_all.get("n", 0)} if era_iso else None),
-            "alltime": book_payload(s_all)}
+            "alltime": book_payload(s_all),
+            # [(hf)] Published so a consumer can render the warning without
+            # string-matching `fails`, exactly as `bars` did for the bar map.
+            "integrity": {
+                "two_writers": bool(overlaps),
+                "same_pair_overlaps": len(overlaps),
+                "deepest_overlap_h": (round(overlaps[0][1], 2) if overlaps
+                                      else 0.0),
+                "deepest_overlap_pair": (overlaps[0][0] if overlaps else None),
+                "peak_concurrent": peak_concurrency(integ_eps)}}
     print()
     print(f"READY: {ready or 'none'}")
 

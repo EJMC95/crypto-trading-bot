@@ -92,6 +92,15 @@ SELFTEST_MODULES = [
     # detection, and the CALIBRATION gate — no reproduction of the observed
     # result, no recommendation, fail-closed when no baseline is supplied.
     "scripts.study_exit_sweep",
+    # [2026-07-30 (hf)] LEDGER INTEGRITY — is a book's ledger ONE book's record?
+    # --selftest is fully offline and pins the discrimination that makes the
+    # detector usable rather than alarming: sequential holds on one symbol are
+    # clean, a close-and-reopen inside a single loop (sub-60s, identical stamps)
+    # must NOT fire, a hold that opens HOURS inside another on the same symbol
+    # must, a DECLARED book reports the same overlaps without the accusation,
+    # rows missing a stamp are skipped rather than guessed, and the sniper's
+    # '... UTC' dialect still parses.
+    "scripts.audit_ledger_integrity",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",

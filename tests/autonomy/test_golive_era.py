@@ -334,6 +334,105 @@ def test_the_card_carries_the_all_time_reading_it_replaced(monkeypatch):
     assert "All-time would read" in out, out[:600]
 
 
+# --------------------------------------------------------------------------
+# 8. LEDGER INTEGRITY is a PRECONDITION, not a seventh bar. [(hf)]
+# --------------------------------------------------------------------------
+
+def _eps(*spans):
+    """(pair, open, close) episodes from (pair, open_h, close_h) triples."""
+    from datetime import datetime, timedelta, timezone
+    t0 = datetime(2026, 7, 20, tzinfo=timezone.utc)
+    return [(p, t0 + timedelta(hours=o), t0 + timedelta(hours=c))
+            for p, o, c in spans]
+
+
+def test_one_process_sequential_holds_are_clean():
+    """Close-and-reopen on the same symbol is the NORMAL shape — the bot deletes
+    the position and the entry block runs later in the same loop, so open2 ==
+    close1. If that fired, every book in the fleet would read as compromised."""
+    assert g.same_pair_overlaps(_eps(("BTC", 0, 5), ("BTC", 5, 9))) == []
+    assert g.peak_concurrency(_eps(("BTC", 0, 5), ("ETH", 1, 4))) == 2
+
+
+def test_a_hold_opening_INSIDE_another_on_one_symbol_is_two_writers():
+    """The detector. A carry process keys `positions` by coin and enters only
+    `if c not in positions`, so this shape is structurally impossible for one
+    process — which is what makes it proof rather than a heuristic."""
+    hits = g.same_pair_overlaps(_eps(("BTC", 0, 5), ("BTC", 3, 8)))
+    assert len(hits) == 1 and abs(hits[0][1] - 2.0) < 1e-9, hits
+
+
+def test_sub_threshold_jitter_does_not_fire():
+    from datetime import datetime, timedelta, timezone
+    t0 = datetime(2026, 7, 20, tzinfo=timezone.utc)
+    eps = [("BTC", t0, t0 + timedelta(hours=5)),
+           ("BTC", t0 + timedelta(hours=5, seconds=-30), t0 + timedelta(hours=9))]
+    assert g.same_pair_overlaps(eps) == [], "30s of loop jitter is not a writer"
+
+
+def test_a_two_writer_book_can_never_be_READY(capsys, monkeypatch):
+    """The whole point of wiring it into the grader. A flawless book on all six
+    bars must still be refused if its ledger cannot have come from one process —
+    `n` is not one book's trades and `t` scales with sqrt(n). Fail-closed."""
+    import bot_pnl_store as store
+    rows = []
+    for i in range(40):        # 40 clean sequential winners over 40 days
+        rows.append({"bot": "book-dup", "pair": f"C{i}", "profit_abs": 3.0,
+                     "profit_ratio": 0.01,
+                     "open_ts": f"2026-06-{1 + i % 28:02d}T00:00:00+00:00",
+                     "close_ts": f"2026-07-{1 + i % 28:02d}T00:00:00+00:00"})
+    monkeypatch.setattr(store, "fetch_paper_trades", lambda limit=2000: rows)
+    monkeypatch.setattr(sys, "argv", ["golive_readiness.py", "--min-closes", "10"])
+    g.main()
+    clean = capsys.readouterr().out
+    assert "book-dup" in clean
+
+    # now add ONE overlapping pair — nothing else changes
+    rows.append({"bot": "book-dup", "pair": "C0", "profit_abs": 3.0,
+                 "profit_ratio": 0.01,
+                 "open_ts": "2026-06-02T00:00:00+00:00",
+                 "close_ts": "2026-07-05T00:00:00+00:00"})
+    g.main()
+    out = capsys.readouterr().out
+    assert "TWO WRITERS" in out, out[-1200:]
+    assert "READY: none" in out or "book-dup" not in (
+        out.split("READY:")[-1]), "a two-writer book must never be READY"
+
+
+def test_the_card_shouts_when_a_ledger_has_two_writers(monkeypatch):
+    b = _era_book()
+    b["integrity"] = {"two_writers": True, "same_pair_overlaps": 7,
+                      "deepest_overlap_h": 9.14, "deepest_overlap_pair": "HYPE",
+                      "peak_concurrent": 10}
+    out = _card({CARRY: b}, monkeypatch)
+    assert ">2 writers</span>" in out, out[:500]
+    assert "HYPE" in out and "stop the duplicate service" in out.lower()
+
+
+def test_the_card_is_silent_when_the_ledger_is_clean(monkeypatch):
+    b = _era_book()
+    b["integrity"] = {"two_writers": False, "same_pair_overlaps": 0,
+                      "deepest_overlap_h": 0.0, "deepest_overlap_pair": None,
+                      "peak_concurrent": 4}
+    out = _card({CARRY: b}, monkeypatch)
+    assert ">2 writers</span>" not in out
+
+
+def test_the_audit_and_the_gate_share_ONE_owner():
+    """A second copy of the detector would let the audit and the gate disagree
+    about the same ledger. The audit imports the grader's primitives; the
+    reverse would drag a non-shipped script into the freqtrade image's import
+    graph, which is the born-dark class."""
+    src = (_ROOT / "scripts/audit_ledger_integrity.py").read_text()
+    assert "from golive_readiness import" in src
+    assert "\ndef same_pair_overlaps(" not in src, (
+        "the audit re-defines the detector — one owner or they will drift")
+    assert "\ndef peak_concurrency(" not in src
+    import audit_ledger_integrity as a
+    assert a.same_pair_overlaps is g.same_pair_overlaps
+    assert a.peak_concurrency is g.peak_concurrency
+
+
 def test_a_book_with_no_era_key_renders_unchanged(monkeypatch):
     """Backwards compatibility in the safe direction: a payload from a publisher
     that predates (hc) has no `era` key at all, and must render exactly as
