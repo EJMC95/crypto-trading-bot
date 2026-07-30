@@ -267,15 +267,75 @@ def fee_rt_for(bot, venue_fees=None):
 # Without this the brain prosecutes today's strategy for yesterday's crimes
 # (e.g. flagging pairs the dead 15m scalper bled on). Trades opened before a
 # bot's era-start still show in lifetime tallies but generate no hypotheses.
+# [2026-07-30 (hh)] THE SIX FAMILY/SPOT ERAS WERE STILL EARLIER THAN THE ACCRUAL
+# FIX. Each was set for a STRATEGY change (13/14-Jul) and each was therefore
+# still pooling pre-17-Jul closes whose `accrued` was 8x — `lighter_family_bot`
+# publishes all six and carries "[2026-07-17 BASIS FIX ii]" on its accrual line.
+# (hg) left this as a stated follow-up rather than a side effect of a real-money
+# commit; this is that follow-up.
+#
+# THE RULE, so a future entry cannot get it wrong: **an era is the LATEST of
+# every invalidating change that applies to the book.** Two eras do not compose
+# into a range — a sample must exclude BOTH the old strategy and the old
+# accounting, and 17-Jul > 14-Jul does exactly that. Moving these dates FORWARD
+# therefore preserves each original reason instead of discarding it; the earlier
+# reason is kept in the comment because it is what the date must never go BELOW.
+# Strictly narrower, so strictly restrict-only: a bucket that falls under the
+# n>=30 floor stops generating hypotheses, which is the fail-closed direction.
 ERA_START = {
-    "crypto-intraday-15m": "2026-07-13T00:00",   # 13-Jul: range_meanrev retired + counter-trend stop 2.0->3.5x
-    "crypto-swing-daily":  "2026-07-03T06:00",   # ungated range -> validated dip + bounce
-    "crypto-breakout-4h":  "2026-07-14T00:00",   # 14-Jul: BTC-tide gate on breakout entries (backtest-validated)
-    "crypto-trendmomo-4h": "2026-07-03T06:00",   # 4h/20-alt -> 1d BTC+ETH 10/40 (retired 12-Jul)
-    "perps-regime-switch": "2026-07-03T10:00",   # EMA-cross -> Donchian entries (retired 12-Jul)
-    "freqtrade-georgia":   "2026-07-13T00:00",   # 13-Jul: same DayTraderV5Gated sleeve/stop changes
-    "freqtrade-mum":       "2026-07-14T00:00",   # 14-Jul: whitelist curated to the 10 backtest-positive pairs
-    "freqtrade-dad":       "2026-07-14T00:00",   # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier)
+    # 13-Jul: range_meanrev retired + counter-trend stop 2.0->3.5x; 17-Jul accrual basis
+    "crypto-intraday-15m": "2026-07-17T00:00",
+    # ungated range -> validated dip + bounce (3-Jul); 17-Jul accrual basis
+    "crypto-swing-daily":  "2026-07-17T00:00",
+    # 14-Jul: BTC-tide gate on breakout entries (backtest-validated); 17-Jul accrual basis
+    "crypto-breakout-4h":  "2026-07-17T00:00",
+    "crypto-trendmomo-4h": "2026-07-03T06:00",   # 4h/20-alt -> 1d BTC+ETH 10/40 (RETIRED 12-Jul — pre-dates the accrual fix entirely, left as history)
+    "perps-regime-switch": "2026-07-03T10:00",   # EMA-cross -> Donchian entries (RETIRED 12-Jul — same)
+    # 13-Jul: same DayTraderV5Gated sleeve/stop changes; 17-Jul accrual basis
+    "freqtrade-georgia":   "2026-07-17T00:00",
+    # 14-Jul: whitelist curated to the 10 backtest-positive pairs; 17-Jul accrual basis
+    "freqtrade-mum":       "2026-07-17T00:00",
+    # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier); 17-Jul accrual basis
+    "freqtrade-dad":       "2026-07-17T00:00",
+    # never had an era; same publisher, same accrual fix
+    "freqtrade-avo-maria": "2026-07-17T00:00",
+    # [2026-07-30 (hh)] 🎫 Ticket Taker — REAL MONEY, and it had no brain era at
+    # all while the go-live gate gained one in (hg). It accrues (its divergence
+    # lens exists to collect the credit) and carried the same 8x defect modelled
+    # inline. Its own note: the inflated credit "flattered the one number that
+    # could earn this bot a go-live" — and the brain's lens-forward grades are a
+    # taker VETO, so an inflated number here reaches an actuator.
+    "lighter-ticket-taker": "2026-07-17T00:00",
+    # [2026-07-30 (hh)] ⚖️ Counterweight — the book whose own basis-fix note says
+    # its "entire reported profit was this artifact". No brain era until now.
+    "perps-funding-spread": "2026-07-17T00:00",
+    # [2026-07-30 (hd)] 🌾 Yield Harvester. Not a strategy change — an
+    # ACCOUNTING one, which is the purest case this table exists for. The
+    # lighter_shadow arm's accrual basis was fixed from per-hour to the venue's
+    # own per-8h settlement, and for a funding book `accrued` IS the reported
+    # P&L and its win/loss call. So every pre-fix close is denominated in a unit
+    # the book no longer uses. Measured (hc): 25 closes opened before it total
+    # +$62.03; the 57 since total -$0.91. The brain was grading the two
+    # together, and `brain-diagnosis` carries an ACTUATOR-bearing
+    # `regime_gate` on this book's `long` bucket — a bucket whose entire
+    # positive evidence is 3 pre-fix decay wins.
+    # NOTE this key also matches the RETIRED HL arm `perps-funding-carry`,
+    # harmlessly: it is in LEGACY_BOTS and the liveness filter drops it before
+    # any era lookup. Keyed EXACTLY, not by substring — substring-matching this
+    # same pair is the (gr) near-miss that would have exempted the living twin.
+    "perps-funding-carry": "2026-07-17T00:00",
+    # [2026-07-30 (hg)] 💸 Funding Farmer — the SAME accrual-basis fix, and this
+    # key covers a REAL-MONEY row. `era_epoch_for` strips both suffixes, so one
+    # entry scopes `perps-funding-lighter-lighter` (live) and `-lshadow`.
+    # The bot's own accrual comment: the pre-fix figure "reaches the per-trade
+    # ledger AND the win/loss call — an inflated carry credit inflates the win
+    # rate of a book that COLLECTS carry". The brain grades WIN RATE (post_wr,
+    # Wilson bounds, the whole v3 evidence stack) off that ledger, and it has
+    # had jurisdiction over the live Farmer's tag since (bb). Measured: the live
+    # row's win rate is 63% pooled and 50% in-era; the shadow twin's 56% -> 45%.
+    # A brain reasoning about a real-money book from an inflated win rate is the
+    # precise failure this table exists to prevent.
+    "perps-funding-lighter": "2026-07-17T00:00",
 }
 
 
@@ -294,9 +354,31 @@ def era_epoch_for(bot):
         a `"2026-07-14T00:00"` era at char 10 (`' '` < `'T'`) and was wrongly
         excluded. Comparing PARSED epochs fixes both — every stamp normalises
         through `_epoch` regardless of format.
+
+    [2026-07-30 (hg)] THIRD BUG, same function, and it needed a book whose OWN
+    NAME ends in a venue suffix to surface. The strip was
+    `.rsplit("-lshadow",1)[0].rsplit("-lighter",1)[0]` — two strips, always —
+    and 💸 Funding Farmer is named `perps-funding-lighter`:
+
+        perps-funding-lighter          -> 'perps-funding'          (misses itself)
+        perps-funding-lighter-lighter  -> 'perps-funding-lighter'  (hits)
+        perps-funding-lighter-lshadow  -> 'perps-funding'          (MISSES)
+
+    So one declaration would have scoped the LIVE row and left the SHADOW twin
+    pooled. Now: EXACT match first, then strip exactly ONE trailing suffix. No
+    existing entry changes — every other row carries a single suffix, so
+    one-strip and two-strip agree on all of them.
     """
-    base = str(bot).rsplit("-lshadow", 1)[0].rsplit("-lighter", 1)[0]
-    era = ERA_START.get(base)
+    b = str(bot)
+    if b in ERA_START:
+        era = ERA_START[b]
+    else:
+        base = b
+        for suf in ("-lshadow", "-lighter"):
+            if b.endswith(suf):
+                base = b[:-len(suf)]
+                break
+        era = ERA_START.get(base)
     return _epoch(era) if era else None
 
 # [2026-07-15 LIVENESS] Generate hypotheses/diagnoses/multipliers ONLY for

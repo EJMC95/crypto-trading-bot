@@ -172,11 +172,22 @@ def live_marker_filters():
     src = _read(WORKFLOW)
     vars_ = dict(re.findall(r"(\w+_files)='([^']+)'", src))
     out = {}
-    for var, svc in re.findall(
+    # [2026-07-30 (hi)] ONE BRANCH MAY APPEND SEVERAL SERVICES. The Farmer's
+    # branch now appends `trail-blazer-live,funding-farmer-shadow` so its two
+    # experiment arms cannot ship apart, and the old `([a-z0-9-]+)` read that
+    # whole comma-joined string as a SINGLE service name — which silently
+    # dropped `trail-blazer-live` from the marker map and, with it, every
+    # both-lists rule applied to the real-money path. Caught by this file's own
+    # selftest, which is the only reason it is not shipping broken: the parser
+    # returned a plausible-looking dict with the wrong keys.
+    for var, svcs in re.findall(
             r'grep\s+-qE\s+"\$(\w+_files)".*?\n\s*svcs="\$\{svcs:\+\$svcs,\}'
-            r'([a-z0-9-]+)"', src, re.S):
-        if var in vars_:
-            out[svc] = vars_[var]
+            r'([a-z0-9,-]+)"', src, re.S):
+        if var not in vars_:
+            continue
+        for svc in (s.strip() for s in svcs.split(",")):
+            if svc:
+                out[svc] = vars_[var]
     return out
 
 
@@ -345,6 +356,57 @@ def covered(svc, rel, filters=_UNSET, globs=_UNSET):
             and _path_listed(rel, globs))
 
 
+#: [2026-07-30 (hi)] PAIRED ARMS. An A/B experiment is only valid while both
+#: arms run the SAME code, and `experiment_judge`'s ARM DRIFT gate enforces that
+#: at grade time by refusing to promote on mismatched build stamps. But nothing
+#: enforced it at DEPLOY time, and the consequence is not a red build — it is a
+#: promotion pipeline that silently freezes.
+#:
+#: MEASURED: `funding-farmer-shadow`, the control arm, appeared NOWHERE in the
+#: workflow — only in a comment inside experiment_judge.py — so it had no deploy
+#: route at all. After (hb) shipped the live arm this morning: live
+#: 705425a83422 vs shadow 128995c2fd76. The judge was idle, so nothing was
+#: blocked; the next candidate would have been drift-held on arrival.
+#:
+#: This guard could not see it, and that is the point worth recording: it asks
+#: "does this FILE have a deploy route?" and `lighter_funding_bot.py` does — to
+#: the LIVE service. A per-file question cannot express a per-PAIR invariant.
+#: {live service: control service} — both must appear in the same decide branch.
+PAIRED_ARMS = {"trail-blazer-live": "funding-farmer-shadow"}
+
+
+def arm_pairing_orphans(src=None):
+    """[(live, control, why)] for every arm pair that is not deployed together.
+
+    Textual on purpose: the decide step is shell, and what must hold is that the
+    two service names are appended by the SAME `if` — i.e. under one condition,
+    so neither arm can ship without the other. Parsing the shell would be a
+    second implementation of bash; finding both names in one appended value is
+    the invariant stated directly."""
+    if src is None:
+        with open(os.path.join(ROOT, WORKFLOW)) as fh:
+            src = fh.read()
+    out = []
+    for live, ctrl in sorted(PAIRED_ARMS.items()):
+        if live not in src:
+            out.append((live, ctrl, f"{live} is not routed by the workflow at all"))
+            continue
+        if ctrl not in src:
+            out.append((live, ctrl,
+                        f"{ctrl} has NO deploy route — every {live} deploy drifts "
+                        f"the arms and the judge's drift gate freezes promotions"))
+            continue
+        # both present: they must be appended together, under ONE condition
+        together = any(live in line and ctrl in line
+                       for line in src.splitlines() if "svcs=" in line)
+        if not together:
+            out.append((live, ctrl,
+                        f"{ctrl} is routed but NOT in the same decide branch as "
+                        f"{live} — the arms can ship on different pushes, which "
+                        f"is the same drift by a slower route"))
+    return out
+
+
 def main():
     filters = workflow_filters()
     globs = workflow_paths()
@@ -397,6 +459,27 @@ def main():
         print("\n  Fix: add the path to the `paths:` block in "
               ".github/workflows/railway-redeploy.yml.\n")
 
+    # [2026-07-30 (hi)] PAIRED ARMS — reported BEFORE the file-level verdicts,
+    # because an unpaired arm is not a missing file (every file here has a route)
+    # and a reader scanning for orphans would never find it.
+    arm_bad = arm_pairing_orphans()
+    if arm_bad:
+        print("ARM-PAIRING BROKEN — an A/B experiment's two arms do not deploy "
+              "together.\nThe judge's ARM DRIFT gate then refuses every "
+              "promotion: 'this window measures a\ncode delta, not edge'. The "
+              "failure is not a red build — it is a promotion\npipeline that "
+              "silently freezes.\n")
+        for live, ctrl, why in arm_bad:
+            print(f"  {live} / {ctrl}\n      {why}")
+        print("\n  Fix: append BOTH service names in the SAME decide branch of "
+              ".github/workflows/\n  railway-redeploy.yml, under one condition, "
+              "so neither arm can ship alone.\n  Keep the SERVICE split (the "
+              "control container holds no keys) — join the CLOCK.\n")
+
+    if arm_bad and not (m_orphans or orphans or organ_orphans):
+        print(f"audit_deploy_coverage: {len(arm_bad)} UNPAIRED arm(s); "
+              f"{len(ok_declared)} declared exception(s).")
+        return 1
     if m_orphans and not (orphans or organ_orphans):
         print(f"audit_deploy_coverage: {len(m_orphans)} MARKER-ORPHANED "
               f"file(s); {len(ok_declared)} declared exception(s).")
@@ -490,7 +573,13 @@ def _marker_logic_selftest():
         assert r.returncode == 0, f"decide bash failed ({r.returncode}): {r.stderr}"
         return r.stdout.strip()
 
-    T, F = "tide-rider-lighter-live", "trail-blazer-live"
+    # [2026-07-30 (hi)] `F` is now the Farmer's BRANCH OUTPUT, not one service:
+    # its two experiment arms are appended together so neither can ship alone.
+    # Every expectation below that previously read "trail-blazer-live" therefore
+    # reads both — and that is the assertion, not a fixture accommodation: a
+    # farmer deploy that emits only the live service is the arm-drift bug.
+    T = "tide-rider-lighter-live"
+    F = "trail-blazer-live,funding-farmer-shadow"
     cases = [
         # HAZARD — an unmarked push must NEVER deploy a real-money book
         ("lighter_funding_bot.py", "fix funding slope", ""),
@@ -615,9 +704,27 @@ def _selftest():
         assert len(v) > 60, f"{k}: a reason must be a reason, not a label"
     # the OPT-IN live-bot marker gate — bound to the real workflow bash
     _marker_logic_selftest()
+
+    # [2026-07-30 (hi)] PAIRED ARMS. Three states, and the middle one is the
+    # whole reason this exists: "routed, but on a different push" is drift by a
+    # slower route and reads as covered to every per-file check.
+    with open(os.path.join(ROOT, WORKFLOW)) as _fh:
+        _wf = _fh.read()
+    assert arm_pairing_orphans(_wf) == [], (
+        "the shipped workflow does not deploy the Farmer's two arms together: "
+        f"{arm_pairing_orphans(_wf)}")
+    _gone = arm_pairing_orphans(_wf.replace("funding-farmer-shadow", ""))
+    assert len(_gone) == 1 and "NO deploy route" in _gone[0][2], _gone
+    _split = arm_pairing_orphans(
+        _wf.replace("trail-blazer-live,funding-farmer-shadow", "trail-blazer-live")
+        + "\n# funding-farmer-shadow mentioned but never appended\n")
+    assert len(_split) == 1 and "same decide branch" in _split[0][2], _split
+    for _live, _ctrl in PAIRED_ARMS.items():
+        assert _live != _ctrl and _ctrl, (_live, _ctrl)
+
     print("audit_deploy_coverage _selftest OK "
-          "(parser + COPY reconstruction + declared-prefix + live-bot marker gate, "
-          "on fixtures)")
+          "(parser + COPY reconstruction + declared-prefix + live-bot marker gate "
+          "+ paired arms, on fixtures)")
 
 
 if __name__ == "__main__":

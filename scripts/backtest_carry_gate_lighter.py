@@ -56,7 +56,26 @@ CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 # funding_carry_bot's shipped constants (lighter basis: TRUE apr)
 NOTIONAL = 300.0
-MAX_POSITIONS = 8
+# [2026-07-30 (he)] MAX_POSITIONS WAS RETYPED AS 8 AND THE BOT NOW SHIPS 12.
+# The 30-Jul change ("measured at 7 of 8, i.e. the fleet's BIGGEST EARNER was
+# one slot from full") moved the book and left this harness modelling a
+# 8-slot version of it — a re-run today would have measured a book the fleet
+# does not run, silently, because a retyped constant looks like a fact. Read
+# from the bot so it cannot drift again; falls back to 8 only if the import
+# fails, and says so, because a research script must still run offline.
+# NOTE the RESULTS TABLE ABOVE WAS PRODUCED AT MAX_POSITIONS=8 (21-Jul). It is
+# kept as the historical record of the decision that moved CARRY_ENTER_APR, with
+# its parameters now stated rather than assumed; a re-run at 12 is a different
+# measurement and should be recorded as one.
+try:
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    from funding_carry_bot import MAX_POSITIONS  # noqa: F401
+except Exception:      # noqa: BLE001
+    MAX_POSITIONS = 8
+    print("WARNING: could not read MAX_POSITIONS from funding_carry_bot — "
+          "using 8, which is the 21-Jul value and may no longer be shipped")
 PERSIST_H = 6.0
 FLIP_GRACE_H = 1.0
 OPEN_COST = 0.00045 + 0.0010          # per side

@@ -114,7 +114,20 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
 - `bot_learn.py` (brain) — L4 stake multipliers (family bot + strategies
   consume via `fleet_bus.py`), per-bucket DIAGNOSIS (exit/entry/fee/regime/
   venue), venue A/B, scout lens-forward grades (taker veto); generates for
-  LIVING bots only (retired set + 7d close recency, 15-Jul). **v3 statistics
+  LIVING bots only (retired set + 7d close recency, 15-Jul).
+  **[2026-07-30 (hd)/(hg)/(hh)] `ERA_START` was pooling the 17-Jul accrual-basis
+  fix on ELEVEN books, including a REAL-MONEY row.** Its header rule — "hypotheses
+  must come from trades taken by the CURRENT code" — is exactly about this, and
+  it had no entry for the two funding books and six family/spot books, while the
+  six it *did* have were dated 13/14-Jul for STRATEGY changes and so still sat
+  BELOW the accrual fix. All are now ≥17-Jul (an era is the LATEST of every
+  invalidating change; moving a date forward preserves the earlier reason).
+  Also fixed here: `era_epoch_for`'s **THIRD** bug — the double `rsplit` mangles
+  `perps-funding-lighter-lshadow` to `perps-funding` because 💸 Farmer is itself
+  named after the venue suffix, so a single declaration would have scoped the
+  live row and MISSED its shadow twin. Exact-match first, then strip ONE suffix.
+  The gate's sample may never be wider than the brain's, and both tables must
+  cover the same living accruing set — pinned in both directions. **v3 statistics
   engine (16-Jul, `brain_stats.py`)**: decay-weighted buckets (14d half-life
   forgetting), empirical-Bayes pooling (tag-family → bot → fleet priors),
   Wilson/t evidence bars, regime splits, episode-deduped lens grading (raw
@@ -246,6 +259,17 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   `fleet-immune.quarantined_levers` → reverts to operator default), phone-
   pushes NEW sickness. Restrict/clean only; fail-safe (dead immune = no
   quarantine). → bot_state `fleet-immune`; surfaced on the board (🛡️)
+  **[2026-07-30 (hh)] IT NOW WATCHES FOR A COMPROMISED LEDGER** — the purest
+  alive-but-sick shape there is: a row that is fresh, in-TTL and trusted while
+  its `n` is two processes' trades. Reads `golive-readiness.books.<bot>.
+  integrity.two_writers` (the PUBLISHER's verdict, never re-derived) and pages
+  the operator, because the fix is an OPERATOR action — stop the duplicate
+  Railway service — and no guard can un-pool closes two processes already
+  wrote. `golive-readiness` had to join the organ's `_keys` fetch list in the
+  same commit or the scanner would be inert; `tests/autonomy/
+  test_immune_two_writers.py` pins that, and pins that a clean book in the
+  SAME payload stays silent (a detector that flags everything trains the
+  operator to ignore it).
 - `fleet_regen.py` 🩹 — REGENERATION (self-repair tier 2): restores a
   stateful organ the immune organ flagged SICK to its last-good history
   snapshot (age-bounded) or a safe baseline; content-only, carries the
@@ -338,6 +362,18 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   Rendered as the 🚦 dashboard card (✦ = passes the new bar where the retired
   win-rate rule would have rejected it). PUBLISH-ONLY: promotes nothing,
   writes no lever; go-live stays an explicit operator act.
+  **[2026-07-30 (hc)–(hh)] IT NOW OWNS TWO PRECONDITIONS in front of the six
+  bars** — `POLICY_ERA` (which sample describes the book) and ledger
+  `integrity` (is the sample one book at all). See the GO-LIVE GATE rule below
+  for both, including what may and may not reset an era. It is also the ONE
+  OWNER of `parse_stamp` / `same_pair_overlaps` / `peak_concurrency`:
+  `scripts/audit_ledger_integrity.py` imports THEM, deliberately in that
+  direction — the reverse would drag a non-shipped script into the freqtrade
+  image's import graph (the born-dark class), and a second copy would let the
+  audit and the gate disagree about the same ledger. Payload gained `era`,
+  `alltime` (the pooled reading it replaced, so nothing is hidden) and
+  `integrity`; `--min-closes` filters on the ALL-TIME count so a demoted book
+  shows dark bars instead of vanishing.
 - `fleet_respiration.py` 🫁 — RESPIRATION / blood-oxygen: OXYGEN = fresh
   market data; LUNGS = the venue-fetch layer. Measures SpO2 (weighted
   fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA
@@ -674,12 +710,34 @@ All new bots:
   Measured six minutes after the dispatch woke the second: n=82 with
   `extra.caps` → **n=71, caps=None, build=None**. `funding_carry_bot.py` emits
   `caps` unconditionally, so caps=None proves the winner is not running HEAD.
-  The paper LEDGER is CLEAN (82 closes, zero duplicate trade_ids) so the
-  go-live grade and the baseline are intact — the casualty is the summary row.
-  **OPERATOR ACTION OUTSTANDING: one of the two services must be STOPPED in
-  Railway**; a deploy rule cannot fix a duplicate that is already running, and
-  the row will flap until then. Lesson: a duplicate PUBLISHER is not a
-  duplicate DEPLOY — ask "do they share a key?", not "is redeploying cheap?"]**
+  ~~The paper LEDGER is CLEAN (82 closes, zero duplicate trade_ids) so the
+  go-live grade and the baseline are intact — the casualty is the summary row.~~
+  **[2026-07-30 (hf) — THAT SENTENCE WAS WRONG, and the check behind it could
+  not have shown what it was used to show.** Two independent processes open at
+  different moments, so their `trade_id`s (`{coin}:{opened_ts}`) never collide —
+  a duplicate-id scan is blind to duplicate WRITERS by construction. The
+  detector that works: a carry process keys `positions` by coin and enters only
+  `if c not in positions`, so **one process cannot hold two positions in the
+  same coin**. Measured across all 28 books / 1,706 episodes, same-pair
+  overlapping holds appear in exactly TWO — `perps-funding-carry-lshadow`
+  (7 overlaps, deepest **9.14h** on HYPE) and retired `event-listing-sniper`
+  (a pair-naming collision across ~100 CEXes, declared). Every other book reads
+  zero. Second, independent line: that ledger reaches **10 concurrent positions
+  on 27 occasions** while its own `MAX_POSITIONS` was **8** until 30-Jul. And
+  the STATE key is shared too — the bot persists `positions` to
+  `bot_state[bot_id]` and restores at boot, so two processes clobber one
+  position map and a single logical position can be closed by both. **So the
+  casualty is not just the summary row: the graded LEDGER is not one book's
+  record, and `t` scales with sqrt(n).** Guarded by
+  `scripts/audit_ledger_integrity.py` (registered selftest; exits non-zero on a
+  LIVING two-writer book).]**
+  **OPERATOR ACTION OUTSTANDING — now more than cosmetic: one of the two
+  services must be STOPPED in Railway**; a deploy rule cannot fix a duplicate
+  that is already running, a guard cannot un-pool closes two processes already
+  wrote, and every grade over this window inherits the pooling. Lesson: a
+  duplicate PUBLISHER is not a duplicate DEPLOY — ask "do they share a key?",
+  not "is redeploying cheap?" — and when you check whether a shared key did
+  damage, pick a test that COULD detect the damage.]**
   **[2026-07-22 CORRECTION — this paragraph was WRONG about two of them.]** The
   `paths:` filter DOES carry `lighter_ticket_taker.py`, `lighter_ticket_replay.py`,
   `venues/**` and most of the intelligence layer (`lighter_market_scout`,
@@ -886,6 +944,84 @@ All new bots:
   - REGIME CAVEAT applies (item 18): Lighter's tape is ONE falling-BTC regime,
     so a DIRECTIONAL book passing this has passed in that regime only. Funding
     books are largely direction-agnostic, so it bites them less.
+  - **[2026-07-30 (hc)–(hh)] TWO PRECONDITIONS NOW SIT IN FRONT OF THE SIX BARS,
+    because a bar computed over the wrong sample means nothing. Both are
+    fail-CLOSED and neither promotes anything.**
+    1. **THE SAMPLE MUST BE THE BOOK'S CURRENT SELF — `POLICY_ERA`.** The gate
+       used to grade a book's WHOLE retained ledger, so a change that made the
+       earlier record *wrong* kept counting toward the 30-day bar. Measured on
+       the two books nearest real money: 🌾 carry had **101% of its P&L**
+       (+$62.03 of +$61.12) opened before the 17-Jul accrual-basis fix and is
+       −$0.91 over the 57 closes since (5/6 bars → 2/6); 💸 Farmer's shadow twin
+       read **5/6 at t=+2.09** all-time and **3/6 at t=+0.74 with h1 NEGATIVE**
+       in-era, and **no post-fix boundary passes the t bar at all**.
+       - **WHAT RESETS AN ERA**: a change that makes earlier P&L *wrong* (an
+         accounting/accrual-basis fix) or the strategy *different in kind*.
+       - **WHAT DOES NOT**: ordinary tuning — a lever step, a widened universe, a
+         clip change. The growth rail moves levers daily BY DESIGN; resetting the
+         clock each time makes the 30-day bar unreachable forever. Carry's own
+         21-Jul `ENTER_APR` 0.40→1.60 is the worked example of what does *not*
+         reset it, even though splitting there would restrict the book further.
+       - **AN ERA IS THE LATEST OF EVERY INVALIDATING CHANGE.** Two eras do not
+         compose into a range: a sample must exclude BOTH the old strategy and
+         the old accounting, so moving a date FORWARD preserves the earlier
+         reason rather than discarding it.
+       - **Keyed on the OPEN** (a trade's policy is fixed when it is taken; a
+         straddler accrued in both bases and belongs to neither), **fail-closed**
+         on an unreadable stamp, and **keyed BARE with a ONE-AT-A-TIME suffix
+         strip** — `perps-funding-lighter` is itself named after the venue
+         suffix, so the obvious double-`rsplit` scopes the live row and silently
+         MISSES its shadow twin. Both `POLICY_ERA` and `bot_learn.ERA_START` had
+         that bug; both are fixed and mutation-pinned.
+       - **THE GATE'S SAMPLE MAY NEVER BE WIDER THAN THE BRAIN'S**, and every
+         living accruing book must appear in BOTH tables. Membership is
+         RULE-DRIVEN — *the publisher accrues funding AND the book has pre-fix
+         closes* — not a curated list. **It is not uniformly restrictive**: four
+         of the six family/spot books read BETTER in-era, and ⚖️ Counterweight
+         goes from mean +0.709%/win 56% to **+1.263%/win 68%** — pooling was
+         HIDING the fleet's best expectancy. Books whose publisher does not
+         accrue (🧲 Snap Back, 🎯 Perp Sniper) are excluded on purpose; an era
+         declared "for symmetry" on a price book discards real evidence.
+    2. **THE LEDGER MUST BE ONE BOOK'S RECORD — integrity.** A book with a
+       same-pair overlapping hold can never be `READY`, and the reason prints
+       FIRST in `fails` (behind `fails[:2]` it was invisible in exactly the run
+       that needed it). Deliberately NOT a seventh bar: `BAR_NAMES` is the
+       published contract, and this invalidates the other six rather than
+       joining them. Published as `integrity`, rendered as a red `2 writers`
+       chip, and `fleet_immune` pages the operator on it — because the fix is an
+       OPERATOR action and a guard cannot un-pool closes two processes already
+       wrote. Detector + rationale: `scripts/audit_ledger_integrity.py`.
+- **DOCTRINE (2026-07-30) — WHEN YOU CHECK WHETHER SOMETHING WAS DAMAGED, PICK A
+  TEST THAT COULD DETECT THE DAMAGE.** This cost most of a session and it keeps
+  recurring in different clothes:
+  - `(gn)` scanned the carry ledger for duplicate `trade_id`s, found none, and
+    concluded the grade was intact. Two processes open at different moments, so
+    their ids (`{coin}:{opened_ts}`) **never collide** — the scan was blind to
+    duplicate WRITERS by construction. The test that works is STRUCTURAL: a
+    carry process keys `positions` by coin and enters only `if c not in
+    positions`, so a same-coin overlap is *impossible* for one process. 7 of
+    them, deepest 9.14h.
+  - A **page-wide substring scan is not a structural claim.** Three tests in one
+    session failed on the very sentence promising the property they checked
+    (`dry_run` appears in "flips no dry_run"; `era` appears in "operator"). Use
+    AST for call sites and a chip's own markup for rendering.
+  - **Do not assert a convention the fleet does not have.** A test requiring the
+    marker `"BASIS FIX"` failed on `funding_carry_bot`, which labels the same fix
+    `"THE SIXTH 8x BOT"`. Match the invariant (a date + a real rate conversion),
+    not one house phrase.
+  - **A retyped constant is a constant that drifts.** `backtest_carry_gate_
+    lighter.py` pinned `MAX_POSITIONS = 8` while the bot shipped 12, so a re-run
+    would have measured a book the fleet does not run. Read from the bot, or add
+    a drift arm that fails when they disagree.
+  - **A finding no gate consumes is a note.** Integrity became a precondition
+    plus a phone push; the era became the published sample. Otherwise the
+    measurement sits on a card and the pipeline keeps using the old number.
+  - **A "sanity anchor" that nothing gates on is decoration.** `study_carry_flip_
+    grace_lighter` printed its sim-vs-ledger drift from day one; gating on it
+    revealed the shipped-rule replay overstates its own losses by 2.3x, which
+    invalidates every variant in the table. Generalise `(gx)`: a harness that
+    cannot reproduce what DID happen may not say what WOULD have — and the
+    reproduction check must REFUSE, not report.
 - Never modify bot logic without backtesting first
 - **BACKTEST ON LIGHTER ONLY — the venue we trade is the venue we measure
   (operator rule, 17-Jul: "Lighter needs to be the only exchange backtests run

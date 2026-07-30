@@ -47,6 +47,12 @@ REGIME CAVEAT (21-Jul item 18): Lighter's tape is one falling-BTC regime, so
 books (carry, Farmer, spread) are largely direction-agnostic so it bites less,
 but a directional book passing here has passed in ONE regime only.
 
+POLICY ERAS (2026-07-30 (hc)) — the bar counts a book's CURRENT self. Until
+now this grader pooled a book's whole retained ledger, so a change that made
+the earlier record WRONG kept counting toward the 30-day bar. See POLICY_ERA
+below for the measurement that forced this, and for the rule about which
+changes reset an era and which deliberately do not.
+
 READ-ONLY. Grades and prints. Promotes nothing, writes no lever, flips no
 dry_run — go-live remains an explicit operator act
 ([[no-real-money-without-explicit-golive]]).
@@ -72,6 +78,278 @@ BOOK_USD = float(os.environ.get("GOLIVE_BOOK_USD", "1000"))
 # [2026-07-30] bot_state key + TTL for the published verdicts (see main()).
 KEY = "golive-readiness"
 TTL_SEC = int(os.environ.get("GOLIVE_TTL_SEC", "86400"))
+
+
+# ---------------------------------------------------------------------------
+# POLICY ERAS
+# ---------------------------------------------------------------------------
+# [2026-07-30 (hc)] THE GATE HAD NO NOTION OF WHEN A BOOK BECAME ITSELF.
+#
+# It graded each book's whole retained ledger. So a book could change in a way
+# that makes its earlier P&L simply WRONG, keep the old numbers, and go on
+# accumulating them toward the 30-day bar. Measured on the book that is closest
+# to real money — 🌾 `perps-funding-carry-lshadow`, the fleet's frontrunner at
+# five of six bars:
+#
+#     opened BEFORE 2026-07-17   n=25   +$62.03
+#     opened SINCE  2026-07-17   n=57   -$0.91
+#
+# **101% of its entire realised P&L was opened before 17-Jul** (+$62.03 of
+# +$61.12), and it has been flat-to-negative for 13 days and 57 closes since.
+# The pooled grade is 5/6 bars — mean +0.248%, t=+2.60, both halves positive —
+# and every one of those numbers is carried by the earlier segment.
+#
+# WHAT CHANGED ON 17-JUL. `funding_carry_bot.py`'s own comment: the accrual
+# line `rate * dt_h` "is only right when the quote IS hourly. On the
+# lighter_shadow arm the quote is per 8h, so this over-accrued 8x — straight
+# into `accrued`, which IS this book's reported P&L and its win/loss call."
+#
+# THE EXACT DATE IS NOT LOAD-BEARING, which is what makes this safe to declare
+# without container archaeology. The comment is dated 17-Jul but this file only
+# entered `main`'s history on 28-Jul (PR #95), so when the RUNNING container
+# changed is not established here. It does not matter: the verdict is the same
+# at every candidate boundary —
+#     era >= 17-Jul   n=57  -$0.91   mean -0.005%  t -0.08   2/6 bars
+#     era >= 22-Jul   n=28  +$0.60   mean +0.007%  t +0.10   2/6 bars
+#     era >= 28-Jul   n= 6  +$5.66   mean +0.314%  t +1.24   3/6 bars
+# — so 17-Jul is used because it is the date the code's own comment carries AND
+# the most generous of the three. A finding that survives its own sensitivity
+# analysis does not need the archaeology settled.
+#
+# THE ERA DOES NOT REST ON THAT DIAGNOSIS, deliberately. A competing
+# explanation exists and is not eliminated here: the venue's funding may simply
+# have been hotter in early July (it is still hot — the live row shows carries
+# at +84% to +722% APR), which would shrink accrual per hold with no bug at
+# all. Either way the gate's own question — *does this book, as it now runs,
+# make money* — is answered by the 57 closes, not by the 25. That is why the
+# era is defensible without settling the cause, and the 30-day re-grade is what
+# settles it.
+#
+# WHICH CHANGES RESET AN ERA, and this limit is load-bearing:
+#   RESET      a change that makes earlier P&L WRONG (an accounting or
+#              accrual-basis fix) or makes the strategy DIFFERENT IN KIND (a
+#              rewritten entry/exit rule, a venue move).
+#   DO NOT     ordinary tuning — a lever step, a widened universe, a clip
+#              change. The growth rail moves levers continuously BY DESIGN; if
+#              every move reset the clock, no book could ever reach 30 days and
+#              this guard would become a way of never promoting anything.
+# Carry's OWN 21-Jul `ENTER_APR` 0.40 -> 1.60 is the worked example of the
+# second kind: measured, deliberate, enacted from a sweep — and NOT an era
+# reset, even though splitting there too would restrict the book further
+# (n=31, -$0.76). The guard is not for maximising restriction.
+#
+#: {bare bot id: (ISO date, why)}. Keyed BARE — the ledger's `bot` carries a
+#: `-lshadow` / `-lighter` suffix and `era_epoch_for` strips it, which is the
+#: bug the brain shipped for nine days (bot_learn.era_epoch_for, 23-Jul audit:
+#: "every `ERA_START.get(bot)` missed and every bot was graded on its WHOLE
+#: retained ledger"). Absence of an entry means grade ALL-TIME — the behaviour
+#: before this block, so no other book's verdict moves.
+POLICY_ERA = {
+    "perps-funding-carry": (
+        "2026-07-17",
+        "the lighter_shadow arm's accrual basis was fixed from per-hour to the "
+        "venue's own per-8h settlement; for a funding book the accrual IS the "
+        "P&L, so closes opened before it are denominated in a unit the book no "
+        "longer uses. 25 closes at +$62.03 before, 57 at -$0.91 since."),
+    # [2026-07-30 (hg)] 💸 Funding Farmer — the SAME basis fix, on the pair that
+    # includes a REAL-MONEY book. One bare key covers both rows: `era_epoch_for`
+    # strips `-lighter` and `-lshadow`.
+    #
+    # THE BOT SAYS IT ITSELF, at `lighter_funding_bot.py`'s accrual line: *"this
+    # line accrued it PER HOUR = 8x. Live equity is honest (the venue charges
+    # the real thing) but this figure reaches the per-trade ledger AND the
+    # win/loss call — an inflated carry credit inflates the win rate of a book
+    # that COLLECTS carry."* The ledger is what every grader reads.
+    #
+    # MEASURED, and this is why it could not wait: `perps-funding-lighter-
+    # lshadow` was reported ONE HOUR AGO as the fleet's new go-live frontrunner
+    # at 5/6 bars, t=+2.09, both halves positive. Scoped to the post-fix era it
+    # is **3/6, t=+0.74, and h1 goes NEGATIVE** (-0.63). Its win rate falls 56%
+    # -> 45%, exactly the inflation the bot's comment predicts for a
+    # carry-collecting book.
+    #     boundary      n    t     h1      h2    win   bars
+    #     all-time     85  +2.09  +11.94  +2.45  56%   5/6   <- the only 5/6
+    #     >= 17-Jul    47  +0.74   -0.63  +3.91  45%   3/6
+    #     >= 22-Jul    20  +1.07   +2.95  -0.58  55%   2/6
+    #     >= 28-Jul     3  +1.09   +0.16  +0.11  67%   3/6
+    # **No post-fix boundary passes the t bar at all** (0.74 / 1.07 / 1.09 vs
+    # 2.0). All-time is the single window in which this book looks ready.
+    #
+    # THE LIVE ROW MOVES TOO, in what it REPORTS rather than in its bar count:
+    # 4/6 either way, but t +1.57 -> +1.07 and **win rate 63% -> 50%** on the
+    # book that actually holds money and whose tag the brain has jurisdiction
+    # over since (bb).
+    #
+    # NOT AFFECTED, checked rather than assumed: the promotion judge. Every arm
+    # comparison goes through `arm_trades(rows, bot, start_ts, end_ts)` and its
+    # windows begin at the candidate's own `started_ts`, all of which postdate
+    # 17-Jul — so the pipeline that is the ONLY writer of `live.funding.*` is
+    # era-safe by construction, not by luck. Pinned by a test.
+    "perps-funding-lighter": (
+        "2026-07-17",
+        "the same per-hour/per-8h accrual basis fix, on the Funding Farmer pair "
+        "— a REAL-MONEY book and its shadow twin. The bot's own comment: the "
+        "pre-fix figure 'reaches the per-trade ledger AND the win/loss call'. "
+        "Measured: the shadow twin reads 5/6 bars at t=+2.09 all-time and 3/6 "
+        "at t=+0.74 with h1 NEGATIVE in-era; no post-fix boundary passes the t "
+        "bar. The live row's win rate reads 63% pooled against 50% in-era."),
+    # [2026-07-30 (hg)] THE RULE, APPLIED UNIFORMLY. The 17-Jul basis fix was
+    # FLEET-WIDE — every `[2026-07-17 BASIS FIX]` in a shipped bot carries the
+    # same date — so declaring it for two books and not the rest would be
+    # cherry-picking the ones whose numbers I happened to look at. Membership is
+    # RULE-DRIVEN: the book's publisher accrues funding AND the book has closes
+    # opened before the fix. Books whose publisher does NOT accrue (🧲 Snap Back,
+    # 🎯 Perp Sniper) are deliberately absent — a price book's P&L cannot carry
+    # an accrual defect, and declaring an era "for symmetry" would discard real
+    # evidence for nothing.
+    #
+    # Measured effect (pooled -> in-era), so the direction is on the record:
+    #   lighter-ticket-taker-lshadow   3/6 t-0.39 win38%  ->  2/6 t-1.45 win34%
+    #   freqtrade-georgia-lshadow      3/6 t+0.03 win47%  ->  2/6 t-0.05 win46%
+    #   perps-funding-spread-lshadow   3/6 t+1.14 win56%  ->  3/6 t+1.30 win68%
+    #   crypto-intraday-15m-lshadow    2/6 t-0.66 win53%  ->  3/6 t+0.41 win59%
+    #   freqtrade-dad-lshadow          1/6 t-3.59 win20%  ->  1/6 t-1.90 win33%
+    #   crypto-breakout-4h-lshadow     1/6 t-4.09 win17%  ->  1/6 t-2.14 win33%
+    # NOTE it is NOT uniformly restrictive — four of those six read BETTER in-era,
+    # i.e. pooling was PUNISHING them. That is the point: the era is about which
+    # sample describes the book, not about being harsh. Stated because "we
+    # tightened everything" would be the easier and false summary.
+    "lighter-ticket-taker": (
+        "2026-07-17",
+        "🎫 Ticket Taker — a REAL-MONEY book. It DOES accrue funding (its "
+        "divergence lens exists to collect the credit) and carried the same 8x "
+        "defect, modelled inline so a grep for the fixed call site missed it: "
+        "'the THIRD accruing book to carry this bug'. Its own note — 'the "
+        "accrual still reaches the per-trade ledger and the win/loss call' — and "
+        "'it lands exactly where it hurts most: DIVERGENCE is the only lens with "
+        "a positive forward grade and the only one that COLLECTS carry, so the "
+        "inflated credit flattered the one number that could earn this bot a "
+        "go-live'. The LIVE row has ZERO pre-fix closes so this is a no-op for it "
+        "today and declared anyway; the shadow twin the brain grades goes 3/6 "
+        "t=-0.39 pooled to 2/6 t=-1.45 in-era."),
+    "perps-funding-spread": (
+        "2026-07-17",
+        "⚖️ Counterweight, the book whose own basis-fix note records that its "
+        "'entire reported profit was this artifact'. Same 17-Jul accrual fix, 20 "
+        "closes opened before it. Declared for correctness, NOT because pooling "
+        "flattered it: in-era it reads BETTER (3/6 t=+1.30 win 68% against 3/6 "
+        "t=+1.14 win 56%), so pooling was punishing this book."),
+    "freqtrade-georgia": (
+        "2026-07-17",
+        "family book on lighter_family_bot, which carries '[2026-07-17 BASIS FIX "
+        "ii]' on its accrual line. 12 closes opened before it; 3/6 t=+0.03 "
+        "pooled against 2/6 t=-0.05 in-era. Note the brain already scoped this "
+        "book from 13-Jul for a STRATEGY change — a book can have an earlier "
+        "hypothesis era than its accounting era, and the later of the two is "
+        "what a promotion sample may use."),
+    "freqtrade-dad": (
+        "2026-07-17",
+        "family book, same lighter_family_bot accrual fix, 4 closes opened "
+        "before it. In-era it reads BETTER (t=-1.90 against t=-3.59), so this is "
+        "a correctness declaration and not a tightening; it fails on 1/6 bars "
+        "either way."),
+    "crypto-intraday-15m": (
+        "2026-07-17",
+        "spot port on lighter_family_bot, same accrual fix, 6 closes opened "
+        "before it. In-era it reads BETTER — 3/6 t=+0.41 against 2/6 t=-0.66 — "
+        "so pooling the pre-fix rows was costing this book a bar."),
+    "crypto-breakout-4h": (
+        "2026-07-17",
+        "spot port on lighter_family_bot, same accrual fix, 6 closes opened "
+        "before it. In-era t=-2.14 against a pooled t=-4.09; 1/6 bars either "
+        "way, declared so the sample matches the code that produced it."),
+    # [2026-07-30 (hh)] DECLARED BEFORE THE SAMPLE EXISTS. These three are below
+    # the report's min-closes floor today (mum, avo-maria n=4, swing-daily n=1),
+    # so no measurement is quoted — and that is exactly why they belong here now.
+    # The brain scopes all three; without these the GATE would grade them
+    # all-time, i.e. WIDER than the brain, on whatever day they first accumulate
+    # ten closes. An era that arrives after the sample does is an era that
+    # arrives too late, and nobody would think to add it then.
+    "freqtrade-mum": (
+        "2026-07-17",
+        "family book on lighter_family_bot, same 17-Jul accrual fix. Below the "
+        "report's min-closes floor today, so no effect is quoted; declared now "
+        "because the gate must never grade a wider sample than the brain, and "
+        "the brain scopes this book from the same date."),
+    "freqtrade-avo-maria": (
+        "2026-07-17",
+        "family book on lighter_family_bot, same 17-Jul accrual fix, n=4 closes "
+        "today. Declared ahead of the sample for the same reason as mum: an era "
+        "added after a book becomes gradeable is an era nobody remembers to add."),
+    "crypto-swing-daily": (
+        "2026-07-17",
+        "spot port on lighter_family_bot, same 17-Jul accrual fix, n=1 close "
+        "today. Declared ahead of the sample; the brain scopes it from the same "
+        "date and the gate must not be the looser of the two."),
+}
+
+
+#: Row suffixes, stripped ONE at a time. See era_base.
+_ROW_SUFFIXES = ("-lshadow", "-lighter")
+
+
+def era_base(bot):
+    """The bare book name a ledger row belongs to.
+
+    [2026-07-30 (hg)] EXACT MATCH FIRST, then strip exactly ONE trailing suffix.
+    The obvious implementation — `.rsplit("-lshadow",1)[0].rsplit("-lighter",1)[0]`,
+    copied from `bot_learn.era_epoch_for` — is WRONG for one book in this fleet,
+    and it is the book that holds real money: **💸 Funding Farmer is itself named
+    `perps-funding-lighter`**, so its own name ends in the venue suffix.
+
+        perps-funding-lighter          -> 'perps-funding'          (misses itself)
+        perps-funding-lighter-lighter  -> 'perps-funding-lighter'  (hits)
+        perps-funding-lighter-lshadow  -> 'perps-funding'          (MISSES)
+
+    So a single declaration would have scoped the LIVE row and silently left the
+    SHADOW twin pooled — and the twin is the row carrying the 5/6-bars artifact
+    this era exists to withdraw. Half-inert, in the same registered-but-inert
+    shape this repo keeps hitting, and caught only because the test asserted
+    both rows resolve to the same era rather than assuming the strip worked."""
+    b = str(bot)
+    if b in POLICY_ERA:
+        return b
+    for suf in _ROW_SUFFIXES:
+        if b.endswith(suf):
+            return b[:-len(suf)]
+    return b
+
+
+def era_epoch_for(bot):
+    """(epoch, iso, why) for a ledger bot id's policy era, or (None, None, None).
+
+    Table keyed BARE, ledger keyed SUFFIXED — the hazard the brain shipped for
+    nine days. See `era_base` for why the strip is one-at-a-time."""
+    ent = POLICY_ERA.get(era_base(bot))
+    if not ent:
+        return None, None, None
+    iso, why = ent
+    from datetime import datetime, timezone
+    dt = datetime.fromisoformat(iso)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.timestamp(), iso, why
+
+
+def in_era(open_ts, era_epoch, parse):
+    """Is a trade OPENED inside the era? Keyed on the OPEN, because the policy
+    that produced a trade is fixed when the trade is taken. A position that
+    straddles the boundary is a HYBRID — a carry open across the accrual fix
+    accrued in the old basis for part of its life and the new one for the rest —
+    so it belongs cleanly to neither era, and excluding it is the conservative
+    reading of a sample that is supposed to describe the book as it now runs.
+
+    FAIL-CLOSED on an unreadable open stamp when an era is declared: counting a
+    trade whose era cannot be determined is exactly the credit this block
+    exists to withdraw. With no era declared everything is in (all-time)."""
+    if era_epoch is None:
+        return True
+    if not open_ts:
+        return False
+    try:
+        return parse(open_ts) >= era_epoch
+    except Exception:      # noqa: BLE001
+        return False
 
 
 def stats(rows, book_usd=None):
@@ -135,6 +413,94 @@ def bar_map(s):
         "halves": s["h1"] > 0 and s["h2"] > 0,
         "maxdd": dd is not None and dd < GOLIVE_MAX_DD,
     }
+
+
+# ---------------------------------------------------------------------------
+# LEDGER INTEGRITY — is this book's ledger ONE book's record? [(hf)]
+# ---------------------------------------------------------------------------
+# These primitives live HERE, in the module that ships inside the freqtrade
+# image and does the grading, rather than in `audit_ledger_integrity.py` which
+# imports them. One owner, and the owner is the consumer that has to fail
+# closed: a grader that cannot tell a pooled ledger from a clean one will keep
+# reporting a `t` computed over two books' trades. (Importing the other
+# direction would put a non-shipped module inside the image's import graph — the
+# born-dark class the (17-Jul) guard exists for.)
+
+#: Below this, a same-pair "overlap" is a close-and-reopen inside ONE bot loop:
+#: the position is deleted and the entry block runs later in the same iteration,
+#: so open2 == close1 to the millisecond. Measured on the carry book those sit
+#: at 0.3s while the real overlaps are 2-9 HOURS.
+LEDGER_MIN_OVERLAP_S = float(os.environ.get("LEDGER_MIN_OVERLAP_S", "60"))
+
+
+def parse_stamp(s):
+    """Tolerant ISO parse. The listing sniper writes '2026-07-13 15:05:04 UTC',
+    which `fromisoformat` rejects — its 337 rows were unreadable for two days
+    over exactly this (15-Jul audit fix)."""
+    t = str(s).strip().replace("Z", "+00:00")
+    if t.endswith(" UTC"):
+        t = t[:-4] + "+00:00"
+    from datetime import datetime
+    return datetime.fromisoformat(t)
+
+
+def same_pair_overlaps(eps, min_gap_s=None):
+    """[(pair, hours_inside)] where one hold opens INSIDE another on the same
+    pair, deepest first.
+
+    Structural proof of a SECOND WRITER for any book whose position map is keyed
+    by symbol — which every Lighter book here is (`if c not in positions`). It is
+    the detector that `(gn)`'s duplicate-`trade_id` scan could not be: two
+    processes open at different moments, so their ids never collide."""
+    min_gap_s = LEDGER_MIN_OVERLAP_S if min_gap_s is None else min_gap_s
+    by = {}
+    for pair, o, c in eps:
+        by.setdefault(pair, []).append((o, c))
+    hits = []
+    for pair, v in by.items():
+        v.sort()
+        for i in range(len(v) - 1):
+            gap = (v[i][1] - v[i + 1][0]).total_seconds()
+            if gap > min_gap_s:
+                hits.append((pair, gap / 3600.0))
+    return sorted(hits, key=lambda x: -x[1])
+
+
+def peak_concurrency(eps):
+    """Most positions open at once, from the intervals alone. The SECOND
+    detector only — caps move (carry's went 8 -> 12 on 30-Jul) and the ledger
+    does not record which cap was in force, so an over-cap reading corroborates
+    and never accuses on its own."""
+    ev = sorted([(o, 1) for _p, o, _c in eps] + [(c, -1) for _p, _o, c in eps])
+    cur = mx = 0
+    for _t, d in ev:
+        cur += d
+        mx = max(mx, cur)
+    return mx
+
+
+def book_payload(s):
+    """The published per-book numbers for one sample, tolerating n<2.
+
+    Split out at (hc) because there are now TWO samples per book (era-scoped
+    and all-time) and an era-scoped sample can be legitimately too thin to
+    grade — the old inline dict indexed `s["days"]` and would have raised a
+    KeyError on exactly the book the era block was written for."""
+    bars = bar_map(s)
+    out = {"n": s.get("n", 0), "bars": bars, "bar_names": list(BAR_NAMES),
+           "bars_passed": sum(bars.values())}
+    if s.get("n", 0) < 2:
+        out.update(days=None, mean_pct=None, t=None, win_pct=None,
+                   max_dd_pct=None, h1=None, h2=None,
+                   why=s.get("why") or "too few closes to grade")
+        return out
+    dd = s.get("max_dd_frac")
+    out.update(days=round(s["days"], 1),
+               mean_pct=round(100 * s["mean_pct"], 3),
+               t=round(s["t"], 2), win_pct=round(100 * s["win_rate"], 1),
+               max_dd_pct=(round(100 * dd, 1) if dd is not None else None),
+               h1=round(s["h1"], 2), h2=round(s["h2"], 2))
+    return out
 
 
 def grade(s, legacy=False):
@@ -266,8 +632,50 @@ def _selftest():
         else:
             assert sum(bm.values()) == 0, (name, bm)   # claims nothing at all
     assert bar_map(nodd)["maxdd"] is False, "an unmeasured drawdown is not a pass"
+
+    # ---- POLICY ERAS [2026-07-30 (hc)] ---------------------------------
+    # The suffix strip is the whole wiring. Keyed bare, looked up suffixed.
+    for suffixed in ("perps-funding-carry-lshadow", "perps-funding-carry"):
+        ep, iso, why = era_epoch_for(suffixed)
+        assert ep is not None and iso == "2026-07-17", (suffixed, ep, iso)
+        assert why and len(why) > 60, f"{suffixed}: era needs a stated reason"
+    # An undeclared book grades ALL-TIME — the pre-(hc) behaviour, unchanged.
+    # Both of these are books whose publisher does NOT accrue funding, so the
+    # 17-Jul basis fix cannot have touched their P&L. (This line named the Ticket
+    # Taker until (hg): it DOES accrue — its divergence lens exists to collect
+    # the credit — and it is now declared.)
+    assert era_epoch_for("lighter-dislocation-lshadow") == (None, None, None)
+    assert era_epoch_for("lighter-perp-sniper-lshadow") == (None, None, None)
+    # ...and the Farmer's OWN NAME ends in a row suffix, so every one of its
+    # three spellings must resolve to the same era. This is the (hg) bug.
+    _fe = era_epoch_for("perps-funding-lighter")
+    assert _fe[0] is not None, "the bare key does not resolve to itself"
+    for _row in ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"):
+        assert era_epoch_for(_row) == _fe, (_row, era_epoch_for(_row), _fe)
+
+    era_ep, _, _ = era_epoch_for("perps-funding-carry-lshadow")
+    def _p(x):                      # stand-in for experiment_judge.parse_ts
+        from datetime import datetime, timezone
+        d = datetime.fromisoformat(str(x))
+        return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
+    assert in_era("2026-07-20T00:00", era_ep, _p) is True
+    assert in_era("2026-07-16T23:59", era_ep, _p) is False
+    # FAIL-CLOSED: unreadable or missing open stamps are OUT when an era is
+    # declared, and IN when none is (no era = no claim about which trades count).
+    for bad in (None, "", "not-a-date"):
+        assert in_era(bad, era_ep, _p) is False, bad
+        assert in_era(bad, None, _p) is True, bad
+    # A too-thin era must be publishable, not a crash. This is the failure the
+    # inline payload dict would have hit on the one book the era exists for.
+    thin_era = stats(mk([0.01]))
+    bp = book_payload(thin_era)
+    assert bp["n"] == 1 and bp["days"] is None and bp["bars_passed"] == 0, bp
+    assert set(bp["bars"]) == set(BAR_NAMES)
+    bp2 = book_payload(good)
+    assert bp2["bars_passed"] == 6 and bp2["t"] is not None, bp2
+
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
-          "high-win-rate loser, window/DD bars, ungradeable input)")
+          "high-win-rate loser, window/DD bars, ungradeable input, policy eras)")
 
 
 def main():
@@ -310,20 +718,58 @@ def main():
     ready, payload_books = [], {}
     for bot in sorted(books):
         rs = sorted(books[bot], key=_key)
-        parsed = []
+        era_epoch, era_iso, era_why = era_epoch_for(bot)
+        parsed, parsed_all, integ_eps = [], [], []
         for r in rs:
+            # [(hf)] intervals for the integrity check, over the WHOLE ledger:
+            # a second writer is a property of the book's record, not of the era
+            # being graded, and narrowing to the era could hide it.
+            if r.get("open_ts") and r.get("close_ts"):
+                try:
+                    integ_eps.append((str(r.get("pair")),
+                                      parse_stamp(r["open_ts"]),
+                                      parse_stamp(r["close_ts"])))
+                except (TypeError, ValueError):
+                    pass
             try:
                 from experiment_judge import parse_ts
                 from datetime import datetime, timezone
                 ts = datetime.fromtimestamp(parse_ts(_key(r)), tz=timezone.utc)
             except Exception:      # noqa: BLE001
                 continue
-            parsed.append((r.get("profit_ratio"), r.get("profit_abs"), ts))
-        s = stats(parsed)
-        if s.get("n", 0) < a.min_closes:
+            row = (r.get("profit_ratio"), r.get("profit_abs"), ts)
+            parsed_all.append(row)
+            if in_era(r.get("open_ts"), era_epoch, parse_ts):
+                parsed.append(row)
+        # [2026-07-30 (hc)] The ERA-SCOPED sample is authoritative; the all-time
+        # one is published beside it so nothing is hidden and the difference is
+        # readable rather than asserted. `min_closes` is applied to the ALL-TIME
+        # count on purpose: a book whose era has too few closes must still
+        # appear, showing its era bars dark, or narrowing the window would
+        # silently REMOVE the frontrunner from the report instead of demoting it.
+        s, s_all = stats(parsed), stats(parsed_all)
+        if s_all.get("n", 0) < a.min_closes:
             continue
         ok, fails = grade(s)
+        # [2026-07-30 (hf)] LEDGER INTEGRITY IS A PRECONDITION, not a bar. It
+        # does not join BAR_NAMES — that tuple is the published contract the
+        # dashboard renders and a seventh entry breaks every consumer — but a
+        # book whose ledger cannot have come from one process is NOT GRADEABLE,
+        # so it can never be READY. Fail-closed, and the reason is stated in
+        # `fails` where a human reads it.
+        overlaps = same_pair_overlaps(integ_eps)
+        if overlaps:
+            # FIRST in the list, not appended: the printed verdict shows
+            # `fails[:2]` and this is the one failure that invalidates the other
+            # five rather than adding to them. Buried at position three it was
+            # invisible in exactly the run that needed it.
+            fails = [f"LEDGER: {len(overlaps)} same-pair overlap(s), deepest "
+                     f"{overlaps[0][1]:.2f}h on {overlaps[0][0]} — TWO WRITERS, "
+                     f"n is not one book's trades"] + fails
+            ok = False
         ok_old, fails_old = grade(s, legacy=True)
+        if overlaps:
+            ok_old = False
         verdict = "READY" if ok else "; ".join(fails[:2])
         flag = ""
         if ok and not ok_old:
@@ -333,11 +779,21 @@ def main():
         dd_pct = (round(100 * s["max_dd_frac"], 1)
                   if s.get("max_dd_frac") is not None else None)
         bars = bar_map(s)
-        print(f"{bot:34s} {s['n']:>4d} {s['days']:>6.1f} "
-              f"{100*s['mean_pct']:>7.3f}% {s['t']:>6.2f} "
-              f"{100*s['win_rate']:>5.1f}% "
-              f"{('n/a' if dd_pct is None else f'{dd_pct:.1f}%'):>7s}  "
-              f"{verdict}{flag}")
+        if era_iso:
+            # Say so on EVERY line for an era-scoped book, whatever the verdict.
+            # An era that only announces itself when it changes the outcome is a
+            # footnote; this one has to be readable as the sample's definition.
+            flag += (f"   [era {era_iso}: {s.get('n', 0)} of {s_all['n']} "
+                     f"closes count]")
+        if s.get("n", 0) < 2:
+            print(f"{bot:34s} {s.get('n', 0):>4d} {'-':>6s} {'-':>8s} {'-':>6s} "
+                  f"{'-':>6s} {'-':>7s}  ungradeable in era{flag}")
+        else:
+            print(f"{bot:34s} {s['n']:>4d} {s['days']:>6.1f} "
+                  f"{100*s['mean_pct']:>7.3f}% {s['t']:>6.2f} "
+                  f"{100*s['win_rate']:>5.1f}% "
+                  f"{('n/a' if dd_pct is None else f'{dd_pct:.1f}%'):>7s}  "
+                  f"{verdict}{flag}")
         if ok:
             ready.append(bot)
         # [2026-07-30] collect for the PUBLISH below — see the note there.
@@ -345,14 +801,27 @@ def main():
         # prose `fails` stays for humans. Publishing both means no consumer has
         # to string-match a message to know WHICH bar is dark.
         payload_books[bot] = {
-            "n": s["n"], "days": round(s["days"], 1),
-            "mean_pct": round(100 * s["mean_pct"], 3),
-            "t": round(s["t"], 2), "win_pct": round(100 * s["win_rate"], 1),
-            "max_dd_pct": dd_pct,
-            "h1": round(s["h1"], 2), "h2": round(s["h2"], 2),
-            "bars": bars, "bar_names": list(BAR_NAMES),
-            "bars_passed": sum(bars.values()), "fails": fails,
-            "ready": bool(ok), "legacy_ready": bool(ok_old)}
+            **book_payload(s), "fails": fails,
+            "ready": bool(ok), "legacy_ready": bool(ok_old),
+            # [2026-07-30 (hc)] The era, and the all-time sample it replaced.
+            # Both published: a consumer that wants the authoritative verdict
+            # reads the top level, and one that wants to see what the era
+            # withdrew reads `alltime`. `era` is None for every book without a
+            # declared era, which is all of them but one — so this is additive
+            # and no other book's payload changes shape in a meaningful way.
+            "era": ({"since": era_iso, "why": era_why,
+                     "closes_in_era": s.get("n", 0),
+                     "closes_all_time": s_all.get("n", 0)} if era_iso else None),
+            "alltime": book_payload(s_all),
+            # [(hf)] Published so a consumer can render the warning without
+            # string-matching `fails`, exactly as `bars` did for the bar map.
+            "integrity": {
+                "two_writers": bool(overlaps),
+                "same_pair_overlaps": len(overlaps),
+                "deepest_overlap_h": (round(overlaps[0][1], 2) if overlaps
+                                      else 0.0),
+                "deepest_overlap_pair": (overlaps[0][0] if overlaps else None),
+                "peak_concurrent": peak_concurrency(integ_eps)}}
     print()
     print(f"READY: {ready or 'none'}")
 

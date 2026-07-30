@@ -1591,6 +1591,43 @@ def golive_card():
             elif b.get("legacy_ready") and not is_ready:
                 note = ('<span style="color:#d1242f" title="the retired '
                         'win-rate rule would have ADMITTED this book">⚠</span>')
+            # [2026-07-30 (hc)] POLICY ERA. When a book is graded on a subset of
+            # its ledger the card must say so beside the sample size, or the
+            # operator reads `n57` next to a book whose row says 82 closes and
+            # has no way to tell which number the bars were computed from. The
+            # tooltip carries the era's declared reason verbatim.
+            era = b.get("era") if isinstance(b.get("era"), dict) else None
+            era_chip = ""
+            if era and era.get("since"):
+                at = b.get("alltime") or {}
+                era_chip = (
+                    f'<span title="policy era since {html.escape(str(era.get("since")))}'
+                    f' — graded on {era.get("closes_in_era")} of '
+                    f'{era.get("closes_all_time")} closes. '
+                    f'{html.escape(str(era.get("why") or ""))} All-time would read '
+                    f'{at.get("bars_passed", "?")}/6, t{(at.get("t") or 0):+.2f}." '
+                    f'style="color:#8250df;background:rgba(130,80,223,.14);'
+                    f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                    f'era {html.escape(str(era.get("since"))[5:])}</span>')
+            # [2026-07-30 (hf)] LEDGER INTEGRITY. A book whose ledger shows a
+            # same-pair overlap cannot have come from one process, so its `n` is
+            # not one book's trades and none of the six bars means what it says.
+            # Rendered as a loud chip rather than folded into `fails`, because
+            # this invalidates the row rather than adding a reason to it.
+            integ = b.get("integrity") if isinstance(b.get("integrity"), dict) else None
+            if integ and integ.get("two_writers"):
+                era_chip += (
+                    f'<span title="TWO WRITERS: '
+                    f'{integ.get("same_pair_overlaps")} same-pair overlap(s), '
+                    f'deepest {integ.get("deepest_overlap_h")}h on '
+                    f'{html.escape(str(integ.get("deepest_overlap_pair")))}, peak '
+                    f'{integ.get("peak_concurrent")} concurrent. One process '
+                    f'cannot hold two positions in one symbol, so this ledger is '
+                    f'more than one book&#39;s record and n/t do not mean what '
+                    f'they say. Operator action: stop the duplicate service." '
+                    f'style="color:#d1242f;background:rgba(209,36,47,.14);'
+                    f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                    f'2 writers</span>')
             miss = "; ".join(str(x) for x in (b.get("fails") or [])[:2])
             col = ("#1a7f37" if is_ready else
                    "#d29922" if np_ >= 5 else "#8b949e")
@@ -1602,7 +1639,7 @@ def golive_card():
                 f'{np_}/6</span>'
                 f'<span style="width:62px">{"".join(chips)}</span>'
                 f'<span style="flex:1;overflow:hidden;text-overflow:ellipsis">'
-                f'{html.escape(str(bot))} {note}</span>'
+                f'{html.escape(str(bot))} {note}{era_chip}</span>'
                 f'<span class="muted" style="width:34px;text-align:right">'
                 f'n{b.get("n")}</span>'
                 f'<span style="width:44px;text-align:right;color:{col}">'

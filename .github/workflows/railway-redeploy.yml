@@ -374,10 +374,29 @@ jobs:
               svcs="${svcs:+$svcs,}tide-rider-lighter-live"
               echo "-> live-taker marker: including tide-rider-lighter-live (REAL MONEY)"
             fi
+            # [2026-07-30 (hi)] THE EXPERIMENT'S TWO ARMS MUST DEPLOY TOGETHER.
+            # `funding-farmer-shadow` — the CONTROL arm of the promotion pipeline
+            # — appeared nowhere in this workflow, only in a comment inside
+            # experiment_judge.py. So it had NO deploy route: every live-Farmer
+            # deploy left the arms on different code, and the judge's own ARM
+            # DRIFT gate then refuses every promotion ("this window measures a
+            # code delta, not edge"). MEASURED after (hb) went out this morning:
+            # live 705425a83422 vs shadow 128995c2fd76 — drifted, by my own
+            # deploy. The judge happened to be idle, so nothing was blocked; the
+            # next candidate would have been drift-held on arrival.
+            # GATED ON THE SAME MARKER AND THE SAME FILE SET as the live arm, on
+            # purpose: matched-in-both-directions is the property that matters,
+            # and auto-deploying the shadow on every unmarked push would simply
+            # drift the arms the other way. The service SPLIT stays (the control
+            # container holds zero keys and no REAL_MONEY_KILL — a hard boundary
+            # the judge's comment says must not become a soft one); only the
+            # deploy CLOCK is joined.
+            # `audit_deploy_coverage.py --arms` enforces the pairing.
             if echo "$changed" | grep -qE "$farmer_files" \
                && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-farmer]'; }; then
-              svcs="${svcs:+$svcs,}trail-blazer-live"
+              svcs="${svcs:+$svcs,}trail-blazer-live,funding-farmer-shadow"
               echo "-> live-farmer marker: including trail-blazer-live (REAL MONEY)"
+              echo "-> ...and funding-farmer-shadow, its CONTROL arm (arm-drift)"
             fi
           fi
           echo "services=$svcs" >> "$GITHUB_OUTPUT"

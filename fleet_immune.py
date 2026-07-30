@@ -338,6 +338,34 @@ def organ_invariants(states, now):
         if ph is not None and ph not in ("idle", "running", "promoted"):
             sick("xp-judge", f"unknown phase {ph!r}")
 
+    # [2026-07-30 (hh)] A LEDGER THAT IS NOT ONE BOOK'S RECORD. This is the
+    # purest ALIVE-BUT-SICK shape in the fleet: the row is fresh, in-TTL and
+    # trusted, and its `n` is two processes' trades. `(hf)` measured it on
+    # `perps-funding-carry-lshadow` — 7 same-pair overlapping holds, deepest
+    # 9.14h, and one process cannot hold two positions in one coin — but the
+    # signal reached only a dashboard chip and a manually-run audit. THE FIX IS
+    # AN OPERATOR ACTION (stop the duplicate Railway service), which is exactly
+    # the case where this organ's phone push is the actuator: a guard cannot
+    # un-pool closes two processes already wrote, so the only useful response is
+    # to tell a human, once, until it stops.
+    # Read off `golive-readiness.books.<bot>.integrity` — the publisher, not
+    # re-derived here, so the gate and the immune organ can never disagree about
+    # which ledgers are compromised.
+    gl = states.get("golive-readiness") or {}
+    if _fresh(gl, now):
+        for _bot, _b in sorted((gl.get("books") or {}).items()):
+            if not isinstance(_b, dict):
+                continue
+            _in = _b.get("integrity")
+            if isinstance(_in, dict) and _in.get("two_writers"):
+                sick("golive-readiness",
+                     f"{_bot}: ledger has {_in.get('same_pair_overlaps')} "
+                     f"same-pair overlap(s), deepest "
+                     f"{_in.get('deepest_overlap_h')}h on "
+                     f"{_in.get('deepest_overlap_pair')} — TWO WRITERS on one "
+                     f"bot_id. n is not one book's trades and t scales with "
+                     f"sqrt(n). OPERATOR: stop the duplicate Railway service")
+
     # [2026-07-17 BORN-DARK DETECTOR] an organ silently running a DEGRADED
     # FALLBACK nobody asked for. The brain shipped its v3 engine on 16-Jul
     # and ran FROZEN v2 in production for a day: brain_stats.py was never
@@ -468,8 +496,13 @@ def run_once():
     # DB failure -> every organ reads as absent, same as load_state failing)
     _keys = ("lighter-market", "brain-lens-forward", "regime-oracle",
              "xp-judge", "fleet-tuning", "fleet-proprioception",
-             "brain-vitals")     # [2026-07-17] born-dark detector, see above
+             "brain-vitals",     # [2026-07-17] born-dark detector, see above
                                  # [2026-07-22] gapscout-census -> regime-oracle
+             # [2026-07-30 (hh)] the two-writer ledger detector. WITHOUT THIS KEY
+             # the scanner above is dead code — the classic registered-but-inert
+             # shape, and the reason this list and the scanner must be changed in
+             # the same commit. `test_immune_two_writers.py` asserts membership.
+             "golive-readiness")
     _batch = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     states = {k: (_batch.get(k) or store.load_state(k) or {}) for k in _keys} \
         if not _batch else {k: (_batch.get(k) or {}) for k in _keys}
@@ -667,6 +700,21 @@ def _selftest():
                                                "end": 2.0}],           # fine
                                  "verdicts": {"taker.tp": {"verdict": "banana"},
                                               "taker.sl": {"verdict": "helping"}}},
+        # [2026-07-30 (hh)] a compromised LEDGER: fresh, trusted, and not one
+        # book's record. `clean-book` must stay silent in the same payload.
+        "golive-readiness": {
+            "updated": fresh, "ttl_sec": 86400,
+            "books": {
+                "dup-book": {"n": 82, "integrity": {
+                    "two_writers": True, "same_pair_overlaps": 7,
+                    "deepest_overlap_h": 9.14, "deepest_overlap_pair": "HYPE",
+                    "peak_concurrent": 10}},
+                "clean-book": {"n": 40, "integrity": {
+                    "two_writers": False, "same_pair_overlaps": 0,
+                    "deepest_overlap_h": 0.0, "deepest_overlap_pair": None,
+                    "peak_concurrent": 4}},
+                # a publisher predating the integrity field must not crash it
+                "old-payload": {"n": 12}}},
         "stale-organ": {"updated": "2020-01-01T00:00:00+00:00", "ttl_sec": 900,
                         "n_books": 1, "n_liquid": 999},
     }
@@ -674,7 +722,23 @@ def _selftest():
     organs = {i["organ"] for i in inv}
     assert organs == {"lighter-market", "brain-lens-forward",
                       "regime-oracle", "xp-judge",
-                      "fleet-proprioception"}, organs
+                      "fleet-proprioception", "golive-readiness"}, organs
+    _gl = [i["detail"] for i in inv if i["organ"] == "golive-readiness"]
+    assert len(_gl) == 1, f"only the compromised book may be flagged: {_gl}"
+    assert "dup-book" in _gl[0] and "TWO WRITERS" in _gl[0], _gl
+    assert "9.14h on HYPE" in _gl[0], _gl
+    assert "OPERATOR" in _gl[0], "the only useful response is to tell a human"
+    # a CLEAN gate payload is silent, and so is a STALE one (the watchdog's job)
+    assert organ_invariants({"golive-readiness": {
+        "updated": fresh, "ttl_sec": 86400, "books": {
+            "b": {"integrity": {"two_writers": False}}}}}, now) == []
+    assert organ_invariants({"golive-readiness": {
+        "updated": "2020-01-01T00:00:00+00:00", "ttl_sec": 86400, "books": {
+            "b": {"integrity": {"two_writers": True}}}}}, now) == []
+    # the KEY must be fetched, or the scanner above is dead code
+    _src = open(os.path.abspath(__file__)).read()
+    assert '"golive-readiness")' in _src or '"golive-readiness",' in _src, \
+        "golive-readiness is scanned but never fetched — inert scanner"
     # regime-oracle must flag ALL FOUR impossible values in the fixture and
     # NONE of the fine ones (SPY's valid grade must not trip)
     # [2026-07-30] the scout's new invariants must FIRE on the fixture above
