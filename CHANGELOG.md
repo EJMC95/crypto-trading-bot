@@ -1,3 +1,25 @@
+## 2026-07-30 (hn) — TWO CONTAINERS ARE WRITING THE FLEET'S ONLY GO-LIVE CANDIDATE
+
+- **THE ASK** (operator): *"Our focus needs to be on growth, expansion, sustainability, not stagnancy and circles ... to not allow things to take steps back every day only to move one step forward."* Acting on that meant running the FORWARD metric — `scripts/golive_readiness.py`, which asks the only question that matters: **which book is closest to holding real money?** It answered with an alarm.
+- **MEASURED, live:** 🌾 `perps-funding-carry-lshadow` has **14 OVERLAPPING SAME-PAIR POSITIONS** (BNB opening at 07-21T21:04 while a BNB position opened 07-21T14:04 is still held; SKHYNIXUSD three times; BTC) and **TWO DISTINCT `extra.build` STAMPS** on recent rows (`c33038455892`, `84da9c2eb9cf`). One book cannot hold the same pair twice at once. **Two containers are publishing this row.**
+- **THE CAUSE IS A DECISION MADE TODAY, AND IT WAS THE RIGHT ONE ON THE INFORMATION AVAILABLE.** `(gl)` found a `yield-harvester-shadow` service beside `funding-carry` and nothing in this repo said which published the row; with 🌾 five of six bars from the gate, "probably right" was not good enough, so the operator's call was **deploy both**. The reasoning was sound and the consequence is that both now write it.
+- **WHAT IT COSTS is evidence, not money.** Both arms are $1k shadow. But the ledger is now a MIXTURE of two independent books, so `n` is not one book's trades and every statistic computed on it is meaningless — including the go-live grade for **the only candidate the fleet has**. The grader's own output says it: `LEDGER: 7 same-pair overlap(s), deepest 9.14h on HYPE — TWO WRITERS, n is not one book's trades`.
+- **THE GUARD — `bot_pnl_store.claim_writer(bot)`**, and the design choices are the point:
+  - **FAIL-OPEN, deliberately.** A dark DB, an unreadable claim or any exception returns `(True, None)`. A duplicate writer corrupts EVIDENCE, which is recoverable; a false positive would stop a book TRADING, which is lost opportunity. The safe direction is to keep trading and shout.
+  - **FIRST CLAIMANT WINS, AND THE CLAIM EXPIRES** (`WRITER_CLAIM_TTL`, 30 min). A lock with no expiry is worse than none: a crashed container would silence the book forever. The incumbent refreshes on every call; a dead one frees the book.
+  - **ADVISORY.** It returns a verdict and halts nothing. Today's only consumer publishes `extra.duplicate_writer` and prints. Making it stop a real book is an operator decision, not a library default — and stopping the duplicate SERVICE is a Railway act, which is the operator's either way.
+  - Per-book, not global; identity is the container (`RAILWAY_REPLICA_ID`/`HOSTNAME`), not the build stamp, because two containers can run the same image.
+- Six tests pin the semantics including the fail-open direction and the dead-incumbent release, plus the consumed-not-just-registered check that this repo keeps needing.
+- **STILL THE OPERATOR'S:** which of `funding-carry` / `yield-harvester-shadow` to stop. Once one is stopped the row is single-writer and 🌾's grade becomes meaningful again — but the overlapping rows already written stay in the ledger and should be quarantined from grading, the same treatment `(hm)` prescribed for BOT/USDC.
+
+### The doctrine this pass was asked to establish
+
+Written into CLAUDE.md as a numbered rule, because the operator asked for it *in doctrine* rather than as an intention. **MEASURED on the day it was written: 40 changelog entries, 16 of them repairing work shipped the SAME DAY** — a 40% self-repair rate, which is the "circles" the operator named. Four rules:
+1. **SHIP NARROW, VERIFY IN THE LIVE PAYLOAD, THEN WIDEN.** `(fz)` changed six books in one pass and produced six follow-up entries repairing itself. One surface per pass; confirm it in `/pnl.json` before starting the next.
+2. **A FIX CLOSES A CLASS OR IT IS NOT FINISHED.** The test: after this change, can the same shape recur silently? That is what separates the compounding work from the corrections that will simply be re-made.
+3. **MEASURE BEFORE BUILDING.** Two sweeps today killed **25 of 30** and **21 of 39** candidates before a line was written. A reverted feature is the most expensive kind of progress.
+4. **THE FORWARD METRIC IS BOOKS THAT CAN BE GRADED, THEN GO LIVE** — not commits, not entries, not tests. State at the end of every pass which book moved and by how much. Running that metric is what found the defect above.
+
 ## 2026-07-30 (hm) — THE TAKER'S "HUGE WIN" WAS THE SHADOW ARM'S, IT WAS TWO EPISODES, AND A RANDOM SHORT BEATS THE LENS
 
 - **THE ASK** (operator): *"The taker also had a huge win and was labeled as noise, can we inquire into this and see if this gives us insight into an edge."* A 46-agent workflow re-opened it: six lanes, adversarial refutation on every decidable claim, and a ZERO-EDGE null simulated on the real tape. 18 claims survived, 21 were refuted. Suite **663**, six guards green.

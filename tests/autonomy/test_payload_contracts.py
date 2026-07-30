@@ -312,3 +312,65 @@ class TestTakerPolicyStamp:
         import lighter_ticket_taker as tt
         for t in ({"side": "short"}, {"side": "long"}, {}, {"side": None}):
             assert (tt.side_of(t) == "long") is (t.get("side", "long") != "short")
+
+
+# ===========================================================================
+# [2026-07-30 (hn)] TWO CONTAINERS WRITING ONE BOOK — silent, and it destroys
+# the evidence rather than the money. Measured on the fleet's ONLY go-live
+# candidate: 14 overlapping same-pair positions and TWO distinct build stamps
+# on perps-funding-carry-lshadow.
+# ===========================================================================
+class TestSoleWriterClaim:
+    def _store(self, monkeypatch):
+        import bot_pnl_store as store
+        box = {}
+        monkeypatch.setattr(store, "load_state", lambda k: box.get(k))
+        monkeypatch.setattr(store, "save_state",
+                            lambda k, v: box.__setitem__(k, v) or True)
+        return store, box
+
+    def test_first_claimant_wins_and_incumbent_refreshes(self, monkeypatch):
+        store, _ = self._store(monkeypatch)
+        assert store.claim_writer("bk", now=1000.0) == (True, None)
+        assert store.claim_writer("bk", now=1100.0) == (True, None)
+
+    def test_a_second_container_is_detected(self, monkeypatch):
+        store, _ = self._store(monkeypatch)
+        store.claim_writer("bk", now=1000.0)
+        monkeypatch.setattr(store, "_WRITER_ID", "OTHER-CONTAINER")
+        ok, other = store.claim_writer("bk", now=1100.0)
+        assert ok is False and other, "a duplicate writer must be detected"
+
+    def test_a_dead_incumbent_frees_the_book(self, monkeypatch):
+        """A lock with no expiry is worse than none — a crashed container would
+        silence the book forever."""
+        store, _ = self._store(monkeypatch)
+        store.claim_writer("bk", now=1000.0)
+        monkeypatch.setattr(store, "_WRITER_ID", "OTHER-CONTAINER")
+        t = 1000.0 + store.WRITER_CLAIM_TTL + 1
+        assert store.claim_writer("bk", now=t) == (True, None)
+
+    def test_it_fails_OPEN_on_any_error(self, monkeypatch):
+        """THE DIRECTION MATTERS. A duplicate writer corrupts EVIDENCE, which
+        is recoverable; a false positive would stop a book TRADING, which is
+        lost opportunity. So a dark DB must never look like a collision."""
+        import bot_pnl_store as store
+        def boom(_k):
+            raise RuntimeError("db down")
+        monkeypatch.setattr(store, "load_state", boom)
+        assert store.claim_writer("bk", now=1.0) == (True, None)
+
+    def test_books_do_not_block_each_other(self, monkeypatch):
+        store, _ = self._store(monkeypatch)
+        assert store.claim_writer("book-a", now=1.0) == (True, None)
+        monkeypatch.setattr(store, "_WRITER_ID", "OTHER")
+        assert store.claim_writer("book-b", now=2.0) == (True, None), \
+            "the claim is per-book, not global"
+
+    def test_the_carry_bot_actually_calls_it(self):
+        """Registered-but-unconsumed is this repo's most repeated defect."""
+        import pathlib as _p
+        src = (_p.Path(__file__).resolve().parents[2]
+               / "funding_carry_bot.py").read_text()
+        assert "claim_writer" in src, "carry does not check for a second writer"
+        assert "duplicate_writer" in src, "the collision is not published"

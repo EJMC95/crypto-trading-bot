@@ -638,6 +638,13 @@ def main():
             open_pnl = sum(p["accrued"] - p["fees"] for p in positions.values())
             top = sorted(fund.items(), key=lambda cf: -abs(cf[1]["rate"]))[:3]
             try:
+                _ok_writer, _other = store.claim_writer(BOT_ROW)
+                _dup_writer = None if _ok_writer else _other
+                if _dup_writer:
+                    print(f"[funding-carry] DUPLICATE LEDGER WRITER on {BOT_ROW}: another "
+                          f"process ({_dup_writer}) is publishing this book. n is NOT one "
+                          f"book's trades and every statistic on it — including the "
+                          f"go-live grade — is a mixture.", flush=True)
                 store.publish(
                     bot_id, status="online",
                     equity=START_EQUITY + realized + open_pnl,
@@ -656,6 +663,19 @@ def main():
                            # board must see the bar this arm ACTUALLY gates on.
                            "caps": {"max_positions": MAX_POSITIONS,
                                     "enter_apr": _enter_apr},
+                           # [2026-07-30 (hn)] SOLE-WRITER CHECK. Measured on
+                           # THIS book: 14 overlapping same-pair positions and
+                           # TWO distinct build stamps — `(gl)` deployed both
+                           # `funding-carry` and `yield-harvester-shadow`
+                           # because the repo could not say which owned the
+                           # row, so both now write it. The ledger is a
+                           # mixture of two independent books, which makes `n`
+                           # meaningless for the fleet's ONLY go-live
+                           # candidate. Advisory and fail-OPEN: it reports,
+                           # it never halts. Stopping the duplicate service is
+                           # a Railway act and therefore the operator's.
+                           **({"duplicate_writer": _dup_writer}
+                              if _dup_writer else {}),
                            # NOT "positions": the dashboard reserves that key for
                            # the stock bots' list-of-dicts holdings format.
                            "carries": {c: f"{p['side']}@{p['entry_apr']:+.0%}"

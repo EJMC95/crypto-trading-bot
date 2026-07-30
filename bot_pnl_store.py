@@ -440,6 +440,62 @@ def save_state(bot, state):
         return False
 
 
+_WRITER_ID = None
+WRITER_CLAIM_TTL = int(os.environ.get("WRITER_CLAIM_TTL_SEC", "1800"))
+
+
+def _writer_id():
+    """This PROCESS's identity — stable for its lifetime, unique across
+    containers. Not the build stamp: two containers can run the same image."""
+    global _WRITER_ID
+    if _WRITER_ID is None:
+        import uuid
+        _WRITER_ID = (os.environ.get("RAILWAY_REPLICA_ID")
+                      or os.environ.get("HOSTNAME")
+                      or uuid.uuid4().hex[:12])
+    return str(_WRITER_ID)[:64]
+
+
+def claim_writer(bot, now=None):
+    """-> (ok, other) — is THIS process the sole writer of `bot`'s ledger?
+
+    [2026-07-30 (hn)] TWO CONTAINERS WRITING ONE BOOK IS SILENT AND IT
+    DESTROYS THE EVIDENCE. Measured on 🌾 perps-funding-carry-lshadow, the
+    fleet's only go-live candidate: 14 OVERLAPPING same-pair positions (one
+    book cannot hold BNB twice at once) and TWO distinct `extra.build` stamps
+    on recent rows. `(gl)` deployed both `funding-carry` and
+    `yield-harvester-shadow` because this repo could not say which owned the
+    row — a reasonable call with the information available, and the
+    consequence is that both now do. The ledger became a mixture of two
+    independent books, so `n` is not one book's trades and every statistic
+    computed on it — including its go-live grade — is meaningless.
+
+    THE CONTRACT, and the direction of failure is deliberate:
+      * FAIL-OPEN. A dark DB, an unreadable claim or any exception returns
+        (True, None). A duplicate writer corrupts EVIDENCE; a false positive
+        would stop a book from TRADING. Evidence is recoverable, a halted book
+        is lost opportunity, so the safe direction is to keep trading and
+        shout.
+      * FIRST CLAIMANT WINS, and the claim EXPIRES. The incumbent refreshes on
+        every call, so a container that dies frees the book within
+        WRITER_CLAIM_TTL rather than locking it forever.
+      * ADVISORY. This returns a verdict; it does not halt anything. The
+        caller decides, and today every caller only reports. Making it halt a
+        real book is an operator decision, not a library default.
+    """
+    me = _writer_id()
+    try:
+        cur = load_state("writer:" + str(bot)) or {}
+        who, ts = cur.get("writer"), float(cur.get("ts") or 0)
+        now = float(now if now is not None else time.time())
+        if who and who != me and (now - ts) < WRITER_CLAIM_TTL:
+            return False, who
+        save_state("writer:" + str(bot), {"writer": me, "ts": now})
+        return True, None
+    except Exception:                      # noqa: BLE001 — fail OPEN, always
+        return True, None
+
+
 def heartbeat(bot):
     """[2026-07-12 GO-GREEN] Touch ONLY updated_at on the bot's existing row —
     a liveness proof that never clobbers the last good snapshot. Cheap enough

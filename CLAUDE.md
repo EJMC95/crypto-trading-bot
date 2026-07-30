@@ -822,6 +822,35 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **FORWARD MOTION IS THE DOCTRINE (operator, 30-Jul: "our focus needs to be on
+  growth, expansion, sustainability, not stagnancy and circles ... to not allow
+  things to take steps back every day only to move one step forward").**
+  MEASURED that day: 40 changelog entries, **16 of them repairing work shipped
+  the SAME DAY**. That ratio is the problem, and it has a mechanism, so it has
+  a fix. Four rules, in priority order:
+  1. **SHIP NARROW, VERIFY IN THE LIVE PAYLOAD, THEN WIDEN.** `(fz)` changed
+     six books in one pass and produced six follow-up entries repairing itself
+     — `(gc)` found three defects in it, `(ge)` two more, `(hk)` found a
+     widening it claimed and never shipped, `(hl)` found it had broken the
+     15% drawdown bar. One surface per pass. Confirm the change in
+     `/pnl.json`'s own payload before starting the next one. A green suite is
+     not a landed change ([[railway-cli-frozen-services]]).
+  2. **A FIX CLOSES A CLASS OR IT IS NOT FINISHED.** Fixing the instance and
+     leaving the class open guarantees a return visit — that is the circle.
+     The test: after this change, can the same shape recur silently? If yes,
+     the work is not done. This is what separates the compounding items
+     (`REJECTED_SLEEVES`, the `DRIFT_OK` hole, the ledger basis invariant,
+     `test_payload_contracts`, the cross-branch letter arm) from the one-off
+     corrections that will be re-made.
+  3. **MEASURE BEFORE BUILDING.** Two sweeps on 30-Jul killed **25 of 30** and
+     **21 of 39** candidates before a line was written — including every route
+     to "more trades", each of which would have shipped, looked good, and been
+     reverted. Measurement is the cheapest form of forward motion; a reverted
+     feature is the most expensive.
+  4. **THE FORWARD METRIC IS BOOKS THAT CAN BE GRADED, THEN GO LIVE.** Not
+     commits, not entries, not tests. A pass that leaves no book closer to the
+     gate has not moved the fleet, however much it fixed. State at the end of
+     every pass which book moved and by how much.
 - **GROWTH FINDINGS ARE IMPLEMENTED, NOT FILED (operator rule, 30-Jul (hn)).**
   *"A new rule must be implemented that if we find something that moves us
   forward in progression and growth, it can implement."* Context: *"the whole
