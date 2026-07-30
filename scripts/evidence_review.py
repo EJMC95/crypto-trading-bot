@@ -77,11 +77,14 @@ for _p in (_HERE, os.path.dirname(_HERE)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 try:                                     # run as a script (sys.path[0]=scripts/)
-    from golive_readiness import (GOLIVE_MIN_CLOSES, GOLIVE_MIN_DAYS,
-                                  grade, stats)
+    from golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
+                                  GOLIVE_MIN_DAYS, bar_map, book_payload,
+                                  grade, same_pair_overlaps, stats)
 except ImportError:                      # run as `python -m scripts.evidence_review`
-    from scripts.golive_readiness import (GOLIVE_MIN_CLOSES, GOLIVE_MIN_DAYS,
-                                          grade, stats)
+    from scripts.golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
+                                          GOLIVE_MIN_DAYS, bar_map,
+                                          book_payload, grade,
+                                          same_pair_overlaps, stats)
 
 # Cheap SQL prefilter before the per-book ledger read. It must never be STRICTER
 # than the real closes bar, or a genuine candidate is hidden before it is graded.
@@ -185,18 +188,59 @@ def gate_status(rows):
     return ("pass", why, s) if passes else ("fail", "; ".join(fails), s)
 
 
-def window_only(why):
-    """True when the 30-day WINDOW is the single remaining bar.
+def ledger_pooled(cur, bot):
+    """[(pair, hours)] where this book's ledger proves a SECOND WRITER.
 
-    Such a book has cleared every EVIDENCE bar and is just accruing calendar —
-    it is the operator's lead time on a decision, so the review says how many
-    days are left. `grade` joins failed bars with '; ', so one bar means no
-    separator; anything else (thin AND short, say) must NOT read as "ready in
-    N days". Pure so the discrimination is testable, not inferred from a
-    string built three call-frames away.
+    Delegates the detection to `golive_readiness.same_pair_overlaps` — the same
+    function `audit_ledger_integrity` uses, so the review and the guard can
+    never disagree about whether a book's record is clean. One process cannot
+    hold two positions in one symbol (every Lighter book keys `positions` by
+    symbol), so an overlap is structural proof, not a heuristic.
+
+    Fail-SOFT and fail-OPEN on a bad read: returns [] rather than raising, so a
+    timestamp that will not cast cannot cost the whole section. Note both
+    columns are TEXT in four formats — the cast is mandatory (see CA).
     """
-    w = str(why or "")
-    return w.startswith("window ") and ";" not in w
+    try:
+        cur.execute(f"""SELECT pair, opened_at::timestamptz, {CA}
+                          FROM paper_trades
+                         WHERE bot=%s AND pnl_abs IS NOT NULL
+                           AND opened_at IS NOT NULL AND closed_at IS NOT NULL""",
+                    (bot,))
+        eps = [(p, o, c) for p, o, c in cur.fetchall() if p and o and c]
+    except Exception:
+        return []
+    return same_pair_overlaps(eps)
+
+
+def blocking_bars(s):
+    """The canonical bar names this book FAILS, sorted. Never prose.
+
+    [2026-07-30] Derived from `golive_readiness.bar_map`, not from parsing
+    `grade`'s reason string. The first cut of this function did parse the
+    string (`why.startswith("window ")`) and was obsolete within hours: (hl)
+    landed `bar_map` for exactly this reason — its own docstring says
+    "published rather than re-derived ... prose is exactly what drifts".
+
+    Deriving it means a bar ADDED, RENAMED or REDEFINED upstream reaches this
+    review automatically instead of silently failing to match a prefix. The
+    maxdd bar's definition is under active change ((hl): realised-only today,
+    MTM once ~30d of `bot_state_history` accrues) — that change must not need
+    an edit here.
+    """
+    return tuple(sorted(k for k, ok in bar_map(s).items() if not ok))
+
+
+def near_miss_eta(s):
+    """Days until the WINDOW bar clears, when it is the ONLY failing bar.
+
+    Returns None unless the book has cleared every EVIDENCE bar — a book that
+    is also thin, or noisy, is not "N days from ready" and must never read as
+    though it were.
+    """
+    if s.get("n", 0) < 2 or blocking_bars(s) != ("window",):
+        return None
+    return GOLIVE_MIN_DAYS - s["days"]
 
 
 def _assert_write_target(key):
@@ -401,22 +445,50 @@ def scan_new_evidence(cur, errors):
                              ORDER BY {CA}""", (bot,))
             rows = cur.fetchall()
             status, why, s = gate_status(rows)
+            # [(hf)/(hi)] A grade is only as good as the ledger under it. If two
+            # processes wrote this book's rows, its n/t describe a POOLED record
+            # and no promotion may rest on them. Measured 30-Jul: 🌾 carry — the
+            # book closest to the bar — carries 7 same-pair overlaps, deepest
+            # 9.14h. Surfaced HERE rather than left to a separate guard nobody
+            # runs on review day.
+            pooled = ledger_pooled(cur, bot)
+            flag = ""
+            if pooled:
+                flag = (f" ⛔ POOLED LEDGER: {len(pooled)} same-pair overlap(s), "
+                        f"deepest {pooled[0][1]:.2f}h on {pooled[0][0]} — a second "
+                        f"writer; this grade is not one book's record")
             if status == "pass":
-                passers.append(f"{bot} ({why})")
-            # A book that clears every EVIDENCE bar and waits only on the 30-day
-            # window is the operator's lead time — it is ~N days from a decision.
-            elif s.get("n", 0) >= 2 and window_only(why):
-                eta = GOLIVE_MIN_DAYS - s["days"]
-                near.append(f"{bot} (t={s['t']:.2f}, n={s['n']}, {s['days']:.1f}d — "
-                            f"evidence bars ALL clear, ~{eta:.1f}d from the window)")
-        items.append("🚦 go-live gates (CANONICAL grader golive_readiness.grade — "
-                     ">=30d, >=30 closes, mean>0, t>=2, both halves +, maxDD<15%; "
-                     "win rate reported, NOT a bar; retired, already-live and "
-                     "live-twin rows excluded; drawdown derived from the LEDGER "
-                     "since bot_pnl.extra.max_drawdown is unpopulated): "
+                passers.append(f"{bot} ({why}){flag}")
+                continue
+            # A book that clears every EVIDENCE bar and waits only on the
+            # window is the operator's lead time — ~N days from a decision.
+            eta = near_miss_eta(s)
+            if eta is not None:
+                p = book_payload(s)
+                near.append(f"{bot} (t={p['t']}, n={p['n']}, {p['days']}d, "
+                            f"{p['bars_passed']}/{len(BAR_NAMES)} bars — only "
+                            f"'window' outstanding, ~{eta:.1f}d away){flag}")
+        # The bar LIST comes from the grader, so a bar added or renamed upstream
+        # shows up here without an edit (the (hl) bar_map doctrine).
+        items.append("🚦 go-live gates (CANONICAL grader golive_readiness — bars: "
+                     + ", ".join(BAR_NAMES) +
+                     "; win rate reported, NOT a bar; retired, already-live and "
+                     "live-twin rows excluded): "
                      f"{'; '.join(passers) if passers else 'NO new candidate'}")
         if near:
-            items.append("⏳ waiting only on the 30-day window: " + "; ".join(near))
+            items.append("⏳ waiting only on the window bar: " + "; ".join(near))
+        # [(hl)] The maxdd bar is measured on REALISED closed P&L only, so a
+        # book that is usually IN a position has drawdown the bar cannot see —
+        # measured on 📊 Index Rider, realised 9.9-10.7% vs true MTM 15.6-17.4%,
+        # i.e. the two definitions disagree about the VERDICT. `snapshot_equity`
+        # started accruing an MTM series on 30-Jul; until ~30d exists the bar
+        # stays realised-only. State it every run rather than let a reader take
+        # a maxdd pass as an MTM pass.
+        if passers or near:
+            items.append("⚠️ maxdd caveat ((hl)): the bar above is REALISED-only; "
+                         "MTM drawdown can be materially larger and can flip the "
+                         "verdict. Re-grade any candidate under MTM once "
+                         "bot_state_history '<bot>:equity' has ~30d.")
 
     with Section(errors, "fleet-risk"):
         st, _ = load_state(cur, "fleet-risk")
@@ -637,7 +709,9 @@ def selftest():
     lop = gate_status(_mk([0.05] * 20 + [-0.01] * 20))   # both-halves only
     assert lop[0] == "fail" and "halves" in lop[1] and ";" not in lop[1], lop[1]
     win = gate_status(_mk([0.01] * 40, span_days=5.0))   # 30-day window only
-    assert win[0] == "fail" and win[1].startswith("window "), win[1]
+    # the window bar alone — asserted on the BAR, not on the reason prose
+    # (the reason string's wording is golive_readiness's business, not ours)
+    assert win[0] == "fail" and blocking_bars(win[2]) == ("window",), win[1]
     # ungradeable input claims nothing and never raises
     assert gate_status([])[0] == "fail"
     assert gate_status([(0.01, 1.0, _t0)])[0] == "fail", "n=1 is ungradeable"
@@ -646,13 +720,32 @@ def selftest():
     #     decision (carry t=2.60, Farmer shadow t=2.09) and the 30-Jul review
     #     mentioned NEITHER — it reported only the false passer. A book whose
     #     sole remaining bar is calendar is the operator's lead time.
-    assert window_only(win[1]), win[1]
-    both = gate_status(_mk([0.02] * 10, span_days=5.0))[1]
-    assert ";" in both and not window_only(both), \
-        f"thin AND short must NOT read as 'waiting only on the window': {both}"
-    assert not window_only(lop[1]), "a halves failure is not a window failure"
-    assert not window_only(""), "no reason is not a near-miss"
-    assert not window_only(None), "None must not raise"
+    _, _, s_win = gate_status(_mk([0.01] * 40, span_days=5.0))
+    assert blocking_bars(s_win) == ("window",), blocking_bars(s_win)
+    assert near_miss_eta(s_win) is not None
+    #     thin AND short is NOT "N days from ready" — two bars outstanding.
+    _, _, s_both = gate_status(_mk([0.02] * 10, span_days=5.0))
+    assert blocking_bars(s_both) == ("closes", "window"), blocking_bars(s_both)
+    assert near_miss_eta(s_both) is None, "two failing bars is not a near-miss"
+    #     a halves failure is not a window failure
+    _, _, s_lop = gate_status(_mk([0.05] * 20 + [-0.01] * 20))
+    assert blocking_bars(s_lop) == ("halves",), blocking_bars(s_lop)
+    assert near_miss_eta(s_lop) is None
+    #     ungradeable claims nothing and never raises
+    assert near_miss_eta(stats([])) is None
+    assert blocking_bars(stats([])) == tuple(sorted(BAR_NAMES))
+
+    # (6) THE ANTI-DRIFT CONTRACT. blocking_bars is derived from the grader's
+    #     bar_map, never from prose, so a bar added/renamed/redefined upstream
+    #     arrives here without an edit. The FIRST cut of this parsed
+    #     `why.startswith("window ")` and was obsolete within hours when (hl)
+    #     landed bar_map — that is the drift this asserts against.
+    assert set(bar_map(_stats_pass := stats(carry))) == set(BAR_NAMES)
+    assert all(bar_map(_stats_pass).values()) is grade(_stats_pass)[0], \
+        "bar_map and grade must agree — the canonical invariant"
+    assert not blocking_bars(_stats_pass), "a passing book blocks on nothing"
+    # the review must render the bar LIST from the grader, not restate it
+    assert len(BAR_NAMES) == 6 and "maxdd" in BAR_NAMES, BAR_NAMES
 
     # ---- the ACTION detector, which was dead code until 30-Jul -------------
     assert action_items(["🚦 go-live gates (...): NO new candidate"]) == []

@@ -822,6 +822,31 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **GROWTH FINDINGS ARE IMPLEMENTED, NOT FILED (operator rule, 30-Jul (hn)).**
+  *"A new rule must be implemented that if we find something that moves us
+  forward in progression and growth, it can implement."* Context: *"the whole
+  premise upon the fleet's inception is GROWTH, not staleness and circles"* and
+  *"otherwise we are just reverting every day and wasting time and money."*
+  So a finding that moves the fleet forward is **acted on in the same session**,
+  not recorded as a follow-up for a later pass. This is a standing
+  authorisation, and it is deliberately routed by WHAT the finding is — the
+  routing is what keeps "implement immediately" from ever meaning "an
+  autonomous run changed a live bot":
+  | Finding | Action |
+  |---|---|
+  | **Correctness / measurement** — a bar on the wrong basis, a stale copy of a rule, a grader reading the wrong field, a guard that cannot fire, a counter that disagrees with itself | **Implement now**, with a test that names the incident, mutation-verified. This is where essentially every real-money benefit has actually come from. |
+  | **Tooling, review, guard, observability** | **Implement now**, same standard. |
+  | **A bounded lever on a shadow lane** the evidence supports | Route through the designed channel — `fleet_proposals.py` → the scout tuner's replay gate (bounded, TTL'd, auto-reverting, brain veto senior). Never hand-set a lever. |
+  | **Real money** — `live.*` levers, clips, `dry_run`, keys, go-live, a Railway service | **Do NOT apply.** Escalate with the exact command/lever and the decision named. Unchanged: go-live is an explicit operator act, and *never modify bot logic without backtesting first*. |
+  **A correctness fix that changes which book gets real money IS a real-money
+  benefit delivered** — it arrives as better evidence rather than a bigger
+  position. Two corollaries learned the same day: a **refusal with evidence is a
+  valid output** ((hl) killed 25 of 30 throughput candidates because the gain was
+  turnover bought with expectancy), and **never add anything that inhibits the
+  fleet** — an untested rewrite of an enforcement authority is not growth, so a
+  change that alters which trades books take still earns its replay evidence
+  first. Growth is not a licence to skip measurement; it is a ban on sitting on
+  a measured win.
 - **THE LIVE-DEPLOY MARKER LIVES IN THE COMMIT SUBJECT, AND MENTIONING IT IN A
   BODY USED TO DEPLOY REAL MONEY (30-Jul (hj)).** The gate read `git log
   --format='%B'`, so a commit whose body said *"NOT deployed to the live taker:
@@ -832,6 +857,31 @@ All new bots:
   a subject mention still fires, by design (a subject is a deliberate
   statement, not prose). Verify a live deploy by the `extra.build` +
   `extra.build_n` stamp, never by the green run.
+- **GRADE A DIRECTIONAL BOOK AGAINST A RANDOM-ENTRY BENCHMARK, NEVER AGAINST
+  ZERO (30-Jul (hm)).** On this venue a random short earns +0.2% to +1.1%/trade
+  for free. Measured on the Ticket Taker: random entries on the LENS'S OWN
+  COINS, same window, same bracket, through the taker's own `exit_reason` over
+  real tape, BEAT the lens — six independent runs put P(coin flip >= taker) at
+  0.55–0.84. A positive mean is not an edge on a trending tape. The
+  cross-section is already in the scout's `marks`; publish a beta-stripped
+  excess beside every lens grade.
+- **A `_tp` THAT BOOKS A LOSS IS A PRICE-BASIS BUG, NOT A ROUNDING ERROR
+  (30-Jul (hm)).** `exit_reason(entry, mark)` was fed `entry` = the broker's
+  book-WALKED fill and `mark` = the venue's `mark_price`, while the P&L booked
+  off a re-walk of the book. On BOT/USDC the mark sat 747.6 bps from its own
+  book top, so a short was born +7.5% in profit ON THE MARK BASIS, tripped `tp`
+  next cycle, and closed at a loss — 43 times in 4.5 hours, 42 of them with
+  `close[i] == open[i+1]` to the second. **One episode, not 43 trades**, and it
+  poisoned 45 of 98 rows in every pooled grade for nine days.
+  `lighter_ticket_taker` now asserts the invariant at the ledger write and
+  stamps `extra.basis_contradiction`. **When an exit label and the P&L sign
+  disagree, suspect two price bases before you suspect funding.**
+- **THE 30-DAY GO-LIVE CLOCK RESTARTS ON EVERY POLICY CHANGE (30-Jul (hm)).**
+  The Ticket Taker changed policy on 24-Jul, 29-Jul and 30-Jul, so despite
+  n=30 arriving ~7-Aug its earliest gradeable date is **~29-Aug**. A book whose
+  bracket is being tuned cannot accumulate a single-policy sample: 137 shadow
+  closes produced ZERO gradeable ones because the scout tuner moved the bracket
+  ~20 times in a fortnight. If a book needs grading, FREEZE ITS BARS FIRST.
 - **THE GO-LIVE DRAWDOWN BAR READS REALISED P&L ONLY — IT CANNOT SEE AN OPEN
   DRAWDOWN (30-Jul (hl)).** `golive_readiness.stats()` accumulates closed
   trades, so for a book that HOLDS most of the time most of its drawdown is
