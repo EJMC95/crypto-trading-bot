@@ -1591,6 +1591,24 @@ def golive_card():
             elif b.get("legacy_ready") and not is_ready:
                 note = ('<span style="color:#d1242f" title="the retired '
                         'win-rate rule would have ADMITTED this book">⚠</span>')
+            # [2026-07-30 (hc)] POLICY ERA. When a book is graded on a subset of
+            # its ledger the card must say so beside the sample size, or the
+            # operator reads `n57` next to a book whose row says 82 closes and
+            # has no way to tell which number the bars were computed from. The
+            # tooltip carries the era's declared reason verbatim.
+            era = b.get("era") if isinstance(b.get("era"), dict) else None
+            era_chip = ""
+            if era and era.get("since"):
+                at = b.get("alltime") or {}
+                era_chip = (
+                    f'<span title="policy era since {html.escape(str(era.get("since")))}'
+                    f' — graded on {era.get("closes_in_era")} of '
+                    f'{era.get("closes_all_time")} closes. '
+                    f'{html.escape(str(era.get("why") or ""))} All-time would read '
+                    f'{at.get("bars_passed", "?")}/6, t{(at.get("t") or 0):+.2f}." '
+                    f'style="color:#8250df;background:rgba(130,80,223,.14);'
+                    f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                    f'era {html.escape(str(era.get("since"))[5:])}</span>')
             miss = "; ".join(str(x) for x in (b.get("fails") or [])[:2])
             col = ("#1a7f37" if is_ready else
                    "#d29922" if np_ >= 5 else "#8b949e")
@@ -1602,7 +1620,7 @@ def golive_card():
                 f'{np_}/6</span>'
                 f'<span style="width:62px">{"".join(chips)}</span>'
                 f'<span style="flex:1;overflow:hidden;text-overflow:ellipsis">'
-                f'{html.escape(str(bot))} {note}</span>'
+                f'{html.escape(str(bot))} {note}{era_chip}</span>'
                 f'<span class="muted" style="width:34px;text-align:right">'
                 f'n{b.get("n")}</span>'
                 f'<span style="width:44px;text-align:right;color:{col}">'

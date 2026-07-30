@@ -47,6 +47,12 @@ REGIME CAVEAT (21-Jul item 18): Lighter's tape is one falling-BTC regime, so
 books (carry, Farmer, spread) are largely direction-agnostic so it bites less,
 but a directional book passing here has passed in ONE regime only.
 
+POLICY ERAS (2026-07-30 (hc)) — the bar counts a book's CURRENT self. Until
+now this grader pooled a book's whole retained ledger, so a change that made
+the earlier record WRONG kept counting toward the 30-day bar. See POLICY_ERA
+below for the measurement that forced this, and for the rule about which
+changes reset an era and which deliberately do not.
+
 READ-ONLY. Grades and prints. Promotes nothing, writes no lever, flips no
 dry_run — go-live remains an explicit operator act
 ([[no-real-money-without-explicit-golive]]).
@@ -72,6 +78,118 @@ BOOK_USD = float(os.environ.get("GOLIVE_BOOK_USD", "1000"))
 # [2026-07-30] bot_state key + TTL for the published verdicts (see main()).
 KEY = "golive-readiness"
 TTL_SEC = int(os.environ.get("GOLIVE_TTL_SEC", "86400"))
+
+
+# ---------------------------------------------------------------------------
+# POLICY ERAS
+# ---------------------------------------------------------------------------
+# [2026-07-30 (hc)] THE GATE HAD NO NOTION OF WHEN A BOOK BECAME ITSELF.
+#
+# It graded each book's whole retained ledger. So a book could change in a way
+# that makes its earlier P&L simply WRONG, keep the old numbers, and go on
+# accumulating them toward the 30-day bar. Measured on the book that is closest
+# to real money — 🌾 `perps-funding-carry-lshadow`, the fleet's frontrunner at
+# five of six bars:
+#
+#     opened BEFORE 2026-07-17   n=25   +$62.03
+#     opened SINCE  2026-07-17   n=57   -$0.91
+#
+# **101% of its entire realised P&L was opened before 17-Jul** (+$62.03 of
+# +$61.12), and it has been flat-to-negative for 13 days and 57 closes since.
+# The pooled grade is 5/6 bars — mean +0.248%, t=+2.60, both halves positive —
+# and every one of those numbers is carried by the earlier segment.
+#
+# WHAT CHANGED ON 17-JUL. `funding_carry_bot.py`'s own comment: the accrual
+# line `rate * dt_h` "is only right when the quote IS hourly. On the
+# lighter_shadow arm the quote is per 8h, so this over-accrued 8x — straight
+# into `accrued`, which IS this book's reported P&L and its win/loss call."
+#
+# THE EXACT DATE IS NOT LOAD-BEARING, which is what makes this safe to declare
+# without container archaeology. The comment is dated 17-Jul but this file only
+# entered `main`'s history on 28-Jul (PR #95), so when the RUNNING container
+# changed is not established here. It does not matter: the verdict is the same
+# at every candidate boundary —
+#     era >= 17-Jul   n=57  -$0.91   mean -0.005%  t -0.08   2/6 bars
+#     era >= 22-Jul   n=28  +$0.60   mean +0.007%  t +0.10   2/6 bars
+#     era >= 28-Jul   n= 6  +$5.66   mean +0.314%  t +1.24   3/6 bars
+# — so 17-Jul is used because it is the date the code's own comment carries AND
+# the most generous of the three. A finding that survives its own sensitivity
+# analysis does not need the archaeology settled.
+#
+# THE ERA DOES NOT REST ON THAT DIAGNOSIS, deliberately. A competing
+# explanation exists and is not eliminated here: the venue's funding may simply
+# have been hotter in early July (it is still hot — the live row shows carries
+# at +84% to +722% APR), which would shrink accrual per hold with no bug at
+# all. Either way the gate's own question — *does this book, as it now runs,
+# make money* — is answered by the 57 closes, not by the 25. That is why the
+# era is defensible without settling the cause, and the 30-day re-grade is what
+# settles it.
+#
+# WHICH CHANGES RESET AN ERA, and this limit is load-bearing:
+#   RESET      a change that makes earlier P&L WRONG (an accounting or
+#              accrual-basis fix) or makes the strategy DIFFERENT IN KIND (a
+#              rewritten entry/exit rule, a venue move).
+#   DO NOT     ordinary tuning — a lever step, a widened universe, a clip
+#              change. The growth rail moves levers continuously BY DESIGN; if
+#              every move reset the clock, no book could ever reach 30 days and
+#              this guard would become a way of never promoting anything.
+# Carry's OWN 21-Jul `ENTER_APR` 0.40 -> 1.60 is the worked example of the
+# second kind: measured, deliberate, enacted from a sweep — and NOT an era
+# reset, even though splitting there too would restrict the book further
+# (n=31, -$0.76). The guard is not for maximising restriction.
+#
+#: {bare bot id: (ISO date, why)}. Keyed BARE — the ledger's `bot` carries a
+#: `-lshadow` / `-lighter` suffix and `era_epoch_for` strips it, which is the
+#: bug the brain shipped for nine days (bot_learn.era_epoch_for, 23-Jul audit:
+#: "every `ERA_START.get(bot)` missed and every bot was graded on its WHOLE
+#: retained ledger"). Absence of an entry means grade ALL-TIME — the behaviour
+#: before this block, so no other book's verdict moves.
+POLICY_ERA = {
+    "perps-funding-carry": (
+        "2026-07-17",
+        "the lighter_shadow arm's accrual basis was fixed from per-hour to the "
+        "venue's own per-8h settlement; for a funding book the accrual IS the "
+        "P&L, so closes opened before it are denominated in a unit the book no "
+        "longer uses. 25 closes at +$62.03 before, 57 at -$0.91 since."),
+}
+
+
+def era_epoch_for(bot):
+    """(epoch, iso, why) for a ledger bot id's policy era, or (None, None, None).
+
+    Suffix-stripped like `bot_learn.era_epoch_for` — same table-keyed-bare,
+    ledger-keyed-suffixed hazard, and the same fix."""
+    base = str(bot).rsplit("-lshadow", 1)[0].rsplit("-lighter", 1)[0]
+    ent = POLICY_ERA.get(base)
+    if not ent:
+        return None, None, None
+    iso, why = ent
+    from datetime import datetime, timezone
+    dt = datetime.fromisoformat(iso)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.timestamp(), iso, why
+
+
+def in_era(open_ts, era_epoch, parse):
+    """Is a trade OPENED inside the era? Keyed on the OPEN, because the policy
+    that produced a trade is fixed when the trade is taken. A position that
+    straddles the boundary is a HYBRID — a carry open across the accrual fix
+    accrued in the old basis for part of its life and the new one for the rest —
+    so it belongs cleanly to neither era, and excluding it is the conservative
+    reading of a sample that is supposed to describe the book as it now runs.
+
+    FAIL-CLOSED on an unreadable open stamp when an era is declared: counting a
+    trade whose era cannot be determined is exactly the credit this block
+    exists to withdraw. With no era declared everything is in (all-time)."""
+    if era_epoch is None:
+        return True
+    if not open_ts:
+        return False
+    try:
+        return parse(open_ts) >= era_epoch
+    except Exception:      # noqa: BLE001
+        return False
 
 
 def stats(rows, book_usd=None):
@@ -135,6 +253,30 @@ def bar_map(s):
         "halves": s["h1"] > 0 and s["h2"] > 0,
         "maxdd": dd is not None and dd < GOLIVE_MAX_DD,
     }
+
+
+def book_payload(s):
+    """The published per-book numbers for one sample, tolerating n<2.
+
+    Split out at (hc) because there are now TWO samples per book (era-scoped
+    and all-time) and an era-scoped sample can be legitimately too thin to
+    grade — the old inline dict indexed `s["days"]` and would have raised a
+    KeyError on exactly the book the era block was written for."""
+    bars = bar_map(s)
+    out = {"n": s.get("n", 0), "bars": bars, "bar_names": list(BAR_NAMES),
+           "bars_passed": sum(bars.values())}
+    if s.get("n", 0) < 2:
+        out.update(days=None, mean_pct=None, t=None, win_pct=None,
+                   max_dd_pct=None, h1=None, h2=None,
+                   why=s.get("why") or "too few closes to grade")
+        return out
+    dd = s.get("max_dd_frac")
+    out.update(days=round(s["days"], 1),
+               mean_pct=round(100 * s["mean_pct"], 3),
+               t=round(s["t"], 2), win_pct=round(100 * s["win_rate"], 1),
+               max_dd_pct=(round(100 * dd, 1) if dd is not None else None),
+               h1=round(s["h1"], 2), h2=round(s["h2"], 2))
+    return out
 
 
 def grade(s, legacy=False):
@@ -266,8 +408,40 @@ def _selftest():
         else:
             assert sum(bm.values()) == 0, (name, bm)   # claims nothing at all
     assert bar_map(nodd)["maxdd"] is False, "an unmeasured drawdown is not a pass"
+
+    # ---- POLICY ERAS [2026-07-30 (hc)] ---------------------------------
+    # The suffix strip is the whole wiring. Keyed bare, looked up suffixed.
+    for suffixed in ("perps-funding-carry-lshadow", "perps-funding-carry"):
+        ep, iso, why = era_epoch_for(suffixed)
+        assert ep is not None and iso == "2026-07-17", (suffixed, ep, iso)
+        assert why and len(why) > 60, f"{suffixed}: era needs a stated reason"
+    # An undeclared book grades ALL-TIME — the pre-(hc) behaviour, unchanged.
+    assert era_epoch_for("freqtrade-mum-lshadow") == (None, None, None)
+    assert era_epoch_for("lighter-ticket-taker-lighter") == (None, None, None)
+
+    era_ep, _, _ = era_epoch_for("perps-funding-carry-lshadow")
+    def _p(x):                      # stand-in for experiment_judge.parse_ts
+        from datetime import datetime, timezone
+        d = datetime.fromisoformat(str(x))
+        return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
+    assert in_era("2026-07-20T00:00", era_ep, _p) is True
+    assert in_era("2026-07-16T23:59", era_ep, _p) is False
+    # FAIL-CLOSED: unreadable or missing open stamps are OUT when an era is
+    # declared, and IN when none is (no era = no claim about which trades count).
+    for bad in (None, "", "not-a-date"):
+        assert in_era(bad, era_ep, _p) is False, bad
+        assert in_era(bad, None, _p) is True, bad
+    # A too-thin era must be publishable, not a crash. This is the failure the
+    # inline payload dict would have hit on the one book the era exists for.
+    thin_era = stats(mk([0.01]))
+    bp = book_payload(thin_era)
+    assert bp["n"] == 1 and bp["days"] is None and bp["bars_passed"] == 0, bp
+    assert set(bp["bars"]) == set(BAR_NAMES)
+    bp2 = book_payload(good)
+    assert bp2["bars_passed"] == 6 and bp2["t"] is not None, bp2
+
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
-          "high-win-rate loser, window/DD bars, ungradeable input)")
+          "high-win-rate loser, window/DD bars, ungradeable input, policy eras)")
 
 
 def main():
@@ -310,7 +484,8 @@ def main():
     ready, payload_books = [], {}
     for bot in sorted(books):
         rs = sorted(books[bot], key=_key)
-        parsed = []
+        era_epoch, era_iso, era_why = era_epoch_for(bot)
+        parsed, parsed_all = [], []
         for r in rs:
             try:
                 from experiment_judge import parse_ts
@@ -318,9 +493,18 @@ def main():
                 ts = datetime.fromtimestamp(parse_ts(_key(r)), tz=timezone.utc)
             except Exception:      # noqa: BLE001
                 continue
-            parsed.append((r.get("profit_ratio"), r.get("profit_abs"), ts))
-        s = stats(parsed)
-        if s.get("n", 0) < a.min_closes:
+            row = (r.get("profit_ratio"), r.get("profit_abs"), ts)
+            parsed_all.append(row)
+            if in_era(r.get("open_ts"), era_epoch, parse_ts):
+                parsed.append(row)
+        # [2026-07-30 (hc)] The ERA-SCOPED sample is authoritative; the all-time
+        # one is published beside it so nothing is hidden and the difference is
+        # readable rather than asserted. `min_closes` is applied to the ALL-TIME
+        # count on purpose: a book whose era has too few closes must still
+        # appear, showing its era bars dark, or narrowing the window would
+        # silently REMOVE the frontrunner from the report instead of demoting it.
+        s, s_all = stats(parsed), stats(parsed_all)
+        if s_all.get("n", 0) < a.min_closes:
             continue
         ok, fails = grade(s)
         ok_old, fails_old = grade(s, legacy=True)
@@ -333,11 +517,21 @@ def main():
         dd_pct = (round(100 * s["max_dd_frac"], 1)
                   if s.get("max_dd_frac") is not None else None)
         bars = bar_map(s)
-        print(f"{bot:34s} {s['n']:>4d} {s['days']:>6.1f} "
-              f"{100*s['mean_pct']:>7.3f}% {s['t']:>6.2f} "
-              f"{100*s['win_rate']:>5.1f}% "
-              f"{('n/a' if dd_pct is None else f'{dd_pct:.1f}%'):>7s}  "
-              f"{verdict}{flag}")
+        if era_iso:
+            # Say so on EVERY line for an era-scoped book, whatever the verdict.
+            # An era that only announces itself when it changes the outcome is a
+            # footnote; this one has to be readable as the sample's definition.
+            flag += (f"   [era {era_iso}: {s.get('n', 0)} of {s_all['n']} "
+                     f"closes count]")
+        if s.get("n", 0) < 2:
+            print(f"{bot:34s} {s.get('n', 0):>4d} {'-':>6s} {'-':>8s} {'-':>6s} "
+                  f"{'-':>6s} {'-':>7s}  ungradeable in era{flag}")
+        else:
+            print(f"{bot:34s} {s['n']:>4d} {s['days']:>6.1f} "
+                  f"{100*s['mean_pct']:>7.3f}% {s['t']:>6.2f} "
+                  f"{100*s['win_rate']:>5.1f}% "
+                  f"{('n/a' if dd_pct is None else f'{dd_pct:.1f}%'):>7s}  "
+                  f"{verdict}{flag}")
         if ok:
             ready.append(bot)
         # [2026-07-30] collect for the PUBLISH below — see the note there.
@@ -345,14 +539,18 @@ def main():
         # prose `fails` stays for humans. Publishing both means no consumer has
         # to string-match a message to know WHICH bar is dark.
         payload_books[bot] = {
-            "n": s["n"], "days": round(s["days"], 1),
-            "mean_pct": round(100 * s["mean_pct"], 3),
-            "t": round(s["t"], 2), "win_pct": round(100 * s["win_rate"], 1),
-            "max_dd_pct": dd_pct,
-            "h1": round(s["h1"], 2), "h2": round(s["h2"], 2),
-            "bars": bars, "bar_names": list(BAR_NAMES),
-            "bars_passed": sum(bars.values()), "fails": fails,
-            "ready": bool(ok), "legacy_ready": bool(ok_old)}
+            **book_payload(s), "fails": fails,
+            "ready": bool(ok), "legacy_ready": bool(ok_old),
+            # [2026-07-30 (hc)] The era, and the all-time sample it replaced.
+            # Both published: a consumer that wants the authoritative verdict
+            # reads the top level, and one that wants to see what the era
+            # withdrew reads `alltime`. `era` is None for every book without a
+            # declared era, which is all of them but one — so this is additive
+            # and no other book's payload changes shape in a meaningful way.
+            "era": ({"since": era_iso, "why": era_why,
+                     "closes_in_era": s.get("n", 0),
+                     "closes_all_time": s_all.get("n", 0)} if era_iso else None),
+            "alltime": book_payload(s_all)}
     print()
     print(f"READY: {ready or 'none'}")
 
