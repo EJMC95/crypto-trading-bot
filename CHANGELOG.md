@@ -1,3 +1,21 @@
+## 2026-07-30 (gv) — A BOOK'S STOP AND THE GATE THAT JUDGES IT WERE NEVER READ AGAINST EACH OTHER
+
+- **Two numbers, chosen in different files, that must agree and never met.** A bot's catastrophic stop lives in the bot; the drawdown bar deciding whether that bot may ever hold real money lives in `scripts/golive_readiness.py`. Nothing in this repo compared them. Measured:
+
+  | book | stop | vs the 15% go-live bar |
+  |---|--:|---|
+  | 🌊 Tide Rider `TREND_CATASTROPHIC_STOP` | **35%** | **2.3× the bar** |
+  | 📊 Index Rider `INDEX_CATASTROPHIC_STOP` | **15%** | **exactly AT it** |
+  | 💸 Funding Farmer `FUNDING_HARD_STOP` | 10% | inside |
+
+- **A 35% stop cannot protect a book its gate disqualifies at 15%.** By the time that seatbelt engages the book has already failed the only test that matters, so it is not a risk control — it is a formality.
+- **THE PRECEDENT IS THIS FLEET'S OWN AND IT IS EXACT.** 🏆 Stock Leaders (`equities-momentum-lshadow`, retired 17-Jul) was the one book that ever ran with a catastrophic stop as its ONLY exit. From the ledger: `long_catastrophic_stop` **n=3, −$91.90, 0% win, 78h median hold** — **thirteen times the next-largest loss in the entire ledger** — retired for maxDD **37–44%**. 🌊 Tide Rider's 35% sits INSIDE that measured range, and its only other exit (an EMA death cross) has **never fired in the book's lifetime**: 0 closes against 1 open position. It is configured to permit precisely the drawdown that retired its sibling.
+- **📊 Index Rider's case is its own problem, not a milder version.** A stop at *exactly* the disqualifying threshold makes "passed the drawdown bar" a tie-break — the book is stopped out at the same instant it becomes ineligible, so the stop can never keep it inside the gate.
+- **DECLARED, NOT CHANGED.** `tests/autonomy/test_stop_vs_gate.py` requires every stop at-or-beyond the bar to be recorded with a reason — the idiom this repo already uses for `BORN_DARK_OK`, `VENUE_PURITY_OK` and `DEPLOY_COVERAGE_OK`. **No stop moved**: "never modify bot logic without backtesting first", and a stop is the last thing to move on a hunch. Index Rider in particular has **zero closed trades**, so there is no evidence to set a number against; `(gt)`'s sweep is the instrument for it once `(gr)`'s telemetry gives it priced closes. What changes today is that a new book cannot quietly inherit a 35% stop — someone has to write down why.
+- **The declarations are forced to be reviewable**: each must quote a percentage and reference the bar, and Tide Rider's must carry the Stock Leaders precedent by name and amount — otherwise the next reader weighs 35% against nothing. A declaration is also checked for staleness, because an exemption for a fixed problem is how a real one hides behind a name that no longer applies.
+- **MUTATION-VERIFIED FROM BOTH SIDES**, which matters for a guard spanning two files: widening Index Rider's stop to 30% fails it, and moving the GATE to 25% fails it too. A guard that only watches one of two numbers that must agree is half a guard.
+- Suite green, five audits green.
+
 ## 2026-07-30 (gu) — THE FLEET'S FIRST EXIT LEVER, and why 🧲 SNAP BACK'S EXIT WAS THROTTLING ITS OWN ENTRY
 
 - **THE ASYMMETRY, quantified**: of the 9 `lighter-books` levers, **0 governed an exit** — every one is ENTRY or CAPACITY. The growth rail could move what all six books OPEN and nothing about what they CLOSE, on a fleet where `(gq)` showed the exit decides the result. Across all 42 registered levers only 8 touch an exit, and every one belongs to the two funding arms or the taker; not one belongs to a Farnham Six book.
