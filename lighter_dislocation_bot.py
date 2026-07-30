@@ -280,17 +280,33 @@ def resolve_universe(configured, width, min_vol_m, current_time=None):
 # the growth rail's central safety property ("levers EXPIRE back to defaults
 # on their own, so auto-revert is the resting state"). Shipped broken in
 # (fz); it was inert only because nothing authored the lane yet.
-_ENV_DEFAULTS = {"ENTER_PCT": ENTER_PCT, "UNIVERSE_N": UNIVERSE_N}
+# [2026-07-30 (gu)] EXIT_BPS added HERE too, not just to the loop above.
+# `apply_tuning` reads `_ENV_DEFAULTS[attr]`, and a missing key raises a
+# KeyError that the loop's own `except Exception: continue` swallows — so
+# the lever would be registered, consumed-looking, and silently INERT.
+# Same shape as the (fz) auto-revert ratchet: the snapshot is what makes an
+# expired lever revert to the operator default instead of ratcheting.
+_ENV_DEFAULTS = {"ENTER_PCT": ENTER_PCT, "UNIVERSE_N": UNIVERSE_N,
+                 "EXIT_BPS": EXIT_BPS}
 
 
 def apply_tuning():
     """Growth-rail levers over the env defaults; {} when the rail is dark."""
-    global ENTER_PCT, UNIVERSE_N
+    # [2026-07-30 (gu)] EXIT_BPS joins the consumed set — the fleet's first
+    # exit lever. It governs BOTH sides on this book: the convergence target
+    # AND, via ENTER_FLOOR_MULT, the floor of the adaptive entry gate. Measured
+    # live: the floor (EXIT_BPS * 1.5 = 60bps) sat above the p90 (21.8bps) of
+    # the residual distribution the gate adapts to, so the adaptation could
+    # only descend to a bound set by a stale constant. Registering it changes
+    # nothing by itself (default unchanged at 40); it makes the constant
+    # reachable by the organ that measures the distribution.
+    global ENTER_PCT, UNIVERSE_N, EXIT_BPS
     if tuning is None:
         return {}
     moved = {}
     for lever, attr in (("disloc.enter_pct", "ENTER_PCT"),
-                        ("disloc.universe_n", "UNIVERSE_N")):
+                        ("disloc.universe_n", "UNIVERSE_N"),
+                        ("disloc.exit_bps", "EXIT_BPS")):
         cur = globals()[attr]
         try:
             val = tuning.get_lever(lever, _ENV_DEFAULTS[attr])
@@ -357,6 +373,14 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, pnl, was_long, reason,
             bot, trade_id=f"{coin}:{ent_ts}", pnl_abs=float(pnl), pnl_pct=pnl_pct,
             pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
             reason=("long_" if was_long else "short_") + reason,
+            # [2026-07-30 (gr)] EXIT TELEMETRY — these were computed two lines
+            # above (for pnl_pct) and then THROWN AWAY. publish_paper_trade has
+            # accepted them since 17-Jul, the DB column exists, the reader
+            # SELECTs them and /trades.json exposes them: 8 of 9 bots simply
+            # never filled the pipe. Without the prices no exit rule can be
+            # counterfactually tested, because the price PATH cannot be joined
+            # to the trade. Telemetry only — no gate moves.
+            entry_price=ent_px, exit_price=exit_px,
             venue=venue, shadow=shadow)
     except Exception:  # noqa: BLE001
         pass
@@ -492,7 +516,9 @@ def main():
                               closed_trades=n_closed, wins=n_wins,
                               losses=n_closed - n_wins,
                               extra={"mode": ctx.mode, "venue": ctx.mode,
-                                     "style": "dislocation"})
+                                     "style": "dislocation",
+                                     "caps": {"enter_pct": ENTER_PCT,
+                                              "universe": len(COINS)}})
             except Exception:  # noqa: BLE001
                 pass
             if args.once:
@@ -693,6 +719,8 @@ def main():
                 open_trades=broker.open_count(),
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": ctx.mode, "venue": ctx.mode, "style": "dislocation",
+                       "caps": {"enter_pct": ENTER_PCT,
+                                "universe": len(COINS)},
                        # [2026-07-30 SIGN BUG] was `sorted(meta.keys())` — a
                        # bare LIST, which fleet_risk's held_items() maps to
                        # side "" and classifies as LONG (correct for the

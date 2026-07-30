@@ -72,6 +72,26 @@ SELFTEST_MODULES = [
     # "carry shape", the high-win-rate money-loser, window/DD bars). It pins
     # that win rate is NOT a bar and that expectancy IS one.
     "scripts.golive_readiness",
+    # [2026-07-30 (gq)] exit attribution — the first instrument in this repo
+    # that reads the exit REASON off the ledger and asks which one makes the
+    # money. --selftest is fully offline (synthetic ledgers) and pins the
+    # things a refactor would quietly break: the carry shape and its hold
+    # ratio, BOTH exit-reason dialects (`reason` and the tag suffix, with
+    # `reason` winning), single-exit detection, that an UNTAGGED close survives
+    # as "?" instead of vanishing, that unparseable or negative holds give None
+    # rather than a zero (a zero reads as "fires instantly", the exact
+    # conclusion the hold column exists to test), and that labelling a book
+    # RETIRED changes no number.
+    "scripts.study_exit_attribution",
+    # [2026-07-30 (gt)] the exit SWEEP — the counterfactual half. --selftest is
+    # fully offline (hand-built candle paths) and pins the properties that make
+    # it trustworthy rather than merely runnable: the adverse-first intra-bar
+    # rule, mirrored shorts, the position CAP actually skipping entries (both
+    # directions), max-drawdown and peak-concurrency floors that REFUSE the
+    # "delete the stop" artifact its own first real run produced, grid-edge
+    # detection, and the CALIBRATION gate — no reproduction of the observed
+    # result, no recommendation, fail-closed when no baseline is supplied.
+    "scripts.study_exit_sweep",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",

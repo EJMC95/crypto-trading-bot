@@ -54,6 +54,13 @@ on:
       - 'Dockerfile.trendlighter'
       - 'lighter_family_bot.py'
       - 'Dockerfile.familyshadow'
+      # [2026-07-30 (gm)] THIS WORKFLOW IS ITS OWN TRIGGER, for the six shadow
+      # books only (see the `_wf` note in the decide step). BOTH lists bind: the
+      # decide grep picks the service, but `paths:` decides whether the job runs
+      # at all — and without this line a routing fix would still deploy nothing,
+      # which is the exact failure (gl) hit. Adding it here means a workflow edit
+      # RUNS the job; the decide step then selects only the six.
+      - '.github/workflows/railway-redeploy.yml'
       # shared (freqtrade poller + dashboard + regime supervisor)
       - 'bot_pnl_store.py'
       - 'freqtrade_pnl_poller.py'
@@ -208,22 +215,32 @@ jobs:
             # would be a silent no-op for funding-carry — caught by
             # audit_deploy_coverage.py before it shipped, which is the whole
             # point of that guard.
-            # [2026-07-30 (gl)] BOTH carry services, on the operator's call.
-            # The project has `funding-carry` AND `yield-harvester-shadow`, and
-            # nothing in this repo determines which publishes the
-            # perps-funding-carry-lshadow row. 🌾 is the book FIVE OF SIX BARS
-            # from go-live, so "probably the right one" is not good enough:
-            # both run carry code, neither carries a volume, so an extra
-            # redeploy costs nothing while a wrong guess costs that book every
-            # lever it was given. This is the same guess that cost four books
-            # their shot earlier in this pass — resolved by covering both
-            # rather than by picking.
-            _carry='funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$'
-            if echo "$changed" | grep -qE "^($_carry)"; then
+            # [2026-07-30 (gn) REVERTED — "deploy both" was WRONG, and the
+            # reason I gave for it was the wrong reason.]
+            # (gl) added `yield-harvester-shadow` beside `funding-carry` on the
+            # operator's call, on my argument that "neither carries a volume, so
+            # a redundant redeploy costs nothing". The volume was never the risk.
+            # BOTH SERVICES PUBLISH THE SAME `bot_pnl` ROW
+            # (`perps-funding-carry-lshadow`), so they are not redundant — they
+            # are two writers of one key, and the row becomes whoever published
+            # last. MEASURED within minutes of the catch-up dispatch: the row
+            # flipped from n=82 with `extra.caps` present to **n=71 with
+            # caps=None** and no build stamp, i.e. a publisher running code that
+            # predates (gd) stomped the good one. `funding_carry_bot.py` emits
+            # `caps` unconditionally every loop, so caps=None is proof the
+            # winning writer is not running HEAD.
+            # WHAT IS *NOT* DAMAGED, checked rather than assumed: the paper
+            # LEDGER is clean — 82 closes for this row, ZERO duplicate
+            # trade_ids. The go-live grader and the 30-day baseline read that
+            # ledger, so the EVIDENCE is intact; the casualty is the summary
+            # row (and `extra.caps`, which the evidence board reads to detect
+            # saturation).
+            # A deploy rule cannot fix this: both services are running
+            # regardless of what this workflow does, so one of them must be
+            # STOPPED in Railway — an operator action. Reverting here at least
+            # stops this repo from re-waking the duplicate on every push.
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$)'; then
               svcs="${svcs:+$svcs,}funding-carry"
-            fi
-            if echo "$changed" | grep -qE "^($_carry)"; then
-              svcs="${svcs:+$svcs,}yield-harvester-shadow"
             fi
             # market-context service (🛰️ instrument collector). Its live-bot
             # freshness watchdog is the fleet's ONLY cross-region check on the
@@ -270,7 +287,31 @@ jobs:
             # funding-carry rule above may be deploying the wrong one. Left
             # for the operator rather than resolved by guessing — the guess is
             # what cost four books their shot.
-            _shared='bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|venues/|requirements\.txt$'
+            # [2026-07-30 (gm) A ROUTING FIX CANNOT DEPLOY ITSELF — measured.]
+            # (gl) corrected four wrong service names and merged as `ed5cce0`.
+            # That commit touched the workflow, the changelog, the dashboard and
+            # some tests — and NOT ONE of the six books' own files. So every
+            # corrected rule stayed silent and the run reported
+            # `Deployed: freqtrade-bots,pnl-dashboard`. The names were right and
+            # the books STILL had not received (fz)'s levers, two merges later.
+            # Fixing the route does not retroactively travel it.
+            # THE FIX: this workflow file is itself part of each shadow book's
+            # trigger set, so a change to the routing redeploys the services it
+            # routes to. Scoped to these six ON PURPOSE — they are $1k SHADOW
+            # books with no volumes and nothing to lose to a redeploy, and they
+            # are exactly the ones whose names were unverified. The live bots and
+            # freqtrade-bots are NOT included: the live pair must stay
+            # marker-gated (an unmarked WIP push must never ship real money), and
+            # freqtrade-bots should not rebuild on every workflow tweak.
+            # Kept as ONE single-quoted literal rather than composed from a
+            # second variable. The composed form needed double quotes to
+            # interpolate, and inside double quotes every `$` anchor has to be
+            # written `\$` — which is a LITERAL dollar in the regex, not an
+            # end-anchor, silently turning `bot_pnl_store\.py$` into a pattern
+            # that matches nothing. audit_deploy_coverage refused the composed
+            # version outright (unresolved interpolation), which is the guard
+            # from (gl) earning its keep an hour later on its own author.
+            _shared='bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|venues/|requirements\.txt$|\.github/workflows/railway-redeploy\.yml$'
             if echo "$changed" | grep -qE "^(lighter_dislocation_bot\.py$|Dockerfile\.dislocation$|$_shared)"; then
               svcs="${svcs:+$svcs,}snap-back-shadow"
             fi

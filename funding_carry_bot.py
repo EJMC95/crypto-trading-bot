@@ -573,6 +573,23 @@ def main():
                         # grade this book's two directions separately.
                         reason=("short_" if pos["side"] == "short_perp"
                                 else "long_") + reason,
+                        # [2026-07-30 (gr)] EXIT TELEMETRY, and note it is
+                        # deliberately NOT entry_price/exit_price. This is a
+                        # FUNDING book: its P&L is `accrued - fees`, so a
+                        # price-path exit sweep would measure the wrong thing
+                        # entirely. What decides its exit is the APR it entered
+                        # at, the APR it left at, and how much it had actually
+                        # been PAID by then. (gq) measured that this book earns
+                        # +$71.42 on `*_decay_paid` (hold 65-70h) and loses
+                        # -$17.32 on the sided flips (hold 6-10h) — and NONE of
+                        # the fields needed to ask "should the flip have waited?"
+                        # were on the row. Now they are. Telemetry only.
+                        extra={"entry_apr": pos.get("entry_apr"),
+                               "exit_apr": (fund.get(coin) or {}).get("rate"),
+                               "accrued": round(pos.get("accrued") or 0.0, 4),
+                               "fees": round(pos.get("fees") or 0.0, 4),
+                               "notional": pos.get("notional"),
+                               "held_h": round(held_h, 2)},
                         venue=venue_tag, shadow=shadow_tag)
                 except Exception:
                     pass

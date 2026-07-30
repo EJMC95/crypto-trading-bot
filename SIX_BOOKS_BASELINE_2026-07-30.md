@@ -25,6 +25,50 @@ This is their state **before** any of it reaches a container, so that in 30 days
 > of **more sample for an UNDECIDED lens**, not feeding a proven winner. Every
 > other finding here was measured independently and is unaffected.
 
+> **[T0 CORRECTION, 2026-07-30 (gl) — read this before running the 30-day
+> review.]** The numbers below are the right starting line, but the DATE this
+> document implies is wrong for **four of the six books.** `(gl)` measured that
+> deploy run `30492918936` resolved only two of the six Railway service names,
+> so 🧲 Snap Back, ⚖️ Counterweight, 🎯 Perp Sniper and 🌊 Tide Rider ran the
+> OLD code after the merge that was supposed to change them. Their clock starts
+> at the **verified deploy**, not at this document's date:
+>
+> | book | T0 | why |
+> |---|---|---|
+> | 🌾 Yield Harvester | 2026-07-29 (merge `39e57d15`) | `funding-carry` resolved and deployed |
+> | 📊 Index Rider | 2026-07-29 (merge `39e57d15`) | `equities-regime-shadow` resolved and deployed |
+> | 🧲 Snap Back | **merge `ed5cce0`** | name was `lighter-dislocation`; real name `snap-back-shadow` |
+> | ⚖️ Counterweight | **merge `ed5cce0`** | name was `perps-funding-spread`; real name `counterweight-shadow` |
+> | 🎯 Perp Sniper | **merge `ed5cce0`** | name was `lighter-perp-sniper`; real name `perp-sniper-shadow` |
+> | 🌊 Tide Rider | **merge `ed5cce0`** | name was `crypto-trend-daily-shadow`; real name `tide-rider-lighter-shadow` |
+>
+> **Why this matters for the verdict, not just the bookkeeping.** Item 2 below
+> says of Counterweight: *"if n rises and t falls, the wider cross-section is
+> worse than the hand list and the widening should be reverted."* Grading that
+> from the wrong T0 pools old-config trades into the new-config window and can
+> manufacture exactly that signal. The four books' windows start at `ed5cce0`.
+>
+> **The receipt, per book, not per merge:** `extra.caps` present on the row.
+> That field exists (`(gd)`) so saturation is observable, and its absence on all
+> six is what proved nothing had deployed the first time. A book with no `caps`
+> has not started its window, whatever the git log says.
+>
+> **[CORRECTION, same day — the receipt only became valid for all six in
+> `(go)`.]** When first written, this criterion was wrong for HALF the cohort:
+> only 🌾 carry, ⚖️ Counterweight and 📊 Index Rider ever published `caps`.
+> 🧲 Snap Back, 🎯 Perp Sniper and 🌊 Tide Rider never did, so no number of
+> deploys could make the receipt appear for them — and the evidence board's
+> saturation check had to fall back to the REGISTRY value for those three,
+> unable to distinguish "at the cap" from "at the cap it set itself last
+> cycle". `(go)` adds the publish to all three (publish-only; no gate moves),
+> and `tests/autonomy/test_book_levers.py` now asserts by AST that every
+> levered book carries `caps` inside a real `store.publish(extra=…)` call. Read
+> `caps` as a receipt only for rows published AFTER `(go)` reaches that book's
+> container. The 🚦 go-live card
+> (`(gk)`) now publishes each book's per-bar map 6-hourly, so `days` is readable
+> without recomputing it by hand — but the card measures the TAPE, not the
+> config, so this table stays the authority on which window is which.
+
 **Provenance.** Aggregates from `/pnl.json`; per-trade metrics computed from
 `/trades.json?source=paper&limit=5000` (1,677 rows — the full tape; the default
 500-row page truncates carry to 27 of its 82 closes, and a baseline computed on
@@ -119,4 +163,6 @@ exist precisely to catch it and stop.
 *Baseline pulled 2026-07-30 from the live endpoints, at branch
 `claude/test-coverage-analysis-efv3hp` (`1ad7a22`), BEFORE any of `(fz)`–`(gg)`
 reached a container — `extra.caps` is absent on all six rows, which is the proof
-of that.*
+of that. That absence stayed true for FOUR of the six through the first merge as
+well; see the T0 correction at the top, which is the honest answer to "when did
+the 30 days start?".*

@@ -139,6 +139,14 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, reaso
         store.publish_paper_trade(
             bot, trade_id=f"{coin}:{ent_ts}", pnl_abs=pnl, pnl_pct=pnl_pct,
             pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
+            # [2026-07-30 (gr)] EXIT TELEMETRY — computed above for pnl_pct,
+            # then discarded. publish_paper_trade has accepted these since
+            # 17-Jul, the DB column exists, the reader SELECTs them and
+            # /trades.json exposes them: 8 of 9 bots never filled the pipe.
+            # Without the prices no exit rule can be counterfactually
+            # tested — the price PATH cannot be joined to the trade.
+            # Telemetry only; no gate moves.
+            entry_price=ent_px, exit_price=exit_px,
             reason="long_" + reason, venue=venue, shadow=shadow)
     except Exception:
         pass
@@ -453,7 +461,9 @@ def main():
                         closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                         extra={"mode": ctx.mode, "venue": ctx.mode,
                                "style": "trend-1x-long",
-                               "held": sorted(meta.keys()), "coins": COINS})
+                               "held": sorted(meta.keys()), "coins": COINS,
+                               "caps": {"rank_by_funding": RANK_BY_FUNDING,
+                                        "universe": len(COINS)}})
                 except Exception:
                     pass
             if args.once:
@@ -642,7 +652,9 @@ def main():
                     equity=pub_equity, pnl_abs=pub_pnl, open_trades=pub_open,
                     closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                     extra={"mode": ctx.mode, "venue": ctx.mode, "style": "trend-1x-long",
-                           "held": sorted(meta.keys()), "coins": COINS})
+                           "held": sorted(meta.keys()), "coins": COINS,
+                               "caps": {"rank_by_funding": RANK_BY_FUNDING,
+                                        "universe": len(COINS)}})
             except Exception:
                 pass
         try:

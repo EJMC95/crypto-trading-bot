@@ -574,11 +574,21 @@ All new bots:
   `$_shared`-interpolating grep at all — both fixed). LESSON: **a guard whose
   only output is a ::warning:: on a passing run is not a guard** — a green
   build with a warning is indistinguishable from a green build. STILL
-  RESOLVED BY THE OPERATOR: a `yield-harvester-shadow` service exists beside
-  `funding-carry` and this repo cannot tell which publishes the
-  `perps-funding-carry-lshadow` row, so the rule now deploys **BOTH** (his
-  call) — neither has a volume, and a redundant redeploy is far cheaper than
-  🌾 silently missing every lever it was given.]**
+  **[2026-07-30 (gn) — "deploy both" was WRONG and is REVERTED.** A
+  `yield-harvester-shadow` service exists beside `funding-carry` and this repo
+  cannot tell which publishes `perps-funding-carry-lshadow`. `(gl)` deployed
+  BOTH on the argument that "neither has a volume, so a redundant redeploy is
+  cheap". **The volume was never the risk: both publish the SAME bot_pnl row**,
+  so they are two writers of one key and the row is whoever published last.
+  Measured six minutes after the dispatch woke the second: n=82 with
+  `extra.caps` → **n=71, caps=None, build=None**. `funding_carry_bot.py` emits
+  `caps` unconditionally, so caps=None proves the winner is not running HEAD.
+  The paper LEDGER is CLEAN (82 closes, zero duplicate trade_ids) so the
+  go-live grade and the baseline are intact — the casualty is the summary row.
+  **OPERATOR ACTION OUTSTANDING: one of the two services must be STOPPED in
+  Railway**; a deploy rule cannot fix a duplicate that is already running, and
+  the row will flap until then. Lesson: a duplicate PUBLISHER is not a
+  duplicate DEPLOY — ask "do they share a key?", not "is redeploying cheap?"]**
   **[2026-07-22 CORRECTION — this paragraph was WRONG about two of them.]** The
   `paths:` filter DOES carry `lighter_ticket_taker.py`, `lighter_ticket_replay.py`,
   `venues/**` and most of the intelligence layer (`lighter_market_scout`,
@@ -631,6 +641,19 @@ All new bots:
   the funding container booted 04:34 and picked up NONE of them — 58 real
   orders, 0 measured fills. The code was right and was never running. This is
   the mechanism behind every "frozen service" incident.
+  **[2026-07-30 (gm) A ROUTING FIX CANNOT DEPLOY ITSELF.** `(gl)` corrected
+  four service names; the merge run reported `Deployed: freqtrade-bots,
+  pnl-dashboard` and the four corrected rules stayed SILENT, because the decide
+  step fires on CHANGED FILES and that commit touched no bot file and nothing in
+  `$_shared`. The rule was right and nothing rang the bell — a distinct failure
+  from a wrong name. This workflow file is now part of the SIX shadow books' own
+  trigger set (both `paths:` and their decide greps), so a routing fix redeploys
+  the services it routes to. Scoped to those six on purpose: no volumes, nothing
+  to lose, and they are the ones whose names were unverified. `freqtrade-bots`
+  and the two LIVE services are EXCLUDED — the live pair stays marker-gated,
+  because an unmarked WIP push must never ship real money. After ANY routing
+  change to a service outside those six, dispatch it explicitly; the structural
+  fix only helps the NEXT one.]**
   Check before you claim a fix is live: `scripts/audit_deploy_coverage.py`
   (does a path have ANY deploy route?), then marker-grep the RUNNING
   container — the only proof a deploy landed ([[railway-cli-frozen-services]]).

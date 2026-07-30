@@ -566,3 +566,217 @@ def test_scout_publishes_ages_and_never_guesses_new():
     ages = snap["ages_d"]
     assert ages["NEW"] == 5.0 and ages["OLD"] == 400.0
     assert "JUNK" not in ages, "unparseable age must be ABSENT, never 0 (=new)"
+
+
+# --------------------------------------------------------------------------
+# [2026-07-30 (go)] EVERY LEVERED BOOK MUST PUBLISH ITS EFFECTIVE CAP.
+#
+# The receipt I used to prove the (fz) deploy had landed was "`extra.caps`
+# present on the row" — and it was WRONG for half the cohort: only carry,
+# fundspread and index ever emitted `caps`. Dislocation, sniper and trend never
+# did, so for those three the receipt could not appear no matter how many times
+# they deployed, and the evidence board's saturation check had to fall back to
+# the REGISTRY value — unable to tell "at the cap" from "at the cap it set
+# itself last cycle", the exact ambiguity (gd) added the field to remove.
+#
+# Two things now depend on it, which is why this is a test and not a comment:
+# the board reads it to decide whether to widen, and a human reads it to tell a
+# landed deploy from a stale container.
+# --------------------------------------------------------------------------
+
+LEVERED_BOOK_MODULES = [
+    "funding_carry_bot",
+    "lighter_funding_spread_bot",
+    "lighter_index_bot",
+    "lighter_dislocation_bot",
+    "lighter_perp_sniper",
+    "lighter_trend_bot",
+]
+
+
+@pytest.mark.parametrize("mod", LEVERED_BOOK_MODULES)
+def test_every_levered_book_publishes_its_effective_caps(mod):
+    """A book with registered levers and no published cap is observable only
+    through the registry, i.e. through the value the tuner may just have
+    changed. That is not an observation."""
+    import pathlib as _pl
+    root = _pl.Path(__file__).resolve().parents[2]
+    src = (root / f"{mod}.py").read_text()
+    assert '"caps"' in src, (
+        f"{mod} registers levers but never publishes extra.caps — the board "
+        "must fall back to the registry, and a deploy cannot be verified")
+
+
+@pytest.mark.parametrize("mod", LEVERED_BOOK_MODULES)
+def test_the_published_caps_sit_inside_a_publish_payload(mod):
+    """Not merely present in the file — present in the `extra=` dict of a real
+    `store.publish(...)` call. A `caps` dict built and never published is the
+    registered-but-inert failure one layer along.
+
+    Checked by AST, not by text proximity. The first version of this test
+    searched a 2,000-character window before each `"caps"` for `extra={` and
+    `publish(` — and failed on `lighter_perp_sniper`, whose payload carries a
+    long explanatory comment block that pushed the call out of the window. The
+    code was correct; the heuristic was not. A structural claim wants a
+    structural check."""
+    import ast
+    import pathlib as _pl
+    root = _pl.Path(__file__).resolve().parents[2]
+    tree = ast.parse((root / f"{mod}.py").read_text())
+
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+        if name != "publish":
+            continue
+        for kw in node.keywords:
+            if kw.arg != "extra" or not isinstance(kw.value, ast.Dict):
+                continue
+            keys = [k.value for k in kw.value.keys
+                    if isinstance(k, ast.Constant)]
+            if "caps" in keys:
+                found.append(keys)
+
+    assert found, (
+        f"{mod}: no store.publish(extra={{...}}) call carries a 'caps' key — "
+        "a cap that is computed but never published is invisible to the board")
+    # the cap must be a dict of NAMED gates, not a bare number — the board
+    # looks levers up by name
+    assert all(isinstance(k, str) for keys in found for k in keys), found
+
+
+# --------------------------------------------------------------------------
+# [2026-07-30 (gs)] THE CAP MUST BE ON THE PATH THAT ACTUALLY RUNS.
+#
+# (go) asserted that every levered book carries `caps` inside a real
+# store.publish(extra=...) call, and ⚖️ Counterweight PASSED — because its caps
+# were in the `status="halted"` publish, the SafetyRails branch. A book that is
+# running normally never takes that path, so the field appeared exactly when the
+# book had STOPPED trading. Measured on the live row: caps=None at 23:50 with
+# the book online and full at 10 of 10 legs.
+#
+# The lesson is narrow and worth pinning: "present in a publish call" is not the
+# same claim as "present in the publish call the loop makes". The (go) test was
+# true and insufficient.
+# --------------------------------------------------------------------------
+
+def _publish_status(call):
+    """The literal `status=` of a store.publish call, or None if not literal."""
+    import ast as _a
+    for kw in call.keywords:
+        if kw.arg == "status" and isinstance(kw.value, _a.Constant):
+            return kw.value.value
+    return None
+
+
+@pytest.mark.parametrize("mod", LEVERED_BOOK_MODULES)
+def test_caps_ride_the_HEALTHY_publish_not_only_an_error_path(mod):
+    """At least one publish whose status is NOT a halted/error state must carry
+    caps. Otherwise the cap is observable only once the book has stopped."""
+    import ast as _a
+    import pathlib as _pl
+    root = _pl.Path(__file__).resolve().parents[2]
+    tree = _a.parse((root / f"{mod}.py").read_text())
+
+    UNHEALTHY = {"halted", "error", "stopped", "crashed", "down"}
+    healthy_with_caps, statuses_with_caps = False, []
+    for node in _a.walk(tree):
+        if not isinstance(node, _a.Call):
+            continue
+        fn = node.func
+        name = fn.attr if isinstance(fn, _a.Attribute) else getattr(fn, "id", "")
+        if name != "publish":
+            continue
+        for kw in node.keywords:
+            if kw.arg != "extra" or not isinstance(kw.value, _a.Dict):
+                continue
+            keys = [k.value for k in kw.value.keys if isinstance(k, _a.Constant)]
+            if "caps" not in keys:
+                continue
+            st = _publish_status(node)
+            statuses_with_caps.append(st)
+            if st is None or str(st).lower() not in UNHEALTHY:
+                healthy_with_caps = True
+
+    assert statuses_with_caps, f"{mod}: no publish carries caps at all"
+    assert healthy_with_caps, (
+        f"{mod}: caps appear ONLY on publish(status={statuses_with_caps}) — an "
+        "unhealthy/halted path. The cap would be visible only once the book had "
+        "stopped trading, which is precisely when it no longer matters.")
+
+
+# --------------------------------------------------------------------------
+# [2026-07-30 (gu)] THE FLEET'S FIRST EXIT LEVER.
+#
+# All nine pre-existing lighter-books levers were ENTRY or CAPACITY: the growth
+# rail could move what every book OPENS and nothing about what it CLOSES, on a
+# fleet whose exits (gq) showed decide the result. `disloc.exit_bps` is the
+# first, and it was chosen for a measured reason rather than convenience — it
+# throttles its own book's ENTRY.
+# --------------------------------------------------------------------------
+
+def test_the_books_lane_now_has_at_least_one_exit_lever():
+    """The asymmetry this closes: 0 of 9 governed an exit. If a refactor drops
+    it the lane silently returns to entry-only and nobody notices, because every
+    other test would still pass."""
+    exitish = [k for k, v in fleet_tuning.LEVERS.items()
+               if v.get("lane") == "lighter-books"
+               and any(t in k.split(".")[-1] for t in
+                       ("exit", "tp", "sl", "hold", "trail", "stop"))]
+    assert exitish, (
+        "the lighter-books lane governs no exit at all — the growth rail can "
+        "move what these books OPEN and nothing about what they CLOSE")
+    assert "disloc.exit_bps" in exitish, exitish
+
+
+def test_the_exit_cage_reaches_INSIDE_the_observed_residual_distribution():
+    """The whole point of the lever. Snap Back's convergence target is 40bps
+    while the live residual distribution measured median 7.9 / p90 21.8 / max
+    50.1 bps across 90 liquid books. A cage that cannot descend below the p90
+    would leave the target permanently outside what the tape delivers — so the
+    floor must reach the median region, and the ceiling must not exceed today's
+    operator default (this lever may LOOSEN the exit toward the measurement,
+    never tighten it past where the operator already has it)."""
+    spec = fleet_tuning.LEVERS["disloc.exit_bps"]
+    assert spec["lo"] <= 10.0, (
+        f"lo={spec['lo']} cannot reach the observed median (~8bps) — the target "
+        "would stay outside the distribution the book trades")
+    assert spec["hi"] == spec["env_default"] == 40.0, (
+        "the ceiling must be the operator's current default, so the rail can "
+        "only loosen toward the measurement")
+    assert spec["step"] < 0, "the useful direction is DOWN, toward the tape"
+
+
+def test_the_exit_lever_is_consumed_and_snapshotted():
+    """Registered-but-inert is this repo's signature failure, and there are TWO
+    ways to hit it here. The loop must read the lever, AND `_ENV_DEFAULTS` must
+    carry the attribute — `apply_tuning` does `_ENV_DEFAULTS[attr]`, and a
+    missing key raises a KeyError that its own `except Exception: continue`
+    swallows, leaving a lever that looks consumed and never moves."""
+    import pathlib as _pl
+    src = (_pl.Path(__file__).resolve().parents[2]
+           / "lighter_dislocation_bot.py").read_text()
+    assert '"disloc.exit_bps", "EXIT_BPS"' in src, "not read by apply_tuning"
+    i = src.index("_ENV_DEFAULTS = {")
+    snap = src[i:src.index("}", i)]
+    assert '"EXIT_BPS"' in snap, (
+        "EXIT_BPS missing from _ENV_DEFAULTS — apply_tuning would KeyError and "
+        "swallow it, and an expired lever could never revert (the (fz) ratchet)")
+
+
+def test_the_exit_constant_still_governs_the_entry_floor():
+    """The coupling that makes this lever unusual and worth a test: EXIT_BPS
+    also sets the adaptive entry gate's floor via ENTER_FLOOR_MULT. If that
+    coupling is ever removed, the lever's note becomes wrong and its cage
+    rationale (derived from the ENTRY side's distribution) stops applying."""
+    import pathlib as _pl
+    src = (_pl.Path(__file__).resolve().parents[2]
+           / "lighter_dislocation_bot.py").read_text()
+    assert "ENTER_FLOOR_MULT" in src
+    assert "EXIT_BPS" in src
+    note = fleet_tuning.LEVERS["disloc.exit_bps"]["note"]
+    assert "ENTER_FLOOR_MULT" in note or "entry" in note.lower(), (
+        "the note must record that this constant governs BOTH sides")

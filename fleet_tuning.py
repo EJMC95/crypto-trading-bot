@@ -357,6 +357,38 @@ LEVERS = {
     "disloc.universe_n": {
         "kind": "int", "lo": 10, "hi": 60, "lane": "lighter-books",
         "note": "Snap Back scout-universe width; env default 40", "env_default": 40, "step": 10},
+    # [2026-07-30 (gu)] THE FLEET'S FIRST EXIT LEVER. Until now all 9 levers on
+    # this lane were ENTRY or CAPACITY — the growth rail could move what every
+    # book OPENS and nothing about what it CLOSES, on a fleet whose exits (gq)
+    # showed decide the result.
+    #
+    # WHY THIS ONE FIRST, and why it is not an arbitrary pick: Snap Back's exit
+    # target throttles its own ENTRY. (fz) replaced its fixed 150bps entry gate
+    # with a percentile of the live residual distribution — then floored that
+    # adaptive gate at `EXIT_BPS * ENTER_FLOOR_MULT` = 40 * 1.5 = **60bps**.
+    # Measured live this hour across 90 liquid books: median **7.9bps**, p90
+    # **21.8bps**, max **50.1bps**. So the floor sits ABOVE the 90th percentile
+    # of the very distribution the gate adapts to — the adaptation can only
+    # descend to a bound set by a stale exit constant, which is the same class
+    # of defect the adaptive gate was introduced to remove. (gq) corroborates
+    # from the other side: this book's dominant exit is `long_max_hold`, i.e.
+    # positions TIME OUT instead of converging, because 40bps convergence is
+    # outside what the tape delivers.
+    #
+    # CAGE DERIVED FROM THE MEASUREMENT, not chosen: lo 8 ≈ the live median
+    # (a target the tape reaches most days), hi 40 = the operator's current
+    # default (so this lever can only ever LOOSEN the exit toward the observed
+    # distribution, never tighten it beyond today's setting). Default UNCHANGED
+    # at 40 — registering a lever moves nothing; it makes the constant
+    # REACHABLE by the organ that measures, instead of by me picking a number.
+    # `step` is negative for the same reason the entry percentile's is.
+    "disloc.exit_bps": {
+        "kind": "float", "lo": 8.0, "hi": 40.0, "lane": "lighter-books",
+        "note": ("Snap Back convergence target in bps; env default 40. Also "
+                 "sets the ADAPTIVE ENTRY FLOOR via ENTER_FLOOR_MULT, so this "
+                 "one constant governs both sides — the only lever on this "
+                 "lane that does"),
+        "env_default": 40.0, "step": -4.0},
     "index.max_open": {
         "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
         "note": "Index Rider concurrent sleeves; env default = universe size", "env_default": 10, "step": 2},

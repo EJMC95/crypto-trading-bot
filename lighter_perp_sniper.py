@@ -502,6 +502,14 @@ def main():
             bot_id, trade_id=f"{coin}:{ent_ts}", pnl_abs=float(pnl), pnl_pct=pnl_pct,
             pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
             reason=("long_" if was_long else "short_") + reason,
+            # [2026-07-30 (gr)] EXIT TELEMETRY — computed above for pnl_pct,
+            # then discarded. publish_paper_trade has accepted these since
+            # 17-Jul, the DB column exists, the reader SELECTs them and
+            # /trades.json exposes them: 8 of 9 bots never filled the pipe.
+            # Without the prices no exit rule can be counterfactually
+            # tested — the price PATH cannot be joined to the trade.
+            # Telemetry only; no gate moves.
+            entry_price=ent_px, exit_price=exit_px,
             venue=venue_tag, shadow=shadow_tag)
 
     def _real_exit(coin, was_long, fallback):
@@ -887,7 +895,21 @@ def main():
                                  # fleet exposure/concentration view can see
                                  # this book (it was sym_uncovered before).
                                  "held": {c: ("L" if DIRECTION_LONG else "S")
-                                          for c in _held_syms}})
+                                          for c in _held_syms},
+                                 # [2026-07-30 (go)] the EFFECTIVE gate this
+                                 # loop is running. Three of the six books that
+                                 # gained levers in (fz) never published one, so
+                                 # the evidence board fell back to the REGISTRY
+                                 # value — which cannot tell "at the cap" from
+                                 # "at the cap it set itself last cycle", the
+                                 # exact ambiguity (gd) added this field to
+                                 # remove. It also means `extra.caps` is a
+                                 # usable deploy receipt for this book, which it
+                                 # was NOT: `caps` present proves the container
+                                 # is running code that carries apply_tuning.
+                                 # Publish-only; no gate moves.
+                                 "caps": {"surge_mult": SURGE_MULT,
+                                          "max_open": MAX_OPEN}})
         except Exception as e:  # noqa: BLE001
             # Never let telemetry kill the trading loop — but never let it fail
             # in silence either: a bare `except: pass` here is what hid the

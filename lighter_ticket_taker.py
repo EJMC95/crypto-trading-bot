@@ -1464,6 +1464,13 @@ def main(_ctx=None):
             # [2026-07-15 AUDIT FIX] provenance: venue + arm on every row —
             # venue NULL claimed the pre-Gate-0 HL-paper era.
             venue="lighter", shadow=dry_run,
+            # [2026-07-30 (gr)] EXIT TELEMETRY on the REAL-MONEY taker too. The
+            # slippage decomposition already rides `extra` (px_decision/px_fill),
+            # but the trade's own entry/exit prices were never columns on the
+            # row — so a counterfactual exit sweep could not join a price path
+            # to the trade. `entry` and `exit_px` are both parameters of this
+            # function; they were simply not passed. Telemetry only.
+            entry_price=entry, exit_price=exit_px, size=size,
             # [2026-07-21 ATTRIBUTION; 2026-07-22 FLAP FIX] bars on every
             # close row. Since the flap fix these are the ENTRY-time stamp —
             # the bars that actually GOVERNED the trade (the 21-Jul

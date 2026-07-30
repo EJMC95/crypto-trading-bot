@@ -36,7 +36,20 @@ FLOORS = {
     # a change could have deleted every assertion those seams added and CI
     # would still have passed green. Doctrine is "raise the floor in the same
     # PR that raised the coverage"; this is that raise, late.
-    "lighter_funding_bot.py": 50,      # measured 52.7
+    # [2026-07-30 (gp)] 50 -> 52. The (gm) book-gate tests took this file to
+    # 54.9% (measured CI's way — subprocess-aware, combined) and took
+    # `book_metrics` + `vwap_slip` from "only the def line" to fully covered.
+    # Raised in the same pass that raised the coverage, which is the doctrine
+    # the note below records being violated once already. What this floor now
+    # protects specifically: the negative-price fail-open fix, the defensive
+    # sort, and the None-means-thin contract on the LIVE Farmer's entry gate.
+    "lighter_funding_bot.py": 52,      # measured 54.9
+    # [2026-07-30] 45 -> 50. Finding 14 of the coverage second pass: the (en)
+    # exit-ladder and (eq) flatten seams raised this file ~6pp and NEITHER
+    # raised the floor, leaving 7.7pp of slack on the LIVE real-money bot —
+    # a change could have deleted every assertion those seams added and CI
+    # would still have passed green. Doctrine is "raise the floor in the same
+    # PR that raised the coverage"; this is that raise, late.
     # the shared real-money surface
     "venues/safety.py": 92,            # measured 94
     "venues/equity_guard.py": 93,      # measured 95

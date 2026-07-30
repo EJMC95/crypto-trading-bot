@@ -316,6 +316,14 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
             pnl_pct=pnl_pct, pair=coin, opened_at=oa,
             closed_at=datetime.now(timezone.utc).isoformat(),
             reason=("long_" if was_long else "short_") + reason,
+            # [2026-07-30 (gr)] EXIT TELEMETRY — computed above for pnl_pct,
+            # then discarded. publish_paper_trade has accepted these since
+            # 17-Jul, the DB column exists, the reader SELECTs them and
+            # /trades.json exposes them: 8 of 9 bots never filled the pipe.
+            # Without the prices no exit rule can be counterfactually
+            # tested — the price PATH cannot be joined to the trade.
+            # Telemetry only; no gate moves.
+            entry_price=ent_px, exit_price=exit_px,
             venue="lighter", shadow=shadow)
     except Exception:  # noqa: BLE001
         pass
@@ -617,6 +625,21 @@ def main():
                 closed_trades=n_closed, wins=n_wins, losses=n_closed - n_wins,
                 extra={"mode": ctx.mode, "venue": ctx.mode,
                        "style": "xsect-funding-spread",
+                       # [2026-07-30 (gs)] `caps` on the ONLINE path. (gd) added
+                       # it to this bot's `status="halted"` publish only — the
+                       # SafetyRails branch — so the effective cap appeared
+                       # exactly when the book had STOPPED trading and never
+                       # while it ran. Measured: the row showed caps=None at
+                       # 23:50 with the book online and full at 10/10. The
+                       # evidence board prefers a published cap over the
+                       # registry precisely to tell "at its cap" from "at the
+                       # cap it set itself", so for this book it has been
+                       # falling back to the registry since (gd) — the same
+                       # blindness (go) fixed for three other books, in a
+                       # fourth I had already counted as done.
+                       "caps": {"k": K, "legs": 2 * K,
+                                "universe_n": UNIVERSE_N,
+                                "universe": len(COINS)},
                        "held": {c: ("S" if m.get("is_short") else "L")
                                 for c, m in meta.items()},
                        "fund_realized": round(fund_realized, 4),

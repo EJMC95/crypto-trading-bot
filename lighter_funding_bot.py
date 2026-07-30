@@ -919,7 +919,21 @@ def book_metrics(ctx, coin, order_usd):
     # would be wrong on an unordered book. [review 2026-07-11]
     bids = sorted(bids, key=lambda x: -x[0])     # highest bid first
     asks = sorted(asks, key=lambda x: x[0])      # lowest ask first
-    if not bids[0][0] or not asks[0][0]:
+    # [2026-07-30] `<= 0`, NOT truthiness. This was `if not bids[0][0] or not
+    # asks[0][0]`, which is falsy for exactly ONE bad value — zero — and TRUE
+    # for every negative one. Twenty lines below, vwap_slip validates the same
+    # levels with `if px <= 0`: two different notions of "valid price" in one
+    # function. Measured consequence of the gap, on the LIVE entry path: an ask
+    # level of [-1.0, 50] sorts FIRST (asks sort ascending), passes this check,
+    # and yields mid 49.0, spread_bps -20408, sell_slip -10204 and ask_depth
+    # -50. The caller's gates are `spread_bps > MAX_SPREAD_BPS` and
+    # `slip > SCAN_MAX_SLIP_BPS` — a negative number passes BOTH, so a SHORT on
+    # that book cleared every gate on a garbage mid. Fail-OPEN on real money.
+    # This change is strictly RESTRICTING: it can only reject books it used to
+    # accept, and only those whose best price is not a positive number, which is
+    # not a price. No strategy parameter moves, so no backtest is implicated.
+    # Pinned in tests/real_money/test_funding_book_gate.py.
+    if bids[0][0] <= 0 or asks[0][0] <= 0:
         return None
     bid, ask = bids[0][0], asks[0][0]
     mid = (bid + ask) / 2.0
