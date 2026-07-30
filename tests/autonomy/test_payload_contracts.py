@@ -315,7 +315,7 @@ class TestTakerPolicyStamp:
 
 
 # ===========================================================================
-# [2026-07-30 (hn)] TWO CONTAINERS WRITING ONE BOOK — silent, and it destroys
+# [2026-07-30 (ho)] TWO CONTAINERS WRITING ONE BOOK — silent, and it destroys
 # the evidence rather than the money. Measured on the fleet's ONLY go-live
 # candidate: 14 overlapping same-pair positions and TWO distinct build stamps
 # on perps-funding-carry-lshadow.

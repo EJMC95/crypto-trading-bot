@@ -1,4 +1,6 @@
-## 2026-07-30 (hn) — TWO CONTAINERS ARE WRITING THE FLEET'S ONLY GO-LIVE CANDIDATE
+## 2026-07-30 (ho) — TWO CONTAINERS ARE WRITING THE FLEET'S ONLY GO-LIVE CANDIDATE
+
+*(RENUMBERED (hn) -> (ho). A concurrent session pushed its own (hn) in the gap between my fetch and my push — a check-then-act race the cross-branch arm added in (hj) cannot close, and the in-file duplicate check caught it post-merge instead. By the convention the CITED entry keeps the letter and this one is cited from three tracked files while theirs is cited from none — but all three citations are my own and consumed by nobody yet, so moving mine is the smaller blast radius and leaves another session's entry untouched. Tenth recorded collision.)*
 
 - **THE ASK** (operator): *"Our focus needs to be on growth, expansion, sustainability, not stagnancy and circles ... to not allow things to take steps back every day only to move one step forward."* Acting on that meant running the FORWARD metric — `scripts/golive_readiness.py`, which asks the only question that matters: **which book is closest to holding real money?** It answered with an alarm.
 - **MEASURED, live:** 🌾 `perps-funding-carry-lshadow` has **14 OVERLAPPING SAME-PAIR POSITIONS** (BNB opening at 07-21T21:04 while a BNB position opened 07-21T14:04 is still held; SKHYNIXUSD three times; BTC) and **TWO DISTINCT `extra.build` STAMPS** on recent rows (`c33038455892`, `84da9c2eb9cf`). One book cannot hold the same pair twice at once. **Two containers are publishing this row.**

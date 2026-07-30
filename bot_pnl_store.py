@@ -459,7 +459,7 @@ def _writer_id():
 def claim_writer(bot, now=None):
     """-> (ok, other) — is THIS process the sole writer of `bot`'s ledger?
 
-    [2026-07-30 (hn)] TWO CONTAINERS WRITING ONE BOOK IS SILENT AND IT
+    [2026-07-30 (ho)] TWO CONTAINERS WRITING ONE BOOK IS SILENT AND IT
     DESTROYS THE EVIDENCE. Measured on 🌾 perps-funding-carry-lshadow, the
     fleet's only go-live candidate: 14 OVERLAPPING same-pair positions (one
     book cannot hold BNB twice at once) and TWO distinct `extra.build` stamps

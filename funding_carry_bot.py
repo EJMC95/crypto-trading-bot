@@ -663,7 +663,7 @@ def main():
                            # board must see the bar this arm ACTUALLY gates on.
                            "caps": {"max_positions": MAX_POSITIONS,
                                     "enter_apr": _enter_apr},
-                           # [2026-07-30 (hn)] SOLE-WRITER CHECK. Measured on
+                           # [2026-07-30 (ho)] SOLE-WRITER CHECK. Measured on
                            # THIS book: 14 overlapping same-pair positions and
                            # TWO distinct build stamps — `(gl)` deployed both
                            # `funding-carry` and `yield-harvester-shadow`
