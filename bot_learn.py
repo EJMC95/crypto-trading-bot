@@ -276,6 +276,21 @@ ERA_START = {
     "freqtrade-georgia":   "2026-07-13T00:00",   # 13-Jul: same DayTraderV5Gated sleeve/stop changes
     "freqtrade-mum":       "2026-07-14T00:00",   # 14-Jul: whitelist curated to the 10 backtest-positive pairs
     "freqtrade-dad":       "2026-07-14T00:00",   # 14-Jul: BTC-tide gate (same MomoBreakoutV1 carrier)
+    # [2026-07-30 (hd)] 🌾 Yield Harvester. Not a strategy change — an
+    # ACCOUNTING one, which is the purest case this table exists for. The
+    # lighter_shadow arm's accrual basis was fixed from per-hour to the venue's
+    # own per-8h settlement, and for a funding book `accrued` IS the reported
+    # P&L and its win/loss call. So every pre-fix close is denominated in a unit
+    # the book no longer uses. Measured (hc): 25 closes opened before it total
+    # +$62.03; the 57 since total -$0.91. The brain was grading the two
+    # together, and `brain-diagnosis` carries an ACTUATOR-bearing
+    # `regime_gate` on this book's `long` bucket — a bucket whose entire
+    # positive evidence is 3 pre-fix decay wins.
+    # NOTE this key also matches the RETIRED HL arm `perps-funding-carry`,
+    # harmlessly: it is in LEGACY_BOTS and the liveness filter drops it before
+    # any era lookup. Keyed EXACTLY, not by substring — substring-matching this
+    # same pair is the (gr) near-miss that would have exempted the living twin.
+    "perps-funding-carry": "2026-07-17T00:00",
 }
 
 

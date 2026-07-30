@@ -260,6 +260,37 @@ def test_the_min_closes_filter_is_applied_to_the_ALL_TIME_count(capsys,
 
 
 # --------------------------------------------------------------------------
+# 6b. The brain and the gate must describe the SAME book. [(hd)]
+# --------------------------------------------------------------------------
+
+def test_the_brain_scopes_the_carry_book_to_the_same_era():
+    """[(hd)] `bot_learn.ERA_START` exists for exactly this — "hypotheses must
+    come from trades taken by the CURRENT code" — and had no carry entry, so the
+    brain graded the pre-fix and post-fix accrual bases together. It carries an
+    ACTUATOR-bearing `regime_gate` diagnosis on this book's `long` bucket, whose
+    entire positive evidence is 3 pre-fix decay wins."""
+    import bot_learn
+    assert bot_learn.ERA_START.get("perps-funding-carry") == "2026-07-17T00:00"
+    assert bot_learn.era_epoch_for("perps-funding-carry-lshadow") is not None
+
+
+def test_the_two_era_tables_do_not_CONTRADICT_each_other():
+    """Two organs, two tables, one book. They may cover different sets — the
+    brain's era is about hypothesis generation and the gate's about promotion
+    eligibility — but where BOTH declare a book they must agree, or the fleet
+    reasons about two different histories of the same ledger and neither reader
+    can tell which one they are looking at."""
+    import bot_learn
+    for base, (iso, _why) in g.POLICY_ERA.items():
+        brain = bot_learn.ERA_START.get(base)
+        if brain is None:
+            continue
+        assert brain.startswith(iso), (
+            f"{base}: the go-live gate scopes from {iso} and the brain from "
+            f"{brain} — same ledger, two different books")
+
+
+# --------------------------------------------------------------------------
 # 7. The operator has to be able to SEE that the sample was scoped.
 # --------------------------------------------------------------------------
 
