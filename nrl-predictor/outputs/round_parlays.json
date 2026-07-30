@@ -1,8 +1,8 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1331,
-  "fair_price": 7.51,
+  "p_joint": 0.1343,
+  "fair_price": 7.45,
   "legs": [
    "Penrith Panthers to win",
    "Dolphins to win",
@@ -12,11 +12,11 @@
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0386,
-  "fair_price": 25.92,
+  "p_joint": 0.0462,
+  "fair_price": 21.65,
   "legs": [
    "Penrith Panthers win & Thomas Jenkins try",
-   "Dolphins win & Jamayne Isaako try",
+   "Dolphins win & Hamiso Tabuai-Fidow try",
    "Melbourne Storm win & Moses Leo try"
   ]
  }

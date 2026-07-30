@@ -1,9 +1,9 @@
 round,date,home,away,p_home_blend,market_p_home,edge_home,books,best_odds_home,best_odds_away,disp_home,disp_away,value_side,value_ev_pct
-Round 22,2026-07-30 19:50:00,North Queensland Cowboys,Sydney Roosters,0.4371,0.3735,0.0636,4,2.55,1.53,0.0,0.0066,North Queensland Cowboys,11.4605
-Round 22,2026-07-31 18:00:00,St George Illawarra Dragons,Dolphins,0.2375,0.2446,-0.0071,4,3.9,1.26,0.0065,0.0,Dolphins,-3.925
-Round 22,2026-07-31 20:00:00,Melbourne Storm,Canterbury-Bankstown Bulldogs,0.6556,0.4444,0.2112,4,2.25,1.77,0.0465,0.0291,Melbourne Storm,47.51
-Round 22,2026-08-01 15:00:00,Gold Coast Titans,New Zealand Warriors,0.3348,0.3855,-0.0507,4,2.55,1.58,0.0345,0.0227,New Zealand Warriors,5.1016
-Round 22,2026-08-01 17:30:00,Penrith Panthers,Canberra Raiders,0.7883,0.7416,0.0467,4,1.3,3.75,0.0156,0.0204,Penrith Panthers,2.479
-Round 22,2026-08-01 19:35:00,Brisbane Broncos,Newcastle Knights,0.5415,0.625,-0.0835,4,1.53,2.55,0.0,0.0,Newcastle Knights,16.9175
-Round 22,2026-08-02 14:00:00,Cronulla-Sutherland Sharks,South Sydney Rabbitohs,0.6897,0.7,-0.0103,4,1.36,3.4,0.0074,0.0794,South Sydney Rabbitohs,5.502
-Round 22,2026-08-02 16:05:00,Wests Tigers,Parramatta Eels,0.5319,0.3369,0.195,4,2.9,1.46,0.0302,0.021,Wests Tigers,54.251
+Round 22,2026-07-30 19:50:00,North Queensland Cowboys,Sydney Roosters,0.437,0.3789,0.0581,4,2.55,1.54,0.02,0.0098,North Queensland Cowboys,11.435
+Round 22,2026-07-31 18:00:00,St George Illawarra Dragons,Dolphins,0.2363,0.2337,0.0026,4,4.1,1.24,0.0123,0.004,St George Illawarra Dragons,-3.117
+Round 22,2026-07-31 20:00:00,Melbourne Storm,Canterbury-Bankstown Bulldogs,0.6549,0.3659,0.289,4,2.65,1.5,0.0192,0.0,Melbourne Storm,73.5485
+Round 22,2026-08-01 15:00:00,Gold Coast Titans,New Zealand Warriors,0.3305,0.3829,-0.0524,4,2.55,1.55,0.0303,0.0098,New Zealand Warriors,3.7725
+Round 22,2026-08-01 17:30:00,Penrith Panthers,Canberra Raiders,0.7876,0.7033,0.0843,4,1.37,3.25,0.0148,0.0156,Penrith Panthers,7.9012
+Round 22,2026-08-01 19:35:00,Brisbane Broncos,Newcastle Knights,0.5391,0.6327,-0.0936,4,1.5,2.6,0.0,0.0097,Newcastle Knights,19.834
+Round 22,2026-08-02 14:00:00,Cronulla-Sutherland Sharks,South Sydney Rabbitohs,0.6902,0.7437,-0.0535,4,1.28,3.75,0.0,0.0135,South Sydney Rabbitohs,16.175
+Round 22,2026-08-02 16:05:00,Wests Tigers,Parramatta Eels,0.5333,0.3287,0.2046,4,2.9,1.42,0.0035,0.0,Wests Tigers,54.657
