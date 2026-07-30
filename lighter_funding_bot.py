@@ -1126,7 +1126,7 @@ _slip_bps_of = slip_bps_of
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
                   reason, order_usd=ORDER_USD, venue=None, shadow=None,
-                  bars=None, src=None):
+                  bars=None, src=None, measured=None, fill_src=None):
     """Mirror a realized directional funding trade to the paper_trades ledger.
     pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip
     (the ENTRY clip — callers pass meta['clip'], not the current loop's clip,
@@ -1164,9 +1164,42 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_l
             # it lived only on position meta + the venue_orders OPEN leg, so
             # the graded ledger structurally could not identify the explore
             # slice (brain/radar/judge all read closes). Telemetry only.
-            extra=_close_src_extra(_close_bars_extra(bars), src))
+            # [2026-07-30 (hb)] WAS THE EXIT PRICE MEASURED, OR ASSUMED?
+            # `_real_exit` returns (px, measured, reason) and falls back to the
+            # DECISION price on every failure path (venues/fills.py) — a
+            # fallback its own docstring calls load-bearing. The repo's own
+            # measurements say it is UNIVERSAL: "0 of 81 live orders ever
+            # produced a measured fill", "0 of 61 real orders ever id-matched".
+            # So `exit_price` on a live row has been the decision mark, not a
+            # fill, and NOTHING on the row said so.
+            # Why it matters more than tidiness: golive_readiness, the brain and
+            # the judge all read `fetch_paper_trades`, which carries no measured
+            # flag — `raw.measured` exists only on `venue_orders`, and no
+            # grading consumer joins that table. So the gate governing real
+            # money could not distinguish a measured round trip from an assumed
+            # one, against a gross edge the CHANGELOG puts at +6.18bps/trade.
+            # TELEMETRY ONLY: no bar, threshold or decision reads these keys.
+            extra=_close_fill_extra(
+                _close_src_extra(_close_bars_extra(bars), src),
+                measured, fill_src))
     except Exception:
         pass
+
+
+def _close_fill_extra(out, measured, fill_src):
+    """Stamp whether the exit price was a MEASURED fill or the decision mark.
+
+    setdefault-shaped like its siblings, so it can never clobber a bars/src
+    key. ABSENT when unknown rather than defaulted to False — a shadow arm has
+    no venue fill to measure and must not be recorded as an unmeasured live one.
+    """
+    if not isinstance(out, dict):
+        out = {}
+    if measured is not None:
+        out.setdefault("exit_measured", bool(measured))
+    if fill_src:
+        out.setdefault("exit_fill_src", str(fill_src))
+    return out
 
 
 def _close_bars_extra(bars):
@@ -1635,7 +1668,8 @@ def main():
                           was_long=not is_short, reason=reason,
                           order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag,
-                          bars=(m or {}).get("bars"), src=(m or {}).get("src"))
+                          bars=(m or {}).get("bars"), src=(m or {}).get("src"),
+                          measured=_meas, fill_src=_src)
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was px_decision — the
                 # decision price echoed back, so slippage_bps was NULL on every
@@ -1983,7 +2017,11 @@ def main():
                                         "(already flat) — not booking a phantom "
                                         "close", coin)
                         else:
-                            _bpx, _, _ = _real_exit(
+                            # [2026-07-30 (hb)] this path discarded the fill
+                            # flags with `_, _`. It is the fail-safe that books
+                            # a position it could not price, so it is the LAST
+                            # close whose basis should be a mystery.
+                            _bpx, _bmeas, _bsrc = _real_exit(
                                 coin, is_short, entry,
                                 client_id=(_res or {}).get("client_order_index"),
                     tx_hash=(_res or {}).get("tx_hash"),
@@ -1996,7 +2034,8 @@ def main():
                                           order_usd=float((m or {}).get("clip") or order_usd),
                                           venue=venue_tag, shadow=shadow_tag,
                                           bars=(m or {}).get("bars"),
-                                          src=(m or {}).get("src"))
+                                          src=(m or {}).get("src"),
+                                          measured=_bmeas, fill_src=_bsrc)
                             n_closed += 1
                             # [2026-07-28 AUDIT FIX] this path never counted a
                             # win at all — a profitable stop_blind close always
@@ -2092,7 +2131,8 @@ def main():
                           was_long=not is_short, reason=decision,
                           order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag,
-                          bars=(m or {}).get("bars"), src=(m or {}).get("src"))
+                          bars=(m or {}).get("bars"), src=(m or {}).get("src"),
+                          measured=_meas, fill_src=_src)
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was the decision price
                 # echoed back -> slippage_bps NULL on every live order.

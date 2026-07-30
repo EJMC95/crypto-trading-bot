@@ -265,6 +265,66 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   Verdict clean/live-ahead/live-slipping/insufficient; sustained slip →
   phone. Answers "is the live book slipping, and on entry or exit?". →
   `impl-shortfall`
+- **THE EXIT INSTRUMENTS (2026-07-30, (gq)/(gt)/(gx)) — read these before
+  touching any TP, SL or max-hold in this fleet.** Entries here have levers, a
+  scout, a tuner and a brain; exits had constants, and until (gr) the ledger did
+  not even record what an exit did.
+  * `scripts/study_exit_attribution.py` — per (book, exit_reason): n, total $,
+    mean %, win %, **median hold**. The hold column is the diagnosis: two exits
+    on one book with a 6x hold gap are one rule firing before the other can.
+    Measured: 🌾 carry earns **+$71.42 on `*_decay_paid`** (hold 65-70h) and
+    loses **−$17.32 on the sided `*_flip`s** (hold 6-10h) — and a THIRD unsided
+    `flip` bucket is +$7.02, so "flip loses" is true only of the sided ones.
+    `*_sl` at a 0% win rate appears on SEVEN living books. RETIRED rows are
+    excluded by default: the ledger is history and a Kraken-era book measures
+    +$272.09, the largest line in it.
+  * `scripts/study_exit_sweep.py` — the counterfactual: replays a book's OWN
+    trades under alternative exits against **Lighter's own candles**. Entries
+    held CONSTANT (never fitted), THROUGHPUT modelled (sequential, with the
+    book's position cap, so a rule that holds longer pays for the entries it
+    blocks — carry and Counterweight are both AT their caps, so for them that
+    is the whole question). `shipped_rule(book)` reads each book's REAL exit
+    from its module — absorbing three hazards that corrupt silently: the taker
+    stores `TT_SL` **negative**, Snap Back's exit is in **bps** and the
+    sniper's hold in **seconds**, and the sniper's exits are **bare literals no
+    lever can reach** (`HARDCODED_EXITS`).
+  * **THE CALIBRATION GATE IS THE POINT.** A harness that cannot reproduce what
+    DID happen may not say what WOULD have. `calibrate()` compares the replayed
+    shipped rule to the book's real ledger mean and **withholds every
+    recommendation** beyond tolerance — fail-CLOSED, so no baseline supplied
+    means nothing recommended. It passes today only for `pm-gillard-lshadow`
+    (replayed −0.158%/trade vs actual −0.110%), because that is the one book
+    whose every close carried a price before (gr).
+  * **A grid-edge winner is reported UNBOUNDED, never as a value.** On gillard
+    every top candidate pins `sl` at whatever maximum the grid allows, so the
+    honest output is "widen the grid", not "ship 8%". Widening until a number
+    appears is chasing the artifact. The direction IS robust and monotone (sl
+    1.0% → −0.158, 1.5% → −0.098, 2.0% → −0.034, 3.0% → +0.050, with drawdown
+    FALLING 40.7% → 26.0% because the tight stop was realising the losses), and
+    the actor already exists: the Parliament's tuners walk tp/sl/hold
+    replay-gated inside `PARAM_BOUNDS`. Two review notes from (gx):
+    `PARAM_BOUNDS["sl_pct"]` caps at 0.05 so the sweep's winner is outside what
+    the system can express, and the ×1.25 step needs **7.2 consecutive accepted
+    widenings** to reach that ceiling while the gain only becomes clear near 3%.
+- **EXIT TELEMETRY IS A CONTRACT NOW ((gr), guarded by
+  `tests/autonomy/test_exit_telemetry.py`).** `publish_paper_trade` accepted
+  `entry_price`/`exit_price` from 17-Jul and **8 of 9 bots never passed them** —
+  computed two lines above the call for `pnl_pct`, then dropped. Every exit
+  constant in the fleet was unfalsifiable. All nine now record, and the guard
+  refuses any bot that holds prices in scope and omits them. **Book-appropriate,
+  not uniform**: 🌾 carry is a FUNDING book (P&L is `accrued − fees`), so it
+  records `entry_apr`/`exit_apr`/`accrued`/`fees`/`held_h` instead — a price
+  sweep measures the wrong thing for it, and `study_exit_sweep` REFUSES funding
+  books outright rather than caveating them. **Not retroactive**: the 1,687
+  closes that predate (gr) have no prices and never will.
+- **A STOP MUST BE RECONCILABLE WITH THE GATE THAT JUDGES IT ((gv),
+  `tests/autonomy/test_stop_vs_gate.py`).** The stop is chosen in the bot; the
+  15% drawdown bar lives in `golive_readiness.py`; nobody had read them against
+  each other. 🌊 Tide Rider 35% = **2.3x the bar**; 📊 Index Rider 15% =
+  **exactly at it**, so it is stopped out at the same instant it becomes
+  ineligible. Any stop at-or-beyond the bar must be DECLARED with a reason
+  (the `BORN_DARK_OK` idiom) — none was moved, because Index Rider has zero
+  closes and there is no evidence to set a number against.
 - `scripts/golive_readiness.py` 🚦 — the GO-LIVE GRADER, an ORGAN since
   2026-07-30 (gk). Grades every LIVING book against the `(fk)` bar and
   publishes → `golive-readiness` (6-hourly `--publish` loop in `run_all.sh`;
@@ -461,7 +521,21 @@ its row is dashboard-retired regardless; stop the process when found.
   `sniper.surge_mult`. Every one is consumed by an `apply_tuning()` in its
   bot, called each loop, tested in `tests/autonomy/test_book_levers.py` —
   the registered-but-inert lever is the failure mode that tier exists to
-  prevent. Kill switch: drop `lighter-books` from `FLEET_TUNING_ENACT_LANES`
+  prevent.
+  **[2026-07-30 (gu)] `disloc.exit_bps` — THE FLEET'S FIRST EXIT LEVER.** All
+  nine above are ENTRY or CAPACITY: the rail could move what every book OPENS
+  and nothing about what it CLOSES. Chosen first for a measured reason — Snap
+  Back's exit target THROTTLES ITS OWN ENTRY, because (fz)'s adaptive entry gate
+  is floored at `EXIT_BPS * ENTER_FLOOR_MULT` = 40 × 1.5 = **60bps**, above the
+  **p90 (21.8bps)** of the residual distribution it adapts to (median 7.9, max
+  50.1 across 90 liquid books). So the adaptation could only descend to a bound
+  set by a stale exit constant. Cage **[8.0, 40.0]** is DERIVED from that
+  measurement — `lo` ≈ the live median, `hi` = the operator's current default,
+  so the rail may only loosen the exit TOWARD the tape and never tighten past
+  today's setting. Default UNCHANGED at 40.0: registering a lever moves nothing.
+  Consumed in `apply_tuning` **and** present in `_ENV_DEFAULTS` — the second is
+  load-bearing, because `_ENV_DEFAULTS[attr]` raises a KeyError that the loop's
+  own `except` swallows, leaving a lever that looks consumed and never moves. Kill switch: drop `lighter-books` from `FLEET_TUNING_ENACT_LANES`
   and every consumer reverts to its env default on the next read. Also new:
   `xp.funding.min_vol` / `live.funding.min_vol` (the Farmer's liquidity floor,
   judge-promotable — the $10M floor excluded 5 of the venue's 8 most extreme
@@ -476,15 +550,32 @@ its row is dashboard-retired regardless; stop the process when found.
 - **`fleet_bus.scout_universe()` / `.scout_funding()` / `.venue_stress_bps()`
   (2026-07-30)** — the ONE supported read of the venue's live universe, its
   funding map and its premium stress, off the scout's `lighter-market` key.
-  Built because five books carried hand-typed watchlists written when Lighter
-  was much smaller: Counterweight ranked **30 of 202 books**, Snap Back 16,
-  Tide Rider 6, Index Rider 3. A ranked selector cannot pick a winner it never
+  Built because **four LIVING books** carried hand-typed watchlists written when
+  Lighter was much smaller: Counterweight ranked **30 of 202 books**, Snap Back
+  16, Tide Rider 6, Index Rider 3. (This said "five" and named four — the fifth
+  was retired Gap Scout's 6-symbol `LIGHTER_WATCH` in `cross_exchange_arb.py`,
+  which cannot be widened because the bot idles behind the LIGHTER-ONLY guard.
+  Corrected (gz): a count that does not match its own list sends the next reader
+  hunting a book that is not there.) A ranked selector cannot pick a winner it never
   sees. `scout_universe` reads the scout's new public `vols` map and falls back
   to its private `_marks` diff base, so a consumer shipped ahead of the scout's
   next deploy is not dark in the meantime. CONTRACT: any doubt returns
   `[]`/`{}`/`None`, and **every caller must read empty as "keep my configured
   list", never as "trade nothing"** — the widening is an enhancement, never a
   dependency, and no organ outage may shrink a book's universe.
+  **[2026-07-30 (gy) MEASURED: only TWO of the four books named above actually
+  call it.** ⚖️ Counterweight and 🧲 Snap Back do (live caps confirm universe 51
+  and 39). 📊 Index Rider does NOT — its 3 → 10 came from a deliberate static
+  list of the venue's non-crypto set, which is correct for it. **🌊 Tide Rider
+  does NOT, and its live caps still read `universe: 6`** — the hardcoded
+  `TREND_COINS` default. It gained `rank_by_funding` and nothing else, so this
+  paragraph overstated the coverage.
+  **AND WIDENING IT IS CONTRAINDICATED, not a to-do.** Tide Rider has ZERO
+  closed trades, no time bound, and a 35% catastrophic stop as its only price
+  exit ((gv)). Handing a book that cannot EXIT more positions to ENTER is
+  strictly worse — the fleet already ran that configuration once: 🏆 Stock
+  Leaders, 3 closes all via `long_catastrophic_stop`, −$91.90, retired at maxDD
+  37-44%. Fix the exit first; the universe is not the binding constraint.]**
 - Every payload carries `updated`+`ttl_sec`; consumers go NEUTRAL on stale
   data (`fleet_bus.is_fresh`). Backtests are inert (no DATABASE_URL).
 - Bot identity for multiplier lookup = `bot_name` in each freqtrade config
@@ -716,7 +807,7 @@ All new bots:
   the default lived in PROSE inside each lever's `note` and the real value
   lived in another file, so the three could not be compared and had already
   drifted (`scout.ticket_top_n` moved 6 → 12 in code with its note still
-  saying 6, the same afternoon). All 42 levers now carry `env_default`;
+  saying 6, the same afternoon). EVERY lever now carries `env_default` (43 of them at (gu); the count is deliberately not load-bearing here because it drifts — `audit_lever_bounds` FAILS if any lever lacks one, so the guard is the claim and this sentence is only a pointer);
   `scripts/audit_lever_bounds.py` enforces on every push that each default is
   INSIDE its cage, that no cage is degenerate, that every book lever's `step`
   moves and terminates, and — the drift arm, mutation-verified — that the

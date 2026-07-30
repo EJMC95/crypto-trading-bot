@@ -145,6 +145,125 @@ def fetch_candles(market_id, start_ts, end_ts):
     return {t: v for t, v in out.items() if start_ts <= t <= end_ts}
 
 
+
+# ------------------------------------------------------------ shipped rules
+#: Each book's REAL exit rule, read from its own module rather than guessed.
+#:
+#: [2026-07-30 (gx)] THE SWEEP'S OWN NAMED BLOCKER. (gt) could not calibrate
+#: because the shipped rule was passed in by hand: on pm-gillard a guessed
+#: {tp 2%, sl 2%, hold 4h} replayed to +0.030%/trade against a book whose real
+#: mean is negative, so every candidate was ranked in a world that is not this
+#: one and the calibration gate correctly withheld everything. A counterfactual
+#: harness is only as good as its baseline, and the baseline was fiction.
+#:
+#: (attr, transform) per rule key. THREE hazards this table exists to absorb,
+#: each of which would silently corrupt a sweep:
+#:   * SIGN — the taker stores `TT_SL = -0.03`. `walk_exit` wants a positive
+#:     magnitude, so a raw read would place the stop ABOVE a long's entry and
+#:     exit instantly at a profit. `abs`.
+#:   * UNITS — Snap Back's exit is 40 BPS, the sniper's hold is in SECONDS.
+#:     A raw 40 would be read as 4,000%, and 21,600 as 21,600 hours.
+#:   * NOT AN ENV VAR AT ALL — the sniper's TP/SL/hold are BARE MODULE
+#:     LITERALS (`TAKE_PROFIT_PCT = 0.15`). No env var, no lever, nothing can
+#:     reach them; only a code edit can. Read from the module so they are at
+#:     least visible, and flagged below so that fact is on the record.
+_pct = lambda v: float(v)
+_abs = lambda v: abs(float(v))
+_bps = lambda v: float(v) / 1e4
+_sec_h = lambda v: float(v) / 3600.0
+
+BOOK_EXITS = {
+    "lighter-ticket-taker-lshadow": ("lighter_ticket_taker", {
+        "tp_pct": ("TAKE_PROFIT", _pct), "sl_pct": ("STOP_LOSS", _abs),
+        "max_hold_h": ("MAX_HOLD_H", _pct), "trail_pct": ("TRAIL_PCT", _pct)}),
+    "lighter-ticket-taker-lighter": ("lighter_ticket_taker", {
+        "tp_pct": ("TAKE_PROFIT", _pct), "sl_pct": ("STOP_LOSS", _abs),
+        "max_hold_h": ("MAX_HOLD_H", _pct), "trail_pct": ("TRAIL_PCT", _pct)}),
+    "lighter-perp-sniper-lshadow": ("lighter_perp_sniper", {
+        "tp_pct": ("TAKE_PROFIT_PCT", _pct), "sl_pct": ("STOP_LOSS_PCT", _abs),
+        "max_hold_h": ("MAX_HOLD_SEC", _sec_h)}),
+    "lighter-dislocation-lshadow": ("lighter_dislocation_bot", {
+        "tp_pct": ("EXIT_BPS", _bps)}),
+    "crypto-trend-daily-lshadow": ("lighter_trend_bot", {
+        "sl_pct": ("CATASTROPHIC_STOP", _abs)}),
+    "equities-regime-lshadow": ("lighter_index_bot", {
+        "sl_pct": ("CATASTROPHIC_STOP", _abs)}),
+}
+
+#: Books whose exit constants are BARE MODULE LITERALS — no env var, no lever.
+#: Recorded because "we could tune this" is false for them today: a code edit
+#: and a redeploy is the only path, so they cannot participate in the growth
+#: rail at all, however good a value the sweep eventually finds.
+HARDCODED_EXITS = {"lighter-perp-sniper-lshadow"}
+
+
+# [2026-07-30 (gx)] THE PARLIAMENT, read from its own strategy table. These six
+# matter disproportionately here: pm-gillard is the ONLY book in the fleet whose
+# every close carries a price (238 of 238), so it is the only one the sweep can
+# CALIBRATE against today — and its shipped rule was the missing half of that.
+# Read via `parliament.strategies.base_params`, the same function the running
+# bots call, so env overrides and clamping are applied exactly as in production
+# rather than re-derived from the defaults table.
+def _parliament_rules():
+    try:
+        from parliament.strategies import PM_BOTS, base_params
+    except Exception:      # noqa: BLE001
+        return {}
+    out = {}
+    for base, (_label, strat) in PM_BOTS.items():
+        try:
+            p = base_params(strat, base)
+        except Exception:      # noqa: BLE001
+            continue
+        rule = {}
+        if p.get("tp_pct"):
+            rule["tp_pct"] = float(p["tp_pct"])
+        if p.get("sl_pct"):
+            rule["sl_pct"] = abs(float(p["sl_pct"]))
+        if p.get("max_hold_hr"):
+            rule["max_hold_h"] = float(p["max_hold_hr"])
+        if rule:
+            out[base + "-lshadow"] = rule
+    return out
+
+
+_PM_RULES = _parliament_rules()
+
+
+def shipped_rule(book):
+    """The book's ACTUAL exit rule, read from its module. None if unknown.
+
+    Imports the module rather than parsing env defaults, because some books
+    (the sniper) hold their exit constants as bare literals that no
+    `os.environ.get` parser can see. A missing attribute yields None for that
+    key rather than a guess — a partially-known rule is still a better
+    baseline than an invented one, and `calibrate` will say so either way.
+    """
+    if book in _PM_RULES:
+        return dict(_PM_RULES[book])
+    spec = BOOK_EXITS.get(book)
+    if spec is None:
+        return None
+    mod_name, fields = spec
+    try:
+        mod = __import__(mod_name)
+    except Exception:      # noqa: BLE001
+        return None
+    rule = {}
+    for key, (attr, xform) in fields.items():
+        v = getattr(mod, attr, None)
+        if v is None:
+            continue
+        try:
+            rule[key] = xform(v)
+        except (TypeError, ValueError):
+            continue
+    # a zero trail/tp means DISABLED, not "exit at entry" — the taker ships
+    # TT_TRAIL_PCT=0 and reading that as a 0% trail would close every position
+    # on its first bar.
+    return {k: v for k, v in rule.items() if v} or None
+
+
 # ---------------------------------------------------------------- the replay
 def walk_exit(candles, entry_ts, entry_px, is_long, rule, max_horizon_h=None):
     """When does ONE position leave, under `rule`? -> (exit_ts, exit_px, why).
@@ -333,7 +452,7 @@ def sweep(trades, candles_by_sym, grid, cap=None, shipped=None,
                               "why": "calibration failed: " + detail}
             return out
         winner = next((r for r in results
-                       if _clears(r, base, min_edge)), None)
+                       if _clears(r, base, min_edge, cap)), None)
         out["verdict"] = _verdict(winner, base, grid, min_edge)
     return out
 
@@ -373,7 +492,7 @@ def calibrate(replayed_shipped, actual_mean_pct, tol_pp=None):
                              "funding/slippage or a wrong shipped rule"))
 
 
-def _clears(cand, base, min_edge):
+def _clears(cand, base, min_edge, cap=None):
     """Every floor, together. Deliberately strict: this is the gate that stops
     a grid-search artefact from being presented as a tailored exit."""
     if not cand["n"] or base.get("mean_pct") is None:
@@ -391,8 +510,16 @@ def _clears(cand, base, min_edge):
     # top five rules were ALL sl_pct=None. A rule must not deepen the drawdown.
     if (cand.get("max_dd_pct") or 0) > (base.get("max_dd_pct") or 0):
         return False
-    # ...nor demand exposure the book cannot carry.
-    if (cand.get("peak_open") or 0) > (base.get("peak_open") or 0):
+    # ...nor demand exposure the book cannot carry. THE BOUND IS THE CAP, NOT
+    # THE BASELINE'S ACCIDENT — corrected the first time a refusal was actually
+    # inspected instead of trusted. On pm-gillard the shipped rule happened to
+    # peak at 5 concurrent positions while the book's cap is 6, so comparing to
+    # the baseline refused a candidate for using 6 of 6 available slots: a
+    # capacity the book demonstrably has. That is not the floor's purpose. With
+    # no cap supplied there is no declared allowance, so fall back to the
+    # baseline's peak as the only available bound (conservative).
+    limit = cap if cap is not None else (base.get("peak_open") or 0)
+    if (cand.get("peak_open") or 0) > limit:
         return False
     return True
 
@@ -519,6 +646,18 @@ def _selftest():
                 "peak_open": 40, "n": 20}
     assert not _clears(greedier, base_r, 0.05), (
         "a rule demanding exposure the book cannot carry MUST be refused")
+    # THE CAP IS THE BOUND, not the baseline's accident. A candidate peaking at
+    # 6 when the baseline peaked at 3 but the CAP is 6 is using capacity the
+    # book has, and must be allowed. Refusing it was a real over-refusal
+    # measured on pm-gillard (shipped peaked at 5, cap 6, candidate 6).
+    at_cap = {"mean_pct": 2.0, "h1": 1.0, "h2": 1.0, "max_dd_pct": 4.0,
+              "peak_open": 6, "n": 20}
+    assert _clears(at_cap, base_r, 0.05, cap=6), (
+        "a candidate within the book's declared cap must not be refused for "
+        "exceeding the baseline's incidental peak")
+    assert not _clears(at_cap, base_r, 0.05, cap=5), "over the cap -> refused"
+    assert not _clears(at_cap, base_r, 0.05), (
+        "with no cap declared, the baseline's peak is the only bound available")
     honest = {"mean_pct": 2.0, "h1": 1.0, "h2": 1.0, "max_dd_pct": 4.0,
               "peak_open": 3, "n": 20}
     assert _clears(honest, base_r, 0.05), "a genuinely better rule must pass"
