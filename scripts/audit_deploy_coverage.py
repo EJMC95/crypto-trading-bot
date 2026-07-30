@@ -191,6 +191,37 @@ def live_marker_filters():
     return out
 
 
+def marker_source_ok():
+    """(ok, detail) — the live-marker grep must read commit SUBJECTS, not bodies.
+
+    [2026-07-30 (hj)] It read `git log --format='%B'` (full body), so a commit
+    that merely MENTIONED a marker deployed real money. Measured on the (hj)
+    commit itself: the body sentence "NOT deployed to the live taker: no
+    [deploy-live-taker] marker" matched, and `tide-rider-lighter-live` — the
+    LIVE Ticket Taker — was redeployed. The sentence saying the deploy was not
+    happening is what caused it.
+
+    A real-money trigger must not be reachable by prose ABOUT the trigger.
+    Every genuine marker in this repo's history sits in the subject, which is
+    also the documented usage, so subjects are the correct and sufficient
+    source. This pins it: a silent revert to %B re-arms the same defect on the
+    one path that moves real money.
+    """
+    src = _read(WORKFLOW)
+    m = re.search(r"msgs=\"\$\(git log --format='(%[a-zA-Z])'", src)
+    if not m:
+        return False, ("could not find the live-marker `msgs=$(git log "
+                       "--format=...)` line at all — the marker gate may have "
+                       "moved; re-check it by hand before trusting this guard")
+    fmt = m.group(1)
+    if fmt != "%s":
+        return False, (f"live-marker grep reads git log --format='{fmt}'. It "
+                       f"MUST be '%s' (subject only): with '%B' a commit body "
+                       f"that merely mentions [deploy-live-taker] deploys the "
+                       f"REAL-MONEY taker — measured 2026-07-30 (hj).")
+    return True, "live-marker grep reads commit SUBJECTS only (%s)"
+
+
 def marker_atoms(pattern):
     """(files, prefixes) — the concrete path atoms inside a `^(a\\.py$|dir/)`
     alternation. File atoms end `$` (unescaped to plain paths); prefix atoms
@@ -415,6 +446,12 @@ def main():
               f"{'service greps' if not filters else 'paths: block'} from "
               f"{WORKFLOW}. The guard cannot vouch for a file it cannot read; "
               "failing closed.")
+        return 1
+    # [(hj)] the real-money marker's SOURCE, before any coverage question —
+    # a gate reachable by prose about the gate is worse than a missing path.
+    _mk_ok, _mk_why = marker_source_ok()
+    if not _mk_ok:
+        print(f"audit_deploy_coverage: FAILED — {_mk_why}")
         return 1
     # A file must be in BOTH lists to deploy: `paths:` gates whether the job
     # runs, the greps choose the service. Fold `paths:` into the service test so

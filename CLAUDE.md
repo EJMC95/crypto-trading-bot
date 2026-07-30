@@ -811,6 +811,16 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **THE LIVE-DEPLOY MARKER LIVES IN THE COMMIT SUBJECT, AND MENTIONING IT IN A
+  BODY USED TO DEPLOY REAL MONEY (30-Jul (hj)).** The gate read `git log
+  --format='%B'`, so a commit whose body said *"NOT deployed to the live taker:
+  no `[deploy-live-taker]` marker"* matched and redeployed
+  `tide-rider-lighter-live`. It now reads `--format='%s'` (subjects only), and
+  `audit_deploy_coverage.marker_source_ok()` fails the build if that ever
+  reverts. **Never write a marker string in a commit body, even to negate it** —
+  a subject mention still fires, by design (a subject is a deliberate
+  statement, not prose). Verify a live deploy by the `extra.build` +
+  `extra.build_n` stamp, never by the green run.
 - **A GUARD WHOSE ONLY OUTPUT IS A WARNING ON A PASSING RUN IS NOT A GUARD
   (30-Jul (gl)/(hj), operator: "no more hiccups preventing situations such as
   those found today").** A green build carrying a `::warning::` is

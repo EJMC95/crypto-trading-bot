@@ -355,7 +355,17 @@ jobs:
             # Restrict-by-construction: no marker, no real-money deploy. Verify the
             # running container's build stamp after (a green run never implied the
             # container took it — [[railway-cli-frozen-services]]).
-            msgs="$(git log --format='%B' ${range/ /..} 2>/dev/null)"
+            # [2026-07-30 (hj)] SUBJECT LINES ONLY — this was `%B` (the full
+            # body) and a commit that merely MENTIONED a marker deployed real
+            # money. Measured, on this very commit: the body sentence
+            # "NOT deployed to the live taker: no [deploy-live-taker] marker"
+            # matched the grep and deployed `tide-rider-lighter-live`. The
+            # sentence declaring the deploy was not happening is what caused
+            # it. A real-money gate must not be triggerable by prose about the
+            # gate. Every genuine marker in this repo's history sits in the
+            # SUBJECT (2902726, 8a2028f), which is also the documented usage,
+            # so this narrows the trigger to actual use and excludes mention.
+            msgs="$(git log --format='%s' ${range/ /..} 2>/dev/null)"
             live_all=0
             if printf '%s' "$msgs" | grep -qF '[deploy-live]'; then live_all=1; fi
             # [2026-07-28 AUDIT FIX] each grep now covers its live image's
