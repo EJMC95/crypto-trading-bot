@@ -256,7 +256,20 @@ def test_optimised_defaults_are_what_shipped():
     # Snap Back's gate was 40x its own median residual.
     assert disloc.ENTER_PCT == 0.98 and disloc.UNIVERSE_N == 40
     # Index Rider carried the fleet's LARGEST clip on a book with zero closes.
-    assert index_bot.ORDER_USD == 100.0
+    # [2026-07-30 (hl)] $100 -> $65. The 15% go-live drawdown bar was ALREADY
+    # BREACHED at 9x$100 — measured 21.60% (lag0) / 23.88% (lag1) realised on
+    # 10y, graded through golive_readiness.stats() itself. Per-trade % is
+    # invariant to clip, so this costs exactly zero expectancy while scaling
+    # dollar drawdown linearly; capping concurrency instead would have bought
+    # the same safety with 58% of realised P&L and 2.3pp of mean per trade.
+    assert index_bot.ORDER_USD == 65.0
+    # MAX_OPEN is a LITERAL now, not len(SYMBOLS): a cap defined as the
+    # universe size can never bind, and it was the one lever the drift guard
+    # had to be blinded to (DRIFT_OK) — where it had already drifted 10 vs 9.
+    assert index_bot.MAX_OPEN == 9
+    import scripts.audit_lever_bounds as _alb
+    assert "index.max_open" not in _alb.DRIFT_OK, \
+        "re-adding this exemption re-blinds the drift arm on the lever most able to drift"
     # [2026-07-30 (hk)] 10 -> 9: XAG REMOVED. (fz) added it under `sma_cross`
     # while this same file's reject list said "don't re-test: XAG (+1.2%
     # regime / 55% DD cross)" — naming the very rule it was shipped under —
@@ -277,6 +290,15 @@ def test_optimised_defaults_are_what_shipped():
                 f"re-testing a rejected sleeve needs a recorded reason")
     # Tide Rider now ranks by the signal class that actually earns here.
     assert trend.RANK_BY_FUNDING is True
+    # [(hl)] 5.0 -> 3.0: measured, 3.0 admits ZEC ($3.38M) and PAXG which carry
+    # 91% of the whole delta; 2.0 buys 6 more trades and LOWERS the mean
+    # (+8.52% -> +7.93%). 3.0 is where candidates stop paying for themselves.
+    assert trend.MIN_VOL_M == 3.0
+    # trend.max_open hi is a SAFETY bound: at >=10 the -10% daily-loss halt
+    # becomes reachable before the -35% catastrophic stop, and in shadow that
+    # halt skips the whole scan — no death cross, no seatbelt, for the rest of
+    # the UTC day. Max simultaneously-golden books measured over 500 days: 6.
+    assert fleet_tuning.LEVERS["trend.max_open"]["hi"] == 9
 
 
 # --------------------------------------------------------------------------

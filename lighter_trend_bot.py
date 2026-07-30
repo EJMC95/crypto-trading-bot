@@ -93,7 +93,7 @@ RANK_BY_FUNDING = os.environ.get("TREND_RANK_BY_FUNDING", "1").lower() in ("1", 
 # must be exitable, and the fleet has already been burned by one-sided debut
 # books (see the sniper's YOUNG_MIN_VOL_M).
 UNIVERSE_N = int(os.environ.get("TREND_UNIVERSE_N", "24"))
-MIN_VOL_M = float(os.environ.get("TREND_MIN_VOL_M", "5.0"))
+MIN_VOL_M = float(os.environ.get("TREND_MIN_VOL_M", "3.0"))
 # [2026-07-30 (hk)] THE WIDENING CHANGES WHAT KIND OF BOOK THIS IS — say so.
 # The scout ranks the whole venue by turnover, and measured on the live bus the
 # ten books it adds are XAU, HYPE, SKHYNIXUSD, SNDK, MU, WTI, LIT, SPCX, XAG,
@@ -739,6 +739,15 @@ def main():
                      len(scan_coins), ",".join(_added) or "-",
                      ",".join(_gone) or "-")
             _last_universe = list(scan_coins)
+        # [2026-07-30 (hl)] THE SKIP CENSUS. The row published `universe: 16`
+        # while SIX of those 16 are STRUCTURALLY MUTE — golden() needs 202
+        # closed daily bars and SPCX (47.9d), SOXL (48.8d), MU (90.8d),
+        # SKHYNIX (112.5d), WTI (161.7d) and SNDK (170.6d) cannot produce a
+        # signal at all. The payload overstated the signal-capable universe by
+        # >=60%, which is the difference between "this book sees 16 books" and
+        # "this book can act on 10". Counted here, published below.
+        census = {"short_history": 0, "candle_err": 0, "unsupported": 0,
+                  "fleet_veto": 0, "signal_capable": 0}
         if RANK_BY_FUNDING:
             scan_coins = sorted(
                 scan_coins, key=lambda c: (fund.get(c) or {}).get("rate")
@@ -752,6 +761,7 @@ def main():
             # carry an explicit guard for. Flat coins still skip as before.
             if skip_coin(ctx.supports(coin),
                          (pos.get(coin, {}) or {}).get("size", 0.0)):
+                census["unsupported"] += 1
                 continue
             # State FIRST so the catastrophic-stop seatbelt works even if candles fail.
             held = pos.get(coin, {}).get("size", 0.0)
@@ -785,6 +795,7 @@ def main():
                     candles = candles[:-1]
                 closes = closes_from_candles(candles)
             except Exception as e:
+                census["candle_err"] += 1
                 log.error("%s candle error: %s", coin, e)
             g = golden(closes) if closes else None
 
@@ -795,9 +806,12 @@ def main():
                     if close_long(coin, "catastrophic_stop", px, held, entry, opened_ts, m):
                         open_now -= 1
                 elif not held:
-                    log.info("%-4s insufficient daily history; skip.", coin)
+                    census["short_history"] += 1
+                    log.info("%-4s insufficient daily history (%d/%d bars); skip.",
+                             coin, len(closes or ()), EMA_SLOW + 2)
                 continue
             is_golden, ef, es = g
+            census["signal_capable"] += 1
 
             if not px:
                 px = closes[-1] if closes else 0.0
@@ -815,6 +829,7 @@ def main():
             # ----- flat: enter long on a golden cross -----
             if is_golden and open_now < max_open:
                 if fleet_long_veto:
+                    census["fleet_veto"] += 1
                     continue      # L2: fleet directional-long budget is full
                 size = round(order_usd / px, 6)
                 if not dry_run:
@@ -884,7 +899,18 @@ def main():
                                     "universe": len(_last_universe),
                                     "universe_n": UNIVERSE_N,
                                     "min_vol_m": MIN_VOL_M,
-                                    "configured": len(COINS)}})
+                                    "max_open": max_open,
+                                    "configured": len(COINS),
+                                    # [(hl)] what the universe COUNT hides:
+                                    # signal_capable is the only number that
+                                    # says how many books this loop could act
+                                    # on. Measured 6 of 16 were mute.
+                                    **census}})
+                # [(hl)] MTM equity series — the go-live drawdown bar reads
+                # REALISED P&L only, and this book holds for weeks, so most of
+                # its drawdown is open and invisible. Publish-only; the grader
+                # is unchanged until there is history to read.
+                store.snapshot_equity(bot_id, pub_equity, pub_open, realized)
             except Exception:
                 pass
         try:

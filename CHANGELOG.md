@@ -1,3 +1,54 @@
+## 2026-07-30 (hl) — "MORE OPENS, MORE EXITS": there is none on offer, and the search found the drawdown bar already broken
+
+- **THE ASK** (operator): *"Enhance further, more opens, more exits, you're on a roll but optimisation is further needed."* A 38-agent workflow swept both riders on Lighter's own tape — EMA pair, asymmetric exits, liquidity floor, bar floor, slots, sleeve universe, structural blockers — and every candidate went through a refutation pass attacking overfit, execution lag, regime and spread cost. Suite **663**, six guards green.
+- **THE HEADLINE IS A REFUSAL: 25 of 30 throughput candidates were killed, and the 5 that survived produce ZERO extra round trips between them.** What survived is capital safety, observability, and a broken grader. Shipping all of it moves the trade count by approximately nothing, and that is the honest answer rather than a disappointing one.
+
+### The thing the search actually found: 📊 Index Rider already fails the 15% bar
+
+- **MEASURED through `golive_readiness.stats()` ITSELF** (not a re-implementation), 10y of the sleeves' own dailies, both lags: the shipped **9 sleeves × $100** book has realised maxDD **21.60% (lag0) / 23.88% (lag1)** — `bar_map` maxdd=**False**. The pre-`(fz)` 3-sleeve book passed at **3.45% / 4.24%**. **The 3→9 widening broke the go-live drawdown bar and shipped without anyone grading the book-level curve.** This is remediation, not caution.
+- **THE FIX IS THE CLIP, AND THE REASON IS EXPECTANCY.** `ORDER_USD` **$100 → $65**. Per-trade % return is INVARIANT to clip, so this costs **exactly zero** expectancy while scaling dollar drawdown linearly — a mechanical identity, not a measurement ($75→16.20%, $100→21.60%, $133→28.73%). $65 is the largest clip clearing 15% at 9 sleeves (≤$69 lag0, ≤$63 lag1).
+- **WHY NOT CAP CONCURRENCY INSTEAD, since that was the obvious move:** `index.max_open` 9→4 reaches 14.85% only by surrendering **79 closes (190→111), 58% of realised P&L and 2.3pp of mean per trade**. And the mechanism is worse than the arithmetic: the entry loop iterates `SYMBOLS` in list order with incumbents holding their slots, so a binding cap starves the LAST-listed diversifiers (WTI/XAU/XCU) while the correlated SPY/QQQ/IWM/NVDA/TSLA/MSTR equity block keeps its slots — **gross falls, correlation RISES, drawdown barely moves** (9→7 costs 10 closes and moves maxDD 21.60%→21.64%, i.e. nothing). Safety bought with expectancy is the same error as throughput bought with expectancy, run backwards.
+
+### The lever that the drift guard was blind to — and it had already drifted
+
+- `MAX_OPEN` was `int(os.environ.get("INDEX_MAX_OPEN", str(len(SYMBOLS))))`. Two consequences: a cap defined as the universe size **can never bind**, so `index.max_open` was a registered growth lever with no reachable effect; and because the default was computed rather than literal, `audit_lever_bounds` had to carve it into **`DRIFT_OK`** — so the one lever whose default silently tracks the universe was the one lever the drift arm could not see. **It had already drifted**: registry 10, code 9 after `(hk)` removed XAG.
+- Now a literal (`"9"`), and **the `DRIFT_OK` entry is deleted** so it is guarded like every other lever. Recorded in the guard: *an entry in `DRIFT_OK` is a hole in the guard; prefer making the consumer literal over declaring the exemption.*
+
+### The grader cannot see most of the drawdown it is grading
+
+- **`golive_readiness.stats()` accumulates REALISED closed-trade P&L only.** 📊 is long on **64% of days**, so most of its drawdown is OPEN and invisible to the bar that decides whether a book may hold real money. Measured at the 3y plateau: **all four stop×lag cells PASS on realised DD 9.9–10.7% while true MTM DD is 15.6–17.4%** — the two definitions disagree about the **verdict**, not merely the number.
+- The books publish MTM equity every loop, but `bot_pnl` is ONE UPSERTED ROW per book: no series exists, so no drawdown can be computed from it. **`bot_pnl_store.snapshot_equity()`** now appends a sample to `bot_state_history` under `<bot>:equity`, wired into both riders.
+- **DELIBERATELY NOT WIRED INTO THE GRADER.** There is no history yet, so changing the bar today would grade every book against an empty series — fail-open or fail-closed, both wrong. Accumulate ~30 days, publish the MTM number BESIDE the realised one, and **re-grade 🌾 carry under it before anyone reads its score as unchanged**: carry is five of six bars from go-live, so a stricter drawdown definition lands on it first. Starting the clock is the whole of this change.
+
+### The payload was overstating 🌊's usable universe by 60%
+
+- The row published `universe: 16` while **SIX of those 16 are structurally mute** — `golden()` needs 202 closed daily bars and SPCX (47.9d), SOXL (48.8d), MU (90.8d), SKHYNIX (112.5d), WTI (161.7d) and SNDK (170.6d) cannot produce a signal at all. `extra.caps` now carries a **skip census** (`signal_capable`, `short_history`, `candle_err`, `unsupported`, `fleet_veto`, `max_open`): the difference between "sees 16 books" and "can act on 10".
+- 📊 likewise publishes **`ref_date` per sleeve**: `bars` reads 501–504 whether the Yahoo cache advanced today or froze a fortnight ago, so a dead off-venue feed was indistinguishable from a flat market. The value was already sitting in `ref["last_date"]`.
+
+### Two bounds moved, both on measurement
+
+- **`trend.min_vol_m` 5.0 → 3.0.** 3.0 admits ZEC ($3.38M) and PAXG, which carry **91% of the entire measured delta**; 2.0 buys 6 more trades and **lowers** the mean (+8.52% → +7.93%) by admitting books held for weeks at $0.58–1.29M/day. 3.0 is where candidates stop paying for themselves.
+- **`trend.max_open` cage hi 12 → 9, and this is a SAFETY bound.** Max simultaneously-golden books over 500 days at the live universe is **six** (7 at the cage extreme), so the lever has never bound and cannot. What ≥10 *does* do is make the −10% daily-loss halt reachable BEFORE the −35% catastrophic stop — and in shadow that halt `continue`s past the whole scan: **no death cross, no seatbelt, no marks for the rest of the UTC day.** Capping at 9 makes that branch unreachable by construction rather than leaving it armed for an author to walk into.
+
+### The single-name class is machine-readable now, after shipping through the prose three times
+
+- `lighter_index_bot`'s prose has rejected single names since 13-Jul (*"timing rules fit indices, not stocks"*) and NVDA/TSLA/MSTR shipped through it anyway in `(fz)`. Re-measured in this sweep and the class **holds**: GOOGL sits BELOW its own shuffled-signal null at both lags; TENCENT is −7.7pp/yr vs buy-and-hold and loses 4 of 5 walk-forward blocks; MSFT's measured Lighter funding (4.25% APR) **exceeds its own breakeven** (3.7%); AMZN is negative at both lags over 5y; single-name maxDD runs 33–90% against a 15% cap. SOXL pays **114.9% APR** on Lighter; the nine FX books measure exactly 0.00% APR and still degrade the book.
+- 54 symbols now in `REJECTED_SLEEVES`. The three already shipped are **GRANDFATHERED in `SLEEVE_EXEMPT`, not endorsed** — pulling three live sleeves on the same day the clip was cut would confound two changes, and they are named FIRST TO DROP if the bar still fails after the cut. Mutation-verified: adding a fourth single name turns the build red.
+
+### WHAT WAS REFUSED, and why it matters more than what shipped
+
+- **Every faster exit on 🌊.** `close < EMA20` gives **6.4× the closes** and improves per-trade **5.1×** — but **per bar-day held it improves 1.04×**. The entire gain is denominator shrinkage from cutting median hold 58.5d → 4d. A content-free 3-day time stop reproduces **78%** of it; a hold-matched random clock ties or beats the 20/50 cross (t between −0.36 and +0.46); the exposure-matched null *beats* `close<EMA20` by −3.65pp (t=−2.38). Textbook turnover-for-expectancy.
+- **Tightening `CATASTROPHIC_STOP` 0.35 → 0.05** raises closes 1.02 → 4.88/30d and "improves" mean per trade −16.40% → −3.86% while total P&L gets **worse** (−$155.8 → −$175.6). Read the second number.
+- **50/200 → 10/20 is real throughput (0.38 → 3.06 closes/30d) and unestablished expectancy**: t=+1.85, H2 +0.34%, walk-forward OOS t=+1.07, and an exposure-matched placebo pays +5.63% against the rule's +8.81% — it beats only 84% of 3000 placebo draws. This is the `(gi)` Ticket Taker shape: **more sample for an undecided rule, not feeding a proven winner.** If it ships it must be a SEPARATE ROW with its own ledger (Australian-musician naming), 50/200 left running as the control, a hold-matched placebo arm logged in parallel, and a pre-registered kill bar — never a re-parameterisation, which would discard the book's entire evidentiary basis.
+
+### The honest total
+
+Ship everything here and the trade count **does not move**. 🌊 goes 0.38–0.54 → 0.4–0.6 closes/30d; 📊 stays at 1.41/30d. **Neither book reaches the 30-closes gate** — 🌊 needs ~5 years at its current rate, 📊 ~640 days, and 30-in-30 would need ~123 sleeves at the measured 2.96 closes/sleeve/yr (the venue's *entire* 83-book non-crypto universe reaches 20.2 per 30 days, at $8,300 of notional on a $1,000 book). **Free and dated:** SPY and QQQ cross the 202-bar floor around **12 Aug 2026**, adding two gradeable 🌊 books for nothing — but at `universe_n` 24 the width cap currently discards QQQ, so if the floor moves the width must move with it.
+
+### Still unknown, and the one measurement
+
+Whether 🌊's silence is fixable or a retirement. On Lighter's own 559d tape the 50/200 golden state has **no measurable forward edge** (+1d diff +0.041pp, t=+0.45; not one of 16 liquid books positive), and 10/20's apparent edge is 2/3 exposure to a tape that rose. Every result sits inside one falling-BTC regime; both big winners (HYPE +36%, ZEC +31%) are still OPEN and uncounted; and the non-crypto arm has **zero H1 trades** because those books listed after the split, so it cannot be both-halves validated at all. More Lighter tape does not fix this — only a different regime does. **The measurement:** run 10/20 as its own shadow row beside the untouched 50/200 control with a hold-matched random-exit placebo arm logged in parallel, to 30 closes (~10 months), and grade it on the **placebo delta** rather than the raw mean.
+
 ## 2026-07-30 (hk) — THE TWO BOOKS THAT NEVER CLOSED: the guidance was fine, the missiles were never loaded
 
 - **THE ASK** (operator): *"deep dive index rider and tide rider, we need them operating, and operating efficiently … find out why machine guns and missiles arent firing or the guidance systems not working"*, then *"widen"*, *"all the bells and whistles"*, *"make things work"*, *"if its not reaching something find something for it to reach and then give it the power to make something of it"*. Suite **648 → 663**, six guards green.

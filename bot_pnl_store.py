@@ -1361,6 +1361,48 @@ def prune_history(conn=None, keep_days=None):
         return None
 
 
+def snapshot_equity(bot, equity, open_trades=None, realized=None):
+    """[2026-07-30 (hl)] Append one MARK-TO-MARKET equity sample for `bot` to
+    bot_state_history under '<bot>:equity'. Never raises; a dark DB is a no-op.
+
+    WHY THIS EXISTS, and it governs REAL MONEY. `golive_readiness.stats()` —
+    the grader for the rule deciding whether a $1,000 shadow book may ever hold
+    real money — accumulates REALISED closed-trade P&L only. For a book that
+    holds most of the time, most of its drawdown is OPEN and therefore
+    INVISIBLE to the bar. Measured on 📊 Index Rider (long on 64% of days): at
+    the 3y plateau all four stop x lag cells PASS the gate on realised
+    drawdown 9.9-10.7% while true mark-to-market drawdown is 15.6-17.4% —
+    the two definitions disagree about the VERDICT, not just the number.
+
+    The books already publish MTM equity to bot_pnl every loop, but bot_pnl is
+    ONE UPSERTED ROW per book: there is no series, so no drawdown can be
+    computed from it. This starts the series.
+
+    DELIBERATELY NOT WIRED INTO THE GRADER YET. There is no history to read, so
+    changing the bar today would grade every book against an empty series —
+    fail-open or fail-closed, both wrong. Accumulate ~30 days first, then
+    publish the MTM number BESIDE the realised one before it is allowed to
+    decide anything. Re-grade 🌾 carry under it before anyone reads its score
+    as unchanged: carry is five of six bars from go-live, so a stricter
+    drawdown definition lands on it first.
+    """
+    try:
+        row = {"equity": round(float(equity), 4)}
+    except (TypeError, ValueError):
+        return False
+    if open_trades is not None:
+        try:
+            row["open"] = int(open_trades)
+        except (TypeError, ValueError):
+            pass
+    if realized is not None:
+        try:
+            row["realized"] = round(float(realized), 4)
+        except (TypeError, ValueError):
+            pass
+    return save_history(str(bot) + ":equity", row)
+
+
 def save_history(key, payload):
     """Append one snapshot to bot_state_history (oracle calls, risk lights) so
     the shared layers become backtestable. Safe every loop. Never raises.

@@ -391,7 +391,8 @@ LEVERS = {
         "env_default": 40.0, "step": -4.0},
     "index.max_open": {
         "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
-        "note": "Index Rider concurrent sleeves; env default = universe size", "env_default": 10, "step": 2},
+        "note": "Index Rider concurrent sleeves; env default 9 (a LITERAL since (hl) — it tracked len(SYMBOLS) and drifted)",
+        "env_default": 9, "step": 2},
     "trend.rank_by_funding": {
         # [2026-07-30 (hk)] HONEST NOTE: this lever cannot change what this book
         # trades. It only reorders ADMISSION, and it is inert whenever
@@ -421,16 +422,30 @@ LEVERS = {
         # book author has something to step once a 24-wide universe can actually
         # oversubscribe six slots. Inert until then, by construction — with a
         # 6-coin universe the book never held more than one position.
-        "kind": "int", "lo": 2, "hi": 12, "lane": "lighter-books",
-        "note": "Tide Rider concurrent long slots; env default 6",
+        # [2026-07-30 (hl)] hi 12 -> 9, and this is a SAFETY bound, not a
+        # throughput one. Measured: the maximum number of simultaneously-golden
+        # books over 500 days at the live universe is SIX, and 7 at the cage
+        # extreme — so the lever has never bound and cannot. What >=10 DOES do
+        # is make the -10% daily-loss halt reachable BEFORE the -35%
+        # catastrophic stop, and in shadow that halt `continue`s past the whole
+        # scan: no death cross, no seatbelt, no marks for the rest of the UTC
+        # day. Capping at 9 makes that branch unreachable by construction
+        # rather than leaving it armed for an author to walk into.
+        "kind": "int", "lo": 2, "hi": 9, "lane": "lighter-books",
+        "note": "Tide Rider concurrent long slots; env default 6 (hi capped at 9 — see the halt note)",
         "env_default": 6, "step": 1},
     "trend.min_vol_m": {
         # Liquidity floor on the SCOUT-added books only — the configured majors
         # are never filtered out by it. Restrict direction is UP (a higher floor
         # admits fewer books), so the growth step is negative.
         "kind": "float", "lo": 1.0, "hi": 50.0, "lane": "lighter-books",
-        "note": "Tide Rider scout-universe 24h $M liquidity floor; env default 5.0",
-        "env_default": 5.0, "step": -1.0},
+        # [2026-07-30 (hl)] 5.0 -> 3.0. Measured: 3.0 admits ZEC ($3.38M) and
+        # PAXG, which carry 91% of the whole measured delta; going further to
+        # 2.0 buys 6 more trades and LOWERS the mean (+8.52% -> +7.93%) by
+        # admitting books held for weeks at $0.58-1.29M/day. 3.0 is the point
+        # where the candidates stop paying for themselves.
+        "note": "Tide Rider scout-universe 24h $M liquidity floor; env default 3.0",
+        "env_default": 3.0, "step": -0.5},
     "sniper.surge_mult": {
         # the sniper's event (a brand-new listing) is too rare to grade —
         # n=1 in weeks, and `new_listings` is empty on the bus right now.

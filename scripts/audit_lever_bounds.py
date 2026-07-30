@@ -100,13 +100,20 @@ DEFAULT_OK = {
         "list-valued lever (uses `allowed`, not lo/hi) — Gap Scout RETIRED 17-Jul",
 }
 # Consumers whose default is computed, not a literal, so (C) cannot parse it.
+# [2026-07-30 (hl)] `index.max_open` was HERE and is now gone. It was the one
+# lever whose consumer default tracked the universe (`str(len(SYMBOLS))`), so
+# the drift arm — the whole point of this guard — was blind to precisely the
+# lever most able to drift. And it HAD drifted: the registry said 10 while the
+# code computed 9. The consumer is now a literal, so the exemption is
+# unnecessary; re-adding it would re-blind the guard.
+# LESSON, general: an entry here is a hole in the guard. Prefer making the
+# consumer literal over declaring the exemption.
 DRIFT_OK = {
     "xp.funding.conviction_hi": "default is _CDHI, a mode-dependent tuple unpack",
     "live.funding.conviction_hi": "default is _CDHI, a mode-dependent tuple unpack",
     "xp.funding.slope_gate": "consumer default is the string 'on', mapped to 1",
     "live.funding.slope_gate": "consumer default is the string 'on', mapped to 1",
     "trend.rank_by_funding": "consumer default is the string '1', parsed to bool",
-    "index.max_open": "consumer default is str(len(SYMBOLS)) — computed, not a literal",
     "live.clip_scale": "no env var: the neutral 1.0 is the call-site default",
     "gapscout.prefilter_gap": "Gap Scout RETIRED 17-Jul — consumer idles behind a guard",
     "gapscout.max_book_fetches": "Gap Scout RETIRED 17-Jul — consumer idles behind a guard",

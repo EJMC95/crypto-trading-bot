@@ -91,7 +91,23 @@ START_EQUITY = 1000.0
 # inversion of how every other book here is sized. $100 across a widened
 # sleeve set deploys MORE of the book than $250 across three, while making
 # each individual bet survivable enough to be informative.
-ORDER_USD = float(os.environ.get("INDEX_ORDER_USD", "100"))
+# [2026-07-30 (hl)] $100 -> $65. THE 15% DRAWDOWN BAR IS ALREADY BREACHED at
+# the shipped 9x$100: measured realised maxDD 21.60% (lag0) / 23.88% (lag1) on
+# 10y of the sleeves' own dailies, graded through golive_readiness.stats()
+# itself (bar_map maxdd=False). The pre-(fz) 3-sleeve book passed at
+# 3.45%/4.24% — so the 3->9 widening broke the bar and shipped without anyone
+# grading the book-level curve. This is remediation, not caution.
+# WHY THE CLIP AND NOT max_open: per-trade % return is INVARIANT to clip, so
+# this costs exactly ZERO expectancy and scales dollar drawdown linearly
+# ($75 -> 16.20%, $100 -> 21.60%, $133 -> 28.73% — a mechanical identity).
+# Capping concurrency instead would buy safety WITH expectancy: max_open 9->4
+# reaches 14.85% only by giving up 79 closes (190->111), 58% of realised P&L
+# and 2.3pp of mean per trade — and because the entry loop iterates SYMBOLS in
+# list order with incumbents holding slots, a binding cap starves the
+# LAST-listed diversifiers (WTI/XAU/XCU) while the correlated equity block
+# keeps its slots: gross falls, correlation RISES, drawdown barely moves.
+# $65 is the largest clip clearing 15% at 9 sleeves (<=$69 lag0, <=$63 lag1).
+ORDER_USD = float(os.environ.get("INDEX_ORDER_USD", "65"))
 # [2026-07-30 UNIVERSE] SPY,QQQ,XAU -> the venue's full non-crypto set (the
 # same ten books the family bot's per-asset gate grades). These are the
 # fleet's ONLY source of a regime that is not falling-BTC: over the same
@@ -156,12 +172,48 @@ REJECTED_SLEEVES = {
     "XAG": "sma_cross", "WTI": "regime", "BRENT": "regime", "BRENTOIL": "regime",
     "XCU": "regime", "XPT": "regime", "NATGAS": "regime",
     "US500": "any", "US100": "any",
+    # [2026-07-30 (hl)] THE SINGLE-NAME CLASS, now machine-readable. The prose
+    # above has rejected it since 13-Jul ("timing rules fit indices, not
+    # stocks") and it has been shipped through THREE times anyway — NVDA/TSLA/
+    # MSTR are live today under that same prose. A 38-agent sweep re-measured
+    # the class and it holds: GOOGL sits BELOW its own shuffled-signal null at
+    # both lags; TENCENT is -7.7pp/yr vs buy-and-hold and loses 4 of 5
+    # walk-forward blocks; MSFT's measured Lighter funding (4.25% APR) exceeds
+    # its own breakeven (3.7%); AMZN is negative at both lags over 5y; and
+    # single-name maxDD runs 33-90% against a 15% cap. Prose is not a control.
+    # the three (fz) already shipped are members of the class too — that is
+    # the point; they are GRANDFATHERED in SLEEVE_EXEMPT, not exempt from it.
+    "NVDA": "any", "TSLA": "any", "MSTR": "any",
+    "AAPL": "any", "AMZN": "any", "MSFT": "any", "GOOGL": "any", "GOOG": "any",
+    "META": "any", "AMD": "any", "INTC": "any", "TENCENT": "any", "TSM": "any",
+    "AVGO": "any", "ORCL": "any", "QCOM": "any", "ARM": "any", "SMCI": "any",
+    "ASML": "any", "BABA": "any", "DELL": "any", "MRVL": "any", "AMAT": "any",
+    "MU": "any", "SNDK": "any", "SKHYNIX": "any", "SKHYNIXUSD": "any",
+    "NBIS": "any", "LITE": "any", "CRCL": "any", "BMNR": "any", "HOOD": "any",
+    "RKLB": "any", "COIN": "any", "PLTR": "any", "SPCX": "any", "ZHIPU": "any",
+    "CBRS": "any", "EWY": "any",
+    # leveraged/sector ETFs and the FX tranche, measured in the same sweep:
+    # SOXL pays 114.9% APR on Lighter (42.7% of hours above 10%), and the nine
+    # FX books measure EXACTLY 0.00% APR and still degrade the book.
+    "SOXL": "any", "USDJPY": "any", "AUDUSD": "any", "EURUSD": "any",
+    "GBPUSD": "any", "USDCNH": "any",
 }
 SLEEVE_EXEMPT = {
     "WTI": "rejected on regime200 (-4.4%); ships as sma_cross, untested by that "
            "sweep. Owes a Lighter-tape backtest before any go-live claim.",
     "XCU": "rejected on regime200 (+0.4%); ships as sma_cross, untested by that "
            "sweep. Owes a Lighter-tape backtest before any go-live claim.",
+    # [(hl)] The three single names (fz) already shipped. They are GRANDFATHERED
+    # rather than endorsed: pulling three live sleeves on the same day the clip
+    # was cut would confound two changes at once, and (hl) is already a sizing
+    # change. They are the FIRST candidates to drop if the book-level drawdown
+    # bar still fails after the clip cut, and no FOURTH single name may ship.
+    "NVDA": "grandfathered from (fz) — single-name class is rejected; retained "
+            "only to avoid confounding this pass's clip cut. First to drop.",
+    "TSLA": "grandfathered from (fz) — single-name class is rejected; retained "
+            "only to avoid confounding this pass's clip cut. First to drop.",
+    "MSTR": "grandfathered from (fz) — single-name class is rejected; retained "
+            "only to avoid confounding this pass's clip cut. First to drop.",
 }
 SLEEVES = {          # symbol -> (rule, param)
     "SPY": ("regime_band", (200, 0.01)),
@@ -188,7 +240,15 @@ CATASTROPHIC_STOP = float(os.environ.get("INDEX_CATASTROPHIC_STOP", "0.15"))
 DELIST_GIVEUP_H = float(os.environ.get("INDEX_DELIST_GIVEUP_H", "6"))
 DAILY_LOSS_LIMIT = float(os.environ.get("INDEX_DAILY_LOSS", "0.10"))
 LOOP_SECONDS = int(os.environ.get("INDEX_LOOP_SECONDS", "300"))
-MAX_OPEN = int(os.environ.get("INDEX_MAX_OPEN", str(len(SYMBOLS))))
+# [2026-07-30 (hl)] A LITERAL, not len(SYMBOLS). Two reasons, both measured:
+# (1) a cap defined as the universe size can NEVER bind, so `index.max_open`
+#     was a registered growth lever with no reachable effect; and
+# (2) it is the one lever whose default silently tracked the universe, which
+#     is exactly why audit_lever_bounds had to carve it into DRIFT_OK — and it
+#     had ALREADY drifted (registry said 10, code computed 9 after (hk)
+#     removed XAG). The carve-out is deleted in the same commit, so the drift
+#     arm now guards this lever like every other one.
+MAX_OPEN = int(os.environ.get("INDEX_MAX_OPEN", "9"))
 
 LOG_FILE = os.environ.get("INDEX_LOG_FILE", "lighter_index_bot.log")
 logging.basicConfig(
@@ -510,6 +570,9 @@ def main():
         # distinguishable from a real downtrend on the dashboard, not just
         # in the container log.
         bars_seen = {}
+        # [(hl)] the reference feed's OWN last date per sleeve — a frozen Yahoo
+        # cache and a flat market are otherwise identical in the payload.
+        ref_dates = {}
         for s in symbols:
             px = marks.fresh_mid(venue, s)
             held = s in broker.pos
@@ -570,6 +633,7 @@ def main():
             want = want_position(s, ref["closes"])
             regime[s] = want
             bars_seen[s] = len(ref["closes"] or ())
+            ref_dates[s] = ref.get("last_date")
             if want is None:
                 # [(hk)] Too short for this sleeve's rule = NO OPINION, not
                 # flat. Skipping here means no entry AND no exit; the
@@ -664,9 +728,22 @@ def main():
                                            (fund.get(s) or {}).get("rate") or 0,
                                            "lighter"), 1)
                                        for s in symbols},
+                       # [(hl)] a DEAD off-venue feed is currently invisible:
+                       # `bars` reads 501-504 whether the Yahoo cache advanced
+                       # today or froze a fortnight ago. The value is already
+                       # in ref["last_date"]; publishing it is free.
+                       "ref_date": {s: ref_dates.get(s) for s in symbols},
                        "skipped_unlisted": skipped})
         except Exception:  # noqa: BLE001
             pass
+        # [(hl)] MTM equity series. This book is LONG on 64% of days, so most
+        # of its drawdown never reaches a closed trade — and the go-live bar
+        # reads realised P&L only. Measured: realised DD 9.9-10.7% vs true MTM
+        # 15.6-17.4% at the 3y plateau, i.e. the two definitions disagree about
+        # the VERDICT. Publish-only; the grader is untouched until this series
+        # has ~30 days in it.
+        store.snapshot_equity(bot_id, equity(), broker.open_count(),
+                              equity() - START_EQUITY)
         try:
             store.save_state(bot_id, {"broker": broker.to_state(), "meta": meta,
                                       "fund_realized": fund_realized,
