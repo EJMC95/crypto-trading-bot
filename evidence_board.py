@@ -855,10 +855,52 @@ def synthesize_expand(lens_fwd, tuner_state, bot_rows, lighter_market, now_ts,
 # The rule is deliberately narrow, because a widening author that fires on
 # noise is worse than none:
 #   SATURATED  — the book is holding at its cap, so it is turning away
-#                candidates it already graded. Widen ONE step.
+#                candidates it already graded, AND it is in profit on a
+#                mark-to-market basis. Widen ONE step.
 #   STARVED    — the book holds nothing and has closed nothing in the window,
 #                so its gate is admitting nothing. Loosen ONE step.
 #   otherwise  — propose nothing. A book that is working is left alone.
+#
+# [2026-07-31 (hs)] THE PROFIT TERM ON THE SATURATED BRANCH IS NEW, and the
+# comment above ("a book that is working is left alone") described an
+# intention the code did not implement: the SATURATED branch asked only
+# `open_n >= cap` and never once asked whether the book was making money.
+#
+# MEASURED, on ⚖️ Counterweight, the day this was found:
+#   * `fundspread.k` had been ratcheted 5 -> 8 -> 12 and was sitting AT its
+#     registry ceiling (`hi: 12`), every step authored by this branch with
+#     reason "SATURATED at 24/11".
+#   * Gross exposure went $200 (the backtested plateau centre, K=5) -> $480.
+#   * The book was at -$27.75: +$7.29 realised over 48 closes against a
+#     -$35.04 OPEN loss carried on 24 legs. Its funding income — the entire
+#     thesis — was $2.11.
+# So the rail scaled a losing book by 2.4x, and cited the book's own fullness
+# as the evidence for doing it.
+#
+# WHY IT COULD NEVER SELF-CORRECT: Counterweight is ALWAYS-IN by construction
+# (its own header: "ALWAYS-IN, balanced long/short"), holding exactly 2K legs
+# at all times. So `open_n >= cap` is true on EVERY cycle, unconditionally,
+# and the ratchet fires until the cage stops it. For a book of that shape
+# saturation carries no information at all — it is a restatement of the
+# book's design, not an observation about its performance. Contrast 🌾 carry,
+# measured the same hour at 8 of 12: its cap is not structurally pinned, so
+# its ratchet stopped on its own and the defect stayed invisible there.
+#
+# THE TERM IS DELIBERATELY ASYMMETRIC — capacity only, never the gate:
+#   * CAPACITY widening scales the exposure of positions the book ALREADY
+#     holds. Requiring those positions to be working before adding more is
+#     the whole point.
+#   * The STARVED branch loosens a GATE on a book holding NOTHING, whose
+#     P&L is ~0 by definition. Applying a `pnl > 0` term there would freeze
+#     every starved book permanently and defeat the branch that exists to
+#     unstick a gate admitting nothing.
+#
+# It reads `pnl_abs` — the published MARK-TO-MARKET total, not realised P&L.
+# That is the load-bearing choice: on this book realised reads +$7.29 and
+# would have authorised the widening, which is exactly the (hl) realised-only
+# blind spot reaching a live actuator instead of only the go-live grader.
+# RESTRICT-ONLY by construction: this branch can now only decline to widen,
+# never widen something it would previously have left alone.
 BOOK_AUTHOR = {
     # bot row -> (capacity lever, gate lever, cap source)
     "perps-funding-carry-lshadow":  ("carry.max_positions", "carry.enter_apr"),
@@ -876,6 +918,32 @@ BOOK_AUTHOR = {
     "crypto-trend-daily-lshadow":   ("trend.max_open", "trend.universe_n"),
 }
 BOOK_STARVED_H = float(os.environ.get("EVBOARD_BOOK_STARVED_H", "24"))
+
+
+def book_mtm_pnl(row):
+    """[2026-07-31 (hs)] The book's MARK-TO-MARKET P&L, or None if unreadable.
+
+    `pnl_abs` is the published total (equity - start), so it carries OPEN
+    positions. Verified on the two books this rule authors, the hour it was
+    written: ⚖️ Counterweight published pnl_abs -27.75 against +7.29 realised
+    (24 open legs), 🌾 carry published +65.62 against +65.91 realised (8 open).
+    Realised-only would have read the first book as +$7 and widened it.
+
+    Returns None rather than 0.0 on a missing/unparseable field, and the
+    caller treats None as "do not widen" — FAIL-CLOSED IN THE WIDENING
+    DIRECTION. Absence of evidence must never authorise more exposure; a book
+    that genuinely sits at exactly 0.0 is also not evidence of a working book.
+    """
+    if not isinstance(row, dict):
+        return None
+    val = row.get("pnl_abs")
+    if val is None or isinstance(val, bool):
+        return None
+    try:
+        val = float(val)
+    except (TypeError, ValueError):
+        return None
+    return None if val != val else val        # NaN is not evidence either
 
 
 def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None):
@@ -970,7 +1038,26 @@ def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None)
                 cap = tuning_mod.get_lever(cap_lever, _spec.get("env_default"),
                                            now_ts=now_ts)
         if cap_lever and cap and open_n >= int(cap):
-            _step(cap_lever, f"SATURATED at {open_n}/{int(cap)}")
+            # [2026-07-31 (hs)] SATURATION IS NOT EVIDENCE THE BOOK IS WORKING.
+            # See the BOOK_AUTHOR header for the measurement that forced this.
+            # Fail-CLOSED: an unreadable pnl_abs declines the widening.
+            book_pnl = book_mtm_pnl(r)
+            if book_pnl is None or book_pnl <= 0:
+                _shown = "unreadable" if book_pnl is None else f"${book_pnl:.2f}"
+                items.append({
+                    "key": f"board:book-{cap_lever}-held",
+                    "severity": "info",     # NOT warn: the board phone-pushes
+                                            # warn/action, and an always-in
+                                            # book trips this EVERY cycle.
+                    "msg": (f"⚖️ {bot} saturated at {open_n}/{int(cap)} but "
+                            f"MTM P&L is {_shown} — {cap_lever} held at {cap:g}"),
+                    "proposal": (f"no widening: capacity growth requires the "
+                                 f"book to be in profit mark-to-market"),
+                    "lever": cap_lever, "direction": "hold",
+                    "ts": now_ts, "source": "board"})
+            else:
+                _step(cap_lever,
+                      f"SATURATED at {open_n}/{int(cap)}, MTM +${book_pnl:.2f}")
         elif (gate_lever and open_n == 0 and closed_n == prev_closed
               and prev_ts and (now_ts - prev_ts) >= BOOK_STARVED_H * 3600):
             _step(gate_lever,
@@ -2092,7 +2179,11 @@ def _selftest():
 
     _bnow = 2_000_000.0
     _CB = "perps-funding-carry-lshadow"
-    _sat = [{"bot": _CB, "open_trades": 12, "closed_trades": 80}]
+    # [2026-07-31 (hs)] `pnl_abs` is REQUIRED on a saturation fixture now: the
+    # capacity branch is fail-closed without it. +65.62 is 🌾 carry's real
+    # published figure the hour the rule was written, not a round number.
+    _sat = [{"bot": _CB, "open_trades": 12, "closed_trades": 80,
+             "pnl_abs": 65.62}]
 
     # SATURATED at the cap -> widen the CAPACITY lever exactly one step
     _T.vals = {}
@@ -2160,17 +2251,84 @@ def _selftest():
     # took is how an author talks itself into widening forever.
     _T.vals = {"carry.max_positions": 18}       # registry thinks 18...
     lv, _ = synthesize_books(
-        [{"bot": _CB, "open_trades": 12, "closed_trades": 80,
+        [{"bot": _CB, "open_trades": 12, "closed_trades": 80, "pnl_abs": 65.62,
           "extra": {"caps": {"max_positions": 12}}}],   # ...the BOOK runs 12
         {}, {}, _bnow, tuning_mod=_T)
     assert lv.get("carry.max_positions", {}).get("value") == 20, \
         "saturation must be judged against the cap the BOOK published"
     lv, _ = synthesize_books(
-        [{"bot": _CB, "open_trades": 12, "closed_trades": 80,
+        [{"bot": _CB, "open_trades": 12, "closed_trades": 80, "pnl_abs": 65.62,
           "extra": {"caps": {"max_positions": 18}}}],
         {}, {}, _bnow, tuning_mod=_T)
     assert lv == {}, "published cap 18 with 12 open is NOT saturated"
     _T.vals = {}
+
+    # ---- [2026-07-31 (hs)] SATURATION IS NOT EVIDENCE ---------------------
+    # The incident: ⚖️ Counterweight, always-in, saturated on EVERY cycle by
+    # construction, ratcheted fundspread.k 5 -> 8 -> 12 (the cage ceiling)
+    # while carrying -$27.75. Gross exposure $200 -> $480 on a losing book.
+    _SB = "perps-funding-spread-lshadow"
+
+    def _spread(pnl, open_n=24, cap=12):
+        row = {"bot": _SB, "open_trades": open_n, "closed_trades": 48,
+               "extra": {"caps": {"k": cap}}}
+        if pnl is not None:
+            row["pnl_abs"] = pnl
+        return [row]
+
+    # the measured case: saturated AND losing -> HOLD, and say so
+    lv, it = synthesize_books(_spread(-27.75), {}, {}, _bnow, tuning_mod=_T)
+    assert lv == {}, "a saturated LOSING book must not be widened"
+    _held = [i for i in it if i.get("direction") == "hold"]
+    assert _held and _held[0]["lever"] == "fundspread.k", it
+    assert _held[0]["severity"] == "info", \
+        "the board phone-pushes warn/action; an always-in book trips this " \
+        "every cycle, so it must not page"
+
+    # the rule still WORKS — this is a profit term, not a disabled branch
+    # NOTE the step comes off the REGISTRY's current value (env_default 8),
+    # while SATURATION is judged against the cap the book published (12) —
+    # two different sources on purpose, per the block above.
+    lv, _ = synthesize_books(_spread(+40.0), {}, {}, _bnow, tuning_mod=_T)
+    assert lv.get("fundspread.k", {}).get("value") == 9, lv
+
+    # REALISED-ONLY WOULD HAVE WIDENED IT. Counterweight's realised P&L was
+    # +$7.29 against a -$27.75 mark-to-market total. If this rule ever reads a
+    # realised field instead of pnl_abs, this assertion is what fails.
+    lv, _ = synthesize_books(_spread(-27.75), {}, {}, _bnow, tuning_mod=_T)
+    assert "fundspread.k" not in lv, \
+        "the term must read MTM pnl_abs, never realised P&L (the (hl) blind spot)"
+
+    # FAIL-CLOSED in the widening direction: no/­unreadable/NaN pnl -> hold
+    for _bad in (None, "n/a", float("nan"), True):
+        _rows = _spread(0.0)
+        if _bad is None:
+            _rows[0].pop("pnl_abs")
+        else:
+            _rows[0]["pnl_abs"] = _bad
+        lv, _ = synthesize_books(_rows, {}, {}, _bnow, tuning_mod=_T)
+        assert lv == {}, f"unreadable pnl_abs ({_bad!r}) must not widen"
+    # exactly break-even is not evidence of a working book either
+    lv, _ = synthesize_books(_spread(0.0), {}, {}, _bnow, tuning_mod=_T)
+    assert lv == {}, "0.0 is not a profitable book"
+
+    # THE ASYMMETRY IS DELIBERATE: the profit term guards CAPACITY only. A
+    # STARVED book holds nothing, so its pnl is ~0 by definition — applying
+    # the term there would freeze the branch that exists to unstick a gate
+    # admitting nothing.
+    lv, _ = synthesize_books(
+        [{"bot": _CB, "open_trades": 0, "closed_trades": 80, "pnl_abs": -9.0}],
+        {_CB: {"closed": 80, "ts": _bnow - 30 * 3600}}, {}, _bnow, tuning_mod=_T)
+    assert lv.get("carry.enter_apr", {}).get("value") == 1.4, \
+        "a losing STARVED book must still get its gate loosened"
+
+    # the field is one the PUBLISHER actually emits — not a name invented by
+    # whoever wrote this consumer (the (hj) hand-fixture class).
+    import inspect as _insp
+
+    import bot_pnl_store as _bps
+    assert "pnl_abs" in _insp.signature(_bps.publish).parameters, \
+        "pnl_abs must be a real publish() field, or this rule reads nothing"
 
     # A MISSING ROW proposes nothing. Absence of evidence is not "widen" —
     # this is the guard that stops a publish outage from ratcheting every

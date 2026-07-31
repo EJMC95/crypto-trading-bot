@@ -971,6 +971,27 @@ All new bots:
   not literal — so the drift arm was blind to precisely the lever most able to
   drift, and it HAD drifted (registry 10 vs code 9). Prefer making the consumer
   a LITERAL over declaring the exemption.
+- **SATURATION IS NOT EVIDENCE — A CAPACITY WIDENING MUST ASK WHETHER THE BOOK
+  IS MAKING MONEY (31-Jul (hs)).** The evidence board's `SATURATED` branch
+  widened a book's capacity on `open_n >= cap` and nothing else, while its own
+  header claimed *"a book that is working is left alone"*. Measured on ⚖️
+  Counterweight: `fundspread.k` ratcheted **5 → 8 → 12 (the cage ceiling)**,
+  gross exposure **$200 → $480**, on a book at **−$27.75**. It could never
+  self-correct, and that is the transferable part: **the book is ALWAYS-IN by
+  construction**, so `open >= cap` is true on every cycle — for a book of that
+  shape saturation restates the DESIGN and observes nothing about performance.
+  Three rules fell out:
+  * A capacity widening reads **`pnl_abs` (mark-to-market), never realised**.
+    Realised read +$7.29 on the same book and would have authorised it — the
+    `(hl)` blind spot reaching a LIVE ACTUATOR, not just the go-live grader.
+  * **Fail CLOSED in the widening direction.** Missing/NaN/unparseable P&L
+    declines. Absence of evidence never authorises more exposure.
+  * **Do NOT apply the same term to the STARVED branch.** A starved book holds
+    nothing so its P&L is ~0 by definition; the term would freeze the branch
+    that exists to unstick a gate admitting nothing. Capacity ≠ gate.
+  Before adding any expand rule, ask what the trigger looks like on a book that
+  is always-in, always-empty, or always-at-cap — a trigger a book satisfies
+  structurally is not a measurement.
 - **A GUARD WHOSE ONLY OUTPUT IS A WARNING ON A PASSING RUN IS NOT A GUARD
   (30-Jul (gl)/(hj), operator: "no more hiccups preventing situations such as
   those found today").** A green build carrying a `::warning::` is
