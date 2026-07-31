@@ -1,5 +1,126 @@
 # CLAUDE.md — crypto-trading-bot Fleet
 
+## THE INVARIANTS — doctrine that has teeth
+
+**Operator mandate, 31-Jul:** *"all of the breakthroughs and milestones we reach
+must be doctrines that serve as building blocks so we stop this perpetual cycle
+of going back to the same square one routine."*
+
+**The mechanism that makes a doctrine a building block is ENFORCEMENT, not
+wording.** Measured the day this section was written: **31 rule-shaped
+doctrines across 1,405 lines against 7 executable guards.** The same session
+was a controlled experiment on which of those two works, and the result was
+one-sided:
+
+| Rules read and violated anyway | Things that actually caught errors |
+|---|---|
+| *"pick a test that could detect the damage"* — broken **twice on one row**: a monitor compared a payload's CONTENT 20 times and never read `age_sec`, so a book DEAD for 13h read as a stable live writer | `audit_deploy_coverage` — a comma-joined `svcs=` that would have orphaned 7 files |
+| *"unknown degrades to the OLD id, never to a guess"* — written in (ht); one entry later I guessed a service from an absence with no control group | `audit_changelog_letters` — two letter collisions, pre-push |
+| | a selftest — a wrong assumption about `"1 "` stripping |
+| | mutation testing — defects inside guards I had just written |
+| | the live payload — a detector that fired NOTHING on the condition it was built for |
+
+So: **every invariant below names the executable artifact that enforces it, or
+declares itself UNENFORCED with a reason.** `scripts/audit_doctrine_enforcement.py`
+fails the build on a doctrine with neither, and on an enforcement reference that
+no longer resolves — so a guard deleted out from under its doctrine is caught.
+
+**What a green run does NOT mean:** it verifies that a declared enforcement
+EXISTS, not that it is CORRECT. A named test could be vacuous. This closes the
+"doctrine with no teeth" class; **mutation testing is what grades the teeth**,
+and that stays a human discipline (I3).
+
+Add an invariant when a lesson is *general* and *recurrent*. The long-form
+history stays below — this section is the load-bearing subset, not a summary.
+
+<!-- INVARIANTS:BEGIN -->
+### I1 · LIVENESS BEFORE SEMANTICS
+Before interpreting what a payload SAYS, establish that something still writes
+it. A frozen row and a healthy one are **byte-identical if you compare content**
+— only the timestamp distinguishes them. 31-Jul: 🌾 carry was sampled 20 times
+over 10 minutes, read as "one stable live writer", and had in fact been dead
+for 13 hours; `status` still read `"online"`, its last word before it stopped.
+Any check over a bot_pnl row, a bot_state key or a bus payload reads `age_sec`
+/ `updated` FIRST.
+  ENFORCED BY: `fleet_immune.py::_row_stale`, `fleet_immune.py::STALE_ROW_S`
+
+### I2 · A CONSTANT LAG IS INVISIBLE — MEASURE THE THING THAT DIVERGES
+When two counters advance together, a stuck process shows a CONSTANT offset
+indistinguishable from healthy ordering. The brain's memory froze for three
+days while `learning-brain.runs`=337 and `brain-vitals.run`=338 — a lag of
+**1**, exactly what correct write-after-publish ordering looks like, forever.
+The signal that diverges is the **timestamp skew** (71.4h). Pick the quantity
+that grows with the fault, not the one the fault holds fixed.
+  ENFORCED BY: `fleet_immune.py::brain_amnesia`
+
+### I3 · A GUARD IS NOT VERIFIED UNTIL A MUTATION REDDENS IT
+Write the guard, then break the thing it guards and confirm it fails. Every
+real defect caught in the 31-Jul session came from a mutation or from running a
+consumer against its publisher's own payload — never from re-reading the code.
+Two guards written that day were themselves wrong (`brain_amnesia` on the run
+counter fired NOTHING on the live payload; `stale_writer_sickness` diagnosed a
+corpse as a bad deploy) and only the live data exposed them.
+  UNENFORCED: mutation discipline cannot be checked by a static guard — a
+  vacuous test and a real one look identical from outside. Recorded here so the
+  expectation is explicit rather than folkloric.
+
+### I4 · A SILENT WRITE FAILURE MAKES AN ORGAN AMNESIAC WHILE IT LOOKS HEALTHY
+A persistence call's return value is load-bearing. `save_state` returned False
+for three days; the caller discarded it and `_warn_once` logged it a single
+time. The brain kept publishing fresh vitals, mults and diagnoses off a frozen
+state, so `mult_streaks` never advanced and the 3-run promotion gate was
+unreachable — 1 multiplier against 20 living bots. **Never discard a
+persistence result, and never report a persistent condition with a one-shot
+warning.**
+  ENFORCED BY: `bot_learn.py::BRAIN MEMORY NOT PERSISTED`, `bot_pnl_store.py::json_safe`
+
+### I5 · NON-FINITE FLOATS MUST NEVER REACH STORAGE
+`json.dumps` emits bare `NaN`/`Infinity`, which is not valid JSON, and Postgres
+`jsonb` rejects the whole write. Any payload built from ratios, t-stats or
+win-rates can carry one. Sanitize at the boundary in the `_finite_or_none`
+direction — a bad field becomes null and the row still writes, because losing
+one field beats losing the whole state.
+  ENFORCED BY: `bot_pnl_store.py::json_safe`, `bot_pnl_store.py::allow_nan=False`
+
+### I6 · AN ABSENCE IS EVIDENCE ONLY AGAINST A CONTROL GROUP
+A missing field means nothing until you can show the mechanism works elsewhere.
+`extra.svc` absent on the carry row was uninterpretable until seven other
+services stamped correctly in the same payload — and even then it supported a
+weaker conclusion than the one published. Before reasoning from a gap, name the
+population where the thing is present.
+  ENFORCED BY: `fleet_immune.py::min_stamped`
+
+### I7 · A TRIGGER A BOOK SATISFIES STRUCTURALLY IS NOT A MEASUREMENT
+Before shipping any rule that fires on a book's state, ask what it looks like on
+a book that is always-in, always-empty, or always-at-cap. The evidence board
+widened capacity on `open_n >= cap` — true on EVERY cycle for an always-in book
+— and ratcheted ⚖️ Counterweight to its cage ceiling while it was down $27.75.
+  ENFORCED BY: `evidence_board.py::book_mtm_pnl`
+
+### I8 · A DETECTOR MUST NAME THE OBJECT THE OPERATOR CAN ACT ON
+If a guard's output is an instruction, it must identify something findable in
+the system the operator will open. Reporting an opaque container id when the fix
+is "stop a named Railway service" is a complete diagnosis and an unactionable
+one. Unknown degrades to the previous, honest identifier — **never to a guess**.
+  ENFORCED BY: `bot_pnl_store.py::describe_writer`, `bot_pnl_store.py::service_name`
+
+### I9 · A REALISED-ONLY METRIC IS BLIND TO A BOOK THAT HOLDS
+Any bar computed from closed trades cannot see an always-in book's open losses.
+⚖️ Counterweight's realised maxDD read **0.2% against a 15% bar** while the book
+sat at −$15.39 — and its three failing bars were pure time and sample size, so
+it was on track to pass the whole gate in late August while below $1,000. Fold
+the mark-to-market number in and take the WORSE of the two.
+  ENFORCED BY: `scripts/golive_readiness.py::apply_mtm`, `scripts/golive_readiness.py::mtm_drawdown`
+
+### I10 · REAL MONEY IS GATED BY PUBLISHED EVIDENCE, IN CODE
+An env var is a deployment choice, not a verdict. A live path must additionally
+read the published gate and refuse unless it says READY — fail-closed on a dark,
+stale or unparseable payload, against the usual degrade-to-default habit,
+because here the cost of a wrong default is unsupervised real money. The live
+arm also pins the BACKTESTED config and takes no growth-rail capacity lever.
+  ENFORCED BY: `lighter_funding_spread_bot.py::golive_blocker`, `lighter_funding_spread_bot.py::GOLIVE_K`
+<!-- INVARIANTS:END -->
+
 ## What This Repo Is
 Eamon's crypto trading bot fleet — **LIGHTER-FIRST since 2026-07-14** (user
 decision: "all services must run off lighter"). Books are $1,000 paper/shadow

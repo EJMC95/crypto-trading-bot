@@ -1,3 +1,30 @@
+## 2026-07-31 (hy) — DOCTRINE WITH TEETH: the square-one cycle has a mechanism, and the mechanism is enforcement
+
+- **THE MANDATE** (operator): *"all of the breakthroughs and milestones we reach must be doctrines that serve as building blocks so we stop this perpetual cycle of going back to the same square one routine."*
+- **THE DIAGNOSIS, measured rather than asserted: CLAUDE.md carried 31 rule-shaped doctrines across 1,405 lines against 7 executable guards.** Most doctrine in this repo is prose, and prose is remembered or it is not.
+- **THIS SESSION WAS THE CONTROLLED EXPERIMENT, and the result is one-sided.**
+  - **Rules READ AND VIOLATED ANYWAY, both already written down:** *"pick a test that could detect the damage"* — broken **twice on one row**, by a monitor that compared a payload's CONTENT 20 times and never read `age_sec`, so a book dead for 13 hours read as a stable live writer; and *"unknown degrades to the OLD id, never to a guess"* — written in `(ht)`, then contradicted one entry later by guessing a service from an absence with no control group.
+  - **Everything that actually caught a defect was executable:** `audit_deploy_coverage` (a comma-joined `svcs=` that would have orphaned 7 files), `audit_changelog_letters` (two collisions, pre-push), a selftest (a wrong assumption about `"1 "` stripping), mutation testing (defects inside guards written minutes earlier), and a live payload (a detector that fired NOTHING on the condition it was built for).
+  - The asymmetry is the finding: **wording does not make a doctrine a building block; enforcement does.**
+- **`## THE INVARIANTS` now sits at the TOP of CLAUDE.md** — the load-bearing subset, ahead of the accumulated history, with the evidence table above stated inline so the next reader gets the *reason* for the format and not just the format. **Ten invariants seeded**, nine with executable enforcement, one declared UNENFORCED with its reason:
+  - **I1 LIVENESS BEFORE SEMANTICS** — a frozen row and a healthy one are byte-identical if you compare content; read `age_sec`/`updated` first (`_row_stale`).
+  - **I2 A CONSTANT LAG IS INVISIBLE** — measure the quantity that *diverges*, not the one the fault holds fixed (`brain_amnesia`).
+  - **I3 A GUARD IS NOT VERIFIED UNTIL A MUTATION REDDENS IT** — **UNENFORCED, and honestly so**: a vacuous test and a real one are indistinguishable from outside, so no static guard can check this. Recorded so the expectation is explicit rather than folkloric.
+  - **I4 A SILENT WRITE FAILURE MAKES AN ORGAN AMNESIAC** — never discard a persistence result, never report a persistent condition with a one-shot warning.
+  - **I5 NON-FINITE FLOATS MUST NEVER REACH STORAGE** (`json_safe`, `allow_nan=False`).
+  - **I6 AN ABSENCE IS EVIDENCE ONLY AGAINST A CONTROL GROUP** (`min_stamped`).
+  - **I7 A TRIGGER A BOOK SATISFIES STRUCTURALLY IS NOT A MEASUREMENT** (`book_mtm_pnl`).
+  - **I8 A DETECTOR MUST NAME THE OBJECT THE OPERATOR CAN ACT ON** (`describe_writer`, `service_name`).
+  - **I9 A REALISED-ONLY METRIC IS BLIND TO A BOOK THAT HOLDS** (`apply_mtm`, `mtm_drawdown`).
+  - **I10 REAL MONEY IS GATED BY PUBLISHED EVIDENCE, IN CODE** (`golive_blocker`, `GOLIVE_K`).
+- **`scripts/audit_doctrine_enforcement.py` is what makes the section binding**, in CI on every push/PR and in the registered selftest list (54 now). It fails on: an invariant declaring neither ENFORCED BY nor UNENFORCED; a lazy UNENFORCED reason (`"TODO"` buys nothing); both declared at once; a duplicate id; an `ENFORCED BY` with no backticked referent — **a claim with no referent reads as enforced and is not**; and the load-bearing arm, **an enforcement reference that no longer resolves.**
+  - **THAT LAST ARM IS THE WHOLE POINT.** Rename or delete `_row_stale` and I1 fails the build. The doctrine and its enforcement are welded together, so a guard cannot be quietly removed from under the rule it serves — which is exactly how a rule becomes decorative and the class comes back around.
+  - **Four doctrine-level mutations verified red**: enforcement line removed, symbol renamed, file deleted, whole section removed. The section-removal arm matters because without it the guard would pass *vacuously* on a doc that had lost its invariants.
+  - **Its own selftest caught a bug in it**, which is I3 doing its job on the guard that enforces I3: a bare `ENFORCED BY: some test somewhere` failed with the *wrong message* (reported as "declares nothing" rather than "claim with no referent"). Ordering fixed so the more misleading defect is diagnosed as itself.
+- **WHAT A GREEN RUN DOES NOT MEAN, stated in the file and in the section**: it verifies a declared enforcement EXISTS, not that it is CORRECT. A named test could be vacuous. This closes the *doctrine-with-no-teeth* class; grading the teeth stays a human discipline, which is precisely why I3 is declared unenforced instead of pretending otherwise.
+- **NOT A REWRITE.** The 31 existing rules stay where they are; this seeds the mechanism with the ten that are general, recurrent and evidenced, and the format lets the rest migrate as they earn it. A big-bang conversion would be prose about prose.
+- **WHICH BOOK MOVED** (doctrine rule 4): none — this is tooling, and it says so. What moved is the *cost of the next repeat*: ten lessons that previously lived only in prose now redden a build when their enforcement disappears.
+
 ## 2026-07-31 (hx) — THE BRAIN HAS BEEN AMNESIAC FOR THREE DAYS, AND 🌾 CARRY HAS BEEN DEAD FOR THIRTEEN HOURS
 
 - **THE ASK** (operator): *"fix all of the above"* — after a chain of my own wrong readings on the carry row finally bottomed out in the real answer.

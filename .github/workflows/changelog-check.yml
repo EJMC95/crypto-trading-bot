@@ -42,6 +42,27 @@ jobs:
       - name: The guard must still be able to see (negative fixture)
         run: python3 scripts/audit_sdk_pin.py --selftest
 
+  doctrine:
+    name: Every invariant names what enforces it
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-31 (hy)] operator: "all of the breakthroughs and milestones we
+      # reach must be doctrines that serve as building blocks so we stop this
+      # perpetual cycle of going back to the same square one routine."
+      # Measured that day: 31 rule-shaped doctrines vs 7 executable guards —
+      # and in the same session TWO written rules were read and violated
+      # anyway, while every defect actually caught came from a guard, a
+      # selftest, a mutation, or a live payload. Prose is remembered or it is
+      # not; this job is what makes an invariant a building block. The second
+      # arm is the load-bearing one: it fails when an enforcement reference no
+      # longer resolves, so a guard deleted out from under its doctrine is
+      # caught rather than leaving the rule quietly toothless.
+      - name: A doctrine with no enforcement is prose, and prose gets re-learned
+        run: python3 scripts/audit_doctrine_enforcement.py
+      - name: The guard must still be able to see (negative fixtures)
+        run: python3 scripts/audit_doctrine_enforcement.py --selftest
+
   lever-bounds:
     name: Every lever cage fits the value its consumer runs
     runs-on: ubuntu-latest
