@@ -352,11 +352,67 @@ def in_era(open_ts, era_epoch, parse):
         return False
 
 
+def _era_parse(parse=None):
+    """Open-stamp -> epoch float, tolerant of what the callers actually hold.
+
+    Accepts a `datetime` directly (a Postgres `opened_at::timestamptz` read) or
+    any of the four TEXT formats `experiment_judge.parse_ts` understands, so no
+    consumer needs its own adapter — writing one is how a second, subtly
+    different notion of "when did this trade open" gets into the fleet."""
+    def _p(x):
+        if hasattr(x, "timestamp"):
+            return x.timestamp()
+        if parse is not None:
+            return parse(x)
+        from experiment_judge import parse_ts
+        return parse_ts(x)
+    return _p
+
+
+def era_rows(bot, rows, parse=None):
+    """(era_scoped, all_time, era_iso) — THE SINGLE OWNER of "which of a book's
+    trades describe the book as it runs today".
+
+    rows: [(pnl_pct, pnl_abs, closed_at_datetime, opened_at)] oldest first —
+    `stats()`'s shape with the OPEN stamp appended, because an era is keyed on
+    the OPEN (a trade's policy is fixed when the trade is taken). Both returned
+    lists are in `stats()`'s 3-tuple shape, ready to hand straight to it.
+
+    Fail-safe in the only direction that is safe: a book with no declared era
+    keeps every row (`in_era` returns True on `era_epoch=None`), and an open
+    stamp that cannot be read is EXCLUDED when an era is declared. Both
+    behaviours are `in_era`'s, unchanged — this is the row plumbing, not a
+    second policy.
+
+    [2026-07-31 (hp)] EXTRACTED BECAUSE A CONSUMER RE-IMPLEMENTED IT BY
+    OMISSION. `(hc)` made the policy era a PRECONDITION sitting in FRONT of the
+    six bars, and `(hn)` made `scripts/evidence_review.py` import
+    `stats`/`grade`/`bar_map` so the daily review could not carry its own copy
+    of the RULE. It still selected its own SAMPLE, with no era filter — so on
+    31-Jul the review published the fleet's ONLY go-live candidate as "5/6
+    bars, only 'window' outstanding, ~10.5d away" on t=2.77 / n=84 / 19.5d,
+    while this grader read the same book at n=59 / t=0.33 / 13.3d. Wrong in the
+    PROMOTIONAL direction, on the one book nearest real money. Importing the
+    scoring while re-deriving the sample is `(hj)`'s "a second copy of a rule is
+    a second rule" one layer down: the bars were canonical and the thing they
+    were computed over was not."""
+    era_epoch, era_iso, _why = era_epoch_for(bot)
+    p = _era_parse(parse)
+    all_time = [(r[0], r[1], r[2]) for r in rows]
+    scoped = [(r[0], r[1], r[2]) for r in rows
+              if in_era(r[3] if len(r) > 3 else None, era_epoch, p)]
+    return scoped, all_time, era_iso
+
+
 def stats(rows, book_usd=None):
     """Grade one book from its closed-trade rows.
 
     rows: [(pnl_pct, pnl_abs, closed_at_datetime)] oldest first. Pure — the DB
-    read is the caller's job so this is selftestable offline."""
+    read is the caller's job so this is selftestable offline.
+
+    The rows must already be ERA-SCOPED — see `era_rows`, the single owner of
+    that filter. `stats` cannot enforce it (it never sees the bot id), which is
+    exactly why the consumer that skipped it went unnoticed for a day."""
     book_usd = BOOK_USD if book_usd is None else book_usd
     pct = [r[0] for r in rows if isinstance(r[0], (int, float))]
     n = len(pct)
@@ -716,10 +772,17 @@ def main():
           f"{'win%':>6s} {'maxDD%':>7s}  verdict")
     print("-" * 104)
     ready, payload_books = [], {}
+    # Hoisted out of the row loop: `parse_ts` is used AFTER it (by `era_rows`),
+    # and a book whose every row fails to parse — or an empty one — would leave
+    # the name unbound. An import inside a loop body is not a guarantee that the
+    # name exists once the loop ends.
+    from datetime import datetime, timezone
+
+    from experiment_judge import parse_ts
     for bot in sorted(books):
         rs = sorted(books[bot], key=_key)
-        era_epoch, era_iso, era_why = era_epoch_for(bot)
-        parsed, parsed_all, integ_eps = [], [], []
+        _era_ep, era_iso, era_why = era_epoch_for(bot)
+        quads, integ_eps = [], []
         for r in rs:
             # [(hf)] intervals for the integrity check, over the WHOLE ledger:
             # a second writer is a property of the book's record, not of the era
@@ -732,15 +795,16 @@ def main():
                 except (TypeError, ValueError):
                     pass
             try:
-                from experiment_judge import parse_ts
-                from datetime import datetime, timezone
                 ts = datetime.fromtimestamp(parse_ts(_key(r)), tz=timezone.utc)
             except Exception:      # noqa: BLE001
                 continue
-            row = (r.get("profit_ratio"), r.get("profit_abs"), ts)
-            parsed_all.append(row)
-            if in_era(r.get("open_ts"), era_epoch, parse_ts):
-                parsed.append(row)
+            quads.append((r.get("profit_ratio"), r.get("profit_abs"), ts,
+                          r.get("open_ts")))
+        # ONE owner of "which trades count" — `era_rows` keys the era on the
+        # OPEN stamp. Extracted at (hp) so the daily review runs the same
+        # selection rather than its own; see that docstring for what the
+        # divergence cost.
+        parsed, parsed_all, _ = era_rows(bot, quads, parse=parse_ts)
         # [2026-07-30 (hc)] The ERA-SCOPED sample is authoritative; the all-time
         # one is published beside it so nothing is hidden and the difference is
         # readable rather than asserted. `min_closes` is applied to the ALL-TIME

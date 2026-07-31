@@ -251,3 +251,144 @@ def test_only_the_grader_owns_the_thresholds():
             owners.append(f"scripts/{py.name}")
     assert owners == ["scripts/golive_readiness.py"], (
         f"gate thresholds must have exactly ONE owner, found {owners}")
+
+
+# ---------------------------------------------------------------------------
+# 3. The SAMPLE is imported too — not just the rule.
+#
+# INCIDENT (31-Jul, (hp)). (hn) stopped the review carrying its own copy of the
+# go-live RULE. It kept selecting its own ROWS, with no policy-era filter — and
+# (hc) had made the era a PRECONDITION sitting in FRONT of the six bars. The
+# next morning the review published the fleet's ONLY go-live candidate,
+# perps-funding-carry-lshadow, as "5/6 bars, only 'window' outstanding, ~10.5d
+# away" on t=2.77 / n=84 / 19.5d, while the canonical grader read the same book
+# at n=59 / t=0.33 / 13.3d — three bars short, not one, and wrong in the
+# PROMOTIONAL direction on the book nearest real money.
+#
+# Importing the scoring while re-deriving the sample is (hj)'s "a second copy of
+# a rule is a second rule" one layer down: the bars were canonical and the thing
+# they were computed over was not.
+# ---------------------------------------------------------------------------
+
+def _grader():
+    import sys
+    for p in (str(ROOT / "scripts"), str(ROOT)):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+    import golive_readiness
+    return golive_readiness
+
+
+def test_review_imports_the_era_filter_too(review_src):
+    """The sample selector is the grader's, exactly as the bars are."""
+    assert "era_rows" in review_src, (
+        "the review must import golive_readiness.era_rows — grading a book's "
+        "WHOLE retained ledger is what published a false ~10.5d go-live ETA "
+        "on the fleet's only candidate (hp)")
+
+
+def test_the_graded_rows_come_from_era_rows_AST(review_src):
+    """The CALL SITE, not a substring. `era_rows` could be imported, called,
+    and its result thrown away while `gate_status` still received the raw
+    fetch — which is precisely the shape of (hp): the era machinery already
+    existed and this consumer simply did not route through it.
+
+    AST because a page-wide substring scan is not a structural claim
+    (CLAUDE.md doctrine, learned three times in one session).
+
+    Scoped to the PRODUCTION path: `_selftest` legitimately calls `gate_status`
+    on synthetic in-memory rows that never came from a ledger and have no bot
+    id, so an era filter is meaningless there. Including them would force a
+    fake era call in the selftest — a test bending the code to satisfy it.
+    """
+    import ast
+    tree = ast.parse(review_src)
+
+    selftest_nodes = set()
+    for fn in ast.walk(tree):
+        if isinstance(fn, ast.FunctionDef) and "selftest" in fn.name:
+            selftest_nodes.update(id(n) for n in ast.walk(fn))
+
+    era_targets, graded_args = set(), []
+    for node in ast.walk(tree):
+        if id(node) in selftest_nodes:
+            continue
+        # `rows, rows_all, era_iso = era_rows(...)` -> collect `rows`
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            fn = node.value.func
+            if isinstance(fn, ast.Name) and fn.id == "era_rows":
+                for tgt in node.targets:
+                    elts = tgt.elts if isinstance(tgt, ast.Tuple) else [tgt]
+                    if elts and isinstance(elts[0], ast.Name):
+                        era_targets.add(elts[0].id)
+        # `... = gate_status(rows)` -> collect the argument name
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "gate_status" and node.args
+                and isinstance(node.args[0], ast.Name)):
+            graded_args.append(node.args[0].id)
+
+    assert era_targets, "no `era_rows(...)` assignment found in the review"
+    assert graded_args, "no production `gate_status(<name>)` call site found"
+    assert all(a in era_targets for a in graded_args), (
+        f"gate_status is graded on {graded_args}, which is not the era-scoped "
+        f"list from era_rows ({sorted(era_targets)}) — the review would grade "
+        "the book's WHOLE retained ledger, the (hp) defect")
+
+
+def test_era_scoping_is_LOAD_BEARING_on_the_incident_shape():
+    """Functional, not structural: prove the filter changes the VERDICT.
+
+    Reproduces (hp)'s shape — a book whose pre-era record is strong and whose
+    in-era record is flat. Pooled it clears the evidence bars; era-scoped it
+    does not. A filter that never changed an answer would satisfy every
+    structural test above while protecting nothing."""
+    from datetime import datetime, timedelta, timezone
+    g = _grader()
+
+    bot = "perps-funding-carry-lshadow"          # has a declared POLICY_ERA
+    era_ep, era_iso, _ = g.era_epoch_for(bot)
+    assert era_ep, "this test needs a book with a declared era"
+    boundary = datetime.fromisoformat(era_iso).replace(tzinfo=timezone.utc)
+
+    def quad(pct, opened):
+        return (pct, pct * 1000.0, opened + timedelta(hours=1),
+                opened.isoformat())
+
+    # 40 strong closes BEFORE the era, 40 flat ones inside it.
+    pre = [quad(0.03, boundary - timedelta(days=40 - i)) for i in range(40)]
+    post = [quad(0.0001 * (1 if i % 2 else -1), boundary + timedelta(days=i))
+            for i in range(40)]
+
+    scoped, all_time, got_iso = g.era_rows(bot, pre + post)
+    assert got_iso == era_iso
+    assert len(all_time) == 80 and len(scoped) == 40, (
+        f"era filter kept {len(scoped)} of 80; it must drop the pre-era half")
+
+    pooled_bars = g.bar_map(g.stats(all_time, book_usd=1000.0))
+    scoped_bars = g.bar_map(g.stats(scoped, book_usd=1000.0))
+    assert pooled_bars["t"] and pooled_bars["mean"], \
+        "fixture is wrong: the POOLED sample must look good"
+    assert not scoped_bars["t"], (
+        "fixture is wrong: the IN-ERA sample must fail the t bar — that "
+        "difference IS the (hp) incident")
+
+
+def test_era_rows_is_the_only_place_the_grading_loop_filters():
+    """`era_rows` must be the function that applies `in_era`. A second inline
+    filter in the grading loop is a second policy — which is how the review
+    came to hold a different sample from the grader in the first place."""
+    src = GRADER.read_text()
+    head, _, rest = src.partition("def era_rows(")
+    assert rest, "era_rows must exist in golive_readiness"
+    body = rest.split("\ndef ", 1)[0]
+    assert "in_era(" in body, "era_rows must be the function applying in_era"
+    assert "era_rows(bot, quads" in src, (
+        "the grading loop must route through era_rows, not filter inline")
+
+
+def test_the_era_is_reported_beside_the_all_time_count(review_src):
+    """An era that hides the sample it discarded is unauditable. The grader
+    prints `[era <iso>: N of M closes count]` on every scoped line; the review
+    must publish the same, so a reader can see WHICH sample produced an ETA."""
+    assert "[era " in review_src and "closes count]" in review_src, (
+        "the review must state the era and the all-time count beside it")

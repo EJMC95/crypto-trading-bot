@@ -76,14 +76,25 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 for _p in (_HERE, os.path.dirname(_HERE)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
+#
+# [2026-07-31 (hp)] AND THE SAMPLE IS IMPORTED TOO, not just the rule. `(hn)`
+# fixed the copied RULE above and left the review selecting its own ROWS — with
+# no policy-era filter, which `(hc)` made a PRECONDITION sitting in FRONT of the
+# six bars. One day later this section published the fleet's ONLY go-live
+# candidate as "5/6 bars, only 'window' outstanding, ~10.5d away" (t=2.77,
+# n=84, 19.5d) while the canonical grader read the same book at n=59, t=0.33,
+# 13.3d — three bars short, not one. Wrong in the PROMOTIONAL direction on the
+# book nearest real money. `era_rows` is now the one owner of which trades
+# count, so the review and the grader cannot disagree about the sample any more
+# than they can about the bars.
 try:                                     # run as a script (sys.path[0]=scripts/)
     from golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                   GOLIVE_MIN_DAYS, bar_map, book_payload,
-                                  grade, same_pair_overlaps, stats)
+                                  era_rows, grade, same_pair_overlaps, stats)
 except ImportError:                      # run as `python -m scripts.evidence_review`
     from scripts.golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                           GOLIVE_MIN_DAYS, bar_map,
-                                          book_payload, grade,
+                                          book_payload, era_rows, grade,
                                           same_pair_overlaps, stats)
 
 # Cheap SQL prefilter before the per-book ledger read. It must never be STRICTER
@@ -439,11 +450,23 @@ def scan_new_evidence(cur, errors):
         for bot in cands:
             if bot in RETIRED or bot in LIVE_ROWS or bot in LIVE_TWINS:
                 continue
-            # The grader's own shape: (pnl_pct, pnl_abs, closed_at) oldest first.
-            cur.execute(f"""SELECT pnl_pct, pnl_abs, {CA} FROM paper_trades
+            # The grader's own shape: (pnl_pct, pnl_abs, closed_at) oldest
+            # first, plus the OPEN stamp the era is keyed on. `opened_at` is
+            # read RAW (TEXT), not cast: the cast can raise on one bad row and
+            # take the whole section down with it, whereas `era_rows` fails
+            # CLOSED per row — an unreadable open stamp drops that trade rather
+            # than the report.
+            cur.execute(f"""SELECT pnl_pct, pnl_abs, {CA}, opened_at
+                              FROM paper_trades
                              WHERE bot=%s AND pnl_abs IS NOT NULL AND closed_at IS NOT NULL
                              ORDER BY {CA}""", (bot,))
-            rows = cur.fetchall()
+            quads = cur.fetchall()
+            # [(hc)/(hp)] THE ERA IS A PRECONDITION IN FRONT OF THE SIX BARS.
+            # Grade the book as it RUNS TODAY, never its whole retained ledger.
+            # `era_rows` is golive_readiness's — the same selection the
+            # canonical grader runs — so review and grader cannot disagree
+            # about the sample any more than about the bars.
+            rows, rows_all, era_iso = era_rows(bot, quads)
             status, why, s = gate_status(rows)
             # [(hf)/(hi)] A grade is only as good as the ledger under it. If two
             # processes wrote this book's rows, its n/t describe a POOLED record
@@ -453,6 +476,14 @@ def scan_new_evidence(cur, errors):
             # runs on review day.
             pooled = ledger_pooled(cur, bot)
             flag = ""
+            if era_iso:
+                # Stated on EVERY era-scoped line, whatever the verdict, and
+                # the all-time count is published BESIDE it so nothing is
+                # hidden — the same contract golive_readiness prints. An era
+                # that only announces itself when it changes the answer is a
+                # footnote; it is the definition of the sample.
+                flag += (f" [era {era_iso}: {s.get('n', 0)} of "
+                         f"{len(rows_all)} closes count]")
             if pooled:
                 flag = (f" ⛔ POOLED LEDGER: {len(pooled)} same-pair overlap(s), "
                         f"deepest {pooled[0][1]:.2f}h on {pooled[0][0]} — a second "
