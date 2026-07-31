@@ -561,4 +561,7 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # [(hw)] imported HERE: this module imports bot_pnl_store lazily inside
+    # its publish path, so there is no module-level `store` to reach.
+    import bot_pnl_store as _store
+    sys.exit(_store.organ_main('market-pulse', main))

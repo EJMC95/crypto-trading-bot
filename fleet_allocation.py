@@ -344,7 +344,10 @@ def _selftest():
     return 0
 
 
-if __name__ == "__main__":
+def _cli():
+    # [2026-08-01 (hw)] the CLI body lives in a function so the
+    # shared organ wrapper can catch its faults — run_all.sh runs
+    # this behind `|| true`, which otherwise hides every crash.
     if "--selftest" in sys.argv:
         sys.exit(_selftest())
     pay = run_once(publish="--publish" in sys.argv)
@@ -352,3 +355,7 @@ if __name__ == "__main__":
         print("fleet_allocation: no DB (DATABASE_URL unset) — nothing to read.")
         sys.exit(0)
     _print(pay)
+
+
+if __name__ == "__main__":
+    sys.exit(store.organ_main('fleet-allocation', _cli))

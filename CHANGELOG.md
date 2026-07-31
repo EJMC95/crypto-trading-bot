@@ -1,3 +1,35 @@
+## 2026-08-01 (hw) — THE BRAIN HAD BEEN DYING ON EVERY RUN, AND 20 OF 22 ORGANS HAD NO WAY TO SAY SO
+
+- **THE ASK** (operator): *"A brain continuously going dead means we are consistently being held back by these small unhelpful and costly problems"*, then *"our entire file system isn't working if we are at square one every day over the same tedious issues — these fixes need to be implemented and addressed permanently so every day we see continuously building, not fixing water leaks."* Suite **723**, seven guards green.
+- **He was right, and it was worse than a dead brain: it was a dead brain nobody could see, and nineteen more organs with the identical hole.**
+
+### The brain: computing perfectly, remembering nothing
+
+- **`bot_learn.main()` raised `KeyError('paper')` on EVERY run.** The venue A/B section guards `arm in e` and then dereferences `e["paper"]` **unguarded**. That section was written when every book had a **KRAKEN PAPER TWIN** — and Kraken was **RETIRED 14-Jul**. No book has a paper arm any more, so the first book carrying a shadow or live arm killed the run.
+- **WHERE IT DIED IS THE WHOLE STORY.** The crash sits *after* the four read-only publishes and *before* `_save_state`. So the brain recomputed everything correctly, published `brain-vitals` / `brain-stake-mults` / `brain-diagnosis` / `brain-lens-forward` **on time and looking perfectly healthy**, and then forgot the entire run.
+- **MEASURED:** `learning-brain.runs` = **337**; `brain-vitals.run` = **338**. The state had not advanced. And because **`mult_streaks` needs THREE CONSECUTIVE runs** to move a stake multiplier — and that streak lives in the state it never saved — **no new evidence could ever accumulate a streak.** A learning loop that could not learn. The only surviving streak entry read `first_run: 324, last_run: 337`, frozen.
+- **14 ACTIONABLE items and a full diagnosis set were computed and discarded on every cycle**, including the `regime_timing` diagnoses that `(gg)` unblocked — the one diagnosis kind carrying an actuator.
+- **CORRECTING MY OWN FIRST READ:** I reported the brain keys "ABSENT from the bus". They are present and fresh in `bot_state`; `/bus.json` simply does not carry them. Wrong surface, right alarm.
+
+### Three fixes, in ascending order of permanence
+
+1. **The guard.** `"paper" not in e` → skip. One line.
+2. **THE ORDERING, which is the real bug.** `_save_state` ran *after* the markdown report, so a fault anywhere in **cosmetic rendering** discarded the run's computed memory. The durable state is now written **FIRST**, and the report is wrapped so it can fail without taking the learning with it. *The report is a nice-to-have; the streak counters are the product.*
+3. **`venue_ab_lines()` EXTRACTED** from `main()`, so a test binds the code that runs rather than a copy of it — an inline block is only ever testable by duplication.
+
+### The permanent fix: 20 of 22 organs could not report their own death
+
+- `run_all.sh` runs every organ as `python3 <organ>.py || true`. That is **correct** — one sick organ must never take the supervisor down — and it makes every organ crash **invisible**: the exit code goes to `|| true`, the traceback goes to a container log nobody tails, and any key published before the fault keeps looking fresh. **Fixing `bot_learn` alone would have been one water leak of twenty.**
+- **`bot_pnl_store.organ_main(key, fn)`** — the shared wrapper. Catches the fault, prints the traceback, and **records it on that organ's own bot_state key** (`healthy: False`, `error`, `error_where`, `error_at`), which is the payload `fleet_immune` already scans and phone-pushes on. **No new plumbing.** Never re-raises: the caller is a `|| true` line and a traceback there is the silence itself. `clear_organ_error()` marks the happy path, because a sticky error pages once and then means nothing — the detector must be able to say RECOVERED, not only DIED.
+- **NINETEEN ORGANS CONVERTED**, each verified individually (parses + its own selftest) with an automatic revert on failure: clock, immune, proprioception, regen, respiration, risk, impl-shortfall, market-scout, scout-tuner, regime-oracle, incubator, judge, market-pulse, event-sentinel, radar, allocation, evidence-board, taker, brain. Radar and allocation needed their multi-statement CLI bodies wrapped in `_cli()` first; market-pulse imports the store lazily, so it imports at the call site.
+- **`evidence_board` was "handling" its errors by PRINTING them.** Printing is not reporting — that print goes to the same unread log. It now records as well.
+- **`scripts/audit_organ_silence.py` — the CI guard that makes it permanent.** Every organ `run_all.sh` invokes must route through the wrapper; a deliberate exception is DECLARED with a reason (three are: the boot-time prune, the Parliament supervisor which has its own per-layer handling, and the DB→DB poller with no key of its own). **The guard explicitly rejects stderr-only "handling"** — its selftest asserts that a module which merely prints a traceback does NOT count. Wired into `changelog-check.yml` and the selftest registry.
+- **The registration guard caught me**: `test_no_unregistered_selftest` failed because the new audit was not registered. Exactly the ratchet working.
+
+### Why this one is different from the last twenty entries
+
+Every fix here closes a **class**, not an instance. The `KeyError` was one bug; the ordering fix means no future rendering bug can ever eat the learning again; the wrapper means no organ can ever die silently again; and the audit means a **new** organ cannot be added without the ability to report its own death. That is the difference the operator asked for between building and patching leaks — and the honest measure is that this pass added one guard that would have caught the defect on day one instead of week three.
+
 ## 2026-08-01 (hv) — 💰 THE ALLOCATION ORGAN: the fleet could say whether a book was SAFE, never where the money should go
 
 - **THE ASK** (operator): *"with growth in mind let's make the best outcome for our growing ecosystem."* Suite **722**, six guards green, three mutations red.

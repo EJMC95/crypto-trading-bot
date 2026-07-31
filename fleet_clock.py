@@ -312,4 +312,4 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
     else:
-        run_once()
+        sys.exit(store.organ_main('fleet-clock', run_once))

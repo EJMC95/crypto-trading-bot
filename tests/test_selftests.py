@@ -182,6 +182,7 @@ ENFORCED_AUDITS = [
     # on 2026-07-30 and its registry note still said 6 the same afternoon, so
     # every organ reasoning about that lever's headroom read the wrong number.
     "scripts/audit_lever_bounds.py",
+    "scripts/audit_organ_silence.py",
 ]
 GUARD_ONLY_AUDITS = [
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can

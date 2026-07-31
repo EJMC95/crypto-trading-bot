@@ -700,4 +700,4 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         selftest()
     else:
-        main()
+        sys.exit(store.organ_main('lighter-market', main))

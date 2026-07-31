@@ -2283,4 +2283,4 @@ if __name__ == "__main__":
         _selftest()
         _selftest_growth()
     else:
-        run_once()
+        sys.exit(store.organ_main('xp-judge', run_once))

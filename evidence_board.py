@@ -918,6 +918,50 @@ BOOK_AUTHOR = {
     "crypto-trend-daily-lshadow":   ("trend.max_open", "trend.universe_n"),
 }
 BOOK_STARVED_H = float(os.environ.get("EVBOARD_BOOK_STARVED_H", "24"))
+# [2026-08-01 (hw)] ...and the same 24h meant OPPOSITE THINGS on different
+# books. ⚖️ Counterweight closes ~2.8x/day, so a silent day is genuinely
+# unusual; 🎯 the Perp Sniper has produced 6 closes in WEEKS, so a silent day
+# is its normal Tuesday. One constant cannot serve both: on the fast book it is
+# too slow to notice, and on the slow book it declares STARVED on essentially
+# every cycle — which is a ratchet, not a signal.
+# The clock is now derived from the BOOK'S OWN measured pace: STARVED_MULT x
+# its mean gap between closes, floored and capped so the answer stays bounded
+# and a book with no history still has a defined one.
+STARVED_MULT = float(os.environ.get("EVBOARD_STARVED_MULT", "3.0"))
+STARVED_MIN_H = float(os.environ.get("EVBOARD_STARVED_MIN_H", "12"))
+STARVED_MAX_H = float(os.environ.get("EVBOARD_STARVED_MAX_H", "336"))   # 14d
+
+
+def book_starved_h(closed_n, age_days, default_h=None):
+    """How long THIS book must be quiet before "starved" means anything.
+
+    `closed_n` closes over `age_days` of life -> mean gap between closes; the
+    bar is STARVED_MULT x that gap, clamped to [STARVED_MIN_H, STARVED_MAX_H].
+
+    THE TWO FALLBACKS DIFFER, and the difference is the point:
+      * NEVER CLOSED (n<2): the CAP. Under the old flat 24h such a book was
+        permanently STARVED, so the author widened it every single cycle until
+        it hit its cage bound — growth by impatience rather than by evidence.
+        A book that has not yet shown it can trade gets two weeks of patience.
+      * HAS CLOSED but pace not yet measurable (no span in the board's memory):
+        the FLAT default, i.e. exactly today's behaviour. A new metric that is
+        not available yet must degrade to the known-acceptable one, never to
+        "never fire" — my first cut returned the cap here and would have
+        silently switched the starvation branch off fleet-wide, trading one
+        broken direction for the other.
+    """
+    base = default_h if default_h is not None else BOOK_STARVED_H
+    try:
+        n = int(closed_n or 0)
+        d = float(age_days or 0.0)
+        if n < 2:
+            return STARVED_MAX_H          # never traded -> be patient
+        if d <= 0:
+            return base                   # pace unknown -> today's behaviour
+        gap_h = (d * 24.0) / n
+        return max(STARVED_MIN_H, min(STARVED_MAX_H, STARVED_MULT * gap_h))
+    except Exception:  # noqa: BLE001 — a bad row must not break the board
+        return base
 
 
 def book_mtm_pnl(row):
@@ -1058,10 +1102,33 @@ def synthesize_books(bot_rows, prior_books, prop_state, now_ts, tuning_mod=None)
             else:
                 _step(cap_lever,
                       f"SATURATED at {open_n}/{int(cap)}, MTM +${book_pnl:.2f}")
-        elif (gate_lever and open_n == 0 and closed_n == prev_closed
-              and prev_ts and (now_ts - prev_ts) >= BOOK_STARVED_H * 3600):
-            _step(gate_lever,
-                  f"STARVED {BOOK_STARVED_H:.0f}h (0 open, no new closes)")
+        else:
+            # [(hw)] the clock is THIS book's, derived from its own pace —
+            # see book_starved_h. `age_days` comes off the row when the
+            # publisher offers it; absent, the book reads as pace-unknown and
+            # gets the patient end of the range rather than the impatient one.
+            # Pace comes from the board's OWN memory span (first_ts/first_closed,
+            # persisted below) — no book publishes an age, and inventing a row
+            # field the publishers do not emit is how a consumer goes dark.
+            # Falls back to the row's own hint, then to the flat default.
+            _age_d = None
+            _f_ts, _f_cl = prev.get("first_ts"), prev.get("first_closed")
+            if _f_ts and _f_cl is not None and closed_n > _f_cl:
+                _span_d = (now_ts - float(_f_ts)) / 86400.0
+                if _span_d > 0:
+                    _age_d = _span_d * closed_n / max(1, closed_n - int(_f_cl))
+            if _age_d is None:
+                for _k in ("age_days", "days", "age_d"):
+                    if (r.get("extra") or {}).get(_k) is not None:
+                        _age_d = (r.get("extra") or {}).get(_k)
+                        break
+            _bar_h = book_starved_h(closed_n, _age_d)
+            if (gate_lever and open_n == 0 and closed_n == prev_closed
+                    and prev_ts and (now_ts - prev_ts) >= _bar_h * 3600):
+                _step(gate_lever,
+                      f"STARVED {_bar_h:.0f}h — this book's own bar "
+                      f"({closed_n} closes; the fleet-flat 24h would have "
+                      f"fired at 24h)")
     return levers, items
 
 
@@ -2360,5 +2427,13 @@ if __name__ == "__main__":
             try:
                 run_once()
             except Exception as e:  # noqa: BLE001
+                # [2026-08-01 (hw)] printing is NOT reporting — the print goes
+                # to a container log nobody tails, which is exactly the silence
+                # that hid the learning brain's crash for weeks. Record it on
+                # this organ's own key so fleet_immune can see it.
                 print(f"[evidence_board] cycle error: {type(e).__name__}: {e}", flush=True)
+                try:
+                    store.record_organ_error(KEY, e)
+                except Exception:  # noqa: BLE001
+                    pass
             time.sleep(INTERVAL)
