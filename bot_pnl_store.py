@@ -1122,6 +1122,55 @@ def split_reason(reason):
     return None, (reason or "trade")
 
 
+# [2026-07-31 (hr)] THE LEDGER QUARANTINE — rows that are real trades but not
+# EVIDENCE. Every entry needs a measured reason and a bounded window; this is
+# not a place to hide losses.
+#
+# BOT/USDC 21-22 Jul: the venue's mark sat ~747 bps from its own book top (mean
+# |px_fill/px_decision-1| over 93 orders, against a ~9 bps ledger median), so a
+# short opened at the book fill was born ~+7.5% in profit ON THE MARK BASIS,
+# tripped its take-profit on the very next 5-minute cycle, and closed by
+# crossing an 81.9 bps spread at a loss. `pos.pop()` freed the slot and the
+# SL cooldown only gates re-entry after an `sl`, so it re-entered every loop:
+# 43 closes in 4.5 hours, 42 of them with close[i] == open[i+1] TO THE SECOND.
+# ONE EPISODE, not 43 trades — and it supplied 45 of the 98 rows in every
+# pooled short-divergence grade the fleet has ever computed.
+# CXMT is the mirror case that proves the mechanism rather than a second bug: a
+# `short-divergence_sl` that booked +$0.4242 on a -735 bps decision-vs-fill gap.
+#
+# NOT swept, deliberately: the two 20-Jul BOT `long-divergence_sl` rows (gaps
+# 47.9 and 87.2 bps) are GENUINE stops on a normal book and stay in the sample.
+# The window is closed and dated for that reason.
+LEDGER_QUARANTINE = (
+    # (pair, bot-substring, first_utc_date, last_utc_date, why)
+    ("BOT/USDC", "ticket-taker", "2026-07-21", "2026-07-22",
+     "mark ~747bps off the book top -> instant phantom TP, 43 closes in 4.5h; "
+     "one episode, not 43 trades (hm)"),
+    ("CXMT/USDC", "ticket-taker", "2026-07-21", "2026-07-22",
+     "same basis defect, mirrored: an _sl that booked +$0.42 (hm)"),
+)
+
+
+def is_quarantined(bot, pair, closed_at):
+    """True when this row is a real trade but NOT admissible evidence.
+
+    Fail-OPEN: anything unparseable is ADMITTED. A quarantine that swallows
+    rows it cannot classify would silently shrink every sample it touches,
+    which is the disease, not the cure.
+    """
+    try:
+        b, p = str(bot or ""), str(pair or "")
+        d = str(closed_at or "")[:10]
+        if len(d) != 10:
+            return False
+        for q_pair, q_bot, lo, hi, _why in LEDGER_QUARANTINE:
+            if p == q_pair and q_bot in b and lo <= d <= hi:
+                return True
+    except Exception:  # noqa: BLE001
+        return False
+    return False
+
+
 def fetch_paper_trades(limit=2000):
     """Per-trade rows from the durable paper_trades ledger (perps + sniper),
     normalized to the SAME shape bot_learn expects from the freqtrade /trades.json
@@ -1172,8 +1221,13 @@ def fetch_paper_trades(limit=2000):
             rows = cur.fetchall()
         from datetime import datetime
         out = []
+        _quarantined = 0
         for (bot, pair, pnl_abs, pnl_pct, opened_at, closed_at, reason,
              extra, venue, entry_price, exit_price, tag) in rows:
+            # [(hr)] real trades, not evidence — see LEDGER_QUARANTINE.
+            if is_quarantined(bot, pair, closed_at):
+                _quarantined += 1
+                continue
             direction, exit_reason = split_reason(reason)
             # a stored tag is richer than the reason prefix ('long-funding'
             # beats 'long'); split_reason strips any '_exit' suffix a
@@ -1225,6 +1279,10 @@ def fetch_paper_trades(limit=2000):
                 # dict or {} — never None, so consumers can .get() safely
                 "extra": extra if isinstance(extra, dict) else {},
             })
+        if _quarantined:
+            print(f"[bot_pnl_store] ledger quarantine: {_quarantined} row(s) "
+                  f"withheld from grading (see LEDGER_QUARANTINE) — real trades, "
+                  f"not admissible evidence", flush=True)
         return out
     except Exception as e:  # noqa: BLE001
         _warn_once(f"paper-trade fetch failed ({e})")

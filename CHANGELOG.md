@@ -42,6 +42,37 @@
   1. **🌾 carry's duplicate writer is still live** — `(hp)` shipped the sole-writer guard, `(hq)` measured the container still not running it (repo `c3ca24732445`/15 vs live row `fbb926402049`/15). A guard in `main` is not a guard in the image; `funding-carry` needs a deploy, and until then `n` keeps pooling two books.
   2. **`equities-momentum-alpaca` is still trading** 17 days after the LIGHTER-ONLY cut, on an $86,926 Alpaca paper account. **Searched this repo: there is no Alpaca trading code here** (only the dashboard's retire list, `cleanup_legacy_bots`, and `audit_venue_purity` reference it), so the LIGHTER-ONLY code-guard pattern cannot reach it. The publishing process is on an unidentified host and only the operator can stop it.
 - **WHICH BOOK MOVED** (doctrine rule 4): ⚖️ Counterweight — not closer to the gate, but its exposure stops compounding against it, and the number the gate reads for it stops being flattered by a rail that was scaling it on the strength of being full. **No book is closer to real money this pass, and the honest headline is that none was ever as close as the pooled figures suggested.**
+## 2026-07-31 (hr) — THE NAMED-BUT-NOT-DONE LIST, DONE: the accrual clock, the grading arm's spread gate, and the ledger quarantine
+
+- **THE ASK** (operator): *"Permission to fix all improvements."* Three items that `(hl)` and `(hm)` named and deliberately did not do. Each was measured before it was written; none changes a trade rule. Suite green, six guards green, all three bot selftests green.
+- **NOTE ON SCOPE:** the weekly multi-agent budget is exhausted until 4-Aug, so this pass is solo. It deliberately took the items that were already MEASURED rather than opening anything that needs a sweep to justify.
+
+### 1. 🌊's funding-accrual clock reset on every boot
+
+- `last_ts` was initialised to `time.time()` at start-up and **never persisted**, so every redeploy silently discarded the funding accrued in the gap — a systematic UNDERCOUNT of the drag a 1x LONG perp pays, on a book that holds for WEEKS. 📊 Index Rider fixed exactly this on 16-Jul (`:505`) and 🌊 was left behind for a fortnight.
+- Not theoretical: this book redeployed **three times today**, and TRX alone has accrued +$1.05 on a ~$30 notional.
+- Persisted in `save_state`, restored bounded to 48h so ancient state cannot over-accrue in a single tick — Index Rider's shape, verbatim.
+- **`_saved` is now bound BEFORE the dry-run branch.** The restore reads it in both paths, and the copied guard relied on a `NameError` to mean "no state" — a guard that works by accident.
+
+### 2. The arm that GRADES the taker had the spread gate switched off
+
+- `TT_SPREAD_GATE_BPS` defaulted to **0**. The LIVE service sets it explicitly; the SHADOW service carries only `TT_BULL_MODE` — so the two arms were trading **different populations**, and the shadow arm was admitting books the money arm would never touch. That is not a conservative difference; it is a grading error in the permissive direction.
+- **Default 0 → 20.** Measured in `(hm)`: at 20bps this refuses **43 of 46 BOT/USDC entries (93%)** — the churn chain that produced the "39 take-profits that booked a loss" defect. A 747bps gap between the mark and the book top is not a tradable spread on any arm.
+- **No effect on real money**: an explicit env var always wins and the live arm has one. Restrict-only and fail-open are unchanged and now asserted (an unreadable book still blocks nothing).
+- **The selftest's own summary line said "spread gate default-OFF"** — true when written, false the moment the default moved. Corrected, and the new default is now pinned WITH its reason, so the next change has to argue with the measurement rather than edit a number.
+
+### 3. The BOT/USDC churn episode still counts as 45 rows of evidence
+
+- `bot_pnl_store.LEDGER_QUARANTINE` + `is_quarantined()`: rows that are REAL TRADES but not admissible EVIDENCE, withheld at `fetch_paper_trades` — the brain's and every grader's single ledger ingest.
+- Scope is exact and dated: BOT/USDC and CXMT/USDC on the taker, **21–22 Jul only**. That episode was 43 closes in 4.5 hours, 42 of them with `close[i] == open[i+1]` to the second — **one episode, not 43 trades** — and it supplied 45 of the 98 rows in every pooled short-divergence grade the fleet has computed.
+- **The two 20-Jul BOT `long-divergence_sl` rows are NOT swept** (gaps 47.9 / 87.2 bps): genuine stops on a normally-behaving book. The window is closed and dated precisely so a real loss cannot hide behind a defect.
+- **FAIL-OPEN**: anything unparseable is ADMITTED. A filter that swallows what it cannot classify silently shrinks every sample it touches — the disease, not the cure. And the count of withheld rows is **printed**, because a silent filter hides its own effect.
+- Six tests, including the every-entry-needs-a-reason-and-a-closed-window rule: **this is not a place to hide losses**, and the guard says so mechanically rather than in prose.
+
+### Discipline notes from this pass
+
+- The `(hp)` commit-gate rule was applied and it worked: `git status` before staging showed exactly the four files I authored, and nothing of the concurrent session's.
+- **`(hq)` was taken by another session while this was being written** — caught by fetching before choosing the letter rather than after, so the citations in four files were renumbered before they were ever committed. Eleventh recorded collision, and the first that cost nothing.
 
 ## 2026-07-31 (hq) — THE DAILY REVIEW IMPORTED THE GO-LIVE RULE BUT NOT ITS SAMPLE
 

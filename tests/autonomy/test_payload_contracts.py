@@ -446,3 +446,53 @@ class TestSoleWriterEnforced:
         monkeypatch.setattr(store, "load_state", boom)
         ok, other = store.claim_writer("perps-funding-carry", now=1.0)
         assert ok is True and other is None
+
+
+# ===========================================================================
+# [2026-07-31 (hr)] THE LEDGER QUARANTINE — real trades that are not evidence.
+# ===========================================================================
+class TestLedgerQuarantine:
+    BOT = "lighter-ticket-taker-lshadow"
+
+    def test_the_churn_episode_is_withheld(self):
+        import bot_pnl_store as s
+        assert s.is_quarantined(self.BOT, "BOT/USDC", "2026-07-22T03:46:00+00:00")
+        assert s.is_quarantined(self.BOT, "CXMT/USDC", "2026-07-21T23:19:00+00:00")
+
+    def test_the_GENUINE_20_jul_stops_are_kept(self):
+        """The window is dated for a reason: the two 20-Jul BOT
+        long-divergence stops had 47.9/87.2bps gaps — normal book behaviour,
+        real evidence. A quarantine that swallowed them would be hiding losses."""
+        import bot_pnl_store as s
+        assert not s.is_quarantined(self.BOT, "BOT/USDC", "2026-07-20T11:00:00+00:00")
+
+    def test_it_is_scoped_to_pair_AND_bot(self):
+        import bot_pnl_store as s
+        assert not s.is_quarantined(self.BOT, "SOL/USDC", "2026-07-22T03:46:00+00:00")
+        assert not s.is_quarantined("perps-funding-carry-lshadow", "BOT/USDC",
+                                    "2026-07-22T03:46:00+00:00")
+
+    def test_it_fails_OPEN_on_anything_unparseable(self):
+        """A filter that swallows what it cannot classify silently shrinks
+        every sample it touches — the disease, not the cure."""
+        import bot_pnl_store as s
+        for args in ((None, None, None), ("x", "BOT/USDC", "garbage"),
+                     ("x", "BOT/USDC", ""), (1, 2, 3)):
+            assert s.is_quarantined(*args) is False, args
+
+    def test_every_entry_carries_a_reason_and_a_closed_window(self):
+        """No open-ended quarantines, and no undocumented ones — this is not a
+        place to hide losses."""
+        import bot_pnl_store as s
+        assert s.LEDGER_QUARANTINE, "empty is fine, but then delete the machinery"
+        for pair, bot, lo, hi, why in s.LEDGER_QUARANTINE:
+            assert pair and bot, (pair, bot)
+            assert len(lo) == 10 and len(hi) == 10 and lo <= hi, (lo, hi)
+            assert len(why) > 30, f"{pair}: a quarantine needs a real reason"
+
+    def test_the_reader_actually_applies_it(self):
+        import pathlib as _p
+        src = (_p.Path(__file__).resolve().parents[2] / "bot_pnl_store.py").read_text()
+        body = src[src.index("def fetch_paper_trades"):]
+        assert "is_quarantined(" in body, "declared but never applied"
+        assert "_quarantined" in body, "a silent filter hides its own effect"

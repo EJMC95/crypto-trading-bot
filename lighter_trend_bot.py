@@ -418,6 +418,14 @@ def main():
     meta = {}          # coin -> {entry, opened_ts, accrued}  (accrued funding, <=0 for a long)
     fund_realized = 0.0
 
+    # [(hr)] bound BEFORE the branch: the accrual-clock restore below reads it
+
+    # in BOTH paths, and relying on a NameError to mean 'no state' is a guard
+
+    # that works by accident.
+
+    _saved = None
+
     if dry_run:
         _saved = store.load_state(bot_id)
         if _saved and broker is not None and broker.restore_state(_saved.get("broker") or {}):
@@ -557,7 +565,18 @@ def main():
         halted_today = True
         day_start_equity = _halt.get("day_start_equity") or day_start_equity
         log.warning("daily-loss halt restored from state — halted for the rest of today.")
-    last_ts = time.time()
+    # [2026-07-31 (hr)] RESTORE THE FUNDING-ACCRUAL CLOCK. It reset to boot time
+    # on every redeploy, so the funding accrued during the gap was never counted
+    # — a systematic UNDERCOUNT of the drag this 1x-long book pays, and this
+    # book holds for WEEKS. 📊 Index Rider fixed exactly this on 16-Jul at :505
+    # and 🌊 was left behind; today it deployed 3 times, so the loss is not
+    # theoretical (TRX alone has accrued +$1.05 on a ~$30 notional).
+    # Gap bounded to 48h so ancient state cannot over-accrue in one tick.
+    try:
+        _lt = float((_saved or {}).get("last_ts") or 0)
+    except Exception:  # noqa: BLE001 — incl. unbound saved-state
+        _lt = 0.0
+    last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
     _last_universe = list(COINS)
 
     while True:
@@ -916,7 +935,10 @@ def main():
         try:
             if dry_run:
                 store.save_state(bot_id, {"broker": broker.to_state(), "meta": meta,
-                                          "fund_realized": fund_realized})
+                                          "fund_realized": fund_realized,
+                                          # [(hr)] the accrual clock — see the
+                                          # restore note below.
+                                          "last_ts": last_ts})
             elif live_baseline is not None:
                 store.save_state(bot_id + ":live", {"initial_equity": live_baseline,
                                                     "meta": meta})
