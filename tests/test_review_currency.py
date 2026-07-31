@@ -256,7 +256,7 @@ def test_only_the_grader_owns_the_thresholds():
 # ---------------------------------------------------------------------------
 # 3. The SAMPLE is imported too — not just the rule.
 #
-# INCIDENT (31-Jul, (hp)). (hn) stopped the review carrying its own copy of the
+# INCIDENT (31-Jul, (hq)). (hn) stopped the review carrying its own copy of the
 # go-live RULE. It kept selecting its own ROWS, with no policy-era filter — and
 # (hc) had made the era a PRECONDITION sitting in FRONT of the six bars. The
 # next morning the review published the fleet's ONLY go-live candidate,
@@ -284,13 +284,13 @@ def test_review_imports_the_era_filter_too(review_src):
     assert "era_rows" in review_src, (
         "the review must import golive_readiness.era_rows — grading a book's "
         "WHOLE retained ledger is what published a false ~10.5d go-live ETA "
-        "on the fleet's only candidate (hp)")
+        "on the fleet's only candidate (hq)")
 
 
 def test_the_graded_rows_come_from_era_rows_AST(review_src):
     """The CALL SITE, not a substring. `era_rows` could be imported, called,
     and its result thrown away while `gate_status` still received the raw
-    fetch — which is precisely the shape of (hp): the era machinery already
+    fetch — which is precisely the shape of (hq): the era machinery already
     existed and this consumer simply did not route through it.
 
     AST because a page-wide substring scan is not a structural claim
@@ -332,13 +332,13 @@ def test_the_graded_rows_come_from_era_rows_AST(review_src):
     assert all(a in era_targets for a in graded_args), (
         f"gate_status is graded on {graded_args}, which is not the era-scoped "
         f"list from era_rows ({sorted(era_targets)}) — the review would grade "
-        "the book's WHOLE retained ledger, the (hp) defect")
+        "the book's WHOLE retained ledger, the (hq) defect")
 
 
 def test_era_scoping_is_LOAD_BEARING_on_the_incident_shape():
     """Functional, not structural: prove the filter changes the VERDICT.
 
-    Reproduces (hp)'s shape — a book whose pre-era record is strong and whose
+    Reproduces (hq)'s shape — a book whose pre-era record is strong and whose
     in-era record is flat. Pooled it clears the evidence bars; era-scoped it
     does not. A filter that never changed an answer would satisfy every
     structural test above while protecting nothing."""
@@ -370,7 +370,7 @@ def test_era_scoping_is_LOAD_BEARING_on_the_incident_shape():
         "fixture is wrong: the POOLED sample must look good"
     assert not scoped_bars["t"], (
         "fixture is wrong: the IN-ERA sample must fail the t bar — that "
-        "difference IS the (hp) incident")
+        "difference IS the (hq) incident")
 
 
 def test_era_rows_is_the_only_place_the_grading_loop_filters():

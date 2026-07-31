@@ -384,7 +384,7 @@ def era_rows(bot, rows, parse=None):
     behaviours are `in_era`'s, unchanged — this is the row plumbing, not a
     second policy.
 
-    [2026-07-31 (hp)] EXTRACTED BECAUSE A CONSUMER RE-IMPLEMENTED IT BY
+    [2026-07-31 (hq)] EXTRACTED BECAUSE A CONSUMER RE-IMPLEMENTED IT BY
     OMISSION. `(hc)` made the policy era a PRECONDITION sitting in FRONT of the
     six bars, and `(hn)` made `scripts/evidence_review.py` import
     `stats`/`grade`/`bar_map` so the daily review could not carry its own copy
@@ -801,7 +801,7 @@ def main():
             quads.append((r.get("profit_ratio"), r.get("profit_abs"), ts,
                           r.get("open_ts")))
         # ONE owner of "which trades count" — `era_rows` keys the era on the
-        # OPEN stamp. Extracted at (hp) so the daily review runs the same
+        # OPEN stamp. Extracted at (hq) so the daily review runs the same
         # selection rather than its own; see that docstring for what the
         # divergence cost.
         parsed, parsed_all, _ = era_rows(bot, quads, parse=parse_ts)

@@ -104,13 +104,54 @@ def test_a_trade_that_straddles_the_boundary_is_excluded():
     assert g.in_era("2026-07-17T00:00", ep, _p) is True, "the boundary is inclusive"
 
 
-def test_the_era_is_read_off_open_ts_in_the_grading_loop():
-    """The wiring, not the arithmetic. `in_era` could be perfect and the loop
-    could still pass it the CLOSE stamp — the exact shape of the repo's
-    'the selftest proves the arithmetic and not the CALL SITE' trap."""
+def test_the_era_is_read_off_the_OPEN_stamp_not_the_close():
+    """The wiring, not the arithmetic. `in_era` could be perfect and the caller
+    could still hand it the CLOSE stamp — the repo's 'the selftest proves the
+    arithmetic and not the CALL SITE' trap.
+
+    [2026-07-31 (hq)] REWRITTEN FROM A SUBSTRING TO THE INVARIANT. This asserted
+    the literal `in_era(r.get("open_ts")` appeared in the grader. That pinned one
+    SPELLING of the wiring, not the wiring: when `era_rows` became the single
+    owner of the filter (so the daily review could stop grading a book's whole
+    retained ledger) the call moved one function and the literal vanished, while
+    the property it protects was untouched. A substring scan is not a structural
+    claim — CLAUDE.md doctrine, and the reason it is worth restating here is that
+    this test's failure was briefly read as evidence the refactor was broken.
+
+    The functional form below cannot be satisfied by any spelling: it feeds a
+    trade OPENED before the era and CLOSED well inside it. Keyed on the open it
+    is excluded; keyed on the close it is kept. A straddler belongs to neither
+    era and excluding it is the conservative reading."""
+    from datetime import datetime, timedelta, timezone
+    ep, iso, _ = g.era_epoch_for(CARRY)
+    assert ep, "this test needs a book with a declared era"
+    boundary = datetime.fromisoformat(iso).replace(tzinfo=timezone.utc)
+
+    straddler = (0.05, 50.0,
+                 boundary + timedelta(days=10),        # closed INSIDE the era
+                 (boundary - timedelta(days=3)).isoformat())   # opened BEFORE
+    clean = (0.01, 10.0,
+             boundary + timedelta(days=11),
+             (boundary + timedelta(days=1)).isoformat())
+
+    scoped, all_time, got_iso = g.era_rows(CARRY, [straddler, clean])
+    assert got_iso == iso
+    assert len(all_time) == 2, "the all-time sample keeps everything"
+    assert len(scoped) == 1 and scoped[0][1] == 10.0, (
+        "the era must be keyed on the trade's OPEN stamp — a position opened "
+        "before the boundary accrued under the old policy for part of its life "
+        "and belongs to neither era")
+
+
+def test_the_grading_loop_hands_era_rows_the_open_stamp():
+    """The other half of the wiring: `era_rows` reads element [3] of each row,
+    so the grading loop must actually PUT the open stamp there. Checked on the
+    source because the loop's DB read is not unit-testable offline."""
     src = (_ROOT / "scripts/golive_readiness.py").read_text()
-    assert 'in_era(r.get("open_ts")' in src, (
-        "the grading loop must key the era on the trade's OPEN stamp")
+    assert 'r.get("open_ts")))' in src or 'r.get("open_ts")' in src, (
+        "the grading loop must carry the trade's OPEN stamp into era_rows")
+    assert "era_rows(bot, quads" in src, (
+        "the grading loop must route through era_rows, not filter inline")
 
 
 # --------------------------------------------------------------------------

@@ -77,7 +77,7 @@ for _p in (_HERE, os.path.dirname(_HERE)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 #
-# [2026-07-31 (hp)] AND THE SAMPLE IS IMPORTED TOO, not just the rule. `(hn)`
+# [2026-07-31 (hq)] AND THE SAMPLE IS IMPORTED TOO, not just the rule. `(hn)`
 # fixed the copied RULE above and left the review selecting its own ROWS — with
 # no policy-era filter, which `(hc)` made a PRECONDITION sitting in FRONT of the
 # six bars. One day later this section published the fleet's ONLY go-live
@@ -461,7 +461,7 @@ def scan_new_evidence(cur, errors):
                              WHERE bot=%s AND pnl_abs IS NOT NULL AND closed_at IS NOT NULL
                              ORDER BY {CA}""", (bot,))
             quads = cur.fetchall()
-            # [(hc)/(hp)] THE ERA IS A PRECONDITION IN FRONT OF THE SIX BARS.
+            # [(hc)/(hq)] THE ERA IS A PRECONDITION IN FRONT OF THE SIX BARS.
             # Grade the book as it RUNS TODAY, never its whole retained ledger.
             # `era_rows` is golive_readiness's — the same selection the
             # canonical grader runs — so review and grader cannot disagree
