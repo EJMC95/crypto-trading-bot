@@ -419,13 +419,38 @@ def _load_state():
 
 
 def _save_state(state):
+    """Persist the brain's memory. Returns the list of sinks that ACCEPTED it.
+
+    [2026-07-31 (hx)] A FAILED POSTGRES WRITE IS NO LONGER SILENT. This
+    swallowed both the exception AND the False return, and it cost the brain
+    three days of memory: `learning-brain.runs` sat at 337 with `updated`
+    2026-07-28 while `brain-vitals.run` published 338 fresh every cycle. The
+    brain reloaded the stale state each run, recomputed, published healthy
+    vitals/mults/diagnosis, and could not remember — so `mult_streaks` froze
+    and the 3-run promotion gate became UNREACHABLE. One multiplier survived,
+    carrying `streak: 15` from before the freeze, against 20 living bots.
+    Root cause was a non-finite float reaching `json.dumps` (see
+    `bot_pnl_store.json_safe`); the fix there stops it recurring, and the
+    shout here stops the NEXT cause of the same shape being invisible.
+    """
     saved = []
     try:
         import bot_pnl_store as store
         if store.save_state("learning-brain", state):
             saved.append("postgres")
-    except Exception:
-        pass
+        else:
+            # LOUD, EVERY RUN — not `_warn_once`. An organ that cannot remember
+            # is not degraded, it is amnesiac, and every streak-gated decision
+            # it makes is void. The one-shot warning underneath is precisely
+            # how this stayed invisible for three days.
+            print(f"[bot_learn] BRAIN MEMORY NOT PERSISTED — "
+                  f"save_state('learning-brain') returned False. The next run "
+                  f"reloads the LAST GOOD state, so mult_streaks cannot "
+                  f"advance and the {PROMOTE_RUNS}-run promotion gate is "
+                  f"UNREACHABLE.", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[bot_learn] BRAIN MEMORY NOT PERSISTED — save_state raised: "
+              f"{e}", flush=True)
     try:
         os.makedirs(REPORTS_DIR, exist_ok=True)
         with open(LOCAL_STATE, "w") as f:

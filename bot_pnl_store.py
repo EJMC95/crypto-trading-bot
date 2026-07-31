@@ -460,8 +460,51 @@ def _ensure_state_table(conn):
     _state_table_ready = True
 
 
+def json_safe(obj, _depth=0):
+    """[2026-07-31 (hx)] Recursively replace NaN/inf with None so a payload can
+    survive `json.dumps` -> Postgres `jsonb`.
+
+    THE INCIDENT, and it cost the brain THREE DAYS OF MEMORY silently.
+    `save_state` dumped with bare `json.dumps`, which emits `NaN`/`Infinity`
+    for those floats — tokens that are NOT valid JSON. Postgres jsonb rejects
+    the whole write, the exception was caught, `_warn_once` logged it ONCE into
+    a container nobody reads, and `bot_learn._save_state` discarded the False.
+    MEASURED 31-Jul: `learning-brain.runs` stuck at 337 with `updated`
+    2026-07-28, while `brain-vitals.run` read 338 and published fresh every
+    cycle. The brain reloaded the 28-Jul state every run, recomputed, published
+    fresh vitals/mults/diagnosis, and could not remember — so `mult_streaks`
+    froze and the 3-run promotion gate became unreachable. `mults_published: 1`
+    of 20 living bots, and that survivor carried `streak: 15` from BEFORE the
+    freeze. An amnesiac organ that looks healthy from every other key.
+
+    This is the `_finite_or_none` discipline the money columns have had since
+    18-Jul, applied to the arbitrary nested blobs `save_state` accepts. Same
+    direction (a bad value becomes null, the row still writes), because losing
+    one field beats losing the whole state.
+
+    Depth-bounded: a self-referential structure would otherwise recurse
+    forever, and this runs inside a never-raises writer.
+    """
+    if _depth > 60:
+        return None
+    if isinstance(obj, float):
+        return None if (obj != obj or obj in (float("inf"), float("-inf"))) else obj
+    if isinstance(obj, dict):
+        # keys must be JSON strings; non-str keys are stringified the way
+        # json.dumps would, so this never changes the emitted shape
+        return {(k if isinstance(k, str) else str(k)): json_safe(v, _depth + 1)
+                for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [json_safe(v, _depth + 1) for v in obj]
+    return obj
+
+
 def save_state(bot, state):
-    """Upsert this bot's durable state blob. Safe to call every loop. Never raises."""
+    """Upsert this bot's durable state blob. Safe to call every loop. Never raises.
+
+    Returns True ONLY on a committed write. Callers that silently ignore a
+    False here get an organ that quietly stops remembering — see `json_safe`.
+    """
     conn = _get_conn()
     if conn is None:
         return False
@@ -476,7 +519,10 @@ def save_state(bot, state):
                     updated_at = now(),
                     state      = EXCLUDED.state
                 """,
-                (bot, json.dumps(state)),
+                # allow_nan=False turns a non-finite that slipped past
+                # json_safe into a LOUD ValueError here rather than an
+                # invalid-JSON rejection at the database.
+                (bot, json.dumps(json_safe(state), allow_nan=False)),
             )
         return True
     except Exception as e:
@@ -1415,6 +1461,38 @@ def _selftest_build():
             os.environ.pop("RAILWAY_SERVICE_NAME", None)
         else:
             os.environ["RAILWAY_SERVICE_NAME"] = _saved_svc
+
+    # ---- [2026-07-31 (hx)] NaN MUST NOT SILENCE AN ORGAN'S MEMORY --------
+    # `json.dumps` emits bare NaN/Infinity, which Postgres jsonb REJECTS. The
+    # brain lost three days of memory to exactly this: runs frozen at 337 while
+    # vitals published 338 every cycle.
+    _nan, _inf = float("nan"), float("inf")
+    _clean = json_safe({"t": _nan, "ok": 1.5, "deep": [{"x": -_inf}, {"y": 2}],
+                        "s": "keep", "b": True, "n": None})
+    assert _clean["t"] is None and _clean["deep"][0]["x"] is None, _clean
+    assert _clean["ok"] == 1.5 and _clean["s"] == "keep" and _clean["b"] is True
+    assert _clean["deep"][1]["y"] == 2 and _clean["n"] is None
+    # the whole point: the sanitized payload must be VALID strict JSON
+    json.dumps(json_safe({"t": _nan, "u": [_inf, -_inf]}), allow_nan=False)
+    # ...and the raw one must not be, or this test proves nothing
+    try:
+        json.dumps({"t": _nan}, allow_nan=False)
+        raise AssertionError("json.dumps must reject NaN in strict mode")
+    except ValueError:
+        pass
+    # tuples become lists (jsonb has no tuple), non-str keys stringify
+    assert json_safe((1, _nan)) == [1, None]
+    assert json_safe({3: _nan}) == {"3": None}
+    # depth-bounded: a self-referential blob must terminate, not hang, inside
+    # a writer whose contract is "never raises"
+    _cyc = {}
+    _cyc["self"] = _cyc
+    json_safe(_cyc)
+    # save_state must ROUTE through it — a sanitizer nothing calls is a note
+    assert "json_safe(state)" in _ins.getsource(save_state), \
+        "save_state must sanitize before dumping"
+    assert "allow_nan=False" in _ins.getsource(save_state), \
+        "strict mode turns a leak into a loud error, not a silent DB reject"
 
     # describe_writer: the string the operator acts on
     assert describe_writer("abc123", "funding-carry") == "funding-carry (abc123)"
