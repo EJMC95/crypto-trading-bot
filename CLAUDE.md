@@ -1,5 +1,169 @@
 # CLAUDE.md — crypto-trading-bot Fleet
 
+## THE INVARIANTS — doctrine that has teeth
+
+**Operator mandate, 31-Jul:** *"all of the breakthroughs and milestones we reach
+must be doctrines that serve as building blocks so we stop this perpetual cycle
+of going back to the same square one routine."*
+
+**The mechanism that makes a doctrine a building block is ENFORCEMENT, not
+wording.** Measured the day this section was written: **31 rule-shaped
+doctrines across 1,405 lines against 7 executable guards.** The same session
+was a controlled experiment on which of those two works, and the result was
+one-sided:
+
+| Rules read and violated anyway | Things that actually caught errors |
+|---|---|
+| *"pick a test that could detect the damage"* — broken **twice on one row**: a monitor compared a payload's CONTENT 20 times and never read `age_sec`, so a book DEAD for 13h read as a stable live writer | `audit_deploy_coverage` — a comma-joined `svcs=` that would have orphaned 7 files |
+| *"unknown degrades to the OLD id, never to a guess"* — written in (ht); one entry later I guessed a service from an absence with no control group | `audit_changelog_letters` — two letter collisions, pre-push |
+| | a selftest — a wrong assumption about `"1 "` stripping |
+| | mutation testing — defects inside guards I had just written |
+| | the live payload — a detector that fired NOTHING on the condition it was built for |
+
+So: **every invariant below names the executable artifact that enforces it, or
+declares itself UNENFORCED with a reason.** `scripts/audit_doctrine_enforcement.py`
+fails the build on a doctrine with neither, and on an enforcement reference that
+no longer resolves — so a guard deleted out from under its doctrine is caught.
+
+**What a green run does NOT mean:** it verifies that a declared enforcement
+EXISTS, not that it is CORRECT. A named test could be vacuous. This closes the
+"doctrine with no teeth" class; **mutation testing is what grades the teeth**,
+and that stays a human discipline (I3).
+
+Add an invariant when a lesson is *general* and *recurrent*. The long-form
+history stays below — this section is the load-bearing subset, not a summary.
+
+<!-- INVARIANTS:BEGIN -->
+### I1 · LIVENESS BEFORE SEMANTICS
+Before interpreting what a payload SAYS, establish that something still writes
+it. A frozen row and a healthy one are **byte-identical if you compare content**
+— only the timestamp distinguishes them. 31-Jul: 🌾 carry was sampled 20 times
+over 10 minutes, read as "one stable live writer", and had in fact been dead
+for 13 hours; `status` still read `"online"`, its last word before it stopped.
+Any check over a bot_pnl row, a bot_state key or a bus payload reads `age_sec`
+/ `updated` FIRST.
+  ENFORCED BY: `fleet_immune.py::_row_stale`, `fleet_immune.py::STALE_ROW_S`
+
+### I2 · A CONSTANT LAG IS INVISIBLE — MEASURE THE THING THAT DIVERGES
+When two counters advance together, a stuck process shows a CONSTANT offset
+indistinguishable from healthy ordering. The brain's memory froze for three
+days while `learning-brain.runs`=337 and `brain-vitals.run`=338 — a lag of
+**1**, exactly what correct write-after-publish ordering looks like, forever.
+The signal that diverges is the **timestamp skew** (71.4h). Pick the quantity
+that grows with the fault, not the one the fault holds fixed.
+  ENFORCED BY: `fleet_immune.py::brain_amnesia`
+
+### I3 · A GUARD IS NOT VERIFIED UNTIL A MUTATION REDDENS IT
+Write the guard, then break the thing it guards and confirm it fails. Every
+real defect caught in the 31-Jul session came from a mutation or from running a
+consumer against its publisher's own payload — never from re-reading the code.
+Two guards written that day were themselves wrong (`brain_amnesia` on the run
+counter fired NOTHING on the live payload; `stale_writer_sickness` diagnosed a
+corpse as a bad deploy) and only the live data exposed them.
+  UNENFORCED: mutation discipline cannot be checked by a static guard — a
+  vacuous test and a real one look identical from outside. Recorded here so the
+  expectation is explicit rather than folkloric.
+
+### I4 · A SILENT WRITE FAILURE MAKES AN ORGAN AMNESIAC WHILE IT LOOKS HEALTHY
+A persistence call's return value is load-bearing. `save_state` returned False
+for three days; the caller discarded it and `_warn_once` logged it a single
+time. The brain kept publishing fresh vitals, mults and diagnoses off a frozen
+state, so `mult_streaks` never advanced and the 3-run promotion gate was
+unreachable — 1 multiplier against 20 living bots. **Never discard a
+persistence result, and never report a persistent condition with a one-shot
+warning.**
+  ENFORCED BY: `bot_learn.py::BRAIN MEMORY NOT PERSISTED`, `bot_pnl_store.py::json_safe`
+
+### I5 · NON-FINITE FLOATS MUST NEVER REACH STORAGE
+`json.dumps` emits bare `NaN`/`Infinity`, which is not valid JSON, and Postgres
+`jsonb` rejects the whole write. Any payload built from ratios, t-stats or
+win-rates can carry one. Sanitize at the boundary in the `_finite_or_none`
+direction — a bad field becomes null and the row still writes, because losing
+one field beats losing the whole state.
+  ENFORCED BY: `bot_pnl_store.py::json_safe`, `bot_pnl_store.py::allow_nan=False`
+
+### I6 · AN ABSENCE IS EVIDENCE ONLY AGAINST A CONTROL GROUP
+A missing field means nothing until you can show the mechanism works elsewhere.
+`extra.svc` absent on the carry row was uninterpretable until seven other
+services stamped correctly in the same payload — and even then it supported a
+weaker conclusion than the one published. Before reasoning from a gap, name the
+population where the thing is present.
+  ENFORCED BY: `fleet_immune.py::min_stamped`
+
+### I7 · A TRIGGER A BOOK SATISFIES STRUCTURALLY IS NOT A MEASUREMENT
+Before shipping any rule that fires on a book's state, ask what it looks like on
+a book that is always-in, always-empty, or always-at-cap. The evidence board
+widened capacity on `open_n >= cap` — true on EVERY cycle for an always-in book
+— and ratcheted ⚖️ Counterweight to its cage ceiling while it was down $27.75.
+  ENFORCED BY: `evidence_board.py::book_mtm_pnl`
+
+### I8 · A DETECTOR MUST NAME THE OBJECT THE OPERATOR CAN ACT ON
+If a guard's output is an instruction, it must identify something findable in
+the system the operator will open. Reporting an opaque container id when the fix
+is "stop a named Railway service" is a complete diagnosis and an unactionable
+one. Unknown degrades to the previous, honest identifier — **never to a guess**.
+  ENFORCED BY: `bot_pnl_store.py::describe_writer`, `bot_pnl_store.py::service_name`
+
+### I9 · A REALISED-ONLY METRIC IS BLIND TO A BOOK THAT HOLDS
+Any bar computed from closed trades cannot see an always-in book's open losses.
+⚖️ Counterweight's realised maxDD read **0.2% against a 15% bar** while the book
+sat at −$15.39 — and its three failing bars were pure time and sample size, so
+it was on track to pass the whole gate in late August while below $1,000. Fold
+the mark-to-market number in and take the WORSE of the two.
+  ENFORCED BY: `scripts/golive_readiness.py::apply_mtm`, `scripts/golive_readiness.py::mtm_drawdown`
+
+### I11 · FINISH THE HOUSE — CARRIED WORK OUTRANKS NEW WORK
+**Operator, 31-Jul:** *"when we make progress on construction, we don't forget
+it and go try and work on a random house the next day."* Before starting
+anything new, discharge what the previous pass left open: an unmerged PR, an
+undeployed fix, a declared OPERATOR ACTION, a `STILL BLOCKING` line. A pass that
+opens a second front while the first is half-built produces two half-houses and
+a changelog that reads like progress. **State at the end of every pass what is
+carried, and start the next pass from that list** — not from whatever is most
+interesting. `audit_recurrence` is the measurement: a subject you keep returning
+to is a house you keep re-entering without finishing.
+  ENFORCED BY: `scripts/audit_recurrence.py::audit`, `scripts/audit_recurrence.py::MAX_ENTRIES`
+
+### I12 · DOCTRINE IS LIVE OR IT IS ARCHAEOLOGY
+**Operator, 31-Jul:** *"we can't refer back to a doctrine that was established at
+the beginning of our journey — it needs to be constantly updated and engraved so
+that we are future proof."* A rule written once and never revisited decays into a
+record of a lesson rather than a control on behaviour — and this file has shipped
+that decay repeatedly: a line reading *"NOT wired into CI, standing follow-up"*
+for a day AFTER it was wired, a standing audit rule naming a RETIRED bot, an
+*"advisory: zero consumers"* note that had had a consumer for days. **The loop
+that keeps doctrine alive is measured recurrence:** a subject the changelog keeps
+returning to must either produce a new enforced invariant or be explicitly
+acknowledged with a reason and an owner. Doctrine therefore grows in response to
+pain rather than to memory. **A doctrine that no longer describes the system is a
+defect, not history — correct it in place and say so.**
+  ENFORCED BY: `scripts/audit_recurrence.py::covered_by_invariant`, `scripts/audit_doctrine_enforcement.py::check_ref`
+
+### I10 · REAL MONEY IS GATED BY PUBLISHED EVIDENCE, IN CODE
+An env var is a deployment choice, not a verdict. A live path must additionally
+read the published gate and refuse unless it says READY — fail-closed on a dark,
+stale or unparseable payload, against the usual degrade-to-default habit,
+because here the cost of a wrong default is unsupervised real money. The live
+arm also pins the BACKTESTED config and takes no growth-rail capacity lever.
+  ENFORCED BY: `lighter_funding_spread_bot.py::golive_blocker`, `lighter_funding_spread_bot.py::GOLIVE_K`
+<!-- INVARIANTS:END -->
+
+### Acknowledged recurrence — houses we keep re-entering, and why
+
+`scripts/audit_recurrence.py` fails the build when the changelog returns to one
+subject more than 5 times in 7 days without either an invariant that closes the
+class or an entry here. **An acknowledgement is a decision, not a snooze**: it
+must name why the class is still open and who can close it. Measured on the day
+this shipped, and every line below is a real cost, not a formality.
+
+<!-- RECURRING:BEGIN -->
+- `funding-carry` — OPEN, and the owner is the OPERATOR, not this repo. 13 entries in 7d. Every in-repo cause has been closed (sole-writer guard (hp), service attribution (ht), deploy routing (hu), dead-vs-stale-deploy (hx)); what remains is *why the container stopped at 03:10 UTC on 31-Jul* and which of the two services to stop, both of which need Railway logs and a Railway action. No further code will close this.
+- `perps-funding-carry` — OPEN, same house as `funding-carry` above, counted separately because it is the dashboard ROW id rather than the service name. 16 entries in 7d. The row cannot become healthy until the service does.
+- `yield-harvester-shadow` — OPEN, same house again, third name. 8 entries in 7d. This is the second carry service; both now deploy and the runtime sole-writer guard picks the winner, so the remaining decision — which one to STOP — is the operator's.
+- `freqtrade-bots` — STRUCTURAL, not a house. 15 entries in 7d because it is the SHARED image every organ ships inside, so any organ change mentions it. This is the limit of a mention-counting detector, declared rather than tuned away: narrowing the extractor to hide it would blind the guard to a real recurrence in the same container.
+- `tide-rider-lighter` — OPEN and it is a genuine unclosed decision, the honest one on this list. 10 entries in 7d on a book with ZERO closed trades whose 35% stop is 2.3x the go-live drawdown bar, so it is structurally ineligible for real money as configured. It keeps being widened, wired and re-graded instead of being kept or retired. **Owner: operator — this is a keep-or-retire call, not a code change**, and every pass that tunes it instead is the exact behaviour I11 names.
+<!-- RECURRING:END -->
+
 ## What This Repo Is
 Eamon's crypto trading bot fleet — **LIGHTER-FIRST since 2026-07-14** (user
 decision: "all services must run off lighter"). Books are $1,000 paper/shadow

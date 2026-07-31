@@ -29,8 +29,24 @@ WHAT / WHY (2026-07-12)
 
   UNVALIDATED LIVE. Shadow fills on the real book via ShadowBroker; funding
   accrued hourly from the venue's own funding map, exactly as the backtest.
-  VENUE=lighter_live REFUSES to start in v1 — go-live is a separate decision
-  on the shadow record (see GO_LIVE_LIGHTER.md).
+
+  GO-LIVE [2026-07-31 (ia)] — PREPARED, NOT ARMED. v1 refused `lighter_live`
+  outright; v2 has a live path that needs THREE independent conditions, and
+  the default with no env set is still to exit:
+    1. VENUE=lighter_live       — the deployment choice
+    2. FUNDSPREAD_GOLIVE=1      — a deliberate second act, this bot only
+    3. the PUBLISHED go-live gate says READY for this book
+  (3) is what makes this preparation rather than a switch: the code cannot get
+  ahead of the evidence even with both env vars set. FAIL-CLOSED — a dark or
+  stale gate REFUSES, against this file's usual degrade-to-default habit,
+  because here the cost of a wrong default is unsupervised real money.
+  The live arm is PINNED to the validated config (K=5, $20/leg -> $200 gross)
+  and takes NO capacity lever; see GOLIVE_K and `apply_tuning(live=True)`.
+  Go-live remains an explicit operator act (see GO_LIVE_LIGHTER.md).
+
+  STATUS at ship: 3/6 bars (window 13.0d, n=28, t=1.23), equity $984.61 —
+  realised +$7.29 on 48 closes against -$22.68 OPEN on 24 legs. NOT READY, and
+  the gate above is what enforces that.
 
 RISK MODEL (why each gate exists)
   * No per-position stop — the BACKTESTED book has none (positions turn over
@@ -160,17 +176,99 @@ def lighter_market_ids():
 # (fz); it was inert only because nothing authored the lane yet.
 _ENV_DEFAULTS = {"K": K, "UNIVERSE_N": UNIVERSE_N}
 
+# ---------------------------------------------------------------------------
+# GO-LIVE [2026-07-31 (ia)]
+# ---------------------------------------------------------------------------
+#: THE VALIDATED CONFIG, and the live arm is PINNED to it regardless of levers.
+#: The backtest that earned this book its existence is the plateau CENTRE:
+#: 72h lookback / K=5 / 24h rebalance / $20 clips -> $200 gross (full +13.7%,
+#: h1 +5.7%, h2 +8.9%, maxDD 11.9%, survives 3x modelled slippage). The SHADOW
+#: arm has been running K=8-12 -> $320-480 gross, i.e. ABOVE what any evidence
+#: covers — (hs) found the growth rail had ratcheted it to the cage ceiling on
+#: a losing book. Real money starts at the number that was actually validated;
+#: widening it live is a new decision needing new evidence.
+GOLIVE_K = 5
+GOLIVE_ORDER_USD = 20.0
+#: The published verdict this bot trusts, and how stale it may be. 25h because
+#: the grader publishes 6-hourly: four missed cycles is an outage, not a blip.
+GOLIVE_KEY = "golive-readiness"
+GOLIVE_MAX_AGE_S = float(os.environ.get("FUNDSPREAD_GOLIVE_MAX_AGE_S", "90000"))
 
-def apply_tuning():
+
+def golive_blocker(bot, state=None, now=None):
+    """-> None if this book may trade REAL money, else the reason it may not.
+
+    FAIL-CLOSED: every uncertainty returns a refusal. A dark bus, a stale
+    payload, a missing book, an unparseable verdict and an unset opt-in all
+    read as "no". The only path to None is an explicit opt-in PLUS a fresh
+    published verdict that says this book is READY.
+    """
+    if os.environ.get("FUNDSPREAD_GOLIVE", "").strip() != "1":
+        return "FUNDSPREAD_GOLIVE is not set to 1 (deliberate second act)"
+    try:
+        if state is None:
+            state = store.load_state(GOLIVE_KEY)
+    except Exception as e:                       # noqa: BLE001
+        return f"go-live gate unreadable ({e})"
+    if not isinstance(state, dict) or not state:
+        return f"go-live gate '{GOLIVE_KEY}' is dark"
+    # freshness: the payload's own stamp, honoured the way fleet_bus does it
+    stamp = state.get("updated") or state.get("updated_at")
+    ts = _parse_iso(stamp)
+    if ts is None:
+        return f"go-live gate has no readable 'updated' stamp ({stamp!r})"
+    age = (float(now if now is not None else time.time()) - ts)
+    if age > GOLIVE_MAX_AGE_S:
+        return f"go-live gate is STALE ({age / 3600.0:.1f}h old)"
+    book = ((state.get("books") or {}).get(bot))
+    if not isinstance(book, dict):
+        return f"go-live gate has no entry for {bot}"
+    if book.get("ready") is not True:
+        bars = book.get("bars") or {}
+        missing = sorted(k for k, v in bars.items() if v is not True)
+        return (f"{bot} is NOT ready ({book.get('bars_passed')}/6 bars"
+                + (f", failing {'+'.join(missing)}" if missing else "") + ")")
+    return None
+
+
+def _parse_iso(s):
+    """Epoch seconds from an ISO stamp, or None. Never raises."""
+    if not s:
+        return None
+    try:
+        txt = str(s).strip().replace("Z", "+00:00")
+        dt = datetime.fromisoformat(txt)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+def apply_tuning(live=False):
     """Growth-rail levers over the env defaults. Bounded by the fleet_tuning
     registry; expired/absent/quarantined levers leave the defaults intact.
-    Returns {lever: value} of whatever actually moved."""
+    Returns {lever: value} of whatever actually moved.
+
+    [2026-07-31 (ia)] THE LIVE ARM TAKES NO CAPACITY LEVER. `fundspread.k`
+    sizes real exposure (gross = 2 * K * clip), and the growth rail is
+    authored by the evidence board on SHADOW evidence — (hs) measured it
+    ratcheting this very lever 5 -> 8 -> 12 (the cage ceiling) on a book at
+    -$27.75. A lane that can do that must not reach real money. `universe_n`
+    still applies live: it widens what the book can SEE, not what it holds,
+    so it cannot change exposure.
+    """
     global K, UNIVERSE_N
     if tuning is None:
         return {}
     moved = {}
+    if live:
+        K = GOLIVE_K                      # pinned, not merely defaulted
     for lever, attr in (("fundspread.k", "K"),
                         ("fundspread.universe_n", "UNIVERSE_N")):
+        if live and attr == "K":
+            continue                      # see the docstring: capacity is not
+                                          # lever-controlled on real money
         cur = globals()[attr]
         try:
             val = tuning.get_lever(lever, _ENV_DEFAULTS[attr])
@@ -341,15 +439,49 @@ def main():
     os.environ.setdefault("VENUE", "lighter_shadow")
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=False)
-    # [v1 GATE] UNVALIDATED LIVE — the shadow record must earn a separate,
-    # explicit go-live (own sub-account), like every bot before it.
+    # [v2 GATE, 2026-07-31 (ia)] — operator: "prepare Counterweight to go live".
+    # v1 refused `lighter_live` unconditionally. That is replaced by a live path
+    # that is PREPARED but not ARMED, and which cannot be armed by accident.
+    # DEFAULT BEHAVIOUR IS UNCHANGED: with no env set, this still exits.
+    #
+    # THREE INDEPENDENT CONDITIONS, all required, checked in this order:
+    #   1. VENUE=lighter_live            — the operator's deployment choice
+    #   2. FUNDSPREAD_GOLIVE=1           — a deliberate second act, this bot
+    #                                      only; no shared switch can arm it
+    #   3. the PUBLISHED go-live gate says READY for this book
+    #
+    # (3) IS THE POINT, and it is why this is preparation rather than a switch.
+    # Measured 31-Jul, the day this shipped: ⚖️ Counterweight is 3/6 bars
+    # (window 13.0d, n=28, t=1.23) with equity $984.61 — realised +$7.29 on 48
+    # closes against -$22.68 of OPEN loss on 24 legs. Its realised maxDD reads
+    # 0.2% against a 15% bar because it is ALWAYS-IN and its losses sit in
+    # positions it has not closed. On trajectory it passes all six bars in late
+    # August; (ia)'s MTM drawdown is what stops that being a green light on a
+    # book below $1,000. Wiring the gate in HERE means the code cannot get
+    # ahead of the evidence even if someone sets both env vars.
+    #
+    # FAIL-CLOSED, deliberately and against this file's usual habit: a dark
+    # bus, a stale payload or an unreadable verdict REFUSES. Everywhere else in
+    # this bot an organ outage degrades to the operator's configured behaviour,
+    # because the cost is a missed shadow trade. Here the cost is unsupervised
+    # real money, so absence of evidence must never read as permission.
     if ctx.mode == "lighter_live":
-        raise SystemExit("perps-funding-spread is UNVALIDATED live — v1 refuses "
-                         "lighter_live. Run VENUE=lighter_shadow to build the "
-                         "record; go-live is a separate decision.")
+        _why = golive_blocker(BOT)
+        if _why:
+            raise SystemExit(f"perps-funding-spread REFUSES lighter_live: {_why}. "
+                             "Run VENUE=lighter_shadow to keep building the "
+                             "record; go-live stays an explicit operator act.")
+        log.warning("LIVE ARMED — gate READY, FUNDSPREAD_GOLIVE=1. Trading REAL "
+                    "money at the VALIDATED config (K=%d, $%.0f/leg).",
+                    GOLIVE_K, GOLIVE_ORDER_USD)
     bot_id = ctx.bot_id
     broker = ctx.broker
-    order_usd = ctx.order_usd(ORDER_USD, own=True)   # backtested $20/leg clip
+    # [2026-07-31 (ia)] BOTH TERMS OF THE EXPOSURE ARE PINNED LIVE. Gross is
+    # 2 * K * clip; pinning K alone would leave the clip free to reopen the
+    # same hole from the other side.
+    order_usd = ctx.order_usd(
+        GOLIVE_ORDER_USD if ctx.mode == "lighter_live" else ORDER_USD,
+        own=True)   # backtested $20/leg clip
     shadow_tag = ctx.mode == "lighter_shadow"
 
     # [2026-07-30] Levers first, THEN the universe — UNIVERSE_N is itself a
@@ -357,7 +489,8 @@ def main():
     # boot's width. The configured list is always kept; the scout only ever
     # ADDS, and a dark scout leaves this exactly as it was.
     global COINS
-    _moved = apply_tuning()
+    _is_live = ctx.mode == "lighter_live"
+    _moved = apply_tuning(live=_is_live)
     COINS = resolve_universe(COINS, UNIVERSE_N, UNIVERSE_MIN_VOL_M)
     COINS, _dead = prune_dead(COINS, ctx.supports)
     if _dead:
@@ -477,7 +610,7 @@ def main():
         # is what makes the authored value reach a trade. (UNIVERSE_N stays a
         # boot-time decision: widening the universe mid-run would rank coins
         # whose funding history was never backfilled.)
-        _lv = apply_tuning()
+        _lv = apply_tuning(live=_is_live)
         if _lv:
             log.info("levers applied %s (K=%d)", _lv, K)
         if now.date() != cur_day:
@@ -774,8 +907,94 @@ def _selftest():
             "born-dark import -> configured list, no AttributeError"
     finally:
         globals()["fleet_bus"] = _saved_bus
+    # ---- [2026-07-31 (ia)] THE GO-LIVE GATE ------------------------------
+    # This is the only thing standing between a shadow book and real money, so
+    # every refusal path is pinned. FAIL-CLOSED means: the ONLY input that
+    # returns None is opt-in + fresh + ready.
+    _saved_env = os.environ.get("FUNDSPREAD_GOLIVE")
+    _now = 1_800_000_000.0
+    _fresh = datetime.fromtimestamp(_now - 60, timezone.utc).isoformat()
+    _stale = datetime.fromtimestamp(_now - 200_000, timezone.utc).isoformat()
+
+    def _payload(ready, updated=None, bars=None):
+        return {"updated": updated or _fresh,
+                "books": {BOT: {"ready": ready, "bars_passed": 6 if ready else 3,
+                                "bars": bars or {b: ready for b in
+                                                 ("window", "closes", "mean",
+                                                  "t", "halves", "maxdd")}}}}
+    try:
+        # 1. NO OPT-IN -> refuse, even with a perfect gate. The env var is a
+        #    deliberate act and nothing else may substitute for it.
+        os.environ.pop("FUNDSPREAD_GOLIVE", None)
+        assert golive_blocker(BOT, _payload(True), _now), "no opt-in must refuse"
+        for _v in ("", "0", "true", "yes", "on", "TRUE"):
+            os.environ["FUNDSPREAD_GOLIVE"] = _v
+            assert golive_blocker(BOT, _payload(True), _now), \
+                f"FUNDSPREAD_GOLIVE={_v!r} must not arm the live path"
+        # ...but WHITESPACE IS TOLERATED, and that is a decision, not an
+        # accident: a Railway env var picking up a stray space would otherwise
+        # refuse to arm with no visible reason, which is a footgun pointing the
+        # other way. The value must still be "1" — no truthy synonyms above.
+        os.environ["FUNDSPREAD_GOLIVE"] = " 1 "
+        assert golive_blocker(BOT, _payload(True), _now) is None, \
+            "a stray space must not silently block a deliberate go-live"
+        os.environ["FUNDSPREAD_GOLIVE"] = "1"
+
+        # 2. WITH opt-in, the GATE decides — and every uncertainty refuses.
+        assert golive_blocker(BOT, _payload(True), _now) is None, \
+            "opt-in + fresh + READY is the one path that arms"
+        _not_ready = golive_blocker(BOT, _payload(False), _now)
+        assert _not_ready and "NOT ready" in _not_ready, _not_ready
+        # the refusal must NAME the failing bars — a detector that says "no"
+        # without saying why sends the operator hunting ((ht)'s lesson)
+        _bars = {"window": False, "closes": True, "mean": True, "t": False,
+                 "halves": True, "maxdd": True}
+        _msg = golive_blocker(BOT, _payload(False, bars=_bars), _now)
+        assert "window" in _msg and "t" in _msg, _msg
+
+        # FAIL-CLOSED on every flavour of missing evidence
+        assert golive_blocker(BOT, {}, _now), "dark gate must refuse"
+        assert golive_blocker(BOT, None, _now), "None gate must refuse"
+        assert golive_blocker(BOT, {"books": {}}, _now), "no stamp must refuse"
+        assert golive_blocker(BOT, _payload(True, updated="not-a-date"), _now), \
+            "unparseable stamp must refuse, not pass"
+        _st = golive_blocker(BOT, _payload(True, updated=_stale), _now)
+        assert _st and "STALE" in _st, _st
+        # a payload for a DIFFERENT book must never arm this one
+        assert golive_blocker(BOT, {"updated": _fresh,
+                                    "books": {"some-other-bot": {"ready": True}}},
+                              _now), "another book's verdict is not ours"
+        # 'ready' must be exactly True — a truthy string must not arm real money
+        for _bad in ("yes", 1, "READY"):
+            assert golive_blocker(BOT, {"updated": _fresh,
+                                        "books": {BOT: {"ready": _bad}}}, _now), \
+                f"ready={_bad!r} is not True and must refuse"
+    finally:
+        if _saved_env is None:
+            os.environ.pop("FUNDSPREAD_GOLIVE", None)
+        else:
+            os.environ["FUNDSPREAD_GOLIVE"] = _saved_env
+
+    # THE LIVE ARM TAKES NO CAPACITY LEVER, and both terms of the exposure are
+    # pinned. (hs) measured the rail ratcheting `fundspread.k` 5 -> 8 -> 12 on
+    # a book at -$27.75; that lane must not reach real money.
+    assert GOLIVE_K == 5 and GOLIVE_ORDER_USD == 20.0, \
+        "the live config must be the BACKTESTED plateau centre"
+    import inspect as _ins
+    _src = _ins.getsource(apply_tuning)
+    assert 'if live and attr == "K"' in _src and "K = GOLIVE_K" in _src, \
+        "apply_tuning must pin K live, not merely default it"
+    _saved_k = K
+    try:
+        globals()["K"] = 99
+        apply_tuning(live=True)
+        assert K == GOLIVE_K, "live must PIN K back to the validated value"
+    finally:
+        globals()["K"] = _saved_k
+
     print("[counterweight] selftest OK (fresh-mid/one-sided/venue-down/"
-          "ledger-row/universe-widening)")
+          "ledger-row/universe-widening; go-live gate: opt-in, ready, "
+          "freshness, fail-closed, live config pinned)")
 
 
 def _supervised():

@@ -461,6 +461,95 @@ STALE_WRITER_OK = {
 }
 
 
+#: A bot_pnl row older than this is DEAD, not merely quiet. The fleet's
+#: freshness convention (fleet_risk uses 65 min); doubled here because this
+#: detector only needs to exclude the unambiguous corpses, and a book that
+#: publishes on a 4h candle legitimately drifts past one hour.
+STALE_ROW_S = float(os.environ.get("IMMUNE_STALE_ROW_S", "7800"))
+
+
+def _row_stale(row, now=None):
+    """True when a bot_pnl row has stopped being written. Unknown age reads as
+    NOT stale: this only ever SUPPRESSES a finding, so an unreadable stamp
+    must not silently mute a real one."""
+    age = row.get("age_sec")
+    if age is None:
+        ts = _parse_ts(row.get("updated_at"))
+        if ts is None:
+            return False
+        age = (float(now if now is not None else now_ts()) - ts)
+    try:
+        return float(age) > STALE_ROW_S
+    except (TypeError, ValueError):
+        return False
+
+
+def _parse_ts(s):
+    """Epoch seconds from an ISO stamp, else None. Never raises."""
+    if not s:
+        return None
+    try:
+        import datetime as _d
+        txt = str(s).strip().replace("Z", "+00:00")
+        dt = _d.datetime.fromisoformat(txt)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_d.timezone.utc)
+        return dt.timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+#: [2026-07-31 (hx)] BRAIN AMNESIA. `learning-brain` is the brain's MEMORY;
+#: `brain-vitals` is what it publishes each run. If the memory's `runs` falls
+#: behind vitals' `run`, the brain is recomputing from a frozen state — it
+#: looks healthy on every other key while `mult_streaks` cannot advance and the
+#: 3-run promotion gate is unreachable. Measured 31-Jul: 337 vs 338 for THREE
+#: DAYS, one multiplier published against 20 living bots.
+#: How far `learning-brain`'s write may trail `brain-vitals`' before the
+#: memory is judged broken. Generous (6h) against a brain that runs every
+#: ~30-60 min: this must catch a DAYS-long freeze, not a slow cycle.
+BRAIN_MEMORY_SKEW_S = float(os.environ.get("IMMUNE_BRAIN_SKEW_S", "21600"))
+
+
+def brain_amnesia(brain_state, vitals_state, max_skew_s=None):
+    """-> [{organ, detail}] when the brain's MEMORY key has stopped being
+    written while it keeps publishing fresh vitals.
+
+    THE TEST IS THE TIMESTAMP SKEW, NOT THE RUN COUNTER, and the first cut of
+    this got that wrong. `learning-brain` and `brain-vitals` are written by the
+    SAME process in the SAME cycle, so their `updated` stamps travel together;
+    a memory three days behind fresh vitals is a failed write, full stop.
+
+    The run counter CANNOT detect this, which is why the counter version fired
+    nothing on the live payload it was written for. A brain whose save fails
+    reloads run N, computes N+1, publishes N+1 and fails to store it — so the
+    lag is PERMANENTLY 1, byte-identical to the normal write-after-publish
+    ordering, no matter how many days it has been stuck. Measured: runs=337 vs
+    run=338 after THREE DAYS. The counter is reported in the detail because it
+    is useful context; it is not the trigger.
+
+    Fail-safe QUIET: either key missing or either stamp unreadable says
+    nothing — a booting brain or a briefly dark bus must not page anyone.
+    """
+    skew_max = BRAIN_MEMORY_SKEW_S if max_skew_s is None else max_skew_s
+    b, v = (brain_state or {}), (vitals_state or {})
+    bt = _parse_ts(b.get("updated") or b.get("updated_at"))
+    vt = _parse_ts(v.get("updated") or v.get("updated_at"))
+    if bt is None or vt is None:
+        return []
+    skew = vt - bt
+    if skew <= skew_max:
+        return []
+    runs, run = b.get("runs"), v.get("run")
+    return [{"organ": "learning-brain",
+             "detail": (f"MEMORY NOT PERSISTING — vitals published "
+                        f"{skew / 3600.0:.1f}h more recently than the stored "
+                        f"state (runs={runs} vs run={run}). The brain reloads a "
+                        f"frozen state every cycle, so mult_streaks cannot "
+                        f"advance and streak-gated promotion is UNREACHABLE. "
+                        f"Check bot_learn's 'BRAIN MEMORY NOT PERSISTED' line.")}]
+
+
 def stale_writer_sickness(bot_rows, ok=None, min_stamped=5):
     """[2026-07-31 (hu)] A FRESH row published by a container running code
     that predates `extra.svc` — i.e. a deploy that reported OK and never
@@ -498,6 +587,19 @@ def stale_writer_sickness(bot_rows, ok=None, min_stamped=5):
         if not bot or bot in ok:
             continue
         if (r.get("extra") or {}).get("svc"):
+            continue
+        # [2026-07-31 (hx)] A DEAD ROW IS NOT A STALE DEPLOY, and saying so was
+        # an actively wrong instruction. (hu) shipped this detector and hours
+        # later it fired on 🌾 carry with "its container is running code that
+        # predates the stamp" — while that row was 779 MINUTES old, i.e. the
+        # publisher had been gone since 03:10 and no container was running
+        # anything. A row that has stopped publishing has no `svc` for the
+        # trivial reason that it has no writer; diagnosing that as a deploy
+        # problem sends the operator to the wrong system entirely.
+        # STALENESS IS THE WATCHDOG'S CALL, not this detector's — it already
+        # reports STALE rows, so claiming them here would double-report one
+        # condition under two different names.
+        if _row_stale(r):
             continue
         build = (r.get("extra") or {}).get("build")
         out.append({"organ": bot,
@@ -568,7 +670,11 @@ def run_once():
              # the scanner above is dead code — the classic registered-but-inert
              # shape, and the reason this list and the scanner must be changed in
              # the same commit. `test_immune_two_writers.py` asserts membership.
-             "golive-readiness")
+             "golive-readiness",
+             # [2026-07-31 (hx)] the brain's MEMORY, read against
+             # `brain-vitals` above to detect amnesia. Same lesson as the
+             # (hh) note: without this key `brain_amnesia` is dead code.
+             "learning-brain")
     _batch = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     states = {k: (_batch.get(k) or store.load_state(k) or {}) for k in _keys} \
         if not _batch else {k: (_batch.get(k) or {}) for k in _keys}
@@ -615,6 +721,8 @@ def run_once():
     app = application_sickness(levers, _papers, now, app_seen)
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
             + stale_writer_sickness(bot_rows)
+            + brain_amnesia(states.get("learning-brain"),
+                            states.get("brain-vitals"))
             + [{"organ": "fleet-tuning", "detail": f"{n}: {w}"} for n, w in q.items()]
             + [{"organ": "lever-application", "detail": f"{n}: {w}"}
                for n, w in app.items()])
@@ -985,6 +1093,67 @@ def _selftest():
     import inspect as _ins2
     assert "stale_writer_sickness(bot_rows)" in _ins2.getsource(run_once), \
         "a detector nothing consumes is a note, not a guard"
+
+    # ---- [2026-07-31 (hx)] A DEAD ROW IS NOT A STALE DEPLOY ---------------
+    # (hu) shipped stale_writer_sickness and hours later it fired on 🌾 carry
+    # with "a deploy that never landed" while that row was 779 MINUTES old —
+    # the publisher had been gone since 03:10. Diagnosing a corpse as a deploy
+    # problem sends the operator to the wrong system.
+    _dead = _row("perps-funding-carry-lshadow", None, "fbb926402049")
+    _dead["age_sec"] = 779 * 60
+    assert stale_writer_sickness(_fleet + [_dead]) == [], \
+        "a STALE row is the watchdog's finding, not a deploy diagnosis"
+    # ...but a FRESH unstamped row is still exactly what this detector is for
+    _live_unstamped = _row("perps-funding-carry-lshadow", None, "fbb926402049")
+    _live_unstamped["age_sec"] = 120
+    assert [s["organ"] for s in stale_writer_sickness(_fleet + [_live_unstamped])] \
+        == ["perps-funding-carry-lshadow"], "a fresh unstamped row must fire"
+    # the staleness test reads updated_at when age_sec is absent...
+    import datetime as _dtm
+    _old_iso = (_dtm.datetime.now(_dtm.timezone.utc)
+                - _dtm.timedelta(seconds=STALE_ROW_S + 600)).isoformat()
+    _d2 = _row("perps-funding-carry-lshadow", None, "x")
+    _d2["updated_at"] = _old_iso
+    assert stale_writer_sickness(_fleet + [_d2]) == [], "updated_at must count"
+    # ...and an UNKNOWN age must NOT mute a finding — suppression only ever
+    # happens on positive evidence of death.
+    _unknown = _row("perps-funding-carry-lshadow", None, "x")
+    assert stale_writer_sickness(_fleet + [_unknown]), \
+        "an unreadable age must not silently suppress a real finding"
+
+    # ---- [2026-07-31 (hx)] BRAIN AMNESIA ---------------------------------
+    # Measured: learning-brain.runs=337 while brain-vitals.run=338 for THREE
+    # DAYS. The brain looked healthy on every other key.
+    # THE REAL SHAPE: memory stamped 28-Jul, vitals stamped today, and the run
+    # counters only ONE apart -- which is why a counter test cannot see this.
+    _mem = {"runs": 337, "updated": "2026-07-28T14:50:35+00:00"}
+    _vit = {"run": 338, "updated": "2026-07-31T14:12:06+00:00"}
+    _am = brain_amnesia(_mem, _vit)
+    assert _am and _am[0]["organ"] == "learning-brain", _am
+    assert "mult_streaks" in _am[0]["detail"], "say WHAT it costs"
+    # THE REGRESSION THIS PINS: a counter-based test reads lag=1 here and says
+    # nothing. If brain_amnesia ever goes back to triggering on the counter,
+    # this fixture goes quiet and the assertion above fails.
+    assert int(_vit["run"]) - int(_mem["runs"]) == 1, \
+        "the fixture must keep the counters 1 apart or it stops proving this"
+    # a healthy brain -- both stamps together -- says nothing
+    _ok_t = "2026-07-31T14:12:06+00:00"
+    assert brain_amnesia({"runs": 338, "updated": _ok_t},
+                         {"run": 338, "updated": _ok_t}) == []
+    # a normal cycle's small skew is not amnesia
+    assert brain_amnesia({"runs": 337, "updated": "2026-07-31T13:00:00+00:00"},
+                         {"run": 338, "updated": _ok_t}) == [], \
+        "an hour of skew is a slow cycle, not a failed write"
+    # FAIL-SAFE QUIET: missing keys / unreadable stamps never fire
+    for _a, _b in (({}, _vit), (_mem, {}), (None, None),
+                   ({"updated": "nope"}, _vit), (_mem, {"updated": None})):
+        assert brain_amnesia(_a, _b) == [], (_a, _b)
+    # wired, and its key is FETCHED — without that it is dead code (the (hh)
+    # lesson, which this file already learned once)
+    _src_run = _ins2.getsource(run_once)
+    assert "brain_amnesia(" in _src_run, "brain_amnesia must be consumed"
+    assert '"learning-brain"' in _src_run, \
+        "learning-brain must be in the _keys fetch or the detector is inert"
     assert application_sickness({}, [], now, {}) == {}
     # [2026-07-17 AUDIT] THE NOTIFY LEDGER: `notified` must mean DELIVERED, not
     # SEEN. It was committed with every sick_id before the push decision, so a
