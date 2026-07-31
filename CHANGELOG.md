@@ -1,3 +1,47 @@
+## 2026-08-01 (hv) — 💰 THE ALLOCATION ORGAN: the fleet could say whether a book was SAFE, never where the money should go
+
+- **THE ASK** (operator): *"with growth in mind let's make the best outcome for our growing ecosystem."* Suite **722**, six guards green, three mutations red.
+- **THE STRUCTURAL GAP.** The fleet runs a dozen organs answering *"is this book safe?"* — risk light, immune, regen, proprioception, respiration, the go-live grader — and **not one** answering *"where should the money go?"*. Every shadow book is handed $1,000 regardless of evidence and always has been, so the best-evidenced book and a book with ZERO closed trades in twenty days carry identical capital and nothing in the system notices.
+- **THE MEASUREMENT THAT MAKES IT URGENT** (live ledger, 30-Jul): FUNDING books **3 books / n=212 / net +$72.89**; DIRECTIONAL books **18 books / n=809 / net −$9.21**. Six times the books and four times the trades on the side that does not pay. That is not a tuning problem — it is an allocation problem, and the fleet had no instrument that could even state it.
+
+### What it says on the live ledger, run today
+
+| | books | closes | current | evidence-weighted |
+|---|---:|---:|---:|---:|
+| **funding** | 4 | 297 | $4,000 | **$16,000** |
+| **directional** | 16 | 867 | $16,000 | **$4,000** |
+
+**ZERO of the 16 directional books has a measured claim. Three of the four funding books do** — 💸 the Farmer's shadow arm (strongest), the LIVE Farmer, and 🌾 carry. ⚖️ Counterweight has n=48 and still no claim: its lower bound is not above zero. An exact inversion of how the capital actually sits.
+
+### The rule: rank on a LOWER BOUND, never on the mean
+
+- A book's claim is `max(0, mean − 1.28·SE)` on per-trade return. **Ranking on the mean rewards small samples that got lucky**; the bound is self-correcting — a big mean on a tiny n has a wide SE and therefore a weak claim, exactly as it should. This is the principle the incubator already learned ([[incubator-evidence-denominated-in-fills]]), applied to capital.
+- **Z=1.28 (90%), deliberately gentler than the gate's t≥2.0.** This decides where to LEARN next, not what may hold real money. Using the gate's bar here would starve every undecided book and the fleet would stop discovering anything.
+- **Every living book keeps a 25% PROBE FLOOR.** A book cannot earn evidence with no capital, so starving an undecided book to zero is how a fleet stops learning. The floor is the price of optionality and it is stated, not hidden.
+- **Total capital is CONSERVED by construction** — it never proposes spending more, only spending it differently.
+- **With no measured claim anywhere the output is EXACTLY the flat allocation.** The organ says "no opinion" rather than inventing a plausible-looking split; that is the honest common case early in a book's life and it must not look like a recommendation.
+
+### What it deliberately is NOT
+
+- **It moves NO capital.** No lever, no clip, no promotion. `test_it_writes_no_lever` asserts the module contains no `write_levers`, `get_lever`, `fleet_tuning`, `market_open` or `publish_paper_trade` — automating capital movement is a large new actuator on a fleet whose growth rail is bounded and TTL'd for good reasons. The operator gets the number, not a fait accompli.
+- **It is NOT a second go-live gate.** The gate lives in `scripts/golive_readiness` and is IMPORTED, never re-implemented — a second copy of a rule that governs real money is a second rule, the 30-Jul `evidence_review` defect. Allocation asks a different question: not *"may this book hold real money?"* but *"where is the next dollar best spent?"*
+
+### Two things caught while building it
+
+- **A DEGENERATE-VARIANCE TRAP.** `if var <= 0` looks right and is not: 30 × 0.01 sums to 0.30000000000000004, so identical returns give a variance of ~1e-36 rather than zero, the bound collapses onto the mean, and **a book with no dispersion would out-claim every real one**. Floored at 1e-18.
+- **MY OWN FIXTURES WERE DEGENERATE** — constant return series, which `lower_bound` correctly refuses to score, so the ranking test proved nothing about ranking. Real books have dispersion and the fixtures now do too. Third time this session that a fixture tested the code's degenerate path instead of its real one.
+- **Mutation-verified**: rank-on-mean, remove-the-floor and overspend each turn the suite red.
+
+### Wiring — the born-dark checklist, all four halves
+
+`COPY` into `Dockerfile.freqtrade`, a `--publish` loop in `run_all.sh` (sharing the radar's 30-min cadence and its single ledger fetch), a `paths:` entry AND the service grep in `railway-redeploy.yml`, and registration in `tests/test_selftests.py`. `audit_image_imports` and `audit_deploy_coverage` both green. Publishing is opt-in (`--publish`) so a bare laptop run against the shared DB writes nothing.
+
+**Also observed in production on its first live run:** the `(hr)` ledger quarantine fired — *"44 row(s) withheld from grading"* — so the BOT/USDC churn episode is now out of every grader's input, as intended.
+
+### What this makes possible, stated as a question rather than an answer
+
+The organ does not say "move the money". It says the funding class is the only place the fleet has measured evidence, and that 80% of the capital is on the side with none. **Whether to act on that is the operator's call**, and it now has a number attached instead of an impression — which is what "structured for growth" has to mean before any capital moves.
+
 ## 2026-07-31 (hu) — `funding-carry` IS THE DEAD ONE: (ht) ANSWERED THE QUESTION AND I READ THE ANSWER BACKWARDS
 
 - **THE ASK** (operator): *"fix and amend and correct and implement optimisations"*, after `(ht)` shipped and its first measurement contradicted the instruction `(ht)` itself had written.

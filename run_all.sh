@@ -307,6 +307,9 @@ done &
 ( sleep 660
   while true; do
     python3 /freqtrade/fleet_radar.py --publish || true
+    # [2026-08-01 (hv)] 💰 allocation view: where SHOULD the capital be?
+    # Publish-only and advisory — it moves no capital and writes no lever.
+    python3 /freqtrade/fleet_allocation.py --publish || true
     sleep "${RADAR_INTERVAL_SEC:-1800}"
   done ) &
 

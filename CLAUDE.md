@@ -349,6 +349,22 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   ineligible. Any stop at-or-beyond the bar must be DECLARED with a reason
   (the `BORN_DARK_OK` idiom) — none was moved, because Index Rider has zero
   closes and there is no evidence to set a number against.
+- `fleet_allocation.py` 💰 — the ALLOCATION organ (2026-08-01 (hv), operator:
+  "structured for growth ... the best outcome for our growing ecosystem"). The
+  fleet had a dozen organs answering "is this book SAFE?" and none answering
+  "where should the MONEY go?" — every shadow book gets $1,000 regardless of
+  evidence. Measured: FUNDING 3 books / n=212 / **+$72.89**; DIRECTIONAL 18
+  books / n=809 / **−$9.21**. Ranks each book by `max(0, mean − 1.28·SE)` on
+  per-trade return — a LOWER BOUND, so a big mean on a tiny n has a wide SE and
+  a weak claim; every living book keeps a **25% probe floor** (a book cannot
+  earn evidence with no capital); total capital is CONSERVED; and with no
+  measured claim anywhere it returns EXACTLY the flat allocation rather than
+  inventing a split. First live run: funding $4k→$16k, directional $16k→$4k,
+  **0 of 16 directional books with any claim**. **ADVISORY — it moves no
+  capital, writes no lever, promotes nothing** (asserted: the module contains
+  no `write_levers`/`get_lever`/`market_open`). NOT a second go-live gate — the
+  gate is IMPORTED from `golive_readiness`. → bot_state `fleet-allocation`,
+  30-min `--publish` loop sharing the radar's ledger fetch.
 - `scripts/golive_readiness.py` 🚦 — the GO-LIVE GRADER, an ORGAN since
   2026-07-30 (gk). Grades every LIVING book against the `(fk)` bar and
   publishes → `golive-readiness` (6-hourly `--publish` loop in `run_all.sh`;

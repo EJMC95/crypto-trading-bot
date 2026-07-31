@@ -111,6 +111,7 @@ SELFTEST_MODULES = [
     "experiment_judge",
     "fleet_agronomy",
     "fleet_radar",
+    "fleet_allocation",
     "fleet_bus",
     "fleet_clock",
     "fleet_immune",
