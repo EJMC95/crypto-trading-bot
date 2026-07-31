@@ -447,6 +447,136 @@ def stats(rows, book_usd=None):
 #: pins them.
 BAR_NAMES = ("window", "closes", "mean", "t", "halves", "maxdd")
 
+# ---------------------------------------------------------------------------
+# MARK-TO-MARKET DRAWDOWN [2026-07-31 (hw)] — operator: "prepare Counterweight
+# to go live", and this is the prerequisite that makes that decision honest.
+#
+# THE DEFECT (hl) NAMED AND DEFERRED. `stats()` accumulates CLOSED trades, so
+# for a book that HOLDS most of the time most of its drawdown is invisible to
+# the bar that governs real money. (hl) proved the two definitions can disagree
+# about the VERDICT on 📊 Index Rider; (hq) started the equity series.
+#
+# ⚖️ COUNTERWEIGHT IS WHERE IT BITES HARDEST, measured 31-Jul:
+#   realised +$7.29 over 48 closes -> maxDD reads 0.2% against a 15% bar,
+#   while the book's actual equity is $984.61, i.e. -$22.68 of OPEN loss on 24
+#   legs it has not closed. It is ALWAYS-IN by construction, so its losses live
+#   almost entirely where the realised bar cannot see them.
+# And the three bars it fails are window/closes/t — pure TIME AND SAMPLE SIZE.
+# At 2.15 closes/day it reaches n=30 in a day, 30 days on ~17-Aug and t=2.0 at
+# n~74 (~21-Aug). So on trajectory THIS BOOK PASSES ALL SIX BARS IN LATE AUGUST
+# WHILE ITS EQUITY IS BELOW $1,000. That is the failure this closes.
+#
+# WHY THIS DOES NOT TOUCH `bar_map`/`grade`. Those two are selftest-BOUND to be
+# exactly equivalent, and that binding is load-bearing. So the MTM number is
+# folded into `max_dd_frac` BEFORE they see it (`apply_mtm`), and both keep
+# reading one field. The bar's definition does not change; its INPUT gets
+# honest.
+#
+# STRICTLY RESTRICTIVE: `apply_mtm` takes the WORSE of realised and MTM, so it
+# can only ever fail a book that currently passes. It never rescues one.
+#
+# FLOORS, and they are the reason (hl) refused to ship this on day one: an
+# empty or thin series must not decide anything. Below them the realised bar
+# stands unchanged and the payload says so via `maxdd_basis`, so a provisional
+# verdict is never mistaken for a graded one.
+MTM_MIN_SAMPLES = int(os.environ.get("GOLIVE_MTM_MIN_SAMPLES", "200"))
+MTM_MIN_DAYS = float(os.environ.get("GOLIVE_MTM_MIN_DAYS", "7"))
+
+
+def mtm_drawdown(samples, book_usd=None):
+    """Peak-to-trough drawdown of a MARK-TO-MARKET equity series.
+
+    samples: [(ts, equity)] in any order, ts a datetime. Pure — the history
+    read is the caller's job, same split as `stats`.
+
+    Returns None when the series cannot support a verdict (fewer than 2 usable
+    points), so the caller can fall back rather than act on a fabricated 0.0 —
+    a book with no series is not a book with no drawdown.
+    """
+    pts = []
+    for s in samples or []:
+        try:
+            ts, eq = s[0], float(s[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if eq != eq or eq in (float("inf"), float("-inf")):
+            continue                       # NaN/inf is not an observation
+        pts.append((ts, eq))
+    if len(pts) < 2:
+        return None
+    pts.sort(key=lambda p: p[0])
+    book_usd = BOOK_USD if book_usd is None else book_usd
+    peak = pts[0][1]
+    dd = 0.0
+    for _, eq in pts:
+        peak = max(peak, eq)
+        dd = min(dd, eq - peak)
+    days = (pts[-1][0] - pts[0][0]).total_seconds() / 86400.0
+    return {"n": len(pts), "days": days,
+            "max_dd_usd": dd,
+            "max_dd_frac": abs(dd) / book_usd if book_usd else None,
+            "first_equity": pts[0][1], "last_equity": pts[-1][1],
+            "peak_equity": max(e for _, e in pts)}
+
+
+def equity_series(bot, store=None, limit=20000):
+    """[(ts, equity)] from `<bot>:equity` in bot_state_history — the series
+    `snapshot_equity` writes. Returns [] on a dark DB or any error: the caller
+    treats empty as "grade on realised", which is exactly today's behaviour, so
+    an unavailable history can never change a verdict.
+    """
+    try:
+        if store is None:
+            import bot_pnl_store as store          # noqa: PLC0415
+        rows = store.load_history(str(bot) + ":equity", limit=limit) or []
+    except Exception:                              # noqa: BLE001
+        return []
+    out = []
+    for r in rows:
+        try:
+            eq = (r.get("payload") or {}).get("equity")
+            if eq is None:
+                continue
+            ts = parse_stamp(r.get("ts"))
+            if ts is None:
+                continue                           # an unreadable stamp is
+                                                   # dropped, never guessed
+            out.append((ts, float(eq)))
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return out
+
+
+def apply_mtm(s, mtm, min_samples=None, min_days=None):
+    """Fold an MTM drawdown into `s` so `bar_map`/`grade` grade the WORSE of
+    the two definitions. Returns a NEW dict; never mutates the caller's.
+
+    `maxdd_basis` is always published: 'mtm' when the series decided,
+    'realised' when it did not, plus `mtm` itself (or the reason it was
+    unusable) so a thin series is visible rather than silently ignored.
+    """
+    min_samples = MTM_MIN_SAMPLES if min_samples is None else min_samples
+    min_days = MTM_MIN_DAYS if min_days is None else min_days
+    out = dict(s or {})
+    out["mtm"] = mtm
+    if not mtm or mtm.get("max_dd_frac") is None:
+        out["maxdd_basis"] = "realised"
+        out["mtm_why"] = "no usable equity series"
+        return out
+    if mtm["n"] < min_samples or mtm["days"] < min_days:
+        out["maxdd_basis"] = "realised"
+        out["mtm_why"] = (f"series too thin to decide "
+                          f"({mtm['n']}/{min_samples} samples, "
+                          f"{mtm['days']:.1f}/{min_days:g}d)")
+        return out
+    realised = out.get("max_dd_frac")
+    worse = mtm["max_dd_frac"] if realised is None else max(realised,
+                                                           mtm["max_dd_frac"])
+    out["max_dd_frac_realised"] = realised
+    out["max_dd_frac"] = worse
+    out["maxdd_basis"] = "mtm" if worse == mtm["max_dd_frac"] else "realised"
+    return out
+
 
 def bar_map(s):
     """{bar_name: passed} for one book — the same six conditions `grade()`
@@ -545,6 +675,26 @@ def book_payload(s):
     bars = bar_map(s)
     out = {"n": s.get("n", 0), "bars": bars, "bar_names": list(BAR_NAMES),
            "bars_passed": sum(bars.values())}
+    # [2026-07-31 (hw)] The MTM drawdown rides on EVERY payload, including the
+    # n<2 early return below — a book too thin to grade on closes may still
+    # have an equity series, and that is exactly the always-in book this
+    # exists for. `maxdd_basis` states which definition decided, so a reader
+    # can never mistake a provisional realised verdict for a graded one.
+    if s.get("maxdd_basis"):
+        out["maxdd_basis"] = s["maxdd_basis"]
+    if s.get("mtm_why"):
+        out["mtm_why"] = s["mtm_why"]
+    _m = s.get("mtm")
+    if _m:
+        out["mtm"] = {
+            "n": _m.get("n"), "days": (round(_m["days"], 1)
+                                       if _m.get("days") is not None else None),
+            "max_dd_pct": (round(100 * _m["max_dd_frac"], 2)
+                           if _m.get("max_dd_frac") is not None else None),
+            "last_equity": _m.get("last_equity"),
+            "peak_equity": _m.get("peak_equity")}
+    if s.get("max_dd_frac_realised") is not None:
+        out["max_dd_pct_realised"] = round(100 * s["max_dd_frac_realised"], 2)
     if s.get("n", 0) < 2:
         out.update(days=None, mean_pct=None, t=None, win_pct=None,
                    max_dd_pct=None, h1=None, h2=None,
@@ -730,8 +880,71 @@ def _selftest():
     bp2 = book_payload(good)
     assert bp2["bars_passed"] == 6 and bp2["t"] is not None, bp2
 
+    # ---- [2026-07-31 (hw)] MARK-TO-MARKET DRAWDOWN -----------------------
+    # THE INCIDENT SHAPE: ⚖️ Counterweight, always-in, realised maxDD 0.2%
+    # against a 15% bar while its equity sits at $984.61 — the loss is in
+    # positions it has not closed.
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
+
+    def _eq(vals, step_h=1.0, start=None):
+        t0 = start or _dt(2026, 7, 1)
+        return [(t0 + _td(hours=step_h * i), v) for i, v in enumerate(vals)]
+
+    # a series that dips to 900 off a 1000 peak is a 10% MTM drawdown
+    md = mtm_drawdown(_eq([1000, 1050, 900, 1010]))
+    assert md["n"] == 4 and abs(md["max_dd_frac"] - 0.150) < 1e-9, md
+    assert md["peak_equity"] == 1050 and md["last_equity"] == 1010, md
+    # ORDER MUST NOT MATTER — history comes back NEWEST FIRST
+    assert mtm_drawdown(_eq([1000, 1050, 900, 1010])[::-1])["max_dd_frac"] == \
+        md["max_dd_frac"], "the series must be sorted, not assumed ordered"
+    # unusable series -> None, never 0.0. A book with no series is NOT a book
+    # with no drawdown, and 0.0 would silently PASS the bar.
+    for bad in ([], None, [(_dt(2026, 7, 1), 1000.0)],
+                [(_dt(2026, 7, 1), float("nan")), (_dt(2026, 7, 2), 1000.0)]):
+        assert mtm_drawdown(bad) is None, bad
+
+    # ---- apply_mtm: strictly restrictive, floors respected ----------------
+    _base = dict(good)                       # a book that passes all six bars
+    assert bar_map(_base)["maxdd"] is True
+    _thick = {"n": 500, "days": 30.0, "max_dd_frac": 0.22}      # 22% MTM
+    _got = apply_mtm(_base, _thick)
+    assert _got["maxdd_basis"] == "mtm" and _got["max_dd_frac"] == 0.22, _got
+    assert bar_map(_got)["maxdd"] is False, \
+        "an MTM drawdown past the cap must FAIL the bar the realised one passed"
+    assert grade(_got)[0] is False, "and it must reach the verdict"
+    # ...and `bar_map` stays exactly equivalent to `grade` (the pinned invariant)
+    assert all(bar_map(_got).values()) is grade(_got)[0]
+    # STRICTLY RESTRICTIVE: a BETTER mtm number never rescues a worse realised
+    _bad_realised = apply_mtm(dict(good, max_dd_frac=0.40),
+                              {"n": 500, "days": 30.0, "max_dd_frac": 0.01})
+    assert _bad_realised["max_dd_frac"] == 0.40, _bad_realised
+    assert bar_map(_bad_realised)["maxdd"] is False, \
+        "MTM must take the WORSE of the two, never the kinder"
+    # FLOORS: a thin series decides nothing and SAYS so
+    _thin = apply_mtm(_base, {"n": 5, "days": 0.2, "max_dd_frac": 0.99})
+    assert _thin["maxdd_basis"] == "realised" and bar_map(_thin)["maxdd"] is True
+    assert "too thin" in _thin["mtm_why"], _thin
+    _none = apply_mtm(_base, None)
+    assert _none["maxdd_basis"] == "realised" and _none["mtm"] is None
+    assert bar_map(_none) == bar_map(_base), \
+        "no series must grade EXACTLY as before — this change is a no-op then"
+    # the caller's dict is never mutated
+    assert "maxdd_basis" not in _base and _base.get("mtm") is None
+
+    # THE COUNTERWEIGHT CASE, end to end: realised DD ~0 but the book is down
+    # 1.5% and holding. With a thick series the MTM number is what grades.
+    _cw = apply_mtm(dict(good, max_dd_frac=0.002),
+                    mtm_drawdown(_eq([1000.0 - i * 0.05 for i in range(400)])))
+    assert _cw["maxdd_basis"] == "mtm", _cw
+    assert _cw["max_dd_frac"] > 0.002, "the open loss must reach the bar"
+    assert _cw["max_dd_frac_realised"] == 0.002, "and the realised one is kept"
+    # equity_series must be inert without a store rather than raising
+    assert equity_series("nope", store=object()) == []
+
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
-          "high-win-rate loser, window/DD bars, ungradeable input, policy eras)")
+          "high-win-rate loser, window/DD bars, ungradeable input, policy "
+          "eras, MTM drawdown: worse-of, floors, no-series no-op)")
 
 
 def main():
@@ -814,6 +1027,14 @@ def main():
         s, s_all = stats(parsed), stats(parsed_all)
         if s_all.get("n", 0) < a.min_closes:
             continue
+        # [2026-07-31 (hw)] MARK-TO-MARKET DRAWDOWN, folded in BEFORE grading.
+        # `apply_mtm` takes the WORSE of realised and MTM, so this can only
+        # fail a book that currently passes — it never rescues one. Below the
+        # series floors it is a no-op and `maxdd_basis` says 'realised', so a
+        # provisional verdict is never mistaken for a graded one. The equity
+        # series is the one (hq) started; a book without one grades exactly as
+        # it did before.
+        s = apply_mtm(s, mtm_drawdown(equity_series(bot)))
         ok, fails = grade(s)
         # [2026-07-30 (hf)] LEDGER INTEGRITY IS A PRECONDITION, not a bar. It
         # does not join BAR_NAMES — that tuple is the published contract the
