@@ -985,6 +985,31 @@ All new bots:
   wrong service name is worse than no name, which is why (gn) correctly
   refused to pick one. When a guard's output is an instruction, check that the
   output names an object the operator can actually find.
+- **AN ABSENCE IS ONLY EVIDENCE ONCE YOU HAVE A CONTROL GROUP (31-Jul (hu)).**
+  (ht) shipped the stamp and then told the operator *"read `extra.svc` on the
+  carry row and stop the OTHER service"* — **backwards**, and acting on it
+  would have stopped the only container running the book. MEASURED after the
+  (ht) deploy: **SEVEN services stamped correctly**, `funding-carry` published
+  **nothing on any row**, and `perps-funding-carry-lshadow` kept publishing on
+  pre-(hp) build `fbb926402049` with no `svc` (20 samples/10 min, one state,
+  never a flip). **`yield-harvester-shadow` runs the book; `funding-carry` is
+  the dead service** — and the one without a deploy rule is exactly the one
+  still running unguarded code. The seven stamped services are what turned "no
+  svc" from a hole into a finding; without them the same absence meant nothing.
+  Consequences now standing:
+  * **`yield-harvester-shadow` IS on the deploy** (both carry services are).
+    (gn) reverted this because two writers pooled the ledger — spent, because
+    (hp)'s `claim_writer` now stands the loser down. Deploying the unguarded
+    service is the only way to GIVE it the guard. Which one to STOP stays an
+    operator act; the runtime guard picks the winner meanwhile.
+  * **`fleet_immune.stale_writer_sickness`** closes the class: a fresh row
+    whose publisher carries no `extra.svc` while the fleet majority does is a
+    deploy that reported OK and never landed. Tests the ABSENCE of a key, not
+    `extra.build` — a build hash is per-image FILE SET ((fd)) and has already
+    mis-read as "never landed". Fail-safe quiet below `min_stamped`;
+    marker-gated live rows DECLARED in `STALE_WRITER_OK` with reasons.
+  * **A green deploy step is not a running container, and now neither is a
+    stamped service list** — check that the book you care about publishes.
 - **SATURATION IS NOT EVIDENCE — A CAPACITY WIDENING MUST ASK WHETHER THE BOOK
   IS MAKING MONEY (31-Jul (hs)).** The evidence board's `SATURATED` branch
   widened a book's capacity on `open_n >= cap` and nothing else, while its own

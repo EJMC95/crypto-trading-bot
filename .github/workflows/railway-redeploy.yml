@@ -55,7 +55,9 @@ on:
       - 'lighter_family_bot.py'
       - 'Dockerfile.familyshadow'
       # [2026-07-30 (gm)] THIS WORKFLOW IS ITS OWN TRIGGER, for the six shadow
-      # books only (see the `_wf` note in the decide step). BOTH lists bind: the
+      # books only — plus the CARRY PAIR since (hu), same reasoning: its
+      # routing was just corrected and a routing fix that cannot deploy itself
+      # leaves the correction sitting in main. BOTH lists bind: the
       # decide grep picks the service, but `paths:` decides whether the job runs
       # at all — and without this line a routing fix would still deploy nothing,
       # which is the exact failure (gl) hit. Adding it here means a workflow edit
@@ -239,8 +241,55 @@ jobs:
             # regardless of what this workflow does, so one of them must be
             # STOPPED in Railway — an operator action. Reverting here at least
             # stops this repo from re-waking the duplicate on every push.
-            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$)'; then
+            # [2026-07-31 (hu)] `yield-harvester-shadow` RE-ADDED, and this
+            # time on MEASUREMENT rather than on the argument (gn) rightly
+            # rejected. Read the (gn) paragraph above first — it is still
+            # correct about why (gl)'s reasoning was wrong.
+            #
+            # WHAT CHANGED. (ht) shipped `extra.svc` on every publish, so for
+            # the first time this repo can SEE which service writes a row.
+            # Measured minutes after the (ht) deploy, run 30598053371, which
+            # reported `OK: 'funding-carry' deployed`:
+            #   * SEVEN deployed services stamped themselves correctly
+            #     (counterweight-shadow, equities-regime-shadow,
+            #     family-lighter-shadow, freqtrade-bots, perp-sniper-shadow,
+            #     snap-back-shadow, tide-rider-lighter-shadow) — so the
+            #     mechanism works and its absence is signal, not noise.
+            #   * `funding-carry` published NOTHING, on any row.
+            #   * `perps-funding-carry-lshadow` kept publishing every ~90-170s
+            #     on build `fbb926402049` with NO svc — i.e. pre-(hp) code, on
+            #     a container the deploy did not reach. Twenty samples over ten
+            #     minutes: one state, never a flip.
+            # `yield-harvester-shadow` is the only other carry service, so it
+            # is the one running the book — and it is the one with no deploy
+            # rule, which is exactly why it still runs code predating both the
+            # (hp) sole-writer guard and the (ht) stamp.
+            #
+            # WHY "TWO WRITERS" NO LONGER BLOCKS THIS. (gn) reverted (gl)
+            # because deploying both made two writers of one key. That
+            # objection is spent: (hp) put `claim_writer` at the TOP of the
+            # carry loop, so if both containers do run, the second STANDS DOWN
+            # instead of pooling the ledger. Deploying the un-guarded service
+            # is now the only way to GIVE it that guard — leaving it out is
+            # what keeps the duplicate possible.
+            #
+            # NOT A GUESS about which service to keep: both are deployed, and
+            # the guard picks the winner at runtime. That is deliberately the
+            # opposite of (gl)'s error, which was naming a service from a
+            # dashboard row id. Stopping the loser stays an OPERATOR act.
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$|\.github/workflows/railway-redeploy\.yml$)'; then
+              # TWO SEPARATE ASSIGNMENTS, deliberately — NOT
+              # `...}funding-carry,yield-harvester-shadow`. audit_deploy_coverage
+              # associates a grep with a service by matching the
+              # `svcs="${svcs:+$svcs,}<name>"` shape one name at a time, so the
+              # comma-joined form made it read the pair as a single unknown
+              # service and report Dockerfile.funding's five files (plus
+              # market-context's two) as DEPLOY-ORPHANED. The guard caught this
+              # before it shipped, which is the same service it did in (gl) —
+              # and the same parser limitation (gl) recorded. Keep one name per
+              # line so the guard can keep seeing.
               svcs="${svcs:+$svcs,}funding-carry"
+              svcs="${svcs:+$svcs,}yield-harvester-shadow"
             fi
             # market-context service (🛰️ instrument collector). Its live-bot
             # freshness watchdog is the fleet's ONLY cross-region check on the
