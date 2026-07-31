@@ -277,7 +277,19 @@ DIV_VOL_M = float(os.environ.get("TT_DIV_VOL_M", "0"))
 # ACTIVE gate. Fail-OPEN — a missing/empty book NEVER blocks (same contract as
 # the coin-quality veto; the delisted-book case is owned by other guards).
 # RESTRICT-ONLY: an over-wide spread can only SKIP an entry, never force one.
-SPREAD_GATE_BPS = float(os.environ.get("TT_SPREAD_GATE_BPS", "0"))
+# [2026-07-31 (hr)] DEFAULT 0 -> 20. The LIVE service sets this explicitly; the
+# SHADOW service carries only TT_BULL_MODE, so the gate defaulted OFF on the arm
+# whose entire job is to GRADE this book. The two arms were therefore trading
+# different populations, and the shadow arm was admitting books the money arm
+# would never touch — which is not a conservative difference, it is a grading
+# error in the permissive direction.
+# MEASURED (hm): at 20bps this would have refused 43 of 46 BOT/USDC entries
+# (93%) — the churn chain that poisoned 45 of 98 short-divergence rows and
+# produced the "39 take-profits that booked a loss" defect. A 747bps gap
+# between the mark and the book top is not a tradable spread on any arm.
+# Setting the DEFAULT (rather than the live env) changes nothing on real money:
+# an explicit env var always wins, and the live arm has one.
+SPREAD_GATE_BPS = float(os.environ.get("TT_SPREAD_GATE_BPS", "20"))
 # [2026-07-14b] Stress veto: when the venue-wide |premium| median is at or
 # above this (bps), the whole venue is dislocated — take NO new entries this
 # cycle (exits keep running). Normal tape prints ~6bps median.
@@ -2717,6 +2729,21 @@ def selftest():
     # before this is ever reached)
     assert allowed_lenses("") == ALL_LENSES
 
+    # ---- (hr) THE SPREAD GATE IS ON BY DEFAULT --------------------------
+    # The live service sets this env explicitly; the SHADOW service does not,
+    # so the arm that GRADES this book had the gate OFF and was admitting
+    # books the money arm would never touch. Measured: at 20bps it refuses 43
+    # of 46 BOT/USDC entries — the churn that poisoned 45 of 98
+    # short-divergence rows. A default of 0 here is a grading error, not a
+    # neutral choice.
+    assert SPREAD_GATE_BPS == 20.0, SPREAD_GATE_BPS
+    # ...and it must still be RESTRICT-ONLY and FAIL-OPEN: an unreadable book
+    # blocks nothing (the delisted case is owned by other guards).
+    assert spread_gate_blocks(45.0, 20.0) is True
+    assert spread_gate_blocks(12.0, 20.0) is False
+    assert spread_gate_blocks(None, 20.0) is False, "unknown spread must not block"
+    assert spread_gate_blocks(999.0, 0.0) is False, "gate off = never blocks"
+
     # ---- (hm) THE BASIS INVARIANT: a _tp cannot book a loss --------------
     # Reproduces the BOT/USDC shape exactly: the exit rule fired on a mark
     # 7.4% away from the book the P&L was booked against, so the reason is
@@ -3234,7 +3261,7 @@ def selftest():
           "long/short exits, signed funding on the TRUE 8h basis, "
           "constant-risk sizing, delist give-up, LIVE lens allow-list "
           "fail-CLOSED vs a dark brain, symbol round-trip for all six "
-          "1000-markets, spread gate default-OFF + fail-open, trend exit "
+          "1000-markets, spread gate ON by default (20bps) + fail-open, trend exit "
           "default-OFF + let-winner-run).")
 
 
