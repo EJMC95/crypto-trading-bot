@@ -63,6 +63,24 @@ jobs:
       - name: The guard must still be able to see (negative fixtures)
         run: python3 scripts/audit_doctrine_enforcement.py --selftest
 
+  recurrence:
+    name: The changelog must not keep returning to the same house
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-07-31 (hz)] operator: "we are fixing the same issues daily and
+      # it's just costing me money ... when we make progress on construction we
+      # don't forget it and go try and work on a random house the next day."
+      # MEASURED that day: perps-funding-carry in 16 entries in 7 days. The
+      # pathology is invisible per-entry -- every one was a legitimate fix --
+      # and only exists in aggregate, so no other guard in this repo can see
+      # it. A subject over threshold must earn an enforced INVARIANT or an
+      # explicit reasoned acknowledgement; both are cheap, neither is silence.
+      - name: A subject we keep returning to is a class that never closed
+        run: python3 scripts/audit_recurrence.py
+      - name: The guard must still be able to see (negative fixtures)
+        run: python3 scripts/audit_recurrence.py --selftest
+
   lever-bounds:
     name: Every lever cage fits the value its consumer runs
     runs-on: ubuntu-latest

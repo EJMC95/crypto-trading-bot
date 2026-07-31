@@ -107,6 +107,12 @@ SELFTEST_MODULES = [
     # claim) AND asserts CLAUDE.md's own invariants pass — so a doctrine whose
     # enforcement was deleted reddens here as well as in CI.
     "scripts.audit_doctrine_enforcement",
+    # [2026-07-31 (hz)] THE SQUARE-ONE DETECTOR. Its --selftest pins the
+    # threshold and window against being tuned into silence, the
+    # longest-match extractor against substring double-counting, and that
+    # the LIVE changelog is clean -- so an unclosed recurring subject
+    # reddens here as well as in CI.
+    "scripts.audit_recurrence",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",

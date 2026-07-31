@@ -112,6 +112,33 @@ it was on track to pass the whole gate in late August while below $1,000. Fold
 the mark-to-market number in and take the WORSE of the two.
   ENFORCED BY: `scripts/golive_readiness.py::apply_mtm`, `scripts/golive_readiness.py::mtm_drawdown`
 
+### I11 · FINISH THE HOUSE — CARRIED WORK OUTRANKS NEW WORK
+**Operator, 31-Jul:** *"when we make progress on construction, we don't forget
+it and go try and work on a random house the next day."* Before starting
+anything new, discharge what the previous pass left open: an unmerged PR, an
+undeployed fix, a declared OPERATOR ACTION, a `STILL BLOCKING` line. A pass that
+opens a second front while the first is half-built produces two half-houses and
+a changelog that reads like progress. **State at the end of every pass what is
+carried, and start the next pass from that list** — not from whatever is most
+interesting. `audit_recurrence` is the measurement: a subject you keep returning
+to is a house you keep re-entering without finishing.
+  ENFORCED BY: `scripts/audit_recurrence.py::audit`, `scripts/audit_recurrence.py::MAX_ENTRIES`
+
+### I12 · DOCTRINE IS LIVE OR IT IS ARCHAEOLOGY
+**Operator, 31-Jul:** *"we can't refer back to a doctrine that was established at
+the beginning of our journey — it needs to be constantly updated and engraved so
+that we are future proof."* A rule written once and never revisited decays into a
+record of a lesson rather than a control on behaviour — and this file has shipped
+that decay repeatedly: a line reading *"NOT wired into CI, standing follow-up"*
+for a day AFTER it was wired, a standing audit rule naming a RETIRED bot, an
+*"advisory: zero consumers"* note that had had a consumer for days. **The loop
+that keeps doctrine alive is measured recurrence:** a subject the changelog keeps
+returning to must either produce a new enforced invariant or be explicitly
+acknowledged with a reason and an owner. Doctrine therefore grows in response to
+pain rather than to memory. **A doctrine that no longer describes the system is a
+defect, not history — correct it in place and say so.**
+  ENFORCED BY: `scripts/audit_recurrence.py::covered_by_invariant`, `scripts/audit_doctrine_enforcement.py::check_ref`
+
 ### I10 · REAL MONEY IS GATED BY PUBLISHED EVIDENCE, IN CODE
 An env var is a deployment choice, not a verdict. A live path must additionally
 read the published gate and refuse unless it says READY — fail-closed on a dark,
@@ -120,6 +147,22 @@ because here the cost of a wrong default is unsupervised real money. The live
 arm also pins the BACKTESTED config and takes no growth-rail capacity lever.
   ENFORCED BY: `lighter_funding_spread_bot.py::golive_blocker`, `lighter_funding_spread_bot.py::GOLIVE_K`
 <!-- INVARIANTS:END -->
+
+### Acknowledged recurrence — houses we keep re-entering, and why
+
+`scripts/audit_recurrence.py` fails the build when the changelog returns to one
+subject more than 5 times in 7 days without either an invariant that closes the
+class or an entry here. **An acknowledgement is a decision, not a snooze**: it
+must name why the class is still open and who can close it. Measured on the day
+this shipped, and every line below is a real cost, not a formality.
+
+<!-- RECURRING:BEGIN -->
+- `funding-carry` — OPEN, and the owner is the OPERATOR, not this repo. 13 entries in 7d. Every in-repo cause has been closed (sole-writer guard (hp), service attribution (ht), deploy routing (hu), dead-vs-stale-deploy (hx)); what remains is *why the container stopped at 03:10 UTC on 31-Jul* and which of the two services to stop, both of which need Railway logs and a Railway action. No further code will close this.
+- `perps-funding-carry` — OPEN, same house as `funding-carry` above, counted separately because it is the dashboard ROW id rather than the service name. 16 entries in 7d. The row cannot become healthy until the service does.
+- `yield-harvester-shadow` — OPEN, same house again, third name. 8 entries in 7d. This is the second carry service; both now deploy and the runtime sole-writer guard picks the winner, so the remaining decision — which one to STOP — is the operator's.
+- `freqtrade-bots` — STRUCTURAL, not a house. 15 entries in 7d because it is the SHARED image every organ ships inside, so any organ change mentions it. This is the limit of a mention-counting detector, declared rather than tuned away: narrowing the extractor to hide it would blind the guard to a real recurrence in the same container.
+- `tide-rider-lighter` — OPEN and it is a genuine unclosed decision, the honest one on this list. 10 entries in 7d on a book with ZERO closed trades whose 35% stop is 2.3x the go-live drawdown bar, so it is structurally ineligible for real money as configured. It keeps being widened, wired and re-graded instead of being kept or retired. **Owner: operator — this is a keep-or-retire call, not a code change**, and every pass that tunes it instead is the exact behaviour I11 names.
+<!-- RECURRING:END -->
 
 ## What This Repo Is
 Eamon's crypto trading bot fleet — **LIGHTER-FIRST since 2026-07-14** (user
