@@ -374,3 +374,75 @@ class TestSoleWriterClaim:
                / "funding_carry_bot.py").read_text()
         assert "claim_writer" in src, "carry does not check for a second writer"
         assert "duplicate_writer" in src, "the collision is not published"
+
+
+# ===========================================================================
+# [2026-07-31 (hp)] THE DOUBLE IS DELETED IN CODE, because `railway down` is
+# not durable here — the deploy workflow resurrects a stopped service on the
+# next push. Operator: "delete the double bot so this doesn't keep happening."
+# ===========================================================================
+class TestSoleWriterEnforced:
+    def _src(self):
+        import pathlib as _p
+        return (_p.Path(__file__).resolve().parents[2]
+                / "funding_carry_bot.py").read_text()
+
+    def test_the_claim_runs_BEFORE_the_trading_pass(self):
+        """(ho) checked at the PUBLISH block — after the loop had already
+        opened and closed positions, so the duplicate still corrupted the very
+        ledger the check existed to protect. A detector that runs after the
+        damage is a report, not a guard.
+
+        Bound via the AST, not string offsets: my first cut searched for
+        "OPEN " and matched the words "fail-OPEN" inside my own comment —
+        a test of the prose, not the code. Today's lesson, same day."""
+        import ast
+        tree = ast.parse(self._src())
+        loop = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.While)
+                    and isinstance(n.test, ast.Constant) and n.test.value is True)
+        claim = min(n.lineno for n in ast.walk(loop)
+                    if isinstance(n, ast.Call)
+                    and getattr(n.func, "attr", None) == "claim_writer")
+        # the real trading act: writing a new entry into `positions`
+        opens = [n.lineno for n in ast.walk(loop)
+                 if isinstance(n, ast.Subscript)
+                 and getattr(n.value, "id", None) == "positions"]
+        assert opens, "could not locate the position-opening site"
+        assert claim < min(opens), (
+            f"claim_writer at line {claim} must precede the first positions[] "
+            f"write at line {min(opens)} — otherwise the duplicate has already "
+            f"traded by the time it is detected")
+
+    def test_a_losing_claimant_stands_down_and_does_not_exit(self):
+        """IDLE, never sys.exit: restartPolicy=always turns an exit into a
+        permanent crash-loop (the Trail Blazer pattern, 15-Jul)."""
+        src = self._src()
+        blk = src[src.index("STANDING DOWN"):]
+        blk = blk[:blk.index("time.sleep")]
+        assert "sys.exit" not in blk and "SystemExit" not in blk, \
+            "a standing-down container must idle, never exit"
+        tail = src[src.index("STANDING DOWN"):]
+        tail = tail[:tail.index("# ---- ") if "# ---- " in tail else 3000]
+        assert "continue" in tail, "it must skip the cycle, not fall through"
+        assert "time.sleep" in tail, "and wait, not spin"
+
+    def test_it_still_publishes_why_it_is_silent(self):
+        """A silenced container must be VISIBLE, not merely absent — the
+        ambiguity that produced this duplicate was nobody being able to say
+        which service owned the row."""
+        src = self._src()
+        blk = src[src.index("STANDING DOWN"):]
+        blk = blk[:blk.index("time.sleep")]
+        for key in ('status="standby"', "duplicate_writer", '"caps"'):
+            assert key in blk, f"standby payload must carry {key}"
+
+    def test_enforcement_is_still_fail_open(self, monkeypatch):
+        """A Postgres blip must NEVER idle the book. Evidence corruption is
+        recoverable; a halted book is lost opportunity."""
+        import bot_pnl_store as store
+        def boom(_k):
+            raise RuntimeError("db down")
+        monkeypatch.setattr(store, "load_state", boom)
+        ok, other = store.claim_writer("perps-funding-carry", now=1.0)
+        assert ok is True and other is None

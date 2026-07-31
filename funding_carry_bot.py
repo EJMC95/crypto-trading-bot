@@ -426,6 +426,53 @@ def main():
     last_ts = max(_lt, time.time() - 48 * 3600) if _lt else time.time()
     while True:
         t0 = time.time()
+        # [2026-07-31 (hp)] SOLE-WRITER ENFORCEMENT, at the TOP of the loop.
+        # (ho) added this check but only at the publish block — after the
+        # trading pass had already opened and closed positions, so the second
+        # container still corrupted the ledger it was meant to protect. A
+        # detector that runs after the damage is a report, not a guard.
+        #
+        # THE OPERATOR'S INSTRUCTION (31-Jul): "delete the double bot so this
+        # doesn't keep happening." `railway down` is not durable here — the
+        # deploy workflow resurrects a stopped service on the next push, which
+        # is why every retirement in this repo is a CODE GUARD (the 17-Jul
+        # LIGHTER-ONLY cut). This is that guard: whichever container claims the
+        # book first keeps it; the other IDLES.
+        #
+        # IDLE, never sys.exit: `restartPolicy=always` turns an exit into a
+        # permanent crash-loop (the Trail Blazer pattern, 15-Jul). It keeps
+        # heart-beating and publishes WHY, so a silenced container is visible
+        # rather than merely absent.
+        #
+        # FAIL-OPEN is preserved: claim_writer returns (True, None) on a dark
+        # DB or any exception, so a Postgres blip can never idle the book.
+        _ok_writer, _other = store.claim_writer(BOT_ROW)
+        if not _ok_writer:
+            print(f"[{now_iso()}] STANDING DOWN — {BOT_ROW} is already claimed "
+                  f"by another container ({_other}). Two writers make `n` a "
+                  f"mixture of two books and destroy the go-live evidence for "
+                  f"the fleet's best-evidenced book. This process will hold "
+                  f"its positions and trade NOTHING until the claim expires "
+                  f"({store.WRITER_CLAIM_TTL}s) or the incumbent stops.",
+                  flush=True)
+            try:
+                store.heartbeat(bot_id)
+                # `caps` rides the STANDBY payload too, and for the same
+                # reason it rides the online one: it is the field that
+                # identifies WHICH build is publishing. A standing-down
+                # container that omitted it would be indistinguishable from a
+                # stale publisher — exactly the ambiguity that produced the
+                # duplicate in the first place. (test_golive_organ pins this.)
+                store.publish(bot_id, status="standby",
+                              extra={"venue": ctx.mode,
+                                     "caps": {"max_positions": MAX_POSITIONS,
+                                              "enter_apr": _enter_apr},
+                                     "duplicate_writer": _other,
+                                     "standing_down": True})
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(LOOP_SECONDS)
+            continue
         # [2026-07-30] Re-read the growth rail EVERY loop, then RE-DERIVE the
         # bars through the same one-owner `_bars()` call. Both halves matter:
         # a lever that moved ENTER_APR without this re-derivation would be
@@ -638,13 +685,6 @@ def main():
             open_pnl = sum(p["accrued"] - p["fees"] for p in positions.values())
             top = sorted(fund.items(), key=lambda cf: -abs(cf[1]["rate"]))[:3]
             try:
-                _ok_writer, _other = store.claim_writer(BOT_ROW)
-                _dup_writer = None if _ok_writer else _other
-                if _dup_writer:
-                    print(f"[funding-carry] DUPLICATE LEDGER WRITER on {BOT_ROW}: another "
-                          f"process ({_dup_writer}) is publishing this book. n is NOT one "
-                          f"book's trades and every statistic on it — including the "
-                          f"go-live grade — is a mixture.", flush=True)
                 store.publish(
                     bot_id, status="online",
                     equity=START_EQUITY + realized + open_pnl,
@@ -674,8 +714,7 @@ def main():
                            # candidate. Advisory and fail-OPEN: it reports,
                            # it never halts. Stopping the duplicate service is
                            # a Railway act and therefore the operator's.
-                           **({"duplicate_writer": _dup_writer}
-                              if _dup_writer else {}),
+
                            # NOT "positions": the dashboard reserves that key for
                            # the stock bots' list-of-dicts holdings format.
                            "carries": {c: f"{p['side']}@{p['entry_apr']:+.0%}"

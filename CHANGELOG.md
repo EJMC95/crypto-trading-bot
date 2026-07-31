@@ -1,3 +1,45 @@
+## 2026-07-31 (hp) — THE DOUBLE IS DELETED IN CODE, and the position-days idea is dead on measurement
+
+- **THE INSTRUCTION** (operator): *"You have my full permission to fix and implement anything that's causing a drift or a double — delete the double bot so this doesn't keep happening."* Suite green, guards green.
+
+### The double: enforced at the top of the loop, not reported at the bottom
+
+- **`(ho)` ADDED THE CHECK IN THE WRONG PLACE — mine, same day.** `claim_writer` ran inside the PUBLISH block, i.e. *after* the trading pass had already opened and closed positions. The duplicate still corrupted the exact ledger the check existed to protect. **A detector that runs after the damage is a report, not a guard.** It now runs as the first statement of the loop body, before anything can trade.
+- **`railway down` IS NOT THE FIX and this repo already knows it** — the deploy workflow resurrects a stopped service on the next push, which is why every retirement here is a CODE GUARD (the 17-Jul LIGHTER-ONLY cut). This is that guard: whichever container claims the book first keeps it, the other **STANDS DOWN**.
+- **IDLE, never `sys.exit`** — `restartPolicy=always` turns an exit into a permanent crash-loop (the Trail Blazer pattern, 15-Jul). The losing container keeps heart-beating and publishes `status="standby"` with `duplicate_writer` and its own `caps`, so a silenced container is **visible rather than merely absent**. That matters here specifically: not being able to say which service owned the row is what created the duplicate in the first place.
+- **FAIL-OPEN is preserved and tested.** A dark DB or any exception returns `(True, None)`, so a Postgres blip can never idle the book. Evidence corruption is recoverable; a halted book is lost opportunity.
+- A test caught that my standby payload omitted `caps` — the field that identifies WHICH build is publishing. Fixed rather than exempted: a standing-down container that omits it is indistinguishable from a stale publisher.
+- **Mutation-verified:** reverting the claim to the `(ho)` publish-block position turns three tests red.
+
+### TWO OF MY OWN NUMBERS FROM `(ho)` WERE SOFT — corrected here
+
+1. **"14 overlapping same-pair positions" was 14 only because I counted same-instant HANDOFFS as overlaps.** Requiring genuine concurrency (>60s) gives **7**, which matches `golive_readiness`' own independent count exactly (*"7 same-pair overlap(s), deepest 9.14h on HYPE"*). The finding stands and is if anything sharper.
+2. **"TWO DISTINCT BUILD STAMPS proves two writers" does not follow.** Every book that redeployed during the window shows multiple stamps — measured, 16 books do, and almost none of them have a duplicate writer. **Redeploys explain build multiplicity; only temporal concurrency proves a second writer.** Using the stamp as evidence was the weaker half of the argument and should not be repeated.
+- **Re-scanned EVERY book on the corrected measure: `perps-funding-carry-lshadow` is the ONLY one affected** (7 of 84 closes; deepest 9.14h on HYPE, 8.98h BNB, 8.23h SKHYNIXUSD). `event-listing-sniper` (8) and `perps-funding-spread-lshadow` (1) were pure handoff artifacts and are clean.
+
+### The position-days admission route: REJECTED on measurement, and it was my idea
+
+`(hn)`'s "path to light" was to grade slow books on their daily mark-to-market series, on the argument that a book holding 4 positions for 20 days has ~80 position-days of evidence the closed-trade count throws away. **A workflow tested the premise directly and it is false.**
+
+- **THE ARITHMETIC.** A position held H days contributes H daily observations, but its total return is `H·mu + sqrt(H)·sigma·Z` — so the daily mean/sd ratio is smaller by exactly `sqrt(H)`. **n rises by H, per-observation SNR falls by sqrt(H), and t is unchanged.** The denominator accumulates; the evidence does not.
+- **MEASURED on real Lighter paths with a planted edge** (400 reps/cell, 4 slots, holds 5/20/60d, windows 180/600d): median `t_day / t_pos` = 1.08, 0.97, 0.95, 0.94 at zero edge; 0.98, 0.97, 0.96, 0.98 at +0.15%/d; 0.96, 0.97, 0.94, 0.99 at +0.30%/d. Pass rates track within noise, and the daily route is if anything **marginally weaker** (HAC estimation cost plus path noise that cancels at exit).
+- **So the route measures nothing new — it only lowers the bar from 30 DECISIONS to 30 DAYS.** That is goalpost-moving in its strongest form: we could not make the books decide more often, so we would have redefined a decision as a day. Rejected.
+- **Also rejected, with numbers:** Newey-West as the estimator (anti-conservative even at rho=0 — 2.7–4.5% FPR against a 2.3% nominal, and 70.5% on a rising-tape rider where the naive t gives 33%; it *manufactures* significance); the block bootstrap (worst calibrated of everything tested, 6.8–11.2% FPR at rho=0 rising to 25% at rho=0.85); and the `paper_trades` + candles backfill, which reconstructs **exactly zero** additional days because `paper_trades` is a CLOSED-trade ledger and these two books have no closes, while `bot_state` is a single upserted row with no history.
+- **The tempting substitute is worse:** replaying the strategy over 438 days of candles to synthesise an equity curve is a BACKTEST — in-sample, embedding today's parameters into a past the book never lived. Feeding that to the go-live gate would let a book buy real money with a simulation.
+- **What survives is the honest position:** 🌊 Tide Rider and 📊 Index Rider are **not gradeable on any statistically defensible route**, and no new ruler changes that. The choice in front of the operator is to keep them running as unpromotable shadow books, or retire them — not to find a kinder statistic.
+
+### A SECOND DRIFT, caught at the commit gate — and I nearly shipped another session's WIP
+
+- Verifying before committing showed my working tree carried modifications to **`scripts/golive_readiness.py` and `scripts/evidence_review.py` that I did not author in this pass** — 73 added lines including a new `era_rows()` / `_era_parse()` owner. They came from a stale **autostash** popped into the tree by a `git pull` earlier in the session, i.e. another concurrent session's in-progress work.
+- **They were BREAKING that session's own tests**: `test_the_era_is_read_off_open_ts_in_the_grading_loop` asserts `in_era(r.get("open_ts")` appears in the grading loop, and the WIP version had replaced it. The suite was green on HEAD, green with only my changes, and red with the contamination — which is exactly the signature to look for.
+- Restored **three** files to HEAD — the WIP spans `golive_readiness.py`, `evidence_review.py` AND `tests/test_review_currency.py`, and reverting only the first two left that test expecting an `era_rows()` that no longer existed. **A partial revert of someone else's coherent change is its own breakage**: revert the whole unit or none of it, and let the suite tell you where the unit ends. **Committing them would have shipped a half-finished refactor of the GO-LIVE GRADER**, the file that governs whether a book may hold real money, under a commit message about something else entirely.
+- **Three stashes remain and I did NOT delete them** — 249, 1,283 and 1,067 line changes across many files, including both real-money bots (`lighter_funding_bot.py`, `lighter_ticket_taker.py`) and the two live-adjacent audits. That is parked work belonging to other sessions, not drift to be swept. **Operator decision required:** whether any of it should be recovered or discarded. `git stash list` / `git stash show -p 'stash@{N}'` to read them.
+- **THE CHEAP GUARD, now doctrine:** before every commit, check that each modified file is one you meant to modify. In a repo with concurrent sessions and autostash, `git status` is not a list of your work — it is a list of what happens to be in the tree.
+
+### Operational note
+
+The workflow that produced the section above **lost 35 of its 40 agents to the weekly usage limit** (resets 4-Aug 18:00 Sydney), including its synthesis. The five design lanes that completed were the decisive ones, so the conclusion is sound — but **no further multi-agent workflows can run this week**, and the remaining analysis in flight should be assumed unfinished rather than negative.
+
 ## 2026-07-30 (ho) — TWO CONTAINERS ARE WRITING THE FLEET'S ONLY GO-LIVE CANDIDATE
 
 *(RENUMBERED (hn) -> (ho). A concurrent session pushed its own (hn) in the gap between my fetch and my push — a check-then-act race the cross-branch arm added in (hj) cannot close, and the in-file duplicate check caught it post-merge instead. By the convention the CITED entry keeps the letter and this one is cited from three tracked files while theirs is cited from none — but all three citations are my own and consumed by nobody yet, so moving mine is the smaller blast radius and leaves another session's entry untouched. Tenth recorded collision.)*

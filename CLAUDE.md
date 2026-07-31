@@ -822,6 +822,48 @@ All new bots:
 - Dashboard service: `pnl-dashboard`
 
 ## Rules
+- **BEFORE EVERY COMMIT, CHECK THAT EACH MODIFIED FILE IS ONE YOU MEANT TO
+  MODIFY (31-Jul (hp)).** Concurrent sessions plus `git pull`'s autostash mean
+  `git status` is a list of what is IN THE TREE, not a list of your work. On
+  31-Jul a stale autostash put another session's half-finished refactor of
+  **`scripts/golive_readiness.py` — the go-live grader itself** — into the tree,
+  and it would have shipped under an unrelated commit message. It was caught
+  because it broke that session's own test; the signature is a suite that is
+  green on HEAD, green with your changes alone, and red in combination.
+  `git checkout HEAD -- <file>` to restore. And do NOT delete other sessions'
+  stashes to tidy up — read them (`git stash show -p`) and escalate.
+- **ONE BOOK, ONE WRITER — ENFORCED AT THE TOP OF THE LOOP (31-Jul (hp)).**
+  Two containers publishing one row makes `n` a mixture of two books and
+  destroys its evidence silently. Measured on 🌾 carry, the fleet's only
+  go-live candidate: **7 genuinely concurrent same-pair positions** of 84
+  closes (deepest 9.14h on HYPE) — one book cannot hold HYPE twice.
+  `bot_pnl_store.claim_writer(bot)` is the guard: first claimant wins, the
+  claim EXPIRES (30 min, so a crashed container cannot silence a book
+  forever), and it is **fail-OPEN** — a dark DB never idles a book.
+  - **CALL IT AT THE TOP OF THE LOOP.** `(ho)` called it in the publish block,
+    after the trading pass had already written the ledger it was protecting.
+  - **STAND DOWN, never `sys.exit`** — `restartPolicy=always` makes an exit a
+    crash-loop. Keep heart-beating and publish `status="standby"` with
+    `duplicate_writer` AND `caps`, so a silenced container is visible.
+  - **`railway down` is not the fix**: the deploy workflow resurrects a stopped
+    service on the next push. Durable retirement here is always a code guard.
+- **A DOUBLE WRITER IS PROVED BY TEMPORAL CONCURRENCY, NOT BY BUILD STAMPS
+  (31-Jul (hp)).** Multiple `extra.build` values just mean the service
+  redeployed — 16 books show that and almost none have a duplicate. The only
+  sound test is two positions in the SAME pair overlapping in time by more
+  than a handoff (>60s; same-instant handoffs inflated my own first count from
+  7 to 14).
+- **POSITION-DAYS ARE NOT EXTRA EVIDENCE — DO NOT RE-PROPOSE THE DAILY-MTM
+  ADMISSION ROUTE (31-Jul (hp)).** A position held H days gives H daily
+  observations, but its total return is `H·mu + sqrt(H)·sigma·Z`, so the daily
+  mean/sd ratio is smaller by exactly `sqrt(H)`: **n rises by H, SNR falls by
+  sqrt(H), t is unchanged.** Measured on real Lighter paths with a planted
+  edge, median `t_day/t_pos` = 0.94–1.08 across every cell. Grading a slow
+  book on daily marks does not find evidence the close count missed — it only
+  lowers the bar from 30 DECISIONS to 30 DAYS. Also rejected with numbers:
+  Newey-West (anti-conservative even at rho=0; *manufactures* significance)
+  and the block bootstrap (worst calibrated at every rho). A slow book that
+  cannot clear the gate is a keep-or-retire decision, not a statistics problem.
 - **FORWARD MOTION IS THE DOCTRINE (operator, 30-Jul: "our focus needs to be on
   growth, expansion, sustainability, not stagnancy and circles ... to not allow
   things to take steps back every day only to move one step forward").**
