@@ -971,6 +971,20 @@ All new bots:
   not literal — so the drift arm was blind to precisely the lever most able to
   drift, and it HAD drifted (registry 10 vs code 9). Prefer making the consumer
   a LITERAL over declaring the exemption.
+- **A DETECTOR MUST NAME THE THING THE OPERATOR HAS TO ACT ON (31-Jul (ht)).**
+  🌾 carry's duplicate-writer guard was correct, fired correctly, and reported
+  `_writer_id()` — `RAILWAY_REPLICA_ID`/`HOSTNAME`, an opaque CONTAINER id —
+  while the fix it demanded was *"stop `funding-carry` or
+  `yield-harvester-shadow` in Railway"*. **Four entries** ((gl), (gn), (hf),
+  (hp)/(hq)) recorded *"this repo cannot tell which of the two publishes the
+  row"* while `RAILWAY_SERVICE_NAME` sat unread in every container — measured
+  31-Jul at **zero hits** across the whole tree. Every publish now carries
+  `extra.svc`, stamped centrally in `bot_pnl_store._stamp_build` so all 24
+  books get it, and `claim_writer` reports `"<service> (<replica>)"`.
+  **Unknown degrades to the OLD opaque id, never to a guess** — a confident
+  wrong service name is worse than no name, which is why (gn) correctly
+  refused to pick one. When a guard's output is an instruction, check that the
+  output names an object the operator can actually find.
 - **SATURATION IS NOT EVIDENCE — A CAPACITY WIDENING MUST ASK WHETHER THE BOOK
   IS MAKING MONEY (31-Jul (hs)).** The evidence board's `SATURATED` branch
   widened a book's capacity on `open_n >= cap` and nothing else, while its own

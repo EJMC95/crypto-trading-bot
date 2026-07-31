@@ -251,15 +251,65 @@ def build_code_files():
     return _BUILD_CACHE[1]
 
 
+def service_name():
+    """[2026-07-31 (ht)] WHICH RAILWAY SERVICE is this process? '' if unknown.
+
+    THE GAP THIS CLOSES, and it has blocked an OPERATOR ACTION for four
+    entries. 🌾 carry is published by TWO services — `funding-carry` and
+    `yield-harvester-shadow` — and one of them must be stopped by hand. Every
+    attempt to say WHICH ran into the same wall, written down three times in
+    three files: `(gl)` "this repo could not say which owned the row",
+    `(gn)`/(railway-redeploy.yml) "this repo cannot tell which of the two
+    publishes the row ... left for the operator rather than resolved by
+    guessing", `(hf)` the ledger is two books.
+
+    Then `(ho)`/`(hp)` shipped the sole-writer guard — and it reports
+    `_writer_id()`, which is `RAILWAY_REPLICA_ID`/`HOSTNAME`: an OPAQUE id
+    that names a container, not a service. So the guard that finally detects
+    the duplicate still cannot name the thing the operator has to switch off.
+    The diagnosis was complete and the instruction was unactionable.
+
+    Railway sets `RAILWAY_SERVICE_NAME` in every container. It was used
+    NOWHERE in this repo (measured 31-Jul: zero hits across *.py/*.yml/*.toml)
+    while four entries reported the question it answers.
+
+    Empty string, never a guess: a missing env var means "unknown", and
+    "unknown" must not render as a service name somebody might go and stop.
+    """
+    return str(os.environ.get("RAILWAY_SERVICE_NAME") or "")[:64]
+
+
+def describe_writer(writer_id, svc=None):
+    """Render a writer as 'service (replica)' — or the bare id when the
+    service is unknown. The operator reads this to decide what to stop, so an
+    unknown service must degrade to the old opaque id rather than to a blank
+    that looks like an answer."""
+    wid = str(writer_id or "")[:64]
+    svc = str(svc or "")[:64]
+    return f"{svc} ({wid})" if svc and wid else (svc or wid)
+
+
 def _stamp_build(extra):
-    """Stamp `extra.build` (+ `extra.build_n`) on every publish. Never raises,
-    never overwrites a caller's key: telemetry must not break a publish that
-    reports real money."""
+    """Stamp `extra.build` (+ `extra.build_n`, + `extra.svc`) on every publish.
+    Never raises, never overwrites a caller's key: telemetry must not break a
+    publish that reports real money.
+
+    [2026-07-31 (ht)] `svc` rides HERE, the one hook every book's publish
+    already passes through, rather than in the carry bot — so the attribution
+    covers all 24 books and the NEXT duplicate is named on sight instead of
+    starting another multi-entry investigation. Doctrine rule 2: a fix closes
+    a class or it is not finished.
+    """
     try:
         cid = build_code_id()
-        if not cid:
-            return extra
         out = dict(extra or {})
+        svc = service_name()
+        if svc:
+            out.setdefault("svc", svc)
+        if not cid:
+            # still return `out` — an unstampable build must not also cost the
+            # row its service attribution (these two are independent).
+            return out if svc else extra
         out.setdefault("build", cid)
         n = build_code_files()
         if n:
@@ -489,8 +539,14 @@ def claim_writer(bot, now=None):
         who, ts = cur.get("writer"), float(cur.get("ts") or 0)
         now = float(now if now is not None else time.time())
         if who and who != me and (now - ts) < WRITER_CLAIM_TTL:
-            return False, who
-        save_state("writer:" + str(bot), {"writer": me, "ts": now})
+            # [2026-07-31 (ht)] Return the SERVICE, not just the replica id.
+            # The whole point of this verdict is to tell the operator what to
+            # switch off, and `_writer_id()` is an opaque container id. Claims
+            # written before this change carry no `svc`, so `describe_writer`
+            # degrades to exactly the old string rather than inventing one.
+            return False, describe_writer(who, cur.get("svc"))
+        save_state("writer:" + str(bot),
+                   {"writer": me, "svc": service_name(), "ts": now})
         return True, None
     except Exception:                      # noqa: BLE001 — fail OPEN, always
         return True, None
@@ -1269,9 +1325,56 @@ def _selftest_build():
     import inspect as _ins
     assert "extra = _stamp_build(extra)" in _ins.getsource(publish_paper_trade), \
         "publish_paper_trade must stamp extra.build (arm-drift's row feed)"
+
+    # ---- [2026-07-31 (ht)] SERVICE ATTRIBUTION -------------------------
+    # The duplicate-writer guard names a CONTAINER; the operator has to stop a
+    # SERVICE. Four entries reported "this repo cannot tell which of the two
+    # publishes the row" while RAILWAY_SERVICE_NAME sat unread in every one.
+    _saved_svc = os.environ.get("RAILWAY_SERVICE_NAME")
+    try:
+        os.environ["RAILWAY_SERVICE_NAME"] = "yield-harvester-shadow"
+        assert service_name() == "yield-harvester-shadow"
+        assert _stamp_build({})["svc"] == "yield-harvester-shadow", \
+            "every publish must carry its service — this is the class fix"
+        assert _stamp_build({"svc": "caller"})["svc"] == "caller", \
+            "a caller's own key wins; svc follows build's contract"
+        # UNKNOWN must degrade to absent, never to a name somebody might stop
+        os.environ.pop("RAILWAY_SERVICE_NAME", None)
+        assert service_name() == ""
+        assert "svc" not in _stamp_build({}), \
+            "an unknown service must be ABSENT, not blank-but-present"
+        # the stamp must survive an unstampable build without losing svc
+        os.environ["RAILWAY_SERVICE_NAME"] = "funding-carry"
+        _sv_cache = _BUILD_CACHE
+        try:
+            globals()["_BUILD_CACHE"] = (None, 0)
+            assert _stamp_build({})["svc"] == "funding-carry", \
+                "build and service attribution are independent failures"
+        finally:
+            globals()["_BUILD_CACHE"] = _sv_cache
+    finally:
+        if _saved_svc is None:
+            os.environ.pop("RAILWAY_SERVICE_NAME", None)
+        else:
+            os.environ["RAILWAY_SERVICE_NAME"] = _saved_svc
+
+    # describe_writer: the string the operator acts on
+    assert describe_writer("abc123", "funding-carry") == "funding-carry (abc123)"
+    assert describe_writer("abc123", None) == "abc123", \
+        "a claim written before (ht) has no svc — degrade to the OLD string"
+    assert describe_writer("abc123", "") == "abc123"
+    assert describe_writer(None, "funding-carry") == "funding-carry"
+    # claim_writer must RECORD svc, or the other side can never read it
+    _src = _ins.getsource(claim_writer)
+    assert '"svc": service_name()' in _src, \
+        "the claim must record its own service or the report stays opaque"
+    assert "describe_writer(who, cur.get(\"svc\"))" in _src, \
+        "the contended path must report the SERVICE, not the replica id"
+
     print(f"bot_pnl_store selftest OK (build id: deterministic, byte-sensitive, "
           f"path-independent, entry counts, short-set self-describing; stamp "
-          f"preserves caller keys) build={a} over {n} files")
+          f"preserves caller keys; svc attribution + writer description) "
+          f"build={a} over {n} files")
     return 0
 
 
