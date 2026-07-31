@@ -691,7 +691,7 @@ def _selftest():
             mock.patch(__name__ + ".UNIVERSE", ["BTC", "ZEC", "GHOST"]), \
             mock.patch(__name__ + ".time", mock.Mock(time=lambda: now,
                                                      sleep=lambda s: None)):
-        main()
+        sys.exit(store.organ_main('regime-oracle', main))
     cov = published["coverage"]
     assert "BTC" in published["pairs"], "a healthy book must still publish"
     assert "ZEC" not in published["pairs"], "a 100-bar book must NOT be graded"

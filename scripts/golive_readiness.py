@@ -448,7 +448,7 @@ def stats(rows, book_usd=None):
 BAR_NAMES = ("window", "closes", "mean", "t", "halves", "maxdd")
 
 # ---------------------------------------------------------------------------
-# MARK-TO-MARKET DRAWDOWN [2026-07-31 (hw)] — operator: "prepare Counterweight
+# MARK-TO-MARKET DRAWDOWN [2026-07-31 (ia)] — operator: "prepare Counterweight
 # to go live", and this is the prerequisite that makes that decision honest.
 #
 # THE DEFECT (hl) NAMED AND DEFERRED. `stats()` accumulates CLOSED trades, so
@@ -675,7 +675,7 @@ def book_payload(s):
     bars = bar_map(s)
     out = {"n": s.get("n", 0), "bars": bars, "bar_names": list(BAR_NAMES),
            "bars_passed": sum(bars.values())}
-    # [2026-07-31 (hw)] The MTM drawdown rides on EVERY payload, including the
+    # [2026-07-31 (ia)] The MTM drawdown rides on EVERY payload, including the
     # n<2 early return below — a book too thin to grade on closes may still
     # have an equity series, and that is exactly the always-in book this
     # exists for. `maxdd_basis` states which definition decided, so a reader
@@ -880,7 +880,7 @@ def _selftest():
     bp2 = book_payload(good)
     assert bp2["bars_passed"] == 6 and bp2["t"] is not None, bp2
 
-    # ---- [2026-07-31 (hw)] MARK-TO-MARKET DRAWDOWN -----------------------
+    # ---- [2026-07-31 (ia)] MARK-TO-MARKET DRAWDOWN -----------------------
     # THE INCIDENT SHAPE: ⚖️ Counterweight, always-in, realised maxDD 0.2%
     # against a 15% bar while its equity sits at $984.61 — the loss is in
     # positions it has not closed.
@@ -1027,7 +1027,7 @@ def main():
         s, s_all = stats(parsed), stats(parsed_all)
         if s_all.get("n", 0) < a.min_closes:
             continue
-        # [2026-07-31 (hw)] MARK-TO-MARKET DRAWDOWN, folded in BEFORE grading.
+        # [2026-07-31 (ia)] MARK-TO-MARKET DRAWDOWN, folded in BEFORE grading.
         # `apply_mtm` takes the WORSE of realised and MTM, so this can only
         # fail a book that currently passes — it never rescues one. Below the
         # series floors it is a no-op and `maxdd_basis` says 'realised', so a

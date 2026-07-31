@@ -1656,6 +1656,86 @@ def prune_history(conn=None, keep_days=None):
         return None
 
 
+def record_organ_error(key, exc=None, where=None):
+    """Stamp an organ's OWN failure onto its OWN bot_state key. Never raises.
+
+    [2026-08-01 (hw)] THE LEAK THIS CLOSES. `run_all.sh` invokes every organ as
+    `python3 <organ>.py || true` — correct, so one sick organ can never take the
+    supervisor down with it, and it makes every organ crash INVISIBLE: the exit
+    code goes to `|| true` and the traceback goes to a container log nobody
+    tails.
+
+    MEASURED the day this shipped: **20 of 22 organs had no way to report their
+    own death.** The learning brain had been raising KeyError('paper') on EVERY
+    run — the Kraken paper twin it compares against was retired 14-Jul — dying
+    before `_save_state`, so `learning-brain.runs` sat frozen at 337 while
+    `brain-vitals.run` read 338. It published its four read-only keys on time
+    and looked perfectly healthy from the outside while its memory, and
+    therefore the 3-run streak gate that moves every stake multiplier, could
+    never advance. A learning loop that cannot learn, for weeks, in silence.
+
+    A failure that exists only in an unread log is a silent failure. This puts
+    it in the payload the fleet ALREADY watches, so `fleet_immune` reaches the
+    operator by the path every organ already uses — no new plumbing.
+    """
+    try:
+        payload = load_state(key) or {}
+        if not isinstance(payload, dict):
+            payload = {}
+        payload["healthy"] = False
+        payload["error"] = (f"{type(exc).__name__}: {exc}" if exc else "unknown")
+        if where:
+            payload["error_where"] = str(where)[:200]
+        payload["error_at"] = datetime.now(timezone.utc).isoformat(
+            timespec="seconds")
+        return bool(save_state(key, payload))
+    except Exception:                                # noqa: BLE001
+        return False
+
+
+def clear_organ_error(payload):
+    """Mark a payload healthy, in place, before it is published.
+
+    A sticky error would page once and then mean nothing — the detector has to
+    be able to say RECOVERED, not only DIED. Callers stamp this on the happy
+    path; `record_organ_error` stamps the other one.
+    """
+    if isinstance(payload, dict):
+        payload["healthy"] = True
+        payload.pop("error", None)
+        payload.pop("error_where", None)
+        payload.pop("error_at", None)
+    return payload
+
+
+def organ_main(key, fn, *args, **kwargs):
+    """Run an organ's entry point; record its own death on `key` if it dies.
+
+    Returns fn's exit code, or 1 on a fault. NEVER re-raises — the caller is a
+    `|| true` shell line and a traceback there is exactly the silence this
+    exists to end. The organ stays responsible for stamping `healthy=True` on
+    its own successful publish (see clear_organ_error).
+    """
+    import traceback
+    try:
+        rc = fn(*args, **kwargs)
+        return 0 if rc is None else rc
+    except SystemExit as e:                          # an organ's own exit code
+        return int(getattr(e, "code", 0) or 0)
+    except Exception as e:                           # noqa: BLE001
+        tb = traceback.format_exc()
+        print(tb, file=sys.stderr)
+        where = ""
+        lines = [ln.strip() for ln in tb.strip().splitlines()]
+        if len(lines) >= 2:
+            where = lines[-2][:200]
+        record_organ_error(key, e, where)
+        print(f"[{key}] ORGAN FAULT recorded on its own bot_state key so the "
+              f"immune organ can see it: {type(e).__name__}: {e}",
+              file=sys.stderr)
+        return 1
+
+
 def snapshot_equity(bot, equity, open_trades=None, realized=None):
     """[2026-07-30 (hl)] Append one MARK-TO-MARKET equity sample for `bot` to
     bot_state_history under '<bot>:equity'. Never raises; a dark DB is a no-op.

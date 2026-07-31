@@ -34,7 +34,7 @@ down 1.5% of capital, because the realised bar accumulates *closed* trades and
 this book is **always-in** — its losses live in positions it has not closed.
 
 So on trajectory **Counterweight passes all six bars in late August while its
-equity is below $1,000.** That is the failure `(hw)` exists to prevent.
+equity is below $1,000.** That is the failure `(ia)` exists to prevent.
 
 ---
 

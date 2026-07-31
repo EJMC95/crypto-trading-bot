@@ -1,3 +1,79 @@
+## 2026-08-01 (hw) — THE BRAIN HAD BEEN DYING ON EVERY RUN, AND 20 OF 22 ORGANS HAD NO WAY TO SAY SO
+
+- **THE ASK** (operator): *"A brain continuously going dead means we are consistently being held back by these small unhelpful and costly problems"*, then *"our entire file system isn't working if we are at square one every day over the same tedious issues — these fixes need to be implemented and addressed permanently so every day we see continuously building, not fixing water leaks."* Suite **723**, seven guards green.
+- **He was right, and it was worse than a dead brain: it was a dead brain nobody could see, and nineteen more organs with the identical hole.**
+
+### The brain: computing perfectly, remembering nothing
+
+- **`bot_learn.main()` raised `KeyError('paper')` on EVERY run.** The venue A/B section guards `arm in e` and then dereferences `e["paper"]` **unguarded**. That section was written when every book had a **KRAKEN PAPER TWIN** — and Kraken was **RETIRED 14-Jul**. No book has a paper arm any more, so the first book carrying a shadow or live arm killed the run.
+- **WHERE IT DIED IS THE WHOLE STORY.** The crash sits *after* the four read-only publishes and *before* `_save_state`. So the brain recomputed everything correctly, published `brain-vitals` / `brain-stake-mults` / `brain-diagnosis` / `brain-lens-forward` **on time and looking perfectly healthy**, and then forgot the entire run.
+- **MEASURED:** `learning-brain.runs` = **337**; `brain-vitals.run` = **338**. The state had not advanced. And because **`mult_streaks` needs THREE CONSECUTIVE runs** to move a stake multiplier — and that streak lives in the state it never saved — **no new evidence could ever accumulate a streak.** A learning loop that could not learn. The only surviving streak entry read `first_run: 324, last_run: 337`, frozen.
+- **14 ACTIONABLE items and a full diagnosis set were computed and discarded on every cycle**, including the `regime_timing` diagnoses that `(gg)` unblocked — the one diagnosis kind carrying an actuator.
+- **CORRECTING MY OWN FIRST READ:** I reported the brain keys "ABSENT from the bus". They are present and fresh in `bot_state`; `/bus.json` simply does not carry them. Wrong surface, right alarm.
+
+### Three fixes, in ascending order of permanence
+
+1. **The guard.** `"paper" not in e` → skip. One line.
+2. **THE ORDERING, which is the real bug.** `_save_state` ran *after* the markdown report, so a fault anywhere in **cosmetic rendering** discarded the run's computed memory. The durable state is now written **FIRST**, and the report is wrapped so it can fail without taking the learning with it. *The report is a nice-to-have; the streak counters are the product.*
+3. **`venue_ab_lines()` EXTRACTED** from `main()`, so a test binds the code that runs rather than a copy of it — an inline block is only ever testable by duplication.
+
+### The permanent fix: 20 of 22 organs could not report their own death
+
+- `run_all.sh` runs every organ as `python3 <organ>.py || true`. That is **correct** — one sick organ must never take the supervisor down — and it makes every organ crash **invisible**: the exit code goes to `|| true`, the traceback goes to a container log nobody tails, and any key published before the fault keeps looking fresh. **Fixing `bot_learn` alone would have been one water leak of twenty.**
+- **`bot_pnl_store.organ_main(key, fn)`** — the shared wrapper. Catches the fault, prints the traceback, and **records it on that organ's own bot_state key** (`healthy: False`, `error`, `error_where`, `error_at`), which is the payload `fleet_immune` already scans and phone-pushes on. **No new plumbing.** Never re-raises: the caller is a `|| true` line and a traceback there is the silence itself. `clear_organ_error()` marks the happy path, because a sticky error pages once and then means nothing — the detector must be able to say RECOVERED, not only DIED.
+- **NINETEEN ORGANS CONVERTED**, each verified individually (parses + its own selftest) with an automatic revert on failure: clock, immune, proprioception, regen, respiration, risk, impl-shortfall, market-scout, scout-tuner, regime-oracle, incubator, judge, market-pulse, event-sentinel, radar, allocation, evidence-board, taker, brain. Radar and allocation needed their multi-statement CLI bodies wrapped in `_cli()` first; market-pulse imports the store lazily, so it imports at the call site.
+- **`evidence_board` was "handling" its errors by PRINTING them.** Printing is not reporting — that print goes to the same unread log. It now records as well.
+- **`scripts/audit_organ_silence.py` — the CI guard that makes it permanent.** Every organ `run_all.sh` invokes must route through the wrapper; a deliberate exception is DECLARED with a reason (three are: the boot-time prune, the Parliament supervisor which has its own per-layer handling, and the DB→DB poller with no key of its own). **The guard explicitly rejects stderr-only "handling"** — its selftest asserts that a module which merely prints a traceback does NOT count. Wired into `changelog-check.yml` and the selftest registry.
+- **The registration guard caught me**: `test_no_unregistered_selftest` failed because the new audit was not registered. Exactly the ratchet working.
+
+### Why this one is different from the last twenty entries
+
+Every fix here closes a **class**, not an instance. The `KeyError` was one bug; the ordering fix means no future rendering bug can ever eat the learning again; the wrapper means no organ can ever die silently again; and the audit means a **new** organ cannot be added without the ability to report its own death. That is the difference the operator asked for between building and patching leaks — and the honest measure is that this pass added one guard that would have caught the defect on day one instead of week three.
+
+## 2026-08-01 (hv) — 💰 THE ALLOCATION ORGAN: the fleet could say whether a book was SAFE, never where the money should go
+
+- **THE ASK** (operator): *"with growth in mind let's make the best outcome for our growing ecosystem."* Suite **722**, six guards green, three mutations red.
+- **THE STRUCTURAL GAP.** The fleet runs a dozen organs answering *"is this book safe?"* — risk light, immune, regen, proprioception, respiration, the go-live grader — and **not one** answering *"where should the money go?"*. Every shadow book is handed $1,000 regardless of evidence and always has been, so the best-evidenced book and a book with ZERO closed trades in twenty days carry identical capital and nothing in the system notices.
+- **THE MEASUREMENT THAT MAKES IT URGENT** (live ledger, 30-Jul): FUNDING books **3 books / n=212 / net +$72.89**; DIRECTIONAL books **18 books / n=809 / net −$9.21**. Six times the books and four times the trades on the side that does not pay. That is not a tuning problem — it is an allocation problem, and the fleet had no instrument that could even state it.
+
+### What it says on the live ledger, run today
+
+| | books | closes | current | evidence-weighted |
+|---|---:|---:|---:|---:|
+| **funding** | 4 | 297 | $4,000 | **$16,000** |
+| **directional** | 16 | 867 | $16,000 | **$4,000** |
+
+**ZERO of the 16 directional books has a measured claim. Three of the four funding books do** — 💸 the Farmer's shadow arm (strongest), the LIVE Farmer, and 🌾 carry. ⚖️ Counterweight has n=48 and still no claim: its lower bound is not above zero. An exact inversion of how the capital actually sits.
+
+### The rule: rank on a LOWER BOUND, never on the mean
+
+- A book's claim is `max(0, mean − 1.28·SE)` on per-trade return. **Ranking on the mean rewards small samples that got lucky**; the bound is self-correcting — a big mean on a tiny n has a wide SE and therefore a weak claim, exactly as it should. This is the principle the incubator already learned ([[incubator-evidence-denominated-in-fills]]), applied to capital.
+- **Z=1.28 (90%), deliberately gentler than the gate's t≥2.0.** This decides where to LEARN next, not what may hold real money. Using the gate's bar here would starve every undecided book and the fleet would stop discovering anything.
+- **Every living book keeps a 25% PROBE FLOOR.** A book cannot earn evidence with no capital, so starving an undecided book to zero is how a fleet stops learning. The floor is the price of optionality and it is stated, not hidden.
+- **Total capital is CONSERVED by construction** — it never proposes spending more, only spending it differently.
+- **With no measured claim anywhere the output is EXACTLY the flat allocation.** The organ says "no opinion" rather than inventing a plausible-looking split; that is the honest common case early in a book's life and it must not look like a recommendation.
+
+### What it deliberately is NOT
+
+- **It moves NO capital.** No lever, no clip, no promotion. `test_it_writes_no_lever` asserts the module contains no `write_levers`, `get_lever`, `fleet_tuning`, `market_open` or `publish_paper_trade` — automating capital movement is a large new actuator on a fleet whose growth rail is bounded and TTL'd for good reasons. The operator gets the number, not a fait accompli.
+- **It is NOT a second go-live gate.** The gate lives in `scripts/golive_readiness` and is IMPORTED, never re-implemented — a second copy of a rule that governs real money is a second rule, the 30-Jul `evidence_review` defect. Allocation asks a different question: not *"may this book hold real money?"* but *"where is the next dollar best spent?"*
+
+### Two things caught while building it
+
+- **A DEGENERATE-VARIANCE TRAP.** `if var <= 0` looks right and is not: 30 × 0.01 sums to 0.30000000000000004, so identical returns give a variance of ~1e-36 rather than zero, the bound collapses onto the mean, and **a book with no dispersion would out-claim every real one**. Floored at 1e-18.
+- **MY OWN FIXTURES WERE DEGENERATE** — constant return series, which `lower_bound` correctly refuses to score, so the ranking test proved nothing about ranking. Real books have dispersion and the fixtures now do too. Third time this session that a fixture tested the code's degenerate path instead of its real one.
+- **Mutation-verified**: rank-on-mean, remove-the-floor and overspend each turn the suite red.
+
+### Wiring — the born-dark checklist, all four halves
+
+`COPY` into `Dockerfile.freqtrade`, a `--publish` loop in `run_all.sh` (sharing the radar's 30-min cadence and its single ledger fetch), a `paths:` entry AND the service grep in `railway-redeploy.yml`, and registration in `tests/test_selftests.py`. `audit_image_imports` and `audit_deploy_coverage` both green. Publishing is opt-in (`--publish`) so a bare laptop run against the shared DB writes nothing.
+
+**Also observed in production on its first live run:** the `(hr)` ledger quarantine fired — *"44 row(s) withheld from grading"* — so the BOT/USDC churn episode is now out of every grader's input, as intended.
+
+### What this makes possible, stated as a question rather than an answer
+
+The organ does not say "move the money". It says the funding class is the only place the fleet has measured evidence, and that 80% of the capital is on the side with none. **Whether to act on that is the operator's call**, and it now has a number attached instead of an impression — which is what "structured for growth" has to mean before any capital moves.
+
 ## 2026-07-31 (hz) — THE SQUARE-ONE DETECTOR: 16 entries on one book in 7 days, measured
 
 - **THE MANDATE** (operator): *"when we make progress on construction, we don't forget it and go try and work on a random house the next day. We are advanced enough to be growing daily, we are fixing the same issues daily and it's just costing me money"* and *"we can't refer back to a doctrine that was established at the beginning of our journey — it needs to be constantly updated and engraved so that we are future proof."*
@@ -54,7 +130,8 @@
 - **A DEAD ROW IS NOT A STALE DEPLOY — `(hu)`'s own detector mis-diagnosed it within hours.** `stale_writer_sickness` fired on carry with *"its container is running code that predates the stamp, i.e. a deploy that never landed"* while the publisher had been gone for 779 minutes. Sending the operator to the deploy system for a dead process is exactly what `(ht)` says a detector must not do. Now excluded by `_row_stale` (>130 min, `age_sec` or `updated_at`), because **staleness is the watchdog's call** and claiming it here would double-report one condition under two names. **Unknown age never mutes a finding** — suppression only on positive evidence of death.
 - **THE BRAIN IS NOT DARK EITHER — IT IS AMNESIAC, WHICH IS WORSE BECAUSE IT LOOKS HEALTHY.** The watchdog says `ORGAN DARK: learning-brain (4398m)`, and I first read that as "the brain is down and every stake multiplier is stale". **Wrong**: `brain-vitals` (run 338), `brain-stake-mults` and `brain-diagnosis` were all updated **14:12 today**. Only the MEMORY key is frozen, at **28-Jul**.
   - **THE MECHANISM.** `bot_learn._load_state` reads `learning-brain`, the run computes, `_save_state` writes it back — and the write has been FAILING. So the brain reloads the 28-Jul state every cycle, recomputes, publishes perfectly fresh vitals/mults/diagnosis, and **cannot remember**. `mult_streaks` is frozen, so the **3-run promotion gate is unreachable**: `mults_published: 1` against **20 living bots**, and that survivor carries `streak: 15` from *before* the freeze. Three days of the brain's two-way multiplier system silently doing nothing.
-  - **ROOT CAUSE: `json.dumps` emits bare `NaN`/`Infinity`**, which is not valid JSON, and Postgres `jsonb` rejects the whole write. `save_state` caught it, `_warn_once` logged it ONCE into a container nobody reads, and `bot_learn._save_state` discarded the `False`. Every other bot's `save_state` works, so it was never the DB — it was this payload's content. This is the `_finite_or_none` discipline the money columns got on 18-Jul, never applied to the arbitrary nested blobs `save_state` accepts.
+  - **[CORRECTED 01-Aug — MY ROOT CAUSE WAS WRONG.** A concurrent session's `(hw)` found the real one: `bot_learn.main()` raised **`KeyError('paper')` on every run** — the venue A/B loop guards `arm in e` then dereferences `e["paper"]` UNGUARDED, and the Kraken paper twins it compares against were RETIRED 14-Jul. **The crash sits after the four read-only publishes and before `_save_state`**, which is precisely the pattern reported below: fresh vitals/mults/diagnosis, frozen memory, `runs` stuck at 337. The save was never ATTEMPTED, so it was never rejected. I reasoned "other bots' `save_state` works, therefore it is this payload's content" — plausible, and wrong, because I had **no control group separating 'the write was attempted and failed' from 'the write was never reached'**. That is I6 violated by the entry that reported it. **What survives:** `json_safe` is correct and defensive — a non-finite float reaching `jsonb` is a real hazard and now cannot happen — but it fixed a hazard, not this incident. **What did NOT survive:** the loud `_save_state` shout would never have fired here, because `_save_state` never ran; my detection was aimed one layer too low. **What DID work is `fleet_immune.brain_amnesia`** — it detects the SYMPTOM (memory lagging vitals by 71.4h) independently of cause, and would have caught this crash on day one.]
+  - ~~**ROOT CAUSE: `json.dumps` emits bare `NaN`/`Infinity`**~~, which is not valid JSON, and Postgres `jsonb` rejects the whole write. `save_state` caught it, `_warn_once` logged it ONCE into a container nobody reads, and `bot_learn._save_state` discarded the `False`. Every other bot's `save_state` works, so it was never the DB — it was this payload's content. This is the `_finite_or_none` discipline the money columns got on 18-Jul, never applied to the arbitrary nested blobs `save_state` accepts.
   - **FIXED IN THREE LAYERS**, because any one alone leaves the class open: `bot_pnl_store.json_safe()` sanitizes NaN/inf → None recursively (depth-bounded, so a self-referential blob terminates inside a never-raises writer) and `save_state` now dumps with `allow_nan=False` so a leak is a LOUD error rather than a silent DB reject; `bot_learn._save_state` prints **every run**, not once, naming what the failure costs; and `fleet_immune.brain_amnesia` detects it.
 - **THE DETECTOR'S FIRST CUT WAS WRONG AND THE LIVE PAYLOAD CAUGHT IT.** I tested the RUN COUNTER — `learning-brain.runs` vs `brain-vitals.run` — and it fired **nothing**, because a stuck brain loads N, computes N+1, publishes N+1 and fails to store it, so the lag is **permanently 1**, byte-identical to normal write-after-publish ordering *no matter how many days it has been frozen*. Measured 337 vs 338 after three days. **The signal is the TIMESTAMP SKEW**: both keys are written by one process in one cycle, so a memory 71.4h behind fresh vitals is a failed write, full stop. The counter is reported as context, never as the trigger — and the selftest pins the counters 1 apart on purpose, so a regression to the counter test goes quiet and reddens.
 - **VERIFIED AGAINST THE PUBLISHER'S OWN PAYLOAD**, per `(hj)`: `brain_amnesia` fires on the live bus with *"vitals published 71.4h more recently than the stored state"*, and `stale_writer_sickness` now returns clean on the live rows — carry correctly excluded as dead rather than misdiagnosed. Nine mutations red across the three files, including *json_safe passes NaN through*, *save_state does not sanitize*, *unbounded recursion*, *dead row diagnosed as a stale deploy*, *unknown age mutes a real finding*, and *compares vitals to itself*.
@@ -62,7 +139,9 @@
 - **WHICH BOOK MOVED** (doctrine rule 4): none, and that is the honest answer. 🌾 carry is OFF — it has traded nothing for 13 hours, so its go-live sample is not merely pooled, it is not accruing. The brain fix restores streak-gated promotion for all 20 shadow books once it deploys. `ready: []` unchanged.
 - **OPERATOR ACTIONS**: (1) find why the carry service stopped at 03:10 — Railway logs; (2) the brain fix needs a deploy to take effect.
 
-## 2026-07-31 (hw) — COUNTERWEIGHT PREPARED FOR LIVE, AND THE BAR THAT WOULD HAVE PASSED IT WHILE IT LOST MONEY
+## 2026-07-31 (ia) — COUNTERWEIGHT PREPARED FOR LIVE, AND THE BAR THAT WOULD HAVE PASSED IT WHILE IT LOST MONEY
+
+*(Letter: written as (hw); a concurrent session landed its own (hw) on main — "THE BRAIN HAD BEEN DYING ON EVERY RUN" — while this branch was open. Theirs is merged and keeps it; mine moved to (ia). Fourteenth recorded collision, and the second in one session.)*
 
 *(Letter: written as (hv); a concurrent session landed its own (hv) on main mid-work. Moved to (hw). Thirteenth recorded collision.)*
 

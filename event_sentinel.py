@@ -805,4 +805,4 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
         sys.exit(0)
-    sys.exit(main())
+    sys.exit(store.organ_main('event-sentinel', main))

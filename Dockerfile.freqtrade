@@ -100,6 +100,8 @@ COPY implementation_shortfall.py /freqtrade/implementation_shortfall.py
 # cull writes itself. Imports bot_pnl_store + cleanup_legacy_bots (both COPY'd);
 # audit_image_imports verifies. Publish-only, --publish gated.
 COPY fleet_radar.py /freqtrade/fleet_radar.py
+# [2026-08-01 (hv)] the allocation organ — publish-only; see fleet_allocation.py
+COPY fleet_allocation.py /freqtrade/fleet_allocation.py
 # [2026-07-30] 🚦 the GO-LIVE GRADER becomes an organ. It implements the (fk)
 # bar — the ONE rule that decides whether a shadow book may ever hold real
 # money — and until now it shipped in no image and ran on no schedule, so its

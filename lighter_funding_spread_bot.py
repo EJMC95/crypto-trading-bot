@@ -30,7 +30,7 @@ WHAT / WHY (2026-07-12)
   UNVALIDATED LIVE. Shadow fills on the real book via ShadowBroker; funding
   accrued hourly from the venue's own funding map, exactly as the backtest.
 
-  GO-LIVE [2026-07-31 (hw)] — PREPARED, NOT ARMED. v1 refused `lighter_live`
+  GO-LIVE [2026-07-31 (ia)] — PREPARED, NOT ARMED. v1 refused `lighter_live`
   outright; v2 has a live path that needs THREE independent conditions, and
   the default with no env set is still to exit:
     1. VENUE=lighter_live       — the deployment choice
@@ -177,7 +177,7 @@ def lighter_market_ids():
 _ENV_DEFAULTS = {"K": K, "UNIVERSE_N": UNIVERSE_N}
 
 # ---------------------------------------------------------------------------
-# GO-LIVE [2026-07-31 (hw)]
+# GO-LIVE [2026-07-31 (ia)]
 # ---------------------------------------------------------------------------
 #: THE VALIDATED CONFIG, and the live arm is PINNED to it regardless of levers.
 #: The backtest that earned this book its existence is the plateau CENTRE:
@@ -250,7 +250,7 @@ def apply_tuning(live=False):
     registry; expired/absent/quarantined levers leave the defaults intact.
     Returns {lever: value} of whatever actually moved.
 
-    [2026-07-31 (hw)] THE LIVE ARM TAKES NO CAPACITY LEVER. `fundspread.k`
+    [2026-07-31 (ia)] THE LIVE ARM TAKES NO CAPACITY LEVER. `fundspread.k`
     sizes real exposure (gross = 2 * K * clip), and the growth rail is
     authored by the evidence board on SHADOW evidence — (hs) measured it
     ratcheting this very lever 5 -> 8 -> 12 (the cage ceiling) on a book at
@@ -439,7 +439,7 @@ def main():
     os.environ.setdefault("VENUE", "lighter_shadow")
     ctx = venue_context(bot=BOT, default_hl_net="mainnet",
                         paper_start=START_EQUITY, live_flag=False)
-    # [v2 GATE, 2026-07-31 (hw)] — operator: "prepare Counterweight to go live".
+    # [v2 GATE, 2026-07-31 (ia)] — operator: "prepare Counterweight to go live".
     # v1 refused `lighter_live` unconditionally. That is replaced by a live path
     # that is PREPARED but not ARMED, and which cannot be armed by accident.
     # DEFAULT BEHAVIOUR IS UNCHANGED: with no env set, this still exits.
@@ -456,7 +456,7 @@ def main():
     # closes against -$22.68 of OPEN loss on 24 legs. Its realised maxDD reads
     # 0.2% against a 15% bar because it is ALWAYS-IN and its losses sit in
     # positions it has not closed. On trajectory it passes all six bars in late
-    # August; (hw)'s MTM drawdown is what stops that being a green light on a
+    # August; (ia)'s MTM drawdown is what stops that being a green light on a
     # book below $1,000. Wiring the gate in HERE means the code cannot get
     # ahead of the evidence even if someone sets both env vars.
     #
@@ -476,7 +476,7 @@ def main():
                     GOLIVE_K, GOLIVE_ORDER_USD)
     bot_id = ctx.bot_id
     broker = ctx.broker
-    # [2026-07-31 (hw)] BOTH TERMS OF THE EXPOSURE ARE PINNED LIVE. Gross is
+    # [2026-07-31 (ia)] BOTH TERMS OF THE EXPOSURE ARE PINNED LIVE. Gross is
     # 2 * K * clip; pinning K alone would leave the clip free to reopen the
     # same hole from the other side.
     order_usd = ctx.order_usd(
@@ -907,7 +907,7 @@ def _selftest():
             "born-dark import -> configured list, no AttributeError"
     finally:
         globals()["fleet_bus"] = _saved_bus
-    # ---- [2026-07-31 (hw)] THE GO-LIVE GATE ------------------------------
+    # ---- [2026-07-31 (ia)] THE GO-LIVE GATE ------------------------------
     # This is the only thing standing between a shadow book and real money, so
     # every refusal path is pinned. FAIL-CLOSED means: the ONLY input that
     # returns None is opt-in + fresh + ready.

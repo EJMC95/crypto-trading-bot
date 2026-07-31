@@ -1589,6 +1589,37 @@ def grade_scout_lenses(max_snapshots=2200):
     return out
 
 
+def venue_ab_lines(venue_ab):
+    """Render the venue A/B section: the same strategy on its paper twin vs its
+    Lighter arm. Extracted from main() so a test can bind the CODE THAT RUNS —
+    an inline block is only ever testable by a copy, and a copy of the rule is
+    not the rule (this repo has paid for that lesson repeatedly).
+
+    [2026-08-01 (hw)] THE BUG THIS EXISTS TO PIN: the loop guarded `arm in e`
+    and then dereferenced `e["paper"]` UNGUARDED. Written when every book had a
+    KRAKEN PAPER twin; Kraken was RETIRED 14-Jul, so no book has a paper arm
+    any more and the first book carrying a shadow/live arm raised
+    KeyError('paper'). It killed main() before `_save_state`, so the brain
+    recomputed everything, published its four read-only keys, and then forgot
+    the run — every cycle, invisibly, behind `|| true`.
+    """
+    out = []
+    for base, e in sorted((venue_ab or {}).items()):
+        if not isinstance(e, dict) or "paper" not in e:
+            continue                 # no paper twin -> nothing to compare
+        p = e["paper"]
+        for arm in ("shadow", "live"):
+            s = e.get(arm)
+            if not s:
+                continue
+            out.append(
+                f"- {base}: paper ${p.get('pnl_abs') or 0:+.2f} "
+                f"({p.get('wins') or 0}W/{p.get('losses') or 0}L) vs {arm} "
+                f"${s.get('pnl_abs') or 0:+.2f} "
+                f"({s.get('wins') or 0}W/{s.get('losses') or 0}L)")
+    return out
+
+
 def main():
     trades = _fetch_trades()
     # [2026-07-16 v3] one epoch parse per trade — decay weighting and the
@@ -1873,6 +1904,12 @@ def main():
     }
     try:
         import bot_pnl_store as store
+        # [(hw)] a HEALTHY run clears the crash flag. A sticky error would
+        # page once and then mean nothing — the detector must be able to say
+        # "recovered", not only "died".
+        vitals_payload["healthy"] = True
+        vitals_payload.pop("error", None)
+        vitals_payload.pop("error_where", None)
         store.save_state(VITALS_KEY, vitals_payload)
         try:
             store.save_history(VITALS_KEY, vitals_payload)
@@ -1960,16 +1997,7 @@ def main():
             L.append(f"- **[{d['primary']}]** {d['proposal']}")
         L.append("")
     # [2026-07-14 REACH] Venue A/B — same strategy, Kraken paper vs Lighter.
-    ab_lines = []
-    for base, e in sorted(venue_ab.items()):
-        for arm in ("shadow", "live"):
-            if arm not in e:
-                continue
-            p, s = e["paper"], e[arm]
-            ab_lines.append(
-                f"- {base}: paper ${p.get('pnl_abs') or 0:+.2f} "
-                f"({p.get('wins') or 0}W/{p.get('losses') or 0}L) vs {arm} "
-                f"${s.get('pnl_abs') or 0:+.2f} ({s.get('wins') or 0}W/{s.get('losses') or 0}L)")
+    ab_lines = venue_ab_lines(venue_ab)
     if ab_lines:
         L.append("## Venue A/B (paper vs Lighter twins — execution/funding gap, not signal)")
         L.extend(ab_lines)
@@ -1994,10 +2022,27 @@ def main():
                 f"{k} n={v['n']} wr={(v['w']/v['n']*100 if v['n'] else 0):.0f}%"
                 for k, v in c["by_mood"].items()) +
                 f" (matched {c.get('mood_matched', 0)}/{c['n']})")
-    with open(LESSONS_MD, "w") as f:
-        f.write("\n".join(L) + "\n")
-
+    # [2026-08-01 (hw)] THE ORDERING IS THE REAL BUG, and it is why one
+    # KeyError cost 17 days of learning. `_save_state` used to run AFTER the
+    # markdown report, so a fault anywhere in REPORT RENDERING — cosmetic,
+    # every one of them — discarded the entire run's computed memory. The
+    # durable state is now written FIRST: the report is a nice-to-have, the
+    # streak counters are the product.
+    #
+    # WHAT IT COST, measured 2026-08-01: `learning-brain.runs` sat at 337
+    # while `brain-vitals.run` read 338 — the state had not advanced. Since
+    # `mult_streaks` needs THREE CONSECUTIVE runs to move a stake multiplier
+    # and the streak lives in that state, no new evidence could ever
+    # accumulate a streak. The brain recomputed everything correctly, published
+    # its four read-only keys, and then died before it could remember any of
+    # it. Every run. That is a learning loop that cannot learn.
     saved = _save_state(state)
+    try:
+        with open(LESSONS_MD, "w") as f:
+            f.write("\n".join(L) + "\n")
+    except Exception as _e:  # noqa: BLE001
+        print(f"[bot_learn] report render failed ({_e!r}) — state ALREADY "
+              f"saved ({'+'.join(saved) or 'NOT SAVED'}); learning is intact.")
     n_mults = sum(len(t) for t in published_mults.values())
     print(f"[bot_learn] run {run_no} ({mult_vitals.get('engine')}): "
           f"{len(trades)} closed trades, "
@@ -2289,4 +2334,7 @@ def _selftest():
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         sys.exit(_selftest())
-    sys.exit(main())
+    # [2026-08-01 (hw)] THE SHARED wrapper, not a bespoke one. run_all.sh runs
+    # this behind `|| true`; without it the KeyError('paper') above ran on
+    # EVERY cycle for weeks and nothing anywhere said so.
+    sys.exit(store.organ_main(VITALS_KEY, main))

@@ -671,7 +671,10 @@ def _selftest():
     return False
 
 
-if __name__ == "__main__":
+def _cli():
+    # [2026-08-01 (hw)] the CLI body lives in a function so the
+    # shared organ wrapper can catch its faults — run_all.sh runs
+    # this behind `|| true`, which otherwise hides every crash.
     if "--selftest" in sys.argv:
         sys.exit(0 if _selftest() else 1)
     pub = "--publish" in sys.argv
@@ -680,3 +683,7 @@ if __name__ == "__main__":
         print(json.dumps(p, indent=1, default=str))
     else:
         _report(p)
+
+
+if __name__ == "__main__":
+    sys.exit(store.organ_main('fleet-radar', _cli))

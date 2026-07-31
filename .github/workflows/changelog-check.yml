@@ -95,6 +95,10 @@ jobs:
         run: python3 scripts/audit_lever_bounds.py
       - name: The guard must still be able to see (negative fixtures)
         run: python3 scripts/audit_lever_bounds.py --selftest
+      - name: Every organ can report its own death (run_all.sh runs them behind `|| true`)
+        run: python3 scripts/audit_organ_silence.py
+      - name: The silent-organ detector must fire, not merely stay quiet
+        run: python3 scripts/audit_organ_silence.py --selftest
 
   venue-purity:
     name: LIGHTER-FIRST (no foreign market data in shipped code)
