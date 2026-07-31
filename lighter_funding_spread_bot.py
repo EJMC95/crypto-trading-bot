@@ -647,6 +647,17 @@ def main():
                        "ff_overlap": f"{ff_overlap}/{len(meta)}" if meta else "0/0",
                        "next_reb": datetime.fromtimestamp(
                            next_reb, tz=timezone.utc).isoformat() if next_reb else None})
+            # [2026-07-31 (hq)] MTM EQUITY SERIES — and this book is where the
+            # realised-only drawdown bar is most blind, measured rather than
+            # asserted. Its ledger is +$7.29 realised over 48 closes while the
+            # published row reads -$27.47: a -$34.76 OPEN loss carried across
+            # 24 legs. `golive_readiness` scores it mean +1.080%/trade, win
+            # 67.9%, maxDD 0.2% — the drawdown bar is measuring almost nothing,
+            # because this book HOLDS and rarely closes. (hl) proved the two
+            # definitions can disagree about the VERDICT; here the gap is
+            # already ~3.5% of the book against a 15% bar. Publish-only: the
+            # grader is unchanged until there is history to read.
+            store.snapshot_equity(bot_id, account_value(), broker.open_count())
         except Exception:  # noqa: BLE001
             pass
         try:

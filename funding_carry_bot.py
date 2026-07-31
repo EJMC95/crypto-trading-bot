@@ -732,6 +732,19 @@ def main():
                            "hottest_funding_apr": {
                                c: f"{f['rate']*_H:+.1%}" for c, f in top}},
                 )
+                # [2026-07-31 (hq)] MTM EQUITY SERIES. (hl) shipped
+                # `snapshot_equity` because the go-live drawdown bar reads
+                # REALISED closed P&L only, and named THIS book as the one to
+                # re-grade under MTM first — carry is five of six bars from the
+                # gate, so a stricter drawdown definition lands on it before
+                # anyone else. It then wired the two RIDERS and not this book,
+                # so the series it deferred the decision for was never
+                # accruing here. Measured 31-Jul: `bot_state_history` held
+                # ':equity' for exactly `crypto-trend-daily-lshadow` and
+                # `equities-regime-lshadow`. Publish-only; the grader is
+                # unchanged until there is history to read.
+                store.snapshot_equity(bot_id, START_EQUITY + realized + open_pnl,
+                                      len(positions), realized)
             except Exception:
                 pass
 
