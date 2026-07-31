@@ -442,6 +442,72 @@ def bot_row_sickness(bot_rows):
     return out
 
 
+# [2026-07-31 (hu)] Rows whose publisher LEGITIMATELY carries no `extra.svc`.
+# The BORN_DARK_OK idiom: a deliberate omission is DECLARED with a reason, so
+# silence is never an option. These three run on services in the LIVE-MARKER
+# deploy path (`trail-blazer-live`, `funding-farmer-shadow`,
+# `tide-rider-lighter-live`), which an unmarked push must never ship — so they
+# are still on pre-(ht) code BY DESIGN and will stamp themselves the first time
+# a deliberate live deploy carries them.
+STALE_WRITER_OK = {
+    "perps-funding-lighter-lighter":
+        "LIVE Funding Farmer — marker-gated deploy, unmarked pushes must not "
+        "ship real money. Stamps on the next deliberate [deploy-live-farmer].",
+    "perps-funding-lighter-lshadow":
+        "the Farmer's shadow twin ships from the same marker-gated rule "
+        "(funding-farmer-shadow), so it is deploy-gated for the same reason.",
+    "lighter-ticket-taker-lighter":
+        "LIVE Ticket Taker — marker-gated. Stamps on [deploy-live-taker].",
+}
+
+
+def stale_writer_sickness(bot_rows, ok=None, min_stamped=5):
+    """[2026-07-31 (hu)] A FRESH row published by a container running code
+    that predates `extra.svc` — i.e. a deploy that reported OK and never
+    landed. Returns [{organ, detail}].
+
+    THE INCIDENT. Run 30598053371 printed `OK: 'funding-carry' deployed`, and
+    `funding-carry` published NOTHING while `perps-funding-carry-lshadow` kept
+    publishing every ~90-170s on build `fbb926402049` with no `svc` — pre-(hp)
+    code, on a container the deploy never reached. Twenty samples over ten
+    minutes showed ONE state and never a flip. The service actually running the
+    book was `yield-harvester-shadow`, which had no deploy rule at all. Nothing
+    in the fleet could see this: the workflow was green, the row was fresh, its
+    P&L was sane, and the guard meant to catch the duplicate was in `main`
+    rather than in the image.
+
+    WHY THE TEST IS "NO svc" AND NOT A BUILD COMPARISON. `extra.build` is a
+    content hash over a per-image FILE SET ((fd)), so predicting it needs that
+    image's COPY list and a same-tree checkout — the repo-side prediction has
+    already read as "the deploy never landed" when it had. The ABSENCE of a key
+    the publisher now always writes needs no prediction at all.
+
+    FAIL-SAFE QUIET. Requires `min_stamped` rows to carry `svc` before saying
+    anything, so during the rollout — when nothing is stamped yet — this stays
+    silent instead of flagging all 24 books. Absence of evidence is not
+    sickness, which is the same direction every other detector here fails.
+    """
+    rows = [r for r in (bot_rows or []) if isinstance(r, dict)]
+    ok = STALE_WRITER_OK if ok is None else ok
+    stamped = [r for r in rows if (r.get("extra") or {}).get("svc")]
+    if len(stamped) < min_stamped:
+        return []                      # the stamp has not propagated yet
+    out = []
+    for r in rows:
+        bot = str(r.get("bot") or "")
+        if not bot or bot in ok:
+            continue
+        if (r.get("extra") or {}).get("svc"):
+            continue
+        build = (r.get("extra") or {}).get("build")
+        out.append({"organ": bot,
+                    "detail": (f"publisher carries no extra.svc (build "
+                               f"{build}) while {len(stamped)} rows do — its "
+                               f"container is running code that predates the "
+                               f"stamp, i.e. a deploy that never landed")})
+    return out
+
+
 # ---------------------------------------------------------------------------
 
 NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
@@ -548,6 +614,7 @@ def run_once():
         _papers = []
     app = application_sickness(levers, _papers, now, app_seen)
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
+            + stale_writer_sickness(bot_rows)
             + [{"organ": "fleet-tuning", "detail": f"{n}: {w}"} for n, w in q.items()]
             + [{"organ": "lever-application", "detail": f"{n}: {w}"}
                for n, w in app.items()])
@@ -873,6 +940,51 @@ def _selftest():
     assert alert_fossils([], now) == ([], [])
     assert organ_invariants({}, now) == []
     assert bot_row_sickness([]) == []
+
+    # ---- [2026-07-31 (hu)] STALE WRITER: deployed OK, never landed --------
+    # The measured shape: seven services stamped, carry unstamped on an old
+    # build. Names and builds are the real ones from the (ht) deploy.
+    def _row(bot, svc=None, build="deadbeef"):
+        e = {"build": build}
+        if svc:
+            e["svc"] = svc
+        return {"bot": bot, "extra": e}
+
+    _live = list(STALE_WRITER_OK)
+    _fleet = [_row("pm-rudd-lshadow", "freqtrade-bots"),
+              _row("perps-funding-spread-lshadow", "counterweight-shadow"),
+              _row("lighter-dislocation-lshadow", "snap-back-shadow"),
+              _row("equities-regime-lshadow", "equities-regime-shadow"),
+              _row("lighter-perp-sniper-lshadow", "perp-sniper-shadow"),
+              _row("crypto-trend-daily-lshadow", "tide-rider-lighter-shadow"),
+              _row("freqtrade-mum-lshadow", "family-lighter-shadow")]
+    _carry = _row("perps-funding-carry-lshadow", None, "fbb926402049")
+
+    sw = stale_writer_sickness(_fleet + [_carry])
+    assert [s["organ"] for s in sw] == ["perps-funding-carry-lshadow"], sw
+    assert "fbb926402049" in sw[0]["detail"], sw
+    # a healthy fleet says NOTHING — a detector that flags everything trains
+    # the operator to ignore it (the (hh) two-writers lesson).
+    assert stale_writer_sickness(_fleet) == [], "all-stamped fleet must be quiet"
+    # the marker-gated LIVE rows are declared, so they never flag
+    assert stale_writer_sickness(_fleet + [_row(b) for b in _live]) == [], \
+        "marker-gated live rows are DECLARED, not sick"
+    # ...and the declaration is a real allow-list, not a blanket pass: an
+    # UNdeclared unstamped row in the same payload still fires.
+    _mixed = _fleet + [_row(b) for b in _live] + [_carry]
+    assert [s["organ"] for s in stale_writer_sickness(_mixed)] == \
+        ["perps-funding-carry-lshadow"], stale_writer_sickness(_mixed)
+    # FAIL-SAFE QUIET during rollout: too few stamped rows -> say nothing
+    assert stale_writer_sickness(_fleet[:2] + [_carry]) == [], \
+        "below min_stamped the detector must stay silent, not flag everyone"
+    assert stale_writer_sickness([]) == [] and stale_writer_sickness(None) == []
+    # every declaration carries a REASON (the BORN_DARK_OK contract)
+    assert all(isinstance(v, str) and len(v) > 20
+               for v in STALE_WRITER_OK.values()), STALE_WRITER_OK
+    # it is wired into run_once's aggregate, not merely defined
+    import inspect as _ins2
+    assert "stale_writer_sickness(bot_rows)" in _ins2.getsource(run_once), \
+        "a detector nothing consumes is a note, not a guard"
     assert application_sickness({}, [], now, {}) == {}
     # [2026-07-17 AUDIT] THE NOTIFY LEDGER: `notified` must mean DELIVERED, not
     # SEEN. It was committed with every sick_id before the push decision, so a
