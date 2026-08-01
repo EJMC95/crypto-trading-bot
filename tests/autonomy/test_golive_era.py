@@ -31,6 +31,7 @@ WHAT THESE TESTS PIN, in order of what would hurt most if it broke:
 """
 import pathlib
 import sys
+import datetime as _dt
 
 import pytest
 
@@ -41,6 +42,10 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "scripts"))
 
 import golive_readiness as g          # noqa: E402
+
+#: The synthetic era used by payload/card fixtures below. Deliberately a date
+#: NO era table owns, so a real era move cannot break a test about rendering.
+FIXTURE_ERA_ISO = "2026-06-01"
 
 CARRY = "perps-funding-carry-lshadow"
 
@@ -85,10 +90,21 @@ def test_the_carry_declaration_carries_its_measurement():
     accrual basis changed' without the split lets the next reader re-open the
     question from prose instead of from the measurement."""
     iso, why = g.POLICY_ERA["perps-funding-carry"]
-    assert iso == "2026-07-17", iso
-    assert "62.03" in why and "0.91" in why, (
-        "the declaration must quote the era split it rests on")
-    assert "accrual" in why.lower()
+    # [(ii)] MOVED 17-Jul -> 31-Jul: a 12-day TWO-WRITER window (7 same-pair
+    # overlaps, deepest 9.14h on HYPE, peak 10 concurrent against a cap of 8)
+    # makes the earlier sample two books' trades, not this book's — a stronger
+    # invalidation than a wrong accrual unit. An era is the LATEST of every
+    # invalidating change, so the declaration must still carry the EARLIER
+    # reason: moving a date forward preserves it rather than discarding it.
+    # The DATE is the table's business and is deliberately NOT pinned here —
+    # pinning it made a correct table move read as a failure ((ii)). What must
+    # hold is that the declaration carries the MEASUREMENT it rests on.
+    assert iso and _dt.datetime.fromisoformat(iso), iso
+    assert "9.14" in why and "claim_writer" in why, (
+        "the declaration must quote the two-writer measurement it now rests on")
+    assert "accrual" in why.lower(), (
+        "an era is the LATEST of every invalidating change — the superseded "
+        "accrual-basis reason must survive in the declaration, not vanish")
 
 
 # --------------------------------------------------------------------------
@@ -98,10 +114,15 @@ def test_the_carry_declaration_carries_its_measurement():
 def test_a_trade_that_straddles_the_boundary_is_excluded():
     """Opened under the old basis, closed under the new one. It accrued in BOTH,
     so it describes neither era — and its close date would smuggle it in."""
+    # Era-relative, so a declared-era move does not break a test about the
+    # BOUNDARY RULE. (This pinned 2026-07-17 literals until (ii).)
+    era_iso = g.POLICY_ERA[g.era_base(CARRY)][0]
+    era_d = _dt.datetime.fromisoformat(era_iso).replace(tzinfo=_dt.timezone.utc)
     ep, _, _ = g.era_epoch_for(CARRY)
-    assert g.in_era("2026-07-16T12:00", ep, _p) is False, (
+    before = (era_d - _dt.timedelta(hours=12)).isoformat()
+    assert g.in_era(before, ep, _p) is False, (
         "a pre-era OPEN must be excluded however late it closed")
-    assert g.in_era("2026-07-17T00:00", ep, _p) is True, "the boundary is inclusive"
+    assert g.in_era(era_d.isoformat(), ep, _p) is True, "the boundary is inclusive"
 
 
 def test_the_era_is_read_off_the_OPEN_stamp_not_the_close():
@@ -205,7 +226,8 @@ def test_the_funding_farmer_pair_is_scoped_to_the_basis_fix(bot):
     `era_epoch_for` strips suffixes, and getting it wrong here would scope the
     shadow twin while leaving the live row pooled."""
     ep, iso, why = g.era_epoch_for(bot)
-    assert ep is not None and iso == "2026-07-17", (bot, ep, iso)
+    # Derived: under test is the SUFFIX STRIP, not the date ((ii)).
+    assert ep is not None and iso == g.POLICY_ERA[g.era_base(bot)][0], (bot, ep, iso)
     assert "REAL-MONEY" in why or "real-money" in why, why
 
 
@@ -270,7 +292,7 @@ def test_the_ticket_taker_IS_an_accruing_book_and_is_scoped_too():
         "describes anything")
     for row in ("lighter-ticket-taker-lighter", "lighter-ticket-taker-lshadow"):
         ep, iso, _why = g.era_epoch_for(row)
-        assert ep is not None and iso == "2026-07-17", (row, ep, iso)
+        assert ep is not None and iso == g.POLICY_ERA[g.era_base(row)][0], (row, ep, iso)
 
 
 @pytest.mark.parametrize("bot,publisher", [
@@ -294,7 +316,10 @@ def test_every_basis_era_names_a_publisher_that_really_accrues(bot, publisher):
     # "[2026-07-17 THE SIXTH 8x BOT]" rather than "BASIS FIX". Matching on the
     # DATE plus a real rate conversion is the invariant; matching on one house
     # phrase was my test asserting a convention the fleet does not have.
-    assert "2026-07-17" in src, f"{publisher} carries no 17-Jul dated note"
+    _era_day = g.POLICY_ERA[g.era_base(bot)][0][:10]
+    assert _era_day in src, (
+        f"{publisher} carries no {_era_day} dated note — the publisher's own "
+        "record of the change must name the date its era is declared from")
     assert ("to_hourly" in src or "_hourly(" in src), (
         f"{publisher} does not convert a funding rate — if it never accrued, "
         f"{bot}'s era describes nothing and should be removed")
@@ -405,21 +430,32 @@ def test_the_min_closes_filter_is_applied_to_the_ALL_TIME_count(capsys,
     from 'never was one'. Drives the REAL main() so this is the wiring, not a
     restatement of the comment."""
     import bot_pnl_store as store
+    # [(ii)] Dates are ERA-RELATIVE, not literals. This test pinned 2026-07-17
+    # in three places, so moving carry's declared era (17-Jul -> 31-Jul, when
+    # the 12-day two-writer window was found) broke it for no reason connected
+    # to what it checks. It exists to prove the MECHANISM — min-closes applied
+    # to the all-time count, and the era keyed on the OPEN — so it now reads
+    # the declared era and builds its fixture around it.
+    era_iso = g.POLICY_ERA[g.era_base(CARRY)][0]
+    era_d = _dt.datetime.fromisoformat(era_iso).replace(tzinfo=_dt.timezone.utc)
+
+    def _at(days, hour=0):
+        return (era_d + _dt.timedelta(days=days, hours=hour)).isoformat()
+
     rows = []
     for i in range(40):                       # 40 closes, all BEFORE the era
         rows.append({"bot": CARRY, "profit_abs": 3.0, "profit_ratio": 0.01,
-                     "open_ts": f"2026-07-1{i % 5}T00:00:00+00:00",
-                     "close_ts": f"2026-07-1{i % 5}T06:00:00+00:00"})
+                     "open_ts": _at(-10 - (i % 5)),
+                     "close_ts": _at(-10 - (i % 5), 6)})
     for i in range(3):                        # 3 closes inside it
         rows.append({"bot": CARRY, "profit_abs": -0.1, "profit_ratio": -0.0003,
-                     "open_ts": f"2026-07-2{i}T00:00:00+00:00",
-                     "close_ts": f"2026-07-2{i}T06:00:00+00:00"})
-    # ...and ONE STRADDLER: opened under the old basis, closed well inside the
+                     "open_ts": _at(1 + i),
+                     "close_ts": _at(1 + i, 6)})
+    # ...and ONE STRADDLER: opened under the old policy, closed well inside the
     # era. This row is what makes the count below discriminating — key the era
     # on the close stamp and it becomes "4 of 44", which is the bug.
     rows.append({"bot": CARRY, "profit_abs": 9.0, "profit_ratio": 0.03,
-                 "open_ts": "2026-07-15T00:00:00+00:00",
-                 "close_ts": "2026-07-25T00:00:00+00:00"})
+                 "open_ts": _at(-2), "close_ts": _at(8)})
     monkeypatch.setattr(store, "fetch_paper_trades", lambda limit=2000: rows)
     monkeypatch.setattr(sys, "argv", ["golive_readiness.py", "--min-closes", "10"])
     g.main()
@@ -427,7 +463,7 @@ def test_the_min_closes_filter_is_applied_to_the_ALL_TIME_count(capsys,
     assert CARRY in out, (
         "an era'd book with a thin era vanished from the report instead of "
         "showing dark bars — a demotion must be readable")
-    assert "era 2026-07-17" in out, "the report does not say it scoped the sample"
+    assert f"era {era_iso}" in out, "the report does not say it scoped the sample"
     assert "3 of 44 closes count" in out, out
     assert "READY: none" in out
 
@@ -443,7 +479,12 @@ def test_the_brain_scopes_the_carry_book_to_the_same_era():
     ACTUATOR-bearing `regime_gate` diagnosis on this book's `long` bucket, whose
     entire positive evidence is 3 pre-fix decay wins."""
     import bot_learn
-    assert bot_learn.ERA_START.get("perps-funding-carry") == "2026-07-17T00:00"
+    # The VALUE belongs to bot_learn.ERA_START, which owns it; duplicating it
+    # here is what breaks on a legitimate move ((ii)). Assert that the brain
+    # scopes the book at all, and that it parses — the gate>=brain RELATION has
+    # its own test below.
+    _brain = bot_learn.ERA_START.get("perps-funding-carry")
+    assert _brain and _dt.datetime.fromisoformat(str(_brain)), _brain
     assert bot_learn.era_epoch_for("perps-funding-carry-lshadow") is not None
 
 
@@ -521,7 +562,10 @@ def _era_book():
                       + _rows([0.0002, -0.0002] * 20, start="2026-07-20"))
     b = {**g.book_payload(era), "fails": g.grade(era)[1],
          "ready": False, "legacy_ready": False,
-         "era": {"since": "2026-07-17", "why": "the accrual basis changed",
+         # A SYNTHETIC era date on purpose: this fixture tests payload SHAPE,
+         # so coupling it to a real declared era would break it whenever that
+         # era legitimately moves ((ii)). Named once, derived by every assertion.
+         "era": {"since": FIXTURE_ERA_ISO, "why": "the accrual basis changed",
                  "closes_in_era": era["n"], "closes_all_time": alltime["n"]},
          "alltime": g.book_payload(alltime)}
     return b
@@ -532,7 +576,7 @@ def test_the_card_says_a_book_was_graded_on_part_of_its_ledger(monkeypatch):
     this. The chip is the only thing tying the bars to the sample they came from.
     """
     out = _card({CARRY: _era_book()}, monkeypatch)
-    assert ">era 07-17</span>" in out, out[:400]
+    assert f">era {FIXTURE_ERA_ISO[5:]}</span>" in out, out[:400]
     assert "40 of 65 closes" in out, "the chip must quote both counts"
 
 
@@ -658,3 +702,112 @@ def test_a_book_with_no_era_key_renders_unchanged(monkeypatch):
     assert "book-plain" in out
     assert ">era " not in out, "a book with no declared era grew an era chip"
     assert "closes count" not in out and "All-time would read" not in out
+
+
+# --------------------------------------------------------------------------
+# 7. INTEGRITY IS EVALUATED OVER THE GRADED SAMPLE. [(ii)] 01-Aug
+#
+# `(hf)` scoped the blocking check to the WHOLE ledger — right about detection,
+# wrong about blocking. A ledger is append-only, so an all-time check is a
+# ONE-WAY LATCH: once true it is true forever however thoroughly the cause is
+# fixed. 🌾 carry, the fleet's only book with a measured claim, could never be
+# READY again on 7 overlaps all falling 17-Jul..29-Jul 07:39Z, against a
+# `claim_writer` guard merged 31-Jul 00:52Z with zero overlaps since. A
+# precondition a book cannot ever clear is a retirement, not a precondition.
+#
+# Evaluating a precondition over a DIFFERENT sample from the bars is also the
+# (hq) defect one layer down: rule and data describing different books.
+# --------------------------------------------------------------------------
+def _carry_rows(store, monkeypatch, overlap_days_before_era, n_clean=40):
+    """A carry ledger with ONE same-pair overlap at a chosen offset from the
+    declared era, plus enough clean closes to be gradeable."""
+    era_iso = g.POLICY_ERA[g.era_base(CARRY)][0]
+    era_d = _dt.datetime.fromisoformat(era_iso).replace(tzinfo=_dt.timezone.utc)
+
+    def at(days, hour=0):
+        return (era_d + _dt.timedelta(days=days, hours=hour)).isoformat()
+
+    rows = []
+    for i in range(n_clean):        # clean, well inside the era, distinct pairs
+        rows.append({"bot": CARRY, "profit_abs": 2.0, "profit_ratio": 0.02,
+                     "open_ts": at(1 + i, 0), "close_ts": at(1 + i, 6)})
+    # the overlapping pair: two HYPE holds that intersect by ~9h
+    d = -overlap_days_before_era
+    rows.append({"bot": CARRY, "pair": "HYPE", "profit_abs": 1.0,
+                 "profit_ratio": 0.01, "open_ts": at(d, 0), "close_ts": at(d, 12)})
+    rows.append({"bot": CARRY, "pair": "HYPE", "profit_abs": 1.0,
+                 "profit_ratio": 0.01, "open_ts": at(d, 3), "close_ts": at(d, 15)})
+    monkeypatch.setattr(store, "fetch_paper_trades", lambda limit=2000: rows)
+    monkeypatch.setattr(sys, "argv", ["golive_readiness.py", "--min-closes", "5"])
+    return rows
+
+
+def test_an_overlap_BEFORE_the_era_no_longer_blocks(capsys, monkeypatch):
+    import bot_pnl_store as store
+    _carry_rows(store, monkeypatch, overlap_days_before_era=5)
+    g.main()
+    out = capsys.readouterr().out
+    assert "TWO WRITERS" not in out, (
+        "a pooled window that predates the graded era still vetoes the book — "
+        "the latch is back, and carry can never be READY again:\n" + out)
+    assert "historical overlap(s) predate this era" in out, (
+        "the historical pooling stopped being REPORTED — it must stay visible "
+        "forever, it just must not veto forever:\n" + out)
+
+
+def test_an_overlap_INSIDE_the_era_still_blocks(capsys, monkeypatch):
+    """The detector must not be weakened. An ongoing duplicate writes recent
+    trades, and recent trades ARE the era."""
+    import bot_pnl_store as store
+    _carry_rows(store, monkeypatch, overlap_days_before_era=-3)   # i.e. +3 days
+    g.main()
+    out = capsys.readouterr().out
+    assert "TWO WRITERS" in out, "an in-era overlap must still block:\n" + out
+    assert "READY: none" in out
+
+
+def test_the_alltime_reading_is_still_published(capsys, monkeypatch):
+    """Published beside the graded verdict so a consumer can ask either
+    question. `two_writers` decides promotion; the all-time count is history."""
+    import bot_pnl_store as store
+    saved = {}
+    _carry_rows(store, monkeypatch, overlap_days_before_era=5)
+    monkeypatch.setattr(store, "save_state", lambda k, v: saved.setdefault(k, v))
+    monkeypatch.setattr(store, "save_history", lambda k, v: True)
+    monkeypatch.setattr(sys, "argv", ["golive_readiness.py", "--min-closes", "5",
+                                      "--publish"])
+    g.main()
+    capsys.readouterr()
+    integ = saved["golive-readiness"]["books"][CARRY]["integrity"]
+    assert integ["two_writers"] is False, integ
+    assert integ["same_pair_overlaps"] == 0, integ
+    assert integ["same_pair_overlaps_alltime"] == 1, (
+        "the all-time reading was dropped — a real past pooling became "
+        "invisible: " + str(integ))
+    assert integ["latest_overlap"], "recency (for fleet_immune) must survive"
+
+
+def test_a_book_with_NO_era_is_unaffected(capsys, monkeypatch):
+    """With no declared era the two samples are identical, so this change is a
+    no-op for every book but the ones that have one."""
+    import bot_pnl_store as store
+    bot = "lighter-dislocation-lshadow"       # asserted era-less elsewhere here
+    assert g.era_epoch_for(bot) == (None, None, None)
+    rows = []
+    for i in range(8):
+        rows.append({"bot": bot, "profit_abs": 1.0, "profit_ratio": 0.01,
+                     "open_ts": f"2026-07-{2 + i:02d}T00:00:00+00:00",
+                     "close_ts": f"2026-07-{2 + i:02d}T06:00:00+00:00"})
+    rows.append({"bot": bot, "pair": "HYPE", "profit_abs": 1.0, "profit_ratio": 0.01,
+                 "open_ts": "2026-07-02T00:00:00+00:00",
+                 "close_ts": "2026-07-02T12:00:00+00:00"})
+    rows.append({"bot": bot, "pair": "HYPE", "profit_abs": 1.0, "profit_ratio": 0.01,
+                 "open_ts": "2026-07-02T03:00:00+00:00",
+                 "close_ts": "2026-07-02T15:00:00+00:00"})
+    monkeypatch.setattr(store, "fetch_paper_trades", lambda limit=2000: rows)
+    monkeypatch.setattr(sys, "argv", ["golive_readiness.py", "--min-closes", "5"])
+    g.main()
+    out = capsys.readouterr().out
+    assert "TWO WRITERS" in out, (
+        "an era-less book must behave exactly as before — all its trades are "
+        "its graded sample:\n" + out)

@@ -119,6 +119,17 @@ jobs:
       - name: The guard must fire on the real defect, not merely stay quiet
         run: python3 scripts/audit_undefined_names.py --selftest
 
+      # [2026-08-01 (ii)] ONE OWNER FOR AN ERA DATE. Operator: "this constant
+      # issue of things maintaining old dates and times ... is a trivial issue
+      # that causes such a set back." Moving carry's declared policy era
+      # 17-Jul -> 31-Jul for a measured reason broke FIVE assertions that were
+      # not about the date at all — the suffix strip, the boundary rule, the
+      # min-closes filter. A correct change must not read as a red build.
+      - name: An era date is stated once, in its table, and derived everywhere
+        run: python3 scripts/audit_era_date_literals.py
+      - name: The date guard must fire on a duplicate and stay silent on prose
+        run: python3 scripts/audit_era_date_literals.py --selftest
+
   venue-purity:
     name: LIGHTER-FIRST (no foreign market data in shipped code)
     runs-on: ubuntu-latest

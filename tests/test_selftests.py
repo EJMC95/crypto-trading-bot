@@ -123,6 +123,12 @@ SELFTEST_MODULES = [
     # must not false-positive, because a detector that flags everything trains
     # the operator to ignore it.
     "scripts.audit_undefined_names",
+    # [2026-08-01 (ii)] one owner for an era date. A legitimate table move
+    # must not redden tests that are not about the date; its --selftest pins
+    # that it fires on a duplicate, stays silent on the derived form AND on
+    # documentation (a `# [2026-07-17 BASIS FIX]` marker records history and
+    # must never move), and that exemptions are file-local and reasoned.
+    "scripts.audit_era_date_literals",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",

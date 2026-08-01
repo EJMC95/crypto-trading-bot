@@ -146,11 +146,40 @@ TTL_SEC = int(os.environ.get("GOLIVE_TTL_SEC", "86400"))
 #: before this block, so no other book's verdict moves.
 POLICY_ERA = {
     "perps-funding-carry": (
-        "2026-07-17",
-        "the lighter_shadow arm's accrual basis was fixed from per-hour to the "
-        "venue's own per-8h settlement; for a funding book the accrual IS the "
-        "P&L, so closes opened before it are denominated in a unit the book no "
-        "longer uses. 25 closes at +$62.03 before, 57 at -$0.91 since."),
+        # [2026-08-01 (ii)] MOVED 17-Jul -> 31-Jul. An era is the LATEST of
+        # every invalidating change, and moving the date forward PRESERVES the
+        # earlier reason rather than discarding it — the accrual-basis note
+        # below still applies to everything before 17-Jul.
+        #
+        # THE NEW INVALIDATION IS STRONGER THAN A WRONG UNIT: for 12 days this
+        # row was written by TWO PROCESSES. Measured — 7 same-pair overlapping
+        # holds between 17-Jul 16:34Z and 29-Jul 07:39Z, deepest 9.14h on HYPE,
+        # and a peak of 10 concurrent positions against a `MAX_POSITIONS` of 8.
+        # A carry process keys `positions` by coin and enters only
+        # `if c not in positions`, so ONE process cannot hold HYPE twice. The
+        # rule about what resets an era asks whether earlier P&L is WRONG; this
+        # is worse — the earlier sample is not this book's record at all, which
+        # is the very thing `integrity` exists to say. `n` was a mixture and
+        # `t` scales with sqrt(n).
+        #
+        # THE FIX THAT CLOSES IT: `bot_pnl_store.claim_writer` merged 31-Jul
+        # 00:52Z ((hp)), corrected through (ib)/(ic)/(id). ZERO overlaps since.
+        #
+        # WHAT THIS COSTS, stated rather than buried: carry restarts its 30-day
+        # clock, so its earliest gradeable date is **~30-Aug** instead of
+        # ~16-Aug. It is deliberately NOT a shortcut to real money — it makes
+        # the gate REACHABLE where it was previously impossible, and reaching
+        # it now requires 30 days of single-writer evidence.
+        "2026-07-31",
+        "TWO WRITERS: for 12 days (17-Jul 16:34Z to 29-Jul 07:39Z) two "
+        "containers published this row and wrote this ledger — 7 same-pair "
+        "overlapping holds, deepest 9.14h on HYPE, peak 10 concurrent against "
+        "a cap of 8. One process cannot hold a coin twice, so the earlier "
+        "sample is two books' trades, not this book's. Closed by "
+        "`claim_writer` (31-Jul 00:52Z); zero overlaps since. SUPERSEDES, and "
+        "preserves, the 17-Jul accrual-basis reason: the lighter_shadow arm's "
+        "accrual was fixed from per-hour to the venue's per-8h settlement, and "
+        "for a funding book the accrual IS the P&L."),
     # [2026-07-30 (hg)] 💸 Funding Farmer — the SAME basis fix, on the pair that
     # includes a REAL-MONEY book. One bare key covers both rows: `era_epoch_for`
     # strips `-lighter` and `-lshadow`.
@@ -879,9 +908,16 @@ def _selftest():
 
     # ---- POLICY ERAS [2026-07-30 (hc)] ---------------------------------
     # The suffix strip is the whole wiring. Keyed bare, looked up suffixed.
+    # [(ii)] Derived from the TABLE, not a frozen literal — this asserted
+    # "2026-07-17" and so broke when carry's era legitimately moved to 31-Jul
+    # for the two-writer window. What is under test is the SUFFIX STRIP, not
+    # the date; pinning the date here tested the declaration twice and the
+    # wiring once.
+    from datetime import datetime as _dtm, timezone as _tz
+    _declared = POLICY_ERA["perps-funding-carry"][0]
     for suffixed in ("perps-funding-carry-lshadow", "perps-funding-carry"):
         ep, iso, why = era_epoch_for(suffixed)
-        assert ep is not None and iso == "2026-07-17", (suffixed, ep, iso)
+        assert ep is not None and iso == _declared, (suffixed, ep, iso)
         assert why and len(why) > 60, f"{suffixed}: era needs a stated reason"
     # An undeclared book grades ALL-TIME — the pre-(hc) behaviour, unchanged.
     # Both of these are books whose publisher does NOT accrue funding, so the
@@ -902,8 +938,14 @@ def _selftest():
         from datetime import datetime, timezone
         d = datetime.fromisoformat(str(x))
         return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
-    assert in_era("2026-07-20T00:00", era_ep, _p) is True
-    assert in_era("2026-07-16T23:59", era_ep, _p) is False
+    # [(ii)] Era-RELATIVE. These were literals either side of 17-Jul, so they
+    # asserted the declared DATE a third time instead of the boundary RULE,
+    # and broke when carry's era legitimately moved.
+    from datetime import timedelta as _td
+    _era_dt = _dtm.fromisoformat(_declared).replace(tzinfo=_tz.utc)
+    assert in_era((_era_dt + _td(days=3)).isoformat(), era_ep, _p) is True
+    assert in_era((_era_dt - _td(minutes=1)).isoformat(), era_ep, _p) is False
+    assert in_era(_era_dt.isoformat(), era_ep, _p) is True, "boundary inclusive"
     # FAIL-CLOSED: unreadable or missing open stamps are OUT when an era is
     # declared, and IN when none is (no era = no claim about which trades count).
     for bad in (None, "", "not-a-date"):
@@ -1080,7 +1122,39 @@ def main():
         # book whose ledger cannot have come from one process is NOT GRADEABLE,
         # so it can never be READY. Fail-closed, and the reason is stated in
         # `fails` where a human reads it.
-        overlaps = same_pair_overlaps(integ_eps)
+        # [2026-08-01 (ii)] THE BLOCKING CHECK RUNS OVER THE GRADED SAMPLE.
+        #
+        # `(hf)` scoped this to the WHOLE ledger on the reasoning that "a second
+        # writer is a property of the book's record, not of the era being
+        # graded". That is right about DETECTION and wrong about BLOCKING, and
+        # the difference had become total: **a ledger is append-only, so an
+        # all-time check is a ONE-WAY LATCH** — once true it is true forever, no
+        # matter what is fixed in code. 🌾 carry, the only book in the fleet with
+        # a measured claim, could never be READY again on 7 overlaps that all
+        # fall between 17-Jul and 29-Jul 07:39Z, against a `claim_writer` guard
+        # that merged 31-Jul 00:52Z with zero overlaps since. A precondition a
+        # book cannot ever clear is not a precondition, it is a retirement.
+        #
+        # Evaluating it over a DIFFERENT sample from the bars is also the `(hq)`
+        # defect one layer down — there the daily review imported the go-live
+        # RULE but not its SAMPLE, and rule and data described different books.
+        # The bars answer "is this book's CURRENT policy any good"; integrity
+        # must answer "is THAT sample one book's record".
+        #
+        # NOTHING IS HIDDEN AND DETECTION IS NOT WEAKENED:
+        #   * the ALL-TIME count is still computed, still published, and still
+        #     printed on the book's line, so a historical pooling is visible
+        #     forever — it just no longer vetoes forever;
+        #   * an ONGOING duplicate is by definition in the recent trades, which
+        #     ARE the era, so it still blocks;
+        #   * `fleet_immune` pages on `latest_overlap` recency ((ih)), which is
+        #     the live-incident detector and is unaffected;
+        #   * with no declared era the two sets are identical, so this is a
+        #     no-op for every book but the ones that have one.
+        overlaps_all = same_pair_overlaps(integ_eps)
+        integ_eps_era = [e for e in integ_eps
+                         if _era_ep is None or e[1].timestamp() >= _era_ep]
+        overlaps = same_pair_overlaps(integ_eps_era)
         if overlaps:
             # FIRST in the list, not appended: the printed verdict shows
             # `fails[:2]` and this is the one failure that invalidates the other
@@ -1108,6 +1182,15 @@ def main():
             # footnote; this one has to be readable as the sample's definition.
             flag += (f"   [era {era_iso}: {s.get('n', 0)} of {s_all['n']} "
                      f"closes count]")
+        if overlaps_all and not overlaps:
+            # [(ii)] Clean IN-ERA but pooled HISTORICALLY. Stated on the line
+            # rather than in `fails`, because it is not a failure — the sample
+            # being graded is not the sample that was pooled — and a note in
+            # `fails` on a book that reads READY is a contradiction a consumer
+            # would have to special-case. Never silent: a real past pooling
+            # that stopped being mentioned is a reading lost.
+            flag += (f"   [ledger: {len(overlaps_all)} historical overlap(s) "
+                     f"predate this era]")
         if s.get("n", 0) < 2:
             print(f"{bot:34s} {s.get('n', 0):>4d} {'-':>6s} {'-':>8s} {'-':>6s} "
                   f"{'-':>6s} {'-':>7s}  ungradeable in era{flag}")
@@ -1139,11 +1222,21 @@ def main():
             # [(hf)] Published so a consumer can render the warning without
             # string-matching `fails`, exactly as `bars` did for the bar map.
             "integrity": {
+                # The GRADED-sample verdict — what actually blocks READY.
                 "two_writers": bool(overlaps),
                 "same_pair_overlaps": len(overlaps),
                 "deepest_overlap_h": (round(overlaps[0][1], 2) if overlaps
                                       else 0.0),
                 "deepest_overlap_pair": (overlaps[0][0] if overlaps else None),
+                # [(ii)] The ALL-TIME reading, published beside it so a
+                # historical pooling stays visible forever even once it has
+                # left the graded era. Equal to the above for any book with no
+                # declared era. A consumer wanting "was this book EVER pooled"
+                # reads this; a consumer wanting "may it be promoted" reads
+                # `two_writers`.
+                "same_pair_overlaps_alltime": len(overlaps_all),
+                "deepest_overlap_h_alltime": (round(overlaps_all[0][1], 2)
+                                              if overlaps_all else 0.0),
                 # [(ih)] WHEN the most recent one began. `two_writers` is a
                 # one-way latch over a permanent ledger, so on its own it can
                 # never stop firing once true — and it kept sending the

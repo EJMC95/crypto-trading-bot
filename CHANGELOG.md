@@ -1,3 +1,36 @@
+## 2026-08-01 (ii) — THE GATE'S INTEGRITY CHECK WAS A ONE-WAY LATCH, AND ONE ERA MOVE BROKE FIVE TESTS THAT WERE NOT ABOUT THE DATE
+
+- **THE ASK** (operator): *"i would like these bots to grow"*, then *"full permission to change whatever necessary"*, then — on watching the era move break the suite — *"this constant issue of things maintaining old dates and times needs to be fixed so everything is constant. This is a trivial issue that causes such a set back."* Suite **768**, ten guards green, eight mutations red.
+
+### 🌾 carry could never be READY again, on a wound that had already healed
+
+- `golive_readiness` computed the `integrity` precondition over the **WHOLE ledger** while the six BARS are computed over the **POLICY ERA**. A ledger is append-only, so that is a **ONE-WAY LATCH**: once true it is true forever, however completely the cause is fixed. **A precondition a book cannot ever clear is not a precondition, it is a retirement.**
+- **MEASURED** — carry's 7 same-pair overlaps and when each began:
+
+      17-Jul 16:34Z SKHYNIXUSD 2.12h   19-Jul 23:06Z HYPE 9.14h   21-Jul 21:04Z BNB 9.00h   29-Jul 07:39Z SKHYNIXUSD 8.07h
+      18-Jul 12:46Z BTC        7.22h   20-Jul 14:21Z HYPE 2.72h   28-Jul 06:30Z SKHYNIXUSD 8.23h
+
+  **Latest 29-Jul 07:39Z, against `claim_writer` merged 31-Jul 00:52Z. Zero since.** The fleet's only book with a measured claim was permanently barred by a condition closed two days earlier.
+- `(hf)`'s all-time scope was deliberate — *"a second writer is a property of the book's record, not of the era being graded"* — and it is **right about DETECTION and wrong about BLOCKING**. Evaluating a precondition over a different sample from the bars is `(hq)` one layer down: rule and data describing different books.
+
+### The fix, and what it refuses to weaken
+
+- The blocking check runs over the **graded sample**. Detection is untouched: the ALL-TIME count is still computed, published as `same_pair_overlaps_alltime`, and **printed on the book's line** (`[ledger: 7 historical overlap(s) predate this era]`), so a real past pooling stays visible forever — it just stops vetoing forever. An **ONGOING** duplicate writes recent trades and recent trades ARE the era, so it still blocks. `fleet_immune`'s recency pager `(ih)` is unaffected. **With no declared era the two samples are identical, so this is a byte-level no-op for every book but the ones that have one.**
+- The historical note goes on the printed FLAG, not into `fails` — a note in `fails` on a book reading READY is a contradiction every consumer would have to special-case.
+- **`POLICY_ERA["perps-funding-carry"] 17-Jul -> 31-Jul.** The new invalidation is stronger than a wrong unit: for 12 days two processes wrote this row, so the earlier sample is not this book's record at all — the very thing `integrity` exists to say. The declaration carries the measurement, and **preserves the superseded accrual reason**, because an era is the LATEST of every invalidating change.
+- **WHAT IT COSTS, stated not buried:** carry restarts its 30-day clock — earliest gradeable **~30-Aug**, not ~16-Aug. **This is not a shortcut to real money.** The gate went from *impossible* to *reachable*, and reaching it now costs 30 days of single-writer evidence. `READY: none`, unchanged. Live: `era 2026-07-31 · 0 of 85 closes count · [ledger: 7 historical overlap(s) predate this era]`, no `TWO WRITERS`.
+
+### The operator's real complaint: ONE table move broke FIVE unrelated tests
+
+- Moving that date reddened `assert iso == "2026-07-17"`, `in_era("2026-07-16T12:00", …)`, `"era 2026-07-17" in out`, fixture rows dated `2026-07-1x`, and two more in the grader's own selftest. **None of those tests is about the date** — they test the suffix strip, the open-stamp boundary rule and the min-closes filter. A correct change read as five failures and cost a debugging pass.
+- **THE RULE: exactly one place may state an era date — the table that owns it. Everything else derives.** All six real duplicates now read `g.POLICY_ERA[g.era_base(BOT)][0]` and build their fixtures relative to it. The card/payload fixtures use `FIXTURE_ERA_ISO`, a date **no table owns**, because they test RENDERING and must not be coupled to a real era at all.
+- **`scripts/audit_era_date_literals.py`** makes it permanent — in CI and the selftest registry. Scope is narrow so it has no false positives: EXECUTABLE constants only (a `# [2026-07-17 BASIS FIX]` marker records something that really happened and must NEVER move), `tests/**` plus `--selftest` bodies only, and only dates the tables currently hold. Genuine coincidences are DECLARED with reasons — four of them, including a brain-amnesia fixture that shares 31-Jul with carry's era by accident. The guard **exempts itself** and says so, because its own selftest must contain canonical dates to prove the matcher fires.
+- **THE ACID TEST: I moved the era AGAIN, to a fabricated 2026-08-05, and ran everything.** Exactly **one** test failed — `test_every_basis_era_names_a_publisher_that_really_accrues` — and **that failure is correct**: it asserts the publisher carries a note dated for its era, and no `2026-08-05` change exists. Under the real move it passes, because `funding_carry_bot.py:445` carries `[2026-07-31 (hp)] SOLE-WRITER ENFORCEMENT`. **An era must name a real change in its publisher, and that coupling is the one worth keeping.**
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**🌾 carry — from structurally impossible to reachable.** It is not closer to real money in days; it is closer in the only sense that matters, which is that the path exists at all. Everything else today was instrumentation; this is the first change in the pass that changes what the gate can ever say.
+
 ## 2026-08-01 (ih) — THE DUPLICATE-WRITER PAGER FIRED FOREVER ON A CLOSED WOUND, AND SENT THE OPERATOR AFTER A SERVICE THAT NO LONGER EXISTS
 
 - **THE ASK** (operator): *"make everything work in harmony please"* — a coherence sweep after `(ie)`–`(ig)`. Suite **763**, nine guards green, four mutations red.
