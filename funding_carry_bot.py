@@ -446,9 +446,19 @@ def main():
         #
         # FAIL-OPEN is preserved: claim_writer returns (True, None) on a dark
         # DB or any exception, so a Postgres blip can never idle the book.
-        _ok_writer, _other = store.claim_writer(BOT_ROW)
+        #
+        # THE NAME IS `bot_id`, NOT `BOT_ROW` (1-Aug (ib)). (hp) shipped this
+        # call against `BOT_ROW`, which is bound NOWHERE in this file — `BOT`
+        # (line 59) is the bare base and `bot_id = ctx.bot_id` (line 378) is
+        # the suffixed row this process actually publishes. Every boot reached
+        # the top of the loop and died on `NameError`, so the guard written to
+        # PREVENT the Trail Blazer crash-loop (see the comment above) became
+        # one: both carry containers restarted forever and the book had no
+        # writer for 25.6h. The row read `status: "online"` throughout — its
+        # last word before it stopped (I1).
+        _ok_writer, _other = store.claim_writer(bot_id)
         if not _ok_writer:
-            print(f"[{now_iso()}] STANDING DOWN — {BOT_ROW} is already claimed "
+            print(f"[{now_iso()}] STANDING DOWN — {bot_id} is already claimed "
                   f"by another container ({_other}). Two writers make `n` a "
                   f"mixture of two books and destroy the go-live evidence for "
                   f"the fleet's best-evidenced book. This process will hold "

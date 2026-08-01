@@ -1,3 +1,31 @@
+## 2026-08-01 (ib) — NOBODY STOPPED THE WRONG SERVICE: THE SOLE-WRITER GUARD CRASH-LOOPED BOTH CARRY CONTAINERS FOR 25.6h
+
+- **THE ASK** (operator): *"did you shut down the wrong stale bot as now my real bot hasn't traded for 13 hours?"* then *"just make sure the right bot was made redundant."* Suite **730**, eight guards green.
+- **ANSWER: no service was stopped, and neither real-money bot is affected.** Both live rows were publishing while the question was being asked — 💸 Funding Farmer `age_sec` **62**, 🎫 Ticket Taker **149**, three open shorts each. The Farmer's 13.7h without a close is a **hold**, not a stall: `max_hold_h` on the live arm is **72**, its last four closes were all profitable `short_decay`, and 2 of its previous 13 inter-close gaps were already ≥13.7h (max 48.0h). It is also at its capital-derived position cap, so "no new trades" is the cap, not a dead gate.
+- **The dead book was 🌾 `perps-funding-carry-lshadow` — a $1,000 SHADOW book — and the cause was mine, not an operator action.**
+
+### The defect
+
+- `(hp)` shipped the sole-writer guard as `store.claim_writer(BOT_ROW)` at `funding_carry_bot.py:449`. **`BOT_ROW` is bound nowhere in that file.** The module has `BOT` (the bare base, line 59) and `bot_id = ctx.bot_id` (the suffixed row it actually publishes, line 378).
+- **Python resolves globals at RUNTIME.** The file imports, compiles and passes `--selftest` cleanly. The name is only resolved when the line executes — and that line is at the **top of the trading loop**, so it executed on every boot.
+- **The guard written to PREVENT the Trail Blazer crash-loop became one.** Its own comment, eight lines above, says *"IDLE, never `sys.exit`: `restartPolicy=always` turns an exit into a permanent crash-loop."* A `NameError` is an exit. Railway restarted it; it crashed again; **for 25.6h, on BOTH containers** — `railway logs` shows the identical traceback on `funding-carry` and `yield-harvester-shadow`, restarting every ~2 seconds.
+- **The row read `status: "online"` throughout** — its last word before it stopped (I1). Timeline fits exactly: `(hp)` merged 00:52 UTC, the row froze at 03:10 UTC.
+
+### What this retracts
+
+- **`(hu)`'s verdict — *"`yield-harvester-shadow` runs the book; `funding-carry` is the dead service"* — is WITHDRAWN.** It inferred the writer from the carry row's missing `extra.svc` against seven correctly-stamped services. But the row was **frozen**, not publishing: a stale payload written before the `(ht)` deploy naturally lacks `svc`. The absence proved nothing about who was writing, because **neither was writing**. This is I6 failing on its own control group — the population was real, the sample was a corpse — and it is I1 again in the same house, three entries running.
+- **So the operator has no service to stop, and never did.** Both containers were dead. The keep-or-stop decision comes back only once they are actually running.
+
+### The class, and why nothing could have caught it
+
+- `audit_image_imports` walks **imports** — this is not an import. The suite tests `bot_pnl_store.claim_writer` directly with **literal strings** (`test_payload_contracts.py`, 8 call sites) and never the bot's own call site. `_selftest_basis()` exercises the funding arithmetic and never enters `main()`. **A `NameError` inside a long-running loop was invisible to every static check this repo had.**
+- **`scripts/audit_undefined_names.py`** — fails the build on a name READ in shipped code and BOUND NOWHERE in its module. Deliberately conservative: it does not model scopes, so it reports a name only if no scope of the module binds it. That misses shadowing subtleties and catches the class that actually ships — a renamed, typo'd or never-created identifier — with no false positives, because **a detector that flags everything trains the operator to ignore it**. A `from x import *` module is SKIPPED and the skip is PRINTED; silence is not an option.
+- Mutation-verified in both directions and on **both** real defects: reintroducing `BOT_ROW` exits 1, the fix exits 0. Its `--selftest` pins the fire, the silence-on-fix, ten real idioms that must not false-positive, and the star-import declaration. Wired into `changelog-check.yml` and the selftest registry.
+
+### It immediately found a second one
+
+- **`evidence_board.py:2436` read `KEY`, bound nowhere** — the key is `BOARD_KEY` (line 87). Shipped **yesterday** in `(hw)`, whose entry reads *"`evidence_board` was 'handling' its errors by PRINTING them. Printing is not reporting — it now records as well."* The recording call raised `NameError` and was swallowed by the bare `except` around it, so **the board has never recorded a single error it hit**. The fix that closed the class shipped broken inside the same commit that closed it. 99 shipped modules scanned; these were the only two.
+
 ## 2026-08-01 (hw) — THE BRAIN HAD BEEN DYING ON EVERY RUN, AND 20 OF 22 ORGANS HAD NO WAY TO SAY SO
 
 - **THE ASK** (operator): *"A brain continuously going dead means we are consistently being held back by these small unhelpful and costly problems"*, then *"our entire file system isn't working if we are at square one every day over the same tedious issues — these fixes need to be implemented and addressed permanently so every day we see continuously building, not fixing water leaks."* Suite **723**, seven guards green.

@@ -113,6 +113,16 @@ SELFTEST_MODULES = [
     # the LIVE changelog is clean -- so an unclosed recurring subject
     # reddens here as well as in CI.
     "scripts.audit_recurrence",
+    # [2026-08-01 (ib)] THE UNDEFINED-NAME GUARD. (hp) shipped
+    # `store.claim_writer(BOT_ROW)` into funding_carry_bot.py with `BOT_ROW`
+    # bound nowhere; Python resolves globals at runtime, so it imported,
+    # compiled and passed --selftest, then died on NameError at the top of the
+    # trading loop on every boot — a 25.6h crash-loop on both carry containers
+    # while the row still read "online". Its --selftest pins BOTH directions
+    # (fires on the real defect, silent on the fix) plus ten real idioms that
+    # must not false-positive, because a detector that flags everything trains
+    # the operator to ignore it.
+    "scripts.audit_undefined_names",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",

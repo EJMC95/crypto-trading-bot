@@ -100,6 +100,25 @@ jobs:
       - name: The silent-organ detector must fire, not merely stay quiet
         run: python3 scripts/audit_organ_silence.py --selftest
 
+  undefined-names:
+    name: No name is read in shipped code that is bound nowhere
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # [2026-08-01 (ib)] Python binds globals at RUNTIME, so a name that
+      # exists nowhere still imports, compiles and passes --selftest — it only
+      # raises when the line executes. (hp) put `store.claim_writer(BOT_ROW)`
+      # at the TOP OF THE CARRY TRADING LOOP with `BOT_ROW` bound nowhere, so
+      # every boot died on NameError and `restartPolicy=always` restarted it:
+      # the guard written to prevent the Trail Blazer crash-loop BECAME one,
+      # for 25.6h, on both carry containers, while the row read "online".
+      # audit_image_imports walks IMPORTS and cannot see this; the suite tested
+      # `claim_writer` directly with literal strings and never the call site.
+      - name: A name read in a trading loop must be bound somewhere
+        run: python3 scripts/audit_undefined_names.py
+      - name: The guard must fire on the real defect, not merely stay quiet
+        run: python3 scripts/audit_undefined_names.py --selftest
+
   venue-purity:
     name: LIGHTER-FIRST (no foreign market data in shipped code)
     runs-on: ubuntu-latest

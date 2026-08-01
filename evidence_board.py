@@ -2433,7 +2433,13 @@ if __name__ == "__main__":
                 # this organ's own key so fleet_immune can see it.
                 print(f"[evidence_board] cycle error: {type(e).__name__}: {e}", flush=True)
                 try:
-                    store.record_organ_error(KEY, e)
+                    # (ib) 1-Aug: this read `KEY`, bound nowhere in this file —
+                    # the key is `BOARD_KEY` (line 87). The NameError was
+                    # swallowed by the `except` below, so (hw)'s whole point
+                    # ("printing is NOT reporting") never reached the bus: the
+                    # board reported no error it ever hit. Caught by
+                    # scripts/audit_undefined_names.py.
+                    store.record_organ_error(BOARD_KEY, e)
                 except Exception:  # noqa: BLE001
                     pass
             time.sleep(INTERVAL)
