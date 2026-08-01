@@ -805,4 +805,13 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
         sys.exit(0)
+    # [2026-08-01 (ig)] IMPORT AT THE CALL SITE. This module binds `store` only
+    # INSIDE functions (`import bot_pnl_store as store`, 4 sites), so the
+    # module-level use `(hw)` added here raised `NameError: name 'store' is not
+    # defined` on EVERY run — measured in the container from 16:23Z 31-Jul, and
+    # a restart could not help because it crashes at once, every cycle.
+    # `(hw)` made exactly this adjustment for market_pulse and missed the two
+    # organs that needed it most. Keeping the import local also keeps `--selftest`
+    # runnable with no DB, which is why the lazy pattern exists here at all.
+    import bot_pnl_store as store
     sys.exit(store.organ_main('event-sentinel', main))

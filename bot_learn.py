@@ -2337,4 +2337,11 @@ if __name__ == "__main__":
     # [2026-08-01 (hw)] THE SHARED wrapper, not a bespoke one. run_all.sh runs
     # this behind `|| true`; without it the KeyError('paper') above ran on
     # EVERY cycle for weeks and nothing anywhere said so.
+    # [2026-08-01 (ig)] IMPORT AT THE CALL SITE. This module binds `store` only
+    # INSIDE functions (`import bot_pnl_store as store`, 3 sites), so the line
+    # below raised `NameError: name 'store' is not defined` on EVERY run from
+    # 16:02Z 31-Jul — the wrapper that exists so no organ dies silently was
+    # itself killing the brain, and silently, because `run_all.sh` runs it
+    # behind `|| true`. A restart cannot help: it crashes instantly, every cycle.
+    import bot_pnl_store as store
     sys.exit(store.organ_main(VITALS_KEY, main))

@@ -120,6 +120,113 @@ def _loaded_names(tree: ast.AST) -> list[ast.Name]:
     ]
 
 
+def _module_level_bound(tree: ast.Module) -> set[str]:
+    """Names bound in the MODULE namespace — imports, assignments, defs, at
+    module level or inside module-level if/try/for/while/with blocks.
+
+    Deliberately NOT descending into function or class bodies: a name imported
+    inside `def f()` is bound in f's LOCAL scope and is not visible to
+    module-level code. That distinction is the whole point of this arm.
+    """
+    out: set[str] = set()
+
+    def add_target(node):
+        for s in ast.walk(node):
+            if isinstance(s, ast.Name):
+                out.add(s.id)
+
+    def visit(body):
+        for n in body:
+            if isinstance(n, (ast.Import, ast.ImportFrom)):
+                for a in n.names:
+                    out.add((a.asname or a.name).split(".")[0])
+            elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                out.add(n.name)          # the NAME is bound; the body is not visited
+            elif isinstance(n, ast.Assign):
+                for t in n.targets:
+                    add_target(t)
+            elif isinstance(n, (ast.AugAssign, ast.AnnAssign)):
+                add_target(n.target)
+            elif isinstance(n, (ast.If, ast.While)):
+                visit(n.body); visit(n.orelse)
+            elif isinstance(n, ast.For):
+                add_target(n.target); visit(n.body); visit(n.orelse)
+            elif isinstance(n, ast.With):
+                for item in n.items:
+                    if item.optional_vars is not None:
+                        add_target(item.optional_vars)
+                visit(n.body)
+            elif isinstance(n, ast.Try):
+                visit(n.body); visit(n.orelse); visit(n.finalbody)
+                for h in n.handlers:
+                    if h.name:
+                        out.add(h.name)
+                    visit(h.body)
+    visit(tree.body)
+    return out
+
+
+#: Nodes that introduce their OWN scope. Descending into them would attribute
+#: their locals to the module namespace. Comprehensions matter as much as
+#: functions here: `[s.strip() for s in XS]` binds `s` inside the comprehension,
+#: and a first cut of this arm reported 53 findings — every one of them a
+#: comprehension variable, and not one a real defect. A detector that flags
+#: everything trains the operator to ignore it ((ib)'s own stated principle),
+#: so the arm is worth nothing until this is exact.
+_OWN_SCOPE = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda,
+              ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+
+
+def _module_level_loads(tree: ast.Module) -> list[ast.Name]:
+    """`Load` Names evaluated in the MODULE namespace.
+
+    A hand-written recursive descent rather than `ast.walk`, because `walk` is
+    a flat traversal of ALL descendants — a `continue` on a nested function
+    node does not stop it from yielding that function's body, so the obvious
+    implementation silently reports every local variable in the file.
+
+    `if __name__ == "__main__":` blocks ARE module level, which is exactly
+    where the 01-Aug incident lived.
+    """
+    out: list[ast.Name] = []
+
+    def expr(node):
+        if node is None or isinstance(node, _OWN_SCOPE):
+            return
+        if isinstance(node, ast.Name):
+            if isinstance(node.ctx, ast.Load):
+                out.append(node)
+            return
+        for child in ast.iter_child_nodes(node):
+            expr(child)
+
+    def visit(body):
+        for n in body:
+            if isinstance(n, _OWN_SCOPE):
+                # The DECORATORS and DEFAULTS of a def are evaluated in the
+                # enclosing (module) scope even though the body is not.
+                for d in getattr(n, "decorator_list", []) or []:
+                    expr(d)
+                continue
+            if isinstance(n, (ast.If, ast.While)):
+                expr(n.test); visit(n.body); visit(n.orelse)
+            elif isinstance(n, ast.For):
+                expr(n.iter); visit(n.body); visit(n.orelse)
+            elif isinstance(n, ast.With):
+                for item in n.items:
+                    expr(item.context_expr)
+                visit(n.body)
+            elif isinstance(n, ast.Try):
+                visit(n.body); visit(n.orelse); visit(n.finalbody)
+                for h in n.handlers:
+                    expr(h.type); visit(h.body)
+            else:
+                for child in ast.iter_child_nodes(n):
+                    expr(child)
+    visit(tree.body)
+    return out
+
+
 def check_source(src: str, path: str) -> tuple[list[str], bool]:
     """Return (findings, skipped). `skipped` marks an unknowable namespace."""
     tree = ast.parse(src, filename=path)
@@ -130,7 +237,8 @@ def check_source(src: str, path: str) -> tuple[list[str], bool]:
     if star:
         return [], True
 
-    known = _bound_names(tree) | set(dir(builtins)) | MODULE_DUNDERS
+    builtin_names = set(dir(builtins)) | MODULE_DUNDERS
+    known = _bound_names(tree) | builtin_names
     findings = []
     seen: set[tuple[str, int]] = set()
     for node in _loaded_names(tree):
@@ -141,6 +249,39 @@ def check_source(src: str, path: str) -> tuple[list[str], bool]:
             continue
         seen.add(key)
         findings.append(f"{path}:{node.lineno}: reads {node.id!r}, bound nowhere")
+
+    # [2026-08-01 (ig)] THE SCOPE ARM — the hole this guard shipped WITH.
+    #
+    # `(ib)` built this file the day before and declared it "deliberately
+    # conservative: it does not model scopes, so it reports a name only if NO
+    # scope of the module binds it". That conservatism has one guaranteed
+    # false negative, and it was already live in production when the guard
+    # went green over 99 modules: a name bound ONLY inside a function is not
+    # visible to module-level code, so using it at module level is a certain
+    # NameError — no scope modelling required to know that.
+    #
+    # MEASURED: `bot_learn.py:2340` and `event_sentinel.py:808` both ran
+    # `store.organ_main(...)` in their `if __name__` block while binding
+    # `import bot_pnl_store as store` only inside functions (3 and 4 sites).
+    # Both crashed on EVERY run from ~16:00Z 31-Jul — the brain and the event
+    # sentinel, dead for 14h, behind `run_all.sh`'s `|| true`. A container
+    # restart could not help: they crash instantly, every cycle. The irony is
+    # the point — `(hw)`'s wrapper, added so that no organ could die silently,
+    # was itself what killed them, silently.
+    #
+    # This arm needs no scope model: module-level LOADS versus module-level
+    # BINDINGS, both computed without descending into function bodies.
+    mod_bound = _module_level_bound(tree) | builtin_names
+    for node in _module_level_loads(tree):
+        if node.id in mod_bound:
+            continue
+        key = (node.id, node.lineno)
+        if key in seen:
+            continue
+        seen.add(key)
+        findings.append(
+            f"{path}:{node.lineno}: reads {node.id!r} at MODULE level, but it is "
+            "bound only inside a function — import it at the call site")
     return findings, False
 
 
@@ -265,8 +406,61 @@ def _selftest() -> None:
     found, skipped = check_source("from os.path import *\nprint(join('a','b'))\n", "s.py")
     assert skipped and found == [], (found, skipped)
 
-    print("audit_undefined_names --selftest OK (fires on (ib), silent on the "
-          "fix, no false positive on 10 real idioms, star-import declared)")
+    # ------------------------------------------------------------------
+    # 5. THE SCOPE ARM — the (ig) incident, 01-Aug.
+    #
+    # bot_learn.py:2340 and event_sentinel.py:808 ran `store.organ_main(...)`
+    # in their `if __name__` block while binding `import bot_pnl_store as
+    # store` only INSIDE functions. Both crashed on every run for 14h — the
+    # brain and the event sentinel — behind run_all.sh's `|| true`. This guard
+    # was GREEN over 99 modules throughout, because (ib) declared it "does not
+    # model scopes: report a name only if NO scope binds it".
+    # ------------------------------------------------------------------
+    incident = (
+        "import sys\n"
+        "def main():\n"
+        "    import bot_pnl_store as store\n"
+        "    return store.ping()\n"
+        "if __name__ == '__main__':\n"
+        "    sys.exit(store.organ_main('k', main))\n"
+    )
+    found, _ = check_source(incident, "organ.py")
+    assert any("MODULE level" in f and "'store'" in f for f in found), found
+
+    # the fix: import at the call site
+    fixed = incident.replace(
+        "    sys.exit(store.organ_main('k', main))",
+        "    import bot_pnl_store as store\n    sys.exit(store.organ_main('k', main))")
+    assert check_source(fixed, "organ.py")[0] == [], check_source(fixed, "organ.py")
+
+    # a module-level import also fixes it
+    assert check_source("import bot_pnl_store as store\n" + incident,
+                        "organ.py")[0] == []
+
+    # ------------------------------------------------------------------
+    # 6. NO FALSE POSITIVES on scoped constructs the fleet actually uses.
+    #    The first cut of arm 5 reported 53 findings and every single one was
+    #    a COMPREHENSION variable — `ast.walk` is flat, so `continue` on a
+    #    nested scope does not stop it yielding that scope's body.
+    # ------------------------------------------------------------------
+    for ok in (
+        "XS = ['a']\nWATCH = [s.strip().upper() for s in XS]\n",   # listcomp
+        "XS = ['a']\nD = {k: 1 for k in XS}\n",                    # dictcomp
+        "XS = ['a']\nG = (y for y in XS)\n",                       # genexp
+        "XS = [1]\nS = {z for z in XS}\n",                         # setcomp
+        "F = lambda q: q + 1\n",                                   # lambda arg
+        "XS = [1]\nT = [b for a in XS for b in range(a)]\n",       # chained
+        "def f():\n    tmp = 1\n    return tmp\n",                # function local
+        "class C:\n    attr = 1\n    def m(self):\n        return self.attr\n",
+        "import os\nfor fn in os.listdir('.'):\n    print(fn)\n",  # for target
+        "try:\n    import json\nexcept ImportError:\n    json = None\nprint(json)\n",
+        "with open('f') as fh:\n    print(fh)\n",                  # with target
+    ):
+        assert check_source(ok, "ok.py")[0] == [], (ok, check_source(ok, "ok.py"))
+
+    print("audit_undefined_names --selftest OK (fires on (ib) and on (ig)'s "
+          "scope defect, silent on both fixes, no false positive on 21 real "
+          "idioms incl. every comprehension form, star-import declared)")
 
 
 if __name__ == "__main__":

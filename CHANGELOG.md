@@ -1,3 +1,30 @@
+## 2026-08-01 (ig) — THE WRAPPER THAT EXISTS SO NO ORGAN DIES SILENTLY KILLED THE BRAIN, SILENTLY
+
+- **THE ASK** (operator): *"full permission to go ahead with your advisements"*. Suite **759**, nine guards green.
+- **MY OWN DIAGNOSIS IN `(ie)` WAS WRONG, and the correction is the entry.** I reported two dead `( while true; … ) &` subshells and told the operator to restart `freqtrade-bots`, suspecting OOM. **I restarted it and nothing came back.** Nine minutes later `brain-vitals` and `event-sentinel` were still 14h stale while sibling organs published normally — which a dead-subshell theory cannot explain, because a restart resurrects a subshell. **The logs were the test that could detect the damage, and I had not read them.**
+
+### The actual defect
+
+      File "/freqtrade/event_sentinel.py", line 808, in <module>
+      File "/freqtrade/bot_learn.py",      line 2340, in <module>
+      NameError: name 'store' is not defined
+
+- `(hw)` converted 19 organs to `store.organ_main(...)` in their `if __name__` block. **`bot_learn` and `event_sentinel` bind `store` only INSIDE functions** — `import bot_pnl_store as store` at 3 and 4 separate call sites — so the module-level use raised `NameError` **on every single run** from ~16:00Z 31-Jul. `(hw)` made exactly this adjustment for `market_pulse` (*"imports the store lazily, so it imports at the call site"*) and missed the two organs that needed it most.
+- **A restart could never have fixed it**: the process crashes instantly, every cycle. `run_all.sh` runs each organ behind `|| true`, so the traceback went to a log nobody tails — the precise silence `(hw)` set out to abolish, produced by `(hw)`.
+- **The cost, measured:** the brain dead 14h (stake multipliers past TTL for all 20 shadow books, `scout-tuner` logging *"brain dark … lens-keyed bar walks suppressed"* — the growth rail on one cylinder), and the event sentinel dead 14h with `tuning-proposals` dark.
+- Fixed by importing at the call site in both, which also keeps `--selftest` runnable with no DB — the reason the lazy pattern exists.
+
+### `(ib)`'s guard was green over 99 modules the whole time, and its stated conservatism is why
+
+- `audit_undefined_names.py` shipped one entry earlier **for this exact class** and declared itself *"deliberately conservative: it does not model scopes, so it reports a name only if NO scope of the module binds it."* A function-local `import` binds `store` in *a* scope, so the module-level use passed. **The blind spot was already live in production on the day the guard was written.**
+- **THE SCOPE ARM needs no scope model** — module-level LOADS versus module-level BINDINGS, neither descending into function bodies. A name bound only inside a function is not visible to module-level code; that is a certain `NameError`, not a heuristic.
+- **The first cut reported 53 findings and every one was a comprehension variable.** `ast.walk` is a FLAT traversal, so `continue` on a nested scope node does not stop it yielding that scope's body. Rewritten as an explicit recursive descent that treats `Lambda`, `ListComp`, `SetComp`, `DictComp` and `GeneratorExp` as scopes exactly like `FunctionDef` — while still checking a `def`'s DECORATORS, which do evaluate in the enclosing scope. **Now: 99 modules, zero findings; revert either fix and it names the file and line.**
+- Selftest extended with the incident itself, both fixes (call-site AND module-level import), and **21 real idioms** including every comprehension form, `with`/`for`/`except` targets and lambda args — because an arm with false positives would have been reverted within a day, which is the same failure as not having it.
+
+### The transferable lesson
+
+**A restart is a test of the "it stopped" theory, and it came back negative.** When the cheap remedy does not work, that is data — read the logs before proposing a second cause. `(ie)` had the right symptom, the right urgency and the wrong mechanism, and the wrong mechanism produced advice (*"suspect OOM"*) that would have sent the operator hunting a memory limit that was never the problem.
+
 ## 2026-08-01 (if) — 🌊 TIDE RIDER RETIRED: 9 BUYS, ZERO SELLS, AND A THIRD OF THE FLEET'S LONG BUDGET
 
 - **THE ASK** (operator): *"full permission to go ahead with your advisements"* — executing the ACTION items from `(ie)`'s daily review. Suite **759**, eight guards green, five mutations red.
