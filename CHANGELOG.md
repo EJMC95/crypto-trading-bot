@@ -1,3 +1,50 @@
+## 2026-08-01 (ij) — THE LENS VETO WAS ABOUT TO HALT THE LIVE BOOK ON A PROXY, AND KEEP THE ONE LENS ACTUALLY LOSING MONEY
+
+- **THE ASK** (operator): *"Correct ticket taker to whichever is more profitable"*, then *"Fix the veto"*, then — decisively — *"I'd like the taker to find a path forward, it's showing can win — I'd like the focus on getting rid of anything stopping it from doing so."* Suite **771**, nine guards green, six mutations red.
+- **FIRST, THE THING THAT WAS ASKED FOR DID NOT NEED DOING.** The live/shadow build drift `(ie)` reported is GONE: repo HEAD predicts `('fd4663d27fb5', 15)` and **both arms report exactly that**, verified by prediction per `(gy)`. And the live policy was already the more profitable one — applying each policy to the shadow's own trades: **live (short-divergence only) +0.092%/trade vs shadow (all lenses) −0.029%/trade.** The shadow's larger dollar total is 58 extra trades at a negative mean, i.e. turnover bought with expectancy `(hl)`.
+
+### Defect 1: win rate as a NECESSARY condition — the non-sequitur this fleet already ruled on
+
+- The veto was `avg < 0 AND hit < 0.5`. **That `and` made a money-LOSING lens unvetoable whenever it won slightly more than half its bets.** `(fk)` removed win rate from the GO-LIVE GATE on 29-Jul for exactly this reason — *"win rate is orthogonal to expectancy"*, and 🌾 carry wins **38.8%** while being the best-evidenced book in the fleet. The same wrong idea survived in an **actuator**.
+- Measured on the live `brain-lens-forward` payload:
+
+      lens                 eavg4h_pct   ehit4h    old rule   new rule
+      dip                     -0.027     0.526    allowed    VETO
+      divergence / SHORT      -0.155     0.502    allowed    (see below)
+      breakout                +0.026     0.480    allowed    allowed
+
+  `dip` escaped on a 52.6% hit rate while its own realised closes are the fleet's **only statistically significant taker result** — n=13, **−1.162%/trade, t=−2.66**. `divergence/short`, the LIVE book's only lens, escaped by **0.002**.
+- Now **expectancy only**. The asymmetry is the point and is pinned: a lens with POSITIVE expectancy at a LOW hit rate — the carry shape, lose often win big — is NOT vetoed. `breakout` (+0.026 at hit 0.480) stays, and a naive `avg < 0 or hit < 0.5` would have wrongly killed it. Win rate is still REPORTED and still consumed by the tuner: demoted, not deleted. Kill switch `TT_LENS_VETO_LEGACY_HIT_GATE=1` restores the conjunction without a deploy, because this rule gates real money.
+
+### Defect 2: the proxy was about to halt the live book — and the fleet already knew
+
+- **`brain-lens-forward` grades the SCOUT's tickets on 4h/24h FORWARD MARKS. The taker does not hold 4h — it holds a bracket.** `(dm)` found this in July and built a bespoke escape for one lens: *"'breakoutup' earns its OWN veto — from its own realized closes, NOT the 4h forward grade (dk) proved misjudges it ... graded at the right horizon BY CONSTRUCTION"*. The general case was never taken.
+- **The two bases disagree in SIGN on the exact lens the live book trades:**
+
+      lens                forward proxy      its OWN realised closes
+      divergence/short      -0.155%          n=16 live +0.558% (n=104 pooled, +0.176%)
+      dip                   -0.027%          n=13 -1.162%, t=-2.66
+
+  So the fixed rule, applied to the proxy alone, **would have vetoed `divergence` and halted the live taker** — killing the winner while the loser had already been caught. That is precisely *"anything stopping it from winning"*.
+- `realised_lens_evidence()` generalises `(dm)`: a lens's OWN closes are **SENIOR in both directions** once it has `TT_LENS_REALISED_MIN_N` (10) of them. Evidence-gated by a **t-stat, not a bare mean** (`REALISED_VETO_T = -1.0`) — at n=10 a mean is noise, and a veto that fires on noise ends a grade before it starts. Side-aware for the same reason the forward veto is: the live arm's long-divergence closes predate the `(hj)` hard gate and read −1.581% against short's +0.558%, so pooling them would veto the live book on trades it is forbidden to take.
+- **VERIFIED ON THE LIVE PAYLOAD, both arms:** live → veto `{dip, momentum}`, **may still fill `divergence`**; shadow → veto `{dip, momentum}`, may fill `{breakout, breakoutup, divergence}`. The book keeps its path forward and the measured loser stops.
+- Also wired: with a DARK brain but a live ledger, a lens this arm's own trades have disproven still stops. A stale proxy is no reason to keep paying a measured loser.
+
+### The shape bug that would have caused the exact harm
+
+- My first cut read `reason` and `pnl_pct` — the raw ledger COLUMN names. `bot_pnl_store.fetch_paper_trades` **splits** the stored reason into `enter_tag` + `exit_reason` and names the P&L `profit_ratio`, so the function graded **nothing**, returned `{}`, and the forward proxy decided — **halting the live arm** in the verification run. Caught only by running it against real rows, which is `(hj)`'s whole thesis, and now pinned in `test_payload_contracts`. It also silently graded OPEN positions until the same run: `fetch_paper_trades` returns them with `exit_reason='hold'`, and an open row's P&L is an unrealised guess.
+- Six mutations red: the conjunct restored, realised no longer senior, realised vetoing on noise, open rows graded, the raw column names, side-awareness dropped.
+
+### Safety
+
+- **Entry-only.** `lens_vetoed` is read at exactly one place (the entry loop); exits run through `exit_reason`/`market_close` untouched, so a veto can never orphan an open position. Checked before the rule was changed, not after.
+- Restrict-only and fail-safe open are preserved end to end: a ledger outage degrades to the pre-`(ij)` behaviour (forward grade only), never to "veto nothing" and never to a crash.
+- `(fn)`'s docstring measurement is CORRECTED IN PLACE (I12): the short side it justified at `0.513 / +0.139%` now grades `0.502 / −0.155%`.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**🎫 the Ticket Taker.** It keeps the one lens its own record says is winning, and stops the one lens its own record says is losing — where before the rule would have done exactly the opposite. Stated honestly: **+0.176%/trade over n=104 is still inside the random-short null of +0.2–1.1% `(hm)`, so this is not yet a demonstrated edge** — it is a book that has been given a fair chance to prove one.
+
 ## 2026-08-01 (ii) — THE GATE'S INTEGRITY CHECK WAS A ONE-WAY LATCH, AND ONE ERA MOVE BROKE FIVE TESTS THAT WERE NOT ABOUT THE DATE
 
 - **THE ASK** (operator): *"i would like these bots to grow"*, then *"full permission to change whatever necessary"*, then — on watching the era move break the suite — *"this constant issue of things maintaining old dates and times needs to be fixed so everything is constant. This is a trivial issue that causes such a set back."* Suite **768**, ten guards green, eight mutations red.

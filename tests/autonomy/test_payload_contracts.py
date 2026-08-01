@@ -618,3 +618,68 @@ class TestLedgerQuarantine:
         body = src[src.index("def fetch_paper_trades"):]
         assert "is_quarantined(" in body, "declared but never applied"
         assert "_quarantined" in body, "a silent filter hides its own effect"
+
+
+# ---------------------------------------------------------------------------
+# (ij) 01-Aug — the taker's REALISED lens grade must read the shape
+# `bot_pnl_store.fetch_paper_trades` actually returns.
+#
+# My first cut read `reason` and `pnl_pct` — the raw COLUMN names. The fetch
+# SPLITS the stored reason into `enter_tag` + `exit_reason` and names the P&L
+# `profit_ratio`, so the function graded NOTHING and returned {}. On the live
+# payload that would have let the 4h forward proxy veto `divergence` and HALT
+# THE LIVE BOOK. Caught only by running it against real rows — which is this
+# file's whole thesis ((hj)).
+# ---------------------------------------------------------------------------
+def test_realised_lens_evidence_reads_the_fetch_shape():
+    import lighter_ticket_taker as tt
+
+    # rows exactly as fetch_paper_trades builds them
+    rows = [
+        {"bot": "b", "enter_tag": "short-divergence", "exit_reason": "tp",
+         "profit_ratio": 0.02, "is_open": False},
+        {"bot": "b", "enter_tag": "short-divergence", "exit_reason": "sl",
+         "profit_ratio": -0.01, "is_open": False},
+        {"bot": "b", "enter_tag": "long-dip", "exit_reason": "sl",
+         "profit_ratio": -0.03, "is_open": False},
+        {"bot": "other", "enter_tag": "short-divergence", "exit_reason": "tp",
+         "profit_ratio": 9.0, "is_open": False},          # a different book
+    ]
+    got = tt.realised_lens_evidence(rows, "b")
+    assert set(got) == {"divergence", "dip"}, got
+    assert got["divergence"][0] == 2, got
+    assert abs(got["divergence"][1] - 0.5) < 1e-9, got     # mean of +2%/-1%, in %
+    assert got["dip"][0] == 1
+
+
+def test_open_positions_never_reach_the_realised_grade():
+    """An open row carries an UNREALISED mark; grading on it grades a guess.
+    fetch_paper_trades returns them with exit_reason='hold'."""
+    import lighter_ticket_taker as tt
+    rows = [
+        {"bot": "b", "enter_tag": "long-breakoutup", "exit_reason": "hold",
+         "profit_ratio": 0.99, "is_open": True},
+        {"bot": "b", "enter_tag": "long-breakoutup", "exit_reason": "hold",
+         "profit_ratio": 0.99},
+        {"bot": "b", "enter_tag": "long-breakoutup", "exit_reason": "tp",
+         "profit_ratio": 0.01, "is_open": False},
+    ]
+    got = tt.realised_lens_evidence(rows, "b")
+    assert got["breakoutup"][0] == 1, f"an open row was graded: {got}"
+
+
+def test_the_realised_grade_is_side_aware_for_a_restricted_arm():
+    """The live arm may fill divergence SHORT only. Its long-divergence closes
+    predate the (hj) hard gate and read -1.581% against short's +0.576%;
+    pooling them would veto the live book on trades it cannot take."""
+    import lighter_ticket_taker as tt
+    rows = [
+        {"bot": "b", "enter_tag": "short-divergence", "exit_reason": "tp",
+         "profit_ratio": 0.02, "is_open": False},
+        {"bot": "b", "enter_tag": "long-divergence", "exit_reason": "sl",
+         "profit_ratio": -0.50, "is_open": False},
+    ]
+    pooled = tt.realised_lens_evidence(rows, "b")
+    scoped = tt.realised_lens_evidence(rows, "b", sides={"divergence": "short"})
+    assert pooled["divergence"][0] == 2 and pooled["divergence"][1] < 0, pooled
+    assert scoped["divergence"][0] == 1 and scoped["divergence"][1] > 0, scoped

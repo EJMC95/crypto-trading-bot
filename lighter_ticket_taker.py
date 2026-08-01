@@ -827,7 +827,7 @@ SIDE_AWARE_VETO = os.environ.get(
     "TT_LENS_VETO_SIDE_AWARE", "on").strip().lower() not in ("off", "0", "false", "no")
 
 
-def vetoed_lenses(lens_fwd, min_n=None, sides=None):
+def vetoed_lenses(lens_fwd, min_n=None, sides=None, realised=None):
     """THE lens veto rule, and the single authority for it (2026-07-17): a
     lens the brain grades negative at sample size stops getting fills.
 
@@ -855,6 +855,13 @@ def vetoed_lenses(lens_fwd, min_n=None, sides=None):
     pooled divergence ehit4h 0.483 / eavg -0.093% (VETO) while the short side
     the live arm actually trades is 0.513 / +0.139% and short+crypto is 0.525 /
     +0.289%; the long side (69% of episodes) is what fails, at 0.470 / -0.199%.
+    [2026-08-01 (ij) — THAT MEASUREMENT HAS SINCE MOVED, recorded rather than
+    left to be re-derived (I12). The short side now grades 0.502 / **-0.155%**
+    over 305 episodes: it has gone NEGATIVE on the forward basis and escaped
+    the old veto by 0.002 of hit rate. It is not vetoed today, and the reason
+    is no longer the sign of this number — it is that the lens's OWN 16 live
+    closes read +0.558%, and realised closes are senior to a 4h proxy for a
+    book that holds a bracket. See `realised_lens_evidence`.]
     This is NOT a loosening — it cuts BOTH ways: an arm restricted to a side
     that grades badly inside a healthy pool now gets vetoed where it did not.
     Fail-safe to the pre-(fn) rule in every degraded case: no `sides`, no
@@ -867,10 +874,165 @@ def vetoed_lenses(lens_fwd, min_n=None, sides=None):
             sub = ((o or {}).get("by_side") or {}).get(sides[lens])
             if isinstance(sub, dict) and lens_evidence(sub, min_n=min_n)[1]:
                 graded = sub
+        # [2026-08-01 (ij)] THE LENS'S OWN REALISED CLOSES ARE SENIOR.
+        # `brain-lens-forward` grades the SCOUT's tickets on 4h/24h FORWARD
+        # MARKS. The taker does not hold 4h — it holds a bracket (tp/sl/
+        # max_hold). `(dm)` already established the consequence and built a
+        # bespoke escape hatch for one lens: "'breakoutup' earns its OWN veto —
+        # from its own realized closes, NOT the 4h forward grade (dk) proved
+        # misjudges it ... graded at the right horizon BY CONSTRUCTION".
+        # This generalises that instead of adding a third bespoke path.
+        rl = (realised or {}).get(lens)
+        if rl is not None:
+            r_n, r_mean, r_t = rl
+            if r_n >= REALISED_MIN_N:
+                if realised_loses(r_mean, r_t):
+                    out.add(lens)
+                continue          # realised decides, in BOTH directions
         _n, floor_met, avg, hit = lens_evidence(graded, min_n=min_n)
-        if floor_met and avg < 0 and hit < 0.5:
+        if floor_met and lens_loses(avg, hit):
             out.add(lens)
     return out
+
+
+#: Floors for the REALISED-closes verdict. A lens decides its own fate only
+#: once it has enough of its own trades: below this the 4h forward proxy is
+#: still the only evidence there is.
+REALISED_MIN_N = int(os.environ.get("TT_LENS_REALISED_MIN_N", "10"))
+#: How much evidence a realised LOSS needs before it vetoes. Deliberately a
+#: t-stat and not just `mean < 0`: at n=10 a mean is noise, and a veto that
+#: fires on noise starves a lens that never had a chance. -1.0 is one-sided
+#: and lenient; the one lens it currently catches (`long-dip`) reads -2.66.
+REALISED_VETO_T = float(os.environ.get("TT_LENS_REALISED_VETO_T", "-1.0"))
+
+
+def realised_loses(mean_pct, t):
+    """Does this lens's OWN trading record say it loses money?
+
+    Restrict-only and evidence-gated: BOTH a negative mean and a t at or below
+    `REALISED_VETO_T`. A lens that is merely noisy-negative keeps trading and
+    keeps collecting — the shadow arm exists to grade, and a veto on n=10 of
+    noise would end the grade before it started.
+    """
+    return mean_pct < 0 and t <= REALISED_VETO_T
+
+
+def realised_lens_evidence(rows, bot_row, sides=None):
+    """{scout-lens: (n, mean_pct, t)} from THIS ARM's own closed trades.
+
+    Keyed to the SCOUT lens name so it can be compared against the forward
+    grade: ledger `reason` is `<side>-<lens>_<exit>` ('short-divergence_tp'),
+    so the lens is the part after the side.
+
+    SIDE-AWARE for the same reason `vetoed_lenses` is: when this arm may only
+    fill one side of a lens, the other side's closes answer a question about
+    trades it cannot make. The live arm trades `divergence` SHORT only, and its
+    long-divergence closes — which predate the (hj) hard gate — read -1.581%
+    against short's +0.576%. Pooling them would veto the live book on trades it
+    is already forbidden to take.
+
+    Pure; the caller supplies rows and owns freshness.
+    """
+    import math
+
+    buckets = {}
+    for r in (rows or []):
+        if (r or {}).get("bot") != bot_row:
+            continue
+        # OPEN positions carry an UNREALISED mark. Grading a lens on them is
+        # grading a guess — and `fetch_paper_trades` returns them with
+        # exit_reason='hold'. Caught by verifying against the publisher's real
+        # rows rather than a fixture ((hj)).
+        if r.get("is_open") or str(r.get("exit_reason") or "") == "hold":
+            continue
+        # SHAPE, verified against `bot_pnl_store.fetch_paper_trades` itself:
+        # it SPLITS the stored `reason` into `enter_tag` ('short-divergence')
+        # + `exit_reason`, and names the return `profit_ratio`. My first cut
+        # read `reason`/`pnl_pct` — the raw COLUMN names — and silently graded
+        # nothing, which on the live payload would have let the forward proxy
+        # halt the live arm. `reason`/`pnl_pct` stay as fallbacks so a caller
+        # reading the ledger table directly still works.
+        pct = r.get("profit_ratio")
+        if pct is None:
+            pct = r.get("pnl_pct")
+        if pct is None:
+            continue
+        head = str(r.get("enter_tag") or r.get("reason") or "").split("_", 1)[0]
+        if "-" not in head:
+            continue
+        side, _, lens = head.partition("-")
+        if not lens:
+            continue
+        if sides and lens in sides and side != sides[lens]:
+            continue
+        try:
+            buckets.setdefault(lens, []).append(float(pct))
+        except (TypeError, ValueError):
+            continue
+    out = {}
+    for lens, v in buckets.items():
+        n = len(v)
+        mean = sum(v) / n
+        if n > 1:
+            sd = math.sqrt(sum((x - mean) ** 2 for x in v) / (n - 1))
+            t = (mean / (sd / math.sqrt(n))) if sd else 0.0
+        else:
+            t = 0.0
+        out[lens] = (n, mean * 100.0, t)
+    return out
+
+
+#: Restores the pre-(ij) conjunction (`avg < 0 AND hit < 0.5`). Kept because
+#: this rule gates a REAL-MONEY book and a change to it must be revertible
+#: without a deploy — the FLEET_RISK_MODE / BRAIN_MULT_ENGINE pattern.
+LEGACY_HIT_GATE = os.environ.get(
+    "TT_LENS_VETO_LEGACY_HIT_GATE", "").strip().lower() in ("1", "on", "true")
+
+
+def lens_loses(avg, hit):
+    """Does this grade say the lens LOSES MONEY? Expectancy only.
+
+    [2026-08-01 (ij)] THE `hit < 0.5` CONJUNCT IS GONE, and it was the same
+    non-sequitur this fleet has already ruled on once. `(fk)` removed win rate
+    from the GO-LIVE GATE on 29-Jul because **win rate is orthogonal to
+    expectancy** — 🌾 carry wins 38.8% of its trades and is the best-evidenced
+    book in the fleet. The lens veto kept win rate as a NECESSARY condition, so
+    a lens that loses money while winning slightly more than half its bets was
+    structurally unvetoable. Same wrong idea, in an actuator instead of a
+    report.
+
+    MEASURED on the live `brain-lens-forward` payload the day this shipped:
+
+        lens                 eavg4h_pct   ehit4h    old rule   new rule
+        dip                     -0.027     0.526    allowed    VETO
+        divergence / SHORT      -0.155     0.502    allowed    VETO
+        divergence (pooled)     -0.098     0.490    VETO       VETO
+        momentum                -0.044     0.435    VETO       VETO
+        breakout                +0.026     0.480    allowed    allowed
+
+    Two of those matter. `dip` is the fleet's only STATISTICALLY SIGNIFICANT
+    taker result — its own realised closes read n=13, **-1.162%/trade,
+    t=-2.66, -$9.15** — and it escaped the veto on a 52.6% hit rate.
+    `divergence/short` is the LIVE book's only lens; it escaped by **0.002**.
+    When `(fn)` justified the live short-only rule it measured that side at
+    `0.513 / +0.139%`; it has since degraded to `0.502 / -0.155%` over 305
+    episodes, and nothing could say so.
+
+    NOTE THE ASYMMETRY, because it is the whole point: this does NOT veto a
+    lens with POSITIVE expectancy and a low hit rate. That is the carry shape —
+    lose often, win big — and vetoing it would be the mirror image of the
+    defect being fixed. `breakout` (+0.026 at hit 0.480) stays allowed, and
+    would have been wrongly killed by a naive `avg < 0 or hit < 0.5`.
+
+    Win rate is still REPORTED by `lens_evidence` and still consumed by the
+    tuner — demoted from a bar, exactly as `(fk)` demoted it, not deleted.
+
+    RESTRICT-ONLY and fail-safe open are preserved: the CALLER owns freshness,
+    and a missing/thin grade vetoes nothing.
+    """
+    if LEGACY_HIT_GATE:
+        return avg < 0 and hit < 0.5
+    return avg < 0
 
 
 # [2026-07-24 (dm) INCREMENT B] 'breakoutup' earns its OWN veto — from its own
@@ -2140,12 +2302,33 @@ def main(_ctx=None):
     # doctrine: a lens graded negative at sample size stops getting fills;
     # missing/stale grades never block anything (fail-safe open).
     lens_vetoed = set()
+    # [2026-08-01 (ij)] THIS ARM'S OWN CLOSES, which are SENIOR to the forward
+    # proxy for any lens that has enough of them. Read here rather than inside
+    # `vetoed_lenses` so the rule stays pure and testable, and so a ledger
+    # outage degrades to the pre-(ij) behaviour (forward grade only) instead of
+    # to "veto nothing" or a crash. Fail-safe open, like every read in this
+    # block: no rows -> `realised={}` -> the forward grade decides, unchanged.
+    realised = {}
+    try:
+        realised = realised_lens_evidence(
+            store.fetch_paper_trades(limit=4000), BOT_ROW,
+            sides=restricted_sides())
+    except Exception:                       # noqa: BLE001
+        realised = {}
     try:
         lf = store.load_state("brain-lens-forward") or {}
         lf_age = (t_now - parse_ts(lf.get("updated"))).total_seconds()
         if 0 <= lf_age <= float(lf.get("ttl_sec") or 26000):  # [2026-07-23] future-stamp-safe
             lens_vetoed = vetoed_lenses(lf.get("lenses"),
-                                        sides=restricted_sides())
+                                        sides=restricted_sides(),
+                                        realised=realised)
+        elif realised:
+            # The brain is DARK but this arm's own record is not. A lens its
+            # own trades have disproven must still stop — the forward grade
+            # being stale is no reason to keep paying for a measured loser.
+            lens_vetoed = vetoed_lenses({k: {} for k in realised},
+                                        sides=restricted_sides(),
+                                        realised=realised)
     except (ValueError, TypeError):
         lens_vetoed = set()
     if lens_vetoed:
@@ -2825,13 +3008,70 @@ def selftest():
     # …while real episode evidence vetoes on the DEDUP'D grade
     assert vetoed_lenses({"m": {"n4h": 1202, "eps4h": 117, "n_syms": 29,
                                 "eavg4h_pct": -0.30, "ehit4h": 0.427}}) == {"m"}
-    # the measured 21-Jul dip flip: raw says allowed (hit4h 0.505), episodes
-    # say vetoed (ehit4h 0.495) — the episode number wins when present
-    _dip = {"n4h": 6072, "avg4h_pct": -0.048, "hit4h": 0.505,
+    # the measured 21-Jul dip flip: the EPISODE number wins when present.
+    # [2026-08-01 (ij)] REBUILT. The original contrast was raw hit4h 0.505
+    # (allowed) vs episode ehit4h 0.495 (vetoed) — a contrast that existed ONLY
+    # because the old rule required `hit < 0.5`. Expectancy-only makes both
+    # bases agree here (both avg are negative), so that fixture no longer
+    # discriminates between them and would pass vacuously. The property under
+    # test is unchanged, so the fixture now disagrees on EXPECTANCY: raw says
+    # the lens makes money, episodes say it loses.
+    _dip = {"n4h": 6072, "avg4h_pct": +0.061, "hit4h": 0.505,
             "eps4h": 760, "n_syms": 110, "eavg4h_pct": -0.053, "ehit4h": 0.495}
-    assert vetoed_lenses({"dip": _dip}) == {"dip"}
+    assert vetoed_lenses({"dip": _dip}) == {"dip"}, "the episode grade must win"
     assert vetoed_lenses({"dip": {k: v for k, v in _dip.items()
-                                  if not k.startswith(("e", "n_s"))}}) == set()
+                                  if not k.startswith(("e", "n_s"))}}) == set(), \
+        "with no episode fields the RAW grade decides, and it is positive"
+
+    # ---- (ij) EXPECTANCY ONLY — win rate is not a bar --------------------
+    # THE DEFECT: `avg < 0 AND hit < 0.5` made a money-LOSING lens unvetoable
+    # whenever it won slightly more than half its bets. Measured on the live
+    # payload: `dip` at eavg -0.027 / ehit 0.526 and `divergence/short` — the
+    # LIVE book's only lens — at -0.155 / 0.502, escaping by 0.002. Same
+    # non-sequitur `(fk)` removed from the GO-LIVE GATE on 29-Jul: win rate is
+    # orthogonal to expectancy, and carry wins 38.8% while being the best book
+    # in the fleet.
+    _loser_hi_hit = {"eps4h": 900, "n_syms": 100, "eavg4h_pct": -0.027,
+                     "ehit4h": 0.526}
+    assert vetoed_lenses({"dip": _loser_hi_hit}) == {"dip"}, \
+        "a lens that LOSES MONEY must be vetoed however often it wins"
+    # …and the mirror image must NOT happen: positive expectancy at a LOW hit
+    # rate is the carry shape (lose often, win big) and must keep trading.
+    _winner_lo_hit = {"eps4h": 900, "n_syms": 100, "eavg4h_pct": +0.026,
+                      "ehit4h": 0.480}
+    assert vetoed_lenses({"breakout": _winner_lo_hit}) == set(), \
+        "positive expectancy at a low hit rate is the carry shape, not a loser"
+    # the kill switch restores the pre-(ij) conjunction exactly
+    globals()["LEGACY_HIT_GATE"] = True
+    try:
+        assert vetoed_lenses({"dip": _loser_hi_hit}) == set()
+        assert vetoed_lenses({"m": {"eps4h": 900, "n_syms": 100,
+                                    "eavg4h_pct": -0.5, "ehit4h": 0.4}}) == {"m"}
+    finally:
+        globals()["LEGACY_HIT_GATE"] = False
+
+    # ---- (ij) REALISED CLOSES ARE SENIOR to the 4h forward proxy ---------
+    # The taker holds a BRACKET, not 4h. (dm) already found the forward grade
+    # "misjudges" a lens and built a bespoke realised-closes veto for
+    # 'breakoutup'; this generalises it. MEASURED the day it shipped: the
+    # forward grade called divergence/short -0.155% while that lens's own 16
+    # live closes read +0.558% — the proxy was about to halt the live book.
+    _fwd_bad = {"divergence": {"eps4h": 900, "n_syms": 90,
+                               "eavg4h_pct": -0.155, "ehit4h": 0.502}}
+    assert vetoed_lenses(_fwd_bad) == {"divergence"}, "forward-only: vetoed"
+    assert vetoed_lenses(_fwd_bad, realised={"divergence": (16, +0.558, +0.57)}) \
+        == set(), "its OWN closes are positive — the proxy must not halt it"
+    # senior in BOTH directions: a realised loser is vetoed even when the
+    # forward proxy likes it.
+    _fwd_ok = {"dip": {"eps4h": 900, "n_syms": 90,
+                       "eavg4h_pct": +0.10, "ehit4h": 0.60}}
+    assert vetoed_lenses(_fwd_ok) == set()
+    assert vetoed_lenses(_fwd_ok, realised={"dip": (13, -1.162, -2.66)}) == {"dip"}
+    # below the sample floor the realised verdict does NOT decide — too thin
+    assert vetoed_lenses(_fwd_ok, realised={"dip": (4, -2.485, -2.97)}) == set()
+    # a realised loss that is merely NOISY does not veto: the shadow arm is a
+    # grading instrument and a veto on noise ends the grade before it starts
+    assert vetoed_lenses(_fwd_ok, realised={"dip": (30, -0.4, -0.5)}) == set()
 
     # ---- (fn) SIDE-AWARE VETO — the pooled grade is not this arm's grade ----
     # Fixture built from the MEASURED 200h tape: pooled divergence fails the bar
