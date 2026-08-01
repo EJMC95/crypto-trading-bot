@@ -164,6 +164,39 @@ out-of-process age check are **complements, never substitutes** — every organ
 needs a key whose staleness someone is told about, and the set that is
 deliberately unpageable must be declared rather than defaulted into.
   ENFORCED BY: `tests/autonomy/test_organ_pageability.py::UNPAGEABLE_OK`, `tests/autonomy/test_organ_pageability.py::test_no_organ_becomes_unpageable_without_being_declared`
+
+### I14 · A PROXY IS NOT THE RECORD — AND AT THE WRONG HORIZON IT INVERTS
+When a book's OWN realised trades disagree with a proxy, **the record decides.**
+A proxy graded over a different horizon than the book actually trades does not
+merely add noise — it can **invert the verdict, killing the winner and keeping
+the loser.** 1-Aug, measured: `brain-lens-forward` grades the scout's tickets on
+**4h forward marks**; 🎫 the Ticket Taker holds a **bracket** (tp/sl/max_hold).
+On the live book's only lens the two bases disagreed in SIGN — proxy
+`divergence/short −0.155%`, its own 16 live closes **+0.558%** — while `dip`,
+which the proxy called acceptable, was the fleet's only statistically
+significant taker result at **−1.162%/trade, t=−2.66**. Acting on the proxy
+alone would have halted the live book and kept the one lens losing money.
+`(dm)` had already found this in July and built a bespoke escape for ONE lens
+(*"graded at the right horizon BY CONSTRUCTION"*) without generalising it — a
+one-off fix is how a known defect survives. **Seniority is in BOTH directions**
+(a realised loser is vetoed though the proxy likes it), gated on a **t-stat not
+a bare mean** (a veto that fires on noise ends a grade before it starts), and
+side-aware where the arm may only trade one side.
+  ENFORCED BY: `lighter_ticket_taker.py::realised_lens_evidence`, `lighter_ticket_taker.py::REALISED_VETO_T`
+
+### I15 · WIN RATE IS NOT EXPECTANCY — AND CHECK THE ACTUATORS, NOT JUST THE REPORTS
+A rule that requires a LOW hit rate before it will act on a loser **cannot see a
+loser that wins often**, and one that requires a HIGH hit rate before it will
+back a winner cannot see the carry shape — lose often, win big. This fleet
+already ruled on it: `(fk)` removed win rate from the **go-live gate** on 29-Jul
+because 🌾 carry wins **38.8%** and is the best-evidenced book it has. The same
+non-sequitur then survived for weeks inside an **actuator** — the lens veto's
+`avg < 0 AND hit < 0.5` — where it was worth more than a mis-worded report: it
+made a money-losing lens structurally unvetoable, and the live book's own lens
+escaped by **0.002** of hit rate. **When a bad idea is removed from a report,
+grep for it in the things that ACT.** The fix is expectancy-only in both
+directions; win rate stays REPORTED, demoted rather than deleted.
+  ENFORCED BY: `lighter_ticket_taker.py::lens_loses`, `lighter_ticket_taker.py::LEGACY_HIT_GATE`
 <!-- INVARIANTS:END -->
 
 ### Acknowledged recurrence — houses we keep re-entering, and why

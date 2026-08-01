@@ -140,6 +140,31 @@ surface to an unproven pipeline.
 
 ---
 
+## 4b. 🎫 THE TAKER HAS A PATH FORWARD — and one step is outstanding *(operator)*
+
+**`(ij)` removed the two things that would have stopped it.** The lens veto was
+about to halt the live book on a 4h forward proxy while that lens's own closes
+were positive, and simultaneously keep `dip`, the fleet's only statistically
+significant loser. Both fixed; doctrine **I14/I15**.
+
+Running on the shadow arm (`5e27c751f5b2`, verified). **The LIVE arm is still on
+`fd4663d27fb5`** — the deploy dispatch was blocked twice by the harness
+permission classifier, which chat authorisation does not reach:
+
+    gh workflow run 305025607 -f services="tide-rider-lighter-live"
+
+Verify by stamp readback (`extra.build` = `5e27c751f5b2`, `build_n` = 15), never
+by the green run. **Nothing is at risk while it waits** — both rules currently
+permit `divergence`, so live behaviour is identical today. The fix is insurance
+against the forward hit rate crossing 0.500 (it sits at **0.502**) and halting a
+book whose own record is positive.
+
+**Honest limit, carried forward:** +0.176%/trade over n=104 is still inside the
+random-short null of +0.2–1.1% `(hm)`. Not a demonstrated edge — a fair chance at
+one. The next real evidence is simply more closes under one frozen policy.
+
+---
+
 ## 5. Carried, unchanged
 
 - **MTM drawdown re-grade** — `(ia)` folded `mtm_drawdown` into the gate

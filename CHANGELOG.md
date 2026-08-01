@@ -1,3 +1,36 @@
+## 2026-08-01 (ik) — THE (ij) BREAKTHROUGH, WELDED TO THE DOCTRINE LAYER SO IT CANNOT BE FORGOTTEN
+
+- **THE ASK** (operator): *"Save and make sure everyone knows this breakthrough."* Suite **771**, ten guards green, two doctrine mutations red.
+- Read as this fleet means it: **"everyone" is every future session and every organ that reads the doctrine layer** — the mechanism `(hy)` built precisely so a lesson stops depending on whether someone remembers it. Nothing was sent anywhere externally.
+- **TWO invariants, because `(ij)` contained two distinct lessons and folding them together would have blurred both.**
+
+### I14 · A PROXY IS NOT THE RECORD — AND AT THE WRONG HORIZON IT INVERTS
+
+- The general form: **a proxy graded over a different horizon than the book actually trades does not merely add noise — it can INVERT the verdict, killing the winner and keeping the loser.** Measured: proxy `divergence/short −0.155%` against that lens's own 16 live closes at **+0.558%**, while `dip` — which the proxy called acceptable — was the fleet's only statistically significant taker result at **−1.162%/trade, t=−2.66**.
+- **`(dm)` had already found this in July** and built a bespoke realised-closes veto for ONE lens, writing that it was *"graded at the right horizon BY CONSTRUCTION"* — and never generalised it. **A one-off fix is how a known defect survives**, which is the part of this worth engraving.
+- ENFORCED BY `realised_lens_evidence` + `REALISED_VETO_T`.
+
+### I15 · WIN RATE IS NOT EXPECTANCY — AND CHECK THE ACTUATORS, NOT JUST THE REPORTS
+
+- `(fk)` removed win rate from the **go-live gate** on 29-Jul because 🌾 carry wins **38.8%** and is the best-evidenced book in the fleet. The identical non-sequitur then survived for weeks inside an **actuator** — the lens veto's `avg < 0 AND hit < 0.5` — where it mattered more than in a report: it made a money-losing lens structurally unvetoable, and the LIVE book's own lens escaped by **0.002** of hit rate.
+- The transferable instruction is the second clause: **when a bad idea is removed from a report, grep for it in the things that ACT.**
+- ENFORCED BY `lens_loses` + `LEGACY_HIT_GATE`.
+
+### The mutation that survived twice, and why it is worth recording
+
+- Renaming `realised_lens_evidence` left the doctrine guard GREEN — **because my sed matched `symbol(` and the symbol also appears in PROSE without a trailing paren.** Third time today a mutation of mine failed to remove the thing it claimed to remove (after the `]`-in-a-comment parser and the override-string-in-a-comment). Re-run against EVERY occurrence, both arms redden correctly.
+- **The recurring lesson is about the mutation, not the guard**: a mutation that does not actually delete the referent proves nothing, and it fails in the reassuring direction — green. I3 is declared UNENFORCED for exactly this reason: no static check can tell a vacuous mutation from a real one.
+
+### Also recorded
+
+- `FORWARD_STEPS_2026-08-01.md` gains the taker as a live carried item with the one outstanding step and its verification, so the next pass starts from it rather than rediscovering it.
+- **STILL OUTSTANDING, and it is an operator act:** the LIVE taker runs `fd4663d27fb5`; the fix is `5e27c751f5b2`. `gh workflow run 305025607 -f services="tide-rider-lighter-live"` was blocked twice by the harness permission classifier — **chat authorisation does not reach it**, and the `[deploy-live-taker]` commit-marker route was deliberately NOT used, because accomplishing by another mechanism what a safety control just refused is not a decision to take unilaterally on real money.
+- **Nothing is at risk while it waits:** both the old and new rules currently permit `divergence`, so live behaviour is identical today. The fix is insurance against the forward hit rate crossing 0.500 — it sits at **0.502**.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — this is the doctrine layer, and it says so.** What moved is the cost of the next repeat: two lessons that would otherwise have lived in one changelog entry now redden a build when their enforcement disappears.
+
 ## 2026-08-01 (ij) — THE LENS VETO WAS ABOUT TO HALT THE LIVE BOOK ON A PROXY, AND KEEP THE ONE LENS ACTUALLY LOSING MONEY
 
 - **THE ASK** (operator): *"Correct ticket taker to whichever is more profitable"*, then *"Fix the veto"*, then — decisively — *"I'd like the taker to find a path forward, it's showing can win — I'd like the focus on getting rid of anything stopping it from doing so."* Suite **771**, nine guards green, six mutations red.
