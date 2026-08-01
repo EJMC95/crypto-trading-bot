@@ -185,11 +185,22 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 # not hidden by this — it moves to the taker's row.
                 # Its record: 0 closed trades ever, died on n=14; the operator
                 # flattened its last TRX by hand and armed the kill switch.
-                # NOTE the -lshadow twin is deliberately NOT here: the
-                # tide-rider-lighter-shadow SERVICE still runs the trend bot, so
-                # hiding that row would hide a bot that is still publishing —
-                # stop the service first, or the row simply returns.
+                # [2026-08-01 (ie)] THE -lshadow TWIN IS NOW HERE TOO, and the
+                # precondition this note demanded has been met FIRST: the
+                # trend bot idles at boot behind
+                # `TIDE_RIDER_RETIRED_OVERRIDE` (lighter_trend_bot.main), so
+                # the row cannot simply return. Order matters — guard, then
+                # retire. Measured over its whole 22-day life: 9 buys, ZERO
+                # sells, 0 closed trades, holding 6 of 6 and 33% of the fleet
+                # long budget with no measured claim. `(hk)`'s universe
+                # widening worked on the ENTRY side only — 5 of those 9 buys
+                # landed in the two days after it — so it now fills ~12x
+                # faster and still cannot exit. Its only price exit is a 35%
+                # stop, 2.3x the 15% go-live drawdown bar ((gv)), so it can
+                # never clear the gate that governs real money. `(hz)` called
+                # this "the genuinely unclosed decision"; it is closed.
                 "crypto-trend-daily-lighter",
+                "crypto-trend-daily-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
                 "perps-regime-switch", "perps-regime-switch-lshadow",

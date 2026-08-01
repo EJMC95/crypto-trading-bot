@@ -370,6 +370,50 @@ def main():
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
     args = p.parse_args()
 
+    # [2026-08-01 (ie)] 🌊 TIDE RIDER RETIRED — a one-way ratchet that fills up
+    # and never empties, holding a THIRD of the fleet's long budget.
+    #
+    # MEASURED, over its whole life (10-Jul -> 01-Aug, 22 days):
+    #   venue_orders   9 buys, **0 sells**       paper_trades   **0 closes**
+    #   holding 6 of 6 (AT CAP): AAPL HYPE LIT TRX USDJPY ZEC
+    #   fleet long budget: 6 of 18 slots = **33%**, against no measured claim
+    #   in `fleet-allocation` — indeed 100% of the long budget is held by books
+    #   with no claim, and this book is the largest single holder.
+    #
+    # WHY NOW, and why `(hk)` is the argument FOR this rather than against it.
+    # `(hk)` widened the universe 6 -> 16-24 and shipped the held-coin orphan
+    # rule so a coin leaving the list could still be exited. It WORKED on the
+    # entry side and only there: **5 of the 9 lifetime buys landed in the two
+    # days since**, i.e. it now fills ~12x faster — and it has still never sold
+    # once. A book that enters faster and cannot exit is strictly worse than
+    # one that does neither, because it reaches its cap sooner and parks there.
+    #
+    # It also cannot ever convert those slots into real money: its only price
+    # exit is a **35% catastrophic stop, 2.3x the 15% go-live drawdown bar**
+    # ((gv)), so it is structurally ineligible for the gate it would have to
+    # pass. `(hz)` named this "the genuinely unclosed decision" and it is now
+    # closed. Its 2.7yr +52% validation is six CRYPTO majors on another
+    # venue's tape — an assumption wearing a number, under the venue-purity
+    # rule — and says nothing about AAPL/USDJPY, which is what it actually holds.
+    #
+    # IDLE, never `sys.exit`: `restartPolicy=always` turns an exit into a
+    # permanent crash-loop (the Trail Blazer pattern, 15-Jul — and `(ib)`
+    # re-learned it four days ago when a NameError crash-looped both carry
+    # containers for 25.6h). Ledgers and history are kept. The 6 open paper
+    # positions are shadow-only and simply freeze; there is no real money here.
+    # Resurrect deliberately with TIDE_RIDER_RETIRED_OVERRIDE=run.
+    if os.environ.get("TIDE_RIDER_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("crypto-trend-daily (🌊 Tide Rider) is RETIRED: 9 buys and ZERO "
+              "sells in 22 days, 0 closed trades, holding 6 of 6 and a THIRD "
+              "of the fleet-wide long budget with no measured claim. Its only "
+              "price exit is a 35% stop — 2.3x the 15% go-live drawdown bar — "
+              "so it can never clear the gate that governs real money. Idling: "
+              "no venue calls, no publishes, ledgers kept. "
+              "TIDE_RIDER_RETIRED_OVERRIDE=run to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     global _SUPERVISOR_BOT_ID
     # [2026-07-17 VENUE MUST BE EXPLICIT — real money] The hl_paper refusal below
     # was written when hl_paper was the DEFAULT: it catches a lost $VENUE landing

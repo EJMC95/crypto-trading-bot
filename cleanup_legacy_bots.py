@@ -47,10 +47,19 @@ LEGACY_BOTS = [
     # is what pinned the fleet-risk light RED for hours on 14-Jul).
     # Safe to prune permanently: tide-rider-lighter-live now builds
     # Dockerfile.tickettaker, so nothing can ever re-upsert this id.
-    # The -lshadow twin is NOT listed: its service still runs the trend bot and
-    # would re-upsert after every prune (see the equities note below for that
-    # exact failure mode). Stop tide-rider-lighter-shadow first.
+    # [2026-08-01 (ie)] THE -lshadow TWIN IS NOW LISTED, and the precondition
+    # this note set has been met FIRST: `lighter_trend_bot.main` idles at boot
+    # behind `TIDE_RIDER_RETIRED_OVERRIDE`, so it no longer publishes and
+    # cannot re-upsert after a prune. Guard first, then prune — the order is
+    # the whole lesson of the equities note below.
+    # WHY: 22 days, 9 buys, ZERO sells, 0 closed trades, holding 6 of 6 and
+    # 33% of the fleet-wide long budget against no measured claim. Pruning
+    # the frozen row is what actually RETURNS those 6 long slots to the fleet
+    # — `fleet_risk` counts a book's open longs from its bot_pnl row, so a
+    # hidden-but-present row would keep consuming the budget invisibly, the
+    # exact 14-Jul phantom-holdings failure that pinned the light RED.
     "crypto-trend-daily-lighter",
+    "crypto-trend-daily-lshadow",
     "perps-regime-switch", "perps-regime-switch-lshadow",
     "scanner-triangular-arb", "crypto-trendmomo-4h",
     # [2026-07-17 LIGHTER-ONLY CUT] operator: "i only want things running on

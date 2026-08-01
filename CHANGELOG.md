@@ -1,3 +1,41 @@
+## 2026-08-01 (if) — 🌊 TIDE RIDER RETIRED: 9 BUYS, ZERO SELLS, AND A THIRD OF THE FLEET'S LONG BUDGET
+
+- **THE ASK** (operator): *"full permission to go ahead with your advisements"* — executing the ACTION items from `(ie)`'s daily review. Suite **759**, eight guards green, five mutations red.
+- **THE DECISION `(hz)` NAMED AS "the genuinely unclosed one" IS NOW CLOSED.**
+
+### Measured over the book's whole 22-day life (10-Jul -> 01-Aug)
+
+      venue_orders    9 buys, **ZERO sells**        paper_trades   **0 closes**
+      holding         6 of 6 — AT CAP               AAPL HYPE LIT TRX USDJPY ZEC
+      long budget     6 of 18 slots = **33%**       fleet-allocation claim: **none**
+      only price exit **35% catastrophic stop** = 2.3x the 15% go-live bar
+
+- And the wider frame from `(ie)`: **100% of the fleet's long budget is held by books with no measured claim**, while both LIVE real-money books hold only shorts and never compete for it. This book is the single largest holder.
+
+### `(hk)` IS THE ARGUMENT FOR RETIRING, NOT AGAINST — and that inverted my own first reading
+
+- `(hk)` widened its universe 6 -> 16-24 two days ago and shipped the held-coin orphan rule so a coin leaving the list could still be exited. **It worked on the ENTRY side and only there: 5 of the 9 LIFETIME buys landed in the two days since.** The book now fills roughly **12x faster** and has still never sold once.
+- I began this pass ready to argue the opposite — that a book repaired 48h ago deserves a fair trial before judgement. The order flow says the repair made it **strictly worse**: a one-way ratchet that fills faster reaches its cap sooner and parks there longer. Recorded because the evidence moved the verdict, not the other way round.
+- It also **cannot ever convert those slots into real money**: a 35% stop against a 15% drawdown bar means it is structurally ineligible for the gate it would have to pass, however long it runs `(gv)`. Its 2.7yr +52% validation is six CRYPTO majors on another venue's tape — *an assumption wearing a number* under the venue-purity rule — and says nothing about AAPL or USDJPY, which is what it actually holds.
+
+### Three places, and the ORDER is the lesson
+
+- The repo's own prior notes on this exact book said the `-lshadow` twin could **not** be listed *because* its service was still running — *"stop the service first, or the row simply returns."* So: **guard first, then retire.**
+  1. **`lighter_trend_bot.main` idles at boot** behind `TIDE_RIDER_RETIRED_OVERRIDE`, placed BEFORE `venue_context` so it never connects or publishes. **IDLE, never `sys.exit`** — `restartPolicy=always` turns an exit into a permanent crash-loop, which `(ib)` re-learned four days ago when a `NameError` crash-looped both carry containers for 25.6h.
+  2. **`RETIRED_ROWS`** hides the card.
+  3. **`LEGACY_BOTS`** prunes the frozen row — and **the prune is what actually returns the 6 long slots**, because `fleet_risk` counts a book's open longs from its bot_pnl row. A hidden-but-present row would keep consuming the budget invisibly: the 14-Jul phantom-holdings failure that pinned the light RED for hours.
+- The 6 open positions are **shadow paper only** and simply freeze; there is no real money in this book. Ledgers, history and `venue_orders` are all kept.
+
+### Two weak tests of my own, both caught by mutation
+
+- **A `]` INSIDE A COMMENT TRUNCATED MY PARSER.** `_string_set` scanned to the closing bracket, and these blocks are dated with tags like `# [2026-07-14 GHOST-EXPOSURE CLEANUP]` — so it stopped at a comment's `]` and returned a truncated set, producing a false FAILURE on first run. Now `ast`-parsed.
+- **A MUTATION STRIPPING THE OVERRIDE FROM THE LOG LINE SURVIVED**, because the same token appears in the comment directly above it and a file-wide substring search found that instead. The operator reads the **print**, so the print is what must be asserted — `_printed_strings` walks `print(...)` call arguments via AST. **Fourth time this repo has hit the page-wide-substring trap**, and the first where it hid a genuine I8 regression (a stop with no stated way back).
+- Five mutations red: hidden-but-not-pruned, pruned-but-not-hidden, guard exits instead of idling, guard moved after `venue_context`, override missing from the log line.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**🌊 Tide Rider — off the board, deliberately.** 6 of 18 fleet long slots return to books that can actually close a trade, at **zero measured expectancy cost**: a book with no closes has no measured expectancy to give up. Reversible in one env var. The fleet is down one row and up a third of its long reach.
+
 ## 2026-08-01 (ie) — TWO ORGANS DIED WITH THE PAGER SILENT, AND 100% OF THE LONG BUDGET IS PARKED IN BOOKS WITH NO CLAIM
 
 - **THE ASK** (operator): *"fix the above for maximum growth and progress"*, then *"full permission to go ahead with your advisements"* — from the daily evidence review. Suite **753**, eight guards green, 24 mutations red.
