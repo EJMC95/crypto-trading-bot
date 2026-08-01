@@ -254,6 +254,91 @@ def near_miss_eta(s):
     return GOLIVE_MIN_DAYS - s["days"]
 
 
+def risk_line(st):
+    """Render the fleet-risk light against the bounds the VETO enforces.
+
+    [2026-08-01] Extracted from `scan_new_evidence` so it can be tested against
+    a payload `fleet_risk` itself builds, rather than by duplicating the
+    f-string in a test ((hw): "an inline block is only ever testable by
+    duplication").
+
+    INCIDENT this fixes. The line read `"<gross> gross vs long budget <N>"`.
+    `gross` is longs+shorts; the enforced veto compares `long_positions` to
+    `LONG_BUDGET` (`fleet_risk.light_for(fleet_long, LONG_BUDGET)`, and
+    `fleet_bus` reads `long_positions`). Measured on the live payload the
+    morning it was caught: gross 25 / long_positions 19 / long_budget 20, i.e.
+    the review printed the fleet as five longs OVER a cap it was one under.
+    An error in the ALARMING direction, on the exact ceiling this review is
+    supposed to watch for REACH — and the 31-Jul report had already carried
+    the same shape ("21 gross vs long budget 20"). Each side is now shown
+    against its own bound; `gross` is retained as context, never as a
+    comparand.
+    """
+    dd7 = st.get("fleet_dd_7d")
+    lp, lb = st.get("long_positions"), st.get("long_budget")
+    sp, sb = st.get("short_positions"), st.get("short_budget")
+    return (f"🚦 fleet-risk light {st.get('light')} — longs {lp}/{lb}, "
+            f"shorts {sp}/{sb} (gross {st.get('gross')}); "
+            f"7d DD {float(dd7 or 0):.2%}, clip_scale {st.get('clip_scale')}"
+            + ("  ** DD GOVERNOR BEYOND -5% **" if (dd7 or 0) <= -0.05 else ""))
+
+
+def long_budget_headroom(st):
+    """-> longs still admissible before the L2 veto refuses, or None if unknown.
+
+    Fail-CLOSED on a missing/unparseable count: `None` means "cannot say", and
+    a caller must never read that as headroom. Never negative.
+    """
+    try:
+        lp, lb = int(st["long_positions"]), int(st["long_budget"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return max(0, lb - lp)
+
+
+def long_budget_occupancy(risk, alloc=None, top=4):
+    """-> [(book, longs, share, claim)] holding the fleet long budget, biggest first.
+
+    [2026-08-01] A ceiling nobody can attribute is not actionable. The review
+    reported `longs 18/20` for weeks without ever saying WHO held the 18 —
+    while `fleet-risk.by_bot` had carried the breakdown the whole time.
+
+    Joined to `fleet-allocation`'s per-book claim, because occupancy only means
+    something against evidence. Measured the day this shipped:
+
+        crypto-trend-daily   6 longs  33.3%   no claim, ZERO closes ever
+        freqtrade-mum        4 longs  22.2%   no claim
+        freqtrade-avo-maria  4 longs  22.2%   claim 0.0 (n=5)
+        freqtrade-dad        2 longs  11.1%   claim 0.0 (n=10)
+        crypto-swing-daily   2 longs  11.1%   claim 0.0 (n=1)
+
+    i.e. **100% of the long budget held by books with no measured claim**, a
+    third of it by one book that has never closed a trade — while both LIVE
+    real-money books held only shorts and so never competed for it at all.
+    That reframes the L2 ceiling: the constraint is not that the budget is too
+    small, it is what the budget is parked in.
+
+    `claim` is None when the book is absent from the allocation payload (a
+    dark organ, or a book with too few closes to score) — never 0.0, because
+    "not scored" and "scored at zero" are different facts and conflating them
+    would let a dark organ read as a fleet with no claims anywhere.
+    """
+    by_bot = (risk or {}).get("by_bot") or {}
+    total = (risk or {}).get("long_positions") or 0
+    books = (alloc or {}).get("books") or {}
+    rows = []
+    for base, d in by_bot.items():
+        n_long = (d or {}).get("long") or 0
+        if not n_long:
+            continue
+        # fleet-risk keys by BARE base; the allocation organ keys by ROW.
+        entry = books.get(base) or books.get(f"{base}-lshadow") or {}
+        rows.append((base, n_long, (n_long / total) if total else None,
+                     entry.get("claim")))
+    rows.sort(key=lambda r: (-r[1], r[0]))
+    return rows[:top]
+
+
 def _assert_write_target(key):
     """The single gate on the single UPSERT. Refuses anything but the review."""
     if key != REVIEW_KEY:
@@ -524,11 +609,29 @@ def scan_new_evidence(cur, errors):
     with Section(errors, "fleet-risk"):
         st, _ = load_state(cur, "fleet-risk")
         if st:
-            dd7 = st.get("fleet_dd_7d")
-            items.append(f"🚦 fleet-risk light {st.get('light')} — {st.get('gross')} gross vs "
-                         f"long budget {st.get('long_budget')}; 7d DD {float(dd7 or 0):.2%}, "
-                         f"clip_scale {st.get('clip_scale')}"
-                         + ("  ** DD GOVERNOR BEYOND -5% **" if (dd7 or 0) <= -0.05 else ""))
+            items.append(risk_line(st))
+            head = long_budget_headroom(st)
+            if head is not None and head <= 2:
+                items.append(f"🚦 REACH: only {head} long slot(s) left under the "
+                             f"L2 veto ({st.get('long_positions')}/"
+                             f"{st.get('long_budget')}) — at 0 the NEXT long is "
+                             "refused fleet-wide regardless of its edge")
+                # WHO holds it. A ceiling with no attribution cannot be acted
+                # on, and the breakdown was already in the payload.
+                al, _ = load_state(cur, "fleet-allocation")
+                occ = long_budget_occupancy(st, al)
+                if occ:
+                    parts = []
+                    for base, n_long, share, claim in occ:
+                        cl = ("no claim" if not claim else f"claim {claim:.4f}")
+                        parts.append(f"{base} {n_long}"
+                                     + (f" ({share:.0%})" if share else "")
+                                     + f" {cl}")
+                    unclaimed = sum(n for _, n, _, c in occ if not c)
+                    items.append("🚦 LONG BUDGET HELD BY: " + "; ".join(parts)
+                                 + f" — {unclaimed} of the top "
+                                 f"{sum(n for _, n, _, _ in occ)} slots are held "
+                                 "by books with NO measured claim")
 
     with Section(errors, "live-shadow"):
         g = live_shadow_gap(cur)
@@ -538,22 +641,50 @@ def scan_new_evidence(cur, errors):
                      f"{'DIVERGING' if abs(g['gap_pp']) >= 2 else 'no divergence'}")
 
     with Section(errors, "arm-drift"):
-        cur.execute("""SELECT bot, extra->>'build' FROM bot_pnl
+        cur.execute("""SELECT bot, extra->>'build', extra->>'build_n' FROM bot_pnl
                         WHERE bot IN ('perps-funding-lighter-lighter',
                                       'perps-funding-lighter-lshadow',
                                       'lighter-ticket-taker-lighter',
                                       'lighter-ticket-taker-lshadow')""")
-        b = dict(cur.fetchall())
+        b = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
         for live, shadow, name in (
                 ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow", "Farmer"),
                 ("lighter-ticket-taker-lighter", "lighter-ticket-taker-lshadow", "Taker")):
-            bl, bs = b.get(live), b.get(shadow)
-            if bl and bs:
-                items.append(f"🧬 {name} arms {'AGREE' if bl == bs else 'DRIFT'}: "
-                             f"live {bl} vs shadow {bs}"
-                             + ("" if bl == bs else
-                                " — the shadow arm is not a clean control while this holds"))
-    return items
+            items.append(arm_drift_line(name, b.get(live), b.get(shadow)))
+    return [i for i in items if i]
+
+
+def arm_drift_line(name, live, shadow):
+    """-> the 🧬 live-vs-shadow build line, or None when either arm is unstamped.
+
+    [2026-08-01] Reads `build_n` beside `build`, per (fd). `build_compute`
+    hashes only the `_BUILD_SHARED` names that EXIST in the image, so the SAME
+    source tree stamps DIFFERENT ids in two images carrying different COPY
+    sets — measured once already, when `family-lighter-shadow` published a
+    14-file id against the repo's 15-file id and read as "the deploy never
+    landed". The live arms run from their own images, so this comparison is
+    exactly where that hazard lives, and this line previously compared the
+    digest ALONE — it could not tell "the control arm is running different
+    code" (a real threat to the control) from "the two images carry different
+    files" (expected, and no threat at all).
+
+    Verified on the live payload the day it shipped: both taker arms report
+    `build_n=15`, so the differing digest there IS genuine code drift.
+    """
+    bl, nl = live or (None, None)
+    bs, ns = shadow or (None, None)
+    if not (bl and bs):
+        return None
+    if bl == bs:
+        return f"🧬 {name} arms AGREE: live {bl} vs shadow {bs} (n={nl})"
+    if nl != ns:
+        return (f"🧬 {name} arms differ on FILE SET, not necessarily code: "
+                f"live {bl} (n={nl}) vs shadow {bs} (n={ns}) — a different "
+                "count means different COPY sets ((fd)); compare against each "
+                "image's own Dockerfile before calling it drift")
+    return (f"🧬 {name} arms DRIFT: live {bl} vs shadow {bs} (both n={nl}, so "
+            "this is code, not file set) — the shadow arm is not a clean "
+            "control while this holds")
 
 
 # ---------------------------------------------------------------------------

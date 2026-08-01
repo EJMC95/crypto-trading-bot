@@ -146,6 +146,24 @@ stale or unparseable payload, against the usual degrade-to-default habit,
 because here the cost of a wrong default is unsupervised real money. The live
 arm also pins the BACKTESTED config and takes no growth-rail capacity lever.
   ENFORCED BY: `lighter_funding_spread_bot.py::golive_blocker`, `lighter_funding_spread_bot.py::GOLIVE_K`
+
+### I13 · A DEAD LOOP RUNS NO HANDLER — LIVENESS IS ONLY VISIBLE FROM OUTSIDE
+Self-reporting covers a process that FAULTS, never one that STOPS. `(hw)`'s
+`organ_main` wrapper catches an organ's exception and records it on that organ's
+own key — but a `( while true; ... ) &` subshell that has died runs no handler,
+records nothing, and leaves every key it ever wrote looking exactly as it did at
+its last successful publish. **1-Aug, measured:** `bot_learn` and
+`event_sentinel` had both stopped ~12.5h earlier inside a container whose other
+~20 organs were seconds fresh (`brain-vitals` 12.87h vs a 7.2h TTL;
+`event-sentinel` 12.52h vs 0.67h — DARK six times over), and the growth rail was
+already degraded — `scout-tuner` logged *"brain dark ... lens-keyed bar walks
+suppressed"*. **Nothing paged for 12.5 hours**, because the watchdog pages only
+on `critical` organs and the sentinel's ONLY key was non-critical: the organ was
+structurally unpageable, not merely quiet. So an in-process wrapper and an
+out-of-process age check are **complements, never substitutes** — every organ
+needs a key whose staleness someone is told about, and the set that is
+deliberately unpageable must be declared rather than defaulted into.
+  ENFORCED BY: `tests/autonomy/test_organ_pageability.py::UNPAGEABLE_OK`, `tests/autonomy/test_organ_pageability.py::test_no_organ_becomes_unpageable_without_being_declared`
 <!-- INVARIANTS:END -->
 
 ### Acknowledged recurrence — houses we keep re-entering, and why

@@ -239,18 +239,71 @@ def test_realised_only_drawdown_caveat_is_stated(review_src):
         "the realised-vs-MTM drawdown caveat was removed — (hl)"
 
 
+#: A GOLIVE_* module-level constant OUTSIDE the grader, declared with its
+#: reason — the `BORN_DARK_OK` idiom. A silent second threshold is how two code
+#: paths come to disagree about who may hold real money; a DECLARED one is a
+#: consumer-local bound that does not restate a bar. Declaring is not a
+#: loophole: a declared name may still never shadow a name the grader owns.
+GOLIVE_CONST_OK = {
+    ("lighter_funding_spread_bot.py", "GOLIVE_MAX_AGE_S"):
+        "(ia) freshness bound on the CONSUMED golive-readiness payload — how "
+        "stale a published verdict may be before the live arm refuses. Not a "
+        "bar: the bot reads book['ready'] and re-derives no threshold.",
+}
+
+
+def _golive_consts(py):
+    """-> {name} of module-level GOLIVE_<MIN|MAX>* assignments in one file."""
+    return set(re.findall(r"^(GOLIVE_(?:MIN|MAX)\w*)\s*=", py.read_text(),
+                          re.MULTILINE))
+
+
 def test_only_the_grader_owns_the_thresholds():
     """One owner for the numbers. If another module grows its own GOLIVE_*
-    threshold, promotion decisions can disagree between two code paths."""
-    owners = []
-    for py in ROOT.glob("*.py"):
-        if re.search(r"^GOLIVE_(MIN|MAX)\w*\s*=", py.read_text(), re.MULTILINE):
-            owners.append(py.name)
-    for py in (ROOT / "scripts").glob("*.py"):
-        if re.search(r"^GOLIVE_(MIN|MAX)\w*\s*=", py.read_text(), re.MULTILINE):
-            owners.append(f"scripts/{py.name}")
-    assert owners == ["scripts/golive_readiness.py"], (
-        f"gate thresholds must have exactly ONE owner, found {owners}")
+    threshold, promotion decisions can disagree between two code paths.
+
+    INCIDENT (01-Aug). (ia) landed `GOLIVE_MAX_AGE_S` in
+    `lighter_funding_spread_bot.py` — a payload-FRESHNESS bound in a consumer,
+    not a second copy of a bar — and this guard, which matched on name prefix
+    alone, went red on the merge. Green on each branch, red in combination:
+    the (hp) signature. A guard that cannot tell a restated bar from a
+    consumer-local bound gets weakened or deleted the first time it cries
+    wolf, so it now DECLARES the exception (with a reason) instead, and keeps
+    failing on anything undeclared.
+    """
+    owned = _golive_consts(GRADER)
+    assert owned, "the grader declares no GOLIVE_<MIN|MAX>* threshold at all"
+
+    undeclared, shadowed = [], []
+    for py in sorted(ROOT.glob("*.py")) + sorted((ROOT / "scripts").glob("*.py")):
+        if py == GRADER:
+            continue
+        rel = py.name if py.parent == ROOT else f"scripts/{py.name}"
+        for name in sorted(_golive_consts(py)):
+            # A name the GRADER owns may never be redefined — declared or not.
+            if name in owned:
+                shadowed.append(f"{rel}:{name}")
+            elif (rel, name) not in GOLIVE_CONST_OK:
+                undeclared.append(f"{rel}:{name}")
+
+    assert not shadowed, (
+        f"these restate a threshold the grader owns {sorted(owned)}: {shadowed}"
+        " — import it from scripts.golive_readiness, never re-declare it")
+    assert not undeclared, (
+        f"undeclared GOLIVE_* constants outside the grader: {undeclared} — "
+        "either import the grader's value or add a (file, name) entry to "
+        "GOLIVE_CONST_OK saying why it is not a bar")
+
+
+def test_golive_const_exemptions_are_reasoned_and_live():
+    """A declaration buys nothing if the reason is empty or the file is gone —
+    the same arm `audit_doctrine_enforcement` (hy) puts on ENFORCED BY."""
+    for (rel, name), why in GOLIVE_CONST_OK.items():
+        assert len(why) >= 40, f"{rel}:{name} exemption reason is too thin"
+        py = ROOT / rel
+        assert py.exists(), f"{rel} no longer exists — drop the exemption"
+        assert name in _golive_consts(py), (
+            f"{rel} no longer defines {name} — drop the stale exemption")
 
 
 # ---------------------------------------------------------------------------
@@ -392,3 +445,184 @@ def test_the_era_is_reported_beside_the_all_time_count(review_src):
     must publish the same, so a reader can see WHICH sample produced an ETA."""
     assert "[era " in review_src and "closes count]" in review_src, (
         "the review must state the era and the all-time count beside it")
+
+
+# ---------------------------------------------------------------------------
+# 5. The REACH ceiling must be rendered against the bound the veto enforces.
+#
+# INCIDENT (01-Aug). `scan_new_evidence` rendered "<gross> gross vs long budget
+# <N>". `gross` is longs+shorts; the enforced veto compares `long_positions`
+# to LONG_BUDGET. On the live payload that morning: gross 25, long_positions
+# 19, long_budget 20 — the review reported the fleet five longs OVER a cap it
+# was one UNDER. Wrong in the ALARMING direction, on the exact ceiling the
+# review's own growth section is supposed to watch. The 31-Jul report carried
+# the same shape ("21 gross vs long budget 20"), so it had shipped twice
+# before anyone compared the two numbers.
+#
+# Per (hj): built from a payload the PUBLISHER shapes, and asserted on VALUES —
+# a hand-written fixture would just re-encode whichever field I happened to
+# believe in, and a substring scan is not a structural claim.
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def risk_payload():
+    """A fleet-risk payload whose counts come from fleet_risk's own code."""
+    _import_both()                      # puts ROOT on sys.path
+    import fleet_risk as fr
+
+    # 19 longs across 19 distinct symbols + 6 shorts: the live 01-Aug shape,
+    # where gross (25) sits ABOVE the long budget (20) and the enforced long
+    # count does not. That divergence is the whole point of the test.
+    positions = ([(f"bot{i}", f"SYM{i}", "long") for i in range(19)]
+                 + [(f"bot{i}", f"SYM{i}", "short") for i in range(6)])
+    expo = fr.exposure_concentration(positions)
+    long_n, short_n = expo["long_n"], expo["short_n"]
+    return fr, {
+        "light": max(fr.light_for(long_n, fr.LONG_BUDGET),
+                     fr.light_for(short_n, fr.SHORT_BUDGET)),
+        "gross": long_n + short_n,
+        "long_positions": long_n, "long_budget": fr.LONG_BUDGET,
+        "short_positions": short_n, "short_budget": fr.SHORT_BUDGET,
+        "fleet_dd_7d": -0.0028, "clip_scale": 1.0,
+        "exposure": expo,
+    }
+
+
+def test_risk_line_compares_each_side_to_its_own_budget(risk_payload):
+    fr, st = risk_payload
+    er, _ = _import_both()
+    assert st["gross"] > st["long_budget"] > st["long_positions"], (
+        "fixture must reproduce the incident: gross above the long budget "
+        "while the enforced long count is below it")
+    line = er.risk_line(st)
+    assert f"{st['long_positions']}/{st['long_budget']}" in line, (
+        f"the enforced long count must be shown against the long budget: {line}")
+    assert f"{st['short_positions']}/{st['short_budget']}" in line, (
+        f"shorts must be shown against the SHORT budget: {line}")
+    assert f"{st['gross']}/{st['long_budget']}" not in line, (
+        f"gross must never be rendered against the long budget: {line}")
+
+
+def test_headroom_is_measured_from_the_enforced_count(risk_payload):
+    fr, st = risk_payload
+    er, _ = _import_both()
+    assert er.long_budget_headroom(st) == st["long_budget"] - st["long_positions"]
+    # gross-based arithmetic would have gone negative here; headroom never does
+    assert er.long_budget_headroom(st) > 0
+
+
+def test_headroom_fails_closed_on_an_unreadable_count():
+    """A missing count must read as 'cannot say', never as free headroom —
+    absence of evidence must not authorise reach ((hs))."""
+    er, _ = _import_both()
+    for bad in ({}, {"long_positions": None, "long_budget": 20},
+                {"long_positions": "x", "long_budget": 20},
+                {"long_positions": 3}):
+        assert er.long_budget_headroom(bad) is None, bad
+    assert er.long_budget_headroom({"long_positions": 25, "long_budget": 20}) == 0
+
+
+# ---------------------------------------------------------------------------
+# 6. Arm drift must distinguish DIFFERENT CODE from a DIFFERENT FILE SET.
+#
+# (fd), 29-Jul: `build_compute` hashes only the `_BUILD_SHARED` names that
+# EXIST in an image, so one source tree stamps different ids in images with
+# different COPY sets — `family-lighter-shadow` published a 14-file id against
+# the repo's 15-file id and was read as "the deploy never landed". The live
+# arms run from their OWN images, so the live-vs-shadow comparison is exactly
+# where that hazard lives, and it compared the digest alone until 01-Aug.
+# ---------------------------------------------------------------------------
+def test_arm_drift_reports_code_drift_when_the_file_counts_match():
+    er, _ = _import_both()
+    line = er.arm_drift_line("Taker", ("0b30b0a79211", "15"), ("d012822f3ea0", "15"))
+    assert "DRIFT" in line and "not a clean control" in line, line
+    assert "file set" in line.lower(), (
+        "a real drift line must say the file counts matched, so the reader "
+        "knows the (fd) explanation was ruled out: " + line)
+
+
+def test_arm_drift_does_not_cry_drift_on_a_different_file_set():
+    er, _ = _import_both()
+    line = er.arm_drift_line("Family", ("74d3b3178fa8", "14"), ("6de64508c304", "15"))
+    assert "DRIFT" not in line, f"(fd) file-set difference misreported as drift: {line}"
+    assert "FILE SET" in line and "(fd)" in line, line
+
+
+def test_arm_drift_agrees_and_stays_quiet_when_unstamped():
+    er, _ = _import_both()
+    agree = er.arm_drift_line("Farmer", ("705425a83422", "15"), ("705425a83422", "15"))
+    assert "AGREE" in agree and "DRIFT" not in agree, agree
+    # an unstamped arm proves nothing either way — say nothing, never "AGREE"
+    assert er.arm_drift_line("X", (None, None), ("abc", "15")) is None
+    assert er.arm_drift_line("X", ("abc", "15"), None) is None
+
+
+# ---------------------------------------------------------------------------
+# 7. A ceiling with no attribution cannot be acted on.
+#
+# The review reported `longs 18/20` while `fleet-risk.by_bot` had carried the
+# per-book breakdown all along. Measured 01-Aug once it was surfaced: 100% of
+# the long budget was held by books with NO measured claim, a third of it by
+# 🌊 crypto-trend-daily, which has never closed a trade — while both LIVE
+# real-money books held only shorts and never competed for it at all.
+# ---------------------------------------------------------------------------
+def _risk_and_alloc():
+    """The live 01-Aug shapes, keyed the way each PUBLISHER keys them:
+    fleet_risk by BARE base, fleet_allocation by ROW (`-lshadow`)."""
+    risk = {"long_positions": 18, "long_budget": 20, "by_bot": {
+        "crypto-trend-daily": {"long": 6, "short": 0},
+        "freqtrade-mum": {"long": 4, "short": 0},
+        "freqtrade-avo-maria": {"long": 4, "short": 0},
+        "freqtrade-dad": {"long": 2, "short": 0},
+        "crypto-swing-daily": {"long": 2, "short": 0},
+        "lighter-ticket-taker": {"long": 0, "short": 3},
+        "perps-funding-lighter": {"long": 0, "short": 3},
+    }}
+    alloc = {"books": {
+        "freqtrade-avo-maria-lshadow": {"claim": 0.0, "n": 5},
+        "freqtrade-dad-lshadow": {"claim": 0.0, "n": 10},
+        "crypto-swing-daily-lshadow": {"claim": 0.0, "n": 1},
+    }}
+    return risk, alloc
+
+
+def test_occupancy_ranks_holders_and_excludes_pure_shorts():
+    er, _ = _import_both()
+    ranked = er.long_budget_occupancy(*_risk_and_alloc(), top=4)
+    assert ranked[0][0] == "crypto-trend-daily", ranked
+    assert ranked[0][1] == 6 and abs(ranked[0][2] - 6 / 18) < 1e-9, ranked
+
+    # `top` MUST be wide enough that an unfiltered short-only book would show
+    # up. A mutation deleting the `if not n_long` guard survived a top=4 check,
+    # because five long-holders crowded the shorts out of the window anyway —
+    # the assertion was passing for the wrong reason.
+    everything = er.long_budget_occupancy(*_risk_and_alloc(), top=99)
+    names = [r[0] for r in everything]
+    assert len(names) == 5, f"only the five LONG holders may appear: {names}"
+    assert "lighter-ticket-taker" not in names and "perps-funding-lighter" not in names, (
+        "a book holding only SHORTS does not consume the long budget: " + str(names))
+    assert all(r[1] > 0 for r in everything), everything
+
+
+def test_occupancy_joins_the_claim_across_the_two_key_conventions():
+    """fleet_risk keys by bare base, fleet_allocation by row. A join that
+    missed this would report every book as unscored — which happens to look
+    like the true 01-Aug answer, so it must be pinned on a book that IS
+    present in the allocation payload."""
+    er, _ = _import_both()
+    occ = dict((r[0], r[3]) for r in er.long_budget_occupancy(*_risk_and_alloc(), top=9))
+    assert occ["freqtrade-avo-maria"] == 0.0, (
+        "the `-lshadow` row key was not joined to the bare base: " + str(occ))
+    assert occ["crypto-trend-daily"] is None, (
+        "a book ABSENT from the allocation payload must read None, never 0.0 — "
+        "'not scored' and 'scored at zero' are different facts")
+
+
+def test_occupancy_is_quiet_and_safe_on_a_dark_organ():
+    er, _ = _import_both()
+    risk, _ = _risk_and_alloc()
+    assert er.long_budget_occupancy(risk, None)          # dark allocation: still ranks
+    assert er.long_budget_occupancy({}, {}) == []
+    assert er.long_budget_occupancy(None, None) == []
+    # no long_positions -> shares are None, never a ZeroDivisionError
+    only = er.long_budget_occupancy({"by_bot": {"a": {"long": 3}}}, {})
+    assert only and only[0][2] is None, only

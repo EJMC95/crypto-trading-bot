@@ -1,3 +1,65 @@
+## 2026-08-01 (ie) — TWO ORGANS DIED WITH THE PAGER SILENT, AND 100% OF THE LONG BUDGET IS PARKED IN BOOKS WITH NO CLAIM
+
+- **THE ASK** (operator): *"fix the above for maximum growth and progress"*, then *"full permission to go ahead with your advisements"* — from the daily evidence review. Suite **753**, eight guards green, 24 mutations red.
+
+### The daily review's own guard was RED on main, and it merged that way
+
+- **`tests/test_review_currency.py::test_only_the_grader_owns_the_thresholds` was failing at HEAD** — the anti-drift guard the whole review depends on. `(ia)` added `GOLIVE_MAX_AGE_S` to `lighter_funding_spread_bot.py`; the guard matched on **name PREFIX** and could not tell a consumer's payload-FRESHNESS bound from a restated go-live bar. Green on each branch, red in combination: the `(hp)` signature.
+- Rewritten to the `BORN_DARK_OK` idiom — the exemption is DECLARED with a reason, a name the grader **owns** may never be redefined *even declared*, and a stale declaration fails. A guard that cries wolf gets deleted the first time it is wrong, so telling the two cases apart is the fix, not loosening it.
+
+### The review was reporting the fleet OVER a cap it was UNDER
+
+- The line read `"25 gross vs long budget 20"`. **`gross` is longs+shorts**; the enforced veto compares `long_positions` to `LONG_BUDGET` (`fleet_risk.light_for(fleet_long, …)`, and `fleet_bus` reads `long_positions`). Live payload: gross 25, **long_positions 19, budget 20** — the review printed the fleet five longs OVER a cap it was one UNDER, in the ALARMING direction, on the one ceiling its own growth section exists to watch. The 31-Jul report carried the same shape, so it shipped twice before anyone compared the two numbers.
+- `risk_line` / `long_budget_headroom` extracted as pure functions (an inline f-string is only testable by duplication — `(hw)`), headroom **fail-CLOSED** on an unreadable count: absence of evidence must not authorise reach `(hs)`.
+
+### Arm drift could not tell different CODE from a different FILE SET
+
+- `build_compute` hashes only the `_BUILD_SHARED` names that EXIST in an image, so one tree stamps different ids in images with different COPY sets `(fd)`. The live arms run from their own images, so this comparison is exactly where that hazard lives — and it compared the digest ALONE. Now reads `build_n` beside `build`. Verified on the live payload: both taker arms report `build_n=15`, so that drift **is** code.
+
+### A DEAD LOOP RUNS NO HANDLER — the class `(hw)` could not close
+
+- **MEASURED 01-Aug:** `bot_learn` and `event_sentinel` had both stopped ~14h earlier inside `freqtrade-bots`, whose other ~20 organs were seconds fresh — two dead `( while true; … ) &` subshells. `brain-vitals` 14.0h (TTL 7.2h), `event-sentinel` 13.7h (TTL 0.67h, **19x**).
+- **It was already costing growth, not just visibility.** `scout-tuner`'s own log: *"brain dark (lens-forward stale/absent) — lens-keyed bar walks suppressed"* and *"no scout-diet changes"*. The rail's most active author ran on one cylinder for 14h, and `brain-stake-mults` went past TTL so 20 shadow books lost their L4 multipliers.
+- **`(hw)`'s `organ_main` cannot see this** — it catches an organ that FAULTS; a subshell that has DIED runs no handler, records nothing, and leaves every key it wrote looking exactly as it did at the last good publish. In-process wrapper and out-of-process age check are **complements, never substitutes**.
+- **THE BRAIN HAD A MEMORY ALARM AND NO LIVENESS ALARM.** `learning-brain` was its only watchdog-critical key — and that is the key `_save_state` writes, which `(hw)`/`(hx)` showed goes dark for a cause that is NOT process death. It had been DARK and paging continuously since 28-Jul, so when the process actually stopped there was **nothing new to say**. `brain-vitals` is the per-run heartbeat, published every run BEFORE `_save_state`; it is now critical, and its TTL cut **26000 → 9600** so a stopped 2h loop goes DARK in 8h instead of 21.7h.
+- `event-sentinel` promoted too: it was its organ's ONLY key and non-critical, so the organ was **structurally unpageable**, not merely quiet — and it is the sole publisher of `tuning-proposals`, a growth-rail author channel.
+- **The class, measured: 19 of 30 organ keys carry a TTL yet cannot page.** Only the two with an incident behind them were promoted — a pager storm is the documented failure mode and the file's own comment says *"promote per-organ once proven"*. The other 17 are now a declared `UNPAGEABLE_OK` ratchet in `tests/autonomy/test_organ_pageability.py`, so the set cannot grow silently and a promotion cannot be quietly reverted.
+- **Doctrine I13** added to CLAUDE.md under the operator's new standing authorisation to update doctrine when a bug is found.
+
+### 100% of the fleet long budget is held by books with NO measured claim
+
+- The review reported `longs 18/20` for weeks and never said WHO held the 18, while **`fleet-risk.by_bot` carried the breakdown the whole time**. Joined to `fleet-allocation`'s per-book claim:
+
+      crypto-trend-daily    6 longs  33%   no claim   ZERO closes, ever
+      freqtrade-avo-maria   4 longs  22%   no claim
+      freqtrade-mum         4 longs  22%   no claim
+      crypto-swing-daily    2 longs  11%   no claim
+      freqtrade-dad         2 longs  11%   no claim
+
+- **Both LIVE real-money books hold only SHORTS** — they never compete for the long budget at all. So the L2 ceiling is not too small; it is parked in books that produce nothing, and 🌊 Tide Rider alone holds a **third** of it with no exit path and a 35% stop that is 2.3x the go-live drawdown bar.
+- `claim` is **None** for an absent book, never 0.0 — "not scored" and "scored at zero" are different facts, and conflating them would let a dark organ read as a fleet with no claims anywhere.
+
+### A REFUSAL, with the measurement: do NOT raise `LONG_BUDGET`
+
+- Living books, in-era (opened >=17-Jul), retired rows excluded:
+
+      side     n     mean%       t     net$
+      long   648   -0.158%   -1.78   -3.38
+      short  444   +0.062%   +0.78   +8.60
+
+  Live real money only: long n=32 **-0.233%**, short n=42 **+0.472%**. **The binding constraint is on the measurably negative side while half the SHORT budget (6/12) sits unused.** Raising the number buys more of the loser; the carried "restructure the long budget toward growth" priority is reframed as *what holds it*, not *how big it is*.
+- **Neither side is an established edge and this does not claim one** — per `(hm)` a random short on this tape earns +0.2% to +1.1%/trade free, so +0.062% is BELOW that null's floor. Only the long side is measurably negative.
+- **Including retired rows flips the answer** to long +1.080% / n=1455 / +$550 — Kraken-era books. `RETIRED_ROWS` lives in `pnl_dashboard.py`, not in `golive_readiness`, and a `getattr(G, "RETIRED_ROWS", ())` returns empty and silently filters NOTHING. Caught mid-measurement; the first reading was wrong and is recorded here rather than quietly dropped.
+
+### Two mistakes of my own, recorded
+
+- **I reported the brain as recovered when it was not.** `bot_state_history` gaps of `2.00h` read as a live cadence; they were HISTORICAL — the key was 13.8h stale. Reading gaps between old rows says nothing about recency. **I1 again**, by the entry reporting an I1-shaped incident.
+- **A mutation survived and the test was the problem.** *"occupancy counts short-only books"* passed a `top=4` check because five long-holders crowded the shorts out of the window — the assertion was green for the wrong reason. Re-pinned at `top=99` with an explicit length assertion. Same shape as `(hz)`'s badly-built fixture, and the reason I3 is declared UNENFORCED rather than pretended.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None directly, and this says so.** What moved: the fleet's growth rail regains full authority the moment `freqtrade-bots` restarts (that is an operator act and is escalated, not applied), the next silent organ death is now paged within 8h instead of never, and 🌊 Tide Rider's occupancy of a third of the long budget is on the board as a keep-or-retire decision with a number attached — the decision `(hz)` named as the genuinely unclosed one.
+
 ## 2026-08-01 (id) — THE BOOK STOOD DOWN AGAINST ITS OWN SERVICE NAME: A REDEPLOY IS NOT A DUPLICATE
 
 - Suite **737**, eight guards green. Third and last entry in the chain `(ib)` → `(ic)` → `(id)`, and each one was only visible because the one before it removed a mask. Recorded that way deliberately.

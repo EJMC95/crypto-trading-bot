@@ -2992,10 +2992,42 @@ ORGAN_SPECS = [
     ("brain-diagnosis",    "🩺 Per-bucket diagnosis",                 False, 26000),
     # [2026-07-16] v3 statistics engine instrumentation (bot_learn +
     # brain_stats): priors, watchlist, regime splits, lens episodes.
-    ("brain-vitals",       "🔬 Brain vitals — v3 statistics engine",  False, 26000),
+    # [2026-08-01] PROMOTED TO CRITICAL, and its TTL cut 26000 -> 9600.
+    # THE BRAIN HAD NO LIVENESS ALARM, ONLY A MEMORY ALARM. `learning-brain`
+    # was its one critical key — but that is the key `_save_state` writes, and
+    # `(hw)`/`(hx)` established it goes dark for a reason that is NOT process
+    # death (the run crashed AFTER publishing, so memory froze while vitals
+    # stayed fresh). It has therefore been DARK and paging continuously since
+    # 28-Jul, which is exactly how an operator learns to ignore DARK.
+    # `brain-vitals` is the per-run HEARTBEAT — published every run, before
+    # `_save_state` — so it is the key that distinguishes "the brain is not
+    # running" from "the brain cannot remember". The two alarms are different
+    # facts and both are worth having.
+    # MEASURED 01-Aug: bot_learn stopped at 16:02Z and 13.8h later nothing had
+    # paged, while `scout-tuner` logged "brain dark ... lens-keyed bar walks
+    # suppressed" — the growth rail degraded with the pager silent.
+    # TTL: the loop is 7200s (run_all.sh), and the old 26000s put DARK (3x TTL)
+    # at 21.7h — nine missed cycles. 9600s puts LATE at one missed cycle and
+    # DARK at 8h / four missed cycles, which is inside a working day.
+    ("brain-vitals",       "🔬 Brain vitals — v3 statistics engine",  True,  9600),
     # [2026-07-16] Event Sentinel — typed major-event detection + sector
     # ripple playbook (advisory; grades its own anticipations).
-    ("event-sentinel",     "🗞️ Event Sentinel — major events/ripples", False, 2400),
+    # [2026-08-01] PROMOTED TO CRITICAL — this is the "promote per-organ once
+    # proven" clause below being exercised, and the proof is an incident.
+    # MEASURED this morning: `event-sentinel`, `event-sentinel-state` and
+    # `tuning-proposals` were all 12.5h stale — 18.8x this key's own TTL, DARK
+    # by `organ_status` six times over — while `bot_learn` had also stopped
+    # (brain-vitals 12.9h). Exactly two organ loops in a container whose other
+    # ~20 organs were seconds fresh, i.e. two dead `( while true ... ) &`
+    # subshells, and NOT a class `(hw)`'s `organ_main` wrapper can ever catch:
+    # a subshell that has DIED runs no handler and records no error.
+    # The pager said nothing for 12.5h, because this was the sentinel's ONLY
+    # key and it was non-critical — the organ was entirely unpageable.
+    # It is also not merely advisory any more: it is the sole publisher of
+    # `tuning-proposals`, a growth-rail author channel, so its death silently
+    # removes a proposer. Storm risk is bounded — DARK needs 3x2400s = 2h,
+    # i.e. 12 consecutive missed cycles on a 600s loop.
+    ("event-sentinel",     "🗞️ Event Sentinel — major events/ripples", True,  2400),
     ("signal-bus",         "🚌 Signal bus mirror",                    False, 900),
     ("regime-oracle",      "🧭 Regime oracle",                        False, 14400),
     # [2026-07-16] growth-rail cohort — was headless; now health-graded.
