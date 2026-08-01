@@ -552,6 +552,46 @@ def _writer_id():
     return str(_WRITER_ID)[:64]
 
 
+def _claim_is_my_own_dead_replica(claim):
+    """[2026-08-01 (id)] Is this claim held by a PREVIOUS REPLICA OF ME?
+
+    `_writer_id()` is `RAILWAY_REPLICA_ID`, and Railway mints a new one on
+    every deploy. So a redeployed container meets a claim written by its own
+    dead predecessor, sees a writer id that is not its own, and stands down
+    against ITSELF. MEASURED 1-Aug, from `funding-carry`'s own log:
+
+        STANDING DOWN — perps-funding-carry-lshadow is already claimed by
+        another container (funding-carry (838bd2e8-...))
+
+    — the service name in the "other container" slot is its own. It idled
+    four consecutive loops and would have idled the book for the full
+    WRITER_CLAIM_TTL (30 min) after EVERY deploy. It was invisible until (ic)
+    stopped the stood-down container from publishing the book's row, which is
+    the only reason the stall became observable at all.
+
+    THE TEST IS THE SERVICE, NOT THE REPLICA. Same `svc` + different replica
+    means Railway replaced the container — it does not run the old and new
+    together. Cross-SERVICE protection is untouched: `funding-carry` still
+    cannot steal from `yield-harvester-shadow`, which is the duplicate this
+    whole guard exists for.
+
+    DECLARED ASSUMPTION — SINGLE REPLICA PER SERVICE. If a carry service is
+    ever scaled past one replica, two live replicas would share a `svc` and
+    could steal from each other, which is exactly the duplicate-writer state
+    this guard prevents. No Railway env reports replica COUNT, so this cannot
+    be asserted at runtime; it is written down instead of assumed silently.
+    Every service in this project is single-replica today.
+
+    Fail-CLOSED on doubt: an unknown or empty `svc` on either side is NOT a
+    match, so pre-(ht) claims (which carry no `svc`) fall through to the TTL
+    exactly as before rather than being stolen on a guess — the (ht) rule that
+    unknown degrades to the old behaviour, never to a guess.
+    """
+    mine = (service_name() or "").strip()
+    theirs = str(claim.get("svc") or "").strip()
+    return bool(mine) and bool(theirs) and mine == theirs
+
+
 def claim_writer(bot, now=None):
     """-> (ok, other) — is THIS process the sole writer of `bot`'s ledger?
 
@@ -575,6 +615,11 @@ def claim_writer(bot, now=None):
       * FIRST CLAIMANT WINS, and the claim EXPIRES. The incumbent refreshes on
         every call, so a container that dies frees the book within
         WRITER_CLAIM_TTL rather than locking it forever.
+      * A REDEPLOY IS NOT A DUPLICATE. A claim held by this process's OWN
+        SERVICE under a different replica id is its own dead predecessor and
+        is taken immediately — see `_claim_is_my_own_dead_replica`. Without
+        this the book idled for the full TTL after every deploy, standing
+        down against its own service name.
       * ADVISORY. This returns a verdict; it does not halt anything. The
         caller decides, and today every caller only reports. Making it halt a
         real book is an operator decision, not a library default.
@@ -584,7 +629,8 @@ def claim_writer(bot, now=None):
         cur = load_state("writer:" + str(bot)) or {}
         who, ts = cur.get("writer"), float(cur.get("ts") or 0)
         now = float(now if now is not None else time.time())
-        if who and who != me and (now - ts) < WRITER_CLAIM_TTL:
+        if who and who != me and (now - ts) < WRITER_CLAIM_TTL \
+                and not _claim_is_my_own_dead_replica(cur):
             # [2026-07-31 (ht)] Return the SERVICE, not just the replica id.
             # The whole point of this verdict is to tell the operator what to
             # switch off, and `_writer_id()` is an opaque container id. Claims

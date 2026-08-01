@@ -350,6 +350,62 @@ class TestSoleWriterClaim:
         t = 1000.0 + store.WRITER_CLAIM_TTL + 1
         assert store.claim_writer("bk", now=t) == (True, None)
 
+    # -- [2026-08-01 (id)] A REDEPLOY IS NOT A DUPLICATE ---------------------
+    # `_writer_id()` is RAILWAY_REPLICA_ID and Railway mints a new one on every
+    # deploy, so a redeployed container met a claim from its own dead
+    # predecessor and stood down against ITSELF. Measured from funding-carry's
+    # own log: "already claimed by another container (funding-carry (838bd...))"
+    # — its own service name in the other-container slot. Four consecutive
+    # idle loops; it would have idled the book for the full 30-min TTL after
+    # every deploy.
+
+    def test_a_redeployed_container_takes_over_from_its_own_dead_replica(
+            self, monkeypatch):
+        store, _ = self._store(monkeypatch)
+        monkeypatch.setattr(store, "service_name", lambda: "funding-carry")
+        assert store.claim_writer("bk", now=1000.0) == (True, None)
+        # same service redeployed -> brand new replica id, claim still warm
+        monkeypatch.setattr(store, "_WRITER_ID", "NEW-REPLICA-AFTER-DEPLOY")
+        ok, other = store.claim_writer("bk", now=1100.0)
+        assert ok is True and other is None, (
+            "a container must not stand down against a previous replica of "
+            "its OWN service — that idles the book for the whole TTL on every "
+            "deploy")
+
+    def test_it_still_refuses_a_genuine_second_SERVICE(self, monkeypatch):
+        """The steal must not weaken the protection this guard exists for:
+        funding-carry and yield-harvester-shadow are the real duplicate."""
+        store, _ = self._store(monkeypatch)
+        monkeypatch.setattr(store, "service_name", lambda: "funding-carry")
+        assert store.claim_writer("bk", now=1000.0) == (True, None)
+        monkeypatch.setattr(store, "_WRITER_ID", "OTHER-CONTAINER")
+        monkeypatch.setattr(store, "service_name",
+                            lambda: "yield-harvester-shadow")
+        ok, other = store.claim_writer("bk", now=1100.0)
+        assert ok is False and "funding-carry" in str(other), (
+            "a different SERVICE is a real duplicate and must still be refused")
+
+    def test_an_unknown_service_is_never_stolen_from(self, monkeypatch):
+        """(ht): unknown degrades to the OLD behaviour, never to a guess. A
+        pre-(ht) claim carries no `svc`, so it must fall through to the TTL
+        rather than be taken on the assumption that it is ours."""
+        store, _ = self._store(monkeypatch)
+        monkeypatch.setattr(store, "service_name", lambda: "")
+        assert store.claim_writer("bk", now=1000.0) == (True, None)
+        monkeypatch.setattr(store, "_WRITER_ID", "OTHER-CONTAINER")
+        ok, other = store.claim_writer("bk", now=1100.0)
+        assert ok is False, "an empty svc on both sides must not count as a match"
+
+        # and one-sided knowledge is not a match either
+        store2, box2 = self._store(monkeypatch)
+        monkeypatch.setattr(store2, "_WRITER_ID", "R1")
+        monkeypatch.setattr(store2, "service_name", lambda: "")
+        store2.claim_writer("bk2", now=1000.0)
+        monkeypatch.setattr(store2, "_WRITER_ID", "R2")
+        monkeypatch.setattr(store2, "service_name", lambda: "funding-carry")
+        ok2, _ = store2.claim_writer("bk2", now=1100.0)
+        assert ok2 is False, "known-vs-unknown svc must not be treated as same"
+
     def test_it_fails_OPEN_on_any_error(self, monkeypatch):
         """THE DIRECTION MATTERS. A duplicate writer corrupts EVIDENCE, which
         is recoverable; a false positive would stop a book TRADING, which is

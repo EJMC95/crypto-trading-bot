@@ -1,3 +1,31 @@
+## 2026-08-01 (id) — THE BOOK STOOD DOWN AGAINST ITS OWN SERVICE NAME: A REDEPLOY IS NOT A DUPLICATE
+
+- Suite **737**, eight guards green. Third and last entry in the chain `(ib)` → `(ic)` → `(id)`, and each one was only visible because the one before it removed a mask. Recorded that way deliberately.
+- **`(ic)` stopped the stood-down container writing the book's row — and the row promptly went STALE instead of flapping.** 22 samples, `age_sec` climbing monotonically **179s → 1138s** with no writer at all, still on the `(ib)` build. The flap was hiding a stall.
+
+### The defect, in the service's own words
+
+```
+[05:25:06] STANDING DOWN — perps-funding-carry-lshadow is already claimed
+by another container (funding-carry (838bd2e8-...))
+```
+
+- That log line is from **`funding-carry`**, and the service named in the *other container* slot is **`funding-carry`**. It stood down against itself, four consecutive loops.
+- **`_writer_id()` is `RAILWAY_REPLICA_ID`, which Railway mints fresh on every deploy.** So a redeployed container always meets a warm claim written by its own dead predecessor, reads a writer id that is not its own, and idles for the **full `WRITER_CLAIM_TTL` (30 min) after EVERY deploy.** Confirmed against the DB: claim `writer=838bd2e8 svc=funding-carry`, unrefreshed for **1331s** of its 1800s TTL, while `perps-funding-carry-lshadow:standby` was fresh at 142s — so `(ic)` was verifiably running and correct, and this was a second, older fault underneath it.
+- It has been latent since `(hp)`, and could never have been seen before `(ib)` made the branch execute or before `(ic)` stopped the loser from papering over the row.
+
+### The fix
+
+- **THE TEST IS THE SERVICE, NOT THE REPLICA.** `_claim_is_my_own_dead_replica` — same `svc` + different replica means Railway replaced the container; it does not run old and new together. The claim is taken immediately.
+- **Cross-SERVICE protection is untouched**, which is the whole point of the guard: `funding-carry` still cannot steal from `yield-harvester-shadow`. Pinned by its own test, and mutation B (match any claim, ignore `svc`) reddens three tests including the original `(ho)` duplicate-detection one.
+- **Fail-CLOSED on doubt.** An empty or unknown `svc` on *either* side is not a match, so pre-`(ht)` claims carrying no `svc` fall through to the TTL exactly as before — `(ht)`'s rule that unknown degrades to the OLD behaviour, never to a guess. Mutation C (drop the emptiness check) reddens.
+- **DECLARED ASSUMPTION — single replica per service.** Two live replicas of one service would share a `svc` and could steal from each other, which is the very state this guard prevents. No Railway env reports replica COUNT, so it cannot be asserted at runtime; it is written into the docstring rather than assumed silently. Every service in this project is single-replica today.
+- Blast radius checked: `bot_pnl_store` ships in every image, but `claim_writer` has exactly **one** production caller (`funding_carry_bot`), so the behaviour change is scoped to 🌾 carry.
+
+### The lesson worth keeping
+
+**A masking bug and a masked bug look identical from outside, and fixing the mask is what surfaces the fault.** The row flapping `(ic)` looked like the whole problem; removing it revealed a stall that had been there since `(hp)`. Three defects in one loop, each hidden by the next one out — and the only reason any of them became visible is that each fix made the system tell the truth about a narrower thing.
+
 ## 2026-08-01 (ic) — THE GUARD AGAINST TWO WRITERS WAS ITSELF THE SECOND WRITER OF THE ROW
 
 - **THE ASK** (operator, on being shown the flap): *"you have full permission to make the logical choice and take control and do it yourself."* Suite **734**, seven guards green.
