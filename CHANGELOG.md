@@ -1,3 +1,25 @@
+## 2026-08-01 (ic) — THE GUARD AGAINST TWO WRITERS WAS ITSELF THE SECOND WRITER OF THE ROW
+
+- **THE ASK** (operator, on being shown the flap): *"you have full permission to make the logical choice and take control and do it yourself."* Suite **734**, seven guards green.
+- **`(ib)` made the standing-down branch reachable for the first time — and it immediately did the opposite of its job.** This is the same-day self-repair the FORWARD MOTION rule names, recorded rather than hidden: the branch had never executed in its life, so nothing about it had ever been observed.
+
+### Measured, not reasoned
+
+- Twelve samples over eight minutes of `perps-funding-carry-lshadow`: the **standby** loop is ~40s and the incumbent's is ~5min, so **the SILENCED container owned the row in 10 of 12 samples.** The card read `standby / n=None / open=None` while the book was **trading** — `n` 84 → **85**, six open, its first close in 25.6h.
+- **`heartbeat(bot_id)` was worse than the clobber.** It refreshes `updated_at` **without writing content**, so had the incumbent died, the stood-down container would have kept the row reading **fresh over a frozen snapshot** — I1, and precisely the shape that hid 🌾 carry's death for 13h. The guard would have manufactured the exact blindness it exists to prevent.
+- `(hp)`'s intent was right and is preserved: *a silenced container must be visible rather than merely absent*. Only the SURFACE was wrong.
+
+### The fix
+
+- **ONE BOOK, ONE WRITER has to bind the ROW, not only the ledger.** A guard against two writers that is itself the second writer of that row enforces nothing. The loser now writes **`_standby_key(bot_id)`** — a `bot_state` key suffixed off the book, so a reader holding the book id can always find it — carrying `standing_down`, `duplicate_writer`, `svc`, `venue`, `caps`, `updated`, `ttl_sec`. It calls **no** `publish`, **no** `heartbeat`, and touches no `bot_pnl` row at all.
+- **Not a `bot_pnl` row and not a page.** A second row would need `CURRENT_BOTS` registration and would render as a book that does not exist. And two live containers is the **DESIGNED steady state** while both services exist — a detector that fires on the design trains the operator to ignore it.
+- **`test_the_loser_never_writes_the_books_own_row` is AST-bound to the branch, not a substring scan.** `publish` and `heartbeat` are called legitimately elsewhere in the same loop, so a page-wide grep would be **green against the very defect it is meant to catch** — the trap this repo has now hit three times. Mutation-verified on three separate reintroductions (heartbeat back, publish back, key changed to the bare row id); all three redden, restored is green.
+
+### Why NOT "just stop the service"
+
+- **`railway down` is not durable here and this repo already knows it** — the deploy workflow resurrects a stopped service on the next push, and `(hu)` put `yield-harvester-shadow` ON that rule. Stopping it buys days.
+- **And two containers are now an ASSET.** The claim expires after `WRITER_CLAIM_TTL` (30 min), so the stood-down container is genuine **failover**: if `funding-carry` dies, the book resumes by itself instead of going dark for 25h the way it just did. The operator keep-or-stop call is now optional rather than outstanding.
+
 ## 2026-08-01 (ib) — NOBODY STOPPED THE WRONG SERVICE: THE SOLE-WRITER GUARD CRASH-LOOPED BOTH CARRY CONTAINERS FOR 25.6h
 
 - **THE ASK** (operator): *"did you shut down the wrong stale bot as now my real bot hasn't traded for 13 hours?"* then *"just make sure the right bot was made redundant."* Suite **730**, eight guards green.

@@ -58,6 +58,22 @@ except Exception:  # noqa: BLE001
 
 BOT = "perps-funding-carry"
 
+
+def _standby_key(bot_id):
+    """[2026-08-01 (ic)] The bot_state key a STOOD-DOWN container reports on.
+
+    Deliberately NOT the book's `bot_pnl` row and NOT a `bot_pnl` row at all.
+    A second row would need `CURRENT_BOTS` registration and would render as a
+    book that does not exist; writing the book's own row is what (ib) measured
+    going wrong (the silenced container won it 10 of 12 samples, and its
+    `heartbeat` would have kept a DEAD incumbent's row reading fresh).
+
+    Suffix, never a rewrite: the key stays derivable from the row it shadows,
+    so a reader that has the book id can always find its standby record.
+    """
+    return f"{bot_id}:standby"
+
+
 # --------------------------- configuration ----------------------------------
 START_EQUITY = 1000.0
 NOTIONAL = 300.0          # quote notional per carry position [2026-07-06 raised from $200]
@@ -466,19 +482,47 @@ def main():
                   f"({store.WRITER_CLAIM_TTL}s) or the incumbent stops.",
                   flush=True)
             try:
-                store.heartbeat(bot_id)
-                # `caps` rides the STANDBY payload too, and for the same
-                # reason it rides the online one: it is the field that
-                # identifies WHICH build is publishing. A standing-down
-                # container that omitted it would be indistinguishable from a
-                # stale publisher — exactly the ambiguity that produced the
-                # duplicate in the first place. (test_golive_organ pins this.)
-                store.publish(bot_id, status="standby",
-                              extra={"venue": ctx.mode,
-                                     "caps": {"max_positions": MAX_POSITIONS,
-                                              "enter_apr": _enter_apr},
-                                     "duplicate_writer": _other,
-                                     "standing_down": True})
+                # [2026-08-01 (ic)] THE LOSER MUST NOT TOUCH THE BOOK'S ROW.
+                # (hp) had this branch call `heartbeat(bot_id)` + `publish(
+                # bot_id, status="standby")` so a silenced container would be
+                # "visible rather than merely absent". Correct intent, and the
+                # implementation inverted it — measured the hour the guard
+                # first actually ran (it had never executed before (ib)):
+                #
+                #   * The standby loop is ~40s and the incumbent's is ~5min, so
+                #     the SILENCED container won the row 10 of 12 samples. The
+                #     card read `standby / n=None / open=None` while the book
+                #     was trading (n 84 -> 85, 6 open). The working container
+                #     was the invisible one.
+                #   * `heartbeat` is worse than the clobber. It refreshes
+                #     `updated_at` WITHOUT writing content, so had the
+                #     incumbent died, this process would have kept the row
+                #     reading FRESH over a frozen snapshot — I1, and the exact
+                #     shape that hid 🌾 carry's death for 13h.
+                #
+                # ONE BOOK, ONE WRITER has to bind the ROW, not just the
+                # ledger: a guard against two writers that is itself the second
+                # writer enforces nothing. Standby state goes on its OWN key.
+                # It is deliberately NOT a page — two live containers is the
+                # DESIGNED steady state while both services exist, and a
+                # detector that fires on the design trains the operator to
+                # ignore it.
+                store.save_state(_standby_key(bot_id), {
+                    "standing_down": True,
+                    "book": bot_id,
+                    "duplicate_writer": _other,
+                    "svc": store.service_name() or None,
+                    "venue": ctx.mode,
+                    # `caps` rides the standby payload for the same reason it
+                    # rides the online one: it identifies WHICH build is
+                    # standing down. A standby record without it is
+                    # indistinguishable from a stale one — the ambiguity that
+                    # produced this duplicate in the first place.
+                    "caps": {"max_positions": MAX_POSITIONS,
+                             "enter_apr": _enter_apr},
+                    "updated": now_iso(),
+                    "ttl_sec": store.WRITER_CLAIM_TTL,
+                })
             except Exception:  # noqa: BLE001
                 pass
             time.sleep(LOOP_SECONDS)

@@ -427,15 +427,81 @@ class TestSoleWriterEnforced:
         assert "continue" in tail, "it must skip the cycle, not fall through"
         assert "time.sleep" in tail, "and wait, not spin"
 
-    def test_it_still_publishes_why_it_is_silent(self):
+    def test_it_still_records_why_it_is_silent(self):
         """A silenced container must be VISIBLE, not merely absent — the
         ambiguity that produced this duplicate was nobody being able to say
-        which service owned the row."""
+        which service owned the row. (ic) moved WHERE it says so; it must
+        still say it."""
         src = self._src()
         blk = src[src.index("STANDING DOWN"):]
         blk = blk[:blk.index("time.sleep")]
-        for key in ('status="standby"', "duplicate_writer", '"caps"'):
-            assert key in blk, f"standby payload must carry {key}"
+        for key in ("standing_down", "duplicate_writer", '"caps"', "svc"):
+            assert key in blk, f"standby record must carry {key}"
+
+    def test_the_loser_never_writes_the_books_own_row(self):
+        """[2026-08-01 (ic)] ONE BOOK, ONE WRITER has to bind the ROW, not only
+        the ledger — a guard against two writers that is itself the second
+        writer of that row enforces nothing.
+
+        MEASURED the hour (ib) made this branch reachable for the first time:
+        the standby loop is ~40s against the incumbent's ~5min, so the SILENCED
+        container owned the row in 10 of 12 samples — the card read
+        `standby / n=None / open=None` while the book was trading (n 84 -> 85,
+        6 open). And `heartbeat` was worse than the clobber: it refreshes
+        `updated_at` without writing content, so a DEAD incumbent would have
+        read fresh indefinitely (I1).
+
+        AST-bound to the standing-down branch, not a substring scan of the
+        file: `publish` and `heartbeat` are called legitimately elsewhere in
+        this same loop, so a page-wide grep would be green against the very
+        defect it is meant to catch."""
+        import ast
+        tree = ast.parse(self._src())
+        loop = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.While)
+                    and isinstance(n.test, ast.Constant) and n.test.value is True)
+        # the `if not _ok_writer:` branch — located by the claim, not by prose
+        claim = next(n for n in ast.walk(loop)
+                     if isinstance(n, ast.Call)
+                     and getattr(n.func, "attr", None) == "claim_writer")
+        branch = next(n for n in ast.walk(loop)
+                      if isinstance(n, ast.If) and n.lineno > claim.lineno
+                      and any(isinstance(c, ast.Continue) for c in ast.walk(n)))
+
+        banned = {"publish", "heartbeat", "publish_paper_trade",
+                  "snapshot_equity", "publish_trades"}
+        for call in ast.walk(branch):
+            if not isinstance(call, ast.Call):
+                continue
+            attr = getattr(call.func, "attr", None)
+            if attr not in banned:
+                continue
+            raise AssertionError(
+                f"the standing-down branch calls store.{attr}() at line "
+                f"{call.lineno} — that writes the BOOK's row, which this "
+                f"process does not own. Report on _standby_key() instead.")
+
+        # and it must still record SOMEWHERE, or "visible not absent" is lost
+        writes = [c for c in ast.walk(branch)
+                  if isinstance(c, ast.Call)
+                  and getattr(c.func, "attr", None) == "save_state"]
+        assert writes, "a standing-down container must still record its state"
+        # ...on a key derived from the book, never the bare book id
+        keyed_off_helper = any(
+            isinstance(w.args[0], ast.Call)
+            and getattr(w.args[0].func, "id", None) == "_standby_key"
+            for w in writes if w.args)
+        assert keyed_off_helper, (
+            "standby state must go to _standby_key(bot_id), not a bare row id")
+
+    def test_standby_key_is_a_suffix_of_the_book_it_shadows(self):
+        """A reader holding the book id must be able to find its standby
+        record without a lookup table."""
+        import funding_carry_bot as fc
+        book = "perps-funding-carry-lshadow"
+        key = fc._standby_key(book)
+        assert key != book, "the standby key must not BE the book's row"
+        assert key.startswith(book), f"not derivable from the book: {key}"
 
     def test_enforcement_is_still_fail_open(self, monkeypatch):
         """A Postgres blip must NEVER idle the book. Evidence corruption is
