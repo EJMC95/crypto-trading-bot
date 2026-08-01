@@ -652,6 +652,44 @@ def same_pair_overlaps(eps, min_gap_s=None):
     return sorted(hits, key=lambda x: -x[1])
 
 
+def latest_overlap_start(eps, min_gap_s=None):
+    """-> datetime the MOST RECENT same-pair overlap began, or None.
+
+    [2026-08-01 (ih)] `same_pair_overlaps` answers "did this ever happen", and
+    a ledger is permanent, so that question can only ever answer YES again —
+    it is a one-way latch. Once `(hp)`/`(ic)`/`(id)` closed the duplicate-writer
+    hole in code, the detector kept firing forever on a CLOSED window and kept
+    telling the operator to *"stop the duplicate Railway service"* — an action
+    that (a) no longer exists, since `claim_writer` now arbitrates and the
+    loser writes its own key, and (b) `(id)` showed would be actively wrong,
+    because two containers are now FAILOVER rather than a fault.
+    A permanent page for a fixed condition is how an operator learns to ignore
+    the pager — `(hw)`'s own "a sticky error pages once and then means nothing".
+
+    Measured on 🌾 carry: 7 overlaps, ALL between 17-Jul and 29-Jul 07:39Z,
+    against a guard that merged 31-Jul 00:52Z. Zero since.
+
+    WHAT THIS DOES NOT DO: it does not clear the finding. The pooled window is
+    still pooled and a promotion still may not rest on it — that is why the
+    `integrity` precondition and the `fails` line are unchanged. It only lets
+    a consumer tell "happening now, act" from "happened then, discount the
+    sample".
+    """
+    min_gap_s = LEDGER_MIN_OVERLAP_S if min_gap_s is None else min_gap_s
+    by = {}
+    for pair, o, c in eps:
+        by.setdefault(pair, []).append((o, c))
+    latest = None
+    for _pair, v in by.items():
+        v.sort()
+        for i in range(len(v) - 1):
+            if (v[i][1] - v[i + 1][0]).total_seconds() > min_gap_s:
+                start = v[i + 1][0]          # when the SECOND hold opened
+                if latest is None or start > latest:
+                    latest = start
+    return latest
+
+
 def peak_concurrency(eps):
     """Most positions open at once, from the intervals alone. The SECOND
     detector only — caps move (carry's went 8 -> 12 on 30-Jul) and the ledger
@@ -1106,6 +1144,15 @@ def main():
                 "deepest_overlap_h": (round(overlaps[0][1], 2) if overlaps
                                       else 0.0),
                 "deepest_overlap_pair": (overlaps[0][0] if overlaps else None),
+                # [(ih)] WHEN the most recent one began. `two_writers` is a
+                # one-way latch over a permanent ledger, so on its own it can
+                # never stop firing once true — and it kept sending the
+                # operator after a service to stop that no longer exists. This
+                # field is what lets a consumer separate "happening now" from
+                # "happened then". The finding itself is UNCHANGED: the pooled
+                # window stays pooled and still blocks READY.
+                "latest_overlap": (lambda d: d.isoformat() if d else None)(
+                    latest_overlap_start(integ_eps)),
                 "peak_concurrent": peak_concurrency(integ_eps)}}
     print()
     print(f"READY: {ready or 'none'}")

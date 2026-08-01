@@ -915,6 +915,21 @@ BOOK_AUTHOR = {
     # "it cannot see enough books to find a golden one". Measured: max
     # simultaneously-golden coins over 192 aligned days = 1, against 6 slots,
     # so the cap is not what binds — the candidate set is.
+    # [2026-08-01 (if)] 🌊 TIDE RIDER IS RETIRED, so this entry is INERT — and
+    # deliberately kept rather than deleted. The book was retired for 9 buys /
+    # ZERO sells / 0 closes in 22 days while holding a third of the fleet long
+    # budget; `lighter_trend_bot` now idles at boot and the row is pruned by
+    # `LEGACY_BOTS`. The loop below is fail-SAFE for exactly this: a book
+    # missing from `bot_rows` proposes NOTHING (`if not r: continue`, pinned by
+    # "no row -> no opinion" in the selftest), so a retired book cannot be
+    # widened on a quiet cycle — which matters, because a book that never
+    # closes reads as permanently STARVED and would otherwise ratchet its
+    # universe up forever. Kept so that resurrecting it
+    # (TIDE_RIDER_RETIRED_OVERRIDE=run) restores its levers in one act instead
+    # of silently coming back with the growth rail unable to reach it (the
+    # (hk) defect this entry was added to fix). Recorded rather than left to
+    # be re-derived: a map that no longer describes the fleet is a defect, not
+    # history (I12).
     "crypto-trend-daily-lshadow":   ("trend.max_open", "trend.universe_n"),
 }
 BOOK_STARVED_H = float(os.environ.get("EVBOARD_BOOK_STARVED_H", "24"))

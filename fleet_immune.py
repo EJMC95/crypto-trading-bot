@@ -185,6 +185,31 @@ def _close_ts(row):
         return None
 
 
+#: Hours after which a same-pair overlap is HISTORY rather than an incident.
+#: 6h > the 30-min `claim_writer` TTL by a wide margin, so a guard that is
+#: actually arbitrating has long since taken effect; and it is short enough
+#: that a REAL recurrence pages the same day. Tunable, because the right value
+#: is "comfortably longer than the claim TTL" and that TTL can move.
+DUP_WRITER_CLOSED_H = float(os.environ.get("IMMUNE_DUP_CLOSED_H", "6"))
+
+
+def _parse_iso(txt):
+    """-> aware datetime, or None. Tolerant of 'Z' and of a naive stamp.
+
+    None means "cannot tell", and every caller must treat that as NOT evidence
+    of recency — the duplicate-writer pager stays LOUD on an unreadable stamp
+    rather than going quiet, because a detector that mutes itself on bad input
+    is the failure it exists to prevent.
+    """
+    if not txt:
+        return None
+    try:
+        d = datetime.fromisoformat(str(txt).strip().replace("Z", "+00:00"))
+    except Exception:  # noqa: BLE001
+        return None
+    return d.replace(tzinfo=timezone.utc) if d.tzinfo is None else d
+
+
 def application_sickness(levers, paper_rows, now, seen):
     """{lever: why} for receipt-lane levers whose consumer has closed
     >= APP_SICK_MIN_CLOSES trades since the lever appeared (plus grace for the
@@ -358,13 +383,37 @@ def organ_invariants(states, now):
                 continue
             _in = _b.get("integrity")
             if isinstance(_in, dict) and _in.get("two_writers"):
+                # [2026-08-01 (ih)] PAGE ONLY WHILE IT IS STILL HAPPENING.
+                # `two_writers` reads a PERMANENT ledger, so it is a one-way
+                # latch: once true it can never go false, and this branch paged
+                # the operator every cycle with "stop the duplicate Railway
+                # service" long after (hp)/(ic)/(id) had closed the hole in
+                # code — an instruction that no longer has an object, and that
+                # (id) showed would now be WRONG, because the stood-down
+                # container is failover rather than a fault. A permanent page
+                # for a fixed condition is how a pager gets ignored ((hw): "a
+                # sticky error pages once and then means nothing").
+                # The FINDING is unchanged and still blocks READY upstream —
+                # only the pager is scoped, and only on positive evidence of
+                # recency. An unreadable/absent stamp still pages (fail-safe
+                # LOUD: the detector must not go quiet because it cannot tell).
+                _latest = _parse_iso(_in.get("latest_overlap"))
+                # `now` is a float epoch here (now_ts), not a datetime.
+                _age_h = ((now - _latest.timestamp()) / 3600.0) if _latest else None
+                if _age_h is not None and _age_h > DUP_WRITER_CLOSED_H:
+                    continue          # historical: the sample is pooled, the
+                                      # process is not. Carried by the grade.
                 sick("golive-readiness",
                      f"{_bot}: ledger has {_in.get('same_pair_overlaps')} "
                      f"same-pair overlap(s), deepest "
                      f"{_in.get('deepest_overlap_h')}h on "
                      f"{_in.get('deepest_overlap_pair')} — TWO WRITERS on one "
-                     f"bot_id. n is not one book's trades and t scales with "
-                     f"sqrt(n). OPERATOR: stop the duplicate Railway service")
+                     f"bot_id, most recent "
+                     + (f"{_age_h:.1f}h ago" if _age_h is not None
+                        else "at an UNKNOWN time")
+                     + ". n is not one book's trades and t scales with "
+                       "sqrt(n). OPERATOR: confirm `claim_writer` is arbitrating "
+                       "(the loser publishes <bot>:standby, not the book's row)")
 
     # [2026-07-17 BORN-DARK DETECTOR] an organ silently running a DEGRADED
     # FALLBACK nobody asked for. The brain shipped its v3 engine on 16-Jul

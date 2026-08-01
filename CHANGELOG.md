@@ -1,3 +1,36 @@
+## 2026-08-01 (ih) — THE DUPLICATE-WRITER PAGER FIRED FOREVER ON A CLOSED WOUND, AND SENT THE OPERATOR AFTER A SERVICE THAT NO LONGER EXISTS
+
+- **THE ASK** (operator): *"make everything work in harmony please"* — a coherence sweep after `(ie)`–`(ig)`. Suite **763**, nine guards green, four mutations red.
+- **A LEDGER IS PERMANENT, SO `two_writers` IS A ONE-WAY LATCH.** Once true it can never go false, so the immune organ's duplicate-writer branch pages **every cycle, forever**, on a window that closed days ago — and it pages with `"OPERATOR: stop the duplicate Railway service"`, which is now wrong twice over: `claim_writer` arbitrates, and `(id)` established that two containers are **failover**, not a fault. The stood-down loser writes `<bot>:standby`, not the book's row. There is no service to stop.
+- **MEASURED on 🌾 carry** — all 7 overlaps and the date each began:
+
+      2026-07-17 16:34Z  SKHYNIXUSD   2.12h        2026-07-21 21:04Z  BNB          9.00h
+      2026-07-18 12:46Z  BTC          7.22h        2026-07-28 06:30Z  SKHYNIXUSD   8.23h
+      2026-07-19 23:06Z  HYPE         9.14h        2026-07-29 07:39Z  SKHYNIXUSD   8.07h
+      2026-07-20 14:21Z  HYPE         2.72h
+
+  **The latest began 29-Jul 07:39Z. `(hp)`'s sole-writer guard merged 31-Jul 00:52Z. Zero overlaps since.** The condition has been closed for two days and the pager has been firing the whole time — *"a sticky error pages once and then means nothing"*, `(hw)`'s own words, now demonstrated on the fleet's best-evidenced book.
+
+### The fix, and what it deliberately does NOT touch
+
+- `golive_readiness.latest_overlap_start()` + a `latest_overlap` field on the published `integrity` payload. `fleet_immune` pages only while the most recent overlap is inside `DUP_WRITER_CLOSED_H` (**6h** — comfortably longer than the 30-min claim TTL, short enough that a real recurrence pages the same day).
+- **THE FINDING IS UNCHANGED.** 🌾 carry still fails `integrity`, still prints `LEDGER: 7 same-pair overlap(s)` FIRST in `fails`, and still cannot be `READY`. The pooled window is still pooled and a promotion still may not rest on it. **Only the PAGER is scoped** — the difference between "act now" and "discount this sample", which the operator could not previously tell apart.
+- **FAIL-SAFE LOUD, against this repo's usual habit.** An absent, empty or unparseable `latest_overlap` **still pages**, reading *"most recent at an UNKNOWN time"*. A detector that mutes itself because it cannot tell is the failure it exists to prevent, and the alternative — going quiet on a missing field — is how a rename silently disarms it.
+- The page now names something the operator can actually check: *"confirm `claim_writer` is arbitrating (the loser publishes `<bot>:standby`, not the book's row)"*. **I8: a detector must name the object the operator can act on** — and the old string had been made false by three entries shipped since it was written.
+- Mutation-verified: fail-safe inverted (unreadable ⇒ quiet), recency ignored, window widened to 9999h, grader stops publishing the field. The **window-widening** arm matters most — `(hz)`'s lesson that the easiest way to "fix" a finding is to stop measuring it.
+
+### The seam test had to move, and that is the honest part
+
+- `test_the_REAL_grader_payload_reaches_the_immune_organ` runs the actual grader and feeds its payload to the organ. It broke, correctly: its fixture trades are dated July 2026 while the module `NOW` sits ~6 months later, so the new filter read them as ancient. Its clock is now derived from the FIXTURE's own dates, so it keeps measuring the SEAM (do the grader's field names reach the organ) instead of accidentally measuring the recency window, which has its own tests.
+
+### Also swept for harmony
+
+- **`evidence_board.BOOK_AUTHOR` still maps the retired 🌊 Tide Rider** to `trend.max_open`/`trend.universe_n`. **Verified inert rather than assumed**: `synthesize_books` refuses any book missing from `bot_rows` (`if not r: continue`), pinned by its own selftest's *"no row -> no opinion"*, and the row is now pruned. Kept rather than deleted **on purpose** — a book that never closes reads as permanently STARVED, so the guard is what stops the rail ratcheting a dead book's universe up forever, and keeping the entry means resurrecting the book (`TIDE_RIDER_RETIRED_OVERRIDE=run`) restores its levers in one act instead of silently returning with the growth rail unable to reach it — the `(hk)` defect that entry was added to fix. Recorded in place, because a map that no longer describes the fleet is a defect, not history (**I12**).
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — this is instrumentation, and it says so.** What moved is that the fleet's pager now distinguishes a live incident from a healed one on its single most-paged finding, so the next real duplicate writer arrives as signal rather than as one more line the operator has learned to scroll past.
+
 ## 2026-08-01 (ig) — THE WRAPPER THAT EXISTS SO NO ORGAN DIES SILENTLY KILLED THE BRAIN, SILENTLY
 
 - **THE ASK** (operator): *"full permission to go ahead with your advisements"*. Suite **759**, nine guards green.

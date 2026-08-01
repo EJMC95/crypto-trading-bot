@@ -195,10 +195,87 @@ def test_the_REAL_grader_payload_reaches_the_immune_organ(monkeypatch):
     assert payload, "the grader published nothing — the seam has no left half"
     assert "dup-book" in payload["books"], payload["books"].keys()
 
-    payload["updated"] = fi._iso(NOW)          # freshness is the organ's gate
-    out = fi.organ_invariants({"golive-readiness": payload}, NOW)
+    # [(ih)] The organ now pages only on a RECENT overlap, so this seam test
+    # has to run its clock near the FIXTURE's own dates rather than at the
+    # module-level NOW (which sits ~6 months after them). Deriving the clock
+    # from the data keeps the test measuring the SEAM — that the grader's field
+    # names reach the organ — instead of accidentally measuring the recency
+    # window, which has its own tests below.
+    import datetime as _d
+    _fix_now = _d.datetime(2026, 7, 21, 2, 0, tzinfo=_d.timezone.utc).timestamp()
+    payload["updated"] = fi._iso(_fix_now)     # freshness is the organ's gate
+    assert payload["books"]["dup-book"]["integrity"].get("latest_overlap"), (
+        "the grader must publish `latest_overlap` — without it the organ "
+        "cannot tell an ongoing duplicate from a closed one (ih)")
+    out = fi.organ_invariants({"golive-readiness": payload}, _fix_now)
     names = [o["detail"].split(":")[0] for o in out]
     assert names == ["dup-book"], (
         f"the organ read {names} off the grader's OWN payload — expected exactly "
         "the compromised book. A field rename on either side lands here.")
     assert "TWO WRITERS" in out[0]["detail"]
+
+
+# ---------------------------------------------------------------------------
+# (ih) 01-Aug — PAGE ONLY WHILE IT IS STILL HAPPENING.
+#
+# `two_writers` reads a PERMANENT ledger, so it is a one-way latch: once true
+# it can never go false. That branch therefore paged every cycle with
+# "OPERATOR: stop the duplicate Railway service" long after (hp)/(ic)/(id)
+# closed the hole in code — an instruction with no object left, and one that
+# (id) showed is now WRONG (the stood-down container is failover, not a fault).
+#
+# MEASURED on 🌾 carry: 7 overlaps, all between 17-Jul and 29-Jul 07:39Z,
+# against a guard that merged 31-Jul 00:52Z. Zero since. A permanent page for
+# a fixed condition is how a pager gets ignored ((hw): "a sticky error pages
+# once and then means nothing").
+#
+# The FINDING is unchanged and still blocks READY upstream — only the PAGER is
+# scoped, and only on positive evidence of recency.
+# ---------------------------------------------------------------------------
+def _iso_hours_ago(h):
+    return fi._iso(NOW - h * 3600.0)
+
+
+def test_a_historical_overlap_no_longer_pages():
+    out = fi.organ_invariants(
+        _payload({"dup": _dup(latest_overlap=_iso_hours_ago(72))}), NOW)
+    assert out == [], (
+        "a 3-day-old overlap still pages — the pager would fire forever on a "
+        f"condition the code already closed: {out}")
+
+
+def test_an_ONGOING_overlap_still_pages():
+    out = fi.organ_invariants(
+        _payload({"dup": _dup(latest_overlap=_iso_hours_ago(1))}), NOW)
+    assert len(out) == 1, out
+    d = out[0]["detail"]
+    assert "TWO WRITERS" in d and "1.0h ago" in d, d
+    assert "claim_writer" in d, (
+        "the page must name what the operator can check NOW, not the retired "
+        f"'stop the duplicate service' instruction (I8): {d}")
+
+
+def test_an_unreadable_or_missing_stamp_stays_LOUD():
+    """Fail-safe LOUD. A detector that mutes itself because it cannot tell is
+    the failure it exists to prevent; absence is not evidence of recency."""
+    for bad in (None, "", "not-a-date", 12345, {}):
+        out = fi.organ_invariants(_payload({"dup": _dup(latest_overlap=bad)}), NOW)
+        assert len(out) == 1, f"{bad!r} went quiet: {out}"
+        assert "UNKNOWN time" in out[0]["detail"], out[0]["detail"]
+    # and a payload with NO latest_overlap key at all (an older publisher)
+    d = _dup()
+    d["integrity"].pop("latest_overlap", None)
+    out = fi.organ_invariants(_payload({"dup": d}), NOW)
+    assert len(out) == 1 and "UNKNOWN time" in out[0]["detail"], out
+
+
+def test_the_boundary_is_the_declared_constant():
+    """Pinned so the window cannot be widened into uselessness without the
+    test moving too — the (hz) lesson that the easiest way to 'fix' a finding
+    is to stop measuring it."""
+    assert 1.0 <= fi.DUP_WRITER_CLOSED_H <= 48.0, fi.DUP_WRITER_CLOSED_H
+    just_inside = fi.organ_invariants(
+        _payload({"dup": _dup(latest_overlap=_iso_hours_ago(fi.DUP_WRITER_CLOSED_H - 0.5))}), NOW)
+    just_outside = fi.organ_invariants(
+        _payload({"dup": _dup(latest_overlap=_iso_hours_ago(fi.DUP_WRITER_CLOSED_H + 0.5))}), NOW)
+    assert len(just_inside) == 1 and just_outside == [], (just_inside, just_outside)
