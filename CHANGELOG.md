@@ -1,3 +1,30 @@
+## 2026-08-02 (in) — THE DEPLOY LANDED, SO THREE REAL-MONEY ROWS STOPPED BEING EXEMPT FROM THE DETECTOR THAT WATCHES THEM
+
+- **THE ASK** (operator): dispatched both live services after the `(il)` review, then *"did it work"*. Suite **780**, ten guards green, three mutations red.
+- **IT WORKED, AND IT IS VERIFIED BY STAMP RATHER THAN BY A GREEN RUN.** Run `30728658721` deployed `trail-blazer-live` + `funding-farmer-shadow`; the earlier pair deployed `tide-rider-lighter-live`. Predictions were computed from a clean `origin/main` worktree BEFORE the rows were read — the repo tree could not be used, because `(il)` had modified `bot_pnl_store.py`, which is in `_BUILD_SHARED` and shifts every predicted id:
+
+      perps-funding-lighter-lighter   705425a83422 -> 30bf230bd5fb /15   svc=trail-blazer-live
+      perps-funding-lighter-lshadow   705425a83422 -> 30bf230bd5fb /15   svc=funding-farmer-shadow
+      lighter-ticket-taker-lighter    fd4663d27fb5 -> 5e27c751f5b2 /15   svc=tide-rider-lighter-live
+
+  All three match. Both live books and both control twins now run what is merged, so `(ij)`'s lens veto is live on real money and the Farmer's control arm is a clean pair again.
+
+### The exemption was SPENT, so it is gone
+
+- `(hu)` declared those three rows in `STALE_WRITER_OK` with a stated, falsifiable prediction: *"still on pre-(ht) code BY DESIGN ... stamps on the next deliberate deploy."* **The deploy happened and the prediction came true**, so the reason no longer describes the system.
+- **Keeping it would have left the three REAL-MONEY-adjacent rows permanently excused from the detector built to notice a deploy that reported OK and never landed** — the `DRIFT_OK` shape `(hl)` named, where the carve-out lands on exactly the rows most worth watching. A declaration that no longer describes the system is a defect, not history (**I12**).
+- **MEASURED AFTER THE CHANGE, on the live payload: 23 of 23 rows stamped, allow-list EMPTY, detector silent.** No false alarm, and nothing is excused.
+
+### The vacuity this created, and why the tests say so
+
+- Three selftest arms read `_live = list(STALE_WRITER_OK)` and asserted *"the declared rows never flag"*. **Emptying the dict made every one of them vacuously green** — asserting a property over an empty set proves nothing, and it fails in the reassuring direction. The MECHANISM is now tested with a **synthetic** allow-list injected via `ok=`, so it stays under test while the real list honestly holds nothing.
+- A new arm asserts the opposite direction explicitly: with the REAL (empty) list, those same rows **DO** flag. That is the arm that would catch the exemption creeping back, and the mutation restoring it reddens.
+- The "every declaration carries a REASON" arm is now vacuous by construction; it says so in place rather than pretending otherwise, and the empty-list arm is what carries the weight instead.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**💸 the Funding Farmer and 🎫 the Ticket Taker — both real-money books now run the merged code**, which is the first time this pass can say that. What moved structurally is that no row is exempt from the stale-deploy detector any more, so the next deploy that reports OK and does not land is visible on all 23 books instead of 20.
+
 ## 2026-08-02 (im) — THE GROWTH RAIL REFUSED TO WIDEN THE ONE LENS THE LIVE BOOK TRADES, ON THE HORIZON (ij) PROVED WRONG
 
 - **THE ASK** (operator): *"Go forth with steed on optimisations"* — the #1 item from the `(il)` daily review. Suite **777**, ten guards green, eight mutations red.

@@ -498,16 +498,23 @@ def bot_row_sickness(bot_rows):
 # `tide-rider-lighter-live`), which an unmarked push must never ship — so they
 # are still on pre-(ht) code BY DESIGN and will stamp themselves the first time
 # a deliberate live deploy carries them.
-STALE_WRITER_OK = {
-    "perps-funding-lighter-lighter":
-        "LIVE Funding Farmer — marker-gated deploy, unmarked pushes must not "
-        "ship real money. Stamps on the next deliberate [deploy-live-farmer].",
-    "perps-funding-lighter-lshadow":
-        "the Farmer's shadow twin ships from the same marker-gated rule "
-        "(funding-farmer-shadow), so it is deploy-gated for the same reason.",
-    "lighter-ticket-taker-lighter":
-        "LIVE Ticket Taker — marker-gated. Stamps on [deploy-live-taker].",
-}
+# [2026-08-02] EMPTY, AND THAT IS THE POINT: the exemption was spent, not
+# deleted. All three declared rows now stamp, verified in the live payload
+# minutes after the operator dispatched both live services —
+#   perps-funding-lighter-lighter  -> svc=trail-blazer-live      build 30bf230bd5fb
+#   perps-funding-lighter-lshadow  -> svc=funding-farmer-shadow  build 30bf230bd5fb
+#   lighter-ticket-taker-lighter   -> svc=tide-rider-lighter-live build 5e27c751f5b2
+# — exactly what the declaration above predicted would happen ("stamps on the
+# next deliberate deploy"). Keeping the entries would leave three REAL-MONEY-
+# adjacent rows permanently excused from the detector that exists to notice a
+# deploy which reported OK and never landed: the `DRIFT_OK` shape, where the
+# carve-out lands on precisely the rows most worth watching. A declaration that
+# no longer describes the system is a defect, not history (I12).
+#
+# The MECHANISM is unchanged and still tested — `ok=` injects an allow-list, so
+# a future legitimate exemption is one entry away and its selftest arms below
+# use a synthetic one rather than depending on this dict being non-empty.
+STALE_WRITER_OK = {}
 
 
 #: A bot_pnl row older than this is DEAD, not merely quiet. The fleet's
@@ -1107,7 +1114,15 @@ def _selftest():
             e["svc"] = svc
         return {"bot": bot, "extra": e}
 
-    _live = list(STALE_WRITER_OK)
+    # [2026-08-02] The allow-list MECHANISM is tested with a SYNTHETIC list,
+    # not with the live one. `STALE_WRITER_OK` is empty now that all three
+    # marker-gated rows stamp, and arms that read `list(STALE_WRITER_OK)` went
+    # vacuously green the moment it emptied — asserting "the declared rows
+    # never flag" over an empty set proves nothing. Injecting `ok=` keeps the
+    # mechanism under test while the real list honestly holds nothing.
+    _live = ["some-marker-gated-row", "another-declared-row"]
+    _OK = {b: "declared for a stated reason that is at least twenty chars long"
+           for b in _live}
     _fleet = [_row("pm-rudd-lshadow", "freqtrade-bots"),
               _row("perps-funding-spread-lshadow", "counterweight-shadow"),
               _row("lighter-dislocation-lshadow", "snap-back-shadow"),
@@ -1123,19 +1138,27 @@ def _selftest():
     # a healthy fleet says NOTHING — a detector that flags everything trains
     # the operator to ignore it (the (hh) two-writers lesson).
     assert stale_writer_sickness(_fleet) == [], "all-stamped fleet must be quiet"
-    # the marker-gated LIVE rows are declared, so they never flag
-    assert stale_writer_sickness(_fleet + [_row(b) for b in _live]) == [], \
-        "marker-gated live rows are DECLARED, not sick"
+    # a DECLARED row never flags...
+    assert stale_writer_sickness(_fleet + [_row(b) for b in _live],
+                                 ok=_OK) == [], \
+        "a declared row is DECLARED, not sick"
     # ...and the declaration is a real allow-list, not a blanket pass: an
     # UNdeclared unstamped row in the same payload still fires.
     _mixed = _fleet + [_row(b) for b in _live] + [_carry]
-    assert [s["organ"] for s in stale_writer_sickness(_mixed)] == \
-        ["perps-funding-carry-lshadow"], stale_writer_sickness(_mixed)
+    assert [s["organ"] for s in stale_writer_sickness(_mixed, ok=_OK)] == \
+        ["perps-funding-carry-lshadow"], stale_writer_sickness(_mixed, ok=_OK)
+    # ...and with the REAL (now empty) list those same rows are NOT excused —
+    # the whole reason the spent exemption was removed rather than kept.
+    assert sorted(s["organ"] for s in
+                  stale_writer_sickness(_fleet + [_row(b) for b in _live])) \
+        == sorted(_live), "an empty allow-list must excuse nobody"
     # FAIL-SAFE QUIET during rollout: too few stamped rows -> say nothing
     assert stale_writer_sickness(_fleet[:2] + [_carry]) == [], \
         "below min_stamped the detector must stay silent, not flag everyone"
     assert stale_writer_sickness([]) == [] and stale_writer_sickness(None) == []
-    # every declaration carries a REASON (the BORN_DARK_OK contract)
+    # every declaration carries a REASON (the BORN_DARK_OK contract). Vacuous
+    # while the list is empty — which is correct and is why the arm above
+    # proves the empty list excuses nobody rather than relying on this one.
     assert all(isinstance(v, str) and len(v) > 20
                for v in STALE_WRITER_OK.values()), STALE_WRITER_OK
     # it is wired into run_once's aggregate, not merely defined
