@@ -1,3 +1,52 @@
+## 2026-08-02 (im) — THE GROWTH RAIL REFUSED TO WIDEN THE ONE LENS THE LIVE BOOK TRADES, ON THE HORIZON (ij) PROVED WRONG
+
+- **THE ASK** (operator): *"Go forth with steed on optimisations"* — the #1 item from the `(il)` daily review. Suite **777**, ten guards green, eight mutations red.
+- **`(ij)` FIXED THE ACTUATOR THAT HALTS. THIS IS THE SAME DEFECT IN THE ACTUATOR THAT GROWS.**
+
+### The disagreement, measured on the live payload
+
+- `lighter_scout_tuner.vetoed_lenses` delegates to the taker's single authority — **correctly, no second copy, this is not (hj) again** — but called it `tt.vetoed_lenses(lens_fwd, min_n=LENS_FLOOR)`: **no `sides`, no `realised`.** So it never saw the lens's own closed trades, the basis `(ij)` made SENIOR precisely because `brain-lens-forward` grades the scout's tickets on **4h forward marks** while the taker holds a **bracket**.
+
+      TUNER  vetoed {dip, divergence, momentum}    <- pooled 4h proxy only
+      TAKER  vetoed {dip, momentum}                <- realised closes senior
+
+      realised, shadow arm: divergence n=50 +0.463% t=+0.83
+
+- The tuner said so out loud every cycle in its own published log — **`"divergence: brain-vetoed at floor — never widened"`** — so **the one lens the LIVE book trades was the one lens the growth rail could never widen.** That is exactly *"anything stopping it from winning"*.
+- **The generalisation worth keeping**: a second copy of a rule is a second rule `(hj)` — **and so is one copy asked the same question with half the evidence.** Delegation is not enough; the evidence has to travel with it.
+- **VERIFIED ON THE LIVE PAYLOAD**: tuner before `{dip, divergence, momentum}` → after `{dip, momentum}`, byte-equal to the taker's own verdict on the same data.
+
+### What it does NOT do
+
+- **It loosens nothing by itself.** It only makes a lens ELIGIBLE for the walk; the expand rule still requires IMPROVE-both-halves through the real replay gate. Pinned in the selftest: once un-vetoed, `dip` on a negative forward grade is still **not widened**, because it is not a graded winner. The fix removes a refusal made on the wrong basis; it does not hand out a widening.
+- **Seniority cuts BOTH ways**, same as `(ij)`: a lens the proxy likes whose own record loses at the t-bar is now vetoed where it was not. Pinned with `dip` at n=13, −1.162%, t=−2.66.
+- `sides` stays `None` deliberately — the tuner tunes the **SHADOW** arm, which trades both sides. `TUNER_BOT_ROW` is pinned to `-lshadow` and a mutation to the live row reddens.
+- Fail-safe open end to end: `realised=None`/`{}` reproduces the pre-fix behaviour **byte for byte**, and `realised_for_tuner` returns `{}` on any ledger trouble, so an outage degrades to the forward grade rather than to "veto nothing" or a crash.
+
+### The mutation round is the entry
+
+- Eight mutations, and **three survived a green selftest before the tests were good enough** — recorded because each is a distinct way to fake coverage:
+  1. **Threading to the taker-bar walk**: a signature check (`"realised" in parameters`) passes against a function that IGNORES the argument — the registered-but-inert shape. Replaced with a BEHAVIOURAL assertion on the veto log line.
+  2. **`realised_for_tuner` fail-open**: asserted via `__doc__` rather than behaviour. Replaced by monkeypatching the fetch to raise.
+  3. **The diet walk's AST check was VACUOUS** — `"realised" in ast.dump(...)` matches the function's own `realised=None` PARAMETER, so it stayed green with the call-site argument deleted. It now inspects the **Call node's keywords**. This is `(ik)`'s lesson arriving one layer in: a check that cannot fail proves nothing, and it fails in the reassuring direction.
+- **AND ONE BRANCH IS HONESTLY UNTESTABLE, so it says so rather than shipping a fake test.** `desired_scout_levers`'s veto is **unreachable by output**: a lens below the ruling floor is never vetoed (`lens_loses` is consulted only when `floor_met`), and the diet walk acts ONLY below that floor — measured, identical levers and logs with and without the evidence. The argument is threaded for consistency and would matter the moment either floor moves. `run_once` likewise needs a live tape and a DB, so its wiring is asserted structurally.
+
+### THE RECURRENCE DETECTOR CAUGHT ME FIXING INSTANCES, AND IT WAS RIGHT
+
+- Committing the tuner fix turned `audit_recurrence` RED: **`lighter-ticket-taker`, 6 entries in 7d** ((im),(il),(hj),(fq),(fm),(ek)) — *"the class is not closing"*. `(hz)` built that detector for exactly this, and this is the first time it has caught a live pass mid-flight rather than being read after the fact.
+- **It was correct.** Grepping every caller of the veto found a **THIRD consumer doing the same thing: `strategy_incubator.live_lenses`** — the one this repo had explicitly predicted when the rule was centralised (*"a third was about to appear in strategy_incubator"*). It excluded `divergence`, the ONLY lens the live arm may fill, on the same 4h proxy — so the incubator was breeding genes for lenses the live book cannot trade, **the very fiction that function was written to stop**.
+- **CLOSED EXECUTABLY, not acknowledged away**: `tests/autonomy/test_lens_veto_consumers.py` fails the build if any consumer outside the defining module calls `vetoed_lenses` without the lens's own record. It finds callers **by AST across the whole tree**, so a fourth consumer cannot arrive quietly — and it inspects the **Call node's keywords**, because a source-text scan matches the callee's own `realised=None` parameter and cannot fail.
+- **SELFTEST BODIES ARE EXCLUDED, and that is load-bearing**: `bot_learn`'s selftest asserts *"the taker vetoes on the pooled grade WITHOUT `sides`"* — a contract test whose whole point is to omit the argument. Demanding the evidence there would forbid testing the degrade path this fleet's fail-safe contract depends on. Both mutations red (either consumer reverted to proxy-only).
+- The RECURRING block records it as **CLOSING with an owner**, and says plainly that a future taker recurrence for a DIFFERENT reason is a new class and may not be filed under this line.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**🎫 the Ticket Taker.** Its only live lens can now be considered for widening by the growth rail instead of being refused on a proxy graded at the wrong horizon. Stated honestly: **eligibility, not a widening** — `divergence` is UNDECIDED (shadow +0.463% t=+0.83, live −0.385% t=−0.52; neither clears ±1), so what it gains is the chance to be measured by the replay gate rather than vetoed before it starts.
+
+### Also, from the same pass
+
+- **The `(il)` live-taker deploy LANDED and is verified.** `lighter-ticket-taker-lighter` moved `fd4663d27fb5` → **`5e27c751f5b2`/15**, matching the id computed from `origin/main` BEFORE the row was read — a falsifiable prediction, not a green run. Both taker arms are converged, so the arm drift is closed and **`(ij)`'s lens veto is live on real money**. 💸 Farmer was NOT in the dispatch and remains on `705425a83422` vs repo `30bf230bd5fb`.
+
 ## 2026-08-02 (il) — THREE DETECTORS THAT COULD NOT SEE: A CONVERGENT ARM CHECK, A STALE INSTRUCTION, AND A PRUNE THAT NEVER ONCE RAN
 
 - **THE ASK**: the daily evidence review (scheduled task). Suite **777** (+6), ten guards green, thirteen mutations red. Letter picked at commit time against a synced `origin/main`; **re-check before pushing** — this was not pushed.

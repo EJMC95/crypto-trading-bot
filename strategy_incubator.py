@@ -206,8 +206,19 @@ def t90(df):
     return _T90[df - 1] if df <= len(_T90) else bs.Z80
 
 
-def live_lenses(lens_fwd):
+def live_lenses(lens_fwd, realised=None):
     """The lenses the LIVE taker is currently ALLOWED to fill (2026-07-17).
+
+    [2026-08-02] THE THIRD CONSUMER, and the one CLAUDE.md predicted: the veto
+    was extracted into a single authority because "a third copy was about to
+    land in the incubator". It never became a copy — but it called that
+    authority with HALF THE EVIDENCE, which produces the same wrong answer by a
+    different route. Passing no `realised` means the lens's OWN closes are
+    invisible, so this excluded `divergence` — the only lens the live arm may
+    fill — on the 4h forward proxy `(ij)` proved is the wrong horizon for a
+    book that holds a bracket. The incubator would then breed genes for the
+    lenses the live book CANNOT trade, which is the very fiction this function
+    was written to stop.
 
     The replay is deliberately veto-blind — "external bus state isn't in this
     tape" — which is right for a pure harness and which each CONSUMER is then
@@ -221,7 +232,7 @@ def live_lenses(lens_fwd):
 
     Fail-safe OPEN, matching the taker's own documented direction: no grades =
     nothing vetoed. Freshness is the caller's job (see fresh_lens_fwd)."""
-    return set(LENS_GENE) - tt.vetoed_lenses(lens_fwd)
+    return set(LENS_GENE) - tt.vetoed_lenses(lens_fwd, realised=realised)
 
 
 def fresh_lens_fwd(state, now):
@@ -1139,7 +1150,16 @@ def run_once():
         # The replay is veto-blind by design, so without this the fitness is
         # dominated by fills the live taker refuses to make.
         lens_fwd = fresh_lens_fwd(store.load_state("brain-lens-forward"), now)
-        allowed = scored_lenses = live_lenses(lens_fwd)
+        # [2026-08-02] The LIVE arm's own closes, senior to the forward proxy
+        # ((ij)). Read here, not inside `live_lenses`, so that stays pure —
+        # and fail-safe open, so a dark ledger degrades to the forward grade.
+        try:
+            _realised = tt.realised_lens_evidence(
+                store.fetch_paper_trades(limit=4000),
+                tt.BOT + "-lighter", sides=tt.restricted_sides()) or {}
+        except Exception:                       # noqa: BLE001
+            _realised = {}
+        allowed = scored_lenses = live_lenses(lens_fwd, realised=_realised)
         genes, gene_dropped = evolvable_genes(genes, allowed)
         if gene_dropped:
             print(f"[incubator] lens veto — brain grades "

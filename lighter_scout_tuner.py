@@ -260,16 +260,69 @@ def next_notches(ladder, current):
         return out
 
 
-def vetoed_lenses(lens_fwd):
+def vetoed_lenses(lens_fwd, realised=None):
     """The taker's own veto rule — the tuner never widens what the brain has
     ruled negative at the floor. [2026-07-17] Delegates to the taker, which
     now owns the single definition: this was a hand-copy of the taker's inline
     rule, and a third copy was about to land in the incubator. Same behaviour
-    (LENS_FLOOR is the same TT_LENS_VETO_MIN_N env the taker reads)."""
-    return tt.vetoed_lenses(lens_fwd, min_n=LENS_FLOOR)
+    (LENS_FLOOR is the same TT_LENS_VETO_MIN_N env the taker reads).
+
+    [2026-08-02] IT DELEGATED TO THE RIGHT AUTHORITY AND UNDER-SUPPLIED THE
+    EVIDENCE, so the two callers of one rule reached OPPOSITE verdicts. This
+    passed neither `sides` nor `realised`, so it never saw the lens's own
+    closed trades — the basis `(ij)` made SENIOR precisely because
+    `brain-lens-forward` grades the scout's tickets on 4h forward marks while
+    the taker holds a bracket. Measured on the live payload the day this was
+    fixed:
+
+        TUNER  vetoed {dip, divergence, momentum}   <- pooled 4h proxy only
+        TAKER  vetoed {dip, momentum}               <- realised closes senior
+
+        realised, shadow arm:  divergence n=50  +0.463%  t=+0.83
+
+    The tuner's own log said it out loud every cycle — *"divergence:
+    brain-vetoed at floor — never widened"* — so **the one lens the live book
+    trades was the one lens the growth rail would never widen**, refused on the
+    wrong horizon. That is the same defect `(ij)` fixed in the actuator that
+    HALTS, surviving in the actuator that GROWS. `(hj)`'s lesson generalises: a
+    second copy of a rule is a second rule, and so is one copy asked the same
+    question with half the evidence.
+
+    THIS LOOSENS NOTHING BY ITSELF. It only lets a lens enter the walk; the
+    expand rule still requires IMPROVE-both-halves through the real replay
+    gate, and a brain veto backed by the lens's own losing record still stops
+    it. `sides` stays None on purpose: the tuner tunes the SHADOW arm, which
+    trades both sides, so there is no side restriction to apply.
+
+    Fail-safe open and unchanged: `realised=None` reproduces the pre-(2-Aug)
+    behaviour byte for byte, so a ledger outage degrades to the forward grade
+    rather than to "veto nothing"."""
+    return tt.vetoed_lenses(lens_fwd, min_n=LENS_FLOOR, realised=realised)
 
 
-def desired_taker_bars(tape, baseline, lens_fwd, helping=None, lens_fresh=True):
+#: The arm this tuner tunes. Its levers land on the `lighter-taker` lane, which
+#: is the $1k SHADOW book — never the live row — so the realised evidence that
+#: informs its veto must come from the SHADOW ledger.
+TUNER_BOT_ROW = tt.BOT + "-lshadow"
+
+
+def realised_for_tuner(limit=4000):
+    """This arm's own closed-trade evidence, or {} — never raises.
+
+    Mirrors the taker's own read (`lighter_ticket_taker` entry loop) rather
+    than inventing a second path, so the tuner and the taker cannot disagree
+    about what the ledger says. Fail-safe open: any trouble returns {} and the
+    forward grade decides exactly as it did before.
+    """
+    try:
+        return tt.realised_lens_evidence(
+            store.fetch_paper_trades(limit=limit), TUNER_BOT_ROW) or {}
+    except Exception:                       # noqa: BLE001
+        return {}
+
+
+def desired_taker_bars(tape, baseline, lens_fwd, helping=None, lens_fresh=True,
+                       realised=None):
     """Walk each lens's conviction-bar ladder from the DEFAULT. Three rules:
 
     STARVING (seen tickets, zero fills, under the brain's ruling floor):
@@ -306,7 +359,7 @@ def desired_taker_bars(tape, baseline, lens_fwd, helping=None, lens_fresh=True):
     if not h1 or not h2:
         return {}, ["tape too short to halve — no taker-bar changes"]
     helping = set(helping or ())
-    veto = vetoed_lenses(lens_fwd)
+    veto = vetoed_lenses(lens_fwd, realised=realised)
     bars = dict(DEFAULTS)
     log = []
     for lens, (attr, lever, ladder) in TAKER_LADDERS.items():
@@ -419,7 +472,7 @@ def sweep_exits(tape, baseline):
     return {k: v for k, v in best.items() if v != DEFAULTS[k]}, log
 
 
-def desired_scout_levers(lens_fwd, helping=None):
+def desired_scout_levers(lens_fwd, helping=None, realised=None):
     """Scout emission widening: advisory tickets only — this widens the
     BRAIN'S GRADING DIET, never what trades (the taker's bars gate fills).
     A lens under the brain's ruling floor gets its emission bar held one
@@ -434,7 +487,7 @@ def desired_scout_levers(lens_fwd, helping=None):
     floor. Returns ({lever: value}, log)."""
     out, log = {}, []
     helping = set(helping or ())
-    veto = vetoed_lenses(lens_fwd)
+    veto = vetoed_lenses(lens_fwd, realised=realised)
     for lens, (lever, default, ladder) in SCOUT_LADDERS.items():
         if lens in veto:
             continue
@@ -492,7 +545,8 @@ def desired_scout_levers(lens_fwd, helping=None):
     return out, log
 
 
-def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh):
+def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh,
+                      realised=None):
     """[2026-07-21 operator mandate: "the organs need more ability to
     implement changes to forward onto the tuners to act on"] Gate ORGAN
     PROPOSALS (fleet_proposals) through this tuner's OWN evidence bars and
@@ -562,7 +616,7 @@ def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh):
                 log.append(f"proposal({p['set_by']}): expand {p['lever']}"
                            f"={v} refused (brain dark — earns nothing)")
                 continue
-            if lens in vetoed_lenses(lens_fwd):
+            if lens in vetoed_lenses(lens_fwd, realised=realised):
                 log.append(f"proposal({p['set_by']}): expand {p['lever']}"
                            f"={v} refused (lens brain-vetoed)")
                 continue
@@ -642,6 +696,15 @@ def run_once():
     # replay is their evidence) but grading-floor logic contributes nothing.
     lens_fwd = (lf_state.get("lenses") or {}) if lf_fresh else {}
 
+    # [2026-08-02] THIS ARM'S OWN CLOSES, senior to the 4h forward proxy for
+    # any lens that has enough of them ((ij)). Read ONCE here rather than
+    # inside `vetoed_lenses` so the rule stays pure and testable, and so a
+    # ledger outage degrades to the forward grade instead of to a crash — the
+    # same shape as the taker's own read. Without it the tuner vetoed
+    # `divergence`, the live book's only lens, on the wrong horizon and logged
+    # "never widened" every cycle.
+    realised = realised_for_tuner()
+
     # proprioception (16-Jul): HELPING levers earn the expansion walk /
     # deeper diet; HURTING levers are dropped before the write. Both sides
     # fail-safe — a dark organ earns nothing and restricts nothing.
@@ -651,7 +714,7 @@ def run_once():
 
     baseline = replay_with(tape, DEFAULTS)
     bars, log1 = desired_taker_bars(tape, baseline, lens_fwd, helping=helping,
-                                    lens_fresh=lf_fresh)
+                                    lens_fresh=lf_fresh, realised=realised)
     exits, log2 = sweep_exits(tape, baseline)
     # [2026-07-16 AUDIT FIX] bars were validated against DEFAULT exits and
     # exits against DEFAULT bars — the deployed COMBINATION was never on the
@@ -672,7 +735,8 @@ def run_once():
     else:
         bars.update(exits)
     if lf_fresh:
-        scout_levers, log3 = desired_scout_levers(lens_fwd, helping=helping)
+        scout_levers, log3 = desired_scout_levers(lens_fwd, helping=helping,
+                                                  realised=realised)
     else:
         scout_levers, log3 = {}, ["lens-forward missing/stale — no scout-diet "
                                   "changes (fail-safe neutral)"]
@@ -684,7 +748,8 @@ def run_once():
     if fprop is not None:
         props = fprop.proposals_for(set(PROPOSAL_TAKER))
         bars, prov, log5 = consume_proposals(props, tape, bars, lens_fwd,
-                                             lens_fresh=lf_fresh)
+                                             lens_fresh=lf_fresh,
+                                             realised=realised)
 
     attr_to_lever = {attr: lever for _l, (attr, lever, _lad) in TAKER_LADDERS.items()}
     # [2026-07-29 (fp)] STOP_LOSS is deliberately ABSENT: with no mapping, a
@@ -787,6 +852,46 @@ def _selftest():
           "breakout": {"n4h": 5}}
     assert vetoed_lenses(lf) == {"dip"}
 
+    # ---- [2026-08-02] THE TUNER AND THE TAKER MUST NOT DISAGREE ----------
+    # THE INCIDENT: this delegated to the taker's single authority — correctly,
+    # no second copy — but passed neither `sides` nor `realised`, so it never
+    # saw the lens's OWN closes. Measured on the live payload:
+    #   TUNER {dip, divergence, momentum} vs TAKER {dip, momentum}
+    # and the tuner logged "divergence: brain-vetoed at floor — never widened"
+    # every cycle. The one lens the LIVE book trades was the one lens the
+    # growth rail could never widen, refused on the 4h forward horizon that
+    # (ij) proved is the wrong basis for a book holding a bracket.
+    _lf_div = {"divergence": {"n4h": 300, "avg4h_pct": -0.10, "hit4h": 0.494}}
+    assert vetoed_lenses(_lf_div) == {"divergence"}, \
+        "the forward proxy alone must still veto — that half is unchanged"
+    #   ...and the lens's own winning closes overturn it, in the tuner exactly
+    #   as they already did in the taker.
+    _win = {"divergence": (50, 0.463, 0.83)}
+    assert vetoed_lenses(_lf_div, realised=_win) == set(), \
+        "realised closes are SENIOR: a lens its own trades say wins may widen"
+    #   SENIORITY CUTS BOTH WAYS — this is not a loosening. A lens the proxy
+    #   likes but whose own record loses at the t-bar is still vetoed.
+    _lf_ok = {"dip": {"n4h": 300, "avg4h_pct": +0.10, "hit4h": 0.55}}
+    assert vetoed_lenses(_lf_ok) == set()
+    assert vetoed_lenses(_lf_ok, realised={"dip": (13, -1.162, -2.66)}) == {"dip"}, \
+        "a measured loser must not earn a widening because the proxy likes it"
+    #   thin evidence decides nothing — below the floor the proxy still rules
+    assert vetoed_lenses(_lf_div, realised={"divergence": (3, 5.0, 9.9)}) \
+        == {"divergence"}, "n below TT_LENS_REALISED_MIN_N must not overturn"
+    #   FAIL-SAFE OPEN: no evidence reproduces the pre-fix behaviour exactly,
+    #   so a ledger outage degrades to the forward grade, never to "veto
+    #   nothing" and never to a crash.
+    assert vetoed_lenses(_lf_div, realised={}) == vetoed_lenses(_lf_div)
+    assert vetoed_lenses(_lf_div, realised=None) == {"divergence"}
+    assert realised_for_tuner.__doc__ and TUNER_BOT_ROW.endswith("-lshadow"), \
+        "the tuner tunes the SHADOW arm — its evidence must come from that row"
+    #   every caller that can veto must be able to receive the evidence, or
+    #   the fix reaches only some of them and the disagreement survives
+    import inspect as _insp
+    for _fn in (desired_taker_bars, desired_scout_levers, consume_proposals):
+        assert "realised" in _insp.signature(_fn).parameters, \
+            f"{_fn.__name__} gates on the veto and must accept realised"
+
     # A tape where dip tickets sit at range_pos 0.07: the default 0.05 bar
     # starves the lens; one notch (0.08) fills it. Make the dip trades WIN
     # (price rises to TP) so the widen is not-worse on both halves.
@@ -803,6 +908,76 @@ def _selftest():
     assert base["lenses"]["dip"]["seen"] == 2 and base["lenses"]["dip"]["taken"] == 0
     bars, log = desired_taker_bars(win_tape, base, {})
     assert bars.get("DIP_RANGE") == 0.08, (bars, log)
+
+    # [2026-08-02] THE PARAMETER MUST BE CONSUMED, NOT MERELY ACCEPTED.
+    # A signature check passes against a function that ignores the argument —
+    # the registered-but-inert failure mode. Caught by mutation: dropping
+    # `realised=` from THIS call site left the selftest green. So assert on
+    # BEHAVIOUR at the call site that actually gates the widening.
+    _lf_veto = {"dip": {"n4h": 300, "avg4h_pct": -0.10, "hit4h": 0.494}}
+    _b_no, _log_no = desired_taker_bars(win_tape, base, _lf_veto)
+    assert "DIP_RANGE" not in _b_no and \
+        any("brain-vetoed" in l for l in _log_no), (_b_no, _log_no)
+    _b_yes, _log_yes = desired_taker_bars(win_tape, base, _lf_veto,
+                                          realised={"dip": (50, 0.463, 0.83)})
+    assert not any("brain-vetoed" in l for l in _log_yes), _log_yes
+    # NOTE what is and is not claimed: the lens is now ELIGIBLE for the walk,
+    # not widened by it. Its forward grade is still negative, so it is not a
+    # graded winner and the expand rule declines — correctly. The fix removes a
+    # refusal made on the wrong basis; it does not hand out a widening, and the
+    # replay gate remains the only thing that can.
+    assert "DIP_RANGE" not in _b_yes, (_b_yes, _log_yes)
+
+    # THE WIRING, asserted structurally — because two of the four consumers
+    # CANNOT be covered behaviourally, and saying so beats a test that pretends
+    # otherwise. Both were caught by mutation surviving a green selftest.
+    #   * `desired_scout_levers`: its veto branch is UNREACHABLE by output.
+    #     A lens below the ruling floor is never vetoed (`lens_loses` is only
+    #     consulted when `floor_met`), and the diet walk acts ONLY on lenses
+    #     below that floor — measured: with and without `realised` it returns
+    #     byte-identical levers and logs. The argument is threaded for
+    #     consistency (one rule, one evidence set) and would matter the moment
+    #     either floor moves; it changes nothing today.
+    #   * `run_once`: needs a live tape and a DB, so the selftest cannot call
+    #     it. An AST check is the honest substitute for "is it plugged in?".
+    import ast as _ast, textwrap as _tw
+
+    def _passes_realised(fn):
+        """True iff fn CALLS vetoed_lenses with a `realised=` keyword.
+
+        Inspect the CALL NODE, not the source text. The first cut of this
+        asserted `"realised" in ast.dump(...)` and was vacuous — the string is
+        present in the function's own `realised=None` parameter, so the check
+        stayed green with the argument dropped at the call site. Mutation 3
+        survived twice before this was written correctly.
+        """
+        tree = _ast.parse(_tw.dedent(_insp.getsource(fn)))
+        return any(
+            isinstance(n, _ast.Call)
+            and getattr(n.func, "id", None) == "vetoed_lenses"
+            and any(k.arg == "realised" for k in n.keywords)
+            for n in _ast.walk(tree))
+
+    for _fn in (desired_taker_bars, desired_scout_levers, consume_proposals):
+        assert _passes_realised(_fn), \
+            f"{_fn.__name__} calls vetoed_lenses without the realised evidence"
+    _ro = _ast.dump(_ast.parse(_tw.dedent(_insp.getsource(run_once))))
+    assert "realised_for_tuner" in _ro, \
+        "run_once must actually COMPUTE the evidence — mutation showed a " \
+        "stubbed {} left every offline test green while the fix went inert"
+    assert _ro.count("arg='realised'") >= 3, (
+        "run_once must hand the evidence to all three veto consumers "
+        "(taker bars, scout diet, proposal gate)")
+
+    # FAIL-OPEN is behavioural too: a ledger that raises must yield {}, not an
+    # exception into the tuner's cycle. Also caught by mutation.
+    _real_fetch = store.fetch_paper_trades
+    try:
+        store.fetch_paper_trades = lambda *a, **k: (_ for _ in ()).throw(
+            RuntimeError("ledger down"))
+        assert realised_for_tuner() == {}, "a dark ledger must not raise here"
+    finally:
+        store.fetch_paper_trades = _real_fetch
 
     # [2026-07-16 AUDIT] tickets UNREACHABLE at every notch (range_pos 0.30
     # > ladder max 0.15): every notch fills nothing, not_worse passes 0-vs-0
