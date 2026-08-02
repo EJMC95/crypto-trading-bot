@@ -1678,6 +1678,14 @@ def _ensure_history_table(conn):
 _HISTORY_KEEP_DAYS = float(os.environ.get("BOT_STATE_HISTORY_KEEP_DAYS", "60"))
 _hist_writes = 0
 
+#: [2026-08-02] The retention DELETE, as a named constant so a test can assert
+#: on the statement this function actually runs rather than on a description of
+#: it. `%s * interval '1 day'` accepts a NUMERIC bind; `make_interval(days =>
+#: %s)` demands an INTEGER and raised on every call for 17 days. See
+#: `prune_history`.
+HISTORY_PRUNE_SQL = ("DELETE FROM bot_state_history "
+                     "WHERE ts < now() - (%s * interval '1 day')")
+
 
 def prune_history(conn=None, keep_days=None):
     """[2026-07-16 AUDIT FIX] bot_state_history had NO retention anywhere in
@@ -1685,7 +1693,26 @@ def prune_history(conn=None, keep_days=None):
     Railway Postgres bloated indefinitely). Deletes rows older than
     keep_days (default 60 — every consumer reads days, not months: brain
     lens grading, replay tape, regen last-good 24h, /bus.json?hours<=200).
-    Returns rows deleted, or None on DB trouble. Never raises."""
+    Returns rows deleted, or None on DB trouble. Never raises.
+
+    [2026-08-02] THIS HAD NEVER ONCE SUCCEEDED, and it said so in the logs
+    every boot while nobody read them. `make_interval(days => ...)` takes an
+    **integer**, and `days` is built with `float(...)`, so psycopg2 bound a
+    `numeric` and Postgres found no matching function:
+
+        function make_interval(days => numeric) does not exist
+
+    Every call raised, `_warn_once` logged it a single time per process, and
+    the retention this function exists to provide has never run — so
+    `bot_state_history` has grown without bound since 16-Jul. The failure was
+    invisible in exactly the way `(I4)` names: a persistent condition reported
+    by a one-shot warning, behind a `return None` the caller discards.
+
+    The fix is the multiplication idiom, which is typed for `numeric` and so
+    keeps FRACTIONAL retention working (`keep_days=0.5` is meaningful and
+    `make_interval` could never have expressed it). Found by reading a
+    container's logs during the daily review — not by any test, because no
+    test ever ran this function against a real Postgres."""
     conn = conn or _get_conn()
     if conn is None:
         return None
@@ -1693,9 +1720,7 @@ def prune_history(conn=None, keep_days=None):
         _ensure_history_table(conn)
         days = float(keep_days if keep_days is not None else _HISTORY_KEEP_DAYS)
         with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM bot_state_history WHERE ts < now() - "
-                "make_interval(days => %s)", (days,))
+            cur.execute(HISTORY_PRUNE_SQL, (days,))
             return cur.rowcount
     except Exception as e:  # noqa: BLE001
         _warn_once(f"history prune failed ({e})")

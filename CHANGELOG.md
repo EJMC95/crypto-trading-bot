@@ -1,3 +1,42 @@
+## 2026-08-02 (il) — THREE DETECTORS THAT COULD NOT SEE: A CONVERGENT ARM CHECK, A STALE INSTRUCTION, AND A PRUNE THAT NEVER ONCE RAN
+
+- **THE ASK**: the daily evidence review (scheduled task). Suite **777** (+6), ten guards green, thirteen mutations red. Letter picked at commit time against a synced `origin/main`; **re-check before pushing** — this was not pushed.
+- All three are the same shape: a check that runs, reports, and cannot detect the thing it exists to detect.
+
+### 1 · THE ARM-DRIFT CHECK READS "HEALTHY" WHEN BOTH ARMS ARE STALE
+
+- `evidence_review.arm_drift_line` compares the LIVE arm to its SHADOW twin, so it answers *"is the control arm running the same code?"* and nothing else. **Under a total deploy failure of BOTH arms it prints `arms AGREE`** — and the selftest pins that string as raising NO operator flag. A convergent metric is not a health check: ask what it reads when everything is broken.
+- **MEASURED today**: both 💸 Farmer arms report `705425a83422` while the repo predicts `30bf230bd5fb` at the same `build_n=15`. So the **LIVE REAL-MONEY Farmer** sits ~3 days behind `bot_pnl_store` — missing `(hp)`'s `claim_writer`, `(ht)`'s `extra.svc` stamp, `(hr)`'s ledger quarantine — and the daily review has been calling it healthy.
+- `build_compute` has existed since (fd) with **no running consumer anywhere in the tree**: every verification against the repo in this fleet's history was hand-typed into a changelog entry. `head_drift_line` makes it a standing check on all four real-money-adjacent rows.
+- **`n` FIRST, per (fd)**: a differing file count is reported as a FILE-SET difference and explicitly NOT as drift — that misread already cost a day chasing four converged books. It says *"the repo tree"*, not *"HEAD"*, because it predicts from the working tree and `railway up` ships the desk.
+- **The control group is what makes it readable (I6)**: `lighter-ticket-taker-lshadow matches the repo tree` in the same payload, so three "BEHIND" lines are a finding rather than a broken predictor.
+- Fail-soft everywhere: no stamp, no prediction, or an unparseable count claims NOTHING. **The entry file must exist** — `build_compute` silently skips an absent name, so a renamed entry would otherwise return a confident id hashed over the shared set alone. That arm was written first and immediately caught it.
+
+### 2 · THE THIRD CONSUMER OF THE TWO-WRITER FINDING STILL SAID "STOP THE SERVICE"
+
+- A ledger is append-only, so `two_writers` is a **ONE-WAY LATCH**. `(ih)` scoped the pager on recency; `(ii)` scoped the gate's blocking check. **`audit_ledger_integrity` was the third consumer of the same finding and was missed**, still printing *"Stop the duplicate SERVICE in Railway"* — an instruction `(hp)`'s `claim_writer` and `(id)`'s failover ruling had already made false. **A fix closes a class or it is not finished.**
+- Now reports recency and routes the action: 🌾 carry reads `2026-07-29T07:39Z (89.5h ago) — HISTORICAL, no overlap inside 6h. Nothing to stop`. **The finding is unchanged and it still exits non-zero** — the pooled closes stay pooled and no grade may rest on them. Only the INSTRUCTION is scoped, which is the difference between "act now" and "discount this sample".
+- **FAIL-SAFE LOUD**: an unknown timestamp reads ONGOING. The window is the same constant the pager uses and the selftest asserts the two cannot disagree — the reason this file imports the grader instead of re-deriving it.
+- Caught by running it against the live ledger, not by the selftest: my `bad` tuple grew a fourth field and `main()`'s unpack did not. `main()` has no test because it needs a DB — recorded rather than papered over.
+
+### 3 · `prune_history` HAD NEVER ONCE SUCCEEDED
+
+- `make_interval(days => %s)` takes an **integer**; `days` is built with `float(...)`, so psycopg2 bound a `numeric` and Postgres refused: `function make_interval(days => numeric) does not exist`. Every call since 16-Jul raised, `_warn_once` said so once per process, and the caller discards the `None`. **`(I4)` exactly** — a persistent condition announced by a one-shot warning behind a return value nobody reads.
+- **Found by reading a container's log during the review**, not by a test. No test ever ran it against a real Postgres.
+- **VERIFIED against the live DB in both directions** (read-only, no DELETE executed): the old idiom fails with the logged message on a float bind, `now() - (%s * interval '1 day')` resolves, and the multiplication idiom additionally supports FRACTIONAL retention that `make_interval` could never express.
+- **IMPACT, stated honestly: zero rows to date.** `bot_state_history` spans 26 days (47,169 rows) against a 60-day policy, so the prune had nothing to delete and would first have mattered ~5-Sep. It does **not** threaten `(hl)`'s MTM equity series (needs 30d, retention 60d). A bug fixed before it could cost anything still ran broken for seventeen days announcing itself.
+- The test scans the **AST body, not the source text** — the first cut failed on the docstring explaining the fix, reproducing the trap CLAUDE.md already records. Both halves are pinned: the statement AND the float bind, because an int bind would have worked under the old idiom too.
+
+### Also measured, not changed
+
+- **🧲 Snap Back is the fleet's most significant negative result**: n=101 opened since 30-Jul at **−0.402%/trade, t=−3.12**, and it is not a concentration artifact (−0.248%, t=−2.31 with the two worst removed). **100% of those exits are `converged`** — the thesis fires and the book still loses. Its own lever `disloc.enter_pct` has `step: -0.01`, so the growth rail can only LOOSEN it. Keep-or-retire is an operator call; per `(hl)` the fix is not more throughput.
+- **`(hs)` verified working on live data**: the board is HOLDING `fundspread.k` at 8 with *"saturated at 16/8 but MTM P&L is $-13.88"*. A growth-rail restraint firing correctly on the exact book it was built for.
+- **🌾 carry has opened nothing since 30-Jul 01:40Z** while publishing candidates at +245–345% APR against a 20% bar with 7 of 12 slots free. Container alive, `scan ok | 217 perps` every 5 min. Cause NOT diagnosed — the logs carry no reject reason, and `(ie)` is the standing lesson against naming a cause without reading the evidence.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None directly — this is instrumentation, and it says so.** What moved is that the fleet can now see when a REAL-MONEY container stops taking deploys, which it could not before; the finding that produced it is that both live bots are behind the repo right now.
+
 ## 2026-08-01 (ik) — THE (ij) BREAKTHROUGH, WELDED TO THE DOCTRINE LAYER SO IT CANNOT BE FORGOTTEN
 
 - **THE ASK** (operator): *"Save and make sure everyone knows this breakthrough."* Suite **771**, ten guards green, two doctrine mutations red.

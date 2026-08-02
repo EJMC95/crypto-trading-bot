@@ -125,6 +125,16 @@ LIVE_TWINS = frozenset(
     (r[:-len("-lighter")] + "-lshadow") if r.endswith("-lighter") else r
     for r in LIVE_ROWS)
 
+# [2026-08-02] The entry file whose build id each graded row stamps, so the
+# review can compare a RUNNING container against the repo. See
+# `head_drift_line` for why a live/shadow comparison alone cannot do this.
+ROW_ENTRY = {
+    "perps-funding-lighter-lighter": "lighter_funding_bot.py",
+    "perps-funding-lighter-lshadow": "lighter_funding_bot.py",
+    "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",
+    "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
+}
+
 
 # ---------------------------------------------------------------------------
 # pure helpers (covered by --selftest)
@@ -651,6 +661,17 @@ def scan_new_evidence(cur, errors):
                 ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow", "Farmer"),
                 ("lighter-ticket-taker-lighter", "lighter-ticket-taker-lshadow", "Taker")):
             items.append(arm_drift_line(name, b.get(live), b.get(shadow)))
+
+    with Section(errors, "head-drift"):
+        # Same rows, different question: is the CONTAINER carrying what has
+        # been merged? `arm-drift` above cannot answer it — two arms that are
+        # both stale agree with each other. See `head_drift_line`.
+        heads = {}
+        for row, entry in ROW_ENTRY.items():
+            if entry not in heads:
+                heads[entry] = repo_build(entry)
+            items.append(head_drift_line(
+                row, b.get(row), heads[entry], live_money=row in LIVE_ROWS))
     return [i for i in items if i]
 
 
@@ -687,6 +708,81 @@ def arm_drift_line(name, live, shadow):
             "control while this holds")
 
 
+def repo_build(entry):
+    """-> (id, n_files) predicted for `entry` from THIS repo tree, or None.
+
+    Fail-soft by contract: any failure returns None and the caller reports
+    nothing. A drift claim must never rest on a prediction that did not run.
+
+    THE ENTRY MUST EXIST, and that check is load-bearing rather than defensive.
+    `build_compute` SILENTLY SKIPS a declared-but-absent name ((fd), deliberate
+    — images carry different subsets), so a renamed or moved entry does not
+    raise: it returns a confident id hashed over the SHARED SET ALONE. That
+    prediction is wrong, and wrong in the direction that looks like data.
+    """
+    try:
+        import bot_pnl_store
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = entry if os.path.isabs(entry) else os.path.join(root, entry)
+        if not os.path.isfile(path):
+            return None
+        bid, n = bot_pnl_store.build_compute(path)
+        return (bid, int(n)) if bid else None
+    except Exception:
+        return None
+
+
+def head_drift_line(name, row, head, live_money=False):
+    """-> the 🧬 container-vs-REPO build line, or None when it cannot tell.
+
+    [2026-08-02] WHY THIS EXISTS, and why `arm_drift_line` above cannot do it:
+    that check compares the LIVE arm to its SHADOW twin, so it answers "is the
+    control arm running the same code?" and nothing else. **Under a total
+    deploy failure of BOTH arms it reads `arms AGREE` — i.e. healthy** — which
+    is this fleet's own recorded lesson that a convergent metric is not a
+    health check: ask what it reads when everything is broken.
+
+    MEASURED the day this shipped, which is why it is here. Both 💸 Farmer arms
+    reported `705425a83422` while the repo predicted `30bf230bd5fb` at the same
+    `build_n=15`. The review printed "🧬 Farmer arms AGREE" and its own
+    `action_items` selftest pins that string as raising NO flag — so the LIVE
+    REAL-MONEY Farmer sat ~3 days behind `bot_pnl_store` (missing `(hp)`'s
+    `claim_writer`, `(ht)`'s service stamp, `(hr)`'s ledger quarantine) and the
+    daily review called it healthy. `build_compute` existed the whole time and
+    had NO running consumer anywhere in the tree: every verification against
+    the repo in this fleet's history was hand-typed into a changelog entry.
+
+    COMPARE `n` FIRST, per `(fd)`. `build_compute` hashes only the
+    `_BUILD_SHARED` names that EXIST, so one tree stamps different ids in
+    images carrying different COPY sets — that has already been mis-read once
+    as "the deploy never landed". A differing count is reported as a FILE-SET
+    difference and explicitly NOT as drift.
+
+    It says "the repo tree", not "HEAD", on purpose: this predicts from the
+    working tree, and `railway up` ships the desk too. Verifying which commit
+    that tree is remains the reader's job.
+    """
+    br, nr = row or (None, None)
+    if not br or not head:
+        return None
+    bh, nh = head
+    tag = "REAL MONEY " if live_money else ""
+    if br == bh:
+        return f"🧬 {name} matches the repo tree: {br} (n={nr})"
+    try:
+        same_n = int(nr) == int(nh)
+    except (TypeError, ValueError):
+        same_n = False
+    if not same_n:
+        return (f"🧬 {name} differs from the repo on FILE SET, not necessarily "
+                f"code: container {br} (n={nr}) vs repo {bh} (n={nh}) — a "
+                "different count means a different COPY set ((fd)); check that "
+                "image's own Dockerfile before calling it a stale deploy")
+    return (f"🧬 {tag}{name} is BEHIND THE REPO: container {br} vs repo {bh} "
+            f"(both n={nr}, so this is code, not file set) — the running "
+            "container does not carry what has been merged")
+
+
 # ---------------------------------------------------------------------------
 # publish
 # ---------------------------------------------------------------------------
@@ -719,6 +815,13 @@ def action_items(evidence):
         elif "go-live gates" in e and "NO new candidate" not in e:
             out.append(e)
         elif "arms DIVERGE" in e or "DRIFT" in e:
+            out.append(e)
+        elif "BEHIND THE REPO" in e:
+            # [2026-08-02] A container running less than what was merged is an
+            # operator decision (which deploy, and whether it is marker-gated),
+            # never something this review can act on. It gets its own branch
+            # because "BEHIND THE REPO" shares no token with "DRIFT" — matching
+            # it by accident is how a detector silently stops firing.
             out.append(e)
     return out
 
@@ -917,6 +1020,61 @@ def selftest():
     assert len(action_items(["📏 Farmer live-vs-shadow DIVERGING"])) == 1
     assert action_items(["🧬 Farmer arms AGREE: live abc vs shadow abc"]) == []
     assert len(action_items(["🧬 Taker arms DIVERGE: live abc vs shadow def"])) == 1
+
+    # ---- [2026-08-02] CONTAINER vs REPO ----------------------------------
+    # THE INCIDENT: on 2-Aug both Farmer arms reported `705425a83422` while the
+    # repo predicted `30bf230bd5fb` at the same build_n=15. `arm_drift_line`
+    # said "arms AGREE" and `action_items` raised nothing, so a LIVE
+    # REAL-MONEY container ~3 days behind `bot_pnl_store` read as healthy.
+    # A convergent metric is not a health check: ask what it says when
+    # EVERYTHING is broken. Two stale arms agree with each other.
+    _agree = arm_drift_line("Farmer", ("705425a83422", "15"),
+                            ("705425a83422", "15"))
+    assert "AGREE" in _agree and action_items([_agree]) == [], \
+        "the incident's premise: the arm check calls a doubly-stale pair healthy"
+    _behind = head_drift_line("perps-funding-lighter-lighter",
+                              ("705425a83422", "15"), ("30bf230bd5fb", 15),
+                              live_money=True)
+    assert "BEHIND THE REPO" in _behind and "REAL MONEY" in _behind, _behind
+    assert len(action_items([_behind])) == 1, \
+        "a live container behind the repo MUST raise the operator flag"
+    #     ...and the two checks must disagree on this input, or the new one is
+    #     redundant. This is the whole reason it exists.
+    assert action_items([_agree]) == [] and action_items([_behind]) != []
+
+    #     `n` FIRST, per (fd): a different COPY set is NOT a stale deploy, and
+    #     claiming it is has already cost this fleet a day of chasing four books.
+    _fileset = head_drift_line("x", ("aaa", "14"), ("bbb", 15))
+    assert "FILE SET" in _fileset and "BEHIND THE REPO" not in _fileset
+    assert action_items([_fileset]) == [], \
+        "a file-set difference is expected and must not page anyone"
+    #     a match is reported and is not an action
+    _match = head_drift_line("x", ("aaa", "15"), ("aaa", 15))
+    assert "matches the repo tree" in _match and action_items([_match]) == []
+
+    #     FAIL-SOFT: no prediction, no stamp, or an unreadable count claims
+    #     NOTHING. A drift claim must never rest on a prediction that did not
+    #     run — the failure would look exactly like a clean deploy.
+    assert head_drift_line("x", ("aaa", "15"), None) is None
+    assert head_drift_line("x", (None, None), ("aaa", 15)) is None
+    assert head_drift_line("x", None, ("aaa", 15)) is None
+    assert "FILE SET" in head_drift_line("x", ("aaa", "junk"), ("bbb", 15)), \
+        "an unparseable count is a file-set doubt, never a drift accusation"
+    assert repo_build("no_such_entry_file_%%%.py") is None
+
+    #     BORN-DARK ARM. Every failure mode above returns None, so a wrong path
+    #     in ROW_ENTRY makes the whole section return nothing FOREVER and look
+    #     exactly like "no drift". Resolve each mapped entry for real. This is
+    #     also why repo_build resolves against the repo root and not the cwd:
+    #     the review runs from wherever cron happens to start it.
+    for _row, _entry in ROW_ENTRY.items():
+        _p = repo_build(_entry)
+        assert _p and _p[0] and _p[1] > 0, \
+            f"ROW_ENTRY[{_row}]={_entry!r} does not resolve — the check is inert"
+
+    #     every mapped row must be one the arm-drift query actually SELECTs, or
+    #     the section silently reports nothing for it
+    assert set(ROW_ENTRY) >= set(LIVE_ROWS), "both real-money rows must be mapped"
 
     # the gate is IMPORTED, never redefined here — the whole point of (fk)
     assert not any(k.startswith("GATE_MIN") for k in globals()), \

@@ -67,8 +67,57 @@ LIMIT = int(os.environ.get("LEDGER_AUDIT_LIMIT", "5000"))
 # ledger.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from golive_readiness import (       # noqa: E402
-    LEDGER_MIN_OVERLAP_S as MIN_OVERLAP_S, parse_stamp as _dt,
+    LEDGER_MIN_OVERLAP_S as MIN_OVERLAP_S, latest_overlap_start, parse_stamp as _dt,
     peak_concurrency, same_pair_overlaps)
+
+#: [2026-08-02] How long after the most recent overlap this still reads as a
+#: LIVE incident. Deliberately the same constant the pager uses
+#: (`fleet_immune.DUP_WRITER_CLOSED_H`, 6h) so the two cannot disagree about
+#: the same ledger — the reason this file imports the grader rather than
+#: re-deriving it.
+DUP_WRITER_CLOSED_H = float(os.environ.get("DUP_WRITER_CLOSED_H", "6"))
+
+
+def remediation(last_start, now=None):
+    """The operator line for a two-writer finding: what to DO, given WHEN.
+
+    [2026-08-02] THIS TEXT WAS STALE AND POINTED AT THE WRONG ACTION. It read
+    *"Stop the duplicate SERVICE in Railway"* — written when that was true, and
+    made false by three entries shipped since. `(hp)`'s `claim_writer`
+    arbitrates at the top of the loop, `(id)` established that two carry
+    containers are FAILOVER rather than a fault, and the stood-down loser
+    publishes `<bot>:standby` instead of the book's row. There is no service to
+    stop.
+
+    Worse, it could not tell a LIVE incident from a HEALED one, because a
+    ledger is append-only and `two_writers` is therefore a ONE-WAY LATCH. `(ih)`
+    fixed exactly that in the pager and `(ii)` fixed it in the gate's blocking
+    check — **this was the third consumer of the same finding and it was
+    missed.** A fix closes a class or it is not finished.
+
+    THE FINDING ITSELF IS UNCHANGED and this still exits non-zero: the pooled
+    closes stay pooled forever and no grade may rest on them. Only the
+    INSTRUCTION is scoped — the difference between "act now" and "discount this
+    sample", which is precisely what the operator could not previously tell.
+
+    FAIL-SAFE LOUD, against this repo's usual habit: an unknown timestamp reads
+    as ONGOING. A detector that goes quiet because it cannot tell is the
+    failure it exists to prevent.
+    """
+    if last_start is None:
+        return ("UNKNOWN — treat as ONGOING. Confirm `claim_writer` is "
+                "arbitrating: the stood-down container publishes "
+                "`<bot>:standby`, not the book's row.")
+    now = now or datetime.now(last_start.tzinfo)
+    age_h = (now - last_start).total_seconds() / 3600.0
+    when = f"{last_start.isoformat()} ({age_h:.1f}h ago)"
+    if age_h <= DUP_WRITER_CLOSED_H:
+        return (f"{when} — ONGOING. Check that `claim_writer` is arbitrating "
+                "(the loser must publish `<bot>:standby`, not the book's row).")
+    return (f"{when} — HISTORICAL, no overlap inside {DUP_WRITER_CLOSED_H:.0f}h. "
+            "Nothing to stop; the sample stays pooled and unusable, which is "
+            "what this failure means now.")
+
 
 #: Books whose same-pair overlaps are EXPLAINED, with the explanation. The
 #: BORN_DARK_OK idiom: an exemption is on the record or it is not taken.
@@ -170,6 +219,40 @@ def _selftest():
                       "closed_at": "2026-07-13 16:05:04 UTC"}])
     assert len(got2["s"]) == 1, got2
     assert episodes([]) == {} and peak_concurrency([]) == 0
+
+    # ---- [2026-08-02] THE REMEDIATION LINE, and what made it wrong --------
+    # A ledger is append-only, so `two_writers` is a ONE-WAY LATCH. (ih) scoped
+    # the pager on recency and (ii) scoped the gate's blocking check; this file
+    # was the THIRD consumer of the same finding and still said "Stop the
+    # duplicate SERVICE in Railway" — an instruction (hp)/(id) had already made
+    # false. The finding is unchanged; only the ACTION is scoped.
+    from datetime import timedelta as _td
+    _now = _dt("2026-08-02T00:00:00+00:00")
+    _old = remediation(_now - _td(hours=72), now=_now)
+    assert "HISTORICAL" in _old and "Nothing to stop" in _old, _old
+    assert "Stop the duplicate SERVICE" not in _old, \
+        "the stale instruction (hp)/(id) made false must not come back"
+    _live = remediation(_now - _td(hours=1), now=_now)
+    assert "ONGOING" in _live and "claim_writer" in _live, _live
+    assert "standby" in _live, "I8: name the object the operator can check"
+    #     FAIL-SAFE LOUD: an unknown time reads as ONGOING, never as healed.
+    #     Going quiet on a missing field is how a rename disarms a detector.
+    assert "ONGOING" in remediation(None), remediation(None)
+    #     the boundary belongs to the LIVE side (<= window is still ongoing)
+    assert "ONGOING" in remediation(_now - _td(hours=DUP_WRITER_CLOSED_H - 0.01),
+                                    now=_now)
+    assert "HISTORICAL" in remediation(_now - _td(hours=DUP_WRITER_CLOSED_H + 0.01),
+                                       now=_now)
+    #     ...and this guard must agree with the PAGER about the same ledger,
+    #     which is the whole reason this file imports rather than re-derives.
+    try:
+        import fleet_immune as _fi
+        assert DUP_WRITER_CLOSED_H == _fi.DUP_WRITER_CLOSED_H, (
+            "the audit and the pager must not disagree about when a duplicate "
+            f"writer is closed: {DUP_WRITER_CLOSED_H} vs {_fi.DUP_WRITER_CLOSED_H}")
+    except ImportError:      # noqa: BLE001 — offline selftest stays runnable
+        pass
+
     print("audit_ledger_integrity selftest OK (one-process clean, loop jitter "
           "below threshold, two-writer overlap, declared exemption, tolerant "
           "stamps)")
@@ -200,16 +283,17 @@ def main():
         print(f"{bot:34s} {len(e):>4d} {peak_concurrency(e):>5d} "
               f"{len(ov):>4d} {(ov[0][1] if ov else 0):>8.2f}h  {st}{tag}")
         if st == "TWO-WRITERS":
-            bad.append((bot, why, bot in retired))
+            bad.append((bot, why, bot in retired, latest_overlap_start(e)))
     print()
-    for bot, why, is_retired in bad:
+    for bot, why, is_retired, last in bad:
         print(f"*** {bot}{' (RETIRED)' if is_retired else ''}: {why}")
+        print(f"    most recent overlap began: {remediation(last)}")
     if bad:
-        print("\nA guard cannot un-pool a ledger two processes already wrote. "
-              "Stop the duplicate SERVICE in Railway; every close already "
-              "written stays pooled, and any grade over that window inherits "
-              "it.")
-    return 1 if any(not r for _b, _w, r in bad) else 0
+        print("\nA guard cannot un-pool a ledger two processes already wrote: "
+              "every close already written stays pooled, and any grade over "
+              "that window inherits it. That part is permanent and is why this "
+              "still fails.")
+    return 1 if any(not r for _b, _w, r, _last in bad) else 0
 
 
 if __name__ == "__main__":
