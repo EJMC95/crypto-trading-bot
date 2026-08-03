@@ -1,3 +1,20 @@
+## 2026-08-03 (ip) — THE LIVE FARMER'S SECOND, UNGATED DEPLOY PATH IS CLOSED
+
+- **THE ASK** (operator, after `(io)` found the rollback): *"fix the issue of it drifting back at all"*.
+- **THE DEFECT WAS NOT THE DRIFT, IT WAS THE SECOND PATH.** `trail-blazer-live` (💸 the LIVE Funding Farmer, real money) was git-connected to `claude/lighter-gate0`. That gave it **two** ways to deploy: the `[deploy-live-farmer]` marker-gated workflow, and *any* push to gate0 — plus, as `(io)` measured, **any variable change**, which rebuilds from the branch tip. The Ticket Taker has only the gated path. Two live bots, unequal protection, and the weaker one was the one whose branch drifted 60 commits.
+- **Fast-forwarding gate0 was a fix for the instance, not the class** — it would drift again the moment main moved, and the ungated path would still exist. So the source is **DISCONNECTED**:
+
+      railway service source disconnect --service trail-blazer-live --environment production
+
+- **VERIFIED by topology, not by exit code** — `railway status --json`, mapping `serviceId` -> name:
+
+      trail-blazer-live        source={"image": null, "repo": null}   <- was gate0
+      tide-rider-lighter-live  source={"image": null, "repo": null}
+      funding-farmer-shadow    source={"image": null, "repo": null}
+
+  The Farmer now matches the Taker and the shadow: **image / `railway up` only, marker-gated.** No git source ⇒ no branch-triggered rebuild ⇒ a config change cannot roll it back. The bot stayed **online across the disconnect** (build `f61a101f37cf`, equity $198.91, unchanged). The running deployment still reports `meta.branch=claude/lighter-gate0` — that is the provenance of the container already up, not a live connection; it clears on the next `railway up`.
+- **CLI CORRECTION:** `railway service source connect|disconnect` WORKS in **5.30.3**. The standing note that it is broken (`ServiceInstance not found`, "use the web console") was measured on **5.26.2** and is stale — a doctrine that no longer describes the system is a defect (**I12**), and this one would have sent the next reader to a GUI for a one-line fix.
+- **THE TRANSFERABLE RULE, now in CLAUDE.md:** *a git-connected service has a second, ungated deploy path, and a variable change walks it.* Any marker gate, freeze, or review discipline that lives in the workflow is bypassed by the git connection — so for a real-money service the two must not coexist.
 ## 2026-08-03 (io) — THE CARD ASSERTED THREE NUMBERS NOTHING PUBLISHED, AND A VARIABLE CHANGE ROLLED THE LIVE FARMER BACK 60 COMMITS
 
 - **THE ASK** (operator): *"ive just added more money to funding farmer real money, can you optomise the new balance accordingly"*, then *"make sure pnl reflects appropriately"*, then — reading the dashboard after the change — *"the pnl still says clip 20 and cap 80"*.

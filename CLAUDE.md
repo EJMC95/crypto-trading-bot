@@ -733,7 +733,18 @@ its row is dashboard-retired regardless; stop the process when found.
 - `user_data/` — Freqtrade strategies/configs (dormant post-Kraken; the
   gate0 family bot re-expresses them on Lighter)
 - gate0 branch (`claude/lighter-gate0`) — the Lighter runtime (venues/,
-  ShadowBroker, lighter_family_bot.py); its services deploy from there
+  ShadowBroker, lighter_family_bot.py). **NO SERVICE DEPLOYS FROM IT ANY MORE
+  (3-Aug (ip)).** *"its services deploy from there"* stood here while gate0's
+  only consumer was `trail-blazer-live` — **the LIVE Funding Farmer, real
+  money** — and that connection made every config change a code deploy: setting
+  `LIGHTER_ORDER_USD` on 3-Aug rebuilt the service from gate0's tip and rolled
+  the live bot **backwards 60 commits**, dropping `claim_writer` and
+  `extra.svc`. The source is now DISCONNECTED (`railway service source
+  disconnect --service trail-blazer-live`), verified `source={"image":null,
+  "repo":null}` in `railway status --json`. The Farmer now deploys exactly like
+  the Ticket Taker: `railway up` only, behind the `[deploy-live-farmer]` marker
+  gate. **The general rule: a git-connected service has a SECOND, ungated
+  deploy path, and a variable change walks it.**
 
 ## Cross-Bot Intelligence (bot_state keys — since 2026-07-14 CONSUMED, not just published)
 - `brain-stake-mults` — bot_learn's L4 per-(bot, enter_tag) stake
