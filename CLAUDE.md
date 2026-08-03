@@ -1136,6 +1136,24 @@ All new bots:
      commits, not entries, not tests. A pass that leaves no book closer to the
      gate has not moved the fleet, however much it fixed. State at the end of
      every pass which book moved and by how much.
+- **ONLY GROWTH, NO STEP BACKS (operator standing rule, 3-Aug, stated three
+  times in one session: *"anything that sets us back we disregard; anything
+  that promotes its growth and win rate we implement"* / *"only growth, no step
+  backs, we only focus on winning"*).** This is the compression of the rule
+  below and it governs both directions. The half that is easy to get wrong is
+  the FIRST one: **"disregard setbacks" is not permission to skip measurement —
+  it is the ban on banking a change that costs expectancy.** Worked example the
+  day it was stated: `carry.enter_apr` 20% → 10% TRUE would have unlocked 6
+  candidate books on a starved book and read as pure growth; it was REFUSED
+  because a 29bps round trip needs 254 of a 336h max hold to break even at 10%,
+  and the 21-Jul sweep measured that direction loss-making. **Turnover bought
+  with expectancy is a step back wearing a growth costume.** Two corollaries:
+  a **refusal with evidence satisfies this rule** (a silent omission does not —
+  say what you checked), and **a fix whose payoff the measurement then refutes
+  is reported as refuted**, in the commit and the changelog, never sold as a
+  win. `(it)` is the worked example of that too: `carry.min_vol` was registered
+  because the rail structurally could not reach the binding gate, and the same
+  entry records that walking it unlocks zero books today.
 - **GROWTH FINDINGS ARE IMPLEMENTED, NOT FILED (operator rule, 30-Jul (hn)).**
   *"A new rule must be implemented that if we find something that moves us
   forward in progression and growth, it can implement."* Context: *"the whole
