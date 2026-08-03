@@ -412,6 +412,32 @@ EVIDENCE = {
 # A reason must say WHY the omission is correct, not restate it.
 # ---------------------------------------------------------------------------
 LEVER_AUTHORITY_OK = {
+    # --- [2026-08-03 (iv)] the fleet budgets: the gated quantity has NEVER
+    # BEEN OBSERVED, because the bound has never bound ------------------------
+    "lever:risk.long_budget": (
+        "UNMEASURABLE TODAY, and for a reason that is itself the measurement: "
+        "the quantity this bound gates is 'the fleet-wide long count at which "
+        "the veto starts refusing entries', and THE VETO HAS NEVER FIRED at "
+        "20. Measured 3-Aug: longs 11/20, and the highest reading in the "
+        "reviewed window is well inside it. There is no recorded episode of "
+        "the budget binding, so there is no empirical distribution to "
+        "calibrate [20, 40] against — and manufacturing one from the CURRENT "
+        "long count would be circular, since that count is itself produced by "
+        "books the veto never restrained. "
+        "The cage is DERIVED rather than fitted: lo == the operator's value "
+        "(the rail may only widen, never tighten the fleet's risk budget) and "
+        "hi == 2x, which is the point at which `long_effective_n` (11.8 "
+        "effective bets from 15 positions today) would need re-deriving "
+        "anyway. This becomes measurable the first time the veto refuses a "
+        "long — `fleet_bus.long_entries_blocked` is the event to record — and "
+        "that is a real review item, not a reason to assert authority now."),
+    "lever:risk.short_budget": (
+        "UNMEASURABLE TODAY, same mechanism as `risk.long_budget` above and "
+        "more so: shorts read 2/12 on 3-Aug, so the short budget is even "
+        "further from binding than the long one. Declared separately rather "
+        "than folded in, because the two cohorts are counted by different "
+        "code paths and a single declaration would hide a divergence between "
+        "them."),
     # --- levers whose gated quantity is NOT RECORDED, and the obvious
     # substitute would be CIRCULAR --------------------------------------------
     "lever:taker.tp": (

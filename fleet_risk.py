@@ -47,6 +47,17 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 
+# [2026-08-03 (iv)] the growth rail, GUARDED — this organ must publish the
+# light even in an image that does not carry fleet_tuning. `apply_tuning()`
+# no-ops on `tuning is None`, so the budgets stay at the operator's env
+# defaults, which is also what a dark or lane-disabled rail yields. Declared
+# rather than assumed: `audit_image_imports` is the check that this import
+# resolves wherever fleet_risk actually ships.
+try:
+    import fleet_tuning as tuning
+except Exception:  # noqa: BLE001  # pragma: no cover
+    tuning = None
+
 RISK_KEY = "fleet-risk"
 BUS_KEY = "signal-bus"
 TTL_SEC = 900
@@ -162,8 +173,23 @@ def authoritative_row(base, by_bot):
 
 # Fleet budgets (positions, count-based v1 — inverse-vol weighting is a later
 # refinement once this has advisory history to calibrate against).
-LONG_BUDGET = 20
-SHORT_BUDGET = 12
+#
+# [2026-08-03 (iv) STEP 1 OF THE GROWTH RESTRUCTURE — env-backed and REGISTERED,
+# at today's values, so this ships INERT.] These were the only bounds in this
+# file not `os.environ.get`-backed, which made them unreachable by the growth
+# rail: the fleet could widen a book's universe, its cap and its gates, but not
+# the fleet-wide budget those books compete for. A ceiling no author can move is
+# a ceiling that can only ever bind harder as the fleet grows.
+#
+# REGISTERING MOVES NOTHING — the env defaults are 20/12, exactly today's
+# values, and the cages are one-sided in the GROWTH direction (lo == today), so
+# the rail may only widen and can never tighten the budget below what the
+# operator set. Step 2 (admission by EDGE with a displacement policy, so the
+# veto refuses the WORST long rather than the NEXT one) and Step 3 (inverse-vol
+# weighting) both need replay evidence first and are deliberately not here:
+# they change which trades six books take.
+LONG_BUDGET = int(os.environ.get("FLEET_LONG_BUDGET", "20"))
+SHORT_BUDGET = int(os.environ.get("FLEET_SHORT_BUDGET", "12"))
 YELLOW_FRAC = 0.7
 
 # [2026-07-15 EXPOSURE VIEW] The light counts HOW MANY positions; this says
@@ -198,7 +224,7 @@ def held_items(held):
     return [(c, "") for c in (held or [])]
 
 
-def exposure_concentration(positions, uncovered=0):
+def exposure_concentration(positions, uncovered=0, over=0):
     """Advisory concentration view over the SAME directional cohort the light
     counts. `positions` is [(bot, base_symbol, side)] where side is
     'long'/'short'; `uncovered` counts light-cohort positions whose publisher
@@ -216,6 +242,13 @@ def exposure_concentration(positions, uncovered=0):
     return {
         "long_n": n, "short_n": len(shorts),
         "sym_uncovered": int(uncovered),
+        # [2026-08-03 (iv)] the other half of the honesty metric. `sym_over`
+        # counts symbol-harvested positions the BUDGET cohort did not count —
+        # the direction `max(0, ...)` used to discard. Non-zero means
+        # `exposure.long_n` and `long_positions` describe different
+        # populations, which is a fact about the payload the reader must have
+        # rather than a discrepancy they have to rediscover.
+        "sym_over": int(over),
         "long_distinct": len(by_sym),
         # 1/HHI — "the longs behave like this many independent symbol bets".
         "long_effective_n": round(1.0 / hhi, 1) if hhi > 0 else 0.0,
@@ -317,18 +350,55 @@ def governed_clip_scale(raw, mode):
     return (raw if mode == "enforce" else 1.0), raw
 
 
+_ENV_DEFAULTS = {"LONG_BUDGET": LONG_BUDGET, "SHORT_BUDGET": SHORT_BUDGET}
+
+
+def apply_tuning():
+    """Read the fleet budgets from the growth rail. Returns {lever: value}.
+
+    [2026-08-03 (iv)] INERT TODAY, AND DOUBLY SO — `fleet-risk` is not in
+    `FLEET_TUNING_ENACT_LANES`, so `write_levers` drops any attempt to set
+    these AND `get_lever` re-checks the lane at the consumer (the 17-Jul audit
+    fix), returning the operator's env default either way. The plumbing exists
+    so that enabling the lane is a genuine one-line operator act rather than a
+    promise that needs code written first — the `disloc.exit_bps` lesson, where
+    a lever was registered and consumed but absent from `_ENV_DEFAULTS`, so it
+    looked wired and could never move.
+
+    Passing `_ENV_DEFAULTS[attr]` rather than the current global is the
+    ONE-WAY-RATCHET fix: `get_lever` hands back its `default` when a lever is
+    absent, expired or quarantined, so passing the already-moved value would
+    make a widened budget permanent. Auto-revert is the resting state.
+    """
+    global LONG_BUDGET, SHORT_BUDGET
+    if tuning is None:
+        return {}
+    moved = {}
+    for lever, attr in (("risk.long_budget", "LONG_BUDGET"),
+                        ("risk.short_budget", "SHORT_BUDGET")):
+        try:
+            val = int(tuning.get_lever(lever, _ENV_DEFAULTS[attr]))
+        except Exception:  # noqa: BLE001
+            continue                      # a sick rail never moves the budget
+        if val != globals()[attr]:
+            globals()[attr] = val
+            moved[lever] = val
+    return moved
+
+
 def main():
     rows = store.fetch_bot_pnl()
     if rows is None:
         print(f"[fleet-risk] {now_iso()} no DB — skipped")
         return
+    apply_tuning()
     by_bot = {r["bot"]: r for r in rows}
 
     fleet_long, fleet_short = 0, 0
     fleet_equity = 0.0
     equity_by_bot, equity_venue = {}, {}
     per_bot, pair_count, venues_seen = {}, {}, {}
-    expo, expo_uncovered = [], 0   # [2026-07-15 EXPOSURE VIEW] (bot, base, side)
+    expo, expo_uncovered, expo_over = [], 0, 0   # [2026-07-15 EXPOSURE VIEW] (bot, base, side)
     for name in FREQTRADE_BOTS:
         r, venue = authoritative_row(name, by_bot)
         if not r:
@@ -374,7 +444,15 @@ def main():
                 pair_count[base] = pair_count.get(base, 0) + 1
                 expo.append((name, base, side))
                 covered += 1
+        # [2026-08-03 (iv)] TWO-SIDED, because `max(0, ...)` clamped away the
+        # direction that was actually happening: `sym_uncovered` read 0 — "the
+        # view sees everything the budget counts" — while it reported 15 longs
+        # against a budget count of 11. Over-coverage is not the smaller
+        # problem; it means the two numbers describe different populations and
+        # the honesty metric denied it. A metric that can only report half its
+        # own failure mode is the (hh) shape.
         expo_uncovered += max(0, longs + shorts - covered)
+        expo_over += max(0, covered - (longs + shorts))
     for name in PERPS_LS_BOTS:
         r, venue = authoritative_row(name, by_bot)   # live Lighter > paper twin
         if not r or not row_fresh(r):
@@ -410,7 +488,15 @@ def main():
                 pair_count[base] = pair_count.get(base, 0) + 1
                 expo.append((name, base, side))
                 covered += 1
+        # [2026-08-03 (iv)] TWO-SIDED, because `max(0, ...)` clamped away the
+        # direction that was actually happening: `sym_uncovered` read 0 — "the
+        # view sees everything the budget counts" — while it reported 15 longs
+        # against a budget count of 11. Over-coverage is not the smaller
+        # problem; it means the two numbers describe different populations and
+        # the honesty metric denied it. A metric that can only report half its
+        # own failure mode is the (hh) shape.
             expo_uncovered += max(0, longs + shorts - covered)
+            expo_over += max(0, covered - (longs + shorts))
 
     # Shadow/testnet cohort — modelled, NOT real capital, so it never moves the
     # risk light; surfaced as info so the Lighter-cohort activity is still visible.
@@ -460,7 +546,8 @@ def main():
 
     hot_pairs = {k: v for k, v in sorted(pair_count.items(),
                                          key=lambda kv: -kv[1]) if v >= 2}
-    exposure = exposure_concentration(expo, uncovered=expo_uncovered)
+    exposure = exposure_concentration(expo, uncovered=expo_uncovered,
+                                      over=expo_over)
 
     # [2026-07-21 PER-SYMBOL PILEUP CAP — advisory-first, N3 follow-through]
     # A week of 168h history (n=2,019) showed the 20-slot long budget binding
@@ -611,6 +698,15 @@ def main():
         "long_positions": fleet_long, "long_budget": LONG_BUDGET,
         "short_positions": fleet_short, "short_budget": SHORT_BUDGET,
         "gross": gross,
+        # [2026-08-03 (iv)] PUBLISHED AT LAST. `per_bot` has been computed on
+        # every cycle since this organ shipped and thrown away at the publish
+        # boundary, which is why "the three counters disagree" survived four
+        # daily reviews as an open item: `long_positions`, `exposure.long_n`
+        # and `gross` could be SEEN to differ and the breakdown that explains
+        # WHICH bot contributes what was never in the payload. A reconciliation
+        # you cannot attribute is a mystery, not a measurement — I8, applied to
+        # the organ's own output.
+        "per_bot": per_bot,
         "pair_concentration": hot_pairs,   # same base held by >=2 bots
         # [2026-07-15 EXPOSURE VIEW] how many independent bets the count is.
         "exposure": exposure,

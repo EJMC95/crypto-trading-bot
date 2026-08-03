@@ -205,6 +205,11 @@ def test_every_close_path_carries_the_streak_age():
 import funding_basis  # noqa: E402
 import funding_carry_bot as CARRY  # noqa: E402
 
+CARRY_MOD_HAS_NO_LOCAL_COPY = not any(
+    isinstance(n, ast.FunctionDef) and n.name == "restore_hot_since"
+    for n in ast.walk(ast.parse(
+        pathlib.Path(CARRY.__file__).read_text(encoding="utf-8"))))
+
 _NOW = 1_000_000.0
 _CASES = [
     None,
@@ -219,12 +224,41 @@ _CASES = [
 ]
 
 
+def test_the_farmer_REUSES_the_shared_rule_rather_than_copying_it():
+    """PINNED BY IDENTITY, not by behavioural comparison.
+
+    `(iu)` first pinned these two with a 9-blob equality sweep, which was
+    correct while the Farmer carried its own copy. Once the copy was deleted
+    and the name delegated, that sweep compared one object to itself and became
+    VACUOUS — green, proving nothing, and failing in the reassuring direction
+    (the `(in)` lesson, where emptying an allow-list made three arms vacuously
+    pass).
+
+    Identity is both the stronger claim and the honest one, and it is the
+    remedy `(hj)` prescribes: pin re-use with `is`, because a name check stays
+    green against a hand-rolled copy.
+
+    Mutation that turns this red: re-introduce a local `def restore_hot_since`
+    in either module.
+    """
+    assert M.restore_hot_since is funding_basis.restore_hot_since, (
+        "the Farmer has its own copy again — a second copy of a rule is a "
+        "second rule")
+    assert M.HOT_RESTORE_MAX_GAP_S == funding_basis.HOT_RESTORE_MAX_GAP_S
+    assert CARRY_MOD_HAS_NO_LOCAL_COPY, "carry must not define its own either"
+
+
 @pytest.mark.parametrize("blob", _CASES)
-def test_both_funding_books_restore_the_clock_identically(blob):
-    """One rule, one owner. If these ever disagree, one book is admitting
-    entries the other refuses — silently, and only after an outage."""
-    assert (funding_basis.restore_hot_since(blob, _NOW)[0]
-            == M.restore_hot_since(blob, _NOW)[0])
+def test_the_shared_rule_is_exercised_across_the_whole_input_space(blob):
+    """The behavioural sweep now guards the ONE owner directly. It kept its
+    teeth when identity replaced comparison: these are the cases that decide
+    whether a streak survives a gap, and they run against the code both books
+    actually execute."""
+    out, why = funding_basis.restore_hot_since(blob, _NOW)
+    assert isinstance(out, dict) and isinstance(why, str)
+    # a blob without a trustworthy clock must never resurrect one
+    if not (isinstance(blob, dict) and isinstance(blob.get("saved_ts"), (int, float))):
+        assert out == {}, (blob, out)
 
 
 def test_the_shared_restore_fails_closed_in_every_doubtful_direction():

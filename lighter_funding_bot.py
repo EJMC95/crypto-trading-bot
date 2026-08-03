@@ -190,39 +190,22 @@ MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-s
 # now, but cold in between is indistinguishable from continuously hot once the
 # observer was away, so a blob older than this bound is DISCARDED (exactly
 # today's behaviour). 900s covers a deploy/restart, not an outage.
-HOT_RESTORE_MAX_GAP_S = float(
-    os.environ.get("FUNDING_HOT_RESTORE_MAX_GAP_S", "900"))
-
-
-def restore_hot_since(blob, now, max_gap_s=None):
-    """(hot_since, why) — the persisted hot-streak clock, or {} if untrustworthy.
-
-    Pure + selftested. Fail-CLOSED in every doubtful direction, because a
-    WRONGLY-restored clock lets a coin skip the persistence gate on a real-money
-    book: no `saved_ts` -> {}, a gap over the bound -> {}, a negative gap (clock
-    skew) -> {}, a future or unparseable stamp -> that coin dropped. The floor
-    of the failure mode is exactly the pre-fix behaviour, never worse."""
-    max_gap_s = HOT_RESTORE_MAX_GAP_S if max_gap_s is None else max_gap_s
-    blob = blob or {}
-    try:
-        saved = float(blob.get("saved_ts"))
-    except (TypeError, ValueError):
-        return {}, "no saved_ts — clock not restored (pre-(iq) blob or first boot)"
-    gap = now - saved
-    if gap < 0:
-        return {}, f"negative gap {gap:.0f}s (clock skew) — not restored"
-    if gap > max_gap_s:
-        return {}, (f"gap {gap:.0f}s > {max_gap_s:.0f}s — hotness could have "
-                    f"lapsed unobserved; not restored")
-    out = {}
-    for c, t in (blob.get("hot_since") or {}).items():
-        try:
-            t = float(t)
-        except (TypeError, ValueError):
-            continue
-        if t <= now:                      # never trust a future stamp
-            out[str(c)] = t
-    return out, f"restored {len(out)} coin clock(s) across a {gap:.0f}s gap"
+# [2026-08-03 (iu)] DELEGATED TO THE ONE OWNER. This function was defined here
+# by `(iq)` and then needed VERBATIM by the carry book, whose own restore was
+# unconditional — the mirror defect. Rather than let two funding books carry two
+# copies of one rule (`(hj)`: the go-live gate cost the fleet exactly that when
+# `evidence_review` kept its own copy through a re-spec), the implementation now
+# lives in `funding_basis`, which is already this module's imported basis
+# authority, is in `_BUILD_SHARED`, and is COPY'd into every image that runs a
+# funding book (`Dockerfile.fundinglighter:19`, `Dockerfile.funding:18`).
+#
+# BEHAVIOUR-IDENTICAL BY CONSTRUCTION, not by assertion: same env var
+# (`FUNDING_HOT_RESTORE_MAX_GAP_S`), same 900s default, same fail-closed
+# ordering. Verified equal across 9 blobs before this line was written, and
+# `tests/autonomy/test_hot_streak_durability.py` keeps asserting it — the names
+# below stay bound so every existing caller and test is untouched.
+HOT_RESTORE_MAX_GAP_S = funding_basis.HOT_RESTORE_MAX_GAP_S
+restore_hot_since = funding_basis.restore_hot_since
 
 # ---- 🧪 COIN-QUALITY (vol-character) ENTRY FILTER — DEFAULT OFF -------------
 # [2026-07-24 (dp)] Measured on Lighter's own 180d tape at the live gate 0.05

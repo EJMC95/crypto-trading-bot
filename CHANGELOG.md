@@ -1,3 +1,30 @@
+## 2026-08-03 (iv) — THREE COUNTERS DISAGREED FOR FOUR DAYS BECAUSE THE ONE FIELD THAT ATTRIBUTES THEM WAS NEVER PUBLISHED
+
+- **THE ASK** (operator): *"Fix all of the above"* — the daily review's carried list — under the standing rule *"only growth, no step backs."*
+- **THE ITEM**: one `fleet-risk` payload published `long_positions=11`, `exposure.long_n=15`, `gross=13`, and `exposure.sym_uncovered=0` asserting the symbol view saw everything the budget counted. Three numbers answering *"how many longs does the fleet hold"*, disagreeing — and the **ENFORCED** long-budget veto acts on the first (`fleet_bus` reads `long_positions`).
+
+### Two defects, and neither was the arithmetic
+
+1. **`per_bot` was computed every cycle and thrown away at the publish boundary.** Both counting loops populate it; the payload never carried it. **That is why this survived four daily reviews:** every one of them could SEE the gap and none could attribute it. A reconciliation you cannot attribute is a mystery, not a measurement — **I8**, pointed at the organ's own output. Now published.
+2. **`sym_uncovered` could only ever report HALF its own failure mode.** It was `max(0, longs + shorts - covered)`, so when the symbol harvest saw MORE positions than the budget cohort counted, the excess was **clamped to zero and the metric read "fully covered"** — while the payload showed 15 against 11. The honesty metric was structurally incapable of reporting the direction that was actually happening. `sym_over` is the other half; the two are now independent fields, not one number under two names.
+
+- **The two counters are allowed to differ** — `long_positions` counts the BUDGET cohort, `exposure.long_n` counts SYMBOL-HARVESTED positions. What is not allowed is differing **silently**.
+
+### STEP 1 of the long-budget restructure — env-backed, registered, and deliberately NOT auto-enactable
+
+- `LONG_BUDGET`/`SHORT_BUDGET` were **the only bounds in `fleet_risk.py` not `os.environ.get`-backed**. The rail could widen every book's universe, cap and gates but not the fleet-wide budget those books compete for — a ceiling no author can move is one that can only bind harder as the fleet grows. Now `FLEET_LONG_BUDGET`/`FLEET_SHORT_BUDGET`, registered as `risk.long_budget` / `risk.short_budget`, drift-checked in `audit_lever_bounds`.
+- **INERT ON SHIP** (defaults 20/12 = today's values) and **cages are one-sided UP** (`lo == env_default`): the rail may only ever WIDEN the fleet's risk budget and can never tighten it below what a human set.
+- **LANE `fleet-risk` IS DELIBERATELY ABSENT FROM `ENACT_LANES`, and that restraint is the point.** This veto reaches the strategies, the family books AND the Ticket Taker; a lane that lets an automated author widen the whole fleet's admission is a categorically larger object than one that widens a single shadow book's universe. Doubly inert — `write_levers` drops the lane, and `get_lever` re-checks it at the consumer (the 17-Jul fix). Enabling it is one env entry plus an `AUTHOR_LANES` binding: an explicit operator act.
+- **The consumer is wired anyway**, because a lever registered with no reader is the `disloc.exit_bps` shape — looks wired, can never move. `audit_lever_authority` caught exactly that: it reported **NO-CONSUMER** until `apply_tuning()` existed. `_ENV_DEFAULTS` is passed rather than the current global — the one-way-ratchet fix, so a widened budget still auto-reverts.
+- **Both levers are DECLARED `UNMEASURED` with the reason, not silently exempted:** the quantity the bound gates is *the long count at which the veto starts refusing entries*, and **the veto has never fired at 20** (measured 3-Aug: longs 11/20, shorts 2/12). There is no episode to calibrate against, and deriving one from the current count would be circular — that count is produced by books the veto never restrained. It becomes measurable the first time `long_entries_blocked` fires.
+
+### Step 2/3 are NOT here, on purpose
+
+Admission by EDGE with a displacement policy (on 30-Jul ⚖️ Counterweight at t=0.65 held budget 🌾 carry at t=2.60 competed for, because the veto refuses the NEXT long rather than the WORST) and inverse-vol weighting both **change which trades six books take** and need replay evidence first. Shipping Step 1 alone is what makes them possible without pretending they are done.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None directly — this is measurement and reach plumbing.** What moved is that the fleet's most-consumed risk number is now attributable per bot, its coverage metric can report both of its failure directions, and the ceiling six books compete for is reachable by an operator without a deploy. Three mutations verified red (drop `per_bot`, revert a budget to a literal, drop the `over` field). Suite **840**, seven guards green, `audit_lever_authority` back to its 27-finding baseline with two new declarations.
 ## 2026-08-03 (iu) — 🌾 CARRY HAD THE MIRROR OF `(iq)`: IT RESURRECTED HOT STREAKS THAT NEVER PERSISTED
 
 - **THE ASK** (operator, standing): *"only growth, no step backs, we only focus on winning."* Found while checking whether carry shared the Farmer's `(iq)` blackout bug. **It did not — it had the opposite one**, which is worse for win rate.

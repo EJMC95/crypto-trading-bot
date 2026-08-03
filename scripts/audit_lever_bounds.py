@@ -82,6 +82,8 @@ CONSUMERS = {
     "live.funding.min_vol": ("lighter_funding_bot.py", "FUNDING_MIN_VOL"),
     "xp.funding.explore_k": ("lighter_funding_bot.py", "SCAN_EXPLORE_K"),
     "live.funding.explore_k": ("lighter_funding_bot.py", "SCAN_EXPLORE_K"),
+    "risk.long_budget": ("fleet_risk.py", "FLEET_LONG_BUDGET"),
+    "risk.short_budget": ("fleet_risk.py", "FLEET_SHORT_BUDGET"),
     "carry.enter_apr": ("funding_carry_bot.py", "CARRY_ENTER_APR"),
     "carry.max_positions": ("funding_carry_bot.py", "CARRY_MAX_POSITIONS"),
     "carry.min_vol": ("funding_carry_bot.py", "CARRY_MIN_VOL"),

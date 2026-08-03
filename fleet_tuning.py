@@ -339,6 +339,41 @@ LEVERS = {
         # from full and cannot take the eighth-best carry it has graded.
         "kind": "int", "lo": 6, "hi": 20, "lane": "lighter-books",
         "note": "Yield Harvester concurrent carries; env default 12", "env_default": 12, "step": 2},
+    # [2026-08-03 (iv)] THE FLEET-WIDE BUDGETS — the ceiling every book competes
+    # for, and the last bounds in fleet_risk.py that were not env-backed. The
+    # rail could widen a book's universe, its cap and its gates but not the
+    # budget those books share, so growth anywhere pushed harder against a
+    # ceiling no author could move.
+    #
+    # ONE-SIDED BY CONSTRUCTION: `lo` == the operator's current value, so the
+    # rail may only WIDEN and can never tighten the fleet's risk budget below
+    # what a human set. That asymmetry is deliberate — a growth rail that can
+    # restrict the whole fleet's admission is a different and much more
+    # dangerous object than one that can only loosen it.
+    #
+    # INERT ON SHIP (defaults == today's 20/12). This is Step 1 only: it makes
+    # the ceiling reachable. Step 2 is admission by EDGE with a displacement
+    # policy — on 30-Jul ⚖️ Counterweight (t=0.65) held budget that 🌾 carry
+    # (t=2.60) competed for, because `fleet_bus` refuses the NEXT long rather
+    # than the WORST one — and that needs replay evidence before it governs
+    # anything, because it changes which trades six books take.
+    # LANE `fleet-risk` IS DELIBERATELY *NOT* IN `ENACT_LANES`. Registering
+    # these makes them machine-readable, drift-checked and settable by the
+    # OPERATOR without a deploy — which is the whole of Step 1. It does NOT
+    # hand an automated author the fleet-wide risk budget, and that restraint
+    # is the point: this veto reaches the strategies, the family books AND the
+    # Ticket Taker, so a lane that could widen it is a different and much
+    # larger object than one that widens a single shadow book's universe.
+    # Turning it on is one entry in `FLEET_TUNING_ENACT_LANES` plus an
+    # `AUTHOR_LANES` binding — an explicit operator act, exactly like go-live.
+    "risk.long_budget": {
+        "kind": "int", "lo": 20, "hi": 40, "lane": "fleet-risk",
+        "note": "fleet-wide concurrent LONG budget; env default 20",
+        "env_default": 20, "step": 2},
+    "risk.short_budget": {
+        "kind": "int", "lo": 12, "hi": 24, "lane": "fleet-risk",
+        "note": "fleet-wide concurrent SHORT budget; env default 12",
+        "env_default": 12, "step": 2},
     "carry.min_vol": {
         # [2026-08-03] THE GATE THAT WAS ACTUALLY BINDING. `enter_apr` and
         # `max_positions` were both registered and both had room — the book
