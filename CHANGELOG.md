@@ -1,3 +1,41 @@
+## 2026-08-03 (io) — THE CARD ASSERTED THREE NUMBERS NOTHING PUBLISHED, AND A VARIABLE CHANGE ROLLED THE LIVE FARMER BACK 60 COMMITS
+
+- **THE ASK** (operator): *"ive just added more money to funding farmer real money, can you optomise the new balance accordingly"*, then *"make sure pnl reflects appropriately"*, then — reading the dashboard after the change — *"the pnl still says clip 20 and cap 80"*.
+
+### The deposit accounting was already correct, and it is verified rather than asserted
+
+- Equity read `null` for ~8 minutes: the deposit broke the EquityGuard's continuity check and it refused the print, which is the designed behaviour. It rebased on the 3rd consecutive reject and booked the move as **capital, not P&L**:
+
+      deposit  $97.84   how=rebase-consistent
+      equity   $101.11 -> $198.96
+      pnl_abs  +$7.43  -> +$7.44        (unchanged across the deposit)
+      day_start $102.13 -> $199.97      (capital_adjusted_day_start shifted it)
+
+  `198.9602 − 61.1326 (baseline) − 97.84 (move) − 32.55 (backfill) = +7.4377`, matching the published `pnl_abs` exactly. **Declared residual:** while equity is `None` the daily-loss rail cannot fire (it needs a non-None equity) — bounded here to ~8 minutes by the collateral-stable rebase, and already declared in `equity_guard`.
+
+### The card was prose, and every number in it was wrong
+
+- `pnl_dashboard.DESCRIPTIONS["perps-funding-lighter"]` read *"…when |APR|≥40% … · clip $20 × cap $80"* against a process running **clip $37.50, cap $150, gate 5% TRUE apr**. All three are RUNTIME values — the clip rides `live.clip_scale`, the cap is the operator's `*_MAX_NOTIONAL` env, `enter_apr` is a judge-promotable lever — so the string could only ever drift, and the APR half had been **8x overstated since the 17-Jul basis fix**.
+- **The cost was not cosmetic:** the operator read the card, concluded the parameter change had not landed, and only the container's own boot line settled it. A hardcoded number and a live one render identically.
+- **Fixed so it cannot recur:** the bot publishes `clip_usd` / `cap_usd` / `max_open` / `enter_apr`; `live_units()` renders them; the static string keeps only the MECHANISM. Absent fields render **nothing** — a plausible wrong number is worse than a blank, which is the whole defect. `tests/autonomy/test_card_units_from_payload.py` reads the publisher's own `publish(extra=…)` dict **by AST** and requires the consumer's keys to be a subset (the `(hj)` class: a consumer reading a key its publisher does not emit, green fixture and all). Four mutations verified red: publisher key rename, dropped bool guard, restored prose units, invented default.
+
+### A VARIABLE CHANGE REDEPLOYED A REAL-MONEY BOT ONTO A BRANCH 60 COMMITS STALE
+
+- `trail-blazer-live` is git-connected to **`claude/lighter-gate0`**, which is **60 commits behind main and 0 ahead**. Setting an env var triggered a Railway rebuild from gate0's tip, moving the live Farmer's code **backwards**:
+
+      before  30bf230bd5fb = main@8f1d11a   (1-Aug 15:46)
+      after   128995c2fd76 = gate0@2902726  (~30-Jul)
+
+  Both matched by replaying `build_compute` over each ref's own file set — measured, not inferred.
+- **What the real-money bot lost:** `claim_writer` (gate0 has **0** definitions) and `extra.svc` attribution (**0** references to `RAILWAY_SERVICE_NAME`). Confirmed live with a control group, per **I6**: the Farmer published `svc: None` while the Ticket Taker, on a main-derived build, published `svc: 'tide-rider-lighter-live'`. That is precisely the `fleet_immune.stale_writer_sickness` signature.
+- **THE LESSON, and it generalises past this bot:** *a deploy trigger is not always a deploy you asked for.* Nobody pushed code; an env var was set. Any service pinned to a stale branch converts **every** future config change into a silent rollback. `[[gate0-stale-lacks-tonights-guardrails]]` called this the loaded gun; this is it firing.
+
+### Sizing
+
+- Live Farmer: `LIGHTER_ORDER_USD` 20 → **30**, `PERPS_FUNDING_LIGHTER_MAX_NOTIONAL` 80 → **150**, `LIGHTER_MAX_DAILY_LOSS` 10 → **20**. Boot confirms `clip=$37.50 max_open=5`. Gross 0.75x equity — deliberately just under the 0.79x the current 47-close record was earned at.
+- `TRAIL_BLAZER_MAX_NOTIONAL=40` deleted: inert (the alias table maps only `perps-donchian-breakout`), and corroborated by `peak_concurrent: 4` = floor(80/20), which would have read 2 had it bound.
+- **The shadow twin needed no change** — it carries no `LIGHTER_ORDER_USD`, so it already ran the code default $30. The live move brought the arms INTO sync. `conviction=scaled` / `explore_k=2` stay divergent on purpose: that is the experiment judge's A/B, not drift.
+- **Stated plainly, because it runs against the recommendation:** at a fixed cap the $30 clip buys size, not slots, and per-trade % is invariant to clip — so this does not move `t`, `n`, or the window bar. The book is 4/6 bars from the gate (**t=1.55**, window fails until ~16-Aug). Operator's call, taken knowingly.
 ## 2026-08-02 (in) — THE DEPLOY LANDED, SO THREE REAL-MONEY ROWS STOPPED BEING EXEMPT FROM THE DETECTOR THAT WATCHES THEM
 
 - **THE ASK** (operator): dispatched both live services after the `(il)` review, then *"did it work"*. Suite **780**, ten guards green, three mutations red.

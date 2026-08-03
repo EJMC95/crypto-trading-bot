@@ -2504,6 +2504,26 @@ def main():
                                   "conviction": CONVICTION_MODE,
                                   "explore_floor": EXPLORE_MIN_VOL},
                        "vol_filter": VOL_FILTER,
+                       # [2026-08-03] THE CARD'S UNITS COME FROM THE PROCESS NOW.
+                       # pnl_dashboard's DESCRIPTIONS carried "clip $20 x cap $80"
+                       # and "|APR|>=40%" as PROSE, read from nothing. All three
+                       # are RUNTIME values — the clip rides live.clip_scale, the
+                       # cap is the operator's *_MAX_NOTIONAL env, enter_apr is a
+                       # judge-promotable lever — so the string was wrong the
+                       # moment any of them moved, and it was: measured 3-Aug the
+                       # card said "clip $20 x cap $80 / >=40%" against a process
+                       # running clip $37.50, cap $150, gate 5% TRUE. The APR half
+                       # had been 8x wrong since the 17-Jul basis fix. A reader had
+                       # no way to tell, because a hardcoded number and a live one
+                       # render identically. Publish what this process ACTUALLY
+                       # runs; the static string keeps only the MECHANISM, which
+                       # does not drift. Same lesson as [[self-describing-labels-lie]]
+                       # and the (df) rule: enablement is verified by published
+                       # output, never by "the var is set on the service".
+                       "clip_usd": round(order_usd, 2),
+                       "cap_usd": ctx.rails.max_notional,
+                       "max_open": max_open,
+                       "enter_apr": ENTER_APR,
                        # [2026-07-29 audit R5] a blind boot was LOG-ONLY: the
                        # row said "online" while entries were blocked and the
                        # ':live' save suppressed — only container logs said

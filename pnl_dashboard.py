@@ -383,7 +383,15 @@ DESCRIPTIONS = {
     "crypto-intraday-15m": "DayTraderV5Gated · 1h — Georgia's engine at the validated 1h settings · 29 pairs, 5 slots",
     "crypto-swing-daily":  "SwingDipV1 · 1d — the validated daily dip-buyer · 29 pairs, 8 slots",
     "crypto-breakout-4h":  "MomoBreakoutV1 · 4h — the validated Donchian breakout · 29 pairs, 6 slots",
-    "perps-funding-lighter": "holds the side that RECEIVES funding when |APR|≥40%, vol-vetoed, stop-guarded · clip $20 × cap $80",
+    # [2026-08-03] UNITS DELIBERATELY ABSENT — this line used to read
+    # "…when |APR|≥40% … · clip $20 × cap $80" and every one of those three
+    # numbers was wrong: the process was running clip $37.50, cap $150 and a 5%
+    # TRUE gate, and the APR had been 8x overstated since the 17-Jul basis fix.
+    # They are RUNTIME values (clip rides live.clip_scale, cap is the operator's
+    # *_MAX_NOTIONAL env, enter_apr is a judge-promotable lever), so prose can
+    # only ever drift. The bot publishes them now and `live_units` renders them.
+    # Describe the MECHANISM here; never the numbers.
+    "perps-funding-lighter": "holds the side that RECEIVES funding, vol-vetoed, stop-guarded",
     "perps-funding-carry":  "funding-rate carry on HL data — the Funding Farmer's origin strategy",
     "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, rebalances daily · K=8, $20/leg [30-Jul: K 5→8, universe 30→60]",
     "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
@@ -402,9 +410,45 @@ DESCRIPTIONS = {
 }
 
 
-def desc_for(bot):
+def _num(v):
+    """A real number, never a bool (isinstance(True, int) is True and a
+    stray flag rendering as 'clip $1.00' is exactly the kind of confident
+    wrong number this whole change exists to remove)."""
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def live_units(row):
+    """[2026-08-03] A card's sizing, read from the PROCESS's own payload.
+
+    The units used to be typed into DESCRIPTIONS by hand, so the card asserted
+    a clip and a cap that nothing verified — and on 3-Aug the Funding Farmer's
+    line was wrong in all three numbers at once (see the note above its entry).
+    Anything the growth rail, an env var or a promoted lever can move must be
+    rendered from what the bot published, not from prose.
+
+    Absent fields render NOTHING rather than a default: a bot that has not
+    shipped the publisher yet must show no units at all, because a plausible
+    wrong number is worse than a blank — the failure mode being closed here."""
+    e = (row or {}).get("extra") or {}
+    if not isinstance(e, dict):
+        return ""
+    bits = []
+    if _num(e.get("clip_usd")):
+        bits.append(f"clip ${e['clip_usd']:,.2f}")
+    if _num(e.get("cap_usd")):
+        bits.append(f"cap ${e['cap_usd']:,.0f}")
+    if _num(e.get("max_open")):
+        bits.append(f"{int(e['max_open'])} slots")
+    if _num(e.get("enter_apr")):
+        bits.append(f"enter ≥{e['enter_apr']:.2%} TRUE apr")
+    return " · ".join(bits)
+
+
+def desc_for(bot, row=None):
     base, _ = venue_variant(bot)
-    return DESCRIPTIONS.get(base, "")
+    desc = DESCRIPTIONS.get(base, "")
+    units = live_units(row)
+    return " · ".join(p for p in (desc, units) if p)
 def label_for(bot):
     base, suf = venue_variant(bot)
     if suf:
@@ -1987,7 +2031,7 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
         badge += (f' <span style="font-size:10px;border:1px solid {_vc};color:#fff;'
                   f'background:{_vc};border-radius:6px;padding:1px 6px;'
                   f'vertical-align:middle;font-weight:700;letter-spacing:.3px">{_vt}</span>')
-    _desc = desc_for(bot)
+    _desc = desc_for(bot, row)
     _desc_html = (f'<div class="desc">{html.escape(_desc)}</div>' if _desc else "")
     if row is None:
         return (f'<div class="card"><h2>{html.escape(label_for(bot))}{badge} '
