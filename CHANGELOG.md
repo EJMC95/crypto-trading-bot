@@ -1,3 +1,28 @@
+## 2026-08-03 (iw) — "WHICH COMMIT IS THIS BOT ACTUALLY RUNNING?" IS A COMMAND NOW, NOT A 40-MINUTE INVESTIGATION
+
+- **THE ASK** (operator): *"this constant backstepping is running off old code needs to be fixed ... we should be constantly referring to the updated and latest knowledge."*
+- **THE GAP THIS CLOSES.** `extra.build` is a CONTENT HASH: a row can say its container differs from the repo, and never **which commit it is on** or **how far back that is**. Establishing that by hand — which this morning's review did — means a throwaway worktree and replaying `build_compute` across a dozen commits per bot. Nobody does that per deploy, so *"is the fix actually running?"* has been answered by assumption far more often than by measurement. The bill so far: `(io)` an env-var change silently rebuilt the LIVE Farmer from a branch **60 commits stale**; 17-Jul, six fill-telemetry commits landed and **58 real orders** were placed by code that did not contain them; `(gl)` four of six shadow services never deployed for a day.
+- `scripts/audit_code_currency.py` resolves every stamp to a COMMIT and classifies the gap by WHAT IS IN IT — because "behind" is the wrong verdict on its own:
+  * `CURRENT` — matches HEAD.
+  * `BEHIND-OWN` — the gap changes this bot's **own entry file**: it is missing merged behaviour. **The only class that fails the build.**
+  * `BEHIND-SHARED` — the stamp moved, the bot's logic did not.
+  * `DEFERRED` — behind, but every commit in the gap is unmarked and the service is marker-gated: working as designed.
+  * `FILE-SET` — the `build_n` count itself disagrees.
+
+### It replays the REAL function, and its first two runs were both wrong in instructive ways
+
+- **It does not re-hash.** The stamp covers "the entry module plus whatever `_BUILD_SHARED` names EXIST", a set that differs per image — so each candidate commit is checked out and asked to compute its own stamp with its own `bot_pnl_store`. A second copy of that rule would drift the first time the set changes (**(hj)**).
+- **FIRST RUN: nine rows came back UNRESOLVED, and the message blamed history depth.** They publish `build_n=14`; a repo checkout has every shared file and stamps **15**. That is `(fd)` exactly — *a different COUNT means a different FILE SET, not drifted code* — and this guard walked straight into the trap it was built to detect. Fixed by computing each entry against **its own image's COPY set** (`Dockerfile.familyshadow` carries no `fleet_tuning.py`; `dislocation`/`psniper` carry no `funding_basis.py`), and by making the count mismatch its own named verdict instead of a misleading one.
+- **SECOND RUN: the per-image map came back EMPTY and nothing was hidden.** `audit_image_imports.image_contents` returns a 4-TUPLE and the first cut iterated the tuple, so every lookup "matched" a stringified set. Now indexed deliberately, with an empty map treated as a skip rather than a silent pass.
+- **THIRD RUN reported `funding-farmer-shadow` BEHIND-OWN by 6 commits — and that was a gap in the MODEL, not a fleet defect.** `(hi)` joined the two Farmer arms' deploy clock ON PURPOSE: the shadow is the judge's CONTROL arm and *"auto-deploying the shadow on every unmarked push would simply drift the arms the other way"*. Checked against the workflow before being believed, and the arms were in fact byte-identical (both `16c4b139231d`) at the moment it fired. Declared in `MARKER_GATED` with the reason — **a guard that cries wolf on a deliberate design is how a real finding later gets ignored (`(hh)`)**.
+
+### What it says about the fleet today
+
+**Every stamped container is CURRENT, deliberately DEFERRED, or behind only on shared modules.** The two REAL-MONEY services are DEFERRED by design: 💸 the live Farmer sits 6 commits back at `(iq)`, 🎫 the live Taker 12 back at `(ij)`/`(ik)` — both awaiting a deliberate marked deploy, neither missing a change to its own entry file beyond telemetry.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — this is instrumentation.** What moved is that the question behind every "is it live yet?" incident in this changelog is now one command with a verdict, and the three classes that are NOT defects are named so they stop generating false alarms. Selftest covers all eight branches. Suite **840**, eight guards green.
 ## 2026-08-03 (iv) — THREE COUNTERS DISAGREED FOR FOUR DAYS BECAUSE THE ONE FIELD THAT ATTRIBUTES THEM WAS NEVER PUBLISHED
 
 - **THE ASK** (operator): *"Fix all of the above"* — the daily review's carried list — under the standing rule *"only growth, no step backs."*

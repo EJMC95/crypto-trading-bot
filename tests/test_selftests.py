@@ -211,6 +211,14 @@ ENFORCED_AUDITS = [
     # every organ reasoning about that lever's headroom read the wrong number.
     "scripts/audit_lever_bounds.py",
     "scripts/audit_organ_silence.py",
+    # [2026-08-03 (iw)] CODE CURRENCY — resolves each container's `extra.build`
+    # to an actual COMMIT and classifies the gap. Its selftest is the whole
+    # value: the classifier must keep telling BEHIND-OWN (missing merged
+    # behaviour) apart from DEFERRED (marker-gated, working as designed) and
+    # FILE-SET (a different `build_n`, i.e. a different COPY set, not stale
+    # code). Its own first three runs got each of those wrong in turn, so the
+    # negative fixtures are not ceremony.
+    "scripts/audit_code_currency.py",
 ]
 GUARD_ONLY_AUDITS = [
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can
