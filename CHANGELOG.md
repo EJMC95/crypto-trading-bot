@@ -1,3 +1,26 @@
+## 2026-08-03 (is) — 🌾 CARRY CAN NAME ITS OWN BINDING CONSTRAINT, AND THE CENSUS THAT SAYS SO CANNOT STOP THE BOOK
+
+- **THE ASK** (operator): *"if theres anything useful from the other session and adds to the growth and win rate then implement it otherwise discard"* — a concurrent session had left `scan_census()` complete and wired but uncommitted in the tree.
+- **JUDGED USEFUL AND KEPT.** It is the observability half of the exact problem today's review spent a session measuring BY HAND: the book had opened nothing for 98.9h while holding 6 of 12 slots, and `scan ok | 217 perps | held: none` is byte-identical whether 217 coins are cold or 40 are hot and held back by one gate. The census turns a 40-minute cross-source investigation into a line the book prints about itself — **I8** one layer in, applied to a book's own quiet spells.
+- **VERIFIED BEFORE ACCEPTING, not taken on its docstring:** 6 tests pass; buckets are mutually exclusive and sum to `scanned`; `eligible` is pinned against the entry loop's OWN predicate across a 25-cell sweep *including cells where coins qualify*, so the agreement is tested in both directions and not only at zero; the gate ORDER is pinned by a `DUST` row that is both cold and thin, which is what gives `thin` the meaning "hot but untradeable" rather than merely "illiquid".
+
+### What it was missing, and why that mattered more than it looks
+
+- **The census is NOT total over its input and its call site was unguarded.** Measured: `scan_census` raises `KeyError` on a funding entry missing `vol` or `rate`, and `TypeError` on a `None` rate. `funding_map()` seeds those keys today, so this was latent rather than live — but the loop must not DEPEND on that staying true.
+- **The exposure is real because the census runs UNCONDITIONALLY while the trading path below it is gated on a free slot.** A FULL book evaluates `f["rate"]`/`f["vol"]` on coins the candidate expression would never touch — exposure the book did not have before the census existed.
+- **And it sits UPSTREAM of the exit sweep**, so a raise there would skip position management for the entire cycle. **Telemetry taking down trading is the inverse of why it was added** — the "never add anything that inhibits the fleet" rule, arriving through the observability door.
+- Now wrapped, degrading to a **zeroed census with every key present** (never a partial dict — that would move the failure one line down into the log line and `extra.scan` instead of preventing it).
+
+### Guarded by AST, not by a substring scan
+
+- `test_the_census_call_site_is_exception_guarded` walks the tree and requires every `scan_census(...)` call to sit lexically inside a `try` whose handler catches a broad `Exception`, and asserts `guarded == unguarded` so a SECOND unguarded call cannot arrive later. A page-wide grep would have passed on the prose alone — the `(hm)` lesson, where three tests in one session passed on the very sentence promising the property they checked.
+- `test_the_degraded_census_carries_every_key_the_consumers_read` reads the handler's fallback dict from the AST and requires the six bucket keys.
+- `test_scan_census_raises_on_a_malformed_entry_which_is_why_the_call_is_guarded` records WHY the guard exists, so a future reader cannot mistake it for defensive noise.
+- **Two mutations verified red:** unwrapping the call reddens both AST arms.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — and that is the honest answer.** This is pure observability: it changes no gate, no ordering and no entry, and it buys 🌾 carry no trade. What it changes is that the NEXT quiet spell costs a log line instead of a 40-minute investigation, and cannot be misdiagnosed as a stall. Suite **831**, six guards green.
 ## 2026-08-03 (ir) — THE PERSISTENCE BAR WAS UNFALSIFIABLE, AND ITS SUPPRESSION WAS UNREPORTABLE
 
 - **THE ASK** (operator): *"shorten the gate"*, then twice — *"funding farmer still hasnt opened a trade"* / *"still no opens for the real money farmer yet either.."*

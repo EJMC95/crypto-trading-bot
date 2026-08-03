@@ -221,6 +221,63 @@ def _bars(mode):
     return H, ENTER_APR * scale, EXIT_APR * scale
 
 
+def scan_census(fund, positions, hot_since, t0, H, enter_apr,
+                min_vol=None, persist_h=None):
+    """WHY DID NOTHING OPEN? -> a per-gate count of the loop's own decisions.
+
+    [2026-08-02] THE INCIDENT. This book opened nothing for ~50h while holding
+    5 of 12 slots and publishing `hottest_funding_apr` of +245% to +345%
+    against a 20% bar. Everything about the row looked wrong and nothing was:
+    the three coins that had cleared the 6h persistence gate (FOLKS $6k, S
+    $123k, ARC $29k of 24h volume) were **1-3 ORDERS OF MAGNITUDE below the
+    $2M liquidity floor**, and the one liquid hot coin (KAITO, $3.01M) was
+    0.74h short of persisting. Only 12 of the venue's 203 books cleared the
+    volume floor at all. A market condition, correctly handled — not a defect.
+
+    ESTABLISHING THAT COST A 40-MINUTE INVESTIGATION across three sources —
+    this bot's `hot_since` in its state key, the scout's `vols`, and the
+    source for the gate order — because the book's own log said only
+    `scan ok | 217 perps` and its `caps` carried the bar and the cap. **A
+    reader could not tell "no candidates exist" from "a gate is blocking" from
+    "the book is broken".** That is I8 one layer in: a book must be able to
+    name its own binding constraint, or every quiet spell costs an
+    investigation and the next one gets misdiagnosed.
+
+    PURE, AND IT DECIDES NOTHING. The caller's eligibility expression is
+    untouched; this only counts what those rules already decided. The buckets
+    are mutually exclusive and sum to `scanned`, and `eligible` is pinned
+    against the REAL candidate expression in the selftest — a census that can
+    drift from the gate it explains is worse than no census at all.
+
+    Bucket order mirrors the gate order deliberately, so `thin` means "hot but
+    too illiquid" rather than "illiquid", which is the distinction that made
+    the incident legible.
+    """
+    min_vol = MIN_DAY_VOLUME if min_vol is None else min_vol
+    persist_h = PERSIST_H if persist_h is None else persist_h
+    out = {"scanned": len(fund or {}), "held": 0, "thin": 0,
+           "cold": 0, "waiting": 0, "eligible": 0}
+    nxt = None
+    for c, f in (fund or {}).items():
+        if c in (positions or {}):
+            out["held"] += 1
+            continue
+        if abs(f["rate"] * H) < enter_apr:
+            out["cold"] += 1
+        elif f["vol"] < min_vol:
+            out["thin"] += 1
+        elif (t0 - (hot_since or {}).get(c, t0)) < persist_h * 3600.0:
+            out["waiting"] += 1
+            eta = persist_h - (t0 - (hot_since or {}).get(c, t0)) / 3600.0
+            if nxt is None or eta < nxt[1]:
+                nxt = (c, eta)
+        else:
+            out["eligible"] += 1
+    if nxt:
+        out["next"], out["next_eta_h"] = nxt[0], round(nxt[1], 2)
+    return out
+
+
 _MODE_VENUE = {"lighter_shadow": "lighter", "hl_paper": "hyperliquid"}
 
 
@@ -705,6 +762,51 @@ def main():
                 else:
                     hot_since.pop(c, None)
 
+            # ---- WHY DID NOTHING OPEN? [2026-08-02] ----------------------
+            # THE INCIDENT: on 2-Aug this book had opened nothing for ~50h
+            # while holding 5 of 12 slots and publishing `hottest_funding_apr`
+            # of +245% to +345% against a 20% bar. Everything looked wrong and
+            # nothing was: the coins clearing the 6h persistence gate (FOLKS,
+            # S, ARC) were 1-3 ORDERS OF MAGNITUDE below the $2M liquidity
+            # floor, and the one liquid hot coin (KAITO, $3.01M) was 0.74h
+            # short of persisting. A market condition, not a defect.
+            #
+            # IT TOOK A 40-MINUTE INVESTIGATION ACROSS THREE SOURCES to
+            # establish that — this bot's state key for `hot_since`, the
+            # scout's `vols`, and the source for the gate order — because the
+            # book's own log says only `scan ok | 217 perps` and its `caps`
+            # carry only the bar and the cap. **Nobody could tell "no
+            # candidates exist" from "a gate is blocking" from "the book is
+            # broken".** That is I8 one layer in: a book must be able to name
+            # its own binding constraint, or every quiet spell costs an
+            # investigation and the next one gets misdiagnosed as a stall.
+            #
+            # PURE OBSERVABILITY. This changes no gate, no ordering and no
+            # entry — the census is computed from `fund`, which is already in
+            # hand, and the eligibility expression below is UNCHANGED. It only
+            # counts what the existing rules already decided.
+            # [2026-08-03 (is)] GUARDED, and the guard is the load-bearing
+            # part. `scan_census` indexes `f["rate"]`/`f["vol"]` and raises on
+            # a malformed funding entry (verified: KeyError on a missing key,
+            # TypeError on a None rate). It also runs UNCONDITIONALLY, while
+            # the candidate expression below is gated on a free slot — so a
+            # FULL book evaluates those fields on coins the trading path would
+            # never touch, which is exposure the book did not have before.
+            #
+            # An observability feature must never be able to stop the book:
+            # this one sits upstream of the exit sweep, so an exception here
+            # would skip position management for the whole cycle — telemetry
+            # taking down trading, which is the inverse of why it was added.
+            # Degrades to a zeroed census (every key present, so the log line
+            # and `extra.scan` stay well-formed) and never to a partial dict.
+            try:
+                _cens = scan_census(fund, positions, hot_since, t0,
+                                    _H, _enter_apr)
+            except Exception:  # noqa: BLE001
+                _cens = {"scanned": len(fund or {}), "held": 0, "thin": 0,
+                         "cold": 0, "waiting": 0, "eligible": 0,
+                         "error": "census failed"}
+
             # ---- scan for new carries ------------------------------------
             if len(positions) < MAX_POSITIONS:
                 candidates = sorted(
@@ -757,6 +859,12 @@ def main():
                            # board must see the bar this arm ACTUALLY gates on.
                            "caps": {"max_positions": MAX_POSITIONS,
                                     "enter_apr": _enter_apr},
+                           # [2026-08-02] THE BOOK NAMES ITS OWN BINDING
+                           # CONSTRAINT. `scan` answers "why did nothing
+                           # open?" in one glance instead of an investigation
+                           # across this bot's state key, the scout's `vols`
+                           # and the source. See the census block above.
+                           "scan": _cens,
                            # [2026-07-30 (ho)] SOLE-WRITER CHECK. Measured on
                            # THIS book: 14 overlapping same-pair positions and
                            # TWO distinct build stamps — `(gl)` deployed both
@@ -810,8 +918,16 @@ def main():
                 pass
 
             held = ", ".join(f"{c}({p['side'][0]})" for c, p in positions.items()) or "none"
+            # [2026-08-02] The census goes in the LOG too, not only the row.
+            # A quiet book is read from its logs first, and "scan ok | 217
+            # perps" is indistinguishable between a healthy wait and a stall.
+            _why = (f"cold {_cens['cold']}, thin {_cens['thin']}, "
+                    f"waiting {_cens['waiting']}, eligible {_cens['eligible']}")
+            if _cens.get("next"):
+                _why += f" | next {_cens['next']} in {_cens['next_eta_h']:.1f}h"
             print(f"[{now_iso()}] scan ok | {len(fund)} perps | open: {held} "
-                  f"| open_pnl {open_pnl:+.2f} | realized {realized:+.2f}")
+                  f"| open_pnl {open_pnl:+.2f} | realized {realized:+.2f} "
+                  f"| {_why}")
 
         if args.once:
             print(f"[{now_iso()}] --once smoke test complete.")
