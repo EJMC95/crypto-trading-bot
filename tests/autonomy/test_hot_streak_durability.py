@@ -30,6 +30,7 @@ by AST, over the publisher's own save blobs.
 """
 import ast
 import os
+import pathlib
 import sys
 
 import pytest
@@ -184,6 +185,102 @@ def test_every_close_path_carries_the_streak_age():
         n += 1
         assert "hot_h" in kw, "a close path records src but drops hot_h"
     assert n >= 3, f"expected >=3 close paths, found {n}"
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-03 (iu)] THE CARRY BOOK HAD THE MIRROR OF THIS BUG.
+#
+# `(iq)` fixed a LOST clock on the Farmer -> the book went INERT for 4h. The
+# carry book restored its clock UNCONDITIONALLY — any dict, any age, no
+# `saved_ts` and no gap bound — which is the same defect pointing the other
+# way: a WRONGLY-restored streak lets a coin skip PERSIST_H on hotness that
+# did not persist. An inert book shows up as nothing; a permissive one shows
+# up as a bad trade, and "spikes pay fees" is this book's whole thesis.
+#
+# The rule now has ONE OWNER in `funding_basis` (already in _BUILD_SHARED and
+# COPY'd into both images), so the two funding books cannot drift — the `(hj)`
+# rule that a second copy of a rule is a second rule.
+# ---------------------------------------------------------------------------
+
+import funding_basis  # noqa: E402
+import funding_carry_bot as CARRY  # noqa: E402
+
+_NOW = 1_000_000.0
+_CASES = [
+    None,
+    {},
+    {"hot_since": {"A": 1.0}},                                # pre-durability blob
+    {"saved_ts": _NOW - 60, "hot_since": {"A": 5.0}},          # good
+    {"saved_ts": _NOW - 899, "hot_since": {"A": 1.0, "B": 2.0}},
+    {"saved_ts": _NOW - 99999, "hot_since": {"A": 5.0}},       # outage gap
+    {"saved_ts": _NOW + 60, "hot_since": {"A": 5.0}},          # clock skew
+    {"saved_ts": _NOW - 60, "hot_since": {"A": _NOW + 900}},   # future stamp
+    {"saved_ts": _NOW - 60, "hot_since": {"A": "junk"}},       # unparseable
+]
+
+
+@pytest.mark.parametrize("blob", _CASES)
+def test_both_funding_books_restore_the_clock_identically(blob):
+    """One rule, one owner. If these ever disagree, one book is admitting
+    entries the other refuses — silently, and only after an outage."""
+    assert (funding_basis.restore_hot_since(blob, _NOW)[0]
+            == M.restore_hot_since(blob, _NOW)[0])
+
+
+def test_the_shared_restore_fails_closed_in_every_doubtful_direction():
+    """The floor of every failure mode must be the pre-durability behaviour
+    (a fresh wait), never a resurrected streak.
+
+    Mutations that turn this red: drop the gap bound, trust a future stamp,
+    default a missing `saved_ts` to now.
+    """
+    r = funding_basis.restore_hot_since
+    assert r({"hot_since": {"A": 1.0}}, _NOW)[0] == {}, "no saved_ts must not restore"
+    assert r({"saved_ts": _NOW - 99999, "hot_since": {"A": 5.0}}, _NOW)[0] == {}, \
+        "an outage-sized gap must not resurrect a streak"
+    assert r({"saved_ts": _NOW + 60, "hot_since": {"A": 5.0}}, _NOW)[0] == {}, \
+        "clock skew must not restore"
+    assert r({"saved_ts": _NOW - 60, "hot_since": {"A": _NOW + 900}}, _NOW)[0] == {}, \
+        "a future per-coin stamp must be dropped"
+    # and the good case still restores, so the above are not vacuously empty
+    assert r({"saved_ts": _NOW - 60, "hot_since": {"A": 5.0}}, _NOW)[0] == {"A": 5.0}
+
+
+def test_carry_restores_through_the_shared_owner_and_persists_saved_ts():
+    """Two halves, both load-bearing: the carry bot must CALL the shared
+    restore (not re-implement or inline a bare dict copy), and it must WRITE
+    `saved_ts` — without the write, the read fails closed forever and the book
+    silently reduces to a fresh PERSIST_H wait on every boot.
+
+    AST, not a substring scan: this file's own prose says every one of these
+    words (the (hm) lesson).
+    """
+    tree = ast.parse(pathlib.Path(CARRY.__file__).read_text(encoding="utf-8"))
+
+    calls_shared = any(
+        isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "restore_hot_since"
+        and isinstance(n.func.value, ast.Name)
+        and n.func.value.id == "funding_basis"
+        for n in ast.walk(tree))
+    assert calls_shared, "carry must restore through funding_basis, not its own copy"
+
+    assert not any(
+        isinstance(n, ast.FunctionDef) and n.name == "restore_hot_since"
+        for n in ast.walk(tree)), "carry must not define a SECOND copy of the rule"
+
+    saves_ts = False
+    for n in ast.walk(tree):
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "save_state"):
+            for a in n.args:
+                if isinstance(a, ast.Dict) and any(
+                        isinstance(k, ast.Constant) and k.value == "saved_ts"
+                        for k in a.keys):
+                    saves_ts = True
+    assert saves_ts, (
+        "carry never writes `saved_ts` — the restore would fail closed forever "
+        "and every boot would start a fresh PERSIST_H wait")
 
 
 if __name__ == "__main__":

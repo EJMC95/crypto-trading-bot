@@ -38,6 +38,10 @@ THE CONTRACT
   Ask this module; never hardcode 24*365 against a venue again.
 """
 
+# [2026-08-03 (iu)] the module's ONLY import, for the env-overridable
+# HOT_RESTORE_MAX_GAP_S bound below. The basis tables stay pure.
+import os
+
 # periods per DAY of the venue's QUOTED funding rate.
 #   lighter     : /funding-rates `rate` is per 8h  -> 3/day   (VERIFIED 17-Jul)
 #   hyperliquid : `funding` is per 1h              -> 24/day
@@ -122,6 +126,61 @@ def to_hourly(rate, venue: str = DEFAULT_VENUE):
     return float(rate) * (periods_per_day(venue) / 24.0)
 
 
+HOT_RESTORE_MAX_GAP_S = float(
+    os.environ.get("FUNDING_HOT_RESTORE_MAX_GAP_S", "900"))
+
+
+def restore_hot_since(blob, now, max_gap_s=None):
+    """(hot_since, why) — a persisted hot-streak clock, or {} if untrustworthy.
+
+    [2026-08-03 (iu)] THE ONE OWNER of the rule `(iq)` established on the live
+    Farmer, placed here because BOTH funding books need it and a second copy of
+    a rule is a second rule (`(hj)`): the go-live gate cost the fleet exactly
+    that when `evidence_review` kept its own copy through a re-spec. This module
+    is already the funding basis authority, is in `_BUILD_SHARED`, and is COPY'd
+    into both images — so it is the natural home, and neither bot can drift from
+    the other's semantics.
+
+    THE FAILURE IT PREVENTS IS THE MIRROR OF THE ONE `(iq)` FIXED. A LOST clock
+    makes a book INERT (the Farmer's 4h entry blackout). A WRONGLY-RESTORED one
+    makes it PERMISSIVE — a coin skips the persistence gate on a streak that did
+    not actually persist, which is precisely the spike entry the carry thesis
+    exists to refuse ("persistent funding pays carries, spikes pay fees"). An
+    inert book shows up as nothing; a permissive one shows up as a bad trade.
+
+    Fail-CLOSED in every doubtful direction: no `saved_ts` -> {}, a gap over the
+    bound -> {}, a negative gap (clock skew) -> {}, a future or unparseable
+    per-coin stamp -> that coin dropped. **The floor of every failure mode is
+    exactly the pre-durability behaviour, never worse.**
+
+    THE LONG-GAP REFUSAL IS THE LOAD-BEARING ONE: hot before, hot now, cold in
+    between is indistinguishable from continuously hot once the observer was
+    away, so an outage-sized gap must not resurrect a streak. 900s covers a
+    deploy, not an outage.
+    """
+    max_gap_s = HOT_RESTORE_MAX_GAP_S if max_gap_s is None else max_gap_s
+    blob = blob or {}
+    try:
+        saved = float(blob.get("saved_ts"))
+    except (TypeError, ValueError):
+        return {}, "no saved_ts — clock not restored (pre-durability blob or first boot)"
+    gap = now - saved
+    if gap < 0:
+        return {}, f"negative gap {gap:.0f}s (clock skew) — not restored"
+    if gap > max_gap_s:
+        return {}, (f"gap {gap:.0f}s > {max_gap_s:.0f}s — hotness could have "
+                    f"lapsed unobserved; not restored")
+    out = {}
+    for c, t in (blob.get("hot_since") or {}).items():
+        try:
+            t = float(t)
+        except (TypeError, ValueError):
+            continue
+        if t <= now:                      # never trust a future stamp
+            out[str(c)] = t
+    return out, f"restored {len(out)} coin clock(s) across a {gap:.0f}s gap"
+
+
 def _selftest():
     # the verified Lighter anchor: ETH 9.6e-05 per 8h -> 10.51% true APR
     assert abs(to_apr_pct(9.6e-05, "lighter") - 10.512) < 0.01, to_apr_pct(9.6e-05, "lighter")
@@ -141,6 +200,25 @@ def _selftest():
         raise AssertionError("unknown venue must raise, not default")
     except KeyError:
         pass
+    # ---- restore_hot_since: fail-CLOSED in every doubtful direction --------
+    _now = 1_000_000.0
+    assert restore_hot_since({}, _now)[0] == {}, "no saved_ts must not restore"
+    assert restore_hot_since({"hot_since": {"A": 1.0}}, _now)[0] == {}, \
+        "a pre-durability blob has no saved_ts and must not restore"
+    assert restore_hot_since(
+        {"saved_ts": _now - 60, "hot_since": {"A": 5.0}}, _now)[0] == {"A": 5.0}
+    assert restore_hot_since(
+        {"saved_ts": _now - 99999, "hot_since": {"A": 5.0}}, _now)[0] == {}, \
+        "an outage-sized gap must not resurrect a streak"
+    assert restore_hot_since(
+        {"saved_ts": _now + 60, "hot_since": {"A": 5.0}}, _now)[0] == {}, \
+        "clock skew must not restore"
+    assert restore_hot_since(
+        {"saved_ts": _now - 60, "hot_since": {"A": _now + 900}}, _now)[0] == {}, \
+        "a FUTURE per-coin stamp must be dropped"
+    assert restore_hot_since(
+        {"saved_ts": _now - 60, "hot_since": {"A": "junk"}}, _now)[0] == {}, \
+        "an unparseable per-coin stamp must be dropped"
     # None-safe
     assert to_apr(None) is None and to_apr_pct(None) is None
     print("funding_basis self-tests passed "

@@ -1,3 +1,30 @@
+## 2026-08-03 (iu) — 🌾 CARRY HAD THE MIRROR OF `(iq)`: IT RESURRECTED HOT STREAKS THAT NEVER PERSISTED
+
+- **THE ASK** (operator, standing): *"only growth, no step backs, we only focus on winning."* Found while checking whether carry shared the Farmer's `(iq)` blackout bug. **It did not — it had the opposite one**, which is worse for win rate.
+- **`(iq)` FIXED A LOST CLOCK. THIS IS A WRONGLY-RESTORED ONE.** Carry already persisted `hot_since` (so it never suffered the Farmer's 4h blackout) but restored it **UNCONDITIONALLY**: any dict, any age, **no `saved_ts`, no gap bound, no skew check, no future-stamp check**.
+- **ONLY THE DIRECTION DIFFERS, AND THAT IS WHY THIS ONE HID.** A lost clock makes a book **INERT** — it shows up as nothing, which is how `(iq)` cost two operator asks to find. A wrongly-restored clock makes a book **PERMISSIVE**: a coin skips `PERSIST_H` on hotness that lapsed unobserved, and **that shows up as a bad trade, not as silence.** `(iq)` named the hazard exactly — *"hot before, hot now, cold in between is indistinguishable from continuously hot once the observer was away"* — and fixed it on one book only.
+- **THE COST IS THE BOOK'S OWN THESIS.** `PERSIST_H` exists because *"persistent funding pays carries, spikes pay fees"* (the research-backed filter, in this file since 7-Jul). A resurrected streak admits precisely the spike entry the gate was built to refuse — and the 21-Jul Lighter sweep measured what those entries do: **−$93.31/150d at a 20% win rate** when the bar admits non-paying carries.
+
+### ONE OWNER, because a second copy of a rule is a second rule
+
+- The rule now lives in **`funding_basis.py`** — already the fleet's funding-basis authority, already in `_BUILD_SHARED`, already COPY'd into **both** images (`Dockerfile.funding` line 18) and imported by both bots. No born-dark risk, no new dependency.
+- **The live Farmer's own copy was NOT touched** — it is real money and `(iq)` shipped it hours ago; an unrequested refactor of a trading bot's tested code is not on offer under the routing table. Instead `test_both_funding_books_restore_the_clock_identically` pins the two to **identical output across 9 blobs** (measured IDENTICAL), so they cannot drift while the duplicate stands. Consolidating the Farmer onto the shared owner is a one-line follow-up for a pass that has authority over the live image.
+- Fail-CLOSED in every doubtful direction, **floor = the pre-durability behaviour, never worse**: no `saved_ts` ⇒ `{}`, gap > 900s ⇒ `{}`, negative gap ⇒ `{}`, future/unparseable per-coin stamp ⇒ that coin dropped.
+- `saved_ts` is now WRITTEN on every `save_state`. **That half is load-bearing and is tested separately**: without the write the read fails closed forever and the book silently reduces to a fresh 6h wait on every boot — a fix that reads as shipped and does nothing.
+
+### Guarded by AST, mutation-verified
+
+- `test_carry_restores_through_the_shared_owner_and_persists_saved_ts` asserts carry CALLS `funding_basis.restore_hot_since`, **defines no second copy**, and writes `saved_ts`. Substring scanning would pass on this entry's own prose — the `(hm)` lesson.
+- **Two mutations verified red:** dropping the gap bound in the shared owner (breaks parity AND the fail-closed arm), and removing carry's `saved_ts` write.
+- Both selftests green; `funding_basis` gained seven fail-closed assertions of its own.
+
+### WHAT IT COSTS, stated plainly
+
+- **One 6h wait, once.** The blob on disk predates this commit, so the first boot after deploy restores `{}` and starts a fresh `PERSIST_H`. **Now is the cheapest possible moment to pay it** — carry has opened nothing in 98.9h and only ONE liquid book on the venue clears its bar (which it already holds), so the wait costs entries it was not going to take anyway. `(iq)` made the same argument for the same reason.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**🌾 carry — in win-rate quality, not in trade count.** It can no longer enter on a streak that lapsed while its container was down. No gate was weakened, no bar moved, and `PERSIST_H` is unchanged at 6h. Suite **833**, six guards green.
 ## 2026-08-03 (it) — THE ONE GATE THAT BOUND 🌾 CARRY WAS THE ONE THE GROWTH RAIL COULD NOT REACH
 
 - **THE ASK** (operator): *"fix the things holding it back from wins"*, under the standing rule *"only growth, no step backs, we only focus on winning."*

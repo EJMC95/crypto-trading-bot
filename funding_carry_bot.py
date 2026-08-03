@@ -506,10 +506,20 @@ def main():
         _saved = store.load_state(bot_id)
         if _saved and isinstance(_saved.get("positions"), dict) and _saved["positions"]:
             positions = _saved["positions"]
-        if _saved and isinstance(_saved.get("hot_since"), dict):
-            hot_since = {str(k): float(v) for k, v in _saved["hot_since"].items()}
-            print(f"[{now_iso()}] restored {len(positions)} open carry position(s) "
-                  f"from saved state")
+        # [2026-08-03 (iu)] THE HOT-STREAK CLOCK IS RESTORED FAIL-CLOSED.
+        # It used to be restored UNCONDITIONALLY — any dict, any age, no
+        # `saved_ts` and no gap bound. That is the MIRROR of the bug `(iq)`
+        # fixed on the live Farmer: a LOST clock makes a book inert, a
+        # WRONGLY-RESTORED one makes it PERMISSIVE, letting a coin skip
+        # PERSIST_H on a streak that did not actually persist — the exact
+        # spike entry this book's thesis exists to refuse. `funding_basis` is
+        # the ONE OWNER of the rule so the two funding books cannot drift.
+        if _saved is not None:
+            import funding_basis  # function-local, matching this file's idiom
+            hot_since, _why = funding_basis.restore_hot_since(
+                _saved, time.time())
+            print(f"[{now_iso()}] restored {len(positions)} open carry "
+                  f"position(s) | hot-streak clock: {_why}")
     except Exception:
         pass
 
@@ -947,8 +957,13 @@ def main():
 
             # [2026-07-03 PERSIST] Durable open-carry state -> Postgres.
             try:
+                # [2026-08-03 (iu)] `saved_ts` is what makes the hot-streak
+                # clock restorable AT ALL — `restore_hot_since` fails closed
+                # without it, so omitting it here would silently reduce the
+                # book to a fresh PERSIST_H wait on every boot.
                 store.save_state(bot_id, {"positions": positions, "hot_since": hot_since,
-                                           "last_ts": last_ts})
+                                           "last_ts": last_ts,
+                                           "saved_ts": time.time()})
             except Exception:
                 pass
 
