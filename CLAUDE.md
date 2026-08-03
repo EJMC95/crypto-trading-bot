@@ -1060,6 +1060,26 @@ All new bots:
   Check before you claim a fix is live: `scripts/audit_deploy_coverage.py`
   (does a path have ANY deploy route?), then marker-grep the RUNNING
   container — the only proof a deploy landed ([[railway-cli-frozen-services]]).
+  **[2026-08-03 (iw)] AND `scripts/audit_code_currency.py` ANSWERS "WHICH
+  COMMIT IS THIS BOT ACTUALLY RUNNING?" — it is one command now, not a
+  40-minute investigation.** `extra.build` is a CONTENT HASH: it can say a
+  container differs from the repo and never which commit it is on or how far
+  back. This resolves every stamp to a commit by replaying the REAL
+  `build_compute` per commit (never re-hashing — that would be a second copy
+  of the rule), and classifies the gap by WHAT IS IN IT, because "behind" is
+  the wrong verdict on its own:
+  `CURRENT` / `BEHIND-OWN` (the gap changes the bot's own entry file — the
+  only class that fails) / `BEHIND-SHARED` (the stamp moved, the logic did
+  not) / `DEFERRED` (marker-gated, working as designed) / `FILE-SET` (a
+  different `build_n`, i.e. a different COPY set — the `(fd)` trap).
+  **Its own first three runs were each wrong**, and the reasons are the
+  standing traps: it computed against the REPO tree so nine 14-file images
+  read as UNRESOLVED (`(fd)`, walked into by the guard built to detect it);
+  `audit_image_imports.image_contents` returns a 4-TUPLE and iterating it gave
+  a silently EMPTY map; and it reported `funding-farmer-shadow` BEHIND-OWN
+  when `(hi)` had joined the two arms' deploy clock ON PURPOSE. **Check a
+  currency finding against the workflow before believing it** — a guard that
+  cries wolf on a deliberate design is how a real finding later gets ignored.
   Deploy live from a CLEAN worktree: `railway up` uploads your DESK, WIP and
   all ([[deploy-live-from-a-clean-worktree]]).
 - Dashboard service: `pnl-dashboard`
