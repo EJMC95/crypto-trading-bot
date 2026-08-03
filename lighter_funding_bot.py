@@ -644,7 +644,7 @@ def entry_admission(coin, src, is_short, apr, st):
     return "open", None
 
 
-def entry_stamp(is_short, px, now_ts, clip, src):
+def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None):
     """The position's ENTRY receipt, pure — the meta dict every exit,
     grader and lever audit reads.
 
@@ -662,6 +662,16 @@ def entry_stamp(is_short, px, now_ts, clip, src):
     """
     return {"is_short": is_short, "entry": px, "opened_ts": now_ts,
             "accrued": 0.0, "clip": clip, "src": src,
+            # [2026-08-03 (ir)] HOW LONG THE COIN HAD BEEN HOT AT ENTRY.
+            # PERSIST_H (4h) is the entry gate, and until now the ledger
+            # recorded the BAR but never the OBSERVATION — so "should the
+            # persistence gate be shorter?" was structurally unanswerable from
+            # the book's own record, the same unfalsifiable-constant class the
+            # (gr) exit-telemetry fix closed for prices. With this stamped, a
+            # few weeks of closes can say whether trades entered at 4h differ
+            # from those entered at 12h. TELEMETRY ONLY — no bar, threshold or
+            # decision reads it, and None on a legacy/blind entry.
+            "hot_h": hot_h,
             "bars": {"enter_apr": ENTER_APR,
                      "take_profit": TAKE_PROFIT,
                      "max_hold_h": MAX_HOLD_H,
@@ -1185,7 +1195,7 @@ _slip_bps_of = slip_bps_of
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_long,
                   reason, order_usd=ORDER_USD, venue=None, shadow=None,
-                  bars=None, src=None, measured=None, fill_src=None):
+                  bars=None, src=None, measured=None, fill_src=None, hot_h=None):
     """Mirror a realized directional funding trade to the paper_trades ledger.
     pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip
     (the ENTRY clip — callers pass meta['clip'], not the current loop's clip,
@@ -1239,7 +1249,8 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl, was_l
             # one, against a gross edge the CHANGELOG puts at +6.18bps/trade.
             # TELEMETRY ONLY: no bar, threshold or decision reads these keys.
             extra=_close_fill_extra(
-                _close_src_extra(_close_bars_extra(bars), src),
+                _close_hot_extra(
+                    _close_src_extra(_close_bars_extra(bars), src), hot_h),
                 measured, fill_src))
     except Exception:
         pass
@@ -1281,6 +1292,26 @@ def _close_src_extra(extra, src):
         return extra
     out = dict(extra or {})
     out.setdefault("src", str(src))
+    return out
+
+
+def _close_hot_extra(extra, hot_h):
+    """[2026-08-03 (ir)] merge the position's hot-streak age at entry into the
+    close row. Same additive contract as `_close_src_extra`: a legacy position
+    (no clock recorded) changes nothing, a None extra is never turned into a
+    claim, and an existing value is never clobbered. Accepts 0.0 — that is a
+    REAL and interesting reading (it would mean the persistence gate admitted
+    a coin with no streak), so it must not be swallowed by a falsy test."""
+    if hot_h is None:
+        return extra
+    try:
+        hot_h = float(hot_h)
+    except (TypeError, ValueError):
+        return extra
+    if hot_h != hot_h:                      # NaN — never reaches storage (I5)
+        return extra
+    out = dict(extra or {})
+    out.setdefault("hot_h", hot_h)
     return out
 
 
@@ -1738,6 +1769,7 @@ def main():
                           order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag,
                           bars=(m or {}).get("bars"), src=(m or {}).get("src"),
+                          hot_h=(m or {}).get("hot_h"),
                           measured=_meas, fill_src=_src)
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was px_decision — the
@@ -2104,6 +2136,7 @@ def main():
                                           venue=venue_tag, shadow=shadow_tag,
                                           bars=(m or {}).get("bars"),
                                           src=(m or {}).get("src"),
+                                          hot_h=(m or {}).get("hot_h"),
                                           measured=_bmeas, fill_src=_bsrc)
                             n_closed += 1
                             # [2026-07-28 AUDIT FIX] this path never counted a
@@ -2201,6 +2234,7 @@ def main():
                           order_usd=float((m or {}).get("clip") or order_usd),
                           venue=venue_tag, shadow=shadow_tag,
                           bars=(m or {}).get("bars"), src=(m or {}).get("src"),
+                          hot_h=(m or {}).get("hot_h"),
                           measured=_meas, fill_src=_src)
             try:
                 # [2026-07-17 FILL TELEMETRY] px_fill was the decision price
@@ -2302,6 +2336,8 @@ def main():
         if open_now < max_open and not quarantine_blind and not live_state_blind:
             # cheap prefilter: hard SAFETY gates on the funding map only (no network)
             prelim, explore_pool = [], []
+            # [(ir)] persistence-gate suppression census for this scan
+            _persist_block, _persist_soonest = 0, float("inf")
             # [2026-07-30 (eu) §B RECEIPTS] this cycle's decision-time
             # quantities (slope ratios incl. skips, unclamped conviction
             # scores, explore pool size) — published at the end of the
@@ -2328,12 +2364,31 @@ def main():
                 main_ok = vol24 >= MIN_VOL
                 if not main_ok and (_ex_floor is None or vol24 < _ex_floor):
                     continue
-                if (t0 - hot_since.get(c, t0)) / 3600.0 < PERSIST_H:
+                _hot_h = (t0 - hot_since.get(c, t0)) / 3600.0
+                if _hot_h < PERSIST_H:
+                    # [(ir)] COUNT what the persistence gate is holding back.
+                    # This is the ONLY gate that can suppress the whole book at
+                    # once (a restart zeroes every clock), and until now it did
+                    # so silently: the loop printed `scan ok | held: none`,
+                    # byte-identical to "nothing was hot". The operator asked
+                    # twice why the live book had not opened, and neither the
+                    # log nor the row could answer.
+                    _persist_block += 1
+                    _persist_soonest = min(_persist_soonest, PERSIST_H - _hot_h)
                     continue
                 if not ctx.supports(c):
                     continue
                 (prelim if main_ok else explore_pool).append((c, f, apr))
             prelim.sort(key=lambda x: -abs(x[2]))
+            # [(ir)] Report suppression as a STATE, not as an absence. Only when
+            # the gate is the binding constraint (nothing got through and
+            # something was held): a book that is simply idle stays quiet, so
+            # this cannot become noise the operator learns to ignore.
+            if _persist_block and not prelim and not explore_pool:
+                log.info("PERSISTENCE GATE holding %d hot coin(s) — soonest "
+                         "eligible in %.1fh (PERSIST_H=%.1fh). This is the "
+                         "post-restart wait, not an empty market.",
+                         _persist_block, max(_persist_soonest, 0.0), PERSIST_H)
 
             if SCAN_ENABLED:
                 # deep-scan the hottest SCAN_DEEP_MAX: veto traps + rank risk-adjusted.
@@ -2462,7 +2517,14 @@ def main():
                 # [2026-07-30 (es) SEAM] the entry receipt, extracted pure —
                 # carries the 22-Jul flap fix + 28-Jul D7 entry-time bars
                 # contract (see entry_stamp's docstring for the history).
-                meta[coin] = entry_stamp(is_short, px, t0, clip, src)
+                meta[coin] = entry_stamp(
+                    is_short, px, t0, clip, src,
+                    # [(ir)] the observation behind the PERSIST_H bar. `t0`
+                    # default => 0.0 for a coin with no clock (never negative,
+                    # never a guess); the gate above has already required this
+                    # to be >= PERSIST_H, so a 0.0 here would itself be a bug
+                    # worth seeing in the ledger.
+                    hot_h=round((t0 - hot_since.get(coin, t0)) / 3600.0, 3))
                 # [2026-07-28 AUDIT FIX] make this open visible to the REST of
                 # THIS loop's cap checks at its REAL clip: open_notional prices
                 # a position present in `pos` via meta['clip'] (conviction-

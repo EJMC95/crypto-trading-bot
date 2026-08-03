@@ -1,3 +1,39 @@
+## 2026-08-03 (ir) — THE PERSISTENCE BAR WAS UNFALSIFIABLE, AND ITS SUPPRESSION WAS UNREPORTABLE
+
+- **THE ASK** (operator): *"shorten the gate"*, then twice — *"funding farmer still hasnt opened a trade"* / *"still no opens for the real money farmer yet either.."*
+- **THE SECOND ASK IS THE FINDING.** Being asked twice is the defect: the book was in the `(iq)` post-restart wait, the loop was healthy, and **nothing anywhere could say so**. `scan ok | 217 perps | held: none` is byte-identical whether 217 coins are cold or 40 are hot and held back by one gate.
+
+### Why "shorten the gate" could not be answered
+
+- The ledger stamps the persistence **BAR** (`extra.bars.enter_apr`, `max_hold_h`, …) and never the **OBSERVATION** — how long the coin had actually been hot at entry. So no query over the book's own record can compare trades entered at 4h against trades entered at 12h, and `PERSIST_H` is exactly as unfalsifiable as every exit constant was before `(gr)`.
+- The one harness that sweeps it, `backtest_funding_persistence.py`, carries a **formally WITHDRAWN verdict**, and its every $/yr figure is denominated in an assumed 10bps round trip its own LIMITATIONS section calls *"the load-bearing constant … not measured"*. Shortening a real-money entry gate on that basis would be swapping one unmeasured constant for another — the `(fk)` mistake.
+- **So the gate is NOT shortened.** `entry_stamp` now records `hot_h`, and in a few weeks the question answers itself from the record. Telemetry only: no bar, threshold or decision reads it.
+- `_close_hot_extra` mirrors `_close_src_extra`'s additive contract, with two deliberate differences: **0.0 is RECORDED, not swallowed** (a falsy test would hide the one reading that would prove the gate was bypassed), and **NaN is dropped before storage** — `json.dumps` emits bare `NaN`, Postgres `jsonb` rejects the row, and one bad field would cost the whole close (**I5**).
+- Class-closed by AST: any `_record_close` call passing `src` must pass `hot_h`, so a fourth close path cannot silently drop it for one exit reason. **A partial ledger is worse than none — the gap would read as a finding.** Three mutations verified red.
+
+### Suppression is a STATE now, not an absence
+
+- The prefilter counts what the persistence gate held back and logs it **only when that gate is the binding constraint** (nothing got through AND something was held):
+
+      PERSISTENCE GATE holding 12 hot coin(s) — soonest eligible in 0.4h
+      (PERSIST_H=4.0h). This is the post-restart wait, not an empty market.
+
+- Gated deliberately so an idle book stays quiet: **a detector that fires on every empty scan trains the operator to ignore it** — the `(hh)` rule, applied to a log line instead of a page.
+
+### What the live book's own record says about wins (n=50 in-era, +$3.82, 52%)
+
+      short_take_profit   4   +3.27   +0.817/trade   100% win   15.7h median hold
+      short_decay        31   +3.45   +0.111/trade    55%        5.9h
+      short_flip         11   -0.58   -0.053/trade    36%        4.0h
+      short_stop          1   -2.00   -1.997/trade     0%       24.3h
+
+- **The wins are in the HELD trades.** TP wins 100% at a 15.7h hold; `short_flip` loses at a 4.0h hold — a ~4x hold gap between the best and worst buckets, the "one rule firing before the other can" signature.
+- **The asymmetry to investigate: 4 hours of persistence to ENTER, one observation to EXIT.** Slow in, instant out. `short_flip` is 22% of live trades and negative, and the shadow arm agrees independently (15 trades, 40%, −$0.43), as does the sister carry book (−$17.32 on sided flips while the UNSIDED bucket earns +$7.02).
+- **Not proposed, because it is already refuted:** tightening the stop. It is tempting (7 stops across both arms, 0 wins, −$7.86) but TP.04/STOP.03 measured **−$11.57 with both halves negative** on this bot ([[funding-farmer-stop-is-the-bug]]).
+
+### Not deployed, on purpose
+
+- **This commit carries NO live marker.** It was ready at 04:20Z with the `(iq)` blackout due to clear at 04:36Z — deploying would have restarted the container and cost the book another four hours after it had already waited four. The code lands on main and ships on the next deliberate deploy.
 ## 2026-08-03 (iq) — EVERY DEPLOY COST THE LIVE BOOK A SILENT 4-HOUR ENTRY BLACKOUT
 
 - **THE ASK** (operator): *"funding farmer still hasnt opened a trade"*, then *"get it fixed now that delay is a silly rule"*.

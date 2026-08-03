@@ -137,5 +137,54 @@ def test_the_validated_gate_was_not_weakened():
         "a bookkeeping bug and must not be worked around by weakening it")
 
 
+def test_entry_stamp_records_the_streak_age():
+    """[(ir)] The ledger recorded the persistence BAR but never the
+    OBSERVATION, so "should PERSIST_H be shorter?" could not be answered from
+    the book's own record — the unfalsifiable-constant class (gr) closed for
+    exit prices."""
+    m = M.entry_stamp(True, 100.0, 1_700_000_000.0, 25.0, "exploit", hot_h=7.25)
+    assert m["hot_h"] == 7.25
+    assert M.entry_stamp(True, 100.0, 1.0, 25.0, "exploit")["hot_h"] is None
+
+
+def test_zero_hours_is_recorded_not_swallowed():
+    """0.0 is a REAL and alarming reading — it would mean the gate admitted a
+    coin with no streak at all. A falsy test would hide exactly the bug most
+    worth seeing, so this pins truthiness is not used."""
+    assert M._close_hot_extra({}, 0.0) == {"hot_h": 0.0}
+
+
+@pytest.mark.parametrize("bad", [None, "later", float("nan")])
+def test_unusable_streak_ages_never_reach_storage(bad):
+    """NaN is the I5 case: json.dumps emits bare NaN and Postgres jsonb rejects
+    the whole row, so one bad field would cost the entire close record."""
+    assert M._close_hot_extra({"bars": {"x": 1}}, bad) == {"bars": {"x": 1}}
+
+
+def test_hot_extra_is_additive_only():
+    assert M._close_hot_extra(None, None) is None
+    assert M._close_hot_extra(None, 3.0) == {"hot_h": 3.0}
+    assert M._close_hot_extra({"hot_h": "keep"}, 9.0)["hot_h"] == "keep"
+
+
+def test_every_close_path_carries_the_streak_age():
+    """Class-closer. Three call sites record a close; a fourth added later
+    without `hot_h` would silently drop the telemetry for that exit reason
+    only — and a partial ledger is worse than none, because the gap would look
+    like a finding. Any `_record_close` call passing `src` must pass `hot_h`."""
+    src = open(os.path.join(_ROOT, "lighter_funding_bot.py"), encoding="utf-8").read()
+    n = 0
+    for node in ast.walk(ast.parse(src)):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "_record_close"):
+            continue
+        kw = {k.arg for k in node.keywords}
+        if "src" not in kw:
+            continue
+        n += 1
+        assert "hot_h" in kw, "a close path records src but drops hot_h"
+    assert n >= 3, f"expected >=3 close paths, found {n}"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
