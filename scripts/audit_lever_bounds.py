@@ -84,6 +84,7 @@ CONSUMERS = {
     "live.funding.explore_k": ("lighter_funding_bot.py", "SCAN_EXPLORE_K"),
     "carry.enter_apr": ("funding_carry_bot.py", "CARRY_ENTER_APR"),
     "carry.max_positions": ("funding_carry_bot.py", "CARRY_MAX_POSITIONS"),
+    "carry.min_vol": ("funding_carry_bot.py", "CARRY_MIN_VOL"),
     "fundspread.k": ("lighter_funding_spread_bot.py", "FUNDSPREAD_K"),
     "fundspread.universe_n": ("lighter_funding_spread_bot.py",
                               "FUNDSPREAD_UNIVERSE_N"),

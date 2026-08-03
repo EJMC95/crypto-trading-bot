@@ -1,3 +1,41 @@
+## 2026-08-03 (it) — THE ONE GATE THAT BOUND 🌾 CARRY WAS THE ONE THE GROWTH RAIL COULD NOT REACH
+
+- **THE ASK** (operator): *"fix the things holding it back from wins"*, under the standing rule *"only growth, no step backs, we only focus on winning."*
+- **THE SHAPE.** 🌾 carry had TWO registered levers (`carry.enter_apr`, `carry.max_positions`) and both had slack — it sat at **6 of 12 slots** and went **98.9h without an OPEN**. The gate that actually bound, `MIN_DAY_VOLUME`, was a **bare literal**: not env-backed, not in `_ENV_DEFAULTS`, not registered. A book whose only tunable knobs are the ones with room looks tunable and cannot move. Same shape as `fleet_risk`'s `LONG_BUDGET`/`SHORT_BUDGET`, on a different book.
+- **MEASURED** against the scout's live `vols` (203 books, age 0.06h): only **14** clear the $2M floor; the median book turns over **$0.043M**. The book's own published hot list was **CXMT −692.9% ($0.155M)** and **H100 +209.4% ($0.128M)** — 13-16x BELOW the floor — while **KAITO missed by $2,000** ($1.998M).
+- `carry.min_vol` is now registered on `lighter-books`, cage **[1e6, 2e6]**, `env_default` 2e6, step −250k, consumed through `apply_tuning()` (not read at the call site — that is the registered-but-inert failure the lane exists to prevent). Drift-checked in `audit_lever_bounds.CONSUMERS`.
+- **SHIPS INERT, verified:** `MIN_DAY_VOLUME` is still exactly 2e6; clamp can only loosen ($2.5M→$2.0M capped, $0.5M→$1.0M floored); the step ladder terminates ($2.00→1.75→1.50→1.25→1.00M). **Three mutations verified red** — unwiring it from `apply_tuning`, drifting the registry default (the audit names the exact defect), and dropping it from the test list.
+
+### THE MEASUREMENT THEN REFUTED THE PAYOFF, AND THAT IS RECORDED RATHER THAN BURIED
+
+- Walking the new cage to its floor unlocks **ZERO additional hot books**:
+
+      floor     liquid   hot&liquid   NEW vs $2M
+      $2.00M      15          1           —     (SKHYNIXUSD +137%, ALREADY HELD)
+      $1.00M      26          1          +0
+
+- The hot coins are **6-13x below even the $1M bound** — they were never one notch away. Every liquid book, ranked, shows the real condition: `SKHYNIXUSD +136.7%`, then **nothing between 13% and 137%**, then SOXL +13.1%, LIT/SOL/ZEC/HYPE/KAITO ~±10.5%, BTC +6.1%. **Exactly one liquid book clears the 20% TRUE bar and carry already holds it.**
+- **So the venue's funding distribution has collapsed. That is a market condition, correctly handled — not a defect and not a knob.** The fix removes a STRUCTURAL blind spot in the rail; it does not buy a trade today, and the daily review's earlier framing of it as the #1 growth win is **withdrawn in place**.
+
+### The gate with real headroom, and why it was NOT touched
+
+- `carry.enter_apr` (cage [0.80, 3.20] = 10-40% TRUE, shipped 1.60 = 20%). At the $2M floor: 20% -> **0** unheld candidates, 12% -> 1, **10% -> 6** (SOXL, LIT, SOL, ZEC, HYPE, KAITO, all $2.3M-$26.8M — no liquidity objection).
+- **It is refused on measurement, not on caution.** The 21-Jul gate sweep on Lighter's own 150d tape found this direction loss-making (0.40 = 5% TRUE: −$93.31/150d at a 20% win rate; monotone, only 1.60 beat shipped on the full window AND both halves). Reproduced independently from the bot's own constants — 29.0bps round trip against a 336h `MAX_HOLD`:
+
+      5% -> 508h  CANNOT PAY within MAX_HOLD   <- reproduces the 21-Jul finding
+     10% -> 254h  pays, margin  82h            <- the cage floor: thin
+     20% -> 127h  pays, margin 209h            <- shipped
+
+- 10% is not *structurally* impossible the way 5% was, but it needs the rate to hold 254 of 336 hours merely to break even — on rates that mean-revert in hours, which is why `PERSIST_H` exists. **That is turnover bought with expectancy: a step back wearing a growth costume, and the standing rule rejects it.** It is also not a thing to hand-set — it belongs in `fleet_proposals.py` -> the scout tuner's replay gate, brain veto senior.
+
+### A CLASS CLOSED, AND IT CAUGHT A REAL GAP ON ITS FIRST RUN
+
+- `tests/autonomy/test_book_levers.py` drove its coverage from a **hand-written list**, so registering `carry.min_vol` left all 104 tests passing *around* it — green, covering nothing. A list that must be updated by hand is a list that will not be, and it fails in the reassuring direction.
+- `test_every_lighter_books_lever_is_listed_here` now requires the registry's `lighter-books` membership to be a subset of the tested list. **On its first run it failed on `disloc.exit_bps`** — the fleet's FIRST exit lever, shipped `(gu)` on 30-Jul, registered on that lane and listed nowhere here, so it had no cage, consumer or auto-revert assertion for four days. Verified correctly wired (it is), now covered in both consumption parametrizes. Coverage hole, not a live defect — which is exactly the shape that stays invisible until the lever misbehaves.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**No book moved, stated plainly.** 🌾 carry gains a reachable gate and zero trades, because nothing on the venue is worth buying today. The honest forward note: carry's era restarted 31-Jul and it has **0 gradeable closes**, so if the funding distribution does not widen it will not approach the gate — **a keep-or-retire call for the operator in late August, not a code change.** Suite **831**, six guards green, `--selftest` OK.
 ## 2026-08-03 (is) — 🌾 CARRY CAN NAME ITS OWN BINDING CONSTRAINT, AND THE CENSUS THAT SAYS SO CANNOT STOP THE BOOK
 
 - **THE ASK** (operator): *"if theres anything useful from the other session and adds to the growth and win rate then implement it otherwise discard"* — a concurrent session had left `scan_census()` complete and wired but uncommitted in the tree.

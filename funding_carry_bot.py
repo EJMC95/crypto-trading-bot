@@ -84,7 +84,34 @@ NOTIONAL = 300.0          # quote notional per carry position [2026-07-06 raised
 # tail, which is exactly why turning away graded candidates is expensive.
 # Now also a registry-bounded lever (`carry.max_positions`, [6, 20]).
 MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
-MIN_DAY_VOLUME = 2e6      # only coins with >= $2M 24h notional volume [2026-07-06 lowered from $5M to capture hot-rate coins like ME/MINA]
+# [2026-08-03 (it) THE FLOOR WAS THE BINDING GATE AND THE RAIL COULD NOT REACH
+# IT] `carry.enter_apr` and `carry.max_positions` were both registered and both
+# had slack — the book sat at 6 of 12 slots and went 98.9h without an OPEN —
+# while the one gate that actually bound was a bare literal. A book whose only
+# tunable knobs are the ones with room looks tunable and cannot move; the same
+# shape as fleet_risk's LONG_BUDGET/SHORT_BUDGET.
+#
+# MEASURED against the scout's live `vols` (203 books): only **14** clear this
+# $2M floor and the median book turns over $0.043M. The book's own hot list
+# read CXMT -692.9% ($0.155M) and H100 +209.4% ($0.128M) — 13-16x BELOW the
+# floor — while KAITO missed by **$2,000** ($1.998M).
+#
+# REGISTERING IT MOVES NOTHING: the env default is today's value, so this ships
+# INERT. Cage [1e6, 2e6] — `hi` is today's setting so the rail may only loosen
+# TOWARD the tape and can never tighten past it (the `disloc.exit_bps` idiom);
+# `lo` stops at $1M, which doubles the eligible set (14 -> 26) while holding the
+# $300 clip at <=0.03% of a book's daily turnover. DELIBERATELY NOT LOWER:
+# per-book slippage here is unmeasured ([[lighter-slippage-is-per-book-not-per-venue]])
+# and the real-money funding floors (`{xp,live}.funding.min_vol`) bottom at $2M.
+#
+# STATED AGAINST MY OWN CHANGE, because a growth claim that does not pay must
+# not be banked: walking this cage to $1M today unlocks **ZERO** additional hot
+# books. Only ONE liquid book clears the 20% TRUE bar (SKHYNIXUSD +137%) and
+# carry already holds it; the hot coins are 6-13x below even $1M. The venue's
+# funding distribution has collapsed — a market condition, not a defect. This
+# removes a STRUCTURAL blind spot in the rail; it does not buy a trade today
+# and must not be reported as if it did.
+MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "2e6"))  # 24h $ turnover floor
 
 # Funding thresholds, ANNUALIZED. These are denominated in THIS FILE'S ORIGINAL
 # HYPERLIQUID basis (hourly rate * 24 * 365) and are NOT the numbers either arm
@@ -173,7 +200,8 @@ def _basis(mode):
 # the growth rail's central safety property ("levers EXPIRE back to defaults
 # on their own, so auto-revert is the resting state"). Shipped broken in
 # (fz); it was inert only because nothing authored the lane yet.
-_ENV_DEFAULTS = {"ENTER_APR": ENTER_APR, "MAX_POSITIONS": MAX_POSITIONS}
+_ENV_DEFAULTS = {"ENTER_APR": ENTER_APR, "MAX_POSITIONS": MAX_POSITIONS,
+                 "MIN_DAY_VOLUME": MIN_DAY_VOLUME}
 
 
 def apply_tuning():
@@ -189,12 +217,19 @@ def apply_tuning():
     the gate through the same single path main() uses, and the basis
     selftest keeps exercising the real call site.
     """
-    global ENTER_APR, MAX_POSITIONS
+    global ENTER_APR, MAX_POSITIONS, MIN_DAY_VOLUME
     if tuning is None:
         return {}
     moved = {}
     for lever, attr in (("carry.enter_apr", "ENTER_APR"),
-                        ("carry.max_positions", "MAX_POSITIONS")):
+                        ("carry.max_positions", "MAX_POSITIONS"),
+                        # [2026-08-03 (it)] the liquidity floor — the gate that
+                        # was actually binding while the other two had room. It
+                        # must be reached through THIS loop, not read from the
+                        # module constant at the call site, or the lever is
+                        # registered-but-inert: the exact failure the
+                        # `lighter-books` lane was created to prevent.
+                        ("carry.min_vol", "MIN_DAY_VOLUME")):
         cur = globals()[attr]
         try:
             val = tuning.get_lever(lever, _ENV_DEFAULTS[attr])

@@ -48,7 +48,46 @@ BOOK_LEVERS = [
     # 192 aligned days was ONE against six). A book whose sole lever cannot
     # change what it trades has no growth rail; these three can.
     "trend.universe_n", "trend.min_vol_m", "trend.max_open",
+    # [2026-08-03] 🌾 carry's LIQUIDITY FLOOR — the gate that was actually
+    # binding while the two registered ones had slack. The book sat at 6 of 12
+    # slots and went 98.9h without an OPEN because only 14 of 203 books clear
+    # $2M of 24h turnover (median book $0.043M); its own hot list was 13-16x
+    # below the floor and KAITO missed by $2,000.
+    "carry.min_vol",
+    # [2026-08-03] FOUND BY THE COMPLETENESS TEST BELOW ON ITS FIRST RUN, not
+    # by a human: `disloc.exit_bps` — the fleet's FIRST exit lever, shipped
+    # (gu) 30-Jul — was registered on this lane and listed nowhere here, so it
+    # had no cage assertion, no consumer assertion and no auto-revert
+    # assertion for four days. It is correctly wired (verified: consumed in
+    # `apply_tuning` and present in `_ENV_DEFAULTS`), so this was a coverage
+    # hole rather than a live defect — which is exactly the shape that stays
+    # invisible until the lever misbehaves.
+    "disloc.exit_bps",
 ]
+
+
+def test_every_lighter_books_lever_is_listed_here():
+    """THE CLASS-CLOSER, and it is here because this file failed to catch its
+    own gap. `BOOK_LEVERS` is hand-written, so when `carry.min_vol` was
+    registered the 104 tests in this file passed *around* it — green, and
+    covering nothing. A list that must be updated by hand is a list that will
+    not be, and the failure is silent and reassuring.
+
+    So the registry is the source of truth in the completeness direction: any
+    lever on the `lighter-books` lane MUST appear above and inherit every
+    assertion in this file. The hand-written list keeps its own teeth in the
+    other direction — a lever DISAPPEARING from the registry still fails.
+
+    Mutation that turns this red: register a `lighter-books` lever and do not
+    list it.
+    """
+    registered = {n for n, s in fleet_tuning.LEVERS.items()
+                  if s.get("lane") == "lighter-books"}
+    missing = sorted(registered - set(BOOK_LEVERS))
+    assert not missing, (
+        f"registered on lighter-books but untested here: {missing} — "
+        "add them to BOOK_LEVERS; a registered lever with no test is the "
+        "'registered but inert' class this file exists to prevent")
 
 
 @pytest.mark.parametrize("name", BOOK_LEVERS)
@@ -106,10 +145,12 @@ def test_farmer_liquidity_floor_is_now_reachable_by_the_judge():
 @pytest.mark.parametrize("mod,lever,attr,value", [
     (carry, "carry.enter_apr", "ENTER_APR", 2.40),
     (carry, "carry.max_positions", "MAX_POSITIONS", 16),
+    (carry, "carry.min_vol", "MIN_DAY_VOLUME", 1.5e6),
     (spread, "fundspread.k", "K", 10),
     (spread, "fundspread.universe_n", "UNIVERSE_N", 75),
     (disloc, "disloc.enter_pct", "ENTER_PCT", 0.95),
     (disloc, "disloc.universe_n", "UNIVERSE_N", 25),
+    (disloc, "disloc.exit_bps", "EXIT_BPS", 20.0),
     (index_bot, "index.max_open", "MAX_OPEN", 7),
 ])
 def test_apply_tuning_moves_the_real_module_global(monkeypatch, mod, lever,
@@ -433,8 +474,10 @@ def test_sniper_probe_cache_is_monotone_by_construction():
 @pytest.mark.parametrize("mod,lever,attr,moved", [
     (carry, "carry.enter_apr", "ENTER_APR", 2.40),
     (carry, "carry.max_positions", "MAX_POSITIONS", 16),
+    (carry, "carry.min_vol", "MIN_DAY_VOLUME", 1.5e6),
     (spread, "fundspread.k", "K", 10),
     (disloc, "disloc.enter_pct", "ENTER_PCT", 0.95),
+    (disloc, "disloc.exit_bps", "EXIT_BPS", 20.0),
     (index_bot, "index.max_open", "MAX_OPEN", 7),
     (sniper, "sniper.surge_mult", "SURGE_MULT", 6.0),
 ])

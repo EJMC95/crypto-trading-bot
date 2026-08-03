@@ -339,6 +339,26 @@ LEVERS = {
         # from full and cannot take the eighth-best carry it has graded.
         "kind": "int", "lo": 6, "hi": 20, "lane": "lighter-books",
         "note": "Yield Harvester concurrent carries; env default 12", "env_default": 12, "step": 2},
+    "carry.min_vol": {
+        # [2026-08-03] THE GATE THAT WAS ACTUALLY BINDING. `enter_apr` and
+        # `max_positions` were both registered and both had room — the book
+        # sat at 6 of 12 slots and went 98.9h without an OPEN, because only
+        # **14 of 203** books clear its $2M turnover floor (median book:
+        # $0.043M). Its own hot list read CXMT -692.9% at $0.155M and H100
+        # +209.4% at $0.128M, 13-16x below the floor, while KAITO missed by
+        # $2,000. Registering the two knobs with slack and leaving the binding
+        # one a bare literal is how a book looks tunable and cannot move.
+        #
+        # `hi` is today's value so the rail can only LOOSEN toward the tape,
+        # never tighten past the operator's setting (the `disloc.exit_bps`
+        # idiom). `lo` = $1M doubles the eligible set (14 -> 26) and holds the
+        # $300 clip at <=0.03% of daily turnover; it stops there because
+        # per-book slippage here is unmeasured and the real-money funding
+        # floors bottom at $2M. Step walks DOWN a notch at a time
+        # (2.0 -> 1.75 -> 1.5 -> 1.25 -> 1.0), each one replay-gated.
+        "kind": "float", "lo": 1e6, "hi": 2e6, "lane": "lighter-books",
+        "note": "Yield Harvester 24h $ turnover floor; env default 2e6",
+        "env_default": 2000000.0, "step": -250000.0},
     "fundspread.k": {
         # measured AT its cap: 10 open = exactly K=5 x 2 legs.
         "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
