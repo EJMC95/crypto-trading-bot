@@ -1,0 +1,141 @@
+"""A TIMER ON A CONTAINER THAT RESTARTS MUST SURVIVE THE RESTART (2026-08-03).
+
+MEASURED on the live Funding Farmer: it booted 00:05Z after a deploy and could
+not open a position until **04:05Z**, because the entry gate needs a coin hot
+for `PERSIST_H` (4h) and `hot_since` was memory-only — every boot reset every
+coin's streak to zero. The loop meanwhile printed
+
+    scan ok | 217 perps | held: none
+
+which is byte-identical to "nothing was hot enough". A blocked book and an
+idle book looked the same from outside, on real money, for four hours after
+every deploy — and there were several deploys that day.
+
+**This is the same defect the 22-Jul COOLDOWN DURABILITY fix closed on this very
+bot** ("a memory-only guard on a bot whose container is not"), and `hot_since`
+is the timer it missed. Only the direction differs: a lost cooldown made the
+bot too PERMISSIVE (re-armed a coin it had just stopped out of), a lost
+hot-streak makes it entirely INERT. Same class, opposite sign — which is
+presumably why one got noticed and the other did not.
+
+The validated gate is UNCHANGED: `PERSIST_H` is still 4h and a coin must still
+be continuously hot for it. Restoring the clock only readmits entries an
+UNINTERRUPTED process would have taken.
+
+`test_both_arms_persist_the_clock` is the load-bearing one. The shadow twin is
+the experiment judge's CONTROL ARM, and the bot's own 22-Jul note records what
+happens when a durability fix ships on one arm only: "makes the paired
+promotion bar compare two different rules". So parity is asserted structurally,
+by AST, over the publisher's own save blobs.
+"""
+import ast
+import os
+import sys
+
+import pytest
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+import lighter_funding_bot as M  # noqa: E402
+
+NOW = 1_000_000.0
+
+
+def _blob(hot, saved):
+    return {"hot_since": hot, "saved_ts": saved}
+
+
+def test_clock_survives_a_deploy_sized_gap():
+    """The whole point: a redeploy must not cost the book its streak."""
+    hot, why = M.restore_hot_since(_blob({"BTC": NOW - 5 * 3600}, NOW - 60), NOW)
+    assert hot == {"BTC": NOW - 5 * 3600}, why
+    # ...and the restored clock actually CLEARS the gate it exists to satisfy
+    age_h = (NOW - hot["BTC"]) / 3600.0
+    assert age_h >= M.PERSIST_H, f"{age_h}h should clear PERSIST_H={M.PERSIST_H}"
+
+
+def test_a_pre_fix_blob_restores_nothing():
+    """No `saved_ts` = a blob written before this shipped. Fail-closed to the
+    OLD behaviour, never to a guess about when the coin went hot."""
+    hot, why = M.restore_hot_since({"hot_since": {"BTC": NOW - 9e9}}, NOW)
+    assert hot == {} and "no saved_ts" in why
+
+
+def test_a_long_gap_is_refused():
+    """Hot before, hot now, COLD IN BETWEEN is indistinguishable from
+    continuously hot once the observer was away — so an outage-sized gap must
+    not resurrect a streak. This is the one case that could wrongly let a coin
+    skip the gate on a real-money book."""
+    hot, why = M.restore_hot_since(
+        _blob({"BTC": NOW - 5 * 3600}, NOW - 6 * 3600), NOW)
+    assert hot == {} and "not restored" in why
+
+
+def test_clock_skew_is_refused():
+    hot, why = M.restore_hot_since(_blob({"BTC": NOW - 5 * 3600}, NOW + 500), NOW)
+    assert hot == {} and "negative gap" in why
+
+
+@pytest.mark.parametrize("bad", [NOW + 3600, "soon", None, float("nan")])
+def test_untrustworthy_stamps_are_dropped_per_coin(bad):
+    """A future or unparseable stamp drops THAT coin, without taking the
+    healthy ones with it. NaN compares False against every bound, so it is
+    excluded by the same `t <= now` test rather than by a special case."""
+    hot, _ = M.restore_hot_since(
+        _blob({"BTC": NOW - 5 * 3600, "JUNK": bad}, NOW - 60), NOW)
+    assert hot == {"BTC": NOW - 5 * 3600}
+
+
+def test_bound_is_configurable_and_defaults_sanely():
+    assert 0 < M.HOT_RESTORE_MAX_GAP_S <= 3600, (
+        "the bound must cover a deploy, not an outage — a large value "
+        "reintroduces the stale-streak hazard this fails closed on")
+
+
+def _save_blob_keys(module_filename):
+    """Key sets of every `store.save_state(bot, {...})` dict literal. AST, not
+    a substring scan — `"hot_since"` appears in this file's own docstring and
+    in the bot's comments, either of which would satisfy a grep."""
+    src = open(os.path.join(_ROOT, module_filename), encoding="utf-8").read()
+    out = []
+    for node in ast.walk(ast.parse(src)):
+        if not (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "save_state"):
+            continue
+        for arg in node.args:
+            if isinstance(arg, ast.Dict):
+                out.append({k.value for k in arg.keys
+                            if isinstance(k, ast.Constant)
+                            and isinstance(k.value, str)})
+    return out
+
+
+def test_both_arms_persist_the_clock():
+    """ARM PARITY. Every state blob that persists `explore_seen` is an arm's
+    own blob (live and shadow both do); each must also carry the hot clock and
+    its stamp. Ship it on one arm and the judge's paired bar silently compares
+    two different rules — the bot's 22-Jul note says exactly that."""
+    blobs = [k for k in _save_blob_keys("lighter_funding_bot.py")
+             if "explore_seen" in k]
+    assert len(blobs) >= 2, f"expected both arm blobs, found {len(blobs)}"
+    for keys in blobs:
+        assert "hot_since" in keys, f"arm blob missing hot_since: {sorted(keys)}"
+        assert "saved_ts" in keys, (
+            f"arm blob has hot_since but no saved_ts — the clock would be "
+            f"restored with no gap bound: {sorted(keys)}")
+
+
+def test_the_validated_gate_was_not_weakened():
+    """The fix restores a clock; it must not loosen the rule. If someone
+    'fixes' the blackout by shrinking PERSIST_H instead, that is a different
+    change and this says so."""
+    assert M.PERSIST_H >= 4.0, (
+        "PERSIST_H is the validated persistence gate; the restart blackout is "
+        "a bookkeeping bug and must not be worked around by weakening it")
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-q"]))

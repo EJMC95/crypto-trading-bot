@@ -1,3 +1,29 @@
+## 2026-08-03 (iq) — EVERY DEPLOY COST THE LIVE BOOK A SILENT 4-HOUR ENTRY BLACKOUT
+
+- **THE ASK** (operator): *"funding farmer still hasnt opened a trade"*, then *"get it fixed now that delay is a silly rule"*.
+- **MEASURED, on real money.** The container booted 00:05:06Z after the `(io)`/`(ip)` deploys and could not open a position until **04:05Z**. The entry gate needs a coin hot for `PERSIST_H` (4h); the clock lives in `hot_since`, which was initialised `{}` at boot and **never persisted**. On the first loop after any boot every coin gets `hot_since = now`, so `(t0 - t0)/3600 = 0 < 4` and EVERY candidate is skipped for four hours.
+- **AND IT WAS INVISIBLE.** The loop prints
+
+      scan ok | 217 perps | held: none | realized $+8.48
+
+  which is byte-identical to *"nothing was hot enough"*. A structurally-blocked book and a genuinely quiet one looked the same from outside — the **I1** shape (liveness before semantics) reappearing as *suppression* before semantics. Nothing logged the blackout or its remaining time.
+
+### It is the 22-Jul cooldown bug, on the same bot, in the timer that fix missed
+
+- The live restore block already carries a **COOLDOWN DURABILITY** note: *"`cooldown` and `stop_hist` were memory-only, so EVERY restart silently cleared the post-stop quarantine … a memory-only guard on a bot whose container is not."* That fix enumerated the durable timers and **`hot_since` was not among them.**
+- **Only the DIRECTION differs, which is presumably why one was noticed and the other was not:** a lost cooldown made the bot too **PERMISSIVE** (LIT re-opened 4h40m into a 12h quarantine); a lost hot-streak makes it entirely **INERT**. A permissive leak shows up as a bad trade. An inert one shows up as nothing at all — and nothing is what the log printed. **A defect that manifests as absence needs a detector that reads absence.**
+
+### The fix restores an observation; it does not move the gate
+
+- `hot_since` is persisted on **both arms** with a `saved_ts`, and restored through `restore_hot_since()` — pure, selftested, fail-CLOSED in every doubtful direction: no `saved_ts` (a pre-(iq) blob) ⇒ `{}`, gap > `HOT_RESTORE_MAX_GAP_S` (900s) ⇒ `{}`, negative gap (clock skew) ⇒ `{}`, a future or unparseable stamp ⇒ that coin dropped. **The floor of every failure mode is exactly today's behaviour, never worse.**
+- **The long-gap refusal is the load-bearing one.** Hot before, hot now, *cold in between* is indistinguishable from continuously hot once the observer was away — so an outage-sized gap must not resurrect a streak. 900s covers a deploy, not an outage.
+- **`PERSIST_H` IS UNCHANGED at 4h** and a coin must still be continuously hot for it. This is not a policy change and needs no new backtest: it readmits only entries an **uninterrupted process would already have taken**. The tempting alternative — shrinking `PERSIST_H` to end the blackout — weakens a validated gate to paper over a bookkeeping bug, and `test_the_validated_gate_was_not_weakened` fails the build if anyone tries.
+- **ARM PARITY IS ASSERTED STRUCTURALLY.** The twin is the judge's CONTROL ARM, and the bot's own 22-Jul note records the cost of shipping durability on one arm only: *"makes the paired promotion bar compare two different rules."* `test_both_arms_persist_the_clock` walks the publisher's `save_state` dict literals **by AST** and requires every blob carrying `explore_seen` to carry `hot_since` + `saved_ts`. Five mutations verified red: live-arm parity break, missing gap bound, trusted future stamps, shrunken `PERSIST_H`, dropped skew guard.
+
+### What it does NOT do, stated plainly
+
+- **It does not shorten today's blackout.** The blob on disk predates this commit, so the first boot after this deploy still restores `{}` and starts a fresh 4h clock. It prevents the NEXT one, and every one after.
+- Which makes **now the cheapest moment to ship it**: a restart taken *during* a blackout costs only the elapsed remainder, while the same restart taken once the book is trading costs a full fresh 4h.
 ## 2026-08-03 (ip) — THE LIVE FARMER'S SECOND, UNGATED DEPLOY PATH IS CLOSED
 
 - **THE ASK** (operator, after `(io)` found the rollback): *"fix the issue of it drifting back at all"*.

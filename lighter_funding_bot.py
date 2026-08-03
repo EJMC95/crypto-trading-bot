@@ -165,6 +165,65 @@ MAX_HOLD_H = float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))  # recycle after 
 MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "10e6"))      # 24h turnover floor
 MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-spread gate
 
+# [2026-08-03 (iq)] THE PERSISTENCE CLOCK IS A TIMER ON A CONTAINER THAT
+# RESTARTS. `hot_since` was memory-only, so every boot reset every coin's
+# hot-streak to zero and NO entry was possible for PERSIST_H (4h) afterwards —
+# silently, because the loop keeps printing `scan ok | held: none`, which is
+# byte-identical to "nothing was hot". MEASURED 3-Aug: the live Farmer booted
+# 00:05Z after a deploy and could not enter until 04:05Z; on a day with several
+# deploys the book loses most of its entry opportunity and nothing says so.
+#
+# THIS IS THE SAME DEFECT THE 22-Jul COOLDOWN FIX CLOSED, on the same bot, and
+# `hot_since` was the one timer it missed — see the COOLDOWN DURABILITY note in
+# the live restore block ("a memory-only guard on a bot whose container is
+# not"). Only the DIRECTION differs: a lost cooldown made the bot too
+# PERMISSIVE (re-armed a stopped coin), a lost hot-streak makes it entirely
+# INERT. Same class, opposite sign.
+#
+# The validated gate is UNCHANGED — PERSIST_H is still 4h and every coin must
+# still be continuously hot for it. This restores an observation the process
+# already made instead of discarding it at the process boundary; it admits only
+# entries an UNINTERRUPTED process would have taken, so it is not a policy
+# change and needs no new backtest.
+#
+# FAIL-CLOSED on the one case we cannot vouch for: a long gap. Hot before, hot
+# now, but cold in between is indistinguishable from continuously hot once the
+# observer was away, so a blob older than this bound is DISCARDED (exactly
+# today's behaviour). 900s covers a deploy/restart, not an outage.
+HOT_RESTORE_MAX_GAP_S = float(
+    os.environ.get("FUNDING_HOT_RESTORE_MAX_GAP_S", "900"))
+
+
+def restore_hot_since(blob, now, max_gap_s=None):
+    """(hot_since, why) — the persisted hot-streak clock, or {} if untrustworthy.
+
+    Pure + selftested. Fail-CLOSED in every doubtful direction, because a
+    WRONGLY-restored clock lets a coin skip the persistence gate on a real-money
+    book: no `saved_ts` -> {}, a gap over the bound -> {}, a negative gap (clock
+    skew) -> {}, a future or unparseable stamp -> that coin dropped. The floor
+    of the failure mode is exactly the pre-fix behaviour, never worse."""
+    max_gap_s = HOT_RESTORE_MAX_GAP_S if max_gap_s is None else max_gap_s
+    blob = blob or {}
+    try:
+        saved = float(blob.get("saved_ts"))
+    except (TypeError, ValueError):
+        return {}, "no saved_ts — clock not restored (pre-(iq) blob or first boot)"
+    gap = now - saved
+    if gap < 0:
+        return {}, f"negative gap {gap:.0f}s (clock skew) — not restored"
+    if gap > max_gap_s:
+        return {}, (f"gap {gap:.0f}s > {max_gap_s:.0f}s — hotness could have "
+                    f"lapsed unobserved; not restored")
+    out = {}
+    for c, t in (blob.get("hot_since") or {}).items():
+        try:
+            t = float(t)
+        except (TypeError, ValueError):
+            continue
+        if t <= now:                      # never trust a future stamp
+            out[str(c)] = t
+    return out, f"restored {len(out)} coin clock(s) across a {gap:.0f}s gap"
+
 # ---- 🧪 COIN-QUALITY (vol-character) ENTRY FILTER — DEFAULT OFF -------------
 # [2026-07-24 (dp)] Measured on Lighter's own 180d tape at the live gate 0.05
 # (scripts/study_funding_vol_filter.py + FUNDING_VOL_FILTER_2026-07-24.md):
@@ -1421,6 +1480,12 @@ def main():
             fund_realized = float(_saved.get("fund_realized") or 0.0)
             explore_seen = {str(k): float(v) for k, v in
                             (_saved.get("explore_seen") or {}).items()}
+            # [(iq)] ARM PARITY — the twin is the judge's CONTROL ARM, so a
+            # clock that survives a restart on live and not here would make the
+            # paired promotion bar compare two different rules (the exact
+            # finding behind the 22-Jul cooldown parity note below).
+            hot_since, _hs_why = restore_hot_since(_saved, time.time())
+            log.info("hot-streak clock: %s", _hs_why)
             _qok, _qcd, _qsh = _read_quarantine(bot_id)
             cooldown, stop_hist = _qcd, _qsh
             if not _qok:
@@ -1459,6 +1524,10 @@ def main():
                       "will not be overwritten until a clean re-read lands "
                       "(exits/stops keep running off venue truth).")
         meta = {str(k): v for k, v in (_live.get("meta") or {}).items()}
+        # [(iq)] the hot-streak clock — see HOT_RESTORE_MAX_GAP_S. Without this
+        # every deploy cost this book a 4h entry blackout it never reported.
+        hot_since, _hs_why = restore_hot_since(_live, time.time())
+        log.info("hot-streak clock: %s", _hs_why)
         explore_seen = {str(k): float(v) for k, v in
                         (_live.get("explore_seen") or {}).items()}
         # [2026-07-22 COOLDOWN DURABILITY — a MEASURED real-money guard failure]
@@ -2562,7 +2631,12 @@ def main():
                     # 14d window: a coin not explored that long resets to never-
                     # tried and regains priority — bounded + self-cleaning.
                     "explore_seen": {c: t for c, t in explore_seen.items()
-                                     if time.time() - t <= 14 * 86400}})
+                                     if time.time() - t <= 14 * 86400},
+                    # [(iq)] hot-streak clock + the stamp that bounds its reuse.
+                    # Self-pruning: the loop pops any coin not CURRENTLY over
+                    # the gate, so this only ever holds live hot coins.
+                    "hot_since": dict(hot_since),
+                    "saved_ts": time.time()})
             elif live_baseline is not None and not live_state_blind:
                 # (the blind guard is belt-and-braces: while blind the
                 # baseline stays None above, but a state we failed to READ
@@ -2587,7 +2661,12 @@ def main():
                     # [2026-07-24] explore cursor (Lever 1) — dark on live (K=0 ->
                     # empty), persisted for arm parity with the shadow twin.
                     "explore_seen": {c: t for c, t in explore_seen.items()
-                                     if time.time() - t <= 14 * 86400}})
+                                     if time.time() - t <= 14 * 86400},
+                    # [(iq)] hot-streak clock + the stamp that bounds its reuse.
+                    # Self-pruning: the loop pops any coin not CURRENTLY over
+                    # the gate, so this only ever holds live hot coins.
+                    "hot_since": dict(hot_since),
+                    "saved_ts": time.time()})
         except Exception:
             pass
 
