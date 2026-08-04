@@ -58,6 +58,32 @@ SWEEP = [("tp_pct", 0.75), ("tp_pct", 1.25),
          ("sl_pct", 0.75), ("sl_pct", 1.25),
          ("max_hold_hr", 0.5), ("max_hold_hr", 1.5)]
 
+# [2026-08-05] SWEEP ACCELERATION — the gillard sl-walk expressibility fix.
+# (gx) measured, on the fleet's ONLY calibrated exit counterfactual
+# (pm-gillard, the largest-n book): sl monotone improving 1% -> 3% with
+# drawdown FALLING — while this walk could never express it. Each enactment
+# multiplies the STATIC base and expiry reverts to that base, so the
+# reachable set was ONE x1.25 step, forever, whatever the evidence said
+# ((gx) framed it as "7.2 consecutive accepted widenings"; the truth is
+# harsher — the walk never compounds at all). The fix is an ACCELERATION,
+# not a cage change: when the most recent ACCEL_CONSEC_N replay-accepted
+# walks on (bot, param) agree in direction (a 'hurting' grade or a
+# direction flip breaks the streak; a dark/unreadable history reads as NO
+# streak — fail-safe), the sweep OFFERS one extra candidate at
+# mult**(1+streak), power-capped at ACCEL_MAX_POWER, value still clamped
+# to the UNCHANGED PARAM_BOUNDS, judged by the SAME replay gate (n floor,
+# $ floor, both halves) as every other candidate, enacted with the SAME
+# TTL — auto-revert semantics untouched. The gate stays senior; this only
+# widens what it may LOOK at. Scope-guarded BY BOOK: only ACCEL_BOOKS
+# (default pm-gillard — the one book whose counterfactual is calibrated)
+# may receive an accelerated candidate; every other bench structurally
+# cannot, however long its streak.
+ACCEL_BOOKS = frozenset(
+    b.strip() for b in
+    os.environ.get("PARL_ACCEL_BOOKS", "pm-gillard").split(",") if b.strip())
+ACCEL_CONSEC_N = int(os.environ.get("PARL_ACCEL_CONSEC", "2"))
+ACCEL_MAX_POWER = int(os.environ.get("PARL_ACCEL_MAX_POWER", "8"))
+
 
 def simulate_exit(direction: int, entry_px: float, opened_ts: float,
                   candles: list[dict], tp_pct: float, sl_pct: float,
@@ -151,6 +177,52 @@ class TunerBench:
                 return h["verdict"]
         return None
 
+    # -- sweep acceleration ([2026-08-05], see the ACCEL_* block above) -------
+    def _accel_streak(self, bot: str, param: str) -> tuple[int, int]:
+        """(streak, direction) of the most recent consecutive replay-accepted
+        walks on (bot, param) agreeing in direction. direction: +1 widen
+        (value > baseline), -1 tighten. A 'hurting' grade or a direction flip
+        ends the streak. Any read failure returns (0, 0) — fail-safe: a dark
+        history accelerates nothing."""
+        try:
+            hist = self.db.lever_history(bot, param, limit=ACCEL_MAX_POWER + 4)
+        except Exception:  # noqa: BLE001
+            return 0, 0
+        streak, direction = 0, 0
+        for h in hist:                                   # newest first
+            if h.get("verdict") == "hurting":
+                break
+            try:
+                delta = float(h["value"]) - float(h["baseline"])
+            except Exception:  # noqa: BLE001
+                break
+            d = 1 if delta > 0 else -1 if delta < 0 else 0
+            if d == 0 or (direction and d != direction):
+                break
+            direction = d
+            streak += 1
+        return streak, direction
+
+    def _sweep_candidates(self, bot: str) -> list[tuple[str, float]]:
+        """The candidate walk: SWEEP, plus — for ACCEL_BOOKS only — one
+        accelerated step per (param, direction) whose streak qualifies. The
+        accelerated mult is SWEEP-derived (mult ** (1 + streak), power-capped);
+        the caller clamps the value to the UNCHANGED PARAM_BOUNDS and the
+        candidate must clear the SAME replay gate as any other."""
+        cands = list(SWEEP)
+        if bot not in ACCEL_BOOKS or self.db is None:    # scope guard: by BOOK
+            return cands
+        for param, mult in SWEEP:
+            streak, direction = self._accel_streak(bot, param)
+            if streak < ACCEL_CONSEC_N:
+                continue
+            want = 1 if mult > 1.0 else -1
+            if direction != want:
+                continue
+            power = min(1 + streak, ACCEL_MAX_POWER)
+            cands.append((param, mult ** power))
+        return cands
+
     # -- the hourly cycle for one bot -----------------------------------------
     # [2026-07-21 AUDIT FIX] default resolution follows the data layer's
     # RES_FAST — the hardcoded '15m' meant a PARL_RES_FAST override stored
@@ -196,13 +268,17 @@ class TunerBench:
             "with_tape": sum(1 for t in trades if tapes.get(t["sym"]))}
         cur = clamp_params(base)
         best = None
-        for param, mult in SWEEP:
+        tried: set = set()
+        for param, mult in self._sweep_candidates(bot):
             if self._last_verdict(bot, param) == "hurting":
                 continue
             lo, hi = PARAM_BOUNDS[param]
             value = max(lo, min(hi, cur[param] * mult))
             if abs(value - cur[param]) < 1e-9:
                 continue
+            if (param, round(value, 12)) in tried:
+                continue     # an accel step clamped onto an already-tried value
+            tried.add((param, round(value, 12)))
             variant = dict(cur, **{param: value})
             # [2026-07-28 AUDIT FIX] split by REPLAYABLE index with a
             # per-half floor. The old split indexed over ALL trades and had
@@ -238,11 +314,13 @@ class TunerBench:
                 if best is None or improve > best["improve"]:
                     best = {"param": param, "value": value,
                             "baseline": cur[param],
-                            "improve": round(improve, 2), "n": n}
+                            "improve": round(improve, 2), "n": n,
+                            "accel": (param, mult) not in SWEEP}
         if best is None:
             return None
-        return self._enact(bot, best, note=f"replay +${best['improve']}"
-                                           f" on n={best['n']}")
+        return self._enact(bot, best,
+                           note=f"replay +${best['improve']} on n={best['n']}"
+                                + (" [accel]" if best["accel"] else ""))
 
     def _starving_widen(self, bot: str, base: dict) -> dict | None:
         """< STARVING closes in 7d: one bounded entry_bar widening so the
