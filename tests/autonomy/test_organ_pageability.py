@@ -47,6 +47,13 @@ UNPAGEABLE_OK = {
     "strategy-incubator", "fleet-radar", "golive-readiness", "xp-queue",
     "xp-judge", "fleet-regen", "fleet-clock", "impl-shortfall",
     "parliament", "parliament-tuning",
+    # [2026-08-04 (iy)] allocation organ joined the roster (it had NO roster
+    # entry and NO serve surface at all — worse than unpageable, invisible).
+    # Declared unpageable on the same rationale as fleet-radar/golive-readiness
+    # beside it: advisory publish-only grader, no actuator consumes it, its
+    # staleness is visible on the vitals card. If it ever gains an actuator
+    # consumer, it leaves this set the same day.
+    "fleet-allocation",
 }
 
 
