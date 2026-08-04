@@ -1241,12 +1241,18 @@ All new bots:
   (long 64% of days): all four stop x lag cells PASS on realised DD 9.9-10.7%
   while true MTM DD is 15.6-17.4% — the two definitions disagree about the
   VERDICT. `bot_pnl_store.snapshot_equity()` now appends an MTM sample to
-  `bot_state_history` under `<bot>:equity` (both riders wired). **The grader is
-  DELIBERATELY unchanged** — there is no history yet, and grading against an
-  empty series fails open or closed, both wrong. After ~30 days: publish the
-  MTM number BESIDE the realised one, and **re-grade 🌾 carry first** — it is
-  five of six bars from go-live, so a stricter drawdown definition lands on it
-  before anyone else.
+  `bot_state_history` under `<bot>:equity` (both riders wired; carry +
+  Counterweight at (hq)). ~~The grader is DELIBERATELY unchanged~~ —
+  **superseded: `(ia)` folded the MTM number into the maxDD bar**
+  (`apply_mtm`, worse-of-both, floored at 200 samples/7d), **and `(ix)` made
+  the read path actually work**: `equity_series` called a `store.load_history`
+  that bot_pnl_store never defined, behind a bare `except: return []`, so the
+  `(ia)` bar graded every book "no usable equity series" from the day it
+  shipped — I9's declared enforcement EXISTED and was inert, the exact
+  green-run caveat at the top of this file. Read seams are now tested
+  end-to-end against the real publisher AND the real reader
+  (`tests/autonomy/test_mtm_equity_series.py`), and **re-grade 🌾 carry
+  first** — a stricter drawdown definition lands on it before anyone else.
 - **AN ENTRY IN `DRIFT_OK` IS A HOLE IN THE GUARD (30-Jul (hl)).** `index.max_open`
   was carved out because its consumer default was `str(len(SYMBOLS))` — computed,
   not literal — so the drift arm was blind to precisely the lever most able to

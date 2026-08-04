@@ -30,11 +30,15 @@ accrues no MTM series and nobody notices for a week". A book is added here
 deliberately or the build goes red.
 """
 import ast
+import datetime as _dt
 import pathlib
+import sys
 
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 #: Books that HOLD positions and that `golive_readiness` grades as living
 #: candidates. Each MUST call `store.snapshot_equity`.
@@ -149,3 +153,143 @@ def test_pending_declarations_are_not_stale():
     assert not stale, (
         f"{stale} now call snapshot_equity but are still declared PENDING — "
         "move them to MTM_REQUIRED so the guard protects them")
+
+
+# ---------------------------------------------------------------------------
+# THE READ SIDE ((ix), 2026-08-04). Everything above guards the WRITE half of
+# the wire; nothing exercised the READ half, and it was dead on arrival:
+# `golive_readiness.equity_series` called `store.load_history(...)` — a
+# function `bot_pnl_store` has never defined (the read side of `save_history`
+# is `fetch_state_history`) — and its bare `except Exception: return []`
+# swallowed the AttributeError. Every book graded `mtm_why: "no usable equity
+# series"`, so the (ia) MTM drawdown bar — built precisely so an always-in
+# book like ⚖️ Counterweight cannot pass the 15% maxDD bar on realised-only
+# data — was structurally inert from the day it shipped. The selftest pinned
+# only the DEGENERATE direction (`equity_series("nope", store=object()) ==
+# []`): a value-free green, exactly the class the (hj) doctrine names.
+#
+# These tests run the REAL publisher and the REAL reader end-to-end —
+# snapshot_equity -> save_history -> fetch_state_history -> equity_series ->
+# mtm_drawdown -> apply_mtm — and demand a NON-degenerate result. Only the
+# transport is simulated: `_FakeConn` replays whatever the real save_history
+# INSERTs back through the real fetch_state_history's SELECT (same key
+# filter, same NEWEST-FIRST order, same LIMIT), so the payload shape is the
+# publisher's own, never a hand-written fixture. Mutation-verified: renaming
+# the equity_series call back to `load_history` turns both tests red.
+# ---------------------------------------------------------------------------
+
+class _FakeCursor:
+    def __init__(self, db):
+        self._db = db
+        self._rows = []
+        self.rowcount = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def execute(self, sql, params=None):
+        s = " ".join(str(sql).split()).lower()
+        if s.startswith("insert into bot_state_history"):
+            key, payload = params            # exactly save_history's two binds
+            self._db.rows.append((key, self._db.tick(), payload))
+        elif s.startswith("select ts, payload from bot_state_history"):
+            key, limit = params
+            hit = [r for r in self._db.rows if r[0] == key]
+            hit.sort(key=lambda r: r[1], reverse=True)   # ORDER BY ts DESC
+            self._rows = [(ts, payload) for _, ts, payload in hit[:int(limit)]]
+        # CREATE TABLE / CREATE INDEX / DELETE (prune): accepted, no-op
+
+    def fetchall(self):
+        return list(self._rows)
+
+
+class _FakeConn:
+    """In-memory stand-in for the Postgres CONNECTION only. Rows are whatever
+    the real `save_history` binds; the DB clock (`now()`) advances one hour
+    per write so a 240-write series spans ~10 days — past both MTM floors."""
+
+    def __init__(self):
+        self.rows = []
+        self._now = _dt.datetime(2026, 8, 1, tzinfo=_dt.timezone.utc)
+
+    def tick(self):
+        self._now += _dt.timedelta(hours=1)
+        return self._now
+
+    def cursor(self):
+        return _FakeCursor(self)
+
+    def close(self):
+        pass
+
+
+@pytest.fixture
+def store_on_fake_db(monkeypatch):
+    import bot_pnl_store as store            # noqa: PLC0415
+    conn = _FakeConn()
+    monkeypatch.setattr(store, "_get_conn", lambda: conn)
+    monkeypatch.setattr(store, "_history_table_ready", False)
+    return store
+
+
+def test_grader_reads_the_series_the_publisher_writes(store_on_fake_db):
+    """The incident pin: a series the publisher wrote must come back
+    NON-degenerate through the grader's own read path, and a planted MTM
+    drawdown must reach — and decide — the maxDD bar."""
+    import golive_readiness as g             # noqa: PLC0415
+    store = store_on_fake_db
+    bot = "perps-funding-spread-lshadow"
+    # 240 hourly samples (~10d): 1000 -> 1100 -> 900, i.e. a $200
+    # peak-to-trough = 20% of the $1,000 book, against the 15% bar.
+    for i in range(240):
+        if i < 100:
+            eq = 1000.0 + i
+        elif i < 200:
+            eq = 1100.0 - 2.0 * (i - 100)
+        else:
+            eq = 900.0
+        assert store.snapshot_equity(bot, eq, open_trades=3) is True, \
+            "the publisher's write failed — the series never even started (I4)"
+
+    series = g.equity_series(bot, store=store)
+    assert len(series) == 240, (
+        "equity_series returned a degenerate series for a book whose history "
+        "the publisher just wrote — the (ix) failure: the grader calling a "
+        "read function the store does not define, behind a bare except")
+    assert max(e for _, e in series) == 1100.0
+    assert min(e for _, e in series) == 900.0
+
+    mtm = g.mtm_drawdown(series)
+    assert mtm is not None and mtm["n"] == 240
+    assert mtm["max_dd_usd"] == pytest.approx(-200.0)
+    assert mtm["max_dd_frac"] == pytest.approx(0.2)
+    assert mtm["days"] > 7
+
+    folded = g.apply_mtm({"max_dd_frac": 0.002}, mtm)
+    assert folded["maxdd_basis"] == "mtm", (
+        "a thick MTM series must DECIDE the bar, not fall back to realised")
+    assert folded["max_dd_frac"] == pytest.approx(0.2)
+    assert "mtm_why" not in folded
+
+
+def test_a_young_series_reads_thin_not_absent(store_on_fake_db):
+    """After the fix, a book with a young series must publish 'series too
+    thin to decide' — NEVER 'no usable equity series', which was the (ix)
+    symptom on all 18 books (the grader could not read ANY series)."""
+    import golive_readiness as g             # noqa: PLC0415
+    store = store_on_fake_db
+    bot = "perps-funding-carry-lshadow"
+    for i in range(24):
+        assert store.snapshot_equity(bot, 1000.0 + i) is True
+
+    series = g.equity_series(bot, store=store)
+    assert len(series) == 24
+
+    folded = g.apply_mtm({"max_dd_frac": 0.002}, g.mtm_drawdown(series))
+    assert folded["maxdd_basis"] == "realised"
+    assert "too thin" in folded.get("mtm_why", ""), (
+        f"got mtm_why={folded.get('mtm_why')!r} — a young series must read "
+        "'thin', not 'absent'; the floors stand, the read works")

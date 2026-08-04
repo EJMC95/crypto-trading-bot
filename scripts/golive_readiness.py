@@ -557,7 +557,8 @@ def equity_series(bot, store=None, limit=20000):
     try:
         if store is None:
             import bot_pnl_store as store          # noqa: PLC0415
-        rows = store.load_history(str(bot) + ":equity", limit=limit) or []
+        rows = store.fetch_state_history(str(bot) + ":equity",
+                                         limit=limit) or []
     except Exception:                              # noqa: BLE001
         return []
     out = []
