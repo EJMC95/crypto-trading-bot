@@ -887,11 +887,14 @@ def _selftest():
     # [2026-08-04] reference staleness guard: the age math, and the guard's
     # calibration in BOTH directions — the routine Yahoo null-close lag
     # (measured 4-Aug: equities' freshest consolidated close was Friday on a
-    # Tuesday, age 4d) must NOT trip it; a frozen fortnight MUST.
-    _now = datetime(2026, 8, 4, 9, 34, tzinfo=timezone.utc).timestamp()
-    assert _ref_age_days("2026-07-31", _now) == 4
-    assert _ref_age_days("2026-07-20", _now) == 15
-    assert _ref_age_days("2026-08-04", _now) == 0
+    # Tuesday, age 4d) must NOT trip it; a frozen fortnight MUST. Anchor is a
+    # SYNTHETIC Tuesday (the real measured Friday, 31-Jul, is a canonical era
+    # date and audit_era_date_literals owns those — the math is what's under
+    # test, not which Friday it was).
+    _now = datetime(2026, 8, 11, 9, 34, tzinfo=timezone.utc).timestamp()
+    assert _ref_age_days("2026-08-07", _now) == 4      # Friday-on-Tuesday
+    assert _ref_age_days("2026-07-27", _now) == 15
+    assert _ref_age_days("2026-08-11", _now) == 0
     assert _ref_age_days("garbage", _now) is None      # unknown age != fresh
     assert _ref_age_days(None, _now) is None
     assert not (4 > REF_STALE_D), "the routine 1-2 session lag must not fire"

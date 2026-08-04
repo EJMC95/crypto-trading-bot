@@ -81,21 +81,26 @@ def test_ref_closes_dates_the_last_valued_bar_not_the_last_bar(monkeypatch):
 def test_age_math_and_calibration_in_both_directions():
     """The routine consolidation lag (measured age 4d on 4-Aug) must NOT trip
     the guard; a frozen fortnight MUST; an unparseable date is stale, never
-    fresh (the sniper's ages_d rule)."""
-    now = dt.datetime(2026, 8, 4, 9, 34, tzinfo=dt.timezone.utc).timestamp()
+    fresh (the sniper's ages_d rule).
+
+    Anchor dates are SYNTHETIC (a Tuesday and its preceding Friday): the real
+    measured Friday, 31-Jul, is a canonical era date and
+    audit_era_date_literals owns those — the math is under test here, not
+    which Friday the incident happened on."""
+    now = dt.datetime(2026, 8, 11, 9, 34, tzinfo=dt.timezone.utc).timestamp()
     age = index_bot._ref_age_days
-    assert age("2026-07-31", now) == 4
-    assert age("2026-08-04", now) == 0
-    assert age("2026-07-20", now) == 15
+    assert age("2026-08-07", now) == 4          # Friday, seen on a Tuesday
+    assert age("2026-08-11", now) == 0
+    assert age("2026-07-27", now) == 15
     assert age("not-a-date", now) is None
     assert age(None, now) is None
 
     def stale(a):        # the guard's own expression, from main()
         return a is None or a > index_bot.REF_STALE_D
 
-    assert not stale(age("2026-07-31", now)), "benign lag must not fire"
-    assert not stale(age("2026-08-04", now))
-    assert stale(age("2026-07-20", now)), "a frozen fortnight must fire"
+    assert not stale(age("2026-08-07", now)), "benign lag must not fire"
+    assert not stale(age("2026-08-11", now))
+    assert stale(age("2026-07-27", now)), "a frozen fortnight must fire"
     assert stale(age("garbage", now)), "unknown age must read stale, not fresh"
 
 
