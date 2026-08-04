@@ -86,6 +86,13 @@
 - **Forward-metric honesty**: no book moved toward the gate this pass. This is
   defense of the graded samples themselves — georgia's 4/6-bar sample, carry's
   go-live ledger — which one well-timed blip could have silently replaced.
+- *(Amended same day, next push: the staleness tests' anchor dates moved off
+  the measured 31-Jul Friday onto a synthetic Friday/Tuesday pair —
+  `audit_era_date_literals` (CI-only, correctly) owns the canonical era dates,
+  and the tests exercise the age MATH, not which Friday the incident happened
+  on. The measured dates stay here and in comments, which the guard exempts.
+  Lesson: that audit was not in my local pre-push set; it is now — run it
+  beside the letters audit before any push that adds a date literal.)*
 
 ## 2026-08-04 (jc) — THE CODE-CURRENCY AUDIT GETS ITS FIRST CONSUMER: A RULE NOBODY RUNS IS THE (gk) SHAPE, ONE TOOL LATER
 
