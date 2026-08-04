@@ -1,0 +1,137 @@
+# OPERATOR QUEUE — every open decision, with options you can actually use
+
+Created 4-Aug-2026 at the operator's ask (*"throw me some options I can
+actually use — clean up the rest of the remaining items"*). ONE surface for
+every act only the operator can take, each with lettered options, the
+evidence, and the prepared command. **Maintenance rule: the daily review keeps
+this current; an item leaves the day it is decided, with the decision recorded
+in the changelog.** Nothing here is executed by an agent — that boundary is
+the (hn) routing table and it does not move.
+
+Recommended options are marked ★.
+
+---
+
+## 1 · The "super bot" question — combining utilities
+
+Four routes, ranked by evidence. The fleet's measured reality (1-Aug,
+allocation organ): ALL measured claims live in the FUNDING class (3 books,
++$72.89, n=297); DIRECTIONAL has zero claims in 867 closes.
+
+- **S1 ★ — Allocation-weighted funding trio (a super bot in effect, no new
+  book).** Flip `fleet_allocation` from advisory to ACTING on the shadow
+  notionals of 🌾 carry / 💸 Farmer-shadow / ⚖️ Counterweight (evidence-ranked
+  split, 25% probe floor, conserved total). One capital brain over three
+  specialised organs — the utilities combine at the CAPITAL layer, where the
+  evidence is, without resetting a single 30-day clock. Touches zero real
+  dollars (shadow notionals steer what the fleet LEARNS). Reversible by env.
+  *Say "do S1" and a session wires the consumer + kill switch through the
+  standard replay/registry pattern.*
+- **S2 — The literal consolidated funding super-book.** One new row (next
+  cohort naming: Australian musicians) running three sleeves — carry-decay
+  harvest, funding-extreme entries, cross-sectional L/S — each closing with
+  its own tag so the brain grades sleeves independently. This is
+  FORWARD_STEPS item 4 ("more funding surface") in consolidated form, and its
+  own condition applies: **build it after the promotion pipeline proves itself
+  on an existing book** — i.e. decide at ~16-Aug when the Farmer's window
+  fills. Cost: a fresh 30-day clock (gradeable ~mid-Sep at the earliest); a
+  merged book is a NEW policy, so none of the three books' existing evidence
+  carries over ((hm)). *Option: pre-build in shadow now and let the clock run
+  — the cost is only a row and attention.*
+- **S3 — Directional consolidation: REFUSED, with evidence.** Merging the
+  directional tail (Snap Back / gillard / abbott / intraday...) into one bot
+  combines zero measured claims into one ungraded book with a fresh clock —
+  a merged loser is still a loser, minus its history. The 🏛️ Parliament
+  already IS the multi-strategy self-evolving experiment; the honest version
+  of this wish is promoting its best book through the standard gate.
+- **S4 — Consensus-ensemble book** (scout tickets × oracle regime × sentinel
+  events × brain mults gating one book's entries). Buildable, genuinely novel
+  — but it is a NEW thesis with no evidence yet, so it enters as a standard
+  shadow book behind S1/S2 in priority. Cheap first step instead: measure
+  retrospectively (replay: would consensus-gating have improved any existing
+  book's closes?) before minting anything.
+
+## 2 · Book decisions
+
+- **🧲 Snap Back — keep or retire.** t=−2.97, n=175, mean −0.281%/trade, BOTH
+  halves negative, ~−$1/day, and the growth rail structurally cannot restrict
+  it (its binding floor is unregistered). Options: **A ★ retire** (standard
+  two-halves retirement + code guard; strongest case in the fleet; reversible
+  like Tide Rider), **B** persist-`noconv`-then-study (cost-aware entry-floor
+  study is the only measured route to positive; keeps bleeding while it
+  runs), **C** keep as-is (not defensible on the record).
+- **🌾 Carry — keep or wait.** Fresh era (31-Jul) × venue stall (0 eligible;
+  one liquid book clears the bar and carry holds it). Both widening levers
+  already REFUSED on measurement ((it)) — they are not on this menu. Options:
+  **A ★ wait to ~30-Aug** (costs nothing; 5 open carries +$10.33 riding),
+  **B** retire (against: the fleet's best all-time record, 5/6 t=2.99).
+- **⚖️ Counterweight — early revert.** Its own pre-registered criterion ("t
+  must be rising toward 2 by ~28-Aug or the widening reverts") is trending
+  met the wrong way: t=−0.44 and falling, −$16.01 fleet-worst, and the K=8 /
+  45-book / non-crypto config has NO backtest behind it. Options: **A ★
+  revert now** through the board's `fundspread.k` lever (the designed
+  channel — never hand-set), **B** wait for the ~28-Aug scheduled verdict,
+  **C** run the config re-validation study first (measure-first; can run
+  under A regardless).
+- **📊 Index Rider** — nothing to decide until the ~28-Aug zero-closes read;
+  its MTM series now actually grades (post-(iz)/(ja)) from ~6-Aug.
+
+## 3 · Infrastructure
+
+- **Railway cleanup — one sitting, guard-first order.** Delete in this order
+  (deploy rule out first where one exists, then the service):
+  1. `perps-bot` — CRASH-LOOPING now, retired bot; delete first.
+  2. `cross-exchange-arb`, `listing-sniper`, `momo-bot`, `freqtrade-trainer`,
+     `triangular-arb` — retired, idling, no deploy rules to remove.
+  3. `tide-rider-lighter-shadow` — retired (if); **first** remove its
+     paths/grep/AUTO_IMAGES entries (say the word and a session ships that
+     commit), then delete.
+  4. Offline corpses: `freqtrade-{mum,dad,georgia,avo-maria}`.
+  5. `nrl-feed` → move to its own Railway project (cost attribution + its
+     failing workflow leaves this repo's CI).
+  Do NOT touch: the failover pair (`funding-carry` + `yield-harvester-shadow`
+  — now deliberate), both live services, the six live shadow services,
+  `pnl-dashboard`, `market-context`, `Postgres`, `freqtrade-bots`.
+  Saving: ~6 containers ≈ $10–30/mo + the resurrect hazard gone.
+- **Five git-connected shadow services** (snap-back, counterweight,
+  equities-regime, perp-sniper, family — Railway auto-deploys them from main
+  beside the workflow's own `railway up`). Options: **A ★ disconnect** (one
+  `railway service source disconnect --service <name>` each — same command
+  (ip) used on the live Farmer; consistency, one deploy path), **B** keep +
+  declare in CLAUDE.md with a guard asserting the branch is main (they are
+  harmless-to-helpful while pointed at main). Either is defensible; A is
+  cleaner doctrine.
+- **Zombie publishers (external projects).** `equities-momentum-alpaca` still
+  writes daily (~22:01 UTC ≈ 08:00 Sydney; $86k paper equity) — publisher is
+  almost certainly in your `trading-bot` or `ikbr-stock-bot` Railway
+  projects, which are separate systems you may want. Inspect:
+  `railway link` to the project, `railway service list`, `railway logs`.
+  Decision: stop it, or declare it external-and-deliberate (the fleet
+  dashboard already hides the row either way).
+  *Done this session: the two LOCAL zombies are stopped — `com.eamon.tri-arb`
+  (retired bot, KeepAlive launchd) and `com.eamon.freqtrade.datarefresh`
+  (hourly Kraken data pulls for the dormant local freqtrade). Plists archived
+  in `~/Library/LaunchAgents/disabled-2026-08-04/` — reversible.*
+- **CI quota** — merge the three test jobs into one runner (~30–40% quota
+  saving; the 28-Jul lockout recurs by arithmetic in any heavy week) + the
+  off-Actions CI-liveness probe. Say the word; both are plain implement-now
+  passes.
+
+## 4 · Security / hygiene
+
+- **Postgres password rotation** — still open, now less theoretical (copies
+  existed in the dropped stash and in session scratchpads). Rotate in
+  Railway → update `DATABASE_URL` references → the gitleaks hook already
+  guards new commits.
+- **LuLu** — flip `allowInstalled=false` (the 29-Jul posture sweep's one gap).
+- *Done this session: scheduler purged (5 spent one-shots deleted; the four
+  "Kraken-era P&L tasks" turned out to be unregistered leftover files — they
+  never ran); all three git stashes verified superseded and dropped, with the
+  4 stash-only analysis scripts recovered into `analysis_2026-07-01/` first.*
+
+## 5 · Standing (calendar, no action)
+
+First MTM-graded book ~6-Aug → Counterweight ~7-Aug · Farmer window ~16-Aug
+(t≥2 is the whole question) · item-18 oracle grades + SPY/QQQ graduation
+~mid-Aug · Farnham-Six verdicts ~28-29-Aug · carry gradeable ~30-Aug · Taker
+policy-clock ruling (chip queued will surface the evidence).

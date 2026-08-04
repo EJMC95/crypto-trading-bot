@@ -147,17 +147,12 @@ about to halt the live book on a 4h forward proxy while that lens's own closes
 were positive, and simultaneously keep `dip`, the fleet's only statistically
 significant loser. Both fixed; doctrine **I14/I15**.
 
-Running on the shadow arm (`5e27c751f5b2`, verified). **The LIVE arm is still on
-`fd4663d27fb5`** — the deploy dispatch was blocked twice by the harness
-permission classifier, which chat authorisation does not reach:
-
-    gh workflow run 305025607 -f services="tide-rider-lighter-live"
-
-Verify by stamp readback (`extra.build` = `5e27c751f5b2`, `build_n` = 15), never
-by the green run. **Nothing is at risk while it waits** — both rules currently
-permit `divergence`, so live behaviour is identical today. The fix is insurance
-against the forward hit rate crossing 0.500 (it sits at **0.502**) and halting a
-book whose own record is positive.
+~~The LIVE arm is still on `fd4663d27fb5`~~ — **DISCHARGED (4-Aug review,
+I11/I12): the deploy LANDED.** The live row publishes `extra.build =
+5e27c751f5b2`, `build_n = 15` — verified by stamp readback in the 4-Aug
+per-bot dive and by `audit_code_currency` (verdict: DEFERRED-by-design on
+later shared-module commits, zero of its own files in the gap). The (ij)
+realised-senior veto protects the live book's lens on real money today.
 
 **Honest limit, carried forward:** +0.176%/trade over n=104 is still inside the
 random-short null of +0.2–1.1% `(hm)`. Not a demonstrated edge — a fair chance at
@@ -172,11 +167,10 @@ one. The next real evidence is simply more closes under one frozen policy.
   samples / 7 days of `bot_state_history '<bot>:equity'`. Series started 30-Jul,
   **window closes ≈10–11 Aug**. Re-grade 🌾 carry first — it is nearest the gate,
   so a stricter drawdown definition lands on it before anyone else.
-- **🎫 Live Ticket Taker drift** — `live 0b30b0a79211` vs shadow, **same
-  `build_n=15`**, so genuine code drift, not the `(fd)` file-set artifact. The
-  shadow is not a clean control while it holds.
-  `gh workflow run 305025607 -f services="tide-rider-lighter-live"`, then verify
-  by the `extra.build` + `extra.build_n` stamp. **Real money — operator.**
+- ~~🎫 Live Ticket Taker drift~~ — **DISCHARGED (4-Aug review): the live arm
+  runs `5e27c751f5b2` (the (ij) build), currency verdict DEFERRED-by-design.**
+  Next `[deploy-live-taker]` marker push should bundle `snapshot_equity` +
+  `claim_writer` (chips queued 4-Aug); no deploy is due on its own.
 - **L2 admission by edge** — reframed by measurement rather than deferred. Longs
   are the measurably negative side, so the fix is *what holds the budget*, not a
   bigger number. With Tide Rider retired the pressure is off (12/20, green), so
