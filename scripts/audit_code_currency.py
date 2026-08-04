@@ -50,8 +50,19 @@ THE VERDICT THAT MATTERS IS NOT "BEHIND"
     UNRESOLVED     stamp not produced by any commit in the window -> older than
                    --depth, or a file set this tree no longer produces.
 
-Exit 0 = nothing is BEHIND-OWN. Exit 1 = at least one container is running
-stale code of its own. `--selftest` proves the classifier can still see.
+[2026-08-04 (jb)] AN UNMAPPED STAMPED ROW IS A FINDING, NOT A SKIP. The first
+cut kept only rows present in ROW_ENTRY, so a stamped row this file had never
+heard of was dropped SILENTLY — unaudited by construction, green run. Measured
+the day this shipped: `market-context` (svc-stamped, build-stamped, publishing
+fresh) had been invisible to every run since the guard was born. Now any
+stamped bot_pnl row must either be mapped in ROW_ENTRY or declared in
+NON_BOT_ROWS with a reason, else exit 1 — so a FUTURE bot's row cannot be born
+unaudited (operator mandate 4-Aug: "ones to come are always getting current
+live and up to date upgrades").
+
+Exit 0 = nothing is BEHIND-OWN and every stamped row is mapped or declared.
+Exit 1 = a container is running stale code of its own, or a stamped row is
+unmapped. `--selftest` proves the classifier can still see.
 """
 import argparse
 import json
@@ -80,6 +91,12 @@ ROW_ENTRY = {
     "equities-regime-lshadow": "lighter_index_bot.py",
     "lighter-dislocation-lshadow": "lighter_dislocation_bot.py",
     "lighter-perp-sniper-lshadow": "lighter_perp_sniper.py",
+    # [2026-08-04 (jb)] not a trading bot — the instrument collector — but its
+    # row is stamped (measured: build a6219e09bd45 / n=14, svc=market-context)
+    # and its image auto-deploys, so currency applies to it exactly as to a
+    # bot. It was silently skipped from this guard's first run until the
+    # unmapped-row gate below made that impossible.
+    "market-context": "market_context.py",
     "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",
     "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
     "perps-funding-carry-lshadow": "funding_carry_bot.py",
@@ -117,6 +134,16 @@ MARKER_GATED = {
     # deliberate design is how a real finding later gets ignored ((hh)).
     "perps-funding-lighter-lshadow": ("[deploy-live-farmer]", "[deploy-live]"),
 }
+
+#: [2026-08-04 (jb)] stamped bot_pnl rows DELIBERATELY outside this audit's
+#: scope, {row: reason}. fetch_bot_pnl() returns EVERY row in the table, and
+#: the old code kept only `b in ROW_ENTRY` — so a stamped row this file had
+#: never heard of was skipped silently (market-context, from the guard's first
+#: run). An unmapped stamped row now FAILS the audit unless declared here.
+#: Empty today ON PURPOSE: every stamped publisher currently has an entry-file
+#: mapping, market-context included — a declaration is for a row whose stamp
+#: genuinely cannot be resolved to one entry module, not a snooze button.
+NON_BOT_ROWS = {}
 
 
 def _git(*args, cwd=None):
@@ -264,6 +291,23 @@ def audit(depth=40, rows=None):
     live = {r["bot"]: (r.get("extra") or {}) for r in rows
             if (r.get("extra") or {}).get("build")}
     wanted = {b: ROW_ENTRY[b] for b in live if b in ROW_ENTRY}
+    # [2026-08-04 (jb)] a stamped row this file has never heard of is a
+    # FINDING, never a skip — the silent `b in ROW_ENTRY` filter is how
+    # market-context went unaudited from the guard's first run.
+    unmapped = sorted(b for b in live
+                      if b not in ROW_ENTRY and b not in NON_BOT_ROWS)
+    if unmapped:
+        print("audit_code_currency: UNMAPPED STAMPED ROW(S) — these containers "
+              "publish a build stamp\nthis audit cannot resolve, so their code "
+              "currency is UNAUDITED BY CONSTRUCTION:\n")
+        for b in unmapped:
+            ex = live[b]
+            print(f"  {b:36s} svc={ex.get('svc')} "
+                  f"build={ex.get('build')}/{ex.get('build_n')}")
+        print("\n  Fix: map the row in ROW_ENTRY (row -> the entry module its "
+              "image stamps), or\n  declare it in NON_BOT_ROWS with a reason. "
+              "Silence is not an option.")
+        return 1
     if not wanted:
         print("audit_code_currency: no stamped rows with a known entry — nothing to check.")
         return 0
@@ -362,9 +406,29 @@ def _selftest():
     # marker-gated rows must be mapped, or they can never be classified
     for row in MARKER_GATED:
         assert row in ROW_ENTRY, f"{row} is marker-gated but unmapped"
+    # [2026-08-04 (jb)] the unmapped-stamped-row gate, driven through audit()
+    # ITSELF with injected rows (testing around a function is not testing it):
+    # a stamped row this file has never heard of must FAIL, not silently skip.
+    _mystery = [{"bot": "mystery-row",
+                 "extra": {"build": "abc123", "build_n": 9,
+                           "svc": "mystery-svc"}}]
+    assert audit(depth=1, rows=_mystery) == 1, \
+        "an unmapped stamped row must fail the audit, not vanish from it"
+    NON_BOT_ROWS["mystery-row"] = (
+        "selftest-only declaration: proves a declared row is re-admitted "
+        "without an entry-file mapping, then removed below")
+    try:
+        assert audit(depth=1, rows=_mystery) == 0, \
+            "a DECLARED non-bot row must not fail the audit"
+    finally:
+        del NON_BOT_ROWS["mystery-row"]
+    assert not (set(NON_BOT_ROWS) & set(ROW_ENTRY)), \
+        "a row cannot be both mapped in ROW_ENTRY and declared in NON_BOT_ROWS"
+    for row, why in NON_BOT_ROWS.items():
+        assert len(why) > 60, f"{row}: a reason must be a reason, not a label"
     print("audit_code_currency --selftest OK "
           "(current, behind-own, behind-shared, deferred, marked-gap, "
-          "unresolved, unstamped, map integrity)")
+          "unresolved, unstamped, map integrity, unmapped-row gate)")
 
 
 if __name__ == "__main__":

@@ -46,6 +46,16 @@ and what it RUNS (CMD / run_all.sh). The workflow declares which paths trigger
 a deploy of which service. A file that ships in an auto-deployed image but is
 NOT on that image's path filter is ORPHANED: editing it is a silent no-op.
 
+[2026-08-04 (jb)] AND, BEFORE ANY PER-FILE QUESTION: every Dockerfile in the
+repo root must be CLAIMED by a deploy story at all. The per-file check can only
+interrogate images already listed in AUTO_IMAGES, so a brand-new Dockerfile.* +
+service was INVISIBLE — the audit stayed green while the new bot had no deploy
+route whatsoever, which is exactly how the (fz) shadow books were born
+routeless. The census: repo-root Dockerfile* ⊆ AUTO_IMAGES ∪ the live
+marker-grep image set ∪ MANUAL_IMAGES_OK (declared, with reasons). An unclaimed
+image fails the build (operator mandate 4-Aug: "ones to come are always getting
+current live and up to date upgrades").
+
 WHAT IT DELIBERATELY DOES NOT CHECK. Whether a service is git-connected, and
 whether the running container matches git — both need the network, and this
 guard must stay a static, offline, CI-safe check like its siblings
@@ -362,6 +372,95 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                "Dockerfile.familyshadow": "family-lighter-shadow"}
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-04 (jb)] THE IMAGE CENSUS's declared-manual set. Same rule as
+# DEPLOY_COVERAGE_OK: silence is not an option — an image with no deploy route
+# is either a defect (list it in AUTO_IMAGES / a live marker grep) or a
+# decision, and a decision is written down with its reason. Every entry below
+# was verified against the fleet tables in CLAUDE.md the day it was written; a
+# key whose file is deleted fails the selftest (a declaration for a deleted
+# image is archaeology, I12).
+# ---------------------------------------------------------------------------
+MANUAL_IMAGES_OK = {
+    "Dockerfile": (
+        "The legacy single shared image from the pre-split era — its own header "
+        "says each Railway service overrides the Start Command. No living "
+        "service builds from it: every current service pins its own "
+        "Dockerfile.* via RAILWAY_DOCKERFILE_PATH or a railway.*.toml config "
+        "(which silently OVERRIDES the env var — see "
+        "railway-config-as-code-overrides-env). Kept as history."
+    ),
+    "Dockerfile.arb": (
+        "Triangular arb (scanner-triangular-arb) — RETIRED in the 17-Jul "
+        "LIGHTER-ONLY cut; the bot idles at boot behind ARB_RETIRED_OVERRIDE. "
+        "No deploy route on purpose: a deploy would only reboot an idler."
+    ),
+    "Dockerfile.crossarb": (
+        "Gap Scout (scanner-cross-exchange-arb) — RETIRED 17-Jul. CEX-to-CEX "
+        "arb has no Lighter leg, so the book could not be moved, only stopped; "
+        "it idles at boot behind GAPSCOUT_RETIRED_OVERRIDE."
+    ),
+    "Dockerfile.momolive": (
+        "Trail Blazer's ORIGINAL live image. Its service name "
+        "(trail-blazer-live) survives as the LIVE FUNDING FARMER, which "
+        "deploys Dockerfile.fundinglighter behind the [deploy-live-farmer] "
+        "marker — routing THIS image anywhere would point retired momo code at "
+        "a real-money slot (golive-name-the-image-before-the-env)."
+    ),
+    "Dockerfile.momoshadow": (
+        "Stock Leaders (equities-momentum-lshadow) — RETIRED 17-Jul at maxDD "
+        "37-44% vs the 15% go-live gate. Row hidden + pruned; re-building this "
+        "image is an operator decision, never an auto-route."
+    ),
+    "Dockerfile.perpslive": (
+        "Bounce Catcher (perps-rsi-meanrev) — a Hyperliquid bot, retired in "
+        "the LIGHTER-ONLY cut; idles at boot behind PERPS_RETIRED_OVERRIDE. "
+        "Same no-route-for-an-idler rule as the arb images."
+    ),
+    "Dockerfile.regime": (
+        "Kraken-era freqtrade image (RegimeSwitchV1 dry-run, its own header). "
+        "Its book predates the 14-Jul Kraken retirement and is not in the "
+        "living fleet; the living regime book is equities-regime-shadow, built "
+        "from Dockerfile.indexshadow, which IS in AUTO_IMAGES."
+    ),
+    "Dockerfile.trainer": (
+        "The on-demand hyperopt trainer — deliberately MANUAL: a heavy, "
+        "human-dispatched job on its own service precisely so it can never "
+        "compete with or OOM the freqtrade-bots container. An auto-deploy "
+        "would restart it mid-hyperopt and discard the run."
+    ),
+}
+
+
+def live_marker_dockerfiles(marker_map=None):
+    """The Dockerfile atoms named inside the LIVE marker greps — the
+    marker-gated image set. Derived from the workflow rather than hardcoded so
+    a renamed live image moves the census's claimed set with it instead of
+    leaving a stale claim behind."""
+    marker_map = live_marker_filters() if marker_map is None else marker_map
+    out = set()
+    for pattern in (marker_map or {}).values():
+        files, _ = marker_atoms(pattern)
+        out.update(f for f in files if f.startswith("Dockerfile"))
+    return out
+
+
+def dockerfile_census(names=None, auto=None, marker=None, manual=None):
+    """[name, ...] of every Dockerfile in the repo root that NO deploy story
+    claims: not workflow-deployed (AUTO_IMAGES), not a live marker-gated image,
+    not declared manual-with-a-reason (MANUAL_IMAGES_OK). Parameters are
+    injectable for the same reason covered() takes them — a census that can
+    only run against today's clean tree cannot prove it would SEE a gap."""
+    if names is None:
+        names = sorted(n for n in os.listdir(ROOT)
+                       if n == "Dockerfile" or n.startswith("Dockerfile."))
+    auto = set(AUTO_IMAGES) if auto is None else set(auto)
+    marker = live_marker_dockerfiles() if marker is None else set(marker)
+    manual = set(MANUAL_IMAGES_OK) if manual is None else set(manual)
+    claimed = auto | marker | manual
+    return [n for n in names if n not in claimed]
+
+
 _UNSET = object()   # "not supplied" — distinct from None, which means UNPARSEABLE
 
 
@@ -453,6 +552,24 @@ def main():
     if not _mk_ok:
         print(f"audit_deploy_coverage: FAILED — {_mk_why}")
         return 1
+    # [2026-08-04 (jb)] THE IMAGE CENSUS — before any per-file question, is
+    # every image in the repo CLAIMED by a deploy story at all? The per-file
+    # checks below can only interrogate images listed in AUTO_IMAGES, so a
+    # brand-new Dockerfile.* + service used to be invisible here: green audit,
+    # zero deploy route — the (fz) shadow books' birth defect, waiting for the
+    # next bot.
+    census_bad = dockerfile_census()
+    if census_bad:
+        print("UNROUTED IMAGE — these Dockerfiles are claimed by NO deploy "
+              "story.\nA service built from one has no deploy route at all: "
+              "every change to it ships\nonly when a human remembers `railway "
+              "up` — the exact mechanism that left the\n(fz) shadow books "
+              "routeless for a day.\n")
+        for df in census_bad:
+            print(f"  {df}")
+        print("\n  Fix: give the image a deploy rule and list it in "
+              "AUTO_IMAGES (or, for a\n  real-money image, a live marker "
+              "grep), or DECLARE it in MANUAL_IMAGES_OK\n  with a reason.\n")
     # A file must be in BOTH lists to deploy: `paths:` gates whether the job
     # runs, the greps choose the service. Fold `paths:` into the service test so
     # a file listed in one and not the other is reported, not passed.
@@ -513,11 +630,11 @@ def main():
               "so neither arm can ship alone.\n  Keep the SERVICE split (the "
               "control container holds no keys) — join the CLOCK.\n")
 
-    if arm_bad and not (m_orphans or orphans or organ_orphans):
+    if arm_bad and not (m_orphans or orphans or organ_orphans or census_bad):
         print(f"audit_deploy_coverage: {len(arm_bad)} UNPAIRED arm(s); "
               f"{len(ok_declared)} declared exception(s).")
         return 1
-    if m_orphans and not (orphans or organ_orphans):
+    if m_orphans and not (orphans or organ_orphans or census_bad):
         print(f"audit_deploy_coverage: {len(m_orphans)} MARKER-ORPHANED "
               f"file(s); {len(ok_declared)} declared exception(s).")
         return 1
@@ -547,10 +664,14 @@ def main():
         print(f"\naudit_deploy_coverage: {len(seen)} ORPHANED file(s); "
               f"{len(ok_declared)} declared exception(s).")
         return 1
+    if census_bad:
+        print(f"audit_deploy_coverage: {len(census_bad)} UNROUTED image(s); "
+              f"{len(ok_declared)} declared exception(s).")
+        return 1
 
     print(f"audit_deploy_coverage: OK — every runnable file in an auto-deployed "
-          f"image is covered by a push path or declared ({len(ok_declared)} "
-          f"declared).")
+          f"image is covered by a push path or declared, and every image in the "
+          f"repo is claimed by a deploy story ({len(ok_declared)} declared).")
     return 0
 
 
@@ -759,9 +880,39 @@ def _selftest():
     for _live, _ctrl in PAIRED_ARMS.items():
         assert _live != _ctrl and _ctrl, (_live, _ctrl)
 
+    # [2026-08-04 (jb)] THE IMAGE CENSUS — fixtures first (the gap must be
+    # provable on a set that cannot be fixed out from under the test), then
+    # the real tree.
+    got = dockerfile_census(names=["Dockerfile.newbot", "Dockerfile.old"],
+                            auto={"Dockerfile.old"}, marker=set(), manual=set())
+    assert got == ["Dockerfile.newbot"], got
+    assert dockerfile_census(names=["Dockerfile.newbot"], auto=set(),
+                             marker={"Dockerfile.newbot"}, manual=set()) == [], \
+        "a live-marker-gated image is a claimed image"
+    assert dockerfile_census(names=["Dockerfile.newbot"], auto=set(),
+                             marker=set(), manual={"Dockerfile.newbot"}) == [], \
+        "a declared manual image is a claimed image"
+    assert dockerfile_census(names=["Dockerfile"], auto=set(), marker=set(),
+                             manual=set()) == ["Dockerfile"], \
+        "the bare Dockerfile is an image too — the census must see it"
+    _lmdf = live_marker_dockerfiles()
+    assert {"Dockerfile.tickettaker", "Dockerfile.fundinglighter"} <= _lmdf, (
+        "the two LIVE images must be derivable from the marker greps — a "
+        f"parser regression silently shrinks the claimed set: {sorted(_lmdf)}")
+    for k, v in MANUAL_IMAGES_OK.items():
+        assert os.path.exists(os.path.join(ROOT, k)), (
+            f"{k} is declared manual but does not exist on disk — a "
+            f"declaration for a deleted image is archaeology (I12); remove it")
+        assert len(v) > 60, f"{k}: a reason must be a reason, not a label"
+    assert not (set(MANUAL_IMAGES_OK) & set(AUTO_IMAGES)), \
+        "an image cannot be both workflow-deployed and declared manual"
+    assert dockerfile_census() == [], (
+        "the shipped tree carries an UNROUTED image — run this script without "
+        f"--selftest for the fix menu: {dockerfile_census()}")
+
     print("audit_deploy_coverage _selftest OK "
           "(parser + COPY reconstruction + declared-prefix + live-bot marker gate "
-          "+ paired arms, on fixtures)")
+          "+ paired arms + image census, on fixtures)")
 
 
 if __name__ == "__main__":
