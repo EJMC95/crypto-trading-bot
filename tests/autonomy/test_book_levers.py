@@ -291,9 +291,15 @@ def test_optimised_defaults_are_what_shipped():
     # carry was measured AT 7 open of 8 — the fleet's biggest earner turning
     # away graded candidates.
     assert carry.MAX_POSITIONS == 12
-    # Counterweight was measured AT its cap: 10 open = exactly K=5 x 2 legs.
-    assert spread.K == 8
-    assert spread.UNIVERSE_N == 60
+    # Counterweight: the (fz) widening (K 5->8, universe 30->60) was REVERTED
+    # 4-Aug (jg) by its OWN pre-registered criterion — n rose, t FELL (0.65 ->
+    # -0.44), mean -0.361%/trade, -$16.01 MTM fleet-worst — back to the config
+    # both validations actually cleared (K=5 over the hand list; the (ia)
+    # Lighter re-run's universe is the bot's own COINS list). Width 30 == the
+    # 30-name hand list, so no scout book is added. This pin exists to make a
+    # SILENT revert visible; a documented one moves the pin with its reason.
+    assert spread.K == 5
+    assert spread.UNIVERSE_N == 30
     # Snap Back's gate was 40x its own median residual.
     assert disloc.ENTER_PCT == 0.98 and disloc.UNIVERSE_N == 40
     # Index Rider carried the fleet's LARGEST clip on a book with zero closes.

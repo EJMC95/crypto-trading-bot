@@ -111,7 +111,17 @@ START_EQUITY = 1000.0
 # does not loosen the selection rule at all: it still takes exactly top-K
 # and bottom-K, just from a real cross-section. Registry-bounded [20, 90];
 # 0 disables the widening and restores the hand-list exactly.
-UNIVERSE_N = int(os.environ.get("FUNDSPREAD_UNIVERSE_N", "60"))
+# [2026-08-04 REVERTED 60 -> 30 with K (see the K note below).] The
+# pre-registered criterion names the CROSS-SECTION as the culprit on this
+# exact outcome — "the wider cross-section is worse than the hand list" —
+# and both validations ranked the HAND LIST only (the (ia) re-run's header:
+# "the faithful test of the live book, not a fresh universe" — the wide
+# set pulled in non-crypto books whose funding dispersion is ~9x crypto's,
+# so it changed which legs the book HELD, not just what it saw). Width 30 ==
+# the 30-name configured list, so no scout book is added: the cage-safe
+# equivalent of the 0 switch ([20,90] cannot hold 0 and audit_lever_bounds
+# requires the default inside the cage).
+UNIVERSE_N = int(os.environ.get("FUNDSPREAD_UNIVERSE_N", "30"))
 # Minimum 24h $M turnover for a scout-added book. Kept well above dust: this
 # book always holds BOTH sides, so an illiquid leg it cannot exit is a real
 # cost, unlike the Farmer's single-sided carry.
@@ -126,7 +136,18 @@ COINS = os.environ.get(
 # cross-section and could act on only the five extremes per side. K=8 with a
 # widened universe keeps the same selectivity RATIO while deploying the book
 # it already has. Registry-bounded [3, 12] (`fundspread.k`).
-K = int(os.environ.get("FUNDSPREAD_K", "8"))
+# [2026-08-04 REVERTED 8 -> 5 per the widening's OWN pre-registered criterion]
+# SIX_BOOKS_BASELINE_2026-07-30.md item 2: "If n rises and t *falls*, the
+# wider cross-section is worse than the hand list and the widening should be
+# reverted." Measured 4-Aug: in-era t=-0.44 and falling (baseline t=0.65),
+# mean -0.361%/trade, halves +6.19/-9.88, book -$16.01 MTM at 16 open —
+# fleet-worst. K=5/$200 is the config BOTH validations actually cleared
+# (the HL lab and the 31-Jul (ia) Lighter re-run: +13.7%, maxDD 9.6%); the
+# K=8 / wide-universe book has NO backtest behind it. Operator decision
+# 4-Aug (OPERATOR_QUEUE "Counterweight — early revert", option A) — this is
+# the OPERATOR-DEFAULT route, not a hand-set lever: no fundspread.* lever
+# was open on the bus (the (hs) ratchet lapsed), so the widening lived HERE.
+K = int(os.environ.get("FUNDSPREAD_K", "5"))
 LOOKBACK_H = int(os.environ.get("FUNDSPREAD_LOOKBACK_H", "72"))
 REBALANCE_H = float(os.environ.get("FUNDSPREAD_REBALANCE_H", "24"))
 ORDER_USD = float(os.environ.get("FUNDSPREAD_ORDER_USD", "20"))

@@ -2368,11 +2368,12 @@ def _selftest():
         "every cycle, so it must not page"
 
     # the rule still WORKS — this is a profit term, not a disabled branch
-    # NOTE the step comes off the REGISTRY's current value (env_default 8),
-    # while SATURATION is judged against the cap the book published (12) —
-    # two different sources on purpose, per the block above.
+    # NOTE the step comes off the REGISTRY's current value (env_default 5
+    # since the 4-Aug (jg) revert of the (fz) widening), while SATURATION is
+    # judged against the cap the book published (12) — two different sources
+    # on purpose, per the block above.
     lv, _ = synthesize_books(_spread(+40.0), {}, {}, _bnow, tuning_mod=_T)
-    assert lv.get("fundspread.k", {}).get("value") == 9, lv
+    assert lv.get("fundspread.k", {}).get("value") == 6, lv
 
     # REALISED-ONLY WOULD HAVE WIDENED IT. Counterweight's realised P&L was
     # +$7.29 against a -$27.75 mark-to-market total. If this rule ever reads a

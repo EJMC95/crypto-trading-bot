@@ -396,11 +396,17 @@ LEVERS = {
         "env_default": 2000000.0, "step": -250000.0},
     "fundspread.k": {
         # measured AT its cap: 10 open = exactly K=5 x 2 legs.
+        # [2026-08-04] default 8 -> 5: the (fz) widening reverted per its own
+        # pre-registered criterion (t=-0.44 and falling; see the bot's K note).
+        # K=5 is the validated plateau centre; the cage is unchanged so the
+        # board can still WIDEN a book that is measured in profit MTM ((hs)).
         "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
-        "note": "Counterweight legs per side; env default 8", "env_default": 8, "step": 1},
+        "note": "Counterweight legs per side; env default 5", "env_default": 5, "step": 1},
     "fundspread.universe_n": {
+        # [2026-08-04] default 60 -> 30 with fundspread.k: width 30 == the
+        # 30-name hand list both validations ranked, so no scout book is added.
         "kind": "int", "lo": 20, "hi": 90, "lane": "lighter-books",
-        "note": "Counterweight scout-universe width; env default 60", "env_default": 60, "step": 10},
+        "note": "Counterweight scout-universe width; env default 30", "env_default": 30, "step": 10},
     "disloc.enter_pct": {
         # Snap Back's gate was a FIXED 150bps against a measured median
         # residual of 3.8bps — ~40x the middle of its own signal, which is

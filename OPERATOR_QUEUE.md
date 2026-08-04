@@ -65,14 +65,19 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   already REFUSED on measurement ((it)) — they are not on this menu. Options:
   **A ★ wait to ~30-Aug** (costs nothing; 5 open carries +$10.33 riding),
   **B** retire (against: the fleet's best all-time record, 5/6 t=2.99).
-- **⚖️ Counterweight — early revert.** Its own pre-registered criterion ("t
-  must be rising toward 2 by ~28-Aug or the widening reverts") is trending
-  met the wrong way: t=−0.44 and falling, −$16.01 fleet-worst, and the K=8 /
-  45-book / non-crypto config has NO backtest behind it. Options: **A ★
-  revert now** through the board's `fundspread.k` lever (the designed
-  channel — never hand-set), **B** wait for the ~28-Aug scheduled verdict,
-  **C** run the config re-validation study first (measure-first; can run
-  under A regardless).
+- **⚖️ Counterweight — early revert. DECIDED-REVERTED 4-Aug (option A,
+  operator: "full permission to go ahead with all advancements").** Shipped
+  as the CODE DEFAULT K 8→5 + universe 60→30 (`lighter_funding_spread_bot.py`
+  \+ the registry `env_default`s) — the operator-default route, NOT a
+  hand-set lever: no `fundspread.*` lever was open on the bus (the (hs)
+  ratchet had lapsed), so the widening lived in the env default and only an
+  operator decision could move it. One correction to this item's own text:
+  option A said "through the board's `fundspread.k` lever", but the designed
+  channel can only widen-or-lapse back to `env_default` — it cannot SET 5
+  while the default IS 8; the default was the actuator. Criterion wording
+  honoured wholesale (it blames "the wider cross-section", so the universe
+  reverted with K). Era NOT reset — capacity change = ordinary tuning (hc).
+  Verify: row caps read k=5, universe_n=30 after the push.
 - **📊 Index Rider** — nothing to decide until the ~28-Aug zero-closes read;
   its MTM series now actually grades (post-(iz)/(ja)) from ~6-Aug.
 
