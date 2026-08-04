@@ -4,6 +4,14 @@ name: fleet-watchdog
 # fleet-watchdog) and closes it on recovery — transition alerts, no email storms.
 # Per-bot "stale" flags come from the dashboard's own per-kind thresholds, so
 # future services (e.g. lighter-*) are covered automatically once they publish.
+#
+# [2026-08-05] It is ALSO the CI-liveness dead-man's switch: the first step
+# writes bot_state 'actions-heartbeat' each hourly run, and the IN-SERVICE
+# watchdog (fleet_watchdog_svc on Railway — unaffected by a GitHub outage)
+# pages the ntfy topic when the beat goes ~3h silent. A billing lockout kills
+# every workflow INCLUDING this one (28-Jul: 3-16s not-started "failures",
+# no email), so no Actions-side check can detect it — I13, liveness is only
+# visible from outside.
 on:
   schedule:
     - cron: '7 * * * *'  # hourly since 28-Jul-2026: twice-hourly emptied the Free-plan minute quota (Jul-28 billing lockout); pnl-dashboard's in-service 5-min watchdog is the fine-grained layer
@@ -22,6 +30,49 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Actions-liveness heartbeat -> bot_state (dead-man's switch)
+        # [2026-08-05] Upserts bot_state 'actions-heartbeat' {updated, ttl_sec,
+        # run_id} via the SAME secret pattern as db-backup.yml (project token
+        # -> `railway variables` -> DATABASE_PUBLIC_URL; no new secrets, no
+        # unauthenticated write endpoint). Consumed by
+        # fleet_watchdog_svc.actions_heartbeat_problem (pages >3 missed beats)
+        # and shown on /vitals as a critical organ (ttl 3900).
+        # continue-on-error is DELIBERATE and is not the (gl) warning-guard
+        # trap: enforcement is the dead-man's switch itself — if this step
+        # breaks, the beat goes stale and the Railway-side pager fires within
+        # 3.25h, out of band of any green/red run. A red step here must never
+        # stop the fleet probe below. Shell installer first (seconds), npm
+        # fallback (db-backup's proven path) — hourly minutes are the budget
+        # that caused the 28-Jul lockout, so keep this step lean.
+        continue-on-error: true
+        env:
+          RAILWAY_PROJECT_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_ACCOUNT_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          curl -fsSL https://railway.app/install.sh | sh >/dev/null 2>&1 || true
+          command -v railway >/dev/null 2>&1 || npm install -g @railway/cli >/dev/null 2>&1
+          command -v railway >/dev/null 2>&1 || { echo "::error::railway CLI unavailable — heartbeat not written (svc pager fires if this persists ~3h)"; exit 1; }
+          if [ -n "${RAILWAY_PROJECT_TOKEN:-}" ]; then
+            export RAILWAY_TOKEN="$RAILWAY_PROJECT_TOKEN"; unset RAILWAY_API_TOKEN || true
+          fi
+          URL=""
+          for svc in Postgres postgres PostgreSQL; do
+            URL=$(railway variables --service "$svc" --json 2>/dev/null \
+                  | jq -r '[.. | objects | to_entries[] | select(.key=="DATABASE_PUBLIC_URL") | .value] | first // empty') && [ -n "$URL" ] && break
+          done
+          [ -n "$URL" ] || { echo "::error::no DATABASE_PUBLIC_URL resolved — heartbeat not written (svc pager fires if this persists ~3h)"; exit 1; }
+          echo "::add-mask::$URL"
+          UPDATED=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
+          psql "$URL" -v ON_ERROR_STOP=1 -q -c "
+            INSERT INTO bot_state (bot, updated_at, state) VALUES ('actions-heartbeat', now(),
+              jsonb_build_object('updated', '${UPDATED}', 'ttl_sec', 3900,
+                                 'run_id', '${RUN_ID}', 'src', 'fleet-watchdog.yml'))
+            ON CONFLICT (bot) DO UPDATE SET updated_at = now(), state = EXCLUDED.state;"
+          echo "actions-heartbeat written (run ${RUN_ID}, ${UPDATED})"
+
       - name: Probe fleet feed
         shell: bash
         run: |

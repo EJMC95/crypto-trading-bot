@@ -68,6 +68,69 @@ def send_push(title, body, priority="urgent", tags="rotating_light"):
         return False
 
 
+# [2026-08-05 CI-LIVENESS dead-man's switch — the OFF-ACTIONS half.]
+# A GitHub billing lockout kills EVERY workflow silently (28-Jul, measured:
+# 3-16s not-started "failures", no email, CI AND deploys dead) — including the
+# Actions-hosted fleet-watchdog itself, so no Actions-side check can ever
+# detect it (I13: a dead loop runs no handler; liveness is only visible from
+# OUTSIDE). fleet-watchdog.yml now writes bot_state 'actions-heartbeat'
+# {updated, ttl_sec, run_id} on its hourly cron REGARDLESS of pushes, and THIS
+# service — on Railway, unaffected by a lockout — pages when the beat goes
+# silent. Quiet no-push days cannot false-page: the cron never depended on
+# pushes. The key is also in ORGAN_SPECS as critical (the I13 "joins the
+# pageable set deliberately" half), so the vitals card shows it; this direct
+# DB read is the pager's own path and must not depend on the vitals surface
+# it backstops.
+ACTIONS_HB_KEY = "actions-heartbeat"
+# 3 missed hourly beats + cron jitter = 3.25h. Kept equal to 3x the
+# ORGAN_SPECS/payload ttl (3900s) so the vitals card's DARK and this page
+# fire together, telling one story.
+ACTIONS_HB_MAX_S = int(os.environ.get("WATCHDOG_ACTIONS_HB_MAX_SEC", "11700"))
+
+
+def actions_heartbeat_problem(hb, read_ok, uptime_s, now_ts):
+    """problem-string or None. Pure — tests/autonomy/test_actions_heartbeat.py.
+
+    hb       : the bot_state payload dict (None = genuinely no row)
+    read_ok  : False when the DB READ itself failed — that darkness belongs to
+               the FEED STALE layer (the dashboard reads the same DB); paging
+               "ACTIONS DARK" on a Postgres blip would send the operator to
+               GitHub while the fault is the DB (I8: name the object the
+               operator can act on).
+    uptime_s : this service's own uptime. Absence of the key pages only after
+               we have been up longer than the stale bar — so the bootstrap
+               window (workflow not yet run once) is quiet, while a heartbeat
+               that NEVER arrives still pages (a dead-man's switch that never
+               arms is the I13 trap).
+    """
+    if not read_ok:
+        return None
+    if not isinstance(hb, dict) or not hb:
+        if uptime_s is not None and uptime_s > ACTIONS_HB_MAX_S:
+            return ("GITHUB ACTIONS HEARTBEAT NEVER SEEN: no bot_state "
+                    f"'{ACTIONS_HB_KEY}' after {uptime_s / 3600:.1f}h up — "
+                    "Actions dead or the heartbeat step broken; check the "
+                    "repo's Actions runs + Settings/Billing")
+        return None
+    try:
+        u = dt.datetime.fromisoformat(str(hb.get("updated")).replace("Z", "+00:00"))
+        if u.tzinfo is None:
+            u = u.replace(tzinfo=dt.timezone.utc)
+        age = now_ts - u.timestamp()
+    except Exception:  # noqa: BLE001
+        # A row that EXISTS with an unreadable stamp is a broken writer, not
+        # bootstrap — fail toward the page (the (hc) unreadable-stamp rule).
+        return (f"GITHUB ACTIONS HEARTBEAT UNREADABLE: bot_state "
+                f"'{ACTIONS_HB_KEY}' has no parseable 'updated' — fix the "
+                "fleet-watchdog.yml heartbeat step")
+    if age > ACTIONS_HB_MAX_S:
+        return (f"GITHUB ACTIONS DARK: hourly heartbeat {age / 3600:.1f}h old "
+                f"(last run_id {hb.get('run_id')}) — a billing lockout kills "
+                "CI AND deploys silently (28-Jul scar); check the repo's "
+                "Actions runs + Settings/Billing")
+    return None
+
+
 def _now_iso():
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
 
@@ -237,6 +300,7 @@ def run_loop(dash):
     min_gap = int(os.environ.get("WATCHDOG_EMAIL_MIN_GAP_SEC", "1800"))
     with _LOCK:
         _STATE["started"] = _now_iso()
+    started_ts = time.time()
     time.sleep(60)  # let the server come up before the first probe
     last_emailed = None      # None = never evaluated-for-email; () = known-good
     last_email_ts = 0.0
@@ -275,6 +339,20 @@ def run_loop(dash):
                             + (f" (last publish {age:.0f}m ago)" if age is not None else
                                (" (never published)" if o.get("status") == "DARK"
                                 else " (payload unreadable)")))
+            except Exception:  # noqa: BLE001
+                pass
+            # [2026-08-05] CI-liveness dead-man's switch — see
+            # actions_heartbeat_problem above. Reads the DB DIRECTLY (not
+            # /vitals.json): this pager must not depend on the surface it
+            # backstops. The guard clause only covers the import; the check
+            # itself is total (load_state_checked never raises).
+            try:
+                import bot_pnl_store as _hb_store
+                _hb_ok, _hb = _hb_store.load_state_checked(ACTIONS_HB_KEY)
+                _hb_p = actions_heartbeat_problem(
+                    _hb, _hb_ok, time.time() - started_ts, time.time())
+                if _hb_p:
+                    problems.append(_hb_p)
             except Exception:  # noqa: BLE001
                 pass
             email_armed = bool(report_emailer and report_emailer.smtp_configured())

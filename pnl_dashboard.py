@@ -3054,6 +3054,8 @@ def _organ_vital(key, st):
                       sc.get("emitted"), len(bench) or "—",
                       f" · {quiet} quiet" if bench and quiet else "",
                       f" · STALLED {','.join(stalled)}" if stalled else "")
+        if key == "actions-heartbeat":
+            return _v("run {} · {}", st.get("run_id"), st.get("src"))
         if key == "parliament-tuning":
             act = st.get("active") or {}
             n = sum(len(v) for v in act.values() if isinstance(v, list))
@@ -3081,6 +3083,17 @@ ORGAN_SPECS = [
     # every loop (market_context.py:626) even when the veto CONTENT is
     # unchanged, so a fresh row really does attest a living publisher.
     ("coin-vetoes",        "🚫 Coin vetoes — quality filter (LIVE)", True,  3600),
+    # [2026-08-05] CI-LIVENESS dead-man's switch. A GitHub billing lockout
+    # kills EVERY workflow silently (28-Jul: 3-16s not-started "failures" —
+    # CI, deploys AND the Actions-hosted watchdog all dead at once), so the
+    # only detector that survives it is THIS service. fleet-watchdog.yml
+    # writes this key on its hourly cron regardless of pushes (no false page
+    # on a quiet no-push day); ttl 3900 = one beat + cron jitter, so DARK
+    # (3x = 3.25h) means three missed beats. CRITICAL deliberately — I13:
+    # the key joins the pageable set the day it is born, and
+    # fleet_watchdog_svc.actions_heartbeat_problem adds the diagnosis line
+    # (check Actions runs + Settings/Billing) beside the generic ORGAN DARK.
+    ("actions-heartbeat",  "🛰️ GitHub Actions heartbeat — CI/deploy liveness", True, 3900),
     ("evidence-board",     "⚖️ Evidence board — scoring/synthesis",  True,  1800),
     ("market-pulse",       "🫀 Market Pulse — news/social mood",     True,  2700),
     ("learning-brain",     "🧠 Brain — hypotheses/diagnosis",        True,  26000),
