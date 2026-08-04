@@ -1,3 +1,81 @@
+## 2026-08-04 (jd) — ONE FAILED READ COULD SEED A FRESH BOOK OVER FIVE LIVING BOOKS' RECORDS — the 17-Jul sniper class closed for boot restores, and 📊's ref_date gets its first consumer: the bot itself
+
+- **THE CLASS** (review §4 parity, item ⑤ of the ranked plan):
+  `bot_pnl_store.load_state()` collapses "no row" and "READ FAILED" into one
+  None, so any bot that boots `load_state(bot_id) or fresh` and then
+  `save_state()`s every loop turns a Postgres blip into a SEEDED fresh book
+  whose next save OVERWRITES the durable record — equity curve, open-position
+  meta, accrual clocks, all of it, while the row keeps looking healthy. The
+  sniper (17-Jul) and parliament (21-Jul) already carried the fix; the review
+  named **three** living books still exposed (⚖️ Counterweight — 16 open legs'
+  meta rides that state; 📊 Index Rider; 👩👨🙏🔮 Family — georgia's 4/6-bar
+  sample rides it). **The closing grep measured FIVE**: 🌾 carry's shadow arm
+  restores `positions` the same way (the fleet's best-evidenced ledger), and
+  🧲 Snap Back restores broker+meta+census. Fixing the named three would have
+  been instance-fixing — the exact circle the forward-motion rule bans.
+- **THE FIX, one home**: `bot_pnl_store.load_state_required(bot)` — a second
+  copy of a rule is a second rule, so the degrade is callable instead of
+  re-implemented per bot. No DATABASE_URL → fresh (nothing durable exists and
+  nothing CAN be overwritten; local smoke and inert backtests unchanged).
+  Clean read → the state (None = genuinely no row, a legitimate first run).
+  Read failing after bounded retries → **SystemExit**: crash-loop LOUDLY
+  (Railway restarts, the watchdog sees the stale row) rather than poison the
+  book — the sniper's degrade, and NOT the forbidden exit-as-retirement shape,
+  because a blip clears and the loop self-heals. Wired into carry, Snap Back,
+  Counterweight and Index Rider. **Family is a multi-book container**, so it
+  gets parliament's pattern verbatim instead: `Book._restored` gate, persist()
+  refuses until a clean read, the main loop retries per cycle and SKIPS the
+  un-restored book (trading un-restored = a fresh $1000 book opening positions
+  the record says are held), and a late restore re-anchors the daily rail so
+  the -10% halt cannot false-trip on the equity jump. `sys.exit` would be
+  wrong there — one shared connection failing would kill all seven books.
+- **ENFORCED**: `tests/autonomy/test_seed_guard_checked_reads.py` — the helper
+  contract (refusal counted per try, recovery on a cleared blip), the Family
+  book restoring a payload **its own persist() built** through the real JSON
+  boundary ((hj): never a hand-written fixture), and the WIRING by AST: no
+  shipped living book may call `load_state` with a `bot_id`-shaped argument
+  (literal-keyed cross-organ reads stay allowed — they are fail-safe
+  consumers, not seeds). 🌊 Tide Rider keeps its unchecked read and is
+  DECLARED exempt with the reason (retired (if), idles at boot, restore
+  unreachable) — a resurrection commit must move it into `GUARDED_BOOKS`.
+  **Seven mutations, each reddened exactly the intended test** — including
+  reverting Counterweight to the unchecked read (the wiring arm caught it).
+- **Mutation-discipline lesson, banked**: the first mutation pass restored
+  files with `git checkout --`, which restores **HEAD**, not your uncommitted
+  work — it silently destroyed two of this entry's own fixes, caught only
+  because clean-file runs kept failing. Snapshot-and-`cp` is the safe restore
+  for uncommitted work; `git checkout` is only safe after the commit exists.
+- **📊 ref_date ROOT CAUSE, measured 4-Aug 09:34Z**: the row read `2026-07-31`
+  on six equity sleeves (~2 sessions stale) while WTI/XAU/XCU read today.
+  Yahoo's chart API serves the MOST RECENT COMPLETED session with a **null
+  close** until it consolidates — SPY/QQQ/NVDA's 03-Aug bar was null on EVERY
+  range while `meta.regularMarketTime` said that session closed 03-Aug 20:00Z
+  — and `ref_closes()` drops nulls (correctly; a null is not a price), so the
+  series ends at the last CONSOLIDATED close. The futures refs mask the
+  identical hole: their ~24h sessions append a VALUED live bar dated today.
+  So the equity signal routinely runs 1-2 sessions behind — immaterial to a
+  200d SMA band, and NOT the defect the stamp was built for.
+- **📊 THE GUARD — the stamp's first consumer**: (hl) published `ref_date` so
+  a frozen feed would be visible, and it had ZERO consumers (the review's
+  class j, shipped-but-inert). Now the bot consumes its own stamp:
+  `REF_STALE_D` (default 7 **calendar** days, `INDEX_REF_STALE_D`) — a sleeve
+  whose reference is older makes NO decision and publishes a null regime, the
+  (hk) false-FLAT rule exactly (no entry, NO exit, catastrophic stop runs
+  ahead; no new trading behavior invented). An unparseable date is STALE,
+  never fresh (the sniper's `ages_d` rule). Calibrated in BOTH directions and
+  pinned in selftest + `tests/autonomy/test_index_ref_staleness.py`: the
+  routine consolidation lag (age 4d today) must NOT fire — a guard that nulls
+  SPY every weekend blinds a book that trades ~17×/yr — and a frozen
+  fortnight MUST. 7 = longest benign gap (~5d: Friday close + weekend +
+  Monday holiday + the null-lag) plus margin. Publishes `extra.ref_age_d`
+  beside the date so the condition is machine-visible off-container; the
+  consumer test runs the real `ref_closes` against the EXACT null-tailed JSON
+  shape Yahoo returned today, and the wiring arm is AST (guard computed,
+  compared, published), not a substring scan.
+- **Forward-metric honesty**: no book moved toward the gate this pass. This is
+  defense of the graded samples themselves — georgia's 4/6-bar sample, carry's
+  go-live ledger — which one well-timed blip could have silently replaced.
+
 ## 2026-08-04 (jc) — THE CODE-CURRENCY AUDIT GETS ITS FIRST CONSUMER: A RULE NOBODY RUNS IS THE (gk) SHAPE, ONE TOOL LATER
 
 - *(Letter moved from (jb) at push time — a concurrent session claimed (jb) on

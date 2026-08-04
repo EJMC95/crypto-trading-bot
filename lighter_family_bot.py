@@ -685,6 +685,9 @@ class Book:
         self.halted_today = False
         self.day_start_equity = None
         self.last_accrue = time.time()
+        # [2026-08-04 SEED GUARD] False until a CLEAN state read. While False
+        # the book neither trades nor persists — see restore()/persist().
+        self._restored = False
 
     # -- persistence ----------------------------------------------------------
     def restore(self):
@@ -694,7 +697,27 @@ class Book:
                 self.n_closed, self.n_wins = agg["closed"], agg["wins"]
         except Exception:  # noqa: BLE001
             pass
-        saved = store.load_state(self.bot_id)
+        # [2026-08-04 SEED GUARD] the CHECKED read — load_state() collapses
+        # "no row" and "READ FAILED" into one None, so a Postgres blip at boot
+        # started a fresh $1000 book whose persist() then OVERWROTE the durable
+        # record (georgia's graded sample rides this state). Parliament's
+        # 21-Jul pattern for a multi-book container: on a failed read stay
+        # un-restored — the main loop skips this book's cycle and retries next
+        # loop; persist() refuses until a clean read. sys.exit is wrong here:
+        # one shared connection failing would kill all seven books for one
+        # book's blip. No DATABASE_URL = fresh book (old behavior): with no DB
+        # the write path cannot overwrite anything either.
+        if not os.environ.get("DATABASE_URL", "").strip():
+            self._restored = True
+            saved = None
+        else:
+            ok, saved = store.load_state_checked(self.bot_id)
+            if not ok:
+                log.warning("%s state read FAILED — NOT seeding a fresh book "
+                            "over a blip; this book skips trading until a "
+                            "clean read (retry next cycle)", self.bot_id)
+                return
+            self._restored = True
         if saved and self.broker.restore_state(saved.get("broker") or {}):
             self.meta = {str(k): v for k, v in (saved.get("meta") or {}).items()}
             self.closed = list(saved.get("closed") or [])
@@ -719,6 +742,12 @@ class Book:
             log.warning("%s daily-loss halt restored — halted for today.", self.bot_id)
 
     def persist(self):
+        # [2026-08-04 SEED GUARD] never overwrite durable state we could not
+        # read (parliament's rule, verbatim). Without this gate the guard in
+        # restore() protects nothing — the first loop's persist() would write
+        # the fresh book over the record anyway.
+        if not self._restored:
+            return
         try:
             store.save_state(self.bot_id, {
                 "broker": self.broker.to_state(), "meta": self.meta,
@@ -1063,6 +1092,21 @@ def main():
 
         for b in books:
             store.heartbeat(b.bot_id)
+            # [2026-08-04 SEED GUARD] a book whose durable state could not be
+            # read does NOT trade this cycle — trading un-restored means a
+            # fresh $1000 book opening positions the record says are already
+            # held. Retry the read each loop; on a late success re-anchor the
+            # daily rail (boot anchored it on the fresh book's equity, and a
+            # wrong anchor could false-trip the -10% halt the moment the real
+            # equity appears). persist() is refusing meanwhile, so nothing
+            # durable is at risk while we wait.
+            if not b._restored:
+                b.restore()
+                if not b._restored:
+                    log.warning("%s still un-restored — skipping cycle "
+                                "(no trade, no persist)", b.bot_id)
+                    continue
+                b.day_start_equity = b.equity()
             tf_s = _interval_ms(b.s.tf) / 1000.0
 
             # ---- daily-loss rail (durable halt, debounced) ----

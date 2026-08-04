@@ -504,7 +504,16 @@ def main():
     fund_hist = {}       # coin -> [[epoch_s, hourly_rate], ...] (rolling window)
     fund_realized = 0.0
     next_reb = None
-    _saved = store.load_state(bot_id)
+    # [2026-08-04 SEED GUARD] the CHECKED read — load_state() collapses "no
+    # row" and "READ FAILED" into one None, and this restore is exactly the
+    # seed-on-failed-read caller its docstring warns about: a Postgres blip at
+    # boot would start a fresh book over this book's open legs' meta, and the
+    # loop's save_state below would then overwrite the durable record with the
+    # empty one. Degrade per the sniper's 17-Jul fix: bounded retry, then
+    # REFUSE (crash-loop loudly; a blip clears, so the loop self-heals). No
+    # DATABASE_URL keeps the old fresh-boot behavior — with no DB the write
+    # path cannot overwrite anything either.
+    _saved = store.load_state_required(bot_id, sleep_s=LOOP_SECONDS)
     if _saved:
         if broker is not None and broker.restore_state(_saved.get("broker") or {}):
             meta = {str(k): v for k, v in (_saved.get("meta") or {}).items()}

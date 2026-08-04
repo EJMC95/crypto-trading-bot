@@ -422,7 +422,13 @@ def main():
     noconv = {}          # coin -> ts of a max_hold (non-converged) close;
                          # entry-embargoed until |dev| first dips below
                          # EXIT_BPS (21-Jul: the APEX 6-round-trip lesson)
-    _saved = store.load_state(bot_id)
+    # [2026-08-04 SEED GUARD] the CHECKED read — load_state() collapses "no
+    # row" and "READ FAILED" into one None, so a Postgres blip at boot started
+    # a fresh book (empty meta over held positions, census wiped) and the
+    # loop's save_state then overwrote the durable record. Bounded retry, then
+    # REFUSE (crash-loop loudly; a blip clears, so this self-heals). No
+    # DATABASE_URL keeps the old fresh-boot behavior.
+    _saved = store.load_state_required(bot_id, sleep_s=LOOP_SECONDS)
     if _saved:
         if broker is not None and broker.restore_state(_saved.get("broker") or {}):
             meta = {str(k): v for k, v in (_saved.get("meta") or {}).items()}

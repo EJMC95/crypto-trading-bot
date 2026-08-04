@@ -809,6 +809,44 @@ def load_state(bot):
     return load_state_checked(bot)[1]
 
 
+def load_state_required(bot, tries=3, sleep_s=60.0):
+    """Boot-time restore for a daemon that save_state()s durable state each loop.
+
+    [2026-08-04] The seed-on-failed-read class, ONE home instead of a copy per
+    bot (a second copy of a rule is a second rule): a bot that boots with
+    `load_state(bot) or fresh` cannot tell a Postgres blip from a first run, so
+    a blip at boot starts a fresh book whose very next save_state OVERWRITES
+    the durable record. The sniper's 17-Jul fix established the degrade; this
+    is that degrade, callable.
+
+    Semantics:
+      * no DATABASE_URL         -> None, immediately. Nothing durable exists to
+        protect, and nothing CAN be overwritten — save_state needs the same DB
+        — so a fresh in-memory book is safe (local smoke / selftests / inert
+        backtests keep working).
+      * read OK                 -> the state dict, or None for genuinely-no-row.
+      * read FAILS `tries` times (sleep_s between) -> SystemExit. Crash-loop
+        LOUDLY — Railway restarts us, the watchdog sees the stale row — rather
+        than silently poison the book. A blip clears, so the loop is
+        self-healing; this is not the forbidden exit-as-retirement shape.
+    """
+    if not _DATABASE_URL:
+        return None
+    for try_n in range(1, max(1, int(tries)) + 1):
+        ok, saved = load_state_checked(bot)
+        if ok:
+            return saved
+        print(f"[bot_pnl_store] {bot}: state read FAILED (try {try_n}/{tries})"
+              " — NOT seeding: an unreadable state is indistinguishable from a"
+              " fresh bot, and seeding now would let the next save_state"
+              " overwrite the durable record.", flush=True)
+        if try_n < tries:
+            time.sleep(max(0.0, float(sleep_s)))
+    raise SystemExit(
+        f"{bot}: durable state unreadable after {tries} tries — refusing to "
+        "run rather than seed a fresh book over a blip (load_state_required).")
+
+
 def fetch_states(keys):
     """[2026-07-15 BLOODSTREAM] Batch read: {key: state_dict} for many keys in
     ONE query instead of N round-trips. Organs that read a fistful of bus keys

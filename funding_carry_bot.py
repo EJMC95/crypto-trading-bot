@@ -503,7 +503,15 @@ def main():
     # accrued funding + entry levels (realized already restores from the ledger
     # above). Saved after every published loop below.
     try:
-        _saved = store.load_state(bot_id)
+        # [2026-08-04 SEED GUARD] the CHECKED read — load_state() collapses
+        # "no row" and "READ FAILED" into one None, so a Postgres blip at boot
+        # seeded empty `positions` over real open carries and the loop's
+        # save_state then overwrote the durable record. load_state_required
+        # retries, then REFUSES (SystemExit — a BaseException, so this
+        # try/except Exception deliberately does not swallow it): crash-loop
+        # loudly rather than poison the fleet's best-evidenced ledger. No
+        # DATABASE_URL keeps the old fresh-boot behavior.
+        _saved = store.load_state_required(bot_id, sleep_s=LOOP_SECONDS)
         if _saved and isinstance(_saved.get("positions"), dict) and _saved["positions"]:
             positions = _saved["positions"]
         # [2026-08-03 (iu)] THE HOT-STREAK CLOCK IS RESTORED FAIL-CLOSED.

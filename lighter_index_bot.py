@@ -340,6 +340,33 @@ def want_position(symbol, closes):
 # keeps Yahoo's live bar too instead of dropping it.
 _ref_cache = {}      # symbol -> {"ts": epoch, "closes": [...], "last_date": iso}
 _REF_TTL_S = 6 * 3600      # refresh a few times a day, like the 2h IBKR poll
+# [2026-08-04 STALENESS GUARD] `ref_date` shipped in (hl) so a frozen Yahoo
+# feed would be VISIBLE — and then had zero consumers (the shipped-but-inert
+# class): nothing read the stamp, so a feed frozen a fortnight would keep
+# trading on its last opinion forever. The bot now consumes its own stamp: a
+# sleeve whose reference last bar is older than this many CALENDAR days makes
+# no decision and publishes a null regime — the (hk) false-FLAT rule, no new
+# trading behavior (no entry, NO exit; the catastrophic stop runs ahead of the
+# signal). 7 because the longest BENIGN gap is ~5 days: Friday's close stays
+# the freshest CONSOLIDATED bar across a weekend, plus a Monday holiday, plus
+# Yahoo's null-close consolidation lag (measured 4-Aug — see ref_closes), with
+# nothing wrong. Deliberately does NOT fire on that routine 1-2 session lag.
+REF_STALE_D = int(os.environ.get("INDEX_REF_STALE_D", "7"))
+
+
+def _ref_age_days(last_date, now_s=None):
+    """Calendar days between the reference's own last bar date and now (UTC).
+
+    None when the date is missing/unparseable — and the caller must treat None
+    as STALE, never fresh (the sniper's `ages_d` rule: "age unknown" must not
+    read as "brand new")."""
+    try:
+        d = datetime.strptime(str(last_date)[:10], "%Y-%m-%d").date()
+    except Exception:  # noqa: BLE001
+        return None
+    now = datetime.fromtimestamp(now_s if now_s is not None else time.time(),
+                                 tz=timezone.utc).date()
+    return (now - d).days
 
 
 # [2026-07-30 AUTO-REVERT FIX] The operator's env defaults, snapshotted at
@@ -389,6 +416,18 @@ def ref_closes(symbol):
         cl = (res.get("indicators", {}).get("quote") or [{}])[0].get("close") or []
         closes, dates = [], []
         for t, c in zip(ts, cl):
+            # [2026-08-04 ROOT CAUSE of the ref_date lag] Yahoo serves the
+            # MOST RECENT COMPLETED session with a NULL close until it
+            # consolidates (measured 4-Aug 09:34Z: SPY/QQQ/NVDA's 03-Aug bar
+            # null on EVERY range while meta.regularMarketTime said that
+            # session closed 03-Aug 20:00Z). Dropping nulls is correct — a
+            # null close is not a price — but it means the series ends at the
+            # last CONSOLIDATED close, so ref_date routinely reads 1-2
+            # sessions behind the calendar. The futures refs (GC=F/CL=F/HG=F)
+            # mask the same hole: their ~24h sessions append a VALUED live bar
+            # dated today. Benign for a 200d SMA; the REF_STALE_D guard above
+            # is calibrated for the frozen-FEED class ((hl): "froze a
+            # fortnight ago"), not this serving quirk.
             if c is None:
                 continue
             closes.append(float(c))
@@ -461,7 +500,15 @@ def main():
     meta = {}            # symbol -> {entry, opened_ts, accrued}
     fund_realized = 0.0
     n_closed = n_wins = 0
-    saved = store.load_state(bot_id)
+    # [2026-08-04 SEED GUARD] the CHECKED read — load_state() collapses "no
+    # row" and "READ FAILED" into one None, so a Postgres blip at boot looked
+    # identical to a first run: fresh $1000 book, empty meta over held
+    # positions, and the loop's save_state below then overwrote the durable
+    # record with the seeded one. Degrade per the sniper's 17-Jul fix: bounded
+    # retry, then REFUSE (crash-loop loudly; a blip clears, so this
+    # self-heals). No DATABASE_URL keeps the old fresh-boot behavior — with no
+    # DB the write path cannot overwrite anything either.
+    saved = store.load_state_required(bot_id, sleep_s=LOOP_SECONDS)
     if saved and broker.restore_state(saved.get("broker") or {}):
         meta = {str(k): v for k, v in (saved.get("meta") or {}).items()}
         fund_realized = float(saved.get("fund_realized") or 0.0)
@@ -573,6 +620,7 @@ def main():
         # [(hl)] the reference feed's OWN last date per sleeve — a frozen Yahoo
         # cache and a flat market are otherwise identical in the payload.
         ref_dates = {}
+        ref_ages = {}     # [2026-08-04] calendar age of each sleeve's ref
         for s in symbols:
             px = marks.fresh_mid(venue, s)
             held = s in broker.pos
@@ -630,10 +678,26 @@ def main():
             if ref is None:
                 regime[s] = None
                 continue
-            want = want_position(s, ref["closes"])
-            regime[s] = want
             bars_seen[s] = len(ref["closes"] or ())
             ref_dates[s] = ref.get("last_date")
+            age_d = _ref_age_days(ref.get("last_date"), t0)
+            ref_ages[s] = age_d
+            if age_d is None or age_d > REF_STALE_D:
+                # [2026-08-04] a STALE reference is NO DATA, per the (hk)
+                # false-FLAT rule: no entry AND no exit — a position must
+                # never be opened or closed by an opinion formed on a feed
+                # that stopped. The catastrophic stop already ran above. An
+                # unparseable date counts as stale, never fresh.
+                regime[s] = None
+                log.warning("%-5s reference STALE — last ref close %s is %s "
+                            "day(s) old (guard %dd): NO SIGNAL (holding %s, "
+                            "not acting on a frozen feed)",
+                            s, ref.get("last_date"),
+                            "?" if age_d is None else age_d, REF_STALE_D,
+                            "yes" if held else "no")
+                continue
+            want = want_position(s, ref["closes"])
+            regime[s] = want
             if want is None:
                 # [(hk)] Too short for this sleeve's rule = NO OPINION, not
                 # flat. Skipping here means no entry AND no exit; the
@@ -733,6 +797,10 @@ def main():
                        # today or froze a fortnight ago. The value is already
                        # in ref["last_date"]; publishing it is free.
                        "ref_date": {s: ref_dates.get(s) for s in symbols},
+                       # [2026-08-04] the stamp, made consumable: calendar age
+                       # of each sleeve's reference (null = unparseable). The
+                       # guard nulls `regime` past REF_STALE_D.
+                       "ref_age_d": {s: ref_ages.get(s) for s in symbols},
                        "skipped_unlisted": skipped})
         except Exception:  # noqa: BLE001
             pass
@@ -815,7 +883,21 @@ def _selftest():
         _record_close("b", "SPY", 500.0, 1, 510.0, 1.0, 0.0, "tp", 100.0)
     finally:
         store.publish_paper_trade = _orig
-    print("[index-rider] selftest OK (sma/regime/band-hysteresis/dispatch/ledger-row)")
+
+    # [2026-08-04] reference staleness guard: the age math, and the guard's
+    # calibration in BOTH directions — the routine Yahoo null-close lag
+    # (measured 4-Aug: equities' freshest consolidated close was Friday on a
+    # Tuesday, age 4d) must NOT trip it; a frozen fortnight MUST.
+    _now = datetime(2026, 8, 4, 9, 34, tzinfo=timezone.utc).timestamp()
+    assert _ref_age_days("2026-07-31", _now) == 4
+    assert _ref_age_days("2026-07-20", _now) == 15
+    assert _ref_age_days("2026-08-04", _now) == 0
+    assert _ref_age_days("garbage", _now) is None      # unknown age != fresh
+    assert _ref_age_days(None, _now) is None
+    assert not (4 > REF_STALE_D), "the routine 1-2 session lag must not fire"
+    assert 15 > REF_STALE_D, "a frozen fortnight must fire"
+    print("[index-rider] selftest OK (sma/regime/band-hysteresis/dispatch/"
+          "ledger-row/ref-staleness)")
 
 
 def _supervised():
