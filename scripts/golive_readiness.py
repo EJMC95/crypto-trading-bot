@@ -62,6 +62,7 @@ Usage:
   python3 scripts/golive_readiness.py --selftest
 """
 import argparse
+import json
 import math
 import os
 import sys
@@ -398,7 +399,143 @@ def _era_parse(parse=None):
     return _p
 
 
-def era_rows(bot, rows, parse=None):
+# ---------------------------------------------------------------------------
+# STAMP-DERIVED POLICY BOUNDARIES [2026-08-04 (jf)]
+# ---------------------------------------------------------------------------
+# THE DECLARED TABLE ABOVE CANNOT KEEP UP WITH A BOOK THAT CHANGES POLICY IN
+# CODE. The Ticket Taker — a REAL-MONEY book — changed policy on 24-Jul
+# (TT_BULL_MODE), 29-Jul and 30-Jul ((hj)'s LIVE_SIDES hard gate), and (hm)
+# already ruled that a sample pooled across those is meaningless… while this
+# grader's era for it sat at the single 17-Jul accrual date, so its t/halves
+# bars graded a mixture of three policies. The ledger has carried the fix since
+# (fx)/(gi)/(hj): every taker close stamps `extra.policy` — precisely so "any
+# grader can split eras MECHANICALLY". No grader ever consumed it. This block
+# is the consumer.
+#
+# Measured on the live ledger the day this shipped (4-Aug):
+#   lighter-ticket-taker-lighter   38 closes = 25 unstamped (17→29-Jul, the
+#     three-policy mixture) + a 13-close run stamped {bull, lenses:[divergence],
+#     sides:{divergence:[short]}, venue:lighter_live} since 30-Jul 11:05:43Z.
+#     Keyed on the OPEN, 11 closes are in-era → earliest gradeable ~29-Aug,
+#     computed from the real boundary instead of hand-waved.
+#   lighter-ticket-taker-lshadow   boundary 30-Jul 11:09:46Z, 14 in-era opens.
+#     (The shadow's boundary is partly a stamp-SCHEMA event — `sides` joined
+#     the stamp at (hj) without changing shadow behaviour — and the machinery
+#     cannot tell schema arrival from a policy change, so it takes the
+#     fail-closed reading. Cost measured: one 30-Jul close.)
+#
+# WHAT COUNTS AS THE POLICY, and this subset is load-bearing: venue / bull /
+# lenses / sides — the DIFFERENT-IN-KIND fields (which signals, which sides,
+# which venue mode). `max_open` and `ticket_top_n` ride the same stamp but are
+# capacity/supply levers — (hc)'s "ordinary tuning", which must NOT reset an
+# era or the growth rail's daily lever walks would keep every clock at zero
+# and the 30-day bar would be unreachable forever. The exit bracket (tp/sl/
+# hold) lives in `extra.bars`, not the policy stamp, for the same reason.
+#
+# THE (ij) RULING, decided by code review as the 4-Aug review asked, and the
+# competing reading stated rather than silently dropped. Does the 1-Aug lens-
+# veto rewrite (expectancy-only, realised-record senior — I14/I15; live-taker
+# deploy 2-Aug (im)) reset this clock?
+#   NO — ruled here, on three code facts and one measurement:
+#   (1) the stamp's lens/side sets are `allowed_lenses`/`allowed_sides`, the
+#       hard fail-CLOSED gates, and `allowed_lenses`' own docstring says it is
+#       "deliberately NOT the brain's veto" — (ij) touched the veto, not the
+#       gates, so the stamped policy is byte-identical across it (measured:
+#       the 30-Jul run continues unbroken through the 2-Aug deploy);
+#   (2) the veto is RESTRICT-ONLY — it can only subtract entries, so a veto
+#       flip pauses the book rather than admitting a different KIND of trade;
+#       a pause adds no trades to the sample and so cannot contaminate it;
+#   (3) measured at the deploy ((ik): "both the old and new rules currently
+#       permit divergence, so live behaviour is identical today") — no trade
+#       in the sample was admitted or refused differently by the rewrite.
+#   THE COMPETING READING: the veto is consulted in the entry loop, and (hc)
+#   lists "a rewritten entry rule" as a reset. If the operator rules that way,
+#   the implementation is one line — move POLICY_ERA["lighter-ticket-taker"]
+#   to "2026-08-02" (the deploy date, not the merge date) — and the max() rule
+#   below applies it over the stamp boundary automatically.
+
+#: The stamp fields that ARE the policy. Adding a tuning field here weaponises
+#: the era ((hc)); removing one blinds the boundary to a real change.
+POLICY_SIG_FIELDS = ("venue", "bull", "lenses", "sides")
+
+
+def policy_signature(extra):
+    """Canonical signature (a sorted-JSON string) of the policy a close row
+    stamps, or None for a row that carries no readable stamp.
+
+    None never matches anything — an unreadable stamp breaks a run and is
+    fail-closed out of any stamp-derived era, because counting a trade whose
+    policy cannot be confirmed is exactly the credit the era withdraws. A
+    stamp without a non-empty `lenses` is unreadable: a policy that names no
+    admissible signal describes nothing."""
+    if not isinstance(extra, dict):
+        return None
+    pol = extra.get("policy")
+    if not isinstance(pol, dict):
+        return None
+    sig = {k: pol[k] for k in POLICY_SIG_FIELDS if k in pol}
+    if not sig.get("lenses"):
+        return None
+    try:
+        return json.dumps(sig, sort_keys=True)
+    except (TypeError, ValueError):
+        return None
+
+
+def stamped_policy_boundary(rows, parse=None):
+    """(epoch, iso, policy_dict, run_n) of the LATEST policy boundary the
+    ledger's own `extra.policy` stamps can establish. (None, None, None, 0)
+    when the stamps establish nothing; (None, None, policy, n) when they show
+    ONE policy for the whole ledger — a known policy with no boundary.
+
+    rows: era_rows' shape, oldest first, with the row's `extra` dict at [4]
+    (rows without one — every pre-(jf) caller and every non-stamping book —
+    derive nothing, so this is a no-op for the rest of the fleet).
+
+    THE RULE: the graded era is the maximal same-signature SUFFIX of the
+    ledger, and the boundary is the CLOSE time of that suffix's first row.
+    Three fail-closed properties, each load-bearing:
+      * the suffix breaks on ANY row whose stamp (or close stamp) cannot be
+        read — an unreadable row cannot confirm the policy held through it;
+      * the epoch is the first in-suffix CLOSE, an UPPER bound on when the
+        change landed (the change happened at or before the close that first
+        recorded it), so keying opens on it can only over-exclude — never
+        smuggle an old-policy trade in;
+      * a ledger whose EVERY row carries one signature has no boundary at all:
+        stamps showing no change are not evidence of one, and inventing a
+        boundary at the first close would disqualify a stable book's earliest
+        trades for nothing.
+    """
+    if not rows:
+        return None, None, None, 0
+    p = _era_parse(parse)
+    cur = policy_signature(rows[-1][4] if len(rows[-1]) > 4 else None)
+    if cur is None:
+        return None, None, None, 0
+    epoch, n = None, 0
+    for r in reversed(rows):
+        if policy_signature(r[4] if len(r) > 4 else None) != cur:
+            break
+        try:
+            e = p(r[2])
+        except Exception:      # noqa: BLE001 — unreadable close breaks the run
+            break
+        epoch, n = e, n + 1
+    if epoch is None:
+        return None, None, None, 0
+    if n >= len(rows):
+        # Stamps show ONE policy across the whole ledger: no boundary (stamps
+        # showing no change are not evidence of one, and inventing one at the
+        # first close would disqualify a stable book's earliest trades for
+        # nothing) — but the policy itself is known, and is returned so the
+        # payload can still say which policy the graded sample runs.
+        return None, None, json.loads(cur), n
+    from datetime import datetime, timezone
+    iso = datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+    return epoch, iso, json.loads(cur), n
+
+
+def era_rows(bot, rows, parse=None, detail=False):
     """(era_scoped, all_time, era_iso) — THE SINGLE OWNER of "which of a book's
     trades describe the book as it runs today".
 
@@ -424,13 +561,45 @@ def era_rows(bot, rows, parse=None):
     PROMOTIONAL direction, on the one book nearest real money. Importing the
     scoring while re-deriving the sample is `(hj)`'s "a second copy of a rule is
     a second rule" one layer down: the bars were canonical and the thing they
-    were computed over was not."""
-    era_epoch, era_iso, _why = era_epoch_for(bot)
+    were computed over was not.
+
+    [2026-08-04 (jf)] THE ERA IS NOW THE LATEST OF THE DECLARED DATE AND THE
+    LEDGER'S OWN POLICY-STAMP BOUNDARY (`stamped_policy_boundary`, rows[4]).
+    max(), never either-or: an era is the LATEST of every invalidating change,
+    so a declared date after the last stamp change still governs (the operator
+    can always reset a clock the stamps cannot see), and a stamp change after
+    the declared date supersedes it while the declaration keeps covering
+    everything before. `detail=True` returns the full reading (epoch, source,
+    the graded sample's policy, both candidate boundaries) for the publish
+    path; the default 3-tuple is unchanged for every existing caller."""
+    declared_ep, declared_iso, declared_why = era_epoch_for(bot)
+    st_ep, st_iso, st_policy, st_n = stamped_policy_boundary(rows, parse)
+    if st_ep is not None and (declared_ep is None or st_ep > declared_ep):
+        era_epoch, era_iso, source = st_ep, st_iso, "policy-stamp"
+        why = (f"POLICY STAMP: the ledger's own extra.policy changed at this "
+               f"boundary — the graded sample is the newest same-policy run "
+               f"({st_n} closes). An era is the LATEST of every invalidating "
+               f"change; any earlier declared era ({declared_iso or 'none'}) "
+               f"still covers everything before it.")
+    else:
+        era_epoch, era_iso, source = declared_ep, declared_iso, (
+            "declared" if declared_ep is not None else None)
+        why = declared_why
     p = _era_parse(parse)
     all_time = [(r[0], r[1], r[2]) for r in rows]
     scoped = [(r[0], r[1], r[2]) for r in rows
               if in_era(r[3] if len(r) > 3 else None, era_epoch, p)]
-    return scoped, all_time, era_iso
+    if not detail:
+        return scoped, all_time, era_iso
+    return {"scoped": scoped, "all_time": all_time, "iso": era_iso,
+            "epoch": era_epoch, "source": source, "why": why,
+            "declared_since": declared_iso, "declared_why": declared_why,
+            "stamp_since": st_iso, "stamp_run_n": st_n,
+            # The policy the graded sample runs under. Published whenever the
+            # stamps know it, whichever boundary governs: the graded era never
+            # starts before the stamp boundary, so every graded trade is in
+            # the final run and this dict describes all of them.
+            "policy": st_policy}
 
 
 def stats(rows, book_usd=None):
@@ -1046,9 +1215,102 @@ def _selftest():
             raise RuntimeError("db unreachable")
     assert equity_series("nope", store=_DarkStore) == []
 
+    # ---- [2026-08-04 (jf)] STAMP-DERIVED POLICY BOUNDARIES ----------------
+    # Offline mechanics only — the publisher-contract half (rows built by the
+    # taker's own `_close_extra`, per (hj)) lives in
+    # tests/autonomy/test_golive_policy_era.py, because importing the taker
+    # here would drag it into this module's import graph in every image.
+    from datetime import datetime as _sdt
+    from datetime import timedelta as _std
+    from datetime import timezone as _stz
+
+    _t0 = _sdt(2026, 8, 10, tzinfo=_stz.utc)     # after every declared era
+    POL_A = {"venue": "lighter_live", "bull": True, "lenses": ["divergence"],
+             "sides": {"divergence": ["long", "short"]}, "max_open": 4,
+             "ticket_top_n": 6}
+    POL_B = {**POL_A, "sides": {"divergence": ["short"]}}    # the (hj) shape
+
+    def _prow(open_h, close_h, pol, base=None):
+        b = base or _t0
+        return (0.01, 10.0, b + _std(hours=close_h),
+                (b + _std(hours=open_h)).isoformat(),
+                {"policy": pol} if pol is not None else {})
+
+    # a1..a3 under policy A, then a STRADDLER (opened in the ambiguity window,
+    # stamped B at close), then b1..b2 cleanly under B. Close-ordered.
+    rows_ab = [_prow(0, 1, POL_A), _prow(1, 2, POL_A), _prow(2, 3, POL_A),
+               _prow(9, 10, POL_B),          # run start — itself a straddler
+               _prow(4, 10.5, POL_B),        # the straddler proper
+               _prow(10, 11, POL_B), _prow(11, 12, POL_B)]
+    ep_b, iso_b, pol_b, n_b = stamped_policy_boundary(rows_ab)
+    assert n_b == 4 and pol_b["sides"] == {"divergence": ["short"]}, (n_b, pol_b)
+    assert abs(ep_b - (_t0 + _std(hours=10)).timestamp()) < 1e-6, (
+        "the boundary is the FIRST close of the newest same-policy run — an "
+        "upper bound on when the change landed, so keyed opens over-exclude "
+        "rather than smuggle an old-policy trade in")
+    # era keyed on the OPEN: both straddlers are out, only b1/b2 count.
+    sc, at, got = era_rows("stampbook", rows_ab)
+    assert got == iso_b and len(at) == 7, (got, iso_b, len(at))
+    assert len(sc) == 2 and {r[2] for r in sc} == \
+        {_t0 + _std(hours=11), _t0 + _std(hours=12)}, sc
+    d = era_rows("stampbook", rows_ab, detail=True)
+    assert d["source"] == "policy-stamp" and d["iso"] == iso_b, d
+    assert d["policy"]["lenses"] == ["divergence"] and d["stamp_run_n"] == 4
+    assert d["declared_since"] is None and d["epoch"] == ep_b, d
+    # ORDINARY TUNING IS NOT A BOUNDARY: max_open / ticket_top_n moves leave
+    # ONE signature, so there is no era at all — the (hc) anti-weaponisation
+    # rule, now enforced on the stamp path too.
+    rows_tune = [_prow(0, 1, POL_A), _prow(1, 2, {**POL_A, "max_open": 9}),
+                 _prow(2, 3, {**POL_A, "ticket_top_n": 12})]
+    ep_t, iso_t, pol_t, n_t = stamped_policy_boundary(rows_tune)
+    assert ep_t is None and iso_t is None, (
+        "a capacity/supply lever move created a policy boundary — the growth "
+        "rail walks levers daily and this would keep every clock at zero")
+    assert pol_t is not None and n_t == 3, "one-policy ledger: policy known"
+    assert era_rows("stampbook", rows_tune)[2] is None
+    # FAIL-CLOSED: an unreadable stamp INSIDE the run breaks it (the boundary
+    # moves LATER, never earlier), and an unstamped NEWEST row derives nothing.
+    rows_junk = rows_ab[:5] + [(0.01, 10.0, _t0 + _std(hours=11),
+                                (_t0 + _std(hours=10)).isoformat(),
+                                {"policy": "junk"})] + rows_ab[6:]
+    ep_j, _, _, n_j = stamped_policy_boundary(rows_junk)
+    assert n_j == 1 and ep_j == (_t0 + _std(hours=12)).timestamp(), (
+        "an unreadable stamp must break the run — counting a trade whose "
+        "policy cannot be confirmed is the credit this block withdraws")
+    assert stamped_policy_boundary(rows_ab + [(0.01, 10.0,
+        _t0 + _std(hours=13), (_t0 + _std(hours=12)).isoformat(), {})]) == \
+        (None, None, None, 0), "an unstamped newest row derives no boundary"
+    # 4-tuple rows (every pre-(jf) caller) and stampless books: no-op.
+    assert stamped_policy_boundary([r[:4] for r in rows_ab]) == \
+        (None, None, None, 0)
+    # THE MAX() RULE, both directions, on the book with a real declared era.
+    _c_iso = POLICY_ERA["perps-funding-carry"][0]
+    # stamps AFTER the declared date -> the stamp boundary governs...
+    d2 = era_rows("perps-funding-carry-lshadow", rows_ab, detail=True)
+    assert d2["source"] == "policy-stamp" and d2["iso"] == iso_b, d2
+    assert d2["declared_since"] == _c_iso, d2
+    # ...stamps BEFORE it -> the declared era governs (it is the LATER of the
+    # two invalidating changes) and the stamp reading is still published.
+    _july = _sdt(2026, 7, 1, tzinfo=_stz.utc)
+    rows_early = [_prow(o, c, p, base=_july) for (o, c, p) in
+                  [(0, 1, POL_A), (1, 2, POL_A), (9, 10, POL_B),
+                   (10, 11, POL_B), (11, 12, POL_B)]]
+    d3 = era_rows("perps-funding-carry-lshadow", rows_early, detail=True)
+    assert d3["source"] == "declared" and d3["iso"] == _c_iso, d3
+    assert d3["stamp_since"] is not None and d3["scoped"] == [], d3
+    # signature: the tuning fields are OUTSIDE it; junk shapes are None.
+    assert policy_signature({"policy": {**POL_A, "max_open": 99}}) == \
+        policy_signature({"policy": POL_A})
+    for junk in (None, {}, {"policy": None}, {"policy": "x"},
+                 {"policy": {"lenses": []}}, {"policy": {"bull": True}}):
+        assert policy_signature(junk) is None, junk
+
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
           "high-win-rate loser, window/DD bars, ungradeable input, policy "
-          "eras, MTM drawdown: worse-of, floors, no-series no-op)")
+          "eras, stamp-derived policy boundaries: first-new-close bound, "
+          "open-keyed straddlers, tuning-not-a-boundary, fail-closed junk, "
+          "declared-vs-stamp max, MTM drawdown: worse-of, floors, "
+          "no-series no-op)")
 
 
 def main():
@@ -1098,7 +1360,6 @@ def main():
     from experiment_judge import parse_ts
     for bot in sorted(books):
         rs = sorted(books[bot], key=_key)
-        _era_ep, era_iso, era_why = era_epoch_for(bot)
         quads, integ_eps = [], []
         for r in rs:
             # [(hf)] intervals for the integrity check, over the WHOLE ledger:
@@ -1115,13 +1376,17 @@ def main():
                 ts = datetime.fromtimestamp(parse_ts(_key(r)), tz=timezone.utc)
             except Exception:      # noqa: BLE001
                 continue
+            # [(jf)] `extra` rides at [4]: it carries the close's policy stamp,
+            # which `era_rows` now reads to derive the LATEST policy boundary.
             quads.append((r.get("profit_ratio"), r.get("profit_abs"), ts,
-                          r.get("open_ts")))
+                          r.get("open_ts"), r.get("extra")))
         # ONE owner of "which trades count" — `era_rows` keys the era on the
         # OPEN stamp. Extracted at (hq) so the daily review runs the same
         # selection rather than its own; see that docstring for what the
         # divergence cost.
-        parsed, parsed_all, _ = era_rows(bot, quads, parse=parse_ts)
+        ed = era_rows(bot, quads, parse=parse_ts, detail=True)
+        parsed, parsed_all = ed["scoped"], ed["all_time"]
+        era_iso, _era_ep = ed["iso"], ed["epoch"]
         # [2026-07-30 (hc)] The ERA-SCOPED sample is authoritative; the all-time
         # one is published beside it so nothing is hidden and the difference is
         # readable rather than asserted. `min_closes` is applied to the ALL-TIME
@@ -1204,7 +1469,11 @@ def main():
             # Say so on EVERY line for an era-scoped book, whatever the verdict.
             # An era that only announces itself when it changes the outcome is a
             # footnote; this one has to be readable as the sample's definition.
-            flag += (f"   [era {era_iso}: {s.get('n', 0)} of {s_all['n']} "
+            # [(jf)] A stamp-derived boundary names its source on the line — a
+            # date the POLICY_ERA table does not contain must not read as if it
+            # were declared there.
+            _src = " (policy-stamp)" if ed.get("source") == "policy-stamp" else ""
+            flag += (f"   [era {era_iso}{_src}: {s.get('n', 0)} of {s_all['n']} "
                      f"closes count]")
         if overlaps_all and not overlaps:
             # [(ii)] Clean IN-ERA but pooled HISTORICALLY. Stated on the line
@@ -1239,7 +1508,16 @@ def main():
             # withdrew reads `alltime`. `era` is None for every book without a
             # declared era, which is all of them but one — so this is additive
             # and no other book's payload changes shape in a meaningful way.
-            "era": ({"since": era_iso, "why": era_why,
+            # [(jf)] `source` says which boundary governs (declared |
+            # policy-stamp), `policy` says WHICH policy the graded sample runs
+            # (from the ledger's own stamps), and both candidate boundaries
+            # are published so a consumer can compute the real gradeable date
+            # (since + 30d) and see what a declaration would supersede.
+            "era": ({"since": era_iso, "source": ed.get("source"),
+                     "why": ed.get("why"),
+                     "policy": ed.get("policy"),
+                     "declared_since": ed.get("declared_since"),
+                     "stamp_since": ed.get("stamp_since"),
                      "closes_in_era": s.get("n", 0),
                      "closes_all_time": s_all.get("n", 0)} if era_iso else None),
             "alltime": book_payload(s_all),
