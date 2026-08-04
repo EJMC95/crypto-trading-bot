@@ -392,6 +392,45 @@ def main():
     p.add_argument("--once", action="store_true", help="Single scan then exit.")
     args = p.parse_args()
 
+    # [2026-08-04] 🧲 SNAP BACK RETIRED — the fleet's only statistically
+    # significant LOSER, and the growth rail structurally cannot restrict it.
+    #
+    # MEASURED (golive-readiness payload, 4-Aug): t=-2.97, n=175, mean
+    # -0.281%/trade, BOTH halves negative (-$2.48 / -$2.56), ~-$1/day since
+    # the widening — after which 100% of closes exit `converged`. The book
+    # enters at an adaptive percentile FLOORED at EXIT_BPS * ENTER_FLOOR_MULT
+    # and closes when the residual mean-reverts inside EXIT_BPS, so it books
+    # round trips whose capture is structurally smaller than the noise that
+    # produces them: the loss rate is the design working as shipped.
+    #
+    # AND THE RAIL CANNOT FIX IT: the binding entry floor is ENTER_FLOOR_MULT,
+    # a bare env literal (DISLOC_ENTER_FLOOR_MULT) — unregistered, invisible
+    # to the registry, the I18 class. Every reachable lever motion
+    # (disloc.enter_pct down, disloc.exit_bps down, disloc.universe_n up)
+    # LOOSENS a measured loser; nothing the rail can express tightens it.
+    #
+    # Operator decision 4-Aug ("full permission to go ahead with all
+    # advancements") on OPERATOR_QUEUE.md item 2, option A. The Tide Rider
+    # retirement pattern exactly ((if)): guard FIRST, then hide (RETIRED_ROWS)
+    # and prune (LEGACY_BOTS). IDLE, never an exit — restartPolicy=always
+    # turns an exit into a permanent crash-loop (the Trail Blazer pattern,
+    # 15-Jul). Ledgers, census history and venue_orders are all kept; open
+    # paper positions are shadow-only and simply freeze. The Railway service
+    # stop is the operator's SEPARATE act — the deploy workflow resurrects a
+    # stopped service on the next push, so this guard is the durable half.
+    # Resurrect deliberately with SNAPBACK_RETIRED_OVERRIDE=run.
+    if os.environ.get("SNAPBACK_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("lighter-dislocation (🧲 Snap Back) is RETIRED: t=-2.97 on "
+              "n=175 closes, mean -0.281%/trade, both halves negative, "
+              "~-$1/day, 100% `converged` exits since the widening — and its "
+              "binding entry floor (ENTER_FLOOR_MULT) is unreachable by the "
+              "growth rail, so every reachable lever motion loosens a "
+              "measured loser. Idling: no venue calls, no publishes, ledgers "
+              "kept. SNAPBACK_RETIRED_OVERRIDE=run to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     # [2026-07-16 AUDIT] a lost Railway VENUE var silently booted hl_paper:
     # unsuffixed row id (the -lshadow row went stale) + a Hyperliquid book
     # under a Lighter-named bot (dev≈0 forever). The sniper already guards

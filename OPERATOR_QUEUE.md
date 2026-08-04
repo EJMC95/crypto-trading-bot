@@ -53,13 +53,13 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
 
 ## 2 · Book decisions
 
-- **🧲 Snap Back — keep or retire.** t=−2.97, n=175, mean −0.281%/trade, BOTH
-  halves negative, ~−$1/day, and the growth rail structurally cannot restrict
-  it (its binding floor is unregistered). Options: **A ★ retire** (standard
-  two-halves retirement + code guard; strongest case in the fleet; reversible
-  like Tide Rider), **B** persist-`noconv`-then-study (cost-aware entry-floor
-  study is the only measured route to positive; keeps bleeding while it
-  runs), **C** keep as-is (not defensible on the record).
+- **🧲 Snap Back — DECIDED-RETIRED 4-Aug (option A, operator: "full
+  permission to go ahead with all advancements").** Shipped same day,
+  changelog (jh): code guard idles the bot (`SNAPBACK_RETIRED_OVERRIDE=run`
+  to resurrect), row hidden + pruned, evidence engraved. The one act left is
+  YOURS and moved to item 3's Railway list: stop/delete the
+  `snap-back-shadow` service (remove its deploy-rule entries first) — the
+  code guard is the durable half either way.
 - **🌾 Carry — keep or wait.** Fresh era (31-Jul) × venue stall (0 eligible;
   one liquid book clears the bar and carry holds it). Both widening levers
   already REFUSED on measurement ((it)) — they are not on this menu. Options:
@@ -91,11 +91,15 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   3. `tide-rider-lighter-shadow` — retired (if); **first** remove its
      paths/grep/AUTO_IMAGES entries (say the word and a session ships that
      commit), then delete.
-  4. Offline corpses: `freqtrade-{mum,dad,georgia,avo-maria}`.
-  5. `nrl-feed` → move to its own Railway project (cost attribution + its
+  4. `snap-back-shadow` — retired 4-Aug (jh), same treatment: **first** remove
+     its paths/grep/AUTO_IMAGES entries, then delete. (Until then it idles
+     harmlessly behind the code guard — the container prints the retirement
+     line and sleeps.)
+  5. Offline corpses: `freqtrade-{mum,dad,georgia,avo-maria}`.
+  6. `nrl-feed` → move to its own Railway project (cost attribution + its
      failing workflow leaves this repo's CI).
   Do NOT touch: the failover pair (`funding-carry` + `yield-harvester-shadow`
-  — now deliberate), both live services, the six live shadow services,
+  — now deliberate), both live services, the remaining live shadow services,
   `pnl-dashboard`, `market-context`, `Postgres`, `freqtrade-bots`.
   Saving: ~6 containers ≈ $10–30/mo + the resurrect hazard gone.
 - **Five git-connected shadow services** (snap-back, counterweight,

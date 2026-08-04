@@ -1,3 +1,31 @@
+## 2026-08-04 (jh) — 🧲 SNAP BACK RETIRED: THE FLEET'S ONLY STATISTICALLY SIGNIFICANT LOSER, AND THE RAIL COULD ONLY EVER LOOSEN IT
+
+- *(Renumbered at push time: written as (jg); origin/main took (jg) for the ⚖️ Counterweight revert while this session ran — the pushed entry keeps the letter, per the convention.)*
+- **THE ASK** (operator, today: *"full permission to go ahead with all advancements"* — OPERATOR_QUEUE.md item 2, recommendation A). The queue called it the strongest retire case in the fleet, and unlike the (if) precedent this book is not UNDECIDABLE — it is **DECIDED, against**: I17's other half. Suite green, six mutations red, guard verified live in both directions.
+
+### Measured (golive payload, 4-Aug)
+
+      t = **−2.97**        n = **175 closes**      mean **−0.281%/trade**
+      both halves NEGATIVE (−$2.48 / −$2.56)       ~ **−$1/day**
+      exits since the widening: **100% `converged`**
+
+- The exit census is the diagnosis: every close "wins" its own convergence race, and the book still bleeds — because the adaptive gate enters at a percentile FLOORED at `EXIT_BPS × ENTER_FLOOR_MULT`, so it books round trips whose capture is structurally smaller than the noise that produced them. The loss rate is the design working exactly as shipped.
+- **And the growth rail structurally cannot restrict it.** The binding entry floor is `ENTER_FLOOR_MULT` — a bare env literal (`DISLOC_ENTER_FLOOR_MULT`), unregistered, invisible to the registry: the exact I18 class, on the losing side this time. Every lever motion the registry CAN express (`disloc.enter_pct` down, `disloc.exit_bps` down, `disloc.universe_n` up) LOOSENS the book. A measured loser whose every reachable knob makes it trade more has no self-correction path; retirement is the only restrict actuator left.
+
+### The (if) pattern exactly — guard first, then both halves
+
+  1. **`lighter_dislocation_bot.main` idles at boot** behind `SNAPBACK_RETIRED_OVERRIDE`, placed BEFORE `load_state_required` (no boot-time DB retry loop for a retired book) and BEFORE `venue_context` (no venue calls, no publishes). **IDLE, never an exit** — `restartPolicy=always` turns an exit into a permanent crash-loop (the Trail Blazer pattern; (ib)'s 25.6h re-learning). The print carries the evidence AND the way back (I8). `--once` and `--selftest` still work.
+  2. **`RETIRED_ROWS`** hides the card. Only the `-lshadow` row ever published — the v1 gate refuses `lighter_live`, so there is no live row to retire.
+  3. **`LEGACY_BOTS`** prunes the frozen row, which is what actually frees its held slots from every reader of bot_pnl (the 14-Jul phantom-holdings class). Ledgers, census history and `venue_orders` all KEPT; the open paper positions are shadow-only and freeze.
+- **Swept, with the (if) sweep as the checklist**: `golive_readiness`/radar/allocation/brain all key off `LEGACY_BOTS` or close-recency — automatic (verified: the grader imports the prune list; the era tables never declared this book, `era_epoch_for` still `(None, None, None)`, pinned in test_golive_era). The evidence board's `BOOK_AUTHOR` entry and the three `disloc.*` levers stay REGISTERED-and-inert — the (if) precedent, so a deliberate resurrection restores the rail's reach in one act instead of returning unreachable (the (hk) defect). MTM roster: already `MTM_PENDING` with a reason, unchanged. `test_stop_vs_gate`: never listed this book. Rot guards (market_context / proprioception / board LIVE_ROWS) assert against `LEGACY_BOTS` and stay quiet — this was a shadow row.
+- **`tests/autonomy/test_snap_back_retired.py`** pins all three places plus two this retirement adds: the guard precedes the boot-time state read, and the levers stay registered. **Six mutations red**: hidden-not-pruned, pruned-not-hidden, exit-instead-of-idle, guard-after-venue_context, override stripped from the print (the comment still names it — the fourth-time substring trap, tested by AST on the print args), and a lever deleted from the registry. Runtime both ways: unset → prints the retirement line and idles with zero venue work; `=run` → stands aside and the bot loads 220 markets.
+- **OPERATOR ACTION (separate, yours)**: stop/delete the `snap-back-shadow` Railway service — queued in OPERATOR_QUEUE.md item 3 with the deploy-rule-first order. Not done here and cannot be: the deploy workflow resurrects a stopped service on the next push, which is exactly why the CODE guard is the durable half. Until then the container idles printing the retirement line.
+- Recurrence: `lighter-dislocation`/`snap-back-shadow` acknowledged CLOSED-RETIRED in CLAUDE.md the day they closed, so this retirement's own follow-ups cannot re-open the subject. The RETIRED section also gains the (if) line it was missing — an I12 correct-in-place.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**🧲 Snap Back — off the board, on the strongest evidence any retirement here has had.** This is offense by subtraction: ~$1/day of measured bleed stops; its slots and attention return to books with a claim; the fleet's directional tail is one un-gradeable loser shorter. Zero expectancy given up — the measured expectancy was the argument. Reversible in one env var.
+
 ## 2026-08-04 (jg) — ⚖️ COUNTERWEIGHT'S (fz) WIDENING REVERTED BY ITS OWN PRE-REGISTERED CRITERION — K 8→5, UNIVERSE 60→30
 
 - **THE ASK** (operator, 4-Aug: *"full permission to go ahead with all advancements"* on the OPERATOR_QUEUE item "⚖️ Counterweight — early revert", option A ★ revert now). This entry executes a decision the widening itself pre-registered on 30-Jul, so the verdict was written before the outcome was known.

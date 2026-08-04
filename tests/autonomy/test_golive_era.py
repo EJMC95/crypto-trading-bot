@@ -791,7 +791,11 @@ def test_a_book_with_NO_era_is_unaffected(capsys, monkeypatch):
     """With no declared era the two samples are identical, so this change is a
     no-op for every book but the ones that have one."""
     import bot_pnl_store as store
-    bot = "lighter-dislocation-lshadow"       # asserted era-less elsewhere here
+    # [2026-08-04 (jh)] was lighter-dislocation-lshadow — RETIRED, and main()
+    # rightly drops LEGACY_BOTS rows before grading, so a retired fixture book
+    # produces no output at all (the (ci) class: a test roster naming a
+    # retired bot). The sniper is asserted era-less elsewhere here and living.
+    bot = "lighter-perp-sniper-lshadow"
     assert g.era_epoch_for(bot) == (None, None, None)
     rows = []
     for i in range(8):

@@ -201,6 +201,22 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 # this "the genuinely unclosed decision"; it is closed.
                 "crypto-trend-daily-lighter",
                 "crypto-trend-daily-lshadow",
+                # [2026-08-04] 🧲 SNAP BACK RETIRED — operator decision
+                # (OPERATOR_QUEUE.md item 2, option A) on the strongest
+                # retire case in the fleet: t=-2.97 on n=175, mean
+                # -0.281%/trade, BOTH halves negative, ~-$1/day, and 100%
+                # `converged` exits since the widening — the book harvests
+                # its own entry gate. The growth rail structurally cannot
+                # restrict it: its binding entry floor (ENTER_FLOOR_MULT)
+                # is an unregistered bare literal, and every lever motion
+                # the registry CAN express loosens it. Guard first, then
+                # retire (the Tide Rider order, (if)):
+                # `lighter_dislocation_bot.main` idles at boot behind
+                # `SNAPBACK_RETIRED_OVERRIDE`, so the row cannot simply
+                # return. Only the -lshadow row ever published — the v1
+                # gate refuses lighter_live, so there is no live row to
+                # retire. Ledgers and census history kept.
+                "lighter-dislocation-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
                 "perps-regime-switch", "perps-regime-switch-lshadow",

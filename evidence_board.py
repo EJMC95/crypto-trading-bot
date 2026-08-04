@@ -905,6 +905,18 @@ BOOK_AUTHOR = {
     # bot row -> (capacity lever, gate lever, cap source)
     "perps-funding-carry-lshadow":  ("carry.max_positions", "carry.enter_apr"),
     "perps-funding-spread-lshadow": ("fundspread.k", "fundspread.universe_n"),
+    # [2026-08-04] 🧲 SNAP BACK IS RETIRED, so this entry is INERT — and
+    # deliberately kept, the exact (if) Tide Rider precedent one entry down.
+    # The book was retired as the fleet's only statistically significant
+    # loser (t=-2.97, n=175, mean -0.281%/trade, both halves negative) whose
+    # binding entry floor (ENTER_FLOOR_MULT) the rail cannot reach — every
+    # lever this map CAN author loosens it, which is why authorship here
+    # could never have fixed it. The loop below is fail-SAFE for a retired
+    # book: its bot_pnl row is pruned by LEGACY_BOTS, and a book missing
+    # from `bot_rows` proposes NOTHING ("no row -> no opinion", pinned in
+    # the selftest). Kept so that resurrecting it
+    # (SNAPBACK_RETIRED_OVERRIDE=run) restores its lever authorship in one
+    # act instead of silently coming back unreachable by the growth rail.
     "lighter-dislocation-lshadow":  (None, "disloc.enter_pct"),
     "equities-regime-lshadow":      ("index.max_open", None),
     "lighter-perp-sniper-lshadow":  (None, "sniper.surge_mult"),

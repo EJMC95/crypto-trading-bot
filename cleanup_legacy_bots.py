@@ -60,6 +60,20 @@ LEGACY_BOTS = [
     # exact 14-Jul phantom-holdings failure that pinned the light RED.
     "crypto-trend-daily-lighter",
     "crypto-trend-daily-lshadow",
+    # [2026-08-04] 🧲 SNAP BACK RETIRED (operator decision, OPERATOR_QUEUE.md
+    # item 2 option A). The guard came FIRST, per the order this file teaches:
+    # `lighter_dislocation_bot.main` idles at boot behind
+    # `SNAPBACK_RETIRED_OVERRIDE`, so this prune is terminal rather than a
+    # race with a live publisher. WHY: t=-2.97 on n=175 closes, mean
+    # -0.281%/trade, both halves negative, ~-$1/day, 100% `converged` exits
+    # since the widening, and the growth rail structurally cannot restrict it
+    # (its binding entry floor ENTER_FLOOR_MULT is an unregistered literal;
+    # every reachable lever motion loosens). Pruning frees the book's held
+    # slots from every reader of bot_pnl — a hidden-but-present row keeps
+    # consuming budget invisibly (the 14-Jul phantom-holdings failure).
+    # Ledgers (paper_trades / venue_orders) and census history are KEPT.
+    # Only the -lshadow row ever published (v1 refuses lighter_live).
+    "lighter-dislocation-lshadow",
     "perps-regime-switch", "perps-regime-switch-lshadow",
     "scanner-triangular-arb", "crypto-trendmomo-4h",
     # [2026-07-17 LIGHTER-ONLY CUT] operator: "i only want things running on
