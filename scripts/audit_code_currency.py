@@ -50,8 +50,19 @@ THE VERDICT THAT MATTERS IS NOT "BEHIND"
     UNRESOLVED     stamp not produced by any commit in the window -> older than
                    --depth, or a file set this tree no longer produces.
 
-Exit 0 = nothing is BEHIND-OWN. Exit 1 = at least one container is running
-stale code of its own. `--selftest` proves the classifier can still see.
+[2026-08-04 (jb)] AN UNMAPPED STAMPED ROW IS A FINDING, NOT A SKIP. The first
+cut kept only rows present in ROW_ENTRY, so a stamped row this file had never
+heard of was dropped SILENTLY — unaudited by construction, green run. Measured
+the day this shipped: `market-context` (svc-stamped, build-stamped, publishing
+fresh) had been invisible to every run since the guard was born. Now any
+stamped bot_pnl row must either be mapped in ROW_ENTRY or declared in
+NON_BOT_ROWS with a reason, else exit 1 — so a FUTURE bot's row cannot be born
+unaudited (operator mandate 4-Aug: "ones to come are always getting current
+live and up to date upgrades").
+
+Exit 0 = nothing is BEHIND-OWN and every stamped row is mapped or declared.
+Exit 1 = a container is running stale code of its own, or a stamped row is
+unmapped. `--selftest` proves the classifier can still see.
 
 DATA SOURCES — DB by default, the PUBLIC FEED for CI [(jc)]
   With no flags the rows come from `fetch_bot_pnl()` (needs DATABASE_URL).
@@ -60,14 +71,18 @@ DATA SOURCES — DB by default, the PUBLIC FEED for CI [(jc)]
   That path is FAIL-CLOSED: an unreadable, empty or stamp-free feed exits 2,
   because in an unattended run "nothing to check" and "the feed broke" must not
   share a green (the warn-only-guard class). The default DB path keeps its
-  old degrade-to-a-message behaviour for a human at a terminal.
+  old degrade-to-a-message behaviour for a human at a terminal. Scope note:
+  the feed is the dashboard's FILTERED view (retired/hidden rows dropped, and
+  non-bot rows like market-context are not on it), so the weekly CI run
+  audits the published fleet; the DB path stays the wider ad-hoc census.
 
   `--gha` additionally writes the verdict table to $GITHUB_STEP_SUMMARY and
   emits a `::error::` annotation per BEHIND-OWN row — and ONLY per BEHIND-OWN:
   DEFERRED / BEHIND-SHARED / FILE-SET are deliberate designs or stamp
   bookkeeping, and a red (or even a ::warning::) on a deliberate design is the
   cry-wolf failure the header above records this guard committing on its own
-  first run.
+  first run. The (jb) unmapped-row gate is a real failure in both sources and
+  annotates the same way.
 """
 import argparse
 import json
@@ -96,6 +111,12 @@ ROW_ENTRY = {
     "equities-regime-lshadow": "lighter_index_bot.py",
     "lighter-dislocation-lshadow": "lighter_dislocation_bot.py",
     "lighter-perp-sniper-lshadow": "lighter_perp_sniper.py",
+    # [2026-08-04 (jb)] not a trading bot — the instrument collector — but its
+    # row is stamped (measured: build a6219e09bd45 / n=14, svc=market-context)
+    # and its image auto-deploys, so currency applies to it exactly as to a
+    # bot. It was silently skipped from this guard's first run until the
+    # unmapped-row gate below made that impossible.
+    "market-context": "market_context.py",
     "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",
     "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
     "perps-funding-carry-lshadow": "funding_carry_bot.py",
@@ -133,6 +154,16 @@ MARKER_GATED = {
     # deliberate design is how a real finding later gets ignored ((hh)).
     "perps-funding-lighter-lshadow": ("[deploy-live-farmer]", "[deploy-live]"),
 }
+
+#: [2026-08-04 (jb)] stamped bot_pnl rows DELIBERATELY outside this audit's
+#: scope, {row: reason}. fetch_bot_pnl() returns EVERY row in the table, and
+#: the old code kept only `b in ROW_ENTRY` — so a stamped row this file had
+#: never heard of was skipped silently (market-context, from the guard's first
+#: run). An unmapped stamped row now FAILS the audit unless declared here.
+#: Empty today ON PURPOSE: every stamped publisher currently has an entry-file
+#: mapping, market-context included — a declaration is for a row whose stamp
+#: genuinely cannot be resolved to one entry module, not a snooze button.
+NON_BOT_ROWS = {}
 
 
 def rows_from_pnl_json(src):
@@ -335,6 +366,28 @@ def audit(depth=40, rows=None, fail_closed=False, gha=False):
             if (r.get("extra") or {}).get("build")}
     ages = {r["bot"]: _row_age(r) for r in rows if r.get("bot") in live}
     wanted = {b: ROW_ENTRY[b] for b in live if b in ROW_ENTRY}
+    # [2026-08-04 (jb)] a stamped row this file has never heard of is a
+    # FINDING, never a skip — the silent `b in ROW_ENTRY` filter is how
+    # market-context went unaudited from the guard's first run.
+    unmapped = sorted(b for b in live
+                      if b not in ROW_ENTRY and b not in NON_BOT_ROWS)
+    if unmapped:
+        print("audit_code_currency: UNMAPPED STAMPED ROW(S) — these containers "
+              "publish a build stamp\nthis audit cannot resolve, so their code "
+              "currency is UNAUDITED BY CONSTRUCTION:\n")
+        for b in unmapped:
+            ex = live[b]
+            if gha:
+                print(f"::error title=UNMAPPED STAMPED ROW {b}::"
+                      f"svc={ex.get('svc')} publishes a stamp this audit "
+                      f"cannot resolve — map it in ROW_ENTRY or declare it "
+                      f"in NON_BOT_ROWS with a reason")
+            print(f"  {b:36s} svc={ex.get('svc')} "
+                  f"build={ex.get('build')}/{ex.get('build_n')}")
+        print("\n  Fix: map the row in ROW_ENTRY (row -> the entry module its "
+              "image stamps), or\n  declare it in NON_BOT_ROWS with a reason. "
+              "Silence is not an option.")
+        return 1
     if not wanted:
         msg = "no stamped rows with a known entry — nothing to check."
         if fail_closed:
@@ -486,6 +539,26 @@ def _selftest():
     # marker-gated rows must be mapped, or they can never be classified
     for row in MARKER_GATED:
         assert row in ROW_ENTRY, f"{row} is marker-gated but unmapped"
+    # [2026-08-04 (jb)] the unmapped-stamped-row gate, driven through audit()
+    # ITSELF with injected rows (testing around a function is not testing it):
+    # a stamped row this file has never heard of must FAIL, not silently skip.
+    _mystery = [{"bot": "mystery-row",
+                 "extra": {"build": "abc123", "build_n": 9,
+                           "svc": "mystery-svc"}}]
+    assert audit(depth=1, rows=_mystery) == 1, \
+        "an unmapped stamped row must fail the audit, not vanish from it"
+    NON_BOT_ROWS["mystery-row"] = (
+        "selftest-only declaration: proves a declared row is re-admitted "
+        "without an entry-file mapping, then removed below")
+    try:
+        assert audit(depth=1, rows=_mystery) == 0, \
+            "a DECLARED non-bot row must not fail the audit"
+    finally:
+        del NON_BOT_ROWS["mystery-row"]
+    assert not (set(NON_BOT_ROWS) & set(ROW_ENTRY)), \
+        "a row cannot be both mapped in ROW_ENTRY and declared in NON_BOT_ROWS"
+    for row, why in NON_BOT_ROWS.items():
+        assert len(why) > 60, f"{row}: a reason must be a reason, not a label"
 
     # --- the /pnl.json source [(jc)] -------------------------------------
     # Fixture mirrors the LIVE feed's envelope (read off the endpoint 4-Aug:
@@ -541,8 +614,8 @@ def _selftest():
     assert audit(rows=[{"bot": "nobody", "extra": {}}], fail_closed=False) == 0
     print("audit_code_currency --selftest OK "
           "(current, behind-own, behind-shared, deferred, marked-gap, "
-          "unresolved, unstamped, map integrity, pnl-json fail-closed, "
-          "i1-age plumbing)")
+          "unresolved, unstamped, map integrity, unmapped-row gate, "
+          "pnl-json fail-closed, i1-age plumbing)")
 
 
 if __name__ == "__main__":
