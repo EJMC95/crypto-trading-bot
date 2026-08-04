@@ -288,6 +288,32 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit):
     return [s for _, _, s in rows[:int(limit)]]
 
 
+# [2026-08-04] ADMISSION SOURCES — the three routes into this book. Every
+# close used to land in one undifferentiated bucket (`long_<exit>`), so the
+# (ga) three-source experiment was unfalsifiable: 9/9 exits were
+# `long_max_hold` and nothing could say WHICH source supplied the losers.
+# The tuple is the whitelist for both the tag composer and the state restore
+# — junk degrades to the un-stamped tag, never to a guessed source.
+SNIPE_SOURCES = ("listing", "surge", "young")
+
+
+def close_reason(was_long, exit_reason, src=None):
+    """The ledger close tag, source-stamped — the taker's lens pattern.
+
+    [2026-08-04] `<side>-<source>_<exit>` (e.g. `long-young_max_hold`) when the
+    admission source is known, else the historical `<side>_<exit>` — an unknown
+    source degrades to the OLD tag, never to a guess (the (ht) rule). Source
+    names must stay underscore-free: `bot_pnl_store.split_reason` partitions at
+    the FIRST underscore, so `long-young_max_hold` round-trips to
+    enter_tag='long-young' / exit='max_hold' and the brain buckets each source
+    separately. Forward-only: rows written before this stamp keep their tags.
+    """
+    side = "long" if was_long else "short"
+    if src in SNIPE_SOURCES:
+        return f"{side}-{src}_{exit_reason}"
+    return f"{side}_{exit_reason}"
+
+
 def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
                    try_snipe, is_held=lambda s: False,
                    max_attempts=PENDING_MAX_ATTEMPTS,
@@ -372,6 +398,12 @@ def main():
 
     # Restore paper account + baseline + open snipes from Postgres.
     entry_ts = {}
+    # [2026-08-04] sym -> admission source ("listing"|"surge"|"young"), set at
+    # snipe time and consumed at close to stamp the ledger tag. Persisted with
+    # entry_ts (same lifecycle): a restart that forgot it would close every
+    # held position under the un-stamped tag and silently un-grade the very
+    # sources the (ga) experiment exists to compare.
+    entry_src = {}
     baseline = set()
     pending = {}          # sym -> {"first_seen": ts, "attempts": n} — detected, not yet sniped
     # [2026-07-30] the SURGE source's own dedup ledger (see surge_candidates).
@@ -446,6 +478,13 @@ def main():
                      broker.equity(), broker.open_count())
         baseline = set(_saved.get("baseline") or [])
         entry_ts = {str(k): float(v) for k, v in (_saved.get("entry_ts") or {}).items()}
+        # [2026-08-04] restore the admission-source map. Whitelisted through
+        # SNIPE_SOURCES: a junk value is DROPPED, so its close degrades to the
+        # old un-stamped tag rather than inventing a source. A missing entry is
+        # correct for positions opened before this stamp shipped (forward-only).
+        entry_src = {str(k): str(v) for k, v
+                     in (_saved.get("entry_src") or {}).items()
+                     if str(v) in SNIPE_SOURCES}
         # [2026-07-30 (ha)] restore the zombie clock — see save_state below.
         # A missing entry is correct (the coin becomes priceable again and the
         # clock is irrelevant); a RESET entry was the defect.
@@ -528,7 +567,13 @@ def main():
         store.publish_paper_trade(
             bot_id, trade_id=f"{coin}:{ent_ts}", pnl_abs=float(pnl), pnl_pct=pnl_pct,
             pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
-            reason=("long_" if was_long else "short_") + reason,
+            # [2026-08-04] source-stamped close tag (`long-young_max_hold` ...)
+            # so the brain and study_exit_attribution grade each admission
+            # source separately; a position with no recorded source (opened
+            # pre-stamp, or a landed-but-unacked order folded in as held)
+            # keeps the historical `long_<exit>` tag. Pop: one close consumes
+            # the record, same lifecycle as entry_ts.
+            reason=close_reason(was_long, reason, entry_src.pop(coin, None)),
             # [2026-07-30 (gr)] EXIT TELEMETRY — computed above for pnl_pct,
             # then discarded. publish_paper_trade has accepted these since
             # 17-Jul, the DB column exists, the reader SELECTs them and
@@ -561,11 +606,13 @@ def main():
                      coin, real, fallback or 0.0)
         return real or fallback
 
-    def open_snipe(sym, now_ts, open_now):
+    def open_snipe(sym, now_ts, open_now, src=None):
         """Attempt ONE snipe. True only if a position actually opened.
 
         Every False is a retryable skip — the caller keeps the symbol pending
-        rather than folding it into the baseline.
+        rather than folding it into the baseline. `src` is the admission source
+        ("listing"|"surge"|"young") recorded into entry_src on success so the
+        eventual close carries it; None records nothing (old-style tag).
         """
         px, why = _snipe_price(ctx.venue.orderbook, sym)
         if not px:
@@ -612,8 +659,11 @@ def main():
             except Exception as e:  # noqa: BLE001
                 log.error("snipe order failed %s: %s — staying pending", sym, e)
                 return False
-        log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f)",
-                 sym, "LONG" if DIRECTION_LONG else "SHORT", px, size, order_usd)
+        if src in SNIPE_SOURCES:
+            entry_src[sym] = src
+        log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f) [src=%s]",
+                 sym, "LONG" if DIRECTION_LONG else "SHORT", px, size, order_usd,
+                 src or "?")
         return True
 
     # [2026-07-16 AUDIT FIX] seed W/L from the durable ledger — this bot
@@ -646,6 +696,9 @@ def main():
             store.save_state(bot_id, {"baseline": sorted(baseline),
                                       "broker": broker.to_state() if dry_run else None,
                                       "entry_ts": entry_ts, "pending": pending,
+                                      # [2026-08-04] admission-source map —
+                                      # same shape at BOTH writers ((ha)).
+                                      "entry_src": entry_src,
                                       "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
                                       "bar_counts": bar_counts,
                                       # [2026-07-30 (ha)] the SEED path is a
@@ -791,11 +844,23 @@ def main():
                          ", ".join(f"{s}({bar_counts.get(s)}d)" for s in _young))
                 for _s in _young:
                     surge_done[_s] = now.timestamp()
+        # [2026-08-04] which source ADMITTED each candidate this pass, for the
+        # close-tag stamp. Listing wins a tie (candidate order: it is tried
+        # first, so it is the source that actually admitted the symbol);
+        # setdefault keeps that priority. A pending symbol from an earlier
+        # pass that is no longer in any source list simply has no entry and
+        # closes under the old un-stamped tag — never a guessed source.
+        _src_map = {s: "listing" for s in new_listings}
+        for _s in _surge:
+            _src_map.setdefault(_s, "surge")
+        for _s in _young:
+            _src_map.setdefault(_s, "young")
         open_now, _sniped, _abandoned = run_snipe_pass(
             candidates=new_listings + _surge + _young, pending=pending,
             baseline=baseline,
             now_ts=now.timestamp(), open_now=open_now, max_open=max_open,
-            try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n),
+            try_snipe=lambda s, n: open_snipe(s, now.timestamp(), n,
+                                              src=_src_map.get(s)),
             is_held=lambda s: s in _held_now)
 
         # ----- manage open snipes (TP / SL / max-hold) -----
@@ -970,6 +1035,11 @@ def main():
                                   "broker": broker.to_state() if dry_run else None,
                                   "entry_ts": entry_ts,
                                   "pending": pending,
+                                  # [2026-08-04] admission-source map — the
+                                  # close-tag stamp survives a restart, same
+                                  # lifecycle as entry_ts ((ha): both writers
+                                  # of this key write the same shape).
+                                  "entry_src": entry_src,
                                   "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
                                   "bar_counts": bar_counts,
                                   # [2026-07-30 (ha)] PERSIST THE ZOMBIE CLOCK.
@@ -1391,6 +1461,24 @@ def selftest():
     assert kw3["equity"] is not None and kw3["open_trades"] == 2, kw3
     assert kw3["extra"]["held"] == {"G1": "L", "NEW": "L"}, kw3["extra"]
     assert ven3.opened == [], "shadow must NEVER send an order to the venue"
+
+    # ---- [2026-08-04] SOURCE-STAMPED CLOSE TAGS round-trip through the ONE
+    # parser every ledger row passes ((hj): test against the real consumer,
+    # never a hand-written fixture). Three properties: each source yields a
+    # DISTINCT enter_tag, the exit survives intact (max_hold has its own
+    # underscore — the split must be at the FIRST one), and an unknown source
+    # degrades to the historical tag, never to a guess.
+    for _src in SNIPE_SOURCES:
+        assert "_" not in _src, f"source {_src!r} breaks the split contract"
+        _r = close_reason(True, "max_hold", _src)
+        assert _r == f"long-{_src}_max_hold", _r
+        _tag, _exit = store.split_reason(_r)
+        assert _tag == f"long-{_src}" and _exit == "max_hold", (_tag, _exit)
+    assert close_reason(True, "tp", None) == "long_tp"
+    assert close_reason(False, "sl", "junk-source") == "short_sl", \
+        "an unrecognised source must degrade to the un-stamped tag"
+    _tag, _exit = store.split_reason(close_reason(True, "tp", None))
+    assert (_tag, _exit) == ("long", "tp"), (_tag, _exit)
 
     print("All perp sniper self-tests passed (one-sided debut book RETRIES and "
           "still snipes; cap/exception/skip never absorb; give-up bounded by "
