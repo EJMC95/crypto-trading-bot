@@ -93,9 +93,10 @@ done &
 
 # [2026-07-16 EVENT ORGAN] Event Sentinel 🗞️⚡ — typed MAJOR-EVENT detection
 # (RSS + GDELT) + historical sector-ripple playbook + self-grading against
-# the scout's marks -> bot_state 'event-sentinel'. ADVISORY: no consumer
-# trades on it until a review wires one. Offset from pulse so the two news
-# fetchers don't hit feeds in the same second.
+# the scout's marks -> bot_state 'event-sentinel'. [comment corrected 4-Aug
+# per I12: it HAS consumers — replay-gated proposals steer the SHADOW taker's
+# levers via the scout tuner (22-Jul (ci)); real money untouched.] Offset from
+# pulse so the two news fetchers don't hit feeds in the same second.
 ( sleep 240
   while true; do
     python3 /freqtrade/event_sentinel.py || true
@@ -118,7 +119,8 @@ done &
 
 # [2026-07-07 CROSS-BOT L1] Regime oracle — ONE shared read of the tape
 # (per-major direction + ADX character) -> bot_state 'regime-oracle' +
-# bot_state_history. ADVISORY week one: nothing consumes it yet.
+# bot_state_history. [comment corrected 4-Aug per I12: CONSUMED — the family
+# bot's per-asset regime gate rides oracle verdicts for non-crypto (30-Jul).]
 ( sleep 120
   while true; do
     python3 /freqtrade/regime_oracle.py || true
@@ -135,8 +137,9 @@ done &
 
 # [2026-07-07 CROSS-BOT L2/L3] Fleet risk traffic light + signal bus —
 # fleet-wide directional exposure vs budgets + scanner exhaust ->
-# bot_state 'fleet-risk' / 'signal-bus'. ADVISORY: enforcement wiring is
-# decided from ~7 days of this history, not vibes.
+# bot_state 'fleet-risk' / 'signal-bus'. [comment corrected 4-Aug per I12:
+# mode=ENFORCE — strategies veto new longs at budget; kill switch
+# FLEET_RISK_MODE=advisory.]
 ( sleep 90
   while true; do
     python3 /freqtrade/fleet_risk.py || true

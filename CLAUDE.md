@@ -19,6 +19,7 @@ one-sided:
 | | a selftest — a wrong assumption about `"1 "` stripping |
 | | mutation testing — defects inside guards I had just written |
 | | the live payload — a detector that fired NOTHING on the condition it was built for |
+| | `fleet_allocation`'s lower bound — 0 of 16 directional books with a measured claim, stated in one number |
 
 So: **every invariant below names the executable artifact that enforces it, or
 declares itself UNENFORCED with a reason.** `scripts/audit_doctrine_enforcement.py`
@@ -30,8 +31,12 @@ EXISTS, not that it is CORRECT. A named test could be vacuous. This closes the
 "doctrine with no teeth" class; **mutation testing is what grades the teeth**,
 and that stays a human discipline (I3).
 
-Add an invariant when a lesson is *general* and *recurrent*. The long-form
-history stays below — this section is the load-bearing subset, not a summary.
+Add an invariant when a lesson is *general* and *recurrent* — and add an
+OFFENSE invariant (I16+) when a mechanism is MEASURED to move a book toward
+the gate: doctrine must grow in the win-more direction at least as fast as in
+the don't-break direction, or this file becomes a museum of avoided losses.
+The long-form history stays below — this section is the load-bearing subset,
+not a summary.
 
 <!-- INVARIANTS:BEGIN -->
 ### I1 · LIVENESS BEFORE SEMANTICS
@@ -197,6 +202,65 @@ escaped by **0.002** of hit rate. **When a bad idea is removed from a report,
 grep for it in the things that ACT.** The fix is expectancy-only in both
 directions; win rate stays REPORTED, demoted rather than deleted.
   ENFORCED BY: `lighter_ticket_taker.py::lens_loses`, `lighter_ticket_taker.py::LEGACY_HIT_GATE`
+
+**— THE OFFENSE TIER (added 4-Aug, operator: "only growth, no step backs, we
+only focus on winning" / "lean further towards how we make bots win more").**
+I1–I15 above are how the fleet stops being wrong. I16–I19 are how it wins:
+point evidence-gathering capital at measured claims, keep every book decidable,
+make the binding constraint reachable, and price every widening in expectancy.
+Every real win-more delivery to date arrived through these four shapes — the
+lens veto that kept the live book's winner trading (I14/I15), the era move that
+made the gate reachable at all, the allocation organ, and the lever-reach work.
+The forward metric is unchanged and senior: BOOKS THAT CAN BE GRADED, THEN GO
+LIVE.
+
+### I16 · CAPITAL FOLLOWS MEASURED CLAIMS — RANK ON A LOWER BOUND, NEVER ON THE MEAN
+The fleet ran a dozen organs asking "is this book SAFE?" and none asking "where
+should the money go?" — so the best-evidenced book and a zero-close book held
+identical capital for weeks. Measured 1-Aug: FUNDING 4 books / 297 closes /
++$72.89 with three measured claims; DIRECTIONAL 16 books / 867 closes / −$9.21
+with ZERO — while 80% of capital sat directional. A claim is
+`max(0, mean − 1.28·SE)`: ranking on the mean rewards small samples that got
+lucky, and the incubator already learned this in fills. The organ is ADVISORY
+by construction (moves no capital, writes no lever) — offense here means the
+number exists and is ranked honestly, not that an organ spends money.
+  ENFORCED BY: `fleet_allocation.py::lower_bound`, `tests/autonomy/test_fleet_allocation.py::test_luck_does_not_outrank_evidence`
+
+### I17 · A BOOK THAT CANNOT REACH ITS OWN BAR IS NOT A SLOW WINNER — KEEP EVERY BOOK DECIDABLE, OR RETIRE IT
+Eight of twenty-three books had <13 closes on 29-Jul; two had ZERO after 20+
+days. A zero-close book is not slow — it is UNDECIDABLE, and it still consumes
+a row, budget and attention (🌊 held a third of the long budget while producing
+nothing; retired (if)). Two halves, both binding: every living book keeps a
+25% probe floor, because a book cannot earn evidence with no capital — and a
+book still undecidable at the floor after its window is a keep-or-retire call
+for the operator (I11), never another tuning pass. Decidability is the first
+unit of winning: an edge the fleet cannot measure is an edge it does not have.
+  ENFORCED BY: `fleet_allocation.py::PROBE_FLOOR`, `tests/autonomy/test_fleet_allocation.py::test_every_book_keeps_a_probe_floor`
+
+### I18 · WHEN A BOOK STALLS, FIND THE BINDING CONSTRAINT — AND THE BINDING CONSTRAINT MUST BE A REACHABLE LEVER
+🌾 carry went 98.9h without an open holding 6 of 12 slots, with BOTH its
+registered levers slack — the gate that actually bound (`MIN_DAY_VOLUME`) was a
+bare literal: unregistered, unconsumed, invisible to the rail. A book whose
+only tunable knobs are the ones with room LOOKS tunable and cannot move; the
+same shape sat in `fleet_risk.py`'s long/short budgets. So: diagnose a stall by
+naming which gate binds (the census pattern), and require that gate to be
+registered, cage-checked, CONSUMED via `apply_tuning`, and drift-guarded — a
+lever with no reader is the registered-but-inert failure. Corollary, from the
+same entry: registration is REACH, not payoff — walking `carry.min_vol` to its
+floor unlocked zero books, and that refutation was recorded, not buried.
+  ENFORCED BY: `scripts/audit_lever_authority.py::NO-CONSUMER`, `tests/autonomy/test_book_levers.py::test_every_lighter_books_lever_is_listed_here`
+
+### I19 · A WIDENING IS PAID FOR IN EXPECTANCY, THROUGH THE REPLAY GATE — TURNOVER IS NOT A WIN
+"Disregard setbacks" bans banking a change that costs expectancy; it never
+waives the measurement. The evidence is one-sided: 25 of 30 throughput
+candidates died in refutation (every "faster exit" was denominator shrinkage);
+`carry.enter_apr` 20%→10% would have read as pure growth and needs the rate to
+hold 254 of 336h to break even; and the one honest widening channel already
+exists — expand-direction enactments must IMPROVE both halves through the real
+replay before they touch a lever, brain veto senior. A refusal with evidence
+satisfies the growth rule; a widening that skips the gate is a step back
+wearing a growth costume, whatever its trade count says.
+  ENFORCED BY: `lighter_scout_tuner.py::MARGIN_HALF`, `lighter_scout_tuner.py::desired_scout_levers`
 <!-- INVARIANTS:END -->
 
 ### Acknowledged recurrence — houses we keep re-entering, and why
@@ -208,12 +272,12 @@ must name why the class is still open and who can close it. Measured on the day
 this shipped, and every line below is a real cost, not a formality.
 
 <!-- RECURRING:BEGIN -->
-- `funding-carry` — OPEN, and the owner is the OPERATOR, not this repo. 13 entries in 7d. Every in-repo cause has been closed (sole-writer guard (hp), service attribution (ht), deploy routing (hu), dead-vs-stale-deploy (hx)); what remains is *why the container stopped at 03:10 UTC on 31-Jul* and which of the two services to stop, both of which need Railway logs and a Railway action. No further code will close this.
-- `perps-funding-carry` — OPEN, same house as `funding-carry` above, counted separately because it is the dashboard ROW id rather than the service name. 16 entries in 7d. The row cannot become healthy until the service does.
-- `yield-harvester-shadow` — OPEN, same house again, third name. 8 entries in 7d. This is the second carry service; both now deploy and the runtime sole-writer guard picks the winner, so the remaining decision — which one to STOP — is the operator's.
+- `funding-carry` — **CLOSED as a duplicate-writer house (corrected in place 4-Aug per I12; the window is still draining so the line stays).** The (ib)–(id)/(ih) chain resolved it IN CODE: `claim_writer` at the top of the loop, the loser publishes only `<bot>:standby` naming the winner, the pager is recency-scoped. Measured 4-Aug in the live payload: `funding-carry` runs the book (exactly one writer, `extra.svc` stamped, build at HEAD), `yield-harvester-shadow` stands by fresh, immune quiet, zero overlaps since 31-Jul 00:52Z. The two containers are now a DELIBERATE failover pair; stopping one is **optional tidiness, not an outstanding action**. What remains open on this book is the VENUE stall + fresh era (see the carry row) — a different house; do not stretch this line to cover it.
+- `perps-funding-carry` — same house as `funding-carry` above (dashboard ROW id vs service name); closed with it 4-Aug. The row's remaining story is the era/venue one, tracked on the book itself.
+- `yield-harvester-shadow` — same house, third name; closed with it 4-Aug. It is the standing-by member of the failover pair.
 - `freqtrade-bots` — STRUCTURAL, not a house. 15 entries in 7d because it is the SHARED image every organ ships inside, so any organ change mentions it. This is the limit of a mention-counting detector, declared rather than tuned away: narrowing the extractor to hide it would blind the guard to a real recurrence in the same container.
 - `lighter-ticket-taker` — **CLOSING, and the detector is the reason it closed.** 6 entries in 7d ((im),(il),(hj),(fq),(fm),(ek)). The recent cluster is ONE class: the lens veto judging a bracket-holding book on a 4h forward proxy. `(ij)` fixed the actuator that HALTS (the taker) and engraved I14/I15; `(im)` then found the SCOUT TUNER asking the same authority with half the evidence, and closing that turned up a THIRD consumer in `strategy_incubator` — the one this file had already predicted when the rule was centralised. Fixing instances was not closing the class, which is exactly what `audit_recurrence` exists to say. **Now closed executably**: `tests/autonomy/test_lens_veto_consumers.py` fails the build if ANY consumer outside the defining module calls `vetoed_lenses` without the lens's own record, found by AST across the whole tree so a fourth consumer cannot arrive quietly. **Owner: this repo — and if the taker recurs again for a DIFFERENT reason, that is a new class and this line must not be stretched to cover it.**
-- `tide-rider-lighter` — OPEN and it is a genuine unclosed decision, the honest one on this list. 10 entries in 7d on a book with ZERO closed trades whose 35% stop is 2.3x the go-live drawdown bar, so it is structurally ineligible for real money as configured. It keeps being widened, wired and re-graded instead of being kept or retired. **Owner: operator — this is a keep-or-retire call, not a code change**, and every pass that tunes it instead is the exact behaviour I11 names.
+- `tide-rider-lighter` — **CLOSED 1-Aug: the keep-or-retire call was MADE — retired (if)** (9 buys / zero sells in 22 days, a third of the long budget returned; reversible via `TIDE_RIDER_RETIRED_OVERRIDE`). Line corrected in place 4-Aug per I12 (it still read "OPEN" three days after the decision) and retained while the 7d mention window drains.
 <!-- RECURRING:END -->
 
 ## What This Repo Is
@@ -231,7 +295,7 @@ guarded off on 17-Jul — see the LIGHTER-ONLY table after the fleet table.
 |-----|------|------------|
 | freqtrade-{mum,dad,avo-maria,georgia}-lshadow | 👩👨🙏🔮 family | TrendMomo/MomoBreakout/SwingDip/DayTraderV5 on Lighter (gate0 `lighter_family_bot.py`, service `family-lighter-shadow`); closes tagged `long-<tag>_<exit>` + brain stake-mults applied at entry (15-Jul) |
 | crypto-{intraday-15m,swing-daily,breakout-4h}-lshadow | spot ports | same service, 29-pair whitelist |
-| crypto-trend-daily-lshadow | 🌊 Tide Rider | shadow only. Its LIVE row `crypto-trend-daily-lighter` was RETIRED 17-Jul — 🎫 Ticket Taker took the slot on the SAME service/keys/sub-account, so leaving both rows would DOUBLE-COUNT the same $34.67 of real money. **[30-Jul (hk)] ZERO closes in 20 days was CORRECT, not broken** — 1 buy / 0 sells ever in `venue_orders`, and its universe produced no signal flip of any kind in that time. What WAS broken: `(fz)` claimed this book was widened off the scout and it had no `fleet_bus` import and no COPY. Now wired: **6 → 16 books measured on the live bus**, additive (empty ⇒ keep the configured six, never shrink). **The prerequisite shipped with it:** `scan_universe()` scans the resolved universe ∪ every HELD coin, and `supports()` no longer skips a held position — without both, a coin leaving the list kept its position with no exit, no stop and no seatbelt (this book's only sweeper is `not dry_run`-gated, so shadow had none). Nine of the ten added books are TRADFI, so this is now a venue-wide trend follower despite the row name; kept ON (the EMA50/200 signal is per-coin, so it is per-asset by construction and cannot breach item 18) and reversible via `TREND_ALLOW_TRADFI=0`. Its 2.7yr +52% validation is SIX CRYPTO MAJORS and says nothing about XAU/SOXL — those sleeves are unvalidated and are there to be graded. Levers that can actually move its rate: `trend.universe_n` / `trend.min_vol_m` / `trend.max_open` (`trend.rank_by_funding` is inert while candidates ≤ slots — measured max simultaneously-golden coins = 1 vs 6 slots). Author: evidence board, gate lever = the universe. **[30-Jul (hl)] NO THROUGHPUT IS AVAILABLE WITHOUT PAYING EXPECTANCY** — 25 of 30 candidates died in refutation. `close<EMA20` gives 6.4x the closes and improves per-trade 5.1x, but **per bar-day held only 1.04x**: the gain is denominator shrinkage (median hold 58.5d -> 4d), a content-free 3-day time stop reproduces 78%% of it, and the exposure-matched null BEATS it. Tightening the catastrophic stop raises closes and makes total P&L WORSE. `min_vol_m` 5.0 -> **3.0** (ZEC+PAXG carry 91%% of the delta; 2.0 lowers the mean). `trend.max_open` cage hi 12 -> **9 as a SAFETY bound**: at >=10 the -10%% daily-loss halt becomes reachable before the -35%% stop, and in shadow that halt skips the whole scan — no death cross, no seatbelt, for the rest of the UTC day. `extra.caps` now carries a SKIP CENSUS: the row said `universe: 16` while 6 of the 16 are structurally mute (<202 bars), overstating the actionable universe by 60%%. 50/200 -> 10/20 is real throughput (0.38 -> 3.06 closes/30d) with UNESTABLISHED expectancy (beats only 84%% of 3000 placebo draws) — if ever shipped it is a SEPARATE ROW with the 50/200 control left running, never a re-parameterisation |
+| crypto-trend-daily-lshadow | 🌊 Tide Rider | **RETIRED 1-Aug (if): 9 buys / ZERO sells in 22 days while holding a third of the fleet's long budget — the keep-or-retire call was made. Row hidden + pruned (both halves); reversible via `TIDE_RIDER_RETIRED_OVERRIDE`. History below kept per I12's correct-in-place rule.** shadow only. Its LIVE row `crypto-trend-daily-lighter` was RETIRED 17-Jul — 🎫 Ticket Taker took the slot on the SAME service/keys/sub-account, so leaving both rows would DOUBLE-COUNT the same $34.67 of real money. **[30-Jul (hk)] ZERO closes in 20 days was CORRECT, not broken** — 1 buy / 0 sells ever in `venue_orders`, and its universe produced no signal flip of any kind in that time. What WAS broken: `(fz)` claimed this book was widened off the scout and it had no `fleet_bus` import and no COPY. Now wired: **6 → 16 books measured on the live bus**, additive (empty ⇒ keep the configured six, never shrink). **The prerequisite shipped with it:** `scan_universe()` scans the resolved universe ∪ every HELD coin, and `supports()` no longer skips a held position — without both, a coin leaving the list kept its position with no exit, no stop and no seatbelt (this book's only sweeper is `not dry_run`-gated, so shadow had none). Nine of the ten added books are TRADFI, so this is now a venue-wide trend follower despite the row name; kept ON (the EMA50/200 signal is per-coin, so it is per-asset by construction and cannot breach item 18) and reversible via `TREND_ALLOW_TRADFI=0`. Its 2.7yr +52% validation is SIX CRYPTO MAJORS and says nothing about XAU/SOXL — those sleeves are unvalidated and are there to be graded. Levers that can actually move its rate: `trend.universe_n` / `trend.min_vol_m` / `trend.max_open` (`trend.rank_by_funding` is inert while candidates ≤ slots — measured max simultaneously-golden coins = 1 vs 6 slots). Author: evidence board, gate lever = the universe. **[30-Jul (hl)] NO THROUGHPUT IS AVAILABLE WITHOUT PAYING EXPECTANCY** — 25 of 30 candidates died in refutation. `close<EMA20` gives 6.4x the closes and improves per-trade 5.1x, but **per bar-day held only 1.04x**: the gain is denominator shrinkage (median hold 58.5d -> 4d), a content-free 3-day time stop reproduces 78%% of it, and the exposure-matched null BEATS it. Tightening the catastrophic stop raises closes and makes total P&L WORSE. `min_vol_m` 5.0 -> **3.0** (ZEC+PAXG carry 91%% of the delta; 2.0 lowers the mean). `trend.max_open` cage hi 12 -> **9 as a SAFETY bound**: at >=10 the -10%% daily-loss halt becomes reachable before the -35%% stop, and in shadow that halt skips the whole scan — no death cross, no seatbelt, for the rest of the UTC day. `extra.caps` now carries a SKIP CENSUS: the row said `universe: 16` while 6 of the 16 are structurally mute (<202 bars), overstating the actionable universe by 60%%. 50/200 -> 10/20 is real throughput (0.38 -> 3.06 closes/30d) with UNESTABLISHED expectancy (beats only 84%% of 3000 placebo draws) — if ever shipped it is a SEPARATE ROW with the 50/200 control left running, never a re-parameterisation |
 | perps-funding-lighter-lighter / -lshadow | 💸 Funding Farmer | **LIVE** funding harvester + shadow |
 | perps-funding-carry-lshadow | 🌾 Yield Harvester | Lighter shadow. **[30-Jul] `MAX_POSITIONS` 8 -> 12: measured at 7 of 8, i.e. the fleet's BIGGEST EARNER was one slot from full and turning away carries it had already graded. Its 38.8% win rate is not a defect — carry's return lives in the tail.** Its HL-data arm (`perps-funding-carry`) is RETIRED 17-Jul — see LIGHTER-ONLY below |
 | perps-funding-spread-lshadow | ⚖️ Counterweight | funding L/S book. **[30-Jul] K 5 -> 8 and the universe 30 -> up to 60 via `fleet_bus.scout_universe()`: measured AT its structural cap (10 open = exactly K=5 x 2 legs) while ranking 15% of the venue. Widening the candidate set does not loosen the rule — it still takes exactly top-K/bottom-K, from a real cross-section.**
@@ -985,10 +1049,13 @@ All new bots:
   record, and `t` scales with sqrt(n).** Guarded by
   `scripts/audit_ledger_integrity.py` (registered selftest; exits non-zero on a
   LIVING two-writer book).]**
-  **OPERATOR ACTION OUTSTANDING — now more than cosmetic: one of the two
-  services must be STOPPED in Railway**; a deploy rule cannot fix a duplicate
-  that is already running, a guard cannot un-pool closes two processes already
-  wrote, and every grade over this window inherits the pooling. Lesson: a
+  **[4-Aug CORRECTION per I12: the "one service must be STOPPED" action is
+  SPENT.** (hp)/(ib)–(id)/(ih) closed it in code — `claim_writer` picks one
+  writer, the loser stands by on its own key, the pager is recency-scoped, and
+  the era move (ii) put the pooled window outside the graded sample. The two
+  services are now a deliberate failover pair; stopping one is optional.] The
+  lessons stand: a deploy rule cannot fix a duplicate that is already running,
+  a guard cannot un-pool closes two processes already wrote. Lesson: a
   duplicate PUBLISHER is not a duplicate DEPLOY — ask "do they share a key?",
   not "is redeploying cheap?" — and when you check whether a shared key did
   damage, pick a test that COULD detect the damage.]**
@@ -1155,7 +1222,9 @@ All new bots:
   4. **THE FORWARD METRIC IS BOOKS THAT CAN BE GRADED, THEN GO LIVE.** Not
      commits, not entries, not tests. A pass that leaves no book closer to the
      gate has not moved the fleet, however much it fixed. State at the end of
-     every pass which book moved and by how much.
+     every pass which book moved and by how much. I16/I17 make this measurable:
+     the allocation organ's claims table says which books have evidence, and a
+     book that cannot become decidable is retired, not carried.
 - **ONLY GROWTH, NO STEP BACKS (operator standing rule, 3-Aug, stated three
   times in one session: *"anything that sets us back we disregard; anything
   that promotes its growth and win rate we implement"* / *"only growth, no step
@@ -1173,7 +1242,10 @@ All new bots:
   is reported as refuted**, in the commit and the changelog, never sold as a
   win. `(it)` is the worked example of that too: `carry.min_vol` was registered
   because the rail structurally could not reach the binding gate, and the same
-  entry records that walking it unlocks zero books today.
+  entry records that walking it unlocks zero books today. **The executable form
+  of this rule is the OFFENSE TIER (I16–I19)**: capital by lower bound,
+  decidability or retirement, binding-constraint reach, and expectancy-priced
+  widenings.
 - **GROWTH FINDINGS ARE IMPLEMENTED, NOT FILED (operator rule, 30-Jul (hn)).**
   *"A new rule must be implemented that if we find something that moves us
   forward in progression and growth, it can implement."* Context: *"the whole
