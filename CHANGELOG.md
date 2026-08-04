@@ -1,3 +1,65 @@
+## 2026-08-04 (jc) — THE CODE-CURRENCY AUDIT GETS ITS FIRST CONSUMER: A RULE NOBODY RUNS IS THE (gk) SHAPE, ONE TOOL LATER
+
+- *(Letter moved from (jb) at push time — a concurrent session claimed (jb) on
+  origin/main mid-session for the unmapped-row/census work below, and
+  `audit_changelog_letters` caught the collision pre-push, exactly as built.
+  All of this entry's tree citations were renumbered with it.)*
+- **THE GAP** (fleet review §6 action ①, measured 4-Aug): `(iw)` built
+  `scripts/audit_code_currency.py` and it had **ZERO consumers** — no workflow,
+  no scheduled task, no `run_all.sh` entry — while deploy-verification labor
+  consumed **~29% of the week's changelog entries**. The tool that ends the
+  "is the fix actually running?" class ran only when a human remembered it:
+  exactly the "rule nobody runs" shape `(gk)` fixed for the go-live grader.
+- **WIRED: a `code-currency` job in `fleet-weekly-assessment.yml`.** A
+  SEPARATE job on purpose — a BEHIND-OWN red fails the RUN without suppressing
+  the scoreboard issue the `assess` job opens. `fetch-depth: 0` because the
+  audit replays the real `build_compute` across history; `--depth 200` because
+  the weekly window must cover a week of commits (measured: 120 in 7d — at the
+  script's ad-hoc default 40, a deliberately DEFERRED live service drifts off
+  the window into UNRESOLVED, losing exactly the verdict the run exists to
+  publish).
+- **DATA SOURCE: the public `/pnl.json`, and it is FAIL-CLOSED.** The script
+  gained `--pnl-json <path-or-url>` (CI holds no DB credentials; the feed
+  serves the same rows, `extra.build/build_n/svc` intact — verified against
+  the live endpoint, 22/22 rows stamped). Without it the CI run would fall
+  back to the DB, get None, print "nothing to check" and pass **forever
+  vacuously** — so the feed path exits 2 on a dark/empty/stamp-free document,
+  while the human DB path keeps its old quiet message. One merged check, one
+  raise: the first cut had two, and mutation testing showed the first was
+  subsumed by the second for every reachable shape — an undetectable line is
+  not a guard, so it was collapsed rather than kept for its prose.
+- **BEHIND-OWN IS THE ONLY RED.** `--gha` writes the per-service verdict table
+  to the run summary and emits `::error::` per BEHIND-OWN row — and ONLY per
+  BEHIND-OWN. DEFERRED / BEHIND-SHARED / FILE-SET are deliberate designs or
+  stamp bookkeeping: a red (or a warning) on a deliberate design is the
+  cry-wolf trap `(iw)`'s own header records this guard committing on its
+  first live run, and a `::warning::` on a passing run is not a guard at all
+  ((gl)/(hj)) — so the tolerable verdicts are table rows, not annotations.
+- **I1 RIDES ALONG**: the feed's server-side `age_sec`/`stale` now annotate
+  the report — a stale row's verdict describes its LAST publish, not a running
+  process (two family rows carried the flag on the live run and say so).
+- **THE WIRING IS ITSELF GUARDED** — `tests/autonomy/test_code_currency_wired.py`
+  pins the four silent-degrade modes: job deleted (the original gap restored),
+  depth-1 checkout (everything UNRESOLVED = vacuous green), `--pnl-json`
+  dropped (DB fallback = vacuous green), exit code masked (`|| true` /
+  `continue-on-error` = warn-only guard). **Five workflow mutations + four
+  script mutations verified red**, each restored green. Scoped to the job's
+  own YAML block, never page-wide substrings ((hm)).
+- **Deliberately NOT in `run_all.sh`**: containers ship without git history,
+  so an in-container run would classify everything UNRESOLVED — a guard that
+  is wrong by construction where it runs. The daily-review half of action ① is
+  a scheduled-task prompt this repo cannot write; the exact insertion text was
+  handed to the operator. Live run against the fleet: 22 rows — CURRENT ×10,
+  DEFERRED ×3 (both live services + the Farmer's control arm, by marker
+  design), BEHIND-SHARED ×9, BEHIND-OWN **0**, in 2.5s at depth 40.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None directly — this is the enforcement half of `(iw)`'s instrumentation.**
+What moved: the question behind every "is it live yet?" incident now gets
+asked WEEKLY by a machine instead of occasionally by a human, and a container
+missing its own merged behaviour turns the run red instead of waiting for the
+next 40-minute investigation. Suite **857**, guards green.
 ## 2026-08-04 (ja) — (iz) HARDENED: the NEXT phantom method would have failed silent the same way
 
 - **TWO SESSIONS, ONE BUG, INDEPENDENTLY — and the letter guard caught the collision pre-push.** This session's per-bot deep dive found the dead MTM reader in parallel with the session that shipped (iz) (its two agents disagreed — one blamed the 7-day floor, one said the reader was broken; reading the code decided, per I14). `audit_changelog_letters` fired on the duplicate (iz) at push time; (iz) keeps the letter, this is the follow-up.

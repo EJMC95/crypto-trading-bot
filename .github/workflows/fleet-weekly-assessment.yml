@@ -19,6 +19,38 @@ env:
   EXPOSURE_BUDGET: '20'
 
 jobs:
+  # [2026-08-04 (jc)] CODE CURRENCY — `(iw)` built the tool and it had ZERO
+  # consumers: deploy-verification labor was ~29% of the week's changelog
+  # entries while the command that ends that class ran only when a human
+  # remembered it (the exact "rule nobody runs" shape (gk) fixed for the
+  # go-live grader). A SEPARATE job, deliberately: a BEHIND-OWN red must fail
+  # the RUN without suppressing the scoreboard issue the assess job opens.
+  # Reads the PUBLIC /pnl.json (no DB credentials in CI); `--pnl-json` is
+  # FAIL-CLOSED, so a dark feed is exit 2, never a vacuous green. BEHIND-OWN
+  # is the ONLY ::error:: — DEFERRED / BEHIND-SHARED / FILE-SET are deliberate
+  # designs or stamp bookkeeping and stay informational rows in the step
+  # summary (a red on a deliberate design is the cry-wolf trap the script's
+  # own header records). Guarded by tests/autonomy/test_code_currency_wired.py.
+  code-currency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # the audit replays the REAL build_compute per commit — a depth-1
+          # checkout would classify every container UNRESOLVED and pass,
+          # which is exactly the vacuous green the guard test pins against
+          fetch-depth: 0
+      - name: Fetch the public feed
+        run: |
+          set -euo pipefail
+          curl -sS --retry 3 --retry-delay 5 "$FEED" -o pnl.json
+          test -s pnl.json
+      - name: Which commit is each container running?
+        # depth 200: the audit window must cover a WEEK of history on this
+        # cadence (measured 4-Aug: 120 commits in 7 days) or a deliberately
+        # DEFERRED live service drifts off the window into UNRESOLVED.
+        run: python3 scripts/audit_code_currency.py --pnl-json pnl.json --depth 200 --gha
+
   assess:
     runs-on: ubuntu-latest
     steps:

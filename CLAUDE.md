@@ -1148,6 +1148,19 @@ All new bots:
   when `(hi)` had joined the two arms' deploy clock ON PURPOSE. **Check a
   currency finding against the workflow before believing it** — a guard that
   cries wolf on a deliberate design is how a real finding later gets ignored.
+  **[4-Aug (jc)] IT HAS A CONSUMER NOW** — a `code-currency` job in
+  `fleet-weekly-assessment.yml`: reads the PUBLIC `/pnl.json` (`--pnl-json`,
+  FAIL-CLOSED — a dark/empty/stamp-free feed exits 2, never a vacuous green),
+  full-history checkout, `--depth 200` (a week is ~120 commits here),
+  verdict table into the run summary with BEHIND-OWN the ONLY red —
+  DEFERRED/BEHIND-SHARED/FILE-SET stay informational rows, per this entry's
+  own cry-wolf warning. For its first day it ran only when a human remembered
+  it — the (gk) "rule nobody runs" shape — while deploy-verification labor
+  measured ~29% of the week's changelog entries. Wiring pinned by
+  `tests/autonomy/test_code_currency_wired.py` (job exists, fetch-depth 0,
+  feed source, unmasked exit code, week-deep window — five workflow mutations
+  verified red). Deliberately NOT in `run_all.sh`: containers ship without
+  git history, so an in-container run would read everything UNRESOLVED.
   Deploy live from a CLEAN worktree: `railway up` uploads your DESK, WIP and
   all ([[deploy-live-from-a-clean-worktree]]).
 - Dashboard service: `pnl-dashboard`

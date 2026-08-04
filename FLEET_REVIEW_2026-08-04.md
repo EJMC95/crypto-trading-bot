@@ -157,7 +157,11 @@ faults in what the page shows/costs, all fixed and verified by readback:
 ## 6. Operations efficiency — ranked plan
 
 Measured: same-day-repair ratio flat (~40%); deploy-verification labor ~29% of
-the week's entries (its tool now exists but is **wired nowhere**); 26 Railway
+the week's entries (its tool now exists but is **wired nowhere** —
+**[corrected in place 4-Aug per I12: `(jc)` wired it — a `code-currency` job
+in the weekly workflow off the public /pnl.json, fail-closed, BEHIND-OWN the
+only red; action ① below is DONE on the weekly half, and the daily-review
+prompt text is prepared awaiting the operator's paste]**); 26 Railway
 services where ~14 are needed (6 retired containers online, `perps-bot`
 crash-looping, `nrl-feed` unrelated); 7 of 15 scheduled tasks spent/stale —
 four still describe the Kraken fleet retired three weeks ago; CI quota
@@ -165,7 +169,8 @@ arithmetic makes the 28-Jul billing lockout recur in any heavy week; CLAUDE.md
 carries ~450 lines of compressible archaeology (~5k tokens every session).
 
 Top actions: **①** wire `audit_code_currency` into the daily review + weekly
-workflow [implement-now]; **②** scheduler purge + rewrite the four Kraken-era
+workflow [implement-now] — **DONE 4-Aug (jc)** (weekly job shipped + guarded;
+daily-review line is operator-paste, text prepared); **②** scheduler purge + rewrite the four Kraken-era
 prompts [operator — agent prepares texts]; **③** Railway cleanup, one sitting,
 guard-first order [operator]; **④** CLAUDE.md archaeology compression pass
 [implement-now, separate pass]; **⑤** one-command deploy-and-verify script;

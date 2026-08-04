@@ -52,6 +52,22 @@ THE VERDICT THAT MATTERS IS NOT "BEHIND"
 
 Exit 0 = nothing is BEHIND-OWN. Exit 1 = at least one container is running
 stale code of its own. `--selftest` proves the classifier can still see.
+
+DATA SOURCES — DB by default, the PUBLIC FEED for CI [(jc)]
+  With no flags the rows come from `fetch_bot_pnl()` (needs DATABASE_URL).
+  `--pnl-json <path-or-url>` reads the dashboard's public read-only /pnl.json
+  instead — same rows, no credentials — which is what the weekly workflow uses.
+  That path is FAIL-CLOSED: an unreadable, empty or stamp-free feed exits 2,
+  because in an unattended run "nothing to check" and "the feed broke" must not
+  share a green (the warn-only-guard class). The default DB path keeps its
+  old degrade-to-a-message behaviour for a human at a terminal.
+
+  `--gha` additionally writes the verdict table to $GITHUB_STEP_SUMMARY and
+  emits a `::error::` annotation per BEHIND-OWN row — and ONLY per BEHIND-OWN:
+  DEFERRED / BEHIND-SHARED / FILE-SET are deliberate designs or stamp
+  bookkeeping, and a red (or even a ::warning::) on a deliberate design is the
+  cry-wolf failure the header above records this guard committing on its own
+  first run.
 """
 import argparse
 import json
@@ -117,6 +133,37 @@ MARKER_GATED = {
     # deliberate design is how a real finding later gets ignored ((hh)).
     "perps-funding-lighter-lshadow": ("[deploy-live-farmer]", "[deploy-live]"),
 }
+
+
+def rows_from_pnl_json(src):
+    """Rows from a /pnl.json document — a local file path or an http(s) URL.
+
+    The feed's envelope is `{"meta": {...}, "bots": [rows]}` (shape read off
+    the LIVE endpoint 4-Aug, not guessed); a bare list is tolerated for tests.
+    Each row already carries the two keys this audit consumes (`bot`, `extra`)
+    plus `age_sec`/`stale`, which the report uses for the I1 annotation.
+
+    RAISES on anything doubtful — no rows, no parse, no fetch. The caller
+    behind `--pnl-json` turns that into exit 2: this source exists for
+    unattended runs, where a quiet empty result is a vacuous green.
+    """
+    if str(src).startswith(("http://", "https://")):
+        import urllib.request
+        with urllib.request.urlopen(str(src), timeout=30) as resp:
+            doc = json.load(resp)
+    else:
+        doc = json.loads(Path(src).read_text())
+    rows = doc.get("bots") if isinstance(doc, dict) else doc
+    if not isinstance(rows, list):
+        rows = []
+    stamped = sum(1 for r in rows
+                  if isinstance(r, dict) and (r.get("extra") or {}).get("build"))
+    if not stamped:
+        raise ValueError(
+            f"pnl.json from {src} yields no build-stamped rows "
+            f"({len(rows)} row(s) total) — empty feed, changed shape, or dark "
+            f"stampers")
+    return rows
 
 
 def _git(*args, cwd=None):
@@ -257,15 +304,48 @@ def classify(row, container_id, container_n, history, head_stamp, touched):
             f"{len(history)}-commit window — older than --depth")
 
 
-def audit(depth=40, rows=None):
+def _row_age(r):
+    """(age_sec, stale) for one row — I1: read the age BEFORE the semantics.
+
+    A dead container's row still carries its last stamp, so a verdict on a
+    stale row describes its LAST publish, not a running process. The feed
+    computes both fields server-side (threshold-aware); a DB row only has
+    `updated_at`, so age is derived and stale stays None — this audit does not
+    own the per-bot thresholds and will not invent them.
+    """
+    age, stale = r.get("age_sec"), r.get("stale")
+    if age is None and r.get("updated_at"):
+        try:
+            import datetime as dt
+            ua = dt.datetime.fromisoformat(str(r["updated_at"]))
+            if ua.tzinfo is None:
+                ua = ua.replace(tzinfo=dt.timezone.utc)
+            age = max(0, int((dt.datetime.now(dt.timezone.utc) - ua)
+                             .total_seconds()))
+        except Exception:  # noqa: BLE001
+            age = None
+    return age, bool(stale) if stale is not None else None
+
+
+def audit(depth=40, rows=None, fail_closed=False, gha=False):
     import bot_pnl_store as store
     if rows is None:
         rows = store.fetch_bot_pnl() or []
     live = {r["bot"]: (r.get("extra") or {}) for r in rows
             if (r.get("extra") or {}).get("build")}
+    ages = {r["bot"]: _row_age(r) for r in rows if r.get("bot") in live}
     wanted = {b: ROW_ENTRY[b] for b in live if b in ROW_ENTRY}
     if not wanted:
-        print("audit_code_currency: no stamped rows with a known entry — nothing to check.")
+        msg = "no stamped rows with a known entry — nothing to check."
+        if fail_closed:
+            # Unattended path: an empty check is indistinguishable from a
+            # passed one unless it is RED. (gha annotation so the run summary
+            # says why, not just that.)
+            if gha:
+                print(f"::error title=code-currency vacuous::{msg}")
+            print(f"audit_code_currency: FAIL-CLOSED — {msg}")
+            return 2
+        print(f"audit_code_currency: {msg}")
         return 0
 
     hist = commits(depth)
@@ -292,7 +372,7 @@ def audit(depth=40, rows=None):
           f"(window: {len(hist)} commits)\n")
     print(f"{'row':34s} {'verdict':14s} {'behind':>6s}  detail")
     print("-" * 108)
-    findings = 0
+    findings, table = 0, []
     for row in sorted(wanted):
         entry = wanted[row]
         history = [(s, per_commit[s][0], per_commit[s][1].get(entry))
@@ -301,14 +381,28 @@ def audit(depth=40, rows=None):
         v, sha, behind, why = classify(
             row, live[row].get("build"), live[row].get("build_n"),
             history, head_stamp, touched[entry])
+        age, stale = ages.get(row, (None, None))
+        if stale:
+            why += (f"  [ROW STALE {age / 3600.0:.1f}h — the verdict describes "
+                    f"its LAST publish, not a running process (I1)]")
         if v == "BEHIND-OWN":
             findings += 1
+            if gha:
+                print(f"::error title=BEHIND-OWN {row}::"
+                      f"svc={live[row].get('svc')} is running stale code of "
+                      f"its own — {why}")
         tag = f"{behind}" if behind is not None else "-"
         short = (sha or "")[:9]
         print(f"{row:34s} {v:14s} {tag:>6s}  {short} {why}")
         if v == "BEHIND-OWN":
             print(f"{'':34s} {'':14s} {'':>6s}  svc={live[row].get('svc')} "
                   f"stamp={live[row].get('build')}/{live[row].get('build_n')}")
+        table.append({"row": row, "svc": live[row].get("svc"), "verdict": v,
+                      "behind": behind, "commit": short, "age_sec": age,
+                      "stale": stale, "why": why})
+
+    if gha:
+        _write_step_summary(table, len(hist))
 
     print()
     if findings:
@@ -322,6 +416,36 @@ def audit(depth=40, rows=None):
           "deliberately DEFERRED behind its marker gate, or behind only on "
           "shared modules.")
     return 0
+
+
+def _write_step_summary(table, window):
+    """Markdown verdict table into $GITHUB_STEP_SUMMARY, one line per row.
+    Prose stays out of the cells; the `detail` column IS the actionable why
+    (I8 — the operator acts on a named service, so `svc` gets its own column).
+    """
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    L = [f"### Code currency — which commit is each container running? "
+         f"(window: {window} commits)", "",
+         "| row | service | verdict | behind | commit | age | detail |",
+         "|---|---|---|---|---|---|---|"]
+    for t in sorted(table, key=lambda t: (t["verdict"] != "BEHIND-OWN",
+                                          t["row"])):
+        v = f"**{t['verdict']}** ❌" if t["verdict"] == "BEHIND-OWN" \
+            else t["verdict"]
+        age = "-" if t["age_sec"] is None else f"{t['age_sec'] / 3600.0:.1f}h"
+        if t["stale"]:
+            age += " STALE"
+        why = t["why"].replace("|", "\\|")
+        L.append(f"| `{t['row']}` | `{t['svc']}` | {v} | "
+                 f"{'-' if t['behind'] is None else t['behind']} | "
+                 f"{t['commit'] or '-'} | {age} | {why} |")
+    L += ["", "BEHIND-OWN is the only failing verdict — DEFERRED / "
+          "BEHIND-SHARED / FILE-SET are deliberate designs or stamp "
+          "bookkeeping, listed so nobody re-derives that by hand.", ""]
+    with open(path, "a") as f:
+        f.write("\n".join(L) + "\n")
 
 
 def _selftest():
@@ -362,17 +486,89 @@ def _selftest():
     # marker-gated rows must be mapped, or they can never be classified
     for row in MARKER_GATED:
         assert row in ROW_ENTRY, f"{row} is marker-gated but unmapped"
+
+    # --- the /pnl.json source [(jc)] -------------------------------------
+    # Fixture mirrors the LIVE feed's envelope (read off the endpoint 4-Aug:
+    # {"meta": ..., "bots": [rows]}, rows keyed bot/extra/age_sec/stale) —
+    # the (hj) rule wants the publisher's own payload, and the publisher is a
+    # DB-backed HTTP handler, so the measured envelope is the closest
+    # network-free stand-in. The adapter must return rows NON-DEGENERATE
+    # (bot + extra.build intact), and must RAISE on the three dark shapes an
+    # unattended run would otherwise call green.
+    import tempfile as _tf
+    feed = {"meta": {"generated_at": "2026-08-04T00:00:00+00:00"},
+            "bots": [{"bot": "perps-funding-lighter-lighter",
+                      "extra": {"build": "f27e50d805af", "build_n": 15,
+                                "svc": "trail-blazer-live"},
+                      "age_sec": 75, "stale": False},
+                     {"bot": "crypto-breakout-4h-lshadow",
+                      "extra": {"build": "6779a282bbd8", "build_n": 14,
+                                "svc": "family-lighter-shadow"},
+                      "age_sec": 1828, "stale": True}]}
+    with _tf.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(feed, f)
+        fp = f.name
+    try:
+        got = rows_from_pnl_json(fp)
+        assert len(got) == 2 and got[0]["bot"] == "perps-funding-lighter-lighter"
+        assert got[0]["extra"]["build"] == "f27e50d805af", got[0]
+        # I1 plumbing: the feed's server-side age/stale must survive into
+        # _row_age verbatim — a stale row's verdict is about its LAST publish.
+        assert _row_age(got[1]) == (1828, True), _row_age(got[1])
+        assert _row_age(got[0]) == (75, False), _row_age(got[0])
+        for bad in ([], {"meta": {}, "bots": []},
+                    {"bots": [{"bot": "x", "extra": {}}]}):   # rows, no stamps
+            with _tf.NamedTemporaryFile("w", suffix=".json",
+                                        delete=False) as f2:
+                json.dump(bad, f2)
+            try:
+                rows_from_pnl_json(f2.name)
+                raise AssertionError(f"adapter accepted a dark feed: {bad!r}")
+            except ValueError:
+                pass
+            finally:
+                os.unlink(f2.name)
+    finally:
+        os.unlink(fp)
+    # a DB-shaped row (updated_at, no age_sec) degrades to derived age,
+    # stale=None — never a guessed threshold
+    age, stale = _row_age({"bot": "x",
+                           "updated_at": "2026-01-01T00:00:00+00:00"})
+    assert age is not None and age > 0 and stale is None, (age, stale)
+    # the unattended path must go RED on an empty check, the human path must
+    # keep its old quiet message
+    assert audit(rows=[{"bot": "nobody", "extra": {}}], fail_closed=True) == 2
+    assert audit(rows=[{"bot": "nobody", "extra": {}}], fail_closed=False) == 0
     print("audit_code_currency --selftest OK "
           "(current, behind-own, behind-shared, deferred, marked-gap, "
-          "unresolved, unstamped, map integrity)")
+          "unresolved, unstamped, map integrity, pnl-json fail-closed, "
+          "i1-age plumbing)")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--depth", type=int, default=40)
+    ap.add_argument("--pnl-json", metavar="PATH_OR_URL",
+                    help="read rows from the dashboard's public /pnl.json "
+                         "(file or URL) instead of the DB — FAIL-CLOSED: a "
+                         "dark/empty/stamp-free feed exits 2, never green")
+    ap.add_argument("--gha", action="store_true",
+                    help="GitHub Actions mode: verdict table into "
+                         "$GITHUB_STEP_SUMMARY + ::error:: per BEHIND-OWN "
+                         "(and ONLY per BEHIND-OWN)")
     a = ap.parse_args()
     if a.selftest:
         _selftest()
         raise SystemExit(0)
-    raise SystemExit(audit(depth=a.depth))
+    rows = None
+    if a.pnl_json:
+        try:
+            rows = rows_from_pnl_json(a.pnl_json)
+        except Exception as e:  # noqa: BLE001
+            if a.gha:
+                print(f"::error title=code-currency feed unreadable::{e}")
+            print(f"audit_code_currency: FAIL-CLOSED — {e}")
+            raise SystemExit(2)
+    raise SystemExit(audit(depth=a.depth, rows=rows,
+                           fail_closed=bool(a.pnl_json), gha=a.gha))
