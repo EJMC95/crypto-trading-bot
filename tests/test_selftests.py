@@ -129,6 +129,18 @@ SELFTEST_MODULES = [
     # documentation (a `# [2026-07-17 BASIS FIX]` marker records history and
     # must never move), and that exemptions are file-local and reasoned.
     "scripts.audit_era_date_literals",
+    # [2026-08-05] deploy_live_verify — the live deploy as ONE VERIFIED ACT
+    # (print the operator command / watch the gh run / verify by stamp
+    # readback), replacing the measured 8-dispatches-5-cancelled-in-4-minutes
+    # dance of 3-Aug. --selftest is fully offline (injected fetch/sleep, feed-
+    # shaped fixtures) and pins the properties that make the tool safe rather
+    # than merely runnable: it structurally CANNOT dispatch (`gh workflow ...`
+    # is AST-banned — live dispatch is operator-only), it re-implements none
+    # of the stamp rule (second-copy AST pin; audit_code_currency is the
+    # owner), a stale row never confirms (I1), a build_n mismatch reports the
+    # (fd) FILE-SET reading, and every poll is bounded (P1–P3). Six mutation
+    # classes verified red the day it shipped.
+    "scripts.deploy_live_verify",
     "bot_learn",
     "bot_pnl_store",
     "brain_replay",
