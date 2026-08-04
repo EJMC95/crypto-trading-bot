@@ -1,3 +1,12 @@
+## 2026-08-04 (ja) — (iz) HARDENED: the NEXT phantom method would have failed silent the same way
+
+- **TWO SESSIONS, ONE BUG, INDEPENDENTLY — and the letter guard caught the collision pre-push.** This session's per-bot deep dive found the dead MTM reader in parallel with the session that shipped (iz) (its two agents disagreed — one blamed the 7-day floor, one said the reader was broken; reading the code decided, per I14). `audit_changelog_letters` fired on the duplicate (iz) at push time; (iz) keeps the letter, this is the follow-up.
+- **What (iz) left open:** the one-line fix kept `store.fetch_state_history` INSIDE the blanket `except: return []` — so a future rename/typo on either side of the seam would reproduce the exact silent-inert-bar failure, again indistinguishable from a thin series. Now the API is resolved OUTSIDE the fail-safe: a store missing the read API raises (programming error, loud); only the DB call keeps the dark-DB `[]` fail-safe.
+- **The grader's own selftest pinned the camouflage**: `equity_series("nope", store=object()) == []` asserted the exact tolerance that hid the phantom method — (iz)'s test comment named this and left the line in place. The contract is now SPLIT in the selftest: junk store → AttributeError; dark-DB store (read raises) → [].
+- `tests/autonomy/test_mtm_reader_alive.py` adds the CLASS guard both fixes lacked: AST-extract every `store.<attr>` reference inside `equity_series` and assert each exists on the REAL `bot_pnl_store` — plus a documented-shape newest-first end-to-end (complementing (iz)'s FakeConn replay) and the dark-DB fail-safe. Mutation-verified red on the `load_history` spelling.
+- I12 correction: `snapshot_equity`'s docstring still said "DELIBERATELY NOT WIRED INTO THE GRADER YET" — false since (ia), and it dressed the inert bar as design. Corrected in place.
+- **WHICH BOOK MOVED: same as (iz) — all 18 in gradeability**; this entry is the insurance that the gradeability stays real when the seam next changes.
+
 ## 2026-08-04 (iz) — THE (ia) MTM BAR NEVER READ A SINGLE SAMPLE: THE GRADER CALLED A READ FUNCTION THE STORE DOES NOT HAVE
 
 *(Letter: written as (ix); TWO concurrent sessions landed their own (ix) — "THE OFFENSE TIER" — and (iy) — "THE DASHBOARD INQUEST" — on main while this branch was open. Both are merged and keep their letters; mine moved to (iz). Fifteenth and sixteenth recorded collisions, and the letter moved twice in one push — the rule "pick at PUSH time" now demonstrably means at the final push, not the first attempt.)*

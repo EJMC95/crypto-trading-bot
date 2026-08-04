@@ -554,11 +554,20 @@ def equity_series(bot, store=None, limit=20000):
     treats empty as "grade on realised", which is exactly today's behaviour, so
     an unavailable history can never change a verdict.
     """
-    try:
-        if store is None:
+    if store is None:
+        try:
             import bot_pnl_store as store          # noqa: PLC0415
-        rows = store.fetch_state_history(str(bot) + ":equity",
-                                         limit=limit) or []
+        except Exception:                          # noqa: BLE001
+            return []
+    # [2026-08-04 (ja), hardening (iz)] The read API is resolved OUTSIDE the
+    # fail-safe. (iz) fixed the phantom `load_history` name, but with the
+    # attribute access still inside the blanket except, the NEXT phantom
+    # method would fail silent the same way — "no usable equity series" on
+    # every book while the series accrues. A missing API is a programming
+    # error and must fail loud; only the DB call keeps the dark-DB fail-safe.
+    read = store.fetch_state_history
+    try:
+        rows = read(str(bot) + ":equity", limit=limit) or []
     except Exception:                              # noqa: BLE001
         return []
     out = []
@@ -1020,8 +1029,22 @@ def _selftest():
     assert _cw["maxdd_basis"] == "mtm", _cw
     assert _cw["max_dd_frac"] > 0.002, "the open loss must reach the bar"
     assert _cw["max_dd_frac_realised"] == 0.002, "and the realised one is kept"
-    # equity_series must be inert without a store rather than raising
-    assert equity_series("nope", store=object()) == []
+    # [2026-08-04 (ja)] The contract SPLIT, and this assertion is the record
+    # of why. The old line pinned "any junk store -> []" — the exact tolerance
+    # that hid (iz)'s phantom `load_history` for 4 days. New contract: a store
+    # MISSING the read API raises (programming error, loud); a store whose
+    # read RAISES returns [] (dark DB, fail-safe).
+    try:
+        equity_series("nope", store=object())
+        raise AssertionError("a store with no read API must raise, not []")
+    except AttributeError:
+        pass
+
+    class _DarkStore:                                   # dark DB: read raises
+        @staticmethod
+        def fetch_state_history(key, limit=800):
+            raise RuntimeError("db unreachable")
+    assert equity_series("nope", store=_DarkStore) == []
 
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
           "high-win-rate loser, window/DD bars, ungradeable input, policy "

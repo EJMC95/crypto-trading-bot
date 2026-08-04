@@ -1824,13 +1824,15 @@ def snapshot_equity(bot, equity, open_trades=None, realized=None):
     ONE UPSERTED ROW per book: there is no series, so no drawdown can be
     computed from it. This starts the series.
 
-    DELIBERATELY NOT WIRED INTO THE GRADER YET. There is no history to read, so
-    changing the bar today would grade every book against an empty series —
-    fail-open or fail-closed, both wrong. Accumulate ~30 days first, then
-    publish the MTM number BESIDE the realised one before it is allowed to
-    decide anything. Re-grade 🌾 carry under it before anyone reads its score
-    as unchanged: carry is five of six bars from go-live, so a stricter
-    drawdown definition lands on it first.
+    [2026-08-04 (ja) — the paragraph that stood here said "DELIBERATELY NOT
+    WIRED INTO THE GRADER YET"; that became false in (ia) and then MASKED a
+    real bug: the grader WAS wired, behind sample floors (200 samples / 7d),
+    but its reader called a store method that never existed ((iz)) and the
+    blanket except made that look like the deliberate deferral this text
+    described. Corrected per I12.] The grader consumes this series via
+    `golive_readiness.equity_series` -> `apply_mtm`, floor-gated, taking the
+    WORSE of realised and MTM. Re-grade 🌾 carry first when its floor clears:
+    a stricter drawdown definition lands on the book nearest the gate first.
     """
     try:
         row = {"equity": round(float(equity), 4)}
