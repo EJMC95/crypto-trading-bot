@@ -1,65 +1,70 @@
 {
- "round": 22,
- "built_at": "2026-07-30T01:19:52+00:00",
+ "round": 23,
+ "built_at": "2026-08-04T10:13:45+00:00",
  "games": [
   {
-   "home": "North Queensland Cowboys",
-   "away": "Sydney Roosters",
-   "info_confidence": "provisional",
-   "team_lists_confirmed": false,
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 15.5,
-    "temp_c": 20.9,
-    "forecast_hour": "2026-07-30T19:00"
-   },
-   "weather_try_mult": 1.0,
-   "baseline_total": 48.7,
-   "adjusted_total": 48.7,
-   "flags": [
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "North Queensland Cowboys news: Cowboys v Broncos: Dearden ruled out; Billy's back - NRL.com"
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "Sydney Roosters news: Knights v Roosters: Ponga, Gagai sidelined: Roosters guns return - NRL.com"
-    }
-   ]
-  },
-  {
-   "home": "St George Illawarra Dragons",
-   "away": "Dolphins",
+   "home": "Gold Coast Titans",
+   "away": "North Queensland Cowboys",
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 12.2,
-    "temp_c": 12.1,
-    "forecast_hour": "2026-07-31T18:00"
+    "wind_kmh": 2.3,
+    "temp_c": 15.3,
+    "forecast_hour": "2026-08-06T19:00"
    },
    "weather_try_mult": 1.0,
-   "baseline_total": 48.8,
-   "adjusted_total": 48.8,
+   "baseline_total": 48.6,
+   "adjusted_total": 48.6,
    "flags": [
     {
      "severity": "warn",
      "kind": "spine-change",
-     "text": "Dolphins: Hamiso Tabuai-Fidow named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+     "text": "Gold Coast Titans: Lachlan Ilias named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
     },
     {
      "severity": "info",
      "kind": "news",
-     "text": "St George Illawarra Dragons news: Dragons v Titans: Gutho's milestone; Brimson sidelined - NRL.com"
+     "text": "North Queensland Cowboys news: Cowboys v Broncos: Dearden ruled out; Billy's back - NRL.com"
     }
    ]
   },
   {
-   "home": "Melbourne Storm",
+   "home": "New Zealand Warriors",
+   "away": "Penrith Panthers",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 0,
+    "wind_kmh": 3.4,
+    "temp_c": 9.2,
+    "forecast_hour": "2026-08-07T18:00"
+   },
+   "weather_try_mult": 1.0,
+   "baseline_total": 45.5,
+   "adjusted_total": 45.5,
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Penrith Panthers: Jaxen Edgar named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "Penrith Panthers news: Panthers v Raiders: Cogger steps up; Sasagi sidelined - NRL.com"
+    },
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "Penrith Panthers news: Eels v Panthers: Moses, Penisini return; Edwards sidelined - NRL.com"
+    }
+   ]
+  },
+  {
+   "home": "Sydney Roosters",
    "away": "Canterbury-Bankstown Bulldogs",
    "info_confidence": "high",
    "team_lists_confirmed": true,
@@ -71,78 +76,127 @@
     {
      "severity": "warn",
      "kind": "spine-change",
-     "text": "Melbourne Storm: Tyran Wishart named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
+     "text": "Sydney Roosters: James Tedesco named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
     },
     {
      "severity": "warn",
      "kind": "spine-change",
-     "text": "Melbourne Storm: Trent Toelau named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+     "text": "Sydney Roosters: Sam Walker named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Sydney Roosters: Reece Robson named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
     },
     {
      "severity": "info",
      "kind": "news",
-     "text": "Melbourne Storm news: Rabbitohs v Storm: Big three sidelined; Hughes back on deck - NRL.com"
+     "text": "Sydney Roosters news: Knights v Roosters: Ponga, Gagai sidelined: Roosters guns return - NRL.com"
     }
    ]
   },
   {
-   "home": "Gold Coast Titans",
-   "away": "New Zealand Warriors",
+   "home": "Melbourne Storm",
+   "away": "Manly-Warringah Sea Eagles",
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": null,
    "weather_try_mult": 1.0,
-   "baseline_total": 46.6,
-   "adjusted_total": 46.6,
-   "flags": []
-  },
-  {
-   "home": "Penrith Panthers",
-   "away": "Canberra Raiders",
-   "info_confidence": "high",
-   "team_lists_confirmed": true,
-   "weather": null,
-   "weather_try_mult": 1.0,
-   "baseline_total": 46.0,
-   "adjusted_total": 46.0,
+   "baseline_total": 47.4,
+   "adjusted_total": 47.4,
    "flags": [
     {
      "severity": "warn",
      "kind": "spine-change",
-     "text": "Penrith Panthers: Jaxen Edgar named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+     "text": "Melbourne Storm: Tyran Wishart named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
     },
     {
      "severity": "warn",
      "kind": "spine-change",
-     "text": "Canberra Raiders: Ethan Strange named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "Penrith Panthers news: Eels v Panthers: Moses, Penisini return; Edwards sidelined - NRL.com"
+     "text": "Manly-Warringah Sea Eagles: Joey Walsh named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
     }
    ]
   },
   {
-   "home": "Brisbane Broncos",
-   "away": "Newcastle Knights",
+   "home": "Dolphins",
+   "away": "Brisbane Broncos",
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 2,
-    "wind_kmh": 10.2,
-    "temp_c": 14.9,
-    "forecast_hour": "2026-08-01T19:00"
+    "precip_prob": 1,
+    "wind_kmh": 7.2,
+    "temp_c": 18.5,
+    "forecast_hour": "2026-08-08T17:00"
    },
    "weather_try_mult": 1.0,
-   "baseline_total": 48.4,
-   "adjusted_total": 48.4,
+   "baseline_total": 48.9,
+   "adjusted_total": 48.9,
    "flags": [
     {
      "severity": "warn",
      "kind": "spine-change",
+     "text": "Dolphins: Hamiso Tabuai-Fidow named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
      "text": "Brisbane Broncos: Reece Walsh named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Brisbane Broncos: Billy Walters named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "Brisbane Broncos news: Cowboys v Broncos: Dearden ruled out; Billy's back - NRL.com"
+    }
+   ]
+  },
+  {
+   "home": "South Sydney Rabbitohs",
+   "away": "Parramatta Eels",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": {
+    "precip_mm": 0.0,
+    "precip_prob": 0,
+    "wind_kmh": 11.3,
+    "temp_c": 14.0,
+    "forecast_hour": "2026-08-08T19:00"
+   },
+   "weather_try_mult": 1.0,
+   "baseline_total": 48.8,
+   "adjusted_total": 48.8,
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Parramatta Eels: Mitchell Moses named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "South Sydney Rabbitohs news: Rabbitohs v Storm: Big three sidelined; Hughes back on deck - NRL.com"
+    }
+   ]
+  },
+  {
+   "home": "Canberra Raiders",
+   "away": "Newcastle Knights",
+   "info_confidence": "high",
+   "team_lists_confirmed": true,
+   "weather": null,
+   "weather_try_mult": 1.0,
+   "baseline_total": 47.9,
+   "adjusted_total": 47.9,
+   "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "Canberra Raiders: Ethan Strange named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
     },
     {
      "severity": "warn",
@@ -152,30 +206,25 @@
     {
      "severity": "info",
      "kind": "news",
-     "text": "Brisbane Broncos news: Cowboys v Broncos: Dearden ruled out; Billy's back - NRL.com"
-    },
-    {
-     "severity": "info",
-     "kind": "news",
      "text": "Newcastle Knights news: Knights v Roosters: Ponga, Gagai sidelined: Roosters guns return - NRL.com"
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "Newcastle Knights news: Eels v Knights: Owen sidelined; Kirra hits 50 - NRL.com"
     }
    ]
   },
   {
-   "home": "Cronulla-Sutherland Sharks",
-   "away": "South Sydney Rabbitohs",
+   "home": "St George Illawarra Dragons",
+   "away": "Cronulla-Sutherland Sharks",
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": null,
    "weather_try_mult": 1.0,
-   "baseline_total": 47.8,
-   "adjusted_total": 47.8,
+   "baseline_total": 47.5,
+   "adjusted_total": 47.5,
    "flags": [
+    {
+     "severity": "warn",
+     "kind": "spine-change",
+     "text": "St George Illawarra Dragons: Lyhkan King-Togia named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
     {
      "severity": "warn",
      "kind": "spine-change",
@@ -194,44 +243,7 @@
     {
      "severity": "info",
      "kind": "news",
-     "text": "Cronulla-Sutherland Sharks news: Teams: Gun ruled out, doubt lingering over host of Origin stars - nine.com.au"
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "South Sydney Rabbitohs news: Rabbitohs v Storm: Big three sidelined; Hughes back on deck - NRL.com"
-    }
-   ]
-  },
-  {
-   "home": "Wests Tigers",
-   "away": "Parramatta Eels",
-   "info_confidence": "high",
-   "team_lists_confirmed": true,
-   "weather": null,
-   "weather_try_mult": 1.0,
-   "baseline_total": 49.2,
-   "adjusted_total": 49.2,
-   "flags": [
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Wests Tigers: Adam Doueihi named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Wests Tigers: Apisai Koroisau named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Parramatta Eels: Mitchell Moses named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "Parramatta Eels news: Eels v Knights: Owen sidelined; Kirra hits 50 - NRL.com"
+     "text": "St George Illawarra Dragons news: Dragons v Titans: Gutho's milestone; Brimson sidelined - NRL.com"
     }
    ]
   }

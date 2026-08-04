@@ -1,23 +1,23 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1343,
-  "fair_price": 7.45,
+  "p_joint": 0.1277,
+  "fair_price": 7.83,
   "legs": [
-   "Penrith Panthers to win",
+   "Cronulla-Sutherland Sharks to win",
+   "Sydney Roosters to win",
    "Dolphins to win",
-   "Melbourne Storm to win",
-   "New Zealand Warriors to win"
+   "South Sydney Rabbitohs to win"
   ]
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0462,
-  "fair_price": 21.65,
+  "p_joint": 0.0288,
+  "fair_price": 34.77,
   "legs": [
-   "Penrith Panthers win & Thomas Jenkins try",
-   "Dolphins win & Hamiso Tabuai-Fidow try",
-   "Melbourne Storm win & Moses Leo try"
+   "Cronulla-Sutherland Sharks win & Ronaldo Mulitalo try",
+   "Sydney Roosters win & Mark Nawaqanitawase try",
+   "Dolphins win & Hamiso Tabuai-Fidow try"
   ]
  }
 ]
