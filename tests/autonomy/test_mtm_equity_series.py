@@ -156,7 +156,7 @@ def test_pending_declarations_are_not_stale():
 
 
 # ---------------------------------------------------------------------------
-# THE READ SIDE ((ix), 2026-08-04). Everything above guards the WRITE half of
+# THE READ SIDE ((iz), 2026-08-04). Everything above guards the WRITE half of
 # the wire; nothing exercised the READ half, and it was dead on arrival:
 # `golive_readiness.equity_series` called `store.load_history(...)` — a
 # function `bot_pnl_store` has never defined (the read side of `save_history`
@@ -257,7 +257,7 @@ def test_grader_reads_the_series_the_publisher_writes(store_on_fake_db):
     series = g.equity_series(bot, store=store)
     assert len(series) == 240, (
         "equity_series returned a degenerate series for a book whose history "
-        "the publisher just wrote — the (ix) failure: the grader calling a "
+        "the publisher just wrote — the (iz) failure: the grader calling a "
         "read function the store does not define, behind a bare except")
     assert max(e for _, e in series) == 1100.0
     assert min(e for _, e in series) == 900.0
@@ -277,7 +277,7 @@ def test_grader_reads_the_series_the_publisher_writes(store_on_fake_db):
 
 def test_a_young_series_reads_thin_not_absent(store_on_fake_db):
     """After the fix, a book with a young series must publish 'series too
-    thin to decide' — NEVER 'no usable equity series', which was the (ix)
+    thin to decide' — NEVER 'no usable equity series', which was the (iz)
     symptom on all 18 books (the grader could not read ANY series)."""
     import golive_readiness as g             # noqa: PLC0415
     store = store_on_fake_db

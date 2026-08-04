@@ -2044,7 +2044,11 @@ def card(bot, row, open_trades=None, quality=None, spark=None, mode_note=None,
     extra = row.get("extra") or {}
     if isinstance(extra, dict):
         _HIDE = {"positions", "open_orders", "open_pos", "err", "src", "port"}
-        _bits = {k: v for k, v in extra.items() if k not in _HIDE}
+        # [2026-08-04 (iy)] None values are dropped: shadow arms publish
+        # cap_usd=null (no cap env by design) and the raw join rendered
+        # "cap_usd: None" on two cards. An absent value is not a datum.
+        _bits = {k: v for k, v in extra.items()
+                 if k not in _HIDE and v is not None}
         extra_bits = " · ".join(f"{k}: {html.escape(str(v))}" for k, v in _bits.items())
     else:
         extra_bits = html.escape(str(extra))
@@ -2413,18 +2417,24 @@ def render():
     tot_equity = sum((r.get("equity") or 0) for r in _crypto if r.get("equity") is not None)
     stock_equity = sum((r.get("equity") or 0) for r in live
                        if r.get("bot") in STOCKS and r.get("equity") is not None)
-    n_open = sum((r.get("open_trades") or 0) for r in _crypto)
-    n_closed = sum((r.get("closed_trades") or 0) for r in _crypto)
+    # [2026-08-04 (iy)] Trades counts the WHOLE living fleet, not the legacy
+    # non-variant paper cohort — that cohort has been empty since the 14/17-Jul
+    # retirements, so the most prominent line on the page read "Trades 0
+    # closed · 0 open" over cards showing hundreds of closes and ~54 open
+    # positions. I12 rot, in the UI.
+    n_open = sum((r.get("open_trades") or 0) for r in live)
+    n_closed = sum((r.get("closed_trades") or 0) for r in live)
     online = sum(1 for r in live
                  if not age_str(r.get("updated_at"), stale_secs_for(r.get("bot")))[1]
                  and r.get("status") not in ("halted", "error"))
 
-    # Grand total across EVERYTHING (the full picture). Equity is a clean sum of
-    # all account balances; P&L sums all bots' pnl_abs (mixed bases — see subtotals).
+    # Grand total across EVERYTHING (the full picture). [2026-08-04 (iy)] Both
+    # sides are now SPLIT real vs modelled: the old line summed 20 modelled $1k
+    # shadow books into eq while excluding them from P&L — three cohort
+    # definitions in one span, and the reader had no way to tell $20k of
+    # modelled paper from $267 of real money.
     grand_equity = sum((r.get("equity") or 0) for r in live if r.get("equity") is not None)
-    # Real-money live P&L IS part of the grand total; shadow is modelled (not real)
-    # so it stays out of the headline and only shows on its own muted line.
-    grand_pnl = tot_pnl + scan_pnl + stock_pnl + live_pnl
+    modelled_pnl = sum((r.get("pnl_abs") or 0) for r in live) - live_pnl
 
     # Whole-feed staleness. The DB can be reachable and rows can exist, yet every
     # row is old because the bots lost their write path (the exact failure mode on
@@ -2477,6 +2487,24 @@ def render():
             f'padding:2px 9px">shadow/testnet <b class="{cls(shadow_pnl)}">'
             f'{money(shadow_pnl)}</b> · {n_shadow_bots} bot'
             f'{"s" if n_shadow_bots != 1 else ""} (modelled)</span>')
+
+    # [2026-08-04 (iy)] The legacy paper-cohort spans render ONLY when their
+    # cohort has members. All three (non-variant crypto paper, scanners,
+    # stocks) have been empty since the 14/17-Jul retirements, so the header
+    # permanently asserted "Crypto (paper) +0.00 · Scanner paper +0.00 ·
+    # Stocks (paper) +0.00" — a fleet that no longer exists, rendered above 22
+    # trading books. A span that can only ever read zero is the UI form of the
+    # warning-shaped guard.
+    paper_spans = ""
+    if _crypto:
+        paper_spans += (f'<span>Crypto (paper) <b class="{cls(tot_pnl)}">'
+                        f'{money(tot_pnl)}</b> · eq {money(tot_equity)}</span>')
+    if any(r.get("bot") in SCANNERS for r in live):
+        paper_spans += (f'<span>Scanner paper <b class="{cls(scan_pnl)}">'
+                        f'{money(scan_pnl)}</b></span>')
+    if any(r.get("bot") in STOCKS for r in live):
+        paper_spans += (f'<span>Stocks (paper) <b class="{cls(stock_pnl)}">'
+                        f'{money(stock_pnl)}</b> · eq {money(stock_equity)}</span>')
 
     # [2026-07-13 INTERACTIVE MANAGE] Hide/unhide/delete panel. Hide = persisted
     # in bot_state (reversible, survives redeploys, respected by the grid, the
@@ -2689,11 +2717,9 @@ async function botAdmin(action, bot){
  <h1>All Bots — live P&amp;L &nbsp;·&nbsp; <a href="/history" style="color:#58a6ff;font-size:14px">history →</a> &nbsp;·&nbsp; <a href="/periods" style="color:#58a6ff;font-size:14px">P&amp;L by day/week/month →</a> &nbsp;·&nbsp; <a href="/market" style="color:#58a6ff;font-size:14px">market regime →</a> &nbsp;·&nbsp; <a href="/learning" style="color:#58a6ff;font-size:14px">learning →</a> &nbsp;·&nbsp; <a href="/vitals" style="color:#58a6ff;font-size:14px">health →</a></h1>
  <div class="totals">
    <span>Bots live <b>{online}</b></span>
-   <span style="border-right:1px solid #30363d;padding-right:18px">GRAND TOTAL <b>{money(grand_equity)}</b> eq · <b class="{cls(grand_pnl)}">{money(grand_pnl)}</b> P&amp;L</span>
+   <span style="border-right:1px solid #30363d;padding-right:18px">TOTAL eq real <b>{money(live_equity)}</b> · modelled {money(grand_equity - live_equity)} &nbsp;—&nbsp; P&amp;L real <b class="{cls(live_pnl)}">{money(live_pnl)}</b> · modelled <span class="{cls(modelled_pnl)}">{money(modelled_pnl)}</span></span>
    {live_total_line}
-   <span>Crypto (paper) <b class="{cls(tot_pnl)}">{money(tot_pnl)}</b> · eq {money(tot_equity)}</span>
-   <span>Scanner paper <b class="{cls(scan_pnl)}">{money(scan_pnl)}</b></span>
-   <span>Stocks (paper) <b class="{cls(stock_pnl)}">{money(stock_pnl)}</b> · eq {money(stock_equity)}</span>
+   {paper_spans}
    <span>Trades <b>{n_closed} closed · {n_open} open</b></span>
    {pulse_strip}
  </div>
@@ -3104,6 +3130,11 @@ ORGAN_SPECS = [
     # [2026-07-23] edge radar — per-book significance/both-halves/median/ETA.
     # Publish-only, 30-min loop; a fresh row attests the fleet_radar organ ran.
     ("fleet-radar",        "📡 Edge radar — book verdicts + ETA",     False, 5400),
+    # [2026-08-04 (iy)] allocation organ — I16's instrument (claims table +
+    # evidence-weighted split). Publishes on the radar's 30-min loop; it was
+    # publishing healthily with NO surface serving it and NO roster entry, so
+    # it could go dark unseen — both halves of the (hw)/I13 class at once.
+    ("fleet-allocation",   "💰 Allocation — capital vs measured claims", False, 5400),
     # [2026-07-30] go-live grader — the (fk) bar, now an organ on a 6-hourly
     # loop. Staleness matters here for a specific reason: this is the ONLY
     # published view of how close a book is to holding real money, so a dark
@@ -3453,6 +3484,14 @@ def fetch_tick():
 #  * A 1-second "updated Ns ago" ticker makes liveness visible between morphs.
 LIVE_POLL_MS = int(os.environ.get("DASH_LIVE_POLL_MS", "5000"))
 LIVE_FALLBACK_MS = int(os.environ.get("DASH_LIVE_FALLBACK_MS", "60000"))
+# [2026-08-04 (iy)] Minimum interval between full-page refetches. /tick.json's
+# `v` is MAX(updated_at) over bot_pnl AND bot_state, and with 22 bots + ~30
+# organs publishing, `v` moves every ~13-19s (measured) — so the "only when
+# data changes" morph was in practice a full 584 KB refetch 3-6x/min per open
+# tab. The tick poll stays cheap and fast (heartbeat honesty); the EXPENSIVE
+# refetch is throttled to this floor. 30s matches the old blanket meta-refresh
+# the station replaced, so liveness is not worse than the design it improved.
+LIVE_MIN_MORPH_MS = int(os.environ.get("DASH_LIVE_MIN_MORPH_MS", "30000"))
 
 
 # [2026-07-18] Interactive charts, morph-safe. The live-station morph replaces
@@ -3524,8 +3563,8 @@ def live_js(container="station"):
     Both attach to document, so they survive content morphs. No dependencies."""
     return CHART_JS + f'''<script>
 (function(){{
-  var POLL={LIVE_POLL_MS}, FB={LIVE_FALLBACK_MS}, ID="{container}";
-  var last=null, lastOk=Date.now(), fails=0, busy=false;
+  var POLL={LIVE_POLL_MS}, FB={LIVE_FALLBACK_MS}, MM={LIVE_MIN_MORPH_MS}, ID="{container}";
+  var last=null, lastOk=Date.now(), lastMorph=0, fails=0, busy=false;
   var hb=document.getElementById("hb"), age=document.getElementById("hbage");
   function beat(state){{
     if(!hb) return;
@@ -3548,7 +3587,8 @@ def live_js(container="station"):
     try{{
       var r=await fetch("/tick.json",{{cache:"no-store"}});
       var j=await r.json(); fails=0; beat("live");
-      if(j.v===null||j.v!==last){{ last=j.v; await morph(); }}
+      if((j.v===null||j.v!==last)&&Date.now()-lastMorph>=MM){{
+        last=j.v; lastMorph=Date.now(); await morph(); }}
     }}catch(e){{
       fails++; beat(fails>2?"off":"stale");
       // fail-safe: a persistently blind poller must not leave a frozen page
@@ -4716,6 +4756,30 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
 
+    def _send_ok(self, body, ctype):
+        """[2026-08-04 (iy)] One 200 send path with gzip. Measured before this:
+        /bus.json was 8.2 MB and the main page 584 KB, both served UNCOMPRESSED
+        even to clients offering gzip — and the live station refetches the full
+        page every ~10-20s per open tab, so the waste compounds into MB/min of
+        phone data. Compress only when the client asks and it actually pays;
+        no-cache semantics unchanged."""
+        enc = None
+        if "gzip" in (self.headers.get("Accept-Encoding") or "").lower() \
+                and len(body) > 1024:
+            import gzip as _gz
+            gz = _gz.compress(body, 6)
+            if len(gz) < len(body):
+                body, enc = gz, "gzip"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self._no_cache()
+        if enc:
+            self.send_header("Content-Encoding", enc)
+            self.send_header("Vary", "Accept-Encoding")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         if self.path.startswith("/health"):
             self.send_response(200); self._no_cache(); self.end_headers(); self.wfile.write(b"ok"); return
@@ -4791,10 +4855,15 @@ class H(BaseHTTPRequestHandler):
             # these were unreachable off-Railway; this endpoint is the fix so
             # the Jul-21 review reads evidence directly. Read-only, no auth —
             # no secrets inside (same contract as /pulse.json).
-            # Query params: ?hours=<lookback for history, default 24, max 200>
+            # Query params: ?hours=<lookback for history, default 24, max 200;
+            # 0 = live keys only, no history>. [2026-08-04 (iy)] hours=0 added:
+            # the old clamp floored at 1.0, so history could not be turned OFF
+            # and every consumer of the live keys paid ~8 MB (97% of the
+            # payload is history; lighter-market alone ~4.7 MB). The default
+            # stays 24 — existing history consumers see no change.
             q = parse_qs(urlparse(self.path).query)
             try:
-                hours = min(max(float(q.get("hours", ["24"])[0]), 1.0), 200.0)
+                hours = min(max(float(q.get("hours", ["24"])[0]), 0.0), 200.0)
             except (ValueError, TypeError):
                 hours = 24.0
             try:
@@ -4851,6 +4920,11 @@ class H(BaseHTTPRequestHandler):
                             # readable from a review seat with no Railway
                             # login — it is the bar that governs real money.
                             "'golive-readiness', "
+                            # [2026-08-04 (iy)] the allocation organ was
+                            # publishing healthy 30-min payloads that NO
+                            # review surface served — the (hw) wrong-surface
+                            # class. Its claims table is I16's instrument.
+                            "'fleet-allocation', "
                             "'fleet-respiration', 'fleet-clock', "
                             "'fleet-regen', 'brain-vitals')")
                         live = {}
@@ -4861,7 +4935,7 @@ class H(BaseHTTPRequestHandler):
                         cur.execute(
                             "SELECT to_regclass('public.bot_state_history') AS t")
                         hist = []
-                        if cur.fetchone()[0] is not None:
+                        if hours > 0 and cur.fetchone()[0] is not None:
                             cur.execute(
                                 "SELECT key, ts, payload FROM bot_state_history "
                                 "WHERE key IN ('fleet-risk', 'signal-bus', "
@@ -4908,6 +4982,7 @@ class H(BaseHTTPRequestHandler):
                                    "strategy_incubator": live.get("strategy-incubator"),
                                    "fleet_radar": live.get("fleet-radar"),
                                    "golive_readiness": live.get("golive-readiness"),
+                                   "fleet_allocation": live.get("fleet-allocation"),
                                    "fleet_respiration": live.get("fleet-respiration"),
                                    "fleet_clock": live.get("fleet-clock"),
                                    "fleet_regen": live.get("fleet-regen"),
@@ -4916,9 +4991,9 @@ class H(BaseHTTPRequestHandler):
                                    "history": hist}, default=str).encode()
             except Exception as e:
                 body = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode()
-            self.send_response(200); self._no_cache()
-            self.send_header("Content-Type", "application/json")
-            self.end_headers(); self.wfile.write(body)
+            # [2026-08-04 (iy)] gzip-capable send: this is the fleet's heaviest
+            # endpoint (8.2 MB measured uncompressed at the 24h default).
+            self._send_ok(body, "application/json")
             return
         if self.path.startswith("/disloc.json"):
             # [2026-07-14] Snap Back's dislocation CENSUS — the evidence the
@@ -5158,11 +5233,9 @@ class H(BaseHTTPRequestHandler):
                 body = render().encode()
         except Exception as e:
             body = f"<pre>dashboard error: {html.escape(str(e))}</pre>".encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self._no_cache()
-        self.end_headers()
-        self.wfile.write(body)
+        # [2026-08-04 (iy)] gzip-capable send: the live station refetches this
+        # full page (584 KB measured) every ~10-20s per open tab.
+        self._send_ok(body, "text/html; charset=utf-8")
 
     def do_POST(self):
         # [2026-07-13 INTERACTIVE MANAGE] hide / unhide / delete a bot row from
