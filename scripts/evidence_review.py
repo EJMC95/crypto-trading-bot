@@ -551,7 +551,12 @@ def scan_new_evidence(cur, errors):
             # take the whole section down with it, whereas `era_rows` fails
             # CLOSED per row — an unreadable open stamp drops that trade rather
             # than the report.
-            cur.execute(f"""SELECT pnl_pct, pnl_abs, {CA}, opened_at
+            # [(jf)] `extra` rides at [4] for the same (hq) reason the open
+            # stamp rides at [3]: `era_rows` now derives the LATEST policy
+            # boundary from the close's own extra.policy stamp, and a review
+            # that selects everything BUT the stamp would grade a different
+            # sample than the grader — the exact divergence (hq) closed.
+            cur.execute(f"""SELECT pnl_pct, pnl_abs, {CA}, opened_at, extra
                               FROM paper_trades
                              WHERE bot=%s AND pnl_abs IS NOT NULL AND closed_at IS NOT NULL
                              ORDER BY {CA}""", (bot,))

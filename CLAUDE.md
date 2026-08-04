@@ -1320,6 +1320,18 @@ All new bots:
   bracket is being tuned cannot accumulate a single-policy sample: 137 shadow
   closes produced ZERO gradeable ones because the scout tuner moved the bracket
   ~20 times in a fortnight. If a book needs grading, FREEZE ITS BARS FIRST.
+  **[4-Aug (jf)] THE CLOCK IS MECHANICAL NOW**: `golive_readiness.era_rows`
+  derives the boundary from the ledger's own `extra.policy` stamps
+  (`stamped_policy_boundary` — latest same-policy run, keyed on the OPEN,
+  fail-closed on unreadable stamps, `max()` with the declared `POLICY_ERA`).
+  Measured: the live taker's era begins 30-Jul 11:05:43Z (11 of 38 closes),
+  so ~29-Aug is now computed, not hand-waved. The signature is venue/bull/
+  lenses/sides ONLY — capacity/supply levers (`max_open`, `ticket_top_n`) are
+  (hc) ordinary tuning and deliberately do not reset it. The (ij) veto rewrite
+  was RULED not a reset (the stamp reads the hard gates, "deliberately NOT the
+  brain's veto"; the run continues unbroken through the 2-Aug deploy) — the
+  competing reading and its one-line implementation are recorded in the (jf)
+  entry and in the POLICY_ERA block.
 - **THE GO-LIVE DRAWDOWN BAR READS REALISED P&L ONLY — IT CANNOT SEE AN OPEN
   DRAWDOWN (30-Jul (hl)).** `golive_readiness.stats()` accumulates closed
   trades, so for a book that HOLDS most of the time most of its drawdown is
