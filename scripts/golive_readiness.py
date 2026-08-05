@@ -1334,6 +1334,26 @@ def main():
     except Exception:      # noqa: BLE001
         retired = set()
     rows = store.fetch_paper_trades(limit=20000) or []
+    # [2026-08-05 (kd)] FAIL CLOSED ON A DEAD LEDGER READ. An empty fetch used
+    # to fall straight through to the table and print a confident
+    # "READY: none" over ZERO rows — indistinguishable from a real verdict, in
+    # the rule that governs real money. Observed for real this session: the
+    # Postgres password rotated mid-run ((kb)), `fetch_paper_trades` returned []
+    # behind its own never-raise guard, and the grader reported a clean
+    # negative. The daily review's own notes warn about this for an UNSET url;
+    # it fires identically on an AUTH FAILURE, which the note did not cover.
+    #
+    # An empty ledger is never a legitimate state for this fleet (24 books,
+    # ~1,700 retained closes), so there is no good-news case to protect —
+    # unlike the audits, whose empty-input case is real. Exit 2, distinct from
+    # the 1 a real failing grade uses, so a caller can tell "could not read"
+    # from "nothing qualifies".
+    if not rows:
+        print("DEGRADED — no ledger rows read (DATABASE_URL unset, "
+              "unreachable, or auth failed). NO VERDICT IS PUBLISHED: a "
+              "clean-looking 'READY: none' over zero rows is the one output "
+              "this grader must never produce.", file=sys.stderr)
+        return 2
     books = {}
     for r in rows:
         bot = str(r.get("bot"))
@@ -1591,4 +1611,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # [(kd)] `main()` was called bare, so its return value was DISCARDED and the
+    # process exited 0 whatever happened. The (kd) degraded-read guard returned
+    # 2 and the shell saw 0 — a guard that cannot fire, which is the class this
+    # repo keeps re-learning. `or 0` because a normal run returns None.
+    sys.exit(main() or 0)
