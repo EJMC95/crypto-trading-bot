@@ -135,9 +135,15 @@ def test_farmer_liquidity_floor_is_now_reachable_by_the_judge():
     # Finding: MIN_VOL=$10M excluded 5 of the venue's 8 most extreme funding
     # books. The floor must be explorable on the shadow twin and promotable
     # only by the judge — never an env flip on the live arm.
+    # [2026-08-05 (ka)] lo 2e6 -> 1e5 on BOTH cages, operator-signed ("if it
+    # produces better numbers then proceed") against the thin-tier replay
+    # (STUDY_THIN_TIER_MIN_VOL_2026-08-05: band01 alone +$14.83/30d, both
+    # halves positive, robust at p90). Both los move together by mechanism:
+    # a static candidate must clamp clean in BOTH cages, so an xp-only
+    # floor is unexercisable — the judge selftest mutation-pins that.
     for name in ("xp.funding.min_vol", "live.funding.min_vol"):
         spec = fleet_tuning.LEVERS[name]
-        assert spec["lo"] == 2e6 and spec["hi"] == 20e6
+        assert spec["lo"] == 1e5 and spec["hi"] == 20e6
     assert fleet_tuning._author_may_write(
         "live.funding.min_vol", "lighter-live", "experiment-judge")
     assert not fleet_tuning._author_may_write(

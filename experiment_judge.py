@@ -185,6 +185,34 @@ CANDIDATES = [
     # item 2. A verdict on this candidate is a verdict on the $1-10M
     # tier only, not on the extreme-book thesis.
     {"name": "min-vol-2e6",     "levers": {"xp.funding.min_vol": 2e6}},
+    # [2026-08-05 (ka)] min-vol-1e5 — the thin-tier follow-through, filed
+    # the day the operator signed both cage floors down ('if it produces
+    # better numbers then proceed'). THE NUMBERS, from the calibrated
+    # backtest_funding_lighter.run() over 30d of the venue's own tape, each
+    # tier priced at ITS OWN measured friction ((js) fill study;
+    # STUDY_THIN_TIER_MIN_VOL_2026-08-05):
+    #   * the [0.1M,2M) band ALONE (74 books) at tier-median 5.12bps/fill,
+    #     shipped gate 0.05: +$14.83, n=158, win 65.8%, BOTH halves
+    #     positive (+7.68/+10.29), maxDD -7.97 — vs the incumbent >=10M
+    #     universe's +$4.01 on the same window at ITS 0.27bps median.
+    #   * robust at the tier's p90 (14.77bps): +$7.20. At gate 0.12 the
+    #     churn doubles and p90 flips negative (-$6.89) — 0.05 is the
+    #     better in-tier gate; the higher expressible gate is NOT filed.
+    #   * fail-closed combined read (every book charged 5.12): +$0.20 vs
+    #     incumbent +$4.01 — flat, not materially worse; the harness fills
+    #     slots in volume order while the real bot RANKS by |apr|, so the
+    #     truth sits between the combined and band-alone cells.
+    # WHY FOURTH (prior ordering per (ju)): its prior is an own-tape
+    # replay with both halves positive — stronger than enter-gate-0.105's
+    # negative tape prior below, weaker than nothing above it; min-vol-2e6
+    # keeps its filed slot (its subset verdict ~11-Sep de-risks this one's
+    # read). Honesty gates ride along: 30d, one regime, $25 clips
+    # (larger-clip scaling in thin books UNMEASURED), iteration-order slot
+    # model, and the band's two four-digit-APR outliers (SKR/CXMT — CXMT
+    # is the quarantined-manipulation symbol) are inside these numbers;
+    # the arm's own SCAN_MAX_SLIP_BPS/MAX_SPREAD_BPS vetoes stay senior
+    # per-book at runtime, which the harness does not model.
+    {"name": "min-vol-1e5",     "levers": {"xp.funding.min_vol": 1e5}},
     # [2026-08-05 (ju)] enter-gate-0.105 — the measured-friction study
     # (STUDY_MEASURED_FRICTION_2026-08-05 §3b, entry (js)) filed through
     # THIS channel.
@@ -1854,8 +1882,12 @@ def _selftest():
     # [2026-08-05 (jy)] min-vol-2e6 takes the (ju)-reserved slot between
     # them: unrefuted friction-tier prior outranks the negative tape prior,
     # and must never outrank the two rows (ju) pinned above it.
-    assert names[:4] == ["slope-gate-off", "tp-0.06", "min-vol-2e6",
-                         "enter-gate-0.105"], names
+    # [2026-08-05 (ka)] min-vol-1e5 sits between min-vol-2e6 and the
+    # negative-prior enter-gate row: its prior is an own-tape replay with
+    # both halves positive (see its CANDIDATES block) — reordering any of
+    # the five reddens here.
+    assert names[:5] == ["slope-gate-off", "tp-0.06", "min-vol-2e6",
+                         "min-vol-1e5", "enter-gate-0.105"], names
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -1870,7 +1902,7 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["slope-gate-off", "tp-0.06", "min-vol-2e6",
+    assert n2 == ["slope-gate-off", "tp-0.06", "min-vol-2e6", "min-vol-1e5",
                   "enter-gate-0.105", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
@@ -1971,9 +2003,12 @@ def _selftest():
                           None)["name"] == "min-vol-2e6"
     assert next_candidate(pool, ["slope-gate-off", "tp-0.06",
                                  "min-vol-2e6"],
-                          None)["name"] == "enter-gate-0.105"
+                          None)["name"] == "min-vol-1e5"
     assert next_candidate(pool, ["slope-gate-off", "tp-0.06",
-                                 "min-vol-2e6", "enter-gate-0.105"],
+                                 "min-vol-2e6", "min-vol-1e5"],
+                          None)["name"] == "enter-gate-0.105"
+    assert next_candidate(pool, ["slope-gate-off", "tp-0.06", "min-vol-2e6",
+                                 "min-vol-1e5", "enter-gate-0.105"],
                           None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 

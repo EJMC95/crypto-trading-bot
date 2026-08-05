@@ -83,34 +83,21 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   Verify: row caps read k=5, universe_n=30 after the push.
 - **📊 Index Rider** — nothing to decide until the ~28-Aug zero-closes read;
   its MTM series now actually grades (post-(iz)/(ja)) from ~6-Aug.
-- **💸 Farmer — the `min_vol` CAGE floor vs the five extreme books (NEW
-  5-Aug (jy)).** The judge's `min-vol-2e6` candidate (filed (jy), slot
-  ~4-Sep) can only test the $1–10M tier: the cage `[2e6, 20e6]` floor sits
-  ABOVE all five extreme books that MOTIVATED the lever ((fz): H100/XLM/
-  SKR/XPD/TRUMP — re-measured 5-Aug at $0.11–0.35M, the <$1M tier). No
-  candidate value can reach them; a cage change on a live-promotable lever
-  is operator-signed by precedent (the 30-Jul A1 widening).
-  - **A ★ — keep the cage; let `min-vol-2e6` rule first.** Its verdict
-    (eval ~11-Sep) is the first FORWARD evidence on lowering the floor at
-    all; decide the sub-$1M question with that in hand. Why waiting is
-    cheap: the <$1M tier's measured friction is 5.12bps/fill median but
-    **p90 14.77 / max 59.88** (the fleet's worst measured fill lives in
-    this tier), and the five books' extreme APRs are a 30-Jul snapshot —
-    transience unmeasured. The thesis keeps: at those snapshot APRs
-    (41–99%) the tier's ~10.2bps median round trip pays in 9–22h, so it
-    is unpriced at the tail, not refuted.
-  - **B — sign a SHADOW-only widening now**: `xp.funding.min_vol` lo
-    2e6 → 0.1e6, live cage UNCHANGED. The twin could explore sub-$1M
-    books for evidence; note promotion writes the SAME value to the live
-    twin, so nothing below 2e6 could ever PROMOTE without a later live
-    signature — evidence-only by construction.
-  - **C — sign BOTH cages down.** Fastest, and it extends the judge's
-    promotable range into the venue's worst-friction tier before any
-    forward evidence exists. Not recommended ahead of A's verdict.
-  Prepared act for B/C: edit `fleet_tuning.py`
-  `LEVERS["xp.funding.min_vol"]["lo"]` (+ the live twin for C), record the
-  signature in the lever note per the A1 precedent, `audit_lever_bounds`
-  green before push.
+- **💸 Farmer `min_vol` cage floor — DECIDED-SIGNED-MEASURED 5-Aug (ka)
+  (operator conditional: "if it produces better numbers then proceed!").**
+  The condition was tested BEFORE shipping: the calibrated Farmer replay
+  over 30d of the venue's own tape, each tier at its own (js) friction —
+  the [0.1M,2M) band ALONE reads **+$14.83 (both halves positive, maxDD
+  −7.97) vs the incumbent's +$4.01**, robust at the tier's p90 (+$7.20).
+  Rule pre-registered, passed → shipped: **both cage los 2e6 → 1e5**
+  (option B alone turned out structurally inert — the judge's both-cage
+  clamp invariant means an xp-only floor can never be exercised;
+  mutation-pinned now), signatures in both registry notes, and
+  **`min-vol-1e5` filed FOURTH** (above the negative-prior enter-gate,
+  below the filed `min-vol-2e6`, whose ~11-Sep subset verdict de-risks the
+  wider read — measured here the $2–10M band is the WEAK half). Real money
+  unchanged: the paired bar (judge sole writer) + fade-watch remain the
+  only door. Full table: `STUDY_THIN_TIER_MIN_VOL_2026-08-05.md`.
 
 ## 3 · Infrastructure
 

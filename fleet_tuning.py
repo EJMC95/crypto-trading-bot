@@ -306,11 +306,23 @@ LEVERS = {
     # better instrument. Doctrine path: the shadow twin explores, the judge
     # alone promotes. Env defaults untouched by this registration.
     "xp.funding.min_vol": {
-        "kind": "float", "lo": 2e6, "hi": 20e6, "lane": "lighter-xp",
-        "note": "shadow twin's 24h $ turnover floor; env default 10e6", "env_default": 10000000.0},
+        "kind": "float", "lo": 1e5, "hi": 20e6, "lane": "lighter-xp",
+        "note": "shadow twin's 24h $ turnover floor; env default 10e6. "
+                "[5-Aug (ka)] lo 2e6->1e5 OPERATOR-SIGNED ('if it produces "
+                "better numbers then proceed') on the thin-tier replay: the "
+                "[0.1M,2M) band ALONE, at its tier-median 5.12bps/fill, "
+                "shipped gate 0.05, reads +$14.83/30d, both halves positive, "
+                "+$7.20 at p90 14.77 (STUDY_THIN_TIER_MIN_VOL_2026-08-05)",
+        "env_default": 10000000.0},
     "live.funding.min_vol": {
-        "kind": "float", "lo": 2e6, "hi": 20e6, "lane": "lighter-live",
-        "note": "PROMOTED turnover floor; env default 10e6", "env_default": 10000000.0},
+        "kind": "float", "lo": 1e5, "hi": 20e6, "lane": "lighter-live",
+        "note": "PROMOTED turnover floor; env default 10e6. [5-Aug (ka)] lo "
+                "2e6->1e5 with the xp twin, same signature — the judge's "
+                "both-cage clamp invariant makes an xp-only floor "
+                "unexercisable (a static must clamp clean in BOTH cages), "
+                "and the real-money gate was never this cage: it is the "
+                "paired bar (judge sole writer) + fade-watch, unchanged",
+        "env_default": 10000000.0},
     # ---------------------------------------------------------------------
     # [2026-07-30 THE SHADOW BOOKS GET LEVERS — operator: "every bot needs
     # every tool at its disposal and every bot needs the ability to grow"]
