@@ -43,11 +43,12 @@
   a menu choice the queue reserves for your explicit "do S1"; all Railway
   service acts remain yours (the queue's own boundary).
 
-## 2026-08-05 (jo) — THE ORGAN TIER OF THE SEED CLASS: five organs stop trusting a failed read, and the frontier is measured rather than assumed
+## 2026-08-05 (jq) — THE ORGAN TIER OF THE SEED CLASS: five organs stop trusting a failed read, and the frontier is measured rather than assumed
 
-- *(Letter moved from (jn) at push time — a concurrent session claimed (jn) on
-  origin/main for the slippage-distribution work mid-pass;
-  `audit_changelog_letters` caught the collision pre-push, exactly as built.)*
+- *(Letter moved TWICE at push time — (jn) then (jo) were each claimed on
+  origin/main by concurrent sessions mid-pass (slippage distribution; loss
+  decomposition); `audit_changelog_letters` caught both collisions pre-push,
+  exactly as built. Sits above (jp) in the file; sequence is claim order.)*
 - **(jd) closed the BOOK tier; this closes the tracked ORGAN tier — and
   measures what remains.** The five organs the 17-Jul memory table left open
   all ran `load_state(KEY) or {}` at cycle top and `save_state(KEY, ...)` at
