@@ -699,8 +699,14 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   safe-haven flip, ETF Jan-24, yen-carry Aug-24, tariffs Apr-25) → then
   GRADES its own anticipations at 4h/24h/72h against sector indices
   chained from the scout's marks, and the playbook confidence LEARNS
-  (EB blend; a wrong playbook decays toward zero bias — direction never
-  auto-flips without review). ~~ADVISORY: zero consumers~~ **[22-Jul: THE
+  (EB blend **on measured EDGE since 5-Aug (jv)** — the record is scored
+  against a COIN FLIP, so an at-or-below-0.5 playbook is silenced by its
+  own grades instead of keeping `hit_rate` worth of its fear forever;
+  priors keep their modest soft-weight role at n=0; direction never
+  auto-flips without review. Measured basis: crackdown 0.19/n=85, shock
+  0.24/n=83, incident 0.34/n=87 were pressing every sector bias negative
+  while easing sat earned at 0.95/n=21 — the risk-on proposal path was
+  unreachable by construction, (ji)). ~~ADVISORY: zero consumers~~ **[22-Jul: THE
   "ZERO CONSUMERS" CLAIM IS STALE — but it steers a SHADOW book, NOT real
   money.** `fleet-tuning` carries `taker.momo_chg=6.0` and `taker.brk_range=0.97`
   on the `lighter-taker` lane, both stamped

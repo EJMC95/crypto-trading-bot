@@ -293,10 +293,29 @@ def fetch_gdelt_headlines():
 
 def blended_bias(etype, sector, sev, observed):
     """(bias, confidence) for one (event_type, sector). Prior direction and
-    confidence come from the playbook; confidence is blended with this
-    fleet's own graded episodes at the 24h horizon (PRIOR_EPISODES
-    pseudo-count). A playbook that keeps being wrong decays toward 0 bias
-    — direction never auto-flips (that needs an operator/review)."""
+    prior WEIGHT come from the playbook; the graded record then pulls the
+    weight toward the playbook's measured EDGE — its hit record scored
+    against a coin flip, floored at zero — because the informative zero of
+    a directional call is 0.5, not 0.
+
+    [2026-08-05 (jv)] The EB posterior of hit rate WAS the weight, and that
+    is I15's non-sequitur inside this organ: a playbook measured
+    ANTI-predictive kept `hit_rate` worth of its full fear forever — on the
+    day this shipped, the three highest-n playbooks were crackdown 0.19
+    (n=85), geopolitical shock 0.24 (n=83), exchange incident 0.34 (n=87),
+    and summed bias could ~never reach the +0.3 risk-on bar ((ji): bias
+    ≥ +0.5 in 0.0% of 2,399 samples) — the organ's EXPAND half was
+    unreachable by construction, its restrict half pressed permanently.
+    Now: at n=0 the prior applies UNCHANGED (priors are deliberately modest
+    soft weights, not probability claims — re-scoring them against 0.5
+    would mute the taxonomy at birth); as n grows the weight converges to
+    max(0, 2·hit/n − 1), so an at-or-below-coin-flip playbook is SILENCED
+    by its own record while an accurate one (easing: 0.95 over n=21 today)
+    keeps its measured edge. Direction still never auto-flips (that needs
+    an operator/review — the record saying a fear playbook is BACKWARDS on
+    this tape is surfaced by its grade, not traded in reverse). Returned
+    `confidence` is unchanged: the EB posterior hit estimate, published on
+    the grades card."""
     pb = EVENT_TYPES[etype]["playbook"]
     row = pb.get(sector) or pb.get("all")
     if not row:
@@ -305,7 +324,11 @@ def blended_bias(etype, sector, sev, observed):
     o = (observed or {}).get(f"{etype}|{sector}|24") or {}
     n, hit = float(o.get("n") or 0), float(o.get("hit") or 0)
     conf = (prior_conf * PRIOR_EPISODES + hit) / (PRIOR_EPISODES + n)
-    return round(direction * sev * conf, 3), round(conf, 3)
+    # max(0, 2·hit − n) is the record's votes ABOVE a coin flip: the edge
+    # analogue of `hit` in the conf line, same pseudo-count blend.
+    weight = (prior_conf * PRIOR_EPISODES + max(0.0, 2.0 * hit - n)) \
+        / (PRIOR_EPISODES + n)
+    return round(direction * sev * weight, 3), round(conf, 3)
 
 
 # ---------------------------------------------------------------------------
@@ -741,6 +764,30 @@ def _selftest():
     b_naive, c_naive = blended_bias("stablecoin_stress", "all", 0.8, {})
     b_learn, c_learn = blended_bias("stablecoin_stress", "all", 0.8, missed)
     assert abs(b_learn) < abs(b_naive) and c_learn < c_naive
+    # [2026-08-05 (jv)] the informative zero of a directional call is a coin
+    # flip. Four arms, each one mutation-killable:
+    # (1) a record-REFUTED playbook is ~silenced (weight -> prior*PE/(PE+n),
+    #     not hit_rate) — reverting the weight to `conf` reddens this;
+    refuted = {"regulation_crackdown|all|24": {"n": 30, "hit": 6, "sum_mv": -1.0}}
+    b_ref, _ = blended_bias("regulation_crackdown", "all", 0.9, refuted)
+    b_pri, _ = blended_bias("regulation_crackdown", "all", 0.9, {})
+    assert abs(b_ref) <= abs(b_pri) * 0.2, (b_ref, b_pri)
+    # (2) the sign NEVER flips against the playbook, whatever the record
+    #     says — dropping the max(0, ·) floor reddens this;
+    assert b_ref * -1 >= 0 and b_pri * -1 >= 0, (b_ref, b_pri)
+    # (3) a COIN-FLIP record earns ~nothing (hit=n/2 must not keep half the
+    #     fear the way hit-rate weighting did);
+    coin = {"regulation_crackdown|all|24": {"n": 40, "hit": 20, "sum_mv": 0.0}}
+    b_coin, _ = blended_bias("regulation_crackdown", "all", 0.9, coin)
+    assert abs(b_coin) <= abs(b_pri) * 0.15, (b_coin, b_pri)
+    # (4) an ACCURATE playbook keeps (and grows) its voice — applying the
+    #     edge map to the PRIOR too would mute it at birth and redden the
+    #     banking_stress prior asserts above as well.
+    earned = {"monetary_easing|all|24": {"n": 20, "hit": 19, "sum_mv": 2.0}}
+    b_earn, c_earn = blended_bias("monetary_easing", "all", 0.8, earned)
+    b_earn_pri, _ = blended_bias("monetary_easing", "all", 0.8, {})
+    assert b_earn > b_earn_pri > 0, (b_earn, b_earn_pri)
+    assert c_earn > 0.8, c_earn      # conf still the posterior hit estimate
     # sector index chaining: only symbol intersections move the index
     i1 = sector_index_step({"BTC": 100.0, "ETH": 50.0}, {"BTC": 110.0, "ETH": 55.0}, {})
     assert round(i1["majors"], 2) == 110.0
