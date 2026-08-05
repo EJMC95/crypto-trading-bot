@@ -470,6 +470,12 @@ def apply_levers(mode):
     _ACTIVE_BARS.clear()
     _ACTIVE_BARS.update({"enter_apr": ENTER_APR, "take_profit": TAKE_PROFIT,
                          "max_hold_h": MAX_HOLD_H, "explore_k": SCAN_EXPLORE_K,
+                         # [2026-08-05 (jy)] min_vol receipt — the lever was
+                         # consumed here since (ge) with NO receipt, so a
+                         # min_vol judge candidate would accrue ZERO closes
+                         # (ran_candidate reads bars.min_vol; a missing
+                         # receipt is disproof by design)
+                         "min_vol": MIN_VOL,
                          # numeric receipt for the slope-gate-off candidate
                          # (ran_candidate float-compares bars.slope_gate)
                          "slope_gate": 1 if SLOPE_GATE else 0,
@@ -684,6 +690,11 @@ def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None):
             "bars": {"enter_apr": ENTER_APR,
                      "take_profit": TAKE_PROFIT,
                      "max_hold_h": MAX_HOLD_H,
+                     # [2026-08-05 (jy)] min_vol is an ENTRY-phase gate like
+                     # enter_apr: the honest receipt is the floor in force
+                     # when the book was ADMITTED, surviving a lever that
+                     # expires mid-hold (the (ed) rule)
+                     "min_vol": MIN_VOL,
                      "slope_gate": 1 if SLOPE_GATE else 0,
                      "explore_k": SCAN_EXPLORE_K,
                      "conviction_hi": (CONVICTION_HI
@@ -3580,6 +3591,33 @@ def _selftest_lever_consume():
         M.tuning = _FakeT({"xp.funding.slope_gate": 0})   # no leak onto paper arm
         M.apply_levers("hl_paper")
         assert M.SLOPE_GATE is True, "no-prefix arm must ignore xp levers"
+        # 6) [2026-08-05 (jy)] min_vol RECEIPTS — the lever was consumed
+        #    since (ge) with no receipt, the exact enter-gate-0.30@0.075
+        #    zero-accrual shape. Pins: no lever -> env default receipted;
+        #    a lever moves BOTH the running floor and the receipt, at close
+        #    time (_ACTIVE_BARS) AND entry time (entry_stamp — a mid-hold
+        #    expiry must not rewrite the admission floor); expiry reverts.
+        M.tuning = _FakeT({})
+        M.apply_levers("lighter_shadow")
+        assert M.MIN_VOL == M._ENV_BARS["min_vol"] \
+            and M._ACTIVE_BARS["min_vol"] == M._ENV_BARS["min_vol"], \
+            "no lever -> env-default floor, receipt says so"
+        M.tuning = _FakeT({"xp.funding.min_vol": 2e6})
+        moved = M.apply_levers("lighter_shadow")
+        assert M.MIN_VOL == 2e6 and M._ACTIVE_BARS["min_vol"] == 2e6, \
+            "the receipt must stamp the RUNNING floor (ran_candidate reads it)"
+        assert "xp.funding.min_vol" in moved, moved
+        _es = M.entry_stamp(True, 1.0, 0.0, 10.0, "exploit")
+        assert _es["bars"]["min_vol"] == 2e6, \
+            ("entry_stamp must receipt the admission floor at ENTRY", _es)
+        M.tuning = _FakeT({})
+        M.apply_levers("lighter_shadow")
+        assert M.MIN_VOL == M._ENV_BARS["min_vol"], \
+            "expiry must revert the floor to the env default"
+        M.tuning = _FakeT({"xp.funding.min_vol": 2e6})    # no leak onto paper arm
+        M.apply_levers("hl_paper")
+        assert M.MIN_VOL == M._ENV_BARS["min_vol"], \
+            "no-prefix arm must ignore xp levers"
     finally:
         M.tuning = real_tuning
         env, M.SCAN_EXPLORE_K, M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI = save
