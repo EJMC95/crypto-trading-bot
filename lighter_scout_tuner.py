@@ -780,7 +780,15 @@ def run_once():
     enacted = tuning.write_levers(levers, set_by="scout-tuner",
                                   ttl_sec=LEVER_TTL) if levers else None
 
-    prev = store.load_state(KEY) or {}
+    # [2026-08-05 SEED GUARD] the CHECKED read — `prev.enacted` is the change
+    # detector's baseline: a failed read that fell through as {} made EVERY
+    # standing lever look freshly enacted (a phantom change-push) and the save
+    # below overwrote the cycle memory. The levers themselves were already
+    # written above and are TTL-gated at the bus, so the degrade is narrow:
+    # keep the cycle's work, skip the save and the change-push (comparing
+    # against an unknown prior is noise). hasattr keeps stub stores working.
+    _ok_prev, prev = store.load_state_checked(KEY)
+    prev = prev or {}
     prev_set = prev.get("enacted") or {}
     now_set = {k: v["value"] for k, v in (enacted or {}).get("levers", {}).items()
                if v.get("set_by") == "scout-tuner"} if enacted else {}
@@ -793,17 +801,22 @@ def run_once():
                             for l, s in (baseline.get("lenses") or {}).items()},
         "enacted": now_set, "log": (log4 + log5 + log1 + log2 + log3)[:20],
     }
-    store.save_state(KEY, payload)
-    if hasattr(store, "save_history"):
-        try:
-            store.save_history(KEY, {"updated": payload["updated"],
-                                     "enacted": now_set,
-                                     "baseline_net": baseline["closed_net"]})
-        except Exception:
-            pass
+    if _ok_prev:
+        store.save_state(KEY, payload)
+        if hasattr(store, "save_history"):
+            try:
+                store.save_history(KEY, {"updated": payload["updated"],
+                                         "enacted": now_set,
+                                         "baseline_net": baseline["closed_net"]})
+            except Exception:
+                pass
+    else:
+        print("[scout-tuner] state read FAILED — cycle ran (enactments are "
+              "TTL-gated at the bus) but memory NOT overwritten; no "
+              "change-push against an unknown prior", flush=True)
     for line in payload["log"]:
         print(f"[scout-tuner] {line}")
-    if now_set != prev_set:
+    if _ok_prev and now_set != prev_set:
         delta = {k: v for k, v in now_set.items() if prev_set.get(k) != v}
         released = sorted(set(prev_set) - set(now_set))
         body = (f"enacted: {json.dumps(delta)}" if delta else "") + \

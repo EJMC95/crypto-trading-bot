@@ -152,7 +152,17 @@ def restore_payload(snap, baseline, key, now):
 
 def run_once():
     now = now_ts()
-    prior = store.load_state(KEY) or {}
+    # [2026-08-05 SEED GUARD] the CHECKED read — a failed read here wiped
+    # `last_push`, so the notify gap reset and a repair page could double-fire
+    # while the save below overwrote the durable memory. Standard organ
+    # degrade: skip the cycle (repairs wait one beat; the immune organ's sick
+    # flags persist).
+    _ok, _prior = store.load_state_checked(KEY)
+    if not _ok:
+        print("[fleet-regen] state read FAILED — skipping this cycle rather "
+              "than seed over the record", flush=True)
+        return None
+    prior = _prior or {}
     imm = store.load_state(immune.KEY) or {}
     # only act on organs the immune organ currently flags SICK (fresh check)
     sick_organs = {s.get("organ") for s in (imm.get("sick") or [])

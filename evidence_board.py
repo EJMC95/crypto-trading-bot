@@ -1343,7 +1343,17 @@ def send_push(title, body, priority="urgent", tags="scales"):
 
 def run_once():
     now = _now()
-    prior = store.load_state(BOARD_KEY) or {}
+    # [2026-08-05 SEED GUARD] the CHECKED read — a Postgres blip here looked
+    # like a first run: `notified` and `seen` empty, so every standing item
+    # re-notifies as "new" and the save at the end OVERWRITES the durable
+    # first-seen memory with the amnesia. Standard organ degrade: skip the
+    # cycle.
+    _ok, _prior = store.load_state_checked(BOARD_KEY)
+    if not _ok:
+        print("[evidence_board] state read FAILED — skipping this cycle "
+              "rather than seed empty notified/seen over the record", flush=True)
+        return None
+    prior = _prior or {}
     prior_items = {i["key"]: i for i in prior.get("items", [])}
     notified = dict(prior.get("notified") or {})
     # [2026-07-16] full first-seen memory. prior_items only holds the top-20

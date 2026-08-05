@@ -251,3 +251,85 @@ def test_retired_exemptions_are_still_retired():
             f"{fname} no longer looks retired but is exempted here: {why!r} — "
             f"move it into GUARDED_BOOKS and give it the checked read.")
         assert len(why) > 40, f"{fname} exemption needs a real reason"
+
+
+# ---------------------------------------------------------------------------
+# 4. The ORGAN tier — a key a file save_state()s must be read CHECKED, or a
+#    blip seeds an amnesiac payload over the organ's own durable memory.
+#    This is a RATCHET: a file added to GUARDED_ORGANS can never regress.
+# ---------------------------------------------------------------------------
+
+GUARDED_ORGANS = [
+    "evidence_board.py",       # notified/seen: re-notify storms on a wipe
+    "fleet_immune.py",         # notified/app_seen + the fleet-alerts RMW
+    "fleet_regen.py",          # last_push: a wipe double-fires repair pages
+    "lighter_scout_tuner.py",  # enacted baseline: phantom change-pushes
+    "strategy_incubator.py",   # proposed: the LIFETIME dedup ledger + xp-queue
+]
+
+# The 5-Aug AST census of the SAME shape not yet guarded (declared, not
+# silent): bot_learn, fleet_tuning, fleet_risk, fleet_clock, fleet_proposals,
+# fleet_respiration, market_context (incl. fleet-alerts + coin-vetoes),
+# market_pulse, regime_oracle, implementation_shortfall, lighter_market_scout,
+# experiment_judge (xp-queue-release-request only — its own KEY was fixed
+# 17-Jul), lighter_ticket_taker (STATE_KEY only — its live meta was fixed
+# 17-Jul), plus retired cross_exchange_arb/listing_sniper (idle). Each needs
+# its own degrade analysis before joining the list — growing this list
+# file-by-file is the intended path, silence about the frontier is not.
+
+
+def _module_str_consts(tree):
+    return {t.targets[0].id: t.value.value for t in tree.body
+            if isinstance(t, ast.Assign) and len(t.targets) == 1
+            and isinstance(t.targets[0], ast.Name)
+            and isinstance(t.value, ast.Constant)
+            and isinstance(t.value.value, str)}
+
+
+def _key_of(node, consts):
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return consts.get(node.id)
+    return None
+
+
+@pytest.mark.parametrize("fname", GUARDED_ORGANS)
+def test_guarded_organ_reads_its_own_save_keys_checked(fname):
+    tree = ast.parse(open(os.path.join(ROOT, fname)).read())
+    consts = _module_str_consts(tree)
+    saves, bad = set(), []
+    for n in ast.walk(tree):
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.args):
+            k = _key_of(n.args[0], consts)
+            if n.func.attr == "save_state" and k:
+                saves.add(k)
+    for n in ast.walk(tree):
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "load_state" and n.args):
+            k = _key_of(n.args[0], consts)
+            if k and k in saves:
+                bad.append((n.lineno, k))
+    assert not bad, (
+        f"{fname}:{bad} reads a key this file save_state()s through the "
+        f"UNCHECKED load_state — a blip seeds an amnesiac payload over the "
+        f"organ's durable memory. Use load_state_checked and skip the cycle "
+        f"(or the write) on ok=False.")
+    assert any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+               and n.func.attr == "load_state_checked" for n in ast.walk(tree)), (
+        f"{fname} has no checked read at all — if its self-state read was "
+        f"deleted, remove it from GUARDED_ORGANS with a reason.")
+
+
+def test_immune_skips_the_cycle_on_a_failed_read(monkeypatch):
+    """Behavioral, for the worst member: a failed KEY read must produce NO
+    payload and NO write — not a fresh `notified` that re-pages the fleet."""
+    import fleet_immune as fi
+    written = []
+    monkeypatch.setattr(fi.store, "load_state_checked",
+                        lambda k: (False, None), raising=False)
+    monkeypatch.setattr(fi.store, "save_state",
+                        lambda k, p: written.append(k) or True)
+    assert fi.run_once() is None
+    assert not written, "a skipped cycle must write NOTHING"

@@ -1,3 +1,96 @@
+## 2026-08-05 (jp) — QUEUE SWEEP: retired services lose their deploy rules, the Farmer/Taker arms join the MTM series, and the Tests workflow becomes ONE runner
+
+- *(Letter moved from (jo) at push time — sibling move to the (jo) entry's own,
+  one collision, two entries renumbered together.)*
+- Three operator-queue / ranked-plan items, each the half a session may ship;
+  every Railway-side act (service deletes, source disconnects) stays yours.
+- **Retired services un-routed (queue item 3, guard-first order)**:
+  `tide-rider-lighter-shadow` and `snap-back-shadow` deploy rules REMOVED —
+  paths, decide-greps, `AUTO_IMAGES` — because `railway down`/delete is not
+  durable while a rule exists: the next shared-file push resurrects the
+  service ([[railway-autodeploy-resurrects-stopped-services]]). Their images
+  are DECLARED in `MANUAL_IMAGES_OK` with the retirement reasons ((if)/(jh) —
+  no route for an idler), and `test_golive_organ.py` gained the INVERSE pin:
+  `RETIRED_UNROUTED` fails the build if either service ever regains a rule.
+  Both services are now safe to delete in one sitting.
+- **Ranked-plan item ② — the Farmer and Taker arms join the MTM equity
+  series.** `snapshot_equity` was wired to carry + the riders + Counterweight
+  ((hl)/(hq)) and the (ia)/(iz) drawdown bar reads the series — but the LIVE
+  pair's books (💸 both Farmer arms, 🎫 both Taker arms) were dark on it, so
+  the stricter bar could never grade the books closest to real money. Wired at
+  each file's single publish site (`pub_equity` / `equity` — the arm's own
+  MTM number, live and shadow alike; a failed live read stays None and the
+  helper no-ops rather than write a hole). **Deploy honesty: the Taker's
+  shadow arm ships with freqtrade-bots now; BOTH Farmer arms and the live
+  Taker pick this up only at your next `[deploy-live-farmer]` /
+  `[deploy-live-taker]` marker push** — code-in-main is not
+  code-in-container, and telemetry does not earn a live deploy on its own.
+- **CI quota (queue item, after the 28-Jul billing lockout): the Tests
+  workflow's three jobs merged into ONE runner.** The coverage-floors job was
+  already a strict SUPERSET of the other two — the ENTIRE suite, pinned
+  signer wheel installed (the (em) floors were SET in that configuration),
+  under subprocess-aware coverage — so the lean pytest job and the harness
+  job were paying two extra checkouts, two pip installs and a redundant
+  full-suite run for nothing new. One checkout, one install, ONE run that is
+  simultaneously the regression net, the live harness and the floor input:
+  >50% of the workflow's billed minutes. Declared loss: the lean no-SDK pass
+  (the self-skip path) — still exercised by every local run without the
+  wheel; the SDK import-guard step keeps the dangerous direction (a silent
+  skip in CI) impossible. Stale job-name references in
+  `audit_coverage_floors.py` / `test_selftests.py` corrected in place (I12).
+- NOT taken, with reasons: `claim_writer` on the Taker (ranked ⑧) — a boot
+  behavior change on the live row is not a cleanup-pass decision; S1 remains
+  a menu choice the queue reserves for your explicit "do S1"; all Railway
+  service acts remain yours (the queue's own boundary).
+
+## 2026-08-05 (jo) — THE ORGAN TIER OF THE SEED CLASS: five organs stop trusting a failed read, and the frontier is measured rather than assumed
+
+- *(Letter moved from (jn) at push time — a concurrent session claimed (jn) on
+  origin/main for the slippage-distribution work mid-pass;
+  `audit_changelog_letters` caught the collision pre-push, exactly as built.)*
+- **(jd) closed the BOOK tier; this closes the tracked ORGAN tier — and
+  measures what remains.** The five organs the 17-Jul memory table left open
+  all ran `load_state(KEY) or {}` at cycle top and `save_state(KEY, ...)` at
+  cycle end, so one failed read published amnesia over durable memory:
+  🛡️ immune (`notified` — everything re-pages; `app_seen` — every lever's
+  first-seen clock resets), the board (`notified`/`seen` — re-notify storms),
+  the scout tuner (`enacted` — phantom change-pushes), the incubator
+  (`proposed` — the LIFETIME dedup ledger: a wipe re-proposes judge-refuted
+  genes; plus the `xp-queue` merge, which on a failed read would overwrite
+  the queue AND mark proposals proposed-but-never-queued, losing them
+  forever), and regen (`last_push` — repair pages double-fire).
+- **The degrade is the standard one** (the 17-Jul judge/proprio fix): checked
+  read, and on `ok=False` SKIP THE CYCLE — write nothing, publish nothing,
+  retry next beat. Two deliberate variations: the scout tuner keeps its
+  cycle's work (its levers were already TTL-gated at the bus) and skips only
+  the save + the change-push (a diff against an unknown prior is noise); the
+  immune organ's fleet-alerts PRUNE — a read-modify-write of another
+  producer's key — skips rather than risk the bare `{"alerts": ...}` write
+  that drops the producer's stamp (the exact hazard its own comment names).
+- **The wiring is a RATCHET, and the rule is structural**: any key a file
+  `save_state`s must be read through `load_state_checked` —
+  `GUARDED_ORGANS` in `tests/autonomy/test_seed_guard_checked_reads.py`,
+  AST-checked (save-target keys resolved from module constants, never a
+  substring scan), plus a behavioral test on the worst member (immune: failed
+  read ⇒ `run_once() is None` and ZERO writes). **The ratchet found a defect
+  in this very pass's first draft**: the hasattr-fallback branches I wrote
+  for stub tolerance were themselves unchecked reads, and the test refused
+  them — the fallbacks are deleted, not excused.
+- **The frontier is measured, not assumed (I6)**: the same AST census found
+  the read-own-save-key shape in ~13 MORE files (bot_learn, fleet_tuning,
+  fleet_risk, market_context incl. its fleet-alerts/coin-vetoes writes,
+  fleet_clock, fleet_proposals, fleet_respiration, market_pulse,
+  regime_oracle, impl-shortfall, the scout, the judge's release-request key,
+  the Taker's STATE_KEY). Each needs its own degrade analysis — fleet_tuning
+  is the growth rail's lever store, not a memo pad — so they are DECLARED in
+  the test as the un-guarded census rather than silently out of scope.
+  Growing `GUARDED_ORGANS` file-by-file is the intended path.
+- Mutation-verified: unchecked-revert (×2, immune + incubator queue) and
+  degrade-removal (immune falls through) each reddened exactly the intended
+  test. The first two mutation attempts silently failed to apply (shell
+  quoting ate the assert) and read as "guard not caught" — re-run visibly
+  before believing a quiet mutation, in either direction.
+
 ## 2026-08-05 (jm) — A LIVE DEPLOY BECOMES ONE VERIFIED ACT: `scripts/deploy_live_verify.py` — print the operator command, watch the run, prove the landing by stamp readback
 
 - *(Letter renumbered at push time — three times, a measure of tonight's push traffic: drafted (jj), then (jk), then (jl); parallel sessions took each on origin/main first (Parliament sl-walk, sniper source-stamps, billing-lockout canary). The pushed entry keeps its letter; this one moves, recorded inline per the letter convention.)*

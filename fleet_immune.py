@@ -713,7 +713,20 @@ def notify_ledger(prior_sick, sick_ids, delivered=()):
 
 def run_once():
     now = now_ts()
-    prior = store.load_state(KEY) or {}
+    # [2026-08-05 SEED GUARD] the CHECKED read — load_state() collapses "no
+    # row" and "READ FAILED" into one None, so a Postgres blip here looked
+    # like a first run: `notified` empty (everything re-pages the moment the
+    # gap limiter allows), `app_seen` empty (every lever's first-seen clock
+    # resets), and the save below then OVERWRITES the durable memory with the
+    # amnesia. Standard organ degrade (the 17-Jul judge/proprio fix): SKIP THE
+    # CYCLE — an organ skipping one beat costs minutes; seeding costs the
+    # ledger.
+    _ok, _prior = store.load_state_checked(KEY)
+    if not _ok:
+        print("[fleet-immune] state read FAILED — skipping this cycle rather "
+              "than seed an empty notified/app_seen over the record", flush=True)
+        return None
+    prior = _prior or {}
     prior_sick = set(prior.get("notified") or [])
 
     # one batched beat instead of five round-trips (fail-safe: batch {} on
@@ -740,13 +753,26 @@ def run_once():
         bot_rows = []
 
     # --- FILTRATION: prune the alert bloodstream ---------------------------
+    # [2026-08-05 SEED GUARD] both fleet-alerts reads are CHECKED: this block
+    # is a read-modify-WRITE of another producer's durable key, and a failed
+    # re-read used to fall through as {} — turning the write below into a bare
+    # {"alerts": ...} that drops the producer's updated/ttl_sec stamp, the
+    # exact hazard the stamp note below names. Filtration is tidying; skipping
+    # one cycle of it is free, a stamp wipe is not.
     pruned = []
-    raw = store.load_state("fleet-alerts") or {}
-    alerts = raw.get("alerts") or []
+    _ok_al, raw = store.load_state_checked("fleet-alerts")
+    alerts = ((raw or {}).get("alerts") or []) if _ok_al else []
     keep, pruned = alert_fossils(alerts, now)
     if pruned:
         # re-read immediately before write to shrink the append race window
-        cur_raw = store.load_state("fleet-alerts") or {}
+        _ok_al2, cur_raw = store.load_state_checked("fleet-alerts")
+        if not _ok_al2:
+            print("[fleet-immune] fleet-alerts re-read FAILED — prune skipped "
+                  "this cycle (a blind write would drop the producer's stamp)",
+                  flush=True)
+            pruned = []
+    if pruned:
+        cur_raw = cur_raw or {}
         cur = cur_raw.get("alerts") or alerts
         keep2, _ = alert_fossils(cur, now)
         # [2026-07-17] PRESERVE the producer's bus stamp, never re-mint it.

@@ -1130,7 +1130,17 @@ def funding_prospects_view(proposed, queue_candidates, judge_state):
 
 def run_once():
     now = now_ts()
-    prior = store.load_state(KEY) or {}
+    # [2026-08-05 SEED GUARD] the CHECKED read — `prior.proposed` is the
+    # LIFETIME dedup ledger: a failed read that fell through as {} would
+    # re-propose genes the judge already refuted, and the save at the end
+    # overwrites the durable ledger with the amnesia. Standard organ degrade:
+    # skip the cycle.
+    _ok, _prior = store.load_state_checked(KEY)
+    if not _ok:
+        print("[incubator] state read FAILED — skipping this cycle rather "
+              "than seed over the proposed ledger", flush=True)
+        return None
+    prior = _prior or {}
     tape, used = rp.load_tape(source="auto")
 
     # --- TAKER breeding (shadow-only, replay-scored) -----------------------
@@ -1307,7 +1317,18 @@ def run_once():
     # re-proposal); the only rebuild source is that same lifetime memory,
     # which also holds tape-refuted names the judge never ran — fail-closed
     # wins over a resurrection risk.
-    candidates_now = queue_carry(store.load_state(QUEUE_KEY), now)
+    # [2026-08-05 SEED GUARD] the CHECKED read, second key: merging into an
+    # unreadable queue would overwrite it, and stamping these proposals into
+    # the `proposed` ledger without actually queueing them loses them FOREVER
+    # (the lifetime dedup blocks re-proposal). Nothing is written on a failed
+    # read — the whole cycle is skipped, same degrade as the KEY read above.
+    _ok_q, _q_prior = store.load_state_checked(QUEUE_KEY)
+    if not _ok_q:
+        print("[incubator] xp-queue read FAILED — skipping this cycle "
+              "(queue untouched, proposals deferred, ledger preserved)",
+              flush=True)
+        return None
+    candidates_now = queue_carry(_q_prior, now)
     if props:
         existing = {p["name"] for p in candidates_now}
         merged = candidates_now + [p for p in props
