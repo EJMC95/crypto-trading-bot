@@ -380,7 +380,11 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
                 """,
                 (bot, status, equity, pnl_abs, pnl_pct, open_trades,
                  closed_trades, wins, losses,
-                 json.dumps(extra) if extra is not None else None,
+                 # [(kh)] sanitised — see publish_paper_trade for the class.
+                 # A NaN here makes Postgres reject the row and the dashboard
+                 # silently freezes at its last good publish.
+                 json.dumps(json_safe(extra), allow_nan=False)
+                 if extra is not None else None,
                  pnl_daily),
             )
         return True
@@ -419,7 +423,11 @@ def publish(bot, status="online", equity=None, pnl_abs=None, pnl_pct=None,
                         """,
                         (bot, status, equity, pnl_abs, pnl_pct, open_trades,
                          closed_trades, wins, losses,
-                         json.dumps(extra) if extra is not None else None,
+                         # [(kh)] sanitised — the reconnect RETRY path had the
+                         # same hole, so a NaN failed twice and looked like a
+                         # connection problem.
+                         json.dumps(json_safe(extra), allow_nan=False)
+                         if extra is not None else None,
                          pnl_daily),
                     )
                 return True
@@ -1184,7 +1192,23 @@ def publish_paper_trade(bot, trade_id, pnl_abs, pnl_pct=None, pair=None,
                 (bot, str(trade_id), pair, pnl_abs, pnl_pct,
                  opened_at, closed_at, reason, venue, shadow, side, tag,
                  entry_price, exit_price, size,
-                 json.dumps(extra) if extra is not None else None),
+                 # [2026-08-05 (kh)] SANITISED — this was a bare
+                 # `json.dumps(extra)` and it is a hole in I5's OWN declared
+                 # enforcement. I5 says "non-finite floats must never reach
+                 # storage" and names `json_safe` as the guard; `save_state`
+                 # uses it (`json.dumps(json_safe(state), allow_nan=False)`)
+                 # and THE CLOSE LEDGER DID NOT.
+                 #
+                 # Why this site is the worst of the three: `json.dumps` emits
+                 # bare `NaN`/`Infinity`, Postgres `jsonb` REJECTS the whole
+                 # statement, and this function never raises — so the close row
+                 # is silently LOST. Not a stale row a reader can spot by its
+                 # age: a trade that happened and left no record, in the
+                 # ledger that IS the fleet's evidence base. `extra` here
+                 # routinely carries ratios, APRs and t-stats — precisely the
+                 # fields I5 was written about.
+                 json.dumps(json_safe(extra), allow_nan=False)
+                 if extra is not None else None),
             )
         return True
     except Exception as e:  # noqa: BLE001

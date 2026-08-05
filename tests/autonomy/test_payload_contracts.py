@@ -886,3 +886,65 @@ def test_the_realised_grade_is_side_aware_for_a_restricted_arm():
     scoped = tt.realised_lens_evidence(rows, "b", sides={"divergence": "short"})
     assert pooled["divergence"][0] == 2 and pooled["divergence"][1] < 0, pooled
     assert scoped["divergence"][0] == 1 and scoped["divergence"][1] > 0, scoped
+
+
+class TestI5HasNoHolesInTheLedgerWriter:
+    """[2026-08-05 (kh)] I5 says NON-FINITE FLOATS MUST NEVER REACH STORAGE and
+    names `bot_pnl_store.json_safe` as its enforcement. `save_state` used it;
+    **`publish_paper_trade` and both `publish` paths did not** — they dumped
+    `extra` with a bare `json.dumps`.
+
+    Why that is worse than it sounds: `json.dumps` emits bare `NaN`/`Infinity`,
+    Postgres `jsonb` REJECTS the whole statement, and both writers swallow the
+    exception. So a close row was silently LOST — not a stale row a reader can
+    spot by its age, but a trade that happened and left no record, in the
+    ledger that IS the fleet's evidence base. `extra` on these rows carries
+    ratios, APRs and t-stats: exactly the fields I5 was written about.
+    """
+
+    def _src(self):
+        import pathlib
+        return (pathlib.Path(__file__).resolve().parents[2]
+                / "bot_pnl_store.py").read_text()
+
+    def test_no_bare_json_dumps_of_extra_survives_anywhere(self):
+        """AST, not a substring scan — a page-wide grep matches the comment
+        that DESCRIBES the defect, which is how this class hides."""
+        import ast
+        tree = ast.parse(self._src())
+        bad = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            f = node.func
+            if not (isinstance(f, ast.Attribute) and f.attr == "dumps"):
+                continue
+            if not node.args:
+                continue
+            a0 = node.args[0]
+            # a BARE name argument (json.dumps(extra)) is the defect; a nested
+            # call (json.dumps(json_safe(extra))) is the fix.
+            if isinstance(a0, ast.Name) and a0.id == "extra":
+                bad.append(node.lineno)
+        assert not bad, (
+            f"bare json.dumps(extra) at line(s) {bad} — a NaN there makes "
+            f"Postgres reject the write and the row is silently lost")
+
+    def test_every_extra_dump_is_sanitised_and_asserts_finiteness(self):
+        src = self._src()
+        assert src.count("json.dumps(json_safe(extra), allow_nan=False)") >= 3, \
+            ("all three writers — publish, its reconnect RETRY, and "
+             "publish_paper_trade — must sanitise; the retry path had the same "
+             "hole, so a NaN failed twice and looked like a connection problem")
+
+    def test_json_safe_nulls_non_finite_at_every_depth(self):
+        import json as _j
+        import bot_pnl_store as s
+        payload = {"apr": float("nan"),
+                   "nested": {"t": float("inf"), "ok": 1.5},
+                   "lst": [float("-inf"), 2]}
+        out = _j.dumps(s.json_safe(payload), allow_nan=False)   # must not raise
+        back = _j.loads(out)
+        assert back["apr"] is None
+        assert back["nested"]["t"] is None and back["nested"]["ok"] == 1.5
+        assert back["lst"] == [None, 2], "a list element must be nulled too"

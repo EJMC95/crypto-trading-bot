@@ -516,3 +516,83 @@ def test_a_thin_book_publishes_money_keys_as_none_not_zero():
     import golive_readiness as g
     p = g.book_payload(g.stats(_rows([0.01], [1.0])))
     assert p["net_usd"] is None and p["usd_per_day"] is None
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-05 (kh)] AN UNDERPOWERED NULL MUST NOT MASQUERADE AS EVIDENCE.
+#
+# Every bar is a test, and a failing bar means one of two opposite things: the
+# effect is absent, or the sample could never have seen it. Measured the day
+# this shipped: 🎫 short-divergence went into the record as REFUTED at n=28,
+# where MDE80 is 2.06%/trade — FIVE TIMES the largest per-trade edge this fleet
+# has ever measured at a gradeable n. Meanwhile pm-gillard at n=280 has
+# MDE80 0.196% and power 1.000, so ITS negative reading is real evidence.
+# Same failing bar, opposite decisions under I17.
+# ---------------------------------------------------------------------------
+def test_mde_is_mean_free():
+    """The property that makes this publishable where n_needed was refused.
+
+    `n_needed` divided by the OBSERVED MEAN, so it was finite and positive for
+    the 8 of 14 books whose mean is <= 0 and told the operator 'you already
+    have enough closes' about a book that is losing. MDE depends on sd and n
+    only: it says what the sample CAN see, never what it saw.
+    """
+    import golive_readiness as g
+    # identical dispersion and n, wildly different means
+    a = [0.05, -0.05, 0.05, -0.05] * 8
+    b = [0.55, 0.45, 0.55, 0.45] * 8          # same sd, mean +50pp
+    sa = g.stats(_rows(a, [1.0, -1.0] * 16))
+    sb = g.stats(_rows(b, [1.0, -1.0] * 16))
+    assert sa["mde80_pct"] == pytest.approx(sb["mde80_pct"], rel=1e-9), \
+        "MDE must not depend on the mean — that was n_needed's fatal defect"
+
+
+def test_mde_uses_the_t_distribution_not_the_normal():
+    """The normal approximation makes MDE look SMALLER, i.e. it understates how
+    underpowered a thin book is — the exact thing this field exists to reveal.
+    Pinned against the published table value t_{0.975,27} = 2.0518."""
+    import golive_readiness as g
+    assert g._t_crit(1.959964, 27) == pytest.approx(2.0518, abs=0.002)
+    assert g._t_crit(1.959964, 9) == pytest.approx(2.2622, abs=0.006)
+    # and it must EXCEED the normal-based number at small n
+    import math
+    sd, n = 0.03753, 28
+    normal = 2.8015854 * sd / math.sqrt(n)
+    assert g._mde80(sd, n) > normal, "the t version must be the CONSERVATIVE one"
+    # the measured case from the audit: short-divergence
+    assert 100 * g._mde80(0.03753, 28) == pytest.approx(2.061, abs=0.02)
+
+
+def test_power_is_two_sided_and_equals_alpha_at_zero_effect():
+    """A symmetric test can reject in the WRONG direction; pretending otherwise
+    overstates power on exactly the thin samples this is for."""
+    import golive_readiness as g
+    assert g._power(0.0, 0.03, 30) == pytest.approx(0.05, abs=1e-3)
+    assert g._power(0.05, 0.03, 30) > 0.99
+    assert 0.0 < g._power(0.005, 0.03753, 28) < 0.25
+    # TWO CUTS OF THIS TEST FAILED TO DISCRIMINATE, both caught by mutation:
+    #   1. `power(0) == 0.05` — a ONE-SIDED test at alpha=0.05 also returns
+    #      0.05 at zero effect, so "make it one-sided" survived.
+    #   2. symmetry `power(+e) == power(-e)` — the implementation takes
+    #      `abs(effect)`, so the one-sided mutation is symmetric TOO and it
+    #      survived a second time.
+    # Only a PINNED VALUE separates them, because the two curves agree at the
+    # origin and diverge everywhere else:
+    #     two-sided(1.96):  Phi(0.9129-1.9600) + Phi(-0.9129-1.9600) = 0.1496
+    #     one-sided(1.645): Phi(0.9129-1.6449)                       = 0.2321
+    assert g._power(0.005, 0.03, 30) == pytest.approx(0.1496, abs=0.002), \
+        ("a one-sided power reads 0.2321 here and OVERSTATES what a thin "
+         "sample can see — the opposite of this field's purpose")
+    # symmetry is still a real property worth holding, just not a discriminator
+    assert g._power(0.01, 0.03, 30) == pytest.approx(
+        g._power(-0.01, 0.03, 30), rel=1e-9)
+    assert g._power(-0.05, 0.03, 30) > 0.99
+
+
+def test_mde_reaches_the_payload_and_is_none_when_thin():
+    import golive_readiness as g
+    p = g.book_payload(g.stats(_rows([0.01, -0.005] * 15, [1.0, -0.5] * 15)))
+    assert p["mde80_pct"] is not None and p["power_at_half_pct"] is not None
+    thin = g.book_payload(g.stats(_rows([0.01], [1.0])))
+    assert thin["mde80_pct"] is None and thin["power_at_half_pct"] is None
+    assert "mde80_pct" not in g.BAR_NAMES, "REPORTED, never a bar"

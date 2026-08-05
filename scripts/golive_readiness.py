@@ -663,8 +663,81 @@ def stats(rows, book_usd=None):
                # `grade()` is unchanged, so no verdict moves — re-specifying
                # the gate is an operator act ((fk) was). This makes the damage
                # VISIBLE; making it BLOCKING is the operator's call.
-               usd_per_day=(realised / days) if days > 0 else None)
+               usd_per_day=(realised / days) if days > 0 else None,
+               # [2026-08-05 (kh)] THE MINIMUM DETECTABLE EFFECT, so an
+               # UNDERPOWERED NULL CANNOT MASQUERADE AS EVIDENCE OF ABSENCE.
+               #
+               # Every bar here is a test, and a book that fails one fails in
+               # one of two completely different ways: the effect is absent, or
+               # the sample could never have seen it. The gate said only
+               # "t 0.59 < 2" and left the reader to guess which. Measured the
+               # day this shipped: 🎫 short-divergence was written into the
+               # record as REFUTED at n=28 — where MDE80 is 2.061%/trade, FIVE
+               # TIMES the largest per-trade edge this fleet has ever measured
+               # at a gradeable n. That refusal established nothing and was
+               # reported as though it established something.
+               #
+               # MEAN-FREE BY CONSTRUCTION, which is why this is publishable
+               # where two earlier attempts were correctly refused: `n_needed`
+               # divides by the observed mean, so it is finite and positive for
+               # the 8 of 14 books whose mean is <= 0 and tells the operator
+               # "you already have enough closes" about a book that is losing;
+               # `n_sep` was a pure function of an unidentified tau. MDE depends
+               # on sd and n ONLY — it says what the sample CAN see, never what
+               # it saw.
+               #
+               # REPORTED, NOT A BAR. `grade()` is untouched. This makes a weak
+               # null visible; it changes no verdict.
+               mde80_pct=_mde80(sd, n),
+               power_at_half_pct=_power(0.005, sd, n))
     return out
+
+
+def _norm_cdf(x):
+    """Phi(x) — no scipy in the freqtrade image, and this is exact enough."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def _t_crit(p_z, df):
+    """t quantile from its normal counterpart via Cornish-Fisher.
+
+    The t DISTRIBUTION, not the normal, because these samples are small and the
+    normal approximation is optimistic in exactly the wrong direction: it makes
+    the MDE look SMALLER than it is, i.e. it understates how underpowered a
+    thin book is — the one thing this field exists to reveal. At n=28 the gap
+    is 1.987% (normal) vs 2.061% (t), and the honest number is the larger.
+
+    Verified against the table: t_{0.975, 27} = 2.0518 (exact 2.0518)."""
+    if df < 1:
+        return None
+    z = p_z
+    z3, z5 = z ** 3, z ** 5
+    return (z + (z3 + z) / (4.0 * df)
+            + (5.0 * z5 + 16.0 * z3 + 3.0 * z) / (96.0 * df * df))
+
+
+def _mde80(sd, n):
+    """Smallest per-trade effect this sample could detect at 80% power,
+    two-sided alpha=0.05: (t_0.975 + t_0.80) * sd/sqrt(n)."""
+    if not sd or n < 2:
+        return None
+    df = n - 1
+    return ((_t_crit(1.959964, df) + _t_crit(0.8416212, df))
+            * sd / math.sqrt(n))
+
+
+def _power(effect, sd, n):
+    """Probability this sample rejects a true `effect`, two-sided alpha=0.05.
+
+    Both tails, because a symmetric test can reject in the wrong direction and
+    pretending otherwise overstates power on a tiny sample."""
+    if not sd or n < 2:
+        return None
+    se = sd / math.sqrt(n)
+    if se <= 0:
+        return None
+    lam = abs(effect) / se
+    return _norm_cdf(lam - 1.959964) + _norm_cdf(-lam - 1.959964)
 
 
 #: The six bars, in the order the operator reads them. Names are the PUBLISHED
@@ -973,6 +1046,7 @@ def book_payload(s):
         out.update(days=None, mean_pct=None, t=None, win_pct=None,
                    max_dd_pct=None, h1=None, h2=None,
                    net_usd=None, usd_per_day=None,
+                   mde80_pct=None, power_at_half_pct=None,
                    why=s.get("why") or "too few closes to grade")
         return out
     dd = s.get("max_dd_frac")
@@ -988,7 +1062,15 @@ def book_payload(s):
                # that a book whose shape improved while its earnings collapsed
                # cannot look like progress.
                net_usd=round(s["realised_usd"], 2),
-               usd_per_day=(round(_upd, 4) if _upd is not None else None))
+               usd_per_day=(round(_upd, 4) if _upd is not None else None),
+               # [(kh)] What this sample COULD have seen. A failing bar beside a
+               # large MDE is "we cannot tell yet"; beside a small one it is
+               # "measured absent". Those route to opposite decisions under I17.
+               mde80_pct=(round(100 * s["mde80_pct"], 3)
+                          if s.get("mde80_pct") is not None else None),
+               power_at_half_pct=(round(s["power_at_half_pct"], 3)
+                                  if s.get("power_at_half_pct") is not None
+                                  else None))
     return out
 
 
@@ -1405,7 +1487,8 @@ def main():
           f"closes, mean>0, t>={GOLIVE_MIN_T:g}, both halves +, maxDD<"
           f"{100*GOLIVE_MAX_DD:.0f}%")
     print(f"{'book':34s} {'n':>4s} {'days':>6s} {'mean%':>8s} {'t':>6s} "
-          f"{'win%':>6s} {'maxDD%':>7s} {'net$':>8s} {'$/day':>8s}  verdict")
+          f"{'win%':>6s} {'maxDD%':>7s} {'net$':>8s} {'$/day':>8s} "
+          f"{'MDE80%':>7s}  verdict")
     print("-" * 104)
     ready, payload_books = [], {}
     # Hoisted out of the row loop: `parse_ts` is used AFTER it (by `era_rows`),
@@ -1543,7 +1626,7 @@ def main():
                      f"predate this era]")
         if s.get("n", 0) < 2:
             print(f"{bot:34s} {s.get('n', 0):>4d} {'-':>6s} {'-':>8s} {'-':>6s} "
-                  f"{'-':>6s} {'-':>7s} {'-':>8s} {'-':>8s}  "
+                  f"{'-':>6s} {'-':>7s} {'-':>8s} {'-':>8s} {'-':>7s}  "
                   f"ungradeable in era{flag}")
         else:
             # [(kg)] net$ and $/day sit BESIDE the shape bars, because every
@@ -1551,12 +1634,18 @@ def main():
             # 0.28% take-profit takes the live Farmer to a PASSING t=+2.55 on
             # 37% of its dollars, and this row is where that becomes visible.
             _upd = s.get("usd_per_day")
+            _mde = s.get("mde80_pct")
+            _mde_s = "n/a" if _mde is None else f"{100 * _mde:.2f}"
             print(f"{bot:34s} {s['n']:>4d} {s['days']:>6.1f} "
                   f"{100*s['mean_pct']:>7.3f}% {s['t']:>6.2f} "
                   f"{100*s['win_rate']:>5.1f}% "
                   f"{('n/a' if dd_pct is None else f'{dd_pct:.1f}%'):>7s} "
                   f"{s.get('realised_usd', 0):>+8.2f} "
-                  f"{('n/a' if _upd is None else f'{_upd:+.3f}'):>8s}  "
+                  f"{('n/a' if _upd is None else f'{_upd:+.3f}'):>8s} "
+                  # [(kh)] MDE80 turns a failing bar from "no" into either
+                  # "measured absent" (small MDE) or "we cannot tell yet"
+                  # (large MDE) — opposite decisions under I17.
+                  f"{_mde_s:>7s}  "
                   f"{verdict}{flag}")
         if ok:
             ready.append(bot)
