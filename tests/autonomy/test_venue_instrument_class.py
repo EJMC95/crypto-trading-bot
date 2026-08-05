@@ -56,7 +56,11 @@ _VENUE = [_obd_row("BTC", 2), _obd_row("SOL", 2), _obd_row("PAXG", 2),
           _obd_row("USDKRW", 4),
           _obd_row("SPY", 5), _obd_row("WEN", 5), _obd_row("BB", 5),
           _obd_row("TENCENT", 6), _obd_row("SKHYNIXUSD", 6),
-          _obd_row("OPENAI", 7)]
+          _obd_row("OPENAI", 7),
+          # A listing NO hand list has ever heard of. This one row is what
+          # separates "reads the venue" from "reads a list that happens to
+          # agree" — see TestTheVenueIsActuallyRead.
+          _obd_row("NEWLISTINGCO", 5)]
 
 
 @pytest.fixture
@@ -122,6 +126,33 @@ class TestTheVenueOutranksTheHandList:
         one case a naive 'just read the field' rewrite gets wrong."""
         assert published["classes"]["PAXG"] == 2
         assert not fleet_bus.is_crypto("PAXG")
+
+
+class TestTheVenueIsActuallyRead:
+    """MUTATION-DRIVEN. The first cut of this file passed with `is_crypto`
+    ignoring the venue entirely — because all 41 missed names were synced into
+    `NONCRYPTO_BASES`, so every symbol under test gave the SAME answer by
+    either route. The list-only mutant survived, which means the venue-read
+    path — the entire point of the change — was untested.
+
+    The separating case is the one the change exists for: a listing the hand
+    list has never heard of. List-only fails OPEN and ranks it as crypto; the
+    venue says equity.
+    """
+
+    def test_a_brand_new_listing_screens_with_no_code_change(self, published):
+        assert "NEWLISTINGCO" not in fleet_bus.NONCRYPTO_BASES, \
+            "the separating case stops separating if it is added to the list"
+        assert published["classes"]["NEWLISTINGCO"] == 5
+        assert not fleet_bus.is_crypto("NEWLISTINGCO"), (
+            "the venue's own class must outrank the hand list — otherwise "
+            "this is still a hand list and rots at the same rate")
+
+    def test_and_the_same_symbol_reads_crypto_when_the_scout_is_dark(self):
+        """The other half of the same fact: the fallback genuinely IS a
+        fallback, so this symbol's verdict depends on the venue read."""
+        fleet_bus._cache.pop("lighter-market", None)
+        assert fleet_bus.is_crypto("NEWLISTINGCO")
 
 
 class TestTheFallbackIsNotStale:
