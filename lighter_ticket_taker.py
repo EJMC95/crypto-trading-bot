@@ -136,6 +136,23 @@ BOT = "lighter-ticket-taker"
 _ROW_SUFFIX = {"lighter_paper": "-lshadow", "lighter_shadow": "-lshadow",
                "lighter_live": "-lighter"}
 BOT_ROW = BOT + _ROW_SUFFIX.get(TT_VENUE, "-lshadow")
+
+
+def _standby_key(bot_row):
+    """[2026-08-04] The bot_state key a STOOD-DOWN process reports on —
+    funding_carry_bot's (ic) pattern, applied to the real-money pair.
+
+    Deliberately NOT the book's `bot_pnl` row and NOT a `bot_pnl` row at all:
+    the loser of the writer claim must not touch the row it does not own.
+    (ib)/(ic) measured the naive version inverted — the standby loop WON the
+    row 10 of 12 samples, and a loser's `heartbeat` keeps a DEAD incumbent's
+    row reading fresh over a frozen snapshot (I1). Suffix, never a rewrite:
+    derivable from the row it shadows, so a reader holding the book id can
+    always find its standby record.
+    """
+    return f"{bot_row}:standby"
+
+
 STATE_KEY = "lighter-ticket-taker"
 # [2026-07-17 LIVE PATH] The live arm keeps its OWN state key. STATE_KEY holds
 # a PaperBroker/ShadowBroker snapshot (a local account); a live arm restoring
@@ -1386,6 +1403,49 @@ def main(_ctx=None):
             "decide that. Set TT_VENUE=lighter_live or TT_VENUE=lighter_shadow "
             "explicitly.")
     _setup_logging(_ctx)
+    # [2026-08-04] ONE BOOK, ONE WRITER — claimed at the TOP of the cycle,
+    # before any read, lever or trading act. The TT_VENUE guard directly above
+    # names the exact two-writer scenario this closes: "a lost var on the live
+    # service would make TWO writers of one row while the live book's
+    # positions went unmanaged — no page, because the row looks healthy."
+    # That guard catches the UNSET var; this claim catches every other route
+    # to two processes on one row (a mis-set var, a duplicate service, an
+    # operator `railway up` racing the workflow — the carry book lost 25.6h
+    # and its ledger's integrity to exactly this class, (hf)/(hp)).
+    # funding_carry_bot's hardened (hp)/(ib)/(ic)/(id) pattern, adapted to a
+    # RUN-ONCE process: `return` skips the cycle (the ~300s shell loop is the
+    # wait — no sleep, and never sys.exit/SystemExit: a raise here would read
+    # as a crash and mark the row error over a book another process owns).
+    # claim_writer is FAIL-OPEN (a dark DB never idles the book) and a
+    # redeploy is NOT a duplicate (`_claim_is_my_own_dead_replica` — same svc,
+    # new replica id — or every deploy would idle the book for the full
+    # 30-min TTL, the (id) stall).
+    _ok_writer, _other_writer = store.claim_writer(BOT_ROW)
+    if not _ok_writer:
+        print(f"[ticket-taker] {iso(now())} STANDING DOWN — {BOT_ROW} is "
+              f"already claimed by another container ({_other_writer}). Two "
+              f"writers make `n` a mixture of two books and, on the live arm, "
+              f"two managers of one real account. Skipping this cycle; the "
+              f"claim expires in <= {store.WRITER_CLAIM_TTL}s if the "
+              f"incumbent stops.", flush=True)
+        try:
+            # The loser reports on its OWN key ((ic)): no publish, no
+            # heartbeat, no bot_pnl row. `caps` identifies WHICH build is
+            # standing down — a standby record without it is
+            # indistinguishable from a stale one.
+            store.save_state(_standby_key(BOT_ROW), {
+                "standing_down": True,
+                "book": BOT_ROW,
+                "duplicate_writer": _other_writer,
+                "svc": store.service_name() or None,
+                "venue": TT_VENUE,
+                "caps": {"max_open": MAX_OPEN, "clip_usd": CLIP_USD},
+                "updated": iso(now()),
+                "ttl_sec": store.WRITER_CLAIM_TTL,
+            })
+        except Exception:  # noqa: BLE001
+            pass
+        return
     moved = apply_tuning()
     if moved:
         print(f"[ticket-taker] {iso(now())} growth-rail levers active: {moved}")
@@ -1987,6 +2047,12 @@ def main(_ctx=None):
                 extra={"venue": TT_VENUE, "strategy": "scout tickets (live)",
                        "halted": True, "day": cur_day,
                        "flatten_incomplete": bool(_still)})
+            # [2026-08-04] the MTM series must not skip halted days — a
+            # daily-loss halt IS the drawdown the series exists to see.
+            try:
+                store.snapshot_equity(BOT_ROW, equity, _still)
+            except Exception:  # noqa: BLE001
+                pass
             print(f"[ticket-taker] {iso(t_now)} halted for {cur_day}; no entries"
                   f"{f'; {_still} STILL OPEN — flatten incomplete' if _still else ''}.")
             return
@@ -3680,8 +3746,18 @@ def _selftest_live():
     _real = {k: getattr(store, k) for k in
              ("publish_paper_trade", "publish_venue_order", "save_state",
               "load_state", "load_state_checked", "publish", "save_daily_halt",
-              "load_daily_halt", "heartbeat")}
+              "load_daily_halt", "heartbeat", "claim_writer",
+              "snapshot_equity")}
     store.heartbeat = lambda bot: None
+    # [2026-08-04] main() now claims the writer lock and appends an MTM equity
+    # sample each cycle. Stub BOTH: this harness rebinds BOT_ROW to the LIVE
+    # row id, so unstubbed on an operator machine with DATABASE_URL set, the
+    # fixtures below would append FICTIONAL equity samples to the live book's
+    # '<bot>:equity' series — the exact series the go-live drawdown bar reads.
+    # A test that can poison the gate's evidence is worse than no test.
+    store.claim_writer = lambda bot, now=None: (True, None)
+    store.snapshot_equity = (
+        lambda bot, equity, open_trades=None, realized=None: True)
     store.publish_paper_trade = lambda bot, **kw: captured["paper"].append((bot, kw))
     store.publish_venue_order = lambda bot, **kw: captured["orders"].append((bot, kw))
 

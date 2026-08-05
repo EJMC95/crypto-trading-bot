@@ -280,6 +280,7 @@ this shipped, and every line below is a real cost, not a formality.
 - `tide-rider-lighter` — **CLOSED 1-Aug: the keep-or-retire call was MADE — retired (if)** (9 buys / zero sells in 22 days, a third of the long budget returned; reversible via `TIDE_RIDER_RETIRED_OVERRIDE`). Line corrected in place 4-Aug per I12 (it still read "OPEN" three days after the decision) and retained while the 7d mention window drains.
 - `lighter-dislocation` — **CLOSED-RETIRED 4-Aug (jh): the keep-or-retire call was MADE — retired** on the strongest evidence in the fleet (t=−2.97, n=175, mean −0.281%/trade, both halves negative, ~−$1/day; the rail structurally could not restrict it — binding floor `ENTER_FLOOR_MULT` unregistered, every reachable motion loosens). Operator decision, OPERATOR_QUEUE.md item 2 option A; reversible via `SNAPBACK_RETIRED_OVERRIDE`. Line added the day it closed so the retirement's own follow-up entries cannot re-open the subject; covers `snap-back-shadow` (the service name) too.
 - `snap-back-shadow` — same house as `lighter-dislocation` above (Railway service name vs dashboard row id); closed with it 4-Aug (jh). What remains on the service is the operator's separate stop/delete act (OPERATOR_QUEUE.md item 3), which no code change performs.
+- `perps-funding-lighter` — STRUCTURAL mention-count, not rework (the `freqtrade-bots` shape at the real-money row): 💸 the LIVE Farmer's row is named by every fleet-wide real-money sweep because it IS the real money, so unrelated classes each add a mention — (hc)/(hg) the era tables, (in) the detector-exemption sweep, (io) the gate0 rollback incident (closed at (ip) by the source disconnect), (jx) the sole-writer/MTM parity pass. None of the six rebuilds the same mechanism twice, and the two real classes this row DID have are both closed executably: the ungated second deploy path ((ip), `source={null,null}` verified) and the two-writer/MTM-blindness class ((jx), claim + series, AST-pinned). **Owner: this repo** — if the row recurs on ONE mechanism twice, that is a new house and this line must not be stretched to cover it.
 - `equities-regime` — STRUCTURAL mention-count, not rework (the `freqtrade-bots` shape at book scale): 📊 Index Rider is a member of every fleet-wide sweep in the window — (gl) deploy naming, (hu) svc stamps, (hq) MTM wiring, (iz) the MTM read-side fix — and none of the six entries rebuilds the book itself. It sits OUTSIDE the graded set today (zero closes, below the publish filter) while its `:equity` series accrues (n=1436 since 30-Jul). The genuinely open item is DECIDABILITY at its measured ~17 closes/yr — exactly I17's class. **Owner: operator** — keep-or-retire when the per-asset oracle evidence window closes (~mid-Aug, the 28-Jul review accrual); a pass that tunes it instead of deciding is the I11 behaviour.
 <!-- RECURRING:END -->
 
@@ -1371,7 +1372,10 @@ All new bots:
   while true MTM DD is 15.6-17.4% — the two definitions disagree about the
   VERDICT. `bot_pnl_store.snapshot_equity()` now appends an MTM sample to
   `bot_state_history` under `<bot>:equity` (both riders wired; carry +
-  Counterweight at (hq)). ~~The grader is DELIBERATELY unchanged~~ —
+  Counterweight at (hq); the REAL-MONEY pair — both Farmer arms + both Taker
+  arms — at (jp), with halted-day coverage + carry's hardened
+  `claim_writer`/standby pattern at (jx); live containers take it on the
+  next marker deploy). ~~The grader is DELIBERATELY unchanged~~ —
   **superseded: `(ia)` folded the MTM number into the maxDD bar**
   (`apply_mtm`, worse-of-both, floored at 200 samples/7d), **and `(iz)` made
   the read path actually work**: `equity_series` called a `store.load_history`
