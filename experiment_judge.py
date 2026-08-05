@@ -181,25 +181,39 @@ CANDIDATES = [
     # single measured fill in 13d: 2.06bps). At ~2bps rt the breakeven is
     # 29.7% TRUE — OUTSIDE the cage — so a tripped guard kills this
     # candidate's rationale; read any verdict against it.
-    # QUEUE NOTE — min_vol: the intended NEXT candidate (xp.funding.min_vol,
-    # registered (fz), consumed (ge)) is NOT filable today: it is absent
-    # from XP_TO_LIVE (a running spec would _needs_reset as invalid state)
-    # and apply_levers stamps no bars.min_vol receipt, so ran_candidate
-    # would exclude every close — the enter-gate-0.30@0.075 zero-accrual
-    # shape — and the receipt reaches the arms only with a marker-gated
-    # Farmer deploy. When that pass lands, its candidate slots ABOVE this
-    # one: its prior (the study's per-tier friction table) is unrefuted,
-    # while this row's tape prior is negative. Measured 05-Aug at its $2M
-    # cage floor: +3 books on the live snapshot (LIT 31.5% APR clears its
-    # tier's ~3.9bps-rt breakeven; ZEC/PUMP at the 10.5% resting default),
-    # and ALL five extreme books that motivated the lever ($0.11-0.35M)
-    # sit BELOW the cage floor — carry that to the min_vol pass.
+    # [2026-08-05 (jw)] min-vol-2M — the (ju) QUEUE NOTE's reserved slot,
+    # now FILED: the three filability gaps that note recorded are closed in
+    # one pass (XP_TO_LIVE mapping below; entry_stamp + _ACTIVE_BARS stamp
+    # bars.min_vol in lighter_funding_bot; the receipt reaches both arms
+    # with the same marker-gated Farmer deploy that ships it — until that
+    # deploy lands, ran_candidate correctly proves nothing, which is the
+    # fail-closed direction). Sits ABOVE enter-gate-0.105 per (ju)'s own
+    # ordering rule: this row's prior — the (js) study's per-tier friction
+    # table, the fleet's first measured friction prior — is UNREFUTED,
+    # while enter-gate's tape prior is negative.
+    # VALUE = the $2M cage floor, the maximal expressible widening: the
+    # lever exists because the $10M floor excluded 5 of the venue's 8 most
+    # extreme funding books. Measured 05-Aug at 2e6: +3 books join on the
+    # live snapshot (LIT 31.5% APR clears its tier's ~3.9bps-rt breakeven;
+    # ZEC/PUMP at the 10.5% resting default) — and ALL five extreme books
+    # that motivated the lever ($0.11-0.35M) sit BELOW even this floor, so
+    # the verdict reads on the three joiners' tier, never on the extremes
+    # the cage cannot reach (widening the CAGE is an operator act, not a
+    # candidate). The scan's own SCAN_MAX_SLIP_BPS quality veto still
+    # judges every admitted book on its real clip — the floor is the crude
+    # proxy, the slip veto the better instrument (registry note, (gu)).
+    {"name": "min-vol-2M",      "levers": {"xp.funding.min_vol": 2000000.0}},
+    # QUEUE NOTE — min_vol filability ((ju)) is DISCHARGED above ((jw)).
     {"name": "enter-gate-0.105", "levers": {"xp.funding.enter_apr": 0.105}},
 ]
 XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               "xp.funding.take_profit": "live.funding.take_profit",
               "xp.funding.max_hold_h": "live.funding.max_hold_h",
-              "xp.funding.slope_gate": "live.funding.slope_gate"}
+              "xp.funding.slope_gate": "live.funding.slope_gate",
+              # [2026-08-05 (jw)] the min-vol-2M candidate's promotion twin;
+              # same cage both sides ([2e6, 20e6], fleet_tuning), judge
+              # remains the ONLY live.funding.* writer.
+              "xp.funding.min_vol": "live.funding.min_vol"}
 
 
 def now_ts():
@@ -1781,7 +1795,11 @@ def _selftest():
     # tape prior is negative vs shipped at measured friction (see the
     # CANDIDATES comment), so it must never outrank the supported
     # (slope-gate-off) or merely-mute (tp-0.06) candidates.
-    assert names[:3] == ["slope-gate-off", "tp-0.06", "enter-gate-0.105"], names
+    # [2026-08-05 (jw)] min-vol-2M takes the (ju)-reserved slot ABOVE it
+    # (unrefuted friction-table prior outranks a negative tape prior) and
+    # BELOW the two earlier statics — reordering any of the four reddens.
+    assert names[:4] == ["slope-gate-off", "tp-0.06", "min-vol-2M",
+                         "enter-gate-0.105"], names
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -1796,8 +1814,8 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["slope-gate-off", "tp-0.06", "enter-gate-0.105",
-                  "xp-enter_apr-0.0625"], n2
+    assert n2 == ["slope-gate-off", "tp-0.06", "min-vol-2M",
+                  "enter-gate-0.105", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
     # 96-vs-96.0 dedup are withdrawn — see CANDIDATES)
@@ -1890,11 +1908,15 @@ def _selftest():
     # gate-off +$34.07); tp-0.06 follows, unsupported-but-not-refuted.
     assert next_candidate(pool, [], None)["name"] == "slope-gate-off"
     assert next_candidate(pool, ["slope-gate-off"], None)["name"] == "tp-0.06"
-    # [2026-08-05 (ju)] the third static precedes queue proposals by pool
-    # construction (statics first), then the incubator's xp-tp-0.05
+    # [2026-08-05 (ju)/(jw)] the third and fourth statics precede queue
+    # proposals by pool construction (statics first), then the incubator's
+    # xp-tp-0.05 — min-vol-2M holds the (ju)-reserved slot ahead of the
+    # negative-prior enter-gate-0.105
     assert next_candidate(pool, ["slope-gate-off", "tp-0.06"],
+                          None)["name"] == "min-vol-2M"
+    assert next_candidate(pool, ["slope-gate-off", "tp-0.06", "min-vol-2M"],
                           None)["name"] == "enter-gate-0.105"
-    assert next_candidate(pool, ["slope-gate-off", "tp-0.06",
+    assert next_candidate(pool, ["slope-gate-off", "tp-0.06", "min-vol-2M",
                                  "enter-gate-0.105"],
                           None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted

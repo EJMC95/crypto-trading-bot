@@ -452,6 +452,11 @@ def apply_levers(mode):
     ENTER_GATE = SCAN_ENTER if SCAN_ENABLED else ENTER_APR
     _ACTIVE_BARS.clear()
     _ACTIVE_BARS.update({"enter_apr": ENTER_APR, "take_profit": TAKE_PROFIT,
+                         # numeric receipt for a min_vol judge candidate
+                         # ((jw); ran_candidate float-compares bars.min_vol —
+                         # entry stamp is senior, this is the legacy/close
+                         # fallback context)
+                         "min_vol": MIN_VOL,
                          "max_hold_h": MAX_HOLD_H, "explore_k": SCAN_EXPLORE_K,
                          # numeric receipt for the slope-gate-off candidate
                          # (ran_candidate float-compares bars.slope_gate)
@@ -665,6 +670,13 @@ def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None):
             # decision reads it, and None on a legacy/blind entry.
             "hot_h": hot_h,
             "bars": {"enter_apr": ENTER_APR,
+                     # [2026-08-05 (jw)] min_vol joins the admission-gate
+                     # receipts (same class as enter_apr: attribution only —
+                     # it gated which books this entry could SEE). Without it
+                     # ran_candidate excludes every close of a min_vol judge
+                     # candidate — the enter-gate-0.30@0.075 zero-accrual
+                     # shape the (ju) queue note names.
+                     "min_vol": MIN_VOL,
                      "take_profit": TAKE_PROFIT,
                      "max_hold_h": MAX_HOLD_H,
                      "slope_gate": 1 if SLOPE_GATE else 0,
@@ -2932,6 +2944,11 @@ def _selftest_entry_admission():
     assert b["max_hold_h"] == MAX_HOLD_H
     assert b["slope_gate"] == (1 if SLOPE_GATE else 0)
     assert b["explore_k"] == SCAN_EXPLORE_K
+    # [2026-08-05 (jw)] the min_vol admission receipt — dropping it from
+    # entry_stamp reddens here; a min_vol judge candidate would otherwise
+    # accrue ZERO provable closes (ran_candidate fails closed on a missing
+    # receipt, by design)
+    assert b["min_vol"] == MIN_VOL, b
     assert b["conviction_hi"] == (CONVICTION_HI
                                   if CONVICTION_MODE == "scaled" else 1.0)
     # the FLAP-FIX shape: a lever moved AFTER the stamp changes new

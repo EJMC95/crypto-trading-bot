@@ -22,8 +22,9 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   above"* / *"Full permission"*). `fleet_bus.allocation_scale` consumes the
   organ's `target_usd`, clamped [0.25, 4.0], NEW entries only, wired into
   🌾 carry + ⚖️ Counterweight (live via the auto-deploy path) and 💸 the
-  Farmer's SHADOW arm (**deferred behind the next marked Farmer deploy** —
-  bundle with the queued snapshot_equity push). Real money never reads it
+  Farmer's SHADOW arm (**deployed 5-Aug with the (jw) marker push** — the
+  bundle also carried the (jp) equity series + the min_vol receipt; verify
+  by stamp readback per the (jw) entry). Real money never reads it
   (AST-pinned); kill switch `FLEET_ALLOCATION_MODE=advisory` per service.
   The organ itself is unchanged, publish-only.
 - **S2 — The literal consolidated funding super-book.** One new row (next
