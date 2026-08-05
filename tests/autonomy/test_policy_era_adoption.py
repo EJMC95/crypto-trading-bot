@@ -25,6 +25,8 @@ THE RULE: **an absence is not a change** (I6). A malformed stamp still is.
 import pathlib
 import sys
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -46,8 +48,15 @@ BROKEN = {"policy": {"venue": "x"}}    # present but nameless -> unreadable
 
 
 def _rows(spec):
-    """era_rows' shape, oldest first, with the row's `extra` at [4]."""
-    return [(0.01, 100.0, f"2026-07-{10 + i:02d}T00:00:00+00:00", None, s)
+    """era_rows' shape, oldest first, with the row's `extra` at [4].
+
+    Dates are real datetime arithmetic, NOT f"2026-07-{10+i}" — that emits
+    "2026-07-34" past 25 rows, which `_era_parse` cannot read, so the walk
+    breaks fail-closed and any `ep is None` assertion passes for entirely
+    the wrong reason. Caught when a 25-row case went red.
+    """
+    base = datetime(2026, 7, 10, tzinfo=timezone.utc)
+    return [(0.01, 100.0, (base + timedelta(days=i)).isoformat(), None, s)
             for i, s in enumerate(spec)]
 
 

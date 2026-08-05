@@ -458,6 +458,23 @@ def _era_parse(parse=None):
 #: the era ((hc)); removing one blinds the boundary to a real change.
 POLICY_SIG_FIELDS = ("venue", "bull", "lenses", "sides")
 
+#: [2026-08-06 (km)] The EXIT BRACKET, for books that stamp `extra.bars` at
+#: entry instead of an `extra.policy` block — 💸 the Funding Farmer and its
+#: shadow twin. Same warning as above, in both directions:
+#:
+#:   * ADDING a tuning field here weaponises the era. `enter_apr`, `min_vol`,
+#:     `slope_gate`, `explore_k` and `conviction_hi` are all stamped in the
+#:     same `bars` dict and are all DELIBERATELY EXCLUDED — they are the
+#:     judge's and the rail's ordinary tuning ((hc)), and resetting the clock
+#:     on every promotion would make the 30-day bar unreachable forever.
+#:   * REMOVING one blinds the gate to `(kg)`: a take-profit that reads
+#:     **86% win and t=+2.55 — PASSING the t bar** — on a book earning $2.36
+#:     instead of $6.46. Truncation collapses variance faster than the mean,
+#:     so a tight bracket INFLATES t. That is the single most expensive way
+#:     this fleet could be wrong about real money, and the defence is that
+#:     such a change must earn its OWN 30 days rather than inherit 62 closes.
+BRACKET_SIG_FIELDS = ("take_profit", "max_hold_h")
+
 
 #: [2026-08-06 (kk)] A row that carries NO `policy` key at all — i.e. a close
 #: written before its book adopted the stamp. Distinct from a stamp that is
@@ -481,8 +498,10 @@ def stamp_state(extra):
 
     An ABSENCE IS NOT A CHANGE (I6). A malformed stamp still is — that half of
     the fail-closed contract is unchanged."""
-    if not isinstance(extra, dict) or "policy" not in extra:
+    if not isinstance(extra, dict):
         return ABSENT
+    if "policy" not in extra:
+        return _bracket_state(extra)
     pol = extra.get("policy")
     if not isinstance(pol, dict):
         return None
@@ -491,6 +510,36 @@ def stamp_state(extra):
         return None
     try:
         return json.dumps(sig, sort_keys=True)
+    except (TypeError, ValueError):
+        return None
+
+
+def _bracket_state(extra):
+    """[2026-08-06 (km)] The era signature for a book that stamps its EXIT
+    BRACKET at entry (`extra.bars` + `bars_basis`) rather than an explicit
+    `extra.policy` block. 💸 the Funding Farmer has recorded this on every
+    close for weeks and the gate never read it.
+
+    `bars_basis` is load-bearing and is checked, not assumed:
+      * `"entry"` — the values in force when the position was OPENED. That is
+        the era doctrine's own rule (a trade's policy is fixed when it is
+        taken; a straddler belongs to neither side), so only these are read.
+      * anything else (`"close-legacy"`) — the row carries the bars ACTIVE AT
+        CLOSE, which cannot tell us the policy the trade was taken under. It
+        is treated as ABSENT, i.e. pre-adoption: an absence is not a change
+        ((kk)). Calling it unreadable instead would manufacture a boundary on
+        every legacy row and re-introduce the exact bug (kk) removed.
+    """
+    if extra.get("bars_basis") != "entry":
+        return ABSENT
+    bars = extra.get("bars")
+    if not isinstance(bars, dict):
+        return None
+    sig = {k: bars[k] for k in BRACKET_SIG_FIELDS if k in bars}
+    if not sig:
+        return None
+    try:
+        return json.dumps({"bracket": sig}, sort_keys=True)
     except (TypeError, ValueError):
         return None
 
