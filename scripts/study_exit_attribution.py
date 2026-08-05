@@ -99,9 +99,44 @@ def fetch_trades(limit=None, url=None):
     except Exception as e:      # noqa: BLE001
         print(f"could not fetch {u}: {type(e).__name__}: {e}", file=sys.stderr)
         return []
-    if isinstance(d, list):
-        return d
-    return d.get("trades") or d.get("rows") or []
+    rows = d if isinstance(d, list) else (d.get("trades") or d.get("rows") or [])
+    # [2026-08-05 (kf)] APPLY THE LEDGER QUARANTINE. `/trades.json` serves the
+    # ledger UNFILTERED, so this study read the 44 rows `(hr)` withholds from
+    # grading — the BOT/USDC and CXMT/USDC basis defect, where a mark sitting
+    # ~747bps off its own book top made a short read as instantly +7.5% in
+    # profit, tripped `tp`, and closed at a loss 43 times in 4.5 hours. ONE
+    # episode, not 43 trades.
+    #
+    # It inverted this study's largest exit row on the shadow Taker: raw it
+    # reads as a 42.6%-win 4.8-MINUTE take-profit (a rule firing far too early),
+    # clean it is a 96.0%-win 8.97h take-profit — the book's single best
+    # mechanism. An exit pass reading the raw number would have tightened the
+    # one rule that works.
+    #
+    # Fail-OPEN, matching `is_quarantined`'s own contract: if the store cannot
+    # be imported the rows pass through, because a study that silently drops
+    # its input is worse than one that reports too much.
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__)))))
+        from bot_pnl_store import is_quarantined
+    except Exception:      # noqa: BLE001
+        return rows
+    keep, dropped = [], 0
+    for r in rows:
+        try:
+            if is_quarantined(r.get("bot"), r.get("pair"),
+                              r.get("closed_at") or r.get("close_ts")):
+                dropped += 1
+                continue
+        except Exception:  # noqa: BLE001
+            pass
+        keep.append(r)
+    if dropped:
+        print(f"ledger quarantine: {dropped} row(s) withheld — real trades, "
+              f"not admissible evidence (see LEDGER_QUARANTINE)",
+              file=sys.stderr)
+    return keep
 
 
 def retired_rows():

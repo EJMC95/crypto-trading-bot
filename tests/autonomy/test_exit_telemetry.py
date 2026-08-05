@@ -271,3 +271,105 @@ def test_no_bot_has_prices_in_scope_and_omits_them():
         + "\n  ".join(offenders)
         + "\nThe pipe is built end to end; leaving the tap shut makes the "
           "book's exit unfalsifiable.")
+
+
+# ---------------------------------------------------------------------------
+# 5. [2026-08-05 (kf)] SIDE IS THE SAME CLASS AS PRICE — and it cost a SIGN.
+#
+# `(gr)` closed "the bot holds the value in scope and never passes it" for
+# entry_price/exit_price. `side` had the identical defect and nobody looked:
+# `publish_paper_trade` has accepted side= since 17-Jul, 💸 the Farmer stamps
+# it on 71 of 71 priced closes, and 🎫 the Ticket Taker COMPUTED
+# `side = "long" if is_long else "short"` four lines above its publish call and
+# dropped it.
+#
+# THE COST, measured: `study_exit_sweep.load_trades` read a missing side as a
+# LONG (`"".startswith("s")` is False), so all 15 of the LIVE Taker's priced
+# closes — every one a SHORT — replayed backwards, and a candidate bracket
+# inverted from +0.397% to -0.397%/trade. Nine books publish 100%-NULL side.
+# ---------------------------------------------------------------------------
+_SIDE_EXEMPT = {
+    # Books whose ledger rows are not direction-bearing in the sweep's sense,
+    # or that are dead. Declared with a reason — silence is not an option.
+    "funding_carry_bot": "delta-neutral modelled; a leg pair has no single side",
+    # 🧲 Snap Back — RETIRED 4-Aug (jh) on the fleet's strongest evidence
+    # (t=-2.97, n=175, both halves negative). It idles at boot behind the
+    # guard, so it writes no further rows and its 170 side-less priced closes
+    # are frozen history that no stamp can reach. A resurrection commit
+    # (SNAPBACK_RETIRED_OVERRIDE) must delete this line — same contract as
+    # 🌊 Tide Rider's exemption in the (jd) seed guard.
+    "lighter_dislocation_bot": "retired (jh); idles at boot, writes no rows",
+}
+
+
+@pytest.mark.parametrize("mod", sorted(PRICE_BOOKS))
+def test_no_price_book_computes_a_side_and_omits_it(mod):
+    """A direction-bearing book must STAMP its side, not merely know it.
+
+    This is deliberately the `(gr)` test one field over: the failure mode is
+    identical (computed in scope, dropped at the call) and so is the fix.
+    """
+    if mod in _SIDE_EXEMPT:
+        pytest.skip(f"declared exempt: {_SIDE_EXEMPT[mod]}")
+    calls = _publish_calls(mod)
+    if not calls:
+        pytest.skip(f"{mod} writes no paper-trade rows")
+    src = (_ROOT / f"{mod}.py").read_text()
+    # Only bind books that actually reason about direction — a book with no
+    # notion of side cannot be asked for one.
+    if "is_long" not in src and "is_short" not in src:
+        pytest.skip(f"{mod} has no direction concept")
+    missing = [c.lineno for c in calls if "side" not in _kwargs(c)]
+    assert not missing, (
+        f"{mod} publishes a close WITHOUT side= at line(s) {missing}. The "
+        f"value is in scope — the exit sweep reads a missing side as a LONG, "
+        f"which replays every short backwards and inverts the sign of any "
+        f"bracket it recommends.")
+
+
+def test_the_ledger_can_carry_a_side_at_every_layer():
+    store = (_ROOT / "bot_pnl_store.py").read_text()
+    assert "side=None" in store, "writer signature must accept side"
+
+
+def test_the_sweep_skips_a_sideless_row_instead_of_guessing_long():
+    """The harness half. A missing side must be SKIPPED and COUNTED — never
+    defaulted — the same rule bot_pnl_store's `_rate()` applies to a missing
+    fill price, because a fabricated value reads as real data."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_ses", _ROOT / "scripts" / "study_exit_sweep.py")
+    ses = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ses)
+    rows = [
+        {"bot": "b", "pair": "X/USDC", "opened_at": "2026-08-01T00:00:00+00:00",
+         "entry_price": 100.0, "side": "short"},
+        {"bot": "b", "pair": "X/USDC", "opened_at": "2026-08-01T01:00:00+00:00",
+         "entry_price": 100.0, "side": None},          # <- must NOT become long
+        {"bot": "b", "pair": "X/USDC", "opened_at": "2026-08-01T02:00:00+00:00",
+         "entry_price": 100.0},                         # <- absent, same rule
+        {"bot": "b", "pair": "X/USDC", "opened_at": "2026-08-01T03:00:00+00:00",
+         "entry_price": 100.0, "side": "long"},
+    ]
+    trades, no_px, no_side = ses.load_trades("b", rows)
+    assert no_side == 2, f"both side-less rows must be skipped, got {no_side}"
+    assert len(trades) == 2, trades
+    assert [t["is_long"] for t in trades] == [False, True], \
+        "a short must replay SHORT — this is the sign the bug inverted"
+
+
+def test_the_funding_registry_refuses_the_live_real_money_book():
+    """A price-path sweep is the wrong instrument for a funding book, and the
+    LIVE Farmer was missing from the refusal set — so the CLI swept real money
+    as a price book and printed 'no stop, hold 96h, +1.282%/trade'."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_ses2", _ROOT / "scripts" / "study_exit_sweep.py")
+    ses = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ses)
+    for bot in ("perps-funding-lighter-lighter",      # REAL MONEY
+                "perps-funding-lighter-lshadow",
+                "perps-funding-carry-lshadow",
+                "band-barnes-lshadow"):
+        assert bot in ses.FUNDING_BOOKS, \
+            f"{bot} earns funding — a price sweep measures the wrong thing"

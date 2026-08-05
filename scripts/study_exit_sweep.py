@@ -94,6 +94,22 @@ FUNDING_BOOKS = {
     "perps-funding-carry-lshadow",
     "perps-funding-carry",
     "perps-funding-spread-lshadow",
+    # [2026-08-05 (kf)] BOTH FARMER ARMS AND BARNESY WERE MISSING, and the live
+    # arm is the fleet's REAL MONEY. 💸 the Funding Farmer harvests funding —
+    # its P&L is `accrued - fees +/- price` — so a pure price-path sweep is the
+    # wrong instrument for it by exactly the reasoning already written above for
+    # carry. Because it was absent from this set, the CLI swept it as a price
+    # book and printed a recommendation of "no stop, hold 96h, +1.282%/trade"
+    # for a real-money row. The one book that DOES calibrate measures that same
+    # shape at -0.718%/trade and 27.0% drawdown.
+    #
+    # 🎸 band-barnes is three funding sleeves (carry/extreme/xsect) and is added
+    # BEFORE it publishes its first close, so the refusal is in place from the
+    # start rather than after a wrong answer. Same reasoning as (kc) catching
+    # its allocation class while it was still free.
+    "perps-funding-lighter-lighter",
+    "perps-funding-lighter-lshadow",
+    "band-barnes-lshadow",
 }
 
 
@@ -749,8 +765,11 @@ def _iso(x):
 def load_trades(book, rows):
     """The book's real entries -> the shape simulate() wants. Rows WITHOUT an
     entry price are skipped and counted: before `(gr)` that was every row on
-    most books, which is the whole reason this harness could not run."""
-    out, no_px = [], 0
+    most books, which is the whole reason this harness could not run.
+
+    [(kf)] Rows without a readable SIDE are skipped and counted the same way —
+    see the comment at the skip. Returns (trades, no_px, no_side)."""
+    out, no_px, no_side = [], 0, 0
     for r in rows:
         if r.get("bot") != book:
             continue
@@ -763,9 +782,32 @@ def load_trades(book, rows):
             no_px += 1
             continue
         sym = str(r.get("pair") or "").split("/")[0].strip()
+        # [2026-08-05 (kf)] A MISSING SIDE IS SKIPPED, NEVER GUESSED. This read
+        # `not str(r.get("side","")).lower().startswith("s")`, and `""` does not
+        # start with "s", so **every side-less row became a LONG**. Measured:
+        # nine books publish 100%-NULL side on their priced closes, and on the
+        # LIVE Ticket Taker that is 15 of 15 rows — all of them SHORTS —
+        # replayed backwards. A candidate bracket read +0.397%/trade under the
+        # bug and -0.397%/trade corrected: an exact SIGN INVERSION in the
+        # instrument this fleet uses to choose exits.
+        #
+        # The Farmer is the CONTROL GROUP that makes the absence a finding (I6):
+        # it stamps side on 71 of 71 priced closes, so "no side" is a publisher
+        # gap, not a venue one. Same rule as bot_pnl_store's `_rate()` — a
+        # missing fill price stays None rather than becoming 0.0, because a
+        # fabricated value reads as real data.
+        side = r.get("side")
+        s = str(side).strip().lower() if side is not None else ""
+        if s.startswith("s"):
+            is_long = False
+        elif s.startswith("l") or s.startswith("b"):
+            is_long = True
+        else:
+            no_side += 1
+            continue
         out.append({"sym": sym, "entry_ts": int(a.timestamp()), "entry_px": px,
-                    "is_long": not str(r.get("side", "")).lower().startswith("s")})
-    return out, no_px
+                    "is_long": is_long})
+    return out, no_px, no_side
 
 
 def main():
@@ -795,7 +837,12 @@ def main():
                   f"not price, so a price-path sweep measures the wrong thing. "
                   f"Needs a funding sweep off /api/v1/fundings.")
             continue
-        trades, no_px = load_trades(book, rows)
+        trades, no_px, no_side = load_trades(book, rows)
+        if no_side:
+            print(f"{book}: {no_side} priced closes carry NO side and were "
+                  f"SKIPPED — a side-less row used to be replayed as a LONG, "
+                  f"which inverts every short ((kf)). Fix the publisher, then "
+                  f"re-run; a partial sample is not a reason to guess.")
         if no_px and not trades:
             print(f"{book}: {no_px} closes carry NO entry_price — nothing to "
                   f"sweep. (gr) turned this telemetry on; rows recorded before "
@@ -817,7 +864,35 @@ def main():
         grid = {"tp_pct": [None, 0.02, 0.04, 0.06, 0.10],
                 "sl_pct": [None, 0.02, 0.03, 0.05],
                 "max_hold_h": [4, 12, 24, 48, 96]}
-        res = sweep(trades, candles, grid, cap=a.cap)
+        # [2026-08-05 (kf)] THE CALIBRATION GATE NOW FIRES ON THE PATH HUMANS
+        # RUN. `sweep()` computes its shipped-rule replay, calibration and
+        # verdict ONLY inside `if shipped is not None`, and this call site — the
+        # ONLY one outside the selftest — passed neither `shipped` nor
+        # `actual_mean_pct`. So the library was fail-CLOSED and the CLI was not:
+        # every recommendation it has ever printed skipped the gate that (gx)
+        # calls "the point", the one that WITHHOLDS a recommendation when the
+        # harness cannot reproduce what actually happened.
+        #
+        # Measured on the one book that calibrates: adopting this CLI's own
+        # top-ranked rule is -0.934pp/trade and +18.0pp of drawdown. The gate
+        # existed, was correct, and was inert on the path anyone used — I9/(iz)
+        # exactly, a declared enforcement that EXISTS and does not run.
+        actual = [float(r["pnl_pct"]) * 100.0 for r in rows
+                  if r.get("bot") == book and r.get("pnl_pct") is not None]
+        res = sweep(trades, candles, grid, cap=a.cap,
+                    shipped=shipped_rule(book),
+                    actual_mean_pct=(sum(actual) / len(actual)
+                                     if actual else None))
+        v = res.get("verdict") or {}
+        if res.get("calibration") is not None:
+            _status = ("FAIL — every recommendation below is WITHHELD"
+                       if v.get("withheld") else "PASS")
+            print(f"   calibration: replayed shipped rule vs the book's own "
+                  f"ledger = {res['calibration']:+.3f}pp ({_status})")
+        elif shipped_rule(book) is None:
+            print(f"   calibration: SKIPPED — {book}'s shipped exit rule could "
+                  f"not be read from its module, so there is no baseline to "
+                  f"reproduce. Recommendations are unvalidated.")
         out[book] = res
         print(f"\n{book}: {len(trades)} priced closes, {no_px} unpriced, "
               f"{res.get('n_rules')} rules")

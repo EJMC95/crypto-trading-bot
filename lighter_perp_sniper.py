@@ -567,6 +567,11 @@ def main():
         store.publish_paper_trade(
             bot_id, trade_id=f"{coin}:{ent_ts}", pnl_abs=float(pnl), pnl_pct=pnl_pct,
             pair=coin, opened_at=oa, closed_at=datetime.now(timezone.utc).isoformat(),
+            # [2026-08-05 (kf)] `was_long` is used two lines above to sign
+            # pnl_pct and was then dropped — the (gr) shape, one field over.
+            # A side-less row used to replay as a LONG in study_exit_sweep,
+            # inverting every short.
+            side=("long" if was_long else "short"),
             # [2026-08-04] source-stamped close tag (`long-young_max_hold` ...)
             # so the brain and study_exit_attribution grade each admission
             # source separately; a position with no recorded source (opened

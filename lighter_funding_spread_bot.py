@@ -435,6 +435,10 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
             pnl_pct=pnl_pct, pair=coin, opened_at=oa,
             closed_at=datetime.now(timezone.utc).isoformat(),
             reason=("long_" if was_long else "short_") + reason,
+            # [2026-08-05 (kf)] the direction is already used to build `reason`
+            # on the line above; stamping it as a first-class field means a
+            # grader does not have to parse prose to know which way a LEG ran.
+            side=("long" if was_long else "short"),
             # [2026-07-30 (gr)] EXIT TELEMETRY — computed above for pnl_pct,
             # then discarded. publish_paper_trade has accepted these since
             # 17-Jul, the DB column exists, the reader SELECTs them and

@@ -1842,6 +1842,21 @@ def main(_ctx=None):
             pnl_pct=round(net / clip_used, 6),
             pair=f"{sym}/USDC",
             opened_at=m.get("opened"), closed_at=iso(t_now),
+            # [2026-08-05 (kf)] `side` is stamped. It was COMPUTED four lines
+            # above and dropped — the exact (gr) shape, where 8 of 9 bots held
+            # the value in scope and never passed it. `publish_paper_trade` has
+            # accepted side= since 17-Jul and 💸 the Farmer stamps it on 71 of
+            # 71 priced closes, which is the control group that makes this
+            # absence a finding (I6) rather than a venue quirk.
+            #
+            # THE COST while it was missing: `study_exit_sweep.load_trades`
+            # read a missing side as a LONG, so all 15 of the LIVE Taker's
+            # priced closes — every one a SHORT — replayed backwards, and a
+            # candidate bracket inverted from +0.397% to -0.397%/trade. The
+            # harness now SKIPS side-less rows instead of guessing, so without
+            # this stamp the book is simply unsweepable; with it, its exits
+            # become analysable for the first time.
+            side=side,
             reason=f"{side}-{lens}_{reason}",
             # [2026-07-15 AUDIT FIX] provenance: venue + arm on every row —
             # venue NULL claimed the pre-Gate-0 HL-paper era.
