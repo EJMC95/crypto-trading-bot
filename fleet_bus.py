@@ -454,21 +454,96 @@ NONCRYPTO_BASES = {s.strip().upper() for s in os.environ.get(
     # signal, and it was one of the five legs 🎸 Barnesy held when this shipped)
     "WTI,BRENTOIL,NATGAS,USOIL,XAU,XAG,XCU,XPD,XPT,PAXG,WHEAT,CORN,"
     # FX
-    "USDJPY,AUDUSD,EURUSD,GBPUSD,USDCNH").split(",") if s.strip()}
+    "USDJPY,AUDUSD,EURUSD,GBPUSD,USDCNH,"
+    # [2026-08-06] THE 41 THIS LIST WAS MISSING, from the venue's own
+    # `strategy_index` (see `is_crypto`). Kept in sync with the live field so
+    # a dark scout falls back to the RIGHT answer rather than to yesterday's.
+    # Grouped by the venue's class so the next reconciliation is readable.
+    # 4=FX
+    "NZDUSD,USDCAD,USDCHF,USDHKD,USDKRW,"
+    # 3=commodities
+    "H100,URA,"
+    # 5=US equities — BB (BlackBerry), BE (Bloom Energy), WEN (Wendy's), BOT,
+    # CAP and QNT are the reason this is read and not eyeballed: every one of
+    # them reads as a crypto ticker.
+    "AAOI,BB,BE,BOT,BOTZ,CRWV,DRAM,GEV,GME,IBM,NOK,NOW,QNT,STRC,TTWO,WEN,"
+    # 6=Asian equities
+    "BYD,HYUNDAIUSD,MINIMAX,POPMART,SAMSUNGUSD,SKHY,SKHYNIXUSD,SMIC,TENCENT,"
+    "XIAOMI,"
+    # 7=pre-IPO / private
+    "ADI,ANSEM,ANTHROPIC,CAP,CXMT,FOLKS,OPENAI,UNITREE").split(",")
+    if s.strip()}
 
 
-def is_crypto(sym):
+#: [2026-08-06] The venue's own class for a crypto book, from the
+#: `strategy_index` field on `/api/v1/orderBookDetails` — published by the
+#: market scout as `lighter-market.classes`. Everything else it lists
+#: (3=commodities, 4=FX, 5=US equities, 6=Asian equities, 7=pre-IPO) is not.
+CRYPTO_STRATEGY_INDEX = 2
+
+#: Symbols where the fleet DELIBERATELY overrules the venue's class. The venue
+#: files PAXG under crypto (it is a token); the fleet trades it as a metal
+#: price, which is the question `is_crypto` is actually asked. Declared here
+#: rather than silently, because an override is a judgement call and the next
+#: reader is entitled to see whose it was — and (ki) mutation-tested exactly
+#: this entry being "corrected" back out.
+NONCRYPTO_OVERRIDE = {"PAXG"}
+
+
+def _venue_class(sym, current_time=None):
+    """The venue's own `strategy_index` for `sym`, or None when the scout is
+    dark, stale, or has no entry. Never raises."""
+    try:
+        p = _load("lighter-market", current_time)
+        if not p or not is_fresh(p, current_time):
+            return None
+        classes = p.get("classes")
+        if not isinstance(classes, dict):
+            return None
+        v = classes.get(sym)
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            return None
+        return int(v)
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def is_crypto(sym, current_time=None):
     """True when `sym` is a crypto book on this venue.
 
-    Fail-OPEN: an unrecognised symbol is treated as CRYPTO, because the venue
-    lists new crypto books constantly and a closed default would silently
-    starve a book every time one appeared. The cost of the open default is a
-    genuinely new non-crypto listing slipping through until it is declared —
-    visible, and far cheaper than a book that stops trading."""
+    [2026-08-06] THE VENUE CLASSIFIES ITS OWN INSTRUMENTS AND WE WERE GUESSING.
+    `(ki)` made this the ONE owner of the question a day earlier, seeded from
+    the widest hand list the fleet had. Measured against the venue's own
+    `strategy_index` the next morning, that list was wrong on **41 of 204
+    active books** — every FX cross but four, every tokenised Asian equity,
+    the whole pre-IPO shelf (ANTHROPIC, OPENAI), and six US tickers that read
+    as crypto slang (BB, BE, WEN, BOT, CAP, QNT). A hand list cannot track a
+    venue that lists new instruments weekly; this reads the fact instead.
+
+    Order of authority, most specific first:
+      1. `NONCRYPTO_OVERRIDE` — the fleet's declared judgement calls;
+      2. the scout's published `classes` — the venue's own answer;
+      3. `NONCRYPTO_BASES` — the fallback for a dark or stale scout. It is
+         kept in sync with (2) rather than retired: an organ outage must not
+         silently re-admit 41 equities to a funding-rank book.
+
+    Fail-OPEN at the end: an unrecognised symbol is treated as CRYPTO, because
+    the venue lists new crypto books constantly and a closed default would
+    silently starve a book every time one appeared. The residual cost is a
+    genuinely new non-crypto listing slipping through until the scout's next
+    publish — hours now, not "until a human notices"."""
     try:
-        return str(sym or "").strip().upper() not in NONCRYPTO_BASES
+        s = str(sym or "").strip().upper()
     except Exception:      # noqa: BLE001
         return True
+    if not s:
+        return True
+    if s in NONCRYPTO_OVERRIDE:
+        return False
+    idx = _venue_class(s, current_time)
+    if idx is not None:
+        return idx == CRYPTO_STRATEGY_INDEX
+    return s not in NONCRYPTO_BASES
 
 
 def crypto_only(symbols):

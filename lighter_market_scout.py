@@ -180,6 +180,21 @@ def book_stats(books, min_qvol):
                 # exactly why this is published rather than hardcoded anywhere.
                 "taker_fee": float(b.get("taker_fee") or 0.0),
                 "maker_fee": float(b.get("maker_fee") or 0.0),
+                # [2026-08-06] the venue's OWN INSTRUMENT CLASS. Same story as
+                # `created_at` above: it was on every row of a response this
+                # organ already fetches, and the fleet was maintaining FIVE
+                # hand-typed non-crypto lists instead of reading it. Measured
+                # across the 204 active books, it separates them exactly:
+                #   2=crypto (111)  3=commodities (11)  4=FX (9)
+                #   5=US equities (52)  6=Asian equities (12)  7=pre-IPO (9)
+                # NOT `or None` — index 0 exists on inactive rows and is a
+                # legitimate value, so a falsy-test would discard it.
+                "strategy_index": (int(b["strategy_index"])
+                                   if isinstance(b.get("strategy_index"),
+                                                 (int, float))
+                                   and not isinstance(b.get("strategy_index"),
+                                                      bool)
+                                   else None),
             }
         except (TypeError, ValueError):
             continue
@@ -506,6 +521,18 @@ def build_snapshot(stats, lighter_apr, other_aprs, prev_marks, regimes=None,
                    for s, v in stats.items()
                    if (v.get("created_ms") or 0) > 0
                    and now_ms > v["created_ms"]},
+        # [2026-08-06] the venue's own instrument class per book, behind
+        # `fleet_bus.is_crypto()`. Published for the same reason `fees` is:
+        # the alternative is a hand list that rots. Measured the day this
+        # shipped — the fleet's 60-name hand list disagreed with this field on
+        # **41 of 204 active books**, every one of them a real non-crypto
+        # instrument the list had missed (5 FX pairs, 16 US equities, 10 Asian
+        # equities, 8 pre-IPO names, 2 commodities). Among them BB, BE, WEN,
+        # BOT, CAP and QNT — tickers that read like crypto slang and which no
+        # human sweep would ever have caught by eye. That is the argument for
+        # the field over any list, stated as a number.
+        "classes": {s: v["strategy_index"] for s, v in stats.items()
+                    if v.get("strategy_index") is not None},
         # compact diff base for the NEXT run (all active books, not just liquid,
         # so listings/delistings diff over the full set)
         "_marks": {s: [round(v["qvol"], 2), round(v["oi"], 4)]
