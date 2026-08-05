@@ -349,6 +349,23 @@ def resolve_universe(configured, width, min_vol_m, current_time=None):
                                          current_time=current_time)
     except Exception:  # noqa: BLE001
         return out
+    # [2026-08-05 (ki)] THE TOP-UP IS CRYPTO-ONLY. The configured core is NOT
+    # filtered — it is the backtested list and this function's own contract
+    # says those names are never dropped. Only the scout's widening is
+    # screened, which is where non-crypto entered.
+    #
+    # INERT TODAY AND DELIBERATELY SHIPPED ANYWAY: after (jg) reverted
+    # `universe_n` 60 -> 30 and the core is 30 names, `len(out) >= width` on
+    # the first pass, so nothing tops up at all — verified, the book holds ZERO
+    # legs right now and its resolved universe reads 25. This is a REGRESSION
+    # GUARD: the registry cage still permits `fundspread.universe_n` up to 90,
+    # so the next widening would re-admit equities silently. Measured on this
+    # book's own ledger, the population it re-admits is -9.209%/trade (n=19,
+    # t=-2.80, block-permuted P=0.002, both halves negative).
+    try:
+        extra = fleet_bus.crypto_only(extra)
+    except Exception:  # noqa: BLE001
+        pass           # fail-open: a filter fault must not shrink the book
     have = set(out)
     for sym in extra:
         if len(out) >= int(width):

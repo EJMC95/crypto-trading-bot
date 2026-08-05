@@ -705,6 +705,31 @@ def main():
                 if not uni:
                     uni = [c for c, f in fund.items()
                            if float(f.get("vol") or 0.0) >= XSECT_MIN_VOL_M * 1e6]
+                # [2026-08-05 (ki)] CRYPTO ONLY. This sleeve ranks the venue by
+                # |TRUE apr| and takes the extremes, and the extremes of a
+                # funding cross-section are exactly where the tokenised
+                # equities, indices and FX sit. Unlike its parent ⚖️
+                # Counterweight — which starts from a VALIDATED 30-name crypto
+                # core and only tops up from the scout — this sleeve had NO
+                # core at all: `scout_universe(min_vol_m=1.0, limit=60)` ranked
+                # by volume, full stop.
+                #
+                # MEASURED THE DAY THIS SHIPPED, on the live book: 5 of its 10
+                # held legs were non-crypto — a long-AAPL / short-AMD
+                # single-stock semiconductor pair, plus PAXG (gold), US500 and
+                # US100 — inside a book whose whole thesis is funding carry.
+                # The parent's own ledger prices that population at
+                # -9.209%/trade (n=19, t=-2.80, block-permuted P=0.002).
+                #
+                # Applied to BOTH paths deliberately: the scout list and the
+                # venue-direct fallback are two ways into the same rank, and
+                # filtering one leaves the book one dark organ away from the
+                # behaviour this removes.
+                if fleet_bus is not None:
+                    try:
+                        uni = fleet_bus.crypto_only(uni)
+                    except Exception:  # noqa: BLE001
+                        pass           # fail-open: never stop trading on this
                 aprs = {}
                 for c in uni:
                     f = fund.get(c)

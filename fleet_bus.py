@@ -424,6 +424,65 @@ def venue_stress_bps(current_time=None):
         return None
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-05 (ki)] IS THIS BOOK CRYPTO? — one owner, because there were FOUR.
+#
+# Lighter lists ~27 non-crypto perps (tokenised equities, indices, FX,
+# commodities) beside its crypto books, and a FUNDING-RANK book that ranks the
+# whole venue by |APR| will happily take them: the extremes of a funding
+# cross-section are exactly where the odd instruments sit. Measured on
+# ⚖️ Counterweight's own ledger: CRYPTO legs n=69 at +0.227%/trade, NON-CRYPTO
+# legs n=19 at **-9.209%/trade, t=-2.80**, both halves negative, -$34.52 — and
+# the split survives a BLOCK permutation over close-minute groups at P=0.002
+# (legs close in batches, so the effective n is ~23, not 88).
+#
+# WHY A NEW OWNER RATHER THAN A FIFTH LIST: the fleet already had four, and
+# they had drifted — `lighter_ticket_taker.TRADFI_BASES` (58 names, the true
+# superset), `fleet_risk.EQUITY_BASES` (28, no commodities or FX),
+# `regime_oracle.NONCRYPTO` (10, a category map) and
+# `lighter_family_bot.NONCRYPTO_UNIVERSE` (10). The last two are DELIBERATELY
+# narrower — "books we have a regime for" and "books the family may trade" are
+# different questions from "is this crypto" — so this seeds from the superset
+# and a test pins that relationship instead of collapsing them.
+NONCRYPTO_BASES = {s.strip().upper() for s in os.environ.get(
+    "FLEET_NONCRYPTO_BASES",
+    # equities + indices
+    "SPY,QQQ,IWM,US100,US500,SOXL,AMD,MU,HOOD,RKLB,TSLA,NVDA,AAPL,MSFT,META,"
+    "GOOGL,GOOG,AMZN,COIN,MSTR,PLTR,TSM,INTC,SKHYNIX,AMAT,EWY,LITE,CRCL,BMNR,"
+    "SNDK,NBIS,MRVL,ASML,BABA,DELL,ORCL,QCOM,AVGO,ARM,SMCI,SPCX,ZHIPU,CBRS,"
+    # commodities (PAXG is gold-backed: a metal price, not a crypto funding
+    # signal, and it was one of the five legs 🎸 Barnesy held when this shipped)
+    "WTI,BRENTOIL,NATGAS,USOIL,XAU,XAG,XCU,XPD,XPT,PAXG,WHEAT,CORN,"
+    # FX
+    "USDJPY,AUDUSD,EURUSD,GBPUSD,USDCNH").split(",") if s.strip()}
+
+
+def is_crypto(sym):
+    """True when `sym` is a crypto book on this venue.
+
+    Fail-OPEN: an unrecognised symbol is treated as CRYPTO, because the venue
+    lists new crypto books constantly and a closed default would silently
+    starve a book every time one appeared. The cost of the open default is a
+    genuinely new non-crypto listing slipping through until it is declared —
+    visible, and far cheaper than a book that stops trading."""
+    try:
+        return str(sym or "").strip().upper() not in NONCRYPTO_BASES
+    except Exception:      # noqa: BLE001
+        return True
+
+
+def crypto_only(symbols):
+    """`symbols` with the venue's non-crypto books removed, order preserved.
+
+    Never raises and never returns None — a caller that gets [] must read it as
+    "no opinion, keep your configured list", the same contract as
+    `scout_universe`."""
+    try:
+        return [s for s in (symbols or []) if is_crypto(s)]
+    except Exception:      # noqa: BLE001
+        return list(symbols or [])
+
+
 if __name__ == "__main__":
     # offline selftest: prime the cache directly, exercise the fail-safe
     # contract (no DB touched)
