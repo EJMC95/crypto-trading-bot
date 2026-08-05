@@ -150,6 +150,51 @@ CANDIDATES = [
     # is kept verbatim on purpose: the numbers are real, the INFERENCE from
     # them to "raise the bar" is what the 29-Jul study falsified.
     {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
+    # [2026-08-05 (ju)] enter-gate-0.105 — the measured-friction study
+    # (STUDY_MEASURED_FRICTION_2026-08-05 §3b, entry (js)) filed through
+    # THIS channel.
+    # DERIVATION, from measured fills not assumption: Farmer round trip =
+    # 0.22 + 0.36 = 0.58bps median (n=91 tx-hash fills) at the live book's
+    # own 5.9h median hold -> breakeven 0.58e-4 * 8760 / 5.9 = 8.6% TRUE apr;
+    # the bar is the venue's RESTING DEFAULT 0.105 = breakeven + 22% margin
+    # (an entry at 10.5% pays its round trip in ~4.8h vs the 5.9h the market
+    # grants). 0.105 is the exact "enter only above modal" candidate the
+    # 30-Jul A1 cage widening (hi -> 0.12, operator-signed) existed to make
+    # askable. Registration only: nothing moves until this candidate's slot
+    # arrives, and then only on the shadow twin; live.funding.* still changes
+    # ONLY via this judge's paired bar.
+    # WHY IT SITS LAST — the tape prior is AGAINST it, recorded here so the
+    # eventual verdict is era-honest: on the cached 180d/25-book tape at
+    # HEAD, varying ONLY (gate, slip), gate 0.05 nets +$15.60/+$10.65 at
+    # measured slip 0.27/0.97bps while 0.105 nets +$5.58/+$0.42 — shipped
+    # beats this candidate full-window at BOTH measured frictions, and h1 is
+    # negative for every gate at every slip (the study's regime caveat). It
+    # is still worth a LAST-position slot because that same cache has a
+    # documented reproduction problem (§3b: the 23-Jul both-halves read does
+    # not reproduce; universe drift flips signs —
+    # [[backtest-cache-serves-the-wrong-universe]]), so the paired
+    # live-vs-shadow bar is the only instrument that can settle it — and the
+    # bar fails closed: no promotion unless the twin beats live by >=0.5pp
+    # on the window AND both halves.
+    # TRIPWIRE DEPENDENCY: the premise is the measured 0.58bps rt, guarded
+    # by the published impl-shortfall.order_slip.live ~2bps tripwire (worst
+    # single measured fill in 13d: 2.06bps). At ~2bps rt the breakeven is
+    # 29.7% TRUE — OUTSIDE the cage — so a tripped guard kills this
+    # candidate's rationale; read any verdict against it.
+    # QUEUE NOTE — min_vol: the intended NEXT candidate (xp.funding.min_vol,
+    # registered (fz), consumed (ge)) is NOT filable today: it is absent
+    # from XP_TO_LIVE (a running spec would _needs_reset as invalid state)
+    # and apply_levers stamps no bars.min_vol receipt, so ran_candidate
+    # would exclude every close — the enter-gate-0.30@0.075 zero-accrual
+    # shape — and the receipt reaches the arms only with a marker-gated
+    # Farmer deploy. When that pass lands, its candidate slots ABOVE this
+    # one: its prior (the study's per-tier friction table) is unrefuted,
+    # while this row's tape prior is negative. Measured 05-Aug at its $2M
+    # cage floor: +3 books on the live snapshot (LIT 31.5% APR clears its
+    # tier's ~3.9bps-rt breakeven; ZEC/PUMP at the 10.5% resting default),
+    # and ALL five extreme books that motivated the lever ($0.11-0.35M)
+    # sit BELOW the cage floor — carry that to the min_vol pass.
+    {"name": "enter-gate-0.105", "levers": {"xp.funding.enter_apr": 0.105}},
 ]
 XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               "xp.funding.take_profit": "live.funding.take_profit",
@@ -1732,7 +1777,11 @@ def _selftest():
     # 28-Jul D7 order was reversed once the 29-Jul TP study falsified
     # tp-0.06's premise. Pinned so a silent re-shuffle of the fleet's only
     # path to live.funding.* cannot pass unnoticed.
-    assert names[:2] == ["slope-gate-off", "tp-0.06"], names
+    # [2026-08-05 (ju)] enter-gate-0.105 is pinned LAST of the statics: its
+    # tape prior is negative vs shipped at measured friction (see the
+    # CANDIDATES comment), so it must never outrank the supported
+    # (slope-gate-off) or merely-mute (tp-0.06) candidates.
+    assert names[:3] == ["slope-gate-off", "tp-0.06", "enter-gate-0.105"], names
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -1747,7 +1796,8 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["slope-gate-off", "tp-0.06", "xp-enter_apr-0.0625"], n2
+    assert n2 == ["slope-gate-off", "tp-0.06", "enter-gate-0.105",
+                  "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
     # 96-vs-96.0 dedup are withdrawn — see CANDIDATES)
@@ -1840,7 +1890,12 @@ def _selftest():
     # gate-off +$34.07); tp-0.06 follows, unsupported-but-not-refuted.
     assert next_candidate(pool, [], None)["name"] == "slope-gate-off"
     assert next_candidate(pool, ["slope-gate-off"], None)["name"] == "tp-0.06"
+    # [2026-08-05 (ju)] the third static precedes queue proposals by pool
+    # construction (statics first), then the incubator's xp-tp-0.05
     assert next_candidate(pool, ["slope-gate-off", "tp-0.06"],
+                          None)["name"] == "enter-gate-0.105"
+    assert next_candidate(pool, ["slope-gate-off", "tp-0.06",
+                                 "enter-gate-0.105"],
                           None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 
