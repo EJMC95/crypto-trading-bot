@@ -1196,6 +1196,17 @@ All new bots:
   Deploy live from a CLEAN worktree: `railway up` uploads your DESK, WIP and
   all ([[deploy-live-from-a-clean-worktree]]).
 - Dashboard service: `pnl-dashboard`
+- **A SERVICE'S `DATABASE_URL` IS A REFERENCE, NEVER A LITERAL (5-Aug (kb),
+  measured the hard way).** During the credential rotation, 13 services held
+  PASTED old-password URLs and every one went dark the moment the DB changed —
+  the dashboard 500'd while its container was perfectly healthy. All consumers
+  now carry `DATABASE_URL=${{Postgres.DATABASE_URL}}` (Railway resolves the
+  reference and auto-redeploys on variable change), so a future rotation is
+  ONE change at the source. A literal DB URL on any service is a defect.
+  Superuser access + the full rotation runbook (the `railway ssh` word-split
+  trap, the stdin/`env -u`/`su postgres` form, Keychain custody): memory
+  `pg-rotation-runbook`. The leaked pre-July credential is DEAD, verified
+  refused.
 
 ## Rules
 - **BEFORE EVERY COMMIT, CHECK THAT EACH MODIFIED FILE IS ONE YOU MEANT TO

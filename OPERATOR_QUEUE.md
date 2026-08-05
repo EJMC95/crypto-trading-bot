@@ -111,14 +111,11 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   2b. `freqtrade-{mum,dad,avo-maria,georgia}` — still EXIST in the project
      (visible in `status --json`) but hold no running deployment; delete at
      the dashboard whenever.
-  3. `tide-rider-lighter-shadow` — retired (if). **Repo half DONE 5-Aug**:
-     paths/grep/AUTO_IMAGES entries removed (image declared in
-     MANUAL_IMAGES_OK; `test_retired_services_have_no_deploy_rule` pins the
-     rule's absence). Safe to delete the service whenever you like.
-  4. `snap-back-shadow` — retired 4-Aug (jh). **Repo half DONE 5-Aug**, same
-     treatment as tide-rider above. Safe to delete the service whenever you
-     like. (Until then it idles harmlessly behind the code guard — the
-     container prints the retirement line and sleeps.)
+  3. ~~`tide-rider-lighter-shadow`~~ **DELETED 5-Aug** (repo half landed
+     first — paths/grep/AUTO_IMAGES removed, image in MANUAL_IMAGES_OK,
+     rule-absence pinned by test — then the service).
+  4. ~~`snap-back-shadow`~~ **DELETED 5-Aug**, same sequence. Project now at
+     **15 services, every one load-bearing**.
   5. Offline corpses: `freqtrade-{mum,dad,georgia,avo-maria}`.
   6. `nrl-feed` → move to its own Railway project (cost attribution + its
      failing workflow leaves this repo's CI).
@@ -126,13 +123,12 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   — now deliberate), both live services, the remaining live shadow services,
   `pnl-dashboard`, `market-context`, `Postgres`, `freqtrade-bots`.
   Saving: ~6 containers ≈ $10–30/mo + the resurrect hazard gone.
-- **Five git-connected shadow services** (snap-back, counterweight,
-  equities-regime, perp-sniper, family — Railway auto-deploys them from main
-  beside the workflow's own `railway up`). Options: **A ★ disconnect** (one
-  `railway service source disconnect --service <name>` each — same command
-  (ip) used on the live Farmer; consistency, one deploy path), **B** keep +
-  declare in CLAUDE.md with a guard asserting the branch is main (they are
-  harmless-to-helpful while pointed at main). Either is defensible; A is
+- ~~Five git-connected shadow services~~ — **DONE 4-Aug (option A)**: all
+  five disconnected (`railway service source disconnect`), verified
+  `source={"image":null,"repo":null}` on each — the whole fleet now matches
+  the live pair: `railway up` from the workflow is the ONLY deploy path
+  anywhere. (Historical options kept for the record: **B** was keep +
+  declare with a branch guard; A won on consistency — one deploy path,
   cleaner doctrine. **[5-Aug: DONE — option A executed on the operator's
   explicit direction ("attend to railway item"), all five disconnected and
   VERIFIED: `railway status --json` reads `source: null` on EVERY service in
@@ -161,11 +157,16 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
 
 ## 4 · Security / hygiene
 
-- **Postgres password rotation** — still open, now less theoretical (copies
-  existed in the dropped stash and in session scratchpads). Rotate in
-  Railway → update `DATABASE_URL` references → the gitleaks hook already
-  guards new commits.
-- **LuLu** — flip `allowInstalled=false` (the 29-Jul posture sweep's one gap).
+- ~~Postgres password rotation~~ — **DONE 5-Aug (kb), the hard way.** The
+  leaked credential is DEAD (verified refused); the live value exists only in
+  the DB and the operator's macOS Keychain (`security find-generic-password
+  -s fleet-pg-rotation -w`). The incident en route produced the standing
+  rule now in Railway Setup: **every consumer's `DATABASE_URL` is the
+  `${{Postgres.DATABASE_URL}}` REFERENCE, never a literal** — 13 pasted
+  literals were what took the fleet dark mid-rotation. Full runbook incl.
+  the `railway ssh` stdin/quoting traps: memory `pg-rotation-runbook`.
+- ~~LuLu~~ — **DONE 5-Aug**: `allowInstalled = false` verified in
+  `/Library/Objective-See/LuLu/preferences.plist`.
 - *Done this session: scheduler purged (5 spent one-shots deleted; the four
   "Kraken-era P&L tasks" turned out to be unregistered leftover files — they
   never ran); all three git stashes verified superseded and dropped, with the
