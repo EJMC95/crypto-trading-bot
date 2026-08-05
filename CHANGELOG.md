@@ -1,3 +1,45 @@
+## 2026-08-05 (jz) — SEED-CLASS TRANCHE 2: eight more organs read their own save-keys CHECKED, and the shadow Taker's restore gets the treatment its live arm has had since 17-Jul
+
+- **(jq) closed five organs and measured a ~13-file frontier; this closes the
+  eight whose degrade analysis is simple**, each with its stated hazard:
+  fleet_risk (`equity_by_bot` carry-forward — a wiped read IS the false
+  drawdown the carry exists to prevent, feeding the governor), regime_oracle
+  (`pairs` — the item-18 per-asset grade ACCRUAL), market_pulse (`history` —
+  the brain's hourly series, RESET to one sample by a blip; degrade skips
+  only the postgres sink, the file sink still writes), fleet_respiration +
+  implementation_shortfall (transition/push memory — double-pages),
+  fleet_clock (a failed read fabricated a phantom TRANSITION row in history;
+  the payload itself is a pure recompute and still saves), and
+  lighter_market_scout — **deliberately FAIL-OPEN, measured safe**: an empty
+  `_marks` fires NOTHING (build_snapshot's own first-run defense) and the
+  diff base self-heals in one cycle, so skipping the save would delay the
+  whole fleet's snapshot for zero protection. A checked read with a
+  documented fail-open degrade is a legitimate member of the class — the
+  RULE is "never mistake a failed read for an empty one"; what you do next
+  is per-organ.
+- **The asymmetry with teeth: 🎫 the Taker's SHADOW restore.** The live arm's
+  STATE read has been checked-and-refusing since 17-Jul; the shadow arm kept
+  `load_state(STATE_KEY) or {}` the whole time — and it is a RUN-ONCE bot,
+  so every ~300s cycle is a boot: one Postgres blip seeded a fresh $1000
+  book over the graded shadow record (the very record that justified the
+  live divergence rule) and the cycle-end save made it durable. Now
+  mirrored: refuse the cycle, retry in ~300s.
+- All eight join `GUARDED_ORGANS`; the ratchet enforces them forever. The
+  frontier note is updated with the reasons each remaining file is NOT here
+  yet (fleet_tuning and fleet_proposals are locked multi-author
+  read-modify-writes — the growth rail's lever store deserves its own pass,
+  not a pattern-paste; market_context's fleet-alerts APPEND path;
+  bot_learn's brain-memory read with the era machinery in view). Two fresh
+  mutations (fleet_risk and the Taker reverted to unchecked) each reddened
+  exactly their ratchet case.
+- **Duplicate-work note, honestly**: this session also implemented
+  claim_writer on the Taker (ranked ⑧) with behavioral tests — and (jx)
+  landed the same guard on BOTH live-pair files first, broader (Farmer too,
+  halted-branch MTM, 8 AST arms). Mine is dropped wholesale in favor of
+  (jx); the one complementary piece kept is the shadow STATE_KEY read above,
+  which (jx) did not touch. First-to-main wins; two implementations of one
+  guard is how drift starts.
+
 ## 2026-08-05 (jx) — THE REAL-MONEY PAIR GETS carry's SOLE-WRITER GUARD, AND ITS MTM SERIES STOPS SKIPPING THE DAYS THAT MATTER
 
 - *(Drafted as (jh); moved to (jx) at push — (jh) was taken on main by the Snap Back retirement while this session ran. Rule 3 of the letter convention: the pushed entry keeps its letter.)*
