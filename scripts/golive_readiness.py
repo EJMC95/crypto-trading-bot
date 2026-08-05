@@ -632,10 +632,38 @@ def stats(rows, book_usd=None):
         peak = max(peak, eq)
         dd = min(dd, eq - peak)
     wins = sum(1 for x in pct if x > 0)
+    realised = sum(r[1] or 0 for r in rows)
     out.update(days=days, mean_pct=mean, t=t, h1=h1, h2=h2,
                win_rate=wins / n, max_dd_usd=dd,
                max_dd_frac=abs(dd) / book_usd if book_usd else None,
-               realised_usd=sum(r[1] or 0 for r in rows))
+               realised_usd=realised,
+               # [2026-08-05 (kg)] THE EARNING RATE. Every one of the six bars
+               # is SHAPE (mean, t, halves, maxdd) or SAMPLE SIZE (window,
+               # closes). NOT ONE OF THEM IS MONEY, and `realised_usd` was
+               # computed here and never published — so a change that destroys
+               # most of a book's dollars while improving its shape passes
+               # unseen. That is not hypothetical:
+               #
+               #   MEASURED on 💸 the LIVE Farmer, 71 priced closes replayed
+               #   against Lighter's own hourly candles — a take-profit at
+               #   0.28% yields win 85.9% and **t = +2.55, which PASSES the
+               #   t>=2.0 bar**, on a book earning $2.36 instead of $6.46.
+               #   In the limit it is fully degenerate: at TP=0.05% every
+               #   close returns +0.05%, giving win 100%, maxDD ~0 and
+               #   t = 6.1e15 on $0.80 of the book's $6.46.
+               #
+               # The mechanism is that TRUNCATION COLLAPSES VARIANCE FASTER
+               # THAN IT COLLAPSES THE MEAN, so tightening an exit INFLATES t.
+               # Win rate was removed from this gate on 29-Jul ((fk)) for good
+               # reasons and nothing replaced it as a sanity check on size, so
+               # between then and now the gate would have called a book READY
+               # while it earned a third as much.
+               #
+               # REPORTED, NOT A BAR. `BAR_NAMES` is the published contract and
+               # `grade()` is unchanged, so no verdict moves — re-specifying
+               # the gate is an operator act ((fk) was). This makes the damage
+               # VISIBLE; making it BLOCKING is the operator's call.
+               usd_per_day=(realised / days) if days > 0 else None)
     return out
 
 
@@ -944,14 +972,23 @@ def book_payload(s):
     if s.get("n", 0) < 2:
         out.update(days=None, mean_pct=None, t=None, win_pct=None,
                    max_dd_pct=None, h1=None, h2=None,
+                   net_usd=None, usd_per_day=None,
                    why=s.get("why") or "too few closes to grade")
         return out
     dd = s.get("max_dd_frac")
+    _upd = s.get("usd_per_day")
     out.update(days=round(s["days"], 1),
                mean_pct=round(100 * s["mean_pct"], 3),
                t=round(s["t"], 2), win_pct=round(100 * s["win_rate"], 1),
                max_dd_pct=(round(100 * dd, 1) if dd is not None else None),
-               h1=round(s["h1"], 2), h2=round(s["h2"], 2))
+               h1=round(s["h1"], 2), h2=round(s["h2"], 2),
+               # [(kg)] MONEY, beside the shape. See `stats` for the incident:
+               # a 0.28% take-profit takes the live Farmer to t=+2.55 (PASSING)
+               # on 37% of its dollars. Neither field is a bar; both exist so
+               # that a book whose shape improved while its earnings collapsed
+               # cannot look like progress.
+               net_usd=round(s["realised_usd"], 2),
+               usd_per_day=(round(_upd, 4) if _upd is not None else None))
     return out
 
 
@@ -1368,7 +1405,7 @@ def main():
           f"closes, mean>0, t>={GOLIVE_MIN_T:g}, both halves +, maxDD<"
           f"{100*GOLIVE_MAX_DD:.0f}%")
     print(f"{'book':34s} {'n':>4s} {'days':>6s} {'mean%':>8s} {'t':>6s} "
-          f"{'win%':>6s} {'maxDD%':>7s}  verdict")
+          f"{'win%':>6s} {'maxDD%':>7s} {'net$':>8s} {'$/day':>8s}  verdict")
     print("-" * 104)
     ready, payload_books = [], {}
     # Hoisted out of the row loop: `parse_ts` is used AFTER it (by `era_rows`),
@@ -1506,12 +1543,20 @@ def main():
                      f"predate this era]")
         if s.get("n", 0) < 2:
             print(f"{bot:34s} {s.get('n', 0):>4d} {'-':>6s} {'-':>8s} {'-':>6s} "
-                  f"{'-':>6s} {'-':>7s}  ungradeable in era{flag}")
+                  f"{'-':>6s} {'-':>7s} {'-':>8s} {'-':>8s}  "
+                  f"ungradeable in era{flag}")
         else:
+            # [(kg)] net$ and $/day sit BESIDE the shape bars, because every
+            # one of the six is shape or sample size and none is money — a
+            # 0.28% take-profit takes the live Farmer to a PASSING t=+2.55 on
+            # 37% of its dollars, and this row is where that becomes visible.
+            _upd = s.get("usd_per_day")
             print(f"{bot:34s} {s['n']:>4d} {s['days']:>6.1f} "
                   f"{100*s['mean_pct']:>7.3f}% {s['t']:>6.2f} "
                   f"{100*s['win_rate']:>5.1f}% "
-                  f"{('n/a' if dd_pct is None else f'{dd_pct:.1f}%'):>7s}  "
+                  f"{('n/a' if dd_pct is None else f'{dd_pct:.1f}%'):>7s} "
+                  f"{s.get('realised_usd', 0):>+8.2f} "
+                  f"{('n/a' if _upd is None else f'{_upd:+.3f}'):>8s}  "
                   f"{verdict}{flag}")
         if ok:
             ready.append(bot)

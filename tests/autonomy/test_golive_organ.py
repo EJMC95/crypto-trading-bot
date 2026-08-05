@@ -437,3 +437,82 @@ def test_the_carry_bot_always_publishes_its_caps():
     assert '"caps"' in pub, (
         "caps must be inside the unconditional publish payload — it is the "
         "field that identifies a stale publisher from the outside")
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-05 (kg)] THE GATE CANNOT SEE A BOOK BEING TRUNCATED INTO A PASS.
+#
+# All six bars are SHAPE (mean, t, halves, maxdd) or SAMPLE SIZE (window,
+# closes). None is MONEY. Truncation collapses variance faster than it
+# collapses the mean, so tightening an exit INFLATES t — measured on the LIVE
+# Farmer's 71 priced closes replayed against Lighter's own hourly candles:
+#
+#     take-profit 0.28%  ->  win 85.9%, t = +2.55  (PASSES the t>=2.0 bar)
+#                            on a book earning $2.36 instead of $6.46
+#     take-profit 0.05%  ->  win 100%, maxDD ~0, t = 6.1e15, on $0.80 of $6.46
+#
+# Win rate was removed from this gate on 29-Jul ((fk)) for good reasons, and
+# nothing replaced it as a check on SIZE. These tests pin that the money is at
+# least VISIBLE. They deliberately do NOT make it a bar: BAR_NAMES is the
+# published contract and re-specifying the gate is an operator act.
+# ---------------------------------------------------------------------------
+def _rows(pcts, usd, t0=None, step_h=6):
+    from datetime import datetime, timezone, timedelta
+    base = t0 or datetime(2026, 7, 1, tzinfo=timezone.utc)
+    return [(p, u, base + timedelta(hours=step_h * i))
+            for i, (p, u) in enumerate(zip(pcts, usd))]
+
+
+def test_the_gate_publishes_money_beside_the_shape():
+    import golive_readiness as g
+    s = g.stats(_rows([0.01, -0.005, 0.02, 0.008] * 5, [1.0, -0.5, 2.0, 0.8] * 5))
+    assert s["realised_usd"] == pytest.approx(sum([1.0, -0.5, 2.0, 0.8] * 5))
+    assert s["usd_per_day"] == pytest.approx(s["realised_usd"] / s["days"])
+    p = g.book_payload(s)
+    assert p["net_usd"] is not None and p["usd_per_day"] is not None, \
+        "money must reach the PAYLOAD — realised_usd was computed and dropped"
+
+
+def test_truncation_inflates_t_while_destroying_the_money():
+    """The incident, reproduced as arithmetic rather than asserted.
+
+    A book with real dispersion vs the SAME book truncated to a near-constant
+    small win. The truncated one has a BETTER t and a WORSE bank account, and
+    only the new fields can tell them apart.
+    """
+    import golive_readiness as g
+    honest = g.stats(_rows([0.04, -0.02, 0.06, -0.01, 0.05] * 6,
+                           [4.0, -2.0, 6.0, -1.0, 5.0] * 6))
+    # every close truncated to +0.3%: variance collapses, mean shrinks less
+    truncated = g.stats(_rows([0.003] * 30, [0.30] * 29 + [0.31]))
+    assert truncated["t"] > honest["t"], \
+        "truncation must inflate t — this is the whole mechanism"
+    assert truncated["realised_usd"] < honest["realised_usd"], \
+        "...while earning strictly less money"
+    # THE POINT: the six bars cannot distinguish them on money; the new fields can.
+    assert truncated["usd_per_day"] < honest["usd_per_day"]
+    hp, tp = g.book_payload(honest), g.book_payload(truncated)
+    assert tp["t"] > hp["t"] and tp["net_usd"] < hp["net_usd"], \
+        ("a reader comparing these two payloads must be able to SEE that the "
+         "better-shaped book is the poorer one")
+
+
+def test_money_is_reported_and_is_NOT_a_seventh_bar():
+    """Re-specifying the gate is an operator act ((fk) was). These fields make
+    the damage visible; they must not silently change a single verdict."""
+    import golive_readiness as g
+    assert "net_usd" not in g.BAR_NAMES and "usd_per_day" not in g.BAR_NAMES
+    assert len(g.BAR_NAMES) == 6, g.BAR_NAMES
+    s = g.stats(_rows([0.003] * 30, [0.30] * 29 + [0.31]))
+    assert set(g.bar_map(s)) == set(g.BAR_NAMES), \
+        "bar_map must still yield exactly the six published bars"
+    # and grade() must be reachable/unchanged in shape
+    ok, fails = g.grade(s)
+    assert isinstance(ok, bool) and isinstance(fails, list)
+
+
+def test_a_thin_book_publishes_money_keys_as_none_not_zero():
+    """n<2 takes an early return. 'no opinion' must not read as '$0 earned'."""
+    import golive_readiness as g
+    p = g.book_payload(g.stats(_rows([0.01], [1.0])))
+    assert p["net_usd"] is None and p["usd_per_day"] is None
