@@ -55,6 +55,12 @@ on:
       - 'Dockerfile.psniper'
       - 'lighter_family_bot.py'
       - 'Dockerfile.familyshadow'
+      # [2026-08-05] 🎸 Barnesy — the funding super-book (band-barnes-shadow).
+      # Routed the day it was born, per the (jb) census guard: a new image
+      # with no deploy story fails audit_deploy_coverage outright now, which
+      # is exactly the birth defect the (fz) shadow books had.
+      - 'lighter_band_barnes_bot.py'
+      - 'Dockerfile.bandbarnes'
       # [2026-07-30 (gm)] THIS WORKFLOW IS ITS OWN TRIGGER, for the six shadow
       # books only — plus the CARRY PAIR since (hu), same reasoning: its
       # routing was just corrected and a routing fix that cannot deploy itself
@@ -381,6 +387,16 @@ jobs:
             fi
             if echo "$changed" | grep -qE "^(lighter_family_bot\.py$|Dockerfile\.familyshadow$|$_shared)"; then
               svcs="${svcs:+$svcs,}family-lighter-shadow"
+            fi
+            # [2026-08-05] 🎸 Barnesy (band-barnes-shadow) — the funding
+            # super-book. Same $_shared contract as the other shadow books:
+            # its image COPYs the shared money/organ modules, so a change to
+            # any of them must redeploy this container too. Service name is
+            # created alongside this rule (railway add --service
+            # band-barnes-shadow); the resolver step ERRORS on a name that
+            # does not resolve, per the (hj) no-warning rule.
+            if echo "$changed" | grep -qE "^(lighter_band_barnes_bot\.py$|Dockerfile\.bandbarnes$|$_shared)"; then
+              svcs="${svcs:+$svcs,}band-barnes-shadow"
             fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,

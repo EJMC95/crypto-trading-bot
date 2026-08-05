@@ -43,6 +43,11 @@ sys.path.insert(0, str(ROOT / "scripts"))
 #: Books that HOLD positions and that `golive_readiness` grades as living
 #: candidates. Each MUST call `store.snapshot_equity`.
 MTM_REQUIRED = {
+    "lighter_band_barnes_bot.py":
+        "🎸 Barnesy — the funding super-book, wired at BIRTH (the class this "
+        "file exists to prevent, closed by construction instead of "
+        "retrofitted): its xsect sleeve is always-in and its harvest sleeves "
+        "hold for days, so a realised-only bar would be blind to it",
     "funding_carry_bot.py":
         "🌾 carry — the fleet's nearest go-live candidate; (hl) named it FIRST "
         "and did not wire it",

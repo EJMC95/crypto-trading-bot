@@ -277,7 +277,12 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # (parliament_main.py in the freqtrade-bots container).
                 # Publish ONLY -lshadow rows; bases never publish.
                 "pm-albanese", "pm-morrison", "pm-turnbull",
-                "pm-abbott", "pm-rudd", "pm-gillard"}
+                "pm-abbott", "pm-rudd", "pm-gillard",
+                # [2026-08-05] 🎸 Barnesy — the funding super-book
+                # (lighter_band_barnes_bot.py, service band-barnes-shadow).
+                # First of the Australian-musician cohort. Shadow-only;
+                # base never publishes.
+                "band-barnes"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper"]
 
@@ -307,6 +312,8 @@ OVERTRADE_LIMIT = {
     "perps-funding-spread":  40,   # ⚖️ Counterweight — x-sect L/S rebalances
     "pm-abbott":             40,   # 🥊 Parliament scalper — ≤4h holds by design
     "pm-gillard":            40,   # 🤝 Parliament disloc fader — closes often
+    "band-barnes":           40,   # 🎸 Barnesy — 10 xsect legs can rebalance
+                                   # in one pass + two harvest sleeves
 }
 OVERTRADE_DEFAULT = 15
 
@@ -365,6 +372,7 @@ LABELS = {
     # deleted from bot_pnl (cleanup_legacy_bots on boot) and RETIRED_ROWS
     # filters any republish, so the labels were dead code.
     "perps-funding-carry":         "🌾 Yield Harvester — funding carry",
+    "band-barnes":                 "🎸 Barnesy — funding super-book",
     "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
@@ -409,6 +417,7 @@ DESCRIPTIONS = {
     # Describe the MECHANISM here; never the numbers.
     "perps-funding-lighter": "holds the side that RECEIVES funding, vol-vetoed, stop-guarded",
     "perps-funding-carry":  "funding-rate carry on HL data — the Funding Farmer's origin strategy",
+    "band-barnes":          "three funding sleeves under one $1k roof — carry harvest (≥20% TRUE, decay-paid discipline, $80×4), funding-extreme directional (top |APR|, 10% stop, $40×4), x-sect L/S rank (K=5/side, $33 legs, 24h rebalance) · closes tagged per sleeve · config FROZEN 30d from birth ((hm))",
     "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, rebalances daily · K=8, $20/leg [30-Jul: K 5→8, universe 30→60]",
     "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
     "lighter-perp-sniper":  "snipes debut-regime books: brand-new listings PLUS volume surges and any book under 21 daily candles [30-Jul — the listing diff alone was a one-loop trigger, hence n=1 in weeks]",

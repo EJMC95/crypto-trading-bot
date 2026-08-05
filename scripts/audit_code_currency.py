@@ -100,6 +100,10 @@ sys.path.insert(0, str(ROOT))
 #: which is the direction that erodes trust in the guard (I8 — name the object
 #: the operator can act on, and be right about it).
 ROW_ENTRY = {
+    # [2026-08-05] 🎸 Barnesy — mapped the day the row was born, per the (jb)
+    # unmapped-row gate (a stamped row this file has never heard of fails the
+    # audit rather than being skipped silently).
+    "band-barnes-lshadow": "lighter_band_barnes_bot.py",
     "crypto-breakout-4h-lshadow": "lighter_family_bot.py",
     "crypto-intraday-15m-lshadow": "lighter_family_bot.py",
     "crypto-swing-daily-lshadow": "lighter_family_bot.py",

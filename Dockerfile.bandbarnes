@@ -1,0 +1,26 @@
+# Image for 🎸 Barnesy (band-barnes-shadow) — the FUNDING SUPER-BOOK, shadow
+# only. Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.bandbarnes
+#   VENUE=lighter_shadow
+# The bot REFUSES every other VENUE (loud SystemExit): it is a $1,000 paper
+# consolidation of the three proven funding utilities (carry harvest /
+# funding-extreme / cross-sectional L/S) and holds ZERO keys. Config is
+# birth-frozen 30 days ((hm)) so the shadow clock accrues a gradeable sample.
+#
+# COPY set mirrors Dockerfile.fundspread (the other funding image that reads
+# the scout bus): fleet_tuning + fleet_bus are GUARDED imports in the bot, and
+# a guarded import with a missing COPY is the born-dark failure this fleet has
+# shipped three times — both ship in the SAME commit as the imports.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_band_barnes_bot.py bot_pnl_store.py paper_broker.py funding_basis.py fleet_tuning.py fleet_bus.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_band_barnes_bot.py"]

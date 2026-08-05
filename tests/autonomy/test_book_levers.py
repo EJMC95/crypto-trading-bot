@@ -24,6 +24,7 @@ import fleet_tuning
 import pytest
 
 import funding_carry_bot as carry
+import lighter_band_barnes_bot as barnes
 import lighter_dislocation_bot as disloc
 import lighter_funding_spread_bot as spread
 import lighter_index_bot as index_bot
@@ -63,6 +64,12 @@ BOOK_LEVERS = [
     # hole rather than a live defect — which is exactly the shape that stays
     # invisible until the lever misbehaves.
     "disloc.exit_bps",
+    # [2026-08-05] 🎸 Barnesy — registered AT BIRTH, and BIRTH-FROZEN at the
+    # consumer: apply_tuning refuses the rail until BARNES_FREEZE_UNTIL
+    # ((hm) — a book whose bars move accrues zero gradeable closes). The
+    # dedicated freeze tests below prove BOTH halves: frozen = nothing
+    # moves; thawed = the lever reaches the module global.
+    "barnes.enter_apr", "barnes.max_positions", "barnes.k",
 ]
 
 
@@ -187,6 +194,57 @@ def test_trend_rank_by_funding_lever_is_a_bool_consumer(monkeypatch):
         assert trend.RANK_BY_FUNDING is False, "int lever -> bool consumer"
     finally:
         trend.RANK_BY_FUNDING = original
+
+
+def test_barnes_birth_freeze_refuses_the_rail_then_admits_it(monkeypatch):
+    """🎸 Barnesy's levers are wired AND birth-frozen ((hm)): while the freeze
+    holds, a rail offering values must move NOTHING — otherwise the book's
+    first 30 days accrue zero gradeable closes, which is the whole reason the
+    book exists. After the freeze the standard consumer contract applies, so
+    day 31 needs no deploy. Both halves asserted, or 'frozen' is just a word
+    in a docstring."""
+    frozen = barnes._freeze_until_ts() - 86400.0
+    thawed = barnes._freeze_until_ts() + 86400.0
+    original = barnes.MAX_POSITIONS
+
+    class _Rail:
+        @staticmethod
+        def get_lever(name, default, now_ts=None):
+            return 8 if name == "barnes.max_positions" else default
+
+    monkeypatch.setattr(barnes, "tuning", _Rail)
+    try:
+        assert barnes.apply_tuning(frozen) == {}, \
+            "the birth freeze must refuse the rail outright"
+        assert barnes.MAX_POSITIONS == original, "a frozen lever moved a global"
+        moved = barnes.apply_tuning(thawed)
+        assert moved == {"barnes.max_positions": 8}, \
+            "after the freeze the lever must reach the module global"
+        assert barnes.MAX_POSITIONS == 8
+    finally:
+        barnes.MAX_POSITIONS = original
+
+
+def test_barnes_freeze_fails_closed_on_an_unparseable_stamp(monkeypatch):
+    """A typo'd BARNES_FREEZE_UNTIL must freeze FOREVER, never unfreeze — the
+    fail-closed direction for a rule whose failure mode is silent tuning."""
+    monkeypatch.setattr(barnes, "FREEZE_UNTIL_ISO", "not-a-date")
+    assert barnes.freeze_active(9e12), \
+        "an unparseable freeze stamp must read as frozen, not as thawed"
+
+
+def test_barnes_dark_rail_is_a_noop_even_after_the_freeze(monkeypatch):
+    monkeypatch.setattr(barnes, "tuning", None)
+    assert barnes.apply_tuning(barnes._freeze_until_ts() + 1) == {}
+
+    class _Sick:
+        @staticmethod
+        def get_lever(name, default, now_ts=None):
+            raise RuntimeError("rail is sick")
+
+    monkeypatch.setattr(barnes, "tuning", _Sick)
+    assert barnes.apply_tuning(barnes._freeze_until_ts() + 1) == {}, \
+        "a raising rail must not propagate into a trading loop"
 
 
 @pytest.mark.parametrize("mod", [carry, spread, disloc, index_bot, trend])

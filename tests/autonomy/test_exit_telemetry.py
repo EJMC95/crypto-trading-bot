@@ -56,6 +56,14 @@ PRICE_BOOKS = [
 #: instrument; the exit is governed by APR and time-paid.
 FUNDING_BOOKS = {
     "funding_carry_bot": ("entry_apr", "exit_apr", "accrued", "held_h"),
+    # [2026-08-05] 🎸 Barnesy — a FUNDING book by thesis: every close (all
+    # three sleeves) carries the funding-form fields, because its exits are
+    # governed by APR-at-entry / APR-at-exit / accrual-so-far. Its mark-based
+    # sleeves ALSO pass entry_price/exit_price on the same rows (prices they
+    # genuinely have — extra telemetry, not the grading basis), which is why
+    # it is classified here and not in PRICE_BOOKS: the taxonomy is exclusive
+    # and the funding fields are what a sweep of ITS exits must join on.
+    "lighter_band_barnes_bot": ("entry_apr", "exit_apr", "accrued", "held_h"),
 }
 
 

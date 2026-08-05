@@ -165,6 +165,9 @@ SELFTEST_MODULES = [
     "funding_basis",
     "funding_carry_bot",
     "implementation_shortfall",
+    # [2026-08-05] 🎸 Barnesy — registered the day it was born; its selftest
+    # is offline (gates, exits, tags, freeze, publisher-built payload).
+    "lighter_band_barnes_bot",
     "lighter_dislocation_bot",
     "lighter_family_bot",
     "lighter_funding_bot",
