@@ -459,17 +459,30 @@ def _era_parse(parse=None):
 POLICY_SIG_FIELDS = ("venue", "bull", "lenses", "sides")
 
 
-def policy_signature(extra):
-    """Canonical signature (a sorted-JSON string) of the policy a close row
-    stamps, or None for a row that carries no readable stamp.
+#: [2026-08-06 (kk)] A row that carries NO `policy` key at all — i.e. a close
+#: written before its book adopted the stamp. Distinct from a stamp that is
+#: present and malformed, which stays fail-closed. See `stamp_state`.
+ABSENT = "\x00absent"
 
-    None never matches anything — an unreadable stamp breaks a run and is
-    fail-closed out of any stamp-derived era, because counting a trade whose
-    policy cannot be confirmed is exactly the credit the era withdraws. A
-    stamp without a non-empty `lenses` is unreadable: a policy that names no
-    admissible signal describes nothing."""
-    if not isinstance(extra, dict):
-        return None
+
+def stamp_state(extra):
+    """`ABSENT` | None (unreadable) | a canonical signature string.
+
+    [2026-08-06 (kk)] THE THIRD STATE IS WHY THIS EXISTS. `policy_signature`
+    collapsed "this book does not stamp yet" and "this stamp is broken" into
+    one None, and `stamped_policy_boundary` treats None as a run-breaker — so
+    the FIRST stamped close on any adopting book reads as a policy CHANGE and
+    the boundary lands there. Measured on the live payload: giving 💸 the
+    Farmer a stamp today would have set its era to today and discarded **62 of
+    its 62 in-era closes**, taking the fleet's only 4/6 book to ~1/6 and its
+    gate date from ~5-Sep to nowhere. `(jf)`'s clock was un-adoptable by a
+    SECOND book; the Taker survived adoption only because its declared era
+    happened to coincide with the stamp's arrival, which masked it.
+
+    An ABSENCE IS NOT A CHANGE (I6). A malformed stamp still is — that half of
+    the fail-closed contract is unchanged."""
+    if not isinstance(extra, dict) or "policy" not in extra:
+        return ABSENT
     pol = extra.get("policy")
     if not isinstance(pol, dict):
         return None
@@ -480,6 +493,22 @@ def policy_signature(extra):
         return json.dumps(sig, sort_keys=True)
     except (TypeError, ValueError):
         return None
+
+
+def policy_signature(extra):
+    """Canonical signature (a sorted-JSON string) of the policy a close row
+    stamps, or None for a row that carries no readable stamp.
+
+    None never matches anything — an unreadable stamp breaks a run and is
+    fail-closed out of any stamp-derived era, because counting a trade whose
+    policy cannot be confirmed is exactly the credit the era withdraws. A
+    stamp without a non-empty `lenses` is unreadable: a policy that names no
+    admissible signal describes nothing.
+
+    Callers that must tell "unstamped" from "broken" use `stamp_state`; this
+    keeps its original two-state contract for everyone else."""
+    st = stamp_state(extra)
+    return None if st is ABSENT else st
 
 
 def stamped_policy_boundary(rows, parse=None):
@@ -512,15 +541,32 @@ def stamped_policy_boundary(rows, parse=None):
     cur = policy_signature(rows[-1][4] if len(rows[-1]) > 4 else None)
     if cur is None:
         return None, None, None, 0
-    epoch, n = None, 0
-    for r in reversed(rows):
-        if policy_signature(r[4] if len(r) > 4 else None) != cur:
+    epoch, n, stopped_on_absent, i_stop = None, 0, False, -1
+    for i in range(len(rows) - 1, -1, -1):
+        r = rows[i]
+        st = stamp_state(r[4] if len(r) > 4 else None)
+        if st is ABSENT:
+            # [2026-08-06 (kk)] Pre-adoption row. An absence is not a change.
+            stopped_on_absent, i_stop = True, i
+            break
+        if st != cur:
+            i_stop = i
             break
         try:
             e = p(r[2])
         except Exception:      # noqa: BLE001 — unreadable close breaks the run
+            i_stop = i
             break
         epoch, n = e, n + 1
+    if stopped_on_absent and not any(
+            stamp_state(rows[j][4] if len(rows[j]) > 4 else None) is not ABSENT
+            for j in range(i_stop + 1)):
+        # Every older row is unstamped: this is ADOPTION, not a policy change.
+        # The stamps have witnessed no change, so they establish no boundary
+        # and the DECLARED era governs — exactly the `n >= len(rows)` case.
+        # (A stamp that vanishes and returns mid-ledger is NOT this: some
+        # older row is stamped, so the fail-closed boundary below still fires.)
+        return None, None, json.loads(cur), n
     if epoch is None:
         return None, None, None, 0
     if n >= len(rows):
