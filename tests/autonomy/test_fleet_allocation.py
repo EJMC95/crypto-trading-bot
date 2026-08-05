@@ -121,3 +121,223 @@ class TestTheContract:
         assert "- 'fleet_allocation.py'" in wf, "no push path -> never deploys"
         assert "fleet_allocation\\.py$" in wf, "not in the service grep"
         assert "fleet_allocation.py --publish" in (root / "run_all.sh").read_text()
+
+
+class TestTheEvidenceRecordIsPublished:
+    """[2026-08-05 (kc)] The payload used to publish {n, claim, class,
+    target_usd, current_usd, delta_usd, undecided} and nothing else, so two
+    books failing for OPPOSITE reasons were byte-identical rows.
+
+    Measured on the live ledger the day this shipped: pm-rudd (n=94, mean
+    -0.116%/trade, bound straddling zero — "not enough sample to say") and
+    pm-abbott (n=79, mean -0.224%, upper bound below zero — "measured loser")
+    published the same row. I17's keep-or-retire call has opposite answers for
+    those two and could not be made from the organ that exists to inform it.
+    """
+
+    def test_the_published_claim_is_reproducible_from_the_published_stats(self):
+        r = alloc.allocate({"w": [0.02, 0.01, 0.03, -0.005] * 8},
+                           book_usd=1000.0)["w"]
+        assert r["mean_pct"] is not None and r["se_pct"] is not None
+        assert abs(r["claim"] - max(0.0, r["mean_pct"]
+                                    - alloc.Z_LOWER * r["se_pct"])) < 1e-6, \
+            ("mean_pct/se_pct must describe the SAME sample the claim was "
+             "ranked on — if they cannot rebuild it, they are a second rule")
+
+    def test_no_opinion_reaches_the_payload_as_none_never_as_zero(self):
+        """lower_bound's own rule — 'no opinion' and 'measured zero' must not
+        collapse into the same number — carried through to the payload boundary
+        instead of stopping one layer short of it."""
+        flat = alloc.allocate({"f": [0.01] * 30}, book_usd=1000.0)["f"]
+        assert flat["mean_pct"] is None and flat["se_pct"] is None
+        assert flat["undecided_why"] == "no-bound"
+        # ...while a MEASURED loser still publishes its measurement, because
+        # that is the number the retire conversation needs.
+        neg = alloc.allocate({"g": [-0.02, -0.01, -0.03, 0.0] * 8},
+                             book_usd=1000.0)["g"]
+        assert neg["claim"] == 0.0 and neg["undecided_why"] == "bound<=0"
+        assert neg["mean_pct"] is not None and neg["mean_pct"] < 0
+
+    def test_thin_and_losing_are_distinguishable(self):
+        """The whole point: the two failure modes have OPPOSITE remedies."""
+        a = alloc.allocate({"thin": [0.05, 0.04, 0.06, 0.05, 0.05],
+                            "losing": [-0.02, -0.01, -0.03, 0.0] * 8},
+                           book_usd=1000.0)
+        assert a["thin"]["undecided_why"] == "below-min-n"
+        assert a["losing"]["undecided_why"] == "bound<=0"
+        assert a["thin"]["undecided_why"] != a["losing"]["undecided_why"], \
+            "a payload that cannot tell 'no sample' from 'no edge' informs nothing"
+
+    def test_a_claim_never_exceeds_its_own_sample_mean(self):
+        """RED-LINES any future estimator — pooling, shrinkage, a rate
+        multiplier — that would hand a book a claim its OWN sample cannot
+        support. A lower bound that sits above the mean is not a lower bound.
+        """
+        for pcts in ([0.02, 0.01, 0.03, -0.005] * 8,
+                     [0.002, 0.001, 0.003, 0.002] * 20,
+                     [0.05, -0.01, 0.02, 0.04] * 10):
+            r = alloc.allocate({"b": pcts}, book_usd=1000.0)["b"]
+            if r["claim"] > 0:
+                assert r["claim"] < r["mean_pct"], \
+                    "a bound above its own mean is not a bound"
+
+
+class TestEveryLivingBookReachesThePayload:
+    """[2026-08-05 (kc)] I17: 'every living book keeps a 25% probe floor,
+    because a book cannot earn evidence with no capital.'
+
+    The I/O shell built its book set from LEDGER ROWS ONLY, so a book with ZERO
+    closes never entered the payload and got no floor — the organ was silent
+    about precisely the case the invariant was written for. Measured that day:
+    band-barnes-lshadow (10 open / 0 closed), equities-regime-lshadow (5 open)
+    and freqtrade-mum-lshadow (4 open) were all absent.
+
+    The pre-existing test_every_book_keeps_a_probe_floor stayed GREEN through
+    all of it, because it drives `allocate` with a fixture that always contains
+    the book. That is the CLAUDE.md header caveat in one place: a green run
+    verifies the enforcement EXISTS, not that it is CORRECT.
+    """
+
+    def _store(self, monkeypatch, pnl_rows, trades):
+        import types
+        fake = types.SimpleNamespace(
+            fetch_bot_pnl=lambda: pnl_rows,
+            fetch_paper_trades=lambda limit=8000: trades,
+            save_state=lambda *a, **k: True,
+            save_history=lambda *a, **k: True,
+        )
+        monkeypatch.setattr(alloc, "store", fake)
+        return fake
+
+    def _row(self, bot, opened=0, closed=0):
+        from datetime import datetime, timezone
+        return {"bot": bot, "updated_at": datetime.now(timezone.utc).isoformat(),
+                "status": "online", "open_trades": opened,
+                "closed_trades": closed, "extra": {}}
+
+    def test_a_zero_close_living_book_gets_a_row_and_the_probe_floor(
+            self, monkeypatch):
+        self._store(monkeypatch,
+                    [self._row("newbook-lshadow", opened=10, closed=0),
+                     self._row("tradedbook-lshadow", opened=1, closed=40)],
+                    [{"bot": "tradedbook-lshadow", "profit_ratio": p,
+                      "profit_abs": 1.0, "open_ts": None, "close_ts": None,
+                      "extra": {}}
+                     for p in [0.01, 0.02, 0.0, 0.015] * 10])
+        p = alloc.run_once(publish=False)
+        assert "newbook-lshadow" in p["books"], \
+            "a living book with zero closes must still reach the payload"
+        r = p["books"]["newbook-lshadow"]
+        assert r["n"] == 0
+        assert r["target_usd"] >= p["book_usd"] * alloc.PROBE_FLOOR, \
+            "I17's floor is not optional, and this is the case it is FOR"
+        assert "newbook-lshadow" in p["zero_close_books"]
+
+    def test_a_non_book_service_row_is_never_allocated_capital(
+            self, monkeypatch):
+        """A market-data publisher is not a book. It reports no trade counts,
+        which is the semantic discriminator — not a name list, so a FUTURE
+        service row is excluded the day it appears."""
+        svc = self._row("some-context-service")
+        svc["open_trades"] = svc["closed_trades"] = None
+        self._store(monkeypatch, [svc, self._row("realbook-lshadow", 1, 5)],
+                    [{"bot": "realbook-lshadow", "profit_ratio": 0.01,
+                      "profit_abs": 1.0, "open_ts": None, "close_ts": None,
+                      "extra": {}}])
+        p = alloc.run_once(publish=False)
+        assert "some-context-service" not in p["books"], \
+            "allocating capital to a data publisher is a category error"
+        assert "realbook-lshadow" in p["books"]
+
+    def test_a_retired_book_stays_out_even_with_a_fresh_row(self, monkeypatch):
+        from cleanup_legacy_bots import LEGACY_BOTS
+        dead = sorted(LEGACY_BOTS)[0]
+        self._store(monkeypatch,
+                    [self._row(dead, opened=3, closed=0),
+                     self._row("realbook-lshadow", 1, 5)],
+                    [{"bot": "realbook-lshadow", "profit_ratio": 0.01,
+                      "profit_abs": 1.0, "open_ts": None, "close_ts": None,
+                      "extra": {}}])
+        p = alloc.run_once(publish=False)
+        assert dead not in p["books"], \
+            "the retirement authority is senior to the living-row seed"
+
+
+class TestTheFundingSuperBookIsClassedBySignal:
+    def test_band_barnes_is_funding_not_directional(self):
+        """🎸 Barnesy is three FUNDING sleeves (carry / extreme / xsect) named
+        for an Australian musician, so no substring marker can see it. Caught
+        while it still had zero closes — it would have silently corrupted the
+        by_class headline the moment it closed its first trade."""
+        assert alloc.book_class("band-barnes-lshadow") == "funding"
+
+    def test_the_registry_is_exact_not_a_widened_marker(self):
+        """Widening FUNDING_MARKERS until it caught 'barnes' would catch
+        unrelated rows too — the same defect one layer over."""
+        assert "barnes" not in alloc.FUNDING_MARKERS
+        assert alloc.book_class("band-someoneelse-lshadow") == "directional"
+
+    def test_every_registered_funding_book_is_a_real_row(self):
+        """A registry entry that no longer resolves is the stale-reference
+        class `audit_doctrine_enforcement::check_ref` exists to catch."""
+        import pathlib as _p
+        root = _p.Path(__file__).resolve().parents[2]
+        tree = (root / "CLAUDE.md").read_text()
+        for bot in alloc.FUNDING_BOOKS:
+            assert bot in tree, f"{bot} is registered but names no known row"
+
+
+class TestTheEraTwinIsLiveNotBornDark:
+    """[2026-08-05 (kc)] The era twin imports its rule from `golive_readiness`
+    (and `experiment_judge` for the stamp parse) behind a try/except, so that a
+    grading-surface move can never take the organ down. That is correct AND it
+    is the born-dark shape: a missing module degrades to None forever and the
+    payload just quietly stops carrying the field.
+
+    So these assert the twin actually SPLITS, not merely that it imports.
+    """
+
+    def test_both_era_modules_ship_in_the_image(self):
+        import pathlib as _p
+        df = (_p.Path(__file__).resolve().parents[2]
+              / "Dockerfile.freqtrade").read_text()
+        assert "golive_readiness.py" in df, \
+            "the era owner must ship or the twin is dark in production"
+        assert "experiment_judge.py" in df, \
+            "the stamp parser must ship or every close fails to parse"
+
+    def test_the_twin_actually_excludes_pre_era_trades(self):
+        """A book with a DECLARED era must report fewer in-era closes than
+        all-time. If this returns n_era == n, the era rule is not running and
+        the field is decoration."""
+        from datetime import datetime, timezone, timedelta
+        import sys as _s, os as _o
+        _s.path.insert(0, _o.path.join(
+            _o.path.dirname(_o.path.abspath(alloc.__file__)), "scripts"))
+        from golive_readiness import POLICY_ERA, era_base
+        bot = "perps-funding-carry-lshadow"
+        iso = POLICY_ERA[era_base(bot)][0]
+        cut = datetime.fromisoformat(iso).replace(tzinfo=timezone.utc)
+        rows = []
+        for d in (-9, -6, -3, 3, 6, 9):        # 3 before the era, 3 after
+            ts = cut + timedelta(days=d)
+            rows.append({"profit_ratio": 0.01, "profit_abs": 1.0,
+                         "open_ts": ts.isoformat(),
+                         "close_ts": ts.isoformat(), "extra": {}})
+        n_era, _claim, era_iso, src = alloc._era_twin(bot, rows)
+        assert n_era == 3, (
+            f"expected the 3 post-era closes, got {n_era} — the era rule is "
+            f"not running (source={src}, iso={era_iso})")
+        assert era_iso is not None and src is not None
+
+    def test_an_undeclared_book_keeps_every_row(self):
+        """Fail-safe in the only safe direction: no declared era -> nothing is
+        excluded, so the twin can never silently shrink a book's evidence."""
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        rows = [{"profit_ratio": 0.01, "profit_abs": 1.0,
+                 "open_ts": (now - timedelta(days=d)).isoformat(),
+                 "close_ts": (now - timedelta(days=d)).isoformat(),
+                 "extra": {}} for d in range(6)]
+        n_era, _c, _i, _s = alloc._era_twin("no-such-book-lshadow", rows)
+        assert n_era == 6, "an undeclared book must keep every row"

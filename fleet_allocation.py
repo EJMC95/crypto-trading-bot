@@ -87,6 +87,19 @@ BOOK_USD = float(os.environ.get("ALLOC_BOOK_USD", "1000"))
 # the headline this organ exists to keep in front of the operator.
 FUNDING_MARKERS = ("funding", "carry", "spread")
 
+# [2026-08-05 (kc)] EXPLICIT ids for funding books the markers cannot see.
+# 🎸 band-barnes-lshadow is the funding SUPER-BOOK ((jw): carry + extreme +
+# xsect sleeves, every one of them a funding signal) and it was classed
+# DIRECTIONAL, because the naming convention for that cohort is Australian
+# musicians and a musician's surname contains no funding marker.
+#
+# A REGISTRY, not a wider marker list, and that is the whole point: widening
+# FUNDING_MARKERS until it catches "barnes" would catch unrelated rows too —
+# the same defect one layer over. Caught free: the book has ZERO closes today,
+# so relabelling it moves no claim and no target_usd. It would have silently
+# corrupted the by_class headline the moment Barnesy closed its first trade.
+FUNDING_BOOKS = ("band-barnes-lshadow",)
+
 
 def _iso(ts=None):
     return (ts or datetime.now(timezone.utc)).isoformat(timespec="seconds")
@@ -95,17 +108,25 @@ def _iso(ts=None):
 def book_class(bot):
     """'funding' | 'directional'. By signal, not by name prefix."""
     b = str(bot or "").lower()
+    if b in FUNDING_BOOKS:
+        return "funding"
     return "funding" if any(m in b for m in FUNDING_MARKERS) else "directional"
 
 
-def lower_bound(pcts, z=Z_LOWER):
-    """One-sided lower confidence bound on mean per-trade return.
+def sample_stats(pcts):
+    """(n, mean, se) for a per-trade return sample, or None when the sample
+    cannot support a bound (n<2 or variance below the floor).
 
-    Returns None when the sample cannot support one (n<2 or zero variance) —
-    NEVER 0.0, because "no opinion" and "measured zero" must not collapse into
-    the same number. Callers treat None as undecided.
+    [2026-08-05 (kc)] EXTRACTED as the SINGLE OWNER of the admissibility rule.
+    `lower_bound` is now a thin wrapper over it, so the published `mean_pct` /
+    `se_pct` and the published `claim` cannot describe different samples — a
+    second copy of this rule would be a second rule, and the two would drift
+    exactly where it matters least visibly.
     """
-    v = [float(p) for p in pcts if p is not None]
+    # `pcts or []` because this now runs on RAW payload input (allocate calls it
+    # per book), not only behind claims()' n-guard — and it runs inside an organ
+    # loop, where a TypeError on a junk row would take the whole publish down.
+    v = [float(p) for p in (pcts or []) if p is not None]
     n = len(v)
     if n < 2:
         return None
@@ -118,7 +139,21 @@ def lower_bound(pcts, z=Z_LOWER):
     # Below the floor the sample is telling us nothing about dispersion.
     if var <= 1e-18:
         return None
-    return mean - z * math.sqrt(var / n)
+    return n, mean, math.sqrt(var / n)
+
+
+def lower_bound(pcts, z=Z_LOWER):
+    """One-sided lower confidence bound on mean per-trade return.
+
+    Returns None when the sample cannot support one (n<2 or zero variance) —
+    NEVER 0.0, because "no opinion" and "measured zero" must not collapse into
+    the same number. Callers treat None as undecided.
+    """
+    st = sample_stats(pcts)
+    if st is None:
+        return None
+    _n, mean, se = st
+    return mean - z * se
 
 
 def claims(books):
@@ -160,14 +195,42 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
         n = len([p for p in (books[b] or []) if p is not None])
         share = (cl[b] / tot_claim) if tot_claim > 0 else (1.0 / len(bots))
         target = base + surplus * share
+        # [2026-08-05 (kc)] THE EVIDENCE RECORD. `mean` and `se` were computed
+        # one line inside `lower_bound` and thrown away, so two books failing
+        # for OPPOSITE reasons published byte-identical rows: measured today,
+        # pm-rudd (n=94, mean -0.116%, t=-0.94, bound straddling zero) and
+        # pm-abbott (n=79, mean -0.224%, t=-2.04, upper bound below zero) were
+        # indistinguishable in the payload. The I17 keep-or-retire conversation
+        # cannot start from a field that cannot tell "no edge" from "no sample".
+        #
+        # RAW INPUTS, deliberately not a verdict. `claim` stays the ONLY ranked
+        # number and the ONLY field any consumer reads — I15's warning is that
+        # a demoted-but-reported statistic migrates into an actuator, so these
+        # ship as the inputs from which the published claim is exactly
+        # reproducible, and nothing else.
+        st = sample_stats(books[b])
+        if st is None:
+            why = "no-bound"          # n<2, or dispersion below the floor
+        elif n < MIN_N:
+            why = "below-min-n"
+        elif cl[b] <= 0.0:
+            why = "bound<=0"
+        else:
+            why = None
         out[b] = {
             "n": n,
             "class": book_class(b),
             "claim": round(cl[b], 6),
+            # None, never 0.0 — "no opinion" and "measured zero" must not
+            # collapse into the same number (lower_bound's own rule, carried
+            # through to the payload boundary instead of stopping at it).
+            "mean_pct": round(st[1], 8) if st else None,
+            "se_pct": round(st[2], 8) if st else None,
             "target_usd": round(target, 2),
             "current_usd": round(book_usd, 2),
             "delta_usd": round(target - book_usd, 2),
             "undecided": n < MIN_N or cl[b] <= 0.0,
+            "undecided_why": why,
         }
     return out
 
@@ -220,18 +283,152 @@ def _living(trades):
     return [t for t in trades if t.get("bot") not in retired], len(retired)
 
 
+#: Max age of a bot_pnl row for its book to count as LIVING. Generous on
+#: purpose: excluding a live book breaks I17's probe floor, while including a
+#: quiet one only hands it the floor it was already entitled to.
+LIVING_MAX_AGE_H = float(os.environ.get("ALLOC_LIVING_MAX_AGE_H", "24"))
+
+
+def _living_book_ids():
+    """Every book with a fresh, non-retired bot_pnl row — INCLUDING books that
+    have never closed a trade.
+
+    [2026-08-05 (kc)] I17 says "every living book keeps a 25% probe floor,
+    because a book cannot earn evidence with no capital". The I/O shell built
+    `books` from LEDGER ROWS ONLY, so a book with zero closes never entered the
+    payload at all and got no floor — the organ was silent about exactly the
+    case the invariant was written for. Measured today: 🎸 band-barnes-lshadow
+    (10 open, 0 closed), 📊 equities-regime-lshadow (5 open) and
+    👩 freqtrade-mum-lshadow (4 open) were all missing.
+
+    Its declared enforcement (test_every_book_keeps_a_probe_floor) passed
+    throughout, because it drives `allocate` with hand-built fixtures that
+    always contain the book — the CLAUDE.md header caveat instantiated: a green
+    run verifies the enforcement EXISTS, not that it is CORRECT.
+
+    Fail-OPEN in both directions, like `_living`: no DB read, or an unreadable
+    stamp, keeps the book rather than dropping it.
+    """
+    rows = store.fetch_bot_pnl() if store is not None else None
+    if not rows:
+        return []
+    try:
+        from cleanup_legacy_bots import LEGACY_BOTS as retired
+        retired = set(retired)
+    except Exception:                                # noqa: BLE001
+        retired = set()
+    out, now = [], datetime.now(timezone.utc)
+    for r in rows:
+        bot = r.get("bot")
+        if not bot or bot in retired:
+            continue
+        # A TRADING BOOK reports trade counts; a service row does not. Measured
+        # on the live table: `market-context` publishes open/closed = None/None
+        # and is a market-data publisher, not a book — allocating capital to it
+        # would be a category error. Semantic, not a name list, so a future
+        # service row is excluded the day it appears rather than the day
+        # somebody remembers to add it. A brand-new book publishing 0/0 still
+        # qualifies, which is I17's case exactly.
+        if r.get("open_trades") is None and r.get("closed_trades") is None:
+            continue
+        stamp = r.get("updated_at")
+        try:
+            ts = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if (now - ts).total_seconds() > LIVING_MAX_AGE_H * 3600.0:
+                continue
+        except Exception:                            # noqa: BLE001
+            pass                     # unreadable stamp -> keep (fail-open)
+        out.append(bot)
+    return out
+
+
+def _era_twin(bot, rows):
+    """(n_era, claim_era, iso, source) — the SAME claim recomputed on the
+    era-scoped sample the go-live grader actually grades.
+
+    [2026-08-05 (kc)] WHY THIS SHIPS AS A TWIN AND NOT AS THE SAMPLE: measured
+    over 15 historical days, era-scoping as the ALLOCATION sample had ZERO
+    claimants on 15 of 15 — it turns the organ off, and its forward realised
+    return was byte-identical to flat. So the all-time claim stays the ranked
+    number and this rides beside it as DISCLOSURE, because the gap is the most
+    important single fact about this payload: measured today, 🌾 carry's
+    fleet-best 0.152% claim rests on 88 closes of which exactly ONE is in-era
+    (its declared era is 31-Jul, the two-writer window), and the Farmer shadow's
+    0.199% claim goes to zero under the era rule.
+
+    The era rule is IMPORTED from its owner, never re-derived — a second copy of
+    a rule is a second rule. Fail-safe: any import or parse failure publishes
+    None (no opinion), never a fabricated era.
+    """
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), "scripts"))
+        from golive_readiness import era_rows
+        from experiment_judge import parse_ts
+    except Exception:                                # noqa: BLE001
+        return None, None, None, None
+    quads = []
+    for r in rows or []:
+        try:
+            ts = datetime.fromtimestamp(parse_ts(r.get("close_ts")),
+                                        tz=timezone.utc)
+        except Exception:                            # noqa: BLE001
+            continue
+        quads.append((r.get("profit_ratio"), r.get("profit_abs"), ts,
+                      r.get("open_ts"), r.get("extra")))
+    if not quads:
+        return None, None, None, None
+    quads.sort(key=lambda q: q[2])       # era_rows takes them oldest first
+    try:
+        ed = era_rows(bot, quads, parse=parse_ts, detail=True)
+    except Exception:                                # noqa: BLE001
+        return None, None, None, None
+    pcts = [q[0] for q in (ed.get("scoped") or [])]
+    n_era = len([p for p in pcts if p is not None])
+    lb = lower_bound(pcts) if n_era >= MIN_N else None
+    # None (no opinion), never 0.0 — the same distinction lower_bound draws.
+    claim_era = max(0.0, lb) if lb is not None else None
+    return n_era, claim_era, ed.get("iso"), ed.get("source")
+
+
 def run_once(publish=False):
     if store is None:
         return None
     trades, n_retired = _living(store.fetch_paper_trades(limit=8000))
-    books = {}
+    rows_by_bot = {}
     for t in trades:
         bot = t.get("bot")
         pct = t.get("profit_ratio", t.get("pnl_pct"))
         if bot and pct is not None:
-            books.setdefault(bot, []).append(pct)
+            rows_by_bot.setdefault(bot, []).append(t)
+    # [(kc)] seed the ZERO-CLOSE living books so I17's floor reaches them.
+    zero_close = []
+    for bot in _living_book_ids():
+        if bot not in rows_by_bot:
+            rows_by_bot[bot] = []
+            zero_close.append(bot)
+    books = {b: [r.get("profit_ratio", r.get("pnl_pct")) for r in rs]
+             for b, rs in rows_by_bot.items()}
     payload = build(books)
     payload["excluded_retired"] = n_retired
+    payload["zero_close_books"] = sorted(zero_close)
+    # [(kc)] Say WHICH sample the ranked claim is computed on. Three organs
+    # grade this fleet on three different samples — allocation pools all-time,
+    # golive_readiness scopes to the policy era, the brain decays at a 14d
+    # half-life — and only this one had no label saying so.
+    payload["sample"] = "all-time-pooled"
+    for b, rs in rows_by_bot.items():
+        rec = payload["books"].get(b)
+        if rec is None:
+            continue
+        n_era, claim_era, era_iso, era_src = _era_twin(b, rs)
+        rec["n_era"] = n_era
+        rec["claim_era"] = (round(claim_era, 6)
+                            if claim_era is not None else None)
+        rec["era_since"] = era_iso
+        rec["era_source"] = era_src
     # The go-live verdict is IMPORTED, never re-derived here — allocation is a
     # different question and must not become a second gate. Optional by design:
     # that module is the other half of the fleet's grading surface and this
@@ -255,15 +452,24 @@ def run_once(publish=False):
 
 
 def _print(payload):
-    print(f"\n{'book':34s} {'cls':11s} {'n':>4} {'claim':>9} "
-          f"{'now$':>7} {'target$':>8} {'delta':>8}")
-    print("-" * 88)
+    # [(kc)] mean/se and the era twin are shown because the two failure modes
+    # they separate — "no edge" and "no sample" — have OPPOSITE remedies, and
+    # the table could not tell them apart.
+    print(f"\n{'book':34s} {'cls':11s} {'n':>4} {'mean%':>8} {'se%':>7} "
+          f"{'claim':>9} {'target$':>8} {'nEra':>5} {'claimEra':>9}  why")
+    print("-" * 118)
     for b, r in sorted(payload["books"].items(),
                        key=lambda kv: -kv[1]["target_usd"]):
-        print(f"{b:34s} {r['class']:11s} {r['n']:>4} {r['claim']:>9.5f} "
-              f"{r['current_usd']:>7.0f} {r['target_usd']:>8.0f} "
-              f"{r['delta_usd']:>+8.0f}"
-              + ("  (undecided -> probe floor)" if r["undecided"] else ""))
+        def _f(x, w, p):
+            return f"{x*100:>{w}.{p}f}" if isinstance(x, (int, float)) else \
+                   f"{'-':>{w}}"
+        ce = r.get("claim_era")
+        print(f"{b:34s} {r['class']:11s} {r['n']:>4} "
+              f"{_f(r.get('mean_pct'), 8, 3)} {_f(r.get('se_pct'), 7, 3)} "
+              f"{r['claim']:>9.5f} {r['target_usd']:>8.0f} "
+              f"{(r.get('n_era') if r.get('n_era') is not None else '-'):>5} "
+              f"{(f'{ce:.5f}' if ce is not None else '-'):>9}"
+              f"  {r.get('undecided_why') or ''}")
     print()
     for cls, c in payload["by_class"].items():
         print(f"  {cls:11s} {c['books']:2d} books  {c['closes']:5d} closes  "
@@ -326,6 +532,44 @@ def _selftest():
     assert book_class("crypto-trend-daily-lshadow") == "directional"
     assert book_class("lighter-ticket-taker-lighter") == "directional"
     assert book_class(None) == "directional", "unknown must not claim funding"
+    # [(kc)] the funding SUPER-BOOK carries a musician's name, so no marker can
+    # see it. Registry first, markers second.
+    assert book_class("band-barnes-lshadow") == "funding", \
+        "the funding super-book must not be classed directional"
+
+    # --- [(kc)] THE EVIDENCE RECORD reproduces the published claim ---------
+    # mean_pct/se_pct are the INPUTS to the ranked number, so the payload must
+    # be self-describing: if these two cannot rebuild `claim`, they describe a
+    # different sample than the one that was ranked.
+    ev = allocate({"w": [0.02, 0.01, 0.03, -0.005] * 8}, book_usd=1000.0)["w"]
+    assert ev["mean_pct"] is not None and ev["se_pct"] is not None
+    assert abs(ev["claim"] - max(0.0, ev["mean_pct"]
+                                 - Z_LOWER * ev["se_pct"])) < 1e-6, \
+        "the published claim must be reproducible from the published stats"
+    # a claim ALWAYS sits below its own sample mean — this is what red-lines
+    # any estimator (pooling, shrinkage, a rate multiplier) that would hand a
+    # book a claim its own sample cannot support.
+    assert ev["claim"] < ev["mean_pct"], "a bound must sit below the mean"
+    assert ev["undecided_why"] is None and ev["undecided"] is False
+
+    # "no opinion" must reach the payload as None, never as 0.0 --------------
+    thin_ev = allocate({"t": [0.01, 0.02]}, book_usd=1000.0)["t"]
+    assert thin_ev["claim"] == 0.0 and thin_ev["undecided_why"] == "below-min-n"
+    flat_ev = allocate({"f": [0.01] * 30}, book_usd=1000.0)["f"]
+    assert flat_ev["mean_pct"] is None and flat_ev["se_pct"] is None, \
+        "zero variance is NO OPINION — it must not publish a mean"
+    assert flat_ev["undecided_why"] == "no-bound"
+    neg_ev = allocate({"g": [-0.02, -0.01, -0.03, 0.0] * 8}, book_usd=1000.0)["g"]
+    assert neg_ev["undecided_why"] == "bound<=0" and neg_ev["claim"] == 0.0
+    assert neg_ev["mean_pct"] is not None, \
+        "a measured loser still publishes its measurement"
+
+    # a ZERO-CLOSE book still gets a row and a floor (I17's actual case) -----
+    z = allocate({"empty": [], "real": [0.01, 0.02, 0.0, 0.015] * 8},
+                 book_usd=1000.0)
+    assert z["empty"]["n"] == 0 and z["empty"]["target_usd"] >= 250.0, \
+        "a book with no closes is exactly the case the probe floor is for"
+    assert z["empty"]["undecided_why"] == "no-bound"
 
     # --- the payload is honest about what it is ---------------------------
     p = build({"m": [0.01, 0.02, 0.0, 0.015] * 10})
