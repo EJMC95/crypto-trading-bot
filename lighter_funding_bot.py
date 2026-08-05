@@ -370,7 +370,7 @@ try:
     import fleet_tuning as tuning
 except Exception:  # noqa: BLE001
     tuning = None
-# [2026-08-05 (jn) S1] fleet_bus for the allocation organ's capital scale.
+# [2026-08-05 (jr) S1] fleet_bus for the allocation organ's capital scale.
 # SHADOW ARM ONLY — the consumer below gates on shadow_tag, and the live
 # arm's clip keeps its (ia) discipline: no capacity lever and no allocation
 # ever reaches real money. COPY'd into Dockerfile.fundinglighter same commit
@@ -1848,7 +1848,7 @@ def main():
         # board's bounded live.clip_scale lever applies to NEW entries only
         # (open positions untouched); reverts with the lever's own expiry.
         _clip = ctx.order_usd(ORDER_USD)
-        # [2026-08-05 (jn) S1] allocation scale, SHADOW ARM ONLY: the live
+        # [2026-08-05 (jr) S1] allocation scale, SHADOW ARM ONLY: the live
         # arm's clip takes no capital lever ((ia)) and no allocation. NEW
         # entries only, like the lever above. Dark/stale organ -> 1.0.
         if shadow_tag and fleet_bus is not None:

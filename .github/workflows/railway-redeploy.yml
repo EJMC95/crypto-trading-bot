@@ -279,7 +279,11 @@ jobs:
             # the guard picks the winner at runtime. That is deliberately the
             # opposite of (gl)'s error, which was naming a service from a
             # dashboard row id. Stopping the loser stays an OPERATOR act.
-            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|venues/|requirements\.txt$|\.github/workflows/railway-redeploy\.yml$)'; then
+            # [2026-08-05 (jr) S1] fleet_bus.py joined this image's COPY set
+            # (the allocation-scale consumer) — in BOTH this grep and paths:,
+            # or editing the bus would be a silent no-op for funding-carry
+            # (the exact fleet_tuning precedent five lines up).
+            if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|venues/|requirements\.txt$|\.github/workflows/railway-redeploy\.yml$)'; then
               # TWO SEPARATE ASSIGNMENTS, deliberately — NOT
               # `...}funding-carry,yield-harvester-shadow`. audit_deploy_coverage
               # associates a grep with a service by matching the
@@ -426,7 +430,9 @@ jobs:
             # drift sensor's own feed — could not reach either live arm via
             # its marker).
             taker_files='^(lighter_ticket_taker\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|tickettaker_loop\.sh$|Dockerfile\.tickettaker$|requirements\.txt$)'
-            farmer_files='^(lighter_funding_bot\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|Dockerfile\.fundinglighter$|requirements\.txt$)'
+            # [2026-08-05 (jr) S1] + fleet_bus.py: now in the farmer image's
+            # COPY set (shadow-arm allocation consumer; live arm never reads it)
+            farmer_files='^(lighter_funding_bot\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|Dockerfile\.fundinglighter$|requirements\.txt$)'
             if echo "$changed" | grep -qE "$taker_files" \
                && { [ "$live_all" = 1 ] || printf '%s' "$msgs" | grep -qF '[deploy-live-taker]'; }; then
               svcs="${svcs:+$svcs,}tide-rider-lighter-live"

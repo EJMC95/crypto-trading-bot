@@ -55,7 +55,7 @@ try:
     import fleet_tuning as tuning
 except Exception:  # noqa: BLE001
     tuning = None
-# [2026-08-05 (jn) S1] fleet_bus for the allocation organ's capital scale —
+# [2026-08-05 (jr) S1] fleet_bus for the allocation organ's capital scale —
 # COPY'd into Dockerfile.funding in the same commit (a guarded import with no
 # COPY is the born-dark class the comment above names). A dark bus scales
 # nothing: entries stay at the env-default NOTIONAL.
@@ -870,7 +870,7 @@ def main():
 
             # ---- scan for new carries ------------------------------------
             if len(positions) < MAX_POSITIONS:
-                # [2026-08-05 (jn) S1] the allocation organ's capital scale,
+                # [2026-08-05 (jr) S1] the allocation organ's capital scale,
                 # NEW entries only — open positions keep the notional they
                 # were opened at (same rule as the growth rail's clip). This
                 # arm is shadow-only by construction (the HL arm exits at

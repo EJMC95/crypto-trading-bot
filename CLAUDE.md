@@ -648,6 +648,17 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   no `write_levers`/`get_lever`/`market_open`). NOT a second go-live gate — the
   gate is IMPORTED from `golive_readiness`. → bot_state `fleet-allocation`,
   30-min `--publish` loop sharing the radar's ledger fetch.
+  **[2026-08-05 (jr) S1 — IT HAS CONSUMERS NOW, by operator decision.** The
+  ORGAN is unchanged (publish-only); `fleet_bus.allocation_scale(bot)` serves
+  `target_usd/book_usd` clamped [0.25, 4.0] and the three funding SHADOW
+  books size NEW entries by it — 🌾 carry, ⚖️ Counterweight (`not _is_live`),
+  💸 Farmer shadow arm (`if shadow_tag`; consumer deferred behind the next
+  marked Farmer deploy). Real money never reads it — AST-pinned in
+  `tests/autonomy/test_allocation_consumer.py` — and
+  `FLEET_ALLOCATION_MODE=advisory` per service reverts every consumer to its
+  env default at the accessor. Both funding Dockerfiles gained the
+  `fleet_bus.py` COPY + deploy-route entries in the same commit (born-dark +
+  orphan rules).]
 - `scripts/golive_readiness.py` 🚦 — the GO-LIVE GRADER, an ORGAN since
   2026-07-30 (gk). Grades every LIVING book against the `(fk)` bar and
   publishes → `golive-readiness` (6-hourly `--publish` loop in `run_all.sh`;

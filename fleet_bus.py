@@ -110,7 +110,7 @@ def allocation_scale(bot, current_time=None):
     book: `books[bot].target_usd / book_usd`, clamped to [0.25, 4.0], or
     None on any doubt.
 
-    [2026-08-05 (jn) S1 — operator decision "proceed"] The allocation organ
+    [2026-08-05 (jr) S1 — operator decision "proceed"] The allocation organ
     ranked capital by claim (`max(0, mean − 1.28·SE)`) for four days with
     zero consumers; S1 flips it from advisory to ACTING on the shadow
     notionals of the three funding books — the trio holding every measured

@@ -45,7 +45,7 @@
 
 ## 2026-08-05 (jq) — THE ORGAN TIER OF THE SEED CLASS: five organs stop trusting a failed read, and the frontier is measured rather than assumed
 
-- *(Letter moved TWICE at push time — (jn) then (jo) were each claimed on
+- *(Letter moved TWICE at push time — (jr) then (jo) were each claimed on
   origin/main by concurrent sessions mid-pass (slippage distribution; loss
   decomposition); `audit_changelog_letters` caught both collisions pre-push,
   exactly as built. Sits above (jp) in the file; sequence is claim order.)*
@@ -97,14 +97,14 @@
 - **METHOD, per (ji)'s own warning**: the production close path — `bot_pnl_store.fetch_paper_trades` (quarantine applied at source, 44 rows withheld), eras from the gate's published payload (the (gk) organ, read via /bus.json) + `era_epoch_for` for the sub-floor books, keyed on the OPEN, fail-closed. 2,079 admissible rows → **1,091 in-era closes** across the living fleet. Calibration: per-book n/mean/win matches the published gate payload EXACTLY on every shared book; the one divergence (⚖️ n=68 vs 56) is 12 closes stamped 00:37:57Z 5-Aug — the (jg) unwind itself, observed landing.
 - **THE HEADLINE**: the fleet's in-era red is the `sl` exit family — **−$90.28 over 260 stops at 2.3% win** (median hold 0.7h), more than every other losing family combined. **12 books' stop cells sit at exactly 0% win** (the (gq) "seven books" prior, confirmed and widened). **−$50.10 of it is the six Parliament books' ~1% stop** — the rule (gx) already measured as realising reversion losses (sl 1%→3% on gillard: −0.158→+0.050%/trade with maxDD FALLING), whose actuator shipped in (jj), gillard-scoped. №2 and №4 were closed by the same night's work and verified in this ledger read: ⚖️ CW rebalance −$31.31 ((jg) — 12-leg unwind at 00:37Z, SOXL −47%/SNDK −41%/MU −21%, shorting semis in their bull run: the chronic-losers shape; **the next payload reads worse BECAUSE the fix landed** — MTM realising is the revert's accounting, not a regression) and 🧲 Snap Back's converged bleed ((jh) — last close 4-Aug 20:46Z, silent since; the operator's service stop is still queue item 3).
 - **THE I15 DEMO the question deserved**: longs win **43.6%**, shorts win **44.1%** — near-identical win rates hiding a 0.22pp/trade expectancy gap (longs −0.227%/t=−2.56; shorts −0.008%/t=−0.11, BELOW the +0.2–1.1 random-short null). Win rate cannot see the fleet's actual problem; expectancy can. Priors scorecard: long-side loss CONFIRMED (worse), `*_sl` 0%-win CONFIRMED (widened to 12), carry's sided flips NOT MEASURABLE in-era (n=1, the stall), georgia's `trend_breakout`-is-the-loser **REFUTED in-era** (72% of trades, +$5.02 — her red is the sl slice, −$10.10).
-- **TOP 5 by recoverable $** (full routes in the study): 1. Parliament stops −$50.10 [(jj) runs; extend to the other five PMs only after gillard's out-of-sample verdict + per-book `calibrate()`]; 2. CW −$31.31 [SOLVED-PENDING-EVIDENCE, ~28-Aug read]; 3. spot/family stops −$27.14 (intraday-15m 4.8%-win, georgia 11.6%-win, dad's donchian) [implement-now MEASUREMENT: `study_exit_sweep` on post-(gr) priced closes, `calibrate()` decides]; 4. Snap Back ~−$1/day [SOLVED + operator stop]; 5. long-side discipline [nothing-to-pull — 78% of the open stop pool IS long-side, so №1/№3 are the long fix]. Corroboration from the parallel (jn) friction study, independent data: the taker's `sl` exits are also its expensive fills (mean 10bps, firing into the move) — the stop family loses twice.
+- **TOP 5 by recoverable $** (full routes in the study): 1. Parliament stops −$50.10 [(jj) runs; extend to the other five PMs only after gillard's out-of-sample verdict + per-book `calibrate()`]; 2. CW −$31.31 [SOLVED-PENDING-EVIDENCE, ~28-Aug read]; 3. spot/family stops −$27.14 (intraday-15m 4.8%-win, georgia 11.6%-win, dad's donchian) [implement-now MEASUREMENT: `study_exit_sweep` on post-(gr) priced closes, `calibrate()` decides]; 4. Snap Back ~−$1/day [SOLVED + operator stop]; 5. long-side discipline [nothing-to-pull — 78% of the open stop pool IS long-side, so №1/№3 are the long fix]. Corroboration from the parallel (jr) friction study, independent data: the taker's `sl` exits are also its expensive fills (mean 10bps, firing into the move) — the stop family loses twice.
 - **DO-NOT-DO, each refused on a number** (§5 of the study): loosen stops without a calibrated sweep (Stock Leaders: −$91.90, all catastrophic-stop); tp-0.06-shape tight targets; flip books short for drift (our shorts run below the free null); raise LONG_BUDGET; carry.enter_apr→10% ((it)); daily-mark grading ((hp)); any consensus gate ((ji)).
 
 ### WHICH BOOK MOVED (doctrine rule 4)
 
 **None directly — a measurement pass; the deliverable is the ranked target list with the churn routes closed.** The book with a live actuator already walking is **pm-gillard** ((jj)); the two biggest solved cells (⚖️, 🧲) had their landings VERIFIED here by ledger readback, which is the half of (jg)/(jh) that was still owed.
 
-## 2026-08-05 (jn) — LIGHTER'S REAL SLIPPAGE, MEASURED AT LAST: n=158 tx-hash fills give the fleet its first friction DISTRIBUTION — and the flip list runs through it
+## 2026-08-05 (jr) — LIGHTER'S REAL SLIPPAGE, MEASURED AT LAST: n=158 tx-hash fills give the fleet its first friction DISTRIBUTION — and the flip list runs through it
 
 - **THE ASK** (operator: *"find the avenue to ultimate growth and wins"*): replace the fleet's assumed friction constants with the measured record, then re-run every refusal that was denominated in the assumption. Study: `STUDY_MEASURED_FRICTION_2026-08-05.md`. **Study + this entry only — no bot logic, no lever, no config changed.**
 - **THE DISTRIBUTION** (venue_orders, `fill_src='trades(tx)'`, 22-Jul→4-Aug, both live books): 💸 Farmer **median 0.27bps/fill, p90 0.97, max 2.06** (n=91, rt ~0.58bps); 🎫 Taker **median 5.06, p90 14.28, max 59.88** (n=67, rt ~10.2bps) — **~18x apart**, per-book per doctrine. Liquidity tier is monotone and is the whole story (≥$100M: 0.21 median → <$1M: 5.12). Exits cost 1.3–1.6x entries on both books, and the Taker's `sl` exits are its expensive tail (mean 10.0bps, max 59.9 — the stop fires INTO the move, on the losers). **The ShadowBroker model is validated in aggregate**: within ±60% of measured at the median, errors in both directions (Taker model 3.83 vs 5.06; Farmer 0.43 vs 0.27) — so shadow ledgers and replay gates run on a defensible friction.
@@ -116,6 +116,69 @@
 - **HONESTY GATES**: $10–38 clips only (larger-clip scaling UNMEASURED); taker-style only (zero maker fills ever); 91 of 158 fills are four liquid majors; 13 days, one regime; every carry number conditional on the 20bps hedge model.
 - **ROUTES** (standing table, nothing hand-set): no lever moves anywhere — two refusals re-confirmed, one discrepancy filed with an owner, and the one measured edge (Farmer 0.05 carry lane) is already guarded by the published `impl-shortfall.order_slip.live` ~2bps tripwire (worst measured fill in 13 days: 2.06bps — not close). Future funding-economics runs use the measured band, never `BT_SLIP_BPS=5.0`.
 
+## 2026-08-05 (jr) — S1 SHIPPED: THE ALLOCATION ORGAN ACTS — CAPITAL FOLLOWS MEASURED CLAIMS ON THE THREE FUNDING SHADOWS
+
+- *(Letter moved from (jn) at push time — concurrent sessions claimed
+  (jn)–(jq) on origin/main mid-build; `audit_changelog_letters` caught it
+  pre-push, second time in two days. All tree citations renumbered with it.)*
+- **THE DECISION** (operator, 5-Aug: *"Proceed with all of the above"* / *"Full
+  permission"* on OPERATOR_QUEUE item S1 ★). The allocation organ ranked
+  capital by claim (I16, `max(0, mean − 1.28·SE)`) for four days with **zero
+  consumers** — the fleet KNEW where the money should go and nothing read it.
+  S1 is the smallest true "super bot": one capital brain over three
+  specialised funding organs, combined at the CAPITAL layer where the
+  evidence actually is, resetting no book's 30-day clock.
+- **THE CONSUMER**: `fleet_bus.allocation_scale(bot)` — `target_usd /
+  book_usd` off the organ's own payload, clamped **[0.25, 4.0]** (floor =
+  the organ's PROBE_FLOOR; cap keeps a $1k paper book's clip inside sane
+  slippage modelling). Standard bus contract: dark/stale/unknown/junk →
+  None → the consumer keeps its env default. Wired into the three books
+  holding every measured claim in the fleet, NEW entries only:
+  * 🌾 carry — `NOTIONAL × scale` at the entry scan (open positions keep
+    their recorded notional; close math was already per-position).
+  * ⚖️ Counterweight — loop clip refresh behind `not _is_live`; the live
+    arm's clip stays PINNED at `GOLIVE_ORDER_USD` per `(ia)`.
+  * 💸 Farmer **shadow arm only** (`if shadow_tag`) — the live arm takes no
+    capacity lever and no allocation, ever.
+- **REAL MONEY NEVER READS IT — pinned by AST**, parent-tracked (a page-wide
+  substring is not a structural claim, (hm)): every `allocation_scale` call
+  in the two live-capable files must sit inside its shadow guard, and losing
+  the call entirely is ALSO red (registered-but-inert is the failure S1
+  exists to end). **Kill switch reaches the consumer**:
+  `FLEET_ALLOCATION_MODE=advisory` on a service → the ACCESSOR returns None
+  → every consumer reverts to env defaults next loop, no redeploy.
+- **THE ORGAN IS UNCHANGED** — still publish-only, `moves_capital: False`.
+  Consumers choosing to read the bus is the same pattern as brain
+  stake-mults; the acting is at the consumers, by operator decision.
+- **BORN-DARK CLOSED IN THE SAME COMMIT**: neither funding Dockerfile COPY'd
+  `fleet_bus.py` — the guarded import would have scaled nothing, silently,
+  forever. Both COPYs added (`fleet_bus` is NOT in `_BUILD_SHARED`, so no
+  build-stamp shift), and `audit_deploy_coverage` immediately caught the
+  next hole: a `fleet_bus.py` edit had NO route to `funding-carry` — grep +
+  farmer marker-list extended, guard back to OK. Tested from the publisher's
+  own payload (`fleet_allocation.build`; the first fixture used constant
+  series and the organ's variance floor correctly refused them — the
+  publisher's rules, not mine). **Six mutations red**: farmer gate dropped,
+  Counterweight gate dropped, COPY dropped, freshness dropped, clamp
+  dropped, kill switch dropped.
+- **Deploy reality, stated**: carry (`funding-carry` + failover twin) and
+  `counterweight-shadow` take this on the auto-path NOW; the Farmer pair is
+  marker-gated, so its shadow arm's consumer is **DEFERRED until the next
+  marked Farmer deploy** — bundle with the queued `snapshot_equity` push.
+- **Also recorded this session**: 🌾 carry keep-or-wait DECIDED-WAIT to
+  ~30-Aug (queue item 2, option A); the five shadow-service source
+  disconnects + the `perps-bot` stop were attempted and **blocked by the
+  session permission layer** — they return to the operator checklist with
+  exact commands (no workaround attempted, by design).
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**The three funding books — in capital, the fleet's first evidence-routed
+allocation.** At the live payload's current claims: carry-shadow and
+Farmer-shadow scale UP (the only books with positive lower bounds beside the
+live Farmer), Counterweight to its probe floor — the fleet now LEARNS at
+stakes proportional to evidence instead of flat $1k habit. Suite green, six
+guards green, `audit_lever_bounds` drift arm green.
 ## 2026-08-05 (jm) — A LIVE DEPLOY BECOMES ONE VERIFIED ACT: `scripts/deploy_live_verify.py` — print the operator command, watch the run, prove the landing by stamp readback
 
 - *(Letter renumbered at push time — three times, a measure of tonight's push traffic: drafted (jj), then (jk), then (jl); parallel sessions took each on origin/main first (Parliament sl-walk, sniper source-stamps, billing-lockout canary). The pushed entry keeps its letter; this one moves, recorded inline per the letter convention.)*

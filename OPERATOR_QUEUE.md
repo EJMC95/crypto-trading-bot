@@ -18,15 +18,14 @@ Four routes, ranked by evidence. The fleet's measured reality (1-Aug,
 allocation organ): ALL measured claims live in the FUNDING class (3 books,
 +$72.89, n=297); DIRECTIONAL has zero claims in 867 closes.
 
-- **S1 ★ — Allocation-weighted funding trio (a super bot in effect, no new
-  book).** Flip `fleet_allocation` from advisory to ACTING on the shadow
-  notionals of 🌾 carry / 💸 Farmer-shadow / ⚖️ Counterweight (evidence-ranked
-  split, 25% probe floor, conserved total). One capital brain over three
-  specialised organs — the utilities combine at the CAPITAL layer, where the
-  evidence is, without resetting a single 30-day clock. Touches zero real
-  dollars (shadow notionals steer what the fleet LEARNS). Reversible by env.
-  *Say "do S1" and a session wires the consumer + kill switch through the
-  standard replay/registry pattern.*
+- **S1 — DECIDED-SHIPPED 5-Aug (jr)** (operator: *"Proceed with all of the
+  above"* / *"Full permission"*). `fleet_bus.allocation_scale` consumes the
+  organ's `target_usd`, clamped [0.25, 4.0], NEW entries only, wired into
+  🌾 carry + ⚖️ Counterweight (live via the auto-deploy path) and 💸 the
+  Farmer's SHADOW arm (**deferred behind the next marked Farmer deploy** —
+  bundle with the queued snapshot_equity push). Real money never reads it
+  (AST-pinned); kill switch `FLEET_ALLOCATION_MODE=advisory` per service.
+  The organ itself is unchanged, publish-only.
 - **S2 — The literal consolidated funding super-book.** One new row (next
   cohort naming: Australian musicians) running three sleeves — carry-decay
   harvest, funding-extreme entries, cross-sectional L/S — each closing with
@@ -60,11 +59,10 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   YOURS and moved to item 3's Railway list: stop/delete the
   `snap-back-shadow` service (remove its deploy-rule entries first) — the
   code guard is the durable half either way.
-- **🌾 Carry — keep or wait.** Fresh era (31-Jul) × venue stall (0 eligible;
-  one liquid book clears the bar and carry holds it). Both widening levers
-  already REFUSED on measurement ((it)) — they are not on this menu. Options:
-  **A ★ wait to ~30-Aug** (costs nothing; 5 open carries +$10.33 riding),
-  **B** retire (against: the fleet's best all-time record, 5/6 t=2.99).
+- **🌾 Carry — DECIDED-WAIT 5-Aug (option A, operator: "Proceed with all of
+  the above").** Ride to ~30-Aug; both widening levers stay refused on
+  measurement ((it)). Revisit lands on the calendar with the era window; the
+  S1 scale (jr) now sizes its NEW entries by claim in the meantime.
 - **⚖️ Counterweight — early revert. DECIDED-REVERTED 4-Aug (option A,
   operator: "full permission to go ahead with all advancements").** Shipped
   as the CODE DEFAULT K 8→5 + universe 60→30 (`lighter_funding_spread_bot.py`
@@ -110,7 +108,11 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   (ip) used on the live Farmer; consistency, one deploy path), **B** keep +
   declare in CLAUDE.md with a guard asserting the branch is main (they are
   harmless-to-helpful while pointed at main). Either is defensible; A is
-  cleaner doctrine.
+  cleaner doctrine. **[5-Aug: operator approved A and an agent ATTEMPTED it —
+  blocked by the session permission layer (Railway mutations denied), no
+  workaround attempted. Run the five commands yourself, or add a Bash
+  permission rule for `railway service source disconnect` and ask again.
+  Same status for stopping the crash-looping `perps-bot`.]**
 - **Zombie publishers (external projects).** `equities-momentum-alpaca` still
   writes daily (~22:01 UTC ≈ 08:00 Sydney; $86k paper equity) — publisher is
   almost certainly in your `trading-bot` or `ikbr-stock-bot` Railway

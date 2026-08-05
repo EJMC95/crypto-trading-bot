@@ -643,7 +643,7 @@ def main():
         _lv = apply_tuning(live=_is_live)
         if _lv:
             log.info("levers applied %s (K=%d)", _lv, K)
-        # [2026-08-05 (jn) S1] the allocation organ's capital scale, SHADOW
+        # [2026-08-05 (jr) S1] the allocation organ's capital scale, SHADOW
         # arm only and NEW entries only (rebalance legs open at the scaled
         # clip; held legs keep their entry size). The live arm's clip stays
         # PINNED at GOLIVE_ORDER_USD per (ia) — capital levers do not reach
