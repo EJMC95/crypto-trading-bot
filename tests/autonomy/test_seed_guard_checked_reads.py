@@ -265,17 +265,34 @@ GUARDED_ORGANS = [
     "fleet_regen.py",          # last_push: a wipe double-fires repair pages
     "lighter_scout_tuner.py",  # enacted baseline: phantom change-pushes
     "strategy_incubator.py",   # proposed: the LIFETIME dedup ledger + xp-queue
+    # -- the 5-Aug second tranche --
+    "fleet_clock.py",          # transition log: a wipe fabricates an event
+    "fleet_respiration.py",    # hypoxia-transition memory: double-pages
+    "fleet_risk.py",           # equity carry-forward: a wipe IS the false
+                               # drawdown the carry exists to prevent
+    "implementation_shortfall.py",  # push-gap memory
+    "lighter_market_scout.py",  # _marks diff base — FAIL-OPEN, measured safe:
+                               # the first-run defense fires nothing on empty
+    "lighter_ticket_taker.py",  # shadow STATE_KEY — a run-once bot reboots
+                               # every cycle; the live arm was fixed 17-Jul
+    "market_pulse.py",         # the brain's hourly history: a wipe RESET it
+    "regime_oracle.py",        # per-asset grade accrual (item-18 evidence)
 ]
 
-# The 5-Aug AST census of the SAME shape not yet guarded (declared, not
-# silent): bot_learn, fleet_tuning, fleet_risk, fleet_clock, fleet_proposals,
-# fleet_respiration, market_context (incl. fleet-alerts + coin-vetoes),
-# market_pulse, regime_oracle, implementation_shortfall, lighter_market_scout,
-# experiment_judge (xp-queue-release-request only — its own KEY was fixed
-# 17-Jul), lighter_ticket_taker (STATE_KEY only — its live meta was fixed
-# 17-Jul), plus retired cross_exchange_arb/listing_sniper (idle). Each needs
-# its own degrade analysis before joining the list — growing this list
-# file-by-file is the intended path, silence about the frontier is not.
+# The remaining frontier (5-Aug census, updated after the second tranche) —
+# declared, not silent. Each needs its own degrade analysis before joining:
+#   * fleet_tuning — the growth rail's LEVER STORE: locked multi-author
+#     read-modify-write (3 sites); a wrong degrade could strand or wipe live
+#     levers. Its TTL-expiry semantics are load-bearing. Own pass required.
+#   * fleet_proposals — same locked multi-author merge shape.
+#   * market_context — five sites over three keys incl. the fleet-alerts
+#     APPEND path (a wipe truncates the alert stream) and coin-vetoes.
+#   * bot_learn (learning-brain read) — the brain's memory; the WRITE side is
+#     I4-guarded and (hx) watches the timestamp skew; the read seam still
+#     deserves its own pass with the era machinery in view.
+#   * experiment_judge (xp-judge-release-request) — a request-queue RMW; the
+#     judge's own KEY was fixed 17-Jul.
+#   * retired cross_exchange_arb / listing_sniper — idle behind guards.
 
 
 def _module_str_consts(tree):

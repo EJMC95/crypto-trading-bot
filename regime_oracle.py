@@ -461,7 +461,16 @@ def grade_pairs(prev_grading, pairs, now=None):
 
 
 def main():
-    prev = store.load_state(KEY) or {}
+    # [2026-08-05 SEED GUARD] checked read — `pairs` carries the per-asset
+    # grade accrual (the item-18 evidence window); a failed read that fell
+    # through as {} rebuilt it from scratch and the save made the wipe
+    # durable. Standard degrade: skip the cycle.
+    _ok, _prev = store.load_state_checked(KEY)
+    if not _ok:
+        print("[regime-oracle] state read FAILED — skipping this cycle "
+              "rather than seed over the accrual record", flush=True)
+        return
+    prev = _prev or {}
     prev_pairs = prev.get("pairs", {})
     # missing_nc keeps the crypto coverage contract untouched: coverage.missing
     # / n_missing have always meant THE MAJORS; a young non-crypto book (most

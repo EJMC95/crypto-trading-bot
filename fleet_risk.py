@@ -602,7 +602,18 @@ def main():
     sniper = by_bot.get("event-listing-sniper") or {}
     if not row_fresh(sniper):
         sniper = {}
-    prev_state = store.load_state(RISK_KEY) or {}
+    # [2026-08-05 SEED GUARD] checked read — `equity_by_bot` is the outage
+    # guard's carry-forward: a failed read that fell through as {} dropped
+    # every carried equity, which is exactly the false-drawdown the carry
+    # exists to prevent, and the save made the wipe durable. Standard
+    # degrade: skip the cycle — every consumer of the light fails NEUTRAL on
+    # staleness by contract, so a skipped beat restricts nothing.
+    _ok_prev, _prev_state = store.load_state_checked(RISK_KEY)
+    if not _ok_prev:
+        print("[fleet-risk] state read FAILED — skipping this cycle rather "
+              "than seed over the equity carry-forward", flush=True)
+        return None
+    prev_state = _prev_state or {}
     # [2026-07-15 AUDIT FIX] Outage guard for the drawdown governor: a bot
     # whose publisher went quiet must read as "publisher lost", not "equity
     # lost" — otherwise a container restart looks like a -12% fleet drawdown

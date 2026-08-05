@@ -223,13 +223,15 @@ def run_once():
     now = _now()
     r = classify(now)
     payload = {"updated": now.isoformat(timespec="seconds"), "ttl_sec": TTL_SEC, **r}
-    try:
-        prev = store.load_state(KEY)
-    except Exception:
-        prev = None
+    # [2026-08-05 CHECKED READ — the seed-guard ratchet] this payload is a
+    # pure recompute (no memory to seed), but `prev` gates the TRANSITION log:
+    # a failed read used to read as prev=None, fabricating a phantom
+    # transition row in history. On ok=False, save the payload (recomputed,
+    # safe) and skip only the transition append.
+    _ok_prev, prev = store.load_state_checked(KEY)
     store.save_state(KEY, payload)
     # history on TRANSITIONS only → an open/close event log, not a heartbeat
-    if _transition_sig(prev) != _transition_sig(payload) and hasattr(store, "save_history"):
+    if _ok_prev and _transition_sig(prev) != _transition_sig(payload) and hasattr(store, "save_history"):
         try:
             store.save_history(KEY, {"updated": payload["updated"],
                                      "primary": r["primary"],

@@ -140,7 +140,15 @@ def send_push(title, body, priority="high"):
 
 def run_once():
     now = now_ts()
-    prior = store.load_state(KEY) or {}
+    # [2026-08-05 SEED GUARD] checked read — a wiped `prior` resets the
+    # hypoxia-transition memory and can double-page. Standard degrade: skip
+    # the cycle; oxygen is re-measured next beat.
+    _ok, _prior = store.load_state_checked(KEY)
+    if not _ok:
+        print("[fleet-respiration] state read FAILED — skipping this cycle "
+              "rather than seed over the record", flush=True)
+        return None
+    prior = _prior or {}
     # one batched beat for every oxygen feed
     states = (store.fetch_states(list(OXYGEN_FEEDS))
               if hasattr(store, "fetch_states") else {}) or {}

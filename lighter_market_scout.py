@@ -533,7 +533,14 @@ def main():
         return
     lighter_apr, other_aprs = funding_aprs(fr.get("funding_rates") or [])
 
-    prev = store.load_state(KEY) or {}
+    # [2026-08-05 CHECKED READ — the seed-guard ratchet] deliberately
+    # FAIL-OPEN, and measured safe: `_marks` is the listings/surge diff base,
+    # and build_snapshot's own first-run defense (`if prev_syms else []`)
+    # means an empty prev fires NOTHING — no phantom listings — and the base
+    # self-heals in one cycle from current stats. Skipping the save instead
+    # would delay the whole fleet's market snapshot for zero protection.
+    _ok_prev, prev = store.load_state_checked(KEY)
+    prev = prev or {}
     regimes = oracle_regimes(store.load_state("regime-oracle"))
     payload = build_snapshot(stats, lighter_apr, other_aprs,
                              prev.get("_marks") or {}, regimes)

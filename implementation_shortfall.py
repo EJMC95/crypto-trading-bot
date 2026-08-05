@@ -435,7 +435,14 @@ def _xp_running(now):
 
 def run_once():
     now = now_ts()
-    prior = store.load_state(KEY) or {}
+    # [2026-08-05 SEED GUARD] checked read — `prior` carries the push-gap
+    # memory; a wipe double-pages. Standard degrade: skip the cycle.
+    _ok, _prior = store.load_state_checked(KEY)
+    if not _ok:
+        print("[impl-shortfall] state read FAILED — skipping this cycle "
+              "rather than seed over the record", flush=True)
+        return None
+    prior = _prior or {}
     xp = _xp_running(now)
     try:
         _drift = arm_drift(store.fetch_bot_pnl() or [])

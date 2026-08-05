@@ -400,7 +400,16 @@ def save(pulse):
     # Durable copy + rolling history for the brain.
     try:
         import bot_pnl_store as store
-        prev = store.load_state("market-pulse") or {}
+        # [2026-08-05 SEED GUARD] checked read — `history` is the rolling
+        # hourly series the brain reads; a failed read that fell through as {}
+        # RESET it to a single sample and the save made the wipe durable.
+        # Degrade: skip the postgres sink this cycle (the other sinks still
+        # save); the series resumes on the next clean read.
+        _ok, prev = store.load_state_checked("market-pulse")
+        if not _ok:
+            raise RuntimeError("market-pulse state read failed — "
+                               "not overwriting the hourly history")
+        prev = prev or {}
         hist = append_hourly(prev.get("history", []), pulse)
         # [2026-07-15] carry the fleet freshness contract (updated+ttl_sec) so
         # respiration / immune / fleet_bus can read pulse's age — it had none,
