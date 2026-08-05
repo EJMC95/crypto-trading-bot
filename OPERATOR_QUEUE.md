@@ -26,17 +26,22 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   bundle with the queued snapshot_equity push). Real money never reads it
   (AST-pinned); kill switch `FLEET_ALLOCATION_MODE=advisory` per service.
   The organ itself is unchanged, publish-only.
-- **S2 — The literal consolidated funding super-book.** One new row (next
-  cohort naming: Australian musicians) running three sleeves — carry-decay
-  harvest, funding-extreme entries, cross-sectional L/S — each closing with
-  its own tag so the brain grades sleeves independently. This is
-  FORWARD_STEPS item 4 ("more funding surface") in consolidated form, and its
-  own condition applies: **build it after the promotion pipeline proves itself
-  on an existing book** — i.e. decide at ~16-Aug when the Farmer's window
-  fills. Cost: a fresh 30-day clock (gradeable ~mid-Sep at the earliest); a
-  merged book is a NEW policy, so none of the three books' existing evidence
-  carries over ((hm)). *Option: pre-build in shadow now and let the clock run
-  — the cost is only a row and attention.*
+- **S2 — BUILDING 5-Aug (operator: "yes build the super bot" — the pre-build
+  option taken).** 🎸 **Barnesy** (`band-barnes-lshadow`, service
+  `band-barnes-shadow`, `lighter_band_barnes_bot.py`) — first of the
+  Australian-musician cohort. Three sleeves, each a conservative
+  re-expression of its parent's validated gates: carry harvest (≥20% TRUE,
+  decay-paid discipline, $80×4), funding-extreme directional (top |APR|, 10%
+  stop, $40×4), x-sect L/S at the VALIDATED K=5 ($33 legs, 24h rebalance).
+  Closes tagged `<side>-<sleeve>_<exit>` so the brain grades sleeves
+  independently. **Config birth-frozen 30 days (BARNES_FREEZE_UNTIL
+  2026-09-04)** so the clock accrues a single-policy sample; the 30-day
+  clock starts at FIRST PUBLISH — gradeable ~mid-Sep at the earliest, and
+  none of the parents' evidence carries over ((hm)), stated in the bot's own
+  header. Birth-complete parity shipped in one commit: claim_writer at loop
+  top, funding-form exit telemetry, snapshot_equity from day one, barnes.*
+  levers (registered + birth-frozen at the consumer), deploy route +
+  AUTO_IMAGES + ROW_ENTRY + dashboard row.
 - **S3 — Directional consolidation: REFUSED, with evidence.** Merging the
   directional tail (Snap Back / gillard / abbott / intraday...) into one bot
   combines zero measured claims into one ungraded book with a fresh clock —
@@ -78,6 +83,34 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   Verify: row caps read k=5, universe_n=30 after the push.
 - **📊 Index Rider** — nothing to decide until the ~28-Aug zero-closes read;
   its MTM series now actually grades (post-(iz)/(ja)) from ~6-Aug.
+- **💸 Farmer — the `min_vol` CAGE floor vs the five extreme books (NEW
+  5-Aug (jy)).** The judge's `min-vol-2e6` candidate (filed (jy), slot
+  ~4-Sep) can only test the $1–10M tier: the cage `[2e6, 20e6]` floor sits
+  ABOVE all five extreme books that MOTIVATED the lever ((fz): H100/XLM/
+  SKR/XPD/TRUMP — re-measured 5-Aug at $0.11–0.35M, the <$1M tier). No
+  candidate value can reach them; a cage change on a live-promotable lever
+  is operator-signed by precedent (the 30-Jul A1 widening).
+  - **A ★ — keep the cage; let `min-vol-2e6` rule first.** Its verdict
+    (eval ~11-Sep) is the first FORWARD evidence on lowering the floor at
+    all; decide the sub-$1M question with that in hand. Why waiting is
+    cheap: the <$1M tier's measured friction is 5.12bps/fill median but
+    **p90 14.77 / max 59.88** (the fleet's worst measured fill lives in
+    this tier), and the five books' extreme APRs are a 30-Jul snapshot —
+    transience unmeasured. The thesis keeps: at those snapshot APRs
+    (41–99%) the tier's ~10.2bps median round trip pays in 9–22h, so it
+    is unpriced at the tail, not refuted.
+  - **B — sign a SHADOW-only widening now**: `xp.funding.min_vol` lo
+    2e6 → 0.1e6, live cage UNCHANGED. The twin could explore sub-$1M
+    books for evidence; note promotion writes the SAME value to the live
+    twin, so nothing below 2e6 could ever PROMOTE without a later live
+    signature — evidence-only by construction.
+  - **C — sign BOTH cages down.** Fastest, and it extends the judge's
+    promotable range into the venue's worst-friction tier before any
+    forward evidence exists. Not recommended ahead of A's verdict.
+  Prepared act for B/C: edit `fleet_tuning.py`
+  `LEVERS["xp.funding.min_vol"]["lo"]` (+ the live twin for C), record the
+  signature in the lever note per the A1 precedent, `audit_lever_bounds`
+  green before push.
 
 ## 3 · Infrastructure
 

@@ -372,7 +372,13 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                "Dockerfile.fundspread": "counterweight-shadow",
                "Dockerfile.indexshadow": "equities-regime-shadow",
                "Dockerfile.psniper": "perp-sniper-shadow",
-               "Dockerfile.familyshadow": "family-lighter-shadow"}
+               "Dockerfile.familyshadow": "family-lighter-shadow",
+               # [2026-08-05] 🎸 Barnesy — the funding super-book, routed the
+               # day it was born (the (jb) census fails an unclaimed image, so
+               # a route-less birth is no longer possible; this entry is the
+               # claim). Name created by `railway add --service
+               # band-barnes-shadow` in the same session as this rule.
+               "Dockerfile.bandbarnes": "band-barnes-shadow"}
 
 
 # ---------------------------------------------------------------------------

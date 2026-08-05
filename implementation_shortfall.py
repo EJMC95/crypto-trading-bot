@@ -529,6 +529,14 @@ def run_once():
                 "live.funding.slope_gate": {
                     "value": 1, "direction": "restrict",
                     "reason": _why, "evidence": _ev, "ttl_sec": 5400},
+                # [2026-08-05 (jy)] min_vol is promotable now (the judge's
+                # min-vol-2e6 candidate); sustained live slip is exactly
+                # the evidence against a LOWERED liquidity floor, so the
+                # release value is the $10M env default — the tighter
+                # direction by construction, same as every row above.
+                "live.funding.min_vol": {
+                    "value": 10000000.0, "direction": "restrict",
+                    "reason": _why, "evidence": _ev, "ttl_sec": 5400},
             }, set_by="impl-shortfall", now_ts=now)
         except Exception:      # noqa: BLE001
             pass

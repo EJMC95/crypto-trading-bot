@@ -51,6 +51,23 @@ from venues.fills import measured_from_reason, read_fill, slip_bps_of
 from venues.safety import capital_adjusted_day_start, open_notional
 
 BOT = "perps-funding-lighter"
+
+
+def _standby_key(bot_id):
+    """[2026-08-04] The bot_state key a STOOD-DOWN container reports on —
+    funding_carry_bot's (ic) pattern, verbatim in intent.
+
+    Deliberately NOT the book's `bot_pnl` row and NOT a `bot_pnl` row at all:
+    the loser of the writer claim must not touch the row it does not own —
+    (ib)/(ic) measured the standby loop WINNING the row 10 of 12 samples, and
+    a `heartbeat` from the loser keeps a DEAD incumbent's row reading fresh
+    (I1). Suffix, never a rewrite: the key stays derivable from the row it
+    shadows, so a reader holding the book id can always find its standby
+    record.
+    """
+    return f"{bot_id}:standby"
+
+
 # [2026-07-17 BASIS FIX — behaviour-NEUTRAL, see funding_basis.py]
 # Was `H = 24 * 365`, which annualised Lighter's 8-HOUR funding fraction as if
 # hourly: every apr this LIVE book computed was 8x TRUE. H is now 3*365=1095,
@@ -453,6 +470,12 @@ def apply_levers(mode):
     _ACTIVE_BARS.clear()
     _ACTIVE_BARS.update({"enter_apr": ENTER_APR, "take_profit": TAKE_PROFIT,
                          "max_hold_h": MAX_HOLD_H, "explore_k": SCAN_EXPLORE_K,
+                         # [2026-08-05 (jy)] min_vol receipt — the lever was
+                         # consumed here since (ge) with NO receipt, so a
+                         # min_vol judge candidate would accrue ZERO closes
+                         # (ran_candidate reads bars.min_vol; a missing
+                         # receipt is disproof by design)
+                         "min_vol": MIN_VOL,
                          # numeric receipt for the slope-gate-off candidate
                          # (ran_candidate float-compares bars.slope_gate)
                          "slope_gate": 1 if SLOPE_GATE else 0,
@@ -667,6 +690,11 @@ def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None):
             "bars": {"enter_apr": ENTER_APR,
                      "take_profit": TAKE_PROFIT,
                      "max_hold_h": MAX_HOLD_H,
+                     # [2026-08-05 (jy)] min_vol is an ENTRY-phase gate like
+                     # enter_apr: the honest receipt is the floor in force
+                     # when the book was ADMITTED, surviving a lever that
+                     # expires mid-hold (the (ed) rule)
+                     "min_vol": MIN_VOL,
                      "slope_gate": 1 if SLOPE_GATE else 0,
                      "explore_k": SCAN_EXPLORE_K,
                      "conviction_hi": (CONVICTION_HI
@@ -1841,6 +1869,51 @@ def main():
 
     while True:
         t0 = time.time()
+        # [2026-08-04] ONE BOOK, ONE WRITER — claimed at the TOP of the loop,
+        # BEFORE the heartbeat and before any trading act. This is
+        # funding_carry_bot's hardened (hp)/(ib)/(ic)/(id) pattern applied to
+        # the REAL-MONEY pair: two containers publishing one row make `n` a
+        # mixture of two books ((hf): 7 same-pair overlapping holds on carry),
+        # and here the row at stake holds real money. claim_writer is
+        # FAIL-OPEN (a dark DB never idles the book) and a redeploy is NOT a
+        # duplicate (`_claim_is_my_own_dead_replica` — same svc, new replica id
+        # — or every deploy would idle this book for the full 30-min TTL, the
+        # (id) stall). The claim precedes `store.heartbeat` deliberately: the
+        # loser must not refresh `updated_at` over a row it does not own —
+        # heartbeat from a loser keeps a DEAD incumbent's row reading fresh
+        # over a frozen snapshot (I1, the (ic) lesson).
+        _ok_writer, _other_writer = store.claim_writer(bot_id)
+        if not _ok_writer:
+            log.warning(
+                "STANDING DOWN — %s is already claimed by another container "
+                "(%s). Two writers make `n` a mixture of two books and, on the "
+                "live arm, two managers of one real account. Holding "
+                "positions untouched and trading NOTHING until the claim "
+                "expires (%ss) or the incumbent stops.",
+                bot_id, _other_writer, store.WRITER_CLAIM_TTL)
+            try:
+                # The loser reports on its OWN key ((ic)): no publish, no
+                # heartbeat, no bot_pnl row. `caps` identifies WHICH build is
+                # standing down — a standby record without it is
+                # indistinguishable from a stale one.
+                store.save_state(_standby_key(bot_id), {
+                    "standing_down": True,
+                    "book": bot_id,
+                    "duplicate_writer": _other_writer,
+                    "svc": store.service_name() or None,
+                    "venue": ctx.mode,
+                    "caps": {"clip_usd": round(order_usd, 2),
+                             "max_open": max_open,
+                             "enter_apr": ENTER_APR},
+                    "updated": datetime.now(timezone.utc).isoformat(),
+                    "ttl_sec": store.WRITER_CLAIM_TTL,
+                })
+            except Exception:  # noqa: BLE001
+                pass
+            if args.once:
+                break
+            time.sleep(LOOP_SECONDS)
+            continue
         # [2026-07-12 GO-GREEN] loop-top liveness touch: slow scans, venue
         # outages and skip-paths below can't read as a dead bot any more.
         store.heartbeat(bot_id)
@@ -1976,6 +2049,10 @@ def main():
                            "style": "directional-funding",
                            "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                     for c in meta}})
+                # [2026-08-04] the MTM series must not skip halted days — a
+                # daily-loss halt IS the drawdown the series exists to see.
+                store.snapshot_equity(bot_id, _hb_eq, len(meta),
+                                      realized if dry_run else None)
             except Exception:
                 pass
             if args.once:
@@ -3514,6 +3591,33 @@ def _selftest_lever_consume():
         M.tuning = _FakeT({"xp.funding.slope_gate": 0})   # no leak onto paper arm
         M.apply_levers("hl_paper")
         assert M.SLOPE_GATE is True, "no-prefix arm must ignore xp levers"
+        # 6) [2026-08-05 (jy)] min_vol RECEIPTS — the lever was consumed
+        #    since (ge) with no receipt, the exact enter-gate-0.30@0.075
+        #    zero-accrual shape. Pins: no lever -> env default receipted;
+        #    a lever moves BOTH the running floor and the receipt, at close
+        #    time (_ACTIVE_BARS) AND entry time (entry_stamp — a mid-hold
+        #    expiry must not rewrite the admission floor); expiry reverts.
+        M.tuning = _FakeT({})
+        M.apply_levers("lighter_shadow")
+        assert M.MIN_VOL == M._ENV_BARS["min_vol"] \
+            and M._ACTIVE_BARS["min_vol"] == M._ENV_BARS["min_vol"], \
+            "no lever -> env-default floor, receipt says so"
+        M.tuning = _FakeT({"xp.funding.min_vol": 2e6})
+        moved = M.apply_levers("lighter_shadow")
+        assert M.MIN_VOL == 2e6 and M._ACTIVE_BARS["min_vol"] == 2e6, \
+            "the receipt must stamp the RUNNING floor (ran_candidate reads it)"
+        assert "xp.funding.min_vol" in moved, moved
+        _es = M.entry_stamp(True, 1.0, 0.0, 10.0, "exploit")
+        assert _es["bars"]["min_vol"] == 2e6, \
+            ("entry_stamp must receipt the admission floor at ENTRY", _es)
+        M.tuning = _FakeT({})
+        M.apply_levers("lighter_shadow")
+        assert M.MIN_VOL == M._ENV_BARS["min_vol"], \
+            "expiry must revert the floor to the env default"
+        M.tuning = _FakeT({"xp.funding.min_vol": 2e6})    # no leak onto paper arm
+        M.apply_levers("hl_paper")
+        assert M.MIN_VOL == M._ENV_BARS["min_vol"], \
+            "no-prefix arm must ignore xp levers"
     finally:
         M.tuning = real_tuning
         env, M.SCAN_EXPLORE_K, M.CONVICTION_MODE, M.CONVICTION_LO, M.CONVICTION_HI = save

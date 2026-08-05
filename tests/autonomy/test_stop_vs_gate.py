@@ -50,6 +50,14 @@ STOPS = [
     ("lighter_trend_bot", "TREND_CATASTROPHIC_STOP"),
     ("lighter_index_bot", "INDEX_CATASTROPHIC_STOP"),
     ("lighter_funding_bot", "FUNDING_HARD_STOP"),
+    # [2026-08-05] 🎸 Barnesy's extreme sleeve — the Farmer's 10% bar
+    # inherited verbatim, INSIDE the 15% gate, declared at birth so a new
+    # book cannot quietly inherit an unreconciled stop (the rule this file
+    # states in its own header). Its xsect sleeve deliberately has NO
+    # per-leg stop, mirroring its validated parent (replay fidelity —
+    # Counterweight's backtested book has none); the carry sleeve's guard
+    # is the parent's bleed stop at 2% of a $80 clip, book-level trivial.
+    ("lighter_band_barnes_bot", "BARNES_HARD_STOP"),
 ]
 
 #: Stops KNOWINGLY wider than the go-live drawdown bar, each with the reason.

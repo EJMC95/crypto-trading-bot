@@ -150,6 +150,41 @@ CANDIDATES = [
     # is kept verbatim on purpose: the numbers are real, the INFERENCE from
     # them to "raise the bar" is what the 29-Jul study falsified.
     {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
+    # [2026-08-05 (jy)] min-vol-2e6 — the (ju) reserved slot, FILED. The
+    # (ju) QUEUE NOTE's three gaps are closed the same day: XP_TO_LIVE
+    # mapping (below), the arm's bars.min_vol receipt (apply_levers +
+    # entry_stamp, shipped to both arms via the (jy) marked Farmer
+    # deploy), and LIVE_ENV_DEFAULTS/impl-shortfall release paths.
+    # DERIVATION of the VALUE — the cage floor, 2e6, for three measured
+    # reasons (STUDY_MEASURED_FRICTION_2026-08-05 §1):
+    #   * $2M is the carry sibling's own floor — the fleet's biggest
+    #     earner trades this tier, and its shadow arm models 1.01bps/fill
+    #     median (n=218), consistent with the tier's MEASURED 1.93bps
+    #     median — so the shadow ledger the paired bar will grade prices
+    #     the new books' friction honestly (ShadowBroker validated ±60%).
+    #   * Measured 05-Aug at 2e6: +3 books join (LIT 31.5% APR — pays the
+    #     tier's ~3.9bps rt in ~11h vs the 72h max hold and 5.9h live
+    #     median hold; ZEC/PUMP sit AT the venue's 10.5% resting default,
+    #     needing ~32h — inside max hold, marginal). Any HIGHER value
+    #     admits a subset of the same 3: the floor is a crude proxy for
+    #     what the scan measures directly (SCAN_MAX_SLIP_BPS on the real
+    #     clip, MAX_SPREAD_BPS), and those stay senior per-book — so ask
+    #     the widest expressible question and let the paired bar judge.
+    #   * WHY ABOVE enter-gate-0.105 and not higher: its prior (the
+    #     study's per-tier friction table — the first measured friction
+    #     prior) is unrefuted, so it outranks the negative-tape-prior row
+    #     below; slope-gate-off is venue-supported ((dp)) and tp-0.06's
+    #     second place is (ju)-pinned — this row takes the RESERVED slot,
+    #     it does not re-litigate the order above it.
+    # CAGE LIMIT, recorded so the verdict is read honestly: ALL five
+    # extreme books that MOTIVATED the lever ((fz): H100/XLM/SKR/XPD/
+    # TRUMP) measured $0.11-0.35M on 05-Aug — BELOW the 2e6 cage floor,
+    # in the <$1M tier (5.12bps/fill median, p90 14.77). NO candidate
+    # value can reach them; widening the cage is an operator-signed act
+    # (precedent: the 30-Jul A1 widening) — queued, OPERATOR_QUEUE.md
+    # item 2. A verdict on this candidate is a verdict on the $1-10M
+    # tier only, not on the extreme-book thesis.
+    {"name": "min-vol-2e6",     "levers": {"xp.funding.min_vol": 2e6}},
     # [2026-08-05 (ju)] enter-gate-0.105 — the measured-friction study
     # (STUDY_MEASURED_FRICTION_2026-08-05 §3b, entry (js)) filed through
     # THIS channel.
@@ -181,25 +216,19 @@ CANDIDATES = [
     # single measured fill in 13d: 2.06bps). At ~2bps rt the breakeven is
     # 29.7% TRUE — OUTSIDE the cage — so a tripped guard kills this
     # candidate's rationale; read any verdict against it.
-    # QUEUE NOTE — min_vol: the intended NEXT candidate (xp.funding.min_vol,
-    # registered (fz), consumed (ge)) is NOT filable today: it is absent
-    # from XP_TO_LIVE (a running spec would _needs_reset as invalid state)
-    # and apply_levers stamps no bars.min_vol receipt, so ran_candidate
-    # would exclude every close — the enter-gate-0.30@0.075 zero-accrual
-    # shape — and the receipt reaches the arms only with a marker-gated
-    # Farmer deploy. When that pass lands, its candidate slots ABOVE this
-    # one: its prior (the study's per-tier friction table) is unrefuted,
-    # while this row's tape prior is negative. Measured 05-Aug at its $2M
-    # cage floor: +3 books on the live snapshot (LIT 31.5% APR clears its
-    # tier's ~3.9bps-rt breakeven; ZEC/PUMP at the 10.5% resting default),
-    # and ALL five extreme books that motivated the lever ($0.11-0.35M)
-    # sit BELOW the cage floor — carry that to the min_vol pass.
+    # [2026-08-05 (jy)] the reserved min_vol candidate is FILED ABOVE this
+    # row (its block precedes the (ju) one), so this row starts one slot
+    # later than the (ju) dates.
     {"name": "enter-gate-0.105", "levers": {"xp.funding.enter_apr": 0.105}},
 ]
 XP_TO_LIVE = {"xp.funding.enter_apr": "live.funding.enter_apr",
               "xp.funding.take_profit": "live.funding.take_profit",
               "xp.funding.max_hold_h": "live.funding.max_hold_h",
-              "xp.funding.slope_gate": "live.funding.slope_gate"}
+              "xp.funding.slope_gate": "live.funding.slope_gate",
+              # [2026-08-05 (jy)] gap 1 of the (ju) QUEUE NOTE: without
+              # this mapping a running min_vol spec would _needs_reset as
+              # invalid state and promotion could not name its live twin
+              "xp.funding.min_vol": "live.funding.min_vol"}
 
 
 def now_ts():
@@ -488,7 +517,14 @@ LIVE_ENV_DEFAULTS = {"live.funding.enter_apr": (0.05, "up"),
                      # slope gate ON (FUNDING_SLOPE_GATE "on" -> 1).
                      "live.funding.explore_k": (0.0, "down"),
                      "live.funding.conviction_hi": (1.0, "down"),
-                     "live.funding.slope_gate": (1.0, "up")}
+                     "live.funding.slope_gate": (1.0, "up"),
+                     # [2026-08-05 (jy)] min_vol joins with promotability:
+                     # env default $10M, HIGHER floor = tighter, so a
+                     # release of a promoted (lowered) floor tightens by
+                     # construction. Selftest pins XP_TO_LIVE's live twins
+                     # to THIS map — a promotable lever with no organ
+                     # release path can no longer arrive silently.
+                     "live.funding.min_vol": (10000000.0, "up")}
 
 
 def proposal_fade(proposals, live_levers, now):
@@ -1729,8 +1765,12 @@ def _selftest():
     for _var, _key in (("FUNDING_ENTER_APR", "live.funding.enter_apr"),
                        ("FUNDING_TAKE_PROFIT", "live.funding.take_profit"),
                        ("FUNDING_MAX_HOLD_H", "live.funding.max_hold_h"),
-                       ("SCAN_EXPLORE_K", "live.funding.explore_k")):
-        _mm = _re.search(_var + r'"\s*,\s*"([0-9.]+)"', _fb_src)
+                       ("SCAN_EXPLORE_K", "live.funding.explore_k"),
+                       # [2026-08-05 (jy)] min_vol is promotable now; its
+                       # source default is the literal "10e6", hence the
+                       # scientific-notation e in the regex class
+                       ("FUNDING_MIN_VOL", "live.funding.min_vol")):
+        _mm = _re.search(_var + r'"\s*,\s*"([0-9.e]+)"', _fb_src)
         assert _mm, f"could not read {_var} default from lighter_funding_bot.py"
         _src_def[_key] = float(_mm.group(1))
     # [2026-07-28] the two non-numeric env defaults pin the same way, via
@@ -1750,6 +1790,36 @@ def _selftest():
             f"LIVE_ENV_DEFAULTS[{_key}]={_v} has DRIFTED from the funding bot's "
             f"source default {_src_def[_key]}; a restrict proposal could widen a "
             f"real-money lever. Sync the two.")
+
+    # [2026-08-05 (jy)] TWO CLASS-CLOSERS for the (ju) "unfilable candidate"
+    # shape, so the NEXT promotable lever cannot arrive half-wired:
+    # (1) every XP_TO_LIVE live twin has an organ release path — a promoted
+    #     lever absent from LIVE_ENV_DEFAULTS is unreleasable on organ
+    #     evidence ("unmapped lever: never release on a guess").
+    for _lk in XP_TO_LIVE.values():
+        assert _lk in LIVE_ENV_DEFAULTS, (
+            f"{_lk} is promotable (XP_TO_LIVE) but has no LIVE_ENV_DEFAULTS "
+            f"entry — proposal_fade could never release it")
+    # (2) every XP_TO_LIVE bar is RECEIPTED by the arm, at BOTH stamp sites:
+    #     close-time (_ACTIVE_BARS.update in apply_levers) and entry-time
+    #     (entry_stamp's bars dict — the (ed) mid-hold rule). A consumed-but-
+    #     unreceipted lever is the enter-gate-0.30@0.075 zero-accrual
+    #     pathology: ran_candidate excludes every close, silently. Scoped to
+    #     the two stamp sites, NOT a page-wide substring (the doctrine's
+    #     structural-claim rule — "min_vol" also appears in _ENV_BARS and
+    #     get_lever calls, where its presence proves nothing).
+    _al_src = _fb_src.split("def apply_levers", 1)[1].split("\ndef ", 1)[0]
+    _stamp_src = _al_src[_al_src.index("_ACTIVE_BARS.update"):]
+    _es_src = _fb_src.split("def entry_stamp", 1)[1].split("\ndef ", 1)[0]
+    _es_bars_src = _es_src[_es_src.index('"bars": {'):]
+    for _xk in XP_TO_LIVE:
+        _bar = _xk.split(".")[-1]
+        assert f'"{_bar}":' in _stamp_src, (
+            f"apply_levers stamps no bars.{_bar} receipt — a {_bar} judge "
+            f"candidate would accrue ZERO closes (ran_candidate fails closed)")
+        assert f'"{_bar}":' in _es_bars_src, (
+            f"entry_stamp carries no {_bar} — a mid-hold lever expiry would "
+            f"rewrite the admission-time receipt (the (ed) rule)")
 
     # every candidate's levers are registered, in-bounds, and map to a live twin
     for c in CANDIDATES:
@@ -1781,7 +1851,11 @@ def _selftest():
     # tape prior is negative vs shipped at measured friction (see the
     # CANDIDATES comment), so it must never outrank the supported
     # (slope-gate-off) or merely-mute (tp-0.06) candidates.
-    assert names[:3] == ["slope-gate-off", "tp-0.06", "enter-gate-0.105"], names
+    # [2026-08-05 (jy)] min-vol-2e6 takes the (ju)-reserved slot between
+    # them: unrefuted friction-tier prior outranks the negative tape prior,
+    # and must never outrank the two rows (ju) pinned above it.
+    assert names[:4] == ["slope-gate-off", "tp-0.06", "min-vol-2e6",
+                         "enter-gate-0.105"], names
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -1796,8 +1870,8 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["slope-gate-off", "tp-0.06", "enter-gate-0.105",
-                  "xp-enter_apr-0.0625"], n2
+    assert n2 == ["slope-gate-off", "tp-0.06", "min-vol-2e6",
+                  "enter-gate-0.105", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
     # 96-vs-96.0 dedup are withdrawn — see CANDIDATES)
@@ -1890,12 +1964,16 @@ def _selftest():
     # gate-off +$34.07); tp-0.06 follows, unsupported-but-not-refuted.
     assert next_candidate(pool, [], None)["name"] == "slope-gate-off"
     assert next_candidate(pool, ["slope-gate-off"], None)["name"] == "tp-0.06"
-    # [2026-08-05 (ju)] the third static precedes queue proposals by pool
-    # construction (statics first), then the incubator's xp-tp-0.05
+    # [2026-08-05 (ju)/(jy)] the statics precede queue proposals by pool
+    # construction (statics first) — min-vol-2e6 in its (ju)-reserved slot,
+    # then enter-gate-0.105, then the incubator's xp-tp-0.05
     assert next_candidate(pool, ["slope-gate-off", "tp-0.06"],
+                          None)["name"] == "min-vol-2e6"
+    assert next_candidate(pool, ["slope-gate-off", "tp-0.06",
+                                 "min-vol-2e6"],
                           None)["name"] == "enter-gate-0.105"
     assert next_candidate(pool, ["slope-gate-off", "tp-0.06",
-                                 "enter-gate-0.105"],
+                                 "min-vol-2e6", "enter-gate-0.105"],
                           None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 

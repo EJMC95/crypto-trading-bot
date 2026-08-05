@@ -571,6 +571,209 @@ class TestSoleWriterEnforced:
 
 
 # ===========================================================================
+# [2026-08-04] SOLE-WRITER + MTM PARITY ON THE REAL-MONEY PAIR. The hardened
+# claim/standby pattern was earned on 🌾 carry through (hp)/(ib)/(ic)/(id) —
+# the naive versions crash-looped both carry containers for 25.6h, then the
+# standby branch itself clobbered the row, then a redeploy stood down against
+# its own dead replica. The two files where the money is REAL ran with no
+# claim at all: the Ticket Taker's own TT_VENUE guard names the scenario in
+# as many words ("a lost var on the live service would make TWO writers of
+# one row while the live book's positions went unmanaged — no page, because
+# the row looks healthy") and until now nothing enforced it past the unset
+# case. These arms pin the pattern per bot, AST-bound (a docstring citing the
+# incident must never satisfy the guard that exists because of it).
+# ===========================================================================
+class TestSoleWriterRealMoneyPair:
+    def _tree(self, name):
+        import ast
+        import pathlib as _p
+        return ast.parse((_p.Path(__file__).resolve().parents[2] / name)
+                         .read_text())
+
+    @staticmethod
+    def _calls(node, attr):
+        import ast
+        return [n for n in ast.walk(node)
+                if isinstance(n, ast.Call)
+                and getattr(n.func, "attr", None) == attr]
+
+    def _farmer_loop(self):
+        import ast
+        tree = self._tree("lighter_funding_bot.py")
+        fn = next(n for n in ast.walk(tree)
+                  if isinstance(n, ast.FunctionDef) and n.name == "main")
+        return next(n for n in ast.walk(fn)
+                    if isinstance(n, ast.While)
+                    and isinstance(n.test, ast.Constant)
+                    and n.test.value is True)
+
+    def _taker_main(self):
+        import ast
+        tree = self._tree("lighter_ticket_taker.py")
+        return next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef) and n.name == "main")
+
+    def _standby_branch(self, scope, claim_lineno, exit_type):
+        """The stand-down If: the FIRST If after the claim whose body can
+        leave the cycle (Continue for the daemon, Return for run-once)."""
+        import ast
+        cands = [n for n in ast.walk(scope)
+                 if isinstance(n, ast.If) and n.lineno > claim_lineno
+                 and any(isinstance(c, exit_type) for c in ast.walk(n))]
+        assert cands, "no stand-down branch found after the claim"
+        return min(cands, key=lambda n: n.lineno)
+
+    def _assert_loser_writes_only_standby(self, branch):
+        """(ic): the loser must not touch the book's own row — publish and
+        heartbeat are called legitimately elsewhere in the same scope, so this
+        binds to the BRANCH, never the file."""
+        import ast
+        banned = {"publish", "heartbeat", "publish_paper_trade",
+                  "snapshot_equity", "publish_trades", "set_status"}
+        for call in ast.walk(branch):
+            if isinstance(call, ast.Call) \
+                    and getattr(call.func, "attr", None) in banned:
+                raise AssertionError(
+                    f"the standing-down branch calls store."
+                    f"{call.func.attr}() at line {call.lineno} — that touches "
+                    f"the BOOK's row, which this process does not own")
+        writes = [c for c in ast.walk(branch)
+                  if isinstance(c, ast.Call)
+                  and getattr(c.func, "attr", None) == "save_state"]
+        assert writes, "a standing-down process must still record its state"
+        assert any(isinstance(w.args[0], ast.Call)
+                   and getattr(w.args[0].func, "id", None) == "_standby_key"
+                   for w in writes if w.args), (
+            "standby state must go to _standby_key(<row>), not a bare row id")
+
+    # ------------------------- 💸 the Funding Farmer -----------------------
+
+    def test_the_farmer_claims_before_heartbeat_and_any_trade(self):
+        """The claim must precede BOTH the loop-top heartbeat (a loser's
+        heartbeat keeps a dead incumbent's row fresh — I1) and the first
+        order-placing call ((ho): a claim in the publish block runs after the
+        damage)."""
+        import ast
+        loop = self._farmer_loop()
+        claims = self._calls(loop, "claim_writer")
+        assert claims, "the Farmer's trading loop never claims its writer lock"
+        claim = min(n.lineno for n in claims)
+        beats = [n.lineno for n in self._calls(loop, "heartbeat")]
+        assert beats and claim < min(beats), (
+            f"claim_writer (line {claim}) must precede the loop-top "
+            f"heartbeat (line {min(beats, default='?')})")
+        trades = ([n.lineno for n in self._calls(loop, "market_open")]
+                  + [n.lineno for n in self._calls(loop, "open")])
+        assert trades and claim < min(trades), (
+            f"claim_writer (line {claim}) must precede the first "
+            f"order-placing call (line {min(trades, default='?')})")
+
+    def test_the_farmer_loser_stands_down_without_touching_the_row(self):
+        import ast
+        loop = self._farmer_loop()
+        claim = min(n.lineno for n in self._calls(loop, "claim_writer"))
+        branch = self._standby_branch(loop, claim, ast.Continue)
+        self._assert_loser_writes_only_standby(branch)
+        # daemon semantics: skip the cycle and wait — never exit (the Trail
+        # Blazer crash-loop pattern; restartPolicy=always)
+        src = ast.unparse(branch)
+        assert "sys.exit" not in src and "SystemExit" not in src
+        assert any(isinstance(c, ast.Call)
+                   and getattr(c.func, "attr", None) == "sleep"
+                   for c in ast.walk(branch)), "it must wait, not spin"
+
+    def test_the_farmer_snapshots_the_row_it_publishes(self):
+        """MTM parity (I9): each arm snapshots ITS OWN row's equity —
+        the first arg must be `bot_id` (the VENUE-derived row this process
+        publishes), never a hardcoded id that pins one arm's series to the
+        other arm's row."""
+        import ast
+        loop = self._farmer_loop()
+        snaps = self._calls(loop, "snapshot_equity")
+        assert snaps, "the Farmer's loop never appends an MTM equity sample"
+        for s in snaps:
+            assert s.args and getattr(s.args[0], "id", None) == "bot_id", (
+                f"snapshot_equity at line {s.lineno} must snapshot bot_id's "
+                f"own row")
+
+    # ------------------------- 🎫 the Ticket Taker -------------------------
+
+    def test_the_taker_claims_at_the_top_of_the_cycle(self):
+        """Run-once bot: main() IS the loop body, so 'top of the loop' means
+        before the data fetch and every order call."""
+        import ast
+        fn = self._taker_main()
+        claims = self._calls(fn, "claim_writer")
+        assert claims, "the Taker's cycle never claims its writer lock"
+        claim = min(n.lineno for n in claims)
+        fetches = [n.lineno for n in ast.walk(fn)
+                   if isinstance(n, ast.Call)
+                   and (getattr(n.func, "id", None) == "fetch_marks_and_funding"
+                        or getattr(n.func, "attr", None)
+                        == "fetch_marks_and_funding")]
+        assert fetches and claim < min(fetches), (
+            f"claim_writer (line {claim}) must precede the market-data fetch "
+            f"(line {min(fetches, default='?')})")
+        trades = ([n.lineno for n in self._calls(fn, "market_open")]
+                  + [n.lineno for n in self._calls(fn, "open")])
+        assert trades and claim < min(trades), (
+            f"claim_writer (line {claim}) must precede the first "
+            f"order-placing call (line {min(trades, default='?')})")
+
+    def test_the_taker_loser_returns_and_never_exits(self):
+        """Run-once semantics: the shell loop re-invokes every ~300s, so the
+        stand-down is a RETURN — a sys.exit/SystemExit would read as a crash
+        and mark the row 'error' over a book another process owns
+        (_supervised sets status on the way out)."""
+        import ast
+        fn = self._taker_main()
+        claim = min(n.lineno for n in self._calls(fn, "claim_writer"))
+        branch = self._standby_branch(fn, claim, ast.Return)
+        self._assert_loser_writes_only_standby(branch)
+        src = ast.unparse(branch)
+        assert "sys.exit" not in src and "SystemExit" not in src, (
+            "a standing-down run-once process must RETURN, never exit")
+
+    def test_the_taker_snapshots_the_row_it_publishes(self):
+        import ast
+        fn = self._taker_main()
+        snaps = self._calls(fn, "snapshot_equity")
+        assert snaps, "the Taker's cycle never appends an MTM equity sample"
+        for s in snaps:
+            assert s.args and getattr(s.args[0], "id", None) == "BOT_ROW", (
+                f"snapshot_equity at line {s.lineno} must snapshot BOT_ROW — "
+                f"the TT_VENUE-derived row this process publishes")
+
+    def test_standby_keys_are_suffixes_of_the_books_they_shadow(self):
+        """A reader holding the book id must find the standby record with no
+        lookup table — same contract as carry's (ic) key."""
+        import lighter_funding_bot as fb
+        import lighter_ticket_taker as tt
+        for mod, row in ((fb, "perps-funding-lighter-lighter"),
+                         (tt, "lighter-ticket-taker-lighter")):
+            key = mod._standby_key(row)
+            assert key != row, f"{mod.__name__}: standby key must not BE the row"
+            assert key.startswith(row), (
+                f"{mod.__name__}: not derivable from the book: {key}")
+
+    def test_selftest_live_stubs_the_two_new_store_calls(self):
+        """The live-path harness rebinds BOT_ROW to the LIVE row id; unstubbed
+        on a machine with DATABASE_URL set, its fixtures would append
+        FICTIONAL samples to the live book's ':equity' series — the exact
+        series the go-live drawdown bar reads. A test that can poison the
+        gate's evidence is worse than no test."""
+        import pathlib as _p
+        src = (_p.Path(__file__).resolve().parents[2]
+               / "lighter_ticket_taker.py").read_text()
+        blk = src[src.index("def _selftest_live"):]
+        blk = blk[:blk.index("def _supervised")]
+        assert '"claim_writer"' in blk and '"snapshot_equity"' in blk, (
+            "_selftest_live must capture+restore both new store calls")
+        assert "store.claim_writer = lambda" in blk
+        assert "store.snapshot_equity = " in blk
+
+
+# ===========================================================================
 # [2026-07-31 (hr)] THE LEDGER QUARANTINE — real trades that are not evidence.
 # ===========================================================================
 class TestLedgerQuarantine:

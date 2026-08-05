@@ -402,6 +402,42 @@ LEVERS = {
         # board can still WIDEN a book that is measured in profit MTM ((hs)).
         "kind": "int", "lo": 3, "hi": 12, "lane": "lighter-books",
         "note": "Counterweight legs per side; env default 5", "env_default": 5, "step": 1},
+    # -----------------------------------------------------------------------
+    # [2026-08-05] 🎸 Barnesy (band-barnes-lshadow) — the funding super-book.
+    # Registered AT BIRTH so the growth surface exists (I18: the binding
+    # constraint must be a reachable lever), and BIRTH-FROZEN at the consumer:
+    # `lighter_band_barnes_bot.apply_tuning` refuses the rail outright until
+    # BARNES_FREEZE_UNTIL (default 2026-09-04, 30 days from first publish),
+    # because a book whose bars move accrues zero gradeable closes ((hm)).
+    # Reach without rule-drift: on day 31 the rail needs no deploy.
+    #
+    # CAGES ARE ONE-SIDED ON PURPOSE, each default pinned at `lo`:
+    #   * enter_apr may only walk UP (more selective, the tail-seeking
+    #     direction) — walking DOWN toward 10% TRUE is the direction (it)
+    #     measured loss-making on the parent (29bps round trip needs 254h of
+    #     a 336h max hold to break even at 10%) and must not be reachable.
+    #   * max_positions / k may only WIDEN, and only after the board's
+    #     (hs)-fixed capacity author sees MTM profit — K=5 is the validated
+    #     Counterweight plateau centre, so 5 is the floor, not the middle.
+    "barnes.enter_apr": {
+        "kind": "float", "lo": 0.20, "hi": 0.40, "lane": "lighter-books",
+        "note": ("Barnesy harvest entry bar, TRUE apr fraction (both harvest "
+                 "sleeves); env default 0.20 = the 21-Jul gate-sweep winner. "
+                 "One-sided: may only tighten upward — 10-20% TRUE is "
+                 "measured loss-making ((it))"),
+        "env_default": 0.20, "step": 0.04},
+    "barnes.max_positions": {
+        "kind": "int", "lo": 4, "hi": 8, "lane": "lighter-books",
+        "note": ("Barnesy per-harvest-sleeve concurrent positions (carry AND "
+                 "extreme each); env default 4. One-sided: capacity widens "
+                 "only on MTM evidence ((hs))"),
+        "env_default": 4, "step": 1},
+    "barnes.k": {
+        "kind": "int", "lo": 5, "hi": 8, "lane": "lighter-books",
+        "note": ("Barnesy xsect legs per side; env default 5 = Counterweight's "
+                 "VALIDATED plateau centre (the un-backtested K=8 is the "
+                 "cautionary tale, not the target)"),
+        "env_default": 5, "step": 1},
     "fundspread.universe_n": {
         # [2026-08-04] default 60 -> 30 with fundspread.k: width 30 == the
         # 30-name hand list both validations ranked, so no scout book is added.
