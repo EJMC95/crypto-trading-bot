@@ -783,9 +783,32 @@ def head_drift_line(name, row, head, live_money=False):
                 f"code: container {br} (n={nr}) vs repo {bh} (n={nh}) — a "
                 "different count means a different COPY set ((fd)); check that "
                 "image's own Dockerfile before calling it a stale deploy")
-    return (f"🧬 {tag}{name} is BEHIND THE REPO: container {br} vs repo {bh} "
-            f"(both n={nr}, so this is code, not file set) — the running "
-            "container does not carry what has been merged")
+    # [2026-08-05 (ke)] UNCLASSIFIED, and it must not read as an alarm.
+    # This function knows only that two hashes differ. It CANNOT tell
+    # BEHIND-OWN (the gap changes the bot's own entry file — the only real
+    # finding) from BEHIND-SHARED (a `_BUILD_SHARED` module moved, so every
+    # image's stamp moved and no bot's logic changed) or DEFERRED (a live row
+    # correctly waiting behind its marker gate).
+    #
+    # MEASURED 5-Aug: `(ka)` touched `fleet_tuning.py`, which is in
+    # `_BUILD_SHARED`, so the stamp of EVERY image moved. This line fired on
+    # BOTH real-money rows — tagged "REAL MONEY", escalated to ⚠️ ACTION —
+    # while `scripts/audit_code_currency.py`, run minutes later on the same
+    # fleet, classified both as CURRENT. Textbook BEHIND-SHARED.
+    #
+    # That tool's own header documents this as the cry-wolf trap and records
+    # that it cost the 3-Aug review four false alarms; `(jc)` wired it into
+    # the weekly workflow and left it unwired HERE. So the taxonomy had one
+    # consumer and one ignorer, and the ignorer is the report a human reads
+    # every morning. Now this states the fact and NAMES THE AUTHORITY instead
+    # of asserting a verdict it cannot support.
+    return (f"🧬 {name} stamp differs from the repo tree: container {br} vs "
+            f"repo {bh} (both n={nr}, so not a file-set difference) — "
+            "UNCLASSIFIED. A shared-module change moves every image's stamp "
+            "without changing any bot's logic, so this is NOT yet a finding: "
+            "run `scripts/audit_code_currency.py`, whose own-entry-file "
+            "verdict is the only one that means the container is stale"
+            + (f" [{tag.strip()} row]" if tag else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -821,12 +844,22 @@ def action_items(evidence):
             out.append(e)
         elif "arms DIVERGE" in e or "DRIFT" in e:
             out.append(e)
-        elif "BEHIND THE REPO" in e:
+        elif "BEHIND-OWN:" in e:
             # [2026-08-02] A container running less than what was merged is an
             # operator decision (which deploy, and whether it is marker-gated),
             # never something this review can act on. It gets its own branch
-            # because "BEHIND THE REPO" shares no token with "DRIFT" — matching
-            # it by accident is how a detector silently stops firing.
+            # because this shares no token with "DRIFT" — matching it by
+            # accident is how a detector silently stops firing.
+            #
+            # [2026-08-05 (ke)] NARROWED from "BEHIND THE REPO" to "BEHIND-OWN".
+            # A bare stamp difference is not a finding — a shared-module change
+            # moves every image's stamp — and escalating it put two FALSE
+            # real-money alarms at the top of the 5-Aug report, contradicted by
+            # `audit_code_currency` minutes later. Only that tool's BEHIND-OWN
+            # verdict means the running container is stale in its own logic, so
+            # only that word escalates here. `head_drift_line` no longer emits
+            # the old phrase at all; this matches the classifier's vocabulary
+            # so that piping its verdicts in keeps working.
             out.append(e)
     return out
 
@@ -1040,12 +1073,42 @@ def selftest():
     _behind = head_drift_line("perps-funding-lighter-lighter",
                               ("705425a83422", "15"), ("30bf230bd5fb", 15),
                               live_money=True)
-    assert "BEHIND THE REPO" in _behind and "REAL MONEY" in _behind, _behind
-    assert len(action_items([_behind])) == 1, \
-        "a live container behind the repo MUST raise the operator flag"
-    #     ...and the two checks must disagree on this input, or the new one is
-    #     redundant. This is the whole reason it exists.
-    assert action_items([_agree]) == [] and action_items([_behind]) != []
+    #     [2026-08-05 (ke)] THE CONTRACT CHANGED, and the reason is a SECOND
+    #     incident pointing the other way. The 2-Aug line asserted "the running
+    #     container does not carry what has been merged" and tagged it REAL
+    #     MONEY. On 5-Aug `(ka)` touched `fleet_tuning.py` — a `_BUILD_SHARED`
+    #     name — so EVERY image's stamp moved while no bot's logic did, and
+    #     this fired on both real-money rows and led the report, while
+    #     `audit_code_currency` classified both as CURRENT minutes later.
+    #     A stamp difference is a FACT; staleness is a VERDICT, and this
+    #     function has only the fact. It now says so and names the authority.
+    assert "stamp differs" in _behind and "UNCLASSIFIED" in _behind, _behind
+    assert "REAL MONEY" in _behind, "the row's real-money status is still shown"
+    assert action_items([_behind]) == [], \
+        ("an unclassified stamp difference must NOT page: a shared-module "
+         "change moves every stamp, and escalating that daily is the "
+         "cry-wolf trap audit_code_currency's own header documents")
+    #     ...but the CLASSIFIER's verdict still pages, so the 2-Aug incident
+    #     (a live container genuinely stale in its OWN entry file) is not lost
+    #     — it arrives as BEHIND-OWN, the one verdict that means it.
+    assert len(action_items(["🧬 perps-funding-lighter-lighter BEHIND-OWN: "
+                             "container 705425a83422 is 3 commits behind on "
+                             "its own entry file"])) == 1, \
+        "BEHIND-OWN is the verdict that means the container is really stale"
+    #     ...and the arm check must still disagree with the head check on the
+    #     doubly-stale input, or the second detector is redundant.
+    assert "AGREE" in _agree and "stamp differs" in _behind
+    #     [(ke)] THE COLLISION THIS ALREADY HIT, pinned so it cannot return.
+    #     The first cut of the unclassified message NAMED the verdict word as
+    #     guidance ("...where BEHIND-OWN is the only verdict that means..."),
+    #     and the matcher was a bare substring scan — so the sentence saying
+    #     "this is NOT yet a finding" paged as a finding. The fleet's own rule:
+    #     a page-wide substring scan is not a structural claim. The matcher now
+    #     requires the verdict LABEL (`BEHIND-OWN:`), and prose that merely
+    #     discusses the class must never page.
+    assert action_items(["🧬 x: see audit_code_currency, where BEHIND-OWN is "
+                         "the only real verdict"]) == [], \
+        "prose ABOUT the verdict class must not be mistaken for the verdict"
 
     #     `n` FIRST, per (fd): a different COPY set is NOT a stale deploy, and
     #     claiming it is has already cost this fleet a day of chasing four books.
