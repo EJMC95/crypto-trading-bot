@@ -55,6 +55,14 @@ try:
     import fleet_tuning as tuning
 except Exception:  # noqa: BLE001
     tuning = None
+# [2026-08-05 (jn) S1] fleet_bus for the allocation organ's capital scale —
+# COPY'd into Dockerfile.funding in the same commit (a guarded import with no
+# COPY is the born-dark class the comment above names). A dark bus scales
+# nothing: entries stay at the env-default NOTIONAL.
+try:
+    import fleet_bus
+except Exception:  # noqa: BLE001
+    fleet_bus = None
 
 BOT = "perps-funding-carry"
 
@@ -862,6 +870,15 @@ def main():
 
             # ---- scan for new carries ------------------------------------
             if len(positions) < MAX_POSITIONS:
+                # [2026-08-05 (jn) S1] the allocation organ's capital scale,
+                # NEW entries only — open positions keep the notional they
+                # were opened at (same rule as the growth rail's clip). This
+                # arm is shadow-only by construction (the HL arm exits at
+                # boot; VENUE=lighter_shadow is the only mode that runs this
+                # loop), so no real money can reach it. Dark bus -> 1.0.
+                _alloc = (fleet_bus.allocation_scale(bot_id)
+                          if fleet_bus is not None else None) or 1.0
+                _notional = NOTIONAL * _alloc
                 candidates = sorted(
                     ((c, f) for c, f in fund.items()
                      if c not in positions and f["vol"] >= MIN_DAY_VOLUME
@@ -877,14 +894,14 @@ def main():
                     # always the modelled HEDGE_COST (it lives off-venue).
                     perp_open_cost, _ = _perp_leg_fill(
                         ctx, bot_id, coin, is_buy=(side == "long_perp"),
-                        notional=NOTIONAL, mark=(f.get("mark") or 0.0))
+                        notional=_notional, mark=(f.get("mark") or 0.0))
                     positions[coin] = {
-                        "side": side, "notional": NOTIONAL, "opened_ts": t0,
+                        "side": side, "notional": _notional, "opened_ts": t0,
                         "accrued": 0.0,
-                        "fees": perp_open_cost + HEDGE_COST * NOTIONAL,
+                        "fees": perp_open_cost + HEDGE_COST * _notional,
                         "entry_apr": apr,
                     }
-                    print(f"[{now_iso()}] OPEN {coin} {side} ${NOTIONAL:.0f} "
+                    print(f"[{now_iso()}] OPEN {coin} {side} ${_notional:.0f} "
                           f"| funding {apr:+.1%} APR "
                           f"| hot {(t0 - hot_since.get(coin, t0)) / 3600.0:.1f}h "
                           f"| perp-leg cost ${perp_open_cost:.3f} "

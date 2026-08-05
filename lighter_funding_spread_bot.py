@@ -643,6 +643,18 @@ def main():
         _lv = apply_tuning(live=_is_live)
         if _lv:
             log.info("levers applied %s (K=%d)", _lv, K)
+        # [2026-08-05 (jn) S1] the allocation organ's capital scale, SHADOW
+        # arm only and NEW entries only (rebalance legs open at the scaled
+        # clip; held legs keep their entry size). The live arm's clip stays
+        # PINNED at GOLIVE_ORDER_USD per (ia) — capital levers do not reach
+        # real money, and the allocation organ doubly so. Dark bus -> 1.0.
+        if not _is_live and fleet_bus is not None:
+            _alloc = fleet_bus.allocation_scale(bot_id) or 1.0
+            _target = ctx.order_usd(ORDER_USD, own=True) * _alloc
+            if abs(_target - order_usd) > 1e-9:
+                log.info("allocation scale %.2fx: clip %.2f -> %.2f",
+                         _alloc, order_usd, _target)
+                order_usd = _target
         if now.date() != cur_day:
             cur_day, halted_today = now.date(), False
             day_start_equity = account_value()

@@ -20,6 +20,8 @@ Postgres. Shipped in Dockerfile.freqtrade next to bot_pnl_store.py (CWD
 /freqtrade), so strategies use the same `import` mechanics that already
 work for the market-pulse reads.
 """
+import os
+
 from datetime import datetime, timedelta, timezone
 
 CACHE_SEC = 300
@@ -101,6 +103,51 @@ def stake_multiplier(bot, entry_tag, current_time=None):
         return max(MULT_FLOOR, min(MULT_CEIL, float(m.get("mult", 1.0))))
     except Exception:
         return 1.0
+
+
+def allocation_scale(bot, current_time=None):
+    """💰 fleet_allocation's evidence-weighted capital scale for one SHADOW
+    book: `books[bot].target_usd / book_usd`, clamped to [0.25, 4.0], or
+    None on any doubt.
+
+    [2026-08-05 (jn) S1 — operator decision "proceed"] The allocation organ
+    ranked capital by claim (`max(0, mean − 1.28·SE)`) for four days with
+    zero consumers; S1 flips it from advisory to ACTING on the shadow
+    notionals of the three funding books — the trio holding every measured
+    claim in the fleet. The ORGAN is unchanged (still publish-only,
+    `moves_capital: False` — it moves nothing; consumers choosing to read it
+    is the same bus pattern as brain stake-mults). Floor 0.25 mirrors the
+    organ's own PROBE_FLOOR (I17: a book cannot earn evidence with no
+    capital); cap 4.0 keeps a $1k paper book's clip inside sane slippage
+    modelling. Scale applies to NEW entries only, at each consumer.
+
+    REAL MONEY NEVER READS THIS — every consumer gates on its shadow arm,
+    and `tests/autonomy/test_allocation_consumer.py` pins that. Kill switch:
+    `FLEET_ALLOCATION_MODE=advisory` on a service returns None here, i.e.
+    every consumer reverts to its env-default clip on the next loop — the
+    central-accessor pattern, so the switch reaches the consumer without a
+    redeploy ([[a-kill-switch-must-reach-the-consumer]]).
+
+    Fail-safe: dark/stale organ, unknown book, junk numbers -> None, and a
+    None consumer MUST keep its env default (scale nothing).
+    """
+    try:
+        if os.environ.get("FLEET_ALLOCATION_MODE", "act").strip().lower() \
+                != "act":
+            return None
+        p = _load("fleet-allocation", current_time)
+        if not p or not is_fresh(p, current_time):
+            return None
+        row = (p.get("books") or {}).get(str(bot))
+        base = float(p.get("book_usd") or 0.0)
+        if not isinstance(row, dict) or base <= 0:
+            return None
+        t = float(row.get("target_usd"))
+        if t != t or t < 0:           # NaN / negative
+            return None
+        return max(0.25, min(4.0, t / base))
+    except Exception:
+        return None
 
 
 def lever_outcome(lever, current_time=None):
