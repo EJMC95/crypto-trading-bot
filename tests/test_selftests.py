@@ -242,9 +242,10 @@ GUARD_ONLY_AUDITS = [
     # `--selftest` negative fixture runs here.
     "scripts/audit_lever_authority.py",
     # [2026-07-29 (em)] coverage-floor ratchet: its FULL run needs the
-    # coverage.json the tests.yml `coverage-floors` job produces (the suite
-    # under subprocess-aware coverage), so only the detector's negative
-    # fixture runs in the lean suite; the full check gates in its own job.
+    # coverage.json the tests.yml `suite` job produces (the suite under
+    # subprocess-aware coverage; job renamed from `coverage-floors` in the
+    # 5-Aug one-runner merge), so only the detector's negative fixture runs
+    # in the lean suite; the full check gates in that job's last step.
     "scripts/audit_coverage_floors.py",
 ]
 

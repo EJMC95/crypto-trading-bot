@@ -53,6 +53,16 @@ MTM_REQUIRED = {
         "🌊 Tide Rider — holds for weeks; wired by (hl)",
     "lighter_index_bot.py":
         "📊 Index Rider — long on 64% of days; the book (hl) measured, wired by it",
+    # [2026-08-05] ranked-plan item ② — moved up from MTM_PENDING. The code
+    # edit was the reviewable half all along; what stays operator-gated is
+    # the DEPLOY (both Farmer arms + the live Taker ship at the next marker
+    # push; the Taker's shadow arm auto-deploys with freqtrade-bots).
+    "lighter_funding_bot.py":
+        "💸 Funding Farmer, BOTH arms — the live pair's books were the last "
+        "gradeable holders dark on the series the (ia) bar reads",
+    "lighter_ticket_taker.py":
+        "🎫 Ticket Taker, BOTH arms — live money on divergence-short; its "
+        "open drawdown was invisible to the bar that governs it",
 }
 
 #: Books that publish `open_trades` but are NOT yet wired, each with the reason.
@@ -60,11 +70,6 @@ MTM_REQUIRED = {
 #: DECLARED, silence is not an option. Moving a book from here to MTM_REQUIRED
 #: is the act of putting it in front of the gate.
 MTM_PENDING = {
-    "lighter_funding_bot.py":
-        "LIVE Funding Farmer — real money; a publish-path change to a live "
-        "image is an operator-gated deploy, not a review-run edit",
-    "lighter_ticket_taker.py":
-        "LIVE Ticket Taker — same reason as the Farmer",
     "lighter_dislocation_bot.py":
         "🧲 Snap Back — flat most of the time (0 open at time of writing) and "
         "mean is negative, so it is not a promotion candidate",

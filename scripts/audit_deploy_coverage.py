@@ -364,11 +364,14 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                # 30494145090, not inferred from the dashboard row ids (the
                # Railway names follow the EMOJI NICKNAME, which is exactly
                # why four of the five guesses were wrong).
-               "Dockerfile.dislocation": "snap-back-shadow",
+               # [2026-08-05] Dockerfile.dislocation + Dockerfile.trendlighter
+               # moved to MANUAL_IMAGES_OK: their books are RETIRED ((jh)/(if))
+               # and their deploy rules are removed from the workflow so the
+               # operator can delete the services without auto-deploy
+               # resurrecting them (operator-queue item 3, guard-first order).
                "Dockerfile.fundspread": "counterweight-shadow",
                "Dockerfile.indexshadow": "equities-regime-shadow",
                "Dockerfile.psniper": "perp-sniper-shadow",
-               "Dockerfile.trendlighter": "tide-rider-lighter-shadow",
                "Dockerfile.familyshadow": "family-lighter-shadow"}
 
 
@@ -428,6 +431,20 @@ MANUAL_IMAGES_OK = {
         "human-dispatched job on its own service precisely so it can never "
         "compete with or OOM the freqtrade-bots container. An auto-deploy "
         "would restart it mid-hyperopt and discard the run."
+    ),
+    "Dockerfile.trendlighter": (
+        "Tide Rider (crypto-trend-daily-lshadow) — RETIRED 1-Aug (if): 9 buys "
+        "/ zero sells in 22 days holding a third of the long budget. Idles at "
+        "boot behind TIDE_RIDER_RETIRED_OVERRIDE; deploy rule removed 5-Aug "
+        "so the operator can delete tide-rider-lighter-shadow without a "
+        "shared-file push resurrecting it (no route for an idler)."
+    ),
+    "Dockerfile.dislocation": (
+        "Snap Back (lighter-dislocation-lshadow) — RETIRED 4-Aug (jh): the "
+        "fleet's only statistically significant loser (t=-2.97, both halves "
+        "negative). Idles at boot behind SNAPBACK_RETIRED_OVERRIDE; deploy "
+        "rule removed 5-Aug so the operator can delete snap-back-shadow "
+        "without a shared-file push resurrecting it (no route for an idler)."
     ),
 }
 

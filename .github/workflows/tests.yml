@@ -2,16 +2,24 @@ name: Tests
 
 # The fleet had NO automated test suite until 2026-07-18: ~38 in-module
 # `--selftest` blocks that nothing ran, so a regression in a *covered* function
-# still shipped green. This workflow is that missing regression net — it runs
-# the pytest suite (which includes a subprocess runner over every module's
-# `--selftest`) on every push/PR. The lean job is stdlib + numpy/pandas only
-# (no lighter-sdk), so the live signer harness self-skips THERE — and until
-# 2026-07-29 it self-skipped EVERYWHERE: no Dockerfile, workflow, or loop
-# script ran it, so the one detector for the Taker's 8x accrual call-site
-# class (its own selftest says so at lighter_ticket_taker.py:2449) had the
-# same status the 38 selftests had before 18-Jul. The selftest-live job below
-# closes that: it installs the PINNED signer wheel and runs the harness on
-# every push/PR (TEST_COVERAGE_ANALYSIS_2026-07-29.md, Finding 1).
+# still shipped green. This workflow is that missing regression net.
+#
+# [2026-08-05 ONE RUNNER — operator-queue CI-quota item, after the 28-Jul
+# billing lockout made quota a correctness concern (a lockout kills deploys
+# SILENTLY, not just tests).] This was THREE jobs — a lean pytest run, the
+# live signer harness, and the coverage-floors run — and the third was a
+# strict SUPERSET of the first two: it runs the ENTIRE suite with the PINNED
+# signer wheel installed (so the live harness contributes — the (em) floors
+# were SET in that configuration) under subprocess-aware coverage. Three
+# checkouts + three pip installs + two full suite runs + one subset run
+# became one of each: >50% of the workflow's billed minutes, same coverage.
+#
+# DECLARED LOSS, deliberate: the old lean job also proved the suite passes
+# WITHOUT the SDK (the harness self-skip path). That path is still exercised
+# by every local run on a machine without the wheel; the import-guard step
+# below keeps the opposite rot out (a silent skip in the job that must NOT
+# skip). If the self-skip path ever breaks, it breaks loudly on a dev
+# machine, not silently in CI.
 
 on:
   pull_request:
@@ -24,23 +32,8 @@ concurrency:
   cancel-in-progress: true  # [28-Jul-2026] a superseded push's run is pure quota burn
 
 jobs:
-  pytest:
-    name: pytest (selftests + real-money / financial / autonomy)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install test deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-test.txt
-      - name: Run the suite
-        run: python -m pytest -p no:cacheprovider
-
-  selftest-live:
-    name: live signer harness (the 8x call-site detector, pinned SDK)
+  suite:
+    name: suite + live signer harness + coverage floors (one runner)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,30 +50,10 @@ jobs:
           grep -E '^(lighter-sdk|websockets)' requirements.txt | sed 's/#.*//' | xargs pip install
       - name: The SDK must import — a silent skip is the rot this job exists to prevent
         run: python -c "import lighter, importlib.metadata as m; print('lighter-sdk', m.version('lighter-sdk'))"
-      - name: Run the live-order harness (LIVE_SELFTESTS registry)
-        run: python -m pytest tests/test_selftests.py -k test_module_selftest_live -q -p no:cacheprovider
-
-  # [2026-07-29 (em)] Finding 9's ratchet: the whole suite runs under
-  # subprocess-aware coverage (the selftest subprocesses count), then
-  # audit_coverage_floors.py holds the real-money surface at its measured
-  # floors. The SDK is installed so the live harness contributes — floors
-  # were SET in that configuration; without it the taker reads ~38%, not
-  # ~92%, and every run would false-trip. The import check above the run
-  # guards that, same as the selftest-live job.
-  coverage-floors:
-    name: coverage floors (real-money surface only ratchets UP)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install test deps + the PINNED signer wheel
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-test.txt
-          grep -E '^(lighter-sdk|websockets)' requirements.txt | sed 's/#.*//' | xargs pip install
-          python -c "import lighter"
+      # [2026-07-29 (em)] Finding 9's ratchet: the whole suite (including the
+      # subprocess selftest runner and the LIVE_SELFTESTS harness, SDK
+      # present) under subprocess-aware coverage, then the real-money floors
+      # only ratchet UP. One run is the regression net AND the floor input.
       - name: Run the suite under subprocess-aware coverage
         run: |
           mkdir -p /tmp/covhook

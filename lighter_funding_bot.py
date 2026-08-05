@@ -2653,6 +2653,15 @@ def main():
                            capital_adjust["total"] + CAPITAL_ADJUST_USD, 2)})})
         except Exception:
             pass
+        # [2026-08-05] MTM EQUITY SERIES — ranked-plan item ② (4-Aug review):
+        # the (ia)/(iz) drawdown bar reads bot_state_history['<bot>:equity']
+        # and BOTH Farmer arms were dark on it (the (hq) sweep wired carry +
+        # the riders + Counterweight and named these arms next). pub_equity is
+        # already this arm's own MTM number, live and shadow alike. NOTE the
+        # LIVE container only picks this up at the next [deploy-live-farmer]
+        # marker push — code-in-main is not code-in-container; the shadow twin
+        # auto-deploys.
+        store.snapshot_equity(bot_id, pub_equity, pub_open, pub_pnl)
         # persist state (dry_run: full paper account; live: baseline + open meta)
         try:
             if dry_run:

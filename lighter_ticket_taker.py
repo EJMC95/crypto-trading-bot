@@ -2760,6 +2760,15 @@ def main(_ctx=None):
                # the bars actually in force this cycle (growth-rail visible)
                "bars": {lever: globals()[attr] for lever, attr in TUNABLE},
                "tuned": sorted(moved)})
+    # [2026-08-05] MTM EQUITY SERIES — ranked-plan item ② (4-Aug review): the
+    # (ia)/(iz) drawdown bar reads bot_state_history['<bot>:equity'] and BOTH
+    # taker arms were dark on it. `equity` is this arm's own MTM number
+    # (shadow: broker.equity(); live: the venue's account value — a failed
+    # live read leaves it None and snapshot_equity no-ops rather than write a
+    # hole). NOTE the LIVE container only picks this up at the next
+    # [deploy-live-taker] marker push — code-in-main is not code-in-container;
+    # the shadow arm auto-deploys with freqtrade-bots.
+    store.snapshot_equity(BOT_ROW, equity, len(pos), pnl_abs)
     print(f"[ticket-taker] {iso(t_now)} equity "
           f"{equity if equity is None else round(equity, 2)} "
           f"open {len(pos)}/{MAX_OPEN} closed {stats['closed']} "

@@ -4,9 +4,10 @@
 Finding 9 (TEST_COVERAGE_ANALYSIS_2026-07-29.md): the repo measured 48%
 coverage the day it was first measured, and nothing in CI would notice the
 real-money files drifting back down. This guard reads a coverage.json
-(produced by the tests.yml `coverage-floors` job: the FULL suite under
-subprocess-aware coverage, signer SDK installed so the live harness
-contributes) and fails if any floored file drops below its floor.
+(produced by the tests.yml `suite` job — renamed from `coverage-floors` in
+the 5-Aug one-runner merge: the FULL suite under subprocess-aware coverage,
+signer SDK installed so the live harness contributes) and fails if any
+floored file drops below its floor.
 
 DOCTRINE:
   * Floors sit ~2 points under the MEASURED value at the time they were set

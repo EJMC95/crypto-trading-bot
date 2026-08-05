@@ -88,13 +88,14 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   1. `perps-bot` — CRASH-LOOPING now, retired bot; delete first.
   2. `cross-exchange-arb`, `listing-sniper`, `momo-bot`, `freqtrade-trainer`,
      `triangular-arb` — retired, idling, no deploy rules to remove.
-  3. `tide-rider-lighter-shadow` — retired (if); **first** remove its
-     paths/grep/AUTO_IMAGES entries (say the word and a session ships that
-     commit), then delete.
-  4. `snap-back-shadow` — retired 4-Aug (jh), same treatment: **first** remove
-     its paths/grep/AUTO_IMAGES entries, then delete. (Until then it idles
-     harmlessly behind the code guard — the container prints the retirement
-     line and sleeps.)
+  3. `tide-rider-lighter-shadow` — retired (if). **Repo half DONE 5-Aug**:
+     paths/grep/AUTO_IMAGES entries removed (image declared in
+     MANUAL_IMAGES_OK; `test_retired_services_have_no_deploy_rule` pins the
+     rule's absence). Safe to delete the service whenever you like.
+  4. `snap-back-shadow` — retired 4-Aug (jh). **Repo half DONE 5-Aug**, same
+     treatment as tide-rider above. Safe to delete the service whenever you
+     like. (Until then it idles harmlessly behind the code guard — the
+     container prints the retirement line and sleeps.)
   5. Offline corpses: `freqtrade-{mum,dad,georgia,avo-maria}`.
   6. `nrl-feed` → move to its own Railway project (cost attribution + its
      failing workflow leaves this repo's CI).
@@ -121,10 +122,12 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   (retired bot, KeepAlive launchd) and `com.eamon.freqtrade.datarefresh`
   (hourly Kraken data pulls for the dormant local freqtrade). Plists archived
   in `~/Library/LaunchAgents/disabled-2026-08-04/` — reversible.*
-- **CI quota** — merge the three test jobs into one runner (~30–40% quota
-  saving; the 28-Jul lockout recurs by arithmetic in any heavy week) + the
-  off-Actions CI-liveness probe. Say the word; both are plain implement-now
-  passes.
+- **CI quota** — **DONE**: the off-Actions CI-liveness probe shipped 4-Aug
+  (jl); the three test jobs merged into ONE runner 5-Aug (one checkout, one
+  pip install, ONE full-suite run that is simultaneously the regression net,
+  the live signer harness and the coverage-floor input — >50% of the
+  workflow's billed minutes; the lean no-SDK pass is the declared loss,
+  still exercised by every local run without the wheel).
 
 ## 4 · Security / hygiene
 

@@ -42,16 +42,17 @@ on:
       # it silently applied to the (fz) offense pass: the levers, the widened
       # universes and Snap Back's adaptive gate would all have sat in main,
       # green, and never reached a container.
-      - 'lighter_dislocation_bot.py'
-      - 'Dockerfile.dislocation'
+      # [2026-08-05] tide-rider (retired 1-Aug (if)) and snap-back (retired
+      # 4-Aug (jh)) deploy rules REMOVED — operator-queue item 3: the rules
+      # must go BEFORE the services are deleted, or auto-deploy resurrects
+      # them on the next shared-file push. Their images are declared in
+      # audit_deploy_coverage.MANUAL_IMAGES_OK (no route for an idler).
       - 'lighter_funding_spread_bot.py'
       - 'Dockerfile.fundspread'
       - 'lighter_index_bot.py'
       - 'Dockerfile.indexshadow'
       - 'lighter_perp_sniper.py'
       - 'Dockerfile.psniper'
-      - 'lighter_trend_bot.py'
-      - 'Dockerfile.trendlighter'
       - 'lighter_family_bot.py'
       - 'Dockerfile.familyshadow'
       # [2026-07-30 (gm)] THIS WORKFLOW IS ITS OWN TRIGGER, for the six shadow
@@ -362,9 +363,9 @@ jobs:
             # version outright (unresolved interpolation), which is the guard
             # from (gl) earning its keep an hour later on its own author.
             _shared='bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|venues/|requirements\.txt$|\.github/workflows/railway-redeploy\.yml$'
-            if echo "$changed" | grep -qE "^(lighter_dislocation_bot\.py$|Dockerfile\.dislocation$|$_shared)"; then
-              svcs="${svcs:+$svcs,}snap-back-shadow"
-            fi
+            # [2026-08-05] snap-back-shadow + tide-rider-lighter-shadow rules
+            # REMOVED (retired (jh)/(if)) — a $_shared push must not resurrect
+            # a service the operator is about to delete.
             if echo "$changed" | grep -qE "^(lighter_funding_spread_bot\.py$|Dockerfile\.fundspread$|$_shared)"; then
               svcs="${svcs:+$svcs,}counterweight-shadow"
             fi
@@ -373,9 +374,6 @@ jobs:
             fi
             if echo "$changed" | grep -qE "^(lighter_perp_sniper\.py$|Dockerfile\.psniper$|$_shared)"; then
               svcs="${svcs:+$svcs,}perp-sniper-shadow"
-            fi
-            if echo "$changed" | grep -qE "^(lighter_trend_bot\.py$|Dockerfile\.trendlighter$|$_shared)"; then
-              svcs="${svcs:+$svcs,}tide-rider-lighter-shadow"
             fi
             if echo "$changed" | grep -qE "^(lighter_family_bot\.py$|Dockerfile\.familyshadow$|$_shared)"; then
               svcs="${svcs:+$svcs,}family-lighter-shadow"

@@ -315,14 +315,19 @@ def test_the_publish_block_cannot_fail_the_grade():
 #: Verified against the live `railway service list` (run 30494145090).
 #: Railway names follow the EMOJI NICKNAME, not the dashboard row id — the
 #: mismatch that caused the misses.
+#: [2026-08-05] snap-back + tide-rider moved to RETIRED_UNROUTED below —
+#: retired ((jh)/(if)), rules removed so deletion cannot be resurrected.
 SHADOW_SERVICES = {
-    "Dockerfile.dislocation": "snap-back-shadow",
     "Dockerfile.fundspread": "counterweight-shadow",
     "Dockerfile.indexshadow": "equities-regime-shadow",
     "Dockerfile.psniper": "perp-sniper-shadow",
-    "Dockerfile.trendlighter": "tide-rider-lighter-shadow",
     "Dockerfile.familyshadow": "family-lighter-shadow",
 }
+
+#: The INVERSE pin for retired services: a deploy rule pointing at a retired
+#: service is the resurrect hazard (railway-autodeploy-resurrects-stopped-
+#: services) — the rule must be GONE, and stay gone.
+RETIRED_UNROUTED = ("snap-back-shadow", "tide-rider-lighter-shadow")
 
 #: Names the workflow used to carry. Each one resolved to NOTHING at Railway,
 #: so a push matching its rule deployed that book's image nowhere.
@@ -335,6 +340,17 @@ def test_each_shadow_image_deploys_its_verified_service(dockerfile, service):
     wf = (_ROOT / ".github/workflows/railway-redeploy.yml").read_text()
     assert f"svcs,}}{service}\"" in wf, f"{dockerfile} has no rule for {service}"
     assert f"'{dockerfile}'" in wf, f"{dockerfile} missing from paths:"
+
+
+@pytest.mark.parametrize("service", RETIRED_UNROUTED)
+def test_retired_services_have_no_deploy_rule(service):
+    """[2026-08-05] The other half of a retirement: `railway down` is not
+    durable because the NEXT shared-file push re-deploys the service. The
+    rule's absence is what makes the operator's delete stick."""
+    wf = (_ROOT / ".github/workflows/railway-redeploy.yml").read_text()
+    assert f'svcs,}}{service}"' not in wf, (
+        f"{service} is retired but still has a deploy rule — a shared-file "
+        f"push would resurrect the service the operator deleted.")
 
 
 @pytest.mark.parametrize("dead", DEAD_SERVICE_NAMES)
