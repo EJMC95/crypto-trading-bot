@@ -170,8 +170,29 @@ HARD_STOP = float(os.environ.get("BARNES_HARD_STOP", "0.10"))
 K = int(os.environ.get("BARNES_K", "5"))       # the VALIDATED plateau centre
 XSECT_CLIP = 33.0               # $/leg -> 2*K*33 = $330 gross, ~zero net
 XSECT_REBALANCE_H = 24.0        # parent's validated cadence
-XSECT_MIN_VOL_M = 1.0           # $M floor for scout-universe candidates
-XSECT_UNIVERSE_N = 60           # how many scout books the rank may see
+XSECT_MIN_VOL_M = float(os.environ.get("BARNES_XSECT_MIN_VOL_M", "1.0"))
+# [2026-08-06 (kl)] 60 -> 30, AND the core below. `(ki)` NAMED this defect in
+# its own comment — "unlike its parent, which starts from a VALIDATED 30-name
+# crypto core and only tops up, this sleeve had NO core at all" — and fixed
+# only the crypto filter. The width was the other half: 30 is what BOTH of the
+# parent's validations cleared (the HL lab and the 31-Jul (ia) Lighter re-run,
+# +13.7% / maxDD 9.6%), and `(jg)` reverted the parent 60 -> 30 on that
+# widening's OWN pre-registered criterion EIGHT HOURS before this book was
+# born — measured in-era t=-0.44 and falling from a 0.65 baseline, mean
+# -0.361%/trade, -$16.01 MTM, fleet-worst. The child shipped the reverted half.
+XSECT_UNIVERSE_N = int(os.environ.get("BARNES_XSECT_UNIVERSE_N", "30"))
+#: The parent's VALIDATED cross-section, seeded from its `COINS` default. This
+#: sleeve ranked the venue's top-N by volume with no core, so its September
+#: grade would have been a grade of a cross-section no validation covers.
+#: Core names are NEVER dropped (the parent's `resolve_universe` contract);
+#: only the scout's top-up is screened. `tests/autonomy/test_barnes_xsect_core`
+#: pins this resolution EQUAL to the parent's function on the same inputs —
+#: the two implementations cannot be shared (the parent is not in this image)
+#: so they are held honest by an executable equality check instead.
+XSECT_CORE = os.environ.get(
+    "BARNES_XSECT_CORE",
+    "BTC,ETH,SOL,BNB,XRP,DOGE,AVAX,LINK,ADA,LTC,DOT,NEAR,SUI,HYPE,AAVE,WIF,"
+    "JUP,OP,ARB,TIA,ENA,SEI,APT,INJ,RUNE,STX,GALA,JTO,PYTH,W").split(",")
 
 # harvest capacity — ONE lever for both harvest sleeves.
 MAX_POSITIONS = int(os.environ.get("BARNES_MAX_POSITIONS", "4"))
@@ -184,7 +205,15 @@ HEDGE_COST = 0.0010             # per side, carry sleeve's off-venue hedge leg
 # get_lever must be handed THESE, never the current global, or the rail is a
 # one-way ratchet (the (fz) defect).
 _ENV_DEFAULTS = {"ENTER_APR": ENTER_APR, "MAX_POSITIONS": MAX_POSITIONS,
-                 "K": K}
+                 "K": K,
+                 # [2026-08-06 (kl)] I18 reach. Present here as well as in
+                 # `apply_tuning` deliberately: `_ENV_DEFAULTS[attr]` raises a
+                 # KeyError the tuning loop's own `except` swallows, leaving a
+                 # lever that LOOKS consumed and never moves — the (gu) trap.
+                 "PERSIST_H": PERSIST_H,
+                 "CARRY_MIN_VOL": CARRY_MIN_VOL,
+                 "EXTREME_MIN_VOL": EXTREME_MIN_VOL,
+                 "XSECT_UNIVERSE_N": XSECT_UNIVERSE_N}
 
 
 def apply_tuning(now=None):
@@ -198,12 +227,18 @@ def apply_tuning(now=None):
     or sick rail leaves the defaults in force. Reach without rule-drift.
     """
     global ENTER_APR, MAX_POSITIONS, K
+    global PERSIST_H, CARRY_MIN_VOL, EXTREME_MIN_VOL, XSECT_UNIVERSE_N
     if tuning is None or freeze_active(now):
         return {}
     moved = {}
     for lever, attr in (("barnes.enter_apr", "ENTER_APR"),
                         ("barnes.max_positions", "MAX_POSITIONS"),
-                        ("barnes.k", "K")):
+                        ("barnes.k", "K"),
+                        # [(kl)] the gates the census names as binding
+                        ("barnes.persist_h", "PERSIST_H"),
+                        ("barnes.carry_min_vol", "CARRY_MIN_VOL"),
+                        ("barnes.extreme_min_vol", "EXTREME_MIN_VOL"),
+                        ("barnes.xsect_universe_n", "XSECT_UNIVERSE_N")):
         cur = globals()[attr]
         try:
             val = tuning.get_lever(lever, _ENV_DEFAULTS[attr])
@@ -291,6 +326,68 @@ def harvest_census(fund, held, hot_since, t0, enter_apr, min_vol,
             out["waiting"] += 1
         else:
             out["eligible"] += 1
+    return out
+
+
+def resolve_xsect_universe(fund, current_time=None, _scout=None):
+    """The coin list the xsect sleeve ranks: the VALIDATED CORE first (order
+    preserved), then the scout's most-liquid CRYPTO books until
+    `XSECT_UNIVERSE_N` is reached.
+
+    [2026-08-06 (kl)] This sleeve had no core at all — it ranked
+    `scout_universe(min_vol_m=1.0, limit=60)` by volume, full stop, so its
+    30-day grade would have graded a cross-section neither parent validation
+    covers. `(ki)` named that in its own comment and fixed only the crypto
+    filter; this is the other half.
+
+    It mirrors `lighter_funding_spread_bot.resolve_universe` term for term,
+    and the two CANNOT share code — the parent is not in this image, and
+    dragging a whole bot module in to reuse six lines is the born-dark trade
+    this fleet keeps losing. "A second copy of a rule is a second rule", so
+    they are instead pinned EQUAL by an executable check
+    (`test_barnes_xsect_core.py`), which is what keeps the copy honest.
+
+    Contract, inherited from the parent deliberately:
+      * a dark or stale scout returns [] from the accessor, so this returns
+        the CORE unchanged — widening is an enhancement, never a dependency;
+      * `XSECT_UNIVERSE_N <= 0` disables the widening entirely;
+      * CORE names are NEVER dropped and NEVER crypto-filtered — they are the
+        backtested list, and screening them would silently change what the
+        book is. Only the scout's top-up is screened.
+    """
+    out = list(dict.fromkeys(
+        str(c).strip().upper() for c in XSECT_CORE if str(c).strip()))
+    width = int(XSECT_UNIVERSE_N or 0)
+    if width <= 0 or len(out) >= width:
+        return out
+    extra = _scout
+    if extra is None:
+        extra = []
+        if fleet_bus is not None:
+            try:
+                extra = fleet_bus.scout_universe(
+                    min_vol_m=XSECT_MIN_VOL_M, limit=width,
+                    current_time=current_time) or []
+            except Exception:      # noqa: BLE001
+                extra = []
+    if not extra:
+        # venue-direct fallback: never "trade nothing" because an organ is down
+        extra = [c for c, f in (fund or {}).items()
+                 if float((f or {}).get("vol") or 0.0) >= XSECT_MIN_VOL_M * 1e6]
+    if fleet_bus is not None:
+        try:
+            extra = fleet_bus.crypto_only(extra)
+        except Exception:          # noqa: BLE001
+            pass                   # fail-open: never stop trading on this
+    seen = set(out)
+    for c in extra:
+        c = str(c or "").strip().upper()
+        if not c or c in seen:
+            continue
+        out.append(c)
+        seen.add(c)
+        if len(out) >= width:
+            break
     return out
 
 
@@ -694,42 +791,7 @@ def main():
                 xsect_last = t0
                 # rank over the scout universe; a dark scout degrades to the
                 # venue-direct funding map (never "trade nothing").
-                uni = []
-                if fleet_bus is not None:
-                    try:
-                        uni = fleet_bus.scout_universe(
-                            min_vol_m=XSECT_MIN_VOL_M,
-                            limit=XSECT_UNIVERSE_N) or []
-                    except Exception:  # noqa: BLE001
-                        uni = []
-                if not uni:
-                    uni = [c for c, f in fund.items()
-                           if float(f.get("vol") or 0.0) >= XSECT_MIN_VOL_M * 1e6]
-                # [2026-08-05 (ki)] CRYPTO ONLY. This sleeve ranks the venue by
-                # |TRUE apr| and takes the extremes, and the extremes of a
-                # funding cross-section are exactly where the tokenised
-                # equities, indices and FX sit. Unlike its parent ⚖️
-                # Counterweight — which starts from a VALIDATED 30-name crypto
-                # core and only tops up from the scout — this sleeve had NO
-                # core at all: `scout_universe(min_vol_m=1.0, limit=60)` ranked
-                # by volume, full stop.
-                #
-                # MEASURED THE DAY THIS SHIPPED, on the live book: 5 of its 10
-                # held legs were non-crypto — a long-AAPL / short-AMD
-                # single-stock semiconductor pair, plus PAXG (gold), US500 and
-                # US100 — inside a book whose whole thesis is funding carry.
-                # The parent's own ledger prices that population at
-                # -9.209%/trade (n=19, t=-2.80, block-permuted P=0.002).
-                #
-                # Applied to BOTH paths deliberately: the scout list and the
-                # venue-direct fallback are two ways into the same rank, and
-                # filtering one leaves the book one dark organ away from the
-                # behaviour this removes.
-                if fleet_bus is not None:
-                    try:
-                        uni = fleet_bus.crypto_only(uni)
-                    except Exception:  # noqa: BLE001
-                        pass           # fail-open: never stop trading on this
+                uni = resolve_xsect_universe(fund)
                 aprs = {}
                 for c in uni:
                     f = fund.get(c)

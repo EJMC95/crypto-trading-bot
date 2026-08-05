@@ -450,6 +450,49 @@ LEVERS = {
                  "VALIDATED plateau centre (the un-backtested K=8 is the "
                  "cautionary tale, not the target)"),
         "env_default": 5, "step": 1},
+    # [2026-08-06 (kl)] I18 — THE GATES THAT ACTUALLY BIND THIS BOOK. Barnesy
+    # had three registered levers and every one of them is tighten-only or
+    # inert on a starved sleeve, while the four gates its OWN census names as
+    # binding were bare literals: no lever, no cage, no reader, invisible to
+    # the rail. That is the `carry.MIN_DAY_VOLUME` shape I18 was written for —
+    # "a book whose only tunable knobs are the ones with room LOOKS tunable
+    # and cannot move". Measured the day these were registered: 218 scanned,
+    # cold 201, thin 15, waiting 2, ELIGIBLE 0, and the carry sleeve's nearest
+    # candidate ETA moved AWAY over an hour (3.42h -> 4.45h) as thin books
+    # dipped below the apr gate and had their persistence clocks deleted.
+    # REACH, NOT PAYOFF, and said plainly: every default is UNCHANGED, so
+    # registering these moves nothing today — exactly as (it) recorded when
+    # walking `carry.min_vol` to its floor unlocked zero books.
+    "barnes.persist_h": {
+        "kind": "float", "lo": 3.0, "hi": 12.0, "lane": "lighter-books",
+        "note": ("Barnesy hours a book must hold |TRUE apr| >= enter_apr "
+                 "before entry; env default 6.0 = both parents' bar. The "
+                 "MEASURED binding gate: thin books dip and the clock is "
+                 "deleted, so candidates never mature. Two-sided, but "
+                 "loosening is an I19 widening and owes expectancy first"),
+        "env_default": 6.0, "step": -0.5},
+    "barnes.carry_min_vol": {
+        "kind": "float", "lo": 1e6, "hi": 4e6, "lane": "lighter-books",
+        "note": ("Barnesy carry sleeve 24h $ turnover floor; env default 2e6 "
+                 "= 🌾 the parent's. Cage lo is 1e6 NOT lower on purpose: at "
+                 "the >=20%% apr gate the venue's crypto candidates run "
+                 "$600-$23k/day against an $80 clip, so a deeper cut buys "
+                 "unfillable names, not trades"),
+        "env_default": 2e6, "step": -250000.0},
+    "barnes.extreme_min_vol": {
+        "kind": "float", "lo": 5e6, "hi": 20e6, "lane": "lighter-books",
+        "note": ("Barnesy extreme sleeve 24h $ turnover floor; env default "
+                 "10e6 = 💸 the Farmer's liquidity floor. Directional and "
+                 "unhedged, so its floor stays above the carry sleeve's"),
+        "env_default": 10e6, "step": -1e6},
+    "barnes.xsect_universe_n": {
+        "kind": "int", "lo": 30, "hi": 60, "lane": "lighter-books",
+        "note": ("Barnesy xsect cross-section width; env default 30 == the "
+                 "validated 30-name core, so no scout book is added. Cage lo "
+                 "is 30: the rail may never rank FEWER names than the "
+                 "validated list, and widening past it re-runs the experiment "
+                 "(jg) reverted on the parent"),
+        "env_default": 30, "step": 5},
     "fundspread.universe_n": {
         # [2026-08-04] default 60 -> 30 with fundspread.k: width 30 == the
         # 30-name hand list both validations ranked, so no scout book is added.

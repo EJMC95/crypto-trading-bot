@@ -70,6 +70,15 @@ BOOK_LEVERS = [
     # dedicated freeze tests below prove BOTH halves: frozen = nothing
     # moves; thawed = the lever reaches the module global.
     "barnes.enter_apr", "barnes.max_positions", "barnes.k",
+    # [2026-08-06 (kl)] I18 — the gates Barnesy's OWN CENSUS names as binding,
+    # which were bare literals with no lever, no cage and no reader. Its three
+    # birth levers are all tighten-only or inert on a starved sleeve, so the
+    # book LOOKED tunable and could not move: 218 scanned, cold 201, thin 15,
+    # waiting 2, eligible 0, and the nearest candidate's ETA moved AWAY over
+    # an hour as thin books dipped and their persistence clocks were deleted.
+    # Defaults UNCHANGED — reach, not payoff, exactly as (it) recorded.
+    "barnes.persist_h", "barnes.carry_min_vol", "barnes.extreme_min_vol",
+    "barnes.xsect_universe_n",
 ]
 
 
