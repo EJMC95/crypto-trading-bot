@@ -81,11 +81,16 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
 
 ## 3 · Infrastructure
 
-- **Railway cleanup — one sitting, guard-first order.** Delete in this order
-  (deploy rule out first where one exists, then the service):
-  1. `perps-bot` — CRASH-LOOPING now, retired bot; delete first.
-  2. `cross-exchange-arb`, `listing-sniper`, `momo-bot`, `freqtrade-trainer`,
-     `triangular-arb` — retired, idling, no deploy rules to remove.
+- **Railway cleanup — MOSTLY DONE (measured 5-Aug: 16 services remain of the
+  review's 26; `perps-bot`, the five retired idlers and the deletable
+  corpses are gone — the operator did the sitting).** Remaining, all
+  optional/low-urgency:
+  1. ~~`perps-bot`~~ **DELETED** (crash-loop over).
+  2. ~~cross-exchange-arb, listing-sniper, momo-bot, freqtrade-trainer,
+     triangular-arb~~ **DELETED**.
+  2b. `freqtrade-{mum,dad,avo-maria,georgia}` — still EXIST in the project
+     (visible in `status --json`) but hold no running deployment; delete at
+     the dashboard whenever.
   3. `tide-rider-lighter-shadow` — retired (if). **Repo half DONE 5-Aug**:
      paths/grep/AUTO_IMAGES entries removed (image declared in
      MANUAL_IMAGES_OK; `test_retired_services_have_no_deploy_rule` pins the
@@ -108,11 +113,14 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   (ip) used on the live Farmer; consistency, one deploy path), **B** keep +
   declare in CLAUDE.md with a guard asserting the branch is main (they are
   harmless-to-helpful while pointed at main). Either is defensible; A is
-  cleaner doctrine. **[5-Aug: operator approved A and an agent ATTEMPTED it —
-  blocked by the session permission layer (Railway mutations denied), no
-  workaround attempted. Run the five commands yourself, or add a Bash
-  permission rule for `railway service source disconnect` and ask again.
-  Same status for stopping the crash-looping `perps-bot`.]**
+  cleaner doctrine. **[5-Aug: DONE — option A executed on the operator's
+  explicit direction ("attend to railway item"), all five disconnected and
+  VERIFIED: `railway status --json` reads `source: null` on EVERY service in
+  the project, so the workflow's `railway up` is now the ONLY deploy path
+  anywhere — the (io) class closed project-wide. The earlier blocked attempt
+  note is superseded; `perps-bot` turned out to be ALREADY DELETED (the
+  operator had done the deletion sitting — 16 services remain of the
+  review's 26; the crash-loop is over).]**
 - **Zombie publishers (external projects).** `equities-momentum-alpaca` still
   writes daily (~22:01 UTC ≈ 08:00 Sydney; $86k paper equity) — publisher is
   almost certainly in your `trading-bot` or `ikbr-stock-bot` Railway
