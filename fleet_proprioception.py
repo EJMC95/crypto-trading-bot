@@ -174,6 +174,13 @@ BOOK_LEVER_BOTS = {
     "index": "equities-regime-lshadow",
     "trend": "crypto-trend-daily-lshadow",
     "sniper": "lighter-perp-sniper-lshadow",
+    # [2026-08-05 (jw)] 🎸 Barnesy — mapped the day its levers were
+    # registered (the selftest below fails an unmapped lighter-books prefix,
+    # which is how this line was demanded rather than remembered). NOTE the
+    # bot's apply_tuning is BIRTH-FROZEN until BARNES_FREEZE_UNTIL
+    # (2026-09-04), so no episode can OPEN before then — this mapping is
+    # where any post-freeze enactment gets graded.
+    "barnes": "band-barnes-lshadow",
 }
 # SELECTION vs CAPACITY, and the distinction is not cosmetic — it decides
 # which QUESTION the evidence can answer.
