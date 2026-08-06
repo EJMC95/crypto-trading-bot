@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 23,
- "scanned_at": "2026-08-04T10:13:09+00:00",
+ "scanned_at": "2026-08-06T01:20:29+00:00",
  "games": [
   {
    "home": "Gold Coast Titans",
@@ -323,8 +323,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 2.3,
-    "temp_c": 15.3,
+    "wind_kmh": 4.4,
+    "temp_c": 15.1,
     "forecast_hour": "2026-08-06T19:00"
    },
    "news": [],
@@ -337,18 +337,18 @@
      "players": [],
      "link": "https://news.google.com/rss/articles/CBMiowFBVV95cUxOb2NYRk4yLV90b0ZiZGR2WC13VHVsNUh5MmdXTmFJeXdMUTRval9lYnpvc0djQmRYNDRlVldndlFzQUZXV0h2S2JGOG1OUXV3QjZLV25FdWtUNWUwUVpWd1FuczY5RThUY0ZqcUNjSzl6QnlxNkFOQ05LS3B1bjJNeE1qX1VqdmRrN2dtTGNYM180a0RmRlVfZVVQczJPS2RQUmF3?oc=5",
      "published": "Sat, 25 Jul 2026 07:00:00 GMT"
+    },
+    {
+     "headline": "Dragons v Titans: Gutho's milestone; Brimson sidelined - NRL.com",
+     "flags": [
+      "out"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQX3VvemVad1NfNERnY2dhcnZLR2laRDZRRVJGaFFIakxVd2xHZUFxS0QtZWJlbkJHeHFWaTBzb0RpaVlkbHNCdXZEVnRVX1JtWjNQZDRjNl9tb3BsYVc0NDNpeTJKT2ZxejZRcG8wZnhTcHhGRUJHM3NsLXlGbWFLeWNVa0Z0alFHdUJUZUlvM2tDZw?oc=5",
+     "published": "Sun, 26 Jul 2026 07:00:00 GMT"
     }
    ],
    "news_away": [
-    {
-     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - nine.com.au",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
-     "published": "Tue, 04 Aug 2026 06:03:27 GMT"
-    },
     {
      "headline": "Cowboys v Broncos: Dearden ruled out; Billy's back - NRL.com",
      "flags": [
@@ -356,6 +356,15 @@
      ],
      "players": [],
      "link": "https://news.google.com/rss/articles/CBMijAFBVV95cUxOSHNXSmZ1TDViWEYweU5YOE16UXBvem8zUDhLOVpZT1ZvSFZjLWNSTld5NlBxWGhzTXAwUUx6RGpaWkZ4TFFrc2ZyS3FQVEtJWW5LR2hiZWZEMEFSX2VuQXA5NW5CN0NYTGlTMnlXaExWc3ptTjJkd25xbnlmRUhhUHZpaWdqYmlRZnZTbA?oc=5",
+     "published": "Sat, 25 Jul 2026 07:00:00 GMT"
+    },
+    {
+     "headline": "Cowboys v Titans: Lloyd-Phillips to debut; Grey day for Gold Coast - NRL.com",
+     "flags": [
+      "debut"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMiowFBVV95cUxOb2NYRk4yLV90b0ZiZGR2WC13VHVsNUh5MmdXTmFJeXdMUTRval9lYnpvc0djQmRYNDRlVldndlFzQUZXV0h2S2JGOG1OUXV3QjZLV25FdWtUNWUwUVpWd1FuczY5RThUY0ZqcUNjSzl6QnlxNkFOQ05LS3B1bjJNeE1qX1VqdmRrN2dtTGNYM180a0RmRlVfZVVQczJPS2RQUmF3?oc=5",
      "published": "Sat, 25 Jul 2026 07:00:00 GMT"
     }
    ]
@@ -680,8 +689,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 3.4,
-    "temp_c": 9.2,
+    "wind_kmh": 3.5,
+    "temp_c": 8.8,
     "forecast_hour": "2026-08-07T18:00"
    },
    "news": [],
@@ -706,15 +715,6 @@
     }
    ],
    "news_away": [
-    {
-     "headline": "Panthers v Raiders: Cogger steps up; Sasagi sidelined - NRL.com",
-     "flags": [
-      "out"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMijwFBVV95cUxQUm5YYWZ1VHExbzIyT1hwWTNFanotc1BZLVM0b0VoWjUxcm4xc205RFduaWNldG5GTDFWUFVKMzlvOUZHVlBzYjU1ei1CSjRmNmNzbXpDSUtwZ3dXWlZsb05BdVgyVjFHZmRnUDBCNmFXZkdWN2ZWVjFMakVKaEtPQzAtM2dVOEtxWlJDbXVKRQ?oc=5",
-     "published": "Sat, 01 Aug 2026 06:02:24 GMT"
-    },
     {
      "headline": "Eels v Panthers: Moses, Penisini return; Edwards sidelined - NRL.com",
      "flags": [
@@ -1047,15 +1047,6 @@
    "news": [],
    "news_home": [
     {
-     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - nine.com.au",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
-     "published": "Tue, 04 Aug 2026 06:03:27 GMT"
-    },
-    {
      "headline": "Knights v Roosters: Ponga, Gagai sidelined: Roosters guns return - NRL.com",
      "flags": [
       "out"
@@ -1386,7 +1377,26 @@
    ],
    "weather": null,
    "news": [],
-   "news_home": [],
+   "news_home": [
+    {
+     "headline": "Storm v Sea Eagles: Munster back on deck; Wakeham returns - NRL.com",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMilwFBVV95cUxNU0t1RXhBcjJid2h2em0wcnR5Skt0U2s3NTVYUDczZDB5UEoxRDZkek4xa2ZpVGlaeTZfbHRtTmlXZTJyZ0kwU0NGbkc4cWdER2poX0g3SGlOWjJ1eFpBY0NuYmJEbkRUeVR0SXVoNWlGNzlfRWFYTVBHU3ViNGVmNWdBOERCaDAzVkxQaHlzSUN1MzVTQXEw?oc=5",
+     "published": "Tue, 04 Aug 2026 08:01:42 GMT"
+    },
+    {
+     "headline": "Rabbitohs v Storm: Big three sidelined; Hughes back on deck - NRL.com",
+     "flags": [
+      "out"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxNR3VXN2lUTXhpam83Qnp0elBKcG5IU3JwY1pISFU2LUdoWWNYcUJmeUIxZnIyT1JGOG14UDloeXNieTVJSE5vQlZmcUZQVE1FX3pHTHlLdGNremZBYk1faHZLUGRnOWdGX0pYZXhfMzNwbDJ5Zm1wckJsQ2NNZzNBMXJyN3psbHJxdVdkUmIxdHdpakxt?oc=5",
+     "published": "Fri, 24 Jul 2026 07:00:00 GMT"
+    }
+   ],
    "news_away": []
   },
   {
@@ -1706,13 +1716,7 @@
      "status": null
     }
    ],
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 1,
-    "wind_kmh": 7.2,
-    "temp_c": 18.5,
-    "forecast_hour": "2026-08-08T17:00"
-   },
+   "weather": null,
    "news": [],
    "news_home": [
     {
@@ -2054,23 +2058,17 @@
      "status": null
     }
    ],
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 11.3,
-    "temp_c": 14.0,
-    "forecast_hour": "2026-08-08T19:00"
-   },
+   "weather": null,
    "news": [],
    "news_home": [
     {
-     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - nine.com.au",
+     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - Nine.com.au",
      "flags": [
       "return"
      ],
      "players": [],
      "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
-     "published": "Tue, 04 Aug 2026 06:03:27 GMT"
+     "published": "Tue, 04 Aug 2026 07:07:57 GMT"
     },
     {
      "headline": "Rabbitohs v Storm: Big three sidelined; Hughes back on deck - NRL.com",
@@ -2401,19 +2399,15 @@
      "status": null
     }
    ],
-   "weather": null,
+   "weather": {
+    "precip_mm": 1.0,
+    "precip_prob": 93,
+    "wind_kmh": 20.1,
+    "temp_c": 9.4,
+    "forecast_hour": "2026-08-09T14:00"
+   },
    "news": [],
-   "news_home": [
-    {
-     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - nine.com.au",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
-     "published": "Tue, 04 Aug 2026 06:03:27 GMT"
-    }
-   ],
+   "news_home": [],
    "news_away": [
     {
      "headline": "Knights v Roosters: Ponga, Gagai sidelined: Roosters guns return - NRL.com",
@@ -2743,18 +2737,15 @@
      "status": null
     }
    ],
-   "weather": null,
+   "weather": {
+    "precip_mm": 1.1,
+    "precip_prob": 67,
+    "wind_kmh": 17.6,
+    "temp_c": 14.1,
+    "forecast_hour": "2026-08-09T16:00"
+   },
    "news": [],
    "news_home": [
-    {
-     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - nine.com.au",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
-     "published": "Tue, 04 Aug 2026 06:03:27 GMT"
-    },
     {
      "headline": "Dragons v Titans: Gutho's milestone; Brimson sidelined - NRL.com",
      "flags": [
@@ -2766,15 +2757,6 @@
     }
    ],
    "news_away": [
-    {
-     "headline": "Teams: Huge returns for desperate Bunnies; Dogs receive big boost - nine.com.au",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQem1PT2hnVDQ3NGlhSlRndlB1Vm9wTU9CVGkzNy0zYVVKczhDVzNCT2RYM1lyZzQ1bnFxLWMxXzBoR01tUDB5OWtQUkRkYWoyXzNYZXdfaDFXYjA5OU9RZlJxWTlyM2VqQmQxaDVsN0VJbzhZTmliUVZsdkQyVGhwVmNQQTNjdU56djhvUXpkRXNLRjd2eUh1SERCdjM0Z1djTllEWC1tNXVBMDQxbFA2bnJka09YeXRjZ3VqdTZYYmpPR1cxdmVMQXh5dG9uX28xbTdMT3RBZVNCSnRnWHMzTXYyVElKOUJrT2g1ZVptMkY?oc=5",
-     "published": "Tue, 04 Aug 2026 06:03:27 GMT"
-    },
     {
      "headline": "Cowboys v Sharks: Nanai returns; McInnes back on deck - NRL.com",
      "flags": [

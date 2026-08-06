@@ -1,6 +1,6 @@
 {
  "round": 23,
- "built_at": "2026-08-04T10:13:45+00:00",
+ "built_at": "2026-08-06T01:21:29+00:00",
  "games": [
   {
    "home": "Gold Coast Titans",
@@ -10,8 +10,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 2.3,
-    "temp_c": 15.3,
+    "wind_kmh": 4.4,
+    "temp_c": 15.1,
     "forecast_hour": "2026-08-06T19:00"
    },
    "weather_try_mult": 1.0,
@@ -22,6 +22,11 @@
      "severity": "warn",
      "kind": "spine-change",
      "text": "Gold Coast Titans: Lachlan Ilias named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "Gold Coast Titans news: Dragons v Titans: Gutho's milestone; Brimson sidelined - NRL.com"
     },
     {
      "severity": "info",
@@ -38,8 +43,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 3.4,
-    "temp_c": 9.2,
+    "wind_kmh": 3.5,
+    "temp_c": 8.8,
     "forecast_hour": "2026-08-07T18:00"
    },
    "weather_try_mult": 1.0,
@@ -50,11 +55,6 @@
      "severity": "warn",
      "kind": "spine-change",
      "text": "Penrith Panthers: Jaxen Edgar named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "info",
-     "kind": "news",
-     "text": "Penrith Panthers news: Panthers v Raiders: Cogger steps up; Sasagi sidelined - NRL.com"
     },
     {
      "severity": "info",
@@ -114,6 +114,11 @@
      "severity": "warn",
      "kind": "spine-change",
      "text": "Manly-Warringah Sea Eagles: Joey Walsh named at Five-Eighth \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "news",
+     "text": "Melbourne Storm news: Rabbitohs v Storm: Big three sidelined; Hughes back on deck - NRL.com"
     }
    ]
   },
@@ -122,13 +127,7 @@
    "away": "Brisbane Broncos",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 1,
-    "wind_kmh": 7.2,
-    "temp_c": 18.5,
-    "forecast_hour": "2026-08-08T17:00"
-   },
+   "weather": null,
    "weather_try_mult": 1.0,
    "baseline_total": 48.9,
    "adjusted_total": 48.9,
@@ -160,13 +159,7 @@
    "away": "Parramatta Eels",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": {
-    "precip_mm": 0.0,
-    "precip_prob": 0,
-    "wind_kmh": 11.3,
-    "temp_c": 14.0,
-    "forecast_hour": "2026-08-08T19:00"
-   },
+   "weather": null,
    "weather_try_mult": 1.0,
    "baseline_total": 48.8,
    "adjusted_total": 48.8,
@@ -188,10 +181,16 @@
    "away": "Newcastle Knights",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": null,
-   "weather_try_mult": 1.0,
+   "weather": {
+    "precip_mm": 1.0,
+    "precip_prob": 93,
+    "wind_kmh": 20.1,
+    "temp_c": 9.4,
+    "forecast_hour": "2026-08-09T14:00"
+   },
+   "weather_try_mult": 0.944,
    "baseline_total": 47.9,
-   "adjusted_total": 47.9,
+   "adjusted_total": 45.2,
    "flags": [
     {
      "severity": "warn",
@@ -205,6 +204,11 @@
     },
     {
      "severity": "info",
+     "kind": "weather",
+     "text": "93% rain / 1.0mm at kickoff \u2192 tries \u00d70.94 (wet-weather suppression, assumption)"
+    },
+    {
+     "severity": "info",
      "kind": "news",
      "text": "Newcastle Knights news: Knights v Roosters: Ponga, Gagai sidelined: Roosters guns return - NRL.com"
     }
@@ -215,10 +219,16 @@
    "away": "Cronulla-Sutherland Sharks",
    "info_confidence": "high",
    "team_lists_confirmed": true,
-   "weather": null,
-   "weather_try_mult": 1.0,
+   "weather": {
+    "precip_mm": 1.1,
+    "precip_prob": 67,
+    "wind_kmh": 17.6,
+    "temp_c": 14.1,
+    "forecast_hour": "2026-08-09T16:00"
+   },
+   "weather_try_mult": 0.956,
    "baseline_total": 47.5,
-   "adjusted_total": 47.5,
+   "adjusted_total": 45.4,
    "flags": [
     {
      "severity": "warn",
@@ -239,6 +249,11 @@
      "severity": "warn",
      "kind": "spine-change",
      "text": "Cronulla-Sutherland Sharks: Blayke Brailey named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
+    },
+    {
+     "severity": "info",
+     "kind": "weather",
+     "text": "67% rain / 1.1mm at kickoff \u2192 tries \u00d70.96 (wet-weather suppression, assumption)"
     },
     {
      "severity": "info",
