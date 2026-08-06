@@ -463,6 +463,14 @@ def _record_close(bot_id, coin, ent_px, ent_ts, exit_px, price_pnl, fund_pnl,
             # tested — the price PATH cannot be joined to the trade.
             # Telemetry only; no gate moves.
             entry_price=ent_px, exit_price=exit_px,
+            # [2026-08-06 (kn)] SIDE, a constant here: all three position
+            # functions (`pos_sma_cross`, `pos_regime`, `pos_regime_band`)
+            # return 0 or 1 only, so this book is LONG-OR-FLAT and can never
+            # be short — which the line below already asserts by hardcoding a
+            # "long_" reason prefix. Free to fix now: the book has ZERO closed
+            # trades, so stamping it before its first close costs nothing,
+            # the same free catch (kc) and (kf) took on 🎸 Barnesy.
+            side="long",
             reason="long_" + reason, venue="lighter", shadow=True)
     except Exception:  # noqa: BLE001
         pass

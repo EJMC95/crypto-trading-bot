@@ -884,18 +884,36 @@ def main():
                     actual_mean_pct=(sum(actual) / len(actual)
                                      if actual else None))
         v = res.get("verdict") or {}
-        if res.get("calibration") is not None:
-            _status = ("FAIL — every recommendation below is WITHHELD"
-                       if v.get("withheld") else "PASS")
-            print(f"   calibration: replayed shipped rule vs the book's own "
-                  f"ledger = {res['calibration']:+.3f}pp ({_status})")
+        cal = res.get("calibration")
+        out[book] = res
+        # [2026-08-06 (kn)] HEADER FIRST. The calibration and SKIPPED lines
+        # used to print BEFORE this book's own name, so a reader attributed
+        # them to the book ABOVE — in the tool that chooses exits, on the line
+        # that says whether its recommendations may be believed at all.
+        print(f"\n{book}: {len(trades)} priced closes, {no_px} unpriced, "
+              f"{res.get('n_rules')} rules")
+        if cal is not None:
+            # [2026-08-06 (kn)] This block had TWO defects, one day old, in the
+            # instrument that chooses real-money exits:
+            #   1. it formatted `res["calibration"]` — a {"ok", "detail"} DICT —
+            #      with `:+.3f`, so `--all` died with a TypeError before any
+            #      book printed a verdict;
+            #   2. it read `v["withheld"]`, a key NOTHING in this module ever
+            #      writes (sweep() sets verdict.uncalibrated), so the status
+            #      was pinned to "PASS" — it would have reported PASS on a
+            #      FAILED calibration, which is precisely the state the gate
+            #      exists to announce.
+            # (kf) fixed "the CLI skips the gate" by wiring the gate in; the
+            # wiring then read a key its own publisher does not emit. That is
+            # the (hj) class, and the fix is to read `ok` from the payload the
+            # library actually builds.
+            _status = ("PASS" if cal.get("ok") else
+                       "FAIL — every recommendation below is WITHHELD")
+            print(f"   calibration: {cal.get('detail')} ({_status})")
         elif shipped_rule(book) is None:
             print(f"   calibration: SKIPPED — {book}'s shipped exit rule could "
                   f"not be read from its module, so there is no baseline to "
                   f"reproduce. Recommendations are unvalidated.")
-        out[book] = res
-        print(f"\n{book}: {len(trades)} priced closes, {no_px} unpriced, "
-              f"{res.get('n_rules')} rules")
         for r in (res.get("results") or [])[:5]:
             print(f"   {json.dumps(r['rule'])}  n={r['n']:>3d} "
                   f"total={r['total_pct']:>+8.2f}% mean={r['mean_pct']:>+7.3f}% "

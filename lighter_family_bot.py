@@ -834,6 +834,22 @@ class Book:
                 # no exit rule on these four books could be counterfactually
                 # tested. Telemetry only; no gate moves.
                 entry_price=m.get("entry"), exit_price=px,
+                # [2026-08-06 (kn)] SIDE, and it is a CONSTANT here. These
+                # seven rows are LONG-ONLY — the only two mentions of "short"
+                # in this module are a selftest asserting that a short verdict
+                # CLOSES a position — so the value is knowable with certainty
+                # and was still absent. `(kf)` stamped the taker, sniper and
+                # Counterweight, and this book was SKIPPED by its guard on the
+                # heuristic "no `is_long` in source ⇒ no direction concept",
+                # which is exactly backwards: a long-only book is the case
+                # where the side is least in doubt.
+                # Measured cost: the exit sweep discarded 53 priced closes
+                # across 🔮 georgia (33), intraday (14), avo-maria (5) and
+                # dad (1) — georgia being one of only three books sitting at
+                # 4/6 on the go-live gate, so the exit question could not be
+                # asked of a book near real money. Telemetry only; no gate,
+                # entry, exit or size moves.
+                side="long",
                 venue="lighter", shadow=shadow)
         except Exception:  # noqa: BLE001
             pass

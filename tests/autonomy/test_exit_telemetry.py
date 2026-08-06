@@ -299,6 +299,30 @@ _SIDE_EXEMPT = {
     # (SNAPBACK_RETIRED_OVERRIDE) must delete this line — same contract as
     # 🌊 Tide Rider's exemption in the (jd) seed guard.
     "lighter_dislocation_bot": "retired (jh); idles at boot, writes no rows",
+    # 🌊 Tide Rider — RETIRED 1-Aug (if) (9 buys / ZERO sells in 22 days while
+    # holding a third of the fleet's long budget). It idles at boot behind
+    # TIDE_RIDER_RETIRED_OVERRIDE and writes no further rows. A resurrection
+    # commit must DELETE this line — the same contract as 🧲 Snap Back above.
+    "lighter_trend_bot": "retired (if); idles at boot, writes no rows",
+}
+
+#: [2026-08-06 (kn)] Books that hold ONE direction, so their side is a
+#: constant rather than a variable. They must still STAMP it — the sweep reads
+#: a missing side as a LONG, so an unstamped long-only book means the harness
+#: is guessing what the book knows for certain, and the next short-capable
+#: book to be added here by mistake inherits that guess silently.
+LONG_ONLY = {
+    # 👩👨🙏🔮 the family + the three spot ports — 7 rows off one publisher.
+    # Verified: the only two occurrences of "short" in the module are a
+    # selftest asserting a SHORT verdict CLOSES a position, never opens one,
+    # and every ledger reason is composed `long-<tag>_<exit>`.
+    "lighter_family_bot",
+    # 📊 Index Rider. Verified: `pos_sma_cross`, `pos_regime` and
+    # `pos_regime_band` each return 0 or 1 ONLY, so it is long-or-flat and
+    # cannot be short — which its own publish already asserts by hardcoding a
+    # "long_" reason prefix. Zero closed trades, so stamping it before its
+    # first close costs nothing.
+    "lighter_index_bot",
 }
 
 
@@ -315,10 +339,25 @@ def test_no_price_book_computes_a_side_and_omits_it(mod):
     if not calls:
         pytest.skip(f"{mod} writes no paper-trade rows")
     src = (_ROOT / f"{mod}.py").read_text()
-    # Only bind books that actually reason about direction — a book with no
-    # notion of side cannot be asked for one.
-    if "is_long" not in src and "is_short" not in src:
-        pytest.skip(f"{mod} has no direction concept")
+    # [2026-08-06 (kn)] THIS SKIP USED TO BE THE HOLE. It read "no `is_long`
+    # or `is_short` in source ⇒ no direction concept ⇒ nothing to ask for",
+    # which is exactly backwards for a LONG-ONLY book: the side is a constant,
+    # i.e. the case where it is LEAST in doubt. `lighter_family_bot` — the
+    # publisher for SEVEN rows — was skipped on that heuristic while `(kf)`
+    # was declaring the class closed, and the sweep discarded 53 priced closes
+    # across 🔮 georgia (33), intraday (14), avo-maria (5) and dad (1).
+    # georgia sits at 4/6 on the go-live gate, so the exit question could not
+    # be asked of a book near real money.
+    #
+    # A book with no direction VARIABLE is now one of two declared things, and
+    # neither is silence: LONG_ONLY (must stamp a constant side) or
+    # _SIDE_EXEMPT (must say why). An undeclared one turns the build red.
+    if "is_long" not in src and "is_short" not in src and mod not in LONG_ONLY:
+        pytest.fail(
+            f"{mod} has no direction variable and is not declared LONG_ONLY "
+            f"or _SIDE_EXEMPT. A long-only book must stamp side='long' — the "
+            f"sweep reads a missing side as a LONG anyway, so leaving it "
+            f"unstamped means the harness GUESSES what the book KNOWS.")
     missing = [c.lineno for c in calls if "side" not in _kwargs(c)]
     assert not missing, (
         f"{mod} publishes a close WITHOUT side= at line(s) {missing}. The "
