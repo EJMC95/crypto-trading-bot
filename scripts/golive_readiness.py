@@ -1006,6 +1006,203 @@ def bar_map(s):
 
 
 # ---------------------------------------------------------------------------
+# GATE HORIZON — WHEN does this book become decidable? [2026-08-06 (ks)]
+# ---------------------------------------------------------------------------
+# Every organ in this fleet senses the past or the present; none computed the
+# future. The operator's go-live calendar lived as hand-typed prose
+# (OPERATOR_QUEUE item 5: "Farmer window ~16-Aug ... carry ~30-Aug") — the
+# exact I12 rot shape — and it HAD already rotted: the hand's 16-Aug matches
+# the Farmer's pre-(jf) declared era, while the live row's stamped era is
+# 23-Jul, so its window arms ~22-Aug. The (kp) entry itself hand-computed
+# "the Farmer needs ~178 in-era closes against 62" in prose. Both are one
+# closed form away from the fields this grader already publishes:
+#
+#     t = mean / (sd/sqrt(n))   =>   n_req(t_bar) = n * (t_bar / t)^2
+#
+# so the sample needed for the t bar at the book's CURRENT mean/sd needs only
+# n and t — no new statistic. This block publishes that arithmetic per book,
+# with the honesty rails the fleet has already paid for:
+#
+#   * REPORTED, NOT A BAR — `BAR_NAMES`/`grade()` untouched; no verdict moves.
+#   * The rate denominator is ERA AGE (first in-era close -> now), never the
+#     close SPAN: a span cannot see a stall — the last-close->now gap is the
+#     quantity that grows with the fault (I1). Measured: dad's span-rate reads
+#     2.2x its age-rate because the book stalled 7-11d.
+#   * A projection is a FLOOR, never a promise: `halves` is a path property
+#     and is listed as a blocker, not scheduled; every ETA assumes the
+#     current mean/sd/rate persist, which nothing guarantees — consumers must
+#     re-derive from each fresh payload, never cache (an era move voids every
+#     previously reported date for that book).
+#   * UNREACHABLE means "at current trajectory", NEVER "retire": mean <= 0
+#     cannot flip the mean/t/halves bars by accumulating more of itself, and
+#     a blown in-era maxDD cannot un-blow (the running peak-to-trough is
+#     monotone within an era). ⚖️ Counterweight reads UNREACHABLE today over
+#     a sample that deliberately still pools the reverted K=8 window ((hc):
+#     capacity is ordinary tuning) — the label is a trajectory statement and
+#     the keep-or-retire call stays the operator's (I17).
+#   * Fail-closed: junk or too-thin input yields verdict "no_rate"/None and
+#     a why, never a fabricated date. pm-turnbull's t=0.07 projects 9,132d —
+#     year 2051 — without the cap; with it, that renders as the I17 verdict
+#     it actually is, with `raw_days` published so 110d stays distinguishable
+#     from 9,132d.
+#   * I5: every emitted number is finite-or-None — `save_history` does not
+#     run `json_safe`, so a NaN here would kill the whole history write.
+HORIZON_CAP_DAYS = float(os.environ.get("HORIZON_CAP_DAYS", "90"))
+HORIZON_MIN_N_RATE = int(os.environ.get("HORIZON_MIN_N_RATE", "5"))
+HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
+
+
+def _fin(x, nd=2):
+    """round(x, nd) if x is a finite number, else None — the I5 boundary."""
+    try:
+        if x is None or not math.isfinite(float(x)):
+            return None
+        return round(float(x), nd)
+    except (TypeError, ValueError):
+        return None
+
+
+def gate_horizon(s, first_close=None, era_epoch=None, now=None):
+    """-> the horizon dict for one era-scoped sample. Pure and offline.
+
+    s           stats() output (post apply_mtm) for the ERA-SCOPED sample.
+    first_close datetime of the first in-era close (rate/window basis).
+    era_epoch   epoch float of the era boundary, for the window FLOOR when the
+                book is too thin to have a rate (carry: era 31-Jul -> 30-Aug).
+    now         injected for determinism in tests; defaults to UTC now.
+
+    Verdicts (each one earns its keep in _selftest):
+      ready        all six bars pass today — go-live stays an operator act.
+      on_track     every failing bar is projectable; `eta` is the date the
+                   LAST one flips at the measured rate (a floor if `blockers`
+                   is non-empty). `eta_conf`='low' below HORIZON_LOWCONF_N.
+      no_rate      < HORIZON_MIN_N_RATE in-era closes — a rate from n=1 is
+                   fiction (Poisson CV = 1/sqrt(n) = 100%); only the window
+                   FLOOR (first close / era + 30d) is honest, `eta_kind`
+                   says so.
+      unreachable  mean <= 0 or maxDD blown — at the CURRENT trajectory no
+                   amount of the same closes flips those bars.
+      undecidable  the projection exceeds HORIZON_CAP_DAYS — I17's class,
+                   surfaced the day it becomes visible instead of at the
+                   post-mortem. `raw_days` keeps the magnitude auditable.
+      unprojectable only path-property bars (halves) fail — they mend by
+                   trading, not by the calendar.
+    """
+    from datetime import datetime, timedelta, timezone
+    now = now if isinstance(now, datetime) else datetime.now(timezone.utc)
+    out = {"verdict": None, "eta": None, "eta_days": None, "eta_kind": None,
+           "eta_conf": None, "binding": None, "blockers": [],
+           "rate_cpd": None, "n_req_t": None, "raw_days": None, "why": ""}
+
+    def _floor_eta():
+        """Window FLOOR from the first close (preferred) or the era epoch."""
+        base = first_close if isinstance(first_close, datetime) else None
+        if base is None and isinstance(era_epoch, (int, float)) \
+                and math.isfinite(era_epoch):
+            base = datetime.fromtimestamp(era_epoch, tz=timezone.utc)
+        if base is None:
+            return None, None
+        d = (base + timedelta(days=GOLIVE_MIN_DAYS) - now).total_seconds() \
+            / 86400.0
+        return (base + timedelta(days=GOLIVE_MIN_DAYS)).date().isoformat(), \
+            max(0.0, d)
+
+    n = s.get("n", 0) if isinstance(s, dict) else 0
+    try:
+        bars = bar_map(s if isinstance(s, dict) else {"n": 0})
+    except (KeyError, TypeError):
+        # A stats dict that claims n>=2 but lacks the graded fields is junk,
+        # not a thin book — refuse the projection rather than misdiagnose it.
+        out.update(why="malformed stats — horizon unavailable")
+        return out
+    if n >= 2 and all(bars.values()):
+        out.update(verdict="ready",
+                   why="all six bars pass — go-live is an operator act")
+        return out
+
+    if n < HORIZON_MIN_N_RATE:
+        eta, d = _floor_eta()
+        out.update(verdict="no_rate",
+                   eta=eta, eta_days=_fin(d, 1),
+                   eta_kind=("floor" if eta else None), eta_conf="low",
+                   why=(f"n={n} in-era — no measurable close rate; "
+                        + (f"window floor {eta} (opens, not passes)"
+                           if eta else "no era/close to floor a window on")))
+        return out
+
+    fc = first_close if isinstance(first_close, datetime) else None
+    age_d = (now - fc).total_seconds() / 86400.0 if fc else None
+    if age_d is None or age_d <= 0:
+        out.update(verdict="no_rate",
+                   why="first in-era close missing or not in the past — "
+                       "no rate denominator")
+        return out
+    rate = n / age_d
+    out["rate_cpd"] = _fin(rate, 2)
+
+    mean = s.get("mean_pct")
+    if not bars["mean"] or not bars["maxdd"]:
+        parts = []
+        if not bars["mean"]:
+            parts.append(f"mean {100 * (mean or 0):+.3f}% <= 0 — more of the "
+                         "same closes cannot flip mean/t/halves")
+        if not bars["maxdd"]:
+            dd = s.get("max_dd_frac")
+            parts.append((f"maxDD {100 * dd:.1f}%" if dd is not None
+                          else "maxDD unmeasurable")
+                         + " >= bar — a blown in-era drawdown cannot un-blow")
+        out.update(verdict="unreachable",
+                   why="at current trajectory: " + "; ".join(parts))
+        return out
+
+    per_bar = {}
+    if not bars["window"]:
+        per_bar["window"] = max(0.0, GOLIVE_MIN_DAYS - age_d)
+    if not bars["closes"]:
+        per_bar["closes"] = max(0.0, (GOLIVE_MIN_CLOSES - n) / rate)
+    t = s.get("t")
+    if not bars["t"] and isinstance(t, (int, float)) and t > 0:
+        # mean > 0 here (the unreachable branch returned above), so t > 0 is
+        # guaranteed by construction — the isinstance guard is for junk input.
+        n_req = math.ceil(n * (GOLIVE_MIN_T / t) ** 2)
+        out["n_req_t"] = int(n_req)
+        per_bar["t"] = max(0.0, (n_req - n) / rate)
+    blockers = [b for b in ("halves",) if not bars[b]]
+    out["blockers"] = blockers
+
+    if not per_bar:
+        out.update(verdict="unprojectable",
+                   why="only path-property bars fail "
+                       f"({', '.join(blockers) or 'none'}) — they mend by "
+                       "trading, not by the calendar")
+        return out
+
+    binding = max(per_bar, key=lambda k: per_bar[k])
+    eta_days = per_bar[binding]
+    if eta_days > HORIZON_CAP_DAYS:
+        out.update(verdict="undecidable", binding=binding,
+                   raw_days=_fin(eta_days, 1),
+                   why=(f"needs ~{eta_days:.0f}d at the measured rate "
+                        f"({rate:.2f}/d) — beyond the {HORIZON_CAP_DAYS:.0f}d "
+                        "horizon; I17: a book that cannot reach its own bar "
+                        "is a keep-or-retire call, not a tuning pass"))
+        return out
+
+    eta_dt = now + timedelta(days=eta_days)
+    why = (f"{binding} bar binds: ~{eta_days:.1f}d at {rate:.2f} closes/day"
+           + (f" (needs ~{out['n_req_t']} closes for t>={GOLIVE_MIN_T:g} "
+              "at current mean/sd)" if binding == "t" else ""))
+    if blockers:
+        why += f" — FLOOR: {', '.join(blockers)} must also mend"
+    out.update(verdict="on_track", binding=binding,
+               eta=eta_dt.date().isoformat(), eta_days=_fin(eta_days, 1),
+               eta_kind="projected",
+               eta_conf=("low" if n < HORIZON_LOWCONF_N else "ok"),
+               why=why)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # LEDGER INTEGRITY — is this book's ledger ONE book's record? [(hf)]
 # ---------------------------------------------------------------------------
 # These primitives live HERE, in the module that ships inside the freqtrade
@@ -1519,12 +1716,102 @@ def _selftest():
                  {"policy": {"lenses": []}}, {"policy": {"bull": True}}):
         assert policy_signature(junk) is None, junk
 
+    # ---- [2026-08-06 (ks)] GATE HORIZON — every verdict earns its keep ----
+    # Deterministic: `now` is always injected. Each verdict below is the SOLE
+    # outcome of its case, per this selftest's own rule ("each bar must be the
+    # sole reason in some case, or it is untested decoration").
+    _hnow = t0 + timedelta(days=40)
+
+    # READY — all six bars pass; no projection, no date.
+    hz = gate_horizon(good, first_close=t0, now=_hnow)
+    assert hz["verdict"] == "ready" and hz["eta"] is None, hz
+
+    # ON_TRACK, t binding — mean>0, 0<t<2, everything else green. The rate is
+    # exactly 1.0/day (40 closes, first close 40d ago), so eta_days must equal
+    # (n_req - 40) and the ETA date must be now + that. This pins the
+    # n_req = n*(T/t)^2 closed form THROUGH the date arithmetic.
+    ontrack = stats(mk([0.052, -0.032] * 20))
+    assert ontrack["mean_pct"] > 0 and 0 < ontrack["t"] < GOLIVE_MIN_T, ontrack
+    hz = gate_horizon(ontrack, first_close=t0, now=_hnow)
+    assert hz["verdict"] == "on_track" and hz["binding"] == "t", hz
+    assert hz["n_req_t"] == math.ceil(40 * (GOLIVE_MIN_T / ontrack["t"]) ** 2)
+    assert abs(hz["eta_days"] - (hz["n_req_t"] - 40) / 1.0) < 0.2, hz
+    from datetime import timedelta as _htd
+    assert hz["eta"] == (_hnow + _htd(days=hz["eta_days"])).date().isoformat()
+    assert hz["blockers"] == [] and hz["eta_kind"] == "projected", hz
+
+    # ...and a FLOOR when halves also fails: same shape, sick second half.
+    floored = stats(mk([0.06] * 20 + [-0.038] * 20))
+    assert floored["mean_pct"] > 0 and floored["h2"] < 0 < floored["h1"]
+    assert 0 < floored["t"] < GOLIVE_MIN_T, floored
+    hz = gate_horizon(floored, first_close=t0, now=_hnow)
+    assert hz["verdict"] == "on_track" and hz["blockers"] == ["halves"], hz
+    assert "FLOOR" in hz["why"], hz
+
+    # NO_RATE — n=1 gives no rate; only the window floor is honest, and it
+    # comes from the era epoch when there is no usable first close (carry's
+    # real shape: era 31-Jul -> floor 30-Aug).
+    hz = gate_horizon(stats(mk([0.01])), era_epoch=t0.timestamp(), now=_hnow)
+    assert hz["verdict"] == "no_rate" and hz["eta_kind"] == "floor", hz
+    assert hz["eta"] == (t0 + timedelta(days=GOLIVE_MIN_DAYS)).date().isoformat()
+
+    # UNREACHABLE on mean — a losing mean cannot flip mean/t/halves by
+    # accumulating more of itself. `tails` is the high-win-rate loser above.
+    hz = gate_horizon(tails, first_close=t0, now=_hnow)
+    assert hz["verdict"] == "unreachable" and "mean" in hz["why"], hz
+    assert hz["eta"] is None, hz
+
+    # UNREACHABLE on maxDD alone — mean>0, t>2, but the in-era drawdown is
+    # blown and a running peak-to-trough cannot un-blow. Kills the mutation
+    # that treats maxdd as projectable.
+    blown = stats(mk([2.0] * 10 + [-1.6] * 10 + [2.0] * 20))
+    assert blown["mean_pct"] > 0 and blown["t"] >= GOLIVE_MIN_T, blown
+    assert blown["max_dd_frac"] >= GOLIVE_MAX_DD, blown
+    hz = gate_horizon(blown, first_close=t0, now=_hnow)
+    assert hz["verdict"] == "unreachable" and "maxDD" in hz["why"], hz
+
+    # UNDECIDABLE — the cap converts a year-2051 date into the I17 verdict,
+    # with raw_days published so magnitude stays auditable. `noisy` (t~0.33)
+    # needs ~1,400 closes at 1/day. Also pins n_req = n*(T/t)^2 EXACTLY at
+    # t=1.0 (the arithmetic a mutated factor breaks first).
+    hz = gate_horizon(noisy, first_close=t0, now=_hnow)
+    assert hz["verdict"] == "undecidable" and hz["eta"] is None, hz
+    assert hz["raw_days"] and hz["raw_days"] > HORIZON_CAP_DAYS, hz
+    pin = dict(noisy)
+    pin.update(t=1.0)
+    hz = gate_horizon(pin, first_close=t0, now=_hnow)
+    assert hz["n_req_t"] == 160, hz     # 40 * (2.0/1.0)^2, exact
+    assert hz["verdict"] == "undecidable" and hz["raw_days"] == 120.0, hz
+
+    # UNPROJECTABLE — only the halves bar fails; it mends by trading, not by
+    # the calendar. No date may be fabricated for it.
+    halved = stats(mk([0.05] * 20 + [-0.001] * 20))
+    assert halved["t"] >= GOLIVE_MIN_T and halved["h2"] < 0, halved
+    hz = gate_horizon(halved, first_close=t0, now=_hnow)
+    assert hz["verdict"] == "unprojectable" and hz["eta"] is None, hz
+
+    # FAIL-CLOSED junk: no stats, no floor -> no_rate with why, never a date;
+    # a first close in the FUTURE (clock skew / junk stamp) refuses a rate
+    # rather than fabricating a negative denominator.
+    hz = gate_horizon({}, now=_hnow)
+    assert hz["verdict"] == "no_rate" and hz["eta"] is None, hz
+    hz = gate_horizon(ontrack, first_close=_hnow + timedelta(days=1), now=_hnow)
+    assert hz["verdict"] == "no_rate" and "denominator" in hz["why"], hz
+    # I5 at the boundary: every emitted number is finite or None.
+    for _v in (gate_horizon(ontrack, first_close=t0, now=_hnow),
+               gate_horizon(noisy, first_close=t0, now=_hnow)):
+        for _k, _x in _v.items():
+            if isinstance(_x, float):
+                assert math.isfinite(_x), (_k, _x)
+
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
           "high-win-rate loser, window/DD bars, ungradeable input, policy "
           "eras, stamp-derived policy boundaries: first-new-close bound, "
           "open-keyed straddlers, tuning-not-a-boundary, fail-closed junk, "
           "declared-vs-stamp max, MTM drawdown: worse-of, floors, "
-          "no-series no-op)")
+          "no-series no-op, gate horizon: ready/on-track/floor/no-rate/"
+          "unreachable-mean/unreachable-dd/undecidable-cap/unprojectable/"
+          "fail-closed junk + the n*(T/t)^2 pin)")
 
 
 def main():
@@ -1691,6 +1978,15 @@ def main():
         ok_old, fails_old = grade(s, legacy=True)
         if overlaps:
             ok_old = False
+        # [(ks)] THE HORIZON — computed beside the verdict, never instead of
+        # it. Wrapped so an annotation bug can never fail the grade (the same
+        # never-raise contract the publish block carries): a dark horizon is a
+        # lost projection; a crashed grader is a lost gate.
+        try:
+            hz = gate_horizon(s, first_close=(parsed[0][2] if parsed else None),
+                              era_epoch=_era_ep)
+        except Exception as e:      # noqa: BLE001
+            hz = {"verdict": None, "why": f"horizon error: {e}"}
         verdict = "READY" if ok else "; ".join(fails[:2])
         flag = ""
         if ok and not ok_old:
@@ -1719,6 +2015,11 @@ def main():
             # that stopped being mentioned is a reading lost.
             flag += (f"   [ledger: {len(overlaps_all)} historical overlap(s) "
                      f"predate this era]")
+        if hz.get("verdict") and hz["verdict"] != "ready":
+            # [(ks)] One glance at WHEN. The full reasoning is in the payload.
+            _h = hz["verdict"] + (f" {hz['eta']}" if hz.get("eta") else "") \
+                + (f" ({hz['binding']})" if hz.get("binding") else "")
+            flag += f"   [horizon: {_h}]"
         if s.get("n", 0) < 2:
             print(f"{bot:34s} {s.get('n', 0):>4d} {'-':>6s} {'-':>8s} {'-':>6s} "
                   f"{'-':>6s} {'-':>7s} {'-':>8s} {'-':>8s} {'-':>7s}  "
@@ -1770,6 +2071,13 @@ def main():
                      "closes_in_era": s.get("n", 0),
                      "closes_all_time": s_all.get("n", 0)} if era_iso else None),
             "alltime": book_payload(s_all),
+            # [2026-08-06 (ks)] GATE HORIZON — when this book becomes
+            # decidable at its measured trajectory. REPORTED, NOT A BAR
+            # (`grade()`/`BAR_NAMES` untouched); era-scoped only, computed
+            # once here rather than in `book_payload` (which runs twice per
+            # book and would double it onto `alltime`, where a projection
+            # over a superseded sample means nothing). See `gate_horizon`.
+            "horizon": hz,
             # [(hf)] Published so a consumer can render the warning without
             # string-matching `fails`, exactly as `bars` did for the bar map.
             "integrity": {

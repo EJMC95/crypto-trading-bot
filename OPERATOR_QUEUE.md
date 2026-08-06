@@ -174,7 +174,15 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
 
 ## 5 · Standing (calendar, no action)
 
-First MTM-graded book ~6-Aug → Counterweight ~7-Aug · Farmer window ~16-Aug
-(t≥2 is the whole question) · item-18 oracle grades + SPY/QQQ graduation
-~mid-Aug · Farnham-Six verdicts ~28-29-Aug · carry gradeable ~30-Aug · Taker
-policy-clock ruling (chip queued will surface the evidence).
+**COMPUTED NOW — 6-Aug (ks).** The go-live dates below are derived from the
+ledger by the grader each publish (`golive-readiness` → per-book `horizon`,
+rendered on the 🚦 dashboard card and the daily review's 🔭 line) — read those,
+not this paragraph. First live read: **Farmer-live on_track ~23-Aug (t bar
+binding — its stamped (jf) era is 23-Jul, so the "~16-Aug" this item used to
+carry matched the superseded era; the rot is why the calendar is computed
+now)** · carry window-floor 30-Aug (n=1 in-era; the venue stall (I18) is the
+real blocker). Human-decision dates stay hand-carried, correctly — a
+trajectory cannot derive a review date: item-18 oracle grades + SPY/QQQ
+graduation ~mid-Aug · Farnham-Six keep-or-retire verdicts ~28-29-Aug ·
+Barnesy gradeable ~mid-Sep · Taker policy-clock ruling (chip queued will
+surface the evidence).

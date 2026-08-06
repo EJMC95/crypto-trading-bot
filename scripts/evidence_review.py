@@ -112,12 +112,13 @@ for _p in (_HERE, os.path.dirname(_HERE)):
 try:                                     # run as a script (sys.path[0]=scripts/)
     from golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                   GOLIVE_MIN_DAYS, bar_map, book_payload,
-                                  era_rows, grade, same_pair_overlaps, stats)
+                                  era_rows, gate_horizon, grade,
+                                  same_pair_overlaps, stats)
 except ImportError:                      # run as `python -m scripts.evidence_review`
     from scripts.golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                           GOLIVE_MIN_DAYS, bar_map,
-                                          book_payload, era_rows, grade,
-                                          same_pair_overlaps, stats)
+                                          book_payload, era_rows, gate_horizon,
+                                          grade, same_pair_overlaps, stats)
 
 # Cheap SQL prefilter before the per-book ledger read. It must never be STRICTER
 # than the real closes bar, or a genuine candidate is hidden before it is graded.
@@ -615,6 +616,7 @@ def scan_new_evidence(cur, errors):
                          ORDER BY 2 DESC""")
         cands = [r[0] for r in cur.fetchall()]
         passers, near = [], []
+        horizon_lines, horizon_tally = [], {}
         for bot in cands:
             if bot in RETIRED or bot in LIVE_ROWS or bot in LIVE_TWINS:
                 continue
@@ -641,6 +643,35 @@ def scan_new_evidence(cur, errors):
             # about the sample any more than about the bars.
             rows, rows_all, era_iso = era_rows(bot, quads)
             status, why, s = gate_status(rows)
+            # [2026-08-06 (ks)] GATE HORIZON — the hand calendar, computed.
+            # The canonical `gate_horizon` (one owner, same doctrine as
+            # bar_map/era_rows above: the review FORMATS, it never re-derives).
+            # This section's sample is realised-only by its own declared
+            # caveat, and the horizon inherits that basis.
+            try:
+                _era_ep = None
+                if era_iso:
+                    from datetime import datetime as _hdt, timezone as _htz
+                    _d = _hdt.fromisoformat(str(era_iso))
+                    if _d.tzinfo is None:
+                        _d = _d.replace(tzinfo=_htz.utc)
+                    _era_ep = _d.timestamp()
+                hz = gate_horizon(s, first_close=(rows[0][2] if rows else None),
+                                  era_epoch=_era_ep)
+            except Exception:      # noqa: BLE001 — a lost projection, never a lost report
+                hz = {}
+            if hz.get("verdict") == "on_track" and hz.get("eta"):
+                horizon_lines.append(
+                    f"{bot} → {hz['eta']}"
+                    + ("~" if hz.get("eta_conf") == "low" else "")
+                    + f" ({hz.get('binding')})"
+                    + (f" FLOOR:{','.join(hz['blockers'])}" if hz.get("blockers")
+                       else ""))
+            elif hz.get("verdict") == "no_rate" and hz.get("eta"):
+                horizon_lines.append(f"{bot} ≥ {hz['eta']} (window floor)")
+            elif hz.get("verdict") in ("unreachable", "undecidable"):
+                horizon_tally[hz["verdict"]] = \
+                    horizon_tally.get(hz["verdict"], 0) + 1
             # [(hf)/(hi)] A grade is only as good as the ledger under it. If two
             # processes wrote this book's rows, its n/t describe a POOLED record
             # and no promotion may rest on them. Measured 30-Jul: 🌾 carry — the
@@ -681,6 +712,18 @@ def scan_new_evidence(cur, errors):
                      f"{'; '.join(passers) if passers else 'NO new candidate'}")
         if near:
             items.append("⏳ waiting only on the window bar: " + "; ".join(near))
+        # [(ks)] The computed calendar. OPERATOR_QUEUE item 5's dates were
+        # hand-typed prose and had already rotted (the Farmer's "~16-Aug"
+        # matches its pre-(jf) era); these are derived from the ledger by the
+        # canonical grader each run. Projections at the current measured
+        # trajectory — floors, never promises.
+        if horizon_lines or horizon_tally:
+            _tal = "; ".join(f"{k}@trend: {v}" for k, v in
+                             sorted(horizon_tally.items()))
+            items.append("🔭 gate horizon (computed at trajectory, (ks)): "
+                         + ("; ".join(horizon_lines) if horizon_lines
+                            else "no projectable candidate")
+                         + (f" · {_tal}" if _tal else ""))
         # [(hl)] The maxdd bar is measured on REALISED closed P&L only, so a
         # book that is usually IN a position has drawdown the bar cannot see —
         # measured on 📊 Index Rider, realised 9.9-10.7% vs true MTM 15.6-17.4%,
