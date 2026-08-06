@@ -39,12 +39,22 @@ lens the live arm trades. The live arm is divergence-short only, runs
 live entry passes that screen. It is the only thing between the real-money
 book and a short on a tokenised equity.
 
-**Urgency — honest:** real but **not currently armed**. All divergence tickets
-on the bus right now are `side: "long"`, and the live arm takes only shorts,
-so nothing is eligible today. It arms when the scout next emits a
-divergence/**short** on a non-crypto symbol — credible, since `CAP` is showing
-−402% gap / −1515% apr on a $0.18M book, and those readings flip. **Today, not
-this minute.**
+**Urgency — CORRECTED 6-Aug 18:40 AEST. The earlier text here said "not
+currently armed". That was WRONG and the error was mine.** It was based on an
+audit that used `fleet_bus.is_crypto` on the ledger's `pair` column — and that
+function did not strip the `/USDC` quote, so it returned "crypto" for every
+non-crypto row and the audit reported ZERO. Blind by construction; fixed in
+`(kv)`.
+
+**Measured correctly, the live real-money book has already opened 19
+non-crypto positions (−$1.97 all-time). Five are IN-ERA short-divergence —
+DRAM, MINIMAX, SKHY — opened 1-Aug to 4-Aug.** In-era that population runs
+**−0.263%/trade against +1.145% on the crypto trades the screen keeps**, and
+it is **5 of 14 in-era trades: over a third of the sample the go-live gate is
+grading** on the book nearest real money.
+
+The dollar damage is two cents. The evidence damage is the reason to deploy:
+the gate is grading a sample a third of which the book's own design excludes.
 
 ```bash
 gh workflow run 305025607 -f services="tide-rider-lighter-live"

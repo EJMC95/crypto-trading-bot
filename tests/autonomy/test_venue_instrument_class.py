@@ -241,3 +241,44 @@ class TestTheTakersOwnListCannotDriftAgain:
             assert not _is_crypto(sym), sym
         for sym in ("BTC", "SOL", "ZRO"):
             assert _is_crypto(sym), sym
+
+
+class TestPairShapedSymbolsAreScreened:
+    """[2026-08-06 (kv)] MEASURED, not hypothetical. `is_crypto` compared the
+    WHOLE string against the base set, so every ledger-shaped `BASE/QUOTE`
+    pair fell through fail-open as "crypto".
+
+    It was used to audit 🎫 the live Taker's ledger for non-crypto positions
+    and returned ZERO. The real count is 19 all-time (−$1.97) and 5 in-era
+    short-divergence — DRAM, MINIMAX, SKHY, last opened 4-Aug — which is over
+    a THIRD of the in-era sample the go-live gate grades on the book nearest
+    real money. `paper_trades.pair` is ALWAYS `BASE/QUOTE`, so the audit could
+    never have detected the damage it was run to find.
+
+    `lighter_ticket_taker._is_crypto` has split on "/" since it was written.
+    The canonical owner did not, which is why the fleet's own screen and the
+    fleet's own audit disagreed for a day.
+    """
+
+    @pytest.mark.parametrize("pair", [
+        "SKHY/USDC", "DRAM/USDC", "MINIMAX/USDC", "AAPL/USDC",
+        "TSLA/USDC", "SPCX/USDC", "USDKRW/USDC",
+    ])
+    def test_a_pair_shaped_noncrypto_symbol_is_screened(self, pair):
+        assert not fleet_bus.is_crypto(pair), pair
+
+    @pytest.mark.parametrize("pair", ["BTC/USDC", "SOL/USDC", "ZRO/USDC"])
+    def test_a_pair_shaped_crypto_symbol_survives(self, pair):
+        assert fleet_bus.is_crypto(pair), pair
+
+    def test_crypto_only_filters_pairs_too(self):
+        held = ["BTC/USDC", "SKHY/USDC", "SOL/USDC", "DRAM/USDC"]
+        assert fleet_bus.crypto_only(held) == ["BTC/USDC", "SOL/USDC"]
+
+    def test_it_agrees_with_the_takers_own_screen_on_pairs(self):
+        """The two implementations must not disagree again — that disagreement
+        is what let a day pass with a wrong audit."""
+        from lighter_ticket_taker import _is_crypto
+        for p in ("SKHY/USDC", "DRAM/USDC", "BTC/USDC", "SOL/USDC",
+                  "AAPL/USDC", "ZRO/USDC", "NEWCOIN/USDC"):
+            assert fleet_bus.is_crypto(p) == _is_crypto(p), p

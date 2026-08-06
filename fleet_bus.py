@@ -533,7 +533,20 @@ def is_crypto(sym, current_time=None):
     genuinely new non-crypto listing slipping through until the scout's next
     publish — hours now, not "until a human notices"."""
     try:
-        s = str(sym or "").strip().upper()
+        # [2026-08-06 (kv)] SPLIT THE QUOTE OFF FIRST. This accepted a BASE
+        # only, so every ledger-shaped pair — `SKHY/USDC`, `DRAM/USDC` — missed
+        # the set and returned True, i.e. "crypto", fail-open.
+        #
+        # THE COST, measured: it was used to audit 🎫 the live Taker's ledger
+        # for non-crypto positions and reported ZERO. The real count is
+        # **19 all-time (−$1.97) and 5 in-era short-divergence** (DRAM,
+        # MINIMAX, SKHY, last opened 4-Aug) — over a THIRD of the in-era
+        # sample the go-live gate is grading on the book nearest real money.
+        # The audit was blind by construction: `pnl_trades.pair` is always
+        # `BASE/QUOTE`, and this function only ever compared the whole string.
+        # `lighter_ticket_taker._is_crypto` has split on "/" since it was
+        # written; the canonical owner did not.
+        s = str(sym or "").strip().upper().split("/")[0]
     except Exception:      # noqa: BLE001
         return True
     if not s:
