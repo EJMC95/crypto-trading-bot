@@ -201,7 +201,7 @@ class TestTheFailOpenContractSurvives:
 
 
 class TestTheTakersOwnListCannotDriftAgain:
-    """[2026-08-06 (kq)] `(kj)` left this leak OPEN and declared it, because
+    """[2026-08-06 (kt)] `(kj)` left this leak OPEN and declared it, because
     changing what a real-money book trades is an operator act. Then it was
     measured on the live bus and it was not theoretical:
 
@@ -244,7 +244,7 @@ class TestTheTakersOwnListCannotDriftAgain:
 
 
 class TestPairShapedSymbolsAreScreened:
-    """[2026-08-06 (kv)] MEASURED, not hypothetical. `is_crypto` compared the
+    """[2026-08-06 (lc)] MEASURED, not hypothetical. `is_crypto` compared the
     WHOLE string against the base set, so every ledger-shaped `BASE/QUOTE`
     pair fell through fail-open as "crypto".
 

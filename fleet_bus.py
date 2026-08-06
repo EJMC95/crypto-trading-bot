@@ -533,7 +533,7 @@ def is_crypto(sym, current_time=None):
     genuinely new non-crypto listing slipping through until the scout's next
     publish — hours now, not "until a human notices"."""
     try:
-        # [2026-08-06 (kv)] SPLIT THE QUOTE OFF FIRST. This accepted a BASE
+        # [2026-08-06 (lc)] SPLIT THE QUOTE OFF FIRST. This accepted a BASE
         # only, so every ledger-shaped pair — `SKHY/USDC`, `DRAM/USDC` — missed
         # the set and returned True, i.e. "crypto", fail-open.
         #
