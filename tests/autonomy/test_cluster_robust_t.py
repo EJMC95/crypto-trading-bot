@@ -183,3 +183,38 @@ class TestTheDegenerateCase:
                     out.append((v, b * 24 * 3600 + i))
             c = g.stats(_rows(out))["cluster"]
             assert c is None or c["n_eff"] <= len(out) * 1.5, c
+
+
+class TestTheSmallGCorrection:
+    """MUTATION-DRIVEN. Dropping the `G/(G-1)` factor SURVIVED the first round:
+    at G=6 it is a ~10% move in SE, which every tolerance-based test above
+    absorbed. It matters MOST when batches are few — which is precisely the
+    basket-book case this whole estimator exists for — so it gets an exact
+    arithmetic pin rather than a tolerance.
+    """
+
+    def test_t_cluster_equals_the_hand_computed_sandwich(self):
+        rows = _batched(6, 10, [1.2, 0.9, 1.1, 0.8, -0.5, 0.4])
+        s = g.stats(rows)
+        pct = [r[0] for r in rows]
+        n = len(pct)
+        mean = sum(pct) / n
+        groups = [pct[i * 10:(i + 1) * 10] for i in range(6)]
+        meat = sum(sum(x - mean for x in grp) ** 2 for grp in groups)
+        se_cr = math.sqrt((6 / 5.0) * meat) / n          # WITH the correction
+        assert math.isclose(s["cluster"]["t_cluster"], round(mean / se_cr, 2),
+                            abs_tol=0.011), s["cluster"]
+
+    def test_dropping_the_correction_is_detectable(self):
+        """The uncorrected estimator is smaller by exactly sqrt(G/(G-1)); at
+        G=6 that is 9.5% of t. Pinned so the factor cannot be removed."""
+        rows = _batched(6, 10, [1.2, 0.9, 1.1, 0.8, -0.5, 0.4])
+        s = g.stats(rows)
+        pct = [r[0] for r in rows]
+        n = len(pct); mean = sum(pct) / n
+        groups = [pct[i * 10:(i + 1) * 10] for i in range(6)]
+        meat = sum(sum(x - mean for x in grp) ** 2 for grp in groups)
+        uncorrected = mean / (math.sqrt(meat) / n)
+        assert abs(s["cluster"]["t_cluster"] - uncorrected) > 0.05, (
+            "corrected and uncorrected t are indistinguishable in this "
+            "fixture — it cannot pin the factor")
