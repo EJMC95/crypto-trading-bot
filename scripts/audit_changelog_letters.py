@@ -62,6 +62,64 @@ def scan(text):
     return entries, dups
 
 
+# A header that is not at line start. `HEADER` is anchored with re.M, and so
+# is every human `grep '^## '` — so an entry glued to the end of the previous
+# entry's prose is invisible to the index, to this guard, and to Markdown
+# itself, while its letter still gets cited.
+GLUED = re.compile(r"(?<!\A)(?<!\n)## (\d{4}-\d{2}-\d{2}) \(([a-z]+)\)")
+
+# THE TWO FORMS THAT ARE UNAMBIGUOUSLY CITATIONS: the dated bracket the fleet
+# stamps in code comments, and a backticked letter in prose. MEASURED before
+# choosing: matching any parenthesised short word instead finds 278 "dangling"
+# hits across the tree — ordinary English and identifiers, every one noise, and
+# a guard that cries wolf trains the operator to ignore it. These two forms
+# find 496 real citations with ZERO noise. LIMIT, declared rather than silent:
+# a bare prose citation is not checked; it is also not how code cites.
+CITE_DATED = re.compile(r"\[\d{4}-\d{2}-\d{2} \(([a-z]{1,3})\)\]")
+CITE_TICKED = re.compile(r"`\(([a-z]{1,3})\)`")
+
+
+def glued_headers(text):
+    """-> [(date, letter)] for headers not at line start. See entry lc.
+
+    MEASURED: entry kp's header was appended directly to the previous entry's
+    last sentence. One missing newline, the only occurrence in 369 headers —
+    and it took the entry out of the index entirely while 10 citations, 6 of
+    them in tracked code, kept pointing at it."""
+    return GLUED.findall(text or "")
+
+
+def dangling_code_citations(paths, known):
+    """-> [(path, lineno, letter)] for changelog citations in tracked python
+    COMMENTS/STRINGS that resolve to no header. See 2026-08-06 entry lc.
+
+    Tokenized rather than regexed over raw source: only comments and string
+    literals can carry a citation, and source is full of same-shaped
+    identifiers. A citation that resolves to nothing is a reader sent nowhere.
+
+    NOTE ON THIS DOCSTRING: it deliberately writes letters in prose form and
+    never in either citation form, so text ABOUT the class cannot be flagged
+    AS the class — the self-reference trap this fleet has paid for before.
+    That is why this file needs no exemption from its own guard."""
+    import io
+    import tokenize
+    out = []
+    for p in paths:
+        try:
+            src = open(p, encoding="utf-8").read()
+            toks = list(tokenize.generate_tokens(io.StringIO(src).readline))
+        except Exception:      # noqa: BLE001 — unreadable/unparseable: skip
+            continue
+        for tok in toks:
+            if tok.type not in (tokenize.COMMENT, tokenize.STRING):
+                continue
+            for letter in (CITE_DATED.findall(tok.string)
+                           + CITE_TICKED.findall(tok.string)):
+                if letter not in known:
+                    out.append((p, tok.start[0], letter))
+    return out
+
+
 def cross_branch(mine, theirs):
     """-> {letter: (my_title, their_title)} for letters BOTH sides used with
     DIFFERENT titles. Pure, so the selftest can drive it.
@@ -120,7 +178,22 @@ def main():
     if not os.path.isfile(CHANGELOG):
         print("audit_changelog_letters: CHANGELOG.md not found", file=sys.stderr)
         return 1
-    entries, dups = scan(open(CHANGELOG, encoding="utf-8").read())
+    _raw = open(CHANGELOG, encoding="utf-8").read()
+    entries, dups = scan(_raw)
+    # [2026-08-06 (lc)] A HEADER THAT IS NOT A HEADER. Checked FIRST: every other arm
+    # here reasons over the index, and an entry missing from the index cannot
+    # be found duplicated, cited or clashing. Fixing it is one newline.
+    glued = glued_headers(_raw)
+    if glued:
+        print("\nCHANGELOG HEADER NOT AT LINE START — invisible to the letter "
+              "index, to `grep '^## '`\nand to Markdown, while its letter is "
+              "still cited:\n")
+        for d, letter in glued:
+            print(f"  ({letter})  {d}")
+        print("\nFIX: put a blank line before the header. Measured in lc: one "
+              "glued header took an\nentry out of the index while 10 "
+              "citations, 6 in tracked code, pointed at it.\n")
+        return 1
     base_text = _baseline_changelog()
     if base_text:
         clashes = cross_branch(entries, scan(base_text)[0])
@@ -151,8 +224,35 @@ def main():
               "  grep -rn '(<letter>)' --include='*.md' --include='*.py' "
               "--include='*.yml' .\n")
         return 1
+    # [2026-08-06 (lc)] A CITATION THAT RESOLVES TO NOTHING. Uniqueness says two entries
+    # do not share a letter; it says nothing about a letter cited from code
+    # that no entry carries — which is how a real-money finding
+    # (`fleet_bus.is_crypto`, 19 non-crypto live positions) reached tracked
+    # code and never reached this file. Known letters come from the WHOLE
+    # changelog, not the >=ERA_START window: citing an older entry is normal.
+    _known = {l for _, l, _ in HEADER.findall(_raw)}
+    _py = []
+    for _root, _dirs, _files in os.walk(ROOT):
+        _dirs[:] = [d for d in _dirs
+                    if d not in {".git", ".venv", "node_modules", "__pycache__"}]
+        _py += [os.path.join(_root, f) for f in _files if f.endswith(".py")]
+    dangling = dangling_code_citations(sorted(_py), _known)
+    if dangling:
+        print("\nCHANGELOG CITATION IN CODE RESOLVES TO NO ENTRY — a reader "
+              "following it lands nowhere:\n")
+        for p, ln, letter in dangling[:20]:
+            print(f"  ({letter})  {os.path.relpath(p, ROOT)}:{ln}")
+        if len(dangling) > 20:
+            print(f"  ... and {len(dangling) - 20} more")
+        print("\nFIX: either the entry is missing (write it — an undocumented "
+              "change is the defect,\nnot the citation) or the letter moved "
+              "(repoint the comment). Measured (lc): a\nreal-money finding "
+              "lived only in a commit body because its entry was never "
+              "written.\n")
+        return 1
     print(f"audit_changelog_letters: OK — {len(entries)} lettered entries since "
-          f"{ERA_START}, every letter unique"
+          f"{ERA_START}, every letter unique, no glued header, "
+          f"{len(_py)} python files' citations all resolve"
           + (f" ({len(LETTERS_OK)} declared)" if LETTERS_OK else ""))
     return 0
 

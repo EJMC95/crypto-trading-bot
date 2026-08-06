@@ -44,7 +44,8 @@ currently armed". That was WRONG and the error was mine.** It was based on an
 audit that used `fleet_bus.is_crypto` on the ledger's `pair` column — and that
 function did not strip the `/USDC` quote, so it returned "crypto" for every
 non-crypto row and the audit reported ZERO. Blind by construction; fixed in
-`(kv)`.
+`(lc)` (the fix cited `(kv)`, a letter the horizon work already held —
+repointed and engraved there).
 
 **Measured correctly, the live real-money book has already opened 19
 non-crypto positions (−$1.97 all-time). Five are IN-ERA short-divergence —

@@ -583,7 +583,7 @@ TRADFI_BASES = {s.strip().upper() for s in os.environ.get(
     "SPY,QQQ,IWM,US100,US500,SOXL,AMD,MU,HOOD,RKLB,TSLA,NVDA,AAPL,MSFT,META,"
     "GOOGL,GOOG,AMZN,COIN,MSTR,PLTR,TSM,INTC,SKHYNIX,AMAT,EWY,LITE,CRCL,BMNR,"
     "SNDK,NBIS,MRVL,ASML,BABA,DELL,ORCL,QCOM,AVGO,ARM,SMCI,SPCX,ZHIPU,CBRS,"
-    # [2026-08-06 (kq)] THE 41 THIS LIST WAS MISSING, from the venue's own
+    # [2026-08-06 (kt)] THE 41 THIS LIST WAS MISSING, from the venue's own
     # `strategy_index` (see `(kj)`). NOT a regression guard — LIVE EXPOSURE,
     # measured on the bus the day it shipped: 3 of 16 scout tickets were
     # non-crypto instruments this list did not catch (DRAM, CXMT, CAP), and
