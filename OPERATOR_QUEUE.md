@@ -12,6 +12,71 @@ Recommended options are marked ★.
 
 ---
 
+## 0 · PENDING DEPLOYS — code that is written, tested and pushed, waiting on you
+
+*Added 6-Aug. Both are **restrict-only** (they can make a book trade FEWER
+things, never more) and both are already on `main`, green, mutation-verified.
+The shadow arms have them; only the marker-gated LIVE arms are waiting.*
+
+### 0a ★ 🎫 Ticket Taker — live arm is screening against a 41-name-stale list
+
+**What it carries:** `(kt)` + `(ku)`.
+
+**Why:** the live arm's only crypto screen (`bull_entry_ok` → `_is_crypto`) had
+fallen 41 names behind the venue. Measured on the bus 6-Aug, **3 of the
+scout's 16 tickets were non-crypto instruments it would have admitted** —
+`DRAM`, `CXMT`, `CAP` — and **`CAP` was on the `divergence` lens**, the only
+lens the live arm trades. The live arm is divergence-short only, runs
+`bull: True`, and `("divergence","short")` is in `BULL_LENS_SIDES`, so every
+live entry passes that screen. It is the only thing between the real-money
+book and a short on a tokenised equity.
+
+**Urgency — honest:** real but **not currently armed**. All divergence tickets
+on the bus right now are `side: "long"`, and the live arm takes only shorts,
+so nothing is eligible today. It arms when the scout next emits a
+divergence/**short** on a non-crypto symbol — credible, since `CAP` is showing
+−402% gap / −1515% apr on a $0.18M book, and those readings flip. **Today, not
+this minute.**
+
+```bash
+gh workflow run 305025607 -f services="tide-rider-lighter-live"
+```
+
+`(ku)` also means this is the LAST time this class needs a deploy: the scout
+now stamps the venue's instrument class on every ticket, so a newly listed
+equity is screened the moment the scout sees it.
+
+### 0b · 💸 Funding Farmer — lever cage is 17 commits stale
+
+**What it carries:** `(ka)`'s `min_vol` cage widening, plus `(jx)`'s
+`claim_writer` + MTM series on the real-money pair.
+
+**Why:** `(ka)` moved `{xp,live}.funding.min_vol` cage `lo` 2e6 → 1e5 and filed
+`min-vol-1e5` in the judge's queue. Both Farmer arms still carry `lo=2e6`, so
+the judge would write 1e5, the container would clamp to 2e6, and it would
+grade a thin-tier experiment **the book never ran** — against a value identical
+to the `min-vol-2e6` candidate queued beside it.
+
+**Urgency — low.** `(kp)` now makes that failure LOUD instead of silent (the
+lever refuses to the operator default and `skewed_levers()` names it), and the
+judge is on `slope-gate-off` at 16/30 shadow closes with `min-vol-2e6`
+(unaffected) queued ahead. Realistically **2–4 weeks** out.
+
+```bash
+gh workflow run 305025607 -f services="trail-blazer-live"
+```
+
+### Verify either one landed — by stamp readback, never by the green run
+
+```bash
+.venv/bin/python3 scripts/audit_code_currency.py --pnl-json https://pnl-dashboard-production-858c.up.railway.app/pnl.json --depth 200
+```
+
+Expect the row to move from `DEFERRED` to `CURRENT`. A green workflow run has
+never implied a container took it.
+
+---
+
 ## 1 · The "super bot" question — combining utilities
 
 Four routes, ranked by evidence. The fleet's measured reality (1-Aug,
