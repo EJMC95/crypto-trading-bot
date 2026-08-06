@@ -275,15 +275,30 @@ def blocking_bars(s):
     return tuple(sorted(k for k, ok in bar_map(s).items() if not ok))
 
 
-def near_miss_eta(s):
+def near_miss_eta(s, first_close=None, now=None):
     """Days until the WINDOW bar clears, when it is the ONLY failing bar.
 
     Returns None unless the book has cleared every EVIDENCE bar — a book that
     is also thin, or noisy, is not "N days from ready" and must never read as
     though it were.
-    """
+
+    [2026-08-06 (la)] DELEGATES TO `gate_horizon`; it no longer owns the
+    arithmetic. It used to compute `GOLIVE_MIN_DAYS - s["days"]` off the
+    CLOSE SPAN while the 🔭 line beside it projected off the era AGE, so the
+    same report answered "how far to the window bar" twice, differently, for
+    the same book — (hj)'s second-copy-of-a-rule at two-line range. Measured
+    on a stalled 5/6 book: this said "~2.0d away" while the horizon said
+    today. The grader is the one owner; a dark/parameterless call falls back
+    to the old span arithmetic so this can never lose the line entirely."""
     if s.get("n", 0) < 2 or blocking_bars(s) != ("window",):
         return None
+    try:
+        hz = gate_horizon(s, first_close=first_close, now=now)
+        d = hz.get("eta_days")
+        if isinstance(d, (int, float)):
+            return d
+    except Exception:      # noqa: BLE001 — never lose the line to a projection
+        pass
     return GOLIVE_MIN_DAYS - s["days"]
 
 
@@ -669,9 +684,16 @@ def scan_new_evidence(cur, errors):
                        else ""))
             elif hz.get("verdict") == "no_rate" and hz.get("eta"):
                 horizon_lines.append(f"{bot} ≥ {hz['eta']} (window floor)")
-            elif hz.get("verdict") in ("unreachable", "undecidable"):
-                horizon_tally[hz["verdict"]] = \
-                    horizon_tally.get(hz["verdict"], 0) + 1
+            elif hz.get("verdict") in ("unreachable", "undecidable",
+                                       "unprojectable"):
+                # [(la)] NAME THE BOOKS (I8: a detector must name the object
+                # the operator can act on). This tallied COUNTS — "unreachable
+                # @trend: 6" — for exactly the two verdicts whose stated
+                # purpose is a keep-or-retire call, so the daily report was
+                # strictly worse than the dashboard, which names them.
+                # `unprojectable` joins because it fell through silently: the
+                # 5/6 book nearest the gate appeared in neither list.
+                horizon_tally.setdefault(hz["verdict"], []).append(bot)
             # [(hf)/(hi)] A grade is only as good as the ledger under it. If two
             # processes wrote this book's rows, its n/t describe a POOLED record
             # and no promotion may rest on them. Measured 30-Jul: 🌾 carry — the
@@ -697,7 +719,10 @@ def scan_new_evidence(cur, errors):
                 continue
             # A book that clears every EVIDENCE bar and waits only on the
             # window is the operator's lead time — ~N days from a decision.
-            eta = near_miss_eta(s)
+            # [(la)] Pass the first in-era close so the delegation to
+            # `gate_horizon` uses the AGE basis — without it the helper falls
+            # back to the span arithmetic it was extracted from.
+            eta = near_miss_eta(s, first_close=(rows[0][2] if rows else None))
             if eta is not None:
                 p = book_payload(s)
                 near.append(f"{bot} (t={p['t']}, n={p['n']}, {p['days']}d, "
@@ -717,9 +742,13 @@ def scan_new_evidence(cur, errors):
         # matches its pre-(jf) era); these are derived from the ledger by the
         # canonical grader each run. Projections at the current measured
         # trajectory — floors, never promises.
-        if horizon_lines or horizon_tally:
-            _tal = "; ".join(f"{k}@trend: {v}" for k, v in
-                             sorted(horizon_tally.items()))
+        # [(la)] EMITTED WHENEVER THERE ARE CANDIDATES, not only when something
+        # projected. The old `if horizon_lines or horizon_tally` dropped the
+        # whole item when every candidate fell through — the same dark-reads-
+        # as-clean ambiguity (kw) closed one file over.
+        if cands:
+            _tal = "; ".join(f"{k}@trend: {', '.join(sorted(v))}"
+                             for k, v in sorted(horizon_tally.items()))
             items.append("🔭 gate horizon (computed at trajectory, (ks)): "
                          + ("; ".join(horizon_lines) if horizon_lines
                             else "no projectable candidate")

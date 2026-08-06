@@ -146,6 +146,45 @@ def test_the_time_floor_lets_a_real_rate_through():
     assert hz["rate_cpd"] == pytest.approx(8 / 7.0, abs=0.05), hz
 
 
+def test_stalled_book_never_projects_the_window_to_today():
+    # [(la)] THE DEFECT: the window bar reads the CLOSE SPAN, which only
+    # advances when a NEW close lands — but the projection was pure calendar
+    # (30 - age_d), so a STALLED 5/6 book published "on_track, eta = TODAY".
+    # 40 closes, first 40d ago, last 12d ago -> span 28d (window fails), age
+    # 40d (calendar term is negative). The honest answer is "at least one
+    # more close away", never today.
+    t0 = _NOW - timedelta(days=40)
+    step = timedelta(days=28.0 / 39)
+    rows = [(0.01, 0.1, t0 + i * step) for i in range(40)]
+    s = g.stats(rows)
+    assert s["days"] < g.GOLIVE_MIN_DAYS, "fixture must fail the window bar"
+    hz = g.gate_horizon(s, first_close=t0, now=_NOW)
+    assert hz["binding"] == "window", hz
+    assert hz["eta_days"] >= 1.0 / hz["rate_cpd"] - 0.01, \
+        ("a stalled book must be projected at least one close out, not today",
+         hz)
+    assert hz["eta"] != _NOW.date().isoformat(), \
+        "a 12-day-silent book must never read as ready today"
+
+
+def test_rate_denominator_spans_the_whole_era_not_the_close_tail():
+    # [(la)] `era_rows` keys an era on the OPEN, so a HOLDING book's first
+    # in-era close lags the era boundary by one holding period. Measuring the
+    # rate from that close prices the wait out of existence — measured risk
+    # on 🌾 carry (65-70h holds), the fleet's only go-live candidate.
+    era_start = _NOW - timedelta(days=10)
+    fc = _NOW - timedelta(days=2)
+    rows = [(0.01, 0.1, fc + timedelta(hours=4 * i)) for i in range(10)]
+    s = g.stats(rows)
+    hz = g.gate_horizon(s, first_close=fc, era_epoch=era_start.timestamp(),
+                        now=_NOW)
+    assert hz["rate_cpd"] == pytest.approx(1.0, abs=0.1), \
+        ("rate must be n/era-age (10/10d), not n/close-tail (10/2d)", hz)
+    # ...and with NO era declared it still uses the first close (unchanged).
+    hz2 = g.gate_horizon(s, first_close=fc, now=_NOW)
+    assert hz2["rate_cpd"] == pytest.approx(5.0, abs=0.3), hz2
+
+
 def test_future_first_close_refuses_a_rate():
     hz = g.gate_horizon(_ONTRACK, first_close=_NOW + timedelta(days=1),
                         now=_NOW)
@@ -251,6 +290,32 @@ def test_non_book_publishers_are_declared_and_excluded():
     names = [n.id for n in ast.walk(fn) if isinstance(n, ast.Name)]
     assert "ROSTER_NON_BOOKS" in names, \
         "main()'s roster sweep no longer consults the non-book set"
+
+
+def test_both_horizon_call_sites_use_the_same_maxdd_basis():
+    # [(la)] The below-floor branch called gate_horizon on RAW stats while the
+    # graded path folds MTM in first, so `bars["maxdd"]` meant two different
+    # things either side of --min-closes — the below-floor side using the
+    # realised-only definition I9 exists to replace. Pinned by STRUCTURE
+    # because both call sites live in main()'s DB path, which no offline test
+    # reaches: a mutation removing the wrap survived the whole suite until
+    # this test existed (the (kz)/roster_admits lesson, applied without
+    # waiting to be bitten twice).
+    tree = ast.parse((_ROOT / "scripts" / "golive_readiness.py").read_text())
+    fn = next(n for n in tree.body
+              if isinstance(n, ast.FunctionDef) and n.name == "main")
+    calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Name) and n.func.id == "gate_horizon"]
+    assert len(calls) >= 2, "expected a graded and a below-floor call site"
+    # COUNT the folds, do not match argument names: both call sites can pass a
+    # bare `s` and are then indistinguishable by name — the first cut of this
+    # test allowed exactly that and the mutation walked straight through it.
+    # One fold per horizon call site is the invariant that actually bites.
+    folds = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Name) and n.func.id == "apply_mtm"]
+    assert len(folds) >= len(calls), (
+        f"{len(calls)} gate_horizon call sites but only {len(folds)} "
+        "apply_mtm folds — one of them projects on a realised-only maxDD")
 
 
 def test_main_publishes_roster_receipt():
@@ -393,6 +458,56 @@ def test_card_survives_junk_horizon(monkeypatch, junk):
     # the card's blanket except would BLANK everything on a crash — so the
     # assertion is that the book still renders, not merely that nothing raised.
     assert html and "bk" in html, f"card blanked on junk horizon {junk!r}"
+
+
+def test_the_five_of_six_book_gets_a_chip_too(monkeypatch):
+    # [(la)] `unprojectable` (only the halves bar failing) had no branch in
+    # either consumer, so a 2/6 book showed a chip and the 5/6 book CLOSEST
+    # to the gate showed none — read as "no data" rather than "one path bar".
+    halved = g.stats(_mk([0.05] * 20 + [-0.001] * 20))
+    hz = g.gate_horizon(halved, first_close=_T0, now=_NOW)
+    assert hz["verdict"] == "unprojectable"
+    html = _render(_payload({"bk": _book(halved, hz)}), monkeypatch)
+    assert "halves only" in html, "the 5/6 book must not be the silent one"
+
+
+def test_below_floor_footer_labels_projections_and_keeps_verdicts(monkeypatch):
+    # [(la)] The footer stamped `≥` (the card's own FLOOR glyph) on ANY eta,
+    # so a PROJECTED date read as a floor; and unreachable/undecidable books
+    # (eta=None) rendered as a bare `bot nN`, byte-identical to a book with
+    # no horizon — the two verdicts that carry the I17 call, invisible on the
+    # line built to surface I17.
+    proj = {"verdict": "on_track", "eta": "2026-09-05",
+            "eta_kind": "projected", "why": "window bar binds"}
+    unre = {"verdict": "unreachable", "eta": None, "why": "mean <= 0"}
+    floor = {"verdict": "no_rate", "eta": "2026-08-28", "eta_kind": "floor",
+             "why": "window floor"}
+    p = _payload({"bk": _book(_ONTRACK, None)})
+    p["below_floor"] = {"proj-bk": _bf(8, proj), "unre-bk": _bf(6, unre),
+                        "floor-bk": _bf(1, floor)}
+    html = _render(p, monkeypatch)
+    assert "&rarr;09-05" in html, "a projection must not wear the floor glyph"
+    assert "&ge;08-28" in html, "a real floor keeps the floor glyph"
+    assert "@trend" in html, "an unreachable below-floor book must say so"
+    assert "window bar binds" in html, "per-book why must reach the tooltip"
+
+
+def test_footer_says_so_when_the_roster_sweep_is_dark(monkeypatch):
+    # [(la)] (kw) made the sweep self-reporting and left every CONSUMER blind:
+    # on a dark fetch the roster books just vanish and the footer gets
+    # shorter — silently dropping 📊 equities-regime, the standing I17 case.
+    p = _payload({"bk": _book(_ONTRACK, None)})
+    p["below_floor"] = {}
+    p["roster"] = {"scanned": 0, "admitted": 0, "rejected": 0,
+                   "non_book": 0, "error": None}
+    html = _render(p, monkeypatch)
+    assert "roster sweep DARK" in html, "a dark sweep must not read as clean"
+    # ...and a healthy sweep says nothing.
+    p["roster"] = {"scanned": 23, "admitted": 2, "rejected": 0,
+                   "non_book": 1, "error": None}
+    p["below_floor"] = {"x": _bf(3, {"verdict": "no_rate", "eta": None,
+                                     "why": "thin"})}
+    assert "roster sweep DARK" not in _render(p, monkeypatch)
 
 
 def test_ready_book_gets_no_horizon_chip(monkeypatch):

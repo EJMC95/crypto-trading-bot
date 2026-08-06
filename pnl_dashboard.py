@@ -1731,6 +1731,14 @@ def golive_card():
                     _txt, _col, _bg = "∞ @trend", "#d1242f", "rgba(209,36,47,.14)"
                 elif _hv == "undecidable":
                     _txt = "undecidable"
+                elif _hv == "unprojectable":
+                    # [(la)] A 5/6 BOOK MUST NOT BE THE ONE WITH NO CHIP.
+                    # `unprojectable` fires when ONLY the halves bar fails —
+                    # the book CLOSEST to the gate — and it had no branch
+                    # here, so a 2/6 book showed a chip and a 5/6 book showed
+                    # nothing. The operator reads that absence as "no data"
+                    # rather than "one path-property bar, mends by trading".
+                    _txt = "halves only"
                 if _txt:
                     era_chip += (
                         f'<span title="{html.escape(str(hz.get("why") or ""))}'
@@ -1781,24 +1789,61 @@ def golive_card():
         bf = r.get("below_floor") if isinstance(r.get("below_floor"), dict) \
             else None
         bf_line = ""
-        if bf:
+        # [(la)] The DARK check must sit OUTSIDE the below-floor guard — a
+        # dark sweep with no thin books produces an EMPTY map, which is
+        # exactly when the warning matters and exactly when an inside-the-
+        # guard check cannot fire. (Caught by its own test before ship.)
+        rm = r.get("roster") if isinstance(r.get("roster"), dict) else {}
+        dark = ""
+        if rm and (rm.get("error") or not rm.get("scanned")):
+            dark = ('<div style="font-size:.75em;color:#d1242f" '
+                    'title="The zero-ledger roster sweep did not run, so '
+                    'books with no ledger rows are NOT covered by the line '
+                    'above.">roster sweep DARK — zero-ledger books not '
+                    'covered (' +
+                    html.escape(str(rm.get("error") or "scanned 0")) +
+                    ')</div>')
+        if bf or dark:
             parts = []
-            for b, v in sorted(bf.items()):
+            for b, v in sorted((bf or {}).items()):
                 if not isinstance(v, dict):
                     continue
                 h = v.get("horizon") if isinstance(v.get("horizon"), dict) \
                     else {}
                 p = html.escape(f'{b} n{v.get("n_alltime")}')
-                if h.get("eta"):
-                    p += f' &ge;{html.escape(str(h.get("eta"))[5:])}'
-                parts.append(p)
-            if parts:
+                # [(la)] KEY THE GLYPH ON THE VERDICT THE PUBLISHER SENDS, and
+                # never drop one. This stamped `≥` — the card's own FLOOR
+                # glyph, defined 40 lines up — on ANY eta, so live Barnesy's
+                # PROJECTED 05-09 read as a floor; and a below-floor book
+                # whose verdict is unreachable/undecidable has eta=None, so it
+                # rendered as a bare `bot nN`, byte-identical to a book with
+                # no horizon at all. Those are precisely the two verdicts
+                # carrying an I17 keep-or-retire call, invisible on the line
+                # built to surface I17.
+                _bhv, _beta = str(h.get("verdict") or ""), h.get("eta")
+                if _beta:
+                    p += ((' &rarr;' if _bhv == "on_track" else ' &ge;')
+                          + html.escape(str(_beta)[5:]))
+                elif _bhv == "unreachable":
+                    p += ' &infin;@trend'
+                elif _bhv == "undecidable":
+                    p += ' undecidable'
+                _bwhy = h.get("why")
+                parts.append(f'<span title="{html.escape(str(_bwhy))}">{p}</span>'
+                             if _bwhy else p)
+            # (kw) made the sweep self-reporting and left every CONSUMER
+            # blind: on a dark `fetch_bot_pnl` the roster books simply vanish
+            # from this line and the footer just gets shorter — silently
+            # dropping 📊 equities-regime, the standing I17 case it exists
+            # for. `dark` is computed above the guard for that reason.
+            if parts or dark:
                 bf_line = (
                     '<div class="muted" style="font-size:.75em;padding-top:2px"'
                     ' title="Below the grader&#39;s publish floor — too few '
                     'closes to grade. Undecidable until they close trades '
                     '(I17: keep-or-retire, not another tuning pass).">'
-                    'below floor: ' + " · ".join(parts) + '</div>')
+                    + ('below floor: ' + " · ".join(parts) if parts else '')
+                    + '</div>' + dark)
         return (f'<div class="card"><h2>🚦 Go-live grader '
                 f'<span class="dot on"></span></h2>'
                 f'<div class="muted">{len(rows)} graded books · {head}{age} — '
