@@ -693,11 +693,19 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   ready/on_track/no_rate/unreachable-at-trajectory/undecidable-per-I17/
   unprojectable; every ETA a FLOOR, fail-closed, reported-not-a-bar).
   Consumers: the 🚦 card's horizon chip, the daily review's 🔭 line, the CLI
-  suffix. LIMIT, stated: books below `--min-closes` all-time (📊
-  equities-regime at 0 closes, newborn 🎸 Barnesy) are outside the payload and
-  therefore outside the horizon — payload membership is a separate contract,
-  deliberately not changed here. An era move voids every previously reported
-  date for that book; consumers re-derive each publish, never cache.
+  suffix. ~~LIMIT: books below `--min-closes` are outside the horizon~~ —
+  **SUPERSEDED THE SAME DAY by (kv), corrected in place per I12** (the limit
+  as written is now false and a reader acting on it would think 📊
+  equities-regime is unmonitored): below-floor books ride an additive
+  **`below_floor`** map — thin books get a horizon from their own sample, and
+  a **roster sweep** over `bot_pnl` catches ZERO-ledger books, fail-CLOSED on
+  liveness (`roster_admits`, I1) and excluding declared non-trading
+  publishers (`ROSTER_NON_BOOKS`, (kx) — `market-context` is a heartbeat, not
+  a book). The sweep publishes its own receipt (`roster: {scanned, admitted,
+  rejected, non_book, error}`) so sweep-DARK is never byte-identical to
+  swept-CLEAN ((kw), I4). `books` membership itself is unchanged — that
+  contract did not move. An era move voids every previously reported date for
+  that book; consumers re-derive each publish, never cache.
 - `fleet_respiration.py` 🫁 — RESPIRATION / blood-oxygen: OXYGEN = fresh
   market data; LUNGS = the venue-fetch layer. Measures SpO2 (weighted
   fraction of data feeds breathing fresh) and phone-alerts on a HYPOXIA
