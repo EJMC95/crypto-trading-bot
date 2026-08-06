@@ -12,13 +12,21 @@ Recommended options are marked ★.
 
 ---
 
-## 0 · PENDING DEPLOYS — code that is written, tested and pushed, waiting on you
+## 0 · PENDING DEPLOYS — ~~waiting on you~~ **BOTH EXECUTED 6-Aug, same day**
 
-*Added 6-Aug. Both are **restrict-only** (they can make a book trade FEWER
-things, never more) and both are already on `main`, green, mutation-verified.
-The shadow arms have them; only the marker-gated LIVE arms are waiting.*
+*Added 6-Aug by one session; executed and stamp-verified the same day by a
+parallel session running on the operator's "full permission to commit and
+deploy all positive movements" — the two sessions crossed mid-flight, so this
+section was born already-stale (corrected in place per I12). Evidence:
+`audit_code_currency` reads **every stamped container CURRENT at main HEAD**;
+0a landed via the 06:06Z + 06:22Z dispatches (live Taker carries (kt)+(ku),
+stamp `d5d03751b3ef`→`3bacbbf6037d`), 0b via the 06:06Z + shadow-arm
+dispatches (both Farmer arms on `4f998e4eec4d`, cage lo=1e5 live — the
+judge's `min-vol-1e5` experiment is unblocked). Nothing here is waiting on
+anyone; the section stays until the next daily review confirms and removes
+it.*
 
-### 0a ★ 🎫 Ticket Taker — live arm is screening against a 41-name-stale list
+### 0a ★ 🎫 Ticket Taker — ~~live arm is screening against a 41-name-stale list~~ DONE 6-Aug
 
 **What it carries:** `(kt)` + `(ku)`.
 
@@ -46,7 +54,7 @@ gh workflow run 305025607 -f services="tide-rider-lighter-live"
 now stamps the venue's instrument class on every ticket, so a newly listed
 equity is screened the moment the scout sees it.
 
-### 0b · 💸 Funding Farmer — lever cage is 17 commits stale
+### 0b · 💸 Funding Farmer — ~~lever cage is 17 commits stale~~ DONE 6-Aug
 
 **What it carries:** `(ka)`'s `min_vol` cage widening, plus `(jx)`'s
 `claim_writer` + MTM series on the real-money pair.

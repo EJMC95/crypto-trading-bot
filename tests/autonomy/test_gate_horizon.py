@@ -161,6 +161,68 @@ def test_main_publishes_horizon_key():
     calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Name) and n.func.id == "gate_horizon"]
     assert calls, "main() no longer calls gate_horizon"
+    # [(kv)] ...and the below-floor map must ride the same payload — a book
+    # too thin for `books` was invisible to the very calendar built to flag
+    # its undecidability (equities-regime at 0 closes, newborn Barnesy).
+    assert "below_floor" in keys, "main() no longer publishes below_floor"
+    ra = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+          and isinstance(n.func, ast.Name) and n.func.id == "roster_admits"]
+    assert ra, "main()'s roster sweep no longer runs the liveness filter"
+
+
+def test_roster_admits_is_fail_closed():
+    # [(kv)] I1 at the roster: a frozen bot_pnl row must not resurrect a dead
+    # book onto the go-live card. Fail-CLOSED on junk/naive/absent stamps.
+    now = _NOW
+    assert g.roster_admits(now - timedelta(hours=1), now) is True
+    assert g.roster_admits(now - timedelta(hours=49), now) is False
+    assert g.roster_admits(None, now) is False
+    assert g.roster_admits("2026-08-06", now) is False
+    # naive stamps are treated as UTC, not rejected (the DB writes UTC)
+    naive_fresh = (now - timedelta(hours=2)).replace(tzinfo=None)
+    assert g.roster_admits(naive_fresh, now) is True
+
+
+# --------------------------------------------------------------------------
+# 4b. BELOW THE FLOOR [(kv)]: the card's footer line for books too thin for
+#     `books` — present when published, absent on old payloads, junk-proof.
+# --------------------------------------------------------------------------
+
+def _bf(n_alltime, horizon):
+    return {"n_alltime": n_alltime,
+            "why_absent": "below --min-closes (10)", "horizon": horizon}
+
+
+def test_card_renders_below_floor_footer(monkeypatch):
+    thin_hz = g.gate_horizon(g.stats(_mk([0.01] * 8, span_days=8.0)),
+                             first_close=_T0, now=_NOW)
+    p = _payload({"bk": _book(_ONTRACK, None)})
+    p["below_floor"] = {
+        "band-barnes-lshadow": _bf(8, thin_hz),
+        "equities-regime-lshadow": _bf(0, {"verdict": "no_rate", "eta": None,
+                                           "why": "no closes ever"}),
+    }
+    html = _render(p, monkeypatch)
+    assert "below floor:" in html, "footer line missing"
+    assert "band-barnes-lshadow n8" in html, html
+    assert "equities-regime-lshadow n0" in html, html
+    assert "I17" in html, "the footer tooltip must carry the I17 framing"
+
+
+def test_old_payload_has_no_below_floor_footer(monkeypatch):
+    html = _render(_payload({"bk": _book(_ONTRACK, None)}), monkeypatch)
+    assert "below floor:" not in html
+
+
+@pytest.mark.parametrize("junk", [
+    "not-a-dict", 123, {}, {"x": "not-a-dict"}, {"x": {"horizon": 5}},
+    {"x": {"n_alltime": None, "horizon": {}}},
+])
+def test_card_survives_junk_below_floor(monkeypatch, junk):
+    p = _payload({"bk": _book(_ONTRACK, None)})
+    p["below_floor"] = junk
+    html = _render(p, monkeypatch)
+    assert html and "bk" in html, f"card blanked on junk below_floor {junk!r}"
 
 
 # --------------------------------------------------------------------------
