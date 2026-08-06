@@ -172,15 +172,53 @@ def test_main_publishes_horizon_key():
 
 def test_roster_admits_is_fail_closed():
     # [(kv)] I1 at the roster: a frozen bot_pnl row must not resurrect a dead
-    # book onto the go-live card. Fail-CLOSED on junk/naive/absent stamps.
+    # book onto the go-live card. Fail-CLOSED on junk/absent stamps.
     now = _NOW
     assert g.roster_admits(now - timedelta(hours=1), now) is True
     assert g.roster_admits(now - timedelta(hours=49), now) is False
     assert g.roster_admits(None, now) is False
-    assert g.roster_admits("2026-08-06", now) is False
+    assert g.roster_admits("not a stamp", now) is False
     # naive stamps are treated as UTC, not rejected (the DB writes UTC)
     naive_fresh = (now - timedelta(hours=2)).replace(tzinfo=None)
     assert g.roster_admits(naive_fresh, now) is True
+
+
+def test_roster_admits_accepts_the_publishers_real_shape():
+    # [(kw)] `fetch_bot_pnl` returns `updated_at` as an ISO STRING
+    # (`.isoformat()` inside bot_pnl_store) — the datetime-only first cut
+    # silently rejected the ENTIRE living roster and the sweep published
+    # nothing. The (hj) class, inside the change whose PR cited (hj): this
+    # fixture is the string the publisher actually emits, not the datetime
+    # the consumer's author imagined.
+    now = _NOW
+    fresh_iso = (now - timedelta(hours=1)).isoformat()
+    stale_iso = (now - timedelta(hours=72)).isoformat()
+    naive_iso = (now - timedelta(hours=2)).replace(tzinfo=None).isoformat()
+    assert g.roster_admits(fresh_iso, now) is True, \
+        "the publisher's ISO string form MUST be admitted when fresh"
+    assert g.roster_admits(stale_iso, now) is False
+    assert g.roster_admits(naive_iso, now) is True
+    # a date-only string parses; it is stale by construction here
+    assert g.roster_admits("2026-01-01", now) is False
+    # ...and the pin that keeps the two ends honest: the publisher REALLY
+    # does convert to a string (if this ever changes, the fixture above is
+    # stale and this failure names it).
+    import inspect
+    import bot_pnl_store as store
+    src = inspect.getsource(store.fetch_bot_pnl)
+    assert 'd["updated_at"].isoformat()' in src, \
+        "fetch_bot_pnl no longer stringifies updated_at — update roster_admits fixtures"
+
+
+def test_main_publishes_roster_receipt():
+    # [(kw)] scanned=0 / non-null error must be readable from the PAYLOAD —
+    # the sweep's first failure was visible only in container stdout (I4).
+    tree = ast.parse((_ROOT / "scripts" / "golive_readiness.py").read_text())
+    fn = next(n for n in tree.body
+              if isinstance(n, ast.FunctionDef) and n.name == "main")
+    keys = [k.value for n in ast.walk(fn) if isinstance(n, ast.Dict)
+            for k in n.keys if isinstance(k, ast.Constant)]
+    assert "roster" in keys, "main() no longer publishes the roster receipt"
 
 
 # --------------------------------------------------------------------------
