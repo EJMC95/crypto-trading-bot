@@ -608,6 +608,45 @@ LEVERS = {
 }
 
 
+#: [2026-08-06 (kp)] Levers this container could not express as written —
+#: {name: {"written", "clamped", "n", "since"}}. Kept as STATE, not announced
+#: once and forgotten: I4 — "never report a persistent condition with a
+#: one-shot warning". A skew persists until the image is redeployed, so it has
+#: to stay readable for as long as it is true. `skewed_levers()` is the
+#: supported read.
+_SKEW = {}
+
+
+def skewed_levers():
+    """{name: {written, clamped, n, since}} for levers this container's
+    registry cannot express — i.e. it is running an older cage than the lever's
+    author. Empty in a consistently-deployed fleet."""
+    return {k: dict(v) for k, v in _SKEW.items()}
+
+
+def _skewed(name, written, clamped, now_ts=None):
+    """True when `written` and `clamped` differ — recorded, then refused."""
+    try:
+        same = abs(float(written) - float(clamped)) < 1e-9
+    except (TypeError, ValueError):
+        same = written == clamped
+    if same:
+        _SKEW.pop(name, None)
+        return False
+    prev = _SKEW.get(name)
+    if not prev or prev["written"] != written or prev["clamped"] != clamped:
+        # Print on first sighting and on any CHANGE, not once ever.
+        print(f"[fleet_tuning] LEVER SKEW {name}: author wrote {written!r}, "
+              f"this container's cage clamps to {clamped!r} — refusing to the "
+              f"operator default. This image is running an older registry "
+              f"than the lever's author; redeploy it.", flush=True)
+        _SKEW[name] = {"written": written, "clamped": clamped, "n": 1,
+                       "since": now_ts if now_ts is not None else time.time()}
+    else:
+        prev["n"] += 1
+    return True
+
+
 def clamp(name, value):
     """Registry-checked, bounds-clamped value; None if unusable/unknown."""
     spec = LEVERS.get(name)
@@ -761,8 +800,37 @@ def get_lever(name, default, now_ts=None):
         entry = (p.get("levers") or {}).get(name)
         if not isinstance(entry, dict) or not _lever_alive(entry, now_ts):
             return default
-        v = clamp(name, entry.get("value"))
-        return default if v is None else v
+        written = entry.get("value")
+        v = clamp(name, written)
+        if v is None:
+            return default
+        # [2026-08-06 (kp)] A READ-TIME CLAMP IS A VERSION SKEW, NEVER A
+        # LEGITIMATE ADJUSTMENT — so it REFUSES rather than silently
+        # substituting a different number.
+        #
+        # `write_levers` already clamps every value against the AUTHOR's
+        # registry before it reaches the bus. So a value that needs clamping
+        # HERE can only mean the author's registry and this container's
+        # disagree: a cage moved and this image has not been redeployed. The
+        # old behaviour was `min(hi, max(lo, v))`, which quietly applied a
+        # DIFFERENT value than the author wrote and told nobody.
+        #
+        # THE LIVE INSTANCE this was written for: `(ka)` moved
+        # `{xp,live}.funding.min_vol` cage lo from 2e6 to 1e5 and filed
+        # `min-vol-1e5` in the judge's queue. Both 💸 Farmer arms are
+        # marker-gated and 17 commits behind, still carrying lo=2e6 — so when
+        # the judge reaches that candidate it would write 1e5, the container
+        # would clamp it to 2e6, and the judge would grade a thin-tier
+        # experiment the book never ran, against a value identical to the
+        # `min-vol-2e6` candidate queued beside it. An A/B measuring the wrong
+        # arm, silently, on the pipeline that feeds real money.
+        #
+        # Refusing to the OPERATOR DEFAULT is the same fail-safe direction
+        # this function already takes for a quarantined lever, a measured-bad
+        # live lever and a stale payload: when in doubt, the operator's value.
+        if _skewed(name, written, v, now_ts):
+            return default
+        return v
     except Exception:
         return default
 
@@ -970,7 +1038,17 @@ def _selftest():
     _cache.update(ts=now, payload={"updated": fresh_iso, "ttl_sec": 7200,
                                    "levers": {"gapscout.prefilter_gap": {"value": 0.9},
                                               "gapscout.extra_exchanges": {"value": "kucoin"}}})
-    assert get_lever("gapscout.prefilter_gap", 0.002, now_ts=now) == 0.0030  # clamped
+    # [2026-08-06 (kp)] WAS: `== 0.0030  # clamped`. A read-time clamp now
+    # REFUSES to the operator default instead of silently applying a value the
+    # author never wrote. This payload (0.9 against a 0.0030 cage) is written
+    # straight into the cache by hand — `write_levers` clamps against the
+    # AUTHOR's registry, so a value needing a clamp HERE can only be a version
+    # skew or a corrupted payload, and in both cases the operator's default
+    # beats a number nobody chose. Deliberate behaviour change, stated rather
+    # than absorbed.
+    assert get_lever("gapscout.prefilter_gap", 0.002, now_ts=now) == 0.002
+    assert "gapscout.prefilter_gap" in skewed_levers()
+    _SKEW.clear()
     assert get_lever("gapscout.extra_exchanges", "", now_ts=now) == "kucoin"
     assert get_lever("unknown.lever", 7, now_ts=now) == 7
     # immune QUARANTINE: a quarantined lever returns the caller's default
