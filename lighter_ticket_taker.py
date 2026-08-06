@@ -583,6 +583,27 @@ TRADFI_BASES = {s.strip().upper() for s in os.environ.get(
     "SPY,QQQ,IWM,US100,US500,SOXL,AMD,MU,HOOD,RKLB,TSLA,NVDA,AAPL,MSFT,META,"
     "GOOGL,GOOG,AMZN,COIN,MSTR,PLTR,TSM,INTC,SKHYNIX,AMAT,EWY,LITE,CRCL,BMNR,"
     "SNDK,NBIS,MRVL,ASML,BABA,DELL,ORCL,QCOM,AVGO,ARM,SMCI,SPCX,ZHIPU,CBRS,"
+    # [2026-08-06 (kq)] THE 41 THIS LIST WAS MISSING, from the venue's own
+    # `strategy_index` (see `(kj)`). NOT a regression guard — LIVE EXPOSURE,
+    # measured on the bus the day it shipped: 3 of 16 scout tickets were
+    # non-crypto instruments this list did not catch (DRAM, CXMT, CAP), and
+    # **CAP was on the `divergence` lens**. The live arm is divergence-SHORT
+    # only, runs `bull: True`, and `("divergence","short")` is in
+    # BULL_LENS_SIDES — so every live real-money entry passes through
+    # `bull_entry_ok` -> `_is_crypto`, and this screen is the ONLY thing
+    # standing between the real-money book and a short on a tokenised equity.
+    # Its own docstring is the rationale: "the divergence short edge and the
+    # breakout edge both live in CRYPTO; tradfi contaminates the read".
+    # Synced by HAND on purpose: this list stays LOCAL (see above — importing
+    # fleet_bus would drag a dependency into the lean live image, the
+    # born-dark trap), and `test_taker_tradfi_parity` pins it EQUAL to
+    # `fleet_bus.NONCRYPTO_BASES` so it cannot drift again.
+    "NZDUSD,USDCAD,USDCHF,USDHKD,USDKRW,"
+    "H100,URA,"
+    "AAOI,BB,BE,BOT,BOTZ,CRWV,DRAM,GEV,GME,IBM,NOK,NOW,QNT,STRC,TTWO,WEN,"
+    "BYD,HYUNDAIUSD,MINIMAX,POPMART,SAMSUNGUSD,SKHY,SKHYNIXUSD,SMIC,TENCENT,"
+    "XIAOMI,"
+    "ADI,ANSEM,ANTHROPIC,CAP,CXMT,FOLKS,OPENAI,UNITREE,"
     "WTI,BRENTOIL,NATGAS,USOIL,XAU,XAG,XCU,XPD,XPT,PAXG,WHEAT,CORN,"
     "USDJPY,AUDUSD,EURUSD,GBPUSD,USDCNH").split(",") if s.strip()}
 

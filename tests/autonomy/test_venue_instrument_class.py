@@ -200,14 +200,44 @@ class TestTheFailOpenContractSurvives:
         assert fleet_bus.crypto_only(held) == ["BTC", "SOL"]
 
 
-class TestTheLiveTakerLeakIsDeclaredNotForgotten:
-    """The remaining copy, pinned so it cannot be quietly assumed fixed. When
-    the operator decides the live arm should screen too, this test is what
-    tells the next reader the decision was made deliberately."""
+class TestTheTakersOwnListCannotDriftAgain:
+    """[2026-08-06 (kq)] `(kj)` left this leak OPEN and declared it, because
+    changing what a real-money book trades is an operator act. Then it was
+    measured on the live bus and it was not theoretical:
 
-    def test_the_takers_private_list_is_still_the_narrower_one(self):
+        3 of 16 scout tickets were non-crypto instruments TRADFI_BASES did not
+        catch — DRAM, CXMT and **CAP** — and CAP was on the `divergence` lens.
+
+    The live arm is divergence-SHORT only, runs `bull: True`, and
+    ("divergence","short") is in BULL_LENS_SIDES — so every live real-money
+    entry passes `bull_entry_ok` -> `_is_crypto`, and that screen was the only
+    thing between the real-money book and a short on a tokenised equity.
+
+    The list stays LOCAL by design (importing fleet_bus would drag a
+    dependency into the lean live image — the born-dark trap the taker's own
+    comment names), so the two are pinned EQUAL here instead of shared. This
+    replaces `(kj)`'s "the leak is declared, not forgotten" test, which existed
+    to fail exactly when the leak was closed.
+    """
+
+    def test_the_taker_screens_everything_the_canonical_set_does(self):
         from lighter_ticket_taker import TRADFI_BASES
-        leak = fleet_bus.NONCRYPTO_BASES - TRADFI_BASES
-        assert leak, (
-            "the taker's list now covers the canonical set — if that was "
-            "deliberate, retire this test and say so in the CHANGELOG")
+        missing = fleet_bus.NONCRYPTO_BASES - TRADFI_BASES
+        assert not missing, (
+            f"the LIVE taker would admit {sorted(missing)} — its crypto screen "
+            f"is the only gate between the real-money book and a tokenised "
+            f"equity short. Add them to TT_TRADFI_BASES' default.")
+
+    def test_and_the_canonical_set_covers_the_takers(self):
+        """Both directions: the two lists are EQUAL, so neither can drift."""
+        from lighter_ticket_taker import TRADFI_BASES
+        extra = TRADFI_BASES - fleet_bus.NONCRYPTO_BASES
+        assert not extra, f"canonical set missing {sorted(extra)}"
+
+    def test_the_three_symbols_the_incident_named(self):
+        """Names the incident rather than a synthetic case."""
+        from lighter_ticket_taker import _is_crypto
+        for sym in ("CAP", "DRAM", "CXMT"):
+            assert not _is_crypto(sym), sym
+        for sym in ("BTC", "SOL", "ZRO"):
+            assert _is_crypto(sym), sym
