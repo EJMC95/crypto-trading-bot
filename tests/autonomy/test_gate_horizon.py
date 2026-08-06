@@ -210,6 +210,24 @@ def test_roster_admits_accepts_the_publishers_real_shape():
         "fetch_bot_pnl no longer stringifies updated_at — update roster_admits fixtures"
 
 
+def test_non_book_publishers_are_declared_and_excluded():
+    # [(kx)] The receipt's first live read admitted `market-context` — a
+    # heartbeat publisher, not a book — onto the go-live card (I7: the sweep's
+    # question is satisfied structurally by any non-trading publisher). The
+    # declared set is the guard; every entry must carry a reason, and the
+    # sweep must consult it (AST pin below in the wiring test).
+    assert "market-context" in g.ROSTER_NON_BOOKS
+    for name, why in g.ROSTER_NON_BOOKS.items():
+        assert isinstance(why, str) and len(why) > 10, \
+            (name, "a declared exclusion needs a reason, not a bare name")
+    tree = ast.parse((_ROOT / "scripts" / "golive_readiness.py").read_text())
+    fn = next(n for n in tree.body
+              if isinstance(n, ast.FunctionDef) and n.name == "main")
+    names = [n.id for n in ast.walk(fn) if isinstance(n, ast.Name)]
+    assert "ROSTER_NON_BOOKS" in names, \
+        "main()'s roster sweep no longer consults the non-book set"
+
+
 def test_main_publishes_roster_receipt():
     # [(kw)] scanned=0 / non-null error must be readable from the PAYLOAD —
     # the sweep's first failure was visible only in container stdout (I4).

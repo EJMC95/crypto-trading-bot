@@ -1051,6 +1051,20 @@ HORIZON_CAP_DAYS = float(os.environ.get("HORIZON_CAP_DAYS", "90"))
 HORIZON_MIN_N_RATE = int(os.environ.get("HORIZON_MIN_N_RATE", "5"))
 HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
 
+# [2026-08-06 (kx)] NON-BOOK bot_pnl PUBLISHERS, declared with reasons — the
+# BORN_DARK_OK idiom. The roster sweep asks "living bot_pnl row with no
+# ledger rows?", and a NON-TRADING publisher satisfies that structurally
+# (I7): the receipt's first live read admitted `market-context` — the
+# dashboard's market-data compiler — onto the go-live card as an
+# "undecidable book". A new non-trading publisher that is not declared here
+# lands VISIBLY on the card's below-floor line (fail-visible, prompting the
+# addition), never silently anywhere.
+ROSTER_NON_BOOKS = {
+    "market-context": "compile_market_data — market prices for the "
+                      "dashboard's display; publishes a heartbeat row, "
+                      "holds no book",
+}
+
 
 def _fin(x, nd=2):
     """round(x, nd) if x is a finite number, else None — the I5 boundary."""
@@ -2179,7 +2193,8 @@ def main():
     # read (I4's shape): the payload showed three skip-path books and gave no
     # way to tell "roster swept clean" from "roster sweep dark". `scanned=0`
     # or a non-null `error` now says so where a consumer can see it.
-    roster_meta = {"scanned": 0, "admitted": 0, "rejected": 0, "error": None}
+    roster_meta = {"scanned": 0, "admitted": 0, "rejected": 0,
+                   "non_book": 0, "error": None}
     try:
         _rnow = datetime.now(timezone.utc)
         _seen = set(books) | set(payload_floor)
@@ -2187,6 +2202,11 @@ def main():
             roster_meta["scanned"] += 1
             _b = _r.get("bot")
             if not _b or _b in _seen or _b in retired:
+                continue
+            if _b in ROSTER_NON_BOOKS:
+                # [(kx)] declared non-trading publisher — counted so the
+                # exclusion is itself visible in the receipt.
+                roster_meta["non_book"] += 1
                 continue
             if not roster_admits(_r.get("updated_at"), _rnow):
                 roster_meta["rejected"] += 1

@@ -14,6 +14,15 @@
 
 **🎫 the Ticket Taker, structurally rather than by verdict — and that is the point of this one.** No bar, sample or position changes. What changes is the COST of the next occurrence: `(kt)` was a live real-money exposure that took a code change and a marked deploy to close, and the same class now closes itself on a scout cycle. The fleet keeps paying for hand lists that describe a venue which changes weekly; this is the second half of `(kj)`'s answer — read the fact, and then carry it to the consumers that cannot reach the library.
 
+## 2026-08-06 (kx) — THE RECEIPT'S FIRST LIVE READ CAUGHT A NON-BOOK ON THE GO-LIVE CARD: `market-context` is a heartbeat, not a book
+
+- **(kw)'s receipt earned its keep within one publish**: `roster {scanned: 23, admitted: 3}` recovered the two zero-ledger books as designed — and admitted **`market-context`**, the dashboard's market-data compiler, onto the below-floor line as an "undecidable book". The sweep's question — *living bot_pnl row with no ledger rows* — is satisfied STRUCTURALLY by any non-trading publisher (I7: a trigger a row satisfies structurally is not a measurement).
+- **Fixed with the house idiom**: `ROSTER_NON_BOOKS`, a declared exclusion set with reasons (the BORN_DARK_OK shape), consulted by the sweep and **counted in the receipt** (`non_book`) so the exclusion is itself visible. An UNDECLARED new non-trading publisher lands visibly on the card — fail-visible prompting the declaration, never silent in either direction. Tests pin: every entry carries a reason, the sweep consults the set (AST), a non-book never reaches `below_floor` while a real zero-ledger book still does (string-shape repro, assertions verified to actually execute — the first repro cut hit the (kd) empty-ledger guard and its checks never ran; caught and rebuilt with a `checked` sentinel).
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — the card stops misdescribing one.** The below-floor line now carries exactly the fleet's five thin/zero books; the receipt distinguishes swept-clean, sweep-dark, and declared-non-book at a glance.
+
 ## 2026-08-06 (kw) — THE ROSTER SWEEP REJECTED THE ENTIRE LIVING FLEET, SILENTLY: (hj) committed inside the change whose PR cited (hj)
 
 - **THE DEFECT, caught by (kv)'s own ship-narrow verification within the hour.** The first live publish carrying `below_floor` showed the three skip-path books and **zero roster catches** — 📊 equities-regime and 👩 mum, the exact zero-ledger books the sweep was built for, were absent. Root cause: **`fetch_bot_pnl` converts `updated_at` to an ISO STRING before returning** (`.isoformat()`, in bot_pnl_store, since long before the sweep existed) — and `roster_admits` accepted only `datetime`, so the fail-closed filter **rejected every row of the living roster** and the sweep published nothing, indistinguishable from "swept clean".
