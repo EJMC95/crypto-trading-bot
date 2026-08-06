@@ -100,6 +100,11 @@ MOMO_CHG_MIN = float(os.environ.get("SCOUT_MOMO_CHG_MIN", "3.0"))
 # the taker's own gates still judge every ticket — it only stops the scout
 # throwing away already-graded candidates. Registry-bounded at 15.
 TICKET_TOP_N = int(os.environ.get("SCOUT_TICKET_TOP_N", "12"))
+#: [2026-08-06 (ku)] The venue's own class for a crypto book (`strategy_index`
+#: on /api/v1/orderBookDetails). Mirrors `fleet_bus.CRYPTO_STRATEGY_INDEX` and
+#: is duplicated deliberately: this module is the PUBLISHER and must not depend
+#: on a consumer-side library to describe its own data. Pinned equal by test.
+CRYPTO_STRATEGY_INDEX = 2
 
 
 def apply_tuning():
@@ -337,6 +342,32 @@ def strategy_tickets(stats, lighter_apr, divergence=None, regimes=None):
                                   "xvenue_apr": d.get("xvenue_apr"),
                                   "vol_m": round((v.get("qvol") or 0) / 1e6, 2),
                                   "prem_bps": prem})
+    # [2026-08-06 (ku)] INSTRUMENT CLASS ON THE TICKET ITSELF — one place for
+    # all four lenses, mirroring the regime stamp below so no lens can miss it.
+    #
+    # WHY ON THE TICKET and not just in `classes`: 🎫 the Ticket Taker screens
+    # non-crypto on its live real-money path (`bull_entry_ok` -> `_is_crypto`)
+    # from a HAND LIST, because `Dockerfile.tickettaker` deliberately does not
+    # COPY `fleet_bus` — importing it would drag a dependency chain into the
+    # lean live image, the born-dark trap its own comment names. So the taker
+    # cannot read `lighter-market.classes` at all, and its list fell 41 names
+    # behind: measured 6-Aug, `DRAM`, `CXMT` and `CAP` were live tickets it
+    # would have admitted, `CAP` on the `divergence` lens the live arm trades
+    # ((kt)). Closing that took a code change and a marked real-money deploy.
+    #
+    # Stamped HERE, the same class of defect costs nothing: a newly listed
+    # tokenised equity is screened the moment the scout sees it, with no code
+    # change and no deploy on any consumer.
+    #
+    # ABSENT MEANS NO OPINION, never "crypto". The key is omitted when the
+    # venue publishes no class for the book, so a consumer falls back to its
+    # own rule rather than reading a fabricated answer — the (kj) fail-open
+    # contract, expressed as a missing key instead of a guessed value.
+    for rows in out.values():
+        for r in rows:
+            idx = (stats.get(r["sym"]) or {}).get("strategy_index")
+            if idx is not None:
+                r["noncrypto"] = int(idx) != CRYPTO_STRATEGY_INDEX
     # [2026-07-22] per-asset regime stamp (see oracle_regimes): additive,
     # only where the oracle grades the sym on its OWN tape; one place for
     # all four lenses so no lens can silently miss it.

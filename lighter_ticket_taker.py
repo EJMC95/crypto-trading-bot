@@ -699,6 +699,15 @@ def bull_entry_ok(lens, side, ticket, up=None):
     screen carries it."""
     if (lens, side) not in BULL_LENS_SIDES:
         return False
+    # [2026-08-06 (ku)] BOTH screens, and the order is deliberate. The scout
+    # now stamps `noncrypto` on every ticket from the VENUE's own class, so a
+    # newly listed tokenised equity is screened the moment the scout sees it —
+    # no code change here, no marked real-money deploy. The local hand list
+    # stays as the fallback for a ticket with no stamp (an older scout, or a
+    # book the venue does not classify): ABSENT means no opinion, never
+    # "crypto". Restrict-only — either screen may reject, neither may admit.
+    if ticket.get("noncrypto") is True:
+        return False
     if not _is_crypto(ticket.get("sym")):
         return False
     if up is None:
