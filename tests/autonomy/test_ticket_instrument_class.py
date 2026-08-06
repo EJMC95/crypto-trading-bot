@@ -104,6 +104,27 @@ class TestTheConsumerHonoursIt:
         assert not tt.bull_entry_ok(
             "divergence", "short", {"sym": "CAP", "noncrypto": True}, up=False)
 
+    def test_a_newly_listed_equity_the_hand_list_has_never_heard_of(self):
+        """THE WHOLE POINT OF THE CHANGE, and mutation-driven: the first cut
+        of this file passed with the taker IGNORING the stamp entirely,
+        because `(kt)` had just synced the local list and it caught CAP, DRAM
+        and CXMT on its own. The stamp was untested.
+
+        The separating case is the one this exists for — the venue lists a
+        tokenised equity tomorrow, the hand list has never heard of it, and
+        the stamp is the ONLY thing standing between it and the live book."""
+        assert "NEWLISTEDCO" not in tt.TRADFI_BASES, \
+            "the separating case stops separating if it is added to the list"
+        assert tt.bull_entry_ok(
+            "divergence", "short", {"sym": "NEWLISTEDCO"}, up=False), \
+            "unstamped + unknown must fail OPEN, or a new crypto book starves"
+        assert not tt.bull_entry_ok(
+            "divergence", "short",
+            {"sym": "NEWLISTEDCO", "noncrypto": True}, up=False), (
+            "the venue said non-crypto and the taker admitted it anyway — the "
+            "stamp is doing nothing and every future listing needs a marked "
+            "real-money deploy again")
+
     def test_an_unstamped_ticket_falls_back_to_the_local_list(self):
         """An older scout, or a book the venue does not classify. The hand
         list is the fallback, not dead weight."""
