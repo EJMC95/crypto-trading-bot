@@ -119,37 +119,6 @@ CANDIDATES = [
     # restrict-safe: no bar moves, no lever changes, the paired bar still
     # gates every promotion.
     {"name": "slope-gate-off",  "levers": {"xp.funding.slope_gate": 0}},
-    # [2026-07-21, corrected same day] BOTH hold-cap candidates (hold-48,
-    # and the hold-96 that briefly replaced it) are WITHDRAWN — refuted by
-    # adversarial verify against the fleet's own recorded evidence:
-    #   (1) scripts/backtest_funding_lighter.py §3b: "'hold longer' REFUTED,
-    #       recorded so nobody re-runs it" (72->720h moves funding earned by
-    #       $0.20 and makes P&L WORSE; the cap never binds — max_hold is
-    #       ~5% of exits, median hold 8h). hold-96 re-ran a recorded-refuted
-    #       hypothesis; hold-48 tests the same inert knob the other way.
-    #   (2) The lever is inert where it acts: on the Farmer twin only 2/59
-    #       closes hit max_hold — no cap value can move the paired mean by
-    #       the judge's +0.5pp bar on >=30 closes. A 7-day slot is wasted by
-    #       construction at ANY hold number.
-    #   (3) The +$46.21 decay_paid family that motivated hold-96 belongs to
-    #       the HEDGED carry bot, where the fee-payback EXIT (shipped 07-07,
-    #       FEE_PAYBACK_MARGIN) is the mechanism — an exit-architecture
-    #       question for a future candidate, not a cap number; and on a
-    #       hedged book "close only when paid" records wins by construction.
-    # [2026-07-28 D7] slope-gate-off's own evidence, and why it took the slot:
-    # the (dp) Lighter backtest refuted the slope gate ON THIS VENUE (live gate
-    # 0.05: durable-history -$14.90 vs gate-off +$34.07 @5bps; the gate is
-    # HL-validated, Lighter-NEGATIVE). That is a real prior in the supported
-    # direction, on the tape that holds the money — the thing tp-0.06 lacks.
-    # The Farmer consumes xp.funding.slope_gate in apply_levers and stamps the
-    # receipt (`bars.slope_gate`), so the skew gate can accrue.
-    #
-    # tp-0.06 keeps its slot HERE (second), on the reasoning recorded above.
-    # Its original rationale line — "take_profit IS the Farmer's
-    # measured-positive exit family (shadow 11-0 +$14.96, live 9-0 +$8.11)" —
-    # is kept verbatim on purpose: the numbers are real, the INFERENCE from
-    # them to "raise the bar" is what the 29-Jul study falsified.
-    {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
     # [2026-08-05 (jy)] min-vol-2e6 — the (ju) reserved slot, FILED. The
     # (ju) QUEUE NOTE's three gaps are closed the same day: XP_TO_LIVE
     # mapping (below), the arm's bars.min_vol receipt (apply_levers +
@@ -213,6 +182,73 @@ CANDIDATES = [
     # the arm's own SCAN_MAX_SLIP_BPS/MAX_SPREAD_BPS vetoes stay senior
     # per-book at runtime, which the harness does not model.
     {"name": "min-vol-1e5",     "levers": {"xp.funding.min_vol": 1e5}},
+    # [2026-07-21, corrected same day] BOTH hold-cap candidates (hold-48,
+    # and the hold-96 that briefly replaced it) are WITHDRAWN — refuted by
+    # adversarial verify against the fleet's own recorded evidence:
+    #   (1) scripts/backtest_funding_lighter.py §3b: "'hold longer' REFUTED,
+    #       recorded so nobody re-runs it" (72->720h moves funding earned by
+    #       $0.20 and makes P&L WORSE; the cap never binds — max_hold is
+    #       ~5% of exits, median hold 8h). hold-96 re-ran a recorded-refuted
+    #       hypothesis; hold-48 tests the same inert knob the other way.
+    #   (2) The lever is inert where it acts: on the Farmer twin only 2/59
+    #       closes hit max_hold — no cap value can move the paired mean by
+    #       the judge's +0.5pp bar on >=30 closes. A 7-day slot is wasted by
+    #       construction at ANY hold number.
+    #   (3) The +$46.21 decay_paid family that motivated hold-96 belongs to
+    #       the HEDGED carry bot, where the fee-payback EXIT (shipped 07-07,
+    #       FEE_PAYBACK_MARGIN) is the mechanism — an exit-architecture
+    #       question for a future candidate, not a cap number; and on a
+    #       hedged book "close only when paid" records wins by construction.
+    # [2026-07-28 D7] slope-gate-off's own evidence, and why it took the slot:
+    # the (dp) Lighter backtest refuted the slope gate ON THIS VENUE (live gate
+    # 0.05: durable-history -$14.90 vs gate-off +$34.07 @5bps; the gate is
+    # HL-validated, Lighter-NEGATIVE). That is a real prior in the supported
+    # direction, on the tape that holds the money — the thing tp-0.06 lacks.
+    # The Farmer consumes xp.funding.slope_gate in apply_levers and stamps the
+    # receipt (`bars.slope_gate`), so the skew gate can accrue.
+    #
+    # tp-0.06 keeps its slot HERE (second), on the reasoning recorded above.
+    # Its original rationale line — "take_profit IS the Farmer's
+    # measured-positive exit family (shadow 11-0 +$14.96, live 9-0 +$8.11)" —
+    # is kept verbatim on purpose: the numbers are real, the INFERENCE from
+    # them to "raise the bar" is what the 29-Jul study falsified.
+    #
+    # [2026-08-06 (ld)] MOVED FROM SECOND TO FOURTH — both min_vol rows now
+    # outrank it, and this applies the queue's OWN rule rather than a new one.
+    # (ju) fixed the principle — rank by PRIOR STRENGTH — when it wrote that "a
+    # negative-prior candidate must never outrank the supported
+    # (slope-gate-off) or merely-mute (tp-0.06) ones". Read forward, the same
+    # rule says a candidate with a POSITIVE measured prior must not sit BELOW a
+    # merely-mute one. (ka) all but wrote the correction itself: it placed
+    # min-vol-1e5 fourth on the grounds that its prior was "weaker than nothing
+    # above it" — while tp-0.06 sat above it. Nothing above it was stronger;
+    # the row simply took the next free slot. (jy) likewise declined to
+    # re-litigate, taking "the RESERVED slot" — a scope choice, not an argument
+    # that tp-0.06 earns second place.
+    # THE PRIORS, which is the whole argument:
+    #   * tp-0.06 — MUTE. NO take_profit value is both-halves positive at
+    #     either universe or either slip, and the universe FLIPS THE SIGN
+    #     (+$13.89 top-25 vs -$50.43 all-79): "unresolvable here".
+    #   * min-vol-2e6 — unrefuted per-tier friction prior, +3 books.
+    #   * min-vol-1e5 — own-tape replay: +$14.83, n=158, win 65.8%, BOTH
+    #     halves positive (+7.68/+10.29), robust at the tier p90 (+$7.20).
+    #     The strongest prior in this queue.
+    # WHY THE MOVE IS WORTH MAKING — a schedule fact, not a taste. The queue is
+    # SERIAL at 7-14d + 48h cooldown, so a position IS weeks. On (ju)'s own
+    # arithmetic min-vol-1e5 started ~20-Sep and resolved ~4-Oct; ahead of
+    # tp-0.06 it starts ~4-Sep. It is also the only queued candidate aimed at
+    # the binding constraint of the fleet's ONLY on-track book: 💸 the Farmer
+    # needs ~102 in-era closes for t>=2.0 against 44 today, and THROUGHPUT AT
+    # CONSTANT MEAN is the sole honest route ((kp)). The shipped 10e6 floor
+    # admits ~11 books and passes ~3; 1e5 admits 74 more.
+    # tp-0.06 IS NOT DELETED and its position is not a verdict: a mute backtest
+    # is not a negative one, and the paired live-vs-shadow bar remains
+    # independent forward evidence. Restrict-safe exactly as (ev)'s reorder
+    # was — no bar moves, no lever changes, no promotion becomes easier; only
+    # the ORDER in which questions are asked.
+    # 2e6-BEFORE-1e5 IS PRESERVED DELIBERATELY: (ka) gives a real dependency
+    # for it ("its subset verdict de-risks this one's read"), untouched here.
+    {"name": "tp-0.06",         "levers": {"xp.funding.take_profit": 0.06}},
     # [2026-08-05 (ju)] enter-gate-0.105 — the measured-friction study
     # (STUDY_MEASURED_FRICTION_2026-08-05 §3b, entry (js)) filed through
     # THIS channel.
@@ -1977,8 +2013,28 @@ def _selftest():
     # negative-prior enter-gate row: its prior is an own-tape replay with
     # both halves positive (see its CANDIDATES block) — reordering any of
     # the five reddens here.
-    assert names[:5] == ["slope-gate-off", "tp-0.06", "min-vol-2e6",
-                         "min-vol-1e5", "enter-gate-0.105"], names
+    # [2026-08-06 (ld)] tp-0.06 MOVED 2nd -> 4th, behind both min_vol rows.
+    # The pin's PURPOSE is unchanged and this is not a loosening of it: the
+    # queue is still strictly ordered by PRIOR STRENGTH, which is the rule
+    # (ju) set. What changed is that the rule is now applied to tp-0.06 as
+    # well — its prior is MUTE (no take_profit value both-halves positive;
+    # the universe flips the sign) while both min_vol rows carry positive or
+    # unrefuted priors, so it can no longer consume a ~2-week serial slot
+    # ahead of them. Full argument in the CANDIDATES comment above tp-0.06.
+    # The invariant this asserts is the ORDERING RULE, spelled out below so a
+    # future re-shuffle has to argue with the rule rather than edit a literal.
+    assert names[:5] == ["slope-gate-off", "min-vol-2e6", "min-vol-1e5",
+                         "tp-0.06", "enter-gate-0.105"], names
+    # the rule itself, asserted independently of the literal above: every
+    # static is ranked by the strength of its recorded prior, strongest first.
+    _PRIOR_RANK = {"slope-gate-off": 0,    # venue-supported ((dp))
+                   "min-vol-2e6": 1,       # unrefuted friction-tier prior
+                   "min-vol-1e5": 2,       # own-tape replay, both halves +ve
+                   "tp-0.06": 3,           # MUTE — no both-halves-positive tp
+                   "enter-gate-0.105": 4}  # tape prior AGAINST it
+    _ranks = [_PRIOR_RANK[n] for n in names[:5]]
+    assert _ranks == sorted(_ranks), \
+        f"statics must run strongest-prior-first ((ju)'s rule): {names[:5]}"
     assert "xp-tp-0.05" in names and "evil" not in names, names
     assert names.count("tp-0.06") == 1, "dup name deduped"
 
@@ -1993,7 +2049,7 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["slope-gate-off", "tp-0.06", "min-vol-2e6", "min-vol-1e5",
+    assert n2 == ["slope-gate-off", "min-vol-2e6", "min-vol-1e5", "tp-0.06",
                   "enter-gate-0.105", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
@@ -2143,22 +2199,27 @@ def _selftest():
     # next_candidate: skips done + current, name-based (pool may grow)
     # [2026-07-29 (ev)] slope-gate-off is FIRST — it is the only static with a
     # Lighter-tape prior in the supported direction (gate-on -$14.90 vs
-    # gate-off +$34.07); tp-0.06 follows, unsupported-but-not-refuted.
+    # gate-off +$34.07).
+    # [2026-08-06 (ld)] ...and the two min_vol rows follow it, ahead of the
+    # merely-mute tp-0.06 — the serial slot goes to the stronger prior, which
+    # is (ju)'s rule applied to tp-0.06 as well. Walked one slot at a time so
+    # the DRAIN ORDER is pinned, not just the list: this is what actually
+    # decides which question the fleet asks next.
     assert next_candidate(pool, [], None)["name"] == "slope-gate-off"
-    assert next_candidate(pool, ["slope-gate-off"], None)["name"] == "tp-0.06"
-    # [2026-08-05 (ju)/(jy)] the statics precede queue proposals by pool
-    # construction (statics first) — min-vol-2e6 in its (ju)-reserved slot,
-    # then enter-gate-0.105, then the incubator's xp-tp-0.05
-    assert next_candidate(pool, ["slope-gate-off", "tp-0.06"],
+    assert next_candidate(pool, ["slope-gate-off"],
                           None)["name"] == "min-vol-2e6"
-    assert next_candidate(pool, ["slope-gate-off", "tp-0.06",
-                                 "min-vol-2e6"],
+    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6"],
                           None)["name"] == "min-vol-1e5"
-    assert next_candidate(pool, ["slope-gate-off", "tp-0.06",
-                                 "min-vol-2e6", "min-vol-1e5"],
+    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6",
+                                 "min-vol-1e5"],
+                          None)["name"] == "tp-0.06"
+    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6",
+                                 "min-vol-1e5", "tp-0.06"],
                           None)["name"] == "enter-gate-0.105"
-    assert next_candidate(pool, ["slope-gate-off", "tp-0.06", "min-vol-2e6",
-                                 "min-vol-1e5", "enter-gate-0.105"],
+    # the statics precede queue proposals by pool construction (statics first)
+    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6",
+                                 "min-vol-1e5", "tp-0.06",
+                                 "enter-gate-0.105"],
                           None)["name"] == "xp-tp-0.05"
     assert next_candidate(pool, [c["name"] for c in pool], None) is None  # exhausted
 

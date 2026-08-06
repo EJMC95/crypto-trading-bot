@@ -1,0 +1,327 @@
+"""[2026-08-06 (ld)] THE DECISION DOCKET — I17's overdue keep-or-retire calls.
+
+WHY IT EXISTS. `(ks)` made the fleet's future computable per book, and nothing
+carried a verdict to a DECISION. Measured on the live payload 6-Aug: **14 of 22
+books** sat in a state I17 says must be decided (9 `unreachable`, 5
+`undecidable`) while `OPERATOR_QUEUE.md` — hand-maintained — carried three of
+them. A book could read "unreachable at trajectory" for weeks and never reach
+the operator. That is the `(gk)` shape: the rule that governs real money ran
+only when a human remembered it.
+
+THE DESIGN CONSTRAINTS THESE TESTS PIN:
+  * a verdict can flip on ONE trade, so a single reading is noise — the book
+    must hold a stuck verdict for DOCKET_DAYS;
+  * the clock RESETS when the verdict changes (two spells are not one spell);
+  * a newborn book must NOT dock for being newborn (I7 — a trigger satisfied
+    structurally is not a measurement);
+  * an unreadable prior must fail toward SILENCE, never toward "the whole
+    fleet is overdue" ((gl): a detector that cries wolf is ignored).
+"""
+import ast
+import inspect
+import math
+import sys
+import textwrap
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+import golive_readiness as G  # noqa: E402
+
+
+def iso(dt):
+    return dt.isoformat(timespec="seconds")
+
+
+T0 = datetime(2026, 8, 6, 9, 0, tzinfo=timezone.utc)
+
+
+def book(verdict, n=50, mean=-0.2, t=-2.0, era_days=60.0, raw_days=None):
+    return {"hz": {"verdict": verdict, "why": f"{verdict} at trajectory",
+                   "raw_days": raw_days},
+            "era_days": era_days, "n": n, "mean_pct": mean, "t": t}
+
+
+class TestTheClock:
+    def test_a_first_sighting_does_not_docket(self):
+        d, seen = G.decision_docket({"a": book("unreachable")}, {}, iso(T0))
+        assert d == []
+        assert seen["a"]["reason"] == "unreachable"
+        assert seen["a"]["since"] == iso(T0)
+
+    def test_it_dockets_once_held_long_enough(self):
+        start = iso(T0)
+        seen = {"a": {"reason": "unreachable", "since": start}}
+        later = iso(T0 + timedelta(days=G.DOCKET_DAYS))
+        d, _ = G.decision_docket({"a": book("unreachable")}, seen, later)
+        assert len(d) == 1
+        assert d[0]["book"] == "a"
+        assert d[0]["days_held"] == pytest.approx(G.DOCKET_DAYS, abs=0.05)
+        assert "keep-or-retire" in d[0]["asks"]
+
+    def test_it_stays_quiet_one_hour_short(self):
+        seen = {"a": {"reason": "unreachable", "since": iso(T0)}}
+        nearly = iso(T0 + timedelta(days=G.DOCKET_DAYS, hours=-1))
+        d, _ = G.decision_docket({"a": book("unreachable")}, seen, nearly)
+        assert d == []
+
+    def test_the_clock_resets_when_the_verdict_changes(self):
+        """unreachable -> undecidable is a NEW spell: the second is not
+        evidence about the first."""
+        old = iso(T0 - timedelta(days=30))
+        seen = {"a": {"reason": "unreachable", "since": old}}
+        d, new_seen = G.decision_docket({"a": book("undecidable")}, seen,
+                                        iso(T0))
+        assert d == [], "a changed verdict must restart the clock"
+        assert new_seen["a"]["since"] == iso(T0)
+        assert new_seen["a"]["reason"] == "undecidable"
+
+    def test_recovery_drops_the_book_and_its_clock(self):
+        old = iso(T0 - timedelta(days=30))
+        seen = {"a": {"reason": "unreachable", "since": old}}
+        d, new_seen = G.decision_docket({"a": book("on_track", mean=0.5, t=2.5)},
+                                        seen, iso(T0))
+        assert d == []
+        assert "a" not in new_seen, "a recovered book keeps no clock"
+
+    def test_a_long_stuck_book_reports_its_true_age(self):
+        old = iso(T0 - timedelta(days=45))
+        seen = {"a": {"reason": "unreachable", "since": old}}
+        d, _ = G.decision_docket({"a": book("unreachable")}, seen, iso(T0))
+        assert d[0]["days_held"] == pytest.approx(45.0, abs=0.05)
+
+
+class TestWhoQualifies:
+    @pytest.mark.parametrize("verdict", ["unreachable", "undecidable"])
+    def test_the_two_i17_verdicts_qualify(self, verdict):
+        stuck, reason = G._docket_stuck({"verdict": verdict})
+        assert stuck and reason == verdict
+
+    @pytest.mark.parametrize("verdict", ["ready", "on_track", "unprojectable",
+                                         None, "", "nonsense"])
+    def test_everything_else_does_not(self, verdict):
+        stuck, _ = G._docket_stuck({"verdict": verdict}, era_days=999)
+        assert not stuck
+
+    def test_a_newborn_no_rate_book_does_not_docket(self):
+        """🎸 Barnesy at n=8, days old. Docketing it would be the I7 error —
+        every new book satisfies 'no rate' structurally."""
+        stuck, _ = G._docket_stuck({"verdict": "no_rate"}, era_days=3.0)
+        assert not stuck
+
+    def test_a_no_rate_book_past_its_window_does_docket(self):
+        """I17's own wording: still undecidable at the floor AFTER its
+        window. 📊 equities-regime — 0 closes ever, alive for months."""
+        stuck, reason = G._docket_stuck({"verdict": "no_rate"},
+                                        era_days=G.GOLIVE_MIN_DAYS + 1)
+        assert stuck and reason == "no_rate_past_window"
+
+    def test_no_rate_at_exactly_the_window_qualifies(self):
+        stuck, _ = G._docket_stuck({"verdict": "no_rate"},
+                                   era_days=G.GOLIVE_MIN_DAYS)
+        assert stuck
+
+    @pytest.mark.parametrize("bad", [None, float("nan"), "60", float("inf")])
+    def test_an_unusable_era_age_never_dockets_a_no_rate_book(self, bad):
+        stuck, _ = G._docket_stuck({"verdict": "no_rate"}, era_days=bad)
+        assert not stuck, "unknown age must not read as 'had its window'"
+
+
+class TestFailSafe:
+    def test_an_empty_prior_dockets_nobody(self):
+        """The direction that matters: a lost prior must not declare the
+        whole fleet overdue."""
+        cur = {f"b{i}": book("unreachable") for i in range(14)}
+        d, seen = G.decision_docket(cur, {}, iso(T0))
+        assert d == []
+        assert len(seen) == 14, "clocks still start, they just have not run"
+
+    @pytest.mark.parametrize("junk", [None, [], "nope", 42])
+    def test_a_junk_prior_is_treated_as_empty(self, junk):
+        d, _ = G.decision_docket({"a": book("unreachable")}, junk, iso(T0))
+        assert d == []
+
+    @pytest.mark.parametrize("since", [None, "", "not-a-date", 12345])
+    def test_an_unreadable_since_never_dockets(self, since):
+        """An unparseable stamp must not become 'stuck forever' — nor 0 days,
+        which would silently reset the clock on every run."""
+        seen = {"a": {"reason": "unreachable", "since": since}}
+        d, new = G.decision_docket({"a": book("unreachable")}, seen, iso(T0))
+        assert d == []
+        assert new["a"]["since"] == iso(T0) if not since else True
+
+    def test_a_future_since_does_not_docket(self):
+        seen = {"a": {"reason": "unreachable",
+                      "since": iso(T0 + timedelta(days=5))}}
+        d, _ = G.decision_docket({"a": book("unreachable")}, seen, iso(T0))
+        assert d == []
+
+    def test_a_missing_horizon_claims_nothing(self):
+        d, seen = G.decision_docket({"a": {"hz": None, "era_days": 99}},
+                                    {}, iso(T0))
+        assert d == [] and seen == {}
+
+    def test_days_between_refuses_junk(self):
+        assert G._days_between("x", iso(T0)) is None
+        assert G._days_between(iso(T0), "x") is None
+        assert G._days_between(iso(T0 + timedelta(days=1)), iso(T0)) is None
+
+
+class TestOrderingAndContent:
+    def test_longest_stuck_comes_first(self):
+        seen = {
+            "old": {"reason": "unreachable", "since": iso(T0 - timedelta(days=40))},
+            "new": {"reason": "unreachable", "since": iso(T0 - timedelta(days=8))},
+        }
+        cur = {"old": book("unreachable"), "new": book("unreachable")}
+        d, _ = G.decision_docket(cur, seen, iso(T0))
+        assert [x["book"] for x in d] == ["old", "new"]
+
+    def test_the_entry_names_the_numbers_the_decision_needs(self):
+        seen = {"a": {"reason": "unreachable", "since": iso(T0 - timedelta(days=10))}}
+        d, _ = G.decision_docket({"a": book("unreachable", n=280, mean=-0.106,
+                                            t=-1.53)}, seen, iso(T0))
+        e = d[0]
+        assert e["n"] == 280 and e["mean_pct"] == -0.106 and e["t"] == -1.53
+        assert e["since"] and e["reason"] == "unreachable"
+
+    def test_it_is_reported_never_a_bar(self):
+        """BAR_NAMES is the published contract; the docket must not join it,
+        and grade() must not consult it."""
+        assert "docket" not in " ".join(G.BAR_NAMES).lower()
+        src = textwrap.dedent(inspect.getsource(G.grade))
+        assert "docket" not in src, "grade() must not read the docket"
+
+
+class TestTheMeasuredFleet:
+    """The 6-Aug live reading, replayed: 14 of 22 books stuck."""
+
+    LIVE = {  # (verdict, n, mean_pct, t) off bus.json golive_readiness
+        "pm-abbott-lshadow": ("unreachable", 80, -0.232, -2.15),
+        "pm-gillard-lshadow": ("unreachable", 280, -0.106, -1.53),
+        "pm-rudd-lshadow": ("unreachable", 94, -0.116, -0.95),
+        "pm-morrison-lshadow": ("unreachable", 22, -0.301, -0.54),
+        "crypto-intraday-15m-lshadow": ("unreachable", 51, -0.095, -0.40),
+        "crypto-breakout-4h-lshadow": ("unreachable", 7, -0.892, -2.06),
+        "freqtrade-dad-lshadow": ("unreachable", 7, -2.940, -2.36),
+        "lighter-perp-sniper-lshadow": ("unreachable", 14, -0.204, -0.24),
+        "perps-funding-spread-lshadow": ("unreachable", 70, -2.307, -2.00),
+        "perps-funding-lighter-lshadow": ("undecidable", 85, 0.074, 0.34),
+        "freqtrade-georgia-lshadow": ("undecidable", 79, 0.043, 0.32),
+        "pm-turnbull-lshadow": ("undecidable", 20, 0.022, 0.07),
+        "pm-albanese-lshadow": ("undecidable", 21, 0.406, 0.52),
+        "lighter-ticket-taker-lshadow": ("undecidable", 24, 0.445, 0.44),
+        # NOT stuck — the fleet's only on-track book, and a newborn
+        "perps-funding-lighter-lighter": ("on_track", 44, 0.219, 1.31),
+        "band-barnes-lshadow": ("no_rate", 8, None, None),
+    }
+
+    def _cur(self):
+        out = {}
+        for b, (v, n, m, t) in self.LIVE.items():
+            era = 3.0 if b == "band-barnes-lshadow" else 60.0
+            out[b] = {"hz": {"verdict": v, "why": v}, "era_days": era,
+                      "n": n, "mean_pct": m, "t": t}
+        return out
+
+    def test_first_run_dockets_nobody_but_clocks_everyone_stuck(self):
+        d, seen = G.decision_docket(self._cur(), {}, iso(T0))
+        assert d == []
+        assert len(seen) == 14, sorted(seen)
+        assert "perps-funding-lighter-lighter" not in seen
+        assert "band-barnes-lshadow" not in seen, \
+            "the newborn must not be clocked for being newborn"
+
+    def test_a_week_later_all_fourteen_are_overdue(self):
+        _, seen = G.decision_docket(self._cur(), {}, iso(T0))
+        later = iso(T0 + timedelta(days=G.DOCKET_DAYS))
+        d, _ = G.decision_docket(self._cur(), seen, later)
+        assert len(d) == 14
+        # gillard carries the fleet's largest stuck sample — the operator
+        # should see the numbers, not a count
+        g = next(x for x in d if x["book"] == "pm-gillard-lshadow")
+        assert g["n"] == 280 and g["t"] == -1.53
+
+    def test_the_parliament_is_six_of_them(self):
+        _, seen = G.decision_docket(self._cur(), {}, iso(T0))
+        d, _ = G.decision_docket(self._cur(), seen,
+                                 iso(T0 + timedelta(days=G.DOCKET_DAYS)))
+        pms = [x for x in d if x["book"].startswith("pm-")]
+        assert len(pms) == 6, [x["book"] for x in d]
+
+
+class TestItIsActuallyWired:
+    def test_main_collects_docket_inputs_on_both_horizon_paths(self):
+        """A docket fed by only the graded path would rebuild the very blind
+        spot (kv) closed — 📊 equities-regime lives BELOW the floor."""
+        src = textwrap.dedent(inspect.getsource(G.main))
+        assert src.count("_docket_now[bot]") == 2, \
+            "both the graded and below-floor paths must feed the docket"
+
+    def test_main_calls_decision_docket_and_publishes_it(self):
+        src = textwrap.dedent(inspect.getsource(G.main))
+        tree = ast.parse(src)
+        called = {n.func.id for n in ast.walk(tree)
+                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+        assert "decision_docket" in called
+        assert '"decision_docket": _docket' in src
+        assert '"docket_seen": _seen' in src
+
+    def test_the_prior_seen_map_is_actually_PASSED(self):
+        """STRUCTURAL, and it earned its place.
+
+        The first cut of the test above asserted only that
+        `decision_docket(...)` is CALLED, and a mutation that replaced the
+        prior argument with a literal `None` stayed GREEN — every offline
+        test builds its own prior and passes it directly, so nothing noticed
+        that main() had stopped reading the persisted one. With that mutation
+        live the clock can never accumulate: every run is a first sighting
+        and the docket is empty FOREVER, which is byte-identical to
+        "no book is overdue". So the claim is made about the CALL SITE'S
+        ARGUMENT, not the call.
+        """
+        src = textwrap.dedent(inspect.getsource(G.main))
+        calls = [n for n in ast.walk(ast.parse(src))
+                 if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                 and n.func.id == "decision_docket"]
+        assert calls, "main() no longer calls decision_docket"
+        for c in calls:
+            assert len(c.args) >= 2, ast.dump(c)
+            prior = c.args[1]
+            assert not isinstance(prior, ast.Constant), (
+                "the prior seen-map must come from the persisted payload — a "
+                "literal makes the clock unable to accumulate, and an empty "
+                "docket then reads exactly like 'nothing is overdue'")
+            # and it must actually reach for the stored key
+            assert "docket_seen" in ast.dump(prior), ast.dump(prior)
+
+    def test_the_prior_read_is_checked(self):
+        """(jz) seed class: a FAILED read must not look like 'no prior'.
+
+        STRUCTURAL — the substring version of this test passed against DEAD
+        CODE. Replacing the `hasattr(...)` guard with `False` leaves the
+        checked call sitting unreachable in the branch body, the string still
+        present, and every consumer silently back on the unchecked read. So
+        the assertion is about the GUARD, not the presence of a name.
+        """
+        src = textwrap.dedent(inspect.getsource(G.main))
+        # the GUARD itself must name the checked API — an `if False:` (or any
+        # other constant) leaves the checked call unreachable while the name
+        # still appears in the source
+        guards = [n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.If)
+                  and "load_state_checked" in ast.dump(n.test)]
+        assert guards, (
+            "no reachable guard selects the checked read — a failed prior "
+            "read then looks exactly like 'no prior', resets every clock, "
+            "and the docket is silently empty forever ((jz) seed class)")
+        for node in guards:
+            assert not isinstance(node.test, ast.Constant)
+
+    def test_the_era_age_is_used_not_the_close_span(self):
+        """(lb) established that s['days'] is the close SPAN and cannot
+        advance during a stall — it must never answer 'had its window?'."""
+        src = textwrap.dedent(inspect.getsource(G.main))
+        assert '"era_days": _era_age_d(' in src
+        assert '"era_days": s' not in src

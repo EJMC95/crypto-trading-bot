@@ -1,3 +1,122 @@
+## 2026-08-06 (ld) — TWO LEADING METRICS, NOT TWO MORE REPORTS: the serial slot goes to the strongest prior, and I17's overdue calls get a clock
+
+- *[RENUMBERED (lb) → (lc) → (ld) at push time, TWICE in one pass: two other
+  sessions in this shared tree committed their own `(lb)` and `(lc)` while this
+  was being written. `audit_changelog_letters`' cross-branch arm caught both
+  pre-push; the COMMITTED entry keeps the letter each time. Fittingly, the
+  `(lc)` that displaced this one is itself about holes in the letter index.]*
+
+*Operator: "implement the top leading metrics to success". Both items act on
+the FORWARD METRIC — books that can be graded, then go live — rather than
+adding another thing to read.*
+
+### 1 · THE JUDGE'S SERIAL QUEUE WAS SPENDING ITS BEST WEEKS ON ITS WEAKEST PRIOR
+
+- **THE QUEUE IS A SCHEDULE, AND POSITION IS WEEKS.** One candidate at a time,
+  ≥7d (max 14) plus a 48h cooldown. So the order is not a preference — it is
+  the calendar on which the fleet's only path to `live.funding.*` runs.
+- **MEASURED against the priors already recorded in the file itself:**
+  | candidate | recorded prior | was | now |
+  |---|---|---|---|
+  | `slope-gate-off` | venue-supported ((dp)) | 1 | 1 |
+  | `min-vol-2e6` | unrefuted per-tier friction, +3 books | 3 | **2** |
+  | `min-vol-1e5` | own-tape replay **+$14.83, n=158, win 65.8%, BOTH halves positive**, robust at tier p90 | 4 | **3** |
+  | `tp-0.06` | **MUTE** — no take_profit value is both-halves positive at either universe or either slip; the universe FLIPS THE SIGN | 2 | **4** |
+  | `enter-gate-0.105` | tape prior AGAINST it | 5 | 5 |
+- **THIS APPLIES THE QUEUE'S OWN RULE RATHER THAN A NEW ONE.** `(ju)` fixed the
+  principle — *"a negative-prior candidate must never outrank the supported
+  (slope-gate-off) or merely-mute (tp-0.06) ones"* — i.e. rank by PRIOR
+  STRENGTH. Read forward, that same rule says a POSITIVE prior must not sit
+  BELOW a mute one. **`(ka)` all but wrote the correction itself**, placing
+  `min-vol-1e5` fourth because its prior was *"weaker than nothing above it"* —
+  while `tp-0.06` sat above it. Nothing above it was stronger; the row took the
+  next free slot. `(jy)` likewise declined to re-litigate, taking *"the
+  RESERVED slot"* — a scope choice, not an argument that `tp-0.06` earns
+  second place. `(ev)` had already made this exact move once, on this exact
+  candidate, for this exact reason.
+- **WHAT IT BUYS, on `(ju)`'s own arithmetic**: `min-vol-1e5` was starting
+  **~20-Sep** and resolving **~4-Oct**; it now starts **~4-Sep**. It is the
+  only queued candidate aimed at the binding constraint of the fleet's ONLY
+  on-track book — 💸 the Farmer needs ~102 in-era closes for `t≥2.0` against 44,
+  and **throughput at constant mean is the sole honest route** ((kp)). The
+  shipped 10e6 floor admits ~11 books and passes ~3; 1e5 admits 74 more.
+- **`tp-0.06` IS NOT DELETED and its position is not a verdict** — a mute
+  backtest is not a negative one, and the paired bar remains independent
+  forward evidence. **2e6-before-1e5 is preserved**: `(ka)` gives a real
+  dependency for it (*"its subset verdict de-risks this one's read"*),
+  untouched here. Restrict-safe exactly as `(ev)`'s reorder was: no bar moves,
+  no lever changes, no promotion becomes easier — only the order in which
+  questions get asked.
+- **THE PIN NOW ASSERTS THE RULE, NOT A LITERAL.** The order test carried a
+  hand-written list that any future re-shuffle could simply edit. Beside it now
+  sits `_PRIOR_RANK`, asserting the statics run strongest-prior-first — so a
+  re-order has to argue with the principle. The `next_candidate` walk is
+  pinned one slot at a time, because the DRAIN ORDER is what actually decides
+  which question the fleet asks next. Both mutations red.
+
+### 2 · A COMPUTED VERDICT THAT NEVER REACHES A DECISION: THE DOCKET
+
+- **THE GAP, measured on the live payload.** `(ks)` made the fleet's future
+  computable per book. **14 of 22 books** sit in a state I17 says must be
+  decided — **9 `unreachable`, 5 `undecidable`** — while `OPERATOR_QUEUE.md`,
+  which is hand-maintained, carries **three** of them. A book can read
+  "unreachable at trajectory" for weeks and never reach the operator. That is
+  the `(gk)` shape exactly: the rule that governs real money ran only when a
+  human remembered it.
+- **`decision_docket` is the clock that makes "overdue" a measurement.** A
+  verdict can flip on one trade, so a single reading is noise: a book must hold
+  a stuck verdict for `DOCKET_DAYS` (7), and **the clock RESETS when the
+  verdict changes** — two spells are not one spell, which is why the reason is
+  stored beside the stamp rather than a bare timestamp. A recovered book leaves
+  the docket and keeps no clock.
+- **A NEWBORN MUST NOT DOCKET FOR BEING NEWBORN (I7).** `no_rate` is
+  deliberately NOT a docket verdict on its own — every young book satisfies it
+  structurally, and 🎸 Barnesy at n=8 would have led the list. It joins only
+  once the book has HAD its 30-day window and still cannot produce a rate,
+  which is I17's own wording. The window test reads **ERA AGE, never
+  `s["days"]`** — `(lb)` established hours earlier that the close SPAN cannot
+  advance during a stall, and "has this book had its window?" is precisely the
+  question a stall must not be able to answer falsely.
+- **FAIL-SAFE TOWARD SILENCE, in the direction that matters.** An unreadable
+  prior means every book looks first-seen today, so the docket comes up EMPTY
+  rather than declaring the whole fleet overdue — and the prior is read with
+  `load_state_checked` so a FAILED read carries the old docket forward instead
+  of seeding an empty one over the record ((jz) seed class). A docket that
+  cries wolf after one bad read is worse than one a week late ((gl)).
+- **BELOW-FLOOR BOOKS ARE IN IT.** 📊 equities-regime — 0 closes ever, ~17.2
+  closes/yr, the fleet's standing I17 case — lives below `--min-closes`, so a
+  docket fed only by the graded path would have rebuilt the exact blind spot
+  `(kv)` closed. Both horizon paths feed it, pinned by a source count.
+- **REPORTED, NEVER A BAR**: `BAR_NAMES` and `grade()` are untouched, nothing
+  is promoted or retired, and every entry says so in its own text —
+  *"keep-or-retire (I17) — an operator decision, not a tuning pass"*. Printed
+  with NAMED BOOKS and their numbers, never a count (I8); `(lb)` had just fixed
+  that same defect one file over.
+- **REPLAYED AGAINST THE LIVE PAYLOAD**: 22 books in, 14 clocks started, **0
+  docketed today** (correct — nothing has been observed for a week yet), and
+  all 14 overdue after seven days of the same verdicts, with 🏛️ the Parliament
+  supplying six of them. The 8 excluded are the newborn, the on-track books and
+  🌾 carry, whose window has not elapsed.
+- **Verification**: 44 docket tests, full suite, grader + judge selftests, nine
+  audits green. **8 mutations, each red** — and TWO of them only after the
+  tests were rewritten: the prior seen-map replaced by a literal `None` (the
+  clock can then never accumulate, and an empty docket reads exactly like
+  "nothing is overdue") passed a test that asserted only that the function was
+  CALLED; and the checked read hidden behind `if False:` passed a substring
+  scan **against dead code**. Both are now AST claims about the call site and
+  the guard. That is the third time in one day the substring form has let a
+  mutation through.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**💸 the Farmer — its throughput experiment moves ~16 days earlier**, onto the
+only book with an on-track ETA (~24-Aug, `t` binding). Nothing else changes
+today: no bar, no lever, no position. What the docket adds is that the fleet
+can no longer lose track of a book it has already proved cannot reach the gate
+— 14 of them, with 🏛️ the Parliament's six the largest single block, all now
+carrying a clock the operator can read instead of a queue someone has to
+remember to update.
+
 ## 2026-08-06 (la) — A FRESH KEY IS NOT A LIVING ORGAN EITHER: 🏛️ the Parliament restarted 15x in 24h unpaged, and the judge held real money on rows its own bar excludes
 
 *Daily review pass. Two live defects found by reading payloads rather than

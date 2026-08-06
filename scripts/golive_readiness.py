@@ -1135,6 +1135,32 @@ HORIZON_MIN_N_RATE = int(os.environ.get("HORIZON_MIN_N_RATE", "5"))
 HORIZON_MIN_AGE_D = float(os.environ.get("HORIZON_MIN_AGE_D", "2.0"))
 HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
 
+# --- [2026-08-06 (ld)] THE DECISION DOCKET ----------------------------------
+# (ks) made the fleet's FUTURE computable per book; nothing carried a verdict
+# to a DECISION. Measured 6-Aug: 14 of 22 books sat in a state I17 says must
+# be decided (9 `unreachable`, 5 `undecidable`) while OPERATOR_QUEUE.md carried
+# three of them — and the queue is hand-maintained, so a book can read
+# "unreachable at trajectory" for weeks and never reach the operator. That is
+# the (gk) shape exactly: the rule that governs real money ran only when a
+# human remembered it.
+#
+# The docket is REPORTED, NEVER A BAR — it promotes nothing, retires nothing
+# and changes no verdict. It answers one question: which books have been
+# undecidable long enough that I17's keep-or-retire call is overdue?
+#
+# A verdict can flip on one trade, so a single reading is noise. The book must
+# hold a stuck verdict for DOCKET_DAYS, and the clock RESETS the moment the
+# verdict changes — a book that recovers leaves the docket and starts over.
+DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
+#: Verdicts that mean "not on a path to the gate at the current trajectory".
+#: `no_rate` is deliberately NOT here unconditionally — a newborn book is
+#: legitimately rate-less (🎸 Barnesy at n=8), and docketing it would be the
+#: I7 error: a trigger a book satisfies STRUCTURALLY is not a measurement. It
+#: joins only once the book has HAD its window and still cannot produce a rate
+#: (see `_docket_stuck`), which is I17's own wording — "still undecidable at
+#: the floor after its window".
+DOCKET_VERDICTS = ("unreachable", "undecidable")
+
 # [2026-08-06 (kx)] NON-BOOK bot_pnl PUBLISHERS, declared with reasons — the
 # BORN_DARK_OK idiom. The roster sweep asks "living bot_pnl row with no
 # ledger rows?", and a NON-TRADING publisher satisfies that structurally
@@ -1488,6 +1514,103 @@ def peak_concurrency(eps):
         cur += d
         mx = max(mx, cur)
     return mx
+
+
+def _docket_stuck(hz, era_days=None):
+    """(bool, reason) — is this book off any path to the gate right now?
+
+    `unreachable` and `undecidable` are the horizon's own words for it.
+    `no_rate` qualifies ONLY once the book has already HAD its 30-day window
+    and still cannot produce a rate — I17's "still undecidable at the floor
+    after its window". Without that clause every newborn book would dock on
+    its first day, which is the I7 error (a trigger satisfied structurally
+    measures nothing) and would train the reader to ignore the docket.
+    """
+    v = (hz or {}).get("verdict")
+    if v in DOCKET_VERDICTS:
+        return True, v
+    if v == "no_rate" and isinstance(era_days, (int, float)) \
+            and math.isfinite(era_days) and era_days >= GOLIVE_MIN_DAYS:
+        return True, "no_rate_past_window"
+    return False, None
+
+
+def decision_docket(current, prior, now_iso, docket_days=None):
+    """-> (docket, seen) — books whose keep-or-retire call is overdue (I17).
+
+    PURE. `current` is {bot: {"hz": horizon, "era_days": float|None,
+    "n": int, "mean_pct": float|None, "t": float|None}}; `prior` is the last
+    published `docket_seen` map; `now_iso` is this run's stamp. Returns the
+    docket list (sorted, worst-evidenced first) and the NEW seen-map to
+    persist.
+
+    THE CLOCK IS PER (BOOK, REASON) AND RESETS ON CHANGE. A book that goes
+    unreachable -> on_track -> unreachable starts again, because the second
+    spell is not evidence about the first. Storing the reason alongside the
+    stamp is what makes that resettable; a bare timestamp could not tell the
+    two spells apart.
+
+    FAIL-SAFE TOWARD SILENCE, and deliberately in this direction: an
+    unreadable prior map means every book looks first-seen TODAY, so the
+    docket comes up EMPTY rather than declaring the whole fleet overdue. A
+    docket that cries wolf after one bad read is worse than one that is a week
+    late — the (gl) lesson, and the caller must skip the write entirely on a
+    FAILED read rather than seed over the record ((jz) seed class).
+    """
+    docket_days = DOCKET_DAYS if docket_days is None else docket_days
+    prior = prior if isinstance(prior, dict) else {}
+    seen, docket = {}, []
+    for bot in sorted(current):
+        c = current[bot] or {}
+        stuck, reason = _docket_stuck(c.get("hz"), c.get("era_days"))
+        if not stuck:
+            continue                     # not stuck -> no entry -> clock gone
+        was = prior.get(bot)
+        was = was if isinstance(was, dict) else {}
+        if was.get("reason") == reason and was.get("since"):
+            since = was["since"]
+        else:
+            since = now_iso              # new spell (or a changed reason)
+        seen[bot] = {"reason": reason, "since": since}
+        held = _days_between(since, now_iso)
+        if held is None or held < docket_days:
+            continue
+        hz = c.get("hz") or {}
+        docket.append({
+            "book": bot, "reason": reason, "since": since,
+            "days_held": round(held, 1),
+            "n": c.get("n"), "mean_pct": c.get("mean_pct"), "t": c.get("t"),
+            "raw_days": hz.get("raw_days"),
+            "why": hz.get("why") or "",
+            # I17 is a KEEP-OR-RETIRE call for the operator, never another
+            # tuning pass — say so in the entry so the docket cannot be read
+            # as a to-do list for the next session.
+            "asks": ("keep-or-retire (I17) — an operator decision, not a "
+                     "tuning pass"),
+        })
+    # worst first: longest stuck, then weakest evidence
+    docket.sort(key=lambda d: (-(d["days_held"] or 0),
+                               (d["mean_pct"] if d["mean_pct"] is not None
+                                else 0.0)))
+    return docket, seen
+
+
+def _days_between(a_iso, b_iso):
+    """Whole-and-fractional days from ISO `a` to ISO `b`; None if unreadable.
+    Unreadable stamps must not become 0 days (that would silently RESET a
+    book's clock every run) nor a huge number (that would docket it at once)."""
+    from datetime import datetime, timezone
+    try:
+        a = datetime.fromisoformat(str(a_iso).replace("Z", "+00:00"))
+        b = datetime.fromisoformat(str(b_iso).replace("Z", "+00:00"))
+    except Exception:      # noqa: BLE001
+        return None
+    if a.tzinfo is None:
+        a = a.replace(tzinfo=timezone.utc)
+    if b.tzinfo is None:
+        b = b.replace(tzinfo=timezone.utc)
+    d = (b - a).total_seconds() / 86400.0
+    return d if math.isfinite(d) and d >= 0 else None
 
 
 def book_payload(s):
@@ -2059,6 +2182,19 @@ def main():
           f"{'MDE80%':>7s}  verdict")
     print("-" * 104)
     ready, payload_books, payload_floor = [], {}, {}
+    # [(ld)] Docket inputs, collected on BOTH horizon paths (graded and
+    # below-floor) and resolved after the loop — see decision_docket.
+    _docket_now = {}
+
+    def _era_age_d(era_ep):
+        """Days since the era boundary, or None. The honest denominator for
+        'has this book had its window?' — see the note at the call site."""
+        from datetime import datetime, timezone
+        if not isinstance(era_ep, (int, float)) or not math.isfinite(era_ep):
+            return None
+        d = (datetime.now(timezone.utc).timestamp() - era_ep) / 86400.0
+        return d if d >= 0 else None
+
     # Hoisted out of the row loop: `parse_ts` is used AFTER it (by `era_rows`),
     # and a book whose every row fails to parse — or an empty one — would leave
     # the name unbound. An import inside a loop body is not a guarantee that the
@@ -2126,6 +2262,13 @@ def main():
                     era_epoch=_era_ep)
             except Exception:      # noqa: BLE001
                 hz_f = {"verdict": None, "why": "horizon unavailable"}
+            # [(ld)] Below-floor books are docket candidates too — 📊
+            # equities-regime (0 closes ever, ~17.2 closes/yr) is the fleet's
+            # standing I17 case and it lives HERE, not in `books`. Excluding
+            # them would rebuild the very blind spot (kv) closed.
+            _docket_now[bot] = {"hz": hz_f, "era_days": _era_age_d(_era_ep),
+                                "n": s.get("n", 0),
+                                "mean_pct": s.get("mean_pct"), "t": s.get("t")}
             payload_floor[bot] = {"n_alltime": s_all.get("n", 0),
                                   "why_absent": f"below --min-closes "
                                                 f"({a.min_closes})",
@@ -2200,6 +2343,13 @@ def main():
                               era_epoch=_era_ep)
         except Exception as e:      # noqa: BLE001
             hz = {"verdict": None, "why": f"horizon error: {e}"}
+        # [(ld)] Docket input. ERA AGE, never `s["days"]` — (lb) established
+        # that the close SPAN cannot advance during a stall, and "has this
+        # book had its 30-day window?" is exactly the question a stall must
+        # not be able to answer falsely.
+        _docket_now[bot] = {"hz": hz, "era_days": _era_age_d(_era_ep),
+                            "n": s.get("n", 0), "mean_pct": s.get("mean_pct"),
+                            "t": s.get("t")}
         verdict = "READY" if ok else "; ".join(fails[:2])
         flag = ""
         if ok and not ok_old:
@@ -2403,9 +2553,43 @@ def main():
         try:
             import bot_pnl_store as _store
             from datetime import datetime as _dt, timezone as _tz
+            _now_iso = _dt.now(_tz.utc).isoformat(timespec="seconds")
+            # [(ld)] THE DECISION DOCKET needs the PRIOR seen-map, and the read
+            # must distinguish "no prior" from "READ FAILED" — the (jz) seed
+            # class. A failed read must NOT be treated as "no book has ever
+            # been stuck": that would reset every clock and silently push the
+            # whole docket a week into the future, on the one organ whose job
+            # is to say a decision is overdue. On a failed read we keep the
+            # docket we cannot recompute (carry the prior payload's own values
+            # forward) rather than publish a confident empty one.
+            _docket, _seen, _docket_why = [], {}, None
+            try:
+                if hasattr(_store, "load_state_checked"):
+                    _ok_prior, _prior_pl = _store.load_state_checked(KEY)
+                else:
+                    _prior_pl, _ok_prior = _store.load_state(KEY), True
+                if _ok_prior:
+                    _docket, _seen = decision_docket(
+                        _docket_now, (_prior_pl or {}).get("docket_seen"),
+                        _now_iso)
+                else:
+                    _prior_pl = _prior_pl or {}
+                    _docket = _prior_pl.get("decision_docket") or []
+                    _seen = _prior_pl.get("docket_seen") or {}
+                    _docket_why = ("prior state unreadable — docket carried "
+                                   "forward, not recomputed")
+            except Exception as _de:      # noqa: BLE001
+                _docket_why = f"docket unavailable: {type(_de).__name__}: {_de}"
             payload = {
-                "updated": _dt.now(_tz.utc).isoformat(timespec="seconds"),
+                "updated": _now_iso,
                 "ttl_sec": TTL_SEC,
+                # [(ld)] I17's overdue keep-or-retire calls, with the clock
+                # that makes "overdue" a measurement. REPORTED, NEVER A BAR:
+                # `bar_names`/`grade()` are untouched and no verdict moves.
+                "decision_docket": _docket,
+                "docket_seen": _seen,
+                "docket_days": DOCKET_DAYS,
+                **({"docket_why": _docket_why} if _docket_why else {}),
                 "bar": {"min_days": GOLIVE_MIN_DAYS,
                         "min_closes": GOLIVE_MIN_CLOSES,
                         "min_t": GOLIVE_MIN_T, "max_dd": GOLIVE_MAX_DD},
@@ -2429,6 +2613,23 @@ def main():
             _store.save_history(KEY, payload)
             print(f"published {KEY}: {len(payload_books)} books, "
                   f"{len(ready)} ready ({'ok' if ok_pub else 'WRITE FAILED'})")
+            # [(ld)] PRINT IT — a docket nobody reads is a note, which is the
+            # thing this build exists to stop being. Named books, never a
+            # count (I8): "3 overdue" tells the operator nothing they can act
+            # on, and (lb) had just fixed exactly that in the daily review.
+            if _docket:
+                print(f"\n⚖️  DECISION DOCKET — {len(_docket)} book(s) stuck "
+                      f"≥{DOCKET_DAYS:g}d. I17: keep-or-retire is an OPERATOR "
+                      f"call, not another tuning pass.")
+                for _d in _docket:
+                    _mp = _d.get("mean_pct")
+                    _t = _d.get("t")
+                    print(f"   {_d['book']:34s} {_d['reason']:20s} "
+                          f"{_d['days_held']:>5.1f}d  n={_d.get('n')}"
+                          f"{'' if _mp is None else f'  mean={_mp:+.3f}%'}"
+                          f"{'' if _t is None else f'  t={_t:+.2f}'}")
+            elif _docket_why:
+                print(f"\n⚖️  decision docket: {_docket_why}")
         except Exception as e:      # noqa: BLE001 — a publish must never fail the grade
             print(f"publish skipped: {type(e).__name__}: {e}")
     print("Go-live remains an explicit operator act — this grades, it does not "
