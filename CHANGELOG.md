@@ -1,3 +1,55 @@
+## 2026-08-06 (le) — THE DETECTOR I SHIPPED THIS AFTERNOON READ SILENT UNDER TOTAL FAILURE: 🏛️ the worst boots were the invisible ones
+
+- **FOUND BY READING THE LIVE DATA, hours after shipping `(la)`.** Watching 🏛️
+  the Parliament's counter to see whether the new churn detector would fire, I
+  hit three consecutive samples reading `cycles: 0` (18:33, 18:43, 18:53
+  AEST) — boots that died **before completing a single cycle**. `(la)`'s rule
+  counts a RESET, i.e. `cur < last`. **`0 → 0` is not a decrease.** So the
+  boots that got nowhere at all — the worst ones — were exactly the ones the
+  sensor could not see.
+- **AND IN THE LIMIT IT IS NOT AN UNDERCOUNT BUT A BLINDNESS.** A process that
+  dies before every first cycle never regresses, so the counter sits at 0
+  forever, the key stays FRESH on every boot, and the detector reports
+  **nothing at the organ's worst possible state**. That is
+  [[convergent-metric-is-not-a-health-check]] — *"what does it read under
+  TOTAL failure?"* — built into the very detector written to catch the
+  fresh-but-dead class. Same shape as `(la)`'s own subject, one level up.
+- **MEASURED BEFORE CHANGING ANYTHING, because the fix needs a cadence
+  assumption and I did not have one.** Over 24h of real Parliament history
+  (269 samples): **245 healthy publishes, EVERY ONE ADVANCING** (min +1,
+  median +2, max +3) — and **5 stagnant transitions, ALL FIVE sitting at
+  zero**. So for a looping organ no-advance never happens while it works, and
+  at the floor it is the signature of a boot that never completed a cycle.
+  Detected 17 of a true **22**: a 23% undercount today, silence in the limit.
+- **THE FIX IS RESTRICTED TO THE FLOOR, and that restriction is the design.**
+  An organ legitimately idling at a non-zero count must stay quiet, so the new
+  arm claims nothing above `RESTART_FLOOR` (0) — the I7 discipline, since
+  "counter did not move" is satisfied structurally by anything paused.
+  `resets` and `stalls` are counted SEPARATELY so each number keeps its exact
+  meaning (observed regressions vs publishes at the floor with no cycle
+  completed) and reported together against the same 4-in-24h bar; the detail
+  line names both. The window forgets stalls exactly as it forgets resets, so
+  neither can latch.
+- **REPLAYED THROUGH THE REAL 24h HISTORY**: 17 resets + 5 stalls = **22,
+  matching the independent raw count exactly**, first crossing the bar at
+  05-Aug 23:48 AEST. **4 mutations, each red** — the stall arm removed (the
+  `(la)` blind spot restored), the arm not restricted to the floor, the stall
+  window never forgetting, and stalls excluded from the bar.
+- **THE CITATION GUARD CAUGHT ME MID-PASS**, and it is worth recording that it
+  worked: `audit_changelog_letters` failed the run because `fleet_immune.py`
+  cited `(le)` while this entry did not yet exist — *"an undocumented change
+  is the defect, not the citation"*. That arm is one `(lc)` old.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — this is a sensor correction, and the honest framing is that
+yesterday's number was wrong rather than that a book improved.** 🏛️ the
+Parliament's real restart rate is **22 in 24h, not 17**, and it has since
+accelerated to roughly one every fifteen minutes. Root cause is still
+undiagnosed; the container logs are the next step. What changed is that the
+detector can no longer go quiet at precisely the moment the organ is most
+broken.
+
 ## 2026-08-06 (ld) — TWO LEADING METRICS, NOT TWO MORE REPORTS: the serial slot goes to the strongest prior, and I17's overdue calls get a clock
 
 - *[RENUMBERED (lb) → (lc) → (ld) at push time, TWICE in one pass: two other

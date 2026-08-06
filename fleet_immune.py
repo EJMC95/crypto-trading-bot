@@ -582,6 +582,22 @@ RESTART_COUNTERS = {
 #: keep their cadence — which is exactly what was measured on 6-Aug.
 RESTART_CHURN_N = int(os.environ.get("IMMUNE_RESTART_CHURN_N", "4"))
 RESTART_WINDOW_S = float(os.environ.get("IMMUNE_RESTART_WINDOW_S", "86400"))
+#: [2026-08-06 (le)] THE FLOOR AT WHICH "NO ADVANCE" IS ITSELF THE FAULT.
+#: The (la) rule counted only a DECREASE, so a boot that died before finishing
+#: its first cycle published 0, then 0 again — and 0 -> 0 is not a decrease.
+#: MEASURED over 24h of 🏛️ Parliament history the same evening: **245 healthy
+#: publishes, every one of them ADVANCING** (min +1, median +2, max +3), and
+#: **5 stagnant transitions, all 5 sitting at zero**. So for a looping organ,
+#: no-advance never happens while it works, and at the floor it is the
+#: signature of a boot that never completed a cycle. Detected count was 17 of
+#: a true 22 — a 23% undercount, and in the limit (every boot dying before its
+#: first cycle) the counter would never regress at all and the sensor would
+#: read SILENT under TOTAL failure, which is the
+#: [[convergent-metric-is-not-a-health-check]] trap built into the very
+#: detector that exists to catch it.
+#: Restricted to the FLOOR on purpose: an organ legitimately idling at a
+#: non-zero count must stay quiet, so this claims nothing above it.
+RESTART_FLOOR = float(os.environ.get("IMMUNE_RESTART_FLOOR", "0"))
 
 
 def _dotted(payload, path):
@@ -637,20 +653,33 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
         mem = dict(seen.get(key) or {})
         resets = [float(t) for t in (mem.get("resets") or [])
                   if isinstance(t, (int, float))]
+        stalls = [float(t) for t in (mem.get("stalls") or [])
+                  if isinstance(t, (int, float))]
         last = mem.get("last")
-        if isinstance(last, (int, float)) and not isinstance(last, bool) \
-                and cur < last:
-            resets.append(float(now))
+        if isinstance(last, (int, float)) and not isinstance(last, bool):
+            if cur < last:
+                resets.append(float(now))          # a boot that got somewhere
+            elif cur == last and cur <= RESTART_FLOOR:
+                # [(le)] ...and a boot that got NOWHERE. Counted separately so
+                # each number keeps its exact meaning: `resets` are observed
+                # regressions, `stalls` are publishes at the floor with no
+                # cycle completed between them.
+                stalls.append(float(now))
         resets = [t for t in resets if now - t <= window_s]
-        seen[key] = {"last": float(cur), "resets": resets}
-        if len(resets) >= min_n:
+        stalls = [t for t in stalls if now - t <= window_s]
+        seen[key] = {"last": float(cur), "resets": resets, "stalls": stalls}
+        total = len(resets) + len(stalls)
+        if total >= min_n:
             hrs = window_s / 3600.0
+            _st = (f", {len(stalls)} of them publishing at {RESTART_FLOOR:g} "
+                   f"with no cycle completed" if stalls else "")
             out.append({
                 "organ": key,
-                "detail": (f"{label} RESTARTED {len(resets)}x in {hrs:.0f}h "
-                           f"({path} keeps resetting; now {cur:g}) — the key "
-                           f"stays FRESH on every boot, so no age check can "
-                           f"see this, and in-process state is lost each time"),
+                "detail": (f"{label} RESTARTED {total}x in {hrs:.0f}h "
+                           f"({path} keeps resetting{_st}; now {cur:g}) — the "
+                           f"key stays FRESH on every boot, so no age check "
+                           f"can see this, and in-process state is lost each "
+                           f"time"),
             })
     return out
 

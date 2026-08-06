@@ -81,6 +81,79 @@ class TestTheSensor:
             out = FI.restart_churn(_parl(50, now), seen, now)
             assert len(out) == expect, (n_resets, out)
 
+    def test_a_boot_that_never_completes_a_cycle_still_counts(self):
+        """[(le)] THE HOLE THE FIRST CUT LEFT, closed on measurement.
+
+        (la) counted only a DECREASE. A boot that dies before finishing its
+        first cycle publishes 0, and 0 -> 0 is not a decrease — so the worst
+        boots were the invisible ones. Measured over 24h of real Parliament
+        history: 245 healthy publishes, EVERY one advancing (min +1); 5
+        stagnant transitions, ALL at zero. Detected 17 of a true 22.
+        """
+        now = FI.now_ts()
+        seen = {}
+        FI.restart_churn(_parl(0, now), seen, now)          # first sighting
+        for _ in range(3):
+            out = FI.restart_churn(_parl(0, now), seen, now)
+        assert len(seen["parliament"]["stalls"]) == 3
+        assert seen["parliament"]["resets"] == []
+        assert out == [], "3 stalls is still below the 4-in-24h bar"
+        out = FI.restart_churn(_parl(0, now), seen, now)
+        assert len(out) == 1
+        assert "publishing at 0 with no cycle completed" in out[0]["detail"]
+
+    def test_it_is_not_silent_under_TOTAL_failure(self):
+        """The convergent-metric trap, asserted directly: a process that dies
+        before every first cycle never regresses, so the pre-(le) rule read
+        perfectly healthy at the organ's worst possible state."""
+        now = FI.now_ts()
+        seen = {}
+        out = []
+        for _ in range(12):                      # every publish a dead boot
+            out = FI.restart_churn(_parl(0, now), seen, now)
+        assert out, "a permanently dead loop must not read healthy"
+        assert out[0]["organ"] == "parliament"
+
+    def test_stagnation_ABOVE_the_floor_stays_quiet(self):
+        """An organ idling at a non-zero count is not restarting, and this
+        arm must claim nothing about it — the (I7) discipline."""
+        now = FI.now_ts()
+        seen = {}
+        for _ in range(12):
+            out = FI.restart_churn(_parl(57, now), seen, now)
+        assert out == []
+        assert seen["parliament"]["stalls"] == []
+
+    def test_an_advancing_counter_records_neither(self):
+        now = FI.now_ts()
+        seen = {}
+        for c in (0, 2, 4, 6, 9, 11):
+            FI.restart_churn(_parl(c, now), seen, now)
+        assert seen["parliament"]["resets"] == []
+        assert seen["parliament"]["stalls"] == []
+
+    def test_resets_and_stalls_are_counted_together_against_the_bar(self):
+        now = FI.now_ts()
+        seen = {"parliament": {"last": 5.0,
+                               "resets": [now] * 2, "stalls": [now] * 1}}
+        out = FI.restart_churn(_parl(0, now), seen, now)   # 5 -> 0 = a reset
+        assert len(out) == 1, "2 resets + 1 stall + this reset = 4"
+        assert "RESTARTED 4x" in out[0]["detail"]
+
+    def test_the_stall_window_forgets_too(self):
+        now = FI.now_ts()
+        old = now - FI.RESTART_WINDOW_S - 60
+        seen = {"parliament": {"last": 0.0, "resets": [], "stalls": [old] * 9}}
+        out = FI.restart_churn(_parl(0, now), seen, now)
+        assert out == []
+        assert len(seen["parliament"]["stalls"]) == 1     # only today's
+
+    def test_a_junk_stall_memory_does_not_crash(self):
+        now = FI.now_ts()
+        for bad in ({"parliament": {"last": 0.0, "stalls": "nope"}},
+                    {"parliament": {"last": 0.0, "stalls": [None, "t", 1]}}):
+            FI.restart_churn(_parl(0, now), dict(bad), now)
+
     def test_the_window_forgets(self):
         """Churn a week ago is not churn today, or the finding latches
         forever ([[a-permanent-ledger-makes-a-one-way-latch]])."""
