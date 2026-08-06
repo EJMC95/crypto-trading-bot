@@ -1,3 +1,26 @@
+## 2026-08-06 (ky) — `t` COUNTS TRADES; A BASKET BOOK MAKES DECISIONS. ⚖️ COUNTERWEIGHT'S 90 CLOSES ARE 24
+
+- *[RENUMBERED (kw) → (ky) at commit time: a concurrent session in this shared tree had already committed its own `(kw)` ("the roster sweep rejected the entire living fleet"), and `(kx)` was taken too. `audit_changelog_letters` caught it before the commit landed — third collision today. The COMMITTED entry keeps the letter.]*
+- **THE DEFECT IN THE BAR THAT GUARDS REAL MONEY.** `t = mean / (sd/sqrt(n))` assumes **n INDEPENDENT observations**. Several books here close a whole basket in one instant: ⚖️ Counterweight holds 10 legs and rebalances them together, so its legs share that instant's move and are far fewer decisions than trades. Treating them as independent overstates `t` by roughly `sqrt(legs-per-batch)` — and **`t >= 2.0` is the bar standing between a book and real money**.
+- **MEASURED ACROSS EVERY LIVING LEDGER**, not asserted:
+  | book | n | t_iid | t_cluster | batches | max batch | n_eff |
+  |---|---|---|---|---|---|---|
+  | ⚖️ perps-funding-spread | 90 | **−1.96** | **−1.27** | 24 | 12 | **37.6** |
+  | 🌾 perps-funding-carry-lshadow | 89 | +3.12 | +3.10 | 86 | 2 | 87.8 |
+  | 💸 perps-funding-lighter-lighter | 89 | +1.69 | +1.66 | 84 | 3 | 86.4 |
+  | 🎫 lighter-ticket-taker-lighter | 41 | +0.09 | +0.08 | 41 | 1 | 40.0 |
+  **Counterweight's effective sample is 42% of its nominal one.** Every book that does NOT batch is essentially unchanged — that inertness is the property that makes this safe to publish. On a synthetic 60-leg / 5-decision book the gap is the whole ballgame: **t_iid +9.47 vs t_cluster +2.45, n_eff 4.0**.
+- **THE REASON TO SHIP IT NOW IS 🎸 BARNESY.** Its xsect sleeve rebalances 10 legs every 24h — the identical shape — and its 30-day grade starts in September. Without this its FIRST gate reading would be inflated by construction, on a book born five days ago.
+- **REPORTED, NEVER A BAR.** `BAR_NAMES` is the published contract, `grade()` is byte-unchanged, and a test asserts the verdict is identical with the field present or absent. Making it BLOCKING is a gate re-spec and therefore an operator act — exactly as `(kg)` ruled for money. No book's verdict moves today.
+- **Estimator**: the standard cluster-sandwich for a sample mean, `SE_cr = sqrt( G/(G-1) * Σ_g (Σ_{i∈g}(x_i − x̄))² ) / n`, batched on closes within `CLUSTER_WINDOW_S = 60`. `n_eff = n·(SE_iid/SE_cr)²` — the iid sample size that would give the same SE, so it is **directly comparable to the `closes` bar** rather than a unitless index.
+- **A DEGENERACY GUARD, AND IT WAS FOUND BY A TEST FIXTURE BUILDING THE CASE BY ACCIDENT.** When every batch's deviations cancel, the between-batch variance goes to ~0 and the naive estimator reports astronomical significance — the first run printed **n_eff = 5.9e32**. That is the `(kg)` degenerate-t pathology (TP=0.05% ⇒ win 100%, t=6.1e15) surfacing in a new place. It now fails CLOSED, like the `G < 2` case: a near-zero between-batch variance is a shape this estimator cannot judge, not enormous evidence. The accidental fixture is kept as its own test.
+- **Fail-closed throughout**: `G < 2` ⇒ None; degenerate ⇒ None; any exception ⇒ None. ABSENT means "not computable", never "fine", and a reported field never breaks a grade it runs inside.
+- **Verification**: full suite green, `golive_readiness --selftest` green, replayed against all 22 living ledgers.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None today, and 🎸 Barnesy in September.** No verdict changes: Counterweight fails either way and the books near the gate barely batch. What changes is that the next basket book to approach `t = 2.0` cannot do it on legs that were one decision — and the fleet has exactly such a book, five days old, whose first grade lands next month.
+
 ## 2026-08-06 (ku) — THE INSTRUMENT CLASS RIDES ON THE TICKET: the next tokenised-equity leak costs a scout cycle, not a real-money deploy
 
 - **THE RECURRING COST `(kt)` PAID.** 🎫 the Ticket Taker screens non-crypto on its LIVE real-money path (`bull_entry_ok` → `_is_crypto`) from a HAND LIST, and that list had fallen **41 names behind**: measured on the bus 6-Aug, `DRAM`, `CXMT` and `CAP` were live tickets it would have admitted, `CAP` on the `divergence` lens — the only lens the live arm trades. Closing it took a code change to a real-money module **and a marked deploy**. The venue lists tokenised equities weekly, so that is a bill that arrives again and again.

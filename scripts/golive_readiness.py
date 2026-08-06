@@ -697,6 +697,77 @@ def era_rows(bot, rows, parse=None, detail=False):
             "policy": st_policy}
 
 
+#: [2026-08-06 (kw)] Trades closing within this window are ONE decision, not
+#: several. A cross-sectional book rebalances its whole basket at once, so its
+#: legs close in a batch and their returns share that instant's move — the
+#: single largest source of dependence in this fleet's ledgers.
+CLUSTER_WINDOW_S = 60.0
+
+
+def cluster_stats(rows, mean, sd, n):
+    """Cluster-robust view of `t`, keyed on batched CLOSES. Reported, never a
+    bar — see the note in `stats`.
+
+    WHY IT EXISTS. `t = mean / (sd/sqrt(n))` assumes n INDEPENDENT
+    observations. Several books here close a whole basket in one instant:
+    ⚖️ Counterweight holds 10 legs and rebalances them together, so its 70
+    legs are ~18 decisions. Treating them as 70 overstates `t` by roughly
+    sqrt(legs-per-batch), and `t >= 2.0` is the bar standing between a book
+    and REAL MONEY.
+
+    MEASURED at ship: Counterweight reads t_iid **-2.00** and cluster-robust
+    **-1.32**. In the significant direction that is the whole ballgame — at
+    the earliest date a daily-rebalancing book could pass, an iid t=2.00 is a
+    true t of about **0.98**.
+
+    Estimator: the standard cluster-sandwich for a sample mean,
+        SE_cr = sqrt( G/(G-1) * sum_g ( sum_{i in g} (x_i - xbar) )^2 ) / n
+    with G the number of close-batches. `n_eff` is the iid sample size that
+    would produce the same SE, i.e. n * (SE_iid/SE_cr)^2 — so it is directly
+    comparable to the `closes` bar.
+
+    Fail-CLOSED on a shape it cannot judge: G < 2 returns None rather than a
+    number, because a single cluster has no between-cluster variation and any
+    value here would be invented. Absent means "not computable", never "fine".
+    """
+    try:
+        if n < 2 or not rows:
+            return None
+        groups, cur, cur_ts = [], [], None
+        for r in rows:
+            ts = r[2]
+            if cur_ts is None or (ts - cur_ts).total_seconds() <= CLUSTER_WINDOW_S:
+                cur.append(r[0])
+                cur_ts = cur_ts if cur_ts is not None else ts
+            else:
+                groups.append(cur)
+                cur, cur_ts = [r[0]], ts
+        if cur:
+            groups.append(cur)
+        g = len(groups)
+        if g < 2:
+            return None
+        meat = sum((sum(x - mean for x in grp)) ** 2 for grp in groups)
+        se_cr = math.sqrt((g / (g - 1.0)) * meat) / n
+        se_iid = sd / math.sqrt(n)
+        # DEGENERACY GUARD. When the batches' deviations cancel, `meat` goes to
+        # ~0 and this would report an astronomically large `t_cluster` and
+        # `n_eff` — the same degenerate-t pathology (kg) measured at the TP
+        # limit (win 100%, t=6.1e15). Found by a test fixture that built the
+        # exactly-cancelling case by accident. A near-zero between-batch
+        # variance is not evidence of enormous significance; it is a shape
+        # this estimator cannot judge, so it fails CLOSED like the G<2 case.
+        if not (se_cr > 0) or se_cr < se_iid * 1e-6:
+            return None
+        return {"n_clusters": g,
+                "max_batch": max(len(x) for x in groups),
+                "t_cluster": round(mean / se_cr, 2),
+                "n_eff": round(n * (se_iid / se_cr) ** 2, 1),
+                "window_s": CLUSTER_WINDOW_S}
+    except Exception:      # noqa: BLE001 — a reported field never breaks a grade
+        return None
+
+
 def stats(rows, book_usd=None):
     """Grade one book from its closed-trade rows.
 
@@ -718,6 +789,7 @@ def stats(rows, book_usd=None):
     var = sum((x - mean) ** 2 for x in pct) / n
     sd = math.sqrt(var) or 1e-12
     t = mean / (sd / math.sqrt(n))
+    clus = cluster_stats(rows, mean, sd, n)
     mid = n // 2
     h1 = sum(r[1] or 0 for r in rows[:mid])
     h2 = sum(r[1] or 0 for r in rows[mid:])
@@ -729,6 +801,12 @@ def stats(rows, book_usd=None):
     wins = sum(1 for x in pct if x > 0)
     realised = sum(r[1] or 0 for r in rows)
     out.update(days=days, mean_pct=mean, t=t, h1=h1, h2=h2,
+               # [2026-08-06 (kw)] The cluster-robust read of `t`, beside it.
+               # REPORTED, NEVER A BAR: `BAR_NAMES` is the published contract
+               # and `grade()` is byte-unchanged, exactly as (kg) did with
+               # money. Making it BLOCKING is a gate re-spec and therefore an
+               # operator act. None when it cannot be computed (< 2 batches).
+               cluster=clus,
                win_rate=wins / n, max_dd_usd=dd,
                max_dd_frac=abs(dd) / book_usd if book_usd else None,
                realised_usd=realised,
