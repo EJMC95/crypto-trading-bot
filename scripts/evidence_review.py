@@ -57,6 +57,28 @@ CA = "closed_at::timestamptz"
 START_EQUITY = 1000.0    # $1,000 per book, no top-ups (CLAUDE.md)
 ALERT_WINDOW_D = 7
 
+# [2026-08-06 — I1, LIVENESS BEFORE SEMANTICS] How old the dislocation census
+# publisher may be before its CONTENT stops meaning anything.
+#
+# THE INCIDENT this names: 🧲 Snap Back was RETIRED 4-Aug ((jh)), so
+# `bot_state['lighter-dislocation-lshadow']` froze at its last write. This
+# verifier then read the frozen payload's per-symbol `last_iso` fields, found
+# them inside the 7-day alert window, and published **33 of 37 alerts as
+# "active"** every morning — a dead book's last words, re-certified daily into
+# the operator's 🔔 EVIDENCE banner. The smoking gun was one character: the
+# section wrote `st, _ = load_state(...)` and DISCARDED the publisher's own
+# `updated_at`. A frozen census and a live one are byte-identical if you only
+# compare content; the timestamp is the sole thing that separates them.
+#
+# DERIVED, not taste: the publisher's loop is 90s
+# (`lighter_dislocation_bot.LOOP_SECONDS`) and its retired-idle path sleeps
+# 3600s. 6h is 240x the live cadence and 6x the idle sleep, so it cannot fire
+# on a merely slow loop, and it fires unambiguously on a dead one (the census
+# was 23.5h stale when this shipped). Generous on purpose: the cost of a false
+# "stale" is one day of a re-verifiable alert, the cost of a false "active" is
+# the fleet acting on a corpse.
+CENSUS_STALE_H = 6.0
+
 # [LOAD-BEARING — 2026-07-30] The go-live gate is NOT re-implemented here. It is
 # imported from `scripts/golive_readiness.py`, the canonical grader CLAUDE.md
 # names, so the two can never drift.
@@ -379,6 +401,42 @@ def load_state(cur, key):
     return (json.loads(s) if isinstance(s, str) else s), u
 
 
+def census_publisher_age_h(updated_at, now):
+    """Hours since the dislocation census was last WRITTEN, or None.
+
+    None means "cannot tell" — a missing row, a null stamp, or anything
+    unparseable. Kept distinct from a number so the caller can fail SAFE
+    (see `census_is_dark`) instead of treating an unknown age as fresh.
+    """
+    if updated_at is None:
+        return None
+    try:
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=dt.timezone.utc)
+        return (now - updated_at).total_seconds() / 3600.0
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def census_is_dark(age_h):
+    """True when the census may no longer be read as current.
+
+    FAIL-SAFE (age unknown => dark): an unreadable stamp is exactly the state
+    a frozen publisher presents, and I1's whole lesson is that content cannot
+    distinguish the two. Marking a live alert `stale` costs one day of a
+    re-verifiable verdict; marking a dead one `active` is what this closes.
+    """
+    return age_h is None or age_h > CENSUS_STALE_H
+
+
+def census_dark_note(age_h):
+    """The operator-facing reason, naming the object to act on (I8)."""
+    age = "age unknown" if age_h is None else f"{age_h:.1f}h stale"
+    return (f"dislocation census publisher `lighter-dislocation-lshadow` is "
+            f"{age} (> {CENSUS_STALE_H:.0f}h) — 🧲 Snap Back was retired 4-Aug "
+            f"(jh), so this alert is frozen history, not a live condition")
+
+
 class Section:
     """Fail-soft section wrapper — a throwing section costs its own output only.
 
@@ -420,13 +478,28 @@ def verify_alerts(cur, errors):
             latest[k] = a
 
     census = {}
+    census_age_h = None
     with Section(errors, "disloc-census"):
-        st, _ = load_state(cur, "lighter-dislocation-lshadow")
+        # [I1] Read the publisher's OWN age BEFORE its content. `updated_at` is
+        # the second return value and was previously discarded — see
+        # CENSUS_STALE_H for the incident that cost.
+        st, updated_at = load_state(cur, "lighter-dislocation-lshadow")
         census = (st or {}).get("census") or {}
+        census_age_h = census_publisher_age_h(updated_at, now)
+
+    census_dark = census_is_dark(census_age_h)
 
     for key, a in sorted(latest.items()):
         kind = alert_key_kind(key)
         try:
+            # [I1] A dark publisher invalidates every verdict derived from its
+            # payload, whatever the payload says. Both kinds below read the
+            # SAME frozen `census` dict, so both are gated here rather than in
+            # one branch — a check that covers one reader of a dead source and
+            # not the other is the hole, not the fix.
+            if census_dark and kind in ("disloc", "census"):
+                verdicts.append((key, "stale", census_dark_note(census_age_h)))
+                continue
             if kind == "disloc":
                 sym = key.split(":", 1)[1]
                 claim_bps, claim_n = parse_disloc_msg(a.get("msg"))
@@ -708,9 +781,28 @@ def arm_drift_line(name, live, shadow):
                 f"live {bl} (n={nl}) vs shadow {bs} (n={ns}) — a different "
                 "count means different COPY sets ((fd)); compare against each "
                 "image's own Dockerfile before calling it drift")
+    # [2026-08-06] The CONSEQUENCE is not derivable from the stamps, so it is
+    # no longer asserted. This is (ke)'s category error one function down: that
+    # entry fixed `head_drift_line` for stamp-vs-repo and explicitly left this
+    # line — *"it does not yet CLASSIFY inside the review"* — still asserting
+    # "the shadow arm is not a clean control".
+    #
+    # MEASURED the morning this shipped: the two Taker arms drifted by exactly
+    # two commits, (kh) and (ki). Neither touches `lighter_ticket_taker.py` —
+    # the diff is `bot_pnl_store.py` (a PUBLISHER) and an additive `fleet_bus`
+    # helper the taker never calls. The arms' trading logic was byte-identical,
+    # so the control was sound and the line was wrong about the one thing it
+    # asserted. The differing code still mattered, but for a different reason
+    # (the live arm lacked the (kh) I5 fix), which is a DEPLOY question.
+    #
+    # A stamp difference is a FACT; whether it changes what the bot DOES is a
+    # verdict only `audit_code_currency` can give (BEHIND-OWN = the gap changes
+    # the bot's own entry file). State the fact, name the authority, stop.
     return (f"🧬 {name} arms DRIFT: live {bl} vs shadow {bs} (both n={nl}, so "
-            "this is code, not file set) — the shadow arm is not a clean "
-            "control while this holds")
+            "shared-module code differs, not the file set) — whether the arms' "
+            "own logic differs is `scripts/audit_code_currency.py`'s call "
+            "(BEHIND-OWN), not this line's; a shared-module-only gap leaves "
+            "the control sound and is a deploy question")
 
 
 def repo_build(entry):
@@ -864,12 +956,33 @@ def action_items(evidence):
     return out
 
 
+def sydney_stamp(iso_utc):
+    """'<Sydney local> (<UTC>)' — never a bare UTC time in operator-facing text.
+
+    CLAUDE.md: *"ALWAYS give Eamon Sydney-local times ... Never hand him a bare
+    UTC time"*, while fleet INTERNALS stay UTC. This report is the operator's
+    surface, so it carries BOTH: Sydney to read, UTC to join against ledgers.
+    The FILENAME deliberately stays UTC-dated — it is the series key, and
+    re-dating it would fork the report history mid-stream.
+
+    Degrades to the UTC string it was given if the zone database is absent, so
+    a slim container never loses the stamp altogether.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        t = dt.datetime.fromisoformat(iso_utc).astimezone(
+            ZoneInfo("Australia/Sydney"))
+        return f"{t:%Y-%m-%d %H:%M} {t:%Z} (Sydney) · {iso_utc} UTC"
+    except Exception:  # noqa: BLE001
+        return iso_utc
+
+
 def write_report(payload, repo_root):
     day = payload["reviewed_at"][:10]
     path = os.path.join(repo_root, "reports", f"evidence_review_{day}.md")
     act = action_items(payload["new_evidence"])
     lines = [f"# Evidence Review — {day}", "",
-             f"_Reviewed {payload['reviewed_at']}._", ""]
+             f"_Reviewed {sydney_stamp(payload['reviewed_at'])}._", ""]
     if act:
         lines += ["## ⚠️ ACTION — needs an operator decision", ""]
         lines += [f"- {e}" for e in act] + [""]
@@ -959,6 +1072,72 @@ def selftest():
         == (315.0, 82)
     assert parse_disloc_msg("no numbers here") == (None, None)
     assert parse_disloc_msg(None) == (None, None)
+
+    # ---- I1: LIVENESS BEFORE SEMANTICS on the dislocation census ----------
+    # [2026-08-06] THE INCIDENT: 🧲 Snap Back retired 4-Aug (jh); its census
+    # key froze; this verifier read the frozen payload's CONTENT — per-symbol
+    # `last_iso` values still inside the 7-day alert window — and certified
+    # **33 of 37 alerts "active"** every morning, because it discarded the
+    # publisher's own `updated_at`. Measured at the time of the fix: the
+    # publisher was 23.5h stale and every disloc verdict read "active".
+    _now = dt.datetime.now(dt.timezone.utc)
+
+    # the age arithmetic itself
+    assert census_publisher_age_h(None, _now) is None
+    _fresh = _now - dt.timedelta(hours=1.0)
+    assert abs(census_publisher_age_h(_fresh, _now) - 1.0) < 0.01
+    _dead = _now - dt.timedelta(hours=23.5)          # the measured incident
+    assert abs(census_publisher_age_h(_dead, _now) - 23.5) < 0.01
+    # naive stamps are treated as UTC, not crashed on
+    assert census_publisher_age_h(
+        (_now - dt.timedelta(hours=2)).replace(tzinfo=None), _now) is not None
+
+    # the verdict, with the boundary pinned on BOTH sides — a one-sided check
+    # passes against `>=` and against a constant moved to 24h, which is
+    # exactly how this defect would return.
+    assert census_is_dark(23.5), "the incident itself must read DARK"
+    assert census_is_dark(CENSUS_STALE_H + 0.1), "just past the bound is dark"
+    assert not census_is_dark(CENSUS_STALE_H - 0.1), "just inside is NOT dark"
+    assert not census_is_dark(0.05), "a live 90s-loop publisher is never dark"
+    assert census_is_dark(None), "FAIL-SAFE: an unknown age must read DARK"
+    # a bound loose enough to admit the corpse is not a bound
+    assert CENSUS_STALE_H < 23.5, \
+        "CENSUS_STALE_H must be tighter than the incident it exists to catch"
+
+    # the operator-facing note names the object to act on (I8)
+    _note = census_dark_note(23.5)
+    assert "lighter-dislocation-lshadow" in _note, "name the publisher"
+    assert "23.5h" in _note and "retired" in _note
+    assert "age unknown" in census_dark_note(None)
+
+    # ---- operator-facing times are Sydney-local, never bare UTC -----------
+    # CLAUDE.md standing rule. The UTC string must SURVIVE alongside it (the
+    # ledgers join on UTC), so this pins both halves rather than a swap.
+    _s = sydney_stamp("2026-08-05T21:46:47+00:00")
+    assert "2026-08-06 07:46" in _s, f"Sydney local missing/wrong: {_s}"
+    assert "Sydney" in _s and "2026-08-05T21:46:47+00:00" in _s, _s
+    # AEDT side of the DST boundary (Jan = UTC+11), so the offset is not
+    # hardcoded to winter
+    assert "2026-01-15 11:00" in sydney_stamp("2026-01-15T00:00:00+00:00")
+
+    # ...AND THE WIRING, through the REAL `write_report`. Pinning the helper
+    # alone left a mutation alive: reverting the header to a bare
+    # `payload['reviewed_at']` kept this selftest green, because a correct
+    # function nothing calls is exactly the inert-enforcement shape (iz) cost a
+    # dead MTM bar. Render the file and read the header back.
+    import tempfile
+    with tempfile.TemporaryDirectory() as _td:
+        os.makedirs(os.path.join(_td, "reports"))
+        _p = write_report({"reviewed_at": "2026-08-05T21:46:47+00:00",
+                           "verdicts": [], "new_evidence": [],
+                           "summary": "s", "errors": []}, _td)
+        _hdr = open(_p).read().split("\n")[2]
+        assert "Sydney" in _hdr and "2026-08-06 07:46" in _hdr, \
+            f"report header is not Sydney-local: {_hdr!r}"
+        assert "2026-08-05T21:46:47+00:00" in _hdr, \
+            f"report header dropped the UTC join key: {_hdr!r}"
+        # the FILENAME stays UTC-dated — the series key must not fork
+        assert _p.endswith("evidence_review_2026-08-05.md"), _p
 
     # tstat
     assert tstat([1.0]) is None, "n=1 is undefined"

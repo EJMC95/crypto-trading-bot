@@ -534,10 +534,39 @@ def test_headroom_fails_closed_on_an_unreadable_count():
 def test_arm_drift_reports_code_drift_when_the_file_counts_match():
     er, _ = _import_both()
     line = er.arm_drift_line("Taker", ("0b30b0a79211", "15"), ("d012822f3ea0", "15"))
-    assert "DRIFT" in line and "not a clean control" in line, line
+    assert "DRIFT" in line, line
     assert "file set" in line.lower(), (
         "a real drift line must say the file counts matched, so the reader "
         "knows the (fd) explanation was ruled out: " + line)
+
+
+# [2026-08-06] ...but it must NOT assert what the drift MEANS.
+#
+# This test previously required the string "not a clean control", pinning an
+# over-claim: whether differing code changes what a bot DOES is not derivable
+# from two build stamps. MEASURED the morning this changed — the two Taker
+# arms drifted by (kh) and (ki), neither of which touches
+# `lighter_ticket_taker.py`; the diff was `bot_pnl_store.py` and an additive
+# `fleet_bus` helper, so the arms' trading logic was byte-identical and the
+# control was sound. Same category error (ke) fixed in `head_drift_line` and
+# explicitly left open here.
+def test_arm_drift_states_the_fact_and_names_the_authority_not_a_verdict():
+    er, _ = _import_both()
+    line = er.arm_drift_line("Taker", ("0b30b0a79211", "15"), ("d012822f3ea0", "15"))
+    assert "not a clean control" not in line, (
+        "the consequence is not derivable from stamps — state the fact, name "
+        "the authority: " + line)
+    assert "audit_code_currency" in line, (
+        "a line that refuses the verdict must name who can give it: " + line)
+    # (ke)'s own trap: prose ABOUT the class must not trip the ACTION matcher,
+    # which keys on the verdict LABEL `BEHIND-OWN:` (with the colon).
+    assert "BEHIND-OWN:" not in line, (
+        "naming the classifier's verdict with its colon makes the disclaimer "
+        "page as the finding — the exact (ke) collision: " + line)
+    # it must still SURFACE: removing the false verdict is not the same as
+    # hiding a real-money-adjacent fact.
+    assert line in er.action_items([line]), (
+        "arm drift must still reach the operator: " + line)
 
 
 def test_arm_drift_does_not_cry_drift_on_a_different_file_set():
