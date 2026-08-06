@@ -1297,7 +1297,24 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
                         + (f"window floor {eta} (opens, not passes)"
                            if eta else "no era/close to floor a window on")))
         return out
-    rate = n / age_d
+    # [(la)] THE RATE'S DENOMINATOR IS THE WHOLE OBSERVED ERA, not the tail
+    # after the first close. `era_rows` keys an era on the OPEN, so a book
+    # that HOLDS necessarily takes one holding period to produce its first
+    # in-era close — and measuring the rate from that close prices the wait
+    # out of existence. MEASURED: 🌾 carry holds 65-70h, so at n>=5 its rate
+    # would read 2-3x its true throughput, on the fleet's ONLY go-live
+    # candidate, published as a confident `on_track` date. Same I1 argument
+    # as close-span vs age: the denominator must contain the quiet part.
+    rate_base = fc
+    if isinstance(era_epoch, (int, float)) and math.isfinite(era_epoch):
+        try:
+            _e = datetime.fromtimestamp(era_epoch, tz=timezone.utc)
+            if _e < rate_base:
+                rate_base = _e
+        except (OverflowError, OSError, ValueError):
+            pass                      # junk epoch: keep the first-close base
+    rate_age_d = (now - rate_base).total_seconds() / 86400.0
+    rate = n / (rate_age_d if rate_age_d > 0 else age_d)
     out["rate_cpd"] = _fin(rate, 2)
 
     mean = s.get("mean_pct")
@@ -1317,7 +1334,16 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
 
     per_bar = {}
     if not bars["window"]:
-        per_bar["window"] = max(0.0, GOLIVE_MIN_DAYS - age_d)
+        # [(la)] THE WINDOW BAR IS A SPAN, AND A SPAN NEEDS A CLOSE TO ADVANCE.
+        # `bar_map` reads `s["days"]` = the CLOSE SPAN (last close − first),
+        # which cannot grow on its own: it moves only when a NEW close lands.
+        # Projecting it as pure calendar (`30 − age_d`) therefore published
+        # `eta = TODAY` for a STALLED 5/6 book — the exact "waiting only on
+        # the window" shape the operator reads as lead time, on a book that
+        # had not traded in 12 days. This is the I1 stall class the rate
+        # denominator was already fixed for; the window projection was not.
+        # Floor at the expected wait for one more close.
+        per_bar["window"] = max(GOLIVE_MIN_DAYS - age_d, 1.0 / rate)
     if not bars["closes"]:
         per_bar["closes"] = max(0.0, (GOLIVE_MIN_CLOSES - n) / rate)
     t = s.get("t")
@@ -2086,8 +2112,17 @@ def main():
             # world changes shape. Fail-soft: a horizon error here loses one
             # annotation, never the grade.
             try:
+                # [(la)] SAME maxDD BASIS AS THE GRADED PATH. This called
+                # `gate_horizon` on the RAW stats while the graded path (below)
+                # folds MTM in first — so `bars["maxdd"]` meant two different
+                # things either side of `--min-closes`, and the below-floor
+                # side used the realised-only definition I9 exists to replace.
+                # A thin book with a blown MTM drawdown would read `on_track`
+                # with a date instead of `unreachable`. Inside the fail-soft
+                # try, so a series read failure still costs one annotation.
                 hz_f = gate_horizon(
-                    s, first_close=(parsed[0][2] if parsed else None),
+                    apply_mtm(s, mtm_drawdown(equity_series(bot))),
+                    first_close=(parsed[0][2] if parsed else None),
                     era_epoch=_era_ep)
             except Exception:      # noqa: BLE001
                 hz_f = {"verdict": None, "why": "horizon unavailable"}
@@ -2321,17 +2356,33 @@ def main():
                 roster_meta["rejected"] += 1
                 continue
             roster_meta["admitted"] += 1
+            # [(la)] DERIVE THE WORDING FROM THE NUMBER, never assert it. This
+            # branch's real predicate is "absent from `fetch_paper_trades`",
+            # which is NOT the same claim as "no closes ever" — `n_alltime`
+            # comes from the bot_pnl summary and can disagree three ways: a
+            # poller-published row that writes no paper_trades, a book whose
+            # closes all fall outside the fetch's 20k newest-first window, and
+            # a book whose every retained row is quarantined. When they
+            # disagree the mismatch is a real FINDING (the sample the gate
+            # would grade does not exist), not a contradiction to paper over.
+            _n_all = int(_r.get("closed_trades") or 0)
+            _why = ("no closes ever — undecidable until the book closes "
+                    "trades (I17: keep-or-retire, not another tuning pass)"
+                    if _n_all == 0 else
+                    f"bot_pnl reports {_n_all} closes but the ledger holds "
+                    "none for this book — the sample the gate would grade "
+                    "does not exist (poller-only, outside the fetch window, "
+                    "or fully quarantined)")
             payload_floor[_b] = {
-                "n_alltime": int(_r.get("closed_trades") or 0),
-                "why_absent": "no closed trades in the ledger",
+                "n_alltime": _n_all,
+                "why_absent": ("no closed trades in the ledger" if _n_all == 0
+                               else "no LEDGER rows despite a non-zero "
+                                    "bot_pnl close count"),
                 "horizon": {"verdict": "no_rate", "eta": None,
                             "eta_days": None, "eta_kind": None,
                             "eta_conf": None, "binding": None, "blockers": [],
                             "rate_cpd": None, "n_req_t": None,
-                            "raw_days": None,
-                            "why": "no closes ever — undecidable until the "
-                                   "book closes trades (I17: keep-or-retire, "
-                                   "not another tuning pass)"}}
+                            "raw_days": None, "why": _why}}
     except Exception as e:      # noqa: BLE001 — annotations only, never the grade
         roster_meta["error"] = f"{type(e).__name__}: {e}"
         print(f"roster sweep skipped: {type(e).__name__}: {e}")
