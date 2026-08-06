@@ -1062,6 +1062,27 @@ def _fin(x, nd=2):
         return None
 
 
+def roster_admits(updated_at, now, max_age_h=48.0):
+    """Fail-CLOSED admission for the zero-ledger roster sweep [(kv)].
+
+    A bot_pnl row with no parseable, sufficiently fresh `updated_at` is NOT a
+    living book (I1: liveness before semantics — a frozen row and a healthy
+    one are byte-identical if you compare content). Dead publishers are the
+    watchdog's jurisdiction; admitting one here would resurrect it on the
+    go-live card. Pure so the offline suite can redden a fail-open mutation —
+    the first cut of this filter lived inline in main()'s DB path, where a
+    deleted check survived the whole suite."""
+    from datetime import datetime, timedelta, timezone
+    if not isinstance(updated_at, datetime) or not isinstance(now, datetime):
+        return False
+    u = updated_at if updated_at.tzinfo else \
+        updated_at.replace(tzinfo=timezone.utc)
+    try:
+        return (now - u) <= timedelta(hours=max_age_h)
+    except TypeError:
+        return False
+
+
 def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     """-> the horizon dict for one era-scoped sample. Pure and offline.
 
@@ -1872,7 +1893,7 @@ def main():
           f"{'win%':>6s} {'maxDD%':>7s} {'net$':>8s} {'$/day':>8s} "
           f"{'MDE80%':>7s}  verdict")
     print("-" * 104)
-    ready, payload_books = [], {}
+    ready, payload_books, payload_floor = [], {}, {}
     # Hoisted out of the row loop: `parse_ts` is used AFTER it (by `era_rows`),
     # and a book whose every row fails to parse — or an empty one — would leave
     # the name unbound. An import inside a loop body is not a guarantee that the
@@ -1917,6 +1938,24 @@ def main():
         # silently REMOVE the frontrunner from the report instead of demoting it.
         s, s_all = stats(parsed), stats(parsed_all)
         if s_all.get("n", 0) < a.min_closes:
+            # [2026-08-06 (kv)] BELOW THE FLOOR IS NOT INVISIBLE ANY MORE.
+            # `continue` used to be the whole story, and it hid exactly the
+            # books the horizon exists to flag: newborn 🎸 Barnesy accrued its
+            # first closes off-payload, and the clearest I17 cases sat where
+            # no consumer could see them. `books` membership is UNCHANGED —
+            # this is a separate additive map, so no existing consumer's
+            # world changes shape. Fail-soft: a horizon error here loses one
+            # annotation, never the grade.
+            try:
+                hz_f = gate_horizon(
+                    s, first_close=(parsed[0][2] if parsed else None),
+                    era_epoch=_era_ep)
+            except Exception:      # noqa: BLE001
+                hz_f = {"verdict": None, "why": "horizon unavailable"}
+            payload_floor[bot] = {"n_alltime": s_all.get("n", 0),
+                                  "why_absent": f"below --min-closes "
+                                                f"({a.min_closes})",
+                                  "horizon": hz_f}
             continue
         # [2026-07-31 (ia)] MARK-TO-MARKET DRAWDOWN, folded in BEFORE grading.
         # `apply_mtm` takes the WORSE of realised and MTM, so this can only
@@ -2109,6 +2148,42 @@ def main():
     print()
     print(f"READY: {ready or 'none'}")
 
+    # [2026-08-06 (kv)] ZERO-LEDGER BOOKS — the roster sweep. A book that has
+    # never closed a trade has no paper_trades row at all, so the loop above
+    # cannot even see it to demote it: 📊 equities-regime (0 closes ever,
+    # measured ~17.2 closes/yr) is the fleet's standing I17 case and was
+    # invisible to the very calendar built to flag it. The roster is the
+    # bot_pnl summary table (every living book publishes one), minus retired
+    # rows, minus anything the ledger already covered; rows stale >48h are
+    # skipped (I1 — a frozen row is not a living book, and dead publishers
+    # are the watchdog's jurisdiction, not this grader's). Fail-soft
+    # everywhere: this sweep may only ever ADD annotations.
+    try:
+        _rnow = datetime.now(timezone.utc)
+        _seen = set(books) | set(payload_floor)
+        for _r in (store.fetch_bot_pnl() or []):
+            _b = _r.get("bot")
+            if not _b or _b in _seen or _b in retired:
+                continue
+            if not roster_admits(_r.get("updated_at"), _rnow):
+                continue
+            payload_floor[_b] = {
+                "n_alltime": int(_r.get("closed_trades") or 0),
+                "why_absent": "no closed trades in the ledger",
+                "horizon": {"verdict": "no_rate", "eta": None,
+                            "eta_days": None, "eta_kind": None,
+                            "eta_conf": None, "binding": None, "blockers": [],
+                            "rate_cpd": None, "n_req_t": None,
+                            "raw_days": None,
+                            "why": "no closes ever — undecidable until the "
+                                   "book closes trades (I17: keep-or-retire, "
+                                   "not another tuning pass)"}}
+    except Exception as e:      # noqa: BLE001 — annotations only, never the grade
+        print(f"roster sweep skipped: {type(e).__name__}: {e}")
+    if payload_floor:
+        print(f"below floor: " + ", ".join(
+            f"{b} n{v['n_alltime']}" for b, v in sorted(payload_floor.items())))
+
     # [2026-07-30 THIS GRADER BECOMES AN ORGAN — operator: "make sure the PNL
     # dashboard reflects all work done".] Until now it published NOTHING and was
     # scheduled NOWHERE: the tool that decides whether a book has earned real
@@ -2130,6 +2205,10 @@ def main():
                         "min_t": GOLIVE_MIN_T, "max_dd": GOLIVE_MAX_DD},
                 "bar_names": list(BAR_NAMES),
                 "books": payload_books,
+                # [(kv)] Books BELOW the publish floor, each with an honest
+                # horizon — a separate additive map so `books` membership (a
+                # consumer contract) is unchanged. See the roster sweep above.
+                "below_floor": payload_floor,
                 "ready": sorted(ready)}
             ok_pub = _store.save_state(KEY, payload)
             # HISTORY too, because the question the baseline document asks is a

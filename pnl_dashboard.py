@@ -1773,6 +1773,32 @@ def golive_card():
             pass
         head = (f'{len(ready)} at the bar' if ready
                 else 'none at the bar yet')
+        # [2026-08-06 (kv)] BOOKS BELOW THE PUBLISH FLOOR — one muted footer
+        # line. These are the I17 cases the horizon exists to surface (📊
+        # equities-regime at 0 closes ever, a newborn 🎸 Barnesy accruing its
+        # first closes) and until now they were invisible on the very card
+        # built to show gate distance. Absent key = old payload = no line.
+        bf = r.get("below_floor") if isinstance(r.get("below_floor"), dict) \
+            else None
+        bf_line = ""
+        if bf:
+            parts = []
+            for b, v in sorted(bf.items()):
+                if not isinstance(v, dict):
+                    continue
+                h = v.get("horizon") if isinstance(v.get("horizon"), dict) \
+                    else {}
+                p = html.escape(f'{b} n{v.get("n_alltime")}')
+                if h.get("eta"):
+                    p += f' &ge;{html.escape(str(h.get("eta"))[5:])}'
+                parts.append(p)
+            if parts:
+                bf_line = (
+                    '<div class="muted" style="font-size:.75em;padding-top:2px"'
+                    ' title="Below the grader&#39;s publish floor — too few '
+                    'closes to grade. Undecidable until they close trades '
+                    '(I17: keep-or-retire, not another tuning pass).">'
+                    'below floor: ' + " · ".join(parts) + '</div>')
         return (f'<div class="card"><h2>🚦 Go-live grader '
                 f'<span class="dot on"></span></h2>'
                 f'<div class="muted">{len(rows)} graded books · {head}{age} — '
@@ -1782,7 +1808,7 @@ def golive_card():
                 f'{100 * (bar.get("max_dd") or 0.15):.0f}%. '
                 f'Win% is reported, NOT a bar. Grades only — go-live is an '
                 f'explicit operator act.</div>'
-                f'{"".join(rows)}</div>')
+                f'{"".join(rows)}{bf_line}</div>')
     except Exception:  # noqa: BLE001
         return ""
 
