@@ -253,12 +253,67 @@ class TestTheMeasuredFleet:
 
 
 class TestItIsActuallyWired:
-    def test_main_collects_docket_inputs_on_both_horizon_paths(self):
-        """A docket fed by only the graded path would rebuild the very blind
-        spot (kv) closed — 📊 equities-regime lives BELOW the floor."""
+    def test_every_path_that_publishes_a_book_also_feeds_the_docket(self):
+        """[(lf)] THIS TEST USED TO PIN THE BUG IN PLACE.
+
+        It read `src.count("_docket_now[bot]") == 2` — a substring count that
+        (a) asserted exactly TWO sources were correct, so adding the missing
+        THIRD would have REDDENED the build, and (b) could never have matched
+        the roster sweep anyway, which binds `_b` rather than `bot`. Meanwhile
+        its own docstring claimed 📊 equities-regime was covered, and the live
+        payload showed all 14 clocks coming from the graded path with the two
+        zero-ledger books absent.
+
+        The real invariant is a RELATIONSHIP: every path that can put a book
+        into the payload must also offer it to the docket. Asserted over the
+        AST by comparing the two target sets, so a fourth path cannot arrive
+        quietly and a third does not have to fight the test.
+        """
         src = textwrap.dedent(inspect.getsource(G.main))
-        assert src.count("_docket_now[bot]") == 2, \
-            "both the graded and below-floor paths must feed the docket"
+        tree = ast.parse(src)
+
+        def subscript_writers(name):
+            out = set()
+            for n in ast.walk(tree):
+                if not isinstance(n, ast.Assign):
+                    continue
+                for t in n.targets:
+                    if (isinstance(t, ast.Subscript)
+                            and isinstance(t.value, ast.Name)
+                            and t.value.id == name
+                            and isinstance(t.slice, ast.Name)):
+                        out.add(t.slice.id)
+            return out
+
+        pub = subscript_writers("payload_books") | subscript_writers("payload_floor")
+        dock = subscript_writers("_docket_now")
+        assert pub, "no publish paths found — the AST shape changed"
+        assert pub <= dock, (
+            f"these publish paths do not feed the docket: {sorted(pub - dock)} "
+            f"(docket fed from {sorted(dock)}) — a book that reaches the "
+            f"payload but not the docket is invisible to I17 forever")
+
+    def test_the_roster_zero_ledger_books_can_actually_docket(self):
+        """The motivating case, end to end. 📊 equities-regime has NO era, so
+        the no_rate arm's `era_days >= 30` can never fire for it; without its
+        own arm it was permanently un-docketable."""
+        now = FI_ISO = iso(T0)
+        cur = {"equities-regime-lshadow": {
+            "hz": {"verdict": "no_rate", "why": "no closes ever"},
+            "era_days": None, "roster_zero_ledger": True,
+            "n": 0, "mean_pct": None, "t": None}}
+        d, seen = G.decision_docket(cur, {}, now)
+        assert seen["equities-regime-lshadow"]["reason"] == "zero_ledger"
+        later = iso(T0 + timedelta(days=G.DOCKET_DAYS))
+        d2, _ = G.decision_docket(cur, seen, later)
+        assert len(d2) == 1 and d2[0]["book"] == "equities-regime-lshadow"
+
+    def test_a_zero_ledger_flag_is_required_not_inferred(self):
+        """A book with no era and a no_rate verdict but NOT from the roster
+        (e.g. a newborn) must still stay quiet."""
+        stuck, _ = G._docket_stuck({"verdict": "no_rate"}, era_days=None,
+                                   roster_zero_ledger=False)
+        assert not stuck
 
     def test_main_calls_decision_docket_and_publishes_it(self):
         src = textwrap.dedent(inspect.getsource(G.main))
@@ -294,8 +349,33 @@ class TestItIsActuallyWired:
                 "the prior seen-map must come from the persisted payload — a "
                 "literal makes the clock unable to accumulate, and an empty "
                 "docket then reads exactly like 'nothing is overdue'")
-            # and it must actually reach for the stored key
-            assert "docket_seen" in ast.dump(prior), ast.dump(prior)
+            # and it must actually reach into a loaded state object, not a
+            # freshly-built dict ([(lf)]: the clocks now live in their own key,
+            # so this reads `(_prior_seen or {}).get("seen")`)
+            names = {n.id for n in ast.walk(prior) if isinstance(n, ast.Name)}
+            assert any("prior" in n for n in names), (
+                f"the prior must come from the LOADED state; got {ast.dump(prior)}")
+
+    def test_the_clocks_are_written_only_on_a_successful_read(self):
+        """[(lf)] The defect this split removed: `save_state` replaces a
+        payload wholesale, so while the seen-map rode inside the grade payload
+        a single unreadable prior wrote `{}` over every clock. Now the clocks
+        have their own key and are persisted ONLY when the read succeeded."""
+        src = textwrap.dedent(inspect.getsource(G.main))
+        tree = ast.parse(src)
+        writes = [n for n in ast.walk(tree)
+                  if isinstance(n, ast.Call)
+                  and isinstance(n.func, ast.Attribute)
+                  and n.func.attr == "save_state"
+                  and any(isinstance(a, ast.Name) and a.id == "DOCKET_SEEN_KEY"
+                          for a in n.args)]
+        assert writes, "the clocks must be persisted to their own key"
+        # ...and that write must sit under a guard, not run unconditionally
+        guarded = [n for n in ast.walk(tree) if isinstance(n, ast.If)
+                   and any(w in ast.walk(n) for w in writes)]
+        assert guarded, "the clock write must be guarded by the read result"
+        assert any("_seen_ok" in ast.dump(g.test) for g in guarded), \
+            "the guard must be the read-succeeded flag"
 
     def test_the_prior_read_is_checked(self):
         """(jz) seed class: a FAILED read must not look like 'no prior'.

@@ -1,3 +1,137 @@
+## 2026-08-06 (lf) — I POINTED AGENTS AT MY OWN DAY AND THEY FOUND 20 DEFECTS: (la)'s fix was HALF A FIX and it was still holding a real-money bar
+
+*Operator asked me to double-check that today's work was running properly and
+optimally. It was not. Three adversarial reviewers over `(la)`/`(ld)`/`(le)`
+returned **20 findings, 7 verified CONFIRMED, 2 critical** — every one of them
+mine, every one shipped today. The (lb) session did this to itself this morning
+and found 8; this is the same discipline applied to the four passes after it.
+Fixed here: the three that were causing live harm or making a shipped claim
+false. The rest are recorded at the end with their evidence.*
+
+### 1 · THE `(la)` WINDOW SCOPING WAS INERT WHERE IT MATTERED — AND THE FALSE HOLD WAS STILL LIVE
+
+- **`(la)` scoped the drift check's ROW half to the bar's window and I reported
+  it verified in production. That verification only exercised the SERIAL path.**
+  Scoping changes the answer only when an arm's newest close falls OUTSIDE the
+  window. The serial window had opened at 06:29Z, after the 06:06/06:22Z
+  deploys, so the stale live close fell out and the hold cleared — which is what
+  I saw. **The GROWTH window is 2.5 DAYS**, wide enough to straddle any deploy,
+  so there the scoped verdict was **byte-identical to the unscoped one**.
+- **MEASURED, in production, AFTER the fix landed**: `xp-judge`'s
+  `last_growth.why` read *"ARMS ON DIFFERENT CODE: live=6ff86f4d6b09
+  shadow=4f998e4eec4d"* on **five consecutive samples** (09:37, 09:55, 10:06,
+  10:15, 10:48Z) while `bot_pnl` had **both containers on `4f998e4eec4d`** — and
+  it was short-circuiting a growth bar whose floors were **both met**
+  (shadow 15/15, live 11/10). Reconstructed deterministically after the live
+  state self-cleared: scoped to 2.5d still returns the drift; scoped to 30 min
+  returns None.
+- **THE RULE WAS UNSOUND AT ANY WINDOW WIDTH, which is the real lesson.**
+  `implementation_shortfall.arm_drift` keeps ONE row per bot. For `bot_pnl` that
+  is right — one row per bot, describing NOW. For a LEDGER it compares each
+  arm's newest close, and **two "newest" closes are two different MOMENTS**.
+  Across a rolling deploy the faster-closing arm publishes post-deploy while the
+  slower one's newest is still pre-deploy, and the sensor calls that drift.
+- **THE FIX IS ABOUT SETS, NOT ENDPOINTS.** `_row_drift` claims drift only when
+  the two arms' in-window build **sets are DISJOINT**. Intersecting sets mean
+  they tracked the same deploy line and the difference is TIMING. On the live
+  tape: live `{f27e50d805af, 6ff86f4d6b09}` vs shadow `{f27e50d805af,
+  6ff86f4d6b09, 4f998e4eec4d}` — a two-build intersection, so not drift.
+  Restrict-only and fail-safe unchanged: both arms must have stamped in-window
+  rows or the answer is "unknown", never a hold.
+- **AND `(la)`'s MUTATION ROUND WAS MEASURING THE WRONG THING.** Its "5
+  mutations, each red" were all inside `_arm_drift_snapshot`; the fix's entire
+  effect lives at the two CALL SITES, and **reverting both to `since_ts=None`
+  left the whole suite GREEN** — no test in `tests/` referenced `_drift_snap`,
+  `growth_window_start`, `_rows_since` or `since_ts`. The `(hh)` dead-code
+  class, in the same commit whose fleet_immune half DID guard its wiring by AST.
+  `tests/autonomy/test_judge_arm_drift_wiring.py` now pins both call sites;
+  **5 mutations red, including the two that survived `(la)` silently.**
+
+### 2 · THE DOCKET COULD NEVER SEE ITS OWN MOTIVATING CASE
+
+- **`(ld)` claimed *"BELOW-FLOOR BOOKS ARE IN IT — 📊 equities-regime … Both
+  horizon paths feed it"*. That was FALSE in production, twice over.** The
+  `(kv)` roster sweep is a **THIRD** horizon path and it fed nothing; the two
+  zero-ledger books enter the payload only through it. Live payload: 14 clocks,
+  **all 14 from the graded path**, equities-regime and 👩 mum absent. And even
+  fed, they could not docket — a zero-ledger book has **no era at all**
+  (`era_epoch_for` → None), so the `no_rate` arm's `era_days >= 30` test could
+  never be true for it.
+- **Both halves fixed**: the roster sweep now feeds `_docket_now`, and a
+  `zero_ledger` arm supplies the time basis the missing era cannot — **the
+  docket's own clock**. Seven consecutive days of "living publisher, zero closes
+  in the ledger" is exactly I17's signal and needs no era.
+- **The wiring test was PINNING THE BUG.** It read
+  `src.count("_docket_now[bot]") == 2` — asserting exactly two sources were
+  correct, so **adding the missing third would have reddened the build** — and
+  the roster sweep binds `_b`, not `bot`, so the literal could never have
+  matched it anyway. Replaced with an AST claim on the RELATIONSHIP: every
+  subscript-assign target of `payload_books`/`payload_floor` must also appear as
+  a target of `_docket_now`. A fourth path cannot arrive quietly, and a third
+  does not have to fight the test.
+
+### 3 · THE DOCKET'S FAIL-SAFE WAS A NO-OP THAT WIPED EVERY CLOCK
+
+- `(ld)` said it "carried the docket forward" on a failed prior read. But
+  `load_state_checked` returns `(False, None)` on failure — so `_prior_pl` **is**
+  None, `_seen` stayed `{}`, and `save_state` wrote that empty map over the
+  clocks while `docket_why` reported a reassuring, false *"carried forward"*.
+  **One Postgres blip in any of the ~112 publishes a book needs to reach
+  `DOCKET_DAYS` resets every clock to zero** — an organ whose entire job is to
+  say a decision is overdue, structurally unable to ever say it.
+- **Omitting the keys would not have fixed it either**, and my first cut did
+  exactly that: `save_state` replaces a payload WHOLESALE, so a payload without
+  `docket_seen` is read next cycle as an empty prior — the clocks die one cycle
+  later instead of now. My second cut skipped the whole publish, which broke
+  three unrelated grader tests because a store with no `DATABASE_URL` reports a
+  read failure too.
+- **THE CLOCKS NOW LIVE IN THEIR OWN KEY** (`golive-docket-seen`), written only
+  when the read succeeded. A failed read costs the CLOCKS and never the GRADE:
+  they are simply not rewritten and the previous value survives. The split is
+  the correctness fix, not tidiness.
+
+### STILL OPEN — the confirmed findings this entry does NOT fix, with their evidence
+
+- **CRITICAL — the churn sampler ALIASES the fault.** `fleet_immune` samples
+  every **900s** (`IMMUNE_INTERVAL_SEC`, 94 rows/24h) while the Parliament
+  publishes every ~5 min and restarts every 15-60 min. Faithful replay at the
+  organ's REAL sample times: **11 resets + 7 stalls = 18 vs 18 + 5 = 23** on the
+  tape — resets undercounted 39%, composition wrong in both directions, first
+  fire 51 min late. Worse, simulated at a stable 15-min restart period the
+  detector counts **95 at one sampling phase and ZERO at two others**, because a
+  constant non-zero reading is certified healthy by `(le)`'s own
+  `test_stagnation_ABOVE_the_floor_stays_quiet`. **`(le)` did not close the
+  convergent-metric trap; it moved it.** The real fix is to stop deriving an
+  event count from point samples — read `bot_state_history`, or have the
+  Parliament publish a monotone `boots` counter. Until then the number is a
+  LOWER BOUND and the detail line does not say so.
+- **HIGH — `stalls` counts SAMPLES, not restarts**, so "RESTARTED 22x" is not
+  true of the 5 stalls; 5 of 7 counted stalls on the live tape provably had
+  completed cycles. **HIGH — the deploy margin is gone**: one ordinary restart
+  plus 45 min at the floor now crosses the 4-in-24h bar.
+- **HIGH — the drift-recovery branch restarts the experiment clock
+  unconditionally.** Measured cost today: **3.05 days** (06:29Z, after the
+  container-half hold from a 16-minute deploy skew) **+ 3.13 hours** (09:37Z,
+  triggered by my own `(la)` fix clearing the false hold). `slope-gate-off`'s
+  resolution slipped ~3 days. `(la)` named this cost in its own text and shipped
+  without touching it.
+- **MEDIUM** — `_PRIOR_RANK` is an unreachable assertion and its ranks contradict
+  the file's own recorded priors; the docket clock survives an era move that
+  voids the evidence it counts; `churn_seen` rides a `save_state` whose return
+  value is discarded (I4). **LOW** — three now-false positional claims left in
+  the CANDIDATES rationale by the `(ld)` reorder; a book briefly absent from the
+  docket input loses its clock rather than pausing it.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**💸 the Farmer, for real this time.** `(la)` claimed to unblock its promotion
+pipeline and left the growth bar held on a converged pair — with both floors
+already met. That hold is gone at the rule level rather than at one window
+width. Nothing else moves: no bar, no lever, no position. The honest summary of
+today is that four passes shipped four real improvements and seven real defects,
+and the only reason the count is known is that the work was attacked instead of
+admired.
+
 ## 2026-08-06 (le) — THE DETECTOR I SHIPPED THIS AFTERNOON READ SILENT UNDER TOTAL FAILURE: 🏛️ the worst boots were the invisible ones
 
 - **FOUND BY READING THE LIVE DATA, hours after shipping `(la)`.** Watching 🏛️

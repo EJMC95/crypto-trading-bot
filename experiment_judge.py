@@ -974,6 +974,60 @@ def _rows_since(rows, since_ts):
     return out
 
 
+def _row_build_sets(rows, live=None, shadow=None):
+    """{bot: set(build ids)} over the rows given, ignoring unstamped rows."""
+    live, shadow = live or LIVE_BOT, shadow or SHADOW_BOT
+    out = {live: set(), shadow: set()}
+    for r in rows or []:
+        b = str(r.get("bot"))
+        if b in out:
+            bid = ((r.get("extra") or {}) or {}).get("build")
+            if bid:
+                out[b].add(str(bid))
+    return out
+
+
+def _row_drift(rows, live=None, shadow=None):
+    """The ROW half: did this window's two samples come from DISJOINT code?
+
+    [2026-08-06 (lf)] THIS REPLACES A NEWEST-vs-NEWEST COMPARISON THAT WAS
+    UNSOUND AT ANY WINDOW WIDTH. `implementation_shortfall.arm_drift` keeps one
+    row per bot — for `bot_pnl` that is right (one row per bot, describing NOW),
+    but for a LEDGER it compares each arm's newest close, and two "newest"
+    closes are two DIFFERENT MOMENTS. Across a rolling deploy the faster-closing
+    arm publishes a post-deploy close while the slower one's newest is still
+    pre-deploy, and the sensor calls that "ARMS ON DIFFERENT CODE".
+
+    MEASURED 6-Aug, and this is why `(la)`'s window scoping was only half a fix:
+    on the SERIAL window (opened 06:29Z, after the 06:06/06:22Z deploys) the
+    stale live close fell outside and the hold cleared — but the GROWTH window
+    is 2.5 DAYS, wide enough to straddle any deploy, so the scoped verdict was
+    byte-identical to the unscoped one. Production carried
+    "ARMS ON DIFFERENT CODE" on five consecutive samples AFTER the fix landed,
+    holding a growth bar whose floors were BOTH met (shadow 15/15, live 11/10),
+    while `bot_pnl` had both containers on the same build.
+
+    THE SOUND QUESTION IS ABOUT SETS, NOT ENDPOINTS. If the arms' in-window
+    build sets INTERSECT they tracked the same deploy sequence and the
+    difference is TIMING; only DISJOINT sets mean the two samples were really
+    produced by different code with no overlap. Measured on that same tape:
+    live {f27e50d805af, 6ff86f4d6b09} vs shadow {f27e50d805af, 6ff86f4d6b09,
+    4f998e4eec4d} — a two-build intersection, i.e. not drift.
+
+    RESTRICT-ONLY and fail-safe toward SILENCE, unchanged: a claim needs BOTH
+    arms to have stamped rows in the window (an empty set on either side is
+    "unknown", never drift), so a rollout cannot make this fire.
+    """
+    sets = _row_build_sets(rows, live, shadow)
+    a, b = sets[live or LIVE_BOT], sets[shadow or SHADOW_BOT]
+    if not a or not b:
+        return None                      # unknown is not drift
+    if a & b:
+        return None                      # shared build => same deploy line
+    return {"live": sorted(a)[-1], "shadow": sorted(b)[-1],
+            "source": "rows-disjoint"}
+
+
 def _current_drift(fetch=None):
     """The CONTAINER half: are the arms running different code right NOW?
 
@@ -1053,8 +1107,11 @@ def _arm_drift_snapshot(rows, fetch=None, since_ts=None, current=_UNSET):
     except Exception:      # noqa: BLE001
         return None
     try:
-        d = _isf.arm_drift(_rows_since(rows, since_ts),
-                           live=LIVE_BOT, shadow=SHADOW_BOT)
+        # [(lf)] SET-DISJOINTNESS, not newest-vs-newest — see _row_drift. The
+        # window scoping stays (the bar's sample is what a row claim is about),
+        # but it is no longer load-bearing on its own: a 2.5-day window
+        # straddles any deploy, and that is exactly where (la) was inert.
+        d = _row_drift(_rows_since(rows, since_ts))
         if d is not None:
             return d
         if current is not _UNSET:
@@ -2123,11 +2180,12 @@ def _selftest():
             {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
         # ...and converged rows + converged current builds still clear
         assert _arm_drift_snapshot(_r_same, fetch=lambda: _pnl_same) is None
-        # row-based POSITIVE drift is returned untouched (senior path)
+        # row-based POSITIVE drift: DISJOINT build sets, the only shape that
+        # actually proves the two samples came from different code ((lf))
         _r_drift = [{"bot": LIVE_BOT, "extra": {"build": "p"}},
                     {"bot": SHADOW_BOT, "extra": {"build": "q"}}]
         assert _arm_drift_snapshot(_r_drift, fetch=lambda: _pnl_same) == \
-            {"live": "p", "shadow": "q"}
+            {"live": "p", "shadow": "q", "source": "rows-disjoint"}
         # a dead fetch costs nothing, claims nothing
         def _boom():
             raise RuntimeError("db down")
@@ -2154,10 +2212,11 @@ def _selftest():
         # A — in-window rows are converged (the live row is out of scope): quiet
         assert _arm_drift_snapshot(_r_prewindow, since_ts=_w0,
                                    fetch=lambda: _pnl_same) is None
-        # B — the same rows, unscoped, still hold (the pre-fix behaviour, kept
-        #     for callers with no window)
+        # B — the same rows, unscoped: the build SETS are disjoint ({old} vs
+        #     {new}), so a claim here is correct even without a window. This
+        #     was the (la) shape; (lf) keeps it true for the right reason.
         assert _arm_drift_snapshot(_r_prewindow, fetch=lambda: _pnl_same) == \
-            {"live": "old", "shadow": "new"}
+            {"live": "old", "shadow": "new", "source": "rows-disjoint"}
         # C — scoping never blinds the CONTAINER half: rows clean in-window,
         #     containers on two builds -> hold. This is what makes dropping
         #     the pre-window rows safe.
@@ -2171,7 +2230,26 @@ def _selftest():
         ]
         assert _arm_drift_snapshot(_r_inwindow, since_ts=_w0,
                                    fetch=lambda: _pnl_same) == \
-            {"live": "p", "shadow": "q"}
+            {"live": "p", "shadow": "q", "source": "rows-disjoint"}
+        # D2 [(lf)] — THE DEFECT (la) LEFT BEHIND, and the reason this rule
+        #     changed. A ROLLING DEPLOY inside a wide window: both arms close
+        #     under the old build AND the new one, but the slower arm's newest
+        #     close is still the old build. Newest-vs-newest called that drift;
+        #     the sets INTERSECT, so it is timing, not divergence. This is the
+        #     exact live shape that held a growth bar with both floors met.
+        _r_rolling = [
+            {"bot": LIVE_BOT, "close_ts": iso(_w0 + 10), "extra": {"build": "A"}},
+            {"bot": LIVE_BOT, "close_ts": iso(_w0 + 20), "extra": {"build": "B"}},
+            {"bot": SHADOW_BOT, "close_ts": iso(_w0 + 15), "extra": {"build": "A"}},
+            {"bot": SHADOW_BOT, "close_ts": iso(_w0 + 25), "extra": {"build": "B"}},
+            {"bot": SHADOW_BOT, "close_ts": iso(_w0 + 40), "extra": {"build": "C"}},
+        ]
+        assert _arm_drift_snapshot(_r_rolling, since_ts=_w0,
+                                   fetch=lambda: _pnl_same) is None, \
+            "overlapping build sets are a shared deploy line, not drift"
+        # ...and the container half is still free to hold on the same rows
+        assert _arm_drift_snapshot(_r_rolling, since_ts=_w0,
+                                   fetch=lambda: _pnl_drift) is not None
         # E — an unparseable stamp is excluded, matching arm_trades' own
         #     `continue`: the bar cannot place it, so neither may the sensor
         _r_junkts = [
