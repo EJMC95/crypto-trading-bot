@@ -330,40 +330,67 @@ LONG_ONLY = {
 def test_no_price_book_computes_a_side_and_omits_it(mod):
     """A direction-bearing book must STAMP its side, not merely know it.
 
-    This is deliberately the `(gr)` test one field over: the failure mode is
-    identical (computed in scope, dropped at the call) and so is the fix.
+    Deliberately the `(gr)` test one field over: the failure mode is identical
+    (computed in scope, dropped at the call) and so is the fix.
+
+    [2026-08-06 (kn)] THERE IS NO LONGER A HEURISTIC HERE, and removing it is
+    the fix. This used to skip any module with no direction variable in its
+    SOURCE TEXT — "no notion of side, so nothing to ask for". That is exactly
+    backwards for a LONG-ONLY book, where the side is a constant and therefore
+    least in doubt: `lighter_family_bot` publishes SEVEN rows and was skipped
+    on it while `(kf)` declared the class closed, so the sweep discarded 53
+    priced closes including 33 on the family's short-sleeve book — which sits
+    at 4/6 on the go-live gate.
+
+    And the substring scan could not be repaired in place, which this file
+    proved on itself: a first attempt kept the scan and merely added a
+    declaration, and the explanatory COMMENT written beside the fix contained
+    the very token being scanned for, so the module matched its own heuristic
+    and the branch went dead. Two mutations survived it. That is this repo's
+    own rule — *a page-wide substring scan is not a structural claim* —
+    arriving inside the fix for it.
+
+    So: every price book is now one of exactly THREE declared states, none of
+    them inferred from prose.
+      * `_SIDE_EXEMPT` — not direction-bearing, or dead. Says why.
+      * `LONG_ONLY`    — holds one direction, so `side=` must be the literal
+                         "long". A constant is correct here precisely because
+                         the book cannot be anything else.
+      * everything else — must pass `side=` as an EXPRESSION, never a literal.
+                         A directional book hardcoding a side is fabricated
+                         data, exactly as a hardcoded price would be.
     """
     if mod in _SIDE_EXEMPT:
         pytest.skip(f"declared exempt: {_SIDE_EXEMPT[mod]}")
     calls = _publish_calls(mod)
     if not calls:
         pytest.skip(f"{mod} writes no paper-trade rows")
-    src = (_ROOT / f"{mod}.py").read_text()
-    # [2026-08-06 (kn)] THIS SKIP USED TO BE THE HOLE. It read "no `is_long`
-    # or `is_short` in source ⇒ no direction concept ⇒ nothing to ask for",
-    # which is exactly backwards for a LONG-ONLY book: the side is a constant,
-    # i.e. the case where it is LEAST in doubt. `lighter_family_bot` — the
-    # publisher for SEVEN rows — was skipped on that heuristic while `(kf)`
-    # was declaring the class closed, and the sweep discarded 53 priced closes
-    # across 🔮 georgia (33), intraday (14), avo-maria (5) and dad (1).
-    # georgia sits at 4/6 on the go-live gate, so the exit question could not
-    # be asked of a book near real money.
-    #
-    # A book with no direction VARIABLE is now one of two declared things, and
-    # neither is silence: LONG_ONLY (must stamp a constant side) or
-    # _SIDE_EXEMPT (must say why). An undeclared one turns the build red.
-    if "is_long" not in src and "is_short" not in src and mod not in LONG_ONLY:
-        pytest.fail(
-            f"{mod} has no direction variable and is not declared LONG_ONLY "
-            f"or _SIDE_EXEMPT. A long-only book must stamp side='long' — the "
-            f"sweep reads a missing side as a LONG anyway, so leaving it "
-            f"unstamped means the harness GUESSES what the book KNOWS.")
     missing = [c.lineno for c in calls if "side" not in _kwargs(c)]
     assert not missing, (
         f"{mod} publishes a close WITHOUT side= at line(s) {missing}. The "
         f"value is in scope — the exit sweep reads a missing side as a LONG, "
         f"which replays every short backwards and inverts the sign of any "
-        f"bracket it recommends.")
+        f"bracket it recommends. If this book holds ONE direction, declare it "
+        f"in LONG_ONLY and stamp the constant; if it is not direction-bearing "
+        f"at all, declare it in _SIDE_EXEMPT with a reason.")
+    for call in calls:
+        for kw in call.keywords:
+            if kw.arg != "side":
+                continue
+            literal = isinstance(kw.value, ast.Constant)
+            if mod in LONG_ONLY:
+                assert literal and kw.value.value == "long", (
+                    f"{mod} is declared LONG_ONLY but stamps a non-constant "
+                    f"side at line {call.lineno}. Either it can now go short "
+                    f"— in which case remove it from LONG_ONLY — or the "
+                    f"declaration is wrong.")
+            else:
+                assert not literal, (
+                    f"{mod} hardcodes side={kw.value.value!r} at line "
+                    f"{call.lineno}. A directional book must record the side "
+                    f"it actually took; a literal is fabricated data, the "
+                    f"same defect as a hardcoded entry_price. If it really "
+                    f"holds one direction, declare it in LONG_ONLY.")
 
 
 def test_the_ledger_can_carry_a_side_at_every_layer():
