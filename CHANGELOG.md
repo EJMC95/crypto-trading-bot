@@ -14,6 +14,18 @@
 
 **🎫 the Ticket Taker, structurally rather than by verdict — and that is the point of this one.** No bar, sample or position changes. What changes is the COST of the next occurrence: `(kt)` was a live real-money exposure that took a code change and a marked deploy to close, and the same class now closes itself on a scout cycle. The fleet keeps paying for hand lists that describe a venue which changes weekly; this is the second half of `(kj)`'s answer — read the fact, and then carry it to the consumers that cannot reach the library.
 
+## 2026-08-06 (kw) — THE ROSTER SWEEP REJECTED THE ENTIRE LIVING FLEET, SILENTLY: (hj) committed inside the change whose PR cited (hj)
+
+- **THE DEFECT, caught by (kv)'s own ship-narrow verification within the hour.** The first live publish carrying `below_floor` showed the three skip-path books and **zero roster catches** — 📊 equities-regime and 👩 mum, the exact zero-ledger books the sweep was built for, were absent. Root cause: **`fetch_bot_pnl` converts `updated_at` to an ISO STRING before returning** (`.isoformat()`, in bot_pnl_store, since long before the sweep existed) — and `roster_admits` accepted only `datetime`, so the fail-closed filter **rejected every row of the living roster** and the sweep published nothing, indistinguishable from "swept clean".
+- **THE CLASS, named without flinching**: (hj) verbatim — *a consumer tested against a payload its author hand-wrote, not the one the publisher builds*. The (kv) offline repro fed the sweep `datetime` fixtures and passed; the publisher emits strings. Committed in the very change whose PR body cited (hj) as its testing standard. Two fixes, both structural:
+  1. **`roster_admits` now accepts the publisher's real shape** (ISO string, incl. naive-as-UTC) and still refuses junk; the fixture in `test_gate_horizon.py` is now the string the publisher emits, **plus a source pin on `fetch_bot_pnl`'s `.isoformat()` conversion** — if the publisher ever changes shape, the failure names which end moved.
+  2. **THE SWEEP REPORTS ITS OWN OUTCOME IN THE PAYLOAD** — `roster: {scanned, admitted, rejected, error}` beside `below_floor`. Its first failure was visible only as a stdout line in a container nobody can read (I4's shape); `scanned=0` or a non-null `error` is now readable where a consumer looks, and "swept clean" is no longer byte-identical to "sweep dark".
+- **Verified end-to-end with the string shape**: the repro that missed the bug now feeds `fetch_bot_pnl`'s exact emission — zero-ledger admitted, 72h-stale rejected, receipt `{scanned:3, admitted:1, rejected:1}` in the payload. 35 tests green, selftest green, full suite + audits green.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**The (kv) claim becomes true in production**: 📊 equities-regime and 👩 mum actually reach the card at the next publish, with the receipt proving the sweep ran. The lesson entry is the deliverable — the fleet's testing rule caught its own author.
+
 ## 2026-08-06 (kv) — BELOW THE FLOOR IS NOT INVISIBLE: the horizon's two clearest I17 cases were outside the payload built to flag them — and the deploy sweep is verified + engraved
 
 - **THE HOLE, declared in (ks) and now closed.** The horizon covered only books in the grader's payload, and `--min-closes` filters on the ALL-TIME count — so 📊 equities-regime (**0 closes ever**, measured ~17.2 closes/yr, the fleet's standing I17 case) and newborn 🎸 Barnesy (n=8, accruing toward its ~mid-Sep clock) were invisible to the very calendar built to surface undecidability. Worse, a zero-close book has **no paper_trades rows at all**, so the book loop could not even see it to demote it.

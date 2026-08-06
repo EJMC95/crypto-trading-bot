@@ -1063,7 +1063,7 @@ def _fin(x, nd=2):
 
 
 def roster_admits(updated_at, now, max_age_h=48.0):
-    """Fail-CLOSED admission for the zero-ledger roster sweep [(kv)].
+    """Fail-CLOSED admission for the zero-ledger roster sweep [(kv)/(kw)].
 
     A bot_pnl row with no parseable, sufficiently fresh `updated_at` is NOT a
     living book (I1: liveness before semantics — a frozen row and a healthy
@@ -1071,12 +1071,28 @@ def roster_admits(updated_at, now, max_age_h=48.0):
     watchdog's jurisdiction; admitting one here would resurrect it on the
     go-live card. Pure so the offline suite can redden a fail-open mutation —
     the first cut of this filter lived inline in main()'s DB path, where a
-    deleted check survived the whole suite."""
+    deleted check survived the whole suite.
+
+    [(kw)] ACCEPTS THE PUBLISHER'S REAL SHAPE: `fetch_bot_pnl` converts
+    `updated_at` to an ISO STRING before returning (`.isoformat()`, in
+    bot_pnl_store, since long before this sweep existed). The first shipped
+    cut accepted only datetime — so this fail-closed filter silently rejected
+    the ENTIRE living roster and the sweep published nothing, caught the same
+    day by reading the live payload. The (hj) class verbatim, inside the
+    change whose PR cited (hj): the offline repro used a hand-written
+    datetime fixture instead of the publisher's own string. Junk strings are
+    still refused."""
     from datetime import datetime, timedelta, timezone
-    if not isinstance(updated_at, datetime) or not isinstance(now, datetime):
+    u = updated_at
+    if isinstance(u, str):
+        try:
+            u = datetime.fromisoformat(u)
+        except ValueError:
+            return False
+    if not isinstance(u, datetime) or not isinstance(now, datetime):
         return False
-    u = updated_at if updated_at.tzinfo else \
-        updated_at.replace(tzinfo=timezone.utc)
+    if u.tzinfo is None:
+        u = u.replace(tzinfo=timezone.utc)
     try:
         return (now - u) <= timedelta(hours=max_age_h)
     except TypeError:
@@ -2158,15 +2174,24 @@ def main():
     # skipped (I1 — a frozen row is not a living book, and dead publishers
     # are the watchdog's jurisdiction, not this grader's). Fail-soft
     # everywhere: this sweep may only ever ADD annotations.
+    # [(kw)] THE SWEEP REPORTS ITS OWN OUTCOME IN THE PAYLOAD. Its first
+    # failure was visible only as a stdout line in a container nobody can
+    # read (I4's shape): the payload showed three skip-path books and gave no
+    # way to tell "roster swept clean" from "roster sweep dark". `scanned=0`
+    # or a non-null `error` now says so where a consumer can see it.
+    roster_meta = {"scanned": 0, "admitted": 0, "rejected": 0, "error": None}
     try:
         _rnow = datetime.now(timezone.utc)
         _seen = set(books) | set(payload_floor)
         for _r in (store.fetch_bot_pnl() or []):
+            roster_meta["scanned"] += 1
             _b = _r.get("bot")
             if not _b or _b in _seen or _b in retired:
                 continue
             if not roster_admits(_r.get("updated_at"), _rnow):
+                roster_meta["rejected"] += 1
                 continue
+            roster_meta["admitted"] += 1
             payload_floor[_b] = {
                 "n_alltime": int(_r.get("closed_trades") or 0),
                 "why_absent": "no closed trades in the ledger",
@@ -2179,6 +2204,7 @@ def main():
                                    "book closes trades (I17: keep-or-retire, "
                                    "not another tuning pass)"}}
     except Exception as e:      # noqa: BLE001 — annotations only, never the grade
+        roster_meta["error"] = f"{type(e).__name__}: {e}"
         print(f"roster sweep skipped: {type(e).__name__}: {e}")
     if payload_floor:
         print(f"below floor: " + ", ".join(
@@ -2209,6 +2235,10 @@ def main():
                 # horizon — a separate additive map so `books` membership (a
                 # consumer contract) is unchanged. See the roster sweep above.
                 "below_floor": payload_floor,
+                # [(kw)] The sweep's own receipt — scanned=0 or a non-null
+                # error means the roster went DARK, which must be readable
+                # from the payload, never only from container stdout (I4).
+                "roster": roster_meta,
                 "ready": sorted(ready)}
             ok_pub = _store.save_state(KEY, payload)
             # HISTORY too, because the question the baseline document asks is a
