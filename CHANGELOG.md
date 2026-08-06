@@ -1,3 +1,56 @@
+## 2026-08-06 (lg) — THE SAMPLER ALIASED THE FAULT: `(le)` MOVED THE CONVERGENT-METRIC TRAP INSTEAD OF CLOSING IT
+
+- **THE CRITICAL `(lf)` RECORDED AND DID NOT FIX.** `restart_churn` compared
+  🏛️ the Parliament's cycle counter between **this organ's own cycles** —
+  `IMMUNE_INTERVAL_SEC=900`, measured 94 rows/24h — while the Parliament
+  publishes every ~5 min and restarts every 15-60. That is ~1.3 samples per
+  event, **below the two-per-event floor needed to resolve them**, so events
+  collapse into each other.
+- **MEASURED TWO WAYS, both against the real tape.** Replaying the shipped
+  detector at the organ's REAL sample times gives **11 resets + 7 stalls = 18**
+  where the publisher's series holds **18 + 5 = 23**: resets undercounted 39%,
+  composition wrong in both directions, first fire 51 minutes late. And
+  simulated at a STABLE 15-minute restart period the sampler counts **95 at one
+  sampling phase and ZERO at two others** — every sample lands mid-boot on the
+  same non-zero value, and a constant non-zero reading is certified healthy by
+  `(le)`'s own `test_stagnation_ABOVE_the_floor_stays_quiet`. Phase drift is
+  ~0.5s/cycle, so a blind phase persists for DAYS.
+- **SO `(le)` DID NOT CLOSE THE CONVERGENT-METRIC TRAP — IT MOVED IT**, from
+  "dies before the first cycle" to "dies at a period that beats the sampler".
+  The second form is worse: it is silent at a HIGHER fault rate.
+- **THE FIX: THE RESOLUTION BELONGS TO THE PUBLISHER.** `bot_state_history`
+  already holds the ~5-minute series `(le)` validated against —
+  `fetch_state_history` has existed since 14-Jul — so `churn_from_history`
+  counts regressions over that series instead of over this organ's wake-ups.
+  **Stateless by construction**: the whole window is recounted each call, so
+  there is no memory to seed, drift or lose. Verified on the live 24h tape:
+  history-based **16 resets + 5 stalls over 270 samples** against the point
+  sampler's **11 + 6** at the organ's real 93 cycle times.
+- **THE SAMPLER SURVIVES AS A DECLARED FALLBACK, AND SAYS SO.** When the
+  history is unreadable the old tallies are used and the detail line carries
+  *"a LOWER BOUND … which undercounts at short restart periods"*. A number
+  whose basis changes must name its basis; `basis` is also persisted in
+  `churn_seen` so a reader can tell which produced it.
+- **AND "RESTARTED Nx" WAS A FALSE SENTENCE.** `stalls` counts OBSERVATIONS at
+  the floor, not restarts — 5 of 7 counted stalls on the live tape provably had
+  completed cycles — so folding them into one restart total misnamed the thing
+  the operator acts on (I8). Resets and floor-observations are now reported
+  separately.
+- **Verification**: 37 churn tests, full suite, three organ selftests, six
+  audits green. **6 mutations, each red — and the third only after a test was
+  added for it**: the history stall arm was NOT floor-restricted and a mutation
+  dropping the floor survived, which is the same I7 slip `(le)` made in the
+  sampler arm, repeated one function away.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — this is a sensor correction, and the third in a row on the same
+sensor.** 🏛️ the Parliament's count stops depending on when the immune organ
+happens to wake up. Root cause of the restarts is still undiagnosed. The
+pattern worth naming: `(la)` built the detector, `(le)` fixed a blind spot in
+it, `(lg)` fixed the blind spot in that fix — each found only because the next
+pass attacked the previous one rather than trusting it.
+
 ## 2026-08-06 (lf) — I POINTED AGENTS AT MY OWN DAY AND THEY FOUND 20 DEFECTS: (la)'s fix was HALF A FIX and it was still holding a real-money bar
 
 *Operator asked me to double-check that today's work was running properly and

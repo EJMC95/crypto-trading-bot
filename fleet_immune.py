@@ -609,6 +609,61 @@ def _dotted(payload, path):
     return cur
 
 
+def churn_from_history(key, path, now, window_s=None, fetch=None):
+    """(resets, stalls, n_samples) counted over the PUBLISHER'S OWN series, or
+    None when the history is unavailable.
+
+    [2026-08-06 (lg)] WHY THIS EXISTS: THE POINT SAMPLER ALIASES THE FAULT.
+    `restart_churn` compared the counter between the immune organ's OWN cycles
+    — one sample every `IMMUNE_INTERVAL_SEC` (900s, measured 94 rows/24h) —
+    while 🏛️ the Parliament publishes every ~5 min and restarts every 15-60.
+    That is ~1.3 samples per event, below the 2-per-event floor needed to
+    resolve them, so events collapse into each other.
+    MEASURED against the real 24h tape: replaying the shipped detector at the
+    organ's REAL sample times gives **11 resets + 7 stalls = 18** where the
+    tape holds **18 + 5 = 23** — resets undercounted 39%, composition wrong in
+    both directions, first fire 51 minutes late. Worse, simulated at a STABLE
+    15-minute restart period the sampler counts **95 at one phase and ZERO at
+    two others**: every sample lands mid-boot on the same non-zero value, and a
+    constant non-zero reading is certified healthy by design. So `(le)` did not
+    close the convergent-metric trap — it MOVED it, from "dies before the first
+    cycle" to "dies at a period that beats the sampler".
+    The resolution belongs to the PUBLISHER, not the sampler: `bot_state_history`
+    already holds the ~5-minute series `(le)` validated against, so read that
+    and the count stops depending on when this organ happens to wake up.
+    Stateless by construction — the whole window is recounted each call, so
+    there is no memory to seed, drift or lose.
+    """
+    window_s = RESTART_WINDOW_S if window_s is None else window_s
+    try:
+        rows = (fetch or store.fetch_state_history)(key, limit=2000) or []
+    except Exception:      # noqa: BLE001
+        return None
+    if not rows:
+        return None
+    series = []
+    for r in rows:
+        try:
+            t = _parse_ts((r or {}).get("ts"))
+        except Exception:      # noqa: BLE001
+            continue
+        if t is None or now - t > window_s or t > now:
+            continue
+        v = _dotted((r or {}).get("payload") or {}, path)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            series.append((t, float(v)))
+    if len(series) < 2:
+        return None
+    series.sort()
+    resets = stalls = 0
+    for (_, a), (_, b) in zip(series, series[1:]):
+        if b < a:
+            resets += 1
+        elif b == a and b <= RESTART_FLOOR:
+            stalls += 1
+    return resets, stalls, len(series)
+
+
 def restart_churn(states, seen, now, min_n=None, window_s=None):
     """-> [{organ, detail}] when an organ's monotone counter keeps RESETTING.
 
@@ -668,18 +723,42 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
         resets = [t for t in resets if now - t <= window_s]
         stalls = [t for t in stalls if now - t <= window_s]
         seen[key] = {"last": float(cur), "resets": resets, "stalls": stalls}
-        total = len(resets) + len(stalls)
+        # [(lg)] THE PUBLISHER'S SERIES IS SENIOR TO THIS ORGAN'S SAMPLES.
+        # Point sampling aliases the fault (see churn_from_history): the
+        # counted number depends on when this organ happens to wake up, and at
+        # an unlucky phase it is ZERO while the organ restarts 96x/day. When
+        # the history is readable the count comes from it and the sampler's
+        # tallies are used only as the FALLBACK, declared in `basis` so a
+        # reader can tell which one produced the number.
+        hist = churn_from_history(key, path, now, window_s)
+        if hist is not None:
+            h_res, h_sta, h_n = hist
+            total, n_res, n_sta = h_res + h_sta, h_res, h_sta
+            basis = f"publisher series, {h_n} samples"
+            bound = ""
+        else:
+            total, n_res, n_sta = len(resets) + len(stalls), len(resets), len(stalls)
+            basis = "this organ's own samples"
+            # I8/honesty: say the number is a floor when it is one.
+            bound = (" — a LOWER BOUND: the publisher's history was unreadable "
+                     "so this counts only what one sample per immune cycle "
+                     "could see, which undercounts at short restart periods")
+        seen[key]["basis"] = basis
         if total >= min_n:
             hrs = window_s / 3600.0
-            _st = (f", {len(stalls)} of them publishing at {RESTART_FLOOR:g} "
-                   f"with no cycle completed" if stalls else "")
+            # [(lg)] `stalls` counts OBSERVATIONS at the floor, not restarts.
+            # Reporting them inside a "RESTARTED Nx" total was false — 5 of 7
+            # counted stalls on the live tape provably had completed cycles.
+            # The two numbers are now named separately (I8).
+            _st = (f" plus {n_sta} publish(es) at {RESTART_FLOOR:g} with no "
+                   f"cycle completed" if n_sta else "")
             out.append({
                 "organ": key,
-                "detail": (f"{label} RESTARTED {total}x in {hrs:.0f}h "
-                           f"({path} keeps resetting{_st}; now {cur:g}) — the "
-                           f"key stays FRESH on every boot, so no age check "
-                           f"can see this, and in-process state is lost each "
-                           f"time"),
+                "detail": (f"{label}: {n_res} RESTART(s) in {hrs:.0f}h{_st} "
+                           f"({path} keeps resetting; now {cur:g}; basis: "
+                           f"{basis}){bound} — the key stays FRESH on every "
+                           f"boot, so no age check can see this, and "
+                           f"in-process state is lost each time"),
             })
     return out
 
@@ -1406,7 +1485,12 @@ def _selftest():
     for _c in (5, 0, 8, 0, 3, 0):
         _out = restart_churn(_parl(_c), _cs, now)
     assert len(_out) == 1 and _out[0]["organ"] == "parliament", _out
-    assert "RESTARTED 4x" in _out[0]["detail"], _out
+    # [(lg)] resets and stalls are named SEPARATELY — a stall is an observation
+    # at the floor, not a restart, and folding them into one "RESTARTED Nx" was
+    # false of 5 of the 7 stalls on the live tape.
+    assert "4 RESTART(s)" in _out[0]["detail"], _out
+    # ...and with no publisher history available the number must say it is a floor
+    assert "LOWER BOUND" in _out[0]["detail"], _out
     # the window FORGETS: resets older than it stop counting (a churn last
     # week is not churn today)
     _old = {"parliament": {"last": 99.0, "resets": [now - 90000] * 9}}

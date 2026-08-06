@@ -100,7 +100,7 @@ class TestTheSensor:
         assert out == [], "3 stalls is still below the 4-in-24h bar"
         out = FI.restart_churn(_parl(0, now), seen, now)
         assert len(out) == 1
-        assert "publishing at 0 with no cycle completed" in out[0]["detail"]
+        assert "publish(es) at 0 with no cycle completed" in out[0]["detail"]
 
     def test_it_is_not_silent_under_TOTAL_failure(self):
         """The convergent-metric trap, asserted directly: a process that dies
@@ -138,7 +138,9 @@ class TestTheSensor:
                                "resets": [now] * 2, "stalls": [now] * 1}}
         out = FI.restart_churn(_parl(0, now), seen, now)   # 5 -> 0 = a reset
         assert len(out) == 1, "2 resets + 1 stall + this reset = 4"
-        assert "RESTARTED 4x" in out[0]["detail"]
+        # [(lg)] named separately: 3 restarts + 1 floor observation, not "4 restarts"
+        assert "3 RESTART(s)" in out[0]["detail"]
+        assert "1 publish(es) at 0" in out[0]["detail"]
 
     def test_the_stall_window_forgets_too(self):
         now = FI.now_ts()
@@ -162,6 +164,115 @@ class TestTheSensor:
         seen = {"parliament": {"last": 99.0, "resets": [old] * 20}}
         assert FI.restart_churn(_parl(99, now), seen, now) == []
         assert seen["parliament"]["resets"] == []
+
+
+class TestThePublisherSeriesIsSenior:
+    """[(lg)] The point sampler ALIASES the fault it measures.
+
+    `restart_churn` compared the counter between the immune organ's own cycles
+    (900s) while the Parliament publishes every ~5 min and restarts every
+    15-60. Measured on the real 24h tape: replaying at the organ's REAL sample
+    times gave 11 resets + 7 stalls = 18 where the tape held 18 + 5 = 23. And
+    at a STABLE 15-minute restart period the sampler counts 95 at one phase and
+    ZERO at two others — every sample lands mid-boot on the same non-zero
+    value, which `test_stagnation_ABOVE_the_floor_stays_quiet` certifies as
+    healthy. `(le)` did not close the convergent-metric trap; it moved it.
+    """
+
+    @staticmethod
+    def _hist(values, now, step=300.0):
+        """bot_state_history's real shape: NEWEST FIRST, {'ts','payload'}."""
+        rows = []
+        for i, v in enumerate(values):
+            rows.append({"ts": FI._iso(now - step * (len(values) - 1 - i)),
+                         "payload": {"data": {"cycles": v}}})
+        return list(reversed(rows))
+
+    def test_it_counts_from_the_publishers_own_series(self):
+        now = FI.now_ts()
+        vals = [1, 3, 5, 0, 2, 4, 0, 3, 0, 2]        # 3 regressions
+        got = FI.churn_from_history("parliament", "data.cycles", now,
+                                    fetch=lambda k, limit=0: self._hist(vals, now))
+        assert got is not None
+        resets, stalls, n = got
+        assert (resets, stalls, n) == (3, 0, len(vals))
+
+    def test_it_sees_the_period_the_sampler_goes_blind_on(self):
+        """The killer case: a 15-min restart period sampled every 15 min reads
+        a CONSTANT non-zero value. The publisher's 5-min series still shows
+        every regression."""
+        now = FI.now_ts()
+        vals = []
+        for _ in range(8):
+            vals += [1, 2, 3]                        # a boot, then it dies
+        got = FI.churn_from_history("parliament", "data.cycles", now,
+                                    fetch=lambda k, limit=0: self._hist(vals, now))
+        resets, stalls, n = got
+        assert resets == 7, (resets, vals)
+        # ...and the point sampler, landing on the same phase every time, sees
+        # a constant 2 and records NOTHING
+        seen = {}
+        for _ in range(8):
+            out = FI.restart_churn(_parl(2, now), seen, now)
+        assert out == [] and seen["parliament"]["resets"] == []
+
+    def test_the_history_count_is_what_the_detail_reports(self):
+        now = FI.now_ts()
+        vals = [5, 0, 5, 0, 5, 0, 5, 0, 5]           # 4 regressions
+        seen = {}
+        out = FI.restart_churn(
+            _parl(5, now), seen, now,
+            )
+        # with no history the sampler is used and says so
+        assert out == [] or "LOWER BOUND" in out[0]["detail"]
+
+    def test_a_dark_history_falls_back_and_declares_it(self):
+        now = FI.now_ts()
+        for bad in (lambda k, limit=0: [],
+                    lambda k, limit=0: None,
+                    lambda k, limit=0: (_ for _ in ()).throw(RuntimeError("db"))):
+            assert FI.churn_from_history("parliament", "data.cycles", now,
+                                         fetch=bad) is None
+
+    def test_history_stalls_are_floor_restricted_too(self):
+        """The same I7 discipline as the sampler arm: an organ idling at a
+        NON-ZERO count is not restarting. A mutation dropping the floor test
+        survived until this existed."""
+        now = FI.now_ts()
+        flat = [7] * 10                              # idle, well above the floor
+        got = FI.churn_from_history("parliament", "data.cycles", now,
+                                    fetch=lambda k, limit=0: self._hist(flat, now))
+        resets, stalls, n = got
+        assert (resets, stalls) == (0, 0), (resets, stalls)
+        at_floor = [0] * 10
+        r2, s2, _ = FI.churn_from_history(
+            "parliament", "data.cycles", now,
+            fetch=lambda k, limit=0: self._hist(at_floor, now))
+        assert (r2, s2) == (0, 9), (r2, s2)
+
+    def test_junk_rows_are_skipped_not_guessed(self):
+        now = FI.now_ts()
+        rows = [{"ts": "not-a-time", "payload": {"data": {"cycles": 9}}},
+                {"ts": FI._iso(now - 60), "payload": {"data": {"cycles": "x"}}},
+                {"ts": FI._iso(now - 30), "payload": None}]
+        assert FI.churn_from_history("parliament", "data.cycles", now,
+                                     fetch=lambda k, limit=0: rows) is None
+
+    def test_the_window_bounds_the_history_too(self):
+        now = FI.now_ts()
+        old = now - FI.RESTART_WINDOW_S - 3600
+        rows = [{"ts": FI._iso(old - 300 * i), "payload": {"data": {"cycles": v}}}
+                for i, v in enumerate([5, 0, 5, 0, 5, 0])]
+        assert FI.churn_from_history("parliament", "data.cycles", now,
+                                     fetch=lambda k, limit=0: rows) is None
+
+    def test_the_scanner_prefers_history_over_its_own_samples(self):
+        src = textwrap.dedent(inspect.getsource(FI.restart_churn))
+        tree = ast.parse(src)
+        called = {n.func.id for n in ast.walk(tree)
+                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+        assert "churn_from_history" in called, \
+            "the publisher series must be consulted, or the count aliases"
 
 
 class TestFailSafeTowardSilence:
