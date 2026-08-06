@@ -57,6 +57,9 @@ The dollar damage is two cents. The evidence damage is the reason to deploy:
 the gate is grading a sample a third of which the book's own design excludes.
 
 ```bash
+# ALREADY RUN 6-Aug 06:22Z — kept for the record, not as an instruction.
+# Verified: the live Taker reads CURRENT at main HEAD (audit_code_currency).
+# Re-running is harmless but redeploys identical code.
 gh workflow run 305025607 -f services="tide-rider-lighter-live"
 ```
 
@@ -81,6 +84,9 @@ judge is on `slope-gate-off` at 16/30 shadow closes with `min-vol-2e6`
 (unaffected) queued ahead. Realistically **2–4 weeks** out.
 
 ```bash
+# ALREADY RUN 6-Aug (both arms) — kept for the record, not as an instruction.
+# Verified: both Farmer arms CURRENT at main HEAD; cage lo=1e5 is live, so
+# the judge's `min-vol-1e5` candidate will be graded on the value it writes.
 gh workflow run 305025607 -f services="trail-blazer-live"
 ```
 

@@ -121,6 +121,31 @@ def test_tiny_n_gets_floor_only():
     assert hz["eta"] == (_T0 + timedelta(days=g.GOLIVE_MIN_DAYS)).date().isoformat()
 
 
+def test_birth_burst_gets_a_floor_not_a_rate():
+    # [(kz)] MEASURED on the live payload: 🎸 Barnesy published
+    # `rate_cpd: 45.66` — 8 closes over the 4.2 HOURS since its first one.
+    # A count floor is not a time floor; a rate needs a denominator too.
+    burst = g.stats(_mk([0.02, 0.001] * 4, span_days=0.15))   # 8 closes, 3.6h
+    hz = g.gate_horizon(burst, first_close=_NOW - timedelta(hours=4),
+                        era_epoch=(_NOW - timedelta(days=1)).timestamp(),
+                        now=_NOW)
+    assert hz["verdict"] == "no_rate", hz
+    assert hz["rate_cpd"] is None, "a birth burst must not publish a rate"
+    assert hz["eta_kind"] == "floor" and hz["eta"], \
+        "the honest window floor must survive — only the false rate goes"
+    assert "burst" in hz["why"], hz
+
+
+def test_the_time_floor_lets_a_real_rate_through():
+    # ...and it must not swallow a genuine measurement: the same shape over a
+    # week publishes its rate normally (a floor that blocks everything is the
+    # I7 failure — a bar satisfied structurally measures nothing).
+    real = g.stats(_mk([0.02, 0.001] * 4, span_days=7.0))
+    hz = g.gate_horizon(real, first_close=_NOW - timedelta(days=7), now=_NOW)
+    assert hz["verdict"] == "on_track" and hz["rate_cpd"], hz
+    assert hz["rate_cpd"] == pytest.approx(8 / 7.0, abs=0.05), hz
+
+
 def test_future_first_close_refuses_a_rate():
     hz = g.gate_horizon(_ONTRACK, first_close=_NOW + timedelta(days=1),
                         now=_NOW)

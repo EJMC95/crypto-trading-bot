@@ -1127,6 +1127,12 @@ def bar_map(s):
 #     run `json_safe`, so a NaN here would kill the whole history write.
 HORIZON_CAP_DAYS = float(os.environ.get("HORIZON_CAP_DAYS", "90"))
 HORIZON_MIN_N_RATE = int(os.environ.get("HORIZON_MIN_N_RATE", "5"))
+# [(kz)] The TIME half of the rate floor. `HORIZON_MIN_N_RATE` bounds the
+# numerator; this bounds the DENOMINATOR. 2 days is derived, not chosen: the
+# fleet's fastest legitimate book closes a few trades a day, so 2d spans
+# several closes for a real earner while refusing the sub-day burst a newborn
+# produces in its first hours (measured: 🎸 Barnesy at 45.66/d over 4.2h).
+HORIZON_MIN_AGE_D = float(os.environ.get("HORIZON_MIN_AGE_D", "2.0"))
 HORIZON_LOWCONF_N = int(os.environ.get("HORIZON_LOWCONF_N", "15"))
 
 # [2026-08-06 (kx)] NON-BOOK bot_pnl PUBLISHERS, declared with reasons — the
@@ -1265,6 +1271,31 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
         out.update(verdict="no_rate",
                    why="first in-era close missing or not in the past — "
                        "no rate denominator")
+        return out
+    if age_d < HORIZON_MIN_AGE_D:
+        # [(kz)] A COUNT FLOOR IS NOT A TIME FLOOR — the missing half of the
+        # n>=5 rule above. MEASURED on the live payload the day it shipped:
+        # 🎸 Barnesy, born 5-Aug, published `rate_cpd: 45.66` — 8 closes over
+        # the 4.2 HOURS since its first one, a birth burst extrapolated as
+        # throughput. A rate needs a denominator as well as a numerator, and
+        # 4 hours of a newborn book is not a measurement of anything.
+        #
+        # Its ETA happened to be RIGHT (the window bar binds at first-close
+        # +30d, pure calendar, immune to the rate) — which is exactly why
+        # this had to be caught by reading the number rather than the date:
+        # a correct date was carrying a fabricated rate, and the first book
+        # whose CLOSES bar binds would have inherited the fiction as a date.
+        # Degrades to the same honest window FLOOR the n-floor uses, so the
+        # published date does not move; only the false precision goes.
+        eta, d = _floor_eta()
+        out.update(verdict="no_rate",
+                   eta=eta, eta_days=_fin(d, 1),
+                   eta_kind=("floor" if eta else None), eta_conf="low",
+                   why=(f"first close {age_d * 24:.1f}h ago — under the "
+                        f"{HORIZON_MIN_AGE_D:g}d observation floor, a rate "
+                        f"would be a birth burst, not throughput; "
+                        + (f"window floor {eta} (opens, not passes)"
+                           if eta else "no era/close to floor a window on")))
         return out
     rate = n / age_d
     out["rate_cpd"] = _fin(rate, 2)
