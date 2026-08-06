@@ -1708,6 +1708,37 @@ def golive_card():
                     f'style="color:#d1242f;background:rgba(209,36,47,.14);'
                     f'border-radius:3px;padding:0 3px;font-size:.75em">'
                     f'2 writers</span>')
+            # [2026-08-06 (kq)] GATE HORIZON — WHEN the book becomes decidable
+            # at its measured trajectory. Published by the grader
+            # (`gate_horizon`), never re-derived here; a payload without the
+            # field renders exactly as before. Amber "→ date" = projected at
+            # the current rate ("~" = low-confidence n); grey "≥ date" = a
+            # window FLOOR (opens, not passes); red "∞ @trend" = unreachable
+            # at the current trajectory (a trajectory statement, NOT a
+            # retirement verdict — the tooltip says why); "undecidable" =
+            # beyond the projection horizon, I17's keep-or-retire class.
+            hz = b.get("horizon") if isinstance(b.get("horizon"), dict) else None
+            if hz and hz.get("verdict") and hz.get("verdict") != "ready":
+                _txt, _col, _bg = None, "#8b949e", "rgba(110,118,129,.10)"
+                _hv = str(hz.get("verdict"))
+                if _hv == "on_track" and hz.get("eta"):
+                    _pre = "~" if hz.get("eta_conf") == "low" else ""
+                    _txt = f'→ {_pre}{html.escape(str(hz["eta"])[5:])}'
+                    _col, _bg = "#d29922", "rgba(210,153,34,.14)"
+                elif _hv == "no_rate" and hz.get("eta"):
+                    _txt = f'≥ {html.escape(str(hz["eta"])[5:])}'
+                elif _hv == "unreachable":
+                    _txt, _col, _bg = "∞ @trend", "#d1242f", "rgba(209,36,47,.14)"
+                elif _hv == "undecidable":
+                    _txt = "undecidable"
+                if _txt:
+                    era_chip += (
+                        f'<span title="{html.escape(str(hz.get("why") or ""))}'
+                        f' — a projection at the current measured trajectory, '
+                        f'never a promise; re-derived each publish." '
+                        f'style="color:{_col};background:{_bg};'
+                        f'border-radius:3px;padding:0 3px;font-size:.75em">'
+                        f'{_txt}</span>')
             miss = "; ".join(str(x) for x in (b.get("fails") or [])[:2])
             col = ("#1a7f37" if is_ready else
                    "#d29922" if np_ >= 5 else "#8b949e")
