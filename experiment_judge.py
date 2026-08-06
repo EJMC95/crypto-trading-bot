@@ -893,7 +893,7 @@ def growth_promoter(rows, gstate, now, drift=None):
         return (gstate, ("eval", {"promote": False,
                                   "why": f"release cooldown until "
                                          f"{iso(_num(gstate['cooldown_until']))}"}))
-    start = now - GROWTH_WINDOW_D * 86400
+    start = growth_window_start(now)
     v = paired_eval(rows, start, now, shadow_bot=SHADOW_BOT, live_bot=LIVE_BOT,
                     min_closes=GROWTH_MIN_CLOSES, live_min=GROWTH_LIVE_MIN,
                     cand_levers=GROWTH_CAND, drift=drift, both_halves=False)
@@ -905,7 +905,59 @@ def growth_promoter(rows, gstate, now, drift=None):
     return (gstate, ("eval", v))
 
 
-def _arm_drift_snapshot(rows, fetch=None):
+_UNSET = object()
+
+
+def growth_window_start(now):
+    """The growth pair's trailing window start — ONE definition.
+
+    Read by growth_promoter (the bar) and by the drift scoping at the call
+    site, so the two can never disagree about which closes are in-window.
+    A second copy of this expression would be a second rule (the (hj) class).
+    """
+    return now - GROWTH_WINDOW_D * 86400
+
+
+def _rows_since(rows, since_ts):
+    """`rows` restricted to closes at-or-after `since_ts` — the SAME filter
+    arm_trades applies to build the bar.
+
+    An unparseable stamp is EXCLUDED, matching arm_trades' own `continue`:
+    a row the bar cannot place in time is a row the drift check must not
+    place either, and the sensor's declared direction is silence.
+    """
+    if since_ts is None:
+        return rows
+    out = []
+    for r in rows or []:
+        try:
+            if parse_ts(r.get("close_ts")) >= since_ts:
+                out.append(r)
+        except Exception:      # noqa: BLE001
+            continue
+    return out
+
+
+def _current_drift(fetch=None):
+    """The CONTAINER half: are the arms running different code right NOW?
+
+    One reading per cycle by construction — it describes a single moment and
+    both consumers ask it the same question. Split out of
+    _arm_drift_snapshot so the row half can be scoped per-window without
+    re-fetching bot_pnl per consumer."""
+    try:
+        import implementation_shortfall as _isf
+    except Exception:      # noqa: BLE001
+        return None
+    try:
+        pnl_rows = (fetch or store.fetch_bot_pnl)() or []
+        cur = _isf.arm_drift(pnl_rows, live=LIVE_BOT, shadow=SHADOW_BOT)
+        return dict(cur, source="bot_pnl-current") if cur is not None else None
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def _arm_drift_snapshot(rows, fetch=None, since_ts=None, current=_UNSET):
     """Arm-drift for paired_eval: EITHER source may raise a hold, neither clears.
 
     [2026-07-28 REVIEW] The row-based check was structurally DARK from birth:
@@ -934,15 +986,43 @@ def _arm_drift_snapshot(rows, fetch=None):
       one, and "unknown" stays quiet (it must — treating unknown as drift
       would fire on every rollout and train the operator to ignore it).
       Fail-safe None on any import/DB failure (a dark sensor claims nothing).
-    `fetch` is injectable for the selftest; defaults to store.fetch_bot_pnl."""
+
+    [2026-08-06 THE ROW HALF IS WINDOW-SCOPED — `since_ts`.] The 17-Jul
+    "same snapshot" note above claimed the drift check and the bar it gates
+    "can never describe different moments" because both read the same `rows`.
+    Same OBJECT, different SAMPLE: the bar filters to [start, now] via
+    arm_trades and the row check read the whole ledger, so it compared each
+    arm's NEWEST close whenever that was — routinely outside the window.
+    MEASURED 6-Aug: both Farmer deploys landed 06:06/06:22Z and the candidate
+    window opened 06:29Z with n_live=0, yet the row check compared the live
+    arm's 02:06Z close (build 6ff86f4d6b09, pre-deploy) against the shadow's
+    07:01Z close (4f998e4eec4d) and raised a HOLD — while bot_pnl had BOTH
+    containers on 4f998e4eec4d. Every row that could enter that bar was
+    post-deploy and converged. The cost was not cosmetic: it held the
+    real-money promotion pipeline and fired an urgent push telling the
+    operator to "deploy both arms to the same build" when they already
+    matched (the (ht)/I8 class — a detector naming an act already taken),
+    and the recovery branch then RESTARTS the experiment clock, so any
+    deploy cost the window its accrued days even when the window was clean.
+    Scoping the row half loses nothing: if the CONTAINERS disagree the
+    current half still holds, and pre-window rows can never reach the bar.
+    `since_ts=None` keeps the whole-ledger behaviour for callers with no
+    window (the selftest).
+
+    `fetch` is injectable for the selftest; defaults to store.fetch_bot_pnl.
+    `current` is the pre-computed container half (_current_drift), hoisted so
+    one cycle takes one bot_pnl reading however many windows it scopes."""
     try:
         import implementation_shortfall as _isf
     except Exception:      # noqa: BLE001
         return None
     try:
-        d = _isf.arm_drift(rows, live=LIVE_BOT, shadow=SHADOW_BOT)
+        d = _isf.arm_drift(_rows_since(rows, since_ts),
+                           live=LIVE_BOT, shadow=SHADOW_BOT)
         if d is not None:
             return d
+        if current is not _UNSET:
+            return current
 
         # [2026-07-29] The row verdict is no longer FINAL-on-converged, and the
         # reason is a measured live state, not a theory. The old rule said: if
@@ -960,11 +1040,7 @@ def _arm_drift_snapshot(rows, fetch=None):
         # evidence (two stamps present, two stamps different), so this can add
         # a hold and never clear one, and "unknown" stays quiet exactly as
         # before (it must — see the docstring on why unknown != drift).
-        pnl_rows = (fetch or store.fetch_bot_pnl)() or []
-        cur = _isf.arm_drift(pnl_rows, live=LIVE_BOT, shadow=SHADOW_BOT)
-        if cur is not None:
-            cur = dict(cur, source="bot_pnl-current")
-        return cur
+        return _current_drift(fetch)
     except Exception:      # noqa: BLE001
         return None
 
@@ -1290,7 +1366,17 @@ def run_once():
     # [2026-07-28] ONE drift snapshot per cycle, shared by the growth step and
     # the running phase — the drift check and the numbers it gates must never
     # describe different moments (the 17-Jul same-snapshot doctrine).
-    _drift_snap = _arm_drift_snapshot(rows) if have_ledger else None
+    # [2026-08-06] ...and "the same moment" now means the same SAMPLE too: the
+    # CONTAINER half is one reading per cycle (it describes NOW, and both
+    # consumers ask it the same question), while the ROW half is scoped to
+    # each consumer's own window — growth's trailing 2.5d below, the
+    # candidate's `started` in the running phase. Unscoped, the row half
+    # compared closes the bar excludes and held the pipeline on a converged
+    # pair; see _arm_drift_snapshot.
+    _cur_drift = _current_drift() if have_ledger else None
+    _drift_snap = (_arm_drift_snapshot(rows, since_ts=growth_window_start(now),
+                                       current=_cur_drift)
+                   if have_ledger else None)
 
     def save(**kw):
         payload = {"updated": iso(now), "ttl_sec": TTL_SEC,
@@ -1470,7 +1556,12 @@ def run_once():
         # spends future money through today's containers. See the docstring.
         # [2026-07-28 §3c] hoisted to _drift_snap (one snapshot per cycle,
         # shared with the growth step above).
-        _drift = _drift_snap
+        # [2026-08-06] The CONTAINER half is still that one shared reading;
+        # the ROW half is re-scoped to THIS candidate's window, because the
+        # growth pair's trailing 2.5d and a candidate's `started` are
+        # different samples and a hold must be about the rows this bar uses.
+        _drift = _arm_drift_snapshot(rows, since_ts=started,
+                                     current=_cur_drift)
         ev = (paired_eval(rows, started, now, cand_levers=cand.get("levers"),
                           drift=_drift)
               if have_ledger else {"promote": False, "why": "no ledger"})
@@ -1985,6 +2076,65 @@ def _selftest():
         def _boom():
             raise RuntimeError("db down")
         assert _arm_drift_snapshot(_r_unstamped, fetch=_boom) is None
+
+        # [2026-08-06] THE WINDOW SCOPING, asserted on the shape that was
+        # measured live: the live arm's newest close predates the deploy and
+        # the candidate window opened AFTER it, so the only rows that can
+        # reach the bar are converged — no hold. Unscoped (since_ts=None)
+        # the same rows raise one, which is exactly the defect.
+        # Mutation check: dropping the _rows_since filter turns assert A red;
+        # letting the scoping swallow the container half turns assert C red.
+        # close_ts carries the ISO string the ledger actually stores (the (hj)
+        # rule: the fixture is the publisher's shape, not a convenient one —
+        # an epoch float here would make every row unparseable and every
+        # assertion below pass vacuously).
+        _w0 = 1_700_000_000.0                  # window opens here
+        _r_prewindow = [
+            {"bot": LIVE_BOT, "close_ts": iso(_w0 - 3600),
+             "extra": {"build": "old"}},
+            {"bot": SHADOW_BOT, "close_ts": iso(_w0 + 60),
+             "extra": {"build": "new"}},
+        ]
+        # A — in-window rows are converged (the live row is out of scope): quiet
+        assert _arm_drift_snapshot(_r_prewindow, since_ts=_w0,
+                                   fetch=lambda: _pnl_same) is None
+        # B — the same rows, unscoped, still hold (the pre-fix behaviour, kept
+        #     for callers with no window)
+        assert _arm_drift_snapshot(_r_prewindow, fetch=lambda: _pnl_same) == \
+            {"live": "old", "shadow": "new"}
+        # C — scoping never blinds the CONTAINER half: rows clean in-window,
+        #     containers on two builds -> hold. This is what makes dropping
+        #     the pre-window rows safe.
+        assert _arm_drift_snapshot(_r_prewindow, since_ts=_w0,
+                                   fetch=lambda: _pnl_drift) == \
+            {"live": "aaa", "shadow": "bbb", "source": "bot_pnl-current"}
+        # D — real drift INSIDE the window is still caught
+        _r_inwindow = [
+            {"bot": LIVE_BOT, "close_ts": iso(_w0 + 30), "extra": {"build": "p"}},
+            {"bot": SHADOW_BOT, "close_ts": iso(_w0 + 60), "extra": {"build": "q"}},
+        ]
+        assert _arm_drift_snapshot(_r_inwindow, since_ts=_w0,
+                                   fetch=lambda: _pnl_same) == \
+            {"live": "p", "shadow": "q"}
+        # E — an unparseable stamp is excluded, matching arm_trades' own
+        #     `continue`: the bar cannot place it, so neither may the sensor
+        _r_junkts = [
+            {"bot": LIVE_BOT, "close_ts": "not-a-time", "extra": {"build": "old"}},
+            {"bot": SHADOW_BOT, "close_ts": iso(_w0 + 60),
+             "extra": {"build": "new"}},
+        ]
+        assert _arm_drift_snapshot(_r_junkts, since_ts=_w0,
+                                   fetch=lambda: _pnl_same) is None
+        # F — the pre-computed container half is used verbatim when the rows
+        #     are quiet (one bot_pnl reading per cycle, however many windows)
+        assert _arm_drift_snapshot(_r_prewindow, since_ts=_w0,
+                                   current=None, fetch=_boom) is None
+        assert _arm_drift_snapshot(
+            _r_prewindow, since_ts=_w0, fetch=_boom,
+            current={"live": "a", "shadow": "b", "source": "bot_pnl-current"}
+        ) == {"live": "a", "shadow": "b", "source": "bot_pnl-current"}
+        # G — growth_window_start is the ONE definition of that window
+        assert growth_window_start(_w0) == _w0 - GROWTH_WINDOW_D * 86400
     else:
         # image without the organ: the sensor is dark and must claim nothing
         assert _arm_drift_snapshot(_r_unstamped, fetch=lambda: _pnl_drift) is None

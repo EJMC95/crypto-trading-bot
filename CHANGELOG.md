@@ -1,3 +1,119 @@
+## 2026-08-06 (la) — A FRESH KEY IS NOT A LIVING ORGAN EITHER: 🏛️ the Parliament restarted 15x in 24h unpaged, and the judge held real money on rows its own bar excludes
+
+*Daily review pass. Two live defects found by reading payloads rather than
+code, both confirmed against production data before a line was written.*
+
+### 1 · THE JUDGE HELD THE REAL-MONEY PIPELINE ON A CONVERGED PAIR
+
+- **MEASURED on the live bus, 6-Aug.** `xp-judge` published, fresh: *"ARMS ON
+  DIFFERENT CODE: live=6ff86f4d6b09 shadow=4f998e4eec4d — no promotion can
+  rest on it"*, holding the `slope-gate-off` experiment and firing an **urgent
+  push telling the operator to deploy both arms to the same build**. Both
+  containers were already on `4f998e4eec4d`: today's deploys landed 06:06Z and
+  06:22Z, and `bot_pnl` had them converged, `build_n=15` on each.
+- **THE MECHANISM is a sample mismatch hiding behind a shared object.** The
+  17-Jul "one snapshot" design read the drift stamps off *"the SAME `rows` the
+  bar is computed from"* — same OBJECT, different SAMPLE. The bar filters to
+  `[started, now]` through `arm_trades`; the row-based drift check read the
+  WHOLE ledger and compared each arm's newest close *whenever that was*. So it
+  matched the live arm's **02:06Z** close (pre-deploy build) against the
+  shadow's **07:01Z** close (post-deploy), for a window that **opened 06:29Z
+  with n_live=0**. Every row that could ever enter that bar was post-deploy and
+  converged.
+- **THE COST WAS NOT COSMETIC.** It is the (ht)/I8 class — a detector whose
+  instruction names an act already taken, which is how a pager gets ignored —
+  and the recovery branch then **restarts the experiment clock**, so any deploy
+  to either arm cost the window its accrued days even when the window was
+  clean. On a book that closes slowly the hold does not self-clear at all: it
+  persists until the quieter arm writes its next trade.
+- **THE FIX: scope the ROW half to the window the bar uses** (`since_ts`),
+  leaving the CONTAINER half unscoped and authoritative. Nothing is lost —
+  if the containers disagree, `bot_pnl-current` still raises the hold; and
+  pre-window rows can never reach the bar. An unparseable stamp is EXCLUDED,
+  matching `arm_trades`' own `continue`: a row the bar cannot place in time is
+  one the sensor must not place either. `growth_window_start()` now gives that
+  window ONE definition instead of a second copy at the call site.
+- **VERIFIED AGAINST THE LIVE PAYLOAD, not a fixture**: replayed through the
+  real `/trades.json` + `/pnl.json` — unscoped reproduces today's hold exactly,
+  scoped returns `None`, containers read converged, and the bar's own sample is
+  `live=0 shadow=0`. **5 mutations, each red** (filter dropped = the original
+  defect; scoping swallowing the container half; unparseable stamp counted
+  in-window; the window halved; the hoisted container reading ignored).
+
+### 2 · 🏛️ THE PARLIAMENT CRASH-LOOPED 15 TIMES IN A DAY AND NOTHING PAGED
+
+- **MEASURED off `/bus.json?hours=24`**: `parliament.data.cycles` reset to 0
+  **15 times** between 05-Aug 10:30Z and 06-Aug 08:33Z (110→0, 250→0, 128→0,
+  …), wiping the six PM books' equity/closed telemetry to `1000.0/0` on every
+  boot. Its neighbours in the same container held an unbroken cadence
+  throughout (fleet-risk 291 samples/24h, brain runs monotone at 427), which is
+  what rules out a container restart and names the supervisor loop.
+- **WHY NOTHING SAW IT, and this is I13's twin.** I13 covers a loop that
+  **stops** — age grows, an outside check catches it. This is a loop that
+  **restarts**: every boot republishes within seconds, so the key is
+  permanently FRESH and *age is the quantity the fault holds fixed*. The
+  watchdog pages on staleness; `fleet_immune` had invariants for fresh-but-
+  wrong CONTENT. Neither can see an organ that is perpetually alive and
+  perpetually starting over. The quantity that grows with the fault is the
+  counter's regression (I2).
+- **`fleet_immune.restart_churn`** watches declared monotone counters
+  (`RESTART_COUNTERS`, `parliament → data.cycles` today) using the organ's own
+  durable memory — a reset is only observable BETWEEN cycles, so the memory IS
+  the sensor, exactly as `app_seen` already works. No history table, no
+  publisher change.
+- **ONE RESET IS A DEPLOY AND STAYS QUIET** — the (gl) lesson: a detector that
+  fires on healthy cadence trains the operator to ignore it. The bar is 4 in
+  24h, and the reasoning is structural rather than arbitrary: **a deploy
+  restarts every organ in the image at once; a crash-loop restarts one while
+  its neighbours keep their cadence.** The window FORGETS, so the finding
+  cannot latch. Fail-safe quiet on an absent key, a **stale** payload (that is
+  the watchdog's jurisdiction), a non-numeric counter, a junk memory, and a
+  first sighting.
+- **REPLAYED THROUGH THE REAL 24h HISTORY**: 271 production samples → 15 resets
+  → **one finding, first crossing the bar at 05-Aug 12:16Z** — roughly 21 hours
+  before this review found it by hand. **7 mutations, each red** — and the
+  seventh is the entry's own lesson: dropping the watched key from the `_keys`
+  fetch (the (hh) dead-code class) **stayed GREEN**, because my wiring test
+  asserted `"RESTART_COUNTERS" in src` and the explanatory COMMENT still
+  carried the word. The (gn) rule biting the test written to enforce it. The
+  claim is now made about the `_keys` **assignment node** via AST.
+- **ROOT CAUSE IS NOT DIAGNOSED and the detector does not pretend otherwise** —
+  it converts an invisible fault into a visible one. The container logs are the
+  next step; the ecosystem DB survives (Keating's ML state persists across
+  boots), so the damage is the supervisor's telemetry, not the ledgers.
+
+### 3 · REGISTRY HYGIENE: 7 LEVERS ON RETIRED BOOKS, AND A HEADER THAT MISDESCRIBED ITS OWN GUARD
+
+- `audit_lever_authority` reads **34 findings** and has been red since its
+  22-Jul birth (it is CI-informational — only its `--selftest` runs). Seven were
+  the gapscout **dangling-by-retirement** shape: `trend.*` (🌊 Tide Rider,
+  retired (if)) and `disloc.*` (🧲 Snap Back, retired (jh)) still ship their
+  `apply_tuning` calls and merely idle at boot, so the static consumer scan
+  finds a consumer that will never run. **Declared, not deleted** — against the
+  gapscout note's own advice, and the reason is stated: both retirements are
+  reversible by env var, so deleting the entries would return a resurrected
+  book with **no growth-rail reach at all**, re-creating I18 as the price of
+  tidying a report. Each declaration carries the measurement that would
+  otherwise have to be re-made (the (hl) safety bound on `trend.max_open`, the
+  (gu) residual-derived cage on `disloc.exit_bps`). **34 → 27.**
+- The guard's docstring still advertised its 22-Jul *"5 FINDING(s)"* run.
+  Corrected in place (I12) with **why the delta is measurement debt rather than
+  regression**, and with the warning the next reader actually needs: `--measure`
+  alone **cannot** clear most of what remains, because the lighter-books lane
+  levers have no `QUANTITIES` spec for it to profile. The guard's own selftest
+  caught one of my declarations for being a label rather than a reason.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**💸 the Farmer — its promotion pipeline stops holding on a converged pair.**
+No bar, sample or position changes anywhere; the Farmer-live still reads 4/6
+with `t` binding and an on_track ETA of ~24-Aug. What changes is that the
+experiment queued to get it there — `min-vol-1e5`, throughput at constant mean,
+the only honest route to `t≥2.0` — can now accrue instead of being held and
+clock-restarted by every deploy. And the fleet gains a sense for an organ that
+is alive and getting nothing done, which is the failure mode 🏛️ the Parliament
+has been in, unwatched, for at least a day.
+
 ## 2026-08-06 (ky) — `t` COUNTS TRADES; A BASKET BOOK MAKES DECISIONS. ⚖️ COUNTERWEIGHT'S 90 CLOSES ARE 24
 
 - *[RENUMBERED (kw) → (ky) at commit time: a concurrent session in this shared tree had already committed its own `(kw)` ("the roster sweep rejected the entire living fleet"), and `(kx)` was taken too. `audit_changelog_letters` caught it before the commit landed — third collision today. The COMMITTED entry keeps the letter.]*

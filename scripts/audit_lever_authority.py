@@ -107,6 +107,28 @@ ledgers. This is the actual run, not a sample. exit 1.
   audit_lever_authority: 5 FINDING(s), 0 stale declaration(s), 5 warning(s);
   19 declared exception(s), 74 OK.
 
+[2026-08-06 I12 — THE COUNT ABOVE IS 22-JUL HISTORY AND THE LIVE RUN NOW READS
+27. Recorded here because the delta reads like a regression and is not.] The
+registry grew ~32 -> 56 levers ((fz)'s lighter-books lane, (eu)'s receipt
+levers, (it)'s carry.min_vol, (jw)'s seven barnes.*) while EVIDENCE still holds
+only the 22-Jul --measure snapshot, and live/xp.funding.enter_apr's evidence was
+deliberately DELETED at the A1 cage widening. So the growth is MEASUREMENT DEBT,
+not guard rot: the mechanics are green (selftest passes, 0 stale declarations),
+and 7 of the findings that were dangling-by-retirement (trend.*, disloc.*) are
+declared as of today.
+
+READ THIS BEFORE "FIXING" IT: --measure alone cannot clear most of what remains.
+A lever reads UNMEASURED when its QUANTITIES spec OR its EVIDENCE is missing,
+and the levers on the lighter-books lane have no QUANTITIES entry at all, so
+--measure has nothing to profile for them. The upkeep is: write the specs, THEN
+re-measure. The two founding findings (EXIT_APR, HARD_STOP — both on the LIVE
+Farmer, both still unlevered) are the ones that were always real.
+
+AND THE REASON THIS MATTERS RATHER THAN BEING TIDINESS: this guard is
+CI-informational (tests/test_selftests.py runs only its --selftest), so a
+saturated bare run is how a genuinely inert new cage arrives invisibly — the
+convergent-metric failure this file's own header warns about, turned inward.
+
 The funding pair's arithmetic in full, on the tape's own 1-decimal grid:
     A(>=3.125) = 93.65%   <- lever lo
     A(>=3.5)   = 93.65%   <- the equity pin 3.504 is STILL admitted here
@@ -506,6 +528,57 @@ LEVER_AUTHORITY_OK = {
         "live-lane episodes; re-deriving it here would duplicate that organ "
         "and give the operator two numbers to reconcile."),
     # --- levers whose CONSUMER is retired -------------------------------------
+    # [2026-08-06] 🌊 Tide Rider (retired 1-Aug (if): 9 buys / ZERO sells in 22
+    # days) and 🧲 Snap Back (retired 4-Aug (jh): t=-2.97, n=175, the fleet's
+    # only statistically significant loser) are the gapscout shape exactly —
+    # both modules still ship and still contain their apply_tuning() calls,
+    # they merely idle at boot behind TIDE_RIDER_RETIRED_OVERRIDE /
+    # SNAPBACK_RETIRED_OVERRIDE, so the static consumer scan finds a consumer
+    # that will never run. Their gated quantities stopped being produced at
+    # retirement and cannot accrue again unless a book is resurrected.
+    #
+    # WHY DECLARED AND NOT DELETED, against the gapscout note's own advice:
+    # both retirements are deliberately REVERSIBLE by env var, and deleting
+    # the registry entries would mean a resurrected book comes back with NO
+    # growth-rail reach at all — re-creating the I18 defect ("a book whose
+    # only tunable knobs are the ones with room LOOKS tunable and cannot
+    # move") as the price of tidying a report. The cost of keeping them is one
+    # declared line each; the cost of deleting them is paid by whoever
+    # resurrects the book and cannot work out why the rail ignores it.
+    "lever:trend.universe_n": (
+        "Dangling by retirement — 🌊 Tide Rider, retired 1-Aug (if). Reversible "
+        "via TIDE_RIDER_RETIRED_OVERRIDE=run; see the block note above on why "
+        "the entry is kept rather than deleted."),
+    "lever:trend.max_open": (
+        "Dangling by retirement — 🌊 Tide Rider (if). Note its cage hi was set "
+        "to 9 as a SAFETY bound by (hl) (at >=10 the -10% daily-loss halt "
+        "becomes reachable before the -35% stop), so this entry also records a "
+        "safety finding that must survive any resurrection."),
+    "lever:trend.min_vol_m": (
+        "Dangling by retirement — 🌊 Tide Rider (if). Its 5.0 -> 3.0 move was "
+        "measured (ZEC+PAXG carried 91% of the delta; 2.0 lowered the mean), so "
+        "the bound is evidence-backed and worth preserving for a resurrection."),
+    "lever:trend.rank_by_funding": (
+        "Dangling by retirement — 🌊 Tide Rider (if), and INERT even before it: "
+        "measured max simultaneously-golden coins = 1 against 6 slots, so the "
+        "ranking never bound while the book ran."),
+    "lever:disloc.enter_pct": (
+        "Dangling by retirement — 🧲 Snap Back, retired 4-Aug (jh). Reversible "
+        "via SNAPBACK_RETIRED_OVERRIDE=run. Its real binding gate was never "
+        "this lever but the unregistered ENTER_FLOOR_MULT literal — the I18 "
+        "finding that helped justify the retirement, recorded here so it is not "
+        "re-learned."),
+    "lever:disloc.universe_n": (
+        "Dangling by retirement — 🧲 Snap Back, retired 4-Aug (jh). It widened "
+        "the ranked universe 16 -> 40 off fleet_bus.scout_universe; that feed "
+        "still publishes, but the book that consumed it idles at boot, so the "
+        "admitted-set distribution this bound gates stopped being produced on "
+        "the day of the retirement."),
+    "lever:disloc.exit_bps": (
+        "Dangling by retirement — 🧲 Snap Back (jh). This was the fleet's FIRST "
+        "exit lever ((gu)) and its cage [8.0, 40.0] was derived from the live "
+        "residual distribution (median 7.9bps, p90 21.8), so the entry carries a "
+        "measurement that would have to be re-made from scratch."),
     "lever:gapscout.prefilter_gap": (
         "DANGLING BY RETIREMENT, declared because the automatic consumer scan "
         "CANNOT see it: Gap Scout was retired 17-Jul under LIGHTER-ONLY, but "

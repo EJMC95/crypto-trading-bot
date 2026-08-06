@@ -567,6 +567,94 @@ def _parse_ts(s):
 BRAIN_MEMORY_SKEW_S = float(os.environ.get("IMMUNE_BRAIN_SKEW_S", "21600"))
 
 
+#: [2026-08-06] MONOTONE COUNTERS whose REGRESSION means the publisher
+#: restarted: {state key: (dotted path to the counter, human name)}. Declared
+#: rather than sniffed — a counter this organ does not understand must not be
+#: guessed at, and an undeclared organ simply is not watched (visible in the
+#: payload's `churn_watched`, never a silent omission).
+RESTART_COUNTERS = {
+    "parliament": ("data.cycles", "🏛️ the Parliament's supervisor loop"),
+}
+#: Restarts inside RESTART_WINDOW_S before the churn is called sickness. One
+#: restart is an ordinary DEPLOY and must stay quiet, or this pages on every
+#: push. Four in a day is not a deploy pattern: a deploy restarts EVERY organ
+#: in the image at once, and a crash-loop restarts one while its neighbours
+#: keep their cadence — which is exactly what was measured on 6-Aug.
+RESTART_CHURN_N = int(os.environ.get("IMMUNE_RESTART_CHURN_N", "4"))
+RESTART_WINDOW_S = float(os.environ.get("IMMUNE_RESTART_WINDOW_S", "86400"))
+
+
+def _dotted(payload, path):
+    cur = payload
+    for part in str(path).split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(part)
+    return cur
+
+
+def restart_churn(states, seen, now, min_n=None, window_s=None):
+    """-> [{organ, detail}] when an organ's monotone counter keeps RESETTING.
+
+    THE CLASS THIS CLOSES, and it is I13's twin. I13 says a dead loop runs no
+    handler, so liveness is only visible from OUTSIDE — an age check. A
+    RESTARTING loop defeats the age check from the other side: every boot
+    republishes, so the key is permanently FRESH while the organ never
+    completes any work. Age is the quantity the fault holds FIXED; the
+    counter's regression is the quantity that grows with it (I2).
+
+    MEASURED 6-Aug on 🏛️ the Parliament: `data.cycles` reset to 0 **15 times
+    in 24h** (110->0, 250->0, 128->0, ...), the six PM books' equity/closed
+    telemetry wiped to 1000.0/0 on every boot, and the key never once read
+    stale — age 233s at the sweep that found it. Nothing paged, because the
+    watchdog pages on staleness and the immune organ had no invariant for
+    "publisher keeps restarting". Its neighbours in the same container held an
+    unbroken cadence throughout (fleet-risk 291 samples/24h, brain runs
+    monotone), which is what rules out a container restart and names the
+    supervisor.
+
+    `seen` is this organ's own durable memory — {key: {"last": n, "resets":
+    [ts,...]}} — mutated in place and persisted by the caller, the same
+    first-seen pattern application_sickness uses. No history table is read: a
+    reset is only observable BETWEEN cycles, so the memory IS the sensor.
+
+    FAIL-SAFE TOWARD SILENCE at every step: an absent key, a non-numeric
+    counter, a stale payload (a stale organ is the watchdog's jurisdiction,
+    matching organ_invariants) and a first sighting all claim nothing. A
+    counter that ADVANCES or holds is healthy. Only a positive, repeated
+    regression speaks.
+    """
+    min_n = RESTART_CHURN_N if min_n is None else min_n
+    window_s = RESTART_WINDOW_S if window_s is None else window_s
+    out = []
+    for key, (path, label) in sorted(RESTART_COUNTERS.items()):
+        st = states.get(key) or {}
+        if not st or not _fresh(st, now):
+            continue
+        cur = _dotted(st, path)
+        if not isinstance(cur, (int, float)) or isinstance(cur, bool):
+            continue
+        mem = dict(seen.get(key) or {})
+        resets = [float(t) for t in (mem.get("resets") or [])
+                  if isinstance(t, (int, float))]
+        last = mem.get("last")
+        if isinstance(last, (int, float)) and not isinstance(last, bool) \
+                and cur < last:
+            resets.append(float(now))
+        resets = [t for t in resets if now - t <= window_s]
+        seen[key] = {"last": float(cur), "resets": resets}
+        if len(resets) >= min_n:
+            hrs = window_s / 3600.0
+            out.append({
+                "organ": key,
+                "detail": (f"{label} RESTARTED {len(resets)}x in {hrs:.0f}h "
+                           f"({path} keeps resetting; now {cur:g}) — the key "
+                           f"stays FRESH on every boot, so no age check can "
+                           f"see this, and in-process state is lost each time"),
+            })
+    return out
+
+
 def brain_amnesia(brain_state, vitals_state, max_skew_s=None):
     """-> [{organ, detail}] when the brain's MEMORY key has stopped being
     written while it keeps publishing fresh vitals.
@@ -743,7 +831,12 @@ def run_once():
              # [2026-07-31 (hx)] the brain's MEMORY, read against
              # `brain-vitals` above to detect amnesia. Same lesson as the
              # (hh) note: without this key `brain_amnesia` is dead code.
-             "learning-brain")
+             "learning-brain",
+             # [2026-08-06] the restart-churn counter. Same lesson a third
+             # time: without this key `restart_churn` is dead code, so the
+             # key and the scanner move in one commit. Membership is pinned
+             # by tests/autonomy/test_immune_restart_churn.py.
+             ) + tuple(RESTART_COUNTERS)
     _batch = store.fetch_states(_keys) if hasattr(store, "fetch_states") else {}
     states = {k: (_batch.get(k) or store.load_state(k) or {}) for k in _keys} \
         if not _batch else {k: (_batch.get(k) or {}) for k in _keys}
@@ -801,8 +894,13 @@ def run_once():
     except Exception:  # noqa: BLE001
         _papers = []
     app = application_sickness(levers, _papers, now, app_seen)
+    # [2026-08-06] restart churn: this organ's own memory of each watched
+    # counter, carried cycle to cycle exactly like app_seen above (a reset is
+    # only observable BETWEEN cycles, so the memory IS the sensor).
+    churn_seen = dict(prior.get("churn_seen") or {})
     sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
             + stale_writer_sickness(bot_rows)
+            + restart_churn(states, churn_seen, now)
             + brain_amnesia(states.get("learning-brain"),
                             states.get("brain-vitals"))
             + [{"organ": "fleet-tuning", "detail": f"{n}: {w}"} for n, w in q.items()]
@@ -829,6 +927,14 @@ def run_once():
         # [2026-07-16] first-seen map for the application invariant — the
         # organ's own memory of when each (lever, value) appeared.
         "app_seen": app_seen,
+        # [2026-08-06] the restart-churn memory (per watched counter: last
+        # value + the reset timestamps still inside the window). Persisted
+        # for the same reason app_seen is: without it every cycle is a first
+        # sighting and the sensor can never fire.
+        "churn_seen": churn_seen,
+        # ...and WHICH counters are watched, so an organ that is NOT watched
+        # is visible here rather than silently unmonitored.
+        "churn_watched": sorted(RESTART_COUNTERS),
         # [2026-07-17 AUDIT] `notified` records what was DELIVERED, not what was
         # SEEN. It used to be set to every sick_id and saved BELOW, before the
         # push decision — so a finding the gap limiter vetoed (NOTIFY_GAP_H=6h)
@@ -1252,6 +1358,47 @@ def _selftest():
     assert "brain_amnesia(" in _src_run, "brain_amnesia must be consumed"
     assert '"learning-brain"' in _src_run, \
         "learning-brain must be in the _keys fetch or the detector is inert"
+    # [2026-08-06] RESTART CHURN — the 🏛️ Parliament shape, measured: the key
+    # is FRESH on every boot (so no age check can see it) while `data.cycles`
+    # resets 15x/24h. Fixture carries the payload's real nesting.
+    def _parl(cycles, ts=None):
+        return {"parliament": {"updated": _iso(ts or now), "ttl_sec": 900,
+                               "data": {"cycles": cycles, "books": 204}}}
+    _cs = {}
+    # a first sighting claims nothing, and a counter that ADVANCES is healthy
+    assert restart_churn(_parl(110), _cs, now) == []
+    assert restart_churn(_parl(111), _cs, now) == []
+    assert _cs["parliament"]["last"] == 111.0 and not _cs["parliament"]["resets"]
+    # ...and one reset is an ordinary DEPLOY: below the bar, still quiet
+    assert restart_churn(_parl(0), _cs, now) == []
+    assert len(_cs["parliament"]["resets"]) == 1
+    # four resets inside the window IS churn -> exactly one finding, naming
+    # the organ the operator must go and look at (I8)
+    for _c in (5, 0, 8, 0, 3, 0):
+        _out = restart_churn(_parl(_c), _cs, now)
+    assert len(_out) == 1 and _out[0]["organ"] == "parliament", _out
+    assert "RESTARTED 4x" in _out[0]["detail"], _out
+    # the window FORGETS: resets older than it stop counting (a churn last
+    # week is not churn today)
+    _old = {"parliament": {"last": 99.0, "resets": [now - 90000] * 9}}
+    assert restart_churn(_parl(0), _old, now) == []
+    # FAIL-SAFE QUIET: absent key, stale payload, non-numeric counter
+    assert restart_churn({}, {}, now) == []
+    _stale = {"parliament": {"updated": _iso(now - 99999), "ttl_sec": 900,
+                             "data": {"cycles": 0}}}
+    _cs2 = {"parliament": {"last": 500.0, "resets": [now] * 9}}
+    assert restart_churn(_stale, _cs2, now) == [], \
+        "a STALE organ is the watchdog's jurisdiction, not sickness"
+    _junk = {"parliament": {"updated": _iso(now), "ttl_sec": 900,
+                            "data": {"cycles": "many"}}}
+    assert restart_churn(_junk, {"parliament": {"last": 9.0,
+                                                "resets": [now] * 9}}, now) == []
+    # wired, and its key is FETCHED — the (hh) lesson a third time
+    assert "restart_churn(" in _src_run, "restart_churn must be consumed"
+    assert "RESTART_COUNTERS" in _src_run, \
+        "the watched keys must reach the _keys fetch or the detector is inert"
+    assert "churn_seen" in _src_run, \
+        "the durable memory must be persisted or every cycle is a first sighting"
     assert application_sickness({}, [], now, {}) == {}
     # [2026-07-17 AUDIT] THE NOTIFY LEDGER: `notified` must mean DELIVERED, not
     # SEEN. It was committed with every sick_id before the push decision, so a
