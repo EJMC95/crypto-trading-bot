@@ -174,7 +174,7 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
 
 ## 5 · Standing (calendar, no action)
 
-**COMPUTED NOW — 6-Aug (kq).** The go-live dates below are derived from the
+**COMPUTED NOW — 6-Aug (ks).** The go-live dates below are derived from the
 ledger by the grader each publish (`golive-readiness` → per-book `horizon`,
 rendered on the 🚦 dashboard card and the daily review's 🔭 line) — read those,
 not this paragraph. First live read: **Farmer-live on_track ~23-Aug (t bar

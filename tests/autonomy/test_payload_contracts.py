@@ -857,7 +857,16 @@ def test_realised_lens_evidence_reads_the_fetch_shape():
 
 def test_open_positions_never_reach_the_realised_grade():
     """An open row carries an UNREALISED mark; grading on it grades a guess.
-    fetch_paper_trades returns them with exit_reason='hold'."""
+
+    [2026-08-06 (kq)] The premise sentence here used to read "fetch_paper_trades
+    returns them with exit_reason='hold'", and that is FALSE — corrected in
+    place per I12. That helper reads only the CLOSED ledger and sets
+    `is_open: False` on every row; `hold` is merely what `exit_reason()`
+    returns when no bracket fired, so a `_hold` close is a REAL trade. Acting
+    on the wrong premise cost 22% of the taker's realised record, by exit path,
+    and flipped two veto verdicts. The discriminator is `is_open`, with an
+    ABSENT key defaulting to open — which is what the middle row below pins,
+    and it is the half of this test that was always right."""
     import lighter_ticket_taker as tt
     rows = [
         {"bot": "b", "enter_tag": "long-breakoutup", "exit_reason": "hold",

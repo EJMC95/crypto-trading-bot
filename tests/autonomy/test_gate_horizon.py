@@ -1,6 +1,6 @@
 """GATE HORIZON — the fleet's first sense of its own FUTURE, producer/consumer bound.
 
-[2026-08-06 (kq)] `gate_horizon` projects WHEN each currently-failing go-live
+[2026-08-06 (ks)] `gate_horizon` projects WHEN each currently-failing go-live
 bar flips at a book's measured in-era trajectory, published as an additive
 per-book `horizon` sub-dict beside `era`/`alltime`/`integrity`. The operator's
 calendar was hand-typed prose (OPERATOR_QUEUE item 5) and had already rotted —

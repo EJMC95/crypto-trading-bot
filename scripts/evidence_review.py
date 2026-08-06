@@ -643,7 +643,7 @@ def scan_new_evidence(cur, errors):
             # about the sample any more than about the bars.
             rows, rows_all, era_iso = era_rows(bot, quads)
             status, why, s = gate_status(rows)
-            # [2026-08-06 (kq)] GATE HORIZON — the hand calendar, computed.
+            # [2026-08-06 (ks)] GATE HORIZON — the hand calendar, computed.
             # The canonical `gate_horizon` (one owner, same doctrine as
             # bar_map/era_rows above: the review FORMATS, it never re-derives).
             # This section's sample is realised-only by its own declared
@@ -712,7 +712,7 @@ def scan_new_evidence(cur, errors):
                      f"{'; '.join(passers) if passers else 'NO new candidate'}")
         if near:
             items.append("⏳ waiting only on the window bar: " + "; ".join(near))
-        # [(kq)] The computed calendar. OPERATOR_QUEUE item 5's dates were
+        # [(ks)] The computed calendar. OPERATOR_QUEUE item 5's dates were
         # hand-typed prose and had already rotted (the Farmer's "~16-Aug"
         # matches its pre-(jf) era); these are derived from the ledger by the
         # canonical grader each run. Projections at the current measured
@@ -720,7 +720,7 @@ def scan_new_evidence(cur, errors):
         if horizon_lines or horizon_tally:
             _tal = "; ".join(f"{k}@trend: {v}" for k, v in
                              sorted(horizon_tally.items()))
-            items.append("🔭 gate horizon (computed at trajectory, (kq)): "
+            items.append("🔭 gate horizon (computed at trajectory, (ks)): "
                          + ("; ".join(horizon_lines) if horizon_lines
                             else "no projectable candidate")
                          + (f" · {_tal}" if _tal else ""))

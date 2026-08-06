@@ -1006,7 +1006,7 @@ def bar_map(s):
 
 
 # ---------------------------------------------------------------------------
-# GATE HORIZON — WHEN does this book become decidable? [2026-08-06 (kq)]
+# GATE HORIZON — WHEN does this book become decidable? [2026-08-06 (ks)]
 # ---------------------------------------------------------------------------
 # Every organ in this fleet senses the past or the present; none computed the
 # future. The operator's go-live calendar lived as hand-typed prose
@@ -1716,7 +1716,7 @@ def _selftest():
                  {"policy": {"lenses": []}}, {"policy": {"bull": True}}):
         assert policy_signature(junk) is None, junk
 
-    # ---- [2026-08-06 (kq)] GATE HORIZON — every verdict earns its keep ----
+    # ---- [2026-08-06 (ks)] GATE HORIZON — every verdict earns its keep ----
     # Deterministic: `now` is always injected. Each verdict below is the SOLE
     # outcome of its case, per this selftest's own rule ("each bar must be the
     # sole reason in some case, or it is untested decoration").
@@ -1978,7 +1978,7 @@ def main():
         ok_old, fails_old = grade(s, legacy=True)
         if overlaps:
             ok_old = False
-        # [(kq)] THE HORIZON — computed beside the verdict, never instead of
+        # [(ks)] THE HORIZON — computed beside the verdict, never instead of
         # it. Wrapped so an annotation bug can never fail the grade (the same
         # never-raise contract the publish block carries): a dark horizon is a
         # lost projection; a crashed grader is a lost gate.
@@ -2016,7 +2016,7 @@ def main():
             flag += (f"   [ledger: {len(overlaps_all)} historical overlap(s) "
                      f"predate this era]")
         if hz.get("verdict") and hz["verdict"] != "ready":
-            # [(kq)] One glance at WHEN. The full reasoning is in the payload.
+            # [(ks)] One glance at WHEN. The full reasoning is in the payload.
             _h = hz["verdict"] + (f" {hz['eta']}" if hz.get("eta") else "") \
                 + (f" ({hz['binding']})" if hz.get("binding") else "")
             flag += f"   [horizon: {_h}]"
@@ -2071,7 +2071,7 @@ def main():
                      "closes_in_era": s.get("n", 0),
                      "closes_all_time": s_all.get("n", 0)} if era_iso else None),
             "alltime": book_payload(s_all),
-            # [2026-08-06 (kq)] GATE HORIZON — when this book becomes
+            # [2026-08-06 (ks)] GATE HORIZON — when this book becomes
             # decidable at its measured trajectory. REPORTED, NOT A BAR
             # (`grade()`/`BAR_NAMES` untouched); era-scoped only, computed
             # once here rather than in `book_payload` (which runs twice per

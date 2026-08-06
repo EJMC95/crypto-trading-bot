@@ -1708,7 +1708,7 @@ def golive_card():
                     f'style="color:#d1242f;background:rgba(209,36,47,.14);'
                     f'border-radius:3px;padding:0 3px;font-size:.75em">'
                     f'2 writers</span>')
-            # [2026-08-06 (kq)] GATE HORIZON — WHEN the book becomes decidable
+            # [2026-08-06 (ks)] GATE HORIZON — WHEN the book becomes decidable
             # at its measured trajectory. Published by the grader
             # (`gate_horizon`), never re-derived here; a payload without the
             # field renders exactly as before. Amber "→ date" = projected at

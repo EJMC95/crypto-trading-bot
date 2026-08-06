@@ -956,11 +956,48 @@ def realised_lens_evidence(rows, bot_row, sides=None):
     for r in (rows or []):
         if (r or {}).get("bot") != bot_row:
             continue
-        # OPEN positions carry an UNREALISED mark. Grading a lens on them is
-        # grading a guess — and `fetch_paper_trades` returns them with
-        # exit_reason='hold'. Caught by verifying against the publisher's real
-        # rows rather than a fixture ((hj)).
-        if r.get("is_open") or str(r.get("exit_reason") or "") == "hold":
+        # OPEN positions carry an UNREALISED mark and must not be graded.
+        #
+        # [2026-08-06 (kq)] THE `exit_reason == "hold"` CLAUSE IS GONE — it was
+        # discarding 22% of this book's REALISED record, by exit path.
+        #
+        # The claim it rested on ("`fetch_paper_trades` returns open positions
+        # with exit_reason='hold'") is FALSE of this ledger, measured three
+        # ways: that helper reads only `paper_trades` (the CLOSED table), it
+        # hardcodes `is_open: False` on every row it builds, and the shadow
+        # arm's 165 rows carry **165 distinct trade_ids with ZERO duplicate
+        # (pair, opened_at) groups** — so a `_hold` row is never a snapshot
+        # that later re-closes as `_tp`. `hold` is what `exit_reason()` returns
+        # when NO bracket condition fired, so a close written with it is a
+        # position closed by some other path — a real trade with realised P&L.
+        #
+        # WHAT IT COST, measured on the live ledger the day this shipped:
+        #   * `breakoutup` — n=13 −1.856%/t=−1.18 (VETOED, `realised_loses`)
+        #     vs n=22 −0.242%/t=−0.22 on its full record: NOT a loser. **The
+        #     verdict flipped**, so a lens was being denied fills on a sample
+        #     truncated by exit path.
+        #   * `momentum` — absent ENTIRELY (every close exits `hold`), so a
+        #     whole lens was invisible to the realised veto.
+        #   * `divergence`, the LIVE arm's only lens — n=61 -> 74 shadow,
+        #     37 -> 41 live. Verdict unchanged, but this is the evidence that
+        #     overrides the forward proxy for a real-money book (I14), and it
+        #     was 18% short.
+        #
+        # THE CORROBORATION that settles it: I14 in CLAUDE.md cites `dip` at
+        # **−1.162%/trade, t=−2.66**. That is the hold-INCLUSIVE number (n=13);
+        # the shipped filter computes −2.485%/t=−2.97 on n=4. The doctrine was
+        # written from the full record and the code drifted from it.
+        #
+        # THE DISCRIMINATOR IS `is_open`, AND AN ABSENT KEY DEFAULTS TO OPEN.
+        # That default is what the old 'hold' clause was really reaching for,
+        # and `test_open_positions_never_reach_the_realised_grade` is right to
+        # demand it: a caller who hands over a row with no `is_open` at all has
+        # told us nothing, and grading an unknown row is the very guess this
+        # excludes. It costs nothing in production — `fetch_paper_trades` sets
+        # the key on every row it builds — while keeping the fail-safe for any
+        # future caller. What it does NOT do is infer "open" from an exit
+        # LABEL, which is how 22% of a realised ledger went missing.
+        if r.get("is_open", True):
             continue
         # SHAPE, verified against `bot_pnl_store.fetch_paper_trades` itself:
         # it SPLITS the stored `reason` into `enter_tag` ('short-divergence')
@@ -3171,6 +3208,38 @@ def selftest():
     assert vetoed_lenses(_fwd_ok, realised={"dip": (13, -1.162, -2.66)}) == {"dip"}
     # below the sample floor the realised verdict does NOT decide — too thin
     assert vetoed_lenses(_fwd_ok, realised={"dip": (4, -2.485, -2.97)}) == set()
+
+    # ---- (kq) A `hold` EXIT IS A REALISED CLOSE, NOT AN OPEN POSITION ------
+    # THE INCIDENT: `realised_lens_evidence` skipped `exit_reason == "hold"`,
+    # believing those rows were open positions carrying an unrealised mark.
+    # They are not: `fetch_paper_trades` reads only the CLOSED ledger and
+    # hardcodes `is_open: False`, and the shadow arm's 165 rows carry 165
+    # DISTINCT trade_ids with zero duplicate (pair, opened_at) groups. `hold`
+    # is simply what `exit_reason()` returns when no bracket condition fired.
+    # It discarded 22% of the book's realised record, BY EXIT PATH, and the
+    # two tuples immediately above are the same lens: (13, -1.162, -2.66) is
+    # `dip`'s full record — the number I14 itself quotes — while the filter
+    # produced (4, -2.485, -2.97), which this file asserts does NOT veto. So
+    # the fleet's only statistically significant taker loser was escaping its
+    # own veto by being truncated below the sample floor.
+    _hold_rows = [
+        {"bot": "b", "enter_tag": "long-dip", "exit_reason": "hold",
+         "profit_ratio": -0.02, "is_open": False},
+        {"bot": "b", "enter_tag": "long-dip", "exit_reason": "sl",
+         "profit_ratio": -0.03, "is_open": False},
+        # a genuinely OPEN row must STILL be excluded — that half is unchanged
+        {"bot": "b", "enter_tag": "long-dip", "exit_reason": "hold",
+         "profit_ratio": +9.99, "is_open": True},
+    ]
+    _ev = realised_lens_evidence(_hold_rows, "b")
+    assert _ev["dip"][0] == 2, \
+        f"a `hold` close is realised evidence and must count: {_ev}"
+    assert _ev["dip"][1] < 0, "the open row's +9.99 must not leak in: %s" % (_ev,)
+    # and the exclusion that IS correct still holds on its own
+    assert realised_lens_evidence(
+        [{"bot": "b", "enter_tag": "long-dip", "exit_reason": "tp",
+          "profit_ratio": 0.01, "is_open": True}], "b") == {}, \
+        "an OPEN position carries an unrealised mark and may never be graded"
     # a realised loss that is merely NOISY does not veto: the shadow arm is a
     # grading instrument and a veto on noise ends the grade before it starts
     assert vetoed_lenses(_fwd_ok, realised={"dip": (30, -0.4, -0.5)}) == set()

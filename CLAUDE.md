@@ -686,7 +686,7 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   `alltime` (the pooled reading it replaced, so nothing is hidden) and
   `integrity`; `--min-closes` filters on the ALL-TIME count so a demoted book
   shows dark bars instead of vanishing.
-  **[2026-08-06 (kq)] It also publishes the 🔭 GATE HORIZON** — per-book, WHEN
+  **[2026-08-06 (ks)] It also publishes the 🔭 GATE HORIZON** — per-book, WHEN
   the failing bars flip at the measured in-era trajectory (`n_req = n·(T/t)²`
   for the t bar; rate over ERA AGE never close-span, I1; verdicts
   ready/on_track/no_rate/unreachable-at-trajectory/undecidable-per-I17/
