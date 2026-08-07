@@ -1811,6 +1811,21 @@ def record_organ_error(key, exc=None, where=None):
     it in the payload the fleet ALREADY watches, so `fleet_immune` reaches the
     operator by the path every organ already uses — no new plumbing.
     """
+    # [2026-08-07 (lj)] THE MISSING IMPORT THAT MADE THIS FUNCTION A NO-OP FROM
+    # THE DAY IT SHIPPED. `datetime` is not a module-level name in this file —
+    # every other user imports it locally (lines 1012, 1376, 1655) — so
+    # `datetime.now(...)` below raised NameError on EVERY call, the blanket
+    # `except Exception: return False` swallowed it, and the function returned
+    # False without ever reaching `save_state`. Verified by stubbing both DB
+    # calls to succeed: `save_state` is still never called.
+    #
+    # So `(hw)`'s whole deliverable — "20 of 22 organs had no way to report
+    # their own death" — never recorded a single organ death. And the caller
+    # made it worse than silent: `organ_main` discarded the result and printed
+    # "ORGAN FAULT recorded on its own bot_state key so the immune organ can
+    # see it", a sentence that has never been true (I4's discarded result and
+    # I8's unactionable instruction in one line, now both fixed).
+    from datetime import datetime, timezone      # noqa: PLC0415 — file convention
     try:
         payload = load_state(key) or {}
         if not isinstance(payload, dict):
@@ -1862,10 +1877,22 @@ def organ_main(key, fn, *args, **kwargs):
         lines = [ln.strip() for ln in tb.strip().splitlines()]
         if len(lines) >= 2:
             where = lines[-2][:200]
-        record_organ_error(key, e, where)
-        print(f"[{key}] ORGAN FAULT recorded on its own bot_state key so the "
-              f"immune organ can see it: {type(e).__name__}: {e}",
-              file=sys.stderr)
+        # [2026-08-07 (lj)] READ THE RESULT AND SAY WHICH HAPPENED (I4/I8).
+        # This discarded the return value and printed "recorded ... so the
+        # immune organ can see it" unconditionally — a sentence that was FALSE
+        # on every call for as long as `record_organ_error` had its missing
+        # import, and that would go on being false whenever the DB is down.
+        # The two cases need different words because they need different acts:
+        # one says the operator will be paged, the other says nobody will.
+        if record_organ_error(key, e, where):
+            print(f"[{key}] ORGAN FAULT recorded on its own bot_state key so "
+                  f"the immune organ can see it: {type(e).__name__}: {e}",
+                  file=sys.stderr)
+        else:
+            print(f"[{key}] ORGAN FAULT — AND IT COULD NOT BE RECORDED. This "
+                  f"death is visible ONLY in this container's log, which is "
+                  f"the silence record_organ_error exists to end: "
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
         return 1
 
 

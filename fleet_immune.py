@@ -268,6 +268,62 @@ def application_sickness(levers, paper_rows, now, seen):
     return out
 
 
+def organ_faults(states):
+    """[2026-08-07 (lj)] Organs that recorded their OWN death — `(hw)`'s signal,
+    finally consumed.
+
+    `bot_pnl_store.organ_main` catches an organ's exception and calls
+    `record_organ_error`, which stamps `healthy=False` / `error` / `error_at`
+    onto that organ's own bot_state key. `(hw)` built it because `run_all.sh`
+    runs every organ as `python3 <organ>.py || true`, so a crash goes to a
+    container log nobody tails — measured that day at **20 of 22 organs with no
+    way to report their own death**.
+
+    THE WHOLE MECHANISM WAS DEAD IN THREE PLACES AT ONCE, which is why nobody
+    noticed any one of them:
+      * the WRITER raised NameError on every call (`datetime` is not a
+        module-level name in `bot_pnl_store`) and its blanket except returned
+        False — so nothing was ever stamped;
+      * its CALLER discarded that False and printed "ORGAN FAULT recorded ...
+        so the immune organ can see it" regardless (I4 + I8);
+      * and **nothing read the field**. `clear_organ_error` is called by no
+        organ at all, and `healthy` appears in no consumer in the tree.
+    A writer that never wrote, a clearer nobody calls, and no reader. Fixing
+    only the import would have left a signal that still reached no one — *"a
+    finding no gate consumes is a note"*.
+
+    NO FRESHNESS GATE HERE, deliberately, and it inverts the rule its sibling
+    `organ_invariants` follows. That one asks "is this CONTENT currently true?",
+    which a stale payload cannot answer. This asks "did this organ die?" — and
+    a dead organ is exactly the one that stops refreshing its key, so gating on
+    freshness would mute the loudest case (I1 read the other way round: age is
+    the evidence, not the disqualifier). `error_at` carries the age into the
+    detail so the operator can see how old the death is.
+    """
+    out = []
+    for key in sorted(states or {}):
+        st = states.get(key)
+        if not isinstance(st, dict) or not st:
+            continue
+        # `healthy` is only ever written False by record_organ_error and True
+        # by clear_organ_error, so its ABSENCE means "this organ has never
+        # stamped either" — not a fault. Test the explicit False.
+        if st.get("healthy") is not False:
+            continue
+        err = str(st.get("error") or "unknown")
+        at = st.get("error_at")
+        where = st.get("error_where")
+        out.append({"organ": key,
+                    "detail": (f"ORGAN DIED AND SAID SO — {err}"
+                               + (f" at {where}" if where else "")
+                               + (f" (recorded {at})" if at else "")
+                               + ". It crashed under `|| true`, so its exit "
+                                 "code and traceback are invisible; this stamp "
+                                 "is the only record. Restart is automatic — "
+                                 "the fix is the exception.")})
+    return out
+
+
 def organ_invariants(states, now):
     """Fresh-but-WRONG content in the key organs. Each finding is
     {organ, detail}. Only checks organs whose payload is FRESH (a stale
@@ -1033,7 +1089,8 @@ def run_once():
     # counter, carried cycle to cycle exactly like app_seen above (a reset is
     # only observable BETWEEN cycles, so the memory IS the sensor).
     churn_seen = dict(prior.get("churn_seen") or {})
-    sick = (organ_invariants(states, now) + bot_row_sickness(bot_rows)
+    sick = (organ_invariants(states, now) + organ_faults(states)
+            + bot_row_sickness(bot_rows)
             + stale_writer_sickness(bot_rows)
             + restart_churn(states, churn_seen, now)
             + brain_amnesia(states.get("learning-brain"),

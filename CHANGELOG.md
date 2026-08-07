@@ -357,6 +357,57 @@
   that no longer describes the system is a defect (I12), and an enforcement
   list that covers one direction of a two-direction rule is exactly that.
 
+### The organ-death recorder never recorded anything, its caller said it had, and nothing read the field
+
+- **THREE BROKEN LINKS IN ONE CHAIN, which is why no single one was noticed.**
+  `(hw)` shipped `record_organ_error` because `run_all.sh` runs every organ as
+  `python3 <organ>.py || true` — the exit code goes to `|| true`, the traceback
+  to a log nobody tails, and it measured **20 of 22 organs with no way to report
+  their own death**.
+  1. **THE WRITER NEVER WROTE.** `record_organ_error` calls
+     `datetime.now(timezone.utc)`, and **`datetime` is not a module-level name
+     in `bot_pnl_store`** — every other user in the file imports it locally
+     (lines 1012, 1376, 1655). So it raised `NameError` on EVERY call, the
+     blanket `except Exception: return False` swallowed it, and it returned
+     False. **Proven rather than inferred**: with `load_state` AND `save_state`
+     both stubbed to succeed, it still returns False and `save_state` is
+     **still never called**.
+  2. **THE CALLER SAID IT HAD.** `organ_main` discarded that False and printed
+     *"ORGAN FAULT recorded on its own bot_state key so the immune organ can
+     see it"* unconditionally — a sentence that has never once been true. I4's
+     discarded persistence result and I8's unactionable instruction in one line.
+  3. **NOTHING READ THE FIELD.** `clear_organ_error` is called by **no organ at
+     all**, and `healthy` appears in **no consumer anywhere in the tree**.
+  A writer that never wrote, a clearer nobody calls, and no reader. Fixing only
+  the import would have left a signal that still reached nobody — *"a finding no
+  gate consumes is a note"*.
+- **ALL THREE FIXED.** The local import (matching the file's own convention);
+  the caller now reads the result and prints a DIFFERENT sentence when the
+  recording failed, because the two cases need different acts — one says the
+  operator will be paged, the other says nobody will; and
+  `fleet_immune.organ_faults` is the consumer, folded into the existing `sick`
+  list so it rides the notify path every other finding already uses.
+- **THE CONSUMER IS DELIBERATELY NOT FRESHNESS-GATED, and that inverts its own
+  sibling.** `organ_invariants` asks *"is this CONTENT true right now?"*, which
+  a stale payload cannot answer, so it skips them. This asks *"did this organ
+  die?"* — and **a dead organ is precisely the one that stops refreshing its
+  key**, so gating on freshness would mute the loudest case. I1 read the other
+  way round: here age is the evidence, not the disqualifier. `error_at` carries
+  it into the detail so the operator can age the death.
+- **`healthy` ABSENT IS NOT A FAULT.** It is only ever written False by
+  `record_organ_error` and True by `clear_organ_error`, so absence means the
+  organ has never stamped either way — which today is nearly all of them.
+  Testing `is not False` rather than falsiness is what keeps this from firing on
+  the entire fleet on its first run; a detector that flags everything trains the
+  operator to ignore it.
+- **SEVEN MUTATIONS, EACH RED** — the import removed · the caller discarding and
+  lying again · the consumer unwired from `run_once` · the consumer firing on an
+  absent `healthy` · the consumer freshness-gated · the stamp blanking the
+  organ's existing payload · `record_organ_error` allowed to raise. The chain
+  test drives writer → caller → consumer with only the DB edges stubbed, because
+  each of the three links looked fine in isolation and that is exactly how this
+  survived.
+
 ### WHICH BOOK MOVED (doctrine rule 4)
 
 **🎫 the Ticket Taker's LIVE row — its in-era sample stops being a third
