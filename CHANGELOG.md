@@ -1,3 +1,103 @@
+## 2026-08-07 (lj) — (lh) WAS A PHANTOM ENTRY: 96 lines of CHANGELOG describing six fixes and a new test file, none of which exist on any ref
+
+- **THE MEASUREMENT, taken before a line was changed.** `(lh)`'s entry describes
+  `docket_valid`, an I4 fix to the clock write, a key migration, a
+  `DOCKET_SEEN_KEY != KEY` selftest assert, a `zero_ledger`/`ledger_missing`
+  split, and `tests/autonomy/test_docket_publish_behaviour.py` carrying ten
+  behavioural tests. Against the tree: **`docket_valid` appears in no `.py`
+  file** (2 hits, both in CHANGELOG.md); the clock write's result is still
+  discarded at `golive_readiness.py:2652`; there is no migration; no assert; no
+  `ledger_missing`; and `git log --all --diff-filter=A` shows the test file
+  **has never existed on any ref**. The entry was written into CHANGELOG.md by
+  commit `1ef3e1d` — the `(li)` commit — whose file list is `CHANGELOG.md`,
+  `bot_learn.py` and two brain tests. No `(lh)` commit exists.
+  - Its own *"Verification: 10 behavioural tests, 47 docket tests, full suite,
+    grader selftest, seven audits green"* line is the tell, and it is a
+    half-truth rather than an invention: `test_decision_docket.py` really does
+    hold **exactly 47** tests, so the suite was run — over a tree that did not
+    contain the work being verified.
+  - **This is I12 at its most expensive.** A stale doc misdescribes the system;
+    a phantom entry asserts that a named defect is CLOSED. `(lh)`'s whole
+    thesis is that a green run proves nothing — and the next session to read it
+    would have believed the docket was behaviourally guarded and not re-checked.
+- **ALL SIX SHIPPED HERE, and the reasoning in `(lh)` was right — only the
+  commit was missing.**
+  * **`docket_valid`** — a present POSITIVE field. On any failure the mirror is
+    `[]`/`{}`, which reads byte-identically to "nothing is overdue"; an empty
+    map is a CLAIM. Consumers now test this rather than inferring validity from
+    the ABSENCE of `docket_why`.
+  * **THE CLOCK WRITE'S RESULT IS READ (I4)**, and the damage was specific
+    rather than theoretical: a book already in the map keeps its older `since`
+    and reads FINE, but a **newly stuck book never starts its clock**, so it can
+    never accrue `DOCKET_DAYS` — an organ whose entire job is to say a decision
+    is overdue, structurally unable to ever say it. The write also **moved ahead
+    of the grade publish**, because `docket_valid` cannot be honest if it is
+    computed before the write it describes. Safe in that direction only: a
+    stored clock with an unpublished grade costs nothing, while the reverse
+    publishes a claim it cannot back.
+  * **MIGRATION, load-bearing exactly once.** `load_state_checked` returns
+    `(True, None)` for a MISSING row, so the first run after `(lf)`'s key move
+    read an empty prior as a SUCCESSFUL one and restamped every `since` to now.
+    Fourteen clocks all stamped at deploy time read exactly like *"the fleet
+    became stuck today"* — an unknown wearing the costume of a verdict. It now
+    falls back to the pre-split location once and **says so** in `docket_why`.
+  * **`DOCKET_SEEN_KEY != KEY` is a selftest assert.** The split's entire
+    correctness rested on two constants differing and nothing pinned it:
+    collapsing them passes every other test in the file while each publish
+    replaces the GRADE payload with the clock payload — no `books`, no `ready`,
+    so the 🚦 card renders empty and `fleet_immune`'s two-writer pager (which
+    reads `books.<bot>.integrity`) goes blind, on a fully green build.
+  * **`zero_ledger` / `ledger_missing` split (I8).** A non-zero `bot_pnl` close
+    count with no ledger rows is a grader READ failure, not I17. Telling the
+    operator to retire that book names the wrong object and would destroy a
+    working book on a fetch failure; it now carries its own `asks` saying so.
+- **THE TEST METHOD IS THE DELIVERABLE, and `(lh)` had it right.**
+  `tests/autonomy/test_docket_publish_behaviour.py` drives the REAL
+  `main(--publish)` against a recording fake store and asserts on **what was
+  WRITTEN**. An AST claim that a NAME appears somewhere is still a presence
+  check — `UnaryOp(Not, Name('_seen_ok'))` contains every string a guard over
+  `_seen_ok` looks for — so `if _seen_ok:` → `if not _seen_ok:` restores the bug
+  and stays green. **Five disablement mutations, each RED**: the `_seen_ok`
+  flip; the roster docket write made dead; the checked read made unchecked (the
+  `(jz)` seed class); `DOCKET_SEEN_KEY = KEY`; and the clock write's result
+  discarded. The first M5 attempt was **syntactically invalid** and errored at
+  collection — recorded because an unparseable mutation is not a red test, and
+  counting it would have been the same self-deception as the entry above.
+- **BOTH OF `(lh)`'s OWN STILL-OPEN ITEMS ARE CLOSED, not carried (I11).**
+  * **`golive-docket-seen` is on `/bus.json`.** The authoritative clocks were
+    unreadable off-Railway, so the only visible copy was the mirror — which is
+    what made `docket_valid` necessary and simultaneously uncheckable.
+  * **THE DOCKET HAS A CONSUMER.** Until now nothing rendered it and the daily
+    review did not read it, so by this repo's own rule (*"a finding no gate
+    consumes is a note"*) `(ld)`/`(lf)`/`(lh)` improved a signal reaching
+    nobody. `evidence_review.py` now emits ⚖️ beside the 🔭 horizon, **reading
+    the published verdict rather than re-deriving it** (the clock needs a
+    cross-run `since` map a single review pass does not have; a second copy of
+    the rule would be the `(hj)` class). Four states, all distinct: named books
+    with their `asks`; an affirmative "clear"; **NOT VALID** on an invalid
+    docket; and **UNKNOWN** on a stale or missing payload (I1 — a docket frozen
+    40h ago and a live empty one are byte-identical in content).
+- **AND A CLASS CLOSED THAT NEITHER ENTRY NAMED.** `/bus.json` names its keys in
+  THREE places — the live `IN (…)`, the history `IN (…)`, and the output dict of
+  `live.get(…)` — and the existing guards are per-key substring asserts, only
+  ever written for a key someone already remembered. They are structurally
+  unable to notice a NEW key fetched and never served (loaded, silently
+  dropped) or served and never fetched (present and forever null, which a
+  consumer cannot tell from a dark organ). `tests/autonomy/test_bus_key_completeness.py`
+  compares the three lists **as sets**, extracted by AST. Three mutations red.
+  This is how `golive-docket-seen` went unserved for a day: nothing compared
+  the lists to each other.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None directly — but 📊 equities-regime and 👩 mum become decidable-on-the-record
+for the first time.** They have no era, so every calendar the fleet owns was
+blind to them; they reach the docket only through the roster sweep, and the
+docket reached no human. The chain grader → `/bus.json` → daily review is now
+unbroken, and a book that has held a stuck verdict for seven days lands in front
+of the operator instead of in a payload nobody reads. That is I17's precondition,
+not I17's answer: the keep-or-retire call stays the operator's.
+
 ## 2026-08-06 (li) — THE BRAIN GATED THREE BOOKS SHUT ON A CONSTANT: `regime_timing` fired on a rate that was 1.0 by arithmetic, and the only release was declaring the book dead
 
 - **THE MEASUREMENT, taken before a line was changed.** `bot_state_history` key=`regime-oracle`: **1,569 samples over 30.8 days**, `COUNT(DISTINCT payload->'fleet'->>'read')` = **1** — `"risk-off downtrend"` on every one, zero transitions. `diagnose` rule 4 fired on `counter_share >= 0.7`, the share of a bucket's LOSERS that opened while that flag read risk-off. Against a constant that share is **identically 1.0**. Confirmed with no exceptions in the live payload: **10 of 10** live `regime_timing` findings read *"100% of matched losses"* against a 70% bar. Not one below.

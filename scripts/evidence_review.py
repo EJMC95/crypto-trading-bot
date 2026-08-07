@@ -753,6 +753,58 @@ def scan_new_evidence(cur, errors):
                          + ("; ".join(horizon_lines) if horizon_lines
                             else "no projectable candidate")
                          + (f" · {_tal}" if _tal else ""))
+        # [2026-08-06 (lj)] ⚖️ THE DECISION DOCKET — its FIRST consumer.
+        # (ld) built it, (lf) fixed three defects in it and (lh) recorded, as
+        # still open, that "the docket still has NO CONSUMER: nothing renders
+        # it and the daily review does not read it". By this repo's own rule a
+        # finding no gate consumes is a note, so until this line existed the
+        # whole organ improved a signal that reached nobody.
+        #
+        # READ, NEVER RE-DERIVED. The clock lives in the grader (it needs the
+        # cross-run `since` map, which a single review pass does not have), so
+        # this section FORMATS the published verdict exactly as it does for
+        # bar_map/era_rows/gate_horizon above. A second copy of the docket rule
+        # here would be the (hj) class.
+        _dk_state, _dk_age = load_state(cur, "golive-readiness")
+        _dk_state = _dk_state or {}
+        _dk_stale = census_publisher_age_h(_dk_age,
+                                           dt.datetime.now(dt.timezone.utc))
+        if _dk_stale is None or _dk_stale > 24:
+            # I1: liveness before semantics. A frozen payload's docket is
+            # byte-identical to a live "nothing overdue" one.
+            items.append("⚖️ decision docket: grader payload is "
+                         + ("unreadable" if _dk_stale is None
+                            else f"{_dk_stale:.1f}h stale")
+                         + " — the docket below could not be refreshed, so "
+                           "treat it as UNKNOWN, not as empty")
+        elif not _dk_state.get("docket_valid"):
+            # The whole reason `docket_valid` exists: [] is a CLAIM, and on a
+            # failed clock read it reads identically to "nothing is overdue".
+            items.append("⚖️ decision docket: NOT VALID this cycle — "
+                         + (_dk_state.get("docket_why")
+                            or "no reason published")
+                         + " — an empty docket here means 'could not tell', "
+                           "never 'nothing is overdue'")
+        else:
+            _dk = _dk_state.get("decision_docket") or []
+            _dd = _dk_state.get("docket_days")
+            if _dk:
+                # NAME THE BOOKS (I8) — "3 overdue" is not something an
+                # operator can act on, and (la) had just fixed exactly that
+                # failure in the horizon tally three items above.
+                items.append(
+                    f"⚖️ DECISION DOCKET — {len(_dk)} book(s) stuck "
+                    f"≥{_dd:g}d; I17 keep-or-retire is an OPERATOR call, not "
+                    "another tuning pass: "
+                    + "; ".join(
+                        f"{d.get('book')} ({d.get('reason')}, "
+                        f"{d.get('days_held')}d"
+                        + (f", n={d.get('n')}" if d.get("n") is not None else "")
+                        + ") → " + str(d.get("asks") or "")
+                        for d in _dk))
+            else:
+                items.append(f"⚖️ decision docket: clear — no book has held a "
+                             f"stuck verdict ≥{_dd:g}d")
         # [(hl)] The maxdd bar is measured on REALISED closed P&L only, so a
         # book that is usually IN a position has drawdown the bar cannot see —
         # measured on 📊 Index Rider, realised 9.9-10.7% vs true MTM 15.6-17.4%,

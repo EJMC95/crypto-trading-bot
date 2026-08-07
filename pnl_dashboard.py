@@ -5060,6 +5060,17 @@ class H(BaseHTTPRequestHandler):
                             # readable from a review seat with no Railway
                             # login — it is the bar that governs real money.
                             "'golive-readiness', "
+                            # [2026-08-06 (lj)] THE DOCKET'S AUTHORITATIVE
+                            # CLOCKS. `golive-readiness` carries a MIRROR of
+                            # them (`docket_seen`), but the durable record
+                            # lives in its own key — (lf) split it out
+                            # precisely so a failed read costs the clocks and
+                            # never the grade. Without this line the only
+                            # off-Railway copy was the mirror, so a review seat
+                            # could not tell a book's clock from a redraw of
+                            # it. Serving both is what makes `docket_valid`
+                            # checkable rather than merely believed.
+                            "'golive-docket-seen', "
                             # [2026-08-04 (iy)] the allocation organ was
                             # publishing healthy 30-min payloads that NO
                             # review surface served — the (hw) wrong-surface
@@ -5122,6 +5133,7 @@ class H(BaseHTTPRequestHandler):
                                    "strategy_incubator": live.get("strategy-incubator"),
                                    "fleet_radar": live.get("fleet-radar"),
                                    "golive_readiness": live.get("golive-readiness"),
+                                   "golive_docket_seen": live.get("golive-docket-seen"),
                                    "fleet_allocation": live.get("fleet-allocation"),
                                    "fleet_respiration": live.get("fleet-respiration"),
                                    "fleet_clock": live.get("fleet-clock"),
