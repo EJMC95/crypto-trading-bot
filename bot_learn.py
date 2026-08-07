@@ -166,6 +166,16 @@ VITALS_KEY = "brain-vitals"
 # a venue problem, so its prose pointed at the wrong lever.
 DIAG_KEY = "brain-diagnosis"
 DIAG_MIN_N = 10           # closed era trades before diagnosing a bucket
+# [2026-08-07 (li)] The control group rule 4 never had — see `diagnose`.
+#: matched NON-losers required before a base rate means anything. Mirrors the
+#: losers' own `matched >= 8` floor: a base computed off 2 winners is noise
+#: wearing a denominator, and this rule's action STOPS A BOOK TRADING.
+REGIME_BASE_MIN_N = 8
+#: how much more often losers must have opened in risk-off than non-losers.
+#: A real regime effect separates the two populations; a constant oracle gives
+#: EXACTLY 0.0 lift, which is the defect this closes. 15pp is deliberately
+#: modest — the point is to reject 0.0, not to demand a large effect.
+REGIME_LIFT_MIN = 0.15
 # [2026-07-15 LENS-FORWARD] counterfactual scout-lens scoreboard published for
 # the taker (restrict-only veto) + the dashboard. Same freshness contract.
 LENS_FWD_KEY = "brain-lens-forward"
@@ -945,6 +955,30 @@ def _load_regime_history():
     return out
 
 
+def _regime_hist_varies(regime_hist):
+    """Did the oracle's risk-off flag take MORE THAN ONE value in this window?
+
+    [2026-08-07 (li)] A conditioning variable that never varies is not
+    evidence. Scoped to the history the rule ACTUALLY READ (`_load_regime_history`
+    pages a bounded window), not to all of time — a guard that asks a different
+    question from the rule it protects is not protecting it.
+
+    Fail-CLOSED for the caller's purposes: an empty or absent history returns
+    False, so no action is minted. Refusing to mint here means the book KEEPS
+    TRADING, which is the safe direction for a gate whose failure mode is a
+    book silenced indefinitely.
+    """
+    seen = set()
+    for h in (regime_hist or []):
+        try:
+            seen.add(bool(h["risk_off"]))
+        except (KeyError, TypeError):
+            continue
+        if len(seen) > 1:
+            return True
+    return False
+
+
 def _regime_at(regime_hist, open_ts):
     """Nearest oracle snapshot within 1h of a trade's open, else None."""
     t = _epoch(open_ts)
@@ -1021,6 +1055,43 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget,
             counter += 1 if r["risk_off"] else 0
     counter_share = (counter / matched) if matched >= 8 else None
 
+    # [2026-08-07 (li)] THE CONTROL GROUP — I6, and this rule had none.
+    #
+    # `counter_share` is the share of a bucket's LOSERS that opened while the
+    # oracle read risk-off, and rule 4 fired on it exceeding 0.7. MEASURED the
+    # day this shipped: `regime-oracle.fleet.read` had published
+    # "risk-off downtrend" on **1,569 of 1,569** history samples spanning 30.8
+    # days — ZERO transitions. So `counter_share` was identically 1.0 for every
+    # bucket on every book: arithmetic, not a measurement (I7), and 100% of the
+    # bucket's WINNERS shared the property too (I6 — the population where the
+    # thing is absent did not exist). All 10 live regime_timing findings read
+    # exactly "100% of matched losses"; not one below.
+    #
+    # What it cost: the action gates BOTH sides of a book, so the book stops
+    # trading, its era bucket freezes (`era_trades` filters on a FIXED start),
+    # the hypothesis re-fires identically forever, and the ONLY release is the
+    # book going silent past LIVENESS_DAYS — the gate lifts by declaring the
+    # book dead, then re-fires once it trades. A one-way latch with a perverse
+    # escape. 🏛️ pm-gillard sat gated 10.6 days; pm-abbott was released, traded
+    # for 12.75h, and was re-gated.
+    #
+    # The fix is the one `(jv)` already made in `event_sentinel` two days
+    # earlier for the identical shape (a market-bias constant gating nothing):
+    # score against a control group, not a raw rate. The class was engraved
+    # there and never swept — this is the sweep.
+    others = [t for t in trades if (t.get("profit_abs") or 0) >= 0]
+    base_matched = base_counter = 0
+    for t in others:
+        r = _regime_at(regime_hist, t.get("open_ts"))
+        if r is not None:
+            base_matched += 1
+            base_counter += 1 if r["risk_off"] else 0
+    base_share = ((base_counter / base_matched)
+                  if base_matched >= REGIME_BASE_MIN_N else None)
+    regime_lift = (counter_share - base_share
+                   if (counter_share is not None and base_share is not None)
+                   else None)
+
     # [2026-07-28 AUDIT FIX] venue_ab is keyed by BASE name but `bot` here is
     # the SUFFIXED ledger id (e.g. 'perps-funding-lighter-lshadow') — the old
     # lookup missed by construction for every living book. Strip the suffix
@@ -1050,6 +1121,13 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget,
           "fee_share": None if fee_share is None else round(fee_share, 2),
           "regime_matched": matched,
           "counter_regime": None if counter_share is None else round(counter_share, 2),
+          # [2026-08-07 (li)] the control group, published beside the rate it
+          # controls. A reader who sees counter_regime=1.00 alone cannot tell a
+          # regime effect from a constant tape; with base_regime=1.00 beside it
+          # the vacuity is visible without re-deriving anything.
+          "base_regime": None if base_share is None else round(base_share, 2),
+          "regime_lift": None if regime_lift is None else round(regime_lift, 2),
+          "regime_varies": _regime_hist_varies(regime_hist),
           "twin_pnl": twin_pnl, "twin_n": twin_n}
 
     def out(primary, proposal):
@@ -1087,11 +1165,26 @@ def diagnose(bot, tag, trades, regime_hist, venue_ab, drift_budget,
                    f"{where} losses are fee-scale (median loser {med_loser:.2%} vs "
                    f"~{fee_rt:.2%} round-trip) — raise band/edge floors or move venue; "
                    f"signals are not the lever")
-    # 4. REGIME TIMING: losses cluster in oracle risk-off windows.
-    if counter_share is not None and counter_share >= 0.7:
+    # 4. REGIME TIMING: losses cluster in oracle risk-off windows MORE THAN
+    #    this bucket's own non-losers do. The lift is what makes it a
+    #    measurement rather than a restatement of the tape — see the
+    #    control-group block above. Three conditions, all required:
+    #      * the absolute bar (unchanged, 0.7);
+    #      * a control group exists at all (I6 — no base, no action);
+    #      * the oracle actually VARIED in the window this rule read. The lift
+    #        already forces this arithmetically (a constant gives base ==
+    #        counter, lift 0.0), but it is asserted separately so the latch
+    #        cannot return silently if REGIME_LIFT_MIN is ever re-tuned toward
+    #        zero. A gate that stops a book trading must not rest on one
+    #        tunable.
+    if (counter_share is not None and counter_share >= 0.7
+            and regime_lift is not None and regime_lift >= REGIME_LIFT_MIN
+            and _regime_hist_varies(regime_hist)):
         return out("regime_timing",
                    f"gate {where} entries on the shared regime — {counter_share:.0%} "
-                   f"of matched losses opened during oracle risk-off")
+                   f"of matched losses opened during oracle risk-off, against "
+                   f"{base_share:.0%} of its non-losers (lift {regime_lift:+.0%} "
+                   f"vs a {REGIME_LIFT_MIN:.0%} bar)")
     # 5. ENTRY QUALITY: price kept falling after losing exits — the exits were
     #    right, the entries were wrong. The ONLY case that earns the old
     #    "tighten the entry gates" prose.

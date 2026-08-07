@@ -168,13 +168,41 @@ def test_the_phantom_fee_would_shadow_the_only_actionable_diagnosis():
         "brain keeps blaming costs and never reaches regime_timing")
 
 
+def _regime_effect_bucket(n_losers=12, pct=0.010, n_win=10):
+    """A bucket carrying a GENUINE regime effect: losers in risk-off, winners
+    in risk-on, so `counter_share − base_share` is a real lift.
+
+    [2026-08-06 (li)] This fixture used to be 12 losers, NO winners, and an
+    all-risk-off history — and it reached `regime_timing` because rule 4 fired
+    on a raw rate that is 1.0 by arithmetic whenever the oracle is constant.
+    That is the exact defect (li) fixed: the test was passing BECAUSE of the
+    bug. Its actual invariant — rule 3 (`fee_bleed`) must not shadow rule 4,
+    the only diagnosis carrying an actuator — is unchanged and still tested;
+    it now just rests on regime evidence that would genuinely justify the
+    verdict. Winners are tiny (+0.001) so the bucket stays NET NEGATIVE, which
+    `diagnose` requires before it will classify at all.
+    """
+    base = _T0.timestamp()
+    trades = _losers(n_losers, pct)
+    hist = [{"ts": base + i, "risk_off": True} for i in range(n_losers)]
+    for j in range(n_win):
+        off = 7200 + j * 60          # well clear of the losers' 1h match window
+        trades.append({"pair": "BTC/USDT", "profit_abs": +0.001,
+                       "profit_ratio": +0.0001, "enter_tag": "long-dip",
+                       "exit_reason": "roi",
+                       "open_ts": _iso(_T0 + timedelta(seconds=off)),
+                       "close_ts": _iso(_T0 + timedelta(seconds=off + 100))})
+        hist.append({"ts": base + off, "risk_off": False})
+    return trades, hist
+
+
 def test_diagnose_reaches_regime_timing_on_a_zero_fee_venue():
     """End-to-end through the real diagnose(): the same bucket that would have
     been called `fee_bleed` now reaches `regime_timing`, which is the finding
     that carries an actuator."""
-    trades = _losers(12, 0.010)
+    trades, hist = _regime_effect_bucket()
     d = bot_learn.diagnose("perps-funding-carry-lshadow", "long-dip", trades,
-                           _regime_hist(risk_off=True), {}, {"left": 120},
+                           hist, {}, {"left": 120},
                            venue_fees={"taker": 0.0, "maker": 0.0})
     assert d is not None, "the bucket should be diagnosable at this n"
     assert d["primary"] != "fee_bleed", (

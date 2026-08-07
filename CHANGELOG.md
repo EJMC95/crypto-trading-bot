@@ -1,3 +1,97 @@
+## 2026-08-06 (li) — THE BRAIN GATED THREE BOOKS SHUT ON A CONSTANT: `regime_timing` fired on a rate that was 1.0 by arithmetic, and the only release was declaring the book dead
+
+- **THE MEASUREMENT, taken before a line was changed.** `bot_state_history` key=`regime-oracle`: **1,569 samples over 30.8 days**, `COUNT(DISTINCT payload->'fleet'->>'read')` = **1** — `"risk-off downtrend"` on every one, zero transitions. `diagnose` rule 4 fired on `counter_share >= 0.7`, the share of a bucket's LOSERS that opened while that flag read risk-off. Against a constant that share is **identically 1.0**. Confirmed with no exceptions in the live payload: **10 of 10** live `regime_timing` findings read *"100% of matched losses"* against a 70% bar. Not one below.
+  - **I7** — a trigger a book satisfies STRUCTURALLY is not a measurement. **I6** — every one of those buckets' WINNERS opened in risk-off too, so the population where the property is absent did not exist. The independent tell that this was never a regime effect: **both sides of all three books qualified.** A rule concluding *"don't go long AND don't go short"* from a constant has measured nothing.
+- **THE LATCH, and it is the expensive part.** The minted action gates both directions via `fleet_bus.entry_regime_gated` → `parliament/strategies.py:364`. A gated book takes no trades → its era bucket freezes (`era_trades` filters on a FIXED start, no rolling window) → the hypothesis re-fires identically every run → `last_run` tracks `run_no` forever → retirement via `PROMOTE_RUNS` is **unreachable**. The ONLY release is `alive` at `bot_learn.py:1657-1659`: the book going silent past `LIVENESS_DAYS`. **The gate lifts by declaring the book dead, then re-fires the moment it trades.** Measured limit cycle: 🏛️ pm-gillard continuously gated **10.6 days** and silent 137.9h; pm-abbott released 5-Aug 10:29Z, opened one position at 21:39Z, **re-gated at 23:14Z** — 12.75h of trading inside a 7.6-day drought.
+- **THE FIX IS A SWEEP, NOT AN INVENTION — and that is the whole point.** `(jv)` made the identical correction **two days earlier** in `event_sentinel`, for the identical shape (a market-bias constant: *"the panic was structural, not observed"*), and `tests/autonomy/test_sentinel_bias_edge.py` engraved it. **The lesson was engraved and the sweep was never done.** Rule 4 now requires a **LIFT over the bucket's own non-losers** (`REGIME_LIFT_MIN = 0.15`) rather than a bare rate, with `REGIME_BASE_MIN_N = 8` mirroring the losers' own floor. On a constant oracle base == counter, lift is **exactly 0.0**, and all 10 findings correctly evaporate.
+  - **A SECOND, INDEPENDENT LOCK**: `_regime_hist_varies(regime_hist)` asserts the oracle actually took more than one value **in the window the rule read**. The lift already forces this arithmetically, so this is deliberately redundant — because if a later pass re-tunes `REGIME_LIFT_MIN` toward zero, `lift >= 0.0` is TRUE on a constant and the latch returns **silently**. A gate that stops a book trading must not rest on one tunable. Pinned by a test that sets the bar to 0.0 and requires the refusal to hold.
+  - **FAIL-SAFE DIRECTION, stated because it inverts the usual habit**: refusing to mint keeps the book **trading**. For a gate whose failure mode is a book silenced indefinitely, "no evidence ⇒ no action" is the safe default, so an absent control group and an empty history both decline.
+  - **PUBLISHED STRUCTURALLY, not just in prose**: `base_regime`, `regime_lift` and `regime_varies` join `counter_regime` in the evidence dict. A reader seeing `counter_regime=1.00` alone cannot distinguish a regime effect from a constant tape; with `base_regime=1.00` beside it the vacuity is visible without re-deriving anything.
+- **MUTATION-VERIFIED ×5, and one of my own tests failed to discriminate first.** Red: the bare rate restored; the variance lock dropped alone; the control group computed over all trades instead of non-losers; `_regime_hist_varies` failing OPEN on an empty history. The fifth — **a missing control group defaulting to `base_share = 0.0`, the permissive direction — SURVIVED**, because my no-control-group fixture used an all-risk-off history and was therefore caught by the *variance* lock instead. The fixture now uses a VARYING history so only the `REGIME_BASE_MIN_N` floor can refuse it, and the mutation reddens. A test that passes for the wrong reason is the thing this entry is about.
+- **`CHANGELOG.md:871` CORRECTED IN PLACE (I12), same pass.** `(kh)` wrote that gillard, rudd and abbott *"ARE measured losers, so those retirement cases are real"*. The MDE/power numbers reproduce **exactly**; the label does not. Only **abbott** is individually significant (t=−2.15, p=0.0347); gillard reads p=0.128, rudd p=0.346, and **no book survives Benjamini-Hochberg at FDR 0.05** over the six-book family. Under `(kh)`'s own semantics one bullet earlier the supported label is *"measured to carry no positive edge at high power"*. Left standing it was the fleet's citable precedent for retiring a book on **t=−1.53 / p=0.128** — the exact underpowered-null-as-evidence failure `(kh)` shipped to prevent, committed by `(kh)` itself.
+- **FOUR REFUSALS from the same sweep, worth as much as the fix** (13 agents, each finding adversarially refuted; two of six DEFECT calls did not survive and are **not** reinstated): the regime GATE itself is correct and faithfully restrict-only — **do not "fix" it**, the defect was one level upstream in what mints its input; `ml_gate = 0.45` is cage-registered, consumed, and its missing autonomous author is DECLARED in place at `strategies.py:76-83` (the `BORN_DARK_OK` idiom) — and it must **not** be loosened, since the population it admits measures −0.0168%/trade (I19); the tuner does **not** ratchet — `_starving_widen` is `entry_bar`'s only author, its only multiplier is 0.85, and over the Parliament's entire 16.6-day life every stance ever published is exactly `base × 0.85`, one loosening step, never an increase; and the **12+ supervisor restarts are container redeploys, not a Parliament fault** — 17 `freqtrade-bots` deploys between 04:27Z and 12:18Z on 6-Aug, **zero** of the 31 commits in that window touching `parliament/`. The chamber is a passenger.
+- **STILL OPEN, named rather than implied**: `last_skip` is a never-reset latch that also embeds a varying payload (`ml-gate({p_win:.2f})`), which inflates that class's transition count **2.98x** while five other classes read 1.00x — it misled **two of six investigations in this very sweep** into naming the wrong binding gate. The Parliament publishes no boot counter, so `fleet_immune.restart_churn` must infer restarts from `data.cycles` resetting and **undercounts** (12 reported vs ≥16 actual). `self.signals` is in-process TTL'd state that no restart restores — the last open instance of a class closed three times already (🎯 sniper's `baseline`, `surge_done`, 🎸 Barnes's `restore_hot_since`).
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**Three: 🏛️ pm-gillard, pm-rudd and pm-abbott — from structurally unable to open a position, back to decidable.** Between them they hold **454 of the cohort's 518 closes**, and all three had both directions gated on a rule that could not have concluded anything else. This does not make them winners: the cohort still reads −$8.70 with no book carrying an I16 claim, and the keep-or-retire call (I17) remains the operator's. What it restores is their ability to **produce evidence for that decision** — which is the fleet's declared forward metric, and which a latch releasable only by declaring the book dead had taken away.
+## 2026-08-06 (lh) — MY "STRUCTURAL" AST TESTS DETECT DELETION, NOT DISABLEMENT: five mutations, all green, all restoring the exact bug the test was written for
+
+- **THE FINDING THAT MATTERS, and it is about the TESTS rather than the code.**
+  `(ld)` pinned the docket's wiring with substring counts and two mutations
+  walked through. `(lf)` replaced them with AST claims and I called them
+  structural. An adversarial pass over `(lf)` then showed **the AST claims
+  survive the mutations that restore the exact bugs they were written for**:
+  | mutation | restores | `(lf)` AST tests |
+  |---|---|---|
+  | `if _seen_ok:` → `if not _seen_ok:` | writes the empty map on failure, never a real one | **GREEN** |
+  | roster docket write → `if False:` | the `(ld)` hole — equities-regime invisible | **GREEN** |
+  | checked-read guard → `and False` | the `(jz)` seed class | **GREEN** |
+  | `DOCKET_SEEN_KEY = KEY` | blanks the ENTIRE grade payload every publish | **GREEN** |
+  Deleting those lines IS red. **So the suite detected DELETION and not
+  DISABLEMENT** — the `(hh)` dead-code class one abstraction level up from the
+  substring form it replaced. *An AST assertion that a NAME appears somewhere is
+  still a presence check*: `UnaryOp(Not, Name('_seen_ok'))` contains the string
+  the guard test looked for.
+- **THE ANSWER IS TO STOP ASSERTING ABOUT SOURCE.**
+  `tests/autonomy/test_docket_publish_behaviour.py` drives the REAL
+  `main(--publish)` against a fake `bot_pnl_store` and reads what it actually
+  WROTE. Measured, and this is the whole entry in one line: **all five
+  disablement mutations are GREEN on the AST-era tests and RED on the
+  behavioural ones.** Every one of them changes the writes, so every one is
+  caught. The AST checks stay as a cheap second line; they are no longer the
+  claim.
+- **AND THE ATTACK FOUND FOUR REAL DEFECTS IN `(lf)` ITSELF**, all fixed here:
+  * **NO MIGRATION.** `(lf)` moved the clocks to a new key and read only that
+    key — and `load_state_checked` returns `(True, None)` for a MISSING row, so
+    `_seen_ok` was True, the prior was empty, every `since` restamped to now,
+    and the same wholesale write destroyed the old 14-clock mirror. A silent
+    restart, and 14 clocks all stamped at deploy time read exactly like *"the
+    fleet became stuck today"* — an unknown reading as a verdict. Now falls back
+    to the old location once and **says so** in `docket_why`.
+  * **NOTHING PINNED `DOCKET_SEEN_KEY != KEY`.** The split's entire correctness
+    rested on two constants differing and no test asserted it; collapsing them
+    passed 47/47 while every publish replaced the grade payload with
+    `{updated, ttl_sec, seen}` — no `books`, no `ready`, so the 🚦 card renders
+    empty and `fleet_immune`'s two-writer pager (which reads
+    `books.<bot>.integrity`) goes blind, on a green build. Now a selftest assert.
+  * **THE CLOCK WRITE DISCARDED ITS RESULT (I4)** — the payload advertised
+    clocks that were never stored. This is the shape `(lf)`'s OWN still-open
+    list flagged for `churn_seen`, shipped one function away from where it was
+    written down.
+  * **`zero_ledger` COLLAPSED TWO DIAGNOSES AND MISNAMED ONE (I8).** A book with
+    `n_alltime > 0` and no ledger rows is a READ problem, not I17 — telling the
+    operator to retire a book because the grader cannot see its trades is the
+    wrong instruction. Split into `zero_ledger` / `ledger_missing` with
+    different `asks`.
+- **`docket_valid`** is now published: on a failed read the mirror is `[]`/`{}`,
+  and **an empty map is a CLAIM** that reads identically to "nothing is
+  overdue". Consumers test a present positive field rather than inferring from
+  the absence of `docket_why`.
+- **Verification**: 10 behavioural tests, 47 docket tests, full suite, grader
+  selftest, seven audits green. One PRE-EXISTING failure is unrelated and
+  proven so — `lighter_ticket_taker --selftest-live` cannot resolve
+  `mainnet.zklighter.elliot.ai` (a DNS timeout that also killed this pass's own
+  verification agents); it fails identically with my change stashed.
+
+### STILL OPEN (recorded, not fixed)
+
+`DOCKET_SEEN_KEY` is **not on `/bus.json`'s fixed key list**, so the
+authoritative clocks are unreadable off-Railway and the visible copy is the
+mirror — which is why `docket_valid` had to exist. **The docket still has NO
+CONSUMER**: nothing renders it and the daily review does not read it, so by this
+repo's own rule (*"a finding no gate consumes is a note"*) parts 2 and 3 of
+`(lf)` improve a signal that reaches nobody. Both belong to the same next pass.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None. The deliverable is a test method, not a book.** The sequence today —
+`(ld)` substring → `(lf)` AST → `(lh)` behavioural — is three attempts to pin
+one wiring, and only the third actually does. The transferable rule: **when a
+guard's job is "this path runs", assert on what the code WROTE, not on what the
+source CONTAINS.** Everything else today was found the same way: by attacking
+the previous pass instead of trusting its green run.
+
 ## 2026-08-06 (lg) — THE SAMPLER ALIASED THE FAULT: `(le)` MOVED THE CONVERGENT-METRIC TRAP INSTEAD OF CLOSING IT
 
 - **THE CRITICAL `(lf)` RECORDED AND DID NOT FIX.** `restart_churn` compared
@@ -791,7 +885,7 @@ The operator's standing rule is that a refusal WITH EVIDENCE satisfies the growt
   - **MEAN-FREE BY CONSTRUCTION**, which is why this is publishable where two earlier attempts were correctly refused: `n_needed` divides by the observed mean, so it is finite and positive for the 8 of 14 books whose mean is ≤ 0 and tells the operator *"you already have enough closes"* about a book that is losing; `n_sep` was a pure function of an unidentified tau. MDE depends on **sd and n only**.
   - **t-DISTRIBUTION, NOT NORMAL.** The normal approximation makes MDE look *smaller*, i.e. understates how underpowered a thin book is — the exact thing the field exists to reveal (1.987% vs 2.061% at n=28). Cornish-Fisher, verified against the table: t(0.975, 27) = 2.0517 vs 2.0518.
   - **REPORTED, NOT A BAR.** `BAR_NAMES` and `grade()` untouched; no verdict moves.
-  - **What it immediately says on the live fleet** — and it CORRECTS this morning's report: ⚖️ Counterweight's t=−1.98 has **MDE80 3.37% and power 0.071**, so that reading is *not evidence of anything* and my "one notch off the retirement profile" line was wrong. Meanwhile 🏛️ gillard (MDE 0.196, power 1.000), rudd (0.347/0.983) and abbott (0.310/0.996) ARE measured losers, so those retirement cases are real. Both live rows read `CANNOT SEE ANYTHING` (Taker n=13, MDE 3.26) or weak (Farmer, power 0.495).
+  - **What it immediately says on the live fleet** — and it CORRECTS this morning's report: ⚖️ Counterweight's t=−1.98 has **MDE80 3.37% and power 0.071**, so that reading is *not evidence of anything* and my "one notch off the retirement profile" line was wrong. Meanwhile 🏛️ gillard (MDE 0.196, power 1.000), rudd (0.347/0.983) and abbott (0.310/0.996) ~~ARE measured losers, so those retirement cases are real~~ — **CORRECTED IN PLACE 7-Aug (li) per I12: the MDE/power numbers above reproduce EXACTLY, but this label overstated them for two of the three books.** Re-measured: only **abbott** is individually significant (t=−2.15, p=0.0347); gillard reads p=0.128 and rudd p=0.346, and **no book survives Benjamini-Hochberg at FDR 0.05** across the six-book family (rank-1 threshold 0.0083). Under this entry's OWN semantics one bullet earlier — *"beside a small [MDE] it is 'measured absent'"* — the supported label is **"measured to carry NO POSITIVE EDGE at high power"**, which is a weaker and different claim than a demonstrated loss. Left as written, this line was the fleet's citable precedent for retiring a book on t=−1.53 / p=0.128 — the exact underpowered-null-as-evidence failure (kh) shipped to prevent, committed by (kh) itself. The sound cohort-level reading, which (kh) never computed: the six books are statistically indistinguishable (I²=0.000, Q=2.30 on df=5) with a common effect of **−0.1319%/trade at t=−2.548**. Both live rows read `CANNOT SEE ANYTHING` (Taker n=13, MDE 3.26) or weak (Farmer, power 0.495).
 - **AND A HOLE IN I5's OWN DECLARED ENFORCEMENT, found in the same pass and worse than the ask.** I5 says *"non-finite floats must never reach storage"* and names `bot_pnl_store.json_safe`. `save_state` uses it. **`publish_paper_trade` and BOTH `publish` paths did not** — they dumped `extra` with a bare `json.dumps`. `json.dumps` emits bare `NaN`/`Infinity`, Postgres `jsonb` REJECTS the whole statement, and both writers swallow the exception — so **a close row was silently LOST**. Not a stale row a reader can spot by its age: a trade that happened and left no record, in the ledger that IS the fleet's evidence base, on rows whose `extra` routinely carries ratios, APRs and t-stats. All three sites now `json.dumps(json_safe(extra), allow_nan=False)`; the reconnect RETRY path had the same hole, so a NaN failed twice and looked like a connection problem. Closed by an **AST** guard, because a page-wide grep matches the comment that describes the defect.
 - **MUTATION DISCIPLINE, including two of my own tests failing to discriminate.** 6 mutations red — MDE reverting to the normal approximation; MDE becoming mean-dependent (the `n_needed` defect); the ledger writer reverting to a bare `json.dumps`; and two variants of a wrong power test. **The power test survived TWICE before it earned its keep**: `power(0)==0.05` is satisfied by a one-sided test too, and symmetry is satisfied as well because the implementation takes `abs(effect)`. Only a PINNED VALUE separates the curves (0.1496 two-sided vs 0.2321 one-sided at the same point). Recorded because a test that cannot fail is the thing this entry is about. Also: a `python -c` restore silently failed to write back and left a mutant in the tree — **`cp` from a snapshot is the only restore that has never failed here**.
 
