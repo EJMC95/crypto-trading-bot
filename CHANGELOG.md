@@ -490,6 +490,37 @@
   `None` · era not reset · brain era left behind · the era reason dropping its
   earlier half.
 
+### The guard keeping a capital lever off REAL MONEY was a name check, and both inversions walked through it
+
+- **THE CLAIM IT MADE.** `test_allocation_consumer`'s header says S1 is safe
+  because *"REAL MONEY NEVER READS IT — the Farmer's call sits inside its
+  `shadow_tag` gate and Counterweight's inside `not _is_live`, **checked by AST
+  on the real source, not substring** ((hm))"*.
+- **WHAT IT ACTUALLY CHECKED.** `_guarded_calls` collected
+  `{n.id for n in ast.walk(p.test)}` — a SET OF NAMES from the enclosing `if`.
+  That cannot tell `if shadow_tag:` from `if not shadow_tag:`, because
+  `UnaryOp(Not, Name('shadow_tag'))` contains the same name. **Measured: both
+  inversions leave the suite GREEN** — and an inverted guard is exactly the
+  state in which the LIVE arm sizes off the allocation organ, which `(ia)` and
+  `(jr)` both forbid in terms ("real money never reads it", AST-pinned).
+  Being AST rather than substring bought nothing here: it was a presence check
+  one abstraction level up, the `(lh)` class, landing on the guard between a
+  capital lever and real money.
+- **THE FIX IS TO ASK THE ONLY QUESTION THAT MATTERS: can this call RUN on the
+  live arm?** `_guarded_calls` now returns the CONDITION CHAIN with polarity —
+  including whether the call sits in an `else` limb — and `reachable_when`
+  evaluates it under a named assignment. Two claims per book, in both
+  directions: **unreachable** with `shadow_tag` falsy / `_is_live` true, and
+  still **reachable** on the shadow arm, because a guard that blocks everything
+  is registered-but-inert and reads identically to a safe one.
+  - Unbound names resolve truthy, deliberately: the question is whether the
+    NAMED condition forbids the call, not whether every unrelated precondition
+    holds. That direction can raise a false alarm and can never hide a real
+    one.
+- **FIVE MUTATIONS RED, INCLUDING THE TWO THAT PREVIOUSLY SURVIVED** — Farmer
+  guard inverted · Counterweight guard inverted · each guard removed entirely ·
+  and the consumer deleted (the inert case the same test also claims to cover).
+
 ### A METHODOLOGY BUG IN MY OWN MUTATION TESTING, worth more than one of the fixes
 
 **A same-length mutation can leave a POISONED `.pyc` and turn a mutation round

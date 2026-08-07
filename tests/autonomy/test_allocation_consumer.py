@@ -102,8 +102,22 @@ def test_scale_is_clamped_both_ends(monkeypatch):
 
 
 def _guarded_calls(path, func="allocation_scale"):
-    """[(call_node, guard_names_on_the_path)] via a parent-tracked AST walk —
-    a page-wide substring scan is not a structural claim ((hm))."""
+    """[(call_node, [(test_src, taken_branch), ...])] — the CONDITION CHAIN
+    that must hold for this call to run, innermost last.
+
+    [2026-08-07 (lj)] THIS USED TO RETURN A SET OF NAMES, and that made the two
+    real-money assertions below VACUOUS. Collecting `{n.id for n in
+    ast.walk(p.test)}` cannot tell `if shadow_tag:` from `if not shadow_tag:` —
+    `UnaryOp(Not, Name('shadow_tag'))` contains the same name — so inverting
+    either guard, which is precisely what would let the LIVE arm size off the
+    allocation organ, left the suite GREEN. Measured: both inversions survived.
+
+    That is the `(lh)` class ("an AST assertion that a NAME appears somewhere is
+    still a presence check") landing on the guard that keeps a capital lever
+    away from real money. The chain is returned with POLARITY — including
+    whether the call sits in the `else` branch — so `reachable_when` below can
+    ask the only question that matters: can this call run on the live arm?
+    """
     tree = ast.parse((ROOT / path).read_text())
     for parent in ast.walk(tree):
         for child in ast.iter_child_nodes(parent):
@@ -113,35 +127,103 @@ def _guarded_calls(path, func="allocation_scale"):
         if (isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Attribute)
                 and node.func.attr == func):
-            guards = set()
-            p = node
+            chain, p, prev = [], node, node
             while hasattr(p, "_parent"):
-                p = p._parent
+                prev, p = p, p._parent
                 if isinstance(p, ast.If):
-                    guards |= {n.id for n in ast.walk(p.test)
-                               if isinstance(n, ast.Name)}
-            out.append((node, guards))
+                    # which limb are we in? `orelse` inverts the test.
+                    in_else = any(prev is st or prev in ast.walk(st)
+                                  for st in p.orelse)
+                    chain.append((ast.unparse(p.test), not in_else))
+            out.append((node, list(reversed(chain))))
     return out
+
+
+def reachable_when(chain, **env):
+    """Could a call with this condition chain RUN under `env`?
+
+    Names the caller does not bind are assumed satisfiable (True): the question
+    is whether the named condition — `shadow_tag` false, `_is_live` true —
+    forbids the call, not whether every unrelated precondition happens to hold.
+    A test we cannot evaluate is treated as satisfiable too, which is the
+    conservative direction: it can only make a guard look WEAKER, never
+    stronger, so this can raise a false alarm but never hide a real one.
+    """
+    class _Any:
+        def __bool__(self):
+            return True
+
+        def __getattr__(self, _):
+            return _Any()
+
+    for src, want_true in chain:
+        ns = dict(env)
+        try:
+            got = bool(eval(src, {"__builtins__": {}},           # noqa: S307
+                            _Env(ns)))
+        except Exception:                                        # noqa: BLE001
+            got = True
+        if got is not want_true:
+            return False
+    return True
+
+
+class _Env(dict):
+    """Unbound names resolve to a truthy sentinel rather than NameError."""
+
+    def __missing__(self, key):
+        if key in ("None", "True", "False"):
+            raise KeyError(key)
+        return _Truthy()
+
+
+class _Truthy:
+    def __bool__(self):
+        return True
+
+    def __getattr__(self, _):
+        return _Truthy()
+
+    def __eq__(self, other):
+        return True
+
+    def __ne__(self, other):
+        return False
+
+    __hash__ = object.__hash__
 
 
 def test_farmer_reads_allocation_only_behind_its_shadow_gate():
     calls = _guarded_calls("lighter_funding_bot.py")
     assert calls, "the Farmer's shadow arm lost its allocation consumer " \
                   "(registered-but-inert is the failure S1 exists to avoid)"
-    for _, guards in calls:
-        assert "shadow_tag" in guards, (
-            "an allocation_scale call in the REAL-MONEY Farmer file is not "
-            "inside an `if shadow_tag` guard — the live arm takes no capital "
-            "lever and no allocation ((ia))")
+    for node, chain in calls:
+        assert chain, f"line {node.lineno}: allocation_scale is UNGUARDED"
+        # THE REAL-MONEY CLAIM: on the live arm (`shadow_tag` falsy) this call
+        # must be UNREACHABLE. Asserted by polarity, not by the name appearing
+        # in the guard — see `_guarded_calls`.
+        assert not reachable_when(chain, shadow_tag=None), (
+            f"line {node.lineno}: allocation_scale is reachable on the "
+            f"REAL-MONEY Farmer arm (chain: {chain}) — the live arm takes no "
+            "capital lever and no allocation ((ia))")
+        # ...and it must still RUN on the shadow arm, or the consumer is inert
+        assert reachable_when(chain, shadow_tag="shadow"), (
+            f"line {node.lineno}: allocation_scale is unreachable even on the "
+            f"SHADOW arm (chain: {chain}) — registered-but-inert")
 
 
 def test_counterweight_reads_allocation_only_when_not_live():
     calls = _guarded_calls("lighter_funding_spread_bot.py")
     assert calls, "Counterweight lost its allocation consumer"
-    for _, guards in calls:
-        assert "_is_live" in guards, (
-            "Counterweight's allocation_scale call is not guarded by the "
-            "`not _is_live` branch — the live arm's clip is PINNED ((ia))")
+    for node, chain in calls:
+        assert chain, f"line {node.lineno}: allocation_scale is UNGUARDED"
+        assert not reachable_when(chain, _is_live=True), (
+            f"line {node.lineno}: allocation_scale is reachable on the "
+            f"REAL-MONEY Counterweight arm (chain: {chain}) — the live arm's "
+            "clip is PINNED ((ia))")
+        assert reachable_when(chain, _is_live=False), (
+            f"line {node.lineno}: allocation_scale is unreachable even on the "
+            f"SHADOW arm (chain: {chain}) — registered-but-inert")
 
 
 def test_carry_consumes_and_both_funding_images_carry_fleet_bus():
