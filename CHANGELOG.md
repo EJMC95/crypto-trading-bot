@@ -521,6 +521,83 @@
   guard inverted · Counterweight guard inverted · each guard removed entirely ·
   and the consumer deleted (the inert case the same test also claims to cover).
 
+### ⚖️ Counterweight's live clip was not pinned — the growth rail reached real-money sizing through `ctx.order_usd`
+
+- **THE CLAIM AND THE CODE DISAGREED.** The call site read
+  `ctx.order_usd(GOLIVE_ORDER_USD if live else ORDER_USD, own=True)` under a
+  comment saying *"BOTH TERMS OF THE EXPOSURE ARE PINNED LIVE ... backtested
+  $20/leg clip"*. But `own=True` short-circuits ONLY off the live arm —
+  `if own and self.mode != "lighter_live": return paper_default` — so on
+  `lighter_live` the argument is **discarded** and the function returns the
+  global `LIGHTER_ORDER_USD` (default 30) × the growth rail's
+  `live.clip_scale` lever.
+- **MEASURED**: $30/leg baseline, up to **$45 at clip_scale 1.5**. Gross is
+  `2·K·clip`, so **$300–$450 against the validated $200 — 1.5x to 2.25x.**
+  `(ia)`'s own sentence two lines above is *"the live arm takes NO capacity
+  lever"*, and `live.clip_scale` reached it through exactly this call. Pinning
+  `K` alone was the hole `(ia)` set out to close from one side; the clip
+  reopened it from the other.
+- **NO MONEY WAS AT RISK, and saying so precisely matters.** The gate refuses
+  `lighter_live` today — and before the key-form fix earlier in this same pass
+  it could never have passed at all, so the two defects were hiding each other:
+  the unpassable gate meant nobody would ever have reached the unpinned clip.
+  This is the prepared path being made to match what it says about itself. It
+  is **RESTRICT-ONLY** — it can only LOWER the live clip — and SafetyRails'
+  notional cap stays senior at order time regardless.
+- **THE ASSERTION THAT EXISTED WAS ABOUT THE CONSTANTS, NOT THE CLIP.**
+  `assert GOLIVE_K == 5 and GOLIVE_ORDER_USD == 20.0` sat correct and green
+  the whole time, because nothing checked what the live clip actually
+  RESOLVES to. `resolve_order_usd(ctx)` is extracted from `main()` for exactly
+  that reason — a one-line function whose only purpose is to be callable from a
+  test.
+- **FOUR MUTATIONS RED** — the live clip routed back through `ctx.order_usd` ·
+  pinned to the wrong value · the shadow arm accidentally pinned too (which
+  would silently change the control arm) · and `main` no longer calling the
+  resolver. **That last one survived the first cut**, because a correct
+  resolver nothing calls is the registered-but-inert shape and the three
+  value assertions stayed green without it; the wiring is now pinned by AST on
+  `main`'s FIRST `order_usd` assignment (the later one is the shadow-only
+  allocation rebalance, whose live-unreachability belongs to
+  `test_allocation_consumer`).
+
+### STILL OPEN — carried, with what is known about each (I11)
+
+The adversarial sweep returned **34 findings across nine lenses**; the criticals
+and the reachable highs are fixed above. These are CONFIRMED by an independent
+refutation pass and deliberately NOT fixed here, because each is a measurement
+or design question rather than a defect with an obvious correct answer:
+
+- **🏛️ `last_skip` is a never-reset latch that embeds a varying payload**
+  (`ml-gate({p_win:.2f})`), inflating that class's transition count **2.98x**
+  while five other classes read 1.00x. Verified to have **zero programmatic
+  consumers** — it steers no trade, no lever and no capital — so it is a
+  REPORTING distortion, and it already misled two of six investigations in the
+  `(li)` sweep into naming the wrong binding gate. Fixing it means deciding
+  what the field is FOR, which is a design call.
+- **🏛️ the per-coin re-entry cooldown lives only in process memory** and is
+  armed at ENTRY, so every supervisor restart clears it. Fourth instance of the
+  in-process-state class ((li) named three closed ones); the fix is durable
+  state, and the Parliament's restart rate is itself still undiagnosed.
+- **The brain-liveness TTL cut never took effect** — the alarm goes dark at
+  ~21.7h rather than the 8h its own `ORGAN_SPECS` entry declares. Confirmed
+  with the correction that the /vitals card DOES render it LATE in the interim,
+  so it is a degraded alarm rather than a silent one.
+- **`_docket_stuck`'s `no_rate_past_window` arm** cannot fire for a book with no
+  declared era; `era_days` is None for both a newborn and a book stalled for
+  months. Partly mitigated by the `zero_ledger`/`ledger_missing` arms shipped
+  above, and the remaining gap needs a time basis that does not exist yet.
+- **The daily review's maxdd bar is realised-only** — it never calls
+  `apply_mtm`, so it disagrees with the grader it otherwise delegates to.
+  Fixing it means deciding whether the review's own realised-only caveat
+  (stated every run) is the intended contract or a workaround.
+
+Also **REFUTED and recorded so nobody re-opens them**: four findings described
+code this pass had already changed (the verifiers resolved their quoted lines to
+commits `e1eeb6d^`, `9c55c90^`, `d7f7e67^` and `ad8f878^`), and one predicated on
+`TT_BULL_MODE` being unset on a container where it is set — which is exactly why
+the tradfi screen still needed hoisting out of that branch, and not a reason it
+did not.
+
 ### A METHODOLOGY BUG IN MY OWN MUTATION TESTING, worth more than one of the fixes
 
 **A same-length mutation can leave a POISONED `.pyc` and turn a mutation round

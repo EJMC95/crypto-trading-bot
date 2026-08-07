@@ -496,6 +496,40 @@ def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
         pass
 
 
+def resolve_order_usd(ctx):
+    """The per-leg clip. LIVE is PINNED to the BACKTESTED `GOLIVE_ORDER_USD`.
+
+    [2026-08-07 (lj)] THE LIVE CLIP WAS NOT ACTUALLY PINNED. This read
+    `ctx.order_usd(GOLIVE_ORDER_USD if live else ORDER_USD, own=True)` under a
+    comment claiming "BOTH TERMS OF THE EXPOSURE ARE PINNED LIVE ... backtested
+    $20/leg clip". But `own=True` short-circuits ONLY off the live arm:
+
+        if own and self.mode != "lighter_live":
+            return paper_default
+
+    On `lighter_live` it falls through and returns the GLOBAL
+    `LIGHTER_ORDER_USD` (default 30) multiplied by the growth rail's
+    `live.clip_scale` lever. So the backtested $20 was discarded on the one arm
+    it exists for: the live book would have run **$30/leg baseline and up to $45
+    at clip_scale 1.5**, i.e. gross `2·K·clip` of **$300–$450 against the
+    validated $200 — 1.5x to 2.25x**. The `(ia)` note two lines up says "the
+    live arm takes NO capacity lever"; `live.clip_scale` reached it through
+    exactly this call.
+
+    NO MONEY WAS AT RISK. The gate refuses `lighter_live` today — and before the
+    key-form fix in this same pass it could never have passed at all. This makes
+    the prepared path match what it says about itself, and it is RESTRICT-ONLY:
+    it can only LOWER the live clip, never raise it. SafetyRails' notional cap
+    stays senior at order time either way.
+
+    Extracted from `main()` so the claim is testable: the constants were already
+    asserted, but nothing checked what the live clip actually RESOLVES to.
+    """
+    if ctx.mode == "lighter_live":
+        return GOLIVE_ORDER_USD
+    return ctx.order_usd(ORDER_USD, own=True)
+
+
 def main():
     p = argparse.ArgumentParser(
         description="Counterweight — cross-sectional funding-spread factor book")
@@ -564,9 +598,7 @@ def main():
     # [2026-07-31 (ia)] BOTH TERMS OF THE EXPOSURE ARE PINNED LIVE. Gross is
     # 2 * K * clip; pinning K alone would leave the clip free to reopen the
     # same hole from the other side.
-    order_usd = ctx.order_usd(
-        GOLIVE_ORDER_USD if ctx.mode == "lighter_live" else ORDER_USD,
-        own=True)   # backtested $20/leg clip
+    order_usd = resolve_order_usd(ctx)
     shadow_tag = ctx.mode == "lighter_shadow"
 
     # [2026-07-30] Levers first, THEN the universe — UNIVERSE_N is itself a
@@ -1100,6 +1132,43 @@ def _selftest():
     # a book at -$27.75; that lane must not reach real money.
     assert GOLIVE_K == 5 and GOLIVE_ORDER_USD == 20.0, \
         "the live config must be the BACKTESTED plateau centre"
+    # [(lj)] ...and the live clip must RESOLVE to it. Asserting the CONSTANTS
+    # is not asserting the clip: `ctx.order_usd(GOLIVE_ORDER_USD, own=True)`
+    # discarded that argument on the live arm and returned the global
+    # LIGHTER_ORDER_USD x live.clip_scale — $30-$45/leg, gross 1.5x-2.25x the
+    # validated $200 — while these two constants sat correct and green.
+    class _ClipCtx:
+        def __init__(self, mode):
+            self.mode = mode
+
+        def order_usd(self, paper_default, own=False):
+            return 999.0          # the global anchor x growth-rail lever
+
+    assert resolve_order_usd(_ClipCtx("lighter_live")) == GOLIVE_ORDER_USD, \
+        ("the LIVE clip is not pinned to the backtested value — the growth "
+         "rail reaches real-money sizing through ctx.order_usd")
+    # gross exposure is 2*K*clip; both terms pinned means exactly the
+    # validated $200 book, not "about the right size"
+    assert 2 * GOLIVE_K * resolve_order_usd(_ClipCtx("lighter_live")) == 200.0
+    # the SHADOW arm must keep taking its own env clip (unchanged behaviour)
+    assert resolve_order_usd(_ClipCtx("lighter_shadow")) == 999.0, \
+        "the shadow arm must still go through ctx.order_usd"
+    # ...and `main` must USE it. A correct resolver that nothing calls is the
+    # registered-but-inert shape, and reverting the call site alone restored
+    # the whole defect with the three assertions above still green.
+    import ast as _ast2
+    import inspect as _ins2
+    _mt = _ast2.parse(_ins2.getsource(main))
+    _oa = [n for n in _ast2.walk(_mt)
+           if isinstance(n, _ast2.Assign)
+           and any(getattr(t, "id", "") == "order_usd" for t in n.targets)]
+    assert _oa, "main() no longer assigns order_usd"
+    # The FIRST assignment is the resolution; later ones are the shadow-only
+    # allocation rebalance, whose live-unreachability is pinned by
+    # tests/autonomy/test_allocation_consumer.py rather than here.
+    assert _ast2.unparse(_oa[0].value).startswith("resolve_order_usd("), (
+        "main() computes the initial order_usd without the pinned resolver: "
+        + repr(_ast2.unparse(_oa[0].value)))
     import inspect as _ins
     _src = _ins.getsource(apply_tuning)
     assert 'if live and attr == "K"' in _src and "K = GOLIVE_K" in _src, \
