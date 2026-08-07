@@ -440,9 +440,36 @@ def fresh_mid(ctx, coin):
 
 
 def _record_close(bot, coin, ent_px, ent_ts, exit_px, total_pnl, was_long,
-                  reason, shadow):
+                  reason, shadow, notional=None):
+    # [2026-08-07 (lj)] `pnl_pct` IS THE SAME RETURN AS `pnl_abs`, ON THE
+    # DEPLOYED CLIP. It used to be the PRICE return only —
+    # `(exit_px - ent_px)/ent_px` — while `pnl_abs` is `price_pnl + accrued`.
+    # Two fields, two different definitions of "what this trade returned", and
+    # the go-live grader reads BOTH: `mean` and `t` come from `pnl_pct`
+    # (`stats`: `pct = [r[0] ...]`) while `halves` and `maxdd` come from
+    # `pnl_abs` (`h1 = sum(r[1] ...)`, `eq += r[1]`).
+    #
+    # On THIS book that is the worst possible split. ⚖️ Counterweight is
+    # DELTA-NEUTRAL by construction — long K and short K, dollar-balanced — so
+    # its price return is noise around zero BY DESIGN, and funding on both legs
+    # is the entire thesis. The two bars that decide significance were measuring
+    # the one component the book does not trade, while the drawdown bars
+    # measured the right one. Every recorded expectancy figure for this book
+    # (e.g. the (hc) "mean +1.263%/win 68%") is on the price-only basis.
+    #
+    # CONTROL GROUP (I6) — all three sibling funding books already do this, and
+    # this one was the lone outlier: `funding_carry_bot` and
+    # `lighter_band_barnes_bot` both use `pnl / pos["notional"]`, and the LIVE
+    # Farmer says it outright — "pnl_abs = price P&L + funding accrued; pnl_pct
+    # is on the deployed clip".
+    #
+    # Fail-safe: no notional (a pre-(lj) position restored from state) falls
+    # back to the old price basis rather than emitting None, because a missing
+    # `pnl_pct` drops the row from the grader's sample entirely.
     pnl_pct = None
-    if ent_px:
+    if notional:
+        pnl_pct = float(total_pnl) / float(notional)
+    elif ent_px:
         pnl_pct = ((exit_px - ent_px) / ent_px) if was_long \
             else ((ent_px - exit_px) / ent_px)
     oa = datetime.fromtimestamp(ent_ts, tz=timezone.utc).isoformat() if ent_ts else None
@@ -662,7 +689,7 @@ def main():
                  price_pnl, accr, reason)
         _record_close(bot_id, coin, m.get("entry"), m.get("opened_ts"), px,
                       total, was_long=not m.get("is_short"), reason=reason,
-                      shadow=shadow_tag)
+                      shadow=shadow_tag, notional=m.get("notional"))
         meta.pop(coin, None)
 
     while True:
@@ -806,6 +833,12 @@ def main():
                     ent = broker.pos.get(c)
                     meta[c] = {"is_short": is_short,
                                "entry": (ent[1] if ent else px),
+                               # [(lj)] the leg's DEPLOYED notional, stored at
+                               # OPEN so `pnl_pct` is denominated by what this
+                               # leg actually risked. Reading `order_usd` at
+                               # close instead would misattribute every trade
+                               # whose clip the growth rail moved mid-life.
+                               "notional": order_usd,
                                "opened_ts": t0, "accrued": 0.0}
                     log.info("OPEN %s %s $%.0f @ %.6g (%dh mean %+.1f%% apr)",
                              c, "SHORT" if is_short else "LONG", order_usd,

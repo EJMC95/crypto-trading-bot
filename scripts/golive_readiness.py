@@ -258,12 +258,36 @@ POLICY_ERA = {
         "today and declared anyway; the shadow twin the brain grades goes 3/6 "
         "t=-0.39 pooled to 2/6 t=-1.45 in-era."),
     "perps-funding-spread": (
-        "2026-07-17",
+        # [2026-08-07 (lj)] MOVED 2026-07-17 -> 2026-08-07: a `pnl_pct`
+        # ACCOUNTING-BASIS fix, which is the declared reset condition ("a change
+        # that makes earlier P&L *wrong*"), and an era is the LATEST of every
+        # invalidating change so the 17-Jul reason below is preserved, not
+        # discarded.
+        #
+        # WHAT WAS WRONG. This book wrote `pnl_abs = price_pnl + accrued` but
+        # `pnl_pct = (exit-entry)/entry` — PRICE ONLY. The grader reads BOTH:
+        # `mean` and `t` come from `pnl_pct`, `halves` and `maxdd` from
+        # `pnl_abs`. ⚖️ Counterweight is DELTA-NEUTRAL by construction, so its
+        # price return is noise around zero BY DESIGN and funding on both legs
+        # is the entire thesis — the two bars that decide significance were
+        # measuring the one component the book does not trade. Every recorded
+        # expectancy figure for it, including the "t=+1.30 win 68%" in the
+        # paragraph below, is on that price-only basis and is not comparable to
+        # what the book will publish from now on.
+        #
+        # The three sibling funding books already denominated on the clip
+        # (`pnl / notional`); this one was the lone outlier, which is what made
+        # the difference a defect rather than a convention (I6).
+        "2026-08-07",
         "⚖️ Counterweight, the book whose own basis-fix note records that its "
-        "'entire reported profit was this artifact'. Same 17-Jul accrual fix, 20 "
-        "closes opened before it. Declared for correctness, NOT because pooling "
-        "flattered it: in-era it reads BETTER (3/6 t=+1.30 win 68% against 3/6 "
-        "t=+1.14 win 56%), so pooling was punishing this book."),
+        "'entire reported profit was this artifact'. FIRST reason, 17-Jul: the "
+        "accrual fix, 20 closes opened before it — declared for correctness, "
+        "NOT because pooling flattered it (in-era it read BETTER, 3/6 t=+1.30 "
+        "win 68% against 3/6 t=+1.14 win 56%, so pooling was punishing it). "
+        "SECOND reason, 7-Aug (lj): `pnl_pct` was PRICE-ONLY while `pnl_abs` "
+        "carried price+funding, so the mean and t bars graded a delta-neutral "
+        "funding book on the component it deliberately hedges away. Both "
+        "figures above are on that old basis; the sample restarts here."),
     "freqtrade-georgia": (
         "2026-07-17",
         "family book on lighter_family_bot, which carries '[2026-07-17 BASIS FIX "

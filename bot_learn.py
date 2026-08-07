@@ -318,7 +318,13 @@ ERA_START = {
     "lighter-ticket-taker": "2026-07-17T00:00",
     # [2026-07-30 (hh)] ⚖️ Counterweight — the book whose own basis-fix note says
     # its "entire reported profit was this artifact". No brain era until now.
-    "perps-funding-spread": "2026-07-17T00:00",
+    # [2026-08-07 (lj)] MOVED 17-Jul -> 7-Aug, in lockstep with POLICY_ERA. A
+    # SECOND accounting fix: `pnl_pct` was PRICE-ONLY while `pnl_abs` carried
+    # price+funding, so every per-trade percentage this book ever published
+    # measured the component a delta-neutral funding book hedges away. The two
+    # tables must move together — "the gate's sample may never be wider than
+    # the brain's", and the brain grades this book's buckets off the same rows.
+    "perps-funding-spread": "2026-08-07T00:00",
     # [2026-07-30 (hd)] 🌾 Yield Harvester. Not a strategy change — an
     # ACCOUNTING one, which is the purest case this table exists for. The
     # lighter_shadow arm's accrual basis was fixed from per-hour to the venue's

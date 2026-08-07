@@ -84,6 +84,22 @@ COINCIDENTAL = {
         "the venue basis-fix date asserted as a literal in the scout's own "
         "unit-conversion selftest — it is a statement about the VENUE's "
         "settlement schedule, not about any book's policy era.",
+    # [2026-08-07 (lj)] These three are a WORKED EXAMPLE of the coincidence this
+    # table exists for, and they arrived by the mechanism the guard predicts. 📊
+    # Index Rider's ref-staleness arithmetic needs a "Friday seen on a Tuesday"
+    # pair; its authors deliberately picked 2026-08-07 over the REAL measured
+    # Friday (31-Jul) with the comment "31-Jul is a canonical era date and
+    # audit_era_date_literals owns those — the math is what's under test, not
+    # which Friday it was". Moving ⚖️ Counterweight's era to 7-Aug then made
+    # their escape date canonical too. Nothing about this arithmetic has any
+    # relationship to any book's era, and moving an era must not redden it.
+    ("lighter_index_bot.py", "2026-08-07"):
+        "synthetic Friday in the ref-age arithmetic selftest; chosen BECAUSE "
+        "the real date was canonical, and coincidentally canonical since (lj). "
+        "No relationship to any policy era.",
+    ("tests/autonomy/test_index_ref_staleness.py", "2026-08-07"):
+        "the same synthetic Friday as lighter_index_bot.py above — this file "
+        "tests that module's ref-age math, so the two must use one date.",
 }
 
 

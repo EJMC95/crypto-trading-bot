@@ -449,10 +449,94 @@
   branch is unreachable rather than wrong. Counting it would have inflated the
   round; the realistic confusion (shadow arming live) is covered by its own test.
 
+### ⚖️ Counterweight's `pnl_pct` was PRICE-ONLY while `pnl_abs` carried the funding — so its significance bars graded the component it hedges away
+
+- **TWO FIELDS, TWO DEFINITIONS OF THE SAME TRADE.** `_record_close` wrote
+  `pnl_abs = price_pnl + accrued` and `pnl_pct = (exit_px − ent_px)/ent_px`.
+  The go-live grader reads **both**: `mean` and `t` come from `pnl_pct`
+  (`stats`: `pct = [r[0] for r in rows]`), while `halves` and `maxdd` come from
+  `pnl_abs` (`h1 = sum(r[1] …)`, `eq += r[1]`). Six bars, two bases.
+- **AND ON THIS BOOK IT IS THE WORST POSSIBLE SPLIT.** ⚖️ Counterweight is
+  **delta-neutral by construction** — long K, short K, dollar-balanced — so its
+  price return is noise around zero BY DESIGN and funding on both legs is the
+  entire thesis. **The two bars that decide statistical significance were
+  measuring the one component the book does not trade**, while the drawdown
+  bars measured the right one. Every recorded expectancy figure for this book
+  is on that basis, including `(hc)`'s *"mean +1.263% / win 68%"*.
+  - The sharpest form: a leg whose PRICE rose while the trade LOST money
+    overall published a POSITIVE `pnl_pct` and a NEGATIVE `pnl_abs`, so the
+    mean bar and the halves bar disagreed about whether the same trade won.
+- **CONTROL GROUP (I6) — this is what makes it a defect and not a convention.**
+  All three sibling funding books already denominate on the deployed clip:
+  `funding_carry_bot` and `lighter_band_barnes_bot` both use
+  `pnl / pos["notional"]`, and the LIVE Farmer says it in its own docstring —
+  *"pnl_abs = price P&L + funding accrued; pnl_pct is on the deployed clip"*.
+  Counterweight was the lone outlier. Without that population the difference
+  would have been uninterpretable.
+- **THE ERA MOVES, AND BOTH TABLES MOVE TOGETHER.** An accounting-basis fix is
+  the declared reset condition, so `POLICY_ERA["perps-funding-spread"]` goes
+  17-Jul → **7-Aug** and `bot_learn.ERA_START` with it — *"the gate's sample may
+  never be wider than the brain's"*. An era is the LATEST of every invalidating
+  change, so the 17-Jul accrual reason is **preserved** in the note rather than
+  replaced, and a test pins that it still names both.
+- **Fail-safe on restore**: a position carried over from pre-`(lj)` state has no
+  `notional` and falls back to the old price basis rather than emitting `None` —
+  because `stats` filters on `isinstance(r[0], (int, float))`, so a `None` would
+  drop the row from the graded sample entirely, which is worse than one row on
+  the old basis. The notional is captured at OPEN, not read at close, so a clip
+  the growth rail moves mid-life cannot misattribute a trade.
+- **EIGHT MUTATIONS RED** — price-only restored · notional not captured at open ·
+  not forwarded at close · forwarded but hardcoded · missing-notional emitting
+  `None` · era not reset · brain era left behind · the era reason dropping its
+  earlier half.
+
+### A METHODOLOGY BUG IN MY OWN MUTATION TESTING, worth more than one of the fixes
+
+**A same-length mutation can leave a POISONED `.pyc` and turn a mutation round
+into a lie.** Swapping `"2026-08-07T00:00"` for `"2026-07-17T00:00"` changes the
+file's SIZE not at all, and if the restore lands in the same second as the
+`.pyc`'s recorded source mtime, CPython's `(mtime, size)` check passes and the
+**stale bytecode from the MUTATED run is reused**. It surfaced here as a test
+that failed against a source file which, read from disk, plainly said the right
+thing — `bot_learn.ERA_START` reporting `2026-07-17` while line 327 read
+`2026-08-07`.
+
+The direction of the error is what matters: a poisoned cache means **the
+mutation never took effect**, so the round reports the test SURVIVED when it
+would in fact have reddened — a false NEGATIVE that reads as a weak guard, or
+worse, a false GREEN that reads as a verified one. Every mutation round in this
+pass now runs under `-B` with `PYTHONDONTWRITEBYTECODE=1` and the caches cleared.
+Re-checked: every round reported here reproduces.
+
+### AND THE ERA MOVE REDDENED A GUARD, CORRECTLY
+
+`audit_era_date_literals` fails on any file hardcoding a date the era tables own,
+*"so one legitimate table move does not redden a test that is not about the
+date"*. Moving Counterweight's era made **2026-08-07 canonical**, and five sites
+tripped. Two were mine and are now derived or moved off the date. The other
+three are a worked example of the coincidence that table exists for: 📊 Index
+Rider's ref-age arithmetic needs a "Friday seen on a Tuesday", and its authors
+had **already** dodged one canonical date — their comment reads *"31-Jul is a
+canonical era date and audit_era_date_literals owns those — the math is what's
+under test, not which Friday it was"*. Their escape date became canonical in
+turn. Declared in `COINCIDENTAL` with that history, which is the idiom, rather
+than silently renumbered.
+
 ### WHICH BOOK MOVED (doctrine rule 4)
 
-**🎫 the Ticket Taker's LIVE row — its in-era sample stops being a third
-non-crypto.** Five of its fourteen in-era trades are short-divergence on
+**⚖️ Counterweight and 🎫 the Ticket Taker's LIVE row — both stop being graded
+on a sample that misdescribes them.**
+
+⚖️ Counterweight's significance bars were computed on price-only returns for a
+book that is delta-neutral by construction: `mean` and `t` measured the exact
+component its design hedges away, while `halves` and `maxdd` measured the real
+one. Its era restarts today on the corrected basis, so for the first time the
+six bars will be graded on one definition of what the book returns. That is a
+reset, not a promotion — every recorded figure for it is on the old basis and
+the clock starts over — but it is the difference between a book that can be
+decided and one whose two most important bars were answering the wrong question.
+
+🎫 the Ticket Taker's LIVE row — Five of its fourteen in-era trades are short-divergence on
 tokenised equities the book's own design excludes, and they run −0.263%/trade
 against +1.145% on the crypto trades the screen keeps. The gate is grading a
 sample a third of which the book does not intend to trade; closing the

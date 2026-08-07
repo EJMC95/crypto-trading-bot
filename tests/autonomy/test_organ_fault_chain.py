@@ -141,7 +141,7 @@ def test_the_immune_organ_reports_a_recorded_death():
     out = FI.organ_faults({"brain-vitals": {
         "healthy": False, "error": "KeyError: 'paper'",
         "error_where": "bot_learn.py:1200",
-        "error_at": "2026-08-07T02:00:00+00:00"}})
+        "error_at": "2026-05-04T02:00:00+00:00"}})
     assert len(out) == 1
     assert out[0]["organ"] == "brain-vitals"
     d = out[0]["detail"]
