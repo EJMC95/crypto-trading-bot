@@ -12,7 +12,15 @@ Recommended options are marked ★.
 
 ---
 
-## 0 · PENDING DEPLOYS — ~~waiting on you~~ **BOTH EXECUTED 6-Aug, same day**
+## 0 · PENDING DEPLOYS — ~~waiting on you~~ **BOTH EXECUTED AND VERIFIED**
+
+*Verified 7-Aug 10:15 AEST by stamp readback, which is the rule this file
+sets for itself — a green workflow run has never implied a container took it.
+`audit_code_currency` reads **CURRENT, 0 behind** on all three previously
+DEFERRED rows (`lighter-ticket-taker-lighter`, `perps-funding-lighter-lighter`,
+`perps-funding-lighter-lshadow`), all matching HEAD `904e949bb`. The live
+Taker now carries (kt)+(ku) — the venue-class screen — and (kq), the
+realised-lens-veto rewrite that decides when it HALTS.*
 
 *Added 6-Aug by one session; executed and stamp-verified the same day by a
 parallel session running on the operator's "full permission to commit and
@@ -227,8 +235,25 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   note is superseded; `perps-bot` turned out to be ALREADY DELETED (the
   operator had done the deletion sitting — 16 services remain of the
   review's 26; the crash-loop is over).]**
-- **Zombie publishers (external projects).** `equities-momentum-alpaca` still
-  writes daily (~22:01 UTC ≈ 08:00 Sydney; $86k paper equity) — publisher is
+- **Zombie publishers — ~~`equities-momentum-alpaca` still writes daily~~
+  MEASURED SILENT 7-Aug.** A full sweep of `bot_pnl` reads **23 rows written
+  in the last 24h and ZERO of them retired** — every writer is a live,
+  load-bearing service, and no `equities-momentum%`/`%alpaca%` row exists in
+  the table at all. So either the publisher stopped or its row was pruned
+  after its last write; **the two are not distinguishable from this side**,
+  and the difference only matters for the external project's own cost. The
+  fleet-side concern is closed. Confirming the publisher itself is one
+  command, below, and it is YOURS to run rather than mine — `railway link`
+  rebinds this repo's Railway context and concurrent sessions deploy from
+  here.
+
+  ```bash
+  # in a scratch dir, NOT this repo — link rebinds the project context
+  cd /tmp && railway link   # pick: trading-bot   (then repeat for ikbr-stock-bot)
+  railway service list && railway logs --service <whichever> | tail -40
+  ```
+  *(superseded text below kept for the record)*
+- ~~`equities-momentum-alpaca` still writes daily (~22:01 UTC ≈ 08:00 Sydney; $86k paper equity) — publisher is
   almost certainly in your `trading-bot` or `ikbr-stock-bot` Railway
   projects, which are separate systems you may want. Inspect:
   `railway link` to the project, `railway service list`, `railway logs`.
