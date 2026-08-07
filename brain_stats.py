@@ -177,7 +177,24 @@ def weighted_bucket(trades, now_ts, half_life=HALF_LIFE_DAYS):
     out["wr_w"] = (w_wins / sw) if sw > 0 else 0.0
     out["pnl_w"] = sum(w * p for w, p in zip(ws, pnls))
     mean_w = out["pnl_w"] / sw if sw > 0 else 0.0
-    var_w = (sum(w * (p - mean_w) ** 2 for w, p in zip(ws, pnls)) / sw) if sw > 0 else 0.0
+    # [2026-08-07 (lj)] UNBIASED weighted variance — the ddof=1 correction in
+    # its weighted form. `Σw(p-mean)²/Σw` is the POPULATION variance of a
+    # weighted sample; with reliability weights the unbiased estimator divides
+    # by `Σw − Σw²/Σw`, which is exactly `Σw · (n_eff-1)/n_eff` for the Kish
+    # n_eff already computed above. Without it `sd_w` is understated and `t` is
+    # inflated by sqrt(n_eff/(n_eff-1)) — 1.7% at n_eff=30.
+    #
+    # This one drives an ACTUATOR, not a report: the v3 expand bars are
+    # `t >= +2.0/+2.5` and the reduce bars `t <= -2.5`, so an inflated |t| makes
+    # BOTH easier to reach, and the expand direction is a widening bought
+    # without the evidence to pay for it (I19). Shadow books only — no live bot
+    # reads the multipliers. Same defect as the go-live grader and fleet_radar,
+    # fixed in the same pass; `tests/financial/test_tstat_ddof.py` is the
+    # class-closer that found this third instance.
+    _ne_raw = kish_n_eff(ws)
+    _bessel = (_ne_raw / (_ne_raw - 1.0)) if _ne_raw > 1.0 else 1.0
+    var_w = ((sum(w * (p - mean_w) ** 2 for w, p in zip(ws, pnls)) / sw)
+             * _bessel) if sw > 0 else 0.0
     sd_w = math.sqrt(var_w)
     out["mean_w"] = mean_w
     out["sd_w"] = sd_w

@@ -786,7 +786,26 @@ def stats(rows, book_usd=None):
         return out
     days = (rows[-1][2] - rows[0][2]).total_seconds() / 86400.0
     mean = sum(pct) / n
-    var = sum((x - mean) ** 2 for x in pct) / n
+    # [2026-08-07 (lj)] SAMPLE stdev (ddof=1), not population. This divided by
+    # `n`, which understates sd by sqrt((n-1)/n) and therefore INFLATES every
+    # book's t by sqrt(n/(n-1)) — 1.7% at the n=30 bar, 1.2% at n=41. Small,
+    # one-directional, and on the one rule that governs REAL MONEY: it can only
+    # ever admit a book that has not earned it, never block one that has. A
+    # book whose true t is 1.967 read 2.000 and PASSED.
+    #
+    # THE FLEET HAD ALREADY RULED ON THIS AND NEVER SWEPT IT. `scripts/
+    # study_alpha_vs_regime.py::_t` uses ddof=1 with the docstring "Population
+    # stdev inflates every t at small n", and a CHANGELOG entry corrects its own
+    # published numbers for exactly this ("Every t above used POPULATION stdev.
+    # Sample stdev: live +0.73 (not +0.77), shadow +4.86 (not +5.13), pooled
+    # +2.79 (not +2.86)") — then left the grader alone. Every other estimator in
+    # the fleet is already ddof=1: fleet_allocation's I16 lower bound, the
+    # taker's I14 realised-lens veto, the Parliament's scanners, the family
+    # book's `stdev(..., ddof=1)`, and every study script.
+    #
+    # `t_cluster` is unaffected (it divides by its own `se_cr`); `n_eff` moves
+    # very slightly and in the honest direction, because `se_iid` was too small.
+    var = sum((x - mean) ** 2 for x in pct) / (n - 1)
     sd = math.sqrt(var) or 1e-12
     t = mean / (sd / math.sqrt(n))
     clus = cluster_stats(rows, mean, sd, n)

@@ -145,6 +145,64 @@
   `continue` · gate fail-open on live · venue stamp ignored · shadow arm
   narrowed.
 
+### The go-live t-bar was computed with the POPULATION stdev, so every book's `t` was inflated — on the one rule that governs real money
+
+- **THE ARITHMETIC.** `golive_readiness.stats` computed
+  `var = Σ(x-mean)² / n`. That is the POPULATION variance; a t-statistic needs
+  the SAMPLE variance, `/(n-1)`. Dividing by `n` understates `sd` by
+  `sqrt((n-1)/n)` and therefore **inflates every book's `t` by
+  `sqrt(n/(n-1))`** — **1.71% at the n=30 closes bar, 1.24% at n=41, 0.55% at
+  n=92**. Constructed exactly and verified: a book whose true `t` is **1.9664**
+  read **2.0000** and PASSED; `bar_map(...)["t"]` now returns `False` for it.
+- **SMALL, BUT ONE-DIRECTIONAL AND ON THE WRONG GATE.** It can only ever ADMIT
+  a book that has not earned real money; it can never block one that has. I10's
+  own reasoning is that this gate fails closed *"because here the cost of a
+  wrong default is unsupervised real money"* — and its central statistic was
+  biased open.
+- **THE FLEET HAD ALREADY RULED ON IT AND NEVER SWEPT IT** — the `(li)` pattern
+  exactly, and the third instance of it this week.
+  * `scripts/study_alpha_vs_regime.py::_t` uses `ddof=1`, with the docstring
+    *"Population stdev inflates every t at small n."*
+  * A CHANGELOG entry corrects **its own published numbers** for precisely this:
+    *"Every t above used POPULATION stdev. Sample stdev: live +0.73 (not +0.77),
+    shadow +4.86 (not +5.13), pooled +2.79 (not +2.86)"* — and one bullet later,
+    *"I wrote '+1.96' (the ddof=0 variant) and read it as survival."* The
+    analysis was corrected; the GRADER was not.
+  * Measured across the tree, **every other estimator was already `ddof=1`**:
+    `fleet_allocation` (the I16 lower bound), `lighter_ticket_taker` (the I14
+    realised-lens veto), `parliament/scanners`, `lighter_funding_bot`, and
+    `lighter_family_bot`'s explicit `stdev(..., ddof=1)`.
+- **THREE INSTANCES FIXED, AND THE SECOND ONE WAS HIDING BEHIND A FALSE
+  COMMENT.** `fleet_radar._t` divided by `n` under the comment *"population sd
+  (matches the fleet's other scorers)"* — a parity claim that was **false when
+  it was written**, and the two organs render side by side on the same card, so
+  a book could read significant on one and not the other for an estimator
+  reason. The third, `brain_stats.weighted_bucket`, is a WEIGHTED variance whose
+  ddof=1 equivalent is the Kish factor `n_eff/(n_eff-1)`; it drives an
+  **ACTUATOR** rather than a report (the v3 expand bars are `t >= +2.0/+2.5`),
+  so an inflated |t| was a widening bought without the evidence to pay for it
+  (I19). Shadow books only — no live bot reads the multipliers.
+  **`brain_replay`'s nine-scenario discrimination suite still passes
+  unchanged**, including H (strong winner still expands) and I (thin winner
+  still refused), so the correction sharpened the bar without breaking what the
+  engine can tell apart.
+- **THE CLASS IS CLOSED, and closing it is what found the third instance.**
+  `tests/financial/test_tstat_ddof.py` walks the whole tree by AST for
+  `Σ(x-m)²/n` and fails on any undeclared site — `POPULATION_OK` carries the
+  four legitimate ones with reasons (rolling vol bands, a harness-parity vol
+  filter, an order-invariant low-vol RANK score). It also carries
+  `test_the_detector_is_not_vacuous`, because a matcher that stops matching
+  turns the whole file green over a fleet full of population variances.
+  **Five mutations, each red**: grader reverted · radar reverted · Kish factor
+  removed · a NEW population scorer arrives in `fleet_allocation` · the AST
+  matcher blinded.
+  - Recorded as a limit rather than papered over: the matcher cannot see a
+    correction applied by MULTIPLICATION, which is the legitimate shape for a
+    weighted variance. `brain_stats` is therefore declared, and pinned instead
+    by a behavioural test at EQUAL weights — where Kish `n_eff` is exactly `n`
+    and the weighted estimator must reduce to the ordinary sample statistic,
+    the one configuration whose right answer is unambiguous.
+
 ### WHICH BOOK MOVED (doctrine rule 4)
 
 **🎫 the Ticket Taker's LIVE row — its in-era sample stops being a third

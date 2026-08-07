@@ -90,7 +90,18 @@ def _t(xs):
     if n < 2:
         return 0.0
     m = _mean(xs)
-    var = sum((x - m) ** 2 for x in xs) / n     # population sd (matches the fleet's other scorers)
+    # [2026-08-07 (lj)] SAMPLE stdev (ddof=1). This read `/ n` behind the
+    # comment "population sd (matches the fleet's other scorers)" — and that
+    # claim was FALSE when it was written. Measured across the tree: every
+    # other scorer is already ddof=1 — `fleet_allocation` (the I16 lower
+    # bound), `lighter_ticket_taker` (the I14 realised-lens veto),
+    # `parliament/scanners`, `lighter_funding_bot`, `lighter_family_bot`'s
+    # explicit `stdev(..., ddof=1)`, and every study script. The only two
+    # population users in the fleet were this line and the GO-LIVE GRADER,
+    # fixed in the same pass. A comment asserting parity is not parity, and
+    # this radar's verdicts sit beside the grader's on the same card, so the
+    # two must not disagree about the same book for an estimator reason.
+    var = sum((x - m) ** 2 for x in xs) / (n - 1)
     sd = math.sqrt(var)
     # sd > 1e-9, not > 0: identical values give a FLOAT-NOISE sd ~1e-17 (0.05
     # is not exactly representable), which would explode m/(sd/√n) to ~1e16. A
