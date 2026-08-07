@@ -443,6 +443,31 @@ def _save_state(state):
     `bot_pnl_store.json_safe`); the fix there stops it recurring, and the
     shout here stops the NEXT cause of the same shape being invisible.
     """
+    # [2026-08-07 (lj)] STAMP THE MEMORY WITH ITS OWN WRITE TIME, and this is
+    # what makes I2's declared enforcement able to fire at all.
+    # `fleet_immune.brain_amnesia` — the artifact CLAUDE.md names as I2's
+    # enforcement — tests `vitals.updated - brain.updated > skew` and returns
+    # [] the moment either stamp is unreadable. The brain's memory payload
+    # NEVER carried one: `save_state` records the time in the bot_state
+    # `updated_at` COLUMN, and `fetch_states` selects only `(bot, state)`, so
+    # the detector's `b.get("updated") or b.get("updated_at")` was None on
+    # every real cycle and the guard returned [] forever. Measured: no test
+    # covered it either, and `audit_doctrine_enforcement` stayed green because
+    # the NAME resolves — the exact "a named test could be vacuous" caveat this
+    # repo writes at the top of its own invariant table.
+    #
+    # The detector was written against what a human sees in `psql` (where
+    # `updated_at` is a visible column) rather than against what its publisher
+    # actually emits — the (hj) class, "a consumer is tested against a payload
+    # its publisher built".
+    #
+    # Stamping HERE, before the write, is also what gives the detector its
+    # signal: when the save FAILS the stored row keeps its OLD stamp, so the
+    # skew against fresh vitals grows exactly as the amnesia does. It also
+    # brings this key into the fleet's own bus contract ("every payload carries
+    # `updated` + `ttl_sec`"), which `learning-brain` alone never honoured.
+    state["updated"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    state["ttl_sec"] = MULT_TTL_SEC
     saved = []
     try:
         import bot_pnl_store as store

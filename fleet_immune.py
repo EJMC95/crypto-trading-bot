@@ -787,8 +787,35 @@ def brain_amnesia(brain_state, vitals_state, max_skew_s=None):
     b, v = (brain_state or {}), (vitals_state or {})
     bt = _parse_ts(b.get("updated") or b.get("updated_at"))
     vt = _parse_ts(v.get("updated") or v.get("updated_at"))
-    if bt is None or vt is None:
-        return []
+    # [2026-08-07 (lj)] A BLIND DETECTOR MUST SAY SO — it may not read as
+    # "healthy". This returned [] whenever either stamp was unreadable, and
+    # the brain's memory payload NEVER carried one: `save_state` records the
+    # time in the bot_state `updated_at` COLUMN while `fetch_states` selects
+    # only `(bot, state)`, so `bt` was None on every real cycle and I2's
+    # declared enforcement returned [] forever, silently. No test covered it,
+    # and `audit_doctrine_enforcement` stayed green because the NAME resolves
+    # — precisely the "a named test could be vacuous" caveat at the top of
+    # CLAUDE.md, realised.
+    #
+    # Fail-safe QUIET is still right for a booting brain or a briefly dark bus,
+    # so the quiet case is kept where it is genuinely uninformative: no vitals
+    # to compare against. But vitals PRESENT and readable while the memory
+    # carries no stamp at all is not a transient — it is this guard unable to
+    # do its job, and reporting nothing there is how it hid for a week.
+    if vt is None:
+        return []                      # nothing to compare against — quiet
+    if bt is None:
+        if not b:
+            return []                  # no memory row yet — a booting brain
+        return [{"organ": "learning-brain",
+                 "detail": ("BRAIN AMNESIA CHECK IS BLIND — `learning-brain` "
+                            "carries no `updated` stamp, so the memory-vs-"
+                            "vitals skew cannot be computed and I2's "
+                            "enforcement is inert. The publisher stamps it in "
+                            "`bot_learn._save_state`; a payload without one is "
+                            "a container running pre-(lj) code. This is NOT a "
+                            "statement that the brain is amnesiac — it is a "
+                            "statement that nothing can currently tell.")}]
     skew = vt - bt
     if skew <= skew_max:
         return []
@@ -1456,10 +1483,24 @@ def _selftest():
     assert brain_amnesia({"runs": 337, "updated": "2026-07-31T13:00:00+00:00"},
                          {"run": 338, "updated": _ok_t}) == [], \
         "an hour of skew is a slow cycle, not a failed write"
-    # FAIL-SAFE QUIET: missing keys / unreadable stamps never fire
+    # FAIL-SAFE QUIET, where the silence is INFORMATIVE: no memory row yet (a
+    # booting brain) or nothing to compare against (a dark bus).
     for _a, _b in (({}, _vit), (_mem, {}), (None, None),
-                   ({"updated": "nope"}, _vit), (_mem, {"updated": None})):
+                   (_mem, {"updated": None})):
         assert brain_amnesia(_a, _b) == [], (_a, _b)
+    # [2026-08-07 (lj)] BUT A BLIND GUARD IS NOT QUIET — a DELIBERATE CHANGE to
+    # the line above, which used to include this case. A memory row that EXISTS
+    # while its stamp cannot be read is not a transient: it is this detector
+    # unable to do its job, and returning [] there is byte-identical to "the
+    # brain is healthy". That is exactly how it hid — the payload never carried
+    # `updated` at all (save_state stamps the bot_state COLUMN; fetch_states
+    # selects only `(bot, state)`), so I2's declared enforcement returned []
+    # on every real cycle with no test covering it.
+    for _bad in ({"updated": "nope"}, {"runs": 337}, {"updated": None}):
+        _bl = brain_amnesia(_bad, _vit)
+        assert _bl and "BLIND" in _bl[0]["detail"], (_bad, _bl)
+        # it must not CLAIM amnesia — it cannot know that
+        assert "MEMORY NOT PERSISTING" not in _bl[0]["detail"], _bl
     # wired, and its key is FETCHED — without that it is dead code (the (hh)
     # lesson, which this file already learned once)
     _src_run = _ins2.getsource(run_once)

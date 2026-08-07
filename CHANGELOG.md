@@ -253,6 +253,60 @@
   short_sleeve` — which turned out to be a correct bail and is now known to be
   one rather than assumed.
 
+### I2's declared enforcement could never fire — the caveat at the top of this file, realised
+
+- **THE CHAIN, and every link is checkable.** CLAUDE.md names
+  `fleet_immune.py::brain_amnesia` as I2's enforcement. That function computes
+  `vitals.updated − brain.updated` and returns `[]` the moment either stamp is
+  unreadable. **The brain's memory payload never carried one:**
+  * nothing in `bot_learn` ever set `state["updated"]` — the payload is the raw
+    `{"runs": N, "hypotheses": {...}}` memory dict;
+  * `bot_pnl_store.save_state` records the time in the bot_state **`updated_at`
+    COLUMN**, not inside the JSON;
+  * `fleet_immune` reads via `store.fetch_states`, whose SQL is
+    **`SELECT bot, state`** — the column is never merged in.
+  So `b.get("updated") or b.get("updated_at")` was `None` on every real cycle,
+  `bt is None` short-circuited, and the guard **returned `[]` forever**.
+- **NOTHING CAUGHT IT, and the reasons are each a named class.** There was **no
+  test for `brain_amnesia` at all** (grep: zero hits in `tests/`).
+  `audit_doctrine_enforcement` stayed green because the *reference resolves* —
+  the function exists. That is verbatim the caveat this file writes above I1:
+  *"it verifies that a declared enforcement EXISTS, not that it is CORRECT. A
+  named test could be vacuous."* And the detector was written against **what a
+  human sees in `psql`**, where `updated_at` is a visible column, rather than
+  against what its publisher emits — the `(hj)` class, *"a consumer is tested
+  against a payload its publisher built"*.
+- **FIXED AT THE PUBLISHER, which also closes a contract violation.**
+  `_save_state` now stamps `updated` + `ttl_sec` into the memory payload.
+  `learning-brain` was the one bus key that never honoured the fleet's own
+  *"every payload carries `updated`+`ttl_sec`"* rule, and that omission is
+  precisely what blinded the guard. **The ORDER is load-bearing**: stamping
+  BEFORE the write is what creates the signal — when the save fails the stored
+  row keeps its OLD stamp, so the skew against fresh vitals grows exactly as
+  the amnesia does. Stamping after a successful write would refresh the mark on
+  the very cycle that lost the memory.
+- **AND A BLIND DETECTOR MAY NOT READ AS HEALTHY — a DELIBERATE contract change,
+  stated rather than slipped in.** The selftest previously pinned "unreadable
+  stamp ⇒ quiet" alongside the genuinely uninformative cases. Fail-safe quiet is
+  still right for a booting brain (no memory row) and a dark bus (no vitals),
+  and both stay quiet. But a memory row that EXISTS while its stamp cannot be
+  read is not transient — it is the guard unable to do its job, and `[]` there
+  is byte-identical to "the brain is healthy". It now reports **BLIND**, and
+  says explicitly that this is *not* a claim of amnesia: it is a claim that
+  nothing can currently tell. Same distinction the `(kw)` roster receipt draws
+  one organ over.
+- **SIX MUTATIONS RED PLUS A GREEN CONTROL** — publisher stamp removed · stamp
+  moved after the save · the blind case silently `[]` again · the detector
+  reverted to the run COUNTER (I2's own lesson: runs=337 vs run=338 is
+  byte-identical to healthy ordering forever) · `learning-brain` dropped from
+  the organ's fetch list · and the healthy brain staying silent. One mutation
+  attempt was `return [] or [{...}]`, which is a no-op in Python — recorded,
+  and redone, because counting it would have been the same self-deception this
+  entry is about.
+- The tests drive `bot_learn._save_state` itself and read what it handed the
+  store. A hand-written `{"updated": ...}` fixture would have passed against
+  the broken code — which is exactly how this survived.
+
 ### WHICH BOOK MOVED (doctrine rule 4)
 
 **🎫 the Ticket Taker's LIVE row — its in-era sample stops being a third
