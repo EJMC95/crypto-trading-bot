@@ -408,6 +408,47 @@
   each of the three links looked fine in isolation and that is exactly how this
   survived.
 
+### I10's real-money gate looked the book up by a key its publisher never writes
+
+- **THE MISMATCH.** `golive_blocker` — CLAUDE.md's declared enforcement for I10,
+  *"real money is gated by published evidence, in code"* — read
+  `state["books"].get("perps-funding-spread")`, the **bare base**. The publisher
+  keys `payload_books` by the LEDGER's `bot` column, which is `ctx.bot_id` =
+  `BOT + _SUFFIX[mode]`: **`perps-funding-spread-lighter`** live,
+  **`-lshadow`** shadow. The lookup could never match.
+- **FAIL-CLOSED, SO NEVER AN UNSAFE ADMIT — BUT THE GATE WAS STRUCTURALLY
+  UNPASSABLE.** The operator could set `FUNDSPREAD_GOLIVE=1` on a genuinely
+  READY book and still be refused, with *"go-live gate has no entry for
+  perps-funding-spread"* — a message that reads like the grader not knowing the
+  book exists. Demonstrated against a payload the REAL grader produced: the old
+  lookup returns that refusal, the new one returns `None`.
+- **FOURTH INSTANCE OF THE BARE-VS-SUFFIXED KEY CLASS** — `FEE_RT`, `ERA_START`,
+  `era_epoch_for`, now this. Each is documented in CLAUDE.md; each shipped
+  anyway. The class survives because the *shape* of the mistake is invisible
+  from inside the consumer: both spellings look like "the book".
+- **AND THE SELFTEST COULD NOT SEE IT, for the reason it never can.** The bot's
+  own `_payload` fixture keyed `books` by `BOT` too — so consumer and fixture
+  agreed with each other and **both disagreed with the publisher**. That is the
+  `(hj)` rule verbatim: *"a consumer is tested against a payload its publisher
+  built. Never hand-write a fixture that 'looks like' the payload."* The fixture
+  is now keyed the way `golive_readiness` keys it, and 13 selftest call sites
+  moved with it.
+- **THE NEW TEST DRIVES THE REAL GRADER'S PUBLISH PATH** and feeds what it
+  actually wrote to the real gate. It also pins the case a tolerant fix would
+  have broken: **a READY SHADOW twin must not arm the LIVE arm.** That is why
+  the fix is the exact `ctx.bot_id` and not a match on either spelling — the
+  suffix is the difference between two books, not decoration.
+  - One test isolates the ERA from the key form on purpose: this book's real
+    `POLICY_ERA` is 17-Jul, so its in-era window cannot reach the 30-day bar
+    today and no synthetic ledger can make it READY. The era rule is correct and
+    tested elsewhere; standing it down is what lets this file test one thing.
+- **THREE MUTATIONS RED; THE FOURTH IS RECORDED AS NOT A DEFECT.** Red: the call
+  site reverted to `BOT` · the gate admitting on an absent book · the `ready`
+  check dropped. The fourth added a tolerant fallback to the bare base and
+  stayed green — correctly, because the publisher never writes that key, so the
+  branch is unreachable rather than wrong. Counting it would have inflated the
+  round; the realistic confusion (shadow arming live) is covered by its own test.
+
 ### WHICH BOOK MOVED (doctrine rule 4)
 
 **🎫 the Ticket Taker's LIVE row — its in-era sample stops being a third

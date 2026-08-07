@@ -508,7 +508,23 @@ def main():
     # because the cost is a missed shadow trade. Here the cost is unsupervised
     # real money, so absence of evidence must never read as permission.
     if ctx.mode == "lighter_live":
-        _why = golive_blocker(BOT)
+        # [2026-08-07 (lj)] THE ROW ID, NOT THE BARE BASE. This passed `BOT`
+        # ("perps-funding-spread") while `golive-readiness.books` is keyed by
+        # the LEDGER's bot column — `ctx.bot_id`, i.e. BOT + the venue suffix
+        # ("-lighter" live, "-lshadow" shadow). So the lookup could NEVER match
+        # and the gate always refused with "no entry for perps-funding-spread".
+        # Fail-closed, so no unsafe admit — but I10's gate was structurally
+        # UNPASSABLE: the operator could set FUNDSPREAD_GOLIVE=1 on a genuinely
+        # READY book and still be refused, for a reason that reads like the
+        # grader not knowing the book.
+        #
+        # Fourth instance of the bare-vs-suffixed key class in this fleet
+        # (FEE_RT, ERA_START, era_epoch_for). The selftest could not see it:
+        # its fixture keyed `books` by `BOT` too, so consumer and fixture
+        # agreed with each other and both disagreed with the publisher — the
+        # (hj) class, "a consumer is tested against a payload its publisher
+        # built".
+        _why = golive_blocker(ctx.bot_id)
         if _why:
             raise SystemExit(f"perps-funding-spread REFUSES lighter_live: {_why}. "
                              "Run VENUE=lighter_shadow to keep building the "
@@ -979,57 +995,65 @@ def _selftest():
     _fresh = datetime.fromtimestamp(_now - 60, timezone.utc).isoformat()
     _stale = datetime.fromtimestamp(_now - 200_000, timezone.utc).isoformat()
 
-    def _payload(ready, updated=None, bars=None):
+    # [(lj)] KEYED THE WAY THE PUBLISHER KEYS IT. This used `BOT` — the same
+    # bare base the consumer was reading — so fixture and consumer agreed with
+    # each other and both disagreed with `golive_readiness`, which keys `books`
+    # by the ledger's bot column (BOT + the venue suffix). The gate could never
+    # match in production and the selftest could never see it.
+    _LIVE_ROW = BOT + "-lighter"
+
+    def _payload(ready, updated=None, bars=None, key=None):
         return {"updated": updated or _fresh,
-                "books": {BOT: {"ready": ready, "bars_passed": 6 if ready else 3,
-                                "bars": bars or {b: ready for b in
-                                                 ("window", "closes", "mean",
-                                                  "t", "halves", "maxdd")}}}}
+                "books": {(key or _LIVE_ROW): {
+                    "ready": ready, "bars_passed": 6 if ready else 3,
+                    "bars": bars or {b: ready for b in
+                                     ("window", "closes", "mean",
+                                      "t", "halves", "maxdd")}}}}
     try:
         # 1. NO OPT-IN -> refuse, even with a perfect gate. The env var is a
         #    deliberate act and nothing else may substitute for it.
         os.environ.pop("FUNDSPREAD_GOLIVE", None)
-        assert golive_blocker(BOT, _payload(True), _now), "no opt-in must refuse"
+        assert golive_blocker(_LIVE_ROW, _payload(True), _now), "no opt-in must refuse"
         for _v in ("", "0", "true", "yes", "on", "TRUE"):
             os.environ["FUNDSPREAD_GOLIVE"] = _v
-            assert golive_blocker(BOT, _payload(True), _now), \
+            assert golive_blocker(_LIVE_ROW, _payload(True), _now), \
                 f"FUNDSPREAD_GOLIVE={_v!r} must not arm the live path"
         # ...but WHITESPACE IS TOLERATED, and that is a decision, not an
         # accident: a Railway env var picking up a stray space would otherwise
         # refuse to arm with no visible reason, which is a footgun pointing the
         # other way. The value must still be "1" — no truthy synonyms above.
         os.environ["FUNDSPREAD_GOLIVE"] = " 1 "
-        assert golive_blocker(BOT, _payload(True), _now) is None, \
+        assert golive_blocker(_LIVE_ROW, _payload(True), _now) is None, \
             "a stray space must not silently block a deliberate go-live"
         os.environ["FUNDSPREAD_GOLIVE"] = "1"
 
         # 2. WITH opt-in, the GATE decides — and every uncertainty refuses.
-        assert golive_blocker(BOT, _payload(True), _now) is None, \
+        assert golive_blocker(_LIVE_ROW, _payload(True), _now) is None, \
             "opt-in + fresh + READY is the one path that arms"
-        _not_ready = golive_blocker(BOT, _payload(False), _now)
+        _not_ready = golive_blocker(_LIVE_ROW, _payload(False), _now)
         assert _not_ready and "NOT ready" in _not_ready, _not_ready
         # the refusal must NAME the failing bars — a detector that says "no"
         # without saying why sends the operator hunting ((ht)'s lesson)
         _bars = {"window": False, "closes": True, "mean": True, "t": False,
                  "halves": True, "maxdd": True}
-        _msg = golive_blocker(BOT, _payload(False, bars=_bars), _now)
+        _msg = golive_blocker(_LIVE_ROW, _payload(False, bars=_bars), _now)
         assert "window" in _msg and "t" in _msg, _msg
 
         # FAIL-CLOSED on every flavour of missing evidence
-        assert golive_blocker(BOT, {}, _now), "dark gate must refuse"
-        assert golive_blocker(BOT, None, _now), "None gate must refuse"
-        assert golive_blocker(BOT, {"books": {}}, _now), "no stamp must refuse"
-        assert golive_blocker(BOT, _payload(True, updated="not-a-date"), _now), \
+        assert golive_blocker(_LIVE_ROW, {}, _now), "dark gate must refuse"
+        assert golive_blocker(_LIVE_ROW, None, _now), "None gate must refuse"
+        assert golive_blocker(_LIVE_ROW, {"books": {}}, _now), "no stamp must refuse"
+        assert golive_blocker(_LIVE_ROW, _payload(True, updated="not-a-date"), _now), \
             "unparseable stamp must refuse, not pass"
-        _st = golive_blocker(BOT, _payload(True, updated=_stale), _now)
+        _st = golive_blocker(_LIVE_ROW, _payload(True, updated=_stale), _now)
         assert _st and "STALE" in _st, _st
         # a payload for a DIFFERENT book must never arm this one
-        assert golive_blocker(BOT, {"updated": _fresh,
+        assert golive_blocker(_LIVE_ROW, {"updated": _fresh,
                                     "books": {"some-other-bot": {"ready": True}}},
                               _now), "another book's verdict is not ours"
         # 'ready' must be exactly True — a truthy string must not arm real money
         for _bad in ("yes", 1, "READY"):
-            assert golive_blocker(BOT, {"updated": _fresh,
+            assert golive_blocker(_LIVE_ROW, {"updated": _fresh,
                                         "books": {BOT: {"ready": _bad}}}, _now), \
                 f"ready={_bad!r} is not True and must refuse"
     finally:
