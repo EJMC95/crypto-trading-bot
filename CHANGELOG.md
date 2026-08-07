@@ -88,9 +88,74 @@
   This is how `golive-docket-seen` went unserved for a day: nothing compared
   the lists to each other.
 
+### The real-money half: the tradfi screen was protecting the live book only because an env var happened to be set
+
+- **THE DEFECT.** `(kt)`/`(ku)` shipped the tokenised-equity screen INSIDE
+  `bull_entry_ok()`, and the entry loop calls that function only under
+  `if BULL_MODE:`. **`BULL_MODE = os.environ.get("TT_BULL_MODE", "off")` — it
+  defaults to OFF.** So the only thing standing between the real-money book and
+  a short on a tokenised equity was one environment variable being set on one
+  container. The lens allow-list has a BULL_MODE-independent belt AND a
+  halt-don't-fill brace; the side allow-list has both; the instrument class had
+  **neither**.
+- **THIS IS `(hj)` REPEATED ONE SCREEN OVER, AND THE LESSON WAS ALREADY IN THIS
+  FILE.** `allowed_sides()` exists because the SIDE restriction had exactly this
+  shape, and its docstring — **80 lines above where the new gate now sits** —
+  says it in terms: *"Deliberately independent of BULL_MODE and of
+  bull_entry_ok(): that gate is RESTRICT-ONLY and evaluated only when an env var
+  is on, **which is exactly why it cannot be the thing protecting real
+  money**."* `(kt)`'s own comment then states the dependency out loud as though
+  it were a safeguard: *"the live arm ... runs `bull: True` ... so every live
+  real-money entry passes through `bull_entry_ok` -> `_is_crypto`, and this
+  screen is the ONLY thing standing between the real-money book and a short on
+  a tokenised equity."* A restriction that holds because a variable happens to
+  be set is not a gate. Same shape as `(li)`: the lesson was engraved and the
+  sweep was never done.
+- **MEASURED, and this is not hypothetical exposure.** OPERATOR_QUEUE 0a,
+  corrected 6-Aug: the live real-money book has **already opened 19 non-crypto
+  positions**, five of them in-era short-divergence (DRAM, MINIMAX, SKHY) —
+  **5 of 14 in-era trades, over a third of the sample the go-live gate is
+  grading** on the book nearest real money. The dollar damage is two cents; the
+  evidence damage is the whole in-era grade.
+- **THE FIX IS THE THIRD TWIN, in the same shape as the other two.**
+  `live_instrument_ok(mode, ticket)` reads no env, no bus and no brain; BELT in
+  the entry loop beside the side check, BRACES at the order path that **HALT
+  rather than fill**. Both `(ku)` screens keep their order and semantics — the
+  venue's own `noncrypto` stamp first, the local hand list as the fallback,
+  ABSENT meaning no opinion rather than "crypto". **RESTRICT-ONLY and a strict
+  no-op on shadow**: this hoists REACHABILITY, it changes no policy, it can
+  refuse an entry and never admit one, and the shadow arm must keep taking
+  non-crypto tickets because that grade is what justifies the live rule. It
+  needs no expectancy price (I19) because it removes nothing the design intends
+  to keep. `bull_entry_ok` keeps its copies — defence in depth, not a second
+  authority.
+- **MUTATION-VERIFIED ×8, AND MY FIRST CUT OF THE GUARD FAILED TWO OF THEM.**
+  Deleting the belt and disabling the braces both stayed GREEN, for two separate
+  reasons worth recording because they are the same reasons `(lh)` names:
+  * the AST scan counted `live_instrument_ok` call sites **inside `_selftest`**,
+    a dozen of them, so "the gate is called at least twice" survived deleting
+    **both** production call sites;
+  * the braces check asserted the breach STRING appears in the source, and
+    `if False:` leaves every line of a body intact — **detecting deletion, not
+    disablement**, in a test written the same hour as an entry about that trap.
+  The guard now resolves each call site to its enclosing `If`, excludes the
+  selftest span, and rejects any site that is constant-false-dead or under a
+  BULL_MODE test. All eight red: belt removed · braces `if False` · braces
+  removed · belt back under BULL_MODE · braces downgraded from `raise` to
+  `continue` · gate fail-open on live · venue stamp ignored · shadow arm
+  narrowed.
+
 ### WHICH BOOK MOVED (doctrine rule 4)
 
-**None directly — but 📊 equities-regime and 👩 mum become decidable-on-the-record
+**🎫 the Ticket Taker's LIVE row — its in-era sample stops being a third
+non-crypto.** Five of its fourteen in-era trades are short-divergence on
+tokenised equities the book's own design excludes, and they run −0.263%/trade
+against +1.145% on the crypto trades the screen keeps. The gate is grading a
+sample a third of which the book does not intend to trade; closing the
+reachability hole is what makes the next thirty closes describe the book. No
+lever moved and no position was opened or closed by this change.
+
+Also: 📊 equities-regime and 👩 mum become decidable-on-the-record
 for the first time.** They have no era, so every calendar the fleet owns was
 blind to them; they reach the docket only through the roster sweep, and the
 docket reached no human. The chain grader → `/bus.json` → daily review is now

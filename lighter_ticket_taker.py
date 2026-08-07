@@ -542,6 +542,43 @@ def allowed_sides(mode, lens):
     return LIVE_SIDES.get(lens, frozenset())
 
 
+def live_instrument_ok(mode, ticket):
+    """Hard INSTRUMENT-CLASS gate for the live arm — the third twin of
+    `allowed_lenses()` and `allowed_sides()`, and for the identical reason.
+
+    [2026-08-07 (lj)] `(kt)`/`(ku)` shipped the tokenised-equity screen INSIDE
+    `bull_entry_ok`, which the entry loop calls only under `if BULL_MODE:` —
+    and `TT_BULL_MODE` defaults to **off**. So the only thing standing between
+    the real-money book and a short on a tokenised equity was an environment
+    variable being set on one container.
+
+    That is precisely the defect `(hj)` closed for the SIDE restriction, whose
+    fix is 80 lines above this one and whose docstring already says it in
+    terms: *"that gate is RESTRICT-ONLY and evaluated only when an env var is
+    on, which is exactly why it cannot be the thing protecting real money."*
+    `(kt)`'s own comment states the dependency out loud — *"the live arm ...
+    runs `bull: True` ... so every live real-money entry passes through
+    `bull_entry_ok` -> `_is_crypto`"* — and a restriction that holds because a
+    variable happens to be set is not a gate. The lesson was engraved in this
+    file and the sweep was never done.
+
+    Non-live modes admit everything: the shadow arm's job is to GRADE the
+    non-crypto population, and narrowing it would blind the evidence that
+    justifies the live rule. On the live arm both `(ku)` screens apply in the
+    same order and with the same semantics they have inside `bull_entry_ok` —
+    this hoists reachability, it does not change policy, and it is
+    RESTRICT-ONLY: it can refuse an entry, never admit one.
+    """
+    if mode != "lighter_live":
+        return True
+    # The venue's own class, stamped by the scout, screens a newly listed
+    # equity the moment the scout sees it. ABSENT means no opinion, never
+    # "crypto" — hence the hand-list fallback below rather than a return.
+    if (ticket or {}).get("noncrypto") is True:
+        return False
+    return _is_crypto((ticket or {}).get("sym"))
+
+
 def side_of(ticket):
     """The ONE reading of a ticket's side, so belt and braces cannot disagree.
 
@@ -2583,6 +2620,17 @@ def main(_ctx=None):
             # TT_BULL_MODE is not set. No-op on shadow (both sides allowed).
             if side_of(t) not in allowed_sides(TT_VENUE, lens):
                 continue
+            # [(lj)] INSTRUMENT-CLASS belt, the third member of this family and
+            # evaluated in the same place for the same reason: independent of
+            # BULL_MODE, of the brain, and of every bus payload. (kt)/(ku) put
+            # the tokenised-equity screen inside `bull_entry_ok`, reachable only
+            # under `if BULL_MODE:` with TT_BULL_MODE defaulting to OFF — so the
+            # live book's only protection against shorting a tokenised equity
+            # was an env var. Measured before this landed: 19 non-crypto
+            # positions already opened on the real-money row, 5 of them in-era
+            # short-divergence. No-op on shadow, which must keep grading them.
+            if not live_instrument_ok(TT_VENUE, t):
+                continue
             # [2026-07-24 (dk) breakout_up RELABEL — BEFORE the veto] An UP-REGIME
             # crypto breakout becomes its own lens 'breakoutup' HERE, ahead of the
             # brain veto: the broad 4h 'breakout' veto is correct for un-gated
@@ -2715,6 +2763,20 @@ def main(_ctx=None):
                         f"reached the order path on real money (allowed: "
                         f"{sorted(_ok_sides) or 'NOTHING'}). "
                         f"Halting rather than filling.")
+            # [(lj)] The INSTRUMENT-CLASS braces. Checked against `sym` — the
+            # symbol actually handed to market_open — not only the ticket field
+            # the belt read, so a divergence between the two is caught here
+            # rather than filled. Same halt-don't-restart semantics as the two
+            # gates above: on real money a breach is a bug, and continuing past
+            # it is how a tokenised-equity short reaches the venue.
+            if not dry_run and not live_instrument_ok(TT_VENUE,
+                                                      {**(t or {}), "sym": sym}):
+                raise SystemExit(
+                    f"live INSTRUMENT-CLASS allow-list BREACHED: {sym!r} is a "
+                    f"tokenised equity/commodity/FX book and reached the order "
+                    f"path on real money ({lens!r}). The divergence short edge "
+                    f"lives in CRYPTO; tradfi contaminates the read. "
+                    f"Halting rather than filling.")
             if dry_run:
                 broker.open(sym, is_long, size, mark)
                 # ShadowBroker fills by WALKING the book, so the decision price
@@ -3150,6 +3212,43 @@ def selftest():
             assert allowed_sides("lighter_shadow", "divergence") == ALL_SIDES, _bm
     finally:
         globals()["BULL_MODE"] = _wb
+    # ---- LIVE INSTRUMENT-CLASS ALLOW-LIST (lj) — the THIRD twin ----
+    # THE INCIDENT THIS PINS: (kt)/(ku) shipped the tokenised-equity screen
+    # inside `bull_entry_ok`, which the entry loop reaches only under
+    # `if BULL_MODE:` — and TT_BULL_MODE defaults to "off". So the live book's
+    # only protection against shorting a tokenised equity was an env var being
+    # set, which is the EXACT shape (hj) closed for the side restriction 80
+    # lines above. Measured: 19 non-crypto positions already opened on the
+    # real-money row, 5 of them in-era short-divergence.
+    assert live_instrument_ok("lighter_live", {"sym": "BTC"}) is True
+    assert live_instrument_ok("lighter_live", {"sym": "CAP"}) is False   # equity
+    assert live_instrument_ok("lighter_live", {"sym": "DRAM"}) is False
+    assert live_instrument_ok("lighter_live", {"sym": "XAU"}) is False   # metal
+    assert live_instrument_ok("lighter_live", {"sym": "EURUSD"}) is False  # FX
+    # the venue's own stamp screens a book the hand list has never seen
+    assert live_instrument_ok("lighter_live",
+                              {"sym": "NEWLISTING", "noncrypto": True}) is False
+    # ABSENT means NO OPINION, never "crypto": the hand list still decides
+    assert live_instrument_ok("lighter_live", {"sym": "CAP",
+                                               "noncrypto": None}) is False
+    # the SHADOW arm must keep taking them — it is what grades the live rule
+    for _m in ("lighter_shadow", "lighter_paper", ""):
+        assert live_instrument_ok(_m, {"sym": "CAP"}) is True, _m
+        assert live_instrument_ok(_m, {"sym": "X", "noncrypto": True}) is True, _m
+    # junk must not crash the entry loop, and must not admit on the live arm
+    assert live_instrument_ok("lighter_live", None) is True   # no sym -> no claim
+    assert live_instrument_ok("lighter_live", {}) is True
+    # THE INDEPENDENCE CLAIM, asserted rather than described — this is the whole
+    # defect: the verdict must not move when BULL_MODE does.
+    _wb2 = globals()["BULL_MODE"]
+    try:
+        for _bm in (True, False):
+            globals()["BULL_MODE"] = _bm
+            assert live_instrument_ok("lighter_live", {"sym": "CAP"}) is False, _bm
+            assert live_instrument_ok("lighter_live", {"sym": "BTC"}) is True, _bm
+    finally:
+        globals()["BULL_MODE"] = _wb2
+
     # side_of() must agree with the entry loop's own is_long derivation, or
     # belt and braces guard different values
     assert side_of({"side": "short"}) == "short"
