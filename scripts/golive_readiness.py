@@ -1160,6 +1160,17 @@ DOCKET_DAYS = float(os.environ.get("GOLIVE_DOCKET_DAYS", "7"))
 #: (see `_docket_stuck`), which is I17's own wording — "still undecidable at
 #: the floor after its window".
 DOCKET_VERDICTS = ("unreachable", "undecidable")
+#: [(lj)] WHAT EACH DOCKET REASON ACTUALLY ASKS FOR. A docket entry's output is
+#: an INSTRUCTION, so it must name an object the operator can act on (I8) — and
+#: `ledger_missing` is the case where the generic I17 wording is actively wrong:
+#: the book may be trading perfectly and the GRADER is the thing that is broken.
+#: Retiring it on that entry would destroy a working book on a read failure.
+DOCKET_ASKS = {
+    "ledger_missing": ("fix the ledger read — bot_pnl reports closes the "
+                       "grader cannot see; this is NOT a retirement case"),
+    "_default": ("keep-or-retire (I17) — an operator decision, not a "
+                 "tuning pass"),
+}
 #: [(lf)] THE CLOCKS LIVE IN THEIR OWN KEY, and that is a correctness choice
 #: rather than tidiness. `save_state` replaces a payload WHOLESALE, so while the
 #: seen-map rode inside `golive-readiness` a single unreadable prior forced a
@@ -1526,7 +1537,8 @@ def peak_concurrency(eps):
     return mx
 
 
-def _docket_stuck(hz, era_days=None, roster_zero_ledger=False):
+def _docket_stuck(hz, era_days=None, roster_zero_ledger=False,
+                  roster_reason=None):
     """(bool, reason) — is this book off any path to the gate right now?
 
     `unreachable` and `undecidable` are the horizon's own words for it.
@@ -1544,12 +1556,20 @@ def _docket_stuck(hz, era_days=None, roster_zero_ledger=False):
     era to measure against, so the DOCKET'S OWN CLOCK is the time basis:
     DOCKET_DAYS of consecutive "living publisher, zero closes in the ledger"
     is the evidence, and it is exactly what I17 asks for.
+
+    [(lj)] THE ROSTER ARM CARRIES TWO DIFFERENT DIAGNOSES AND THEY NEED
+    DIFFERENT WORDS (I8). "No closes ever" is I17: a real keep-or-retire call.
+    "bot_pnl reports N closes but the ledger holds none for this book" is a
+    READ problem — the grader cannot SEE the book's trades — and telling the
+    operator to retire a book because the grader is blind is the wrong
+    instruction on the wrong object. `roster_reason` lets the caller, the only
+    place that knows `n_alltime`, name which one it is; the flag alone cannot.
     """
     v = (hz or {}).get("verdict")
     if v in DOCKET_VERDICTS:
         return True, v
     if roster_zero_ledger:
-        return True, "zero_ledger"
+        return True, (roster_reason or "zero_ledger")
     if v == "no_rate" and isinstance(era_days, (int, float)) \
             and math.isfinite(era_days) and era_days >= GOLIVE_MIN_DAYS:
         return True, "no_rate_past_window"
@@ -1584,7 +1604,8 @@ def decision_docket(current, prior, now_iso, docket_days=None):
     for bot in sorted(current):
         c = current[bot] or {}
         stuck, reason = _docket_stuck(c.get("hz"), c.get("era_days"),
-                                      c.get("roster_zero_ledger"))
+                                      c.get("roster_zero_ledger"),
+                                      c.get("roster_reason"))
         if not stuck:
             continue                     # not stuck -> no entry -> clock gone
         was = prior.get(bot)
@@ -1606,9 +1627,12 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             "why": hz.get("why") or "",
             # I17 is a KEEP-OR-RETIRE call for the operator, never another
             # tuning pass — say so in the entry so the docket cannot be read
-            # as a to-do list for the next session.
-            "asks": ("keep-or-retire (I17) — an operator decision, not a "
-                     "tuning pass"),
+            # as a to-do list for the next session. [(lj)] EXCEPT for
+            # `ledger_missing`, which is not an I17 case at all: the grader
+            # cannot read the book's trades, so the act is to fix the read.
+            # Asking the operator to retire a book because a fetch is blind
+            # names the wrong object (I8) and would retire a working book.
+            "asks": (DOCKET_ASKS.get(reason) or DOCKET_ASKS["_default"]),
         })
     # worst first: longest stuck, then weakest evidence
     docket.sort(key=lambda d: (-(d["days_held"] or 0),
@@ -2135,6 +2159,29 @@ def _selftest():
             if isinstance(_x, float):
                 assert math.isfinite(_x), (_k, _x)
 
+    # [(lj)] THE SPLIT'S ENTIRE CORRECTNESS RESTS ON TWO CONSTANTS DIFFERING,
+    # and nothing pinned it. Collapsing them passes every other test in this
+    # file while each publish replaces the GRADE payload with the clock payload
+    # ({updated, ttl_sec, seen}) — no `books`, no `ready`, so the 🚦 card
+    # renders empty and `fleet_immune`'s two-writer pager (which reads
+    # `books.<bot>.integrity`) goes blind, on a fully green build.
+    assert DOCKET_SEEN_KEY != KEY, (
+        "the docket clocks must live in their OWN bot_state key: save_state "
+        "replaces a payload WHOLESALE, so sharing the key silently destroys "
+        f"the grade every publish (KEY={KEY!r})")
+
+    # [(lj)] `ledger_missing` is NOT a retirement case — a grader that cannot
+    # read a book's trades must not tell the operator to retire it (I8).
+    _zl, _r_zl = _docket_stuck({"verdict": "no_rate"}, roster_zero_ledger=True,
+                               roster_reason="zero_ledger")
+    _lm, _r_lm = _docket_stuck({"verdict": "no_rate"}, roster_zero_ledger=True,
+                               roster_reason="ledger_missing")
+    assert _zl and _r_zl == "zero_ledger", (_zl, _r_zl)
+    assert _lm and _r_lm == "ledger_missing", (_lm, _r_lm)
+    assert "retirement" not in DOCKET_ASKS["_default"]
+    assert "NOT a retirement case" in DOCKET_ASKS["ledger_missing"]
+    assert DOCKET_ASKS["ledger_missing"] != DOCKET_ASKS["_default"]
+
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
           "high-win-rate loser, window/DD bars, ungradeable input, policy "
           "eras, stamp-derived policy boundaries: first-new-close bound, "
@@ -2568,8 +2615,14 @@ def main():
             # its own reason, and THE DOCKET'S OWN CLOCK supplies the time
             # basis the missing era cannot — seven consecutive days of "living
             # publisher, zero closes ever" IS I17's signal, and it needs no era.
+            # [(lj)] `_n_all` is the discriminator and it is known ONLY here:
+            # zero closes ever is I17, but a non-zero bot_pnl count with no
+            # ledger rows is a READ failure wearing I17's clothes. They get
+            # different reasons and different `asks` — see DOCKET_ASKS.
             _docket_now[_b] = {"hz": payload_floor[_b]["horizon"],
                                "era_days": None, "roster_zero_ledger": True,
+                               "roster_reason": ("zero_ledger" if _n_all == 0
+                                                 else "ledger_missing"),
                                "n": _n_all, "mean_pct": None, "t": None}
     except Exception as e:      # noqa: BLE001 — annotations only, never the grade
         roster_meta["error"] = f"{type(e).__name__}: {e}"
@@ -2600,6 +2653,13 @@ def main():
             # rewrite, so the stored clocks survive untouched.
             _docket, _seen, _docket_why = [], {}, None
             _seen_ok = False
+            #: [(lj)] `docket_valid` — a PRESENT POSITIVE field. On any failure
+            #: the mirror below is `[]`/`{}`, which reads byte-identically to
+            #: "nothing is overdue"; an empty map is a CLAIM. Consumers test
+            #: this rather than inferring validity from the ABSENCE of
+            #: `docket_why`, because absence-inference is the shape that made
+            #: the (kw) roster receipt necessary one organ over.
+            _docket_valid = False
             try:
                 if hasattr(_store, "load_state_checked"):
                     _ok_prior, _prior_seen = _store.load_state_checked(
@@ -2607,10 +2667,36 @@ def main():
                 else:
                     _prior_seen, _ok_prior = _store.load_state(
                         DOCKET_SEEN_KEY), True
+                # [(lj)] MIGRATION, AND IT IS LOAD-BEARING EXACTLY ONCE. (lf)
+                # moved the clocks to DOCKET_SEEN_KEY and read only there —
+                # but `load_state_checked` returns (True, None) for a MISSING
+                # row, so on the first run after that deploy `_ok_prior` was
+                # True with an EMPTY prior: every `since` restamped to now and
+                # the pre-(lf) mirror in KEY was abandoned. 14 clocks all
+                # stamped at deploy time read exactly like "the fleet became
+                # stuck today" — an unknown wearing the costume of a verdict.
+                # Fall back to the old in-grade location when the new key has
+                # no row yet, and SAY SO, so a reader can tell a migrated run
+                # from a genuinely fresh one.
+                _migrated = False
+                if _ok_prior and not (_prior_seen or {}).get("seen"):
+                    try:
+                        _old = _store.load_state(KEY) or {}
+                        if isinstance(_old.get("docket_seen"), dict) \
+                                and _old["docket_seen"]:
+                            _prior_seen = {"seen": _old["docket_seen"]}
+                            _migrated = True
+                    except Exception:      # noqa: BLE001 — best-effort only
+                        pass
                 if _ok_prior:
                     _docket, _seen = decision_docket(
                         _docket_now, (_prior_seen or {}).get("seen"), _now_iso)
                     _seen_ok = True
+                    if _migrated:
+                        _docket_why = (
+                            f"clocks migrated once from '{KEY}.docket_seen' to "
+                            f"'{DOCKET_SEEN_KEY}' — days_held below are carried "
+                            "from the old location, not restarted today")
                 else:
                     _docket_why = ("docket clocks unreadable — NOT recomputed "
                                    "and NOT rewritten this cycle, so the "
@@ -2618,6 +2704,41 @@ def main():
                                    "unaffected)")
             except Exception as _de:      # noqa: BLE001
                 _docket_why = f"docket unavailable: {type(_de).__name__}: {_de}"
+            # [(lj)] THE CLOCK WRITE HAPPENS HERE — BEFORE the payload — AND ITS
+            # RESULT IS READ (I4). Two separate defects lived in the two lines
+            # this replaces. First, the result was DISCARDED, so the payload
+            # advertised clocks that were never stored; the damage is specific
+            # and it disables the organ's whole purpose — a book already in the
+            # map keeps its older `since` and reads FINE, but a NEWLY stuck book
+            # never gets its clock started, so it can never accrue DOCKET_DAYS
+            # and the docket is structurally unable to ever name it. Second, the
+            # write came AFTER `save_state(KEY, payload)`, so no honest
+            # `docket_valid` was computable at payload-build time: the payload
+            # asserted the clocks before knowing whether they had been stored.
+            # Ordering is safe in this direction — a stored clock with an
+            # unpublished grade costs nothing (the stamps are cumulative
+            # first-seen marks and next cycle reads them), while the reverse
+            # publishes a claim it cannot back.
+            if _seen_ok:
+                try:
+                    _clock_ok = bool(_store.save_state(
+                        DOCKET_SEEN_KEY, {"updated": _now_iso,
+                                          "ttl_sec": TTL_SEC, "seen": _seen}))
+                except Exception as _we:      # noqa: BLE001
+                    _clock_ok, _we_txt = False, f"{type(_we).__name__}: {_we}"
+                else:
+                    _we_txt = "save_state returned falsey"
+                if _clock_ok:
+                    _docket_valid = True
+                else:
+                    # Report the PERSISTENT condition, not a one-shot warning
+                    # (I4's second half): the field below carries it into every
+                    # consumer, not just this container's stdout.
+                    _docket_why = (
+                        f"docket clock write FAILED ({_we_txt}) — the days_held "
+                        "below are this run's only copy and a newly stuck book "
+                        "cannot start its clock; the docket cannot be trusted "
+                        "to ever name one")
             payload = {
                 "updated": _now_iso,
                 "ttl_sec": TTL_SEC,
@@ -2627,6 +2748,10 @@ def main():
                 "decision_docket": _docket,
                 "docket_seen": _seen,
                 "docket_days": DOCKET_DAYS,
+                # [(lj)] See `_docket_valid` above: a present POSITIVE field.
+                # `decision_docket: []` alone cannot distinguish "swept, nothing
+                # overdue" from "the read failed and this is a placeholder".
+                "docket_valid": _docket_valid,
                 **({"docket_why": _docket_why} if _docket_why else {}),
                 "bar": {"min_days": GOLIVE_MIN_DAYS,
                         "min_closes": GOLIVE_MIN_CLOSES,
@@ -2643,15 +2768,12 @@ def main():
                 "roster": roster_meta,
                 "ready": sorted(ready)}
             ok_pub = _store.save_state(KEY, payload)
-            # [(lf)] The clocks are written ONLY when the read succeeded. A
-            # write we cannot make safely is a write we do not make: on a
-            # failed read `_seen` is `{}` and persisting it would zero every
-            # book's clock, which is precisely the defect this split exists to
-            # remove. The GRADE above is already published either way.
-            if _seen_ok:
-                _store.save_state(DOCKET_SEEN_KEY,
-                                  {"updated": _now_iso, "ttl_sec": TTL_SEC,
-                                   "seen": _seen})
+            # [(lf)] The clocks are written ONLY when the read succeeded — see
+            # the write block above, which now runs BEFORE this publish. A write
+            # we cannot make safely is a write we do not make: on a failed read
+            # `_seen` is `{}` and persisting it would zero every book's clock,
+            # which is precisely the defect that split exists to remove. The
+            # GRADE publishes either way.
             # HISTORY too, because the question the baseline document asks is a
             # TRAJECTORY one — "is t moving toward 2.0 and n above 41?" — and a
             # single current snapshot cannot answer it. 4 writes/day against a
