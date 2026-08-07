@@ -203,6 +203,56 @@
     and the weighted estimator must reduce to the ordinary sample statistic,
     the one configuration whose right answer is unambiguous.
 
+### The regime oracle's selftest exited 0 one third of the way in, so 37 assertions never ran — on the organ that had just been measured publishing a constant
+
+- **MEASURED, before a line was changed.** `regime_oracle._selftest` contained
+  `sys.exit(store.organ_main('regime-oracle', main))` — **the production
+  `__main__` line, copy-pasted into the test**. It raises `SystemExit(0)` and
+  kills the process there. Run it: exit code **0**, the closing
+  *"regime_oracle selftest OK"* line **never prints**, and **37 assertions
+  after that line never execute**. `tests/test_selftests.py` asserts only the
+  exit code, so the harness built because *"a regression in a covered function
+  still shipped green because the selftest was never executed"* was itself
+  reporting a module it had not tested.
+- **AND THE FIXTURES WERE DEAD TOO, WHICH THE EXIT HAD HIDDEN.** All three
+  blocks mocked `store.load_state`, but `main()` reads
+  **`store.load_state_checked`** (line 468 — the `(jz)` seed-class migration).
+  So the real, DB-less store answered `(False, None)`, `main()` printed *"state
+  read FAILED — skipping this cycle"* and returned before publishing anything.
+  Even with the `sys.exit` removed, every assertion would have been reading an
+  empty dict. **Two independent defects, and the first made the second
+  unobservable** — which is why the migration was never followed through here.
+- **WHAT WAS DEAD.** Coverage naming (young book / unlisted coin), the FROZEN-
+  tape guard, payload shape, the dark-venue fail-safe, per-asset non-crypto
+  coverage, `fleet.read` staying crypto-only, and the whole self-grading block.
+  Restored, they all **PASS** — the assertions were right, they had simply
+  never run. The timing is the sharp part: `(li)` measured this same oracle
+  publishing `"risk-off downtrend"` on **1,569 consecutive samples over 30.8
+  days**, and the organ's own regression net had been inert throughout.
+- **THE CLASS IS CLOSED IN THE HARNESS THAT WAS FOOLED.**
+  `test_no_selftest_exits_with_success` walks every `*selftest*` function by AST
+  and fails on any process exit that would report SUCCESS. The rule is narrow on
+  purpose, because exiting to signal FAILURE is correct: `fleet_agronomy`'s
+  `sys.exit(1)` after printing its collected failures is allowed, and so is
+  `backtest_georgia_short_sleeve`'s `raise SystemExit("selftest needs the BTC
+  tape")`. **The exit-code semantics were measured, not assumed** —
+  `sys.exit("msg")` exits **1**, `sys.exit(0)`/`sys.exit()`/`sys.exit(None)`
+  exit **0**, and a COMPUTED argument is normally 0 (the oracle's case exactly).
+- **DELIBERATELY NOT a "must print an OK line" check.** 80 of 106 selftests use
+  that wording and 26 use their own (*"All Ticket Taker self-tests passed"*), so
+  requiring it would be asserting a convention the fleet does not have — the
+  trap this repo names in the same breath as this class.
+- **SIX MUTATIONS RED PLUS A GREEN CONTROL — and the first cut of the scanner
+  failed one of them.** It hard-coded the owner name to `sys`/`os`, so
+  `import sys as _s; _s.exit(0)` walked straight through: a guard blind to a
+  one-line rename, in a test about guards that cannot fire. It now resolves
+  module aliases and also catches `raise SystemExit`. Red: the oracle's exit
+  restored · aliased `_s.exit(0)` · bare `exit()` · `raise SystemExit(0)` ·
+  `os._exit(0)` · the scanner blinded. Green: a legitimate `sys.exit(1)`.
+  **Hardening the scanner is what found the second site** — `backtest_georgia_
+  short_sleeve` — which turned out to be a correct bail and is now known to be
+  one rather than assumed.
+
 ### WHICH BOOK MOVED (doctrine rule 4)
 
 **🎫 the Ticket Taker's LIVE row — its in-era sample stops being a third

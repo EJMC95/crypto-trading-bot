@@ -441,3 +441,120 @@ def test_no_unregistered_selftest():
         "tests/test_selftests.py (add to SELFTEST_MODULES, or to "
         f"SELFTEST_EXCLUDE with a reason):\n  " + "\n  ".join(unregistered)
     )
+
+
+# ── [2026-08-07 (lj)] A SELFTEST MAY NOT EXIT SUCCESSFULLY MID-BLOCK ─────────
+# `test_module_selftest` above asserts the subprocess exits 0 — and that is the
+# ONLY thing it asserts, so a selftest that calls `sys.exit(0)` halfway through
+# reports SUCCESS while skipping every assertion after it.
+#
+# THE INCIDENT: `regime_oracle._selftest` contained
+#     sys.exit(store.organ_main('regime-oracle', main))
+# — the production `__main__` line, copy-pasted in. It raised SystemExit(0) and
+# killed the process there. Measured: the final "regime_oracle selftest OK"
+# line NEVER printed and **37 assertions never executed**, while this harness
+# marked the module passing. Every coverage, frozen-tape, dark-venue and
+# per-asset contract in that file was dead — on the organ `(li)` had just
+# measured publishing a CONSTANT verdict for 30.8 days.
+#
+# The rule is narrow on purpose: exiting to signal FAILURE is correct and
+# `fleet_agronomy._selftest` does exactly that (`sys.exit(1)` after printing
+# its collected failures). What is never correct is exiting with SUCCESS, or
+# with a computed code that is normally zero, from inside the block.
+#
+# Deliberately NOT a "must print an OK line" check: 80 of 106 selftests use
+# that wording and 26 use their own ("All Ticket Taker self-tests passed"),
+# so requiring it would be asserting a convention the fleet does not have —
+# the trap CLAUDE.md names in the same breath as this class.
+
+def _selftest_exit_calls():
+    """(file, function, line, code) for every `sys.exit`/`exit` inside a
+    selftest function body."""
+    import ast
+
+    out = []
+    for py in ROOT.rglob("*.py"):
+        rel = py.relative_to(ROOT).as_posix()
+        if rel.startswith("tests/") or "/.claude/" in py.as_posix():
+            continue
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8", errors="ignore"))
+        except (OSError, SyntaxError):
+            continue
+        # Resolve module aliases: `import sys as _s` makes `_s.exit(0)` the
+        # same call. The first cut of this scanner hard-coded the owner name
+        # to "sys"/"os" and an aliased mutation walked straight through it —
+        # a guard blind to a one-line rename is the class this file is about.
+        aliases = {"sys", "os"}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for a in node.names:
+                    if a.name in ("sys", "os") and a.asname:
+                        aliases.add(a.asname)
+        for fn in ast.walk(tree):
+            if not (isinstance(fn, ast.FunctionDef) and "selftest" in fn.name):
+                continue
+            for node in ast.walk(fn):
+                # `raise SystemExit(...)` is the same process exit by another
+                # spelling, and this repo uses it deliberately elsewhere.
+                if isinstance(node, ast.Raise):
+                    exc = node.exc
+                    nm = ""
+                    args = []
+                    if isinstance(exc, ast.Call):
+                        nm = getattr(exc.func, "id", "")
+                        args = exc.args
+                    elif isinstance(exc, ast.Name):
+                        nm = exc.id
+                    if nm == "SystemExit":
+                        out.append((rel, fn.name, node.lineno,
+                                    args[0] if args else None))
+                    continue
+                if not isinstance(node, ast.Call):
+                    continue
+                f = node.func
+                name = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", "")
+                owner = getattr(getattr(f, "value", None), "id", None)
+                is_exit = (name in ("exit", "_exit", "quit")
+                           and (owner is None or owner in aliases))
+                if is_exit:
+                    arg = node.args[0] if node.args else None
+                    out.append((rel, fn.name, node.lineno, arg))
+    return out
+
+
+def test_no_selftest_exits_with_success():
+    """A selftest that exits 0 mid-block reports success over dead assertions."""
+    bad = []
+    for rel, fname, line, arg in _selftest_exit_calls():
+        # A LITERAL that produces a NON-ZERO exit is a deliberate failure
+        # signal and is allowed. Verified empirically rather than assumed:
+        # `sys.exit(1)` -> 1, `sys.exit("msg")` -> 1 with msg on stderr,
+        # `sys.exit(0)` -> 0, `sys.exit()` -> 0. So a non-zero int and a
+        # non-empty string are both honest bails; 0, None, no-arg and any
+        # COMPUTED expression (which is normally 0 — the regime_oracle case,
+        # `sys.exit(organ_main(...))`) are not.
+        import ast as _ast
+        if isinstance(arg, _ast.Constant):
+            v = arg.value
+            if isinstance(v, bool):
+                pass                     # True==1 but reads as a mistake
+            elif isinstance(v, int) and v != 0:
+                continue
+            elif isinstance(v, str) and v.strip():
+                continue
+        bad.append(f"{rel}:{line} in {fname}()")
+    assert not bad, (
+        "these selftests can terminate the process with a SUCCESS code "
+        "mid-block, so every assertion after them silently never runs while "
+        "this harness reports the module passing — exit only to signal "
+        "FAILURE (a literal non-zero int):\n  " + "\n  ".join(bad))
+
+
+def test_the_selftest_exit_scanner_is_not_vacuous():
+    """If the AST walk stops finding selftest functions, the test above turns
+    green over the whole fleet. Prove it still sees the legitimate case."""
+    calls = _selftest_exit_calls()
+    assert any(rel == "fleet_agronomy.py" for rel, _, _, _ in calls), (
+        "the scanner no longer finds fleet_agronomy's deliberate sys.exit(1) "
+        f"— it has gone blind. Found: {calls}")
