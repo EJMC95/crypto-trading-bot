@@ -371,7 +371,16 @@ def desired_taker_bars(tape, baseline, lens_fwd, helping=None, lens_fresh=True,
         # [2026-07-21 IMB-24] episode basis when the brain publishes v3
         # fields, raw fallback otherwise — same authority as the veto.
         graded, floor_met, avg, hit = tt.lens_evidence(g, min_n=LENS_FLOOR)
-        positive = floor_met and avg > 0 and hit >= 0.5
+        # [(lj)] EXPECTANCY ONLY — I15 in the back-a-winner direction, which
+        # `(ij)` fixed for the veto and never swept here. `hit >= 0.5` cannot
+        # see the carry shape (lose often, win big): on the fleet's own
+        # recorded payload `breakout` is +0.026%/trade at hit 0.480 and was
+        # excluded from this walk entirely. `tt.lens_wins` is the twin of
+        # `tt.lens_loses` and lives in the same module for the same reason a
+        # second copy of the veto would be the (hj) class. The expectancy PRICE
+        # is untouched: this only decides who ENTERS the walk, and every notch
+        # below must still improve BOTH halves through the real replay (I19).
+        positive = floor_met and tt.lens_wins(avg, hit)
         earned = positive or lever in helping
         starving = (lens_rep.get("seen", 0) > 0
                     and lens_rep.get("taken", 0) == 0
@@ -507,7 +516,7 @@ def desired_scout_levers(lens_fwd, helping=None, realised=None):
             log.append(f"{lens}: graded n={graded} under floor — scout "
                        f"emission {lever} -> {val} (grading diet, not trading"
                        + (", deeper: proprio-helping" if deeper else "") + ")")
-        elif _avg is not None and _avg > 0 and (_hit or 0) >= 0.5:
+        elif tt.lens_wins(_avg, _hit):      # [(lj)] expectancy only — see above
             # [2026-07-21b AUDIT FIX] the WINNER path — the exact state
             # IMB-20 shipped scout.div_gap_pp FOR (divergence: floor met,
             # positive at every horizon) was UNREACHABLE: the diet only

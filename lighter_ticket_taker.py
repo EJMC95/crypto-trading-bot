@@ -1156,6 +1156,44 @@ def lens_loses(avg, hit):
     return avg < 0
 
 
+def lens_wins(avg, hit):
+    """Does this grade say the lens MAKES MONEY? Expectancy only.
+
+    [2026-08-07 (lj)] THE OTHER HALF OF I15, AND IT WAS NEVER SWEPT. `(ij)`
+    removed `hit < 0.5` from the VETO above and I15 records the ruling as
+    *"expectancy-only in BOTH directions"* — but the back-a-winner direction
+    lived in `lighter_scout_tuner`, which kept requiring `hit >= 0.5` before it
+    would widen anything. I15's own wording names that case in terms: *"one
+    that requires a HIGH hit rate before it will back a winner cannot see the
+    carry shape — lose often, win big."*
+
+    MEASURED, from the table in `lens_loses` directly above — the fleet's own
+    recorded `brain-lens-forward` payload: **`breakout` reads eavg4h +0.026%
+    with ehit4h 0.480**. Positive expectancy, sub-50% hit. The veto correctly
+    leaves it alone, and the tuner's winner walk could not see it at all. 🌾
+    carry, the best-evidenced book in the fleet, wins **38.8%**.
+
+    THIS IS NOT A WIDENING BOUGHT WITHOUT EVIDENCE (I19). It only decides
+    whether a lens ENTERS the tuner's walk; every notch inside that walk must
+    still IMPROVE BOTH HALVES by `MARGIN_HALF` through the real replay before
+    it touches a lever, and the brain veto stays senior ahead of both. What is
+    removed is a filter with no evidentiary basis, not the price.
+
+    Same owner, same revert switch: `TT_LENS_VETO_LEGACY_HIT_GATE` restores the
+    pre-(lj) conjunction here exactly as it does for the veto, so one env var
+    puts both directions back without a deploy. Win rate stays REPORTED by
+    `lens_evidence` and in the tuner's log lines — demoted, not deleted.
+
+    Fail-safe CLOSED, opposite to `lens_loses` and deliberately so: this
+    AUTHORISES a widening, so a missing or unreadable grade must return False.
+    """
+    if avg is None:
+        return False
+    if LEGACY_HIT_GATE:
+        return avg > 0 and (hit or 0) >= 0.5
+    return avg > 0
+
+
 # [2026-07-24 (dm) INCREMENT B] 'breakoutup' earns its OWN veto — from its own
 # realized closes, NOT the 4h forward grade (dk) proved misjudges it.
 #

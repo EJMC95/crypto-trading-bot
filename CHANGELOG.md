@@ -307,6 +307,56 @@
   store. A hand-written `{"updated": ...}` fixture would have passed against
   the broken code — which is exactly how this survived.
 
+### I15 said "expectancy-only in BOTH directions" and only one direction was ever swept
+
+- **THE HALF THAT WAS DONE.** `(ij)` removed the `hit < 0.5` conjunct from
+  `lens_loses`, so a lens that loses money while winning slightly more than half
+  its bets became vetoable. I15 was engraved off that fix.
+- **THE HALF THAT WAS NOT.** The back-a-winner direction lives in
+  `lighter_scout_tuner`, and BOTH its expand paths still read
+  `avg > 0 and hit >= 0.5` — the taker-bar winner walk and the scout emission
+  diet. I15's own second sentence describes exactly this case: *"one that
+  requires a HIGH hit rate before it will back a winner cannot see the carry
+  shape — lose often, win big."* The invariant named the defect and the sweep
+  stopped at the first instance. **Third time this week** ((li) the sentinel→
+  brain constant, (lj) the ddof grader, this).
+- **MEASURED, and the number is in this repo already.** The table inside
+  `lens_loses`'s own docstring — the fleet's recorded `brain-lens-forward`
+  payload — lists **`breakout` at eavg4h +0.026% with ehit4h 0.480**. Positive
+  expectancy, sub-50% hit: correctly left alone by the veto, and **invisible to
+  the winner walk**. 🌾 carry, the best-evidenced book the fleet has, wins
+  **38.8%**. The bar could not see either of them.
+- **`lens_wins` IS THE TWIN, and every design choice mirrors its sibling for a
+  stated reason.** It lives in `lighter_ticket_taker` beside `lens_loses`
+  because a second copy of the rule is a second rule (the (hj) class, which
+  this fleet already paid for once with the go-live gate). It honours the same
+  `TT_LENS_VETO_LEGACY_HIT_GATE`, so one env var restores **both** halves
+  without a deploy — a revert that put back only one would leave the fleet in a
+  state neither ruling describes. And it fails **CLOSED** where `lens_loses`
+  fails open, deliberately: this one AUTHORISES a widening, so a missing or
+  unreadable grade must return False.
+- **THIS IS NOT A WIDENING BOUGHT WITHOUT EVIDENCE (I19), and that is asserted
+  rather than claimed.** `lens_wins` decides only who ENTERS the tuner's walk.
+  Every notch inside it must still improve BOTH halves by `MARGIN_HALF` through
+  the real replay, and the brain veto still short-circuits ahead of everything.
+  Two tests pin exactly that, and both redden when the margin or the veto is
+  removed. What this deletes is a filter with no evidentiary basis, not a price.
+- **EIGHT MUTATIONS, EACH RED** — the hit gate restored in each of the two walks
+  · `lens_wins` failing open · `lens_wins` regrowing a hit gate · the replay
+  margin dropped · the tuner growing its own copy of the rule · the brain veto
+  demoted · the AST matcher blinded.
+  - **AND MY OWN I19 TEST FAILED ITS MUTATION FIRST.** It asserted
+    `"MARGIN_HALF" in body` — a presence check — and the name survives elsewhere
+    in the function, so dropping the margin from the actual comparison stayed
+    GREEN. It now walks the `Compare` nodes and requires every replay
+    comparison to carry the margin. That is the third time in this pass a guard
+    I wrote detected deletion but not disablement; each one is recorded rather
+    than quietly repaired, because the rate at which I make this mistake is
+    itself the finding.
+- **I15's `ENFORCED BY:` line now names the twin and its guard.** A doctrine
+  that no longer describes the system is a defect (I12), and an enforcement
+  list that covers one direction of a two-direction rule is exactly that.
+
 ### WHICH BOOK MOVED (doctrine rule 4)
 
 **🎫 the Ticket Taker's LIVE row — its in-era sample stops being a third

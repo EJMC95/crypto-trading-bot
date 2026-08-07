@@ -201,7 +201,18 @@ made a money-losing lens structurally unvetoable, and the live book's own lens
 escaped by **0.002** of hit rate. **When a bad idea is removed from a report,
 grep for it in the things that ACT.** The fix is expectancy-only in both
 directions; win rate stays REPORTED, demoted rather than deleted.
-  ENFORCED BY: `lighter_ticket_taker.py::lens_loses`, `lighter_ticket_taker.py::LEGACY_HIT_GATE`
+**[7-Aug (lj)] "BOTH DIRECTIONS" WAS HALF-DONE FOR SIX DAYS.** `(ij)` swept the
+VETO; the BACK-A-WINNER direction sat in `lighter_scout_tuner`, whose two expand
+paths both still read `avg > 0 and hit >= 0.5`. So on the fleet's own recorded
+`brain-lens-forward` payload, `breakout` — **+0.026%/trade at hit 0.480**, the
+carry shape this invariant names in its own second sentence — could not enter
+the winner walk at all. `lens_wins` is now the twin of `lens_loses`: same
+module (a second copy would be the (hj) class), same `LEGACY_HIT_GATE` revert
+switch so one env var restores both halves, and fail-CLOSED rather than
+fail-open because it AUTHORISES a widening instead of restricting one. The
+expectancy price is untouched — it gates ENTRY to the walk, and every notch
+inside still has to improve BOTH halves through the real replay (I19).
+  ENFORCED BY: `lighter_ticket_taker.py::lens_loses`, `lighter_ticket_taker.py::LEGACY_HIT_GATE`, `lighter_ticket_taker.py::lens_wins`, `tests/autonomy/test_i15_expand_direction.py::test_the_tuner_has_no_bare_hit_rate_gate_left`
 
 **— THE OFFENSE TIER (added 4-Aug, operator: "only growth, no step backs, we
 only focus on winning" / "lean further towards how we make bots win more").**
