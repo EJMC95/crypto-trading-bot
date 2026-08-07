@@ -235,8 +235,40 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   note is superseded; `perps-bot` turned out to be ALREADY DELETED (the
   operator had done the deletion sitting — 16 services remain of the
   review's 26; the crash-loop is over).]**
-- **Zombie publishers — ~~`equities-momentum-alpaca` still writes daily~~
-  MEASURED SILENT 7-Aug.** A full sweep of `bot_pnl` reads **23 rows written
+- **Zombie publishers — RESOLVED 7-Aug, and NOT the way this item or my first
+  answer assumed. IT NEVER STOPPED.** Located: Railway project **`trading-bot`**,
+  two services — **`market-scanner`** and **`trading-bot`** — both deploying from
+  repo `EJMC95/equities-momentum-alpaca`. Both ran **6-Aug 22:00 and 22:03 UTC**
+  and logged `=== Run complete (LIVE) ===` while placing orders (`order 7db96759
+  accepted`, `STOP CRWD trailing 12% attached (qty 65)`).
+
+  What stopped is its PUBLISHING, and the cause is ours: the 5-Aug rotation
+  `(kb)`. `trading-bot` logs `[bot_pnl_store] disabled: connect failed …
+  password authentication failed for user "postgres"` — **a 14th pasted DATABASE_URL
+  literal, in a project the rotation never swept.** `market-scanner` logs
+  `DATABASE_URL not set` and never published at all. So `bot_pnl` is empty of
+  alpaca rows because the writer is locked out, not because it went away.
+
+  **Two things for you, and both are yours because this is a separate system
+  placing live orders:**
+  1. **Decide whether it should be running.** It says LIVE. This item used to
+     describe it as "$86k paper equity"; the logs do not confirm paper. Nothing
+     in this repo can tell you which, and that is the question worth answering
+     first.
+  2. **If you want its row back**, set `DATABASE_URL` on both services to the
+     rotated value from Keychain (`security find-generic-password -s
+     fleet-pg-rotation -w`). The `${{Postgres.DATABASE_URL}}` reference form
+     that `(kb)` mandates does NOT resolve across projects, so this one is
+     necessarily a literal — the single declared exception to that rule, and it
+     will break again on the next rotation unless it is on the sweep list.
+
+  *Corrects my own 7-Aug entry, which read "MEASURED SILENT" on the strength of
+  a `bot_pnl` sweep. The sweep was right that no row is being written and wrong
+  about why; I said the two cases were indistinguishable from this side, and
+  they were — from THIS side. Reading the other project's logs distinguished
+  them in one command.*
+
+- ~~**Zombie publishers — MEASURED SILENT 7-Aug (superseded above).**~~ A full sweep of `bot_pnl` reads **23 rows written
   in the last 24h and ZERO of them retired** — every writer is a live,
   load-bearing service, and no `equities-momentum%`/`%alpaca%` row exists in
   the table at all. So either the publisher stopped or its row was pruned
