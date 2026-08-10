@@ -1,9 +1,9 @@
 round,date,home,away,p_home_blend,market_p_home,edge_home,books,best_odds_home,best_odds_away,disp_home,disp_away,value_side,value_ev_pct
-Round 23,2026-08-06 19:50:00,Gold Coast Titans,North Queensland Cowboys,0.4165,0.4242,-0.0077,4,2.25,1.65,0.0045,0.0,North Queensland Cowboys,-3.7225
-Round 23,2026-08-07 18:00:00,New Zealand Warriors,Penrith Panthers,0.4372,0.4167,0.0205,4,2.43,1.65,0.0681,0.0154,New Zealand Warriors,6.2396
-Round 23,2026-08-07 20:00:00,Sydney Roosters,Canterbury-Bankstown Bulldogs,0.7284,0.7023,0.0261,4,1.36,3.3,0.0112,0.0394,Sydney Roosters,-0.9376
-Round 23,2026-08-08 15:00:00,Melbourne Storm,Manly-Warringah Sea Eagles,0.5656,0.4517,0.1139,4,2.1,1.73,0.0,0.0,Melbourne Storm,18.776
-Round 23,2026-08-08 17:30:00,Dolphins,Brisbane Broncos,0.7417,0.6619,0.0798,4,1.44,2.9,0.007,0.0357,Dolphins,6.8048
-Round 23,2026-08-08 19:35:00,South Sydney Rabbitohs,Parramatta Eels,0.6789,0.7065,-0.0276,4,1.35,3.3,0.0075,0.0233,Parramatta Eels,5.963
-Round 23,2026-08-09 14:00:00,Canberra Raiders,Newcastle Knights,0.58,0.5171,0.0629,4,1.88,2.0,0.0217,0.0152,Canberra Raiders,9.04
-Round 23,2026-08-09 16:05:00,St George Illawarra Dragons,Cronulla-Sutherland Sharks,0.2131,0.2069,0.0062,4,5.0,1.2,0.087,0.0042,St George Illawarra Dragons,6.55
+Round 24,2026-08-13 19:50:00,Penrith Panthers,Sydney Roosters,0.6488,0.5352,0.1136,4,1.8,2.05,0.0112,0.0,Penrith Panthers,16.784
+Round 24,2026-08-14 18:00:00,Manly-Warringah Sea Eagles,Dolphins,0.4843,0.3345,0.1498,4,2.95,1.44,0.0442,0.0141,Manly-Warringah Sea Eagles,42.8685
+Round 24,2026-08-14 20:00:00,Canterbury-Bankstown Bulldogs,South Sydney Rabbitohs,0.5479,0.5769,-0.029,4,1.65,2.3,0.003,0.0222,South Sydney Rabbitohs,3.983
+Round 24,2026-08-15 15:00:00,Cronulla-Sutherland Sharks,Canberra Raiders,0.7168,0.7119,0.0049,4,1.34,3.35,0.0037,0.0152,Cronulla-Sutherland Sharks,-3.9488
+Round 24,2026-08-15 17:30:00,Parramatta Eels,North Queensland Cowboys,0.4385,0.3987,0.0398,4,2.4,1.58,0.0105,0.0032,Parramatta Eels,5.24
+Round 24,2026-08-15 19:35:00,Brisbane Broncos,New Zealand Warriors,0.3676,0.3468,0.0208,4,2.75,1.55,0.0,0.0616,Brisbane Broncos,1.09
+Round 24,2026-08-16 14:00:00,Newcastle Knights,Gold Coast Titans,0.7261,0.7475,-0.0214,4,1.28,3.8,0.0039,0.0066,Gold Coast Titans,4.082
+Round 24,2026-08-16 16:05:00,Wests Tigers,St George Illawarra Dragons,0.624,0.5026,0.1214,4,1.9,1.94,0.0,0.0104,Wests Tigers,18.56
