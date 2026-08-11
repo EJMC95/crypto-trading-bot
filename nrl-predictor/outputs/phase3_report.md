@@ -1,6 +1,6 @@
 # Phase 3 report — Poisson + GBM vs Elo and the closing line
 
-_Generated 2026-08-10. Walk-forward 2015–2025; Poisson refits before every round (Dixon–Coles decay ξ=1.0, 5y window); GBM retrains before every season on strictly-prior matches; stacked probability features are themselves walk-forward outputs. Draws score 0.5._
+_Generated 2026-08-11. Walk-forward 2015–2025; Poisson refits before every round (Dixon–Coles decay ξ=1.0, 5y window); GBM retrains before every season on strictly-prior matches; stacked probability features are themselves walk-forward outputs. Draws score 0.5._
 
 ## Overall 2015–2025 (Brier / log loss)
 
