@@ -264,8 +264,42 @@ def _bars(mode):
     return H, ENTER_APR * scale, EXIT_APR * scale
 
 
+# [2026-08-13 (lk)] INSTRUMENT-CLASS SCREEN — crypto perps only. The third
+# funding book to need it, and the last found the hard way: (ki) screened 🎸
+# Barnesy, (jg)-era work screened ⚖️ Counterweight, and this book — the
+# fleet's best-evidenced — was left harvesting tokenised non-crypto funding.
+# MEASURED, era ledger (opened >= 31-Jul): non-crypto −$14.96 over 9 closes
+# (WTI ×4, SKHYNIXUSD ×2, SPCX ×2, all `*_flip` with FEES > ACCRUED on every
+# loss) vs crypto −$0.49 over 1 — the whole era bleed of a book that is
+# +$66.21 all-time. THE MECHANISM, not just the outcome: an instrument whose
+# underlying market CLOSES holds its funding artifact for hours while nothing
+# can arb it, so `PERSIST_H` — the research-backed spike filter, validated on
+# 24/7 crypto — is satisfied STRUCTURALLY (I7) by every closed-market night,
+# and the print snaps back at reopen: entry fees paid, accrual never arrives.
+# WTI's four era flips each accrued $0.11–0.47 against $2.48–2.76 of fees.
+# Pre-era non-crypto reads +$30.19/29, and honesty requires saying so — but
+# that sample is the two-writer window plus the wrong accrual basis, the
+# exact evidence the era declaration rules inadmissible.
+# Screen is ENTRY-ONLY (a held position exits by its normal rules), fail-OPEN
+# on a missing fleet_bus (an import regression must not shrink the universe —
+# the dark-scout fallback INSIDE `is_crypto` is the load-bearing degrade),
+# and reversible without a deploy: CARRY_ALLOW_NONCRYPTO=1.
+ALLOW_NONCRYPTO = os.environ.get("CARRY_ALLOW_NONCRYPTO", "").strip().lower() \
+    in ("1", "on", "true", "yes")
+
+
+def _class_ok(coin):
+    """May `coin` ENTER this book? Crypto perps only — see the block above."""
+    if ALLOW_NONCRYPTO or fleet_bus is None:
+        return True
+    try:
+        return bool(fleet_bus.is_crypto(coin))
+    except Exception:      # noqa: BLE001 — a class lookup must never stop a scan
+        return True
+
+
 def scan_census(fund, positions, hot_since, t0, H, enter_apr,
-                min_vol=None, persist_h=None):
+                min_vol=None, persist_h=None, class_ok=None):
     """WHY DID NOTHING OPEN? -> a per-gate count of the loop's own decisions.
 
     [2026-08-02] THE INCIDENT. This book opened nothing for ~50h while holding
@@ -298,8 +332,9 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
     """
     min_vol = MIN_DAY_VOLUME if min_vol is None else min_vol
     persist_h = PERSIST_H if persist_h is None else persist_h
+    class_ok = _class_ok if class_ok is None else class_ok
     out = {"scanned": len(fund or {}), "held": 0, "thin": 0,
-           "cold": 0, "waiting": 0, "eligible": 0}
+           "cold": 0, "waiting": 0, "noncrypto": 0, "eligible": 0}
     nxt = None
     for c, f in (fund or {}).items():
         if c in (positions or {}):
@@ -314,6 +349,12 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
             eta = persist_h - (t0 - (hot_since or {}).get(c, t0)) / 3600.0
             if nxt is None or eta < nxt[1]:
                 nxt = (c, eta)
+        elif not class_ok(c):
+            # [(lk)] LAST in the gate order on purpose: this bucket means
+            # "hot, liquid, persistent — blocked by class ALONE", i.e. the
+            # screen's live bite, which is what lets the payload verify the
+            # change (FORWARD MOTION rule 1) and the operator see its cost.
+            out["noncrypto"] += 1
         else:
             out["eligible"] += 1
     if nxt:
@@ -865,8 +906,8 @@ def main():
                                     _H, _enter_apr)
             except Exception:  # noqa: BLE001
                 _cens = {"scanned": len(fund or {}), "held": 0, "thin": 0,
-                         "cold": 0, "waiting": 0, "eligible": 0,
-                         "error": "census failed"}
+                         "cold": 0, "waiting": 0, "noncrypto": 0,
+                         "eligible": 0, "error": "census failed"}
 
             # ---- scan for new carries ------------------------------------
             if len(positions) < MAX_POSITIONS:
@@ -883,7 +924,8 @@ def main():
                     ((c, f) for c, f in fund.items()
                      if c not in positions and f["vol"] >= MIN_DAY_VOLUME
                      and abs(f["rate"] * _H) >= _enter_apr
-                     and (t0 - hot_since.get(c, t0)) >= PERSIST_H * 3600.0),
+                     and (t0 - hot_since.get(c, t0)) >= PERSIST_H * 3600.0
+                     and _class_ok(c)),      # [(lk)] crypto perps only
                     key=lambda cf: -abs(cf[1]["rate"]))
                 for coin, f in candidates[:MAX_POSITIONS - len(positions)]:
                     apr = f["rate"] * _H
@@ -997,7 +1039,9 @@ def main():
             # A quiet book is read from its logs first, and "scan ok | 217
             # perps" is indistinguishable between a healthy wait and a stall.
             _why = (f"cold {_cens['cold']}, thin {_cens['thin']}, "
-                    f"waiting {_cens['waiting']}, eligible {_cens['eligible']}")
+                    f"waiting {_cens['waiting']}, "
+                    f"noncrypto {_cens.get('noncrypto', 0)}, "
+                    f"eligible {_cens['eligible']}")
             if _cens.get("next"):
                 _why += f" | next {_cens['next']} in {_cens['next_eta_h']:.1f}h"
             print(f"[{now_iso()}] scan ok | {len(fund)} perps | open: {held} "

@@ -99,6 +99,16 @@ judge is on `slope-gate-off` at 16/30 shadow closes with `min-vol-2e6`
 gh workflow run 305025607 -f services="trail-blazer-live"
 ```
 
+### 0c · 🎫 Ticket Taker — the (lj) realised-veto era fix rides the audit PR
+
+**What it carries:** `(lj)` — the realised lens veto scoped to the policy the
+arm runs. On deploy the LIVE arm's veto FIRES on its own era record
+(short-divergence n=31, mean −1.128%, t=−1.75; trailing 8d −2.456%, t=−3.68,
+nine of ten closes `_sl`) and the book stops opening new entries until that
+record clears — idle beats a measured −2.5%/trade. **Merging the audit PR is
+the deploy decision**: the commit subject carries `[deploy-live-taker]`, so
+the marker gate fires when it lands on main. Verify by stamp readback below.
+
 ### Verify either one landed — by stamp readback, never by the green run
 
 ```bash
@@ -179,6 +189,27 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   honoured wholesale (it blames "the wider cross-section", so the universe
   reverted with K). Era NOT reset — capacity change = ordinary tuning (hc).
   Verify: row caps read k=5, universe_n=30 after the push.
+  **[13-Aug (ll) — THE DOCKET NUMBERS FOR YOUR ~28-Aug CALL, updated.]** The
+  book's −$27.62 day (5-Aug 00:37Z) was the revert CRYSTALLIZING the old
+  K=8/wide basket's MTM losses — all 12 closes in one rebalance instant, the
+  losers the non-crypto legs (SOXL −47%, SNDK −41%, MU −21%, SAMSUNG,
+  SKHYNIX, WTI, BRENTOIL). Post-revert on the crypto basket (6→13-Aug):
+  −$0.54 realised over 10 rebalance closes, MTM flat. **Era split: crypto
+  +$5.90 over 65 closes vs non-crypto −$36.48 over 21 — the whole era loss
+  sits in the population (ki)/(jg) already made unenterable.** That updates
+  (jg)'s "+$4.80 on the trades it can still take" to +$5.90/65 with the
+  post-revert week added. Options unchanged; the date stands.
+- **🎸 Barnesy — harvest sleeves lack the (lk) class screen; frozen, so it is
+  YOUR call, not a code push.** `harvest_candidates` (carry + extreme
+  sleeves) takes non-crypto harvests (−$1.58 over 8 closes since birth);
+  only the xsect universe was screened at (ki). The (lk) fix is one line to
+  extend — but the book is BIRTH-FROZEN to 2026-09-04 for its single-policy
+  clock, and a universe change is a policy change in kind: shipping it now
+  resets a young clock to zero ((hm)/(kk)). ★ **A — apply at unfreeze
+  (4-Sep)**, the screen lands with the first post-freeze policy rev, clock
+  intact. **B — apply now**, eating the clock reset, if the non-crypto
+  harvest bleed grows enough to outweigh ~a week of accrued sample (it is
+  ~$0.2/day today). Nothing needed from you before 4-Sep unless B.
 - **📊 Index Rider** — nothing to decide until the ~28-Aug zero-closes read;
   its MTM series now actually grades (post-(iz)/(ja)) from ~6-Aug.
 - **💸 Farmer `min_vol` cage floor — DECIDED-SIGNED-MEASURED 5-Aug (ka)

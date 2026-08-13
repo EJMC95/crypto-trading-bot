@@ -173,3 +173,56 @@ def test_the_source_map_reaches_run_snipe_pass():
     i = _SRC.index("_src_map = {")
     block = _SRC[i:i + 400]
     assert '"listing"' in block and "setdefault" in block, block
+
+
+# --------------------------------------------------------------------------
+# [2026-08-13 (lk)] The surge + young sources screen instrument class.
+# Era-measured on this book's own ledger: non-crypto surge −$5.01/13 and
+# young −$1.19/2 vs crypto +$1.13/5 across sources; every surge close exits
+# `max_hold` ((gt): the tp/sl are unreachable literals), so a surge-long on
+# an FX cross or ETF is a timer-held drift bet on an instrument whose venue
+# volume event is its UNDERLYING's market event. The LISTING source is
+# deliberately unscreened (n=1, +$0.28 — unmeasured, and the founding
+# thesis). Offline, `fleet_bus.is_crypto` runs its hand-list fallback, which
+# carries WTI/USDKRW/BOTZ — the measured losers' own class.
+# --------------------------------------------------------------------------
+
+def _surge_rows(*syms, ratio=9.0):
+    return [{"sym": s, "ratio": ratio} for s in syms]
+
+
+def test_surge_screens_noncrypto_and_does_not_burn_limit_slots():
+    out = sniper.surge_candidates(
+        _surge_rows("WTI", "USDKRW", "KAITO"), 2.0, set(), limit=1)
+    assert out == ["KAITO"], (
+        "a screened symbol must neither pass nor consume the limit slot")
+
+
+def test_young_screens_noncrypto():
+    bars = {"BOTZ": 3, "NEWCOIN": 4}
+    vols = {"BOTZ": 9.0, "NEWCOIN": 9.0}
+    out = sniper.young_candidates(bars, 21, vols, 1.0, set(), 4)
+    assert out == ["NEWCOIN"], out
+
+
+def test_the_screen_is_reversible_without_a_deploy(monkeypatch):
+    monkeypatch.setattr(sniper, "ALLOW_NONCRYPTO", True)
+    assert sniper.surge_candidates(_surge_rows("WTI"), 2.0, set()) == ["WTI"]
+    assert sniper.young_candidates({"BOTZ": 3}, 21, {"BOTZ": 9.0},
+                                   1.0, set(), 4) == ["BOTZ"]
+
+
+def test_a_missing_fleet_bus_fails_open(monkeypatch):
+    """An import regression must not shrink the book's universe."""
+    monkeypatch.setattr(sniper, "fleet_bus", None)
+    assert sniper.surge_candidates(_surge_rows("WTI"), 2.0, set()) == ["WTI"]
+
+
+def test_an_injected_predicate_overrides_the_default():
+    out = sniper.surge_candidates(_surge_rows("AAA", "BBB"), 2.0, set(),
+                                  class_ok=lambda s: s == "BBB")
+    assert out == ["BBB"], out
+    out = sniper.young_candidates({"AAA": 2, "BBB": 3}, 21,
+                                  {"AAA": 9.0, "BBB": 9.0}, 1.0, set(), 4,
+                                  class_ok=lambda s: s == "AAA")
+    assert out == ["AAA"], out

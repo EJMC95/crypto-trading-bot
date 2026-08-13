@@ -208,7 +208,34 @@ def apply_tuning():
     return {}
 
 
-def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP):
+# [2026-08-13 (lk)] INSTRUMENT-CLASS SCREEN on the surge + young sources —
+# crypto perps only. MEASURED on this book's own ledger: non-crypto surge
+# entries −$5.01 over 13 closes and non-crypto young −$1.19/2, against crypto
+# +$1.13 over 5 across all sources; every surge close exits `max_hold` (the
+# tp/sl are bare literals, (gt)), so a surge-long on USDKRW/BOTZ/WHEAT is a
+# timer-held drift bet on an instrument whose venue volume surge is its
+# UNDERLYING's market event, already priced where the underlying trades —
+# not the crypto discovery repricing this book's thesis is about. The
+# LISTING source stays UNSCREENED, declared: n=1 (+$0.28) is unmeasured, and
+# a listing pop is the book's founding thesis — screening it on no evidence
+# would close the source entirely now that most new listings are tokenised.
+# Fail-OPEN on a missing fleet_bus; reversible: SNIPER_ALLOW_NONCRYPTO=1.
+ALLOW_NONCRYPTO = os.environ.get("SNIPER_ALLOW_NONCRYPTO", "").strip().lower() \
+    in ("1", "on", "true", "yes")
+
+
+def _class_ok(sym):
+    """May `sym` enter via the surge/young sources? Crypto perps only."""
+    if ALLOW_NONCRYPTO or fleet_bus is None:
+        return True
+    try:
+        return bool(fleet_bus.is_crypto(sym))
+    except Exception:      # noqa: BLE001 — class lookup must never stop a scan
+        return True
+
+
+def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP,
+                     class_ok=None):
     """Books the scout reports as volume-SURGING, as snipe candidates.
 
     [2026-07-30 THE SNIPER'S POPULATION PROBLEM] This bot's event — a brand-new
@@ -227,6 +254,7 @@ def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP):
     Bounded by `limit` so one venue-wide volume event cannot flood the pass.
     """
     out = []
+    class_ok = _class_ok if class_ok is None else class_ok
     try:
         rows = sorted(surges or [],
                       key=lambda r: -float(r.get("ratio") or 0.0))
@@ -240,12 +268,14 @@ def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP):
             ratio = float(r.get("ratio") or 0.0)
         except (TypeError, ValueError, AttributeError):
             continue
-        if sym and sym not in already and ratio >= float(mult):
+        if sym and sym not in already and ratio >= float(mult) \
+                and class_ok(sym):        # [(lk)] crypto perps only
             out.append(sym)
     return out
 
 
-def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit):
+def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
+                     class_ok=None):
     """Books still inside their DEBUT REGIME, as snipe candidates.
 
     [2026-07-30 THE SCOPE FIX] `new_listings` is a market-set DIFF: a symbol
@@ -264,6 +294,7 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit):
     cannot dedup it), and bounded by `limit`.
     """
     rows = []
+    class_ok = _class_ok if class_ok is None else class_ok
     for sym, n in (bar_counts or {}).items():
         # `str(sym)` alone is too permissive — a None key coerces to the
         # string "NONE" and becomes a tradable-looking candidate. Caught by
@@ -276,6 +307,8 @@ def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit):
             continue
         s = sym.strip().upper()
         if not s or s in (already or set()) or bars > int(max_bars):
+            continue
+        if not class_ok(s):               # [(lk)] crypto perps only
             continue
         try:
             vol = float((vols or {}).get(s, 0.0) or 0.0)

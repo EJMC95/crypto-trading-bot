@@ -1,3 +1,164 @@
+## 2026-08-13 (ll) — FLEET P&L AUDIT: the week's −$51 has three mechanisms, not one — a crystallization, a real-money veto hole, and an instrument-class leak in the best book
+
+- **THE WEEK, measured from the ledger (realised, paper feed): −$50.95 over
+  7 days, every day 6→9-Aug and 11→12-Aug negative.** Where it sits, since
+  5-Aug: ⚖️ Counterweight −$26.89/30, 🎫 taker-shadow −$13.12/27, 💸 Farmer
+  shadow −$12.33/54, 📉 breakout-4h −$6.65/9, 🎯 sniper −$5.82/18, 🌾 carry
+  −$4.74/13, 🎫 taker-LIVE −$4.42/18. Three distinct mechanisms; each got a
+  different treatment, and two of the three are closed in code this pass
+  ((lj), (lk)).
+- **⚖️ COUNTERWEIGHT'S −$27.62 DAY (5-Aug 00:37Z) WAS A CRYSTALLIZATION, NOT
+  A NEW BLEED.** All 12 closes in one rebalance instant, and the losers are
+  the K=8/wide-universe basket's NON-CRYPTO legs marked deep underwater:
+  SOXL −47.1%, SNDK −41.1%, MU −21.3%, SKHYNIX −11.3%, SAMSUNG −8.1%, WTI,
+  BRENTOIL. The 4-Aug revert to K=5/universe-30 closed the old basket and
+  REALISED the MTM loss the book already carried. Since 6-Aug on the
+  crypto-only basket: **−$0.54 realised over 10 rebalance closes** — flat.
+  **The docket number for the ~28-Aug keep-or-retire updates: in-era crypto
+  +$5.90 over 65 closes vs non-crypto −$36.48 over 21** — the era's entire
+  net loss sits in the population `(ki)`/`(jg)` already made unenterable.
+  The (jg) figure (+$4.80/+0.461%) was pre-crystallization; +$5.90/65 is the
+  same claim with the post-revert week added. Filed in OPERATOR_QUEUE item 2;
+  the pre-registered date stands, no era ruling touched.
+- **💸 FARMER: the softness is CRYPTO-funding environment, not class.** Both
+  arms' recent halves are negative on their CRYPTO trades (shadow crypto
+  h2 −$11.10/67, live crypto h2 −$0.21/49) while their small non-crypto
+  slices read ~flat — so the (lk) class screen is deliberately NOT extended
+  to the Farmer: no measured claim there, and its $10M floor already filters
+  most tokenised names. The shadow's extra bleed is the judge's running
+  `slope-gate-off` experiment (started 6-Aug, shadow-only by construction);
+  its own eval already reads "shadow not positive in its own right", so the
+  slot resolves without promotion at eval end.
+- **🎸 BARNESY'S HARVEST SLEEVES CARRY THE SAME HOLE (lk) CLOSES IN THE
+  PARENT — left in place, deliberately, and queued.** `harvest_candidates`
+  (carry + extreme sleeves) has no class screen; only the xsect universe was
+  screened at `(ki)`. Measured since birth: non-crypto carry −$1.58 over 8
+  closes. NOT fixed this pass because the book is BIRTH-FROZEN to 4-Sep for
+  its single-policy clock, and a universe change is a policy change in kind —
+  the fix would reset a 7-day-old clock to zero ((hm)/(kk)). Queued in
+  OPERATOR_QUEUE item 2: apply at unfreeze, or earlier at the operator's
+  option, eating the reset knowingly.
+- **REPORT-ONLY, measured and named:** 🏛️ gillard is a 304-close book whose
+  population is ~99% tokenised non-crypto (SKHYNIX n=130, SAMSUNG n=40 …),
+  all-time −$6.55 on that class — the dislocation-fade thesis reading frozen
+  underlying indices as "dislocations". It is the Parliament's own layer and
+  small money; recorded here so the class has a name when the Parliament's
+  keep-or-retire review reaches it. 📉 breakout-4h is the fleet's worst
+  in-era mean (−1.745%/trade, t=−3.50, n=15) but sits below every actuator's
+  n≥30 floor — the floors are doctrine (a veto on n=15 of noise starves
+  books that never had a chance); it needs ~15 more closes before the brain
+  may reduce it, and that is the system working as specified, stated so the
+  next session does not re-derive it.
+
+## 2026-08-13 (lk) — THE THIRD FUNDING BOOK GETS THE CLASS SCREEN THE FIRST TWO GOT THE HARD WAY: 🌾 carry and 🎯 the sniper's surge/young sources stop harvesting closed markets
+
+- **🌾 CARRY, the fleet's best-evidenced book (+$66.21 all-time, 6/6 bars),
+  is 9-of-10 losers in its post-31-Jul era — and every dollar of the bleed is
+  tokenised non-crypto.** Era ledger, opened ≥31-Jul: **non-crypto −$14.96
+  over 9 closes vs crypto −$0.49 over 1**; every loss a `*_flip` with **fees
+  > accrued on the row itself** (WTI ×4: accrued $0.11–0.47 against fees
+  $2.48–2.76; SKHYNIXUSD ×2, SPCX ×2). Win rate 10%, t=−4.48, horizon
+  verdict "unreachable" — on the book the fleet's go-live hopes ride on.
+- **THE MECHANISM IS STRUCTURAL, NOT BAD LUCK (I7).** `PERSIST_H` — the
+  research-backed spike filter, validated on 24/7 crypto — requires a rate to
+  hold 6h before entry. An instrument whose underlying market CLOSES holds
+  its funding artifact for hours *because nothing can arb it while the
+  underlying is shut*, then snaps at reopen: the persistence gate is
+  satisfied structurally by every closed-market night, entry fees are paid,
+  and the accrual never arrives. The gate's own protection is inverted on
+  exactly this class.
+- **STATED HONESTLY: pre-era non-crypto reads +$30.19/29.** That sample is
+  the two-writer window plus the wrong accrual basis — the precise evidence
+  the carry era declaration rules inadmissible — and it is recorded here
+  rather than hidden because the screen's case must rest on the admissible
+  era plus the mechanism, not on pretending the old wins away.
+- **THE FIX, the (ki)/(jg) pattern at the third book:** `_class_ok()` on the
+  entry candidates only (`fleet_bus.is_crypto` — venue's own
+  `strategy_index`, hand-list fallback for a dark scout, fail-OPEN when
+  `fleet_bus` itself is missing so an import regression cannot shrink the
+  universe), reversible without a deploy via `CARRY_ALLOW_NONCRYPTO=1`. Held
+  positions exit by their normal rules. The census gains a **`noncrypto`
+  bucket, LAST in the gate order** — it counts "hot, liquid, persistent,
+  blocked by class ALONE", so the row's own payload shows the screen's live
+  bite (FORWARD MOTION rule 1) and its cost is visible, not asserted.
+  `tests/autonomy/test_carry_scan_census.py` extends: the drift arm's
+  verbatim predicate moves with the entry loop's, an AST arm pins the entry
+  loop itself calling `_class_ok` (removing the screen from the loop alone
+  reddens), reversibility + fail-open have fixtures, and the degraded-census
+  key set grows. Mutation-verified: entry-only removal caught.
+- **🎯 THE SNIPER'S SURGE/YOUNG SOURCES, same class, own evidence:**
+  non-crypto surge −$5.01/13 and young −$1.19/2 vs crypto +$1.13/5 — and
+  every surge close exits `max_hold` ((gt): tp/sl are unreachable literals),
+  so a surge-long on USDKRW/BOTZ/WHEAT is a timer-held drift bet on an
+  instrument whose venue volume surge is its underlying's market event,
+  already priced where the underlying trades. Screened in
+  `surge_candidates`/`young_candidates` (injectable predicate, screened
+  symbols don't burn limit slots), reversible via
+  `SNIPER_ALLOW_NONCRYPTO=1`. **The LISTING source stays unscreened,
+  declared:** n=1 (+$0.28) is unmeasured, it is the founding thesis, and
+  most new listings are now tokenised — screening it on no evidence would
+  close the source entirely. Tests in
+  `tests/autonomy/test_sniper_source_tags.py`.
+- **Consumers unchanged, no lever minted:** the screen is book logic behind
+  env kill switches, the `TREND_ALLOW_TRADFI` pattern. Both books deploy on
+  their existing shadow auto-deploy rules. Real money untouched.
+
+## 2026-08-13 (lj) — THE REALISED VETO WAS GRADING A POLICY THE LIVE ARM NO LONGER RUNS: 13 other-era rows held a real-money halt open
+
+- **THE INCIDENT, on the fleet's real-money book.** 🎫 the live Ticket Taker
+  (divergence-short only) reads short-divergence **n=44, mean −0.468%,
+  t=−0.83 POOLED — `realised_loses` silent** (bar: mean<0 AND t≤−1.0) —
+  while the rows taken under the policy it ACTUALLY RUNS read **n=31,
+  mean −1.128%, t=−1.75**, the trailing 8 days **−2.456%, t=−3.68**, and
+  nine of its last ten closes are `_sl` at −3% to −6.3%. The 13 diluting
+  rows predate the 30-Jul policy boundary `golive_readiness` already refuses
+  to pool across. Three independent reads agree the lens is currently
+  losing: its own era record, the shadow tape's divergence net (−$9.63 over
+  the tuner's 8-day replay), and the forward proxy's short side (−0.155%).
+- **THE CLASS (I15's exact shape):** era discipline existed in the GRADER
+  ((jf) stamps, (kk) absence semantics) and never reached the ACTUATOR that
+  halts real money — "when a bad idea is removed from a report, grep for it
+  in the things that ACT". The veto's sample was every close the arm ever
+  wrote.
+- **THE FIX:** `realised_lens_evidence(..., policy=current_policy())` —
+  membership-by-signature on the `extra.policy` stamp the taker already
+  writes. `current_policy()` is ONE builder shared by the stamp
+  (`_close_extra`) and the filter, so they cannot drift; the signature
+  fields mirror `golive_readiness.POLICY_SIG_FIELDS` (venue/bull/lenses/
+  sides — capacity levers stay outside, (hc)) with a direct import blocked
+  in the unusual direction: this file ships in the LIVE image, and dragging
+  the grader in is the born-dark class. The drift arms live in
+  `tests/autonomy/test_realised_veto_era.py`: field-set pinned equal,
+  signature functions pinned behaviourally equal on shared fixtures
+  (malformed included), and the PRODUCTION call site (the
+  `fetch_paper_trades`-fed one) AST-pinned to pass `policy=`.
+- **SCOPED-PREFERRED, POOLED-FALLBACK — the half that stops a flagship
+  regression.** A lens below `REALISED_MIN_N` in the era sample is graded on
+  the arm's FULL record, never handed to the 4h proxy: the `dip` veto
+  (n=13, t=−2.66 — I14's worked example) has ~no current-era closes BECAUSE
+  the veto blocks them, and a proxy fallback would have RELEASED the fleet's
+  only significant realised loser the day this shipped (the proxy currently
+  LIKES dip: eavg4h +0.199%). Restrict-direction conservative by
+  construction: a standing veto holds until current-policy evidence clears
+  the floor. (kk)/I6 absence semantics: an arm with NO stamps anywhere keeps
+  pooled behaviour; once any row is stamped, unstamped rows are
+  pre-adoption. Unreadable stamps are fail-closed out. `policy=None` and the
+  module selftest's legacy calls are byte-identical pre-(lj).
+- **MEASURED EFFECT ON DEPLOY (verified against the live ledger, not
+  predicted):** live arm scoped → divergence (31, −1.128%, −1.75) →
+  **veto FIRES; the live book stops opening short-divergence until its
+  current-policy record clears** — it has no other lens, so it idles, which
+  beats −2.456%/trade. Release paths: the era record improving, or old rows
+  aging out of the 4000-row window returning control to the forward proxy.
+  Shadow arm scoped: dip stays vetoed (pooled fallback), divergence
+  (24, −0.324%, −0.40) keeps trading and keeps grading — the shadow's job.
+  Mutation-verified both ways: era filter disabled → incident + absence
+  tests redden; pooled fallback removed → dip test reddens.
+- **DEPLOY:** ships to the live container via the `[deploy-live-taker]`
+  marker on this commit's subject when it lands on main — merging the PR IS
+  the deploy decision. Verify by stamp readback (`audit_code_currency`),
+  never by the green run.
+
 ## 2026-08-06 (li) — THE BRAIN GATED THREE BOOKS SHUT ON A CONSTANT: `regime_timing` fired on a rate that was 1.0 by arithmetic, and the only release was declaring the book dead
 
 - **THE MEASUREMENT, taken before a line was changed.** `bot_state_history` key=`regime-oracle`: **1,569 samples over 30.8 days**, `COUNT(DISTINCT payload->'fleet'->>'read')` = **1** — `"risk-off downtrend"` on every one, zero transitions. `diagnose` rule 4 fired on `counter_share >= 0.7`, the share of a bucket's LOSERS that opened while that flag read risk-off. Against a constant that share is **identically 1.0**. Confirmed with no exceptions in the live payload: **10 of 10** live `regime_timing` findings read *"100% of matched losses"* against a 70% bar. Not one below.
