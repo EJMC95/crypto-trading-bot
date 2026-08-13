@@ -1,3 +1,35 @@
+## 2026-08-13 (mi) — THE WAVE-2 BIRTH EXECUTED END-TO-END: PR #169 merged on the operator's explicit grant, the four services provisioned by one dispatch, and the activation armed — gated, as always, on the rows proving themselves by stamp
+
+**Operator, 13-Aug:** *"Merge and continue works. Full permission to commit
+push, optimise and send live."* ("Live" here means the shadow services going
+up — all four books are $1k paper, zero keys; the go-live gate is untouched
+and senior, as the grant's own un-amendable core requires.)
+
+- **MERGED:** PR #169 squash-merged to main as `9386537` (the repo's PR
+  convention) carrying (mb)–(mh): the four books, the fleet-lessons pass,
+  the Harris telemetry, and the birth review's fixes. Changelog-check fully
+  green on the head; the full suite green locally on the identical tree.
+- **PROVISIONED:** `books-provision.yml` dispatched on main (run
+  31754375430) — creates `book-{douglas,grimes,schwager,hull}-shadow` with
+  `VENUE=lighter_shadow`, `RAILWAY_DOCKERFILE_PATH` per image, the (kb)
+  `DATABASE_URL` REFERENCE form, and runs each first deploy with the
+  redeploy workflow's own retry shape.
+- **ACTIVATION, THIS COMMIT:** the four decide rules + `paths:` entries
+  armed in `railway-redeploy.yml` (scalar trimmed 640 chars of provenance
+  prose to stay under the (ls) run-scalar budget — the audit that exists
+  because of that incident verified 20,220/20,500), the four images moved
+  `MANUAL_IMAGES_OK` → `AUTO_IMAGES`, and the provision workflow DELETED
+  per its own header (an armed provisioning tool is how a retired service
+  gets resurrected by accident, (lr)). **This commit merges only after all
+  four rows publish** — rule-before-service never reaches main.
+- **THE PROOF STANDARD, pre-registered ((iw): a green dispatch is not a
+  running book):** each row must publish on /pnl.json with `extra.build`
+  equal to the id predicted locally against ITS OWN image's COPY set (the
+  (fd) rule — the three price images stamp 13 files, Hull 14):
+  🧘 `56d16a305cbb`/13 · 📐 `ac6bf6582780`/13 · 🧙 `7d51154ead89`/13 ·
+  🧮 `444962b8ab95`/14. A watcher is on the feed; the verification receipt
+  lands as an addendum to this entry when the rows speak for themselves.
+
 ## 2026-08-13 (mh) — THE BIRTH REVIEW BITES: an adversarial pass over the wave-2 books confirms six real defects — including a look-ahead that had flattered the one OPEN gate — and the corrected measurement closes it: 📐 Grimes is born trading NOTHING, by its own rule
 
 The (mb)–(me) birth shipped with a standing adversarial review over the four
