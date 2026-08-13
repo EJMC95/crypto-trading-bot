@@ -1,3 +1,65 @@
+## 2026-08-14 (mb) — THE DAILY REVIEW HAS BEEN OVERWRITING ITS OWN PREVIOUS REPORT EVERY MORNING: a UTC-dated filename on a job that runs at 08:00 Sydney
+
+- **MEASURED BY LOSING ONE, this run.** The 14-Aug 08:00 AEST review resolved
+  its filename from `reviewed_at[:10]` — a **UTC** date — and 08:00 AEST is
+  **22:00 UTC the previous day**, so it wrote `evidence_review_2026-08-13.md`
+  and replaced the 13-Aug report: **31,223 bytes, including the hand-written
+  human layer, overwritten by 6,674 bytes of fresh script output.** The loss
+  is not recoverable — `reports/` is deliberately not committed.
+- **IT WAS STRUCTURAL, NOT A RACE.** Every Sydney clock time from 10:00 to
+  midnight maps to the same UTC day as the previous Sydney evening. The
+  scheduled slot is 08:00 Sydney and the previous day's run had been at 16:51
+  Sydney (06:51 UTC), so **the two runs collided on one filename by
+  construction, and would have every single day.**
+- **THE SELFTEST WAS PINNING THE BUG.** It asserted
+  `write_report({"reviewed_at": "2026-08-05T21:46:47+00:00"})` ends
+  `evidence_review_2026-08-05.md` — and 21:46 UTC is **07:46 the next morning
+  in Sydney**, i.e. the cron's own slot. The one timestamp chosen to exercise
+  the Sydney-stamp logic was the exact collision case, asserted in the wrong
+  direction. Same fixture now asserts `..._2026-08-06.md`.
+- **THE DOCSTRING'S DEFENCE DOES NOT SURVIVE CONTACT.** It read: *"The
+  FILENAME deliberately stays UTC-dated — it is the series key, and re-dating
+  it would fork the report history mid-stream."* It forks nothing: yesterday's
+  16:51 AEST run was 13-Aug in **both** zones, so every existing filename keeps
+  its meaning and the series becomes one file per operator-day — which is what
+  a daily review on the operator's clock already was. Fleet INTERNALS stay UTC
+  (`reviewed_at`, every ledger join) exactly as before; this is the operator's
+  surface and CLAUDE.md's Sydney rule governs it. **A declared design choice is
+  not a measured one** — this one was declared, cited in its own docstring, and
+  wrong.
+- **SHIPPED — two functions, both fail-OPEN:**
+  * **`report_day(iso_utc)`** — the series key in Sydney. Degrades to the UTC
+    date if the zone database is absent: a filename wrong by one beats no
+    report.
+  * **`preserve_existing_report(path)`** — the Sydney date removes the
+    once-a-day collision; **two runs in one Sydney day still land on one
+    filename, and that also really happened (6-Aug).** The human layer is
+    written into this file *after* the script produces it, so a re-run eats an
+    operator's annotations — the most expensive thing in the directory. An
+    existing report is renamed to `evidence_review_<day>.superseded-<HHMM>.md`
+    (its own mtime, Sydney) before the new one is written, and **the new report
+    names the backup in its own body**: a silent rename is the same class of
+    defect as the silent overwrite it replaces. Fail-open — if the rename
+    cannot be done the review is still published.
+- **MUTATION-VERIFIED ×5, all RED**: the filename reverted to the UTC date;
+  preservation removed; `os.rename` skipped so the backup is never created;
+  the backup left unnamed in the report body; and `report_day` degraded to UTC
+  unconditionally. Restored green.
+- **THE CLASS, and why this is I1-adjacent rather than a cosmetic fix.** The
+  review's *first* mandated step is *"assess the work done since the last
+  review"*, and its stated source for that is the previous report in
+  `reports/`. A job whose memory of yesterday is destroyed by its own startup
+  cannot perform its first step — and, exactly like a frozen row, **a clobbered
+  report and a correctly-written one are byte-identical in every respect except
+  the one nobody was reading.** It survived because the only artifact that
+  could have exposed it, the selftest, asserted the collision was correct.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None, and this makes no claim to have moved one.** It is a tooling fix on the
+review's own surface. What it restores is the review's ability to do its first
+job — grade yesterday's work against today's data — which had been silently
+impossible for as long as the job has run at 08:00 Sydney.
 ## 2026-08-13 (mh) — THE BIRTH REVIEW BITES: an adversarial pass over the wave-2 books confirms six real defects — including a look-ahead that had flattered the one OPEN gate — and the corrected measurement closes it: 📐 Grimes is born trading NOTHING, by its own rule
 
 The (mb)–(me) birth shipped with a standing adversarial review over the four
