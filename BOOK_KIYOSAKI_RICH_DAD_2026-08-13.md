@@ -45,7 +45,7 @@ fleet has already measured.
 | Persistence | 6h | parent's bar |
 | Volume floor | $2M 24h | parent's floor |
 | Decay bar | 0.01875 TRUE | both parents' 0.15-legacy exit, re-denominated |
-| Flip grace | 1h | (gq) |
+| Flip grace | ~~1h~~ **6h** | (gq); **[corrected in place 13-Aug (mf), hours after birth at zero clock cost: measured on the cell's own coin population, 1h grace = +$26.88/t=1.91 with 192/231 exits churning the RT on sign wobbles and h2 NEGATIVE; 6h = +$42.09/t=3.00 both halves positive; monotone to 24h — 🧮 Hull's basis-noise doctrine, landing on its sibling]** |
 | Max hold | 336h | parent's recycle bound |
 | Bleed stop | −2% of notional | parent's |
 | Crypto perps only | `fleet_bus.is_crypto`, fail-open, revert `RICHDAD_ALLOW_NONCRYPTO=1` | (lk): carry's non-crypto era was 9-of-10 losers — a closed underlying satisfies persistence structurally (I7) |

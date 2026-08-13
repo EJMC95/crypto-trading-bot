@@ -49,6 +49,8 @@ FUNDING_BOOKS = [
     "band-barnes-lshadow",               # 🎸 Barnesy (carry + xsect sleeves)
     "book-kiyosaki-lshadow",             # 🏦 Rich Dad
     "band-garrett-lshadow",              # 🛢️ Garrett (thin tier — different slice)
+    "book-hull-lshadow",                 # 🧮 Hull ([2M,10M) x [7.8%,20%) — the
+                                         # tile between Garrett and the Farmer)
     "perps-funding-lighter-lshadow",     # 💸 Farmer shadow
     "perps-funding-lighter-lighter",     # 💸 Farmer LIVE — real money
     "perps-funding-spread-lshadow",      # ⚖️ Counterweight
@@ -114,7 +116,13 @@ def living_gates(cur):
         caps = e.get("caps") if isinstance(e.get("caps"), dict) else {}
         g = {}
         for key, dest in (("enter_apr", "enter_apr"), ("min_vol", "min_vol"),
-                          ("carry_min_vol", "min_vol"), ("max_vol", "max_vol")):
+                          ("carry_min_vol", "min_vol"), ("max_vol", "max_vol"),
+                          # [(mh)] the apr CEILING — 🧮 Hull is the first
+                          # book with one; without this arm admits() counted
+                          # a band book as a rival for supply ABOVE its band
+                          # (the same (gl) phantom-rival class the volume
+                          # ceiling already guards against, on the apr axis)
+                          ("apr_hi", "apr_hi")):
             v = e.get(key, caps.get(key))
             if isinstance(v, (int, float)) and not isinstance(v, bool) \
                     and dest not in g:
@@ -142,6 +150,9 @@ def admits(g, gate, floor):
     """
     if g["enter_apr"] > gate + 1e-9:
         return "no"                      # stricter apr bar — never sees it
+    if g.get("apr_hi") is not None and gate >= g["apr_hi"] - 1e-9:
+        return "no"                      # [(mh)] supply sits ABOVE its apr
+                                         # band (half-open ceiling)
     if not g.get("vol_known"):
         return "unknown"
     mn, mx = g.get("min_vol"), g.get("max_vol")

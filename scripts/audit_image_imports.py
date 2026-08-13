@@ -84,7 +84,13 @@ BORN_DARK_OK = {
                   # [2026-08-13 (ls)] 🏦 Rich Dad — env-only config by
                   # design (no tuning lane, the Garrett choice), so the
                   # module would be a dead file in its image
-                  "Dockerfile.kiyosaki")},
+                  "Dockerfile.kiyosaki",
+                  # [2026-08-13 (mb)-(me)] the BOOKS cohort's second wave —
+                  # 🧘 Douglas, 📐 Grimes, 🧙 Schwager, 🧮 Hull: all four
+                  # env-only by design (the same Garrett choice), so the
+                  # module would be a dead file in each image
+                  "Dockerfile.douglas", "Dockerfile.grimes",
+                  "Dockerfile.schwager", "Dockerfile.hull")},
     # [2026-07-17 VENUE SWAP] market-context COPYs venues/ purely for
     # venues.symbol_map.from_lighter (the fleet<->Lighter symbol authority)
     # after moving off Hyperliquid. It is an INSTRUMENT-ONLY collector: it

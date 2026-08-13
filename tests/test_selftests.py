@@ -176,6 +176,15 @@ SELFTEST_MODULES = [
     # [2026-08-13 (ls)] 🏦 Rich Dad — registered the day it was born; offline
     # (payback gate, entry gates, census, exits, income statement, payload).
     "lighter_book_kiyosaki_bot",
+    # [2026-08-13 (mb)-(me)] the BOOKS cohort's second wave — each registered
+    # the day it was born; all offline (gates, exits, tags, census, payload,
+    # plus each book's signature pin: Douglas's consistency signature,
+    # Grimes's I20 roster exclusion + replay gate, Schwager's no-pyramid +
+    # monotone trail, Hull's band tiling + measured grace).
+    "lighter_book_douglas_bot",
+    "lighter_book_grimes_bot",
+    "lighter_book_hull_bot",
+    "lighter_book_schwager_bot",
     "lighter_dislocation_bot",
     "lighter_family_bot",
     "lighter_funding_bot",

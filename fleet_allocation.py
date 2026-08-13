@@ -108,7 +108,14 @@ FUNDING_BOOKS = ("band-barnes-lshadow",
                  # [2026-08-13 (ls)] 🏦 Rich Dad — funding carry by thesis
                  # (delta-neutral modelled cash flow); "kiyosaki" likewise
                  # carries no marker. Registered at birth, zero closes.
-                 "book-kiyosaki-lshadow")
+                 "book-kiyosaki-lshadow",
+                 # [2026-08-13 (me)] 🧮 The Professor — funding carry by
+                 # thesis (cost-of-carry, delta-neutral modelled) in the
+                 # [2M,10M) mid tier; "hull" carries no marker. Registered
+                 # at birth, zero closes. The other three second-wave books
+                 # (douglas/grimes/schwager) are PRICE books and belong to
+                 # the directional class — deliberately not listed.
+                 "book-hull-lshadow")
 
 
 def _iso(ts=None):

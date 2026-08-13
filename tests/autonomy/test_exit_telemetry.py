@@ -50,6 +50,12 @@ PRICE_BOOKS = [
     "lighter_family_bot",            # 👩👨🙏🔮 the family
     "lighter_ticket_taker",          # 🎫 Ticket Taker — REAL MONEY
     "lighter_funding_bot",           # 💸 Funding Farmer — REAL MONEY (already did)
+    # [2026-08-13 (mb)-(md)] the BOOKS cohort's three price books, registered
+    # the day they were born: their P&L is the price path (fills modelled at
+    # mark), so every close carries real entry/exit prices + side.
+    "lighter_book_douglas_bot",      # 🧘 The Zone
+    "lighter_book_grimes_bot",       # 📐 The Technician
+    "lighter_book_schwager_bot",     # 🧙 The Wizard
 ]
 
 #: Books whose P&L is driven by FUNDING ACCRUAL -> a price sweep is the wrong
@@ -69,6 +75,10 @@ FUNDING_BOOKS = {
     # the funding form and no prices: a price on a delta-neutral modelled
     # close would be fabricated data, not telemetry.
     "lighter_book_kiyosaki_bot": ("entry_apr", "exit_apr", "accrued", "held_h"),
+    # [2026-08-13 (me)] 🧮 Hull — the same delta-neutral modelled shape as
+    # Rich Dad: funding-form fields, no prices (a price on its rows would be
+    # fabricated data).
+    "lighter_book_hull_bot": ("entry_apr", "exit_apr", "accrued", "held_h"),
 }
 
 
@@ -446,6 +456,9 @@ def test_the_funding_registry_refuses_the_live_real_money_book():
                 # added BEFORE their first close so the refusal precedes any
                 # wrong answer (the (kc) pattern)
                 "band-garrett-lshadow",
-                "book-kiyosaki-lshadow"):
+                "book-kiyosaki-lshadow",
+                # [2026-08-13 (me)] 🧮 Hull — same pattern, added before its
+                # first close
+                "book-hull-lshadow"):
         assert bot in ses.FUNDING_BOOKS, \
             f"{bot} earns funding — a price sweep measures the wrong thing"

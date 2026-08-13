@@ -60,7 +60,8 @@ WHAT IS DELIBERATELY NOT ENCODED, stated so no future session "finishes" it:
 THE VALIDATED GATES INHERITED (the Barnesy carry-sleeve cell, itself the 🌾
 parent's): enter >= 20% TRUE apr (21-Jul Lighter-tape sweep — the only bar
 that beat shipped on the full window AND both halves), 6h persistence, $2M
-24h-volume floor, decay bar 0.01875 TRUE, flip grace 1h, max hold 336h,
+24h-volume floor, decay bar 0.01875 TRUE, flip grace 6h ((mf) — was 1h;
+measured on the cell: 1h churned half the profit away), max hold 336h,
 bleed stop −2%, crypto perps only ((lk): carry's non-crypto era was 9-of-10
 losers; a closed underlying satisfies persistence structurally, I7).
 
@@ -125,7 +126,17 @@ HOURS_PER_YEAR = 24.0 * 365.0   # TRUE apr is per year; payback is per hour
 ENTER_APR = float(os.environ.get("RICHDAD_ENTER_APR", "0.20"))
 EXIT_APR = float(os.environ.get("RICHDAD_EXIT_APR", "0.01875"))
 PERSIST_H = 6.0                 # hot >= this long before entry (parent's bar)
-FLIP_GRACE_H = 1.0              # a liability must persist before it is sold
+# [2026-08-13 (mf)] 1.0 -> 6.0, MEASURED on this cell's own coin population
+# (250d of settled fundings, KAITO/XMR/PAXG/XRP + the cell's visitors, the
+# book's own gate + exits replayed): grace 1h = +$26.88 t=1.91 with h2
+# NEGATIVE and 192/231 exits churning the 30bps RT on sign wobbles; grace 6h
+# = +$42.09 t=3.00 both halves positive; monotone to 24h (+$50.87 t=3.56).
+# Hull's ch.-3 basis-noise doctrine (the 🧮 book), landing on its sibling:
+# a one-hour adverse spell is noise, not a liability. 6h chosen over 24h to
+# keep the close cadence (27.7 -> 21.8/30d vs 16.6) on a book whose supply
+# is already the starved 6.6%-occupancy cell (I17: decidability first) —
+# and it mirrors PERSIST_H: six hours of proof to buy, six to sell.
+FLIP_GRACE_H = 6.0              # a liability must persist before it is sold
 MAX_HOLD_H = 14 * 24            # recycle capital (parent's bar)
 DELIST_GIVEUP_H = 24.0          # coin absent from the map this long -> close
 MIN_VOL = float(os.environ.get("RICHDAD_MIN_VOL", "2e6"))

@@ -118,6 +118,11 @@ FUNDING_BOOKS = {
     # added BEFORE their first close (the (kc) pattern).
     "band-garrett-lshadow",
     "book-kiyosaki-lshadow",
+    # [2026-08-13 (me)] 🧮 Hull — delta-neutral modelled like Rich Dad
+    # (accrued − fees, no price term, structural), added BEFORE its first
+    # close (the (kc) pattern). The other three second-wave BOOKS-cohort
+    # rows (douglas/grimes/schwager) are PRICE books and stay sweepable.
+    "book-hull-lshadow",
 }
 
 

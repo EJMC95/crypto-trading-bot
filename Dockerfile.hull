@@ -1,0 +1,27 @@
+# Image for 🧮 The Professor (book-hull-shadow) — the COST-OF-CARRY BOOK,
+# shadow only. Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.hull
+#   VENUE=lighter_shadow
+# The bot REFUSES every other VENUE (loud SystemExit): a $1,000 paper book
+# trading Hull's cost-of-carry machinery on the mid-band funding tier
+# ([2M,10M) x [7.8%,20%) TRUE — the cell that completes the Garrett|Hull|
+# Farmer volume tiling), delta-neutral modelled, ZERO keys. Config is
+# ENV-ONLY (no tuning lane), single-policy (hm) clock by construction.
+#
+# COPY set is the kiyosaki one (funding family minus fleet_tuning: no lever
+# is read, the module would be a dead file). fleet_bus IS a guarded import
+# (the (lk) crypto class screen) and ships in the SAME commit as the import
+# (born-dark rule).
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_book_hull_bot.py bot_pnl_store.py paper_broker.py funding_basis.py fleet_bus.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_book_hull_bot.py"]

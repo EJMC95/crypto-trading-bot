@@ -12,6 +12,28 @@ Recommended options are marked ★.
 
 ---
 
+## ⚡ WAITING ON YOU · The BOOKS wave-2 birth (PR #169) — merge, then one dispatch
+
+**(mb)–(me), 13-Aug:** 🧘 book-douglas, 📐 book-grimes, 🧙 book-schwager,
+🧮 book-hull — four measured shadow books, full green bar, birth state (no
+deploy rule is armed, so the merge cannot red any push). Two acts, in order:
+
+1. **Merge PR #169** (draft — mark ready + merge).
+2. **Dispatch the one-shot provisioner** (creates the four services + first
+   deploys; the workflow only registers once it is on main):
+
+```bash
+gh workflow run books-provision.yml
+```
+
+Then say "done" in any session — it verifies all four rows on /pnl.json by
+build stamp ((iw): a green dispatch is not a running book) and lands the
+ACTIVATION commit (decide rules + paths:, MANUAL→AUTO, provision workflow
+deleted per its DELETE-after-use header). Reading docs: the four
+`BOOK_*_2026-08-13.md`; evidence: `scripts/study_books_cohort_2026-08-13.py`.
+
+---
+
 ## ⚡ ~~WAITING ON YOU~~ · Avo Maria live slot swap — **EXECUTED 13-Aug ~19:13 AEST, verified by stamp readback (`e49ba8fa7ed2`); retirement + live-roster sweep shipped the same evening ((ma) addendum). Item closes at the next daily review.**
 
 **Your decision, built end-to-end and inert on main.** 🙏 Avo Maria
@@ -108,6 +130,18 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   the above").** Ride to ~30-Aug; both widening levers stay refused on
   measurement ((it)). Revisit lands on the calendar with the era window; the
   S1 scale (jr) now sizes its NEW entries by claim in the meantime.
+  **[13-Aug (mf) — NEW EVIDENCE FOR THE ~30-Aug DECISION DAY, deliberately
+  NOT applied now (changing the exit mid-window corrupts the very sample the
+  decision reads):** the carry-cell grace study — this book's own gate +
+  exits replayed over 250d of the cell's coin population — measured the 1h
+  flip grace churning half the cell's profit away: grace 1h +$27.25/t=1.95
+  with h2 NEGATIVE and 192/231 exits paying the RT on sign wobbles; 6h
+  +$41.17/t=2.96; 24h +$50.12/t=3.52, monotone, robust ex-AVNT. Its own
+  ledger agrees in shape ((gq): sided `*_flip`s −$17.32 vs `decay_paid`
+  +$71.42). ★If the book RIDES ON at ~30-Aug, extend `funding_carry_bot.py`'s
+  `FLIP_GRACE_H` (a literal, 1.0) in the same act — 🏦 Rich Dad already took the 6h form at (mf), zero clock
+  cost, hours after its birth. `scripts/study_books_cohort_2026-08-13.py`
+  reproduces.]**
 - **⚖️ Counterweight — early revert. DECIDED-REVERTED 4-Aug (option A,
   operator: "full permission to go ahead with all advancements").** Shipped
   as the CODE DEFAULT K 8→5 + universe 60→30 (`lighter_funding_spread_bot.py`
@@ -206,6 +240,14 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   intact. **B — apply now**, eating the clock reset, if the non-crypto
   harvest bleed grows enough to outweigh ~a week of accrued sample (it is
   ~$0.2/day today). Nothing needed from you before 4-Sep unless B.
+  **[13-Aug (mf) — a SECOND item for the same 4-Sep unfreeze rev, so one
+  policy change carries both:** the carry-cell grace study measured the 1h
+  flip grace on the ≥20% cell churning half the profit away (1h +$27.25/
+  t=1.95 h2 negative → 6h +$41.17/t=2.96 → 24h +$50.12/t=3.52, monotone,
+  robust ex-AVNT). Its carry sleeve's own 8 closes are ALL `flip` exits at
+  0% win ((lv)). ★Extend `lighter_band_barnes_bot.py`'s `FLIP_GRACE_H` (a literal,
+  1.0) to 6h in the same unfreeze commit as the class screen — two measured fixes, one clock reset,
+  already spent.]**
 - **📊 Index Rider — DECIDED-RETIRED 13-Aug (lo)** (operator: *"get rid of
   what's not working"* — the I17 call, made early on conclusive evidence:
   ZERO closes in 44 days and a measured rule rate of ~17.2 closes/yr against
