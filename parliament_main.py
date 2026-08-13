@@ -87,9 +87,21 @@ async def run_chamber():
     ml, tuners, bots = c["ml"], c["tuners"], c["bots"]
     beat = howard.beat
     params_fn = tuners.effective_params
-    log.info("🏛️ Parliament in session: %d books %s | watch core %s",
-             len(bots), list(PM_BOTS), data.watchlist)
+    # [2026-08-13 (lt)] COUNT THIS BOOT BEFORE ANYTHING CAN CRASH.
+    # Deliberately the first statement of the session and deliberately NOT in
+    # build_chamber(): the quantity worth publishing is "how many times has the
+    # SUPERVISOR started", so `--once` smoke tests and the selftest must not
+    # advance it. Placed ahead of every fallible startup step (ml.train_from_db
+    # reads the DB, the pollers touch the network) so that a boot which dies
+    # during startup — the one an observer has the least other evidence of —
+    # is still counted by the next boot that survives.
+    c["db"].boots, c["db"].boots_durable = c["db"].bump_boots()
+    log.info("🏛️ Parliament in session: %d books %s | watch core %s | boot #%s%s",
+             len(bots), list(PM_BOTS), data.watchlist, c["db"].boots,
+             "" if c["db"].boots_durable else " (in-memory DB — NOT durable)")
     ml.train_from_db()      # restart-proof memory before the first entry
+    for bot in bots:        # ...and so is the signal window (see restore_signals)
+        bot.restore_signals()
     tasks = [
         asyncio.create_task(_supervised(
             "data.market", lambda: data.poll_market_forever(beat=beat))),

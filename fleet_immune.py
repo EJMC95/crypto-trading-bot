@@ -664,6 +664,79 @@ def churn_from_history(key, path, now, window_s=None, fetch=None):
     return resets, stalls, len(series)
 
 
+#: [2026-08-13 (lt)] EXACT boot counters: {state key: (count path, durability
+#: path)}. Senior to `RESTART_COUNTERS` for the same key, because this counts
+#: boots instead of inferring them from a counter that resets — see
+#: `boots_from_history`. A key here that the publisher does not yet stamp
+#: simply yields None and the inference below still runs, so the two can be
+#: deployed in either order.
+BOOT_COUNTERS = {
+    "parliament": ("data.boots", "data.boots_durable"),
+}
+
+
+def boots_from_history(key, path, durable_path, now, window_s=None, fetch=None):
+    """(boots, n_samples) counted EXACTLY from a monotone boot counter, or None.
+
+    [2026-08-13 (lt)] WHY THIS OUTRANKS THE INFERENCE ABOVE. `churn_from_history`
+    reads a counter that RESETS (`data.cycles`) and calls each regression one
+    restart. That is a LOWER BOUND in three ways no sampling rate can fix:
+    two boots between two publishes look like one; a boot that dies before
+    publishing anything is invisible; and a boot that dies before completing
+    its first cycle publishes 0 after 0, which is not a regression at all.
+    A counter that only goes UP, kept outside the process, has none of those:
+    a gap that contains two boots advances it by two, and a boot that never
+    published is still counted by the next boot that does.
+
+    THE COUNT IS `sum of positive deltas`, NOT `last - first`, and that
+    difference is the DB-loss case: if the persist volume is lost the counter
+    restarts at 1, and differencing the endpoints would return a NEGATIVE
+    number that reads as health. Positive deltas degrade that to an
+    undercount instead — wrong in the safe direction, and the direction the
+    inference already errs in.
+
+    REFUSES A NON-DURABLE COUNTER outright. `EcosystemDB` falls back to an
+    in-memory database when its file is unwritable, which is right for a
+    shadow book and fatal for this reading: every boot then counts itself as
+    #1 forever, so the deltas are identically zero and a crash-looping organ
+    would certify as perfectly healthy. That is precisely the
+    [[convergent-metric-is-not-a-health-check]] trap `(le)` and `(lg)` were
+    each written about, so it is refused here rather than trusted and the
+    caller falls back to inference — which, unlike this, still works when the
+    publisher has no memory at all.
+    """
+    window_s = RESTART_WINDOW_S if window_s is None else window_s
+    try:
+        rows = (fetch or store.fetch_state_history)(key, limit=2000) or []
+    except Exception:      # noqa: BLE001
+        return None
+    if not rows:
+        return None
+    series = []
+    for r in rows:
+        try:
+            t = _parse_ts((r or {}).get("ts"))
+        except Exception:  # noqa: BLE001
+            continue
+        if t is None or now - t > window_s or t > now:
+            continue
+        payload = (r or {}).get("payload") or {}
+        v = _dotted(payload, path)
+        if not isinstance(v, (int, float)) or isinstance(v, bool):
+            continue
+        # Durability is per-sample on purpose: a container that lost its
+        # volume mid-window must not have its earlier, trustworthy samples
+        # silently pooled with untrustworthy ones.
+        if not _dotted(payload, durable_path):
+            continue
+        series.append((t, float(v)))
+    if len(series) < 2:
+        return None
+    series.sort()
+    boots = sum(max(0.0, b - a) for (_, a), (_, b) in zip(series, series[1:]))
+    return int(boots), len(series)
+
+
 def restart_churn(states, seen, now, min_n=None, window_s=None):
     """-> [{organ, detail}] when an organ's monotone counter keeps RESETTING.
 
@@ -730,12 +803,29 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
         # the history is readable the count comes from it and the sampler's
         # tallies are used only as the FALLBACK, declared in `basis` so a
         # reader can tell which one produced the number.
+        # [(lt)] AND AN EXACT COUNT OUTRANKS THE PUBLISHER'S SERIES.
+        # Both readings below infer restarts from a counter that RESETS, which
+        # undercounts by construction. When the publisher stamps a durable
+        # monotone boot counter, the count is a measurement rather than an
+        # inference — so it is tried first and named in `basis`. Absent or
+        # non-durable, this returns None and nothing changes.
+        exact = None
+        _bc = BOOT_COUNTERS.get(key)
+        if _bc:
+            exact = boots_from_history(key, _bc[0], _bc[1], now, window_s)
         hist = churn_from_history(key, path, now, window_s)
-        if hist is not None:
+        if exact is not None:
+            n_boots, e_n = exact
+            total, n_res, n_sta = n_boots, n_boots, 0
+            basis = f"durable boot counter, {e_n} samples"
+            bound = ""
+        elif hist is not None:
             h_res, h_sta, h_n = hist
             total, n_res, n_sta = h_res + h_sta, h_res, h_sta
             basis = f"publisher series, {h_n} samples"
-            bound = ""
+            bound = (" — a LOWER BOUND: counted by inference from a counter "
+                     "that resets, which cannot see two boots in one gap or a "
+                     "boot that died before publishing")
         else:
             total, n_res, n_sta = len(resets) + len(stalls), len(resets), len(stalls)
             basis = "this organ's own samples"

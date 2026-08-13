@@ -287,6 +287,62 @@ class EcosystemDB:
         except Exception:  # noqa: BLE001
             return None
 
+    # -- boot counter ---------------------------------------------------------
+    #: The durable key `bump_boots` keeps its counter under.
+    BOOTS_KEY = "supervisor.boots"
+
+    @property
+    def durable(self) -> bool:
+        """True when this DB is a real file whose contents survive a restart.
+
+        Load-bearing rather than cosmetic. The in-memory fallback above is the
+        right call for a shadow book (a storage fault must never stop trading),
+        but it makes every restart-counting read return the SAME value forever
+        — and a constant counter is certified healthy by every detector this
+        fleet owns. That is the [[convergent-metric-is-not-a-health-check]]
+        trap `(le)`/`(lg)` were both written about. A consumer has to be able to
+        tell **"0 boots since"** from **"cannot count boots"**, so durability is
+        published beside the number instead of being assumed.
+        """
+        return self.path != ":memory:"
+
+    def bump_boots(self) -> tuple[int, bool]:
+        """Increment the durable process-start counter -> (boots, durable).
+
+        [2026-08-13 (lt)] WHY A COUNTER AND NOT AN INFERENCE. `fleet_immune`
+        counts the Parliament's restarts by watching `data.cycles` fall back to
+        zero. That is an INFERENCE from a counter which resets, and it is a
+        LOWER BOUND by construction, in three separate ways:
+          * two boots between two publishes collapse into one observed reset;
+          * a boot that dies before it ever publishes is invisible — the very
+            failure worth paging on leaves the least evidence;
+          * a boot that dies before completing its first cycle publishes 0
+            after 0, which is not a regression at all — `(le)` had to add a
+            floor-stall rule to see it, and that rule then counted SAMPLES
+            rather than restarts.
+        A counter that only ever goes UP, kept outside the process, has none of
+        those failure modes: two boots inside one sampling gap still advance it
+        by two, and a boot that publishes nothing is still counted by the NEXT
+        boot that does. `(lg)` named this fix in its own docstring — *"or have
+        the Parliament publish a monotone `boots` counter"* — and `(li)` carried
+        it forward as still-open. This is that counter.
+
+        Never raises and never blocks a boot: a failed read starts from 0 and a
+        failed write is already swallowed by `_exec`, so the worst case is an
+        undercount — the same direction the inference already errs in, never a
+        crash on the startup path.
+        """
+        prev = 0
+        try:
+            got = (self.recall(self.BOOTS_KEY) or {}).get("n")
+            if isinstance(got, (int, float)) and not isinstance(got, bool):
+                prev = max(0, int(got))
+        except Exception:  # noqa: BLE001 — a junk memory row is not a reason
+            prev = 0       # to refuse to boot
+        n = prev + 1
+        self.remember(self.BOOTS_KEY, {"n": n, "ts": time.time()})
+        return n, self.durable
+
     def prune(self, keep_days: float = 30.0) -> None:
         cutoff = time.time() - keep_days * 86400
         self._exec("DELETE FROM signals WHERE ts < ?", (cutoff,))

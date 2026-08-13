@@ -182,6 +182,14 @@ class Howard:
                 "closed": bot.wins + bot.losses,
                 "wins": bot.wins, "losses": bot.losses,
                 "halted": bot.halted_today, "last_skip": bot.last_skip,
+                # [(lt)] `last_skip` alone cannot be counted (its ml-gate
+                # variant embeds a probability, so the string churns while the
+                # state holds) and cannot be dated (it is a latch that only a
+                # successful entry clears). Both halves published beside it.
+                "last_skip_class": getattr(bot, "last_skip_class", ""),
+                "last_skip_age_sec": (
+                    int(time.time() - bot.last_skip_ts)
+                    if getattr(bot, "last_skip_ts", 0.0) else None),
             }
         return out
 
@@ -243,6 +251,17 @@ class Howard:
             "data": {"books": len(getattr(data, "market", {}) or {}),
                      "watchlist": list(getattr(data, "watchlist", []) or []),
                      "cycles": getattr(data, "cycles", 0),
+                     # [(lt)] the EXACT restart count, beside the counter that
+                     # only lets it be inferred. `boots` is None until the
+                     # supervisor has counted this boot, and `boots_durable`
+                     # is False when the DB fell back to memory — in both
+                     # cases the number cannot be differenced across a
+                     # restart, and a consumer must say so rather than read
+                     # a constant as "no restarts" (I6: an absence is only
+                     # evidence against a control group).
+                     "boots": getattr(self.db, "boots", None),
+                     "boots_durable": bool(getattr(self.db, "boots_durable",
+                                                   False)),
                      "errors": getattr(data, "errors", 0)} if data else {},
             "scanners": {"emitted": getattr(scanners, "emitted", 0),
                          # the full 10-scanner bench, quiet members included —

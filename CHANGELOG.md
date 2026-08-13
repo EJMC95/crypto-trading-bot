@@ -1,3 +1,146 @@
+## 2026-08-13 (lt) — THE PARLIAMENT'S RESTART COUNT WAS AN INFERENCE, AND EVERY RESTART SILENTLY REWROTE THREE BOOKS' ENTRY RULES
+
+*Letter moved (lj) -> (lt) at push time, per the collision rule: a parallel
+session had already merged `(lj)`–`(ls)` to main and nine later entries cite
+its `(lj)`, so the CITED entry keeps the letter. `git log` will show the old
+letter in this commit's subject — grep the CHANGELOG headers, not the log.*
+
+**Carried work, not new work (I11).** `(lg)` closed the sampling half of the
+churn detector and named the other half in its own docstring — *"or have the
+Parliament publish a monotone `boots` counter"*. `(li)` carried it forward
+still-open alongside two siblings from the same sweep. This is that counter,
+plus both siblings, because they are one class: **state a restart destroys, and
+telemetry that misreads because of it.**
+
+### FIRST, THE PREVIOUS PASS VERIFIED IN THE LIVE PAYLOAD (forward-motion rule 1)
+
+`(li)` claimed three 🏛️ books went from structurally unable to open a position
+back to decidable. Measured on `/bus.json` 13-Aug 05:44Z, six days after that
+deploy: **zero `regime_timing` findings** in `brain-diagnosis` (it was **10 of
+10** reading *"100% of matched losses"*), and pm-gillard / pm-rudd / pm-abbott
+all read `halted: false`. The cohort has gone **518 → 552 closes**, and **30 of
+those 34 are the three formerly-gated books**. The claim holds.
+
+Stated without varnish, because the point of freeing them was evidence and not
+applause: the cohort also moved **−$8.70 → −$10.50** over those 34 closes
+(−0.053%/trade). They are producing the evidence the I17 keep-or-retire call
+needs, and so far that evidence is mildly negative. That is the system working.
+
+### THE MEASUREMENT THAT MOTIVATES THE COUNTER
+
+Live tape, 285 `parliament` samples over 24h (~5 min cadence): one healthy run
+reaching **4346 cycles**, then **4 restarts** clustered 02:42–05:39Z, and
+`data.cycles = 3` at the moment of reading. `fleet_immune` reported *"4
+RESTART(s) in 24h"* — exactly its `RESTART_CHURN_N` bar. **No `boots` field
+existed anywhere in the payload.**
+
+**Every reading built on `data.cycles` infers a restart from a REGRESSION, and
+that is a lower bound no sampling rate can lift**, in three separate ways:
+two boots inside one publishing gap collapse into one; a boot that dies before
+it publishes anything leaves no regression at all — *the failure most worth
+paging on leaves the least evidence*; and a boot that dies before completing
+its first cycle publishes 0 after 0, which is not a regression, and is why
+`(le)` had to bolt on a floor-stall rule that then counted SAMPLES rather than
+restarts. A counter kept OUTSIDE the process has none of those holes: a gap
+containing two boots advances it by two, and a boot that never published is
+still carried by the next boot that does.
+
+- `EcosystemDB.bump_boots()` — durable, monotone, in the `memory` table that
+  already survives `prune`. Called as the **first statement of the session**
+  and deliberately *not* in `build_chamber()`, so `--once` and the selftest do
+  not advance it, and so a boot dying during startup is still counted later.
+- `fleet_immune.boots_from_history` — counts **`sum of positive deltas`, not
+  `last − first`**. That difference is the lost-volume case: the counter
+  restarts at 1 and endpoint differencing would return **−39**, which reads as
+  health. Positive deltas degrade it to an undercount — wrong in the safe
+  direction, the direction the inference already errs in.
+- **IT REFUSES A NON-DURABLE COUNTER.** `EcosystemDB` falls back to in-memory
+  when its file is unwritable — right for a shadow book, fatal here: every boot
+  then counts itself #1 forever, the deltas are identically zero, and a
+  crash-looping organ certifies as perfectly healthy. That is the
+  [[convergent-metric-is-not-a-health-check]] trap `(le)` and `(lg)` were *each*
+  written about, arriving a third time by a new road. So `boots_durable` is
+  published beside the number and a false one falls back to inference.
+- **AND THE INFERENCE NOW SAYS WHAT IT IS** — `(lg)`'s own carried note read
+  *"the number is a LOWER BOUND and the detail line does not say so."* It says
+  so now, on both fallback paths.
+
+### THE TWO SIBLINGS, WHICH ARE THE SAME CLASS
+
+- **`last_skip` was a latch with no clock and a churning payload.** Never
+  cleared, so a book entering happily for hours still displayed the last thing
+  that ever blocked it — **a latched string with no timestamp is byte-identical
+  whether the skip happened two seconds or ten days ago, which is I1 at field
+  scale.** And the ml-gate variant embeds a formatted probability
+  (`H100:ml-gate(0.26)`, `KAITO:ml-gate(0.30)` — both live in today's payload),
+  so counting that field's transitions counts the PAYLOAD moving, not the
+  STATE: measured at **2.98x** the five stable classes, and it misled **two of
+  six investigations** in `(li)`'s sweep into naming the wrong binding gate.
+  Now: a stable `last_skip_class` to count, `last_skip_age_sec` to date it,
+  cleared on a filled entry, and `last_skip` keeps its exact historical string
+  so nothing that reads it breaks.
+- **`self.signals` did not merely forget across a restart — it CHANGED THE
+  RULES, in inconsistent directions.** trend needs a fresh `momentum_burst` to
+  confirm and breakout needs `volume_spike`, so an empty window makes both
+  books **stricter**; meanrev skips only when volatility reads `expanding`, so
+  the same emptiness makes it **looser**; and `_exit_reason`'s `flip` rule reads
+  the primary topic for an opposing signal, so **a held position quietly loses
+  an exit** until the scanner re-emits. `restore_signals()` refills it from the
+  DB rows that have been there since day one. This is the last open instance of
+  a class closed three times already (🎯 `baseline`, 🎯 `surge_done`, 🎸
+  `restore_hot_since`).
+  - **Bounded honestly**: `ScannerEngine._last` is in-process too, so anything
+    whose CONDITION still holds is re-emitted within one `SCAN_SEC` (120s) and
+    self-heals. What does not come back is a signal whose condition has passed
+    inside its 15-minute TTL — precisely what the flip exit and the confirmers
+    read. Real, small, and free to fix; not sold as more than that.
+  - **THE SEAM WAS THE WHOLE RISK, and it is the `(hj)` class.** `add_signal`
+    stores `sig["meta"]` into a column named `payload`, so `recent_signals`
+    returns `payload` while every consumer here reads `s["meta"]`
+    (`reg["meta"].get("regime")`). Restoring the row verbatim puts a KeyError in
+    the entry path. Caught by writing the test through the REAL publisher into
+    the REAL consumer instead of a fixture authored from the consumer's side.
+
+### VERIFICATION — 11 MUTATIONS, AND ONE OF MY TESTS PASSED FOR THE WRONG REASON
+
+Not one AST or substring claim in the new file, per `(lh)`: source-shaped tests
+detect DELETION and not DISABLEMENT. Every test drives the real code against a
+real SQLite file across simulated restarts and reads what it WROTE. The
+discriminating one is `test_two_boots_in_one_gap_are_BOTH_counted` — the exact
+count and the inference are handed the SAME tape and **must disagree** (2 vs 1),
+or the new path has bought nothing and should be deleted.
+
+**M9 survived the first run.** Deleting the TTL cutoff from `restore_signals`
+left the expiry test green, because `recent_signals(hours=…)` already filters at
+the query — so the test never exercised the check it appeared to verify. The
+cutoff is still load-bearing (it is what stands between a DB whose window filter
+does not bite and a stale signal entering as fresh), so it stays, and a fake
+that ignores `hours` now reddens the mutation. **11/11 caught.** Full suite
+green; seven audits green; `parliament_main --selftest` green across all six
+layers.
+
+### STILL OPEN, named rather than implied
+
+`audit_lever_authority` has **27 findings on HEAD, pre-existing and untouched
+here** — including `lighter_funding_bot.py`'s `EXIT_APR` and `HARD_STOP`
+UNLEVERED on the REAL-MONEY row (59.5% of $20.34 gross loss decided by an
+unregistered constant). That is I18's class on the book that holds real money
+and it deserves its own pass, not a footnote in this one. Also carried from
+`(lh)`: `DOCKET_SEEN_KEY` is still absent from `/bus.json`'s fixed key list and
+**the decision docket still has no consumer** — by this repo's own rule a
+finding no gate consumes is a note.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**No book moved toward the gate, and this pass does not claim one did.** What
+moved: the six 🏛️ books keep their confirmers and their `flip` exit across a
+restart instead of silently trading a different rule set for two minutes, four
+times a day; and the fleet can now count the Parliament's restarts exactly
+rather than inferring a floor from a counter that resets. The honest framing is
+the one `(lg)` used — this is the sensor, not the cure. The cohort's
+keep-or-retire call (I17) remains the operator's, and it is now being fed
+evidence at ~6 closes/day with the entry rules holding still between boots.
+
 ## 2026-08-13 (ls) — 🏦 RICH DAD IS BORN: Kiyosaki's book, read as a rule set — every lesson lands on a validated gate, and the one NEW rule can only tighten
 
 - **Operator, 13-Aug: *"Please read the book rich dad poor dad by Robert

@@ -181,6 +181,24 @@ class PMBot:
         self.halted_today = False
         self._restored = False
         self.last_skip = ""                        # observability: why no trade
+        # [2026-08-13 (lt)] THE SKIP IS A LATCH — GIVE IT A CLASS AND A CLOCK.
+        # `last_skip` alone was both unreadable and actively misleading, in two
+        # separate ways measured in `(li)`'s sweep:
+        #   * it was NEVER cleared, so a book that has been happily entering
+        #     for hours still displays the last thing that ever blocked it. A
+        #     latched string with no timestamp is byte-identical whether the
+        #     skip happened two seconds or ten days ago — I1, at field scale.
+        #   * the ml-gate variant embeds a formatted probability
+        #     (`ml-gate(0.26)`), so counting transitions of this field counts
+        #     the PAYLOAD changing, not the STATE changing. Measured: that
+        #     class read 2.98x the transitions of the five stable classes and
+        #     misled two of six investigations in that sweep into naming the
+        #     wrong binding gate.
+        # So the stable CLASS gets its own field (count transitions on this),
+        # the varying part moves to `_detail`, and `_ts` says when.
+        self.last_skip_class = ""                  # stable token, e.g. 'ml-gate'
+        self.last_skip_detail = ""                 # the varying part, e.g. '0.26'
+        self.last_skip_ts = 0.0                    # when — 0.0 means 'never'
         self.fund_realized = 0.0                   # funding accrued, book-life
         self._fund_ts = None                       # last accrual timestamp
 
@@ -227,6 +245,73 @@ class PMBot:
         except Exception as e:  # noqa: BLE001
             log.warning("%s state restore failed (%s) — fresh book", self.bot_id, e)
 
+    def restore_signals(self) -> int:
+        """Refill the in-process signal window from the ecosystem DB -> n rows.
+
+        [2026-08-13 (lt)] THE LAST OPEN INSTANCE OF A CLASS CLOSED THREE TIMES.
+        `self.signals` is in-process, TTL'd, and no restart restores it — the
+        same shape as 🎯 the sniper's `baseline` and `surge_done` and 🎸
+        Barnes's `restore_hot_since`, each already fixed. Here it is not merely
+        forgetful, it CHANGES THE RULES, and in inconsistent directions:
+          * trend needs a fresh `momentum_burst` to confirm and breakout needs
+            `volume_spike` below strength 0.5 — an empty window makes both
+            books STRICTER (no confirmation available, so no entry);
+          * meanrev skips only when volatility reads `expanding`, so an empty
+            window makes that book LOOSER — the veto cannot fire;
+          * `_exit_reason`'s `flip` rule reads the primary topic for an
+            OPPOSING signal, so after a restart a HELD position loses one of
+            its exits until the scanner happens to re-emit.
+        The scanner's own dedupe memory (`ScannerEngine._last`) is in-process
+        too, so anything whose CONDITION still holds is re-emitted within one
+        `SCAN_SEC` (120s) and self-heals. What does not come back is a signal
+        whose condition has passed but whose 15-minute TTL had not — and that
+        is exactly the population the flip exit and the confirmers read. Small
+        and bounded, then, but free to fix: the DB has held these rows since
+        the Parliament's first day.
+
+        THE KEY MAP IS THE WHOLE RISK, and it is the (hj) class: `add_signal`
+        stores `sig["meta"]` into a column called `payload`, so `recent_signals`
+        hands it back as `payload` while every consumer here reads `s["meta"]`
+        (`reg["meta"].get("regime")`). Restoring the row verbatim would put a
+        KeyError in the entry path. Hence the explicit rebuild below, and a
+        test that drives the REAL publisher into the REAL consumer rather than
+        a fixture written from this side of the seam.
+
+        Fail-safe to TODAY'S behaviour: any fault leaves the window empty,
+        which is exactly where a restart leaves it now.
+        """
+        if self.db is None:
+            return 0
+        topics = {self.primary_topic} | ({self.confirm_topic}
+                                         if self.confirm_topic else set())
+        wanted = {t.split(".", 1)[1]: t for t in topics if "." in t}
+        cutoff = time.time() - SIGNAL_TTL_SEC
+        n = 0
+        try:
+            rows = self.db.recent_signals(hours=SIGNAL_TTL_SEC / 3600.0)
+        except Exception as e:  # noqa: BLE001
+            log.warning("%s signal restore failed (%s) — starting blind",
+                        self.bot_id, e)
+            return 0
+        for r in rows or []:
+            topic = wanted.get(r.get("scanner"))
+            ts = r.get("ts")
+            if topic is None or not isinstance(ts, (int, float)) or ts < cutoff:
+                continue
+            self.signals[(topic, r.get("sym"))] = {
+                "scanner": r.get("scanner"), "sym": r.get("sym"),
+                "direction": int(r.get("direction") or 0),
+                "strength": float(r.get("strength") or 0.0),
+                "ts": float(ts),
+                # payload -> meta: the seam named above.
+                "meta": r.get("payload") or {},
+            }
+            n += 1
+        if n:
+            log.info("%s restored %d in-TTL signal(s) across %d topic(s)",
+                     self.bot_id, n, len(topics))
+        return n
+
     def save(self) -> None:
         if store is None or self.broker is None:
             return
@@ -252,6 +337,27 @@ class PMBot:
         cutoff = time.time() - SIGNAL_TTL_SEC
         self.signals = {k: s for k, s in self.signals.items()
                         if s["ts"] >= cutoff}
+
+    # -- skip telemetry -------------------------------------------------------
+    def _skip(self, sym: str, klass: str, detail: str = "") -> None:
+        """Record WHY no trade was taken: stable class, varying detail, clock.
+
+        `last_skip` keeps its exact historical shape (`SYM:class(detail)`) so
+        nothing that already reads it breaks; the machine-countable fields are
+        the new ones beside it.
+        """
+        self.last_skip_class = klass
+        self.last_skip_detail = detail
+        self.last_skip_ts = time.time()
+        self.last_skip = f"{sym}:{klass}({detail})" if detail else f"{sym}:{klass}"
+
+    def _skip_clear(self) -> None:
+        """An entry succeeded — the latch has to drop, or the field reports a
+        block that is over. Only a SUCCESSFUL entry clears it: a cycle with no
+        candidates leaves the last real reason standing, which is the useful
+        reading."""
+        self.last_skip = self.last_skip_class = self.last_skip_detail = ""
+        self.last_skip_ts = 0.0
 
     def _fresh_signal(self, topic: str, sym: str) -> dict | None:
         s = self.signals.get((topic, sym))
@@ -360,7 +466,7 @@ class PMBot:
     def _try_enter(self, sym: str, direction: int, sig: dict) -> bool:
         why = self._entry_blocked(sym, direction)
         if why:
-            self.last_skip = f"{sym}:{why}"
+            self._skip(sym, why)
             return False
         # [2026-07-28 BRAIN ACTS, Parliament lane] the brain's ACTIONABLE
         # regime_gate finding finally has a consumer here — pm-gillard's
@@ -375,7 +481,7 @@ class PMBot:
         if fleet_bus is not None:
             try:
                 if fleet_bus.entry_regime_gated(self.bot_id, _gate_tag):
-                    self.last_skip = f"{sym}:brain-regime-gate"
+                    self._skip(sym, "brain-regime-gate")
                     return False
             except Exception:  # noqa: BLE001
                 pass
@@ -384,7 +490,7 @@ class PMBot:
         stake_mult = 1.0
         if ready:
             if p_win < self.params["ml_gate"]:
-                self.last_skip = f"{sym}:ml-gate({p_win:.2f})"
+                self._skip(sym, "ml-gate", f"{p_win:.2f}")
                 return False
             if p_win < 0.55:
                 stake_mult = 0.6            # tepid conviction -> smaller clip
@@ -407,7 +513,7 @@ class PMBot:
         # venues/safety.py exists for. Unreachable at today's defaults
         # (3 x $37.50 < $150) but armed the day PARL_ORDER_USD/MAX_OPEN move.
         if self._open_notional() + usd > MAX_NOTIONAL:
-            self.last_skip = f"{sym}:notional-cap(mult)"
+            self._skip(sym, "notional-cap", "mult")
             return False
         px = self._fill_px(sym, direction > 0)
         if px is None:
@@ -435,6 +541,7 @@ class PMBot:
                 "usd": usd, "p_win": p_win})
         log.info("%s OPEN %s %s @%.6g ($%.0f, p=%.2f)", self.bot_id, tag,
                  sym, px, usd, p_win)
+        self._skip_clear()      # [(lt)] the book just traded — drop the latch
         return True
 
     # -- exits ----------------------------------------------------------------
@@ -551,7 +658,13 @@ class PMBot:
                        "held": {s: (self.open_meta.get(s) or {}).get(
                                     "tag", "long")
                                 for s in self.broker.pos},
-                       "last_skip": self.last_skip})
+                       "last_skip": self.last_skip,
+                       # [(lt)] the countable half: a STABLE class token, and
+                       # the age that says whether it is current news.
+                       "last_skip_class": self.last_skip_class,
+                       "last_skip_age_sec": (
+                           int(time.time() - self.last_skip_ts)
+                           if self.last_skip_ts else None)})
         except Exception:  # noqa: BLE001
             pass
 
