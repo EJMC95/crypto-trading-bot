@@ -137,6 +137,33 @@ def freeze_active(now=None):
     return float(now if now is not None else time.time()) < _freeze_until_ts()
 
 
+# ---- instrument class screen, harvest sleeves (2026-08-13 (lv)) -------------
+# The `(lj,lk,ll)` sweep class-screened 🌾 the carry PARENT and 🎯 the sniper
+# and did not touch this file — so the funding SUPER-BOOK, built expressly to
+# consolidate those parents' validated gates, kept taking the instrument class
+# they screen out. Measured over the scout's own 8,610-snapshot tape: 68.2% of
+# this sleeve's OFFERED supply is non-crypto, and all 8 of its real closes were
+# WTI x4 / SKHYNIXUSD x2 / SPCX x2 — 0% win, zero crypto. `(ki)` had already
+# found this exact leak in this exact book and fixed only the xsect sleeve;
+# fixing instances is not closing the class (I14, `(im)`).
+# Mirrors the parent's contract EXACTLY: ENTRY-ONLY (a held position exits by
+# its normal rules), fail-OPEN on a missing fleet_bus (an import regression
+# must not shrink the universe — the dark-scout fallback inside `is_crypto` is
+# the load-bearing degrade), reversible without a deploy.
+ALLOW_NONCRYPTO = os.environ.get("BARNES_ALLOW_NONCRYPTO", "").strip().lower() \
+    in ("1", "on", "true", "yes")
+
+
+def _class_ok(coin):
+    """May `coin` ENTER a harvest sleeve? Crypto perps only — see above."""
+    if ALLOW_NONCRYPTO or fleet_bus is None:
+        return True
+    try:
+        return bool(fleet_bus.is_crypto(coin))
+    except Exception:      # noqa: BLE001 — a class lookup must never stop a scan
+        return True
+
+
 # ---- shared harvest gates (carry + extreme sleeves) -------------------------
 # 20% TRUE apr — the 21-Jul gate sweep on Lighter's OWN 150d tape: the only
 # bar that beat shipped on the full window AND both halves (+$55.93). (it)
@@ -272,14 +299,16 @@ def sleeve_tag(sleeve, side):
 
 
 def harvest_candidates(fund, held, hot_since, t0, enter_apr, min_vol,
-                       max_n, persist_h=PERSIST_H):
+                       max_n, persist_h=PERSIST_H, class_ok=None):
     """Eligible (coin, rec, apr) for a harvest sleeve, hottest first.
 
     The parent's exact gate order: not already held (across BOTH harvest
     sleeves — one coin, one harvest position), |TRUE apr| >= the bar, 24h $
-    volume >= the floor, and the coin has been hot >= persist_h (persistent
-    funding pays carries, spikes pay fees). Pure; decides nothing itself.
+    volume >= the floor, the coin has been hot >= persist_h (persistent
+    funding pays carries, spikes pay fees), and — since (lv) — the venue's own
+    instrument class is crypto. Pure; decides nothing itself.
     """
+    class_ok = _class_ok if class_ok is None else class_ok
     out = []
     for c, f in (fund or {}).items():
         if c in held:
@@ -296,18 +325,21 @@ def harvest_candidates(fund, held, hot_since, t0, enter_apr, min_vol,
             continue
         if (t0 - (hot_since or {}).get(c, t0)) < persist_h * 3600.0:
             continue
+        if not class_ok(c):
+            continue
         out.append((c, f, apr))
     out.sort(key=lambda x: -abs(x[2]))
     return out[:max_n]
 
 
 def harvest_census(fund, held, hot_since, t0, enter_apr, min_vol,
-                   persist_h=PERSIST_H):
-    """WHY DID NOTHING OPEN? — the (is) census for the shared harvest bar.
+                   persist_h=PERSIST_H, class_ok=None):
+    """WHY DID NOTHING OPEN? — the (is) census for a harvest bar.
     Buckets are mutually exclusive, mirror the gate order, and sum to
     `scanned`. Pure observability; it decides nothing."""
+    class_ok = _class_ok if class_ok is None else class_ok
     out = {"scanned": len(fund or {}), "held": 0, "cold": 0, "thin": 0,
-           "waiting": 0, "eligible": 0}
+           "waiting": 0, "noncrypto": 0, "eligible": 0}
     for c, f in (fund or {}).items():
         if c in held:
             out["held"] += 1
@@ -324,6 +356,12 @@ def harvest_census(fund, held, hot_since, t0, enter_apr, min_vol,
             out["thin"] += 1
         elif (t0 - (hot_since or {}).get(c, t0)) < persist_h * 3600.0:
             out["waiting"] += 1
+        elif not class_ok(c):
+            # [(lk)/(lv)] LAST in the gate order on purpose: this bucket means
+            # "hot, liquid, persistent — blocked by class ALONE", i.e. the
+            # screen's live bite, which is what lets the payload verify the
+            # change and the operator see its cost.
+            out["noncrypto"] += 1
         else:
             out["eligible"] += 1
     return out
@@ -489,7 +527,8 @@ def build_state(positions, hot_since, last_ts, xsect_last, now=None):
             "saved_ts": float(now if now is not None else time.time())}
 
 
-def build_extra(census, positions, open_pnl, realized, moved, now=None):
+def build_extra(census, positions, open_pnl, realized, moved, now=None,
+                census_ext=None):
     """The published `extra` — ONE builder, so the payload the dashboard,
     board and immune organ read is the payload the selftest asserted on
     (a consumer is tested against a payload its publisher built, (hj))."""
@@ -501,6 +540,13 @@ def build_extra(census, positions, open_pnl, realized, moved, now=None):
             "cap": (2 * K if s == "xsect" else MAX_POSITIONS),
             "pnl": round(sum(position_pnl(p, p.get("last_mark")) for p in rows), 2),
         }
+        # [(lv)] a sleeve that opens nothing must say WHY. `open: 0` alone is
+        # byte-identical between "quiet venue" and "structurally unreachable",
+        # and this book shipped 8 days of the second while reading as the
+        # first. The extreme sleeve carries its own census at its own floor.
+        if s == "extreme" and census_ext is not None:
+            sleeves[s]["scan"] = census_ext
+            sleeves[s]["floor_usd"] = EXTREME_MIN_VOL
     return {
         "mode": "dry-run",
         "venue": "lighter",
@@ -756,6 +802,14 @@ def main():
                             if p["sleeve"] in ("carry", "extreme")}
             census = harvest_census(fund, held_harvest, hot_since, t0,
                                     ENTER_APR, CARRY_MIN_VOL)
+            # [(lv)] The extreme sleeve gets its OWN census. Without it the
+            # sleeve publishes `open: 0` and NOTHING else — byte-identical to
+            # "the venue is quiet", which is exactly how it sat dead for its
+            # whole first 8 days unnoticed (I1: a payload must distinguish a
+            # starved organ from an empty one). Its floor is 5x the carry
+            # sleeve's, so the shared census cannot speak for it.
+            census_ext = harvest_census(fund, held_harvest, hot_since, t0,
+                                        ENTER_APR, EXTREME_MIN_VOL)
 
             # ---- carry sleeve entries -----------------------------------
             n_carry = sum(1 for p in positions.values()
@@ -772,6 +826,27 @@ def main():
                               f"${CARRY_NOTIONAL:.0f} | {apr:+.1%} TRUE")
 
             # ---- extreme sleeve entries ---------------------------------
+            # [2026-08-13 (lv)] MEASURED STRUCTURALLY STARVED, AND REORDERING
+            # THIS BLOCK IS *REFUSED* — do not "fix" it by moving it above the
+            # carry block. Its candidate set is a strict SUBSET of carry's
+            # (same ENTER_APR, same persistence clock, same |apr| ranking,
+            # only a 5x stricter volume floor), carry runs first off the
+            # shared `held_harvest`, and carry's cap exceeds the whole
+            # qualified supply — so over 8,611 scout snapshots (30d) this
+            # sleeve was offered something carry had not already claimed in
+            # ZERO of them, and carry never once reached its cap.
+            # Running extreme FIRST was measured: it yields 12 entries over 5
+            # coins — WTI, SKHYNIXUSD, MU, SPCX, SNDK — every one NON-CRYPTO.
+            # With the (lv) class screen applied the reorder yields exactly
+            # ZERO either way, because no crypto book has EVER cleared this
+            # sleeve's $10M floor while at the 20% apr bar: the highest 24h
+            # volume ever observed on a qualifying crypto book is $5.53M
+            # (KAITO). So the binding constraint is the FLOOR, not the order,
+            # and the reorder would only ever have fed a directional sleeve
+            # the instrument class this fleet has repeatedly measured losing.
+            # `barnes.extreme_min_vol` is the reachable lever (cage lo 5e6 —
+            # itself 90% of that observed maximum); moving it is an operator
+            # policy call, escalated, NOT taken here.
             n_ext = sum(1 for p in positions.values()
                         if p["sleeve"] == "extreme")
             if n_ext < MAX_POSITIONS:
@@ -840,7 +915,7 @@ def main():
                            for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
             extra = build_extra(census, positions, open_pnl, realized,
-                                _moved, t0)
+                                _moved, t0, census_ext=census_ext)
             try:
                 store.publish(
                     bot_id, status="online", equity=equity,
@@ -866,7 +941,9 @@ def main():
             print(f"[{now_iso()}] scan ok | {len(fund)} books | open: {held} "
                   f"| open_pnl {open_pnl:+.2f} | realized {realized:+.2f} | "
                   f"cold {census['cold']}, thin {census['thin']}, waiting "
-                  f"{census['waiting']}, eligible {census['eligible']}")
+                  f"{census['waiting']}, noncrypto {census['noncrypto']}, "
+                  f"eligible {census['eligible']} | extreme eligible "
+                  f"{census_ext['eligible']} (thin {census_ext['thin']})")
 
         if args.once:
             print(f"[{now_iso()}] --once smoke test complete.")
@@ -892,26 +969,86 @@ def _selftest():
             "D": {"rate": 9.6e-5, "vol": 5e6, "mark": 2.0},  # cold: 10.5% TRUE
             "E": {"rate": 5e-4, "vol": 5e6, "mark": 3.0}}    # hot, not persisted
 
+    # every fixture coin is crypto unless a case says otherwise — the class
+    # screen has its OWN section below, and letting the live `_class_ok` run
+    # here would make these gate assertions depend on the scout being up.
+    _all_crypto = lambda _c: True                              # noqa: E731
+
     # 1) the harvest gate: bar, floor, persistence, ordering, cap, held-skip
-    cands = harvest_candidates(fund, set(), hot_old, t0, 0.20, 2e6, 4)
+    cands = harvest_candidates(fund, set(), hot_old, t0, 0.20, 2e6, 4,
+                               class_ok=_all_crypto)
     assert [c for c, _f, _a in cands] == ["B", "A"], cands
-    assert harvest_candidates(fund, {"A", "B"}, hot_old, t0, 0.20, 2e6, 4) == []
+    assert harvest_candidates(fund, {"A", "B"}, hot_old, t0, 0.20, 2e6, 4,
+                              class_ok=_all_crypto) == []
     # the E coin is hot and liquid but has no persisted streak -> excluded
     assert all(c != "E" for c, _f, _a in cands)
     # the D coin is the 8x trap: 9.6e-5 quoted IS 10.5% TRUE, below a 20% bar.
     # If a mutation drops the *H conversion, D's bare rate never clears any
     # sane bar either — so pin the OTHER direction: a bar in QUOTED units
     # would admit nothing at all.
-    assert harvest_candidates(fund, set(), hot_old, t0, 0.20 / H, 2e6, 9) != [], \
+    assert harvest_candidates(fund, set(), hot_old, t0, 0.20 / H, 2e6, 9,
+                              class_ok=_all_crypto) != [], \
         "gate must compare TRUE apr, not the quoted per-period rate"
     # extreme's $10M floor excludes everything in this fixture
-    assert harvest_candidates(fund, set(), hot_old, t0, 0.20, 10e6, 4) == []
+    assert harvest_candidates(fund, set(), hot_old, t0, 0.20, 10e6, 4,
+                              class_ok=_all_crypto) == []
+
+    # 1b) [(lv)] THE INSTRUMENT-CLASS SCREEN. 🎸's harvest sleeves took the
+    # class 🌾 the parent screens out — all 8 real carry closes were WTI /
+    # SKHYNIXUSD / SPCX at a 0% win rate. The screen is ENTRY-ONLY and the
+    # gate must sit LAST, so a non-crypto name that is also cold still reads
+    # `cold` rather than masking the cheaper reason.
+    _no_b = lambda c: c != "B"                                 # noqa: E731
+    screened = harvest_candidates(fund, set(), hot_old, t0, 0.20, 2e6, 4,
+                                  class_ok=_no_b)
+    assert [c for c, _f, _a in screened] == ["A"], screened
+    # fail-OPEN, exercised on the REAL `_class_ok`: a class lookup that raises
+    # or a fleet_bus that never imported must ADMIT, never empty the book — an
+    # import regression must not silently shrink the universe (the parent's
+    # contract, and the load-bearing degrade).
+    global fleet_bus
+    _saved_bus, _saved_allow = fleet_bus, ALLOW_NONCRYPTO
+    try:
+        class _Boom:
+            @staticmethod
+            def is_crypto(_c):
+                raise RuntimeError("class service down")
+        fleet_bus = _Boom()
+        assert _class_ok("ANYTHING") is True, "a raising lookup must fail OPEN"
+        fleet_bus = None
+        assert _class_ok("ANYTHING") is True, "a missing fleet_bus must fail OPEN"
+        # and the screen must actually BITE when the bus answers honestly
+        class _Bus:
+            @staticmethod
+            def is_crypto(c):
+                return c == "A"
+        fleet_bus = _Bus()
+        assert _class_ok("A") is True and _class_ok("WTI") is False, \
+            "the screen must consume the venue's own class verdict"
+        # THE WIRING, not the function: called with NO class_ok, the gate and
+        # the census must still consult `_class_ok`. Injecting class_ok in
+        # every other assertion would leave the DEFAULT free to regress to
+        # "admit everything" with the suite still green — a substring/shape
+        # test is not a wiring test.
+        _dflt = harvest_candidates(fund, set(), hot_old, t0, 0.20, 2e6, 4)
+        assert [c for c, _f, _a in _dflt] == ["A"], \
+            f"default gate must screen by class, got {_dflt}"
+        _dcen = harvest_census(fund, set(), hot_old, t0, 0.20, 2e6)
+        assert _dcen["noncrypto"] == 1 and _dcen["eligible"] == 1, _dcen
+    finally:
+        fleet_bus = _saved_bus
 
     # 2) the census mirrors the gate and sums to scanned
-    cen = harvest_census(fund, set(), hot_old, t0, 0.20, 2e6)
+    cen = harvest_census(fund, set(), hot_old, t0, 0.20, 2e6,
+                         class_ok=_all_crypto)
     assert cen == {"scanned": 5, "held": 0, "cold": 1, "thin": 1,
-                   "waiting": 1, "eligible": 2}, cen
+                   "waiting": 1, "noncrypto": 0, "eligible": 2}, cen
     assert sum(v for k, v in cen.items() if k != "scanned") == cen["scanned"]
+    # the `noncrypto` bucket is the screen's LIVE BITE — it must move when the
+    # screen bites, and the buckets must still partition `scanned`.
+    cen_s = harvest_census(fund, set(), hot_old, t0, 0.20, 2e6, class_ok=_no_b)
+    assert cen_s["noncrypto"] == 1 and cen_s["eligible"] == 1, cen_s
+    assert sum(v for k, v in cen_s.items() if k != "scanned") == cen_s["scanned"]
 
     # 3) xsect: signs, k, refusal of a thin cross-section, zero-excluded
     aprs = {"P": 0.5, "Q": 0.4, "R": 0.3, "S": 0.2, "T": 0.1,
@@ -1013,15 +1150,28 @@ def _selftest():
                    mark=5.0)
     assert _open_position(positions, "xsect", "C", "long", 33.0, t0, -0.2,
                           mark=0.0) is None, "an unpriceable mark leg must refuse"
-    extra = build_extra(cen, positions, 1.23, 4.56, {}, t0)
+    cen_x = harvest_census(fund, set(), hot_old, t0, 0.20, EXTREME_MIN_VOL,
+                           class_ok=_all_crypto)
+    extra = build_extra(cen, positions, 1.23, 4.56, {}, t0, census_ext=cen_x)
     assert extra["caps"]["enter_apr"] == ENTER_APR
     assert extra["caps"]["frozen"] is True and extra["caps"]["freeze_until"]
     assert extra["scan"]["scanned"] == 5
     assert extra["sleeves"]["carry"]["open"] == 1
     assert extra["sleeves"]["extreme"]["open"] == 1
     assert extra["sleeves"]["xsect"]["open"] == 0
+    # [(lv)] the extreme sleeve must publish WHY it is empty at ITS OWN floor.
+    # Without this the payload cannot tell a quiet venue from a sleeve that is
+    # structurally unreachable — the 8-day blind spot this entry closes.
+    assert extra["sleeves"]["extreme"]["floor_usd"] == EXTREME_MIN_VOL
+    assert extra["sleeves"]["extreme"]["scan"]["eligible"] == 0, \
+        "the fixture has nothing over $10M — the sleeve must SAY so"
+    assert extra["sleeves"]["extreme"]["scan"]["thin"] >= 1, \
+        "the reason must be attributable to the floor, not silence"
+    assert "scan" not in extra["sleeves"]["carry"], \
+        "only the sleeve with its own floor carries its own census"
     st = store.json_safe(extra)
     assert st["sleeves"]["carry"]["cap"] == MAX_POSITIONS
+    assert st["sleeves"]["extreme"]["scan"]["scanned"] == 5
 
     # 10) the persistence blob restores through the ONE owner of the rule
     blob = build_state(positions, {"A": t0 - 60}, t0, t0, now=t0)
