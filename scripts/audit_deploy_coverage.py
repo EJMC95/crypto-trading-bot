@@ -122,6 +122,75 @@ def _read(p):
         return f.read()
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-13 (ls)] THE RUN-SCALAR BUDGET. GitHub evaluates a `run:` scalar
+# that contains ANY ${{ }} expression as ONE template with a hard
+# 21,000-character cap — one character over and the WHOLE workflow file fails
+# validation at push time: the run is recorded with the file PATH as its name,
+# ZERO jobs, no logs, and NOTHING deploys. Measured the day this shipped: the
+# (ls) birth merge added 15 comment lines to the decide step (20,541 →
+# 21,390) and main's deploy workflow was DEAD from a002b1f until the repair —
+# every push red, dashboard and organs frozen, invisibly to every other
+# guard because the failure produces no job to fail. The budget sits below
+# the cap so this audit reds while pushes still deploy, with runway left to
+# trim. Comments inside the scalar COUNT — prose provenance belongs in the
+# CHANGELOG, not in this one string GitHub measures.
+# ---------------------------------------------------------------------------
+RUN_SCALAR_CAP = 21000          # GitHub's hard limit (its own 422 names it)
+RUN_SCALAR_BUDGET = 20500       # fail here, with 500 chars of runway
+
+
+def run_scalar_lengths(src=None):
+    """[(line_no, length, has_expr), ...] for every `run:` scalar in the
+    deploy workflow — length measured as YAML delivers it (block content
+    DEDENTED to the block's own indentation), because that is the string
+    GitHub's expression parser measures. Indentation-based on purpose: this
+    audit deliberately has no yaml dependency, and the selftest pins the
+    extractor against a fixture with a known exact length."""
+    src = _read(WORKFLOW) if src is None else src
+    out = []
+    lines = src.splitlines(keepends=True)
+    i = 0
+    while i < len(lines):
+        m = re.match(r"^(\s*)(?:-\s+)?run:\s*([|>][+\-0-9]*\s*)?(.*)$",
+                     lines[i])
+        if not m:
+            i += 1
+            continue
+        indent, block, rest = m.group(1), m.group(2), m.group(3)
+        if not block:                              # single-line run
+            out.append((i + 1, len(rest), "${{" in rest))
+            i += 1
+            continue
+        body, j, base = [], i + 1, len(indent)
+        while j < len(lines):
+            ln = lines[j]
+            if ln.strip() == "":
+                body.append(ln)
+                j += 1
+                continue
+            if (len(ln) - len(ln.lstrip())) <= base:
+                break
+            body.append(ln)
+            j += 1
+        while body and not body[-1].strip():
+            body.pop()                     # clip mode: trailing blanks vanish
+        pad = min((len(x) - len(x.lstrip())
+                   for x in body if x.strip()), default=0)
+        text = "".join(x[pad:] if x.strip() else "\n" for x in body)
+        out.append((i + 1, len(text), "${{" in text))
+        i = j
+    return out
+
+
+def oversized_run_scalars(src=None, budget=RUN_SCALAR_BUDGET):
+    """(line_no, length) for every expression-bearing run scalar over the
+    budget. Scalars with no ${{ }} are exempt — GitHub only templates the
+    ones that interpolate, and only those hit the cap."""
+    return [(ln, n) for ln, n, has_expr in run_scalar_lengths(src)
+            if has_expr and n > budget]
+
+
 def _shell_vars(src):
     """Single-quoted shell assignments in the decide step, e.g.
     `_shared='a\\.py$|venues/'` — so a grep that INTERPOLATES one can still be
@@ -586,6 +655,22 @@ def main():
     # brand-new Dockerfile.* + service used to be invisible here: green audit,
     # zero deploy route — the (fz) shadow books' birth defect, waiting for the
     # next bot.
+    # [(ls)] the run-scalar budget, before any coverage question: a workflow
+    # whose file GitHub refuses to parse deploys NOTHING, whatever its rules
+    # say — and the failure mode (zero-job red run) is invisible to every
+    # per-file check below.
+    fat = oversized_run_scalars()
+    if fat:
+        for ln, n in fat:
+            print(f"audit_deploy_coverage: FAILED — the run: scalar at "
+                  f"{WORKFLOW}:{ln} is {n} chars with ${{{{ }}}} expressions "
+                  f"inside (budget {RUN_SCALAR_BUDGET}, GitHub's hard cap "
+                  f"{RUN_SCALAR_CAP}). Over the cap the whole workflow file "
+                  f"fails validation at push time — zero jobs, nothing "
+                  f"deploys (the (ls) incident: main dead at 21,390). TRIM "
+                  f"COMMENTS from the scalar — provenance prose belongs in "
+                  f"the CHANGELOG, not in the one string GitHub measures.")
+        return 1
     census_bad = dockerfile_census()
     if census_bad:
         print("UNROUTED IMAGE — these Dockerfiles are claimed by NO deploy "
@@ -790,10 +875,60 @@ def _marker_logic_selftest():
                             f"-> {got!r}, want {exp!r}")
 
 
+def _selftest_run_scalar_budget():
+    """[(ls)] The extractor is pinned on fixtures with EXACT known lengths —
+    dedent semantics included, because over-measuring indentation by ~10
+    chars/line would keep this guard permanently red on a healthy file (the
+    inverse cry-wolf). Mutation-verified at authoring time: dropping the
+    dedent, the has-expr filter, or the budget comparison each reddens this."""
+    fx = (
+        "jobs:\n"
+        "  j:\n"
+        "    steps:\n"
+        "      - name: short with expr\n"
+        "        run: |\n"
+        "          echo \"${{ github.event_name }}\"\n"
+        "          echo two\n"
+        "      - name: long no expr\n"
+        "        run: |\n"
+        "          " + "x" * 30000 + "\n"
+        "      - name: single line\n"
+        "        run: echo hi\n"
+    )
+    rows = run_scalar_lengths(fx)
+    assert len(rows) == 3, rows
+    # block 1: dedented content is exactly the two echo lines
+    ln1, n1, e1 = rows[0]
+    assert n1 == len('echo "${{ github.event_name }}"\n' + "echo two\n"), rows[0]
+    assert e1 is True
+    # block 2: 30000 x's + newline, NO expression -> never flagged
+    _ln2, n2, e2 = rows[1]
+    assert n2 == 30001 and e2 is False, rows[1]
+    # single-line run measured too
+    assert rows[2][1] == len("echo hi"), rows[2]
+    # the guard flags ONLY expression-bearing scalars over budget
+    assert oversized_run_scalars(fx) == [], \
+        "a 30k scalar with no expression must not flag — GitHub only " \
+        "templates the ones that interpolate"
+    fat = ("jobs:\n  j:\n    steps:\n      - run: |\n"
+           "          echo \"${{ x }}\"\n"
+           "          " + "y" * (RUN_SCALAR_BUDGET + 10) + "\n")
+    flagged = oversized_run_scalars(fat)
+    assert len(flagged) == 1 and flagged[0][1] > RUN_SCALAR_BUDGET, flagged
+    # and the REAL workflow is currently under budget with its expressions —
+    # asserted on the live file because this is the guard's whole job; if it
+    # reds here, TRIM THE SCALAR, do not touch the budget.
+    assert oversized_run_scalars() == [], (
+        "the deploy workflow's expression-bearing run scalar is over "
+        f"budget ({RUN_SCALAR_BUDGET}); GitHub hard-fails at {RUN_SCALAR_CAP}")
+    assert RUN_SCALAR_BUDGET < RUN_SCALAR_CAP
+
+
 def _selftest():
     """Drives the parser against SYNTHETIC fixtures, never against today's real
     violations — a test that asserts the current breakage still exists demands
     the defect remain (tests-must-not-fail-on-good-news)."""
+    _selftest_run_scalar_budget()
     fs = workflow_filters()
     assert "freqtrade-bots" in fs, fs.keys()
     assert "pnl-dashboard" in fs, fs.keys()

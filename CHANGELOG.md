@@ -59,6 +59,31 @@
   errors on an unresolvable service name and rule-before-service must
   never reach main. The verified-alive facts get their own line here when
   the row proves them — a green dispatch is not a running book.]**
+- **[Same session — THE BIRTH MERGE KILLED MAIN'S DEPLOY WORKFLOW, and the
+  mechanism is one no guard measured: GitHub's 21,000-char cap on an
+  expression-bearing `run:` scalar.** The (ls) prose deferral added 15
+  comment lines to the decide step (20,541 → **21,390** chars) and GitHub
+  refused to PARSE the whole workflow from a002b1f: the push run recorded
+  the file PATH as its name, ZERO jobs, no logs, `conclusion: failure` in
+  the same second — so NOTHING deployed (dashboard + organs frozen at
+  pre-birth code, which is also why the new row could not appear on
+  /pnl.json: the old dashboard filters unknown bases). Diagnosed by
+  dispatching the workflow against main and reading GitHub's own 422:
+  *"(Line: 185, Col: 14): Exceeded max expression length 21000"* — the
+  scalar is measured as ONE template because it interpolates `${{ }}`,
+  comments included (the (lr) 422 was this same scanner). **Repaired by
+  trimming the scalar** (the now-archaeological (lp) Garrett deferral prose
+  deleted, rule comments compressed: 21,037 → **19,960**, PyYAML-calibrated
+  byte-exact) **and the class is closed executably**:
+  `audit_deploy_coverage.run_scalar_lengths` — dedent-exact, no yaml
+  dependency, trailing-clip semantics pinned — fails the build at
+  `RUN_SCALAR_BUDGET` 20,500 so the audit reds while pushes still deploy,
+  with trimming runway before the 21,000 cliff. Three mutations verified
+  red (dedent dropped, expr-filter dropped, comparison inverted). Lesson,
+  engraved where the next birth will look: **provenance prose belongs in
+  the CHANGELOG, not inside the one string GitHub measures** — the (lp)
+  "write it as prose, not commented-out code" rule traded a parser trap
+  for a length trap, and only the length trap fails the whole file.]
 - **Two (lp)/(lr) birth gaps closed in passing, same mechanism as this
   birth's own registrations:** 🛢️ Garrett's row was publishing WITH a build
   stamp but was unmapped in `audit_code_currency.ROW_ENTRY` (the next
