@@ -1,3 +1,169 @@
+## 2026-08-13 (ly) — 🎸 BARNESY'S `extreme` SLEEVE RETIRED: the I17 call MADE rather than escalated a second time — one venue supports ONE harvest sleeve
+
+**Operator: *"fix the obvious problem"*.** `(lv)` measured this sleeve
+structurally starved, shipped the class screen and the census, and then left
+the sleeve itself dead while escalating its floor as a policy call. That was
+the obvious problem: a component that cannot ever fire, sitting inside a book
+being graded, with a follow-up date attached. I17 is explicit that this is a
+keep-or-retire decision and **not another tuning pass** — so it was measured to
+a decision instead.
+
+- **THE MEASUREMENT THAT DECIDED IT, and it corrects `(lv)` in one place.**
+  `(lv)` framed floor and ordering as alternatives and called the reorder
+  refused. Sharper: **they are not alternatives, and neither works alone.**
+  Lowering the floor is INERT at any value ≥ carry's, because the subset
+  relation still holds and carry still runs first; the reorder alone hands a
+  directional sleeve non-crypto names. Only floor+reorder together move
+  anything — and then, with the `(lv)` class screen on, over the full 30d tape:
+
+  | ext floor | entries/30d | days to 30 closes | carry entries |
+  |---|---|---|---|
+  | $10M (shipped) | **0** | never | 5 |
+  | $5M (the cage's own `lo`) | **0** | never | 5 |
+  | $3M + reorder | 1 | **903** | 4 |
+  | $2M + reorder | 5 | **181** | **0** |
+  | $1M + reorder | 7 | **129** | **0** |
+
+  **Undecidable at every reachable setting, and the two cheap ones take the
+  carry sleeve's supply to ZERO.** The cause is not a bad constant: at the 20%
+  TRUE bar this venue's entire crypto population is **KAITO / XMR / PAXG /
+  XRP**, so two harvest sleeves are bidding for the same three or four names.
+  **One venue, one harvest sleeve.** The $10M floor was inherited from 💸 the
+  Farmer, where it exists to guarantee REAL fills; here it gated a MODELLED
+  shadow leg against a supply that never existed.
+- **RETIRED, on the (if)/(jh)/(lo) pattern — ENTRY-ONLY.** A restored
+  pre-retirement position still exits by its normal rules; nothing is ever
+  stranded without an exit path. Reversible without a deploy via
+  `BARNES_EXTREME_RETIRED_OVERRIDE=run`.
+- **THE CENSUS KEEPS PUBLISHING, beside `retired: true`.** A retired component
+  that stopped reporting could never be un-retired ON EVIDENCE, which would
+  make the call permanent by accident — the one-way-latch shape. If venue
+  liquidity ever rises to meet the bar, `sleeves.extreme.scan.eligible` goes
+  positive and says so out loud.
+- **IT CHANGES NO TRADES TODAY — and that is the point, stated honestly.** The
+  sleeve has never opened a position, so there is no P&L effect and no
+  expectancy claim is being made. What it buys is that **the next session
+  cannot "fix" the ordering and silently starve the sleeve that works.** The
+  measured trap is a one-line change that looks like an improvement, so the
+  refusal and its table now live at the entry block, where someone about to
+  make it would read them.
+- **🎸 Barnesy is a TWO-sleeve book (carry + xsect) and its own description now
+  says so.** Corrected in place per I12 — the fleet table described a
+  three-sleeve book for 8 days while one sleeve was structurally incapable of
+  trading.
+- **A SLEEVE RETIREMENT IS NOT A ROW RETIREMENT, and the doctrine now says so.**
+  The row rule (`RETIRED_ROWS` + `LEGACY_BOTS`, both halves) would DELETE a
+  living book here, because the other two sleeves keep trading. The sleeve
+  equivalent is recorded in CLAUDE.md: gate entries only, publish `retired`,
+  keep the census alive, pin it with a test.
+- **PINNED + MUTATION-VERIFIED (I3).** `tests/autonomy/test_barnes_extreme_retired.py`
+  is AST-shaped, not substring-shaped, and carries the decision table in its
+  own header so a future reader meets the evidence at the guard. Six mutations,
+  all reddened: deleting the gate; inverting the override sense; gating the
+  CARRY sleeve by mistake; hardcoding the flag with no env override; dropping
+  the census from a retired sleeve; and not publishing `retired`. Two of the
+  test's own first-draft assertions were themselves wrong (it matched the
+  selftest's fixture call sites, and anchored its documentation window on the
+  sleeve tuple in `build_extra` rather than the entry site) — both were test
+  bugs, not findings, and are fixed with the reason recorded in the file.
+
+**What moved toward the gate:** still nothing in P&L terms, and this entry does
+not pretend otherwise. What moved is decidability: 🎸 went from a book silently
+ungradeable on two of three sleeves to a two-sleeve book whose remaining
+sleeves both trade, with the dead one's removal reversible on published
+evidence. Method + harnesses: `reports/expansion_research_log.md`.
+
+## 2026-08-13 (lx) — 🌾 CARRY WAS BEING SIZED 4x OFF 91 CLOSES TWO CONTAINERS WROTE: the allocation organ published the disclaimer and the consumer read straight past it
+
+- **FOUND BY THE WEEKLY VERDICT, in the payload rather than the code.**
+  `fleet-allocation` ranks 🌾 `perps-funding-carry-lshadow` at a claim of
+  **0.149%/trade → target $13,684**, which `fleet_bus.allocation_scale` clamps to
+  **4.0x on every new entry**. That claim is computed over **n=101 all-time, of
+  which 91 closes predate the book's own declared era boundary** — 31-Jul, and
+  the reason for that boundary is `golive-readiness`' own words: *"TWO WRITERS:
+  for 12 days two containers published this row and wrote this ledger — 7
+  same-pair overlapping holds, deepest 9.14h on HYPE"*. In-era the same book
+  reads **mean −0.155%, t=−4.48, n=10**. The organ was not hiding any of this:
+  it published **`claim_era: null`** in the same row. The consumer never read it.
+  - **I16** — rank on a lower bound of THIS BOOK'S record. A ledger the gate's
+    own `integrity` precondition calls two books' trades is not that record, and
+    `(hf)`/`(hp)` are the entries that established it.
+- **THE FIX IS AT THE CONSUMER, IN ONE DIRECTION, AND THAT IS THE WHOLE DESIGN.**
+  `allocation_scale` now refuses to scale a book **above the flat allocation**
+  unless its era claim is a positive number. Everything else is untouched:
+  - **The RANKING does not move, deliberately.** `(kc)` already measured the
+    obvious fix — era-scoping the ranked claim leaves **zero claimants on 15 of
+    15 historical days**, i.e. it turns the organ off, and its forward realised
+    return was byte-identical to flat. That measurement stands and is why the
+    ranked claim was left alone. What `(kc)` could not have weighed is the
+    consumer, because on 05-Aug there was none; `(jr)` added it four days later.
+    **A refusal that predates the thing it would now govern is worth re-reading,
+    not re-running** — the disclosure field `(kc)` shipped is exactly what made
+    this fix a three-line change.
+  - **It can only ever make a book SMALLER**, never larger, and never below the
+    25% probe floor (I17 — a book cannot earn evidence with no capital). The
+    floor still comes from the all-time claim, so a thin era cannot starve a book.
+  - **It reverses itself with no intervention** the moment the book's own era
+    sample reaches `MIN_N` with a positive bound.
+  - **Fail-CLOSED in the widening direction**, against the usual degrade-to-
+    permissive habit: absent key, `None`, NaN, a string, a bool — every unknown
+    declines. `build()` now publishes the era fields as **explicit None** rather
+    than omitting them, so "the organ has no opinion" and "this publisher is too
+    old to have the field" cannot be told apart *and do not need to be* — both
+    decline. `set_era_twin` is the single writer of those four field names.
+- **MEASURED EFFECT TODAY, and the expectancy price stated (I19).** Exactly one
+  book moves: 🌾 carry **4.0x → 1.0x**. ⚖️ Counterweight and 💸 the Farmer's
+  shadow arm are at **0.25x** and are untouched (the cap is expand-only). Real
+  money reads none of this — AST-pinned, unchanged. **The immediate realised
+  cost is $0**: carry holds nothing and its own census reads **0 eligible of 219
+  books scanned** (196 below the APR gate, 22 below the liquidity floor), so the
+  4x has been sizing nothing. The forward cost is that if the pre-era claim is
+  real we forgo 4x until n_era ≥ 20; the forward benefit is that we do not put
+  4x on a two-writer sample. **On the only evidence that describes the book as
+  it runs today — t=−4.48 — the measured direction favours the cap.**
+- **MUTATION-VERIFIED ×5, and the sixth was found by a test I wrote to fail.**
+  Red: the cap deleted; the unknown-era default flipped permissive; the cap
+  applied in BOTH directions (reddens the probe-floor test written for exactly
+  that); `build()` omitting the era fields instead of declaring them; `>` relaxed
+  to `>=` so a measured-zero era grants expansion. The sixth was not a mutation
+  at all — `test_junk_era_claims_decline_the_expansion` **failed on the first
+  run** because `float(ce)` happily coerces the string `"0.5"` and granted the
+  full 4.0x. The accessor now requires a real `int`/`float` and excludes `bool`
+  explicitly, since `isinstance(True, int)` is True and `True > 0.0` would have
+  read as evidence.
+- **A SEVENTH-TIME COLLISION THAT COST MORE THAN A LETTER — read this before the
+  next parallel session.** Written as `(lt)`, moved to `(lu)`, then `(lv)`, and
+  landing here as `(lx)`. A concurrent session was editing `CHANGELOG.md` in the
+  same worktree throughout, and the **letter was not the expensive part**: to
+  avoid committing that session's files I staged a synthetic blob built by
+  extracting "the entry whose header contains `(lv)`" from the working tree — and
+  between writing my entry and extracting it, the other session had replaced it
+  with **their** `(lv)`. **Commit `afed198` therefore carried their Barnesy entry
+  under my commit message, and mine never landed.** The code fix in that commit
+  is correct and is untouched by this. Two rules fall out, both of which the
+  convention implies and neither of which it says:
+  - **Extract by TITLE, never by letter** — the letter is the field that moves.
+    An anchor that another session can legally rewrite is not an anchor.
+  - **A synthetic-blob commit must be diffed against `origin/main` and READ
+    before it is pushed.** `git commit` reported a plausible stat line for a file
+    whose contents were somebody else's. `audit_changelog_letters` cannot catch
+    this: every letter was still unique and every citation still resolved — to
+    the WRONG entry. That is the failure the guard is blind to by construction,
+    and it is why the code citations here are repointed to `(lx)` in the same
+    commit as this entry rather than a follow-up.
+- **CORRECTED IN PLACE (I12), same pass**: `_era_twin`'s docstring said the era
+  claim ships *"as DISCLOSURE"*. It has a consumer now, and a docstring that
+  tells the next reader a field is inert is how an inert field gets deleted.
+- **AND THE REPORT THAT FOUND IT WAS CORRECTED AND RE-SENT.** The weekly verdict
+  emailed at 13:20 claimed *"no commits since 07-Aug"* and flagged 📊 Index
+  Rider's disappearance from `/pnl.json` as a suppression to investigate. Both
+  were artifacts of a `git fetch` taken at 12:19 while twelve commits landed
+  between 12:34 and 15:40: the row had been **retired by `(lo)` that afternoon**,
+  properly, in both halves. The report's third recommendation — rank allocation
+  on `claim_era` — was the one `(kc)` had already refused. **A stale checkout
+  turns a report into a set of confident wrong instructions**, and the fix is
+  cheap: re-fetch immediately before publishing conclusions, not only at the start.
+
 ## 2026-08-13 (lw) — THE VETO THAT HALTED THE REAL-MONEY BOOK WAS INVISIBLE FROM OUTSIDE: answering "is the Taker stopped?" needed `railway logs`, and a gate that stops gating looks exactly like one that is correctly quiet
 
 *(Letter note: written as `(lt)`, renumbered `(lt)`→`(lv)`→`(lw)` before any

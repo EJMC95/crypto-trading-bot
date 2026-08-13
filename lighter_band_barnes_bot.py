@@ -188,6 +188,14 @@ CARRY_BLEED_FRAC = 0.02         # close if net <= -2% of notional (parent's)
 # ---- extreme sleeve (💸 parent: lighter_funding_bot) ------------------------
 EXTREME_NOTIONAL = 40.0
 EXTREME_MIN_VOL = 10e6          # the Farmer's liquidity floor
+# [2026-08-13 (ly)] RETIRED — the I17 keep-or-retire call, made on measurement.
+# Never opened a position in its life; every reachable floor is undecidable
+# (903/181/129 days to 30 closes at $3M/$2M/$1M) and the cheap ones take the
+# carry sleeve's whole supply, because both harvest sleeves bid for the SAME
+# 3-4 crypto names at the 20% TRUE bar. Entry-only, so a restored position
+# still exits by its normal rules. See the entry block for the full table.
+EXTREME_RETIRED = os.environ.get(
+    "BARNES_EXTREME_RETIRED_OVERRIDE", "").strip().lower() not in ("run", "1", "on")
 # the Farmer's NON-NEGOTIABLE control for a directional funding book: a hard
 # price stop, 10% — the parent's own bar, well inside the 15% go-live
 # drawdown gate (test_stop_vs_gate reads this literal).
@@ -547,6 +555,11 @@ def build_extra(census, positions, open_pnl, realized, moved, now=None,
         if s == "extreme" and census_ext is not None:
             sleeves[s]["scan"] = census_ext
             sleeves[s]["floor_usd"] = EXTREME_MIN_VOL
+            # [(ly)] the retirement is PUBLISHED, not just coded: a reader of
+            # this row must not have to infer from `open: 0` whether the
+            # sleeve is dead, quiet, or switched off. The census keeps
+            # publishing beside it so the call stays falsifiable.
+            sleeves[s]["retired"] = EXTREME_RETIRED
     return {
         "mode": "dry-run",
         "venue": "lighter",
@@ -825,31 +838,45 @@ def main():
                         print(f"[{now_iso()}] OPEN carry:{c} {side} "
                               f"${CARRY_NOTIONAL:.0f} | {apr:+.1%} TRUE")
 
-            # ---- extreme sleeve entries ---------------------------------
-            # [2026-08-13 (lv)] MEASURED STRUCTURALLY STARVED, AND REORDERING
-            # THIS BLOCK IS *REFUSED* — do not "fix" it by moving it above the
-            # carry block. Its candidate set is a strict SUBSET of carry's
-            # (same ENTER_APR, same persistence clock, same |apr| ranking,
-            # only a 5x stricter volume floor), carry runs first off the
-            # shared `held_harvest`, and carry's cap exceeds the whole
-            # qualified supply — so over 8,611 scout snapshots (30d) this
-            # sleeve was offered something carry had not already claimed in
-            # ZERO of them, and carry never once reached its cap.
-            # Running extreme FIRST was measured: it yields 12 entries over 5
-            # coins — WTI, SKHYNIXUSD, MU, SPCX, SNDK — every one NON-CRYPTO.
-            # With the (lv) class screen applied the reorder yields exactly
-            # ZERO either way, because no crypto book has EVER cleared this
-            # sleeve's $10M floor while at the 20% apr bar: the highest 24h
-            # volume ever observed on a qualifying crypto book is $5.53M
-            # (KAITO). So the binding constraint is the FLOOR, not the order,
-            # and the reorder would only ever have fed a directional sleeve
-            # the instrument class this fleet has repeatedly measured losing.
-            # `barnes.extreme_min_vol` is the reachable lever (cage lo 5e6 —
-            # itself 90% of that observed maximum); moving it is an operator
-            # policy call, escalated, NOT taken here.
+            # ---- extreme sleeve entries — RETIRED 2026-08-13 (ly) --------
+            # THE I17 KEEP-OR-RETIRE CALL, MADE. `(lv)` measured this sleeve
+            # structurally starved (offered nothing carry had not claimed in
+            # 0 of 8,611 snapshots) and escalated the floor as a policy call.
+            # The follow-up measurement retires it instead, because EVERY
+            # reachable setting is undecidable and the cheap ones cannibalise
+            # the sleeve that works. With the (lv) class screen on, over the
+            # full 30d tape, extreme entries / days-to-30-closes:
+            #     $10M any order   0   never          (shipped)
+            #     $5M  any order   0   never          (the cage's own floor)
+            #     $3M  extreme-1st 1   903 days
+            #     $2M  extreme-1st 5   181 days  — and carry goes 5 -> 0
+            #     $1M  extreme-1st 7   129 days  — and carry goes 5 -> 0
+            # Lowering the floor ALONE is inert at any value >= carry's,
+            # because the subset relation holds and carry still runs first;
+            # only floor+reorder together move anything, and then the two
+            # harvest sleeves are bidding for the SAME 3-4 crypto names.
+            # This venue supports ONE harvest sleeve, not two: at the 20%
+            # TRUE bar the crypto population is KAITO/XMR/PAXG/XRP, and the
+            # highest 24h volume ever seen on a qualifying crypto book is
+            # $5.53M — below the floor this sleeve inherited from 💸 the
+            # Farmer, where it exists to guarantee REAL fills.
+            # So 🎸 Barnesy is a TWO-sleeve book (carry + xsect) and its own
+            # description now says so. This changes NO trades today (the
+            # sleeve has never opened one); what it buys is that the next
+            # session cannot "fix" the ordering and silently take carry's
+            # supply away. The census below KEEPS PUBLISHING so the decision
+            # stays falsifiable — if the venue's liquidity ever rises to meet
+            # the bar, `extreme.scan.eligible` goes positive and says so.
+            # Reversible without a deploy: BARNES_EXTREME_RETIRED_OVERRIDE=run
             n_ext = sum(1 for p in positions.values()
                         if p["sleeve"] == "extreme")
-            if n_ext < MAX_POSITIONS:
+            if EXTREME_RETIRED and n_ext:
+                # defensive only: entries are gated off, so a live position
+                # here means a restored pre-retirement state. Let it exit by
+                # its normal rules (retirement is ENTRY-only, the (if)/(jh)
+                # convention) — never strand a position with no exit path.
+                pass
+            if not EXTREME_RETIRED and n_ext < MAX_POSITIONS:
                 for c, f, apr in harvest_candidates(
                         fund, held_harvest, hot_since, t0, ENTER_APR,
                         EXTREME_MIN_VOL, MAX_POSITIONS - n_ext):
@@ -1167,6 +1194,13 @@ def _selftest():
         "the fixture has nothing over $10M — the sleeve must SAY so"
     assert extra["sleeves"]["extreme"]["scan"]["thin"] >= 1, \
         "the reason must be attributable to the floor, not silence"
+    # [(ly)] the retirement is a PUBLISHED fact, and the census survives it —
+    # a retired sleeve that stopped reporting could never be un-retired on
+    # evidence, which is the whole point of keeping the call falsifiable.
+    assert extra["sleeves"]["extreme"]["retired"] is True, \
+        "the extreme sleeve is retired (ly) and the row must say so"
+    assert extra["sleeves"]["extreme"]["scan"]["scanned"] == 5, \
+        "a retired sleeve MUST keep publishing its census"
     assert "scan" not in extra["sleeves"]["carry"], \
         "only the sleeve with its own floor carries its own census"
     st = store.json_safe(extra)
