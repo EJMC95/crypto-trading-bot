@@ -12,6 +12,28 @@ Recommended options are marked ★.
 
 ---
 
+## ⚡ WAITING ON YOU · The BOOKS wave-2 birth (PR #169) — merge, then one dispatch
+
+**(mb)–(me), 13-Aug:** 🧘 book-douglas, 📐 book-grimes, 🧙 book-schwager,
+🧮 book-hull — four measured shadow books, full green bar, birth state (no
+deploy rule is armed, so the merge cannot red any push). Two acts, in order:
+
+1. **Merge PR #169** (draft — mark ready + merge).
+2. **Dispatch the one-shot provisioner** (creates the four services + first
+   deploys; the workflow only registers once it is on main):
+
+```bash
+gh workflow run books-provision.yml
+```
+
+Then say "done" in any session — it verifies all four rows on /pnl.json by
+build stamp ((iw): a green dispatch is not a running book) and lands the
+ACTIVATION commit (decide rules + paths:, MANUAL→AUTO, provision workflow
+deleted per its DELETE-after-use header). Reading docs: the four
+`BOOK_*_2026-08-13.md`; evidence: `scripts/study_books_cohort_2026-08-13.py`.
+
+---
+
 ## ⚡ ~~WAITING ON YOU~~ · Avo Maria live slot swap — **EXECUTED 13-Aug ~19:13 AEST, verified by stamp readback (`e49ba8fa7ed2`); retirement + live-roster sweep shipped the same evening ((ma) addendum). Item closes at the next daily review.**
 
 **Your decision, built end-to-end and inert on main.** 🙏 Avo Maria
