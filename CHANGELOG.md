@@ -1,5 +1,17 @@
 ## 2026-08-13 (lt) — (lh) WAS A CHANGELOG ENTRY WITH NO CODE: four disablement mutations still green, the four defects it "fixed" still live, and the docket still had no consumer
 
+> **[RENUMBERED, recorded inline per letter-convention rule 4.]** Written as
+> `(lj)` and moved to `(lt)` at push time: parallel sessions took `(lj)`
+> through `(ls)` on main while this branch was in flight, and main's `(lj)`
+> — the realised-veto era fix — is merged and cited **seven times in tracked
+> code**, including `lighter_ticket_taker.py`, the real-money book. Rule 3
+> says the CITED entry keeps the letter. This is the eighth recorded
+> instance of the collision the convention exists to manage, and the second
+> defect it caught in this one pass: the entry was also dated **7-Aug by
+> inference from `(li)`** rather than from git's clock, which rule 5 names
+> exactly. `git log` subjects for the first two commits here still read
+> `(lj)`; the header is the index.
+
 - **THE FINDING, and it is about this file rather than about the fleet.**
   `(lh)` reads as a completed pass — a behavioural test suite, four defects
   fixed, `docket_valid` published. **None of it was in the tree.** Measured at
@@ -116,12 +128,27 @@ is its first consumer, not its only intended one.
 ### WHICH BOOK MOVED (doctrine rule 4)
 
 **None directly, and the honest version is narrower than it looks.** What moved
-is that 📊 equities-regime and every other structurally-stuck book can now
-actually reach the operator with the right instruction attached: the docket was
-computed correctly and read by nobody, and one of its two zero-ledger reasons
-was asking for the wrong act. The forward metric is BOOKS THAT CAN BE GRADED,
-and a keep-or-retire call that never surfaces is a book that stays undecidable
-by default — I17's failure mode rather than its remedy.
+is that a structurally-stuck book can now reach the operator with the RIGHT
+instruction attached: the docket was computed correctly and read by nobody, and
+one of its two zero-ledger reasons was asking for the wrong act. The forward
+metric is BOOKS THAT CAN BE GRADED, and a keep-or-retire call that never
+surfaces is a book that stays undecidable by default — I17's failure mode
+rather than its remedy.
+
+**AND THE MOTIVATING EXAMPLE WAS DECIDED WITHOUT THE DOCKET, WHICH IS THE
+HONEST FOOTNOTE.** This entry was drafted naming 📊 equities-regime as the book
+the consumer would surface — the docket's own standing case, 0 closes ever.
+Rebasing onto main revealed `(ln)`/`(lo)` had **RETIRED it mid-pass**, so the
+example was stale before it shipped, and it is corrected here rather than left
+to read as a live claim (I12). Two things follow, and the second is the useful
+one. The I17 call got made — by the operator, on the evidence, exactly as the
+doctrine says — and **the docket contributed nothing to it**, because it had no
+reader. That is the cost of a signal with no consumer stated as a measurement
+instead of an argument. It also broke a test of mine that hardcoded the book's
+name: the roster correctly drops retired rows, so the fixture now uses a
+neutral name with a guard asserting it is not retired. **A test coupled to one
+book's membership fails for reasons that have nothing to do with what it
+checks.**
 
 ## 2026-08-13 (ls) — 🏦 RICH DAD IS BORN: Kiyosaki's book, read as a rule set — every lesson lands on a validated gate, and the one NEW rule can only tighten
 
@@ -631,7 +658,7 @@ by default — I17's failure mode rather than its remedy.
 **Three: 🏛️ pm-gillard, pm-rudd and pm-abbott — from structurally unable to open a position, back to decidable.** Between them they hold **454 of the cohort's 518 closes**, and all three had both directions gated on a rule that could not have concluded anything else. This does not make them winners: the cohort still reads −$8.70 with no book carrying an I16 claim, and the keep-or-retire call (I17) remains the operator's. What it restores is their ability to **produce evidence for that decision** — which is the fleet's declared forward metric, and which a latch releasable only by declaring the book dead had taken away.
 ## 2026-08-06 (lh) — MY "STRUCTURAL" AST TESTS DETECT DELETION, NOT DISABLEMENT: five mutations, all green, all restoring the exact bug the test was written for
 
-> **[CORRECTED IN PLACE 7-Aug by (lt), per I12 — READ THIS BEFORE THE ENTRY
+> **[CORRECTED IN PLACE 13-Aug by (lt), per I12 — READ THIS BEFORE THE ENTRY
 > BELOW.] THIS ENTRY'S DIAGNOSIS IS CORRECT AND ITS CODE NEVER LANDED.** Every
 > artifact described below was absent from the tree at `1ef3e1d`:
 > `tests/autonomy/test_docket_publish_behaviour.py` (no such file),

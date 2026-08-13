@@ -153,10 +153,32 @@ def run_publish(store, argv=("--publish", "--min-closes", "10")):
 
 
 # A book that is LIVING in bot_pnl and has ZERO ledger rows — the roster
-# zero-ledger path, i.e. 📊 equities-regime, the docket's motivating case.
+# zero-ledger path. 📊 equities-regime was this path's motivating case and is
+# RETIRED as of (ln)/(lo), which is why the fixtures below use a NEUTRAL name:
+# the first cut hardcoded `equities-regime-lshadow` and went red the moment a
+# parallel session retired it, because the grader correctly drops retired rows
+# from the roster. The claim under test is the MECHANISM — a living zero-ledger
+# book gets a clock — not any one book's membership, and a test that couples
+# them fails for a reason that has nothing to do with what it checks.
+FIXTURE_ZERO_LEDGER_BOOK = "zero-ledger-book-lshadow"
+
+
 def _living_pnl_row(bot, closed=0):
     return {"bot": bot, "closed_trades": closed, "status": "running",
             "updated_at": NOW, "equity": 1000.0}
+
+
+def test_the_fixture_book_is_not_retired():
+    """Names the failure above so it cannot recur silently: a retired fixture
+    name makes every roster test vacuously green if the assertions are ever
+    loosened, and confusingly red while they are strict."""
+    import sys as _s
+    _s.path.insert(0, str(ROOT))
+    from cleanup_legacy_bots import LEGACY_BOTS
+    assert FIXTURE_ZERO_LEDGER_BOOK not in set(LEGACY_BOTS), (
+        f"{FIXTURE_ZERO_LEDGER_BOOK} has been retired — the roster drops "
+        f"retired rows, so pick a fresh fixture name rather than relaxing "
+        f"the tests below")
 
 
 @pytest.fixture
@@ -164,7 +186,7 @@ def graded_and_zero_ledger():
     """One gradeable book + one living zero-ledger book."""
     trades = _closes("book-graded-lshadow", 40, 60.0, mean_pct=0.1)
     pnl = [_living_pnl_row("book-graded-lshadow", 40),
-           _living_pnl_row("equities-regime-lshadow", 0)]
+           _living_pnl_row("zero-ledger-book-lshadow", 0)]
     return trades, pnl
 
 
@@ -292,7 +314,7 @@ class TestTheRosterZeroLedgerBookReachesTheDocket:
         s = FakeStore(trades=trades, pnl_rows=pnl, prior_seen={})
         run_publish(s)
         seen = s.saved[G.DOCKET_SEEN_KEY]["seen"]
-        assert "equities-regime-lshadow" in seen, (
+        assert "zero-ledger-book-lshadow" in seen, (
             "the zero-ledger roster book fed no clock — this is the (ld) hole "
             "(lf) claimed to close: the docket's own motivating case invisible "
             "to the docket")
@@ -307,7 +329,7 @@ class TestTheRosterZeroLedgerBookReachesTheDocket:
         s = FakeStore(trades=trades, pnl_rows=pnl, prior_seen=seeded)
         run_publish(s)
         books = {d["book"] for d in s.saved[G.KEY]["decision_docket"]}
-        assert "equities-regime-lshadow" in books
+        assert "zero-ledger-book-lshadow" in books
 
 
 class TestTheZeroLedgerDiagnosesAreNotCollapsed:
