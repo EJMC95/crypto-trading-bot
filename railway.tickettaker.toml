@@ -1,22 +1,36 @@
-# Service-specific Railway config for the 🎫 Ticket Taker's OWN service ONLY
-# (lighter_ticket_taker.py; bot id lighter-ticket-taker -> -lshadow / -lighter).
-# Point that service's Config-as-code "Railway Config File" setting at this file
-# so it does NOT affect the other services deploying from this same repo.
-# Selecting the image here also removes the manual RAILWAY_DOCKERFILE_PATH step —
-# the step whose absence, on 17-Jul, left tide-rider-lighter-live still running
-# the TREND BOT while its kill switch was disarmed for the taker.
+# Service-specific Railway config for the LIVE SLOT service
+# `tide-rider-lighter-live` ONLY. Point that service's Config-as-code
+# "Railway Config File" setting at this file so it does NOT affect the other
+# services deploying from this same repo.
+#
+# [2026-08-13 SLOT SWAP — THIRD OCCUPANT] This file now builds 🙏 Avo Maria
+# LIVE (lighter_avo_live_bot.py, row freqtrade-avo-maria-lighter) — operator
+# decision, the 17-Jul Tide Rider → Ticket Taker pattern repeated: same
+# service, same keys, same sub-account, new routine. The 🎫 Ticket Taker it
+# replaces had self-halted (its only lens crossed its own realised veto bar,
+# n=27, −1.258%/trade, t=−1.80).
+#
+# THE FILENAME LIES AND THAT IS DELIBERATE, said here so nobody "fixes" it:
+# the Railway service setting names this exact path, and renaming the file
+# would require the UI step whose absence on 17-Jul left this same service
+# running the TREND BOT while its kill switch was disarmed for the taker.
+# The config-as-code path IS the swap mechanism; the filename is history.
+#
+# THIS REPOINT IS INERT UNTIL THE NEXT DEPLOY OF THIS SERVICE: it is not
+# git-connected — only a [deploy-live-taker] marker push or an explicit
+# workflow dispatch (`gh workflow run 305025607 -f
+# services="tide-rider-lighter-live"`) builds it. The running Taker container
+# is untouched by this file landing on main. Activation runbook:
+# CUTOVER_AVO_LIVE_2026-08-13.md.
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile.tickettaker"
-# Dockerfile.tickettaker bakes CMD ["/app/tickettaker_loop.sh"] (main() is one
-# cycle; the wrapper owns the 300s cadence), so no [deploy].startCommand here.
+dockerfilePath = "Dockerfile.avolive"
 
 [deploy]
-# Restart on any exit, no retry cap. The taker's exits — TP, stop, max-hold,
-# delist give-up, daily-loss flatten, kill-switch flatten — all run IN-PROCESS,
-# and a live perp has NO resting stop on Lighter's book. The running process IS
-# the position manager: keep it alive so it resumes managing real positions after
-# a crash. (Railway's default is ON_FAILURE with a retry cap — a crash-loop would
-# abandon a funded position.) The loop wrapper already absorbs a single bad
-# cycle, so a restart here means the wrapper itself died.
+# Restart on any exit, no retry cap. The book's exits — stop, ROI ladder,
+# exit signal, delist give-up, daily-loss flatten, kill-switch flatten — all
+# run IN-PROCESS, and a live perp has NO resting stop on Lighter's book. The
+# running process IS the position manager: keep it alive so it resumes
+# managing real positions after a crash. (Railway's default is ON_FAILURE
+# with a retry cap — a crash-loop would abandon a funded position.)
 restartPolicyType = "always"

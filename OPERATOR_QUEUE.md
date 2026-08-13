@@ -12,6 +12,31 @@ Recommended options are marked ★.
 
 ---
 
+## ⚡ WAITING ON YOU · Avo Maria live slot swap — two commands (13-Aug (ma))
+
+**Your decision, built end-to-end and inert on main.** 🙏 Avo Maria
+(SwingDip, imported from the family registry so the arms cannot drift) takes
+`tide-rider-lighter-live` — same service/keys/sub-account (~$62.80), clip =
+equity/4, rails sized to the balance. The self-halted live Taker keeps
+standing by until you run these. Full runbook + verification + rollback:
+`CUTOVER_AVO_LIVE_2026-08-13.md`. Evidence basis stated there honestly:
+shadow n≈10, +1.378%/trade, t=+1.68 — does NOT pass the gate; the go-live is
+your explicit act.
+
+```bash
+railway variables --service tide-rider-lighter-live --set "AVO_VENUE=lighter_live" --set "FREQTRADE_AVO_MARIA_MAX_NOTIONAL=63" --set "LIGHTER_MAX_DAILY_LOSS=6"
+```
+
+```bash
+gh workflow run 305025607 -f services="tide-rider-lighter-live"
+```
+
+Then say "done" in any session — it verifies by stamp readback and applies
+`CUTOVER_AVO_LIVE_2026-08-13.patch` (retires the Taker LIVE row so the fleet
+total does not double-count the sub-account; shadow arm untouched).
+
+---
+
 ## 0 · PENDING DEPLOYS — **NONE. Section closed 13-Aug by the daily review.**
 
 *Closed per this file's own maintenance rule ("an item leaves the day it is

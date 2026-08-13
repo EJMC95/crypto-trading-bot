@@ -155,6 +155,15 @@ on:
       - 'Dockerfile.tickettaker'
       - 'Dockerfile.fundinglighter'
       - 'requirements.txt'
+      # [2026-08-13 SLOT SWAP] 🙏 Avo Maria LIVE — the live slot service's
+      # THIRD occupant (operator decision; railway.tickettaker.toml now
+      # builds Dockerfile.avolive). Marker-gated like every live image:
+      # these paths make the job RUN; the [deploy-live-taker] marker still
+      # decides whether the live service deploys. lighter_family_bot.py
+      # (the imported strategy) is already on this list for the family
+      # shadow service.
+      - 'lighter_avo_live_bot.py'
+      - 'Dockerfile.avolive'
       # [2026-07-21] 🏛️ the Parliament (runs inside freqtrade-bots via
       # run_all.sh). Added the same day it shipped — the 17-Jul lesson: a
       # module COPY'd into the image but absent from THIS list merges green
@@ -455,7 +464,9 @@ jobs:
             # NOTHING (measured: 9476811's bot_pnl_store build-stamp — the
             # drift sensor's own feed — could not reach either live arm via
             # its marker).
-            taker_files='^(lighter_ticket_taker\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|tickettaker_loop\.sh$|Dockerfile\.tickettaker$|requirements\.txt$)'
+            # [13-Aug SLOT SWAP] avolive is the slot's image now (see the
+            # toml); taker files stay until cutover, then prune.
+            taker_files='^(lighter_avo_live_bot\.py$|lighter_family_bot\.py$|fleet_bus\.py$|regime_oracle\.py$|Dockerfile\.avolive$|lighter_ticket_taker\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|funding_basis\.py$|tickettaker_loop\.sh$|Dockerfile\.tickettaker$|requirements\.txt$)'
             # [2026-08-05 (jr) S1] + fleet_bus.py: now in the farmer image's
             # COPY set (shadow-arm allocation consumer; live arm never reads it)
             farmer_files='^(lighter_funding_bot\.py$|venues/|bot_pnl_store\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|funding_basis\.py$|Dockerfile\.fundinglighter$|requirements\.txt$)'

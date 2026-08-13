@@ -165,6 +165,11 @@ SELFTEST_MODULES = [
     "funding_basis",
     "funding_carry_bot",
     "implementation_shortfall",
+    # [2026-08-13 (ma)] 🙏 Avo Maria LIVE — registered the day it was born
+    # (the live Taker slot swap). Offline stub-venue harness: identity guard,
+    # balance-derived sizing, cap seniority, stop/ROI parity with the family
+    # instance, kill-switch flatten, seed guard, standby, published vetoes.
+    "lighter_avo_live_bot",
     # [2026-08-05] 🎸 Barnesy — registered the day it was born; its selftest
     # is offline (gates, exits, tags, freeze, publisher-built payload).
     "lighter_band_barnes_bot",

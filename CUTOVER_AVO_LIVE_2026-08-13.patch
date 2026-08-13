@@ -1,0 +1,38 @@
+Retire the 🎫 Ticket Taker's LIVE row after the Avo Maria slot cutover.
+Apply ONLY after step 3 of CUTOVER_AVO_LIVE_2026-08-13.md verifies (the new
+row publishing with the predicted build stamp) — applying early hides the
+still-running Taker's live row. Both halves per the standing rule: hiding a
+row is not retiring it. Ledgers are kept.
+
+--- a/pnl_dashboard.py
++++ b/pnl_dashboard.py
+@@ -171,6 +171,13 @@
+ RETIRED_ROWS = {"perps-donchian-breakout",
+                 "perps-donchian-breakout-lighter",
+                 "perps-donchian-breakout-lshadow",
++                # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — 🙏 Avo Maria
++                # took the slot (same service/keys/sub-account, the slot's
++                # THIRD occupant; operator decision). Same rule as the Tide
++                # Rider entry directly below: both rows would report the SAME
++                # ~$62.80 sub-account and the fleet total would double-count
++                # it. The Taker SHADOW row is untouched and keeps grading.
++                "lighter-ticket-taker-lighter",
+                 # [2026-07-17] 🌊 Tide Rider RETIRED from the live slot —
+                 # 🎫 Ticket Taker took it (operator: "taker was meant to replace
+                 # rider"), the same shape as the 11-Jul Trail Blazer -> Funding
+--- a/cleanup_legacy_bots.py
++++ b/cleanup_legacy_bots.py
+@@ -37,6 +37,13 @@
+     "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
+     "perps-donchian-breakout", "perps-donchian-breakout-lighter",
+     "perps-donchian-breakout-lshadow",
++    # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — pruned once
++    # freqtrade-avo-maria-lighter publishes from the same sub-account
++    # (CUTOVER_AVO_LIVE_2026-08-13.md step 4). Ledger (56 closes) kept, as
++    # always. Safe to prune permanently: tide-rider-lighter-live builds
++    # Dockerfile.avolive after the swap, so nothing re-upserts this id.
++    # The Taker SHADOW row is untouched.
++    "lighter-ticket-taker-lighter",
+     # [2026-07-17] 🌊 Tide Rider's LIVE row — 🎫 Ticket Taker took the slot on
+     # the SAME service/keys/sub-account (the 11-Jul Trail Blazer -> Funding
+     # Farmer shape). Both halves of a retirement, per the 16-Jul lesson that

@@ -1,0 +1,57 @@
+# Image for 🙏 Avo Maria LIVE (lighter_avo_live_bot.py; row
+# freqtrade-avo-maria-lighter) on the live slot service tide-rider-lighter-live.
+#
+# THE SLOT'S THIRD OCCUPANT (2026-08-13, operator decision — the 17-Jul
+# Tide Rider → Ticket Taker pattern, repeated): the live Ticket Taker's only
+# lens crossed its own realised veto bar (n=27, −1.258%/trade, t=−1.80) and
+# the book self-halted; the operator swapped the routine to the SwingDip
+# family book, sized to the actual balance. Same service, same keys, same
+# sub-account. railway.tickettaker.toml points the service's config-as-code
+# at THIS file — the toml keeps its filename because the Railway service
+# setting names that exact path (renaming it is a UI step; the 17-Jul
+# incident this mechanism closed was exactly a missed UI step).
+#
+# SAFETY — inert until the operator does all of this, each refusing LOUDLY:
+#   AVO_VENUE=lighter_live                    explicit; anything else REFUSES
+#                                             (identity guard — the shadow arm
+#                                             lives in family-lighter-shadow,
+#                                             a second shadow writer would
+#                                             pool the graded ledger)
+#   REAL_MONEY_KILL=DISARMED_I_UNDERSTAND     exact token or SafetyRails
+#                                             refuses (already on the service)
+#   FREQTRADE_AVO_MARIA_MAX_NOTIONAL          hard cap; boot REFUSES without it
+#   LIGHTER_API_PRIVATE_KEY / LIGHTER_ACCOUNT_INDEX / LIGHTER_API_KEY_INDEX
+#                                             (already on the service)
+#
+# Every COPY below is an import in the entry file's real graph — a missing
+# one is a boot crash-loop, not a silent degrade. Verified by
+# scripts/audit_image_imports.py (the born-dark guard):
+#   lighter_family_bot : the STRATEGY — the configured SwingDip instance,
+#                        indicators, regime gates, ledger tag format. The
+#                        live runner imports it so the two arms cannot drift.
+#   fleet_bus          : brain regime entry-gate + oracle verdict reads
+#                        (restrict-only, fail-open; lazy imports inside
+#                        lighter_family_bot)
+#   fleet_tuning       : live.clip_scale lever read (the board's live lane)
+#   funding_basis      : 8h-vs-hourly basis authority (ledger funding drag)
+#   venues/            : LighterClient (signer), SafetyRails, EquityGuard,
+#                        fills (measured-slip reads), marks, symbol_map
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+# paper_broker: venues/shadow.py imports it at module scope (ShadowBroker's
+# modelled book) — this live arm never constructs one, but the born-dark rule
+# is the IMPORT GRAPH, not the call graph.
+# regime_oracle: lighter_family_bot's noncrypto_regimes() imports it lazily
+# (the per-asset oracle read behind the fail-closed non-crypto entry gate).
+COPY lighter_avo_live_bot.py lighter_family_bot.py bot_pnl_store.py \
+     fleet_bus.py fleet_tuning.py funding_basis.py paper_broker.py \
+     regime_oracle.py ./
+COPY venues/ ./venues/
+ENV PYTHONUNBUFFERED=1
+# Daemon (family parity — warm CandleCache; a run-once process would re-fetch
+# ~39 books' 4h candles cold every cycle). Crash -> railway.tickettaker.toml
+# restartPolicyType=always restarts it; _supervised() marks the row ERROR on
+# the way down so the restart is visible, never a quiet stale row.
+CMD ["python", "-u", "lighter_avo_live_bot.py"]

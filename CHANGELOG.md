@@ -1,3 +1,90 @@
+## 2026-08-13 (ma) — 🙏 AVO MARIA TAKES THE LIVE SLOT: the operator's swap, built end-to-end — the strategy imported so it cannot drift, the sizing derived from the balance, and the one act that stays the operator's prepared as two commands
+
+**OPERATOR DECISION, verbatim basis:** *"Change ticket taker to Avo Maria bot
+and make live immediately, as we have done in the past - swap the bot routine.
+Adjust metrics and parameters to the equity balance."* The 17-Jul
+Tide Rider → Ticket Taker pattern, third occupant of `tide-rider-lighter-live`
+(same service, same keys, same ~$62.80 sub-account). Context: the live Taker's
+only lens crossed its own realised veto bar 11-Aug (n=27, −1.258%/trade,
+t=−1.80, per `(lw)`) and the book self-halted — the I17 shape on a real-money
+row; this is the operator's keep-or-retire answer for the slot.
+
+- **EVIDENCE BASIS, stated honestly (I19), because a go-live entry without its
+  number is exactly what this file exists to prevent:** Avo Maria's shadow
+  record at build time is **n≈10 closes, +1.378%/trade, t=+1.68, 3/6 go-live
+  bars** (closes/window/t binding), horizon `on_track`. **It does not pass the
+  (fk) gate.** Go-live has always been an explicit operator act — the gate
+  advises, the operator decides — and this entry records that the decision was
+  made against the gate's current reading, with the shadow twin continuing in
+  `family-lighter-shadow` as the control arm. The new row's own ledger grades
+  the decision; nothing is claimed that is not measured.
+- **WHAT SHIPPED (inert until the activation dispatch — the live service is
+  not git-connected):**
+  * **`lighter_avo_live_bot.py`** — a LIVE RUNNER, not a second strategy: the
+    configured SwingDip instance (tf=4h, stop −10%, ROI ladder, protections,
+    4 slots) is IMPORTED from `lighter_family_bot.STRATEGIES` and pinned **by
+    identity** in the selftest ((hj): a name check stays green against a
+    hand-rolled copy). Live plumbing at full fleet parity: AVO_VENUE identity
+    guard (`lighter_live` ONLY — a second shadow writer would pool the graded
+    ledger), `claim_writer` at cycle top + standby key, SafetyRails cap as a
+    hard boot gate with the kill switch reaching the IN-LOOP flatten (the
+    taker's `live_boot_gate` rule), EquityGuard-vetted equity, both daily-loss
+    rails confirm-debounced, `venues.fills` measured-slip telemetry on both
+    legs, seed-guarded state, `snapshot_equity` from day one, policy stamped
+    on every close ((jf) — the era is mechanical from birth), and every entry
+    gate PUBLISHED on the row from birth (`entry_vetoes` — the `(lw)` rule
+    applied at design time instead of after an incident).
+  * **SIZED TO THE BALANCE, which is the operator's ask made mechanical:**
+    clip = equity/max_open (~$15.70 at cutover), × the strategy's own
+    stake_mult × the board's `live.clip_scale` lever, capped by
+    `FREQTRADE_AVO_MARIA_MAX_NOTIONAL`; protections' drawdown denominator is
+    the LIVE baseline (20% of the shadow's $1,000 would never bind on $63);
+    the runbook sets `LIGHTER_MAX_DAILY_LOSS=6` (~10% of the book — the $30
+    default is 48% of it). Deliberately NOT read: brain stake-mults (no live
+    bot sizes off the brain), fleet_allocation (AST-pinned), any tuning lane
+    of its own (env-only, the Garrett/Kiyosaki single-policy-clock rule).
+    Restrict-only reads kept: fleet long-budget veto + symbol cap, the brain's
+    regime entry gate, the coin-quality veto — live-entry hygiene parity with
+    the Farmer and the Taker.
+  * **`Dockerfile.avolive`** + **`railway.tickettaker.toml` repointed** (the
+    swap mechanism — the toml FILENAME stays because the Railway service
+    setting names that exact path; its header says so, so nobody "fixes" it)
+    + deploy routes (paths + the `[deploy-live-taker]` marker grep carry the
+    new image's COPY set; taker files stay in the grep until cutover, then
+    prune). The born-dark guard caught `regime_oracle.py` missing from the
+    image on its first run — the lazy import inside `noncrypto_regimes()` —
+    and the deploy-coverage guard caught the decide scalar at 20,541 chars
+    against GitHub's cap (the `(ls)` incident class); both fixed pre-push.
+- **MUTATION-VERIFIED ×7, all RED** (I3, via the registered selftest — 11
+  offline stub-venue fixtures driving the real `main()` and reading what it
+  PUBLISHED and SENT, the (lh) rule): stop-loss disabled; notional cap
+  ignored; identity guard defaulted; kill switch dead; clip hardcoded instead
+  of balance-derived; the protections lock published as a constant None (the
+  disablement mutation); seed guard bypassed. The selftest also caught two of
+  its own defects en route — a fixture whose −12.4% day tripped the daily
+  rail before the stop it meant to test (the ordering working, not a bug),
+  and the first draft's helpers defined after their kill-path callers.
+- **THE ONE ACT THAT STAYS THE OPERATOR'S — two commands, prepared verbatim
+  in `CUTOVER_AVO_LIVE_2026-08-13.md`:** set the identity + balance-sized
+  rail vars, then dispatch the slot deploy. Arming real-money trading on a
+  new routine is not a session's act, permission notwithstanding — the same
+  boundary `(lm)` engraved. Verification is stamp readback (predicted id
+  computed from `build_compute` at verify time, per (fd)); **step 4** applies
+  `CUTOVER_AVO_LIVE_2026-08-13.patch` — the STAGED retirement of
+  `lighter-ticket-taker-lighter` (both halves), which must land promptly
+  after cutover or the fleet total double-counts the sub-account (the exact
+  17-Jul Tide Rider reason). The Taker's shadow arm keeps grading untouched.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**The live slot itself.** The Taker live row was structurally frozen (sole
+lens vetoed by its own record, horizon `unreachable`); on activation the slot
+runs a book whose shadow reads positive at n≈10 with a single-policy,
+policy-stamped era from birth — gradeable at ~13-Sep. That is a decidability
+trade the operator chose knowingly: an n≈10 book on real money is a bet, not
+a measured claim, and this entry says so plainly rather than dressing it as
+one.
+
 ## 2026-08-13 (lz) — THREE BOOKS ARE BIDDING FOR THREE COINS, AND NOTHING COULD SEE IT: the fleet could not ask whether two books hold the same position
 
 **Operator: *"fix all of the above"*.** The `(lv)`/`(ly)` Barnesy work exposed a
