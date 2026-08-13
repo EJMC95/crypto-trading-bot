@@ -99,15 +99,23 @@ judge is on `slope-gate-off` at 16/30 shadow closes with `min-vol-2e6`
 gh workflow run 305025607 -f services="trail-blazer-live"
 ```
 
-### 0c · 🎫 Ticket Taker — the (lj) realised-veto era fix rides the audit PR
+### 0c · 🎫 Ticket Taker — the (lj) realised-veto era fix ~~rides the audit PR~~ MERGED 13-Aug, verification pending
 
 **What it carries:** `(lj)` — the realised lens veto scoped to the policy the
 arm runs. On deploy the LIVE arm's veto FIRES on its own era record
 (short-divergence n=31, mean −1.128%, t=−1.75; trailing 8d −2.456%, t=−3.68,
 nine of ten closes `_sl`) and the book stops opening new entries until that
-record clears — idle beats a measured −2.5%/trade. **Merging the audit PR is
-the deploy decision**: the commit subject carries `[deploy-live-taker]`, so
-the marker gate fires when it lands on main. Verify by stamp readback below.
+record clears — idle beats a measured −2.5%/trade.
+
+**[13-Aug 12:35 AEST — EXECUTED under the operator's real-money grant
+("full permission to commit push and adjust real money bots also"): PR #155
+merged, squash `75ead10f`, `[deploy-live-taker]` in the title, Railway
+Redeploy ran on the push.** Also ships (lk): carry + sniper class screens on
+their shadow auto-deploy rules. **Verification OPEN until the stamps move**
+— first readback ~6 min post-merge still showed old builds on all four rows;
+re-check armed ~13:21 AEST. Expect: both Taker arms + carry + sniper rows at
+new builds via `audit_code_currency`, carry's `extra.scan` carrying the new
+`noncrypto` census bucket, and the live Taker opening nothing.]
 
 ### Verify either one landed — by stamp readback, never by the green run
 

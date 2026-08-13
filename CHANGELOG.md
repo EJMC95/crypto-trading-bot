@@ -1,3 +1,39 @@
+## 2026-08-13 (lm) — THE REAL-MONEY GRANT, ENGRAVED WITH ITS LIMITS — and what the data actually authorizes today, so the grant is not misread as a mandate
+
+- **Operator, 13-Aug (verbatim): *"We have so much data now on all bots, we
+  are now able to move this p n L positive - full permission to commit push
+  and adjust real money bots also."*** Engraved as the (hn) real-money row's
+  amendment (the (kd) pattern): a session may now EXECUTE a real-money
+  change — commit, push, deploy, set — instead of parking a prepared
+  command. WHAT qualifies is unchanged and gate-governed: measured number +
+  expectancy price (I19), go-live gate for new live books, judge sole-writer
+  on `live.funding.*`, cages, SafetyRails. The un-amendable core is restated
+  in the row: no discretionary order-direction, no overriding a gate the
+  fleet's own organs hold closed.
+- **Executed under the grant, same hour:** PR #155 marked ready, merged
+  (squash `75ead10f`, marker in the title) — the (lj) live-Taker veto fix,
+  the (lk) class screens and the (ll) docket updates are on main; Railway
+  Redeploy ran on the push. Verification is stamp-readback, armed ~03:21Z
+  (13:21 AEST): first payload check ~6 min post-merge still showed the old
+  builds on all four affected rows — a green run is not a landed container,
+  so 0c stays open until the stamps move.
+- **THE HONEST DATA STATEMENT, so "so much data" routes to the right acts.**
+  The fleet's own measurement organs, on the 13-Aug payload: `golive-
+  readiness.ready = []` (no book passes its bar in-era), `fleet_allocation`
+  shows ZERO books with a positive in-era claim (every row `undecided:
+  bound<=0`), the live Taker's era record fires its own veto, and the live
+  Farmer reads mean +0.079%/t=0.50 in-era with the horizon calling its t bar
+  ~23-Aug at trajectory. **The volume of data is large; the data's VERDICT
+  is that no real-money widening is supported today.** What the grant
+  therefore buys NOW: same-day execution of protective/correctness deploys
+  (done), and same-day execution of the PRE-REGISTERED positive moves the
+  moment their gates open — Farmer-live t bar ~23-Aug, carry's clean-era
+  read ~30-Aug (its era now uncontaminated by (lk)), the judge's
+  `min-vol-1e5` slot, Counterweight's ~28-Aug call. Dates, not vibes. A
+  clip raise or lens widening on today's evidence was considered and
+  REFUSED with the numbers above — a refusal with evidence satisfies the
+  growth rule; an unmeasured widening is the (hs) shape wearing the grant.
+
 ## 2026-08-13 (ll) — FLEET P&L AUDIT: the week's −$51 has three mechanisms, not one — a crystallization, a real-money veto hole, and an instrument-class leak in the best book
 
 - **THE WEEK, measured from the ledger (realised, paper feed): −$50.95 over
