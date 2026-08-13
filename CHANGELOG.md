@@ -1,3 +1,52 @@
+## 2026-08-13 (mf) — THE BOOKS TEACH THE FLEET: Hull's basis-noise finding replayed on the carry cohort's OWN cell — 🏦 Rich Dad takes the fix at zero clock cost, the protected clocks get it as decision-day evidence, and two lessons turn out to be already built
+
+**Operator, 13-Aug:** *"Also if there are things from these books we can add
+to our bots now implement also please :)"* Routed per the (hn) table:
+implement where measured and free, queue where clocks are protected, refuse
+with evidence where the lesson already exists.
+
+- **THE CARRY-CELL GRACE STUDY (the one new measurement, consumed same
+  hour).** 🧮 Hull's mid-band finding — basis noise is not a sell signal —
+  replayed on the ≥20% cell's OWN gate and coin population (KAITO/XMR/PAXG/
+  XRP + the cell's visitors, 250d of settled fundings, kiyosaki-form exits,
+  6 slots): flip grace **1h = +$27.25, t=1.95, h2 NEGATIVE, 192/231 exits
+  churning the 30bps RT on sign wobbles** → **6h = +$41.17, t=2.96, both
+  halves positive** → **24h = +$50.12, t=3.52** — monotone, robust ex-AVNT
+  (+$3.18 → +$13.35 → +$20.65), and the cohort's own ledger agrees in shape
+  ((gq): sided `*_flip`s −$17.32 vs `decay_paid` +$71.42). Reproduce:
+  `scripts/study_books_cohort_2026-08-13.py` (CARRY-CELL section, added).
+- **CONSUMED NOW — 🏦 Rich Dad `FLIP_GRACE_H` 1.0 → 6.0**, hours after its
+  birth at effectively zero clock cost (ledger ~empty; env-only book, the
+  (jg) default route). 6h chosen over the 24h optimum for decidability
+  (I17): the cell's supply is already the starved 6.6%-occupancy slot, and
+  6h keeps ~79% of the close cadence while doubling per-trade expectancy —
+  and it mirrors `PERSIST_H`: six hours of proof to buy, six to sell. Row
+  cell + reading doc corrected in place per I12.
+- **QUEUED, NOT APPLIED — the protected clocks.** 🌾 carry (DECIDED-WAIT to
+  ~30-Aug: changing the exit mid-window corrupts the exact sample the
+  decision reads) and 🎸 Barnesy (BIRTH-FROZEN to 4-Sep; its carry sleeve's
+  8 closes are ALL `flip` exits at 0% win, (lv)) each get the study appended
+  to their standing OPERATOR_QUEUE items — carry's for decision day,
+  Barnesy's bundled with the (lk) class screen so ONE unfreeze rev carries
+  both measured fixes.
+- **ALREADY BUILT, VERIFIED RATHER THAN REBUILT (I11 — finish the house,
+  don't re-enter it):** (1) Schwager/Douglas's "tight stops realise the
+  losses" was landed on the 🏛️ Parliament THIS MORNING as (lq) —
+  `PARAM_BOUNDS["sl_pct"]` hi 0.05→0.08 on the (gx) evidence; checked, not
+  duplicated. (2) Schwager's ride-winners trail for 🎫 the Taker ALREADY
+  EXISTS as the BULL dual-mode policy (`bull_exit` per lens, trail + no-TP,
+  `TT_BULL_MODE` off, its own operator workflow, the (dg)/(de) inertness
+  guards) — registering a second trail path through the tuner would be the
+  second-copy-of-a-rule class ((hj)); refused. (3) Hull's payback literacy
+  on the Farmer: closes by construction at its measured (js) friction
+  (~2.5bps RT ⇒ 44h payback at its 5% gate, inside its 72h hold); no gate
+  needed.
+- **A FINDING BY ACCIDENT, KEPT:** merging the carry-cell coins into the
+  study cache leaked thin names into Hull's sim universe and its rule
+  collapsed to +$0.05 — i.e. 🧮's $2M volume floor is LOAD-BEARING, not
+  decoration. The study now models the book's real universe and records the
+  collapse as evidence for the band.
+
 ## 2026-08-13 (me) — 🧮 THE PROFESSOR (book-hull) COMPLETES THE VOLUME TILING: Hull's cost-of-carry machinery on the one funding cell no living book enters — and the measurement that made the book possible was the one that killed its first draft
 
 **Operator, 13-Aug:** *"Build me 4 bots for each of these books ... Options,

@@ -69,6 +69,15 @@ CACHE = os.path.join(HERE, ".books_cohort_cache")
 FEE_SIDE = 0.0005
 UNIVERSE = ("BTC,ETH,SOL,HYPE,LIT,ZEC,PUMP,XRP,UNI,ETHFI,BNB,ENA,"
             "DOGE,NEAR,XMR,AVAX,LINK,TAO").split(",")
+# [2026-08-13 (mf)] the >=20%-cell coin population (the carry cohort's
+# supply: KAITO/XMR/PAXG/XRP per (ly), plus the cell's occasional visitors)
+# for the CARRY-CELL GRACE study — Hull's basis-noise finding replayed on
+# the carry books' own gate. Measured: grace 1h = +$26.88 t=1.91 (h2
+# NEGATIVE, 192/231 exits churning the RT); 6h = +$42.09 t=3.00 both
+# halves; 24h = +$50.87 t=3.56. Robust ex-AVNT (+$2.81 -> +$21.40).
+# Consumed: 🏦 Kiyosaki FLIP_GRACE_H 1.0 -> 6.0 the same day; 🌾 carry and
+# 🎸 Barnesy queued (protected clocks — OPERATOR_QUEUE).
+CARRY_CELL_COINS = "KAITO,XMR,PAXG,XRP,ZEC,LIT,EDEN,AVNT,TRUMP,ENA".split(",")
 
 
 def _get(url):
@@ -119,7 +128,7 @@ def fetch_tape():
         json.dump(out, open(os.path.join(CACHE, f"candles_{res}.json"), "w"))
     # settled fundings, paged backward (sign: direction long = +)
     out = {}
-    for sym in UNIVERSE:
+    for sym in sorted(set(UNIVERSE) | set(CARRY_CELL_COINS)):
         if sym not in ids:
             continue
         rows = {}
@@ -437,7 +446,12 @@ def main():
         summarize(f"GRIMES trailing-120d {name}", closed, dt4)
 
     # ---------------- HULL
-    series = {s: {t: v * 8760.0 for t, v in rows} for s, rows in fund.items()}
+    # LIQUID set only — the fundings cache also carries the (mf) carry-cell
+    # coins, and the bot's [2M,10M) volume band excludes them. Leaking them
+    # in was measured once by accident: the rule collapses to +$0.05 on the
+    # thin names — i.e. the volume floor is LOAD-BEARING, kept as a finding.
+    series = {s: {t: v * 8760.0 for t, v in fund[s]}
+              for s in UNIVERSE if s in fund}
     all_t = sorted({t for s in series.values() for t in s})
     fdays = (all_t[-1] - all_t[0]) / 86400
     CLIP, RT, HI, EXIT, HOLD, MARGIN, CAP = 80.0, 0.003, 0.20, 0.035, 504, 1.3, 4
@@ -499,6 +513,72 @@ def main():
               f"h1=${sum(c['pnl'] for c in cs[:half]):.2f} "
               f"h2=${sum(c['pnl'] for c in cs[half:]):.2f} "
               f"c/30d={n/fdays*30:.1f}")
+
+    # ---------------- CARRY-CELL GRACE ((mf)): Hull's finding on the
+    # carry cohort's own gate (>=20% TRUE, persist 6h, kiyosaki-form exits,
+    # 6 slots), over the cell's coin population. No historical volume floor
+    # is modelable — declared; the ex-AVNT split covers the thin-name risk.
+    cell = {s: {t: v * 8760.0 for t, v in fund[s]}
+            for s in CARRY_CELL_COINS if s in fund}
+    cell_t = sorted({t for s in cell.values() for t in s})
+    cdays = (cell_t[-1] - cell_t[0]) / 86400 if cell_t else 0
+
+    def carry_run(grace_h):
+        open_pos, closed = {}, []
+        for t in cell_t:
+            for sym in list(open_pos):
+                p = open_pos[sym]
+                apr = cell[sym].get(t)
+                if apr is None:
+                    continue
+                recv = apr * p["side"] < 0
+                hourly = abs(apr) / 8760.0 * CLIP
+                p["acc"] += hourly if recv else -hourly
+                p["pay"] = 0 if recv else p["pay"] + 1
+                p["held"] += 1
+                net = p["acc"] - RT * CLIP
+                why = None
+                if p["pay"] > grace_h:
+                    why = "flip"
+                elif abs(apr) < 0.01875 and net >= 0.03:
+                    why = "decay_paid"
+                elif p["held"] >= 336:
+                    why = "max_hold"
+                elif net <= -0.02 * CLIP:
+                    why = "bleed"
+                if why:
+                    closed.append(dict(sym=sym, pnl=net, t=t))
+                    del open_pos[sym]
+            if len(open_pos) < 6:
+                for sym in cell:
+                    if sym in open_pos or len(open_pos) >= 6:
+                        continue
+                    w = [cell[sym].get(t - 3600 * k) for k in range(6)]
+                    if any(x is None for x in w):
+                        continue
+                    if len({1 if x > 0 else -1 for x in w}) != 1:
+                        continue
+                    if not all(abs(x) >= 0.20 for x in w):
+                        continue
+                    open_pos[sym] = dict(side=-1 if w[0] > 0 else 1,
+                                         acc=0.0, held=0, pay=0)
+        return closed
+
+    for g in (1, 6, 24):
+        cc = carry_run(g)
+        if not cc:
+            print(f"CARRY-CELL grace={g}h: ZERO closes")
+            continue
+        pnls = [c["pnl"] for c in cc]
+        n = len(pnls)
+        cs = sorted(cc, key=lambda c: c["t"])
+        half = n // 2
+        ex_avnt = sum(c["pnl"] for c in cc if c["sym"] != "AVNT")
+        print(f"CARRY-CELL grace={g}h: n={n} tot=${sum(pnls):.2f} "
+              f"t={t_stat(pnls):.2f} "
+              f"h1=${sum(c['pnl'] for c in cs[:half]):.2f} "
+              f"h2=${sum(c['pnl'] for c in cs[half:]):.2f} "
+              f"ex-AVNT=${ex_avnt:.2f} c/30d={n/cdays*30:.1f}")
 
 
 if __name__ == "__main__":
