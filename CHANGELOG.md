@@ -1,3 +1,70 @@
+## 2026-08-13 (ls) — 🏦 RICH DAD IS BORN: Kiyosaki's book, read as a rule set — every lesson lands on a validated gate, and the one NEW rule can only tighten
+
+- **Operator, 13-Aug: *"Please read the book rich dad poor dad by Robert
+  kiyosaki and create a bot from it."*** The reading is
+  `BOOK_KIYOSAKI_RICH_DAD_2026-08-13.md`; the bot is
+  `lighter_book_kiyosaki_bot.py` → row `book-kiyosaki-lshadow`, service
+  `book-kiyosaki-shadow` ($1k shadow, zero keys, VENUE allowlist). First of
+  the BOOKS cohort (`book-<surname>`, named for the author — the
+  musician rule keeps governing incubator-earned rows, exactly as the
+  operator-commissioned Barnesy/Garrett carried their own themes).
+- **Why a funding book is the honest translation, not a vibe:** the book's
+  core is an accounting identity — an ASSET pays you for holding it, a
+  LIABILITY charges you — and funding is the only instrument on this venue
+  that pays you for holding. The fleet's own census agrees with the book
+  (funding +$72.89/297 with every measured claim; directional −$9.21/867
+  with none). So the lessons land on the VALIDATED carry cell rather than
+  inventing signals: assets-only = funding-receiving only; cash-flow-not-
+  capital-gains = delta-neutral modelled with NO price term (structural —
+  `position_pnl` cannot see a mark, selftest-pinned); pay-yourself-first =
+  the (gq) decay-paid discipline (the fleet's measured best exit, +$71.42);
+  fear/greed = hysteresis both ends (6h persistence entry, 1h liability
+  grace); know-your-numbers = the income statement published every loop
+  (income/expenses/banked + live assets/liabilities from the exit rule's
+  own flip clock, one owner). Crypto-only per (lk). Exits:
+  `decay_paid`/`liability_flip`/`max_hold`/`bleed_stop`/`delisted`, tagged
+  `<side>-cashflow_<exit>`, funding-form (gr) telemetry, no prices.
+- **The ONE new rule — PAYBACK VELOCITY ("it's not how much you make, it's
+  how much you keep"):** an entry must repay the declared 30bps round trip
+  within 120h at its entry rate. `payback_hours` is monotone-decreasing in
+  |apr|, so the gate is RESTRICT-ONLY by construction: effective bar
+  ~21.9% TRUE vs the validated 20% — it admits nothing the 21-Jul sweep
+  did not validate, it only declines some of it (I19: the tightening and
+  its arithmetic are stated in the doc, the header and the selftest, so
+  the effective bar cannot drift silently).
+- **Birth-complete in one commit (the Barnesy parity list):** claim_writer
+  at loop top + (ic) standby key, snapshot_equity from day one
+  (`MTM_REQUIRED`), TRUE-apr denomination via `funding_basis` throughout,
+  durable hot-streak clock ((iu) `restore_hot_since`) behind the checked
+  (jd) state read, census with `noncrypto` + `slow_payback` buckets,
+  registered in VARIANT_ONLY/LABELS/OVERTRADE_LIMIT/DESCRIPTIONS,
+  SELFTEST_MODULES, ROW_ENTRY, and the funding class in fleet_allocation +
+  study_exit_sweep + test_exit_telemetry. **Env-only config, no tuning
+  lane** (the Garrett (lp) choice): single-policy (hm) clock by
+  construction; levers are a day-31 decision. Clock from first publish —
+  gradeable ~12-Sep.
+- **Deploy is the (lr) two-step, prepared not skipped:** the service does
+  not exist, so the decide rule ships as PROSE (the (lp) form — the
+  coverage parser reads dead rules through comments), the image is
+  DECLARED in `MANUAL_IMAGES_OK` with the activation path written into the
+  entry, and `kiyosaki-provision.yml` (the verbatim (lr) pattern, DELETE
+  after use) waits on one dispatch. Queue §2 has the three steps.
+- **Two (lp)/(lr) birth gaps closed in passing, same mechanism as this
+  birth's own registrations:** 🛢️ Garrett's row was publishing WITH a build
+  stamp but was unmapped in `audit_code_currency.ROW_ENTRY` (the next
+  weekly currency run would have red on it) and absent from
+  `fleet_allocation.FUNDING_BOOKS` + `study_exit_sweep.FUNDING_BOOKS`
+  (classed DIRECTIONAL by the organ, sweepable as a price book — the exact
+  (kc) defect, caught while its ledger is still ~empty so the relabel
+  moves no claim). Both registered; the exit-telemetry registry test now
+  pins garrett + kiyosaki membership. Garrett's stale "deploy rule
+  COMMENTED" clause in the CLAUDE.md fleet table corrected in place per
+  I12.
+- NOT encoded, stated so no future session "finishes" it: OPM/leverage
+  ($1k no-top-ups is law), discretionary deal-making (the assistant
+  directs no trades), allocation-organ sizing at birth (a claimless book
+  gets a degenerate scale; day-31 candidate, noted in the doc).
+
 ## 2026-08-13 (lr) — GARRETT'S SERVICE, PROVISIONED FROM THE REPO'S OWN TOKEN: the last manual birth step becomes a dispatched workflow
 
 - **Operator, 13-Aug: *"Full permission for you to run the garret."*** The

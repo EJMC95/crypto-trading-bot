@@ -1,0 +1,28 @@
+# Image for 🏦 Rich Dad (book-kiyosaki-shadow) — the CASH-FLOW DOCTRINE BOOK,
+# shadow only. Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.kiyosaki
+#   VENUE=lighter_shadow
+# The bot REFUSES every other VENUE (loud SystemExit): it is a $1,000 paper
+# book trading Rich Dad Poor Dad's lessons as mechanical funding-carry rules
+# (delta-neutral modelled — the hedge leg does not exist) and holds ZERO keys.
+# Config is ENV-ONLY (no tuning lane), so its (hm) clock is single-policy by
+# construction.
+#
+# COPY set is the funding family's minus fleet_tuning: this bot reads NO
+# lever, so the module would be a dead file in the image. fleet_bus IS a
+# guarded import (the (lk) crypto class screen) and ships in the SAME commit
+# as the import — a guarded import with a missing COPY is the born-dark
+# failure this fleet has shipped three times.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_book_kiyosaki_bot.py bot_pnl_store.py paper_broker.py funding_basis.py fleet_bus.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_book_kiyosaki_bot.py"]

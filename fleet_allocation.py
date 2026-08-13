@@ -98,7 +98,17 @@ FUNDING_MARKERS = ("funding", "carry", "spread")
 # the same defect one layer over. Caught free: the book has ZERO closes today,
 # so relabelling it moves no claim and no target_usd. It would have silently
 # corrupted the by_class headline the moment Barnesy closed its first trade.
-FUNDING_BOOKS = ("band-barnes-lshadow",)
+FUNDING_BOOKS = ("band-barnes-lshadow",
+                 # [2026-08-13 (ls)] 🛢️ Garrett is the Farmer's file trading
+                 # a funding gate in a thin volume band — funding by signal,
+                 # invisible to the markers because "garrett" carries none.
+                 # Caught while its ledger is still empty, like (kc) caught
+                 # Barnesy: relabelling moves no claim today.
+                 "band-garrett-lshadow",
+                 # [2026-08-13 (ls)] 🏦 Rich Dad — funding carry by thesis
+                 # (delta-neutral modelled cash flow); "kiyosaki" likewise
+                 # carries no marker. Registered at birth, zero closes.
+                 "book-kiyosaki-lshadow")
 
 
 def _iso(ts=None):

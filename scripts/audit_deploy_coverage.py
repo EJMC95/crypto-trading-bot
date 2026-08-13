@@ -452,6 +452,15 @@ MANUAL_IMAGES_OK = {
         "rule removed 5-Aug so the operator can delete snap-back-shadow "
         "without a shared-file push resurrecting it (no route for an idler)."
     ),
+    "Dockerfile.kiyosaki": (
+        "🏦 Rich Dad (book-kiyosaki-shadow) — BORN 13-Aug (ls); the service "
+        "does not exist yet, so an active decide rule would red every push "
+        "at the resolver ((lr): rule-before-service is the failure mode). "
+        "The (lr) two-step applies: dispatch kiyosaki-provision.yml, verify "
+        "the row publishes with a build stamp, THEN activate the rule in "
+        "railway-redeploy.yml and MOVE this image to AUTO_IMAGES. This "
+        "entry is the deferral, written down; it is not a resting state."
+    ),
 }
 
 

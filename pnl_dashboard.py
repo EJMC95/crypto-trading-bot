@@ -294,7 +294,13 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # (lighter_funding_bot.py VARIANT, service
                 # band-garrett-shadow). Second of the musician cohort.
                 # Shadow-only; base never publishes.
-                "band-garrett"}
+                "band-garrett",
+                # [2026-08-13 (ls)] 🏦 Rich Dad — the cash-flow doctrine book
+                # (lighter_book_kiyosaki_bot.py, service book-kiyosaki-shadow;
+                # operator: "create a bot from rich dad poor dad"). First of
+                # the BOOKS cohort (book-<surname>, named for the author).
+                # Shadow-only; base never publishes.
+                "book-kiyosaki"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper"]
 
@@ -328,6 +334,8 @@ OVERTRADE_LIMIT = {
                                    # in one pass + two harvest sleeves
     "band-garrett":          40,   # 🛢️ Garrett — the Farmer's loop cadence
                                    # (same file), thin tier flips often
+    "book-kiyosaki":         20,   # 🏦 Rich Dad — 6 slots; a funding whipsaw
+                                   # day can flip-and-refill more than 15
 }
 OVERTRADE_DEFAULT = 15
 
@@ -388,6 +396,7 @@ LABELS = {
     "perps-funding-carry":         "🌾 Yield Harvester — funding carry",
     "band-barnes":                 "🎸 Barnesy — funding super-book",
     "band-garrett":                "🛢️ Garrett — thin-tier funding band",
+    "book-kiyosaki":               "🏦 Rich Dad — cash-flow doctrine book",
     "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
@@ -433,6 +442,7 @@ DESCRIPTIONS = {
     "perps-funding-lighter": "holds the side that RECEIVES funding, vol-vetoed, stop-guarded",
     "perps-funding-carry":  "funding-rate carry on HL data — the Funding Farmer's origin strategy",
     "band-barnes":          "three funding sleeves under one $1k roof — carry harvest (≥20% TRUE, decay-paid discipline, $80×4), funding-extreme directional (top |APR|, 10% stop, $40×4), x-sect L/S rank (K=5/side, $33 legs, 24h rebalance) · closes tagged per sleeve · config FROZEN 30d from birth ((hm))",
+    "book-kiyosaki":        "Rich Dad Poor Dad as rules — holds only funding-RECEIVING positions (assets), delta-neutral modelled so P&L is pure cash flow; sells a position the moment it persists as a liability; decay-closes only after income repays all costs (pay yourself first); entries must repay their round trip within the payback bar (financial literacy)",
     "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, rebalances daily · K=8, $20/leg [30-Jul: K 5→8, universe 30→60]",
     "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
     "lighter-perp-sniper":  "snipes debut-regime books: brand-new listings PLUS volume surges and any book under 21 daily candles [30-Jul — the listing diff alone was a one-loop trigger, hence n=1 in weeks]",
