@@ -1,44 +1,23 @@
 {
  "round": 24,
- "built_at": "2026-08-11T08:36:22+00:00",
+ "built_at": "2026-08-13T00:59:21+00:00",
  "games": [
   {
    "home": "Penrith Panthers",
    "away": "Sydney Roosters",
-   "info_confidence": "high",
-   "team_lists_confirmed": true,
+   "info_confidence": "provisional",
+   "team_lists_confirmed": false,
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 5.5,
-    "temp_c": 13.8,
+    "wind_kmh": 5.1,
+    "temp_c": 14.1,
     "forecast_hour": "2026-08-13T19:00"
    },
    "weather_try_mult": 1.0,
    "baseline_total": 46.6,
    "adjusted_total": 46.6,
-   "flags": [
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Penrith Panthers: Jaxen Edgar named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Sydney Roosters: James Tedesco named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Sydney Roosters: Sam Walker named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Sydney Roosters: Reece Robson named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    }
-   ]
+   "flags": []
   },
   {
    "home": "Manly-Warringah Sea Eagles",
@@ -47,9 +26,9 @@
    "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 1,
-    "wind_kmh": 8.9,
-    "temp_c": 14.9,
+    "precip_prob": 0,
+    "wind_kmh": 8.4,
+    "temp_c": 14.4,
     "forecast_hour": "2026-08-14T18:00"
    },
    "weather_try_mult": 1.0,
@@ -177,15 +156,15 @@
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.1,
-    "precip_prob": 77,
-    "wind_kmh": 13.5,
-    "temp_c": 15.9,
+    "precip_mm": 0.5,
+    "precip_prob": 83,
+    "wind_kmh": 18.8,
+    "temp_c": 16.2,
     "forecast_hour": "2026-08-16T14:00"
    },
-   "weather_try_mult": 0.968,
+   "weather_try_mult": 0.965,
    "baseline_total": 48.7,
-   "adjusted_total": 47.1,
+   "adjusted_total": 47.0,
    "flags": [
     {
      "severity": "warn",
@@ -200,7 +179,7 @@
     {
      "severity": "info",
      "kind": "weather",
-     "text": "77% rain / 0.1mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
+     "text": "83% rain / 0.5mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
     },
     {
      "severity": "info",
@@ -215,15 +194,15 @@
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.3,
-    "precip_prob": 65,
-    "wind_kmh": 15.9,
-    "temp_c": 14.1,
+    "precip_mm": 0.1,
+    "precip_prob": 43,
+    "wind_kmh": 17.1,
+    "temp_c": 15.6,
     "forecast_hour": "2026-08-16T16:00"
    },
-   "weather_try_mult": 0.973,
+   "weather_try_mult": 1.0,
    "baseline_total": 48.5,
-   "adjusted_total": 47.2,
+   "adjusted_total": 48.5,
    "flags": [
     {
      "severity": "warn",
@@ -242,8 +221,8 @@
     },
     {
      "severity": "info",
-     "kind": "weather",
-     "text": "65% rain / 0.3mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
+     "kind": "news",
+     "text": "Wests Tigers news: Wests Tigers v Warriors: Star duo sidelined; Nuuausala props up - NRL.com"
     },
     {
      "severity": "info",

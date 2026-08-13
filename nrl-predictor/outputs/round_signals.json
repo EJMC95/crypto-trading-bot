@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "round": 24,
- "scanned_at": "2026-08-11T08:35:18+00:00",
+ "scanned_at": "2026-08-13T00:58:19+00:00",
  "games": [
   {
    "home": "Penrith Panthers",
@@ -9,7 +9,7 @@
    "home_id": "PEN",
    "away_id": "SYD",
    "kickoff": "2026-08-13 19:50:00",
-   "team_lists_confirmed": true,
+   "team_lists_confirmed": false,
    "home_17": [
     {
      "number": 1,
@@ -167,15 +167,6 @@
    ],
    "away_17": [
     {
-     "number": 1,
-     "position": "Fullback",
-     "player": "James Tedesco",
-     "player_id": 19474,
-     "is_starter": true,
-     "is_spine": true,
-     "status": null
-    },
-    {
      "number": 2,
      "position": "Winger",
      "player": "Billy Smith",
@@ -323,8 +314,8 @@
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 5.5,
-    "temp_c": 13.8,
+    "wind_kmh": 5.1,
+    "temp_c": 14.1,
     "forecast_hour": "2026-08-13T19:00"
    },
    "news": [],
@@ -650,9 +641,9 @@
    ],
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 1,
-    "wind_kmh": 8.9,
-    "temp_c": 14.9,
+    "precip_prob": 0,
+    "wind_kmh": 8.4,
+    "temp_c": 14.4,
     "forecast_hour": "2026-08-14T18:00"
    },
    "news": [],
@@ -1995,6 +1986,15 @@
    "news": [],
    "news_home": [
     {
+     "headline": "NRL Team List: Vaimauga returns to face Broncos - Warriors",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMikwFBVV95cUxPSDIxcTJoczF2TDBLdFFRelNPQ2ViY0hLNk1Hdjh0U0xpWTM2RkFKUTltQ2tuRU5RSFV3RHcxOGJvT3g2Q2l0UWo0a3JreldqWEVCMDI4M2dtb2hmeGVRTktCVUctRVV2bjIxc1NENXU4OXB2M1RzZ2ZyOE45QnlZSHJneVlBb21wbDNNVzl1VWtieWc?oc=5",
+     "published": "Tue, 11 Aug 2026 06:00:12 GMT"
+    },
+    {
      "headline": "Cowboys v Broncos: Dearden ruled out; Billy's back - NRL.com",
      "flags": [
       "out"
@@ -2022,15 +2022,6 @@
      "players": [],
      "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxPRUFxMENPQ3NaOGpBc0g1aTIyV2RmejlIaTQwQnh1ajV5VnQ5UmxkcnlWdE0xZGJQYVBhX2ZJZ25sVGZjeVVBLW9yZWRJTGRLcWZSdzBURkNzM2Uxa2l4WEo3eEI1ZGt3blh5ZjV1aUZ4b3RtZUE0OW9mVEZHOG00TmhCR3hLLU5nYzFaeFRkMEE3dFhVdG5kUTV3?oc=5",
      "published": "Sat, 25 Jul 2026 07:00:00 GMT"
-    },
-    {
-     "headline": "Warriors v Wests Tigers: Metcalf returns; Madden in for Luai - NRL.com",
-     "flags": [
-      "return"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOMHdWWFpadXBraVkyWDJLYW93bGtLbDg0OGI2dXNyVS1yMzFNTGc2a1BTYVBoaGFmUW4yR3N1T2pSVV9WU2prX3N0QUlXUTQ1Y294RkhmdW9XdjRaWjNLSUV6dTUwb1ItMHByMS1sMGdibXpMUTg2SnNYX0FaTUlYNjdWbkJHQ1NVODdDd2tLUThUY0tQZ0YwaURmR29ieTdpRmNIWmRxUFBPQQ?oc=5",
-     "published": "Thu, 26 Mar 2026 07:00:00 GMT"
     }
    ]
   },
@@ -2352,10 +2343,10 @@
     }
    ],
    "weather": {
-    "precip_mm": 0.1,
-    "precip_prob": 77,
-    "wind_kmh": 13.5,
-    "temp_c": 15.9,
+    "precip_mm": 0.5,
+    "precip_prob": 83,
+    "wind_kmh": 18.8,
+    "temp_c": 16.2,
     "forecast_hour": "2026-08-16T14:00"
    },
    "news": [],
@@ -2370,17 +2361,7 @@
      "published": "Fri, 24 Jul 2026 07:00:00 GMT"
     }
    ],
-   "news_away": [
-    {
-     "headline": "Cowboys v Titans: Lloyd-Phillips to debut; Grey day for Gold Coast - NRL.com",
-     "flags": [
-      "debut"
-     ],
-     "players": [],
-     "link": "https://news.google.com/rss/articles/CBMiowFBVV95cUxOb2NYRk4yLV90b0ZiZGR2WC13VHVsNUh5MmdXTmFJeXdMUTRval9lYnpvc0djQmRYNDRlVldndlFzQUZXV0h2S2JGOG1OUXV3QjZLV25FdWtUNWUwUVpWd1FuczY5RThUY0ZqcUNjSzl6QnlxNkFOQ05LS3B1bjJNeE1qX1VqdmRrN2dtTGNYM180a0RmRlVfZVVQczJPS2RQUmF3?oc=5",
-     "published": "Sat, 25 Jul 2026 07:00:00 GMT"
-    }
-   ]
+   "news_away": []
   },
   {
    "home": "Wests Tigers",
@@ -2700,10 +2681,10 @@
     }
    ],
    "weather": {
-    "precip_mm": 0.3,
-    "precip_prob": 65,
-    "wind_kmh": 15.9,
-    "temp_c": 14.1,
+    "precip_mm": 0.1,
+    "precip_prob": 43,
+    "wind_kmh": 17.1,
+    "temp_c": 15.6,
     "forecast_hour": "2026-08-16T16:00"
    },
    "news": [],
@@ -2717,6 +2698,24 @@
      "players": [],
      "link": "https://news.google.com/rss/articles/CBMinwFBVV95cUxNUHo3NkRWRFNmaXhtSm96d25ackNsUFpjMjhRb21CMGJrWHJZczN3Q0xPSnJfQVpKQmxUTXNrMzlsWEM4ejI2QjRmZmJYWDE2aGM5V0JXeWw0UkdablZxOVIzeURJZWpsYWdHNENjRHlqVFM5U2RwX3AweXdDUU1ULWZCd2oxVjRRSi1Pei03VGJkdlg2UllGZEZVeWF2amM?oc=5",
      "published": "Tue, 11 Aug 2026 08:01:42 GMT"
+    },
+    {
+     "headline": "Wests Tigers v Warriors: Star duo sidelined; Nuuausala props up - NRL.com",
+     "flags": [
+      "out"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMipgFBVV95cUxNaFNJYmNxYS11QnlKWENLMk9JeTJjeUpZekoxMGQ4S1RjZ3hLRHRtSjVEUWdUSkhiaEdheWdzX2hZQ0ZLOWhoYjVuZGFoZ2tPcXNQcy1pcXF4UHhMNDEzM2VxTUZDMkJSWFptZTdmdDZmY0p1aE03LURzOTh1QlVUSHE3cUVDMFpITmU0ZktnQWhPTEx1bTRFTDVBRUg5SE1jMXJfZ3NR?oc=5",
+     "published": "Wed, 12 Aug 2026 04:01:22 GMT"
+    },
+    {
+     "headline": "Bulldogs v Wests TIgers: Kikau back on deck; Koroisau returns - NRL.com",
+     "flags": [
+      "return"
+     ],
+     "players": [],
+     "link": "https://news.google.com/rss/articles/CBMiowFBVV95cUxNRUNYR0c2OWlDUnVlREZ3ak5OVmhDVFlPTzJPaGwyRkk3WlYwanY5dVNmdUM3NXVFTy0zdVg0WEpibUJwMTRvNXk3MmFXZWdWZTFwSnBRQjVkZHk2YVI3c3VGOS01OUVVbzhYTlVkLXFVLXZTbTJnVXBQNzdMQkNzTWU0N2lzZjZDZWIwNzA0NUpveUUtWU1meUQySk9kUHZjUEEw?oc=5",
+     "published": "Sat, 18 Jul 2026 07:00:00 GMT"
     }
    ],
    "news_away": [

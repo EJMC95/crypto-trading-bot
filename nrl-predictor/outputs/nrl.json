@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-08-11T08:38:02+00:00",
+ "generated_at": "2026-08-13T01:00:38+00:00",
  "source": "nrl-predictor",
  "disclaimer": "Paper-track model output. Not betting advice.",
  "round": "Round 24",
@@ -13,7 +13,7 @@
    "p_home_elo": 0.6011,
    "p_home_poisson": 0.5999,
    "p_home_gbm": 0.6384,
-   "p_home_blend": 0.6488,
+   "p_home_blend": 0.6115,
    "exp_margin_home": 4.2,
    "exp_total_points": 46.6
   },
@@ -24,9 +24,9 @@
    "home": "Manly-Warringah Sea Eagles",
    "away": "Dolphins",
    "p_home_elo": 0.4837,
-   "p_home_poisson": 0.5265,
+   "p_home_poisson": 0.5288,
    "p_home_gbm": 0.6015,
-   "p_home_blend": 0.4843,
+   "p_home_blend": 0.4712,
    "exp_margin_home": 1.2,
    "exp_total_points": 48.3
   },
@@ -37,9 +37,9 @@
    "home": "Canterbury-Bankstown Bulldogs",
    "away": "South Sydney Rabbitohs",
    "p_home_elo": 0.6061,
-   "p_home_poisson": 0.4821,
+   "p_home_poisson": 0.4832,
    "p_home_gbm": 0.6401,
-   "p_home_blend": 0.5479,
+   "p_home_blend": 0.558,
    "exp_margin_home": -0.7,
    "exp_total_points": 45.9
   },
@@ -50,10 +50,10 @@
    "home": "Cronulla-Sutherland Sharks",
    "away": "Canberra Raiders",
    "p_home_elo": 0.7078,
-   "p_home_poisson": 0.5895,
-   "p_home_gbm": 0.7694,
-   "p_home_blend": 0.7168,
-   "exp_margin_home": 3.7,
+   "p_home_poisson": 0.5856,
+   "p_home_gbm": 0.7847,
+   "p_home_blend": 0.7049,
+   "exp_margin_home": 3.6,
    "exp_total_points": 47.0
   },
   {
@@ -65,7 +65,7 @@
    "p_home_elo": 0.4767,
    "p_home_poisson": 0.5016,
    "p_home_gbm": 0.4931,
-   "p_home_blend": 0.4385,
+   "p_home_blend": 0.4605,
    "exp_margin_home": 0.1,
    "exp_total_points": 49.3
   },
@@ -78,7 +78,7 @@
    "p_home_elo": 0.3988,
    "p_home_poisson": 0.4684,
    "p_home_gbm": 0.3852,
-   "p_home_blend": 0.3676,
+   "p_home_blend": 0.3661,
    "exp_margin_home": -1.2,
    "exp_total_points": 46.2
   },
@@ -91,7 +91,7 @@
    "p_home_elo": 0.7378,
    "p_home_poisson": 0.5578,
    "p_home_gbm": 0.7696,
-   "p_home_blend": 0.7261,
+   "p_home_blend": 0.7313,
    "exp_margin_home": 2.4,
    "exp_total_points": 48.7
   },
@@ -104,7 +104,7 @@
    "p_home_elo": 0.6232,
    "p_home_poisson": 0.5723,
    "p_home_gbm": 0.5522,
-   "p_home_blend": 0.624,
+   "p_home_blend": 0.6285,
    "exp_margin_home": 3.0,
    "exp_total_points": 48.5
   }
@@ -115,128 +115,128 @@
    "date": "2026-08-13 19:50:00",
    "home": "Penrith Panthers",
    "away": "Sydney Roosters",
-   "p_home_blend": 0.6488,
-   "market_p_home": 0.5413,
-   "edge_home": 0.1075,
+   "p_home_blend": 0.6115,
+   "market_p_home": 0.6188,
+   "edge_home": -0.0072,
    "books": 4,
-   "best_odds_home": 1.77,
-   "best_odds_away": 2.1,
-   "disp_home": 0.0114,
-   "disp_away": 0.0169,
-   "value_side": "Penrith Panthers",
-   "value_ev_pct": 14.8376
+   "best_odds_home": 1.55,
+   "best_odds_away": 2.55,
+   "disp_home": 0.0065,
+   "disp_away": 0.02,
+   "value_side": "Sydney Roosters",
+   "value_ev_pct": -0.9325
   },
   {
    "round": "Round 24",
    "date": "2026-08-14 18:00:00",
    "home": "Manly-Warringah Sea Eagles",
    "away": "Dolphins",
-   "p_home_blend": 0.4843,
-   "market_p_home": 0.2977,
-   "edge_home": 0.1866,
+   "p_home_blend": 0.4712,
+   "market_p_home": 0.2908,
+   "edge_home": 0.1804,
    "books": 4,
    "best_odds_home": 3.4,
    "best_odds_away": 1.36,
-   "disp_home": 0.0709,
-   "disp_away": 0.0112,
+   "disp_home": 0.0462,
+   "disp_away": 0.0226,
    "value_side": "Manly-Warringah Sea Eagles",
-   "value_ev_pct": 64.662
+   "value_ev_pct": 60.208
   },
   {
    "round": "Round 24",
    "date": "2026-08-14 20:00:00",
    "home": "Canterbury-Bankstown Bulldogs",
    "away": "South Sydney Rabbitohs",
-   "p_home_blend": 0.5479,
-   "market_p_home": 0.5867,
-   "edge_home": -0.0388,
+   "p_home_blend": 0.558,
+   "market_p_home": 0.5882,
+   "edge_home": -0.0302,
    "books": 4,
    "best_odds_home": 1.62,
    "best_odds_away": 2.38,
-   "disp_home": 0.0,
+   "disp_home": 0.0062,
    "disp_away": 0.0348,
    "value_side": "South Sydney Rabbitohs",
-   "value_ev_pct": 7.5998
+   "value_ev_pct": 5.196
   },
   {
    "round": "Round 24",
    "date": "2026-08-15 15:00:00",
    "home": "Cronulla-Sutherland Sharks",
    "away": "Canberra Raiders",
-   "p_home_blend": 0.7168,
-   "market_p_home": 0.7119,
-   "edge_home": 0.0049,
+   "p_home_blend": 0.7049,
+   "market_p_home": 0.7255,
+   "edge_home": -0.0206,
    "books": 4,
-   "best_odds_home": 1.34,
-   "best_odds_away": 3.35,
-   "disp_home": 0.0037,
-   "disp_away": 0.0152,
-   "value_side": "Cronulla-Sutherland Sharks",
-   "value_ev_pct": -3.9488
+   "best_odds_home": 1.32,
+   "best_odds_away": 3.5,
+   "disp_home": 0.0038,
+   "disp_away": 0.0072,
+   "value_side": "Canberra Raiders",
+   "value_ev_pct": 3.285
   },
   {
    "round": "Round 24",
    "date": "2026-08-15 17:30:00",
    "home": "Parramatta Eels",
    "away": "North Queensland Cowboys",
-   "p_home_blend": 0.4385,
-   "market_p_home": 0.3735,
-   "edge_home": 0.065,
+   "p_home_blend": 0.4605,
+   "market_p_home": 0.3828,
+   "edge_home": 0.0777,
    "books": 4,
-   "best_odds_home": 2.55,
-   "best_odds_away": 1.52,
-   "disp_home": 0.0,
-   "disp_away": 0.0066,
+   "best_odds_home": 2.6,
+   "best_odds_away": 1.55,
+   "disp_home": 0.0505,
+   "disp_away": 0.0098,
    "value_side": "Parramatta Eels",
-   "value_ev_pct": 11.8175
+   "value_ev_pct": 19.73
   },
   {
    "round": "Round 24",
    "date": "2026-08-15 19:35:00",
    "home": "Brisbane Broncos",
    "away": "New Zealand Warriors",
-   "p_home_blend": 0.3676,
-   "market_p_home": 0.3468,
-   "edge_home": 0.0208,
+   "p_home_blend": 0.3661,
+   "market_p_home": 0.3416,
+   "edge_home": 0.0245,
    "books": 4,
-   "best_odds_home": 2.75,
-   "best_odds_away": 1.46,
-   "disp_home": 0.0,
-   "disp_away": 0.0034,
+   "best_odds_home": 2.8,
+   "best_odds_away": 1.45,
+   "disp_home": 0.009,
+   "disp_away": 0.0069,
    "value_side": "Brisbane Broncos",
-   "value_ev_pct": 1.09
+   "value_ev_pct": 2.508
   },
   {
    "round": "Round 24",
    "date": "2026-08-16 14:00:00",
    "home": "Newcastle Knights",
    "away": "Gold Coast Titans",
-   "p_home_blend": 0.7261,
-   "market_p_home": 0.7659,
-   "edge_home": -0.0398,
+   "p_home_blend": 0.7313,
+   "market_p_home": 0.7759,
+   "edge_home": -0.0446,
    "books": 4,
-   "best_odds_home": 1.27,
+   "best_odds_home": 1.22,
    "best_odds_away": 4.25,
-   "disp_home": 0.0283,
-   "disp_away": 0.0494,
+   "disp_home": 0.0,
+   "disp_away": 0.0059,
    "value_side": "Gold Coast Titans",
-   "value_ev_pct": 16.4075
+   "value_ev_pct": 14.1975
   },
   {
    "round": "Round 24",
    "date": "2026-08-16 16:05:00",
    "home": "Wests Tigers",
    "away": "St George Illawarra Dragons",
-   "p_home_blend": 0.624,
-   "market_p_home": 0.5026,
-   "edge_home": 0.1214,
+   "p_home_blend": 0.6285,
+   "market_p_home": 0.5053,
+   "edge_home": 0.1232,
    "books": 4,
    "best_odds_home": 1.9,
-   "best_odds_away": 1.94,
-   "disp_home": 0.0,
-   "disp_away": 0.0104,
+   "best_odds_away": 1.95,
+   "disp_home": 0.0133,
+   "disp_away": 0.0183,
    "value_side": "Wests Tigers",
-   "value_ev_pct": 18.56
+   "value_ev_pct": 19.415
   }
  ],
  "props": [
@@ -245,11 +245,11 @@
    "team": "Penrith Panthers",
    "player": "Thomas Jenkins",
    "position": "W",
-   "exp_tries": 1.22,
-   "p_ats": 0.705,
-   "fair_price": 1.42,
-   "p_2plus": 0.345,
-   "fair_2plus": 2.9,
+   "exp_tries": 0.94,
+   "p_ats": 0.609,
+   "fair_price": 1.64,
+   "p_2plus": 0.242,
+   "fair_2plus": 4.1,
    "vs_opp": "4t/2g"
   },
   {
@@ -257,59 +257,59 @@
    "team": "Penrith Panthers",
    "player": "Brian To'o",
    "position": "W",
-   "exp_tries": 0.65,
-   "p_ats": 0.479,
-   "fair_price": 2.09,
-   "p_2plus": 0.139,
-   "fair_2plus": 7.2,
+   "exp_tries": 0.5,
+   "p_ats": 0.395,
+   "fair_price": 2.53,
+   "p_2plus": 0.091,
+   "fair_2plus": 11.0,
    "vs_opp": "8t/13g"
   },
   {
    "match": "Penrith Panthers v Sydney Roosters",
    "team": "Penrith Panthers",
-   "player": "Paul Alamoti",
+   "player": "Casey McLean",
    "position": "C",
-   "exp_tries": 0.55,
-   "p_ats": 0.424,
-   "fair_price": 2.36,
-   "p_2plus": 0.106,
-   "fair_2plus": 9.4,
-   "vs_opp": "3t/5g"
+   "exp_tries": 0.44,
+   "p_ats": 0.356,
+   "fair_price": 2.81,
+   "p_2plus": 0.072,
+   "fair_2plus": 13.8,
+   "vs_opp": "2t/3g"
   },
   {
    "match": "Penrith Panthers v Sydney Roosters",
    "team": "Sydney Roosters",
-   "player": "Mark Nawaqanitawase",
+   "player": "Tommy Talau",
    "position": "W",
-   "exp_tries": 0.7,
-   "p_ats": 0.501,
-   "fair_price": 2.0,
-   "p_2plus": 0.154,
-   "fair_2plus": 6.5,
-   "vs_opp": "1t/3g"
+   "exp_tries": 0.58,
+   "p_ats": 0.441,
+   "fair_price": 2.27,
+   "p_2plus": 0.116,
+   "fair_2plus": 8.6,
+   "vs_opp": "6t/8g"
   },
   {
    "match": "Penrith Panthers v Sydney Roosters",
    "team": "Sydney Roosters",
-   "player": "Billy Smith",
+   "player": "Rex Bassingthwaighte",
    "position": "W",
-   "exp_tries": 0.57,
-   "p_ats": 0.433,
-   "fair_price": 2.31,
-   "p_2plus": 0.111,
-   "fair_2plus": 9.0,
+   "exp_tries": 0.52,
+   "p_ats": 0.407,
+   "fair_price": 2.46,
+   "p_2plus": 0.097,
+   "fair_2plus": 10.3,
    "vs_opp": "\u2014"
   },
   {
    "match": "Penrith Panthers v Sydney Roosters",
    "team": "Sydney Roosters",
-   "player": "Robert Toia",
-   "position": "C",
-   "exp_tries": 0.52,
-   "p_ats": 0.405,
-   "fair_price": 2.47,
-   "p_2plus": 0.096,
-   "fair_2plus": 10.4,
+   "player": "Junior Tupou",
+   "position": "B",
+   "exp_tries": 0.5,
+   "p_ats": 0.391,
+   "fair_price": 2.56,
+   "p_2plus": 0.089,
+   "fair_2plus": 11.2,
    "vs_opp": "2t/3g"
   },
   {
@@ -678,9 +678,9 @@
    "player": "Dominic Young",
    "position": "W",
    "exp_tries": 1.09,
-   "p_ats": 0.663,
+   "p_ats": 0.662,
    "fair_price": 1.51,
-   "p_2plus": 0.297,
+   "p_2plus": 0.296,
    "fair_2plus": 3.4,
    "vs_opp": "11t/6g"
   },
@@ -690,10 +690,10 @@
    "player": "Fletcher Sharpe",
    "position": "FE",
    "exp_tries": 0.75,
-   "p_ats": 0.529,
-   "fair_price": 1.89,
-   "p_2plus": 0.174,
-   "fair_2plus": 5.7,
+   "p_ats": 0.528,
+   "fair_price": 1.9,
+   "p_2plus": 0.173,
+   "fair_2plus": 5.8,
    "vs_opp": "6t/4g"
   },
   {
@@ -702,9 +702,9 @@
    "player": "Kalyn Ponga",
    "position": "FB",
    "exp_tries": 0.46,
-   "p_ats": 0.372,
-   "fair_price": 2.69,
-   "p_2plus": 0.08,
+   "p_ats": 0.371,
+   "fair_price": 2.7,
+   "p_2plus": 0.079,
    "fair_2plus": 12.6,
    "vs_opp": "8t/12g"
   },
@@ -714,9 +714,9 @@
    "player": "Phillip Sami",
    "position": "W",
    "exp_tries": 0.74,
-   "p_ats": 0.523,
-   "fair_price": 1.91,
-   "p_2plus": 0.17,
+   "p_ats": 0.522,
+   "fair_price": 1.92,
+   "p_2plus": 0.169,
    "fair_2plus": 5.9,
    "vs_opp": "8t/10g"
   },
@@ -725,10 +725,10 @@
    "team": "Gold Coast Titans",
    "player": "AJ Brimson",
    "position": "C",
-   "exp_tries": 0.65,
-   "p_ats": 0.476,
-   "fair_price": 2.1,
-   "p_2plus": 0.137,
+   "exp_tries": 0.64,
+   "p_ats": 0.475,
+   "fair_price": 2.11,
+   "p_2plus": 0.136,
    "fair_2plus": 7.3,
    "vs_opp": "8t/10g"
   },
@@ -738,10 +738,10 @@
    "player": "Dean Ieremia",
    "position": "W",
    "exp_tries": 0.48,
-   "p_ats": 0.379,
+   "p_ats": 0.378,
    "fair_price": 2.64,
    "p_2plus": 0.083,
-   "fair_2plus": 12.0,
+   "fair_2plus": 12.1,
    "vs_opp": "0t/1g"
   },
   {
@@ -749,11 +749,11 @@
    "team": "Wests Tigers",
    "player": "Junior Tupou",
    "position": "W",
-   "exp_tries": 0.89,
-   "p_ats": 0.589,
-   "fair_price": 1.7,
-   "p_2plus": 0.224,
-   "fair_2plus": 4.5,
+   "exp_tries": 0.91,
+   "p_ats": 0.599,
+   "fair_price": 1.67,
+   "p_2plus": 0.233,
+   "fair_2plus": 4.3,
    "vs_opp": "3t/3g"
   },
   {
@@ -761,11 +761,11 @@
    "team": "Wests Tigers",
    "player": "Sunia Turuva",
    "position": "W",
-   "exp_tries": 0.63,
-   "p_ats": 0.468,
-   "fair_price": 2.14,
-   "p_2plus": 0.132,
-   "fair_2plus": 7.6,
+   "exp_tries": 0.65,
+   "p_ats": 0.477,
+   "fair_price": 2.1,
+   "p_2plus": 0.138,
+   "fair_2plus": 7.2,
    "vs_opp": "2t/4g"
   },
   {
@@ -773,11 +773,11 @@
    "team": "Wests Tigers",
    "player": "Jahream Bula",
    "position": "FB",
-   "exp_tries": 0.47,
-   "p_ats": 0.375,
-   "fair_price": 2.66,
-   "p_2plus": 0.081,
-   "fair_2plus": 12.3,
+   "exp_tries": 0.48,
+   "p_ats": 0.384,
+   "fair_price": 2.61,
+   "p_2plus": 0.085,
+   "fair_2plus": 11.7,
    "vs_opp": "1t/5g"
   },
   {
@@ -785,11 +785,11 @@
    "team": "St George Illawarra Dragons",
    "player": "Valentine Holmes",
    "position": "C",
-   "exp_tries": 0.76,
-   "p_ats": 0.532,
-   "fair_price": 1.88,
-   "p_2plus": 0.177,
-   "fair_2plus": 5.7,
+   "exp_tries": 0.78,
+   "p_ats": 0.542,
+   "fair_price": 1.85,
+   "p_2plus": 0.184,
+   "fair_2plus": 5.4,
    "vs_opp": "13t/14g"
   },
   {
@@ -797,11 +797,11 @@
    "team": "St George Illawarra Dragons",
    "player": "Setu Tu",
    "position": "W",
-   "exp_tries": 0.55,
-   "p_ats": 0.422,
-   "fair_price": 2.37,
-   "p_2plus": 0.105,
-   "fair_2plus": 9.5,
+   "exp_tries": 0.56,
+   "p_ats": 0.431,
+   "fair_price": 2.32,
+   "p_2plus": 0.11,
+   "fair_2plus": 9.1,
    "vs_opp": "\u2014"
   },
   {
@@ -809,11 +809,11 @@
    "team": "St George Illawarra Dragons",
    "player": "Clinton Gutherson",
    "position": "FB",
-   "exp_tries": 0.48,
-   "p_ats": 0.379,
-   "fair_price": 2.64,
-   "p_2plus": 0.083,
-   "fair_2plus": 12.0,
+   "exp_tries": 0.49,
+   "p_ats": 0.387,
+   "fair_price": 2.58,
+   "p_2plus": 0.087,
+   "fair_2plus": 11.5,
    "vs_opp": "10t/18g"
   }
  ],
@@ -879,40 +879,40 @@
    "correlation_lift": 4.872
   },
   {
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 ATS Brian To'o \u00d7 ATS Casey McLean \u00d7 total over 42.5 \u00d7 match tries over 9.5",
+   "n_legs": 6,
+   "tier": "longshot",
+   "legs": "['home_win', 'ats 34023', 'ats 28598', 'ats 48731', 'total over 42.5', 'tries_total over 9.5']",
+   "leg_probs": "[0.571, 0.6087, 0.3966, 0.3562, 0.5682, 0.3015]",
+   "p_joint": 0.0394,
+   "fair_price": 25.35,
+   "p_independent": 0.0084,
+   "correlation_lift": 4.688
+  },
+  {
    "match": "Newcastle Knights v Gold Coast Titans",
    "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 ATS Kalyn Ponga \u00d7 ATS Greg Marzhew \u00d7 total over 42.5 \u00d7 match tries over 9.5",
    "n_legs": 6,
    "tier": "longshot",
    "legs": "['home_win', 'ats 28635', 'ats 22966', 'ats 31083', 'total over 42.5', 'tries_total over 9.5']",
-   "leg_probs": "[0.5327, 0.6608, 0.3721, 0.3643, 0.5788, 0.3132]",
-   "p_joint": 0.0403,
-   "fair_price": 24.8,
-   "p_independent": 0.0087,
-   "correlation_lift": 4.661
+   "leg_probs": "[0.5331, 0.6603, 0.372, 0.3629, 0.5765, 0.3116]",
+   "p_joint": 0.04,
+   "fair_price": 25.01,
+   "p_independent": 0.0085,
+   "correlation_lift": 4.683
   },
   {
    "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 ATS Sunia Turuva \u00d7 ATS Jahream Bula \u00d7 total over 42.5 \u00d7 match tries over 9.5",
+   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 ATS Sunia Turuva \u00d7 ATS Jahream Bula \u00d7 total over 44.5 \u00d7 match tries over 9.5",
    "n_legs": 6,
    "tier": "longshot",
-   "legs": "['home_win', 'ats 32836', 'ats 33587', 'ats 37248', 'total over 42.5', 'tries_total over 9.5']",
-   "leg_probs": "[0.5476, 0.5908, 0.4672, 0.372, 0.5803, 0.3136]",
-   "p_joint": 0.0468,
-   "fair_price": 21.37,
-   "p_independent": 0.0102,
-   "correlation_lift": 4.573
-  },
-  {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 ATS Brian To'o \u00d7 ATS Paul Alamoti \u00d7 total over 42.5 \u00d7 match tries over 9.5",
-   "n_legs": 6,
-   "tier": "longshot",
-   "legs": "['home_win', 'ats 34023', 'ats 28598', 'ats 35607', 'total over 42.5', 'tries_total over 9.5']",
-   "leg_probs": "[0.5687, 0.7043, 0.4753, 0.4261, 0.5673, 0.3027]",
-   "p_joint": 0.0629,
-   "fair_price": 15.89,
-   "p_independent": 0.0139,
-   "correlation_lift": 4.517
+   "legs": "['home_win', 'ats 32836', 'ats 33587', 'ats 37248', 'total over 44.5', 'tries_total over 9.5']",
+   "leg_probs": "[0.548, 0.6021, 0.4785, 0.3818, 0.5638, 0.3442]",
+   "p_joint": 0.0532,
+   "fair_price": 18.8,
+   "p_independent": 0.0117,
+   "correlation_lift": 4.545
   },
   {
    "match": "Parramatta Eels v North Queensland Cowboys",
@@ -980,23 +980,35 @@
    "n_legs": 4,
    "tier": "longshot",
    "legs": "['home_win', 'tries2+ 28635', 'ats 22966', 'total over 50.5']",
-   "leg_probs": "[0.5327, 0.2924, 0.3721, 0.3903]",
-   "p_joint": 0.0586,
-   "fair_price": 17.07,
-   "p_independent": 0.0226,
-   "correlation_lift": 2.59
+   "leg_probs": "[0.5331, 0.2903, 0.372, 0.3882]",
+   "p_joint": 0.0579,
+   "fair_price": 17.28,
+   "p_independent": 0.0224,
+   "correlation_lift": 2.589
   },
   {
    "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers win \u00d7 Junior Tupou 2+ tries \u00d7 ATS Sunia Turuva \u00d7 total over 50.5",
+   "combo": "Wests Tigers win \u00d7 Junior Tupou 2+ tries \u00d7 ATS Sunia Turuva \u00d7 total over 52.5",
    "n_legs": 4,
    "tier": "longshot",
-   "legs": "['home_win', 'tries2+ 32836', 'ats 33587', 'total over 50.5']",
-   "leg_probs": "[0.5476, 0.2234, 0.4672, 0.3903]",
-   "p_joint": 0.0575,
-   "fair_price": 17.39,
-   "p_independent": 0.0223,
-   "correlation_lift": 2.578
+   "legs": "['home_win', 'tries2+ 32836', 'ats 33587', 'total over 52.5']",
+   "leg_probs": "[0.548, 0.2322, 0.4785, 0.3751]",
+   "p_joint": 0.0587,
+   "fair_price": 17.05,
+   "p_independent": 0.0228,
+   "correlation_lift": 2.569
+  },
+  {
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers win \u00d7 Thomas Jenkins 2+ tries \u00d7 ATS Brian To'o \u00d7 total over 50.5",
+   "n_legs": 4,
+   "tier": "longshot",
+   "legs": "['home_win', 'tries2+ 34023', 'ats 28598', 'total over 50.5']",
+   "leg_probs": "[0.571, 0.2422, 0.3966, 0.3776]",
+   "p_joint": 0.0518,
+   "fair_price": 19.29,
+   "p_independent": 0.0207,
+   "correlation_lift": 2.502
   },
   {
    "match": "Parramatta Eels v North Queensland Cowboys",
@@ -1009,18 +1021,6 @@
    "fair_price": 19.59,
    "p_independent": 0.0206,
    "correlation_lift": 2.483
-  },
-  {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers win \u00d7 Thomas Jenkins 2+ tries \u00d7 ATS Brian To'o \u00d7 total over 50.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['home_win', 'tries2+ 34023', 'ats 28598', 'total over 50.5']",
-   "leg_probs": "[0.5687, 0.3412, 0.4753, 0.3796]",
-   "p_joint": 0.0829,
-   "fair_price": 12.06,
-   "p_independent": 0.035,
-   "correlation_lift": 2.368
   },
   {
    "match": "Canterbury-Bankstown Bulldogs v South Sydney Rabbitohs",
@@ -1071,40 +1071,40 @@
    "correlation_lift": 2.197
   },
   {
-   "match": "Newcastle Knights v Gold Coast Titans",
-   "combo": "Newcastle Knights by 13+ \u00d7 ATS Dominic Young \u00d7 ATS Kalyn Ponga \u00d7 total over 42.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['margin_band NEW 13 60', 'ats 28635', 'ats 22966', 'total over 42.5']",
-   "leg_probs": "[0.2523, 0.6608, 0.3721, 0.5788]",
-   "p_joint": 0.0785,
-   "fair_price": 12.75,
-   "p_independent": 0.0359,
-   "correlation_lift": 2.185
-  },
-  {
-   "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers by 13+ \u00d7 ATS Junior Tupou \u00d7 ATS Sunia Turuva \u00d7 total over 42.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['margin_band WST 13 60', 'ats 32836', 'ats 33587', 'total over 42.5']",
-   "leg_probs": "[0.2627, 0.5908, 0.4672, 0.5803]",
-   "p_joint": 0.0901,
-   "fair_price": 11.09,
-   "p_independent": 0.0421,
-   "correlation_lift": 2.142
-  },
-  {
    "match": "Penrith Panthers v Sydney Roosters",
    "combo": "Penrith Panthers by 13+ \u00d7 ATS Thomas Jenkins \u00d7 ATS Brian To'o \u00d7 total over 42.5",
    "n_legs": 4,
    "tier": "big",
    "legs": "['margin_band PEN 13 60', 'ats 34023', 'ats 28598', 'total over 42.5']",
-   "leg_probs": "[0.2827, 0.7043, 0.4753, 0.5673]",
-   "p_joint": 0.1101,
-   "fair_price": 9.09,
-   "p_independent": 0.0537,
-   "correlation_lift": 2.05
+   "leg_probs": "[0.2835, 0.6087, 0.3966, 0.5682]",
+   "p_joint": 0.085,
+   "fair_price": 11.76,
+   "p_independent": 0.0389,
+   "correlation_lift": 2.186
+  },
+  {
+   "match": "Newcastle Knights v Gold Coast Titans",
+   "combo": "Newcastle Knights by 13+ \u00d7 ATS Dominic Young \u00d7 ATS Kalyn Ponga \u00d7 total over 42.5",
+   "n_legs": 4,
+   "tier": "big",
+   "legs": "['margin_band NEW 13 60', 'ats 28635', 'ats 22966', 'total over 42.5']",
+   "leg_probs": "[0.2523, 0.6603, 0.372, 0.5765]",
+   "p_joint": 0.0781,
+   "fair_price": 12.8,
+   "p_independent": 0.0357,
+   "correlation_lift": 2.186
+  },
+  {
+   "match": "Wests Tigers v St George Illawarra Dragons",
+   "combo": "Wests Tigers by 13+ \u00d7 ATS Junior Tupou \u00d7 ATS Sunia Turuva \u00d7 total over 44.5",
+   "n_legs": 4,
+   "tier": "big",
+   "legs": "['margin_band WST 13 60', 'ats 32836', 'ats 33587', 'total over 44.5']",
+   "leg_probs": "[0.2673, 0.6021, 0.4785, 0.5638]",
+   "p_joint": 0.0937,
+   "fair_price": 10.67,
+   "p_independent": 0.0434,
+   "correlation_lift": 2.158
   },
   {
    "match": "Parramatta Eels v North Queensland Cowboys",
@@ -1160,11 +1160,11 @@
    "n_legs": 4,
    "tier": "big",
    "legs": "['home_win', 'ats 28635', 'ats 22966', 'total over 42.5']",
-   "leg_probs": "[0.5327, 0.6608, 0.3721, 0.5788]",
-   "p_joint": 0.1307,
-   "fair_price": 7.65,
-   "p_independent": 0.0758,
-   "correlation_lift": 1.724
+   "leg_probs": "[0.5331, 0.6603, 0.372, 0.5765]",
+   "p_joint": 0.1299,
+   "fair_price": 7.7,
+   "p_independent": 0.0755,
+   "correlation_lift": 1.72
   },
   {
    "match": "Brisbane Broncos v New Zealand Warriors",
@@ -1179,28 +1179,28 @@
    "correlation_lift": 1.714
   },
   {
-   "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 ATS Sunia Turuva \u00d7 total over 42.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['home_win', 'ats 32836', 'ats 33587', 'total over 42.5']",
-   "leg_probs": "[0.5476, 0.5908, 0.4672, 0.5803]",
-   "p_joint": 0.148,
-   "fair_price": 6.76,
-   "p_independent": 0.0877,
-   "correlation_lift": 1.687
-  },
-  {
    "match": "Penrith Panthers v Sydney Roosters",
    "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 ATS Brian To'o \u00d7 total over 42.5",
    "n_legs": 4,
-   "tier": "value",
+   "tier": "big",
    "legs": "['home_win', 'ats 34023', 'ats 28598', 'total over 42.5']",
-   "leg_probs": "[0.5687, 0.7043, 0.4753, 0.5673]",
-   "p_joint": 0.1752,
-   "fair_price": 5.71,
-   "p_independent": 0.108,
-   "correlation_lift": 1.622
+   "leg_probs": "[0.571, 0.6087, 0.3966, 0.5682]",
+   "p_joint": 0.1339,
+   "fair_price": 7.47,
+   "p_independent": 0.0783,
+   "correlation_lift": 1.709
+  },
+  {
+   "match": "Wests Tigers v St George Illawarra Dragons",
+   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 ATS Sunia Turuva \u00d7 total over 44.5",
+   "n_legs": 4,
+   "tier": "big",
+   "legs": "['home_win', 'ats 32836', 'ats 33587', 'total over 44.5']",
+   "leg_probs": "[0.548, 0.6021, 0.4785, 0.5638]",
+   "p_joint": 0.1515,
+   "fair_price": 6.6,
+   "p_independent": 0.089,
+   "correlation_lift": 1.702
   },
   {
    "match": "Parramatta Eels v North Queensland Cowboys",
@@ -1347,6 +1347,18 @@
    "correlation_lift": 1.385
   },
   {
+   "match": "Wests Tigers v St George Illawarra Dragons",
+   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 total over 52.5",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['home_win', 'ats 32836', 'total over 52.5']",
+   "leg_probs": "[0.548, 0.6021, 0.3751]",
+   "p_joint": 0.171,
+   "fair_price": 5.85,
+   "p_independent": 0.1238,
+   "correlation_lift": 1.382
+  },
+  {
    "match": "Manly-Warringah Sea Eagles v Dolphins",
    "combo": "Manly-Warringah Sea Eagles win \u00d7 ATS Lehi Hopoate \u00d7 ATS Toluta'u Koula",
    "n_legs": 3,
@@ -1357,18 +1369,6 @@
    "fair_price": 5.75,
    "p_independent": 0.1259,
    "correlation_lift": 1.382
-  },
-  {
-   "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 total over 50.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 32836', 'total over 50.5']",
-   "leg_probs": "[0.5476, 0.5908, 0.3903]",
-   "p_joint": 0.1735,
-   "fair_price": 5.77,
-   "p_independent": 0.1263,
-   "correlation_lift": 1.374
   },
   {
    "match": "Parramatta Eels v North Queensland Cowboys",
@@ -1407,16 +1407,16 @@
    "correlation_lift": 1.365
   },
   {
-   "match": "Brisbane Broncos v New Zealand Warriors",
-   "combo": "New Zealand Warriors win \u00d7 ATS Alofiana Khan-Pereira \u00d7 ATS Dallin Watene-Zelezniak",
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 total over 50.5",
    "n_legs": 3,
    "tier": "value",
-   "legs": "['away_win', 'ats 35142', 'ats 20794']",
-   "leg_probs": "[0.5091, 0.6281, 0.5308]",
-   "p_joint": 0.2311,
-   "fair_price": 4.33,
-   "p_independent": 0.1697,
-   "correlation_lift": 1.362
+   "legs": "['home_win', 'ats 34023', 'total over 50.5']",
+   "leg_probs": "[0.571, 0.6087, 0.3776]",
+   "p_joint": 0.1791,
+   "fair_price": 5.58,
+   "p_independent": 0.1313,
+   "correlation_lift": 1.364
   },
   {
    "match": "Cronulla-Sutherland Sharks v Canberra Raiders",
@@ -1428,6 +1428,18 @@
    "p_joint": 0.095,
    "fair_price": 10.53,
    "p_independent": 0.0697,
+   "correlation_lift": 1.362
+  },
+  {
+   "match": "Brisbane Broncos v New Zealand Warriors",
+   "combo": "New Zealand Warriors win \u00d7 ATS Alofiana Khan-Pereira \u00d7 ATS Dallin Watene-Zelezniak",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['away_win', 'ats 35142', 'ats 20794']",
+   "leg_probs": "[0.5091, 0.6281, 0.5308]",
+   "p_joint": 0.2311,
+   "fair_price": 4.33,
+   "p_independent": 0.1697,
    "correlation_lift": 1.362
   },
   {
@@ -1443,28 +1455,28 @@
    "correlation_lift": 1.36
   },
   {
-   "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers win \u00d7 Junior Tupou 2+ tries",
-   "n_legs": 2,
-   "tier": "big",
-   "legs": "['home_win', 'tries2+ 32836']",
-   "leg_probs": "[0.5476, 0.2234]",
-   "p_joint": 0.1661,
-   "fair_price": 6.02,
-   "p_independent": 0.1223,
-   "correlation_lift": 1.358
-  },
-  {
    "match": "Newcastle Knights v Gold Coast Titans",
    "combo": "Newcastle Knights win \u00d7 Dominic Young 2+ tries",
    "n_legs": 2,
    "tier": "value",
    "legs": "['home_win', 'tries2+ 28635']",
-   "leg_probs": "[0.5327, 0.2924]",
-   "p_joint": 0.211,
-   "fair_price": 4.74,
-   "p_independent": 0.1558,
-   "correlation_lift": 1.355
+   "leg_probs": "[0.5331, 0.2903]",
+   "p_joint": 0.2103,
+   "fair_price": 4.76,
+   "p_independent": 0.1548,
+   "correlation_lift": 1.358
+  },
+  {
+   "match": "Wests Tigers v St George Illawarra Dragons",
+   "combo": "Wests Tigers win \u00d7 Junior Tupou 2+ tries",
+   "n_legs": 2,
+   "tier": "value",
+   "legs": "['home_win', 'tries2+ 32836']",
+   "leg_probs": "[0.548, 0.2322]",
+   "p_joint": 0.1723,
+   "fair_price": 5.8,
+   "p_independent": 0.1272,
+   "correlation_lift": 1.354
   },
   {
    "match": "Cronulla-Sutherland Sharks v Canberra Raiders",
@@ -1504,27 +1516,27 @@
   },
   {
    "match": "Newcastle Knights v Gold Coast Titans",
-   "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 total over 50.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 28635', 'total over 50.5']",
-   "leg_probs": "[0.5327, 0.6608, 0.3903]",
-   "p_joint": 0.184,
-   "fair_price": 5.44,
-   "p_independent": 0.1374,
-   "correlation_lift": 1.339
-  },
-  {
-   "match": "Newcastle Knights v Gold Coast Titans",
    "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 ATS Kalyn Ponga",
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 28635', 'ats 22966']",
-   "leg_probs": "[0.5327, 0.6608, 0.3721]",
-   "p_joint": 0.1747,
-   "fair_price": 5.72,
+   "leg_probs": "[0.5331, 0.6603, 0.372]",
+   "p_joint": 0.1758,
+   "fair_price": 5.69,
    "p_independent": 0.131,
-   "correlation_lift": 1.334
+   "correlation_lift": 1.342
+  },
+  {
+   "match": "Newcastle Knights v Gold Coast Titans",
+   "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 total over 50.5",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['home_win', 'ats 28635', 'total over 50.5']",
+   "leg_probs": "[0.5331, 0.6603, 0.3882]",
+   "p_joint": 0.1828,
+   "fair_price": 5.47,
+   "p_independent": 0.1367,
+   "correlation_lift": 1.338
   },
   {
    "match": "Cronulla-Sutherland Sharks v Canberra Raiders",
@@ -1564,15 +1576,63 @@
   },
   {
    "match": "Wests Tigers v St George Illawarra Dragons",
+   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 ATS Valentine Holmes \u00d7 total over 44.5",
+   "n_legs": 4,
+   "tier": "big",
+   "legs": "['home_win', 'ats 32836', 'ats 20869', 'total over 44.5']",
+   "leg_probs": "[0.548, 0.6021, 0.5391, 0.5638]",
+   "p_joint": 0.1333,
+   "fair_price": 7.5,
+   "p_independent": 0.1003,
+   "correlation_lift": 1.329
+  },
+  {
+   "match": "Wests Tigers v St George Illawarra Dragons",
    "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 ATS Sunia Turuva",
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 32836', 'ats 33587']",
-   "leg_probs": "[0.5476, 0.5908, 0.4672]",
-   "p_joint": 0.1995,
-   "fair_price": 5.01,
-   "p_independent": 0.1511,
+   "leg_probs": "[0.548, 0.6021, 0.4785]",
+   "p_joint": 0.2092,
+   "fair_price": 4.78,
+   "p_independent": 0.1579,
+   "correlation_lift": 1.325
+  },
+  {
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers win \u00d7 Thomas Jenkins 2+ tries",
+   "n_legs": 2,
+   "tier": "value",
+   "legs": "['home_win', 'tries2+ 34023']",
+   "leg_probs": "[0.571, 0.2422]",
+   "p_joint": 0.1832,
+   "fair_price": 5.46,
+   "p_independent": 0.1383,
+   "correlation_lift": 1.324
+  },
+  {
+   "match": "Wests Tigers v St George Illawarra Dragons",
+   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 total over 44.5",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['home_win', 'ats 32836', 'total over 44.5']",
+   "leg_probs": "[0.548, 0.6021, 0.5638]",
+   "p_joint": 0.2456,
+   "fair_price": 4.07,
+   "p_independent": 0.1861,
    "correlation_lift": 1.32
+  },
+  {
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 ATS Brian To'o",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['home_win', 'ats 34023', 'ats 28598']",
+   "leg_probs": "[0.571, 0.6087, 0.3966]",
+   "p_joint": 0.1819,
+   "fair_price": 5.5,
+   "p_independent": 0.1379,
+   "correlation_lift": 1.319
   },
   {
    "match": "Manly-Warringah Sea Eagles v Dolphins",
@@ -1659,16 +1719,40 @@
    "correlation_lift": 1.306
   },
   {
-   "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 ATS Valentine Holmes \u00d7 total over 42.5",
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 ATS Tommy Talau \u00d7 total over 42.5",
    "n_legs": 4,
    "tier": "big",
-   "legs": "['home_win', 'ats 32836', 'ats 20869', 'total over 42.5']",
-   "leg_probs": "[0.5476, 0.5908, 0.5288, 0.5803]",
-   "p_joint": 0.1296,
-   "fair_price": 7.72,
-   "p_independent": 0.0993,
-   "correlation_lift": 1.306
+   "legs": "['home_win', 'ats 34023', 'ats 28822', 'total over 42.5']",
+   "leg_probs": "[0.571, 0.6087, 0.4418, 0.5682]",
+   "p_joint": 0.1137,
+   "fair_price": 8.8,
+   "p_independent": 0.0873,
+   "correlation_lift": 1.303
+  },
+  {
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 match tries over 7.5",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['home_win', 'ats 34023', 'tries_total over 7.5']",
+   "leg_probs": "[0.571, 0.6087, 0.5668]",
+   "p_joint": 0.2565,
+   "fair_price": 3.9,
+   "p_independent": 0.197,
+   "correlation_lift": 1.302
+  },
+  {
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 total over 42.5",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['home_win', 'ats 34023', 'total over 42.5']",
+   "leg_probs": "[0.571, 0.6087, 0.5682]",
+   "p_joint": 0.2569,
+   "fair_price": 3.89,
+   "p_independent": 0.1975,
+   "correlation_lift": 1.301
   },
   {
    "match": "Wests Tigers v St George Illawarra Dragons",
@@ -1676,59 +1760,23 @@
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 32836', 'tries_total over 7.5']",
-   "leg_probs": "[0.5476, 0.5908, 0.5792]",
-   "p_joint": 0.2446,
-   "fair_price": 4.09,
-   "p_independent": 0.1874,
-   "correlation_lift": 1.305
-  },
-  {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 total over 50.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 34023', 'total over 50.5']",
-   "leg_probs": "[0.5687, 0.7043, 0.3796]",
-   "p_joint": 0.1982,
-   "fair_price": 5.04,
-   "p_independent": 0.152,
-   "correlation_lift": 1.304
-  },
-  {
-   "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers win \u00d7 ATS Junior Tupou \u00d7 total over 42.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 32836', 'total over 42.5']",
-   "leg_probs": "[0.5476, 0.5908, 0.5803]",
-   "p_joint": 0.2448,
-   "fair_price": 4.09,
-   "p_independent": 0.1877,
-   "correlation_lift": 1.304
-  },
-  {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers win \u00d7 Thomas Jenkins 2+ tries",
-   "n_legs": 2,
-   "tier": "value",
-   "legs": "['home_win', 'tries2+ 34023']",
-   "leg_probs": "[0.5687, 0.3412]",
-   "p_joint": 0.2524,
-   "fair_price": 3.96,
-   "p_independent": 0.194,
+   "leg_probs": "[0.548, 0.6021, 0.6078]",
+   "p_joint": 0.2609,
+   "fair_price": 3.83,
+   "p_independent": 0.2006,
    "correlation_lift": 1.301
   },
   {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 ATS Brian To'o",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 34023', 'ats 28598']",
-   "leg_probs": "[0.5687, 0.7043, 0.4753]",
-   "p_joint": 0.2459,
-   "fair_price": 4.07,
-   "p_independent": 0.1904,
-   "correlation_lift": 1.292
+   "match": "Newcastle Knights v Gold Coast Titans",
+   "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 ATS Phillip Sami \u00d7 total over 42.5",
+   "n_legs": 4,
+   "tier": "big",
+   "legs": "['home_win', 'ats 28635', 'ats 23750', 'total over 42.5']",
+   "leg_probs": "[0.5331, 0.6603, 0.5239, 0.5765]",
+   "p_joint": 0.1377,
+   "fair_price": 7.26,
+   "p_independent": 0.1063,
+   "correlation_lift": 1.295
   },
   {
    "match": "Canterbury-Bankstown Bulldogs v South Sydney Rabbitohs",
@@ -1744,27 +1792,27 @@
   },
   {
    "match": "Newcastle Knights v Gold Coast Titans",
-   "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 total over 42.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 28635', 'total over 42.5']",
-   "leg_probs": "[0.5327, 0.6608, 0.5788]",
-   "p_joint": 0.2618,
-   "fair_price": 3.82,
-   "p_independent": 0.2038,
-   "correlation_lift": 1.285
-  },
-  {
-   "match": "Newcastle Knights v Gold Coast Titans",
    "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 match tries over 7.5",
    "n_legs": 3,
    "tier": "value",
    "legs": "['home_win', 'ats 28635', 'tries_total over 7.5']",
-   "leg_probs": "[0.5327, 0.6608, 0.5779]",
-   "p_joint": 0.2612,
-   "fair_price": 3.83,
-   "p_independent": 0.2035,
-   "correlation_lift": 1.284
+   "leg_probs": "[0.5331, 0.6603, 0.5741]",
+   "p_joint": 0.2599,
+   "fair_price": 3.85,
+   "p_independent": 0.2021,
+   "correlation_lift": 1.286
+  },
+  {
+   "match": "Newcastle Knights v Gold Coast Titans",
+   "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 total over 42.5",
+   "n_legs": 3,
+   "tier": "value",
+   "legs": "['home_win', 'ats 28635', 'total over 42.5']",
+   "leg_probs": "[0.5331, 0.6603, 0.5765]",
+   "p_joint": 0.2604,
+   "fair_price": 3.84,
+   "p_independent": 0.2029,
+   "correlation_lift": 1.283
   },
   {
    "match": "Brisbane Broncos v New Zealand Warriors",
@@ -1784,59 +1832,23 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['margin_band WST 13 60', 'ats 32836']",
-   "leg_probs": "[0.2627, 0.5908]",
-   "p_joint": 0.1973,
-   "fair_price": 5.07,
-   "p_independent": 0.1552,
-   "correlation_lift": 1.271
-  },
-  {
-   "match": "Newcastle Knights v Gold Coast Titans",
-   "combo": "Newcastle Knights win \u00d7 ATS Dominic Young \u00d7 ATS Phillip Sami \u00d7 total over 42.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['home_win', 'ats 28635', 'ats 23750', 'total over 42.5']",
-   "leg_probs": "[0.5327, 0.6608, 0.526, 0.5788]",
-   "p_joint": 0.136,
-   "fair_price": 7.36,
-   "p_independent": 0.1072,
-   "correlation_lift": 1.269
+   "leg_probs": "[0.2673, 0.6021]",
+   "p_joint": 0.2034,
+   "fair_price": 4.92,
+   "p_independent": 0.1609,
+   "correlation_lift": 1.264
   },
   {
    "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 ATS Mark Nawaqanitawase \u00d7 total over 42.5",
-   "n_legs": 4,
-   "tier": "big",
-   "legs": "['home_win', 'ats 34023', 'ats 52106', 'total over 42.5']",
-   "leg_probs": "[0.5687, 0.7043, 0.501, 0.5673]",
-   "p_joint": 0.143,
-   "fair_price": 6.99,
-   "p_independent": 0.1138,
-   "correlation_lift": 1.256
-  },
-  {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 match tries over 7.5",
-   "n_legs": 3,
+   "combo": "Penrith Panthers by 13+ \u00d7 ATS Thomas Jenkins",
+   "n_legs": 2,
    "tier": "value",
-   "legs": "['home_win', 'ats 34023', 'tries_total over 7.5']",
-   "leg_probs": "[0.5687, 0.7043, 0.566]",
-   "p_joint": 0.2842,
-   "fair_price": 3.52,
-   "p_independent": 0.2267,
-   "correlation_lift": 1.254
-  },
-  {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers win \u00d7 ATS Thomas Jenkins \u00d7 total over 42.5",
-   "n_legs": 3,
-   "tier": "value",
-   "legs": "['home_win', 'ats 34023', 'total over 42.5']",
-   "leg_probs": "[0.5687, 0.7043, 0.5673]",
-   "p_joint": 0.2842,
-   "fair_price": 3.52,
-   "p_independent": 0.2272,
-   "correlation_lift": 1.251
+   "legs": "['margin_band PEN 13 60', 'ats 34023']",
+   "leg_probs": "[0.2835, 0.6087]",
+   "p_joint": 0.2162,
+   "fair_price": 4.62,
+   "p_independent": 0.1725,
+   "correlation_lift": 1.253
   },
   {
    "match": "Newcastle Knights v Gold Coast Titans",
@@ -1844,11 +1856,11 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['margin_band NEW 13 60', 'ats 28635']",
-   "leg_probs": "[0.2523, 0.6608]",
-   "p_joint": 0.2072,
-   "fair_price": 4.83,
-   "p_independent": 0.1667,
-   "correlation_lift": 1.243
+   "leg_probs": "[0.2523, 0.6603]",
+   "p_joint": 0.2074,
+   "fair_price": 4.82,
+   "p_independent": 0.1666,
+   "correlation_lift": 1.245
   },
   {
    "match": "Canterbury-Bankstown Bulldogs v South Sydney Rabbitohs",
@@ -1873,18 +1885,6 @@
    "fair_price": 4.14,
    "p_independent": 0.1977,
    "correlation_lift": 1.223
-  },
-  {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers by 13+ \u00d7 ATS Thomas Jenkins",
-   "n_legs": 2,
-   "tier": "value",
-   "legs": "['margin_band PEN 13 60', 'ats 34023']",
-   "leg_probs": "[0.2827, 0.7043]",
-   "p_joint": 0.2417,
-   "fair_price": 4.14,
-   "p_independent": 0.1991,
-   "correlation_lift": 1.214
   },
   {
    "match": "Cronulla-Sutherland Sharks v Canberra Raiders",
@@ -1923,6 +1923,18 @@
    "correlation_lift": 1.187
   },
   {
+   "match": "Penrith Panthers v Sydney Roosters",
+   "combo": "Penrith Panthers -4.5 \u00d7 ATS Thomas Jenkins",
+   "n_legs": 2,
+   "tier": "value",
+   "legs": "['line PEN -4.5', 'ats 34023']",
+   "leg_probs": "[0.4751, 0.6087]",
+   "p_joint": 0.3406,
+   "fair_price": 2.94,
+   "p_independent": 0.2892,
+   "correlation_lift": 1.178
+  },
+  {
    "match": "Canterbury-Bankstown Bulldogs v South Sydney Rabbitohs",
    "combo": "South Sydney Rabbitohs -0.5 \u00d7 ATS Alex Johnston",
    "n_legs": 2,
@@ -1936,15 +1948,15 @@
   },
   {
    "match": "Wests Tigers v St George Illawarra Dragons",
-   "combo": "Wests Tigers -2.5 \u00d7 ATS Junior Tupou",
+   "combo": "Wests Tigers -3.5 \u00d7 ATS Junior Tupou",
    "n_legs": 2,
    "tier": "value",
-   "legs": "['line WST -2.5', 'ats 32836']",
-   "leg_probs": "[0.4997, 0.5908]",
-   "p_joint": 0.3462,
-   "fair_price": 2.89,
-   "p_independent": 0.2952,
-   "correlation_lift": 1.173
+   "legs": "['line WST -3.5', 'ats 32836']",
+   "leg_probs": "[0.4968, 0.6021]",
+   "p_joint": 0.3514,
+   "fair_price": 2.85,
+   "p_independent": 0.2991,
+   "correlation_lift": 1.175
   },
   {
    "match": "Newcastle Knights v Gold Coast Titans",
@@ -1952,23 +1964,23 @@
    "n_legs": 2,
    "tier": "value",
    "legs": "['line NEW -2.5', 'ats 28635']",
-   "leg_probs": "[0.4854, 0.6608]",
-   "p_joint": 0.3734,
+   "leg_probs": "[0.4855, 0.6603]",
+   "p_joint": 0.3733,
    "fair_price": 2.68,
-   "p_independent": 0.3208,
-   "correlation_lift": 1.164
+   "p_independent": 0.3205,
+   "correlation_lift": 1.165
   },
   {
    "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "Penrith Panthers -4.5 \u00d7 ATS Thomas Jenkins",
+   "combo": "ATS Thomas Jenkins \u00d7 ATS Tommy Talau",
    "n_legs": 2,
    "tier": "value",
-   "legs": "['line PEN -4.5', 'ats 34023']",
-   "leg_probs": "[0.4742, 0.7043]",
-   "p_joint": 0.3847,
-   "fair_price": 2.6,
-   "p_independent": 0.334,
-   "correlation_lift": 1.152
+   "legs": "['ats 34023', 'ats 28822']",
+   "leg_probs": "[0.6087, 0.4418]",
+   "p_joint": 0.2704,
+   "fair_price": 3.7,
+   "p_independent": 0.2689,
+   "correlation_lift": 1.005
   },
   {
    "match": "Brisbane Broncos v New Zealand Warriors",
@@ -1995,16 +2007,28 @@
    "correlation_lift": 1.002
   },
   {
+   "match": "Newcastle Knights v Gold Coast Titans",
+   "combo": "ATS Dominic Young \u00d7 ATS Phillip Sami",
+   "n_legs": 2,
+   "tier": "value",
+   "legs": "['ats 28635', 'ats 23750']",
+   "leg_probs": "[0.6603, 0.5239]",
+   "p_joint": 0.3461,
+   "fair_price": 2.89,
+   "p_independent": 0.3459,
+   "correlation_lift": 1.001
+  },
+  {
    "match": "Wests Tigers v St George Illawarra Dragons",
    "combo": "ATS Junior Tupou \u00d7 ATS Valentine Holmes",
    "n_legs": 2,
    "tier": "value",
    "legs": "['ats 32836', 'ats 20869']",
-   "leg_probs": "[0.5908, 0.5288]",
-   "p_joint": 0.3123,
-   "fair_price": 3.2,
-   "p_independent": 0.3124,
-   "correlation_lift": 1.0
+   "leg_probs": "[0.6021, 0.5391]",
+   "p_joint": 0.325,
+   "fair_price": 3.08,
+   "p_independent": 0.3246,
+   "correlation_lift": 1.001
   },
   {
    "match": "Cronulla-Sutherland Sharks v Canberra Raiders",
@@ -2017,30 +2041,6 @@
    "fair_price": 4.67,
    "p_independent": 0.214,
    "correlation_lift": 1.0
-  },
-  {
-   "match": "Newcastle Knights v Gold Coast Titans",
-   "combo": "ATS Dominic Young \u00d7 ATS Phillip Sami",
-   "n_legs": 2,
-   "tier": "value",
-   "legs": "['ats 28635', 'ats 23750']",
-   "leg_probs": "[0.6608, 0.526]",
-   "p_joint": 0.3474,
-   "fair_price": 2.88,
-   "p_independent": 0.3476,
-   "correlation_lift": 0.999
-  },
-  {
-   "match": "Penrith Panthers v Sydney Roosters",
-   "combo": "ATS Thomas Jenkins \u00d7 ATS Mark Nawaqanitawase",
-   "n_legs": 2,
-   "tier": "value",
-   "legs": "['ats 34023', 'ats 52106']",
-   "leg_probs": "[0.7043, 0.501]",
-   "p_joint": 0.352,
-   "fair_price": 2.84,
-   "p_independent": 0.3529,
-   "correlation_lift": 0.998
   },
   {
    "match": "Parramatta Eels v North Queensland Cowboys",
@@ -2071,40 +2071,19 @@
   {
    "home": "Penrith Panthers",
    "away": "Sydney Roosters",
-   "info_confidence": "high",
-   "team_lists_confirmed": true,
+   "info_confidence": "provisional",
+   "team_lists_confirmed": false,
    "weather": {
     "precip_mm": 0.0,
     "precip_prob": 0,
-    "wind_kmh": 5.5,
-    "temp_c": 13.8,
+    "wind_kmh": 5.1,
+    "temp_c": 14.1,
     "forecast_hour": "2026-08-13T19:00"
    },
    "weather_try_mult": 1.0,
    "baseline_total": 46.6,
    "adjusted_total": 46.6,
-   "flags": [
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Penrith Panthers: Jaxen Edgar named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Sydney Roosters: James Tedesco named at Fullback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Sydney Roosters: Sam Walker named at Halfback \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    },
-    {
-     "severity": "warn",
-     "kind": "spine-change",
-     "text": "Sydney Roosters: Reece Robson named at Hooker \u2014 a spine change the win-prob model doesn't price; treat with caution."
-    }
-   ]
+   "flags": []
   },
   {
    "home": "Manly-Warringah Sea Eagles",
@@ -2113,9 +2092,9 @@
    "team_lists_confirmed": true,
    "weather": {
     "precip_mm": 0.0,
-    "precip_prob": 1,
-    "wind_kmh": 8.9,
-    "temp_c": 14.9,
+    "precip_prob": 0,
+    "wind_kmh": 8.4,
+    "temp_c": 14.4,
     "forecast_hour": "2026-08-14T18:00"
    },
    "weather_try_mult": 1.0,
@@ -2243,15 +2222,15 @@
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.1,
-    "precip_prob": 77,
-    "wind_kmh": 13.5,
-    "temp_c": 15.9,
+    "precip_mm": 0.5,
+    "precip_prob": 83,
+    "wind_kmh": 18.8,
+    "temp_c": 16.2,
     "forecast_hour": "2026-08-16T14:00"
    },
-   "weather_try_mult": 0.968,
+   "weather_try_mult": 0.965,
    "baseline_total": 48.7,
-   "adjusted_total": 47.1,
+   "adjusted_total": 47.0,
    "flags": [
     {
      "severity": "warn",
@@ -2266,7 +2245,7 @@
     {
      "severity": "info",
      "kind": "weather",
-     "text": "77% rain / 0.1mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
+     "text": "83% rain / 0.5mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
     },
     {
      "severity": "info",
@@ -2281,15 +2260,15 @@
    "info_confidence": "high",
    "team_lists_confirmed": true,
    "weather": {
-    "precip_mm": 0.3,
-    "precip_prob": 65,
-    "wind_kmh": 15.9,
-    "temp_c": 14.1,
+    "precip_mm": 0.1,
+    "precip_prob": 43,
+    "wind_kmh": 17.1,
+    "temp_c": 15.6,
     "forecast_hour": "2026-08-16T16:00"
    },
-   "weather_try_mult": 0.973,
+   "weather_try_mult": 1.0,
    "baseline_total": 48.5,
-   "adjusted_total": 47.2,
+   "adjusted_total": 48.5,
    "flags": [
     {
      "severity": "warn",
@@ -2308,8 +2287,8 @@
     },
     {
      "severity": "info",
-     "kind": "weather",
-     "text": "65% rain / 0.3mm at kickoff \u2192 tries \u00d70.97 (wet-weather suppression, assumption)"
+     "kind": "news",
+     "text": "Wests Tigers news: Wests Tigers v Warriors: Star duo sidelined; Nuuausala props up - NRL.com"
     },
     {
      "severity": "info",
