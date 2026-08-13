@@ -249,9 +249,14 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
      ```
   The row appears on the dashboard at first publish; 30-day clock starts
   then — gradeable ~mid-Sep.
-- **🏦 Rich Dad (`book-kiyosaki-shadow`) — BORN 13-Aug (ls); provision
-  DISPATCHED AND GREEN (96s), activation riding PR #165; row verification
-  pending the #165 merge.** Your ask ("read rich dad poor dad and create a
+- **🏦 Rich Dad (`book-kiyosaki-shadow`) — DONE 13-Aug (ls): ALIVE AND
+  PUBLISHING, VERIFIED BY THE ROW** (`book-kiyosaki-lshadow` online,
+  $1,000, build `96aac5eae665`/n=14 — equal to the locally predicted id,
+  so the container runs the merged code; the 23rd row on your board).
+  Nothing left for you here; the birth uncovered and closed a real
+  infrastructure class along the way (the 21,000-char run-scalar cap that
+  killed main's deploy workflow for ~30 min — changelog (ls)). Original
+  bullet kept below for the record. Your ask ("read rich dad poor dad and create a
   bot from it") shipped as the cash-flow doctrine book: only
   funding-RECEIVING positions (assets), delta-neutral modelled so P&L is
   pure cash flow, liability sales after a 1h grace, decay-closes only
