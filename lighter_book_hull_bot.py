@@ -442,7 +442,16 @@ def fetch_premiums():
                 mark = float(b.get("mark_price") or 0.0)
                 idx = float(b.get("index_price") or 0.0)
                 if mark > 0 and idx > 0:
-                    out[str(b.get("symbol"))] = (mark / idx - 1.0) * 1e4
+                    sym = str(b.get("symbol"))
+                    # [(mh)] key by FLEET symbol: funding_map folds per fleet
+                    # symbol (1000BONK -> kBONK), and a raw-symbol key left
+                    # the basis veto silently dark on every 1000-market.
+                    try:
+                        from venues.symbol_map import from_lighter
+                        sym = from_lighter(sym)[0]
+                    except Exception:  # noqa: BLE001
+                        pass
+                    out[sym] = (mark / idx - 1.0) * 1e4
             except (TypeError, ValueError):
                 continue
         return out

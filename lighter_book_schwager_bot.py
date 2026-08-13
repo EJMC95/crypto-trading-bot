@@ -267,9 +267,13 @@ def resolve_universe(held, current_time=None):
     out = list(DEFAULT_COINS)
     try:
         if fleet_bus is not None:
+            # [(mh)] NO limit on the scout read: `limit` truncates to the
+            # venue's top-N across ALL instrument classes BEFORE the crypto
+            # screen, so every non-crypto book in the volume top-18 silently
+            # shrank this book's universe below the measured 18. Screen
+            # first, then truncate.
             scout = fleet_bus.scout_universe(
-                min_vol_m=MIN_VOL_M, limit=UNIVERSE_N,
-                current_time=current_time)
+                min_vol_m=MIN_VOL_M, current_time=current_time)
             if not ALLOW_NONCRYPTO:
                 scout = fleet_bus.crypto_only(scout)
             if scout:
@@ -278,7 +282,7 @@ def resolve_universe(held, current_time=None):
         pass
     have = set(out)
     for c in held or ():
-        s = str(c).strip().upper()
+        s = str(c).strip()      # ((mh)) venue symbols verbatim — no .upper()
         if s and s not in have:
             out.append(s)
             have.add(s)
@@ -353,6 +357,10 @@ def _open_position(positions, coin, side, mark, atr, t0, signal_t):
         return None
     if not mark or mark <= 0 or not atr or atr <= 0:
         return None
+    if TRAIL_ATR * atr >= 0.9 or SL_ATR * atr >= 0.9:
+        return None      # ((mh)) a stop wider than the price is not a stop:
+                         # hwm*(1-3.5*atr) <= 0 clamps the long trail to 0
+                         # and silently disables BOTH stops
     positions[coin] = {"coin": coin, "side": side, "notional": CLIP_USD,
                        "opened_ts": t0, "entry_mark": mark,
                        "last_mark": mark, "atr_frac": atr,
@@ -492,7 +500,26 @@ def main():
                 # exit check first, then the ratchet — the study's ordering
                 reason = trend_exit(pos, mark, t0)
                 if reason is None:
-                    update_trail(pos, mark)
+                    # ((mh)) THE RATCHET FEEDS ON CLOSED 4h BARS, NEVER the
+                    # 5-min mark: the study's +$457 ratcheted the chandelier
+                    # on bar CLOSES, and feeding intrabar highs tightens the
+                    # trail toward the REFUTED 2.5x-shaped behavior. One
+                    # candles call per held coin per loop; a dark fetch
+                    # skips the ratchet (the trail keeps its last level and
+                    # exits keep running on the live mark).
+                    try:
+                        rows = ctx.venue.candles(
+                            pos["coin"], BAR_INTERVAL,
+                            (int(t0) - 3 * BAR_SEC) * 1000, int(t0) * 1000)
+                        cb = _closed_bars(rows, BAR_SEC, int(t0))
+                        if cb:
+                            bt, _o, _h, _l, bc = cb[-1]
+                            if (bt + BAR_SEC > pos["opened_ts"]
+                                    and bt != pos.get("trail_bar_t")):
+                                update_trail(pos, bc)
+                                pos["trail_bar_t"] = bt
+                    except Exception:  # noqa: BLE001
+                        pass
                     continue
                 pos["fees"] += SLIP_COST * pos["notional"]
                 px = pos["trail_px"] if reason == "trail" else mark
@@ -517,7 +544,10 @@ def main():
                       "quiet": 0, "signal": 0}
             opened = capped = unpriceable = 0
             now_s = int(t0)
-            need = max(DON_N + 2, EMA_SLOW + 5, ATR_N + 2) + 6
+            # ((mh)) 3x the slow span: an EMA50 seeded over a 61-bar
+            # window is half-converged and flips the confirm near crosses
+            # where the study's full-history EMAs did not.
+            need = max(DON_N + 2, EMA_SLOW * 3, ATR_N + 2) + 10
             for coin in universe:
                 if coin in positions:
                     census["held"] += 1
@@ -541,13 +571,16 @@ def main():
                 census["signal"] += 1
                 side, a, sig_t = sig
                 if acted.get(coin) == sig_t:
+                    census["repeat"] = census.get("repeat", 0) + 1
                     continue
                 if len(positions) >= MAX_POSITIONS:
-                    capped += 1
-                    continue
+                    acted[coin] = sig_t     # ((mh)) sim semantics: a
+                    capped += 1             # cap-bound signal is DROPPED,
+                    continue                # never retried at drifted marks
                 mark = float((fund.get(coin) or {}).get("mark") or 0.0)
                 pos = _open_position(positions, coin, side, mark, a, t0, sig_t)
                 if pos is None:
+                    acted[coin] = sig_t
                     unpriceable += 1
                     continue
                 pos["spread_bps_entry"] = live_spread_bps(ctx, coin)
@@ -664,9 +697,11 @@ def _selftest():
     update_trail(ps, 100.0)
     s1 = ps["trail_px"]
     update_trail(ps, 90.0)
-    assert ps["trail_px"] < s1
+    s2 = ps["trail_px"]
+    assert s2 < s1
     update_trail(ps, 95.0)
-    assert ps["trail_px"] == min(s1, ps["trail_px"])
+    assert ps["trail_px"] == s2, \
+        "a bounce must NOT loosen the short trail — the ratchet is the rule"
 
     # 3) exits: initial stop before the first ratchet, trail after
     pf = _open_position({}, "C", "long", 100.0, 0.01, t, bars[-1][0])
@@ -685,6 +720,8 @@ def _selftest():
     assert again is None, \
         "re-opening a held coin is pyramiding — measured −$292.83 to " \
         "−$1,103.57, refused structurally"
+    assert _open_position({}, "W", "long", 100.0, 0.30, t, bars[-1][0]) \
+        is None, "((mh)) a 105%-wide trail is no stop — entry must refuse"
     params = set(inspect.signature(_open_position).parameters)
     for banned in ("units", "add", "pyramid", "scale_in"):
         assert banned not in params, f"a '{banned}' input is the pyramid door"

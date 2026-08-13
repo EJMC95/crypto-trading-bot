@@ -21,8 +21,12 @@ the venue we trade is the venue we measure). Headline results at authoring:
     (pullback x6, failtest x4, daily-dislocation fade, keltner fade) — NONE
     beat random entries (best P=0.24). The bot therefore ships the TESTING
     DISCIPLINE (the roster + rolling replay gate), not a refuted setup.
-    Trailing-120d scorecard at birth: keltner n=106 +$48.79 t=0.75 OPEN;
-    pullback −$13.32 closed; failtest −$7.24 closed.
+    Trailing-120d scorecard at birth, LAG-1 trend ((mh)): keltner n=109
+    +$31.69 t=0.49 — knife-edge BELOW the 0.5 bar, closed; pullback
+    −$36.25 closed; failtest −$12.05 closed. All gates closed at birth;
+    the unlagged first cut read keltner t=0.75 OPEN — the look-ahead was
+    part of the apparent edge, and the full-window refutations stand a
+    fortiori (they were refuted even WITH the look-ahead flattering them).
   SCHWAGER (4h, 18 coins, 500d, cap 4):
     - shipped: Donchian-20 close breakout + EMA20>50, sl 2xATR, chandelier
       trail 3.5xATR, NO pyramid: n=277 +$457.21 mean +1.65% t=+1.88 halves
@@ -389,7 +393,9 @@ def main():
             continue
         dcl = [r[4] for r in cdt[s]]
         de20, de50 = ema_series(dcl, 20), ema_series(dcl, 50)
-        dtr[s] = {cdt[s][j][0] // 86400:
+        # [(mh)] LAG-1: day D is gated on D-1's close — the unlagged map
+        # gave the replay a look-ahead and the live scan a missing key.
+        dtr[s] = {cdt[s][j][0] // 86400 + 1:
                   (0 if (de20[j] is None or de50[j] is None)
                    else (1 if de20[j] > de50[j] else -1))
                   for j in range(len(cdt[s]))}

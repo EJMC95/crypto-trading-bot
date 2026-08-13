@@ -1,3 +1,75 @@
+## 2026-08-13 (mh) — THE BIRTH REVIEW BITES: an adversarial pass over the wave-2 books confirms six real defects — including a look-ahead that had flattered the one OPEN gate — and the corrected measurement closes it: 📐 Grimes is born trading NOTHING, by its own rule
+
+The (mb)–(me) birth shipped with a standing adversarial review over the four
+new files; this entry is that review landing. Six confirmed classes, every
+one fixed the same session, one of them changing a published claim —
+corrected in place per I12 wherever it appeared.
+
+- **📐 THE TREND MAP WAS A LOOK-AHEAD IN THE REPLAY AND A MISSING KEY LIVE
+  (critical).** `daily_trend_map` keyed each day by its own candle: the
+  replay gated day D's bars on day D's OWN close (look-ahead), while the
+  live scan asked for TODAY — whose candle is still forming — and read
+  0="no data" on ~5 of 6 live 4h bars. And dt=0 passes BOTH of keltner's
+  trend conditions, so "no data" UNFILTERED the fade while killing pullback
+  — the live book would have traded a different policy than its gate
+  graded, the exact divergence the book's one-owner rule exists to prevent.
+  **Fixed with one convention: LAG-1** (day D gated on D−1's close — always
+  available live, no look-ahead in replay; `trend_at` adds a one-day
+  fallback), selftest-pinned. **THE CORRECTED MEASUREMENT MOVES THE BIRTH
+  STATE:** keltner's trailing-120d record drops from t=0.75 to **t=0.49 —
+  knife-edge BELOW the 0.5 bar — so ALL THREE gates are closed at birth**
+  and the book trades nothing until its own 6h retest finds a setup that
+  tests. The look-ahead was part of the apparent edge; the full-window
+  refutations stand a fortiori (refuted even WITH the flattery). Doc,
+  fleet-table row and study header corrected in place.
+- **🧙 THE TRAIL RATCHETED ON 5-MINUTE MARKS, NOT 4h CLOSES (critical).**
+  The measured +$457 chandelier ratchets on bar CLOSES; the live loop fed
+  it every 5-min mark, so intrabar highs tightened the trail toward the
+  REFUTED 2.5×-shaped behavior (−$29.88 on the same entries). The ratchet
+  now feeds on the latest CLOSED 4h bar only (one candles call per held
+  coin; dark fetch = trail holds, exits keep running), which also restores
+  the initial 2×ATR stop's governance until the first bar close — the sim's
+  own ordering. Two more: **EMA50 on a 61-bar fetch was half-converged**
+  (flipping the confirm near crosses; fetch is 3× the slow span now, and
+  Douglas's ATR fetch got the same 3× treatment), and an ATR wide enough
+  that `hwm·(1−3.5a) ≤ 0` clamped the long trail to zero and silently
+  disabled BOTH stops — entry now refuses any bracket ≥90% of price.
+- **📐 A STALE TREND CACHE FAILED OPEN (major).** The first cut cleared the
+  cache on staleness and let the scan keep running — but empty-cache dt=0
+  UNFILTERS keltner (same mechanism as above). A dark/stale cache now
+  fails CLOSED for the two regime-gated setups (failtest, trend-free, is
+  unaffected), `trend_dark` rides the census, and a restart always re-runs
+  the retest on its first loop instead of honoring a saved clock over an
+  empty in-memory cache. Also: the retest's 776-bar window now pages in
+  ≤450-bar chunks (`_paged_bars`) — the venue serves ~500 rows/call
+  regardless of count_back, so the one-shot fetch would have silently
+  graded ~83d while claiming 120d.
+- **🧘/📐/🧙 THE CRYPTO SCREEN RAN AFTER THE TOP-18 TRUNCATION (major).**
+  `scout_universe(limit=18)` truncates across ALL instrument classes before
+  `crypto_only` — every non-crypto book in the venue's volume top-18
+  silently shrank the measured universe. Screen first, then truncate, all
+  three price books.
+- **SIM-FIDELITY SEMANTICS, ALL THREE PRICE BOOKS (minor, fixed):** a
+  cap-bound or unpriceable signal is now DROPPED (acted-stamped) exactly as
+  the study's portfolio dropped it — not retried for hours at drifted
+  marks; the acted-dedup gets a `repeat` census rider; a second setup
+  firing on an already-taken coin is no longer misfiled as `unpriceable`
+  (📐 breaks after an open); held-coin re-append no longer `.upper()`s
+  venue symbols.
+- **THE I20 TOOL LEARNS THE CEILING (major, in `audit_book_overlap.py`):**
+  `admits()` had no apr-CEILING arm, so 🧮 Hull — the first book that
+  publishes one — would have been counted as a rival for supply ABOVE its
+  band (the same (gl) phantom-rival class the volume ceiling already
+  guards, on the apr axis). `living_gates` now reads `apr_hi` and
+  `admits()` excludes at-or-above-ceiling gates, half-open. And Hull's
+  premium map now keys by FLEET symbol (`from_lighter`) — the raw-symbol
+  join left the basis veto silently dark on every 1000-market.
+- Declared, not churned: the replay enters at next-bar open and never
+  checks the entry bar's own range — the same convention the measurements
+  were calibrated with (live checks continuously, i.e. tighter); the
+  sim-vs-live fill-convention gap is inherent to every mark-fill book and
+  the (mg) spread telemetry is what makes it measurable.
+
 ## 2026-08-13 (mg) — 📖 HARRIS READ AGAINST THE FLEET: the microstructure book turns out to be the fleet's own biography — verified where it already exists, and the one real gap closed with falsifiable-slip telemetry on the wave-2 books
 
 **Operator, 13-Aug:** *"Can you implement any knowledge from Trading and
@@ -181,10 +253,12 @@ Second of the (mb)–(me) BOOKS wave; reading:
   a missing or stale scorecard, and the full scorecard publishes every loop
   so `open: 0` is never ambiguous between quiet and impossible (I18/(lv)).
   The gate IS the regime switch, mechanically.
-- **BORN TRADING ONE SETUP, BY ITS OWN RULE.** Trailing-120d at authoring:
-  keltner **n=106, +$48.79, t=0.75 → OPEN** (the recent tape turned mean-
-  reverting and the gate found it without being told); pullback −$13.32 and
-  failtest −$7.24 → closed. **`breakout` is structurally ABSENT from the
+- ~~**BORN TRADING ONE SETUP, BY ITS OWN RULE.** Trailing-120d at authoring:
+  keltner **n=106, +$48.79, t=0.75 → OPEN**~~ **[SAME DAY (mh): the birth
+  review found the trend map was a look-ahead; under the corrected LAG-1
+  convention keltner reads t=0.49 — below the 0.5 bar — so the book is born
+  with ALL gates closed, trading nothing by its own rule until a retest
+  finds a setup that tests.]** pullback and failtest closed in both cuts. **`breakout` is structurally ABSENT from the
   roster** — that supply is (md)'s, and the selftest pins the exclusion with
   the I20 citation. The roster COMBINATION is unmeasured as a combination
   (no historical scorecard series exists) — declared, not hidden; I17

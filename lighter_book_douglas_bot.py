@@ -252,9 +252,13 @@ def resolve_universe(held, current_time=None):
     out = list(DEFAULT_COINS)
     try:
         if fleet_bus is not None:
+            # [(mh)] NO limit on the scout read: `limit` truncates to the
+            # venue's top-N across ALL instrument classes BEFORE the crypto
+            # screen, so every non-crypto book in the volume top-18 silently
+            # shrank this book's universe below the measured 18. Screen
+            # first, then truncate.
             scout = fleet_bus.scout_universe(
-                min_vol_m=MIN_VOL_M, limit=UNIVERSE_N,
-                current_time=current_time)
+                min_vol_m=MIN_VOL_M, current_time=current_time)
             if not ALLOW_NONCRYPTO:
                 scout = fleet_bus.crypto_only(scout)
             if scout:
@@ -263,7 +267,7 @@ def resolve_universe(held, current_time=None):
         pass
     have = set(out)
     for c in held or ():
-        s = str(c).strip().upper()
+        s = str(c).strip()      # ((mh)) venue symbols verbatim — no .upper()
         if s and s not in have:
             out.append(s)
             have.add(s)
@@ -515,7 +519,9 @@ def main():
                     continue
                 try:
                     end_ms = now_s * 1000
-                    start_ms = end_ms - (ATR_N + 6) * BAR_SEC * 1000
+                    # ((mh)) 3x the ATR span: a Wilder ATR seeded five steps
+                    # ago is not the study's converged ATR.
+                    start_ms = end_ms - (ATR_N * 3 + 6) * BAR_SEC * 1000
                     rows = ctx.venue.candles(coin, BAR_INTERVAL,
                                              start_ms, end_ms)
                 except Exception:  # noqa: BLE001
@@ -532,13 +538,16 @@ def main():
                 census["signal"] += 1
                 side, a, sig_t = sig
                 if acted.get(coin) == sig_t:
+                    census["repeat"] = census.get("repeat", 0) + 1
                     continue                    # this impulse already traded
                 if len(positions) >= MAX_POSITIONS:
-                    capped += 1
-                    continue
+                    acted[coin] = sig_t         # ((mh)) sim semantics: a
+                    capped += 1                 # cap-bound signal is DROPPED,
+                    continue                    # never retried at drifted marks
                 mark = float((fund.get(coin) or {}).get("mark") or 0.0)
                 pos = _open_position(positions, coin, side, mark, a, t0, sig_t)
                 if pos is None:
+                    acted[coin] = sig_t
                     unpriceable += 1
                     continue
                 pos["spread_bps_entry"] = live_spread_bps(ctx, coin)

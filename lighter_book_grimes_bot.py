@@ -34,10 +34,14 @@ is banned; shipping his TESTING DISCIPLINE is the book:
        between "quiet" and "nothing currently tests" (I18/(lv)).
   4. THE REGIME SWITCH IS MECHANICAL: when the tape changes, a setup's
        trailing record opens or closes its gate — Grimes's "match the trade
-       to the market regime" without a human in the loop. At authoring the
-       trailing-120d scorecard read: keltner n=106, +$48.79, t=0.75 ->
-       OPEN; pullback n=130, −$13.32 -> closed; failtest n=294, −$7.24 ->
-       closed. The book is born trading exactly one setup, by its own rule.
+       to the market regime" without a human in the loop. At authoring,
+       under the corrected LAG-1 trend convention ((mh) — the unlagged map
+       gave the replay a look-ahead), the trailing-120d scorecard read:
+       keltner n=109, +$31.69, t=0.49 — ON the 0.5 bar and BELOW it, so
+       closed; pullback −$36.25 closed; failtest −$12.05 closed. The book
+       is born trading NOTHING, by its own rule — which is the rule
+       working: nothing currently tests, and the scorecard says so in
+       public every loop. The gate re-decides at every 6h retest.
 
 THE SUPPLY, NAMED (I20): the venue's liquid crypto set (24h vol >= $1M, top
 18). A DIRECTIONAL price book: it can hold the same coin as the family
@@ -201,16 +205,36 @@ def ema_series(vals, n):
 
 
 def daily_trend_map(daily_bars):
-    """{utc_day_number: +1/-1/0} from daily EMA20 vs EMA50 closes."""
+    """{utc_day_number: +1/-1/0}, LAG-1 by construction ((mh)): day D's
+    entry is the EMA20-vs-EMA50 verdict AS OF DAY D-1's CLOSE. Two defects
+    die in this one convention: the live scan's "today" key always exists
+    (yesterday's candle is closed), where the unlagged map keyed every day
+    by its own still-forming candle and read 0="no data" on ~5 of 6 live 4h
+    bars — unfiltering keltner and killing pullback while the replay graded
+    the filtered policy; and the replay loses its look-ahead (day D's bars
+    were gated on day D's OWN close). One map, both consumers."""
     closes = [b[4] for b in daily_bars or []]
     e20 = ema_series(closes, EMA_FAST)
     e50 = ema_series(closes, EMA_SLOW)
     out = {}
     for j, b in enumerate(daily_bars or []):
         a, s = e20[j], e50[j]
-        out[b[0] // 86400] = 0 if (a is None or s is None) else \
+        out[b[0] // 86400 + 1] = 0 if (a is None or s is None) else \
             (1 if a > s else -1)
     return out
+
+
+def trend_at(dtrend, day):
+    """The trend verdict governing `day`, with a one-day fallback for a
+    missing daily candle. 0 = no claim (keltner reads it as unaligned-both-
+    ways, pullback as no-trade — each setup's own documented degrade)."""
+    try:
+        v = (dtrend or {}).get(day)
+        if v is None:
+            v = (dtrend or {}).get(day - 1)
+        return v if v in (-1, 0, 1) else 0
+    except Exception:      # noqa: BLE001
+        return 0
 
 
 # --------------------------- the setups (ONE owner: live + replay) -----------
@@ -220,7 +244,7 @@ def sig_pullback(bars, i, atrs, e20, e50, dtrend):
     a, x20, x50 = atrs[i], e20[i], e50[i]
     if not (a and x20 and x50):
         return None
-    dt = dtrend.get(bars[i][0] // 86400, 0)
+    dt = trend_at(dtrend, bars[i][0] // 86400)
     _t, _o, h, l, c = bars[i]
     if dt > 0 and x20 > x50 and l <= x20 and c > x20:
         return "long", 1.5 * a, 4.5 * a, 20
@@ -252,7 +276,7 @@ def sig_keltner(bars, i, atrs, e20, e50, dtrend):
     a, x20 = atrs[i], e20[i]
     if not (a and x20):
         return None
-    dt = dtrend.get(bars[i][0] // 86400, 0)
+    dt = trend_at(dtrend, bars[i][0] // 86400)
     c = bars[i][4]
     if c > x20 * (1 + KELT_MULT * a) and dt <= 0:
         return "short", 1.5 * a, KELT_MULT * a, 20
@@ -375,9 +399,13 @@ def resolve_universe(held, current_time=None):
     out = list(DEFAULT_COINS)
     try:
         if fleet_bus is not None:
+            # [(mh)] NO limit on the scout read: `limit` truncates to the
+            # venue's top-N across ALL instrument classes BEFORE the crypto
+            # screen, so every non-crypto book in the volume top-18 silently
+            # shrank this book's universe below the measured 18. Screen
+            # first, then truncate.
             scout = fleet_bus.scout_universe(
-                min_vol_m=MIN_VOL_M, limit=UNIVERSE_N,
-                current_time=current_time)
+                min_vol_m=MIN_VOL_M, current_time=current_time)
             if not ALLOW_NONCRYPTO:
                 scout = fleet_bus.crypto_only(scout)
             if scout:
@@ -386,7 +414,7 @@ def resolve_universe(held, current_time=None):
         pass
     have = set(out)
     for c in held or ():
-        s = str(c).strip().upper()
+        s = str(c).strip()      # ((mh)) venue symbols verbatim — no .upper()
         if s and s not in have:
             out.append(s)
             have.add(s)
@@ -508,6 +536,38 @@ def _closed_bars(rows, bar_sec, now_s):
     return out
 
 
+def _paged_bars(ctx, coin, interval, bar_sec, n_bars, now_s):
+    """Closed bars, fetched in <=450-bar chunks. ((mh)) The venue's candle
+    API serves ~500 rows per call regardless of count_back — one big request
+    for the retest's 776-bar window would silently return only the newest
+    page, shrinking the gate's 120d claim to ~83d. Pages backward like the
+    oracle; partial data is returned as-is (the caller's own floors judge
+    sufficiency)."""
+    rows = {}
+    end_s = int(now_s)
+    remaining = int(n_bars)
+    for _ in range(6):
+        if remaining <= 0:
+            break
+        chunk = min(450, remaining + 4)
+        try:
+            page = ctx.venue.candles(
+                coin, interval, (end_s - chunk * bar_sec) * 1000,
+                end_s * 1000)
+        except Exception:  # noqa: BLE001
+            break
+        got = [b for b in _closed_bars(page, bar_sec, now_s) if b[0] < end_s]
+        if not got:
+            break
+        for b in got:
+            rows[b[0]] = b
+        end_s = min(b[0] for b in got)
+        remaining -= len(got)
+        if len(got) < chunk - 8:
+            break
+    return [rows[t] for t in sorted(rows)]
+
+
 def main():
     p = argparse.ArgumentParser(
         description="📐 The Technician — trade only what tests")
@@ -547,10 +607,10 @@ def main():
                      if isinstance(v, (int, float))}
         if _saved and isinstance(_saved.get("scorecard"), dict):
             scorecard = _saved["scorecard"]
-        try:
-            last_retest = float((_saved or {}).get("last_retest") or 0.0)
-        except (TypeError, ValueError):
-            last_retest = 0.0
+        # ((mh)) last_retest is deliberately NOT restored: the trend cache
+        # is in-memory only, so honoring a recent saved clock would leave
+        # the regime-gated setups dark for up to RETEST_H after every
+        # restart. A boot always re-runs the retest on its first loop.
         if _saved is not None:
             print(f"[{now_iso()}] restored {len(positions)} position(s), "
                   f"scorecard for {sorted(scorecard)}")
@@ -645,23 +705,17 @@ def main():
             if (t0 - last_retest) >= RETEST_H * 3600.0:
                 try:
                     deep_bars, deep_trend = {}, {}
-                    span_ms = int((WINDOW_D * 86400 +
-                                   (EMA_SLOW + 10) * BAR_SEC) * 1000)
+                    n_4h = int(WINDOW_D * 6 + EMA_SLOW + 10)
+                    n_1d = int(WINDOW_D + 80)
                     for coin in universe:
                         try:
-                            rows = ctx.venue.candles(
-                                coin, BAR_INTERVAL,
-                                now_s * 1000 - span_ms, now_s * 1000)
-                            bars = _closed_bars(rows, BAR_SEC, now_s)
+                            bars = _paged_bars(ctx, coin, BAR_INTERVAL,
+                                               BAR_SEC, n_4h, now_s)
                             if len(bars) >= EMA_SLOW + 8:
                                 deep_bars[coin] = bars
-                            drows = ctx.venue.candles(
-                                coin, "1d",
-                                now_s * 1000 - int(
-                                    (WINDOW_D + 80) * 86400 * 1000),
-                                now_s * 1000)
                             deep_trend[coin] = daily_trend_map(
-                                _closed_bars(drows, 86400, now_s))
+                                _paged_bars(ctx, coin, "1d", 86400,
+                                            n_1d, now_s))
                         except Exception:  # noqa: BLE001
                             continue
                     if deep_bars:
@@ -689,9 +743,14 @@ def main():
                       "quiet": 0, "signal": 0}
             opened = capped = unpriceable = gated = 0
             held_coins = {p["coin"] for p in positions.values()}
-            if (t0 - dtrend_asof) > 6 * 3600.0:
-                dtrend_cache = {}       # stale daily trend: setups needing
-                                        # it will simply not fire long
+            # ((mh)) a stale/empty trend cache FAILS CLOSED for the two
+            # regime-gated setups. The first cut cleared the cache and let
+            # keltner keep firing — but dt=0 passes BOTH of keltner's trend
+            # conditions, so "no data" UNFILTERED the fade instead of
+            # stopping it (the comment claimed the opposite; the reviewer's
+            # measured counterexample stands).
+            trend_dark = (not dtrend_cache) or \
+                (t0 - dtrend_asof) > 6 * 3600.0
             for coin in universe:
                 if coin in held_coins:
                     census["held"] += 1
@@ -716,6 +775,8 @@ def main():
                 i = len(bars) - 1
                 fired = False
                 for s in SETUPS:
+                    if trend_dark and s in ("pullback", "keltner"):
+                        continue    # fail-CLOSED without the regime input
                     sig = SETUP_FNS[s](bars, i, atrs, e20, e50, dtrend)
                     if sig is None:
                         continue
@@ -725,21 +786,28 @@ def main():
                         continue
                     akey = f"{s}:{coin}"
                     if acted.get(akey) == bars[i][0]:
+                        census["repeat"] = census.get("repeat", 0) + 1
                         continue
                     if len(positions) >= MAX_POSITIONS:
-                        capped += 1
-                        continue
+                        acted[akey] = bars[i][0]   # ((mh)) sim semantics:
+                        capped += 1                # dropped, never retried
+                        continue                   # at drifted marks
                     side, sl, tp, hold = sig
                     mark = float((fund.get(coin) or {}).get("mark") or 0.0)
                     pos = _open_position(positions, s, coin, side, mark,
                                          sl, tp, hold, t0, bars[i][0])
                     if pos is None:
+                        acted[akey] = bars[i][0]
                         unpriceable += 1
                         continue
                     pos["spread_bps_entry"] = live_spread_bps(ctx, coin)
                     acted[akey] = bars[i][0]
                     held_coins.add(coin)
                     opened += 1
+                    break               # ((mh)) one bet per coin: the pass
+                                        # is done — a second setup firing on
+                                        # the same coin was misfiled as
+                                        # `unpriceable` in the census
                     print(f"[{now_iso()}] OPEN {s}:{coin} {side} "
                           f"${CLIP_USD:.0f} @ {mark} | sl {sl:.2%} tp "
                           f"{tp:.2%} hold {hold} bars")
@@ -751,6 +819,7 @@ def main():
             census["capped"] = capped
             census["unpriceable"] = unpriceable
             census["gated"] = gated
+            census["trend_dark"] = 1 if trend_dark else 0
             acted = {k: v for k, v in acted.items()
                      if isinstance(v, (int, float))
                      and now_s - v < 3 * 86400}
@@ -930,6 +999,21 @@ def _selftest():
     blob = build_state(positions, {"keltner:AAA": float(t)}, sc2, t, t, now=t)
     assert "saved_ts" in blob and "scorecard" in blob
 
+
+    # (mh) the trend map is LAG-1 by construction, and the lookup has the
+    # one-day fallback — the live-vs-replay divergence class, pinned
+    t_day = 1_000_000 * 86400
+    dbars = [(t_day + k * 86400, 100, 101, 99, 100) for k in range(60)]
+    dmap = daily_trend_map(dbars)
+    last_bar_day = dbars[-1][0] // 86400
+    assert last_bar_day + 1 in dmap, \
+        "day D's verdict must come from D-1's CLOSE — the live scan's " \
+        "today-key must exist without today's still-forming candle"
+    assert last_bar_day + 2 not in dmap
+    assert trend_at({5: 1}, 5) == 1
+    assert trend_at({5: 1}, 6) == 1, "one-day fallback for a missing candle"
+    assert trend_at({5: 1}, 7) == 0, "two days dark is no claim"
+    assert trend_at(None, 5) == 0 and trend_at({5: "junk"}, 5) == 0
 
     # (mg) Harris spread telemetry: pure arithmetic + the refusal shapes
     good = {"bids": [(99.0, 5.0), (98.0, 1.0)], "asks": [(101.0, 4.0)]}
