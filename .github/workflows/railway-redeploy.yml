@@ -492,6 +492,15 @@ jobs:
               echo "-> live-farmer marker: including trail-blazer-live (REAL MONEY)"
               echo "-> ...and funding-farmer-shadow, its CONTROL arm (arm-drift)"
             fi
+            # [2026-08-13 (lr) ACTIVATED] 🛢️ Garrett (band-garrett-shadow) —
+            # the thin-tier VARIANT of the Farmer's file: NO marker (a $1k
+            # shadow book tracks main), same file set as the Farmer. Placed
+            # HERE, after farmer_files is assigned — under the (lp) prose
+            # note above the marker section that variable is still empty,
+            # and an empty grep pattern matches every push.
+            if echo "$changed" | grep -qE "$farmer_files"; then
+              svcs="${svcs:+$svcs,}band-garrett-shadow"
+            fi
           fi
           echo "services=$svcs" >> "$GITHUB_OUTPUT"
           echo "-> will deploy: ${svcs:-<none>}"

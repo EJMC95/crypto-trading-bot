@@ -22,6 +22,16 @@
 - Verification stays (iw)-shaped: a green dispatch is not a running book —
   the proof is the `band-garrett-lshadow` row publishing with an
   `extra.build` stamp on /pnl.json.
+- **[13:58 AEST — DONE, VERIFIED BY THE ROW.]** Dispatch #3 green in 83s
+  (runs #1–2 are the pre-fix file's zero-duration parse failures, expected);
+  `band-garrett-lshadow` publishing at $1,000, svc `band-garrett-shadow`,
+  build stamped, thin-tier funding visible in its own caps (CASHCAT +176%,
+  KAITO −915%). Auto-deploy rule ACTIVATED — placed AFTER `farmer_files` is
+  assigned, not under the (lp) prose note: at the prose note the shell var
+  is still empty, and `grep -qE ""` matches every push. Provision workflow
+  DELETED per its own note. Recorded: runtime clip $30 (venue minimum) vs
+  the study's modeled $25 — per-trade % is clip-invariant and clip-scaling
+  was declared unmeasured. Clock runs from first publish: gradeable ~12-Sep.
 
 ## 2026-08-13 (lq) — THE PARLIAMENT'S CAGE COULD NOT EXPRESS ITS OWN SWEEP'S WINNER: `sl_pct` hi 0.05 → 0.08, reach not a set value
 
