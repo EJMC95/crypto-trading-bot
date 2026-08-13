@@ -182,7 +182,16 @@ def open_notional(pos, meta, open_now, order_usd):
 
 
 def capital_adjusted_day_start(day_start, cap_delta):
-    """Net-of-capital daily-loss baseline — the ONE rule both live bots share.
+    """Net-of-capital daily-loss baseline — the ONE rule EVERY live bot shares.
+
+    [2026-08-14 (mi)] Said "both live bots" while the live pair was Farmer +
+    Ticket Taker. 🙏 Avo Maria replaced the Taker on the live slot on 13-Aug
+    ((ma)) and shipped with this arithmetic INLINE instead of importing it —
+    already drifted, in that the copy skipped the 2dp rounding below. The
+    wording is the reason it was easy to miss: a helper described by a COUNT of
+    its callers stops describing the system the moment the roster changes, so
+    it now names the RULE. Any new live bot imports this; a live bot that
+    reimplements it is the defect this function exists to prevent.
 
     A deposit/withdrawal the EquityGuard just healed lands in the RAW equity
     read, and the daily-loss rail compares that raw equity to `day_start`. So

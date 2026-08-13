@@ -1046,7 +1046,7 @@ def sydney_stamp(iso_utc):
     UTC time"*, while fleet INTERNALS stay UTC. This report is the operator's
     surface, so it carries BOTH: Sydney to read, UTC to join against ledgers.
 
-    [2026-08-14 (mb)] The FILENAME is Sydney-dated too — see `report_day`. It
+    [2026-08-14 (mj)] The FILENAME is Sydney-dated too — see `report_day`. It
     used to be UTC-dated on the argument that re-dating "would fork the report
     history mid-stream", and that argument was measured wrong the only way it
     could be: by destroying a report.
@@ -1066,7 +1066,7 @@ def sydney_stamp(iso_utc):
 def report_day(iso_utc):
     """The report's series key: the SYDNEY date of the run, not the UTC one.
 
-    [2026-08-14 (mb)] THIS JOB RUNS AT 08:00 SYDNEY, WHICH IS THE PREVIOUS UTC
+    [2026-08-14 (mj)] THIS JOB RUNS AT 08:00 SYDNEY, WHICH IS THE PREVIOUS UTC
     DAY, SO A UTC-DATED FILENAME MADE EVERY MORNING RUN OVERWRITE THE PREVIOUS
     DAY'S REPORT. Measured, not theorised: the 14-Aug 08:00 AEST run resolved
     to `2026-08-13` and replaced the 13-Aug report — 31,223 bytes including its
@@ -1294,7 +1294,7 @@ def selftest():
             f"report header is not Sydney-local: {_hdr!r}"
         assert "2026-08-05T21:46:47+00:00" in _hdr, \
             f"report header dropped the UTC join key: {_hdr!r}"
-        # [(mb)] THE FILENAME IS SYDNEY-DATED. This exact timestamp is the
+        # [(mj)] THE FILENAME IS SYDNEY-DATED. This exact timestamp is the
         # incident: 21:46 UTC is 07:46 the NEXT morning in Sydney, i.e. the
         # cron's own slot, and a UTC-dated name filed it under the PREVIOUS
         # day — overwriting that day's finished report. The old selftest

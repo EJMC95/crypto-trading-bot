@@ -577,9 +577,26 @@ RESTART_COUNTERS = {
 }
 #: Restarts inside RESTART_WINDOW_S before the churn is called sickness. One
 #: restart is an ordinary DEPLOY and must stay quiet, or this pages on every
-#: push. Four in a day is not a deploy pattern: a deploy restarts EVERY organ
-#: in the image at once, and a crash-loop restarts one while its neighbours
-#: keep their cadence — which is exactly what was measured on 6-Aug.
+#: push.
+#: [2026-08-14 (mi)] THE NEIGHBOUR TEST IS AN ASSERTION HERE, NOT AN
+#: IMPLEMENTATION — corrected in place (I12) because the previous wording read
+#: as though the detector performed it. It said: "a deploy restarts EVERY organ
+#: in the image at once, and a crash-loop restarts one while its neighbours keep
+#: their cadence." That IS the right discriminator and it is exactly how the
+#: 6-Aug finding was reasoned — but a HUMAN did that comparison. `RESTART_COUNTERS`
+#: declares ONE organ, so this function has no neighbour series to read and the
+#: only thing standing between a deploy and a page is the bare count below.
+#: MEASURED 13-Aug, the predicted false positive: 🏛️ the Parliament reset 7x
+#: between 02:42Z and 09:52Z — every one inside that day's deploy storm, `errors`
+#: 0, `stalled` [], and stable for the ~13h since. The detector fired on ordinary
+#: deploy churn, which is the (gl) cry-wolf shape aimed at the operator's phone.
+#: NOT "fixed" by raising the threshold or adding the check on one day's data:
+#: the failure direction of a quieter detector is SILENCE on a real crash-loop,
+#: and the (le) history above is a record of this sensor undercounting already.
+#: Implementing it properly means declaring neighbour counters for the organs
+#: sharing the freqtrade-bots image and requiring co-regression within a short
+#: window — its own measurement, its own mutation tests, its own entry.
+#: Four in a day is the current bar, and it is a COUNT, nothing more.
 RESTART_CHURN_N = int(os.environ.get("IMMUNE_RESTART_CHURN_N", "4"))
 RESTART_WINDOW_S = float(os.environ.get("IMMUNE_RESTART_WINDOW_S", "86400"))
 #: [2026-08-06 (le)] THE FLOOR AT WHICH "NO ADVANCE" IS ITSELF THE FAULT.
