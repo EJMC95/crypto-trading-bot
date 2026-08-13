@@ -74,6 +74,11 @@ LEGACY_BOTS = [
     # Ledgers (paper_trades / venue_orders) and census history are KEPT.
     # Only the -lshadow row ever published (v1 refuses lighter_live).
     "lighter-dislocation-lshadow",
+    # [2026-08-13 (lo)] 📊 Index Rider — I17 retirement, operator decision
+    # ("get rid of what's not working"): 0 closes/44d, ~17.2 closes/yr
+    # structural rate. Both halves per doctrine: RETIRED_ROWS hides, this
+    # prunes. Ledgers kept; INDEX_RIDER_RETIRED_OVERRIDE=run resurrects.
+    "equities-regime-lshadow",
     "perps-regime-switch", "perps-regime-switch-lshadow",
     "scanner-triangular-arb", "crypto-trendmomo-4h",
     # [2026-07-17 LIGHTER-ONLY CUT] operator: "i only want things running on

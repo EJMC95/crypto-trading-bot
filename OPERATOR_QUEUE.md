@@ -223,8 +223,15 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   intact. **B — apply now**, eating the clock reset, if the non-crypto
   harvest bleed grows enough to outweigh ~a week of accrued sample (it is
   ~$0.2/day today). Nothing needed from you before 4-Sep unless B.
-- **📊 Index Rider** — nothing to decide until the ~28-Aug zero-closes read;
-  its MTM series now actually grades (post-(iz)/(ja)) from ~6-Aug.
+- **📊 Index Rider — DECIDED-RETIRED 13-Aug (lo)** (operator: *"get rid of
+  what's not working"* — the I17 call, made early on conclusive evidence:
+  ZERO closes in 44 days and a measured rule rate of ~17.2 closes/yr against
+  a 30-close bar — no waiting period changes structural undecidability).
+  Shipped same day: code guard idles the bot
+  (`INDEX_RIDER_RETIRED_OVERRIDE=run` resurrects), row hidden + pruned.
+  The one act left is YOURS: stop/delete the `equities-regime-shadow`
+  Railway service whenever — the code guard is the durable half either way
+  (added to item 3's list).
 - **💸 Farmer `min_vol` cage floor — DECIDED-SIGNED-MEASURED 5-Aug (ka)
   (operator conditional: "if it produces better numbers then proceed!").**
   The condition was tested BEFORE shipping: the calibrated Farmer replay
@@ -261,6 +268,9 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   5. Offline corpses: `freqtrade-{mum,dad,georgia,avo-maria}`.
   6. `nrl-feed` → move to its own Railway project (cost attribution + its
      failing workflow leaves this repo's CI).
+  7. **[13-Aug (lo)]** `equities-regime-shadow` — 📊 Index Rider retired;
+     the code guard idles it durably, so stopping/deleting the service is
+     optional tidiness (~$2-5/mo).
   Do NOT touch: the failover pair (`funding-carry` + `yield-harvester-shadow`
   — now deliberate), both live services, the remaining live shadow services,
   `pnl-dashboard`, `market-context`, `Postgres`, `freqtrade-bots`.
