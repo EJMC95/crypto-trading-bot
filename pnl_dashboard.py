@@ -5085,7 +5085,7 @@ class H(BaseHTTPRequestHandler):
                             # readable from a review seat with no Railway
                             # login — it is the bar that governs real money.
                             "'golive-readiness', "
-                            # [2026-08-07 (lj)] the docket's AUTHORITATIVE
+                            # [2026-08-13 (lt)] the docket's AUTHORITATIVE
                             # clocks. `(lf)` moved them out of the grade
                             # payload into their own key for a correctness
                             # reason and never added that key here, so the
@@ -5159,7 +5159,7 @@ class H(BaseHTTPRequestHandler):
                                    "strategy_incubator": live.get("strategy-incubator"),
                                    "fleet_radar": live.get("fleet-radar"),
                                    "golive_readiness": live.get("golive-readiness"),
-                                   # [(lj)] The docket's authoritative clocks.
+                                   # [(lt)] The docket's authoritative clocks.
                                    # Adding the key to the SELECT above is
                                    # NOT enough — this body maps keys one by
                                    # one, so a fetched key that is not listed

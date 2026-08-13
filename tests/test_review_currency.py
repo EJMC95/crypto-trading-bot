@@ -658,7 +658,7 @@ def test_occupancy_is_quiet_and_safe_on_a_dark_organ():
 
 
 # ---------------------------------------------------------------------------
-# 9. [2026-08-07 (lj)] THE DECISION DOCKET REACHES THE OPERATOR.
+# 9. [2026-08-13 (lt)] THE DECISION DOCKET REACHES THE OPERATOR.
 #
 # `(ld)` built the docket, `(lf)` and `(lh)` corrected it, and none of the
 # three gave it a consumer — so by this repo's own rule ("a finding no gate
@@ -739,7 +739,7 @@ def test_a_dark_grader_key_is_not_an_all_clear():
 
 def test_it_names_the_books_and_carries_each_ENTRY_S_OWN_ask():
     """I8 — a detector must name the object the operator can act on; and
-    (lj) split the zero-ledger reason in two because the two want OPPOSITE
+    (lt) split the zero-ledger reason in two because the two want OPPOSITE
     acts, so one shared instruction would undo that split at the surface."""
     er, _ = _import_both()
     now = _fresh_now()
@@ -776,7 +776,7 @@ def test_the_review_actually_calls_the_consumer(review_src):
               if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
     assert "docket_lines" in called, (
         "docket_lines is defined but never called — the docket still has no "
-        "consumer, which is the whole point of (lj)")
+        "consumer, which is the whole point of (lt)")
 
 
 def test_a_valid_docket_still_surfaces_its_note():

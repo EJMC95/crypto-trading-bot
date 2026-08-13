@@ -1170,7 +1170,7 @@ DOCKET_VERDICTS = ("unreachable", "undecidable")
 #: a failed read of the clocks costs only the clocks: they are simply not
 #: rewritten, the previous value survives, and the GRADE still publishes.
 DOCKET_SEEN_KEY = "golive-docket-seen"
-#: [(lj)] WHAT THE DOCKET IS ASKING FOR, per reason. Keyed by `_docket_stuck`'s
+#: [(lt)] WHAT THE DOCKET IS ASKING FOR, per reason. Keyed by `_docket_stuck`'s
 #: reason with `None` as the default, because the two zero-ledger shapes want
 #: OPPOSITE acts and `(lf)` gave them the same words: a book that never traded
 #: is I17's keep-or-retire, while a book whose closes the grader cannot READ is
@@ -1557,7 +1557,7 @@ def _docket_stuck(hz, era_days=None, roster_zero_ledger=False):
     DOCKET_DAYS of consecutive "living publisher, zero closes in the ledger"
     is the evidence, and it is exactly what I17 asks for.
 
-    [(lj)] THAT ARM COLLAPSED TWO DIFFERENT DIAGNOSES UNDER ONE NAME (I8). A
+    [(lt)] THAT ARM COLLAPSED TWO DIFFERENT DIAGNOSES UNDER ONE NAME (I8). A
     book with `n_alltime == 0` has never traded — I17's keep-or-retire call.
     A book whose bot_pnl row reports closes the LEDGER does not hold is a READ
     problem (poller-only, outside the fetch window, quarantined), and telling
@@ -1627,7 +1627,7 @@ def decision_docket(current, prior, now_iso, docket_days=None):
             "why": hz.get("why") or "",
             # I17 is a KEEP-OR-RETIRE call for the operator, never another
             # tuning pass — say so in the entry so the docket cannot be read
-            # as a to-do list for the next session. [(lj)] EXCEPT for
+            # as a to-do list for the next session. [(lt)] EXCEPT for
             # `ledger_missing`, where that instruction is simply WRONG: the
             # book's closes exist and the GRADER cannot see them, so the act
             # is to fix the read, not to retire a book on absent evidence (I8
@@ -1762,7 +1762,7 @@ def _selftest():
     from datetime import datetime, timedelta, timezone
     t0 = datetime(2026, 6, 1, tzinfo=timezone.utc)
 
-    # [(lj)] THE SPLIT'S ENTIRE CORRECTNESS RESTS ON THESE TWO CONSTANTS
+    # [(lt)] THE SPLIT'S ENTIRE CORRECTNESS RESTS ON THESE TWO CONSTANTS
     # DIFFERING, AND NOTHING PINNED IT. Collapsing them passes 47/47 docket
     # tests while every publish replaces the grade payload with
     # {updated, ttl_sec, seen} — no `books`, no `ready`, so the 🚦 card renders
@@ -2616,7 +2616,7 @@ def main():
             # its own reason, and THE DOCKET'S OWN CLOCK supplies the time
             # basis the missing era cannot — seven consecutive days of "living
             # publisher, zero closes ever" IS I17's signal, and it needs no era.
-            # [(lj)] The two shapes are DISTINGUISHED here, where the
+            # [(lt)] The two shapes are DISTINGUISHED here, where the
             # measurement lives, rather than collapsed into one reason the
             # operator cannot act on differently. `_n_all` is the same number
             # `why_absent` above already splits on — this makes the docket
@@ -2664,7 +2664,7 @@ def main():
                         DOCKET_SEEN_KEY), True
                 if _ok_prior:
                     _prior_clocks = (_prior_seen or {}).get("seen")
-                    # [(lj)] MIGRATION — READ THE OLD LOCATION ONCE.
+                    # [(lt)] MIGRATION — READ THE OLD LOCATION ONCE.
                     # `(lf)` moved the clocks to their own key and read only
                     # that key. `load_state_checked` returns (True, None) for a
                     # MISSING row, so on the first run after that deploy the
@@ -2705,7 +2705,7 @@ def main():
                                    "unaffected)")
             except Exception as _de:      # noqa: BLE001
                 _docket_why = f"docket unavailable: {type(_de).__name__}: {_de}"
-            # [(lj)] THE CLOCKS ARE WRITTEN *BEFORE* THE GRADE, and that
+            # [(lt)] THE CLOCKS ARE WRITTEN *BEFORE* THE GRADE, and that
             # ordering is the fix rather than a preference. `(lf)` discarded
             # `save_state`'s return value here — the exact I4 shape its OWN
             # still-open list flagged for `churn_seen`, shipped one function
@@ -2728,7 +2728,7 @@ def main():
                                    "docket is computed but its clocks are not "
                                    "stored, so the next run restamps and the "
                                    "ages below reset silently")
-            # [(lj)] `docket_valid` — a PRESENT POSITIVE claim. On any
+            # [(lt)] `docket_valid` — a PRESENT POSITIVE claim. On any
             # degraded path the docket is `[]`, and an empty list reads
             # identically to "nothing is overdue". A consumer must not have to
             # infer health from the ABSENCE of `docket_why`; it tests this.
@@ -2742,7 +2742,7 @@ def main():
                 "decision_docket": _docket,
                 "docket_seen": _seen,
                 "docket_days": DOCKET_DAYS,
-                # [(lj)] Present-positive health, see above. False means the
+                # [(lt)] Present-positive health, see above. False means the
                 # LIST is not a claim about the fleet — never that the fleet
                 # is clean.
                 "docket_valid": _docket_valid,

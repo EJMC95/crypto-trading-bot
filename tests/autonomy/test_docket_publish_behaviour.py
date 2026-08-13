@@ -1,4 +1,4 @@
-"""[2026-08-07 (lj)] THE DOCKET'S PUBLISH PATH, ASSERTED ON WHAT IT *WROTE*.
+"""[2026-08-13 (lt)] THE DOCKET'S PUBLISH PATH, ASSERTED ON WHAT IT *WROTE*.
 
 WHY THIS FILE EXISTS — and it is a lesson about TESTS, not about the docket.
 

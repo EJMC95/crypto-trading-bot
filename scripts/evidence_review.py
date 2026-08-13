@@ -766,7 +766,7 @@ def scan_new_evidence(cur, errors):
                          "verdict. Re-grade any candidate under MTM once "
                          "bot_state_history '<bot>:equity' has ~30d.")
 
-    # [(lj)] THE DOCKET'S FIRST CONSUMER. Deliberately its OWN section rather
+    # [(lt)] THE DOCKET'S FIRST CONSUMER. Deliberately its OWN section rather
     # than folded into `golive-gates` above: that section is gated on
     # `cands` (books past CANDIDATE_MIN_CLOSES), and the docket's motivating
     # case — 📊 equities-regime, zero closes ever — is by definition not a
@@ -839,7 +839,7 @@ def docket_lines(payload, updated_at, now=None, max_age_h=None):
     """-> [str] — the ⚖️ DECISION DOCKET item(s), or [] when there is nothing
     honest to say.
 
-    [2026-08-07 (lj)] THE DOCKET HAD NO CONSUMER. `(ld)` built it, `(lf)` and
+    [2026-08-13 (lt)] THE DOCKET HAD NO CONSUMER. `(ld)` built it, `(lf)` and
     `(lh)` corrected it, and by this repo's own rule — *"a finding no gate
     consumes is a note"* — all three improved a signal that reached nobody.
     The grader prints it to a container log; this puts it in front of the
@@ -862,7 +862,7 @@ def docket_lines(payload, updated_at, now=None, max_age_h=None):
       something an operator can act on; `(lb)` had just fixed that exact
       shape in this same report.
 
-    It also carries each entry's own `asks`, because `(lj)` split the
+    It also carries each entry's own `asks`, because `(lt)` split the
     zero-ledger reason in two and the two want OPPOSITE acts — one is a
     keep-or-retire call, the other is a plumbing fault where retiring the
     book would be acting on an absence (I6).
@@ -896,7 +896,7 @@ def docket_lines(payload, updated_at, now=None, max_age_h=None):
     # A VALID docket can still carry a `docket_why` — the clock migration is
     # the live example. Surface it, because a migration nobody can see is
     # indistinguishable from the silent restart it exists to prevent, which
-    # is the whole reason `(lj)` had to write one.
+    # is the whole reason `(lt)` had to write one.
     note = ([f"⚖️ docket note: {payload['docket_why']}"]
             if payload.get("docket_why") else [])
     if not docket:

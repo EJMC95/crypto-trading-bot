@@ -1,4 +1,4 @@
-## 2026-08-07 (lj) — (lh) WAS A CHANGELOG ENTRY WITH NO CODE: four disablement mutations still green, the four defects it "fixed" still live, and the docket still had no consumer
+## 2026-08-13 (lt) — (lh) WAS A CHANGELOG ENTRY WITH NO CODE: four disablement mutations still green, the four defects it "fixed" still live, and the docket still had no consumer
 
 - **THE FINDING, and it is about this file rather than about the fleet.**
   `(lh)` reads as a completed pass — a behavioural test suite, four defects
@@ -17,7 +17,7 @@
   THIS PASS EXISTS.** `(lh)`'s four mutations reproduce exactly against the
   live 47-test `test_decision_docket.py`, and five more join them:
 
-  | mutation | restores | (lf) AST suite | (lj) behavioural |
+  | mutation | restores | (lf) AST suite | (lt) behavioural |
   |---|---|---|---|
   | `if _seen_ok:` → `if not _seen_ok:` | writes the EMPTY clock map on failure | GREEN | **RED** |
   | roster docket write → `if False:` | the (ld) hole — 📊 equities-regime invisible | GREEN | **RED** |
@@ -631,7 +631,7 @@ by default — I17's failure mode rather than its remedy.
 **Three: 🏛️ pm-gillard, pm-rudd and pm-abbott — from structurally unable to open a position, back to decidable.** Between them they hold **454 of the cohort's 518 closes**, and all three had both directions gated on a rule that could not have concluded anything else. This does not make them winners: the cohort still reads −$8.70 with no book carrying an I16 claim, and the keep-or-retire call (I17) remains the operator's. What it restores is their ability to **produce evidence for that decision** — which is the fleet's declared forward metric, and which a latch releasable only by declaring the book dead had taken away.
 ## 2026-08-06 (lh) — MY "STRUCTURAL" AST TESTS DETECT DELETION, NOT DISABLEMENT: five mutations, all green, all restoring the exact bug the test was written for
 
-> **[CORRECTED IN PLACE 7-Aug by (lj), per I12 — READ THIS BEFORE THE ENTRY
+> **[CORRECTED IN PLACE 7-Aug by (lt), per I12 — READ THIS BEFORE THE ENTRY
 > BELOW.] THIS ENTRY'S DIAGNOSIS IS CORRECT AND ITS CODE NEVER LANDED.** Every
 > artifact described below was absent from the tree at `1ef3e1d`:
 > `tests/autonomy/test_docket_publish_behaviour.py` (no such file),
@@ -640,11 +640,11 @@ by default — I17's failure mode rather than its remedy.
 > `(li)`'s commit as prose while the work it narrates was not committed — so
 > for a day this file asserted, in the past tense, four fixes that did not
 > exist, and the four mutations it correctly identifies as GREEN were still
-> green. `(lj)` re-measured them from scratch (all four reproduced, plus five
+> green. `(lt)` re-measured them from scratch (all four reproduced, plus five
 > more), then actually shipped the behavioural suite and the four fixes.
 > **The lesson this entry teaches applies to the entry itself: a green
 > changelog is not a landed change either.** Left standing rather than
-> deleted, because the diagnosis is sound and `(lj)` is its evidence.
+> deleted, because the diagnosis is sound and `(lt)` is its evidence.
 
 - **THE FINDING THAT MATTERS, and it is about the TESTS rather than the code.**
   `(ld)` pinned the docket's wiring with substring counts and two mutations
