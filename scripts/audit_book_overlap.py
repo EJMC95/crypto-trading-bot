@@ -49,6 +49,8 @@ FUNDING_BOOKS = [
     "band-barnes-lshadow",               # 🎸 Barnesy (carry + xsect sleeves)
     "book-kiyosaki-lshadow",             # 🏦 Rich Dad
     "band-garrett-lshadow",              # 🛢️ Garrett (thin tier — different slice)
+    "book-hull-lshadow",                 # 🧮 Hull ([2M,10M) x [7.8%,20%) — the
+                                         # tile between Garrett and the Farmer)
     "perps-funding-lighter-lshadow",     # 💸 Farmer shadow
     "perps-funding-lighter-lighter",     # 💸 Farmer LIVE — real money
     "perps-funding-spread-lshadow",      # ⚖️ Counterweight

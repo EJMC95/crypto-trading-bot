@@ -465,6 +465,28 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
 # image is archaeology, I12).
 # ---------------------------------------------------------------------------
 MANUAL_IMAGES_OK = {
+    # [2026-08-13 (mb)-(me)] the BOOKS cohort's second wave — BIRTH state,
+    # the (lr)/(ls) sequencing: the image is declared here until the
+    # provision dispatch creates each service and its row publishes with a
+    # build stamp; the ACTIVATION commit then moves it to AUTO_IMAGES and
+    # arms the decide rule. Rule-before-service must never reach main — the
+    # deploy resolver reds the whole run on an unresolvable name.
+    "Dockerfile.douglas": (
+        "🧘 book-douglas-shadow provision pending — auto-deploy rule arms in "
+        "the activation commit once the row publishes with a build stamp."
+    ),
+    "Dockerfile.grimes": (
+        "📐 book-grimes-shadow provision pending — auto-deploy rule arms in "
+        "the activation commit once the row publishes with a build stamp."
+    ),
+    "Dockerfile.schwager": (
+        "🧙 book-schwager-shadow provision pending — auto-deploy rule arms "
+        "in the activation commit once the row publishes with a build stamp."
+    ),
+    "Dockerfile.hull": (
+        "🧮 book-hull-shadow provision pending — auto-deploy rule arms in "
+        "the activation commit once the row publishes with a build stamp."
+    ),
     "Dockerfile": (
         "The legacy single shared image from the pre-split era — its own header "
         "says each Railway service overrides the Start Command. No living "

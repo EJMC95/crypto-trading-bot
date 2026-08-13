@@ -52,6 +52,20 @@ MTM_REQUIRED = {
         "🏦 Rich Dad — the cash-flow doctrine book, wired at BIRTH: its whole "
         "thesis is holding paid positions for days (decay-paid discipline), "
         "so a realised-only bar would be blind to exactly what it does",
+    "lighter_book_douglas_bot.py":
+        "🧘 The Zone — wired at BIRTH: short holds (~1h median) but up to 4 "
+        "concurrent brackets whose open drawdown a realised-only bar cannot "
+        "see between closes",
+    "lighter_book_grimes_bot.py":
+        "📐 The Technician — wired at BIRTH: 1-3 day structure holds behind "
+        "a replay gate; the gate can go quiet for weeks while positions ride",
+    "lighter_book_schwager_bot.py":
+        "🧙 The Wizard — wired at BIRTH: a trend book holding for ~112h "
+        "median is exactly I9's blind spot (the 🌊 Tide Rider shape)",
+    "lighter_book_hull_bot.py":
+        "🧮 The Professor — wired at BIRTH: its whole thesis is holding paid "
+        "positions up to 21 days, so a realised-only bar would be blind to "
+        "exactly what it does",
     "funding_carry_bot.py":
         "🌾 carry — the fleet's nearest go-live candidate; (hl) named it FIRST "
         "and did not wire it",

@@ -113,6 +113,14 @@ ROW_ENTRY = {
     # the same (jb) gate. The service does not exist yet (provision pending);
     # mapping it now means its FIRST stamped publish is already covered.
     "book-kiyosaki-lshadow": "lighter_book_kiyosaki_bot.py",
+    # [2026-08-13 (mb)-(me)] the BOOKS cohort's second wave — mapped the day
+    # each row was born, per the (jb) gate: the services may not exist yet
+    # (provision pending), and mapping now means the FIRST stamped publish
+    # is already covered.
+    "book-douglas-lshadow": "lighter_book_douglas_bot.py",
+    "book-grimes-lshadow": "lighter_book_grimes_bot.py",
+    "book-schwager-lshadow": "lighter_book_schwager_bot.py",
+    "book-hull-lshadow": "lighter_book_hull_bot.py",
     "crypto-breakout-4h-lshadow": "lighter_family_bot.py",
     "crypto-intraday-15m-lshadow": "lighter_family_bot.py",
     "crypto-swing-daily-lshadow": "lighter_family_bot.py",

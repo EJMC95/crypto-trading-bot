@@ -1,0 +1,27 @@
+# Image for 📐 The Technician (book-grimes-shadow) — the QUANTIFIED-EDGE
+# BOOK, shadow only. Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.grimes
+#   VENUE=lighter_shadow
+# The bot REFUSES every other VENUE (loud SystemExit): a $1,000 paper book
+# carrying Grimes's structural setup roster (pullback/failtest/keltner —
+# breakout is 🧙 book-schwager's supply, I20) behind a rolling replay gate:
+# a setup may enter only while its trailing record on the venue's own tape
+# clears the bar. Fills modelled at mark, ZERO keys. Config is ENV-ONLY (no
+# tuning lane), single-policy (hm) clock by construction.
+#
+# COPY set is the kiyosaki one minus funding_basis (a price book never
+# touches a funding rate). fleet_bus IS a guarded import (universe + crypto
+# screen) and ships in the SAME commit as the import (born-dark rule).
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_book_grimes_bot.py bot_pnl_store.py paper_broker.py fleet_bus.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_book_grimes_bot.py"]

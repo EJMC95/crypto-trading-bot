@@ -1,3 +1,163 @@
+## 2026-08-13 (me) — 🧮 THE PROFESSOR (book-hull) COMPLETES THE VOLUME TILING: Hull's cost-of-carry machinery on the one funding cell no living book enters — and the measurement that made the book possible was the one that killed its first draft
+
+**Operator, 13-Aug:** *"Build me 4 bots for each of these books ... Options,
+Futures, and Other Derivatives — John Hull. Best technical reference for
+futures, leverage, margin and derivatives mechanics."* Fourth of the (mb)–(me)
+BOOKS wave; reading: `BOOK_HULL_OPTIONS_FUTURES_DERIVATIVES_2026-08-13.md`.
+
+- **THE SUPPLY, NAMED BEFORE MINTING (I20).** TRUE |apr| in [7.82%, 20%) ×
+  24h vol in **[$2M, $10M)**, crypto only — the cell that completes the tiling
+  🛢️ Garrett [0.1M,2M) | **🧮 Hull [2M,10M)** | 💸 Farmer [10M,∞), with the 20%
+  ceiling half-open so everything above it stays the carry cohort's (🌾/🎸/🏦).
+  ZERO living rivals admit the cell; live occupancy at authoring LIT/ZEC/PUMP
+  (the venue's ~10.5% base-rate coins), band populated ~100% of 219 measured
+  days vs the carry cell's 6.6%. Both edges are PUBLISHED in `caps` — floor
+  AND ceiling, apr AND volume ((gl): an unpublished ceiling manufactures
+  phantom rivals). The one future collision is pre-named: the Farmer's
+  `min-vol-2e6` judge candidate (~4-Sep) would overlap this band if promoted —
+  the judge's paired bar decides that day, not this book.
+- **THE MEASUREMENT THAT SHAPED IT (scripts/study_books_cohort_2026-08-13.py,
+  219d of Lighter's own settled series).** The first draft — the cohort's
+  1h-grace flip exit on this band — is REFUTED: **−$16.84, t=−6.65, 136 of
+  158 exits paying the 30bps RT on a sign wobble**. Hull's own ch. 3 (basis
+  oscillation is noise around carry, not a signal to unwind) is what fixes
+  it: **persist 24h + flip grace 24h → n=45, +$4.92, t=+3.27, both halves
+  positive (+$0.75/+$4.17), random-timing control P=0.000**; tier-restricted
+  n=30, +$4.17, t=+2.76. The persist×grace×floor grid is a PLATEAU (every
+  persist≥24h × grace≥6h cell positive, every grace=1h cell negative) — a
+  region, not a lucky cell. The floor is DERIVED, not picked: payback
+  velocity (30bps RT within 336h) ⇒ 7.82% TRUE, the cost band's own edge.
+- **Mechanics:** delta-neutral modelled (P&L = accrued − fees, `position_pnl`
+  takes no mark — the 🏦 structural pin), decay_paid/liability_flip/max_hold
+  504h/bleed exits, adverse-basis entry veto off the venue's own mark-vs-index
+  (>10bps against; restrict-only, UNMEASURED and declared so per I19,
+  fail-OPEN on a dark feed), $80×4, crypto-only, env-only config (no tuning
+  lane — the Garrett single-policy clock). **I17 declared at birth:** ~4-6
+  closes/30d — 30 closes in ~5-7 months, a slow cash-flow clock, stated not
+  discovered.
+- Birth-complete in one commit: claim_writer top-of-loop + (ic) standby,
+  funding-form (gr) telemetry + `entry_prem_bps`, snapshot_equity day one
+  (`MTM_REQUIRED`), full-band caps, census with `above_band`/`deep`/
+  `adverse_basis` buckets, registrations (dashboard, `SELFTEST_MODULES`,
+  `ROW_ENTRY`, `fleet_allocation.FUNDING_BOOKS`, `audit_book_overlap`,
+  `study_exit_sweep` refusal, `test_exit_telemetry` funding form, born-dark
+  declaration). Deploy per the (mb) two-step.
+
+## 2026-08-13 (md) — 🧙 THE WIZARD (book-schwager): cut losses, ride winners, respect the trend — and the book's most famous rule, the pyramid, refused with its own numbers
+
+**Operator, 13-Aug:** *"... Market Wizards — Jack Schwager. Best for learning
+how genuinely successful traders think, though it won't give you a perp
+strategy."* Third of the (mb)–(me) BOOKS wave; reading:
+`BOOK_SCHWAGER_MARKET_WIZARDS_2026-08-13.md`.
+
+- **THE SHIPPED CELL (500d of Lighter 4h tape, 18 coins, 5bps/side):** 4h
+  Donchian-20 close breakout + EMA20>50 confirm, initial stop 2×ATR14, then a
+  wide 3.5×ATR chandelier trail from the close-basis HWM, NO profit target,
+  max hold 30d, $80×4 — **n=277, +$457.21, mean +1.65%/trade, t=1.88, both
+  halves positive (+$357.90/+$99.31), beats 197/200 random-entry draws
+  (P=0.015)**. 251 of 277 exits are the trail: the Seykota rule is the one
+  doing the earning — trail 2.5× on the SAME entries loses (−$29.88).
+- **THE PYRAMID IS REFUTED, STRUCTURALLY.** Adding units into winners — the
+  book's most quoted rule — turned +$457.21 into **−$292.83** (trail 3.5) and
+  **−$1,103.57** (trail 2.5, t=−5.8) on this tape: the pyramid buys chop
+  exposure at the top of every leg. Refusal is structural, not config: one
+  position per coin, `_open_position` refuses a held coin, no add-units
+  parameter exists — both selftest-pinned. A DAILY variant was also refused:
+  2.9 closes/30d is the 🌊 Tide Rider I17 shape.
+- Sides: longs +$443.40 / shorts +$13.80 — shorts kept ON as the only regime
+  insurance a one-tape validation has (item 18); the brain grades
+  `long-trend`/`short-trend` separately. t=1.88 is sub-bar and h2 < h1 —
+  stated, not smoothed; gradeable ~mid-Oct (~17 closes/30d), the slowest
+  clock of the four. Birth-complete parity as (me); price-form telemetry
+  (`PRICE_BOOKS` + side stamp), monotone-trail ratchet selftest-pinned.
+
+## 2026-08-13 (mc) — 📐 THE TECHNICIAN (book-grimes): twelve of Grimes's setups tested, none beat random — so the book ships his actual rule, the test itself, and is born trading the one setup its gate finds alive
+
+**Operator, 13-Aug:** *"... The Art and Science of Technical Analysis — Adam
+Grimes. Best for building and testing a repeatable price-action framework."*
+Second of the (mb)–(me) BOOKS wave; reading:
+`BOOK_GRIMES_ART_AND_SCIENCE_OF_TA_2026-08-13.md`.
+
+- **TWELVE VARIANTS, TWELVE HONEST FAILURES.** Pullback ×6 (incl. daily-trend
+  MTF alignment, the best at +$84.07 — still loses to random 24% of the
+  time), failure test ×4 (−$284 at 20-bar extremes, t=−2.2), the daily-
+  dislocation fade (P=0.51 vs random), the Keltner fade full-window (−$94.45)
+  — all on 500d of the venue's own 4h tape, every one pre-declared, every one
+  reported. Grimes's own thesis ("most patterns don't work; test everything")
+  is the only part of the book that survived its own test — so THAT is what
+  ships.
+- **THE MECHANISM: a setup roster behind a rolling replay gate.** Three
+  structural setups live in the file as code with ONE owner each (live scan
+  and replay share the signal functions): `pullback`, `failtest`, `keltner`.
+  Every 6h each is replayed over the trailing 120d through the study's exact
+  method (cap-2 sequential portfolio, 5bps/side); a setup may ENTER only
+  while its trailing record clears **n≥20, net>$0, t≥+0.5** — fail-CLOSED on
+  a missing or stale scorecard, and the full scorecard publishes every loop
+  so `open: 0` is never ambiguous between quiet and impossible (I18/(lv)).
+  The gate IS the regime switch, mechanically.
+- **BORN TRADING ONE SETUP, BY ITS OWN RULE.** Trailing-120d at authoring:
+  keltner **n=106, +$48.79, t=0.75 → OPEN** (the recent tape turned mean-
+  reverting and the gate found it without being told); pullback −$13.32 and
+  failtest −$7.24 → closed. **`breakout` is structurally ABSENT from the
+  roster** — that supply is (md)'s, and the selftest pins the exclusion with
+  the I20 citation. The roster COMBINATION is unmeasured as a combination
+  (no historical scorecard series exists) — declared, not hidden; I17
+  declared: a book whose gate stays shut is a keep-or-retire call, not a
+  bar-lowering session. Birth-complete parity as (me); `gated` census bucket;
+  price-form telemetry.
+
+## 2026-08-13 (mb) — 🧘 THE ZONE (book-douglas) OPENS THE BOOKS WAVE: Douglas's discipline doctrine wrapped around the one edge this tape actually supports — and the "revenge guard" I designed for it measured harmful, exactly as the book itself argues
+
+**Operator, 13-Aug:** *"Build me 4 bots for each of these books (please read
+them and build for lighter exchange as usual). Also add in any additional
+wins you know would complement them."* This entry opens the wave and carries
+the shared machinery; (mc)/(md)/(me) are the siblings. Reading:
+`BOOK_DOUGLAS_TRADING_IN_THE_ZONE_2026-08-13.md`.
+
+- **MEASURE BEFORE BUILDING, and the first measurements killed every naive
+  translation.** `scripts/study_books_cohort_2026-08-13.py` (Lighter-only:
+  208d of 1h, 500d of 4h, 219d of settled fundings, 18-coin liquid set,
+  random-entry benchmarks per (hm), throughput per (gt)) refuted the
+  pre-registered first drafts of ALL FOUR books: impulse continuation
+  −$210.59 t=−2.81; every Grimes structural setup vs random; Schwager's
+  pyramid −$292..−$1,104; the 1h-grace mid-band carry −$16.84 t=−6.65. What
+  shipped is what survived: 25-of-30-style refutation is the (hl) pattern
+  and it repeated here almost exactly.
+- **🧘 THE SHIPPED EDGE:** fade EXTREME 1h impulses (>2.5×ATR24) with a
+  bracket predefined at entry (sl 1.0×ATR / tp 1.5×ATR / 12h expiry, never
+  widened), $100×4 fixed clips — **n=575, +$27.01, both halves positive
+  (+$8.80/+$18.21), beats 199/200 random draws on both metrics (P=0.005)**;
+  t=0.84 sub-bar, stated — the book exists to earn its sample (~83
+  closes/30d, gradeable ~12-Sep).
+- **THE REFUTATION THAT IS THE BOOK'S OWN LESSON:** my naive revenge guard
+  (4h per-coin cooldown after a loss + 3-loss pause) flipped the book
+  NEGATIVE (+$27.01 → −$11.32). Douglas's actual doctrine — outcomes must
+  not alter execution — beat my first reading of him, measured. Consistency
+  is STRUCTURAL instead: `_open_position` has no streak/outcome/equity
+  parameter (selftest pins the signature), same clip every trade, and the
+  rolling 20-trade sample publishes in R-multiples every loop (win rate
+  reported, never a bar — I15).
+- **SHARED MACHINERY OF THE WAVE (the "additional wins" the operator asked
+  for), all four books:** claim_writer at loop top + (ic) standby key ·
+  snapshot_equity from DAY ONE (`MTM_REQUIRED` ×4 — I9 closed at birth, not
+  retrofitted) · exit-telemetry contracts registered at birth (3 price-form
+  + 1 funding-form) · censuses with per-gate buckets · `held` maps in the
+  Farmer's shape · (hk) held-coin universe union with measured-list
+  fallback · crypto-only screens with per-book reverts · env-only config
+  (single-policy (hm) clocks, no freeze machinery) · offline selftests ×4
+  registered in `SELFTEST_MODULES` · born-dark declarations ×4 ·
+  `ROW_ENTRY`/dashboard/allocation-class registrations at birth (the (jb)/
+  (kc) pattern — before the first close, not after the first wrong answer).
+- **DEPLOY, the (lr)/(ls) two-step compressed into one PR:** birth state
+  ships the four Dockerfiles claimed in `MANUAL_IMAGES_OK` + the one-shot
+  `books-provision.yml` (DELETE-after-use, the (kb) DATABASE_URL reference
+  form, shell-assembled). The provision dispatch creates the four services
+  and first-deploys them; the ACTIVATION commit then arms the four decide
+  rules + `paths:` entries, moves the images to `AUTO_IMAGES`, and deletes
+  the provision workflow — gated on all four rows publishing with build
+  stamps ((iw): a green dispatch is not a running book). Rule-before-service
+  never reaches main.
+
 ## 2026-08-13 (ma) — 🙏 AVO MARIA TAKES THE LIVE SLOT: the operator's swap, built end-to-end — the strategy imported so it cannot drift, the sizing derived from the balance, and the one act that stays the operator's prepared as two commands
 
 **OPERATOR DECISION, verbatim basis:** *"Change ticket taker to Avo Maria bot
