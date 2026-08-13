@@ -45,8 +45,14 @@ def _payload(monkeypatch, books, now=None, era=None):
     """
     p = fleet_allocation.build(books)
     for bot, claim_era in (era or {}).items():
+        # `era_since`/`era_source` are left at their defaults ON PURPOSE: the
+        # accessor reads `claim_era` and nothing else, so pinning a real era
+        # DATE here would make `audit_era_date_literals` redden this file on a
+        # legitimate era table move — a test that fails on a change it is not
+        # about. (Its first draft passed "2026-07-31" and CI caught exactly
+        # that.)
         fleet_allocation.set_era_twin(p["books"][bot], fleet_allocation.MIN_N,
-                                      claim_era, "2026-07-31", "declared")
+                                      claim_era)
     if now is not None:
         p["updated"] = now.isoformat()
     monkeypatch.setattr(fleet_bus, "_load", lambda key, ct: p
