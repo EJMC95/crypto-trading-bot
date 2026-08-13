@@ -84,6 +84,19 @@
   the CHANGELOG, not inside the one string GitHub measures** — the (lp)
   "write it as prose, not commented-out code" rule traded a parser trap
   for a length trap, and only the length trap fails the whole file.]
+- **[15:35 AEST — DONE, VERIFIED BY THE ROW, twice over.**
+  `book-kiyosaki-lshadow` online at $1,000, svc `book-kiyosaki-shadow`,
+  caps publishing exactly the configured gates (enter 0.20 TRUE / payback
+  120h / $80×6 / crypto-only) — and the build stamp closes the loop
+  (iw)-style: published `96aac5eae665`/n=14 equals the id predicted
+  locally against the image's own COPY set, so the container runs
+  exactly the merged code. The row appeared on the FIRST poll after the
+  repaired workflow redeployed the dashboard, confirming the incident
+  diagnosis end to end: the bot had been publishing since the provision
+  deploy (~15:10 AEST) and only the pre-repair dashboard's
+  CURRENT_BOTS filter was hiding it. #165 merged; main's deploy
+  workflow parses and deploys again. 30-day clock runs from first
+  publish: gradeable ~12-Sep. Nothing carried.]**
 - **Two (lp)/(lr) birth gaps closed in passing, same mechanism as this
   birth's own registrations:** 🛢️ Garrett's row was publishing WITH a build
   stamp but was unmapped in `audit_code_currency.ROW_ENTRY` (the next
