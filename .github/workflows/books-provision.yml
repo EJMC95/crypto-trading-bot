@@ -1,0 +1,83 @@
+# One-shot provisioning for the BOOKS cohort's second wave — DELETE AFTER USE
+# (an armed provisioning tool is how a retired service gets resurrected by
+# accident — the (lr) rule). Creates the four shadow services, sets their
+# env-only config + the DATABASE_URL REFERENCE form ((kb)), and runs each
+# first deploy with the redeploy workflow's own retry shape. The repo's
+# project-scoped RAILWAY_TOKEN does the work; sessions hold no credentials.
+#
+# A green run here is NOT a running book — the proof is each row publishing
+# on /pnl.json with an extra.build stamp ((iw)).
+name: Provision BOOKS wave 2
+on:
+  workflow_dispatch: {}
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Create services, set variables, first deploys
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          fail=0
+          for PAIR in \
+            "book-douglas-shadow:Dockerfile.douglas" \
+            "book-grimes-shadow:Dockerfile.grimes" \
+            "book-schwager-shadow:Dockerfile.schwager" \
+            "book-hull-shadow:Dockerfile.hull"; do
+            SVC="${PAIR%%:*}"; DF="${PAIR##*:}"
+
+            echo "::group::$SVC — create (tolerated if it already exists)"
+            railway add --service "$SVC" || railway add -s "$SVC" || \
+              echo "railway add failed — service may already exist; continuing to verify"
+            echo "::endgroup::"
+
+            echo "::group::$SVC — verify the service resolves"
+            # capture, never pipe into grep -q: its early exit SIGPIPEs the
+            # Rust CLI, which panics, and under pipefail the panic reads as
+            # "did not resolve" — the run-1 failure mode (schwager verified
+            # false-negative, the loop aborted, hull never provisioned)
+            status_json="$(railway status --json 2>/dev/null || true)"
+            if ! printf '%s' "$status_json" | grep -qF "\"$SVC\""; then
+              echo "::error::service '$SVC' did not resolve after create"
+              printf '%s\n' "$status_json" | head -50 || true
+              fail=1; continue
+            fi
+            echo "::endgroup::"
+
+            echo "::group::$SVC — set variables"
+            # The DATABASE_URL REFERENCE form ((kb): a literal URL on any
+            # service is a defect). Assembled in shell so GitHub's own
+            # dollar-double-brace expression parser never sees it — and this
+            # comment cannot name that token literally either: Actions scans
+            # the ENTIRE run scalar, comments included ((lr), 422).
+            DB_REF="$(printf '$%s' '{{Postgres.DATABASE_URL}}')"
+            railway variables --service "$SVC" \
+              --set "VENUE=lighter_shadow" \
+              --set "RAILWAY_DOCKERFILE_PATH=${DF}" \
+              --set "DATABASE_URL=${DB_REF}" \
+              --skip-deploys || { echo "::error::$SVC variable set failed"; fail=1; continue; }
+            railway variables --service "$SVC" | sed 's/postgres[^ ]*/<redacted>/g' || true
+            echo "::endgroup::"
+
+            echo "::group::$SVC — first deploy"
+            ok=0
+            for i in 1 2 3; do
+              if railway up --service "$SVC" --ci; then ok=1; break; fi
+              echo "retry $i failed; sleeping"; sleep 15
+            done
+            if [ "$ok" != 1 ]; then
+              echo "::error::$SVC railway up failed x3"; fail=1
+            fi
+            echo "::endgroup::"
+          done
+          [ "$fail" = 0 ] || exit 1
+          echo "Provisioned. Verify by the ROWS: book-{douglas,grimes,schwager,hull}-lshadow"
+          echo "on /pnl.json with extra.build stamped — a green run here is NOT that proof."
