@@ -119,6 +119,51 @@ CANDIDATES = [
     # restrict-safe: no bar moves, no lever changes, the paired bar still
     # gates every promotion.
     {"name": "slope-gate-off",  "levers": {"xp.funding.slope_gate": 0}},
+    # [2026-08-13 (ln) ORDER SWAPPED — min-vol-1e5 now runs BEFORE
+    # min-vol-2e6, by operator directive ("fix all of the above and ...
+    # what we know does work"), executed under the 13-Aug real-money grant.
+    # WHY: the Farmer-live horizon now reads its t bar UNREACHABLE at the
+    # current mean (+0.079%/trade needs ~1,152 closes ≈ 311d at 3.48/d) —
+    # the blocker is the MEAN, and this queue is the only path that can
+    # raise it. min-vol-1e5 holds the strongest measured mean-raiser in the
+    # queue (the [0.1M,2M) band alone: +$14.83, BOTH halves, robust at p90,
+    # vs the incumbent's +$4.01 — STUDY_THIN_TIER_MIN_VOL_2026-08-05),
+    # while min-vol-2e6's role was to DE-RISK that read (~11-Sep subset
+    # verdict) at the cost of a 7-day slot. The operator's directive buys
+    # the speed. Restrict-safe per the (ev) precedent: no bar moves, no
+    # lever changes, the paired live-vs-shadow bar still gates every
+    # promotion, fade-watch unchanged.
+    # [2026-08-05 (ka)] min-vol-1e5 — the thin-tier follow-through, filed
+    # the day the operator signed both cage floors down ('if it produces
+    # better numbers then proceed'). THE NUMBERS, from the calibrated
+    # backtest_funding_lighter.run() over 30d of the venue's own tape, each
+    # tier priced at ITS OWN measured friction ((js) fill study;
+    # STUDY_THIN_TIER_MIN_VOL_2026-08-05):
+    #   * the [0.1M,2M) band ALONE (74 books) at tier-median 5.12bps/fill,
+    #     shipped gate 0.05: +$14.83, n=158, win 65.8%, BOTH halves
+    #     positive (+7.68/+10.29), maxDD -7.97 — vs the incumbent >=10M
+    #     universe's +$4.01 on the same window at ITS 0.27bps median.
+    #   * robust at the tier's p90 (14.77bps): +$7.20. At gate 0.12 the
+    #     churn doubles and p90 flips negative (-$6.89) — 0.05 is the
+    #     better in-tier gate; the higher expressible gate is NOT filed.
+    #   * fail-closed combined read (every book charged 5.12): +$0.20 vs
+    #     incumbent +$4.01 — flat, not materially worse; the harness fills
+    #     slots in volume order while the real bot RANKS by |apr|, so the
+    #     truth sits between the combined and band-alone cells.
+    # ~~WHY FOURTH~~ [13-Aug (ln): SUPERSEDED — swapped ahead of
+    # min-vol-2e6 by the reorder note above; the original ordering logic
+    # is kept below for the record.] (prior ordering per (ju)): its prior
+    # is an own-tape
+    # replay with both halves positive — stronger than enter-gate-0.105's
+    # negative tape prior below, weaker than nothing above it; min-vol-2e6
+    # keeps its filed slot (its subset verdict ~11-Sep de-risks this one's
+    # read). Honesty gates ride along: 30d, one regime, $25 clips
+    # (larger-clip scaling in thin books UNMEASURED), iteration-order slot
+    # model, and the band's two four-digit-APR outliers (SKR/CXMT — CXMT
+    # is the quarantined-manipulation symbol) are inside these numbers;
+    # the arm's own SCAN_MAX_SLIP_BPS/MAX_SPREAD_BPS vetoes stay senior
+    # per-book at runtime, which the harness does not model.
+    {"name": "min-vol-1e5",     "levers": {"xp.funding.min_vol": 1e5}},
     # [2026-08-05 (jy)] min-vol-2e6 — the (ju) reserved slot, FILED. The
     # (ju) QUEUE NOTE's three gaps are closed the same day: XP_TO_LIVE
     # mapping (below), the arm's bars.min_vol receipt (apply_levers +
@@ -154,34 +199,6 @@ CANDIDATES = [
     # item 2. A verdict on this candidate is a verdict on the $1-10M
     # tier only, not on the extreme-book thesis.
     {"name": "min-vol-2e6",     "levers": {"xp.funding.min_vol": 2e6}},
-    # [2026-08-05 (ka)] min-vol-1e5 — the thin-tier follow-through, filed
-    # the day the operator signed both cage floors down ('if it produces
-    # better numbers then proceed'). THE NUMBERS, from the calibrated
-    # backtest_funding_lighter.run() over 30d of the venue's own tape, each
-    # tier priced at ITS OWN measured friction ((js) fill study;
-    # STUDY_THIN_TIER_MIN_VOL_2026-08-05):
-    #   * the [0.1M,2M) band ALONE (74 books) at tier-median 5.12bps/fill,
-    #     shipped gate 0.05: +$14.83, n=158, win 65.8%, BOTH halves
-    #     positive (+7.68/+10.29), maxDD -7.97 — vs the incumbent >=10M
-    #     universe's +$4.01 on the same window at ITS 0.27bps median.
-    #   * robust at the tier's p90 (14.77bps): +$7.20. At gate 0.12 the
-    #     churn doubles and p90 flips negative (-$6.89) — 0.05 is the
-    #     better in-tier gate; the higher expressible gate is NOT filed.
-    #   * fail-closed combined read (every book charged 5.12): +$0.20 vs
-    #     incumbent +$4.01 — flat, not materially worse; the harness fills
-    #     slots in volume order while the real bot RANKS by |apr|, so the
-    #     truth sits between the combined and band-alone cells.
-    # WHY FOURTH (prior ordering per (ju)): its prior is an own-tape
-    # replay with both halves positive — stronger than enter-gate-0.105's
-    # negative tape prior below, weaker than nothing above it; min-vol-2e6
-    # keeps its filed slot (its subset verdict ~11-Sep de-risks this one's
-    # read). Honesty gates ride along: 30d, one regime, $25 clips
-    # (larger-clip scaling in thin books UNMEASURED), iteration-order slot
-    # model, and the band's two four-digit-APR outliers (SKR/CXMT — CXMT
-    # is the quarantined-manipulation symbol) are inside these numbers;
-    # the arm's own SCAN_MAX_SLIP_BPS/MAX_SPREAD_BPS vetoes stay senior
-    # per-book at runtime, which the harness does not model.
-    {"name": "min-vol-1e5",     "levers": {"xp.funding.min_vol": 1e5}},
     # [2026-07-21, corrected same day] BOTH hold-cap candidates (hold-48,
     # and the hold-96 that briefly replaced it) are WITHDRAWN — refuted by
     # adversarial verify against the fleet's own recorded evidence:
@@ -2080,13 +2097,25 @@ def _selftest():
     # ahead of them. Full argument in the CANDIDATES comment above tp-0.06.
     # The invariant this asserts is the ORDERING RULE, spelled out below so a
     # future re-shuffle has to argue with the rule rather than edit a literal.
-    assert names[:5] == ["slope-gate-off", "min-vol-2e6", "min-vol-1e5",
+    # [2026-08-13 (ln)] min-vol-1e5 and min-vol-2e6 SWAPPED, arguing with
+    # the rule as this block demands: 1e5's prior is the queue's only
+    # CALIBRATED OWN-TAPE replay with both halves positive (+$14.83 vs the
+    # incumbent's +$4.01, robust at p90) — a DIRECT measurement — while
+    # 2e6's prior is indirect (the carry sibling trades the tier + the
+    # friction table). (ka) ranked 2e6 first as a de-risking SEQUENCE
+    # preference dressed in the prior frame; with the Farmer-live t bar
+    # now UNREACHABLE at its current mean (~1,152 closes needed), the
+    # 7-day de-risking slot costs more than it insures. Operator-directed
+    # 13-Aug, executed under the real-money grant; paired bar unchanged.
+    assert names[:5] == ["slope-gate-off", "min-vol-1e5", "min-vol-2e6",
                          "tp-0.06", "enter-gate-0.105"], names
     # the rule itself, asserted independently of the literal above: every
     # static is ranked by the strength of its recorded prior, strongest first.
     _PRIOR_RANK = {"slope-gate-off": 0,    # venue-supported ((dp))
-                   "min-vol-2e6": 1,       # unrefuted friction-tier prior
-                   "min-vol-1e5": 2,       # own-tape replay, both halves +ve
+                   "min-vol-1e5": 1,       # calibrated own-tape replay, both
+                                           # halves +ve — strongest DIRECT prior
+                   "min-vol-2e6": 2,       # unrefuted friction-tier prior —
+                                           # indirect ((ln) swap)
                    "tp-0.06": 3,           # MUTE — no both-halves-positive tp
                    "enter-gate-0.105": 4}  # tape prior AGAINST it
     _ranks = [_PRIOR_RANK[n] for n in names[:5]]
@@ -2106,7 +2135,7 @@ def _selftest():
         {"name": "xp-enter_apr-0.0625", "levers": {"xp.funding.enter_apr": 0.0625}},
     ]})
     n2 = [c["name"] for c in candidate_pool(q2, now=_qnow)]
-    assert n2 == ["slope-gate-off", "min-vol-2e6", "min-vol-1e5", "tp-0.06",
+    assert n2 == ["slope-gate-off", "min-vol-1e5", "min-vol-2e6", "tp-0.06",
                   "enter-gate-0.105", "xp-enter_apr-0.0625"], n2
     # the int-vs-float signature normalisation stays pinned by the direct
     # _lever_sig asserts below (the hold statics that used to pin it via a
@@ -2285,14 +2314,14 @@ def _selftest():
     # decides which question the fleet asks next.
     assert next_candidate(pool, [], None)["name"] == "slope-gate-off"
     assert next_candidate(pool, ["slope-gate-off"],
-                          None)["name"] == "min-vol-2e6"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6"],
                           None)["name"] == "min-vol-1e5"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6",
-                                 "min-vol-1e5"],
+    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5"],
+                          None)["name"] == "min-vol-2e6"
+    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5",
+                                 "min-vol-2e6"],
                           None)["name"] == "tp-0.06"
-    assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6",
-                                 "min-vol-1e5", "tp-0.06"],
+    assert next_candidate(pool, ["slope-gate-off", "min-vol-1e5",
+                                 "min-vol-2e6", "tp-0.06"],
                           None)["name"] == "enter-gate-0.105"
     # the statics precede queue proposals by pool construction (statics first)
     assert next_candidate(pool, ["slope-gate-off", "min-vol-2e6",

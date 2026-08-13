@@ -217,6 +217,13 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 # gate refuses lighter_live, so there is no live row to
                 # retire. Ledgers and census history kept.
                 "lighter-dislocation-lshadow",
+                # [2026-08-13 (lo)] 📊 Index Rider RETIRED — the I17 call,
+                # made by the operator ("get rid of what's not working"):
+                # ZERO closes in 44 days, measured rule rate ~17.2/yr vs a
+                # 30-close bar — structurally undecidable. Guard idles the
+                # bot (INDEX_RIDER_RETIRED_OVERRIDE=run resurrects); only
+                # the -lshadow row ever published. Ledgers + :equity kept.
+                "equities-regime-lshadow",
                 "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
                 "scanner-triangular-arb", "crypto-trendmomo-4h",
                 "perps-regime-switch", "perps-regime-switch-lshadow",

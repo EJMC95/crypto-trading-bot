@@ -1,3 +1,55 @@
+## 2026-08-13 (lo) — 📊 INDEX RIDER RETIRED: the I17 call, made — a book that closes 17 trades a year cannot answer a 30-close question, ever
+
+- **Operator, 13-Aug: *"get rid of what's not working"*.** The fleet's
+  clearest structural-undecidability case, decided on conclusive evidence
+  rather than waiting out its ~28-Aug calendar slot: **ZERO closes in 44
+  days** (3 buys / 0 sells ever), and the rule's own measured close rate is
+  **~17.2/yr against a 30-close gate bar** — no amount of patience makes
+  that sample exist. I17's words: an edge the fleet cannot measure is an
+  edge it does not have. It idled holding **+$13.93 open MTM**, recorded and
+  abandoned as what it is — marks on 6 open positions, not validated edge.
+- **Both halves shipped** ((jh)/(if) pattern): code guard idles the bot
+  (`INDEX_RIDER_RETIRED_OVERRIDE=run` resurrects; `--once` still runs for
+  selftests), `RETIRED_ROWS` hides, `LEGACY_BOTS` prunes, ledgers +
+  `:equity` series kept. Railway service stop (`equities-regime-shadow`) is
+  the operator's separate act, queued (item 3.7).
+- **What does NOT die with it:** item-18 regime coverage — the family
+  books' non-crypto universe + the per-asset oracle carry that job since
+  30-Jul; this row's 10 sleeves were the original instrument, not the
+  current one. And the deliberate KEEPS, stated so "get rid of what's not
+  working" is executed with a scalpel, not a mower: **⚖️ Counterweight
+  stays to its pre-registered ~28-Aug date** (post-revert evidence favors
+  keep: crypto era +$5.90/65); **💸 Farmer-shadow stays** (its "~5,388d"
+  undecidable read is irrelevant — it is the judge's experiment arm, not a
+  gate candidate); **the live Taker stays** (correctly idle behind its own
+  veto, self-reversing on recovery); **mum/swing-daily** calls mature
+  16/28-Aug per their I17 windows; **breakout-4h** stays below the brain's
+  n≥30 floor by doctrine; **gillard** belongs to the Parliament's review.
+
+## 2026-08-13 (ln) — THE JUDGE'S QUEUE RUNS THE STRONGEST MEASURED MEAN-RAISER NEXT: min-vol-1e5 swapped ahead, because the Farmer's blocker is its MEAN
+
+- **Operator, 13-Aug: *"fix all of the above ... and what we know does
+  work"* — executing the queue-swap option prepared in this session.** The
+  Farmer-live horizon now reads its t bar **unreachable at the current
+  mean** (+0.079%/trade needs ~1,152 closes ≈ 311 days at 3.48/d) — the
+  6-Aug "~23-Aug on-track" date is stale, superseded by the soft recent
+  half. More closes at this mean never pass the gate; only a HIGHER MEAN
+  does, and the serial judge queue is the only path that can raise it.
+- **The swap:** `min-vol-1e5` now runs ahead of `min-vol-2e6` — it holds
+  the queue's strongest DIRECT prior (calibrated own-tape replay: the
+  [0.1M,2M) band alone **+$14.83, both halves positive, robust at the
+  tier's p90**, vs the incumbent's +$4.01 —
+  STUDY_THIN_TIER_MIN_VOL_2026-08-05), while 2e6's prior is indirect and
+  its role was to DE-RISK the 1e5 read at the cost of a 7-day slot. The
+  selftest's own ordering rule (statics run strongest-prior-first) is
+  argued with, not edited around: `_PRIOR_RANK` now ranks the direct
+  measurement above the indirect one, which arguably it always should have.
+- **Restrict-safe, per the (ev) reorder precedent:** no bar moves, no lever
+  changes, the paired live-vs-shadow bar still gates every promotion,
+  fade-watch unchanged. `slope-gate-off` (running, eval already reading
+  no-promote) releases on its own; `min-vol-1e5` starts next. Judge
+  selftest green with the drain-order pins updated to match.
+
 ## 2026-08-13 (lm) — THE REAL-MONEY GRANT, ENGRAVED WITH ITS LIMITS — and what the data actually authorizes today, so the grant is not misread as a mandate
 
 - **Operator, 13-Aug (verbatim): *"We have so much data now on all bots, we

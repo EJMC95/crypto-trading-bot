@@ -481,6 +481,26 @@ def main():
     p.add_argument("--once", action="store_true", help="Single loop then exit.")
     args = p.parse_args()
 
+    # [2026-08-13 (lo)] RETIRED — the I17 keep-or-retire call, MADE by the
+    # operator ("get rid of what's not working"). ZERO closes in 44 days
+    # (3 buys / 0 sells ever), and the rule's own measured rate is ~17.2
+    # closes/yr against a 30-close gate bar: STRUCTURALLY UNDECIDABLE — an
+    # edge the fleet cannot measure is an edge it does not have. It idles
+    # holding +$13.93 of open MTM, which is marks, not evidence. Item-18
+    # regime coverage does not die with it: the family books' non-crypto
+    # universe + the per-asset oracle carry that job now. Idles, never
+    # exits (restartPolicy=always makes an exit a crash-loop — the Trail
+    # Blazer pattern). Ledgers kept. Resurrect: INDEX_RIDER_RETIRED_OVERRIDE=run.
+    if os.environ.get("INDEX_RIDER_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("equities-regime (📊 Index Rider) is RETIRED: 0 closes in 44 "
+              "days, measured rule rate ~17.2 closes/yr vs a 30-close gate "
+              "bar — structurally undecidable (I17); operator decision "
+              "13-Aug. Idling: no venue calls, no publishes, ledgers kept. "
+              "INDEX_RIDER_RETIRED_OVERRIDE=run to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     # [v1 GATE] UNVALIDATED on this venue — shadow only.
     # [2026-07-22] The original rule read "the funding-drag record vs the IBKR
