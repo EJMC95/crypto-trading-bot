@@ -128,7 +128,7 @@ def allocation_scale(bot, current_time=None):
     central-accessor pattern, so the switch reaches the consumer without a
     redeploy ([[a-kill-switch-must-reach-the-consumer]]).
 
-    [2026-08-13 (lv)] EXPANSION IS PRICED ON THE BOOK'S OWN ERA. The organ
+    [2026-08-13 (lx)] EXPANSION IS PRICED ON THE BOOK'S OWN ERA. The organ
     ranks on the ALL-TIME pooled sample — `(kc)` measured that era-scoping the
     ranked claim leaves zero claimants on 15 of 15 days, i.e. it turns the
     organ off, so that is deliberately unchanged. But the ranked claim and the
@@ -184,7 +184,7 @@ def era_supports_expansion(row):
     """True only when a published allocation row's ERA-scoped claim is a
     positive number — the gate on `allocation_scale` growing a book past flat.
 
-    [2026-08-13 (lv)] Deliberately NOT a re-derivation of the era rule. That
+    [2026-08-13 (lx)] Deliberately NOT a re-derivation of the era rule. That
     rule has exactly one owner (`golive_readiness.era_rows`, which
     `fleet_allocation._era_twin` imports rather than copies) and a second copy
     of a rule is a second rule ((hj)). This reads the published number and asks

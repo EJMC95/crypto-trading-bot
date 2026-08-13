@@ -37,7 +37,7 @@ import fleet_bus
 def _payload(monkeypatch, books, now=None, era=None):
     """Publisher-built payload served through the accessor's own _load.
 
-    [(lv)] `era` is {bot: claim_era} and goes through the publisher's OWN
+    [(lx)] `era` is {bot: claim_era} and goes through the publisher's OWN
     `set_era_twin` — the single writer of those fields — so these tests cannot
     drift from the field names `run_once` actually publishes. `build` alone
     leaves every era claim None (no opinion), which is the fail-closed state
@@ -123,7 +123,7 @@ def test_scale_is_clamped_both_ends(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# [2026-08-13 (lv)] A BOOK GROWS PAST FLAT ONLY ON ITS OWN ERA'S EVIDENCE.
+# [2026-08-13 (lx)] A BOOK GROWS PAST FLAT ONLY ON ITS OWN ERA'S EVIDENCE.
 #
 # THE INCIDENT: 13-Aug, 🌾 carry was being scaled 4.0x on new entries off a
 # claim computed over n=101 all-time, of which 91 closes predate its declared

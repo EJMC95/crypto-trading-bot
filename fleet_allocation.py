@@ -242,7 +242,7 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
             "undecided": n < MIN_N or cl[b] <= 0.0,
             "undecided_why": why,
         }
-        # [2026-08-13 (lv)] DECLARED SHAPE, fail-CLOSED. The era twin is filled
+        # [2026-08-13 (lx)] DECLARED SHAPE, fail-CLOSED. The era twin is filled
         # by `run_once` (it needs the ledger rows and the era owner's import);
         # `build` cannot compute it, so it publishes the fields as None rather
         # than omitting them. That matters because a CONSUMER now reads
@@ -258,7 +258,7 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
 def set_era_twin(rec, n_era, claim_era, era_iso=None, era_src=None):
     """The ONE writer of a published book row's era-twin fields.
 
-    [2026-08-13 (lv)] Both `run_once` and the consumer tests go through here so
+    [2026-08-13 (lx)] Both `run_once` and the consumer tests go through here so
     the field NAMES have a single author. `claim_era` keeps `lower_bound`'s own
     distinction all the way to the payload boundary: None is "no opinion" (era
     sample below MIN_N, or the era rule unavailable), 0.0 is "measured, and the
@@ -395,7 +395,7 @@ def _era_twin(bot, rows):
     (its declared era is 31-Jul, the two-writer window), and the Farmer shadow's
     0.199% claim goes to zero under the era rule.
 
-    [2026-08-13 (lv)] IT IS NO LONGER DISCLOSURE-ONLY — corrected in place (I12)
+    [2026-08-13 (lx)] IT IS NO LONGER DISCLOSURE-ONLY — corrected in place (I12)
     rather than left describing the system as it was. `fleet_bus.allocation_
     scale` now reads this field and refuses to scale a book ABOVE the flat
     allocation unless the era claim is a positive number. `(kc)`'s measurement
