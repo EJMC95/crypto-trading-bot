@@ -68,7 +68,11 @@ jobs:
               --set "RAILWAY_DOCKERFILE_PATH=${DF}" \
               --set "DATABASE_URL=${DB_REF}" \
               --skip-deploys || { echo "::error::$SVC variable set failed"; fail=1; continue; }
-            railway variables --service "$SVC" | sed 's/postgres[^ ]*/<redacted>/g' || true
+            # NO echo-back of variables: `railway variables` prints RESOLVED
+            # values, and a wrapped table defeats any line-based redaction —
+            # the (kb) class. The --set call's exit code above IS the check;
+            # db-backup.yml's rule holds here: names only, never values.
+            echo "$SVC variables set (VENUE, RAILWAY_DOCKERFILE_PATH, DATABASE_URL reference)"
             echo "::endgroup::"
 
             echo "::group::$SVC — first deploy"
