@@ -167,6 +167,39 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
+# --------------------------- microstructure telemetry ((mg)) -----------------
+def spread_bps(book):
+    """Quoted spread of a live order book in bps of mid, or None when the
+    book cannot support a claim. Harris (Trading and Exchanges): the spread
+    is the price of immediacy — this book MODELS its fills at mark plus a
+    flat slip constant, and recording what the venue actually quotes at
+    entry/exit is what keeps that constant falsifiable instead of asserted.
+    Levels with non-positive price/size are filtered (the Farmer's measured
+    lesson: a negative level sorts first and fabricates a garbage mid), and
+    a crossed book returns None — a book that is not a price makes no claim."""
+    try:
+        bids = [p for p, s in (book or {}).get("bids") or [] if p > 0 and s > 0]
+        asks = [p for p, s in (book or {}).get("asks") or [] if p > 0 and s > 0]
+        if not bids or not asks:
+            return None
+        bid, ask = max(bids), min(asks)
+        mid = (bid + ask) / 2.0
+        if mid <= 0 or ask < bid:
+            return None
+        return round((ask - bid) / mid * 1e4, 2)
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def live_spread_bps(ctx, coin):
+    """One orderbook fetch -> quoted spread bps. TELEMETRY ONLY, never a
+    gate — None on any failure, and a dark book must not slow the pass."""
+    try:
+        return spread_bps(ctx.venue.orderbook(coin))
+    except Exception:      # noqa: BLE001
+        return None
+
+
 # --------------------------- pure decision layer -----------------------------
 def _class_ok(coin):
     """May `coin` ENTER this book? Crypto perps only — (lk). Fail-OPEN, the
@@ -418,10 +451,12 @@ def fetch_premiums():
 
 
 # --------------------------- the loop ----------------------------------------
-def _close(bot_id, key, pos, reason, exit_rate, pnl):
+def _close(bot_id, key, pos, reason, exit_rate, pnl, spread_exit=None):
     """Ledger one close: `<side>-basis_<exit>` + the (gr) funding-form
     telemetry. No prices: delta-neutral modelled — a price on its rows would
-    be fabricated data (the cohort rule)."""
+    be fabricated data (the cohort rule). The (mg) Harris spread fields ARE
+    recorded: the quoted spread is what the 30bps RT friction model asserts
+    about, so every close carries the number that can falsify it."""
     t = time.time()
     held_h = (t - pos["opened_ts"]) / 3600.0
     try:
@@ -441,6 +476,8 @@ def _close(bot_id, key, pos, reason, exit_rate, pnl):
                    "fees": round(pos.get("fees") or 0.0, 4),
                    "notional": pos.get("notional"),
                    "entry_prem_bps": pos.get("entry_prem_bps"),
+                   "spread_bps_entry": pos.get("spread_bps_entry"),
+                   "spread_bps_exit": spread_exit,
                    "held_h": round(held_h, 2)})
     except Exception:  # noqa: BLE001
         pass
@@ -597,7 +634,8 @@ def main():
                 n_closed += 1
                 n_wins += 1 if pnl > 0 else 0
                 held_h = (t0 - pos["opened_ts"]) / 3600.0
-                _close(bot_id, key, pos, reason, rate, pnl)
+                _close(bot_id, key, pos, reason, rate, pnl,
+                       spread_exit=live_spread_bps(ctx, pos["coin"]))
                 print(f"[{now_iso()}] CLOSE {key} {pos['side']} after "
                       f"{held_h:.1f}h [{reason}] pnl {pnl:+.2f} | "
                       f"banked {realized:+.2f}")
@@ -631,6 +669,7 @@ def main():
                     side = "short" if apr > 0 else "long"
                     _open_position(positions, c, side, CLIP_USD, t0, apr,
                                    prem_bps=prem_map.get(c))
+                    positions[c]["spread_bps_entry"] = live_spread_bps(ctx, c)
                     held.add(c)
                     print(f"[{now_iso()}] OPEN {c} {side} ${CLIP_USD:.0f} | "
                           f"{apr:+.1%} TRUE | payback "
@@ -820,6 +859,19 @@ def _selftest():
         assert _class_ok("ANYTHING") is True
     finally:
         fleet_bus = _orig
+
+
+    # (mg) Harris spread telemetry: pure arithmetic + the refusal shapes
+    good = {"bids": [(99.0, 5.0), (98.0, 1.0)], "asks": [(101.0, 4.0)]}
+    assert abs(spread_bps(good) - 200.0) < 0.5, spread_bps(good)
+    assert spread_bps({"bids": [], "asks": [(1, 1)]}) is None
+    assert spread_bps({"bids": [(-1.0, 50), (99.0, 1)],
+                       "asks": [(101.0, 1)]}) == \
+        spread_bps({"bids": [(99.0, 1)], "asks": [(101.0, 1)]}), \
+        "a negative level must be FILTERED, never a mid (the Farmer's lesson)"
+    assert spread_bps({"bids": [(102.0, 1)], "asks": [(101.0, 1)]}) is None, \
+        "a crossed book is not a price and makes no claim"
+    assert spread_bps(None) is None
 
     print("lighter_book_hull_bot self-tests passed "
           "(band, payback floor, basis veto, gates, census, measured exit "

@@ -1,3 +1,40 @@
+## 2026-08-13 (mg) — 📖 HARRIS READ AGAINST THE FLEET: the microstructure book turns out to be the fleet's own biography — verified where it already exists, and the one real gap closed with falsifiable-slip telemetry on the wave-2 books
+
+**Operator, 13-Aug:** *"Can you implement any knowledge from Trading and
+Exchanges: Market Microstructure for Practitioners — Larry Harris also this
+could be helpful."* No new row minted — a microstructure book's lessons land
+inside every book that trades, or nowhere. Full reading:
+`BOOK_HARRIS_TRADING_AND_EXCHANGES_2026-08-13.md`.
+
+- **THE AUDIT BEFORE THE BUILD (I11):** Harris's practitioner chapters map
+  one-to-one onto mechanisms the fleet already paid to learn — TCA/
+  implementation shortfall = the 📏 organ (named after his text's concept);
+  effective-spread-at-size = the (js) tx-hash fill study + the Farmer's
+  `book_metrics` VWAP walk on the live entry path; broken-price-discovery
+  halts = the stress veto; the zero-sum "know whose money you're winning" =
+  the (hm) random-entry benchmark; adverse selection = the dip-lens veto and
+  the Snap Back retirement; bid-ask bounce contaminating measurement = the
+  (hm) two-price-bases lesson; liquidity tiering = the I20 volume tiling.
+  Each VERIFIED in place, none rebuilt.
+- **THE ONE REAL GAP, CLOSED:** the wave-2 books charged flat modelled slip
+  (5bps/side price books, 15bps/side modelled pairs) that NOTHING could
+  falsify — an asserted transaction cost, Harris's cardinal sin. All four
+  now record the venue's QUOTED spread at entry and exit
+  (`spread_bps_entry`/`spread_bps_exit` on every close row; one orderbook
+  fetch per entry/close event; TELEMETRY ONLY — fail-open, never a gate, so
+  the measured trading rules are untouched). `spread_bps()` inherits the
+  Farmer's two measured refusal shapes, selftest-pinned in all four files:
+  non-positive levels FILTERED (the 30-Jul negative-level/garbage-mid live
+  fix) and a crossed book returns None. Sharpest consumer: 🧮 Hull's
+  payback floor is DERIVED from the 30bps RT assertion — its spread rows
+  now carry the number that can falsify its own entry bar.
+- **REFUSED, with reasons (in the doc):** a maker/limit-order book (no
+  honest fill simulator — modelled makers fabricate exactly the fills
+  adverse selection denies); a spread ENTRY veto on the newborn books
+  (unsimmed gate = drift from birth evidence — the telemetry precedes any
+  veto, day-31 decision on the books' own rows); front-running defenses and
+  venue-routing economics (no surface on a one-venue shadow fleet).
+
 ## 2026-08-13 (mf) — THE BOOKS TEACH THE FLEET: Hull's basis-noise finding replayed on the carry cohort's OWN cell — 🏦 Rich Dad takes the fix at zero clock cost, the protected clocks get it as decision-day evidence, and two lessons turn out to be already built
 
 **Operator, 13-Aug:** *"Also if there are things from these books we can add

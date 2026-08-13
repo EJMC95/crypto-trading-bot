@@ -133,6 +133,39 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
+# --------------------------- microstructure telemetry ((mg)) -----------------
+def spread_bps(book):
+    """Quoted spread of a live order book in bps of mid, or None when the
+    book cannot support a claim. Harris (Trading and Exchanges): the spread
+    is the price of immediacy — this book MODELS its fills at mark plus a
+    flat slip constant, and recording what the venue actually quotes at
+    entry/exit is what keeps that constant falsifiable instead of asserted.
+    Levels with non-positive price/size are filtered (the Farmer's measured
+    lesson: a negative level sorts first and fabricates a garbage mid), and
+    a crossed book returns None — a book that is not a price makes no claim."""
+    try:
+        bids = [p for p, s in (book or {}).get("bids") or [] if p > 0 and s > 0]
+        asks = [p for p, s in (book or {}).get("asks") or [] if p > 0 and s > 0]
+        if not bids or not asks:
+            return None
+        bid, ask = max(bids), min(asks)
+        mid = (bid + ask) / 2.0
+        if mid <= 0 or ask < bid:
+            return None
+        return round((ask - bid) / mid * 1e4, 2)
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def live_spread_bps(ctx, coin):
+    """One orderbook fetch -> quoted spread bps. TELEMETRY ONLY, never a
+    gate — None on any failure, and a dark book must not slow the pass."""
+    try:
+        return spread_bps(ctx.venue.orderbook(coin))
+    except Exception:      # noqa: BLE001
+        return None
+
+
 # --------------------------- pure decision layer -----------------------------
 def atr_frac(bars, n=ATR_N):
     """Wilder ATR of the LAST bar as a fraction of its close, over closed
@@ -266,9 +299,11 @@ def build_extra(census, positions, recent, open_pnl, realized):
 
 
 # --------------------------- the loop ----------------------------------------
-def _close(bot_id, key, pos, reason, exit_px, pnl):
+def _close(bot_id, key, pos, reason, exit_px, pnl, spread_exit=None):
     """Ledger one close: `<side>-impulse_<exit>` + the (gr) price telemetry —
-    entry/exit prices from the position's own records, never literals."""
+    entry/exit prices from the position's own records, never literals. The
+    (mg) Harris fields record the venue's QUOTED spread at entry/exit so the
+    flat modelled slip stays falsifiable against the book's own tape."""
     t = time.time()
     held_h = (t - pos["opened_ts"]) / 3600.0
     entry_px = pos.get("entry_mark")
@@ -286,6 +321,8 @@ def _close(bot_id, key, pos, reason, exit_px, pnl):
                    "sl_frac": pos.get("sl_frac"),
                    "tp_frac": pos.get("tp_frac"),
                    "notional": pos.get("notional"),
+                   "spread_bps_entry": pos.get("spread_bps_entry"),
+                   "spread_bps_exit": spread_exit,
                    "held_h": round(held_h, 2)})
     except Exception:  # noqa: BLE001
         pass
@@ -460,7 +497,8 @@ def main():
                                    if pos.get("sl_frac") else None)})
                 recent = recent[-SAMPLE_N:]
                 held_h = (t0 - pos["opened_ts"]) / 3600.0
-                _close(bot_id, key, pos, reason, mark, pnl)
+                _close(bot_id, key, pos, reason, mark, pnl,
+                       spread_exit=live_spread_bps(ctx, pos["coin"]))
                 print(f"[{now_iso()}] CLOSE {key} {pos['side']} after "
                       f"{held_h:.1f}h [{reason}] pnl {pnl:+.2f} | "
                       f"banked {realized:+.2f}")
@@ -503,6 +541,7 @@ def main():
                 if pos is None:
                     unpriceable += 1
                     continue
+                pos["spread_bps_entry"] = live_spread_bps(ctx, coin)
                 acted[coin] = sig_t
                 opened += 1
                 print(f"[{now_iso()}] OPEN {coin} {side} ${CLIP_USD:.0f} @ "
@@ -671,6 +710,19 @@ def _selftest():
     # 10) the persistence blob
     blob = build_state(positions, rec, {"A": float(sig_t)}, t, now=t)
     assert "saved_ts" in blob and blob["acted"] == {"A": float(sig_t)}
+
+
+    # (mg) Harris spread telemetry: pure arithmetic + the refusal shapes
+    good = {"bids": [(99.0, 5.0), (98.0, 1.0)], "asks": [(101.0, 4.0)]}
+    assert abs(spread_bps(good) - 200.0) < 0.5, spread_bps(good)
+    assert spread_bps({"bids": [], "asks": [(1, 1)]}) is None
+    assert spread_bps({"bids": [(-1.0, 50), (99.0, 1)],
+                       "asks": [(101.0, 1)]}) == \
+        spread_bps({"bids": [(99.0, 1)], "asks": [(101.0, 1)]}), \
+        "a negative level must be FILTERED, never a mid (the Farmer's lesson)"
+    assert spread_bps({"bids": [(102.0, 1)], "asks": [(101.0, 1)]}) is None, \
+        "a crossed book is not a price and makes no claim"
+    assert spread_bps(None) is None
 
     print("lighter_book_douglas_bot self-tests passed "
           "(impulse fade, predefined bracket, consistency signature, "

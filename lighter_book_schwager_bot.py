@@ -127,6 +127,39 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
+# --------------------------- microstructure telemetry ((mg)) -----------------
+def spread_bps(book):
+    """Quoted spread of a live order book in bps of mid, or None when the
+    book cannot support a claim. Harris (Trading and Exchanges): the spread
+    is the price of immediacy — this book MODELS its fills at mark plus a
+    flat slip constant, and recording what the venue actually quotes at
+    entry/exit is what keeps that constant falsifiable instead of asserted.
+    Levels with non-positive price/size are filtered (the Farmer's measured
+    lesson: a negative level sorts first and fabricates a garbage mid), and
+    a crossed book returns None — a book that is not a price makes no claim."""
+    try:
+        bids = [p for p, s in (book or {}).get("bids") or [] if p > 0 and s > 0]
+        asks = [p for p, s in (book or {}).get("asks") or [] if p > 0 and s > 0]
+        if not bids or not asks:
+            return None
+        bid, ask = max(bids), min(asks)
+        mid = (bid + ask) / 2.0
+        if mid <= 0 or ask < bid:
+            return None
+        return round((ask - bid) / mid * 1e4, 2)
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def live_spread_bps(ctx, coin):
+    """One orderbook fetch -> quoted spread bps. TELEMETRY ONLY, never a
+    gate — None on any failure, and a dark book must not slow the pass."""
+    try:
+        return spread_bps(ctx.venue.orderbook(coin))
+    except Exception:      # noqa: BLE001
+        return None
+
+
 # --------------------------- pure decision layer -----------------------------
 def atr_frac(bars, n=ATR_N):
     """Wilder ATR of the LAST bar as a fraction of its close. None when the
@@ -282,8 +315,9 @@ def build_extra(census, positions, open_pnl, realized):
 
 
 # --------------------------- the loop ----------------------------------------
-def _close(bot_id, key, pos, reason, exit_px, pnl):
-    """Ledger one close: `<side>-trend_<exit>` + (gr) price telemetry."""
+def _close(bot_id, key, pos, reason, exit_px, pnl, spread_exit=None):
+    """Ledger one close: `<side>-trend_<exit>` + (gr) price telemetry + the
+    (mg) Harris quoted-spread fields (falsifiable slip model)."""
     t = time.time()
     held_h = (t - pos["opened_ts"]) / 3600.0
     entry_px = pos.get("entry_mark")
@@ -302,6 +336,8 @@ def _close(bot_id, key, pos, reason, exit_px, pnl):
                    "trail_px": pos.get("trail_px"),
                    "hwm": pos.get("hwm"),
                    "notional": pos.get("notional"),
+                   "spread_bps_entry": pos.get("spread_bps_entry"),
+                   "spread_bps_exit": spread_exit,
                    "held_h": round(held_h, 2)})
     except Exception:  # noqa: BLE001
         pass
@@ -469,7 +505,8 @@ def main():
                 n_closed += 1
                 n_wins += 1 if pnl > 0 else 0
                 held_h = (t0 - pos["opened_ts"]) / 3600.0
-                _close(bot_id, key, pos, reason, px, pnl)
+                _close(bot_id, key, pos, reason, px, pnl,
+                       spread_exit=live_spread_bps(ctx, pos["coin"]))
                 print(f"[{now_iso()}] CLOSE {key} {pos['side']} after "
                       f"{held_h:.1f}h [{reason}] pnl {pnl:+.2f} | "
                       f"banked {realized:+.2f}")
@@ -513,6 +550,7 @@ def main():
                 if pos is None:
                     unpriceable += 1
                     continue
+                pos["spread_bps_entry"] = live_spread_bps(ctx, coin)
                 acted[coin] = sig_t
                 opened += 1
                 print(f"[{now_iso()}] OPEN {coin} {side} ${CLIP_USD:.0f} @ "
@@ -689,6 +727,19 @@ def _selftest():
     # 9) the persistence blob
     blob = build_state(positions, {"A": float(bars[-1][0])}, t, now=t)
     assert "saved_ts" in blob and "positions" in blob
+
+
+    # (mg) Harris spread telemetry: pure arithmetic + the refusal shapes
+    good = {"bids": [(99.0, 5.0), (98.0, 1.0)], "asks": [(101.0, 4.0)]}
+    assert abs(spread_bps(good) - 200.0) < 0.5, spread_bps(good)
+    assert spread_bps({"bids": [], "asks": [(1, 1)]}) is None
+    assert spread_bps({"bids": [(-1.0, 50), (99.0, 1)],
+                       "asks": [(101.0, 1)]}) == \
+        spread_bps({"bids": [(99.0, 1)], "asks": [(101.0, 1)]}), \
+        "a negative level must be FILTERED, never a mid (the Farmer's lesson)"
+    assert spread_bps({"bids": [(102.0, 1)], "asks": [(101.0, 1)]}) is None, \
+        "a crossed book is not a price and makes no claim"
+    assert spread_bps(None) is None
 
     print("lighter_book_schwager_bot self-tests passed "
           "(entry+confirm, monotone trail, stop handoff, no-pyramid pin, "
