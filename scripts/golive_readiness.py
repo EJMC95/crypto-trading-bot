@@ -1170,6 +1170,23 @@ DOCKET_VERDICTS = ("unreachable", "undecidable")
 #: a failed read of the clocks costs only the clocks: they are simply not
 #: rewritten, the previous value survives, and the GRADE still publishes.
 DOCKET_SEEN_KEY = "golive-docket-seen"
+#: [(lu)] A CLOCK THAT STARTED WHEN THE INSTRUMENT WAS INSTALLED IS A FLOOR,
+#: NOT AN ONSET — and it must not be reported as one. When the docket first
+#: runs (or after any restart that takes an empty prior), EVERY stuck book is
+#: stamped `since = now` in the same publish, to the same second. Those clocks
+#: then all mature together `DOCKET_DAYS` later, and the docket's output reads
+#: "these N books became overdue on <date>" when the truth is only "on <date>
+#: we started counting". Measured 13-Aug: NINE books shared
+#: `2026-08-06T12:28:34Z` — the (lf) key-split deploy — and were 6.73d from
+#: firing as one batch, on the docket's first ever firing.
+#:
+#: The honest repair is NOT to invent an onset date (I8: unknown degrades to
+#: the honest value, never to a guess) and NOT to suppress the entry (all nine
+#: are genuinely `unreachable`; suppressing hides true findings). It is to say
+#: which number we actually have: a LOWER BOUND. A `since` shared by this many
+#: books to the exact second is a batch stamp, not a coincidence — books do not
+#: become stuck in the same second.
+BATCH_STAMP_MIN = int(os.environ.get("GOLIVE_DOCKET_BATCH_MIN", "3"))
 
 # [2026-08-06 (kx)] NON-BOOK bot_pnl PUBLISHERS, declared with reasons — the
 # BORN_DARK_OK idiom. The roster sweep asks "living bot_pnl row with no
@@ -1526,7 +1543,8 @@ def peak_concurrency(eps):
     return mx
 
 
-def _docket_stuck(hz, era_days=None, roster_zero_ledger=False):
+def _docket_stuck(hz, era_days=None, roster_zero_ledger=False,
+                  roster_n_alltime=0):
     """(bool, reason) — is this book off any path to the gate right now?
 
     `unreachable` and `undecidable` are the horizon's own words for it.
@@ -1549,7 +1567,17 @@ def _docket_stuck(hz, era_days=None, roster_zero_ledger=False):
     if v in DOCKET_VERDICTS:
         return True, v
     if roster_zero_ledger:
-        return True, "zero_ledger"
+        # [(lh)] TWO DIFFERENT DIAGNOSES, and (lf) collapsed them into one
+        # reason string that named the wrong operator action for half the
+        # cases (I8). `n_alltime == 0` is a book that has genuinely never
+        # closed — I17's keep-or-retire. `n_alltime > 0` with no ledger rows
+        # is a READ problem (poller-only, outside the fetch window, fully
+        # quarantined): asking the operator to retire a book because the
+        # grader cannot see its trades is the wrong instruction entirely.
+        # Distinct reasons also mean the clock RESETS between them, which is
+        # correct — they are different findings about different things.
+        return True, ("zero_ledger" if not roster_n_alltime
+                      else "ledger_missing")
     if v == "no_rate" and isinstance(era_days, (int, float)) \
             and math.isfinite(era_days) and era_days >= GOLIVE_MIN_DAYS:
         return True, "no_rate_past_window"
@@ -1584,7 +1612,8 @@ def decision_docket(current, prior, now_iso, docket_days=None):
     for bot in sorted(current):
         c = current[bot] or {}
         stuck, reason = _docket_stuck(c.get("hz"), c.get("era_days"),
-                                      c.get("roster_zero_ledger"))
+                                      c.get("roster_zero_ledger"),
+                                      c.get("n") or 0)
         if not stuck:
             continue                     # not stuck -> no entry -> clock gone
         was = prior.get(bot)
@@ -1601,15 +1630,48 @@ def decision_docket(current, prior, now_iso, docket_days=None):
         docket.append({
             "book": bot, "reason": reason, "since": since,
             "days_held": round(held, 1),
+            # [(lu)] filled in below, once every clock in this run is known —
+            # batchness is a property of the SET, not of one book.
+            "since_is_floor": False,
             "n": c.get("n"), "mean_pct": c.get("mean_pct"), "t": c.get("t"),
             "raw_days": hz.get("raw_days"),
             "why": hz.get("why") or "",
             # I17 is a KEEP-OR-RETIRE call for the operator, never another
             # tuning pass — say so in the entry so the docket cannot be read
             # as a to-do list for the next session.
-            "asks": ("keep-or-retire (I17) — an operator decision, not a "
+            # [(lh)] the instruction must match the FINDING (I8). A book
+            # the grader cannot READ is not a book to retire.
+            "asks": ("investigate the ledger read — bot_pnl reports closes "
+                     "the grader cannot see; this is NOT an I17 decision"
+                     if reason == "ledger_missing" else
+                     "keep-or-retire (I17) — an operator decision, not a "
                      "tuning pass"),
         })
+    # [(lu)] BATCH-STAMP DISCLOSURE. A clock in a batch reports its age as a
+    # FLOOR.
+    #
+    # Counted over `seen` (every stuck book) rather than `docket` (the matured
+    # ones). Be honest about why: today the two are EQUIVALENT — books sharing
+    # a `since` to the second necessarily share `held`, so a stamp present in
+    # the docket has all its members in the docket. A mutation swapping them
+    # survived, which is the proof. `seen` is kept because it is the basis the
+    # property is actually about, and it stays correct if maturity ever varies
+    # per book (a per-book `docket_days`); it is NOT load-bearing today, and
+    # claiming otherwise would be the vacuous-guard shape this file warns of.
+    _batch = {}
+    for _v in seen.values():
+        _s = (_v or {}).get("since")
+        if _s:
+            _batch[_s] = _batch.get(_s, 0) + 1
+    for _d in docket:
+        if _batch.get(_d["since"], 0) >= BATCH_STAMP_MIN:
+            _d["since_is_floor"] = True
+            _d["batch_n"] = _batch[_d["since"]]
+            _d["why"] = ((_d["why"] + " · ") if _d["why"] else "") + (
+                "clock is a LOWER BOUND: `since` is shared to the second by "
+                f"{_batch[_d['since']]} books, so it is when the docket "
+                "STARTED COUNTING (install/restart), not when this book "
+                f"became stuck — stuck for AT LEAST {_d['days_held']}d")
     # worst first: longest stuck, then weakest evidence
     docket.sort(key=lambda d: (-(d["days_held"] or 0),
                                (d["mean_pct"] if d["mean_pct"] is not None
@@ -2135,6 +2197,16 @@ def _selftest():
             if isinstance(_x, float):
                 assert math.isfinite(_x), (_k, _x)
 
+    # [(lh)] THE (lf) SPLIT'S PREMISE, MADE EXECUTABLE. The whole correctness
+    # of moving the clocks to their own key rests on the two constants
+    # DIFFERING — and nothing asserted it. Setting `DOCKET_SEEN_KEY = KEY`
+    # passed 47/47 tests while every publish overwrote the grade payload with
+    # `{updated, ttl_sec, seen}`: no `books`, no `below_floor`, no `ready`. The
+    # 🚦 card renders empty at that point and fleet_immune's two-writer pager
+    # (which reads `books.<bot>.integrity`) goes blind — on a green build.
+    assert DOCKET_SEEN_KEY != KEY, (
+        "the docket clocks must live in their OWN state key; collapsing them "
+        "into the grade key destroys the whole payload on every publish")
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
           "high-win-rate loser, window/DD bars, ungradeable input, policy "
           "eras, stamp-derived policy boundaries: first-new-close bound, "
@@ -2608,8 +2680,25 @@ def main():
                     _prior_seen, _ok_prior = _store.load_state(
                         DOCKET_SEEN_KEY), True
                 if _ok_prior:
+                    _prior_map = (_prior_seen or {}).get("seen")
+                    # [(lh)] ONE-TIME MIGRATION. (lf) moved the clocks to a new
+                    # key and read ONLY that key — and `load_state_checked`
+                    # returns (True, None) for a MISSING row, so the first
+                    # publish would have taken an empty prior, restamped every
+                    # `since` to now, and overwritten the old 14-clock mirror in
+                    # the same wholesale write. A silent restart, and 14 clocks
+                    # all stamped at deploy time read exactly like "the fleet
+                    # became stuck today" — an unknown reading as a verdict.
+                    # The hand-off is stated in the payload, never silent.
+                    if not _prior_map:
+                        _legacy = (_store.load_state(KEY) or {}).get(
+                            "docket_seen")
+                        if _legacy:
+                            _prior_map = _legacy
+                            _docket_why = ("clocks migrated from "
+                                           "golive-readiness.docket_seen")
                     _docket, _seen = decision_docket(
-                        _docket_now, (_prior_seen or {}).get("seen"), _now_iso)
+                        _docket_now, _prior_map, _now_iso)
                     _seen_ok = True
                 else:
                     _docket_why = ("docket clocks unreadable — NOT recomputed "
@@ -2627,6 +2716,14 @@ def main():
                 "decision_docket": _docket,
                 "docket_seen": _seen,
                 "docket_days": DOCKET_DAYS,
+                # [(lh)] A POSITIVE VALIDITY FLAG. On a failed clocks read the
+                # two fields above are `[]`/`{}` — an EMPTY MAP IS A CLAIM and
+                # reads identically to "nothing is overdue", while the honest
+                # state is "unknown". Consumers test this rather than inferring
+                # from the absence of `docket_why`. The mirror is kept (it is
+                # what /bus.json exposes; DOCKET_SEEN_KEY is not on that list),
+                # so the flag is what makes it safe to read.
+                "docket_valid": bool(_seen_ok),
                 **({"docket_why": _docket_why} if _docket_why else {}),
                 "bar": {"min_days": GOLIVE_MIN_DAYS,
                         "min_closes": GOLIVE_MIN_CLOSES,
@@ -2649,9 +2746,17 @@ def main():
             # book's clock, which is precisely the defect this split exists to
             # remove. The GRADE above is already published either way.
             if _seen_ok:
-                _store.save_state(DOCKET_SEEN_KEY,
-                                  {"updated": _now_iso, "ttl_sec": TTL_SEC,
-                                   "seen": _seen})
+                # [(lh)] I4: NEVER DISCARD A PERSISTENCE RESULT. (lf) dropped
+                # this return, so a failed clock write left the payload
+                # advertising clocks that were never stored — the exact shape
+                # (lf)'s own still-open list flagged for `churn_seen`, shipped
+                # one function away from where it was written down.
+                _ok_seen = _store.save_state(
+                    DOCKET_SEEN_KEY,
+                    {"updated": _now_iso, "ttl_sec": TTL_SEC, "seen": _seen})
+                if not _ok_seen:
+                    print("[golive] docket CLOCK WRITE FAILED — the clocks did "
+                          "not advance this cycle", flush=True)
             # HISTORY too, because the question the baseline document asks is a
             # TRAJECTORY one — "is t moving toward 2.0 and n above 41?" — and a
             # single current snapshot cannot answer it. 4 writes/day against a

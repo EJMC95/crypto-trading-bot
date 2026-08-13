@@ -195,6 +195,92 @@ class TestOrderingAndContent:
         assert "docket" not in src, "grade() must not read the docket"
 
 
+class TestTheBatchStampIsDisclosedAsAFloor:
+    """[(lu)] THE INCIDENT, measured on the live payload 13-Aug.
+
+    `golive-docket-seen` held 20 clocks and NINE of them carried the identical
+    `since` — `2026-08-06T12:28:34Z`, the second the (lf) key split deployed.
+    At `DOCKET_DAYS=7` they were 6.73d from maturing TOGETHER, so the docket's
+    first ever firing would have been nine books at once, every entry dated to
+    a day on which nothing happened to any of them.
+
+    The books were genuinely stuck (all `unreachable`), so suppressing is
+    wrong; we do not know when each became stuck, so inventing an onset is
+    worse (I8). What we know is a LOWER BOUND, and that is what must be said.
+    """
+
+    def _batch(self, k, days):
+        stamp = iso(T0 - timedelta(days=days))
+        seen = {f"b{i}": {"reason": "unreachable", "since": stamp}
+                for i in range(k)}
+        cur = {f"b{i}": book("unreachable") for i in range(k)}
+        return G.decision_docket(cur, seen, iso(T0))
+
+    def test_a_shared_second_is_flagged_as_a_floor_not_an_onset(self):
+        d, _ = self._batch(G.BATCH_STAMP_MIN, 10)
+        assert d, "the batch must still docket — these books ARE stuck"
+        for e in d:
+            assert e["since_is_floor"] is True
+            assert e["batch_n"] == G.BATCH_STAMP_MIN
+            assert "AT LEAST" in e["why"], (
+                "an install-time clock reported as an onset is an unknown "
+                "reading as a verdict")
+
+    def test_a_lone_clock_is_reported_as_an_onset(self):
+        """The flag must DISCRIMINATE. If everything is a floor, the field
+        carries no information and the real batch stops standing out."""
+        seen = {"solo": {"reason": "unreachable",
+                         "since": iso(T0 - timedelta(days=10))}}
+        d, _ = G.decision_docket({"solo": book("unreachable")}, seen, iso(T0))
+        assert d[0]["since_is_floor"] is False
+        assert "batch_n" not in d[0]
+        assert "AT LEAST" not in d[0]["why"]
+
+    def test_below_the_threshold_is_not_a_batch(self):
+        d, _ = self._batch(G.BATCH_STAMP_MIN - 1, 10)
+        assert all(e["since_is_floor"] is False for e in d)
+
+    def test_a_batch_matures_together_and_every_member_is_flagged(self):
+        """The whole batch crosses in one publish — that simultaneity IS the
+        symptom — and no member may slip through unflagged.
+
+        Recorded honestly: an earlier version of this test claimed the count
+        had to be taken over `seen` rather than the matured `docket`, and a
+        mutation swapping them SURVIVED. Books sharing a `since` to the second
+        share `held`, so they mature together and the two bases agree. The
+        real property is the one asserted here.
+        """
+        stamp = iso(T0 - timedelta(days=10))
+        others = {f"y{i}": {"reason": "unreachable", "since": stamp}
+                  for i in range(G.BATCH_STAMP_MIN)}
+        solo = {"solo": {"reason": "unreachable",
+                         "since": iso(T0 - timedelta(days=9))}}
+        seen = {**others, **solo}
+        cur = {k: book("unreachable") for k in seen}
+        d, _ = G.decision_docket(cur, seen, iso(T0))
+        assert len(d) == G.BATCH_STAMP_MIN + 1, "all of them matured"
+        flagged = {e["book"] for e in d if e["since_is_floor"]}
+        assert flagged == set(others), (
+            "every batch member is flagged and the lone book is not — "
+            "partial flagging would leave a wrong date in the docket")
+
+    def test_the_live_13aug_batch_would_have_been_disclosed(self):
+        """The incident itself, as a regression fixture: nine books sharing
+        `2026-08-06T12:28:34Z`, read at the moment they crossed 7 days."""
+        stamp = "2026-08-06T12:28:34+00:00"
+        names = ["crypto-breakout-4h-lshadow", "freqtrade-dad-lshadow",
+                 "lighter-perp-sniper-lshadow", "perps-funding-spread-lshadow",
+                 "pm-abbott-lshadow", "pm-gillard-lshadow",
+                 "pm-morrison-lshadow", "pm-rudd-lshadow",
+                 "pm-turnbull-lshadow"]
+        seen = {n: {"reason": "unreachable", "since": stamp} for n in names}
+        cur = {n: book("unreachable") for n in names}
+        d, _ = G.decision_docket(cur, seen, "2026-08-13T12:28:34+00:00")
+        assert len(d) == 9, "all nine cross in the same publish"
+        assert all(e["since_is_floor"] and e["batch_n"] == 9 for e in d)
+        assert all("AT LEAST" in e["why"] for e in d)
+
+
 class TestTheMeasuredFleet:
     """The 6-Aug live reading, replayed: 14 of 22 books stuck."""
 

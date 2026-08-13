@@ -12,124 +12,18 @@ Recommended options are marked ★.
 
 ---
 
-## 0 · PENDING DEPLOYS — ~~waiting on you~~ **BOTH EXECUTED AND VERIFIED**
+## 0 · PENDING DEPLOYS — **NONE. Section closed 13-Aug by the daily review.**
 
-*Verified 7-Aug 10:15 AEST by stamp readback, which is the rule this file
-sets for itself — a green workflow run has never implied a container took it.
-`audit_code_currency` reads **CURRENT, 0 behind** on all three previously
-DEFERRED rows (`lighter-ticket-taker-lighter`, `perps-funding-lighter-lighter`,
-`perps-funding-lighter-lshadow`), all matching HEAD `904e949bb`. The live
-Taker now carries (kt)+(ku) — the venue-class screen — and (kq), the
-realised-lens-veto rewrite that decides when it HALTS.*
-
-*Added 6-Aug by one session; executed and stamp-verified the same day by a
-parallel session running on the operator's "full permission to commit and
-deploy all positive movements" — the two sessions crossed mid-flight, so this
-section was born already-stale (corrected in place per I12). Evidence:
-`audit_code_currency` reads **every stamped container CURRENT at main HEAD**;
-0a landed via the 06:06Z + 06:22Z dispatches (live Taker carries (kt)+(ku),
-stamp `d5d03751b3ef`→`3bacbbf6037d`), 0b via the 06:06Z + shadow-arm
-dispatches (both Farmer arms on `4f998e4eec4d`, cage lo=1e5 live — the
-judge's `min-vol-1e5` experiment is unblocked). Nothing here is waiting on
-anyone; the section stays until the next daily review confirms and removes
-it.*
-
-### 0a ★ 🎫 Ticket Taker — ~~live arm is screening against a 41-name-stale list~~ DONE 6-Aug
-
-**What it carries:** `(kt)` + `(ku)`.
-
-**Why:** the live arm's only crypto screen (`bull_entry_ok` → `_is_crypto`) had
-fallen 41 names behind the venue. Measured on the bus 6-Aug, **3 of the
-scout's 16 tickets were non-crypto instruments it would have admitted** —
-`DRAM`, `CXMT`, `CAP` — and **`CAP` was on the `divergence` lens**, the only
-lens the live arm trades. The live arm is divergence-short only, runs
-`bull: True`, and `("divergence","short")` is in `BULL_LENS_SIDES`, so every
-live entry passes that screen. It is the only thing between the real-money
-book and a short on a tokenised equity.
-
-**Urgency — CORRECTED 6-Aug 18:40 AEST. The earlier text here said "not
-currently armed". That was WRONG and the error was mine.** It was based on an
-audit that used `fleet_bus.is_crypto` on the ledger's `pair` column — and that
-function did not strip the `/USDC` quote, so it returned "crypto" for every
-non-crypto row and the audit reported ZERO. Blind by construction; fixed in
-`(lc)` (the fix cited `(kv)`, a letter the horizon work already held —
-repointed and engraved there).
-
-**Measured correctly, the live real-money book has already opened 19
-non-crypto positions (−$1.97 all-time). Five are IN-ERA short-divergence —
-DRAM, MINIMAX, SKHY — opened 1-Aug to 4-Aug.** In-era that population runs
-**−0.263%/trade against +1.145% on the crypto trades the screen keeps**, and
-it is **5 of 14 in-era trades: over a third of the sample the go-live gate is
-grading** on the book nearest real money.
-
-The dollar damage is two cents. The evidence damage is the reason to deploy:
-the gate is grading a sample a third of which the book's own design excludes.
-
-```bash
-# ALREADY RUN 6-Aug 06:22Z — kept for the record, not as an instruction.
-# Verified: the live Taker reads CURRENT at main HEAD (audit_code_currency).
-# Re-running is harmless but redeploys identical code.
-gh workflow run 305025607 -f services="tide-rider-lighter-live"
-```
-
-`(ku)` also means this is the LAST time this class needs a deploy: the scout
-now stamps the venue's instrument class on every ticket, so a newly listed
-equity is screened the moment the scout sees it.
-
-### 0b · 💸 Funding Farmer — ~~lever cage is 17 commits stale~~ DONE 6-Aug
-
-**What it carries:** `(ka)`'s `min_vol` cage widening, plus `(jx)`'s
-`claim_writer` + MTM series on the real-money pair.
-
-**Why:** `(ka)` moved `{xp,live}.funding.min_vol` cage `lo` 2e6 → 1e5 and filed
-`min-vol-1e5` in the judge's queue. Both Farmer arms still carry `lo=2e6`, so
-the judge would write 1e5, the container would clamp to 2e6, and it would
-grade a thin-tier experiment **the book never ran** — against a value identical
-to the `min-vol-2e6` candidate queued beside it.
-
-**Urgency — low.** `(kp)` now makes that failure LOUD instead of silent (the
-lever refuses to the operator default and `skewed_levers()` names it), and the
-judge is on `slope-gate-off` at 16/30 shadow closes with `min-vol-2e6`
-(unaffected) queued ahead. Realistically **2–4 weeks** out.
-
-```bash
-# ALREADY RUN 6-Aug (both arms) — kept for the record, not as an instruction.
-# Verified: both Farmer arms CURRENT at main HEAD; cage lo=1e5 is live, so
-# the judge's `min-vol-1e5` candidate will be graded on the value it writes.
-gh workflow run 305025607 -f services="trail-blazer-live"
-```
-
-### 0c · 🎫 Ticket Taker — the (lj) realised-veto era fix ~~rides the audit PR~~ MERGED 13-Aug, verification pending
-
-**What it carries:** `(lj)` — the realised lens veto scoped to the policy the
-arm runs. On deploy the LIVE arm's veto FIRES on its own era record
-(short-divergence n=31, mean −1.128%, t=−1.75; trailing 8d −2.456%, t=−3.68,
-nine of ten closes `_sl`) and the book stops opening new entries until that
-record clears — idle beats a measured −2.5%/trade.
-
-**[13-Aug 12:35 AEST — EXECUTED under the operator's real-money grant
-("full permission to commit push and adjust real money bots also"): PR #155
-merged, squash `75ead10f`, `[deploy-live-taker]` in the title, Railway
-Redeploy ran on the push.** Also ships (lk): carry + sniper class screens on
-their shadow auto-deploy rules.]
-
-**[13-Aug 12:50 AEST — VERIFIED BY STAMP READBACK, item CLOSED.**
-`audit_code_currency` reads **every stamped container CURRENT at
-`675f5562a`** (both Taker arms + carry + sniper on new builds:
-`cf458a382966` / `f80d5c78d168` / `7d3433170de2`), and carry's live
-`extra.scan` now publishes the `noncrypto` census bucket — the (lk) screen
-is live in the payload, not just in git. The live Taker's era-scoped veto is
-in force on the real-money book. Wake trigger deleted (P5). Nothing here is
-waiting on anyone; the section can drop at the next daily review.]
-
-### Verify either one landed — by stamp readback, never by the green run
-
-```bash
-.venv/bin/python3 scripts/audit_code_currency.py --pnl-json https://pnl-dashboard-production-858c.up.railway.app/pnl.json --depth 200
-```
-
-Expect the row to move from `DEFERRED` to `CURRENT`. A green workflow run has
-never implied a container took it.
+*Closed per this file's own maintenance rule ("an item leaves the day it is
+decided") and per 0c's own instruction ("the section can drop at the next daily
+review"). Verified 13-Aug 16:05 AEST by the rule this file sets for itself —
+stamp readback, not a green run: `audit_code_currency --depth 45` reads every
+stamped container **CURRENT at HEAD `5a4c9b8`**, except both 💸 Farmer arms,
+which are **DEFERRED** (8 commits, none marked for their marker-gated service —
+working as designed, not a finding). 0a/0b (6-Aug) and 0c (the (lj) live-Taker
+veto + (lk) class screens, 13-Aug) are all landed and stamp-verified; carry's
+`extra.scan.noncrypto` census bucket is publishing, so the (lk) screen is live
+in the payload. Nothing is waiting on anyone.*
 
 ---
 
