@@ -49,6 +49,16 @@
   DECLARED in `MANUAL_IMAGES_OK` with the activation path written into the
   entry, and `kiyosaki-provision.yml` (the verbatim (lr) pattern, DELETE
   after use) waits on one dispatch. Queue §2 has the three steps.
+  **[Same session, ~15:06 AEST — the two-step is IN MOTION under the
+  operator's ask + the (lr) precedent:** birth PR #164 merged on green CI,
+  provision dispatched (run 31669156528), and the ACTIVATION staged as PR
+  #165 — decide rule live, paths: entries, `MANUAL_IMAGES_OK` →
+  `AUTO_IMAGES`, provision workflow deleted per its own note — with the
+  merge GATED on the row: #165 does not land until `book-kiyosaki-lshadow`
+  publishes on /pnl.json with an `extra.build` stamp, because the resolver
+  errors on an unresolvable service name and rule-before-service must
+  never reach main. The verified-alive facts get their own line here when
+  the row proves them — a green dispatch is not a running book.]**
 - **Two (lp)/(lr) birth gaps closed in passing, same mechanism as this
   birth's own registrations:** 🛢️ Garrett's row was publishing WITH a build
   stamp but was unmapped in `audit_code_currency.ROW_ENTRY` (the next
