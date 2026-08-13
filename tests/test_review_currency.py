@@ -655,3 +655,138 @@ def test_occupancy_is_quiet_and_safe_on_a_dark_organ():
     # no long_positions -> shares are None, never a ZeroDivisionError
     only = er.long_budget_occupancy({"by_bot": {"a": {"long": 3}}}, {})
     assert only and only[0][2] is None, only
+
+
+# ---------------------------------------------------------------------------
+# 9. [2026-08-07 (lj)] THE DECISION DOCKET REACHES THE OPERATOR.
+#
+# `(ld)` built the docket, `(lf)` and `(lh)` corrected it, and none of the
+# three gave it a consumer — so by this repo's own rule ("a finding no gate
+# consumes is a note") all that work improved a signal nobody read. These
+# tests pin the consumer's REFUSALS, which are the part that matters: every
+# degraded path produces an empty list, and an empty list rendered as "clear"
+# is a false all-clear on the fleet's I17 calendar.
+# ---------------------------------------------------------------------------
+def _docket_payload(**over):
+    from datetime import datetime, timezone
+    p = {"updated": datetime.now(timezone.utc).isoformat(),
+         "ttl_sec": 86400, "docket_valid": True, "docket_days": 7,
+         "decision_docket": []}
+    p.update(over)
+    return p
+
+
+def _fresh_now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
+
+
+def test_a_clear_docket_is_only_claimed_when_the_docket_said_it_was_VALID():
+    er, _ = _import_both()
+    now = _fresh_now()
+    clear = er.docket_lines(_docket_payload(), now, now=now)
+    assert clear and "CLEAR" in clear[0]
+
+
+@pytest.mark.parametrize("bad", [
+    {"docket_valid": False, "docket_why": "clocks unreadable"},
+    {"docket_valid": None},
+    "absent",                             # the field is not published at all
+])
+def test_a_degraded_docket_never_reads_as_a_clean_fleet(bad):
+    """The (lh) ambiguity: on EVERY failure path the list is [], which is
+    byte-identical to 'no book is overdue'."""
+    er, _ = _import_both()
+    now = _fresh_now()
+    if bad == "absent":
+        p = _docket_payload()
+        p.pop("docket_valid")
+    else:
+        p = _docket_payload(**bad)
+    lines = er.docket_lines(p, now, now=now)
+    assert lines, "a degraded docket must say something"
+    joined = " ".join(lines)
+    assert "CLEAR" not in joined, (
+        "a docket that could not be computed was rendered as a clean fleet")
+
+
+def test_a_stale_grader_payload_makes_no_claim_at_all():
+    """I1 — liveness before semantics. A frozen payload and a fresh one are
+    byte-identical on the docket field; only the stamp separates them."""
+    er, _ = _import_both()
+    from datetime import timedelta
+    now = _fresh_now()
+    old = now - timedelta(hours=50)
+    lines = er.docket_lines(_docket_payload(), old, now=now)
+    assert lines and "STALE" in lines[0]
+    assert "CLEAR" not in " ".join(lines)
+
+
+def test_an_unknown_age_is_treated_as_stale_not_as_fresh():
+    er, _ = _import_both()
+    now = _fresh_now()
+    lines = er.docket_lines(_docket_payload(), None, now=now)
+    assert lines and "STALE" in lines[0]
+
+
+def test_a_dark_grader_key_is_not_an_all_clear():
+    er, _ = _import_both()
+    now = _fresh_now()
+    lines = er.docket_lines(None, None, now=now)
+    assert lines and "CLEAR" not in " ".join(lines)
+    assert "DARK" in " ".join(lines).upper()
+
+
+def test_it_names_the_books_and_carries_each_ENTRY_S_OWN_ask():
+    """I8 — a detector must name the object the operator can act on; and
+    (lj) split the zero-ledger reason in two because the two want OPPOSITE
+    acts, so one shared instruction would undo that split at the surface."""
+    er, _ = _import_both()
+    now = _fresh_now()
+    p = _docket_payload(decision_docket=[
+        {"book": "equities-regime-lshadow", "reason": "zero_ledger",
+         "days_held": 9.4, "n": 0, "mean_pct": None, "t": None,
+         "asks": "keep-or-retire (I17) — an operator decision, not a tuning pass"},
+        {"book": "unreadable-lshadow", "reason": "ledger_missing",
+         "days_held": 8.1, "n": 137, "mean_pct": None, "t": None,
+         "asks": "fix the LEDGER READ — bot_pnl reports closes this grader cannot see"},
+    ])
+    lines = er.docket_lines(p, now, now=now)
+    joined = "\n".join(lines)
+    assert "equities-regime-lshadow" in joined and "unreadable-lshadow" in joined
+    # the two asks must both survive to the operator, distinctly
+    assert "keep-or-retire" in joined and "fix the LEDGER READ" in joined
+    assert "9.4d" in joined and "8.1d" in joined
+
+
+def test_a_junk_docket_field_claims_nothing():
+    er, _ = _import_both()
+    now = _fresh_now()
+    for junk in ("nope", 3, {"a": 1}):
+        lines = er.docket_lines(_docket_payload(decision_docket=junk), now, now=now)
+        assert lines and "CLEAR" not in " ".join(lines)
+
+
+def test_the_review_actually_calls_the_consumer(review_src):
+    """The (ld)/(lf) failure mode one level up: a helper that exists, is
+    tested, and is wired to nothing."""
+    import ast
+    tree = ast.parse(review_src)
+    called = {n.func.id for n in ast.walk(tree)
+              if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+    assert "docket_lines" in called, (
+        "docket_lines is defined but never called — the docket still has no "
+        "consumer, which is the whole point of (lj)")
+
+
+def test_a_valid_docket_still_surfaces_its_note():
+    """The clock MIGRATION is the live case: valid, but carrying a
+    `docket_why` the operator must see. A migration nobody can see is
+    indistinguishable from the silent restart it exists to prevent."""
+    er, _ = _import_both()
+    now = _fresh_now()
+    p = _docket_payload(docket_why="clocks migrated from the pre-(lf) mirror")
+    lines = er.docket_lines(p, now, now=now)
+    joined = " ".join(lines)
+    assert "migrated" in joined, "a valid docket dropped its own note"
+    assert "CLEAR" in joined, "the migration note must not suppress the verdict"

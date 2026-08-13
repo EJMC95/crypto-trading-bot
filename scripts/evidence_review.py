@@ -766,6 +766,16 @@ def scan_new_evidence(cur, errors):
                          "verdict. Re-grade any candidate under MTM once "
                          "bot_state_history '<bot>:equity' has ~30d.")
 
+    # [(lj)] THE DOCKET'S FIRST CONSUMER. Deliberately its OWN section rather
+    # than folded into `golive-gates` above: that section is gated on
+    # `cands` (books past CANDIDATE_MIN_CLOSES), and the docket's motivating
+    # case — 📊 equities-regime, zero closes ever — is by definition not a
+    # candidate. Nesting it there would have rebuilt the exact blind spot
+    # (kv)/(lf) each closed once.
+    with Section(errors, "decision-docket"):
+        _dk, _dk_u = load_state(cur, "golive-readiness")
+        items.extend(docket_lines(_dk, _dk_u))
+
     with Section(errors, "fleet-risk"):
         st, _ = load_state(cur, "fleet-risk")
         if st:
@@ -823,6 +833,96 @@ def scan_new_evidence(cur, errors):
             items.append(head_drift_line(
                 row, b.get(row), heads[entry], live_money=row in LIVE_ROWS))
     return [i for i in items if i]
+
+
+def docket_lines(payload, updated_at, now=None, max_age_h=None):
+    """-> [str] — the ⚖️ DECISION DOCKET item(s), or [] when there is nothing
+    honest to say.
+
+    [2026-08-07 (lj)] THE DOCKET HAD NO CONSUMER. `(ld)` built it, `(lf)` and
+    `(lh)` corrected it, and by this repo's own rule — *"a finding no gate
+    consumes is a note"* — all three improved a signal that reached nobody.
+    The grader prints it to a container log; this puts it in front of the
+    operator, which is the only surface where an I17 keep-or-retire call can
+    actually be made.
+
+    THREE THINGS THIS REFUSES TO DO, each a rule this fleet has already paid
+    for:
+
+    * **It reads `age` before it reads content (I1).** A frozen
+      `golive-readiness` payload and a fresh one are byte-identical on the
+      docket field; only the stamp separates them, and a docket computed
+      three days ago names books whose verdicts may have flipped since.
+    * **It never renders an empty docket as good news unless the docket said
+      it was VALID (`docket_valid`).** On every degraded path the list is
+      `[]`, which reads exactly like "no book is overdue" — the ambiguity
+      `(lh)` added the field to remove, and the one `(kw)` closed for the
+      roster one file over.
+    * **It names the BOOKS, never a count (I8).** "3 overdue" is not
+      something an operator can act on; `(lb)` had just fixed that exact
+      shape in this same report.
+
+    It also carries each entry's own `asks`, because `(lj)` split the
+    zero-ledger reason in two and the two want OPPOSITE acts — one is a
+    keep-or-retire call, the other is a plumbing fault where retiring the
+    book would be acting on an absence (I6).
+    """
+    from datetime import datetime, timezone
+    now = now or datetime.now(timezone.utc)
+    if not isinstance(payload, dict):
+        return ["⚖️ decision docket: `golive-readiness` unreadable — the I17 "
+                "calendar is DARK this run (not 'nothing overdue')"]
+    # I1 — liveness before semantics.
+    ttl = payload.get("ttl_sec")
+    limit_h = max_age_h if max_age_h is not None else (
+        (float(ttl) / 3600.0) if isinstance(ttl, (int, float)) and ttl else 24.0)
+    age_h = census_publisher_age_h(updated_at, now)
+    if age_h is None or age_h > limit_h:
+        age = "age unknown" if age_h is None else f"{age_h:.1f}h old"
+        return [f"⚖️ decision docket: STALE ({age} vs {limit_h:.1f}h TTL) — "
+                f"the grader has not republished, so this calendar describes "
+                f"a fleet state that may have moved. No claim made."]
+    if payload.get("docket_valid") is not True:
+        why = payload.get("docket_why") or "no reason published"
+        return [f"⚖️ decision docket: NOT A CLAIM this run — {why}. An empty "
+                f"docket on a degraded read is indistinguishable from a clean "
+                f"fleet, so nothing is asserted either way."]
+    docket = payload.get("decision_docket")
+    if not isinstance(docket, list):
+        return ["⚖️ decision docket: published field is not a list — "
+                "unreadable, no claim made"]
+    days = payload.get("docket_days")
+    days_s = f"{float(days):g}" if isinstance(days, (int, float)) else "?"
+    # A VALID docket can still carry a `docket_why` — the clock migration is
+    # the live example. Surface it, because a migration nobody can see is
+    # indistinguishable from the silent restart it exists to prevent, which
+    # is the whole reason `(lj)` had to write one.
+    note = ([f"⚖️ docket note: {payload['docket_why']}"]
+            if payload.get("docket_why") else [])
+    if not docket:
+        return note + [
+            f"⚖️ decision docket: CLEAR — no book has held a stuck verdict "
+            f"≥{days_s}d. (I17 calendar is live and was computed this run.)"]
+    out = note + [
+        f"⚖️ DECISION DOCKET — {len(docket)} book(s) overdue for an I17 "
+        f"keep-or-retire call (stuck ≥{days_s}d). This is an OPERATOR "
+        f"decision, not another tuning pass:"]
+    for d in docket:
+        if not isinstance(d, dict):
+            continue
+        n = d.get("n")
+        mp = d.get("mean_pct")
+        t = d.get("t")
+        ev = f"n={n}"
+        if isinstance(mp, (int, float)):
+            ev += f", mean {mp:+.3f}%"
+        if isinstance(t, (int, float)):
+            ev += f", t={t:+.2f}"
+        held = d.get("days_held")
+        held_s = f"{held:.1f}d" if isinstance(held, (int, float)) else "?d"
+        out.append(f"   • {d.get('book')} — {d.get('reason')} for {held_s} "
+                   f"({ev}) → {d.get('asks')}")
+    return out
 
 
 def arm_drift_line(name, live, shadow):

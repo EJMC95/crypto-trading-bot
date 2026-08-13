@@ -5085,6 +5085,18 @@ class H(BaseHTTPRequestHandler):
                             # readable from a review seat with no Railway
                             # login — it is the bar that governs real money.
                             "'golive-readiness', "
+                            # [2026-08-07 (lj)] the docket's AUTHORITATIVE
+                            # clocks. `(lf)` moved them out of the grade
+                            # payload into their own key for a correctness
+                            # reason and never added that key here, so the
+                            # only copy readable off-Railway stayed the
+                            # MIRROR inside `golive-readiness` — and a mirror
+                            # is what a consumer must NOT audit the clocks
+                            # against, since the two can disagree exactly
+                            # when the write failed. Live key only: this is a
+                            # current-state map, not a trajectory, so it does
+                            # not join the history list below.
+                            "'golive-docket-seen', "
                             # [2026-08-04 (iy)] the allocation organ was
                             # publishing healthy 30-min payloads that NO
                             # review surface served — the (hw) wrong-surface
@@ -5147,6 +5159,14 @@ class H(BaseHTTPRequestHandler):
                                    "strategy_incubator": live.get("strategy-incubator"),
                                    "fleet_radar": live.get("fleet-radar"),
                                    "golive_readiness": live.get("golive-readiness"),
+                                   # [(lj)] The docket's authoritative clocks.
+                                   # Adding the key to the SELECT above is
+                                   # NOT enough — this body maps keys one by
+                                   # one, so a fetched key that is not listed
+                                   # here is read from Postgres and silently
+                                   # dropped. The registered-but-inert shape,
+                                   # at the serving layer.
+                                   "golive_docket_seen": live.get("golive-docket-seen"),
                                    "fleet_allocation": live.get("fleet-allocation"),
                                    "fleet_respiration": live.get("fleet-respiration"),
                                    "fleet_clock": live.get("fleet-clock"),

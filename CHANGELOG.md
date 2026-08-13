@@ -1,3 +1,128 @@
+## 2026-08-07 (lj) — (lh) WAS A CHANGELOG ENTRY WITH NO CODE: four disablement mutations still green, the four defects it "fixed" still live, and the docket still had no consumer
+
+- **THE FINDING, and it is about this file rather than about the fleet.**
+  `(lh)` reads as a completed pass — a behavioural test suite, four defects
+  fixed, `docket_valid` published. **None of it was in the tree.** Measured at
+  `1ef3e1d` before a line was changed: `tests/autonomy/test_docket_publish_behaviour.py`
+  did not exist; `git log --all -S docket_valid` returns **no commit on any
+  branch**; `ledger_missing` appears nowhere; the publish block reads
+  `DOCKET_SEEN_KEY` with no fallback to the old location. The entry's prose
+  was committed as part of `(li)`; the work it narrates was not. So the
+  repo's own record asserted four past-tense fixes that did not exist —
+  **the I12 defect at its most direct: a doctrine that does not describe the
+  system**, and the one class this file's top section cannot catch, since
+  `audit_doctrine_enforcement` checks that a named enforcement RESOLVES and
+  `(lh)` named none.
+- **I RE-MEASURED RATHER THAN TRUSTING THE ENTRY, WHICH IS THE ONLY REASON
+  THIS PASS EXISTS.** `(lh)`'s four mutations reproduce exactly against the
+  live 47-test `test_decision_docket.py`, and five more join them:
+
+  | mutation | restores | (lf) AST suite | (lj) behavioural |
+  |---|---|---|---|
+  | `if _seen_ok:` → `if not _seen_ok:` | writes the EMPTY clock map on failure | GREEN | **RED** |
+  | roster docket write → `if False:` | the (ld) hole — 📊 equities-regime invisible | GREEN | **RED** |
+  | checked-read guard → `and False` | the (jz) seed class | GREEN | **RED** |
+  | `DOCKET_SEEN_KEY = KEY` | blanks the ENTIRE grade payload every publish | GREEN | **RED** |
+  | migration fallback → `if False:` | the silent clock restart | GREEN | **RED** |
+  | `docket_valid` → hardcoded `True` | degraded reads as a clean fleet | GREEN | **RED** |
+  | clock write result discarded | I4 — advertises clocks never stored | GREEN | **RED** |
+  | `ledger_missing` → `zero_ledger` | I8 — retire a book we cannot READ | GREEN | **RED** |
+  | `asks` table → one instruction | the same, at the surface | GREEN | **RED** |
+
+  **0 of 9 on the AST suite; 9 of 9 on the behavioural one.** `DOCKET_SEEN_KEY = KEY`
+  is additionally caught by a selftest assert now — the split's entire
+  correctness rested on two constants differing and **nothing pinned it**,
+  while collapsing them passes 47/47 and replaces the grade payload with
+  `{updated, ttl_sec, seen}`: no `books`, no `ready`, so the 🚦 card renders
+  empty and `fleet_immune`'s two-writer pager (which reads
+  `books.<bot>.integrity`) goes blind, on a green build.
+- **THE METHOD IS THE DELIVERABLE: STOP ASSERTING ABOUT SOURCE.**
+  `tests/autonomy/test_docket_publish_behaviour.py` drives the REAL
+  `main(--publish)` against a recording `bot_pnl_store` and reads what it
+  actually WROTE. An AST assertion that a NAME appears somewhere is still a
+  presence check — `UnaryOp(Not, Name('_seen_ok'))` contains the string the
+  guard test looked for — so the `(ld)` substring form and the `(lf)` AST form
+  fail the same way one abstraction level apart. The AST tests stay as a cheap
+  second line; they are no longer the claim. **My own first fixture proved the
+  point twice over**: it used `publish()`'s field names (`pnl_pct`/`pnl_abs`)
+  instead of the ledger's (`profit_ratio`/`profit_abs`), so it graded ZERO
+  books and two tests passed for the wrong reason — the (hj) hand-written-payload
+  trap, caught only because the behavioural assertions demanded a non-degenerate
+  result.
+- **THE FOUR DEFECTS, NOW ACTUALLY FIXED.**
+  * **NO MIGRATION** — `(lf)` moved the clocks to a new key and read only that
+    key, and `load_state_checked` returns `(True, None)` for a MISSING row, so
+    `_seen_ok` was True, the prior was empty and every `since` restamped to
+    now. **14 clocks all stamped at deploy time read exactly like "the fleet
+    became stuck today"** — an unknown presenting as a verdict. Now falls back
+    to the pre-`(lf)` mirror once and SAYS SO, and the note reaches the
+    operator even on a valid docket, because a migration nobody can see is
+    indistinguishable from the restart it prevents.
+  * **THE CLOCK WRITE DISCARDED ITS RESULT (I4)** — the payload advertised
+    clocks that were never stored. Fixed by ORDERING as much as by capture:
+    the clocks are now written BEFORE the grade payload is built, because a
+    grade written first cannot carry the outcome of a write that has not
+    happened yet.
+  * **`zero_ledger` COLLAPSED TWO DIAGNOSES (I8/I6)** — a book with
+    `n_alltime > 0` and no ledger rows is a READ problem, and telling the
+    operator to retire it because the grader cannot see its trades is acting
+    on an absence. Split into `zero_ledger` / `ledger_missing` with a
+    `DOCKET_ASKS` table, distinguished at the roster loop where the
+    measurement already lives — the surrounding `why_absent` text had split on
+    that exact number since `(la)` while the docket contradicted it.
+  * **`docket_valid`** is published: on every degraded path the docket is `[]`,
+    and an empty list is a CLAIM that reads identically to "nothing is
+    overdue". Consumers test a present positive field.
+- **THE CARRIED WORK IS DISCHARGED (I11) — `(lh)`'s own STILL OPEN list, both
+  items, and the second one was the point.**
+  * **`golive-docket-seen` is on `/bus.json`.** And adding it to the SELECT was
+    **not enough**: that handler maps keys one at a time into the response
+    body, so a fetched key that is not also listed there is read from Postgres
+    and silently dropped — the registered-but-inert shape (I18) at the serving
+    layer, which would have shipped a "fix" that served nothing.
+  * **THE DOCKET HAS A CONSUMER.** `(ld)` built it, `(lf)` and `(lh)` corrected
+    it, and none of the three gave it a reader — so by this repo's own rule
+    (*"a finding no gate consumes is a note"*) all that work improved a signal
+    that reached nobody but a container log. `evidence_review.docket_lines`
+    puts it in the daily review, the only surface where an I17 keep-or-retire
+    call actually gets made. It is REFUSAL-shaped, and the refusals are
+    mutation-verified: it reads `age` before content (I1 — a frozen payload and
+    a fresh one are byte-identical on this field), it renders "CLEAR" **only**
+    when `docket_valid` is true, it names the BOOKS rather than a count (I8 —
+    "3 overdue" is not actionable, the (lb) shape), and it carries each entry's
+    OWN `asks` so the split above survives to the operator. Given its own
+    section rather than folded into `golive-gates`, which is gated on
+    `CANDIDATE_MIN_CLOSES` — the docket's motivating case has zero closes by
+    definition, so nesting it there would have rebuilt the blind spot `(kv)`
+    and `(lf)` each closed once.
+- **VERIFICATION**: 9 grader mutations + 8 consumer mutations, all red on the
+  new suites; 15 behavioural tests, 47 docket tests, 40 review tests, grader
+  and review selftests, full suite. **Two PRE-EXISTING failures are unrelated
+  and proven so by stash** — `regime_oracle` and one universe test need
+  `pandas`, absent from this container; both fail identically with my changes
+  removed. One mutation of my own (`C4`) first read GREEN because the mutation
+  itself was a no-op (`[] or [...]` returns the second list); rewritten, it is
+  red. A mutation that does not mutate is a test that passed for no reason.
+
+### STILL OPEN (recorded, not fixed — carried from (li), untouched by this pass)
+
+`last_skip` is a never-reset latch embedding a varying payload
+(`ml-gate({p_win:.2f})`), inflating that class's transition count 2.98x;
+`fleet_immune.restart_churn` still undercounts because the Parliament
+publishes no boot counter; `self.signals` is in-process TTL'd state no restart
+restores. The 🚦 dashboard card does not render the docket either — the review
+is its first consumer, not its only intended one.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None directly, and the honest version is narrower than it looks.** What moved
+is that 📊 equities-regime and every other structurally-stuck book can now
+actually reach the operator with the right instruction attached: the docket was
+computed correctly and read by nobody, and one of its two zero-ledger reasons
+was asking for the wrong act. The forward metric is BOOKS THAT CAN BE GRADED,
+and a keep-or-retire call that never surfaces is a book that stays undecidable
+by default — I17's failure mode rather than its remedy.
+
 ## 2026-08-13 (ls) — 🏦 RICH DAD IS BORN: Kiyosaki's book, read as a rule set — every lesson lands on a validated gate, and the one NEW rule can only tighten
 
 - **Operator, 13-Aug: *"Please read the book rich dad poor dad by Robert
@@ -505,6 +630,21 @@
 
 **Three: 🏛️ pm-gillard, pm-rudd and pm-abbott — from structurally unable to open a position, back to decidable.** Between them they hold **454 of the cohort's 518 closes**, and all three had both directions gated on a rule that could not have concluded anything else. This does not make them winners: the cohort still reads −$8.70 with no book carrying an I16 claim, and the keep-or-retire call (I17) remains the operator's. What it restores is their ability to **produce evidence for that decision** — which is the fleet's declared forward metric, and which a latch releasable only by declaring the book dead had taken away.
 ## 2026-08-06 (lh) — MY "STRUCTURAL" AST TESTS DETECT DELETION, NOT DISABLEMENT: five mutations, all green, all restoring the exact bug the test was written for
+
+> **[CORRECTED IN PLACE 7-Aug by (lj), per I12 — READ THIS BEFORE THE ENTRY
+> BELOW.] THIS ENTRY'S DIAGNOSIS IS CORRECT AND ITS CODE NEVER LANDED.** Every
+> artifact described below was absent from the tree at `1ef3e1d`:
+> `tests/autonomy/test_docket_publish_behaviour.py` (no such file),
+> `docket_valid` (`git log -S` finds it in **no commit on any branch**),
+> `ledger_missing`, and the clock migration. The entry text was swept into
+> `(li)`'s commit as prose while the work it narrates was not committed — so
+> for a day this file asserted, in the past tense, four fixes that did not
+> exist, and the four mutations it correctly identifies as GREEN were still
+> green. `(lj)` re-measured them from scratch (all four reproduced, plus five
+> more), then actually shipped the behavioural suite and the four fixes.
+> **The lesson this entry teaches applies to the entry itself: a green
+> changelog is not a landed change either.** Left standing rather than
+> deleted, because the diagnosis is sound and `(lj)` is its evidence.
 
 - **THE FINDING THAT MATTERS, and it is about the TESTS rather than the code.**
   `(ld)` pinned the docket's wiring with substring counts and two mutations
