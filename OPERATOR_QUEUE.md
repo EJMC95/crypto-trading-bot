@@ -111,11 +111,16 @@ record clears — idle beats a measured −2.5%/trade.
 ("full permission to commit push and adjust real money bots also"): PR #155
 merged, squash `75ead10f`, `[deploy-live-taker]` in the title, Railway
 Redeploy ran on the push.** Also ships (lk): carry + sniper class screens on
-their shadow auto-deploy rules. **Verification OPEN until the stamps move**
-— first readback ~6 min post-merge still showed old builds on all four rows;
-re-check armed ~13:21 AEST. Expect: both Taker arms + carry + sniper rows at
-new builds via `audit_code_currency`, carry's `extra.scan` carrying the new
-`noncrypto` census bucket, and the live Taker opening nothing.]
+their shadow auto-deploy rules.]
+
+**[13-Aug 12:50 AEST — VERIFIED BY STAMP READBACK, item CLOSED.**
+`audit_code_currency` reads **every stamped container CURRENT at
+`675f5562a`** (both Taker arms + carry + sniper on new builds:
+`cf458a382966` / `f80d5c78d168` / `7d3433170de2`), and carry's live
+`extra.scan` now publishes the `noncrypto` census bucket — the (lk) screen
+is live in the payload, not just in git. The live Taker's era-scoped veto is
+in force on the real-money book. Wake trigger deleted (P5). Nothing here is
+waiting on anyone; the section can drop at the next daily review.]
 
 ### Verify either one landed — by stamp readback, never by the green run
 
