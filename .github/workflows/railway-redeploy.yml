@@ -398,6 +398,20 @@ jobs:
             if echo "$changed" | grep -qE "^(lighter_band_barnes_bot\.py$|Dockerfile\.bandbarnes$|$_shared)"; then
               svcs="${svcs:+$svcs,}band-barnes-shadow"
             fi
+            # [2026-08-13 (lp)] 🛢️ Garrett (band-garrett-shadow) — the
+            # thin-tier funding VARIANT of the Farmer's own file
+            # (FUNDING_VARIANT=band-garrett, env-only config, zero keys).
+            # Its auto-deploy rule is DEFERRED until the operator creates
+            # the Railway service (OPERATOR_QUEUE item 2): the resolver
+            # ERRORS on an unresolvable name per (hj), so an active rule
+            # before the service exists would red every shared-module
+            # push. The exact three-line branch to add here — the farmer
+            # file-set condition WITHOUT the marker check, appending
+            # band-garrett-shadow — is spelled out in the queue item.
+            # Written as prose, not commented-out code, on purpose: the
+            # deploy-coverage audit's parser reads grep/svcs pairs through
+            # comments, and a machine-shaped dead rule here mispaired the
+            # LIVE taker's route the day this shipped.
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
             # trail-blazer-live = 💸 Funding Farmer — service names lie) are

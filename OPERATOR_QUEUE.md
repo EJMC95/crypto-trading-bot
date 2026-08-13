@@ -212,6 +212,33 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   sits in the population (ki)/(jg) already made unenterable.** That updates
   (jg)'s "+$4.80 on the trades it can still take" to +$5.90/65 with the
   post-revert week added. Options unchanged; the date stands.
+- **🛢️ Garrett — BORN 13-Aug (lp), needs its Railway service: YOUR one
+  action, ~2 minutes.** The thin-tier funding book (the fleet's strongest
+  measured unbuilt claim: the [0.1M,2M) band, +$14.83 both halves vs the
+  incumbent's +$4.01) ships as a VARIANT of the Farmer's proven file — code,
+  tests, dashboard row and docs are all on main. To bring it to life:
+  1. Railway dashboard → this project → **New Service** → name it exactly
+     `band-garrett-shadow` (empty service, no source — the workflow deploys
+     it, same as every other service).
+  2. Set its variables:
+     `FUNDING_VARIANT=band-garrett` · `VENUE=lighter_shadow` ·
+     `FUNDING_MIN_VOL=1e5` · `FUNDING_MAX_VOL=2e6` ·
+     `DATABASE_URL=${{Postgres.DATABASE_URL}}` (the REFERENCE form, (kb))
+     — gate 0.05 TRUE and $25 clips are the file's defaults; set nothing
+     else.
+  3. First deploy: `gh workflow run 305025607 -f services="band-garrett-shadow"`
+     (or tell the session "garrett service is up" and it will dispatch +
+     activate the auto-deploy rule so every future push tracks main). The
+     rule to add in `railway-redeploy.yml`'s decide step, right under the
+     Garrett prose note (three lines, verbatim):
+
+     ```
+     if echo "$changed" | grep -qE "$farmer_files"; then
+       svcs="${svcs:+$svcs,}band-garrett-shadow"
+     fi
+     ```
+  The row appears on the dashboard at first publish; 30-day clock starts
+  then — gradeable ~mid-Sep.
 - **🎸 Barnesy — harvest sleeves lack the (lk) class screen; frozen, so it is
   YOUR call, not a code push.** `harvest_candidates` (carry + extreme
   sleeves) takes non-crypto harvests (−$1.58 over 8 closes since birth);

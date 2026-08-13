@@ -1,3 +1,64 @@
+## 2026-08-13 (lp) — 🛢️ GARRETT IS BORN FROM THE FLEET'S STRONGEST UNBUILT CLAIM — and the "every success instrument" bot the operator asked for was MEASURED first, which is why it is a funding band and not a consensus ensemble
+
+- **Operator, 13-Aug: *"take an assessment on every single bot and build a
+  bot that uses every success instrument and doesn't adopt what currently
+  loses."*** The assessment ran first (per-book verdicts in this session's
+  (ll) entry + the PR body), and it forced an honest fork: the fleet's
+  measured successes are (a) the INSTRUMENT stack — claim_writer, exit
+  telemetry, stamps, censuses, vetoes, screens, the judge — and (b) exactly
+  ONE unbuilt positive CLAIM, the thin-tier funding band. The measured
+  losers are every current directional signal. A bot "using every success"
+  therefore had two candidate shapes, and doctrine (queue S4) had
+  pre-registered the tiebreaker: measure retrospectively before minting.
+- **S4 (consensus-directional) MEASURED AND REFUTED.** Retrospective gates
+  over the shadow Taker's 42 era closes (−$4.40 actual): the class screen
+  would have REMOVED +$3.63 of profit on this book, the dip veto and the
+  walk-forward (lens,side) veto would have removed NOTHING (the shadow's
+  record never crosses the veto line the live arm's does), the oracle
+  hard-gate removes −$1.31 of longs while ALLOWING every divergence-short
+  loser (BTC sits below its EMA200 — the oracle correctly reads risk-off,
+  which is precisely why it cannot save this book). Survivors: **−$8.02
+  over 37, WORSE than unfiltered.** A gated loser is still a loser — the
+  S3 refusal's logic generalizes to gating, engraved here so the ensemble
+  is not re-proposed against this tape.
+- **THE BUILD THAT SURVIVED MEASUREMENT: 🛢️ band-garrett-lshadow** — the
+  [0.1M, 2M) funding tier as a standing book. The claim
+  (STUDY_THIN_TIER_MIN_VOL_2026-08-05): the band ALONE reads **+$14.83,
+  n=158, both halves positive (+7.68/+10.29), maxDD −7.97, robust at the
+  tier's p90 friction** vs the incumbent ≥10M universe's +$4.01 —
+  calibrated on the venue's own tape at the tier's own measured friction.
+  Complementary to the judge's `min-vol-1e5` slot, not duplicate: the
+  7-day experiment answers "should the LIVE Farmer's floor drop"; the
+  standing book accrues the thesis's OWN 30-day gate-grade sample as a
+  go-live candidate in its own right. No Barnesy sleeve reaches the tier
+  (carry $2M floor, extreme $10M).
+- **NOT a new file — a VARIANT INSTANCE of the Farmer's proven machine**
+  (ship-narrow: 900 fresh lines was the (fz) risk; ~40 changed lines
+  inherits every instrument battle-tested). `FUNDING_VARIANT=band-garrett`
+  gives it its own row/ledger/claims/stamps automatically; `FUNDING_MAX_VOL`
+  turns the floor into a half-open band [lo, hi) so instances can tile;
+  and a variant reads **NO tuning lane** — the judge's `xp.funding.*`
+  collision is the failure this prevents (its experiment arm is the
+  default-shadow instance; a second consumer of its lever would corrupt
+  the paired bar), and env-only config makes the variant single-policy by
+  construction: a clean (hm) clock with no freeze mechanism.
+  `tests/autonomy/test_funding_variant.py` pins no-op-by-default (REAL
+  MONEY rides this file), the row-id split, the half-open band, and the
+  lever isolation — mutation-verified (restoring the collision reddens).
+- **Config = the study's measured cells, nothing else:** band 1e5→2e6,
+  gate 0.05 TRUE and $25 clips (file defaults — the study's own values),
+  no class screen and no symbol exclusions (the +$14.83 already bears the
+  SKR/CXMT outliers; the runtime slip/spread vetoes stay senior per-book,
+  exactly as the study declared). Honesty gates carried forward verbatim:
+  30d, one regime, $25 clips (larger-clip scaling UNMEASURED),
+  iteration-order slot model.
+- **Birth state:** dashboard base-set + label + overtrade entries shipped;
+  deploy rule shipped COMMENTED (the resolver errors on unresolvable names
+  per (hj), and the Railway service does not exist yet — an active rule
+  would red every shared-module push). The operator's one 2-minute action
+  (create `band-garrett-shadow` + env, queue item 2) brings it to life;
+  clock starts at first publish, gradeable ~mid-Sep.
+
 ## 2026-08-13 (lo) — 📊 INDEX RIDER RETIRED: the I17 call, made — a book that closes 17 trades a year cannot answer a 30-close question, ever
 
 - **Operator, 13-Aug: *"get rid of what's not working"*.** The fleet's

@@ -50,7 +50,32 @@ from venues import marks, venue_context
 from venues.fills import measured_from_reason, read_fill, slip_bps_of
 from venues.safety import capital_adjusted_day_start, open_notional
 
-BOT = "perps-funding-lighter"
+# [2026-08-13 (lp)] VARIANT INSTANCES — one proven file, many books. Setting
+# FUNDING_VARIANT births a NEW shadow book from this file's battle-tested
+# machinery (claim_writer, standby, exit telemetry, bars stamps,
+# snapshot_equity, census, slip/spread vetoes) under its OWN row id, with
+# THREE deliberate properties:
+#   * env-only config: apply_levers reads NO tuning lane for a variant —
+#     a variant must never consume the judge's xp.funding.*/live.funding.*
+#     levers (the judge's experiment arm is perps-funding-lighter-lshadow,
+#     and a second consumer of its lever would corrupt the paired bar) —
+#     and env-only config makes the variant single-policy by construction:
+#     a clean (hm) 30-day clock with no freeze mechanism needed;
+#   * the row id comes from the variant name (venue_context appends the
+#     -lshadow suffix), so ledgers/claims/stamps/state keys all separate
+#     automatically;
+#   * unset (the default) is BYTE-IDENTICAL legacy behaviour — both real
+#     Farmer arms ride this file, so no-op-by-default is the load-bearing
+#     property, pinned in tests/autonomy/test_funding_variant.py.
+# First variant: 🛢️ band-garrett-lshadow (service band-garrett-shadow) —
+# the thin-tier funding book, born from the fleet's strongest measured
+# unbuilt claim (STUDY_THIN_TIER_MIN_VOL_2026-08-05: the [0.1M,2M) band
+# alone +$14.83, both halves positive, robust at the tier's p90, vs the
+# incumbent's +$4.01). Its config IS the study's measured cells:
+# FUNDING_VARIANT=band-garrett VENUE=lighter_shadow FUNDING_MIN_VOL=1e5
+# FUNDING_MAX_VOL=2e6 (gate 0.05 TRUE and $25 clips are the defaults).
+VARIANT = os.environ.get("FUNDING_VARIANT", "").strip()
+BOT = VARIANT or "perps-funding-lighter"
 
 
 def _standby_key(bot_id):
@@ -180,6 +205,13 @@ EXIT_APR = float(os.environ.get("FUNDING_EXIT_APR", "0.01875"))  # TRUE apr cool
 PERSIST_H = float(os.environ.get("FUNDING_PERSIST_H", "4"))     # hot this long first
 MAX_HOLD_H = float(os.environ.get("FUNDING_MAX_HOLD_H", "72"))  # recycle after 3d
 MIN_VOL = float(os.environ.get("FUNDING_MIN_VOL", "10e6"))      # 24h turnover floor
+# [2026-08-13 (lp)] The band CEILING, for variant instances that trade a
+# volume TIER rather than everything-above-a-floor (🛢️ Garrett trades
+# [1e5, 2e6) — the tier the thin-tier study measured ALONE, not pooled with
+# the incumbent's books). inf by default: the real Farmer arms are
+# unchanged. Half-open [lo, hi) so two band instances can tile without
+# overlap or gap.
+MAX_VOL = float(os.environ.get("FUNDING_MAX_VOL", "inf"))
 MAX_SPREAD_BPS = float(os.environ.get("FUNDING_MAX_SPREAD_BPS", "20"))  # book-spread gate
 
 # [2026-08-03 (iq)] THE PERSISTENCE CLOCK IS A TIMER ON A CONTAINER THAT
@@ -417,7 +449,13 @@ def apply_levers(mode):
     global ENTER_APR, SCAN_ENTER, ENTER_GATE, TAKE_PROFIT, MAX_HOLD_H
     global SCAN_EXPLORE_K, CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI
     global SLOPE_GATE, MIN_VOL
-    prefix = {"lighter_shadow": "xp.funding.", "lighter_live": "live.funding."}.get(mode)
+    # [(lp)] a VARIANT reads no tuning lane: the xp./live. levers belong to
+    # the two real Farmer arms (the judge's experiment writes xp.funding.*),
+    # and env-only config is what makes a variant single-policy by
+    # construction. prefix=None short-circuits the whole tuning block below.
+    prefix = (None if VARIANT else
+              {"lighter_shadow": "xp.funding.",
+               "lighter_live": "live.funding."}.get(mode))
     moved = {}
     ENTER_APR, SCAN_ENTER = _ENV_BARS["enter_apr"], _ENV_BARS["scan_enter"]
     TAKE_PROFIT, MAX_HOLD_H = _ENV_BARS["take_profit"], _ENV_BARS["max_hold_h"]
@@ -974,7 +1012,8 @@ def _vol_filter_veto(ctx, fund, now_ts=None):
     this filter may only ever SKIP an entry, never block the loop."""
     try:
         uni = sorted((c for c, f in fund.items()
-                      if (f.get("vol") or 0.0) >= MIN_VOL and ctx.supports(c)),
+                      if MIN_VOL <= (f.get("vol") or 0.0) < MAX_VOL
+                      and ctx.supports(c)),
                      key=lambda c: -(fund[c].get("vol") or 0.0))[:VOL_FILTER_UNIVERSE_MAX]
         have = {}
         for c in uni:
@@ -1475,8 +1514,11 @@ def main():
     venue_tag = None if ctx.mode == "hl_paper" else "lighter"
     shadow_tag = ctx.mode == "lighter_shadow"
     log.info("BOOT lighter_funding_bot build=%s bot=%s VENUE=%s clip=$%.2f max_open=%d "
-             "| explore_k=%d conviction=%s", store.build_code_id(), bot_id, ctx.mode,
-             order_usd, max_open, SCAN_EXPLORE_K, CONVICTION_MODE)
+             "| explore_k=%d conviction=%s | variant=%s vol_band=[%.0f, %s)",
+             store.build_code_id(), bot_id, ctx.mode,
+             order_usd, max_open, SCAN_EXPLORE_K, CONVICTION_MODE,
+             VARIANT or "-", MIN_VOL,
+             ("inf" if MAX_VOL == float("inf") else f"{MAX_VOL:.0f}"))
 
     # Cumulative realized P&L survives restarts via the ledger.
     realized, n_closed, n_wins = 0.0, 0, 0
@@ -2435,7 +2477,7 @@ def main():
                 vol24 = f.get("vol") or 0.0
                 if abs(apr) < ENTER_GATE:
                     continue
-                main_ok = vol24 >= MIN_VOL
+                main_ok = MIN_VOL <= vol24 < MAX_VOL   # [(lp)] band, not floor
                 if not main_ok and (_ex_floor is None or vol24 < _ex_floor):
                     continue
                 _hot_h = (t0 - hot_since.get(c, t0)) / 3600.0
