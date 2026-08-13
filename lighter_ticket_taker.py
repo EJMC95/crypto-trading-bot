@@ -964,7 +964,63 @@ def realised_loses(mean_pct, t):
     return mean_pct < 0 and t <= REALISED_VETO_T
 
 
-def realised_lens_evidence(rows, bot_row, sides=None):
+def current_policy():
+    """The policy-signature half of the `extra.policy` stamp — the fields THIS
+    process is running RIGHT NOW, in exactly the shape `_close_extra` writes
+    them. ONE builder for both the stamp and the veto's era filter, so the two
+    cannot drift: a close is stamped with `current_policy()` and a row is
+    admitted to the realised grade iff its stamp matches `current_policy()`.
+
+    [(hj)] `sides` is stamped per lens because the side rule changed on 30-Jul
+    and a grader pooling across it would mix long+short divergence eras exactly
+    as the retracted alpha claim did. Capacity levers (`max_open`,
+    `ticket_top_n`) are stamped BESIDE these in `_close_extra` but are NOT
+    signature fields — (hc): ordinary tuning must not reset an era."""
+    return {"bull": BULL_MODE,
+            "lenses": sorted(allowed_lenses(TT_VENUE)),
+            "sides": {l: sorted(allowed_sides(TT_VENUE, l))
+                      for l in sorted(allowed_lenses(TT_VENUE))},
+            "venue": TT_VENUE}
+
+
+#: [2026-08-13] Mirrors `scripts/golive_readiness.POLICY_SIG_FIELDS` — pinned
+#: equal by `tests/autonomy/test_realised_veto_era.py`, which also pins the
+#: two signature functions byte-equal on shared fixtures. A direct import is
+#: blocked in the OTHER direction than usual: this file ships in the LIVE
+#: taker image, and dragging the grader into a real-money image is the
+#: born-dark class. The test is the drift arm that makes two copies unable to
+#: disagree silently (the `audit_lever_bounds` pattern).
+_POLICY_SIG_FIELDS = ("venue", "bull", "lenses", "sides")
+
+#: A row that carries NO `policy` stamp at all — written before this book
+#: adopted the stamp. Distinct from a stamp that is present and malformed,
+#: which stays fail-closed (excluded). (kk): an absence is not a change.
+_STAMP_ABSENT = "\x00absent"
+
+
+def _policy_stamp_state(extra):
+    """`_STAMP_ABSENT` | None (unreadable) | canonical signature string.
+
+    The policy branch of `scripts/golive_readiness.stamp_state`, scoped to
+    this book's own rows (every post-adoption taker close carries `policy`,
+    so the grader's bracket branch never applies here). A stamp without a
+    non-empty `lenses` is unreadable: a policy naming no admissible signal
+    describes nothing."""
+    if not isinstance(extra, dict) or "policy" not in extra:
+        return _STAMP_ABSENT
+    pol = extra.get("policy")
+    if not isinstance(pol, dict):
+        return None
+    sig = {k: pol[k] for k in _POLICY_SIG_FIELDS if k in pol}
+    if not sig.get("lenses"):
+        return None
+    try:
+        return json.dumps(sig, sort_keys=True)
+    except (TypeError, ValueError):
+        return None
+
+
+def realised_lens_evidence(rows, bot_row, sides=None, policy=None, min_n=None):
     """{scout-lens: (n, mean_pct, t)} from THIS ARM's own closed trades.
 
     Keyed to the SCOUT lens name so it can be compared against the forward
@@ -979,13 +1035,64 @@ def realised_lens_evidence(rows, bot_row, sides=None):
     is already forbidden to take.
 
     Pure; the caller supplies rows and owns freshness.
+
+    [2026-08-13 (lj)] ERA-AWARE when `policy` is supplied: only rows whose
+    `extra.policy` stamp matches the CURRENT policy signature are graded.
+
+    THE INCIDENT this closes: the live arm's short-divergence read n=44,
+    mean −0.468%, t=−0.83 POOLED — veto silent — while the rows taken under
+    the policy it actually runs read n=31, mean −1.128%, t=−1.75 (and the
+    trailing 8 days −2.456%, t=−3.68, nine of ten closes `_sl`). The 13
+    diluting rows predate the 30-Jul policy boundary THE GRADER ALREADY
+    REFUSES TO POOL ACROSS — era discipline existed in `golive_readiness`
+    and never reached this actuator, the exact I15 shape ("when a bad idea
+    is removed from a report, grep for it in the things that ACT").
+
+    Era membership is the (jf)/(kk) stamp rule, membership-by-signature:
+      * stamp matches `policy`   -> in the era sample;
+      * stamp differs            -> out (another era's trade);
+      * stamp unreadable         -> out (fail-closed — a trade whose policy
+        cannot be confirmed cannot confirm the current one);
+      * stamp ABSENT             -> out ONLY when at least one of this arm's
+        rows carries a readable stamp (I6: an absence is evidence only
+        against a control group). An arm with NO stamps anywhere keeps the
+        pooled behaviour — "the stamp mechanism is not deployed" must not
+        read as "every trade is another era's".
+    A lens whose ERA sample is below `min_n` (default REALISED_MIN_N) is
+    graded on the arm's FULL record instead — scoped-preferred,
+    pooled-fallback; see the merge comment below for why the proxy must NOT
+    take over there.
+    Deliberately signature-MATCH, not the gate's same-signature SUFFIX: an
+    A→B→A ledger pools both A runs here, because the question is "does the
+    policy the arm runs lose money?", and a policy's own earlier record is
+    admissible for that. Degrades: `policy=None` (legacy callers) or an
+    unreadable current signature -> pooled, byte-for-byte pre-(lj).
     """
     import math
 
-    buckets = {}
+    try:
+        cur_sig = (_policy_stamp_state({"policy": dict(policy)})
+                   if policy else None)
+    except (TypeError, ValueError):
+        cur_sig = None          # malformed current policy -> pooled, never raise
+    any_stamped = False
+    if cur_sig:
+        for r in (rows or []):
+            if (r or {}).get("bot") != bot_row:
+                continue
+            if _policy_stamp_state(r.get("extra")) is not _STAMP_ABSENT:
+                any_stamped = True
+                break
+
+    buckets = {}        # rows stamped with the CURRENT policy (the era sample)
+    pooled = {}         # every row, the pre-(lj) sample — the thin-era fallback
     for r in (rows or []):
         if (r or {}).get("bot") != bot_row:
             continue
+        in_era = True
+        if cur_sig and any_stamped:
+            st = _policy_stamp_state(r.get("extra"))
+            in_era = st is not _STAMP_ABSENT and st == cur_sig
         # OPEN positions carry an UNREALISED mark and must not be graded.
         #
         # [2026-08-06 (kq)] THE `exit_reason == "hold"` CLAUSE IS GONE — it was
@@ -1050,11 +1157,14 @@ def realised_lens_evidence(rows, bot_row, sides=None):
         if sides and lens in sides and side != sides[lens]:
             continue
         try:
-            buckets.setdefault(lens, []).append(float(pct))
+            v = float(pct)
         except (TypeError, ValueError):
             continue
-    out = {}
-    for lens, v in buckets.items():
+        pooled.setdefault(lens, []).append(v)
+        if in_era:
+            buckets.setdefault(lens, []).append(v)
+
+    def _stats(v):
         n = len(v)
         mean = sum(v) / n
         if n > 1:
@@ -1062,7 +1172,22 @@ def realised_lens_evidence(rows, bot_row, sides=None):
             t = (mean / (sd / math.sqrt(n))) if sd else 0.0
         else:
             t = 0.0
-        out[lens] = (n, mean * 100.0, t)
+        return n, mean * 100.0, t
+
+    # [(lj)] SCOPED-PREFERRED, POOLED-FALLBACK. The current policy's own
+    # record decides once it clears `min_n`; below that the arm's FULL record
+    # stays senior to the 4h proxy — I14's horizon argument (a bracket-holding
+    # book is misjudged by 4h marks) is not era-conditional, and the flagship
+    # case is `dip`: n=13/t=−2.66 across eras, ~0 closes under the current
+    # policy because the veto itself blocks them. Falling to the PROXY there
+    # would have RELEASED the fleet's only significant realised loser on the
+    # day this shipped. Restrict-direction conservative by construction: a
+    # standing veto holds until current-policy evidence clears the floor.
+    min_n = REALISED_MIN_N if min_n is None else int(min_n)
+    out = {}
+    for lens, v in pooled.items():
+        era_v = buckets.get(lens) or []
+        out[lens] = _stats(era_v if len(era_v) >= min_n else v)
     return out
 
 
@@ -1387,18 +1512,13 @@ def _close_extra(m):
                                        _spec.get("env_default"))
     except Exception:  # noqa: BLE001
         _supply = None
-    out.setdefault("policy", {"bull": BULL_MODE,
-                              "lenses": sorted(allowed_lenses(TT_VENUE)),
-                              # [(hj)] the SIDE half of the policy, stamped for
-                              # the same reason (gi) stamped the lens half: the
-                              # side rule changed on 30-Jul, so a grader pooling
-                              # across it would mix long+short divergence eras
-                              # exactly as the retracted alpha claim did.
-                              "sides": {l: sorted(allowed_sides(TT_VENUE, l))
-                                        for l in sorted(allowed_lenses(TT_VENUE))},
-                              "venue": TT_VENUE,
-                              "max_open": MAX_OPEN,
-                              "ticket_top_n": _supply})
+    # [(lj)] the signature half comes from `current_policy()` — the SAME
+    # builder the realised veto's era filter compares against, so the stamp
+    # and the filter cannot drift. Capacity levers ride beside it, outside
+    # the signature ((hc): ordinary tuning must not reset an era).
+    out.setdefault("policy", dict(current_policy(),
+                                  max_open=MAX_OPEN,
+                                  ticket_top_n=_supply))
     ev = m.get("evidence")
     if isinstance(ev, dict):
         for k, v in ev.items():
@@ -2470,9 +2590,11 @@ def main(_ctx=None):
     # block: no rows -> `realised={}` -> the forward grade decides, unchanged.
     realised = {}
     try:
+        # [(lj)] policy= scopes the grade to trades taken under the policy
+        # this arm runs NOW — the same boundary the go-live grader draws.
         realised = realised_lens_evidence(
             store.fetch_paper_trades(limit=4000), BOT_ROW,
-            sides=restricted_sides())
+            sides=restricted_sides(), policy=current_policy())
     except Exception:                       # noqa: BLE001
         realised = {}
     try:

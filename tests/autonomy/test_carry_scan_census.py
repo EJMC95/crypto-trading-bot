@@ -104,8 +104,8 @@ def test_it_names_the_next_candidate_and_when():
 
 def test_buckets_partition_the_scan():
     c = _census()
-    assert (c["held"] + c["thin"] + c["cold"] + c["waiting"] + c["eligible"]
-            == c["scanned"] == 8), c
+    assert (c["held"] + c["thin"] + c["cold"] + c["waiting"]
+            + c["noncrypto"] + c["eligible"] == c["scanned"] == 8), c
 
 
 def test_census_cannot_drift_from_the_real_candidate_expression():
@@ -129,12 +129,14 @@ def test_census_cannot_drift_from_the_real_candidate_expression():
         for min_vol in (0.0, 1e5, 2e6, 1e7, 1e9):
             c = carry.scan_census(fund, positions, hot_since, T0, H, BAR,
                                   min_vol=min_vol, persist_h=persist)
-            # verbatim the entry loop's own predicate
+            # verbatim the entry loop's own predicate ((lk) incl. the class
+            # screen — the census and the gate move together or this fails)
             real = [x for x in fund.items()
                     if x[0] not in positions
                     and x[1]["vol"] >= min_vol
                     and abs(x[1]["rate"] * H) >= BAR
-                    and (T0 - hot_since.get(x[0], T0)) >= persist * 3600.0]
+                    and (T0 - hot_since.get(x[0], T0)) >= persist * 3600.0
+                    and carry._class_ok(x[0])]
             assert c["eligible"] == len(real), (
                 f"census disagrees with the gate at persist={persist} "
                 f"min_vol={min_vol}: {c['eligible']} vs {len(real)}")
@@ -156,7 +158,63 @@ def test_a_held_coin_is_counted_once_and_never_as_a_candidate():
     fund = {"BNB": _f(HOT, 9_000_000)}
     c = carry.scan_census(fund, {"BNB": {}}, {"BNB": T0 - 99 * 3600}, T0, H, BAR)
     assert c == {"scanned": 1, "held": 1, "thin": 0, "cold": 0,
-                 "waiting": 0, "eligible": 0}, c
+                 "waiting": 0, "noncrypto": 0, "eligible": 0}, c
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-13 (lk)] THE INSTRUMENT-CLASS SCREEN — crypto perps only.
+# Era-measured: non-crypto −$14.96/9 closes (every loss a `*_flip` with fees >
+# accrued) vs crypto −$0.49/1; mechanism: a closed underlying market satisfies
+# PERSIST_H structurally (I7). Offline here, `fleet_bus.is_crypto` runs on its
+# hand-list fallback, which carries WTI/SKHYNIXUSD/SPCX — the era's actual
+# losers — so these fixtures exercise the same degrade path a dark scout uses.
+# ---------------------------------------------------------------------------
+
+def test_a_hot_liquid_persistent_noncrypto_book_is_screened_not_eligible():
+    fund = {"WTI": _f(HOT, 16_810_000), "KAITO": _f(HOT, 3_011_700)}
+    hot = {"WTI": T0 - 9 * 3600, "KAITO": T0 - 9 * 3600}
+    c = carry.scan_census(fund, {}, hot, T0, H, BAR)
+    assert c["noncrypto"] == 1 and c["eligible"] == 1, c
+    # gate ORDER: class is judged LAST, so the bucket means "blocked by class
+    # ALONE" — a cold or thin non-crypto book must not inflate it.
+    fund2 = {"WTI": _f(COLD, 16_810_000), "SPCX": _f(HOT, 1_000)}
+    c2 = carry.scan_census(fund2, {}, {"SPCX": T0 - 9 * 3600}, T0, H, BAR)
+    assert c2["noncrypto"] == 0 and c2["cold"] == 1 and c2["thin"] == 1, c2
+
+
+def test_the_screen_is_reversible_without_a_deploy(monkeypatch):
+    monkeypatch.setattr(carry, "ALLOW_NONCRYPTO", True)
+    fund = {"WTI": _f(HOT, 16_810_000)}
+    c = carry.scan_census(fund, {}, {"WTI": T0 - 9 * 3600}, T0, H, BAR)
+    assert c["eligible"] == 1 and c["noncrypto"] == 0, c
+
+
+def test_a_missing_fleet_bus_fails_open(monkeypatch):
+    """An import regression must not shrink the book's universe — the
+    dark-scout fallback INSIDE `is_crypto` is the load-bearing degrade."""
+    monkeypatch.setattr(carry, "fleet_bus", None)
+    fund = {"WTI": _f(HOT, 16_810_000)}
+    c = carry.scan_census(fund, {}, {"WTI": T0 - 9 * 3600}, T0, H, BAR)
+    assert c["eligible"] == 1 and c["noncrypto"] == 0, c
+
+
+def test_the_entry_loop_itself_carries_the_screen():
+    """AST, not a substring scan (the (hm) lesson): the `candidates`
+    generator in main() must call `_class_ok`. The drift test above pins the
+    census to a COPY of the predicate; this pins the real one, so removing
+    the screen from the entry loop alone cannot pass."""
+    tree = ast.parse(pathlib.Path(carry.__file__).read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "candidates"
+                        for t in node.targets)):
+            calls = {c.func.id for c in ast.walk(node.value)
+                     if isinstance(c, ast.Call)
+                     and isinstance(c.func, ast.Name)}
+            assert "_class_ok" in calls, (
+                "the entry loop's candidate filter no longer screens class")
+            return
+    raise AssertionError("candidates assignment not found in main()")
 
 
 # ---------------------------------------------------------------------------
@@ -234,5 +292,6 @@ def test_the_degraded_census_carries_every_key_the_consumers_read():
                         and isinstance(stmt.value, ast.Dict)):
                     fallback = {k.value for k in stmt.value.keys}
     assert fallback, "no dict fallback found in the census handler"
-    required = {"scanned", "held", "thin", "cold", "waiting", "eligible"}
+    required = {"scanned", "held", "thin", "cold", "waiting", "noncrypto",
+                "eligible"}
     assert required <= fallback, f"degraded census missing {required - fallback}"
