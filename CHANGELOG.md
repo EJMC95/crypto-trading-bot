@@ -1,3 +1,32 @@
+## 2026-08-13 (lq) — THE PARLIAMENT'S CAGE COULD NOT EXPRESS ITS OWN SWEEP'S WINNER: `sl_pct` hi 0.05 → 0.08, reach not a set value
+
+- **The full-effort optimization sweep ("use every resource ... optimise
+  every single bot") ends at ONE unimplemented measured finding, and this
+  is it.** The organs were drained first: brain diagnoses read
+  `mixed_unclear` everywhere except the Farmer's small-n
+  `venue_execution` buckets (already the judge's territory);
+  proprioception holds zero hurting levers; the board's items are all
+  consumed; the scout tuner re-optimized the taker's brackets this
+  morning; family brackets were swept 5-Aug with ZERO changes supported
+  ((kn)); carry's exit re-tuning stays blocked at the instrument level
+  (the flip-grace harness fails its own calibration gate, (gx) rule). A
+  sweep that finds one real item and says so beats one that ships ten
+  unmeasured ones — 25 of 30 throughput candidates died in refutation the
+  last time this fleet went looking ((hl)).
+- **The finding, from (gx), implemented under I18:** gillard is the ONE
+  book whose exit replay passes the calibration gate, and its sweep
+  measured the sl direction robust and MONOTONE (1.0% → −0.158%/trade,
+  1.5% → −0.098, 2.0% → −0.034, 3.0% → +0.050, drawdown FALLING 40.7% →
+  26.0% — the tight stop was realising the losses) with every top
+  candidate pinned at the grid edge. (gx)'s own review note named
+  `PARAM_BOUNDS["sl_pct"]` (hi 0.05) as the wall: the winner sat outside
+  what the system can express. The hi moves to the sweep's grid edge
+  (0.08). **No default moves, no lever is hand-set** — the Parliament's
+  own replay-gated tuners walk one ×1.25 step per cycle behind their
+  both-halves gate, and the measured table says each step improves, so
+  the walk can now traverse to wherever the gate keeps passing. Reach,
+  not payoff — banked as such per (it).
+
 ## 2026-08-13 (lp) — 🛢️ GARRETT IS BORN FROM THE FLEET'S STRONGEST UNBUILT CLAIM — and the "every success instrument" bot the operator asked for was MEASURED first, which is why it is a funding band and not a consensus ensemble
 
 - **Operator, 13-Aug: *"take an assessment on every single bot and build a

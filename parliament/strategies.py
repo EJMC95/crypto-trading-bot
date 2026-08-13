@@ -70,7 +70,20 @@ DEFAULT_SLIP_BPS = float(os.environ.get("PARL_DEFAULT_SLIP_BPS", "5"))
 # and expiry reverts to baseline).
 PARAM_BOUNDS = {
     "tp_pct":      (0.008, 0.08),
-    "sl_pct":      (0.005, 0.05),
+    # [2026-08-13 (lq)] sl_pct hi 0.05 -> 0.08 — REACH, not a set value
+    # (I18: the binding constraint must be a reachable lever). The (gx)
+    # exit sweep on gillard — the ONE book whose replay passes the
+    # calibration gate — measured the direction robust and MONOTONE:
+    # sl 1.0% -> −0.158%/trade, 1.5% -> −0.098, 2.0% -> −0.034,
+    # 3.0% -> +0.050, with drawdown FALLING 40.7% -> 26.0% (the tight stop
+    # was REALISING the losses), and every top candidate pinned sl at the
+    # grid's edge — "the honest output is 'widen the grid', not 'ship 8%'".
+    # (gx)'s own review note named this cage as the blocker: the sweep's
+    # winner sat OUTSIDE what the system can express. The hi moves to the
+    # sweep's grid edge; DEFAULTS ARE UNCHANGED — the Parliament's
+    # replay-gated tuners walk there only if each ×1.25 step keeps passing
+    # their own gate, which the measured table says the steps do.
+    "sl_pct":      (0.005, 0.08),
     "max_hold_hr": (2.0, 96.0),
     "entry_bar":   (0.20, 0.90),
     # [2026-07-28 honesty note] ml_gate is REGISTERED (the cage clamps any
