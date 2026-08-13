@@ -50,7 +50,10 @@ jobs:
           echo "::group::set variables"
           # The DATABASE_URL REFERENCE form ((kb): a literal URL on any
           # service is a defect). Assembled in shell so GitHub's own
-          # ${{ }} expression parser never sees it.
+          # dollar-double-brace expression parser never sees it — and note
+          # this comment cannot name that token literally either: Actions
+          # scans the ENTIRE run scalar, comments included (learned on this
+          # workflow's first dispatch, 422 "An expression was expected").
           DB_REF="$(printf '$%s' '{{Postgres.DATABASE_URL}}')"
           railway variables --service "$SVC" \
             --set "FUNDING_VARIANT=band-garrett" \
