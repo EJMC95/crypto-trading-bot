@@ -128,6 +128,33 @@ def allocation_scale(bot, current_time=None):
     central-accessor pattern, so the switch reaches the consumer without a
     redeploy ([[a-kill-switch-must-reach-the-consumer]]).
 
+    [2026-08-13 (lv)] EXPANSION IS PRICED ON THE BOOK'S OWN ERA. The organ
+    ranks on the ALL-TIME pooled sample — `(kc)` measured that era-scoping the
+    ranked claim leaves zero claimants on 15 of 15 days, i.e. it turns the
+    organ off, so that is deliberately unchanged. But the ranked claim and the
+    thing this accessor DOES are different questions, and the gap between them
+    was live: measured 13-Aug, 🌾 carry's 0.149%/trade claim came from n=101
+    all-time of which **91 closes predate its own declared era boundary** — the
+    17-Jul→29-Jul window in which TWO containers wrote that ledger. The organ
+    published the honest number right beside it (`claim_era: null`, n_era=10,
+    below its own MIN_N) and this accessor read straight past it and returned
+    **4.0x** on new entries. In-era that book reads mean -0.155%, t=-4.48.
+    A claim computed on two books' trades is not this book's record (I16), and
+    a sample the go-live gate's `integrity` precondition excludes cannot be the
+    thing that quadruples a clip.
+
+    THE RULE, and it is one-directional on purpose: a book may be scaled ABOVE
+    the flat allocation only while its ERA-scoped claim is a positive number.
+    Everything else is untouched — the 25% probe floor still comes from the
+    all-time claim, so this can only ever make a book SMALLER, never larger,
+    and never smaller than the floor (I17: a book cannot earn evidence with no
+    capital). It reverses itself with no intervention the moment the book's own
+    era sample reaches MIN_N with a positive bound. Absent/None/NaN `claim_era`
+    is "the era has no opinion" and declines the expansion — fail-CLOSED in the
+    widening direction, against the usual degrade-to-permissive habit, because
+    here the cost of a wrong default is a 4x clip on a sample nobody stands
+    behind (the I10 shape, at shadow scale).
+
     Fail-safe: dark/stale organ, unknown book, junk numbers -> None, and a
     None consumer MUST keep its env default (scale nothing).
     """
@@ -145,9 +172,37 @@ def allocation_scale(bot, current_time=None):
         t = float(row.get("target_usd"))
         if t != t or t < 0:           # NaN / negative
             return None
-        return max(0.25, min(4.0, t / base))
+        scale = max(0.25, min(4.0, t / base))
+        if scale > 1.0 and not era_supports_expansion(row):
+            return 1.0
+        return scale
     except Exception:
         return None
+
+
+def era_supports_expansion(row):
+    """True only when a published allocation row's ERA-scoped claim is a
+    positive number — the gate on `allocation_scale` growing a book past flat.
+
+    [2026-08-13 (lv)] Deliberately NOT a re-derivation of the era rule. That
+    rule has exactly one owner (`golive_readiness.era_rows`, which
+    `fleet_allocation._era_twin` imports rather than copies) and a second copy
+    of a rule is a second rule ((hj)). This reads the published number and asks
+    one question of it.
+
+    A REAL number, not a coercible one. `set_era_twin` writes a float or None,
+    so anything else is a shape surprise, and a shape surprise in the WIDENING
+    direction declines — the first draft used `float(ce)` and the test caught
+    it granting 4.0x off the string `"0.5"`. `bool` is excluded explicitly
+    because `isinstance(True, int)` is True in Python and `True > 0.0` would
+    otherwise read as evidence. `float('nan') > 0.0` is already False, so NaN
+    needs no special case; None, a missing key and every junk type land on
+    "no expansion" too.
+    """
+    ce = row.get("claim_era")
+    if isinstance(ce, bool) or not isinstance(ce, (int, float)):
+        return False
+    return ce > 0.0
 
 
 def lever_outcome(lever, current_time=None):

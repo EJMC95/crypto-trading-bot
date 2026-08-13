@@ -242,7 +242,34 @@ def allocate(books, book_usd=BOOK_USD, floor=PROBE_FLOOR):
             "undecided": n < MIN_N or cl[b] <= 0.0,
             "undecided_why": why,
         }
+        # [2026-08-13 (lv)] DECLARED SHAPE, fail-CLOSED. The era twin is filled
+        # by `run_once` (it needs the ledger rows and the era owner's import);
+        # `build` cannot compute it, so it publishes the fields as None rather
+        # than omitting them. That matters because a CONSUMER now reads
+        # `claim_era` and an ABSENT key must not be distinguishable from "the
+        # era has no opinion" — both mean no expansion. A payload that simply
+        # lacked the key would read as absence-of-evidence and, under the old
+        # habit of degrading to the permissive default, would have granted the
+        # expansion this field exists to withhold (I6).
+        set_era_twin(out[b], None, None)
     return out
+
+
+def set_era_twin(rec, n_era, claim_era, era_iso=None, era_src=None):
+    """The ONE writer of a published book row's era-twin fields.
+
+    [2026-08-13 (lv)] Both `run_once` and the consumer tests go through here so
+    the field NAMES have a single author. `claim_era` keeps `lower_bound`'s own
+    distinction all the way to the payload boundary: None is "no opinion" (era
+    sample below MIN_N, or the era rule unavailable), 0.0 is "measured, and the
+    bound is at or below zero". A consumer must treat those the same in the
+    EXPAND direction and it must not have to guess which it is holding.
+    """
+    rec["n_era"] = n_era
+    rec["claim_era"] = (round(claim_era, 6) if claim_era is not None else None)
+    rec["era_since"] = era_iso
+    rec["era_source"] = era_src
+    return rec
 
 
 def class_totals(alloc, books):
@@ -368,6 +395,18 @@ def _era_twin(bot, rows):
     (its declared era is 31-Jul, the two-writer window), and the Farmer shadow's
     0.199% claim goes to zero under the era rule.
 
+    [2026-08-13 (lv)] IT IS NO LONGER DISCLOSURE-ONLY — corrected in place (I12)
+    rather than left describing the system as it was. `fleet_bus.allocation_
+    scale` now reads this field and refuses to scale a book ABOVE the flat
+    allocation unless the era claim is a positive number. `(kc)`'s measurement
+    is untouched and still governs the RANKING: era-scoping the ranked claim
+    turns the organ off, so it was not done, and no book loses a claim here.
+    What changed is only the EXPAND direction at the consumer, which `(kc)` did
+    not measure because on 05-Aug there was no consumer at all. The restrict
+    direction — the 25% probe floor — still comes from the all-time claim, so a
+    thin era can never make a book BIGGER than the evidence supports nor smaller
+    than its probe floor.
+
     The era rule is IMPORTED from its owner, never re-derived — a second copy of
     a rule is a second rule. Fail-safe: any import or parse failure publishes
     None (no opinion), never a fabricated era.
@@ -433,12 +472,7 @@ def run_once(publish=False):
         rec = payload["books"].get(b)
         if rec is None:
             continue
-        n_era, claim_era, era_iso, era_src = _era_twin(b, rs)
-        rec["n_era"] = n_era
-        rec["claim_era"] = (round(claim_era, 6)
-                            if claim_era is not None else None)
-        rec["era_since"] = era_iso
-        rec["era_source"] = era_src
+        set_era_twin(rec, *_era_twin(b, rs))
     # The go-live verdict is IMPORTED, never re-derived here — allocation is a
     # different question and must not become a second gate. Optional by design:
     # that module is the other half of the fleet's grading surface and this

@@ -34,14 +34,29 @@ import fleet_allocation
 import fleet_bus
 
 
-def _payload(monkeypatch, books, now=None):
-    """Publisher-built payload served through the accessor's own _load."""
+def _payload(monkeypatch, books, now=None, era=None):
+    """Publisher-built payload served through the accessor's own _load.
+
+    [(lv)] `era` is {bot: claim_era} and goes through the publisher's OWN
+    `set_era_twin` — the single writer of those fields — so these tests cannot
+    drift from the field names `run_once` actually publishes. `build` alone
+    leaves every era claim None (no opinion), which is the fail-closed state
+    and is itself asserted below; a bot absent from `era` keeps that.
+    """
     p = fleet_allocation.build(books)
+    for bot, claim_era in (era or {}).items():
+        fleet_allocation.set_era_twin(p["books"][bot], fleet_allocation.MIN_N,
+                                      claim_era, "2026-07-31", "declared")
     if now is not None:
         p["updated"] = now.isoformat()
     monkeypatch.setattr(fleet_bus, "_load", lambda key, ct: p
                         if key == "fleet-allocation" else None)
     return p
+
+
+# The era claim that lets a book grow past flat. Any positive number does; the
+# VALUE is not ranked (the all-time claim still is) — only its sign is read.
+_ERA_OK = {"perps-funding-carry-lshadow": 0.001}
 
 
 def _books():
@@ -60,7 +75,7 @@ def _books():
 
 
 def test_scale_comes_from_the_publishers_own_targets(monkeypatch):
-    p = _payload(monkeypatch, _books())
+    p = _payload(monkeypatch, _books(), era=_ERA_OK)
     base = p["book_usd"]
     win = fleet_bus.allocation_scale("perps-funding-carry-lshadow")
     lose = fleet_bus.allocation_scale("perps-funding-spread-lshadow")
@@ -95,10 +110,101 @@ def test_scale_is_clamped_both_ends(monkeypatch):
     # a lone claimed book among many probes concentrates the whole surplus
     books = dict(_books(), **{f"probe-{i}-lshadow": [None] * 25
                               for i in range(20)})
-    _payload(monkeypatch, books)
+    _payload(monkeypatch, books, era=_ERA_OK)
     s = fleet_bus.allocation_scale("perps-funding-carry-lshadow")
     assert s == 4.0, f"cap must bind at 4.0, got {s}"
     assert fleet_bus.allocation_scale("perps-funding-spread-lshadow") >= 0.25
+
+
+# --------------------------------------------------------------------------
+# [2026-08-13 (lv)] A BOOK GROWS PAST FLAT ONLY ON ITS OWN ERA'S EVIDENCE.
+#
+# THE INCIDENT: 13-Aug, 🌾 carry was being scaled 4.0x on new entries off a
+# claim computed over n=101 all-time, of which 91 closes predate its declared
+# era boundary — the 17-Jul->29-Jul window where TWO containers wrote the
+# ledger. The organ published `claim_era: null` (n_era=10) beside the claim and
+# the accessor read past it. In-era that book reads mean -0.155%, t=-4.48.
+#
+# The fix is one-directional by construction, and each half is pinned here:
+# the probe floor still comes from the all-time claim (nothing shrinks), and no
+# book is ranked differently ((kc)'s measurement that era-scoping the RANKED
+# claim empties the organ is untouched).
+# --------------------------------------------------------------------------
+def test_a_thin_era_cannot_grow_a_book_past_flat(monkeypatch):
+    """THE INCIDENT. Same payload, same ranked claim — only the era differs."""
+    books = dict(_books(), **{f"probe-{i}-lshadow": [None] * 25
+                              for i in range(20)})
+    carry = "perps-funding-carry-lshadow"
+
+    p = _payload(monkeypatch, books, era=_ERA_OK)
+    assert fleet_bus.allocation_scale(carry) == 4.0, \
+        "control arm: with a positive era claim the book still earns 4.0x"
+    ranked = p["books"][carry]["target_usd"]
+
+    # `claim_era: None` is exactly what the live organ published for carry on
+    # 13-Aug: n_era=10, below MIN_N, so the era has NO opinion.
+    p = _payload(monkeypatch, books)
+    assert p["books"][carry]["claim_era"] is None, \
+        "build() must publish the era fields as None, not omit them — an " \
+        "absent key would read as absence-of-evidence and grant the expansion"
+    assert p["books"][carry]["target_usd"] == ranked, (
+        "THE RANKING MUST NOT MOVE. (kc) measured that era-scoping the ranked "
+        "claim leaves zero claimants and turns the organ off; this fix is at "
+        "the consumer, in the expand direction only")
+    assert fleet_bus.allocation_scale(carry) == 1.0, (
+        "a book whose OWN era cannot support a claim must not be scaled past "
+        "the flat allocation — 4.0x on 91 closes from a two-writer window")
+
+
+def test_a_measured_zero_era_claim_also_declines_expansion(monkeypatch):
+    """`claim_era: 0.0` is 'measured, bound <= 0' — a DIFFERENT state from
+    None, and the expand direction must treat them the same. Measured 13-Aug:
+    💸 the Farmer's LIVE row ranks at 3.32x all-time with claim_era exactly
+    0.0 over n_era=72 — a full era sample that says no."""
+    books = dict(_books(), **{f"probe-{i}-lshadow": [None] * 25
+                              for i in range(20)})
+    _payload(monkeypatch, books,
+             era={"perps-funding-carry-lshadow": 0.0})
+    assert fleet_bus.allocation_scale("perps-funding-carry-lshadow") == 1.0
+
+
+def test_the_cap_never_shrinks_a_book_below_its_probe_floor(monkeypatch):
+    """RESTRICT-ONLY IN THE OTHER DIRECTION. The claimless book is at 0.25 and
+    the era gate must leave it there — a scale <= 1.0 is never touched, so a
+    dark or thin era can never take a book below the floor it needs to earn
+    evidence at all (I17)."""
+    books = dict(_books(), **{f"probe-{i}-lshadow": [None] * 25
+                              for i in range(20)})
+    loser = "perps-funding-spread-lshadow"
+    with_era = _payload(monkeypatch, books, era={loser: 0.5})
+    assert fleet_bus.allocation_scale(loser) == 0.25
+    assert with_era["books"][loser]["claim_era"] == 0.5
+    _payload(monkeypatch, books)                 # era says nothing at all
+    assert fleet_bus.allocation_scale(loser) == 0.25
+
+
+def test_junk_era_claims_decline_the_expansion(monkeypatch):
+    """Fail-CLOSED in the widening direction on every unknown: NaN, a string,
+    a bool, a missing key. The usual habit is to degrade to the permissive
+    default; here that default is a 4x clip nobody stands behind.
+
+    `"0.5"` is the case that caught the first draft: `float(ce)` coerces it and
+    granted the full 4.0x off a value the publisher never writes. `True` is the
+    second — `isinstance(True, int)` is True, so a naive numeric check reads a
+    boolean as evidence."""
+    books = dict(_books(), **{f"probe-{i}-lshadow": [None] * 25
+                              for i in range(20)})
+    carry = "perps-funding-carry-lshadow"
+    for junk in (float("nan"), "0.5", True, None, [], {}):
+        p = _payload(monkeypatch, books, era=_ERA_OK)
+        p["books"][carry]["claim_era"] = junk
+        assert fleet_bus.allocation_scale(carry) == 1.0, \
+            f"claim_era={junk!r} must decline the expansion, not grant it"
+    p = _payload(monkeypatch, books, era=_ERA_OK)
+    del p["books"][carry]["claim_era"]
+    assert fleet_bus.allocation_scale(carry) == 1.0, \
+        "a MISSING claim_era must decline too — an older publisher that " \
+        "predates the field must not be read as permission"
 
 
 def _guarded_calls(path, func="allocation_scale"):

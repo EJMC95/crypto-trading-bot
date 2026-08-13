@@ -1,3 +1,96 @@
+## 2026-08-13 (lv) — 🎸 BARNESY'S `extreme` SLEEVE HAS NEVER RUN AND COULD NOT: 0 of 8,611 snapshots, and the sleeve that DID fire was 8-for-8 on the class its own parent screens out
+
+*(Letter note: `(lt)` and `(lu)` were both claimed by concurrent sessions in the
+same working tree while this was being written — three sessions, one tree, the
+exact collision `(fd)` rule 2 exists for. Picked at push time by grepping the
+tree, per the rule; `(lv)`'s 72 grep hits are a local variable `lv`, not
+citations — the guard matches only dated or backticked forms in comments.)*
+
+**Found by the weekly expansion-research slot, on its first run.** 🎸 Barnesy
+publishes ONE pooled number — n=43, mean −0.246%/trade, t=−1.24, win 16.3% —
+and nothing in the fleet had graded its three sleeves separately. That pooling
+was the whole defect: each sleeve re-expresses a DIFFERENT parent's validated
+gates, so a pooled negative reads as "the super-book loses" and hides which
+mechanism failed. Both findings below were invisible in the published row.
+
+- **`extreme` HAS NEVER OPENED A POSITION, AND CANNOT — it is a strict SUBSET
+  consumer running SECOND.** Its gate is carry's gate with a 5× stricter volume
+  floor: same `ENTER_APR`, same 6h persistence clock, same `-abs(apr)` ranking.
+  Carry runs first in the same loop, both draw from one shared `held_harvest`,
+  and carry's cap (`MAX_POSITIONS` 4) exceeds the entire qualified supply at
+  essentially every instant. Replaying the REAL loop order over the scout's own
+  `lighter-market` tape — **8,611 snapshots, 14-Jul→13-Aug** — the extreme
+  sleeve was offered a coin carry had not already claimed in **0 of them
+  (0.000%)**, and carry never once reached its cap during Barnesy's life.
+  This is **I18 in its purest form**: the constraint binding a whole sleeve is
+  the SEQUENCING, and no lever in that sleeve's own registry can reach it.
+  `barnes.extreme_min_vol` is registered, caged and consumed — and walking it
+  to its floor changes nothing.
+- **THE REORDER IS MEASURED AND REFUSED — do not "fix" this by moving the
+  block.** Running extreme first yields 12 entries over 5 coins (WTI,
+  SKHYNIXUSD, MU, SPCX, SNDK) — **every one NON-CRYPTO**. With the class screen
+  below applied it yields **exactly zero either way**, because *no crypto book
+  has ever cleared this sleeve's $10M floor while at the 20% apr bar*: the
+  highest 24h volume ever observed on a qualifying crypto book is **$5.53M
+  (KAITO)**. So the binding constraint is the FLOOR, not the order — and
+  shipping the reorder alone would have looked like a fix while feeding a
+  directional sleeve exactly the instrument class this fleet keeps measuring
+  as a loser. The refusal is engraved at the entry block so the next session
+  does not re-derive it. **Escalated, not taken:** the cage `lo` is 5e6, itself
+  90% of that observed maximum — a cage drawn without reference to the venue's
+  joint funding/liquidity distribution. Lowering it is an operator policy call.
+- **THE CLASS SCREEN THE `(lj,lk,ll)` SWEEP MISSED — SHIPPED.** That sweep,
+  earlier the SAME DAY, class-screened 🌾 the carry PARENT and 🎯 the sniper and
+  did not touch this file. So the funding SUPER-BOOK — built expressly to
+  consolidate those parents' validated gates — kept taking the class they
+  screen out. Measured: **68.2% of the carry sleeve's OFFERED supply is
+  non-crypto**, at the extreme floor it is **100% over 30 days**, and all 8 of
+  its real closes were WTI ×4 / SKHYNIXUSD ×2 / SPCX ×2 at a **0% win rate**.
+  `(ki)` had already found this exact leak in this exact book and fixed only
+  the xsect sleeve — **fixing instances is not closing the class** (I14,
+  `(im)`). `_class_ok` + `BARNES_ALLOW_NONCRYPTO` now mirror the parent's
+  contract EXACTLY: entry-only, fail-OPEN on a missing/raising `fleet_bus`,
+  reversible without a deploy, and the census gains a `noncrypto` bucket LAST
+  in gate order so it means "hot, liquid, persistent — blocked by class ALONE".
+- **A SLEEVE THAT OPENS NOTHING MUST SAY WHY.** `extreme` published
+  `{open: 0, pnl: 0}` and nothing else — **byte-identical between "quiet venue"
+  and "structurally unreachable"**, which is how it sat dead for its entire
+  first 8 days unnoticed (I1). It now carries its OWN census at its OWN floor
+  (`sleeves.extreme.scan` + `floor_usd`); the shared census is computed at
+  carry's floor and structurally cannot speak for it.
+- **WHY THE ECONOMICS COULD NOT CLOSE EITHER — and it is not the exit.**
+  Friction is FIXED at `(slip 0.0005 + hedge 0.0010) × 2 × $80` = **$0.240 per
+  round trip**. Median break-even hold **25.3h** against a median achieved hold
+  of **5.46h** — but **three trades DID reach break-even and still lost**, which
+  kills the "the flip exit fires too early" reading. `entry_apr` is a snapshot,
+  not a rate that holds: realised accrual was **36.0% of what the entry rate
+  implied — $0.343 against $1.92 of friction paid**. Even at the realised
+  **50.3% effective APR** (2.5× the entry bar) break-even needs a **52-hour**
+  hold. The funding on these books is a **spike, not a carry**, and the 6h
+  persistence gate does not filter it on this instrument class. The sleeve has
+  fired `flip` 8 of 8 and `decay_paid` **zero** times — only its parent's
+  LOSING exit (🌾 earns +$71.42 on `*_decay_paid` at 65–70h, loses −$17.32 on
+  the sided flips at 6–10h, `(gq)`).
+- **MUTATION-VERIFIED (I3), six mutations, all reddened**: dropping the class
+  check from the gate; making the `noncrypto` bucket unreachable; regressing
+  the DEFAULT `class_ok` to admit-everything (the wiring, not the function —
+  every other assertion injects `class_ok`, so the default was free to regress
+  with the suite green); flipping the fail-OPEN to fail-closed; moving the
+  class check AHEAD of the cold bar (which would mask the cheaper reason); and
+  dropping the extreme census from the payload.
+- **NOT A POLICY-ERA RESET, stated explicitly.** The screen changes what the
+  carry sleeve ADMITS, which is "different in kind" for that sleeve — but the
+  book is 8 days into a 30-day birth clock that has produced **zero gradeable
+  evidence for two of three sleeves**, so there is no sample to protect. The
+  operator's 4-Sep freeze decision now has numbers instead of one pooled mean.
+  Flagged for that decision rather than decided here.
+
+**What moved toward the gate:** nothing yet, and that is the honest reading —
+this pass converted a book that was *silently ungradeable on 2 of 3 sleeves*
+into one whose failures are named, measured and visible in its own payload.
+Full method, numbers and the four read-only harnesses:
+`reports/expansion_research_log.md` (gitignored, local).
+
 ## 2026-08-13 (ls) — 🏦 RICH DAD IS BORN: Kiyosaki's book, read as a rule set — every lesson lands on a validated gate, and the one NEW rule can only tighten
 
 - **Operator, 13-Aug: *"Please read the book rich dad poor dad by Robert
