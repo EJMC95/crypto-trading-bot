@@ -1,3 +1,28 @@
+## 2026-08-13 (lr) — GARRETT'S SERVICE, PROVISIONED FROM THE REPO'S OWN TOKEN: the last manual birth step becomes a dispatched workflow
+
+- **Operator, 13-Aug: *"Full permission for you to run the garret."*** The
+  (lp) birth left ONE step outside the session's reach — creating the
+  Railway service — because sessions hold no Railway credentials. They do
+  not need any: the repo's deploy workflow already holds the
+  project-scoped `RAILWAY_TOKEN`, so provisioning ships as a one-off
+  `workflow_dispatch` (`garrett-provision.yml`): `railway add` the
+  service, verify it resolves (fail loud, (gl) — no warning-shaped
+  guards), set the env-only config ((lp): variant reads no tuning lane) +
+  `RAILWAY_DOCKERFILE_PATH=Dockerfile.fundinglighter` +
+  the `DATABASE_URL` REFERENCE form ((kb) — assembled in shell so GitHub's
+  own `${{ }}` parser cannot eat it), then the first `railway up --ci`
+  with the redeploy workflow's own retry shape.
+- **Sequenced so a failure never reds unrelated pushes:** provision first,
+  and only on a green dispatch does the auto-deploy rule in
+  `railway-redeploy.yml` activate (the queue item's three-line branch) —
+  the resolver errors on unresolvable names, so rule-before-service was
+  the failure mode being avoided all along. The provision workflow file
+  itself is marked DELETE-after-use: an armed provisioning tool is how a
+  retired service gets resurrected by accident.
+- Verification stays (iw)-shaped: a green dispatch is not a running book —
+  the proof is the `band-garrett-lshadow` row publishing with an
+  `extra.build` stamp on /pnl.json.
+
 ## 2026-08-13 (lq) — THE PARLIAMENT'S CAGE COULD NOT EXPRESS ITS OWN SWEEP'S WINNER: `sl_pct` hi 0.05 → 0.08, reach not a set value
 
 - **The full-effort optimization sweep ("use every resource ... optimise
