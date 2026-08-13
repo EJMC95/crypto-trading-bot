@@ -249,32 +249,28 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
      ```
   The row appears on the dashboard at first publish; 30-day clock starts
   then — gradeable ~mid-Sep.
-- **🏦 Rich Dad (`book-kiyosaki-shadow`) — BORN 13-Aug (ls), ONE dispatch
-  from alive.** Your ask ("read rich dad poor dad and create a bot from
-  it") shipped as the cash-flow doctrine book: only funding-RECEIVING
-  positions (assets), delta-neutral modelled so P&L is pure cash flow,
-  liability sales after a 1h grace, decay-closes only after payback (pay
-  yourself first), and the payback-velocity entry gate (a deal must repay
-  its round trip inside 120h — effective bar ~21.9% TRUE, a tightening of
-  the validated 20%). Full reading + evidence table:
-  `BOOK_KIYOSAKI_RICH_DAD_2026-08-13.md`. Code, tests, dashboard row,
-  registries and docs are all in; the service does not exist yet. To bring
-  it to life (the exact (lr) pattern that birthed Garrett):
-  1. GitHub → Actions → **Provision Rich Dad** → Run workflow (uses the
-     repo's own RAILWAY_TOKEN; creates `book-kiyosaki-shadow`, sets
-     `VENUE=lighter_shadow` + `RAILWAY_DOCKERFILE_PATH=Dockerfile.kiyosaki`
-     \+ the `DATABASE_URL` reference, first `railway up`) — or just tell a
-     session "provision rich dad" and it dispatches.
-  2. Verify by the ROW, never the green run: `book-kiyosaki-lshadow` on
-     /pnl.json publishing with `extra.build` stamped.
-  3. Then (a session can do all three in one commit): activate the deploy
-     rule in `railway-redeploy.yml` (the three-line branch spelled out in
-     the (ls) prose note there, + the two paths: entries), move
-     `Dockerfile.kiyosaki` from `MANUAL_IMAGES_OK` to `AUTO_IMAGES`, and
-     DELETE `kiyosaki-provision.yml` per its own note.
-  30-day clock starts at first publish — gradeable ~12-Sep by the standard
-  gate. Env-only config (no tuning lane), so nothing here can drift while
-  it accrues.
+- **🏦 Rich Dad (`book-kiyosaki-shadow`) — BORN 13-Aug (ls); provision
+  DISPATCHED AND GREEN (96s), activation riding PR #165; row verification
+  pending the #165 merge.** Your ask ("read rich dad poor dad and create a
+  bot from it") shipped as the cash-flow doctrine book: only
+  funding-RECEIVING positions (assets), delta-neutral modelled so P&L is
+  pure cash flow, liability sales after a 1h grace, decay-closes only
+  after payback (pay yourself first), and the payback-velocity entry gate
+  (a deal must repay its round trip inside 120h — effective bar ~21.9%
+  TRUE, a tightening of the validated 20%). Full reading + evidence table:
+  `BOOK_KIYOSAKI_RICH_DAD_2026-08-13.md`. Timeline, executed under your
+  ask + the (lr) precedent: birth PR #164 merged on green CI; **Provision
+  Rich Dad dispatch #1 GREEN in 96s** (service created, env set, first
+  `railway up` accepted); the birth merge then hit the (ls)
+  scalar-length incident (see the changelog entry — main's deploy workflow
+  was dead until the repair), so the DASHBOARD had not yet learned the new
+  base and the row could not appear on /pnl.json. PR #165 carries the
+  repair + the activated deploy rule + the AUTO_IMAGES move + the
+  provision tool's deletion. **After #165 merges, the only check left is
+  yours to enjoy, not to perform: `book-kiyosaki-lshadow` on the dashboard
+  with `extra.build` stamped.** 30-day clock starts at first publish —
+  gradeable ~12-Sep by the standard gate. Env-only config (no tuning
+  lane), so nothing here can drift while it accrues.
 - **🎸 Barnesy — harvest sleeves lack the (lk) class screen; frozen, so it is
   YOUR call, not a code push.** `harvest_candidates` (carry + extreme
   sleeves) takes non-crypto harvests (−$1.58 over 8 closes since birth);
