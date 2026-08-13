@@ -1880,18 +1880,22 @@ All new bots:
 - **LIVE BOTS ALWAYS IN AUDIT SCOPE (operator rule, 16-Jul).** Every audit,
   bug-scan, code-review, or security-review — WHATEVER its nominal scope —
   MUST also check the LIVE REAL-MONEY bots in the same pass: Funding Farmer
-  (`lighter_funding_bot.py` → `perps-funding-lighter-lighter`) and the **Ticket
-  Taker** (`lighter_ticket_taker.py` → `lighter-ticket-taker-lighter`), plus
-  their shared real-money surface (`venues/` SafetyRails / notional caps /
-  equity guard, `order_usd`, and the `live.*` lever consumers). Why: real money
-  lives there, and the 15-Jul cap breach proved a change ELSEWHERE (the growth
-  rail) can break the live bots even when the audit isn't "about" them. Never
-  let an audit exclude the live bots. **[22-Jul (ci) CORRECTION: this rule
-  named the RETIRED Tide Rider (`lighter_trend_bot.py` →
-  `crypto-trend-daily-lighter`) — which the 🎫 Ticket Taker replaced on the
-  same slot 17-Jul. A standing audit rule that names a retired bot sends every
-  future audit to check the wrong file; the live pair is Farmer + Ticket
-  Taker.]**
+  (`lighter_funding_bot.py` → `perps-funding-lighter-lighter`) and **🙏 Avo
+  Maria LIVE** (`lighter_avo_live_bot.py` → `freqtrade-avo-maria-lighter`,
+  which imports its strategy from `lighter_family_bot.py` — so BOTH files are
+  live surface), plus their shared real-money surface (`venues/` SafetyRails /
+  notional caps / equity guard, `order_usd`, and the `live.*` lever
+  consumers). Why: real money lives there, and the 15-Jul cap breach proved a
+  change ELSEWHERE (the growth rail) can break the live bots even when the
+  audit isn't "about" them. Never let an audit exclude the live bots.
+  **[22-Jul (ci) CORRECTION: this rule named the RETIRED Tide Rider — which
+  the 🎫 Ticket Taker replaced on the same slot 17-Jul. A standing audit rule
+  that names a retired bot sends every future audit to check the wrong file.]**
+  **[13-Aug (ma): the same correction AGAIN, made the day of the change this
+  time — 🙏 Avo Maria took the Taker's slot (operator swap; the Taker's live
+  arm had self-halted, its only lens vetoed by its own record). The live pair
+  is Farmer + Avo; the Taker's SHADOW arm keeps grading and stays in ordinary
+  shadow scope.]**
 
 
 ## Doctrine: Claude is the judgment layer, never the polling layer (added 28-Jul-2026)

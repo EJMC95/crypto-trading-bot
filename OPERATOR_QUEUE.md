@@ -12,7 +12,7 @@ Recommended options are marked ★.
 
 ---
 
-## ⚡ WAITING ON YOU · Avo Maria live slot swap — two commands (13-Aug (ma))
+## ⚡ ~~WAITING ON YOU~~ · Avo Maria live slot swap — **EXECUTED 13-Aug ~19:13 AEST, verified by stamp readback (`e49ba8fa7ed2`); retirement + live-roster sweep shipped the same evening ((ma) addendum). Item closes at the next daily review.**
 
 **Your decision, built end-to-end and inert on main.** 🙏 Avo Maria
 (SwingDip, imported from the family registry so the arms cannot drift) takes

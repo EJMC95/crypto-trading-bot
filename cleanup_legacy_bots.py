@@ -37,6 +37,15 @@ LEGACY_BOTS = [
     "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
     "perps-donchian-breakout", "perps-donchian-breakout-lighter",
     "perps-donchian-breakout-lshadow",
+    # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — pruned once
+    # freqtrade-avo-maria-lighter publishes from the same sub-account
+    # (verified at cutover: stamp e49ba8fa7ed2, baseline $62.80). Ledger
+    # (56 closes) kept, as always. NOTE the old container can keep
+    # publishing for a few minutes during Railway's rollout overlap and
+    # re-upsert this row after a prune — harmless: RETIRED_ROWS hides it
+    # from the grid, the totals AND /pnl.json either way, and the next
+    # boot prunes again. The Taker SHADOW row is untouched.
+    "lighter-ticket-taker-lighter",
     # [2026-07-17] 🌊 Tide Rider's LIVE row — 🎫 Ticket Taker took the slot on
     # the SAME service/keys/sub-account (the 11-Jul Trail Blazer -> Funding
     # Farmer shape). Both halves of a retirement, per the 16-Jul lesson that

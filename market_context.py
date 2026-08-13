@@ -539,7 +539,9 @@ def evaluate_evidence(quality):
 # neither is quieter than the old dict's silent skip.
 LIVE_CADENCE_SEC = {
     "perps-funding-lighter-lighter": 1200,    # 💸 Funding Farmer — 300s loop
-    "lighter-ticket-taker-lighter":  1200,    # 🎫 Ticket Taker — 300s loop, LIVE 17-Jul
+    # [2026-08-13 (ma)] 🎫 Ticket Taker's live row RETIRED with the Avo slot
+    # swap; 🙏 Avo Maria took the sub-account. Same 300s loop → same limit.
+    "freqtrade-avo-maria-lighter":   1200,
 }
 # Any live row NOT named above is still watched, at a deliberately slack bar —
 # an unknown cadence earns a late page, never no page.

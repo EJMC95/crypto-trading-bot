@@ -53,8 +53,14 @@ SHADOW = os.environ.get("SHORTFALL_SHADOW", "perps-funding-lighter-lshadow")
 # nothing graded them — order_slip was Farmer-only. Same measurement, two more
 # rows; the farmer keys ('live'/'shadow') are UNCHANGED for every existing
 # consumer, the taker lands under 'taker_live'/'taker_shadow'.
-TAKER_LIVE = os.environ.get("SHORTFALL_TAKER_LIVE", "lighter-ticket-taker-lighter")
-TAKER_SHADOW = os.environ.get("SHORTFALL_TAKER_SHADOW", "lighter-ticket-taker-lshadow")
+# [2026-08-13 (ma)] the live slot's pair moved: 🙏 Avo Maria took the Taker's
+# service/keys/sub-account, so the second execution-quality read now pairs the
+# Avo live arm against its family-shadow twin. The env vars and the published
+# 'taker_live'/'taker_shadow' PAYLOAD KEYS keep their names — they are the
+# SLOT's keys, and renaming them would break every consumer for a label
+# (declared here so the mismatch is a documented fact, not a lie discovered).
+TAKER_LIVE = os.environ.get("SHORTFALL_TAKER_LIVE", "freqtrade-avo-maria-lighter")
+TAKER_SHADOW = os.environ.get("SHORTFALL_TAKER_SHADOW", "freqtrade-avo-maria-lshadow")
 # [2026-07-17 AUDIT] The judge's experiment arm, read from ITS OWN env var with
 # ITS OWN default — so if the operator re-points either organ, they still agree
 # about whether SHADOW is a control or an experiment. Hard-coding the row here

@@ -134,7 +134,12 @@ RETIRED = frozenset({
     "perps-funding-carry", "equities-momentum", "equities-momentum-lshadow",
     "equities-regime-ibkr", "crypto-trend-daily-lighter",
 })
-LIVE_ROWS = ("perps-funding-lighter-lighter", "lighter-ticket-taker-lighter")
+# [2026-08-13 (ma)] the live pair moved: 🙏 Avo Maria took the Taker's slot
+# (same service/keys/sub-account). The review's real-money sweep must cover
+# the CURRENT live pair — leaving the retired row here would send every
+# future audit to a dead row and past the new live book (the exact stale-rule
+# shape the 22-Jul (ci) correction fixed in CLAUDE.md's audit-scope rule).
+LIVE_ROWS = ("perps-funding-lighter-lighter", "freqtrade-avo-maria-lighter")
 # The `-lshadow` CONTROL arm of a row that is ALREADY LIVE is not a go-live
 # candidate — it is the twin of a bot that already went. It also fails the
 # premise twice over: while the experiment judge runs a candidate on it, the
@@ -154,7 +159,8 @@ LIVE_TWINS = frozenset(
 ROW_ENTRY = {
     "perps-funding-lighter-lighter": "lighter_funding_bot.py",
     "perps-funding-lighter-lshadow": "lighter_funding_bot.py",
-    "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",
+    "freqtrade-avo-maria-lighter": "lighter_avo_live_bot.py",   # (ma) slot swap
+    "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",  # retired 13-Aug
     "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
 }
 
@@ -801,15 +807,20 @@ def scan_new_evidence(cur, errors):
                      f"{'DIVERGING' if abs(g['gap_pp']) >= 2 else 'no divergence'}")
 
     with Section(errors, "arm-drift"):
+        # [2026-08-13 (ma)] the Taker pair -> the Avo pair (slot swap). The
+        # Avo arms deliberately run DIFFERENT entry files (live runner vs the
+        # family container) so their build ids will always differ — that is
+        # the (fd) FILE-SET shape, not drift; arm_drift_line's build_n field
+        # is what keeps that readable.
         cur.execute("""SELECT bot, extra->>'build', extra->>'build_n' FROM bot_pnl
                         WHERE bot IN ('perps-funding-lighter-lighter',
                                       'perps-funding-lighter-lshadow',
-                                      'lighter-ticket-taker-lighter',
-                                      'lighter-ticket-taker-lshadow')""")
+                                      'freqtrade-avo-maria-lighter',
+                                      'freqtrade-avo-maria-lshadow')""")
         b = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
         for live, shadow, name in (
                 ("perps-funding-lighter-lighter", "perps-funding-lighter-lshadow", "Farmer"),
-                ("lighter-ticket-taker-lighter", "lighter-ticket-taker-lshadow", "Taker")):
+                ("freqtrade-avo-maria-lighter", "freqtrade-avo-maria-lshadow", "Avo")):
             items.append(arm_drift_line(name, b.get(live), b.get(shadow)))
 
     with Section(errors, "head-drift"):
@@ -1411,9 +1422,12 @@ def selftest():
     # rule) — the failure would be silent and would look like "no candidates"
     assert CANDIDATE_MIN_CLOSES <= GOLIVE_MIN_CLOSES, CANDIDATE_MIN_CLOSES
 
-    # a live row's shadow twin is never a go-live candidate
+    # a live row's shadow twin is never a go-live candidate. The Farmer twin
+    # doubles as the suffix-only-rewrite regression check (its base contains
+    # "-lighter", the case a global replace mangles); the second twin tracks
+    # the live slot's CURRENT occupant ((ma): taker -> avo, 13-Aug).
     assert "perps-funding-lighter-lshadow" in LIVE_TWINS
-    assert "lighter-ticket-taker-lshadow" in LIVE_TWINS
+    assert "freqtrade-avo-maria-lshadow" in LIVE_TWINS
     assert not (LIVE_TWINS & set(LIVE_ROWS)), "twins must be distinct from live rows"
 
     # write scope

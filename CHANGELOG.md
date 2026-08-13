@@ -85,6 +85,32 @@ trade the operator chose knowingly: an n≈10 book on real money is a bet, not
 a measured claim, and this entry says so plainly rather than dressing it as
 one.
 
+**[SAME DAY, LATER — CUTOVER EXECUTED AND VERIFIED; corrected in place per
+I12 so this entry never reads as still-pending.]** The operator ran both
+commands (~19:13 AEST). Stamp readback: `freqtrade-avo-maria-lighter`
+publishing **build `e49ba8fa7ed2` = the predicted id exactly**, baseline
+captured $62.80, clip $15.70 = equity/4, `entry_vetoes` on the row from the
+first publish. **The double-count the staged patch predicted was then
+MEASURED live** — `live_fleet` read $323.30 across 3 "live" rows while the
+real money was $260.50 across 2 accounts (Railway's rollout overlap kept the
+old Taker container publishing for a few minutes) — and the retirement +
+roster sweep shipped in the follow-up commit: both retirement halves, and
+every organ/audit that carried the live pair moved to Farmer+Avo —
+`market_context.LIVE_CADENCE_SEC`, `fleet_respiration.LIVE_BREATHS`,
+`implementation_shortfall` pair defaults (payload keys deliberately keep
+their slot names, declared in-line), `audit_code_currency` row+marker maps,
+`evidence_review` LIVE_ROWS/ROW_ENTRY/arm-drift pair, `deploy_live_verify`,
+the retirement-consistency + dashboard-money + policy-era test rosters, and
+CLAUDE.md's audit-scope rule (its own (ci) correction, made same-day this
+time). **Three of those the fleet's guards demanded themselves** — the
+market_context, fleet_respiration and evidence_review selftests each went
+red on the retired name with instructions in the assertion message. The
+stale threshold needed nothing: the variant falls through to the base's
+SLOW_LOOP window (measured before adding a redundant entry). NOT swept,
+declared: `fleet_agronomy`'s taker-live BookSpec (advisory organ, quiet on a
+dead row — writing a correct Avo spec is its owner's pass, not a rename) and
+`audit_lever_authority`'s taker-file row list (guard-only, non-gating).
+
 ## 2026-08-13 (lz) — THREE BOOKS ARE BIDDING FOR THREE COINS, AND NOTHING COULD SEE IT: the fleet could not ask whether two books hold the same position
 
 **Operator: *"fix all of the above"*.** The `(lv)`/`(ly)` Barnesy work exposed a

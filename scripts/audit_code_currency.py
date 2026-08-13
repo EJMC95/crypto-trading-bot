@@ -130,6 +130,10 @@ ROW_ENTRY = {
     # bot. It was silently skipped from this guard's first run until the
     # unmapped-row gate below made that impossible.
     "market-context": "market_context.py",
+    # [2026-08-13 (ma)] 🙏 Avo Maria took the live slot; the Taker's live row
+    # retired. Its entry stays mapped for the transition window — an old
+    # container's last stamped publishes must resolve, not read UNMAPPED.
+    "freqtrade-avo-maria-lighter": "lighter_avo_live_bot.py",
     "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",
     "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
     "perps-funding-carry-lshadow": "funding_carry_bot.py",
@@ -151,6 +155,9 @@ ROW_ENTRY = {
 MARKER_GATED = {
     "perps-funding-lighter-lighter": ("[deploy-live-farmer]", "[deploy-live]"),
     "lighter-ticket-taker-lighter": ("[deploy-live-taker]", "[deploy-live]"),
+    # [2026-08-13 (ma)] the slot's new occupant deploys behind the SAME
+    # marker (the service kept its gate through the swap).
+    "freqtrade-avo-maria-lighter": ("[deploy-live-taker]", "[deploy-live]"),
     # [2026-08-03] `funding-farmer-shadow` holds ZERO real money and yet is
     # marker-gated, which looks wrong and is not. `(hi)` joined the two arms'
     # deploy CLOCK on purpose: the shadow is the judge's CONTROL arm, and the

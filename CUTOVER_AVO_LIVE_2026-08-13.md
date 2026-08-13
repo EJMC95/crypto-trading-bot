@@ -1,5 +1,11 @@
 # CUTOVER — 🙏 Avo Maria takes the live slot (tide-rider-lighter-live)
 
+> **EXECUTED 13-Aug ~19:13 AEST, VERIFIED BY STAMP READBACK** — row
+> `freqtrade-avo-maria-lighter` publishing build `e49ba8fa7ed2` (= predicted),
+> baseline $62.80, clip $15.70. Step 4 (old-row retirement + the fleet-wide
+> live-roster sweep) shipped the same evening — see the (ma) changelog
+> addendum. This file is now the RECORD of the swap, not an instruction.
+
 **Operator decision, 13-Aug-2026** (*"Change ticket taker to Avo Maria bot and
 make live immediately, as we have done in the past - swap the bot routine.
 Adjust metrics and parameters to the equity balance"*). The 17-Jul

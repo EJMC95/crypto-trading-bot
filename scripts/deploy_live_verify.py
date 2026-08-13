@@ -67,7 +67,9 @@ PNL_URL = "https://pnl-dashboard-production-858c.up.railway.app/pnl.json"
 #: path here: the refusal is about real money, not about markers.)
 LIVE_SERVICES = {
     "trail-blazer-live": ("perps-funding-lighter-lighter", "[deploy-live-farmer]"),
-    "tide-rider-lighter-live": ("lighter-ticket-taker-lighter", "[deploy-live-taker]"),
+    # [2026-08-13 (ma)] the slot's THIRD occupant: 🙏 Avo Maria's row, same
+    # service, same marker gate.
+    "tide-rider-lighter-live": ("freqtrade-avo-maria-lighter", "[deploy-live-taker]"),
 }
 
 # Bounded foreground polling — a CLI a human sits in front of, never a wakeup

@@ -39,7 +39,13 @@ sys.path.insert(0, str(_ROOT / "scripts"))
 import golive_readiness as g          # noqa: E402
 import lighter_ticket_taker as tt     # noqa: E402
 
-LIVE = "lighter-ticket-taker-lighter"
+# [2026-08-13 (ma)] the taker's LIVE row retired with the Avo slot swap, and
+# the grader correctly excludes retired rows (cleanup_legacy_bots.LEGACY_BOTS
+# is its single source) — so these fixtures grade the taker's SHADOW row
+# instead. What is under test is the policy-stamp ERA machinery, which is
+# row-agnostic: the stamps still come from the taker module's own
+# current_policy(), so the cross-module drift arms keep their teeth.
+LIVE = "lighter-ticket-taker-lshadow"
 UTC = _dt.timezone.utc
 
 

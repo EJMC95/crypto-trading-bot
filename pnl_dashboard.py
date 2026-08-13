@@ -171,6 +171,16 @@ DASH_PASS = os.environ.get("DASH_PASS", "")
 RETIRED_ROWS = {"perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
+                # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — 🙏 Avo Maria
+                # took the slot (same service/keys/sub-account, the slot's
+                # THIRD occupant; operator decision, cutover verified by
+                # stamp readback e49ba8fa7ed2). Same rule as the Tide Rider
+                # entry directly below: both rows would report the SAME
+                # ~$62.80 sub-account and the fleet total would double-count
+                # it — measured live at cutover: live_equity read $323.30
+                # across 3 "live bots" when the real money is $260.50 across
+                # 2 accounts. The Taker SHADOW row keeps grading untouched.
+                "lighter-ticket-taker-lighter",
                 # [2026-07-17] 🌊 Tide Rider RETIRED from the live slot —
                 # 🎫 Ticket Taker took it (operator: "taker was meant to replace
                 # rider"), the same shape as the 11-Jul Trail Blazer -> Funding
@@ -425,7 +435,7 @@ LABELS = {
 DESCRIPTIONS = {
     "freqtrade-mum":       "TrendMomoV1 · 1d — long while SMA10>SMA40 with price above; exits on the cross-down · $50 × 4 slots",
     "freqtrade-dad":       "MomoBreakoutV1 · 4h — buys a fresh 20-bar high above the 200-EMA, trails out on the 15-bar low · $50 × 4 slots",
-    "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · $50 × 4 slots",
+    "freqtrade-avo-maria": "SwingDipV1 · 4h — buys RSI<42 dips under the lower Bollinger in an uptrend, sells into strength · shadow $50 × 4 slots; LIVE clips = equity÷4 (slot swap 13-Aug)",
     "freqtrade-georgia":   "DayTraderV5Gated · 15m — BTC-regime-switched pullback + breakout entries, 3.5×ATR trailing stop, ROI ladder · $50 × 5 slots",
     "crypto-trend-daily":  "daily 50/200-EMA golden cross — long through uptrends, cash after the death cross; holds for weeks",
     "crypto-intraday-15m": "DayTraderV5Gated · 1h — Georgia's engine at the validated 1h settings · 29 pairs, 5 slots",

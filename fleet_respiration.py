@@ -70,7 +70,9 @@ OXYGEN_FEEDS = {
 # (pnl_dashboard.py:405).
 LIVE_BREATHS = {
     "perps-funding-lighter-lighter": 1800,   # 💸 Funding Farmer — 300s loop
-    "lighter-ticket-taker-lighter": 1800,    # 🎫 Ticket Taker — 300s loop, LIVE 17-Jul
+    # [2026-08-13 (ma)] 🎫 Taker's live row RETIRED with the Avo slot swap;
+    # 🙏 Avo Maria breathes on the same sub-account at the same 300s loop.
+    "freqtrade-avo-maria-lighter": 1800,
 }
 HYPOXIA_SPO2 = float(os.environ.get("RESP_HYPOXIA_SPO2", "0.7"))   # <70% sat = hypoxic
 

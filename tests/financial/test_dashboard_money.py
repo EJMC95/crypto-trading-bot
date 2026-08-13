@@ -289,21 +289,26 @@ def _install_fake_psycopg2(monkeypatch, rows):
 
 def test_fetch_rows_drops_retired_hidden_and_unknown(monkeypatch):
     # Preconditions the fixture relies on (roster drift would invalidate it):
+    # [2026-08-13 (ma)] the slot's THIRD occupant — the Taker live row joined
+    # Tide Rider's on the RETIRED side when Avo Maria took the sub-account.
     assert "crypto-trend-daily-lighter" in pd.RETIRED_ROWS   # the $34.67 row
-    assert "lighter-ticket-taker" in pd.CURRENT_BOTS
+    assert "lighter-ticket-taker-lighter" in pd.RETIRED_ROWS  # the $62.80 row
+    assert "freqtrade-avo-maria" in pd.CURRENT_BOTS
 
     db_rows = [
-        {"bot": "crypto-trend-daily-lighter", "equity": 1034.67},  # RETIRED
-        {"bot": "lighter-ticket-taker-lighter", "equity": 1034.67},  # survivor
+        {"bot": "crypto-trend-daily-lighter", "equity": 1034.67},   # RETIRED
+        {"bot": "lighter-ticket-taker-lighter", "equity": 62.80},   # RETIRED
+        {"bot": "freqtrade-avo-maria-lighter", "equity": 62.80},    # survivor
         {"bot": "freqtrade-mum-lshadow", "equity": 1000.0},   # hidden below
         {"bot": "totally-unknown-bot", "equity": 999.0},      # not current
     ]
     _install_fake_psycopg2(monkeypatch, db_rows)
     out = pd.fetch_rows(hidden={"freqtrade-mum-lshadow"})
-    # The retired Tide Rider live row and the Ticket Taker live row report the
-    # SAME sub-account's money; only the taker may pass, or the fleet total
-    # double-counts real dollars — the incident, pinned at the choke point.
-    assert set(out) == {"lighter-ticket-taker-lighter"}
+    # Every PAST occupant of the shared live slot reports the SAME
+    # sub-account's money as the current one; only the current occupant may
+    # pass, or the fleet total double-counts real dollars. Two generations
+    # of the incident now, pinned at the choke point.
+    assert set(out) == {"freqtrade-avo-maria-lighter"}
 
 
 def test_fetch_rows_variant_passes_while_its_retired_base_row_stays_out(monkeypatch):

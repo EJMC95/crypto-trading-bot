@@ -21,7 +21,11 @@ RETIRED = pnl_dashboard.RETIRED_ROWS
 LEGACY = set(cleanup_legacy_bots.LEGACY_BOTS)
 
 # The two rows that hold REAL MONEY today (base id + the -lighter live suffix).
-LIVE_ROWS = {"perps-funding-lighter-lighter", "lighter-ticket-taker-lighter"}
+# [2026-08-13 (ma)] lighter-ticket-taker-lighter -> freqtrade-avo-maria-lighter:
+# the live slot's THIRD occupant (operator slot swap, cutover verified by stamp
+# readback e49ba8fa7ed2). The taker's live row moved to the RETIRED side of
+# these invariants, exactly as the Tide Rider live row did on 17-Jul.
+LIVE_ROWS = {"perps-funding-lighter-lighter", "freqtrade-avo-maria-lighter"}
 
 
 def test_every_hidden_row_is_also_pruned():
@@ -55,16 +59,22 @@ def test_current_live_rows_are_never_hidden_or_pruned():
 
 
 def test_the_34_67_double_count_fix_is_locked():
-    # The retired Tide Rider live row must stay filtered (else it double-counts
-    # the Ticket Taker's shared sub-account); the taker's live row must NOT be
-    # filtered (it is the surviving owner of that money).
+    # Every PAST occupant of the shared live slot must stay filtered, or its
+    # frozen row double-counts the sub-account the CURRENT occupant reports.
+    # Two generations now: Tide Rider ($34.67, 17-Jul) and the Ticket Taker
+    # ($62.80, 13-Aug (ma) — measured live at cutover: live_equity read
+    # $323.30 across 3 "live" rows when the real money was $260.50 across 2
+    # accounts). The current occupant must NOT be filtered.
     assert "crypto-trend-daily-lighter" in RETIRED
     assert "crypto-trend-daily-lighter" in LEGACY
-    assert "lighter-ticket-taker-lighter" not in RETIRED
+    assert "lighter-ticket-taker-lighter" in RETIRED
+    assert "lighter-ticket-taker-lighter" in LEGACY
+    assert "freqtrade-avo-maria-lighter" not in RETIRED
+    assert "freqtrade-avo-maria-lighter" not in LEGACY
 
 
 def test_is_live_bot_matches_the_live_suffix():
     assert pnl_dashboard.is_live_bot("perps-funding-lighter-lighter") is True
-    assert pnl_dashboard.is_live_bot("lighter-ticket-taker-lighter") is True
+    assert pnl_dashboard.is_live_bot("freqtrade-avo-maria-lighter") is True
     assert pnl_dashboard.is_live_bot("freqtrade-mum-lshadow") is False
     assert pnl_dashboard.is_live_bot("freqtrade-mum") is False
