@@ -1,0 +1,75 @@
+# [2026-08-13 (lr)] ONE-OFF: provision 🛢️ Garrett's Railway service.
+#
+# The (lp) birth shipped everything but the service — this repo's sessions
+# hold no Railway credentials, so service creation was queued as the
+# operator's action. The operator instead granted it ("Full permission for
+# you to run the garret"), and the path that needs no new secret is this:
+# the repo's existing project-scoped RAILWAY_TOKEN, driven by a
+# workflow_dispatch. Creates `band-garrett-shadow`, sets its variables
+# (env-only config per (lp): a variant reads no tuning lane), and runs the
+# first `railway up`. Idempotent: re-running re-asserts variables and
+# redeploys; `railway add` on an existing name is tolerated.
+#
+# DELETE THIS FILE once the service exists and the auto-deploy rule in
+# railway-redeploy.yml is active — a provisioning tool left armed is how a
+# retired service gets resurrected by accident.
+name: Provision Garrett
+on:
+  workflow_dispatch: {}
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Create service, set variables, first deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set"; exit 1
+          fi
+          SVC="band-garrett-shadow"
+
+          echo "::group::create service (tolerated if it already exists)"
+          railway add --service "$SVC" || railway add -s "$SVC" || \
+            echo "railway add failed — service may already exist; continuing to verify"
+          echo "::endgroup::"
+
+          echo "::group::verify the service resolves"
+          if ! railway status --json | grep -q "\"$SVC\""; then
+            echo "::error::service '$SVC' did not resolve after create — stop"
+            railway status --json | head -50
+            exit 1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::set variables"
+          # The DATABASE_URL REFERENCE form ((kb): a literal URL on any
+          # service is a defect). Assembled in shell so GitHub's own
+          # ${{ }} expression parser never sees it.
+          DB_REF="$(printf '$%s' '{{Postgres.DATABASE_URL}}')"
+          railway variables --service "$SVC" \
+            --set "FUNDING_VARIANT=band-garrett" \
+            --set "VENUE=lighter_shadow" \
+            --set "FUNDING_MIN_VOL=1e5" \
+            --set "FUNDING_MAX_VOL=2e6" \
+            --set "RAILWAY_DOCKERFILE_PATH=Dockerfile.fundinglighter" \
+            --set "DATABASE_URL=${DB_REF}" \
+            --skip-deploys || { echo "::error::variable set failed"; exit 1; }
+          railway variables --service "$SVC" | sed 's/postgres[^ ]*/<redacted>/g' || true
+          echo "::endgroup::"
+
+          echo "::group::first deploy"
+          ok=0
+          for i in 1 2 3; do
+            if railway up --service "$SVC" --ci; then ok=1; break; fi
+            echo "retry $i failed; sleeping"; sleep 15
+          done
+          [ "$ok" = 1 ] || { echo "::error::railway up failed x3"; exit 1; }
+          echo "::endgroup::"
+          echo "Provisioned. Verify by the row: band-garrett-lshadow on /pnl.json"
+          echo "with extra.build stamped — a green run here is NOT that proof."
