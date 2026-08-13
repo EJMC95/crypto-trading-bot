@@ -289,7 +289,12 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # (lighter_band_barnes_bot.py, service band-barnes-shadow).
                 # First of the Australian-musician cohort. Shadow-only;
                 # base never publishes.
-                "band-barnes"}
+                "band-barnes",
+                # [2026-08-13 (lp)] 🛢️ Garrett — the thin-tier funding band
+                # (lighter_funding_bot.py VARIANT, service
+                # band-garrett-shadow). Second of the musician cohort.
+                # Shadow-only; base never publishes.
+                "band-garrett"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper"]
 
@@ -321,6 +326,8 @@ OVERTRADE_LIMIT = {
     "pm-gillard":            40,   # 🤝 Parliament disloc fader — closes often
     "band-barnes":           40,   # 🎸 Barnesy — 10 xsect legs can rebalance
                                    # in one pass + two harvest sleeves
+    "band-garrett":          40,   # 🛢️ Garrett — the Farmer's loop cadence
+                                   # (same file), thin tier flips often
 }
 OVERTRADE_DEFAULT = 15
 
@@ -380,6 +387,7 @@ LABELS = {
     # filters any republish, so the labels were dead code.
     "perps-funding-carry":         "🌾 Yield Harvester — funding carry",
     "band-barnes":                 "🎸 Barnesy — funding super-book",
+    "band-garrett":                "🛢️ Garrett — thin-tier funding band",
     "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
