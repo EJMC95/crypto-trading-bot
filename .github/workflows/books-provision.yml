@@ -40,16 +40,20 @@ jobs:
             echo "::endgroup::"
 
             echo "::group::$SVC — verify the service resolves"
-            # capture, never pipe into grep -q: its early exit SIGPIPEs the
-            # Rust CLI, which panics, and under pipefail the panic reads as
-            # "did not resolve" — the run-1 failure mode (schwager verified
-            # false-negative, the loop aborted, hull never provisioned)
+            # PURE BASH substring match — no pipe anywhere. Run 1 piped the
+            # CLI into grep -q (its early exit SIGPIPEd the CLI into a panic
+            # that pipefail read as "no match"); run 2 captured first but
+            # still piped printf into grep -q, and printf's OWN broken-pipe
+            # write error under pipefail turned every successful match into
+            # a failure. Any producer | grep -q under pipefail is this bug.
             status_json="$(railway status --json 2>/dev/null || true)"
-            if ! printf '%s' "$status_json" | grep -qF "\"$SVC\""; then
-              echo "::error::service '$SVC' did not resolve after create"
-              printf '%s\n' "$status_json" | head -50 || true
-              fail=1; continue
-            fi
+            case "$status_json" in
+              *"\"$SVC\""*) : ;;
+              *)
+                echo "::error::service '$SVC' did not resolve after create"
+                printf '%s\n' "${status_json:0:3000}"
+                fail=1; continue ;;
+            esac
             echo "::endgroup::"
 
             echo "::group::$SVC — set variables"
