@@ -3039,6 +3039,38 @@ def main(_ctx=None):
                                      + (meta.get(s) or {}).get("lens", "ticket"))}
                             for s in pos],
                "scout_fresh": fresh, "stress_veto": stressed,
+               # [2026-08-13 (lw)] THE ENTRY VETOES, PUBLISHED — the actuator
+               # standing between this book and a measured-losing lens was
+               # visible ONLY in container logs. Measured the day this shipped:
+               # the LIVE arm's sole lens (`divergence`) crossed its own
+               # realised bar at 11-Aug 14:18Z and answering "is the real-money
+               # book halted?" required `railway logs`, because /pnl.json
+               # carried `stress_veto`, `bars` and `tuned` but nothing about
+               # the veto that actually STOPS entries.
+               #
+               # This is I13's shape pointed at an ACTUATOR rather than an
+               # organ: self-reporting covers what the loop DOES, and a gate
+               # that silently stops gating is byte-identical from outside to
+               # one that is correctly quiet. `lens_veto: []` now means
+               # "evaluated, nothing vetoed"; the key's ABSENCE means a
+               # container too old to publish it. Those two readings were the
+               # same reading before this line existed.
+               #
+               # `lens_evidence` ships the numbers the verdict was computed
+               # from, so a reader can tell a veto from a near-miss without
+               # re-deriving anything (the (li) `base_regime` lesson: a bare
+               # verdict cannot be distinguished from a vacuous one) — and
+               # `coin_veto` carries each coin's OWN reason, not a bare list,
+               # per the same I8 rule its log line already follows.
+               #
+               # PUBLISH-ONLY: every value here was already computed and used
+               # by the entry loop above. No decision changes.
+               "lens_veto": sorted(lens_vetoed),
+               "lens_evidence": {k: {"n": n,
+                                     "mean_pct": round(m, 3),
+                                     "t": round(t, 2)}
+                                 for k, (n, m, t) in sorted(realised.items())},
+               "coin_veto": {c: coin_vetoed[c] for c in sorted(coin_vetoed)},
                # the bars actually in force this cycle (growth-rail visible)
                "bars": {lever: globals()[attr] for lever, attr in TUNABLE},
                "tuned": sorted(moved)})
@@ -4900,6 +4932,82 @@ def _selftest_live():
                 _root.addHandler(_h)
             _root.setLevel(_saved_level)
 
+        # ================================================================
+        # 14) [(lw)] THE ENTRY VETOES REACH THE ROW. On 13-Aug the LIVE
+        #     arm's only lens crossed its own realised bar at 11-Aug
+        #     14:18Z and the book correctly stopped entering — but the
+        #     ONLY way to establish that was `railway logs`. /pnl.json
+        #     carried `stress_veto`, `bars` and `tuned` and nothing about
+        #     the veto that actually halts the book.
+        #
+        #     Behavioural by construction, per (lh): this drives the real
+        #     main() and reads what it PUBLISHED. An AST/substring test
+        #     here would pass against a payload that carries the key with
+        #     a permanently empty value — which is exactly the failure
+        #     being guarded (a gate that stops gating looks quiet).
+        # ================================================================
+        TT_VENUE, BOT_ROW = "lighter_shadow", BOT + "-lshadow"
+        captured["state"].clear()
+        captured["paper"].clear()
+        captured["published"].clear()
+        _stub_market(marks={"JJJ": 100.0}, funding={}, ranges={"JJJ": 6.0})
+        _scout({"divergence": [{"sym": "JJJ", "side": "short",
+                                "gap_pct": 99.0}]})
+        # A losing realised record for `divergence`: mean < 0 and t <= -1.0
+        # over >= REALISED_MIN_N closes is exactly `realised_loses`.
+        # The returns must VARY: `_stats` yields t=0.0 at zero variance, so a
+        # column of identical losses is not a losing record by this rule — it
+        # is an undefined one. (Caught by this fixture on its first run.)
+        _losers = [{"bot": BOT_ROW, "pair": "ZZZ/USDC", "is_open": False,
+                    "reason": "short-divergence_sl",
+                    "profit_ratio": -0.012 + 0.002 * ((i % 3) - 1),
+                    "close_ts": iso(now() - timedelta(hours=6 + i)),
+                    "extra": {}}
+                   for i in range(REALISED_MIN_N + 4)]
+        _saved_fetch = store.fetch_paper_trades
+        store.fetch_paper_trades = lambda **kw: list(_losers)
+        # a FRESH forward grade carrying the lens — the path production runs
+        captured["state"]["brain-lens-forward"] = {
+            "updated": iso(now()), "ttl_sec": 26000,
+            "lenses": {"divergence": {}}}
+        try:
+            main(_ctx={"venue": None, "rails": None,
+                       "broker": PaperBroker(start_equity=1000.0,
+                                             fee_bps=4.0)})
+        finally:
+            store.fetch_paper_trades = _saved_fetch
+        _pub = captured["published"][-1][1]["extra"]
+        # (a) the verdict rides the row
+        assert "lens_veto" in _pub, \
+            "the row must carry the veto state — its absence is what made " \
+            "'is the book halted?' a shell-access question"
+        assert "divergence" in _pub["lens_veto"], \
+            f"a lens its own closes disprove must be PUBLISHED as vetoed, " \
+            f"got {_pub['lens_veto']}"
+        # (b) and the evidence it was computed from, so a reader can tell a
+        #     veto from a near-miss without re-deriving it (the (li) lesson:
+        #     a bare verdict cannot be distinguished from a vacuous one).
+        _ev = _pub["lens_evidence"]["divergence"]
+        assert _ev["n"] == len(_losers) and _ev["mean_pct"] < 0 \
+            and _ev["t"] <= REALISED_VETO_T, _ev
+        # (c) the book actually acted on it — a published verdict that did
+        #     not gate is a label, not an actuator.
+        assert not captured["paper"], \
+            f"a vetoed lens must not open: {captured['paper']}"
+        # (d) NEGATIVE ARM — the empty list must be reachable, or `lens_veto`
+        #     is a constant and (a) passes on a payload that never varies.
+        captured["state"].clear()
+        captured["published"].clear()
+        captured["state"]["brain-lens-forward"] = {
+            "updated": iso(now()), "ttl_sec": 26000, "lenses": {}}
+        _stub_market(marks={"JJJ": 100.0}, funding={}, ranges={"JJJ": 6.0})
+        _scout({})
+        main(_ctx={"venue": None, "rails": None,
+                   "broker": PaperBroker(start_equity=1000.0, fee_bps=4.0)})
+        assert captured["published"][-1][1]["extra"]["lens_veto"] == [], \
+            "with nothing vetoed the row must say so EXPLICITLY — [] and a " \
+            "missing key are different facts about the container"
+
         print("\nAll LIVE order-path self-tests passed:")
         print("  1 entry SENDS a real order + records the REAL fill")
         print("  2 notional cap is senior — cap-breaching entry never sends")
@@ -4922,6 +5030,9 @@ def _selftest_live():
         print("    a read that never happened does not retry into the reserve")
         print(" 13 the venue layer is AUDIBLE (signer/equity-guard/governor),")
         print("    and importing this file hijacks nobody's logging")
+        print(" 14 the ENTRY VETOES reach the row: a lens its own closes")
+        print("    disprove is published as vetoed WITH its evidence, does")
+        print("    not open, and an empty veto set is published explicitly")
     finally:
         for k, fn in _real.items():
             setattr(store, k, fn)

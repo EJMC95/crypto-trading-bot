@@ -1,3 +1,79 @@
+## 2026-08-13 (lw) — THE VETO THAT HALTED THE REAL-MONEY BOOK WAS INVISIBLE FROM OUTSIDE: answering "is the Taker stopped?" needed `railway logs`, and a gate that stops gating looks exactly like one that is correctly quiet
+
+*(Letter note: written as `(lt)`, renumbered `(lt)`→`(lv)`→`(lw)` before any
+commit — three concurrent sessions in one working tree claimed `(lt)`, `(lu)`
+and `(lv)` while this was being written, `(lv)` landing on origin mid-verify.
+Picked at PUSH time by grepping the tree and origin, per `(fd)` rule 2.)*
+
+- **THE INCIDENT, and the actuator was RIGHT — the reporting was the defect.**
+  The daily brief measured 🎫 the LIVE Ticket Taker's only lens
+  (`short-divergence`, real money) at **n=27, mean −1.258%/trade, t=−1.80** on
+  its own in-policy closes, against a `realised_loses` bar of `mean < 0 AND
+  t <= REALISED_VETO_T (−1.0)` at `REALISED_MIN_N = 10`. Reconstructed close by
+  close, it **crossed that bar at the 11-Aug 14:18Z close** (n=22, t=−1.22) and
+  has stayed over it on every close since. The book nevertheless opened
+  CTR/USDC at 12-Aug 12:02Z and closed it −3.01% — so the brief could not tell
+  whether the halt was armed and late, or not firing at all on a real-money
+  book.
+  - **It WAS firing.** `railway logs --service tide-rider-lighter-live`:
+    `LENS VETO — brain grades ['breakout', 'divergence', 'momentum'] negative
+    at sample size; skipping their tickets`, every cycle, book at `open 0/4`.
+    The (lj) era-scoping shipped earlier the same day is what made the verdict
+    reachable. **No behaviour is changed by this entry.**
+  - **The defect is that establishing this required shell access to a
+    container.** `/pnl.json` carried `stress_veto`, `bars`, `tuned` and
+    `open_pos` — everything except the one gate that actually stops the book
+    trading. The daily brief, the immune organ, the evidence board and
+    `/bus.json` all read that row; none of them could see it.
+- **THIS IS I13 POINTED AT AN ACTUATOR RATHER THAN AN ORGAN.** I13 says a dead
+  loop runs no handler, so liveness is only visible from outside. The same
+  argument applies one level in: **self-reporting covers what a gate DOES, and
+  a gate that has silently stopped gating publishes exactly what a gate with
+  nothing to veto publishes — nothing.** `lens_veto: []` and a missing
+  `lens_veto` key were the same reading before this commit; they are now
+  different facts (nothing vetoed vs. a container too old to say).
+- **SHIPPED — publish-only, three keys, every value already computed by the
+  entry loop it is reporting on** (`lighter_ticket_taker.py`, both arms):
+  - `lens_veto` — the sorted veto set the entry loop actually gated on.
+  - `lens_evidence` — `{lens: {n, mean_pct, t}}`, the numbers the verdict was
+    computed from. Per the `(li)` lesson: a bare verdict cannot be told apart
+    from a vacuous one, so the evidence rides beside it and a reader can
+    distinguish a veto from a near-miss without re-deriving anything.
+  - `coin_veto` — each coin's OWN reason, not a bare list, because the set is
+    not slippage-only (I8: today's live set has ADA vetoed on stop-rate at
+    3.65bps of slip). The log line already followed that rule; the row now does.
+- **MUTATION-VERIFIED ×5, all RED**: the key deleted; the key pinned to `[]`
+  (the **disablement** mutation `(lh)` warns an AST/substring test walks
+  straight through); `lens_evidence` deleted; the entry loop's
+  `if lens in lens_vetoed` disabled; and `realised=` never passed to
+  `vetoed_lenses`. Guarded as **fixture 14 of `--selftest-live`**, which drives
+  the real `main()` against the stub venue and reads what it **PUBLISHED** —
+  behavioural by construction per `(lh)`, not an assertion about source. It
+  carries a NEGATIVE arm (an empty veto set must be reachable, or the positive
+  assert passes against a payload that never varies) and asserts the vetoed
+  lens **did not open**, because a published verdict that did not gate is a
+  label rather than an actuator.
+  - **The fixture caught its own first defect**, worth recording: seeded with a
+    column of IDENTICAL losses it stayed green, because `_stats` returns
+    `t = 0.0` at zero variance — a constant loss is not a losing record under
+    this rule, it is an undefined one. The returns now vary. Same shape as
+    `(li)`'s constant-oracle finding, in a test fixture.
+- **NOT DONE, and named rather than implied.** The Taker publishes this; 💸 the
+  Farmer's transcribed twin of the coin veto (`lighter_funding_bot.py:1033`)
+  and 🌾 carry's own gates do not. Extending it is a sweep, not a fix, and the
+  measurement that justified it lives on the Taker — so it is recorded here as
+  the next instance rather than shipped blind across three books in one pass
+  (the `(fz)` six-books-at-once lesson).
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — and that is the honest answer.** This changes no entry, no exit and no
+lever; the live Taker was already halted by its own rule before this shipped
+and remains so. What moves is the fleet's ability to *see* a real-money halt
+without a container shell — the class of question that cost this session's
+brief an hour and would otherwise cost the next one the same. Filed under I13,
+not under the offense tier: it is a sensing fix, and it makes no claim to have
+moved a book toward the gate.
 ## 2026-08-13 (lv) — 🎸 BARNESY'S `extreme` SLEEVE HAS NEVER RUN AND COULD NOT: 0 of 8,611 snapshots, and the sleeve that DID fire was 8-for-8 on the class its own parent screens out
 
 *(Letter note: `(lt)` and `(lu)` were both claimed by concurrent sessions in the
