@@ -168,6 +168,9 @@ SELFTEST_MODULES = [
     # [2026-08-05] 🎸 Barnesy — registered the day it was born; its selftest
     # is offline (gates, exits, tags, freeze, publisher-built payload).
     "lighter_band_barnes_bot",
+    # [2026-08-13 (ls)] 🏦 Rich Dad — registered the day it was born; offline
+    # (payback gate, entry gates, census, exits, income statement, payload).
+    "lighter_book_kiyosaki_bot",
     "lighter_dislocation_bot",
     "lighter_family_bot",
     "lighter_funding_bot",

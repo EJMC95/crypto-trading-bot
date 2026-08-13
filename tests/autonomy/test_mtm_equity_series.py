@@ -48,6 +48,10 @@ MTM_REQUIRED = {
         "file exists to prevent, closed by construction instead of "
         "retrofitted): its xsect sleeve is always-in and its harvest sleeves "
         "hold for days, so a realised-only bar would be blind to it",
+    "lighter_book_kiyosaki_bot.py":
+        "🏦 Rich Dad — the cash-flow doctrine book, wired at BIRTH: its whole "
+        "thesis is holding paid positions for days (decay-paid discipline), "
+        "so a realised-only bar would be blind to exactly what it does",
     "funding_carry_bot.py":
         "🌾 carry — the fleet's nearest go-live candidate; (hl) named it FIRST "
         "and did not wire it",

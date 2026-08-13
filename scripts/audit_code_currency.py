@@ -104,6 +104,15 @@ ROW_ENTRY = {
     # unmapped-row gate (a stamped row this file has never heard of fails the
     # audit rather than being skipped silently).
     "band-barnes-lshadow": "lighter_band_barnes_bot.py",
+    # [2026-08-13 (ls)] 🛢️ Garrett — the (lp)/(lr) birth missed this map, and
+    # the row began publishing WITH a build stamp on 13-Aug, so the next
+    # weekly currency run would have FAILED on an unmapped row. Its entry
+    # module is the Farmer's file (FUNDING_VARIANT instance).
+    "band-garrett-lshadow": "lighter_funding_bot.py",
+    # [2026-08-13 (ls)] 🏦 Rich Dad — mapped the day the row was born, per
+    # the same (jb) gate. The service does not exist yet (provision pending);
+    # mapping it now means its FIRST stamped publish is already covered.
+    "book-kiyosaki-lshadow": "lighter_book_kiyosaki_bot.py",
     "crypto-breakout-4h-lshadow": "lighter_family_bot.py",
     "crypto-intraday-15m-lshadow": "lighter_family_bot.py",
     "crypto-swing-daily-lshadow": "lighter_family_bot.py",

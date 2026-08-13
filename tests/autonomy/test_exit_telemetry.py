@@ -64,6 +64,11 @@ FUNDING_BOOKS = {
     # it is classified here and not in PRICE_BOOKS: the taxonomy is exclusive
     # and the funding fields are what a sweep of ITS exits must join on.
     "lighter_band_barnes_bot": ("entry_apr", "exit_apr", "accrued", "held_h"),
+    # [2026-08-13 (ls)] 🏦 Rich Dad — a FUNDING book by thesis (delta-neutral
+    # modelled, P&L is accrued − fees with NO price term), so its rows carry
+    # the funding form and no prices: a price on a delta-neutral modelled
+    # close would be fabricated data, not telemetry.
+    "lighter_book_kiyosaki_bot": ("entry_apr", "exit_apr", "accrued", "held_h"),
 }
 
 
@@ -436,6 +441,11 @@ def test_the_funding_registry_refuses_the_live_real_money_book():
     for bot in ("perps-funding-lighter-lighter",      # REAL MONEY
                 "perps-funding-lighter-lshadow",
                 "perps-funding-carry-lshadow",
-                "band-barnes-lshadow"):
+                "band-barnes-lshadow",
+                # [2026-08-13 (ls)] the two funding rows born this week, both
+                # added BEFORE their first close so the refusal precedes any
+                # wrong answer (the (kc) pattern)
+                "band-garrett-lshadow",
+                "book-kiyosaki-lshadow"):
         assert bot in ses.FUNDING_BOOKS, \
             f"{bot} earns funding — a price sweep measures the wrong thing"

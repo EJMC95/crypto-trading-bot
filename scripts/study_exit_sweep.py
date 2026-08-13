@@ -110,6 +110,14 @@ FUNDING_BOOKS = {
     "perps-funding-lighter-lighter",
     "perps-funding-lighter-lshadow",
     "band-barnes-lshadow",
+    # [2026-08-13 (ls)] 🛢️ Garrett — the Farmer's own file (FUNDING_VARIANT),
+    # so the same refusal reasoning applies verbatim; its row was missing here
+    # because the variant birth (lp) touched no registry keyed by ROW id. And
+    # 🏦 Rich Dad — delta-neutral modelled, P&L is accrued − fees with no
+    # price term at all: a price sweep on it would measure pure noise. Both
+    # added BEFORE their first close (the (kc) pattern).
+    "band-garrett-lshadow",
+    "book-kiyosaki-lshadow",
 }
 
 
