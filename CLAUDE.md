@@ -275,6 +275,28 @@ replay before they touch a lever, brain veto senior. A refusal with evidence
 satisfies the growth rule; a widening that skips the gate is a step back
 wearing a growth costume, whatever its trade count says.
   ENFORCED BY: `lighter_scout_tuner.py::MARGIN_HALF`, `lighter_scout_tuner.py::desired_scout_levers`
+
+### I20 · A NEW BOOK MUST NAME ITS SUPPLY — AND A SUPPLY ALREADY SPOKEN FOR IS NOT NEW EDGE
+Minting a book is the fleet's most expensive act (a row, a clock, capital,
+attention) and it was the ONE act with no measurement in front of it. Measured
+13-Aug: at the **20% TRUE / $2M / crypto-only** gate this venue's entire crypto
+population is **KAITO, XMR, PAXG** — three coins, at most **2 qualifying at
+once**, present in **6.6%** of scout snapshots — and **three books now enter
+there** (🌾 carry, 🎸 Barnesy's carry sleeve, 🏦 Rich Dad, born into it the
+same day). They do not starve each other the way two sleeves in one book do
+((ly)); they each take the SAME position, so the fleet holds one bet three
+times while `fleet_allocation` ranks three independent claims. **Concentration
+is a property of the COIN**, so a per-book open-position COUNT cannot express
+it — and two books published exactly that and no coin names, which is why
+nothing could ask. Before minting: run the supply check, name the coins the
+gate actually yields, and name every living book whose gate already admits
+them. A gate is differentiated by an apr BAND or a volume TIER (🛢️ Garrett's
+`[1e5, 2e6)` is the worked example of doing it right), never by a new row id.
+Corollary, learned building the detector: publish the BAND, not just the floor
+— an unpublished ceiling made Garrett read as a rival for a supply its own band
+excludes, and a detector that overstates is one the operator learns to ignore
+((gl)). Unknown bounds stay UNKNOWN and are never counted as a finding.
+  ENFORCED BY: `scripts/audit_book_overlap.py::report_supply`, `scripts/audit_book_overlap.py::admits`
 <!-- INVARIANTS:END -->
 
 ### Acknowledged recurrence — houses we keep re-entering, and why
@@ -1276,6 +1298,25 @@ All new bots:
   green on HEAD, green with your changes alone, and red in combination.
   `git checkout HEAD -- <file>` to restore. And do NOT delete other sessions'
   stashes to tidy up — read them (`git stash show -p`) and escalate.
+  **[13-Aug (lz)] THE INDEX IS SHARED TOO, AND `git add` IS NOT PRIVATE.** The
+  rule above protects the working tree; it does not protect the staging area,
+  and with THREE sessions live in this directory that is the sharper edge. All
+  three of these happened in one afternoon: (1) three files staged, and
+  `git diff --cached` listed SIX moments later — another session's `git add`
+  landed in this session's staged set; (2) that session then ran `git commit`,
+  which commits **the index**, so THIS session's CHANGELOG entry was committed
+  and pushed under THEIR commit subject (`afed198`); (3) a third session's
+  partial-staging, built from a snapshot taken before `(lx)` landed, **deleted
+  the `(lx)` entry** (91 lines) while adding its own. **The fix is
+  `git commit -o <paths> -m ...`** (`--only`): it commits the working-tree
+  content of exactly those paths and ignores the index, so a concurrent
+  `git add`/`git commit` can neither sweep you in nor you them. Use it by
+  default here. **Then READ BACK what actually landed** —
+  `git show --stat --format="" HEAD` and, for a file two sessions prepend to,
+  grep the committed blob for every entry that should still be in it.
+  `git diff --cached` is stale the moment you read it. Letters collide the same
+  way: `(lt)`, `(lu)` and `(lv)` were each claimed by another session mid-write
+  on 13-Aug, so **grep for the letter immediately before committing AND after**.
 - **ONE BOOK, ONE WRITER — ENFORCED AT THE TOP OF THE LOOP (31-Jul (hp)).**
   Two containers publishing one row makes `n` a mixture of two books and
   destroys its evidence silently. Measured on 🌾 carry, the fleet's only

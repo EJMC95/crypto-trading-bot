@@ -1,3 +1,70 @@
+## 2026-08-13 (lz) — THREE BOOKS ARE BIDDING FOR THREE COINS, AND NOTHING COULD SEE IT: the fleet could not ask whether two books hold the same position
+
+**Operator: *"fix all of the above"*.** The `(lv)`/`(ly)` Barnesy work exposed a
+fleet-scale version of the sleeve collision it retired. Inside one book, two
+consumers of one supply STARVE each other — that was `(ly)`. Across books they
+do something worse: they each take the SAME position, so the fleet holds one
+bet three times while `fleet_allocation` ranks three independent claims and
+the effective bet count is overstated.
+
+- **MEASURED: the 20% TRUE / $2M / crypto-only gate yields THREE COINS.**
+  KAITO, XMR, PAXG — at most **2 qualifying simultaneously**, present in
+  **6.64%** of 8,633 scout snapshots over 30 days. **Three living books enter
+  there**: 🌾 carry, 🎸 Barnesy's carry sleeve, and 🏦 Rich Dad — which was
+  born into that slot the same morning. That is not a diversified funding
+  franchise; it is one position with three row ids.
+- **THE REASON NOTHING COULD ASK IS MUNDANE: two books published an open-position
+  COUNT and no coin names.** Concentration is a property of the COIN, so a count
+  cannot express it. 🎸 Barnesy published **11 open positions and named none of
+  them**; 🏦 Rich Dad had no `held` field at all. Both now publish `held` in 💸
+  the Farmer's existing shape (`{coin: "S"|"L"}`) so ONE reader serves every
+  funding book. **Correction to the first read of this:** 🛢️ Garrett and 🌾
+  carry were NOT missing the field — they publish it and were simply flat, which
+  is why the audit reports "holds nothing" and "does not say" as different
+  states rather than collapsing both to empty (I4/(kw)).
+- **NEW: `scripts/audit_book_overlap.py`.** Two modes, because the question
+  matters at two moments. **NOW** — which coins are held by more than one book,
+  with real-money books flagged, and the effective-bet correction
+  (distinct `(coin, side)` over total positions). **BEFORE A BOOK IS BORN** —
+  `--gate/--floor` replays the scout's own tape and answers how deep the supply
+  actually is, at most how many qualify at once, and **which living books' gates
+  already admit it**. Minting was the fleet's most expensive act and the one act
+  with no measurement in front of it.
+- **THE DETECTOR OVERSTATED ON ITS FIRST RUN, AND THAT IS WHY IT IS
+  THREE-VALUED.** It counted 🛢️ Garrett as a rival for the ≥$2M supply — but
+  Garrett is a **BAND**, `[1e5, 2e6)`, whose UPPER bound excludes those names
+  entirely, and neither it nor 💸 the Farmer published a ceiling. So
+  `lighter_funding_bot` now publishes `min_vol`/`max_vol` (covering both Farmer
+  arms AND Garrett, which is a variant instance of that file), Barnesy and carry
+  publish theirs under `caps`, and `admits()` returns **yes / no / UNKNOWN** —
+  an unpublished bound is reported loudly and **never counted as a finding**,
+  because a detector that overstates is one the operator learns to ignore
+  ((gl)). Verified live: before the publish fix lands the audit correctly
+  reports 5 books as UNKNOWN rather than manufacturing a verdict.
+- **I20 ENGRAVED: a new book must NAME its supply, and a supply already spoken
+  for is not new edge.** A gate is differentiated by an apr BAND or a volume
+  TIER — 🛢️ Garrett's thin tier is the worked example of doing it right — never
+  by a new row id. Enforced by the two functions above.
+- **THE SHARED-INDEX RULE, engraved after it cost time three times in one
+  afternoon.** `git add` is not private here: another session's `git add` landed
+  in this session's staged set; that session's `git commit` then committed and
+  pushed THIS session's changelog entry under its own subject (`afed198`); and a
+  third session's partial-staging **deleted the `(lx)` entry** (91 lines) while
+  adding its own. The fix is `git commit -o <paths>` plus a READ-BACK of what
+  actually landed — `git diff --cached` is stale the moment it is read.
+  `(lx)` was restored in `(ly)`.
+
+**What did NOT change, and why.** No lever was written, no book retired, no
+capital moved, and the two dated decisions stay the operator's: ⚖️
+Counterweight's pre-registered ~28-Aug call (deciding it early is the (hs)/(ia)
+trap in reverse) and 🌾 carry's stall. `fleet_allocation` is NOT yet corrected
+for duplication — this entry ships the measurement it would need, and wiring a
+concentration term into an organ that moves shadow capital is a change that
+earns its own evidence first (I19). **Right now the audit reads 13 positions
+across 13 distinct `(coin, side)` — 0% duplication** — because the three books
+sharing the gate happen to be flat. The collision is structural, not current,
+which is exactly the kind of fact a payload has to carry BEFORE it bites.
+
 ## 2026-08-13 (ly) — 🎸 BARNESY'S `extreme` SLEEVE RETIRED: the I17 call MADE rather than escalated a second time — one venue supports ONE harvest sleeve
 
 **Operator: *"fix the obvious problem"*.** `(lv)` measured this sleeve

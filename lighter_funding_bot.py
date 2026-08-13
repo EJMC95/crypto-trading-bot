@@ -2751,6 +2751,16 @@ def main():
                                   "conviction": CONVICTION_MODE,
                                   "explore_floor": EXPLORE_MIN_VOL},
                        "vol_filter": VOL_FILTER,
+                       # [2026-08-13 (lz)] THE VOLUME BAND, PUBLISHED. It is a
+                       # BAND here, not a floor ((lp)): 🛢️ Garrett is a variant
+                       # of this file living in [1e5, 2e6), so its UPPER bound
+                       # is what keeps it off the names 🌾/🎸/🏦 compete for.
+                       # Unpublished, that distinction is invisible, and
+                       # `audit_book_overlap` counted Garrett as a rival for a
+                       # supply its own band excludes — a detector that
+                       # overstates trains the operator to ignore it.
+                       "min_vol": MIN_VOL,
+                       "max_vol": (None if MAX_VOL == float("inf") else MAX_VOL),
                        # [2026-08-03] THE CARD'S UNITS COME FROM THE PROCESS NOW.
                        # pnl_dashboard's DESCRIPTIONS carried "clip $20 x cap $80"
                        # and "|APR|>=40%" as PROSE, read from nothing. All three

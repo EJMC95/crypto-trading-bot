@@ -560,15 +560,34 @@ def build_extra(census, positions, open_pnl, realized, moved, now=None,
             # sleeve is dead, quiet, or switched off. The census keeps
             # publishing beside it so the call stays falsifiable.
             sleeves[s]["retired"] = EXTREME_RETIRED
+    # [2026-08-13 (lz)] WHAT THIS BOOK IS ACTUALLY HOLDING, in 💸 the Farmer's
+    # shape ({coin: "S"|"L"}) so ONE reader serves every funding book. This row
+    # published 11 open positions and named NONE of them, so nothing in the
+    # fleet could ask the question that matters now that three books share a
+    # gate: ARE WE ALL HOLDING THE SAME COIN? Per-sleeve counts cannot answer
+    # it — concentration is a property of the coin, not of the sleeve.
+    # "B" = held on BOTH sides within this book (the xsect sleeve is
+    # dollar-neutral, so a name can legitimately appear long and short); a
+    # side-collision must not silently overwrite into a false directional read.
+    held = {}
+    for p in positions.values():
+        c = p["coin"]
+        s = "S" if p["side"] == "short" else "L"
+        held[c] = s if held.get(c, s) == s else "B"
     return {
         "mode": "dry-run",
         "venue": "lighter",
+        "held": held,
         "funding_basis_periods_per_year": H,
         "open_pnl": round(open_pnl, 2),
         "realized": round(realized, 2),
         # the caps this loop ACTUALLY gates on, so the board can see
         # saturation instead of inferring it — and so a frozen book says so.
+        # [(lz)] `min_vol` rides here so `audit_book_overlap` can rule this
+        # book IN or OUT of a proposed gate's supply. Unpublished, it can do
+        # neither, and an undecidable detector is a detector nobody runs.
         "caps": {"enter_apr": ENTER_APR, "max_positions": MAX_POSITIONS,
+                 "min_vol": CARRY_MIN_VOL, "max_vol": None,
                  "k": K, "frozen": freeze_active(now),
                  "freeze_until": FREEZE_UNTIL_ISO},
         # the book names its own binding constraint (I8 one layer in)
@@ -1184,6 +1203,12 @@ def _selftest():
     assert extra["caps"]["frozen"] is True and extra["caps"]["freeze_until"]
     assert extra["scan"]["scanned"] == 5
     assert extra["sleeves"]["carry"]["open"] == 1
+    # [(lz)] the book must NAME what it holds, not just count it — the
+    # cross-book concentration question is asked per COIN, and this row
+    # published 11 open positions and zero coin names for its first 8 days.
+    assert extra["held"] == {"A": "S", "B": "L"}, extra["held"]
+    assert set(extra["held"]) == {p["coin"] for p in positions.values()}, \
+        "every open position must appear in `held`"
     assert extra["sleeves"]["extreme"]["open"] == 1
     assert extra["sleeves"]["xsect"]["open"] == 0
     # [(lv)] the extreme sleeve must publish WHY it is empty at ITS OWN floor.

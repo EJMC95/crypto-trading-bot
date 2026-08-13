@@ -969,8 +969,15 @@ def main():
                            # raw one is HL-denominated and main() is guarded
                            # against touching it (the 8x-basis defect). The
                            # board must see the bar this arm ACTUALLY gates on.
+                           # [(lz)] `min_vol` rides here so
+                           # `audit_book_overlap` can rule this book IN or OUT
+                           # of a proposed gate's supply. THREE books now enter
+                           # at ~20% TRUE / $2M / crypto-only and the venue's
+                           # whole crypto population at that bar is 3 coins —
+                           # unpublished, the collision is undetectable.
                            "caps": {"max_positions": MAX_POSITIONS,
-                                    "enter_apr": _enter_apr},
+                                    "enter_apr": _enter_apr,
+                                    "min_vol": MIN_DAY_VOLUME, "max_vol": None},
                            # [2026-08-02] THE BOOK NAMES ITS OWN BINDING
                            # CONSTRAINT. `scan` answers "why did nothing
                            # open?" in one glance instead of an investigation

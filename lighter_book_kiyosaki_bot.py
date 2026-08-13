@@ -338,6 +338,15 @@ def build_extra(census, positions, open_pnl, realized):
     return {
         "mode": "dry-run",
         "venue": "lighter",
+        # [2026-08-13 (lz)] WHAT THIS BOOK IS ACTUALLY HOLDING, in 💸 the
+        # Farmer's shape ({coin: "S"|"L"}) so ONE reader serves every funding
+        # book. Load-bearing now that THREE books share this gate — 🌾 carry,
+        # 🎸 Barnesy's carry sleeve and this one all enter at ~20% TRUE / $2M /
+        # crypto-only, and the venue's whole crypto population at that bar is
+        # KAITO/XMR/PAXG/XRP. Without this field nothing can ask whether three
+        # "diversified" books are holding one coin.
+        "held": {p["coin"]: ("S" if p["side"] == "short" else "L")
+                 for p in positions.values()},
         "funding_basis_periods_per_year": H,
         "open_pnl": round(open_pnl, 2),
         "realized": round(realized, 2),
@@ -728,6 +737,13 @@ def _selftest():
     assert extra["caps"]["crypto_only"] is True
     assert extra["scan"]["scanned"] == 6
     assert extra["income_statement"]["assets"] == 1
+    # [(lz)] the book must NAME what it holds. This book shares its gate with
+    # 🌾 carry and 🎸 Barnesy's carry sleeve (~20% TRUE / $2M / crypto-only),
+    # and the venue's crypto population at that bar is four coins — so the
+    # cross-book concentration check needs coin names, not a count.
+    assert extra["held"] == {"A": "S"}, extra["held"]
+    assert set(extra["held"]) == set(positions), \
+        "every open position must appear in `held`"
     st = store.json_safe(extra)
     assert st["caps"]["max_positions"] == MAX_POSITIONS
 
