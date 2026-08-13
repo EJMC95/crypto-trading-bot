@@ -378,7 +378,12 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                # a route-less birth is no longer possible; this entry is the
                # claim). Name created by `railway add --service
                # band-barnes-shadow` in the same session as this rule.
-               "Dockerfile.bandbarnes": "band-barnes-shadow"}
+               "Dockerfile.bandbarnes": "band-barnes-shadow",
+               # [2026-08-13 (ls)] 🏦 Rich Dad — moved here from
+               # MANUAL_IMAGES_OK at activation: service provisioned by the
+               # dispatched workflow, row verified publishing with a build
+               # stamp, decide rule live in the same commit.
+               "Dockerfile.kiyosaki": "book-kiyosaki-shadow"}
 
 
 # ---------------------------------------------------------------------------
@@ -451,15 +456,6 @@ MANUAL_IMAGES_OK = {
         "negative). Idles at boot behind SNAPBACK_RETIRED_OVERRIDE; deploy "
         "rule removed 5-Aug so the operator can delete snap-back-shadow "
         "without a shared-file push resurrecting it (no route for an idler)."
-    ),
-    "Dockerfile.kiyosaki": (
-        "🏦 Rich Dad (book-kiyosaki-shadow) — BORN 13-Aug (ls); the service "
-        "does not exist yet, so an active decide rule would red every push "
-        "at the resolver ((lr): rule-before-service is the failure mode). "
-        "The (lr) two-step applies: dispatch kiyosaki-provision.yml, verify "
-        "the row publishes with a build stamp, THEN activate the rule in "
-        "railway-redeploy.yml and MOVE this image to AUTO_IMAGES. This "
-        "entry is the deferral, written down; it is not a resting state."
     ),
 }
 
