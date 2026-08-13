@@ -212,12 +212,18 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   sits in the population (ki)/(jg) already made unenterable.** That updates
   (jg)'s "+$4.80 on the trades it can still take" to +$5.90/65 with the
   post-revert week added. Options unchanged; the date stands.
-- **🛢️ Garrett — BORN 13-Aug (lp); service provisioning EXECUTED by session
-  13-Aug (lr) on your grant ("full permission for you to run the garret")**
-  via the dispatched `garrett-provision.yml` (repo's own RAILWAY_TOKEN — no
-  new credential). Nothing left for you here unless the dispatch fails, in
-  which case the fallback is the original 2-minute manual creation below.
-  Original checklist kept for the record / fallback: The thin-tier funding book (the fleet's strongest
+- **🛢️ Garrett — DONE 13-Aug (lr): ALIVE AND PUBLISHING.** Provisioned by
+  the dispatched workflow on your grant (repo's own RAILWAY_TOKEN), verified
+  by the row itself: `band-garrett-lshadow` online, $1,000, svc
+  `band-garrett-shadow`, build stamped — the 22nd row on your board.
+  Auto-deploy rule ACTIVE (placed after `farmer_files` is assigned — an
+  empty shell var greps everything, learned on placement); the provision
+  workflow is DELETED per its own delete-after-use note. One recorded
+  wrinkle: runtime clip reads $30 (venue minimum) vs the study's modeled
+  $25 — per-trade % is clip-invariant and clip-scaling was declared
+  unmeasured in the study's own honesty gates. 30-day clock started at
+  first publish (~13-Aug): gradeable ~12-Sep. Nothing left for you here.
+  Original checklist kept for the record: The thin-tier funding book (the fleet's strongest
   measured unbuilt claim: the [0.1M,2M) band, +$14.83 both halves vs the
   incumbent's +$4.01) ships as a VARIANT of the Farmer's proven file — code,
   tests, dashboard row and docs are all on main. To bring it to life:
