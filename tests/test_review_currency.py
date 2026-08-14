@@ -655,3 +655,64 @@ def test_occupancy_is_quiet_and_safe_on_a_dark_organ():
     # no long_positions -> shares are None, never a ZeroDivisionError
     only = er.long_budget_occupancy({"by_bot": {"a": {"long": 3}}}, {})
     assert only and only[0][2] is None, only
+
+
+# ---------------------------------------------------------------------------
+# 7. THE STAMP MUST SEE THE MODULE THAT STEERS WHAT EVERY BOOK READS.
+#
+# (mp), 14-Aug: `(lx)` changed `fleet_bus.allocation_scale` — a real change to
+# what three funding books stake — and `build_compute` returned the IDENTICAL
+# id before and after (`f80d5c78d168`, n=15), because `fleet_bus.py` was not in
+# `_BUILD_SHARED`. Stamp readback is the fleet's only accepted proof a deploy
+# landed, so a file outside that set is a file whose deploys cannot be proved.
+#
+# Asserted as BEHAVIOUR, not membership: a membership check stays green if
+# somebody keeps the name and breaks the hashing, and it teaches the next
+# reader nothing about why the name is there.
+# ---------------------------------------------------------------------------
+def test_a_fleet_bus_change_moves_the_build_stamp(tmp_path, monkeypatch):
+    import bot_pnl_store as b
+
+    root = tmp_path / "img"
+    root.mkdir()
+    (root / "fleet_bus.py").write_text("MULT_CEIL = 1.5\n")
+    (root / "arm.py").write_text("import fleet_bus\n")
+    monkeypatch.setattr(b, "_BUILD_ROOT", str(root))
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+
+    before = b.build_compute(str(root / "arm.py"))
+    # the read client changes; the entry module does not
+    (root / "fleet_bus.py").write_text("MULT_CEIL = 9.9\n")
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+    after = b.build_compute(str(root / "arm.py"))
+
+    assert before[1] == after[1] == 2, (before, after)   # entry + fleet_bus
+    assert before[0] != after[0], (
+        "a fleet_bus.py change must move the build id — it is the read client "
+        "for brain mults, the long-budget veto, allocation_scale and the "
+        "per-asset oracle, and drift there changes BOTH arms of a live/shadow "
+        "pair with nothing to show for it ((mp))")
+
+
+def test_an_image_without_fleet_bus_keeps_its_own_stamp(tmp_path, monkeypatch):
+    """The other half, and the (fd) trap: a declared-but-ABSENT shared name is
+    skipped, so the 11 images that do not COPY fleet_bus.py must not move at
+    all. Predicting an image's id from the REPO tree is the mistake (fd)
+    documented, and adding a name to the set is exactly when it recurs."""
+    import bot_pnl_store as b
+
+    root = tmp_path / "img"
+    root.mkdir()
+    (root / "arm.py").write_text("SAME = 'bytes'\n")          # no fleet_bus.py
+    monkeypatch.setattr(b, "_BUILD_ROOT", str(root))
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+    lean = b.build_compute(str(root / "arm.py"))
+
+    (root / "fleet_bus.py").write_text("MULT_CEIL = 1.5\n")   # same tree + bus
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+    rich = b.build_compute(str(root / "arm.py"))
+
+    assert lean[1] == 1 and rich[1] == 2, (lean, rich)
+    assert lean[0] != rich[0], (
+        "identical entry bytes in two different FILE SETS must stamp "
+        "differently, and the COUNT is what tells a reader which they hold")

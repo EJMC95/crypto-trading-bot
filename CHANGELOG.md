@@ -1,3 +1,59 @@
+## 2026-08-14 (mp) — A FILE OUTSIDE `_BUILD_SHARED` IS A FILE WHOSE DEPLOYS CANNOT BE PROVED: `fleet_bus.py` steers what every book READS and stamped nothing
+
+- **FOUND BY A DEPLOY THAT COULD NOT BE VERIFIED, not by reading the list.**
+  `(lx)` changed `fleet_bus.allocation_scale` so a shadow book may only be sized
+  past its flat allocation on its OWN era's evidence — a real change to what
+  three funding books stake — and the build stamp read **byte-identical before
+  and after**: `f80d5c78d168`, n=15. Stamp readback is the fleet's ONLY accepted
+  proof a deploy landed ([[railway-cli-frozen-services]]: *"a green run has never
+  implied a container took it"*), so the change shipped with no way to show it
+  had. The gap is not `(lx)`-shaped; it covers every `fleet_bus` change ever made.
+- **WHY THIS FILE, in the same terms `(ev)` used for `fleet_tuning.py`.** That
+  entry added the CLAMP CAGE — the limit on what the growth rail may WRITE.
+  `fleet_bus.py` is the layer that decides what each book READS: brain stake
+  mults, the fleet-risk long-budget veto, `allocation_scale`, the per-asset
+  oracle regimes, `scout_universe`, `lever_outcome`. Drift here changes
+  behaviour on BOTH arms of a live/shadow pair with nothing to show for it —
+  which is precisely the arm-drift class the stamp exists to catch, since
+  `experiment_judge` promotes on "shadow beats live per-trade" and
+  `implementation_shortfall` reads the same gap as execution quality. Both
+  compare OUTCOMES; the drift would be in the INPUTS.
+- **THE COST, MEASURED PER IMAGE RATHER THAN ASSERTED — and the (fd) trap was
+  live in my own first measurement.** Computed against the REPO tree, all eight
+  entry modules moved n=15 → 16, which would have said "every image moves".
+  Recomputed through `audit_image_imports.image_contents` — the fleet's existing
+  owner of per-image file sets — the truth is **15 of 26 images COPY
+  `fleet_bus.py` and move; 11 do not and keep their id and count exactly**
+  (`Dockerfile.dashboard`, `.tickettaker`, `.perpslive`, `.regime`, `.momo*`,
+  `.arb`, `.crossarb`, `.indexshadow`, `.marketcontext`, `.trainer`). A
+  declared-but-absent name is skipped by design, so predicting an image's id
+  from the repo tree is exactly the mistake `(fd)` documented — and it reappears
+  the moment anyone adds a file to this set, so it is worth writing down twice.
+- **WHAT THE FLEET WILL SEE FOR ONE DEPLOY CYCLE, and why nothing needs
+  silencing.** Until each of the 15 services redeploys, a repo-side prediction
+  will not match its row. That is **BEHIND-SHARED, never BEHIND-OWN**:
+  `scripts/audit_code_currency.py` classifies it and only BEHIND-OWN is a
+  finding, and the daily review states it **UNCLASSIFIED and names that
+  authority** rather than escalating — `(ke)` built that after `(ka)` touched
+  `fleet_tuning.py` and tripped ⚠️ ACTION on BOTH real-money rows while the
+  currency audit, run minutes later on the same fleet, called them CURRENT. The
+  cry-wolf trap this would otherwise walk into is already closed; this entry is
+  the second live test of that closure, and it is deliberately being run on a
+  quiet observability change rather than discovered during an incident.
+- **NOT A LIVE DEPLOY ON ITS OWN, under `(mm)`'s own test.** This changes no
+  trade either live book would take — it buys zero measured edge and would cost
+  a real-money container restart, which is not free
+  ([[lighter-flatten-silent-halt-redeploy-incident]]: a redeploy wipes
+  memory-only halts). Both live images (`Dockerfile.fundinglighter` 💸 the
+  Farmer, `Dockerfile.avolive` 🙏 Avo) DO carry `fleet_bus.py`, so both live
+  stamps move — **on the next marker-gated deploy that qualifies on its own
+  merits, not this one.** Push-both-ways removes a delay from measured wins; it
+  does not lower the bar for what counts as one.
+- **The 15 shadow services take it automatically** (`bot_pnl_store.py` is on
+  their `paths:`), and the change is self-verifying the moment they do: an image
+  that took it publishes **n=16**, one that has not still reads n=15. Compare
+  BOTH fields — `(fd)`'s rule, and here the count is the whole signal.
+
 ## 2026-08-14 (mo) — THE LIVE ROSTER WAS WRITTEN DOWN TWELVE TIMES: one declaration, one derivation, and a guard that makes the NEXT slot swap turn the build red
 
 **Operator, on the finding that the roster had rotted in three places at once:

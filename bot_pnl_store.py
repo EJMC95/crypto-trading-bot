@@ -150,8 +150,30 @@ _BUILD_ROOT = os.path.dirname(os.path.abspath(__file__))
 # see cage drift between arms (found when the A1 bound widening would have
 # deployed hash-invisibly). Adding a file shifts every build id at each
 # service's NEXT deploy — expected, documented here.
+# [2026-08-14 (mp)] fleet_bus.py joined for the same reason one level out: it
+# is the READ CLIENT for every cross-bot signal a book acts on — brain stake
+# mults, the fleet-risk long-budget veto, `allocation_scale`, the per-asset
+# oracle regimes, `scout_universe`, `lever_outcome`. `fleet_tuning` is the cage
+# on what the rail may WRITE; this is the layer that decides what each book
+# READS, and drift here changes behaviour on both arms with nothing to show for
+# it. FOUND BY A DEPLOY THAT COULD NOT BE VERIFIED: `(lx)` changed
+# `allocation_scale` so a book may only be scaled past flat on its own era's
+# evidence — a real change to shadow sizing — and the stamp read BYTE-IDENTICAL
+# before and after (`f80d5c78d168`, n=15). Stamp readback is the fleet's only
+# accepted proof a deploy landed ([[railway-cli-frozen-services]]), so a file
+# outside this set is a file whose deploys cannot be proved.
+#   THE COST, stated rather than discovered: 15 of 26 images COPY fleet_bus.py,
+#   so those stamp a new id at n+1 on their next deploy and the other 11 do not
+#   move at all (absent names are skipped — the (fd) rule). Until each service
+#   redeploys, a repo-side prediction will not match its row. That is
+#   BEHIND-SHARED, not BEHIND-OWN: `audit_code_currency` classifies it and only
+#   BEHIND-OWN is a finding, and the daily review states it UNCLASSIFIED and
+#   names that authority rather than escalating ((ke), after `(ka)` tripped the
+#   same wire on both real-money rows). NOT a live deploy on its own — it
+#   changes no trade either live book would take, so under (mm)'s push-both-ways
+#   rule it rides free on the next deploy that DOES qualify.
 _BUILD_SHARED = ("venues", "funding_basis.py", "bot_pnl_store.py",
-                 "fleet_tuning.py")
+                 "fleet_tuning.py", "fleet_bus.py")
 _BUILD_CACHE = None
 
 
