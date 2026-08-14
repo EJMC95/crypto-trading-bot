@@ -1,3 +1,52 @@
+## 2026-08-14 (ms) — 🙏 AVO LIVE'S NOTIONAL CAP 63 → 200, AT 1x: an OPERATOR BET, recorded as one — and the half I cannot do is named
+
+- **THE DECISION (operator, 14-Aug: "go ahead with the $200 1x step", after the
+  5x briefing).** The 5x ask was measured and REFUSED with the numbers (worst
+  correlated swing −50% of equity, liquidation ~19% away from a BOT-SIDE stop,
+  t unchanged by leverage — you cannot manufacture evidence by scaling
+  exposure); the counter-offer the operator took is **capital at 1x**: Farmer
+  parity, worst correlated swing −10%, no liquidation surface, per-trade % /
+  DD % / stop geometry all invariant to clip ((hl)).
+- **STATED PLAINLY, per I16/I19: this is NOT an evidence-backed step.** The
+  live book is n=0 closes; the shadow record is n=11 — below the allocation
+  organ's own MIN_N=20 — at in-era t=1.68 against the 2.0 bar. It is an
+  ENLARGEMENT OF THE 13-AUG BET (which went live at 3-of-6 bars, recorded the
+  same way), authorized explicitly by the operator with the numbers in front
+  of him. The expectancy on offer at $200/1x is ~$5.40/month IF the n=11 claim
+  is real; the doctrinal value of recording that honestly is that nobody later
+  cites this cap raise as a measured claim.
+- **THE MECHANISM, and why the change is one env var.** `lighter_avo_live_bot`
+  sizes clips off the ACTUAL balance (`clip = equity / max_open`) and publishes
+  `cap_usd = rails.max_notional`, which is env-only by SafetyRails doctrine
+  (*"per-bot notional caps come from env, never code defaults that could
+  grow"*). So the whole step is `FREQTRADE_AVO_MARIA_MAX_NOTIONAL` **63 → 200**
+  on `tide-rider-lighter-live` — set under the (lm) grant at explicit operator
+  instruction, cap-raise-first deliberately: with $62.77 in the account the
+  raised cap binds nothing (clip stays ~$15.69), so the two halves of the step
+  cannot race.
+  - Pre-checks, both against standing incidents: the service has NO git deploy
+    path (it sat 6 commits behind all week, the currency audit's DEFERRED — so
+    a variable change restarts the existing image, never the (io)
+    rebuild-from-stale-tip), and the restart's position survival is the durable
+    -state contract, not hope.
+  - **Verified by readback, not by the set**: row publishes `cap_usd 200.0`,
+    clip $15.69 unchanged, both held positions (BTC, LTC) restored, status
+    online.
+- **THE HALF ONLY THE OPERATOR CAN DO — the money itself.** The account holds
+  **$62.77**; the cap now ADMITS $200 but nothing mints the difference.
+  Reaching $200 working capital means the operator deposits **~$137** into the
+  Lighter account the avo bot trades (the old taker slot's sub-account).
+  Moving funds is the assistant's hard limit — not a permission gap, a
+  prohibition — so the runway ends here by design. When the deposit lands,
+  clips re-size to ~$50 automatically on the next loop; no further change, no
+  redeploy, nothing to remember.
+- **What would make the NEXT step evidence-backed instead of a bet, so the
+  future reader has the schedule**: shadow n≥20 (~mid-Sep at 0.26 closes/d)
+  earns the first I16 claim; n≥30 with t≥2 and both halves in-era (~9-Nov, the
+  horizon's own ETA) opens the full gate conversation. Leverage stays off the
+  table until the gate is cleared — the 15% DD bar admits at most 1.5x under
+  the 4-slot correlated-stop geometry, and that is a ceiling, not a target.
+
 ## 2026-08-14 (mr) — 🚀 crypto-breakout-4h RETIRED: nine books on the docket, one survives correction, and the first shared-module retirement is row-scoped by construction
 
 - **THE DECISION, and why it is one book and not nine.** The decision docket's
