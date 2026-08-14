@@ -120,6 +120,200 @@ and senior, as the grant's own un-amendable core requires.)
   DASHBOARD was serving 14h-stale code; see (ml) for the diagnosis chain
   and the provisioning postmortems.
 
+## 2026-08-14 (mi) — THE `(mb)` FILENAME CLASS WAS OPEN IN THREE MORE JOBS, AND THE NEW LIVE BOOK CARRIED A THIRD COPY OF A MONEY RULE THAT HAD ALREADY DRIFTED
+
+**Operator: *"do a bug check and fix any items"* / *"fix what needs fixing"*.**
+Suite green (52 autonomy + 14 financial/real-money files) and 14 of 17 audit
+guards clean before this pass; the three non-green are all DECLARED non-gating
+states, checked rather than assumed — `audit_coverage_floors` needs CI's own
+`coverage.json`, `audit_lever_authority` is in `GUARD_ONLY_AUDITS` and exits 1
+by design, and `audit_ledger_integrity` fails on 🌾 carry's permanent
+two-writer history, which its own output says no guard can un-pool. **So
+nothing was newly broken and the defects below all came from reading the code
+born in the last 24h against the fleet's own rules.**
+
+- **THE `(mb)` CLASS WAS FIXED IN ONE HOME AND LEFT OPEN IN THREE.** `(mb)`
+  landed at 08:15 today for `evidence_review.py`: *a UTC-dated filename on a
+  Sydney-scheduled job*, after it had already eaten a 31,223-byte report with
+  an operator's human layer. The same defect sat in three sibling scheduled
+  tasks, and **the daily-brief one was MEASURED by walking into it this
+  morning**: the 09:12 AEST run of `crypto-daily-pnl` resolved to
+  `daily_pnl_2026-08-13.md`, which already held the 13-Aug 15:53 AEST brief
+  (7,139 bytes) — one literal step-follow from destroying it. `reports/` is
+  gitignored, so git is NOT a backstop for any of these; the (mb) casualty was
+  unrecoverable for exactly that reason.
+  * `crypto-daily-pnl` — Sydney-dated now, which also makes the filename match
+    the brief's own "Fleet daily — 14 Aug 2026" heading.
+  * `crypto-weekly-pnl` — fires Monday ~09:30 AEST = **Sunday 23:30 UTC**, so a
+    UTC-derived "Monday's date" lands on the wrong Monday and OVERWRITES the
+    previous week's verdict. A whole week of judgement, and `(lx)`'s corrected
+    re-send would have done it.
+  * `crypto-monthly-pnl` — fires on the 1st Sydney = still the last day of the
+    ending month in UTC, so "prior month" names the month BEFORE the one being
+    graded.
+  * All three also gained the never-overwrite rule (rename aside as
+    `.superseded-<HHMM>.md`), because Sydney-dating alone still collides on a
+    same-day correction pass. **ENFORCEMENT NOTE, stated rather than implied:**
+    these are agent-instruction files, not code, so this is PROSE and weaker
+    than `(mb)`'s `report_day()`. The durable version is a shared helper the
+    jobs call; recorded as the follow-up rather than claimed as done.
+- **AND `crypto-daily-pnl` STILL NAMED 🎫 THE TICKET TAKER AS A LIVE ROW** —
+  retired last night when 🙏 Avo Maria took the slot ((ma)). A standing task
+  that names a retired row sends every future run to read the wrong book: the
+  third time this exact shape is recorded, after `(ci)` and `(ma)`. Corrected,
+  and the task now VERIFIES the pair against `/pnl.json`'s own
+  `meta.live_fleet.live_bots` each run instead of trusting the line — a roster
+  that must be remembered is the control that already failed
+  (`market_context`'s own lesson, 6144).
+- **🙏 THE NEW LIVE BOOK CARRIED A THIRD COPY OF THE NET-OF-CAPITAL RAIL, AND
+  IT HAD ALREADY DRIFTED.** `venues.safety.capital_adjusted_day_start` exists
+  because a money rule with two definitions drifts into a cap breach or a
+  phantom halt; 💸 the Farmer and 🎫 the Taker both import it. `(ma)` shipped
+  `lighter_avo_live_bot.py` with the arithmetic INLINE — and not identically:
+  **the helper rounds the shifted baseline to 2dp and the copy did not**, so
+  the two live bots' daily-loss anchors were computed on subtly different
+  footings. Now imported. Behaviour-preserving apart from the rounding, which
+  is the helper's own semantics.
+  * **THE PATH HAD NO FIXTURE AT ALL** — the Avo selftest's stub returned `[]`
+    from `pop_capital_moves()` in all eleven cases, so the capital-adjust arm
+    of a REAL-MONEY rail was unexercised and a mutation there survived
+    silently. Fixture 12 drives the real `main()` through a $20 same-day
+    deposit and asserts the day anchor shifts with it and that the deposit
+    never reads as profit. **Mutation-verified ×3, all RED**: shift removed;
+    shift double-applied; deposit not folded into `capital_adjust`.
+  * The helper's docstring said *"the ONE rule both live bots share"* — false
+    since last night, and the wording is why it was easy to miss. **A helper
+    described by a COUNT of its callers stops describing the system the moment
+    the roster changes**, so it now names the RULE (I12).
+- **THE IMMUNE ORGAN'S RESTART DETECTOR ASSERTS A DISCRIMINATOR IT DOES NOT
+  IMPLEMENT — corrected in the comment, NOT in the logic, and that restraint is
+  the point.** Its threshold note read *"a deploy restarts EVERY organ in the
+  image at once, and a crash-loop restarts one while its neighbours keep their
+  cadence"*. That IS the right test and it is how the 6-Aug finding was
+  reasoned — **by a human**. `RESTART_COUNTERS` declares ONE organ, so the
+  function has no neighbour series to read and only the bare count stands
+  between a deploy and the operator's phone. **MEASURED 13-Aug, the predicted
+  false positive:** 🏛️ the Parliament reset 7× between 02:42Z and 09:52Z, every
+  one inside that day's deploy storm, `errors` 0, `stalled` [], stable for the
+  ~13h since — the `(gl)` cry-wolf shape. **NOT "fixed" by raising the
+  threshold or bolting on the check**: a quieter detector fails toward SILENCE
+  on a real crash-loop, and `(le)` is already a record of this sensor
+  undercounting. Implementing it means declaring neighbour counters for the
+  organs sharing the freqtrade-bots image and requiring co-regression in a
+  short window — its own measurement, its own mutations, its own entry.
+- **THE CHANGELOG GUARD CAUGHT ME MID-PASS, exactly as designed.** The code
+  citations went in before the entry existed and
+  `audit_changelog_letters` failed the suite with *"CITATION IN CODE RESOLVES
+  TO NO ENTRY"* on both files — the `(lc)` arm doing its job. And the letter
+  itself moved: this was drafted as `(mc)`, which a concurrent session had
+  already pushed (📐 Grimes) along with `(md)`–`(mh)` while this pass ran. The
+  cited entry keeps the letter; this one moved to `(mi)`, repointed in all
+  three files BEFORE the commit rather than after.
+  * **AND THE GUARD THEN FOUND A SECOND, BIGGER COLLISION THAT WAS NOT MINE:**
+    the unpushed local `(mb)` (the daily-review overwrite fix, `3876f97`) and
+    origin/main's `(mb)` (🧘 The Zone) are different entries, **both cited from
+    tracked code** — so the convention's own tiebreak did not resolve it.
+    Settled on blast radius and publication: The Zone keeps `(mb)` (published,
+    and cited from six files as part of a contiguous `(mb)`–`(me)` range), the
+    local one moves to `(mj)` with its three `evidence_review.py` citations in
+    the same commit. Recorded inline in the moved entry, per rule 4. **This is
+    the eighth letter collision this file has logged, and the first where BOTH
+    sides were code-cited** — the tiebreak needs the extra clause, which is now
+    written down in the moved entry rather than re-derived next time.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None, and that is the honest answer.** This is a correctness and
+observability pass: a real-money rail that now computes its anchor by the
+fleet's one shared rule instead of a drifted copy, a fixture where a live
+money path had none, three report jobs that can no longer destroy their own
+history, and a detector whose comment no longer claims a test it does not run.
+The nearest thing to forward motion is that 🙏 Avo Maria's daily-loss leash and
+💸 the Farmer's are now measured on the same footing — which matters precisely
+because Avo's own ledger is what grades the operator's slot-swap decision.
+
+**NOT DEPLOYED, and it must not be:** `lighter_avo_live_bot.py` is
+marker-gated, so this ships on the next deliberate live deploy of that service
+and nowhere else. Nothing here changes a trade the book would take.
+
+## 2026-08-14 (mj) — THE DAILY REVIEW HAS BEEN OVERWRITING ITS OWN PREVIOUS REPORT EVERY MORNING: a UTC-dated filename on a job that runs at 08:00 Sydney
+
+**[RENUMBERED (mb) → (mj) at push time by the `(mi)` pass, per the convention's
+own rule 3-4.** This entry was written as `(mb)` and committed locally
+(`3876f97`) while a concurrent session pushed a DIFFERENT `(mb)` — 🧘 The Zone,
+`book-douglas` — to origin/main. `audit_changelog_letters`' cross-branch arm
+caught it before the push, which is the arm's entire purpose. **Both entries
+were cited from tracked code, so the "cited entry keeps the letter" tiebreak
+did not settle it**; the deciding facts are that The Zone's `(mb)` is already
+PUBLISHED and is cited from six files as part of a contiguous `(mb)`–`(me)`
+range, so renumbering it would break a range across six files and invalidate
+references already in other sessions' hands, while this one was a single
+unpushed commit citing one file. The three citations in
+`scripts/evidence_review.py` moved with it in the same commit — a renumber that
+does not carry its citations just relocates the ambiguity. **Note the commit
+subject of `3876f97` still says `(mb)`: `git log` is not a reliable letter
+index, exactly as convention rule 4 warns.]**
+
+- **MEASURED BY LOSING ONE, this run.** The 14-Aug 08:00 AEST review resolved
+  its filename from `reviewed_at[:10]` — a **UTC** date — and 08:00 AEST is
+  **22:00 UTC the previous day**, so it wrote `evidence_review_2026-08-13.md`
+  and replaced the 13-Aug report: **31,223 bytes, including the hand-written
+  human layer, overwritten by 6,674 bytes of fresh script output.** The loss
+  is not recoverable — `reports/` is deliberately not committed.
+- **IT WAS STRUCTURAL, NOT A RACE.** Every Sydney clock time from 10:00 to
+  midnight maps to the same UTC day as the previous Sydney evening. The
+  scheduled slot is 08:00 Sydney and the previous day's run had been at 16:51
+  Sydney (06:51 UTC), so **the two runs collided on one filename by
+  construction, and would have every single day.**
+- **THE SELFTEST WAS PINNING THE BUG.** It asserted
+  `write_report({"reviewed_at": "2026-08-05T21:46:47+00:00"})` ends
+  `evidence_review_2026-08-05.md` — and 21:46 UTC is **07:46 the next morning
+  in Sydney**, i.e. the cron's own slot. The one timestamp chosen to exercise
+  the Sydney-stamp logic was the exact collision case, asserted in the wrong
+  direction. Same fixture now asserts `..._2026-08-06.md`.
+- **THE DOCSTRING'S DEFENCE DOES NOT SURVIVE CONTACT.** It read: *"The
+  FILENAME deliberately stays UTC-dated — it is the series key, and re-dating
+  it would fork the report history mid-stream."* It forks nothing: yesterday's
+  16:51 AEST run was 13-Aug in **both** zones, so every existing filename keeps
+  its meaning and the series becomes one file per operator-day — which is what
+  a daily review on the operator's clock already was. Fleet INTERNALS stay UTC
+  (`reviewed_at`, every ledger join) exactly as before; this is the operator's
+  surface and CLAUDE.md's Sydney rule governs it. **A declared design choice is
+  not a measured one** — this one was declared, cited in its own docstring, and
+  wrong.
+- **SHIPPED — two functions, both fail-OPEN:**
+  * **`report_day(iso_utc)`** — the series key in Sydney. Degrades to the UTC
+    date if the zone database is absent: a filename wrong by one beats no
+    report.
+  * **`preserve_existing_report(path)`** — the Sydney date removes the
+    once-a-day collision; **two runs in one Sydney day still land on one
+    filename, and that also really happened (6-Aug).** The human layer is
+    written into this file *after* the script produces it, so a re-run eats an
+    operator's annotations — the most expensive thing in the directory. An
+    existing report is renamed to `evidence_review_<day>.superseded-<HHMM>.md`
+    (its own mtime, Sydney) before the new one is written, and **the new report
+    names the backup in its own body**: a silent rename is the same class of
+    defect as the silent overwrite it replaces. Fail-open — if the rename
+    cannot be done the review is still published.
+- **MUTATION-VERIFIED ×5, all RED**: the filename reverted to the UTC date;
+  preservation removed; `os.rename` skipped so the backup is never created;
+  the backup left unnamed in the report body; and `report_day` degraded to UTC
+  unconditionally. Restored green.
+- **THE CLASS, and why this is I1-adjacent rather than a cosmetic fix.** The
+  review's *first* mandated step is *"assess the work done since the last
+  review"*, and its stated source for that is the previous report in
+  `reports/`. A job whose memory of yesterday is destroyed by its own startup
+  cannot perform its first step — and, exactly like a frozen row, **a clobbered
+  report and a correctly-written one are byte-identical in every respect except
+  the one nobody was reading.** It survived because the only artifact that
+  could have exposed it, the selftest, asserted the collision was correct.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None, and this makes no claim to have moved one.** It is a tooling fix on the
+review's own surface. What it restores is the review's ability to do its first
+job — grade yesterday's work against today's data — which had been silently
+impossible for as long as the job has run at 08:00 Sydney.
 ## 2026-08-13 (mh) — THE BIRTH REVIEW BITES: an adversarial pass over the wave-2 books confirms six real defects — including a look-ahead that had flattered the one OPEN gate — and the corrected measurement closes it: 📐 Grimes is born trading NOTHING, by its own rule
 
 The (mb)–(me) birth shipped with a standing adversarial review over the four

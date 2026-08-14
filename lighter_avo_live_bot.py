@@ -85,7 +85,8 @@ from lighter_family_bot import (
     NONCRYPTO_EFFECTIVE,
 )
 from venues import marks
-from venues.safety import SafetyRails, open_notional
+from venues.safety import (
+    SafetyRails, open_notional, capital_adjusted_day_start)
 from venues.fills import read_fill, measured_from_reason
 
 BOT = "freqtrade-avo-maria"
@@ -312,10 +313,21 @@ def main(_ctx=None, once=False):
                          if isinstance(m, dict))
             if _delta:
                 capital_adjust += _delta
-                if day_start_equity is not None:
-                    day_start_equity += _delta
+                # [14-Aug (mi)] THE SHARED RULE, not a third copy of it.
+                # `capital_adjusted_day_start` (venues/safety.py) is the one
+                # source of this arithmetic precisely because a money rule with
+                # two definitions is one edit from drifting — and this file's
+                # inline copy had ALREADY drifted: the helper rounds the shifted
+                # baseline to 2dp and the copy did not, so the two live bots'
+                # daily-loss leashes were measuring from subtly different
+                # anchors. Shifts only when a baseline exists AND a move folded,
+                # so the None case below still adopts the capital-INCLUSIVE
+                # equity and is not shifted twice.
+                day_start_equity, _shifted = capital_adjusted_day_start(
+                    day_start_equity, _delta)
                 _PRINT(f"[avo-live] {iso(t_now)} capital move ${_delta:+.2f} "
-                       f"folded (P&L stays trading-only)")
+                       f"folded (P&L stays trading-only)"
+                       f"{f'; day-start -> {day_start_equity:.2f}' if _shifted else ''}")
         except Exception:  # noqa: BLE001
             pass
         if baseline is None and equity is not None:
@@ -1132,6 +1144,42 @@ def _selftest():
         assert "BTC" not in (_st.get("meta") or {}), \
             "meta phantom must reconcile away"
 
+        # ---- 12) a capital move keeps the daily-loss anchor NET of it ------
+        # [14-Aug (mi)] This path had NO fixture: the stub's pop_capital_moves
+        # returned [] in every case above, so the rail's capital-adjust arm was
+        # unexercised and a mutation there survived silently — on a real-money
+        # book. A same-day DEPOSIT must move day_start by the SAME amount (else
+        # raw equity rises, day_start does not, and the rail cannot fire) and
+        # must never read as profit.
+        captured["state"].clear()
+        captured["published"].clear()
+        bars_box["shape"] = "flat"
+        bars_box["px"] = 100.0
+
+        class _DepositVenue(_StubVenue):
+            def __init__(self, **kw):
+                super().__init__(**kw)
+                self._moves = [{"delta": 20.0}]
+
+            def pop_capital_moves(self):
+                m, self._moves = self._moves, []
+                return m
+
+        v = _DepositVenue(equity=82.80)       # 62.80 book + a $20 deposit
+        captured["state"][STATE_KEY] = {
+            "initial_equity": 62.80, "meta": {}, "closed": [],
+            "day_start": {"day": now().date().isoformat(), "equity": 62.80}}
+        run(v, _StubRails())
+        _st = captured["state"][STATE_KEY]
+        assert abs(_st["day_start"]["equity"] - 82.80) < 1e-9, \
+            ("day-start must shift with the capital move (net-of-capital "
+             f"rail), got {_st['day_start']['equity']}")
+        assert abs(_st["capital_adjust"]["total"] - 20.0) < 1e-9, \
+            f"capital_adjust must carry the move: {_st['capital_adjust']}"
+        _pub = captured["published"][-1][1]
+        assert abs(_pub["pnl_abs"]) < 0.01, \
+            f"a deposit must not read as profit, got pnl_abs={_pub['pnl_abs']}"
+
         print("\nAll Avo LIVE self-tests passed:")
         print("  1 identity guard: only AVO_VENUE=lighter_live boots")
         print("  2 entry sized to the BALANCE (equity/slots), gates on the row")
@@ -1144,6 +1192,7 @@ def _selftest():
         print("  9 protections lock entries AND the row says so")
         print(" 10 unreadable positions: never trade blind")
         print(" 11 venue truth: meta phantoms reconcile, never book closes")
+        print(" 12 a capital move shifts the day anchor, never reads as P&L")
     finally:
         for k, fn in _real.items():
             setattr(store, k, fn)

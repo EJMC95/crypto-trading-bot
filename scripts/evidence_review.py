@@ -1045,8 +1045,11 @@ def sydney_stamp(iso_utc):
     CLAUDE.md: *"ALWAYS give Eamon Sydney-local times ... Never hand him a bare
     UTC time"*, while fleet INTERNALS stay UTC. This report is the operator's
     surface, so it carries BOTH: Sydney to read, UTC to join against ledgers.
-    The FILENAME deliberately stays UTC-dated — it is the series key, and
-    re-dating it would fork the report history mid-stream.
+
+    [2026-08-14 (mj)] The FILENAME is Sydney-dated too — see `report_day`. It
+    used to be UTC-dated on the argument that re-dating "would fork the report
+    history mid-stream", and that argument was measured wrong the only way it
+    could be: by destroying a report.
 
     Degrades to the UTC string it was given if the zone database is absent, so
     a slim container never loses the stamp altogether.
@@ -1060,9 +1063,76 @@ def sydney_stamp(iso_utc):
         return iso_utc
 
 
+def report_day(iso_utc):
+    """The report's series key: the SYDNEY date of the run, not the UTC one.
+
+    [2026-08-14 (mj)] THIS JOB RUNS AT 08:00 SYDNEY, WHICH IS THE PREVIOUS UTC
+    DAY, SO A UTC-DATED FILENAME MADE EVERY MORNING RUN OVERWRITE THE PREVIOUS
+    DAY'S REPORT. Measured, not theorised: the 14-Aug 08:00 AEST run resolved
+    to `2026-08-13` and replaced the 13-Aug report — 31,223 bytes including its
+    hand-written human layer — with its own 6,674-byte output. Every Sydney
+    morning between 10:00 and midnight maps to the same UTC day as the previous
+    Sydney evening, so the collision was structural, not a race.
+
+    The old docstring defended UTC dating as "the series key" that re-dating
+    "would fork the report history mid-stream". It forks nothing: yesterday's
+    16:51 AEST run was 13-Aug in BOTH zones, so the existing filenames keep
+    their meaning and the series simply becomes one file per operator-day —
+    which is what a daily review on the operator's clock already was. Fleet
+    INTERNALS stay UTC (`reviewed_at`, every ledger join); this is the
+    operator's surface, and CLAUDE.md governs it.
+
+    Fails back to the UTC date if the zone database is absent — a wrong-by-one
+    filename beats no report.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        t = dt.datetime.fromisoformat(iso_utc).astimezone(
+            ZoneInfo("Australia/Sydney"))
+        return f"{t:%Y-%m-%d}"
+    except Exception:  # noqa: BLE001
+        return str(iso_utc)[:10]
+
+
+def preserve_existing_report(path):
+    """Move an existing report aside instead of overwriting it. Returns the
+    path it was preserved at, or None if there was nothing to preserve.
+
+    The Sydney date above removes the once-a-day collision; this covers the
+    other one, which also really happened (two runs on 6-Aug). The human layer
+    is added to this file AFTER the script writes it, so a re-run silently
+    destroys an operator's annotations — the single most expensive thing in the
+    directory. Preserving costs one file; the alternative cost a day's report.
+
+    Fail-OPEN: if the rename cannot be done the report is still written. Losing
+    the backup is bad; losing today's review because a backup failed is worse.
+    """
+    if not os.path.exists(path):
+        return None
+    try:
+        stamp = dt.datetime.fromtimestamp(
+            os.path.getmtime(path), dt.timezone.utc)
+        try:
+            from zoneinfo import ZoneInfo
+            stamp = stamp.astimezone(ZoneInfo("Australia/Sydney"))
+        except Exception:  # noqa: BLE001
+            pass
+        base, ext = os.path.splitext(path)
+        keep = f"{base}.superseded-{stamp:%H%M}{ext}"
+        n = 0
+        while os.path.exists(keep):
+            n += 1
+            keep = f"{base}.superseded-{stamp:%H%M}-{n}{ext}"
+        os.rename(path, keep)
+        return keep
+    except OSError:
+        return None
+
+
 def write_report(payload, repo_root):
-    day = payload["reviewed_at"][:10]
+    day = report_day(payload["reviewed_at"])
     path = os.path.join(repo_root, "reports", f"evidence_review_{day}.md")
+    kept = preserve_existing_report(path)
     act = action_items(payload["new_evidence"])
     lines = [f"# Evidence Review — {day}", "",
              f"_Reviewed {sydney_stamp(payload['reviewed_at'])}._", ""]
@@ -1077,6 +1147,11 @@ def write_report(payload, repo_root):
     lines += ["", "## New evidence", ""]
     lines += [f"- {e}" for e in payload["new_evidence"]]
     lines += ["", "## Summary", "", payload["summary"], ""]
+    if kept:
+        # A silent rename is the same class of defect as the silent overwrite
+        # it replaces: the operator must be able to find the annotations.
+        lines += [f"_An earlier report for this day was preserved at "
+                  f"`{os.path.basename(kept)}`._", ""]
     with open(path, "w") as fh:
         fh.write("\n".join(lines))
     return path
@@ -1219,8 +1294,37 @@ def selftest():
             f"report header is not Sydney-local: {_hdr!r}"
         assert "2026-08-05T21:46:47+00:00" in _hdr, \
             f"report header dropped the UTC join key: {_hdr!r}"
-        # the FILENAME stays UTC-dated — the series key must not fork
-        assert _p.endswith("evidence_review_2026-08-05.md"), _p
+        # [(mj)] THE FILENAME IS SYDNEY-DATED. This exact timestamp is the
+        # incident: 21:46 UTC is 07:46 the NEXT morning in Sydney, i.e. the
+        # cron's own slot, and a UTC-dated name filed it under the PREVIOUS
+        # day — overwriting that day's finished report. The old selftest
+        # asserted `..._2026-08-05.md` here and so pinned the bug in place.
+        assert _p.endswith("evidence_review_2026-08-06.md"), _p
+
+    # ---- ...and a re-run on the SAME day must not destroy the human layer --
+    # The Sydney date removes the once-a-day collision; two runs in one Sydney
+    # day (which happened on 6-Aug) still land on one filename. The human layer
+    # is written into this file AFTER the script, so an overwrite silently
+    # eats an operator's annotations.
+    with tempfile.TemporaryDirectory() as _td:
+        os.makedirs(os.path.join(_td, "reports"))
+        _pay = {"reviewed_at": "2026-08-05T21:46:47+00:00", "verdicts": [],
+                "new_evidence": [], "summary": "s", "errors": []}
+        _p1 = write_report(_pay, _td)
+        with open(_p1, "a") as _fh:
+            _fh.write("\n## HUMAN LAYER — operator annotations\n")
+        _pay2 = dict(_pay, reviewed_at="2026-08-05T23:10:00+00:00")
+        _p2 = write_report(_pay2, _td)
+        assert _p2 == _p1, "same Sydney day must reuse the series filename"
+        _kept = [f for f in os.listdir(os.path.join(_td, "reports"))
+                 if "superseded" in f]
+        assert len(_kept) == 1, f"prior report not preserved: {_kept}"
+        _old = open(os.path.join(_td, "reports", _kept[0])).read()
+        assert "HUMAN LAYER" in _old, \
+            "the preserved copy lost the annotations it exists to protect"
+        assert "HUMAN LAYER" not in open(_p2).read(), "fresh report is fresh"
+        assert _kept[0] in open(_p2).read(), \
+            "a silent rename is as bad as a silent overwrite — name the backup"
 
     # tstat
     assert tstat([1.0]) is None, "n=1 is undefined"
