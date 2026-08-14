@@ -102,6 +102,9 @@ Stated so no future session "finishes" it:
   `MANUAL_IMAGES_OK` until the service exists; provision via the (lr)
   dispatch pattern (`kiyosaki-provision.yml`, DELETE after use), then
   activate the auto-deploy rule + move to `AUTO_IMAGES` ✅ (queue item)
+  **[ALIVE 14-Aug (mk): provisioned, stamp-verified on /pnl.json, image
+  in `AUTO_IMAGES`, auto-deploy ACTIVE; the provision workflow deleted
+  after use.]**
 
 ## The payback arithmetic, shown
 

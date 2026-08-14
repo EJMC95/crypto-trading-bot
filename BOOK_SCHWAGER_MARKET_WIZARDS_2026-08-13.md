@@ -71,3 +71,6 @@ levers are a day-31 decision.
 - registrations: dashboard, `SELFTEST_MODULES`, `ROW_ENTRY`, born-dark ✅
 - deploy: `Dockerfile.schwager`, `MANUAL_IMAGES_OK` birth state, (lr)
   provision dispatch, activation gated on the row publishing ✅
+  **[ALIVE 14-Aug (mk): provisioned, stamp-verified on /pnl.json, image
+  in `AUTO_IMAGES`, auto-deploy ACTIVE; the provision workflow deleted
+  after use.]**
