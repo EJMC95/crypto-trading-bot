@@ -66,6 +66,17 @@ on:
       # dispatch created the service and the row verified by build stamp.
       - 'lighter_book_kiyosaki_bot.py'
       - 'Dockerfile.kiyosaki'
+      # [2026-08-13 (mk)] the BOOKS wave 2 (mb)-(me) — routed at activation,
+      # services provisioned by the books-provision dispatch, rows verified
+      # by build stamp.
+      - 'lighter_book_douglas_bot.py'
+      - 'Dockerfile.douglas'
+      - 'lighter_book_grimes_bot.py'
+      - 'Dockerfile.grimes'
+      - 'lighter_book_schwager_bot.py'
+      - 'Dockerfile.schwager'
+      - 'lighter_book_hull_bot.py'
+      - 'Dockerfile.hull'
       # [2026-07-30 (gm)] THIS WORKFLOW IS ITS OWN TRIGGER, for the six shadow
       # books only — plus the CARRY PAIR since (hu), same reasoning: its
       # routing was just corrected and a routing fix that cannot deploy itself
@@ -408,14 +419,22 @@ jobs:
             if echo "$changed" | grep -qE "^(lighter_band_barnes_bot\.py$|Dockerfile\.bandbarnes$|$_shared)"; then
               svcs="${svcs:+$svcs,}band-barnes-shadow"
             fi
-            # (lp) Garrett deferral prose removed at (ls): superseded by the
-            # ACTIVATED rule below; this scalar has a hard budget — see the
-            # run-scalar guard in audit_deploy_coverage.py.
-            # [2026-08-13 (ls) ACTIVATED] 🏦 Rich Dad (book-kiyosaki-shadow),
-            # provisioned via the (lr) dispatch. Same $_shared contract; no
-            # marker (a $1k shadow book tracks main).
+            # [(ls) ACTIVATED] 🏦 Rich Dad, via the (lr) dispatch
             if echo "$changed" | grep -qE "^(lighter_book_kiyosaki_bot\.py$|Dockerfile\.kiyosaki$|$_shared)"; then
               svcs="${svcs:+$svcs,}book-kiyosaki-shadow"
+            fi
+            # [(mk) ACTIVATED] BOOKS wave 2, provisioned via the (lr) dispatch
+            if echo "$changed" | grep -qE "^(lighter_book_douglas_bot\.py$|Dockerfile\.douglas$|$_shared)"; then
+              svcs="${svcs:+$svcs,}book-douglas-shadow"
+            fi
+            if echo "$changed" | grep -qE "^(lighter_book_grimes_bot\.py$|Dockerfile\.grimes$|$_shared)"; then
+              svcs="${svcs:+$svcs,}book-grimes-shadow"
+            fi
+            if echo "$changed" | grep -qE "^(lighter_book_schwager_bot\.py$|Dockerfile\.schwager$|$_shared)"; then
+              svcs="${svcs:+$svcs,}book-schwager-shadow"
+            fi
+            if echo "$changed" | grep -qE "^(lighter_book_hull_bot\.py$|Dockerfile\.hull$|$_shared)"; then
+              svcs="${svcs:+$svcs,}book-hull-shadow"
             fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
@@ -499,12 +518,8 @@ jobs:
               echo "-> live-farmer marker: including trail-blazer-live (REAL MONEY)"
               echo "-> ...and funding-farmer-shadow, its CONTROL arm (arm-drift)"
             fi
-            # [2026-08-13 (lr) ACTIVATED] 🛢️ Garrett (band-garrett-shadow) —
-            # the thin-tier VARIANT of the Farmer's file: NO marker (a $1k
-            # shadow book tracks main), same file set as the Farmer. Placed
-            # HERE, after farmer_files is assigned — under the (lp) prose
-            # note above the marker section that variable is still empty,
-            # and an empty grep pattern matches every push.
+            # [(lr) ACTIVATED] 🛢️ Garrett — Farmer's file set, no marker.
+            # MUST sit after farmer_files is assigned (empty grep = always).
             if echo "$changed" | grep -qE "$farmer_files"; then
               svcs="${svcs:+$svcs,}band-garrett-shadow"
             fi
