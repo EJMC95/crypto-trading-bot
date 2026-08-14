@@ -1422,6 +1422,30 @@ All new bots:
   | **A bounded lever on a shadow lane** the evidence supports | **SET IT. [AMENDED 5-Aug (kd) — operator: *"change the doctrine i want you to be able to change levers as necessary"* / *"you need the power to ... actually positively enhance these bots"*.]** The old rule said *"route through `fleet_proposals.py` → the scout tuner's replay gate; never hand-set a lever"*, and that made every shadow improvement wait on an hourly organ. **A session may now write a shadow-lane lever directly** (`fleet_tuning.write_levers`, or the bot's own env default when no lever is open — the (jg) route). The replay gate remains the PREFERRED channel where it fits, because auto-revert is free safety; it is no longer a precondition. THREE THINGS SURVIVE, because they are what make the authority safe rather than what limits it: the registry **cage** (`fleet_tuning.LEVERS` clamps at write AND read — an out-of-cage value is not authority, it is a bug), the **evidence** (I19 — state the measured number and the expectancy price, or say plainly that it is unmeasured), and the **changelog entry** naming what moved and why. A lever set on a hunch with no number is the thing this fleet has repeatedly paid for; a lever set on a measurement is the job. |
   | **Shadow BOOK LOGIC** — entry/exit rules, universes, new sleeves, a whole new book | **BUILD IT.** The shadow fleet is $1,000 paper per book with NO real money and no top-ups, so the blast radius of being wrong is a wasted sample, not a loss. Backtest-or-replay first stays doctrine (*never modify bot logic without backtesting first*) — that is about not fooling ourselves, not about permission. |
   | **Real money** — `live.*` levers, live clips, `dry_run`, API keys, go-live, a Railway service on a live row | **PREPARE IT COMPLETELY — AND, SINCE 13-Aug, EXECUTE IT TOO, WHEN IT CARRIES ITS MEASUREMENT. [AMENDED 13-Aug (lm), operator: *"full permission to commit push and adjust real money bots also"*.]** What the grant changes is WHO performs the final act: a session may now commit, push, deploy and set a real-money value itself instead of parking a prepared command in the queue. What it does NOT change is WHAT qualifies, and the structural gates stay senior and untouched: the **go-live gate** is still the only door to putting a book live; the **experiment judge** stays the sole writer of `live.funding.*` (its paired bar IS the measurement); registry **cages** clamp at write and read; **SafetyRails** caps stay operator-only. Every executed change still names its measured number and expectancy price (I19) — a live adjustment with no number is not covered by the grant, because it never was the bottleneck: the constraint on real money is measured edge, not permission. **The un-amendable core survives the amendment, stated plainly so no future session stretches this row:** the assistant does not DIRECT live orders discretionarily — no hand-placed trades, no overriding a gate the fleet's own organs hold closed, no bypassing the judge's sole-writer lane. That limit is on the assistant, not a preference of this repo, and neither permission nor a doc edit moves it. Worked example the day of the amendment: the (lj) veto deploy (protective, measured, gate-compliant) was executed same-day under the grant; a clip raise on the same book was REFUSED with evidence — no current-policy claim supports it. |
+  **[AMENDED 14-Aug (mm), operator: *"if it's a fix that makes the real bot
+  more money I'd like you to push both ways"*.] PUSH BOTH WAYS — a money-moving
+  fix ships to main AND to the live service in the same pass, not to main with
+  the live half left for someone to remember.** `(lm)` settled WHO may perform
+  the live act; this settles that performing it is the DEFAULT for a fix that
+  makes the real book money, rather than an extra step to be asked about. The
+  qualifying test is unchanged and is the whole safety of it: the change must
+  **alter what the live book actually does, in a direction with a measured
+  number and a stated expectancy price (I19)**. So:
+  * **Qualifies → deploy both ways in the same pass**, marker in the commit
+    SUBJECT (never the body — (hj)), verified by `extra.build` + `extra.build_n`
+    stamp readback, never by a green run.
+  * **Does NOT qualify → main only, and say so.** A refactor, a comment, a test,
+    a report job, a rounding-consistency fix — anything that changes no trade
+    the book would take — buys zero measured edge and costs a real-money
+    container restart, which is not free ([[lighter-flatten-silent-halt-redeploy-incident]]:
+    a redeploy wipes memory-only halts). It rides free on the next deploy that
+    DOES qualify. **Worked example the day of the amendment:** `(mi)`'s
+    `capital_adjusted_day_start` fix on 🙏 Avo Maria was behaviour-preserving
+    apart from 2dp rounding, so it went to main only and was declared as such —
+    and the same pass measured that NOTHING else was pending on either live row
+    (`audit_code_currency`: both DEFERRED by one commit touching no bot logic).
+    **"Push both ways" is not "push more often"** — it removes a delay from
+    measured wins; it does not lower the bar for what counts as one.
   **A correctness fix that changes which book gets real money IS a real-money
   benefit delivered** — it arrives as better evidence rather than a bigger
   position. Two corollaries learned the same day: a **refusal with evidence is a

@@ -1,3 +1,50 @@
+## 2026-08-14 (mm) — PUSH BOTH WAYS: a money-moving fix ships to main AND the live service in one pass — and the same pass measured that nothing pending today qualifies
+
+**Operator: *"if it's a fix that makes the real bot more money I'd like you to
+push both ways"*.** `(lm)` settled WHO may perform the live act; this settles
+that performing it is the DEFAULT for a money-moving fix rather than a step to
+be asked about. Engraved in the `(hn)` routing table's real-money row, where the
+grant it amends already lives.
+
+- **THE QUALIFYING TEST IS UNCHANGED, AND IS THE WHOLE SAFETY OF IT.** The
+  change must alter what the live book actually DOES, in a direction with a
+  measured number and a stated expectancy price (I19). Qualifies → deploy in the
+  same pass, marker in the commit SUBJECT (never the body, `(hj)`), verified by
+  `extra.build` + `extra.build_n` stamp readback and never by a green run.
+  Does not qualify → main only, said out loud.
+- **"PUSH BOTH WAYS" IS NOT "PUSH MORE OFTEN", and the distinction is the
+  reason this entry exists rather than a one-line edit.** It removes a DELAY
+  from measured wins; it does not lower the bar for what counts as one. A
+  refactor, a comment, a test, a report job or a rounding-consistency fix
+  changes no trade the book would take, so shipping it to a live container buys
+  zero measured edge at the cost of a real-money restart — which is not free:
+  a redeploy wipes memory-only halts (the flatten/halt incident). It rides free
+  on the next deploy that DOES qualify.
+- **APPLIED THE SAME PASS, WHICH IS WHY THE RULE ARRIVES WITH A REFUSAL RATHER
+  THAN A DEPLOY.** `(mi)`'s `capital_adjusted_day_start` fix on 🙏 Avo Maria is
+  behaviour-preserving apart from 2dp rounding on the day-start anchor → **main
+  only**, declared in its own entry. And the broader question the operator's
+  rule implies — *is anything money-moving sitting undeployed?* — was MEASURED,
+  not assumed: `audit_code_currency` against the live `/pnl.json` reads every
+  stamped container CURRENT, deliberately DEFERRED, or behind only on shared
+  modules, with **both live rows DEFERRED by exactly one commit that touches no
+  bot logic**. So there is nothing to push both ways today, and that is the
+  honest output — a refusal with evidence being a valid one ((hl)).
+- **LETTERS:** drafted `(mk)`, which a concurrent session took mid-write (the
+  wave-2 activation) along with `(ml)`; moved to `(mm)` before the commit. That
+  session had itself renumbered `(mi)`→`(mk)` after seeing mine land, so the
+  convention resolved in both directions on the same afternoon — the ninth
+  collision this file has logged, and the first that cost nothing because both
+  sides checked at push time.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — this is a doctrine change, and it should be read as removing a future
+delay rather than as today's win.** What it buys is that the next measured
+money-moving fix does not sit on main waiting for someone to remember the live
+half, which is the exact shape `(hj)`/`(gm)` and the 17-Jul fill-telemetry
+incident all paid for: code that was right and was never running.
+
 ## 2026-08-14 (ml) — THE ROWS WERE PUBLISHING ALL ALONG; THE DASHBOARD WAS 14 HOURS STALE — plus the second adversarial pass lands: keltner's no-claim fail-open closed at the CONTRACT, the replay gains entry-bar fidelity, and the provisioner's variable echo is deleted after a measured near-leak
 
 The provisioning saga's three failures were all the same lesson wearing
