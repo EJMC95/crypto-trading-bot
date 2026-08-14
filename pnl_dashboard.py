@@ -227,6 +227,22 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 # gate refuses lighter_live, so there is no live row to
                 # retire. Ledgers and census history kept.
                 "lighter-dislocation-lshadow",
+                # [2026-08-14 (mr)] 🚀 crypto-breakout-4h RETIRED — the I17
+                # call, operator decision. The ONLY book of the NINE on the
+                # decision docket that survives Benjamini-Hochberg at FDR 0.05
+                # (p=0.0036 vs a 0.0056 critical value); both samples agree in
+                # direction and significance — in-era n=15 mean -1.745%/trade
+                # t=-3.50 halves -2.56/-4.94, all-time n=21 mean -2.236%
+                # t=-5.48 halves both negative, ~-$0.48/day, horizon
+                # `unreachable`. Frees 2 slots of the ENFORCED 20-long budget
+                # (TRX + LINK). Costs no thesis coverage: 4h breakout lives on
+                # in 🧙 book-schwager (n=277, +$457.21, both halves positive).
+                # Guard first, per the order this file teaches: the book is
+                # dropped from `lighter_family_bot.live_strategies()`, which is
+                # ROW-scoped because that module also runs six OTHER books —
+                # the idle-the-process pattern of 🌊/📊 would silence them all.
+                # Ledgers kept; BREAKOUT4H_RETIRED_OVERRIDE=run resurrects.
+                "crypto-breakout-4h-lshadow",
                 # [2026-08-13 (lo)] 📊 Index Rider RETIRED — the I17 call,
                 # made by the operator ("get rid of what's not working"):
                 # ZERO closes in 44 days, measured rule rate ~17.2/yr vs a

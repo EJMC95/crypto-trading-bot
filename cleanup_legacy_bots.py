@@ -88,6 +88,20 @@ LEGACY_BOTS = [
     # structural rate. Both halves per doctrine: RETIRED_ROWS hides, this
     # prunes. Ledgers kept; INDEX_RIDER_RETIRED_OVERRIDE=run resurrects.
     "equities-regime-lshadow",
+    # [2026-08-14 (mr)] 🚀 crypto-breakout-4h — I17 retirement, operator
+    # decision. The one book of NINE on the decision docket that survives
+    # Benjamini-Hochberg at FDR 0.05 (p=0.0036 vs 0.0056): in-era n=15,
+    # mean -1.745%/trade, t=-3.50, BOTH halves negative; all-time n=21,
+    # t=-5.48. Both halves per doctrine: RETIRED_ROWS hides, this prunes —
+    # and pruning is what actually frees its TWO held slots (TRX, LINK) from
+    # every reader of bot_pnl, including the ENFORCED 20-long budget. A
+    # hidden-but-present row keeps consuming budget invisibly (the 14-Jul
+    # phantom-holdings failure). The guard came FIRST: the book is dropped
+    # from `lighter_family_bot.live_strategies()`, so this prune is terminal
+    # rather than a race with a live publisher — and it is ROW-scoped because
+    # that module runs six other books. Ledgers kept;
+    # BREAKOUT4H_RETIRED_OVERRIDE=run resurrects.
+    "crypto-breakout-4h-lshadow",
     "perps-regime-switch", "perps-regime-switch-lshadow",
     "scanner-triangular-arb", "crypto-trendmomo-4h",
     # [2026-07-17 LIGHTER-ONLY CUT] operator: "i only want things running on

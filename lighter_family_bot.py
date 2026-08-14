@@ -662,6 +662,69 @@ STRATEGIES = [
 ]
 
 
+# [2026-08-14 (mr)] 🚀 crypto-breakout-4h RETIRED — the I17 keep-or-retire call,
+# made by the operator on a measurement rather than escalated again.
+#
+# WHY THIS BOOK AND NOT THE OTHER EIGHT ON THE DOCKET. The decision docket fired
+# 14-Aug with NINE books. Testing nine at once is exactly where `(li)` had to
+# correct this fleet's record — it had called three 🏛️ books "measured losers"
+# when none survived multiple-comparison correction. Under Benjamini-Hochberg at
+# FDR 0.05 across all nine, **exactly one survives: this one** (p=0.0036 against
+# a 0.0056 critical value; the next-closest, pm-abbott, reads 0.0430 against
+# 0.0111 and is NOT evidence).
+#
+# ITS OWN RECORD, and the two samples agree in direction AND significance —
+# which is what separates a positive finding of harm from an underpowered null:
+#   in-era   n=15  mean -1.745%/trade  t=-3.50  halves -2.56/-4.94  win 20.0%
+#   all-time n=21  mean -2.236%/trade  t=-5.48  halves -5.63/-6.74  win 14.3%
+#   -$12.37 realised, ~-$0.48/day, horizon verdict `unreachable` (mean <= 0, so
+#   more of the same closes CANNOT flip mean/t/halves — not a slow winner).
+#
+# WHAT IT FREES, and the dollars are the least of it: TWO enforced long-budget
+# slots (`fleet_risk` is in `enforce` mode on a shared 20-long budget) held by
+# TRX and LINK, on the one book the fleet can prove is losing money — and TRX is
+# the fleet's largest single-symbol long share. It also stops dragging the
+# family cohort's empirical-Bayes priors, which size the OTHER family books'
+# stakes.
+#
+# IT COSTS NO THESIS COVERAGE: 4h breakout survives in 🧙 book-schwager
+# (Donchian-20 + EMA confirm, n=277, +$457.21, t=1.88, both halves positive).
+# A losing EXPRESSION is retired; the idea is not.
+#
+# ROW-SCOPED BY CONSTRUCTION, because this is the fleet's first retirement of a
+# book that SHARES ITS MODULE. 🌊 Tide Rider and 📊 Index Rider each owned their
+# file and could idle the whole process (`while True: sleep`); doing that here
+# would silence the other six family books. So the declaration is a SET and the
+# running roster is DERIVED from it ((mo)'s one-declaration-one-derivation) —
+# `STRATEGIES` stays whole so the venue/universe assertions and the history keep
+# covering it, and `live_strategies()` is the only thing the loop builds from.
+#
+# The two open paper positions FREEZE, which is the precedent both prior row
+# retirements set (Tide Rider's 6 and Index Rider's +$13.93 were abandoned as
+# marks-not-evidence). This is $1k paper with no real money; there is nothing to
+# unwind. Ledgers (`paper_trades`, `venue_orders`) and history are KEPT.
+# Reversible: BREAKOUT4H_RETIRED_OVERRIDE=run.
+RETIRED_BOOKS = {"crypto-breakout-4h": "BREAKOUT4H_RETIRED_OVERRIDE"}
+
+
+def live_strategies():
+    """`STRATEGIES` minus the retired books whose override is not set.
+
+    DERIVED, never a second hand-maintained list — the retirement is declared
+    once in `RETIRED_BOOKS` and every consumer reads it through here, so a book
+    cannot be retired in one loop and alive in another. Fail-OPEN on a set
+    override: an operator who says `run` gets the book back with no redeploy.
+    """
+    out = []
+    for s in STRATEGIES:
+        env = RETIRED_BOOKS.get(s.bot)
+        if env and os.environ.get(env, "").strip().lower() \
+                not in ("run", "1", "true"):
+            continue
+        out.append(s)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Per-book runtime (one ShadowBroker + protections + ledger per family bot)
 
@@ -991,7 +1054,7 @@ def main():
 
     cache = CandleCache(venue)
     books = []
-    for s in STRATEGIES:
+    for s in live_strategies():
         # [2026-07-30 STEP 3] the four family books (no s.coins override)
         # carry the non-crypto universe; spot ports pin their own lists
         src = list(s.coins) if s.coins else list(COINS) + NONCRYPTO_UNIVERSE
@@ -1542,7 +1605,9 @@ def _supervised():
             raise
         except Exception:  # noqa: BLE001
             log.exception("unhandled exception — marking rows ERROR, restart in 60s")
-            for s in STRATEGIES:
+            # live_strategies(), not STRATEGIES: marking a RETIRED row `error`
+            # would re-publish it and undo the prune on the next cleanup pass.
+            for s in live_strategies():
                 try:
                     store.set_status(s.bot + "-lshadow", "error")
                 except Exception:  # noqa: BLE001

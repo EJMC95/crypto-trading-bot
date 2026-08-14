@@ -1,3 +1,53 @@
+## 2026-08-14 (mr) — 🚀 crypto-breakout-4h RETIRED: nine books on the docket, one survives correction, and the first shared-module retirement is row-scoped by construction
+
+- **THE DECISION, and why it is one book and not nine.** The decision docket's
+  first batch fired 14-Aug with NINE books. `(li)` is the standing warning about
+  reading a batch like that raw — it had to correct this fleet's own record for
+  calling three 🏛️ books "measured losers" when none survived correction. Under
+  **Benjamini-Hochberg at FDR 0.05 across all nine, exactly one survives:
+  `crypto-breakout-4h-lshadow`** (p=0.0036 against a 0.0056 critical value).
+  The next closest, pm-abbott, reads 0.0430 against 0.0111 — not evidence, not
+  retired. ⚖️ Counterweight (p=0.0516, the largest dollar loss) is explicitly
+  NOT decided today: `(jg)` pre-registered that call for the operator at
+  ~28-Aug, and deciding it early on a worse p-value than the one that failed
+  correction would be the `(hs)`/`(ia)` trap in reverse.
+- **THE MEASUREMENT, from the book's own record, two samples agreeing in
+  direction AND significance**: in-era n=15, mean **−1.745%/trade**, t=**−3.50**,
+  halves −2.56/−4.94, win 20%; all-time n=21, mean −2.236%, t=−5.48, halves
+  −5.63/−6.74, win 14.3%; **−$12.37 realised at ~−$0.48/day**; horizon verdict
+  `unreachable` — mean ≤ 0, so more of the same closes cannot flip mean/t/halves.
+  Not a slow winner; an I17 call, made by the operator ("go ahead and retire it").
+- **WHAT IT FREES — the slots, more than the dollars.** `fleet_risk` is in
+  `enforce` mode on a shared 20-long budget and this book held TWO of those
+  slots (TRX + LINK) at retirement, TRX being the fleet's largest single-symbol
+  long share (25%). It also stops dragging the family cohort's empirical-Bayes
+  priors, which size the other family books' stakes. **It costs no thesis
+  coverage**: 4h breakout lives on in 🧙 book-schwager (Donchian-20 + EMA
+  confirm, n=277, +$457.21, t=1.88, both halves positive) — a losing
+  EXPRESSION is retired, not the idea.
+- **THE FIRST RETIREMENT OF A BOOK THAT SHARES ITS MODULE, and the shape had to
+  change.** 🌊 Tide Rider and 📊 Index Rider owned their files, so "retire" meant
+  idle the process. `lighter_family_bot.py` runs SEVEN books in one service —
+  that pattern would have silenced six healthy ones. So the retirement is
+  **declared once and derived everywhere** ((mo)): `RETIRED_BOOKS` maps the book
+  to its override env, `live_strategies()` is the only thing the loop builds
+  Books from, and `STRATEGIES` stays whole so the spot-ports-stay-crypto
+  assertion and the history keep covering the retired declaration. Both row
+  halves shipped in the same commit (`RETIRED_ROWS` hides, `LEGACY_BOTS` prunes
+  — the prune is what actually frees the held slots from every reader of
+  bot_pnl). Two open paper positions freeze, the precedent both prior row
+  retirements set; ledgers kept; reversible `BREAKOUT4H_RETIRED_OVERRIDE=run`.
+- **PINNED by `tests/autonomy/test_breakout4h_retired.py`, mutation-verified
+  ×4**, and the mutations are the ones this specific shape invites: the loop
+  reverting to the raw declaration; the retirement going TOO BROAD (all seven
+  books dropped — the collateral-damage case, red in two tests); any truthy env
+  resurrecting it (only run/1/true may); either row half dropped. The
+  raw-declaration arm is AST-shaped: a `for s in STRATEGIES:` that constructs a
+  `Book` or publishes is an offender, a read-only walk is not.
+- **NOT a live deploy**: $1k paper, no real money, no marker. The family-shadow
+  service takes it on this push's auto-deploy; verified by the next stamp
+  readback (`build_n` and the roster line in the boot log both say it).
+
 ## 2026-08-14 (mq) — "WHICH COMMIT IS THIS BOT RUNNING?" HAD NO ANSWER FOR A QUARTER OF THE FLEET, AND SAID OK: an entry module in two images took whichever Dockerfile sorted first
 
 - **THE INVESTIGATION THAT FOUND IT WAS A FALSE ALARM, AND THAT IS THE ENTRY.**
