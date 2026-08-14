@@ -1,3 +1,63 @@
+## 2026-08-14 (mq) — "WHICH COMMIT IS THIS BOT RUNNING?" HAD NO ANSWER FOR A QUARTER OF THE FLEET, AND SAID OK: an entry module in two images took whichever Dockerfile sorted first
+
+- **THE INVESTIGATION THAT FOUND IT WAS A FALSE ALARM, AND THAT IS THE ENTRY.**
+  `(mp)`'s stamp readback showed `family-lighter-shadow` publishing **two builds
+  at once** — `150705b6f377`/n=15 on avo-maria, dad, mum and `57f19f061917`/n=14
+  on georgia and the three spot ports, two of them stamped in the **same
+  second**, so it was not staleness. Sampled three times it converged: 3/4 →
+  4/3 → **7/0 over 26 minutes**. A rolling deploy draining, exactly as designed.
+  **I1 generalises to deploys: read the age of the OBSERVATION, not just the
+  payload.** A stamp census taken inside a deploy window is a photograph of a
+  transition; one sample cannot tell it from a persistent split, and the cost
+  of finding out was a second `curl`. The flag was raised on one sample and
+  should not have been.
+- **WHAT THE FALSE ALARM UNCOVERED IS REAL, AND IT IS IN THE GUARD.** Chasing
+  the split, `audit_code_currency` reported **UNRESOLVED for all seven family
+  rows** — *"produced by no commit in the 200-commit window — older than
+  --depth"* — while I could reproduce `150705b6f377` **exactly**, at HEAD, from
+  the family image's own COPY set. The guard was wrong, not the fleet.
+  - **THE MECHANISM.** `image_shared_sets()` maps `{entry module → the shared
+    names its image lacks}` and kept the FIRST Dockerfile alphabetically.
+    `lighter_family_bot.py` ships in **two** images: `Dockerfile.avolive`
+    (lacks nothing) and `Dockerfile.familyshadow` (no `fleet_tuning.py`).
+    `avolive` sorts first, so nothing was hidden, every commit stamped a
+    16-file set, and rows publishing 15 matched nothing — **in every window, at
+    every depth, since the guard was born.** The message blamed history depth,
+    which is the one explanation that can never be tested away.
+  - **AND THE RUN EXITED 0.** Only BEHIND-OWN is red — correct, and `(ke)`
+    built that to stop the cry-wolf — but it means **7 of 27 rows were
+    permanently unauditable while the summary line read OK**. That is `(gl)`'s
+    rule in its purest form: a guard that cannot answer its own question, and
+    reports success, is indistinguishable from one that can. `(jb)` closed the
+    UNMAPPED-row hole in this same file for exactly this reason; this is the
+    same hole one level down — mapped, and still not answered.
+  - **`lighter_ticket_taker.py` HAS THE IDENTICAL AMBIGUITY** (`.freqtrade` vs
+    `.tickettaker`, which lacks `fleet_bus.py`) and resolved only because the
+    alphabetical winner happened to be the image its shadow arm runs in. **Nine
+    rows were exposed; seven were failing and two were passing by luck** — and
+    a guard that is right by luck is a guard that goes wrong on a rename.
+- **THE FIX IS NOT A BETTER GUESS.** This audit maps ROWS → ENTRY MODULES, not
+  rows → services, so it genuinely cannot know which image a row came from —
+  picking a "better" Dockerfile would just move the coin flip. It now computes
+  **every distinct file-set variant** an entry can ship in and accepts a match
+  against any, which is the honest claim available: *this stamp is HEAD under
+  one of the images that ship this entry*. Cost is one extra hash per ambiguous
+  entry per commit; exactly two entries are ambiguous today.
+  - `seen_n` reads across all variants too, so a LEAN image's count can no
+    longer be called `FILE-SET` merely because the fat variant exists in the
+    window — that would have swapped one wrong verdict for another.
+  - `_ids()` tolerates the old single-tuple shape rather than matching nothing
+    if a caller lags.
+- **VERIFIED ON THE LIVE FLEET, NOT ON A FIXTURE.** Before: 7 UNRESOLVED.
+  After: **27 of 27 rows resolve** — every shadow container CURRENT at HEAD
+  `26c3e7535`, both marker-gated live rows DEFERRED and correctly so. The
+  family split is confirmed fully drained by the same run.
+- **MUTATION-VERIFIED ×3**: first-Dockerfile-wins restored; `_ids` reading only
+  the first variant; `seen_n` reading only the first variant (which reddens as
+  a false `FILE-SET`). The new selftest case asserts on the LIVE map — *some*
+  entry must map to more than one variant — and says in its own message that if
+  the fleet ever genuinely has none, the case is to be DELETED, not weakened.
+
 ## 2026-08-14 (mp) — A FILE OUTSIDE `_BUILD_SHARED` IS A FILE WHOSE DEPLOYS CANNOT BE PROVED: `fleet_bus.py` steers what every book READS and stamped nothing
 
 - **FOUND BY A DEPLOY THAT COULD NOT BE VERIFIED, not by reading the list.**

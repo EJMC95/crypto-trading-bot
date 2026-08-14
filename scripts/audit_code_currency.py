@@ -175,21 +175,46 @@ for e, hide in %r:
             if os.path.exists(h):
                 os.rename(h, h + ".__hidden__")
                 moved.append(h)
-        out[e] = b.build_compute(e)
+        b._BUILD_CACHE = None
+        out.setdefault(e, []).append(b.build_compute(e))
     except Exception:
-        out[e] = [None, 0]
+        out.setdefault(e, []).append([None, 0])
     finally:
         for h in moved:
             try:
                 os.rename(h + ".__hidden__", h)
             except OSError:
                 pass
+        b._BUILD_CACHE = None
 print(json.dumps(out))
 """
 
 
 def image_shared_sets():
-    """{entry_file: [shared names its image does NOT COPY]}.
+    """{entry_file: [[shared names image A does NOT COPY], [... image B], ...]}
+    — EVERY distinct variant, because one entry module can ship in more than
+    one image with different COPY sets.
+
+    [2026-08-14 (mq)] THIS RETURNED ONE VARIANT AND TOOK THE FIRST DOCKERFILE
+    ALPHABETICALLY, which is not a rule, it is a coin flip. Measured:
+    `lighter_family_bot.py` ships in `Dockerfile.avolive` (missing nothing) and
+    `Dockerfile.familyshadow` (no `fleet_tuning.py`); `avolive` sorts first, so
+    nothing was hidden, every commit stamped a 16-file set, and the SEVEN
+    family rows — which publish 15 — matched no commit in any window. They read
+    **UNRESOLVED for as long as this guard has existed**, with the message
+    blaming `--depth`, and the run still exited 0. A guard that cannot answer
+    its own question for a quarter of the fleet, while reporting OK, is the
+    `(gl)` shape: a green run indistinguishable from a green run.
+    `lighter_ticket_taker.py` is ambiguous the same way (`Dockerfile.freqtrade`
+    vs `.tickettaker`, which lacks `fleet_bus.py`) and resolved only because
+    the alphabetical winner happened to be the image its shadow arm runs in.
+
+    THE FIX IS NOT to pick a better image — this audit maps ROWS to ENTRY
+    MODULES, not to services, so it genuinely cannot know which image a given
+    row came from. It computes ALL variants and accepts a match against any,
+    which is the honest claim available: "this stamp is HEAD under one of the
+    images that ship this entry." Cost is one extra hash per ambiguous entry
+    per commit; exactly two entries are ambiguous today.
 
     Reuses `audit_image_imports.image_contents` — the fleet's existing owner of
     "what is really in this image", including multi-source COPY and `COPY . .`.
@@ -221,32 +246,46 @@ def image_shared_sets():
                                         for f in files)}
         missing = [s for s in store._BUILD_SHARED if s not in present]
         for e in ROW_ENTRY.values():
-            if e in names and e not in out:
-                out[e] = missing
+            if e in names and missing not in out.setdefault(e, []):
+                out[e].append(missing)
     return out
 
 
 def stamps_at(worktree, entries, hide_map):
-    """{entry: (id, n)} computed BY THAT CHECKOUT's own bot_pnl_store, each
-    against the file set ITS image really ships."""
-    spec = [(e, list(hide_map.get(e, []))) for e in entries]
+    """{entry: [(id, n), ...]} computed BY THAT CHECKOUT's own bot_pnl_store —
+    one stamp per file-set variant its entry can ship in ((mq))."""
+    spec = [(e, list(hide))
+            for e in entries
+            for hide in (hide_map.get(e) or [[]])]
     r = subprocess.run([sys.executable, "-c", _PROBE % (str(worktree), spec)],
                        cwd=str(worktree), capture_output=True, text=True,
                        check=False)
     try:
-        return {k: tuple(v) for k, v in json.loads(r.stdout).items()}
+        raw = json.loads(r.stdout)
     except Exception:  # noqa: BLE001
         return {}
+    return {k: [tuple(s) for s in v] for k, v in raw.items()}
+
+
+def _ids(stamps):
+    """The candidate build ids at one commit — an entry that ships in several
+    images has several ((mq)). Tolerates the old single-tuple shape so a stale
+    caller cannot silently match nothing."""
+    if not stamps:
+        return set()
+    if isinstance(stamps, tuple) and stamps and isinstance(stamps[0], str):
+        stamps = [stamps]
+    return {s[0] for s in stamps if s and s[0]}
 
 
 def classify(row, container_id, container_n, history, head_stamp, touched):
     """(verdict, commit_sha, behind_n, why) for one row. Pure over its inputs."""
     if not container_id:
         return "UNRESOLVED", None, None, "row publishes no build stamp"
-    if head_stamp and container_id == head_stamp[0]:
+    if container_id in _ids(head_stamp):
         return "CURRENT", history[0][0] if history else None, 0, "matches HEAD"
     for i, (sha, _subj, stamp) in enumerate(history):
-        if stamp and stamp[0] == container_id:
+        if container_id in _ids(stamp):
             gap = history[:i]                       # commits NOT in the container
             own = [s for s, _, _ in gap if s in touched]
             marks = MARKER_GATED.get(row)
@@ -266,7 +305,10 @@ def classify(row, container_id, container_n, history, head_stamp, touched):
             return ("BEHIND-SHARED", sha, i,
                     f"{i} commit(s) behind, none touching this bot's own code "
                     f"(shared-module stamp shift only)")
-    seen_n = {st[1] for _, _, st in history if st and st[1]}
+    seen_n = {st[1] for _, _, sts in history
+              for st in ([sts] if isinstance(sts, tuple) and sts
+                         and isinstance(sts[0], str) else (sts or []))
+              if st and st[1]}
     if container_n and seen_n and int(container_n) not in seen_n:
         return ("FILE-SET", None, None,
                 f"build_n={container_n} but this window only produces "
@@ -546,6 +588,30 @@ def _selftest():
                 os.unlink(f2.name)
     finally:
         os.unlink(fp)
+    # [(mq)] AN ENTRY THAT SHIPS IN TWO IMAGES HAS TWO STAMPS, AND A MATCH
+    # AGAINST EITHER IS A MATCH. Before this, the map kept ONE variant — the
+    # first Dockerfile alphabetically — so the seven `lighter_family_bot.py`
+    # rows (image: no fleet_tuning.py, n=15) were graded against the avolive
+    # variant (n=16) and read UNRESOLVED forever, blaming --depth.
+    _hist = [("aaa", "head", [("ID_FULL", 16), ("ID_LEAN", 15)]),
+             ("bbb", "prev", [("OLD_FULL", 16), ("OLD_LEAN", 15)])]
+    for cid, want in (("ID_LEAN", "CURRENT"), ("ID_FULL", "CURRENT")):
+        v = classify("r", cid, 15, _hist, _hist[0][2], set())[0]
+        assert v == want, (cid, v, "a stamp from EITHER image variant is HEAD")
+    v, _sha, behind, _why = classify("r", "OLD_LEAN", 15, _hist,
+                                     _hist[0][2], set())
+    assert (v, behind) == ("BEHIND-SHARED", 1), (v, behind)
+    # ...and the count reported by a LEAN image must not read as FILE-SET just
+    # because the fat variant also exists in the window.
+    v = classify("r", "GHOST", 15, _hist, _hist[0][2], set())[0]
+    assert v == "UNRESOLVED", (v, "n=15 IS produced here, so not FILE-SET")
+    # the live map must actually carry the ambiguity it was built for
+    _m = image_shared_sets()
+    _amb = [e for e, vs in _m.items() if len(vs) > 1]
+    assert _amb, ("no entry maps to >1 file-set variant — either the fleet "
+                  "genuinely has none (then delete this case, do not weaken "
+                  "it) or the variant walk regressed to first-wins")
+
     # a DB-shaped row (updated_at, no age_sec) degrades to derived age,
     # stale=None — never a guessed threshold
     age, stale = _row_age({"bot": "x",
@@ -557,7 +623,8 @@ def _selftest():
     assert audit(rows=[{"bot": "nobody", "extra": {}}], fail_closed=False) == 0
     print("audit_code_currency --selftest OK "
           "(current, behind-own, behind-shared, deferred, marked-gap, "
-          "unresolved, unstamped, map integrity, unmapped-row gate, "
+          "unresolved, unstamped, map integrity, multi-image variants, "
+          "unmapped-row gate, "
           "pnl-json fail-closed, i1-age plumbing)")
 
 
