@@ -1,3 +1,25 @@
+## 2026-08-15 (mt) — the docket's behavioural test finally LANDS: it sat untracked in the shared tree while main's only coverage was the mutation-blind AST form it was written to replace
+
+- **THE CARRIED ITEM (I11).** `tests/autonomy/test_docket_publish_behaviour.py`
+  — the (lh) lesson's executable half, which drives the REAL
+  `golive_readiness.main()` publish block against a fake store and asserts on
+  the WRITES — existed only on the unmerged
+  `claude/bot-improvement-audit-z13wbo` branch (434-line version, now 21
+  commits behind) and as an untracked working-tree file adapted to main after
+  the (lo)/(lu) retirement-and-clock changes. Main's sole coverage of the
+  split-key write path was `test_decision_docket.py`'s AST-presence check
+  (`"_seen_ok" in ast.dump(...)`) — the exact form (lh) measured as green
+  under all five bug-restoring mutations, because `UnaryOp(Not,
+  Name('_seen_ok'))` still contains the name. So the class (lh) named —
+  **detection of DELETION, not DISABLEMENT** — was still open on main.
+- Landed as-is from the tree version (10 tests, green alone and green beside
+  `test_decision_docket.py`'s 37 — the fixture already decoupled from the
+  retired 📊 equities-regime row per its own header). No production code
+  moved: this pins behaviour that shipped with (lf)/(lu).
+- Found during the 15-Aug fleet-wide optimisation audit's carried-work sweep;
+  the branch's other five files are all superseded by main's later evolution
+  and are NOT merged.
+
 ## 2026-08-14 (ms) — 🙏 AVO LIVE'S NOTIONAL CAP 63 → 200, AT 1x: an OPERATOR BET, recorded as one — and the half I cannot do is named
 
 - **THE DECISION (operator, 14-Aug: "go ahead with the $200 1x step", after the
