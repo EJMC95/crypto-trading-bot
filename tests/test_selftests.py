@@ -101,6 +101,13 @@ SELFTEST_MODULES = [
     # rows missing a stamp are skipped rather than guessed, and the sniper's
     # '... UTC' dialect still parses.
     "scripts.audit_ledger_integrity",
+    # [2026-08-14 (mo)] THE ROW REGISTRY. Its --selftest pins the registry's
+    # own invariants (every declared-live row maps to an entry file; no row is
+    # both mapped and declared a non-bot) and — the load-bearing half — that
+    # `live_rows_from_feed` is FAIL-CLOSED: a dark, empty or venue-less feed
+    # returns None ("cannot say"), never [] ("nothing is live"), because []
+    # would let the roster guard pass vacuously on every network blip.
+    "scripts.fleet_books",
     # [2026-07-31 (hy)] THE DOCTRINE GUARD. Its --selftest carries the negative
     # fixtures (missing block, undeclared invariant, broken enforcement ref,
     # renamed symbol, lazy UNENFORCED reason, duplicate id, backtick-less
@@ -251,6 +258,17 @@ ENFORCED_AUDITS = [
     # code). Its own first three runs got each of those wrong in turn, so the
     # negative fixtures are not ceremony.
     "scripts/audit_code_currency.py",
+    # [2026-08-14 (mo)] LIVE ROSTER — is the DECLARED live pair still the pair
+    # that holds real money? The roster rotted twice on one line (17-Jul and
+    # 13-Aug slot swaps) and the second time CLAUDE.md's own audit-scope rule
+    # named a retired row for 22 days, sending every audit past the book that
+    # actually holds the money. Its selftest carries the discrimination that
+    # makes it usable rather than alarming: both directions of disagreement are
+    # named, an UNREADABLE feed makes NO claim (fail-closed — a network blip is
+    # not a clean roster), a retired row inside the live-scope rule fires while
+    # the SAME row as distant history does not, and a removed anchor is
+    # reported rather than silently skipping the check.
+    "scripts/audit_live_roster.py",
 ]
 GUARD_ONLY_AUDITS = [
     # [2026-07-22] lever-authority census: asks whether a lever's [lo, hi] can

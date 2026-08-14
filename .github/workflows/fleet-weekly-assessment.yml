@@ -50,6 +50,15 @@ jobs:
         # cadence (measured 4-Aug: 120 commits in 7 days) or a deliberately
         # DEFERRED live service drifts off the window into UNRESOLVED.
         run: python3 scripts/audit_code_currency.py --pnl-json pnl.json --depth 200 --gha
+      # [2026-08-14 (mo)] The feed arm of the roster guard, placed here because
+      # this job already fetches the feed and already treats a dark feed as a
+      # failure (`test -s pnl.json` above). This is the arm that catches a slot
+      # swap AUTOMATICALLY: the moment a new row publishes venue=lighter_live,
+      # or a declared one stops, the declaration and reality disagree and this
+      # goes red. Fail-closed by construction — an unreadable feed makes no
+      # claim rather than passing.
+      - name: Does the declared live roster still match the live feed?
+        run: python3 scripts/audit_live_roster.py --pnl-json pnl.json
 
   assess:
     runs-on: ubuntu-latest

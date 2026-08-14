@@ -95,103 +95,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-#: dashboard row -> the ENTRY module whose bytes its image stamps. Explicit
-#: rather than inferred: a wrong guess here reports a healthy bot as stale,
-#: which is the direction that erodes trust in the guard (I8 — name the object
-#: the operator can act on, and be right about it).
-ROW_ENTRY = {
-    # [2026-08-05] 🎸 Barnesy — mapped the day the row was born, per the (jb)
-    # unmapped-row gate (a stamped row this file has never heard of fails the
-    # audit rather than being skipped silently).
-    "band-barnes-lshadow": "lighter_band_barnes_bot.py",
-    # [2026-08-13 (ls)] 🛢️ Garrett — the (lp)/(lr) birth missed this map, and
-    # the row began publishing WITH a build stamp on 13-Aug, so the next
-    # weekly currency run would have FAILED on an unmapped row. Its entry
-    # module is the Farmer's file (FUNDING_VARIANT instance).
-    "band-garrett-lshadow": "lighter_funding_bot.py",
-    # [2026-08-13 (ls)] 🏦 Rich Dad — mapped the day the row was born, per
-    # the same (jb) gate, PRE-provision so its FIRST stamped publish was
-    # already covered. Service ALIVE 13-Aug (ls), stamp-verified ((mn)).
-    "book-kiyosaki-lshadow": "lighter_book_kiyosaki_bot.py",
-    # [2026-08-13 (mb)-(me)] the BOOKS cohort's second wave — mapped the day
-    # each row was born, per the (jb) gate, PRE-provision so the FIRST
-    # stamped publish was already covered. All four services ALIVE 14-Aug
-    # (mk), stamp-verified ((mn)).
-    "book-douglas-lshadow": "lighter_book_douglas_bot.py",
-    "book-grimes-lshadow": "lighter_book_grimes_bot.py",
-    "book-schwager-lshadow": "lighter_book_schwager_bot.py",
-    "book-hull-lshadow": "lighter_book_hull_bot.py",
-    "crypto-breakout-4h-lshadow": "lighter_family_bot.py",
-    "crypto-intraday-15m-lshadow": "lighter_family_bot.py",
-    "crypto-swing-daily-lshadow": "lighter_family_bot.py",
-    "crypto-trend-daily-lshadow": "lighter_trend_bot.py",
-    "freqtrade-avo-maria-lshadow": "lighter_family_bot.py",
-    "freqtrade-dad-lshadow": "lighter_family_bot.py",
-    "freqtrade-georgia-lshadow": "lighter_family_bot.py",
-    "freqtrade-mum-lshadow": "lighter_family_bot.py",
-    "equities-regime-lshadow": "lighter_index_bot.py",
-    "lighter-dislocation-lshadow": "lighter_dislocation_bot.py",
-    "lighter-perp-sniper-lshadow": "lighter_perp_sniper.py",
-    # [2026-08-04 (jb)] not a trading bot — the instrument collector — but its
-    # row is stamped (measured: build a6219e09bd45 / n=14, svc=market-context)
-    # and its image auto-deploys, so currency applies to it exactly as to a
-    # bot. It was silently skipped from this guard's first run until the
-    # unmapped-row gate below made that impossible.
-    "market-context": "market_context.py",
-    # [2026-08-13 (ma)] 🙏 Avo Maria took the live slot; the Taker's live row
-    # retired. Its entry stays mapped for the transition window — an old
-    # container's last stamped publishes must resolve, not read UNMAPPED.
-    "freqtrade-avo-maria-lighter": "lighter_avo_live_bot.py",
-    "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",
-    "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
-    "perps-funding-carry-lshadow": "funding_carry_bot.py",
-    "perps-funding-lighter-lighter": "lighter_funding_bot.py",
-    "perps-funding-lighter-lshadow": "lighter_funding_bot.py",
-    "perps-funding-spread-lshadow": "lighter_funding_spread_bot.py",
-    "pm-abbott-lshadow": "parliament_main.py",
-    "pm-albanese-lshadow": "parliament_main.py",
-    "pm-gillard-lshadow": "parliament_main.py",
-    "pm-morrison-lshadow": "parliament_main.py",
-    "pm-rudd-lshadow": "parliament_main.py",
-    "pm-turnbull-lshadow": "parliament_main.py",
-}
-
-#: rows whose service only deploys behind a commit-subject marker, and the
-#: marker that does it. Being behind is EXPECTED here unless a marked commit
-#: sits in the gap — the distinction the 3-Aug review could not make, which
-#: cost it four false ACTION items.
-MARKER_GATED = {
-    "perps-funding-lighter-lighter": ("[deploy-live-farmer]", "[deploy-live]"),
-    "lighter-ticket-taker-lighter": ("[deploy-live-taker]", "[deploy-live]"),
-    # [2026-08-13 (ma)] the slot's new occupant deploys behind the SAME
-    # marker (the service kept its gate through the swap).
-    "freqtrade-avo-maria-lighter": ("[deploy-live-taker]", "[deploy-live]"),
-    # [2026-08-03] `funding-farmer-shadow` holds ZERO real money and yet is
-    # marker-gated, which looks wrong and is not. `(hi)` joined the two arms'
-    # deploy CLOCK on purpose: the shadow is the judge's CONTROL arm, and the
-    # property that matters is matched-in-BOTH-directions — "auto-deploying
-    # the shadow on every unmarked push would simply drift the arms the other
-    # way", and the judge's arm-drift gate then refuses every promotion
-    # ("this window measures a code delta, not edge").
-    #
-    # This guard's FIRST live run reported it BEHIND-OWN by 6 commits, which
-    # was a gap in this model rather than a fleet defect — recorded here
-    # because the finding was checked against the workflow before being
-    # believed, and the two arms were in fact byte-identical (both
-    # 16c4b139231d) at the moment it fired. A guard that cries wolf on a
-    # deliberate design is how a real finding later gets ignored ((hh)).
-    "perps-funding-lighter-lshadow": ("[deploy-live-farmer]", "[deploy-live]"),
-}
-
-#: [2026-08-04 (jb)] stamped bot_pnl rows DELIBERATELY outside this audit's
-#: scope, {row: reason}. fetch_bot_pnl() returns EVERY row in the table, and
-#: the old code kept only `b in ROW_ENTRY` — so a stamped row this file had
-#: never heard of was skipped silently (market-context, from the guard's first
-#: run). An unmapped stamped row now FAILS the audit unless declared here.
-#: Empty today ON PURPOSE: every stamped publisher currently has an entry-file
-#: mapping, market-context included — a declaration is for a row whose stamp
-#: genuinely cannot be resolved to one entry module, not a snooze button.
-NON_BOT_ROWS = {}
+# [2026-08-14 (mo)] THE REGISTRY MOVED TO `fleet_books` AND IS IMPORTED, NOT
+# RE-DECLARED. It lived here and, near-verbatim, in `evidence_review` — the
+# same map maintained twice, which is how a slot swap edits ten sites and
+# still misses two. Imported by IDENTITY so a hand-rolled copy cannot drift
+# back in ((hj)); `audit_live_roster` checks the declared live set against the
+# live feed. Order matters: scripts import scripts, never the reverse.
+# The sys.path line is the `audit_ledger_integrity` <- `golive_readiness`
+# pattern verbatim: this file is imported as a MODULE by the suite as well as
+# run as a script, and only the script path gets `scripts/` for free.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from fleet_books import (                    # noqa: E402
+    ROW_ENTRY, MARKER_GATED, NON_BOT_ROWS, DECLARED_LIVE)
 
 
 def rows_from_pnl_json(src):

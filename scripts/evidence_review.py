@@ -139,7 +139,14 @@ RETIRED = frozenset({
 # the CURRENT live pair — leaving the retired row here would send every
 # future audit to a dead row and past the new live book (the exact stale-rule
 # shape the 22-Jul (ci) correction fixed in CLAUDE.md's audit-scope rule).
-LIVE_ROWS = ("perps-funding-lighter-lighter", "freqtrade-avo-maria-lighter")
+# [2026-08-14 (mo)] IMPORTED, not re-declared — `fleet_books` is the one
+# declaration, and `audit_live_roster` fails the build when it disagrees with
+# the live feed. This tuple and `ROW_ENTRY` below were BOTH second copies of
+# `audit_code_currency`'s, which is why the (ma) swap had to edit ten sites.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
+from fleet_books import DECLARED_LIVE, ROW_ENTRY   # noqa: E402
+
+LIVE_ROWS = DECLARED_LIVE
 # The `-lshadow` CONTROL arm of a row that is ALREADY LIVE is not a go-live
 # candidate — it is the twin of a bot that already went. It also fails the
 # premise twice over: while the experiment judge runs a candidate on it, the
@@ -156,13 +163,9 @@ LIVE_TWINS = frozenset(
 # [2026-08-02] The entry file whose build id each graded row stamps, so the
 # review can compare a RUNNING container against the repo. See
 # `head_drift_line` for why a live/shadow comparison alone cannot do this.
-ROW_ENTRY = {
-    "perps-funding-lighter-lighter": "lighter_funding_bot.py",
-    "perps-funding-lighter-lshadow": "lighter_funding_bot.py",
-    "freqtrade-avo-maria-lighter": "lighter_avo_live_bot.py",   # (ma) slot swap
-    "lighter-ticket-taker-lighter": "lighter_ticket_taker.py",  # retired 13-Aug
-    "lighter-ticket-taker-lshadow": "lighter_ticket_taker.py",
-}
+# [2026-08-14 (mo)] Now imported above from `fleet_books` — this was a SUBSET
+# copy of `audit_code_currency`'s map, and a subset copy is the worse kind: it
+# stays green while silently covering fewer rows than the guard it mirrors.
 
 
 # ---------------------------------------------------------------------------

@@ -99,6 +99,17 @@ jobs:
         run: python3 scripts/audit_organ_silence.py
       - name: The silent-organ detector must fire, not merely stay quiet
         run: python3 scripts/audit_organ_silence.py --selftest
+      # [2026-08-14 (mo)] The DECLARED live pair must still be the pair holding
+      # real money. Runs WITHOUT --pnl-json here on purpose: this job gates
+      # every push and must not depend on the dashboard being reachable, so CI
+      # checks the registry's integrity and the docs (the arm that would have
+      # caught CLAUDE.md's 22-day-stale audit rule). The feed comparison runs
+      # where a live read is already expected and fail-closed — the weekly
+      # assessment, beside audit_code_currency.
+      - name: The declared live roster must be internally consistent, and the docs current
+        run: python3 scripts/audit_live_roster.py
+      - name: The roster guard must fire on a stale declaration, not merely stay quiet
+        run: python3 scripts/audit_live_roster.py --selftest
 
   undefined-names:
     name: No name is read in shipped code that is bound nowhere

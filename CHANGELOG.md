@@ -1,3 +1,80 @@
+## 2026-08-14 (mo) — THE LIVE ROSTER WAS WRITTEN DOWN TWELVE TIMES: one declaration, one derivation, and a guard that makes the NEXT slot swap turn the build red
+
+**Operator, on the finding that the roster had rotted in three places at once:
+*"How do we do this"* → *"Go ahead"*.** Slice 1 of the plan: collapse the
+duplicate declarations into one owner and add the guard that keeps it honest.
+
+- **THE MEASUREMENT FIRST, because "derive it" is only half right.** Twelve
+  sites named the live pair; exactly TWO derived it (`market_context`, which
+  deleted its hardcoded roster on 17-Jul for this reason, and
+  `fleet_watchdog_svc`, which never had one). And the sharpest duplicate:
+  `evidence_review.ROW_ENTRY` and `audit_code_currency.ROW_ENTRY` were **the
+  same map maintained twice** — the second a SUBSET copy, which is the worse
+  kind: it stays green while silently covering fewer rows than the guard it
+  mirrors.
+- **TWO KINDS OF FACT WERE TANGLED, AND ONLY ONE IS DERIVABLE.** *Which rows
+  are live right now* is a property of the PAYLOAD (`extra.venue ==
+  'lighter_live'`) and must never be written down. *Row → entry file / deploy
+  marker* is a property of the REPO — no payload contains it, so it must be
+  declared, but ONCE. Conflating them is why "just derive it" would have
+  produced the wrong build.
+- **`scripts/fleet_books.py` is the one declaration**, and it lives under
+  `scripts/` deliberately: nothing in a container needs it, and the obvious
+  shipped home (`bot_pnl_store.py`) is IN the build-stamp file set, so putting
+  a registry there would re-stamp every image and read the whole fleet as
+  behind — the `(fd)` trap. Imported by other scripts, the same direction as
+  `golive_readiness` ← `audit_ledger_integrity`; the reverse would drag a
+  non-shipped script into an image's import graph (born-dark).
+- **`scripts/audit_live_roster.py` is what closes the class rather than moving
+  the copies.** Three arms: registry integrity (always runs), the DERIVED
+  comparison against the live feed, and a PROSE arm that greps the fleet's own
+  live-scope rule for rows that are no longer live — the arm that would have
+  caught CLAUDE.md's 22-day-stale audit rule. **Mutation-verified against the
+  state we were actually in yesterday**: declaring the retired Taker reddens
+  from three angles at once (contradiction, live-in-feed-not-declared,
+  declared-not-in-feed), and reverting CLAUDE.md's rule to name the Taker
+  reddens the prose arm.
+- **THE THREE DESIGN CHOICES THAT KEEP IT FROM CRYING WOLF**, each pinned by a
+  negative fixture: (1) it **never picks a side** — a disagreement prints both
+  and says the fix might be the declaration OR a publisher stamping a stale
+  venue, because a confident wrong name is I8's failure; (2) it is
+  **FAIL-CLOSED** — a dark/empty/venue-less feed returns None ("cannot say")
+  and SKIPS the comparison, never `[]` ("nothing is live"), which would pass
+  vacuously on every network blip ((kw)); (3) the prose arm reads a **window
+  around the live-scope anchor**, not the whole file, so a retired row named in
+  its own history is not a finding — and a REMOVED anchor is itself reported,
+  since a guard silently blinded is worse than no guard.
+- **CI placement is split on purpose.** `changelog-check` runs it WITHOUT the
+  feed (it gates every push and must not depend on the dashboard being up);
+  the feed comparison rides `fleet-weekly-assessment`, which already fetches
+  `/pnl.json` and already treats a dark feed as failure.
+- **SCOPE, stated so the next session does not think this is finished.**
+  Deliberately NOT swept: the tests (a fixture that derives its own expectation
+  tests nothing), `cleanup_legacy_bots` (a retirement list, correctly
+  declared), the cutover runbook (frozen history), `railway.tickettaker.toml`
+  (a Railway setting). **Slice 2 remains open**: `fleet_respiration.LIVE_BREATHS`
+  and `implementation_shortfall` mix the roster WITH per-bot config, so the
+  roster can derive but the limits stay declared — fiddlier, lower payoff, and
+  it touches shipped organs.
+- **A CONCURRENT SESSION EDITED THE BLOCK I WAS MOVING, mid-pass.** origin/main
+  gained comment updates INSIDE `ROW_ENTRY` (the wave-2 services going alive)
+  while this pass was deleting that block. A naive rebase would have dropped
+  them silently — the diff is a delete-vs-modify, and the delete wins by
+  default. Their text was ported into `fleet_books.py` BEFORE the sync, so the
+  content survives regardless of how the conflict resolves. **This is the
+  `(lz)` hazard in a new costume: it is not enough to check which FILES you
+  modified, you must check whether anyone edited the lines you are relocating.**
+- **LETTERS:** drafted `(mn)`, taken by that same session mid-write → `(mo)`.
+  Third collision in one day (`(mc)`→`(mi)`, `(mk)`→`(mm)`, `(mn)`→`(mo)`), all
+  caught at push time and none costly.
+
+### WHICH BOOK MOVED (doctrine rule 4)
+
+**None — and this one is honest about being infrastructure.** What it buys is
+that the roster cannot rot silently again: the next slot swap fails CI the
+moment the new row publishes, instead of surviving 22 days in the rule that
+tells every audit which books hold real money. The measured cost of the last
+rot was that `(ma)` edited ~10 sites and still missed three.
 ## 2026-08-14 (mn) — SAVE THE FINDINGS: the operator's "this could be our pivot" pass — every discovery from the wave-2 activation session engraved where the next session actually looks
 
 **Operator, 14-Aug:** *"Save all new found data and information this could be
