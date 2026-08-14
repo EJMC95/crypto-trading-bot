@@ -1,13 +1,9 @@
 # TEMPORARILY REPURPOSED (branch-only): provisioning completed green in run
-# 4 (all four services created + variables + first deploys). GitHub only
-# registers dispatchable workflows from the default branch, so this
-# registered slot carries the READ-ONLY diagnostic below until the rows
-# verify. DELETE AFTER USE — both this and the diag file.
-#
-# Diag v2: the containers are RUNNING and looping (v1 evidence) while
-# /pnl.json carries no wave-2 row — so the split to test is WHICH DATABASE
-# each side touches, and what the fleet DB actually contains. No value is
-# ever printed: URLs are masked and compared by sha256 digest only.
+# 4. Diag v3: bot_pnl HAS all five book rows on the one shared DB (v2
+# evidence) while /pnl.json serves only kiyosaki — the four filtered names
+# are exactly the ones whose registrations arrived in the 23:35Z merge, so
+# the question is whether the serving pnl-dashboard container is actually
+# running post-merge code. DELETE AFTER USE.
 name: Provision BOOKS wave 2
 on:
   workflow_dispatch: {}
@@ -18,47 +14,32 @@ jobs:
     steps:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
-      - name: Compare resolved DATABASE_URL digests
+      - name: pnl-dashboard deployment state and logs
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           set -uo pipefail
-          digest_of() {
-            railway variables --service "$1" --json 2>/dev/null \
-              | jq -r '[.. | objects | to_entries[] | select(.key=="DATABASE_URL") | .value] | first // empty'
-          }
-          for SVC in pnl-dashboard book-kiyosaki-shadow book-douglas-shadow \
-                     book-grimes-shadow book-schwager-shadow book-hull-shadow; do
-            V="$(digest_of "$SVC")"
-            if [ -z "$V" ]; then
-              echo "$SVC: DATABASE_URL ABSENT"
-              continue
-            fi
-            echo "::add-mask::$V"
-            D="$(printf '%s' "$V" | sha256sum | cut -c1-16)"
-            echo "$SVC: len=${#V} sha256=$D"
-          done
-      - name: Query the fleet DB directly
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          set -uo pipefail
-          URL=""
-          for svc in Postgres postgres PostgreSQL; do
-            URL=$(railway variables --service "$svc" --json 2>/dev/null \
-                  | jq -r '[.. | objects | to_entries[] | select(.key=="DATABASE_PUBLIC_URL") | .value] | first // empty') && [ -n "$URL" ] && break
-          done
-          [ -n "$URL" ] || { echo "::error::no DATABASE_PUBLIC_URL resolved"; exit 1; }
-          echo "::add-mask::$URL"
-          echo "::group::bot_pnl rows for book-%"
-          psql "$URL" -v ON_ERROR_STOP=1 -q -c \
-            "SELECT bot, updated_at, status, equity FROM bot_pnl WHERE bot LIKE 'book-%' ORDER BY bot;"
+          echo "::group::active deployments (all services, created + status)"
+          railway status --json 2>/dev/null | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)
+          for env in d.get("environments", {}).get("edges", []):
+              for si in env["node"].get("serviceInstances", {}).get("edges", []):
+                  n = si["node"]
+                  name = n.get("serviceName")
+                  for dep in n.get("activeDeployments") or []:
+                      print(name,
+                            "| created", dep.get("createdAt"),
+                            "| stopped", dep.get("deploymentStopped"),
+                            "| instances",
+                            [i.get("status") for i in dep.get("instances") or []])
+          ' || echo "status parse failed"
           echo "::endgroup::"
-          echo "::group::bot_state keys for the wave-2 books"
-          psql "$URL" -v ON_ERROR_STOP=1 -q -c \
-            "SELECT bot, updated_at FROM bot_state WHERE bot LIKE 'book-douglas%' OR bot LIKE 'book-grimes%' OR bot LIKE 'book-schwager%' OR bot LIKE 'book-hull%' ORDER BY bot;"
+          echo "::group::pnl-dashboard deploy logs (recent)"
+          ( timeout 25 railway logs --service pnl-dashboard 2>&1 || true ) \
+            | tail -n 60 | grep -aiv "postgres" || true
           echo "::endgroup::"
-          echo "::group::total bot_pnl rows + newest"
-          psql "$URL" -v ON_ERROR_STOP=1 -q -c \
-            "SELECT count(*) AS rows, max(updated_at) AS newest FROM bot_pnl;"
+          echo "::group::pnl-dashboard build logs (recent)"
+          ( timeout 25 railway logs --build --service pnl-dashboard 2>&1 || true ) \
+            | tail -n 30 | grep -aiv "postgres" || true
           echo "::endgroup::"
