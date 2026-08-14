@@ -12,25 +12,10 @@ Recommended options are marked ★.
 
 ---
 
-## ⚡ WAITING ON YOU · The BOOKS wave-2 birth (PR #169) — merge, then one dispatch
+## ⚡ ~~WAITING ON YOU~~ · The BOOKS wave-2 birth — **EXECUTED 13/14-Aug under your "merge and continue" grant, verified by stamp readback 14-Aug 00:12Z: all four rows online on /pnl.json with `extra.build` byte-equal to prediction (🧘 `56d16a305cbb` · 📐 `ac6bf6582780` · 🧙 `7d51154ead89` · 🧮 `444962b8ab95`). PR #169 merged; provisioning took four runs ((ml) — the grep -q/pipefail class, twice) and surfaced a 14h-stale pnl-dashboard container that was hiding the rows; activation lands with PR #170. Item closes at the next daily review.**
 
-**(mb)–(me), 13-Aug:** 🧘 book-douglas, 📐 book-grimes, 🧙 book-schwager,
-🧮 book-hull — four measured shadow books, full green bar, birth state (no
-deploy rule is armed, so the merge cannot red any push). Two acts, in order:
-
-1. **Merge PR #169** (draft — mark ready + merge).
-2. **Dispatch the one-shot provisioner** (creates the four services + first
-   deploys; the workflow only registers once it is on main):
-
-```bash
-gh workflow run books-provision.yml
-```
-
-Then say "done" in any session — it verifies all four rows on /pnl.json by
-build stamp ((iw): a green dispatch is not a running book) and lands the
-ACTIVATION commit (decide rules + paths:, MANUAL→AUTO, provision workflow
-deleted per its DELETE-after-use header). Reading docs: the four
-`BOOK_*_2026-08-13.md`; evidence: `scripts/study_books_cohort_2026-08-13.py`.
+Reading docs: the four `BOOK_*_2026-08-13.md`; evidence:
+`scripts/study_books_cohort_2026-08-13.py`; postmortems: (ml).
 
 ---
 

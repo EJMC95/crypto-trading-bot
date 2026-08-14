@@ -261,15 +261,46 @@ def run_portfolio(signals, rows_by_sym, cap, res_sec, atrs_by_sym):
             ei += 1
             if sym in open_pos or len(open_pos) >= cap:
                 continue
-            entry = rows_by_sym[sym][bar_i + 1][1]
+            ebar = rows_by_sym[sym][bar_i + 1]
+            entry = ebar[1]
             if not entry or entry <= 0:
                 continue
             a0 = atrs_by_sym[sym][bar_i] or sl
-            open_pos[sym] = dict(entry=entry,
-                                 sign=1.0 if side == "long" else -1.0,
-                                 sl=sl, tp=tp, hold=hold, bars=0,
-                                 trail=trail, trail_px=None, hwm=entry,
-                                 atr0=a0)
+            sign = 1.0 if side == "long" else -1.0
+            # [(ml)] the ENTRY BAR's own post-open range is bracket-tested
+            # too (stop first, same convention as the manage pass) and the
+            # bar counts toward the hold — a live loop realises entry-bar
+            # stops, so skipping them graded an optimistic rule. Numbers
+            # recorded before this correction carry that small optimism.
+            _, _eo, eh, el, ec = ebar[:5]
+            px = None
+            if sign > 0:
+                if el <= entry * (1 - sl):
+                    px = entry * (1 - sl)
+                elif tp and eh >= entry * (1 + tp):
+                    px = entry * (1 + tp)
+            else:
+                if eh >= entry * (1 + sl):
+                    px = entry * (1 + sl)
+                elif tp and el <= entry * (1 - tp):
+                    px = entry * (1 - tp)
+            if px is not None:
+                ret = (px - entry) / entry * sign - 2 * FEE_SIDE
+                closed.append(dict(sym=sym, ret=ret, t=now_t,
+                                   hold=res_sec / 3600.0))
+                continue
+            p0 = dict(entry=entry, sign=sign,
+                      sl=sl, tp=tp, hold=hold, bars=1,
+                      trail=trail, trail_px=None, hwm=entry,
+                      atr0=a0)
+            if trail:
+                if sign > 0:
+                    p0["hwm"] = max(p0["hwm"], ec)
+                    p0["trail_px"] = p0["hwm"] * (1 - trail * a0)
+                else:
+                    p0["hwm"] = min(p0["hwm"], ec)
+                    p0["trail_px"] = p0["hwm"] * (1 + trail * a0)
+            open_pos[sym] = p0
     return closed
 
 
@@ -405,7 +436,11 @@ def main():
         a, xf, xs = at[s][i], et20[s][i], et50[s][i]
         if not (a and xf and xs):
             return None
-        dt = dtr.get(s, {}).get(c4t[s][i][0] // 86400, 0)
+        # [(ml)] no claim (missing coin/day or EMA warmup) FAILS CLOSED —
+        # dt=0 passed keltner's <=0/>=0, unfiltering the fade on gaps.
+        dt = dtr.get(s, {}).get(c4t[s][i][0] // 86400)
+        if dt not in (-1, 1):
+            return None
         _, o, h, l, c = c4t[s][i][:5]
         if dt > 0 and xf > xs and l <= xf and c > xf:
             return ("long", 1.5 * a, 4.5 * a, 20, None)
@@ -430,7 +465,9 @@ def main():
         a, xf = at[s][i], et20[s][i]
         if not (a and xf):
             return None
-        dt = dtr.get(s, {}).get(c4t[s][i][0] // 86400, 0)
+        dt = dtr.get(s, {}).get(c4t[s][i][0] // 86400)
+        if dt not in (-1, 1):        # [(ml)] no claim -> no fade, fail-closed
+            return None
         c = c4t[s][i][4]
         if c > xf * (1 + 2.25 * a) and dt <= 0:
             return ("short", 1.5 * a, 2.25 * a, 20, None)

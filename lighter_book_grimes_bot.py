@@ -205,7 +205,8 @@ def ema_series(vals, n):
 
 
 def daily_trend_map(daily_bars):
-    """{utc_day_number: +1/-1/0}, LAG-1 by construction ((mh)): day D's
+    """{utc_day_number: +1/-1/0} (0 = EMA warmup, which trend_at reads as
+    NO CLAIM -> None), LAG-1 by construction ((mh)): day D's
     entry is the EMA20-vs-EMA50 verdict AS OF DAY D-1's CLOSE. Two defects
     die in this one convention: the live scan's "today" key always exists
     (yesterday's candle is closed), where the unlagged map keyed every day
@@ -226,15 +227,19 @@ def daily_trend_map(daily_bars):
 
 def trend_at(dtrend, day):
     """The trend verdict governing `day`, with a one-day fallback for a
-    missing daily candle. 0 = no claim (keltner reads it as unaligned-both-
-    ways, pullback as no-trade — each setup's own documented degrade)."""
+    missing daily candle. None = NO CLAIM (missing coin/day, junk, or EMA
+    warmup) and both trend-gated setups FAIL CLOSED on it. The first cut
+    returned 0 for no-claim — which keltner's `dt <= 0` / `dt >= 0` read
+    as a PASS, so missing data UNFILTERED the fade instead of stopping it
+    (the same inversion the (mh) trend_dark fix closed at the live entry
+    site, still open per-coin inside the replay)."""
     try:
         v = (dtrend or {}).get(day)
         if v is None:
             v = (dtrend or {}).get(day - 1)
-        return v if v in (-1, 0, 1) else 0
+        return v if v in (-1, 1) else None
     except Exception:      # noqa: BLE001
-        return 0
+        return None
 
 
 # --------------------------- the setups (ONE owner: live + replay) -----------
@@ -245,6 +250,8 @@ def sig_pullback(bars, i, atrs, e20, e50, dtrend):
     if not (a and x20 and x50):
         return None
     dt = trend_at(dtrend, bars[i][0] // 86400)
+    if dt is None:
+        return None                    # no daily claim -> no with-trend trade
     _t, _o, h, l, c = bars[i]
     if dt > 0 and x20 > x50 and l <= x20 and c > x20:
         return "long", 1.5 * a, 4.5 * a, 20
@@ -277,6 +284,8 @@ def sig_keltner(bars, i, atrs, e20, e50, dtrend):
     if not (a and x20):
         return None
     dt = trend_at(dtrend, bars[i][0] // 86400)
+    if dt is None:
+        return None            # no daily claim is not a licence to fade
     c = bars[i][4]
     if c > x20 * (1 + KELT_MULT * a) and dt <= 0:
         return "short", 1.5 * a, KELT_MULT * a, 20
@@ -294,9 +303,14 @@ def replay_setup(setup, bars_by_coin, dtrend_by_coin, cap=None,
                  clip=REF_CLIP):
     """Replay ONE setup over the supplied tape through its own signal code:
     cap-bound sequential portfolio, entry at next bar open, intra-bar
-    bracket with the stop checked FIRST (conservative), 5bps/side. Returns
-    the closed-trade $ list, oldest-exit first. The study's exact method —
-    grading each setup as if it were the whole book."""
+    bracket with the stop checked FIRST (conservative), 5bps/side — and the
+    ENTRY BAR's own post-open range is bracket-tested too ((ml)): the live
+    loop realises an entry-bar stop (bracket_exit runs from the first loop
+    after open), so a replay whose first check is the NEXT bar grades an
+    optimistic rule, in the direction that holds a losing setup's gate open.
+    Returns the closed-trade $ list, oldest-exit first. The study's method,
+    with that one live-fidelity correction — grading each setup as if it
+    were the whole book."""
     cap = MAX_POSITIONS if cap is None else cap
     fn = SETUP_FNS[setup]
     sigs = []
@@ -353,12 +367,32 @@ def replay_setup(setup, bars_by_coin, dtrend_by_coin, cap=None,
             si += 1
             if coin in open_pos or len(open_pos) >= cap:
                 continue
-            entry = bars_by_coin[coin][i + 1][1]
+            ebar = bars_by_coin[coin][i + 1]
+            entry = ebar[1]
             if not entry or entry <= 0:
                 continue
-            open_pos[coin] = {"entry": entry,
-                              "sign": 1.0 if side == "long" else -1.0,
-                              "sl": sl, "tp": tp, "hold": hold, "bars": 0}
+            sign = 1.0 if side == "long" else -1.0
+            # the entry bar itself: stop first, same convention as the
+            # manage pass above; counting it toward the hold matches the
+            # live max-hold clock, which runs from the entry timestamp.
+            _t2, _o2, h2, l2, _c2 = ebar
+            reason_px = None
+            if sign > 0:
+                if l2 <= entry * (1 - sl):
+                    reason_px = entry * (1 - sl)
+                elif h2 >= entry * (1 + tp):
+                    reason_px = entry * (1 + tp)
+            else:
+                if h2 >= entry * (1 + sl):
+                    reason_px = entry * (1 + sl)
+                elif l2 <= entry * (1 - tp):
+                    reason_px = entry * (1 - tp)
+            if reason_px is not None:
+                closed.append(((reason_px - entry) / entry * sign
+                               - 2 * SLIP_COST) * clip)
+                continue
+            open_pos[coin] = {"entry": entry, "sign": sign,
+                              "sl": sl, "tp": tp, "hold": hold, "bars": 1}
     return closed
 
 
@@ -882,7 +916,7 @@ def _selftest():
     assert set(SETUPS) == set(SETUP_FNS), "every setup needs its one owner"
 
     # 2) setup arithmetic on engineered fixtures
-    # keltner: flat tape then a violent poke above the band, daily trend flat
+    # keltner: flat tape then a violent poke above the band, daily trend DOWN
     bars = [(t + i * BAR_SEC, 100.0, 100.6, 99.4, 100.0) for i in range(70)]
     bars.append((t + 70 * BAR_SEC, 100.0, 112.0, 100.0, 111.0))
     atrs = atr_series(bars)
@@ -890,8 +924,13 @@ def _selftest():
     e20 = ema_series(closes, EMA_FAST)
     e50 = ema_series(closes, EMA_SLOW)
     i = len(bars) - 1
-    sk = sig_keltner(bars, i, atrs, e20, e50, {})
+    dn_day = {bars[i][0] // 86400: -1}
+    sk = sig_keltner(bars, i, atrs, e20, e50, dn_day)
     assert sk is not None and sk[0] == "short", sk
+    # NO CLAIM fails closed — the first cut read {} as "unaligned both
+    # ways" and FIRED here; missing data must never unfilter the fade
+    assert sig_keltner(bars, i, atrs, e20, e50, {}) is None, \
+        "an empty daily-trend map is no claim, not a licence to fade"
     # the SAME poke with the daily trend UP is refused (regime filter)
     up_day = {bars[i][0] // 86400: 1}
     assert sig_keltner(bars, i, atrs, e20, e50, up_day) is None
@@ -923,14 +962,34 @@ def _selftest():
         "no daily-trend alignment -> no pullback trade"
 
     # 3) the replay engine, end-to-end: the keltner fixture must produce a
-    # closed SHORT that mean-reverts to profit.
+    # closed SHORT that mean-reverts to profit (daily trend supplied — an
+    # empty map now generates NO trend-gated signals, by design).
     fix = list(bars)
     fix.append((t + 71 * BAR_SEC, 111.0, 111.5, 100.0, 100.5))   # reversion
     for j in range(3):
         fix.append((t + (72 + j) * BAR_SEC, 100.5, 101.0, 99.9, 100.2))
-    closed = replay_setup("keltner", {"AAA": fix}, {"AAA": {}}, cap=2)
+    dn_all = {d: -1 for d in range(fix[0][0] // 86400,
+                                   fix[-1][0] // 86400 + 2)}
+    closed = replay_setup("keltner", {"AAA": fix}, {"AAA": dn_all}, cap=2)
     assert len(closed) >= 1, "the fixture's fade must close"
     assert closed[0] > 0, "the reversion trade must be profitable net of fees"
+    assert replay_setup("keltner", {"AAA": fix}, {"AAA": {}}, cap=2) == [], \
+        "a coin with no daily-trend claim must contribute NO keltner grades"
+    # ((ml)) the ENTRY BAR's own range is bracket-tested: a short whose
+    # entry bar spikes through the stop, on a tape that then gaps down to
+    # the tp, must book the STOP — reverting the entry-bar check rides
+    # through to the tp and flips this trade's sign, which is exactly the
+    # optimistic bias it pins.
+    fix2 = list(bars)
+    fix2.append((t + 71 * BAR_SEC, 111.0, 125.0, 110.0, 124.0))  # stop-spike
+    fix2.append((t + 72 * BAR_SEC, 96.0, 97.0, 90.0, 95.0))      # gap reversion
+    for j in range(3):
+        fix2.append((t + (73 + j) * BAR_SEC, 96.0, 97.0, 95.0, 96.0))
+    dn2 = {d: -1 for d in range(fix2[0][0] // 86400,
+                                fix2[-1][0] // 86400 + 2)}
+    closed2 = replay_setup("keltner", {"AAA": fix2}, {"AAA": dn2}, cap=2)
+    assert closed2 and closed2[0] < 0, \
+        "the entry-bar stop must be realised, not ridden through to the tp"
 
     # 4) the gate, both directions + fail-closed staleness
     g = grade([5.0] * 25)
@@ -1012,8 +1071,10 @@ def _selftest():
     assert last_bar_day + 2 not in dmap
     assert trend_at({5: 1}, 5) == 1
     assert trend_at({5: 1}, 6) == 1, "one-day fallback for a missing candle"
-    assert trend_at({5: 1}, 7) == 0, "two days dark is no claim"
-    assert trend_at(None, 5) == 0 and trend_at({5: "junk"}, 5) == 0
+    assert trend_at({5: 1}, 7) is None, "two days dark is no claim"
+    assert trend_at(None, 5) is None and trend_at({5: "junk"}, 5) is None
+    assert trend_at({5: 0}, 5) is None, \
+        "an EMA-warmup 0 is no claim, and no claim is None — never a pass"
 
     # (mg) Harris spread telemetry: pure arithmetic + the refusal shapes
     good = {"bids": [(99.0, 5.0), (98.0, 1.0)], "asks": [(101.0, 4.0)]}

@@ -66,7 +66,7 @@ on:
       # dispatch created the service and the row verified by build stamp.
       - 'lighter_book_kiyosaki_bot.py'
       - 'Dockerfile.kiyosaki'
-      # [2026-08-13 (mi)] the BOOKS wave 2 (mb)-(me) — routed at activation,
+      # [2026-08-13 (mk)] the BOOKS wave 2 (mb)-(me) — routed at activation,
       # services provisioned by the books-provision dispatch, rows verified
       # by build stamp.
       - 'lighter_book_douglas_bot.py'
@@ -423,7 +423,7 @@ jobs:
             if echo "$changed" | grep -qE "^(lighter_book_kiyosaki_bot\.py$|Dockerfile\.kiyosaki$|$_shared)"; then
               svcs="${svcs:+$svcs,}book-kiyosaki-shadow"
             fi
-            # [(mi) ACTIVATED] BOOKS wave 2, provisioned via the (lr) dispatch
+            # [(mk) ACTIVATED] BOOKS wave 2, provisioned via the (lr) dispatch
             if echo "$changed" | grep -qE "^(lighter_book_douglas_bot\.py$|Dockerfile\.douglas$|$_shared)"; then
               svcs="${svcs:+$svcs,}book-douglas-shadow"
             fi

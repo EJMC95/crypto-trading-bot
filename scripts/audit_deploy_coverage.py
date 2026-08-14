@@ -453,7 +453,7 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
                # dispatched workflow, row verified publishing with a build
                # stamp, decide rule live in the same commit.
                "Dockerfile.kiyosaki": "book-kiyosaki-shadow",
-               # [2026-08-13 (mi)] the BOOKS wave 2 — moved here from
+               # [2026-08-13 (mk)] the BOOKS wave 2 — moved here from
                # MANUAL_IMAGES_OK at activation: services provisioned by the
                # dispatched workflow, all four rows verified publishing with
                # their locally predicted build stamps, decide rules live in

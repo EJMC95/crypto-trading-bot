@@ -1,4 +1,87 @@
-## 2026-08-13 (mi) — THE WAVE-2 BIRTH EXECUTED END-TO-END: PR #169 merged on the operator's explicit grant, the four services provisioned by one dispatch, and the activation armed — gated, as always, on the rows proving themselves by stamp
+## 2026-08-14 (ml) — THE ROWS WERE PUBLISHING ALL ALONG; THE DASHBOARD WAS 14 HOURS STALE — plus the second adversarial pass lands: keltner's no-claim fail-open closed at the CONTRACT, the replay gains entry-bar fidelity, and the provisioner's variable echo is deleted after a measured near-leak
+
+The provisioning saga's three failures were all the same lesson wearing
+different clothes: **the thing you built is fine — verify the thing that
+REPORTS on it.**
+
+- **PROVISIONING (runs 1–4).** Run 1: `railway status --json | grep -q` —
+  grep's early exit SIGPIPEs the Rust CLI into a panic that `pipefail`
+  reads as no-match; the loop aborted on a service that existed. Run 2's
+  fix captured the output first but still piped `printf` into `grep -q` —
+  and printf's OWN broken-pipe write error inverted every successful match.
+  **The class: ANY producer piped into `grep -q` under `set -o pipefail`
+  can invert a match.** Run 3 (pure-bash `case` substring, no pipe
+  anywhere) was cancelled mid-flight for the leak finding below; run 4 ran
+  it green: all four services created, variables set, first deploys up.
+- **THE LEAK FINDING (the 24-agent review's third confirmed defect,
+  measured before believed).** The provisioner echoed `railway variables`
+  back through `sed 's/postgres[^ ]*/<redacted>/g'` — but the CLI prints
+  RESOLVED values (the reference form resolves to the full postgres URL,
+  password included) in a table that WRAPS long values, and a line-based
+  redaction cannot see a wrapped value. Forensic audit of every table the
+  five runs printed: **zero password characters leaked** — the CLI happened
+  to wrap after `postgresql://`, putting the username `postgres` at the
+  start of the continuation line, so sed's match swallowed the whole
+  password; the only raw fragment was `es.railway.internal:5432/railway`,
+  Railway's universal private-network default. Verdict PARTIAL, no
+  rotation, logs kept as evidence — **but the non-leak depended on a lucky
+  wrap point**, so the echo is DELETED (`ea36a3e`): the `--set` exit code
+  was always the real check; names only in logs, never values (the (kb)
+  class, now with a measured near-miss attached).
+- **ZERO ROWS ON /pnl.json — AND THE BOTS WERE NEVER THE PROBLEM.**
+  Twenty minutes after green deploys the feed showed none of the four.
+  Diagnosed by evidence, not restarts (the container-log + DB-query
+  read-only diagnostics ran through the registered workflow slot):
+  containers RUNNING and looping (📐 grimes completed its first live
+  retest and correctly opened NOTHING; 🧙 schwager restored 4 positions;
+  🧮 hull's band census live at `eligible 0, waiting 4`), every service's
+  resolved `DATABASE_URL` sha256-IDENTICAL to the dashboard's, and
+  `bot_pnl` holding all five book rows fresh and online. **The serving
+  pnl-dashboard container was running 09:46Z code — the post-merge
+  23:37Z deployment sat `stopped, instances []` while the 14h-old
+  deployment kept serving** — so the feed filtered exactly the four names
+  merged that day. The fix was a redeploy of the REPORTER, and the (iw)
+  lesson compounds: a green "Deployed: pnl-dashboard" line is not a
+  serving container — READ BACK the feed.
+- **📐 GRIMES: THE NO-CLAIM FAIL-OPEN, CLOSED AT THE CONTRACT (the
+  review's first confirmed defect).** (mh)'s `trend_dark` guard closed the
+  live entry site, but the same inversion survived per-coin inside the
+  REPLAY: `trend_at` returned 0 for missing/junk/warmup, and keltner's
+  `dt<=0`/`dt>=0` reads 0 as a PASS — so a coin whose daily fetch failed
+  was graded UNFILTERED by the very scorecard that gates entries. Now
+  **no-claim is `None` and both trend-gated setups fail closed on it** —
+  one contract change kills every slice (empty coin map, day gaps, EMA
+  warmup), live and replay alike, because the signal functions are the one
+  owner both call. The selftest that ASSERTED the defect (keltner firing
+  on `{}`) now asserts its refusal. 4 mutations verified red.
+- **📐 GRIMES: THE REPLAY BRACKET-TESTS THE ENTRY BAR (the review's
+  second).** The gate's grader entered at next-bar open but first checked
+  brackets on the bar AFTER that — entry-bar stop-outs the live loop
+  realises (bracket_exit runs from the first loop after open) were
+  invisible to the trailing record, an optimism in exactly the numbers
+  (net, t) that hold a losing setup's gate open, at decision-flipping size
+  (keltner sat at t=0.49 vs the 0.5 bar). The entry bar's post-open range
+  is now bracket-tested (stop first, the manage pass's own convention) and
+  counts toward the hold, matching live's entry-timestamp clock. Same fix
+  mirrored into `study_books_cohort`'s `run_portfolio` (trend semantics
+  too) so a re-run cannot resurrect the bias; pre-correction recorded
+  numbers carry a small declared optimism, and the bot's own rolling gate
+  re-derives every 6h regardless — the scorecard, not the study, is the
+  authority. Mutation-pinned including the sign-flip fixture (a stop-spike
+  entry bar on a tape that then gaps to the tp books the STOP).
+- **LETTERS:** this branch's activation entry was renumbered (mi)→(mk)
+  after a concurrent main session's own collision resolution claimed (mi)
+  and (mj) — the cross-branch case rule 2 exists for, caught by grepping
+  origin/main before push.
+
+## 2026-08-13 (mk) — THE WAVE-2 BIRTH EXECUTED END-TO-END: PR #169 merged on the operator's explicit grant, the four services provisioned by one dispatch, and the activation armed — gated, as always, on the rows proving themselves by stamp
+
+**[RENUMBERED (mi) → (mk) at push time: a concurrent session's pass on main
+claimed (mi) AND (mj) — its own collision resolution renumbered INTO this
+branch's range, which only the cross-branch letter audit could see. Tree
+citations repointed in `railway-redeploy.yml`, `audit_deploy_coverage.py`;
+the commit subjects saying "(mi addendum)" stay stale per the convention —
+the commit log is not a letter index.]**
 
 **Operator, 13-Aug:** *"Merge and continue works. Full permission to commit
 push, optimise and send live."* ("Live" here means the shadow services going
@@ -29,6 +112,13 @@ and senior, as the grant's own un-amendable core requires.)
   🧘 `56d16a305cbb`/13 · 📐 `ac6bf6582780`/13 · 🧙 `7d51154ead89`/13 ·
   🧮 `444962b8ab95`/14. A watcher is on the feed; the verification receipt
   lands as an addendum to this entry when the rows speak for themselves.
+- **[VERIFIED 14-Aug 00:12Z — the receipt.]** All four rows on /pnl.json,
+  status online, `extra.svc` stamped, and **every `extra.build` byte-equal
+  to its prediction**: 🧘 `56d16a305cbb`/13 · 📐 `ac6bf6582780`/13 ·
+  🧙 `7d51154ead89`/13 · 🧮 `444962b8ab95`/14. The verification took a
+  detour that became its own entry — the rows were in `bot_pnl` and the
+  DASHBOARD was serving 14h-stale code; see (ml) for the diagnosis chain
+  and the provisioning postmortems.
 
 ## 2026-08-13 (mh) — THE BIRTH REVIEW BITES: an adversarial pass over the wave-2 books confirms six real defects — including a look-ahead that had flattered the one OPEN gate — and the corrected measurement closes it: 📐 Grimes is born trading NOTHING, by its own rule
 
