@@ -105,3 +105,6 @@ floor cannot drift from this table.
   `study_exit_sweep` refusal, born-dark ✅
 - deploy: `Dockerfile.hull`, `MANUAL_IMAGES_OK` birth state, (lr) provision
   dispatch, activation gated on the row publishing ✅
+  **[ALIVE 14-Aug (mk): provisioned, stamp-verified on /pnl.json, image
+  in `AUTO_IMAGES`, auto-deploy ACTIVE; the provision workflow deleted
+  after use.]**

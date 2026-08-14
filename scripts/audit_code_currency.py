@@ -110,13 +110,13 @@ ROW_ENTRY = {
     # module is the Farmer's file (FUNDING_VARIANT instance).
     "band-garrett-lshadow": "lighter_funding_bot.py",
     # [2026-08-13 (ls)] 🏦 Rich Dad — mapped the day the row was born, per
-    # the same (jb) gate. The service does not exist yet (provision pending);
-    # mapping it now means its FIRST stamped publish is already covered.
+    # the same (jb) gate, PRE-provision so its FIRST stamped publish was
+    # already covered. Service ALIVE 13-Aug (ls), stamp-verified ((mn)).
     "book-kiyosaki-lshadow": "lighter_book_kiyosaki_bot.py",
     # [2026-08-13 (mb)-(me)] the BOOKS cohort's second wave — mapped the day
-    # each row was born, per the (jb) gate: the services may not exist yet
-    # (provision pending), and mapping now means the FIRST stamped publish
-    # is already covered.
+    # each row was born, per the (jb) gate, PRE-provision so the FIRST
+    # stamped publish was already covered. All four services ALIVE 14-Aug
+    # (mk), stamp-verified ((mn)).
     "book-douglas-lshadow": "lighter_book_douglas_bot.py",
     "book-grimes-lshadow": "lighter_book_grimes_bot.py",
     "book-schwager-lshadow": "lighter_book_schwager_bot.py",

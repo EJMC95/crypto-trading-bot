@@ -1,3 +1,37 @@
+## 2026-08-14 (mn) — SAVE THE FINDINGS: the operator's "this could be our pivot" pass — every discovery from the wave-2 activation session engraved where the next session actually looks
+
+**Operator, 14-Aug:** *"Save all new found data and information this could be
+our pivot!"* The mechanism that makes a finding a building block is
+ENGRAVEMENT in the load-bearing places, not a changelog entry alone — this
+pass writes each one where it will be READ.
+
+- **CLAUDE.md doctrine grew by three measured rules** (the I12 loop — grown
+  on pain, each carrying its measurement): the `grep -q`-under-`pipefail`
+  match-inversion class (bit twice in one hour, two costumes; fix is no pipe
+  at all); the stale-READER rule (a green "Deployed:" left a 14h-old
+  pnl-dashboard container serving while the new deployment sat stopped —
+  when exactly-the-new-things go missing while old things work, suspect the
+  reporter before the writers, and read back the SERVED output); and the
+  never-echo-`railway variables` rule (resolved values + a wrapping table
+  defeat any line-based redaction — the measured zero-characters-by-luck
+  near-miss now rides the (kb) block).
+- **The four fleet-table rows corrected in place**: birth-state prose
+  ("dispatch pending") replaced with the verified ALIVE state — stamps
+  byte-equal to prediction, auto-deploy ACTIVE and proven by the merge push;
+  📐 grimes's row gains the (ml) grader corrections and its first live
+  retest (all three gates closed on live tape — the birth state confirmed).
+- **`REVIEW_BOOKS_WAVE2_ADVERSARIAL_2026-08-14.md`**: the full 19-finding
+  adjudication of the 24-agent birth review, saved from session-ephemeral
+  storage — 3 confirmed (fixed same session, (ml)), the rest split between
+  already-fixed-by-(mh) and refuted WITH the verifiers' reasons, because a
+  refusal with evidence is evidence and the next reviewer should not re-run
+  a settled hunt.
+- **What "pivot" is honestly supported by today**: four measured books are
+  ALIVE on fresh single-policy clocks (gradeable ~12-Sep for the fast two;
+  Schwager ~mid-Oct; Hull declared slow per I17) — the forward metric moved
+  because four new books can now BE graded. No gate moved, no claim
+  inflated: the pivot, if it is one, will be visible in the scorecards.
+
 ## 2026-08-14 (mm) — PUSH BOTH WAYS: a money-moving fix ships to main AND the live service in one pass — and the same pass measured that nothing pending today qualifies
 
 **Operator: *"if it's a fix that makes the real bot more money I'd like you to

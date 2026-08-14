@@ -78,3 +78,6 @@ Stated so no future session "finishes" it:
 - deploy: `Dockerfile.douglas`, `MANUAL_IMAGES_OK` birth state, the (lr)
   provision dispatch pattern (`books-provision.yml`), activation gated on
   the row publishing with a build stamp ✅
+  **[ALIVE 14-Aug (mk): provisioned, stamp-verified on /pnl.json, image
+  in `AUTO_IMAGES`, auto-deploy ACTIVE; the provision workflow deleted
+  after use.]**
