@@ -172,8 +172,21 @@ _BUILD_ROOT = os.path.dirname(os.path.abspath(__file__))
 #   same wire on both real-money rows). NOT a live deploy on its own — it
 #   changes no trade either live book would take, so under (mm)'s push-both-ways
 #   rule it rides free on the next deploy that DOES qualify.
+# [2026-08-15 (mu)] lighter_family_bot.py joins: it is the STRATEGY MODULE of
+# a REAL-MONEY image. `Dockerfile.avolive` COPYs it (the configured SwingDip
+# instance 🙏 Avo Maria live actually trades) and the stamp did not hash it —
+# so the fleet's mandated deploy-verification instrument ((hj): verify by
+# `extra.build`+`build_n` readback, never by a green run) was blind to exactly
+# the file the live deploy route carries. A strategy edit could ship to the
+# live book and the stamp would read BYTE-IDENTICAL. Found by the 15-Aug
+# fleet audit; adversarially verified before shipping. MEASURED per image
+# (grep of the COPY sets, not image_contents — whose 4-tuple return has
+# already produced one silently-empty carrier map): exactly 2 of 26 images
+# carry it (avolive, familyshadow); the other 24 skip the absent name and
+# move only because this file itself changed — the same one-deploy-cycle
+# BEHIND-SHARED cost (mp) documented above.
 _BUILD_SHARED = ("venues", "funding_basis.py", "bot_pnl_store.py",
-                 "fleet_tuning.py", "fleet_bus.py")
+                 "fleet_tuning.py", "fleet_bus.py", "lighter_family_bot.py")
 _BUILD_CACHE = None
 
 

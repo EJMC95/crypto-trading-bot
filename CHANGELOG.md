@@ -1,3 +1,46 @@
+## 2026-08-15 (mu) — the LIVE Avo book's strategy module was invisible to its own build stamp; fixed, and the same push re-aligns the Farmer arms the judge has been refusing on since 14-Aug
+
+- **THE FINDING (15-Aug fleet audit, adversarially verified before shipping).**
+  `Dockerfile.avolive` COPYs `lighter_family_bot.py` — the configured SwingDip
+  instance 🙏 Avo Maria LIVE actually trades — and `_BUILD_SHARED` did not name
+  it, so `_build_files('lighter_avo_live_bot.py')` returned 16 files with the
+  strategy module absent. A strategy edit could deploy to the REAL-MONEY book
+  and the stamp would read byte-identical: the fleet's only accepted proof of a
+  live deploy ((hj)) was blind to exactly the file the live deploy route
+  carries. Same class as (mp), one file closer to the money.
+- Measured per image by grepping the COPY sets (NOT `image_contents` — its
+  4-tuple return produced a silently-empty carrier map in this very session,
+  the (iw) trap): **2 of 26 images carry it** (avolive, familyshadow). The
+  other 24 skip the absent name; every stamp still moves at next deploy
+  because this file itself changed — the (mp) one-cycle BEHIND-SHARED cost,
+  known and declared. Avo live itself stays DEFERRED; its row gains the
+  corrected stamp on its next qualifying marker deploy.
+- Behaviour-pinned like (mp)'s pair in `tests/test_review_currency.py`
+  (a family-bot change moves the id for a carrying image; a non-carrying image
+  keeps id and count). **Mutation-verified: removing the name reddens both.**
+  The letters guard also fired mid-build on this very entry being missing —
+  written because the guard demanded it, which is the system working.
+- **THE ARM-ALIGNMENT HALF IS PREPARED, NOT EXECUTED — OPERATOR ACTION.**
+  The audit's verified high finding on the promotion pipeline: **xp-judge has
+  been structurally unable to conclude since ~07:44Z 14-Aug** — every hourly
+  eval refuses on "ARMS ON DIFFERENT CODE: live=eeddcea5b71a
+  shadow=9afe4b3909f8" while every paired-bar floor is already met (n_live=32
+  ≥ 10, n_shadow=53 ≥ 30, candidate slope-gate-off running 8.6d ≥ 7d). The
+  (hi) pairing exists for exactly this: deploying BOTH `trail-blazer-live` and
+  `funding-farmer-shadow` from the same commit re-aligns the arms at HEAD and
+  the next hourly eval concludes on its own bar. The deploy content is
+  behaviour-neutral for both arms (live gap was bot_pnl_store.py stamping
+  only; shadow's gap commits change no farmer trade — the (lx) allocation
+  consumer already runs there and currently scales 1.0), and no halt was
+  active on the live row when checked (the flatten-incident rule). **This
+  session's environment declined the live-deploy act at the permission layer,
+  so it is queued rather than worked around** — the pre-(lm) prepare-it-
+  completely form. THE COMMAND (either route):
+  `gh workflow run 305025607 -f services="trail-blazer-live,funding-farmer-shadow"`
+  or any qualifying farmer-file push whose SUBJECT carries the live-farmer
+  marker. Verification is stamp readback on BOTH rows, equal ids, not the
+  green run. Every hour this waits is another judge eval discarded.
+
 ## 2026-08-15 (mt) — the docket's behavioural test finally LANDS: it sat untracked in the shared tree while main's only coverage was the mutation-blind AST form it was written to replace
 
 - **THE CARRIED ITEM (I11).** `tests/autonomy/test_docket_publish_behaviour.py`

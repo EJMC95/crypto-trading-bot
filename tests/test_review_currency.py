@@ -716,3 +716,60 @@ def test_an_image_without_fleet_bus_keeps_its_own_stamp(tmp_path, monkeypatch):
     assert lean[0] != rich[0], (
         "identical entry bytes in two different FILE SETS must stamp "
         "differently, and the COUNT is what tells a reader which they hold")
+
+
+# ---------------------------------------------------------------------------
+# 8. THE STAMP MUST SEE THE STRATEGY A REAL-MONEY IMAGE TRADES.
+#
+# (mu), 15-Aug: `Dockerfile.avolive` COPYs `lighter_family_bot.py` — the
+# configured SwingDip instance 🙏 Avo Maria LIVE actually trades — and
+# `_build_files('lighter_avo_live_bot.py')` did not include it, so a strategy
+# edit could deploy to the live book with a byte-identical stamp. Same class
+# as (mp), one file closer to the money. Behaviour-pinned like (mp)'s pair:
+# a family-bot change must move the id for an image that carries it, and an
+# image without it must keep its own id and count ((fd)).
+# ---------------------------------------------------------------------------
+def test_a_family_strategy_change_moves_the_build_stamp(tmp_path, monkeypatch):
+    import bot_pnl_store as b
+
+    root = tmp_path / "img"
+    root.mkdir()
+    (root / "lighter_family_bot.py").write_text("SWING_DIP = 1\n")
+    (root / "arm.py").write_text("import lighter_family_bot\n")
+    monkeypatch.setattr(b, "_BUILD_ROOT", str(root))
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+
+    before = b.build_compute(str(root / "arm.py"))
+    (root / "lighter_family_bot.py").write_text("SWING_DIP = 2\n")
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+    after = b.build_compute(str(root / "arm.py"))
+
+    assert before[1] == after[1] == 2, (before, after)   # entry + strategy
+    assert before[0] != after[0], (
+        "a lighter_family_bot.py change must move the build id — it is the "
+        "strategy module the LIVE Avo book trades, and a stamp blind to it "
+        "cannot prove a live strategy deploy landed ((mu))")
+
+
+def test_an_image_without_the_family_module_keeps_its_own_stamp(
+        tmp_path, monkeypatch):
+    """The (fd) half: 24 of 26 images do not COPY lighter_family_bot.py and
+    must not move at all when the name joins the set — absent names are
+    skipped, and the COUNT tells a reader which file set they hold."""
+    import bot_pnl_store as b
+
+    root = tmp_path / "img"
+    root.mkdir()
+    (root / "arm.py").write_text("SAME = 'bytes'\n")
+    monkeypatch.setattr(b, "_BUILD_ROOT", str(root))
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+    lean = b.build_compute(str(root / "arm.py"))
+
+    (root / "lighter_family_bot.py").write_text("SWING_DIP = 1\n")
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+    rich = b.build_compute(str(root / "arm.py"))
+
+    assert lean[1] == 1 and rich[1] == 2, (lean, rich)
+    assert lean[0] != rich[0], (
+        "identical entry bytes in two different FILE SETS must stamp "
+        "differently ((fd))")
