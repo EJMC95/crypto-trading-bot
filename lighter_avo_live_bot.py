@@ -131,6 +131,19 @@ def clip_usd(equity):
     return equity / float(S.max_open)
 
 
+def _clip_scale_now():
+    """[(mz)] The clamped live.clip_scale the entry path applies, re-read at
+    publish time so the row's clip_usd is the EFFECTIVE entry clip whichever
+    code path publishes (the halt paths publish before the entry section
+    refreshes its loop-local copy). Fail-open 1.0 on a dark rail."""
+    try:
+        import fleet_tuning as tuning
+        return max(0.25, min(1.0, float(tuning.get_lever("live.clip_scale",
+                                                         1.0))))
+    except Exception:  # noqa: BLE001
+        return 1.0
+
+
 def roi_exit_due(age_min, profit):
     """freqtrade-style ROI ladder, byte-identical to the family Book's rule:
     the rung is the LARGEST minute key <= age, exit when profit >= its bar."""
@@ -383,7 +396,13 @@ def main(_ctx=None, once=False):
                 "strategy": "SwingDipV1 (live slot swap 13-Aug)",
                 "max_open": S.max_open,
                 "cap_usd": rails.max_notional,
-                "clip_usd": (round(clip_usd(eq) or 0.0, 2) if eq else None),
+                # [2026-08-15 (mz)] the row's clip folds in live.clip_scale —
+                # the actual stake is clip * scale, and a reader sizing risk
+                # off the row was shown the unscaled number (correct only
+                # while the board holds the lever at 1.0). Same clamped read
+                # as the entry path; fail-open 1.0 keeps a dark rail honest.
+                "clip_usd": (round((clip_usd(eq) or 0.0) * _clip_scale_now(),
+                             2) if eq else None),
                 "held": {c: (meta.get(c) or {}).get("tag")
                          for c in live_pos},
                 "policy": _policy(),

@@ -295,6 +295,17 @@ def class_totals(alloc, books):
             "current_usd": round(sum(alloc[b]["current_usd"] for b in rows), 2),
             "target_usd": round(sum(alloc[b]["target_usd"] for b in rows), 2),
             "n_with_claim": sum(1 for b in rows if alloc[b]["claim"] > 0),
+            # [2026-08-15 (mz)] the ERA count beside the pooled one, at the
+            # headline. Measured by the 15-Aug audit (verified): all three
+            # positive claims were all-time-pooled and ZERO books had a
+            # positive era-scoped bound — carry ranked #1 (57% of target
+            # capital) on a sample 91/101 of whose closes predate its own
+            # declared era boundary. The (lx) accessor gate already stops any
+            # consumer from ACTING on a pooled claim; this stops a READER of
+            # the headline from believing one. n_with_claim 3 /
+            # n_with_era_claim 0 is the honest sentence.
+            "n_with_era_claim": sum(
+                1 for b in rows if (alloc[b].get("claim_era") or 0) > 0),
         }
     return out
 

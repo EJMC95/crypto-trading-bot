@@ -1,3 +1,54 @@
+## 2026-08-15 (mz) — the audit's small-fix sweep: the backtest venue-purity arm gets TEETH (a ratchet, 29 days after "a deliberate later step"), a guard's own live roster was stale, and three honesty fixes
+
+- **VENUE-PURITY BACKTEST RATCHET.** The 17-Jul design built the backtest arm
+  ADVISORY on purpose ("turning these into build failures is a deliberate
+  later step once the triage below is agreed") — and the later step never
+  came: 29 days of green runs with foreign-venue backtests cited as the LIVE
+  Farmer's stated justification. Now enforced as a RATCHET (the
+  `REJECTED_SLEEVES` shape): today's 6 cited offenders are grandfathered by
+  name in `BACKTEST_VENUE_LEGACY` with their citation sets FROZEN — each owes
+  a Lighter-tape re-justification — and the build fails on any NEW
+  foreign-venue backtest cited by shipped code, or any NEW citer of a legacy
+  file. Uncited history stays advisory (red-flagging corpses trains the
+  operator to ignore the section). Pure decision function, selftested,
+  **mutation-verified** (disabling the new-offender branch reddens).
+- **THE GUARD'S OWN LIVE ROSTER WAS STALE — the (mo) class inside the guard
+  built to protect the rule.** `_LIVE_BOTS` hand-named the RETIRED trend bot
+  and the Taker's retired live arm, and missed 🙏 Avo entirely, so the
+  blast-radius ranking called dead citations LIVE MONEY and the live book's
+  nothing. Now DERIVED from `fleet_books.DECLARED_LIVE` (+
+  `lighter_family_bot.py` as Avo's live surface, the standing audit-scope
+  rule) — the live bucket honestly reads 3, all Farmer-cited.
+- **Detector precision:** the fleet's own dashboard host is no longer charged
+  as a foreign venue (`study_div_vol_floor` reads the fleet's OWN ledger —
+  Lighter's tape as this fleet recorded it; a guard crying wolf on the one
+  compliant source teaches the operator to ignore it).
+- **🙏 Avo's published `clip_usd` now folds in `live.clip_scale`** (re-read
+  clamped at publish time, fail-open 1.0): the actual stake is clip × scale,
+  and a reader sizing risk off the row saw the unscaled number — correct only
+  while the board held the lever at 1.0. Publish-only, changes no trade →
+  main lane per (mm), rides the next qualifying Avo deploy.
+- **💰 allocation headline honesty:** `class_totals` now publishes
+  `n_with_era_claim` beside `n_with_claim`. Measured and verified: all three
+  positive claims are all-time-pooled and ZERO books hold a positive
+  era-scoped bound — carry ranks #1 (57% of target capital) on a sample
+  91/101 of whose closes predate its own era boundary. The (lx) accessor
+  gate already stops consumers ACTING on pooled claims; this stops a reader
+  of the headline BELIEVING one ("3 with claim / 0 with era claim" is the
+  honest sentence).
+- **OPERATOR_QUEUE corrected per I12:** the standing calendar's "Farmer-live
+  on_track ~23-Aug" was superseded by the grader's own later publishes
+  (undecidable, era t=0.48, n_req≈1,333 — the stall is EDGE); struck in
+  place with the current reading. New queue section 6 carries the ONE action
+  waiting on the operator: the judge-unblock dispatch, with the exact
+  command. Also recorded: ⚖️ Counterweight's 28-Aug pre-registered criterion
+  recomputed (+$5.90/t=0.49 crypto-only in-era, still weakly KEEP; current
+  admission-rule trades n=15 flat) — no early decision, per its own
+  pre-registration.
+- Checked and already closed elsewhere: the parliament `sl_pct` cage the
+  audit flagged as unreachable was widened to 0.08 two days earlier ((lq)) —
+  the finder's claim was stale, caught before an edit was made.
+
 ## 2026-08-15 (my) — the (ia) MTM drawdown bar was grading 6 of 17 books: the entire directional cohort — including the fleet's CLOSEST book to the gate — walked toward real money on realised-only drawdown
 
 - **THE FINDING (15-Aug audit, adversarially verified: exactly 17 graded

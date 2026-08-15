@@ -658,8 +658,74 @@ _CACHE_OWNER = {
 # The LIVE real-money bots. A foreign-venue backtest CITED by one of these is a
 # different animal from one cited by nobody: it is the stated justification for a
 # constant that is moving real money right now.
-_LIVE_BOTS = {"lighter_funding_bot.py", "lighter_ticket_taker.py",
-              "lighter_trend_bot.py"}
+# [2026-08-15 (mz)] DERIVED from fleet_books.DECLARED_LIVE, not hand-listed —
+# the hand list here named the RETIRED trend bot and the Taker's retired live
+# arm while missing 🙏 Avo entirely, which mis-bucketed the blast-radius
+# ranking (a stale live roster inside a guard is the exact class (mo) built
+# `fleet_books` to end). `lighter_family_bot.py` rides along explicitly: the
+# Avo live entry imports its strategy from it, so both files are live surface
+# (the standing audit-scope rule).
+def _live_bots():
+    try:
+        import fleet_books
+        out = {fleet_books.ROW_ENTRY[r] for r in fleet_books.DECLARED_LIVE
+               if r in fleet_books.ROW_ENTRY}
+        if "lighter_avo_live_bot.py" in out:
+            out.add("lighter_family_bot.py")
+        return out
+    except Exception:  # noqa: BLE001
+        # a broken roster import must FAIL LOUD, not quietly grade nothing
+        # as live — return a sentinel the caller can see
+        raise
+
+
+_LIVE_BOTS = _live_bots()
+
+# [2026-08-15 (mz)] The fleet's OWN infrastructure is not a foreign venue.
+# `study_div_vol_floor.py` reads the pnl-dashboard endpoint — the fleet's own
+# ledger, i.e. Lighter's tape as this fleet recorded it — and the host
+# detector charged it as a venue-purity offender. A guard that cries wolf on
+# the one compliant data source teaches the operator to stop reading it.
+_OWN_INFRA_HOSTS = {"pnl-dashboard-production-858c.up.railway.app"}
+
+# [2026-08-15 (mz)] THE RATCHET. These foreign-venue backtests are CITED BY
+# SHIPPED CODE as justification TODAY, and were passing an advisory section
+# green for 29 days ("turning these into build failures is a deliberate later
+# step" — the later step never came; the (gk) rule-nobody-runs shape). They
+# are GRANDFATHERED by name with their citation sets FROZEN: any NEW
+# foreign-venue backtest cited by shipped code, or any NEW citer of a legacy
+# file, is a BUILD FAILURE. Each entry owes a Lighter-tape re-justification;
+# removing one from this table is the act of paying that debt.
+BACKTEST_VENUE_LEGACY = {
+    "backtest_directional_funding.py": {
+        "citers": {"lighter_funding_bot.py"},
+        "why": "HL tape; the LIVE Farmer's stated justification (line ~282). "
+               "The 17-Jul basis story already caught its worst export "
+               "(ENTER_APR fitted on HL hourly); what remains owed is a "
+               "Lighter-tape re-run of the gate constants."},
+    "backtest_funding_leverage.py": {
+        "citers": {"lighter_funding_bot.py", "market_context.py"},
+        "why": "HL via `import backtest_directional_funding`; justifies the "
+               "live 2x leverage config."},
+    "backtest_scanner.py": {
+        "citers": {"lighter_funding_bot.py"},
+        "why": "HL tape; cited three times by the live Farmer's scanner "
+               "constants."},
+    "backtest_tide_rider_perp.py": {
+        "citers": {"lighter_trend_bot.py"},
+        "why": "Binance+HL; its bot (🌊 Tide Rider) is RETIRED 1-Aug — this "
+               "is history the moment the citation line is, but the file "
+               "still ships and cites, so it stays frozen here rather than "
+               "silently green."},
+    "backtest_xsect_factor_lab.py": {
+        "citers": {"lighter_funding_spread_bot.py"},
+        "why": "HL via .dirfund_cache.json; ⚖️ Counterweight factor study. "
+               "The book's Lighter-native validation (ia) supersedes it as "
+               "the load-bearing evidence."},
+    "backtest_xsect_momentum.py": {
+        "citers": {"lighter_funding_spread_bot.py"},
+        "why": "HL via .dirfund_cache.json; same book, same status."},
+}
 
 
 def backtest_citations(root=None):
@@ -771,7 +837,8 @@ def audit_backtests(root=None):
     for name in backtest_files(root):
         v = backtest_venues(name, root)
         foreign = {s: w for s, w in v.items()
-                   if s != "UNPARSED" and "lighter" not in s.lower()}
+                   if s != "UNPARSED" and "lighter" not in s.lower()
+                   and not any(h in s for h in _OWN_INFRA_HOSTS)}
         if not foreign:
             continue
         if name in BACKTEST_VENUE_OK:
@@ -779,6 +846,38 @@ def audit_backtests(root=None):
         else:
             offenders.append((name, foreign))
     return offenders, declared
+
+
+def backtest_failures(offenders, cites):
+    """[2026-08-15 (mz)] The ratchet's decision, pure so the selftest can
+    drive it. A foreign-venue backtest FAILS the build iff it is cited by
+    shipped code and either (a) it is not declared in BACKTEST_VENUE_OK or
+    BACKTEST_VENUE_LEGACY at all, or (b) it is LEGACY but has grown a citer
+    outside its frozen set. Uncited foreign backtests stay advisory — they
+    justify nothing, and red-flagging history nobody cites trains the
+    operator to ignore the section."""
+    fails = []
+    for name, _foreign in offenders:
+        by = set(cites.get(name, {}))
+        if not by:
+            continue
+        legacy = BACKTEST_VENUE_LEGACY.get(name)
+        if legacy is None:
+            fails.append(
+                f"scripts/{name} loads a foreign venue and is cited by "
+                f"{sorted(by)} — a NEW foreign-venue justification. "
+                f"Re-run it on Lighter's own tape, or declare it with a "
+                f"reason (BACKTEST_VENUE_OK if principled, "
+                f"BACKTEST_VENUE_LEGACY if grandfathered debt).")
+        else:
+            new = by - set(legacy["citers"])
+            if new:
+                fails.append(
+                    f"scripts/{name} is grandfathered foreign-venue DEBT and "
+                    f"gained NEW citer(s) {sorted(new)} — a legacy backtest "
+                    f"may not justify anything new. Cite Lighter-tape "
+                    f"evidence instead.")
+    return fails
 
 
 def audit(root=None):
@@ -840,11 +939,15 @@ def main(argv):
         print(f"\n  Fix: move it to Lighter data, or DECLARE it in "
               f"VENUE_PURITY_OK with a reason.")
 
-    # ---- BACKTESTS: separate section, ADVISORY, does not touch the exit code --
+    # ---- BACKTESTS: separate section. [2026-08-15 (mz)] RATCHETED: cited-by-
+    # shipped offenders outside the OK/LEGACY tables FAIL the build; uncited
+    # history stays advisory (see backtest_failures).
     bt_offenders, bt_declared = audit_backtests()
+    bt_fails = backtest_failures(bt_offenders, backtest_citations())
     if bt_offenders:
         print("\n" + "=" * 74)
-        print("BACKTEST VENUE PURITY [ADVISORY — does not fail the build yet]")
+        print("BACKTEST VENUE PURITY [ratcheted (mz): new cited offenders "
+              "FAIL; uncited history advisory]")
         print("  Operator rule 17-Jul: \"the venue we trade is the venue we "
               "measure\".\n  A backtest on another venue's data is not "
               "validation of a Lighter bot —\n  it is a hypothesis about "
@@ -889,11 +992,17 @@ def main(argv):
               f"declare them, do not re-run them.")
         print("=" * 74)
 
-    total = len(violations) + len(unparsed)
+    if bt_fails:
+        print("\nBACKTEST RATCHET FAILURES:")
+        for f in bt_fails:
+            print(f"  ERROR: {f}")
+
+    total = len(violations) + len(unparsed) + len(bt_fails)
     if total:
         n_v_files = len({r for r, _s, _l in violations})
         print(f"\naudit_venue_purity: {len(violations)} VIOLATION(s) in "
-              f"{n_v_files} file(s); {n_files} files scanned, "
+              f"{n_v_files} file(s) + {len(bt_fails)} backtest ratchet "
+              f"failure(s); {n_files} files scanned, "
               f"{len(VENUE_PURITY_OK)} declared exception(s).")
         if unparsed:
             print(f"                    {len(unparsed)} file(s) UNAUDITED.")
@@ -1112,6 +1221,31 @@ def _selftest():
         backtest_venues("backtest_cycle_a.py", d)      # must return, not hang
     for k, v in BACKTEST_VENUE_OK.items():
         assert len(v) > 60, f"{k}: a reason must be a reason, not a label"
+
+    # --- [(mz)] the backtest RATCHET's decision table, driven pure ---------
+    _off = [("brand_new_hl_backtest.py", {"host:api.hyperliquid.xyz": "direct"}),
+            ("backtest_scanner.py", {"host:api.hyperliquid.xyz": "direct"}),
+            ("uncited_history.py", {"host:api.hyperliquid.xyz": "direct"})]
+    # a NEW cited offender fails; a legacy one inside its frozen citers does
+    # not; uncited history stays advisory
+    _f = backtest_failures(_off, {
+        "brand_new_hl_backtest.py": {"some_new_bot.py": [1]},
+        "backtest_scanner.py": {"lighter_funding_bot.py": [340]}})
+    assert len(_f) == 1 and "brand_new_hl_backtest.py" in _f[0], _f
+    # a legacy file growing a NEW citer fails, and the message names it
+    _f2 = backtest_failures(_off, {
+        "backtest_scanner.py": {"lighter_funding_bot.py": [340],
+                                "shiny_new_bot.py": [7]}})
+    assert len(_f2) == 1 and "shiny_new_bot.py" in _f2[0], _f2
+    # nothing cited -> nothing fails (history is advisory, not red)
+    assert backtest_failures(_off, {}) == []
+    # the LIVE roster is DERIVED and contains the real live pair's surface
+    assert "lighter_funding_bot.py" in _LIVE_BOTS
+    assert "lighter_family_bot.py" in _LIVE_BOTS, (
+        "Avo's strategy module is live surface — the derived roster must "
+        "carry it")
+    assert "lighter_trend_bot.py" not in _LIVE_BOTS, (
+        "the retired trend bot must not rank citations as LIVE money")
 
     print("audit_venue_purity selftest OK (NEGATIVE fixture, docstring+comment "
           "prose ignored, ccxt static+dynamic, env defaults, f-strings, "

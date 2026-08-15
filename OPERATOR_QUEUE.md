@@ -388,12 +388,37 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
 **COMPUTED NOW — 6-Aug (ks).** The go-live dates below are derived from the
 ledger by the grader each publish (`golive-readiness` → per-book `horizon`,
 rendered on the 🚦 dashboard card and the daily review's 🔭 line) — read those,
-not this paragraph. First live read: **Farmer-live on_track ~23-Aug (t bar
-binding — its stamped (jf) era is 23-Jul, so the "~16-Aug" this item used to
-carry matched the superseded era; the rot is why the calendar is computed
-now)** · carry window-floor 30-Aug (n=1 in-era; the venue stall (I18) is the
-real blocker). Human-decision dates stay hand-carried, correctly — a
-trajectory cannot derive a review date: item-18 oracle grades + SPY/QQQ
-graduation ~mid-Aug · Farnham-Six keep-or-retire verdicts ~28-29-Aug ·
+not this paragraph. ~~First live read: Farmer-live on_track ~23-Aug (t bar
+binding)~~ **[15-Aug audit, corrected in place per I12 — that first read is
+SUPERSEDED by the grader's own later publishes: Farmer-live now reads
+`undecidable` (era t=0.48, needs n≈1,333 at trajectory vs n=76; both halves
+negative), and every snapshot of the 14-Aug 24h history agrees. Its era edge
+is statistically zero while execution measures clean — the stall is EDGE,
+which no date can fix. It matures onto the decision docket at the 15-Aug
+publishes alongside carry and Barnesy.]** · carry window-floor 30-Aug (n=1
+in-era; the venue stall (I18) is the real blocker). Human-decision dates stay
+hand-carried, correctly — a trajectory cannot derive a review date: item-18
+oracle grades + SPY/QQQ graduation ~mid-Aug · Farnham-Six keep-or-retire
+verdicts ~28-29-Aug (⚖️ Counterweight's pre-registered criterion recomputed
+15-Aug: crypto-only in-era +$5.90/+0.307%/trade t=0.49 — still weakly
+KEEP-pointing; trades under the CURRENT admission rule n=15 read flat) ·
 Barnesy gradeable ~mid-Sep · Taker policy-clock ruling (chip queued will
 surface the evidence).
+
+## 6 · NEW 15-Aug — ONE ACTION WAITING ON YOU: the judge-unblock dispatch
+
+**xp-judge has discarded every hourly eval since ~07:44Z 14-Aug** on "ARMS ON
+DIFFERENT CODE" while every paired-bar floor is met (n_live=32 ≥ 10,
+n_shadow=53 ≥ 30, candidate window 8.6d ≥ 7d). The fix is one dispatch that
+deploys BOTH Farmer arms from the same commit (the (hi) pairing exists for
+exactly this); the deploy content is behaviour-neutral for both arms and no
+halt was active when checked. This session's environment declined the
+live-deploy act at the permission layer, so it is prepared, not executed:
+
+```
+gh workflow run 305025607 -f services="trail-blazer-live,funding-farmer-shadow"
+```
+
+Verify by stamp readback on BOTH rows (equal `extra.build` ids), never by the
+green run. Every hour this waits is another judge eval discarded. Full
+context: CHANGELOG (mu).
