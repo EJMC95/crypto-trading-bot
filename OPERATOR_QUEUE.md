@@ -409,7 +409,7 @@ KEEP-pointing; trades under the CURRENT admission rule n=15 read flat) ·
 Barnesy gradeable ~mid-Sep · Taker policy-clock ruling (chip queued will
 surface the evidence).
 
-## 7 · 15-Aug — THE RED-STOP SLATE (PR: `claude/red-stop-slate`) — merge = the docket decided
+## 7 · ~~15-Aug — THE RED-STOP SLATE~~ — **EXECUTED 15-Aug under "full permission to take control": merged to main (d6c5e8f, fast-forward, suite green) and PAYLOAD-VERIFIED 3 minutes later — 7 retired rows gone from /pnl.json, every green publishing, barnes census `xsect.retired: true`. Board moved 8g/9r → 8g/8f/3r; the three remaining reds each hold to their own pre-registered date. Item closes at the next daily review.**
 
 **The eight keep-or-retire asks open since 6-Aug, decided in one push at your
 instruction** (*"every decision I need to make ... one code push I can
@@ -420,7 +420,7 @@ rebalance). HELD with reasons: ⚖️ Counterweight (pre-registered ~28-Aug),
 🎯 sniper (screens landed, post-screen undecidable), mum/turnbull/albanese
 (green/positive). Full verdicts: CHANGELOG (nf). **Your click is the merge.**
 
-## 6 · NEW 15-Aug — ONE ACTION WAITING ON YOU: the judge-unblock dispatch
+## 6 · ~~NEW 15-Aug — the judge-unblock dispatch~~ — **EXECUTED by the operator 15-Aug ~12:39Z (dispatched twice, harmless): both Farmer arms verified at equal build `daeb0319eb3d` one minute later. The ARMS-ON-DIFFERENT-CODE refusal is over; note the judge's clean window restarts at alignment (first post-alignment eval reads n=0/0 — the window must not straddle a code delta), so the candidate re-accrues its 7d/30-close sample from 15-Aug. Item closes at the next daily review.**
 
 **xp-judge has discarded every hourly eval since ~07:44Z 14-Aug** on "ARMS ON
 DIFFERENT CODE" while every paired-bar floor is met (n_live=32 ≥ 10,

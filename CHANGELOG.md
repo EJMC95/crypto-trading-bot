@@ -1,3 +1,43 @@
+## 2026-08-15 (ng) — the closing sweep: doctrine caught up to the slate (I12), and the judge's post-alignment n=0 is BY DESIGN — the one alarming reading of the day, run to ground in code
+
+- **THE READING THAT LOOKED LIKE A REGRESSION.** Minutes after both 💸 Farmer
+  arms were aligned (equal build `daeb0319eb3d`, verified by readback), the
+  judge's eval flipped from *"ARMS ON DIFFERENT CODE, n_live=32, n_shadow=53,
+  floors met"* to **`floors: shadow 0/30, live 0/10`, n=0 everywhere** — i.e.
+  the unblock appeared to have destroyed the very sample it was meant to
+  release. Two candidate mechanisms: (a) by design, or (b) a regression from
+  today's (na) entry-stamp change (the `bars` dict gained `exit_apr` /
+  `hard_stop`, so any equality-based window match would silently zero).
+- **VERDICT: (a), stated in the code with its own audit note.**
+  `experiment_judge.py:~1694`: on arms re-matching after a drift hold, the
+  judge **RESTARTS THE CLOCK** — *"the days (and closes) that accrued while
+  the arms ran DIFFERENT BUILDS belong to a comparison the drift hold itself
+  ruled structurally invalid"* (2026-07-21 audit fix, the same recovery the
+  skew and assert-fail paths take). The window is `started_ts`-scoped, not
+  bars-equality-scoped, so (na) is not implicated. **Consequence to carry
+  forward: the slope-gate candidate re-accrues its 7d / 30-close sample from
+  15-Aug** — the unblock bought a VALID window, not an instant verdict, and
+  anyone reading n=0 tomorrow should read this entry rather than re-open it.
+- **DOCTRINE CORRECTED IN PLACE (I12), because the fleet table still
+  described seven retired books as living:** the family row (👨 dad retired;
+  🙏 avo noted at SHADOW cap 6 with the live literal untouched), the spot-port
+  row (both retired), the 🏛️ Parliament row (six books → **two**, with each
+  verdict and override), the 🎸 Barnes row (a **ONE-sleeve** book now — its
+  own text claimed two), and a dated (nf) entry in the RETIRED list.
+  `OPERATOR_QUEUE` §6/§7 struck through as EXECUTED with their receipts.
+- **Standing audits re-run post-slate:** live-roster, book-overlap,
+  deploy-coverage, image-imports, venue-purity, lever-bounds, doctrine,
+  letters, recurrence all green; full suite green.
+  `audit_ledger_integrity` fails on the KNOWN permanent carry two-writer
+  history (most recent overlap 413h old — "a guard cannot un-pool a ledger
+  two processes already wrote"), unrelated to today, and it now correctly
+  labels every slate book `(retired)`.
+- **The closing adversarial sweep itself did not run** — all four reviewers
+  died on a usage-credit limit and returned nothing. Recorded rather than
+  papered over: the judge question above was answered by hand instead, and
+  the remaining sweep dimensions (consumer-drift beyond the audits, deploy
+  currency of the post-slate wave) are UNSWEPT, not clean-by-verification.
+
 ## 2026-08-15 (nf) — THE RED-STOP SLATE: seven I17 calls and one sleeve wind-down, made in ONE operator act on the docket's own verdicts — the eight asks that sat open since 6-Aug are decided
 
 - **THE OPERATOR'S INSTRUCTION** (*"give me every decision I need to make
