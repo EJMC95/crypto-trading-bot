@@ -171,6 +171,17 @@ DASH_PASS = os.environ.get("DASH_PASS", "")
 RETIRED_ROWS = {"perps-donchian-breakout",
                 "perps-donchian-breakout-lighter",
                 "perps-donchian-breakout-lshadow",
+                # [2026-08-15 (nf)] THE RED-STOP SLATE — seven I17 calls made
+                # in one operator act on the decision docket's own verdicts
+                # (every row horizon=unreachable or I17-undecidable, asks
+                # open since 6-Aug). Each is reversible via its own override
+                # env; ledgers kept; open paper positions freeze (the (mr)
+                # precedent). Both halves shipped together per the standing
+                # retirement rule (this set hides; LEGACY_BOTS prunes).
+                "pm-gillard-lshadow", "pm-abbott-lshadow",
+                "pm-rudd-lshadow", "pm-morrison-lshadow",
+                "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
+                "freqtrade-dad-lshadow",
                 # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — 🙏 Avo Maria
                 # took the slot (same service/keys/sub-account, the slot's
                 # THIRD occupant; operator decision, cutover verified by

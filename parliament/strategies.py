@@ -695,5 +695,7 @@ class PMBot:
 
 
 def build_bots(data, bus, db, ml, howard=None) -> list[PMBot]:
+    # [(nf)] built through the retirement-aware derivation, never PM_BOTS raw
+    from . import live_pm_bots
     return [PMBot(base, strat, data, bus, db, ml, howard)
-            for base, (_label, strat) in PM_BOTS.items()]
+            for base, (_label, strat) in live_pm_bots().items()]

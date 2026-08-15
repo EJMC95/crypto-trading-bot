@@ -196,6 +196,21 @@ EXTREME_MIN_VOL = 10e6          # the Farmer's liquidity floor
 # still exits by its normal rules. See the entry block for the full table.
 EXTREME_RETIRED = os.environ.get(
     "BARNES_EXTREME_RETIRED_OVERRIDE", "").strip().lower() not in ("run", "1", "on")
+# [2026-08-15 (nf)] THE XSECT SLEEVE IS RETIRED — the second sleeve-level I17
+# call (the (ly) pattern), made by the operator on the X6 attribution: the
+# sleeve is the book's whole burn (−$9.56 of −$11.01; crypto LONG legs at
+# 4.5% win, era cluster t=−2.20) while the parent ⚖️ rode the SAME window
+# near-flat, and the class screens measurably do NOT repair it. Barnes is now
+# a ONE-sleeve (carry) book. Retirement mechanism differs from extreme's
+# entry-gate on purpose: xsect is ALWAYS-IN, so freezing entries would hold
+# the losing legs' mark-to-market bleed open — instead the retired sleeve's
+# target set is EMPTY, and its own rebalance (its only exit, 100% of its
+# closes) winds every leg down at the next 24h cycle. No stranded positions,
+# exits by the sleeve's own rule. Census keeps publishing beside
+# retired:true so the call stays falsifiable. Does NOT reset the carry
+# sleeve's clock (sleeve-scoped, the (ly) precedent).
+XSECT_RETIRED = os.environ.get(
+    "BARNES_XSECT_RETIRED_OVERRIDE", "").strip().lower() not in ("run", "1", "on")
 # the Farmer's NON-NEGOTIABLE control for a directional funding book: a hard
 # price stop, 10% — the parent's own bar, well inside the 15% go-live
 # drawdown gate (test_stop_vs_gate reads this literal).
@@ -560,6 +575,10 @@ def build_extra(census, positions, open_pnl, realized, moved, now=None,
             # sleeve is dead, quiet, or switched off. The census keeps
             # publishing beside it so the call stays falsifiable.
             sleeves[s]["retired"] = EXTREME_RETIRED
+        # [(nf)] same publication rule for the xsect retirement: the row says
+        # so beside the sleeve's numbers while its legs wind down to flat.
+        if s == "xsect":
+            sleeves[s]["retired"] = XSECT_RETIRED
     # [2026-08-13 (lz)] WHAT THIS BOOK IS ACTUALLY HOLDING, in 💸 the Farmer's
     # shape ({coin: "S"|"L"}) so ONE reader serves every funding book. This row
     # published 11 open positions and named NONE of them, so nothing in the
@@ -922,7 +941,11 @@ def main():
                         aprs[c] = float(f.get("rate") or 0.0) * H
                     except (TypeError, ValueError):
                         continue
-                longs, shorts = xsect_targets(aprs, K)
+                # [(nf)] a retired xsect sleeve rebalances TO FLAT: empty
+                # targets make the close-loop below wind down every leg by
+                # the sleeve's own exit, and the open-loop a no-op.
+                longs, shorts = (([], []) if XSECT_RETIRED
+                                 else xsect_targets(aprs, K))
                 want = {f"xsect:{c}": ("long" if c in longs else "short")
                         for c in longs + shorts}
                 # close legs that left the target set (or flipped side)

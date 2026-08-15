@@ -409,6 +409,17 @@ KEEP-pointing; trades under the CURRENT admission rule n=15 read flat) ·
 Barnesy gradeable ~mid-Sep · Taker policy-clock ruling (chip queued will
 surface the evidence).
 
+## 7 · 15-Aug — THE RED-STOP SLATE (PR: `claude/red-stop-slate`) — merge = the docket decided
+
+**The eight keep-or-retire asks open since 6-Aug, decided in one push at your
+instruction** (*"every decision I need to make ... one code push I can
+click"*). RETIRED (all reversible via override env, ledgers kept):
+pm-gillard/abbott/rudd/morrison · crypto-intraday-15m · crypto-swing-daily ·
+freqtrade-dad · 🎸 Barnes xsect sleeve (winds down to flat by its own
+rebalance). HELD with reasons: ⚖️ Counterweight (pre-registered ~28-Aug),
+🎯 sniper (screens landed, post-screen undecidable), mum/turnbull/albanese
+(green/positive). Full verdicts: CHANGELOG (nf). **Your click is the merge.**
+
 ## 6 · NEW 15-Aug — ONE ACTION WAITING ON YOU: the judge-unblock dispatch
 
 **xp-judge has discarded every hourly eval since ~07:44Z 14-Aug** on "ARMS ON

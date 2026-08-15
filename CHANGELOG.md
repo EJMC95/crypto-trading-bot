@@ -1,3 +1,65 @@
+## 2026-08-15 (nf) — THE RED-STOP SLATE: seven I17 calls and one sleeve wind-down, made in ONE operator act on the docket's own verdicts — the eight asks that sat open since 6-Aug are decided
+
+- **THE OPERATOR'S INSTRUCTION** (*"give me every decision I need to make
+  that I missed in one code push I can click so that these reds stop and the
+  greens start coming in"*) **executed as one reviewable push.** Every
+  retired book below carried the docket's own verdict — horizon
+  `unreachable` (mean ≤ 0 at trajectory: the go-live gate is structurally
+  beyond reach) or the I17 undecidable shape — with its ask open since
+  6-Aug. Retirement is the fleet's proven green-not-red move (breakout-4h,
+  Snap Back, Tide Rider, Index Rider precedents); every one is reversible
+  without a redeploy via its own override env, ledgers kept, open paper
+  positions freeze (the (mr) precedent).
+- **RETIRED — family/spot rows (row-scoped via `RETIRED_BOOKS`, the (mr)
+  mechanism; mum/avo/georgia demonstrably unaffected):**
+  * `crypto-intraday-15m-lshadow` — unreachable; era n=72, mean −0.082%/t,
+    −$6.88 realised (3 paper positions freeze). `INTRADAY15M_RETIRED_OVERRIDE`
+  * `crypto-swing-daily-lshadow` — `no_rate`: n=3 in six weeks, the 🌊
+    9-buys-zero-sells undecidable class. `SWINGDAILY_RETIRED_OVERRIDE`
+  * `freqtrade-dad-lshadow` — unreachable; era n=15, mean −1.317%/t
+    (3 paper positions freeze). `DAD_RETIRED_OVERRIDE`
+- **RETIRED — parliament books (NEW mechanism `parliament.PM_RETIRED` +
+  `live_pm_bots()`, the one-declaration-one-derivation (mo) pattern;
+  `build_bots` AST-pinned to read the derivation, never `PM_BOTS` raw; all
+  four had ZERO open positions):** `pm-gillard` (n=304, t=−1.85; its sl
+  class alone −$28 at 0% win), `pm-abbott` (n=82, t=−2.06), `pm-rudd`
+  (n=99, t=−1.17), `pm-morrison` (n=24, t=−0.34). Albanese (+$1.83) and
+  Turnbull (positive, undecidable) stay. `PM_<NAME>_RETIRED_OVERRIDE=run`
+  each.
+- **RETIRED — 🎸 Barnes's xsect SLEEVE (the second sleeve-level I17 call,
+  (ly) precedent; the book continues as ONE sleeve, carry).** The sleeve is
+  the book's whole burn (−$9.56 of −$11.01; era crypto LONGS at 4.5% win,
+  cluster t=−2.20) while parent ⚖️ rode the SAME window near-flat — and the
+  class screens measurably do NOT repair it. Mechanism deliberately differs
+  from the extreme sleeve's entry gate: xsect is ALWAYS-IN, so a retired
+  sleeve rebalances TO FLAT — empty targets make its own rebalance (its
+  only exit, 100% of its closes) wind every leg down at the next 24h cycle.
+  No stranded positions; census publishes `retired: true`; the carry
+  sleeve's clock does NOT reset (sleeve-scoped). Early-vs-4-Sep priced for
+  the operator beforehand (~$1/day carrying cost vs ~8% noise risk at the
+  cluster t) and taken under the explicit instruction.
+  `BARNES_XSECT_RETIRED_OVERRIDE=run`.
+- **HELD, with reasons stated (deciding these today would be the (hs)/(ia)
+  trap):** ⚖️ Counterweight — its keep-or-retire is PRE-REGISTERED for
+  ~28-Aug with its own criterion, its loss driver is a population (ki)
+  already made unenterable, and current-rule trades read flat (n=15,
+  t=−0.22); 🎯 sniper — its red is the class the (lk) screens already
+  closed, and the post-screen sample is undecidable (the (ne) telemetry now
+  measures it); mum/turnbull/albanese — green or positive-undecidable, they
+  stay accruing.
+- Both halves of every row retirement shipped together (`RETIRED_ROWS` +
+  `LEGACY_BOTS`), pinned with the slate's other mechanisms in
+  `tests/autonomy/test_red_stop_slate.py` (greens-stay, override-resurrects,
+  builder-through-derivation AST, rebalance-to-flat, published-retirement,
+  both-halves). **Mutation-verified: dropping a book from the family set and
+  reverting the xsect gate each redden their pins.** Three standing fixtures
+  that named now-retired books were moved to living instances — the exact
+  (lu) green-alone/red-together signature, caught in-branch this time.
+- **What this buys, honestly:** it stops measured bleed (~$1/day xsect, plus
+  the slow directional drip) and returns budget/attention to the greens; it
+  does NOT manufacture edge. The greens come from the funding cells, Avo's
+  accelerated gate walk, and the judge pipeline — all fed earlier today.
+
 ## 2026-08-15 (ne) — the entry/exit study lands: the canonical exit sweeper had an entry-bar LOOK-AHEAD (the (gx) sl direction dies at LAG-1), avo shadow's binding cap steps 4→6 shadow-only, and the referees killed two proposals before they could ship
 
 - **Six analysts + five adversarial referees; full record:

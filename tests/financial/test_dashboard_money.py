@@ -315,13 +315,15 @@ def test_fetch_rows_variant_passes_while_its_retired_base_row_stays_out(monkeypa
     # The ex-Kraken bases live a double life: the BARE id is a RETIRED paper-era
     # row (14-Jul Kraken cut) while remaining a CURRENT base so its -lshadow
     # twin displays. The filter must express both halves at once.
-    assert "crypto-intraday-15m" in pd.CURRENT_BOTS
-    assert "crypto-intraday-15m" in pd.RETIRED_ROWS
-    db_rows = [{"bot": "crypto-intraday-15m-lshadow", "equity": 1000.0},
-               {"bot": "crypto-intraday-15m", "equity": 1000.0}]
+    # [(nf) 15-Aug] intraday's -lshadow row is itself retired now (red-stop
+    # slate), so the double-life fixture moves to mum — same ex-Kraken class
+    assert "freqtrade-mum" in pd.CURRENT_BOTS
+    assert "freqtrade-mum" in pd.RETIRED_ROWS
+    db_rows = [{"bot": "freqtrade-mum-lshadow", "equity": 1000.0},
+               {"bot": "freqtrade-mum", "equity": 1000.0}]
     _install_fake_psycopg2(monkeypatch, db_rows)
     out = pd.fetch_rows(hidden=set())
-    assert "crypto-intraday-15m-lshadow" in out    # variant of a current base
+    assert "freqtrade-mum-lshadow" in out    # variant of a current base
     assert "crypto-intraday-15m" not in out        # retired paper row stays gone
 
 

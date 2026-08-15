@@ -37,6 +37,12 @@ LEGACY_BOTS = [
     "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow",
     "perps-donchian-breakout", "perps-donchian-breakout-lighter",
     "perps-donchian-breakout-lshadow",
+    # [2026-08-15 (nf)] the red-stop slate's prune half — see RETIRED_ROWS
+    # in pnl_dashboard.py for the seven verdicts and overrides
+    "pm-gillard-lshadow", "pm-abbott-lshadow",
+    "pm-rudd-lshadow", "pm-morrison-lshadow",
+    "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
+    "freqtrade-dad-lshadow",
     # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — pruned once
     # freqtrade-avo-maria-lighter publishes from the same sub-account
     # (verified at cutover: stamp e49ba8fa7ed2, baseline $62.80). Ledger

@@ -54,12 +54,14 @@ def test_the_other_six_books_keep_trading(monkeypatch):
     book in this service."""
     fam = _family()
     monkeypatch.delenv(OVERRIDE, raising=False)
+    # [(nf) 15-Aug] dad/intraday/swing joined RETIRED_BOOKS in the red-stop
+    # slate, so the still-alive roster is the three greens and the count
+    # tracks the declaration instead of hardcoding "minus one".
     live = {s.bot for s in fam.live_strategies()}
-    for still in ("freqtrade-mum", "freqtrade-dad", "freqtrade-avo-maria",
-                  "freqtrade-georgia", "crypto-intraday-15m",
-                  "crypto-swing-daily"):
+    for still in ("freqtrade-mum", "freqtrade-avo-maria",
+                  "freqtrade-georgia"):
         assert still in live, f"{still} was retired by collateral damage"
-    assert len(live) == len(fam.STRATEGIES) - 1, live
+    assert len(live) == len(fam.STRATEGIES) - len(fam.RETIRED_BOOKS), live
 
 
 def test_the_override_resurrects_it_with_no_redeploy(monkeypatch):

@@ -64,6 +64,40 @@ PM_BOTS = {
     "pm-gillard":  ("🤝 Gillard — Dislocation Fader", "disloc"),
 }
 
+# [2026-08-15 (nf)] THE I17 CALLS, MADE — operator decision ("give me every
+# decision I need to make ... so that these reds stop"), executed on the
+# decision docket's own verdicts (every book below reads horizon=unreachable,
+# ask open since 6-Aug). The declaration/derivation split is the (mr)/(mo)
+# pattern: retire HERE once, every consumer builds through live_pm_bots(), so
+# a book cannot be retired in one layer and alive in another. All four had
+# ZERO open positions at retirement. Reversible without a redeploy via each
+# override env (= "run"). Albanese (+$1.83) and Turnbull (undecidable,
+# positive) stay.
+#   pm-gillard  n=304 mean −0.122%/t t=−1.85 (its sl class: −$28 at 0% win)
+#   pm-abbott   n=82  mean −0.221%/t t=−2.06
+#   pm-rudd     n=99  mean −0.138%/t t=−1.17
+#   pm-morrison n=24  mean −0.186%/t t=−0.34
+PM_RETIRED = {
+    "pm-gillard":  "PM_GILLARD_RETIRED_OVERRIDE",
+    "pm-abbott":   "PM_ABBOTT_RETIRED_OVERRIDE",
+    "pm-rudd":     "PM_RUDD_RETIRED_OVERRIDE",
+    "pm-morrison": "PM_MORRISON_RETIRED_OVERRIDE",
+}
+
+
+def live_pm_bots():
+    """PM_BOTS minus retired books whose override is not set — the ONE
+    derivation every builder reads (never a second hand list)."""
+    import os
+    out = {}
+    for base, spec in PM_BOTS.items():
+        env = PM_RETIRED.get(base)
+        if env and os.environ.get(env, "").strip().lower() \
+                not in ("run", "1", "true"):
+            continue
+        out[base] = spec
+    return out
+
 SHADOW_SUFFIX = "-lshadow"
 START_EQUITY = 1000.0          # fleet rule: $1,000 per book, no top-ups
 

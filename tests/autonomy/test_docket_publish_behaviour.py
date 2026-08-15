@@ -34,7 +34,11 @@ import golive_readiness as g  # noqa: E402
 import bot_pnl_store as store  # noqa: E402
 
 
-BOOK = "pm-gillard-lshadow"          # a real unreachable book
+BOOK = "lighter-perp-sniper-lshadow"  # a real unreachable book
+# [(nf) 15-Aug] WAS pm-gillard-lshadow — retired in the red-stop slate,
+# so the roster stops admitting it: the exact green-alone/red-together
+# signature this file already documents from (lu). Swapped to the one
+# unreachable book the slate deliberately KEPT (screens landed).
 # [(lu)] WAS `equities-regime-lshadow`, and (lo) RETIRED that book on 13-Aug —
 # into RETIRED_ROWS and LEGACY_BOTS — so the roster sweep correctly stops
 # admitting it and this fixture could never pass again. The signature was the

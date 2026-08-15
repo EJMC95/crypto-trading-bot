@@ -704,7 +704,23 @@ STRATEGIES = [
 # marks-not-evidence). This is $1k paper with no real money; there is nothing to
 # unwind. Ledgers (`paper_trades`, `venue_orders`) and history are KEPT.
 # Reversible: BREAKOUT4H_RETIRED_OVERRIDE=run.
-RETIRED_BOOKS = {"crypto-breakout-4h": "BREAKOUT4H_RETIRED_OVERRIDE"}
+RETIRED_BOOKS = {
+    "crypto-breakout-4h": "BREAKOUT4H_RETIRED_OVERRIDE",
+    # [2026-08-15 (nf)] THE I17 CALLS, MADE — operator decision on the
+    # decision docket's own verdicts (asks open since 6-Aug):
+    #   crypto-intraday-15m  horizon=unreachable (era n=72, mean −0.082%/t;
+    #                        −$6.88 realised) — 3 open paper positions freeze,
+    #                        the (mr) precedent
+    #   crypto-swing-daily   horizon=no_rate — n=3 in six weeks, the I17
+    #                        UNDECIDABLE shape (🌊's 9-buys-zero-sells class)
+    #   freqtrade-dad        horizon=unreachable (era n=15, mean −1.317%/t) —
+    #                        3 open paper positions freeze
+    # mum (green, slow) / avo (the gate candidate) / georgia (+$4.43) stay.
+    "crypto-intraday-15m": "INTRADAY15M_RETIRED_OVERRIDE",
+    "crypto-swing-daily":  "SWINGDAILY_RETIRED_OVERRIDE",
+    "freqtrade-dad":       "DAD_RETIRED_OVERRIDE",
+
+}
 
 
 def live_strategies():
