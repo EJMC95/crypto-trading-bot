@@ -1,3 +1,72 @@
+## 2026-08-15 (mw) — the brain's pager fired at 21.7h, not the engraved 8h: a critical organ's own payload was slackening its paging bar — plus two more TTL-honesty fixes in the same class
+
+- **THE FINDING (15-Aug audit, adversarially verified line-by-line).** The
+  01-Aug I13 promotion cut brain-vitals' spec TTL to 9600 ("LATE at one
+  missed cycle, DARK at 8h — inside a working day") and at runtime the pager
+  bar sat at **21.7h**, because `vitals_payload()` PREFERRED the payload's
+  own `ttl_sec` and `bot_learn` kept publishing `MULT_TTL_SEC=26000` on the
+  heartbeat key. The 01-Aug incident replayed today (brain dead 13.8h) would
+  read **LATE — and LATE never pages** (`fleet_watchdog_svc` pages critical
+  organs on DARK/ERROR only). The engraved I13 enforcement was green the
+  whole time: `test_organ_pageability` regex-parses the SPEC literal and
+  never runs a payload through the real seam — the (iz)
+  declared-but-inert shape, on the exact invariant built from the last
+  unpaged incident.
+- **TWO FIXES, ONE PER SIDE, so neither can re-open it alone.** Dashboard:
+  a CRITICAL organ's payload TTL is now `min(payload, spec)` — an organ may
+  tighten its own bar, never slacken it; non-critical organs keep
+  payload-preferred TTLs (their payload IS the contract). This closes the
+  CLASS for every future critical organ whose publisher drifts. Publisher:
+  the heartbeat gets its own `VITALS_TTL_SEC=9600`; the mults contract keeps
+  `MULT_TTL_SEC=26000` unchanged.
+- **The test now drives the real seam** (publisher-shaped payload →
+  `vitals_payload()` → status), replaying the 01-Aug window: 13.8h at an
+  advertised 26000 must read DARK; a payload BELOW spec (1800s) must still be
+  honoured in the tighten direction. **Mutation-verified: deleting the min()
+  clamp reddens exactly the incident-replay test.**
+- **Same class, two more organs, fixed in the same pass:** `fleet_allocation`
+  published ttl 21600 on an 1800s loop (a frozen allocation read fresh
+  through 12 missed cycles, under an unpageability rationale of "staleness
+  visible on the dashboard") → **5400**; `golive_readiness` published ttl
+  86400 on a 21600s loop (a frozen GO-LIVE GATE — consumers fail closed on
+  staleness, but only if staleness is ever declared — read fresh a full day)
+  → **43200**. Both are honesty changes, not behaviour changes: no consumer
+  reads differently while the loops are alive.
+
+## 2026-08-15 (mv) — the growth rail was holding 🌾 carry's entry gate at the exact value a measurement refused: cage lo 0.80 → 1.60, tighten-only
+
+- **THE FINDING (15-Aug audit, adversarially verified).** The evidence board's
+  STARVED ladder — behaving exactly as designed — walked `carry.enter_apr`
+  down to its cage floor **0.80 = 10% TRUE**, and the book consumed it: the
+  live row read `caps.enter_apr=0.1`. That is the precise 20%→10% widening
+  the 3-Aug session MEASURED AND REFUSED (a 29bps RT needs the rate to hold
+  254 of a 336h max hold to break even at 10%; the 21-Jul sweep measured the
+  direction loss-making). The refusal lived in doctrine; the cage said
+  otherwise; the cage won — I19's "a widening is paid for in expectancy"
+  had no executable edge on this lever. Today the widened gate admits
+  nothing anyway (census: eligible 0 — the venue stall), so zero trades were
+  taken at 10%; the defect was ARMED, not yet paid for.
+- **The second, quieter breach: I20.** Below 1.60 the carry gate invades 🧮
+  Hull's published zero-rival band [7.82%, 20%) × [$2M,$10M) — the tiling
+  declared at Hull's birth (🛢️[0.1M,2M) | 🧮[2M,10M) | 💸[10M,∞) at the 20%
+  ceiling). The board's ladder was one venue-uptick away from making the
+  fleet's newest book's supply claim false without any organ noticing.
+- **THE FIX IS THE CAGE, per (kd)'s own terms** ("an out-of-cage value is not
+  authority, it is a bug"): `lo` 0.80 → 1.60 in `fleet_tuning.LEVERS`. The
+  registry clamps at write AND read, so the open 0.80 lever retires at the
+  consumer with no bus write the moment the container carries this code; the
+  board's next STARVED walk terminates at the floor = the default = a no-op.
+  Tightening (the direction never in dispute) keeps its full range to 3.20.
+  A future widening below 20% is a replay-gated measurement FIRST (I19), then
+  a deliberate cage change citing it — the 30-Jul "test BOTH directions"
+  rationale this cage was born with predates both measurements and is
+  corrected in place per I12.
+- Pinned behaviourally in `tests/autonomy/test_book_levers.py` (the refused
+  0.80 clamps to 1.60 at read; tightening unaffected; floor ≥ 1.60).
+  **Mutation-verified: restoring lo=0.80 reddens it.** `audit_lever_bounds`
+  stays green. Verify in the live payload: `caps.enter_apr` back at 0.2
+  after the shadow wave redeploys.
+
 ## 2026-08-15 (mu) — the LIVE Avo book's strategy module was invisible to its own build stamp; fixed, and the same push re-aligns the Farmer arms the judge has been refusing on since 14-Aug
 
 - **THE FINDING (15-Aug fleet audit, adversarially verified before shipping).**

@@ -175,3 +175,72 @@ def test_the_brain_heartbeat_goes_dark_within_a_working_day():
     assert ttl >= 7200, (
         f"TTL {ttl}s is below the 7200s loop period — one ordinary cycle would "
         "read LATE on every single run, which is how an alarm becomes noise")
+
+
+# ---------------------------------------------------------------------------
+# [(mw), 15-Aug] THE PAGING BAR MUST SURVIVE THE PUBLISHER'S OWN TTL.
+#
+# The 01-Aug promotion cut brain-vitals' spec TTL to 9600 ("DARK at 8h") and
+# the runtime read 21.7h anyway: `vitals_payload` preferred the payload's
+# ttl_sec, bot_learn kept publishing MULT_TTL_SEC=26000, and the test below
+# this file already had regex-parsed the spec literal only — green while
+# inert, the (iz) shape, found by the 15-Aug audit and adversarially
+# verified. This test drives the REAL `vitals_payload()` with a
+# publisher-shaped payload replaying the 01-Aug incident (brain dead 13.8h,
+# payload still advertising 26000) and asserts on the OUTPUT: the organ must
+# read DARK — the status that pages — not LATE.
+# ---------------------------------------------------------------------------
+def test_a_critical_organs_payload_ttl_cannot_slacken_its_paging_bar(
+        monkeypatch):
+    import time as _time
+    import pnl_dashboard as dash
+
+    now = _time.time()
+    dead_for = 13.8 * 3600            # the measured 01-Aug unpaged window
+    stale_iso = __import__("datetime").datetime.fromtimestamp(
+        now - dead_for, __import__("datetime").timezone.utc
+    ).isoformat(timespec="seconds")
+
+    def fake_states(keys):
+        return {"brain-vitals": (
+            {"updated": stale_iso, "ttl_sec": 26000, "run": 541}, None)}
+
+    monkeypatch.setattr(dash, "_states_with_ts", fake_states)
+    organs = {o["key"]: o for o in dash.vitals_payload()["organs"]}
+    bv = organs["brain-vitals"]
+    assert bv["critical"] is True
+    assert bv["status"] == "DARK", (
+        f"brain-vitals dead 13.8h read {bv['status']} — LATE never pages; "
+        "the payload's 26000 ttl_sec slackened the 9600 spec bar (I13)")
+
+
+def test_a_critical_organ_may_still_tighten_its_own_bar(monkeypatch):
+    """The other direction stays open: a payload ttl BELOW spec is honoured
+    (min, not override) — an organ that knows its cadence quickened can page
+    sooner without a dashboard change."""
+    import time as _time
+    import pnl_dashboard as dash
+
+    now = _time.time()
+    stale_iso = __import__("datetime").datetime.fromtimestamp(
+        now - 2.0 * 3600, __import__("datetime").timezone.utc
+    ).isoformat(timespec="seconds")
+
+    def fake_states(keys):
+        return {"brain-vitals": (
+            {"updated": stale_iso, "ttl_sec": 1800, "run": 541}, None)}
+
+    monkeypatch.setattr(dash, "_states_with_ts", fake_states)
+    organs = {o["key"]: o for o in dash.vitals_payload()["organs"]}
+    assert organs["brain-vitals"]["status"] == "DARK", (
+        "2h dead at a self-declared 1800s ttl is 4x — the tighter payload "
+        "bar must be honoured, min() not spec-override")
+
+
+def test_the_brain_heartbeat_publisher_matches_the_spec_bar():
+    """The publisher half of (mw): bot_learn's heartbeat key carries its own
+    VITALS_TTL_SEC and it must not exceed the dashboard spec's 9600 — the
+    mults contract keeps MULT_TTL_SEC=26000, the heartbeat does not."""
+    import bot_learn
+    assert bot_learn.VITALS_TTL_SEC <= 9600, bot_learn.VITALS_TTL_SEC
+    assert bot_learn.MULT_TTL_SEC == 26000  # the mults contract is unchanged

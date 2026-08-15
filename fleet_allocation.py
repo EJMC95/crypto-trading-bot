@@ -66,7 +66,12 @@ except Exception:                                    # pragma: no cover
     store = None
 
 KEY = "fleet-allocation"
-TTL_SEC = int(os.environ.get("ALLOC_TTL_SEC", "21600"))      # 6h
+# [2026-08-15 (mw)] 21600 -> 5400: the loop publishes every 1800s
+# (RADAR_INTERVAL_SEC), so 6h let a FROZEN allocation read fresh through 12
+# missed cycles — and this organ's declared unpageability rests on "staleness
+# visible on the dashboard", which a 12-cycle-slack TTL makes decorative.
+# 5400 = 3 missed cycles, the fleet's usual staleness slack.
+TTL_SEC = int(os.environ.get("ALLOC_TTL_SEC", "5400"))       # 3 x 1800s loop
 
 # One-sided Z for the lower bound. 1.28 = 90%: deliberately gentler than the
 # go-live gate's t>=2.0, because this decides where to LEARN next, not what may

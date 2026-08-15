@@ -118,6 +118,15 @@ MULT_EXPAND = os.environ.get("BRAIN_MULT_EXPAND", "on").strip().lower() \
 EP_GAP_SEC = float(os.environ.get("BRAIN_EP_GAP_SEC", "600"))
 MULT_KEY = "brain-stake-mults"
 MULT_TTL_SEC = 26000  # ~3.6 brain intervals (7200s) -> 3 missed runs = stale
+# [2026-08-15 (mw)] The HEARTBEAT key gets its OWN, tighter TTL. brain-vitals
+# was publishing MULT_TTL_SEC (right for the mults contract, wrong for a
+# liveness heartbeat): the dashboard preferred the payload's ttl_sec over the
+# 01-Aug spec cut to 9600, so DARK sat at 21.7h and LATE (7.2h) never pages —
+# the exact unpaged-13.8h window I13 was engraved to close, re-opened. 9600
+# puts LATE at one missed 7200s cycle and DARK at 8h. The dashboard now also
+# min()s a critical organ's payload TTL against its spec, so neither side can
+# drift this open alone again.
+VITALS_TTL_SEC = 9600
 
 # [2026-07-16 v3] brain_stats.py carries the statistics engine (decay
 # weighting, EB pooling, Wilson/t bars). Import-guarded like every other
@@ -1974,7 +1983,7 @@ def main():
     # Advisory + fail-soft: a vitals failure must never cost a mult publish
     # (which already happened above).
     vitals_payload = {
-        "updated": now, "ttl_sec": MULT_TTL_SEC, "run": run_no,
+        "updated": now, "ttl_sec": VITALS_TTL_SEC, "run": run_no,
         "engine": mult_vitals.get("engine"),
         "half_life_days": HALF_LIFE_DAYS,
         "bars": ({"hard_post_wr": bstats.HARD_POST_WR, "hard_w_hi": bstats.HARD_W_HI,

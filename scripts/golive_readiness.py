@@ -78,7 +78,12 @@ GOLIVE_LEGACY_WIN = float(os.environ.get("GOLIVE_LEGACY_WIN", "0.55"))
 BOOK_USD = float(os.environ.get("GOLIVE_BOOK_USD", "1000"))
 # [2026-07-30] bot_state key + TTL for the published verdicts (see main()).
 KEY = "golive-readiness"
-TTL_SEC = int(os.environ.get("GOLIVE_TTL_SEC", "86400"))
+# [2026-08-15 (mw)] 86400 -> 43200: the publish loop runs every 21600s
+# (GOLIVE_INTERVAL_SEC), so a 24h TTL let a FROZEN go-live gate — the payload
+# that governs real money, whose consumers rightly fail CLOSED on staleness —
+# read FRESH for a full day of missed publishes. 43200 = 2 missed cycles: a
+# single hiccup does not flap consumers, a dead loop is visible in half a day.
+TTL_SEC = int(os.environ.get("GOLIVE_TTL_SEC", "43200"))
 
 
 # ---------------------------------------------------------------------------

@@ -3537,6 +3537,19 @@ def vitals_payload():
                 ttl = float(st.get("ttl_sec")) if st.get("ttl_sec") else fb_ttl
             except Exception:
                 ttl = fb_ttl                   # a junk ttl_sec is not a dead organ
+            # [2026-08-15 (mw)] A CRITICAL organ's payload may TIGHTEN its
+            # paging bar, never slacken it. The 01-Aug promotion cut
+            # brain-vitals' spec TTL 26000 -> 9600 ("DARK at 8h, inside a
+            # working day") — but this line preferred the payload's own
+            # ttl_sec, and bot_learn kept publishing 26000, so runtime DARK
+            # sat at 3x26000 = 21.7h and the engraved I13 enforcement was
+            # green-while-inert (the (iz) shape). The 01-Aug incident replayed
+            # today would read LATE at 13.8h — and LATE never pages. min()
+            # closes the class for every FUTURE critical organ whose publisher
+            # drifts, not just this one; non-critical organs keep
+            # payload-preferred TTLs (their payload IS the contract).
+            if critical and ttl is not None and fb_ttl:
+                ttl = min(ttl, float(fb_ttl))
             if key in ("fleet-alerts", "evidence-review",
                        # [2026-07-16 AUDIT FIX] written ON EVENTS only (an
                        # enactment / a proposal) — in a healthy, QUIET fleet
