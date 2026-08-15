@@ -627,6 +627,13 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
     Measured: 🌾 carry earns **+$71.42 on `*_decay_paid`** (hold 65-70h) and
     loses **−$17.32 on the sided `*_flip`s** (hold 6-10h) — and a THIRD unsided
     `flip` bucket is +$7.02, so "flip loses" is true only of the sided ones.
+    **[15-Aug (nc), corrected in place per I12: ≈$13 of carry's all-time
+    accrual (≈$6 of it inside the decay_paid family) is PHANTOM — rows opened
+    17–28-Jul by the stale pre-basis-fix container over-accrued 2.5–6.7×
+    (resting stamps exactly 8× TRUE). Era-scoped grades are clean (the 31-Jul
+    era boundary happens to exclude every contaminated row); every POOLED
+    all-time quote of this book — allocation rank, +$66 headline, the
+    decay_paid story — overstates. STUDY_FUNDING_LIFECYCLE_2026-08-15.md §1.]**
     `*_sl` at a 0% win rate appears on SEVEN living books. RETIRED rows are
     excluded by default: the ledger is history and a Kraken-era book measures
     +$272.09, the largest line in it.

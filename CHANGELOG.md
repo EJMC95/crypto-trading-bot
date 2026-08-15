@@ -1,3 +1,75 @@
+## 2026-08-15 (nd) — the funding-lifecycle study returns: one contamination finding, four refutations that prevent bad moves, one parked hypothesis, no enactable edge today — and every refusal carries its evidence
+
+- **Ten agents, pre-registered grids, calibration gates, adversarial referees
+  (3/3 reproduced their analysts exactly). Full record:
+  `STUDY_FUNDING_LIFECYCLE_2026-08-15.md`.** The compressed verdicts:
+  * **E2 (the Farmer's exit geometry, measured on its own cell for the first
+    time): INERT.** Calibration PASSED on the live arm's own 95 era entries;
+    ZERO of 48 grid cells beat shipped on both halves at t≥1.5 (one stop
+    event in 95 trades; the EXIT_APR axis structurally quantized to
+    inexpressibility). Flip-grace REFUTED in all 16 pairs — the OPPOSITE of
+    the (mf)/Hull results: **grace is a cell property, not a doctrine.**
+    Controls: the live record is indistinguishable from exposure-matched
+    drift (P=0.155) — the stall is EDGE, and exit tuning cannot manufacture
+    it. **The (na) plumbing stays as REACH ((it) precedent); no judge
+    candidate is filed — the refusal-with-evidence closes that thread.**
+  * **E5 (⚖️ cross-sectional funding momentum): REFUTED on the validated
+    frame** (calibration reproduced the repo's own validated script to 2dp):
+    delta24h rank −19.4% both halves negative at 3.6× turnover; the
+    level×momentum blend the worst book tested (worse than 94.8% of random).
+    28-Aug review evidence: the VALIDATED level signal itself reads ~zero on
+    the trailing 121d (t=0.08) — consistent with the live in-era t=−0.44.
+  * **E4 (seasonality/supply): no clock edge** (the one full-tape hour-of-day
+    effect fails its second half → null). The 6h persistence gate consumes
+    81% of qualifying window-hours (median window 2h!) — and earns it: P=1
+    LOSES (t=−5.9); per-episode net is MONOTONE in persistence with **P=12
+    at +0.161%/ep, t=1.80, both halves, referee-verified LAG-1-clean and not
+    denominator shrinkage. PARKED as a replay-gate hypothesis** — its
+    would-be consumer (🌾 carry) is on the I17 docket, and tuning a docket
+    book is the exact I17 forbidden move.
+  * **E1/E3 (onset entry, decay predictors): NULL at current n** — onset
+    never significant (p 0.42–0.60) despite directional consistency; nothing
+    survives BH across 16 decay-predictor tests (n=103 binding); k=12 onset
+    is structurally vacuous after a 6h gate (I7, caught pre-ship). The
+    random-timing null itself earns +0.22–0.28%/trade on these coins —
+    membership, not timing, carries the cell.
+
+## 2026-08-15 (nc) — ≈$13 of 🌾 carry's +$66 all-time is PHANTOM accrual: the stale-container window stamped 8× APRs into durable state, and every pooled quote of the fleet's best number carries it
+
+- **THE FINDING (E1's calibration refusal, run to ground with receipts).**
+  The pre-registered carry replay REFUSED (gap 0.242pp > 0.20pp), and the gap
+  decomposed into a measured ledger defect: rows entered at RESTING rates
+  over-accrued **2.5–6.7×** vs the settled venue tape (ZEC 4.6×, XAU 6.7×,
+  LIT 2.9×, BNB 2.5×, SPCX 4.0×), with resting `entry_apr` stamps at exactly
+  **84.1% = 8× the 10.512% resting TRUE apr**. Hot-regime rows reconcile at
+  0.83–0.97×.
+- **ROOT CAUSE — temporal, not live; the analyst's mixed-basis-feed
+  hypothesis is REFUTED by direct measurement.** Every 8×-stamped row was
+  opened **17–28 July**: the (hu) window in which `yield-harvester-shadow`
+  (the container with no deploy rule) kept running the pre-17-Jul basis-fix
+  build. Entries stamped 8× into durable position state; accruals straddled
+  both bases across the deploy — the exact "straddler belongs to neither
+  basis" class (hc) named. Verified clean today: the venue endpoint reads a
+  uniform per-8h convention (ratio 8.00 on every pinned resting coin), every
+  row opened ≥30-Jul stamps true, `_basis`/`to_hourly`/the accrual line are
+  internally consistent. **No code change: there is nothing live to fix.**
+- **QUANTIFIED:** phantom ≈ accrued×(1−1/ratio) over the receipted rows —
+  ZEC $4.34, XAU $2.96, LIT $2.27, SPCX $1.39, BNB $0.76, kBONK ≈$1.5 —
+  **≈$13 of the +$66.21 all-time (~20%), ≈$6 of it inside the "+$85.9
+  decay_paid, 100% win" story.** The decay_paid MECHANISM survives on clean
+  rows (SKHYNIX 30-Jul +$2.91, 10-Aug +$4.24); its magnitude was inflated.
+- **WHAT THIS CHANGES:** era-scoped grades are CLEAN everywhere — carry's
+  31-Jul era boundary (declared for the two-writer reason) happens to also be
+  the basis boundary, and Barnesy/Garrett/Hull/Kiyosaki post-date the window;
+  both Farmer arms' P&L is venue-settled reality. What overstates is every
+  POOLED all-time quote: the allocation organ's #1 rank for carry (57% of
+  target, on 91/101 pre-era closes), the +$66 headline, the decay_paid
+  figure. The (lx) accessor gate already blocks ACTING on pooled claims and
+  (mz) put `n_with_era_claim=0` on the headline; the ledger itself is
+  HISTORY and is not rewritten. CLAUDE.md's exit-instruments numbers
+  corrected in place (I12); the carry docket item (matures 15-Aug) now
+  carries: era n=10 at −$15.45 (venue stall) AND pooled record inflated ≈$13.
+
 ## 2026-08-15 (nb) — 🛢️ Garrett was validating a $25-clip study cell at $7.50: the allocation organ's probe floor leaked into a variant whose whole contract is "no external knobs"
 
 - **THE FINDING (15-Aug audit, binding-constraints dimension).** The (lp)

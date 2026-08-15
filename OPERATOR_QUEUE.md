@@ -396,7 +396,11 @@ negative), and every snapshot of the 14-Aug 24h history agrees. Its era edge
 is statistically zero while execution measures clean — the stall is EDGE,
 which no date can fix. It matures onto the decision docket at the 15-Aug
 publishes alongside carry and Barnesy.]** · carry window-floor 30-Aug (n=1
-in-era; the venue stall (I18) is the real blocker). Human-decision dates stay
+in-era; the venue stall (I18) is the real blocker — **and (nc) 15-Aug: when
+its keep-or-retire matures, read the pooled +$66 all-time as inflated ≈$13 by
+the stale-container phantom-accrual window (17–28-Jul rows, 2.5–6.7× over);
+the era sample is clean and reads −$15.45/n=10. The book's true story is
+weaker than its row suggests**). Human-decision dates stay
 hand-carried, correctly — a trajectory cannot derive a review date: item-18
 oracle grades + SPY/QQQ graduation ~mid-Aug · Farnham-Six keep-or-retire
 verdicts ~28-29-Aug (⚖️ Counterweight's pre-registered criterion recomputed
