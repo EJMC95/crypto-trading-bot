@@ -1065,6 +1065,14 @@ def main():
             # in silence either: a bare `except: pass` here is what hid the
             # funded-mode AttributeError above indefinitely.
             log.warning("publish failed (row will go stale): %s", e)
+        # [2026-08-15 (my)] I9 MTM series. The MTM_PENDING exemption ("n=5,
+        # nowhere near the closes bar") aged out: the book reads n=29 and sits
+        # on the decision docket — a keep-or-retire verdict should see the
+        # same drawdown definition the gate uses, not realised-only.
+        try:
+            store.snapshot_equity(bot_id, pub_equity, pub_open)
+        except Exception:  # noqa: BLE001
+            pass
         # [2026-07-17 FUNDED-MODE FIX] was `if dry_run` — the mirror of the
         # restore gate above, and the reason a funded boot had nothing to read
         # back. The seed path already saved unconditionally, so live mode wrote a

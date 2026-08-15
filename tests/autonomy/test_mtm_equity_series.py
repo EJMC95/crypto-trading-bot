@@ -86,6 +86,23 @@ MTM_REQUIRED = {
     "lighter_ticket_taker.py":
         "🎫 Ticket Taker, BOTH arms — live money on divergence-short; its "
         "open drawdown was invisible to the bar that governs it",
+    # [2026-08-15 (my)] the audit's verified high finding: 11 of the grader's
+    # 17 books read 'no usable equity series' — the ENTIRE directional cohort,
+    # including the closest-to-gate book. Three declared exemptions below had
+    # aged out and are moved up:
+    "lighter_family_bot.py":
+        "the six family/spot books — the old exemption ('short holds, "
+        "|unreal| <= $5.31') predates 🙏 avo-maria-lshadow becoming the "
+        "fleet's closest book to the gate (4/6 bars); the (ia) bar must not "
+        "grade the nearest candidate realised-only",
+    "lighter_perp_sniper.py":
+        "🎯 Perp Sniper — 'n=5, nowhere near the closes bar' aged to n=29 "
+        "and a decision-docket seat; a keep-or-retire verdict should see "
+        "MTM drawdown",
+    "parliament/strategies.py":
+        "🏛️ the six PM books — 'graded by Howard, not golive_readiness' "
+        "became false when the roster sweep began grading every bot_pnl "
+        "publisher (pm-albanese/turnbull at 2/6 bars, realised-only)",
 }
 
 #: Books that publish `open_trades` but are NOT yet wired, each with the reason.
@@ -96,18 +113,10 @@ MTM_PENDING = {
     "lighter_dislocation_bot.py":
         "🧲 Snap Back — flat most of the time (0 open at time of writing) and "
         "mean is negative, so it is not a promotion candidate",
-    "lighter_perp_sniper.py":
-        "🎯 Perp Sniper — event-class, n=5; nowhere near the closes bar",
-    "lighter_family_bot.py":
-        "the four family books — short holds, and their drawdown is already "
-        "close to realised (measured |unrealised| <= $5.31)",
     "lighter_momentum_bot.py": "retired (Trail Blazer), idles behind a guard",
     "hyperliquid_momo_bot.py": "retired 15-Jul, idles behind a guard",
     "hyperliquid_perps_bot.py": "retired (Bounce Catcher), idles behind a guard",
     "listing_sniper.py": "retired 17-Jul (LIGHTER-ONLY cut), idles behind a guard",
-    "parliament/strategies.py":
-        "🏛️ the Parliament — shadow-only forever until the standard gate; its "
-        "six books are graded by Howard, not by golive_readiness",
     "freqtrade_pnl_poller.py": "a POLLER, not a book — holds nothing itself",
 }
 

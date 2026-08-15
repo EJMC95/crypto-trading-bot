@@ -554,6 +554,17 @@ class PMBot:
                        "last_skip": self.last_skip})
         except Exception:  # noqa: BLE001
             pass
+        # [2026-08-15 (my)] I9 MTM series. The MTM_PENDING exemption said the
+        # six PM books are "graded by Howard, not by golive_readiness" — that
+        # became false when the roster sweep started grading every bot_pnl
+        # publisher: pm-albanese and pm-turnbull sit at 2/6 bars in the live
+        # payload, graded on realised-only drawdown. The series arms the (ia)
+        # worse-of-both bar for them like every other graded holder.
+        try:
+            store.snapshot_equity(self.bot_id, round(eq, 2),
+                                  len(self.broker.pos))
+        except Exception:  # noqa: BLE001
+            pass
 
     # -- one cycle ------------------------------------------------------------
     def _accrue_funding(self) -> None:

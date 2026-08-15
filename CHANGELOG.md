@@ -1,3 +1,34 @@
+## 2026-08-15 (my) — the (ia) MTM drawdown bar was grading 6 of 17 books: the entire directional cohort — including the fleet's CLOSEST book to the gate — walked toward real money on realised-only drawdown
+
+- **THE FINDING (15-Aug audit, adversarially verified: exactly 17 graded
+  books, 11 with `mtm_why='no usable equity series'`, 6 with real MTM blocks
+  of 2,777–4,287 samples).** I9's fold-in (`apply_mtm`, worse-of-both) is
+  wired and working — for the funding books, 🎸 Barnesy and the 🎫 Taker. The
+  directional cohort never got the series: 🙏 avo-maria-lshadow at **4/6
+  bars, the nearest candidate in the fleet, with real money already riding
+  its live twin on an operator bet**, was being graded on the definition
+  (hl) measured as verdict-flipping (📊 Index Rider: realised 9.9–10.7%
+  PASS vs true MTM 15.6–17.4% FAIL).
+- **Why they were dark, stated honestly: each was a DECLARED exemption whose
+  reason aged out** — the `MTM_PENDING` pattern working as designed, plus the
+  part nobody wrote: nothing re-reads a declaration's premise. The family
+  books' *"short holds, |unreal| ≤ $5.31"* predates Avo's candidacy; the
+  sniper's *"n=5, nowhere near the bar"* is n=29 with a docket seat; the
+  Parliament's *"graded by Howard, not golive_readiness"* became false when
+  the roster sweep began grading every bot_pnl publisher (pm-albanese and
+  pm-turnbull sit at 2/6 bars in the live payload).
+- **THE WIRING (three publishers, 13 books):** `lighter_family_bot`
+  (mum/dad/avo/georgia + both spot ports), `parliament/strategies.py` (six PM
+  books), `lighter_perp_sniper` — each calls `store.snapshot_equity` beside
+  its existing publish, same per-loop cadence as every wired book; the (ia)
+  bar arms itself once each series clears its 200-sample/7d floor (~22-Aug
+  for the family loop). All three moved from `MTM_PENDING` to `MTM_REQUIRED`
+  with the aged-out reason recorded. **Mutation-verified: disabling the
+  parliament call reddens both the per-module and the
+  wired-or-DECLARED guard.**
+- Not wired, still declared: 🧲 Snap Back (retired-idle) and the four
+  retired-idle guards — their reasons still hold.
+
 ## 2026-08-15 (mx) — a proposal with an EMPTY evidence field displaced the tuner's own measured winner: the ratchet was strict up and loose down, and the two margins exactly cancelled
 
 - **THE INCIDENT (found by the 15-Aug audit, adversarially verified; live on

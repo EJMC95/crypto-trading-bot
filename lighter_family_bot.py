@@ -1439,6 +1439,18 @@ def main():
                            "skipped_unlisted": b.s.skipped})
             except Exception:  # noqa: BLE001
                 pass
+            # [2026-08-15 (my)] I9: the MTM equity series for the six family/
+            # spot books. The MTM_PENDING exemption ("short holds, |unreal|
+            # <= $5.31") was written before 🙏 avo-maria-lshadow became the
+            # fleet's CLOSEST book to the go-live gate (4/6 bars) — the (ia)
+            # drawdown bar reads this series or reads realised-only, and a
+            # book must not walk to the gate with the stricter definition
+            # dark. Same per-loop cadence as every wired funding book.
+            try:
+                store.snapshot_equity(b.bot_id, b.equity(),
+                                      b.broker.open_count())
+            except Exception:  # noqa: BLE001
+                pass
             b.persist()
 
         log.info("loop ok | %s | regime_up=%s",
