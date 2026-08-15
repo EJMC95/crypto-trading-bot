@@ -508,13 +508,31 @@ def main():
                     # skips the ratchet (the trail keeps its last level and
                     # exits keep running on the live mark).
                     try:
+                        # [2026-08-15 (ne)] CATCH-UP: fetch back to the last
+                        # ratcheted bar (bounded at 42 bars = 7d) and replay
+                        # EVERY missed closed bar in order. The old form
+                        # applied only cb[-1], so a container outage longer
+                        # than one 4h bar permanently dropped intermediate
+                        # bar-close HWM updates — if a missed bar set a new
+                        # high and price then fell, the trail sat silently
+                        # LOOSER than the validated every-bar ratchet (X5
+                        # conformance finding; the wide trail IS this book's
+                        # whole edge, but a loosened-by-outage trail is a
+                        # different rule, the flap class). Continuous
+                        # operation is unchanged: one new bar, one update.
+                        # Outages beyond 7d ratchet on the last 42 closes
+                        # only — stated bound, not a silent cap.
+                        _last = float(pos.get("trail_bar_t") or 0.0)
+                        _span = (min(42, max(3, int((t0 - _last) / BAR_SEC)
+                                             + 2)) if _last else 3)
                         rows = ctx.venue.candles(
                             pos["coin"], BAR_INTERVAL,
-                            (int(t0) - 3 * BAR_SEC) * 1000, int(t0) * 1000)
+                            (int(t0) - _span * BAR_SEC) * 1000,
+                            int(t0) * 1000)
                         cb = _closed_bars(rows, BAR_SEC, int(t0))
-                        if cb:
-                            bt, _o, _h, _l, bc = cb[-1]
+                        for bt, _o, _h, _l, bc in cb:
                             if (bt + BAR_SEC > pos["opened_ts"]
+                                    and bt > _last
                                     and bt != pos.get("trail_bar_t")):
                                 update_trail(pos, bc)
                                 pos["trail_bar_t"] = bt

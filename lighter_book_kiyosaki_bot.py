@@ -367,6 +367,10 @@ def build_extra(census, positions, open_pnl, realized):
                  "persist_h": PERSIST_H, "payback_max_h": PAYBACK_MAX_H,
                  "max_positions": MAX_POSITIONS, "clip_usd": CLIP_USD,
                  "min_vol": MIN_VOL,
+                 # [(ne)] the (mf) headline change (1h->6h, +$26.88 t=1.91 ->
+                 # +$42.09 t=3.00) was invisible from the row while sibling
+                 # hull publishes its grace — X5 conformance finding
+                 "flip_grace_h": FLIP_GRACE_H,
                  "crypto_only": not ALLOW_NONCRYPTO},
         "scan": census,
         "income_statement": income_statement(positions, realized),

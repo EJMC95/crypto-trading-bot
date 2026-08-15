@@ -657,11 +657,17 @@ BOTH `RETIRED_ROWS` (hides) and `LEGACY_BOTS` (prunes).
   * **A grid-edge winner is reported UNBOUNDED, never as a value.** On gillard
     every top candidate pins `sl` at whatever maximum the grid allows, so the
     honest output is "widen the grid", not "ship 8%". Widening until a number
-    appears is chasing the artifact. The direction IS robust and monotone (sl
-    1.0% → −0.158, 1.5% → −0.098, 2.0% → −0.034, 3.0% → +0.050, with drawdown
-    FALLING 40.7% → 26.0% because the tight stop was realising the losses), and
-    the actor already exists: the Parliament's tuners walk tp/sl/hold
-    replay-gated inside `PARAM_BOUNDS`. Two review notes from (gx):
+    appears is chasing the artifact. ~~The direction IS robust and monotone~~
+    **[15-Aug (ne), corrected in place per I12: the direction was an ARTIFACT
+    of the harness's entry-bar look-ahead — `walk_exit` credited the entry
+    bar's FULL range, pre-entry prices included, and on gillard the same
+    candidate rule reads +0.319%/trade with the entry bar and −0.396%/trade
+    at LAG-1 (entry bar excluded). Two calibrating conventions, opposite
+    verdicts ⇒ per the execution-lag doctrine the intrabar edge is REFUTED.
+    The look-ahead is fixed in `walk_exit` (LAG-1 is now the convention);
+    do not walk gillard's sl on the old reading.]** The actor still exists:
+    the Parliament's tuners walk tp/sl/hold replay-gated inside
+    `PARAM_BOUNDS`, and their own replay gate stays the honest judge. Two review notes from (gx):
     `PARAM_BOUNDS["sl_pct"]` caps at 0.05 so the sweep's winner is outside what
     the system can express, and the ×1.25 step needs **7.2 consecutive accepted
     widenings** to reach that ceiling while the gain only becomes clear near 3%.

@@ -782,7 +782,16 @@ class TestLedgerQuarantine:
     def test_the_churn_episode_is_withheld(self):
         import bot_pnl_store as s
         assert s.is_quarantined(self.BOT, "BOT/USDC", "2026-07-22T03:46:00+00:00")
-        assert s.is_quarantined(self.BOT, "CXMT/USDC", "2026-07-21T23:19:00+00:00")
+        # [(ne)] the CXMT assertion used to pin the MIS-DATED 21..22 window
+        # with a FABRICATED timestamp — the ledger has no CXMT row on 21-Jul
+        # at all (rows: 16-Jul, 28-Jul, 30-Jul), so the entry quarantined
+        # nothing for 18 days while this test stayed green: the hand-fixture
+        # class, inside the quarantine's own pin. Now pinned on the REAL
+        # defective row's close time, and its genuine neighbours must STAY
+        # in the sample (a quarantine that swallows real stops hides losses).
+        assert s.is_quarantined(self.BOT, "CXMT/USDC", "2026-07-28T01:33:12+00:00")
+        assert not s.is_quarantined(self.BOT, "CXMT/USDC", "2026-07-16T13:21:42+00:00")
+        assert not s.is_quarantined(self.BOT, "CXMT/USDC", "2026-07-30T01:34:49+00:00")
 
     def test_the_GENUINE_20_jul_stops_are_kept(self):
         """The window is dated for a reason: the two 20-Jul BOT

@@ -1,3 +1,61 @@
+## 2026-08-15 (ne) — the entry/exit study lands: the canonical exit sweeper had an entry-bar LOOK-AHEAD (the (gx) sl direction dies at LAG-1), avo shadow's binding cap steps 4→6 shadow-only, and the referees killed two proposals before they could ship
+
+- **Six analysts + five adversarial referees; full record:
+  `STUDY_ENTRY_EXIT_FLEETWIDE_2026-08-15.md`.** Implemented, each
+  referee-confirmed and mutation-verified where a guard exists:
+  * **`walk_exit` entry-bar look-ahead CLOSED** (the (ml) class inside the
+    fleet's canonical exit sweeper): the walk credited the entry bar's FULL
+    range — pre-entry prices included — to tp/sl/trail and seeded the trail
+    peak from it. Decision-flipping on pm-gillard: +0.319%/trade with the
+    entry bar, −0.396%/trade at LAG-1 → **the (gx) "widen gillard's sl"
+    direction is REFUTED** (two calibrating conventions, opposite verdicts;
+    the execution-lag doctrine rules). CLAUDE.md corrected in place;
+    LAG-1 is now the walk's stated convention; selftest reddens on revert.
+    The parliament tuner's own replay already used the honest convention.
+  * **🙏 avo shadow cap 4 → 6, SHADOW-ONLY** — the growth step. Cap-4 was
+    BINDING (39% of its era at 4/4, reproduced independently; real blocked
+    SwingDip signals during measured full windows), and the closes bar —
+    not edge — is what holds the fleet's nearest candidate (t=2.17 already
+    passes). ~+25% close rate, closes-bar ETA ~64d vs 80d, NO era reset
+    ((hc) capacity class). Cap 8 refused (one marginal add contradicted by
+    the real timeline). Shipped as `FAMILY_SHADOW_MAX_OPEN_OVERRIDES`
+    applied in main() only, because **the referee's kill-class finding**:
+    the live Avo bot binds the SAME SwingDip instance and sizes its
+    REAL-MONEY clip as equity/max_open — the literal is live surface,
+    stays 4, and `tests/autonomy/test_family_shadow_capacity.py` reddens
+    on a casual edit. (The same test hunt caught a `bot_id`/`bot` attr
+    crash in my own first override draft — the selftest alone was green.)
+    Marginal expectancy at confidence: UNMEASURED, stated (a throughput
+    step on the book's own signal, not an expectancy claim). The row now
+    publishes its effective `max_open` (the (go) receipt rule).
+  * **CXMT quarantine window corrected 21..22 → 28..28**: the entry was
+    mis-dated from birth — its own comment's row (+$0.4242 phantom _sl)
+    closed 28-Jul, the old window contained ZERO rows, and the defect sat
+    in every graded taker sample for 18 days.
+  * **🎯 sniper surge admission telemetry**: `surge_ratio` + the
+    `surge_mult` in force now stamp durable entry meta and publish at
+    close — the X4 expectancy split was UNMEASURABLE without them.
+  * **🧙 schwager trail catch-up**: missed closed bars now replay through
+    the ratchet in order (bounded 42 bars); an outage >4h used to leave the
+    trail silently LOOSER than the validated every-bar rule — and the wide
+    trail IS that book's whole edge. Continuous operation byte-identical.
+  * **🏦 kiyosaki publishes `flip_grace_h`** beside its caps (the (mf)
+    headline change was invisible from the row).
+- **Killed by the referees, recorded so they stay dead:** the sniper surge
+  cage-tighten (pooled t=−1.43 misses the bar; the clearing sample is the
+  (lk)-closed class — citing it double-counts) and the FAMILY_COINS
+  widening (measured DILUTIVE in-sim: 0.54%/trade at cap 4 vs the book's
+  actual 1.64%, 41% outside-coin stop rate, 4-book blast radius, and the
+  env reaches the LIVE universe if mis-scoped — revisit only with the
+  cap-6 sample and a random-entry null).
+- **For the 4-Sep Barnes docket** (numbers ready in the study file): quote
+  cluster-robust t=−1.78, not the naive −2.52; the burn is xsect crypto
+  LONGS (win 4.5%) while the parent rode the same window near-flat; the
+  class screens do not repair the sleeve; the carry sleeve arrives
+  I17-undecidable. Exit changes fleet-wide follow the bundling rule: one
+  era reset per book, through a calibrated harness — of which there is
+  still exactly one book (gillard) that calibrates.
+
 ## 2026-08-15 (nd) — the funding-lifecycle study returns: one contamination finding, four refutations that prevent bad moves, one parked hypothesis, no enactable edge today — and every refusal carries its evidence
 
 - **Ten agents, pre-registered grids, calibration gates, adversarial referees

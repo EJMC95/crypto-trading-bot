@@ -437,6 +437,13 @@ def main():
     # held position under the un-stamped tag and silently un-grade the very
     # sources the (ga) experiment exists to compare.
     entry_src = {}
+    # [2026-08-15 (ne)] admission-time SURGE telemetry: {sym: {"surge_ratio",
+    # "surge_mult"}}. The X4 audit found the surge bucket's expectancy
+    # question UNMEASURABLE because the ledger stamps the source but not the
+    # ratio or the mult-in-force at entry — so "does the board's widened
+    # population (mult<3.0 admits) differ?" had no data. Durable like
+    # entry_src; forward-only; a missing entry is a pre-(ne) open.
+    entry_meta = {}
     baseline = set()
     pending = {}          # sym -> {"first_seen": ts, "attempts": n} — detected, not yet sniped
     # [2026-07-30] the SURGE source's own dedup ledger (see surge_candidates).
@@ -518,6 +525,16 @@ def main():
         entry_src = {str(k): str(v) for k, v
                      in (_saved.get("entry_src") or {}).items()
                      if str(v) in SNIPE_SOURCES}
+        # [(ne)] restore the surge admission telemetry; junk values dropped
+        # (the close degrades to no extra, never a guessed number)
+        entry_meta = {}
+        for _k, _m in (_saved.get("entry_meta") or {}).items():
+            try:
+                entry_meta[str(_k)] = {
+                    "surge_ratio": float(_m["surge_ratio"]),
+                    "surge_mult": float(_m["surge_mult"])}
+            except (KeyError, TypeError, ValueError):
+                continue
         # [2026-07-30 (ha)] restore the zombie clock — see save_state below.
         # A missing entry is correct (the coin becomes priceable again and the
         # clock is irrelevant); a RESET entry was the defect.
@@ -620,6 +637,10 @@ def main():
             # tested — the price PATH cannot be joined to the trade.
             # Telemetry only; no gate moves.
             entry_price=ent_px, exit_price=exit_px,
+            # [(ne)] surge admission telemetry (ratio + mult in force at
+            # entry) — the two numbers the X4 expectancy split needed; empty
+            # for non-surge and pre-(ne) opens. Pop: one close consumes it.
+            extra=(entry_meta.pop(coin, None) or None),
             venue=venue_tag, shadow=shadow_tag)
 
     def _real_exit(coin, was_long, fallback):
@@ -699,6 +720,15 @@ def main():
                 return False
         if src in SNIPE_SOURCES:
             entry_src[sym] = src
+            # [(ne)] surge admissions record the ratio + the mult in force —
+            # the two numbers X4 needed and the ledger never had
+            if src == "surge":
+                try:
+                    entry_meta[sym] = {
+                        "surge_ratio": float(_surge_ratios.get(sym)),
+                        "surge_mult": float(SURGE_MULT)}
+                except (TypeError, ValueError):
+                    pass
         log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f) [src=%s]",
                  sym, "LONG" if DIRECTION_LONG else "SHORT", px, size, order_usd,
                  src or "?")
@@ -737,6 +767,7 @@ def main():
                                       # [2026-08-04] admission-source map —
                                       # same shape at BOTH writers ((ha)).
                                       "entry_src": entry_src,
+                                      "entry_meta": entry_meta,
                                       "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
                                       "bar_counts": bar_counts,
                                       # [2026-07-30 (ha)] the SEED path is a
@@ -803,6 +834,7 @@ def main():
         if _lv:
             log.info("levers applied %s", _lv)
         _surge = []
+        _surge_ratios = {}      # [(ne)] always bound, even on a dark scout
         if SURGE_MULT > 0 and fleet_bus is not None:
             try:
                 _sp = fleet_bus._load("lighter-market", None) or {}
@@ -810,6 +842,15 @@ def main():
                     _live_done = active_done(surge_done, now.timestamp())
                     _surge = surge_candidates(_sp.get("vol_surges"), SURGE_MULT,
                                               _live_done | set(pending))
+                    # [(ne)] the ratio each surge candidate carried at
+                    # admission — telemetry for the close, keyed like _src_map
+                    _surge_ratios = {}
+                    for _r in (_sp.get("vol_surges") or []):
+                        try:
+                            _surge_ratios[str(_r.get("sym") or "").strip()
+                                          .upper()] = float(_r.get("ratio"))
+                        except (TypeError, ValueError, AttributeError):
+                            continue
             except Exception:  # noqa: BLE001
                 _surge = []
             if _surge:
@@ -1086,6 +1127,7 @@ def main():
                                   # lifecycle as entry_ts ((ha): both writers
                                   # of this key write the same shape).
                                   "entry_src": entry_src,
+                                  "entry_meta": entry_meta,
                                   "surge_done": {k: round(v, 0) for k, v in surge_done.items()},
                                   "bar_counts": bar_counts,
                                   # [2026-07-30 (ha)] PERSIST THE ZOMBIE CLOCK.

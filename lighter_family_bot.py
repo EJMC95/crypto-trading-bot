@@ -1035,6 +1035,31 @@ def noncrypto_entry_blocked(coin, regime_up):
     return coin in NONCRYPTO_EFFECTIVE and not regime_up
 
 
+def shadow_max_open_overrides(raw=None):
+    """[(ne)] {bot_id: max_open} — the SHADOW runner's capacity overrides,
+    parsed from FAMILY_SHADOW_MAX_OPEN_OVERRIDES ("bot:slots,bot:slots").
+    Called from main() ONLY, never at import: the live Avo bot binds the same
+    STRATEGIES instance by identity and sizes its real-money clip as
+    equity/max_open, so the declared literals are live surface. Values clamp
+    to [1, 12]; junk tokens are dropped, never guessed. Default carries the
+    measured avo step (X3, adversarially confirmed: cap-4 binding 39% of its
+    era, cap 6 ≈ +25% close rate, no era reset per (hc)); "" reverts."""
+    if raw is None:
+        raw = os.environ.get("FAMILY_SHADOW_MAX_OPEN_OVERRIDES",
+                             "freqtrade-avo-maria:6")
+    out = {}
+    for tok in str(raw).split(","):
+        tok = tok.strip()
+        if not tok or ":" not in tok:
+            continue
+        bid, v = tok.rsplit(":", 1)
+        try:
+            out[bid.strip()] = max(1, min(12, int(v)))
+        except ValueError:
+            continue
+    return out
+
+
 def main():
     p = argparse.ArgumentParser(description="Family bots — Lighter shadow books")
     p.add_argument("--once", action="store_true", help="Single loop then exit.")
@@ -1054,7 +1079,28 @@ def main():
 
     cache = CandleCache(venue)
     books = []
+    # [2026-08-15 (ne)] SHADOW-ONLY capacity overrides, applied in main() and
+    # NEVER at import — lighter_avo_live_bot binds the SAME STRATEGIES
+    # instance by identity and sizes its REAL-MONEY clip as equity/max_open,
+    # so the declared literal is live surface and must not move (the referee's
+    # kill-class finding). This env is read only by THIS runner, in the shadow
+    # container. Measured basis (X3, adversarially confirmed): avo shadow's
+    # cap-4 is BINDING — 39% of its era at 4/4, at cap at measurement time,
+    # AAVE 24-25-Jul + LTC 25-Jul signals fired during measured full windows;
+    # cap 6 recovers ~+2 closes/21d (~+25% close rate, closes-bar ETA ~64d vs
+    # 80d) with NO era reset (capacity is (hc) ordinary tuning; precedents
+    # carry 8->12, Counterweight K 5->8). Cap 8 was NOT supported (one
+    # marginal add contradicted by the real timeline, LINK pileup) and is not
+    # shipped. Marginal expectancy at confidence: UNMEASURED (n=2 recovered
+    # signals, one-regime tape) — a throughput step on the book's own signal,
+    # not an expectancy claim. Revert: FAMILY_SHADOW_MAX_OPEN_OVERRIDES="".
+    _mo_overrides = shadow_max_open_overrides()
     for s in live_strategies():
+        if s.bot in _mo_overrides and _mo_overrides[s.bot] != s.max_open:
+            log.info("%s: SHADOW max_open %d -> %d ((ne) capacity override; "
+                     "live literal untouched)", s.bot, s.max_open,
+                     _mo_overrides[s.bot])
+            s.max_open = _mo_overrides[s.bot]
         # [2026-07-30 STEP 3] the four family books (no s.coins override)
         # carry the non-crypto universe; spot ports pin their own lists
         src = list(s.coins) if s.coins else list(COINS) + NONCRYPTO_UNIVERSE
@@ -1432,6 +1478,9 @@ def main():
                     losses=b.n_closed - b.n_wins,
                     extra={"mode": mode, "venue": mode, "style": b.s.style,
                            "family": True,
+                           # [(ne)] the EFFECTIVE cap (the (go) rule: publish
+                           # the gate in force, so the row is a receipt)
+                           "max_open": b.s.max_open,
                            "held": {c: (m or {}).get("tag") for c, m in b.meta.items()},
                            "fund_realized": round(b.fund_realized, 4),
                            "fund_open": round(open_accr, 4),

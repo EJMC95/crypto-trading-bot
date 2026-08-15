@@ -303,6 +303,18 @@ def walk_exit(candles, entry_ts, entry_px, is_long, rule, max_horizon_h=None):
     INTRA-BAR ORDERING: if a bar touches both the adverse level and the target,
     the ADVERSE one is taken. Hourly OHLC cannot resolve the true order, and
     assuming the favourable one is the classic way a backtest flatters itself.
+
+    [2026-08-15 (ne)] ENTRY-BAR LOOK-AHEAD CLOSED — the (ml) class, found in
+    THIS instrument by the X2 sweep audit at decision-flipping size: the walk
+    used to start at `entry_ts - 3600`, crediting the ENTRY bar's FULL range —
+    including PRE-ENTRY prices — to tp/sl/trail and the trail's peak. On
+    pm-gillard (the one book that calibrates) the same candidate rule read
+    +0.319%/trade with the entry bar and −0.396%/trade without it: optimism in
+    exactly the numbers that pick a winner. The walk now starts at the first
+    bar OPENING at/after entry (LAG-1): a mid-bar entry forfeits its partial
+    bar entirely — conservative, because OHLC cannot order a bar's extremes
+    around an intra-bar entry timestamp. Bar-open entries are unaffected.
+    Convention stated here so every consumer reports against it.
     """
     if not candles or not entry_px or entry_px <= 0:
         return None, None, "no-data"
@@ -314,7 +326,7 @@ def walk_exit(candles, entry_ts, entry_px, is_long, rule, max_horizon_h=None):
     tp_px = entry_px * (1 + sign * tp) if tp else None
     sl_px = entry_px * (1 - sign * sl) if sl else None
 
-    hours = sorted(t for t in candles if t >= entry_ts - 3600)
+    hours = sorted(t for t in candles if t >= entry_ts)
     peak = entry_px                      # best price seen, for the trail
     for i, t in enumerate(hours):
         if t > entry_ts + horizon * 3600:
@@ -613,6 +625,19 @@ def _selftest():
     ts, px, why = walk_exit(path([100, 120, 100]), t0, 100.0, True,
                             {"trail_pct": 0.10})
     assert why == "trail" and px == 108.0, (px, why)     # 120 * 0.9
+
+    # ---- [(ne)] ENTRY-BAR LOOK-AHEAD: a mid-bar entry must NOT be credited
+    # with the entry bar's pre-entry spike. Bar t0 spikes to 110 (a 5% tp
+    # would 'fill' on it); the entry happens mid-bar at t0+30min, AFTER the
+    # spike may already have passed. LAG-1: the walk starts at t0+1h, where
+    # the tape is flat below target -> the exit must be max_hold, never tp.
+    spike_then_flat = {t0: (100, 110, 100, 100),
+                       **{t0 + (i + 1) * H: (100, 100, 100, 100)
+                          for i in range(6)}}
+    ts, px, why = walk_exit(spike_then_flat, t0 + 1800, 100.0, True,
+                            {"tp_pct": 0.05, "max_hold_h": 4})
+    assert why == "max_hold", (
+        f"pre-entry range credited to tp — the (ne) look-ahead is back: {why}")
 
     # ---- no candles claims nothing ---------------------------------------
     assert walk_exit({}, t0, 100.0, True, {"tp_pct": 0.05})[2] == "no-data"

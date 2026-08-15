@@ -1335,7 +1335,13 @@ LEDGER_QUARANTINE = (
     ("BOT/USDC", "ticket-taker", "2026-07-21", "2026-07-22",
      "mark ~747bps off the book top -> instant phantom TP, 43 closes in 4.5h; "
      "one episode, not 43 trades (hm)"),
-    ("CXMT/USDC", "ticket-taker", "2026-07-21", "2026-07-22",
+    # [2026-08-15 (ne)] window 21..22 -> 28..28: the entry was MIS-DATED from
+    # birth — the row its own comment describes (+$0.4242) closed 28-Jul, and
+    # the 21..22 window contained ZERO CXMT rows, so is_quarantined admitted
+    # the defective row into every graded taker sample for 18 days. Found by
+    # the X1 census, adversarially confirmed (the ledger has exactly one such
+    # row). The 16-Jul and 30-Jul CXMT rows are genuine stops and stay.
+    ("CXMT/USDC", "ticket-taker", "2026-07-28", "2026-07-28",
      "same basis defect, mirrored: an _sl that booked +$0.42 (hm)"),
 )
 
