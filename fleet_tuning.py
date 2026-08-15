@@ -314,6 +314,37 @@ LEVERS = {
                 "shipped gate 0.05, reads +$14.83/30d, both halves positive, "
                 "+$7.20 at p90 14.77 (STUDY_THIN_TIER_MIN_VOL_2026-08-05)",
         "env_default": 10000000.0},
+    # [2026-08-15 (na)] THE FARMER'S EXIT KNOBS BECOME LEVERS. The 15-Aug
+    # audit measured (adversarially verified from the live ledger) that
+    # EXIT_APR and HARD_STOP decide ~100% of the LIVE row's gross loss
+    # (48.9% / 51.1% of $7.83) while being the only bars outside the growth
+    # rail — I18's unreachable-binding-constraint, on real money. Registered
+    # as the min_vol-precedent PAIR: the judge explores on the shadow twin
+    # (xp), promotes through the paired bar (live; judge sole writer,
+    # fade-watch unchanged). Cages bracket the E2 study's pre-registered
+    # grid (exit_apr 0.5x-2x default; hard_stop 5%-15%); consumers price
+    # them at ENTRY (pos_exit_bars), so mid-hold flap is structurally closed.
+    "xp.funding.exit_apr": {
+        "kind": "float", "lo": 0.009375, "hi": 0.0375, "lane": "lighter-xp",
+        "note": "shadow twin's decay-exit TRUE-apr floor; env default "
+                "0.01875 — a rate cooling below this books 'decay'",
+        "env_default": 0.01875},
+    "live.funding.exit_apr": {
+        "kind": "float", "lo": 0.009375, "hi": 0.0375, "lane": "lighter-live",
+        "note": "PROMOTED decay-exit floor; env default 0.01875; judge sole "
+                "writer via the paired bar",
+        "env_default": 0.01875},
+    "xp.funding.hard_stop": {
+        "kind": "float", "lo": 0.05, "hi": 0.15, "lane": "lighter-xp",
+        "note": "shadow twin's adverse-move hard stop; env default 0.10 "
+                "(HL-fitted 17-Jul; never measured on this book's own cell "
+                "— the E2 study's whole point)",
+        "env_default": 0.10},
+    "live.funding.hard_stop": {
+        "kind": "float", "lo": 0.05, "hi": 0.15, "lane": "lighter-live",
+        "note": "PROMOTED hard stop; env default 0.10; judge sole writer "
+                "via the paired bar",
+        "env_default": 0.10},
     "live.funding.min_vol": {
         "kind": "float", "lo": 1e5, "hi": 20e6, "lane": "lighter-live",
         "note": "PROMOTED turnover floor; env default 10e6. [5-Aug (ka)] lo "

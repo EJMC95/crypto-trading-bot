@@ -438,6 +438,14 @@ _ENV_BARS = {"enter_apr": ENTER_APR, "scan_enter": SCAN_ENTER,
              # .funding.min_vol) — snapshot the env value so an expiry reverts
              # to the operator's number, never to whatever a lever left behind.
              "min_vol": MIN_VOL,
+             # [2026-08-15 (na)] the EXIT knobs join the lever system. The
+             # 15-Aug audit measured (adversarially verified) that EXIT_APR
+             # and HARD_STOP decide ~100% of the LIVE row's gross loss
+             # (48.9% / 51.1% of $7.83) while being the only bars outside
+             # the growth rail — the I18 unreachable-binding-constraint
+             # shape on the real-money book itself. Env snapshots here so a
+             # lever expiry reverts to the operator's number.
+             "exit_apr": EXIT_APR, "hard_stop": HARD_STOP,
              "conviction": (CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI)}
 _ACTIVE_BARS = {}    # what this arm is running NOW — stamped on every close
 
@@ -448,7 +456,7 @@ def apply_levers(mode):
     levers for the log; refreshes _ACTIVE_BARS either way."""
     global ENTER_APR, SCAN_ENTER, ENTER_GATE, TAKE_PROFIT, MAX_HOLD_H
     global SCAN_EXPLORE_K, CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI
-    global SLOPE_GATE, MIN_VOL
+    global SLOPE_GATE, MIN_VOL, EXIT_APR, HARD_STOP
     # [(lp)] a VARIANT reads no tuning lane: the xp./live. levers belong to
     # the two real Farmer arms (the judge's experiment writes xp.funding.*),
     # and env-only config is what makes a variant single-policy by
@@ -464,6 +472,7 @@ def apply_levers(mode):
     CONVICTION_MODE, CONVICTION_LO, CONVICTION_HI = _ENV_BARS["conviction"]
     SLOPE_GATE = bool(_ENV_BARS.get("slope_gate", 1))
     MIN_VOL = _ENV_BARS["min_vol"]
+    EXIT_APR, HARD_STOP = _ENV_BARS["exit_apr"], _ENV_BARS["hard_stop"]
     if tuning is not None and prefix:
         ea = tuning.get_lever(prefix + "enter_apr", ENTER_APR)
         if ea != ENTER_APR:
@@ -478,6 +487,19 @@ def apply_levers(mode):
         if mv != MIN_VOL:
             MIN_VOL = mv
             moved[prefix + "min_vol"] = mv
+        # [(na)] the exit knobs — judge-explorable on the shadow twin,
+        # judge-promotable to real money through the paired bar like every
+        # other live.funding.* lever. Positions price them at ENTRY (the
+        # (bw) flap rule) via entry_stamp/pos_exit_bars, so a lever starting
+        # or fading mid-hold cannot snap an in-flight trade.
+        xa = tuning.get_lever(prefix + "exit_apr", EXIT_APR)
+        if xa != EXIT_APR:
+            EXIT_APR = xa
+            moved[prefix + "exit_apr"] = xa
+        hs = tuning.get_lever(prefix + "hard_stop", HARD_STOP)
+        if hs != HARD_STOP:
+            HARD_STOP = hs
+            moved[prefix + "hard_stop"] = hs
         tp = tuning.get_lever(prefix + "take_profit", TAKE_PROFIT)
         if tp != TAKE_PROFIT:
             TAKE_PROFIT = tp
@@ -514,6 +536,10 @@ def apply_levers(mode):
                          # (ran_candidate reads bars.min_vol; a missing
                          # receipt is disproof by design)
                          "min_vol": MIN_VOL,
+                         # [(na)] exit-knob receipts — a judge candidate on
+                         # either accrues provable closes (the (jy) rule: a
+                         # missing receipt is disproof by design)
+                         "exit_apr": EXIT_APR, "hard_stop": HARD_STOP,
                          # numeric receipt for the slope-gate-off candidate
                          # (ran_candidate float-compares bars.slope_gate)
                          "slope_gate": 1 if SLOPE_GATE else 0,
@@ -534,8 +560,13 @@ def apply_levers(mode):
 # twin, live.funding.* on real money): a judge promotion starting/fading
 # mid-hold is exactly such a snap. The rule now: THE BARS PRICED AT ENTRY
 # GOVERN THE TRADE — entries stamp them into meta, exits read the stamp.
-# enter_apr stays live-read (it gates NEW entries only); HARD_STOP / EXIT_APR
-# / flip are env-only, never levers, unchanged. This also makes the judge's
+# enter_apr stays live-read (it gates NEW entries only); ~~HARD_STOP /
+# EXIT_APR / flip are env-only, never levers, unchanged~~ [(na) 15-Aug,
+# corrected in place per I12: HARD_STOP and EXIT_APR ARE levers now — the
+# audit measured them deciding ~100% of the live row's gross loss while
+# unreachable by the rail (I18) — and they ride THIS SAME entry-stamp rule
+# (pos_exit_bars), so the flap class this block closed stays closed; flip
+# remains env-only]. This also makes the judge's
 # ran_candidate receipt strictly truthful: a row stamped with candidate bars
 # now provably RAN them to its exit. Unstamped/legacy positions keep the old
 # close-time behavior; LEVER_GRANDFATHER=off reverts it everywhere.
@@ -559,6 +590,26 @@ def pos_bars(m):
     return TAKE_PROFIT, MAX_HOLD_H
 
 
+def pos_exit_bars(m):
+    """[(na)] (hard_stop, exit_apr) GOVERNING an open position — the entry
+    stamp when grandfathering is on and sane, else the module's current
+    bars. The (bw) flap rule extended to the two knobs the 15-Aug audit
+    measured as deciding ~100% of the live row's gross loss: now that they
+    are levers, a lever starting/fading mid-hold must not snap a different
+    stop geometry onto an in-flight position. Fail-safe identical to
+    pos_bars: legacy/junk stamps behave exactly as before."""
+    try:
+        if LEVER_GRANDFATHER:
+            b = (m or {}).get("bars") or {}
+            hs = float(b["hard_stop"])
+            xa = float(b["exit_apr"])
+            if hs > 0.0 and xa > 0.0:
+                return hs, xa
+    except (KeyError, TypeError, ValueError):
+        pass
+    return HARD_STOP, EXIT_APR
+
+
 def exit_decision(is_short, entry, px, apr, held_h, tp, max_hold_h,
                   hard_stop=None, exit_apr=None):
     """The live book's close ladder: 'stop' | 'take_profit' | 'flip' |
@@ -580,8 +631,11 @@ def exit_decision(is_short, entry, px, apr, held_h, tp, max_hold_h,
       * Thresholds: stop/tp/max_hold trigger AT the bar (>=); decay is
         strict < (a rate sitting exactly at EXIT_APR still earns).
       * tp/max_hold arrive from the position's ENTRY stamp via pos_bars()
-        (the 22-Jul flap fix); hard_stop/exit_apr default to the module's
-        env-only bars at CALL time — they are deliberately not levers.
+        (the 22-Jul flap fix); hard_stop/exit_apr arrive the same way via
+        pos_exit_bars() since (na) — they became levers when the 15-Aug
+        audit measured them deciding ~100% of the live row's gross loss
+        while being the only bars the growth rail could not reach (I18).
+        The None-default fallback to module bars remains for direct callers.
     """
     hard_stop = HARD_STOP if hard_stop is None else hard_stop
     exit_apr = EXIT_APR if exit_apr is None else exit_apr
@@ -733,6 +787,11 @@ def entry_stamp(is_short, px, now_ts, clip, src, hot_h=None):
                      # when the book was ADMITTED, surviving a lever that
                      # expires mid-hold (the (ed) rule)
                      "min_vol": MIN_VOL,
+                     # [(na)] exit knobs are ENTRY-PRICED like tp/max_hold:
+                     # the stamp governs the trade (pos_exit_bars), so a
+                     # lever expiring mid-position cannot snap an in-flight
+                     # stop onto a different geometry (the (bw) flap class)
+                     "exit_apr": EXIT_APR, "hard_stop": HARD_STOP,
                      "slope_gate": 1 if SLOPE_GATE else 0,
                      "explore_k": SCAN_EXPLORE_K,
                      "conviction_hi": (CONVICTION_HI
@@ -2288,11 +2347,14 @@ def main():
 
             held_h = (t0 - opened_ts) / 3600.0
             # [2026-07-22 FLAP FIX] tp/hold from the position's OWN entry
-            # stamp (pos_bars); stop/flip/decay bars are env-only, unchanged.
+            # stamp (pos_bars); [(na)] stop/decay bars now arrive the same
+            # way (pos_exit_bars) — they are levers since 15-Aug.
             _tp, _mh = pos_bars(m)
+            _hs, _xa = pos_exit_bars(m)
             # [2026-07-29 (en)] the ladder itself is exit_decision() — pure,
             # fixture-tested, precedence and sign convention pinned there.
-            decision = exit_decision(is_short, entry, px, apr, held_h, _tp, _mh)
+            decision = exit_decision(is_short, entry, px, apr, held_h, _tp, _mh,
+                                     hard_stop=_hs, exit_apr=_xa)
             if decision is None:
                 continue
 

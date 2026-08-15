@@ -1,3 +1,42 @@
+## 2026-08-15 (na) — the two knobs deciding ~100% of the LIVE Farmer's gross loss become levers, entry-priced, judge-explorable: the I18 unreachable-binding-constraint on real money itself
+
+- **THE FINDING (15-Aug audit; adversarially verified from the live ledger).**
+  `EXIT_APR` (48.9%) and `HARD_STOP` (51.1%) decide ~100% of the live row's
+  gross loss ($7.83) — and they were the ONLY bars on the book outside the
+  growth rail: env-only constants, unreachable by the judge, unmeasured on
+  this book's own cell (`HARD_STOP=0.10` is HL-fitted from 17-Jul). The live
+  book's era edge reads statistically zero (t=0.48) with execution measured
+  clean — if the stall is anywhere tractable, it is in the exit geometry,
+  and the fleet's promotion pipeline structurally could not touch it.
+- **The "never levers" line was scoped, not principled — read before
+  bulldozed.** The (bw) flap fix's comment declared them env-only; its
+  actual doctrine was *"the bars priced at entry govern the trade"*. That
+  entry-stamp machinery is exactly what makes exit knobs safe to lever:
+  they now ride it. Corrected in place per I12.
+- **THE PLUMBING (min_vol-precedent pair, no behaviour change today):**
+  `xp.funding.{exit_apr,hard_stop}` (judge explores on the shadow twin) +
+  `live.funding.{exit_apr,hard_stop}` (judge sole writer via the paired
+  bar, fade-watch unchanged). Cages bracket the E2 study's pre-registered
+  grid (exit_apr 0.5×–2× default; hard_stop [5%, 15%]); registry
+  env_defaults match the code's (bounds audit green). Consumed in
+  `apply_levers`, receipted in `_ACTIVE_BARS` (the (jy) rule — a candidate
+  without a receipt accrues zero provable closes), stamped at entry, and
+  **governed by the stamp** via the new `pos_exit_bars` twin of `pos_bars`
+  — a lever starting or fading mid-hold cannot snap a different stop
+  geometry onto an in-flight position. Fail-safe identical to (bw):
+  legacy/junk stamps behave exactly as before.
+- **The authority audit's own pin FLIPPED from good news:** its selftest
+  asserted this exact pair UNLEVERED (the finding); it now asserts their
+  ABSENCE from the unlevered set. **Mutation-verified: severing the
+  `exit_apr` consumer read resurfaces the knob and reddens the selftest.**
+- **No lever opens today.** Env defaults are byte-identical; entry stamps
+  gain two fields; the judge's CANDIDATES gains an exit-policy entry ONLY
+  if the running E2 study (the Farmer-cell exit-policy grid, calibration-
+  gated on the live arm's own record) produces a cell that beats shipped on
+  both halves. The code reaches both Farmer arms via the already-queued
+  judge-unblock dispatch (OPERATOR_QUEUE §6) — one dispatch now delivers
+  the arm alignment AND this plumbing.
+
 ## 2026-08-15 (mz) — the audit's small-fix sweep: the backtest venue-purity arm gets TEETH (a ratchet, 29 days after "a deliberate later step"), a guard's own live roster was stale, and three honesty fixes
 
 - **VENUE-PURITY BACKTEST RATCHET.** The 17-Jul design built the backtest arm

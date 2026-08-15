@@ -1578,9 +1578,15 @@ def _selftest():
     unm = {n for n, _b, v, _y, _x in f_now if v == "UNMEASURED"}
     assert {"live.funding.enter_apr", "xp.funding.enter_apr"} <= unm, \
         f"the widened pair must read UNMEASURED pending re-measure: {unm}"
+    # [(na) 15-Aug] FLIPPED: this pin used to assert HARD_STOP/EXIT_APR are
+    # UNLEVERED — the very finding the 15-Aug audit acted on. They are
+    # registered (xp/live.funding.{exit_apr,hard_stop}), consumed in
+    # apply_levers and entry-priced via pos_exit_bars, so the honest pin is
+    # now their ABSENCE from the unlevered set: a regression that severs the
+    # consumer would resurface them here and redden this.
     knobs = {n for n, _b, v, _y, _x in f_now if v == "UNLEVERED"}
-    assert "lighter_funding_bot.py:HARD_STOP" in knobs, knobs
-    assert "lighter_funding_bot.py:EXIT_APR" in knobs, knobs
+    assert "lighter_funding_bot.py:HARD_STOP" not in knobs, knobs
+    assert "lighter_funding_bot.py:EXIT_APR" not in knobs, knobs
 
     # --- 10. Declarations must be reasons, and must name something real.
     for k, v in LEVER_AUTHORITY_OK.items():
