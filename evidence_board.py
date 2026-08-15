@@ -2323,12 +2323,22 @@ def _selftest():
     assert lv == {}, "at the cage bound the author proposes nothing"
     _T.vals = {}
 
-    # STARVED: 0 open AND no new closes for the window -> loosen the GATE
+    # STARVED: 0 open AND no new closes for the window -> the ladder WANTS to
+    # loosen the gate — and since (mv) the cage refuses it: `carry.enter_apr`
+    # is tighten-only (lo == default == 1.6), because the 3-Aug measurement
+    # refused the 20%->10% widening with numbers (I19) and below 1.6 the gate
+    # invades 🧮 Hull's published zero-rival band (I20). The walk terminates
+    # at the floor, so the author proposes NOTHING on this lever. This
+    # selftest used to assert the walk reached 1.4; that assertion was the
+    # armed defect the 15-Aug audit found (the board held the refused value
+    # open on the live bus), pinned here in its corrected direction.
     _prior = {_CB: {"closed": 80, "ts": _bnow - 30 * 3600}}
     lv, _ = synthesize_books([{"bot": _CB, "open_trades": 0,
                                "closed_trades": 80}], _prior, {}, _bnow,
                              tuning_mod=_T)
-    assert lv.get("carry.enter_apr", {}).get("value") == 1.4, lv
+    _ea = lv.get("carry.enter_apr")
+    assert _ea is None or _ea.get("value") >= 1.6, \
+        f"the STARVED ladder must not widen carry.enter_apr below 1.6: {lv}"
 
     # ...but a book that CLOSED something in the window is not starved
     lv, _ = synthesize_books([{"bot": _CB, "open_trades": 0,
@@ -2421,11 +2431,23 @@ def _selftest():
     # STARVED book holds nothing, so its pnl is ~0 by definition — applying
     # the term there would freeze the branch that exists to unstick a gate
     # admitting nothing.
+    # [(mv)] carry's gate lever is now tighten-only (cage lo == default), so
+    # the asymmetry is pinned on a book whose gate KEEPS widen room: the
+    # sniper (surge_mult 3.0, step -0.5, lo 2.0). The doctrine under test is
+    # unchanged — the STARVED branch reads no P&L term — only the worked
+    # example moved, because carry's example became the (mv) armed defect.
+    _SB = "lighter-perp-sniper-lshadow"
+    lv, _ = synthesize_books(
+        [{"bot": _SB, "open_trades": 0, "closed_trades": 29, "pnl_abs": -9.0}],
+        {_SB: {"closed": 29, "ts": _bnow - 30 * 3600}}, {}, _bnow, tuning_mod=_T)
+    assert lv.get("sniper.surge_mult", {}).get("value") == 2.5, \
+        "a losing STARVED book must still get its gate loosened"
+    # ...and even a losing STARVED carry proposes NOTHING on its capped gate
     lv, _ = synthesize_books(
         [{"bot": _CB, "open_trades": 0, "closed_trades": 80, "pnl_abs": -9.0}],
         {_CB: {"closed": 80, "ts": _bnow - 30 * 3600}}, {}, _bnow, tuning_mod=_T)
-    assert lv.get("carry.enter_apr", {}).get("value") == 1.4, \
-        "a losing STARVED book must still get its gate loosened"
+    _ea = lv.get("carry.enter_apr")
+    assert _ea is None or _ea.get("value") >= 1.6, lv
 
     # the field is one the PUBLISHER actually emits — not a name invented by
     # whoever wrote this consumer (the (hj) hand-fixture class).

@@ -1076,3 +1076,23 @@ class TestTideRiderUniverse:
         assert trend.resolve_universe(["XAU"], 24, 5.0)[0] == "XAU"
         monkeypatch.setattr(trend, "ALLOW_TRADFI", True)
         assert "XAU" in trend.resolve_universe(self.CORE, 24, 5.0)
+
+
+# ---------------------------------------------------------------------------
+# [(mv), 15-Aug] THE CARRY ENTRY GATE IS TIGHTEN-ONLY, AND THE CAGE IS THE
+# ENFORCEMENT. The board's STARVED ladder walked carry.enter_apr to its old
+# cage floor 0.80 = 10% TRUE — the exact widening the 3-Aug measurement
+# refused with numbers (I19) — and the book consumed it (caps.enter_apr=0.1
+# on the live row, 15-Aug audit, adversarially verified). Below 1.60 the gate
+# also invades 🧮 Hull's published zero-rival band [7.82%, 20%) (I20 tiling).
+# Behavioural, not membership: the claim is what a consumer READS.
+# ---------------------------------------------------------------------------
+def test_carry_enter_apr_cannot_be_widened_below_the_validated_bar():
+    # the exact value the board held open on 14/15-Aug must clamp back up
+    assert fleet_tuning.clamp("carry.enter_apr", 0.80) == 1.60, (
+        "a cage that admits the measured-refused 10% TRUE value makes the "
+        "I19 refusal decorative and re-opens Hull's I20 band")
+    # tightening stays available — that direction was never in dispute
+    assert fleet_tuning.clamp("carry.enter_apr", 2.40) == 2.40
+    # and the registry floor itself is pinned at the validated 20% bar
+    assert fleet_tuning.LEVERS["carry.enter_apr"]["lo"] >= 1.60

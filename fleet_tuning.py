@@ -340,12 +340,25 @@ LEVERS = {
     # consumer below reverts to its operator env default on the next read.
     "carry.enter_apr": {
         # env default 1.60 = 20% TRUE apr = the top ~14% of the venue's
-        # funding distribution (measured over all 202 books). Bounds span
-        # 10%-40% TRUE so the rail can test BOTH directions around the value
-        # that is currently winning — a tail-seeking bar is the carry book's
-        # whole thesis and it has never been measured against its neighbours.
-        "kind": "float", "lo": 0.80, "hi": 3.20, "lane": "lighter-books",
-        "note": "Yield Harvester funding entry gate; env default 1.60 (=20% TRUE)", "env_default": 1.6, "step": -0.2},
+        # funding distribution (measured over all 202 books).
+        # [2026-08-15 (mv)] `lo` 0.80 -> 1.60 — the cage may no longer WIDEN
+        # this gate, only tighten it, for two measured reasons the 30-Jul
+        # "test BOTH directions" rationale predates:
+        #   I19: 3-Aug measured 20%->10% TRUE as loss-making (a 29bps RT needs
+        #   the rate to hold 254 of a 336h max hold to break even at 10%) and
+        #   REFUSED it — yet the board's STARVED ladder walked this lever to
+        #   0.80 = exactly that refused value, and the book consumed it
+        #   (caps.enter_apr=0.1 on the live row, 15-Aug audit, adversarially
+        #   verified). A cage that admits a measured-refused value makes the
+        #   refusal decorative.
+        #   I20: below 1.60 this gate invades 🧮 Hull's PUBLISHED zero-rival
+        #   band [7.82%, 20%) x [$2M,$10M) — the tiling declared at Hull's
+        #   birth. A widening here is a silent second entrant, not growth.
+        # The read-side clamp retires the open 0.80 lever without a bus write.
+        # A future widening BELOW 20% is a replay-gated measurement first
+        # (I19), then a deliberate two-sided cage change citing it.
+        "kind": "float", "lo": 1.60, "hi": 3.20, "lane": "lighter-books",
+        "note": "Yield Harvester funding entry gate; env default 1.60 (=20% TRUE); tighten-only since (mv)", "env_default": 1.6, "step": -0.2},
     "carry.max_positions": {
         # measured AT 7 open of 8 — the fleet's biggest earner is one slot
         # from full and cannot take the eighth-best carry it has graded.
