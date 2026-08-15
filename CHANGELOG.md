@@ -1,3 +1,35 @@
+## 2026-08-15 (mx) — a proposal with an EMPTY evidence field displaced the tuner's own measured winner: the ratchet was strict up and loose down, and the two margins exactly cancelled
+
+- **THE INCIDENT (found by the 15-Aug audit, adversarially verified; live on
+  the bus at snapshot).** The scout tuner's exit sweep enacted
+  `MAX_HOLD_H=72` — "+$12.23 on the tape AND both halves", the strict bar:
+  IMPROVE by MARGIN_HALF ($0.5) on each half. In the same merged payload the
+  event sentinel's risk-off proposal (evidence field EMPTY, driver a playbook
+  bias whose own self-measured record reads hit 0.37 on n=558 — i.e. worse
+  than a coin flip) wrote `taker.max_hold_h=24.0` over it, because a RESTRICT
+  proposal only had to be "not worse within TOL ($0.5) per half". **A value
+  that had to prove +$0.5/half could be displaced by one allowed to forfeit
+  $0.5/half — the enact bar and the displace slack cancel exactly**, so the
+  measured winner's whole margin was erasable by a signal with no evidence.
+- **THE FIX: measured seniority, mechanical, at the same evidence bar.**
+  `consume_proposals` now takes `sweep_attrs` (the attrs this cycle's sweep
+  actually landed in bars — a joint-replay drop earns no seniority) and gates
+  a restrict proposal against a sweep-owned attr at **tol=0**: a restriction
+  that is genuinely FREE on the tape (the usual risk-off crouch on an idle
+  lever) still passes; one that forfeits measured margin is REJECTED with the
+  log naming the seniority. Non-sweep-owned attrs keep the old TOL slack —
+  the organs' proposal channel is not narrowed anywhere else.
+- **Self-healing on deploy, no hand write:** the open 24.0 lever expires on
+  its own TTL; the next tuner cycle re-runs the sweep (the +$12.23 cell
+  re-derives if it still holds on the trailing tape) and the sentinel's
+  re-proposal can no longer displace it un-free. The sentinel's own lane and
+  levers are untouched.
+- Selftest drives the exact boundary: a fixture whose forfeit sits INSIDE
+  (0, TOL) on one half — enacted without seniority (old rule, preserved),
+  REJECTED with it, and a genuinely-free crouch still passes against a sweep
+  winner. **Mutation-verified: restoring `tol_r = TOL` replays the incident
+  verbatim (24.0 ENACTED) and reddens.**
+
 ## 2026-08-15 (mw) — the brain's pager fired at 21.7h, not the engraved 8h: a critical organ's own payload was slackening its paging bar — plus two more TTL-honesty fixes in the same class
 
 - **THE FINDING (15-Aug audit, adversarially verified line-by-line).** The

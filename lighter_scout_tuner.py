@@ -546,7 +546,7 @@ def desired_scout_levers(lens_fwd, helping=None, realised=None):
 
 
 def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh,
-                      realised=None):
+                      realised=None, sweep_attrs=frozenset()):
     """[2026-07-21 operator mandate: "the organs need more ability to
     implement changes to forward onto the tuners to act on"] Gate ORGAN
     PROPOSALS (fleet_proposals) through this tuner's OWN evidence bars and
@@ -602,9 +602,27 @@ def consume_proposals(proposals, tape, bars, lens_fwd, lens_fresh,
             continue
         cand = dict(current, **{attr: v})
         if true_dir == "restrict":
-            if not not_worse(h1, h2, current, cand):
+            # [2026-08-15 (mx)] MEASURED SENIORITY. The sweep's winner had to
+            # IMPROVE both halves by MARGIN_HALF ($0.5) to enact; a restrict
+            # proposal then displaced it while forfeiting up to TOL ($0.5) per
+            # half — strict ratchet up, loose ratchet down, on the same
+            # evidence bar, so the two cancel and a fear-driven proposal with
+            # an EMPTY evidence field could undo a measured winner. Observed
+            # live 14-Aug: the sweep enacted MAX_HOLD_H=72 (+$12.23, both
+            # halves) and the sentinel's playbook bias (self-measured hit
+            # 0.37) wrote 24 over it in the same merged payload. Against a
+            # same-cycle sweep winner the proposal now gates at tol=0: a
+            # restriction that is genuinely FREE on the tape (the usual
+            # risk-off crouch on an idle lever) still passes; one that
+            # forfeits measured margin needs evidence of the sweep's own
+            # strength, which a proposal does not carry.
+            tol_r = 0.0 if attr in sweep_attrs else TOL
+            if not not_worse(h1, h2, current, cand, tol=tol_r):
+                why = ("would forfeit the sweep's measured margin — the "
+                       "measured winner is senior"
+                       if attr in sweep_attrs else "worse on a half")
                 log.append(f"proposal({p['set_by']}): restrict {p['lever']}"
-                           f"={v} REJECTED (worse on a half)")
+                           f"={v} REJECTED ({why})")
                 continue
         else:
             lens = _ATTR_LENS.get(attr)
@@ -747,9 +765,13 @@ def run_once():
     prov, log5 = {}, []
     if fprop is not None:
         props = fprop.proposals_for(set(PROPOSAL_TAKER))
+        # [(mx)] seniority applies only to sweep values that actually made it
+        # into this cycle's bars (a joint-replay failure drops the exits, and
+        # a dropped value earns no seniority).
         bars, prov, log5 = consume_proposals(props, tape, bars, lens_fwd,
                                              lens_fresh=lf_fresh,
-                                             realised=realised)
+                                             realised=realised,
+                                             sweep_attrs=set(exits) & set(bars))
 
     attr_to_lever = {attr: lever for _l, (attr, lever, _lad) in TAKER_LADDERS.items()}
     # [2026-07-29 (fp)] STOP_LOSS is deliberately ABSENT: with no mapping, a
@@ -1265,6 +1287,56 @@ def _selftest():
     # empty channel -> untouched passthrough
     assert consume_proposals({}, win_tape, {"MOMO_CHG": 4.5}, {}, True)[0] \
         == {"MOMO_CHG": 4.5}
+
+    # [2026-08-15 (mx)] MEASURED SENIORITY at the exact boundary that bit
+    # live on 14-Aug: a restrict proposal whose forfeit is inside TOL used to
+    # displace a same-cycle sweep winner. Tape: one momo entry whose gain
+    # accrues AFTER the 24h hold would exit but inside the first half, so
+    # restricting 72 -> 24 costs (0, TOL) on that half and nothing on the
+    # other — ENACTED without seniority (old behaviour, preserved for
+    # non-sweep-owned attrs), REJECTED with sweep_attrs (the fix).
+    m_sen = {"sym": "SSS", "chg_pct": 5.5, "vol_m": 9.0}
+
+    def snapH(h, marks, tickets=None):
+        # the day-one `snap` caps at h=23; this fixture spans three days
+        return (dt(0) + timedelta(hours=h),
+                {"marks": marks, "tickets": tickets or {}})
+
+    sen_tape = [
+        snapH(0, {"SSS": 100.0}, {"momentum": [m_sen]}),
+        snapH(12, {"SSS": 100.0}),
+        snapH(25, {"SSS": 100.0}),       # the hold-24 exit lands here, flat
+        snapH(30, {"SSS": 100.35}),      # the gain a 24h cap forfeits
+        snapH(36, {"SSS": 100.35}),      # first half ends holding +0.35%
+        snapH(48, {}), snapH(60, {}), snapH(72, {}),
+    ]
+    sh1, sh2 = halves(sen_tape)
+    _cur72 = dict(DEFAULTS, **{"MAX_HOLD_H": 72.0})
+    _cand24 = dict(_cur72, **{"MAX_HOLD_H": 24.0})
+    _deltas = [(_marked(replay_with(h, _cur72)) -
+                _marked(replay_with(h, _cand24))) for h in (sh1, sh2)]
+    assert 0 < max(_deltas) < TOL and min(_deltas) >= 0, (
+        f"fixture must sit in the (0, TOL) band the incident lived in: "
+        f"{_deltas}")
+    # without seniority the forfeit is inside TOL -> enacted (unchanged rule)
+    b8, _, pl8 = consume_proposals(prop("taker.max_hold_h", 24.0, "restrict"),
+                                   sen_tape, {"MAX_HOLD_H": 72.0}, {},
+                                   lens_fresh=True)
+    assert b8.get("MAX_HOLD_H") == 24.0, (b8, pl8)
+    # with the attr sweep-owned the same proposal is refused, and the log
+    # names the seniority so the operator can see WHY
+    b9, pv9, pl9 = consume_proposals(prop("taker.max_hold_h", 24.0, "restrict"),
+                                     sen_tape, {"MAX_HOLD_H": 72.0}, {},
+                                     lens_fresh=True,
+                                     sweep_attrs={"MAX_HOLD_H"})
+    assert b9.get("MAX_HOLD_H") == 72.0 and not pv9, (b9, pl9)
+    assert any("senior" in l for l in pl9), pl9
+    # ...and a restriction that is genuinely FREE on the tape still passes
+    # even against a sweep winner (the risk-off crouch is not blocked)
+    b10, _, _ = consume_proposals(prop("taker.momo_chg", 6.0, "restrict"),
+                                  win_tape, {}, {}, lens_fresh=True,
+                                  sweep_attrs={"MOMO_CHG"})
+    assert b10.get("MOMO_CHG") == 6.0, b10
 
     # every ladder/sweep value must be registered + in-bounds in fleet_tuning
     for lens, (attr, lever, ladder) in TAKER_LADDERS.items():
