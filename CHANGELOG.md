@@ -1,3 +1,27 @@
+## 2026-08-15 (nb) — 🛢️ Garrett was validating a $25-clip study cell at $7.50: the allocation organ's probe floor leaked into a variant whose whole contract is "no external knobs"
+
+- **THE FINDING (15-Aug audit, binding-constraints dimension).** The (lp)
+  variant contract is *"env-only config, single-policy by construction"* —
+  `apply_levers` short-circuits every tuning lane for a variant. But the
+  (jr) allocation consumer arrived LATER and was not variant-gated:
+  `allocation_scale(bot_id)` returned the no-claim probe floor **0.25** for
+  band-garrett (n=4, below MIN_N — correctly no claim), and the row read
+  `clip_usd: 7.5`. The book EXISTS to validate the fleet's strongest
+  unbuilt measured claim (STUDY_THIN_TIER_MIN_VOL: the [0.1M,2M) band at
+  **+$14.83/30d, both halves, robust at p90 — measured at $25 clips**); at
+  quarter size its 30-day clock was accruing evidence for a policy the
+  study never measured, and the dollar claim could never reproduce.
+- **THE FIX IS ONE GATE:** `shadow_tag and not VARIANT` on the allocation
+  consumer. Garrett's clip returns to its env value on its next loop after
+  deploy (auto-deploy rule active since (lr)). Per-trade % is
+  clip-invariant ((hl)) and (hc) rules a clip change ordinary tuning — the
+  era clock does NOT reset; what changes is that the remaining ~28 days of
+  the clock accrue at the study's own size. The Farmer shadow arm (a real
+  arm, not a variant) keeps its consumer, currently scaling 1.0.
+- Pinned in `tests/autonomy/test_funding_variant.py` beside the lane guard
+  (AST on the gate's own test expression). **Mutation-verified: removing
+  `not VARIANT` reddens it.**
+
 ## 2026-08-15 (na) — the two knobs deciding ~100% of the LIVE Farmer's gross loss become levers, entry-priced, judge-explorable: the I18 unreachable-binding-constraint on real money itself
 
 - **THE FINDING (15-Aug audit; adversarially verified from the live ledger).**

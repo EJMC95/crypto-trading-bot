@@ -101,3 +101,31 @@ def test_the_band_is_half_open(monkeypatch):
     assert fb.MIN_VOL <= 1.99e6 < fb.MAX_VOL       # inside
     assert not (fb.MIN_VOL <= 2e6 < fb.MAX_VOL)    # ceiling excluded
     assert not (fb.MIN_VOL <= 9.9e4 < fb.MAX_VOL)  # below floor excluded
+
+
+def test_variant_takes_no_allocation_scale(monkeypatch):
+    """[(nb), 15-Aug] THE OTHER EXTERNAL KNOB. apply_levers short-circuits
+    the tuning lane for a variant, but the (jr) allocation consumer arrived
+    later and was not variant-gated: the organ's no-claim probe floor (0.25)
+    quarter-sized 🛢️ Garrett to $7.50 clips while its whole birth thesis is
+    validating a study cell measured AT $25 clips. Asserted on the SOURCE
+    GUARD (the `shadow_tag and not VARIANT` gate), driven through the same
+    module-reload fixture as the lane test above."""
+    import ast
+    import inspect
+
+    fb = _fresh(monkeypatch, FUNDING_VARIANT="band-garrett",
+                FUNDING_MIN_VOL="1e5", FUNDING_MAX_VOL="2e6")
+    src = inspect.getsource(fb)
+    tree = ast.parse(src)
+    guarded = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            seg = ast.get_source_segment(src, node.test) or ""
+            if "shadow_tag" in seg and "allocation_scale" in ast.dump(node):
+                guarded = "not VARIANT" in seg.replace("(", " ").replace(")", " ")
+                break
+    assert guarded, (
+        "the allocation_scale consumer must be gated `shadow_tag and not "
+        "VARIANT ...` — a variant scaled by an external organ is no longer "
+        "single-policy by construction ((lp)/(nb))")

@@ -2025,7 +2025,18 @@ def main():
         # [2026-08-05 (jr) S1] allocation scale, SHADOW ARM ONLY: the live
         # arm's clip takes no capital lever ((ia)) and no allocation. NEW
         # entries only, like the lever above. Dark/stale organ -> 1.0.
-        if shadow_tag and fleet_bus is not None:
+        # [2026-08-15 (nb)] ...and NOT VARIANTS. The (lp) variant contract is
+        # "env-only config, single-policy by construction" — apply_levers
+        # short-circuits every tuning lane for a variant, but this consumer
+        # arrived later ((jr)) and was not variant-gated, so the allocation
+        # organ's no-claim probe floor (0.25) quarter-sized 🛢️ Garrett to
+        # $7.50 clips while the book exists to validate a study cell measured
+        # AT $25 clips (STUDY_THIN_TIER_MIN_VOL: +$14.83/30d, both halves,
+        # robust at p90 — at quarter size the dollar claim can never
+        # reproduce). Found by the 15-Aug audit. Per-trade % is
+        # clip-invariant ((hl)) and (hc) rules a clip change ordinary
+        # tuning, so the era clock does NOT reset.
+        if shadow_tag and not VARIANT and fleet_bus is not None:
             _clip *= (fleet_bus.allocation_scale(bot_id) or 1.0)
         if _clip != order_usd:
             log.info("growth rail: clip %s -> %s (max_open recomputed)",
