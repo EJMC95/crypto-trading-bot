@@ -230,16 +230,38 @@ def _build_files(entry=None):
     id — see _stamp_build — so a short set is self-describing and a reader can
     tell "different file set" from "different code".
     """
-    out = []
+    out, seen = [], set()
+
+    def _add(p):
+        # [2026-08-15 (nh)] DEDUP BY REAL PATH. Since (mu) an ENTRY can also be
+        # a _BUILD_SHARED name (`lighter_family_bot.py` is the family image's
+        # entry AND the module the live Avo image carries), and the two
+        # appends use different path forms — `abspath(entry)` vs
+        # `join(_BUILD_ROOT, name)`. Where those forms differ only by a
+        # SYMLINK (macOS /tmp -> /private/tmp, a git worktree under a symlinked
+        # temp dir), the same file was hashed TWICE and the stamp depended on
+        # who was asking: the container counted 15 files, audit_code_currency's
+        # per-commit probe counted 16, so the family rows could never resolve —
+        # the audit printed UNRESOLVED and still exited OK, leaving "which
+        # commit is this bot running?" silently unanswered for the image
+        # carrying the live Avo strategy module's shadow twin.
+        rp = os.path.realpath(p)
+        if rp in seen:
+            return
+        seen.add(rp)
+        out.append(p)
+
     if entry and os.path.isfile(entry):
-        out.append(os.path.abspath(entry))
+        _add(os.path.abspath(entry))
     for name in _BUILD_SHARED:
         p = os.path.join(_BUILD_ROOT, name)
         if os.path.isdir(p):
             for d, _sub, fs in os.walk(p):
-                out.extend(os.path.join(d, f) for f in fs if f.endswith(".py"))
+                for f in fs:
+                    if f.endswith(".py"):
+                        _add(os.path.join(d, f))
         elif os.path.isfile(p):
-            out.append(p)
+            _add(p)
     return sorted(set(out), key=_build_rel)
 
 

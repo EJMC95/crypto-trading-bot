@@ -1,3 +1,37 @@
+## 2026-08-15 (nh) — MY OWN (mu) FIX HAD A BUG: an entry that is ALSO a shared name was hashed TWICE, and the duplicate appeared or vanished with the CALLER'S PATH FORM — so the currency guard went silently blind on three rows and still exited OK
+
+- **FOUND BY THE CLOSING SWEEP** (run by hand after the subagent sweep died on
+  a credit limit): `audit_code_currency` read **UNRESOLVED** for
+  `freqtrade-{mum,avo-maria,georgia}-lshadow` — *"stamp 55efb44ab0f3/15
+  produced by no commit in the 250-commit window"* — while the container was
+  demonstrably CURRENT (avo publishing `max_open: 6` from (ne), the family
+  service publishing exactly the three post-(nf) books). A guard that cannot
+  answer for the image carrying the **live Avo strategy module's shadow
+  twin**, and that exits OK while failing to answer, is the (mq) class
+  reopened by my own hand.
+- **THE MECHANISM, measured both ways.** `(mu)` put `lighter_family_bot.py`
+  into `_BUILD_SHARED` while it is ALSO the family image's ENTRY. `_build_files`
+  appended it twice — once as `abspath(entry)`, once as
+  `join(_BUILD_ROOT, name)` — and those two forms differ **only when a symlink
+  separates them** (macOS `/tmp` → `/private/tmp`; a git worktree under a
+  symlinked temp dir, which is exactly where the audit's per-commit probe
+  runs). So the SAME tree stamped **15 files in the container and 16 in the
+  probe** (17/16 across both hide-variants), and no commit could ever match.
+  The stamp silently depended on who was asking.
+- **THE FIX IS AT THE ROOT:** `_build_files` dedupes by `os.path.realpath`, so
+  an entry that is also a shared name is hashed ONCE in every environment.
+  Verified: probe and live worktree now return byte-identical variant sets.
+- **The first test I wrote for this was VACUOUS** — it used one path form, so
+  the mutation (dropping the dedup) stayed green, and the fixture never
+  reproduced the defect. Replaced with a SYMLINK fixture that reproduces the
+  real asymmetry; **both tests now redden on the mutation.** Recorded because
+  it is the I3 lesson landing on me twice in one day: a guard is not verified
+  until a mutation reddens it, and my first attempt looked fine.
+- **Cost, declared:** editing `bot_pnl_store.py` moves every image's stamp by
+  one deploy cycle — the known BEHIND-SHARED window ((mp)/(mu) precedent),
+  classified by the audit and not a finding. The dedup itself changes no
+  behaviour beyond the stamp.
+
 ## 2026-08-15 (ng) — the closing sweep: doctrine caught up to the slate (I12), and the judge's post-alignment n=0 is BY DESIGN — the one alarming reading of the day, run to ground in code
 
 - **THE READING THAT LOOKED LIKE A REGRESSION.** Minutes after both 💸 Farmer

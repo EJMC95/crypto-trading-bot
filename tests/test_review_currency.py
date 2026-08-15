@@ -773,3 +773,70 @@ def test_an_image_without_the_family_module_keeps_its_own_stamp(
     assert lean[0] != rich[0], (
         "identical entry bytes in two different FILE SETS must stamp "
         "differently ((fd))")
+
+
+# ---------------------------------------------------------------------------
+# 9. A FILE THAT IS BOTH THE ENTRY AND A SHARED NAME IS HASHED ONCE — AND THE
+#    STAMP DOES NOT DEPEND ON WHO IS ASKING.
+#
+# (nh), 15-Aug: (mu) put `lighter_family_bot.py` into _BUILD_SHARED while it
+# is ALSO the family image's entry module. `_build_files` appended it twice,
+# via two different path forms (`abspath(entry)` vs `join(_BUILD_ROOT, name)`)
+# — so whether the duplicate materialised depended on the CALLER'S CWD: the
+# container counted 15 files, `audit_code_currency`'s per-commit probe counted
+# 16, and the audit could never resolve the family rows. It printed UNRESOLVED
+# and still exited OK, i.e. the fleet's answer to "which commit is this bot
+# running?" was silently missing for the image that carries the live Avo
+# strategy module's shadow twin.
+# ---------------------------------------------------------------------------
+def test_an_entry_that_is_also_shared_is_hashed_once(tmp_path, monkeypatch):
+    """THE REAL MECHANISM: the two appends use different path FORMS, so the
+    duplicate only materialises when those forms differ — e.g. by a symlink
+    (macOS /tmp -> /private/tmp, or a git worktree under a symlinked temp
+    dir, which is exactly where audit_code_currency's probe runs)."""
+    import os
+    import bot_pnl_store as b
+
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "entry_shared.py").write_text("S = 1\n")
+    link = tmp_path / "link"
+    os.symlink(str(real), str(link))          # same files, different path form
+
+    monkeypatch.setattr(b, "_BUILD_ROOT", str(real))
+    monkeypatch.setattr(b, "_BUILD_SHARED", ("entry_shared.py",))
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+
+    # the entry arrives by the SYMLINKED form (what a differently-rooted
+    # caller passes); the shared scan finds it by the REAL form
+    files = b._build_files(str(link / "entry_shared.py"))
+    reals = [os.path.realpath(f) for f in files]
+    assert len(reals) == len(set(reals)) == 1, (
+        f"entry-as-shared hashed twice via a symlinked path form: {files}")
+
+
+def test_the_stamp_is_independent_of_the_path_form(tmp_path, monkeypatch):
+    """The property the audit relies on: the container (image root) and the
+    per-commit probe (temp worktree, often symlinked) must compute the SAME
+    stamp, or resolution is impossible and the guard goes silently blind."""
+    import os
+    import bot_pnl_store as b
+
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "entry_shared.py").write_text("S = 1\n")
+    (real / "other.py").write_text("O = 1\n")
+    link = tmp_path / "link"
+    os.symlink(str(real), str(link))
+
+    monkeypatch.setattr(b, "_BUILD_ROOT", str(real))
+    monkeypatch.setattr(b, "_BUILD_SHARED", ("other.py", "entry_shared.py"))
+
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+    direct = b.build_compute(str(real / "entry_shared.py"))
+    monkeypatch.setattr(b, "_BUILD_CACHE", None)
+    via_link = b.build_compute(str(link / "entry_shared.py"))
+
+    assert direct == via_link, (
+        f"the stamp moved with the caller's path form: {direct} vs {via_link}"
+        " — audit_code_currency can never resolve such a row (nh)")
