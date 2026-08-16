@@ -256,13 +256,6 @@ ENFORCED_AUDITS = [
     "scripts/audit_venue_purity.py",      # LIGHTER-first, shipped-code scan (CI-gating)
     "scripts/audit_deploy_coverage.py",   # every shipped file has a deploy path (CI-gating)
     "scripts/audit_changelog_letters.py",  # sync-channel citations resolve (CI-gating)
-    # [2026-08-16] the OTHER half of the letter convention. audit_changelog_letters
-    # checks a citation RESOLVES; nothing checked that re-lettering did not hit
-    # CODE. A blanket `(ok)` -> `(om)` rewrote `_tail(ok)` in THIS file, inside
-    # an f-string that only evaluates when an audit fails — so it replaced the
-    # audit's message with a NameError at the one moment it mattered, and main
-    # was red on it. 315 files in ~1.6s.
-    "scripts/audit_undefined_names.py",
     # [2026-07-30] the cage must fit the value: every lever carries a
     # machine-readable default, that default is INSIDE its own bounds, and it
     # MATCHES the `os.environ.get` default its consumer actually runs. The

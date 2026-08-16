@@ -99,73 +99,73 @@ imposed and not one a lever reaches.
 
 **NO CODE CHANGED.** Five angles closed, six refutations and one self-
 correction recorded, zero levers moved, zero books touched.
-## 2026-08-16 (ow) — THE BLANKET-REPLACE SWEEP: the one I fixed was the only damage in 315 files, and the guard that proves it is the half `audit_changelog_letters` never had
+## 2026-08-16 (ow) — THE BLANKET-REPLACE SWEEP: the one I fixed was the only damage in 315 files, and the guard for it ALREADY EXISTED and skipped the one directory the damage landed in
+
+- **[CORRECTED IN PLACE, 16-Aug. The first version of this entry announced a
+  NEW guard I had written. That was wrong, and wrong in the way that matters
+  most — it would have told every future reader that a duplicate was the
+  original.** `scripts/audit_undefined_names.py` **already existed**: shipped
+  1-Aug by `(ib)` after the `BOT_ROW` crash-loop, with the same rule, the same
+  deliberately-conservative module-wide design, and even the same
+  `getattr`-resolved `match` nodes for the 3.9-vs-3.11 gap I thought I had
+  discovered. I wrote a ~300-line duplicate of it and `Write` overwrote the
+  original, so my first `(ow)` commit **deleted 450 lines of a working guard**.
+  Restored from `b028c99`; the diff against it is now 47 added / 6 removed,
+  all of it the real fix below. The sweep's conclusion is unchanged. What I
+  should have done before creating the file is `git log` the path.]
 
 - **THE ASK** (operator, after the `(oq)` unbreak): *"now check the other
-  guards for blanket letter-replace damage"*. Answer up front: **the one I
-  already fixed was the only damage in the repo** — and the sweep is worth
-  having anyway, because it produced the guard that makes the next one
-  impossible to ship quietly.
-
-- **HOW IT WAS CHECKED, not read.** Four passes, each decisive about a
-  different shape rather than an eyeball over a diff:
-  1. **Every tracked `.py` (315 files), for names LOADED and never BOUND** —
-     the exact `_tail(om)` signature. Collect every binding in a module
-     (assignment, for-target, with-as, def/class, all five argument forms,
-     import, except-as, global/nonlocal, walrus, comprehension, match capture),
-     subtract from every `Load` name. **Zero findings, zero syntax errors.**
-     This also covers f-string interpolations — `f"{len(sh)}"` parses to a real
-     `Name` node — which is where the risk concentrates, since `{pct(bh)}` and
-     a `(bh)` citation are indistinguishable to a naive replace.
+  guards for blanket letter-replace damage"*. **Answer: none — the line fixed
+  in `(oq)` was the only damage in the repo.** Four passes, each decisive about
+  a different shape:
+  1. **Every tracked `.py` (315 files) for names LOADED and bound NOWHERE** —
+     the `_tail(om)` signature. Zero findings, zero syntax errors. This covers
+     f-string interpolations, where the risk concentrates: `{pct(bh)}` and a
+     `(bh)` citation are the same characters to a naive replace, and both parse
+     to a real `Name` node.
   2. **Citation shapes inside value strings** (311 of them): the risky subset
-     is code-in-string — f-string interpolations and SQL like `min(ts)` — and
-     that subset is already covered by pass 1, because it parses as
-     expressions. The remainder is prose in log lines: cosmetic.
-  3. **84 non-python tracked files** (workflows, shell, config): 104 citation
-     shapes, **102 in comments**. The two in executable positions are both
-     `echo "... (bq) ..."` prose — a replace would change a printed sentence
-     and break nothing.
-  4. The CHANGELOG side (dangling and duplicate letters) is already held by
-     `audit_changelog_letters`, currently green.
+     is code-in-string — f-string interpolations, SQL like `min(ts)` — already
+     covered by pass 1. The remainder is prose in log lines.
+  3. **84 non-python tracked files** (workflows, shell, config): 104 shapes,
+     **102 in comments**; the two in executable positions are `echo` prose.
+  4. Dangling and duplicate letters: already held by `audit_changelog_letters`.
 
-- **THE GUARD — `scripts/audit_undefined_names.py`, registered in
-  `ENFORCED_AUDITS`.** `audit_changelog_letters` checks that a citation
-  RESOLVES; nothing checked that re-lettering had not hit CODE, and that is
-  precisely the gap the incident fell through. 315 files in **~1.6s**.
-  Verified end to end by re-injecting the real damage into the real file: it
-  reports `tests/test_selftests.py:463: om`. Its `--selftest` carries the
-  incident as a fixture plus a no-false-positive fixture exercising every
-  binding form the fleet uses, and it REFUSES `import *` loudly rather than
-  skipping a file quietly.
+- **WHY THE EXISTING GUARD MISSED IT — the actual finding.** `(ib)`'s audit
+  runs its full scan in CI (`changelog-check.yml`) and was green throughout,
+  because `SKIP_DIRS` contained **`tests`**, excluded on the reasoning that
+  *"a NameError there fails a run a human is watching, not a trading loop
+  nobody is."* The 16-Aug incident is that reasoning's counterexample: the
+  NameError sat in an f-string evaluated ONLY when an audit fails, so it did
+  not fail a watched run — **it replaced the audit's own failure message**, hid
+  the diagnosis at the one moment it was load-bearing, and left main red on
+  `NameError: name 'om' is not defined`. The harness that reports failures is
+  not lower-stakes than a bot; it is what tells you a bot is broken.
 
-- **WHY MODULE-WIDE SCOPING IS THE POINT, not a shortcut.** A real per-scope
-  analysis would flag use-before-assignment and cross-scope reads and bury 300
-  files in findings that are nearly all fine — and a guard that cries wolf gets
-  deleted rather than fixed `(gl)`. Pooling every binding in the module can
-  only report a name bound in NO scope at all, which is never a scoping false
-  positive: it is a typo, a mangled token, or a missing import.
+- **THE FIX IS TWO LINES OF SCOPE**, in `(ib)`'s file: `SCAN_DIRS` gains
+  `tests`, `SKIP_DIRS` loses it. Coverage **106 -> 195 modules**, still clean,
+  ~0.7s more. Its `--selftest` gains a seventh arm carrying the real damage
+  and asserting the scope itself, so `tests` cannot quietly drop out again.
+  Verified end to end by re-injecting the damage into the real file:
+  `::error::tests/test_selftests.py:463: reads 'om', bound nowhere`.
 
-- **LIMITS, declared:** a replace that swaps one bound name for another bound
-  name still parses and runs — the suite is the detector for that one; and
-  runtime-injected names are declared in `DYNAMIC_OK` (empty today).
+- **REVERTED from the first cut:** the duplicate script, and a duplicate
+  `ENFORCED_AUDITS` registration — the guard was already wired through
+  `changelog-check.yml` and the selftest module list, so that entry would have
+  run it twice and implied it was new.
 
-- **THE AUDIT'S OWN FIRST DRAFT HAD THE DEFECT IT HUNTS.** It referenced
-  `ast.MatchAs` directly — a 3.10+ name — and this repo's venv is **Python
-  3.9.6 while CI runs 3.11**, so it died with `AttributeError` on the machine
-  most likely to run it first. Resolved through `getattr` now. Two things
-  worth keeping from that: a guard must run on the interpreter the operator
-  has, not only the one CI has; and the local/CI version gap is a real seam
-  nobody has written down.
+- **LIMITS, unchanged and declared:** a replace that swaps one bound name for
+  another still parses and runs — the suite is the detector for that one.
 
-- **AND ONE MORE SELF-INFLICTED LOOP:** the first version of this file used a
-  literal two-letter placeholder to EXPLAIN the convention, and
-  `audit_changelog_letters` correctly read it as a citation resolving to
-  nothing. Two guards, each doing its job, disagreeing about a docstring. The
-  placeholder is now spelled out in words.
+- **THE CORRECTION ITSELF WAS CAUGHT BY A GUARD, which is the good news.**
+  My first rewrite changed the title so heavily that `audit_changelog_letters`
+  refused it: `(ns)` requires an in-place correction to declare itself AND to
+  stay textually continuous with what it replaces (difflib >= 0.6), precisely
+  so a "correction" cannot be used to smuggle an unrelated entry onto a taken
+  letter. It made me keep the original title and edit only the clause that was
+  false — which is what an in-place correction is supposed to look like.
 
-- No trade behaviour anywhere in this entry: a new audit script, its
-  registration, and prose. Main only per `(mm)`. Suite green, all 27 floors
-  held.
+- No trade behaviour: a scope widening, a fixture, and prose. Main only per
+  `(mm)`. Suite green, all 27 floors held.
 
 ## 2026-08-16 (ou) — THE OTHER SEVEN STARVED ORGANS: `(os)` fixed the one that pages, and the same 50-minute silence had swallowed the judge, the tuner, proprioception, regen, radar, allocation, the incubator and impl-shortfall
 
