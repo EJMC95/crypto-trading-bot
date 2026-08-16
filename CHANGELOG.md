@@ -1,3 +1,73 @@
+## 2026-08-16 (nk) — THE GO-LIVE GRADER HAD NO CONCEPT OF A RETIRED SLEEVE: 🎸 Barnes was judged on 58 closes when 49 belonged to a component `(nf)` switched off the day before
+
+- **THE INCIDENT.** `(nf)` retired Barnes's `xsect` sleeve, leaving a ONE-sleeve
+  (carry) book — and the grader kept scoring the whole two-sleeve ledger.
+  Measured the next morning: **`n=58, mean −0.505%, −$10.52`**, of which the
+  RETIRED sleeve was **49 closes and −$9.07**. The book that actually exists is
+  **`n=9, mean −0.201%, −$1.45`**. The operator was being asked to judge a book
+  on a burn belonging to a component already switched off — on the rule that
+  governs real money.
+- **THE CLASS IS `(hc)`'s ERA PRECONDITION, ONE AXIS OVER.** An era asks *is
+  this sample the book's current self in TIME*; this asks it in
+  **COMPOSITION**. Both sit in front of the six bars, and a bar computed over
+  the wrong sample means nothing whichever axis is wrong. Deliberately **not**
+  an era reset: `(ly)`/`(nf)` chose sleeve-scoped retirement precisely so the
+  SURVIVING sleeve keeps its own `(hm)` clock, and moving the era would discard
+  the carry sleeve's real history to fix the xsect sleeve's.
+- **THE BOOK DECLARES, THE GRADER DERIVES** — the `(mo)` pattern, so nothing is
+  listed in the grader. 🎸 Barnes already publishes
+  `extra.sleeves.<name>.retired` and `(ly)` already requires a retired sleeve to
+  KEEP publishing its census *"so the call stays falsifiable"*; that existing
+  declaration is the whole input, and a sleeve un-retired by an override env
+  reverts here with no edit.
+- **COMPOSITION BEFORE TIME, and the order is load-bearing.** `era_rows`
+  derives the policy boundary from the rows it is handed, so filtering AFTER it
+  would let a DEAD sleeve's policy stamps still choose which of the LIVING
+  sleeve's trades count. Pinned by AST at the call site — call order is
+  invisible to a substring test.
+- **FAIL-OPEN IN BOTH DIRECTIONS**, because a sample filter's failure mode is
+  silently shrinking the thing it filters (`is_quarantined`'s rule): an empty
+  retired set returns **the same list object** (every other book byte-identical,
+  asserted by identity), and a row whose tag is unreadable is **KEPT**. Only
+  `retired is True` retires — a truthy string is not a retirement.
+- **PUBLISHED, NEVER SILENT.** `sleeves.{retired, closes_dropped,
+  closes_before}` rides the payload — and on the BELOW-FLOOR branch too, which
+  is where this discovery lands Barnes (58 → 9 closes drops it under
+  `--min-closes`). Publishing only on the graded branch would have hidden the
+  exclusion on exactly the book it applies to, leaving `n_alltime: 9` to read as
+  *"this book barely trades"* rather than *"49 closes belong to a sleeve it
+  retired"*.
+- **THE DAILY REVIEW RUNS THE SAME SELECTION**, imported not re-implemented —
+  `(hq)` is explicit that importing the SCORING while re-deriving the SAMPLE is
+  how review and grader published different verdicts for the same book. Pinned
+  by **identity** (`review.fn is grader.fn`), not by name. Note the two callers
+  read different columns: the grader takes the normalised `enter_tag`
+  (`'<side>-<sleeve>'`), the review the raw `reason`
+  (`'<side>-<sleeve>_<exit>'`), so the review strips the exit suffix at the one
+  place it reads the raw column and hands the same shape to the one owner.
+- **WHAT IT DOES NOT BUY — the prediction that motivated it is REFUTED, and is
+  recorded rather than quietly dropped.** Scoping Barnes to its surviving sleeve
+  was expected to soften `unreachable` to `undecidable`. It does the opposite:
+  the carry sleeve is a small but unusually CONSISTENT loser, so **t moves from
+  −2.19 to −4.47** and the verdict hardens. What the correction actually buys is
+  the SAMPLE and the MAGNITUDE — a **7× difference** in the loss the operator is
+  asked to retire a book over — plus a precondition that will not mis-attribute
+  the NEXT sleeve retirement. `test_the_verdict_does_not_soften` pins the
+  refutation so the fix's existence cannot re-seed the wrong expectation. A
+  correctness fix earns its place by making the number right, not only by
+  flipping a decision.
+- **MUTATION-VERIFIED, five mutations, all red**: the grader dropping the call;
+  `retired is True` → any truthy; `split` → `rsplit` (which silently renames
+  `long-mean-rev`'s sleeve to `rev`, matching nothing); the fail-open branch
+  dropping an unreadable tag; and the review losing the import. **The fifth
+  survived the first version of the test** — an AST check that unioned the
+  primary import with its `except ImportError` fallback stayed green when only
+  the real path lost the name; replaced with a runtime identity assertion.
+- Letter: this work was written as `(nj)` and **renumbered to `(nk)` before
+  commit** — a concurrent session had claimed `(nj)` in `evidence_board.py` for
+  the live-clip cohort fix. Recorded inline per the letter convention's rule 4;
+  that session's file was left untouched.
+
 ## 2026-08-16 (ni) — THE DAILY REVIEW WAS NOMINATING CORPSES FOR REAL MONEY: its `RETIRED` list was a hand copy frozen at the July cut while TWELVE books retired under it — including four the red-stop slate killed the day before
 
 - **FOUND BY THE DAILY REVIEW'S OWN OUTPUT.** The 16-Aug run's 🔭 gate-horizon

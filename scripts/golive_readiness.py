@@ -635,6 +635,113 @@ def stamped_policy_boundary(rows, parse=None):
     return epoch, iso, json.loads(cur), n
 
 
+def sleeve_of(tag):
+    """`'<side>-<sleeve>'` → `'<sleeve>'`; None when the tag is not sleeve-shaped.
+
+    The fleet's multi-sleeve books tag every close `<side>-<sleeve>_<exit>`
+    (🎸 Barnes, declared at its birth *"so the brain grades sleeves
+    independently"*), and `fetch_paper_trades` hands that prefix through as
+    `enter_tag`. Split on the FIRST hyphen only: a sleeve name may itself
+    contain one, and `long-mean-rev` is the `mean-rev` sleeve, not `mean`.
+
+    A bare tag (`'long'`, the whole rest of the fleet) has no sleeve and
+    returns None — which is what keeps every single-sleeve book untouched.
+    """
+    if not tag:
+        return None
+    s = str(tag)
+    if "-" not in s:
+        return None
+    return s.split("-", 1)[1] or None
+
+
+def retired_sleeves(extra):
+    """Sleeve names a book's OWN payload declares retired, as a frozenset.
+
+    The book declares, the grader derives — one declaration, one derivation,
+    the `(mo)` pattern. 🎸 Barnes already publishes
+    `extra.sleeves.<name>.retired: true` and keeps publishing the retired
+    sleeve's census beside it *"so the call stays falsifiable"* `(ly)`, so
+    nothing new has to be written down for this to work, and a sleeve that is
+    un-retired by an override env reverts here automatically.
+
+    Reads ONLY `retired is True` — a truthy string or a missing key is not a
+    retirement. Any doubt returns empty, i.e. NOTHING is excluded.
+    """
+    try:
+        sl = (extra or {}).get("sleeves")
+        if not isinstance(sl, dict):
+            return frozenset()
+        return frozenset(str(k) for k, v in sl.items()
+                         if isinstance(v, dict) and v.get("retired") is True)
+    except Exception:      # noqa: BLE001
+        return frozenset()
+
+
+def drop_retired_sleeves(rows, retired, tag_of=None):
+    """(kept, dropped_by_sleeve) — rows minus those a RETIRED sleeve produced.
+
+    [2026-08-16 (nk)] THE INCIDENT. `(nf)` retired 🎸 Barnes's `xsect` sleeve,
+    leaving a ONE-sleeve (carry) book — and the grader kept scoring the whole
+    two-sleeve ledger. Measured the next morning: `n=58, mean −0.505%, −$10.52`,
+    of which the retired sleeve was **49 closes and −$9.07**. The book that
+    actually exists is `n=9, mean −0.201%, −$1.45`. The grader was publishing an
+    actionable verdict about a configuration that had stopped existing, on the
+    rule that governs real money, and attributing to Barnes a burn that belonged
+    to a component already switched off.
+
+    WHAT THIS DID **NOT** BUY, stated because the opposite was assumed while
+    building it: the VERDICT does not move. Sleeve-scoped, the carry sleeve
+    reads `t = −4.47` — a small, unusually CONSISTENT loser — so the horizon
+    stays `unreachable`, more emphatically than the pooled reading's `t = −2.19`
+    rather than less. The prediction that a thinner sample would soften the
+    verdict to `undecidable` is REFUTED by the measurement. What the correction
+    buys is the SAMPLE and the MAGNITUDE — a 7× difference in the loss the
+    operator is being asked to retire a book over — and a precondition that no
+    longer silently mis-attributes the next sleeve retirement. A correctness fix
+    is worth shipping when it makes the number right, not only when it flips a
+    decision.
+
+    This is the `(hc)` era precondition one axis over: an era answers "is this
+    sample the book's current self in TIME", and this answers it in
+    COMPOSITION. Both are preconditions in front of the six bars, and a bar
+    computed over the wrong sample means nothing whichever axis is wrong. It is
+    deliberately NOT an era reset — `(ly)`/`(nf)` chose sleeve-scoped
+    retirement precisely so the surviving sleeve's `(hm)` clock keeps running,
+    and moving the era would throw away the carry sleeve's real history to fix
+    the xsect sleeve's.
+
+    FAIL-OPEN IN BOTH DIRECTIONS, because the failure mode of a sample filter
+    is that it silently SHRINKS the thing it filters (`is_quarantined`'s rule,
+    for the same reason):
+      * an empty `retired` set returns `rows` UNCHANGED and allocates nothing —
+        so every single-sleeve book in the fleet is byte-identical;
+      * a row whose tag is unreadable or has no sleeve is KEPT.
+    The only rows that leave are ones the book itself said it retired.
+
+    `tag_of` extracts the tag from a row; it defaults to `r[5]`, the grader's
+    row shape with the tag appended. Passed explicitly by consumers whose rows
+    are shaped differently, so this stays ONE owner rather than becoming the
+    second copy `(hq)` warns about.
+    """
+    if not retired:
+        return rows, {}
+    get = tag_of if tag_of is not None else (
+        lambda r: r[5] if len(r) > 5 else None)
+    kept, dropped = [], {}
+    for r in rows:
+        try:
+            sl = sleeve_of(get(r))
+        except Exception:      # noqa: BLE001
+            kept.append(r)     # unreadable tag is KEPT, never dropped
+            continue
+        if sl is not None and sl in retired:
+            dropped[sl] = dropped.get(sl, 0) + 1
+            continue
+        kept.append(r)
+    return kept, dropped
+
+
 def era_rows(bot, rows, parse=None, detail=False):
     """(era_scoped, all_time, era_iso) — THE SINGLE OWNER of "which of a book's
     trades describe the book as it runs today".
@@ -1800,7 +1907,73 @@ def grade(s, legacy=False):
     return not fails, fails
 
 
+def _selftest_sleeves():
+    """[(nk)] The retired-sleeve precondition. See `drop_retired_sleeves`."""
+    # sleeve_of — split on the FIRST hyphen so a hyphenated sleeve survives
+    assert sleeve_of("long-xsect") == "xsect"
+    assert sleeve_of("short-carry") == "carry"
+    assert sleeve_of("long-mean-rev") == "mean-rev", "first hyphen only"
+    assert sleeve_of("long") is None, "a bare tag has NO sleeve"
+    assert sleeve_of("") is None and sleeve_of(None) is None
+    assert sleeve_of("long-") is None, "empty sleeve is not a sleeve"
+
+    # retired_sleeves — only `retired is True` counts
+    assert retired_sleeves({"sleeves": {"xsect": {"retired": True},
+                                        "carry": {"retired": False},
+                                        "extreme": {"retired": True}}}) \
+        == frozenset({"xsect", "extreme"})
+    assert retired_sleeves({"sleeves": {"a": {"retired": "yes"}}}) == frozenset(), \
+        "a truthy STRING is not a retirement — only True is"
+    assert retired_sleeves({"sleeves": {"a": {}}}) == frozenset()
+    assert retired_sleeves({"sleeves": []}) == frozenset(), "wrong type ⇒ empty"
+    assert retired_sleeves({}) == frozenset()
+    assert retired_sleeves(None) == frozenset()
+
+    # drop_retired_sleeves — rows are (…, tag) at [5]
+    def row(tag):
+        return (0.01, 1.0, None, None, None, tag)
+    rows = [row("long-xsect"), row("short-carry"), row("long-xsect"),
+            row("long"), row(None)]
+    kept, dropped = drop_retired_sleeves(rows, frozenset({"xsect"}))
+    assert len(kept) == 3, "both xsect rows leave, the other three stay"
+    assert dropped == {"xsect": 2}
+    # THE NO-OP GUARANTEE: an empty retired set returns the SAME LIST OBJECT,
+    # so every single-sleeve book in the fleet is byte-identical and cannot
+    # even pay a copy for this feature.
+    k2, d2 = drop_retired_sleeves(rows, frozenset())
+    assert k2 is rows and d2 == {}, "empty retired set must be a true no-op"
+    k3, d3 = drop_retired_sleeves(rows, None)
+    assert k3 is rows and d3 == {}
+    # FAIL-OPEN: an unreadable tag is KEPT. A sample filter that silently
+    # shrinks its input is the disease, not the cure (`is_quarantined`).
+    class Boom:
+        def __str__(self):
+            raise RuntimeError("unreadable tag")
+    kept4, dropped4 = drop_retired_sleeves(
+        [row(Boom()), row("long-xsect")], frozenset({"xsect"}))
+    assert len(kept4) == 1 and dropped4 == {"xsect": 1}, \
+        "the unreadable row is KEPT and only the declared sleeve leaves"
+    # a custom extractor keeps this ONE owner for differently-shaped rows
+    kept5, _ = drop_retired_sleeves(
+        [{"t": "long-xsect"}, {"t": "long-carry"}], frozenset({"xsect"}),
+        tag_of=lambda r: r["t"])
+    assert len(kept5) == 1
+
+    # THE INCIDENT, in numbers: 🎸 Barnes graded 58 closes when 49 belonged to
+    # a sleeve `(nf)` retired. The surviving book is the 9-close carry sleeve.
+    barnes = ([row("long-xsect")] * 30 + [row("short-xsect")] * 19
+              + [row("long-carry")] * 6 + [row("short-carry")] * 3)
+    kept6, dropped6 = drop_retired_sleeves(
+        barnes, retired_sleeves({"sleeves": {"xsect": {"retired": True},
+                                             "extreme": {"retired": True},
+                                             "carry": {"retired": False}}}))
+    assert len(barnes) == 58 and len(kept6) == 9, \
+        "the graded sample is the sleeves that still trade"
+    assert dropped6 == {"xsect": 49}
+
+
 def _selftest():
+    _selftest_sleeves()
     from datetime import datetime, timedelta, timezone
     t0 = datetime(2026, 6, 1, tzinfo=timezone.utc)
 
@@ -2301,6 +2474,22 @@ def main():
     from datetime import datetime, timezone
 
     from experiment_judge import parse_ts
+    # [2026-08-16 (nk)] WHICH SLEEVES DOES EACH BOOK STILL RUN? Read from the
+    # books' OWN payloads (`extra.sleeves.<name>.retired`), never a list here —
+    # the book declares and the grader derives, so a sleeve retired or reversed
+    # by an override env reaches this grader with no edit. Fail-OPEN: a dark or
+    # unreadable summary leaves the map empty, which excludes NOTHING and grades
+    # exactly as before. Fetched once, outside the loop.
+    _sleeve_retired, _sleeve_err = {}, None
+    try:
+        for _r in (store.fetch_bot_pnl() or []):
+            _rs = retired_sleeves(_r.get("extra"))
+            if _rs:
+                _sleeve_retired[str(_r.get("bot"))] = _rs
+    except Exception as e:      # noqa: BLE001 — a lost filter, never a lost grade
+        _sleeve_err = f"{type(e).__name__}: {e}"
+        print(f"sleeve sweep skipped (grading every sleeve): {_sleeve_err}",
+              file=sys.stderr)
     for bot in sorted(books):
         rs = sorted(books[bot], key=_key)
         quads, integ_eps = [], []
@@ -2321,8 +2510,18 @@ def main():
                 continue
             # [(jf)] `extra` rides at [4]: it carries the close's policy stamp,
             # which `era_rows` now reads to derive the LATEST policy boundary.
+            # [(nk)] the sleeve tag rides at [5]: `drop_retired_sleeves` reads
+            # it. Appended rather than inserted — `era_rows` indexes [0..4].
             quads.append((r.get("profit_ratio"), r.get("profit_abs"), ts,
-                          r.get("open_ts"), r.get("extra")))
+                          r.get("open_ts"), r.get("extra"), r.get("enter_tag")))
+        # [(nk)] COMPOSITION BEFORE TIME. A retired sleeve's trades are not this
+        # book's record at all, so they are removed before the era boundary is
+        # derived — otherwise a dead sleeve's policy stamps could still choose
+        # which of the LIVING sleeve's trades count. No-op for every book that
+        # declares no retired sleeve, which is all of them but 🎸 Barnes.
+        _n_before = len(quads)
+        quads, _dropped_sleeves = drop_retired_sleeves(
+            quads, _sleeve_retired.get(bot))
         # ONE owner of "which trades count" — `era_rows` keys the era on the
         # OPEN stamp. Extracted at (hq) so the daily review runs the same
         # selection rather than its own; see that docstring for what the
@@ -2371,6 +2570,20 @@ def main():
             payload_floor[bot] = {"n_alltime": s_all.get("n", 0),
                                   "why_absent": f"below --min-closes "
                                                 f"({a.min_closes})",
+                                  # [(nk)] CARRIED ON THIS BRANCH TOO. Dropping
+                                  # a retired sleeve can push a book UNDER the
+                                  # floor — 🎸 Barnes goes 58 → 9 and lands
+                                  # here — so publishing the exclusion only on
+                                  # the graded branch would hide it on exactly
+                                  # the book it applies to, and `n_alltime: 9`
+                                  # would read as "this book barely trades"
+                                  # rather than "49 closes belong to a sleeve
+                                  # it retired".
+                                  "sleeves": ({"retired": sorted(
+                                      _sleeve_retired.get(bot) or ()),
+                                      "closes_dropped": _dropped_sleeves,
+                                      "closes_before": _n_before}
+                                      if _dropped_sleeves else None),
                                   "horizon": hz_f}
             continue
         # [2026-07-31 (ia)] MARK-TO-MARKET DRAWDOWN, folded in BEFORE grading.
@@ -2533,6 +2746,21 @@ def main():
                      "closes_in_era": s.get("n", 0),
                      "closes_all_time": s_all.get("n", 0)} if era_iso else None),
             "alltime": book_payload(s_all),
+            # [2026-08-16 (nk)] WHICH SLEEVES THIS SAMPLE EXCLUDES, and how
+            # many closes each took with it. Published for the same reason
+            # `era` is: a sample change that is not readable is a sample change
+            # nobody can audit, and this one moves the NUMBERS hard even when it
+            # leaves the verdict alone (🎸 Barnes: 49 of 58 closes and −$9.07 of
+            # −$10.52 leave; the verdict stays `unreachable`). None for every
+            # book that declares no retired sleeve — additive, so no other
+            # book's payload changes shape.
+            "sleeves": ({"retired": sorted(_sleeve_retired.get(bot) or ()),
+                         "closes_dropped": _dropped_sleeves,
+                         "closes_before": _n_before,
+                         "why": ("a retired sleeve's trades are not this "
+                                 "book's record; the surviving sleeve(s) keep "
+                                 "their own (hm) clock (ly)/(nf)")}
+                        if _dropped_sleeves else None),
             # [2026-08-06 (ks)] GATE HORIZON — when this book becomes
             # decidable at its measured trajectory. REPORTED, NOT A BAR
             # (`grade()`/`BAR_NAMES` untouched); era-scoped only, computed

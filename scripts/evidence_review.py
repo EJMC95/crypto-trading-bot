@@ -112,13 +112,16 @@ for _p in (_HERE, os.path.dirname(_HERE)):
 try:                                     # run as a script (sys.path[0]=scripts/)
     from golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                   GOLIVE_MIN_DAYS, bar_map, book_payload,
-                                  era_rows, gate_horizon, grade,
-                                  same_pair_overlaps, stats)
+                                  drop_retired_sleeves, era_rows, gate_horizon,
+                                  grade, retired_sleeves, same_pair_overlaps,
+                                  stats)
 except ImportError:                      # run as `python -m scripts.evidence_review`
     from scripts.golive_readiness import (BAR_NAMES, GOLIVE_MIN_CLOSES,
                                           GOLIVE_MIN_DAYS, bar_map,
-                                          book_payload, era_rows, gate_horizon,
-                                          grade, same_pair_overlaps, stats)
+                                          book_payload, drop_retired_sleeves,
+                                          era_rows, gate_horizon, grade,
+                                          retired_sleeves, same_pair_overlaps,
+                                          stats)
 
 # Cheap SQL prefilter before the per-book ledger read. It must never be STRICTER
 # than the real closes bar, or a genuine candidate is hidden before it is graded.
@@ -681,6 +684,20 @@ def scan_new_evidence(cur, errors):
         cands = [r[0] for r in cur.fetchall()]
         passers, near = [], []
         horizon_lines, horizon_tally = [], {}
+        # [2026-08-16 (nk)] Which sleeves does each book still run? Straight
+        # from the books' OWN bot_pnl payloads, the same source the grader
+        # reads — the book declares, both consumers derive. Fail-OPEN: an
+        # unreadable summary leaves this empty, which excludes NOTHING and
+        # grades exactly as before rather than silently shrinking a sample.
+        _sleeve_retired = {}
+        try:
+            cur.execute("SELECT bot, extra FROM bot_pnl")
+            for _b, _ex in cur.fetchall():
+                _rs = retired_sleeves(_ex)
+                if _rs:
+                    _sleeve_retired[str(_b)] = _rs
+        except Exception:      # noqa: BLE001 — a lost filter, never a lost report
+            _sleeve_retired = {}
         for bot in cands:
             if bot in RETIRED or bot in LIVE_ROWS or bot in LIVE_TWINS:
                 continue
@@ -695,11 +712,36 @@ def scan_new_evidence(cur, errors):
             # boundary from the close's own extra.policy stamp, and a review
             # that selects everything BUT the stamp would grade a different
             # sample than the grader — the exact divergence (hq) closed.
-            cur.execute(f"""SELECT pnl_pct, pnl_abs, {CA}, opened_at, extra
+            # [(nk)] `reason` rides at [5] so the retired-SLEEVE precondition
+            # runs here too. Selecting the era stamp but not the sleeve tag
+            # would re-open (hq) on the other axis: same bars, same era, a
+            # different sample.
+            cur.execute(f"""SELECT pnl_pct, pnl_abs, {CA}, opened_at, extra,
+                                   reason
                               FROM paper_trades
                              WHERE bot=%s AND pnl_abs IS NOT NULL AND closed_at IS NOT NULL
                              ORDER BY {CA}""", (bot,))
             quads = cur.fetchall()
+            # [2026-08-16 (nk)] COMPOSITION BEFORE TIME — the same order the
+            # grader runs. A retired sleeve's trades are not this book's
+            # record, so they leave before the era boundary is derived.
+            # `retired_sleeves` reads the BOOK'S OWN published declaration
+            # (`bot_pnl.extra.sleeves.<name>.retired`), so nothing is listed
+            # here; a dark/absent payload excludes nothing and grades as
+            # before. Measured on 🎸 Barnes: 49 of 58 closes belonged to the
+            # `xsect` sleeve `(nf)` retired, and the pooled reading published a
+            # confident `unreachable` about a two-sleeve book that no longer
+            # exists.
+            # NOTE the tag shape: this table stores `reason`
+            # (`'<side>-<sleeve>_<exit>'`) while the grader reads the
+            # normalised `enter_tag` (`'<side>-<sleeve>'`). `sleeve_of` splits
+            # on the first hyphen, so the trailing `_<exit>` would ride along —
+            # strip it here, at the one place the raw column is read.
+            quads = [q[:5] + ((str(q[5]).split("_", 1)[0]
+                               if q[5] is not None else None),)
+                     for q in quads]
+            quads, _dropped_sleeves = drop_retired_sleeves(
+                quads, _sleeve_retired.get(bot))
             # [(hc)/(hq)] THE ERA IS A PRECONDITION IN FRONT OF THE SIX BARS.
             # Grade the book as it RUNS TODAY, never its whole retained ledger.
             # `era_rows` is golive_readiness's — the same selection the
