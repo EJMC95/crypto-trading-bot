@@ -1,3 +1,104 @@
+## 2026-08-16 (ov) — THE FIVE-ANGLE P&L HUNT RETURNED NOTHING, AND THAT IS THE ENTRY: 6 of 6 refereed claims refuted, settlement micro-timing CLOSED at a $27/yr ceiling, and the one finding I escalated died to the fleet's own guard
+
+**Operator ask:** *"keep looking for more pnl growth while we wait"* — then
+*"what did the pnl hunt find"*. This entry exists so the answer survives: it
+found no enactable edge, and five angles are now closed with numbers rather
+than with a shrug. Recording a refutation is the rule (`ONLY GROWTH, NO STEP
+BACKS`: *"a fix whose payoff the measurement then refutes is reported as
+refuted"*), and the cost of NOT recording it is that the next session re-runs
+all five. 12 agents, 5 analysts + 7 adversarial referees, ~2.5M tokens.
+
+**THE SCOREBOARD: every claim that reached a referee was killed.** Six
+referee verdicts, six REFUTED. Not "unclear" — each names a specific load-
+bearing error:
+
+| Angle | Analyst's claim | Referee's kill |
+|---|---|---|
+| Hull band occupancy | doc's "~100%" is wrong, real 54.8% | the analyst's own pre-declared calibration gate PASSES, removing their excuse for the static-volume arm; their correction would have engraved a measured-FALSE number under I12 |
+| carry sub-floor entries | 62.8% of entries below its own 20% floor | arithmetic reproduces exactly; the *specification, named mechanism and control* are each wrong |
+| Barnes accrual headline | (the study's load-bearing figure) | four of five numbers reproduce to 4 s.f.; the fifth — the one the headline rests on — is an arithmetic SIGN error |
+| spread on real-money call sites | "0 of 7" | measured 1 of 7 (`lighter_ticket_taker.py:2881` does pass `spread_bps`) |
+| volume-axis calibration | the axis fails, findings withheld | the axis PASSES; the withheld finding is real but is not the one they proposed to probe |
+| Kiyosaki binding constant | (the cell's own title) | classification survives; the deliverable the prereg promised is wrong |
+
+**AND THE ONE ITEM I ESCALATED TO THE OPERATOR WAS ALSO WRONG — corrected
+here in the same breath it was made.** A report-only cell claimed I20's named
+supply had gone stale: KAITO/XMR/PAXG/XRP all now below the $2M floor, gate
+"currently yields LIT and LINK". I checked the live scout map (04:36Z) and it
+agreed — KAITO $0.57M, XMR $0.33M, PAXG $0.11M, XRP $0.86M, every one
+sub-floor, while LIT $3.94M and LINK $2.29M clear it. I passed that to the
+operator as the hunt's most valuable output. **Then I ran the fleet's own
+guard, and it refuted me:** `audit_book_overlap.py --gate 0.20 --floor 2e6`
+over **9,455 scout snapshots / 33 days** reports exactly what doctrine already
+says — **KAITO, XMR, PAXG; 573 snapshots offering ≥1 candidate = 6.06%; at
+most 2 qualifying at once**. I20 is not stale. LIT and LINK clear the VOLUME
+floor and sit at 10.5% TRUE apr, so they never enter the 20% cell at all —
+they are Hull's band, which is the tiling working.
+
+**THE TRANSFERABLE LESSON, and it is I6's shape on a new axis: AN
+INSTANTANEOUS READ OF A DUTY-CYCLED GATE IS NOT EVIDENCE ABOUT THE GATE.**
+This supply qualifies in 6.06% of snapshots BY MEASUREMENT, so "nothing
+qualifies right now" is the MODAL state — observed ~94% of the time when the
+gate is perfectly healthy. A single snapshot cannot distinguish "the supply
+moved" from "you looked during the 94%". The control group I6 demands is the
+*window*, not a sibling population, and the fleet already ships the artifact
+that supplies it. **Before reasoning from a gate that admits nothing, get its
+duty cycle** — and prefer the guard over a hand-rolled read of the same map,
+which is what turned my wrong answer into the right one in a single command.
+
+**WHAT THE FIVE ANGLES ACTUALLY SETTLED** (all report-only; nothing enacted):
+
+1. **Settlement micro-timing — CLOSED, economically dead.** Under the
+   assumption *most favourable* to an edge (discrete settlement, every entry
+   at :59.9 and every exit at :00.1) the entire six-book funding cohort gains
+   **$27.46/yr**. Whether the venue prorates within the hour is honestly
+   reported UNDETERMINED from the tape rather than guessed. The minute-of-hour
+   distribution is non-uniform and fully explained by loop cadence. Do not
+   re-open this for a timing tweak; the ceiling is the answer.
+2. **Cross-book duplication — the premise is MEASURED FALSE.** carry and the
+   Farmer shadow hold the same coin **81.8%** of shared hours, but per-trade
+   return correlation on same-coin overlapping pairs is r=+0.022, coin-
+   clustered 90% CI [−0.216, +0.232], sign agreement 44.3% — a coin flip, and
+   the diff-coin control reads the same. Different horizons and exits
+   decorrelate them (carry holds ~65h to `decay_paid`; the Farmer runs a 72h
+   max-hold). Expected return per dollar is invariant to duplication anyway;
+   only diversification moves, and that cost is **+0.21% of portfolio sd**.
+   **Do not build a de-duplication actuator on coin identity.** The one
+   genuinely correlated pair (r=+0.63) is Farmer-LIVE × Farmer-shadow — the
+   deliberate live/control pair, not a defect.
+3. **Taker lens capital — refuted at every setting.** `TT_MAX_OPEN` is idle
+   ~83% of the time and never refills a freed slot promptly, so slot
+   reservation is inert at every justifiable value. The null test is the
+   killer: **both** lenses lose to a random-entry benchmark on their own coins
+   (68% and 92% of draws). Reserving slots moves capital from one loser to a
+   worse one — the I15/random-null doctrine biting a capital question.
+4. **Friction — nothing to win.** Lighter is zero-fee and the LIVE Farmer's
+   measured slip is **0.38 bps/leg**; the fleet's entire real-money friction
+   bill is **$0.265/month**. An exit-timing or maker-preference project cannot
+   pay for its own review.
+5. **Gate reachability — two observations, neither actionable today.**
+   🏦 Kiyosaki's census reads `scanned 225 / cold 200 / thin 25 / eligible 0 /
+   **slow_payback 0**`: its ONE new rule, the 21.9% payback-velocity bar that
+   is the book's whole distinguishing contribution, **has never once bound** —
+   every coin dies on the inherited 20% apr bar or the $2M floor first. 🧘
+   Douglas publishes `universe_n 18` and `scanned 10`, because only 10 crypto
+   books currently clear its $1M floor, so the birth note's ~83 closes/30d is
+   optimistic. **Both are left alone deliberately:** Kiyosaki is inside its
+   birth-frozen 30-day clock (levers are a day-31 decision, declared at
+   birth), and the 🔭 gate horizon already dates Douglas off its MEASURED rate
+   rather than that projection, so there is nothing to correct in the actor.
+
+**WHY THE HUNT WAS EMPTY, stated so it is not mistaken for a null result about
+the fleet:** the live map is at the venue's RESTING rate almost everywhere
+(most books read exactly 10.512% TRUE), the 20%-crypto cell admits **zero**
+coins at this instant, and **HYPE is the only crypto book over $10M**. That is
+the known [[carry-stalled-venue-funding-collapsed]] state, now corroborated
+from a second direction. The funding cohort is the only one with measured
+edge, and its supply is a venue condition — not a constraint this fleet
+imposed and not one a lever reaches.
+
+**NO CODE CHANGED.** Five angles closed, six refutations and one self-
+correction recorded, zero levers moved, zero books touched.
 ## 2026-08-16 (ow) — THE BLANKET-REPLACE SWEEP: the one I fixed was the only damage in 315 files, and the guard that proves it is the half `audit_changelog_letters` never had
 
 - **THE ASK** (operator, after the `(oq)` unbreak): *"now check the other
