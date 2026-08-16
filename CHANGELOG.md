@@ -65,8 +65,15 @@
 - **NOT A REAL-MONEY CHANGE — main only, per the `(mm)` rule.** Shadow book,
   and every edit is inside `selftest()`: no gate, lever, clip or trade
   behaviour moves, so there is nothing to deploy.
-## 2026-08-16 (nr) — ⚡ HIGH VOLTAGE: THE SIXTH LEVERAGE MEASUREMENT, THE FIRST ON LIGHTER'S OWN TAPE — REFUTED, AND THE CALIBRATION GATE CAUGHT A LIVE BOOK'S HEADLINE ON THE WAY PAST
+## 2026-08-16 (nt) — ⚡ HIGH VOLTAGE: THE SIXTH LEVERAGE MEASUREMENT, THE FIRST ON LIGHTER'S OWN TAPE — REFUTED, AND THE CALIBRATION GATE CAUGHT A LIVE BOOK'S HEADLINE ON THE WAY PAST
 
+- **[LETTER MOVED (nr) -> (nt), 16-Aug.** A concurrent session pushed a
+  different `(nr)` to origin/main while this was being written (the
+  sniper's YOUNG admission source) and THAT one is cited from tracked
+  code (`lighter_perp_sniper.py`, `audit_coverage_floors.py`), so by the
+  convention it keeps the letter and this entry moved to the next free
+  one. The commit subject that landed this work still reads `(nr)` —
+  `git log` is not a reliable letter index; grep these headers.]**
 - **THE ASK.** Operator: *"design me a bot specifically designed for high
   leverage trading"*, then *"move forward high voltage"*. Design in
   `BAND_YOUNG_HIGH_VOLTAGE_2026-08-16.md` (⚡ `band-young-lshadow`, Angus Young
@@ -185,6 +192,57 @@
   almost no ledger, so nothing operational turns on it yet. **Owner: this repo,
   next pass** — re-measure with a stated window convention before its number is
   quoted again.
+- **[CORRECTED IN PLACE, same day, after a three-lens adversarial review —
+  all three returned SURVIVES at high confidence, and all three found things
+  wrong with how it was reported.]**
+  * **THE STATED MECHANISM WAS WRONG.** "The edge lives in wide-stop
+    quintiles" is not the driver. **Excluding entry-bar stop-outs, EVERY
+    quintile is positive** (+0.396R .. +0.874R) and Q1 is not the worst; the
+    gradient tracks entry-bar-stop FREQUENCY (Q2 45%, Q3 42% vs Q4 31%). The
+    real mechanism: **entry-bar stops are 235 of 641 trades (37%) at −1.129R
+    each (−$2,653 equal-risk) against +0.590R on everything else** — and
+    equal-risk sizing charges every stop-out the FULL R while the fixed clip
+    charges a tight-stop loss only `s·CLIP` ($0.47 vs $1.75). **The fixed clip
+    was accidentally insuring its own worst population.** A genuine
+    wide-vs-tight gradient in `ret` does exist (+0.0031, permutation p=0.0013,
+    holds WITHIN-coin) but it is the smaller term — and it argues for
+    FILTERING tight stops, the opposite of re-weighting toward them.
+  * **DO NOT QUOTE THE DOLLARS.** −$255.91 / maxDD 54.1% are a
+    capital-deployment artifact: arm B runs mean notional **$1,265 vs $100**.
+    Risk-matched it reads −$20.24 at maxDD **5.2%** with t bit-identical.
+    They also FLIP SIGN under the pre-(ml) convention (+$242.27). The verdict
+    rests on t, which fails under BOTH conventions: Δt −1.328 (ml on) and
+    −0.237 (ml off). The study now prints that decomposition — the flag existed
+    to be used and was not being used.
+  * **THE VERDICT HARDENED, not softened.** Paired bootstrap
+    **P(Δt ≥ 0) = 0.0014**; block bootstrap 0.0013–0.0040; Δt negative in
+    **13 of 13** perturbations; dropping the worst coin (ETHFI, 27.5% of
+    trades) makes it WORSE (−1.454). Cluster-robust ((kw), which the study had
+    omitted and now reports): A **+0.31** → B **−0.52**. A ~701-cell rescue
+    search found **no variant**: notional ∝ `s^e` is MONOTONE against the
+    design (t −1.335 at e=−1.5 → +0.505 at e=0 → **+1.556 at e=+2**), the two
+    halves pick OPPOSITE-signed optimal exponents out-of-sample, and **once any
+    floor ≥0.85% is applied the exponent is INERT.**
+  * **THREE REAL DEFECTS FIXED, two of them fail-OPEN in the fail-closed
+    module.** (1) **NaN passed every `mmf` guard** (`nan<=0` and `nan>=1` are
+    both False), so `liq_price` returned NaN and `check()` then read `"ok"` —
+    I5's non-finite class arriving at a risk gate; `_frac_ok` added,
+    mutation-verified. (2) `max_leverage_for_headroom` returned a bare `None`
+    for THREE different conditions and the caller read None as "no
+    constraint", so "even 1x breaches the invariant" FAILED OPEN; now
+    inf/0.0/None are distinguished and both refusals are named. (3) The
+    ROBUSTNESS and SECONDARY sections silently inherited the $600 cap that
+    pins 90% of trades. Also: the design's own SHIPPED rule (capped) is now
+    reported (+$60.25, t=+0.31 — still a t regression), and the docstring
+    claim that the venue cap is "a refusal, not a silent downsize" was
+    corrected to match what the code does.
+  * **THE ONE DURABLE LEAD BELONGS TO 🧘 THE ZONE, NOT TO band-young.** An
+    ATR24 stop-distance floor near **1.0%** takes the shipped Douglas rule — at
+    its existing $100 clip, no leverage — to **t≈2.2 in-sample** and **1.487
+    out-of-sample**. NOT shipped: the surface is noise-shaped (10 up / 7 down,
+    collapse at 1.30%) and it was found inside a ~701-cell search, so it needs
+    a pre-registered out-of-sample test first. **Owner: this repo, next pass.**
+
 - **Registered, not silently added:** `scripts.lighter_margin_model` in
   `SELFTEST_MODULES` (pure, offline, and a liquidation engine that stops firing
   is the vacuous-guard shape I3 exists for); the study in `SELFTEST_EXCLUDE`

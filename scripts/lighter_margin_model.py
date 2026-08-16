@@ -76,7 +76,16 @@ ALREADY FETCHES every loop:
     assumption: min_initial_margin_fraction takes exactly
     {200, 333, 400, 500, 666, 1000, 1250, 2000, 3333}, which is
     10000/{50, 30, 25, 20, 15, 10, 8, 5, 3} — the venue's leverage tiers.
-    A percent or a raw-fraction reading produces no such structure.
+    A percent or a raw-fraction reading produces no such structure. The
+    installed SDK divides the same fields by 10_000 independently
+    (`site-packages/lighter/.../risk.py`).
+  * TWO DIFFERENT `imf` FIELDS EXIST AND THEY ARE ON DIFFERENT SCALES — do not
+    cross them. This module reads the MARKET-level tier
+    (`min/default_initial_margin_fraction`, integer per-10000, so 200 = 2% =
+    50x). The ACCOUNT-POSITION field that `venues/lighter_client` reads is a
+    PERCENT, which is why `(no)`/`94d2cdf` derives its own `max_lev` as
+    `100.0 / imf_pct` while this module uses `1.0 / min_imf`. Both give 50x on
+    BTC and they are NOT interchangeable inputs.
   * THE TIERS ARE STRUCTURAL, NOT PER-BOOK TUNING: `mmf ~= 0.60 * min_imf` and
     `cmf ~= 0.40 * min_imf` hold on all 210 active books TO WITHIN THE VENUE'S
     OWN INTEGER ROUNDING (+/-1 per-10000 unit), and exactly on 207 of them.
@@ -90,8 +99,16 @@ ALREADY FETCHES every loop:
     when the venue changes its scheme under a book that is sizing against it.
   * MAX LEVERAGE IS A HARD PER-COIN CAP: BTC/ETH 50x, SOL 25x, XRP/HYPE/BNB
     20x, most alts 10x, LIT/ETHFI/TAO 5x, the thinnest books 3x. A sizing rule
-    that computes L=8 on ETHFI CANNOT OPEN. Callers must clamp with
-    `max_leverage()` and treat the clamp as a refusal, not a silent downsize.
+    that computes L=8 on ETHFI cannot open THAT SIZE. `size_for_risk` DOWNSIZES
+    to the cap and NAMES it (`venue_max_leverage`) rather than refusing —
+    an under-risked trade is not a dangerous one. But the clamped trade is no
+    longer carrying the intended risk, so **an arm with a material clamp rate
+    is no longer the constant-risk arm it claims to be**, and any consumer must
+    report the rate rather than let it hide. (This paragraph previously said
+    callers "must treat the clamp as a refusal, not a silent downsize", which
+    the code has never done; corrected in place per I12 after an adversarial
+    review caught the contradiction. The real defect it pointed at was the
+    SILENCE, and that is fixed — every binding constraint is now named.)
 
 FAIL-CLOSED, DELIBERATELY, AGAINST THIS REPO'S USUAL HABIT. Everywhere else in
 the fleet a dark organ degrades to a neutral default. Here an unknown
@@ -126,6 +143,23 @@ API = os.environ.get("LIGHTER_API", "https://mainnet.zklighter.elliot.ai")
 
 #: the venue publishes margin fractions as integers per-10000 (see docstring).
 FRACTION_SCALE = 10_000.0
+
+def _frac_ok(x, lo=0.0, hi=1.0):
+    """True only for a FINITE fraction strictly inside (lo, hi).
+
+    NaN IS THE POINT. `nan <= 0` and `nan >= 1` are BOTH False, so the obvious
+    guard `if mmf <= 0 or mmf >= 1` passes a NaN straight through — and this
+    module then returns a NaN liquidation price, after which `check()` compares
+    `mark <= nan`, gets False, and reports "ok". A fail-OPEN, inside the one
+    module whose whole premise is failing closed. Found by its own selftest,
+    2026-08-16; it is the I5 non-finite class arriving at a risk gate rather
+    than at storage."""
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return False
+    return f == f and f not in (float("inf"), float("-inf")) and lo < f < hi
+
 
 #: structural tier relationships, re-derived from live data by
 #: assert_tier_structure(). Not used as constants — used as an ALARM.
@@ -195,7 +229,8 @@ def parse_specs(rows) -> dict:
             continue
         # A degenerate tier is worse than a missing one: it would produce an
         # infinite max leverage or a liquidation price at the entry.
-        if not sym or min_imf <= 0 or mmf <= 0 or mmf >= 1 or cmf <= 0:
+        if not sym or not _frac_ok(mmf) or not _frac_ok(min_imf) \
+                or not _frac_ok(cmf):
             continue
         if cmf > mmf or mmf > min_imf:
             # closeout must sit below maintenance, which must sit below the
@@ -268,7 +303,9 @@ def liq_price(entry, is_long, leverage, mmf):
     Returns None if the inputs cannot define one (fail-closed)."""
     if not entry or entry <= 0 or not leverage or leverage <= 0:
         return None
-    if mmf is None or mmf <= 0 or mmf >= 1:
+    if entry != entry or leverage != leverage:      # NaN in, None out
+        return None
+    if not _frac_ok(mmf):
         return None
     inv = 1.0 / leverage
     if is_long:
@@ -302,11 +339,21 @@ def max_leverage_for_headroom(is_long, mmf, stop_frac, k):
     """The largest leverage at which headroom_x >= k still holds.
 
     Solves d(L) >= k*s for L. For a long, d = 1 - (1-1/L)/(1-mmf), which gives
-    L <= 1 / (1 - (1-mmf)(1 - k*s)); the short branch is the mirror. Returns
-    None when no leverage satisfies it (i.e. even 1x is inside the stop)."""
-    if mmf is None or mmf <= 0 or mmf >= 1 or not stop_frac or stop_frac <= 0:
+    L <= 1 / (1 - (1-mmf)(1 - k*s)); the short branch is the mirror.
+
+    THREE OUTCOMES, DISTINGUISHED — and they must be, because they are not the
+    same instruction (adversarial review, 2026-08-16). The first version
+    returned a bare None for all three and `size_for_risk` read None as "no
+    constraint", so the two REFUSAL cases FAILED OPEN, inside the module whose
+    whole premise is failing closed:
+      * float('inf') — every leverage clears the invariant. Never binds.
+      * 0.0          — even 1x violates it (the stop sits at or beyond the
+        liquidation). A REFUSAL: no size respects the invariant.
+      * None         — the inputs cannot define it (unknown mmf, absurd stop).
+        Also a REFUSAL, never a pass."""
+    if not _frac_ok(mmf) or not stop_frac or stop_frac <= 0:
         return None
-    if k is None or k <= 0:
+    if k is None or k <= 0 or k != k:
         return None
     target = k * stop_frac
     if is_long:
@@ -314,9 +361,9 @@ def max_leverage_for_headroom(is_long, mmf, stop_frac, k):
     else:
         denom = (1.0 + mmf) * (1.0 + target) - 1.0
     if denom <= 0:
-        return None                      # any leverage clears it
+        return float("inf")              # any leverage clears it
     lev = 1.0 / denom
-    return lev if lev >= 1.0 else None
+    return lev if lev >= 1.0 else 0.0    # 0.0 == not satisfiable at any size
 
 
 def check(entry, is_long, leverage, mmf, mark):
@@ -405,8 +452,11 @@ def size_for_risk(equity, risk_pct, stop_frac, spec, k=4.0, notional_cap=None,
     # two (a short's liquidation sits marginally closer at the same leverage),
     # so a long can never be admitted at a leverage the binding branch refuses.
     lev_cap = max_leverage_for_headroom(False, spec.mmf, stop_frac, k)
-    if lev_cap is not None:
-        cands.append(("liq_headroom", lev_cap))
+    if lev_cap is None:
+        # Cannot evaluate the invariant -> REFUSE. Reading this as "no
+        # constraint" is the fail-open bug an adversarial review found here.
+        return 0.0, 0.0, "liq_headroom_unknown"
+    cands.append(("liq_headroom", lev_cap))
 
     reason, leverage = min(cands, key=lambda kv: kv[1])
     if leverage <= 0:
@@ -529,10 +579,53 @@ def _selftest():
     for is_long in (True, False):
         for s in (0.002, 0.0041, 0.01, 0.03):
             lev = max_leverage_for_headroom(is_long, 0.012, s, 4.0)
-            if lev is None:
+            if lev is None or lev in (0.0, float("inf")):
                 continue
             assert abs(headroom_x(is_long, lev, 0.012, s) - 4.0) < 1e-6, (
                 is_long, s, lev, headroom_x(is_long, lev, 0.012, s))
+
+    # THE THREE OUTCOMES ARE DISTINCT, and conflating them fails OPEN. The
+    # first version returned a bare None for all three and size_for_risk read
+    # None as "no constraint" — so a stop WIDER than the liquidation, which is
+    # the one case the invariant exists to catch, sailed through unclamped.
+    assert max_leverage_for_headroom(False, None, 0.01, 4.0) is None
+    assert max_leverage_for_headroom(False, 0.012, 0.0, 4.0) is None
+    # a stop so wide that even 1x breaches it -> 0.0, i.e. NOT SATISFIABLE
+    assert max_leverage_for_headroom(False, 0.012, 0.40, 4.0) == 0.0
+    # THE inf BRANCH IS UNREACHABLE WITH VALID INPUTS, and that is a fact
+    # about the algebra worth pinning rather than a case to hope for: for a
+    # short, denom = (1+mmf)(1+target) - 1 >= mmf > 0; for a long,
+    # denom = 1 - (1-mmf)(1-target) > 0 since both factors are below 1. So the
+    # headroom cap is always FINITE and bounded by ~1/mmf — a vanishing stop
+    # buys ~83x on BTC, not infinity, because the maintenance fraction floors
+    # it. The branch stays as a defensive guard; this pins what actually
+    # happens so a future reader does not chase it.
+    tight = max_leverage_for_headroom(False, 0.012, 1e-9, 4.0)
+    assert tight != float("inf") and abs(tight - 1.0 / 0.012) < 0.01, tight
+    # ...and size_for_risk must REFUSE on both refusal shapes, by name
+    assert size_for_risk(1000.0, 0.01, 0.40, specs["BTC"],
+                         k=4.0)[2] == "liq_headroom"
+    # A NaN MAINTENANCE FRACTION MUST REFUSE, AND MUST SAY "UNKNOWN". Before
+    # _frac_ok this returned a NaN liq price and check() read it as "ok".
+    broken_spec = MarginSpec("B", 0, 0.02, 0.05, float("nan"), 0.008)
+    assert size_for_risk(1000.0, 0.01, 0.006, broken_spec,
+                         k=4.0)[2] == "liq_headroom_unknown"
+    assert liq_price(100.0, True, 20.0, float("nan")) is None
+    assert check(100.0, True, 20.0, float("nan"), 99.0) == "liq"
+    assert headroom_x(True, 20.0, float("nan"), 0.01) is None
+    assert liq_price(float("nan"), True, 20.0, 0.012) is None
+    assert liq_price(100.0, True, float("nan"), 0.012) is None
+    # ...and a venue row carrying a non-finite fraction is DROPPED, not parsed
+    assert parse_specs([{"symbol": "NAN", "status": "active",
+                         "min_initial_margin_fraction": float("nan"),
+                         "default_initial_margin_fraction": 500,
+                         "maintenance_margin_fraction": 120,
+                         "closeout_margin_fraction": 80}]) == {}
+    # an inf cap must not poison the min-over-candidates
+    n_inf, lev_inf, why_inf = size_for_risk(1000.0, 0.01, 1e-6, specs["BTC"],
+                                            k=4.0, notional_cap=1e9)
+    assert why_inf == "venue_max_leverage" and \
+        lev_inf == specs["BTC"].max_leverage
 
     # --- liquidation P&L ---------------------------------------------------
     btc = specs["BTC"]

@@ -11,10 +11,22 @@ no real money was touched. **Cohort:** Australian musicians
 
 ## VERDICT (2026-08-16, `scripts/study_leverage_sizing_2026-08-16.py`)
 
-> **REFUTED.** On identical entries, risk-normalised sizing takes the control
-> from **t=+0.50 / +$17.38** to **t=−0.82 / −$255.91**, and **all 12
-> pre-declared grid cells lose money** (t −0.36 to −1.23, maxDD 24% to
-> **100.4%** — outright ruin at 2% risk/trade).
+> **REFUTED.** On identical entries, risk-normalised sizing takes the control's
+> t from **+0.505 to −0.823** (Δt = **−1.328**). Paired bootstrap
+> **P(Δt ≥ 0) = 0.0014**; Δt is negative in **13 of 13** perturbations (worst-
+> trade trims, leave-one-coin-out, 2/3/4/5-way time splits, both harness
+> conventions) and in **all 12** pre-declared grid cells. Adversarially
+> attacked from three independent lenses (code, statistics, rescue-search over
+> ~701 cells) — **all three returned survives=true at high confidence.**
+
+**Quote t, not dollars.** The headline −$255.91 and maxDD 54.1% are NOT the
+refutation's strength and must not be cited as such: arm B runs a mean notional
+of **$1,265 against the control's $100**, so those figures are the free
+parameter `R`, not a finding. Risk-matched to the control the same arm reads
+**−$20.24 at maxDD 5.2% with t bit-identical at −0.823**. And the dollar
+figures FLIP SIGN under the pre-(ml) convention (arm B +$242.27). **The
+pre-registered t test fails under both conventions, which is what carries the
+verdict.** Cluster-robust ((kw) convention): A **+0.31** → B **−0.52**.
 
 The primary criterion was *"t must IMPROVE"*, written before the run precisely
 so this outcome could not be reinterpreted afterwards. It did not improve; it
@@ -40,16 +52,32 @@ The mechanism, measured (208d Lighter 1h tape, 641 closes):
 | Q4 | 128 | 1.134% | **+0.260R** | +0.348R | 0.088 |
 | Q5 widest | 129 | 1.752% | +0.076R | +0.133R | 0.057 |
 
-**The fade edge lives entirely in the two widest-stop quintiles.** Equal-risk
-sizing gives the biggest notional to the smallest stops — exactly the trades
-that lose. The 195 trades (30%) below the measured 0.69% floor contribute
-**−$276.75** under equal-risk weighting but only **−$15.85** under the fixed
-clip. **The fixed clip was accidentally doing the right thing**: sizing in
-dollars under-weights low-ATR setups, and on this signal that is correct.
+**[CORRECTED after adversarial review — the first reading of this table was
+wrong in an important way.]** It is tempting to read the gradient as *"the edge
+lives in wide-stop setups"*. It does not. **Excluding entry-bar stop-outs,
+EVERY quintile is positive** (+0.396R, +0.492R, +0.555R, +0.874R, +0.605R) and
+Q1 is not the worst. The gradient tracks entry-bar-stop FREQUENCY — Q2 45% and
+Q3 42% against Q4 31% and Q5 32% — not stop width.
 
-And it is **not only a cost story** — Q2 and Q3 are negative *gross* of the
-round trip, so the wide-stop concentration is a property of the signal, not
-merely of slippage. That is the transferable finding.
+**THE ACTUAL MECHANISM:**
+
+| population | n | share | mean R-mult | equal-risk $ |
+|---|---|---|---|---|
+| entry-bar stop-outs | 235 | **37%** | **−1.129R** | **−$2,653** |
+| everything else | 406 | 63% | +0.590R | +$2,397 |
+
+> **Equal-risk sizing charges every stop-out the FULL R. The fixed clip charges
+> a tight-stop loss only `s × CLIP`** — $0.47 on a 0.47%-ATR coin against $1.75
+> on a 1.75% one. With 37% of this book's trades stopping on their own entry
+> bar, equalising that cost is the whole verdict. **The fixed clip was
+> accidentally buying insurance against its own worst population**, and
+> risk-normalisation cancels the policy.
+
+A genuine wide-versus-tight gradient in `ret` does also exist and is real
+(+0.0031, permutation p=0.0013, Welch t=+2.90, and it survives *within-coin* —
+so it is a volatility-state effect, not a coin-identity artifact). But it is
+the **smaller** term, and it argues for FILTERING tight-stop trades, which is
+the opposite of re-weighting toward them.
 
 ### What the design got right, and what it got wrong
 
@@ -84,12 +112,30 @@ merely of slippage. That is the transferable finding.
 2. **The venue's margin tiers are free, published, and were unread**: BTC/ETH
    50×, SOL 25×, most alts 10×, LIT/ETHFI/TAO 5×, thinnest books 3×, all on the
    endpoint the scout already fetches every loop.
-3. **A lead, IN-SAMPLE ONLY and not actionable yet:** a stop-distance floor
-   improves the *control* (t 0.50 → 0.76 at a 0.60% floor). It is **not
-   established** — the response is non-monotone across the grid (0.25% → 0.51,
-   0.41% → 0.40, 0.60% → 0.76) and 0.60% is the grid EDGE, which by this
-   document's own §6.7 rule is reported unbounded rather than as a value. It
-   needs an out-of-sample split before anyone touches 🧘 The Zone.
+3. **THE ONE DURABLE LEAD, and it belongs to the HOST book, not to this one.**
+   An ATR24 stop-distance floor near **1.0%** — *"do not fade an impulse while
+   the coin is quiet relative to its own norm"* — takes the shipped 🧘 Douglas
+   rule, at its existing fixed $100 clip with no leverage anywhere, to
+   **t ≈ 2.2 in-sample** (control peaks t=2.217 at a 1.00% floor, sweeping
+   0.0–2.4% at 0.10% steps). Out-of-sample it holds up less but still holds:
+   fitted on one half it delivers **t=1.487** on the other.
+   **Handle with the discipline this document demanded of itself:** the
+   response surface is noise-shaped rather than monotone (10 up / 7 down steps,
+   with a collapse at 1.30%), it was found inside a ~701-cell search, and it is
+   therefore a LEAD requiring a pre-registered out-of-sample test — not a
+   setting to ship. It is written up here because the same search proved the
+   sizing rule adds nothing on top of it.
+4. **A refutation of the whole family, not just one setting.** With notional
+   ∝ `s^e`, t runs **−1.335 (e=−1.5) → −0.823 (e=−1, this design) → +0.505
+   (e=0, the fixed clip) → +1.556 (e=+2)** — 10 up steps, 1 down. The surface
+   is MONOTONE against the design across its entire range, so **there is no
+   interior optimum and no cell to find.** Partial vol-targeting, leverage
+   caps, and decoupling the sizing volatility from the stop volatility are each
+   monotone toward the fixed clip. And the decisive one: fitting (floor,
+   exponent) jointly on one half picks **opposite-signed exponents on the two
+   halves** and loses to plain clip sizing out-of-sample both times. **Once any
+   floor ≥0.85% is applied the exponent is INERT** — every cell that clears the
+   fleet bar clears it because of the entry filter, never the sizing rule.
 
 ### The standing conclusion on leverage in this fleet
 
