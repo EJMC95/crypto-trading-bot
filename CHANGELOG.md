@@ -191,6 +191,49 @@
   with its verdict in the reason, the house pattern for research scripts. Full
   suite green (`tests/autonomy` + `tests/test_selftests.py`).
 
+## 2026-08-16 (ns) — THE (nq) CORRECTION-ESCAPE HAD A HOLE, AND A LIVE RACE FOUND IT WITHIN THE HOUR: a declared correction now also has to LOOK like the same entry
+
+- **WHAT (nq) GOT RIGHT AND WHAT IT MISSED.** `(nq)` taught
+  `audit_changelog_letters` that an entry CORRECTED IN PLACE is not a letter
+  collision — necessary, because editing a title is byte-indistinguishable from
+  a race and the guard was therefore forbidding what I12 *requires*. But it
+  asked only **"does this letter's entry declare a correction?"**, so it equally
+  suppressed a letter shared by **two entirely different entries that both
+  happened to be corrections**.
+- **NOT HYPOTHETICAL — the case existed while the code was being written.** A
+  concurrent session was mid-write on its own `(nq)` (a corrected 🧘 Douglas
+  row) while this session's `(nq)` was already on `origin/main`. A genuine
+  two-session race, of exactly the kind this guard exists for, and the fresh
+  escape would have swallowed it.
+- **THE FIX: BOTH SIGNALS, NEVER EITHER.** `same_entry` requires the two titles
+  to still be recognisably the same entry (`difflib.SequenceMatcher`) *in
+  addition to* the declaration. **MEASURED, not picked** — a real in-place
+  correction scores **0.978**, two different correction entries **0.259**, and
+  the original `(fz)` two-session race **0.267**; `SAME_ENTRY_RATIO = 0.6` sits
+  with ~4× margin on both sides of that gap.
+- **VALIDATED ON A REAL COLLISION THE SAME HOUR.** Two sessions independently
+  took `(nr)` — one pushed (`46b3a50`, the sniper harness), one local
+  (`48c04b4`, the leverage study). The guard names it and fails, where the
+  loose `(nq)` form would have stayed quiet if either entry had carried a
+  correction note.
+- **AND THE FIXTURE WAS THE TELL.** `(nq)`'s own selftest arm used two
+  UNRELATED titles and still asserted suppression — it passed only because the
+  escape was too loose. Adding the similarity requirement turned that arm red,
+  which is how the hole surfaced. Rewritten to a realistic fixture (one clause
+  of one title edited, which is what `(nn)` actually was): **a fixture that does
+  not look like the real thing cannot pin the real thing.**
+- **TWO STALE CLAIMS ABOUT THIS GUARD, CORRECTED IN PLACE (I12).** CLAUDE.md's
+  letter rule said *"on `main` ⇒ arm disabled"* and the guard's own
+  `_baseline_changelog` docstring said *"or running ON main itself"* — both
+  describing a behaviour **deliberately removed**, and the docstring
+  contradicting the NOTE fifteen lines below it. The arm keys on whether HEAD
+  has **diverged** from `origin/main`, never on the local ref's name, because
+  skipping on `main` disabled it *"on the very run that would have caught (gm)
+  being taken by a concurrent session"*. This mattered: the repo's whole
+  workflow is commit-to-local-`main`-and-push, so a session reading CLAUDE.md
+  would conclude the cross-branch arm could never fire for them — exactly
+  backwards; it fires on **every** unpushed commit.
+
 ## 2026-08-16 (nq) — `(nn)` SAID "FOUR DAYS" AND THE RECEIPTS SAY 24 HOURS: the entry whose whole subject is an unreadable guard carried a 4× number in its own title
 
 - **THE CORRECTION.** `(nn)` diagnosed and fixed a real defect — `(ne)` inlined

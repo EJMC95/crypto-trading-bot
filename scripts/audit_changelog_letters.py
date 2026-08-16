@@ -124,6 +124,38 @@ def dangling_code_citations(paths, known):
 #: phrase must appear inside that entry's OWN body — see `corrected_letters`.
 CORRECTED = re.compile(r"CORRECTED IN PLACE", re.I)
 
+#: [2026-08-16 (ns)] How alike two titles must be before a declared correction
+#: is believed. MEASURED, not picked: the real in-place correction this escape
+#: was built for scores **0.978**, while the two known false cases score
+#: **0.259** (two different correction entries colliding on a letter) and
+#: **0.267** (the original `(fz)` two-session race). 0.6 sits with ~4x margin
+#: on both sides of that gap.
+SAME_ENTRY_RATIO = 0.6
+
+
+def same_entry(a, b):
+    """True when two titles are the SAME entry, one of them edited.
+
+    [2026-08-16 (ns)] THE HOLE THIS CLOSES, found within the hour by the very
+    collision it would have hidden. `(nq)` let a declared `CORRECTED IN PLACE`
+    suppress a cross-branch letter clash — but it asked only *"does this
+    letter's entry declare a correction?"*, so it also suppressed a letter
+    shared by two ENTIRELY DIFFERENT entries that both happened to be
+    corrections. That is not hypothetical: a concurrent session was mid-write
+    on its own `(nq)` (a corrected 🧘 Douglas row) while this session's `(nq)`
+    was already on origin/main — a genuine race the escape would have
+    swallowed, in the guard whose entire job is to catch it.
+
+    A real in-place correction edits a few words of one title; a race puts two
+    unrelated subjects on one letter. `difflib` separates those cleanly (see
+    `SAME_ENTRY_RATIO` for the measured numbers), and requiring BOTH signals —
+    an explicit declaration AND textual continuity — means neither alone can
+    wave the guard off.
+    """
+    import difflib
+    return difflib.SequenceMatcher(
+        None, str(a or ""), str(b or "")).ratio() >= SAME_ENTRY_RATIO
+
 
 def corrected_letters(text):
     """-> {letter} whose OWN entry body declares an in-place correction.
@@ -186,8 +218,11 @@ def cross_branch(mine, theirs, my_text=None):
     out = {}
     for _d, letter, title in mine:
         other = theirs_by_letter.get(letter)
-        if other is not None and other != title and letter not in fixed:
-            out[letter] = (title, other)
+        if other is None or other == title:
+            continue
+        if letter in fixed and same_entry(title, other):
+            continue                           # a corrected title, not a race
+        out[letter] = (title, other)
     return out
 
 
@@ -195,8 +230,18 @@ def _baseline_changelog():
     """origin/main's CHANGELOG, or None when it is unavailable/irrelevant.
 
     Fail-SAFE OPEN and deliberately so: no git, a shallow clone with no
-    origin/main, or running ON main itself all return None and the guard keeps
-    its pre-existing in-file behaviour. This arm can only ADD a finding.
+    origin/main, or a HEAD that already EQUALS origin/main all return None and
+    the guard keeps its pre-existing in-file behaviour. This arm can only ADD a
+    finding.
+
+    [2026-08-16 (ns)] CORRECTED IN PLACE: this docstring used to say *"or
+    running ON main itself"*, contradicting the NOTE fifteen lines below it and
+    the code between them. The arm keys on whether HEAD has DIVERGED from
+    origin/main, never on the local ref's name — being skipped on a branch
+    called `main` is the exact bug that NOTE records fixing. The stale sentence
+    had also been copied into CLAUDE.md's letter rule, where a session would
+    actually read it and conclude the arm cannot fire on the workflow this repo
+    uses. Both corrected together.
     """
     import subprocess
     def _git(*a):
@@ -350,28 +395,59 @@ def _selftest():
 
     # [(nq)] AN ENTRY CORRECTED IN PLACE IS NOT A COLLISION — I12 requires the
     # correction, and a corrected TITLE is byte-indistinguishable from a race.
-    _fixed_text = ("## 2026-07-30 (fz) — THE OFFENSE PASS, 24 HOURS\n\n"
+    # The fixture is a REAL in-place correction: one clause of one title edited,
+    # which is what (nn) actually was. [(ns)] An earlier version of this arm
+    # used two unrelated titles and still expected suppression — it passed only
+    # because the escape was too loose, and the (ns) similarity requirement
+    # correctly refuses it. A fixture that does not look like the real thing
+    # cannot pin the real thing.
+    _orig_text = ("## 2026-07-30 (fz) — THE OFFENSE PASS: the growth rail "
+                  "reaches six books, FOUR DAYS of tape\n\nb\n")
+    _orig = scan(_orig_text)[0]
+    _fixed_text = ("## 2026-07-30 (fz) — THE OFFENSE PASS: the growth rail "
+                   "reaches six books, 24 HOURS of tape\n\n"
                    "> **[CORRECTED IN PLACE per I12.]** was 'four days'\n")
     _fixed = scan(_fixed_text)[0]
-    assert cross_branch(_fixed, _main, my_text=_fixed_text) == {}, \
+    assert cross_branch(_fixed, _orig, my_text=_fixed_text) == {}, \
         "a declared in-place correction must not read as a letter collision"
     # ...but WITHOUT the declaration the very same edit still fires, so the
     # (fz) incident this guard was built for is untouched.
-    assert set(cross_branch(_fixed, _main)) == {"fz"}
-    _undeclared = "## 2026-07-30 (fz) — THE OFFENSE PASS, 24 HOURS\n\nb\n"
-    assert set(cross_branch(scan(_undeclared)[0], _main,
+    assert set(cross_branch(_fixed, _orig)) == {"fz"}
+    _undeclared = ("## 2026-07-30 (fz) — THE OFFENSE PASS: the growth rail "
+                   "reaches six books, 24 HOURS of tape\n\nb\n")
+    assert set(cross_branch(scan(_undeclared)[0], _orig,
                             my_text=_undeclared)) == {"fz"}, \
         "no declaration ⇒ still a collision"
     # THE ESCAPE IS PER-ENTRY: a correction declared in a DIFFERENT entry must
     # not excuse this one, or one correction would silence the whole guard.
     _elsewhere = ("## 2026-07-31 (ga) — unrelated\n\n"
                   "> **[CORRECTED IN PLACE per I12.]**\n\n"
-                  "## 2026-07-30 (fz) — THE OFFENSE PASS, 24 HOURS\n\nb\n")
-    assert set(cross_branch(scan(_elsewhere)[0], _main,
+                  + _undeclared)
+    assert set(cross_branch(scan(_elsewhere)[0], _orig,
                             my_text=_elsewhere)) == {"fz"}, \
         "a correction in another entry must not excuse this letter"
     assert corrected_letters(_elsewhere) == {"ga"}
     assert corrected_letters("") == set() and corrected_letters(None) == set()
+
+    # [(ns)] A DECLARATION IS NOT ENOUGH — the titles must be the SAME ENTRY.
+    # The hole (nq) opened: two DIFFERENT entries that both happen to be
+    # corrections would share a letter and be waved through. Measured ratios:
+    # a real in-place correction 0.978, this case 0.259, the (fz) race 0.267.
+    _race_text = ("## 2026-08-16 (fz) — the Douglas row overstated its numbers\n\n"
+                  "> **[CORRECTED IN PLACE per I12.]** pre-(ml) figures\n")
+    assert set(cross_branch(scan(_race_text)[0], _main,
+                            my_text=_race_text)) == {"fz"}, \
+        "a DIFFERENT entry that merely declares a correction is still a race"
+    assert same_entry("— CI WAS RED FOR FOUR DAYS OVER 0.1pp, AND THE REASON "
+                      "WAS 13 UNTESTED STATEMENTS INLINED INTO main()",
+                      "— CI WAS RED FOR 24 HOURS OVER 0.1pp, AND THE REASON "
+                      "WAS 13 UNTESTED STATEMENTS INLINED INTO main()"), \
+        "an edited title is the same entry"
+    assert not same_entry("— THE OFFENSE PASS", "— a THIRD era-pooling error")
+    assert not same_entry("— the Douglas row overstated its numbers",
+                          "— `(nn)` SAID FOUR DAYS AND THE RECEIPTS SAY 24 HOURS")
+    assert same_entry("x", "x") and not same_entry("", "a totally other title")
+    assert not same_entry(None, "anything")
     # the pre-era scope applies here too — 17-Jul's restart must not clash
     _pre = scan("## 2026-07-17 (a) — restart head\n\nb\n")[0]
     assert cross_branch(_pre, scan("## 2026-07-17 (a) — tail\n\nb\n")[0]) == {}

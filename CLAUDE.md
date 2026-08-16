@@ -1698,7 +1698,7 @@ All new bots:
   letter + same title is a rebase and stays quiet. Fail-safe open: no git, a
   shallow clone with no `origin/main`, or a HEAD that already EQUALS
   `origin/main` ⇒ arm disabled.
-  **[16-Aug (nr)] CORRECTED IN PLACE (I12): this line used to say "on `main` ⇒
+  **[16-Aug (ns)] CORRECTED IN PLACE (I12): this line used to say "on `main` ⇒
   arm disabled", and that is FALSE — it describes a behaviour deliberately
   removed.** The arm keys on whether HEAD has **diverged** from `origin/main`,
   never on what the local ref is called; the guard says so in its own words
@@ -1710,7 +1710,7 @@ All new bots:
   backwards, and it fires on **every** unpushed commit. The same sentence had
   been copied into the guard's own docstring, contradicting the note fifteen
   lines below it; both corrected together.
-  **AN ENTRY CORRECTED IN PLACE IS NOT A COLLISION (16-Aug (nq)/(nr)).**
+  **AN ENTRY CORRECTED IN PLACE IS NOT A COLLISION (16-Aug (nq)/(ns)).**
   Editing a title is byte-indistinguishable from a letter race, so the guard
   used to make every title permanently immutable — which forbade what I12
   requires. It now stays quiet when the entry's **own body** declares
