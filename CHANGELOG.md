@@ -1,3 +1,157 @@
+## 2026-08-16 (ot) — THE MARGIN BLOCK EARNS ITS NUMBERS: a "0.000000% calibration" that could not fail, retracted; the forward test that DISAGREED and found the venue's real formula; and a null test that settled the rest
+
+- **THE ASK** (operator): *"avo maria and funding farmer leverage options"*, then
+  *"wire the margin_mode and liquidation_price reads"*. `(no)` wired the read.
+  This is everything after it, and the SEQUENCE is the entry: four commits of
+  correction on my own work, each worth more than the claim it replaced.
+
+### What the two live books actually run — the answer to the original question
+
+- **There is no venue leverage in this fleet and no code that could set any.**
+  A repo-wide grep for `update_leverage|margin_mode|initial_margin|
+  liquidation_price` outside site-packages returns ZERO hits in fleet code.
+  That absence has a CONTROL GROUP (I6): the SDK exposes
+  `update_leverage(market_index, margin_mode, leverage)` and
+  `venues/lighter_client.py` calls a **sibling method on the same signer
+  object** for every real order. Never used, deliberately.
+- What varies is EFFECTIVE leverage, and both live rows now publish it:
+  💸 **0.153×** (gross $30.27 / equity $197.52, one XAU short, 634.8% from its
+  liq) and 🙏 **0.999×** — the 1.00×-by-construction ceiling confirmed against
+  the venue rather than inferred from clip arithmetic. Both `cross`.
+- **Leverage itself stays REJECTED**, now six times including one
+  Lighter-native study, which closes the cross-venue caveat the prior five
+  carried. Nothing here proposes taking any.
+
+### The unit sweep — three renames, all the same class
+
+- **`imf` → `imf_pct`.** CONFIRMED against the venue's own tiers, not inferred:
+  `orderBookDetails` publishes them as integer BASIS POINTS (210 active books,
+  nesting `closeout <= maintenance <= min_imf <= default_imf` with ZERO
+  violations; bps yields sane 3×-50× tiers where percent would imply
+  0.03×-0.2×). The position field is that ÷ 100 — matched **5 of 5** live
+  positions against the DEFAULT tier, **0 of 5** against the min, which is
+  independently what a fleet that never calls `update_leverage` should look
+  like. Read as a 0-1 fraction it is wrong by 100× — the class that gave this
+  fleet an 8×-overstated funding APR. Adds derived `max_lev`.
+- **`dist_pct` → `dist_frac`.** A RATIO published under a `_pct` name (XAU 6.35
+  = 635%), in the very payload where `imf` had just been renamed to stop this.
+  Caught by a peer against the live feed. The FIELD moved, not the VALUE, so
+  every number already published stays true.
+- **`size` published, SIGNED.** Two gaps: the verified leverage basis needs an
+  ENTRY-based notional (`value` is MARK-based, and deriving size as
+  `value/mark` fails exactly when the mark is blind), and **the block could not
+  express DIRECTION at all** — `liq_price` takes `is_long`, so a consumer had
+  to leave the block for a per-bot field. `abs()` for notional, sign for side.
+
+### A RISK NUMBER WAS COMPUTED OFF A BOOT-FROZEN PRICE
+
+- `_margin_block` sourced marks from `funding_map()[coin]["mark"]`, which is
+  `LighterClient.markets[sym]["last"]` — captured by `_load_markets()` at
+  CLIENT CONSTRUCTION (`:451`, served `:591`) and refreshed only by
+  `refresh_markets()`, which **only `lighter_perp_sniper` calls**. Both live
+  bots build their context once outside the loop, so that mark is frozen for
+  the container's lifetime and **its error grows with uptime**. `dist_frac` and
+  `nearest_liq` are RISK numbers, and `venues/marks.py`'s header has forbidden
+  the funding mark on any risk path since it was written — *"using it on a stop
+  path would silently freeze the stop while the real price runs away"*. I walked
+  into it anyway; a peer caught it. Now on `marks.stop_marks` (live order-book
+  mids, held coins only) with a `mark_blind` census. Avo had the same shape via
+  `meta['last_px']` and got the same fix even though its branch is currently
+  unreachable — a latent wrong-price path on a real-money book is not less
+  wrong for being unreachable today.
+
+### THE CIRCULAR CALIBRATION — the one worth reading
+
+- **I published a "0.000000% calibration" of `scripts/lighter_margin_model`
+  against this payload and it was CIRCULAR.** I computed
+  `implied_entry = liq·(1+mmf)/(1+1/L)` and fed it back through `liq_price()`,
+  which is that exact inverse. Proved by falsification after a peer questioned
+  the price source: it returns **0.000000% for leverage 9.9, for mmf 0.9, and
+  for a $1.00 liq price**. A check that cannot fail verified nothing. It had
+  already been pinned in another module's selftest; retracted there within the
+  hour, before anything was built on it.
+- **ROOT CAUSE, and it is structural rather than carelessness:** the venue's own
+  `avg_entry_price` was read into `rec["entry"]` and never projected into the
+  payload, so the honest check was IMPOSSIBLE from outside — which is exactly
+  why an unfalsifiable one felt adequate. `entry` is published now.
+
+### The forward test DISAGREED — and identified the real formula
+
+- With every input observed rather than derived (entry **4339.72**, venue liq
+  **32238.9162**, mmf 0.024):
+
+      mark-notional / total_asset_value   L=0.153254   pred 31891.47   -1.078%
+      entry-notional / total_asset_value  L=0.151605   pred 32192.33   -0.145%
+      (size x entry) / COLLATERAL         L=0.151355   pred 32238.50   -0.001%
+
+- **The isolated formula is right in CROSS mode, but leverage is an ENTRY-based
+  notional over COLLATERAL.** The miss (1.078%) exceeded the whole maintenance
+  term (0.787%), so no correction-term tweak could have rescued the wrong basis.
+  And this is precisely what the circularity hid: back-solving gave 4385.65
+  against a real 4339.72, and **that 1.06% gap WAS the model error**, absorbed
+  invisibly by the inversion.
+- **THE NULL TEST settled the remainder.** Three snapshots of one position; the
+  denominators sit only 0.165% apart in LEVEL so a single fit could not separate
+  them, but their MOTION differs ~40×. T1→T2 the liq moved exactly when
+  collateral moved (+0.000053% observed vs +0.000053% predicted; total_asset
+  predicted +0.002116%). **T2→T3 `value` and `total_asset` moved while
+  collateral did NOT — and the liq did not move either, byte-identical to ten
+  significant figures, where a total_asset formula REQUIRED +0.000182%.** A
+  hypothesis refuted by an absence it predicted is a different quality of
+  evidence from one that merely fits worse. Static fit: collateral +0.00000% at
+  all three, total_asset −0.143/−0.141/−0.141%.
+- Publishing `size` also took the reproduction from −0.0013% to **exact** — that
+  residual was derivation error (`value/mark`), not model error.
+
+### Also fixed: a "bridge" that was permanent
+
+- `(nj)` gave 🙏 Avo its own clip arm and shipped a fallback to the SHARED
+  `live.clip_scale` "so the rollout has no protection gap". Right for the deploy
+  window, **wrong the moment it closed**: in the steady state the own arm is
+  absent on every read, so the fallback fires and the Farmer's dial steers Avo
+  again the instant the board restricts it — the exact coupling `(nj)` removed.
+  A bridge with no expiry is the old behaviour with extra steps. Closed once
+  both consumers were deployed and stamp-verified.
+
+### What the block still does NOT give you, stated because a half-closed gap advertised as closed is worse than an open one
+
+- **`mmf` is absent and NOT derivable.** A model needs the MARKET-level
+  `maintenance_margin_fraction`. The trap is `imf_pct` — a different tier — and
+  the plausible `0.6 × imf_pct` gives 0.0400 against a true 0.0240: **wrong by
+  66%, a −1.540% liq error**, larger than the basis error above. Measured by a
+  peer. Read per book; never derive.
+- **`margin` reads 0.0 on every CROSS position** (cross draws on the pooled
+  collateral). A real measured zero, not a missing field.
+- **One POSITION, not one observation.** `gross/equity` and position-value
+  ÷ equity stay numerically identical while the Farmer holds a single open
+  position, so that pair is untested and waits on a naturally-occurring second.
+
+### Verification, deploys, and two of my own tests that were vacuous
+
+- `tests/autonomy/test_margin_truth.py` (62). Mutation rounds throughout; every
+  guard mutation-verified RED.
+- **THREE of my own checks were wrong first, all recorded because the shape
+  recurs:** the mutation HARNESS grepped lowercase `failed` against pytest's
+  uppercase `FAILED` through a pipe that ate `$?`, reporting all 8 mutations as
+  surviving (the `(ml)` `grep -q` class, in the harness rather than in CI —
+  verdict is the exit code now, plus an assertion that each mutation APPLIED);
+  a restrict-only test asserted `"min(1.0" in source` and matched its OWN
+  DOCSTRING; and the calibration test was named "...the published block
+  alone..." while never calling `margin_state_from` and taking `mmf` from
+  outside it — the sufficiency overstatement in miniature, caught by an
+  adversarial review pass (16 findings, 15 refuted, 1 survivor: mine).
+- **Deployed and stamp-verified** across four rounds, each predicted from a
+  clean `origin/main` worktree BEFORE reading the row: Farmer
+  `bc96d0f543a6`→`5f75543e27ec`→`d73e8938ad8d`→`e9d806605720`, Avo
+  `c317eb48e37b`→`3ef2c7dee9e8`→`5a4acaa4078f`. Shadow control arm deployed
+  alongside the Farmer every time per `(hi)`. All positions restored; no halts.
+- **Shared-tree note:** every commit here used `git commit -o <paths>` and
+  ANCHORED edits rather than whole-file writes. `-o` protects the shared INDEX
+  and does NOTHING about a lost update from a stale in-memory rewrite — two
+  changelog entries (89 and 65 lines) died that way today in other sessions.
+  Anchored edits fail loudly when the surrounding text moved, which is the
+  collision you want to hear about.
+
 ## 2026-08-16 (os) — 🛡️ THE IMMUNE ORGAN DID NOT RUN FOR 41 MINUTES AND ITS OWN FRESHNESS CONTRACT SAID IT WAS FINE: a boot stagger longer than the gap between deploys is an organ that never starts
 
 **Found while verifying `(oi)`.** The Parliament's restart fix landed and I went
