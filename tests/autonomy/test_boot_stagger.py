@@ -154,6 +154,45 @@ def test_BOTH_early_run_shapes_parse_as_mitigated_from_the_LIVE_file():
     assert mod.EARLY_RUN_MAX_S == 60
 
 
+def test_an_invocation_the_organ_REJECTS_is_not_a_first_run():
+    """`(pe)`: a claim read off run_all.sh is a claim about the SHELL, not the
+    organ — and `early` is POSITIONAL, so a block whose first line is an early
+    run scores stagger 0 even when that run dies on `unrecognized arguments`
+    and `|| true` hides it.
+
+    NOT HYPOTHETICAL, AND I SHIPPED IT: at dc803be the shell passed
+    `--publish-if-stale` twice while golive_readiness.py declared it ZERO
+    times, until (pa) supplied the missing half. Live boot log:
+    `error: unrecognized arguments: --publish-if-stale 21600`. A shell-only
+    parser called that block correctly mitigated throughout.
+    """
+    inert = """
+( python3 /freqtrade/scripts/golive_readiness.py --publish --publish-if-nonexistent 21600 || true
+  sleep 900
+  while true; do
+    python3 /freqtrade/scripts/golive_readiness.py --publish || true
+    sleep 21600
+  done ) &
+"""
+    b = mod.parse_blocks(inert)[0]
+    assert b["stagger_s"] == 900, "the rejected run must not count as the first"
+    assert b["early"] is False and b["gated"] is False
+    assert b["inert_flags"] == ["--publish-if-nonexistent"], b["inert_flags"]
+    # ...and the real block, whose flag IS implemented, is unaffected
+    live = {x["organ"]: x for x in mod.parse_blocks(mod.RUN_ALL.read_text())}
+    g = live["golive_readiness"]
+    assert g["inert_flags"] == [] and g["gated"] is True and g["stagger_s"] == 0
+
+
+def test_flag_detection_fails_open_on_an_unreadable_target():
+    """A guard that cannot see must not manufacture a finding."""
+    assert mod.declares_flag("/freqtrade/does_not_exist.py", "--x") is None
+    assert mod.declares_flag("/freqtrade/scripts/golive_readiness.py",
+                             "--publish-if-stale") is True
+    assert mod.declares_flag("/freqtrade/scripts/golive_readiness.py",
+                             "--no-such-flag") is False
+
+
 def test_a_one_shot_organ_can_be_failed_at_all():
     """🧹 cleanup_legacy_bots has no loop, so `interval_s` is None — and with a
     None tolerance it was structurally UNFAILABLE, the single organ whose

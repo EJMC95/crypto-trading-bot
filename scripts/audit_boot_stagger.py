@@ -111,6 +111,32 @@ KEY_ALIASES = {"implementation_shortfall": "impl-shortfall",
 STAGGER_OK: dict[str, str] = {}
 
 
+def declares_flag(script: str, flag: str) -> bool | None:
+    """Does the ORGAN actually implement the flag the SHELL hands it?
+
+    None when the target cannot be read — fail-OPEN, because a guard that
+    cannot see must not manufacture a finding.
+
+    WHY THIS IS THE LOAD-BEARING CHECK, not a nicety. `(pe)`: a claim read off
+    `run_all.sh` is a claim about the SHELL, not the organ. MEASURED on this
+    repo — at `dc803be` the shell passed `--publish-if-stale` TWICE and
+    `golive_readiness.py` declared it ZERO times, until `(pa)` supplied the
+    missing half. argparse exits 2, `|| true` swallows it, the boot log reads
+
+        error: unrecognized arguments: --publish-if-stale 21600
+
+    and a shell parser calls that block correctly mitigated throughout. Static
+    parse rather than `--help`: no imports, no venue calls, no side effects,
+    and it works with no DB and no network.
+    """
+    rel = script.replace("/freqtrade/", "")
+    try:
+        src = (ROOT / rel).read_text()
+    except Exception:      # noqa: BLE001
+        return None
+    return bool(re.search(r"add_argument\(\s*[\"']" + re.escape(flag), src))
+
+
 def parse_blocks(text: str) -> list[dict]:
     """Every backgrounded organ block in run_all.sh, with its timings.
 
@@ -139,7 +165,24 @@ def parse_blocks(text: str) -> list[dict]:
         # implementation_shortfall 30s — and all four were reported FAIL. A
         # guard that invents work is worse than no guard; it was caught only by
         # reading the blocks it had accused.
-        head = body[:org.start()]
+        # AN INVOCATION THE ORGAN WILL REJECT IS NOT A FIRST RUN. `early` is a
+        # POSITIONAL property, so a block whose first line is an early run
+        # scores stagger 0 even when that run dies on `unrecognized arguments`
+        # and `|| true` hides it — which is exactly what shipped here between
+        # `dc803be` and `(pa)`. So walk the invocations in order and take the
+        # first EFFECTIVE one: the first whose flags the target actually
+        # declares. Unreadable target ⇒ fail-OPEN, counted as effective.
+        inert: list[str] = []
+        first_ok = org                      # fallback: the first invocation
+        for inv in re.finditer(
+                r"python3\s+(/freqtrade/(?:scripts/)?[A-Za-z_0-9]+\.py)([^\n]*)", body):
+            flags = re.findall(r"(--[a-z][a-z0-9-]*)", inv.group(2))
+            bad = [f for f in flags if declares_flag(inv.group(1), f) is False]
+            if not bad:
+                first_ok = inv
+                break
+            inert.extend(bad)
+        head = body[:first_ok.start()]
         st_m = re.findall(r"sleep\s+\"?\$?\{?[A-Z_]*:?-?(\d+)\}?\"?", head)
         stagger = sum(int(x) for x in st_m) if st_m else 0
         # EARLY = "no sleep longer than EARLY_RUN_MAX_S precedes the first
@@ -157,7 +200,9 @@ def parse_blocks(text: str) -> list[dict]:
         early = stagger <= EARLY_RUN_MAX_S
         # The CHEAP early run — reachable AND free when the key is already
         # fresh. Named separately because it is the pattern worth spreading.
-        gated = "--publish-if-stale" in body
+        gated = ("--publish-if-stale" in body
+                 and declares_flag("scripts/golive_readiness.py",
+                                   "--publish-if-stale") is not False)
         # The loop interval: the last `sleep` inside the loop body.
         loop = body.split("while true", 1)[1] if "while true" in body else ""
         iv_m = re.findall(r"sleep\s+\"?\$?\{?[A-Z_]*:?-?(\d+)\}?\"?", loop)
@@ -166,7 +211,7 @@ def parse_blocks(text: str) -> list[dict]:
                 and interval <= SUPERVISOR_MAX_BACKOFF_S else "periodic")
         out.append({"organ": name, "stagger_s": stagger, "interval_s": interval,
                     "early": early, "gated": gated, "mitigated": early or gated,
-                    "kind": kind})
+                    "inert_flags": sorted(set(inert)), "kind": kind})
     return out
 
 
