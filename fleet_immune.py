@@ -572,8 +572,20 @@ BRAIN_MEMORY_SKEW_S = float(os.environ.get("IMMUNE_BRAIN_SKEW_S", "21600"))
 #: rather than sniffed — a counter this organ does not understand must not be
 #: guessed at, and an undeclared organ simply is not watched (visible in the
 #: payload's `churn_watched`, never a silent omission).
+#: [2026-08-16 (od)] THIRD ELEMENT: the dotted path to an AUTHORITATIVE
+#: monotone restart count, when the organ publishes one. Optional — a 2-tuple
+#: keeps the old reset/stall inference exactly. This exists because the
+#: docstring below is honest about its own weakness: a RESET is only visible
+#: BETWEEN samples, so "the counted number depends on when this organ happens
+#: to wake up", and at an unlucky phase it reads ZERO while the organ restarts
+#: 96x/day. `(nz)` gave the Parliament a counter that survives its own death
+#: (persisted in the ecosystem DB on the Railway volume, monotone), so for
+#: that organ the count can now be READ rather than inferred: deaths = the
+#: delta between two sightings, exact at any sampling phase, no history
+#: reconstruction and no floor heuristic.
 RESTART_COUNTERS = {
-    "parliament": ("data.cycles", "🏛️ the Parliament's supervisor loop"),
+    "parliament": ("data.cycles", "🏛️ the Parliament's supervisor loop",
+                   "restarts"),
 }
 #: Restarts inside RESTART_WINDOW_S before the churn is called sickness. One
 #: restart is an ordinary DEPLOY and must stay quiet, or this pages on every
@@ -715,7 +727,9 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
     min_n = RESTART_CHURN_N if min_n is None else min_n
     window_s = RESTART_WINDOW_S if window_s is None else window_s
     out = []
-    for key, (path, label) in sorted(RESTART_COUNTERS.items()):
+    for key, spec in sorted(RESTART_COUNTERS.items()):
+        path, label = spec[0], spec[1]
+        auth_path = spec[2] if len(spec) > 2 else None
         st = states.get(key) or {}
         if not st or not _fresh(st, now):
             continue
@@ -747,6 +761,38 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
         # the history is readable the count comes from it and the sampler's
         # tallies are used only as the FALLBACK, declared in `basis` so a
         # reader can tell which one produced the number.
+        # [(od)] AUTHORITATIVE COUNT FIRST. A monotone counter the publisher
+        # persists across its own death cannot alias: two sightings N apart
+        # mean exactly N deaths, whatever the sampling phase. Only a positive
+        # delta speaks; a first sighting claims nothing (the same fail-safe
+        # this function applies everywhere else), and a DECREASE means the
+        # durable store was reset or restored, which is not evidence of a
+        # restart and must not be counted as one.
+        auth = _dotted(st, auth_path) if auth_path else None
+        if isinstance(auth, (int, float)) and not isinstance(auth, bool):
+            prev_auth = mem.get("auth_last")
+            deaths = [float(t) for t in (mem.get("auth_deaths") or [])
+                      if isinstance(t, (int, float))]
+            if isinstance(prev_auth, (int, float)) and auth > prev_auth:
+                deaths.extend([float(now)] * int(auth - prev_auth))
+            deaths = [t for t in deaths if now - t <= window_s]
+            seen[key]["auth_last"] = float(auth)
+            seen[key]["auth_deaths"] = deaths
+            seen[key]["basis"] = f"publisher's own counter (now {auth:g})"
+            if len(deaths) >= min_n:
+                hrs = window_s / 3600.0
+                out.append({
+                    "organ": key,
+                    "detail": (f"{label}: {len(deaths)} RESTART(s) in "
+                               f"{hrs:.0f}h, counted from the publisher's own "
+                               f"durable counter ({auth_path}, now {auth:g}) "
+                               f"— exact at any sampling phase, unlike the "
+                               f"reset heuristic. The key stays FRESH on every "
+                               f"boot, so no age check can see this, and "
+                               f"in-process state is lost each time"),
+                })
+            continue
+
         hist = churn_from_history(key, path, now, window_s)
         if hist is not None:
             h_res, h_sta, h_n = hist

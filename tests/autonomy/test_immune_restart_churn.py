@@ -342,12 +342,30 @@ class TestItIsActuallyWired:
             "key that is never fetched makes restart_churn dead code (hh)")
 
     def test_the_watch_map_is_usable(self):
+        """[(od)] Entries are (path, label) or (path, label, auth_path) — the
+        optional third element is the dotted path to a publisher's own durable
+        restart count, which `restart_churn` prefers over the reset inference
+        because a reset is only observable BETWEEN samples."""
         now = FI.now_ts()
         assert FI.RESTART_COUNTERS, "an empty watch map watches nothing"
-        for key, (path, label) in FI.RESTART_COUNTERS.items():
+        for key, spec in FI.RESTART_COUNTERS.items():
+            assert 2 <= len(spec) <= 3, (key, spec)
+            path, label = spec[0], spec[1]
             assert path and label, key
+            if len(spec) > 2:
+                assert spec[2], f"{key}: an empty auth path is not a path"
         # the declared path must actually resolve against the real payload
         assert FI._dotted(_parl(7, now)["parliament"], "data.cycles") == 7
+
+    def test_the_authoritative_counter_path_resolves_on_a_real_payload(self):
+        """[(od)] A declared auth path that resolves to nothing would silently
+        drop the organ back to the inference it was meant to replace."""
+        spec = FI.RESTART_COUNTERS["parliament"]
+        assert len(spec) == 3 and spec[2] == "restarts", spec
+        # the shape the Parliament actually publishes since (nz)
+        payload = {"updated": FI._iso(FI.now_ts()), "ttl_sec": 900,
+                   "restarts": 4, "data": {"cycles": 12}}
+        assert FI._dotted(payload, spec[2]) == 4
 
     def test_the_memory_is_persisted(self):
         """Without persistence every cycle is a first sighting and the sensor

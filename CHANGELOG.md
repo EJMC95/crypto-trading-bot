@@ -1,10 +1,49 @@
+## 2026-08-16 (od) — the immune organ stops INFERRING the Parliament's restarts and starts READING them: an exact count at any sampling phase
+
+- **WHY NOW.** `(nz)` gave 🏛️ the Parliament a restart counter that survives
+  its own death (persisted in the ecosystem DB on the Railway volume,
+  monotone, published at top level) after the supervisor restarted **10× in
+  48h** while its own payload reported `errors: 0` in all 567 samples. The
+  operator's ask was to keep watching it. The durable form of "keep watching"
+  is not a session polling a URL — it is the organ that already pages doing
+  the counting properly.
+- **THE WEAKNESS THE DETECTOR DOCUMENTS ABOUT ITSELF.** `restart_churn`
+  infers a restart from a counter RESET, and a reset is only observable
+  BETWEEN samples: *"the counted number depends on when this organ happens to
+  wake up, and at an unlucky phase it is ZERO while the organ restarts
+  96×/day."* `churn_from_history` reduces the aliasing by reconstructing the
+  publisher's series, but only when that history is readable. With restart
+  intervals as short as 8 minutes against a 10-minute immune loop, missing
+  deaths is not hypothetical.
+- **THE FIX: read the count instead of inferring it.** `RESTART_COUNTERS`
+  entries gain an OPTIONAL third element — the dotted path to an
+  authoritative monotone restart count. When the publisher provides one, two
+  sightings N apart mean exactly N deaths, **at any sampling phase**, with no
+  history reconstruction and no floor heuristic. A 2-tuple declaration, or a
+  publisher that has not deployed its counter yet, keeps the old inference
+  verbatim.
+- **Fail-safe in the same directions as everything around it:** a first
+  sighting claims nothing; a healthy advance is silent; a stale payload stays
+  the watchdog's jurisdiction; and a **DECREASE** in the durable counter (the
+  store reset or restored from a snapshot) is NOT counted as a restart — it
+  is not evidence of a death. `basis` names which mechanism produced the
+  number, so a reader can always tell a counted total from an inferred one.
+- Pinned in `tests/autonomy/test_restart_counter_authority.py`, including the
+  case that motivated it: five restarts where `cycles` never regresses
+  between samples, so the reset heuristic sees NOTHING and the counter sees
+  all five. **Mutation-verified in both directions** — disabling the delta
+  reddens it, and loosening `>` to `>=` (which would count a flat counter as
+  a death) reddens it too.
+
 ## 2026-08-16 (oe) — 📐 GRIMES RE-MEASURED: THE GATE HAS OPENED, AND WHAT OPENED IT WAS THE COIN LIST, NOT THE EDGE
 
-- **[LETTER MOVED (ob) -> (oe), 16-Aug.** Two concurrent sessions took `(ob)`
-  and then `(od)` mid-write; both are cited from tracked code, so by the
-  convention they keep the letters and this entry moved to the next free one.
-  Second move today — `(nt)` moved from `(nr)` for the same reason. Committed
-  from an ISOLATED WORKTREE, which is the `(ob)` fix working as intended.]**
+- **[LETTER MOVED (ob) -> (oe), 16-Aug — twice, because (od) was taken mid-write too.** A concurrent session pushed a
+  different `(ob)` to origin/main while this was being written (the
+  per-session worktrees entry) and THAT one is cited from tracked code
+  (`scripts/session_commit.py`, `tests/autonomy/test_session_commit.py`),
+  so by the convention it keeps the letter and this entry moved to the
+  next free one. Second time today — see `(nt)`, which moved from `(nr)`
+  for the same reason.]**
 - **THE ASK.** Operator: *"re-measure grimes"* — the last unchecked book of the
   wave-2 cohort, after 🧘 Douglas (nt), 🧙 Schwager (nu) and 🧮 Hull (ny).
 - **IT IS A DIFFERENT QUESTION FROM THE OTHER THREE, and that shaped the whole
@@ -117,71 +156,6 @@
   a deploy bridge, and `venues/lighter_client.py`'s `dist_pct` publishing a
   FRACTION under a `_pct` name on both real-money rows — the same unit-naming
   class they had just fixed with `imf` → `imf_pct`.
-
-## 2026-08-16 (ob) — SESSIONS GET THEIR OWN WORKTREES: the shared-tree class stops being mitigated and starts being unreachable
-
-- **WHY A SECOND ENTRY ON THIS.** `(nx)` shipped `session_commit.py` and said
-  plainly what it could not do: git records no authorship, so no
-  commit-boundary tool can tell whose hunk is whose. Mitigation narrows the
-  blast radius; **isolation removes the surface.** `scripts/new_session_worktree.sh`
-  makes that the default — one command, then `cd` and work.
-- **WHAT IT SETS UP:** a worktree at `.claude/worktrees/<name>` on branch
-  `claude/<name>` cut from `origin/main`, a **symlinked `.venv`** (the suite
-  runs as `.venv/bin/python3`; a second virtualenv would be a slow, drifting
-  copy), a `reports/` dir the daily jobs expect, and the exclude entries that
-  keep both out of `git status`.
-- **VERIFIED ON CREATION, not asserted** — four checks, all live: the suite runs
-  in the worktree off the linked venv (19 tests); the main worktree's **dirty
-  `CLAUDE.md` is invisible** from it, so the sweep that started this whole thread
-  is structurally impossible; the new worktree's index is clean while the main
-  one holds another session's staged deletions; and `git checkout main` there
-  fails with *"already used by worktree"*, which is the constraint the workflow
-  is built around rather than a surprise.
-- **THE WORKFLOW COST IS REAL AND IS THE POINT.** Git will not check out `main`
-  twice, so a session works on its own branch and publishes with
-  `git fetch origin && git rebase origin/main && git push origin HEAD:main`.
-  Two sessions appending to CHANGELOG.md now collide as a **rebase conflict that
-  must be resolved**, instead of one silently overwriting the other. **Every
-  failure this exists for was silent**, and this session alone produced: four
-  changelog-letter collisions, three of its edits swept into other sessions'
-  commits, one entry destroyed (90 lines) by a global letter-rename, and commits
-  repeatedly dropped by concurrent rebases. Loud beats silent.
-- **STATED LIMIT: it cannot relocate a session that is already running.** A
-  shell's working directory is fixed when it starts, so the sessions currently
-  sharing the main worktree keep sharing it until they restart. `(nx)`'s
-  `session_commit.py` stays the rule for them; this is the rule for the next
-  one. Saying so matters — a fix advertised as covering everyone, that quietly
-  covers only new sessions, is how the `(nx)` half-fix happened in the first
-  place.
-- **TWO BUGS IN THIS SCRIPT, BOTH FOUND BY RUNNING IT RATHER THAN READING IT.**
-  (1) A `${#$(...)}` bad substitution killed `--selftest` outright — caught
-  immediately because the selftest is registered rather than optional. (2) The
-  selftest asserted `git check-ignore .claude/worktrees`, which passes in the
-  main worktree and **FAILS from inside a worktree**, because a directory-only
-  pattern matches only when the directory exists — i.e. it failed from exactly
-  the place every session will now run it. Both fixed; the check now greps the
-  exclude PATTERN rather than probing a path, and the selftest is green from
-  both locations. **A guard that only works where it was written is not
-  portable, and this one is meant to be run everywhere.**
-- Also excluded: the per-worktree `.venv` **symlink**. `.gitignore` carries
-  `.venv/` — trailing slash, directories only — which does not match a symlink,
-  so without an explicit `.venv` line every session's worktree would carry a
-  permanent `?? .venv` sitting in the blast radius of any `git add -A`. Local
-  (`info/exclude`), idempotent, no change to the shared `.gitignore`.
-- **AND DOGFOODING THE WORKTREE FLOW FOUND A THIRD BUG IN `session_commit.py`.**
-  It builds the commit in a PRIVATE index, so the worktree's OWN index never
-  learns about it — leaving committed files reported as modified and a newly
-  added file as **DELETED**. Invisible in the shared tree, where the index is
-  already churning; **immediately fatal in a per-session worktree**, because
-  `git rebase` refuses with *"you have unstaged changes"* and the publish step
-  cannot run at all. Fixed with a `git reset -q HEAD -- <paths>` scoped to the
-  committed paths only — a bare `git reset` would unstage whatever ANOTHER
-  session had staged, which is the one thing this tool exists not to do.
-  Mutation-verified. **Three of this tool's bugs have now been found by running
-  it and none by reading it**, which is the argument for the dogfooding, not an
-  embarrassment about it.
-- Letter: `n*` is EXHAUSTED — `na`..`nz` are all taken, on one day. The sequence
-  rolls to `o*`, and `oa` was gone before this entry was written.
 
 ## 2026-08-16 (oa) — THE DOUBLE-OPEN SWEEP: 🎯 the sniper was the ONLY book with it, and the reason is worth more than the result — every other book defends it at the WRITE, which is exactly where the sniper did not
 
