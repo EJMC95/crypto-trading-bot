@@ -77,6 +77,41 @@ Lighter's own settled funding series, 18-coin liquid set):
         funding book must answer for does not move it.
       - CLUSTER-ROBUST t ((kw)) = 3.92 unchanged, n_eff 50: these closes do
         not batch, so there is no clustering penalty to take.
+    **[16-Aug (oo) — THE GRIMES STABILITY TEST APPLIED HERE, AND IT PASSES.]**
+    After `(om)` fixed 📐 Grimes's gate (its verdict was decided by which
+    coins happened to be liquid that day), the same question was put to this
+    book. **It does not have Grimes's pathology, and the reason is precise:**
+      - resampling the graded coin set moves `t` by a comparable amount —
+        k=9 [+1.66,+4.73], k=12 [+2.00,+4.34], k=14 [+2.01,+4.55],
+        k=16 [+3.07,+5.38] — so the SPREAD is not what distinguishes them;
+      - what distinguishes them is WHERE THE BAR SITS. Grimes's distribution
+        straddled its 0.5 bar (so the coin draw decided the verdict);
+        Hull's sits ABOVE the go-live t=2.0 bar — **0 of 12 draws fall below
+        it at k>=14, 1 of 12 at k=9/k=12**.
+      - leave-one-out over all 18: t in **[2.67, 4.50]**, every value above
+        2.0. No single coin carries the verdict (worst drop: PUMP -> 2.67).
+    **THE TRANSFERABLE RULE, worth more than either book:** universe
+    sensitivity is only a defect when the BAR FALLS INSIDE the verdict
+    distribution. Measuring the spread alone would have called these two the
+    same and been wrong.
+    OUT-OF-UNIVERSE HOLDOUT, run and reported INCONCLUSIVE rather than as
+    support: funding was fetched for the 8 crypto books with real history
+    that the study never saw, giving n=48, +$2.02, **t=+0.57** — much weaker,
+    and FARTCOIN alone is >100% of it. **But 0 of those 8 sit in the
+    [$2M,$10M) band this book trades**, so that cell tests a population the
+    rule structurally excludes. It REPLICATES the study's own already-recorded
+    finding that the volume floor is LOAD-BEARING (their measurement on thin
+    names: +$0.05). **A true out-of-band holdout does not exist** — inside
+    [$2M,$10M) the venue's crypto population essentially IS the study's liquid
+    names, the same thin-supply fact `(ly)` measured. Stated as a standing
+    limitation, not resolved.
+    MECHANICAL NOTE from the same run: with `MAX_POSITIONS=4`, adding 8 coins
+    to the universe moved n by ONE (50 -> 49). A capped book's universe size
+    changes WHICH trades are taken, not how many — so "grade a wider set" is
+    not a free improvement here.
+    **NO CODE CHANGED.** The `(om)` fix does not transfer: this book has no
+    gate to fix, and the pathology that motivated it is absent.
+
     ONE NUMBER ABOVE IS NOT REPRODUCIBLE AND IS WITHDRAWN: the
     "random-timing control P(rand >= real) = 0.000 across 200 draws".
     **There is no Hull random control in the study** — `random_bench` is
