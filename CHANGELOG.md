@@ -760,10 +760,26 @@ assertions.
   computed it since `(ky)`; `book_payload` never copied it, so the statistic
   was **ABSENT from every book on the bus** — the entry's whole point lived
   only inside the process. Measured cost the same day: the ⚖️ Counterweight
-  keep-or-retire call turns on cluster `t` = **−0.98**, not the published
-  **−1.87**, and had to be re-derived from the raw ledger because the grader
-  would not say it. **A number a decision depends on must be READABLE, not
-  recomputable.** Published beside `t`, still never a bar.
+  keep-or-retire call turns on cluster `t`, not the published **−1.87**, and
+  had to be re-derived from the raw ledger because the grader would not say it.
+  **A number a decision depends on must be READABLE, not recomputable.**
+  Published beside `t`, still never a bar.
+  **[CORRECTED IN PLACE, same day, and the correction IS the argument.** This
+  bullet first quoted that cluster `t` as **−0.98** — my own hand-derivation.
+  The organ's first publish, minutes later, said **−1.23** over **26
+  decisions** (`n_eff` 39.6, `max_batch` 12). Mine was wrong twice over: it
+  keyed the era on the CLOSE stamp when `era_rows` keys it on the **OPEN** ("a
+  trade's policy is fixed when the trade is taken"), admitting 10 straddlers
+  opened under the superseded policy — 91 rows, not 101 — and it clustered by
+  minute rather than the organ's rolling 60s window. The same error moved two
+  other numbers in that decision: the non-crypto share of the in-era loss is
+  **117%**, not 130%, and the still-enterable crypto subset is **n=72, +$5.22,
+  +0.357%/trade**, not n=82/+$8.33/+0.423%. **The keep verdict is unchanged —
+  the loss is still MORE than fully accounted for by trades the book can no
+  longer take, and the enterable remainder is still positive.** But a bullet
+  arguing that a decision-grade number must be published rather than recomputed
+  was itself carrying a recomputed number that was wrong, and the publish it
+  shipped is what caught it within the hour.]**
 - **IT CHANGES ZERO VERDICTS TODAY, AND THAT IS STATED RATHER THAN BURIED.**
   Verified by diffing the grader's own output before and after against live
   data: 0 of 10 books move. The only basket book is mean-negative, so it
