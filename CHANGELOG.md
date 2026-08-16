@@ -1,3 +1,58 @@
+## 2026-08-16 (og) — THE FORWARD TEST DISAGREED, AND THE DISAGREEMENT WAS THE POINT: the margin model's FORMULA was right, its CALLER CONVENTION was wrong by more than the term it was arguing about
+
+- **THE SEQUENCE, because the shape is the lesson.** `(nu)` banked a peer
+  session's "0.000000% live calibration" of `scripts/lighter_margin_model.py`.
+  It was **CIRCULAR** — the entry was back-solved as the exact inverse of
+  `liq_price`, so it returned 0.000000% at L=9.9, at mmf=0.9, against a $1 liq
+  — and was retracted the same day. An intermediate step recovered the BASIS
+  non-circularly (tier-level leverage demands entries near **$31,000**,
+  impossible for gold). **Now the real forward test has run**, on the venue's
+  own `avg_entry_price`, and it **disagreed** — which is the outcome worth
+  having.
+- **EVERY INPUT OBSERVED, NOTHING DERIVED** (💸 the Farmer's live XAU short):
+  entry **4339.72** · venue liq **32238.9162** · value@mark 30.2703 · mark
+  4386.935 · total_asset 197.516986 · collateral 197.843218 · mmf 0.0240.
+
+      leverage basis                        L          predicted   error
+      mark-notional  / total_asset_value    0.153254   31891.47    -1.078%
+      entry-notional / total_asset_value    0.151605   32192.33    -0.145%
+      entry-notional / COLLATERAL           0.151355   32238.50    -0.001%
+
+  Reproduced independently here before banking; all three match to the cent.
+- **THE FORMULA WAS NEVER WRONG — THE INPUT WAS.** `liq_price()`'s algebra is
+  correct in CROSS mode; the leverage that feeds it is
+  **`(size × avg_entry_price) / collateral`** — an ENTRY-based notional over
+  COLLATERAL — not the mark-based `gross/equity` that `(nu)` banked. **The
+  wrong basis misses by 1.078%, which is LARGER than the entire maintenance
+  term (0.787%)**, so no correction-term tweak could ever have rescued it.
+- **AND THAT IS PRECISELY WHAT THE CIRCULARITY HID.** Back-solving produced an
+  entry of 4385.65 against an observed **4339.72**. That **1.058% gap WAS the
+  model error**, absorbed invisibly by the inversion. A forward test on an
+  observed input surfaced it on the first try. *A validation whose input is
+  derived from its own target validates nothing, and the residual it hides is
+  exactly the error you were looking for.*
+- **SHIPPED:** `cross_leverage(size, entry_price, collateral)` — because the
+  wrong basis is the NATURAL thing to reach for (`position_value` is right
+  there in the payload and it is mark-based). Fail-closed on any doubt. The
+  back-solved self-consistency pin is RETIRED in favour of the observed
+  triple; **three mutations verified RED** — the short-branch mmf sign, a
+  mark-based notional, and a total_asset denominator are each caught.
+- **CONFIDENCE STRATIFIED, and the weak half must not harden into fact:**
+  * **entry-vs-mark notional: STRONG.** Dominant term (mark/entry = 1.0109),
+    moves the error −1.078% → −0.145%, far outside rounding.
+  * **collateral-vs-total_asset: WEAK, provisional.** Those denominators
+    differ by 0.165%; the last step −0.145% → −0.001% could be fitting noise.
+    "Collateral fits better", not "collateral is proven". If a future position
+    disagrees, this is the term to suspect first.
+  * **One position, one observation, two free choices resolved against it.**
+    That is the honest headline caveat. `entry` now publishes on both live
+    rows, so every future position is a free additional data point.
+- **The model's standing changes accordingly**: from "never checked against the
+  venue" to **venue-validated forward at 0.001%, with a specified and
+  non-obvious input convention**. Its scope is unchanged — it prices
+  HYPOTHETICAL positions for paper arms and studies; where the venue publishes
+  a liq for a real position, THAT still wins (I14).
+
 ## 2026-08-16 (od) — the immune organ stops INFERRING the Parliament's restarts and starts READING them: an exact count at any sampling phase
 
 - **WHY NOW.** `(nz)` gave 🏛️ the Parliament a restart counter that survives

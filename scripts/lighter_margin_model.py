@@ -22,74 +22,66 @@ account and no venue-published liq price, so the only way to price liquidation
 for them is to MODEL it from the venue's published per-book margin tier. That
 is this file, and its scope is exactly that: hypothetical positions.
 
-THIS MODEL HAS NEVER BEEN CHECKED AGAINST THE VENUE. Treat it as unvalidated.
+VALIDATED FORWARD AGAINST THE VENUE, 2026-08-16 — to 0.001%, on independently
+observed inputs, AND it corrected the model's caller convention in the process.
+Read the confidence stratification before quoting it.
 
-  **[CORRECTED IN PLACE, 2026-08-16, hours after the wrong version shipped —
-  and the retraction is the more useful entry.]** This paragraph briefly read
-  "THE CALIBRATION HAS BEEN RUN, AND IT PASSES", on a reported 0.000000% match
-  to the venue's published liq for 💸 the Farmer's XAU short. **That result was
-  CIRCULAR and verified nothing.** The entry price it fed in was not observed —
-  it was back-solved as `entry = liq·(1+mmf)/(1+1/L)`, which is the exact
-  inverse of `liq_price`. Feeding it back is an algebraic identity. Re-run with
-  deliberately wrong inputs it still returns **0.000000% at L=9.9, at mmf=0.9,
-  and against a $1.00 liquidation price**. A check that cannot fail is not a
-  check — the I3 shape, arriving as a *calibration* rather than as a test.
+  THE TEST: the venue publishes `avg_entry_price` and `liquidation_price` for
+  each live position. Feed the OBSERVED entry forward through `liq_price()` and
+  compare. Nothing back-solved (see the retraction below for why that matters).
+  Control: 💸 the Farmer's XAU short. entry 4339.72 · venue liq 32238.9162 ·
+  mark 4386.935 · position value 30.2703 · total_asset 197.516986 ·
+  collateral 197.843218 · mmf 0.0240.
 
-  WHAT IS THEREFORE UNVERIFIED, and must not be relied on:
-  * **agreement with the venue's own liquidation price — at any leverage.**
-  * **the CROSS-margin substitution** (`L = gross/equity` in the isolated
-    formula). That was the load-bearing claim and it rested entirely on the
-    circular result. The functions below claim ISOLATED only.
-    **[PARTIALLY RECOVERED 2026-08-16, non-circularly — the BASIS half now has
-    evidence, the FORMULA half still does not. Keep the two apart.]** The test
-    inverts the venue's published liq through each candidate ratio and asks
-    whether the entry it REQUIRES is a possible XAU price, judged against the
-    venue's PUBLIC `orderBookDetails` (index 4387.52, mark 4386.95) rather
-    than against this model:
-        H1 account-level  L = gross/equity 0.153  ratio 7.3510 -> entry  4,385.65   plausible
-        H3 tier-level     L = 1/default_imf 15.02 ratio 1.0416 -> entry 30,951.92   REFUTED
-        H4 min-tier       L = 1/min_imf     25.0  ratio 1.0156 -> entry 31,742.92   REFUTED
-    Gold does not trade near $31,000, so **the leverage BASIS is account-level,
-    not tier-level** — supported by an external price fact, not by inverted
-    arithmetic. Say "basis supported, formula untested", never "validated".
-    TWO LIMITS ON EVEN THAT, both real:
-      1. The Farmer holds exactly ONE position, so `gross` equals that
-         position's value and "account-level" is numerically indistinguishable
-         from "this position's value / equity". A second concurrent live
-         position would separate them; do not manufacture one for telemetry.
-      2. The `(1+mmf)` term remains unresolvable this way, and an attempt to
-         resolve it FAILED rather than being conceded early: dropping it
-         requires an entry of 4,282.86 (2.34% away), and over the position's
-         plausible lifetime — XAU's last 500 1h bars, 20.8 days — the tape
-         ranged **[3999.07, 4455.30]**, which contains BOTH candidates
-         comfortably. Price plausibility cannot reach a 2.3% term here.
-         The binding variable is therefore ENTRY PRECISION, not leverage, and
-         the venue's own `avg_entry_price` (now published at
-         `extra.margin.positions.<coin>.entry`) supplies it exactly — at which
-         point a 2.4% term is trivially resolvable even at 0.15x.
-  * the "implied entry 4,385.65 vs 4,387.6 mark, the gap is unrealised P&L"
-    reading — that mark came from `funding_map()`, i.e.
-    `markets[sym]["last"]`, frozen at client construction
-    (`venues/lighter_client.py:451` sets it, `:591` serves it) and refreshed
-    only by `refresh_markets()`, which only the sniper calls. The gap is a
-    boot-frozen price whose error grows with container uptime, not a P&L.
+      leverage basis                        L          predicted    error
+      mark-notional  / total_asset_value    0.153254   31891.47     -1.078%
+      entry-notional / total_asset_value    0.151605   32192.33     -0.145%
+      entry-notional / COLLATERAL           0.151355   32238.50     -0.001%
 
-  WHAT SURVIVES, because it does not depend on that calibration:
-  * **a long at L <= 1 has no liquidation price, only a path to
-    worthlessness** — that reads straight off the algebra below
-    (`if inv >= 1.0: return 0.0`). So the venue publishing NOTHING for 🙏 Avo's
-    four longs at 0.999x is CORRECT, not a data gap, and a census naming them
-    `liq_unknown` is working as intended.
-  * the responsiveness ladder (a BTC long prices at -49.4% / -19.0% / -8.9%
-    from entry at 2x / 5x / 10x) — the model is live, not degenerate.
+  SO THE ISOLATED FORMULA IS CORRECT IN CROSS MODE — but the leverage that
+  feeds it is **(size x avg_entry_price) / collateral**, an ENTRY-based
+  notional over COLLATERAL. Use `cross_leverage()` below; do NOT hand this
+  module `gross/equity`, which is wrong by 1.078% here.
 
-  THE REAL CHECK, still outstanding and now possible: the missing input was the
-  position's OWN observed `avg_entry_price`, which `margin_state_from` was not
-  projecting into its payload. It now publishes `entry` under
-  `extra.margin.positions.<coin>`. Once the live containers take it, run
-  `liq_price(venue_entry, is_long, L, mmf)` FORWARD — every input independently
-  observed — and compare to the venue's published `liq`. Until that runs, this
-  module's agreement with the venue is an open question.
+  CONFIDENCE, STRATIFIED — two free choices were resolved against ONE position:
+  * **entry-vs-mark notional: STRONGLY established.** It is the dominant term
+    (mark/entry = 1.0109, a 1.088% effect) and moves the error from -1.078% to
+    -0.145%, far outside any rounding.
+  * **collateral-vs-total_asset: WEAKLY established, treat as provisional.**
+    Those denominators differ by only 0.165%, so the last step from -0.145% to
+    -0.001% could be fitting noise at n=1. "Collateral fits better", not
+    "collateral is proven".
+  * One position, one observation. `entry` is published on both live rows now,
+    so every future position adds a data point for free.
+
+  AND THIS IS WHAT THE EARLIER CIRCULAR CHECK HID: back-solving produced an
+  entry of 4385.65 against an observed 4339.72. That **1.058% gap WAS the model
+  error** — larger than the entire mmf term — and the inversion absorbed it
+  invisibly. A forward test on an observed input surfaced it on the first try.
+
+  HOW WE GOT HERE — kept because the failure mode recurs, not for narrative.
+  This block briefly claimed "THE CALIBRATION HAS BEEN RUN, AND IT PASSES" on a
+  reported 0.000000% match. **That result was CIRCULAR.** The entry it fed in
+  was back-solved as `entry = liq*(1+mmf)/(1+1/L)` — the exact inverse of
+  `liq_price` — so feeding it back is an algebraic identity: it returns
+  0.000000% at L=9.9, at mmf=0.9, against a $1 liq. **A check that cannot fail
+  is not a check**, and it arrived wearing the word "calibration" rather than
+  looking like the I3 shape it was. An intermediate step then recovered the
+  BASIS non-circularly (inverting the venue's liq through tier-level candidates
+  demands entries of ~$31,000, impossible for gold), which correctly refuted
+  tier-level leverage but could not reach the finer terms. Only the forward
+  test on an OBSERVED entry, above, settled it — and it overturned the
+  substitution the circular check had "confirmed".
+
+  THREE LESSONS WORTH THE LINES:
+  * a validation whose input is derived from its own target validates nothing;
+  * the residual it hides is exactly the model error (1.058% here);
+  * publish the observed input. `avg_entry_price` was read into the client's
+    position record all along and never projected into the payload, which is
+    precisely why the impossible check got substituted with a circular one.
+
+  STILL OPEN, and cheap: the `collateral` vs `total_asset_value` choice rests
+  on a 0.165% difference at n=1. Every future live position tests it for free.
 
 WHY IT LIVES UNDER scripts/, DELIBERATELY. `bot_pnl_store._BUILD_SHARED` begins
 with `"venues"`, so ANY file under `venues/` joins the build-stamp file set of
@@ -430,6 +422,35 @@ def max_leverage_for_headroom(is_long, mmf, stop_frac, k):
     return lev if lev >= 1.0 else 0.0    # 0.0 == not satisfiable at any size
 
 
+def cross_leverage(size, entry_price, collateral):
+    """The leverage to feed `liq_price()` for a CROSS-margin account.
+
+    `L = (size * avg_entry_price) / collateral` — an ENTRY-based notional over
+    COLLATERAL. Validated forward against the venue's own published
+    liquidation price to **0.001%** (see the module docstring for the table).
+
+    WHY THIS EXISTS RATHER THAN LEAVING IT TO CALLERS: the intuitive input is
+    `gross/equity`, and on the control position that is wrong by **1.078%** —
+    larger than the whole maintenance term, so it cannot be tuned away. Two
+    substitutions matter and they are NOT equally well established:
+      * entry-based notional rather than MARK-based: strongly established,
+        a 1.088% effect that moves the error from -1.078% to -0.145%.
+      * collateral rather than total_asset_value: PROVISIONAL. Those differ by
+        0.165% here and the improvement from -0.145% to -0.001% is within
+        what one observation can fit. If a future position disagrees, this is
+        the term to suspect first.
+
+    Returns None on any doubt — the module-wide fail-closed contract."""
+    try:
+        s, e, c = float(size), float(entry_price), float(collateral)
+    except (TypeError, ValueError):
+        return None
+    if not (s > 0 and e > 0 and c > 0):     # NaN fails this too
+        return None
+    lev = (s * e) / c
+    return lev if lev > 0 else None
+
+
 def check(entry, is_long, leverage, mmf, mark):
     """'ok' | 'liq' — evaluated on a LIVE mark, on the same loop as the stop.
 
@@ -728,28 +749,31 @@ def _selftest():
     except ValueError:
         pass
 
-    # --- SELF-CONSISTENCY PIN (NOT a venue calibration) ----------------------
-    # RELABELLED 2026-08-16, hours after it shipped, and the label is the whole
-    # point. This triple was published as a live calibration proving the model
-    # matches the venue. It does not: the "entry" was BACK-SOLVED from the very
-    # liq it is compared against (`entry = liq·(1+mmf)/(1+1/L)`, the exact
-    # inverse of `liq_price`), so the original derivation returns 0.000000% for
-    # ANY inputs — L=9.9, mmf=0.9, a $1 liq.
-    #
-    # What survives is narrower and still worth keeping: with `entry` frozen as
-    # a LITERAL here, the triple does constrain the formula's algebra — feeding
-    # L=0.20 or L=9.9 makes it fail, and the (1+mmf)->(1-mmf) mutation reddens
-    # it. So this is a CHANGE-DETECTOR on our own arithmetic, and NOT evidence
-    # of agreement with the venue. If the venue's true entry were 4,300 and its
-    # formula differed from ours, the back-solved number would absorb the
-    # discrepancy exactly and this assert would still pass.
-    xau_mmf, xau_lev, back_solved_liq = 0.0240, 0.1532, 32238.90
-    back_solved_entry = 4385.65          # DERIVED, never observed
-    modelled = liq_price(back_solved_entry, False, xau_lev, xau_mmf)
-    assert abs(modelled - back_solved_liq) / back_solved_liq < 1e-6, modelled
-    # ...and prove the pin is not itself circular: wrong leverage must FAIL.
-    assert abs(liq_price(back_solved_entry, False, 0.20, xau_mmf)
-               - back_solved_liq) / back_solved_liq > 0.10
+    # --- THE FORWARD CALIBRATION, PINNED (observed inputs, nothing derived) --
+    # 2026-08-16. This REPLACES a back-solved "0.000000%" triple that was
+    # circular and verified nothing — the entry it used was computed as the
+    # inverse of liq_price, so it could not fail. Every number below is read
+    # off the venue: 💸 the Farmer's live XAU short.
+    xau_entry, xau_liq, xau_mmf = 4339.72, 32238.9162, 0.0240
+    xau_size, xau_coll = 30.2703 / 4386.935, 197.843218
+    xau_tav, xau_mark = 197.516986, 4386.935
+    lev = cross_leverage(xau_size, xau_entry, xau_coll)
+    assert abs(lev - 0.151355) < 1e-5, lev
+    pred = liq_price(xau_entry, False, lev, xau_mmf)
+    assert abs(pred - xau_liq) / xau_liq < 2e-5, (pred, xau_liq)
+    # ...and the WRONG basis must visibly fail, or this pins nothing. The
+    # intuitive gross/equity input is off by ~1.08%, which is larger than the
+    # entire maintenance term — that is why a helper exists at all.
+    bad = liq_price(xau_entry, False, 30.2703 / xau_tav, xau_mmf)
+    assert abs(bad - xau_liq) / xau_liq > 0.010, bad
+    # the entry-vs-mark choice is the DOMINANT term and must dominate here too
+    mark_based = liq_price(xau_entry, False,
+                           (xau_size * xau_mark) / xau_coll, xau_mmf)
+    assert abs(mark_based - xau_liq) / xau_liq > 0.009, mark_based
+    # fail-closed contract on the helper
+    assert cross_leverage(0, xau_entry, xau_coll) is None
+    assert cross_leverage(xau_size, xau_entry, 0) is None
+    assert cross_leverage(float("nan"), xau_entry, xau_coll) is None
     # ...and the NEGATIVE control, which is the half that proves the model is
     # responsive rather than vacuous: 🙏 Avo sits at L=0.999, and a long at or
     # below 1x has NO liquidation price — only a path to worthlessness. So the
