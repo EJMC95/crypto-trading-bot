@@ -109,8 +109,14 @@ Read the confidence stratification before quoting it.
     position record all along and never projected into the payload, which is
     precisely why the impossible check got substituted with a circular one.
 
-  STILL OPEN, and cheap: the `collateral` vs `total_asset_value` choice rests
-  on a 0.165% difference at n=1. Every future live position tests it for free.
+  STILL OPEN: ONE POSITION. `gross/equity` and "this position's value/equity"
+  stay numerically identical while the Farmer holds a single open position, so
+  that pair is untested and needs a naturally-occurring second one.
+  (This block previously read "STILL OPEN ... the collateral vs
+  total_asset_value choice ... at n=1". That was superseded by the null test
+  above and is corrected in place per I12 — it survived the upgrade for one
+  commit and is exactly the self-contradiction this section exists to prevent.
+  Settling it took a DIFFERENT KIND of evidence, not more n.)
 
 WHY IT LIVES UNDER scripts/, DELIBERATELY. `bot_pnl_store._BUILD_SHARED` begins
 with `"venues"`, so ANY file under `venues/` joins the build-stamp file set of
@@ -225,6 +231,9 @@ import sys
 import urllib.request
 
 API = os.environ.get("LIGHTER_API", "https://mainnet.zklighter.elliot.ai")
+
+#: this file, for the self-contradiction guard in the selftest.
+_SELF_PATH = os.path.abspath(__file__)
 
 #: the venue publishes margin fractions as integers per-10000 (see docstring).
 FRACTION_SCALE = 10_000.0
@@ -464,10 +473,14 @@ def cross_leverage(size, entry_price, collateral):
     substitutions matter and they are NOT equally well established:
       * entry-based notional rather than MARK-based: strongly established,
         a 1.088% effect that moves the error from -1.078% to -0.145%.
-      * collateral rather than total_asset_value: PROVISIONAL. Those differ by
-        0.165% here and the improvement from -0.145% to -0.001% is within
-        what one observation can fit. If a future position disagrees, this is
-        the term to suspect first.
+      * collateral rather than total_asset_value: ESTABLISHED, by MOTION.
+        They differ by only 0.165% in LEVEL, so a single snapshot could not
+        separate them — but a NULL TEST did. Across three snapshots of one
+        position, `total_asset` moved while `collateral` did not, and the
+        venue's liquidation price did not move either (byte-identical to ten
+        significant figures) where a total_asset formula REQUIRED +0.000182%.
+        **Do not "fix" this back to total_asset_value** — that is the branch
+        the venue's own behaviour refutes.
 
     Returns None on any doubt — the module-wide fail-closed contract."""
     try:
@@ -791,6 +804,34 @@ def _selftest():
     assert abs(lev - 0.151355) < 1e-5, lev
     pred = liq_price(xau_entry, False, lev, xau_mmf)
     assert abs(pred - xau_liq) / xau_liq < 2e-5, (pred, xau_liq)
+    # THE FILE MUST NOT ARGUE WITH ITSELF. A peer review caught this module
+    # claiming ESTABLISHED in its header and PROVISIONAL in `cross_leverage`'s
+    # own docstring — the one a consumer actually reads, where the obvious
+    # "fix" would have been to swap the denominator back to the branch the
+    # null test refutes. Normally a substring assertion is not a wiring test;
+    # here THE PROSE IS THE ARTEFACT, so checking the prose is the right
+    # instrument. Guarded rather than merely corrected, per I12.
+    # NOTE two earlier cuts of this guard were themselves defective, which is
+    # the whole reason it is mutation-tested: the first read
+    # `if "__file__" in dir()` (dir() returns LOCALS inside a function, so it
+    # never ran), and the second scanned the raw file and tripped on its own
+    # assertion message. It now walks DOCSTRINGS via ast — the claim lives in
+    # prose, so prose is the right thing to check, and scoping it to
+    # docstrings keeps the guard from reading its own code.
+    import ast as _ast
+    _doc_tree = _ast.parse(open(_SELF_PATH, encoding="utf-8").read())
+    _docs = [_ast.get_docstring(_doc_tree) or ""]
+    for _n in _ast.walk(_doc_tree):
+        if isinstance(_n, (_ast.FunctionDef, _ast.ClassDef)):
+            _docs.append(_ast.get_docstring(_n) or "")
+    _live = "\n".join(
+        ln for d in _docs for ln in d.splitlines()
+        if "previously read" not in ln and "corrected in place" not in ln)
+    assert "PROVISIONAL" not in _live, (
+        "the collateral term is ESTABLISHED by the null test; a live "
+        "PROVISIONAL claim in a docstring contradicts it and invites a "
+        "consumer to revert the denominator")
+
     # THE NULL TEST, pinned — the strongest single artifact here. Three
     # snapshots of the same position; between T2 and T3 `total_asset` MOVED
     # (+0.000210%) while `collateral` did not, and the venue's liq did not
