@@ -1,3 +1,61 @@
+## 2026-08-16 (om) — 📐 GRIMES'S GATE NOW GRADES A FIXED SET: the verdict stops depending on which coins happened to be liquid that day
+
+- **THE ASK.** Operator: *"fix grimes gate"*, after `(oe)` measured that the
+  book's central mechanism — its rolling replay gate, which IS its whole
+  thesis — was governed by universe churn as much as by edge.
+- **THE DEFECT, restated in one line:** the gate replayed
+  `resolve_universe()`, a top-18-BY-VOLUME ranking that CHURNS, so at n~100
+  with a true effect near zero **changing only the coin set moved keltner's
+  `t` across 3.82 (−2.55..+1.27) against a 0.5 bar** — opening the gate in 4
+  of 12 plausible draws while a FIXED set never crossed the bar in 90 days.
+- **MEASURED BEFORE SHIPPING (I19), and the measurement is the entry.** Four
+  candidates pre-declared, each scored on BOTH halves of what a fix must do:
+
+      candidate   verdict stability     fires on a real edge at
+      base            66.7%  (defect)         +0.50%
+      FIXED          100.0%                   +0.50%   <- shipped
+      sub80          100.0%                   +1.00%
+      win240         100.0%                   +1.00%
+      tbar10         100.0%                   +1.00%
+
+  **THE POSITIVE CONTROL IS WHY THIS IS A MEASUREMENT AND NOT A PREFERENCE.**
+  Every candidate was re-run with a constant edge added to each trade, because
+  **a gate that never opens is trivially stable and useless** — it would
+  starve the book into an I17 retirement by construction. That control is what
+  separates the winner from the rest: **sub80, win240 and tbar10 buy their
+  stability by being HARDER TO OPEN**, each needing twice the edge to fire.
+  That is "raise the bar" wearing a disguise, and CLAUDE.md already forbids
+  resolving a gate question by moving its bar. `fixed` is the only candidate
+  that reaches 100% stability while KEEPING the shipped gate's sensitivity.
+- **SHIPPED:** the retest replays **`GATE_COINS`** — the founding study's own
+  fixed 18, i.e. the population the 0.5 bar was calibrated on. **TRADING is
+  unchanged** and still follows the live universe; the two are decoupled on
+  purpose, which is the entire point.
+- **THE HAZARD THE FIX CREATES IS PUBLISHED, NOT ASSUMED.** Grading a set you
+  do not trade is the mirror defect. `extra.gate_drift` now reports
+  `{graded, traded, overlap, ungraded, untraded}` every loop, and the field
+  that matters is **`ungraded`** — traded-but-not-graded, i.e. **the book can
+  enter a coin its own gate never tested**. Empty today (the live traded set
+  is a subset of the 18). If it ever isn't, it is visible rather than silent
+  (I18 — `open: 0` must never be byte-identical between "quiet" and
+  "structurally impossible", and neither must "graded" vs "assumed graded").
+- **PINNED by `tests/autonomy/test_grimes_gate_fixed_universe.py`, 4 mutations
+  verified RED**: the gate reverting to the traded universe · `GATE_COINS`
+  resolved live (the defect wearing a new name) · the drift dropped from the
+  payload · the drift silently reporting no `ungraded`. Plus an explicit test
+  that TRADING was not frozen along with grading — collapsing the two would
+  have shrunk the book to a stale list, which is the obvious way to
+  over-apply this fix.
+- **WHAT THIS DOES NOT CLAIM.** It does not make keltner an edge. All three
+  setups remain CLOSED on the fixed set (0 of 10 retests over 90d), which is
+  the correct behaviour for a roster whose twelve founding variants none beat
+  random — the gate is now closed for the right reason rather than open for
+  the wrong one. Point-in-time volume is not reconstructable, so the churn was
+  SIMULATED by resampling the measured 18; that is a proxy for real membership
+  drift and is stated rather than buried.
+- **Registered, not silently added:** the study in `SELFTEST_EXCLUDE` with its
+  verdict in the reason (the house pattern for research scripts).
+
 ## 2026-08-16 (ol) — THE IMMUNE ORGAN CALLED ITS OWN CLOCK "THE FUTURE": `_fresh` refused any negative age, so a payload stamped microseconds ago read as unusable 38% of the time and every detector behind it went quietly blind
 
 - **THE ASK** (operator): *"fix it"* — the intermittent red I reported at the
