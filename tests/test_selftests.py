@@ -250,6 +250,24 @@ LIVE_SELFTESTS = [
 # unblocked — the guard existed but ran nowhere. It is now green on main (radar
 # added to the deploy paths) and CI-gating (changelog-check.yml), so its full
 # scan is asserted here too. The live bots are declared in DEPLOY_COVERAGE_OK.
+# WHICH LIST DOES A NEW AUDIT GO IN? [2026-08-16 (oy)] The question that keeps
+# being answered by feel, so it is written here once:
+#
+#   Does the audit's verdict depend on state that changes WITHOUT a code change?
+#
+#   NO  -> ENFORCED_AUDITS. Its scan runs here, so `pytest` catches the defect
+#          before a push instead of after one.
+#   YES -> SELFTEST_MODULES only (the negative fixture), and let the SCAN run in
+#          changelog-check.yml, where "is my entry right" is the actual subject.
+#
+# The measured example of YES is `audit_recurrence`: it fails when one subject
+# collects more than MAX_ENTRIES=5 changelog entries in 7 days, and on the day
+# this rule was written `tide-rider-lighter` sat at exactly 5 — one entry from
+# ANY concurrent session would have turned every local `pytest` red for a
+# developer who had touched nothing related. That is not a guard doing its job
+# in the wrong place; it is a guard whose subject is the shared file itself.
+# `audit_changelog_letters` is the deliberate exception, and it earns it: at
+# push time your own letter IS part of the change under test.
 ENFORCED_AUDITS = [
     "scripts/audit_image_imports.py",     # born-dark guard (CI-gating)
     "scripts/audit_sdk_pin.py",           # real-money wheel pin (CI-gating)
@@ -266,6 +284,15 @@ ENFORCED_AUDITS = [
     # ~1.6s over 195 modules. (ow) reverted this line once, on the wrong
     # reading that it duplicated an existing registration; it does not.
     "scripts/audit_undefined_names.py",
+    # [2026-08-16 (oy)] Same finding as the line above, two more instances,
+    # placed by the rule stated at the head of this list rather than by feel.
+    # `audit_era_date_literals` is pure AST over python (1.1s) — a hardcoded
+    # era date is a CODE defect and was catchable only after a push.
+    # `audit_doctrine_enforcement` (0.03s) reads CLAUDE.md but fails on a CODE
+    # change: an invariant whose named guard no longer resolves, i.e. a guard
+    # deleted out from under its doctrine.
+    "scripts/audit_era_date_literals.py",
+    "scripts/audit_doctrine_enforcement.py",
     # [2026-07-30] the cage must fit the value: every lever carries a
     # machine-readable default, that default is INSIDE its own bounds, and it
     # MATCHES the `os.environ.get` default its consumer actually runs. The
