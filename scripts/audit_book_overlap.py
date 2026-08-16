@@ -58,6 +58,22 @@ FUNDING_BOOKS = [
 LIVE_BOOKS = {"perps-funding-lighter-lighter"}
 CRYPTO_CLASS = 2
 
+#: TWO ARMS OF ONE BOOK ARE NOT TWO BOOKS. 💸 the Farmer's live row and its
+#: `-lshadow` twin are the experiment judge's EXPERIMENT/CONTROL pair — they are
+#: SUPPOSED to hold the same coin, and the paired promotion bar depends on it.
+#: Counting that as cross-book concentration is a false positive, and a detector
+#: that cries wolf on a deliberate design is how a real finding later gets
+#: ignored ((gl), and the (iw) currency audit's own first three runs).
+#: Within-pair duplication is still REPORTED — divergence between the arms is
+#: the implementation-shortfall signal — it just never counts as a finding.
+ARM_PAIRS = [{"perps-funding-lighter-lighter", "perps-funding-lighter-lshadow"}]
+
+
+def same_book(bots):
+    """True when every holder of a coin belongs to ONE book's arm set."""
+    s = set(bots)
+    return len(s) > 1 and any(s <= pair for pair in ARM_PAIRS)
+
 
 def db_url() -> str:
     u = os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_PUBLIC_URL")
@@ -190,6 +206,8 @@ def report_now(cur) -> int:
         for c, s in h.items():
             by_coin[c].append((bot, s))
     dupes = {c: v for c, v in by_coin.items() if len(v) > 1}
+    arm_only = {c: v for c, v in dupes.items() if same_book(b for b, _s in v)}
+    dupes = {c: v for c, v in dupes.items() if c not in arm_only}
     print(f"\n  distinct coins held: {len(by_coin)}   "
           f"positions: {sum(len(h) for h in held.values())}")
     hard = 0
@@ -207,11 +225,25 @@ def report_now(cur) -> int:
             if len(v) >= 3:
                 hard += 1
     else:
-        print("\n  no coin is held by two books right now.")
+        print("\n  no coin is held by two DIFFERENT books right now.")
+    if arm_only:
+        print("\n  (same coin on both arms of ONE book — by design, the judge's"
+              " experiment/control\n   pair; reported, never a finding):")
+        for c, v in sorted(arm_only.items()):
+            print(f"    {c:10s} " + ", ".join(f"{b}({s})" for b, s in v))
 
-    # effective bet count: positions collapse to distinct (coin, side)
-    slots = {(c, s) for h in held.values() for c, s in h.items()}
-    total = sum(len(h) for h in held.values())
+    # Effective bet count: positions collapse to distinct (coin, side). The
+    # metric is about EVIDENCE independence — `fleet_allocation` ranks each
+    # book's claim as its own — so a book's two arms are collapsed into one
+    # holder first. They are one book being measured twice on purpose, and
+    # counting them as duplication would inflate the correction with the very
+    # design the judge depends on.
+    collapsed = {}
+    for bot, h in held.items():
+        key = next((min(p) for p in ARM_PAIRS if bot in p), bot)
+        collapsed.setdefault(key, {}).update(h)
+    slots = {(c, s) for h in collapsed.values() for c, s in h.items()}
+    total = sum(len(h) for h in collapsed.values())
     if total:
         print(f"\n  EFFECTIVE BETS: {len(slots)} distinct (coin, side) across "
               f"{total} positions"
