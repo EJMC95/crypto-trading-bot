@@ -84,7 +84,14 @@ FLOORS = {
     "lighter_funding_spread_bot.py": 38,   # measured 40.0
     "lighter_dislocation_bot.py": 36,  # measured 38.8 (was 27 before the gate work)
     "lighter_index_bot.py": 32,        # measured 34.6
-    "lighter_perp_sniper.py": 81,      # measured 83.5
+    # [2026-08-16 (np)] 81 -> 83. `(nn)` restored this file over its floor
+    # after (ne) breached it and deliberately did NOT raise, because its own
+    # slack was 1.4pp — under the ~2pp this table is built on, so raising
+    # would have re-armed the trap. `(np)` drives the surge source end to end
+    # through `main()` (the first fixture in this file's life to reach any
+    # admission source but `listing`) and takes it to 85.7% measured CI's way,
+    # which restores the margin and makes the ratchet the doctrine asks for.
+    "lighter_perp_sniper.py": 83,      # measured 85.7 (81/83.5 -> 81/82.4 -> 83/85.7)
     "lighter_market_scout.py": 80,     # measured 82.5 — the fleet's signal source
     # [2026-07-30] THE PROMOTION SURFACE — the code deciding which $1k shadow
     # book gets offered up for real money. Floored for the same reason as the

@@ -1,3 +1,91 @@
+## 2026-08-16 (np) — `(nn)` PINNED THE RULES AND THE CALL SITES STAYED UNPINNED: two of the sniper's three admission sources had never executed in a single fixture, and the harness is why
+
+- **THIS BUILDS ON `(nn)`, IT DOES NOT REDO IT.** Two sessions bisected the
+  same red CI within minutes of each other and reached the same first cause —
+  `(ne)`'s surge-admission telemetry, 13-14 uncovered statements, floor 81 vs
+  80.8% measured. `(nn)` landed first and is the right fix: the rules went back
+  to module level (`surge_ratio_map`, `surge_admission`, `restore_entry_meta`),
+  unit-tested there, file back over its floor at 82.4%, CI green. Nothing here
+  reverses or re-litigates any of that. This is the half its shape cannot
+  reach.
+
+- **WHAT A UNIT TEST ON THOSE THREE CANNOT SAY: that anything CALLS them.**
+  Measured, not argued — seven mutations, all RED under the fixtures below,
+  and **five of the seven survive `(nn)`'s 12 unit tests**:
+
+  | mutation | `(np)` selftest | `(nn)` unit tests |
+  |---|---|---|
+  | `open_snipe` never records the stamp | RED | green |
+  | boot never restores `entry_meta` | RED | RED |
+  | `record_close` drops `extra=` | RED | green |
+  | SEED `save_state` omits `entry_meta` | RED | green |
+  | steady `save_state` omits `entry_meta` | RED | green |
+  | `main()` never builds the ratio map | RED | RED |
+  | SEED `save_state` omits `bar_counts` | RED | green |
+
+  Delete all three call sites and `(nn)` stays green, its coverage stays put,
+  and the X4 expectancy split this telemetry exists to feed silently receives
+  nothing. The value's whole job is a trip — admission → saved state → restart
+  → ledger row — and every leg of it was unasserted.
+
+- **THE OLDER FINDING UNDERNEATH.** Reaching those call sites meant fixing
+  something that predates `(ne)` by weeks: `_drive`, the in-module harness that
+  is the ONLY thing that can enter `main()`, left the real `fleet_bus` in
+  place. A selftest has no DB, so `_load` returns nothing and `is_fresh` is
+  False — which means **the SURGE and YOUNG sources have never executed in any
+  fixture this file has ever had.** Two of the book's three admission sources,
+  including the one `(ga)` added specifically because the listing trigger was
+  unobservable, were dead code to every test that has ever run against it. That
+  is why `(ne)`'s code could land in a hole: the hole was already there, and
+  `(ne)` merely filled it with something the floor could count. `bus=` on
+  `_drive` (a sentinel default — `None` is a legitimate `fleet_bus`) opens it,
+  and it is reusable: the YOUNG source is now one payload away from the same
+  treatment.
+
+- **THE FIXTURES**, four, all asserting on OUTPUT the fleet actually consumes:
+  * **ADMISSION** — a scout payload snipes a real surging book, and the saved
+    state carries `entry_src[SRG]="surge"` + `entry_meta[SRG]={5.0, 3.0}`.
+  * **THE MALFORMED ROW, and this one can only be asserted from here.**
+    `ratio: None` is read TWO WAYS by two consumers of one field:
+    `surge_candidates` does `float(x or 0.0)` (0.0 — not a candidate),
+    `surge_ratio_map` does `float(x)` (TypeError). In `main()` they sit inside
+    ONE `try`, so a raise the map did not swallow lands in
+    `except Exception: _surge = []` and **one malformed row silences the entire
+    surge source for that loop**. In isolation the map just returns a short
+    dict and nothing looks wrong. The assertion is therefore not about the map:
+    it is *SRG is still sniped*. `SPXUSD` pins the `(lk)` class screen beside it.
+  * **RESTART → LEDGER** — the restored record reaches the row
+    (`long-surge_tp`, `extra={surge_ratio, surge_mult}`), the close CONSUMES it
+    (pop), and junk restores to NOTHING: the row degrades to no extra, never a
+    guessed number (`ht`).
+  * **THE TWO WRITERS AGREE ON SHAPE** — `(ha)` states this in a COMMENT at
+    both `save_state` sites ("same shape at BOTH writers") and nothing tested
+    it. The SEED writer fires only on a first-ever run, which no fixture had
+    driven, so a key added at one writer and forgotten at the other is
+    invisible until a first-boot container restores a blob missing it. Found by
+    mutation, not by reading: M4 SURVIVED every other assertion in the block.
+    Comparing KEY SETS closes the class — the next field added at one writer
+    and not the other trips here (M7 confirms).
+
+- **MEASURED: 82.4% → 85.7%**, CI's way (whole suite, subprocess-aware,
+  signer wheel present), and the floor goes **81 → 83**. `(nn)` deliberately
+  did not raise it and said why — its slack was 1.4pp, under the ~2pp this
+  table is built on, so raising then would have re-armed the trap. At 85.7%
+  the margin is back and the ratchet is the one the doctrine asks for. All 27
+  floors held on the full run; suite green.
+
+- **DECLARED, NOT COVERED.** `surge_admission`'s `None` return is exercised by
+  `(nn)` at unit level but never reached through `main()`: both consumers of
+  `ratio` normalise identically, so a value that ADMITS a candidate also
+  PARSES for the map. Named here rather than chased with a fixture that would
+  have to fake an impossible payload.
+
+- **NOT A REAL-MONEY CHANGE — main only, per the `(mm)` push-both-ways rule.**
+  🎯 the Perp Sniper is a $1k shadow book, and every edit is inside
+  `selftest()` plus one sentinel default on a test-only helper. No gate, no
+  lever, no clip, no trade any book would take is different, so there is
+  nothing to deploy and it rides free on the next deploy that qualifies.
+
 ## 2026-08-16 (no) — THE VENUE PUBLISHES ITS MARGIN STATE ON EVERY POSITION AND THIS FLEET READ NONE OF IT: "what leverage is the real money at, and how far is the nearest liquidation?" had no answer from any published field
 
 - **THE ASK** (operator): *"wire the margin_mode and liquidation_price reads"*,

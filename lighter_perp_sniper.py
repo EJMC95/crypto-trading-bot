@@ -1468,20 +1468,35 @@ def selftest():
         def publish_paper_trade(self, bot, **kw):
             self.trades.append((bot, kw))
 
-    def _drive(venue, cap, clip, saved, broker=None, mode="lighter_live"):
-        """Run ONE --once loop of main() against a fake venue; return the store."""
+    # `None` is a LEGITIMATE fleet_bus (the import guard sets it), so the
+    # "leave the global alone" default needs a sentinel, not None.
+    _UNSET = object()
+
+    def _drive(venue, cap, clip, saved, broker=None, mode="lighter_live",
+               bus=_UNSET):
+        """Run ONE --once loop of main() against a fake venue; return the store.
+
+        `bus` swaps the module-global `fleet_bus` for the duration — the scout
+        is how the SURGE and YOUNG sources get their population, and with the
+        real module in place a selftest has no DB and reads nothing, so those
+        two of the three admission sources never execute at all. Left UNSET
+        the global is untouched, which is what every fixture above wants.
+        """
         g, fs = globals(), _FakeStore(saved)
         keep = (g["venue_context"], g["store"], sys.argv,
-                os.environ.get("DATABASE_URL"))
+                os.environ.get("DATABASE_URL"), g["fleet_bus"])
         try:
             g["venue_context"] = lambda **kw: _FakeCtx(venue, _FakeRails(cap), clip,
                                                        broker=broker, mode=mode)
             g["store"] = fs
+            if bus is not _UNSET:
+                g["fleet_bus"] = bus
             sys.argv = ["lighter_perp_sniper.py", "--once"]
             os.environ["DATABASE_URL"] = "postgres://selftest-not-dialled"
             main()
         finally:
             g["venue_context"], g["store"], sys.argv = keep[0], keep[1], keep[2]
+            g["fleet_bus"] = keep[4]
             if keep[3] is None:
                 os.environ.pop("DATABASE_URL", None)
             else:
@@ -1603,6 +1618,129 @@ def selftest():
     assert kw3["extra"]["held"] == {"G1": "L", "NEW": "L"}, kw3["extra"]
     assert ven3.opened == [], "shadow must NEVER send an order to the venue"
 
+    # ---- [2026-08-16 (np)] THE SURGE ADMISSION TELEMETRY, END TO END — the
+    # WIRING half of the (nn) fix, which pinned the RULES.
+    # `(nn)` lifted (ne)'s three inline rules to module level (surge_ratio_map,
+    # surge_admission, restore_entry_meta) and unit-tested them there, which is
+    # what took this file back over its floor. What no unit test can see is
+    # whether main() still CALLS them, and whether the value a call returns
+    # survives the trip it exists to make: admission -> saved state -> restart
+    # -> ledger row. Delete every call site and (nn)'s tests stay green, its
+    # coverage stays where it is, and the X4 split silently gets nothing.
+    #
+    # Reaching that meant fixing something older and larger than (ne): the
+    # SURGE and YOUNG sources both read the scout, and `_drive` left the real
+    # `fleet_bus` in place, where a selftest has no DB — `_load` returns
+    # nothing, `is_fresh` is False. So **two of this book's three admission
+    # sources had never executed in any fixture this file has ever had**; the
+    # listing path was the only one any of them drove. That is why (ne)'s code
+    # could land in a hole: the hole predates it. `bus=` opens it.
+    class _FakeBus:
+        """The scout's payload, as `lighter_market_scout` publishes it."""
+
+        def __init__(self, payload):
+            self._p = payload
+
+        def _load(self, key, _default=None):
+            return dict(self._p) if key == "lighter-market" else _default
+
+        def is_fresh(self, payload, _ttl=None):
+            return bool(payload)
+
+        def is_crypto(self, sym):        # [(lk)] the surge source is crypto-only
+            return str(sym).upper() != "SPXUSD"
+
+    # QUIET carries `ratio: None`. It is not a decoration, and it is the one
+    # property a unit test on `surge_ratio_map` CANNOT state: `surge_candidates`
+    # reads that field as `float(r.get("ratio") or 0.0)` (-> 0.0, simply not a
+    # candidate) while `surge_ratio_map` reads it as `float(r.get("ratio"))`
+    # (-> TypeError). Two consumers, one field, two readings — and in main()
+    # they sit inside ONE `try`, so a raise the map did not swallow lands in
+    # `except Exception: _surge = []` and **one malformed row silences the
+    # whole surge source for that loop**. In isolation the map just returns a
+    # short dict and nothing is wrong. The assertion that pins it can therefore
+    # only be made from here, and it is not about the map at all: SRG is still
+    # sniped. SPXUSD pins the (lk) class screen in the same pass.
+    _bus = _FakeBus({
+        "vol_surges": [{"sym": "srg", "ratio": 5.0},      # lower-case: normalised
+                       {"sym": "SPXUSD", "ratio": 9.0},   # non-crypto: screened
+                       {"sym": "QUIET", "ratio": None}],  # unparseable ratio
+        "vols": {"OLD": 50.0, "SRG": 50.0},
+        # every active book has a known age, so no young candidate is admitted
+        # and no candle probe is fired — this fixture is about the surge source.
+        "ages_d": {"OLD": 500.0, "SRG": 500.0},
+    })
+    _srg_books = dict(_books, SRG={"bids": [[10.0, 10]], "asks": [[10.2, 10]]})
+    _srg_markets = {s: {"status": "active"} for s in ("OLD", "SRG")}
+    ven7 = _FakeVenue(_srg_markets, _srg_books, {})
+    fs7 = _drive(ven7, 1000.0, CLIP,
+                 {"baseline": ["OLD", "SRG"], "entry_ts": {}, "pending": {}},
+                 bus=_bus)
+    assert [o[0] for o in ven7.opened] == ["SRG"], (
+        f"the surge source admitted nothing: {ven7.opened} — a raise inside the "
+        "ratio map escapes to the source's own except and empties _surge")
+    _blob7 = fs7.saves[-1][1]
+    assert _blob7["entry_src"]["SRG"] == "surge", _blob7["entry_src"]
+    assert _blob7["entry_meta"]["SRG"] == {"surge_ratio": 5.0,
+                                           "surge_mult": SURGE_MULT}, \
+        f"the admission telemetry was not recorded: {_blob7.get('entry_meta')}"
+    assert "SPXUSD" not in _blob7["entry_src"], "the class screen let SPXUSD in"
+    assert "QUIET" not in _blob7["entry_meta"], _blob7["entry_meta"]
+
+    # ...and the record SURVIVES A RESTART and reaches the LEDGER ROW — the
+    # whole point of a durable map, and the leg with three call sites between
+    # its ends (`restore_entry_meta` at boot, both `save_state` blobs, the pop
+    # in `record_close`). `entry_src` gained the same lifecycle in (ha)/(jk).
+    # Junk restores to NOTHING: the close degrades to no extra, never to a
+    # guessed number (ht) — asserted here on the ROW, not on the rule.
+    ven8 = _FakeVenue({s: {"status": "active"} for s in ("OLD", "SRG")},
+                      dict(_books, SRG={"bids": [[46.0, 5]], "asks": [[46.2, 5]]}),
+                      {"SRG": {"size": 1.0, "entry": 40.0}})
+    fs8 = _drive(ven8, CAP, CLIP,
+                 {"baseline": ["OLD", "SRG"], "entry_ts": {}, "pending": {},
+                  "entry_src": {"SRG": "surge", "BAD": "surge"},
+                  "entry_meta": {"SRG": {"surge_ratio": 5.0, "surge_mult": 3.0},
+                                 "BAD": {"surge_ratio": "not-a-number",
+                                         "surge_mult": 3.0},
+                                 "GONE": {"surge_mult": 3.0}}})
+    assert ven8.closed == ["SRG"], ven8.closed
+    _bot8, tr8 = fs8.trades[-1]
+    assert tr8["reason"] == "long-surge_tp", tr8["reason"]
+    assert tr8["extra"] == {"surge_ratio": 5.0, "surge_mult": 3.0}, (
+        f"the restored admission telemetry never reached the ledger: {tr8}")
+    _meta8 = fs8.saves[-1][1]["entry_meta"]
+    assert "SRG" not in _meta8, "the close must CONSUME the record (pop), not keep it"
+    assert "BAD" not in _meta8 and "GONE" not in _meta8, (
+        f"junk restored as a number — the (ht) degrade rule: {_meta8}")
+
+    # ---- [(np)] AND THE TWO `save_state` WRITERS MUST AGREE ON SHAPE.
+    # `(ha)` asserts that they do — in a COMMENT, at both of them ("same shape
+    # at BOTH writers") — and nothing tested it. The SEED writer fires only on
+    # a first-ever run (`if not baseline`), which no fixture had ever driven,
+    # so a key added to the steady-state blob and forgotten at the seed one is
+    # invisible until a first-boot container restores a blob missing it.
+    # Found by mutation, not by reading: dropping `entry_meta` from the seed
+    # writer alone SURVIVED every other assertion in this block. Comparing the
+    # KEY SETS closes the class rather than this instance — the next field
+    # added at one writer and not the other trips here.
+    ven10 = _FakeVenue(_srg_markets, _srg_books, {})
+    fs10 = _drive(ven10, 1000.0, CLIP,
+                  {"baseline": [], "entry_ts": {}, "pending": {}}, bus=_bus)
+    _seed_blob = fs10.saves[-1][1]
+    assert sorted(_seed_blob) == sorted(_blob7), (
+        "the two save_state writers disagree on shape — (ha) requires the seed "
+        f"blob and the steady-state blob to carry the same keys:\n"
+        f"  seed only: {sorted(set(_seed_blob) - set(_blob7))}\n"
+        f"  steady only: {sorted(set(_blob7) - set(_seed_blob))}")
+    assert ven10.opened == [], "the seed run must never buy the venue"
+
+    # A non-surge close carries NO extra — `entry_meta` is empty for the other
+    # two sources, and `or None` must keep an empty dict out of the row.
+    ven9 = _FakeVenue(_tp_markets, _tp_books, {"T1": {"size": 1.0, "entry": 40.0}})
+    fs9 = _drive(ven9, CAP, CLIP, {"baseline": ["OLD", "T1"], "entry_ts": {},
+                                   "pending": {}, "entry_meta": {}})
+    assert fs9.trades[-1][1]["extra"] is None, fs9.trades[-1][1]["extra"]
+
     # ---- [2026-08-04] SOURCE-STAMPED CLOSE TAGS round-trip through the ONE
     # parser every ledger row passes ((hj): test against the real consumer,
     # never a hand-written fixture). Three properties: each source yields a
@@ -1625,8 +1763,11 @@ def selftest():
           "still snipes; cap/exception/skip never absorb; give-up bounded by "
           "attempts AND age; held symbols never double-open; an unreadable "
           "state never looks empty; the FUNDED path saves, publishes, clocks a "
-          "lost-ack position and caps on REAL deployed notional; and the SHADOW "
-          "path still books, persists and never sends).")
+          "lost-ack position and caps on REAL deployed notional; the SHADOW "
+          "path still books, persists and never sends; a SURGE admission "
+          "records its ratio + mult, survives a restart, reaches the ledger "
+          "row and degrades junk to no extra; and both save_state writers "
+          "persist the same shape).")
 
 
 if __name__ == "__main__":
