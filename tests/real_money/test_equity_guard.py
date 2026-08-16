@@ -712,3 +712,63 @@ def test_capital_adjust_wiring():
         assert "pop_capital_moves" in src, f"{fname} must fold guard capital moves"
         assert "capital_adjust" in src, f"{fname} must persist the capital ledger"
         assert "CAPITAL_ADJUST_USD" in src, f"{fname} must honor the env backfill"
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-16 (oq)] A CLOCK THAT STEPPED BACK MUST NOT COST THE BASELINE.
+#
+# Found by the (ol) sweep for wall-clock fragility. This file already tolerated
+# 60s of future-stamping on the reject walk while the last-accepted RESTORE
+# demanded `0 <= age` — two conventions for one question, and the strict one
+# guards the path whose failure mode is EQUITY-BLINDNESS. A redeploy moves the
+# container and an NTP correction can leave the new clock a shade behind the
+# one that wrote the blob; the restore is then skipped and the bot has no
+# baseline, which is the 2026-07-18 incident this restore exists to prevent,
+# re-opened by a clock rather than by a bug. Both sites now read one constant.
+# ---------------------------------------------------------------------------
+
+def test_a_slightly_future_stamp_still_restores_the_baseline():
+    """The blob is the bot's OWN last-accepted equity, stamped 5s ahead."""
+    st = {"ts": T + 5.0, "equity": 100.0, "collateral": 100.0,
+          "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}}
+    g = _guard({"BTC": 100.0}, load_state=lambda: st)
+    assert g.has_state, (
+        "a 5-second clock step-back lost the baseline — the bot boots "
+        "equity-blind, which is exactly the 18-Jul incident this restore exists "
+        "to prevent")
+    assert g._last["equity"] == 100.0
+
+
+def test_the_future_bound_still_refuses_an_absurd_stamp():
+    """Bounded, not removed: a blob stamped an hour ahead is still refused.
+
+    Without this the change is just deleting a guard — a corrupt or wildly
+    skewed blob would anchor the baseline.
+    """
+    st = {"ts": T + 3600.0, "equity": 100.0, "collateral": 100.0,
+          "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}}
+    g = _guard({"BTC": 100.0}, load_state=lambda: st)
+    assert not g.has_state, "an hour into the future must still be refused"
+
+
+def test_the_stale_side_of_the_restore_is_unchanged():
+    """(oq) moved the lower bound only — a week-old blob still proves nothing."""
+    st = {"ts": T - (8 * 86400.0), "equity": 100.0, "collateral": 100.0,
+          "mids": {"BTC": 100.0}, "sizes": {"BTC": 1.0}}
+    g = _guard({"BTC": 100.0}, load_state=lambda: st)
+    assert not g.has_state, "beyond _PERSIST_MAX_AGE_S must still be ignored"
+
+
+def test_one_constant_governs_both_future_bounds():
+    """The reject walk and the restore must not drift apart again.
+
+    They were 60.0 and 0 — a second copy of a rule is a second rule. Asserting
+    the VALUE is not enough (both could be re-typed); this asserts neither site
+    carries its own literal.
+    """
+    import inspect
+    import venues.equity_guard as eg
+    src = inspect.getsource(eg)
+    assert "now + _FUTURE_SKEW_S" in src, "the reject walk re-typed its literal"
+    assert "-_FUTURE_SKEW_S <= age" in src, "the restore re-typed its literal"
+    assert "now + 60.0" not in src, "a second future-skew literal is back"

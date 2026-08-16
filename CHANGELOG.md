@@ -1,3 +1,77 @@
+## 2026-08-16 (oq) — THE WALL-CLOCK SWEEP: no other test flakes (measured, 220 runs), the class is FLEET-WIDE and mostly DELIBERATE, and the one real defect was a file disagreeing with itself about the same 60 seconds
+
+- **THE ASK** (operator, after `(ol)`): *"now check the other guards for the
+  same wall-clock flakiness"*. Two populations to separate, because they have
+  different answers: **tests** that sample the real clock (the flake), and
+  **production** freshness gates carrying `(ol)`'s `0 <= age` shape (the class).
+
+- **TESTS: MEASURED CLEAN.** Eleven test files stamp an `updated` from a live
+  clock; each was run **20 times** — `allocation_consumer`,
+  `docket_publish_behaviour`, `fleet_allocation`, `fleet_risk_freshness`,
+  `lever_version_skew`, `live_clip_arms`, `organ_pageability`, `parliament`,
+  `venue_instrument_class`, `dashboard_money`, and the previously-flaky
+  `restart_counter_authority`. **0 failures in 220 runs.** Stated as the bound
+  it is: 0/20 per file excludes a `(ol)`-sized ~38% flake decisively and a
+  ~2% one not at all. The one that WAS flaking is fixed and now runs 30/30.
+
+- **PRODUCTION: the `0 <= age <= ttl` idiom is at ~14 sites, and a blanket
+  "fix" would have been WRONG.** Reading them one by one is what this sweep
+  bought, because three different verdicts fall out:
+  * **DELIBERATE, leave alone.** 🎫 the Ticket Taker's scout read carries a
+    2026-07-23 audit note: *"a future stamp passed as fresh and its stress
+    value was used"* — the lower bound is the fix, not the bug. Loosening it
+    would revert a measured decision.
+  * **ALREADY SOLVED, differently.** `fleet_agronomy` hit this class on
+    **2026-07-22** and recorded the cost: *"a few seconds of skew between this
+    process and the publisher flipped 18 consumer verdicts to `undetermined`
+    and dropped 19 findings. Fail-safe, but wrong."* Its fix is `db_now` —
+    take the clock from the DATABASE so publisher and reader share one. That
+    is a better fix than a tolerance where it is available, and `(ol)`'s
+    tolerance is the complement for the rounding case a shared clock cannot
+    reach.
+  * **BENIGN BY CONTRACT.** The consumer sites (`fleet_bus`, `fleet_tuning`,
+    `fleet_proposals`, the strategies, the family/avo/taker bus reads) fail to
+    NEUTRAL, which is the documented fail-safe: a skewed payload costs one
+    cycle of a lever or a veto, and going neutral is what they are supposed to
+    do when they cannot trust a payload.
+  The distinction that decides it is **what "not fresh" DOES**: for a consumer
+  it means "behave conservatively" and for a DETECTOR it means "see nothing".
+  `(ol)` was worth fixing because the immune organ is the second kind.
+
+- **THE ONE REAL DEFECT: `venues/equity_guard.py` — REAL MONEY — disagreed
+  with itself.** The reject walk already tolerated 60 seconds of future
+  stamping (*"a future-stamped reject … drop it"*), while the last-accepted
+  RESTORE fifty lines earlier demanded `0 <= age`. Two conventions for one
+  question, and the strict one sits on the path whose failure mode is
+  **equity-blindness**: a redeploy moves the container, an NTP correction can
+  leave the new clock a shade behind the one that wrote the blob, the restore
+  is skipped, and the bot boots with no baseline — which is the **2026-07-18
+  incident this restore exists to prevent** (a run-once bot stayed equity-None
+  until it healed), re-opened by a clock rather than by a bug. Both sites now
+  read ONE constant, `_FUTURE_SKEW_S`; a second copy of a rule is a second
+  rule, and here the two copies had already drifted to 60 and 0.
+
+- **Five mutations, all red**: revert the restore to `0`; remove its bound
+  entirely; widen the tolerance to 2h; break the stale side with it; and
+  re-type the literal at the reject walk (the drift that started this).
+  Accepting the bot's own last-accepted equity when it is stamped seconds
+  ahead costs nothing; refusing it costs the baseline.
+
+- **A GUARD GAP WORTH NAMING, found by walking into it.** Three of my `(om)`
+  citations sat in code for several minutes while `audit_changelog_letters`
+  reported *"all citations resolve"* — because `(om)` had been taken by a
+  concurrent session and my citations resolved **to their entry**. The guard
+  checks that a letter resolves to AN entry, not to the RIGHT one, which it
+  cannot do in general. Recorded rather than fixed: the practical defence is
+  the one the convention already states — pick the letter at PUSH time and
+  grep after, which is what caught it.
+
+- Scope: `(ol)` and `(oq)` are the only two changes; **eleven consumer sites
+  were examined and deliberately left alone**, which is the point of a sweep.
+  Suite green, all 27 floors held (`venues/equity_guard.py` 94.7% vs floor 93).
+  Real-money file, but the behaviour only differs under clock skew and carries
+  no measured edge — main only per `(mm)`.
+
 ## 2026-08-16 (op) — THE DENOMINATOR IS SETTLED BY A NULL TEST: the venue's liq stayed still exactly when collateral did, and total_asset is refuted by the absence
 
 - **THE UPGRADE.** `(og)` shipped the forward-validated margin model with ONE

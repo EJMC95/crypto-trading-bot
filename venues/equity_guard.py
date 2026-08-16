@@ -89,6 +89,17 @@ _UNREADABLE_NTL_ALLOW = 0.05
 # persisted guard state older than this is ignored (positions/mids from a
 # week-old process prove nothing about today's book)
 _PERSIST_MAX_AGE_S = 7 * 86400.0
+# [2026-08-16 (oq)] How far into the FUTURE a persisted stamp may sit and still
+# be used. This file already tolerated 60s on the reject walk ("a future-stamped
+# reject ... drop it") while the last-accepted RESTORE demanded `0 <= age` — two
+# conventions for one question, 50 lines apart, and the strict one is on the
+# path whose failure is EQUITY-BLINDNESS: a redeploy moves the container, an NTP
+# correction can leave the new clock a shade behind the old one, and the restore
+# is then skipped. That is the 2026-07-18 incident this restore exists to
+# prevent (a run-once bot stayed equity-None until it healed), re-opened by a
+# clock rather than by a bug. Accepting the bot's OWN last-accepted equity when
+# it is stamped seconds ahead costs nothing; refusing it costs the baseline.
+_FUTURE_SKEW_S = 60.0
 # [2026-07-18] max gap between two reject reads for them to count as the SAME
 # consecutive streak (and max age of the newest reject on restore). A run-once
 # bot relaunches every ~300s (tickettaker_loop.sh) and does 1-2 reads/process,
@@ -167,7 +178,8 @@ class EquityGuard:
                 age = self._now() - float(last_blob.get("ts") or 0)
                 # last-accepted read restores for EVERY bot (unchanged); only a
                 # run-once bot resumes the reject STREAK (below).
-                if last_blob.get("equity") is not None and 0 <= age <= _PERSIST_MAX_AGE_S:
+                if (last_blob.get("equity") is not None
+                        and -_FUTURE_SKEW_S <= age <= _PERSIST_MAX_AGE_S):
                     self._last = {
                         "ts": float(last_blob["ts"]), "equity": float(last_blob["equity"]),
                         "collateral": (float(last_blob["collateral"])
@@ -217,7 +229,7 @@ class EquityGuard:
         # a future-stamped reject (clock skew / corrupt blob) would anchor the
         # walk and break the genuine streak behind it — drop it, mirroring the
         # `0 <= age` guard the last-accepted restore already has.
-        parsed = [r for r in parsed if r[0] <= now + 60.0]
+        parsed = [r for r in parsed if r[0] <= now + _FUTURE_SKEW_S]
         parsed.sort(key=lambda x: x[0])
         out = []
         nxt = now          # anchor: the newest reject must be recent vs now
