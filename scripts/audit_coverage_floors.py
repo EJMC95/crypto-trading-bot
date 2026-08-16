@@ -96,7 +96,11 @@ FLOORS = {
     # it to supply — is driven end to end for the first time, including the
     # candle probe's BUDGETED and MONOTONE properties (a REST bill nothing had
     # ever checked). All three sources now execute in a fixture.
-    "lighter_perp_sniper.py": 86,      # measured 88.6 (81/83.5 -> 83/85.7 -> 86/88.6)
+    # [2026-08-16 (nv)] 86 -> 88. The LISTING source's own rules — the tie
+    # against a dual-source symbol, the flap window, the announcement label —
+    # and the (nv) double-open fix they turned up. Third of three: every
+    # admission route this book has is now driven through main() by a fixture.
+    "lighter_perp_sniper.py": 88,      # measured 90.1 (81/83.5 -> 86/88.6 -> 88/90.1)
     "lighter_market_scout.py": 80,     # measured 82.5 — the fleet's signal source
     # [2026-07-30] THE PROMOTION SURFACE — the code deciding which $1k shadow
     # book gets offered up for real money. Floored for the same reason as the

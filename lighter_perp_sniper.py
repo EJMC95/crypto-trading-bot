@@ -438,10 +438,27 @@ def run_snipe_pass(*, candidates, pending, baseline, now_ts, open_now, max_open,
     (live: a second clip; shadow: PaperBroker.open silently FLIPS the position,
     realising P&L with no record_close). A held symbol is by definition sniped.
 
+    [2026-08-16 (nv)] AND `is_held` CANNOT SEE THIS PASS'S OWN OPENS — it is a
+    snapshot taken before the loop, so the latch above covers a position from a
+    PREVIOUS pass and nothing covered a symbol appearing TWICE in `candidates`.
+    That is reachable, not theoretical: `candidates` is
+    `new_listings + _surge + _young`, and the listing list is the only one not
+    deduped against `surge_done`, so a brand-new book that is also surging
+    arrives twice. Measured through `main()` before the fix: TWO `market_open`
+    calls on one coin in one pass (funded: two clips against one entry_ts;
+    shadow: `PaperBroker.open` re-opens a held symbol and realises P&L with no
+    `record_close` — a trade that never reaches the ledger, on a book whose
+    only product is its ledger). `_src_map`'s `setdefault` shows the overlap
+    was anticipated for the TAG and forgotten for the ORDER. First occurrence
+    wins here too, so the two agree by construction.
+
     Returns (open_now, sniped, abandoned).
     """
-    sniped, abandoned = [], []
+    sniped, abandoned, seen = [], [], set()
     for sym in candidates:
+        if sym in seen:
+            continue          # [(nv)] one attempt per symbol per pass
+        seen.add(sym)
         if is_held(sym):
             pending.pop(sym, None)
             baseline.add(sym)
@@ -1881,6 +1898,110 @@ def selftest():
     assert fs15.saves and fs15.published, \
         "a raising bus stopped the loop — the fail-safe contract is degrade, not halt"
 
+    # ---- [2026-08-16 (nv)] THE LISTING SOURCE — the third of three, and the
+    # only one that was ALREADY driven end to end (every `_drive` fixture above
+    # snipes `NEW` off the market-set diff). So this block is not "reach the
+    # source"; it is the RULES the listing source owns and nobody asserted.
+    # Measured before writing any of it, by mutating each rule and running the
+    # suite: three of the four survived everything the repo had.
+    #
+    # The fourth is worth naming as a shape, not just a result. "Listing wins a
+    # tie" WAS defended — by `'"listing"' in block and "setdefault" in block`
+    # over a 400-character window of the SOURCE TEXT. That catches deleting the
+    # literal and nothing else: rewriting the surge line to
+    # `_src_map[_s] = "surge"` inverts the priority while leaving the word
+    # `setdefault` sitting in the young line two rows down, so the test stays
+    # green on a mutation that changes which bucket every dual-source close
+    # lands in. The memory rule is the general form — a substring test is not a
+    # wiring test — and the fix is to assert the STAMP on a close, below.
+
+    # (1) THE CLOSE TAG, through the bot's OWN saved blob rather than a
+    # hand-written one ((hj)): pass 1 snipes the listing, pass 2 is handed
+    # exactly what pass 1 persisted and must produce `long-listing_tp`.
+    _li_books = dict(_books, LIST1={"bids": [[4.0, 50]], "asks": [[4.04, 50]]})
+    _li_markets = {s: {"status": "active"} for s in ("OLD", "LIST1")}
+    ven16 = _FakeVenue(_li_markets, _li_books, {})
+    fs16 = _drive(ven16, 1000.0, CLIP,
+                  {"baseline": ["OLD"], "entry_ts": {}, "pending": {}})
+    assert [o[0] for o in ven16.opened] == ["LIST1"], ven16.opened
+    _blob16 = fs16.saves[-1][1]
+    assert _blob16["entry_src"]["LIST1"] == "listing", _blob16["entry_src"]
+    ven17 = _FakeVenue(_li_markets,
+                       dict(_li_books, LIST1={"bids": [[4.8, 50]], "asks": [[4.84, 50]]}),
+                       {"LIST1": {"size": 3.0, "entry": 4.02}})
+    fs17 = _drive(ven17, CAP, CLIP, _blob16)
+    assert ven17.closed == ["LIST1"], ven17.closed
+    assert fs17.trades[-1][1]["reason"] == "long-listing_tp", \
+        fs17.trades[-1][1]["reason"]
+
+    # (2) THE TIE, AND THE DOUBLE-OPEN IT WAS HIDING. A brand-new book that is
+    # ALSO surging is in `new_listings` AND `_surge`: the listing list is the
+    # only one not deduped against `surge_done`, so the symbol arrives in
+    # `candidates` twice. Measured through main() before (nv): TWO market_open
+    # calls on one coin in one pass, one entry_ts, and a row reporting `1 open`
+    # — the venue keys positions by symbol, so the second clip is invisible in
+    # the book's own report. In shadow the second open re-enters a held symbol,
+    # which realises P&L with NO record_close: a trade that never reaches the
+    # ledger, on a book whose only product is its ledger.
+    _dual_bus = _FakeBus({"vol_surges": [{"sym": "DUAL", "ratio": 9.0}],
+                          "vols": {"OLD": 50.0, "DUAL": 50.0},
+                          "ages_d": {"OLD": 900.0, "DUAL": 900.0}})
+    _dual_books = dict(_books, DUAL={"bids": [[5.0, 50]], "asks": [[5.05, 50]]})
+    ven18 = _FakeVenue({s: {"status": "active"} for s in ("OLD", "DUAL")},
+                       _dual_books, {})
+    fs18 = _drive(ven18, 1000.0, CLIP,
+                  {"baseline": ["OLD"], "entry_ts": {}, "pending": {}},
+                  bus=_dual_bus)
+    assert [o[0] for o in ven18.opened] == ["DUAL"], (
+        f"a dual-source symbol was sniped {len(ven18.opened)}x in one pass: "
+        f"{ven18.opened} — is_held is a pre-pass snapshot and cannot see it")
+    assert fs18.saves[-1][1]["entry_src"]["DUAL"] == "listing", (
+        "listing must win the tie — it is tried first, so it is the source "
+        "that actually admitted the symbol: "
+        f"{fs18.saves[-1][1]['entry_src']}")
+    # ...and the ORDER and the TAG must agree by construction, which is the
+    # whole reason the dedup keeps the FIRST occurrence.
+    _o, _s2, _a = run_snipe_pass(candidates=["D", "D", "E"], pending={},
+                                 baseline=set(), now_ts=t0, open_now=0,
+                                 max_open=9, try_snipe=always)
+    assert _s2 == ["D", "E"] and _o == 2, (_s2, _o)
+
+    # (3) A LISTING THAT FLAPS OUT OF `active`. A fresh perp's status flickers
+    # around its debut, and the rule has two halves that pull opposite ways:
+    # INSIDE the give-up window the pending record is KEPT (popping it would
+    # reset first_seen/attempts on the symbol's return, so a flapping book
+    # would never reach the bound and could be sniped days late), and past the
+    # bound it is dropped from pending but NEVER folded into `baseline` — an
+    # inactive market that re-lists later is a genuinely new listing, which is
+    # the 17-Jul absorption bug the whole retry design exists to prevent.
+    _now = time.time()
+    _flap = _drive(_FakeVenue(_li_markets, _li_books, {}), CAP, CLIP,
+                   {"baseline": ["OLD", "LIST1"], "entry_ts": {},
+                    "pending": {"YOUNGFLAP": {"first_seen": _now - 60,
+                                              "attempts": 7},
+                                "OLDFLAP": {"first_seen": _now
+                                            - PENDING_MAX_AGE_SEC - 60,
+                                            "attempts": 9}}})
+    _pend, _base = _flap.saves[-1][1]["pending"], _flap.saves[-1][1]["baseline"]
+    assert _pend.get("YOUNGFLAP", {}).get("attempts") == 7, (
+        f"a flapping listing lost its retry clock inside the window: {_pend}")
+    assert "OLDFLAP" not in _pend, f"past the bound it must be dropped: {_pend}"
+    assert "OLDFLAP" not in _base and "YOUNGFLAP" not in _base, (
+        f"an inactive market was folded into the baseline — it can never be "
+        f"sniped when it re-lists: {_base}")
+
+    # (4) `_announcement_tag` — the label on every NEW LISTING DETECTED line.
+    _anns = [{"title": "Scheduled maintenance", "content": ""},
+             {"title": "Perpetual listing: $WIF now trading", "content": ""},
+             {"title": "", "content": "MOODENG debuts today"}]
+    assert _announcement_tag(_anns, "WIF") == "Perpetual listing: $WIF now trading"
+    assert _announcement_tag(_anns, "MOODENG") == "announced", \
+        "a matching announcement with no title must still name itself"
+    assert _announcement_tag(_anns, "ABSENT") is None
+    assert _announcement_tag(None, "WIF") is None       # no feed, no crash
+    assert len(_announcement_tag([{"title": "x" * 200, "content": "ZZZ"}],
+                                 "ZZZ")) == 60, "the tag must stay a LOG label"
+
     # ---- [2026-08-04] SOURCE-STAMPED CLOSE TAGS round-trip through the ONE
     # parser every ledger row passes ((hj): test against the real consumer,
     # never a hand-written fixture). Three properties: each source yields a
@@ -1909,7 +2030,9 @@ def selftest():
           "row and degrades junk to no extra; both save_state writers "
           "persist the same shape; and the YOUNG source admits off the scout, "
           "falls back to a BUDGETED and MONOTONE candle probe, stamps its own "
-          "close tag and carries no surge telemetry).")
+          "close tag and carries no surge telemetry; and a LISTING wins the "
+          "tie, is sniped ONCE even when it also surges, keeps its retry clock "
+          "while it flaps and never absorbs into the baseline).")
 
 
 if __name__ == "__main__":

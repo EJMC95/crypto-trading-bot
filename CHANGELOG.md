@@ -1,3 +1,92 @@
+## 2026-08-16 (nv) — THE LISTING SOURCE WAS THE ONE ALREADY BEING TESTED, AND IT HID A DOUBLE-OPEN: a book that is both a new listing and a scout surge was sniped TWICE in one pass, and the guard against exactly that is a pre-pass snapshot
+
+- **THE ASK** (operator, closing the set): *"now do the listing source too"*.
+  `(np)` reached SURGE, `(nr)` reached YOUNG. LISTING needed no reaching —
+  every `_drive` fixture in this file has sniped `NEW` off the market-set diff
+  since 17-Jul. So this pass is not about coverage of the route; it is about
+  the RULES the route owns, and **I measured which of them were actually
+  defended before writing a line: three of four survived everything the repo
+  had, and the fourth was defended by a substring.**
+
+- **THE DEFECT, found by writing the tie-break test.** `candidates` is
+  `new_listings + _surge + _young`. SURGE marks every candidate into
+  `surge_done` *before* the young block reads it, so surge∩young is deduped by
+  construction — but **the listing list is deduped against nothing**, so a
+  brand-new book that is also surging appears in `candidates` TWICE. And the
+  double-open guard cannot see it: `is_held` closes over `_held_now`, a
+  snapshot taken BEFORE the loop, so it covers a position from a previous pass
+  and is blind to one opened seconds earlier in this one.
+  **Measured through `main()`, not argued:**
+
+      SNIPED DUAL LONG @ 5.025000 size 2.9851 ($15) [src=listing]
+      SNIPED DUAL LONG @ 5.025000 size 2.9851 ($15) [src=listing]
+      market_open calls: [('DUAL', 2.985075), ('DUAL', 2.985075)]
+
+  Two clips on one coin, ONE `entry_ts` (the second overwrites the first), and
+  the published row reads `1 open` — the venue keys positions by symbol, so
+  the second clip is invisible in the book's own report. In SHADOW, which is
+  what actually runs, the second call re-opens a held symbol and
+  `PaperBroker.open` **realises P&L with no `record_close`**: a trade that
+  never reaches the ledger, on a book whose only product is its ledger. This
+  file's own docstring names that hazard — it is why `is_held` was added — and
+  `_src_map`'s `setdefault` proves the overlap was anticipated for the TAG and
+  forgotten for the ORDER.
+
+- **MATERIALITY, stated honestly.** There is no live sniper row (the funded
+  path is built and unused), so the two-clip half is LATENT. On the shadow
+  book the mechanism is live, but both fills happen inside one pass at one
+  book, so the silent realisation is ~$0 at today's prices — **no historical
+  damage is demonstrated and none is claimed.** What is claimed is that the
+  ledger can be written wrong by a path with no ledger write in it.
+
+- **THE FIX goes in `run_snipe_pass`**, which owns the "one symbol enters the
+  baseline by exactly two routes" invariant, rather than in the caller that
+  happened to build a duplicate list: a fourth source is a matter of time, and
+  the caller-side fix would have to be re-made. First occurrence wins, which
+  is `_src_map`'s own priority, so **the order and the tag now agree by
+  construction** instead of by coincidence. Restrict-only — it removes an
+  attempt, never adds one — and no other test in the suite moved.
+
+- **THE SUBSTRING, worth naming as a shape.** "Listing wins a tie" WAS
+  defended: `'"listing"' in block and "setdefault" in block`, over a
+  400-character window of the source TEXT. Rewrite the surge line to
+  `_src_map[_s] = "surge"` and the priority inverts while the word
+  `setdefault` sits untouched in the young line two rows below — green test,
+  every dual-source close in the wrong bucket. That is the memory rule
+  verbatim (*a substring test is not a wiring test*), and the replacement
+  asserts the stamp on a close.
+
+- **FOUR FIXTURES**: the listing close tag through the bot's OWN saved blob
+  (pass 2 is handed exactly what pass 1 persisted → `long-listing_tp`); the
+  tie plus the double-open regression; the FLAP rule, whose two halves pull
+  opposite ways (inside the give-up window a pending record is KEPT, because
+  popping it resets `first_seen`/`attempts` on the symbol's return and a
+  flapping debut would never reach the bound — past the bound it is dropped
+  but **never folded into `baseline`**, since an inactive market that re-lists
+  is a genuinely new listing, the 17-Jul absorption bug); and
+  `_announcement_tag`, the label on every NEW LISTING DETECTED line, which had
+  three uncovered statements and now pins `$SYMBOL` matching, the
+  untitled-announcement fallback and the 60-char log bound.
+
+- **MEASURED: 88.6% → 90.1%**, floor **86 → 88**. Seven mutations, all RED,
+  **six of the seven green under every other sniper test**: the dedup removed,
+  the tie inverted, the listing stamp dropped, an inactive symbol absorbed
+  into the baseline, the give-up window removed, and both halves of the
+  announcement match.
+
+- **THE SECOND NO-OP MUTATION OF THE DAY, and the sharper version of
+  yesterday's lesson.** `(nr)` recorded "a mutation you have not eyeballed is
+  not a mutation", so this time I printed each mutant line — and still scored
+  a false SURVIVED, because the line I printed was the right TEXT in the wrong
+  FUNCTION (`pending.pop(sym, None)` appears three times in `run_snipe_pass`
+  before the one in `main()`'s drop loop, and the branch I hit already added
+  to the baseline, so my "absorb" mutation changed nothing). Printing the line
+  is not enough; the mutant has to be located. Re-run at the right site: RED.
+
+- **A BEHAVIOUR CHANGE, unlike `(np)`/`(nr)` — but shadow only.** 🎯 the Perp
+  Sniper has no live row, and the change is restrict-only, so main only per
+  `(mm)`: it ships on the next deploy that qualifies.
+
 ## 2026-08-16 (nu) — 🧙 SCHWAGER RE-MEASURED: THE FOUNDING NUMBER DOES NOT REPRODUCE, AND THREE TRADES OUT OF 298 ARE THE WHOLE BOOK
 
 - **THE ASK.** Operator: *"re-measure schwager"*, after `(nt)` flagged that its
