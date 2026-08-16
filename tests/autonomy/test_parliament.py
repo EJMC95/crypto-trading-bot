@@ -111,7 +111,13 @@ def test_howard_publish_carries_the_freshness_contract():
     howard = Howard(db=EcosystemDB(path=":memory:"))
     payload = howard.publish()
     assert payload["ttl_sec"] > 0 and payload["updated"]
-    assert set(payload["roster"]["books"]) == set(PM_BOTS)
+    # [(nz)] the published roster is the LIVING set, not the raw declaration —
+    # (nf) retired four PM books and this key is a claim about what the
+    # Parliament is RUNNING. Pinned against the derivation so a future
+    # retirement cannot leave the payload advertising a dead book.
+    from parliament import live_pm_bots
+    assert set(payload["roster"]["books"]) == set(live_pm_bots())
+    assert set(payload["roster"]["books"]) <= set(PM_BOTS)
     # a consumer applying fleet_bus.is_fresh must accept it right now
     import fleet_bus
     assert fleet_bus.is_fresh(payload, None)

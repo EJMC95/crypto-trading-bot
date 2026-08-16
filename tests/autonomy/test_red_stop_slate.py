@@ -100,3 +100,69 @@ def test_both_halves_of_every_row_retirement_shipped():
     missing_prune = rows - set(cleanup_legacy_bots.LEGACY_BOTS)
     assert not missing_hide, f"not hidden: {missing_hide}"
     assert not missing_prune, f"not pruned: {missing_prune}"
+
+
+def test_howard_does_not_page_for_retired_books(monkeypatch):
+    """[(nz)] THE ALARM THE SLATE LEFT FIRING. `EXPECTED_BEATS` was built from
+    raw PM_BOTS, so the four retired books never beat, read STALLED at 3x
+    silence forever, and Howard pushed the operator about a decision the
+    operator had just made. A watchdog that cries wolf about a deliberate
+    retirement is how a REAL stall later gets ignored ((gl))."""
+    import importlib
+    import parliament.brain as brain
+    for env in PM_RETIRED.values():
+        monkeypatch.delenv(env, raising=False)
+    brain = importlib.reload(brain)
+    beats = set(brain.EXPECTED_BEATS)
+    for b in PM_GONE:
+        assert f"bot.{b}" not in beats, f"{b} still expected to heartbeat"
+        assert f"tuner.{b}" not in beats, f"{b}'s tuner still expected"
+    for b in ("pm-albanese", "pm-turnbull"):
+        assert f"bot.{b}" in beats, f"{b} must still be watched"
+
+
+def test_the_published_roster_is_the_living_set(monkeypatch):
+    """The other half: the payload's `roster.books` is a claim about what is
+    RUNNING. It read six while four were retired."""
+    import importlib
+    import parliament.brain as brain
+    for env in PM_RETIRED.values():
+        monkeypatch.delenv(env, raising=False)
+    brain = importlib.reload(brain)
+    from parliament.ecosystem_db import EcosystemDB
+    payload = brain.Howard(db=EcosystemDB(path=":memory:")).publish()
+    assert set(payload["roster"]["books"]) == set(live_pm_bots())
+    assert not (set(payload["roster"]["books"]) & PM_GONE)
+
+
+def test_the_supervisor_restart_count_survives_the_restart():
+    """[(nz)] I13: the Parliament supervisor restarted TEN times in 48h while
+    its own payload published `errors: 0` and a `cycles` counter that RESETS
+    on every death — fleet_immune caught it from outside and paged; the organ
+    itself never said a word. The count is now persisted in the ecosystem DB
+    (Railway volume), monotone, and published OUTSIDE the `data` block so a
+    dark data layer cannot hide it."""
+    from parliament.brain import Howard
+    from parliament.ecosystem_db import EcosystemDB
+
+    db = EcosystemDB(path=":memory:")
+    Howard(db=db)
+    Howard(db=db)
+    third = Howard(db=db)
+    assert third.restart_count() == 3, "the count is not surviving the boot"
+
+    payload = third.publish()          # data layer DARK on purpose
+    assert payload["data"] == {}
+    assert payload["restarts"] == 3, (
+        "restarts must publish even when the data layer is dark — that is "
+        "exactly when a reader needs it")
+
+
+def test_a_dark_db_publishes_unknown_not_zero():
+    """Absence is not evidence: a DB that cannot answer must not read as a
+    healthy zero."""
+    from parliament.brain import Howard
+    h = Howard(db=None)
+    assert h.restart_count() in (None, 1)
+    if h.restart_count() is None:
+        assert h.publish()["restarts"] is None

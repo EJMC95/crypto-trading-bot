@@ -40,7 +40,8 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 
-from . import STATE_KEY, TUNING_STATE_KEY, PM_BOTS, SHADOW_SUFFIX
+from . import (STATE_KEY, TUNING_STATE_KEY, PM_BOTS, SHADOW_SUFFIX,
+               live_pm_bots as _live_pm)
 
 try:
     import bot_pnl_store as store
@@ -59,11 +60,28 @@ STATE_TTL_SEC = 900
 NTFY_MIN_GAP_SEC = 6 * 3600.0
 
 # organ -> expected beat interval (sec); stalled at 3x silence
-EXPECTED_BEATS = {
-    "data.market": 120, "keating.scanners": 120, "keating.ml": 300,
-    **{f"bot.{b}": 60 for b in PM_BOTS},
-    **{f"tuner.{b}": 3600 for b in PM_BOTS},
-}
+#
+# [2026-08-16 (nz)] BUILT FROM THE LIVE ROSTER, NOT THE RAW DECLARATION.
+# `(nf)` retired four PM books via `PM_RETIRED`/`live_pm_bots()` and pinned
+# `build_bots` to the derivation — but THIS table kept expecting a heartbeat
+# from all six, so the four retired books read STALLED (3x silence) forever
+# and Howard paged the operator about books that are retired BY DESIGN. The
+# (mo) rule is one declaration, one derivation, and it has to reach every
+# consumer that makes a LIVE claim — a watchdog that cries wolf about a
+# deliberate decision is how a real stall later gets ignored ((gl)).
+# Computed at import like before; a resurrection via the override env is a
+# process restart, which re-imports this module.
+def _expected_beats():
+    from . import live_pm_bots
+    live = live_pm_bots()
+    return {
+        "data.market": 120, "keating.scanners": 120, "keating.ml": 300,
+        **{f"bot.{b}": 60 for b in live},
+        **{f"tuner.{b}": 3600 for b in live},
+    }
+
+
+EXPECTED_BEATS = _expected_beats()
 
 
 class Howard:
@@ -79,12 +97,41 @@ class Howard:
         self._ntfy_sent: dict[str, float] = {}
         self._fleet_ingest_ts = 0.0
         self.started = time.time()
+        self._restarts = None
+        self.note_restart()   # [(nz)] persisted, survives the container
 
     # -- heartbeat sink (passed to every task as `beat`) ----------------------
     def beat(self, organ: str, note: str = "") -> None:
         self.beats[organ] = (time.time(), note)
         if self.db is not None:
             self.db.beat(organ, note)
+
+    # -- [(nz)] durable restart counter --------------------------------------
+    _RESTART_KEY = "supervisor.restarts"
+
+    def note_restart(self) -> int:
+        """Bump the persisted restart count ONCE per process and return it.
+
+        Called at construction. The ecosystem DB lives on the Railway persist
+        volume, so this survives the container the way `cycles` does not.
+        Never raises: a dark DB costs the count, never the boot."""
+        try:
+            prev = (self.db.recall(self._RESTART_KEY) or {}) if self.db else {}
+            n = int(prev.get("n") or 0) + 1
+            if self.db is not None:
+                self.db.remember(self._RESTART_KEY,
+                                 {"n": n, "last": datetime.now(timezone.utc)
+                                  .isoformat(timespec="seconds")})
+            self._restarts = n
+            return n
+        except Exception:  # noqa: BLE001
+            self._restarts = getattr(self, "_restarts", None)
+            return self._restarts or 0
+
+    def restart_count(self):
+        """What the payload publishes. None when the DB could not answer —
+        UNKNOWN must not read as zero (the absence-is-not-evidence rule)."""
+        return getattr(self, "_restarts", None)
 
     def stalled(self) -> list[str]:
         now = time.time()
@@ -230,8 +277,24 @@ class Howard:
         stalled = self.stalled()
         payload = {
             "updated": now, "ttl_sec": STATE_TTL_SEC,
+            # [2026-08-16 (nz)] THE DEATH COUNTER THAT SURVIVES THE DEATH,
+            # published at TOP level on purpose — `data.cycles` RESETS every
+            # restart and `data.errors` read 0 through TEN supervisor restarts
+            # in 48h (measured off the bus series; fleet_immune caught it from
+            # OUTSIDE and phone-pushed, while this payload said nothing) — the
+            # I13 shape: a process that STOPS runs no handler, so its own
+            # counters are the ones guaranteed not to notice. Persisted in the
+            # ecosystem DB (Railway volume), monotone, and OUTSIDE the `data`
+            # block because a dark data layer is exactly when you need it.
+            # None = the DB could not answer; UNKNOWN must not read as zero.
+            "restarts": self.restart_count(),
+            # [(nz)] the published roster is the LIVING one — this key is a
+            # claim about what the Parliament is running now, and it read six
+            # books while four were retired. (The ingest filter at
+            # `ingest_fleet` keeps using raw PM_BOTS on purpose: a retired
+            # book's HISTORICAL closes are still Howard's own rows.)
             "roster": {"brain": "howard", "intelligence": "keating",
-                       "books": list(PM_BOTS)},
+                       "books": sorted(_live_pm())},
             "books": self.book_summary(),
             "lens_7d": self.lens_rollup(),
             "fleet_lens_7d": self.fleet_lens_rollup(),

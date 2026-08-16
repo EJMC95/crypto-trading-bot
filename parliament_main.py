@@ -355,7 +355,13 @@ async def _selftest_async() -> None:
     assert "pm-albanese" in payload["books"]
     assert payload["books"]["pm-albanese"]["closed"] == 1
     assert payload["roster"]["brain"] == "howard"
-    assert len(payload["roster"]["books"]) == 6
+    # [(nz)] the roster publishes the LIVING books, not the raw declaration —
+    # (nf) retired four, and this key is a claim about what is RUNNING.
+    from parliament import live_pm_bots
+    assert set(payload["roster"]["books"]) == set(live_pm_bots())
+    # ...and the durable restart counter rides along (I13: `cycles` resets on
+    # every death, so it cannot be the only evidence a supervisor died)
+    assert payload["restarts"] is None or payload["restarts"] >= 1
     bench = payload["scanners"]["bench"]
     assert len(bench) == 10, "all 10 scanners must appear, quiet ones included"
     assert all(b["runs"] >= 1 for b in bench.values()), \
@@ -367,7 +373,11 @@ async def _selftest_async() -> None:
     stalled = howard.stalled()
     assert "bot.pm-albanese" not in stalled, "fresh beat is not stalled"
     assert "keating.ml" in stalled, "never-beaten organ must be stalled"
-    assert len(EXPECTED_BEATS) >= 15
+    # [(nz)] DERIVED, not a magic 15: the table is 3 infra organs + one
+    # bot beat + one tuner beat per LIVING book, and (nf) retired four.
+    # A hardcoded count is a second declaration of the roster.
+    assert len(EXPECTED_BEATS) == 3 + 2 * len(live_pm_bots()), EXPECTED_BEATS
+    assert all(f"bot.{b}" in EXPECTED_BEATS for b in live_pm_bots())
     # featurize is None-safe on an empty book
     f = featurize("GHOST", 1, data, None)
     assert all(isinstance(v, float) for v in f.values())
