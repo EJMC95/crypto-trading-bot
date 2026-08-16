@@ -1,3 +1,59 @@
+## 2026-08-17 (pg) — CI HAS BEEN RED ON MAIN SINCE `(pe)` AND THE SAME COMMIT RUNS GREEN ON A LAPTOP: `audit_boot_stagger` crashes in the one regime it cannot see
+
+**Found by the daily evidence review while checking whether yesterday's red-CI
+finding had cleared.** It had — and main went red again 14 minutes later, on a
+different cause, and stayed red through HEAD.
+
+    FAILED tests/test_selftests.py::test_enforced_audit_guard[scripts/audit_boot_stagger.py]
+      KeyError: 'tolerance_src'   (audit_boot_stagger.py:534, in main)
+
+Not a verdict — a **hard crash**, in an `ENFORCED_AUDITS` member, so it gates
+every push. Red from `fb4d1c6` (16-Aug 07:31Z) through `9d5551c`, which is the
+commit whose own subject is *"read the real TTL from SOURCE, so CI stops
+proxying everything"*.
+
+**THE BUG.** `assess()` sets `tolerance_s`/`tolerance_src` *below* its
+`if not gaps: … continue` early return. A run with no deploy cadence therefore
+emits rows that never get the keys at all, and `main()` indexes
+`r["tolerance_src"]` directly to print the basis line.
+
+**WHY IT WAS INVISIBLE LOCALLY AND FATAL IN CI — the (a guard has TWO REGIMES)
+class, landing inside the guard that documents it.** The tolerance does not
+depend on `gaps`; the *cadence* does. A developer's `gh` has full scope and
+returns ~58 deploys, so the early return never fires and the bug is
+unreachable. CI's `GITHUB_TOKEN` is `contents / metadata / packages: read` with
+**no `actions: read`**, so the workflow-run listing comes back empty, `gaps` is
+`[]`, and **every** row takes it. Reproduced exactly:
+
+    assess(blocks, [], {})  ->  row keys lack tolerance_src  ->  KeyError
+
+The block that crashes is the one `(pe)` added to *declare which regime
+produced the verdicts*, after two sessions spent four exchanges disagreeing
+about numbers that were both right. It could not survive the regime it was
+written to disambiguate.
+
+**Shipped:** the tolerance assignment is hoisted **above** the cadence check,
+so every row carries it by construction and every consumer of `assess`'s rows
+gets the guarantee — not a `.get()` in `main()`, which would paper over the
+hole and leave the next reader exposed. Two regression tests, and the mutation
+round confirms they are the guard rather than collateral: reverting to the
+**exact** pre-fix placement fails
+`test_a_cadence_less_row_still_carries_its_tolerance` and
+`test_main_survives_the_CI_regime_end_to_end` **and nothing else**. The
+end-to-end one drives the whole `main()`, because the crash was in the summary
+line and a row-level test sails straight past it.
+
+**The assertion is the SUM, not `unknown == 0`** — my first draft asserted the
+latter and it was wrong: 🧹 `cleanup_legacy_bots` is a one-shot with no
+interval, so it has no proxy to fall back on and `unknown` is its honest basis.
+The real invariant is that the four bucket counts add up to the organ count,
+which is exactly what a missing key broke.
+
+**Not fixed here, named instead:** this audit reads its deploy cadence from a
+live GitHub query, so its verdict depends on external state that the pushes it
+gates are themselves moving. That is a separate property from this crash — it
+did not cause it and the fix does not address it — but an `ENFORCED_AUDITS`
+member that can flip on someone else's deploy burst is worth a decision.
 ## 2026-08-17 (pf) — A BOOK THAT SCREENS AN INSTRUMENT CLASS MUST PUBLISH THAT IT DOES: two `unreachable` verdicts, and 18 of the 19 closes behind them are instruments the books stopped trading four days ago
 
 **Found by the daily evidence review, from the go-live table.** The grader and

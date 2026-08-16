@@ -26,6 +26,7 @@ import datetime as dt
 import importlib.util
 import json
 import pathlib
+import re
 
 import pytest
 
@@ -416,6 +417,51 @@ def test_no_deploy_history_asserts_nothing():
     """Fail-safe: an unavailable cadence must not manufacture a verdict."""
     r = _row(stagger=900, interval=600, gaps=[])
     assert r["verdict"] == "report" and r["starve_rate"] is None
+
+
+def test_a_cadence_less_row_still_carries_its_tolerance():
+    """[(pg)] THE INCIDENT: `assess` set the tolerance BELOW the `if not gaps`
+    early return, so a run with no deploy cadence emitted rows with no
+    `tolerance_s`/`tolerance_src` key at all — and `main()` indexes
+    `r["tolerance_src"]` to print the basis line. `KeyError`, hard crash.
+
+    The tolerance does not depend on the cadence; only the verdict does. So a
+    row must carry it either way, and that is asserted here rather than in
+    `main()` alone — every consumer of `assess`'s rows gets the guarantee.
+    """
+    r = _row(stagger=900, interval=600, gaps=[])
+    assert "tolerance_s" in r and "tolerance_src" in r, sorted(r)
+    assert r["tolerance_src"] == "3x interval (proxy)", r["tolerance_src"]
+
+
+def test_main_survives_the_CI_regime_end_to_end(monkeypatch, capsys):
+    """[(pg)] The regression as CI actually met it: no DATABASE_URL *and* no
+    deploy cadence. A developer's `gh` has full scope and returns ~58 deploys,
+    so this path never fires locally — CI's GITHUB_TOKEN carries
+    `contents/metadata/packages: read` with no `actions: read`, the run listing
+    comes back empty, and every row takes the early return. Red on main from
+    `fb4d1c6` to HEAD while the same commit ran green on a laptop.
+
+    Asserts the whole `main()`, not `assess` alone: the crash was in the
+    summary line, which a row-level test would have sailed past.
+    """
+    monkeypatch.setattr(mod, "deploy_times", lambda _n: ([], "none"))
+    monkeypatch.setattr(mod, "tolerances", lambda _o: {})   # no DB
+    monkeypatch.setattr("sys.argv", ["audit_boot_stagger.py"])
+    assert mod.main() == 0
+    out = capsys.readouterr().out
+    assert "tolerance basis:" in out, out
+    # EVERY organ lands in exactly one bucket. The four counts summing to the
+    # organ count is the real invariant — it is what a missing `tolerance_src`
+    # broke. `unknown` is NOT zero and must not be asserted to be: 🧹
+    # `cleanup_legacy_bots` is a one-shot with no interval, so it has no
+    # proxy to fall back on and "unknown" is its honest basis.
+    n_organs = len(mod.parse_blocks(mod.RUN_ALL.read_text()))
+    got = [int(m) for m in re.findall(
+        r"published ttl_sec (\d+) organ\(s\), ttl_sec from source (\d+), "
+        r"3x-interval proxy (\d+), unknown (\d+)", out)[0]]
+    assert sum(got) == n_organs, \
+        f"{sum(got)} attributed vs {n_organs} organs — a row fell through: {out}"
 
 
 def test_a_declared_exemption_is_honoured_and_must_carry_a_reason():

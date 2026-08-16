@@ -390,6 +390,29 @@ def assess(blocks: list[dict], gaps: list[float],
     out = []
     for b in blocks:
         r = dict(b, starve_rate=None, verdict="report", why="")
+        # [2026-08-17 (pg)] TOLERANCE IS SET BEFORE THE CADENCE CHECK, and the
+        # order is the whole fix. It used to sit below the `if not gaps` early
+        # return, so a run with NO deploy cadence produced rows with no
+        # `tolerance_s`/`tolerance_src` at all — and `main()` indexes
+        # `r["tolerance_src"]` directly to print the basis line. Result:
+        # `KeyError: 'tolerance_src'`, a hard crash, in the block whose own
+        # comment is about declaring which regime you are in.
+        # WHY IT WAS INVISIBLE LOCALLY AND FATAL IN CI: the tolerance does not
+        # depend on `gaps`; the CADENCE does. A developer's `gh` has full scope
+        # and returns ~58 deploys, so this branch never fires. CI's
+        # GITHUB_TOKEN is `contents/metadata/packages: read` with NO
+        # `actions: read`, so the workflow-run listing yields nothing, gaps is
+        # empty, and every row takes the early return. Measured: red on main
+        # from `fb4d1c6` (16-Aug 07:31Z) through HEAD, blocking the Tests
+        # signal for every session pushing on top of it, while the same commit
+        # ran green on a laptop. The (a guard has TWO REGIMES) class, landing
+        # inside the guard that documents it.
+        if b["organ"] in tol:
+            r["tolerance_s"], r["tolerance_src"] = tol[b["organ"]]
+        elif b["interval_s"]:
+            r["tolerance_s"], r["tolerance_src"] = 3 * b["interval_s"], "3x interval (proxy)"
+        else:
+            r["tolerance_s"], r["tolerance_src"] = None, "unknown"
         if not gaps:
             r["why"] = "no deploy cadence available — cannot assess"
             out.append(r)
@@ -405,12 +428,7 @@ def assess(blocks: list[dict], gaps: list[float],
             cur = cur + g if g < b["stagger_s"] else 0.0
             worst = max(worst, cur)
         r["worst_burst_s"] = worst
-        if b["organ"] in tol:
-            r["tolerance_s"], r["tolerance_src"] = tol[b["organ"]]
-        elif b["interval_s"]:
-            r["tolerance_s"], r["tolerance_src"] = 3 * b["interval_s"], "3x interval (proxy)"
-        else:
-            r["tolerance_s"], r["tolerance_src"] = None, "unknown"
+        # (tolerance was set above, before the cadence check — see (pg))
         # A ONE-SHOT organ has no loop and so no interval — it must simply get
         # ONE uninterrupted window as long as its own stagger, ever. If every
         # observed gap is shorter, it never ran at all, and for the one-shot
