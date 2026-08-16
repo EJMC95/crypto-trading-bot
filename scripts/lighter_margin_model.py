@@ -43,16 +43,45 @@ Read the confidence stratification before quoting it.
   notional over COLLATERAL. Use `cross_leverage()` below; do NOT hand this
   module `gross/equity`, which is wrong by 1.078% here.
 
-  CONFIDENCE, STRATIFIED — two free choices were resolved against ONE position:
-  * **entry-vs-mark notional: STRONGLY established.** It is the dominant term
-    (mark/entry = 1.0109, a 1.088% effect) and moves the error from -1.078% to
+  CONFIDENCE, STRATIFIED. Both free choices are now RESOLVED, by two different
+  kinds of evidence — and the second was upgraded from "provisional" on
+  2026-08-16 by a DIFFERENTIAL test, not by a better fit:
+  * **entry-vs-mark notional: ESTABLISHED by MAGNITUDE.** The dominant term
+    (mark/entry = 1.0109, a 1.088% effect); it moves the error from -1.078% to
     -0.145%, far outside any rounding.
-  * **collateral-vs-total_asset: WEAKLY established, treat as provisional.**
-    Those denominators differ by only 0.165%, so the last step from -0.145% to
-    -0.001% could be fitting noise at n=1. "Collateral fits better", not
-    "collateral is proven".
-  * One position, one observation. `entry` is published on both live rows now,
-    so every future position adds a data point for free.
+  * **collateral-vs-total_asset: ESTABLISHED by MOTION.** These two
+    denominators sit only 0.165% apart in LEVEL, which is why one snapshot
+    could not separate them — but their MOTION differs by ~40x, and a
+    differential test survives any constant offset. Three snapshots of the
+    same XAU short, `entry` and `size` identical throughout:
+
+        snap  collateral    total_asset   venue liq       coll err   total err
+        T1    197.843218    197.516986    32238.916157    0.00000%   -0.14322%
+        T2    197.843339    197.521799    32238.933282    0.00000%   -0.14116%
+        T3    197.843339    197.522213    32238.933282    0.00000%   -0.14098%
+
+        T1->T2  observed +0.000053%   coll +0.000053%   total +0.002116%
+        T2->T3  observed +0.000000%   coll +0.000000%   total +0.000182%
+
+    **T2->T3 IS A NULL TEST AND IT REFUTES total_asset OUTRIGHT.** `value` and
+    `total_asset` both moved (the mark ticked, unrealised P&L with it) while
+    collateral did NOT — and the venue's liq did not move either, byte-identical
+    to ten significant figures. A total_asset formula REQUIRED motion of
+    +0.000182% and there was none. **Refuted by the absence, not disfavoured by
+    a fit** — and corroborated in both directions: liq moved exactly when
+    collateral moved (T1->T2) and held exactly when it held (T2->T3).
+  * **FEED IT THE PUBLISHED `size`, NOT `value/mark`.** With the venue's own
+    4-dp `size` the reproduction is EXACT (+0.0000%); deriving it as
+    `value/mark` leaves -0.0013% — pure derivation error, not model error.
+  * A CONSUMER TRAP VISIBLE IN A SINGLE ROW: at T3 `value` moved while `entry`,
+    `size` and `liq` all held. **`value` breathes with the mark; the
+    liquidation price does not**, because it is struck off ENTRY-based
+    notional. Anyone reaching for `value` as the notional sees it drift under a
+    stationary liq and will, reasonably, blame the model.
+  * **STILL GENUINELY OPEN: one POSITION.** `gross/equity` and "this position's
+    value/equity" stay numerically identical while the Farmer holds a single
+    open position, so that pair is untested and needs a naturally-occurring
+    second concurrent position. Not manufactured for telemetry.
 
   AND THIS IS WHAT THE EARLIER CIRCULAR CHECK HID: back-solving produced an
   entry of 4385.65 against an observed 4339.72. That **1.058% gap WAS the model
@@ -756,11 +785,34 @@ def _selftest():
     # off the venue: 💸 the Farmer's live XAU short.
     xau_entry, xau_liq, xau_mmf = 4339.72, 32238.9162, 0.0240
     xau_size, xau_coll = 30.2703 / 4386.935, 197.843218
+    xau_size_pub = 0.0069          # the venue's OWN published size
     xau_tav, xau_mark = 197.516986, 4386.935
     lev = cross_leverage(xau_size, xau_entry, xau_coll)
     assert abs(lev - 0.151355) < 1e-5, lev
     pred = liq_price(xau_entry, False, lev, xau_mmf)
     assert abs(pred - xau_liq) / xau_liq < 2e-5, (pred, xau_liq)
+    # THE NULL TEST, pinned — the strongest single artifact here. Three
+    # snapshots of the same position; between T2 and T3 `total_asset` MOVED
+    # (+0.000210%) while `collateral` did not, and the venue's liq did not
+    # move either. A total_asset-denominated model is refuted by that absence.
+    T2_coll, T3_coll = 197.843339, 197.843339
+    T2_tot, T3_tot = 197.521799, 197.522213
+    venue_liq_T2 = venue_liq_T3 = 32238.933282
+    n_ent = xau_size_pub * xau_entry
+    for coll, want in ((T2_coll, venue_liq_T2), (T3_coll, venue_liq_T3)):
+        got = liq_price(xau_entry, False, n_ent / coll, xau_mmf)
+        assert abs(got - want) / want < 1e-8, (got, want)
+    # collateral predicts NO motion, and there was none
+    a = liq_price(xau_entry, False, n_ent / T2_coll, xau_mmf)
+    b = liq_price(xau_entry, False, n_ent / T3_coll, xau_mmf)
+    assert a == b, "collateral was static; the model must predict no motion"
+    # total_asset predicts motion that the venue did NOT show
+    ta = liq_price(xau_entry, False, n_ent / T2_tot, xau_mmf)
+    tb = liq_price(xau_entry, False, n_ent / T3_tot, xau_mmf)
+    assert tb != ta, "the total_asset branch must predict motion here"
+    assert abs(ta - venue_liq_T2) / venue_liq_T2 > 0.001, \
+        "total_asset must visibly miss the venue's liq, or this pins nothing"
+
     # ...and the WRONG basis must visibly fail, or this pins nothing. The
     # intuitive gross/equity input is off by ~1.08%, which is larger than the
     # entire maintenance term — that is why a helper exists at all.
