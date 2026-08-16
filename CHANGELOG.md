@@ -1,3 +1,63 @@
+## 2026-08-16 (nw) — 🎸 BARNES PRICED ITS ENTIRE OPEN BOOK OFF A BOOT-FROZEN MARK: `(nm)` scoped this book out by reading the code, and the live payload said ten priced legs
+
+**`(nm)` left Barnes out on purpose and the reasoning was right about the SLEEVE
+and wrong about the BOOK.** Its one LIVE sleeve (carry) is delta-neutral
+modelled — `position_pnl` has no price term for it — so the frozen mark could
+not reach P&L. True, and not the whole picture: `position_pnl` DOES add a price
+term for non-carry sleeves, and measured 16-Aug Barnes still held **10 open
+`xsect` legs — its entire open book, −$10.22** — in the sleeve `(nf)` retired
+and is winding to flat. With **zero `fresh_mid` uses** in the file, those ten
+legs were marked, and would have CLOSED, on `markets[sym]["last"]`: captured by
+`_load_markets()` at client construction and never refreshed.
+
+**A RETIRED SLEEVE IS NOT AN ABSENT SLEEVE.** That is the transferable lesson.
+Reading the code said "carry only, no price term, unaffected"; reading the live
+payload said ten priced legs on a retired sleeve mid-wind-down. `(nm)`'s scope
+was decided from the former, and the check that would have caught it costs one
+`curl`. When a fix is scoped by which components are *live*, confirm what the
+book is actually *holding* — retirement gates ENTRIES; it does not empty a book.
+
+**FIXED, using `(nm)`'s own owner:** `venues/marks.stop_marks` supplies the live
+mid for exactly the coins that carry a price term (`sleeve != "carry"`), and
+`fresh_mid` prices priced ENTRIES. Carry asks for no price and gets none, so the
+order-book cost is **zero for a pure-carry book** and falls to zero as the xsect
+legs wind down. Sites moved: the management mark, the xsect rebalance close,
+both priced entries, and `open_pnl` — that last one feeds `snapshot_equity` and
+therefore the go-live maxDD bar (I9), so the drawdown grade was stale too.
+
+**WHAT IS DELIBERATELY *NOT* COPIED FROM `(nm)`: THE `if fund:` GATE STAYS.**
+In the three price books that gate was a defect — a funding outage suspended a
+price stop. Here it is a real dependency: the funding RATE drives accrual and
+the carry/extreme exits, and it refreshes on every call, so with no `fund` there
+is nothing to compute. Copying the shape would have been cargo-culting a fix
+into a book that does not have the defect, and
+`test_the_funding_gate_stays_because_this_book_needs_it` pins the distinction so
+a later reader "finishing the job" cannot delete it.
+
+**THE STAMP IS THE ANSWER TO THIS FIX'S OWN OBJECTION.** The xsect legs close
+ACROSS this change, so the sleeve's realised record spans two price bases — and
+raising exactly that was the reason for not doing this unasked. `price_basis`
+now rides every priced close (`"live-book"`, `None` on carry, **ABSENT on every
+pre-(nw) row**), so `(nf)`'s −$9.56 xsect attribution stays splittable by a
+WHERE clause instead of becoming one indistinguishable mixture. Absent means
+frozen; rows are never back-stamped, because filling that field in retroactively
+would be inventing evidence rather than recording it.
+
+**Guarded**: `tests/autonomy/test_barnes_price_basis.py`, AST-shaped. **Eight
+mutations verified RED**: the management mark, the xsect rebalance close and the
+published MTM each back on the frozen mark; a priced entry back on it; the stamp
+dropped; the stamp made unconditional (so a carry row claims a basis for a price
+term it does not have); carry growing a price term; and the `if fund:` gate
+deleted.
+
+**Shadow book, main-only per `(mm)`** — $1,000 paper, zero keys, no lever, no
+gate, no entry rule changed. **What it costs, stated:** the ten open legs' P&L
+to date was accumulated on the frozen basis and this does not retroactively
+correct it — it makes their CLOSES correct and labelled. The class is now closed
+across every funding-map reader: 💸 the live Farmer (`fresh_mid` ×6),
+`lighter_momentum_bot` (×8) and 🌾 carry (whose `_perp_leg_fill` docstring has
+warned against the frozen mark since July) were each CHECKED, not assumed.
+
 ## 2026-08-16 (nv) — THE LISTING SOURCE WAS THE ONE ALREADY BEING TESTED, AND IT HID A DOUBLE-OPEN: a book that is both a new listing and a scout surge was sniped TWICE in one pass, and the guard against exactly that is a pre-pass snapshot
 
 - **THE ASK** (operator, closing the set): *"now do the listing source too"*.

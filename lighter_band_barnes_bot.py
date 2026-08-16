@@ -88,6 +88,7 @@ from datetime import datetime, timezone
 import bot_pnl_store as store
 import funding_basis
 from venues import venue_context
+from venues.marks import fresh_mid, stop_marks
 
 # Growth rail + scout bus. Guarded like every optional organ: a dark import
 # leaves the operator's env defaults and the venue-direct universe in force,
@@ -651,6 +652,19 @@ def _close(bot_id, key, pos, reason, exit_rate, pnl, mark=None):
                    "accrued": round(pos.get("accrued") or 0.0, 4),
                    "fees": round(pos.get("fees") or 0.0, 4),
                    "notional": pos.get("notional"),
+                   # [2026-08-16 (nw)] WHICH PRICE BASIS THIS ROW'S PRICE
+                   # TERM WAS COMPUTED ON. The xsect sleeve is winding to
+                   # flat under `(nf)`, so its remaining legs close ACROSS
+                   # the (nw) fix: rows before it are marked on the
+                   # boot-frozen funding mark, rows after on the live book.
+                   # Without this field that is one indistinguishable
+                   # mixture and `(nf)`'s -$9.56 attribution cannot be
+                   # split; with it the split is a WHERE clause. ABSENT on
+                   # every pre-(nw) row, which is the honest encoding of
+                   # "frozen" — never back-stamped, never guessed. None on
+                   # carry, whose P&L has no price term at all.
+                   "price_basis": ("live-book"
+                                   if pos["sleeve"] != "carry" else None),
                    "held_h": round(held_h, 2)})
     except Exception:  # noqa: BLE001
         pass
@@ -783,6 +797,26 @@ def main():
             dt_h = (t0 - last_ts) / 3600.0
             last_ts = t0
 
+            # [2026-08-16 (nw)] PRICE COMES FROM THE LIVE BOOK, NOT THE
+            # FUNDING MAP. `fund[coin]["mark"]` is markets[sym]["last"],
+            # captured by LighterClient._load_markets() at CLIENT
+            # CONSTRUCTION and never refreshed, so its error grows with
+            # container uptime — the (nm) class. This book's `fund` gate is
+            # CORRECT and stays: the funding RATE drives accrual and the
+            # carry/extreme exits, and it refreshes on every call. Only the
+            # MARK was wrong, and it reaches only the sleeves whose
+            # position_pnl carries a price term (non-carry). Carry is
+            # delta-neutral modelled — it needs no price and asks for none,
+            # so the live-book cost is zero for a pure-carry book and falls
+            # to zero as the retired xsect legs wind down.
+            _price_coins = {q["coin"] for q in positions.values()
+                            if q["sleeve"] != "carry"}
+            mids, mids_blind = stop_marks(ctx.venue, _price_coins)
+            if mids_blind:
+                print(f"[{now_iso()}] NO LIVE BOOK for "
+                      f"{', '.join(mids_blind)} — priced legs not marked "
+                      f"this loop")
+
             # ---- manage every open position -----------------------------
             for key in list(positions):
                 pos = positions[key]
@@ -807,7 +841,9 @@ def main():
                     continue
                 pos.pop("missing_since", None)
                 rate = float(f.get("rate") or 0.0)
-                mark = float(f.get("mark") or 0.0)
+                # [(nw)] live-book mid; 0.0 for carry (which takes no price)
+                # and for a leg whose book is unreadable this loop.
+                mark = float(mids.get(pos["coin"]) or 0.0)
                 apr = rate * H
                 if pos["sleeve"] != "carry" and mark > 0:
                     pos["last_mark"] = mark
@@ -921,7 +957,7 @@ def main():
                     side = "short" if apr > 0 else "long"
                     if _open_position(positions, "extreme", c, side,
                                       EXTREME_NOTIONAL, t0, apr,
-                                      mark=float(f.get("mark") or 0.0)):
+                                      mark=fresh_mid(ctx.venue, c) or 0.0):
                         held_harvest.add(c)
                         print(f"[{now_iso()}] OPEN extreme:{c} {side} "
                               f"${EXTREME_NOTIONAL:.0f} | {apr:+.1%} TRUE")
@@ -955,7 +991,7 @@ def main():
                         continue
                     f = fund.get(pos["coin"]) or {}
                     rate = float(f.get("rate") or 0.0)
-                    mark = float(f.get("mark") or 0.0)
+                    mark = float(mids.get(pos["coin"]) or 0.0)   # [(nw)]
                     pos["fees"] += SLIP_COST * pos["notional"]
                     pnl = position_pnl(pos, mark)
                     realized += pnl
@@ -975,12 +1011,15 @@ def main():
                         if _open_position(positions, "xsect", c, side,
                                           XSECT_CLIP, t0,
                                           float(f.get("rate") or 0.0) * H,
-                                          mark=float(f.get("mark") or 0.0)):
+                                          mark=(fresh_mid(ctx.venue, c)
+                                                or 0.0)):    # [(nw)]
                             print(f"[{now_iso()}] OPEN xsect:{c} {side} "
                                   f"${XSECT_CLIP:.0f}")
 
             # ---- publish -------------------------------------------------
-            open_pnl = sum(position_pnl(p, (fund.get(p["coin"]) or {}).get("mark"))
+            # [(nw)] MTM on the live book — feeds snapshot_equity and so the
+            # go-live maxDD bar (I9). position_pnl ignores the mark for carry.
+            open_pnl = sum(position_pnl(p, mids.get(p["coin"]))
                            for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
             extra = build_extra(census, positions, open_pnl, realized,
