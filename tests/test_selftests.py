@@ -33,6 +33,16 @@ TIMEOUT = 120
 # `python -m <dotted> --selftest`. Keep this list in sync with the codebase —
 # the rot guard below fails the build if a new selftest module is missing.
 SELFTEST_MODULES = [
+    # [2026-08-16 (pc)] the CI-coverage guard: was the code that reached a
+    # container ever graded? SELFTEST_MODULES and deliberately NOT
+    # ENFORCED_AUDITS, per this file's own rule directly below — its verdict
+    # reads GitHub run history, which changes with no code change at all, so
+    # a scan here would turn local `pytest` red whenever CI happened to be
+    # mid-flight. The negative fixtures are offline and pure (`assess` takes
+    # run rows and commit paths as arguments); the SCAN runs in
+    # fleet-weekly-assessment.yml beside audit_code_currency, which is where
+    # "which commit is running, and was it graded" is the actual subject.
+    "scripts.audit_ci_coverage",
     # [2026-08-16 (nx)] the shared-worktree commit wrapper: --selftest is
     # offline and pure (classify + snapshot round-trip, no git, no DB).
     # Registered in the same commit that adds the tool, per this guard's own

@@ -60,6 +60,26 @@ jobs:
       - name: Does the declared live roster still match the live feed?
         run: python3 scripts/audit_live_roster.py --pnl-json pnl.json
 
+      # [2026-08-16 (pb)] CI COVERAGE — the two workflows disagree about a
+      # burst of pushes and the disagreement is silent: Tests cancels
+      # in-progress runs, Railway Redeploy does not. Measured 16-Aug over 4
+      # hours: 27 of 60 Tests runs cancelled (45%) against 41 successful
+      # deploys and zero failures, i.e. code reached containers from commits
+      # CI never graded. Placed in THIS job because it is already the
+      # deploy-verification job (`code-currency` beside it answers "which
+      # commit is running"; this answers "was that commit ever graded").
+      # Needs GH_TOKEN for `gh run list`, and a full history to walk back to
+      # the last green — a depth-1 checkout would find no green commit and
+      # report the whole window ungraded, which is why fetch-depth: 0 above
+      # is load-bearing for this step too.
+      # Fires ONLY when ungraded commits actually SHIPPED; a doc-only push
+      # ungraded is reported and passes, because a guard that reddens on the
+      # benign case is one the reader learns to ignore ((gl)).
+      - name: Was the deployed code ever graded?
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/audit_ci_coverage.py --depth 60 --gha
+
   assess:
     runs-on: ubuntu-latest
     steps:

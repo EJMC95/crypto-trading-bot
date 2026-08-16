@@ -1,3 +1,70 @@
+## 2026-08-16 (pc) — CODE REACHED CONTAINERS FROM COMMITS CI NEVER GRADED: the two workflows disagree about a burst of pushes, and the disagreement was silent
+
+**MEASURED, and it is the deploy cadence's one unmitigated cost.** Asked to fix
+the cadence, I measured it instead: 41 successful deploy runs in four hours,
+median gap 6.6 min, **zero failures**, `concurrency: cancel-in-progress: false`
+so nothing is dropped, and the decide step already diffs the whole
+`before..HEAD` push range. **The deploy path has no defect.** Re-engineering it
+to coalesce would cut freqtrade-bots restarts 22 → 12, but the harm that
+justified it — organ starvation — was already closed by `(os)`/`(ou)`, real
+money is marker-gated and untouched, and safe coalescing needs the deploy range
+widened to `last-deployed-sha..HEAD` or a skipped run silently drops services.
+Poor risk/reward on the path that ships real money. **Refused, with the
+numbers.**
+
+**What the measurement DID find is a genuine asymmetry:**
+
+    Tests            cancel-in-progress: TRUE   -> the verdict is dropped
+    Railway Redeploy cancel-in-progress: FALSE  -> the deploy still runs
+
+**27 of 60 Tests runs cancelled today (45%)** against 41 successful deploys. So
+on a busy day the deploy always happens and the verdict often does not, and
+nothing said so. That is what turned this morning's standing red into a manual
+bisect: I could not tell which commit broke it because half of them had never
+been graded.
+
+**`cancel-in-progress` is CORRECT and this does not argue with it.** An
+ungraded commit inside a green descendant is covered transitively — that is how
+most resolve, and re-running the suite on every superseded push is the quota
+burn the flag exists to stop. The failure is narrower: **the tip settles with
+no green verdict while commits that touched deploy paths have already
+shipped.**
+
+**`scripts/audit_ci_coverage.py`** answers exactly that, and its CALIBRATION is
+most of the work:
+
+* a cancelled or failed run is **not a verdict**;
+* an in-flight run is **not yet owed** one;
+* an unreadable history is **UNKNOWN and exits 2**, never a vacuous green
+  (`(mq)`: "the currency guard had no answer for 7 of 27 rows, and said OK");
+* **ungraded but nothing shipped is OK** — docs, tests and changelog entries
+  reach no container, so the last green commit is still what runs. Reddening
+  on a doc-only push is the `(gl)` cry-wolf shape, and the first draft did
+  exactly that until a mutation caught it. The count stays *reported*.
+
+**Wired, not filed** (`(gk)`): a step in `fleet-weekly-assessment.yml`'s
+`code-currency` job, which already answers "which commit is each container
+running" — this answers "and was that commit ever graded". Placed in
+`SELFTEST_MODULES` and deliberately **not** `ENFORCED_AUDITS`, per that file's
+own rule: its verdict reads GitHub run history, which changes with no code
+change, so a scan in pytest would redden every local run whenever CI happened
+to be mid-flight.
+
+**Guarded**: `tests/autonomy/test_ci_coverage_guard.py`. **Seven mutations
+verified RED.** Two SURVIVED the first pass and both were real gaps in my
+tests, not the code:
+* every test drove `assess` directly, so **`fetch_runs` itself was unpinned**
+  and could return `[]` instead of `None` on a dark API — a confident verdict
+  built on no data. Now pinned directly, three failure modes.
+* the deny-list (`tests/`, `docs/`, `CHANGELOG.md`) was **entirely inert** —
+  `tests/foo.py` is already excluded because it has a slash and sits under no
+  shipping prefix. A dead guard clause that reads like a live one is worse
+  than none, so `ships()` is now a pure ALLOW-list and the exclusion is by
+  construction.
+
+**First live run: OK** — tip ungraded, 2 commits since the last green,
+**0 of them shipped**, so the containers are still running graded code.
+
 ## 2026-08-16 (pa) — THE `--publish-if-stale` FLAG HAS BEEN ON MAIN SINCE `(oy)` AND THE SCRIPT NEVER IMPLEMENTED IT: two sessions built the two halves of one fix in parallel, and until this entry the early run was inert
 
 **Operator:** *"do the staleness-aware fix"* → *"push it once the referees clear
