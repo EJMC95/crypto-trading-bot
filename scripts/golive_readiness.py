@@ -1392,7 +1392,12 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     now = now if isinstance(now, datetime) else datetime.now(timezone.utc)
     out = {"verdict": None, "eta": None, "eta_days": None, "eta_kind": None,
            "eta_conf": None, "binding": None, "blockers": [],
-           "rate_cpd": None, "n_req_t": None, "raw_days": None, "why": ""}
+           "rate_cpd": None, "n_req_t": None, "raw_days": None, "why": "",
+           # [2026-08-16] which `t` produced the date, and the effective sample
+           # behind it. Declared in the DEFAULTS so every early-return path
+           # carries the keys — a consumer must never have to infer the basis
+           # from a key's absence (the I6 shape: an absence is not evidence).
+           "t_basis": "iid", "n_eff": None}
 
     def _floor_eta():
         """Window FLOOR from the first close (preferred) or the era epoch."""
@@ -1511,7 +1516,34 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
         per_bar["window"] = max(GOLIVE_MIN_DAYS - age_d, 1.0 / rate)
     if not bars["closes"]:
         per_bar["closes"] = max(0.0, (GOLIVE_MIN_CLOSES - n) / rate)
+    # [2026-08-16] PROJECT ON THE STATISTIC THAT MATCHES THE BOOK'S DECISIONS.
+    # `(ky)` established that `t` counts TRADES while a basket book makes
+    # DECISIONS — ⚖️ Counterweight closes ten legs in one instant, so its 101
+    # closes are 28 decisions and its iid `t` is inflated by roughly
+    # sqrt(n/n_eff). `(ky)` published the cluster-robust read BESIDE `t` and
+    # deliberately left the BAR on the iid value (changing a go-live bar is a
+    # policy act, not a fix). The HORIZON is a projection, explicitly
+    # reported-not-a-bar at (ks) — and projecting a required sample from an
+    # inflated `t` is simply wrong arithmetic: `n_req` scales as `t^-2`, so an
+    # iid `t` twice the honest one under-states the remaining sample FOURFOLD
+    # and hands the operator an ETA a basket book cannot meet.
+    # Same closed form, honest input: holding the clustering structure fixed,
+    # growing the sample by k grows n_eff by ~k and t_cluster by ~sqrt(k), so
+    # `n_req = n * (T / t_cluster)^2` — n stays the real close count because
+    # `rate` is in closes/day.
+    # FAIL-SAFE: any doubt (no cluster block, degenerate single cluster, junk,
+    # or no clustering at all) falls back to the iid `t` — today's behaviour,
+    # never worse — and the basis is PUBLISHED so a reader is never guessing
+    # which statistic produced the date.
     t = s.get("t")
+    t_basis, n_eff = "iid", None
+    clus = s.get("cluster")
+    if isinstance(clus, dict):
+        tc, g, ne = clus.get("t_cluster"), clus.get("n_clusters"), clus.get("n_eff")
+        if (isinstance(tc, (int, float)) and tc > 0
+                and isinstance(g, int) and 1 < g < n):
+            t, t_basis, n_eff = tc, "cluster", ne
+    out["t_basis"], out["n_eff"] = t_basis, n_eff
     if not bars["t"] and isinstance(t, (int, float)) and t > 0:
         # mean > 0 here (the unreachable branch returned above), so t > 0 is
         # guaranteed by construction — the isinstance guard is for junk input.
@@ -1542,7 +1574,11 @@ def gate_horizon(s, first_close=None, era_epoch=None, now=None):
     eta_dt = now + timedelta(days=eta_days)
     why = (f"{binding} bar binds: ~{eta_days:.1f}d at {rate:.2f} closes/day"
            + (f" (needs ~{out['n_req_t']} closes for t>={GOLIVE_MIN_T:g} "
-              "at current mean/sd)" if binding == "t" else ""))
+              f"at current mean/sd, projected on the {out['t_basis']} t"
+              + (f"; {out['n_eff']:g} effective closes across "
+                 f"{s['cluster']['n_clusters']} decisions"
+                 if out["t_basis"] == "cluster" else "")
+              + ")" if binding == "t" else ""))
     if blockers:
         why += f" — FLOOR: {', '.join(blockers)} must also mend"
     out.update(verdict="on_track", binding=binding,
@@ -1868,6 +1904,17 @@ def book_payload(s):
                power_at_half_pct=(round(s["power_at_half_pct"], 3)
                                   if s.get("power_at_half_pct") is not None
                                   else None))
+    # [2026-08-16] PUBLISH `(ky)`'s CLUSTER-ROBUST READ. `stats()` has computed
+    # it since (ky) and `book_payload` never carried it, so the statistic that
+    # says ⚖️ Counterweight's 91 closes are 28 DECISIONS existed only inside the
+    # process — absent from every book on the bus. Measured cost, 16-Aug: the
+    # keep-or-retire call on that book turns on cluster t (−0.98, not the
+    # published −1.87), and it had to be re-derived from the raw ledger because
+    # the grader would not say. A number a decision depends on must be
+    # READABLE, not recomputable. Reported beside `t`, never a bar — (ky)'s
+    # choice to leave the gate on the iid value is deliberate and untouched.
+    if isinstance(s.get("cluster"), dict):
+        out["cluster"] = s["cluster"]
     return out
 
 
@@ -2310,6 +2357,62 @@ def _selftest():
     from datetime import timedelta as _htd
     assert hz["eta"] == (_hnow + _htd(days=hz["eta_days"])).date().isoformat()
     assert hz["blockers"] == [] and hz["eta_kind"] == "projected", hz
+    # a book whose closes do NOT batch projects on the iid t, and SAYS so.
+    assert hz["t_basis"] == "iid" and hz["n_eff"] is None, hz
+
+    # [2026-08-16] A BASKET BOOK PROJECTS ON THE CLUSTER-ROBUST t.
+    # `(ky)` measured that ⚖️ Counterweight's 90 closes are 24 DECISIONS, and
+    # published `t_cluster` beside the iid `t`. The horizon was reading the iid
+    # one — and because `n_req` scales as `t^-2`, an inflated `t` under-states
+    # the remaining sample QUADRATICALLY and dates a gate the book cannot make.
+    # Same fixture, same iid t, only the cluster block differs: the projection
+    # must move, and it must move in the CONSERVATIVE direction.
+    _basket = dict(ontrack)
+    _basket["cluster"] = {"n_clusters": 4, "t_cluster": ontrack["t"] / 2.0,
+                          "n_eff": 10.0, "window_s": 60.0}
+    hzb = gate_horizon(_basket, first_close=t0, now=_hnow)
+    assert hzb["t_basis"] == "cluster" and hzb["n_eff"] == 10.0, hzb
+    assert hzb["n_req_t"] == math.ceil(40 * (GOLIVE_MIN_T /
+                                             (ontrack["t"] / 2.0)) ** 2), hzb
+    # halving t quadruples the required sample — the whole point of the fix
+    assert hzb["n_req_t"] > 3 * hz["n_req_t"], (hzb["n_req_t"], hz["n_req_t"])
+    # AND ON THIS FIXTURE THE VERDICT ITSELF FLIPS. The honest sample pushes
+    # the date past HORIZON_CAP_DAYS, so an `on_track` book with a printed ETA
+    # becomes `undecidable` — I17's keep-or-retire call. That is the defect's
+    # real cost: the iid projection was handing the operator a date for a bar
+    # this book could not reach, which is precisely what I17 exists to stop.
+    assert hz["verdict"] == "on_track" and hzb["verdict"] == "undecidable", \
+        (hz["verdict"], hzb["verdict"])
+    _days_b = hzb["eta_days"] if hzb["eta_days"] is not None else hzb["raw_days"]
+    assert _days_b > hz["eta_days"], "a basket book must date LATER"
+    assert _days_b > HORIZON_CAP_DAYS, _days_b
+    assert "cluster t" in hzb["why"] or "I17" in hzb["why"], hzb["why"]
+
+    # FAIL-SAFE: every degenerate cluster block falls back to the iid t and
+    # reproduces today's answer EXACTLY — never worse, never a fabricated date.
+    for _bad in ({"n_clusters": 1, "t_cluster": 0.1, "n_eff": 1.0},   # single
+                 {"n_clusters": 40, "t_cluster": 0.1, "n_eff": 40.0},  # g == n
+                 {"n_clusters": 4, "t_cluster": None, "n_eff": 10.0},  # junk
+                 {"n_clusters": 4, "t_cluster": -1.0, "n_eff": 10.0},  # sign
+                 {}, None, "not-a-dict"):
+        _s = dict(ontrack); _s["cluster"] = _bad
+        _h = gate_horizon(_s, first_close=t0, now=_hnow)
+        assert _h["t_basis"] == "iid", (_bad, _h["t_basis"])
+        assert _h["n_req_t"] == hz["n_req_t"], (_bad, _h["n_req_t"])
+
+    # ...and the cluster read must be PUBLISHED, not merely computed. It was
+    # absent from every book on the bus from (ky) until this commit, so the
+    # ⚖️ keep-or-retire call had to re-derive it from the raw ledger.
+    assert book_payload(_basket).get("cluster") == _basket["cluster"], \
+        "the cluster-robust read must ride the payload a decision is made from"
+    # `stats()` computes a cluster block for EVERY book, so a real one always
+    # publishes — that is the point. Only a junk/absent block must be dropped,
+    # never rendered as an empty dict a consumer could misread as "no batching".
+    assert isinstance(book_payload(ontrack).get("cluster"), dict), \
+        "a real cluster block must publish even when the book does not batch"
+    _nc = dict(ontrack); _nc["cluster"] = None
+    assert "cluster" not in book_payload(_nc), \
+        "a missing cluster read must be ABSENT, never an empty dict"
 
     # ...and a FLOOR when halves also fails: same shape, sick second half.
     floored = stats(mk([0.06] * 20 + [-0.038] * 20))
