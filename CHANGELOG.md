@@ -1,3 +1,68 @@
+## 2026-08-16 (pb) — TWO OF THE OTHER THREE AUDITS WERE IN THE WRONG GROUP AS WELL, and the third stays out for a reason I could measure: it sat exactly one entry from reddening every local run
+
+- **[LETTER: the two-letter sequence EXHAUSTED `oz` during this entry.** My
+  next-free helper enumerated `o` + `a..z` only, so it raised `StopIteration`
+  mid-script — and because the surrounding shell used `$L` unquoted in a
+  subject line, it committed and PUSHED `... ()` with no letter and no
+  changelog entry at all (`64ab214`). The citations in that commit then
+  resolved to a concurrent session's `(oy)`, so `audit_changelog_letters`
+  stayed green while pointing readers at the wrong entry — the same
+  resolves-but-to-the-wrong-thing hole recorded in `(oq)`. Rolled over to
+  `pb`, citations repointed, entry written. **A generator with no rollover is
+  a countdown, and a shell that interpolates an empty variable into a commit
+  subject will happily push it.**]
+
+- **THE ASK** (operator, after `(ox)`): *"check the other three audits aren't
+  in the wrong group too"*. `(ox)` moved one code guard from
+  `SELFTEST_MODULES` (fixture only) into `ENFORCED_AUDITS` (fixture + scan) and
+  asserted, without checking, that the other three belonged where they were.
+  **Two of the three did not.**
+
+- **THE DISCRIMINATOR, now written down at the list itself** rather than
+  re-derived by feel each time: *does the audit's verdict depend on state that
+  changes WITHOUT a code change?* No -> `ENFORCED_AUDITS`, so `pytest` catches
+  it before a push. Yes -> fixture only, and let the scan run in
+  `changelog-check.yml`, where the shared file IS the subject.
+
+  | audit | reads | verdict moves without a code change? | placement |
+  |---|---|---|---|
+  | `audit_era_date_literals` | pure AST over python | no | **MOVED IN** (1.1s) |
+  | `audit_doctrine_enforcement` | CLAUDE.md -> resolves refs into code | rarely; fails on a DELETED GUARD | **MOVED IN** (0.03s) |
+  | `audit_recurrence` | CHANGELOG.md + CLAUDE.md | **yes, continuously** | stays out |
+
+- **`audit_recurrence` STAYS OUT, and the reason is measured rather than
+  argued.** It fails when one subject collects more than `MAX_ENTRIES=5`
+  changelog entries in 7 days. Measured while writing this: **`tide-rider-lighter`
+  sat at exactly 5.** One more entry from ANY concurrent session — and this
+  repo produced entries every few minutes today — would have turned every local
+  `pytest` red for a developer who had touched nothing related to it. That is
+  not a guard doing its job in the wrong place; it is a guard whose subject is
+  the shared file itself, which is precisely what `changelog-check.yml` is for.
+  (`audit_changelog_letters` is the deliberate exception and earns it: at push
+  time your own letter IS part of the change under test — and it reddened this
+  session's local suite five times today, which is the cost of that exception
+  paid in full.)
+
+- **BOTH MOVES PROVEN BY INJECTION, not by the fact that they pass.** A
+  hardcoded canonical era date (`2026-07-03`) in a test file ->
+  `FAILED test_enforced_audit_guard[scripts/audit_era_date_literals.py]`. An
+  invariant repointed at `fleet_immune.py::no_such_function_here` ->
+  `FAILED test_enforced_audit_guard[scripts/audit_doctrine_enforcement.py]`.
+  Both green again on restore.
+
+- **MY FIRST INJECTION WAS WRONG AND SAID SO.** I put the era literal at module
+  level in a bot and the guard stayed quiet — I nearly recorded that as "proven"
+  on a passing run. It is by design: shipped code is scanned only inside
+  `*selftest*` functions (that is where the `(ii)` incident's literals lived),
+  while `tests/` is scanned wholesale. The guard was right and my fixture was in
+  the wrong place. **A guard that stays quiet has told you nothing until you know
+  it was looking where you injected.**
+
+- What this buys: a hardcoded era date and a doctrine whose guard has been
+  deleted are now both catchable by `pytest` before a push, instead of only by
+  `changelog-check.yml` after one. No trade behaviour; main only per `(mm)`.
+  Suite green, all 27 floors held.
+
 ## 2026-08-16 (oz) — A SECOND NULL TEST AT 15.8× THE FIRST, AND IT SURVIVES A REDEPLOY: the venue's liq held while total equity moved — plus four corrections to my own first draft of this entry
 
 - *(Letter: written as `(ox)`, RENUMBERED to `(oz)` before commit — a

@@ -250,7 +250,7 @@ LIVE_SELFTESTS = [
 # unblocked — the guard existed but ran nowhere. It is now green on main (radar
 # added to the deploy paths) and CI-gating (changelog-check.yml), so its full
 # scan is asserted here too. The live bots are declared in DEPLOY_COVERAGE_OK.
-# WHICH LIST DOES A NEW AUDIT GO IN? [2026-08-16 (oy)] The question that keeps
+# WHICH LIST DOES A NEW AUDIT GO IN? [2026-08-16 (pb)] The question that keeps
 # being answered by feel, so it is written here once:
 #
 #   Does the audit's verdict depend on state that changes WITHOUT a code change?
@@ -284,7 +284,7 @@ ENFORCED_AUDITS = [
     # ~1.6s over 195 modules. (ow) reverted this line once, on the wrong
     # reading that it duplicated an existing registration; it does not.
     "scripts/audit_undefined_names.py",
-    # [2026-08-16 (oy)] Same finding as the line above, two more instances,
+    # [2026-08-16 (pb)] Same finding as the line above, two more instances,
     # placed by the rule stated at the head of this list rather than by feel.
     # `audit_era_date_literals` is pure AST over python (1.1s) — a hardcoded
     # era date is a CODE defect and was catchable only after a push.
