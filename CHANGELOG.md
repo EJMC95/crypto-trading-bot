@@ -1,3 +1,74 @@
+## 2026-08-16 (oj) — 🧙 SCHWAGER RETIRED: the I17 call, made on a measurement, and a NEW undecidability class to go with it
+
+- **THE DECISION.** Operator: *"retire schwager"*, on the `(nu)`/`(oe)`
+  re-measurement. The I17 keep-or-retire question was put to the operator with
+  both sides stated; this is the answer, executed.
+- **WHY — and it is not "the strategy is bad".** 🧙 produces ~17.9 closes/30d,
+  a perfectly good RATE. It is still ungradeable, because `t` assumes an
+  approximately normal mean and this distribution is nothing like one:
+  * the top **3 of 298** trades are **112%** of the total — drop them and the
+    book reads −$17.97, t=−0.13;
+  * the founding **+$457.21 / t=1.88** reproduces on NO window: a 90-cell
+    sweep spans −$93.52..+$404.55 with **`t≥2.0` in 0 of 90** and the full
+    go-live gate passing in **0 of 90**;
+  * the random-entry null, re-run under current code, reads **P=0.183**;
+  * at the measured mean/sd it needs **~719 closes ≈ 40 MONTHS** to reach
+    t=2.0.
+  **Fat tails are Schwager's own doctrine** (276 of 298 exits are the trail).
+  The SAMPLE failed, not the strategy, and the entry says so rather than
+  dressing an ungradeable book up as a loser.
+- **A NEW CLASS, worth naming: UNDECIDABLE BY TAIL.** I17 knows one shape —
+  too few closes (🌊 Tide Rider, 📊 Index Rider). This is the other: enough
+  closes, useless `t`. **The test to run on any book graded on `t`:** sort
+  closes by contribution and ask what the top 1/3/5 carry. If dropping three
+  trades flips the sign, `t` is a statistic about the tail and the 30-close bar
+  cannot resolve the rule however fast the closes arrive. Then compute
+  `n_req = n·(t_target/t)²` and state the horizon in months BEFORE promising a
+  grading date.
+- **NOTHING REALISED IS LOST: ZERO closed trades in its own ledger.** Two days
+  live, 4 open paper positions, +$3.41 MTM. Those 4 FREEZE (the (mr)
+  precedent). Retiring on a replay would normally be judging a book by a proxy
+  before its record starts (I14) — the reason that is not the error here is
+  that the replay is ALL the evidence there will be for ~40 months, and the
+  replay says the bar is unreachable.
+- **BOTH HALVES SHIPPED, per the standing rule that doing one hides your own
+  omission**: `RETIRED_ROWS` in `pnl_dashboard.py` hides the card,
+  `LEGACY_BOTS` in `cleanup_legacy_bots.py` prunes the frozen row.
+- **THE GUARD IDLES, NEVER EXITS.** This book owns its module AND its service,
+  so the whole process idles — the 🌊/📊 shape, not `(mr)`'s ROW-scoped case
+  (which existed because `lighter_family_bot` runs seven books). `sys.exit`
+  under `restartPolicy=always` is a permanent crash-loop, so the guard is a
+  `while True: sleep`, placed BEFORE `venue_context` so a retired book makes no
+  venue calls at all. Verified live: it prints its reason and idles; with the
+  override set it runs normally.
+- **PINNED by `tests/autonomy/test_schwager_retired.py`, 6 mutations verified
+  RED**: guard removed · guard EXITS instead of idling · sleep-once-no-loop ·
+  the documented `=run` token dropped · row not hidden · row not pruned. AST
+  throughout, because a page-wide grep for the env name passes on a comment
+  that merely mentions it.
+- **REVERSIBLE**: `SCHWAGER_RETIRED_OVERRIDE=run`. The Railway service stop
+  (`book-schwager-shadow`) is the operator's separate act — a code guard is the
+  durable form, since auto-deploy resurrects a stopped service on the next push.
+- **TWO DOWNSTREAM CONSEQUENCES, NAMED AND NOT FIXED (I11 — one house at a
+  time):**
+  1. **📐 Grimes structurally excludes `breakout`** because "that supply is 🧙
+     book-schwager's" (I20, selftest-pinned in two places). **That supply now
+     has no owner**, so the exclusion guards nothing. Whether Grimes should
+     reclaim it is a separate, measurable question — and note its own gate is
+     already open on universe churn `(oe)`, so this is not the moment.
+  2. **`(mr)`'s consolation is now VOID.** Retiring 🚀 crypto-breakout-4h was
+     softened by "4h breakout lives on in 🧙 book-schwager". It does not
+     anymore. **`(mr)` still stands on its OWN evidence** (in-era t=−3.50,
+     the only one of nine surviving Benjamini-Hochberg at FDR 0.05) — that is
+     unaffected; only the consolation is gone. Already flagged as weaker at
+     `(nu)`; now it is absent.
+- **COHORT SCORECARD, all four wave-2 books now re-measured and resolved:**
+  🧘 Douglas CORRECTED (edge survives, "both halves positive" does not) ·
+  📐 Grimes gate OPEN ON UNIVERSE CHURN (operator call pending) ·
+  🧙 Schwager **RETIRED** · 🧮 Hull HOLDS (n=50, +$6.69, t=+3.92,
+  P(mean≤0)=0.000). **Three of four founding numbers needed correction; the
+  survivor is the funding book, whose walk `(ml)` never touched.**
+
 ## 2026-08-16 (oi) — THE PARLIAMENT'S "CRASH-LOOP" WAS OUR OWN DEPLOYS: all 10 restarts correlate with a deploy run, ZERO unexplained — and the detector now tells the two apart
 
 - **THE ALARM, and it reached the operator's phone.** `fleet_immune` reported
