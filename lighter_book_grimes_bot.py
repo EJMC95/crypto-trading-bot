@@ -56,6 +56,40 @@ HONEST ABOUT THE EVIDENCE (scripts/study_books_cohort_2026-08-13.py):
     measured: each setup's full-window and trailing-window record (above),
     and the bar the gate applies. The (hm) clock runs from first publish;
     the brain grades each `<side>-<setup>` sleeve separately.
+    **[16-Aug (oe) — THE SCORECARD SERIES NOW EXISTS, AND IT SAYS THE GATE IS
+    GOVERNED BY UNIVERSE CHURN AS MUCH AS BY EDGE. Read before trusting an
+    `open: true`.]**
+      - STATE CHANGE, first: the book is no longer born-trading-nothing.
+        `keltner` published **n=99, t=+0.53, net=+$32.73, open=TRUE** (asof
+        fresh, 0.1h). (mh) recorded t=0.49 knife-edge BELOW the bar and the
+        first live retest read −0.05. It has crossed.
+      - BUT ON A FIXED 18-COIN UNIVERSE THE BAR IS NEVER CROSSED. Recomputing
+        the trailing-126d keltner scorecard every 3 days over 90 days, coin
+        set held constant: t ranges **[−2.09, +0.09]**, **0 of 31 retests
+        open**. Not one crossing.
+      - AND UNIVERSE CHOICE ALONE MOVES `t` BY 3.82. At a FIXED as-of, same
+        rule, same window, resampling only WHICH coins are graded: k=9 gives
+        t ∈ [−2.55, +1.27] and opens the gate in 4 of 12 draws; k=12 opens 2
+        of 12; k=14 opens 0 of 12; k=16 opens 1 of 12. **The bar is 0.5 and
+        the spread from coin selection is 2.5x the bar.**
+      - WHAT THAT MEANS, stated carefully because the bot is NOT buggy: it
+        replays `resolve_universe()` — the set it will actually trade — on
+        freshly fetched venue bars, which is the defensible choice. But that
+        universe is a top-18-BY-VOLUME ranking, so it CHURNS; and at n~100
+        with a true effect near zero, the churn dominates. The gate therefore
+        cannot distinguish "this setup's edge changed" from "the coin list
+        changed", and it is currently OPEN on the second.
+      - The live number is not reproducible from the study's method at any
+        universe/window I can construct (18c/126d t=−0.08 · 18c/120d −0.29 ·
+        liquid-9/126d +0.14 · liquid-9/120d −0.11 — all CLOSED). That is
+        expected given the above, not a defect finding; the scout's `vols`
+        differ from `orderBookDetails`, so the exact traded set is not
+        reconstructable offline.
+      - NOT CHANGED HERE. Decoupling the gate from universe churn (grade a
+        FIXED set, or require the bar on several draws, or widen the margin)
+        is a change to this book's CENTRAL mechanism and must be measured
+        before it ships (I19). The book has ZERO closes, so nothing is
+        burning. **Owner: operator.**
   * the gate's bar (n>=20, net>0, t>=0.5) is DELIBERATELY below the
     go-live bar — it decides which setup may spend shadow clips, not what
     goes live; the go-live gate is unchanged and senior.

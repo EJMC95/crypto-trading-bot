@@ -1,3 +1,66 @@
+## 2026-08-16 (oe) — 📐 GRIMES RE-MEASURED: THE GATE HAS OPENED, AND WHAT OPENED IT WAS THE COIN LIST, NOT THE EDGE
+
+- **[LETTER MOVED (ob) -> (oe), 16-Aug.** Two concurrent sessions took `(ob)`
+  and then `(od)` mid-write; both are cited from tracked code, so by the
+  convention they keep the letters and this entry moved to the next free one.
+  Second move today — `(nt)` moved from `(nr)` for the same reason. Committed
+  from an ISOLATED WORKTREE, which is the `(ob)` fix working as intended.]**
+- **THE ASK.** Operator: *"re-measure grimes"* — the last unchecked book of the
+  wave-2 cohort, after 🧘 Douglas (nt), 🧙 Schwager (nu) and 🧮 Hull (ny).
+- **IT IS A DIFFERENT QUESTION FROM THE OTHER THREE, and that shaped the whole
+  pass.** Grimes's founding claim is not "this edge makes money" — it is that
+  **none of twelve pre-declared variants beat random**, so the book ships the
+  TESTING DISCIPLINE (a roster behind a rolling replay gate) rather than a
+  setup. Its gate is FAIL-CLOSED, so a stale-optimistic number cannot hold it
+  open the way one held Schwager's headline up. The risk here is the mirror:
+  a wrongly-STARVED book, or a gate that opens for the wrong reason.
+- **STATE CHANGE FIRST: THE BOOK IS NO LONGER BORN-TRADING-NOTHING.** The live
+  scorecard (fresh, asof 0.1h) reads **keltner n=99, t=+0.53, net=+$32.73,
+  `open: TRUE`**; failtest n=305 t=−1.37 and pullback n=128 t=−0.31 remain
+  closed. `(mh)` recorded keltner at t=0.49, "knife-edge BELOW the 0.5 bar",
+  and the first live retest read −0.05. It has crossed. CLAUDE.md said "all
+  three gates closed at birth" and was stale.
+- **BUT ON A FIXED UNIVERSE THE BAR IS NEVER CROSSED.** Recomputing the
+  trailing-126d keltner scorecard every 3 days across 90 days, coin set held
+  constant at the study's 18: **t ranges [−2.09, +0.09], 0 of 31 retests
+  open.** Not one crossing, and the trajectory is a slow drift up from −2.09
+  toward zero, never through the bar.
+- **AND UNIVERSE CHOICE ALONE MOVES `t` BY 3.82.** At a FIXED as-of, same rule,
+  same window, resampling only WHICH coins are graded: k=9 gives
+  t ∈ [−2.55, +1.27] and opens the gate in **4 of 12** draws; k=12 opens 2 of
+  12; k=14 opens 0 of 12; k=16 opens 1 of 12; the full 18 gives −0.13.
+  **The bar is 0.5 and the spread from coin selection alone is 2.5× the bar.**
+- **THE BOT IS NOT BUGGY, AND THAT IS THE UNCOMFORTABLE PART.** It replays
+  `resolve_universe()` — the set it will actually trade — on freshly fetched
+  venue bars. Grading what you will trade is the defensible choice. But that
+  universe is a **top-18-BY-VOLUME ranking, so it CHURNS**, and at n≈100 with
+  a true effect near zero the churn dominates the statistic. **The gate
+  therefore cannot distinguish "this setup's edge changed" from "the coin list
+  changed" — and it is currently OPEN on the second.** For a book whose ENTIRE
+  THESIS is the discipline of the gate, that is the finding.
+- **THE LIVE NUMBER IS NOT REPRODUCIBLE OFFLINE, and that is expected rather
+  than a defect:** 18c/126d t=−0.08 · 18c/120d −0.29 · liquid-9/126d +0.14 ·
+  liquid-9/120d −0.11 — every reconstruction CLOSED, none matching n=99. The
+  scout's `vols` differ from `orderBookDetails`'s daily volume, so the exact
+  traded set is not reconstructable offline. Named so a later session does not
+  hunt it as a bug.
+- **NOTHING CHANGED, deliberately.** Decoupling the gate from universe churn —
+  grade a FIXED set, require the bar on several universe draws, or widen the
+  margin — is a change to this book's CENTRAL mechanism, so it must be
+  measured before it ships (I19). The book has **ZERO closes** and `scan`
+  reads `scanned 10 / quiet 10 / signal 0 / opened 0`, so nothing is burning
+  while the decision waits. **Owner: operator.**
+- **The founding claim is untouched and still governs**: none of the twelve
+  variants beat random entries, which is precisely why this book ships the
+  test rather than a setup. An `open: true` on a setup that failed that
+  screen is the gate doing something its own evidence does not support.
+- **COHORT COMPLETE — all four wave-2 books now re-measured:** 🧘 Douglas
+  CORRECTED (edge survives, "both halves positive" does not) · 🧙 Schwager NOT
+  ESTABLISHED, undecidable-by-tail, a live I17 call · 🧮 Hull HOLDS (n=50,
+  +$6.69, t=+3.92, low concentration, P(mean≤0)=0.000) · 📐 Grimes's gate is
+  open on universe churn. **Three of four founding numbers needed correction;
+  the one that survived is the funding book, whose walk (ml) never touched.**
+
 ## 2026-08-16 (oc) — the re-run sweep's live-money half: `(nj)`'s new per-row clip arm escaped TWO consumers, and a guard with no answer was still printing OK
 
 *(Letter picked at push time after two collisions — a concurrent session took
