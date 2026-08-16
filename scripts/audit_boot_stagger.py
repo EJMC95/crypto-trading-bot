@@ -363,12 +363,53 @@ def assess(blocks: list[dict], gaps: list[float],
     return out
 
 
+def _selftest() -> int:
+    """NEGATIVE FIXTURE — the detector must still fire on a planted defect.
+
+    `pytest tests/autonomy/test_boot_stagger.py` is the thorough suite; this is
+    the CI-gating proof that the guard has not been quietly defanged, which is
+    the one thing a green full scan can never show (it is green precisely when
+    the fleet is healthy, and would be equally green if the rule were deleted).
+    """
+    # 1. an organ that CANNOT reach its first run must FAIL
+    starved = {"organ": "planted", "stagger_s": 300, "interval_s": 300,
+               "early": False, "gated": False, "mitigated": False,
+               "inert_flags": [], "kind": "periodic"}
+    r = assess([starved], [60.0] * 20)[0]
+    assert r["verdict"] == "FAIL", f"detector did not fire: {r}"
+    # 2. ...and a healthy one must NOT (the cry-wolf direction)
+    healthy = dict(starved, stagger_s=20, early=True, mitigated=True)
+    assert assess([healthy], [60.0] * 20)[0]["verdict"] == "report"
+    # 3. no cadence asserts NOTHING — a guard that cannot see must not invent
+    assert assess([starved], [])[0]["verdict"] == "report"
+    # 4. the real file still parses (the reaper-that-reaps-nothing case)
+    blocks = parse_blocks(RUN_ALL.read_text())
+    assert len(blocks) >= 15, f"parsed only {len(blocks)} organs"
+    by = {b["organ"]: b for b in blocks}
+    assert by["fleet_immune"]["mitigated"] is True, "run-first shape regressed"
+    # 5. a flag the organ does not declare is not a first run (pe)
+    inert = parse_blocks(
+        '( python3 /freqtrade/scripts/golive_readiness.py --publish '
+        '--publish-if-nonexistent 1 || true\n  sleep 900\n  while true; do\n'
+        '    python3 /freqtrade/scripts/golive_readiness.py --publish || true\n'
+        '    sleep 21600\n  done ) &\n')[0]
+    assert inert["stagger_s"] == 900 and inert["inert_flags"], inert
+    print("audit_boot_stagger selftest OK (fires on a starved organ, stays "
+          "quiet on a healthy one, asserts nothing without cadence, parses the "
+          "live file, and discounts an invocation the organ would reject).")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--limit", type=int, default=60,
                     help="how many recent deploys to sample (default 60)")
+    ap.add_argument("--selftest", action="store_true",
+                    help="negative fixture — prove the detector still detects")
     a = ap.parse_args()
+    if a.selftest:
+        return _selftest()
 
     blocks = parse_blocks(RUN_ALL.read_text())
     times, source = deploy_times(a.limit)

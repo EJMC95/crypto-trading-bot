@@ -279,6 +279,17 @@ LIVE_SELFTESTS = [
 # `audit_changelog_letters` is the deliberate exception, and it earns it: at
 # push time your own letter IS part of the change under test.
 ENFORCED_AUDITS = [
+    # [2026-08-16] boot-stagger reachability. A push is a deploy and a deploy
+    # restarts every organ's boot timer, so an organ whose time-to-first-run
+    # exceeds the deploy cadence never starts — and NOTHING else reports that,
+    # because an organ that never ran is not sick: no exception, no stale-key
+    # alarm from the organ itself, every liveness contract green. Registered
+    # here rather than left to pytest alone for the (ox) reason one group
+    # below: the SCAN and the negative fixture answer different questions, and
+    # a guard whose scan runs nowhere is the (gk) shape. Both exit 0 today; the
+    # scan asserts nothing when no deploy cadence is reachable, so it is safe
+    # offline and in CI.
+    "scripts/audit_boot_stagger.py",      # organs can reach their first run
     "scripts/audit_image_imports.py",     # born-dark guard (CI-gating)
     "scripts/audit_sdk_pin.py",           # real-money wheel pin (CI-gating)
     "scripts/audit_venue_purity.py",      # LIGHTER-first, shipped-code scan (CI-gating)
