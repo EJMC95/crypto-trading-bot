@@ -860,6 +860,91 @@ def scan_receipts(shadow, slope_ratios, slope_noref, conv_raws,
     return key, payload
 
 
+def scan_census(fund, *, held, cooldown, t0, hot_since, enter_gate,
+                min_vol, max_vol, persist_h, h_per_year, max_open,
+                open_now, is_crypto=None, top_n=6):
+    """This book's OWN scan, at this book's OWN bar — computed even AT CAP.
+
+    [2026-08-16 (nl)] WHY THIS EXISTS. The entry prefilter lives inside
+    `if open_now < max_open`, so a book at its position limit **does not scan at
+    all** — and the row then publishes `held: {6 coins}` and nothing else.
+    `{6 held}` is byte-identical between *"holding the best six the venue
+    offers"* and *"the four highest-APR coins in this band are being turned away
+    every loop"*, which is I18's rule verbatim: a book that cannot open must
+    publish its own census at its own bar, because `{open: 0}` (or here,
+    `{held: cap}`) cannot tell quiet from structurally impossible. 🎸 Barnes was
+    given exactly this at `(lv)` after its `extreme` sleeve ran dead for 8 days
+    behind an indistinguishable payload; this is the same instrument for the
+    module that runs 💸 the LIVE Farmer and 🛢️ Garrett.
+
+    THE MEASUREMENT THAT PROMPTED IT (16-Aug): 🛢️ Garrett sat at **6 of 6** on a
+    band holding **26 qualifying coins**, and held **none of the four
+    highest-APR** ones (KAITO 205%, ROBO 124%, APT 46%, ETHFI 24.5%) — it held
+    four coins at ~10.5%. That may be entirely correct (those four are
+    $0.13–0.42M books and the spread/slip vetoes plausibly reject them, and
+    positions were opened when the ranking differed) but **nothing published
+    could say which**, and the book is the fleet's fastest path to a graded
+    result.
+
+    PURE AND READ-ONLY. Takes the funding map already in memory, does no
+    network, opens nothing, and is not consulted by any entry decision — the
+    entry path is byte-identical with or without this call. Gate ORDER mirrors
+    the real prefilter so the buckets mean what their names say; `capped` is the
+    number that answers the question the payload could not: candidates that
+    cleared every cheap gate while the book had no free slot.
+    """
+    out = {"scanned": 0, "held": 0, "cooldown": 0, "no_rate": 0, "cold": 0,
+           "off_band": 0, "noncrypto": 0, "waiting": 0, "eligible": 0,
+           "capped": 0, "free_slots": max(0, int(max_open) - int(open_now)),
+           "band_usd": [float(min_vol), (None if max_vol in (None, float("inf"))
+                                         else float(max_vol))],
+           "gate_apr": float(enter_gate), "top": []}
+    elig = []
+    for c, f in (fund or {}).items():
+        out["scanned"] += 1
+        if c in (held or ()):
+            out["held"] += 1
+            continue
+        if cooldown and c in cooldown and t0 < cooldown[c]:
+            out["cooldown"] += 1
+            continue
+        r = (f or {}).get("rate")
+        if r is None:
+            out["no_rate"] += 1
+            continue
+        apr = r * h_per_year
+        if abs(apr) < enter_gate:
+            out["cold"] += 1
+            continue
+        vol24 = (f or {}).get("vol") or 0.0
+        if not (min_vol <= vol24 < (max_vol if max_vol is not None
+                                    else float("inf"))):
+            out["off_band"] += 1
+            continue
+        # Class screen is REPORTED here, never applied — this module has no
+        # `_class_ok` (its three sibling funding books do; the asymmetry is
+        # declared and was measured REFUSED on 16-Aug at live n=12, t=-0.44).
+        # Counting it keeps the question answerable as the sample grows.
+        if is_crypto is not None:
+            try:
+                if not is_crypto(c):
+                    out["noncrypto"] += 1
+            except Exception:      # noqa: BLE001
+                pass
+        if (t0 - (hot_since or {}).get(c, t0)) / 3600.0 < persist_h:
+            out["waiting"] += 1
+            continue
+        out["eligible"] += 1
+        elig.append((abs(apr), c, apr, vol24))
+    elig.sort(reverse=True)
+    out["top"] = [{"sym": c, "apr_pct": round(100 * a, 1),
+                   "vol_m": round(v / 1e6, 2)} for _, c, a, v in elig[:top_n]]
+    # THE NUMBER THE PAYLOAD COULD NOT PRODUCE: qualified-but-unopenable.
+    if out["free_slots"] == 0:
+        out["capped"] = out["eligible"]
+    return out
+
+
 # ---- funding-SLOPE entry gate (2026-07-11) — only enter while the rate is
 # still BUILDING (|apr| >= |apr LOOKBACK_H ago|). Backtested on the 150d
 # portfolio sim (scripts/backtest_funding_leverage.py): at the live 2x config
@@ -2864,6 +2949,24 @@ def main():
                        "held": {c: ("S" if (meta.get(c) or {}).get("is_short") else "L")
                                 for c in meta},
                        "hottest_apr": {c: f"{r*H:+.0%}" for c, r in top},
+                       # [2026-08-16 (nl)] THIS BOOK'S OWN SCAN AT ITS OWN BAR,
+                       # published every loop INCLUDING at cap — where the
+                       # entry prefilter does not run at all, so `held` alone
+                       # cannot tell "holding the best six" from "turning away
+                       # the four hottest coins in the band" (I18). Read-only:
+                       # `scan_census` opens nothing and no entry decision
+                       # consults it. Wrapped so a census bug can never cost
+                       # the publish — an absent key degrades to today's
+                       # payload, it never raises into the trading loop.
+                       **({"census": scan_census(
+                           fund, held=set(meta) | set(pos), cooldown=cooldown,
+                           t0=t0, hot_since=hot_since, enter_gate=ENTER_GATE,
+                           min_vol=MIN_VOL, max_vol=MAX_VOL,
+                           persist_h=PERSIST_H, h_per_year=H,
+                           max_open=max_open, open_now=open_now,
+                           is_crypto=(getattr(fleet_bus, "is_crypto", None)
+                                      if fleet_bus is not None else None))}
+                          if isinstance(fund, dict) else {}),
                        # D1: total capital excluded from pnl_abs — self-describing
                        **({} if dry_run else {"capital_adjust": round(
                            capital_adjust["total"] + CAPITAL_ADJUST_USD, 2)})})
@@ -3185,6 +3288,67 @@ def _selftest_scan_receipts():
     assert len(p3["slope"]["ratios"]) == RECEIPTS_CAP, "slope list capped"
     assert len(p3["conviction"]["raws"]) == RECEIPTS_CAP, "conv list capped"
     print("lighter_funding_bot _selftest_scan_receipts OK")
+
+
+def _selftest_scan_census():
+    """[(nl)] The at-cap census. See `scan_census` for the incident."""
+    H_ = 3.0 * 365.0            # per-8h rate -> annual, the module's shape
+    t0 = 1_000_000.0
+    # 🛢️ Garrett's real band and a supply shaped like the one measured 16-Aug:
+    # two very hot thin coins, two mid, one cold, one out of band, one held.
+    fund = {
+        "KAITO": {"rate": 205 / 100.0 / H_, "vol": 0.42e6},
+        "ROBO":  {"rate": 124 / 100.0 / H_, "vol": 1.53e6},
+        "APT":   {"rate": 46 / 100.0 / H_,  "vol": 0.14e6},
+        "BNB":   {"rate": 10.5 / 100.0 / H_, "vol": 1.19e6},
+        "TINY":  {"rate": 1.0 / 100.0 / H_, "vol": 0.5e6},    # below the gate
+        "BTC":   {"rate": 50 / 100.0 / H_,  "vol": 207e6},    # above the band
+        "XMR":   {"rate": 10.5 / 100.0 / H_, "vol": 0.34e6},  # held
+    }
+    kw = dict(cooldown={}, t0=t0, hot_since={}, enter_gate=0.05,
+              min_vol=1e5, max_vol=2e6, persist_h=0.0, h_per_year=H_)
+
+    # AT CAP — the whole point: the entry prefilter would not run here at all.
+    c = scan_census(fund, held={"XMR"}, max_open=6, open_now=6, **kw)
+    assert c["scanned"] == 7
+    assert c["held"] == 1 and c["cold"] == 1 and c["off_band"] == 1
+    assert c["eligible"] == 4, "KAITO/ROBO/APT/BNB clear the band and the gate"
+    assert c["free_slots"] == 0
+    assert c["capped"] == 4, (
+        "THE NUMBER THE OLD PAYLOAD COULD NOT PRODUCE: four qualified "
+        "candidates the book had no slot for. Without this, `held: {6}` reads "
+        "identically whether the venue offered 4 better coins or none")
+    assert [t["sym"] for t in c["top"]][:3] == ["KAITO", "ROBO", "APT"], \
+        "ranked by |apr| so the operator sees WHAT is being turned away"
+
+    # WITH ROOM — `capped` must be 0, never "eligible regardless of slots"
+    c2 = scan_census(fund, held={"XMR"}, max_open=6, open_now=2, **kw)
+    assert c2["eligible"] == 4 and c2["free_slots"] == 4 and c2["capped"] == 0
+
+    # PERSISTENCE holds candidates back without them counting as eligible
+    kw_p = dict(kw, persist_h=6.0, hot_since={k: t0 for k in fund})
+    c3 = scan_census(fund, held=set(), max_open=6, open_now=0, **kw_p)
+    assert c3["waiting"] == 5 and c3["eligible"] == 0, \
+        "a coin still inside its persistence window is WAITING, not eligible"
+
+    # The class screen is REPORTED, never applied — this module has no
+    # `_class_ok`, and (16-Aug) the evidence REFUSED adding one (live
+    # non-crypto n=12, t=-0.44 vs shadow +$1.78). Counting keeps it answerable.
+    c4 = scan_census(fund, held=set(), max_open=6, open_now=0,
+                     is_crypto=lambda s: s != "APT", **kw)
+    assert c4["noncrypto"] == 1 and c4["eligible"] == 5, \
+        "counted and still eligible — reporting a class is not screening it"
+
+    # An unbounded band (💸 the Farmer: min_vol 1e7, no ceiling) must not raise
+    c5 = scan_census(fund, held=set(), max_open=6, open_now=0,
+                     **dict(kw, min_vol=1e7, max_vol=None))
+    assert c5["eligible"] == 1 and c5["band_usd"][1] is None   # BTC only
+
+    # Degenerate inputs never raise: this runs inside the publish path.
+    for bad in ({}, None):
+        z = scan_census(bad, held=set(), max_open=6, open_now=0, **kw)
+        assert z["scanned"] == 0 and z["eligible"] == 0 and z["top"] == []
+    print("lighter_funding_bot _selftest_scan_census OK")
 
 
 def _selftest_notional():
@@ -3765,6 +3929,7 @@ if __name__ == "__main__":
         _selftest_flatten_fields()
         _selftest_entry_admission()
         _selftest_scan_receipts()
+        _selftest_scan_census()
         sys.exit(0)
     try:
         _supervised()

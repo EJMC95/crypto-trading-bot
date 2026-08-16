@@ -1,3 +1,71 @@
+## 2026-08-16 (nl) — A FUNDING BOOK AT CAP PUBLISHED NOTHING ABOUT WHAT IT WAS REFUSING: 🛢️ Garrett was turning away 27 qualified candidates a loop, and `held: {6}` said exactly what a dead book says
+
+- **THE STRUCTURAL DEFECT.** `lighter_funding_bot.py`'s entry prefilter lives
+  inside `if open_now < max_open`, so a book **at its position limit does not
+  scan at all**. The row then publishes `held` and `hottest_apr` — and the
+  latter is the **VENUE's** hottest, not the band's, so it says nothing about
+  this book's own supply. `{6 held}` is byte-identical between *"holding the
+  best six the venue offers"* and *"the highest-APR coins in this band are
+  turned away every loop"*. That is **I18** verbatim, and 🎸 Barnes was given
+  this exact instrument at `(lv)` after its `extreme` sleeve ran dead for 8 days
+  behind an indistinguishable payload. This module runs 💸 the LIVE Farmer and
+  🛢️ Garrett and had never had one.
+- **WHAT IT SHOWED ON FIRST CONTACT**, at Garrett's own bar (band
+  `[$0.1M, $2M)`, gate 5% TRUE, 210 books scanned): **27 eligible, 0 free
+  slots, 27 capped** — while the book holds six coins, four of them at ~10.5%.
+  Ranked by |apr|, what it is refusing includes **H100 +1499.7%** ($1.24M, in
+  band), **KAITO −161.2%**, **ROBO −120.9%**, **CASHCAT +67.5%**, **ETHFI
+  +28.0%**. The book holds none of them.
+- **STATE THE CAVEATS, because this number will be quoted.** `eligible` counts
+  the CHEAP prefilter only — band, gate, cooldown, persistence — exactly the
+  gates the real prefilter applies before any network call. The spread and slip
+  vetoes run AFTER it and will reject some. The reconstruction above ran with
+  an empty `hot_since` (persistence effectively off), so the live figure will be
+  lower once real clocks apply, and the held positions were opened when the
+  ranking differed. **27 is "candidates clearing the cheap gates", not "27
+  trades foregone"** — and a four-figure APR on a $1.24M book is exactly the
+  shape that turns out to be a listing artifact. What changed is that the
+  question is now ASKABLE from the payload; it was not before.
+- **PURE, READ-ONLY, AND THAT IS THE LOAD-BEARING PART** — this module places
+  REAL orders. `scan_census` takes the funding map already in memory, does no
+  network, opens nothing, and is consulted by no entry decision; the trading
+  path is byte-identical with or without it. Pinned three ways by AST: it calls
+  none of `_open_position`/`market_open`/`place_order`/`_close`/`save_state`;
+  it never appears in an `if`/`while` TEST (a reporting instrument silently
+  becoming an actuator is the `(fz)`-era failure); and it is **not** called
+  inside any branch guarded by the cap — publishing it there would reproduce
+  the exact bug, saying nothing in the one state that needed explaining.
+- **THE CLASS SCREEN IS COUNTED, NEVER APPLIED.** This module has no
+  `_class_ok` while its three sibling funding books do (🌾 `(lk)`, 🎸 `(lv)`,
+  🎯 `(lk)`). That asymmetry was measured the same day and the change was
+  **REFUSED**: the live arm's non-crypto sample reads n=12, −$1.17, **t=−0.44**
+  while the shadow arm reads n=22, **+$1.78**, t=+0.29 — the arms disagree in
+  SIGN and neither is significant, so screening real money on it would be a veto
+  firing on noise (I15/I19). The census counts `noncrypto` so the question stays
+  answerable as n grows, and a test fails the build if it ever starts SKIPPING —
+  a refused change must not arrive by the back door.
+- **PUBLISH THE BAND, NOT THE FLOOR** (`(gl)`'s corollary, engraved in I20):
+  the census states both edges and the gate, so anyone can check it against the
+  venue rather than trusting it.
+- **WHAT THIS DOES NOT DO: it does not raise the cap.** `FUNDING_MAX_OPEN`
+  stays at its default 6. Garrett has **no measured claim** (n=6, −$0.60,
+  `claim = 0.0` in the allocation organ), and widening capacity on a book with
+  no claim is turnover bought on a hunch (I19). **A correction to this
+  session's own earlier reasoning:** the cap raise was first refused on the
+  ground that the marginal slot would be a ~10.5% coin — the census refutes
+  that (there is a real high-APR tail being refused). The refusal stands on the
+  *missing claim* alone, and the census is the instrument that will settle it at
+  n≥30 (~27-Aug at the measured 2.09 closes/day).
+- **Publish-only ⇒ main-only under `(mm)`**: it changes no trade the live book
+  would take, so it buys zero measured edge and must not spend a real-money
+  container restart. It rides the next deploy that actually qualifies.
+- **MUTATION-VERIFIED, five mutations, all red**: `capped` reported regardless
+  of free slots (which would make every healthy loop read capacity-starved —
+  the `(gl)` cry-wolf trap); persistence rows falling through to `eligible`;
+  `is_crypto` skipping instead of counting; `top` ranked by SIGNED apr (which
+  would bury the hottest shorts on a book that trades either side); and the
+  census call moved inside the cap-guarded branch.
+
 ## 2026-08-16 (nk) — THE GO-LIVE GRADER HAD NO CONCEPT OF A RETIRED SLEEVE: 🎸 Barnes was judged on 58 closes when 49 belonged to a component `(nf)` switched off the day before
 
 - **THE INCIDENT.** `(nf)` retired Barnes's `xsect` sleeve, leaving a ONE-sleeve
