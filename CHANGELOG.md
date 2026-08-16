@@ -1,3 +1,95 @@
+## 2026-08-16 (no) — THE VENUE PUBLISHES ITS MARGIN STATE ON EVERY POSITION AND THIS FLEET READ NONE OF IT: "what leverage is the real money at, and how far is the nearest liquidation?" had no answer from any published field
+
+- **THE ASK** (operator): *"wire the margin_mode and liquidation_price reads"*,
+  after the 16-Aug leverage audit found the gap. Letter: written as `(nm)`,
+  **renumbered to `(no)` before commit** — a concurrent session pushed `(nm)`
+  mid-write and a third holds `(nn)` in `lighter_perp_sniper.py`. Recorded
+  inline per the letter convention's rule 4; neither session's files were
+  touched.
+
+- **THE GAP.** `AccountPosition` has carried `margin_mode`,
+  `initial_margin_fraction`, `liquidation_price`, `position_value` and
+  `allocated_margin` for as long as the SDK has been pinned.
+  `LighterClient._positions_from` kept `size`, `entry` and `upnl` and dropped
+  every one of them on the floor. The leverage audit could establish both live
+  books' sizing **ceilings** from clip arithmetic (💸 0.76×, 🙏 1.00×) but could
+  not state what either book was **actually** margined at, nor how close any
+  open position sat to liquidation — because nothing published it. The absence
+  was never a venue limitation: `venues/lighter_client.py` calls a sibling
+  method on the same signer object for every real order.
+
+### The read, and why almost all of the work is in the parsing
+
+- `margin_state_from(acct, marks=None)` is **PURE** — payload in, dict out —
+  so it is testable against a publisher-shaped fixture without a venue, a
+  signer or a key. `LighterClient.margin_state()` is the thin fetch: **one
+  account call, zero market calls**, everything derived from the payload the
+  venue already returns. Pinned by a test that fails if the derivation ever
+  grows a per-symbol fetch and starts competing with orders for the tx budget.
+- It publishes `equity`, `gross`, **`leverage` (gross ÷ equity — the number
+  that had no answer)**, `mode`, per-position `liq`/`imf`/`margin`/`value`,
+  `nearest_liq`, and `liq_unknown`.
+- **`gross` is not `venues.safety.open_notional` and must never be substituted
+  for it.** `open_notional` sums each position at its OWN ENTRY clip because
+  that is what the operator's `*_MAX_NOTIONAL` cap is defined against; this is
+  the venue's mark-based notional. Two different questions, stated in the
+  docstring so the next reader does not "unify" them.
+- **THE DANGEROUS PART IS THAT THE VENUE SENDS STRINGS, AND SENDS `0` FOR A
+  LIQUIDATION PRICE IT IS NOT TRACKING.** The obvious `float(x or 0)` turns two
+  unknowns into confident, catastrophic risk readings — `liquidation_price 0`
+  reads as *"this short can never be liquidated"*, `initial_margin_fraction 0`
+  as *"this position uses infinite leverage"*. Every parse fails to **None**,
+  never 0 (I8 at its sharpest: the one place a guess IS a risk number). An
+  unrecognised `margin_mode` degrades to the **raw integer** rather than being
+  bucketed into one of the two names we know, and the two names are read
+  **from the SDK's own constants**, never retyped here.
+- **`liq_unknown` publishes even when EMPTY** — the (lv)/I18 census rule. A
+  key that vanishes when there is nothing to report makes "every position
+  measured and safe" byte-identical to "nothing was measured", which is the
+  failure this whole entry exists to close.
+- Both live books publish it (`extra.margin`), each using marks **it already
+  has** (the Farmer's funding map, Avo's own `meta[coin]['last_px']`) so the
+  read invents no price it does not hold. Both wrappers swallow everything:
+  telemetry that can raise into a real-money trading loop is a worse defect
+  than the blind spot it closes. `VenueClient.margin_state` defaults to
+  **None**, so every shadow arm — which holds no venue account — reads UNKNOWN
+  instead of publishing a fabricated 1.0×.
+
+### Verification, including two vacuous tests of my own
+
+- `tests/autonomy/test_margin_truth.py` (41). **12 mutations, all verified
+  RED** — including `_num` returning 0.0, a zero liq price read as a price,
+  an unknown mode guessed as `cross`, gross netting the legs, a dark equity
+  publishing `0.0`, the census key vanishing when empty, and either live book
+  dropping the publish.
+- **Two mutations SURVIVED the first round and both tests were genuinely
+  vacuous**, which is the entire argument for doing this:
+  * *gross nets the legs* survived because my fixture gave both legs a
+    POSITIVE `position_value` (the venue sends it unsigned), so the fixture
+    passed whether the code summed or netted. Now the short leg's value is
+    negative on purpose, pinning the defensive property.
+  * *distance invented from the liq price* survived because the test passed
+    **no marks at all**, so the branch containing the mutation never ran. Now
+    parametrised over UNUSABLE marks — and that test immediately found a real
+    bug in my own code: `_num(True)` returned `1.0`, because `bool` is an
+    `int` in Python, so a boolean mark manufactured a *"4099× from
+    liquidation"* reading out of nothing. `_num` rejects `bool` outright now.
+- Full suite green; `audit_image_imports` (the born-dark guard — this adds no
+  import to any image), `audit_deploy_coverage`, `audit_lever_bounds`,
+  `audit_doctrine_enforcement`, `audit_venue_purity` all pass.
+
+### Activation, stated plainly
+
+- **This is telemetry: it changes no trade, moves no lever and buys no
+  expectancy (I19).** Per (mm) it is therefore **main-only** — it does not
+  qualify for a real-money deploy on its own, and it rides the next deploy
+  that does. Until then the code is correct and the containers publish
+  nothing new, which is the honest state rather than a hidden one.
+- `trail-blazer-live` is the cheap one to take when a qualifying change comes
+  (7 commits, none touching its own logic); `tide-rider-lighter-live` is 28
+  behind and its restart should be deliberate. Neither was restarted for a
+  telemetry read.
+
 ## 2026-08-16 (nm) — THE BOOKS COHORT'S STOP WAS NEITHER LIVE NOR RUNNING: three price books evaluated their bracket against a price frozen at container boot, inside a gate that switched the stop off whenever the funding endpoint was quiet
 
 **Found from the daily brief**: 🧘 book-douglas's first two closes (15-Aug) were

@@ -409,6 +409,28 @@ def main(_ctx=None, once=False):
                        f"FAILED — positions' meta (entry, tag, clocks) did "
                        f"NOT persist", flush=True)
 
+        def _margin_block(live_pos):
+            """The venue's margining view for the row, or None.
+
+            Marks come from this book's OWN `meta[coin]['last_px']` — the
+            price it already recorded — so the read costs no extra market
+            call and cannot invent a mark it does not have. Never raises: a
+            telemetry read must not be able to stop a live trading loop, and
+            an exception here degrades to 'unknown' rather than to a number.
+            """
+            try:
+                fn = getattr(venue, "margin_state", None)
+                if not callable(fn):
+                    return None
+                marks = {}
+                for c in live_pos:
+                    px = (meta.get(c) or {}).get("last_px")
+                    if px:
+                        marks[c] = float(px)
+                return fn(marks=marks or None)
+            except Exception:  # noqa: BLE001
+                return None
+
         def _publish_row(eq, base_eq, cap_adj, live_pos, st,
                          status="online", extra_extra=None):
             pnl = (eq - base_eq - cap_adj) \
@@ -443,6 +465,15 @@ def main(_ctx=None, once=False):
                 },
                 "capital_adjust": round(cap_adj, 2),
                 "initial_equity": base_eq,
+                # [2026-08-16 (no)] THE VENUE'S OWN MARGIN TRUTH. Until now
+                # "what leverage is this book at, and how close is it to a
+                # liquidation?" could only be ESTIMATED from clip arithmetic
+                # (clip x slots / equity) — the venue publishes margin_mode,
+                # initial_margin_fraction and liquidation_price on every
+                # position and this fleet read none of them. `None` when the
+                # venue could not answer: an unreadable margin state must not
+                # publish as a confident 1.0x.
+                "margin": _margin_block(live_pos),
             }
             payload.update(extra_extra or {})
             try:

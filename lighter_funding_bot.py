@@ -860,6 +860,31 @@ def scan_receipts(shadow, slope_ratios, slope_noref, conv_raws,
     return key, payload
 
 
+def _margin_block(ctx, fund=None):
+    """[2026-08-16 (no)] The venue's margining view for the row, or None.
+
+    Marks are taken from the funding map this loop ALREADY fetched, so the
+    read adds one account call and no market calls. Returns None — not a
+    number — whenever the venue cannot answer (`hl_paper`, `lighter_shadow`,
+    a dark account read): "unknown leverage" and "1.0x leverage" must never
+    render identically on a real-money row.
+
+    Never raises. Telemetry that can stop a live trading loop is a defect
+    worse than the blind spot it was added to close."""
+    try:
+        fn = getattr(getattr(ctx, "venue", None), "margin_state", None)
+        if not callable(fn):
+            return None
+        marks = {}
+        for coin, row in (fund or {}).items():
+            mk = (row or {}).get("mark") if isinstance(row, dict) else None
+            if mk:
+                marks[coin] = float(mk)
+        return fn(marks=marks or None)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def scan_census(fund, *, held, cooldown, t0, hot_since, enter_gate,
                 min_vol, max_vol, persist_h, h_per_year, max_open,
                 open_now, is_crypto=None, top_n=6):
@@ -2939,6 +2964,19 @@ def main():
                        "cap_usd": ctx.rails.max_notional,
                        "max_open": max_open,
                        "enter_apr": ENTER_APR,
+                       # [2026-08-16 (no)] THE VENUE'S OWN MARGIN TRUTH —
+                       # margin_mode, initial_margin_fraction and
+                       # liquidation_price, which this fleet has never read
+                       # despite the SDK returning them on every position.
+                       # `cap_usd` above answers "how much may be deployed";
+                       # this answers "what leverage is the money ACTUALLY at
+                       # and how far is the nearest liquidation", which no
+                       # published field could answer before. None on a
+                       # venue that cannot say (every shadow arm) — never a
+                       # fabricated 1.0x. Wrapped, like the census below: a
+                       # telemetry read may never raise into a real-money
+                       # trading loop.
+                       "margin": _margin_block(ctx, fund),
                        # [2026-07-29 audit R5] a blind boot was LOG-ONLY: the
                        # row said "online" while entries were blocked and the
                        # ':live' save suppressed — only container logs said

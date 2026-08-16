@@ -50,6 +50,168 @@ from .symbol_map import to_lighter
 log = logging.getLogger("venues.lighter")
 
 
+# ---------------------------------------------------------------------------
+# MARGIN TRUTH [2026-08-16 (no)] — the venue's own margining fields.
+#
+# `AccountPosition` has carried `margin_mode`, `initial_margin_fraction`,
+# `liquidation_price`, `position_value` and `allocated_margin` since the SDK
+# was pinned, and this repo read NONE of them: `_positions_from` kept `size`,
+# `entry` and `upnl` and dropped the rest on the floor. The consequence is not
+# a missing feature, it is an unanswerable question — "what leverage is the
+# real money at, and how far is it from liquidation?" could not be answered
+# from the venue's own numbers, only estimated from clip arithmetic.
+#
+# EVERY parse below fails to None, never to 0. A zero liquidation price reads
+# as "cannot be liquidated"; a zero margin fraction reads as "infinite
+# leverage". Both are catastrophic misreadings of an ABSENT field, and this is
+# the I8 rule at its sharpest — unknown degrades to unknown, never to a guess.
+# ---------------------------------------------------------------------------
+def _num(v):
+    """float(v) or None. Absent, empty, unparseable or non-finite -> None.
+
+    The venue sends these as STRINGS (`StrictStr` on the model), so a bare
+    float() on a missing key raises and a bare `float(v or 0)` silently
+    fabricates a zero — which for `liquidation_price` is the difference
+    between "no liq price published" and "liquidates at zero". Non-finite is
+    screened here too, so a NaN can never reach a published payload (I5)."""
+    if v is None or isinstance(v, bool):
+        # bool is an int in Python, so `float(True)` is 1.0 — a flag would
+        # parse as a PRICE. Caught by the (no) mutation round: a boolean mark
+        # produced a "4099x from liquidation" reading out of nothing. No venue
+        # field here is ever legitimately a bool, so reject the type outright
+        # rather than let a type confusion render as a risk number.
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f == f and f not in (float("inf"), float("-inf")) else None
+
+
+_MARGIN_MODE_NAMES = None
+
+
+def _margin_mode_names():
+    """{code: name} READ FROM THE SDK, never retyped here.
+
+    A retyped constant is a constant that drifts, and this one decides how a
+    real-money position is margined. If the SDK cannot be imported we return
+    an EMPTY map, so `_margin_mode` degrades to the raw integer rather than
+    inventing a name for a code we cannot verify."""
+    global _MARGIN_MODE_NAMES
+    if _MARGIN_MODE_NAMES is None:
+        try:
+            import lighter
+            sc = lighter.SignerClient
+            _MARGIN_MODE_NAMES = {int(sc.CROSS_MARGIN_MODE): "cross",
+                                  int(sc.ISOLATED_MARGIN_MODE): "isolated"}
+        except Exception:  # noqa: BLE001
+            _MARGIN_MODE_NAMES = {}
+    return _MARGIN_MODE_NAMES
+
+
+def _margin_mode(v):
+    """'cross' | 'isolated' | the RAW int for an unrecognised code | None.
+
+    Returning the raw code for an unknown value is deliberate (I8): a new
+    venue margin mode must show up as `3` in the payload — visibly unhandled —
+    rather than be silently bucketed into one of the two names we know."""
+    if v is None:
+        return None
+    try:
+        iv = int(v)
+    except (TypeError, ValueError):
+        return None
+    return _margin_mode_names().get(iv, iv)
+
+
+def _liq_price(v):
+    """Liquidation price, or None when the venue publishes no usable one.
+
+    A non-positive liq price is NOT a price — Lighter sends 0 for a position
+    it is not currently margining toward liquidation. Reporting that as 0.0
+    would make a short look infinitely safe and a long look already-liquidated,
+    which is exactly the direction a risk read must never get wrong."""
+    f = _num(v)
+    return f if (f is not None and f > 0) else None
+
+
+def margin_state_from(acct, marks=None):
+    """The account's margining view, derived from ONE venue account payload.
+
+    PURE — takes the payload, returns a dict. Kept a module-level function so
+    it can be tested against a real publisher shape without a venue, a signer
+    or a key (the fleet's "test consumers against publisher-built payloads"
+    rule; every live-account read is otherwise untestable off Railway).
+
+    Shape:
+      equity / collateral  — the venue's own account numbers
+      gross                — sum of |position_value| (the VENUE's notional,
+                             NOT venues.safety.open_notional, which sums each
+                             position at its OWN ENTRY clip because that is
+                             what the operator's cap is defined against. The
+                             two answer different questions and must never be
+                             substituted for one another.)
+      leverage             — gross / equity: the answer to "what leverage is
+                             the real money actually at". None when either
+                             input is unknown — never 0.0.
+      mode                 — 'cross' | 'isolated' | 'mixed' | raw code | None
+      nearest_liq          — the closest position to liquidation, when marks
+                             were supplied and the venue published a liq price
+      liq_unknown          — coins holding a position for which the venue
+                             published NO liquidation price. Published even
+                             when empty, because an omitted key is
+                             byte-identical between "everything is safe" and
+                             "nothing was measured" — the (lv) census rule.
+    """
+    positions = LighterClient._positions_from(acct)
+    equity = _num(acct.get("total_asset_value"))
+    if equity is None:
+        equity = _num(acct.get("collateral"))
+    gross = 0.0
+    have_value = False
+    modes, out, unknown = set(), {}, []
+    for coin, rec in positions.items():
+        val = rec.get("value")
+        if val is not None:
+            gross += abs(val)
+            have_value = True
+        if rec.get("mode") is not None:
+            modes.add(rec["mode"])
+        row = {k: rec[k] for k in ("value", "liq", "imf", "margin", "mode")
+               if k in rec}
+        liq, mark = rec.get("liq"), (marks or {}).get(coin)
+        if liq is None:
+            unknown.append(coin)
+        elif mark:
+            m = _num(mark)
+            if m and m > 0:
+                row["mark"] = m
+                row["dist_pct"] = abs(m - liq) / m
+        out[coin] = row
+
+    nearest = None
+    priced = [(r["dist_pct"], c) for c, r in out.items() if "dist_pct" in r]
+    if priced:
+        d, c = min(priced)
+        nearest = {"coin": c, "dist_pct": d, "liq": out[c].get("liq"),
+                   "mark": out[c].get("mark")}
+
+    return {
+        "equity": equity,
+        "collateral": _num(acct.get("collateral")),
+        "gross": round(gross, 6) if have_value else None,
+        "leverage": (round(gross / equity, 4)
+                     if (have_value and equity and equity > 0) else None),
+        "mode": (modes.pop() if len(modes) == 1
+                 else ("mixed" if len(modes) > 1 else None)),
+        "n": len(out),
+        "positions": out,
+        "nearest_liq": nearest,
+        "liq_unknown": sorted(unknown),
+    }
+
+
 def _settle_ms_of(resp):
     """The venue's OWN estimate of how long this tx needs, in ms, or None.
 
@@ -581,6 +743,24 @@ class LighterClient(VenueClient):
                         rec["upnl"] = float(p["unrealized_pnl"])
                 except (TypeError, ValueError):
                     pass
+                # [2026-08-16 (no)] the venue's MARGIN truth. Additive keys on
+                # a dict every strategy already iterates — same contract the
+                # `upnl` key above has carried since it was added. A key is
+                # OMITTED when the venue did not publish a usable value, so a
+                # consumer's `.get()` returns None and cannot mistake a
+                # fabricated zero for a measurement.
+                for key, src, parse in (
+                        ("liq", "liquidation_price", _liq_price),
+                        ("imf", "initial_margin_fraction", _num),
+                        ("value", "position_value", _num),
+                        ("margin", "allocated_margin", _num),
+                        ("funding_paid", "total_funding_paid_out", _num)):
+                    val = parse(p.get(src))
+                    if val is not None:
+                        rec[key] = val
+                mode = _margin_mode(p.get("margin_mode"))
+                if mode is not None:
+                    rec["mode"] = mode
                 out[fleet] = rec
         return out
 
@@ -616,6 +796,26 @@ class LighterClient(VenueClient):
         off — callers fold these into their persisted capital ledger so a
         deposit never prints as trading P&L."""
         return self._guard.pop_capital_moves() if self._guard is not None else []
+
+    def margin_state(self, marks=None):
+        """The VENUE's own margining view of this account, or None if unread.
+
+        [2026-08-16 (no)] ONE info call, derived entirely from the account
+        payload the venue already returns — no per-symbol fetch, so this costs
+        the same as `positions()`.
+
+        `marks` is an optional {coin: price} the caller already has; supplied,
+        it adds each position's distance to its liquidation price and the
+        nearest one across the book. Omitted, the liq prices are still
+        reported raw — the read never fabricates a mark to compute a distance.
+        """
+        try:
+            return margin_state_from(self._account_payload(), marks)
+        except VenueError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            log.warning("margin_state unavailable: %r", e)
+            return None
 
     def positions(self):
         return self._positions_from(self._account_payload())

@@ -61,8 +61,24 @@ class VenueClient:
         raise NotImplementedError
 
     def positions(self) -> dict[str, dict]:
-        """{coin: {'size': signed_size, 'entry': entry_px}}"""
+        """{coin: {'size': signed_size, 'entry': entry_px}}
+
+        Venues MAY add keys (Lighter carries 'upnl' and, since (no), the
+        margin fields 'liq'/'imf'/'value'/'margin'/'mode'). Consumers read
+        what they need with .get() and must treat a missing key as UNKNOWN —
+        an absent margin field never means zero."""
         raise NotImplementedError
+
+    def margin_state(self, marks=None) -> dict | None:
+        """[2026-08-16 (no)] The venue's own margining view, or None.
+
+        OPTIONAL by design, and it returns None rather than raising, because
+        most venues in this fleet cannot answer it: a shadow/paper arm holds
+        no venue account, so "what leverage am I at" has no venue-side answer
+        there and must read as UNKNOWN rather than as a fabricated 1.0. A
+        caller that gets None publishes nothing instead of publishing a
+        guess."""
+        return None
 
     # ---- order entry (live/testnet modes; shadow uses ShadowBroker) --------
     def market_open(self, coin: str, is_long: bool, size: float):
