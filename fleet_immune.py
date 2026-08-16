@@ -583,9 +583,19 @@ BRAIN_MEMORY_SKEW_S = float(os.environ.get("IMMUNE_BRAIN_SKEW_S", "21600"))
 #: that organ the count can now be READ rather than inferred: deaths = the
 #: delta between two sightings, exact at any sampling phase, no history
 #: reconstruction and no floor heuristic.
+#: [2026-08-16 (oi)] FOURTH ELEMENT: the dotted path to the running BUILD
+#: STAMP. An increment with a NEW build is a DEPLOY; an increment on the SAME
+#: build is a real death. Without it this sensor cannot tell them apart, which
+#: is not hypothetical — see the (oi) entry: all 10 "restarts in 48h" that
+#: paged the operator correlated with a deploy run inside 15 minutes, ZERO
+#: unexplained. The comment above already predicted exactly this ("one restart
+#: is an ordinary DEPLOY and must stay quiet, or this pages on every push")
+#: and named the neighbour-cadence test as the unimplemented discriminator;
+#: the build stamp is a better one — it is per-publisher, needs no second
+#: organ's series, and answers the question directly.
 RESTART_COUNTERS = {
     "parliament": ("data.cycles", "🏛️ the Parliament's supervisor loop",
-                   "restarts"),
+                   "restarts", "build"),
 }
 #: Restarts inside RESTART_WINDOW_S before the churn is called sickness. One
 #: restart is an ordinary DEPLOY and must stay quiet, or this pages on every
@@ -730,6 +740,7 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
     for key, spec in sorted(RESTART_COUNTERS.items()):
         path, label = spec[0], spec[1]
         auth_path = spec[2] if len(spec) > 2 else None
+        build_path = spec[3] if len(spec) > 3 else None
         st = states.get(key) or {}
         if not st or not _fresh(st, now):
             continue
@@ -773,12 +784,30 @@ def restart_churn(states, seen, now, min_n=None, window_s=None):
             prev_auth = mem.get("auth_last")
             deaths = [float(t) for t in (mem.get("auth_deaths") or [])
                       if isinstance(t, (int, float))]
+            cur_build = _dotted(st, build_path) if build_path else None
+            prev_build = mem.get("auth_build")
+            deployed = (cur_build is not None and prev_build is not None
+                        and cur_build != prev_build)
             if isinstance(prev_auth, (int, float)) and auth > prev_auth:
-                deaths.extend([float(now)] * int(auth - prev_auth))
+                if deployed:
+                    # [(oi)] A NEW IMAGE EXPLAINS THE RESTART. Absorb the
+                    # increment without counting it: a deploy restarts the
+                    # container by design and paging for it is the (gl)
+                    # cry-wolf shape aimed at the operator's phone. Only the
+                    # increments this cannot explain are deaths.
+                    pass
+                else:
+                    deaths.extend([float(now)] * int(auth - prev_auth))
+            if cur_build is not None:
+                seen[key]["auth_build"] = cur_build
             deaths = [t for t in deaths if now - t <= window_s]
             seen[key]["auth_last"] = float(auth)
             seen[key]["auth_deaths"] = deaths
-            seen[key]["basis"] = f"publisher's own counter (now {auth:g})"
+            seen[key]["basis"] = (
+                f"publisher's own counter (now {auth:g}), "
+                f"deploy-discriminated by build stamp"
+                if build_path else
+                f"publisher's own counter (now {auth:g})")
             if len(deaths) >= min_n:
                 hrs = window_s / 3600.0
                 out.append({

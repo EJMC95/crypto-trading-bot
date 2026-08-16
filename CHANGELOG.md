@@ -1,3 +1,49 @@
+## 2026-08-16 (oi) — THE PARLIAMENT'S "CRASH-LOOP" WAS OUR OWN DEPLOYS: all 10 restarts correlate with a deploy run, ZERO unexplained — and the detector now tells the two apart
+
+- **THE ALARM, and it reached the operator's phone.** `fleet_immune` reported
+  🏛️ the Parliament's supervisor *"5 RESTART(s) in 24h plus 1 publish at 0
+  with no cycle completed"* and pushed; the 15-Aug sweep independently counted
+  **10 restarts in 48h** off the bus series (instance lifetimes 8 min to 14h)
+  and recorded that `data.errors` read 0 in all 567 samples. I reported it as
+  live instability, and after `(nz)` shipped the durable counter I reported
+  `restarts 1 → 2` as *"the supervisor died again"*.
+- **IT DID NOT.** Container logs put `Starting Container` at **03:29:49Z**;
+  the deploy workflow ran for my own `(od)` commit at **03:28:50Z** — 59
+  seconds earlier. Correlating every observed restart against the deploy
+  history: **10 of 10 have a deploy run within 15 minutes, zero
+  unexplained.** Two sessions pushed ~12 times in 40 minutes today; that is
+  deploy churn, not a crash-loop, and the "8-minute instance lifetime" is
+  simply two pushes 8 minutes apart.
+- **THE DETECTOR PREDICTED ITS OWN FALSE POSITIVE AND NOBODY CLOSED IT.**
+  `RESTART_CHURN_N`'s comment says it plainly: *"One restart is an ordinary
+  DEPLOY and must stay quiet, or this pages on every push"*, and `(mi)`
+  already measured this exact shape (7 resets inside a deploy storm). It names
+  the neighbour-cadence test as the discriminator and declares it
+  unimplemented — so the only thing between a deploy and a page was a bare
+  count of four.
+- **THE FIX: a better discriminator than the one it asked for.** Howard now
+  publishes the running **build stamp** beside the restart count, and
+  `RESTART_COUNTERS` entries take a fourth element naming it. An increment
+  with a NEW build is a DEPLOY and is absorbed silently; an increment on the
+  SAME build is a real death and still pages. Per-publisher, no second organ's
+  series required, and it answers the question directly rather than by
+  inference. **Fail-safe: a publisher that cannot say which image it runs
+  keeps counting everything — UNKNOWN is never read as "it was a deploy".**
+- **What this costs and what it buys.** It buys the operator's phone back: on
+  today's tape every page this sensor produced was noise. It costs the ability
+  to notice a crash that happens to coincide with a deploy inside the same
+  sampling gap — declared, and the honest trade, because a sensor that pages
+  on every push is one the operator learns to ignore ((gl)).
+- Pinned in `tests/autonomy/test_restart_counter_authority.py` (five
+  consecutive new-build increments never page; five same-build increments
+  page as before; no-build-stamp publisher keeps counting everything).
+  **Mutation-verified: disabling the deploy branch reddens it.**
+- **MY OWN REPORTING IS CORRECTED IN PLACE (I12):** `(nz)` says the root
+  cause "needs container logs and stays open" — the logs were pulled and the
+  answer is deploys. The counter is still worth having: it is what made the
+  correlation checkable at all, and it is now the input to a discriminator
+  rather than a raw alarm.
+
 ## 2026-08-16 (oh) — THE PRE-LOOP SNAPSHOT SWEEP, SECOND PASS: capacity and notional are clean everywhere, and the ONE gap is the fleet long budget on 💸 the LIVE book — a boolean where two sibling books count
 
 - **[LETTER MOVED (od) -> (of) -> (oh), 16-Aug.** Both were taken by concurrent

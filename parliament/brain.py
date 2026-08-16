@@ -128,6 +128,21 @@ class Howard:
             self._restarts = getattr(self, "_restarts", None)
             return self._restarts or 0
 
+    def build_stamp(self):
+        """[(oi)] The image this process is running, so a restart can be told
+        from a DEPLOY. Content hash via the fleet's one owner
+        (`bot_pnl_store.build_compute`, cached there); None when the store is
+        dark — UNKNOWN, never a fake constant that would make every deploy
+        look like a crash."""
+        try:
+            if store is None:
+                return None
+            if getattr(self, "_build", None) is None:
+                self._build = store.build_compute("parliament_main.py")[0]
+            return self._build
+        except Exception:  # noqa: BLE001
+            return None
+
     def restart_count(self):
         """What the payload publishes. None when the DB could not answer —
         UNKNOWN must not read as zero (the absence-is-not-evidence rule)."""
@@ -288,6 +303,9 @@ class Howard:
             # block because a dark data layer is exactly when you need it.
             # None = the DB could not answer; UNKNOWN must not read as zero.
             "restarts": self.restart_count(),
+            # [(oi)] the running image, beside the count: an increment WITH a
+            # new build is a deploy, an increment on the SAME build is a crash
+            "build": self.build_stamp(),
             # [(nz)] the published roster is the LIVING one — this key is a
             # claim about what the Parliament is running now, and it read six
             # books while four were retired. (The ingest filter at

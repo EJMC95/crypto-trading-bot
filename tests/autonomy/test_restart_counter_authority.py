@@ -25,12 +25,14 @@ import fleet_immune as fi  # noqa: E402
 NOW = time.time()
 
 
-def _state(cycles, restarts=None, age_s=0):
+def _state(cycles, restarts=None, age_s=0, build="img-A"):
     p = {"updated": dt.datetime.fromtimestamp(
              NOW - age_s, dt.timezone.utc).isoformat(),
          "ttl_sec": 900, "data": {"cycles": cycles}}
     if restarts is not None:
         p["restarts"] = restarts
+    if build is not None:
+        p["build"] = build
     return {"parliament": p}
 
 
@@ -78,3 +80,35 @@ def test_a_stale_payload_still_claims_nothing():
     """A stale organ is the watchdog's jurisdiction — unchanged by (od)."""
     seen = {}
     assert fi.restart_churn(_state(10, 1, age_s=99999), seen, NOW) == []
+
+
+# ---------------------------------------------------------------------------
+# [(oi)] A DEPLOY IS NOT A DEATH — the discriminator the detector's own
+# comment said was missing. MEASURED: all 10 "restarts in 48h" that paged the
+# operator correlated with a deploy run inside 15 minutes, ZERO unexplained.
+# Two sessions pushing ~12 times in 40 minutes is deploy churn, not a
+# crash-loop, and paging for it is the (gl) cry-wolf shape.
+# ---------------------------------------------------------------------------
+def test_increments_on_a_NEW_build_are_deploys_and_never_page():
+    seen = {}
+    fi.restart_churn(_state(100, 1, build="img-A"), seen, NOW)
+    for i, n in enumerate((2, 3, 4, 5, 6), start=1):
+        out = fi.restart_churn(
+            _state(3, n, build=f"img-{n}"), seen, NOW + 60 * i)
+        assert out == [], f"a deploy paged the operator at restart {n}: {out}"
+
+
+def test_increments_on_the_SAME_build_are_real_deaths():
+    seen = {}
+    fi.restart_churn(_state(100, 1, build="img-A"), seen, NOW)
+    out = fi.restart_churn(_state(3, 6, build="img-A"), seen, NOW + 60)
+    assert out and "5 RESTART(s)" in out[0]["detail"], out
+
+
+def test_a_publisher_with_no_build_stamp_keeps_counting_everything():
+    """Fail-safe: an organ that cannot say which image it runs must not have
+    its deaths silently absorbed — UNKNOWN is not 'it was a deploy'."""
+    seen = {}
+    fi.restart_churn(_state(100, 1, build=None), seen, NOW)
+    out = fi.restart_churn(_state(3, 6, build=None), seen, NOW + 60)
+    assert out and "5 RESTART(s)" in out[0]["detail"], out
