@@ -1,3 +1,60 @@
+## 2026-08-16 (op) — THE DENOMINATOR IS SETTLED BY A NULL TEST: the venue's liq stayed still exactly when collateral did, and total_asset is refuted by the absence
+
+- **THE UPGRADE.** `(og)` shipped the forward-validated margin model with ONE
+  half of the caller convention marked PROVISIONAL: `collateral` vs
+  `total_asset_value` as the leverage denominator. They sit only **0.165%
+  apart in LEVEL**, so a single snapshot could not separate them and the
+  honest label was "collateral fits better", not "proven". **It is now
+  established** — by a differential test rather than a better fit.
+- **WHY LEVEL COULD NOT SETTLE IT AND MOTION COULD:** the two denominators
+  differ by 0.165% in level but their MOTION differs by ~40x, and a
+  differential test survives any constant offset. Three snapshots of the same
+  XAU short, `entry` and `size` identical throughout:
+
+      snap  collateral    total_asset   venue liq       coll err   total err
+      T1    197.843218    197.516986    32238.916157    0.00000%   -0.14322%
+      T2    197.843339    197.521799    32238.933282    0.00000%   -0.14116%
+      T3    197.843339    197.522213    32238.933282    0.00000%   -0.14098%
+
+      T1->T2  observed +0.000053%   coll +0.000053%   total +0.002116%
+      T2->T3  observed +0.000000%   coll +0.000000%   total +0.000182%
+
+  Reproduced independently here before banking; every figure matches.
+- **T2->T3 IS A NULL TEST, AND IT IS THE STRONGEST FORM THIS COULD HAVE
+  TAKEN.** Between those publishes the mark ticked, so `value` moved and
+  `total_asset` moved with it via unrealised P&L — but **`collateral` did not
+  move, and the venue's liquidation price did not move either, byte-identical
+  to ten significant figures.** A total_asset-denominated formula REQUIRED
+  motion of +0.000182%. There was none. **Refuted by the absence, not
+  disfavoured by a fit** — and corroborated in both directions: the liq moved
+  exactly when collateral moved, and held exactly when it held.
+- **TWO PRACTICAL COROLLARIES FOR `cross_leverage()` CONSUMERS:**
+  1. **Feed it the venue's PUBLISHED `size`, not `value/mark`.** With the
+     published 4-dp field the reproduction is EXACT (+0.0000%); deriving it
+     leaves **-0.0013%** — pure derivation error, not model error.
+  2. **A trap visible in a single row:** at T3 `value` moved while `entry`,
+     `size` and `liq` all held. **`value` breathes with the mark; the
+     liquidation price does not**, because it is struck off ENTRY-based
+     notional. Anyone reaching for `value` as the notional will see it drift
+     under a stationary liq and, reasonably, blame the model.
+- **PINNED, and the null test is now the sharpest guard in the module**: the
+  selftest asserts that a static collateral predicts NO motion, that the
+  total_asset branch DOES predict motion here, and that total_asset visibly
+  misses the venue's liq. Three mutations verified RED — switching the
+  denominator to total_asset, flipping the mmf sign, and swapping the
+  entry-based notional for a mark-based one.
+- **STILL GENUINELY OPEN, unchanged: one POSITION.** `gross/equity` and "this
+  position's value/equity" remain numerically identical while the Farmer holds
+  a single open position, so that pair is untested. It needs a naturally
+  occurring second concurrent position and will not be manufactured for a
+  telemetry question.
+- **THE ARC WORTH REMEMBERING**, because it is a full cycle in one day: a
+  circular calibration that could not fail `(nu)` -> retracted -> a
+  non-circular but partial recovery -> a forward test that DISAGREED and
+  corrected the caller convention `(og)` -> a differential test that settled
+  the remaining term by predicting an absence. **Each step was worth more than
+  the confident claim it replaced.**
+
 ## 2026-08-16 (oo) — HULL PASSES THE GRIMES STABILITY TEST, AND THE TEST ITSELF IS THE FINDING: a spread only matters if the BAR FALLS INSIDE IT
 
 - **THE ASK.** Operator: *"re-measure hull with the fixed gate approach"*,
