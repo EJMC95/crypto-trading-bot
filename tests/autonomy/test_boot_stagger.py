@@ -419,6 +419,35 @@ def test_no_deploy_history_asserts_nothing():
     assert r["verdict"] == "report" and r["starve_rate"] is None
 
 
+def test_this_environment_can_actually_reach_a_deploy_cadence():
+    """[(pi)] THE PROOF, not the argument. Everything else about this audit is
+    conditional on there being a cadence to assess; with none it prints
+    "nothing asserted" and exits 0, so a green `test_enforced_audit_guard`
+    cannot tell "passed" from "never ran".
+
+    That is what CI silently did on every run: `gh run list` needs
+    `actions: read` (absent) and `git log origin/main` needs history
+    (`actions/checkout@v4` defaults to depth 1). `tests.yml` now sets
+    `fetch-depth: 0`, and THIS is what fails if anyone removes it — the
+    assertion runs in the same job, so it measures the real checkout rather
+    than reasoning about it.
+
+    Skipped only when there is no git checkout at all (a source tarball, a
+    container), which is a genuinely different situation from a broken one.
+    """
+    if not (mod.ROOT / ".git").exists():
+        pytest.skip("not a git checkout — no cadence source is expected here")
+    times, source = mod.deploy_times(60)
+    assert len(times) >= 3, (
+        f"no deploy cadence reachable (source={source!r}). In CI this means the "
+        "checkout is shallow — restore `fetch-depth: 0` on the suite job in "
+        ".github/workflows/tests.yml. Without it audit_boot_stagger asserts "
+        "NOTHING while still exiting 0, so its ENFORCED_AUDITS registration "
+        "buys a green tick and no enforcement.")
+    assert source != "unavailable", source
+    assert mod.gaps_of(times), "cadence with no gaps is not a cadence"
+
+
 def test_the_git_tier_falls_back_to_HEAD_when_origin_main_is_not_a_ref(monkeypatch):
     """[(pi)] CI checks out a DETACHED HEAD, and `gh run list` needs
     `actions: read` which CI's GITHUB_TOKEN lacks — so the git proxy is the ONLY

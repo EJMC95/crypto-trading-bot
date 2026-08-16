@@ -44,6 +44,19 @@ real verdict, exit 0 — where it previously asserted nothing. 3 mutations red.
 preferred source and a fallback, ask which one CI can actually reach. If the
 answer is "neither", registering it in `ENFORCED_AUDITS` buys a green tick and
 no enforcement.
+
+**ADDENDUM — the belief is now an assertion.** The first cut of this shipped
+`fetch-depth: 0` and *reasoned* that it fixed CI. It could not be checked from
+the run log, because `test_enforced_audit_guard` captures the audit's stdout and
+prints it only on failure — so a green run cannot distinguish "assessed a real
+cadence" from "asserted nothing", which is the entire defect this entry is
+about. `test_this_environment_can_actually_reach_a_deploy_cadence` now calls
+`deploy_times()` for real **in the same job**, so it measures the actual
+checkout instead of arguing about it, and names the fix in its own failure
+message. Verified against a real shallow clone driven with a CI-scoped token —
+the exact pre-fix condition — which yields `n=0, source='unavailable'` and reds
+the assertion; the full checkout passes. Skipped only where there is no `.git`
+at all, which is a different situation from a broken one.
 ## 2026-08-17 (ph) — THE CLASS SCREEN IS PART OF THE GATE: `audit_book_overlap` called three books rivals for a supply their own screens refuse, and it had no test of any kind
 
 `(pf)` gave 🌾 carry and 🎸 Barnes a published `caps.crypto_only`. This is the
