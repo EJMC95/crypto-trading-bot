@@ -70,6 +70,7 @@ READ-ONLY. Parses a shell script and reads workflow history; changes nothing.
 from __future__ import annotations
 
 import argparse
+import ast
 import datetime as dt
 import json
 import re
@@ -259,6 +260,88 @@ def gaps_of(times: list[dt.datetime]) -> list[float]:
     return [(b - a).total_seconds() for a, b in zip(times, times[1:])]
 
 
+def _const_ints(tree: ast.Module) -> dict[str, float]:
+    """Module-level names bound to an integer, for the forms organs actually use.
+
+    MODULE LEVEL ONLY (`tree.body`, never `ast.walk`). A whole-tree walk picks
+    up `--selftest` FIXTURES — that mistake produced a table claiming the proxy
+    was wrong by 18x when the true worst case is 1.50x.
+    """
+    out: dict[str, float] = {}
+
+    def val(n):
+        if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
+            return float(n.value)
+        if isinstance(n, ast.Name):
+            return out.get(n.id)
+        # int(os.environ.get("NAME", "2400")) — the declared default is the
+        # value every container runs unless someone overrides it.
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                and n.func.id in ("int", "float") and n.args):
+            inner = n.args[0]
+            if (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Attribute)
+                    and inner.func.attr == "get" and len(inner.args) >= 2
+                    and isinstance(inner.args[1], ast.Constant)):
+                try:
+                    return float(inner.args[1].value)
+                except (TypeError, ValueError):
+                    return None
+            return val(inner)
+        if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Mult):
+            a, b = val(n.left), val(n.right)
+            return a * b if a is not None and b is not None else None
+        return None
+
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            v = val(node.value)
+            if v is None:
+                continue
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    out[t.id] = v
+    return out
+
+
+def static_ttls(organs: list[str]) -> dict[str, tuple[float, str]]:
+    """{organ: (seconds, source)} read from each organ's SOURCE — no database.
+
+    WHY THIS TIER EXISTS (2026-08-16, peer-found). The live read below is
+    unavailable in the one place this guard gates a build: neither `tests.yml`
+    nor `changelog-check.yml` sets `DATABASE_URL`, so `tolerances()` resolves
+    NOTHING in CI and all 20 organs fall to the 3x proxy. Every improvement
+    built on the DB read — including the min-across-keys fix — is therefore
+    inert at the gate.
+
+    Every organ declares its payload TTL as a module-level `*TTL_SEC` constant,
+    so the real contract is readable with no database at all. The `*TTL_SEC`
+    suffix is the discriminator and it is exact: it captures all 17 payload
+    constants and excludes every LEVER ttl (`LEVER_TTL`, `LIVE_LEVER_TTL_S`,
+    `RELEASE_REQ_TTL`, `QUALITY_VETO_TTL_S`), which are unrelated quantities
+    that would corrupt the number.
+
+    THE MINIMUM across an organ's TTL constants, for the same reason
+    `tolerances()` takes it across keys: an organ is silent on all of them at
+    once, so the strictest consumer contract binds.
+    """
+    out: dict[str, tuple[float, str]] = {}
+    for o in organs:
+        path = ROOT / f"{o}.py"
+        if not path.exists():
+            path = ROOT / "scripts" / f"{o}.py"
+        if not path.exists():
+            continue
+        try:
+            consts = _const_ints(ast.parse(path.read_text()))
+        except Exception:                        # noqa: BLE001 — unreadable ⇒ no claim
+            continue
+        found = [v for k, v in consts.items() if k.endswith("TTL_SEC") and v > 0]
+        if found:
+            out[o] = (min(found), "ttl_sec from source" if len(found) == 1
+                      else f"min of {len(found)} ttl_sec from source")
+    return out
+
+
 def tolerances(organs: list[str]) -> dict[str, tuple[float, str]]:
     """{organ: (seconds, source)} — how long a consumer tolerates silence.
 
@@ -430,7 +513,14 @@ def main() -> int:
     blocks = parse_blocks(RUN_ALL.read_text())
     times, source = deploy_times(a.limit)
     gaps = gaps_of(times)
-    rows = assess(blocks, gaps, tolerances([b['organ'] for b in blocks]))
+    # THREE TIERS, most authoritative first: the LIVE payload (what consumers
+    # are actually gating on right now) > the organ's own SOURCE constant (the
+    # same contract, minus any env override, and available with no database) >
+    # the 3x-interval proxy. The middle tier is what makes CI read real
+    # contracts instead of proxying all 20 organs.
+    _organs = [b["organ"] for b in blocks]
+    _tol = {**static_ttls(_organs), **tolerances(_organs)}
+    rows = assess(blocks, gaps, _tol)
 
     # DECLARE WHICH BASIS PRODUCED THESE VERDICTS. This guard has TWO REGIMES
     # and they are easy to confuse: with a DB it reads each organ's published
@@ -440,15 +530,19 @@ def main() -> int:
     # different regime, stated it unconditionally, and spent four exchanges
     # disagreeing about numbers that were both right. Same "declare your
     # source" property already built into `deploy_times`, one level down.
-    n_pub = sum(1 for r in rows if r["tolerance_src"]
-                and "ttl_sec" in r["tolerance_src"])
-    n_prox = sum(1 for r in rows if r["tolerance_src"]
-                 and "proxy" in r["tolerance_src"])
+    def _n(pred):
+        return sum(1 for r in rows if r["tolerance_src"] and pred(r["tolerance_src"]))
+
+    # ORDER MATTERS: "ttl_sec from source" also contains "ttl_sec", so the live
+    # tier must be matched on "published" and the source tier on "from source".
+    n_live = _n(lambda s: "published" in s)
+    n_src = _n(lambda s: "from source" in s)
+    n_prox = _n(lambda s: "proxy" in s)
     print(f"deploy cadence source: {source}")
-    print(f"tolerance basis: published ttl_sec {n_pub} organ(s), "
-          f"3x-interval proxy {n_prox}, unknown {len(rows) - n_pub - n_prox}"
-          + ("   [no DATABASE_URL — proxy governs; this is the CI regime]"
-             if not n_pub else ""))
+    print(f"tolerance basis: published ttl_sec {n_live} organ(s), "
+          f"ttl_sec from source {n_src}, 3x-interval proxy {n_prox}, "
+          f"unknown {len(rows) - n_live - n_src - n_prox}"
+          + ("   [no DATABASE_URL — this is the CI regime]" if not n_live else ""))
     if gaps:
         print(f"  {len(times)} deploys, {times[0]:%d-%b %H:%M} -> "
               f"{times[-1]:%d-%b %H:%M} UTC | median gap "

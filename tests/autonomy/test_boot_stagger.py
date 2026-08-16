@@ -581,3 +581,139 @@ def test_both_sources_return_timezone_aware_instants(monkeypatch):
         assert times, source
         assert all(t.tzinfo is not None and t.utcoffset() is not None for t in times), \
             f"{source} returned a naive datetime"
+
+
+# --------------------------------------------------------------------------
+# static_ttls() — the tier that makes CI read real contracts.
+#
+# The live read is unavailable exactly where this guard gates a build: neither
+# tests.yml nor changelog-check.yml sets DATABASE_URL, so `tolerances()`
+# resolved nothing and all 20 organs fell to the 3x proxy. Every organ declares
+# its payload TTL as a module-level `*TTL_SEC` constant, so the contract is
+# readable with no database.
+# --------------------------------------------------------------------------
+
+def _ttl_of(tmp_path, name, src):
+    p = tmp_path / f"{name}.py"
+    p.write_text(src)
+    old = mod.ROOT
+    mod.ROOT = tmp_path
+    try:
+        return mod.static_ttls([name]).get(name)
+    finally:
+        mod.ROOT = old
+
+
+def test_a_plain_constant_is_read(tmp_path):
+    assert _ttl_of(tmp_path, "org_a", "TTL_SEC = 2400\n")[0] == 2400
+
+
+def test_the_env_default_is_the_value_containers_actually_run(tmp_path):
+    got = _ttl_of(tmp_path, "org_b",
+                  'import os\nTTL_SEC = int(os.environ.get("X_TTL_SEC", "1200"))\n')
+    assert got[0] == 1200
+
+
+def test_the_three_times_interval_form_resolves(tmp_path):
+    """`evidence_board` and `fleet_proprioception` literally define
+    TTL_SEC = 3 * INTERVAL — which is also why the proxy is exact on them."""
+    got = _ttl_of(tmp_path, "org_c",
+                  'import os\nINTERVAL = int(os.environ.get("I", "600"))\n'
+                  'TTL_SEC = 3 * INTERVAL\n')
+    assert got[0] == 1800
+
+
+def test_the_MINIMUM_is_taken_across_an_organs_ttl_constants(tmp_path):
+    """An organ is silent on every key at once, so the STRICTEST contract binds
+    — the same rule `tolerances()` applies across live keys. The generous
+    constant is written FIRST so a first-hit implementation returns 26000 and
+    this assertion actually discriminates."""
+    got = _ttl_of(tmp_path, "org_d", "MULT_TTL_SEC = 26000\nVITALS_TTL_SEC = 9600\n")
+    assert got[0] == 9600, "took the first constant, not the minimum"
+    assert "min of 2" in got[1]
+
+
+def test_a_LEVER_ttl_is_not_a_payload_ttl(tmp_path):
+    """The `*TTL_SEC` suffix is the discriminator, and it must exclude
+    LEVER_TTL / LIVE_LEVER_TTL_S / RELEASE_REQ_TTL / QUALITY_VETO_TTL_S —
+    unrelated quantities that would corrupt the tolerance."""
+    got = _ttl_of(tmp_path, "org_e",
+                  "TTL_SEC = 10800\nLEVER_TTL = 60\nQUALITY_VETO_TTL_S = 30\n")
+    assert got[0] == 10800, "a lever TTL leaked into the payload tolerance"
+
+
+def test_a_SELFTEST_FIXTURE_is_not_mistaken_for_the_contract(tmp_path):
+    """THE REGRESSION PIN for my own error. A whole-tree `ast.walk` picks up
+    fixtures inside functions and produced a table claiming the proxy was wrong
+    by 18x when the true worst case is 1.50x. Module level only."""
+    got = _ttl_of(tmp_path, "org_f",
+                  "TTL_SEC = 3600\n\n"
+                  "def _selftest():\n"
+                  "    fake = {'updated': 'x', 'ttl_sec': 600}\n"
+                  "    OTHER_TTL_SEC = 60\n"
+                  "    return fake, OTHER_TTL_SEC\n")
+    assert got[0] == 3600, "a selftest fixture was read as the real contract"
+
+
+def test_an_organ_with_no_ttl_constant_makes_NO_claim(tmp_path):
+    """Fail-open: no constant ⇒ no entry ⇒ the proxy still governs. A guard
+    that cannot see must not manufacture a number."""
+    assert _ttl_of(tmp_path, "org_g", "INTERVAL = 300\n") is None
+
+
+def test_an_unparseable_or_missing_module_makes_no_claim(tmp_path):
+    assert _ttl_of(tmp_path, "org_h", "def broken( :\n") is None
+    assert mod.static_ttls(["no_such_organ_anywhere"]) == {}
+
+
+def test_the_LIVE_organs_resolve_and_reproduce_the_min_across_keys_result():
+    """Against the real tree: the static tier must cover the fleet and must
+    reproduce the brain's DB-derived 160m (min of VITALS 9600 / MULT 26000)
+    with no database at all — that equivalence is the whole point of the tier."""
+    organs = [b["organ"] for b in mod.parse_blocks(mod.RUN_ALL.read_text())]
+    st = mod.static_ttls(organs)
+    assert len(st) >= 15, f"only {len(st)} organs resolved statically"
+    assert st["bot_learn"][0] == 9600, st.get("bot_learn")
+    assert "min of 2" in st["bot_learn"][1]
+    # the three that cannot resolve are structural, not gaps
+    for organ in ("cleanup_legacy_bots", "lighter_ticket_taker", "parliament_main"):
+        assert organ not in st, f"{organ} has no payload TTL and must make no claim"
+
+
+def test_the_live_read_OUTRANKS_the_source_read(capsys, monkeypatch):
+    """Precedence: live payload > source constant > proxy. The live value is
+    what consumers gate on RIGHT NOW, including any env override the source
+    read cannot see.
+
+    THIS DRIVES `main()`, NOT AN INLINE DICT. My first version built the merge
+    in the test itself, so reversing the module's real merge order left it
+    GREEN — a test that passes for the wrong reason, the same shape as the
+    `min(found)`/`found[0]` fixture caught in review. The header counts are
+    what discriminate: whichever tier wins is the one that gets counted.
+    """
+    monkeypatch.setattr(mod, "parse_blocks", lambda _t: [
+        {"organ": "x", "stagger_s": 20, "interval_s": 300, "early": True,
+         "gated": False, "mitigated": True, "inert_flags": [],
+         "kind": "periodic"}])
+    monkeypatch.setattr(mod, "deploy_times", lambda _l=60: (
+        [dt.datetime(2026, 8, 16, 0, m, tzinfo=dt.timezone.utc)
+         for m in (0, 5, 10)], "stub"))
+    # both tiers answer, and they DISAGREE
+    monkeypatch.setattr(mod, "static_ttls", lambda _o: {"x": (111.0, "ttl_sec from source")})
+    monkeypatch.setattr(mod, "tolerances", lambda _o: {"x": (999.0, "published ttl_sec")})
+    monkeypatch.setattr("sys.argv", ["audit_boot_stagger.py"])
+    mod.main()
+    out = capsys.readouterr().out
+    assert "published ttl_sec 1 organ(s)" in out, out
+    assert "ttl_sec from source 0" in out, \
+        "the SOURCE tier won — the live payload must outrank it"
+
+
+def test_the_three_bases_are_counted_DISTINCTLY():
+    """`"ttl_sec from source"` also contains `"ttl_sec"`, so a header that
+    matched on that substring would report source reads as live ones and hide
+    the CI regime — the exact ambiguity this declaration exists to remove."""
+    live, src, prox = "published ttl_sec", "ttl_sec from source", "3x interval (proxy)"
+    assert "published" in live and "published" not in src
+    assert "from source" in src and "from source" not in live
+    assert "proxy" in prox and "proxy" not in live and "proxy" not in src
