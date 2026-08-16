@@ -178,8 +178,17 @@ def margin_state_from(acct, marks=None):
             have_value = True
         if rec.get("mode") is not None:
             modes.add(rec["mode"])
-        row = {k: rec[k] for k in ("value", "liq", "imf_pct", "max_lev",
-                                   "margin", "mode") if k in rec}
+        # `entry` is projected DELIBERATELY, and it is the only field here a
+        # consumer cannot derive: without the venue's own avg_entry_price the
+        # published block cannot be checked against a margin model at all.
+        # [2026-08-16] I claimed a 0.000000% calibration of
+        # scripts/lighter_margin_model against this payload and it was
+        # CIRCULAR — I inverted liq_price to get an entry, then fed that entry
+        # back through liq_price. It returns 0.000000% for leverage 9.9, mmf
+        # 0.9 and a $1 liq price; it could not fail, so it verified nothing.
+        # A real check needs an INDEPENDENT entry, which is this field.
+        row = {k: rec[k] for k in ("value", "liq", "entry", "imf_pct",
+                                   "max_lev", "margin", "mode") if k in rec}
         liq, mark = rec.get("liq"), (marks or {}).get(coin)
         if liq is None:
             unknown.append(coin)

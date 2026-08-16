@@ -412,22 +412,29 @@ def main(_ctx=None, once=False):
         def _margin_block(live_pos):
             """The venue's margining view for the row, or None.
 
-            Marks come from this book's OWN `meta[coin]['last_px']` — the
-            price it already recorded — so the read costs no extra market
-            call and cannot invent a mark it does not have. Never raises: a
-            telemetry read must not be able to stop a live trading loop, and
-            an exception here degrades to 'unknown' rather than to a number.
+            [2026-08-16, CORRECTED] Marks came from this book's OWN
+            `meta[coin]['last_px']` — a price recorded whenever the loop last
+            touched that coin, not a live one. `dist_pct` / `nearest_liq` are
+            RISK numbers, and venues/marks.py is the sanctioned source for
+            those: live order-book mids only, because a stale price silently
+            freezes a risk read while the real price runs away. Avo shows no
+            `dist_pct` today (its longs have no liq price at 1x, so the branch
+            never runs), which is precisely why this was worth fixing BEFORE
+            it mattered — a latent wrong-price path on a real-money book is
+            not less wrong for being currently unreachable.
+
+            Never raises: a telemetry read must not be able to stop a live
+            trading loop, and an exception degrades to 'unknown', not a number.
             """
             try:
                 fn = getattr(venue, "margin_state", None)
                 if not callable(fn):
                     return None
-                marks = {}
-                for c in live_pos:
-                    px = (meta.get(c) or {}).get("last_px")
-                    if px:
-                        marks[c] = float(px)
-                return fn(marks=marks or None)
+                live, blind = marks.stop_marks(venue, list(live_pos or []))
+                st = fn(marks=live or None)
+                if st is not None and blind:
+                    st["mark_blind"] = sorted(blind)
+                return st
             except Exception:  # noqa: BLE001
                 return None
 

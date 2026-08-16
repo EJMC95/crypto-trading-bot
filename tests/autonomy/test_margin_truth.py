@@ -308,6 +308,74 @@ def test_a_missing_or_zero_margin_tier_yields_no_max_leverage():
         assert "max_lev" not in st["positions"]["XAU"]
 
 
+# --------------------------------------------------------------------------
+# the PRICE SOURCE — a risk number may not be computed off a frozen price
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("path", LIVE_PUBLISHERS)
+def test_margin_marks_come_from_the_live_book_not_the_funding_map(path):
+    """`dist_pct` / `nearest_liq` are RISK numbers.
+
+    `funding_map()[coin]["mark"]` is `LighterClient.markets[sym]["last"]`,
+    captured by `_load_markets()` at CLIENT CONSTRUCTION and refreshed only by
+    `refresh_markets()` — which only lighter_perp_sniper calls. Both live bots
+    build their venue context once outside the loop, so that mark is frozen
+    for the container's lifetime and its error GROWS WITH UPTIME. The first
+    cut of `_margin_block` used it anyway, against venues/marks.py's own
+    header. The sanctioned source is marks.stop_marks / fresh_mid.
+    """
+    tree = ast.parse(open(os.path.join(ROOT, path), encoding="utf-8").read())
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == "_margin_block")
+
+    uses_sanctioned = any(
+        isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+        and n.func.attr in ("stop_marks", "fresh_mid", "mid_map")
+        for n in ast.walk(fn))
+    assert uses_sanctioned, (
+        f"{path}:_margin_block does not source marks from venues.marks — a "
+        f"liquidation distance off a stale price is a silent risk defect")
+
+    # and it must not reach for the frozen sources at all
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Constant) and isinstance(n.value, str):
+            assert n.value not in ("mark", "last", "last_px"), (
+                f"{path}:_margin_block still reads a {n.value!r} field — that "
+                f"is the boot-frozen funding/last price, not a live mid")
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
+            assert n.func.attr != "funding_map", (
+                f"{path}:_margin_block calls funding_map for prices")
+
+
+def test_the_venue_entry_price_is_published_so_the_model_can_be_CHECKED():
+    """Without the venue's own avg_entry_price the published block cannot be
+    verified against any margin model — and an unverifiable risk read invites
+    exactly the circular 'calibration' that shipped in this file's first
+    version (invert liq_price, feed the result back through liq_price, marvel
+    at 0.000000%)."""
+    st = margin_state_from(_acct([_pos("XAU", avg_entry_price="4385.65")]))
+    assert st["positions"]["XAU"]["entry"] == pytest.approx(4385.65)
+
+
+def test_a_real_calibration_can_FAIL(monkeypatch):
+    """The check the circular one should have been: take the venue's OWN entry
+    and its OWN liq, run the model forward, compare. Independent inputs, so a
+    wrong leverage or a wrong mmf moves the answer."""
+    mm = pytest.importorskip("importlib").import_module
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    M = mm("lighter_margin_model")
+
+    entry, L, mmf = 4385.65, 0.1532, 0.0240
+    liq = M.liq_price(entry, is_long=False, leverage=L, mmf=mmf)
+    # forward agreement with an independent entry is meaningful...
+    assert M.liq_price(entry, False, L, mmf) == pytest.approx(liq)
+    # ...and unlike the circular form, wrong inputs now MOVE the answer
+    assert M.liq_price(entry, False, 9.9, mmf) != pytest.approx(liq, rel=1e-6)
+    assert M.liq_price(entry, False, L, 0.9) != pytest.approx(liq, rel=1e-6)
+    # the structural claim that DID survive: a <=1x long has no liq price
+    assert M.liq_price(entry, True, 0.999, mmf) == 0.0
+    assert M.liq_price(entry, True, 2.0, mmf) > 0.0
+
+
 def test_an_accountless_client_makes_NO_venue_call_at_all():
     """A shadow arm builds LighterClient with with_signer=False, which leaves
     account_index None. Without an early refusal the read fires a real request

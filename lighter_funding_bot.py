@@ -860,14 +860,26 @@ def scan_receipts(shadow, slope_ratios, slope_noref, conv_raws,
     return key, payload
 
 
-def _margin_block(ctx, fund=None):
+def _margin_block(ctx, held=None):
     """[2026-08-16 (no)] The venue's margining view for the row, or None.
 
-    Marks are taken from the funding map this loop ALREADY fetched, so the
-    read adds one account call and no market calls. Returns None — not a
-    number — whenever the venue cannot answer (`hl_paper`, `lighter_shadow`,
-    a dark account read): "unknown leverage" and "1.0x leverage" must never
-    render identically on a real-money row.
+    Returns None — not a number — whenever the venue cannot answer
+    (`hl_paper`, `lighter_shadow`, a dark account read): "unknown leverage"
+    and "1.0x leverage" must never render identically on a real-money row.
+
+    [CORRECTED same day] Marks came from `funding_map()[coin]["mark"]`, which
+    is `LighterClient.markets[sym]["last"]` — a last-trade price captured by
+    `_load_markets()` at CLIENT CONSTRUCTION and refreshed only by
+    `refresh_markets()`, which ONLY `lighter_perp_sniper` calls. This bot
+    builds its context once outside the loop, so that mark is frozen for the
+    container's lifetime and its error GROWS WITH UPTIME. `dist_pct` /
+    `nearest_liq` are RISK numbers, and venues/marks.py's header has forbidden
+    the funding mark on any risk path since it was written — *"using it on a
+    stop path would silently freeze the stop while the real price runs away"*.
+    I walked into it anyway. Now on the sanctioned path: `marks.stop_marks`,
+    live order-book mids only, over the HELD coins alone (1-5 books, not the
+    whole universe). A coin with no readable book is reported BLIND rather
+    than priced off a stale number — same contract as `liq_unknown`.
 
     Never raises. Telemetry that can stop a live trading loop is a defect
     worse than the blind spot it was added to close."""
@@ -875,12 +887,11 @@ def _margin_block(ctx, fund=None):
         fn = getattr(getattr(ctx, "venue", None), "margin_state", None)
         if not callable(fn):
             return None
-        marks = {}
-        for coin, row in (fund or {}).items():
-            mk = (row or {}).get("mark") if isinstance(row, dict) else None
-            if mk:
-                marks[coin] = float(mk)
-        return fn(marks=marks or None)
+        live, blind = marks.stop_marks(ctx.venue, list(held or []))
+        st = fn(marks=live or None)
+        if st is not None and blind:
+            st["mark_blind"] = sorted(blind)
+        return st
     except Exception:  # noqa: BLE001
         return None
 
@@ -2994,7 +3005,7 @@ def main():
                        # fabricated 1.0x. Wrapped, like the census below: a
                        # telemetry read may never raise into a real-money
                        # trading loop.
-                       "margin": _margin_block(ctx, fund),
+                       "margin": _margin_block(ctx, set(meta) | set(pos)),
                        # [2026-07-29 audit R5] a blind boot was LOG-ONLY: the
                        # row said "online" while entries were blocked and the
                        # ':live' save suppressed — only container logs said
