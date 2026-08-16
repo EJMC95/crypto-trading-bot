@@ -1,3 +1,75 @@
+## 2026-08-17 (pf) — A BOOK THAT SCREENS AN INSTRUMENT CLASS MUST PUBLISH THAT IT DOES: two `unreachable` verdicts, and 18 of the 19 closes behind them are instruments the books stopped trading four days ago
+
+**Found by the daily evidence review, from the go-live table.** The grader and
+the gate horizon were publishing this, and nothing in either book's payload
+made it readable:
+
+| book | era-scoped grade | horizon |
+|---|---|---|
+| 🌾 `perps-funding-carry-lshadow` | n=10, mean −0.155%, **t=−4.48**, −$15.45 | `unreachable` |
+| 🎸 `band-barnes-lshadow` (living carry sleeve) | n=9, **t=−4.47**, −$1.45 | `unreachable` |
+
+Split by instrument class, reproducing the grader's own sample exactly
+(`era_rows` + `drop_retired_sleeves`, n=10 and n=9 matched before the split was
+believed):
+
+    🌾 carry   CRYPTO      n=1   −$0.49   (KAITO)
+               NON-CRYPTO  n=9  −$14.96   SKHYNIXUSD/SPCX/WTI   t=−3.78
+    🎸 Barnes  CRYPTO      n=0
+               NON-CRYPTO  n=9   −$1.45   SKHYNIXUSD/SPCX/WTI   t=−4.21
+
+**9 of 10 and 9 of 9.** `(lk)` and `(lv)` gave both books a crypto-only entry
+screen on 13-Aug; neither has opened a position since, so the graded sample is
+frozen on the removed population and *cannot* update. The verdict an operator
+would retire either book on describes a policy neither book still runs.
+
+**THE DEFECT IS THE MISSING DECLARATION, NOT THE VERDICT.** `caps` carried
+`enter_apr` and `min_vol` and not the class screen, so every downstream reader
+had to ASSUME it — this review derived the split by hand, and
+`audit_book_overlap` takes `crypto_only` as a global CLI flag rather than
+reading each book's own gate. `(lz)` had already added `min_vol` to both books
+for precisely this reason (*"unpublished, the collision is undetectable"*) and
+stopped one field short of the other half of the same gate.
+
+**IT IS A CLASS, AND THE SPLIT SAYS SO.** Every book BORN with the screen —
+🧮 Hull `(me)`, 🏦 Rich Dad `(ls)`, 🧘 Douglas, 📐 Grimes — publishes
+`caps.crypto_only`, and Rich Dad even selftest-pins it. Every book that had the
+screen RETROFITTED publishes nothing. A retrofit that changes what a book may
+enter and does not change what it publishes will recur the next time a screen is
+added to a book that already ships.
+
+**I1's shape, one level up:** `{open: 0}` beside a stale losing grade is
+byte-identical between *"the screen is working exactly as designed"* and *"the
+book is broken"*. Only the declaration separates them.
+
+**Shipped:** `"crypto_only": not ALLOW_NONCRYPTO` in both books' caps —
+publish-only, changes no trade, no lever, no era, so **main-only** under `(mm)`.
+Closed by `tests/autonomy/test_class_screen_declared.py`, which finds the
+population by AST (a module-level `ALLOW_NONCRYPTO`, so a NEW book with a screen
+is covered the day it lands, not by a filename list), requires the published
+value to be DERIVED from that switch (a hardcoded `True` would lie the moment
+the reversal env is set), and reads dict keys by AST rather than substring —
+`(hj)` records three tests in one session that passed on the prose promising the
+property they checked. **6 of 6 mutations verified red**, including the
+comment-only one and one that deletes the exemption below.
+
+🎯 `lighter_perp_sniper.py` is DECLARED in `PARTIAL_SCREEN_OK` rather than
+fixed: its surge and young sources are crypto-only but the LISTING source is
+deliberately unscreened `(lk)`, so `crypto_only: true` would be a false
+declaration — worse than none. The exemption carries its reason and a test
+asserts the file still exists, so a stale exemption cannot quietly stop
+guarding.
+
+**WHAT THIS DOES NOT DO, stated because it is the tempting next step.** It does
+NOT move either book's era. CLAUDE.md's era rule names *"a widened universe"* as
+ordinary tuning that does not reset the clock, and a narrowing is the same act
+mirrored; resetting on a universe change would make the 30-day bar unreachable
+by design. The blessed precedent is `(jg)`/`(ki)` on ⚖️ Counterweight — REPORT
+the class split beside the pooled grade, do not re-cut the sample — and that
+decomposition still reproduces today at n=21 non-crypto carrying −$36.48 of a
+−$31.16 book while its 70 crypto legs read +$5.32. What the operator now gets is
+that the same split is derivable from the payload for two more books instead of
+by hand.
 ## 2026-08-16 (pe) — THE SHELL CAN HAND A SCRIPT A FLAG IT REJECTS, AND `|| true` SWALLOWS IT: `run_all.sh` claimed a mitigation the container never had
 
 **Found by a peer session, corroborated here, and generalised into the guard

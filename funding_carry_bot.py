@@ -975,9 +975,28 @@ def main():
                            # at ~20% TRUE / $2M / crypto-only and the venue's
                            # whole crypto population at that bar is 3 coins —
                            # unpublished, the collision is undetectable.
+                           # [2026-08-17 (pf)] `crypto_only` is the OTHER HALF
+                           # of that same gate, and (lz) stopped one field
+                           # short of it. `(lk)` gave this book `_class_ok` on
+                           # 13-Aug and nothing published the narrowing, so
+                           # every downstream reader had to ASSUME it: the
+                           # daily review found 9 of this book's 10 era-scoped
+                           # closes (−$14.96 of −$15.45, driving t=−4.48 and
+                           # an `unreachable` horizon) were SKHYNIXUSD/SPCX/WTI
+                           # — instruments this gate has refused for four days
+                           # — and had to derive that by hand. A book that has
+                           # narrowed its own universe must publish the
+                           # narrowing, or a stale losing grade is
+                           # byte-identical between "the screen is working" and
+                           # "the book is broken" (I1's shape, one level up).
+                           # The two books BORN with the screen (🧮 Hull,
+                           # 🏦 Rich Dad) publish exactly this; the two that had
+                           # it RETROFITTED did not. Guarded by
+                           # tests/autonomy/test_class_screen_declared.py.
                            "caps": {"max_positions": MAX_POSITIONS,
                                     "enter_apr": _enter_apr,
-                                    "min_vol": MIN_DAY_VOLUME, "max_vol": None},
+                                    "min_vol": MIN_DAY_VOLUME, "max_vol": None,
+                                    "crypto_only": not ALLOW_NONCRYPTO},
                            # [2026-08-02] THE BOOK NAMES ITS OWN BINDING
                            # CONSTRAINT. `scan` answers "why did nothing
                            # open?" in one glance instead of an investigation

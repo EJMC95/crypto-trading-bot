@@ -606,9 +606,19 @@ def build_extra(census, positions, open_pnl, realized, moved, now=None,
         # [(lz)] `min_vol` rides here so `audit_book_overlap` can rule this
         # book IN or OUT of a proposed gate's supply. Unpublished, it can do
         # neither, and an undecidable detector is a detector nobody runs.
+        # [2026-08-17 (pf)] `crypto_only` completes the gate `min_vol` started
+        # publishing. `(lv)` gave this book `_class_ok` on 13-Aug — "mirroring
+        # the parent's contract" — and, like the parent, published no
+        # declaration of it. The cost, measured by the daily review: ALL NINE
+        # closes in the living carry sleeve's graded sample (t=−4.47,
+        # `unreachable`) are SKHYNIXUSD/SPCX/WTI, so the verdict the operator
+        # would retire this book on describes a policy it has not run since
+        # 13-Aug — and nothing in the payload said so. Guarded by
+        # tests/autonomy/test_class_screen_declared.py.
         "caps": {"enter_apr": ENTER_APR, "max_positions": MAX_POSITIONS,
                  "min_vol": CARRY_MIN_VOL, "max_vol": None,
                  "k": K, "frozen": freeze_active(now),
+                 "crypto_only": not ALLOW_NONCRYPTO,
                  "freeze_until": FREEZE_UNTIL_ISO},
         # the book names its own binding constraint (I8 one layer in)
         "scan": census,
