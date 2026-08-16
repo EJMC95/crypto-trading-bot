@@ -1,3 +1,71 @@
+## 2026-08-16 (ow) — THE BLANKET-REPLACE SWEEP: the one I fixed was the only damage in 315 files, and the guard that proves it is the half `audit_changelog_letters` never had
+
+- **THE ASK** (operator, after the `(oq)` unbreak): *"now check the other
+  guards for blanket letter-replace damage"*. Answer up front: **the one I
+  already fixed was the only damage in the repo** — and the sweep is worth
+  having anyway, because it produced the guard that makes the next one
+  impossible to ship quietly.
+
+- **HOW IT WAS CHECKED, not read.** Four passes, each decisive about a
+  different shape rather than an eyeball over a diff:
+  1. **Every tracked `.py` (315 files), for names LOADED and never BOUND** —
+     the exact `_tail(om)` signature. Collect every binding in a module
+     (assignment, for-target, with-as, def/class, all five argument forms,
+     import, except-as, global/nonlocal, walrus, comprehension, match capture),
+     subtract from every `Load` name. **Zero findings, zero syntax errors.**
+     This also covers f-string interpolations — `f"{len(sh)}"` parses to a real
+     `Name` node — which is where the risk concentrates, since `{pct(bh)}` and
+     a `(bh)` citation are indistinguishable to a naive replace.
+  2. **Citation shapes inside value strings** (311 of them): the risky subset
+     is code-in-string — f-string interpolations and SQL like `min(ts)` — and
+     that subset is already covered by pass 1, because it parses as
+     expressions. The remainder is prose in log lines: cosmetic.
+  3. **84 non-python tracked files** (workflows, shell, config): 104 citation
+     shapes, **102 in comments**. The two in executable positions are both
+     `echo "... (bq) ..."` prose — a replace would change a printed sentence
+     and break nothing.
+  4. The CHANGELOG side (dangling and duplicate letters) is already held by
+     `audit_changelog_letters`, currently green.
+
+- **THE GUARD — `scripts/audit_undefined_names.py`, registered in
+  `ENFORCED_AUDITS`.** `audit_changelog_letters` checks that a citation
+  RESOLVES; nothing checked that re-lettering had not hit CODE, and that is
+  precisely the gap the incident fell through. 315 files in **~1.6s**.
+  Verified end to end by re-injecting the real damage into the real file: it
+  reports `tests/test_selftests.py:463: om`. Its `--selftest` carries the
+  incident as a fixture plus a no-false-positive fixture exercising every
+  binding form the fleet uses, and it REFUSES `import *` loudly rather than
+  skipping a file quietly.
+
+- **WHY MODULE-WIDE SCOPING IS THE POINT, not a shortcut.** A real per-scope
+  analysis would flag use-before-assignment and cross-scope reads and bury 300
+  files in findings that are nearly all fine — and a guard that cries wolf gets
+  deleted rather than fixed `(gl)`. Pooling every binding in the module can
+  only report a name bound in NO scope at all, which is never a scoping false
+  positive: it is a typo, a mangled token, or a missing import.
+
+- **LIMITS, declared:** a replace that swaps one bound name for another bound
+  name still parses and runs — the suite is the detector for that one; and
+  runtime-injected names are declared in `DYNAMIC_OK` (empty today).
+
+- **THE AUDIT'S OWN FIRST DRAFT HAD THE DEFECT IT HUNTS.** It referenced
+  `ast.MatchAs` directly — a 3.10+ name — and this repo's venv is **Python
+  3.9.6 while CI runs 3.11**, so it died with `AttributeError` on the machine
+  most likely to run it first. Resolved through `getattr` now. Two things
+  worth keeping from that: a guard must run on the interpreter the operator
+  has, not only the one CI has; and the local/CI version gap is a real seam
+  nobody has written down.
+
+- **AND ONE MORE SELF-INFLICTED LOOP:** the first version of this file used a
+  literal two-letter placeholder to EXPLAIN the convention, and
+  `audit_changelog_letters` correctly read it as a citation resolving to
+  nothing. Two guards, each doing its job, disagreeing about a docstring. The
+  placeholder is now spelled out in words.
+
+- No trade behaviour anywhere in this entry: a new audit script, its
+  registration, and prose. Main only per `(mm)`. Suite green, all 27 floors
+  held.
+
 ## 2026-08-16 (ou) — THE OTHER SEVEN STARVED ORGANS: `(os)` fixed the one that pages, and the same 50-minute silence had swallowed the judge, the tuner, proprioception, regen, radar, allocation, the incubator and impl-shortfall
 
 **`(os)` fixed 🛡️ the immune organ and DECLARED the rest rather than patching
