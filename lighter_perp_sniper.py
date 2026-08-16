@@ -1745,6 +1745,142 @@ def selftest():
                                    "pending": {}, "entry_meta": {}})
     assert fs9.trades[-1][1]["extra"] is None, fs9.trades[-1][1]["extra"]
 
+    # ---- [2026-08-16 (nr)] THE YOUNG SOURCE — the third and last admission
+    # route, and the one `(np)` left behind. Same finding, same shape: `(ga)`
+    # added it in July precisely BECAUSE the listing trigger was unobservable
+    # (a market-set diff qualifies a symbol for exactly one loop, and only if
+    # the process is running with a warm baseline at that instant), so this is
+    # the source carrying the population the book is supposed to be graded on
+    # — and it had never executed in a fixture in its life. `young_candidates`
+    # is unit-tested as a RULE; what follows is everything between the rule and
+    # a position: the scout read, the probe fallback, the dedup ledger, the
+    # source stamp on the close.
+    #
+    # It has a second half the surge source does not: a CANDLE PROBE, which is
+    # I/O the bot pays for per loop and is governed by two properties stated in
+    # the comment above it and asserted nowhere — BUDGETED (at most
+    # YOUNG_PROBE_BUDGET unknown symbols per loop) and MONOTONE (a book
+    # measured older than the bar goes into `not_young` FOREVER, because books
+    # only age). "The probe cost decays to zero once the venue has been walked"
+    # is a claim about a REST bill, and until now nothing checked that a second
+    # loop re-probes nothing.
+    class _ProbeVenue(_FakeVenue):
+        """A venue that answers the daily-candle probe, and remembers who asked."""
+
+        def __init__(self, markets, books, positions, bars):
+            _FakeVenue.__init__(self, markets, books, positions)
+            self._bars, self.probed = bars, []
+
+        def candles(self, sym, _interval, _start_ms, _end_ms):
+            self.probed.append(sym)
+            return [None] * int(self._bars.get(sym, 0))
+
+    # (1) THE SCOUT-FED PATH — `ages_d` is the preferred age source (exact,
+    # whole-venue, zero extra REST), so a payload carrying it must admit the
+    # young book AND fire no probe at all.
+    _young_bus = _FakeBus({
+        "vol_surges": [],
+        "vols": {"OLD": 50.0, "NEWB": 3.0},
+        "ages_d": {"OLD": 500.0, "NEWB": 5.0},   # NEWB is 5 days old: young
+    })
+    _young_books = dict(_books, NEWB={"bids": [[2.0, 50]], "asks": [[2.02, 50]]})
+    _young_markets = {s: {"status": "active"} for s in ("OLD", "NEWB")}
+    ven11 = _ProbeVenue(_young_markets, _young_books, {}, {"NEWB": 5})
+    fs11 = _drive(ven11, 1000.0, CLIP,
+                  {"baseline": ["OLD", "NEWB"], "entry_ts": {}, "pending": {}},
+                  bus=_young_bus)
+    assert [o[0] for o in ven11.opened] == ["NEWB"], (
+        f"the young source admitted nothing: {ven11.opened}")
+    assert ven11.probed == [], (
+        f"the scout gave every age and the probe still ran on {ven11.probed} — "
+        "the REST bill this fallback is supposed to avoid")
+    _blob11 = fs11.saves[-1][1]
+    assert _blob11["entry_src"]["NEWB"] == "young", _blob11["entry_src"]
+    # the young source shares the SURGE cooldown ledger deliberately (a young
+    # book is in `baseline`, so baseline cannot dedup it) — without this the
+    # book re-enters `pending` every loop forever.
+    assert "NEWB" in _blob11["surge_done"], _blob11["surge_done"]
+    # ...and it carries NO surge telemetry. `entry_meta` is surge-ONLY; a
+    # stamp that fired for every source would put a mult on a book no mult
+    # admitted, and the X4 split would read it as a measured surge.
+    assert "NEWB" not in (_blob11.get("entry_meta") or {}), _blob11["entry_meta"]
+
+    # (2) THE PROBE FALLBACK — a scout with no `ages_d` (the dark/stale case
+    # the probe exists for). Both branches of the bar test in one pass, and
+    # the two durable maps they write.
+    _probe_bus = _FakeBus({"vol_surges": [], "vols": {"PROBED": 3.0, "OLDBK": 90.0}})
+    _probe_books = dict(_books,
+                        PROBED={"bids": [[2.0, 50]], "asks": [[2.02, 50]]},
+                        OLDBK={"bids": [[9.0, 50]], "asks": [[9.05, 50]]})
+    _probe_markets = {s: {"status": "active"} for s in ("PROBED", "OLDBK")}
+    ven12 = _ProbeVenue(_probe_markets, _probe_books, {},
+                        {"PROBED": 5, "OLDBK": 400})
+    fs12 = _drive(ven12, 1000.0, CLIP,
+                  {"baseline": ["PROBED", "OLDBK"], "entry_ts": {}, "pending": {}},
+                  bus=_probe_bus)
+    assert sorted(ven12.probed) == ["OLDBK", "PROBED"], ven12.probed
+    _blob12 = fs12.saves[-1][1]
+    assert _blob12["bar_counts"].get("PROBED") == 5, _blob12["bar_counts"]
+    assert "OLDBK" in _blob12["not_young"], _blob12["not_young"]
+    assert "PROBED" not in _blob12["not_young"], _blob12["not_young"]
+    assert [o[0] for o in ven12.opened] == ["PROBED"], (
+        f"the probe cache is the fallback age source and admitted nothing: "
+        f"{ven12.opened}")
+    assert _blob12["entry_src"]["PROBED"] == "young", _blob12["entry_src"]
+
+    # ...and MONOTONE: replay the same loop with the maps the first one wrote
+    # and NOTHING is re-probed. This is the property that makes the probe's
+    # cost decay to zero, and a `not_young` that reset (or was dropped from
+    # either save writer) would re-probe the whole venue every loop forever —
+    # the (ha) zombie-clock defect's exact shape, on the REST bill.
+    ven13 = _ProbeVenue(_probe_markets, _probe_books, {},
+                        {"PROBED": 5, "OLDBK": 400})
+    _drive(ven13, 1000.0, CLIP,
+           {"baseline": ["PROBED", "OLDBK"], "entry_ts": {}, "pending": {},
+            "bar_counts": _blob12["bar_counts"],
+            "not_young": _blob12["not_young"],
+            "surge_done": _blob12["surge_done"]},
+           bus=_probe_bus)
+    assert ven13.probed == [], (
+        f"a second loop re-probed {ven13.probed} — the probe is not monotone, "
+        "so its cost never decays")
+
+    # (3) THE SOURCE STAMP REACHES THE LEDGER, and only the young half of it.
+    ven14 = _ProbeVenue(_young_markets,
+                        dict(_young_books,
+                             NEWB={"bids": [[2.4, 50]], "asks": [[2.42, 50]]}),
+                        {"NEWB": {"size": 10.0, "entry": 2.0}}, {})
+    fs14 = _drive(ven14, CAP, CLIP,
+                  {"baseline": ["OLD", "NEWB"], "entry_ts": {}, "pending": {},
+                   "entry_src": {"NEWB": "young"},
+                   "not_young": ["OLD"]})
+    assert ven14.closed == ["NEWB"], ven14.closed
+    _tr14 = fs14.trades[-1][1]
+    assert _tr14["reason"] == "long-young_tp", _tr14["reason"]
+    assert _tr14["extra"] is None, (
+        f"a YOUNG close carried surge telemetry: {_tr14['extra']}")
+
+    # (4) A BUS THAT RAISES admits nothing and stops nothing — both scout reads
+    # in this block are wrapped, and the fail-safe contract is that a dark or
+    # broken organ costs the book its widened population, never its loop.
+    class _BoomBus:
+        def _load(self, *_a, **_k):
+            raise RuntimeError("bot_state read failed")
+
+        def is_fresh(self, *_a, **_k):
+            return True
+
+        def is_crypto(self, _sym):
+            return True
+
+    ven15 = _ProbeVenue(_young_markets, _young_books, {}, {"NEWB": 5})
+    fs15 = _drive(ven15, 1000.0, CLIP,
+                  {"baseline": ["OLD", "NEWB"], "entry_ts": {}, "pending": {}},
+                  bus=_BoomBus())
+    assert ven15.opened == [], "a dark scout must admit no young/surge book"
+    assert fs15.saves and fs15.published, \
+        "a raising bus stopped the loop — the fail-safe contract is degrade, not halt"
+
     # ---- [2026-08-04] SOURCE-STAMPED CLOSE TAGS round-trip through the ONE
     # parser every ledger row passes ((hj): test against the real consumer,
     # never a hand-written fixture). Three properties: each source yields a
@@ -1770,8 +1906,10 @@ def selftest():
           "lost-ack position and caps on REAL deployed notional; the SHADOW "
           "path still books, persists and never sends; a SURGE admission "
           "records its ratio + mult, survives a restart, reaches the ledger "
-          "row and degrades junk to no extra; and both save_state writers "
-          "persist the same shape).")
+          "row and degrades junk to no extra; both save_state writers "
+          "persist the same shape; and the YOUNG source admits off the scout, "
+          "falls back to a BUDGETED and MONOTONE candle probe, stamps its own "
+          "close tag and carries no surge telemetry).")
 
 
 if __name__ == "__main__":

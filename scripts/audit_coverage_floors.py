@@ -91,7 +91,12 @@ FLOORS = {
     # through `main()` (the first fixture in this file's life to reach any
     # admission source but `listing`) and takes it to 85.7% measured CI's way,
     # which restores the margin and makes the ratchet the doctrine asks for.
-    "lighter_perp_sniper.py": 83,      # measured 85.7 (81/83.5 -> 81/82.4 -> 83/85.7)
+    # [2026-08-16 (nr)] 83 -> 86. The YOUNG source — the third and last of this
+    # book's admission routes, and the one carrying the population `(ga)` added
+    # it to supply — is driven end to end for the first time, including the
+    # candle probe's BUDGETED and MONOTONE properties (a REST bill nothing had
+    # ever checked). All three sources now execute in a fixture.
+    "lighter_perp_sniper.py": 86,      # measured 88.6 (81/83.5 -> 83/85.7 -> 86/88.6)
     "lighter_market_scout.py": 80,     # measured 82.5 — the fleet's signal source
     # [2026-07-30] THE PROMOTION SURFACE — the code deciding which $1k shadow
     # book gets offered up for real money. Floored for the same reason as the

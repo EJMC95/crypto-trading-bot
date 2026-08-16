@@ -1,3 +1,71 @@
+## 2026-08-16 (nr) — THE YOUNG SOURCE GOES THROUGH THE HARNESS TOO: the sniper's three admission routes now all execute in a fixture, and the candle probe's REST bill is finally an assertion instead of a comment
+
+- **THE ASK** (operator, after `(np)`): *"now do the same for the young
+  source"*. `(np)` opened `_drive` to the scout with `bus=` and drove the
+  SURGE route end to end; YOUNG was named there as "one payload away". This is
+  that payload, and it closes the set — **all three of this book's admission
+  sources now run in a test**, where a fortnight ago exactly one did.
+
+- **WHY THIS SOURCE PARTICULARLY.** `(ga)` added YOUNG in July *because* the
+  listing trigger is unobservable — `new_listings` is a market-set diff, so a
+  symbol qualifies for exactly the loop in which it first appears, and only if
+  the process happens to be running with a warm baseline at that instant
+  (n=1 close in weeks, `new_listings: []` on the bus). YOUNG is therefore the
+  route carrying the population 🎯 the Perp Sniper is supposed to be GRADED on
+  — a book stays under the 21-bar bar for weeks — and it had never executed in
+  a fixture in its life. `young_candidates` is unit-tested as a RULE; nothing
+  covered the distance between that rule and a position.
+
+- **AND IT HAS A HALF THE SURGE SOURCE DOES NOT: I/O.** The candle probe pays
+  a REST bill every loop, governed by two properties stated in the comment
+  above it and asserted nowhere:
+  * **BUDGETED** — at most `YOUNG_PROBE_BUDGET` unknown symbols per loop, and
+    zero when the scout's `ages_d` is flowing (exact, whole-venue, free — the
+    probe is the fallback for a dark scout, not the primary).
+  * **MONOTONE** — a book measured older than the bar enters `not_young`
+    FOREVER, because books only age. *"The probe cost decays to zero once the
+    venue has been walked"* is a claim about money, and nothing checked that a
+    second loop re-probes nothing. A `not_young` that reset — or that got
+    dropped from either `save_state` writer, the shape `(np)` found unguarded
+    the day before — would re-probe the whole venue every loop forever. That
+    is the `(ha)` zombie-clock defect exactly, relocated onto the REST bill,
+    and it would be invisible: nothing about the book's P&L would look wrong.
+
+- **FIVE FIXTURES**, each on output the fleet consumes:
+  * **scout-fed admission** — `ages_d` admits the young book, `entry_src`
+    stamps `young`, and **the probe fires zero times** (the bill the fallback
+    exists to avoid).
+  * **probe fallback** — a scout with no `ages_d`: both branches of the bar
+    test in one pass (5 bars → `bar_counts`, 400 bars → `not_young`), and the
+    probe cache actually feeds the admission.
+  * **monotonicity** — replay the loop with the maps the first one wrote:
+    nothing is re-probed.
+  * **the close tag** — a young position closes `long-young_tp` and carries
+    **no `extra`**: `entry_meta` is surge-ONLY, so a stamp that fired for every
+    source would put a mult on a book no mult admitted and the X4 split would
+    read it as a measured surge.
+  * **a raising bus** — a dark organ costs the book its widened population,
+    never its loop: nothing admitted, and the pass still saves and publishes.
+  Also pinned in passing: YOUNG shares the SURGE cooldown ledger deliberately
+  (a young book is already in `baseline`, so baseline cannot dedup it) —
+  without that entry it re-enters `pending` every loop forever.
+
+- **MEASURED: 85.7% → 88.6%**, CI's way, and the floor goes **83 → 86**. The
+  young block in `main()` went from 11 uncovered statements to **zero**. Eight
+  mutations, all RED under these fixtures and **seven of the eight green under
+  the file's existing unit tests**: source stamp dropped from `_src_map`,
+  `not_young` never recorded, probe result never cached, `not_young` dropped
+  from the steady writer, the dedup-ledger write removed, the scout's ages
+  ignored, and the `or bar_counts` fallback deleted. (A ninth attempt was a
+  NO-OP — I mutated the first line of a two-line expression and the operator I
+  meant to delete was on the second. It "survived", I read the diff rather
+  than the result, and re-ran it properly: RED. A mutation you have not
+  eyeballed is not a mutation.)
+
+- **NOT A REAL-MONEY CHANGE — main only, per the `(mm)` rule.** Shadow book,
+  and every edit is inside `selftest()`: no gate, lever, clip or trade
+  behaviour moves, so there is nothing to deploy.
+
 ## 2026-08-16 (nq) — `(nn)` SAID "FOUR DAYS" AND THE RECEIPTS SAY 24 HOURS: the entry whose whole subject is an unreadable guard carried a 4× number in its own title
 
 - **THE CORRECTION.** `(nn)` diagnosed and fixed a real defect — `(ne)` inlined
