@@ -683,6 +683,30 @@ def _selftest():
     except ValueError:
         pass
 
+    # --- THE LIVE CALIBRATION, PINNED ---------------------------------------
+    # A model nobody has checked against the venue is a hypothesis. This is the
+    # 2026-08-16 (no)-session calibration frozen as a regression: 💸 the
+    # Farmer's live XAU SHORT, the one live position the venue itself prices.
+    # Inputs are the account's own leverage and the venue's published mmf tier;
+    # the target is the venue's OWN published liquidation price.
+    #
+    # It also widens the module's validated range beyond what the docstring
+    # claims: both live books run CROSS margin, and the isolated formula is
+    # exact there provided the caller substitutes account-level
+    # L = gross/equity. That substitution is the caller's job and this pins it.
+    xau_mmf, xau_lev, venue_liq = 0.0240, 0.1532, 32238.90
+    implied_entry = 4385.65
+    modelled = liq_price(implied_entry, False, xau_lev, xau_mmf)
+    assert abs(modelled - venue_liq) / venue_liq < 1e-6, (modelled, venue_liq)
+    # ...and the NEGATIVE control, which is the half that proves the model is
+    # responsive rather than vacuous: 🙏 Avo sits at L=0.999, and a long at or
+    # below 1x has NO liquidation price — only a path to worthlessness. So the
+    # venue publishing nothing for those four longs is CORRECT, not a data gap.
+    assert liq_price(100.0, True, 0.999, 0.012) == 0.0
+    for lev, want in ((2.0, 0.494), (5.0, 0.190), (10.0, 0.089)):
+        d = liq_distance_frac(True, lev, 0.012)
+        assert abs(d - want) < 0.002, (lev, d, want)
+
     # --- the sizing rule ---------------------------------------------------
     # $1000 equity, 1% risk, 0.6% stop -> $1666 notional, L=1.67x
     n, lev, why = size_for_risk(1000.0, 0.01, 0.006, btc)
