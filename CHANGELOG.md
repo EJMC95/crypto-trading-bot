@@ -1,3 +1,54 @@
+## 2026-08-16 (on) — THE GATE HORIZON DATED A BASKET BOOK ON A STATISTIC THAT COUNTS ITS LEGS: `n_req` scales as `t^-2`, so an inflated `t` under-states the remaining sample FOURFOLD
+
+- **THE DEFECT.** `(ky)` established that `t` counts TRADES while a basket book
+  makes DECISIONS — ⚖️ Counterweight's 91 closes are **28** — and published the
+  cluster-robust read BESIDE the iid `t`, deliberately leaving the BAR on the
+  iid value, because changing a go-live bar is a policy act and not a fix.
+  **The HORIZON then read the iid `t` anyway.** It is a projection, explicitly
+  reported-not-a-bar at `(ks)`, and projecting a required sample from an
+  inflated statistic is not a judgement call — it is wrong arithmetic.
+  `n_req = n·(T/t)²`, so an iid `t` twice the honest one under-states the
+  remaining sample **fourfold** and hands the operator an ETA the book cannot
+  meet. On the selftest fixture the verdict itself flips from
+  **`on_track` with a printed date** to **`undecidable`** — I17's
+  keep-or-retire call, which is precisely what the inflated `t` was hiding.
+- **THE FIX IS THE SAME CLOSED FORM WITH AN HONEST INPUT.** Holding the
+  clustering structure fixed, growing the sample by `k` grows `n_eff` by ~`k`
+  and `t_cluster` by ~`√k`, so `n_req = n·(T/t_cluster)²` — `n` stays the real
+  close count because `rate` is in closes/day. **FAIL-SAFE in every doubtful
+  direction**: no cluster block, a single degenerate cluster, `g == n` (a book
+  that does not batch), junk, or a non-positive `t_cluster` all fall back to
+  the iid `t` and reproduce today's answer EXACTLY — never worse, never a
+  fabricated date. The basis is **published** (`t_basis`, `n_eff`) and declared
+  in the horizon DEFAULTS so every early-return path carries the keys: a
+  consumer must never infer which statistic produced a date from a key's
+  absence (the I6 shape).
+- **AND `(ky)`'s CLUSTER READ WAS NEVER PUBLISHED AT ALL.** `stats()` has
+  computed it since `(ky)`; `book_payload` never copied it, so the statistic
+  was **ABSENT from every book on the bus** — the entry's whole point lived
+  only inside the process. Measured cost the same day: the ⚖️ Counterweight
+  keep-or-retire call turns on cluster `t` = **−0.98**, not the published
+  **−1.87**, and had to be re-derived from the raw ledger because the grader
+  would not say it. **A number a decision depends on must be READABLE, not
+  recomputable.** Published beside `t`, still never a bar.
+- **IT CHANGES ZERO VERDICTS TODAY, AND THAT IS STATED RATHER THAN BURIED.**
+  Verified by diffing the grader's own output before and after against live
+  data: 0 of 10 books move. The only basket book is mean-negative, so it
+  returns `unreachable` before the projection is reached; every other book has
+  `g == n` and keeps the iid basis. **Inert-but-ARMED, not inert-and-dead** —
+  production passes the stats dict, so it engages the moment a batching book
+  has a positive mean, which ⚖️'s crypto-only subset already does. The `(iz)`
+  lesson is why this paragraph exists: a declared enforcement that quietly
+  fires on nothing is the failure mode, so the reach is measured and named.
+- **MUTATION-VERIFIED (I3), six mutations, all reddened**: reverting to the iid
+  `t` (the original defect), accepting a single degenerate cluster, accepting a
+  negative `t_cluster`, not publishing the basis, breaking the `n_req`
+  exponent, and dropping the cluster publish.
+- **SCOPE, deliberately narrow:** `grade()` and `BAR_NAMES` are untouched. The
+  go-live BAR still reads the iid `t` exactly as `(ky)` chose. This entry moves
+  a REPORT onto the honest statistic and makes that statistic visible; moving
+  the BAR is a policy decision for the operator, with its own evidence.
+
 ## 2026-08-16 (om) — 📐 GRIMES'S GATE NOW GRADES A FIXED SET: the verdict stops depending on which coins happened to be liquid that day
 
 - **THE ASK.** Operator: *"fix grimes gate"*, after `(oe)` measured that the
