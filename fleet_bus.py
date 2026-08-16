@@ -169,15 +169,47 @@ def allocation_scale(bot, current_time=None):
         base = float(p.get("book_usd") or 0.0)
         if not isinstance(row, dict) or base <= 0:
             return None
-        t = float(row.get("target_usd"))
-        if t != t or t < 0:           # NaN / negative
-            return None
-        scale = max(0.25, min(4.0, t / base))
-        if scale > 1.0 and not era_supports_expansion(row):
-            return 1.0
-        return scale
+        return allocation_scale_for(row, base)
     except Exception:
         return None
+
+
+#: The consumer-side clamp. FLOOR mirrors the organ's own PROBE_FLOOR (I17: a
+#: book cannot earn evidence with no capital); CEIL keeps a $1k paper book's
+#: clip inside sane slippage modelling.
+ALLOC_SCALE_FLOOR = 0.25
+ALLOC_SCALE_CEIL = 4.0
+
+
+def allocation_scale_for(row, base):
+    """The effective scale one PUBLISHED allocation row yields — the clamp and
+    the era gate, and nothing else. None on an unusable row.
+
+    [2026-08-16 (oy)] EXTRACTED so the organ can PUBLISH the number instead of
+    leaving every reader to re-derive it. `allocation_scale` above keeps the
+    parts that are about the CALLER — the kill switch, payload freshness, the
+    book lookup — and this keeps the parts that are about the ROW. Splitting it
+    that way is what lets `fleet_allocation` show its own gated outcome without
+    a second copy of the rule ((hj)): there is still exactly one place where
+    `target_usd` becomes a scale, and one place where the era decides.
+
+    Deliberately NOT env-aware: a service running
+    `FLEET_ALLOCATION_MODE=advisory` gets None from `allocation_scale`
+    regardless, and no published field can know that. The organ's published
+    number is therefore "what this row yields", never "what every consumer
+    will use" — stated here because a field that overstates its own reach is
+    the defect this exists to remove.
+    """
+    try:
+        t = float(row.get("target_usd"))
+    except (TypeError, ValueError):
+        return None
+    if t != t or t < 0 or not base or base <= 0:   # NaN / negative / no base
+        return None
+    scale = max(ALLOC_SCALE_FLOOR, min(ALLOC_SCALE_CEIL, t / base))
+    if scale > 1.0 and not era_supports_expansion(row):
+        return 1.0
+    return scale
 
 
 def era_supports_expansion(row):

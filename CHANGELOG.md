@@ -1,3 +1,66 @@
+## 2026-08-16 (oy) — 💰 THE ALLOCATION PAYLOAD PUBLISHED WHAT THE RANKING WANTED AND NOT WHAT ANY CONSUMER WOULD DO: `target_usd: 10072` and `scale_effective: 1.00` were the same row, and only one of them was written down
+
+**FOUND BY MISREADING IT MYSELF, which is the whole argument for the fix.**
+This afternoon's brief filed a growth item claiming 🌾 carry's $10,072
+allocation target was moving the fleet's largest block of capital on a sample
+its own era rejects. The premise checked out — carry does rank at
+`claim: 0.1492%` (n=101) with `claim_era: null` (n_era=10). **The conclusion
+was wrong: no capital moves.** `(lx)` gated that expansion on 13-Aug, and the
+gate has been capping carry at flat ever since.
+
+**THE DEFECT IS NOT THE GATE — IT IS THAT THE PAYLOAD DOES NOT SHOW IT.**
+`target_usd` is a PRE-GATE number. The rule deciding whether it is honoured
+(`fleet_bus.era_supports_expansion`) lives in a different file, so a reader of
+`fleet-allocation` alone cannot tell whether a $10,072 target means "this book
+gets 4x" or "this book stays flat". **Those two states were byte-identical in
+the payload.** That is `(lv)`/I18 — `{open: 0}` reading the same for "quiet" and
+"structurally impossible" — relocated from a trading census to an advisory
+organ, and it cost a wrong growth item in a report that goes to the operator's
+phone.
+
+**MEASURED on the live payload before and after:**
+
+| book | `target_usd` | raw | `claim_era` | **`scale_effective`** | `expansion_gated` |
+|---|---|---|---|---|---|
+| 🌾 carry | 10,072 | 4.00 | `null` | **1.00** | `true` |
+| 💸 Farmer shadow | 2,015 | 2.01 | 0.0 | **1.00** | `true` |
+| ⚖️ Counterweight | 250 | 0.25 | 0.0 | **0.25** | `false` |
+
+**ONE OWNER, NOT A SECOND COPY.** The arithmetic is extracted to
+`fleet_bus.allocation_scale_for(row, base)` — the clamp and the era gate — and
+`allocation_scale` keeps only what is about the CALLER (kill switch, payload
+freshness, book lookup). The organ IMPORTS it. There is still exactly one place
+where `target_usd` becomes a scale and one place where the era decides ((hj));
+a drifted ceiling in the organ would publish a number the consumer never
+honours, which is this same defect wearing new clothes, and the test refuses
+any re-clamp literal in `fleet_allocation`.
+
+**THE FLAG IS NARROWER THAN THE NUMBER, deliberately.** `expansion_gated` is
+true only when an expansion was ASKED FOR and DECLINED. ⚖️ Counterweight at the
+0.25 probe floor is a reduction, not a refusal, and reporting it as gated would
+conflate "refused" with "never asked" — pinned, because that conflation is how
+a flag stops meaning anything.
+
+**AND THE FIELD DOES NOT OVERSTATE ITS REACH.** `FLEET_ALLOCATION_MODE` is
+per-service, so no published number can know what a given consumer will use;
+`scale_effective` is what the ROW yields, never a fleet-wide promise. That
+limit is declared in the docstring that owns it — and the test scopes to THAT
+docstring by AST, because the first draft's page-wide substring scan passed
+with the declaration deleted (mutation M6 survived it).
+
+**Guarded**: `tests/autonomy/test_allocation_scale_published.py`. **Six
+mutations verified RED**: the era gate removed from the shared rule,
+`scale_effective` never published, `expansion_gated` true for a reduction, a
+junk target becoming a confident number, the organ re-deriving the clamp
+instead of importing it, and the reach-limit deleted. One of them (M6) survived
+the first draft and the TEST was fixed, not the code.
+
+**Publish-only, additive, no behaviour change.** `moves_capital` is still
+false, `target_usd` semantics are untouched, every consumer gets exactly the
+scale it got yesterday — the number that changed is the one a reader can see.
+The brief's §5 is corrected in place and re-sent, and now reads as a refusal
+with evidence rather than an invented item.
+
 ## 2026-08-16 (ox) — THE GUARD'S SCAN WAS NOT IN THE TESTS WORKFLOW: its --selftest was, so `pytest` proved the detector could see and never pointed it at the repo
 
 - **THE ASK** (operator): *"check the guard's own scan actually runs in the

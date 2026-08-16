@@ -60,6 +60,14 @@ import os
 import sys
 from datetime import datetime, timezone
 
+# [2026-08-16 (oy)] The consumer's own scale rule, IMPORTED not re-derived —
+# there is exactly one place where `target_usd` becomes a scale and one place
+# where the era decides ((hj)). A hard import on purpose: this organ ships only
+# in freqtrade-bots, which carries fleet_bus in `_BUILD_SHARED`, and a guarded
+# import would degrade the field to None — which is precisely the ambiguity
+# this change exists to remove.
+from fleet_bus import allocation_scale_for
+
 try:
     import bot_pnl_store as store
 except Exception:                                    # pragma: no cover
@@ -281,6 +289,33 @@ def set_era_twin(rec, n_era, claim_era, era_iso=None, era_src=None):
     rec["claim_era"] = (round(claim_era, 6) if claim_era is not None else None)
     rec["era_since"] = era_iso
     rec["era_source"] = era_src
+    # [2026-08-16 (oy)] THE GATED OUTCOME, BESIDE THE PRE-GATE TARGET.
+    # `target_usd` is what the RANKING wants; it is not what any consumer
+    # does. The era gate that decides between them lives in another file, so
+    # a reader of this payload alone could not tell that 🌾 carry's $10,072
+    # target yields a scale of 1.00 — and on 16-Aug a reader did exactly that,
+    # filed it as a growth item, and reported that capital was being
+    # misallocated when none was. The number was always derivable and never
+    # published; that is the defect, and this is the (lv)/I18 rule applied to
+    # an ADVISORY organ — a payload must not be byte-identical between "this
+    # book will be scaled up 4x" and "this book will be left at flat".
+    # Written here because this is the moment `claim_era` becomes known, and
+    # the outcome cannot be computed before it.
+    scale = allocation_scale_for(rec, rec.get("current_usd"))
+    rec["scale_effective"] = (round(scale, 4) if scale is not None else None)
+    # The bit, named. `scale_effective < raw` says the era declined an
+    # expansion; without the flag a reader must re-derive the raw scale to
+    # notice. False when there was no expansion to decline (a reduction, or
+    # already flat) — never conflate "declined" with "never asked".
+    raw = None
+    try:
+        base = float(rec.get("current_usd") or 0.0)
+        if base > 0:
+            raw = float(rec.get("target_usd")) / base
+    except (TypeError, ValueError):
+        raw = None
+    rec["expansion_gated"] = bool(
+        raw is not None and raw > 1.0 and scale is not None and scale <= 1.0)
     return rec
 
 
