@@ -1,3 +1,55 @@
+## 2026-08-16 (pd) — THE LETTER HELPER EXISTS NOW, AND IT IS ONE FUNCTION INSTEAD OF AN INLINE ENUMERATOR PER SESSION: bijective base-26, so there is no boundary left to fall off
+
+- **THE ASK** (operator): *"fix the letter helper so it rolls over past oz"*.
+  There was no helper to fix — that was the actual defect. Every session that
+  needed the next letter wrote its own enumerator inline, so the repo had one
+  copy per session and no tests on any of them. `(pb)` records mine dying at
+  `oz`; the same afternoon two other sessions hand-rolled blanket letter
+  replaces that rewrote CODE (`(oq)`, `(ow)`). One owner now, in the module
+  that already parses letters, with a CLI so nobody has to write the fourth.
+
+- **THE SUCCESSOR RULE IS DERIVED FROM THE FILE, NOT INVENTED.** Extracting
+  every header in order shows the sequence rolling `z -> aa`, `az -> ba`,
+  `bz -> ca`, ... `nz -> oa`, `oz -> p*`. That is **bijective base-26** (a=1 …
+  z=26, no zero digit), so `succ()` is arithmetic rather than an alphabet walk
+  — and `zz -> aaa` falls out instead of being a second special case waiting to
+  fail the same way one level up. The selftest asserts every boundary the file
+  has actually crossed, plus that one.
+
+- **`--next` IS THE POINT**: `python3 scripts/audit_changelog_letters.py --next`
+  prints the letter to use. Getting that answer right took three wrong ones,
+  and each was a real property the function now pins:
+  | wrong answer | cause | rule added |
+  |---|---|---|
+  | `er` | started at "a" and found the first FREE letter | the sequence **has gaps** — 381 entries and no `er` header — so it must start AFTER the tip, never fill a hole |
+  | `woo` | counted every bracketed 1–3 letter token | `(the)`, `(usd)`, `(vol)` are prose; only citations WITHIN A WINDOW past the tip can be reservations |
+  | `pe` | counted `_tail(px)`, `pct(bh)` | a citation is never a CALL — `(?<![\w)])` |
+
+- **AND THE TIP MUST BE RANKED, NOT SORTED.** `"z" > "aa"` as text while `aa`
+  comes after `z` in the sequence, so `latest()` compares by rank. A string
+  sort here sends the next entry backwards, which is the `er` failure wearing
+  a different hat.
+
+- **THE FUNCTION'S OWN FIXTURES AND DOCSTRING RESERVED REAL LETTERS, THREE
+  TIMES.** This file is
+  scanned by the thing it implements, so a literal bracketed letter in a test
+  fixture is a live reservation: after adding the arms, `--next` jumped two
+  letters, and the second time it broke an assertion outright. Fixtures now
+  BUILD their citations (`"(" + x + ")"`), which is what the module docstring
+  already warned about for its own prose — a warning I had read and still
+  walked into. The third instance was the docstring EXPLAINING the rule: it
+  spelled bracketed "the"/"usd"/"vol" as examples of what must not count, and
+  the scanner dutifully counted them, so the audit went red on the sentence
+  describing why it should not. Prose now names them without brackets.
+  Recorded because the next person will write a fixture and an explanation.
+
+- **Direction of the remaining imprecision, stated:** the window can still
+  admit a two-letter token that is neither a call nor prose, and the cost is a
+  SKIPPED letter (a gap), never a reused one. Gaps are survivable — the file
+  has them — and collisions are what cost this repo an afternoon.
+
+- No trade behaviour: one function, a CLI and its tests. Main only per `(mm)`.
+
 ## 2026-08-16 (pc) — CODE REACHED CONTAINERS FROM COMMITS CI NEVER GRADED: the two workflows disagree about a burst of pushes, and the disagreement was silent
 
 **MEASURED, and it is the deploy cadence's one unmitigated cost.** Asked to fix

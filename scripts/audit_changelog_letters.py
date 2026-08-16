@@ -89,6 +89,137 @@ def glued_headers(text):
     return GLUED.findall(text or "")
 
 
+def succ(letter):
+    """The next letter in the sequence: a..z, then aa, ab, ... zz, aaa, ...
+
+    [2026-08-16 (pd)] BIJECTIVE BASE-26, not a hand-rolled alphabet walk, and
+    the difference is the bug this retires. Sessions each wrote their own
+    enumerator inline; on 16-Aug one of mine enumerated `o` + `a..z` only, so
+    when the sequence exhausted `oz` it raised StopIteration mid-script, the
+    calling shell interpolated the empty result into a commit subject, and a
+    letterless commit went to main with no entry. A generator with no rollover
+    is a countdown.
+
+    The rule is DERIVED FROM THIS FILE'S HISTORY, not invented: it rolls
+    z -> aa, az -> ba, bz -> ca, ... nz -> oa, oz -> pa. That is bijective
+    base-26 (a=1 ... z=26, no zero digit), so zz -> aaa falls out instead of
+    being a second special case waiting to fail the same way one level up.
+    """
+    n = 0
+    for ch in str(letter):
+        if not ("a" <= ch <= "z"):
+            raise ValueError(f"not a changelog letter: {letter!r}")
+        n = n * 26 + (ord(ch) - 96)
+    if n < 1:
+        raise ValueError(f"not a changelog letter: {letter!r}")
+    n += 1
+    out = ""
+    while n:
+        n, r = divmod(n - 1, 26)
+        out = chr(97 + r) + out
+    return out
+
+
+def rank(letter):
+    """Position in the sequence, as an integer (a=1, z=26, aa=27, ...)."""
+    n = 0
+    for ch in str(letter):
+        if not ("a" <= ch <= "z"):
+            raise ValueError(f"not a changelog letter: {letter!r}")
+        n = n * 26 + (ord(ch) - 96)
+    if n < 1:
+        raise ValueError(f"not a changelog letter: {letter!r}")
+    return n
+
+
+def latest(letters):
+    """The furthest-along letter in `letters`, by SEQUENCE not by string.
+
+    String order is wrong here and quietly so: `"z" > "aa"` lexicographically
+    while `aa` comes after `z` in this sequence.
+    """
+    best = None
+    for l in letters:
+        try:
+            r = rank(l)
+        except ValueError:
+            continue
+        if best is None or r > best[0]:
+            best = (r, l)
+    return None if best is None else best[1]
+
+
+def next_free(taken, start="a"):
+    """The first letter at or after `start` that nothing has claimed.
+
+    `taken` must include letters claimed by CITATIONS, not only by headers: a
+    session writes a citation into code before its entry lands, and taking that
+    letter is how a citation ends up resolving to somebody else's entry — green
+    to this audit, wrong to a reader. Measured twice on 16-Aug.
+    """
+    taken = {str(x) for x in taken}
+    cur = str(start)
+    while cur in taken:
+        cur = succ(cur)
+    return cur
+
+
+def claimed_letters(text, paths=(), window=50):
+    """Letters that are spoken for: every HEADER, plus near-ahead RESERVATIONS.
+
+    [2026-08-16 (pd)] THE TWO KINDS ARE NOT THE SAME KIND, and conflating them
+    is how the first cut of this function answered `woo`.
+
+    * HEADERS are authoritative and unambiguous.
+    * A CITATION is only interesting when it is a RESERVATION: a session writes
+      its letter into code before its entry lands, and taking that letter is
+      how a citation ends up resolving to somebody else's entry — green to this
+      audit, wrong to a reader (measured twice on 16-Aug). But a citation is
+      also just a bracketed pair in text, and this tree is full of prose and
+      code that matches — bracketed "the", "usd", "vol", "row". Counting those
+      put the tip near `won` and produced a next-letter three thousand entries
+      into the future.
+
+    So a citation counts only inside a WINDOW just past the newest header. A
+    reservation is always a step or two ahead of the tip; an English word in
+    brackets is not. `window` bounds how far ahead a session may reserve.
+    """
+    hdrs = {l for _d, l, _t in scan(text)[0]}
+    # A CITATION is never a CALL. `(?<![\w)])` drops `_tail(px)`, `pct(bh)`,
+    # `len(sh)` — call syntax whose argument happens to be two letters — while
+    # keeping `see (pd)` and `[2026-08-16 (pd)]`. Without it the window filled
+    # with variable names (`px`, `py`, `pp`) and the next letter skipped them.
+    pat = re.compile(r"(?<![\w)])\(([a-z]{1,3})\)")
+    tip = latest(hdrs)
+    if tip is None:
+        return set(hdrs)
+    lo, hi = rank(tip), rank(tip) + int(window)
+    out = set(hdrs)
+    for src in [text] + [_read(x) for x in paths]:
+        for cand in pat.findall(src or ""):
+            try:
+                r = rank(cand)
+            except ValueError:
+                continue
+            if lo < r <= hi:
+                out.add(cand)
+    return out
+
+
+def _read(path):
+    try:
+        return open(path, encoding="utf-8").read()
+    except OSError:
+        return ""
+
+
+def next_letter(text, paths=()):
+    """The letter a new entry should take: the first free one AFTER the tip."""
+    claimed = claimed_letters(text, paths)
+    tip = latest({l for _d, l, _t in scan(text)[0]})
+    return next_free(claimed, start=succ(tip) if tip else "a")
+
+
 def dangling_code_citations(paths, known):
     """-> [(path, lineno, letter)] for changelog citations in tracked python
     COMMENTS/STRINGS that resolve to no header. See 2026-08-06 entry lc.
@@ -460,6 +591,76 @@ def _selftest():
     real, _rd = scan(open(CHANGELOG, encoding="utf-8").read())
     assert len(real) > 50, f"parsed only {len(real)} headers — regex rot?"
 
+    # [2026-08-16 (pd)] THE SEQUENCE. Every rollover asserted below is one this
+    # file's own history actually took; `zz -> aaa` is the one it has not
+    # reached, included because the bug retired here was a helper that worked
+    # right up until the sequence outgrew it.
+    assert succ("a") == "b" and succ("y") == "z"
+    assert succ("z") == "aa", "single letters must GROW, not wrap to 'a'"
+    assert succ("az") == "ba" and succ("bz") == "ca" and succ("nz") == "oa"
+    assert succ("oz") == "pa", "the boundary that pushed a letterless commit"
+    assert succ("zz") == "aaa", "and it must not be a countdown one level up"
+    for _bad in ("", "A", "a1", "(a)", None, "a b"):
+        try:
+            succ(_bad)
+        except (ValueError, TypeError):
+            pass
+        else:
+            raise AssertionError(f"succ accepted junk: {_bad!r}")
+    assert next_free({"pa", "pb"}, start="pa") == "pc"
+    assert next_free(set(), start="a") == "a"
+    assert next_free({"z"}, start="z") == "aa", "next_free must cross a boundary"
+    # [(pd)] `latest` must order by SEQUENCE, not by string: "z" > "aa" as
+    # text, while aa comes AFTER z here. Getting this wrong sends the next
+    # entry backwards into a gap.
+    assert latest(["z", "aa"]) == "aa" and latest(["aa", "z"]) == "aa"
+    assert latest(["b", "oz", "pa"]) == "pa"
+    assert latest([]) is None and latest(["ZZ", "9"]) is None
+    assert rank("a") == 1 and rank("z") == 26 and rank("aa") == 27
+    # the real file HAS holes, so first-free != next: pin that the CLI's rule
+    # (start after the tip) never reuses one
+    # [(pd)] WHAT COUNTS AS A RESERVATION — each of these three was a wrong
+    # answer this function actually gave before it was pinned. NOTE THE
+    # `_cite()` HELPER: writing a literal bracketed letter in THIS file would
+    # reserve it for real, because this file is scanned too — the same trap
+    # the module docstring already records for its own prose. Caught by
+    # running `--next` after adding these arms and getting a letter two past
+    # the one I had reserved.
+    def _cite(x):
+        return "(" + x + ")"
+
+    _base = f"## 2026-08-16 {_cite('pa')} — tip\n\nbody\n"
+    assert next_letter(_base) == "pb", next_letter(_base)
+    #   1. a genuine reservation just ahead IS honoured (the stolen-letter hole)
+    assert next_letter(_base + f"\nsee {_cite('pb')} for why\n") == "pc"
+    #   2. an English word in brackets is NOT a letter (this answered `woo`)
+    assert next_letter(_base + "\n" + " ".join(
+        _cite(w) for w in ("the", "usd", "vol", "row")) + "\n") == "pb"
+    #   3. CALL SYNTAX is not a citation (the window filled with `px`, `py`)
+    assert next_letter(_base + f"\nx = _tail{_cite('pb')} + pct{_cite('pc')}\n") == "pb"
+    #   4. and the sequence never goes BACKWARDS into a historical gap: this
+    #      file has 381 entries and no `er` header, which is what made the
+    #      first version of the CLI answer with it.
+    _gapped = _base + f"## 2026-08-16 {_cite('pc')} — later\n\nb\n"
+    assert rank(next_letter(_gapped)) > rank("pc"), next_letter(_gapped)
+
+    _real = claimed_letters(open(CHANGELOG, encoding="utf-8").read())
+    _tip = latest(_real)
+    assert rank(next_free(_real, start=succ(_tip))) > rank(_tip), \
+        "the next letter must move the sequence FORWARD, never into a gap"
+    # built, never spelled: a literal bracketed letter in THIS file would
+    # reserve it for real (see the _cite note below — the same trap twice)
+    _br = lambda x: "(" + x + ")"                                # noqa: E731
+    _hdr = f"## 2026-08-16 {_br('pa')} — x\n\nbody\n"
+    assert "pa" in claimed_letters(_hdr), "a header claims its letter"
+    assert "pb" in claimed_letters(_hdr + f"\nsee {_br('pb')}\n"), \
+        "a CITATION just ahead of the tip claims a letter too — the hole "\
+        "that let one session's citation resolve to another's entry"
+    # and against the real file: the answer must not already be taken
+    _real_txt = open(CHANGELOG, encoding="utf-8").read()
+    _n = next_free(claimed_letters(_real_txt))
+    assert _n not in claimed_letters(_real_txt), _n
+
     print(f"audit_changelog_letters selftest OK (fires on a duplicate; ignores "
           f"the pre-{ERA_START} restart era and letterless headers; sees "
           f"{len(real)} real entries)")
@@ -467,4 +668,18 @@ def _selftest():
 
 
 if __name__ == "__main__":
+    if "--next" in sys.argv:
+        # [(pd)] THE ONE PLACE THAT PICKS A LETTER, so no session has to write
+        # an enumerator again. Counts headers AND citations across tracked
+        # files; degrades to headers-only if git is unavailable.
+        import subprocess
+        _txt = open(CHANGELOG, encoding="utf-8").read()
+        try:
+            _files = subprocess.run(
+                ["git", "ls-files", "*.py", "*.md", "*.yml"],
+                capture_output=True, text=True, timeout=30).stdout.split()
+        except Exception:                    # noqa: BLE001 — degrade, never block
+            _files = []
+        print(next_letter(_txt, _files))
+        sys.exit(0)
     sys.exit(_selftest() if "--selftest" in sys.argv else main())
