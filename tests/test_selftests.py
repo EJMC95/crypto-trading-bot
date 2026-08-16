@@ -453,7 +453,7 @@ def test_module_selftest_live(mod, flag, needs):
 @pytest.mark.parametrize("script", ENFORCED_AUDITS)
 def test_enforced_audit_guard(script):
     ok = _run([script])
-    assert ok.returncode == 0, f"{script} full scan failed:\n{_tail(om)}"
+    assert ok.returncode == 0, f"{script} full scan failed:\n{_tail(ok)}"
     neg = _run([script, "--selftest"])
     assert neg.returncode == 0, f"{script} --selftest (negative fixture) failed:\n{_tail(neg)}"
 

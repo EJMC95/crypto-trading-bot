@@ -92,7 +92,7 @@
   baseline, dropping `deaths` below the threshold; `(oi)`/`(ok)` are what
   stop it RETURNING as `restarts` climbs.
 
-## 2026-08-16 (or) — THE WALL-CLOCK SWEEP: no other test flakes (measured, 220 runs), the class is FLEET-WIDE and mostly DELIBERATE, and the one real defect was a file disagreeing with itself about the same 60 seconds
+## 2026-08-16 (oq) — THE WALL-CLOCK SWEEP: no other test flakes (measured, 220 runs), the class is FLEET-WIDE and mostly DELIBERATE, and the one real defect was a file disagreeing with itself about the same 60 seconds
 
 - **THE ASK** (operator, after `(ol)`): *"now check the other guards for the
   same wall-clock flakiness"*. Two populations to separate, because they have
@@ -159,6 +159,21 @@
   cannot do in general. Recorded rather than fixed: the practical defence is
   the one the convention already states — pick the letter at PUSH time and
   grep after, which is what caught it.
+
+- **[ADDENDUM — the blanket-replace class bit main, twice more, and I am one
+  of the three.** Repaired here because main was RED on it: (1)
+  `tests/test_selftests.py` carried `_tail(om)` where it means `_tail(ok)` — a
+  concurrent `(ok)` -> `(om)` re-letter rewrote a VARIABLE inside an f-string,
+  and because that string is only evaluated when an audit FAILS, it turned
+  every audit failure into `NameError: name 'om' is not defined`, hiding the
+  real message at exactly the moment it is needed; (2) a `(oq)` -> `(or)`
+  re-letter rewrote THIS entry's header, orphaning the three `(oq)` citations
+  in `venues/equity_guard.py` and its test — restored to `(oq)`, the letter the
+  code actually cites, so the other `(or)` entry keeps its own. My own `(of)`
+  -> `(og)` slip earlier today was the same mistake. **Three sessions, one
+  afternoon, one cause: a letter move must edit YOUR entry and YOUR citations,
+  never the file.** Verified by forcing an audit failure: the runner now prints
+  `DUPLICATE CHANGELOG LETTERS` instead of a NameError.]
 
 - Scope: `(ol)` and `(oq)` are the only two changes; **eleven consumer sites
   were examined and deliberately left alone**, which is the point of a sweep.
