@@ -39,8 +39,34 @@ THIS MODEL HAS NEVER BEEN CHECKED AGAINST THE VENUE. Treat it as unvalidated.
   * **agreement with the venue's own liquidation price — at any leverage.**
   * **the CROSS-margin substitution** (`L = gross/equity` in the isolated
     formula). That was the load-bearing claim and it rested entirely on the
-    circular result. It may well be true; there is no evidence either way, and
-    both live books run cross. The functions below claim ISOLATED only.
+    circular result. The functions below claim ISOLATED only.
+    **[PARTIALLY RECOVERED 2026-08-16, non-circularly — the BASIS half now has
+    evidence, the FORMULA half still does not. Keep the two apart.]** The test
+    inverts the venue's published liq through each candidate ratio and asks
+    whether the entry it REQUIRES is a possible XAU price, judged against the
+    venue's PUBLIC `orderBookDetails` (index 4387.52, mark 4386.95) rather
+    than against this model:
+        H1 account-level  L = gross/equity 0.153  ratio 7.3510 -> entry  4,385.65   plausible
+        H3 tier-level     L = 1/default_imf 15.02 ratio 1.0416 -> entry 30,951.92   REFUTED
+        H4 min-tier       L = 1/min_imf     25.0  ratio 1.0156 -> entry 31,742.92   REFUTED
+    Gold does not trade near $31,000, so **the leverage BASIS is account-level,
+    not tier-level** — supported by an external price fact, not by inverted
+    arithmetic. Say "basis supported, formula untested", never "validated".
+    TWO LIMITS ON EVEN THAT, both real:
+      1. The Farmer holds exactly ONE position, so `gross` equals that
+         position's value and "account-level" is numerically indistinguishable
+         from "this position's value / equity". A second concurrent live
+         position would separate them; do not manufacture one for telemetry.
+      2. The `(1+mmf)` term remains unresolvable this way, and an attempt to
+         resolve it FAILED rather than being conceded early: dropping it
+         requires an entry of 4,282.86 (2.34% away), and over the position's
+         plausible lifetime — XAU's last 500 1h bars, 20.8 days — the tape
+         ranged **[3999.07, 4455.30]**, which contains BOTH candidates
+         comfortably. Price plausibility cannot reach a 2.3% term here.
+         The binding variable is therefore ENTRY PRECISION, not leverage, and
+         the venue's own `avg_entry_price` (now published at
+         `extra.margin.positions.<coin>.entry`) supplies it exactly — at which
+         point a 2.4% term is trivially resolvable even at 0.15x.
   * the "implied entry 4,385.65 vs 4,387.6 mark, the gap is unrealised P&L"
     reading — that mark came from `funding_map()`, i.e.
     `markets[sym]["last"]`, frozen at client construction
