@@ -3855,10 +3855,52 @@ Counterweight's pre-registered ~28-Aug call (deciding it early is the (hs)/(ia)
 trap in reverse) and 🌾 carry's stall. `fleet_allocation` is NOT yet corrected
 for duplication — this entry ships the measurement it would need, and wiring a
 concentration term into an organ that moves shadow capital is a change that
-earns its own evidence first (I19). **Right now the audit reads 13 positions
+earns its own evidence first (I19). ~~**Right now the audit reads 13 positions
 across 13 distinct `(coin, side)` — 0% duplication** — because the three books
 sharing the gate happen to be flat. The collision is structural, not current,
-which is exactly the kind of fact a payload has to carry BEFORE it bites.
+which is exactly the kind of fact a payload has to carry BEFORE it bites.~~
+
+**[16-Aug — CORRECTED IN PLACE per I12, re-run on the operator's ask. The
+struck sentence above is FALSE now, and the supply half of this entry is
+STRONGER than when it was written.]**
+
+- **The supply claim reproduces EXACTLY, to the snapshot.** Tape 8,633 → 9,441
+  snapshots (30.1d → 32.9d); the qualifying coins are still **KAITO, XMR,
+  PAXG**, still **max 2 at once**, still the **same 3 books** admitting them —
+  and the count of snapshots offering ≥1 candidate is **573, identical**.
+  Only the percentage moved (6.64% → 6.07%) because the DENOMINATOR grew. An
+  unchanged absolute count over three further days means the contested supply
+  has been **completely dry**, not merely thin.
+- **Every band now resolves — zero UNKNOWNs.** 🛢️ Garrett `[0.10M, 2.00M)`,
+  🧮 Hull `[2.00M, 10.00M)` at a 7.82% gate, and both 💸 Farmer arms
+  `[10.00M, ∞)` are correctly EXCLUDED. Hull was born after this entry and is a
+  correctly differentiated book by I20's own test — the invariant working
+  forward, not just backward.
+- **THE DUPLICATION SENTENCE WAS WRONG, AND WRONG IN AN INSTRUCTIVE PLACE.**
+  It now reads **31 positions → 24 distinct `(coin, side)` = 20% duplicates**
+  (23% before the arm-pair correction below). But **not at the gate this entry
+  measured** — the three books sharing the 20% harvest gate hold nothing there.
+  It materialised in the **CROSS-SECTION**: ⚖️ Counterweight and 🎸 Barnesy's
+  `xsect` sleeve hold **LTC, SEI, TIA, HYPE same-side** (4 of ⚖️'s 10
+  positions), ⚖️+🛢️ Garrett share BNB, and LINK is held three ways on opposing
+  sides. Obvious in hindsight and visible in the fleet table the whole time:
+  that sleeve IS *"⚖️ at the VALIDATED K=5 plateau centre"*. **I measured the
+  harvest gate because it was where I had just been looking, and the real
+  duplication was in the cross-section.**
+- **A FALSE POSITIVE OF THIS ENTRY'S OWN TOOL, FIXED.** The detector flagged
+  XAU(S) on BOTH 💸 Farmer arms as concentration with a `REAL MONEY` banner —
+  but those two rows are the experiment judge's EXPERIMENT/CONTROL pair and are
+  *supposed* to hold the same coin. That is the cry-wolf failure the
+  three-valued `admits()` exists to prevent, reappearing one function over.
+  `ARM_PAIRS` + `same_book()` (commit `a9e3267`): within-pair duplication is
+  REPORTED but never a finding, and the effective-bets metric collapses arms to
+  one holder first — the metric is about EVIDENCE independence, and two arms of
+  one book are one book measured twice on purpose.
+- **THE NEW QUESTION THIS RAISES**, which the fleet has never asked because
+  until this week nothing could see it: ⚖️ Counterweight and 🎸's `xsect` sleeve
+  are running the same strategy over an overlapping universe, and ⚖️ has a
+  pre-registered ~28-Aug keep-or-retire date. Those two decisions are coupled
+  and should be taken together.
 
 ## 2026-08-13 (ly) — 🎸 BARNESY'S `extreme` SLEEVE RETIRED: the I17 call MADE rather than escalated a second time — one venue supports ONE harvest sleeve
 
