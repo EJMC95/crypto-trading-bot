@@ -1,3 +1,73 @@
+## 2026-08-16 (nu) — 🧙 SCHWAGER RE-MEASURED: THE FOUNDING NUMBER DOES NOT REPRODUCE, AND THREE TRADES OUT OF 298 ARE THE WHOLE BOOK
+
+- **THE ASK.** Operator: *"re-measure schwager"*, after `(nt)` flagged that its
+  published **n=277, +$457.21, t=1.88, both halves positive, beats random
+  P=0.015** did not reproduce on any window. Flagged then, measured now.
+- **THE HONEST READING, same rule, current harness, 500d, AT THE CLIP THIS BOOK
+  ACTUALLY TRADES ($80 — the published figure is denominated at $100, which the
+  bot has never used):**
+      **n=298 · +$146.41 · mean +0.614%/trade · t=0.86 · h1 +$168.64 · h2 −$22.22**
+  Exits 276 trail / 18 sl / 4 hold.
+- **THE EDGE IS NOT ESTABLISHED — which is UNPROVEN, not disproven, and the
+  distinction is load-bearing.** Three independent grounds:
+  1. **RANDOM-ENTRY NULL, re-run under the current code: P=0.183** (300 draws).
+     About one random draw in five beats it. The published P=0.015 was measured
+     pre-(ml). Doctrine (hm) is explicit that a DIRECTIONAL book is graded
+     against a random-entry null and never against zero, because a random short
+     on this tape earns +0.2–1.1%/trade for free.
+  2. **BLOCK BOOTSTRAP on the per-trade mean: 95% CI [−0.67%, +2.07%]** (L=1;
+     L=10 [−0.88%, +2.34%]; L=25 [−0.45%, +2.33%]), **P(mean≤0) = 0.11–0.20.**
+     The interval straddles zero at every block length.
+  3. **CONCENTRATION: the single best trade is 50.3% of the total; the top 3 of
+     298 are 112% of it.** Drop those three and the book reads **−$17.97,
+     t=−0.13**. Top 5 → −$79.85; top 10 → −$186.66, t=−1.53.
+- **WHY THE OLD NUMBER LOOKED BETTER — measured, not guessed, and it is NOT the
+  tape.** Running the ORIGINAL harness (`git 9386537`, the commit the number was
+  recorded from) reproduces **n=277 EXACTLY** at a 13-Aug cutoff but **+$361.63**.
+  Sweeping ONLY the window-end hour across 12–16 Aug moves the total from
+  **$243 to $434** (t 1.14→1.79) while n barely stirs (273–280): a handful of
+  large trail exits fall in or out of the window. **+$457.21 sits at or just
+  above the top of that whole range.** Candle revision is REFUTED as a cause —
+  1,500 bars re-fetched from the venue, **zero** differences.
+- **AND (ml) CHANGED THREE THINGS IN THE REPLAY, NOT ONE.** Beyond the entry-bar
+  bracket test it also set `bars=0 -> bars=1` (the entry bar counts toward the
+  hold) and **armed the chandelier trail from the ENTRY BAR's close**, one bar
+  earlier. For a book whose exits are 93% trail that changes every trade — so
+  the `entry_bar_bracket` flag added in `(nt)` is INCOMPLETE as a pre-(ml)
+  revert, and is now declared as such rather than trusted.
+- **THE REAL FINDING, and it is about the GATE, not the book: 🧙 Schwager is
+  UNDECIDABLE BY TAIL, not by rate.** `t = mean/(sd/sqrt(n))` assumes an
+  approximately normal mean. On a distribution where ONE trade of 298 is half
+  the P&L, `t` is a statistic about the tail — so the go-live **`t≥2.0` bar
+  cannot resolve this rule at 30 closes, or at 298.** Its nominal ~mid-Oct
+  grading date grades a statistic this distribution does not support. **Fat
+  tails are not a defect here — they are Schwager's own doctrine** (cut losses,
+  ride winners; 276 of 298 exits are the trail). It is the SAMPLE that fails,
+  not the strategy. This is a NEW class beside I17's undecidable-by-rate, and
+  the same question should be asked of any trend book this fleet grades.
+- **NOT RETIRED, deliberately.** Its own ledger is the record (I14) and it has
+  **ZERO closed trades** — 4 open (BTC/S, ENA/S, PUMP/L, ETHFI/L), +$3.41 MTM,
+  two days live. Retiring on a replay before the record has started is judging a
+  book by a proxy, which is the error I14 exists to prevent. **Owner: operator**
+  — a keep-or-retire call that should be made on its own closes.
+- **THE BOT IS FAITHFUL TO WHAT WAS MEASURED — checked, not assumed.** A grep
+  suggested the trail ratcheted on live marks (which would be tighter than the
+  measured close-basis rule, and tighter measurably LOSES). Reading the call
+  site refuted that: `update_trail(pos, bc)` takes `bc` from `_closed_bars`, so
+  it is genuinely close-basis, and an X5 conformance note already guards the
+  missed-bar case. Checking beat inferring.
+- **Corrected in place (I12):** `lighter_book_schwager_bot.py` docstring,
+  CLAUDE.md's fleet row, AND the `(mr)` breakout-4h retirement entry, which
+  cited Schwager's old figure as its "coverage continues elsewhere" consolation.
+  `(mr)`'s own evidence (t=−3.50 in-era, BH-significant) is unaffected and the
+  retirement stands; the consolation is weaker than it read.
+- **WHAT THIS IMPLIES FOR THE COHORT.** Every wave-2 number in CLAUDE.md was
+  recorded in the same pre-(ml) window: 🧘 Douglas is corrected (nt), 🧙
+  Schwager here. **📐 Grimes and 🧮 Hull have NOT been re-measured** — Grimes's
+  gate is a rolling replay so it self-corrects, but Hull's founding
+  n=45/+$4.92/t=+3.27 is a static claim on the same harness. Named, not fixed:
+  one house at a time (I11).
+
 ## 2026-08-16 (nr) — THE YOUNG SOURCE GOES THROUGH THE HARNESS TOO: the sniper's three admission routes now all execute in a fixture, and the candle probe's REST bill is finally an assertion instead of a comment
 
 - **THE ASK** (operator, after `(np)`): *"now do the same for the young

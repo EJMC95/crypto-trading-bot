@@ -16,8 +16,10 @@ this venue's tape before it shipped:
   1. "Ride winners" (Seykota) — NO PROFIT TARGET. The only profit exit is a
        WIDE trailing stop: a chandelier 3.5x ATR14 below the close-basis
        high-water mark (above, for shorts), ratcheting only. MEASURED as
-       the whole edge: trail 3.5x = +$457.21 vs trail 2.5x = −$29.88 on the
-       same entries — the tight trail gives the winners back.
+       the whole edge: trail 3.5x beat trail 2.5x (−$29.88) on the same
+       entries — the tight trail gives the winners back. (The +$457.21 that
+       figure was quoted against is corrected below; the 3.5-beats-2.5
+       DIRECTION is what the choice rests on and it is unchanged.)
   2. "Cut losses" (everyone) — the initial stop is 2x ATR14, fixed at
        entry, live until the first trail update supersedes it.
   3. "Trade with the trend" (Marcus, Kovner) — entries are 4h Donchian-20
@@ -43,9 +45,44 @@ supply has one owner. No funding gate; the funding books are untouched.
 
 HONEST ABOUT THE EVIDENCE (scripts/study_books_cohort_2026-08-13.py, 500d of
 Lighter 4h tape, 18 coins, 5bps/side):
-  * shipped cell: n=277, +$457.21, mean +1.65%/trade, t=1.88, halves
-    +$357.90/+$99.31, beats 197 of 200 random-entry draws (P=0.015);
-    251 of 277 exits are the trail — the rule doing the earning.
+  * ~~shipped cell: n=277, +$457.21, mean +1.65%/trade, t=1.88, halves
+    +$357.90/+$99.31, beats 197 of 200 random-entry draws (P=0.015)~~
+    **[16-Aug (nu) — RE-MEASURED; THE FOUNDING NUMBER DOES NOT HOLD.
+    Corrected in place per I12.]** Honest reading today, same rule, current
+    harness, 500d, AT THE CLIP THIS BOOK ACTUALLY TRADES ($80 — the published
+    figure is denominated at $100, which the bot has never used):
+        **n=298, +$146.41, mean +0.614%/trade, t=0.86, h1 +$168.64,
+        h2 −$22.22**  (276 trail / 18 sl / 4 hold)
+    THREE INDEPENDENT REASONS THE EDGE IS **NOT ESTABLISHED** — which means
+    UNPROVEN, not disproven, and the distinction is load-bearing:
+      1. RANDOM-ENTRY NULL re-run under the current code (300 draws; the (hm)
+         doctrine that a directional book is graded against random, never
+         against zero): **P=0.183**. About one random draw in five beats it.
+         The published P=0.015 was measured pre-(ml).
+      2. BLOCK BOOTSTRAP on the per-trade mean: 95% CI **[−0.67%, +2.07%]**
+         (L=1; L=25 gives [−0.45%, +2.33%]), P(mean<=0) = 0.11–0.20. The
+         interval straddles zero.
+      3. CONCENTRATION: the single best trade is **50.3%** of the total and
+         the **top 3 of 298 are 112%** of it — drop those three and the book
+         reads **−$17.97, t=−0.13**.
+    WHY THE OLD NUMBER LOOKED BETTER — measured, not guessed. The ORIGINAL
+    harness (git 9386537) reproduces n=277 EXACTLY at a 13-Aug cutoff but
+    +$361.63; sweeping ONLY the window-end hour across 12–16 Aug moves the
+    total from **$243 to $434** (t 1.14→1.79) while n barely stirs (273–280),
+    because a handful of large trail exits fall in or out of the window.
+    +$457.21 sits at or just above the top of that range. The TAPE is not the
+    cause (1,500 bars re-fetched, zero revisions). Note also that (ml) changed
+    THREE things in the replay, not one — it also armed the trail from the
+    entry bar, which for a book whose exits are 93% trail changes every trade.
+    THE REAL FINDING: **this book is undecidable by TAIL, not by rate.** `t`
+    assumes an approximately normal mean; where 1 trade of 298 is half the
+    P&L, `t` is a statistic about the tail, and the go-live `t>=2.0` bar
+    cannot resolve this rule at 30 closes — or at 298. Fat tails are not a
+    defect here, they are Schwager's own doctrine; it is the SAMPLE that
+    fails, not the strategy.
+    NOT RETIRED, deliberately: its own ledger is the record (I14) and it has
+    **zero closed trades** (4 open, +$3.41 MTM at re-measurement). Retiring on
+    a replay before the record has started is judging a book by a proxy.
   * longs +$443.40 / shorts +$13.80: the long side carried the window.
     Shorts stay ON — they paid for themselves and are the only regime
     insurance a one-tape validation has (item 18); the brain grades
