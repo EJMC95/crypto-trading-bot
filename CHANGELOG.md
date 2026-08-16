@@ -1,3 +1,58 @@
+## 2026-08-16 (pe) — THE SHELL CAN HAND A SCRIPT A FLAG IT REJECTS, AND `|| true` SWALLOWS IT: `run_all.sh` claimed a mitigation the container never had
+
+**Found by a peer session, corroborated here, and generalised into the guard
+that already owns this class.** `run_all.sh` passed
+`--publish-if-stale 21600` to `scripts/golive_readiness.py`, which did not
+implement the flag. In the live container:
+
+    golive_readiness.py: error: unrecognized arguments: --publish-if-stale 21600
+
+argparse exit 2, swallowed by `|| true`, and the boot fell through to the old
+`sleep 900`. **The early-publish mitigation was INERT** from the moment the
+shell half landed until `(pa)` implemented the script half hours later, and
+nothing was red for one second of it.
+
+**THE TRANSFERABLE RULE, and it is the one worth keeping: a claim read off
+`run_all.sh` alone is a claim about the SHELL, not about the organ.** A parser
+that reads the shell sees mitigation the container does not have. That matters
+immediately, because a third session is building `audit_boot_stagger.py` on
+top of `(os)`/`(ou)` and it reads exactly that file.
+
+**This is `audit_organ_silence`'s own mechanism from the other end.** Its
+header has said since `(hw)` that "the exit code goes to `|| true`, the
+traceback goes to a container log nobody tails" — an argparse rejection is
+precisely that. So the arm went into that guard rather than a new script: same
+file, same `run_all.sh` parser, same rule family, already in ENFORCED_AUDITS.
+
+**CALIBRATED AGAINST ITS OWN FOUNDING INCIDENT**, which is the only way to know
+a detector works. The first draft reported the known-bad commit as **clean** —
+the golive invocation spans a **backslash continuation**, so a line-at-a-time
+regex sees `--publish` and never sees `--publish-if-stale`. Continuations are
+joined first now, and the fixture in the selftest is that exact two-line shape.
+Verified both directions: `REJECTED --publish-if-stale` at `8998229^`, `none`
+at origin.
+
+**It also fired on a live one.** Run against this desk it reports
+`scripts/golive_readiness.py --publish-if-stale` — because the shared working
+tree holds a **staged copy 119 lines behind origin**, predating `(pa)`.
+Committing that file would revert the fix and restore the inert flag. The
+guard found a staged regression on its first real run.
+
+**Five mutations verified RED.** Two survived the first pass and both were the
+same shape as each other and as `(pc)`'s: **the finder was pinned and the
+WIRING was not.** `bad_flags = []` inside `scan()` survived (the selftest
+patched `scan` wholesale), and `if False:` in `main()` survived (the selftest
+only drove `rejected_flags`). Both closed. While closing them I found the SAME
+gap pre-existing in this guard's original arm — `if True:` in place of
+`reports_own_death(path)` survived, because every existing check drove that
+classifier directly and none checked that `scan()` routes organs through it.
+Closed too, since the file was already open.
+
+**Three times today a "wired" assertion needed strengthening after a mutation
+walked through it.** The pattern is specific enough to name: testing the pure
+function and calling it done, while nothing pins that the caller still calls
+it. The finder is the easy half.
+
 ## 2026-08-16 (pd) — THE LETTER HELPER EXISTS NOW, AND IT IS ONE FUNCTION INSTEAD OF AN INLINE ENUMERATOR PER SESSION: bijective base-26, so there is no boundary left to fall off
 
 - **THE ASK** (operator): *"fix the letter helper so it rolls over past oz"*.

@@ -76,6 +76,64 @@ def organs():
     return found
 
 
+def rejected_flags(src=None):
+    """-> [(script, flag)] for every flag run_all.sh hands a script that the
+    script's own parser does not define. None when run_all.sh is unreadable.
+
+    [2026-08-16 (pe)] THE SECOND WAY AN ORGAN RUNS INERT, and it is this
+    file's own mechanism seen from the other end. The header above says the
+    exit code goes to `|| true` and the traceback to a log nobody tails — an
+    argparse rejection is exactly that: `error: unrecognized arguments`,
+    **exit 2**, swallowed, and the boot falls through to the next line as if
+    nothing happened.
+
+    MEASURED in the live container: `run_all.sh` passed
+    `--publish-if-stale 21600` to `scripts/golive_readiness.py`, which did not
+    implement the flag —
+
+        golive_readiness.py: error: unrecognized arguments: --publish-if-stale 21600
+
+    — so the early-publish mitigation was INERT from the moment the shell half
+    landed until `(pa)` implemented the script half hours later. Nothing was
+    red. `run_all.sh` claimed a mitigation the container never had.
+
+    THE TRANSFERABLE RULE: a claim read off `run_all.sh` alone is a claim
+    about the SHELL, not about the organ. This closes the gap by asking the
+    script whether it accepts what it is handed.
+
+    Backslash continuations are joined FIRST. The golive invocation spans two
+    lines, and a line-at-a-time regex sees `--publish` and misses
+    `--publish-if-stale` entirely — which is how the first draft of this check
+    reported the known-bad commit as clean.
+    """
+    if src is None:
+        try:
+            with open(RUN_ALL, encoding="utf-8") as fh:
+                src = fh.read()
+        except OSError:
+            return None
+    joined = re.sub(r"\\\n\s*", " ", src)
+    out, seen = [], set()
+    for script, flags in re.finditer_tuples(joined) if False else re.findall(
+            r"python3\s+/freqtrade/((?:scripts/)?[\w/]+\.py)"
+            r"((?:\s+--[\w-]+(?:\s+[^\s\\|;&]+)?)*)", joined):
+        for flag in (x for x in flags.split() if x.startswith("--")):
+            if (script, flag) in seen:
+                continue
+            seen.add((script, flag))
+            path = os.path.join(ROOT, script)
+            if not os.path.exists(path):
+                continue          # named but not in this tree — no claim
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    body = fh.read()
+            except OSError:
+                continue
+            if f'"{flag}"' not in body and f"'{flag}'" not in body:
+                out.append((script, flag))
+    return out
+
+
 def reports_own_death(path):
     """True when this module routes its entry point through organ_main(), or
     otherwise records a fault where the fleet can read it.
@@ -98,7 +156,8 @@ def scan():
     """-> (silent, ok, declared, err). Pure, so the selftest can drive it."""
     found = organs()
     if found is None:
-        return None, None, None, "run_all.sh not readable"
+        return None, None, None, "run_all.sh not readable", None
+    bad_flags = rejected_flags()
     silent, ok, declared = [], [], []
     for name in found:
         path = os.path.join(ROOT, name)
@@ -110,11 +169,11 @@ def scan():
             declared.append(name)
         else:
             silent.append(name)
-    return silent, ok, declared, None
+    return silent, ok, declared, None, bad_flags
 
 
 def main():
-    silent, ok, declared, err = scan()
+    silent, ok, declared, err, bad_flags = scan()
     if err:
         print(f"audit_organ_silence: FAILED — {err}. The guard cannot vouch "
               f"for what it cannot read; failing closed.")
@@ -131,13 +190,93 @@ def main():
               "so a\nrecovered organ stops reading as sick.\n"
               "A deliberate exception goes in SILENT_OK **with a reason**.\n")
         return 1
+    if bad_flags:
+        print("\nFLAGS run_all.sh HANDS A SCRIPT THAT REJECTS THEM — argparse "
+              "exits 2 and\n`|| true` swallows it, so the organ runs INERT "
+              "while the shell reads mitigated:\n")
+        for script, flag in sorted(bad_flags):
+            print(f"  {script}  {flag}")
+        print("\nFIX: implement the flag in the script, or stop passing it. "
+              "A claim read off\nrun_all.sh alone is a claim about the SHELL, "
+              "not about the organ ((pe)).\n")
+        return 1
     print(f"audit_organ_silence: OK — {len(ok)} organ(s) report their own "
-          f"death, {len(declared)} declared silent with a reason")
+          f"death, {len(declared)} declared silent with a reason, "
+          f"every run_all.sh flag accepted by its script")
     return 0
+
+
+def _flags_selftest():
+    """[(pe)] The flag arm, driven by fixtures — including the REAL shape that
+    ran inert in production, because a detector that cannot catch its own
+    founding incident is not calibrated."""
+    import tempfile
+
+    # Hoisted: Python requires a `global` declaration before the name's first
+    # use in the scope, and all three are rebound further down.
+    global ROOT, rejected_flags, scan
+
+    with tempfile.TemporaryDirectory() as td:
+        good = os.path.join(td, "ok_organ.py")
+        with open(good, "w") as fh:
+            fh.write('ap.add_argument("--publish")\n'
+                     'ap.add_argument("--publish-if-stale", type=int)\n')
+        bad = os.path.join(td, "bad_organ.py")
+        with open(bad, "w") as fh:
+            fh.write('ap.add_argument("--publish")\n')
+
+        _root = ROOT
+        try:
+            ROOT = td
+            # THE FOUNDING INCIDENT'S EXACT SHAPE: a backslash continuation,
+            # which is what made the first draft of this check report the
+            # known-bad commit as clean.
+            src = ("( python3 /freqtrade/bad_organ.py --publish \\\n"
+                   "    --publish-if-stale 21600 || true\n)\n")
+            assert rejected_flags(src) == [("bad_organ.py",
+                                            "--publish-if-stale")], \
+                rejected_flags(src)
+
+            src_ok = ("( python3 /freqtrade/ok_organ.py --publish \\\n"
+                      "    --publish-if-stale 21600 || true\n)\n")
+            assert rejected_flags(src_ok) == [], rejected_flags(src_ok)
+
+            # a flagless invocation makes no claim
+            assert rejected_flags("python3 /freqtrade/bad_organ.py || true") == []
+            # a script not in this tree makes no claim either
+            assert rejected_flags(
+                "python3 /freqtrade/absent.py --nope || true") == []
+        finally:
+            ROOT = _root
+
+    # ...and the ARM IS WIRED INTO THE VERDICT. Finding it is useless if
+    # main() does not fail on it — a mutation that deleted the report
+    # survived a first draft that tested only the finder.
+    # scan() must actually ASK the finder. Patching scan() wholesale (below)
+    # tests main()'s reporting but leaves this link unpinned — a mutation that
+    # hard-coded `bad_flags = []` inside scan() survived exactly that gap.
+    _rf = rejected_flags
+    try:
+        rejected_flags = lambda src=None: [("sentinel.py", "--x")]
+        assert scan()[4] == [("sentinel.py", "--x")], \
+            "scan() does not propagate the flag finder's result"
+    finally:
+        rejected_flags = _rf
+
+    _scan = scan
+    try:
+        scan = lambda: ([], ["x.py"], [], None, [("bad.py", "--nope")])
+        assert main() == 1, "a rejected flag must FAIL the guard, not print"
+        scan = lambda: ([], ["x.py"], [], None, [])
+        assert main() == 0, "a clean tree must still pass"
+    finally:
+        scan = _scan
 
 
 def _selftest():
     """The detector must FIRE, not merely stay quiet on a clean tree."""
+    global reports_own_death           # hoisted: rebound further down
+    _flags_selftest()
     import tempfile
     # reports_own_death: the three shapes that count, and the one that does not
     with tempfile.TemporaryDirectory() as d:
@@ -153,6 +292,23 @@ def _selftest():
         assert not reports_own_death(
             _w("d.py", "print(tb, file=sys.stderr)\nsys.exit(main())\n"))
         assert not reports_own_death(os.path.join(d, "nope.py"))
+
+    # [(pe)] scan() must USE that classifier. The checks above drive
+    # reports_own_death directly, so a mutation that hard-coded scan()'s
+    # branch to "everyone reports" survived them — the same finder-vs-wiring
+    # gap the flag arm had. Pre-existing; closed here because this file was
+    # already open.
+    _rod = reports_own_death
+    try:
+        reports_own_death = lambda path: False
+        silent, ok, declared, err, _ = scan()
+        assert err is None and silent, \
+            "scan() no longer routes organs through reports_own_death"
+        reports_own_death = lambda path: True
+        silent2, _, _, _, _ = scan()
+        assert not silent2, "scan() ignores a positive classification"
+    finally:
+        reports_own_death = _rod
 
     # every declared exemption must name a real file and give a real reason
     for name, why in SILENT_OK.items():
