@@ -1,3 +1,67 @@
+## 2026-08-16 (ol) — THE IMMUNE ORGAN CALLED ITS OWN CLOCK "THE FUTURE": `_fresh` refused any negative age, so a payload stamped microseconds ago read as unusable 38% of the time and every detector behind it went quietly blind
+
+- **THE ASK** (operator): *"fix it"* — the intermittent red I reported at the
+  end of the `(oh)` sweep. `tests/autonomy/test_restart_counter_authority.py`,
+  shipped hours earlier by `(od)`, was failing on main and in CI while the
+  other ~1,400 tests passed. **It was not the Parliament logic and it was not a
+  bad test. It was a real defect in `_fresh`, on the path every immune check
+  goes through.**
+
+- **THE MECHANISM, measured before anything was changed.** `_fresh` gated on
+
+      return 0 <= age <= horizon
+
+  and `age = now - datetime.fromisoformat(updated).timestamp()`.
+  `datetime.fromtimestamp` rounds to the nearest MICROSECOND, so the round trip
+  `float -> datetime -> isoformat -> float` lands a few hundred nanoseconds in
+  the **future 38% of the time** (10,000 draws). A payload stamped from the
+  reader's OWN clock therefore has `age ≈ -2e-7`, fails `0 <= age`, and is
+  skipped. In the failing test that meant the FIRST sighting never recorded, so
+  the second call became the first sighting and reported nothing: five deaths,
+  `[]` returned, ~30% of runs.
+
+- **WHY IT IS A PRODUCTION BUG, not a test bug.** The same arithmetic runs
+  against real payloads where publisher and reader are **different
+  containers**: any NTP skew leaving the publisher a few milliseconds ahead
+  dates its payload in the reader's future and this organ skips it. And the
+  direction is the dangerous one — all nine `_fresh` call sites are
+  `if _fresh(...)` guarding a CHECK, so refusing does not make the organ
+  careful, **it makes it blind**, which is the exact failure class this file
+  exists to catch (I1). A detector that switches itself off over a nanosecond
+  of rounding is the "guard that cannot fire" shape at `(gl)`/`(hj)`.
+
+- **THE FIX IS A BOUNDED TOLERANCE, NOT A DELETED GUARD.** `FUTURE_SKEW_S`
+  (2s, env-overridable) becomes the lower bound. A payload dated minutes ahead
+  is still refused, because that IS a real fault — a corrupt write or a badly
+  wrong clock. Five mutations, all red: revert to `0`; remove the lower bound
+  entirely; widen the tolerance to 900s; break the stale side; make an
+  unparseable stamp read as fresh.
+
+- **PINNED DETERMINISTICALLY, which is the part that matters for a flake.**
+  A test that reproduces a 38% failure by sampling the wall clock is itself
+  flaky and teaches nobody anything. `tests/autonomy/test_immune_freshness_skew.py`
+  uses a FIXED epoch float whose round trip provably lands in the future
+  (`1755300000.0000007`), and its first assertion is that this property still
+  holds — so if CPython's rounding ever changes, the file says so instead of
+  passing vacuously. It also drives `restart_churn` end to end, because the
+  incident was a DETECTOR reporting nothing, not a helper returning False.
+
+- **VERIFIED THE WAY A FLAKE HAS TO BE**: the previously-flaky file now passes
+  **30 consecutive runs** (was ~30% failing). Suite green, all 27 floors held.
+
+- **WHY THIS WAS WORTH STOPPING FOR.** This session opened on a workflow that
+  had been red on every push for a day, and the cost recorded then was that a
+  genuine new failure would be invisible inside a standing red. An INTERMITTENT
+  red is the same rot on a longer fuse and with a worse habit attached — the
+  team learns to re-run rather than read. It also very nearly bought the wrong
+  diagnosis: the failure lands in a Parliament restart-counter test, three
+  files away from the arithmetic that caused it.
+
+- **NOT MY CODE, and that is recorded on purpose.** `(od)` shipped the test
+  that exposed this; the defect it exposed predates it and lives in `_fresh`.
+  The test was right and the organ was wrong. No `(od)` file was edited.
+  Shadow/organ code, no trade behaviour, no live surface: main only per `(mm)`.
+
 ## 2026-08-16 (oj) — 🧙 SCHWAGER RETIRED: the I17 call, made on a measurement, and a NEW undecidability class to go with it
 
 - **THE DECISION.** Operator: *"retire schwager"*, on the `(nu)`/`(oe)`

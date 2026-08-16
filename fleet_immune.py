@@ -59,6 +59,21 @@ KEY = "fleet-immune"
 TTL_SEC = int(os.environ.get("IMMUNE_TTL_SEC", "2400"))       # 40 min
 MAX_ALERT_AGE_H = float(os.environ.get("IMMUNE_MAX_ALERT_AGE_H", "24"))
 NOTIFY_GAP_H = float(os.environ.get("IMMUNE_NOTIFY_GAP_H", "6"))
+# [2026-08-16 (ol)] How far into the FUTURE a payload may be dated and still be
+# read. `_fresh` refused ANY negative age, and a future-dated payload is worth
+# refusing at scale — a corrupt write, a wildly wrong clock — but not at the
+# microsecond, for two reasons that both bite here:
+#   * publisher and reader are DIFFERENT CONTAINERS, so ordinary NTP skew of a
+#     few ms dates a perfectly good payload in the reader's future;
+#   * `float -> datetime -> isoformat -> float` rounds to the nearest
+#     microsecond and lands in the future **38% of the time** (measured), so
+#     even a payload stamped from the reader's OWN clock trips it.
+# The direction matters: every `_fresh` call site is `if _fresh(...)` guarding a
+# CHECK, so "not fresh" means the detector does nothing. Refusing on a
+# nanosecond of rounding does not make the organ careful, it makes it blind —
+# and blind is the failure mode this whole file exists to prevent (I1). The
+# guard still means something: a payload dated minutes ahead is still refused.
+FUTURE_SKEW_S = float(os.environ.get("IMMUNE_FUTURE_SKEW_S", "2"))
 
 # Known-toxic ANTIBODIES — specific retired/artefact patterns to neutralize
 # on sight regardless of age. Each is (substring, why). The 15-Jul incident
@@ -80,14 +95,19 @@ def _iso(ts=None):
 
 def _fresh(state, now, max_age_s=None):
     """A payload is usable only if its own `updated` is younger than its ttl
-    (or max_age_s override). Fail-safe: unparseable -> not fresh."""
+    (or max_age_s override). Fail-safe: unparseable -> not fresh.
+
+    [2026-08-16 (ol)] The lower bound is `-FUTURE_SKEW_S`, not 0 — see that
+    constant. A sub-microsecond negative age is float round-tripping, not a
+    future-dated payload, and refusing it silently switched a detector off.
+    """
     try:
         u = datetime.fromisoformat(str(state.get("updated")).replace("Z", "+00:00"))
         if u.tzinfo is None:
             u = u.replace(tzinfo=timezone.utc)
         age = now - u.timestamp()
         horizon = max_age_s if max_age_s is not None else float(state.get("ttl_sec") or 0)
-        return 0 <= age <= horizon
+        return -FUTURE_SKEW_S <= age <= horizon
     except Exception:
         return False
 
