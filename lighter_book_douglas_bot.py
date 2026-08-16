@@ -23,10 +23,26 @@ supports, measured before a line of this file was written:
        2.5x ATR24): the disciplined trader is the casino, taking the other
        side of emotional overreaction with a fixed, asymmetric bracket
        (stop 1.0x ATR, target 1.5x ATR, expiry 12h). MEASURED on 208d of
-       Lighter 1h tape: +$27.01, both halves positive (+$8.80/+$18.21),
-       beats 199 of 200 random-entry draws on BOTH total and per-trade
-       mean (P=0.005) — while impulse CONTINUATION, the crowd's trade,
-       measured −$210.59 at t=−2.81. The mirror is the message.
+       Lighter 1h tape: ~~+$27.01, both halves positive (+$8.80/+$18.21),
+       t=0.84~~ — **CORRECTED IN PLACE 2026-08-16 (I12): those are PRE-(ml)
+       numbers and they overstate.** (ml) taught the replay to bracket-test
+       the ENTRY BAR's own post-open range, because a live loop realises
+       entry-bar stops; its own entry warned that "numbers recorded before
+       this correction carry that small optimism". On THIS book it is not
+       small. Re-measured 16-Aug through the same harness, decomposed so
+       the cause is not guessed (tape roll contributes ~nothing):
+           13-Aug window, (ml) OFF : n=562 +$31.70 t=1.00 h1=+$14.10
+           13-Aug window, (ml) ON  : n=630 +$17.90 t=0.52 h1=−$10.45
+           today  (208d), (ml) ON  : n=641 +$17.38 t=0.50 h1=−$7.73
+       So the honest reading is **+$17.38, t=0.50, and h1 NEGATIVE** — the
+       entry-bar fix costs 44% of the total, halves t, and flips the first
+       half. THE EDGE ITSELF SURVIVES: it still beats 199 of 200
+       random-entry draws on BOTH total and per-trade mean (P=0.005), and
+       impulse CONTINUATION, the crowd's trade, still measures −$210.59 at
+       t=−2.81. The mirror is still the message. What does NOT survive is
+       "both halves positive" — one of the six go-live bars.
+       Found by the calibration gate of `study_leverage_sizing_2026-08-16`,
+       which had to reproduce this book to be allowed to speak about it.
   3. "Wins and losses are randomly distributed" — CONSISTENCY.
        Every trade is the same size. Outcomes cannot alter execution:
        `_open_position` takes no streak, no last-trade, no equity input —
@@ -55,9 +71,12 @@ HONEST ABOUT THE EVIDENCE (scripts/study_books_cohort_2026-08-13.py):
     {cont,fade} x bracket {1.0/1.5, 1.5/1.0} x hold {12,24}) — every
     continuation cell negative, every tight-target cell negative; the
     shipped cell's neighbours agree in sign (fade 2.5 h24: +$22.75).
-  * t=0.84 is BELOW the go-live t-bar. This book exists to earn that
-    evidence in shadow, ~83 closes/30d, gradeable ~12-Sep by the standard
-    gate. Regime caveat (item 18): one tape, mean-reverting in its recent
+  * ~~t=0.84~~ **t=0.50 (corrected 16-Aug, see above)** is BELOW the go-live
+    t-bar, and the backtest's h1 is now NEGATIVE, so the book would fail two
+    of the six bars on its own founding sample. This book exists to earn that
+    evidence in shadow, ~92 closes/30d, gradeable ~12-Sep by the standard
+    gate — on its OWN ledger, which is the record and outranks any replay
+    (I14). Regime caveat (item 18): one tape, mean-reverting in its recent
     half; the brain grades `long-impulse` and `short-impulse` separately.
   * friction modelled flat 5bps/side (Lighter fee is zero, measured; the
     Barnesy mark-sleeve number). Fills AT MARK by declared model.

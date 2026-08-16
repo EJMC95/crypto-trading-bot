@@ -201,10 +201,36 @@ def t_stat(xs):
 
 
 # ------------------------------------------------------- portfolio replay
-def run_portfolio(signals, rows_by_sym, cap, res_sec, atrs_by_sym):
+def run_portfolio(signals, rows_by_sym, cap, res_sec, atrs_by_sym,
+                  entry_bar_bracket=True):
     """signals: {sym: [(bar_i, side, sl, tp, hold_bars, trail_mult)]}.
     Entry next-bar open; intra-bar stop first (conservative); trail is a
-    close-basis chandelier when trail_mult is set. Sequential, cap-bound."""
+    close-basis chandelier when trail_mult is set. Sequential, cap-bound.
+
+    [2026-08-16] ADDITIVE EXTENSION for the ⚡ High Voltage sizing study — this
+    stays the ONE owner of the bracket walk (a second copy is a second rule),
+    so the levered study imports it rather than forking it. Nothing about the
+    default path changed: with `entry_bar_bracket=True` every previously
+    published number reproduces byte-identically, and the pre-existing keys
+    (`sym`/`ret`/`t`/`hold`) are untouched. What is new:
+
+      * each closed record also carries `entry`, `entry_t`, `side`, `sl`, `tp`,
+        `atr0`, `reason` and `mae_frac` — the MAXIMUM ADVERSE EXCURSION as a
+        fraction of entry, over every bar the position was open INCLUDING the
+        entry bar. A liquidation is a pure function of that excursion and the
+        position's leverage, so a levered study can price liquidation exactly
+        without a second walk (and without this harness knowing what leverage
+        is).
+      * `gap_frac` — how far the bar that stopped the trade OPENED beyond the
+        stop. The walk fills stops AT the stop price, which is optimistic on a
+        gap; recording the gap lets a study charge it rather than assume it
+        away. Zero when the stop was reachable inside the bar.
+      * `entry_bar_bracket=False` reverts to the PRE-(ml) convention, in which
+        the entry bar's own post-open range was not bracket-tested. It exists
+        so the size of that look-ahead stays MEASURABLE rather than becoming
+        folklore — the (ml) entry warned the recorded numbers "carry that small
+        optimism", and on the Douglas cell it is not small (see the (ml)
+        decomposition in the High Voltage study)."""
     ev = []
     for sym, sigs in signals.items():
         rows = rows_by_sym[sym]
@@ -224,24 +250,28 @@ def run_portfolio(signals, rows_by_sym, cap, res_sec, atrs_by_sym):
                 continue
             _, o, h, l, c = rows_by_sym[sym][i][:5]
             e, sign = p["entry"], p["sign"]
-            px = None
+            # MAE over EVERY bar held, entry bar included (set at open time).
+            p["mae"] = max(p["mae"], (e - l) / e if sign > 0 else (h - e) / e)
+            px, reason = None, None
             if sign > 0:
                 stop_px = e * (1 - p["sl"]) if p["trail_px"] is None \
                     else p["trail_px"]
                 if l <= stop_px:
-                    px = stop_px
+                    px, reason = stop_px, "sl"
+                    p["gap"] = max(0.0, (stop_px - o) / e)
                 elif p["tp"] and h >= e * (1 + p["tp"]):
-                    px = e * (1 + p["tp"])
+                    px, reason = e * (1 + p["tp"]), "tp"
             else:
                 stop_px = e * (1 + p["sl"]) if p["trail_px"] is None \
                     else p["trail_px"]
                 if h >= stop_px:
-                    px = stop_px
+                    px, reason = stop_px, "sl"
+                    p["gap"] = max(0.0, (o - stop_px) / e)
                 elif p["tp"] and l <= e * (1 - p["tp"]):
-                    px = e * (1 - p["tp"])
+                    px, reason = e * (1 - p["tp"]), "tp"
             p["bars"] += 1
             if px is None and p["bars"] >= p["hold"]:
-                px = c
+                px, reason = c, "hold"
             if px is None and p["trail"]:
                 if sign > 0:
                     p["hwm"] = max(p["hwm"], c)
@@ -254,7 +284,11 @@ def run_portfolio(signals, rows_by_sym, cap, res_sec, atrs_by_sym):
             if px is not None:
                 ret = (px - e) / e * sign - 2 * FEE_SIDE
                 closed.append(dict(sym=sym, ret=ret, t=now_t,
-                                   hold=p["bars"] * res_sec / 3600.0))
+                                   hold=p["bars"] * res_sec / 3600.0,
+                                   entry=e, entry_t=p["t0"], side=p["side"],
+                                   sl=p["sl"], tp=p["tp"], atr0=p["atr0"],
+                                   reason=reason, mae_frac=p["mae"],
+                                   gap_frac=p["gap"]))
                 del open_pos[sym]
         while ei < len(ev) and ev[ei][0] == now_t:
             _, sym, bar_i, side, sl, tp, hold, trail = ev[ei]
@@ -273,26 +307,31 @@ def run_portfolio(signals, rows_by_sym, cap, res_sec, atrs_by_sym):
             # stops, so skipping them graded an optimistic rule. Numbers
             # recorded before this correction carry that small optimism.
             _, _eo, eh, el, ec = ebar[:5]
-            px = None
-            if sign > 0:
-                if el <= entry * (1 - sl):
-                    px = entry * (1 - sl)
-                elif tp and eh >= entry * (1 + tp):
-                    px = entry * (1 + tp)
-            else:
-                if eh >= entry * (1 + sl):
-                    px = entry * (1 + sl)
-                elif tp and el <= entry * (1 - tp):
-                    px = entry * (1 - tp)
+            emae = (entry - el) / entry if sign > 0 else (eh - entry) / entry
+            px, reason = None, None
+            if entry_bar_bracket:
+                if sign > 0:
+                    if el <= entry * (1 - sl):
+                        px, reason = entry * (1 - sl), "sl"
+                    elif tp and eh >= entry * (1 + tp):
+                        px, reason = entry * (1 + tp), "tp"
+                else:
+                    if eh >= entry * (1 + sl):
+                        px, reason = entry * (1 + sl), "sl"
+                    elif tp and el <= entry * (1 - tp):
+                        px, reason = entry * (1 - tp), "tp"
             if px is not None:
                 ret = (px - entry) / entry * sign - 2 * FEE_SIDE
                 closed.append(dict(sym=sym, ret=ret, t=now_t,
-                                   hold=res_sec / 3600.0))
+                                   hold=res_sec / 3600.0,
+                                   entry=entry, entry_t=now_t,
+                                   side=side, sl=sl, tp=tp, atr0=a0,
+                                   reason=reason, mae_frac=emae, gap_frac=0.0))
                 continue
             p0 = dict(entry=entry, sign=sign,
                       sl=sl, tp=tp, hold=hold, bars=1,
                       trail=trail, trail_px=None, hwm=entry,
-                      atr0=a0)
+                      atr0=a0, t0=now_t, side=side, mae=emae, gap=0.0)
             if trail:
                 if sign > 0:
                     p0["hwm"] = max(p0["hwm"], ec)

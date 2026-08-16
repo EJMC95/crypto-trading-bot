@@ -215,6 +215,15 @@ SELFTEST_MODULES = [
     "triangular_arb",
     "venues.safety",
     "venues.lighter_client",
+    # [2026-08-16] the isolated-margin liquidation MODEL (the paper-arm
+    # counterpart to (no)'s live-account margin_state). Registered here rather
+    # than excluded because its selftest is pure and offline — it parses a
+    # literal orderBookDetails fixture — and because a liquidation engine that
+    # silently stops firing is the exact vacuous-guard shape I3 warns about.
+    # It lives under scripts/ ON PURPOSE: venues/ is inside
+    # bot_pnl_store._BUILD_SHARED, and putting it there re-stamped 22 images
+    # (build_n 17 -> 18) for a module none of them import — the (fd) trap.
+    "scripts.lighter_margin_model",
 ]
 
 # Heavier live-fixture harnesses that need the real signer SDK. Skipped when the
@@ -306,6 +315,13 @@ SELFTEST_EXCLUDE = {
     "scripts/audit_secret_leak.py",
     # Research backtest: needs historical market data / network, not a unit test.
     "scripts/backtest_georgia_short_sleeve.py",
+    # [2026-08-16] ⚡ High Voltage's decision-point study. `--selftest` IS
+    # offline-green (run it directly); the full run needs the venue's live
+    # margin tiers AND the cached 208d tape. VERDICT IN ITS HEADER: the
+    # risk-normalised sizing design is REFUTED — t 0.50 -> -0.82 on identical
+    # entries, because equal-risk weighting upweights the tight-stop trades
+    # where this edge loses. Re-run it, do not re-argue it from prose.
+    "scripts/study_leverage_sizing_2026-08-16.py",
     # [2026-07-21] TSL reclaim study: --selftest IS offline-green, but the
     # module's import pulls the family bot's full strategy surface and its
     # full run needs the venue API — a research script, not an organ. Its

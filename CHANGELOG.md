@@ -65,6 +65,131 @@
 - **NOT A REAL-MONEY CHANGE — main only, per the `(mm)` rule.** Shadow book,
   and every edit is inside `selftest()`: no gate, lever, clip or trade
   behaviour moves, so there is nothing to deploy.
+## 2026-08-16 (nr) — ⚡ HIGH VOLTAGE: THE SIXTH LEVERAGE MEASUREMENT, THE FIRST ON LIGHTER'S OWN TAPE — REFUTED, AND THE CALIBRATION GATE CAUGHT A LIVE BOOK'S HEADLINE ON THE WAY PAST
+
+- **THE ASK.** Operator: *"design me a bot specifically designed for high
+  leverage trading"*, then *"move forward high voltage"*. Design in
+  `BAND_YOUNG_HIGH_VOLTAGE_2026-08-16.md` (⚡ `band-young-lshadow`, Angus Young
+  — barnes and garrett taken). **Built to step 2 of its own build order, which
+  it declared to be the decision point, and STOPPED there. No row was minted,
+  no service provisioned, no lever set, no real money touched.**
+- **WHY IT WAS NOT THE THING ALREADY REJECTED FIVE TIMES.** Every prior study
+  applied leverage as a SCALAR on a clip (`size = order_usd * L / px`), which
+  scales mean and SD together and leaves `t` UNCHANGED — the POSITION-DAYS
+  algebra. This design made leverage an OUTPUT: `R = RISK_PCT·equity`,
+  `N = R/s`, so `L = RISK_PCT/s` and each trade is weighted by `1/s`, which
+  genuinely CAN move `t`. Pre-registered primary criterion, written before the
+  run: **t must IMPROVE vs the fixed-clip control on IDENTICAL entries.**
+- **REFUTED, decisively.** Host = 🧘 The Zone's shipped rule (208d Lighter 1h,
+  641 closes, 18 coins, cap 4), so the control is a LIVE book and exactly one
+  variable differs. Control **t=+0.50 / +$17.38 / maxDD 5.2%**; risk-normalised
+  **t=−0.82 / −$255.91 / maxDD 54.1%**. **All 12 pre-declared grid cells lose**
+  (t −0.36 to −1.23, maxDD 24% to **100.4% — outright ruin at 2% risk/trade**).
+  Reported as refuted per the standing rule, not reframed as upside.
+- **THE MECHANISM, and it is not the one the design predicted.** §3 reasoned
+  with a scalar `mean(ret)/median(s) = +0.031R`, which predicts **+$199**. The
+  arm's true expectancy is `mean(ret/s)` — arm B's dollar P&L is exactly
+  `R·Σ(ret/s)` — and that is **−0.0399R = −$256**. The two disagree in SIGN.
+  Quintiles by stop distance (gross of cost in brackets): Q1 0.468% **−0.136R**
+  (+0.077) · Q2 0.685% **−0.250R** (−0.104) · Q3 0.877% **−0.150R** (−0.036) ·
+  Q4 1.134% **+0.260R** (+0.348) · Q5 1.752% +0.076R (+0.133). **The fade edge
+  lives entirely in the two WIDEST-stop quintiles, and Q2/Q3 are negative even
+  GROSS of the round trip — so it is a property of the signal, not just of
+  slippage.** Equal-risk sizing hands the biggest notional to exactly the
+  losers: the 195 trades (30%) below the measured 0.69% floor contribute
+  **−$276.75** equal-risk against **−$15.85** fixed-clip. **The fixed clip was
+  accidentally doing the right thing.**
+- **A TRAP CAUGHT MID-RUN, recorded because it nearly published the opposite
+  verdict.** The grid first showed positive cells (best t=+0.75) — an artifact:
+  the $600 notional cap pinned arm B at exactly 0.60× on every cell, making it
+  a fixed-NOTIONAL book, and since `t` is scale-invariant it merely reproduced
+  the control's `t` at the same floor. `size_for_risk` was clamping SILENTLY in
+  the function whose own docstring promises named refusals. Fixed (the binding
+  constraint is now named), a clamp census prints with the grid, and unbinding
+  the cap turned all 12 cells negative.
+- **THE HYPERLIQUID CAVEAT IS CLOSED.** Four of the five prior rejections load
+  HL data and were therefore *hypotheses about Lighter*
+  ([[leverage-measured-and-rejected-five-times]]). This is Lighter-native — its
+  own tape, its own published margin tiers, a liquidation model in the loop —
+  and it AGREES with the prior. Sixth measurement, sixth rejection. The one
+  route still unrefuted is the one the design named and this run did not test:
+  **`c`, execution quality.** Fees are zero here, so `c` is pure slippage, it
+  has never been measured per book, and it is the only term that raises the
+  leverage ceiling `L_ceiling = RISK_PCT·gross_R/c` *while also* raising
+  expectancy.
+- **NEW: `scripts/lighter_margin_model.py` — the fleet's first liquidation
+  model, and it is not vacuous.** `paper_broker.py` says in its own docstring
+  *"cash-settled perps, LEVERAGE 1"* and has no margin, no maintenance margin
+  and no liquidation event; a levered shadow book on it is a FICTION GENERATOR,
+  booking recoveries from positions a real account was liquidated out of. The
+  venue publishes its tiers per book on the endpoint the scout ALREADY fetches:
+  units are **per-10000** (proved by the distinct-value set
+  `{200,333,400,500,666,1000,1250,2000,3333}` = 10000/{50,30,25,20,15,10,8,5,3},
+  and independently by the SDK's own `/10_000`), `mmf ≈ 0.60·min_imf` and
+  `cmf ≈ 0.40·min_imf`. **Max leverage is a hard per-coin cap** — BTC/ETH 50×,
+  SOL 25×, most alts 10×, LIT/ETHFI/TAO 5×, thinnest 3× — so a rule computing
+  L=8 on ETHFI cannot open. The engine FIRES: 2 liquidations at 5% risk/trade,
+  13 at 20%, and **67 of 641 trades would liquidate at each coin's venue-max
+  leverage** (I3). Fail-CLOSED against this repo's usual habit: an unknown
+  maintenance fraction REFUSES the trade.
+- **THE TIER RULE IS AN ALARM, NEVER A SOURCE — and its first version was
+  wrong.** `assert_tier_structure` initially flagged 39 of 210 books; the rule
+  was fine and the TOLERANCE was wrong (expressed in fraction space, not the
+  venue's own per-10000 integer grid). But three books are genuine exceptions:
+  **OP and ARB publish mmf=399 where 0.6·666 rounds to 400, and QQQ publishes
+  199 where US100 — SAME min_imf of 333 — publishes 200.** Two books, one tier,
+  two maintenance fractions. So `parse_specs` reads each book's PUBLISHED field
+  and the derived rule only fires when the venue changes its scheme.
+- **IT LIVES UNDER `scripts/`, DELIBERATELY — the (fd) trap, measured.**
+  `bot_pnl_store._BUILD_SHARED` begins with `"venues"`, so placing it at
+  `venues/margin.py` moved 🧘 Douglas's stamp from `build_n=17` to **18** — a
+  fleet-wide re-stamp of ~22 images for a module none of them import, which
+  `audit_code_currency` reads as the whole fleet drifting. Moved; stamp back to
+  17. Same reasoning `fleet_books.py` records for its own location.
+- **MODEL vs RECORD, declared (I14).** `(no)` landed the venue's own margin
+  truth for the LIVE account hours earlier (`margin_state_from`: real leverage,
+  mode, venue-published liq price). **Where both exist, THAT WINS.** This module
+  is the complement for the case `venues/base.margin_state` explicitly leaves
+  open — *"a shadow/paper arm holds no venue account"* — and its free
+  calibration route (check `liq_price()` against the live account's published
+  `liq`) is named and NOT yet run, so it is an unvalidated model and says so.
+- **`run_portfolio` EXTENDED ADDITIVELY, not forked** (one owner; a second copy
+  is a second rule). Closed trades now also carry `entry/entry_t/side/sl/tp/
+  atr0/reason/mae_frac/gap_frac`, so a levered study can price liquidation from
+  the measured maximum adverse excursion without a second walk. Regression gate
+  run: the default path reproduces every prior number to the cent. New
+  `entry_bar_bracket=False` reverts to the pre-(ml) convention so the size of
+  that look-ahead stays MEASURABLE rather than folkloric.
+- **AND THAT SWITCH IMMEDIATELY EARNED ITS KEEP — 🧘 THE ZONE'S PUBLISHED
+  EVIDENCE IS PRE-(ml) AND OVERSTATES. Corrected in place (I12) in CLAUDE.md
+  and the bot's own docstring.** The study's calibration gate had to reproduce
+  the control before it was allowed to speak, and it could not. Decomposed so
+  the cause is measured, not guessed — 3 days of tape roll contribute ~nothing:
+  13-Aug window **(ml) OFF: n=562 +$31.70 t=1.00 h1=+$14.10** · **(ml) ON:
+  n=630 +$17.90 t=0.52 h1=−$10.45** · today: **n=641 +$17.38 t=0.50 h1=−$7.73**.
+  Recorded everywhere as *n=575, +$27.01, t=0.84, both halves positive*. So the
+  entry-bar fix costs **44% of the total, halves `t`, and flips h1 negative** —
+  (ml) warned its own recorded numbers "carry that small optimism"; on this book
+  it is not small. **The EDGE SURVIVES** (still beats 199/200 random draws on
+  both metrics, P=0.005) — what does not survive is **"both halves positive",
+  one of the six go-live bars.**
+- **🧙 SCHWAGER IS FLAGGED, NOT FIXED (I11 — one house at a time).** Its
+  recorded **n=277 +$457.21 t=1.88 halves +357.90/+99.31** does not reproduce on
+  any window that can be constructed today, and here (ml) is NOT the cause:
+  exact original window (ml) OFF **n=286 +$326.95 t=1.35 h2=−$3.81** · same
+  window (ml) ON **+$317.68 t=1.31** · today 500d **+$183.01 t=0.86 h2=−$27.78**
+  · full 576d tape **+$292.52 t=1.16 h2=+$0.40**. **h2 is negative or ~zero on
+  all four**, so "both halves positive" fails there too, and a headline that
+  moves 30–60% on a 6-day window shift is a fat-tail artefact rather than an
+  estimate. Cause NOT attributed and NOT guessed — the book is 2 days live with
+  almost no ledger, so nothing operational turns on it yet. **Owner: this repo,
+  next pass** — re-measure with a stated window convention before its number is
+  quoted again.
+- **Registered, not silently added:** `scripts.lighter_margin_model` in
+  `SELFTEST_MODULES` (pure, offline, and a liquidation engine that stops firing
+  is the vacuous-guard shape I3 exists for); the study in `SELFTEST_EXCLUDE`
+  with its verdict in the reason, the house pattern for research scripts. Full
+  suite green (`tests/autonomy` + `tests/test_selftests.py`).
 
 ## 2026-08-16 (nq) — `(nn)` SAID "FOUR DAYS" AND THE RECEIPTS SAY 24 HOURS: the entry whose whole subject is an unreadable guard carried a 4× number in its own title
 
