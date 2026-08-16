@@ -394,7 +394,33 @@ done &
 # "a rule nobody runs is not a control" class as the 38 unrun selftests.
 # 6-hourly is plenty — the bar's shortest term is a 30-DAY window. PUBLISH-
 # ONLY: promotes nothing, writes no lever; go-live is an operator act.
-( sleep 900
+# [2026-08-16] THE BOOT STAGGER WAS UNREACHABLE UNDER THIS FLEET'S PUSH
+# CADENCE, so the rule that governs real money could not publish at all.
+# MEASURED 03:02-04:40 UTC: 25 successful redeploy runs, median gap 3.0 min,
+# minimum 6 seconds — and a push is a deploy, so every one restarts this
+# `sleep 900` from zero. 24 of 24 inter-deploy gaps were SHORTER than the
+# stagger (100%); `freqtrade-bots` itself booted three times in 32 minutes
+# (04:09, ~04:24, 04:41) and this organ published only when the gap finally
+# exceeded 900s, at 04:56:07 = boot+900 exactly. The same arithmetic starves
+# parliament_main (79% of gaps), evidence_board (75%) and bot_learn — THE
+# BRAIN — at 71%. Nothing reported it: an organ that never reaches its first
+# run is not sick, and every liveness contract reads fine.
+# THE EARLY RUN closes it. The stagger exists to spread BOOT LOAD, which is a
+# real cost here (this organ grades every book off ledger fetches), so the
+# early run is gated on STALENESS: it publishes at boot only when the last
+# publish is already older than the normal interval — i.e. only when we are
+# overdue anyway. In the common case the gate is one key read and an
+# immediate exit, so boot load is unchanged; under a push burst the key can
+# no longer go unboundedly stale. Threshold is the interval itself, so the
+# organ's designed cadence defines "overdue" and there is no second constant.
+# ORDERING IS TOLERATED ON PURPOSE: `--publish-if-stale` may not exist in the
+# running image yet (it lands with the grader, from another session). An
+# unknown flag makes argparse exit non-zero, `|| true` swallows it, and this
+# falls through to the stagger below — EXACTLY today's behaviour. The floor of
+# this change is the current behaviour; it self-heals when the flag arrives.
+( python3 /freqtrade/scripts/golive_readiness.py --publish \
+      --publish-if-stale "${GOLIVE_INTERVAL_SEC:-21600}" || true
+  sleep 900
   while true; do
     python3 /freqtrade/scripts/golive_readiness.py --publish || true
     sleep "${GOLIVE_INTERVAL_SEC:-21600}"
