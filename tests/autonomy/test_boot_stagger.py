@@ -311,6 +311,42 @@ def test_the_published_ttl_beats_the_proxy_when_available():
     assert generous["verdict"] == "report", "a 2h TTL tolerates a 20m burst"
 
 
+def test_the_run_declares_WHICH_tolerance_basis_produced_its_verdicts(capsys,
+                                                                     monkeypatch):
+    """THIS GUARD HAS TWO REGIMES AND THEY ARE EASY TO CONFUSE.
+
+    With a DB it reads each organ's published `ttl_sec` (17 of 20 today). With
+    none — which is EVERY CI run, since no workflow sets DATABASE_URL — the
+    3x-interval proxy governs ALL of them. Two sessions each measured a
+    different regime, each stated it unconditionally, and spent four exchanges
+    disagreeing about numbers that were both correct.
+
+    So the run must SAY which basis produced it, the same "declare your source"
+    property `deploy_times` already has one level up.
+    """
+    monkeypatch.setattr(mod, "parse_blocks", lambda _t: [
+        {"organ": "x", "stagger_s": 20, "interval_s": 300, "early": True,
+         "gated": False, "mitigated": True, "inert_flags": [],
+         "kind": "periodic"}])
+    monkeypatch.setattr(mod, "deploy_times", lambda _l=60: (
+        [dt.datetime(2026, 8, 16, 0, m, tzinfo=dt.timezone.utc)
+         for m in (0, 5, 10)], "stub"))
+    monkeypatch.setattr(mod, "tolerances", lambda _o: {})       # the CI regime
+    monkeypatch.setattr("sys.argv", ["audit_boot_stagger.py"])
+    mod.main()
+    out = capsys.readouterr().out
+    assert "tolerance basis:" in out, "the run must declare its basis"
+    assert "proxy 1" in out and "published ttl_sec 0" in out, out
+    assert "CI regime" in out, "a proxy-only run must say so unprompted"
+
+    # ...and with real TTLs the line reports them instead
+    monkeypatch.setattr(mod, "tolerances",
+                        lambda _o: {"x": (1200.0, "published ttl_sec")})
+    mod.main()
+    out2 = capsys.readouterr().out
+    assert "published ttl_sec 1" in out2 and "CI regime" not in out2, out2
+
+
 def test_tolerance_is_the_MINIMUM_ttl_across_an_organs_keys(monkeypatch):
     """ORGAN -> KEY IS NOT 1:1, and the strictest contract binds first.
 

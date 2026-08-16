@@ -432,7 +432,23 @@ def main() -> int:
     gaps = gaps_of(times)
     rows = assess(blocks, gaps, tolerances([b['organ'] for b in blocks]))
 
+    # DECLARE WHICH BASIS PRODUCED THESE VERDICTS. This guard has TWO REGIMES
+    # and they are easy to confuse: with a DB it reads each organ's published
+    # `ttl_sec` (17 of 20 today); with none — which is EVERY CI run, since no
+    # workflow sets DATABASE_URL — `tolerances()` returns nothing and the
+    # 3x-interval proxy governs ALL of them. Two sessions each measured a
+    # different regime, stated it unconditionally, and spent four exchanges
+    # disagreeing about numbers that were both right. Same "declare your
+    # source" property already built into `deploy_times`, one level down.
+    n_pub = sum(1 for r in rows if r["tolerance_src"]
+                and "ttl_sec" in r["tolerance_src"])
+    n_prox = sum(1 for r in rows if r["tolerance_src"]
+                 and "proxy" in r["tolerance_src"])
     print(f"deploy cadence source: {source}")
+    print(f"tolerance basis: published ttl_sec {n_pub} organ(s), "
+          f"3x-interval proxy {n_prox}, unknown {len(rows) - n_pub - n_prox}"
+          + ("   [no DATABASE_URL — proxy governs; this is the CI regime]"
+             if not n_pub else ""))
     if gaps:
         print(f"  {len(times)} deploys, {times[0]:%d-%b %H:%M} -> "
               f"{times[-1]:%d-%b %H:%M} UTC | median gap "
