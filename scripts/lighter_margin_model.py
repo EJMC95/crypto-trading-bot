@@ -59,9 +59,26 @@ Read the confidence stratification before quoting it.
         T1    197.843218    197.516986    32238.916157    0.00000%   -0.14322%
         T2    197.843339    197.521799    32238.933282    0.00000%   -0.14116%
         T3    197.843339    197.522213    32238.933282    0.00000%   -0.14098%
+        T4    197.843339    197.528768    32238.933282    0.00000%   -0.13810%
 
         T1->T2  observed +0.000053%   coll +0.000053%   total +0.002116%
-        T2->T3  observed +0.000000%   coll +0.000000%   total +0.000182%
+        T2->T3  observed +0.000000%   coll +0.000000%   total +0.000182%   NULL
+        T3->T4  observed +0.000000%   coll +0.000000%   total +0.002882%   NULL
+        T2->T4  observed +0.000000%   coll +0.000000%   total +0.003064%   NULL
+
+    T4 is on a LATER BUILD — a container restart moved unrealised P&L, so
+    `total_asset` moved while `collateral` held. **T3->T4 is the citation to
+    quote: same verdict as T2->T3 with 15.8x more room to have been wrong**,
+    and it survives a redeploy. Three nulls and one positive: the liq moves
+    exactly when collateral moves and holds exactly when collateral holds.
+
+    METHOD NOTE, learned by getting it wrong: **hold `size` and `entry` FIXED
+    across snapshots.** A differential is meant to isolate the denominator, and
+    T1 predates the published `size` field — letting it fall back to a derived
+    `value/mark` (0.0069001022 vs the published 0.0069) pollutes the
+    comparison and is the entire source of T1's -0.00129% forward residual
+    under the derived convention. With size fixed at the published value all
+    four snapshots are EXACT.
 
     **T2->T3 IS A NULL TEST AND IT REFUTES total_asset OUTRIGHT.** `value` and
     `total_asset` both moved (the mark ticked, unrealised P&L with it) while
@@ -844,8 +861,10 @@ def _selftest():
     # snapshots of the same position; between T2 and T3 `total_asset` MOVED
     # (+0.000210%) while `collateral` did not, and the venue's liq did not
     # move either. A total_asset-denominated model is refuted by that absence.
+    # T3->T4 is pinned rather than T2->T3: same NULL verdict, 15.8x the
+    # magnitude total_asset would have had to move, and it spans a redeploy.
     T2_coll, T3_coll = 197.843339, 197.843339
-    T2_tot, T3_tot = 197.521799, 197.522213
+    T2_tot, T3_tot = 197.521799, 197.528768        # T3_tot is T4's, the wider gap
     venue_liq_T2 = venue_liq_T3 = 32238.933282
     n_ent = xau_size_pub * xau_entry
     for coll, want in ((T2_coll, venue_liq_T2), (T3_coll, venue_liq_T3)):
