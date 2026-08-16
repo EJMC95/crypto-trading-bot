@@ -257,7 +257,11 @@ def run_portfolio(signals, rows_by_sym, cap, res_sec, atrs_by_sym,
                 stop_px = e * (1 - p["sl"]) if p["trail_px"] is None \
                     else p["trail_px"]
                 if l <= stop_px:
-                    px, reason = stop_px, "sl"
+                    px = stop_px
+                    # A CHANDELIER TRAIL IS NOT A STOP. Labelling both "sl"
+                    # made Schwager's cell report 328 stop-outs on a rule whose
+                    # parent study reports 251 of 277 exits as the TRAIL.
+                    reason = "trail" if p["trail_px"] is not None else "sl"
                     p["gap"] = max(0.0, (stop_px - o) / e)
                 elif p["tp"] and h >= e * (1 + p["tp"]):
                     px, reason = e * (1 + p["tp"]), "tp"
@@ -265,7 +269,8 @@ def run_portfolio(signals, rows_by_sym, cap, res_sec, atrs_by_sym,
                 stop_px = e * (1 + p["sl"]) if p["trail_px"] is None \
                     else p["trail_px"]
                 if h >= stop_px:
-                    px, reason = stop_px, "sl"
+                    px = stop_px
+                    reason = "trail" if p["trail_px"] is not None else "sl"
                     p["gap"] = max(0.0, (o - stop_px) / e)
                 elif p["tp"] and l <= e * (1 - p["tp"]):
                     px, reason = e * (1 - p["tp"]), "tp"

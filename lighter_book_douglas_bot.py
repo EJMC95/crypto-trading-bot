@@ -37,10 +37,23 @@ supports, measured before a line of this file was written:
        So the honest reading is **+$17.38, t=0.50, and h1 NEGATIVE** — the
        entry-bar fix costs 44% of the total, halves t, and flips the first
        half. THE EDGE ITSELF SURVIVES: it still beats 199 of 200
-       random-entry draws on BOTH total and per-trade mean (P=0.005), and
-       impulse CONTINUATION, the crowd's trade, still measures −$210.59 at
-       t=−2.81. The mirror is still the message. What does NOT survive is
+       random-entry draws on BOTH total and per-trade mean, and impulse
+       CONTINUATION, the crowd's trade, still loses heavily (see below).
+       The mirror is still the message. What does NOT survive is
        "both halves positive" — one of the six go-live bars.
+       ALSO RE-MEASURED, because a correction that leaves pre-fix numbers
+       standing in its own paragraph is the I12 rot it exists to prevent:
+       impulse CONTINUATION under (ml) ON is **n=2919, −$248.65, t=−3.05**
+       (recorded pre-(ml) as −$210.59, t=−2.81) — still the crowd's trade,
+       still the mirror, and now more negative. The random-entry benchmark
+       WAS re-run under (ml) ON and the edge survives it: P≈0.005–0.007
+       (200–300 draws) on total, per-trade mean and t.
+       DECLARED UNEXPLAINED rather than folded in: no cell reproduces the
+       recorded n=575/+$27.01 exactly — the closest pre-(ml) cells are
+       n=562/+$31.70 (13-Aug window) and n=574/+$34.02 (full cache), leaving
+       ~13 trades and ~$4.69 unaccounted, most likely a refetched tape. The
+       (ml) attribution does not depend on it, and it is named rather than
+       absorbed.
        Found by the calibration gate of `study_leverage_sizing_2026-08-16`,
        which had to reproduce this book to be allowed to speak about it.
   3. "Wins and losses are randomly distributed" — CONSISTENCY.
@@ -49,7 +62,9 @@ supports, measured before a line of this file was written:
        structural (selftest pins the signature), so no future edit can
        quietly add a martingale. THE REFUTATION THAT SHAPED THIS: a naive
        "revenge guard" (per-coin cooldown after a loss + streak pause) was
-       measured and it FLIPPED THE BOOK NEGATIVE (+$27.01 -> −$11.32) —
+       measured and it FLIPPED THE BOOK NEGATIVE (+$27.01 -> −$11.32, a
+       PRE-(ml) pair — the direction is what matters and it is unchanged;
+       the cell has not been re-measured under (ml) ON) —
        skipping entries after losses is itself an emotional deviation from
        the edge, exactly as Douglas says ("the market doesn't know about
        your last trade"). Not shipped; reported.

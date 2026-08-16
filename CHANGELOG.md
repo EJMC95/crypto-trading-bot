@@ -243,6 +243,49 @@
     collapse at 1.30%) and it was found inside a ~701-cell search, so it needs
     a pre-registered out-of-sample test first. **Owner: this repo, next pass.**
 
+- **[SECOND CORRECTION PASS — the ADJUDICATOR found what all three skeptics
+  missed, and it was a bug in this study that FLATTERED the arm being
+  refuted.]**
+  * **THE DRAWDOWN BASIS WAS WRONG.** `max_drawdown` divided by the running
+    PEAK while its own docstring claimed "a fraction of starting equity" and
+    the fleet's grader (`golive_readiness.stats`) uses `abs(dd)/book_usd`. On
+    the fleet basis arm B is **66.7%, not 54.1%** — understated by 12.6pp, on
+    exactly the basis the 15% go-live bar uses. Two of the three lenses then
+    reasoned from the wrong number (one built a whole "capital-deployment
+    artifact" finding on it). Fixed; the grid's worst cell restates 100.4% ->
+    **135.3%**, i.e. more than total ruin.
+  * **THE CROSS-HOST RULE — the reusable asset from the whole pass, and none
+    of the three lenses measured it.** Run the same A/B over SEVEN cohort
+    rules and Δt is **host-dependent in SIGN**: Douglas fade −1.328, Grimes
+    failtest −1.661, Grimes pullback −0.472, Douglas continuation −0.673, but
+    **Schwager 3.5× +0.116, Schwager 2.5× +0.605, Grimes keltner +0.341**. It
+    sorts on the host's cost-to-stop ratio — positive where stops are wide
+    (Schwager med s=5.2%, c/s=0.019), negative where tight (Douglas med
+    s=0.88%, c/s=0.113). So the doctrine is NOT a blanket ban: **before
+    adopting risk-normalised sizing anywhere, measure
+    `sign(t(ret/s) − t(ret))` on that host's own closes** — one line against an
+    existing ledger. THE BOUND THAT KEEPS IT HONEST: the biggest gain lands on
+    a REFUTED rule that stays at t=−0.687, and the best shipped host moves
+    1.164 → 1.280. **No host on this tape crosses a decision boundary.**
+  * **TRAIL EXITS WERE LABELLED `sl`.** The additive `reason` key called a
+    chandelier-trail exit a stop, so Schwager's cell reported 328 stop-outs on
+    a rule whose parent reports 251/277 as the TRAIL. Now emits `trail`
+    (310/18/7); the non-trail cells are byte-identical.
+  * **THREE STALE PRE-(ml) NUMBERS SURVIVED INSIDE THE (ml) CORRECTION
+    ITSELF** — precisely the I12 rot it exists to prevent. Continuation
+    re-measured under (ml) ON: **−$248.65, t=−3.05** (was −$210.59/−2.81). The
+    random-entry null WAS re-run under (ml) ON and the edge survives (P≈0.005–
+    0.007); the revenge-guard pair is declared pre-(ml) and un-re-measured.
+    And **~13 trades / ~$4.69 are DECLARED UNEXPLAINED** rather than absorbed
+    into the (ml) term: no cell reproduces the recorded n=575/+$27.01 exactly.
+  * **A PROCESS NOTE, recorded against the next pass:** the pre-registration,
+    the study and the result all landed in ONE commit. Low-stakes here because
+    the outcome was a refutation — the direction pre-registration protects
+    against — but **the Douglas stop-floor test must be committed and pushed
+    BEFORE it is run.**
+  * Also fixed: `run_arm`'s docstring said EXIT order while the code sorts by
+    entry (entry is correct — the gross budget binds at open).
+
 - **Registered, not silently added:** `scripts.lighter_margin_model` in
   `SELFTEST_MODULES` (pure, offline, and a liquidation engine that stops firing
   is the vacuous-guard shape I3 exists for); the study in `SELFTEST_EXCLUDE`

@@ -138,16 +138,25 @@ def cluster_t(pnls, times, batch_s=60.0):
 
 
 def max_drawdown(pnls):
-    """Closed-basis max drawdown as a FRACTION of starting equity, walking the
-    realised equity path in exit order. Not the MTM drawdown the go-live bar
-    now folds in ((ia)/(iz)) — closes are what both arms share, so this is the
-    comparable number. Stated rather than silently substituted."""
+    """Closed-basis max drawdown on THE FLEET'S OWN BASIS: the worst
+    peak-to-trough fall in dollars, divided by the BOOK (`abs(dd)/book_usd`),
+    exactly as `golive_readiness.stats` computes `max_dd_frac`.
+
+    [CORRECTED 2026-08-16, and it is the one defect none of three adversarial
+    lenses caught — two of them then reasoned from the wrong number.] The first
+    version divided by the RUNNING PEAK while its docstring claimed "a fraction
+    of starting equity", which is neither this nor the fleet's convention. It
+    understated the arm being REFUTED by 12.6 points — arm B reads 54.1%
+    peak-relative against 66.7% on the fleet basis — and the study invites
+    comparison with the 15% go-live drawdown bar, which is book-relative. An
+    error that flatters the thing you are arguing against is still an error,
+    and this one pointed the wrong way twice over."""
     eq, peak, dd = EQUITY, EQUITY, 0.0
     for p in pnls:
         eq += p
         peak = max(peak, eq)
-        dd = max(dd, (peak - eq) / peak if peak > 0 else 0.0)
-    return dd
+        dd = max(dd, peak - eq)
+    return dd / EQUITY
 
 
 def halves(vals):
@@ -202,7 +211,13 @@ def realise(tr, notional, leverage, specs, opts):
 
 
 def run_arm(trades, specs, opts, fixed_clip=False):
-    """Walk the closed trades in EXIT order, applying one sizing rule.
+    """Walk the closed trades in ENTRY order, applying one sizing rule.
+
+    Entry order, not exit order: the gross-leverage budget has to bind at the
+    moment a position would be OPENED. (The docstring said "exit order" for one
+    commit while the code sorted by entry_t — symmetric across arms, so it moved
+    no verdict, but a false docstring feeding max_drawdown is how the next
+    reader gets misled.)
 
     Gross-leverage budget is tracked over positions that are open at the same
     moment, using each trade's own entry/exit stamps — so the budget binds the

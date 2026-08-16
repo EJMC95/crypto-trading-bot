@@ -137,6 +137,29 @@ the opposite of re-weighting toward them.
    floor ≥0.85% is applied the exponent is INERT** — every cell that clears the
    fleet bar clears it because of the entry filter, never the sizing rule.
 
+### The reusable rule — and it is stronger than "risk-normalisation is bad"
+
+The adjudicating review ran the A/B across **seven** cohort rules, which none
+of the three lenses had done. Δt by host: Douglas fade **−1.328** · Douglas
+continuation −0.673 · Grimes failtest −1.661 · Grimes pullback −0.472 · **
+Schwager 3.5× +0.116 · Schwager 2.5× +0.605 · Grimes keltner +0.341**.
+
+**The sign is host-dependent — negative on 4 of 7, positive on 3** — and it
+sorts on the host's own cost-to-stop ratio: positive where stops are wide
+(Schwager median s = 5.2%, `c/s` = 0.019), negative where they are tight
+(Douglas median s = 0.88%, `c/s` = 0.113). So the honest doctrine is NOT a
+blanket ban:
+
+> **Risk-normalised sizing is a property of the HOST's trade distribution, not
+> of the sizing rule. Before adopting it anywhere, measure
+> `sign( t(ret/s) − t(ret) )` on that host's own closes.** It is a one-line
+> test on an existing ledger and it costs nothing.
+
+And the bound that keeps it from being a rescue: **the largest improvement
+anywhere lands on a REFUTED rule that stays at t=−0.687, and the best shipped
+host moves 1.164 → 1.280 — nowhere near the 2.0 bar. No host on this venue's
+tape crosses a decision boundary because of it.**
+
 ### The standing conclusion on leverage in this fleet
 
 The prior was five studies, five rejections, with the caveat that four loaded
