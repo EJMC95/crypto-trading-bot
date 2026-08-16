@@ -120,9 +120,54 @@ def dangling_code_citations(paths, known):
     return out
 
 
-def cross_branch(mine, theirs):
+#: [2026-08-16 (nq)] An entry that declares itself CORRECTED IN PLACE. The
+#: phrase must appear inside that entry's OWN body — see `corrected_letters`.
+CORRECTED = re.compile(r"CORRECTED IN PLACE", re.I)
+
+
+def corrected_letters(text):
+    """-> {letter} whose OWN entry body declares an in-place correction.
+
+    [2026-08-16 (nq)] WHY THIS EXISTS — the guard forbade what I12 REQUIRES.
+    `cross_branch` treats *same letter + different title* as a collision. That
+    is right for two sessions racing for a letter, and wrong for the one other
+    thing that produces the same signature: an entry whose title was CORRECTED
+    IN PLACE. I12 is explicit — *"a doctrine that no longer describes the
+    system is a defect, not history — correct it in place and say so"* — and
+    `(nn)` needed exactly that (its title claimed four days of red CI; the
+    workflow's own run history says 24 hours). With no notion of a correction,
+    the guard made every title permanently immutable, so the repo's own
+    correction rule and its own guard contradicted each other and the guard won.
+
+    THE ESCAPE IS DELIBERATELY NARROW, because a collision guard that can be
+    waved off is worse than none:
+      * the declaration must sit in the body of **that letter's own entry** — a
+        `CORRECTED IN PLACE` anywhere else in the file excuses nothing, so one
+        correction cannot silence the guard for a genuine collision elsewhere;
+      * it only ever suppresses a letter BOTH sides already share, which is the
+        one case where the title is the sole distinguishing signal;
+      * it is a positive declaration a human wrote, not an inference.
+    A real collision — two different entries, neither declaring a correction —
+    fires exactly as before, which the selftest pins with the original `(fz)`
+    incident.
+    """
+    out, marks = set(), list(HEADER.finditer(text or ""))
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        if CORRECTED.search(text[m.end():end]):
+            out.add(m.group(2))
+    return out
+
+
+def cross_branch(mine, theirs, my_text=None):
     """-> {letter: (my_title, their_title)} for letters BOTH sides used with
     DIFFERENT titles. Pure, so the selftest can drive it.
+
+    `my_text` (optional) is my full CHANGELOG. When given, a letter whose own
+    entry declares `CORRECTED IN PLACE` is NOT reported — see
+    `corrected_letters` for why that is the one legitimate way to produce this
+    signature, and how narrow the escape is. Omitting it keeps the original
+    strict behaviour, so every existing caller and test is unchanged.
 
     WHY (2026-07-30 (hj)). The in-file check above cannot see the collision
     that actually keeps happening: two sessions on two BRANCHES each pick "the
@@ -137,10 +182,11 @@ def cross_branch(mine, theirs):
     quiet on every ordinary branch.
     """
     theirs_by_letter = {l: t for _d, l, t in theirs}
+    fixed = corrected_letters(my_text) if my_text else set()
     out = {}
     for _d, letter, title in mine:
         other = theirs_by_letter.get(letter)
-        if other is not None and other != title:
+        if other is not None and other != title and letter not in fixed:
             out[letter] = (title, other)
     return out
 
@@ -196,7 +242,10 @@ def main():
         return 1
     base_text = _baseline_changelog()
     if base_text:
-        clashes = cross_branch(entries, scan(base_text)[0])
+        # [(nq)] `_raw` rides along so a letter whose own entry declares
+        # CORRECTED IN PLACE is not reported as a collision — the signature is
+        # identical and I12 mandates the correction. See `corrected_letters`.
+        clashes = cross_branch(entries, scan(base_text)[0], my_text=_raw)
         if clashes:
             print("\nCROSS-BRANCH CHANGELOG LETTER COLLISION — this branch and "
                   "origin/main both used\nthese letters for DIFFERENT entries. "
@@ -298,6 +347,31 @@ def _selftest():
     _other = scan("## 2026-07-30 (hj) — something else\n\nb\n")[0]
     assert cross_branch(_mine, _other) == {}
     assert cross_branch([], _main) == {} and cross_branch(_mine, []) == {}
+
+    # [(nq)] AN ENTRY CORRECTED IN PLACE IS NOT A COLLISION — I12 requires the
+    # correction, and a corrected TITLE is byte-indistinguishable from a race.
+    _fixed_text = ("## 2026-07-30 (fz) — THE OFFENSE PASS, 24 HOURS\n\n"
+                   "> **[CORRECTED IN PLACE per I12.]** was 'four days'\n")
+    _fixed = scan(_fixed_text)[0]
+    assert cross_branch(_fixed, _main, my_text=_fixed_text) == {}, \
+        "a declared in-place correction must not read as a letter collision"
+    # ...but WITHOUT the declaration the very same edit still fires, so the
+    # (fz) incident this guard was built for is untouched.
+    assert set(cross_branch(_fixed, _main)) == {"fz"}
+    _undeclared = "## 2026-07-30 (fz) — THE OFFENSE PASS, 24 HOURS\n\nb\n"
+    assert set(cross_branch(scan(_undeclared)[0], _main,
+                            my_text=_undeclared)) == {"fz"}, \
+        "no declaration ⇒ still a collision"
+    # THE ESCAPE IS PER-ENTRY: a correction declared in a DIFFERENT entry must
+    # not excuse this one, or one correction would silence the whole guard.
+    _elsewhere = ("## 2026-07-31 (ga) — unrelated\n\n"
+                  "> **[CORRECTED IN PLACE per I12.]**\n\n"
+                  "## 2026-07-30 (fz) — THE OFFENSE PASS, 24 HOURS\n\nb\n")
+    assert set(cross_branch(scan(_elsewhere)[0], _main,
+                            my_text=_elsewhere)) == {"fz"}, \
+        "a correction in another entry must not excuse this letter"
+    assert corrected_letters(_elsewhere) == {"ga"}
+    assert corrected_letters("") == set() and corrected_letters(None) == set()
     # the pre-era scope applies here too — 17-Jul's restart must not clash
     _pre = scan("## 2026-07-17 (a) — restart head\n\nb\n")[0]
     assert cross_branch(_pre, scan("## 2026-07-17 (a) — tail\n\nb\n")[0]) == {}

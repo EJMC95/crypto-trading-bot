@@ -1,3 +1,58 @@
+## 2026-08-16 (nq) — `(nn)` SAID "FOUR DAYS" AND THE RECEIPTS SAY 24 HOURS: the entry whose whole subject is an unreadable guard carried a 4× number in its own title
+
+- **THE CORRECTION.** `(nn)` diagnosed and fixed a real defect — `(ne)` inlined
+  13 untestable statements into `main()`, breaching the sniper's coverage floor
+  and leaving **Tests** red on every push. Its bisect, its mechanism and its fix
+  are all confirmed independently here (sniper re-measured at **82.4%**, all 27
+  floors held, exit 0). **One number in it is wrong, and it is in the title:**
+  the red window was **24 hours 04 minutes**, not four days.
+- **RECEIPTS, from the workflow's own run history (UTC), not from memory:**
+  last green `15acd05` **15-Aug 01:15:29Z** · first red `71b7f4f` **15-Aug
+  01:28:37Z** · green again `65e1ae4` **16-Aug 01:32:19Z**.
+- **THE RUN COUNT WAS RIGHT AND IS UNCHANGED — nine red runs**: `71b7f4f`,
+  `d6c5e8f` ×2 (two runs on one sha), `6b729d0`, `bf2ae4a`, `dbacd42`,
+  `17b1cac`, `aaa92a0`, `489b601`. Nine runs inside ONE day. The likely origin
+  of the error is exactly that: nine runs *feels* like four days, and the run
+  list prints times without dates, so `01:28` on 15-Aug and `01:07` on 16-Aug
+  read as one continuous span unless the dates are pulled separately.
+- **WHY A PROSE NUMBER WAS WORTH A COMMIT.** `(nn)`'s own thesis is that *a
+  guard nobody can read stops being a guard*. An entry making that argument has
+  to be checkable itself, and this number sits in a **title** — the form other
+  entries cite. It is the `(gl)` overstating-detector shape relocated from the
+  detector into the record: a 4× duration teaches the next reader that CI rot
+  here runs for the better part of a week, which would change what they think
+  the standing risk is. I12 is explicit that a record which no longer describes
+  what happened is a defect, not history.
+- **CORRECTED IN PLACE, THREE SITES, with the receipts inline** (I12's
+  correct-and-say-so rule, not a silent edit): `(nn)`'s title, its "for four
+  days a genuine new test failure..." paragraph, and its "the property that made
+  four days of red survivable-looking" line — plus **the copy in tracked code**,
+  `lighter_perp_sniper.py:283`, which is the one that would have outlived the
+  changelog and is the reason this is a commit rather than a note.
+- **Nothing else in `(nn)` is touched.** The diagnosis was right, the fix was
+  better than the one this session was about to make (it moved the telemetry
+  back to module level, restoring a convention the file already held, rather
+  than farming five lines of coverage to clear the floor), and the decision NOT
+  to raise the floor was correct.
+- **AND THE CORRECTION EXPOSED A GUARD THAT FORBADE WHAT I12 REQUIRES.**
+  `audit_changelog_letters`'s cross-branch arm reads *same letter + different
+  title* as a collision — correct for two sessions racing for a letter, and
+  **byte-indistinguishable from an entry whose title was corrected in place.**
+  So editing `(nn)`'s title turned the build red, and the repo's own
+  correct-it-and-say-so rule collided with its own detector, with the detector
+  winning: **every entry title was effectively immutable.** That is not a
+  documented rule anywhere; it was an accident of the heuristic. (CLAUDE.md's
+  note that this arm is *"disabled on main"* is also STALE — the guard says
+  plainly it is *"deliberately NOT skipped when the local branch is called
+  main"*, because being disabled there is what let a real collision through
+  once.)
+  **Fixed narrowly:** `corrected_letters` suppresses a shared letter only when
+  **that letter's own entry body** declares `CORRECTED IN PLACE`. A declaration
+  in a *different* entry excuses nothing (pinned), an undeclared title edit
+  still fires (pinned), and the original `(fz)` two-session collision the arm
+  was built for is untouched (pinned). Three new selftest arms, and the escape
+  is a positive human declaration rather than an inference — a collision guard
+  that can be waved off is worse than none.
 ## 2026-08-16 (np) — `(nn)` PINNED THE RULES AND THE CALL SITES STAYED UNPINNED: two of the sniper's three admission sources had never executed in a single fixture, and the harness is why
 
 - **THIS BUILDS ON `(nn)`, IT DOES NOT REDO IT.** Two sessions bisected the
@@ -189,7 +244,22 @@
   behind and its restart should be deliberate. Neither was restarted for a
   telemetry read.
 
-## 2026-08-16 (nn) — CI WAS RED ON EVERY PUSH FOR FOUR DAYS OVER 0.1pp, AND THE REASON WAS 13 UNTESTED STATEMENTS `(ne)` INLINED INTO main(): the sniper's surge telemetry goes back to module level, where a test can reach it
+## 2026-08-16 (nn) — CI WAS RED ON EVERY PUSH FOR 24 HOURS OVER 0.1pp, AND THE REASON WAS 13 UNTESTED STATEMENTS `(ne)` INLINED INTO main(): the sniper's surge telemetry goes back to module level, where a test can reach it
+
+> **[CORRECTED IN PLACE 2026-08-16 (nq), per I12.]** This entry shipped saying
+> **"four days"** in its title and twice in its body. The red window was
+> **24 hours 04 minutes**, a 4× overstatement. Receipts, from the workflow's own
+> run history (UTC): last green `15acd05` **15-Aug 01:15:29Z**; first red
+> `71b7f4f` **15-Aug 01:28:37Z**; green again `65e1ae4` **16-Aug 01:32:19Z**.
+> **The "nine red runs" count is CORRECT and unchanged** — `71b7f4f`, `d6c5e8f`
+> ×2 (two runs on one sha), `6b729d0`, `bf2ae4a`, `dbacd42`, `17b1cac`,
+> `aaa92a0`, `489b601`. Nine runs inside one day, not four. Corrected because
+> this entry's whole subject is a guard whose credibility depends on its numbers
+> being checkable, and the duration sits in a TITLE that later entries will cite
+> — the (gl) overstating-detector shape, in the record rather than the detector.
+> Nothing else in the entry changes: the diagnosis, the bisect and the fix are
+> all confirmed independently (sniper re-measured at **82.4%**, all 27 floors
+> held).
 
 **The visible symptom was trivial and the cost was not.** `lighter_perp_sniper.py`
 measured **80.8%** against its **81%** floor — 0.1–0.2pp — so `audit_coverage_
@@ -197,8 +267,9 @@ floors.py` failed the **Tests** workflow on `71b7f4f (ne)` and on **every commit
 since** (`d6c5e8f`, `6b729d0`, `bf2ae4a`, `dbacd42`, `2d88ada`, `5499801`,
 `17b1cac`, `aaa92a0`). The suite itself passed in all of them; only the floors
 step failed. **A workflow that is red on every push is a guard nobody reads** —
-for four days a genuine new test failure would have been indistinguishable from
-the standing breach. That is the real defect; the 0.1pp is just what exposed it.
+for a full day and nine consecutive runs a genuine new test failure would have
+been indistinguishable from the standing breach. That is the real defect; the
+0.1pp is just what exposed it.
 
 **BISECTED, not guessed.** Tests last passed at `15acd05 (nc,nd)`; the first red
 is `71b7f4f (ne)` — which is also the last commit to touch the sniper. `(ne)`
@@ -258,8 +329,8 @@ omit `*/.claude/worktrees/*`, or the number you get is another session's.
 **What it does not fix, said plainly:** the floors guard has no notion of "this
 breach is old" — it reports the same red on commit 1 and commit 9, so nothing
 in CI distinguishes a fresh regression from a standing one. That is the
-property that made four days of red survivable-looking, and it is a separate
-piece of work from this entry.
+property that made a day and nine runs of red survivable-looking, and it is a
+separate piece of work from this entry.
 
 ## 2026-08-16 (nm) — THE BOOKS COHORT'S STOP WAS NEITHER LIVE NOR RUNNING: three price books evaluated their bracket against a price frozen at container boot, inside a gate that switched the stop off whenever the funding endpoint was quiet
 

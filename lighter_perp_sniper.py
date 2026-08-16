@@ -280,7 +280,11 @@ def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP,
 # `(ne)` added these three pieces of logic INLINE in main(), where no test can
 # reach them — 13 statements that went straight to uncovered and took this
 # file from a measured 83.5% to 80.8%, breaching its 81% floor and leaving the
-# Tests workflow red on every push for four days. Every sibling rule in this
+# Tests workflow red on every push for 24 hours and nine consecutive runs
+# ([(nq)] corrected in place: this comment and `(nn)`'s title both said "four
+# days". Last green `15acd05` 15-Aug 01:15:29Z, first red `71b7f4f` 15-Aug
+# 01:28:37Z, green again `65e1ae4` 16-Aug 01:32:19Z. The run COUNT was right;
+# the duration was 4× over). Every sibling rule in this
 # file is already module-level and pure for exactly this reason
 # (`surge_candidates`, `young_candidates`, `active_done`, `close_reason`);
 # these three are moved back to that convention, behaviour unchanged.
