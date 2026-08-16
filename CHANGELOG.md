@@ -748,6 +748,57 @@ way; its 30-day clock is unaffected (no policy change — this is a correctness
 fix to how a fixed policy was executed), but the two closes should be read as
 void rather than as a −3.5R signal.
 
+- **[2026-08-16, MEASURED AND CORRECTED IN PLACE (I12) — "every pre-(nm)
+  position carries a phantom entry" WAS AN UNVERIFIED INFERENCE, AND IT IS
+  FALSE.** This entry's own reasoning invited it, and a follow-up session was
+  asked to re-anchor 🧙 Schwager's four open positions on the strength of it.
+  Measured instead, against the venue's own 1h bars at each position's recorded
+  `opened_ts` (2026-08-13 23:48:39Z, all four opened in one pass):
+
+  | | entry_mark | real bar low–high at that instant | inside? | vs close |
+  |---|---|---|---|---|
+  | BTC short | 63404.0 | 63371.4 – 63510.7 | **yes** | −0.10% |
+  | ENA short | 0.08581 | 0.0855 – 0.08591 | **yes** | +0.00% |
+  | PUMP long | 0.002912 | 0.002894 – 0.002933 | **yes** | +0.24% |
+  | ETHFI long | 0.4418 | 0.43927 – 0.44333 | **yes** | −0.30% |
+
+  **All four are real contemporaneous prices. Nothing to re-anchor** — and
+  re-anchoring would have replaced four measured prices with reconstructions.
+
+  **THE RULE THAT DECIDES IT, which this entry did not state: the frozen mark's
+  error GROWS WITH CONTAINER UPTIME.** `_load_markets()` runs at client
+  construction, so a position opened moments after boot is priced almost
+  correctly and one opened hours later is not. All four Schwager legs opened at
+  that container's FIRST BOOT; 🧘 douglas's ROBO opened ~3h into a container's
+  life and was 21% outside its bar. **So the question for any pre-(nm) position
+  is never "was it opened before the fix" but "how long had its container been
+  up" — check the entry against the venue's bar, per position.**
+
+  Two further corrections to what this entry implied. **The trail was never
+  contaminated either**: `hwm` is seeded from the entry mark but
+  `update_trail`'s monotone ratchet overwrites it from CLOSED 4h bar closes
+  ((mh)), and all four `hwm` values are EXACTLY real 4h closes (BTC 14-Aug
+  08:00, ENA 14-Aug 12:00, PUMP 14-Aug 00:00, ETHFI 15-Aug 08:00). And
+  `trend_exit` reads `entry_mark` only while `trail_px is None`, which is false
+  for all four — so the RISK path was clean regardless; the entry mark reaches
+  accounting only (`open_pnl`, realised P&L, the ledger's `entry_price`).
+
+- **THE CLASS IS CLOSED EVERYWHERE ELSE — CHECKED, NOT ASSUMED — WITH ONE LIVE
+  EXCEPTION.** Every other reader of a funding-map mark already avoids it on a
+  price path: 💸 the live Farmer (`fresh_mid` ×6), `lighter_momentum_bot`
+  (×8), and 🌾 carry, whose `_perp_leg_fill` docstring has said since July that
+  the reference is the live-book mid, *"NOT the funding-map `mark`, which is a
+  last-trade price frozen at LighterClient construction and never refreshed"* —
+  the same rule `venues/marks.py` carries, independently written. **The
+  exception is 🎸 Barnes**: zero `fresh_mid` uses, and `position_pnl` adds a
+  price term for non-carry sleeves. Its carry sleeve is delta-neutral (no price
+  term, unaffected), but it still holds **10 open `xsect` legs — its entire
+  open book, −$10.22** — in the sleeve `(nf)` retired and is winding to flat.
+  Those legs' price term is marked on a boot-frozen price, so their closing
+  P&L will be wrong. NOT fixed here: it is a different book, and changing a
+  retired sleeve's P&L basis mid-wind-down would muddy `(nf)`'s own
+  attribution. **Flagged for an explicit decision, with the number attached.**
+
 ## 2026-08-16 (nl) — A FUNDING BOOK AT CAP PUBLISHED NOTHING ABOUT WHAT IT WAS REFUSING: 🛢️ Garrett was turning away 27 qualified candidates a loop, and `held: {6}` said exactly what a dead book says
 
 - **THE STRUCTURAL DEFECT.** `lighter_funding_bot.py`'s entry prefilter lives
