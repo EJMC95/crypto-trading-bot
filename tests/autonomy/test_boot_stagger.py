@@ -311,6 +311,44 @@ def test_the_published_ttl_beats_the_proxy_when_available():
     assert generous["verdict"] == "report", "a 2h TTL tolerates a 20m burst"
 
 
+def test_tolerance_is_the_MINIMUM_ttl_across_an_organs_keys(monkeypatch):
+    """ORGAN -> KEY IS NOT 1:1, and the strictest contract binds first.
+
+    Peer-caught 16-Aug: the alias mapped `bot_learn -> learning-brain`, which is
+    the brain's MEMORY BLOB and carries no `ttl_sec` at all — so the lookup
+    found nothing and fell back to the very proxy the alias existed to avoid,
+    360 min against a real 160. An alias doing the opposite of its job.
+
+    An organ publishing several keys is silent on ALL of them at once, so
+    taking the FIRST hit would let a generous key (brain-stake-mults, 26000s)
+    mask a strict sibling (brain-vitals, 9600s) that has already gone neutral.
+    """
+    ttls = {"brain-vitals": 9600, "brain-stake-mults": 26000}
+
+    class _FakeStore:
+        @staticmethod
+        def load_state(key):
+            return {"ttl_sec": ttls[key]} if key in ttls else None
+
+    monkeypatch.setitem(__import__("sys").modules, "bot_pnl_store", _FakeStore)
+    # ORDER THE GENEROUS KEY FIRST, deliberately. With the strict key first,
+    # `found[0]` and `min(found)` coincide and the test passes against a
+    # first-hit implementation — which is exactly what my own mutation run
+    # caught: U1 (`min` -> `found[0]`) SURVIVED until this line was reversed.
+    # A test that only passes because of tuple ordering is not a test.
+    monkeypatch.setitem(mod.KEY_ALIASES, "bot_learn",
+                        ("brain-stake-mults", "brain-vitals"))
+    tol = mod.tolerances(["bot_learn"])
+    secs, src = tol["bot_learn"]
+    assert secs == 9600, (
+        f"must take the MIN across keys, not the first hit — got {secs}; "
+        "with the generous key first, a first-hit implementation returns 26000")
+    assert "min of 2" in src, src
+    # the discarded alias must be gone — it is what caused the fallback
+    assert "learning-brain" not in mod.KEY_ALIASES.get("bot_learn", ()), \
+        "a key with no ttl_sec cannot serve as the tolerance source"
+
+
 def test_the_key_alias_is_used_so_the_real_ttl_is_found(monkeypatch):
     """A silent fall-back to the 3x-interval PROXY is not harmless: measured
     16-Aug, the proxy was wrong in BOTH directions — impl-shortfall's real TTL

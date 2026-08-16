@@ -98,13 +98,21 @@ EARLY_RUN_MAX_S = 60
 #: lookup silently falls back to the 3x-interval PROXY, and the proxy was
 #: measurably wrong in both directions (impl-shortfall real ttl 60 min vs a 90
 #: min proxy; fleet-regen 40 vs 45). A guard should read the published contract.
-KEY_ALIASES = {"implementation_shortfall": "impl-shortfall",
-               "lighter_market_scout": "lighter-market",
-               "lighter_scout_tuner": "scout-tuner",
-               "bot_learn": "learning-brain",
-               "lighter_ticket_taker": "lighter-ticket-taker-lshadow",
-               "experiment_judge": "xp-judge",
-               "golive_readiness": "golive-readiness"}
+#: ORGAN -> KEY IS NOT 1:1, and the strictest contract binds first. 🧠 bot_learn
+#: alone publishes five keys with different TTLs, so the tolerance that matters
+#: is the MINIMUM across the keys consumers actually gate on.
+#: [CORRECTED 16-Aug, peer-caught] this mapped `bot_learn -> learning-brain`,
+#: which is the brain's MEMORY BLOB and carries no `ttl_sec` at all — so the
+#: lookup found nothing and fell straight back to the proxy the alias existed to
+#: avoid, 360 min against a real 160. An alias doing the opposite of its job.
+#: The brain's real consumer contracts are `brain-vitals` (9600s) and
+#: `brain-stake-mults` (26000s); min = 9600.
+KEY_ALIASES = {"implementation_shortfall": ("impl-shortfall",),
+               "lighter_market_scout": ("lighter-market",),
+               "lighter_scout_tuner": ("scout-tuner",),
+               "bot_learn": ("brain-vitals", "brain-stake-mults"),
+               "experiment_judge": ("xp-judge",),
+               "golive_readiness": ("golive-readiness",)}
 
 #: Organs deliberately exempt, with the reason. An exemption is a DECISION and
 #: must name why — the `BORN_DARK_OK` idiom.
@@ -269,16 +277,24 @@ def tolerances(organs: list[str]) -> dict[str, tuple[float, str]]:
         sys.path.insert(0, str(ROOT))
         import bot_pnl_store as store          # noqa: E402
         for o in organs:
-            for key in (KEY_ALIASES.get(o), o.replace("_", "-"), o):
-                if key is None:
-                    continue
+            keys = KEY_ALIASES.get(o) or (o.replace("_", "-"), o)
+            found: list[float] = []
+            for key in keys:
                 try:
                     st_ = store.load_state(key)
                 except Exception:              # noqa: BLE001
                     st_ = None
                 if isinstance(st_, dict) and isinstance(st_.get("ttl_sec"), (int, float)):
-                    out[o] = (float(st_["ttl_sec"]), "published ttl_sec")
-                    break
+                    found.append(float(st_["ttl_sec"]))
+            # THE MINIMUM, not the first hit: an organ publishing several keys
+            # is silent on ALL of them at once, so the strictest consumer
+            # contract is the one that binds. Taking the first would let a
+            # generous key (brain-stake-mults, 26000s) mask a strict sibling
+            # (brain-vitals, 9600s) that has already gone neutral.
+            if found:
+                out[o] = (min(found),
+                          "published ttl_sec" if len(found) == 1
+                          else f"min of {len(found)} published ttl_sec")
     except Exception:                          # noqa: BLE001
         pass
     return out
