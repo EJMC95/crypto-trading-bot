@@ -22,7 +22,9 @@ reader goes neutral and the silence has actually cost something.
 Tests live here rather than behind a `--selftest` flag because registering one
 means editing `tests/test_selftests.py`, which a concurrent session holds.
 """
+import datetime as dt
 import importlib.util
+import json
 import pathlib
 
 import pytest
@@ -352,3 +354,156 @@ def test_a_declared_exemption_is_honoured_and_must_carry_a_reason():
         mod.STAGGER_OK.pop("x", None)
     assert all(isinstance(v, str) and v.strip() for v in mod.STAGGER_OK.values()), \
         "every exemption must name why — the BORN_DARK_OK idiom"
+
+
+# --------------------------------------------------------------------------
+# deploy_times() — the input the whole verdict rests on.
+#
+# Every `assess` test above is handed a `gaps` list directly, so until now the
+# function that PRODUCES that list was the one untested thing in the guard. It
+# has two sources of very different authority and the caller has to be able to
+# tell which one answered: the deploy workflow's own successful runs, and — when
+# those are unreachable — commit times on origin/main, which are a PROXY because
+# several commits ride one push and so one deploy. A proxy silently presented as
+# the record is the (I14) shape; a guard that dies when `gh` is absent is worse
+# than one that says it cannot assess, because it has to run offline and in CI.
+#
+# These never shell out: `subprocess.run` is faked, so the tests are hermetic
+# and give the same answer on a laptop, in CI, and with no network at all.
+# --------------------------------------------------------------------------
+
+class _Done:
+    """Stands in for a CompletedProcess — only `.stdout` is read."""
+
+    def __init__(self, stdout=""):
+        self.stdout = stdout
+
+
+def _fake_run(gh=None, git=None):
+    """Dispatch on argv[0]. A callable value is invoked so a source can RAISE."""
+
+    def run(cmd, *a, **kw):
+        src = gh if cmd[0] == "gh" else git
+        if src is None:
+            raise FileNotFoundError(cmd[0])       # the tool is not installed
+        if callable(src):
+            return src()
+        return _Done(src)
+
+    return run
+
+
+def _gh_rows(n, conclusion="success", start="2026-08-16T10:00:00Z"):
+    base = dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
+    return json.dumps([
+        {"createdAt": (base + dt.timedelta(minutes=3 * i)).isoformat().replace("+00:00", "Z"),
+         "conclusion": conclusion}
+        for i in range(n)
+    ])
+
+
+def _git_lines(n, start="2026-08-16T10:00:00+10:00"):
+    base = dt.datetime.fromisoformat(start)
+    return "\n".join((base + dt.timedelta(minutes=7 * i)).isoformat()
+                     for i in range(n)) + "\n"
+
+
+def test_the_deploy_workflows_own_runs_are_preferred_and_the_source_says_so(monkeypatch):
+    monkeypatch.setattr(mod.subprocess, "run", _fake_run(gh=_gh_rows(5), git=_git_lines(9)))
+    times, source = mod.deploy_times()
+    assert len(times) == 5, "the gh path answered, so git must not have been consulted"
+    assert source.startswith("gh:"), source
+    assert "PROXY" not in source, "the workflow's own runs are the record, not a proxy"
+
+
+def test_only_SUCCESSFUL_runs_count_as_deploys(monkeypatch):
+    """A failed run did not deploy anything; counting it invents cadence."""
+    monkeypatch.setattr(mod.subprocess, "run",
+                        _fake_run(gh=_gh_rows(6, conclusion="failure"), git=_git_lines(4)))
+    times, source = mod.deploy_times()
+    assert source.startswith("git:"), \
+        "six FAILED runs are zero deploys — that must fall through, not answer"
+    assert len(times) == 4
+
+
+def test_a_gh_failure_DEGRADES_to_git_rather_than_raising(monkeypatch):
+    """The property the guard is least allowed to lose: it must work offline.
+
+    `gh` missing, unauthenticated, rate-limited or returning junk are all the
+    same to a caller — none of them may turn a guard into a crash.
+    """
+    for broken in (None,                                    # not installed
+                   "",                                      # empty stdout
+                   "not json at all",                       # unparseable
+                   '[{"conclusion": "success"}]',           # no createdAt
+                   lambda: (_ for _ in ()).throw(OSError("boom"))):
+        monkeypatch.setattr(mod.subprocess, "run",
+                            _fake_run(gh=broken, git=_git_lines(5)))
+        times, source = mod.deploy_times()
+        assert source.startswith("git:"), f"{broken!r} should degrade to git, got {source}"
+        assert len(times) == 5
+
+
+def test_the_git_fallback_DECLARES_itself_a_proxy(monkeypatch):
+    """A caller must be able to tell which basis produced the verdict."""
+    monkeypatch.setattr(mod.subprocess, "run", _fake_run(gh=None, git=_git_lines(5)))
+    times, source = mod.deploy_times()
+    assert source.startswith("git:")
+    assert "PROXY" in source, \
+        "commits batch into pushes, so these gaps are UNDERSTATED — say so in the source"
+
+
+def test_fewer_than_three_gh_runs_falls_through_instead_of_answering(monkeypatch):
+    """Two points make one gap. That is not a cadence, and the guard says so."""
+    monkeypatch.setattr(mod.subprocess, "run", _fake_run(gh=_gh_rows(2), git=_git_lines(6)))
+    times, source = mod.deploy_times()
+    assert source.startswith("git:") and len(times) == 6
+
+
+def test_fewer_than_three_on_BOTH_paths_asserts_nothing(monkeypatch):
+    monkeypatch.setattr(mod.subprocess, "run", _fake_run(gh=_gh_rows(2), git=_git_lines(2)))
+    times, source = mod.deploy_times()
+    assert times == [] and source == "unavailable"
+
+
+def test_total_unavailability_is_reported_never_raised(monkeypatch):
+    """No gh, no git, no network — the CI and offline case."""
+    monkeypatch.setattr(mod.subprocess, "run", _fake_run(gh=None, git=None))
+    times, source = mod.deploy_times()
+    assert times == [] and source == "unavailable"
+
+
+def test_an_unavailable_cadence_makes_every_organ_unassessable(monkeypatch):
+    """The end-to-end of the two tests above: no basis ⇒ no finding, ever."""
+    monkeypatch.setattr(mod.subprocess, "run", _fake_run(gh=None, git=None))
+    times, _ = mod.deploy_times()
+    b = {"organ": "x", "stagger_s": 900, "interval_s": 300,
+         "mitigated": False, "kind": "periodic"}
+    verdicts = mod.assess([b], mod.gaps_of(times))
+    assert verdicts[0]["verdict"] == "report"
+    assert "cannot assess" in verdicts[0]["why"]
+
+
+def test_times_are_ascending_so_gaps_are_positive(monkeypatch):
+    """`gaps_of` zips consecutive pairs, so a newest-first list yields NEGATIVE
+    gaps — and every negative gap compares `< stagger_s`, i.e. a reversed sort
+    reads as a 100% starve rate on every organ."""
+    for src in (_fake_run(gh=_gh_rows(5), git=None),
+                _fake_run(gh=None, git=_git_lines(5))):
+        monkeypatch.setattr(mod.subprocess, "run", src)
+        times, _ = mod.deploy_times()
+        assert times == sorted(times), "oldest-first is the contract gaps_of relies on"
+        assert all(g > 0 for g in mod.gaps_of(times))
+
+
+def test_both_sources_return_timezone_aware_instants(monkeypatch):
+    """Mixing naive and aware datetimes raises TypeError on subtraction, and
+    the two sources are stamped differently (`...Z` vs a `+10:00` offset), so
+    this is the seam where that would appear."""
+    for src in (_fake_run(gh=_gh_rows(4), git=None),
+                _fake_run(gh=None, git=_git_lines(4))):
+        monkeypatch.setattr(mod.subprocess, "run", src)
+        times, source = mod.deploy_times()
+        assert times, source
+        assert all(t.tzinfo is not None and t.utcoffset() is not None for t in times), \
+            f"{source} returned a naive datetime"
