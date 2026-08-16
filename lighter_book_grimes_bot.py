@@ -82,6 +82,7 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 from venues import venue_context
+from venues.marks import fresh_mid, stop_marks
 
 # Universe + class screen come from the bus. Guarded: a dark import keeps the
 # configured list. COPY lands in Dockerfile.grimes in this same commit.
@@ -691,49 +692,62 @@ def main():
             print(f"[{now_iso()}] mark fetch failed ({e!r}); retrying")
             fund = None
 
+        # ---- manage every open position -----------------------------------
+        # ((nm)) EXITS DO NOT DEPEND ON THE FUNDING MAP, and the bracket is
+        # evaluated on the LIVE BOOK. This block used to sit inside
+        # `if fund:` (a dark funding fetch suspended every stop) and read
+        # `fund[coin]["mark"]` — a last-trade price frozen at client
+        # construction, so the stop compared a boot-time price with itself.
+        # venues/marks.stop_marks carries the measurement.
+        # Positions here are keyed by setup, so the price map is keyed by the
+        # position's own coin.
+        stops, stop_blind = stop_marks(
+            ctx.venue, {p["coin"] for p in positions.values()})
+        for key in list(positions):
+            pos = positions[key]
+            mark = stops.get(pos["coin"]) or 0.0
+            if mark <= 0:
+                first = pos.setdefault("stop_blind_since", t0)
+                if (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
+                    continue
+                px = pos.get("last_mark")
+                pos["fees"] += SLIP_COST * pos["notional"]
+                pnl = _price_pnl(pos, px)
+                realized += pnl
+                n_closed += 1
+                n_wins += 1 if pnl > 0 else 0
+                _close(bot_id, key, pos, "delisted", px, pnl)
+                print(f"[{now_iso()}] CLOSE {key} [delisted] "
+                      f"pnl {pnl:+.2f} | banked {realized:+.2f}")
+                del positions[key]
+                continue
+            pos.pop("stop_blind_since", None)
+            pos.pop("missing_since", None)     # pre-(nm) restored state
+            pos["last_mark"] = mark
+            reason = bracket_exit(pos, mark, t0)
+            if reason is None:
+                continue
+            pos["fees"] += SLIP_COST * pos["notional"]
+            pnl = _price_pnl(pos, mark)
+            realized += pnl
+            n_closed += 1
+            n_wins += 1 if pnl > 0 else 0
+            held_h = (t0 - pos["opened_ts"]) / 3600.0
+            _close(bot_id, key, pos, reason, mark, pnl,
+                   spread_exit=live_spread_bps(ctx, pos["coin"]))
+            print(f"[{now_iso()}] CLOSE {key} {pos['side']} after "
+                  f"{held_h:.1f}h [{reason}] pnl {pnl:+.2f} | "
+                  f"banked {realized:+.2f}")
+            del positions[key]
+        if stop_blind:
+            print(f"[{now_iso()}] STOPS BLIND on {', '.join(stop_blind)} — "
+                  f"no live book; bracket NOT evaluated this loop")
+
         if fund:
             last_ts = t0
             universe = resolve_universe(
                 {p["coin"] for p in positions.values()})
             now_s = int(t0)
-
-            # ---- manage every open position -----------------------------
-            for key in list(positions):
-                pos = positions[key]
-                f = fund.get(pos["coin"])
-                mark = float((f or {}).get("mark") or 0.0)
-                if f is None or mark <= 0:
-                    first = pos.setdefault("missing_since", t0)
-                    if (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
-                        continue
-                    px = pos.get("last_mark")
-                    pos["fees"] += SLIP_COST * pos["notional"]
-                    pnl = _price_pnl(pos, px)
-                    realized += pnl
-                    n_closed += 1
-                    n_wins += 1 if pnl > 0 else 0
-                    _close(bot_id, key, pos, "delisted", px, pnl)
-                    print(f"[{now_iso()}] CLOSE {key} [delisted] "
-                          f"pnl {pnl:+.2f} | banked {realized:+.2f}")
-                    del positions[key]
-                    continue
-                pos.pop("missing_since", None)
-                pos["last_mark"] = mark
-                reason = bracket_exit(pos, mark, t0)
-                if reason is None:
-                    continue
-                pos["fees"] += SLIP_COST * pos["notional"]
-                pnl = _price_pnl(pos, mark)
-                realized += pnl
-                n_closed += 1
-                n_wins += 1 if pnl > 0 else 0
-                held_h = (t0 - pos["opened_ts"]) / 3600.0
-                _close(bot_id, key, pos, reason, mark, pnl,
-                       spread_exit=live_spread_bps(ctx, pos["coin"]))
-                print(f"[{now_iso()}] CLOSE {key} {pos['side']} after "
-                      f"{held_h:.1f}h [{reason}] pnl {pnl:+.2f} | "
-                      f"banked {realized:+.2f}")
-                del positions[key]
 
             # ---- the retest (rule 2): replay the roster on fresh tape ---
             if (t0 - last_retest) >= RETEST_H * 3600.0:
@@ -827,7 +841,9 @@ def main():
                         capped += 1                # dropped, never retried
                         continue                   # at drifted marks
                     side, sl, tp, hold = sig
-                    mark = float((fund.get(coin) or {}).get("mark") or 0.0)
+                    # ((nm)) entry priced on the live book, not the
+                    # boot-frozen funding mark.
+                    mark = fresh_mid(ctx.venue, coin) or 0.0
                     pos = _open_position(positions, s, coin, side, mark,
                                          sl, tp, hold, t0, bars[i][0])
                     if pos is None:
@@ -854,14 +870,19 @@ def main():
             census["unpriceable"] = unpriceable
             census["gated"] = gated
             census["trend_dark"] = 1 if trend_dark else 0
+            # ((nm)) held coins whose bracket could not be evaluated this
+            # loop — published so `open: N` is never byte-identical between
+            # "stops live" and "stops blind" (I1/I18).
+            census["stops_blind"] = len(stop_blind)
             acted = {k: v for k, v in acted.items()
                      if isinstance(v, (int, float))
                      and now_s - v < 3 * 86400}
 
             # ---- publish -------------------------------------------------
             open_pnl = sum(
-                _price_pnl(p, float((fund.get(p["coin"]) or {}).get("mark")
-                                    or 0.0))
+                # ((nm)) MTM on the live book — feeds snapshot_equity and
+                # therefore the go-live maxDD bar (I9).
+                _price_pnl(p, stops.get(p["coin"]) or 0.0)
                 for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
             extra = build_extra(census, positions, scorecard, open_pnl,

@@ -1,3 +1,82 @@
+## 2026-08-16 (nm) — THE BOOKS COHORT'S STOP WAS NEITHER LIVE NOR RUNNING: three price books evaluated their bracket against a price frozen at container boot, inside a gate that switched the stop off whenever the funding endpoint was quiet
+
+**Found from the daily brief**: 🧘 book-douglas's first two closes (15-Aug) were
+98% of the fleet's realised day (−$26.48 of −$27.05) and both blew through a
+declared 1.0×ATR stop — ROBO −23.16% against a 7.035% stop (**3.29×**), LINK
+−3.31% against 0.888% (**3.73×**). The book's own telemetry was already saying
+so: `sample20.expectancy_r = **−3.514**`, denominated in the risk it predefined.
+
+**The first read was wrong and is recorded as wrong.** I diagnosed an
+availability defect — exits gated behind `if fund:` — and that IS real. But the
+dominant defect is the PRICE, and the venue's own tape settles it:
+
+| | recorded by the book | the venue's real bar at that moment |
+|---|---|---|
+| ROBO entry, 12:04 | **0.017707** | 12:00 bar `[0.014507, 0.014938]` — the record sits **21% above the whole hour's high**, and matches ~09:00 |
+| LINK entry, 03:34 | **9.15316** | 03:00 bar `[9.53046, 9.74586]` — **below the hour's low**, matches ~01:00 |
+
+Both entries are ~2–3h stale; both exits are real contemporaneous prices (ROBO's
+0.013623 is exactly the 13:00 bar's low). So the −23.2% is mostly the gap
+between two price vintages: ROBO's REAL 12:04→13:35 move was **−6.7%, inside its
+own 7.03% stop**. The stop fired on a phantom loss, at a phantom entry.
+
+**MECHANISM, in code.** `funding_map()` returns `markets[sym]["last"]`, and
+`LighterClient._load_markets()` runs ONCE at client construction (`venues/
+lighter_client.py:289`). Only `lighter_perp_sniper` ever calls
+`refresh_markets()`; the books build their context once, outside the loop
+(`ctx = venue_context(...)`), so **the mark is frozen for the container's
+lifetime** and `bracket_exit` compared a boot-time price with itself. `ret`
+could not move; tp/sl could not fire until a restart made the frozen value jump
+— which is why both Douglas positions closed in the SAME loop tick
+(13:35:41.02 and 13:35:41.14) after being opened 8.5h apart.
+
+**`venues/marks.py` has forbidden this since it was written**, in its own
+header: *"NEVER a funding-map mark (that is a last-trade price frozen at client
+construction; using it on a stop path would silently freeze the stop while the
+real price runs away)"*. The rule existed, the helper (`fresh_mid`) existed, and
+three books used the banned source anyway — the doctrine-without-enforcement
+shape this file's first section is about. 🧙 Schwager's own comment claimed its
+exits *"keep running on the live mark"*; the mark it was handed was not live.
+
+**FIXED, one owner, three thin call sites.** `venues/marks.stop_marks(venue,
+coins)` is now the ONE price a bracket/stop/trail may read — returning the live
+order-book mid per coin plus the coins with NO readable book. In 🧘 douglas,
+📐 grimes and 🧙 schwager: the management block moved OUT of `if fund:` (exits
+no longer depend on the funding endpoint), the bracket and the ENTRY both price
+off the live book, and `open_pnl` does too — that last one feeds
+`snapshot_equity` and therefore the go-live maxDD bar (I9), so the drawdown
+grade was being computed on frozen prices as well.
+
+**A blind stop is now published, never silent** (I1/I18, the 🎸 extreme-sleeve
+lesson): a held coin with no readable book keeps `stop_blind_since`, is counted
+in `census.stops_blind` and prints, so `open: N` is no longer byte-identical
+between "stops live" and "stops blind". The `DELIST_GIVEUP_H` escape is
+unchanged — a genuinely delisted coin still gives up rather than being held
+forever.
+
+**Scope, stated rather than assumed.** 🧮 hull and 🏦 kiyosaki are NOT touched:
+they are delta-neutral MODELLED funding books whose `position_pnl` takes no mark
+at all, so they carry no price stop for this defect to reach — the same split
+`scripts/study_exit_sweep.py` already makes. `test_hull_and_kiyosaki_are_
+excluded_on_purpose` pins the reason so a later reader cannot "complete" the
+cohort and assert a property they do not have.
+
+**Guarded**: `tests/autonomy/test_cohort_stop_price.py` — STRUCTURAL (AST), not
+substring scans, per the standing lesson. **Six mutations verified RED**: exit
+block back inside `if fund:` (douglas + grimes), any `.get("mark")` restored on
+a price path, entry no longer priced on the live book, `census["stops_blind"]`
+dropped, and `stop_marks` reporting an unreadable book as price `0.0` (which
+would evaluate every bracket as a total loss).
+
+**Not deployed to real money, and it does not qualify**: all three are $1,000
+shadow books, so this is main-only per the (mm) amendment — no live container
+was restarted. The three shadow services carry it on their existing auto-deploy
+rules. **What it costs**: the cohort's realised record to date was produced at
+phantom prices, so 🧘 douglas's 2 closes are not evidence of its edge either
+way; its 30-day clock is unaffected (no policy change — this is a correctness
+fix to how a fixed policy was executed), but the two closes should be read as
+void rather than as a −3.5R signal.
+
 ## 2026-08-16 (nl) — A FUNDING BOOK AT CAP PUBLISHED NOTHING ABOUT WHAT IT WAS REFUSING: 🛢️ Garrett was turning away 27 qualified candidates a loop, and `held: {6}` said exactly what a dead book says
 
 - **THE STRUCTURAL DEFECT.** `lighter_funding_bot.py`'s entry prefilter lives

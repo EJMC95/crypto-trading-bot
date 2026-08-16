@@ -43,3 +43,42 @@ def mid_map(venue, coins):
         if m:
             out[c] = m
     return out
+
+
+def stop_marks(venue, coins):
+    """({coin: live mid}, [coins with NO live price]) — the ONE price source a
+    bracket, stop or trail may be evaluated at.
+
+    [2026-08-16 (nm)] Promoted here because three books read their stop off
+    `venue.funding_map()[coin]["mark"]` instead, which is the failure this
+    module's header has forbidden since it was written. That mark is
+    `markets[sym]["last"]` — a last-trade price captured by
+    `LighterClient._load_markets()` at CLIENT CONSTRUCTION and never
+    refreshed (only `lighter_perp_sniper` calls `refresh_markets`; the books
+    build their context once, outside the loop). So the stop compared a
+    boot-time price with itself: `ret` could not move, and tp/sl could not
+    fire until the container restarted and the frozen value jumped.
+
+    MEASURED on 🧘 book-douglas's first two closes (15-Aug): the recorded
+    entry prices sit OUTSIDE the venue's real hourly bar at the moment of
+    entry — ROBO 0.017707 against a 12:00 bar of [0.014507, 0.014938] (21%
+    above the whole hour's high, matching ~09:00), LINK 9.15316 against an
+    03:00 bar of [9.53046, 9.74586] (matching ~01:00). Both realised ~3.5x
+    their declared 1R stop; ROBO's real 12:04->13:35 move was -6.7%, INSIDE
+    its own 7.03% stop, while the book booked -23.2%.
+
+    Two halves, both load-bearing:
+      * a coin in the map has a stop that was actually evaluated, at a price
+        the venue is quoting NOW;
+      * a coin in `blind` has an UNEVALUATED stop, and callers MUST publish
+        that rather than skipping it silently — `{open: N}` is byte-identical
+        between "stops live" and "stops blind" otherwise (I1/I18).
+    """
+    out, blind = {}, []
+    for c in sorted(coins):
+        m = fresh_mid(venue, c)
+        if m and m > 0:
+            out[c] = float(m)
+        else:
+            blind.append(c)
+    return out, blind

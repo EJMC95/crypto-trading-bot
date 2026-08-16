@@ -76,6 +76,7 @@ from datetime import datetime, timezone
 
 import bot_pnl_store as store
 from venues import venue_context
+from venues.marks import fresh_mid, stop_marks
 
 # Universe + class screen come from the bus. Guarded: a dark import keeps the
 # configured list. COPY lands in Dockerfile.schwager in this same commit.
@@ -471,91 +472,102 @@ def main():
             print(f"[{now_iso()}] mark fetch failed ({e!r}); retrying")
             fund = None
 
-        if fund:
-            last_ts = t0
-            universe = resolve_universe(set(positions))
-
-            # ---- manage every open position -----------------------------
-            for key in list(positions):
-                pos = positions[key]
-                f = fund.get(pos["coin"])
-                mark = float((f or {}).get("mark") or 0.0)
-                if f is None or mark <= 0:
-                    first = pos.setdefault("missing_since", t0)
-                    if (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
-                        continue
-                    px = pos.get("last_mark")
-                    pos["fees"] += SLIP_COST * pos["notional"]
-                    pnl = _price_pnl(pos, px)
-                    realized += pnl
-                    n_closed += 1
-                    n_wins += 1 if pnl > 0 else 0
-                    _close(bot_id, key, pos, "delisted", px, pnl)
-                    print(f"[{now_iso()}] CLOSE {key} [delisted] "
-                          f"pnl {pnl:+.2f} | banked {realized:+.2f}")
-                    del positions[key]
+        # ---- manage every open position -----------------------------------
+        # ((nm)) EXITS DO NOT DEPEND ON THE FUNDING MAP, and the stop/trail is
+        # evaluated on the LIVE BOOK. This block used to sit inside `if fund:`
+        # (a dark funding fetch suspended every stop) and read
+        # `fund[coin]["mark"]` — a last-trade price frozen at client
+        # construction, so the comment below claiming exits "keep running on
+        # the live mark" was not true of the mark it was given.
+        # venues/marks.stop_marks carries the measurement.
+        stops, stop_blind = stop_marks(ctx.venue, set(positions))
+        for key in list(positions):
+            pos = positions[key]
+            mark = stops.get(pos["coin"]) or 0.0
+            if mark <= 0:
+                first = pos.setdefault("stop_blind_since", t0)
+                if (t0 - first) / 3600.0 < DELIST_GIVEUP_H:
                     continue
-                pos.pop("missing_since", None)
-                pos["last_mark"] = mark
-                # exit check first, then the ratchet — the study's ordering
-                reason = trend_exit(pos, mark, t0)
-                if reason is None:
-                    # ((mh)) THE RATCHET FEEDS ON CLOSED 4h BARS, NEVER the
-                    # 5-min mark: the study's +$457 ratcheted the chandelier
-                    # on bar CLOSES, and feeding intrabar highs tightens the
-                    # trail toward the REFUTED 2.5x-shaped behavior. One
-                    # candles call per held coin per loop; a dark fetch
-                    # skips the ratchet (the trail keeps its last level and
-                    # exits keep running on the live mark).
-                    try:
-                        # [2026-08-15 (ne)] CATCH-UP: fetch back to the last
-                        # ratcheted bar (bounded at 42 bars = 7d) and replay
-                        # EVERY missed closed bar in order. The old form
-                        # applied only cb[-1], so a container outage longer
-                        # than one 4h bar permanently dropped intermediate
-                        # bar-close HWM updates — if a missed bar set a new
-                        # high and price then fell, the trail sat silently
-                        # LOOSER than the validated every-bar ratchet (X5
-                        # conformance finding; the wide trail IS this book's
-                        # whole edge, but a loosened-by-outage trail is a
-                        # different rule, the flap class). Continuous
-                        # operation is unchanged: one new bar, one update.
-                        # Outages beyond 7d ratchet on the last 42 closes
-                        # only — stated bound, not a silent cap.
-                        _last = float(pos.get("trail_bar_t") or 0.0)
-                        _span = (min(42, max(3, int((t0 - _last) / BAR_SEC)
-                                             + 2)) if _last else 3)
-                        rows = ctx.venue.candles(
-                            pos["coin"], BAR_INTERVAL,
-                            (int(t0) - _span * BAR_SEC) * 1000,
-                            int(t0) * 1000)
-                        cb = _closed_bars(rows, BAR_SEC, int(t0))
-                        for bt, _o, _h, _l, bc in cb:
-                            if (bt + BAR_SEC > pos["opened_ts"]
-                                    and bt > _last
-                                    and bt != pos.get("trail_bar_t")):
-                                update_trail(pos, bc)
-                                pos["trail_bar_t"] = bt
-                    except Exception:  # noqa: BLE001
-                        pass
-                    continue
+                px = pos.get("last_mark")
                 pos["fees"] += SLIP_COST * pos["notional"]
-                px = pos["trail_px"] if reason == "trail" else mark
-                if reason == "trail" and pos["side"] == "long":
-                    px = min(mark, pos["trail_px"])   # gap through the trail
-                elif reason == "trail":
-                    px = max(mark, pos["trail_px"])
                 pnl = _price_pnl(pos, px)
                 realized += pnl
                 n_closed += 1
                 n_wins += 1 if pnl > 0 else 0
-                held_h = (t0 - pos["opened_ts"]) / 3600.0
-                _close(bot_id, key, pos, reason, px, pnl,
-                       spread_exit=live_spread_bps(ctx, pos["coin"]))
-                print(f"[{now_iso()}] CLOSE {key} {pos['side']} after "
-                      f"{held_h:.1f}h [{reason}] pnl {pnl:+.2f} | "
-                      f"banked {realized:+.2f}")
+                _close(bot_id, key, pos, "delisted", px, pnl)
+                print(f"[{now_iso()}] CLOSE {key} [delisted] "
+                      f"pnl {pnl:+.2f} | banked {realized:+.2f}")
                 del positions[key]
+                continue
+            pos.pop("stop_blind_since", None)
+            pos.pop("missing_since", None)     # pre-(nm) restored state
+            pos["last_mark"] = mark
+            # exit check first, then the ratchet — the study's ordering
+            reason = trend_exit(pos, mark, t0)
+            if reason is None:
+                # ((mh)) THE RATCHET FEEDS ON CLOSED 4h BARS, NEVER the
+                # 5-min mark: the study's +$457 ratcheted the chandelier
+                # on bar CLOSES, and feeding intrabar highs tightens the
+                # trail toward the REFUTED 2.5x-shaped behavior. One
+                # candles call per held coin per loop; a dark fetch
+                # skips the ratchet (the trail keeps its last level and
+                # exits keep running on the live mark).
+                try:
+                    # [2026-08-15 (ne)] CATCH-UP: fetch back to the last
+                    # ratcheted bar (bounded at 42 bars = 7d) and replay
+                    # EVERY missed closed bar in order. The old form
+                    # applied only cb[-1], so a container outage longer
+                    # than one 4h bar permanently dropped intermediate
+                    # bar-close HWM updates — if a missed bar set a new
+                    # high and price then fell, the trail sat silently
+                    # LOOSER than the validated every-bar ratchet (X5
+                    # conformance finding; the wide trail IS this book's
+                    # whole edge, but a loosened-by-outage trail is a
+                    # different rule, the flap class). Continuous
+                    # operation is unchanged: one new bar, one update.
+                    # Outages beyond 7d ratchet on the last 42 closes
+                    # only — stated bound, not a silent cap.
+                    _last = float(pos.get("trail_bar_t") or 0.0)
+                    _span = (min(42, max(3, int((t0 - _last) / BAR_SEC)
+                                         + 2)) if _last else 3)
+                    rows = ctx.venue.candles(
+                        pos["coin"], BAR_INTERVAL,
+                        (int(t0) - _span * BAR_SEC) * 1000,
+                        int(t0) * 1000)
+                    cb = _closed_bars(rows, BAR_SEC, int(t0))
+                    for bt, _o, _h, _l, bc in cb:
+                        if (bt + BAR_SEC > pos["opened_ts"]
+                                and bt > _last
+                                and bt != pos.get("trail_bar_t")):
+                            update_trail(pos, bc)
+                            pos["trail_bar_t"] = bt
+                except Exception:  # noqa: BLE001
+                    pass
+                continue
+            pos["fees"] += SLIP_COST * pos["notional"]
+            px = pos["trail_px"] if reason == "trail" else mark
+            if reason == "trail" and pos["side"] == "long":
+                px = min(mark, pos["trail_px"])   # gap through the trail
+            elif reason == "trail":
+                px = max(mark, pos["trail_px"])
+            pnl = _price_pnl(pos, px)
+            realized += pnl
+            n_closed += 1
+            n_wins += 1 if pnl > 0 else 0
+            held_h = (t0 - pos["opened_ts"]) / 3600.0
+            _close(bot_id, key, pos, reason, px, pnl,
+                   spread_exit=live_spread_bps(ctx, pos["coin"]))
+            print(f"[{now_iso()}] CLOSE {key} {pos['side']} after "
+                  f"{held_h:.1f}h [{reason}] pnl {pnl:+.2f} | "
+                  f"banked {realized:+.2f}")
+            del positions[key]
+        if stop_blind:
+            print(f"[{now_iso()}] STOPS BLIND on {', '.join(stop_blind)} — "
+                  f"no live book; stop/trail NOT evaluated this loop")
+
+        if fund:
+            last_ts = t0
+            universe = resolve_universe(set(positions))
 
             # ---- scan for breakouts -------------------------------------
             census = {"scanned": len(universe), "held": 0, "no_bars": 0,
@@ -595,7 +607,9 @@ def main():
                     acted[coin] = sig_t     # ((mh)) sim semantics: a
                     capped += 1             # cap-bound signal is DROPPED,
                     continue                # never retried at drifted marks
-                mark = float((fund.get(coin) or {}).get("mark") or 0.0)
+                # ((nm)) price the ENTRY on the live book — the funding
+                # map's mark is frozen at client construction.
+                mark = fresh_mid(ctx.venue, coin) or 0.0
                 pos = _open_position(positions, coin, side, mark, a, t0, sig_t)
                 if pos is None:
                     acted[coin] = sig_t
@@ -610,14 +624,19 @@ def main():
             census["opened"] = opened
             census["capped"] = capped
             census["unpriceable"] = unpriceable
+            # ((nm)) held coins whose stop/trail could not be evaluated
+            # this loop — published so `open: N` is never byte-identical
+            # between "stops live" and "stops blind" (I1/I18).
+            census["stops_blind"] = len(stop_blind)
             acted = {c: t for c, t in acted.items()
                      if isinstance(t, (int, float))
                      and now_s - t < 5 * 86400}
 
             # ---- publish -------------------------------------------------
             open_pnl = sum(
-                _price_pnl(p, float((fund.get(p["coin"]) or {}).get("mark")
-                                    or 0.0))
+                # ((nm)) MTM on the live book — this feeds snapshot_equity
+                # and therefore the go-live maxDD bar (I9).
+                _price_pnl(p, stops.get(p["coin"]) or 0.0)
                 for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
             extra = build_extra(census, positions, open_pnl, realized)
