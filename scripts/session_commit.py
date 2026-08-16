@@ -290,6 +290,22 @@ def main(argv=None):
             print("\nThe commit EXISTS. Inspect it (`git show --stat HEAD`) "
                   "before pushing.", file=sys.stderr)
             return 3
+        # [(ob)] REFRESH THE WORKTREE'S REAL INDEX FOR OUR PATHS ONLY.
+        # The commit was built in a PRIVATE index, so the worktree's own index
+        # never learned about it and still reports our files as modified (and a
+        # newly added file as DELETED). That is invisible in a shared tree — the
+        # index there is already churning — but in a per-session worktree it is
+        # immediately fatal: `git rebase` refuses with "you have unstaged
+        # changes", so the publish step cannot run. Found by dogfooding the
+        # worktree flow this same commit introduces.
+        # Scoped with `-- <paths>` deliberately: a bare `git reset` would also
+        # unstage whatever ANOTHER session had staged, which is the very thing
+        # this tool exists not to do.
+        rs = _git("reset", "-q", "HEAD", "--", *paths, index=None)
+        if rs.returncode != 0:
+            print("note: could not refresh the worktree index for "
+                  f"{' '.join(paths)} — `git status` may show phantom changes "
+                  "until you run `git reset HEAD -- <paths>`", file=sys.stderr)
         files = _git("show", "--stat", "--format=", "HEAD", index=index).stdout
         print("\n=== read-back OK — the commit holds exactly these bytes ===")
         print(files)

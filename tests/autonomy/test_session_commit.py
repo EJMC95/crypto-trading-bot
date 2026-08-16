@@ -359,3 +359,30 @@ def test_a_MOVED_entry_is_not_a_deleted_one(sc):
     assert sc.removed_entry_headers(moved_plus_real_deletion) == [
         "## 2026-08-16 (nv) — theirs, really gone"], \
         "a real deletion alongside a move must still be caught"
+
+
+def test_the_worktree_index_is_refreshed_after_a_commit(tmp_path):
+    """[(ob)] The commit is built in a PRIVATE index, so the worktree's own
+    index never learns about it — leaving our files reported as modified and a
+    newly added file as DELETED.
+
+    Invisible in a shared tree (that index is already churning) and immediately
+    fatal in a per-session worktree: `git rebase` refuses with "you have
+    unstaged changes", so the publish step cannot run. Found by dogfooding the
+    worktree flow.
+    """
+    repo, g = _repo(tmp_path)
+    (repo / "brand_new.py").write_text("new\n")
+    (repo / "mine.py").write_text("base\nedit\n")
+
+    r = _run(repo, "-m", "adds and edits", "--", "brand_new.py", "mine.py")
+    assert r.returncode == 0, r.stdout + r.stderr
+
+    status = g("status", "--porcelain").stdout
+    for p in ("brand_new.py", "mine.py"):
+        assert p not in status, (
+            f"{p} still dirty after commit — the worktree index is stale, and "
+            f"`git rebase` will refuse to run:\n{status}")
+    # and a rebase-equivalent precondition actually passes
+    assert g("diff", "--cached", "--quiet").returncode == 0, "index not clean"
+    assert g("diff", "--quiet").returncode == 0, "worktree not clean"

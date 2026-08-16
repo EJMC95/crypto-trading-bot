@@ -105,6 +105,18 @@
   so without an explicit `.venv` line every session's worktree would carry a
   permanent `?? .venv` sitting in the blast radius of any `git add -A`. Local
   (`info/exclude`), idempotent, no change to the shared `.gitignore`.
+- **AND DOGFOODING THE WORKTREE FLOW FOUND A THIRD BUG IN `session_commit.py`.**
+  It builds the commit in a PRIVATE index, so the worktree's OWN index never
+  learns about it — leaving committed files reported as modified and a newly
+  added file as **DELETED**. Invisible in the shared tree, where the index is
+  already churning; **immediately fatal in a per-session worktree**, because
+  `git rebase` refuses with *"you have unstaged changes"* and the publish step
+  cannot run at all. Fixed with a `git reset -q HEAD -- <paths>` scoped to the
+  committed paths only — a bare `git reset` would unstage whatever ANOTHER
+  session had staged, which is the one thing this tool exists not to do.
+  Mutation-verified. **Three of this tool's bugs have now been found by running
+  it and none by reading it**, which is the argument for the dogfooding, not an
+  embarrassment about it.
 - Letter: `n*` is EXHAUSTED — `na`..`nz` are all taken, on one day. The sequence
   rolls to `o*`, and `oa` was gone before this entry was written.
 
