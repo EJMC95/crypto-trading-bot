@@ -127,6 +127,39 @@
   and ~5-7 months; that was honest and remains so. `t` is already 3.92, so this
   book needs TIME, not a better statistic. Contrast `(nu)`: Schwager needs ~719
   closes / ~40 months for t=2.0, which no amount of waiting fixes.
+- **RETRACTION, same pass, and it is mine to carry: the margin model's
+  "0.000000% live calibration" was CIRCULAR and verified nothing.** A peer
+  session sent it, I banked it in `scripts/lighter_margin_model.py`'s docstring
+  and pinned it as a selftest (`9315c98`), and the commit subject that landed it
+  reads *"...and it passes to 0.000000%"*. It does not. The entry price fed in
+  was never observed — it was back-solved as `entry = liq·(1+mmf)/(1+1/L)`,
+  the exact INVERSE of `liq_price`, so feeding it back is an algebraic
+  identity. **Verified here before acting on the retraction: it returns
+  0.0000000000% for L=9.9, for mmf=0.9, and for a $1 liq.** A check that
+  cannot fail is not a check — I3's shape, wearing the word "calibration".
+  * **UNSUPPORTED as a result, and pulled from the docstring: the CROSS-margin
+    substitution `L = gross/equity`.** Not disproven — untested. Both live
+    books run cross, so this matters and is now marked open.
+  * The one non-circular leg ("implied entry 4,385.65 vs a 4,387.6 mark") also
+    fails: that mark is `funding_map()`'s `markets[sym]["last"]`, frozen at
+    client construction and refreshed only by `refresh_markets()`, which only
+    the sniper calls. A boot-frozen price, not unrealised P&L.
+  * **The pin is KEPT but RELABELLED**, because it is not worthless: with the
+    entry frozen as a literal it still constrains our own algebra (L=0.20 and
+    L=9.9 both fail it, and the `(1+mmf)→(1−mmf)` mutation reddens it). It is
+    a change-detector on our arithmetic, NOT evidence of venue agreement, and
+    the selftest now asserts its own non-circularity so the distinction cannot
+    quietly rot back.
+  * **What survives untouched, because it never depended on the calibration:**
+    a long at L≤1 has no liquidation price, only a path to worthlessness —
+    that reads off the algebra itself, so the venue publishing nothing for 🙏
+    Avo's four longs at 0.999× is CORRECT rather than a data gap.
+  * **The real test is now possible and is outstanding**: the position's own
+    observed `avg_entry_price` was read but never projected, which is exactly
+    why the check was impossible and a circular one felt adequate. It is now
+    published at `extra.margin.positions.<coin>.entry`; run `liq_price` FORWARD
+    on independently observed inputs once the live containers carry it.
+
 - **COHORT STATUS after three re-measurements:** 🧘 Douglas CORRECTED (edge
   survives, "both halves positive" does not) · 🧙 Schwager NOT ESTABLISHED and
   a live I17 call · 🧮 Hull HOLDS · 📐 Grimes still unchecked, and least
