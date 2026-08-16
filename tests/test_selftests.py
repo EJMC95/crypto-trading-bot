@@ -256,6 +256,16 @@ ENFORCED_AUDITS = [
     "scripts/audit_venue_purity.py",      # LIGHTER-first, shipped-code scan (CI-gating)
     "scripts/audit_deploy_coverage.py",   # every shipped file has a deploy path (CI-gating)
     "scripts/audit_changelog_letters.py",  # sync-channel citations resolve (CI-gating)
+    # [2026-08-16 (ox)] THE SCAN, not just the --selftest. This guard was in
+    # SELFTEST_MODULES only, so `pytest` ran its negative fixture and never
+    # pointed it at the repo: the scan lived solely in changelog-check.yml, and
+    # a NameError introduced locally was invisible until after a push. Nine of
+    # the thirteen audits in that workflow are ALSO here for exactly this
+    # reason; of the four that were not, three are changelog/doctrine scans
+    # that belong there — this one is a CODE guard and was in the wrong group.
+    # ~1.6s over 195 modules. (ow) reverted this line once, on the wrong
+    # reading that it duplicated an existing registration; it does not.
+    "scripts/audit_undefined_names.py",
     # [2026-07-30] the cage must fit the value: every lever carries a
     # machine-readable default, that default is INSIDE its own bounds, and it
     # MATCHES the `os.environ.get` default its consumer actually runs. The

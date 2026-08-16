@@ -1,3 +1,50 @@
+## 2026-08-16 (ox) — THE GUARD'S SCAN WAS NOT IN THE TESTS WORKFLOW: its --selftest was, so `pytest` proved the detector could see and never pointed it at the repo
+
+- **THE ASK** (operator): *"check the guard's own scan actually runs in the
+  Tests workflow"*. **It did not.** Tests ran its `--selftest` and never
+  pointed it at the repo. Asking the question was the finding.
+
+- **THE TWO REGISTRIES, and why the difference is not cosmetic.**
+  `tests/test_selftests.py` holds both:
+  * `SELFTEST_MODULES` -> `python -m <mod> --selftest`. That is the NEGATIVE
+    FIXTURE: proof the detector can still see. It scans nothing.
+  * `ENFORCED_AUDITS` -> `_run([script])` **and** `--selftest`. That is the
+    scan, pointed at this repo, plus the fixture.
+  `audit_undefined_names` was in the first only. Its scan ran in exactly one
+  place — `changelog-check.yml`, on every push to main, no paths filter,
+  verified green on this session's own commits. So **CI was covered and LOCAL
+  WAS NOT**: `pytest` never executed the scan, and a NameError introduced on a
+  desk was invisible until after a push. Every verification run in this
+  session used that local suite.
+
+- **IT WAS IN THE WRONG GROUP, measurably.** Thirteen audits run their scan in
+  `changelog-check.yml`; **nine are ALSO in `ENFORCED_AUDITS`**. Of the four
+  that were not — `audit_doctrine_enforcement`, `audit_era_date_literals`,
+  `audit_recurrence`, `audit_undefined_names` — the first three scan the
+  changelog and doctrine, which is that workflow's own subject and a reason to
+  keep them out of the test suite (`audit_changelog_letters` IS in
+  `ENFORCED_AUDITS`, which is precisely why a concurrent session taking a
+  letter turns a LOCAL suite red; more of that coupling is not wanted). The
+  fourth is a **code** guard and belongs with the nine. Now registered: ~1.6s
+  over 195 modules.
+
+- **PROVEN, not assumed.** Re-injected the real 16-Aug damage into the real
+  file and ran the suite: `FAILED tests/test_selftests.py::
+  test_enforced_audit_guard[scripts/audit_undefined_names.py]`. Before this
+  change the same injection left the suite green.
+
+- **AND IT UNDOES A REVERT I MADE ON A MISREADING.** `(ow)`'s first cut added
+  this exact line; I then removed it, believing it duplicated an existing
+  registration. It did not — the guard was in `SELFTEST_MODULES`, not
+  `ENFORCED_AUDITS`, and I read "it is already registered" off the wrong list
+  while cleaning up a genuine mistake next to it. `(ow)`'s bullet is corrected
+  in place. **Two lessons, and the second is the one worth keeping: a cleanup
+  performed in the middle of an embarrassment is a bad time to trust your own
+  reading — I over-corrected, and threw away the good half of a bad commit.**
+
+- No trade behaviour: a registration, a proof, and prose. Main only per
+  `(mm)`. Suite green, all 27 floors held.
+
 ## 2026-08-16 (ov) — THE FIVE-ANGLE P&L HUNT RETURNED NOTHING, AND THAT IS THE ENTRY: 6 of 6 refereed claims refuted, settlement micro-timing CLOSED at a $27/yr ceiling, and the one finding I escalated died to the fleet's own guard
 
 **Operator ask:** *"keep looking for more pnl growth while we wait"* — then
@@ -148,10 +195,14 @@ correction recorded, zero levers moved, zero books touched.
   Verified end to end by re-injecting the damage into the real file:
   `::error::tests/test_selftests.py:463: reads 'om', bound nowhere`.
 
-- **REVERTED from the first cut:** the duplicate script, and a duplicate
-  `ENFORCED_AUDITS` registration — the guard was already wired through
-  `changelog-check.yml` and the selftest module list, so that entry would have
-  run it twice and implied it was new.
+- **REVERTED from the first cut:** the duplicate script. ~~and a duplicate
+  `ENFORCED_AUDITS` registration~~ — **that second revert was itself wrong, and
+  is undone by the entry above/below (see the `ENFORCED_AUDITS` line dated
+  16-Aug).** The guard was wired through `changelog-check.yml` (its SCAN) and
+  through `SELFTEST_MODULES` (its `--selftest` only), so an `ENFORCED_AUDITS`
+  entry was NOT a duplicate: it is what makes the SCAN run inside the Tests
+  suite, and therefore inside a local `pytest`. I reverted a correct change on
+  a misreading of which of the two registries it was already in.
 
 - **LIMITS, unchanged and declared:** a replace that swaps one bound name for
   another still parses and runs — the suite is the detector for that one.
