@@ -1,3 +1,105 @@
+## 2026-08-17 (pi) — AN `ENFORCED_AUDITS` MEMBER THAT CANNOT FAIL IN CI: `audit_boot_stagger` could never reach a deploy cadence there, so it asserted nothing on every run that gated a build
+
+`(pg)` fixed the crash. Checking *why* the crash was CI-only turned up the
+larger fact: even working, this audit **never asserted anything in CI**.
+
+Its cadence chain is `gh run list` → `git log origin/main` → `[]`:
+
+1. `gh run list --workflow "Railway Redeploy"` needs **`actions: read`**, and
+   this workflow's `GITHUB_TOKEN` is `contents / metadata / packages: read`.
+   Dark in CI, always.
+2. `git log origin/main` — `actions/checkout@v4` with **no `fetch-depth`**
+   defaults to **depth 1**, and CI checks out a **detached HEAD**, so there is
+   neither history to read nor necessarily an `origin/main` ref.
+3. → `[], "unavailable"` → *"no deploy cadence available — nothing asserted"* →
+   **exit 0**.
+
+So the guard registered to fail the build was, in the build, a no-op. The same
+two-regimes class as `(pg)` one level up: `(pg)` was the CI-only path being
+**broken**, this is the CI-only path being **empty**.
+
+**MEASURED BEFORE ENABLING, because turning a dormant gate on is how you make
+CI flaky.** Forced the git-proxy tier over the burstiest window this repo has
+produced — 60 commits, **median gap 2.3 min, minimum 0.0** — and **nothing
+fails**. That is not luck: the FAIL condition is contract-based (a burst must
+outlast the organ's own published TTL), not rate-based, exactly as this guard's
+header argues at length after an earlier draft cried wolf on 🕐 `fleet_clock`
+missing one advisory cycle. A commit-time proxy overstates deploy frequency —
+several commits ride one push — so it errs toward firing, and it still does not.
+
+**Shipped, both halves in one commit** (a routing fix that cannot deploy itself
+is `(gm)`, and half of this is inert without the other):
+- `deploy_times` tries `origin/main` **then `HEAD`**, so a detached checkout
+  still yields a cadence. Order matters and is pinned: `HEAD` first would
+  silently prefer a feature branch over main.
+- `tests.yml` gains `fetch-depth: 0` on the suite job, so there is history for
+  the proxy to read. No unit test can assert a runner's checkout depth from
+  inside the runner, so that half is guarded by review and named here.
+
+Verified end-to-end in a simulated CI regime (`gh` raising, no `DATABASE_URL`):
+`deploy cadence source: git:origin/main commit times (PROXY …)`, 60 deploys,
+real verdict, exit 0 — where it previously asserted nothing. 3 mutations red.
+
+**The general shape, worth more than this instance:** when an audit has a
+preferred source and a fallback, ask which one CI can actually reach. If the
+answer is "neither", registering it in `ENFORCED_AUDITS` buys a green tick and
+no enforcement.
+## 2026-08-17 (ph) — THE CLASS SCREEN IS PART OF THE GATE: `audit_book_overlap` called three books rivals for a supply their own screens refuse, and it had no test of any kind
+
+`(pf)` gave 🌾 carry and 🎸 Barnes a published `caps.crypto_only`. This is the
+consumer half — and the reason the field was worth publishing.
+
+**MEASURED, live tape, `--gate 0.20 --allow-noncrypto`, before the fix:**
+
+    supply: 14 coins deep — MU, SAMSUNGUSD, SKHY, QQQ … mostly NON-crypto
+    LIVING BOOKS WHOSE GATE ALREADY ADMITS THIS SUPPLY:
+       band-barnes-lshadow · book-kiyosaki-lshadow · perps-funding-carry-lshadow
+    VERDICT: 3 living books already claim this supply, and it is 14 coin(s) deep.
+
+All three screen crypto-only `(lk)`/`(lv)` and can reach **3** of those 14. The
+detector was quoting a collision 4.7× deeper than the one that exists — the
+phantom-rival class the apr ceiling `(mh)` and the volume ceiling `(gl)` were
+each added to prevent, arriving on the third axis. I20's own corollary: *a
+detector that overstates is one the operator learns to ignore.*
+
+**After:**
+
+    band-barnes-lshadow   enter_apr=0.2  vol=[2.00M,inf)  crypto-only: reaches 3 of 14
+    VERDICT: … it is 3 coin(s) deep (the gate yields 14; the rivals' own class
+             screens reach 3).
+
+Three-valued like every other bound in the file: `True` / `False` / **`None` for
+"the book does not publish it"**, which prints `class screen UNPUBLISHED` and
+changes no count. An unpublished screen may neither manufacture a finding nor
+erase one. That label immediately names who is next: 🛢️ Garrett and both
+💸 Farmer arms. And the annotation is **silent at a crypto-only gate**, where
+every coin is crypto and it would be noise on every line.
+
+**THIS FILE HAD NO TEST — and CLAUDE.md names it as I20's enforcement**
+(`report_supply`, `admits`). `audit_doctrine_enforcement` only checks that the
+reference RESOLVES, which is precisely the caveat at the top of CLAUDE.md: *"a
+green run verifies that a declared enforcement EXISTS, not that it is
+CORRECT."* It existed, it was wrong, and nothing could have said so.
+`tests/autonomy/test_book_overlap_gate.py` now pins the reach logic, the
+three-valued `admits` bounds (apr ceiling, volume ceiling, unknown), and the
+arm-pair exclusion. **6 mutations verified red** — one of them found a genuine
+hole in my first draft: without the `isinstance(co, bool)` normalisation a
+malformed `crypto_only` (`"true"`, `1`, `[]`) fell through the `is True` test
+into the *unscreened* branch **without** the UNPUBLISHED label, i.e. wrong in
+both directions at once. `class_reach` is module level rather than a closure so
+it has one owner and can be tested at all.
+
+**AND A CORRECTION TO MY OWN REPORT THE SAME MORNING.** Today's review listed
+*"the XAU ×2 'REAL MONEY IN THE STACK' overstatement is still present, second
+sighting"*. **It is not.** `a9e3267` fixed it on 16-Aug (`ARM_PAIRS` +
+`same_book`), and today's run puts XAU under *"same coin on both arms of ONE
+book — by design, reported, never a finding"*. I carried the item forward from
+yesterday's report instead of re-running the detector — the exact anti-drift
+failure that review's own rules open with. Running it is what found the real
+defect above. The live same-side concentration finding today is **LINK ×3**
+across three genuinely different books (💸 Farmer shadow, ⚖️ Counterweight,
+🛢️ Garrett), and a test now pins that a third book joining an arm pair is still
+a finding.
 ## 2026-08-17 (pg) — CI HAS BEEN RED ON MAIN SINCE `(pe)` AND THE SAME COMMIT RUNS GREEN ON A LAPTOP: `audit_boot_stagger` crashes in the one regime it cannot see
 
 **Found by the daily evidence review while checking whether yesterday's red-CI

@@ -37,6 +37,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # [2026-08-17 (pi)] FULL HISTORY, so `audit_boot_stagger` can reach a
+          # deploy cadence at all. Its preferred source (`gh run list`) needs
+          # `actions: read`, which this workflow's GITHUB_TOKEN does not have,
+          # so the git commit-time PROXY is the ONLY tier CI can use — and at
+          # the default depth of 1 there is no history to read. The audit is in
+          # ENFORCED_AUDITS and was therefore structurally unable to fail here:
+          # it asserted nothing on every run. Measured before enabling, on the
+          # burstiest window this repo has (median gap 2.3 min, min 0.0):
+          # nothing fails, because the FAIL condition is contract-based (a
+          # burst must outlast the organ's own TTL), not rate-based.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

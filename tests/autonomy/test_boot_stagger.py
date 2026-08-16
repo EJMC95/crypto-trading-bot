@@ -419,6 +419,34 @@ def test_no_deploy_history_asserts_nothing():
     assert r["verdict"] == "report" and r["starve_rate"] is None
 
 
+def test_the_git_tier_falls_back_to_HEAD_when_origin_main_is_not_a_ref(monkeypatch):
+    """[(pi)] CI checks out a DETACHED HEAD, and `gh run list` needs
+    `actions: read` which CI's GITHUB_TOKEN lacks — so the git proxy is the ONLY
+    tier CI can reach, and it asked for a ref that may not exist there. With
+    both tiers dark the audit asserted nothing, making an `ENFORCED_AUDITS`
+    member structurally unable to fail the build it gates.
+    """
+    seen = []
+
+    class _R:
+        def __init__(self, out): self.stdout = out
+
+    def fake_run(cmd, *a, **k):
+        if cmd[:2] == ["gh", "run"]:
+            raise RuntimeError("no actions: read")       # the CI regime
+        seen.append(cmd[-1])
+        if cmd[-1] == "origin/main":
+            return _R("")                               # not a ref here
+        return _R("2026-08-17T01:00:00+00:00\n"
+                  "2026-08-17T01:10:00+00:00\n"
+                  "2026-08-17T01:30:00+00:00\n")
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    times, source = mod.deploy_times(60)
+    assert seen == ["origin/main", "HEAD"], f"must try both, in order: {seen}"
+    assert len(times) == 3, times
+    assert "HEAD" in source and "PROXY" in source, source
+
+
 def test_a_cadence_less_row_still_carries_its_tolerance():
     """[(pg)] THE INCIDENT: `assess` set the tolerance BELOW the `if not gaps`
     early return, so a run with no deploy cadence emitted rows with no

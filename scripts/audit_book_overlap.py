@@ -151,9 +151,56 @@ def living_gates(cur):
         # Garrett's band got counted as a rival for a supply it excludes).
         g["vol_known"] = ("min_vol" in g) or ("max_vol" in g) \
             or ("max_vol" in e) or ("max_vol" in caps)
+        # [2026-08-17 (ph)] THE CLASS SCREEN IS PART OF THE GATE, on the same
+        # footing as the apr band `(mh)` and the volume band `(gl)` added. A
+        # book that refuses non-crypto cannot be a rival for the non-crypto
+        # half of a mixed supply, and calling it one is the phantom-rival class
+        # those two arms already exist to prevent. Measured before fixing, at
+        # `--gate 0.20 --allow-noncrypto`: the supply reads 14 coins deep
+        # (MU, SAMSUNGUSD, SKHY, QQQ … all non-crypto) and 🌾 carry, 🎸 Barnes
+        # and 🏦 Rich Dad were all listed as claiming it — while every one of
+        # them screens crypto-only and can reach exactly 3 of those 14.
+        # THREE-VALUED, like every other bound here: True / False / None for
+        # "the book does not publish it". None must NOT be read as either — an
+        # unpublished screen may not manufacture a finding and may not erase
+        # one. `(pf)` gave 🌾 carry and 🎸 Barnes the declaration; until that
+        # deploy lands they read None and this arm stays silent on them.
+        co = e.get("crypto_only", caps.get("crypto_only"))
+        g["crypto_only"] = co if isinstance(co, bool) else None
         if g.get("enter_apr") is not None:
             out[bot] = g
     return out
+
+
+def class_reach(g, supply_coins, is_crypto):
+    """(n_reachable, note) — how many of THIS supply's coins the book's own
+    class screen actually lets it take.
+
+    [2026-08-17 (ph)] The class screen is part of the gate, on the same footing
+    as `(mh)`'s apr ceiling and `(gl)`'s volume ceiling: a crypto-only book is
+    not a rival for the non-crypto half of a mixed supply.
+
+    Module level, not a closure inside `report_supply`, so it has ONE owner and
+    can be tested directly — this file is named in CLAUDE.md as I20's
+    enforcement and had no test of any kind before this.
+
+    Three-valued in, three-valued out. `crypto_only is None` means the book does
+    not publish the screen: that is UNKNOWN and must not be read as either
+    answer, so the reach is left at full and the caller labels it. An
+    unpublished screen may neither manufacture a finding nor erase one.
+    """
+    total = len(supply_coins)
+    crypto = [c for c in supply_coins if is_crypto(c)]
+    mixed = len(crypto) < total
+    if not mixed:
+        # Every coin is crypto: a crypto-only book reaches all of it and the
+        # annotation would be pure noise.
+        return total, ""
+    if g.get("crypto_only") is None:
+        return total, "  class screen UNPUBLISHED"
+    if g.get("crypto_only") is True:
+        return len(crypto), f"  crypto-only: reaches {len(crypto)} of {total}"
+    return total, ""
 
 
 def admits(g, gate, floor):
@@ -335,13 +382,18 @@ def report_supply(cur, gate: float, floor: float, persist_h: float,
         buckets[admits(g, gate, floor)].append((b, g))
     rivals = buckets["yes"]
 
+    # [(ph)] How much of THIS supply can each book's class screen actually
+    # reach? One owner, module level — see `class_reach`.
+    def _reach(g):
+        return class_reach(g, list(coins), is_crypto)
+
     def _line(b, g):
         mn, mx = g.get("min_vol"), g.get("max_vol")
         band = ""
         if mn is not None or mx is not None:
             band = (f"  vol=[{(mn or 0)/1e6:.2f}M,"
                     f"{'inf' if mx is None else f'{mx/1e6:.2f}M'})")
-        return (f"     {b:32s} enter_apr={g['enter_apr']:.3g}{band}"
+        return (f"     {b:32s} enter_apr={g['enter_apr']:.3g}{band}{_reach(g)[1]}"
                 + ("   [REAL MONEY]" if b in LIVE_BOOKS else ""))
 
     print()
@@ -374,8 +426,16 @@ def report_supply(cur, gate: float, floor: float, persist_h: float,
 
     print()
     if len(rivals) >= 2:
+        # [(ph)] DEPTH IS WHAT THE RIVALS CAN REACH, not what the gate yields.
+        # Quoting the full count while every rival is class-screened out of most
+        # of it overstates the collision, and an overstating detector is one the
+        # operator learns to ignore (I20's own corollary).
+        depth = max(_reach(g)[0] for _b, g in rivals)
+        qual = "" if depth == len(coins) else (
+            f" (the gate yields {len(coins)}; the rivals' own class screens "
+            f"reach {depth})")
         print(f"  VERDICT: {len(rivals)} living books already claim this supply, and it "
-              f"is {len(coins)} coin(s) deep.\n           A book minted here is largely "
+              f"is {depth} coin(s) deep{qual}.\n           A book minted here is largely "
               "the SAME BET at a new row id — not new\n           edge. Differentiate "
               "the gate (a different apr band or volume tier),\n           or do not "
               "mint it.")

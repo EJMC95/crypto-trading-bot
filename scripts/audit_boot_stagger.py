@@ -243,16 +243,24 @@ def deploy_times(limit: int = 60) -> tuple[list[dt.datetime], str]:
             return ts, "gh:Railway Redeploy (successful runs)"
     except Exception:      # noqa: BLE001 — any failure falls through to git
         pass
-    try:
-        raw = subprocess.run(
-            ["git", "log", "-n", str(limit), "--format=%cI", "origin/main"],
-            capture_output=True, text=True, timeout=60, cwd=ROOT).stdout
-        ts = sorted(dt.datetime.fromisoformat(l.strip())
-                    for l in raw.splitlines() if l.strip())
-        if len(ts) >= 3:
-            return ts, "git:origin/main commit times (PROXY — commits batch into pushes)"
-    except Exception:      # noqa: BLE001
-        pass
+    # [2026-08-17 (pi)] TRY `HEAD` TOO, not just `origin/main`. CI checks out a
+    # DETACHED HEAD, so `origin/main` may not be a ref there at all — and this
+    # is the only tier CI can ever reach, because `gh run list` above needs
+    # `actions: read` and CI's GITHUB_TOKEN does not have it. With both tiers
+    # dark the audit returned `[]` and asserted NOTHING, so an ENFORCED_AUDITS
+    # member was structurally incapable of failing the build it gates.
+    for ref in ("origin/main", "HEAD"):
+        try:
+            raw = subprocess.run(
+                ["git", "log", "-n", str(limit), "--format=%cI", ref],
+                capture_output=True, text=True, timeout=60, cwd=ROOT).stdout
+            ts = sorted(dt.datetime.fromisoformat(l.strip())
+                        for l in raw.splitlines() if l.strip())
+            if len(ts) >= 3:
+                return ts, (f"git:{ref} commit times "
+                            "(PROXY — commits batch into pushes)")
+        except Exception:      # noqa: BLE001
+            continue
     return [], "unavailable"
 
 
