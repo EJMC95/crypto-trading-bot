@@ -745,6 +745,21 @@ def entry_admission(coin, src, is_short, apr, st):
         return "skip", "quality_veto"
     if not is_short and st["fleet_long_veto"]:
         return "skip", "fleet_long"
+    # [2026-08-16 (oh)] THE IN-CYCLE HALF OF THE SAME BUDGET. `fleet_long_veto`
+    # is a BOOLEAN read once per loop, so it answers "was the fleet at its long
+    # budget when this pass started?" — not "is there still room for the long I
+    # am about to open". At long_positions == budget-1 the veto is False and
+    # this loop may open MAX_NEW_PER_LOOP longs, putting the fleet over a budget
+    # this bot's own log calls ENFORCED. `fleet-risk` republishes on its own
+    # cadence, so the overshoot stands until it does. The 21-Jul budget-headroom
+    # fix bounded exactly this race and reached `lighter_family_bot` and
+    # `lighter_avo_live_bot` (both count `cycle_admitted` against
+    # `fleet_long_headroom`) and not this file — the live book. Same rule, same
+    # shape, third copy. Fail-OPEN: headroom None (stale/absent/advisory
+    # fleet-risk) keeps the pre-(oh) behaviour exactly.
+    if (not is_short and st.get("fleet_long_headroom") is not None
+            and st.get("longs_admitted", 0) >= st["fleet_long_headroom"]):
+        return "skip", "fleet_long"
     sp = st.get("slope_prev")
     if sp is not None and abs(apr) < abs(sp):
         return "skip", "slope"
@@ -2384,12 +2399,20 @@ def main():
         # 16-Jul balance audit, IMB-05 refuted). Missing/stale fails OPEN;
         # kill switch stays central: FLEET_RISK_MODE=advisory.
         fleet_long_veto = False
+        # [(oh)] the in-cycle bound, the twin of the boolean below — see
+        # entry_admission. None = unknown/advisory/stale ⇒ no in-cycle limit,
+        # which is the pre-(oh) behaviour exactly.
+        fleet_long_headroom = None
         try:
             _fr = store.load_state("fleet-risk") or {}
             _fage = (now - datetime.fromisoformat(
                 str(_fr.get("updated")).replace("Z", "+00:00"))).total_seconds()
             _lb = _fr.get("long_budget")
             _lb = 10**9 if _lb is None else int(_lb)   # 0 is a REAL budget
+            if (_fage <= float(_fr.get("ttl_sec") or 900)
+                    and _fr.get("mode") == "enforce"):
+                fleet_long_headroom = max(
+                    0, _lb - int(_fr.get("long_positions") or 0))
             if (_fage <= float(_fr.get("ttl_sec") or 900)
                     and _fr.get("mode") == "enforce"
                     and (_fr.get("long_positions") or 0) >= _lb):
@@ -2400,6 +2423,7 @@ def main():
                          _fr.get("long_budget"))
         except Exception:  # noqa: BLE001 — fail-safe open
             fleet_long_veto = False
+            fleet_long_headroom = None
 
         # [2026-07-11 SLOPE GATE] rolling in-process funding history (apr units)
         # feeding the building-vs-rolling-over entry gate. Restart loses ~1h of
@@ -2412,6 +2436,8 @@ def main():
         # ---- manage open positions (held coins may no longer be hot) ----
         held_coins = set(pos) | set(meta)
         opened_this_loop = 0
+        longs_admitted = 0        # [(oh)] LONGS opened this cycle — the
+        # in-cycle half of the fleet long budget (see entry_admission)
         for coin in list(held_coins):
             held = pos.get(coin, {}).get("size", 0.0)
             if not held:
@@ -2768,6 +2794,8 @@ def main():
                      "n_explore": n_explore, "expl_k": _expl_k,
                      "vol_veto": vol_veto, "vetoes": _vetoes,
                      "fleet_long_veto": fleet_long_veto,
+                     "fleet_long_headroom": fleet_long_headroom,
+                     "longs_admitted": longs_admitted,
                      "slope_prev": _slope_prev})
                 # [2026-07-30 (fd) RECEIPT FIX] the slope quantity is recorded
                 # only for candidates the slope gate ACTUALLY ADJUDICATED —
@@ -2865,6 +2893,8 @@ def main():
                              "entry": px}
                 open_now += 1
                 opened_this_loop += 1
+                if not is_short:
+                    longs_admitted += 1     # [(oh)] consumes fleet headroom
                 if src == "explore":
                     n_explore += 1
                     explore_seen[coin] = t0   # coverage cursor -> rotate this coin to the back
@@ -3239,6 +3269,7 @@ def _selftest_entry_admission():
         base = {"open_now": 0, "max_open": 6, "opened_this_loop": 0,
                 "max_new_per_loop": 3, "n_explore": 0, "expl_k": 2,
                 "vol_veto": set(), "vetoes": {}, "fleet_long_veto": False,
+                "fleet_long_headroom": None, "longs_admitted": 0,
                 "slope_prev": None}
         base.update(over)
         return base
@@ -3279,6 +3310,37 @@ def _selftest_entry_admission():
              st(fleet_long_veto=True)) == ("skip", "fleet_long")
     assert A("ETH", "exploit", True, 0.10,
              st(fleet_long_veto=True))[0] == "open"
+
+    # [2026-08-16 (oh)] THE IN-CYCLE HALF. The boolean above answers "was the
+    # fleet at budget when this pass STARTED"; at budget-1 it is False and this
+    # loop may still open MAX_NEW_PER_LOOP longs, putting the fleet over a
+    # budget this bot's own log calls ENFORCED — and `fleet-risk` republishes
+    # on its own cadence, so the overshoot stands until it does. Found by the
+    # (oa) pre-loop-snapshot sweep: the 21-Jul budget-headroom fix reached
+    # `lighter_family_bot` and `lighter_avo_live_bot` (both count
+    # `cycle_admitted` against `fleet_long_headroom`) and NOT this file — the
+    # live book. Headroom 1 = room for exactly one long this cycle.
+    assert A("ETH", "exploit", False, -0.10,
+             st(fleet_long_headroom=1, longs_admitted=0))[0] == "open", \
+        "the FIRST long must still open while headroom remains"
+    assert A("ETH", "exploit", False, -0.10,
+             st(fleet_long_headroom=1, longs_admitted=1)) == \
+        ("skip", "fleet_long"), \
+        "the SECOND long of the cycle breaches a budget of 1 — must be refused"
+    # zero headroom refuses immediately, even with the boolean clear (the
+    # payload can read exactly AT budget without >= having tripped upstream)
+    assert A("ETH", "exploit", False, -0.10,
+             st(fleet_long_headroom=0)) == ("skip", "fleet_long")
+    # SHORTS are unaffected — the funding mandate's shorts sail through a red
+    # fleet light (IMB-17), and headroom is a LONG budget only.
+    assert A("ETH", "exploit", True, 0.10,
+             st(fleet_long_headroom=0, longs_admitted=9))[0] == "open", \
+        "the short budget is deliberately unenforced — headroom must not bite"
+    # FAIL-OPEN: no headroom known (stale/absent/advisory fleet-risk) is the
+    # pre-(oh) behaviour exactly — an organ outage must not idle the book.
+    assert A("ETH", "exploit", False, -0.10,
+             st(fleet_long_headroom=None, longs_admitted=99))[0] == "open", \
+        "unknown headroom must fail OPEN, never closed"
 
     # SLOPE GATE — skip only while ROLLING OVER: missing history fails
     # OPEN, at-the-bar equality is "still building" and enters, and the

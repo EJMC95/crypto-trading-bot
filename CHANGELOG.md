@@ -1,3 +1,96 @@
+## 2026-08-16 (oh) — THE PRE-LOOP SNAPSHOT SWEEP, SECOND PASS: capacity and notional are clean everywhere, and the ONE gap is the fleet long budget on 💸 the LIVE book — a boolean where two sibling books count
+
+- **[LETTER MOVED (od) -> (of) -> (oh), 16-Aug.** Both were taken by concurrent
+  sessions mid-write — `(od)` by the immune organ's restart-counter entry, `(of)`
+  by the worktree reaper — and the second collision was caught by
+  `audit_changelog_letters`'s cross-branch arm, not by me. Recorded inline per
+  the convention's rule 4. Noted because the FIRST repair was worse than the
+  collision: a blanket `(of)` -> `(oh)` over the whole file rewrote the OTHER
+  session's header too. A letter move edits YOUR entry, never the file.]
+
+- **THE ASK** (operator, widening `(oa)`): *"now check the other books for the
+  pre-loop snapshot pattern elsewhere"*. `(oa)` swept one instance of the shape
+  — a HELD set read before the loop. This sweeps the shape itself: **any
+  quantity read once before an entry loop and then acted on inside it, while
+  the loop's own actions invalidate it.** Four quantities qualify in this
+  fleet: capacity, notional, the fleet LONG BUDGET, and the symbol cap.
+
+- **THREE OF THE FOUR ARE CLEAN, everywhere, and the reasons are already in
+  the tree** — each was found and fixed by an earlier pass, which is why they
+  read as boring now:
+  * **CAPACITY** — 💸 the Farmer increments `open_now` and writes `pos[coin]`
+    in-loop (the 28-Jul audit fix, whose own comment explains the under-count);
+    🙏 Avo, 🧘 Douglas, 🧙 Schwager and 📐 Grimes test `len(positions)` live;
+    🏦 Kiyosaki, 🧮 Hull and 🎸 Barnesy bound the candidate slice by
+    `MAX_POSITIONS - len(positions)` before iterating; 🎯 the sniper passes and
+    increments `open_now` inside `run_snipe_pass`.
+  * **NOTIONAL** — priced from live state at every check: the Farmer re-reads
+    `pos` (the 28-Jul fix again, which explicitly cites the 2nd open of a loop
+    under-counting the 1st), the sniper re-reads `ctx.venue.positions()`, the
+    🏛️ Parliament recomputes `_open_notional()` per entry (its own 28-Jul fix,
+    for the brain-mult clip).
+  * **SYMBOL CAP** — `symcap_blocked(state, coin, cycle_sym)` takes an
+    in-cycle accumulator, in both consumers.
+
+- **THE GAP: the fleet LONG BUDGET on `lighter_funding_bot.py`.**
+  `fleet_long_veto` is a **boolean**, read once per loop from `fleet-risk`. It
+  answers *"was the fleet at its long budget when this pass started?"* — not
+  *"is there room for the long I am about to open"*. At
+  `long_positions == budget - 1` it is False and one pass may open
+  `MAX_NEW_PER_LOOP` (2) longs, putting the fleet **over a budget this bot's
+  own log calls ENFORCED**. `fleet-risk` republishes on its own cadence, so the
+  overshoot is not corrected at the next loop either — it stands until the
+  organ next publishes. Its longs are counted: this file publishes
+  `extra.held` as `{coin: "S"|"L"}` and `fleet_risk` sums the `L`s into
+  `fleet_long`, so they consume the budget they can overshoot.
+
+- **AND THE FIX ALREADY EXISTS — TWICE, IN THE TWO SIBLING BOOKS.** The 21-Jul
+  budget-headroom fix bounds exactly this in-cycle race, and both
+  `lighter_family_bot.py` and `lighter_avo_live_bot.py` carry it: compute
+  `fleet_long_headroom = max(0, budget - held)` and count `cycle_admitted`
+  against it. It never reached the Farmer — **the live real-money book was the
+  one copy that missed the fix**, which is the "fixed the instance, not the
+  class" shape this file keeps recording. Third copy now shipped: headroom
+  computed beside the boolean, `longs_admitted` counted at the open, both
+  handed to the pure `entry_admission` ladder. **Fail-OPEN preserved** —
+  headroom `None` (stale, absent or advisory `fleet-risk`) is the pre-(oh)
+  behaviour exactly, because an organ outage must not ration a book's entries.
+
+- **EXPOSURE, sized honestly: at most ONE long over a 20-long budget per
+  cycle**, and only when the fleet sits at exactly budget-1 with two long
+  candidates admitted in one pass. This is a risk-rule correctness fix, not an
+  edge fix — there is no measured P&L number attached to it and none is
+  claimed.
+
+- **NINE MUTATIONS, ALL RED** across the rule and its wiring: the in-cycle arm
+  deleted; `>=` weakened to `>`; the arm applied to SHORTS (which the funding
+  mandate deliberately exempts, IMB-17); unknown headroom made to fail CLOSED;
+  the increment deleted; the increment moved out from under `if not is_short`;
+  either key dropped from the call; and the headroom seeded with a literal 0.
+
+- **TWO OF THOSE NINE ONLY BECAME REAL ON THE SECOND ATTEMPT, and that is now
+  a three-session pattern worth naming.** `(nr)` recorded *"a mutation you have
+  not eyeballed is not a mutation"*; `(nv)` added *printing the line is not
+  locating it* (right text, wrong function). This pass adds the third form:
+  **a mutation can be a no-op because of short-circuit order** — swapping
+  `st["fleet_long_headroom"]` for `(... or 0)` changes nothing while the
+  `is not None` test still guards it. The check that catches all three is the
+  same: after mutating, ask what the new code DOES, not what it looks like.
+
+- **THE WIRING IS PINNED BY AST, NOT BY SUBSTRING** — `entry_admission` is
+  pure and its selftest covers the rule, but a pure-function test cannot say
+  `main()` still passes the values, and that half is where the defect lived.
+  `tests/autonomy/test_farmer_long_headroom.py` asserts the keyword in the
+  call's dict literal and an `AugAssign` guarded by `if not is_short`. A
+  `"longs_admitted" in src` check would pass on a file that merely mentions the
+  name — including in the comment explaining why it matters. Same reason
+  `(nv)` replaced the `"setdefault" in block` test.
+
+- **Main only per `(mm)`.** It changes what the live book does — but in the
+  restrict direction, enforcing a budget the fleet already declares, with no
+  measured edge attached. That is not the "money-moving fix" the push-both-ways
+  rule is about, so it rides the next deploy that qualifies. Suite green, all
+  27 floors held.
 ## 2026-08-16 (og) — THE FORWARD TEST DISAGREED, AND THE DISAGREEMENT WAS THE POINT: the margin model's FORMULA was right, its CALLER CONVENTION was wrong by more than the term it was arguing about
 
 - **THE SEQUENCE, because the shape is the lesson.** `(nu)` banked a peer
