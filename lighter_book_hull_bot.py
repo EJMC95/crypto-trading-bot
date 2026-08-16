@@ -30,7 +30,9 @@ THE TEXTBOOK, AS RULES:
        side persists FLIP_GRACE_H — MEASURED as the difference between this
        book existing and not existing (grace 1h: −$16.84, t=−6.65, 136 of
        158 exits paying the round trip on a sign wobble; grace 24h: +$4.92,
-       t=+3.27, both halves positive — scripts/study_books_cohort_2026-08-13.py).
+       t=+3.27, both halves positive — scripts/study_books_cohort_2026-08-13.py;
+       re-measured 16-Aug (ny) at +$6.69, t=+3.92, both halves positive, and
+       the grace-1h refutation reproduces — see HONEST ABOUT THE EVIDENCE).
   4. Convergence (ch. 5): entering AGAINST the basis gives away convergence
        P&L. The adverse-basis veto refuses an entry whose premium (mark vs
        index) opposes the position by more than BASIS_VETO_BPS. Restrict-only
@@ -56,11 +58,49 @@ THE SUPPLY, NAMED (I20 — measured before minting, 13-Aug):
 HONEST ABOUT THE EVIDENCE (scripts/study_books_cohort_2026-08-13.py, 219d of
 Lighter's own settled funding series, 18-coin liquid set):
   * the shipped rule (persist 24h, grace 24h, band floor payback-derived):
-    n=45, +$4.92, t=+3.27, halves +$0.75/+$4.17, random-timing control
-    P(rand >= real) = 0.000 across 200 draws.
-  * tier-restricted to today's [2M,10M) members: n=30, +$4.17, t=+2.76,
-    halves +$0.55/+$3.62, ~4 closes/30d — the I17 clock is SLOW (30 closes
+    n=45, +$4.92, t=+3.27, halves +$0.75/+$4.17.
+    **[16-Aug (ny) — RE-MEASURED, AND IT HOLDS. This is the cohort book whose
+    founding number SURVIVES.]** On a tape now 250d (the funding series grew
+    31 days), the same cell reads **n=50, +$6.69, t=+3.92, halves
+    +$3.17/+$3.53** — better than recorded, both halves positive, and the
+    REFUTED grace-1h cell reproduces too (−$18.62, t=−5.95 vs −$16.84,
+    t=−6.65). **(ml) does not touch this book**: `hull_run` is its own funding
+    walk, not the `run_portfolio` bracket walk whose entry-bar look-ahead
+    corrected 🧘 Douglas and could not reproduce 🧙 Schwager.
+    STRESSED, because t=3.92 on n=50 and $6.69 total is a thin sample:
+      - CONCENTRATION IS LOW, the opposite of Schwager: the best trade is 16%
+        of the total and dropping it RAISES t to 4.01; top 3 = 34% (t=3.65);
+        top 5 = 46% (t=3.22). 14 coins contributed, 11 positive; dropping the
+        best coin (XMR) leaves n=47, +$4.73, t=3.67.
+      - BLOCK BOOTSTRAP on the per-trade mean: 95% CI **[+$0.065, +$0.204]**
+        with **P(mean<=0) = 0.000** at L=1, 5 and 10 — the autocorrelation a
+        funding book must answer for does not move it.
+      - CLUSTER-ROBUST t ((kw)) = 3.92 unchanged, n_eff 50: these closes do
+        not batch, so there is no clustering penalty to take.
+    ONE NUMBER ABOVE IS NOT REPRODUCIBLE AND IS WITHDRAWN: the
+    "random-timing control P(rand >= real) = 0.000 across 200 draws".
+    **There is no Hull random control in the study** — `random_bench` is
+    invoked for Douglas and Schwager only — so that figure cannot be
+    reproduced from the cited file. An independent random-timing control
+    (random entry hours, random coins, same count, same exit rules, 300
+    draws) gives **P ≈ 0.043–0.047**: still clears 0.05, but it is a marginal
+    result, not an overwhelming one. Quote 0.045, not 0.000, and note the
+    construction is mine rather than the original's.
+  * ~~tier-restricted to today's [2M,10M) members: n=30, +$4.17, t=+2.76,
+    halves +$0.55/+$3.62~~ **[does NOT reproduce, and the reason is benign:
+    volume-tier membership MOVED.** Of the study's 18 coins only LINK and LIT
+    sit in [$2M,$10M) today, giving n=19, +$3.64, t=3.63 — still positive,
+    smaller n. Point-in-time volume is not reconstructable (the survivorship
+    caveat below already says so), so this number will drift with every
+    re-run and should be read as a sensitivity, never as a second headline.
+    Note the direction of the mismatch: the STUDY sees 18 coins while the BOT
+    scans the whole venue (live census: 225 scanned, 121 below band, 28 above,
+    1 held) — so the study is a SUBSET of the book's real supply, not a
+    superset.]** ~4-6 closes/30d — the I17 clock is SLOW (30 closes
     ~5-7 months) and that is declared here, not discovered later.
+    **Measured 16-Aug: 6.0 closes/30d, so ~5 months to 30 closes from a
+    standing start. Unlike 🧙 Schwager the binding bar here is CLOSES, not
+    `t` — this book needs TIME, not a better statistic.**
   * the grid is a PLATEAU, not a lucky cell: every persist>=24h × grace>=6h
     × floor {7.8%, 10%} cell is positive; every grace=1h cell is negative.
   * survivorship caveat: the universe is today's liquid set; historical
