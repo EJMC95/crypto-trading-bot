@@ -1,3 +1,70 @@
+## 2026-08-16 (ny) — 🧮 HULL RE-MEASURED: THE COHORT BOOK WHOSE FOUNDING NUMBER SURVIVES — AND TWO OF ITS CONTROLS DO NOT
+
+- **THE ASK.** Operator: *"re-measure hull"*, the third of the wave-2 books to
+  be checked after `(nt)` corrected 🧘 Douglas and `(nu)` found 🧙 Schwager's
+  headline unreproducible. **This one holds, and that is the finding.**
+- **FIRST, THE THING THAT MADE IT DIFFERENT — established before assuming the
+  story transferred: `(ml)` DOES NOT TOUCH THIS BOOK.** Hull is a FUNDING book
+  and the study runs it through its own `hull_run` walk, not the
+  `run_portfolio` bracket walk whose entry-bar look-ahead cost Douglas 44% of
+  its total and could not reproduce Schwager. Checking that first is the whole
+  reason this re-measurement took minutes rather than hours.
+- **IT REPRODUCES, AND IMPROVES.** Recorded n=45, +$4.92, t=+3.27, halves
+  +0.75/+4.17 on 219d. On a funding series now 250d: **n=50, +$6.69, t=+3.92,
+  halves +$3.17/+$3.53** — better than recorded, both halves positive. The
+  REFUTED grace-1h cell reproduces too (−$18.62, t=−5.95 vs −$16.84, t=−6.65),
+  which is the control that matters: a harness that only reproduces the
+  favourable cell is not reproducing anything.
+- **STRESSED, because t=3.92 on n=50 and $6.69 total is a thin sample — and it
+  is the MIRROR IMAGE of Schwager on every axis:**
+  * CONCENTRATION IS LOW. The best trade is **16%** of the total and dropping
+    it RAISES t to 4.01; top 3 = 34% (t=3.65); top 5 = 46% (t=3.22). **14 coins
+    contributed, 11 positive**; dropping the best coin (XMR) leaves n=47,
+    +$4.73, t=3.67. Schwager's top 3 were 112% of its total.
+  * BLOCK BOOTSTRAP on the per-trade mean: 95% CI **[+$0.065, +$0.204]** with
+    **P(mean≤0) = 0.000** at L=1, 5 and 10 — the serial correlation a funding
+    book must answer for does not move it.
+  * CLUSTER-ROBUST t ((kw)) = **3.92, n_eff 50**: these closes do not batch, so
+    there is no clustering penalty to take.
+- **TWO NUMBERS WITHDRAWN, both benign, both worth saying out loud.**
+  1. **The "random-timing control P=0.000 across 200 draws" is NOT
+     REPRODUCIBLE — there is no Hull random control in the cited study.**
+     `random_bench` is invoked for Douglas and Schwager only. An independent
+     random-timing construction (random entry hours, random coins, matched
+     count, same exit rules, 300 draws) gives **P ≈ 0.043–0.047**: it still
+     clears 0.05, but it is marginal rather than overwhelming. Quote 0.045 and
+     name the construction as mine, because the original's cannot be inspected.
+  2. **"tier-restricted n=30, +$4.17, t=+2.76" does not reproduce because
+     volume-tier MEMBERSHIP MOVED.** Only LINK and LIT of the study's 18 sit in
+     [$2M,$10M) today: n=19, +$3.64, t=3.63 — still positive, smaller n.
+     Point-in-time volume is not reconstructable (the study's own survivorship
+     caveat), so that cell is a drifting sensitivity, never a second headline.
+     **And the mismatch runs the SAFE way:** the STUDY sees 18 coins while the
+     BOT scans the whole venue — live census `225 scanned / 121 below band /
+     28 above / 1 held` — so the study is a SUBSET of real supply, not a
+     superset. That is the opposite of Schwager's clip mismatch, where the
+     headline was denominated at a clip the book never traded.
+- **BOT FIDELITY VERIFIED EXACTLY, and one apparent divergence reconciled.**
+  `MAX_HOLD_H` 504 ✓ · clip $80 ✓ · cap 4 ✓ · `APR_HI` 0.20 ✓ · `EXIT_APR`
+  0.035 ✓ · `STABLE_H`/`FLIP_GRACE_H` 24 ✓ · bleed 0.02 ✓ · `RT_COST_FRAC`
+  = 0.003 selftest-pinned ✓ · `APR_LO_EFF` = 0.003·8760/336 = 7.82% ✓. The
+  decay rule LOOKS different and is not: the bot closes on
+  `net_if_closed >= $0.07` after all fees, i.e. **accrued ≥ $0.31**, against
+  the study's `acc >= RT·CLIP·1.3` = **$0.312**. Same rule, two
+  parameterisations, matching to within a cent.
+- **THE BINDING BAR HERE IS CLOSES, NOT `t` — and that is why this book is in a
+  healthy position where Schwager is not.** Measured 6.0 closes/30d, so ~5
+  months to 30 closes from a standing start (the live book has 0 closes, 1 open
+  — a ZEC short — after two days). Its birth declaration said ~4-6 closes/30d
+  and ~5-7 months; that was honest and remains so. `t` is already 3.92, so this
+  book needs TIME, not a better statistic. Contrast `(nu)`: Schwager needs ~719
+  closes / ~40 months for t=2.0, which no amount of waiting fixes.
+- **COHORT STATUS after three re-measurements:** 🧘 Douglas CORRECTED (edge
+  survives, "both halves positive" does not) · 🧙 Schwager NOT ESTABLISHED and
+  a live I17 call · 🧮 Hull HOLDS · 📐 Grimes still unchecked, and least
+  urgent by construction — its rolling replay gate re-measures itself every 6h,
+  so a stale founding number cannot hold a gate open there.
+
 ## 2026-08-16 (nx) — `git commit -o` WAS ONLY HALF THE SHARED-TREE FIX, AND THE MISSING HALF IS THE ONE THAT KEEPS BITING: it ignores the shared INDEX, never the shared WORKING TREE
 
 - **THE DOCTRINE SAID "THE FIX", AND IT FAILED AGAIN HOURS AFTER BEING
