@@ -30,7 +30,15 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WT_DIR="$ROOT/.claude/worktrees"
+# [(of)] Worktrees are registered against the MAIN worktree, never against the
+# one you happen to be standing in. Running this from inside a worktree made
+# $ROOT that worktree, so `$WT_DIR` matched nothing and `--prune-stale` reported
+# a serene "0 stale, 0 kept" while every stale worktree sat untouched — a reaper
+# that silently reaps nothing. `git worktree list` always prints the main
+# worktree first; that is the anchor.
+MAIN_ROOT="$(git -C "$ROOT" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"
+[ -n "$MAIN_ROOT" ] || MAIN_ROOT="$ROOT"
+WT_DIR="$MAIN_ROOT/.claude/worktrees"
 
 usage() { sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
@@ -70,10 +78,75 @@ selftest() {
   echo "new_session_worktree selftest OK (name sanitising incl. empty and over-long cases; worktrees are git-ignored)"
 }
 
+# [(of)] Reap worktrees nobody is using. EVERY gate must pass, because the cost
+# of a wrong removal is another session's work: it must live under
+# .claude/worktrees/, not be the one you are standing in, have NOTHING
+# uncommitted or untracked, hold NO commit that is not already on origin/main,
+# and have gone untouched for --days. Anything that fails a gate is REPORTED
+# with the reason rather than skipped silently — a reaper you cannot audit is
+# one you stop trusting. `--dry-run` shows the plan and removes nothing.
+prune_stale() {
+  local days="${1:-3}" dry="${2:-}"
+  git -C "$MAIN_ROOT" fetch origin --quiet 2>/dev/null || true
+  git -C "$MAIN_ROOT" worktree prune            # drop records whose path is gone
+  local here removed=0 kept=0
+  here="$(git rev-parse --show-toplevel 2>/dev/null || echo /nonexistent)"
+  while IFS= read -r p; do
+    case "$p" in "$WT_DIR"/*) ;; *) continue ;; esac    # ours only
+    [ "$p" = "$here" ] && { echo "  KEEP  $(basename "$p") — you are in it"; kept=$((kept+1)); continue; }
+    local dirty head uniq newest age_d
+    dirty="$(git -C "$p" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "$dirty" != "0" ]; then
+      echo "  KEEP  $(basename "$p") — $dirty uncommitted/untracked file(s)"; kept=$((kept+1)); continue
+    fi
+    head="$(git -C "$p" rev-parse HEAD 2>/dev/null)"
+    uniq="$(git -C "$MAIN_ROOT" rev-list --count "$head" ^origin/main 2>/dev/null || echo 999)"
+    if [ "$uniq" != "0" ]; then
+      echo "  KEEP  $(basename "$p") — $uniq commit(s) not on origin/main"; kept=$((kept+1)); continue
+    fi
+    newest="$(find "$p" -type f -not -path '*/.git/*' -not -path '*/.venv/*' \
+              -newermt "-${days} days" -print -quit 2>/dev/null)"
+    if [ -n "$newest" ]; then
+      echo "  KEEP  $(basename "$p") — edited within ${days}d"; kept=$((kept+1)); continue
+    fi
+    if [ -n "$dry" ]; then
+      echo "  WOULD REMOVE  $(basename "$p")"
+    else
+      git -C "$MAIN_ROOT" worktree remove "$p" && echo "  removed  $(basename "$p")"
+    fi
+    removed=$((removed+1))
+  done < <(git -C "$MAIN_ROOT" worktree list --porcelain | sed -n 's/^worktree //p')
+  echo "  ${removed} stale, ${kept} kept"
+  # Branches left behind by a removed worktree, but ONLY when fully on
+  # origin/main and referenced by no tracked file (the gate0 branch is named in
+  # CLAUDE.md and must survive).
+  git -C "$MAIN_ROOT" branch --list 'claude/*' --format='%(refname:short) %(worktreepath)' \
+  | while read -r b wp; do
+      [ -n "$wp" ] && continue
+      [ "$(git -C "$MAIN_ROOT" rev-list --count "$b" ^origin/main 2>/dev/null || echo 999)" = "0" ] || continue
+      git -C "$MAIN_ROOT" grep -q "${b#claude/}" HEAD -- '*.md' '*.py' '*.yml' 2>/dev/null \
+        && { echo "  KEEP branch $b — referenced in a tracked file"; continue; }
+      [ -n "$dry" ] && { echo "  WOULD DELETE branch $b"; continue; }
+      git -C "$MAIN_ROOT" branch -D "$b" >/dev/null 2>&1 && echo "  deleted branch $b"
+    done
+}
+
 case "${1:---help}" in
   --selftest) selftest; exit 0 ;;
   --list)
-    git -C "$ROOT" worktree list
+    git -C "$MAIN_ROOT" worktree list
+    exit 0 ;;
+  --prune-stale)
+    shift
+    DAYS=3; DRY=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --days) DAYS="$2"; shift 2 ;;
+        --dry-run) DRY=1; shift ;;
+        *) echo "unknown option: $1" >&2; exit 1 ;;
+      esac
+    done
+    prune_stale "$DAYS" "$DRY"
     exit 0 ;;
   -h|--help) usage; exit 0 ;;
 esac
@@ -85,12 +158,12 @@ PATH_WT="$WT_DIR/$NAME"
 
 [ -e "$PATH_WT" ] && { echo "error: $PATH_WT already exists" >&2; exit 1; }
 
-git -C "$ROOT" fetch origin --quiet 2>/dev/null || true
+git -C "$MAIN_ROOT" fetch origin --quiet 2>/dev/null || true
 BASE="origin/main"
 git -C "$ROOT" rev-parse --verify --quiet "$BASE" >/dev/null || BASE="HEAD"
 
 mkdir -p "$WT_DIR"
-git -C "$ROOT" worktree add -b "$BRANCH" "$PATH_WT" "$BASE" >/dev/null
+git -C "$MAIN_ROOT" worktree add -b "$BRANCH" "$PATH_WT" "$BASE" >/dev/null
 echo "created worktree : $PATH_WT"
 echo "on branch        : $BRANCH  (from $BASE)"
 

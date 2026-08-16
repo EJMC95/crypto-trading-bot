@@ -100,6 +100,58 @@
   open on universe churn. **Three of four founding numbers needed correction;
   the one that survived is the funding book, whose walk (ml) never touched.**
 
+## 2026-08-16 (of) — THE STALE WORKTREES ARE REAPED, AND THE REAPER REFUSES TO TOUCH LIVE WORK
+
+- **CLEANED, with the evidence for each call.** Two worktrees were 11 days dead
+  — `amazing-carson-e5e3bd` (last edit 05-Aug 14:55) and `vigorous-wiles-cf382a`
+  (05-Aug 12:05) — both detached, zero uncommitted files, zero commits outside
+  `origin/main`, ~27MB. Removed. Everything else had been edited within the
+  hour and was left alone: this session's own worktree, `friendly-hodgkin`
+  (active, with uncommitted work), and two ephemeral harness worktrees in
+  another session's scratchpad.
+- **THE FIRST ACTIVITY SIGNAL WAS CONTAMINATED BY THE PROBE THAT READ IT.** Git
+  metadata mtimes made four worktrees look seconds-old — because the survey's
+  own `git status` had just refreshed their indexes. Re-measured on FILE
+  mtimes, which the probe never wrote, and the picture inverted into the clean
+  11-days-vs-1-hour split above. A measurement that its own instrument
+  perturbs is not a measurement.
+- **14 ORPHAN `claude/*` BRANCHES DELETED**, each verified to hold zero commits
+  outside `origin/main` first. `claude/lighter-gate0` is KEPT and declared: it
+  is named in three tracked files, and deleting a branch the doctrine cites
+  turns a live reference into a dangling one. One branch refused `-d` and the
+  refusal was worth reading rather than forcing — it was about the branch's own
+  REMOTE being ahead, not about unmerged work; both sides measured 0 commits
+  outside `origin/main` before it was removed. **The 45 remote `claude/*`
+  branches are untouched** — deleting those is a push against shared state and
+  was not asked for.
+- **`--prune-stale` MAKES IT REPEATABLE**, because otherwise they simply
+  accumulate again. Every gate must pass: under `.claude/worktrees/`, not the
+  one you are standing in, nothing uncommitted or untracked, no commit missing
+  from `origin/main`, untouched for `--days` (default 3). Anything failing a
+  gate is REPORTED with its reason — a reaper you cannot audit is one you stop
+  trusting — and `--dry-run` plans without removing. Verified live: it refuses
+  the worktree it is run from and refuses `friendly-hodgkin` for its
+  uncommitted file.
+- **TWO BUGS IN THE REAPER, BOTH FOUND BY RUNNING IT.** (1) `$ROOT` resolved to
+  the worktree the script was *in*, but worktrees are registered against the
+  MAIN worktree — so `--prune-stale` matched nothing and reported a serene
+  **"0 stale, 0 kept"** while every stale worktree sat there. **A reaper that
+  silently reaps nothing is worse than no reaper**, and only running it from a
+  worktree exposed it; anchored on `git worktree list`'s first entry now.
+  (2) The blanket rename that introduced that anchor also rewrote the line
+  DEFINING it, making it self-referential — caught instantly by
+  `set -u` because the selftest runs on every invocation.
+- **`.coverage*` IS NOW EXCLUDED**, and it was not cosmetic: 34 stray
+  subprocess-coverage shards made `friendly-hodgkin` permanently "dirty", which
+  under the gates above would have made it **un-reapable forever**. Junk that
+  never gets cleaned is junk that disables the cleaner. Local
+  (`info/exclude`), alongside the `(ob)` `.venv` symlink entry.
+- **Measured side effect of the removals:** repo-wide guard scans dropped from
+  **1,147 python files to 930** — 217 duplicate copies of this repo that every
+  `grep`, every audit and every coverage run had been walking. `(nn)` recorded
+  a false dangling-citation caused by exactly that scanning; a third of it is
+  now gone.
+
 ## 2026-08-16 (oc) — the re-run sweep's live-money half: `(nj)`'s new per-row clip arm escaped TWO consumers, and a guard with no answer was still printing OK
 
 *(Letter picked at push time after two collisions — a concurrent session took
