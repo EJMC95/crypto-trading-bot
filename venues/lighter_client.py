@@ -808,7 +808,18 @@ class LighterClient(VenueClient):
         it adds each position's distance to its liquidation price and the
         nearest one across the book. Omitted, the liq prices are still
         reported raw — the read never fabricates a mark to compute a distance.
+
+        NO ACCOUNT, NO CALL. A shadow arm builds this client with
+        `with_signer=False`, which leaves `account_index` None (:457 — it is
+        only assigned inside `_init_signer`). Without this guard the read
+        would fire a real request with `value="None"` on EVERY loop of every
+        shadow book, burn governor budget against the venue, and log a
+        warning each time — a telemetry read manufacturing venue traffic for
+        an account that does not exist. Caught before shipping by asking what
+        this does under total failure rather than on the happy path.
         """
+        if self.account_index is None:
+            return None
         try:
             return margin_state_from(self._account_payload(), marks)
         except VenueError:

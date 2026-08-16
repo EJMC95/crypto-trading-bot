@@ -262,6 +262,28 @@ def test_the_margin_read_cannot_raise_into_a_trading_loop(path):
         f"telemetry read would propagate into the live trading loop")
 
 
+def test_an_accountless_client_makes_NO_venue_call_at_all():
+    """A shadow arm builds LighterClient with with_signer=False, which leaves
+    account_index None. Without an early refusal the read fires a real request
+    with value="None" on every loop of every shadow book — governor budget and
+    a warning line, forever, for an account that does not exist. `None` here
+    must cost zero network calls, not one failed one."""
+    import venues.lighter_client as lc
+
+    called = []
+
+    class _Accountless(lc.LighterClient):
+        def __init__(self):                       # no venue, no signer, no net
+            self.account_index = None
+
+        def _account_payload(self):
+            called.append(1)
+            raise AssertionError("a venue call was made without an account")
+
+    assert _Accountless().margin_state(marks={"XAU": 1.0}) is None
+    assert called == [], "margin_state hit the venue with no account_index"
+
+
 def test_the_client_read_costs_no_extra_market_calls():
     """One account payload in, everything derived from it. If this ever grows
     a per-symbol fetch it stops being free and starts competing with orders
