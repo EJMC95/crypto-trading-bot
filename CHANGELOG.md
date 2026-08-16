@@ -55,6 +55,59 @@
   FRACTION under a `_pct` name on both real-money rows — the same unit-naming
   class they had just fixed with `imf` → `imf_pct`.
 
+## 2026-08-16 (ob) — SESSIONS GET THEIR OWN WORKTREES: the shared-tree class stops being mitigated and starts being unreachable
+
+- **WHY A SECOND ENTRY ON THIS.** `(nx)` shipped `session_commit.py` and said
+  plainly what it could not do: git records no authorship, so no
+  commit-boundary tool can tell whose hunk is whose. Mitigation narrows the
+  blast radius; **isolation removes the surface.** `scripts/new_session_worktree.sh`
+  makes that the default — one command, then `cd` and work.
+- **WHAT IT SETS UP:** a worktree at `.claude/worktrees/<name>` on branch
+  `claude/<name>` cut from `origin/main`, a **symlinked `.venv`** (the suite
+  runs as `.venv/bin/python3`; a second virtualenv would be a slow, drifting
+  copy), a `reports/` dir the daily jobs expect, and the exclude entries that
+  keep both out of `git status`.
+- **VERIFIED ON CREATION, not asserted** — four checks, all live: the suite runs
+  in the worktree off the linked venv (19 tests); the main worktree's **dirty
+  `CLAUDE.md` is invisible** from it, so the sweep that started this whole thread
+  is structurally impossible; the new worktree's index is clean while the main
+  one holds another session's staged deletions; and `git checkout main` there
+  fails with *"already used by worktree"*, which is the constraint the workflow
+  is built around rather than a surprise.
+- **THE WORKFLOW COST IS REAL AND IS THE POINT.** Git will not check out `main`
+  twice, so a session works on its own branch and publishes with
+  `git fetch origin && git rebase origin/main && git push origin HEAD:main`.
+  Two sessions appending to CHANGELOG.md now collide as a **rebase conflict that
+  must be resolved**, instead of one silently overwriting the other. **Every
+  failure this exists for was silent**, and this session alone produced: four
+  changelog-letter collisions, three of its edits swept into other sessions'
+  commits, one entry destroyed (90 lines) by a global letter-rename, and commits
+  repeatedly dropped by concurrent rebases. Loud beats silent.
+- **STATED LIMIT: it cannot relocate a session that is already running.** A
+  shell's working directory is fixed when it starts, so the sessions currently
+  sharing the main worktree keep sharing it until they restart. `(nx)`'s
+  `session_commit.py` stays the rule for them; this is the rule for the next
+  one. Saying so matters — a fix advertised as covering everyone, that quietly
+  covers only new sessions, is how the `(nx)` half-fix happened in the first
+  place.
+- **TWO BUGS IN THIS SCRIPT, BOTH FOUND BY RUNNING IT RATHER THAN READING IT.**
+  (1) A `${#$(...)}` bad substitution killed `--selftest` outright — caught
+  immediately because the selftest is registered rather than optional. (2) The
+  selftest asserted `git check-ignore .claude/worktrees`, which passes in the
+  main worktree and **FAILS from inside a worktree**, because a directory-only
+  pattern matches only when the directory exists — i.e. it failed from exactly
+  the place every session will now run it. Both fixed; the check now greps the
+  exclude PATTERN rather than probing a path, and the selftest is green from
+  both locations. **A guard that only works where it was written is not
+  portable, and this one is meant to be run everywhere.**
+- Also excluded: the per-worktree `.venv` **symlink**. `.gitignore` carries
+  `.venv/` — trailing slash, directories only — which does not match a symlink,
+  so without an explicit `.venv` line every session's worktree would carry a
+  permanent `?? .venv` sitting in the blast radius of any `git add -A`. Local
+  (`info/exclude`), idempotent, no change to the shared `.gitignore`.
+- Letter: `n*` is EXHAUSTED — `na`..`nz` are all taken, on one day. The sequence
+  rolls to `o*`, and `oa` was gone before this entry was written.
+
 ## 2026-08-16 (oa) — THE DOUBLE-OPEN SWEEP: 🎯 the sniper was the ONLY book with it, and the reason is worth more than the result — every other book defends it at the WRITE, which is exactly where the sniper did not
 
 - **THE ASK** (operator, after `(nv)`): *"now check the other books for the

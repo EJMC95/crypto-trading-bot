@@ -1392,11 +1392,31 @@ All new bots:
   effect), the full diff of those files printed BEFORE the commit so a foreign
   hunk is visible while it can still be stopped, and a snapshot → commit →
   read-back against the commit object.
-  **The only COMPLETE fix is isolation**, because git records no authorship and
-  so no tool built on it can tell whose hunk is whose: one worktree per session
-  (`git worktree add .claude/worktrees/<name>`) gives a private index AND a
-  private working tree. Three of this repo's sessions already work that way;
-  every collision on record came from those sharing the main worktree.
+  **THE COMPLETE FIX IS ISOLATION, AND IT IS NOW THE DEFAULT — START EVERY
+  SESSION WITH ITS OWN WORKTREE (16-Aug (ob)):**
+
+      scripts/new_session_worktree.sh <name>      # then cd into it and work
+
+  Git records no authorship, so no tool built on it can tell whose hunk is
+  whose — mitigation can only narrow the blast radius. A worktree gives a
+  session a **private index AND a private set of files**, so the whole class is
+  unreachable: another session's staged deletions, unstaged edits and `git add`
+  simply are not in your tree. Verified on creation: the main worktree's dirty
+  `CLAUDE.md` is invisible from the new one, and the suite runs there off a
+  symlinked `.venv`.
+  **THE WORKFLOW COST IS REAL, AND IT IS THE POINT.** Git refuses to check out
+  `main` in two worktrees, so each session works on `claude/<name>` and
+  publishes with
+  `git fetch origin && git rebase origin/main && git push origin HEAD:main`.
+  Two sessions appending to CHANGELOG.md then collide as a **rebase conflict you
+  must resolve** instead of one silently overwriting the other — and **every
+  failure this rule exists for was silent**: four letter collisions, three
+  swept edits, one entry destroyed (90 lines), commits dropped by concurrent
+  rebases, all in a single session on 16-Aug. Loud beats silent.
+  **WHAT IT CANNOT DO:** relocate a session that is ALREADY RUNNING — a shell's
+  working directory is fixed when it starts. Existing sessions keep sharing the
+  main worktree until they restart, so `session_commit.py` above remains the
+  rule for them, and this is the rule for the next one.
   **Then READ BACK what actually landed** —
   `git show --stat --format="" HEAD` and, for a file two sessions prepend to,
   grep the committed blob for every entry that should still be in it.
