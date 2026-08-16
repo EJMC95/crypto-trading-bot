@@ -1618,6 +1618,57 @@ def parse_stamp(s):
     return datetime.fromisoformat(t)
 
 
+def publish_is_fresh(state, max_age_sec, now=None):
+    """True only on POSITIVE PROOF that a prior publish is younger than
+    `max_age_sec`. Backs the boot-time early run (`--publish-if-stale`).
+
+    [2026-08-16] WHY THIS EXISTS. `run_all.sh` started this organ behind a bare
+    `( sleep 900` with no early run — the pattern the `(os)`/`(ou)` sweep
+    replaced everywhere else. Measured that morning: the container was
+    redeploying every ~11 minutes while three sessions pushed, so an organ
+    needing an uninterrupted 15-minute window to reach its FIRST publish can
+    miss it indefinitely — and this organ publishes the gate that governs REAL
+    MONEY. The sweep's fix (`sleep 20; run once; ...`) is wrong here on cost:
+    those organs loop every 900-3600s, this one every 21600s and it grades
+    every book off a 20k-row ledger fetch, so an unconditional run at each boot
+    is ~30x its designed frequency during a push burst.
+
+    THE DIRECTION OF FAILURE IS THE WHOLE SAFETY OF IT: every uncertainty
+    returns False, which means RUN, which is byte-identical to today's
+    behaviour. A missing key, a failed read, an unparseable or absent stamp, a
+    future-dated stamp, a junk threshold — all run. The gate can therefore only
+    ever SKIP work it has proven redundant; it can never be the reason the
+    real-money gate goes unpublished. `ok=False` from `load_state_checked` is
+    handled by the CALLER and never reaches here as an empty dict, because
+    "I could not find out" must not read as "no row"
+    ([[load-state-seeds-durable-state-on-a-failed-read]])."""
+    if not isinstance(state, dict) or max_age_sec is None:
+        return False
+    try:
+        limit = float(max_age_sec)
+    except (TypeError, ValueError):
+        return False
+    if not (limit > 0) or limit != limit:        # <=0, or NaN
+        return False
+    raw = state.get("updated")
+    if raw in (None, ""):
+        return False
+    try:
+        t = parse_stamp(raw)
+    except Exception:                            # noqa: BLE001
+        return False
+    from datetime import datetime, timezone
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=timezone.utc)
+    n = now or datetime.now(timezone.utc)
+    if n.tzinfo is None:
+        n = n.replace(tzinfo=timezone.utc)
+    age = (n - t).total_seconds()
+    if age < 0:              # future stamp: clock skew, not proof of freshness
+        return False
+    return age < limit
+
+
 def same_pair_overlaps(eps, min_gap_s=None):
     """[(pair, hours_inside)] where one hold opens INSIDE another on the same
     pair, deepest first.
@@ -2488,6 +2539,47 @@ def _selftest():
     assert DOCKET_SEEN_KEY != KEY, (
         "the docket clocks must live in their OWN state key; collapsing them "
         "into the grade key destroys the whole payload on every publish")
+
+    # [2026-08-16] THE EARLY-RUN GATE SKIPS ONLY ON POSITIVE PROOF. Every arm
+    # below asserts the FAIL-OPEN direction (False == run == today's
+    # behaviour); the one True is the only case that may skip work.
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    _now = _dt(2026, 8, 16, 12, 0, 0, tzinfo=_tz.utc)
+
+    def _st(delta_s):
+        return {"updated": (_now - _td(seconds=delta_s)).isoformat()}
+
+    assert publish_is_fresh(_st(60), 21600, now=_now) is True, \
+        "a publish one minute old is fresh and the early run must skip"
+    assert publish_is_fresh(_st(21599), 21600, now=_now) is True
+    # the boundary RUNS: at exactly the interval the payload is due again, and
+    # skipping there would double the effective period.
+    assert publish_is_fresh(_st(21600), 21600, now=_now) is False, \
+        "age == threshold must RUN, or the organ's period silently doubles"
+    assert publish_is_fresh(_st(90000), 21600, now=_now) is False
+    # every uncertainty runs
+    assert publish_is_fresh(None, 21600, now=_now) is False
+    assert publish_is_fresh({}, 21600, now=_now) is False
+    assert publish_is_fresh({"updated": None}, 21600, now=_now) is False
+    assert publish_is_fresh({"updated": ""}, 21600, now=_now) is False
+    assert publish_is_fresh({"updated": "not-a-date"}, 21600, now=_now) is False
+    assert publish_is_fresh(_st(60), None, now=_now) is False
+    assert publish_is_fresh(_st(60), 0, now=_now) is False
+    assert publish_is_fresh(_st(60), -5, now=_now) is False
+    assert publish_is_fresh(_st(60), float("nan"), now=_now) is False
+    assert publish_is_fresh(_st(60), "junk", now=_now) is False
+    # a FUTURE stamp is clock skew, never proof of freshness
+    assert publish_is_fresh(_st(-3600), 21600, now=_now) is False, \
+        "a future-dated publish must not be treated as proof of freshness"
+    # a naive stamp is read as UTC rather than crashing the boot path
+    assert publish_is_fresh(
+        {"updated": (_now - _td(seconds=60)).replace(tzinfo=None).isoformat()},
+        21600, now=_now) is True
+    # the venue/sniper ' UTC' form parse_stamp exists for
+    assert publish_is_fresh(
+        {"updated": (_now - _td(seconds=60)).strftime("%Y-%m-%d %H:%M:%S UTC")},
+        21600, now=_now) is True
+
     print("golive_readiness selftest OK (clean pass, the carry shape, the "
           "high-win-rate loser, window/DD bars, ungradeable input, policy "
           "eras, stamp-derived policy boundaries: first-new-close bound, "
@@ -2505,11 +2597,38 @@ def main():
                     help="write the verdicts to bot_state['golive-readiness']")
     ap.add_argument("--min-closes", type=int, default=10,
                     help="ignore books below this many closes")
+    ap.add_argument("--publish-if-stale", type=float, default=None,
+                    metavar="SECS",
+                    help="with --publish: do nothing at all when the last "
+                         "publish is younger than SECS. For the boot-time "
+                         "early run, so a container that keeps restarting "
+                         "still reaches a first publish without re-grading "
+                         "every book on every boot.")
     a = ap.parse_args()
     if a.selftest:
         return _selftest()
 
     import bot_pnl_store as store          # noqa: E402
+
+    # [2026-08-16] THE EARLY-RUN GATE — checked BEFORE the ledger fetch below,
+    # which is the entire point: a check that runs after `fetch_paper_trades`
+    # has already paid the cost it exists to avoid. Skips ONLY on positive
+    # proof of freshness (see `publish_is_fresh`); a failed read is not proof,
+    # so it runs.
+    if a.publish and a.publish_if_stale is not None:
+        _ok_prior, _prior = True, None
+        try:
+            if hasattr(store, "load_state_checked"):
+                _ok_prior, _prior = store.load_state_checked(KEY)
+            else:
+                _prior, _ok_prior = store.load_state(KEY), True
+        except Exception:                        # noqa: BLE001
+            _ok_prior, _prior = False, None
+        if _ok_prior and publish_is_fresh(_prior, a.publish_if_stale):
+            print(f"golive_readiness: SKIPPED — '{KEY}' published "
+                  f"{_prior.get('updated')}, younger than "
+                  f"{a.publish_if_stale:.0f}s; nothing to do.")
+            return 0
     # RETIRED rows are HISTORY, not candidates — grading them would offer a
     # dead bot for promotion. Single source: cleanup_legacy_bots.LEGACY_BOTS
     # (the same list that prunes them), fail-OPEN if it cannot be imported.

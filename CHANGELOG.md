@@ -1,3 +1,140 @@
+## 2026-08-16 (pa) — THE `--publish-if-stale` FLAG HAS BEEN ON MAIN SINCE `(oy)` AND THE SCRIPT NEVER IMPLEMENTED IT: two sessions built the two halves of one fix in parallel, and until this entry the early run was inert
+
+**Operator:** *"do the staleness-aware fix"* → *"push it once the referees clear
+it"* → *"push it now"* (the referee pass is discussed at the bottom; it did not
+converge and that is recorded rather than dropped).
+
+**THE STATE THIS LANDS INTO, which is the finding.** A concurrent session
+independently diagnosed the same defect and shipped the **`run_all.sh` half**
+first: the go-live grader's boot block now calls
+`golive_readiness.py --publish --publish-if-stale "${GOLIVE_INTERVAL_SEC:-21600}"`.
+**`scripts/golive_readiness.py` did not implement that flag** — measured on
+`origin/main` immediately before this commit: zero occurrences of
+`publish_if_stale`, `--publish-if-stale` or `publish_is_fresh`. So argparse
+exits 2 on an unknown option, `|| true` swallows it, and the block falls
+through to the `sleep 900` beneath — **exactly the pre-existing behaviour**.
+Their comment anticipates precisely this and calls the fall-through the floor
+of the change, which is why this was inert rather than broken. **This commit
+supplies the missing half and the early run starts working.**
+
+**THE DEFECT BOTH SESSIONS FOUND.** `golive_readiness.py --publish` publishes
+the go-live gate governing REAL MONEY, and it sat behind a bare `( sleep 900`
+with no early run — the last survivor of the pattern the `(os)`/`(ou)` sweep
+replaced on eight other organs. An organ needing an uninterrupted 15-minute
+window to reach its FIRST publish cannot reach it in a container that restarts
+more often than that, and every liveness contract still reads healthy while it
+doesn't (I1).
+
+**MEASURED TWICE, BY TWO SESSIONS THAT DID NOT QUITE AGREE — so both readings
+stand.** Re-measured here from the `railway-redeploy` run history over
+03:02–04:40Z: **23 successful redeploys, 22 gaps, median 3.0 min, minimum 9
+seconds, maximum 11.2 min — and 22 of 22 gaps shorter than the 900s stagger,
+100%.** The other session read the same window as 25 runs / 24 of 24 / 6s
+minimum. The counts differ by two (window-edge inclusion, most likely in-flight
+runs); **the median is identical and the headline is identical**, so the
+discrepancy is recorded and left unresolved because nothing turns on it.
+Directly observed: `freqtrade-bots` booted three times in ~32 minutes and the
+grader published exactly once, at **04:56:07 = boot+900**, when a gap finally
+exceeded the stagger. The cadence continued through this work — restarts
+7→8→9→10 at 04:29:13 / 04:40:22 / 04:52:09, each a deploy with a fresh build
+stamp. **Caveat kept:** not every redeploy run targets `freqtrade-bots`, so the
+run count is an upper bound on its restarts; the three observed boots are the
+hard floor.
+
+**WHAT THIS COMMIT ADDS: `--publish-if-stale SECS` and `publish_is_fresh()`.**
+The boot run does nothing at all unless the last publish is already older than
+the interval. Why the `(ou)` sweep's own pattern (an unconditional run at every
+boot) is wrong *here*: those eight organs loop every **900–3600s**, this one
+loops every **21600s** and each run grades every book off a **20,000-row ledger
+fetch**, so an unconditional boot run is **~30× its designed frequency** during
+a push burst. The gate is the difference between fixing the starvation and
+trading it for a self-inflicted load problem.
+
+**THE DIRECTION OF FAILURE IS THE ENTIRE SAFETY OF IT.** `publish_is_fresh`
+skips **only on positive proof** of freshness; every uncertainty returns False,
+which means RUN, which is byte-identical to the behaviour before the flag
+existed. A missing key, a failed read, an absent/unparseable/future-dated
+stamp, a junk threshold — all run. **So this can never be the reason the
+real-money gate goes unpublished**; the worst it can do is fail to save work it
+meant to save. It reads through `load_state_checked`, so a Postgres blip cannot
+read as "never published" ([[load-state-seeds-durable-state-on-a-failed-read]]),
+and it parses through this file's own `parse_stamp` rather than rolling a
+second timestamp parser.
+
+**THE STEADY LOOP IS DELIBERATELY UNGATED** (the other session's shape, kept
+verbatim): gating it too would let a wake-up landing a hair early skip its
+cycle, making a 6-hourly organ silently 12-hourly — inside its own 12h TTL, so
+nothing would flag it. `age == threshold` therefore RUNS, pinned in both the
+selftest and the test file.
+
+**NINE MUTATIONS VERIFIED RED** (I3), the three shell arms re-run against the
+merged block rather than against my own draft: reintroduce a 900s sleep before
+the first publish · un-gate the early run · gate the steady loop · `age <=
+limit` at the boundary · accept a future-dated stamp · return True on an
+unparseable stamp · **move the gate after `fetch_paper_trades`** · swap
+`load_state_checked` for `load_state` · drop the read-ok conjunct from the skip
+condition.
+
+**TWO OF MY OWN TESTS WERE DEFECTIVE, IN OPPOSITE DIRECTIONS, AND ONLY
+MUTATION/COLLISION FOUND THEM.**
+1. **Vacuous.** `test_a_failed_read_is_not_treated_as_no_row` asserted
+   `load_state_checked` appeared anywhere in `main()` — and the DOCKET's own
+   unrelated call ~100 lines later satisfied it, so swapping the gate's read to
+   `load_state` stayed GREEN. Rescoped to the gate's own AST subtree
+   (`_gate_node()`), after which the mutation reddens. The repo's own *"a
+   substring test is NOT a wiring test"* class, committed while writing the
+   test that cites it.
+2. **Over-specified — it pinned a SHAPE and would have rejected a BETTER
+   implementation.** My draft asserted the block *opens with* `( sleep N`,
+   N ≤ 60. The shipped fix opens with the invocation itself at **boot+0**,
+   which is strictly better, and my test would have called it a failure.
+   Rewritten to assert the property — *no sleep longer than a token stagger may
+   precede the first publish attempt* — which passes on theirs, reddens on the
+   900s restoration, and does not care about the shape. **A guard that pins how
+   a thing is done, rather than what must be true, blocks improvement.**
+
+**THE ORDERING IS THE LOAD-BEARING PROPERTY** and is asserted on the AST: a
+freshness check placed after `fetch_paper_trades` would be correct, green, and
+worthless — it would already have paid the entire cost it exists to avoid.
+
+**THE COLLISION ITSELF, per the shared-tree rule.** Two sessions built the two
+halves of one fix within the hour, neither knowing. On collision *the merged
+one is canonical* — so their `run_all.sh` is kept **verbatim** (it is the
+better shape: boot+0 rather than my boot+20, and it preserves the original loop
+instead of restructuring it, so it changes strictly less) and this ships only
+the complement. My own `run_all.sh` rewrite was dropped entirely rather than
+merged. Four changelog letters were taken by peers between authoring and
+pushing this entry ((ox), (oy), (oz), (pb)) — the convention's *pick the letter
+at PUSH time* rule, exercised four times in one sitting.
+
+**THE ADVERSARIAL PASS WAS ABANDONED, AND SAYING SO IS THE POINT.** Three
+refuters (correctness / operational-schedule / doctrine-and-test-quality) plus
+an adjudicator were launched before this shipped. They never converged: two
+were killed mid-run at 05:07:42 and 05:07:44 (`[Request interrupted by user]`)
+and restarted from zero, each having built ~255KB of transcript first — **new
+input to a session cancels its in-flight subagents**, so interactively checking
+on a long adversarial run is the thing that prevents it finishing. Operator
+decision to ship on the self-verification instead. Recorded rather than quietly
+dropped, because *"we ran an adversarial review"* and *"we launched one"* are
+different claims and only the second is true. The lesson for next time: run
+this class of review when the session can be left alone, or don't launch it.
+
+**RESIDUAL RISKS, DECLARED (mine, unrefereed):**
+1. **A run that cannot finish inside the restart interval will retry every
+   boot.** If grading takes longer than the container lives, the key stays
+   stale, so every boot re-attempts — more load than the old code, which simply
+   never ran. Bounded and non-corrupting (an interrupted run publishes
+   nothing), and it is the correct direction, but it is a real behaviour change
+   and it is UNMEASURED: measuring it needs a live DB, and `--publish` must not
+   be pointed at one from a workstation.
+2. **`GOLIVE_INTERVAL_SEC` now feeds two things** — the loop period and the gate
+   threshold. Deliberate, and a test pins that both read it, so they cannot
+   drift apart; but one env var now tunes two behaviours.
+
+**Deploy:** `scripts/golive_readiness.py` is on the `freqtrade-bots` path
+filter, so this ships on push. PUBLISH-ONLY organ: it promotes nothing, writes
+no lever, and go-live remains an explicit operator act. No real-money marker is
+involved.
 ## 2026-08-16 (pb) — TWO OF THE OTHER THREE AUDITS WERE IN THE WRONG GROUP AS WELL, and the third stays out for a reason I could measure: it sat exactly one entry from reddening every local run
 
 - **[LETTER: the two-letter sequence EXHAUSTED `oz` during this entry.** My
