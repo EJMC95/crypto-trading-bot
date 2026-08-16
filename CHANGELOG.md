@@ -45,6 +45,25 @@
   ride winners; 276 of 298 exits are the trail). It is the SAMPLE that fails,
   not the strategy. This is a NEW class beside I17's undecidable-by-rate, and
   the same question should be asked of any trend book this fleet grades.
+- **A 90-CELL SWEEP PUTS IT BEYOND DOUBT — and turns this into a live I17 call.**
+  Across 90 current-harness windows the total ranges **−$93.52 to +$404.55**
+  (median ~$250) and t ranges **−0.68 to +1.774** (median ~1.20). **`t≥2.0` in
+  0 of 90; the full go-live gate passes in 0 of 90 at either clip**, with `t`
+  the binding bar in every cell. **+$457.21 sits ABOVE THE MAXIMUM of the
+  entire distribution** — so the gap is in the recorded number, not the
+  tooling (the harness reproduces every other prior measurement exactly).
+  **The rule CHANGES SIGN with window LENGTH at a fixed end**: 1500 bars
+  −$93.52 (t=−0.68), 2000 bars −$23.04, 3000 bars +$183.01, 3455 bars
+  +$292.52. The same three long trades — **PUMP +92%, TAO +90%, HYPE +78%** —
+  carry 75–112% of the total in EVERY window; ex-top-3 the median is
+  **+$0.16/trade** and NEGATIVE in 4 of 17 cells. The I16 lower bound
+  (`max(0, mean − 1.28·SE)`) is **exactly 0.000%**.
+- **THE DECIDABILITY NUMBER, which is what makes it actionable: at the measured
+  mean/sd this rule needs ~719 closes to reach t=2.0 — ~40 MONTHS at 17.9
+  closes/30d.** The nominal ~mid-Oct grading date is meaningless. That is
+  I17's undecidability shape with a number on it, and the same question now
+  hangs over any fat-tailed trend book this fleet intends to grade on `t`.
+
 - **NOT RETIRED, deliberately.** Its own ledger is the record (I14) and it has
   **ZERO closed trades** — 4 open (BTC/S, ENA/S, PUMP/L, ETHFI/L), +$3.41 MTM,
   two days live. Retiring on a replay before the record has started is judging a
