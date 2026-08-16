@@ -64,13 +64,26 @@ Read the confidence stratification before quoting it.
         T1->T2  observed +0.000053%   coll +0.000053%   total +0.002116%
         T2->T3  observed +0.000000%   coll +0.000000%   total +0.000182%   NULL
         T3->T4  observed +0.000000%   coll +0.000000%   total +0.002882%   NULL
-        T2->T4  observed +0.000000%   coll +0.000000%   total +0.003064%   NULL
+        T2->T4  observed +0.000000%   coll +0.000000%   total +0.003064%   (composed)
 
-    T4 is on a LATER BUILD — a container restart moved unrealised P&L, so
-    `total_asset` moved while `collateral` held. **T3->T4 is the citation to
-    quote: same verdict as T2->T3 with 15.8x more room to have been wrong**,
-    and it survives a redeploy. Three nulls and one positive: the liq moves
-    exactly when collateral moves and holds exactly when collateral holds.
+    T4 is on a LATER BUILD, so this null also survives a redeploy — but the
+    `total_asset` motion is PRICE-driven, not restart-driven: with `size`,
+    `entry` and `collateral` byte-identical across T2/T3/T4 the identity
+    `d_equity = -d_value` holds exactly (~1e-14), and `d_collateral` is
+    identically zero. A container READS this state and cannot move it; T2->T3
+    has the same shape and spans no restart at all. **T3->T4 is the citation to
+    quote: same verdict as T2->T3 with 15.8x more room to have been wrong** —
+    that factor is a ~4.1x longer window (8m27s -> 34m43s) times a bigger price
+    move, the `position_value`-implied price falling 0.06 then 0.95 (a 15.83x
+    ratio, which IS the 15.8x). Quote the IMPLIED price, not the `mark` field:
+    the latter moves only 0.35 -> 0.86 (2.46x) and the two venue series differ
+    by 0.06-0.17 here.
+
+    TWO nulls and one positive: the liq moves exactly when collateral moves and
+    holds exactly when collateral holds. T2->T4 is listed for completeness but
+    is NOT a third observation — collateral is byte-identical at all three
+    snapshots, so it is the arithmetic composition of the other two
+    (0.000182% + 0.002882% = 0.003064%, exactly) and is forced given them.
 
     METHOD NOTE, learned by getting it wrong: **hold `size` and `entry` FIXED
     across snapshots.** A differential is meant to isolate the denominator, and
@@ -82,8 +95,10 @@ Read the confidence stratification before quoting it.
 
     **T2->T3 IS A NULL TEST AND IT REFUTES total_asset OUTRIGHT.** `value` and
     `total_asset` both moved (the mark ticked, unrealised P&L with it) while
-    collateral did NOT — and the venue's liq did not move either, byte-identical
-    to ten significant figures. A total_asset formula REQUIRED motion of
+    collateral did NOT — and the venue's liq did not move either, identical to
+    ten significant figures (not literally byte-identical: the published doubles
+    wobble by ~1 ULP, ~2.5e-16, immaterial here but worth saying exactly in a
+    block that rests on nulls). A total_asset formula REQUIRED motion of
     +0.000182% and there was none. **Refuted by the absence, not disfavoured by
     a fit** — and corroborated in both directions: liq moved exactly when
     collateral moved (T1->T2) and held exactly when it held (T2->T3).
