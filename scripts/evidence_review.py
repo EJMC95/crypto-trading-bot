@@ -127,13 +127,53 @@ CANDIDATE_MIN_CLOSES = min(10, GOLIVE_MIN_CLOSES)
 # Rows whose ledgers are HISTORY — retired bots keep closing nothing, but their
 # 30d window can still contain trades for a few weeks after the cut and they
 # will happily "pass" a go-live gate they can never act on.
-RETIRED = frozenset({
+#
+# [2026-08-16 (ni)] DERIVED, not hand-listed. THE INCIDENT: this frozenset was
+# a hand copy frozen at the JULY cut while the fleet retired twelve more books
+# under it — 🌊 Tide Rider (if), 🧲 Snap Back (jh), 📊 Index Rider (lo), the
+# Taker's live arm (ma), 🚀 crypto-breakout-4h (mr) and the SEVEN-row red-stop
+# slate (nf) the day before this ran. Every one of them was still being fed to
+# the go-live scan below. The visible symptom was mild — the 🔭 horizon line
+# named eight dead books, the (gl) overstating-detector shape — but the real
+# exposure is the line above it: this loop's whole job is to announce a book as
+# a REAL-MONEY promotion candidate, and `pm-gillard-lshadow` (n=304, the
+# largest ledger in the scanned set) was retired at t=−1.85 the previous day
+# and graded here anyway. A gate that can nominate a corpse is the (hj) class:
+# the review carrying its own stale copy of a standard it does not own.
+#
+# `cleanup_legacy_bots.LEGACY_BOTS` is the canonical declaration — the same
+# list that PRUNES the frozen rows, and the half of CLAUDE.md's two-half
+# retirement rule that cannot be skipped without the row reappearing. It is
+# what `golive_readiness` already imports for exactly this purpose, so review
+# and grader now agree about which books are dead as they already agree about
+# the bars and the era.
+#
+# The literal below survives ONLY as the degraded-mode FLOOR (it is a strict
+# subset of the canonical list, verified in --selftest), never as a parallel
+# authority: `golive_readiness` fails OPEN to `set()` here, which for THIS
+# consumer means grading every retired book — the exact bug being fixed. A
+# union means an unimportable canonical list can never make the scan wider
+# than it is today.
+_RETIRED_FLOOR = frozenset({
     "event-listing-sniper", "scanner-cross-exchange-arb", "scanner-triangular-arb",
     "perps-rsi-meanrev", "perps-rsi-meanrev-lshadow", "perps-donchian-breakout",
     "perps-donchian-breakout-lshadow", "perps-donchian-breakout-lighter",
     "perps-funding-carry", "equities-momentum", "equities-momentum-lshadow",
     "equities-regime-ibkr", "crypto-trend-daily-lighter",
 })
+try:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from cleanup_legacy_bots import LEGACY_BOTS as _LEGACY_BOTS   # noqa: E402
+    RETIRED = _RETIRED_FLOOR | frozenset(_LEGACY_BOTS)
+except Exception:      # noqa: BLE001 — a degraded list, never a lost report
+    RETIRED = _RETIRED_FLOOR
+# NOTE the exact-match contract this relies on. `LEGACY_BOTS` carries the
+# KRAKEN-era BARE names (`freqtrade-georgia`, `freqtrade-mum`,
+# `freqtrade-avo-maria`, retired 14-Jul) whose `-lshadow` twins are LIVING
+# books — one of them the live pair's control arm. Membership is `in`, i.e.
+# string equality, so the bare name excludes nothing living; any future rewrite
+# to prefix/suffix matching here would silently retire three healthy books.
+# Pinned in `tests/autonomy/test_review_retired_roster.py`.
 # [2026-08-13 (ma)] the live pair moved: 🙏 Avo Maria took the Taker's slot
 # (same service/keys/sub-account). The review's real-money sweep must cover
 # the CURRENT live pair — leaving the retired row here would send every
@@ -1208,6 +1248,36 @@ def main():
 
 # ---------------------------------------------------------------------------
 def selftest():
+    # [(ni)] THE RETIRED ROSTER IS DERIVED, NOT HAND-KEPT.
+    # The floor must stay a strict SUBSET of the canonical declaration: the
+    # moment it carries a name `LEGACY_BOTS` does not, it has become a second
+    # authority that can disagree with the grader about which books are dead —
+    # and the whole point of (ni) is that the hand copy drifted twelve books
+    # behind while looking perfectly healthy.
+    try:
+        from cleanup_legacy_bots import LEGACY_BOTS as _lb
+    except Exception:      # noqa: BLE001
+        _lb = None
+    if _lb is not None:
+        _extra = _RETIRED_FLOOR - frozenset(_lb)
+        assert not _extra, (
+            "retired floor carries names the canonical LEGACY_BOTS does not "
+            f"({sorted(_extra)}) — add them to cleanup_legacy_bots.LEGACY_BOTS "
+            "(the half of the retirement rule that prunes the row) rather "
+            "than keeping a second list here")
+        # The incident itself: every canonically-retired book must be excluded
+        # from the go-live scan. A bare `_RETIRED_FLOOR` fails this.
+        for _dead in ("pm-gillard-lshadow", "crypto-breakout-4h-lshadow",
+                      "lighter-dislocation-lshadow", "equities-regime-lshadow",
+                      "freqtrade-dad-lshadow", "lighter-ticket-taker-lighter"):
+            assert _dead in RETIRED, f"{_dead} is retired but still graded"
+        # ...and the bare-name trap must not take a LIVING book with it.
+        for _alive in ("freqtrade-georgia-lshadow", "freqtrade-mum-lshadow",
+                       "freqtrade-avo-maria-lshadow"):
+            assert _alive not in RETIRED, (
+                f"{_alive} is a LIVING book — `LEGACY_BOTS` carries its "
+                "Kraken-era BARE name and membership must stay exact-match")
+
     # ledger_drawdown
     assert ledger_drawdown([]) == 0.0
     assert ledger_drawdown([1.0, 2.0, 3.0]) == 0.0, "monotone up has no drawdown"

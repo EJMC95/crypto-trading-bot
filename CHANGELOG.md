@@ -1,3 +1,57 @@
+## 2026-08-16 (ni) — THE DAILY REVIEW WAS NOMINATING CORPSES FOR REAL MONEY: its `RETIRED` list was a hand copy frozen at the July cut while TWELVE books retired under it — including four the red-stop slate killed the day before
+
+- **FOUND BY THE DAILY REVIEW'S OWN OUTPUT.** The 16-Aug run's 🔭 gate-horizon
+  line named **eight retired books** as `unreachable@trend` — 🚀
+  crypto-breakout-4h, 👨 dad, intraday-15m, 🧲 lighter-dislocation, the Taker's
+  LIVE arm, and four PM books — every one of them dead. The code *does* filter
+  (`if bot in RETIRED ... continue`), so the list itself was the defect:
+  `scripts/evidence_review.py`'s `RETIRED` frozenset carried 13 names, all
+  pre-August, while `cleanup_legacy_bots.LEGACY_BOTS` carried 44. **Strict
+  subset, 12 living-ledger books missing:** 🌊 `(if)`, 🧲 `(jh)`, 📊 `(lo)`,
+  🎫-live `(ma)`, 🚀 `(mr)`, and the SEVEN-row red-stop slate `(nf)` — shipped
+  ~13:00Z the previous day.
+- **THE VISIBLE SYMPTOM WAS THE MILD ONE.** An overstating horizon is the `(gl)`
+  shape — a detector the operator learns to ignore. The exposure is the line
+  directly above it: that loop's entire purpose is to announce a book as a
+  **REAL-MONEY promotion candidate**, and it was scoring corpses.
+  `pm-gillard-lshadow` carried **n=304 — the largest ledger in the scanned
+  set** — and had been retired at t=−1.85 the day before. Nothing but its own
+  bad numbers stopped the review nominating a book the operator had just
+  killed. A gate that can nominate a corpse is not a gate.
+- **THE CLASS IS `(hj)`'s, AND THIS IS ITS THIRD INSTANCE:** a consumer keeping
+  a private copy of a standard it does not own. `(mo)` moved `DECLARED_LIVE` and
+  `ROW_ENTRY` in **this very file** to the one declaration and left `RETIRED`
+  behind — so the fix is not "update the list", it is **stop having a list**.
+  `LEGACY_BOTS` is canonical: it is the half of CLAUDE.md's two-half retirement
+  rule that PRUNES the frozen row, and it is what `golive_readiness` already
+  imports for exactly this purpose. Review and grader now agree about which
+  books are dead as they already agree about the bars `(hj)` and the era `(hq)`.
+- **THE LITERAL SURVIVES ONLY AS A DEGRADED-MODE FLOOR**, never as a parallel
+  authority. `golive_readiness` fails **OPEN** here (`retired = set()`); for
+  THIS consumer open *is* the bug being fixed, so the import is a UNION with the
+  old list — an unimportable canonical list can never make the scan wider than
+  it is today. `--selftest` asserts the floor stays a strict SUBSET, so the
+  moment it carries a name `LEGACY_BOTS` does not, the build says so.
+- **THE TRAP THAT MAKES THIS EXACT-MATCH-ONLY:** `LEGACY_BOTS` carries the
+  KRAKEN-era **bare** names `freqtrade-georgia` / `-mum` / `-avo-maria`
+  (retired 14-Jul) whose `-lshadow` twins are LIVING books — one of them the
+  live pair's control arm. Membership is `in`, i.e. string equality, so the
+  bare name excludes nothing living. Verified after the fix: horizon 17 → 8
+  books, all living, matching the canonical grader's table exactly.
+- **PINNED** by `tests/autonomy/test_review_retired_roster.py` (20 tests: the
+  set-difference, each of the 12 retirements named individually with its entry
+  per I8, the bare-name trap, the subset floor, fail-soft) plus the in-script
+  `--selftest` arm. **MUTATION-VERIFIED, four mutations, all red.**
+- **AND THE FOURTH MUTATION SURVIVED THE FIRST VERSION OF THE TEST — recorded
+  because it is I3 on my own work.** Rewriting the call site to
+  `any(d in bot for d in RETIRED)` leaves every set-contents assertion GREEN
+  (the contents are identical; only the matching semantics move) while
+  silently dropping three living books out of the scan. A set assertion cannot
+  see a call-site change — *"a substring test is not a wiring test"*. Closed
+  with an AST arm requiring every read of `RETIRED` to be the right-hand side
+  of an `in`/`not in`; the mutant now reddens. Had I shipped the first version,
+  the docstring would have claimed a verification that had not happened.
+
 ## 2026-08-15 (nh) — MY OWN (mu) FIX HAD A BUG: an entry that is ALSO a shared name was hashed TWICE, and the duplicate appeared or vanished with the CALLER'S PATH FORM — so the currency guard went silently blind on three rows and still exited OK
 
 - **FOUND BY THE CLOSING SWEEP** (run by hand after the subagent sweep died on
