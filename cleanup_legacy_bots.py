@@ -41,7 +41,7 @@ LEGACY_BOTS = [
     # in pnl_dashboard.py for the seven verdicts and overrides
     "pm-gillard-lshadow", "pm-abbott-lshadow",
     "pm-rudd-lshadow", "pm-morrison-lshadow",
-    # [2026-08-16 (oh)] 🧙 book-schwager — the I17 undecidable-by-TAIL
+    # [2026-08-16 (oj)] 🧙 book-schwager — the I17 undecidable-by-TAIL
     # retirement (operator, 16-Aug). Its 277-trade backtest never became a
     # ledger: ZERO closed trades in 2 days live, so there is no realised
     # record to lose. Ledger rows (none) kept as always; the row is pruned so

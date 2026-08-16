@@ -437,7 +437,7 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
-    # ---- RETIRED 2026-08-16 (oh): the I17 keep-or-retire call, made by the
+    # ---- RETIRED 2026-08-16 (oj): the I17 keep-or-retire call, made by the
     # operator on the (nu)/(oe) re-measurement. IDLE, never sys.exit —
     # restartPolicy=always turns an exit into a permanent crash-loop (the
     # Trail Blazer pattern); this book owns its whole process, so idling it

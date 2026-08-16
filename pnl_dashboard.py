@@ -178,7 +178,7 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 # env; ledgers kept; open paper positions freeze (the (mr)
                 # precedent). Both halves shipped together per the standing
                 # retirement rule (this set hides; LEGACY_BOTS prunes).
-                # [2026-08-16 (oh)] 🧙 book-schwager RETIRED — the I17
+                # [2026-08-16 (oj)] 🧙 book-schwager RETIRED — the I17
                 # keep-or-retire call, operator decision on the (nu)/(oe)
                 # re-measurement. UNDECIDABLE BY TAIL, a new class beside
                 # I17's slow-clock one: the founding +$457.21/t=1.88 sits

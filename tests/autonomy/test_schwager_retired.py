@@ -1,4 +1,4 @@
-"""(oh) 🧙 book-schwager is RETIRED — the UNDECIDABLE-BY-TAIL call.
+"""(oj) 🧙 book-schwager is RETIRED — the UNDECIDABLE-BY-TAIL call.
 
 THE DECISION (2026-08-16, operator: "retire schwager"). The I17
 keep-or-retire call, made on the (nu)/(oe) re-measurement rather than on a

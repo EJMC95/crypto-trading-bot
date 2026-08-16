@@ -85,11 +85,31 @@ HONEST ABOUT THE EVIDENCE (scripts/study_books_cohort_2026-08-13.py):
         expected given the above, not a defect finding; the scout's `vols`
         differ from `orderBookDetails`, so the exact traded set is not
         reconstructable offline.
-      - NOT CHANGED HERE. Decoupling the gate from universe churn (grade a
-        FIXED set, or require the bar on several draws, or widen the margin)
-        is a change to this book's CENTRAL mechanism and must be measured
-        before it ships (I19). The book has ZERO closes, so nothing is
-        burning. **Owner: operator.**
+      - **FIXED 16-Aug (om), operator decision, measured first per I19**
+        (`scripts/study_grimes_gate_2026-08-16.py`). The gate now grades
+        `GATE_COINS` — the founding study's own fixed 18 — while TRADING
+        continues to follow the live `resolve_universe()`. Four candidates
+        were pre-declared and run against BOTH halves of what a fix must do:
+            candidate   verdict stability    fires on a real edge at
+            base            66.7%  (defect)        +0.50%
+            FIXED          100.0%                  +0.50%   <- shipped
+            sub80          100.0%                  +1.00%
+            win240         100.0%                  +1.00%
+            tbar10         100.0%                  +1.00%
+        The three rejected candidates are stable only because they are
+        HARDER TO OPEN — each needs twice the edge to fire, which is "raise
+        the bar" in disguise and starves the book toward an I17 retirement.
+        `fixed` is the only one that keeps the shipped gate's sensitivity.
+        THE POSITIVE CONTROL IS THE POINT: every candidate was re-run with a
+        constant edge added to each trade, because a gate that never opens is
+        trivially stable and useless (I3 applied to a gate).
+        THE HAZARD THIS CREATES, published rather than assumed: grading a set
+        you do not trade. `extra.gate_drift` now reports
+        {graded, traded, overlap, ungraded, untraded} every loop —
+        **`ungraded` non-empty means the book can enter coins its own gate
+        never tested**, which is the one direction that matters.
+        Pinned by `tests/autonomy/test_grimes_gate_fixed_universe.py`
+        (4 mutations verified RED).
   * the gate's bar (n>=20, net>0, t>=0.5) is DELIBERATELY below the
     go-live bar — it decides which setup may spend shadow clips, not what
     goes live; the go-live gate is unchanged and senior.
@@ -152,6 +172,16 @@ MIN_VOL_M = float(os.environ.get("GRIMES_MIN_VOL_M", "1.0"))
 UNIVERSE_N = int(os.environ.get("GRIMES_UNIVERSE_N", "18"))
 DEFAULT_COINS = ("BTC,ETH,SOL,HYPE,LIT,ZEC,PUMP,XRP,UNI,ETHFI,BNB,ENA,"
                  "DOGE,NEAR,XMR,AVAX,LINK,TAO").split(",")
+
+#: [(om)] THE SET THE GATE GRADES — FIXED, and deliberately not the set the
+#: book trades. `resolve_universe()` is a top-18-BY-VOLUME ranking that churns;
+#: grading it let the coin list, rather than the edge, decide whether the book
+#: could enter (measured (oe): t moved 3.82 from the coin set alone against a
+#: 0.5 bar, opening the gate in 4 of 12 plausible draws while a FIXED set never
+#: crossed it in 90 days). This is the founding study's own 18-coin set, so the
+#: gate grades the population its bar was calibrated on. TRADING is unchanged
+#: and still follows the live universe; `gate_drift` publishes the gap.
+GATE_COINS = list(DEFAULT_COINS)
 
 SLIP_COST = 0.0005
 DELIST_GIVEUP_H = 6.0
@@ -499,7 +529,22 @@ def build_state(positions, acted, scorecard, last_retest, last_ts, now=None):
             "saved_ts": float(now if now is not None else time.time())}
 
 
-def build_extra(census, positions, scorecard, open_pnl, realized):
+def gate_drift(traded):
+    """How far the TRADED universe has drifted from the set the gate GRADES.
+
+    [(om)] Decoupling the gate from universe churn creates the opposite
+    hazard: grading coins the book no longer trades. That is fine while the
+    two overlap and dangerous when they do not — so it is PUBLISHED rather
+    than assumed. `ungraded` is traded-but-not-graded: a non-empty list means
+    the book can enter coins its own gate never tested."""
+    t = {str(c) for c in (traded or ())}
+    g = set(GATE_COINS)
+    return {"graded": len(g), "traded": len(t), "overlap": len(t & g),
+            "ungraded": sorted(t - g), "untraded": sorted(g - t)}
+
+
+def build_extra(census, positions, scorecard, open_pnl, realized,
+                drift=None):
     """The published `extra` — ONE builder ((hj)). The scorecard is the
     book's signature payload: rule 3 says the test table is public."""
     return {
@@ -517,6 +562,7 @@ def build_extra(census, positions, scorecard, open_pnl, realized):
                  "crypto_only": not ALLOW_NONCRYPTO},
         "scan": census,
         "scorecard": scorecard or {},
+        "gate_drift": drift or {},
     }
 
 
@@ -789,7 +835,23 @@ def main():
                     deep_bars, deep_trend = {}, {}
                     n_4h = int(WINDOW_D * 6 + EMA_SLOW + 10)
                     n_1d = int(WINDOW_D + 80)
-                    for coin in universe:
+                    # [(om)] THE GATE GRADES A FIXED SET, NOT THE TRADED ONE.
+                    # Measured (oe): grading `resolve_universe()` — a
+                    # top-18-BY-VOLUME ranking that CHURNS — moved keltner's
+                    # `t` across 3.82 (-2.55..+1.27) against a 0.5 bar from
+                    # the coin set ALONE, and opened the gate in 4 of 12
+                    # plausible draws while a FIXED set never crossed the bar
+                    # in 90 days. So the gate could not tell "this setup's
+                    # edge changed" from "the coin list changed", and it was
+                    # OPEN on the second. Grading GATE_COINS decouples the
+                    # verdict from churn; TRADING still follows the live
+                    # `universe`. Chosen over sub-sampling / a wider window /
+                    # a higher bar because it was the only stable candidate
+                    # that KEPT the shipped gate's detection sensitivity —
+                    # all three of those needed 2x the edge to fire, which is
+                    # "raise the bar" wearing a disguise and starves the book
+                    # (`scripts/study_grimes_gate_2026-08-16.py`).
+                    for coin in GATE_COINS:
                         try:
                             bars = _paged_bars(ctx, coin, BAR_INTERVAL,
                                                BAR_SEC, n_4h, now_s)
@@ -920,7 +982,7 @@ def main():
                 for p in positions.values())
             equity = START_EQUITY + realized + open_pnl
             extra = build_extra(census, positions, scorecard, open_pnl,
-                                realized)
+                                realized, drift=gate_drift(universe))
             try:
                 store.publish(
                     bot_id, status="online", equity=equity,

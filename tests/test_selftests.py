@@ -320,6 +320,14 @@ SELFTEST_EXCLUDE = {
     "scripts/audit_secret_leak.py",
     # Research backtest: needs historical market data / network, not a unit test.
     "scripts/backtest_georgia_short_sleeve.py",
+    # [2026-08-16 (om)] 📐 Grimes's GATE-FIX study. `--selftest` is
+    # offline-green but needs the cached 4h/1d tape, so it is excluded like
+    # every other research script here. VERDICT IN ITS HEADER: grading a
+    # FIXED coin set is the only candidate that reaches 100% verdict
+    # stability while keeping the shipped gate's detection sensitivity;
+    # sub-sampling, a 240d window and a t>=1.0 bar each need 2x the edge to
+    # fire. Re-run it, do not re-argue it from prose.
+    "scripts/study_grimes_gate_2026-08-16.py",
     # [2026-08-16] ⚡ High Voltage's decision-point study. `--selftest` IS
     # offline-green (run it directly); the full run needs the venue's live
     # margin tiers AND the cached 208d tape. VERDICT IN ITS HEADER: the
@@ -445,7 +453,7 @@ def test_module_selftest_live(mod, flag, needs):
 @pytest.mark.parametrize("script", ENFORCED_AUDITS)
 def test_enforced_audit_guard(script):
     ok = _run([script])
-    assert ok.returncode == 0, f"{script} full scan failed:\n{_tail(ok)}"
+    assert ok.returncode == 0, f"{script} full scan failed:\n{_tail(om)}"
     neg = _run([script, "--selftest"])
     assert neg.returncode == 0, f"{script} --selftest (negative fixture) failed:\n{_tail(neg)}"
 
