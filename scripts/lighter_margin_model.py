@@ -22,10 +22,29 @@ account and no venue-published liq price, so the only way to price liquidation
 for them is to MODEL it from the venue's published per-book margin tier. That
 is this file, and its scope is exactly that: hypothetical positions.
 
-The model has a free calibration route that should be taken before anyone
-trusts it with real money: on the LIVE account, `margin_state()` publishes the
-venue's own `liq` per open position, so `liq_price()` can be checked against it
-directly. Until that check is run, treat this as an unvalidated model.
+THE CALIBRATION HAS BEEN RUN, AND IT PASSES — corrected in place per I12; this
+paragraph said "treat this as an unvalidated model" for a few hours after the
+module shipped. The route was the obvious one: on the LIVE account
+`margin_state()` publishes the venue's own `liq` per open position, so
+`liq_price()` can be checked against it directly.
+
+  * CONTROL — 💸 the Farmer's XAU SHORT, the one live position the venue does
+    price. Fed the account leverage (0.1532) and the venue's own `mmf` tier
+    (0.0240), this model reproduces the published liq of **32,238.90 to
+    0.000000% error** (the implied entry of 4,385.65 against a 4,387.6 mark is
+    just the position's small unrealised P&L).
+  * THE REUSABLE PART: the isolated-margin formula is correct in CROSS mode
+    too, provided you substitute the ACCOUNT-level `L = gross/equity`. The
+    functions below only claim isolated; that substitution is the caller's.
+  * NEGATIVE CONTROL — 🙏 Avo's four longs, which the venue prices at NOTHING.
+    At L=0.999 the model returns `liq = 0.0`: **a long at <=1x has no
+    liquidation price, only a path to worthlessness.** So the empty venue field
+    is CORRECT rather than a data gap, and `liq_unknown` naming those four is
+    the census working. The model is live, not degenerate — the same BTC long
+    prices at -49.4% / -19.0% / -8.9% from entry at 2x / 5x / 10x.
+
+(Measured by a concurrent session on 2026-08-16 against the live account, which
+this file cannot reach; re-check it there rather than from a shadow arm.)
 
 WHY IT LIVES UNDER scripts/, DELIBERATELY. `bot_pnl_store._BUILD_SHARED` begins
 with `"venues"`, so ANY file under `venues/` joins the build-stamp file set of
