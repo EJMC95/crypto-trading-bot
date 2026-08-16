@@ -202,7 +202,23 @@ done &
 # brain's grading diet). Everything lands as bounded TTL'd fleet_tuning
 # levers that expire back to env defaults unless re-asserted — auto-revert
 # is the resting state. First cycles need tape: it skips below 60 snapshots.
-( sleep 420
+# [2026-08-16 (ou)] BOOT LADDER + ONE RUN PER BOOT — the (os) fix, generalised
+# to the seven siblings that were silent alongside 🛡️ the immune organ.
+# A boot stagger longer than the gap between container restarts is an organ
+# that NEVER RUNS: freqtrade-bots redeployed 10x between 03:40Z and 04:09Z
+# (gaps 0:36-7:31) and EVERY organ staggered >=420s executed zero times for
+# ~50 minutes. The shape: a short distinct offset (5..35s) so the boot burst
+# is still spread, then ONE guaranteed run, then the ORIGINAL stagger to
+# restore the steady-state phase separation the ladder exists to give.
+# Steady-state cadence and phase are unchanged; a restart now costs one
+# duplicated run per organ instead of the organ.
+# The offsets are short ON PURPOSE: the failure was a delay outrunning the
+# restart interval, so a long one here would rebuild the bug. All seven
+# import no pandas/numpy/sklearn (checked) — stdlib+psycopg2 processes, so a
+# 5s-spaced boot burst is spread, not a herd.
+( sleep 5
+  python3 /freqtrade/lighter_scout_tuner.py || true
+  sleep 420
   while true; do
     python3 /freqtrade/lighter_scout_tuner.py || true
     sleep "${TUNER_INTERVAL_SEC:-3600}"
@@ -217,7 +233,10 @@ done &
 # publishes per-lever helping/hurting verdicts. The scout tuner consumes
 # HURTING restrict-only: a movement that measured net-negative in reality
 # stops being repeated. Fail-safe: a dark organ restricts nothing.
-( sleep 540
+# [(ou)] boot ladder — see the note above the scout tuner.
+( sleep 10
+  python3 /freqtrade/fleet_proprioception.py || true
+  sleep 540
   while true; do
     python3 /freqtrade/fleet_proprioception.py || true
     sleep "${PROPRIO_INTERVAL_SEC:-900}"
@@ -230,7 +249,10 @@ done &
 # paired bar — >=7d, >=30 shadow closes, beats live per-trade by the margin
 # on the window AND both halves. Fade-watch releases a promotion whose live
 # performance turns. All TTL'd; phone-pushed per transition.
-( sleep 480
+# [(ou)] boot ladder — see the note above the scout tuner.
+( sleep 15
+  python3 /freqtrade/experiment_judge.py || true
+  sleep 480
   while true; do
     python3 /freqtrade/experiment_judge.py || true
     sleep "${XPJ_INTERVAL_SEC:-3600}"
@@ -298,7 +320,10 @@ done &
 # [2026-07-15 REGENERATION] 🩹 self-repair tier 2: restores a stateful organ
 # the immune organ flagged SICK to its last-good history snapshot (or a safe
 # baseline). Runs AFTER the immune organ so it acts on fresh findings.
-( sleep 660
+# [(ou)] boot ladder — see the note above the scout tuner.
+( sleep 20
+  python3 /freqtrade/fleet_regen.py || true
+  sleep 660
   while true; do
     python3 /freqtrade/fleet_regen.py || true
     sleep "${REGEN_INTERVAL_SEC:-900}"
@@ -307,7 +332,10 @@ done &
 # [2026-07-15 REPRODUCTION] 🧬 breeds strategy genotypes: taker offspring
 # scored instantly by replay (shadow-only), funding offspring proposed to
 # 'xp-queue' for the experiment judge's paired live-promotion bar (gated).
-( sleep 600
+# [(ou)] boot ladder — see the note above the scout tuner.
+( sleep 25
+  python3 /freqtrade/strategy_incubator.py || true
+  sleep 600
   while true; do
     python3 /freqtrade/strategy_incubator.py || true
     sleep "${INCUBATOR_INTERVAL_SEC:-3600}"
@@ -326,7 +354,10 @@ done &
 # the continuous per-trade gap (live real fills − shadow mark fills) on the
 # SAME coins, with entry/exit-slip decomposition as fill prices accrue. The
 # clean yes/no on "is the live Funding Farmer slipping?" (30-min).
-( sleep 720
+# [(ou)] boot ladder — see the note above the scout tuner.
+( sleep 30
+  python3 /freqtrade/implementation_shortfall.py || true
+  sleep 720
   while true; do
     python3 /freqtrade/implementation_shortfall.py || true
     sleep "${SHORTFALL_INTERVAL_SEC:-1800}"
@@ -340,7 +371,13 @@ done &
 # The standing version of the 22/23-Jul edge analysis, so feed/park/cull is a
 # read rather than a re-derivation. PUBLISH-ONLY: no consumer, no actuator;
 # --publish is explicit so a bare run never writes the live bus.
-( sleep 660
+# [(ou)] boot ladder — see the note above the scout tuner.
+( sleep 35
+  python3 /freqtrade/fleet_radar.py --publish || true
+  # [2026-08-01 (hv)] 💰 allocation view: where SHOULD the capital be?
+  # Publish-only and advisory — it moves no capital and writes no lever.
+  python3 /freqtrade/fleet_allocation.py --publish || true
+  sleep 660
   while true; do
     python3 /freqtrade/fleet_radar.py --publish || true
     # [2026-08-01 (hv)] 💰 allocation view: where SHOULD the capital be?

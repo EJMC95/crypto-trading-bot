@@ -1,3 +1,63 @@
+## 2026-08-16 (ou) — THE OTHER SEVEN STARVED ORGANS: `(os)` fixed the one that pages, and the same 50-minute silence had swallowed the judge, the tuner, proprioception, regen, radar, allocation, the incubator and impl-shortfall
+
+**`(os)` fixed 🛡️ the immune organ and DECLARED the rest rather than patching
+them**, on the argument that running eight organs at boot recreates the herd
+the staggers exist to spread. Operator: fix them too. Doing so changed my mind
+about the objection rather than overriding it — **the seven import no
+pandas/numpy/sklearn** (checked, all eight), so they are stdlib+psycopg2
+processes and the "herd" I was protecting against is far cheaper than the
+outage it was justifying.
+
+**THE SHAPE, applied uniformly:** a short DISTINCT boot offset (5..35s) so the
+burst is still spread, then ONE guaranteed run, then the **original** stagger
+so steady-state phase separation is exactly what it was, then the loop.
+Cadence and phase are unchanged; a restart now costs one duplicated run per
+organ instead of the organ. The offsets are short ON PURPOSE — the entire
+failure was a delay outrunning the restart interval, so a long one here would
+rebuild the bug at a new value.
+
+| organ | boot offset | original stagger (kept) |
+|---|---|---|
+| 🛡️ fleet_immune | 0 (runs first, `(os)`) | 540 |
+| 🧠🔧 lighter_scout_tuner | 5 | 420 |
+| 🦾 fleet_proprioception | 10 | 540 |
+| 🧪⚖️ experiment_judge | 15 | 480 |
+| 🩹 fleet_regen | 20 | 660 |
+| 🧬 strategy_incubator | 25 | 600 |
+| 📏 implementation_shortfall | 30 | 720 |
+| 📡 fleet_radar **+ 💰 fleet_allocation** | 35 | 660 |
+
+**EIGHT ORGANS, NINE FIXED.** `fleet_allocation` has no loop of its own — it
+runs inside the radar block — so it was starved silently alongside it and is
+repaired by the same change. That is pinned, because if it is ever split into
+its own loop it needs its own ladder entry or it re-starves invisibly.
+
+**WHAT THIS COST WHILE IT RAN.** Across the 03:40–04:09Z storm every one of
+these executed ZERO times for ~50 minutes: the growth rail's retrospective
+grader, the shadow→live promotion judge, the self-tuning organ, the
+regeneration tier, the edge radar, the allocation view and the live-vs-shadow
+execution monitor. None is a trading path, so no trade was affected — the cost
+was total loss of the autonomy stack's own feedback, at exactly the moment the
+fleet was changing fastest.
+
+**Guarded**: `tests/autonomy/test_immune_boot_execution.py`, extended from one
+organ to the cohort. **Seven mutations verified RED** — a boot run pushed back
+behind its stagger, an offset inflated past the 60s bar, two organs sharing an
+offset (a burst, not a ladder), a long stagger deleted (phase collapse),
+`|| true` dropped, `fleet_allocation` removed from the radar loop, and the
+immune organ reverted to stagger-before-run.
+
+**TWO OF THOSE MUTANTS SURVIVED THE FIRST PASS AND THE TESTS WERE WRONG, NOT
+THE FIX.** "A sleep exists after the run" was satisfied by the loop's own
+interval, so deleting the long stagger passed; and "fleet_allocation appears in
+the radar block" was satisfied by the boot copy alone, so removing it from the
+LOOP passed. Both are now positional — the stagger must sit BETWEEN the boot
+run and `while true`, and allocation must appear at least twice. I3 earning its
+place: the mutation pass is what graded the guard, and the guard failed first.
+
+**Container-shape change only** — no bot logic, no lever, no gate, no trade
+behaviour, `bash -n` clean and pinned as an assertion.
+
 ## 2026-08-16 (ot) — THE MARGIN BLOCK EARNS ITS NUMBERS: a "0.000000% calibration" that could not fail, retracted; the forward test that DISAGREED and found the venue's real formula; and a null test that settled the rest
 
 - **THE ASK** (operator): *"avo maria and funding farmer leverage options"*, then
