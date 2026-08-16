@@ -262,6 +262,52 @@ def test_the_margin_read_cannot_raise_into_a_trading_loop(path):
         f"telemetry read would propagate into the live trading loop")
 
 
+# --------------------------------------------------------------------------
+# the UNIT — confirmed against the venue's own margin tiers, not inferred
+# --------------------------------------------------------------------------
+# Measured 16-Aug from mainnet `orderBookDetails`, which publishes the margin
+# tiers as INTEGER BASIS POINTS. Across 210 active books the nesting
+# closeout <= maintenance <= min_imf <= default_imf held with ZERO violations,
+# and the bps reading yields sane 3x-50x max-leverage tiers where a percent
+# reading would imply 0.03x-0.2x. The position field is that value / 100, i.e.
+# PERCENT — matched on 5 of 5 live positions across both real-money books
+# (XAU 666->6.66, BTC 500->5.0, ADA/LTC/TRX 1000->10.0), 0 of 5 matching the
+# min tier (so both books sit at the venue DEFAULT, which is what a fleet that
+# never calls update_leverage should look like).
+VENUE_DEFAULT_IMF_BPS = {"XAU": 666, "BTC": 500, "ADA": 1000, "LTC": 1000,
+                         "TRX": 1000}
+
+
+@pytest.mark.parametrize("coin,bps", sorted(VENUE_DEFAULT_IMF_BPS.items()))
+def test_imf_is_published_as_PERCENT_matching_the_venue_tier(coin, bps):
+    """The position field is the venue's basis-point tier / 100.
+
+    Read as a 0-1 fraction it is wrong by 100x — the same unit class that gave
+    this fleet an 8x-overstated funding APR. The name carries the unit so a
+    consumer cannot make that mistake silently."""
+    st = margin_state_from(_acct([_pos(coin, initial_margin_fraction=str(bps / 100))]))
+    row = st["positions"][coin]
+    assert row["imf_pct"] == pytest.approx(bps / 100)
+    assert "imf" not in row, "the unit-free name is back; it reads as a fraction"
+    # a 0-1 fraction would be <= 1 for every book on the venue; percent is not
+    assert row["imf_pct"] > 1.0
+
+
+@pytest.mark.parametrize("coin,bps", sorted(VENUE_DEFAULT_IMF_BPS.items()))
+def test_max_leverage_is_derived_from_the_percent_tier(coin, bps):
+    st = margin_state_from(_acct([_pos(coin, initial_margin_fraction=str(bps / 100))]))
+    assert st["positions"][coin]["max_lev"] == pytest.approx(10000.0 / bps,
+                                                             rel=1e-3)
+
+
+def test_a_missing_or_zero_margin_tier_yields_no_max_leverage():
+    """0 would divide-by-zero into an infinite 'leverage'; absent must stay
+    absent rather than become unbounded."""
+    for raw in ("0", "", "junk", None):
+        st = margin_state_from(_acct([_pos("XAU", initial_margin_fraction=raw)]))
+        assert "max_lev" not in st["positions"]["XAU"]
+
+
 def test_an_accountless_client_makes_NO_venue_call_at_all():
     """A shadow arm builds LighterClient with with_signer=False, which leaves
     account_index None. Without an early refusal the read fires a real request

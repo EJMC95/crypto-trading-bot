@@ -178,8 +178,8 @@ def margin_state_from(acct, marks=None):
             have_value = True
         if rec.get("mode") is not None:
             modes.add(rec["mode"])
-        row = {k: rec[k] for k in ("value", "liq", "imf", "margin", "mode")
-               if k in rec}
+        row = {k: rec[k] for k in ("value", "liq", "imf_pct", "max_lev",
+                                   "margin", "mode") if k in rec}
         liq, mark = rec.get("liq"), (marks or {}).get(coin)
         if liq is None:
             unknown.append(coin)
@@ -751,13 +751,33 @@ class LighterClient(VenueClient):
                 # fabricated zero for a measurement.
                 for key, src, parse in (
                         ("liq", "liquidation_price", _liq_price),
-                        ("imf", "initial_margin_fraction", _num),
+                        # [2026-08-16] THE UNIT IS IN THE NAME, and it is not a
+                        # fraction. CONFIRMED against the venue's own margin
+                        # tiers rather than inferred: `orderBookDetails`
+                        # publishes `default_initial_margin_fraction` in BASIS
+                        # POINTS (XAU 666, BTC 500, ADA/LTC/TRX 1000) and the
+                        # position field is exactly that ÷ 100 — matched on
+                        # 5 of 5 live positions across both real-money books,
+                        # 0 of 5 matching the min tier. Read as a 0-1 fraction
+                        # it is wrong by 100×, which is the (unit-purity) class
+                        # that already cost this fleet an 8×-overstated funding
+                        # APR. `imf` was the name for one deploy and had no
+                        # consumers; renamed while that is still free.
+                        ("imf_pct", "initial_margin_fraction", _num),
                         ("value", "position_value", _num),
                         ("margin", "allocated_margin", _num),
                         ("funding_paid", "total_funding_paid_out", _num)):
                     val = parse(p.get(src))
                     if val is not None:
                         rec[key] = val
+                # the number a human actually wants: what this position's own
+                # margin tier permits. Derived, not fetched — 100/imf_pct is
+                # exact given the unit above (XAU 6.66% -> 15.02x). Guarded so
+                # a zero or absent tier yields no ratio rather than a division
+                # blow-up or an infinite "leverage".
+                _imf = rec.get("imf_pct")
+                if _imf and _imf > 0:
+                    rec["max_lev"] = round(100.0 / _imf, 2)
                 mode = _margin_mode(p.get("margin_mode"))
                 if mode is not None:
                     rec["mode"] = mode
