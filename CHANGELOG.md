@@ -1,3 +1,146 @@
+## 2026-08-16 (oz) — A SECOND NULL TEST AT 15.8× THE FIRST, AND IT SURVIVES A REDEPLOY: the venue's liq held while total equity moved — plus four corrections to my own first draft of this entry
+
+- *(Letter: written as `(ox)`, RENUMBERED to `(oz)` before commit — a
+  concurrent session pushed `(ox)` (`6c76d8d`) minutes after I announced
+  claiming it. Recorded inline per the convention's rule 4; `git log`
+  subjects are not a reliable letter index, so grep the headers.)*
+
+- **CONTEXT.** `(ot)` established the venue's cross-margin leverage basis as
+  `(|size| × entry) / collateral` and settled the denominator with ONE null
+  test (T2→T3). This adds a second, far roomier null that additionally spans a
+  container restart — and corrects four things I got wrong writing it up.
+
+### The fourth snapshot, and the second null
+
+- Deploying the `(oq)` equity-guard fix moved 💸 the Farmer to build
+  `e981e11820fc` and produced T4. The forward test's METHOD is unchanged and
+  T2–T4 remain exact. **The table is printed on TWO size conventions on
+  purpose**, and the columns are not comparable across the rule:
+
+      snap  build          collateral     total_asset    venue liq        coll err    total err
+      T1*   d73e8938ad8d   197.843218     197.516986     32238.916157     −0.00129%   −0.14450%
+      T2    e9d806605720   197.843339     197.521799     32238.933282     +0.00000%   −0.14116%
+      T3    e9d806605720   197.843339     197.522213     32238.933282     +0.00000%   −0.14098%
+      T4    e981e11820fc   197.843339     197.528768     32238.933282     −0.00000%   −0.13810%
+
+      * T1 predates the published `size` field, so its row is computed with the
+        DERIVED size (value/mark = 0.0069001022). T2–T4 use the venue's own
+        published 0.0069. **That difference IS T1's −0.00129% residual** — it
+        is derivation error, not model error, and it is the argument for having
+        published `size` at all.
+
+- **T3→T4 IS A SECOND NULL AND A FAR ROOMIER ONE — AND, SEPARATELY, IT SPANS A
+  REDEPLOY.** The two facts are independent and the draft of this entry
+  conflated them.
+
+      raw motion   collateral   197.843339 → 197.843339   +0.000000%
+                   total_asset  197.522213 → 197.528768   +0.003319%
+                   venue liq    32238.933282382248 → 32238.93328238225
+
+      differentials (size/entry HELD FIXED — only the denominator varies)
+        T2→T3   observed +0.000000%   coll +0.000000%   total predicts +0.000182%   NULL
+        T3→T4   observed +0.000000%   coll +0.000000%   total predicts +0.002882%   NULL  ← 15.8×
+        T2→T4   observed +0.000000%   coll +0.000000%   total predicts +0.003064%   (COMPOSED of the two above — not a third datum)
+        T1→T2   observed +0.000053%   coll +0.000053%   total predicts +0.002116%   positive control
+
+- **TWO independent nulls, not three.** `collateral` is byte-identical at T2,
+  T3 and T4, so T2→T4 is the arithmetic composition of the two intervals: given
+  the first two nulls it is FORCED, not observed. It is reported for
+  completeness and labelled so nobody counts it as evidence.
+- **The liq did not move at any material precision — but it is not literally
+  identical.** The payload publishes the full double repr and the last digits
+  wobble: `32238.93328238224` / `...382248` / `...38225`. That is ~2.5e-16
+  relative, one ULP of a double — representational noise, not motion. `(ot)`
+  and `(op)` both said "byte-identical to ten significant figures", which is
+  true at ten and false at the last digit; stated precisely here.
+- **Units, and they are two different quantities:** `+0.003319%` is the raw
+  motion of the DENOMINATOR; `+0.002882%` is the liq motion it implies, after
+  the `(1/L)/(1+1/L)` factor — which is **0.8684**, not the 0.867 my draft
+  asserted. At T3, `1/L = 197.522213 / 29.944068 = 6.596372`, so the factor is
+  `6.596372/7.596372 = 0.868358` and `0.003319% × 0.8684 = 0.002882%`. The
+  wrong factor did not reproduce the entry's own second number.
+
+### The causal error, which is the one that mattered
+
+- **My draft said "the restart moved unrealised P&L". IT DID NOT. The PRICE
+  did.** `equity` is the venue's `total_asset_value` and `value` its
+  `position_value` (`venues/lighter_client.py:192,820`); with `size`, `entry`
+  and `collateral` all fixed, the identity `d_equity = −d_value` holds
+  **exactly** — +7.1e-15 on T2→T3 and +1.8e-14 on T3→T4, with `d_collateral`
+  identically 0.000000000000. **T2→T3 has the same shape and spans NO restart.**
+  A container reads that state; it cannot move it. Asserting otherwise inverts
+  the very thing this margin block exists to establish — that these numbers are
+  the VENUE's record, not the container's (I1/I14).
+- **Nor did the redeploy produce the extra room.** The 15.8× comes from a
+  ~4.1× longer window (8m27s → 34m43s) and a bigger price move: the
+  `position_value`-implied price fell 0.06 over T2→T3 and 0.95 over T3→T4, a
+  **15.83×** ratio that IS the 15.8× above. The `mark` FIELD moves only
+  0.35 → 0.86 (2.46×), so quote the value-implied price, not the mark — they
+  are different venue price series and differ by 0.06–0.17 here.
+- **What the redeploy genuinely adds is worth keeping and is a different
+  claim:** the venue's liquidation price held across a container change, which
+  is independent evidence that the number is venue-published rather than
+  anything the container computes.
+- **The wrong sentence had already propagated into code** —
+  `scripts/lighter_margin_model.py:69` (a concurrent session's `590ee26`)
+  carries the same restart-causality claim, folded in from my message. Flagged
+  to its owner; correcting this entry without correcting that line would leave
+  the wrong claim in the module a future reader cites.
+
+### The method correction, which is the transferable half
+
+- **My first T3→T4 run reported T1→T2 as collateral predicting +0.001340%
+  against an observed +0.000053%** — an apparent mismatch that was MINE. T1
+  falls back to the derived `value/mark`, and letting size vary between
+  snapshots pollutes a differential whose entire purpose is to isolate the
+  denominator. **A differential means nothing unless exactly one thing varies**
+  — [[ab-tests-must-vary-exactly-one-variable]] applied to an observational
+  series. Held fixed at 0.0069, T1→T2 returns +0.000053% against +0.000053%.
+- Caught only because the number looked wrong enough to re-derive. Recorded so
+  the next reader holds `size` and `entry` fixed and knows T1's size is derived.
+
+### The deploy that produced T4
+
+- `(oq)`'s equity-guard fix, **classified main-only by its own author under
+  `(mm)`**. Taking it to production is therefore a DEPARTURE from that
+  classification, and the reason is named rather than assumed: its failure mode
+  is **redeploy-triggered** and this fleet had taken four redeploys today — a
+  restart moves the container, an NTP correction can leave the new clock a
+  shade behind, the last-accepted restore is skipped, and the book sits
+  equity-blind (the 18-Jul incident, reopened by a clock rather than a bug).
+  No expectancy is claimed; this buys availability of a known-good baseline.
+- Reviewed before taking: the whole live-image gap was ONE file, **14
+  insertions / 2 deletions**, of which the behavioural change is a single line
+  (restore tolerance `0 <= age` → `-_FUTURE_SKEW_S <= age`); the rest is the
+  new module constant and its rationale, plus a hardcoded `60.0` replaced by
+  it. Verified by diffing every deletion across the gap, not by the subject.
+- **Verified on the thing it protects.** Stamps predicted from a clean
+  `origin/main` worktree before reading the rows, and matched: Farmer
+  `e981e11820fc`/16, Avo `4d5c491c01ef`/17, with the Farmer's shadow control
+  arm deployed alongside per `(hi)`. Equity readable across the restart on all
+  three (197.527871→197.528768, 1003.14924→1003.10630, 62.75→62.75), no
+  blindness flag, no halts, positions restored 1/3/4, closes unchanged
+  123/180/0.
+- **Both LIVE rows now read `CURRENT — 0 behind, matches HEAD`** — 💸 the
+  Farmer and 🙏 Avo, the whole real-money surface — as does the Farmer's shadow
+  twin, which is a CONTROL ARM carrying no keys and is not a third live book.
+
+### Still open, unchanged
+
+- **One POSITION, not one observation.** While the Farmer holds a single open
+  position, `gross/equity` and `this position's value/equity` remain
+  numerically identical, so that pair is untested. T4 does nothing to close it;
+  it needs a naturally-occurring second concurrent position.
+
+### Shared-tree note
+
+- Written against `origin/main` in a throwaway worktree, not the shared desk:
+  the desk's CHANGELOG was stale AGAIN (missing `(ou)`, `(ov)`, `(ow)`), and a
+  letter check run there reported `(ow)` FREE when origin already held it.
+  **Check letters against origin, never against the desk.** Even then origin is
+  not a lock — a concurrent session read `(ox)` as next-free a minute before I
+  announced claiming it; announcing the claim is what closes that window.
+
 ## 2026-08-16 (oy) — 💰 THE ALLOCATION PAYLOAD PUBLISHED WHAT THE RANKING WANTED AND NOT WHAT ANY CONSUMER WOULD DO: `target_usd: 10072` and `scale_effective: 1.00` were the same row, and only one of them was written down
 
 **FOUND BY MISREADING IT MYSELF, which is the whole argument for the fix.**
