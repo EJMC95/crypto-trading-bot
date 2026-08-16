@@ -1,3 +1,60 @@
+## 2026-08-16 (oc) — the re-run sweep's live-money half: `(nj)`'s new per-row clip arm escaped TWO consumers, and a guard with no answer was still printing OK
+
+*(Letter picked at push time after two collisions — a concurrent session took
+(nu)/(ny) and then (oa) mid-write; the cited entry keeps the letter.)*
+
+- **THE CONTEXT.** `(nj)` (concurrent session) gave 🙏 Avo LIVE its own clip
+  lever, `live.avo.clip_scale`, so the board could size it without moving 💸
+  the Farmer. The lever itself is right — registered with a cage [0.5, 1.0],
+  author-bound to the board, restrict-only by construction. **Two CONSUMERS
+  did not follow it**, both found by the re-run sweep and independently
+  verified by a second agent driving the real code.
+- **1. The new arm escaped proprioception's clip rule** and could be graded
+  HURTING **off the other book's trades.** `group_of` matched the SHARED name
+  EXACTLY, so `live.avo.clip_scale` fell through to the generic `live.` group
+  — which can return a hurting verdict, computed over `LIVE_ROWS`, i.e. the
+  Farmer's record. Two defects in one fall-through: a clip lever escaping the
+  clip rule (per-trade % is INVARIANT to clip size — that is why `live-clip`
+  grades `recorded`, the 23-Jul correction), and one book's lever judged on
+  another book's record. Fixed: any `live.<row>.clip_scale` routes to
+  `live-clip`; `live.funding.*` and other `live.*` names are untouched.
+- **2. The board read one hard-coded lever name for every row**, so Avo's
+  clip ladder was gated on the Farmer's verdict — another book's grade could
+  release Avo's lever or hold its top step. The per-row map already existed
+  (`LIVE_CLIP_LEVERS`); the grade read was simply not using it, and was
+  hoisted OUT of the per-row loop. Fixed: `live_clip_grade(state, bot=row)`,
+  called inside the loop; an unknown row still degrades to the shared lever
+  (fail-safe, pre-(nj) behaviour).
+- **3. The two organs' "shared" live roster had DIVERGENT DEFAULTS.**
+  `fleet_proprioception.LIVE_ROWS` and `evidence_board.LIVE_ROWS` share
+  `EVBOARD_LIVE_ROWS` so they "can never disagree about who is live" — true
+  of the ENV, false of the DEFAULTS from the moment Avo went live: the board
+  gained the second row at `(ma)`, this one did not, so in the shipped state
+  the board graded two live books while proprioception's baselines saw one.
+  Realigned. A shared kill switch with divergent defaults is not a shared
+  roster.
+- **4. `audit_code_currency` printed OK while carrying rows it could not
+  place.** Measured twice in two days: `(nh)`'s path-form duplicate made three
+  family rows unresolvable while they were CURRENT, and a container deployed
+  from an uncommitted worktree is unplaceable by construction — both times
+  the audit reported success underneath. A stamped row this guard cannot
+  place is **a guard with no answer, not a pass**: UNRESOLVED now counts as a
+  finding and the message names the real causes (dirty-worktree deploy,
+  stamp-set change, window shorter than the gap) instead of only blaming
+  `--depth`. Verified on the live feed: it correctly flags the two parliament
+  rows as BEHIND-OWN right now — they are running code from before my own
+  `(nz)` fix, pending the next deploy wave.
+- Pinned in `tests/autonomy/test_live_clip_arms.py` (every clip arm routes to
+  the clip rule; non-clip live levers unaffected; the two organs agree on the
+  roster; each row graded on its own arm; unknown row degrades to shared; AST
+  check that the board reads the arm INSIDE the per-row loop). **Both live-money
+  fixes mutation-verified.**
+- **Handed to the concurrent session rather than edited** (their files, live
+  in their working tree): `(nj)`'s legacy fallback being permanent rather than
+  a deploy bridge, and `venues/lighter_client.py`'s `dist_pct` publishing a
+  FRACTION under a `_pct` name on both real-money rows — the same unit-naming
+  class they had just fixed with `imf` → `imf_pct`.
+
 ## 2026-08-16 (oa) — THE DOUBLE-OPEN SWEEP: 🎯 the sniper was the ONLY book with it, and the reason is worth more than the result — every other book defends it at the WRITE, which is exactly where the sniper did not
 
 - **THE ASK** (operator, after `(nv)`): *"now check the other books for the

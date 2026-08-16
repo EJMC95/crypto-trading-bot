@@ -577,16 +577,24 @@ def _row_fresh(r, now_ts, max_age_s=None):
         return False
 
 
-def live_clip_grade(prop_state):
-    """'hurting' | 'helping' | None for live.clip_scale from a FRESH
-    proprioception payload. None on dark/stale/neutral — and the up-ladder
-    treats None as fail-CLOSED for the TOP step (real-money default: no
-    measured evidence, no top step). Pure — selftested offline."""
+def live_clip_grade(prop_state, bot=None):
+    """'hurting' | 'helping' | None for a live row's OWN clip lever, from a
+    FRESH proprioception payload. None on dark/stale/neutral — and the
+    up-ladder treats None as fail-CLOSED for the TOP step (real-money
+    default: no measured evidence, no top step). Pure — selftested offline.
+
+    [2026-08-16 (oc)] `bot` SELECTS THE ARM. `(nj)` gave each live row its own
+    clip lever (`LIVE_CLIP_LEVERS`) but this reader stayed pinned to the
+    shared `live.clip_scale`, so 🙏 Avo's ladder was gated on 💸 the Farmer's
+    verdict: another book's grade could release Avo's lever or hold its top
+    step. Default stays the shared name so an unknown/None row behaves
+    exactly as before (fail-safe, pre-(nj))."""
     try:
         if not prop_state or not _fresh(prop_state, max_age_s=float(
                 prop_state.get("ttl_sec") or 2700)):
             return None
-        v = (prop_state.get("verdicts") or {}).get("live.clip_scale")
+        lever = live_clip_lever(bot) if bot else "live.clip_scale"
+        v = (prop_state.get("verdicts") or {}).get(lever)
         vd = v.get("verdict") if isinstance(v, dict) else None
         return vd if vd in ("hurting", "helping") else None
     except Exception:  # noqa: BLE001
@@ -1568,9 +1576,12 @@ def run_once():
         return float(prior_release_all or 0)   # legacy scalar: shared clock
 
     live_desired, live_items = {}, []
-    _clip_grade = live_clip_grade(prop_b)
     for _row in sorted(LIVE_ROWS):
         _prior = _prior_live_for(_row)
+        # [(oc)] PER-ROW grade: read the arm that actually steers THIS book.
+        # Hoisted out of the loop before (nj) gave each row its own lever, so
+        # every row was gated on the Farmer's verdict.
+        _clip_grade = live_clip_grade(prop_b, bot=_row)
         _d, _item = synthesize_live(bot_rows, fr, lm, fa, _prior, now,
                                     _clip_grade, window=live_window,
                                     released_ts=_prior_release_for(_row),

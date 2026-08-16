@@ -153,9 +153,16 @@ LIVE_MARGIN_PP = float(os.environ.get("PROP_LIVE_MARGIN_PP", "0.25"))
 # but is NOT added: it never calls venue_context (lighter_ticket_taker.py:523),
 # so it does not consume live.clip_scale — grading a lever on a book the lever
 # cannot move is exactly the defect fixed in grade_live below.
+# [2026-08-16 (oc)] DEFAULT REALIGNED WITH THE BOARD'S. The comment above says
+# these two organs "can never disagree about who is live" because they share
+# EVBOARD_LIVE_ROWS — true of the ENV, false of the DEFAULTS the moment 🙏 Avo
+# went live: the board's default gained the second row `(ma)` and this one did
+# not, so with the var unset (the shipped state) the board grades two live
+# books and this organ's baselines see one. A shared kill switch with
+# divergent defaults is not a shared roster.
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
-    "perps-funding-lighter-lighter").split(",")
+    "perps-funding-lighter-lighter,freqtrade-avo-maria-lighter").split(",")
     if s.strip()}
 
 # [2026-07-30 THE SHADOW BOOKS LEARN — operator: "grow into what works"]
@@ -264,7 +271,17 @@ def group_of(name):
         return f"scout:{name}"
     if name.startswith("gapscout."):
         return "gapscout"
-    if name == "live.clip_scale":
+    # [2026-08-16 (oc)] EVERY clip arm, not just the shared one. `(nj)` gave
+    # 🙏 Avo its own `live.avo.clip_scale`; this test matched the SHARED name
+    # exactly, so the new arm fell through to the generic `live.` group — and
+    # that group CAN return a HURTING verdict, graded over `LIVE_ROWS`, i.e.
+    # off the FARMER's trades. Two defects in one fall-through: a clip lever
+    # escaping the clip rule (per-trade % is INVARIANT to clip size, which is
+    # why `live-clip` grades `recorded` and never `hurting` — the 23-Jul
+    # correction), and one book's lever judged on another book's record. Any
+    # `live.<row>.clip_scale` is a clip lever and routes here.
+    if name == "live.clip_scale" or (
+            name.startswith("live.") and name.endswith(".clip_scale")):
         return "live-clip"
     if name.startswith("live.funding."):
         return "live-funding"

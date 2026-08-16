@@ -410,7 +410,7 @@ def audit(depth=40, rows=None, fail_closed=False, gha=False):
           f"(window: {len(hist)} commits)\n")
     print(f"{'row':34s} {'verdict':14s} {'behind':>6s}  detail")
     print("-" * 108)
-    findings, table = 0, []
+    findings, unresolved, table = 0, 0, []
     for row in sorted(wanted):
         entry = wanted[row]
         history = [(s, per_commit[s][0], per_commit[s][1].get(entry))
@@ -423,6 +423,24 @@ def audit(depth=40, rows=None, fail_closed=False, gha=False):
         if stale:
             why += (f"  [ROW STALE {age / 3600.0:.1f}h — the verdict describes "
                     f"its LAST publish, not a running process (I1)]")
+        if v == "UNRESOLVED" and live[row].get("build"):
+            # [2026-08-16 (oc)] A STAMPED ROW THIS GUARD CANNOT PLACE IS A
+            # GUARD WITH NO ANSWER, NOT A PASS. Measured twice in two days:
+            # the (nh) path-form duplicate made three family rows unresolvable
+            # while they were CURRENT, and a container deployed from an
+            # uncommitted worktree is unplaceable by construction — both times
+            # this audit printed "OK" underneath the unresolved rows, so the
+            # fleet's answer to "which commit is this bot running?" was
+            # silently absent while the guard reported success. Counted as a
+            # finding; the message names the two real causes so the reader
+            # does not just re-run with a bigger --depth.
+            unresolved += 1
+            if gha:
+                print(f"::warning title=UNRESOLVED {row}::"
+                      f"stamp {live[row].get('build')}/"
+                      f"{live[row].get('build_n')} matches no commit in the "
+                      f"window — deeper --depth, a dirty-worktree deploy, or "
+                      f"a stamp-set change")
         if v == "BEHIND-OWN":
             findings += 1
             if gha:
@@ -449,6 +467,15 @@ def audit(depth=40, rows=None, fail_closed=False, gha=False):
               f"shift; one behind on its OWN entry file is missing behaviour "
               f"that was merged. Redeploy the named service, then verify by the "
               f"`extra.build` + `extra.build_n` readback — never by a green run.")
+        return 1
+    if unresolved:
+        print(f"\naudit_code_currency: {unresolved} STAMPED ROW(S) UNRESOLVED "
+              f"— this guard could not say which commit they run. Causes, in "
+              f"order of likelihood: a deploy from an UNCOMMITTED worktree "
+              f"(`railway up` uploads your desk), a stamp-set change needing "
+              f"one deploy cycle, or a window shorter than the gap (--depth). "
+              f"NOT a pass: 'no answer' is the state this audit exists to "
+              f"remove ((oc)).")
         return 1
     print("audit_code_currency: OK — every stamped container is CURRENT, "
           "deliberately DEFERRED behind its marker gate, or behind only on "
