@@ -122,6 +122,77 @@ def test_stagger_and_interval_are_read_off_the_real_block():
     assert b["kind"] == "periodic"
 
 
+def test_BOTH_early_run_shapes_parse_as_mitigated_from_the_LIVE_file():
+    """THE REGRESSION PIN. Peer-caught 16-Aug, and it is the reason this test
+    reads run_all.sh rather than a fixture.
+
+    Every SHAPE-based predicate tried so far was right about one arrangement
+    and wrong about another. `head = body[:first_sleep.start()]` handled the
+    run-first `(os)` shape and missed the `(ou)` ladder. Replacing it with a
+    flag test handled neither, and REGRESSED 🛡️ fleet_immune — the canonical
+    run-first organ whose 50-minute silence started this work — from
+    mitigated=True to False.
+
+    The property that survives both, and is the fleet's own (see
+    `test_immune_boot_execution.py`): NO SLEEP LONGER THAN 60s PRECEDES THE
+    FIRST INVOCATION. Pinned here against the real file so a future predicate
+    cannot pass a fixture while breaking a live organ.
+    """
+    blocks = {b["organ"]: b for b in mod.parse_blocks(mod.RUN_ALL.read_text())}
+    # run-first shape: ( run; sleep 540; while true ... )
+    immune = blocks["fleet_immune"]
+    assert immune["stagger_s"] == 0, immune
+    assert immune["early"] is True and immune["mitigated"] is True, \
+        "fleet_immune is THE run-first organ — it must never parse unmitigated"
+    # ladder shape: ( sleep 10..35; run; sleep 540..720; while true ... )
+    for organ in ("fleet_radar", "fleet_regen", "fleet_proprioception",
+                  "implementation_shortfall"):
+        b = blocks[organ]
+        assert b["stagger_s"] <= mod.EARLY_RUN_MAX_S, (organ, b["stagger_s"])
+        assert b["mitigated"] is True, f"{organ} runs early and must say so"
+    # the bar is the fleet's, not one invented here
+    assert mod.EARLY_RUN_MAX_S == 60
+
+
+def test_a_one_shot_organ_can_be_failed_at_all():
+    """🧹 cleanup_legacy_bots has no loop, so `interval_s` is None — and with a
+    None tolerance it was structurally UNFAILABLE, the single organ whose
+    missed first run is PERMANENT (it prunes retired rows at boot; a skipped
+    run leaves a dead book's row standing). Peer-caught."""
+    one_shot = {"organ": "cleanup_legacy_bots", "stagger_s": 600,
+                "interval_s": None, "early": False, "gated": False,
+                "mitigated": False, "kind": "periodic"}
+    starved = mod.assess([one_shot], [60.0] * 200)[0]
+    assert starved["verdict"] == "FAIL", "a one-shot that never ran must fail"
+    assert "one-shot" in starved["why"].lower()
+    # ...but one long-enough window is all it needs, ever
+    ok = mod.assess([one_shot], [60.0] * 50 + [3600.0])[0]
+    assert ok["verdict"] == "report"
+    # and an early one-shot is never at risk
+    early = dict(one_shot, stagger_s=60, early=True, mitigated=True)
+    assert mod.assess([early], [60.0] * 200)[0]["verdict"] == "report"
+
+
+def test_assess_does_not_clobber_its_own_tolerance_map():
+    """Peer-caught: a local f-string named `tol` rebound the PARAMETER inside
+    the loop, so from iteration two `b["organ"] in tol` was a substring test.
+    Organs silently lost their published ttl_sec, verdicts became
+    ORDER-DEPENDENT, and when a name occurred in the string ("b" in
+    "...published ttl_sec") the next lookup raised TypeError outright."""
+    blocks = [{"organ": n, "stagger_s": 300, "interval_s": 300, "early": False,
+               "gated": False, "mitigated": False, "kind": "periodic"}
+              for n in ("a", "b", "published", "min")]
+    tol = {n: (7200.0, "published ttl_sec") for n in ("a", "b", "published", "min")}
+    gaps = [60.0] * 20                      # 20-min burst; a 2h TTL tolerates it
+    rows = mod.assess(blocks, gaps, tol)
+    assert [r["tolerance_src"] for r in rows] == ["published ttl_sec"] * 4, rows
+    assert {r["verdict"] for r in rows} == {"report"}
+    # ORDER-INDEPENDENCE is the property, so assert it directly
+    rev = mod.assess(blocks[::-1], gaps, tol)
+    assert {r["organ"]: r["verdict"] for r in rows} == \
+           {r["organ"]: r["verdict"] for r in rev}
+
+
 def test_reachability_is_expressed_as_time_to_first_run():
     """An organ that runs BEFORE its long sleep is reachable however fast
     deploys arrive, and the model says so through `stagger_s`, not a flag.

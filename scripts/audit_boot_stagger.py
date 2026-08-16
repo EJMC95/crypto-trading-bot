@@ -88,6 +88,12 @@ RUN_ALL = ROOT / "run_all.sh"
 #: looks for does not apply and it is never failed.
 SUPERVISOR_MAX_BACKOFF_S = 60
 
+#: A first invocation at or under this is EARLY — the organ runs before its own
+#: long stagger, so no deploy cadence can starve it. Not a number invented here:
+#: it is the bar `tests/autonomy/test_immune_boot_execution.py` already asserts
+#: on every starved organ, and the (ou) boot ladder tops out at 35s.
+EARLY_RUN_MAX_S = 60
+
 #: bot_state keys whose name is not the module name. Without these the TTL
 #: lookup silently falls back to the 3x-interval PROXY, and the proxy was
 #: measurably wrong in both directions (impl-shortfall real ttl 60 min vs a 90
@@ -136,10 +142,22 @@ def parse_blocks(text: str) -> list[dict]:
         head = body[:org.start()]
         st_m = re.findall(r"sleep\s+\"?\$?\{?[A-Z_]*:?-?(\d+)\}?\"?", head)
         stagger = sum(int(x) for x in st_m) if st_m else 0
-        # `mitigated` now means only "runs before its own long sleep", which is
-        # exactly what a small time-to-first-run already expresses. Kept for the
-        # staleness-gated form, which is reachable AND cheap when fresh.
-        mitigated = "--publish-if-stale" in body
+        # EARLY = "no sleep longer than EARLY_RUN_MAX_S precedes the first
+        # invocation" — the fleet's OWN property and bar, not one invented here:
+        # `tests/autonomy/test_immune_boot_execution.py::
+        # test_every_starved_organ_runs_once_before_its_long_stagger` asserts
+        # `before[0] <= 60` on every starved organ, and the (ou) ladder tops out
+        # at 35s, so there is deliberate headroom.
+        # [CORRECTED 16-Aug, peer-caught] this was `"--publish-if-stale" in body`
+        # under a comment claiming it meant "runs before its own long sleep". It
+        # did not: 🛡️ fleet_immune — the canonical early-run organ this whole fix
+        # began with — parsed as NOT early, 1 of 20 fleet-wide. The verdict was
+        # unaffected (`stagger_s` already carried reachability) but a field whose
+        # name and comment disagree with its value is a defect waiting to be read.
+        early = stagger <= EARLY_RUN_MAX_S
+        # The CHEAP early run — reachable AND free when the key is already
+        # fresh. Named separately because it is the pattern worth spreading.
+        gated = "--publish-if-stale" in body
         # The loop interval: the last `sleep` inside the loop body.
         loop = body.split("while true", 1)[1] if "while true" in body else ""
         iv_m = re.findall(r"sleep\s+\"?\$?\{?[A-Z_]*:?-?(\d+)\}?\"?", loop)
@@ -147,7 +165,8 @@ def parse_blocks(text: str) -> list[dict]:
         kind = ("supervisor" if interval is not None
                 and interval <= SUPERVISOR_MAX_BACKOFF_S else "periodic")
         out.append({"organ": name, "stagger_s": stagger, "interval_s": interval,
-                    "mitigated": mitigated, "kind": kind})
+                    "early": early, "gated": gated, "mitigated": early or gated,
+                    "kind": kind})
     return out
 
 
@@ -248,6 +267,25 @@ def assess(blocks: list[dict], gaps: list[float],
             r["tolerance_s"], r["tolerance_src"] = 3 * b["interval_s"], "3x interval (proxy)"
         else:
             r["tolerance_s"], r["tolerance_src"] = None, "unknown"
+        # A ONE-SHOT organ has no loop and so no interval — it must simply get
+        # ONE uninterrupted window as long as its own stagger, ever. If every
+        # observed gap is shorter, it never ran at all, and for the one-shot
+        # that matters most the miss is PERMANENT: 🧹 `cleanup_legacy_bots`
+        # prunes retired rows at boot, so a skipped run leaves a dead book's row
+        # standing until the next lucky boot. Peer-caught 16-Aug: with
+        # `interval_s = None` the tolerance was None and this organ — the single
+        # one whose missed first run cannot be made up — was structurally
+        # UNFAILABLE, sailing through a modelled 200-minute burst.
+        if (b["interval_s"] is None and not r["mitigated"]
+                and b["stagger_s"] > 0 and max(gaps) < b["stagger_s"]
+                and b["organ"] not in STAGGER_OK):
+            r["verdict"] = "FAIL"
+            r["why"] = (f"ONE-SHOT organ: no observed deploy gap reached its "
+                        f"{b['stagger_s']}s stagger (longest {max(gaps)/60:.1f} "
+                        f"min), so it never ran — and a one-shot's missed run is "
+                        f"not made up on the next cycle, because there is none.")
+            out.append(r)
+            continue
         if b["organ"] in STAGGER_OK:
             r["why"] = f"declared exempt: {STAGGER_OK[b['organ']]}"
         elif b["kind"] == "supervisor":
@@ -264,10 +302,18 @@ def assess(blocks: list[dict], gaps: list[float],
                         f"({r['tolerance_src']}), so readers saw STALE data. Give it "
                         f"an early run, or declare it in STAGGER_OK with a reason.")
         else:
-            tol = (f"{r['tolerance_s']/60:.0f} min ({r['tolerance_src']})"
-                   if r["tolerance_s"] else "n/a")
+            # NOT `tol` — that is the parameter, and rebinding it here made the
+            # dict a STRING for every later organ. Peer-caught 16-Aug: from
+            # iteration two `b["organ"] in tol` became a substring test, so
+            # organs silently lost their published ttl_sec and fell back to the
+            # proxy, verdicts became ORDER-DEPENDENT, and when an organ's name
+            # happened to occur in the string ("b" in "...published ttl_sec")
+            # the next `tol[b["organ"]]` raised TypeError outright. The live run
+            # survived on ordering luck alone.
+            shown = (f"{r['tolerance_s']/60:.0f} min ({r['tolerance_src']})"
+                     if r["tolerance_s"] else "n/a")
             r["why"] = (f"worst uninterrupted burst {worst/60:.0f} min vs tolerance "
-                        f"{tol} — delayed, never stale to a consumer")
+                        f"{shown} — delayed, never stale to a consumer")
         out.append(r)
     return out
 
