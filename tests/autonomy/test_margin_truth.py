@@ -25,6 +25,7 @@ guess is a risk number. Every parse here must fail to None, and the census
 safe" is never byte-identical to "nothing was measured" ((lv), I18).
 """
 import ast
+import json
 import os
 import sys
 
@@ -419,6 +420,93 @@ def test_avo_reads_ONLY_its_own_clip_arm_no_shared_fallback():
         assert avo._clip_scale_now() == 0.75, "Avo ignored its own arm"
     finally:
         tuning.get_lever = orig
+
+
+def test_size_is_published_SIGNED_so_the_block_carries_direction():
+    """`size` closes two gaps at once.
+
+    MAGNITUDE: the forward-verified leverage basis is (|size| x entry) /
+    collateral — an ENTRY-based notional. `value` is the venue's MARK-based
+    number, so it is the wrong input, and deriving size as value/mark fails
+    exactly when the mark is blind.
+
+    DIRECTION: `liq_price` takes `is_long` and its branches differ, yet before
+    this the margin block could not say whether a position was long or short.
+    A consumer had to leave the block for a per-bot field (the Farmer's
+    `held: {"XAU": "S"}`) to run the model at all."""
+    st = margin_state_from(_acct([_pos("XAU", sign=-1, position="0.0069"),
+                                  _pos("BTC", sign=1, position="0.5")]))
+    assert st["positions"]["XAU"]["size"] == pytest.approx(-0.0069), \
+        "a short must publish a NEGATIVE size — the block lost direction"
+    assert st["positions"]["BTC"]["size"] == pytest.approx(0.5)
+
+
+def test_the_forward_venue_calibration_holds_on_observed_inputs():
+    """The real venue calibration, on 💸 the Farmer's XAU short, 16-Aug.
+
+    Every input was MEASURED, none derived from the target — which is the
+    whole difference from the circular version this replaces.
+
+    IT IS NOT A PAYLOAD-SUFFICIENCY CLAIM, and the first draft of this test
+    was named as though it were ("...the published block alone..."). Four of
+    the five inputs come from the block — `entry`, `size`, `liq` (the target)
+    and account-level `collateral`. The fifth, `mmf`, is the MARKET-level
+    `maintenance_margin_fraction` from /api/v1/orderBookDetails and is NOT in
+    the block. It is also NOT derivable from what is: the block's `imf_pct` is
+    the INITIAL margin fraction (XAU 6.66), and the tempting `0.6 × imf_pct`
+    gives 0.0400 against a true 0.0240 — wrong by 66%, which feeds through to
+    a −1.540% liq error, larger than the entire error this calibration exists
+    to have fixed. Read `mmf` per book; never derive it.
+
+    The forward inputs stay literal on purpose: routing them through a fixture
+    would replace observed venue numbers with derived ones and reintroduce the
+    exact circularity the retraction in lighter_margin_model.py exists to
+    prevent."""
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    M = pytest.importorskip("lighter_margin_model")
+
+    entry, collateral, mmf = 4339.72, 197.843218, 0.024
+    size = -0.00690010                      # SHORT: the sign is the direction
+    venue_liq = 32238.9162
+
+    # couple it to the projection, so dropping `size`/`entry`/`liq` from the
+    # row reddens THIS test too rather than only its sibling
+    st = margin_state_from(_acct([_pos("XAU", sign=-1, position="0.00690010",
+                                       avg_entry_price=str(entry),
+                                       liquidation_price=str(venue_liq))],
+                                 equity=str(collateral)))
+    row = st["positions"]["XAU"]
+    assert row["size"] == pytest.approx(size)
+    assert row["entry"] == pytest.approx(entry)
+    assert row["liq"] == pytest.approx(venue_liq)
+
+    lev = abs(size) * entry / collateral    # the verified basis
+    pred = M.liq_price(entry, is_long=size > 0, leverage=lev, mmf=mmf)
+    assert abs(pred - venue_liq) / venue_liq < 1e-4, (
+        f"predicted {pred:.2f} vs venue {venue_liq:.2f}")
+
+    # the two substitutions this finding rests on must each still MATTER,
+    # or the pin has stopped defending the result and only guards the algebra
+    mark_based = M.liq_price(entry, size > 0, 30.2703 / collateral, mmf)
+    assert abs(mark_based - venue_liq) / venue_liq > 5e-3, \
+        "mark-based notional no longer diverges — the pin went vacuous"
+
+
+def test_mmf_is_absent_from_the_block_and_not_derivable_from_imf():
+    """Pin the GAP so nobody advertises the block as self-sufficient.
+
+    A consumer needs `mmf` to run liq_price, and it is not here. The failure
+    mode is not noticing — it is deriving it from `imf_pct`, which is a
+    different tier and plausible enough to ship."""
+    st = margin_state_from(_acct([_pos("XAU")]))
+    assert "mmf" not in json.dumps(st), \
+        "mmf now publishes — update the docs that say the block lacks it"
+    row = st["positions"]["XAU"]
+    assert "imf_pct" in row and "max_lev" in row
+    # the trap, with the venue's real XAU numbers
+    true_mmf, derived = 0.0240, 0.6 * 0.0666
+    assert abs(derived - true_mmf) / true_mmf > 0.5, \
+        "0.6 x imf is no longer badly wrong — re-check the tier relationship"
 
 
 def test_an_accountless_client_makes_NO_venue_call_at_all():

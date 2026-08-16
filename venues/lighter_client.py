@@ -163,6 +163,30 @@ def margin_state_from(acct, marks=None):
                              when empty, because an omitted key is
                              byte-identical between "everything is safe" and
                              "nothing was measured" — the (lv) census rule.
+
+    TWO THINGS THIS BLOCK DOES NOT GIVE YOU, stated because a half-closed gap
+    advertised as closed is worse than an open one:
+
+      * `mmf` IS NOT HERE, and is NOT derivable from what is. To run a
+        liquidation model you also need the MARKET-level
+        `maintenance_margin_fraction` from /api/v1/orderBookDetails. The trap
+        is `imf_pct`: that is the position's INITIAL margin fraction (XAU
+        6.66), a different tier, and the plausible-looking `0.6 x imf_pct`
+        gives 0.0400 against a true 0.0240 — wrong by 66%, feeding through to
+        a -1.54% liquidation-price error. Read mmf per book; never derive it.
+        (Same class as the venue's own OP/ARB 399-vs-400 and QQQ-199 /
+        US100-200 wrinkles: these are published per book and only look
+        derivable.)
+      * `margin` (allocated_margin) reads 0.0 on every CROSS-mode position,
+        because cross draws on the whole collateral pool rather than
+        allocating per position. It is a real measured zero, not a missing
+        field — do not read it as "no margin posted".
+
+    Verified forward against the venue 16-Aug on the Farmer's XAU short:
+    liq_price(entry, is_long, (|size| x entry) / collateral, mmf) reproduces
+    the venue's published `liq` to -0.001%. Note the leverage basis is an
+    ENTRY-based notional over COLLATERAL — `value` is MARK-based and using it
+    misses by -1.078%.
     """
     positions = LighterClient._positions_from(acct)
     equity = _num(acct.get("total_asset_value"))
@@ -187,7 +211,19 @@ def margin_state_from(acct, marks=None):
         # back through liq_price. It returns 0.000000% for leverage 9.9, mmf
         # 0.9 and a $1 liq price; it could not fail, so it verified nothing.
         # A real check needs an INDEPENDENT entry, which is this field.
-        row = {k: rec[k] for k in ("value", "liq", "entry", "imf_pct",
+        #
+        # `size` is projected for TWO reasons, and the second is the bigger one.
+        # (1) The forward test's leverage basis is (|size| x entry) / collateral
+        #     — an ENTRY-based notional. `value` is the venue's MARK-based
+        #     notional, so it is the wrong input, and deriving size as
+        #     value/mark fails exactly when the mark is blind.
+        # (2) SIGN IS DIRECTION, and without it this block could not say
+        #     whether a position was long or short at all. `liq_price` takes
+        #     `is_long` and its two branches differ, so a consumer had to go
+        #     outside the margin block — to a per-bot field like the Farmer's
+        #     `held: {"XAU": "S"}` — to run the model against it. Signed here,
+        #     so consumers take abs() for notional and the sign for direction.
+        row = {k: rec[k] for k in ("size", "value", "liq", "entry", "imf_pct",
                                    "max_lev", "margin", "mode") if k in rec}
         liq, mark = rec.get("liq"), (marks or {}).get(coin)
         if liq is None:
