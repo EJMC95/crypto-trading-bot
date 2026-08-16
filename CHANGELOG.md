@@ -1,3 +1,52 @@
+## 2026-08-16 (or) — `(op)`'s UPGRADE REACHED THE HEADER AND NOT THE FUNCTION A CONSUMER READS — and the guard written to prevent that was itself vacuous twice
+
+- **CAUGHT BY PEER REVIEW, and it is the I12 shape rather than a typo.**
+  `(op)` upgraded the collateral denominator from PROVISIONAL to ESTABLISHED
+  in `scripts/lighter_margin_model.py`'s module header — and left the claim
+  stale in two places, so the file argued with itself for one commit:
+  * the header's "STILL OPEN ... at **n=1**" block, ~60 lines below the line
+    saying ESTABLISHED by MOTION;
+  * **`cross_leverage`'s OWN docstring — the consequential one.** A consumer
+    calls that function, reads PROVISIONAL, distrusts the denominator, and the
+    obvious "fix" is to swap it back to `total_asset_value` — **precisely the
+    branch the T2→T3 null test refutes.** A reader is far likelier to hit that
+    docstring than the module header.
+  Both corrected in place. The narration at line 47 ("upgraded from
+  'provisional' on...") is left alone — it describes history, not current
+  state, which is the distinction that makes the rest safe to correct.
+- **THE LESSON IS NOT "UPDATE BOTH PLACES", IT IS THAT n=1 WAS THE WRONG FRAME
+  ENTIRELY.** The stale text said the choice "rests on a 0.165% difference at
+  n=1. Every future live position tests it for free" — implying MORE SAMPLES
+  would settle it. They would not have, quickly: the two denominators differ
+  by 0.165% in LEVEL, so more snapshots of the same kind add little. What
+  settled it was a DIFFERENT KIND of evidence — motion, where they differ by
+  ~40× — and a null test that refuted total_asset by predicting a movement
+  that did not occur.
+- **THE GUARD AGAINST RECURRENCE WAS ITSELF DEFECTIVE, TWICE, AND THAT IS
+  RECORDED RATHER THAN QUIETLY FIXED:**
+  1. first cut read `if "__file__" in dir()` — **`dir()` inside a function
+     returns LOCALS**, so the condition was always False, the check never ran,
+     and it **survived its own mutation test**. A guard written to prevent a
+     vacuous claim, itself vacuous;
+  2. second cut scanned the raw file and tripped on **its own assertion
+     message**, which contains the word it forbids.
+  It now walks DOCSTRINGS via `ast` — the claim lives in prose, so prose is
+  the right instrument, and scoping to docstrings stops it reading its own
+  code. **Mutations verified: reintroducing PROVISIONAL in a docstring reddens
+  it; so does switching the denominator back to total_asset.**
+- **ONE MUTATION SURVIVED AND IS DECLARED, because redundancy is not
+  vacuity:** deleting the null test's `assert a == b` ("collateral static ⇒ no
+  predicted motion") does not redden the suite, since the two exact-match
+  assertions on T2 and T3 already imply it — the venue's liq is identical at
+  both. That is a redundant assertion, not a hole, and the distinction matters
+  when reading a mutation report.
+- **Also verified rather than assumed**: the peer flagged that a comment says
+  `total_asset` moved **+0.000210%** while the message said the liq moves
+  **+0.000182%**. Both are right — 0.000210% is the raw denominator movement,
+  0.000182% is the liq movement it implies after the
+  `(1/L)/(1+1/L) = 0.8685` factor at L=0.1514. Re-derived here; no correction
+  needed.
+
 ## 2026-08-16 (ok) — the deploy discriminator was reading the WRONG SET, and the fleet's own monitor caught it live: a same-build "crash" that was a deploy of an organ the stamp does not hash
 
 - **THE ALARM, 04:08:59Z.** The build-discriminated watcher `(oi)` shipped
@@ -43,7 +92,7 @@
   baseline, dropping `deaths` below the threshold; `(oi)`/`(ok)` are what
   stop it RETURNING as `restarts` climbs.
 
-## 2026-08-16 (oq) — THE WALL-CLOCK SWEEP: no other test flakes (measured, 220 runs), the class is FLEET-WIDE and mostly DELIBERATE, and the one real defect was a file disagreeing with itself about the same 60 seconds
+## 2026-08-16 (or) — THE WALL-CLOCK SWEEP: no other test flakes (measured, 220 runs), the class is FLEET-WIDE and mostly DELIBERATE, and the one real defect was a file disagreeing with itself about the same 60 seconds
 
 - **THE ASK** (operator, after `(ol)`): *"now check the other guards for the
   same wall-clock flakiness"*. Two populations to separate, because they have
