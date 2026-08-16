@@ -274,6 +274,70 @@ def surge_candidates(surges, mult, already, limit=SURGE_MAX_PER_LOOP,
     return out
 
 
+# ---------------------------------------------------------------------------
+# [2026-08-16 (nn)] THE (ne) SURGE-ADMISSION TELEMETRY, LIFTED OUT OF main().
+#
+# `(ne)` added these three pieces of logic INLINE in main(), where no test can
+# reach them — 13 statements that went straight to uncovered and took this
+# file from a measured 83.5% to 80.8%, breaching its 81% floor and leaving the
+# Tests workflow red on every push for four days. Every sibling rule in this
+# file is already module-level and pure for exactly this reason
+# (`surge_candidates`, `young_candidates`, `active_done`, `close_reason`);
+# these three are moved back to that convention, behaviour unchanged.
+#
+# The contract they share, and the reason they all swallow rather than raise:
+# this is TELEMETRY on a shadow book. A junk row must degrade the close to NO
+# extra — never to a guessed number — because a fabricated ratio would be
+# indistinguishable from a measured one in the X4 expectancy split these
+# fields exist to feed.
+# ---------------------------------------------------------------------------
+def surge_ratio_map(surges):
+    """{SYM: ratio} from the scout's `vol_surges` rows.
+
+    The ratio each surge candidate carried AT ADMISSION. Keyed like the
+    source map (stripped, upper-cased); unparseable rows are dropped
+    individually, so one bad row cannot cost the whole map.
+    """
+    out = {}
+    for r in (surges or []):
+        try:
+            out[str(r.get("sym") or "").strip().upper()] = float(r.get("ratio"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return out
+
+
+def surge_admission(sym, ratios, mult):
+    """The `{surge_ratio, surge_mult}` a SURGE admission records, or None.
+
+    None when the ratio is unknown — `float(None)` is the guard, not an
+    accident: a surge admitted while the scout's row is missing records
+    NOTHING rather than a zero that would read as a measured ratio.
+    """
+    try:
+        return {"surge_ratio": float((ratios or {}).get(sym)),
+                "surge_mult": float(mult)}
+    except (TypeError, ValueError):
+        return None
+
+
+def restore_entry_meta(saved_meta):
+    """Rehydrate the surge admission telemetry across a restart.
+
+    Durable like `entry_src`, and junk is dropped the same way: a half-written
+    or hand-edited entry degrades that coin's close to no extra. A missing
+    entry is correct — it is a pre-(ne) open.
+    """
+    out = {}
+    for k, m in (saved_meta or {}).items():
+        try:
+            out[str(k)] = {"surge_ratio": float(m["surge_ratio"]),
+                           "surge_mult": float(m["surge_mult"])}
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
 def young_candidates(bar_counts, max_bars, vols, min_vol_m, already, limit,
                      class_ok=None):
     """Books still inside their DEBUT REGIME, as snipe candidates.
@@ -526,15 +590,10 @@ def main():
                      in (_saved.get("entry_src") or {}).items()
                      if str(v) in SNIPE_SOURCES}
         # [(ne)] restore the surge admission telemetry; junk values dropped
-        # (the close degrades to no extra, never a guessed number)
-        entry_meta = {}
-        for _k, _m in (_saved.get("entry_meta") or {}).items():
-            try:
-                entry_meta[str(_k)] = {
-                    "surge_ratio": float(_m["surge_ratio"]),
-                    "surge_mult": float(_m["surge_mult"])}
-            except (KeyError, TypeError, ValueError):
-                continue
+        # (the close degrades to no extra, never a guessed number).
+        # [(nn)] the rule itself now lives at module level, where a test can
+        # reach it — see restore_entry_meta.
+        entry_meta = restore_entry_meta(_saved.get("entry_meta"))
         # [2026-07-30 (ha)] restore the zombie clock — see save_state below.
         # A missing entry is correct (the coin becomes priceable again and the
         # clock is irrelevant); a RESET entry was the defect.
@@ -721,14 +780,13 @@ def main():
         if src in SNIPE_SOURCES:
             entry_src[sym] = src
             # [(ne)] surge admissions record the ratio + the mult in force —
-            # the two numbers X4 needed and the ledger never had
+            # the two numbers X4 needed and the ledger never had. [(nn)] the
+            # rule is module-level now; None means "ratio unknown", and an
+            # unknown ratio records NOTHING rather than a guessed number.
             if src == "surge":
-                try:
-                    entry_meta[sym] = {
-                        "surge_ratio": float(_surge_ratios.get(sym)),
-                        "surge_mult": float(SURGE_MULT)}
-                except (TypeError, ValueError):
-                    pass
+                _meta = surge_admission(sym, _surge_ratios, SURGE_MULT)
+                if _meta is not None:
+                    entry_meta[sym] = _meta
         log.info("SNIPED %s %s @ %.6f size %.4f ($%.0f) [src=%s]",
                  sym, "LONG" if DIRECTION_LONG else "SHORT", px, size, order_usd,
                  src or "?")
@@ -843,14 +901,9 @@ def main():
                     _surge = surge_candidates(_sp.get("vol_surges"), SURGE_MULT,
                                               _live_done | set(pending))
                     # [(ne)] the ratio each surge candidate carried at
-                    # admission — telemetry for the close, keyed like _src_map
-                    _surge_ratios = {}
-                    for _r in (_sp.get("vol_surges") or []):
-                        try:
-                            _surge_ratios[str(_r.get("sym") or "").strip()
-                                          .upper()] = float(_r.get("ratio"))
-                        except (TypeError, ValueError, AttributeError):
-                            continue
+                    # admission — telemetry for the close, keyed like
+                    # _src_map. [(nn)] module-level: see surge_ratio_map.
+                    _surge_ratios = surge_ratio_map(_sp.get("vol_surges"))
             except Exception:  # noqa: BLE001
                 _surge = []
             if _surge:

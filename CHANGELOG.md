@@ -77,6 +77,17 @@
 - Full suite green; `audit_image_imports` (the born-dark guard — this adds no
   import to any image), `audit_deploy_coverage`, `audit_lever_bounds`,
   `audit_doctrine_enforcement`, `audit_venue_purity` all pass.
+- **One more defect, caught before it reached any container** (follow-up
+  commit `489b601`): a shadow arm builds `LighterClient` with
+  `with_signer=False`, which leaves `account_index` **None** — it is assigned
+  only inside `_init_signer`. `margin_state` would therefore have called
+  `_account_payload()` with `value="None"` on EVERY loop of EVERY shadow book:
+  a real request against the venue, governor budget spent and a warning line
+  each time, for an account that does not exist. The `except` caught the
+  failure, but only after the call was made. It now refuses before the call.
+  Found by asking what the read does under TOTAL failure rather than on the
+  happy path — the same question that separates a health check from a
+  convergent metric.
 
 ### Activation, stated plainly
 
@@ -89,6 +100,78 @@
   (7 commits, none touching its own logic); `tide-rider-lighter-live` is 28
   behind and its restart should be deliberate. Neither was restarted for a
   telemetry read.
+
+## 2026-08-16 (nn) — CI WAS RED ON EVERY PUSH FOR FOUR DAYS OVER 0.1pp, AND THE REASON WAS 13 UNTESTED STATEMENTS `(ne)` INLINED INTO main(): the sniper's surge telemetry goes back to module level, where a test can reach it
+
+**The visible symptom was trivial and the cost was not.** `lighter_perp_sniper.py`
+measured **80.8%** against its **81%** floor — 0.1–0.2pp — so `audit_coverage_
+floors.py` failed the **Tests** workflow on `71b7f4f (ne)` and on **every commit
+since** (`d6c5e8f`, `6b729d0`, `bf2ae4a`, `dbacd42`, `2d88ada`, `5499801`,
+`17b1cac`, `aaa92a0`). The suite itself passed in all of them; only the floors
+step failed. **A workflow that is red on every push is a guard nobody reads** —
+for four days a genuine new test failure would have been indistinguishable from
+the standing breach. That is the real defect; the 0.1pp is just what exposed it.
+
+**BISECTED, not guessed.** Tests last passed at `15acd05 (nc,nd)`; the first red
+is `71b7f4f (ne)` — which is also the last commit to touch the sniper. `(ne)`
+added **42 lines** of surge admission telemetry (`surge_ratio` + the
+`surge_mult` in force at entry — the two numbers the X4 expectancy split needed
+and the ledger never had). The feature is right and stays. What was wrong is
+WHERE it lives: all three rules were written **inline inside `main()`**, and
+`main()` is a venue-driven loop no unit test can enter, so 13 statements went
+straight to uncovered and diluted a 725-statement file below its floor.
+
+**Every sibling rule in that file is already module-level and pure** —
+`surge_candidates`, `young_candidates`, `active_done`, `close_reason` — for
+exactly this reason. `(ne)` broke a convention the file had been holding, and
+the floor is what noticed. So the fix is not "add a test that reaches into
+main()"; it is to put the rules back where the file's own design says they go:
+`surge_ratio_map()`, `surge_admission()`, `restore_entry_meta()`, behaviour
+unchanged, `main()` rewired to call them.
+
+**THE CONTRACT THOSE THREE SHARE, now pinned rather than implied:** a junk row
+degrades the close to **no extra — never a guessed number**. The load-bearing
+case is `surge_admission` returning **None** when the scout's ratio is missing:
+a `0.0` there would be indistinguishable downstream from a MEASURED ratio of
+zero and would quietly corrupt the very split these fields exist to feed. Same
+"unknown degrades to honest-absent, never to a guess" rule as I8. The
+per-row `try` in `surge_ratio_map` is load-bearing too — one bad row must not
+cost the whole map.
+
+**Guarded**: `tests/autonomy/test_sniper_surge_telemetry.py` (12 tests).
+**Five mutations verified RED**: unknown ratio recording `0.0` instead of
+nothing; one junk row killing the whole map; the restore keeping junk; the map
+dropping key normalisation; and `main()` no longer calling the extracted
+restore (the registered-but-inert class — extracting a rule and leaving the
+call site behind is a failure this repo has paid for before). The round-trip
+test asserts the admission writer against the restore reader rather than
+against a hand-written fixture ((hj)).
+
+**Measured after**: sniper `80.8% -> 82.4%`, back above the 81% floor.
+**The floor is NOT raised** — doctrine is that floors sit ~2 points under the
+measured value, and raising it to sit tight under 82.4 would re-arm the same
+trap at the new level. Nothing else moved: this is a shadow book, no lever, no
+gate, no trade behaviour changed.
+
+**Stated rather than rounded away: the slack is 1.4pp, not the ~2pp the floor
+was originally set with** (81 under a measured 83.5). The rest of `(ne)`'s 42
+lines live at call sites inside `main()` that cannot be lifted out without
+changing behaviour — the `extra=` argument on the close, the `_surge_ratios`
+init — so they stay uncovered by construction. A future untested addition of
+~10 statements to this file breaches again. The durable fix for THAT is not
+more coverage here; it is not inlining rules into `main()` in the first place.
+
+**A note on measuring this locally:** `coverage combine` picks up every
+`.coverage.*` in the working directory, and with concurrent sessions running
+their own suites in `.claude/worktrees/` it silently combined THEIR data and
+reported every floored file at `0.0%`. Point `data_file` outside the repo and
+omit `*/.claude/worktrees/*`, or the number you get is another session's.
+
+**What it does not fix, said plainly:** the floors guard has no notion of "this
+breach is old" — it reports the same red on commit 1 and commit 9, so nothing
+in CI distinguishes a fresh regression from a standing one. That is the
+property that made four days of red survivable-looking, and it is a separate
+piece of work from this entry.
 
 ## 2026-08-16 (nm) — THE BOOKS COHORT'S STOP WAS NEITHER LIVE NOR RUNNING: three price books evaluated their bracket against a price frozen at container boot, inside a gate that switched the stop off whenever the funding endpoint was quiet
 
