@@ -112,3 +112,72 @@ def test_a_publisher_with_no_build_stamp_keeps_counting_everything():
     fi.restart_churn(_state(100, 1, build=None), seen, NOW)
     out = fi.restart_churn(_state(3, 6, build=None), seen, NOW + 60)
     assert out and "5 RESTART(s)" in out[0]["detail"], out
+
+
+# ---------------------------------------------------------------------------
+# [(ok)] THE RESIDUAL A PEER SESSION FOUND BY REPLAYING THE DISCRIMINATOR:
+# freqtrade-bots also redeploys on `run_all.sh` and `user_data/**`, neither of
+# which is in `build_compute`'s set — so a commit touching only those would
+# restart the container with an IDENTICAL stamp and read as a CRASH. The
+# question the stamp must answer is "did the CONTAINER change?", which is
+# strictly wider than "did my module set change?".
+# ---------------------------------------------------------------------------
+def _mk_image(root):
+    (root / "parliament").mkdir(parents=True)
+    (root / "parliament").joinpath("brain.py").write_text("B = 1\n")
+    (root / "parliament_main.py").write_text("M = 1\n")
+    (root / "run_all.sh").write_text("echo one\n")
+    (root / "fleet_immune.py").write_text("I = 1\n")
+    (root / "user_data").mkdir()
+    (root / "user_data" / "s.py").write_text("S = 1\n")
+    (root / "persist").mkdir()
+    (root / "persist" / "db.json").write_text('{"n": 1}\n')
+
+
+def _stamp(root, monkeypatch):
+    import parliament.brain as brain
+    from parliament.ecosystem_db import EcosystemDB
+    monkeypatch.setattr(brain, "__file__", str(root / "parliament" / "brain.py"))
+    h = brain.Howard(db=EcosystemDB(path=":memory:"))
+    h._build = None
+    return h.build_stamp()
+
+
+def test_any_shipped_file_moves_the_stamp(tmp_path, monkeypatch):
+    """[(ok)] The container redeploys on ~30 organ modules, run_all.sh and
+    user_data/** — a deploy touching ANY of them must move the stamp, or the
+    restart it causes reads as a CRASH. MEASURED: the 04:08Z same-build
+    restart followed a deploy whose commit touched fleet_immune.py, which is
+    in the container's trigger set and in no bot's _BUILD_SHARED."""
+    root = tmp_path / "img"
+    _mk_image(root)
+    base = _stamp(root, monkeypatch)
+    assert base
+
+    for path, new in ((root / "fleet_immune.py", "I = 2\n"),
+                      (root / "run_all.sh", "echo two\n"),
+                      (root / "user_data" / "s.py", "S = 2\n"),
+                      (root / "parliament_main.py", "M = 2\n")):
+        before = _stamp(root, monkeypatch)
+        path.write_text(new)
+        assert _stamp(root, monkeypatch) != before, f"{path.name} did not move it"
+
+
+def test_the_persist_VOLUME_does_not_move_the_stamp(tmp_path, monkeypatch):
+    """The volume changes constantly (a live SQLite file). If it were hashed,
+    every publish would look like a deploy and every real crash would be
+    absorbed — the failure mode that matters most here."""
+    root = tmp_path / "img"
+    _mk_image(root)
+    before = _stamp(root, monkeypatch)
+    (root / "persist" / "db.json").write_text('{"n": 99999}\n')
+    assert _stamp(root, monkeypatch) == before, (
+        "the persist volume is inside the stamp — every publish would read "
+        "as a deploy and no crash could ever be reported")
+
+
+def test_an_unreadable_image_publishes_UNKNOWN_not_a_constant(tmp_path,
+                                                              monkeypatch):
+    root = tmp_path / "empty"
+    (root / "parliament").mkdir(parents=True)
+    assert _stamp(root, monkeypatch) is None

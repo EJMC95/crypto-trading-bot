@@ -1,3 +1,48 @@
+## 2026-08-16 (ok) — the deploy discriminator was reading the WRONG SET, and the fleet's own monitor caught it live: a same-build "crash" that was a deploy of an organ the stamp does not hash
+
+- **THE ALARM, 04:08:59Z.** The build-discriminated watcher `(oi)` shipped
+  reported its first **REAL RESTART — same build `c5452ad38dac`** — exactly
+  the event it exists to surface. It was not a crash. A deploy ran at
+  04:08:29Z, and the commit behind the wave touched **`fleet_immune.py`**:
+  a file in `freqtrade-bots`'s deploy-trigger set and in **no bot's
+  `_BUILD_SHARED`**, so the container restarted with an identical stamp.
+- **THE MISTAKE WAS THE SET, not the mechanism.** `(oi)` stamped with
+  `build_compute("parliament_main.py")` — entry module plus `_BUILD_SHARED`,
+  a deliberately NARROW set built to answer *"did this BOT's own code
+  land?"*. The discriminator asks a strictly wider question: *"did the
+  CONTAINER change?"* `freqtrade-bots` ships ~30 organ modules, `run_all.sh`
+  and `user_data/**`, and any of them triggers a redeploy. Answering a wide
+  question with a narrow instrument is the whole defect.
+- **FOUND FROM BOTH SIDES AT ONCE**, which is why it is worth recording: a
+  peer session found the same hole by REPLAYING my discriminator against
+  deploys it had not yet seen (`run_all.sh`, `user_data/**` — 6/6 of the
+  deploys it had were absorbed correctly, so it went looking for the ones
+  that would not be), while my own monitor hit it in production 20 minutes
+  later through `fleet_immune.py`. Their move is the transferable one: test a
+  detector against the event it has NOT seen.
+- **THE FIX: hash the container's CONTENT.** Every shipped `.py/.sh/.json/
+  .toml` under the app root, minus `_STAMP_SKIP` — the persist VOLUME above
+  all, whose live SQLite file would otherwise make every publish look like a
+  deploy and absorb every real crash. Safe precisely because this value is
+  only ever compared to ITSELF across samples from one container: it needs to
+  match nothing computed anywhere else, which is what licenses the wide set.
+  `None` on any failure — UNKNOWN, never a constant.
+- Pinned in `tests/autonomy/test_restart_counter_authority.py`: a change to
+  `fleet_immune.py`, `run_all.sh`, `user_data/**` or `parliament_main.py`
+  must each move the stamp; a change inside `persist/` must NOT; an
+  unreadable image publishes UNKNOWN. **Mutation-verified in both
+  directions** — narrowing the file filter reddens the coverage test,
+  removing the volume exclusion reddens the volume test. An earlier version
+  of one test monkeypatched the constant under test and was therefore
+  mutation-BLIND; caught when the mutation stayed green, and de-stubbed.
+- **Confirmed and closed from the peer's report:** `fleet_immune` reads FRESH
+  (32.7m vs a 2400s TTL) with a clean watchdog, and every slow organ in that
+  container sits at a similar age — `run_all.sh`'s sleep-first loop after a
+  restart, not a stall. Their finding that the sick report cleared at `(od)`
+  rather than `(oi)` is right: the authoritative counter starts from a fresh
+  baseline, dropping `deaths` below the threshold; `(oi)`/`(ok)` are what
+  stop it RETURNING as `restarts` climbs.
+
 ## 2026-08-16 (oq) — THE WALL-CLOCK SWEEP: no other test flakes (measured, 220 runs), the class is FLEET-WIDE and mostly DELIBERATE, and the one real defect was a file disagreeing with itself about the same 60 seconds
 
 - **THE ASK** (operator, after `(ol)`): *"now check the other guards for the

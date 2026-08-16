@@ -128,17 +128,58 @@ class Howard:
             self._restarts = getattr(self, "_restarts", None)
             return self._restarts or 0
 
+    #: [(ok)] The container's own VOLATILE paths — the persist volume and
+    #: caches — excluded from the image digest below. Everything else in the
+    #: image is content that a deploy changes and a restart does not.
+    _STAMP_SKIP = ("persist", "logs", "__pycache__", ".git", ".venv",
+                   ".claude", "data", "reports", "node_modules")
+
     def build_stamp(self):
-        """[(oi)] The image this process is running, so a restart can be told
-        from a DEPLOY. Content hash via the fleet's one owner
-        (`bot_pnl_store.build_compute`, cached there); None when the store is
-        dark — UNKNOWN, never a fake constant that would make every deploy
-        look like a crash."""
+        """[(oi)/(ok)] A digest of THIS CONTAINER'S CONTENT, so a restart can
+        be told from a DEPLOY.
+
+        WHY NOT `build_compute`, which (oi) used: that hashes the entry module
+        plus `_BUILD_SHARED` — a deliberately narrow set built to prove a
+        BOT's own code landed. The question here is different and strictly
+        wider: `freqtrade-bots` redeploys on ~30 organ modules, `run_all.sh`
+        and `user_data/**`, and a deploy touching any of them restarts this
+        process with an IDENTICAL narrow stamp — so the restart reads as a
+        CRASH. MEASURED: the 04:08Z restart came 13 minutes after a deploy
+        whose commit touched `fleet_immune.py`, which is in the container's
+        trigger set and in no bot's `_BUILD_SHARED`. A peer session found the
+        same hole from the other side (`run_all.sh`, `user_data/**`) by
+        replaying the discriminator against deploys it had not yet seen.
+
+        So: hash every shipped source file under the app root, minus the
+        volatile paths (`_STAMP_SKIP` — the persist VOLUME above all, whose
+        SQLite file changes constantly and would make every publish look like
+        a deploy). This value is only ever compared to ITSELF across samples
+        from the same container, so it does not need to match anything
+        computed anywhere else — which is what makes the wide set safe.
+        Computed once per process. None on any failure: UNKNOWN, never a fake
+        constant that would make every deploy look like a crash."""
         try:
-            if store is None:
-                return None
             if getattr(self, "_build", None) is None:
-                self._build = store.build_compute("parliament_main.py")[0]
+                import hashlib
+                import os
+                root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                h = hashlib.sha256()
+                n = 0
+                for d, subs, files in os.walk(root):
+                    subs[:] = [s for s in subs if s not in self._STAMP_SKIP
+                               and not s.startswith('.')]
+                    for f in sorted(files):
+                        if not f.endswith((".py", ".sh", ".json", ".toml")):
+                            continue
+                        fp = os.path.join(d, f)
+                        try:
+                            with open(fp, "rb") as fh:
+                                h.update(os.path.relpath(fp, root).encode())
+                                h.update(fh.read())
+                            n += 1
+                        except OSError:
+                            continue      # unreadable: skip, never fake
+                self._build = h.hexdigest()[:12] if n else None
             return self._build
         except Exception:  # noqa: BLE001
             return None
