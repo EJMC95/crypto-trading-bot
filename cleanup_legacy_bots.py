@@ -41,6 +41,14 @@ LEGACY_BOTS = [
     # in pnl_dashboard.py for the seven verdicts and overrides
     "pm-gillard-lshadow", "pm-abbott-lshadow",
     "pm-rudd-lshadow", "pm-morrison-lshadow",
+    # [2026-08-16 (oh)] 🧙 book-schwager — the I17 undecidable-by-TAIL
+    # retirement (operator, 16-Aug). Its 277-trade backtest never became a
+    # ledger: ZERO closed trades in 2 days live, so there is no realised
+    # record to lose. Ledger rows (none) kept as always; the row is pruned so
+    # a frozen $1,000.00 card cannot sit in the fleet totals. Reversible via
+    # SCHWAGER_RETIRED_OVERRIDE=run, which also stops the prune mattering
+    # (the bot would simply re-upsert on its next publish).
+    "book-schwager-lshadow",
     "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
     "freqtrade-dad-lshadow",
     # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — pruned once

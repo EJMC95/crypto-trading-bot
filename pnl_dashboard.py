@@ -178,6 +178,19 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 # env; ledgers kept; open paper positions freeze (the (mr)
                 # precedent). Both halves shipped together per the standing
                 # retirement rule (this set hides; LEGACY_BOTS prunes).
+                # [2026-08-16 (oh)] 🧙 book-schwager RETIRED — the I17
+                # keep-or-retire call, operator decision on the (nu)/(oe)
+                # re-measurement. UNDECIDABLE BY TAIL, a new class beside
+                # I17's slow-clock one: the founding +$457.21/t=1.88 sits
+                # OUTSIDE the whole measurable distribution (90-cell sweep,
+                # t>=2.0 in 0 of 90), the top 3 of 298 trades are 112% of the
+                # total, the random-entry null reads P=0.183, and at the
+                # measured mean/sd it needs ~719 closes (~40 MONTHS) to reach
+                # t=2.0. ZERO closes in its own ledger. 4 open paper
+                # positions freeze (the (mr) precedent). Reversible via
+                # SCHWAGER_RETIRED_OVERRIDE=run. Both halves shipped
+                # together; LEGACY_BOTS prunes.
+                "book-schwager-lshadow",
                 "pm-gillard-lshadow", "pm-abbott-lshadow",
                 "pm-rudd-lshadow", "pm-morrison-lshadow",
                 "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",

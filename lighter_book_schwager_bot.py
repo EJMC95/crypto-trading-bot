@@ -437,6 +437,28 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
+    # ---- RETIRED 2026-08-16 (oh): the I17 keep-or-retire call, made by the
+    # operator on the (nu)/(oe) re-measurement. IDLE, never sys.exit —
+    # restartPolicy=always turns an exit into a permanent crash-loop (the
+    # Trail Blazer pattern); this book owns its whole process, so idling it
+    # silences exactly one book (the 🌊/📊 shape, NOT the (mr) shared-module
+    # case). Ledgers kept, 4 open paper positions FREEZE — the precedent every
+    # prior row retirement set. Resurrect: SCHWAGER_RETIRED_OVERRIDE=run.
+    if os.environ.get("SCHWAGER_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("book-schwager (🧙 The Wizard) is RETIRED: UNDECIDABLE BY TAIL "
+              "(I17). Its founding +$457.21/t=1.88 does not reproduce — a "
+              "90-cell sweep puts it OUTSIDE the whole measurable "
+              "distribution, t>=2.0 in 0 of 90 windows; the top 3 of 298 "
+              "trades are 112% of the total (drop them: -$17.97, t=-0.13); "
+              "the random-entry null reads P=0.183; and at the measured "
+              "mean/sd it needs ~719 closes (~40 MONTHS) to reach t=2.0. "
+              "Zero closed trades in its own ledger. Operator decision "
+              "16-Aug. Idling: no venue calls, no publishes, ledgers kept. "
+              "SCHWAGER_RETIRED_OVERRIDE=run to resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     _mode = os.environ.get("VENUE", "lighter_shadow").strip() or "lighter_shadow"
     if _mode != "lighter_shadow":
         raise SystemExit(
