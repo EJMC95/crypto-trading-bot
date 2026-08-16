@@ -44,7 +44,10 @@ FLOORS = {
     # the note below records being violated once already. What this floor now
     # protects specifically: the negative-price fail-open fix, the defensive
     # sort, and the None-means-thin contract on the LIVE Farmer's entry gate.
-    "lighter_funding_bot.py": 52,      # measured 54.9
+    # [2026-08-16 (oa)] 52 -> 54. The (nv) double-open sweep added a fixture
+    # for the scanner's explore/exploit merge on the LIVE book; the floor
+    # ratchets with it, per the doctrine two notes up.
+    "lighter_funding_bot.py": 54,      # measured 56.1 (was 54.9 at 52)
     # [2026-07-30] 45 -> 50. Finding 14 of the coverage second pass: the (en)
     # exit-ladder and (eq) flatten seams raised this file ~6pp and NEITHER
     # raised the floor, leaving 7.7pp of slack on the LIVE real-money bot —

@@ -1,3 +1,71 @@
+## 2026-08-16 (oa) — THE DOUBLE-OPEN SWEEP: 🎯 the sniper was the ONLY book with it, and the reason is worth more than the result — every other book defends it at the WRITE, which is exactly where the sniper did not
+
+- **THE ASK** (operator, after `(nv)`): *"now check the other books for the
+  same double-open"*. `(nv)` found that one symbol reaching `candidates` twice
+  was sniped twice, because `is_held` is a snapshot taken before the loop. The
+  question is whether the fleet shares it. **It does not — and the sweep is a
+  refutation with evidence, recorded so nobody runs it again.**
+
+- **THE RESULT.** Thirteen living books, every one immune, by one of exactly
+  three patterns. The class is real; the sniper was the only instance.
+
+  | Book | Can a symbol arrive twice? | What stops the second open |
+  |---|---|---|
+  | 🎯 Perp Sniper | YES — `new_listings + _surge + _young` | **NOTHING, until `(nv)`** |
+  | 💸 Funding Farmer **(LIVE)** | YES — `explore + exploit` | pool is one dict + one ternary ⇒ disjoint upstream; **no entry-side guard** (see below) |
+  | 🙏 Avo Maria **(LIVE)** | one `universe` | `sym in pos or sym in meta`, and BOTH written in-loop at the open |
+  | 🎫 Ticket Taker | YES — one coin, several lenses | `opened_syms` / `opened_lenses`, accumulated in the loop |
+  | 👩🔮 family books | YES — `list(COINS) + NONCRYPTO_UNIVERSE`, undeduped | `coin in b.broker.pos`, re-read per iteration |
+  | ⚖️ Counterweight | `want` is a dict | `if c in meta: continue`, `meta[c]` written at the open |
+  | 🌾 carry · 🏦 Kiyosaki · 🧮 Hull | candidates come from `fund`, a dict | `held.add(c)` accumulator after each open |
+  | 🎸 Barnesy | per-sleeve over `fund` | `held_harvest.add(c)` accumulator |
+  | 📐 Grimes | YES — setups × coins | `_open_position` re-checks `any(p["coin"] == coin)` LIVE |
+  | 🧘 Douglas · 🧙 Schwager | `for coin in universe` | `if coin in positions` |
+  | 🏛️ Parliament (2 living) | per-symbol | `_entry_blocked` → `"already-in"` |
+
+- **THE PATTERN THAT MATTERS.** Immunity comes from a live re-read AT THE
+  WRITE, an accumulator mutated INSIDE the loop, or a candidate source that is
+  a dict. Not one book relies on a pre-loop snapshot — the sniper's `is_held`
+  was the only one, and `(nv)` fixed it. **🎫 the Ticket Taker is the proof
+  this was an omission rather than a fleet habit**: it has the sniper's exact
+  shape (one coin, several sources — its lenses) and it carries
+  `opened_syms`/`opened_lenses` for precisely this reason.
+
+- **TWO HYPOTHESES CHECKED AND REFUTED**, stated because a sweep that only
+  reports what it found is not a sweep: ⚖️ Counterweight's `ranked[:K]` and
+  `ranked[-K:]` DO overlap when fewer than 2K coins are rankable (which would
+  put one coin in both baskets) — but the block above them refuses the whole
+  rebalance at `len(scores) < 2 * K`, so it cannot be reached. And the family
+  universe really is an undeduped concatenation of two env lists — but the buy
+  site re-reads `broker.pos`, so a duplicated coin is skipped on its second
+  visit.
+
+- **THE ONE THING WORTH CHANGING — 💸 the LIVE Farmer, belt added, no trade
+  moved.** Its scanner returns `explore + exploit`, and **the entry loop has no
+  held-check of its own**: `entry_admission` takes no held set, so `ranked` is
+  simply trusted to be unique. That trust is currently well-founded — main()'s
+  eligible-pool loop walks `fund` (a dict) and a single ternary sends each coin
+  to `prelim` OR `explore_pool` — but **the invariant is maintained in a
+  different function from the one that would be damaged, which is the exact
+  arrangement that failed on the sniper.** Measured on this file's own explore
+  harness: hand the two pools one shared coin and the scanner returns it TWICE,
+  which on real money is two clips against one `meta` entry. Deduped at the
+  merge, first occurrence wins so explore keeps its reservation, and the new
+  fixture is mutation-verified (drop the dedup → red).
+
+- **IT DOES NOT QUALIFY FOR A LIVE DEPLOY, and saying so is the point of the
+  `(mm)` test.** The rule is that a fix ships both ways when it *changes what
+  the live book does, in a direction with a measured number*. This changes
+  nothing today — it is a no-op at the current construction, by measurement —
+  so it buys zero edge now and would cost a real-money container restart
+  ([[lighter-flatten-silent-halt-redeploy-incident]]). **Main only; it rides
+  the next deploy that qualifies.** What it buys is that the next person to
+  build `explore_pool` from a second source cannot silently arm a double clip.
+
+- Floors: `lighter_funding_bot.py` **52 → 54** (measured 56.1), ratcheted in
+  the pass that raised it. Suite green, all 27 floors held. No change to any
+  of the eleven books found immune — a sweep is not a licence to touch them.
+
 ## 2026-08-16 (ny) — 🧮 HULL RE-MEASURED: THE COHORT BOOK WHOSE FOUNDING NUMBER SURVIVES — AND TWO OF ITS CONTROLS DO NOT
 
 - **THE ASK.** Operator: *"re-measure hull"*, the third of the wave-2 books to

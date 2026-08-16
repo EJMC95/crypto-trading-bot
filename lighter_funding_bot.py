@@ -1386,7 +1386,25 @@ def scan_candidates(ctx, prelim, order_usd, log, last_tried=None,
     explore = _evaluate(picked, "explore")
     # explore FIRST so the reservation survives slot scarcity; the entry loop caps
     # explore opens at SCAN_EXPLORE_K and lets exploit overflow any unused window.
-    return explore + exploit
+    # [2026-08-16 (oa)] ONE ROW PER COIN, and this is the BELT — the braces are
+    # upstream. The two pools are disjoint TODAY by construction: main()'s
+    # eligible-pool loop walks `fund` (a dict, so each coin at most once) and a
+    # single ternary sends each coin to prelim OR explore_pool, never both. But
+    # nothing enforced that HERE, and the entry loop has no held-check of its own
+    # — `entry_admission` takes no held set, so `ranked` is trusted to be unique.
+    # Found by the (nv) sweep for the sniper's double-open and MEASURED on this
+    # file's own harness: hand the two pools one shared coin and this returned it
+    # TWICE, which on the REAL-MONEY book is two clips against one `meta` entry.
+    # A no-op at today's construction — it changes no trade, it removes the
+    # dependency on an invariant maintained in another function. First occurrence
+    # wins, so the explore reservation is untouched.
+    merged, seen = [], set()
+    for _row in explore + exploit:
+        if _row[0] in seen:
+            continue
+        seen.add(_row[0])
+        merged.append(_row)
+    return merged
 
 
 # [2026-07-17] The cap rule now lives on the RAIL that enforces it
@@ -3799,6 +3817,28 @@ def _selftest_explore():
         exp7 = [c for c, f, a, s, bm, ev in r7 if ev["src"] == "explore"]
         assert "P0" not in exp7 and exp7 == ["P1"], \
             f"a vetoed pool coin must not pass; got {exp7}"
+
+        # [2026-08-16 (oa)] ONE ROW PER COIN, even if the pools ever overlap.
+        # Found by the (nv) sweep for 🎯 the sniper's double-open: this file
+        # returns `explore + exploit`, and the entry loop trusts that list to
+        # be unique — `entry_admission` takes no held set, so a coin appearing
+        # twice is two clips on the REAL-MONEY book against one `meta` entry.
+        # Disjointness is real but it is maintained in ANOTHER FUNCTION (one
+        # ternary over one dict in main()'s eligible-pool loop), which is
+        # exactly the arrangement that failed on the sniper. Measured before
+        # the fix: this returned C00 twice.
+        M._candle_features = lambda ctx, coin: {"ret_mom": 0.0, "vol": 0.001}
+        _dup = scan_candidates(None, list(prelim), 25.0, lg, {},
+                               explore_pool=[("C00", {"rate": 0.0}, 0.30)])
+        _coins = [c for c, *_ in _dup]
+        assert len(_coins) == len(set(_coins)), (
+            f"the scanner offered the same coin twice — the entry loop has no "
+            f"held-check and would clip it twice: "
+            f"{sorted(c for c in _coins if _coins.count(c) > 1)}")
+        # ...and the dedup keeps the FIRST row, so the explore reservation that
+        # `explore + exploit` ordering exists for is unchanged.
+        assert _dup[0][5]["src"] == "explore", \
+            "dedup must not cost explore its front-of-queue reservation"
     finally:
         (M._candle_features, M.book_metrics, M.cross_venue_mult) = save_fns
         (M.SCAN_EXPLORE_K, M.SCAN_DEEP_MAX, M.SCAN_BOOK_PROBE) = save_cfg
