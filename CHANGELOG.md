@@ -1,3 +1,52 @@
+## 2026-08-16 (oo) — HULL PASSES THE GRIMES STABILITY TEST, AND THE TEST ITSELF IS THE FINDING: a spread only matters if the BAR FALLS INSIDE IT
+
+- **THE ASK.** Operator: *"re-measure hull with the fixed gate approach"*,
+  after `(om)` fixed 📐 Grimes's gate.
+- **FIRST, THE CATEGORY CORRECTION: 🧮 Hull HAS NO GATE.** The rolling replay
+  gate is Grimes's mechanism; Hull's entry is a direct band test on a fixed
+  rule. There is nothing to swap in literally. What DOES transfer is the
+  question `(oe)` was really asking: **is this book's verdict an artifact of
+  which coins got graded?**
+- **IT IS NOT — and the reason is sharper than "Hull is stable".** Resampling
+  the graded coin set moves Hull's `t` by a comparable amount to Grimes's:
+
+      k= 9   t [+1.66, +4.73]   spread 3.07   below t=2.0: 1/12
+      k=12   t [+2.00, +4.34]   spread 2.35   below t=2.0: 1/12
+      k=14   t [+2.01, +4.55]   spread 2.54   below t=2.0: 0/12
+      k=16   t [+3.07, +5.38]   spread 2.32   below t=2.0: 0/12
+
+  Grimes's spread was 3.82 — the same order. **The spread is NOT what
+  separates them. WHERE THE BAR SITS is.** Grimes's distribution straddled its
+  0.5 bar, so the coin draw decided the verdict; Hull's sits ABOVE the t=2.0
+  go-live bar, so it does not. Leave-one-out over all 18 gives
+  **t ∈ [2.67, 4.50], every value above 2.0** (worst drop PUMP → 2.67); no
+  single coin carries it.
+- **THE TRANSFERABLE RULE, and it is worth more than either book:**
+  **universe sensitivity is only a defect when the BAR FALLS INSIDE the
+  verdict distribution.** Measuring the spread alone would have called these
+  two books the same and been wrong in one direction or the other — either
+  "fixing" Hull, which needs nothing, or clearing Grimes, which needed a fix.
+- **AN OUT-OF-UNIVERSE HOLDOUT WAS RUN AND IS REPORTED INCONCLUSIVE, not as
+  support.** Funding was fetched for the 8 crypto books with real history the
+  study never saw: **n=48, +$2.02, t=+0.57** — far weaker than in-sample, with
+  FARTCOIN alone >100% of the total. **But 0 of those 8 sit in the [$2M,$10M)
+  band this book trades**, so the cell measures a population the rule
+  structurally excludes. It REPLICATES the study's own recorded finding that
+  the volume floor is LOAD-BEARING (its measurement on thin names: +$0.05).
+  **A true out-of-band holdout does not exist**: inside [$2M,$10M) the venue's
+  crypto population essentially IS the study's liquid names — the same
+  thin-supply fact `(ly)` measured on the carry cell. Standing limitation,
+  named rather than resolved, and NOT counted as evidence either way.
+- **MECHANICAL NOTE worth keeping:** with `MAX_POSITIONS=4`, adding 8 coins to
+  the universe moved n by ONE (50 → 49). **A capped book's universe size
+  changes WHICH trades are taken, not how many** — so "grade a wider set" is
+  not a free improvement for a capped book, and the combined 26-coin cell
+  (t=+4.08) is not independent evidence from the 18-coin one.
+- **NO CODE CHANGED.** The `(om)` fix does not transfer — no gate to fix, and
+  the pathology that motivated it is absent. Recorded because a measured
+  refusal is a valid output here, and because the next session should not
+  re-ask this question.
+
 ## 2026-08-16 (on) — THE GATE HORIZON DATED A BASKET BOOK ON A STATISTIC THAT COUNTS ITS LEGS: `n_req` scales as `t^-2`, so an inflated `t` under-states the remaining sample FOURFOLD
 
 - **THE DEFECT.** `(ky)` established that `t` counts TRADES while a basket book
