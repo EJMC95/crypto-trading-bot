@@ -831,6 +831,14 @@ def _selftest():
         "the collateral term is ESTABLISHED by the null test; a live "
         "PROVISIONAL claim in a docstring contradicts it and invites a "
         "consumer to revert the denominator")
+    # ...and the POSITIVE half, added after a reviewer noted the check above
+    # tests the VOCABULARY and not the CLAIM: a rewrite hedging it as "not yet
+    # firmly established" would pass a word-ban. Requiring the current claim
+    # to be PRESENT closes that — the two assertions together mean the file
+    # must say this and must not say the old thing.
+    assert "ESTABLISHED, by MOTION" in _live, (
+        "cross_leverage must state the collateral term as ESTABLISHED, by "
+        "MOTION — a reworded hedge passes a word-ban but not this")
 
     # THE NULL TEST, pinned — the strongest single artifact here. Three
     # snapshots of the same position; between T2 and T3 `total_asset` MOVED
