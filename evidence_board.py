@@ -476,10 +476,50 @@ PROMO_MIN_PNL = float(os.environ.get("EVBOARD_PROMO_MIN_PNL", "10"))
 #     defect proprioception has on live-clip today. When the taker is wired to
 #     venue_context/live.clip_scale, add it HERE in the same commit.
 #
-# So the cohort is the ONE book that is both live and steered by this lever.
+# [2026-08-16 (nj) — THE RULE ABOVE WAS WRITTEN CORRECTLY AND THEN BROKEN, so
+# this block is corrected IN PLACE per I12 rather than appended to.] 🙏 Avo
+# Maria took the live slot on 13-Aug ((ma) operator swap) and it DOES consume
+# the lever — `lighter_avo_live_bot.py:616` reads `live.clip_scale` and
+# multiplies its entry clip by it. That is exactly the trigger the 17-Jul
+# entry names ("when X is wired to live.clip_scale, add it HERE in the same
+# commit"), and the commit came and went without it. Measured consequence,
+# and it is the mirror of the Tide Rider ratchet rather than a repeat of it:
+# the cohort was a STRICT SUBSET of the steered set, so the board sized a
+# book it could not see. Avo could be down-scaled on the FARMER's drawdown,
+# and — the sharper half — an Avo drawdown reached NO actuator at all,
+# because `_hurt_why` never looked at its row.
+#
+# THE FIX IS TWO-PART, because adding the row alone would have kept the
+# defect the operator actually named: ONE dial across two unlike books.
+#   1. the cohort is now every REAL-MONEY row this lever steers, and
+#   2. each row carries its OWN metrics and its OWN arm — `synthesize_live`
+#      is scoped per row (see `scope=`) and each row writes a SEPARATE
+#      lever via LIVE_CLIP_LEVERS, so a Farmer drawdown can no longer
+#      shrink Avo's clips and an Avo drawdown can no longer shrink the
+#      Farmer's. A shared size dial across a directional funding book and a
+#      swing-dip long book was never a policy — it was an artifact of there
+#      having been only one live book when the lane was built.
+# The 17-Jul rule is UNCHANGED and still binding: a row belongs here iff it
+# is live AND consumes the lever. Grading a lever on a book it cannot move
+# is still the defect; so is moving a book the grade cannot see.
 LIVE_ROWS = {s.strip() for s in os.environ.get(
     "EVBOARD_LIVE_ROWS",
-    "perps-funding-lighter-lighter").split(",") if s.strip()}
+    "perps-funding-lighter-lighter,freqtrade-avo-maria-lighter").split(",")
+    if s.strip()}
+# Per-row ARM: the lever each live row actually reads. The Farmer keeps
+# `live.clip_scale` — renaming a lever a real-money consumer is reading today
+# would open a protection gap for one deploy, and the gap is the whole risk
+# here; Avo gets its own name. A row with no entry falls back to the shared
+# lever, which is the pre-(nj) behaviour and is fail-safe rather than silent.
+FARMER_ROW = "perps-funding-lighter-lighter"
+LIVE_CLIP_LEVERS = {FARMER_ROW: "live.clip_scale",
+                    "freqtrade-avo-maria-lighter": "live.avo.clip_scale"}
+
+
+def live_clip_lever(bot):
+    """The lever name that steers `bot`'s live clip. Unknown rows degrade to
+    the shared lever (the old behaviour), never to a guess — I8."""
+    return LIVE_CLIP_LEVERS.get(str(bot), "live.clip_scale")
 LIVE_MIN_CLOSED = int(os.environ.get("EVBOARD_LIVE_MIN_CLOSED", "30"))
 LIVE_DOWN_PNL = float(os.environ.get("EVBOARD_LIVE_DOWN_PNL", "10"))     # -$10/7d hurts
 LIVE_DOWN_SCALE = float(os.environ.get("EVBOARD_LIVE_DOWN_SCALE", "0.75"))
@@ -555,11 +595,20 @@ def live_clip_grade(prop_state):
 
 def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
                     prior_scale, now_ts, clip_grade=None, window=None,
-                    released_ts=0.0):
+                    released_ts=0.0, scope=None):
     """The live lane's decision. Returns (desired_scale | None, item | None).
     None = assert nothing (the lever expires back to 1.0 on its own).
     prior_scale: {"value", "ts"} from the previous board payload — the
     up-ladder's cooldown memory.
+    scope [2026-08-16 (nj)]: the row id(s) this decision covers; defaults to
+    the whole LIVE_ROWS cohort (the pre-(nj) behaviour, kept so every
+    existing caller and every gate below is unchanged). run_once passes ONE
+    row so each live book is judged on its OWN metrics and moves its OWN
+    arm — a shared dial across unlike books meant a Farmer drawdown shrank
+    Avo's clips while an Avo drawdown reached no actuator at all. Every gate
+    in this function already reads `rows`, so scoping the cohort is the
+    whole per-row mechanism: no gate is re-implemented, and the single-row
+    case is the same tested code with a one-element cohort.
     clip_grade (16-Jul evening, operator: "the live lane needs to learn"):
     proprioception's live.clip_scale verdict. HURTING (scaled episodes
     measured worse than the pre-window AND the shadow twin) releases the
@@ -579,17 +628,31 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     a partially-visible cohort returns no decision for everything else —
     run_once then HOLDS an in-force restriction rather than releasing it.
     Pure — selftested offline."""
+    cohort = set(scope) if scope else set(LIVE_ROWS)
     rows = {str(r.get("bot")): r for r in (bot_rows or [])
-            if str(r.get("bot")) in LIVE_ROWS}
-    cohort_ok = bool(LIVE_ROWS) and len(rows) >= len(LIVE_ROWS)
+            if str(r.get("bot")) in cohort}
+    cohort_ok = bool(cohort) and len(rows) >= len(cohort)
+    # the item key is per-scope so two rows' decisions cannot collide in the
+    # alert stream or in DEDICATED_PUSH dedup (one shared key would have made
+    # the second row's item overwrite the first's — silently, since both are
+    # "board:live-clip-scale").
+    _key = ("board:live-clip-scale" if not scope
+            else "board:live-clip-scale:" + ",".join(sorted(cohort)))
+    # ...and so is the ARM. A single-row scope names that row's own lever, so
+    # the item the operator reads and the lever run_once writes are the same
+    # object (I8) — a per-row decision reported under the shared lever name
+    # would be an unactionable diagnosis.
+    _lever = (live_clip_lever(next(iter(cohort))) if scope and len(cohort) == 1
+              else "live.clip_scale")
+    _who = ("" if not scope else " [" + ",".join(sorted(cohort)) + "]")
 
     def emit(scale, sev, direction, why):
-        return {"key": "board:live-clip-scale", "severity": sev,
-                "msg": f"💰 LIVE clips x{scale:g} — {why}",
-                "proposal": "live.clip_scale via fleet_tuning (bounds 0.5–1.5, "
+        return {"key": _key, "severity": sev,
+                "msg": f"💰 LIVE clips x{scale:g}{_who} — {why}",
+                "proposal": f"{_lever} via fleet_tuning (bounds 0.5–1.5, "
                             "TTL auto-revert; SafetyRails notional cap stays "
                             "senior — reshapes clips, cannot add exposure)",
-                "lever": "live.clip_scale", "ts": now_ts, "source": "board",
+                "lever": _lever, "ts": now_ts, "source": "board",
                 "direction": direction}
 
     # DOWN first — restriction needs no cooldown and no permission, but the
@@ -645,14 +708,14 @@ def synthesize_live(bot_rows, fleet_risk, lighter_market, alerts,
     if clip_grade == "hurting":
         if (prior_scale or {}).get("value"):
             return None, {
-                "key": "board:live-clip-scale", "severity": "action",
-                "msg": "💰 LIVE clip lever RELEASED — 🦾 proprioception graded "
-                       "scaled episodes HURTING (worse than pre-window AND "
-                       "shadow twin); reverting to operator env sizing",
+                "key": _key, "severity": "action",
+                "msg": f"💰 LIVE clip lever RELEASED{_who} — 🦾 proprioception "
+                       "graded scaled episodes HURTING (worse than pre-window "
+                       "AND shadow twin); reverting to operator env sizing",
                 "proposal": "no re-assert while the verdict holds; the judge "
                             "and the operator remain the only expand paths "
                             "for live",
-                "lever": "live.clip_scale", "ts": now_ts, "source": "board",
+                "lever": _lever, "ts": now_ts, "source": "board",
                 "direction": "restrict"}
         return None, None
 
@@ -1483,35 +1546,62 @@ def run_once():
             live_window = store.fetch_realized_window(sorted(LIVE_ROWS), days=7)
     except Exception:  # noqa: BLE001
         live_window = None
-    prior_live = prior.get("live_scale") or {}
-    prior_release_ts = float(prior.get("live_released_ts") or 0)
-    desired_live, live_item = synthesize_live(bot_rows, fr, lm, fa, prior_live,
-                                              now, live_clip_grade(prop_b),
-                                              window=live_window,
-                                              released_ts=prior_release_ts)
-    # [2026-07-16 blind-hold] an in-force RESTRICTION (< 1.0) is never
-    # withdrawn on missing data: assert-nothing WITHOUT a reasoned item
-    # (blind cohort / dark window) re-asserts the prior restriction until
-    # the evidence is back and healing is MEASURED. A reasoned release
-    # (hurting grade) and any expansion release stay fail-closed as-is.
-    _plv = prior_live.get("value")
-    _vis = {str(r.get("bot")) for r in (bot_rows or [])
-            if str(r.get("bot")) in LIVE_ROWS}
-    live_cohort_ok = bool(LIVE_ROWS) and len(_vis) >= len(LIVE_ROWS)
-    if (desired_live is None and live_item is None
-            and _plv is not None and float(_plv) < 1.0
-            and not (live_cohort_ok and live_window is not None)):
-        desired_live = float(_plv)
-        live_item = {"key": "board:live-clip-scale", "severity": "action",
-                     "msg": f"💰 LIVE clips x{desired_live:g} HELD — cohort/"
-                            f"window not fully visible; a restriction is only "
-                            f"released on measured healing",
+    # [2026-08-16 (nj)] PER-ROW from here down: one decision, one arm, one
+    # prior, per live book. `prior.get("live_scale")` carried the pre-(nj)
+    # SCALAR shape {"value","ts"}; `_prior_live_for` reads either shape so a
+    # restriction in force across the upgrade is never silently dropped (it
+    # would have re-read as absent, i.e. as a release nobody decided).
+    prior_live_all = prior.get("live_scale") or {}
+    prior_release_all = prior.get("live_released_ts") or 0
+
+    def _legacy_scalar(d):
+        return isinstance(d, dict) and "value" in d
+
+    def _prior_live_for(bot):
+        if _legacy_scalar(prior_live_all):
+            return prior_live_all if bot == FARMER_ROW else {}
+        return (prior_live_all or {}).get(bot) or {}
+
+    def _prior_release_for(bot):
+        if isinstance(prior_release_all, dict):
+            return float(prior_release_all.get(bot) or 0)
+        return float(prior_release_all or 0)   # legacy scalar: shared clock
+
+    live_desired, live_items = {}, []
+    _clip_grade = live_clip_grade(prop_b)
+    for _row in sorted(LIVE_ROWS):
+        _prior = _prior_live_for(_row)
+        _d, _item = synthesize_live(bot_rows, fr, lm, fa, _prior, now,
+                                    _clip_grade, window=live_window,
+                                    released_ts=_prior_release_for(_row),
+                                    scope={_row})
+        # [2026-07-16 blind-hold] an in-force RESTRICTION (< 1.0) is never
+        # withdrawn on missing data: assert-nothing WITHOUT a reasoned item
+        # (blind cohort / dark window) re-asserts the prior restriction until
+        # the evidence is back and healing is MEASURED. A reasoned release
+        # (hurting grade) and any expansion release stay fail-closed as-is.
+        # Now scoped to THIS row: a dark window on one book must not hold a
+        # restriction on the other.
+        _plv = _prior.get("value")
+        _vis = {str(r.get("bot")) for r in (bot_rows or [])}
+        if (_d is None and _item is None
+                and _plv is not None and float(_plv) < 1.0
+                and not (_row in _vis and live_window is not None)):
+            _d = float(_plv)
+            _item = {"key": f"board:live-clip-scale:{_row}",
+                     "severity": "action",
+                     "msg": f"💰 LIVE clips x{_d:g} [{_row}] HELD — row/window "
+                            f"not visible; a restriction is only released on "
+                            f"measured healing",
                      "proposal": "conservative hold, re-asserted each cycle "
-                                 "until the cohort + ledger window are back",
-                     "lever": "live.clip_scale", "ts": now, "source": "board",
-                     "direction": "restrict"}
-    if live_item:
-        synth.append(live_item)
+                                 "until the row + ledger window are back",
+                     "lever": live_clip_lever(_row), "ts": now,
+                     "source": "board", "direction": "restrict"}
+        if _d is not None:
+            live_desired[_row] = _d
+        if _item:
+            live_items.append(_item)
+    synth.extend(live_items)
 
     # ---- growth rail: widen Gap Scout's net when its census runs quiet -----
     census = _g("gapscout-census")
@@ -1619,34 +1709,41 @@ def run_once():
                              f"episodes_open={census.get('episodes_open')}, "
                              f"day={json.dumps(census.get('day'))}"}
              for k, v in growth_levers.items()})
-    prior_live_val = prior_live.get("value")
     # [2026-07-16] a lapse/hurting release is now an EXPLICIT WITHDRAWAL
     # (tuning.release_levers), not a wait-for-TTL: the phone said "back to
     # x1.0" while the old lever could stay in force up to 2h. A true
     # removal (not a 1.0 overwrite) so consumers revert instantly AND
     # proprioception sees a clean 'released' episode end instead of a
     # phantom no-op stance it would have to grade.
-    release_live = desired_live is None and prior_live_val is not None
-    if desired_live is not None:
-        board_levers["live.clip_scale"] = {
-            "value": desired_live, "ttl_sec": LIVE_LEVER_TTL_S,
-            "reason": (live_item or {}).get("msg", "")[:180],
-            "evidence": f"live rows {sorted(LIVE_ROWS)}; gates in synthesize_live"}
+    # [2026-08-16 (nj)] PER ROW: each book's arm is written or released on its
+    # OWN decision. One row releasing must never withdraw the other's lever.
+    _item_by_lever = {i.get("lever"): i for i in live_items}
+    prior_live_val = {r: (_prior_live_for(r) or {}).get("value")
+                      for r in LIVE_ROWS}
+    release_rows = [r for r in sorted(LIVE_ROWS)
+                    if r not in live_desired and prior_live_val.get(r) is not None]
+    for _row, _val in sorted(live_desired.items()):
+        _lv = live_clip_lever(_row)
+        board_levers[_lv] = {
+            "value": _val, "ttl_sec": LIVE_LEVER_TTL_S,
+            "reason": (_item_by_lever.get(_lv) or {}).get("msg", "")[:180],
+            "evidence": f"live row {_row}; own metrics; gates in synthesize_live"}
     enacted = None
     if board_levers and tuning is not None:
         enacted = tuning.write_levers(board_levers, set_by="evidence-board",
                                       now_ts=now)
     released = None
-    if release_live and tuning is not None:
-        released = tuning.release_levers(["live.clip_scale"],
-                                         set_by="evidence-board", now_ts=now)
+    if release_rows and tuning is not None:
+        released = tuning.release_levers(
+            [live_clip_lever(r) for r in release_rows],
+            set_by="evidence-board", now_ts=now)
     # did the LIVE change actually land? The URGENT push and the ladder's
-    # memory must not claim a change the rail never recorded.
-    live_write_needed = desired_live is not None or release_live
-    live_write_ok = ((desired_live is not None
-                      and bool(enacted
-                               and "live.clip_scale" in (enacted.get("levers") or {})))
-                     or (release_live and released is not None))
+    # memory must not claim a change the rail never recorded. Per row, so a
+    # landed write on one book is never credited to the other.
+    _enacted_levers = (enacted or {}).get("levers") or {}
+    live_write_ok = {r: (live_clip_lever(r) in _enacted_levers)
+                     for r in live_desired}
+    live_write_ok.update({r: released is not None for r in release_rows})
     prior_step = int(prior.get("growth_step") or 0)
     # the step push lists ONLY the board's own gapscout levers — the merged
     # payload also carries other authors' lanes (and the live lever), which
@@ -1664,20 +1761,26 @@ def run_once():
               f"{sorted(_gs_enacted)}", flush=True)
     # live changes always reach the phone URGENT — it's real money — but
     # only once the write LANDED; a failed write logs and retries next cycle.
-    if desired_live != prior_live_val and (desired_live is not None
-                                           or prior_live_val is not None):
-        if live_write_ok:
-            send_push("LIVE clips " + (f"x{desired_live:g}" if desired_live
-                                       else "back to x1.0 (lever released)"),
-                      (live_item or {}).get("msg")
+    # [2026-08-16 (nj)] one push PER ROW, naming the book: a single "LIVE
+    # clips x0.75" across two books is the (ht) unactionable-diagnosis shape
+    # — the operator cannot tell which real-money book just moved.
+    for _row in sorted(LIVE_ROWS):
+        _new, _old = live_desired.get(_row), prior_live_val.get(_row)
+        if _new == _old or (_new is None and _old is None):
+            continue
+        _lv = live_clip_lever(_row)
+        if live_write_ok.get(_row):
+            send_push(f"LIVE clips [{_row}] "
+                      + (f"x{_new:g}" if _new else "back to x1.0 (lever released)"),
+                      (_item_by_lever.get(_lv) or {}).get("msg")
                       or "conditions no longer hold — released to operator sizing",
                       priority="urgent", tags="moneybag")
-            print(f"[evidence_board] LIVE clip_scale: {prior_live_val} -> "
-                  f"{desired_live}", flush=True)
+            print(f"[evidence_board] LIVE {_lv} [{_row}]: {_old} -> {_new}",
+                  flush=True)
         else:
-            print(f"[evidence_board] LIVE clip_scale write FAILED — lever "
-                  f"unchanged (wanted {prior_live_val} -> {desired_live}); "
-                  f"retrying next cycle", flush=True)
+            print(f"[evidence_board] LIVE {_lv} [{_row}] write FAILED — lever "
+                  f"unchanged (wanted {_old} -> {_new}); retrying next cycle",
+                  flush=True)
 
     # ---- notify: NEW warn/action items AND new EXPAND items — good news
     # reaches the phone with the same machinery as warnings (default
@@ -1686,10 +1789,17 @@ def run_once():
     # are skipped here so they aren't double-sent — and, critically, so an
     # ENACTED live action is never mislabeled "Proposed (shadow)" by the
     # generic template (the 15-Jul confusing push).
-    DEDICATED_PUSH = {"board:live-clip-scale", "board:gapscout-quiet",
-                      "board:impl-shortfall"}   # its tracker owns the push
+    # [2026-08-16 (nj)] the live key is now PER ROW
+    # ("board:live-clip-scale:<row>"), so this must match by PREFIX. Left as
+    # an exact-match set it would have re-sent every live item through the
+    # generic "Proposed (shadow)" template — mislabelling an ENACTED
+    # real-money change as a shadow proposal, which is the exact 15-Jul
+    # confusion this set exists to prevent.
+    DEDICATED_PUSH = ("board:live-clip-scale", "board:gapscout-quiet",
+                      "board:impl-shortfall")   # its tracker owns the push
     for i in items:
-        if i["key"] in DEDICATED_PUSH:
+        if any(i["key"] == p or i["key"].startswith(p + ":")
+               for p in DEDICATED_PUSH):
             continue
         is_expand = i.get("direction") == "expand"
         if i["verdict"] != "active":
@@ -1745,15 +1855,29 @@ def run_once():
     # ladder memory: a live write that never landed must not advance the
     # cooldown clock or the release stamp — carry the prior state so the
     # transition retries next cycle.
-    if live_write_needed and not live_write_ok:
-        live_scale_out = prior.get("live_scale")
-        released_out = prior_release_ts or None
-    else:
-        live_scale_out = ({"value": desired_live,
-                           "ts": (prior_live.get("ts")
-                                  if desired_live == prior_live_val else now)}
-                          if desired_live is not None else None)
-        released_out = (now if release_live else prior_release_ts) or None
+    # [2026-08-16 (nj)] per row, and the carry-on-failure rule is per row too:
+    # one book's failed write must not roll back the other book's landed one.
+    live_scale_out, released_out = {}, {}
+    for _row in sorted(LIVE_ROWS):
+        _prior = _prior_live_for(_row)
+        _prior_rel = _prior_release_for(_row) or None
+        _new, _old = live_desired.get(_row), prior_live_val.get(_row)
+        _needed = _new is not None or _row in release_rows
+        if _needed and not live_write_ok.get(_row):
+            if _prior:                       # carry this row's prior verbatim
+                live_scale_out[_row] = _prior
+            if _prior_rel:
+                released_out[_row] = _prior_rel
+            continue
+        if _new is not None:
+            live_scale_out[_row] = {
+                "value": _new,
+                "ts": (_prior.get("ts") if _new == _old else now)}
+        _rel = (now if _row in release_rows else _prior_rel) or None
+        if _rel:
+            released_out[_row] = _rel
+    live_scale_out = live_scale_out or None
+    released_out = released_out or None
     payload = {
         "updated": _iso(now), "ttl_sec": TTL_SEC, "mode": MODE,
         "items": items[:20],

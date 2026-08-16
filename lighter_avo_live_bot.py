@@ -131,15 +131,37 @@ def clip_usd(equity):
     return equity / float(S.max_open)
 
 
+LIVE_CLIP_LEVER = "live.avo.clip_scale"
+LIVE_CLIP_LEVER_LEGACY = "live.clip_scale"
+
+
 def _clip_scale_now():
-    """[(mz)] The clamped live.clip_scale the entry path applies, re-read at
+    """[(mz)] The clamped live clip scale the entry path applies, re-read at
     publish time so the row's clip_usd is the EFFECTIVE entry clip whichever
     code path publishes (the halt paths publish before the entry section
-    refreshes its loop-local copy). Fail-open 1.0 on a dark rail."""
+    refreshes its loop-local copy). Fail-open 1.0 on a dark rail.
+
+    [2026-08-16 (nj)] THIS BOOK NOW HAS ITS OWN ARM. It used to read
+    `live.clip_scale` — the SHARED live dial — so 🙏 Avo was sized by a
+    decision the evidence board made from 💸 the Farmer's metrics alone (Avo
+    was not even in the board's LIVE_ROWS cohort). Own arm first, shared
+    lever as FALLBACK: during the deploy window where the board already
+    writes per-row and this container has not restarted, or vice versa,
+    there must be no cycle in which NO restriction can reach this book. The
+    fallback is why the rollout has no protection gap; it is not a second
+    source of truth, and the own-arm value wins whenever it exists.
+
+    RESTRICT-ONLY, and that is structural rather than a policy: the clamp is
+    min(1.0, ...), so this lever can only ever SHRINK Avo's clip. With
+    clip = equity/max_open and stake_mult <= 1.0, gross notional can never
+    exceed account equity — the book is 1.00x by construction and no lever
+    reaches past it. The registry cage (hi = 1.0) mirrors this exactly."""
     try:
         import fleet_tuning as tuning
-        return max(0.25, min(1.0, float(tuning.get_lever("live.clip_scale",
-                                                         1.0))))
+        raw = tuning.get_lever(LIVE_CLIP_LEVER, None)
+        if raw is None:
+            raw = tuning.get_lever(LIVE_CLIP_LEVER_LEGACY, 1.0)
+        return max(0.25, min(1.0, float(raw)))
     except Exception:  # noqa: BLE001
         return 1.0
 
@@ -611,12 +633,11 @@ def main(_ctx=None, once=False):
         except Exception:  # noqa: BLE001
             pass
 
-        live_scale = 1.0
-        try:
-            live_scale = max(0.25, min(1.0, float(
-                tuning.get_lever("live.clip_scale", 1.0))))
-        except Exception:  # noqa: BLE001
-            pass
+        # [2026-08-16 (nj)] ONE owner for the rule. This site used to re-type
+        # the lever name and the clamp, so the entry path and the published
+        # `clip_usd` could disagree about which arm steers this book the
+        # moment either was edited — a second copy of a rule is a second rule.
+        live_scale = _clip_scale_now()
 
         coin_vetoed = {}
         try:

@@ -136,6 +136,141 @@
   the live-clip cohort fix. Recorded inline per the letter convention's rule 4;
   that session's file was left untouched.
 
+## 2026-08-16 (nj) — ONE SIZE DIAL WAS STEERING TWO REAL-MONEY BOOKS AND COULD ONLY SEE ONE OF THEM: 🙏 Avo was sized by 💸 the Farmer's evidence for three days, and its own drawdown reached no actuator at all
+
+- **THE ASK** (operator, mid-session, after I surfaced the cohort while auditing
+  leverage): *"live row must include avo as well, and they must be carrying
+  their own metrics and arms, this seems like a trivial issue that should have
+  been fixed along time ago"*. Both halves are implemented here; the second
+  half is the one that matters, and the operator is right that the first is
+  trivial — which is exactly why it went unnoticed.
+
+- **THE INCIDENT, and it is an I12 failure rather than an oversight.** The
+  17-Jul audit block above `LIVE_ROWS` states the rule correctly — *"the cohort
+  is REAL-MONEY BOOKS THIS LEVER STEERS"* — and even names its own trigger:
+  *"When the taker is wired to venue_context/live.clip_scale, add it HERE in
+  the same commit."* On **13-Aug (ma)** 🙏 Avo Maria took the live slot, and
+  `lighter_avo_live_bot.py` reads `live.clip_scale` and multiplies its entry
+  clip by it. The commit came; the cohort never moved. The rule was written,
+  correct, engraved — and not applied. **A doctrine that is not executable is
+  a doctrine that gets skipped**, which is the whole thesis at the top of
+  CLAUDE.md, demonstrated once more on a real-money actuator.
+
+- **THE TWO DEFECTS, and the second is the sharper one.** `LIVE_ROWS` was a
+  strict SUBSET of the set the lever steers, so:
+  1. **Avo could be moved on the Farmer's evidence** — one dial sized a
+     directional funding book and a swing-dip long book together; and
+  2. **an Avo drawdown reached NOTHING.** `_hurt_why` only ever iterates rows
+     in the cohort, so the DOWN reflex — the board's only protective actuator
+     on real money — was structurally blind to one of the two live books.
+  This is the exact mirror of the Tide Rider ratchet the same comment block
+  records: there the cohort was a strict SUPERSET of the visible rows (a
+  one-way ratchet that could pin clips at 0.75 with no path back); here a
+  strict subset (an invisible book). **Both directions of a wrong cohort are
+  real-money defects, and neither is visible from inside `synthesize_live`.**
+
+### The fix: the cohort, and then one arm per book
+
+- `LIVE_ROWS` now carries both live rows. **On its own that would have kept the
+  defect the operator actually named** — one dial across two unlike books — so
+  the substantive half is per-row: `synthesize_live` takes a `scope=`, `run_once`
+  calls it **once per live row**, and each row writes a **separate lever** via
+  `LIVE_CLIP_LEVERS`. A Farmer drawdown can no longer shrink Avo's clips; an Avo
+  drawdown can no longer shrink the Farmer's.
+- **No gate was re-implemented.** Every gate in `synthesize_live` already read
+  its `rows` dict, so scoping the cohort IS the per-row mechanism — the
+  single-row case is the same battle-tested code with a one-element cohort.
+  Rewriting a real-money enforcement authority from scratch would have been the
+  thing CLAUDE.md forbids ("an untested rewrite of an enforcement authority is
+  not growth").
+- **`live.clip_scale` KEEPS ITS NAME and its meaning** (💸 the Farmer's clip).
+  Renaming a lever a real-money consumer is reading today would open a
+  protection gap for exactly one deploy, and that gap is the entire risk of
+  this change. Avo gets `live.avo.clip_scale`, registered, caged and
+  board-owned; its consumer prefers its own arm and **falls back** to the
+  shared lever, so there is no cycle in either deploy order where no
+  restriction can reach the book.
+- Per-row all the way down, because half-measures here fail silently: item
+  KEYS (one shared key and the second row's item overwrites the first's),
+  `DEDICATED_PUSH` matching (left exact-match it would re-send an ENACTED
+  real-money change through the generic *"Proposed (shadow)"* template — the
+  15-Jul confusion), the phone push (a bare *"LIVE clips x0.75"* across two
+  books is the (ht) unactionable-diagnosis shape: the operator cannot tell
+  which book moved), the landed-write check, and the carry-on-failure rule.
+- **Migration.** The prior payload stored `live_scale` as a SCALAR
+  `{"value","ts"}`. Read as the new per-row map that is an empty prior for
+  every row — i.e. **an in-force restriction would have read as absent, a
+  release nobody decided, on real money**. `_prior_live_for` reads either
+  shape and attributes the legacy scalar to the Farmer, which owned it.
+  Verified safe against the live bus first: `fleet_tuning` carries 6 levers,
+  **none `live.*`**, and the board's `live_scale` is `null`, so there is in
+  fact nothing in force to migrate today — but the code does not depend on
+  that having been true.
+
+### Avo is 1.00× by construction, and the cage now says so
+
+- `live.avo.clip_scale` is caged `[0.5, **1.0**]`, not `[0.5, 1.5]` like its
+  sibling, because the consumer clamps to `min(1.0, ...)`. With
+  `clip = equity/max_open`, `stake_mult ≤ 1.0` (`SwingDip.stake_mult` returns
+  0.5 under panic, else 1.0) and this lever ≤ 1.0, **all three multipliers are
+  reduce-only and Avo's gross notional can never exceed account equity.** A
+  cage above the clamp would have registered authority the consumer silently
+  discards — the registered-but-inert failure this registry exists to prevent.
+- The `$200` `FREQTRADE_AVO_MARIA_MAX_NOTIONAL` cap from (ms) does not bind at
+  today's `$62.71` equity; **the sizing formula binds first.** Worth stating
+  plainly because the cap is the number a reader looks at: at this balance it
+  is headroom for growth, not the constraint.
+
+### Verification
+
+- New `tests/autonomy/test_live_clip_cohort.py` (10 tests). The class-closing
+  one is `test_every_live_clip_consumer_is_in_the_cohort`: it finds consumers
+  **by AST** over the live bot files, so a FOURTH live book wired to a clip
+  lever without joining the cohort turns the build red. Pinning today's two row
+  ids would re-pin the instance, and the instance is not what failed — the rule
+  was already written down.
+- **8 mutations, all verified RED**: cohort reverted to Farmer-only · Avo back
+  on the shared dial · `scope` ignored · the `live.avo.` prefix owner removed
+  (arm inert) · cage `hi` 1.0→1.5 · shared item key · Avo reading only the
+  shared lever · the consumer clamp widened to 1.5.
+- **TWO of my own detectors were wrong first, and both are the failures this
+  repo already has rules for** — recorded because a mutation round that finds
+  nothing is the one to distrust:
+  * the mutation HARNESS reported all 8 SURVIVING. It grepped lowercase
+    `"failed"` against pytest's uppercase `FAILED`, through a pipe that also
+    swallowed `$?`. That is the `grep -q` inversion class (ml) named in
+    CLAUDE.md, in the harness rather than in CI. Verdict is the **exit code**
+    now, and the harness additionally asserts each mutation actually APPLIED
+    (a no-op patch is indistinguishable from a surviving mutation).
+  * with that fixed, **M8 genuinely survived**: the restrict-only test asserted
+    `"min(1.0" in <source of _clip_scale_now>` — and the function's own
+    DOCSTRING contains the words `min(1.0, ...)` while explaining the rule. A
+    substring test matching the prose that promises the property, in the same
+    file where I had written an AST helper to avoid precisely that. Now
+    BEHAVIOURAL: serve the consumer 1.5/1.25/4.0 and assert what it returns.
+- `audit_lever_authority` gains a declaration for the new lever with its
+  sibling's reasoning (a multiplier gates no population); its finding count
+  returns to the pre-change baseline of 29. Board / `fleet_tuning` / Avo
+  selftests green; `tests/autonomy` green (864); `audit_lever_bounds`,
+  `audit_doctrine_enforcement`, `audit_deploy_coverage`, `audit_image_imports`
+  pass.
+
+### What this changes today: NOTHING, and that is stated rather than buried
+
+- **No live lever is in force and none is written by this commit**, so not one
+  trade changes on either real-money book. What changes is what the board CAN
+  do: Avo's drawdown now reaches an actuator, and neither book's evidence
+  moves the other's size. Per (mm) this is main-only on its own merits — it
+  alters no trade and buys no measured edge — but the Avo consumer half is
+  only real once that container runs it, so `tide-rider-lighter-live` is
+  deployed with it and verified by stamp readback, not by a green run.
+- **It buys no expectancy and none is claimed (I19).** Sizing authority is not
+  edge. The leverage audit that surfaced this found the fleet's actual
+  position: `fleet_allocation` publishes `n_with_era_claim: 0` for BOTH classes
+  and `golive_readiness.ready` is `[]` — **no book holds a measured claim on
+  its current policy**, so nothing today would justify moving either arm UP
+  regardless of who may write it.
+
 ## 2026-08-16 (ni) — THE DAILY REVIEW WAS NOMINATING CORPSES FOR REAL MONEY: its `RETIRED` list was a hand copy frozen at the July cut while TWELVE books retired under it — including four the red-stop slate killed the day before
 
 - **FOUND BY THE DAILY REVIEW'S OWN OUTPUT.** The 16-Aug run's 🔭 gate-horizon

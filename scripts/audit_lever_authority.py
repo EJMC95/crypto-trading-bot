@@ -527,6 +527,15 @@ LEVER_AUTHORITY_OK = {
         "measured, out-of-sample and in dollars, by fleet_proprioception's "
         "live-lane episodes; re-deriving it here would duplicate that organ "
         "and give the operator two numbers to reconcile."),
+    "lever:live.avo.clip_scale": (
+        "Same shape as live.clip_scale above and declared for the same reason: "
+        "a multiplier, not a threshold, so it gates no population. [2026-08-16 "
+        "(nj)] It exists because 🙏 Avo took the live slot on 13-Aug and was "
+        "being sized by 💸 the Farmer's evidence through ONE shared dial; each "
+        "live book now carries its own arm. Note this one is RESTRICT-ONLY at "
+        "the consumer (clamped to <=1.0, cage hi 1.0 to match), so its whole "
+        "reachable range shrinks the book — there is no expansion authority "
+        "here for a measurement to vouch for."),
     # --- levers whose CONSUMER is retired -------------------------------------
     # [2026-08-06] 🌊 Tide Rider (retired 1-Aug (if): 9 buys / ZERO sells in 22
     # days) and 🧲 Snap Back (retired 4-Aug (jh): t=-2.97, n=175, the fleet's

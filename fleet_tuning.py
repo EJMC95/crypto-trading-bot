@@ -111,6 +111,14 @@ AUTHOR_LANES = {
     "event-sentinel":   {"event-sentinel"},
 }
 _LIVE_PREFIX_OWNERS = {"live.clip_scale": "evidence-board",
+                       # [2026-08-16 (nj)] every per-book clip arm is the
+                       # board's, same as the shared one it replaced. The
+                       # judge's sole-writer claim on live.funding.* is
+                       # untouched — a new live prefix that matched NOTHING
+                       # here would be unwritable by anyone (the `return
+                       # False` below), so this entry is what makes Avo's
+                       # arm real rather than silently inert.
+                       "live.avo.": "evidence-board",
                        "live.funding.": "experiment-judge"}
 
 
@@ -219,12 +227,32 @@ LEVERS = {
         "kind": "float", "lo": 0.0, "hi": 24.0, "lane": "lighter-taker",
         "note": "hours a symbol stays entry-blocked after its own sl close; "
                 "default 2.0, 0 = off", "env_default": 2.0},
-    # LIVE lane 💰 — one lever, a multiplier on the env clip (LIGHTER_ORDER_USD).
-    # SafetyRails' notional cap stays senior at order time: this reshapes
-    # clips, it can never raise total live exposure.
+    # LIVE lane 💰 — a multiplier on the env clip, ONE ARM PER REAL-MONEY BOOK.
+    # SafetyRails' notional cap stays senior at order time: these reshape
+    # clips, they can never raise total live exposure.
+    # [2026-08-16 (nj)] `live.clip_scale` was a SINGLE dial across every live
+    # book, which stopped being right the day 🙏 Avo took the live slot
+    # (13-Aug (ma)): one number sized a directional funding book and a
+    # swing-dip long book at once, so a Farmer drawdown shrank Avo's clips
+    # and an Avo drawdown moved nothing. Each row now carries its own arm
+    # (evidence_board.LIVE_CLIP_LEVERS). `live.clip_scale` KEEPS ITS NAME and
+    # its meaning — the 💸 Farmer's clip — because renaming a lever its
+    # real-money consumer is reading today opens a protection gap for one
+    # deploy, and that gap is the whole risk of this change.
     "live.clip_scale": {
         "kind": "float", "lo": 0.5, "hi": 1.5, "lane": "lighter-live",
-        "note": "live clip multiplier; 1.0 = the operator's env sizing", "env_default": 1.0},
+        "note": "💸 Farmer live clip multiplier; 1.0 = the operator's env sizing",
+        "env_default": 1.0},
+    # 🙏 Avo Maria's own arm. Cage `hi` is 1.0, not 1.5, because its consumer
+    # is RESTRICT-ONLY by construction — lighter_avo_live_bot.py clamps the
+    # lever to min(1.0, ...) so its gross can never exceed equity (clip =
+    # equity/max_open x this x stake_mult, all three reduce-only). A cage
+    # above 1.0 would register authority the consumer silently discards,
+    # which is the registered-but-inert failure this registry exists to stop.
+    "live.avo.clip_scale": {
+        "kind": "float", "lo": 0.5, "hi": 1.0, "lane": "lighter-live",
+        "note": "🙏 Avo live clip multiplier, restrict-only; 1.0 = equity/slots",
+        "env_default": 1.0},
     # Funding Farmer EXPERIMENT arm 🧪 (the -lshadow twin ONLY — zero real
     # money). The experiment judge runs ONE candidate at a time here; while
     # a candidate runs, the twin is an experiment arm, not a control arm.
