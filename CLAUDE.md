@@ -1374,7 +1374,7 @@ All new bots:
   content of exactly those paths and ignores the index, so a concurrent
   `git add`/`git commit` can neither sweep you in nor you them. Use it by
   default here.
-  **[16-Aug (nv)] CORRECTED IN PLACE (I12) — this said "the fix", and it is
+  **[16-Aug (nx)] CORRECTED IN PLACE (I12) — this said "the fix", and it is
   HALF a fix. MEASURED in a scratch repo, and it failed again the same day:**
   `git commit -o mine.py` correctly leaves another session's `shared.md` edit
   alone, but `git commit -o shared.md` commits **their content together with
