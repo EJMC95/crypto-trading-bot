@@ -282,3 +282,80 @@ def test_tool_selftest_passes():
     r = subprocess.run([sys.executable, TOOL, "--selftest"],
                        capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stdout + r.stderr
+
+def test_a_commit_that_DELETES_a_changelog_entry_is_refused(sc, tmp_path):
+    """THE INCIDENT THAT CLOSED THIS TOOL'S OWN LOOP.
+
+    Committing this tool, a `perl -pi -e 's/(nv)/(nx)/g'` letter-rename matched
+    my own new header AND a concurrent session's entry of the same letter; the
+    file lost 90 lines of their work, the tool committed it faithfully, and the
+    read-back reported success. **True and useless** — `verify_readback` proves
+    the commit matches the WORKING TREE, and the working tree was already
+    corrupt. A receipt for fidelity is not a receipt for correctness, and the
+    only reason it surfaced was the doctrine's separate "did my commit remove an
+    entry?" check.
+
+    `(lz)` records the same destruction (91 lines) from a different cause, which
+    is what makes it a class rather than a slip.
+    """
+    repo = tmp_path / "r"
+    (repo / "scripts").mkdir(parents=True)
+    def g(*a):
+        return subprocess.run(("git",) + a, cwd=repo, capture_output=True, text=True)
+    g("init", "-q", ".")
+    g("config", "user.email", "t@t")
+    g("config", "user.name", "t")
+    import shutil
+    shutil.copy(TOOL, repo / "scripts" / "session_commit.py")
+    (repo / "CHANGELOG.md").write_text(
+        "## 2026-08-16 (nv) — THEIR ENTRY\n\ntheir body\n\n"
+        "## 2026-08-15 (na) — old\n\nbody\n")
+    g("add", "-A")
+    g("commit", "-qm", "base")
+    before = g("rev-parse", "HEAD").stdout.strip()
+
+    # the global rename destroys theirs while adding mine
+    (repo / "CHANGELOG.md").write_text(
+        "## 2026-08-16 (nx) — MY ENTRY\n\nmy body\n\n"
+        "## 2026-08-15 (na) — old\n\nbody\n")
+
+    r = subprocess.run(
+        [sys.executable, "scripts/session_commit.py", "-m", "mine",
+         "--shared", "CHANGELOG.md"],
+        cwd=repo, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 4, r.stdout + r.stderr
+    assert "DELETES changelog entr" in r.stderr
+    assert "(nv)" in r.stderr, "the destroyed entry must be NAMED (I8)"
+    assert g("rev-parse", "HEAD").stdout.strip() == before, "nothing may commit"
+
+
+def test_removed_entry_headers_is_pure_and_directional(sc):
+    """Additions are not deletions — the check must not fire on every commit."""
+    d = ("+## 2026-08-16 (nx) — mine\n"
+         "-## 2026-08-16 (nv) — theirs\n-body\n")
+    assert sc.removed_entry_headers(d) == ["## 2026-08-16 (nv) — theirs"]
+    assert sc.removed_entry_headers(
+        "+## 2026-08-16 (nx) — only additions\n") == []
+    assert sc.removed_entry_headers("") == []
+    assert sc.removed_entry_headers(None) == []
+
+
+def test_a_MOVED_entry_is_not_a_deleted_one(sc):
+    """The guard's own false positive, caught when it blocked this commit.
+
+    Entries here are prepended constantly, so a repositioned entry shows as
+    BOTH `-##` and `+##`. Reporting the minus alone blocks ordinary reshuffles —
+    and a guard that fires on the normal case is one the next session learns to
+    bypass, which is how a real deletion then walks through ((gl)).
+    """
+    moved_only = ("-## 2026-08-16 (nx) — mine\n"
+                  "+## 2026-08-16 (nx) — mine\n")
+    assert sc.removed_entry_headers(moved_only) == []
+
+    moved_plus_real_deletion = (
+        "-## 2026-08-16 (nx) — mine\n"
+        "+## 2026-08-16 (nx) — mine\n"
+        "-## 2026-08-16 (nv) — theirs, really gone\n")
+    assert sc.removed_entry_headers(moved_plus_real_deletion) == [
+        "## 2026-08-16 (nv) — theirs, really gone"], \
+        "a real deletion alongside a move must still be caught"

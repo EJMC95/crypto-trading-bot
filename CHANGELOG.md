@@ -1,3 +1,101 @@
+## 2026-08-16 (nx) — `git commit -o` WAS ONLY HALF THE SHARED-TREE FIX, AND THE MISSING HALF IS THE ONE THAT KEEPS BITING: it ignores the shared INDEX, never the shared WORKING TREE
+
+- **THE DOCTRINE SAID "THE FIX", AND IT FAILED AGAIN HOURS AFTER BEING
+  FOLLOWED.** `(lz)` prescribed `git commit -o <paths>` for a worktree three
+  sessions share. On 16-Aug `48c04b4` committed THIS session's CLAUDE.md
+  correction under another session's subject anyway — the exact `(lz)` shape,
+  under the `(lz)` mitigation.
+- **MEASURED IN A SCRATCH REPO, both halves, so the split is not a guess:**
+
+      git commit -o mine.py    -> their shared.md edit NOT swept      (correct)
+      git commit -o shared.md  -> their content committed WITH mine   (the hole)
+
+  `--only` commits the **working-tree content** of the named path. It ignores
+  the shared **index** — precisely as documented, and it does deliver that — and
+  it cannot ignore the shared **working tree**. So the protection evaporates the
+  moment your path list names a file another session is also editing, and **the
+  two files that always are, are the two every session must touch:
+  `CHANGELOG.md` and `CLAUDE.md`.**
+- **`scripts/session_commit.py` — the safe path made the easy one.** Structural,
+  not advice: a **private `GIT_INDEX_FILE`** (a concurrent `git add` is
+  unreachable, and this commit cannot disturb anyone's staged set — the `(lz)`
+  index half is gone); **paths are mandatory** (no bare-commit, no `-a`);
+  **shared doctrine files are REFUSED unless passed via `--shared`**, so
+  committing one is a deliberate act rather than a side effect of a path list —
+  the single gate `48c04b4` would have had to walk through; **the full diff of
+  every `--shared` file is printed BEFORE the commit**, because looking is the
+  only way to know a hunk is not yours and the existing "read back what landed"
+  rule fires one step too late; and **snapshot → commit → read-back** against
+  the commit object, since `git diff --cached` is stale the moment it is read in
+  a shared tree.
+- **WHAT IT CANNOT DO, said plainly rather than implied.** Git records no
+  authorship, so no tool built on git can tell whose hunk is whose. A
+  pre-existing foreign edit in a `--shared` file is **surfaced**, never
+  auto-detected. **The only COMPLETE fix is isolation** — one worktree per
+  session (`git worktree add .claude/worktrees/<name>`) gives a private index
+  AND a private working tree. Three of this repo's sessions already work that
+  way; every collision on record came from the ones sharing the main worktree.
+- **THE TOOL SHIPPED WITH A BUG IN ITS OWN MOST IMPORTANT FEATURE, found by
+  running it end-to-end against the real incident rather than trusting its unit
+  tests.** The private index started EMPTY, so `git diff HEAD -- <file>` saw no
+  tracked paths and printed **`deleted file mode`** for the shared file —
+  garbage, in the one output the whole design rests on. The commit was correct
+  throughout (`--only` reads the working tree, not the index), so nothing failed
+  loudly; **only the display lied, which is worse than a crash** — an operator
+  who sees nonsense once stops reading it, and this output *is* the safety
+  mechanism ((gl)). Fixed by seeding the index with `read-tree HEAD`; pinned by
+  a test that asserts the foreign hunk is visible and the phantom deletion is
+  not.
+- **DOGFOODED, AND IT FOUND TWO MORE OF ITS OWN BUGS.** Run on its own commit:
+  (1) `git commit --only` requires every path to be KNOWN to git, so the two NEW
+  files were **silently dropped** and the summary listed neither — a tool that
+  quietly commits LESS than you asked is worse than one that errors; (2) staging
+  twice then aborted on a DELETED path (`fatal: pathspec ... did not match any
+  files`), because the first `add` had already recorded the deletion. Both fixed
+  by staging **once** into the private index and committing that index. Add,
+  edit and delete now round-trip in one commit, read-back verified.
+- **THEN THE TOOL'S OWN COMMIT DESTROYED A CONCURRENT SESSION'S ENTRY, and the
+  read-back said OK.** A `perl -pi -e 's/(nv)/(nx)/g'` letter-rename — the
+  fourth letter collision of this session — matched my new header AND another
+  session's `(nv)` entry of the same letter, deleting 90 lines of their work.
+  `session_commit` committed it faithfully and reported **read-back OK**, which
+  was **true and useless**: `verify_readback` proves the commit matches the
+  WORKING TREE, and the working tree was already corrupt. **A receipt for
+  fidelity is not a receipt for correctness.** It surfaced only through the
+  doctrine's separate "did my commit remove an entry?" check; their entry was
+  restored from `HEAD~1` before the push.
+- **SO THE TOOL NOW REFUSES IT (exit 4).** `removed_entry_headers` scans the
+  STAGED diff of `CHANGELOG.md` and blocks any commit that DELETES a
+  `## <date> (<letter>)` header, naming each one (I8). `(lz)` recorded the same
+  destruction (91 lines) from a different cause, which is what makes it a class
+  rather than a slip — and the lesson generalises past this repo: **a bulk
+  in-place edit corrupts the file BEFORE the commit boundary, so no
+  commit-boundary tool can catch it by fidelity alone; it has to check the
+  file's INVARIANTS.** Never `perl -pi`/`sed` a letter across a file three
+  sessions append to.
+- **AND THE SHARED-TREE PROBLEM BIT A THIRD TIME WHILE THIS WAS BEING BUILT** —
+  the CLAUDE.md correction written for this very entry was swept into another
+  session's Schwager commit before it could be committed here. Recorded because
+  it is the strongest evidence for the last bullet above: mitigation reduces the
+  blast radius, only isolation removes it.
+- **MUTATION-VERIFIED, five mutations, all red**: full-path instead of basename
+  matching (so `docs/CLAUDE.md` slips through); `SHARED_DOCTRINE` emptied (the
+  refusal never fires while every other unit test still passes); `snapshot`
+  skipping missing files (a deletion stops round-tripping); the `read-tree`
+  seed dropped; and **`verify_readback` returning `[]` unconditionally — which
+  SURVIVED the first version of the test**, because that test only asserted
+  `read-back OK` appears on a clean run, and a check that can only pass is not a
+  check. Closed with a direct negative test (mismatch, missing path, and a
+  snapshot-says-deleted-but-HEAD-still-has-it case). A sixth — reverting to the
+  original no-add/`--only` form — reddens both dogfooding tests; two NARROWER
+  attempts (swapping `--only` back alone, or double-adding) SURVIVE, which is
+  itself the finding: the single `git add` is what does the work, not the
+  removal of `--only`, and only reverting both together reproduces the defect.
+- CLAUDE.md's shared-tree rule corrected in place (I12): *"the fix"* → *"the
+  mitigation"*, with the measured index/working-tree split, the tool, and the
+  worktree escape hatch. Letter: written as `(nu)`, renumbered to `(nv)` before
+  commit — a concurrent session took `(nu)` mid-build.
+
 ## 2026-08-16 (nw) — 🎸 BARNES PRICED ITS ENTIRE OPEN BOOK OFF A BOOT-FROZEN MARK: `(nm)` scoped this book out by reading the code, and the live payload said ten priced legs
 
 **`(nm)` left Barnes out on purpose and the reasoning was right about the SLEEVE
@@ -235,85 +333,6 @@ warned against the frozen mark since July) were each CHECKED, not assumed.
   gate is a rolling replay so it self-corrects, but Hull's founding
   n=45/+$4.92/t=+3.27 is a static claim on the same harness. Named, not fixed:
   one house at a time (I11).
-
-## 2026-08-16 (nx) — `git commit -o` WAS ONLY HALF THE SHARED-TREE FIX, AND THE MISSING HALF IS THE ONE THAT KEEPS BITING: it ignores the shared INDEX, never the shared WORKING TREE
-
-- **THE DOCTRINE SAID "THE FIX", AND IT FAILED AGAIN HOURS AFTER BEING
-  FOLLOWED.** `(lz)` prescribed `git commit -o <paths>` for a worktree three
-  sessions share. On 16-Aug `48c04b4` committed THIS session's CLAUDE.md
-  correction under another session's subject anyway — the exact `(lz)` shape,
-  under the `(lz)` mitigation.
-- **MEASURED IN A SCRATCH REPO, both halves, so the split is not a guess:**
-
-      git commit -o mine.py    -> their shared.md edit NOT swept      (correct)
-      git commit -o shared.md  -> their content committed WITH mine   (the hole)
-
-  `--only` commits the **working-tree content** of the named path. It ignores
-  the shared **index** — precisely as documented, and it does deliver that — and
-  it cannot ignore the shared **working tree**. So the protection evaporates the
-  moment your path list names a file another session is also editing, and **the
-  two files that always are, are the two every session must touch:
-  `CHANGELOG.md` and `CLAUDE.md`.**
-- **`scripts/session_commit.py` — the safe path made the easy one.** Structural,
-  not advice: a **private `GIT_INDEX_FILE`** (a concurrent `git add` is
-  unreachable, and this commit cannot disturb anyone's staged set — the `(lz)`
-  index half is gone); **paths are mandatory** (no bare-commit, no `-a`);
-  **shared doctrine files are REFUSED unless passed via `--shared`**, so
-  committing one is a deliberate act rather than a side effect of a path list —
-  the single gate `48c04b4` would have had to walk through; **the full diff of
-  every `--shared` file is printed BEFORE the commit**, because looking is the
-  only way to know a hunk is not yours and the existing "read back what landed"
-  rule fires one step too late; and **snapshot → commit → read-back** against
-  the commit object, since `git diff --cached` is stale the moment it is read in
-  a shared tree.
-- **WHAT IT CANNOT DO, said plainly rather than implied.** Git records no
-  authorship, so no tool built on git can tell whose hunk is whose. A
-  pre-existing foreign edit in a `--shared` file is **surfaced**, never
-  auto-detected. **The only COMPLETE fix is isolation** — one worktree per
-  session (`git worktree add .claude/worktrees/<name>`) gives a private index
-  AND a private working tree. Three of this repo's sessions already work that
-  way; every collision on record came from the ones sharing the main worktree.
-- **THE TOOL SHIPPED WITH A BUG IN ITS OWN MOST IMPORTANT FEATURE, found by
-  running it end-to-end against the real incident rather than trusting its unit
-  tests.** The private index started EMPTY, so `git diff HEAD -- <file>` saw no
-  tracked paths and printed **`deleted file mode`** for the shared file —
-  garbage, in the one output the whole design rests on. The commit was correct
-  throughout (`--only` reads the working tree, not the index), so nothing failed
-  loudly; **only the display lied, which is worse than a crash** — an operator
-  who sees nonsense once stops reading it, and this output *is* the safety
-  mechanism ((gl)). Fixed by seeding the index with `read-tree HEAD`; pinned by
-  a test that asserts the foreign hunk is visible and the phantom deletion is
-  not.
-- **DOGFOODED, AND IT FOUND TWO MORE OF ITS OWN BUGS.** Run on its own commit:
-  (1) `git commit --only` requires every path to be KNOWN to git, so the two NEW
-  files were **silently dropped** and the summary listed neither — a tool that
-  quietly commits LESS than you asked is worse than one that errors; (2) staging
-  twice then aborted on a DELETED path (`fatal: pathspec ... did not match any
-  files`), because the first `add` had already recorded the deletion. Both fixed
-  by staging **once** into the private index and committing that index. Add,
-  edit and delete now round-trip in one commit, read-back verified.
-- **AND THE SHARED-TREE PROBLEM BIT A THIRD TIME WHILE THIS WAS BEING BUILT** —
-  the CLAUDE.md correction written for this very entry was swept into another
-  session's Schwager commit before it could be committed here. Recorded because
-  it is the strongest evidence for the last bullet above: mitigation reduces the
-  blast radius, only isolation removes it.
-- **MUTATION-VERIFIED, five mutations, all red**: full-path instead of basename
-  matching (so `docs/CLAUDE.md` slips through); `SHARED_DOCTRINE` emptied (the
-  refusal never fires while every other unit test still passes); `snapshot`
-  skipping missing files (a deletion stops round-tripping); the `read-tree`
-  seed dropped; and **`verify_readback` returning `[]` unconditionally — which
-  SURVIVED the first version of the test**, because that test only asserted
-  `read-back OK` appears on a clean run, and a check that can only pass is not a
-  check. Closed with a direct negative test (mismatch, missing path, and a
-  snapshot-says-deleted-but-HEAD-still-has-it case). A sixth — reverting to the
-  original no-add/`--only` form — reddens both dogfooding tests; two NARROWER
-  attempts (swapping `--only` back alone, or double-adding) SURVIVE, which is
-  itself the finding: the single `git add` is what does the work, not the
-  removal of `--only`, and only reverting both together reproduces the defect.
-- CLAUDE.md's shared-tree rule corrected in place (I12): *"the fix"* → *"the
-  mitigation"*, with the measured index/working-tree split, the tool, and the
-  worktree escape hatch. Letter: written as `(nu)`, renumbered to `(nv)` before
-  commit — a concurrent session took `(nu)` mid-build.
 
 ## 2026-08-16 (nr) — THE YOUNG SOURCE GOES THROUGH THE HARNESS TOO: the sniper's three admission routes now all execute in a fixture, and the candle probe's REST bill is finally an assertion instead of a comment
 
@@ -1442,6 +1461,46 @@ void rather than as a −3.5R signal.
   with an AST arm requiring every read of `RETIRED` to be the right-hand side
   of an `in`/`not in`; the mutant now reddens. Had I shipped the first version,
   the docstring would have claimed a verification that had not happened.
+
+## 2026-08-16 (nz) — the re-run sweep's first landing: my slate left Howard paging forever for four retired books, and the Parliament's OWN payload reported `errors: 0` through TEN supervisor deaths
+
+- *(Written as (nu); RENUMBERED to (nz) at push time — a concurrent
+  session had taken (nu) for the Schwager re-measure and (ny) for Hull,
+  both cited from tracked code. The cited entry keeps the letter.)*
+- **THE PAGER I LEFT FIRING (mine, from `(nf)`).** Two independent reviewers
+  found it: `parliament/brain.py` built `EXPECTED_BEATS` from the RAW
+  `PM_BOTS`, so the four books `(nf)` retired were still expected to
+  heartbeat, read STALLED at 3× silence forever, and **Howard phone-pushed
+  the operator about a decision the operator had just made.** I pinned
+  `build_bots` to `live_pm_bots()` and missed the watchdog table two files
+  away — the (mo) rule is one declaration, one derivation, and it has to
+  reach every consumer making a LIVE claim. Same fix for the published
+  `roster.books`, which advertised six while four were retired. **The ingest
+  filter deliberately keeps raw `PM_BOTS`** (a retired book's HISTORICAL
+  closes are still Howard's own rows) — the distinction is live claim vs
+  historical membership, and it is now stated at both sites.
+- **THE DEATH COUNTER THAT SURVIVES THE DEATH.** Same sweep, from the 48h bus
+  series: the Parliament supervisor **restarted 10 times in 48h** (instance
+  lifetimes 8 min to 14h) while `data.errors` read **0 in all 567 samples**
+  and `data.cycles` reset on every death — `fleet_immune` caught it from
+  OUTSIDE and paged; the organ itself never said a word. **I13 exactly: a
+  process that STOPS runs no handler, so its own counters are the ones
+  guaranteed not to notice.** Howard now bumps a restart count persisted in
+  the ecosystem DB (Railway volume, monotone) and publishes it at TOP level —
+  outside the `data` block on purpose, because a dark data layer is exactly
+  when a reader needs it. **`None` when the DB cannot answer: UNKNOWN must
+  not read as a healthy zero.** NOT caused by the slate (5 of the 10 predate
+  that deploy); the root cause needs container logs and stays open — what
+  ships here is that the next death is VISIBLE in the payload instead of
+  only to the immune organ.
+- Pinned in `tests/autonomy/test_red_stop_slate.py` (no beat expected for a
+  retired book, greens still watched, roster == living set, the counter
+  survives three boots and publishes under a dark data layer, dark DB
+  publishes UNKNOWN). **Mutation-verified: restoring `PM_BOTS` in
+  `EXPECTED_BEATS` reddens the pager guard.** Two stale hard-coded counts in
+  the selftests (`roster == 6`, `len(EXPECTED_BEATS) >= 15`) were themselves
+  second declarations of the roster and are now derived from
+  `live_pm_bots()`.
 
 ## 2026-08-15 (nh) — MY OWN (mu) FIX HAD A BUG: an entry that is ALSO a shared name was hashed TWICE, and the duplicate appeared or vanished with the CALLER'S PATH FORM — so the currency guard went silently blind on three rows and still exited OK
 

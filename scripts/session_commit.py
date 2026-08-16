@@ -114,6 +114,38 @@ def snapshot(paths):
     return out
 
 
+def removed_entry_headers(diff_text):
+    """-> [header] for every `## <date> (<letter>)` the diff DELETES.
+
+    [2026-08-16 (nx)] WHY THIS EXISTS, and it is the incident that closed this
+    tool's own loop. Committing THIS tool, a `perl -pi -e 's/(nv)/(nx)/g'`
+    letter-rename matched not only my own new header but ANOTHER SESSION'S
+    entry of the same letter, and the file lost 90 lines of their work. The
+    tool committed it faithfully and the read-back reported success — **which
+    was true and useless**: `verify_readback` proves the commit matches the
+    WORKING TREE, and the working tree was already wrong. A receipt for
+    fidelity is not a receipt for correctness.
+
+    So the one check that catches this is structural and cheap: a commit should
+    ADD changelog entries, never REMOVE them. `(lz)` recorded the same
+    destruction (91 lines) from a different cause, which is what makes it a
+    class rather than a slip. Pure, so the selftest can drive it.
+    """
+    added, removed = set(), []
+    for ln in (diff_text or "").splitlines():
+        if ln.startswith("+## ") and not ln.startswith("+++"):
+            added.add(ln[1:].strip())
+        elif ln.startswith("-## ") and not ln.startswith("---"):
+            removed.append(ln[1:].strip())
+    # [(nx)] A MOVED ENTRY IS NOT A DELETED ONE — subtract the additions.
+    # Caught by this guard firing on its own commit: entries here are prepended
+    # constantly, so an entry that shifts position shows as BOTH `-##` and
+    # `+##`, and reporting the minus alone blocks ordinary reshuffles. A guard
+    # that fires on the normal case is one the next session learns to bypass,
+    # which is how a real deletion then walks through ((gl)).
+    return [h for h in removed if h not in added]
+
+
 def verify_readback(snap, index=None):
     """-> [path] whose COMMITTED bytes differ from what we snapshotted.
 
@@ -216,6 +248,28 @@ def main(argv=None):
         st = _git("diff", "--cached", "--stat", "HEAD", index=index)
         print("\n=== will commit ===")
         print(st.stdout or "  (no changes)")
+
+        # [(nx)] A COMMIT MUST NOT DELETE A CHANGELOG ENTRY. Checked on the
+        # STAGED diff, i.e. before anything lands. See `removed_entry_headers`
+        # for the incident: this tool's own commit destroyed a concurrent
+        # session's entry via a global letter-rename, and the read-back passed
+        # because the working tree was already corrupt. Refuses rather than
+        # warns — a warning on a passing run is not a guard ((gl)).
+        gone = removed_entry_headers(
+            _git("diff", "--cached", "HEAD", "--", "CHANGELOG.md",
+                 index=index).stdout)
+        if gone:
+            print("\nREFUSING — this commit DELETES changelog entr(ies):\n",
+                  file=sys.stderr)
+            for h in gone:
+                print(f"    {h[:100]}", file=sys.stderr)
+            print("\nAlmost always a global in-place edit (a `perl -pi`/`sed`\n"
+                  "letter-rename) that matched another session's entry too, or a\n"
+                  "file rebuilt from a stale snapshot. Restore them\n"
+                  "(`git show HEAD:CHANGELOG.md`) and re-run. If a deletion is\n"
+                  "genuinely intended, commit CHANGELOG.md separately.\n",
+                  file=sys.stderr)
+            return 4
         if a.dry_run:
             print("--dry-run: nothing committed")
             return 0
@@ -277,8 +331,28 @@ def selftest():
     finally:
         ROOT = _root
 
+    # [(nx)] removed_entry_headers — the incident that closed the tool's loop
+    d = ("--- a/CHANGELOG.md\n+++ b/CHANGELOG.md\n"
+         "+## 2026-08-16 (nx) — mine\n"
+         "-## 2026-08-16 (nv) — THEIRS, destroyed by a global rename\n"
+         "-some body line\n")
+    got = removed_entry_headers(d)
+    assert got == ["## 2026-08-16 (nv) — THEIRS, destroyed by a global rename"], got
+    assert removed_entry_headers(
+        "--- a/x\n+++ b/x\n+## 2026-08-16 (nx) — only additions\n") == [], \
+        "an ADDED header is not a deletion"
+    assert removed_entry_headers("") == [] and removed_entry_headers(None) == []
+    assert removed_entry_headers("-## not-a-date (xx) — junk") == [
+        "## not-a-date (xx) — junk"], "shape-matched on the header prefix"
+    # a MOVED entry appears as both - and + : not a deletion
+    moved = ("-## 2026-08-16 (nx) — mine\n+## 2026-08-16 (nx) — mine\n"
+             "-## 2026-08-16 (nv) — theirs, really gone\n")
+    assert removed_entry_headers(moved) == [
+        "## 2026-08-16 (nv) — theirs, really gone"], \
+        "a repositioned entry must not read as deleted"
+
     print("session_commit selftest OK (shared files need opt-in incl. nested; "
-          "snapshot round-trips bytes and records deletions)")
+          "snapshot round-trips bytes and records deletions; a commit that DELETES a changelog entry is refused)")
     return 0
 
 
