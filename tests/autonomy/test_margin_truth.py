@@ -160,11 +160,11 @@ def test_the_liq_census_key_is_present_even_when_empty():
 def test_distance_to_liquidation_needs_a_mark_and_is_never_invented():
     pos = [_pos("XAU", liquidation_price="4100.0")]
     without = margin_state_from(_acct(pos))
-    assert "dist_pct" not in without["positions"]["XAU"]
+    assert "dist_frac" not in without["positions"]["XAU"]
     assert without["nearest_liq"] is None, "no mark -> no distance, no guess"
 
     with_mark = margin_state_from(_acct(pos), marks={"XAU": 3500.0})
-    assert with_mark["positions"]["XAU"]["dist_pct"] == pytest.approx(
+    assert with_mark["positions"]["XAU"]["dist_frac"] == pytest.approx(
         abs(3500.0 - 4100.0) / 3500.0)
     assert with_mark["nearest_liq"]["coin"] == "XAU"
 
@@ -174,13 +174,13 @@ def test_an_UNUSABLE_mark_yields_no_distance_rather_than_a_fake_one(junk):
     """The sharp version of the test above, and the one that catches the real
     bug. Passing NO marks skips the distance branch entirely, so it cannot
     detect a fallback INSIDE that branch — the mutation `m = _num(mark) or liq`
-    survived the no-marks test and published `dist_pct: 0.0`, i.e. "this
+    survived the no-marks test and published `dist_frac: 0.0`, i.e. "this
     position is AT its liquidation price", from nothing but a junk mark.
 
     A mark we cannot parse must produce no distance at all."""
     st = margin_state_from(_acct([_pos("XAU", liquidation_price="4100.0")]),
                            marks={"XAU": junk})
-    assert "dist_pct" not in st["positions"]["XAU"], (
+    assert "dist_frac" not in st["positions"]["XAU"], (
         f"mark {junk!r} produced a distance; an unparseable mark must not "
         f"manufacture a liquidation reading")
     assert st["nearest_liq"] is None
@@ -313,7 +313,7 @@ def test_a_missing_or_zero_margin_tier_yields_no_max_leverage():
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("path", LIVE_PUBLISHERS)
 def test_margin_marks_come_from_the_live_book_not_the_funding_map(path):
-    """`dist_pct` / `nearest_liq` are RISK numbers.
+    """`dist_frac` / `nearest_liq` are RISK numbers.
 
     `funding_map()[coin]["mark"]` is `LighterClient.markets[sym]["last"]`,
     captured by `_load_markets()` at CLIENT CONSTRUCTION and refreshed only by
@@ -374,6 +374,51 @@ def test_a_real_calibration_can_FAIL(monkeypatch):
     # the structural claim that DID survive: a <=1x long has no liq price
     assert M.liq_price(entry, True, 0.999, mmf) == 0.0
     assert M.liq_price(entry, True, 2.0, mmf) > 0.0
+
+
+def test_the_liquidation_distance_names_its_own_unit():
+    """`dist_frac` is a FRACTION (XAU reads 6.35, i.e. 635%). It shipped one
+    commit as `dist_pct` — in the very payload where `imf` had just become
+    `imf_pct` to stop this. A `_pct` name on a ratio is the same 100x class."""
+    st = margin_state_from(
+        _acct([_pos("XAU", liquidation_price="200.0")]), marks={"XAU": 100.0})
+    row = st["positions"]["XAU"]
+    assert row["dist_frac"] == pytest.approx(1.0)      # 200 vs 100 = 1.0, not 100
+    assert "dist_pct" not in row, "a ratio is published under a _pct name again"
+    assert "dist_pct" not in (st["nearest_liq"] or {})
+    assert st["nearest_liq"]["dist_frac"] == pytest.approx(1.0)
+
+
+def test_avo_reads_ONLY_its_own_clip_arm_no_shared_fallback():
+    """THE BRIDGE IS CLOSED. `_clip_scale_now` shipped with a fallback to the
+    shared `live.clip_scale` so the (nj) rollout had no protection gap. That
+    was right for the deploy window and wrong after it: in the steady state
+    the own arm is ABSENT on every read, so the fallback fires and the
+    Farmer's dial steers Avo again the moment the board restricts it — the
+    exact coupling (nj) removed. A bridge with no expiry is the old behaviour
+    with extra steps.
+
+    Serve ONLY the shared lever and Avo must ignore it."""
+    import lighter_avo_live_bot as avo
+    import fleet_tuning as tuning
+
+    served = {}
+
+    def fake_get_lever(name, default, *a, **k):
+        return served.get(name, default)
+
+    orig = tuning.get_lever
+    try:
+        tuning.get_lever = fake_get_lever
+        served.clear()
+        served["live.clip_scale"] = 0.5          # the FARMER's arm, restricted
+        assert avo._clip_scale_now() == 1.0, (
+            "Avo followed the shared lever — it is still steered by the other "
+            "book's evidence, which is the defect (nj) exists to remove")
+        served["live.avo.clip_scale"] = 0.75     # its OWN arm
+        assert avo._clip_scale_now() == 0.75, "Avo ignored its own arm"
+    finally:
+        tuning.get_lever = orig
 
 
 def test_an_accountless_client_makes_NO_venue_call_at_all():

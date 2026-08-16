@@ -196,14 +196,22 @@ def margin_state_from(acct, marks=None):
             m = _num(mark)
             if m and m > 0:
                 row["mark"] = m
-                row["dist_pct"] = abs(m - liq) / m
+                # [2026-08-16] `dist_frac`, NOT `dist_pct`. This is a FRACTION
+                # — XAU reads 6.35, i.e. 635% — and it shipped one commit under
+                # a `_pct` name, in the same payload where I had just renamed
+                # `imf` to `imf_pct` to stop exactly this. Caught by a peer
+                # against the live feed. Each name states its own unit, so
+                # `imf_pct` (percent) and `dist_frac` (fraction) sit together
+                # unambiguously; renaming the FIELD rather than rescaling the
+                # VALUE keeps every number already published still true.
+                row["dist_frac"] = abs(m - liq) / m
         out[coin] = row
 
     nearest = None
-    priced = [(r["dist_pct"], c) for c, r in out.items() if "dist_pct" in r]
+    priced = [(r["dist_frac"], c) for c, r in out.items() if "dist_frac" in r]
     if priced:
         d, c = min(priced)
-        nearest = {"coin": c, "dist_pct": d, "liq": out[c].get("liq"),
+        nearest = {"coin": c, "dist_frac": d, "liq": out[c].get("liq"),
                    "mark": out[c].get("mark")}
 
     return {

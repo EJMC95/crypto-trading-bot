@@ -132,7 +132,6 @@ def clip_usd(equity):
 
 
 LIVE_CLIP_LEVER = "live.avo.clip_scale"
-LIVE_CLIP_LEVER_LEGACY = "live.clip_scale"
 
 
 def _clip_scale_now():
@@ -141,15 +140,24 @@ def _clip_scale_now():
     code path publishes (the halt paths publish before the entry section
     refreshes its loop-local copy). Fail-open 1.0 on a dark rail.
 
-    [2026-08-16 (nj)] THIS BOOK NOW HAS ITS OWN ARM. It used to read
+    [2026-08-16 (nj)] THIS BOOK HAS ITS OWN ARM. It used to read
     `live.clip_scale` — the SHARED live dial — so 🙏 Avo was sized by a
     decision the evidence board made from 💸 the Farmer's metrics alone (Avo
-    was not even in the board's LIVE_ROWS cohort). Own arm first, shared
-    lever as FALLBACK: during the deploy window where the board already
-    writes per-row and this container has not restarted, or vice versa,
-    there must be no cycle in which NO restriction can reach this book. The
-    fallback is why the rollout has no protection gap; it is not a second
-    source of truth, and the own-arm value wins whenever it exists.
+    was not even in the board's LIVE_ROWS cohort).
+
+    [2026-08-16, BRIDGE CLOSED] It shipped with a fallback to the shared
+    lever, justified as "no protection gap during the deploy window". That
+    was right for the window and WRONG the moment it closed: with no live
+    clip lever in force (the steady state), Avo's own arm is absent on every
+    read, so the fallback fires and the Farmer's dial steers Avo again the
+    instant the board restricts it — restoring the exact coupling (nj)
+    existed to remove. A bridge with no expiry is not a bridge, it is the
+    old behaviour with extra steps. Both consumers are now deployed and
+    verified by stamp (board in freqtrade-bots; this book at c317eb48e37b),
+    and the board writes per-row — `live_released_ts` reads as a per-row map
+    on the live payload — so the bridge is spent and removed. This book now
+    reads ITS OWN arm and nothing else; absent means 1.0, the operator's env
+    sizing, never another book's verdict.
 
     RESTRICT-ONLY, and that is structural rather than a policy: the clamp is
     min(1.0, ...), so this lever can only ever SHRINK Avo's clip. With
@@ -158,10 +166,8 @@ def _clip_scale_now():
     reaches past it. The registry cage (hi = 1.0) mirrors this exactly."""
     try:
         import fleet_tuning as tuning
-        raw = tuning.get_lever(LIVE_CLIP_LEVER, None)
-        if raw is None:
-            raw = tuning.get_lever(LIVE_CLIP_LEVER_LEGACY, 1.0)
-        return max(0.25, min(1.0, float(raw)))
+        return max(0.25, min(1.0, float(
+            tuning.get_lever(LIVE_CLIP_LEVER, 1.0))))
     except Exception:  # noqa: BLE001
         return 1.0
 
