@@ -1,3 +1,64 @@
+## 2026-08-16 (os) — 🛡️ THE IMMUNE ORGAN DID NOT RUN FOR 41 MINUTES AND ITS OWN FRESHNESS CONTRACT SAID IT WAS FINE: a boot stagger longer than the gap between deploys is an organ that never starts
+
+**Found while verifying `(oi)`.** The Parliament's restart fix landed and I went
+to confirm the detector half had executed. It had not — and neither had
+anything else the organ does. `fleet-immune` last published **03:38:49Z** and
+was still on that timestamp 41 minutes later.
+
+**THE MECHANISM.** `run_all.sh` launched it as
+`( sleep 540; while true; do run; sleep 900; done )`. That 540s fuse is a
+thundering-herd stagger — one of NINETEEN, 60s..900s — and **every container
+restart resets it**. Measured: freqtrade-bots redeployed **10 times between
+03:40Z and 04:09Z**, gaps of **0:36 .. 7:31**, every one shorter than the fuse.
+The organ was killed mid-`sleep` on every boot and executed **zero times**.
+Not slow, not crashed — never started. Corroborated independently by the
+Parliament's own `restarts` counter climbing 3→5 in the same window: the
+container churn was plainly visible, and the organ whose job is noticing such
+things was the one thing not running.
+
+**WHY NOTHING CAUGHT IT — two independent blind spots, both worth keeping.**
+1. **ITS TTL IS SLACKER THAN ITS LOOP.** `ttl_sec` 2400 against a 900s
+   interval, so a 40-minute silence sits INSIDE its own freshness contract and
+   the watchdog reads a healthy key. The `(mw)` shape — a TTL absorbing a
+   missed cadence — landing on the organ that exists to catch payloads that
+   are fresh and wrong (I1's own twin).
+2. **`audit_organ_silence` ((hw)) CANNOT COVER THIS BY CONSTRUCTION.** It
+   routes organs through `organ_main` so a CRASH is recorded on the organ's
+   own key. A process killed during `sleep` never reaches `main()`, so there
+   is nothing to record and nobody to record it. **Crash-reporting and
+   never-starting are different failures, and only the first was guarded.**
+
+**FIXED: one guaranteed execution per boot, BEFORE the stagger.** The stagger
+survives (now `IMMUNE_BOOT_STAGGER_SEC`, default 540) and does its original
+herd-spreading job for every subsequent cycle; steady-state cadence is
+unchanged. A restart now costs at most one duplicated run instead of the whole
+organ. **The fix is self-healing under the very condition that caused the bug**
+— with no fuse in front of the first run, the next boot executes immediately
+however fast the deploys are coming, which is why it was shipped DURING the
+storm rather than waiting it out. My own earlier reasoning (that pushing would
+reset the fuse and extend the outage) was wrong and is recorded as wrong.
+
+**NOT FIXED, DECLARED.** Seven siblings carry the identical shape and were
+**all** silent across the same window: proprioception 540, judge 480,
+scout-tuner 420, incubator 600, regen 660, radar 660, impl-shortfall 720. They
+are not patched in this pass because applying the same change to all eight
+recreates at boot exactly the herd the staggers exist to spread, and that trade
+wants its own measurement rather than a reflex. 🛡️ goes first because it is the
+pageable safety organ and the only one whose silence disables a live actuator
+(growth-rail lever quarantine — fail-safe open, so the cost is lost detection,
+not a wrong action). `test_the_starved_siblings_are_declared_not_forgotten`
+pins the declaration so the next reader finds a decision, not an oversight.
+
+**Guarded**: `tests/autonomy/test_immune_boot_execution.py`. **Five mutations
+verified RED**: the run moved back behind the stagger (the original bug), the
+stagger deleted entirely, `|| true` dropped so one sick organ could take the
+supervisor down, the sibling declaration removed, and a shell syntax error
+(which would silence the WHOLE container, not one organ).
+
+**Container-shape change only** — no bot logic, no lever, no gate, no trade
+behaviour. `bash -n` clean, and the syntax check is itself one of the pinned
+assertions.
+
 ## 2026-08-16 (or) — `(op)`'s UPGRADE REACHED THE HEADER AND NOT THE FUNCTION A CONSUMER READS — and the guard written to prevent that was itself vacuous twice
 
 - **CAUGHT BY PEER REVIEW, and it is the I12 shape rather than a typo.**

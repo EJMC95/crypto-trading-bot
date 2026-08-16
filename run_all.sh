@@ -245,7 +245,40 @@ done &
 # growth-rail lever (fleet_tuning honors it -> reverts to operator default),
 # phone-pushes NEW sickness. Restrict/clean only; fail-safe (dead immune =
 # no quarantine).
-( sleep 540
+# [2026-08-16 (os)] ONE RUN BEFORE THE BOOT STAGGER, because a stagger longer
+# than the gap between container restarts means the organ NEVER RUNS AT ALL.
+# MEASURED: freqtrade-bots redeployed 10x between 03:40Z and 04:09Z (gaps
+# 0:36-7:31, every one under this 540s fuse), and 🛡️ the immune organ went
+# from 03:38:49Z to 41+ minutes with ZERO executions — killed mid-fuse on
+# every boot. Its own restart counter was not the sensor either: the
+# Parliament's `restarts` climbed 3->5 across the same window, so the
+# container churn was plainly visible while the organ that exists to notice
+# such things was the one thing not running.
+#
+# WHY NOTHING CAUGHT IT, and this is the part worth keeping: the organ
+# publishes `ttl_sec` 2400 against a 900s loop, so a 40-minute silence is
+# still INSIDE its own freshness contract and the watchdog sees a healthy
+# key. And `audit_organ_silence` ((hw)) cannot cover this class by
+# construction — it routes organs through `organ_main` so a CRASH is
+# recorded on the organ's own key, but a process killed during `sleep` never
+# reaches main(), so there is nothing to record and nobody to record it.
+# Crash-reporting and never-starting are different failures.
+#
+# The fix is one guaranteed execution per boot, BEFORE the stagger; the
+# stagger then does its original thundering-herd job for every subsequent
+# cycle, and steady-state cadence is unchanged. A restart now costs at most
+# one duplicated run instead of the whole organ.
+#
+# NOT FIXED HERE, and declared rather than silently left: seven sibling
+# organs carry the same shape (proprioception 540, judge 480, scout-tuner
+# 420, incubator 600, regen 660, radar 660, impl-shortfall 720) and every
+# one of them was ALSO silent across this window. They are not patched in
+# the same pass because applying this to all eight recreates at boot exactly
+# the herd the staggers exist to spread, and that trade wants its own
+# measurement. 🛡️ goes first because it is the pageable safety organ and the
+# only one whose silence disables a live actuator (lever quarantine).
+( python3 /freqtrade/fleet_immune.py || true
+  sleep "${IMMUNE_BOOT_STAGGER_SEC:-540}"
   while true; do
     python3 /freqtrade/fleet_immune.py || true
     sleep "${IMMUNE_INTERVAL_SEC:-900}"
