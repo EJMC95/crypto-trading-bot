@@ -793,6 +793,47 @@ class TestLedgerQuarantine:
         assert not s.is_quarantined(self.BOT, "CXMT/USDC", "2026-07-16T13:21:42+00:00")
         assert not s.is_quarantined(self.BOT, "CXMT/USDC", "2026-07-30T01:34:49+00:00")
 
+    def test_the_pre_nm_frozen_mark_entries_are_withheld(self):
+        """[(pv)] 🧘 douglas's two 15-Aug closes were booked at a mark frozen
+        at container construction — `(nm)` measured both against the venue's
+        own 1h bars (ROBO's entry sat 21% above the whole hour's high) and
+        ruled them void, then wired that verdict into nothing. They are 97%
+        of the book's realised record, which becomes its ~12-Sep grade."""
+        import bot_pnl_store as s
+        D = "book-douglas-lshadow"
+        assert s.is_quarantined(D, "ROBO", "2026-08-15T13:35:41.141319+00:00")
+        assert s.is_quarantined(D, "LINK", "2026-08-15T13:35:41.016732+00:00")
+
+    def test_douglas_closes_on_the_FIXED_build_stay_in_the_sample(self):
+        """The window is one day for a reason. `(nm)`'s own in-place
+        correction refuted "every pre-(nm) position is phantom" — the frozen
+        mark's error grows with container UPTIME, so 🧙 Schwager's four legs
+        all priced inside their bars. These four 17-Aug closes are real
+        evidence and a quarantine that swallowed them would hide a loss."""
+        import bot_pnl_store as s
+        D = "book-douglas-lshadow"
+        for pair, ts in (("SOL", "2026-08-17T01:02:47+00:00"),
+                         ("HYPE", "2026-08-17T02:52:47+00:00"),
+                         ("ZEC", "2026-08-17T08:22:47+00:00"),
+                         ("APEX", "2026-08-17T15:52:47+00:00")):
+            assert not s.is_quarantined(D, pair, ts), pair
+        # and it must not reach across books: LINK trades on several.
+        assert not s.is_quarantined("perps-funding-spread-lshadow", "LINK",
+                                    "2026-08-15T13:35:41+00:00")
+        assert not s.is_quarantined("band-garrett-lshadow", "LINK",
+                                    "2026-08-15T13:35:41+00:00")
+        # THE UPPER EDGE OF THE WINDOW, pinned on the quarantined PAIRS
+        # themselves — the assertions above use pairs that are not in the
+        # table at all, so they cannot see the window move. Found by a
+        # mutation that widened 15..15 to 15..17 and survived: douglas holds
+        # no ROBO/LINK close on those days TODAY, so only this pins it. The
+        # fixed build shipped 16-Aug, which makes any later ROBO/LINK close
+        # real evidence that must never be swallowed retroactively.
+        for pair in ("ROBO", "LINK"):
+            assert not s.is_quarantined(D, pair, "2026-08-16T00:00:00+00:00"), pair
+            assert not s.is_quarantined(D, pair, "2026-08-17T12:00:00+00:00"), pair
+            assert not s.is_quarantined(D, pair, "2026-08-14T23:59:59+00:00"), pair
+
     def test_the_GENUINE_20_jul_stops_are_kept(self):
         """The window is dated for a reason: the two 20-Jul BOT
         long-divergence stops had 47.9/87.2bps gaps — normal book behaviour,

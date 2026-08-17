@@ -1398,6 +1398,30 @@ LEDGER_QUARANTINE = (
     # row). The 16-Jul and 30-Jul CXMT rows are genuine stops and stay.
     ("CXMT/USDC", "ticket-taker", "2026-07-28", "2026-07-28",
      "same basis defect, mirrored: an _sl that booked +$0.42 (hm)"),
+    # [2026-08-18 (pv)] THE PRE-(nm) FROZEN-MARK ENTRIES. `(nm)` measured both
+    # of these against the venue's own 1h bars and ruled them "void rather
+    # than a -3.5R signal" — and then wired that verdict into nothing, so
+    # every grader kept counting them. `funding_map()` served a mark frozen at
+    # client construction, so the ENTRY was booked at a price the venue never
+    # offered while the exit was a real contemporaneous one; the gap between
+    # the two vintages IS the loss. ROBO's real 12:04->13:35 move was -6.7%,
+    # INSIDE its own 7.03% stop — the stop fired on a phantom loss at a
+    # phantom entry. Both closed in the same loop tick (13:35:41.02/.14) after
+    # opening 8.5h apart, which is the frozen mark unfreezing at a restart.
+    # Between them they are 97% of this book's realised record (-$26.48 of
+    # -$23.84 net), so leaving them in makes its ~12-Sep grade meaningless.
+    # SCOPED TO THE TWO MEASURED ROWS, not to "everything pre-(nm)": (nm)'s own
+    # in-place correction refuted that inference — 🧙 Schwager's four legs all
+    # priced INSIDE their bars, because the frozen mark's error grows with
+    # container uptime. The 17-Aug closes are on the fixed build and stay.
+    ("ROBO", "douglas", "2026-08-15", "2026-08-15",
+     "pre-(nm) frozen boot mark: entry 0.017707 vs the 12:00 bar's "
+     "[0.014507, 0.014938] — 21% above the whole hour's high; real move was "
+     "-6.7%, inside its own 7.03% stop (nm)"),
+    ("LINK", "douglas", "2026-08-15", "2026-08-15",
+     "pre-(nm) frozen boot mark: entry 9.15316 vs the 03:00 bar's "
+     "[9.53046, 9.74586] — below the hour's low, matches ~01:00; realised "
+     "-3.31% against a 0.888% stop, 3.73x (nm)"),
 )
 
 

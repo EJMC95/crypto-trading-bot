@@ -1,3 +1,71 @@
+## 2026-08-18 (pv) — `(nm)` RULED TWO ROWS "VOID" AND WIRED IT INTO NOTHING: the verdict lived in prose while every grader kept counting 97% of a book's record
+
+*(Renumbered from (pr) at push time — a concurrent session's Farmer halt-at-boot
+fix took (pr) on origin and is cited by (pt); the cited entry keeps the letter.)*
+
+**Found by the daily evidence review**, from the one number that did not fit:
+🧘 `book-douglas-lshadow` published `pnl_abs −$23.84` over 6 closes while its
+last 4 closes netted **+$2.64**. The whole book was two rows.
+
+| row | recorded | its own stop | overshoot |
+|---|---|---|---|
+| ROBO long, 15-Aug | **−23.16%** | `sl_frac` 7.035% | **3.29×** |
+| LINK short, 15-Aug | −3.31% | `sl_frac` 0.888% | **3.73×** |
+
+**`(nm)` ALREADY MEASURED BOTH AND ALREADY RULED.** Against the venue's own 1h
+bars: ROBO's entry `0.017707` sits **21% above the whole 12:00 hour's high**
+(`[0.014507, 0.014938]`) and LINK's `9.15316` sits **below the 03:00 hour's low**
+(`[9.53046, 9.74586]`). Both exits are real contemporaneous prices, so the loss
+is the gap between two price VINTAGES — `funding_map()` served a mark frozen at
+client construction. ROBO's real 12:04→13:35 move was **−6.7%, inside its own
+7.03% stop**: the stop fired on a phantom loss at a phantom entry. Its own words:
+*"the two closes should be read as void rather than as a −3.5R signal."*
+
+**AND THEN NOTHING CONSUMED IT.** `LEDGER_QUARANTINE` — the fleet's mechanism
+for exactly this, built at `(hr)` for the `BOT/USDC` mark-basis episode, the
+same defect class — carried two ticket-taker entries and neither of these. So
+`fetch_paper_trades` kept serving both rows to the go-live grader, the brain,
+`fleet_allocation` and `study_exit_attribution`. **This file's own rule names
+it: "A finding no gate consumes is a note."** The verdict was a note.
+
+It is not cosmetic. Douglas accrues ~92 closes/30d and is gradeable **~12-Sep on
+its own ledger**, which `(mb)` says outranks any replay (I14) — so these two rows
+were on track to sit inside the 30-day window that decides the book, carrying
+**97% of its realised record** (−$26.48 of a −$23.84 net) and an
+`expectancy_r` of −3.514 in its published telemetry.
+
+**Shipped:** both rows in `LEDGER_QUARANTINE`, each carrying `(nm)`'s measured
+bar. Measured effect: **n=6 / −$23.84 → n=4 / +$2.64**; withheld rows 45 → 47.
+No trade changes, no lever, no era (a correctness fix to how a fixed policy was
+executed, `(nm)`'s own ruling) ⇒ **main-only under `(mm)`**.
+
+**SCOPED TO THE TWO MEASURED ROWS, and that is the load-bearing part.** `(nm)`'s
+own in-place correction refuted the tempting generalisation — *"every pre-(nm)
+position carries a phantom entry"* is FALSE; 🧙 Schwager's four legs all priced
+INSIDE their bars, because **the frozen mark's error grows with container
+uptime**. So the question is never "was it opened before the fix" but "how long
+had its container been up", per position. Nothing else is swept.
+
+**Guarded** in `tests/autonomy/test_payload_contracts.py`: the two rows are
+withheld, and douglas's four 17-Aug closes on the FIXED build stay in the sample
+(a quarantine that swallows real stops hides losses — `is_quarantined`'s own
+rule). **8 of 8 mutations verified RED**, including both window edges and two
+that break `is_quarantined` itself.
+
+**TWO PROCESS NOTES, because the mutation round misreported twice before it was
+right** — the `(po)` class, caught in the act:
+* The first harness scored RED/GREEN with `echo "$out" | grep -q "failed"` under
+  zsh, where `${PIPESTATUS[0]}` is not the exit code and pytest's summary says
+  `FAILED` in caps. **All six mutations read as survivors**; all six actually
+  reddened. A verification harness that cannot fail loudly is the thing being
+  verified.
+* Rewritten to use the exit code, **M3 and M4 still read as survivors — and only
+  one of them was real.** M4 was a stale-`.pyc` artefact ([[mutation-tests-lie-under-out-of-tree-pycache]]):
+  M3/M4 are precisely the two mutations that **preserve file SIZE**, and CPython
+  invalidates bytecode on `(mtime, size)`. M3 was a GENUINE hole — the window's
+  upper edge was pinned only by assertions on pairs that are not in the table at
+  all, so widening `15..15` to `15..17` changed nothing any test could see.
+  Both now covered; the size-preserving mutation is the one to reach for.
 ## 2026-08-18 (pu) — "FIX ANYTHING THAT MAKES MORE MONEY": THE ANSWER IS NOTHING TODAY, AND THE REFUSALS ARE THE DELIVERABLE
 
 Six measured lenses, 55 agents, three adversarial referees per proposal
@@ -320,7 +388,6 @@ probe that looks like it ran:
 fixed, and deliberately outside the new guard's scope: real money first, and a
 guard that reddens on a book nobody has decided about is one the reader learns
 to ignore ((gl)).
-
 ## 2026-08-18 (pq) — A REAL-MONEY DAILY-LOSS HALT THAT A DATABASE BLIP COULD UN-HALT: THE FLAG WAS RE-DERIVED EVERY CYCLE, NEVER LATCHED
 
 🙏 Avo Maria LIVE (`freqtrade-avo-maria-lighter`, real money) read its
