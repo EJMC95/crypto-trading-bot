@@ -3003,6 +3003,32 @@ def main():
                        # overstates trains the operator to ignore it.
                        "min_vol": MIN_VOL,
                        "max_vol": (None if MAX_VOL == float("inf") else MAX_VOL),
+                       # [2026-08-17 (pj)] THE CLASS AXIS, same argument as the
+                       # band above. `(ph)` taught `audit_book_overlap` to read
+                       # each book's own class screen; the three books that
+                       # HAVE one now publish it `(pf)`, and these three rows —
+                       # 💸 Farmer live, 💸 Farmer shadow and 🛢️ Garrett, all
+                       # from this file — were the last printing
+                       # `class screen UNPUBLISHED`, i.e. rule-in-able and
+                       # rule-out-able by nothing.
+                       # **FALSE IS THE TRUE VALUE HERE, and it is a fact about
+                       # this module rather than a default.** This file has no
+                       # `_class_ok` at all: `scan_census` COUNTS non-crypto
+                       # into its own bucket and leaves those coins ELIGIBLE —
+                       # selftest-pinned as *"counted and still eligible —
+                       # reporting a class is not screening it"*. The asymmetry
+                       # against its three sibling funding books is deliberate
+                       # and was MEASURED REFUSED on 16-Aug (live non-crypto
+                       # n=12, t=−0.44 vs shadow +$1.78). So at a mixed gate
+                       # these rows really are rivals for the whole supply, and
+                       # saying so is the honest publication — an UNKNOWN there
+                       # under-informs exactly as a wrong True would overstate.
+                       # A literal is safe because the (pf) guard owns the
+                       # drift: add a module-level ALLOW_NONCRYPTO here and
+                       # `test_class_screen_declared` pulls this file into its
+                       # population, where a hardcoded value fails
+                       # `test_the_declaration_tracks_the_switch_not_a_literal`.
+                       "crypto_only": False,
                        # [2026-08-03] THE CARD'S UNITS COME FROM THE PROCESS NOW.
                        # pnl_dashboard's DESCRIPTIONS carried "clip $20 x cap $80"
                        # and "|APR|>=40%" as PROSE, read from nothing. All three

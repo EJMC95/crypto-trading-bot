@@ -73,24 +73,30 @@ def _module_paths():
     return out
 
 
-def _caps_keys(tree):
-    """Every string key of every dict literal assigned to a `"caps"` entry.
+def _declarations(tree):
+    """Value nodes for every `"crypto_only": <value>` dict key in the module.
 
     AST, not a substring scan: `(hj)` records three tests in one session that
     passed on the prose promising the property they were checking. A comment
     mentioning `crypto_only` must not satisfy this guard.
+
+    [2026-08-17 (pj)] ANY dict literal, not just one under `"caps"`. THIS FLEET
+    HAS TWO PUBLISH SHAPES and `living_gates` reads both — *"top level (💸
+    Farmer, 🛢️ Garrett) or under `caps` (🌾 carry, 🎸 Barnesy, 🏦 Rich Dad)"*.
+    The first cut of this guard knew only the `caps` shape, so it would have
+    reddened a top-level publisher that had done nothing wrong. Found by
+    verifying a claim rather than asserting it: mutating `lighter_funding_bot.py`
+    into this guard's population reddened it while its declaration was present
+    and correct, three lines from the `min_vol`/`max_vol` pair in the same dict.
     """
-    keys = set()
+    out = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Dict):
             continue
         for k, v in zip(node.keys, node.values):
-            if (isinstance(k, ast.Constant) and k.value == "caps"
-                    and isinstance(v, ast.Dict)):
-                for ck in v.keys:
-                    if isinstance(ck, ast.Constant) and isinstance(ck.value, str):
-                        keys.add(ck.value)
-    return keys
+            if isinstance(k, ast.Constant) and k.value == "crypto_only":
+                out.append(v)
+    return out
 
 
 def test_the_scan_finds_the_books_this_is_about():
@@ -108,18 +114,15 @@ def test_the_scan_finds_the_books_this_is_about():
 def test_a_screened_book_declares_its_screen(path, tree):
     if path.name in PARTIAL_SCREEN_OK:
         pytest.skip(PARTIAL_SCREEN_OK[path.name])
-    keys = _caps_keys(tree)
-    assert keys, (
-        f"{path.name} runs a class screen but publishes no `caps` dict at all "
-        "— nothing downstream can read its gate")
-    assert "crypto_only" in keys, (
+    assert _declarations(tree), (
         f"{path.name} runs a crypto-only entry screen (module-level "
-        "ALLOW_NONCRYPTO) and does NOT publish `caps.crypto_only`. Its grade "
-        "then cannot be read: 9 of 🌾 carry's 10 era closes were instruments "
-        "its own gate had refused for four days, and the payload said nothing "
-        "(pf). Add `\"crypto_only\": not ALLOW_NONCRYPTO` to the caps dict, or "
-        "declare the book in PARTIAL_SCREEN_OK with the reason its screen is "
-        f"deliberately incomplete. caps keys found: {sorted(keys)}")
+        "ALLOW_NONCRYPTO) and does NOT publish `crypto_only`. Its grade then "
+        "cannot be read: 9 of 🌾 carry's 10 era closes were instruments its own "
+        "gate had refused for four days, and the payload said nothing (pf). "
+        "Publish `\"crypto_only\": not ALLOW_NONCRYPTO` — either in the `caps` "
+        "dict or top level beside `min_vol`/`max_vol`, whichever shape this "
+        "book already uses — or declare it in PARTIAL_SCREEN_OK with the reason "
+        "its screen is deliberately incomplete.")
 
 
 def test_the_declaration_tracks_the_switch_not_a_literal():
@@ -131,24 +134,16 @@ def test_the_declaration_tracks_the_switch_not_a_literal():
     for path, tree in _module_paths():
         if path.name in PARTIAL_SCREEN_OK:
             continue
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Dict):
-                continue
-            for k, v in zip(node.keys, node.values):
-                if not (isinstance(k, ast.Constant) and k.value == "caps"
-                        and isinstance(v, ast.Dict)):
-                    continue
-                for ck, cv in zip(v.keys, v.values):
-                    if not (isinstance(ck, ast.Constant)
-                            and ck.value == "crypto_only"):
-                        continue
-                    names = {n.id for n in ast.walk(cv)
-                             if isinstance(n, ast.Name)}
-                    if "ALLOW_NONCRYPTO" not in names:
-                        offenders.append(f"{path.name}: {ast.unparse(cv)}")
+        # EVERY declaration in the module, not just the one under `caps` — a
+        # book publishing the honest value in one shape and a stale literal in
+        # the other would have satisfied the narrower check.
+        for cv in _declarations(tree):
+            names = {n.id for n in ast.walk(cv) if isinstance(n, ast.Name)}
+            if "ALLOW_NONCRYPTO" not in names:
+                offenders.append(f"{path.name}: {ast.unparse(cv)}")
     assert not offenders, (
-        "caps.crypto_only must be derived from ALLOW_NONCRYPTO so the "
-        "declaration follows the reversal switch: " + "; ".join(offenders))
+        "crypto_only must be derived from ALLOW_NONCRYPTO so the declaration "
+        "follows the reversal switch: " + "; ".join(offenders))
 
 
 def test_partial_screen_exemptions_carry_a_reason_and_still_exist():

@@ -1,3 +1,54 @@
+## 2026-08-17 (pj) — THE LAST THREE `UNPUBLISHED` CLASS SCREENS, AND THE GUARD FROM THIS MORNING KNEW ONLY ONE OF THE FLEET'S TWO PUBLISH SHAPES
+
+`(ph)` taught `audit_book_overlap` to read each book's own class screen, and its
+three-valued output immediately named who was left: 💸 the Farmer's live row,
+its shadow twin, and 🛢️ Garrett — all three from `lighter_funding_bot.py` — were
+still printing `class screen UNPUBLISHED`, i.e. rule-in-able and rule-out-able
+by nothing.
+
+**THE VALUE IS `False`, AND CHECKING THAT WAS THE WHOLE JOB.** A first grep for
+`ALLOW_NONCRYPTO` in that file returned nothing and I nearly recorded "no
+screen" — but the module DOES thread an `is_crypto` callable into
+`scan_census`. Reading it: the class is **COUNTED into its own bucket and the
+coin stays ELIGIBLE**. The code says so and a selftest pins it —
+*"counted and still eligible — reporting a class is not screening it"* — and the
+asymmetry against its three sibling funding books is declared in place and was
+**measured REFUSED on 16-Aug** (live non-crypto n=12, t=−0.44 vs shadow +$1.78).
+
+So these rows genuinely admit non-crypto, deliberately. At a mixed gate they
+really are rivals for the whole supply, and publishing `False` is the honest
+answer — an UNKNOWN there **under-informs exactly as a wrong `True` would
+overstate**. Published top level beside `min_vol`/`max_vol`, the shape this file
+already uses.
+
+**AND IT FOUND A FALSE POSITIVE IN `(pf)`'s OWN GUARD, HOURS OLD.** I claimed in
+the comment that a future `ALLOW_NONCRYPTO` here would be caught by
+`test_class_screen_declared`, then verified the claim instead of leaving it —
+and it reddened for the **wrong reason**: `test_a_screened_book_declares_its_screen`,
+i.e. *"publishes no declaration"*, while the declaration sat three lines from
+the `min_vol`/`max_vol` pair in the same dict. The guard scanned only dict
+literals under a `"caps"` key.
+
+**This fleet has TWO publish shapes and `living_gates` reads both** — its own
+docstring: *"top level (💸 Farmer, 🛢️ Garrett) or under `caps` (🌾 carry,
+🎸 Barnesy, 🏦 Rich Dad)"*. A guard that knows one of them would have reddened a
+book that had done nothing wrong, which is the cry-wolf failure `(gl)` names and
+the one thing a guard written this morning should not already be doing.
+
+Fixed: `_declarations()` collects `"crypto_only"` value nodes from **any** dict
+literal, and BOTH tests now run off it — so the tracks-the-switch check covers
+every declaration in a module rather than only the `caps` one, closing the
+variant where a book publishes the honest value in one shape and a stale literal
+in the other. Re-mutated: **7 of 7 red**, including a new case that hardcodes the
+value in the *other* shape (🧮 Hull), which the narrower guard could not see.
+With the fix, the future-drift claim now reddens on
+`test_the_declaration_tracks_the_switch_not_a_literal` — the real defect.
+
+`lighter_funding_bot.py` is REAL-MONEY surface, so: **publish-only, changes no
+trade, no lever, no era ⇒ main-only under `(mm)`**, riding to the live container
+on the next marker deploy. The three rows keep printing `UNPUBLISHED` until then,
+which is the guard being honest about a deploy that has not landed rather than a
+bug. 4 selftests green on the live file.
 ## 2026-08-17 (pi) — AN `ENFORCED_AUDITS` MEMBER THAT CANNOT FAIL IN CI: `audit_boot_stagger` could never reach a deploy cadence there, so it asserted nothing on every run that gated a build
 
 `(pg)` fixed the crash. Checking *why* the crash was CI-only turned up the
