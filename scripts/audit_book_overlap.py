@@ -172,6 +172,121 @@ def living_gates(cur):
     return out
 
 
+#: DECLARED cell collisions — living books whose gates already admit the same
+#: supply region. The acknowledged-recurrence idiom (`STAGGER_OK`,
+#: `BORN_DARK_OK`, `PARTIAL_SCREEN_OK`): an entry is a DECISION with an owner,
+#: never a snooze, and an UNDECLARED collision fails the run.
+#:
+#: [2026-08-17 (pl)] Why this exists: I20 says *"run the supply check BEFORE
+#: minting, and name every living book whose gate already admits them"* — and
+#: that check was a command a human had to remember, with the cell's bounds
+#: supplied by hand (`--gate 0.20 --floor 2e6`). Nobody ran it. That is exactly
+#: how THREE books ended up on a cell that holds at most two coins at once. The
+#: rule existed; the run did not — the `(gk)` shape.
+KNOWN_CELL_COLLISIONS = {
+    frozenset({"perps-funding-carry-lshadow", "band-barnes-lshadow",
+               "book-kiyosaki-lshadow"}):
+        "THE CARRY CELL (>=20% TRUE / >=$2M / crypto). Measured 17-Aug over "
+        "9,662 scout snapshots / 33.7 days: occupied 5.93%, at most 2 coins at "
+        "once, 3 distinct coins all window (KAITO 483 snapshots, XMR 71, "
+        "PAXG 38). All three books hold nothing. OPEN, OWNER: OPERATOR — this "
+        "is an I17 keep-or-retire call about how many books the cell supports, "
+        "NOT a band change: re-banding 🛢️ Garrett to free the tier was "
+        "measured and REFUSED (pl) because 6 of 6 of its top-ranked candidates "
+        "are >=20%, so the narrowing would strip the fleet's only "
+        "slot-filling funding book of its entire top of book. Do not stretch "
+        "this line to cover a FOURTH book: minting one here fails this guard, "
+        "which is the point.",
+}
+
+
+def cell_of(g):
+    """(apr_lo, apr_hi, vol_lo, vol_hi, crypto_only) — the supply region a
+    book's own published gate admits. `None` means unbounded on that edge."""
+    return (g.get("enter_apr"), g.get("apr_hi"),
+            g.get("min_vol"), g.get("max_vol"), g.get("crypto_only"))
+
+
+def _ranges_overlap(lo_a, hi_a, lo_b, hi_b):
+    """Half-open [lo, hi) overlap, with None as unbounded on either edge."""
+    lo = max(lo_a or 0.0, lo_b or 0.0)
+    hi = min(float("inf") if hi_a is None else hi_a,
+             float("inf") if hi_b is None else hi_b)
+    return lo < hi
+
+
+def cells_collide(ga, gb):
+    """Do these two books' gates admit any of the same supply?
+
+    Both the apr band and the volume band must overlap. The class screen is
+    NOT a separating axis: a crypto-only book and an unscreened one still
+    compete for every crypto coin in the region, which is the whole supply the
+    crypto-only one can see.
+    """
+    a, b = cell_of(ga), cell_of(gb)
+    return (_ranges_overlap(a[0], a[1], b[0], b[1])
+            and _ranges_overlap(a[2], a[3], b[2], b[3]))
+
+
+def intersect(ga, gb):
+    """The supply region both gates admit: (apr_lo, apr_hi, vol_lo, vol_hi,
+    crypto_only). `crypto_only` is the STRICTER of the two — the region they
+    genuinely contend for is only the part both can take."""
+    a, b = cell_of(ga), cell_of(gb)
+    return (max(a[0] or 0.0, b[0] or 0.0),
+            min(float("inf") if a[1] is None else a[1],
+                float("inf") if b[1] is None else b[1]),
+            max(a[2] or 0.0, b[2] or 0.0),
+            min(float("inf") if a[3] is None else a[3],
+                float("inf") if b[3] is None else b[3]),
+            bool(a[4]) or bool(b[4]))
+
+
+def collisions(gates, has_supply=None):
+    """Connected components of the gate-overlap graph, size >= 2.
+
+    Components, not pairs: three books on one cell is ONE finding the operator
+    decides once, not three pairwise ones they have to reassemble.
+
+    [(pl)] `has_supply(region) -> bool` makes the edge MATERIAL rather than
+    merely set-theoretic, and without it this detector is useless. Measured on
+    the first run: 🌾/🎸/🏦 (`apr>=20%, vol>=$2M`) and 💸 the Farmer
+    (`apr>=5%, vol>=$10M`) DO intersect on paper — at `apr>=20%, vol>=$10M` —
+    so the transitive closure fused two genuinely different tiers into one
+    5-book blob and reported it as a single cell. **That intersection has ZERO
+    supply and always has**: `(ly)` measured it when 🎸's `extreme` sleeve died
+    of the same $10M floor — *"no crypto book has ever cleared it at the 20%
+    bar: observed max $5.53M, KAITO."* An overlap with no supply is not a
+    collision, and a detector that fuses adjacent tiles over an empty sliver is
+    one the operator learns to ignore (I20's own corollary).
+
+    Omitting `has_supply` gives the pure set-theoretic answer, which is what
+    the tests pin — the tape is not available to them.
+    """
+    names = sorted(gates)
+    parent = {n: n for n in names}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            if not cells_collide(gates[a], gates[b]):
+                continue
+            if has_supply is not None and not has_supply(
+                    intersect(gates[a], gates[b])):
+                continue
+            parent[find(a)] = find(b)
+    groups = defaultdict(set)
+    for n in names:
+        groups[find(n)].add(n)
+    return sorted((frozenset(v) for v in groups.values() if len(v) > 1),
+                  key=lambda s: (-len(s), sorted(s)))
+
+
 def class_reach(g, supply_coins, is_crypto):
     """(n_reachable, note) — how many of THIS supply's coins the book's own
     class screen actually lets it take.
@@ -448,6 +563,118 @@ def report_supply(cur, gate: float, floor: float, persist_h: float,
     return 0
 
 
+def supply_in(rows, classes, region, persist_h=6.0):
+    """(snapshots_with_supply, {coin: count}) for a cell region over the tape.
+
+    The same walk `report_supply` runs, parameterised by a region so the
+    collision check can ask "is this intersection actually populated?".
+    """
+    apr_lo, apr_hi, vol_lo, vol_hi, crypto_only = region
+
+    def is_crypto(c):
+        try:
+            return int(classes.get(c)) == CRYPTO_CLASS
+        except (TypeError, ValueError):
+            return False
+
+    hot, snaps, coins = {}, 0, defaultdict(int)
+    for ts, p in rows:
+        t = ts.timestamp()
+        f, v = p.get("funding") or {}, p.get("vols") or {}
+        q = []
+        for c, apr_pct in f.items():
+            try:
+                apr = abs(float(apr_pct)) / 100.0
+            except (TypeError, ValueError):
+                hot.pop(c, None)
+                continue
+            if apr >= apr_lo:
+                hot.setdefault(c, t)
+            else:
+                hot.pop(c, None)
+                continue
+            if apr >= apr_hi:
+                continue
+            try:
+                vol = float(v.get(c)) * 1e6
+            except (TypeError, ValueError):
+                continue
+            if not (vol_lo <= vol < vol_hi):
+                continue
+            if (t - hot[c]) < persist_h * 3600.0:
+                continue
+            if crypto_only and not is_crypto(c):
+                continue
+            q.append(c)
+        if q:
+            snaps += 1
+            for c in q:
+                coins[c] += 1
+    return snaps, dict(coins)
+
+
+def report_collisions(cur) -> int:
+    """Which LIVING books already share a supply cell? Returns the number of
+    UNDECLARED collisions — the only thing that fails.
+
+    [(pl)] This is I20's check, run off the books' OWN published gates instead
+    of a cell a human had to type. It only became possible once every funding
+    book published its full gate: the volume band `(lz)`, the apr ceiling
+    `(mh)`, and the class screen `(pf)`/`(pj)`.
+    """
+    gates = living_gates(cur)
+    # TWO ARMS OF ONE BOOK ARE NOT TWO BOOKS — the same rule `report_now` runs.
+    # 💸 the Farmer's live row and its control twin have IDENTICAL gates by
+    # construction (that is what makes the judge's paired bar valid), so they
+    # collide with each other trivially and reporting it is pure noise.
+    for pair in ARM_PAIRS:
+        keep = sorted(pair & set(gates))
+        for drop in keep[1:]:
+            gates.pop(drop, None)
+    cur.execute("SELECT ts, payload FROM bot_state_history "
+                "WHERE key='lighter-market' ORDER BY ts")
+    rows = cur.fetchall()
+    classes = (rows[-1][1] or {}).get("classes", {}) if rows else {}
+    # Fail OPEN on a dark tape: with no history every region reads empty and
+    # the guard would report "no collisions" — a false all-clear. Fall back to
+    # the set-theoretic answer, which over-reports rather than under-reports.
+    _has = (lambda r: bool(supply_in(rows, classes, r)[1])) if rows else None
+    found = collisions(gates, has_supply=_has)
+    print("=" * 78)
+    print("CELL COLLISIONS — living books whose OWN gates admit the same supply")
+    print("=" * 78)
+    if not found:
+        print("  no two living books share a supply cell.")
+        return 0
+    undeclared = 0
+    for grp in found:
+        why = KNOWN_CELL_COLLISIONS.get(grp)
+        head = "DECLARED" if why else "!! UNDECLARED"
+        print(f"\n  {head}: {len(grp)} books share a cell")
+        for b in sorted(grp):
+            g = gates[b]
+            mn, mx = g.get("min_vol"), g.get("max_vol")
+            hi = g.get("apr_hi")
+            print(f"     {b:32s} apr=[{g['enter_apr']:.3g},"
+                  f"{'inf' if hi is None else f'{hi:.3g}'})"
+                  f"  vol=[{(mn or 0)/1e6:.2f}M,"
+                  f"{'inf' if mx is None else f'{mx/1e6:.2f}M'})"
+                  + ("  crypto-only" if g.get("crypto_only") is True else "")
+                  + ("   [REAL MONEY]" if b in LIVE_BOOKS else ""))
+        if why:
+            print(f"     -> {why}")
+        else:
+            undeclared += 1
+            print("     -> NOT DECLARED. Either differentiate the gate (a "
+                  "different apr BAND or volume\n        TIER — 🧮 Hull's "
+                  "[2M,10M)x[7.8%,20%) is the worked example), or add this "
+                  "group to\n        KNOWN_CELL_COLLISIONS with the "
+                  "measurement, the reason and an owner (I20).")
+    if undeclared:
+        print(f"\n  FINDING: {undeclared} undeclared cell collision(s).")
+    return undeclared
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -468,7 +695,14 @@ def main() -> int:
         if args.gate is not None:
             return report_supply(cur, args.gate, args.floor, args.persist_h,
                                  not args.allow_noncrypto)
+        # [(pl)] The cell check runs by DEFAULT and needs no arguments — that is
+        # the entire point. I20's instruction was to run the supply check before
+        # minting, with the cell typed by hand, and it was never run.
+        undeclared = report_collisions(cur)
+        print()
         hard = report_now(cur)
+        if undeclared:
+            return 1
         if args.strict:
             held, _s = holdings(cur)
             by = defaultdict(int)

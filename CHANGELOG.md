@@ -1,3 +1,83 @@
+## 2026-08-17 (pl) — THE CARRY-CELL RE-BAND IS MEASURED AND REFUSED; WHAT SHIPS INSTEAD IS THE CHECK THAT WOULD HAVE CAUGHT THE CELL FILLING UP
+
+Asked to fix the three-books-one-cell problem. **The specific design on the
+table is a step back, with a number, so it is not shipped** — and the thing that
+let three books land there silently is.
+
+### THE REFUSAL
+
+The option carried since 16-Aug: split the thin tier, 🛢️ Garrett to
+`[5%, 20%)` and 🏦 Rich Dad to `[20%, ∞)`, freeing the crowded carry cell. Its
+named trap was the I18 subset shape, so both edges had to move together.
+
+**There is a second cost, and it is decisive. 🛢️ Garrett is a RANKED selector**
+— `elig.sort(reverse=True)` on `abs(apr)`, cap 6 — so an apr ceiling does not
+trim its marginal candidates, it removes the ones it picks FIRST. Measured
+against the live scout, in-band (`$0.1–2M`), 40 candidates:
+
+| rank | coin | \|TRUE apr\| | vol |
+|---|---|---:|---:|
+| 1 | H100 | 2085.8% | $1.40M |
+| 2 | KAITO | 145.4% | $0.67M |
+| 3 | SKHYNIXUSD | 144.5% | $1.00M |
+| 4 | ROBO | 97.2% | $0.15M |
+| 5 | FOGO | 63.9% | $0.44M |
+| 6 | PENDLE | 53.4% | $0.14M |
+
+**All 6 of the top 6 — its entire cap — are ≥20%.** Capping it there removes
+exactly the coins it takes, every cycle; 31 candidates remain, all ranked below.
+And this is the fleet's ONLY funding book currently filling its slots (6 of 6
+held, 27 eligible refused), being asked to hand its whole top of book to 🏦 Rich
+Dad — **a book with zero closes**, into a sub-band whose median candidate count
+is **0** (28.7% occupied, persistence applied).
+
+Garrett's own claim is `0.0` on n=10, so I cannot argue the high-APR tail is
+load-bearing — and equally cannot argue it is not. **An unpriced expectancy cost
+on the one book that works, to feed a book that has never traded, is I19's
+definition of a step back wearing a growth costume.** Refused with the number.
+
+**The honest restatement:** the carry cell supports **at most 2 coins at once**
+and **three books** sit in it. That is a question of how many books, not which
+bands — an I17 keep-or-retire call, and the operator's.
+
+### WHAT SHIPS
+
+**I20 said *"run the supply check BEFORE minting"* and the check was a command a
+human had to remember, with the cell typed by hand (`--gate 0.20 --floor 2e6`).
+Nobody ran it. That is exactly how three books ended up on one cell** — the
+`(gk)` shape: the rule existed, the run did not.
+
+`audit_book_overlap` now derives the cells from the books' OWN published gates
+and reports collisions **by default, with no arguments**. Only possible now that
+every funding book publishes its whole gate: the volume band `(lz)`, the apr
+ceiling `(mh)`, the class screen `(pf)`/`(pj)`/`(pk)`.
+
+Declared collisions live in `KNOWN_CELL_COLLISIONS` with the measurement, the
+reason and an owner — the `STAGGER_OK`/`BORN_DARK_OK` idiom, a decision rather
+than a snooze. **An UNDECLARED collision exits non-zero, so a FOURTH book minted
+into the carry cell fails**, which is the whole point.
+
+**TWO DEFECTS IN MY OWN FIRST RUN, both found by running it rather than
+reasoning about it:**
+
+1. **It fused two tiers over an empty sliver.** Carry (`≥20%, ≥$2M`) and 💸 the
+   Farmer (`≥5%, ≥$10M`) *do* intersect on paper — at `≥20%, ≥$10M` — so the
+   transitive closure reported one 5-book blob. **That region has zero supply
+   and always has**: `(ly)` found it independently when 🎸's `extreme` sleeve
+   died on the same $10M floor (*"no crypto book has ever cleared it at the 20%
+   bar — observed max $5.53M, KAITO"*), and this run reproduces it at **0
+   snapshots / 0 coins over 9,693**. Edges are now MATERIAL — measured against
+   the tape — not merely set-theoretic. Fail-OPEN on a dark tape: with no
+   history it falls back to the set-theoretic answer, which over-reports rather
+   than delivering a false all-clear.
+2. **It counted 💸 the Farmer's two arms as two books.** They have identical
+   gates *by construction* — that is what makes the judge's paired bar valid.
+   Collapsed via the existing `ARM_PAIRS`, the same rule `report_now` runs.
+
+Result: one finding, correctly declared, instead of a 5-book blob and a false
+positive. **9 mutations verified red**, including one that drops materiality,
+one that lets it silence everything, one that empties the declaration table and
+one that strips the OWNER out of a declaration.
 ## 2026-08-17 (pk) — 🎯 THE PARTIAL SCREEN WAS EXEMPT INSTEAD OF PUBLISHED, AND THE BOOK IT HID IS THE ONE WHOSE STALE VERDICT CAN NEVER AGE OUT
 
 **Found from the daily brief**, ranked as its one growth item. 🎯

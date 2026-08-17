@@ -147,6 +147,80 @@ class TestTheGateItself:
         assert mod.admits(g, 0.05, 2e6) == "unknown"
 
 
+class TestCellCollisions:
+    """[(pl)] I20's check, run off the books' own published gates instead of a
+    cell a human had to type. It was a manual command nobody ran — which is how
+    THREE books ended up on a cell that holds at most two coins at once."""
+
+    CARRY = {"enter_apr": 0.20, "min_vol": 2e6, "max_vol": None,
+             "crypto_only": True, "vol_known": True}
+    FARMER = {"enter_apr": 0.05, "min_vol": 10e6, "max_vol": None,
+              "crypto_only": False, "vol_known": True}
+    GARRETT = {"enter_apr": 0.05, "min_vol": 1e5, "max_vol": 2e6,
+               "crypto_only": False, "vol_known": True}
+    HULL = {"enter_apr": 0.0782, "apr_hi": 0.20, "min_vol": 2e6,
+            "max_vol": 10e6, "crypto_only": True, "vol_known": True}
+
+    def test_identical_gates_collide(self):
+        assert mod.cells_collide(self.CARRY, dict(self.CARRY))
+
+    def test_a_volume_TIER_separates_two_books(self):
+        """🛢️ Garrett [0.1M,2M) vs 🧮 Hull [2M,10M) — the tiling that is
+        supposed to keep them apart."""
+        assert not mod.cells_collide(self.GARRETT, self.HULL)
+
+    def test_an_apr_BAND_separates_two_books(self):
+        """🧮 Hull's ceiling is half-open at 20%, which is exactly where the
+        carry cohort starts."""
+        assert not mod.cells_collide(self.HULL, self.CARRY)
+
+    def test_three_books_on_one_cell_are_ONE_finding(self):
+        gates = {"a": self.CARRY, "b": dict(self.CARRY), "c": dict(self.CARRY)}
+        found = mod.collisions(gates)
+        assert found == [frozenset({"a", "b", "c"})], found
+
+    def test_an_EMPTY_intersection_is_not_a_collision(self):
+        """THE DEFECT THE FIRST RUN EXPOSED. Carry (`apr>=20%, vol>=$2M`) and
+        💸 the Farmer (`apr>=5%, vol>=$10M`) DO intersect on paper — at
+        `apr>=20%, vol>=$10M` — so the transitive closure fused two genuinely
+        different tiers into one blob. That region has **zero** supply and
+        always has: `(ly)` measured *"no crypto book has ever cleared the $10M
+        floor at the 20% bar — observed max $5.53M, KAITO"*, and this run
+        reproduced it at 0 snapshots / 0 coins over 9,693.
+        """
+        gates = {"carry": self.CARRY, "farmer": self.FARMER}
+        assert mod.collisions(gates) == [frozenset({"carry", "farmer"})], \
+            "set-theoretically they DO overlap — that is the trap"
+        empty = lambda _region: False          # noqa: E731 — the measured answer
+        assert mod.collisions(gates, has_supply=empty) == []
+
+    def test_a_populated_intersection_still_collides(self):
+        """The mirror: materiality must not become a blanket excuse that
+        silences every finding."""
+        gates = {"a": self.CARRY, "b": dict(self.CARRY)}
+        full = lambda _region: True            # noqa: E731
+        assert mod.collisions(gates, has_supply=full) == [frozenset({"a", "b"})]
+
+    def test_the_intersection_takes_the_STRICTER_class_screen(self):
+        r = mod.intersect(self.CARRY, self.FARMER)
+        assert r[0] == 0.20 and r[2] == 10e6, r
+        assert r[4] is True, "a crypto-only book cannot contend for non-crypto"
+
+    def test_the_live_carry_cell_is_DECLARED_with_a_reason_and_an_owner(self):
+        key = frozenset({"perps-funding-carry-lshadow", "band-barnes-lshadow",
+                         "book-kiyosaki-lshadow"})
+        why = mod.KNOWN_CELL_COLLISIONS.get(key)
+        assert why, "the live 3-book carry cell must be declared, not silent"
+        assert "OWNER" in why and "%" in why, \
+            "a declaration is a decision: it needs an owner and the measurement"
+
+    def test_every_declaration_names_real_books(self):
+        """A stale entry naming a retired book silently stops guarding."""
+        for grp in mod.KNOWN_CELL_COLLISIONS:
+            for b in grp:
+                assert b in mod.FUNDING_BOOKS, f"{b} is not a living funding book"
+
+
 class TestArmPairsAreNotTwoBooks:
     """The XAU ×2 'REAL MONEY IN THE STACK' false positive: 💸 the Farmer's
     live row and its own control twin are SUPPOSED to hold the same coin."""
