@@ -183,6 +183,31 @@ reason should be rewritten to *"publishes `false` + a per-source `class_screen`
 cannot drift"*. I did not edit it because that file was dirty in another
 session.
 
+- **[ADDENDUM, same session — the follow-up above is DONE, and the stale reason
+  turned out to be a symptom of a broader exemption rather than a wording
+  problem.** The file went clean (the concurrent session committed `(pj)`), so I
+  took it. Rewording alone would have left the real defect: **`PARTIAL_SCREEN_OK`
+  waived the DECLARATION as well as the derive-from-switch rule**, and that is
+  what let 🎯 publish nothing for a day while its `unreachable` verdict sat on a
+  class it had stopped trading. The whole insight of `(pk)` is that a partial
+  screen *does* have an honest whole-gate answer — `false` — so there is no book
+  for which silence is correct, and the blanket skip had no remaining
+  justification. Worse, once 🎯 declared, a blanket skip meant **deleting the
+  declaration again would redden nothing**: the exemption would have quietly
+  protected the exact regression it was standing next to.
+
+  So the exemption is now NARROW — it waives how the value is *computed*, never
+  whether it exists. `test_a_screened_book_declares_its_screen` lost its skip
+  and applies to every screened book including the exempt ones (🎯 passes it
+  today); `test_the_declaration_tracks_the_switch_not_a_literal` keeps the
+  exemption, which is the one rule 🎯 genuinely cannot satisfy. Pinned by a new
+  `test_an_exempt_book_still_publishes_its_whole_gate_answer`, so the exemption
+  cannot widen back into a blanket skip the next time someone reads it as one.
+  The reason text now also names 🎯's own guard and states the revisit
+  condition in terms of what would change: if the listing source is ever
+  screened, the book refuses non-crypto outright and owes a DERIVED
+  `not ALLOW_NONCRYPTO`.]
+
 ## 2026-08-17 (pj) — THE LAST THREE `UNPUBLISHED` CLASS SCREENS, AND THE GUARD FROM THIS MORNING KNEW ONLY ONE OF THE FLEET'S TWO PUBLISH SHAPES
 
 `(ph)` taught `audit_book_overlap` to read each book's own class screen, and its

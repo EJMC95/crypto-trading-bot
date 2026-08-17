@@ -38,16 +38,30 @@ import pytest
 
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-#: Modules whose screen is DELIBERATELY PARTIAL, so a flat `crypto_only: true`
-#: would be a false declaration — worse than none. Declared rather than
-#: defaulted, the `BORN_DARK_OK` idiom.
+#: Modules whose screen is DELIBERATELY PARTIAL, so the published value cannot
+#: be DERIVED from `ALLOW_NONCRYPTO`. Declared rather than defaulted, the
+#: `BORN_DARK_OK` idiom.
+#:
+#: [2026-08-17 (pk)] THIS EXEMPTS THE DERIVE-FROM-SWITCH RULE ONLY — it no
+#: longer waives the declaration itself, and the narrowing is the fix. `(pf)`
+#: read "a flat `crypto_only: true` would be false here" and concluded *publish
+#: nothing*, when **`false` was available and true**: a gate one source leaves
+#: open does not refuse non-crypto, so `false` is the honest whole-gate answer
+#: for exactly these books. A blanket skip also meant that once such a book DID
+#: declare, deleting the declaration again would redden nothing.
 PARTIAL_SCREEN_OK = {
     "lighter_perp_sniper.py":
         "[(lk)] the surge and young admission sources are crypto-only; the "
         "LISTING source is deliberately UNSCREENED (n=1, unmeasured, founding "
         "thesis). The book's gate as a whole therefore does NOT refuse "
-        "non-crypto, and publishing crypto_only:true would misdescribe it. "
-        "Revisit if the listing source is ever screened or retired.",
+        "non-crypto. [(pk)] It publishes the honest `crypto_only: false` plus a "
+        "per-source `class_screen` map, and is exempt HERE only from the "
+        "derive-from-switch rule: `false` is a literal because it cannot drift "
+        "with the env — flipping SNIPER_ALLOW_NONCRYPTO widens surge/young "
+        "only, and the whole-gate answer stays false in both states. Its own "
+        "guard is tests/autonomy/test_sniper_class_screen.py. Revisit if the "
+        "listing source is ever screened or retired: the book would then refuse "
+        "non-crypto outright and owe a DERIVED `not ALLOW_NONCRYPTO`.",
 }
 
 
@@ -112,8 +126,9 @@ def test_the_scan_finds_the_books_this_is_about():
 @pytest.mark.parametrize("path,tree", _module_paths(),
                          ids=lambda x: getattr(x, "name", ""))
 def test_a_screened_book_declares_its_screen(path, tree):
-    if path.name in PARTIAL_SCREEN_OK:
-        pytest.skip(PARTIAL_SCREEN_OK[path.name])
+    """[(pk)] NO EXEMPTION HERE ANY MORE — a partial screen is still a screen,
+    and its honest whole-gate answer is `false` rather than silence. Membership
+    of PARTIAL_SCREEN_OK waives only how the value is computed, below."""
     assert _declarations(tree), (
         f"{path.name} runs a crypto-only entry screen (module-level "
         "ALLOW_NONCRYPTO) and does NOT publish `crypto_only`. Its grade then "
@@ -121,8 +136,10 @@ def test_a_screened_book_declares_its_screen(path, tree):
         "gate had refused for four days, and the payload said nothing (pf). "
         "Publish `\"crypto_only\": not ALLOW_NONCRYPTO` — either in the `caps` "
         "dict or top level beside `min_vol`/`max_vol`, whichever shape this "
-        "book already uses — or declare it in PARTIAL_SCREEN_OK with the reason "
-        "its screen is deliberately incomplete.")
+        "book already uses. If the screen is only PARTIAL, the answer is still "
+        "not silence: publish the honest `false` for the gate as a whole and "
+        "declare the module in PARTIAL_SCREEN_OK, which exempts it from the "
+        "derive-from-switch rule alone (pk).")
 
 
 def test_the_declaration_tracks_the_switch_not_a_literal():
@@ -152,3 +169,22 @@ def test_partial_screen_exemptions_carry_a_reason_and_still_exist():
     for name, why in PARTIAL_SCREEN_OK.items():
         assert (_ROOT / name).exists(), f"{name} no longer exists — drop it"
         assert len(why) > 60, f"{name}: exemption needs a real reason"
+
+
+def test_an_exempt_book_still_publishes_its_whole_gate_answer():
+    """[(pk)] The narrowing, pinned. PARTIAL_SCREEN_OK waives the
+    derive-from-switch rule and NOT the declaration — so an exempt book that
+    published nothing (the pre-(pk) state of 🎯, whose 10-day `unreachable`
+    verdict rested on a class it had stopped trading) must still redden.
+
+    Without this, the exemption could quietly widen back to a blanket skip the
+    next time someone reads it as one.
+    """
+    missing = [name for name in PARTIAL_SCREEN_OK
+               if not _declarations(ast.parse(
+                   (_ROOT / name).read_text(encoding="utf-8")))]
+    assert not missing, (
+        "exempt from derive-from-switch is NOT exempt from declaring: "
+        f"{missing} publish no `crypto_only` at all. A partial screen's honest "
+        "whole-gate answer is `false` — silence leaves the book's grade "
+        "unreadable, which is the defect (pf) exists to close (pk).")
