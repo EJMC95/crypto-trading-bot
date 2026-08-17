@@ -772,9 +772,42 @@ def save_daily_halt(bot, day_iso, day_start_equity=None):
 
 
 def load_daily_halt(bot, day_iso):
-    """Return the halt state saved for day_iso (UTC 'YYYY-MM-DD'), else None."""
-    st = load_state(bot + ":halt") or {}
-    return st if st.get("halted_date") == day_iso else None
+    """Return the halt state saved for day_iso (UTC 'YYYY-MM-DD'), else None.
+
+    NOTE: None means "not halted OR the read failed" — see
+    load_daily_halt_checked(). Any caller that lets trading RESUME on a None
+    must use the checked form instead: this one cannot tell a Postgres blip
+    from a clean day.
+    """
+    return load_daily_halt_checked(bot, day_iso)[1]
+
+
+def load_daily_halt_checked(bot, day_iso):
+    """(ok, halt) — `ok` is False only if the READ ITSELF failed.
+
+    [2026-08-18 (pq)] `load_daily_halt` collapses "no halt today" and "I could
+    not find out" into the same None, and its consumers are DAILY-LOSS RAILS on
+    real money: on a failed read the book resumes entering positions on a day it
+    had already halted. The commit that introduced the function is titled
+    "daily-loss halt survives redeploys" — durability is its whole purpose, and
+    a silent fail-OPEN is precisely the failure it was built to prevent.
+
+    This is `load_state_checked`'s contract applied to the halt, for the same
+    reason and with the same three states:
+
+      ok=True,  halt=dict -> halted today, this is the record
+      ok=True,  halt=None -> read succeeded, genuinely not halted
+      ok=False, halt=None -> read FAILED; the caller must NOT resume trading
+
+    A caller that treats ok=False as "not halted" has reintroduced the bug.
+    The safe degrade is to hold the last known halt state and block NEW entries
+    while blind — never to block EXITS, which must always be able to run.
+    """
+    ok, st = load_state_checked(bot + ":halt")
+    if not ok:
+        return False, None
+    st = st or {}
+    return True, (st if st.get("halted_date") == day_iso else None)
 
 
 def locked_state_update(key, fn):

@@ -1,3 +1,90 @@
+## 2026-08-18 (pq) — A REAL-MONEY DAILY-LOSS HALT THAT A DATABASE BLIP COULD UN-HALT: THE FLAG WAS RE-DERIVED EVERY CYCLE, NEVER LATCHED
+
+🙏 Avo Maria LIVE (`freqtrade-avo-maria-lighter`, real money) read its
+daily-loss halt like this, at the top of every loop iteration:
+
+    halted_today = bool(store.load_daily_halt(BOT_ROW, cur_day))
+
+**`load_daily_halt` returns None for BOTH "not halted today" and "the read
+failed."** It is `load_state(bot + ":halt")`, and `load_state` is
+`load_state_checked(bot)[1]` — whose own docstring, 40 lines up, warns that
+collapsing those two "is a trap for any caller that SEEDS durable state on an
+empty read". Here the caller is a **safety rail on real money**, and the trap
+is worse than seeding: on a failed read the book **resumed entering positions
+on a day it had already halted.**
+
+Reproduced directly against the shipped function (`load_state_checked` stubbed
+to its documented `(False, None)` failure return):
+
+    A. read OK, halt present   -> {'halted_date': '2026-08-18', ...}  halted=True
+    B. read FAILS, halt stored -> None                                halted=False   <-- re-admits entries
+    C. read OK, no halt        -> None                                halted=False
+
+**B and C are byte-identical to every caller.** The function's introducing
+commit (`cde0064`) is titled *"daily-loss halt survives redeploys"* — durability
+is its entire purpose, and the silent fail-OPEN defeats exactly that. No
+deliberate fail-open is declared anywhere.
+
+**AND NOTHING RE-ARMED IT.** The flag was recomputed from the read each cycle
+with no memory of having halted, while `breach` (:621) is recomputed from live
+equity — so once equity sat back above `day_start*(1-DAILY_LOSS_LIMIT)`,
+nothing re-set it. The sibling live book already had the right shape: 💸 the
+Farmer sets `halted_today = True` and clears it **only on the UTC day roll**
+(`lighter_funding_bot.py:2219`). Avo latched nothing.
+
+**FIXED, in the owner and at the call site:**
+
+* `bot_pnl_store.load_daily_halt_checked(bot, day) -> (ok, halt)` — the
+  `load_state_checked` contract applied to the halt, with the same three states
+  and an explicit note that a caller treating `ok=False` as "not halted" has
+  reintroduced this bug. `load_daily_halt` keeps its signature and now documents
+  that it cannot tell a blip from a clean day.
+* Avo **latches** `halted_today` across cycles, reset only on the UTC day roll.
+* A failed halt read sets **`halt_blind`**, which blocks NEW entries and
+  **never blocks exits** — the Farmer's `live_state_blind` idiom
+  (`:2688`, *"skipping all NEW entries this cycle ... exits unaffected"*).
+  "I could not find out" must not buy; a book must always be able to CLOSE.
+* The `save_daily_halt` return is checked and a failure logged CRITICAL (I4 — a
+  safety rail must not discard a persistence result). The in-memory latch now
+  holds the halt regardless; the write is what carries it across a restart.
+
+**MUTATION-VERIFIED (I3), 4 red + 1 instructive survivor.** RED: the original
+derived read restored; `not halt_blind` dropped from the entry gate;
+`load_daily_halt_checked` reporting a failed read as `ok=True`; and
+halt-blindness clearing the held book (which correctly reddens *"must never
+block an EXIT"*). **The instructive one:** a first attempt at that last mutation
+set `pos_readable = False` and SURVIVED — because the exit path iterates `pos`,
+which was still populated. The mutation was ineffective, not the test weak; the
+"never blocks EXITS" claim was unproven until a mutation that actually removes
+the exit path made it fail. A mutation that cannot kill proves nothing.
+
+New selftest 13, and it fails CLOSED on its own fixture: only the `:halt` key
+is made unreadable, because failing the MAIN state read would trip the (7) seed
+guard and pass vacuously for a different reason ((hj)).
+
+**SCOPE, stated rather than assumed.** The verification pass also proposed that
+a failed read poisons `day_start_equity` via the seed at `:378` — **refuted, and
+not fixed**: `_restore()` already uses `load_state_checked` and the loop refuses
+to trade at all while `restored` is False (`:320`, pinned by selftest 7), so
+that path is unreachable. Fixing it would have been motion against a bug that
+cannot happen.
+
+**NOT YET FIXED, and it is the same class one shelf up:** 💸 the Farmer reads
+its halt with the unchecked call at **boot only** (`lighter_funding_bot.py:2084`)
+— so a blip there loses the halt for the **whole UTC day**, with no per-cycle
+re-read to recover. It is partly mitigated (a `:live` read failing in the same
+window sets `live_state_blind` and blocks entries anyway), which is why it is a
+narrower window and not this commit. Shipped narrow on purpose, per the
+forward-motion rule: one surface per pass, verified in the live payload, then
+widen.
+
+Found by a six-lens adversarial defect sweep (46 agents; 10 findings survived
+3-angle refutation, 3 killed). The other survivors — `audit_organ_silence`
+being structurally blind to the go-live grader, I2's `brain_amnesia` reading a
+timestamp its publisher never writes, `fleet-allocation`'s expired UNPAGEABLE
+declaration, and I20 naming a retired 🎸 Barnes as a living carry-cell occupant
+— are recorded and not yet fixed.
+
 ## 2026-08-17 (pp) — THE WEEKLY SCOREBOARD CRIED BREACH EVERY WEEK: A LONG-ONLY BUDGET COMPARED AGAINST A COUNT THAT IS MOSTLY DELTA-NEUTRAL LEGS
 
 `fleet-weekly-assessment.yml` opened every scoreboard issue with

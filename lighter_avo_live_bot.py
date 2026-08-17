@@ -291,6 +291,12 @@ def main(_ctx=None, once=False):
 
     _restore()
 
+    # [2026-08-18 (pq)] The daily-loss latch lives ACROSS cycles, not inside
+    # one. `_halt_day` is the UTC day the latch belongs to; a roll is the only
+    # thing that clears it (see the read site in the loop).
+    halted_today = False
+    _halt_day = None
+
     while True:
         t0 = time.time()
         t_now = now()
@@ -389,8 +395,34 @@ def main(_ctx=None, once=False):
                    f"skipping cycle; never trade blind")
             pos, pos_readable = {}, False
 
-        halted_today = bool(store.load_daily_halt(BOT_ROW, cur_day)) \
-            if _ctx is None or hasattr(store, "load_daily_halt") else False
+        # [2026-08-18 (pq)] THE HALT IS LATCHED, AND A FAILED READ DOES NOT
+        # CLEAR IT. This was `halted_today = bool(store.load_daily_halt(...))`
+        # — RE-DERIVED from a database read on every single cycle, with no
+        # memory of having halted. Two consequences on a real-money book:
+        #   * `load_daily_halt` returned None for BOTH "not halted" and "the
+        #     read failed" (its own docstring now says so), so one Postgres
+        #     blip re-admitted entries on a day this book had already halted;
+        #   * nothing re-armed it — `breach` at :621 is recomputed from live
+        #     equity, so once equity sits above day_start*(1-LIMIT) the halt
+        #     was simply gone for the rest of the day.
+        # The sibling live book latches (lighter_funding_bot.py sets
+        # halted_today True and clears it ONLY on the UTC day roll, :2219);
+        # this is that shape. `halt_blind` carries "I could not find out" so
+        # the entry gate can fail CLOSED without pretending to know — the
+        # Farmer's `live_state_blind` idiom (:2688): block NEW entries while
+        # blind, never block exits.
+        if _halt_day != cur_day:            # UTC day roll: the only reset
+            _halt_day, halted_today = cur_day, False
+        halt_blind = False
+        if _ctx is None or hasattr(store, "load_daily_halt_checked"):
+            _hok, _halt = store.load_daily_halt_checked(BOT_ROW, cur_day)
+            if not _hok:
+                halt_blind = True
+                _PRINT(f"[avo-live] {iso(t_now)} HALT READ FAILED — holding "
+                       f"halted={halted_today} and blocking NEW entries this "
+                       f"cycle; exits unaffected", flush=True)
+            elif _halt:
+                halted_today = True
 
         # Loop-scope defaults so the publish helper is callable from the
         # kill/halt paths, which run BEFORE the entry section assigns these.
@@ -630,7 +662,17 @@ def main(_ctx=None, once=False):
                        f"({equity:.2f} vs day start {day_start_equity:.2f}) "
                        f"— flatten + halt for the day")
                 halted_today = True
-                store.save_daily_halt(BOT_ROW, cur_day, day_start_equity)
+                # [2026-08-18 (pq)] I4 — never discard a persistence result,
+                # least of all a safety rail's. The in-memory latch above now
+                # holds the halt for THIS process regardless; this write is
+                # what carries it across a restart, so a silent failure means
+                # a redeploy resumes trading on a halted day. Retried every
+                # cycle by the idempotent flatten block below.
+                if store.save_daily_halt(
+                        BOT_ROW, cur_day, day_start_equity) is False:
+                    _PRINT(f"[avo-live] {iso(t_now)} CRITICAL: daily-halt "
+                           f"WRITE FAILED — the halt is held in memory but "
+                           f"will NOT survive a restart today", flush=True)
         if halted_today:
             if pos_readable:
                 _flatten_all("daily_loss")   # idempotent retry every cycle
@@ -803,7 +845,12 @@ def main(_ctx=None, once=False):
         clip = clip_usd(equity)
         if clip is not None:
             clip = clip * live_scale
+        # [2026-08-18 (pq)] `not halt_blind` — when the daily-halt read failed
+        # we do not know whether this book is halted, and "unknown" must not
+        # buy. Entries only; the exit/flatten paths above already ran, because
+        # a book must always be able to CLOSE (the Farmer's :2688 rule).
         entries_ok = (pos_readable and equity is not None
+                      and not halt_blind
                       and clip is not None and clip >= MIN_CLIP_USD
                       and t0 >= locked_until)
         if entries_ok:
@@ -1264,6 +1311,68 @@ def _selftest():
         assert abs(_pub["pnl_abs"]) < 0.01, \
             f"a deposit must not read as profit, got pnl_abs={_pub['pnl_abs']}"
 
+        # ---- 13) the daily halt fails CLOSED on an unreadable halt --------
+        # [18-Aug (pq)] `halted_today` was re-derived every cycle from
+        # `bool(store.load_daily_halt(...))`, and that call returns None for
+        # BOTH "not halted" and "the read failed" — so one Postgres blip
+        # re-admitted entries on a day this real-money book had already
+        # halted. Two properties, and the second is the fix:
+        #   (a) a stored halt still halts (regression on the read itself);
+        #   (b) an UNREADABLE halt opens nothing, while exits still run.
+        # Only the ':halt' key fails here — the main state read must SUCCEED,
+        # or the (7) seed guard would block trading for a different reason and
+        # this test would pass vacuously ((hj): a fixture that encodes the bug).
+        _sc = store.load_state_checked
+
+        def _halt_blind_read(k):
+            return (False, None) if k.endswith(":halt") else (True, captured["state"].get(k))
+
+        # (a) stored halt -> halted, no entries
+        captured["state"].clear()
+        captured["published"].clear()
+        _today = now().date().isoformat()
+        captured["state"][BOT_ROW + ":halt"] = {
+            "halted_date": _today, "day_start_equity": 62.80}
+        bars_box["shape"] = "dip"
+        v = _StubVenue(equity=62.80)
+        run(v, _StubRails())
+        assert v.opens == [], "a stored halt must block entries"
+        assert captured["published"][-1][1]["status"] == "halted", \
+            "a stored halt must publish status=halted"
+
+        # (b) halt read FAILS -> no NEW entries, and the exit path still runs
+        captured["state"].clear()
+        captured["published"].clear()
+        captured["state"][STATE_KEY] = {
+            "initial_equity": 62.80, "meta": {}, "closed": [],
+            "day_start": {"day": _today, "equity": 62.80}}
+        store.load_state_checked = _halt_blind_read
+        try:
+            bars_box["shape"] = "dip"          # a signal that WOULD enter
+            v = _StubVenue(equity=62.80)
+            run(v, _StubRails())
+            assert v.opens == [], (
+                "an UNREADABLE daily-halt must block NEW entries — 'I could "
+                "not find out' is not 'not halted'")
+
+            # exits are NEVER blocked by halt-blindness: a held position that
+            # hits its stop must still close, or the fix would trap real money
+            captured["state"][STATE_KEY] = {
+                "initial_equity": 62.80,
+                "meta": {"ETH": {"entry": 100.0, "opened_ts": 0,
+                                 "tag": "swing-dip-4h"}},
+                "closed": [],
+                "day_start": {"day": _today, "equity": 62.80}}
+            bars_box["shape"] = "flat"
+            bars_box["px"] = 50.0              # -50%: through the -10% stop
+            v = _StubVenue(equity=62.80, pos={"ETH": {"size": 0.2}})
+            run(v, _StubRails())
+            assert "ETH" in v.closes, \
+                "halt-blindness must never block an EXIT (stop-loss)"
+        finally:
+            store.load_state_checked = _sc
+            bars_box["px"] = 100.0
+
         print("\nAll Avo LIVE self-tests passed:")
         print("  1 identity guard: only AVO_VENUE=lighter_live boots")
         print("  2 entry sized to the BALANCE (equity/slots), gates on the row")
@@ -1277,6 +1386,7 @@ def _selftest():
         print(" 10 unreadable positions: never trade blind")
         print(" 11 venue truth: meta phantoms reconcile, never book closes")
         print(" 12 a capital move shifts the day anchor, never reads as P&L")
+        print(" 13 an unreadable daily-halt blocks ENTRIES, never EXITS")
     finally:
         for k, fn in _real.items():
             setattr(store, k, fn)
