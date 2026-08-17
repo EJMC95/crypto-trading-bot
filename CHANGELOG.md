@@ -1,3 +1,94 @@
+## 2026-08-17 (pp) — THE WEEKLY SCOREBOARD CRIED BREACH EVERY WEEK: A LONG-ONLY BUDGET COMPARED AGAINST A COUNT THAT IS MOSTLY DELTA-NEUTRAL LEGS
+
+`fleet-weekly-assessment.yml` opened every scoreboard issue with
+
+    EXPOSURE BREACH - 40 open vs budget 20
+
+and it was **FALSE every week measured** — 58 vs 20 on 09-Aug (#154), 40 vs 20
+on 16-Aug (#173) — while `fleet_risk` published, at the same moment:
+
+    light green · mode enforce · clip_scale 1.0
+    long_positions 11/20 · short_n 2 · sym_over 0 · long_effective_n 8.1
+
+**The comparison was never of like with like.** `EXPOSURE_BUDGET` is the LONG
+budget — the thing whose veto is literally `long_positions >= long_budget`,
+applied to NEW LONG entries. The scoreboard compared it against
+`sum(open_trades)` over every row, which counts shorts and, overwhelmingly,
+**delta-neutral funding legs**: ⚖️ Counterweight alone holds 10 (= 5 pairs),
+which are not directional exposure in any sense. The flag was answering "how
+many positions does the fleet hold" and labelling the answer a breach.
+
+**WHY IT MATTERS, and it is not the false alarm.** This is the `(gl)` cry-wolf
+shape sitting in the deterministic artifact the Monday verdict is built from, so
+it trains the reader — human and assistant — to skip the flags block. The cost
+lands the day a **real** breach arrives looking identical to two months of noise.
+Found by the 17-Aug weekly verdict pass, which had to spend a paragraph
+explaining that the headline flag on its own source document was not a finding.
+
+**THE NUMBER IS NOW READ FROM THE ENFORCER, NOT RE-DERIVED.** `fleet_risk` owns
+the rule; the scoreboard reads its published pair and applies its comparison,
+because a second copy of a rule is a second rule ((hj)). Two traps in that
+payload, both handled rather than discovered later:
+
+* it publishes **two different long counts on purpose** ((iv)) —
+  `long_positions` is the BUDGET cohort, `exposure.long_n` is the
+  symbol-harvested population, and `sym_over` is non-zero exactly when they
+  describe different sets. **The pair the veto uses is the pair used here**;
+* **I1, liveness before semantics.** A `fleet_risk` payload that stopped
+  updating is byte-identical to a healthy one but for its timestamp, so age is
+  checked against its own `ttl_sec` BEFORE the numbers are believed. A stale
+  payload reads UNKNOWN **even when its numbers are over budget** — an unlive
+  number cannot support either verdict.
+
+**Dark, unparseable, field-less and stale each produce a VISIBLE
+`EXPOSURE UNKNOWN` line.** Silence means "checked, within budget" and must never
+also mean "nobody asked" ((kw)). The bus fetch is deliberately NOT fail-closed
+the way the feed fetch is: the scoreboard's primary job is the P&L table, so a
+dark bus degrades this one flag rather than suppressing the whole weekly issue.
+
+**`EXPOSURE_BUDGET` IS DELETED, not merely unused.** It was a hardcoded `'20'`
+duplicating `fleet_risk.long_budget` — which is itself a **lever**
+(`risk.long_budget`, movable by the growth rail), so the copy could drift from
+the enforced value with nothing to catch it. The scoreboard now takes the budget
+from the same payload as the count.
+
+**BUILT TO BE TESTABLE, which the old flag was not.** The logic was three lines
+inside a YAML heredoc, where no branch can be exercised. It now lives in
+`scripts/weekly_exposure_flag.py` as a pure `exposure_flag(bus, now)` —
+registered in `SELFTEST_MODULES` (not `ENFORCED_AUDITS`: its verdict reads the
+live bus, which moves with every fill and no code change, so a scan there would
+redden local `pytest` on the fleet's trading activity — the same call `(pc)`
+made one entry earlier). Its `--selftest` drives **20 cases** offline: clean,
+genuine breach, exactly-at-budget, the 40-open/11-long case this entry is about,
+seven dark paths, stale-clean, stale-AND-over-budget, four unreadable stamps, a
+naive stamp, and no-ttl in both directions.
+
+**VERIFIED END-TO-END THROUGH THE REAL WORKFLOW CODE**, not just the unit: the
+builder heredoc was extracted and run against today's actual `/pnl.json` +
+`/bus.json`. Real fleet (long 14/20) → **no flag**; long 25/20 → `EXPOSURE
+BREACH - long 25/20 (fleet_risk, 9m old)`; bus absent → UNKNOWN; 6h-stale →
+UNKNOWN naming the last-known 14/20; stale AND 99/20 → **UNKNOWN, not BREACH**;
+`fleet_risk` key removed → UNKNOWN. **A positive control was mandatory here** —
+a flag that never fires is trivially "fixed" and useless, the I3 point applied
+to a detector whose failure mode was over-firing.
+
+**Wiring pinned by `test_the_exposure_flag_reads_the_bus_and_not_the_open_count`,
+4 mutations verified RED**: the `weekly_exposure_flag` call removed, the bus
+fetch removed, the old `total_open > budget` comparison reinstated, and
+`EXPOSURE_BUDGET` re-added. It scans CODE ONLY (comment lines stripped) —
+because both strings are discussed at length in the comments that record this
+incident, and the first version of the assertion failed on its own
+documentation, which is `(hm)`'s substring trap caught in the act.
+
+One correction to the working method, recorded because it nearly stuck: the
+first end-to-end probe reported the positive control as SILENT, i.e. "the breach
+no longer fires". That was the PROBE — a `sed` range that stopped at the blank
+line immediately after `### Flags` — not the code. A check that looks like it
+ran is not a result.
+
+The header line no longer renders a verdict at all: it reads
+`**40** open positions (all books, all sides)`, a count stated as a count.
+
 ## 2026-08-17 (pn) — THE GUARD SHIPPED YESTERDAY COULD NEVER HAVE ANSWERED ITS QUESTION: A `permissions:` BLOCK DENIES EVERY SCOPE IT OMITS
 
 `(pc)` shipped `scripts/audit_ci_coverage.py` on 16-Aug — the guard that asks

@@ -43,6 +43,15 @@ SELFTEST_MODULES = [
     # fleet-weekly-assessment.yml beside audit_code_currency, which is where
     # "which commit is running, and was it graded" is the actual subject.
     "scripts.audit_ci_coverage",
+    # [2026-08-17 (pp)] the weekly scoreboard's exposure flag. SELFTEST_MODULES
+    # for the same reason as audit_ci_coverage above: its verdict reads the LIVE
+    # bus (`fleet_risk.long_positions`), which moves with every fill and no code
+    # change, so a scan here would redden local `pytest` on the fleet's trading
+    # activity. `exposure_flag()` itself is pure — it takes the parsed payload
+    # and a clock — so the 20-case negative fixture is offline and deterministic,
+    # and it covers the branch that matters most: a STALE payload is UNKNOWN even
+    # when its numbers read clean, and even when they read over budget (I1).
+    "scripts.weekly_exposure_flag",
     # [2026-08-16 (nx)] the shared-worktree commit wrapper: --selftest is
     # offline and pure (classify + snapshot round-trip, no git, no DB).
     # Registered in the same commit that adds the tool, per this guard's own

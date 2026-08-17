@@ -131,6 +131,47 @@ def test_the_window_covers_a_week_of_commits():
         f"commit rate (~120/7d); DEFERRED live services would read UNRESOLVED")
 
 
+def test_the_exposure_flag_reads_the_bus_and_not_the_open_count():
+    """MUTATION: drop the bus fetch, or re-add the total_open comparison -> RED.
+
+    [2026-08-17 (pp)] The scoreboard flagged `EXPOSURE BREACH - N open vs
+    budget 20` off `sum(open_trades)` for as long as it existed, and it was
+    false every week measured (58 vs 20, 40 vs 20) against a fleet at long
+    11/20 with a green light: the budget is LONG-only and the count is mostly
+    delta-neutral funding legs. Two ways for that to come back — the bus fetch
+    being dropped (the flag degrades to a permanent UNKNOWN, which is visible
+    but useless) or someone reinstating the cheap count — so both are pinned.
+    """
+    text = WF.read_text()
+    job = _job_block("assess")
+
+    assert "weekly_exposure_flag" in job, (
+        "the assess job no longer calls weekly_exposure_flag: the exposure "
+        "verdict is back to being derived in the workflow, which is where it "
+        "was wrong every week ((pp)) — and untestable, inside a heredoc")
+    assert "bus.json" in job, (
+        "the assess job never fetches the bus, so exposure_flag can only ever "
+        "return UNKNOWN — the long-budget would go unchecked indefinitely")
+
+    # CODE only: both strings are discussed at length in the comments that
+    # record the incident, so a page-wide scan would fail on its own
+    # documentation — the (hm) trap, which this assertion walked into once.
+    code = "\n".join(ln for ln in text.splitlines()
+                     if not ln.lstrip().startswith("#"))
+
+    assert not re.search(r"total_open\s*>\s*budget", code), (
+        "the total-open-vs-budget comparison is back. `total_open` counts "
+        "shorts and delta-neutral funding legs (Counterweight alone holds 10 "
+        "= 5 pairs) against a LONG-only budget: it is not a breach test, and "
+        "a flag that is false every week is one the reader learns to ignore")
+    assert not re.search(r"^\s*EXPOSURE_BUDGET\s*:", code, re.M) \
+        and "EXPOSURE_BUDGET" not in code, (
+        "EXPOSURE_BUDGET is back in the CODE: it duplicates "
+        "`fleet_risk.long_budget`, which is a LEVER (risk.long_budget) the "
+        "growth rail can move — so the copy can drift from the enforced value "
+        "with nothing to catch it")
+
+
 def _permissions_block(body, indent):
     """The scopes granted by the `permissions:` mapping at `indent`, or None.
 

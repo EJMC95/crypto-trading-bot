@@ -26,7 +26,13 @@ permissions:
 
 env:
   FEED: https://pnl-dashboard-production-858c.up.railway.app/pnl.json
-  EXPOSURE_BUDGET: '20'
+  # `?hours=0` = live keys with no history array (262 KB vs 8.6 MB).
+  BUS: https://pnl-dashboard-production-858c.up.railway.app/bus.json?hours=0
+  # [2026-08-17 (pp)] EXPOSURE_BUDGET is GONE, not merely unused. It was a
+  # hardcoded '20' duplicating `fleet_risk.long_budget` — which is itself a
+  # LEVER (`risk.long_budget`, movable by the growth rail), so the copy could
+  # drift from the enforced value with nothing to catch it. The scoreboard now
+  # reads the enforcer's own budget alongside its own count.
 
 jobs:
   # [2026-08-04 (jc)] CODE CURRENCY — `(iw)` built the tool and it had ZERO
@@ -101,6 +107,19 @@ jobs:
           curl -sS --retry 3 --retry-delay 5 "$FEED" -o pnl.json
           test -s pnl.json
 
+      # [2026-08-17 (pp)] The BUS carries the only number that can answer
+      # "is the fleet over its budget?" — see the exposure block below for why
+      # the feed cannot. `?hours=0` drops the history array: 262 KB instead of
+      # 8.6 MB, same live keys. Deliberately NOT fail-closed like the feed
+      # above: the scoreboard's primary job is the P&L table, so a dark bus
+      # must degrade the exposure flag to UNKNOWN rather than suppress the
+      # whole weekly issue.
+      - name: Fetch the bus (exposure truth)
+        run: |
+          set -euo pipefail
+          curl -sS --retry 3 --retry-delay 5 "$BUS" -o bus.json || true
+          test -s bus.json || { echo "::warning::bus dark - exposure will read UNKNOWN"; rm -f bus.json; }
+
       - name: Restore last week's snapshot
         uses: actions/cache@v4
         with:
@@ -138,7 +157,7 @@ jobs:
       - name: Build the scoreboard
         run: |
           python3 - <<'PY'
-          import json, os, pathlib, datetime
+          import json, pathlib, sys, datetime
           feed = json.load(open('pnl.json'))
           bots = feed.get('bots') or feed.get('services') or []
           if isinstance(bots, dict):
@@ -163,7 +182,18 @@ jobs:
           names = {r['name'] for r in rows}
           total_pnl = sum(r['pnl'] for r in rows)
           total_open = sum(r['open'] for r in rows)
-          budget = int(os.environ['EXPOSURE_BUDGET'])
+          # [2026-08-17 (pp)] EXPOSURE IS READ FROM THE ENFORCER, NOT COUNTED
+          # HERE. This flag used to compare `total_open` against a hardcoded
+          # EXPOSURE_BUDGET and fired EVERY week measured (58 vs 20, 40 vs 20)
+          # while the fleet sat at long 11/20 with a GREEN light -- the budget
+          # is long-only and `total_open` is mostly delta-neutral funding legs.
+          # The rule lives in `fleet_risk`; this reads its verdict rather than
+          # re-deriving it. Logic + its 20-case selftest are in the script so
+          # the branches are testable, which they are not inside a heredoc.
+          sys.path.insert(0, 'scripts')
+          from weekly_exposure_flag import exposure_flag
+          bus = json.loads(pathlib.Path('bus.json').read_text()) \
+              if pathlib.Path('bus.json').exists() else None
           snap = pathlib.Path('.fleet-snapshot')
           prev = json.loads(snap.read_text()) if snap.exists() else {}
           prev_names = set(prev.get('names', []))
@@ -172,11 +202,14 @@ jobs:
           L = []
           L.append(f"## Fleet weekly scoreboard - {datetime.date.today()}")
           L.append("")
-          L.append(f"**{len(rows)} services on feed** | total P&L **${total_pnl:+,.2f}** | open **{total_open}** vs budget **{budget}**")
+          # `open` is stated as a COUNT, not judged against the long budget —
+          # it includes shorts and delta-neutral funding legs ((pp), below).
+          L.append(f"**{len(rows)} services on feed** | total P&L **${total_pnl:+,.2f}** | **{total_open}** open positions (all books, all sides)")
           L.append("")
           flags = []
-          if total_open > budget:
-              flags.append(f"EXPOSURE BREACH - {total_open} open vs budget {budget}")
+          exp = exposure_flag(bus)
+          if exp:
+              flags.append(exp)
           flags += [f"STALE - `{r['name']}`" for r in rows if r['stale']]
           flags += [f"OFF-FEED since last week - `{g}`" for g in gone]
           flags += [f"NEW on feed - `{n}`" for n in new]
