@@ -1587,6 +1587,27 @@ def _close_hot_extra(extra, hot_h):
     return out
 
 
+def _halt_resolve(ok, halt_rec, halted_today):
+    """[2026-08-18 (pr)] ONE halt read -> (halted_today, halt_blind, day_start).
+
+    Extracted PURE for the same reason `_heal_merge` below was: this rule now
+    runs at TWO sites (the boot read and the per-cycle retry) and a second copy
+    of a rule is a second rule ((hj)). `day_start` is None when the record
+    carries no baseline to restore.
+
+    The whole point is the first branch. `store.load_daily_halt` collapses "not
+    halted" and "the read FAILED" into one None, so believing it re-admits
+    entries on a day the book already halted ((pq), measured on 🙏 Avo LIVE).
+    Here a failed read NEVER clears `halted_today` and NEVER reports "clean" —
+    it reports BLIND, and the caller blocks new entries while blind.
+    """
+    if not ok:
+        return halted_today, True, None          # unknown: hold, do not clear
+    if halt_rec:
+        return True, False, halt_rec.get("day_start_equity")
+    return halted_today, False, None
+
+
 def _heal_merge(persisted, meta, explore_seen, live_baseline, capital_adjust,
                 day_start_equity, halt_rec, cur_day_iso):
     """[2026-07-29 audit R6] The ':live' blind→heal MERGE, extracted PURE so
@@ -2081,11 +2102,23 @@ def main():
     halted_today = False
     # [2026-07-11 DURABLE HALT] a tripped daily-loss halt survives restarts —
     # the memory-only flag meant a same-day redeploy silently resumed trading.
-    _halt = store.load_daily_halt(bot_id, cur_day.isoformat())
+    # [2026-08-18 (pr)] ...and it survives them only if the READ is believed.
+    # `load_daily_halt` returns None for BOTH "not halted" and "the read
+    # FAILED" ((pq) proved it on the sibling live book), and this read happens
+    # ONCE, at boot: a Postgres blip here left `halted_today` False for the
+    # WHOLE UTC day, with no per-cycle re-read to recover — strictly worse than
+    # the per-cycle case (pq) fixed. `halt_blind` carries "I could not find
+    # out" into the entry gate, beside the existing `live_state_blind`, and the
+    # loop retries the read until it lands.
+    _hok, _halt = store.load_daily_halt_checked(bot_id, cur_day.isoformat())
+    halted_today, halt_blind, _hds = _halt_resolve(_hok, _halt, halted_today)
+    if halt_blind:
+        log.error("DAILY-HALT READ FAILED at boot — cannot tell halted from "
+                  "clean; blocking NEW entries until a clean re-read "
+                  "(exits unaffected).")
     if _halt:
-        halted_today = True
-        if _halt.get("day_start_equity"):
-            day_start_equity = _halt["day_start_equity"]
+        if _hds:
+            day_start_equity = _hds
             _baseline_is_boot_read = False
         log.warning("daily-loss halt restored from state — halted for the rest of today.")
     elif not dry_run:
@@ -2217,6 +2250,11 @@ def main():
             try:
                 day_start_equity = account_value()
                 cur_day, halted_today = now.date(), False
+                # [(pr)] a NEW day starts unhalted by construction (one book,
+                # one writer — nobody else can have halted it), so the roll
+                # also resolves halt-blindness rather than carrying yesterday's
+                # ignorance forward.
+                halt_blind = False
                 # [2026-07-28 D1 AUDIT FIX] same rule as the boot capture: a
                 # capital move the guard accepted ON this roll read is already
                 # IN the fresh baseline — fold it into the ledger here so the
@@ -2228,6 +2266,24 @@ def main():
             except Exception:
                 log.warning("day-roll equity read failed — keeping the %s "
                             "baseline; retrying next loop", cur_day)
+
+        # [(pr)] RETRY THE HALT READ WHILE BLIND. Without this the boot blind
+        # flag would block entries until the process restarted — a guard that
+        # cannot clear is an outage, not a safety rail. Mirrors the ':live'
+        # re-read below: one clean read resolves it, and a halt found here is
+        # honoured exactly as the boot read would have honoured it.
+        if halt_blind:
+            _rok, _rhalt = store.load_daily_halt_checked(
+                bot_id, cur_day.isoformat())
+            halted_today, halt_blind, _rds = _halt_resolve(
+                _rok, _rhalt, halted_today)
+            if _rok:
+                if _rds:
+                    day_start_equity = _rds
+                log.warning("daily-halt re-read OK — %s",
+                            "HALTED for the rest of today; entries stay "
+                            "blocked" if _rhalt else
+                            "not halted; entries re-enabled")
 
         # kill switch (live) — flatten every held coin and halt on arm.
         if not dry_run and ctx.rails.kill_check():
@@ -2671,7 +2727,17 @@ def main():
                 _lv2 = _lv2 or {}
                 # merge semantics + the three 29-Jul audit findings live in
                 # _heal_merge (pure, fixture-tested — _selftest_heal).
-                _h2 = store.load_daily_halt(bot_id, cur_day.isoformat())
+                # [(pr)] CHECKED here too — this is the ':live' heal path, and
+                # it fed `_heal_merge` a halt record read through the form that
+                # cannot tell a blip from a clean day. A failed read here must
+                # leave the book BLIND (entries stay blocked, retried by the
+                # halt-blind block above), never silently "not halted".
+                # Found by test_daily_halt_failclosed, which is the point of
+                # asserting the CALL rather than the behaviour at one site.
+                _h2ok, _h2 = store.load_daily_halt_checked(
+                    bot_id, cur_day.isoformat())
+                if not _h2ok:
+                    halt_blind, _h2 = True, None
                 live_baseline, day_start_equity, _h_halt = _heal_merge(
                     _lv2, meta, explore_seen, live_baseline, capital_adjust,
                     day_start_equity, _h2, cur_day.isoformat())
@@ -2687,7 +2753,13 @@ def main():
                 log.warning("LIVE-STATE BLIND — skipping all NEW entries this "
                             "cycle; ':live' save suppressed (exits unaffected)")
 
-        if open_now < max_open and not quarantine_blind and not live_state_blind:
+        # [(pr)] `not halt_blind` joins the two existing blind flags: while we
+        # cannot read the daily halt we do not know whether this book is
+        # halted, and "unknown" must not open a position. Entries only — the
+        # exit/flatten paths above are deliberately untouched, because a book
+        # must always be able to CLOSE.
+        if open_now < max_open and not quarantine_blind and not live_state_blind \
+                and not halt_blind:
             # cheap prefilter: hard SAFETY gates on the funding map only (no network)
             prelim, explore_pool = [], []
             # [(ir)] persistence-gate suppression census for this scan
@@ -3944,6 +4016,44 @@ def _selftest_explore():
     print("lighter_funding_bot _selftest_explore OK")
 
 
+def _selftest_halt_blind():
+    """[2026-08-18 (pr)] Fixtures for _halt_resolve — the daily-halt read on a
+    REAL-MONEY book, where None used to mean both "clean" and "I could not
+    ask".
+
+    Mutation-honest: making the `not ok` branch return `False, ...` (i.e.
+    trusting a failed read as "not halted"), or clearing `halted_today` on a
+    blind read, or reporting blind as clean, each turns a case red.
+    """
+    HALT = {"halted_date": "2026-08-18", "day_start_equity": 197.0}
+
+    # (1) THE DEFECT: a FAILED read must never read as "not halted", and must
+    #     never clear a halt already latched in memory.
+    assert _halt_resolve(False, None, False) == (False, True, None)
+    assert _halt_resolve(False, None, True) == (True, True, None), \
+        "a failed read must HOLD an existing halt, not clear it"
+
+    # (2) a clean read with a halt record halts, and hands back the baseline
+    assert _halt_resolve(True, HALT, False) == (True, False, 197.0)
+
+    # (3) a clean read with NO record is the only way to be un-halted, and it
+    #     does not resurrect a halt already set this UTC day
+    assert _halt_resolve(True, None, False) == (False, False, None)
+    assert _halt_resolve(True, None, True) == (True, False, None), \
+        "a clean 'no record' must not clear a halt latched earlier today"
+
+    # (4) blind is NEVER clean: the middle element is what gates entries, and
+    #     a caller that cannot distinguish these two has the (pq) bug back
+    assert _halt_resolve(False, None, False)[1] is True
+    assert _halt_resolve(True, None, False)[1] is False
+
+    # (5) a record with no stored baseline still halts (day_start stays None)
+    assert _halt_resolve(True, {"halted_date": "2026-08-18"}, False) \
+        == (True, False, None)
+
+    print("lighter_funding_bot _selftest_halt_blind OK")
+
+
 def _selftest_heal():
     """[2026-07-29 audit R6] Fixtures for _heal_merge — the blind→heal logic
     the 29-Jul audit fixed three defects in while it was untestable inline.
@@ -4101,6 +4211,7 @@ if __name__ == "__main__":
         _selftest_conviction()
         _selftest_explore()
         _selftest_lever_consume()
+        _selftest_halt_blind()
         _selftest_heal()
         _selftest_exit_decision()
         _selftest_flatten_fields()

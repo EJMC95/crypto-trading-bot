@@ -1,3 +1,75 @@
+## 2026-08-18 (pr) — THE SAME HALT DEFECT ONE SHELF UP, AND WORSE: 💸 THE FARMER READ IT ONCE, AT BOOT
+
+`(pq)` fixed 🙏 Avo LIVE and closed by naming what it had NOT fixed: 💸 the
+Funding Farmer reads its daily-loss halt with the unchecked
+`store.load_daily_halt` at **boot only** (`:2084`). Same fail-open — None means
+both "not halted" and "the read failed" — but a strictly worse blast radius:
+Avo re-reads every cycle, so a blip costs it one cycle; **the Farmer had no
+per-cycle re-read at all, so a blip at boot lost the halt for the WHOLE UTC
+day** on the fleet's larger real-money book ($197 equity vs Avo's $63).
+
+**FIXED, reusing this file's own proven idiom rather than inventing one.** The
+Farmer already carries `quarantine_blind` and `live_state_blind` — flags meaning
+*"a durable read failed, so block NEW entries this cycle, retry next cycle, and
+never touch exits"* (`:2688`: *"skipping all NEW entries ... exits unaffected"*).
+`halt_blind` is the third of that family:
+
+* boot reads through `load_daily_halt_checked`; a failed read sets `halt_blind`
+  and logs at ERROR;
+* a per-cycle retry block re-reads while blind and clears it on the first clean
+  read — **without this the boot flag would block entries until the process
+  restarted, and a guard that cannot clear is an outage, not a safety rail**;
+* the UTC day roll also clears it: a new day starts unhalted by construction
+  (one book, one writer — nobody else can have halted it), so carrying
+  yesterday's ignorance forward would be wrong;
+* the entry gate gains `and not halt_blind`, beside the two existing flags.
+
+**`_halt_resolve(ok, halt_rec, halted_today)` is EXTRACTED PURE**, because the
+rule now runs at three sites and a second copy of a rule is a second rule
+((hj)) — the same reason `_heal_merge` was extracted by the 29-Jul audit. A
+failed read never clears `halted_today` and never reports "clean"; it reports
+BLIND. `_selftest_halt_blind` pins all five cases, **4 mutations verified RED**
+(trusting a failed read as not-halted; a blind read clearing the latch; blind
+reported as clean; a clean "no record" clearing a halt latched earlier today).
+
+**THE TEST FOUND A THIRD UNCHECKED READ I HAD MISSED.** A new AST guard,
+`tests/autonomy/test_daily_halt_failclosed.py`, asserts across BOTH live books
+that no bare `store.load_daily_halt(` call survives and that `not halt_blind`
+actually gates something. It went red on `lighter_funding_bot.py:2730` — the
+`:live` heal path, which fed `_heal_merge` a halt record read through the
+unchecked form. Fixed in the same pass. **That is the whole argument for
+asserting the CALL rather than the behaviour at one site**: I had reasoned about
+two call sites and there were three.
+
+**AST, not grep** — this guard's own docstring contains every string a
+substring scan would match, the `(hm)` trap that has already shipped three
+surviving mutations in this repo. **6 mutations verified RED** across both
+books: each reverting to the unchecked read, each entry gate dropping the term,
+an exit call gated on `not halt_blind`, and the owner reporting a failed read as
+`ok=True`.
+
+**TWO OF MY OWN CHECKS FAILED BEFORE THE CODE DID, both the same shape** — a
+probe that looks like it ran:
+* the first entry-gate assertion walked only `ast.If` and **reddened Avo for
+  being correct**: its gate is an `entries_ok = (... and not halt_blind ...)`
+  ASSIGNMENT, not an `if`. Two books express the same gate differently and both
+  are legitimate; the check now matches the `not <flag>` operand wherever it
+  occurs.
+* the exit-guard mutation "an exit call gated on not-halt_blind" **SURVIVED**
+  until the check walked `ast.IfExp` too — a ternary is not an `ast.If`. And a
+  second pass narrowed it to the branch taken when NOT blind, because an exit in
+  the `else` of `if not halt_blind:` runs precisely WHEN blind, which is correct
+  and must not be flagged.
+* separately, the owner-level mutation first read as SURVIVED and was a **shell
+  quoting no-op**; re-run from a script that ASSERTS its target exists, it is
+  red. Every mutation harness in this repo should assert it applied — an
+  ineffective mutation and a strong test are indistinguishable from the outside.
+
+`lighter_ticket_taker.py` (SHADOW) still uses the unchecked read. Declared, not
+fixed, and deliberately outside the new guard's scope: real money first, and a
+guard that reddens on a book nobody has decided about is one the reader learns
+to ignore ((gl)).
+
 ## 2026-08-18 (pq) — A REAL-MONEY DAILY-LOSS HALT THAT A DATABASE BLIP COULD UN-HALT: THE FLAG WAS RE-DERIVED EVERY CYCLE, NEVER LATCHED
 
 🙏 Avo Maria LIVE (`freqtrade-avo-maria-lighter`, real money) read its
