@@ -46,7 +46,11 @@ from collections import defaultdict
 # silent omission (the census-hole class, (jb)).
 FUNDING_BOOKS = [
     "perps-funding-carry-lshadow",       # 🌾 carry
-    "band-barnes-lshadow",               # 🎸 Barnesy (carry + xsect sleeves)
+    # 🎸 band-barnes-lshadow RETIRED 17-Aug (pm) — 0 of 9 of its episodes were
+    # a coin 🌾 carry was not already holding. Removed here, not just guarded
+    # in its own module: `FUNDING_BOOKS` drives every rivalry count in this
+    # file, so leaving it would keep a dead book contending for supply it can
+    # no longer take — the (gl) phantom-rival class with a corpse in it.
     "book-kiyosaki-lshadow",             # 🏦 Rich Dad
     "band-garrett-lshadow",              # 🛢️ Garrett (thin tier — different slice)
     "book-hull-lshadow",                 # 🧮 Hull ([2M,10M) x [7.8%,20%) — the
@@ -184,19 +188,24 @@ def living_gates(cur):
 #: how THREE books ended up on a cell that holds at most two coins at once. The
 #: rule existed; the run did not — the `(gk)` shape.
 KNOWN_CELL_COLLISIONS = {
-    frozenset({"perps-funding-carry-lshadow", "band-barnes-lshadow",
-               "book-kiyosaki-lshadow"}):
+    frozenset({"perps-funding-carry-lshadow", "book-kiyosaki-lshadow"}):
         "THE CARRY CELL (>=20% TRUE / >=$2M / crypto). Measured 17-Aug over "
         "9,662 scout snapshots / 33.7 days: occupied 5.93%, at most 2 coins at "
         "once, 3 distinct coins all window (KAITO 483 snapshots, XMR 71, "
-        "PAXG 38). All three books hold nothing. OPEN, OWNER: OPERATOR — this "
-        "is an I17 keep-or-retire call about how many books the cell supports, "
-        "NOT a band change: re-banding 🛢️ Garrett to free the tier was "
-        "measured and REFUSED (pl) because 6 of 6 of its top-ranked candidates "
-        "are >=20%, so the narrowing would strip the fleet's only "
-        "slot-filling funding book of its entire top of book. Do not stretch "
-        "this line to cover a FOURTH book: minting one here fails this guard, "
-        "which is the point.",
+        "PAXG 38). It held THREE books until 🎸 band-barnes was RETIRED (pm) "
+        "on the I17 call — 0 of 9 of its episodes were a coin 🌾 carry was not "
+        "already holding, i.e. zero independent evidence. The remaining TWO "
+        "are differentiated in their rules though not in their published "
+        "gate: 🏦 Rich Dad's payback-velocity bar is an EFFECTIVE ~21.9% "
+        "(derived inside its exit rule, so `enter_apr` cannot show it) and its "
+        "exits are its own (liability_flip 6h, decay_paid). OPEN, OWNER: "
+        "OPERATOR, next decision point ~12-Sep when 🏦 becomes gradeable — if "
+        "it is still undecidable then, that is the same I17 call again. NOT a "
+        "band change: re-banding 🛢️ Garrett to free the tier was measured and "
+        "REFUSED (pl) because 6 of 6 of its top-ranked candidates are >=20%, "
+        "so the narrowing would strip the fleet's only slot-filling funding "
+        "book of its entire top of book. Do not stretch this line to cover a "
+        "THIRD book: minting one here fails this guard, which is the point.",
 }
 
 

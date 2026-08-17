@@ -49,6 +49,12 @@ LEGACY_BOTS = [
     # SCHWAGER_RETIRED_OVERRIDE=run, which also stops the prune mattering
     # (the bot would simply re-upsert on its next publish).
     "book-schwager-lshadow",
+    # [2026-08-17 (pm)] 🎸 band-barnes — the I17 call on the carry cell
+    # (operator, 17-Aug). It has 9 realised closes and they are KEPT in the
+    # ledger as always; the summary ROW is pruned so a frozen card cannot sit
+    # in the fleet totals. Reversible via BARNES_RETIRED_OVERRIDE=run, which
+    # also stops the prune mattering (the bot re-upserts on its next publish).
+    "band-barnes-lshadow",
     "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",
     "freqtrade-dad-lshadow",
     # [2026-08-13 (ma)] 🎫 Ticket Taker's LIVE row — pruned once

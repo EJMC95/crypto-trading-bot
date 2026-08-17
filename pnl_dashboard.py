@@ -191,6 +191,17 @@ RETIRED_ROWS = {"perps-donchian-breakout",
                 # SCHWAGER_RETIRED_OVERRIDE=run. Both halves shipped
                 # together; LEGACY_BOTS prunes.
                 "book-schwager-lshadow",
+                # [2026-08-17 (pm)] 🎸 band-barnes — the I17 call on the carry
+                # cell, operator decision. ZERO INDEPENDENT EVIDENCE, measured
+                # on its own ledger: 0 of 9 episodes its living carry sleeve
+                # ever opened were a coin 🌾 carry was not already holding at
+                # that moment (3 coins, all carry's). Minted as a THREE-sleeve
+                # super-book; two sleeves already retired ((ly), (nf)), so the
+                # survivor is carry's own gate at a smaller cap — one bet held
+                # twice. Zero open positions, so nothing freezes. Reversible
+                # via BARNES_RETIRED_OVERRIDE=run. Both halves shipped
+                # together; LEGACY_BOTS prunes.
+                "band-barnes-lshadow",
                 "pm-gillard-lshadow", "pm-abbott-lshadow",
                 "pm-rudd-lshadow", "pm-morrison-lshadow",
                 "crypto-intraday-15m-lshadow", "crypto-swing-daily-lshadow",

@@ -207,12 +207,22 @@ class TestCellCollisions:
         assert r[4] is True, "a crypto-only book cannot contend for non-crypto"
 
     def test_the_live_carry_cell_is_DECLARED_with_a_reason_and_an_owner(self):
-        key = frozenset({"perps-funding-carry-lshadow", "band-barnes-lshadow",
-                         "book-kiyosaki-lshadow"})
+        """TWO books since `(pm)` retired 🎸 band-barnes — it was three when
+        this guard shipped. The group is the dict KEY, so a retirement that
+        forgets to update it leaves the live pair matching nothing and the
+        run reporting UNDECLARED: the declaration has to track the fleet."""
+        key = frozenset({"perps-funding-carry-lshadow", "book-kiyosaki-lshadow"})
         why = mod.KNOWN_CELL_COLLISIONS.get(key)
-        assert why, "the live 3-book carry cell must be declared, not silent"
+        assert why, "the live carry cell must be declared, not silent"
         assert "OWNER" in why and "%" in why, \
             "a declaration is a decision: it needs an owner and the measurement"
+
+    def test_no_declaration_names_a_book_that_left_the_roster(self):
+        """A group naming a retired book can never match the live gates again,
+        so it guards nothing while looking like it does."""
+        for grp in mod.KNOWN_CELL_COLLISIONS:
+            stale = grp - set(mod.FUNDING_BOOKS)
+            assert not stale, f"declaration names non-living book(s): {stale}"
 
     def test_every_declaration_names_real_books(self):
         """A stale entry naming a retired book silently stops guarding."""

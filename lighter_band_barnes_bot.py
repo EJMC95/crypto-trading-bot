@@ -702,6 +702,33 @@ def main():
     p.add_argument("--once", action="store_true", help="single scan then exit")
     args = p.parse_args()
 
+    # ---- RETIRED 2026-08-17 (pm): the I17 keep-or-retire call on the carry
+    # cell, operator decision. IDLE, never sys.exit — restartPolicy=always
+    # turns an exit into a permanent crash-loop (the Trail Blazer pattern);
+    # this book owns its whole process, so idling silences exactly one book
+    # (the 🌊/📊/🧙 shape, NOT the (mr) shared-module case). Ledgers kept; it
+    # holds ZERO open positions, so nothing freezes. Resurrect:
+    # BARNES_RETIRED_OVERRIDE=run.
+    if os.environ.get("BARNES_RETIRED_OVERRIDE", "").strip().lower() \
+            not in ("run", "1", "true") and not args.once:
+        print("band-barnes (🎸 Barnesy) is RETIRED: it produced ZERO "
+              "INDEPENDENT EVIDENCE (I17/I20). Measured on its own ledger: "
+              "0 of 9 episodes its living carry sleeve ever opened were a "
+              "coin 🌾 carry was not already holding at that moment — 3 "
+              "distinct coins (SKHYNIXUSD, SPCX, WTI), every one also traded "
+              "by carry. It was minted as a THREE-sleeve super-book and two "
+              "sleeves are already retired (extreme (ly), xsect (nf)), so the "
+              "surviving sleeve is 🌾 carry's own gate (20% TRUE / $2M / 6h / "
+              "crypto) at a smaller cap (4 vs 12) — one bet held twice, not "
+              "new edge. All 9 closes are the non-crypto class removed 13-Aug "
+              "(lk)/(lv); zero trades since; allocation claim 0.0. Retiring "
+              "costs NO coverage: carry covers the identical cell with 3x the "
+              "cap. Operator decision 17-Aug. Idling: no venue calls, no "
+              "publishes, ledgers kept. BARNES_RETIRED_OVERRIDE=run to "
+              "resurrect.", flush=True)
+        while True:
+            time.sleep(3600)
+
     # SHADOW ONLY, allowlist not blocklist: this book models a hedge leg it
     # does not have and takes directional legs it must never fund — every
     # order-sending mode is refused, loudly, so a flipped env is a decision

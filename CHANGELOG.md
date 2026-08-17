@@ -1,3 +1,81 @@
+## 2026-08-17 (pm) — 🎸 BARNES RETIRED: A THIRD UNDECIDABILITY CLASS — NOT A SLOW CLOCK, NOT A FAT TAIL, BUT **ZERO INDEPENDENT EVIDENCE**
+
+The I17 keep-or-retire call on the carry cell, operator decision, made on a
+measurement of the book's own ledger. `(pl)` refused the band change and said
+the real question was *how many books*, not *which bands*. This answers it.
+
+### THE MEASUREMENT
+
+Every episode 🎸's living carry sleeve ever opened, against 🌾 carry's holdings
+at that instant:
+
+| Barnes opened | coin | held_h | was 🌾 carry holding it? |
+|---|---|---:|---|
+| 07-Aug 03:01 | SKHYNIXUSD | 11.6 | YES |
+| 07-Aug 18:06 | WTI | 5.7 | YES |
+| 07-Aug 21:56 | SPCX | 3.7 | YES |
+| 10-Aug 06:01 | SKHYNIXUSD | 15.0 | YES |
+| 10-Aug 20:41 | WTI | 2.5 | YES |
+| 10-Aug 23:01 | SPCX | 41.7 | YES |
+| 11-Aug 05:31 | SKHYNIXUSD | 62.5 | YES |
+| 11-Aug 19:11 | WTI | 4.0 | YES |
+| 12-Aug 17:01 | WTI | 5.3 | YES |
+
+**0 of 9 independent. 3 distinct coins, every one also traded by carry.** In its
+entire life it produced not one observation the fleet did not already have.
+
+This is `(lv)`'s finding on the `extreme` sleeve — *"offered nothing carry hadn't
+claimed in 0 of 8,611 snapshots"* — reproduced on the REALISED ledger rather
+than the scan, and this time about the sleeve that was actually trading.
+
+### WHY RETIRE RATHER THAN TUNE
+
+* It was minted as a **THREE-sleeve super-book and its thesis was the
+  COMBINATION** ((jw): *"the COMBINATION is a NEW policy"*). Two sleeves are
+  already retired — `extreme` (ly), `xsect` (nf). What remained is not the book
+  that was commissioned.
+* The survivor is 🌾 carry's own gate — 20% TRUE / $2M / 6h / crypto — at a
+  smaller cap, **4 vs 12**. I20: same bet at a new row id, not new edge.
+* All 9 closes are the non-crypto class removed 13-Aug `(lk)`/`(lv)`; it has
+  opened nothing since. `fleet_allocation` claim: **0.0**.
+* **It could not be tuned even in principle**: birth-FROZEN until 4-Sep.
+* **Retiring costs ZERO coverage** — carry covers the identical cell with 3× the
+  capacity. That is what makes this cheap rather than a trade-off.
+
+**WHY THIS BOOK AND NOT ANOTHER ON THE CELL, so the reasoning is falsifiable:**
+🌾 carry is the book the other two copied, with the largest cap and the only
+real history. 🏦 Rich Dad is FOUR DAYS OLD with a genuinely different rule set
+(payback-velocity bar ~21.9% EFFECTIVE — derived inside its exit rule, so
+`enter_apr` cannot show it — plus `liability_flip` 6h and `decay_paid`) and its
+own ~12-Sep gradeable date. Retiring it now would judge a book before its record
+starts, the trap `(nu)` names on 🧙 Schwager.
+
+**A THIRD UNDECIDABILITY CLASS.** I17's original is the slow clock (🌊, 📊: too
+few closes ever). `(oj)`'s is the fat tail (🧙: enough closes, a `t` the
+distribution cannot support). This one is **redundancy** — a book trading at a
+normal rate, whose every observation is a duplicate of another book's. Its `n`
+looks like evidence and is not.
+
+### SHIPPED
+
+Guard IDLES the whole process — own module, own service, the 🌊/📊/🧙 shape,
+never `sys.exit` (`restartPolicy=always` turns an exit into a permanent
+crash-loop). **ZERO open positions, so nothing freezes** — unlike every prior row
+retirement. Ledgers kept; both halves shipped (`RETIRED_ROWS` hides,
+`LEGACY_BOTS` prunes). Reversible via `BARNES_RETIRED_OVERRIDE=run`.
+
+`FUNDING_BOOKS` in `audit_book_overlap` drops it too — **caught by my own new
+test, not by review**: leaving a retired row there keeps a corpse contending for
+supply it can no longer take, the `(gl)` phantom-rival class. `(pl)`'s cell
+declaration follows it from THREE books to TWO, and a test now fails if any
+declaration names a book off the roster — a group naming a retired book can
+never match the live gates again, so it guards nothing while looking like it
+does.
+
+Live after the change: `DECLARED: 2 books share a cell`. **8 mutations verified
+red** — guard removed, guard exiting, one-sleep-then-fall-through, guard moved
+after `venue_context`, each retirement half dropped separately, the reversal
+token removed, and the book left in `FUNDING_BOOKS`.
 ## 2026-08-17 (pl) — THE CARRY-CELL RE-BAND IS MEASURED AND REFUSED; WHAT SHIPS INSTEAD IS THE CHECK THAT WOULD HAVE CAUGHT THE CELL FILLING UP
 
 Asked to fix the three-books-one-cell problem. **The specific design on the
