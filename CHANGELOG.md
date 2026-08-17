@@ -46,9 +46,19 @@ With the fix, the future-drift claim now reddens on
 
 `lighter_funding_bot.py` is REAL-MONEY surface, so: **publish-only, changes no
 trade, no lever, no era ⇒ main-only under `(mm)`**, riding to the live container
-on the next marker deploy. The three rows keep printing `UNPUBLISHED` until then,
-which is the guard being honest about a deploy that has not landed rather than a
-bug. 4 selftests green on the live file.
+on the next marker deploy. 4 selftests green on the live file.
+
+**CORRECTED IN PLACE (I12), verified against the live payload ~40 min later:
+this said "the three rows keep printing `UNPUBLISHED` until then" and it is
+TWO.** 🛢️ Garrett has its own service and its own deploy rule, so it took the
+change immediately — `build=1ed82ffff05c`, `CURRENT` at HEAD, `crypto_only=False`
+live, and its `UNPUBLISHED` label is gone from the detector. The 💸 Farmer's
+**live row AND its shadow twin** are the two still waiting, because `(hi)` put
+both arms on ONE marker-gated deploy clock on purpose — the experiment/control
+pair must stay code-identical or the judge's paired bar is comparing two
+different programs. `audit_code_currency` reads both as `DEFERRED … working as
+designed`. So the remaining `UNPUBLISHED` is a marker gate doing its job, and it
+clears on the next `[deploy-live-farmer]`.
 ## 2026-08-17 (pi) — AN `ENFORCED_AUDITS` MEMBER THAT CANNOT FAIL IN CI: `audit_boot_stagger` could never reach a deploy cadence there, so it asserted nothing on every run that gated a build
 
 `(pg)` fixed the crash. Checking *why* the crash was CI-only turned up the
