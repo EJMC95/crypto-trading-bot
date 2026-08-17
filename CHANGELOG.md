@@ -70,6 +70,53 @@ Found by the Monday weekly-verdict pass, which is supposed to read the machine's
 week rather than debug it; the run being red is what put it in front of the
 operator, who said *"Fix"*.
 
+## 2026-08-17 (po) — A CHECK THAT INSPECTS NOTHING REPORTS CLEAN, AND CLEAN GETS QUOTED AS EVIDENCE: the scoping bug that nearly closed a live defect as fixed
+
+- **THE CLASS, engraved because it cost five mis-aimed reviews of ONE file in a
+  day across two sessions.** The expensive failure is not a check that errors —
+  it is one that runs, inspects nothing, prints nothing, and is then handed to
+  someone as a negative result.
+- **INSTANCE 1, and the consequential one.** Verifying whether
+  `scripts/audit_boot_stagger.py` still shadowed its own `tol` parameter, I
+  scoped with `awk '/^def assess/,/^def [a-z_]+\(/'`. **The end pattern matches
+  the START line** (`def assess(` satisfies `^def [a-z_]+\(`), so the range
+  closed where it opened and scanned exactly ONE line. Empty output. I reported
+  the defect **already fixed** to the session about to hand it to an operator —
+  while it was live, costing **19 of 20 organs** their published `ttl_sec`
+  basis (measured: hand every organ a real tolerance, count how many keep it).
+  A whole-file `grep -nE '^[[:space:]]*tol[[:space:]]*='` finds `:226` and
+  `:267` instantly.
+- **INSTANCE 2.** A hand-rolled block parser collapsed 350 lines of
+  `run_all.sh` into a single block, so every organ resolved to the same first
+  match — plausible-looking output, entirely wrong, and it survived two
+  attempts before I stopped hand-rolling and read the shell directly.
+- **INSTANCE 3, from the other end.** `session_commit.py`'s read-back certified
+  *"the commit holds exactly the bytes I snapshotted"* — TRUE, and useless: a
+  `perl -pi` letter-rename had corrupted `CHANGELOG.md` **before** the commit
+  boundary, so the receipt faithfully certified a destroyed entry. **A receipt
+  for fidelity is not a receipt for correctness** — the same shape as this
+  file's own standing caveat that a green run proves an enforcement EXISTS, not
+  that it is CORRECT.
+- **THE RULES** (now in the Rules section beside the `grep -q`/`pipefail`
+  sibling, which is this class in shell form): empty output is not a negative
+  result until the check has been seen to produce a POSITIVE one; prefer a
+  whole-file grep to a scoped one, because scoping is where the silence hides;
+  ask what the check reads under TOTAL failure; and **when correcting someone,
+  re-run THEIR check rather than substituting your own narrower one** — both
+  corrections I issued that day were wrong in the consequential direction for
+  exactly that reason.
+- **WHAT WAS NOT WRONG, recorded so the entry is not read as blanket doubt:**
+  the underlying defects were real and are now fixed on main by `9d5551c`,
+  verified here by measurement rather than reading — `tol` 0 of 20 organs lose
+  their tolerance (was 19), `fleet_immune` mitigated=True (was the regression),
+  10 of 20 mitigated (was 1), guard exits 0, selftest and registration green.
+  The residual "false FAILs under burst" I reported were an artifact of my own
+  offline harness (no `DATABASE_URL` ⇒ proxy tolerances) against a cadence I
+  invented; the organs concerned genuinely have no early run, so
+  `mitigated=False` is correct for them. **Retracted rather than left standing.**
+- Memory: `a-check-that-looks-like-it-ran` (new), and
+  `concurrent-sessions-share-this-repo` gains the worktree-first pointer.
+
 ## 2026-08-17 (pm) — 🎸 BARNES RETIRED: A THIRD UNDECIDABILITY CLASS — NOT A SLOW CLOCK, NOT A FAT TAIL, BUT **ZERO INDEPENDENT EVIDENCE**
 
 The I17 keep-or-retire call on the carry cell, operator decision, made on a
