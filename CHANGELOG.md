@@ -1,3 +1,75 @@
+## 2026-08-17 (pn) — THE GUARD SHIPPED YESTERDAY COULD NEVER HAVE ANSWERED ITS QUESTION: A `permissions:` BLOCK DENIES EVERY SCOPE IT OMITS
+
+`(pc)` shipped `scripts/audit_ci_coverage.py` on 16-Aug — the guard that asks
+**"was the deployed code ever graded?"** — wired into the `code-currency` job of
+`fleet-weekly-assessment.yml`, with a full logic selftest beside it
+(`test_ci_coverage_guard.py`: green tip, in-flight tip, cancelled-is-not-a-verdict,
+dark history, doc-only-push-is-OK). Every one of those assertions runs against
+pure functions on a laptop.
+
+**Its first scheduled run, `31979750293` (Sun 23:39 UTC / Mon 09:39 AEST), failed:**
+
+    audit_ci_coverage: UNKNOWN — run history unreadable
+    ##[error]Process completed with exit code 2
+
+**Not a fleet finding — there is no BEHIND-OWN.** The two deploy-verification
+steps ahead of it in the same job (`audit_code_currency`, `audit_live_roster`)
+both passed; the `assess` job published the scoreboard normally. The guard could
+not read run history *at all*, and never could have: it shells out to
+`gh run list`, and this workflow declares
+
+    permissions:
+      contents: read
+      issues: write
+
+A `permissions:` block **zeroes every scope it does not list** — it is a
+replacement, not an addition — so `actions: read` was denied, `fetch_runs()`
+returned `None`, and `assess()` took its UNKNOWN branch and exited 2 exactly as
+`(mq)` designed it to (*"a guard with no answer must not print OK"*). The
+fail-closed behaviour is correct and is the only reason this was visible at all;
+what was wrong was the grant.
+
+**THE CLASS, and why it earns an executable pin rather than a one-line fix.**
+This is [[a-guard-has-two-regimes-ci-has-no-database]] landing a second time on
+a second scope: **a guard's fallbacks govern exactly where the build is gated.**
+`(pc)`'s selftest exercised the regime that does NOT gate the build and could not
+have caught this; nothing looked at the workflow's grant, so the guard was
+green locally and structurally blind in CI. Worse, **it was already written
+down**: `tests.yml:43` carries a comment recording this identical missing scope
+(*"`actions: read`, which this workflow's GITHUB_TOKEN does not have"*). Known,
+documented, and walked into one workflow over — which is the difference between
+a lesson and a control.
+
+**FIXED, both halves:**
+
+* `actions: read` added to the workflow's permissions block, with the incident
+  in a comment beside it.
+* `tests/autonomy/test_code_currency_wired.py` — the file that already pins this
+  job's other silent-degrade modes (`--pnl-json`, `--gha`, `fetch-depth: 0`, no
+  masked exit code) — gains
+  `test_ci_coverage_step_is_granted_the_scope_it_needs`. It reads the JOB's own
+  `permissions:` block when it has one and the workflow-level block otherwise,
+  because a job-level block **replaces** rather than extends the workflow grant;
+  and it parses the mapping rather than searching the page, since the string
+  `actions: read` now appears in a comment and in a docstring, either of which
+  would satisfy a substring scan ((hm): a page-wide scan is not a structural
+  claim). A missing block is distinguished from an empty grant — with no block
+  the repo default applies, which is a different thing from a denial.
+
+**FOUR MUTATIONS VERIFIED RED** (I3): the scope deleted (i.e. the defect exactly
+as it shipped), `actions: none`, the scope present only in a comment, and a
+job-level `permissions:` block that omits it. Clean green restored after each.
+`audit_deploy_coverage` and `audit_ci_coverage --selftest` both still OK.
+
+**WHAT THIS DOES NOT CLAIM.** Granting the scope lets the guard ask its question;
+it does not make the answer green. The verdict it returns on the next run is a
+real reading of whether shipped commits were graded, and it may well be a
+finding — that is the point of restoring it.
+
+Found by the Monday weekly-verdict pass, which is supposed to read the machine's
+week rather than debug it; the run being red is what put it in front of the
+operator, who said *"Fix"*.
+
 ## 2026-08-17 (pm) — 🎸 BARNES RETIRED: A THIRD UNDECIDABILITY CLASS — NOT A SLOW CLOCK, NOT A FAT TAIL, BUT **ZERO INDEPENDENT EVIDENCE**
 
 The I17 keep-or-retire call on the carry cell, operator decision, made on a

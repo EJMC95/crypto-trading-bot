@@ -10,9 +10,19 @@ on:
     - cron: '30 23 * * 0'
   workflow_dispatch:
 
+# [2026-08-17 (pn)] `actions: read` is LOAD-BEARING, not tidiness. Declaring a
+# `permissions:` block zeroes every scope not listed, so until this line existed
+# the `audit_ci_coverage` step below could not run `gh run list` at all: it read
+# the history as unreadable, returned its UNKNOWN verdict and exited 2 by design
+# ((mq): a guard with no answer must not print OK). Measured on run 31979750293,
+# the guard's FIRST scheduled run after `(pc)` shipped it — red, and structurally
+# incapable of ever being anything else. `tests.yml:43` already carried a comment
+# recording this exact missing scope; the trap was written down in one workflow
+# and walked into in another. Pinned by test_code_currency_wired.py.
 permissions:
   contents: read
   issues: write
+  actions: read
 
 env:
   FEED: https://pnl-dashboard-production-858c.up.railway.app/pnl.json
