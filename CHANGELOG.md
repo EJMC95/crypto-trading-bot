@@ -1,3 +1,98 @@
+## 2026-08-17 (pk) — 🎯 THE PARTIAL SCREEN WAS EXEMPT INSTEAD OF PUBLISHED, AND THE BOOK IT HID IS THE ONE WHOSE STALE VERDICT CAN NEVER AGE OUT
+
+**Found from the daily brief**, ranked as its one growth item. 🎯
+`lighter-perp-sniper-lshadow` has sat `unreachable` on the decision docket for
+**10 days** — tied longest with ⚖️ Counterweight, which is held with a
+pre-registered ~28-Aug operator date and so is not open. Its verdict rests on
+n=29, mean −0.498%/trade, *"more of the same closes cannot flip mean/t/halves"*.
+
+Split by the scout's own class map, over the 20 of its closes inside the live
+feed window:
+
+| class | n | realised |
+|---|---:|---:|
+| crypto (cls 2) | 2 | **+$0.46** |
+| non-crypto (cls 3/4/5/7) | 18 | **−$5.34** |
+
+The retained population is positive; the screened-out population is the entire
+loss. That reproduces `(lk)`'s own 13-Aug measurement (non-crypto surge
+−$5.01/13 and young −$1.19/2 against crypto +$1.13/5) — which is *why* the
+screen was added.
+
+**THE PART THAT MAKES THIS WORSE THAN `(pf)`'s TWO BOOKS: 🎯 HAS `era = null`.**
+It is deliberately excluded from `POLICY_ERA` because its publisher does not
+accrue. So where 🌾 carry's removed closes will eventually age out of an era
+window, these eighteen **never leave the graded sample**. The verdict is
+permanent by construction, on a policy the book stopped running four days ago —
+and it is the verdict an operator would retire the book on.
+
+**THE DEFECT IS THE EXEMPTION'S CONCLUSION, NOT ITS REASONING.** `(pf)` declared
+this file in `PARTIAL_SCREEN_OK` because `crypto_only: true` would misdescribe a
+gate the LISTING source leaves open. That is correct. It then concluded *publish
+nothing* — when **`false` was available and true the whole time**, and is
+precisely the answer `audit_book_overlap` asks for: `(ph)` made it read a bool
+per book and treat absence as UNKNOWN. `(pj)` had already made this exact
+argument for the funding trio hours earlier — *an UNKNOWN there under-informs
+exactly as a wrong `True` would overstate* — and this book is the same case one
+level down.
+
+**Shipped**, both halves, in `caps`:
+
+    "crypto_only": False,
+    "class_screen": {"surge":   not ALLOW_NONCRYPTO,
+                     "young":   not ALLOW_NONCRYPTO,
+                     "listing": False}
+
+The bool answers the whole-gate question; the map carries what the bool cannot —
+that two of three sources ARE screened and one deliberately is not.
+
+**THE LITERAL IS SAFE HERE FOR THE OPPOSITE REASON TO THE USUAL ONE, and the two
+halves are asymmetric on purpose.** `crypto_only: False` does not track
+`ALLOW_NONCRYPTO` because it *cannot drift with it*: flipping the reversal env
+only widens what surge/young admit, and the listing source is unscreened in both
+states, so the whole-gate answer is `False` either way. The per-source
+`surge`/`young` entries ARE derived from the switch — a hardcoded `True` there
+would lie the moment the env is set, the *kill switch must reach the consumer*
+failure mirrored onto reporting. `listing: False` is a literal for the same
+reason as the bool: deriving it would make the reversal env appear to close a
+source it never touches.
+
+**WHAT THIS DELIBERATELY DOES NOT DO.** It does not re-cut or split the
+published grade. `(pf)`'s own ruling governs: a universe narrowing is ordinary
+tuning that does not move an era, and the blessed precedent `(jg)`/`(ki)` is
+REPORT the split beside the pooled grade, never re-cut the sample. Adding class
+awareness to `scripts/golive_readiness.py` would also put a `fleet_bus`
+dependency inside the real-money gate — the born-dark class — for a book that is
+$1,000 of paper. The split is now derivable from the payload; making the grader
+compute it is a separate, larger decision.
+
+**Guarded**: `tests/autonomy/test_sniper_class_screen.py` — 5 tests, AST-shaped
+(`(hj)`: three tests in one session passed on the prose promising the property
+they checked). It pins the bool's value and its literal-ness, the map's
+existence, that every admission source appears (so *unscreened* is never
+byte-identical to *forgotten* — I1 on the reporting side), that the screened
+sources derive from the switch, that the unscreened one does not, and that a
+real screen still exists behind the whole declaration. **6 mutations verified
+RED** (see below).
+
+Kept OUT of `test_class_screen_declared.py` on purpose: that file is the
+whole-gate guard and was open in a concurrent session's working tree when this
+shipped — `(lz)`/`(nx)`.
+
+**Publish-only: changes no trade, no lever, no era, no universe.** $1,000 shadow
+book, so **main-only** under `(mm)`; it rides `perp-sniper-shadow`'s existing
+auto-deploy rule.
+
+**ONE FOLLOW-UP LEFT FOR THE OWNER OF THE OTHER FILE, named rather than done.**
+`PARTIAL_SCREEN_OK`'s reason for this file now reads stale — it says publishing
+would misdescribe the book, and the book now publishes. 🎯 must **stay** in that
+set (its `crypto_only` is a literal by design, so
+`test_the_declaration_tracks_the_switch_not_a_literal` would fail it), but the
+reason should be rewritten to *"publishes `false` + a per-source `class_screen`
+(pk); exempt from the derive-from-switch rule because the whole-gate answer
+cannot drift"*. I did not edit it because that file was dirty in another
+session.
+
 ## 2026-08-17 (pj) — THE LAST THREE `UNPUBLISHED` CLASS SCREENS, AND THE GUARD FROM THIS MORNING KNEW ONLY ONE OF THE FLEET'S TWO PUBLISH SHAPES
 
 `(ph)` taught `audit_book_overlap` to read each book's own class screen, and its

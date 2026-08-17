@@ -1174,7 +1174,55 @@ def main():
                                  # is running code that carries apply_tuning.
                                  # Publish-only; no gate moves.
                                  "caps": {"surge_mult": SURGE_MULT,
-                                          "max_open": MAX_OPEN}})
+                                          "max_open": MAX_OPEN,
+                                          # [2026-08-17 (pk)] THE CLASS AXIS
+                                          # ON A BOOK WHOSE SCREEN IS PARTIAL.
+                                          # `(pf)` gave the three books with a
+                                          # WHOLE-gate screen a `crypto_only`
+                                          # and DECLARED this one exempt,
+                                          # because `true` would misdescribe a
+                                          # gate the listing source leaves
+                                          # open. Correct — and it concluded
+                                          # "publish nothing" when `false` was
+                                          # available and TRUE. This book's
+                                          # gate as a whole DOES admit
+                                          # non-crypto, so `false` is the
+                                          # honest answer to the question
+                                          # `audit_book_overlap` actually asks
+                                          # (it reads a bool and treats absent
+                                          # as UNKNOWN, which under-informs
+                                          # exactly as a wrong `true` would
+                                          # overstate — the same argument the
+                                          # Farmer/Garrett rows carry).
+                                          #
+                                          # WHY THE LITERAL IS SAFE HERE, and
+                                          # it is the opposite reason to the
+                                          # usual one: `false` does not track
+                                          # ALLOW_NONCRYPTO because it CANNOT
+                                          # drift with it. Flipping the
+                                          # reversal env only widens what
+                                          # surge/young admit; the listing
+                                          # source is unscreened either way,
+                                          # so the whole-gate answer is
+                                          # `false` in both states.
+                                          "crypto_only": False,
+                                          # ...and the detail the bool cannot
+                                          # carry, which is the half that made
+                                          # this book's grade unreadable: 18 of
+                                          # the 20 closes behind its 10-day
+                                          # `unreachable` verdict are the class
+                                          # surge/young stopped admitting on
+                                          # 13-Aug (−$5.34 against +$0.46 on
+                                          # the 2 crypto closes). Per SOURCE,
+                                          # derived from the switch so it
+                                          # tracks a reversal:
+                                          "class_screen": {
+                                              "surge": not ALLOW_NONCRYPTO,
+                                              "young": not ALLOW_NONCRYPTO,
+                                              # structural, not a default —
+                                              # see the (lk) block: n=1,
+                                              # unmeasured, founding thesis.
+                                              "listing": False}}})
         except Exception as e:  # noqa: BLE001
             # Never let telemetry kill the trading loop — but never let it fail
             # in silence either: a bare `except: pass` here is what hid the
