@@ -74,9 +74,15 @@ def _entry(d, key):
 
 
 def test_the_sniper_publishes_a_whole_gate_crypto_only_of_false():
-    """Absent reads as UNKNOWN to `audit_book_overlap`, which under-informs
-    exactly as a wrong `true` would overstate. The gate admits non-crypto via
-    the listing source, so `false` is the honest whole-gate answer."""
+    """The gate admits non-crypto via the listing source, so `false` is the
+    honest whole-gate answer, and an absent field under-informs exactly as a
+    wrong `true` would overstate.
+
+    NOT a claim about a consumer: `audit_book_overlap` reads this field, but
+    its population is `FUNDING_BOOKS` and 🎯 is DIRECTIONAL, so nothing
+    automated consumes it today. The point is that the grade becomes readable
+    — `(pf)`'s defect — in the fleet's standard shape.
+    """
     caps = _caps_dicts(_tree())
     assert caps, "no `caps` dict found — did the publish block move?"
     declared = [_entry(d, "crypto_only") for d in caps]
@@ -84,8 +90,8 @@ def test_the_sniper_publishes_a_whole_gate_crypto_only_of_false():
     assert declared, (
         "lighter_perp_sniper.py publishes no `crypto_only`. Its gate as a "
         "whole ADMITS non-crypto (the listing source is unscreened), so the "
-        "honest value is False — not silence. audit_book_overlap reads a bool "
-        "and treats absence as UNKNOWN (pk).")
+        "honest value is False — not silence, which leaves the book's grade "
+        "unreadable exactly as (pf) found for carry and Barnesy (pk).")
     for node in declared:
         assert isinstance(node, ast.Constant) and node.value is False, (
             "`crypto_only` must be the literal False. True would misdescribe "

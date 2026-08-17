@@ -1187,13 +1187,20 @@ def main():
                                           # available and TRUE. This book's
                                           # gate as a whole DOES admit
                                           # non-crypto, so `false` is the
-                                          # honest answer to the question
-                                          # `audit_book_overlap` actually asks
-                                          # (it reads a bool and treats absent
-                                          # as UNKNOWN, which under-informs
-                                          # exactly as a wrong `true` would
-                                          # overstate — the same argument the
-                                          # Farmer/Garrett rows carry).
+                                          # honest whole-gate answer, and an
+                                          # absent field under-informs exactly
+                                          # as a wrong `true` would overstate
+                                          # — the argument `(pj)` makes for
+                                          # the Farmer/Garrett rows.
+                                          # NOT a claim about a consumer:
+                                          # `audit_book_overlap` reads this
+                                          # field, but its population is
+                                          # `FUNDING_BOOKS` and this is a
+                                          # DIRECTIONAL book, so nothing
+                                          # automated consumes it today. It is
+                                          # published in the fleet's standard
+                                          # shape so the grade is READABLE —
+                                          # which was `(pf)`'s whole defect.
                                           #
                                           # WHY THE LITERAL IS SAFE HERE, and
                                           # it is the opposite reason to the

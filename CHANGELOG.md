@@ -29,12 +29,22 @@ and it is the verdict an operator would retire the book on.
 **THE DEFECT IS THE EXEMPTION'S CONCLUSION, NOT ITS REASONING.** `(pf)` declared
 this file in `PARTIAL_SCREEN_OK` because `crypto_only: true` would misdescribe a
 gate the LISTING source leaves open. That is correct. It then concluded *publish
-nothing* — when **`false` was available and true the whole time**, and is
-precisely the answer `audit_book_overlap` asks for: `(ph)` made it read a bool
-per book and treat absence as UNKNOWN. `(pj)` had already made this exact
-argument for the funding trio hours earlier — *an UNKNOWN there under-informs
-exactly as a wrong `True` would overstate* — and this book is the same case one
-level down.
+nothing* — when **`false` was available and true the whole time**. `(pj)` had
+already made this exact argument for the funding trio hours earlier — *an
+UNKNOWN there under-informs exactly as a wrong `True` would overstate* — and
+this book is the same case one level down.
+
+- **[CORRECTED IN PLACE, same session (I12).** This paragraph first read that
+  `false` *"is precisely the answer `audit_book_overlap` asks for"*. **It is
+  not, for this book.** `(ph)` did make that audit read a per-book bool, but its
+  population is the hardcoded `FUNDING_BOOKS` list and 🎯 is a DIRECTIONAL book,
+  so it is not scanned there at all — I checked the list only after writing the
+  claim. **Nothing automated consumes this declaration today.** What the change
+  actually buys is that the book's grade becomes READABLE in the fleet's
+  standard shape, which is `(pf)`'s whole defect and reason enough; it is not a
+  wiring fix, and the entry should not have implied a consumer it does not have.
+  The same overstatement was corrected in the code comment and the guard's
+  docstring in the same pass.]
 
 **Shipped**, both halves, in `caps`:
 
