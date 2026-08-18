@@ -1,0 +1,31 @@
+# Image for 🪁 band-kelly (band-kelly-shadow) — the MIRROR book, shadow only.
+# Set the service variables:
+#   RAILWAY_DOCKERFILE_PATH=Dockerfile.bandkelly
+#   VENUE=lighter_shadow
+# The bot REFUSES every other VENUE (loud SystemExit): a $1,000 paper book
+# holding the OPPOSITE side of the fleet's measured losers over exactly the
+# windows the loser would have traded — v1 roster is the inverted 🧲 Snap
+# Back (ride dislocations, never fade), founded on the ghost's own negated
+# ledger (STUDY_BAND_KELLY_2026-08-18.md). ZERO keys. Config is ENV-ONLY
+# (no tuning lane), single-policy (hm) clock by construction.
+#
+# COPY set is the douglas one PLUS lighter_dislocation_bot.py — the retired
+# ghost module whose gate math and constants this bot imports (one owner,
+# never a copy; its retirement guard sits inside main(), so the import runs
+# nothing). fleet_tuning is deliberately ABSENT (env-only book — declared in
+# audit_image_imports.BORN_DARK_OK, the cohort idiom); fleet_bus IS a
+# guarded import (crypto class screen + scout universe) and ships in the
+# SAME commit as the import (born-dark rule).
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lighter_band_kelly_bot.py lighter_dislocation_bot.py bot_pnl_store.py paper_broker.py fleet_bus.py ./
+COPY venues/ ./venues/
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "lighter_band_kelly_bot.py"]

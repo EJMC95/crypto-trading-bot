@@ -474,6 +474,15 @@ AUTO_IMAGES = {"Dockerfile.freqtrade": "freqtrade-bots",
 # image is archaeology, I12).
 # ---------------------------------------------------------------------------
 MANUAL_IMAGES_OK = {
+    "Dockerfile.bandkelly": (
+        "🪁 band-kelly (band-kelly-shadow) — PRE-PROVISION, the (ls)/(mk) "
+        "migration state: the Railway service does not exist yet, and since "
+        "(hj) an unresolvable name in the decide step is a hard ::error::, "
+        "so the deploy rule ships COMMENTED in railway-redeploy.yml. At "
+        "activation (service provisioned, row stamp-verified) move this "
+        "entry to AUTO_IMAGES and uncomment the rule — the exact path "
+        "kiyosaki and the wave-2 books walked."
+    ),
     "Dockerfile": (
         "The legacy single shared image from the pre-split era — its own header "
         "says each Railway service overrides the Start Command. No living "

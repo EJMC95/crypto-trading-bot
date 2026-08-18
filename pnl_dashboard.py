@@ -369,7 +369,13 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # (Options, Futures and Other Derivatives). Each its own
                 # service (book-<surname>-shadow). Shadow-only; bases never
                 # publish.
-                "book-douglas", "book-grimes", "book-schwager", "book-hull"}
+                "book-douglas", "book-grimes", "book-schwager", "book-hull",
+                # [2026-08-18] 🪁 band-kelly — the MIRROR book (operator:
+                # "does the exact opposite of all of the major losing
+                # sequences"; lighter_band_kelly_bot.py, service
+                # band-kelly-shadow). Third of the musician cohort.
+                # Shadow-only; base never publishes.
+                "band-kelly"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper"]
 
@@ -407,6 +413,9 @@ OVERTRADE_LIMIT = {
                                    # day can flip-and-refill more than 15
     "book-douglas":          30,   # 🧘 The Zone — 1h impulse fades, ~12h max
                                    # hold; a violent day can cycle 4 slots
+    "band-kelly":            40,   # 🪁 the Mirror — 90s loop, median hold
+                                   # ~5min (the ghost's own cadence); a
+                                   # dislocation-storm day cycles 4 slots fast
 }
 OVERTRADE_DEFAULT = 15
 
@@ -472,6 +481,7 @@ LABELS = {
     "book-grimes":                 "📐 The Technician — quantified-edge book",
     "book-schwager":               "🧙 The Wizard — ride-winners book",
     "book-hull":                   "🧮 The Professor — cost-of-carry book",
+    "band-kelly":                  "🪁 the Mirror — rides what the losers fade",
     "perps-funding-lighter":       "💸 Funding Farmer — funding harvester",
     "lighter-perp-sniper":         "🎯 Perp Sniper — listing sniper",
     "lighter-dislocation":         "🧲 Snap Back — dislocation harvester",
@@ -522,6 +532,7 @@ DESCRIPTIONS = {
     "book-grimes":          "The Art & Science of TA as rules — a structural setup roster (pullback/failtest/keltner; breakout is Schwager's supply) behind a rolling replay gate: a setup may enter only while its trailing 120d record on the venue's own tape clears the bar (n≥20, net>0, t≥0.5); the scorecard is published every loop",
     "book-schwager":        "Market Wizards as rules — 4h Donchian-20 breakouts with EMA20>50 confirm; cut losses at 2×ATR, ride winners on a wide 3.5×ATR chandelier trail, NO profit target and NO pyramid (measured and refuted); one position per coin",
     "book-hull":            "Options, Futures & Other Derivatives as rules — delta-neutral funding receiver in the mid-band cell [7.8%,20%) TRUE × [$2M,$10M) that completes the Garrett|Hull|Farmer volume tiling; payback-velocity floor (the no-arbitrage cost band), 24h flip grace (basis noise ≠ signal, measured), adverse-basis entry veto",
+    "band-kelly":           "holds the OPPOSITE side of the fleet's measured losers over exactly the windows the loser would have traded — v1 mirrors retired 🧲 Snap Back: LONG the premium-rich dislocations it shorted, SHORT the discounts it bought, exit when the ghost's own rules (converged/stop/2h) would have exited · refused/waiting mirror families publish in extra.roster · env-only, single-policy clock",
     "perps-funding-spread": "ranks 72h mean funding across the venue's liquid books: LONG the K most-negative, SHORT the K most-positive, rebalances daily · K=8, $20/leg [30-Jul: K 5→8, universe 30→60]",
     "lighter-dislocation":  "fades Lighter-vs-index dislocations at an ADAPTIVE gate — a percentile of the live residual, floored at EXIT_BPS×1.5 (~60bps today, was a fixed 150) · universe up to 40 [30-Jul]",
     "lighter-perp-sniper":  "snipes debut-regime books: brand-new listings PLUS volume surges and any book under 21 daily candles [30-Jul — the listing diff alone was a one-loop trigger, hence n=1 in weeks]",
