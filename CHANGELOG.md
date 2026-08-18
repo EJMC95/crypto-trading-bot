@@ -1,3 +1,70 @@
+## 2026-08-18 (qh) — 🪁 BAND-KELLY IS ALIVE, STAMP-VERIFIED — and the birth reproduced the (ml) stale-reader class live, so that class finally gets its guard
+
+**Executed end-to-end under the operator's "Continue maverick!" grant** (the
+(mk) precedent: PR #180 the birth, #181 the one-shot provisioner, both
+merged; provisioner dispatched with the repo's own token and DELETED at this
+activation per the (lr) rule). **Row verified the only way that counts
+((iw)/(fd)): `band-kelly-lshadow` on /pnl.json with `extra.build`
+`5eea92e33277` / `build_n` 14 — byte-equal to the prediction computed
+against the image's own COPY set in a clean directory.** First live loops:
+boot 22:16:25Z, 90s cadence, 22-coin scan (the scout universe resolving
+through the bus proves the DATABASE_URL reference), gate at its 60bps
+floor, zero errors.
+
+THE BIRTH'S INCIDENT — (ml) REPRODUCED, MEASURED, AND CLOSED WITH A GUARD.
+The #180 merge's redeploy (run 537) printed `OK: 'pnl-dashboard' deployed`
+while `/watchdog.json` said the SERVING container booted **11:32Z — eleven
+hours earlier**. The old reader's CURRENT_BOTS filtered the unknown row for
+~30 minutes while the writer published cleanly underneath (`freshest=2s` on
+the same watchdog payload — the writer was never the problem, exactly the
+(ml) lesson's mirror). Second measured instance of the class, so per the
+fix-closes-a-class rule it is now EXECUTABLE: the redeploy workflow's new
+`Verify the pnl-dashboard READER actually flipped` step reads back the
+served `/watchdog.json` `started` after any deploy that included
+pnl-dashboard and FAILS unless the boot time advanced past the run's own
+`run_start` (exported by the decide step — no invented context fields; the
+step hard-fails on a missing anchor per (po), and sits OUTSIDE the big
+decide scalar so the GitHub size cap stays clear). The dashboard is the one
+service with a public boot stamp, which is why the guard can exist at all.
+
+THE FIDELITY PASS — the operator's "check for anything missed, make it a
+winner" review, run while the reader was stale, landed THREE corrections
+all PRE-FIRST-CLOSE (zero closes; the (hm) single-policy clock had not
+started, so no era resets):
+* **The adaptive gate now computes over the ghost's UNSCREENED scan.** The
+  gate is a p98 of the residuals seen this loop; crypto-screening the scan
+  computed it over ~22 books where the ghost used ~40 — a different gate
+  selecting different events than the ones the founding ledger negates.
+  The (lk) screen binds at the ENTRY site instead (census bucket
+  `noncrypto`); mutation M8 (re-screen the scan) and M9 (entry screen
+  dead) verified red with a passing control.
+* **Confirm counters carry the ghost's exact semantics**: +1 on a
+  tradeable loop, hard 0 on a quiet one, UNTOUCHED on a blind one, no
+  reset on a slip refusal — my stricter first cut was a mirror that
+  misses events the ghost took.
+* **The ghost's −5% daily-loss halt is declared NOT simulated**: mirroring
+  it would stop entries exactly when the mirror's day is UP 5% (capping
+  the winning days the thesis rides), and a shadow halt is the (hl) trap
+  besides. The founding ledger EMBEDS the halt's selection conservatively
+  — forward takes strictly more of the thesis's best days, never
+  different trades.
+* Census publishes `dev_med_bps`/`dev_p98_bps` beside the gate so a
+  drifted percentile is falsifiable from the payload alone (I18).
+The activation redeploy carries these fixes; post-fix stamp prediction
+**`ca78a502378e`/n=14**, verified by readback after this merge.
+
+ALSO IN THIS PASS: `lighter_dislocation_bot.py` restored to the workflow's
+`paths:` (removed with snap-back's retirement 5-Aug; the ghost module now
+rides IN the band-kelly image, and audit_deploy_coverage's two-lists-bind
+check caught the orphan the moment the image went AUTO — a ghost-only push
+would have deployed nothing). Note the ghost module is NOT in
+`_BUILD_SHARED`, so a ghost-only edit redeploys the mirror WITHOUT moving
+its stamp — verification for that case is the deploy timestamp, named here
+so nobody hunts a "failed" deploy. Provisioner deleted; `MANUAL_IMAGES_OK`
+→ `AUTO_IMAGES`; decide rule live (carrying the ghost module);
+OPERATOR_QUEUE item closed. Clock: fresh 30 days from first publish
+(18-Aug), ~2.8 crypto closes/day measured on the ghost's ledger →
+gradeable ~mid-Sep on its OWN ledger (I14).
 ## 2026-08-19 (qg) — `(qe)` FIXED THE FALSE PROMISE AND LEFT THE SILENCE: `waiting 3 / next none` still could not say whether ANY waiter is admissible — and the mutation round that verified the fix was itself void
 
 *(Renumbered from (qf) at push time — a concurrent session's 🪁 band-kelly

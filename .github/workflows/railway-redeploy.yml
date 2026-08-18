@@ -479,6 +479,7 @@ jobs:
             fi
           fi
           echo "services=$svcs" >> "$GITHUB_OUTPUT"
+          echo "run_start=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" >> "$GITHUB_OUTPUT"
           echo "-> will deploy: ${svcs:-<none>}"
 
       - name: Install Railway CLI
@@ -563,3 +564,38 @@ jobs:
             exit 1
           fi
           echo "Deployed: $SERVICES"
+      # [2026-08-18] THE (ml) CLASS GETS ITS GUARD, on its second measured
+      # instance: run 537 printed `OK: 'pnl-dashboard' deployed` while the
+      # 11:32Z container kept serving — exactly the 14h-stale-reader
+      # incident again, and it hid the band-kelly row for half an hour.
+      # The dashboard is the one service with a PUBLIC boot stamp
+      # (/watchdog.json `started`), so this run can read back its own work:
+      # after a deploy that included pnl-dashboard, the serving container's
+      # boot time must ADVANCE past this run's start. A separate step so
+      # the big decide scalar stays under GitHub's size cap.
+      - name: Verify the pnl-dashboard READER actually flipped ((ml))
+        if: success() && contains(format(',{0},', steps.decide.outputs.services), ',pnl-dashboard,')
+        env:
+          RUN_START: ${{ steps.decide.outputs.run_start }}
+        run: |
+          set -uo pipefail
+          # A guard must be seen to see ((po)): with no anchor it must fail,
+          # never silently pass.
+          if [ -z "${RUN_START:-}" ]; then
+            echo "::error::decide step exported no run_start — this guard cannot anchor"; exit 1
+          fi
+          ok=0
+          for i in $(seq 1 30); do
+            st="$(curl -sS -m 15 "https://pnl-dashboard-production-858c.up.railway.app/watchdog.json" 2>/dev/null \
+                  | python3 -c 'import json,sys;print(json.load(sys.stdin).get("started",""))' 2>/dev/null || true)"
+            # ISO-8601 with a fixed +00:00 offset on both sides -> string
+            # order IS time order; the boot must postdate the run's start.
+            if [ -n "$st" ] && [ "$(printf '%s\n%s\n' "$RUN_START" "$st" | sort | tail -1)" = "$st" ] && [ "$st" != "$RUN_START" ]; then
+              echo "reader flipped: started=$st (> run start $RUN_START)"; ok=1; break
+            fi
+            echo "waiting for the reader to flip (started=${st:-<unreadable>})"; sleep 10
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::pnl-dashboard deploy reported OK but the SERVING container's boot time never advanced past $RUN_START — the (ml) stale-reader class, second measured instance 18-Aug (run 537, 11h-old reader hid the band-kelly row). Re-deploy and read back /watchdog.json."
+            exit 1
+          fi
