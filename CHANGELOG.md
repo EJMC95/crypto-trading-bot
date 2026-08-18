@@ -1,3 +1,159 @@
+## 2026-08-18 (qa) — THE GROWTH DEEP DIVE: 300 DAYS OF VENUE DATA SAY LIQUIDITY DROUGHT, NOT FUNDING DROUGHT — AND THE TWO CARRIED ADJUDICATIONS ARE RUN
+
+Operator: *"Dive deep on all the knowledge you have and we have and you can
+get on how we can make this pnl increase"*, then *"Fix, commit push and deploy
+all enhancements and look for anything we've missed."* Five measurement lenses
++ this session's own measurements; full memo `FLEET_PNL_GROWTH_2026-08-18.md`.
+
+**THE REFRAME (measured, 300d / all 227 books):** funding dispersion is
+INTACT (18.1 crypto coins ≥20% TRUE this week, inside the 44-week 6.3–32.8
+band, corr +0.40 with BTC vol — cyclical) while VOLUME collapsed secularly
+(ex-majors $2.2B/day → $54M/day, −97.5%, halving ~9.4 weeks, ZERO recovery
+episodes in 44 weeks; coins ≥$2M/day 85 → 6.6). Carry's cell: 2,038
+persistent coin-h/wk (Oct) → 0 (now) while the SAME coins (XMR/KAITO/ENA)
+populate the $0.5–1M tiers. So the Farmer's t-collapse (1.73→0.24, and it
+holds NOTHING today: eligible 0, off_band 109), Garrett's band decay `(pw)`
+and the carry/kiyosaki starvation are SUPPLY effects — context that now sits
+beside the ~28-Aug/~12-Sep docket calls so no book is retired as edgeless
+for being starved. `(px)`'s same-day floor walk to $1M is exactly the
+follow-the-supply step; the ladder below it stays gate-by-gate, measured.
+
+**CARRIED ADJUDICATION #1 RUN — the `(kc)` `--refresh` (owed since 5-Aug):**
+fresh-ranked 180d universe, near-zero slip — **every Farmer gate row is
+NEGATIVE full-window** (0.05: −$22.12, h1 −$30.48/h2 +$11.54; 0.40: −$16.25).
+The 23-Jul both-halves-positive does NOT survive; the 5-Aug "alive at
+measured cost" was the stale 24-Jul universe; at gate 0.05 the median 9h hold
+earns ~0.5bps vs ~1bps RT slip. No Farmer gate move is supportable either
+direction; the live book's idleness is CORRECT. (A --days 30 calibration row
+was attempted and NOT quoted: the harness serves the full cached span
+regardless of --days — identical n across a 6× window request — flagged.)
+
+**CARRIED ADJUDICATION #2 RUN — the ~mid-Aug SPY/QQQ graduation re-run**
+(REGIME_GATE_PER_ASSET_2026-07-30.md's own clause, fired silently: both books
+publish LONG-window/dir=1 on the live oracle). Verdict: graduated in BAR
+COUNT, not in graded sample (n=3 each vs the review's n≥20 bar) — the
+decision milestone moves to ~mid-Sep; the wiring is already live and 🙏 avo
+shadow already holds SPY, the fleet's first second-regime long. The
+deep-history cells support the shipped per-asset gate (equity-single D5
+damage cell −0.52pp d1 / −1.70pp d3). Recorded in the study doc (I12).
+
+**REGISTERED, NOT SHIPPED:** the 🧘 Douglas ATR24 stop-floor lead (in-search
+t=2.217, half-fit OOS t=1.487) gets its PRE-REGISTERED OOS test — floor
+frozen at 1.00%, forward tape from 17-Aug, run ~17-Sep, success = beats
+shipped on total AND mean in both forward halves, no re-sweep on a near-miss
+— appended to BAND_YOUNG_HIGH_VOLTAGE_2026-08-16.md, per that study's own
+"a lead, never a setting to ship". OPERATOR_QUEUE item 2 corrected in place
+(the grace half SHIPPED in `(px)`; PERSIST 6h→12h, t=1.80 both halves, is
+the ONE half still parked for the ~30-Aug day, with the supply tripwire
+named: carry's census `eligible` going positive under the new $1M floor).
+
+**WHERE NEW EDGE COULD COME FROM — three admitted studies, one rejection:**
+(1) divergence-conditioned harvesting — the scout already computes
+`funding_divergence` and NO harvest book reads it; live: ZK −51.7% on
+Lighter vs +10.9% cross-venue; the class it would screen is measured (5 of
+the Farmer's 7 stops were LIT shorts, −$9.17); (2) funding-extreme squeeze
+event study — the price leg the fleet only ever eats, paid-to-wait by
+construction; (3) listing-lifecycle retrospective over the venue's 72 crypto
+births vs 🎯's n=1. REJECTED: passive maker at a 30s loop (no queue position;
+Harris already refused it unmodelled). Pre-empted by `(py)`: the thin-tier
+delta-neutral harvest — KAITO is 107% of its total, one coin wearing a cell.
+
+**THE DOLLAR TRUTH, stated:** real money is $259.84 with a ≈$0/day run-rate;
+base-case 90d is −$10..+$18, everything-right ~+$55–75. The nearest real
+event is 🙏 avo's gate run (n=30 lands early-Sep at the post-(ne) rate of
+~1.16 closes/day; t=+2.31 already passes) — worth $0.10–0.13/day at today's
+$15.65 clip and ~10× that only via the operator's deposit. The gate
+validates; the deposit pays; no lever in the codebase is worth two orders of
+magnitude — the capital decision is.
+
+**Environment note (I3 on my own checks):** the two suite failures on this
+container (`test_margin_truth`, `test_crypto_only_universe`) reproduce on
+clean origin/main and are MISSING-DEPENDENCY artifacts (no `lighter` SDK →
+`_margin_mode_names()` returns {}; no numpy pre-install) — CI installs both;
+nothing to fix in the repo.
+
+## 2026-08-18 (qb) — FOUR-AXIS FLEET AUDIT: THE SAME DEFECT FOUND TWICE IN ONE DAY, AND THE SECOND FINDER'S JOB IS TO WITHDRAW ITS OWN FIX
+
+Operator ask: *"Fleet audit. Improve universe / Improve win rate / Improve
+yield / Improve the pnl."* Full report: `FLEET_AUDIT_2026-08-18.md` — every
+number computed this session from the live payloads (17/17 rows fresh, immune
+quiet) and the full 2,585-row ledger. Letter: written as `(pv)`, renumbered
+THREE times at push time — to `(px)` when a concurrent session's `(pv)`
+landed on origin, to `(pz)` when their `(px)`/`(py)` landed mid-review, and
+finally to `(qb)` when a third session's `(pz)` (the deploy-grant amendment)
+landed mid-push. Four collisions on one entry in one day — the cross-branch
+letter arm caught every one, and the first collision turned out to be the
+day's most important fact.
+
+**THE COLLISION IS THE STORY.** This audit's stop-breach sweep independently
+re-found 🧘 douglas's two phantom-price closes (ROBO 3.29× / LINK 3.73× their
+own declared stops, both `closed_at` the same second across a build change),
+confirmed `(nm)` had closed the MECHANISM (post-fix the whole ledger shows one
+1.37×/$0.22 gap-through, not a defect), and found the residue: every grader
+still COUNTED the voided rows — douglas's below-floor horizon read
+`unreachable` on n=6/−$23.84 against a post-fix record of n=4/+$2.64. Built
+here: `POLICY_ERA` entries for douglas/grimes at the `(nm)` date, 4 tests, 4
+mutations verified RED. **Then the pre-push letter re-check surfaced `(pv)` on
+origin: the concurrent session had found the SAME residue hours earlier and
+shipped the RIGHT instrument** — the two measured rows into
+`LEDGER_QUARANTINE` (the `(hr)` mechanism built for exactly this class),
+upstream of EVERY consumer rather than gate-only. Its scoping argument also
+refutes the era key on the merits: the frozen-mark error grows with CONTAINER
+UPTIME, not the calendar (schwager's four pre-fix legs priced INSIDE their
+bars), so "opened before the fix" sweeps rows the measurement clears — and
+`(pv)` rules "no era" in as many words. **The era build is WITHDRAWN, not
+merged**: shipping it on top would be a second copy of one rule ((hj)),
+over-broad exactly where the two differ. `(pv)`'s fix was then VERIFIED here
+rather than trusted (I3): both rows in the table with their measured bars,
+payload-contract suite green, effect n=6/−$23.84 → n=4/+$2.64. Two sessions
+converging on one defect from different directions (daily evidence review vs
+ledger stop sweep) within hours is the finding corroborating itself.
+
+**DISCHARGED — the `(pu)` carried correction (I11/I12).**
+`STUDY_ENTRY_EXIT_FLEETWIDE_2026-08-15.md` said "1 of 8 directional books
+calibrates (gillard)" in two passages; gillard was retired by `(nf)` the day
+the study named it. Both now read **0 of 8**, with the consequence stated: the
+stop family (−$128.05/317, the fleet's dominant loss pot) has NO calibrated
+actuation path, so any directional stop change is the unmeasured widening I19
+bans.
+
+**VERIFIED, NOT CHANGED — the standing claims under the four asks held:**
+* ⚖️ Counterweight's drag is **119% the non-crypto class it can no longer
+  enter** (n=21, −$36.48, t=−2.86 vs crypto +$5.94/n=94; the row's "114%"
+  claim HOLDS on today's class map), zero non-crypto entries since the 5-Aug
+  screen, post-screen flat (n=23, +$0.95, 56.5% win). The pre-registered
+  ~28-Aug keep-or-retire stands untouched (I11).
+* 🌾 carry's in-era t=−4.48 is **9/10 the `(lk)`-screened class** (−$14.96 of
+  −$15.45), zero closes since 12-Aug because `eligible: 0` of 225 — venue
+  starvation (I20's 3-coin cell), not failure. Gate widening re-refused on
+  the standing I19 numbers; an era move to the screen date refused — the
+  fleet ruled class screens non-resetting twice.
+* The allocation organ's pooled carry claim is already era-gated at the
+  consumer (`(oy)`/`(mz)`: `scale_effective 1.00`) — checked before
+  "finding" it.
+* 📐 grimes `gate_drift.ungraded = [ADA, APEX]` is non-empty (the published
+  `(om)` hazard) with zero exposure — all three setup gates CLOSED, holds
+  nothing; the `(oe)` fixed-universe gate is visibly no longer flapping.
+* Win rate is measured-backwards on this fleet (I15): the two best earners
+  win 42.6%/39.3%, the worst-per-trade books win 49.6%/53.3% — the loss
+  TAIL orders the P&L, and both broken tails now have closed, verified
+  mechanisms.
+
+**REFUSALS RECORDED** (report §4, each with its number): carry/kiyosaki gate
+widening · Garrett capacity (independently re-measured and refused by the
+concurrent `(pw)`, which adds that the band's edge has decayed) · Garrett
+class screen · "fixing" Counterweight ahead of its date · any directional
+stop change · win-rate-targeted exits anywhere · this session's own era
+build.
+
+**THE FORWARD METRIC:** 🧘 douglas is the book that moved — graded on the
+book that is running (via `(pv)`, verified here). 🙏 avo shadow remains the
+fleet's only above-bar book (t=+2.31, `on_track`, binding bar `closes`),
+already holding its `(ne)` step. The honest fleet state: measured edge lives
+in the funding class, the funding cells are starved by the venue, and every
+major loss is screened, retired, or on the operator's docket with a date
+(⚖️ ~28-Aug · 🎯 sniper · 🏛️ turnbull, docket 11.4d).
+
 ## 2026-08-18 (pz) — THE DEPLOY GRANT WIDENS TO "ENHANCEMENT", AND THE THREE DEFERRED ROWS ARE BROUGHT TO HEAD UNDER IT
 
 **Operator, 18-Aug: "Full permission to finish on the whole suite, new rule is

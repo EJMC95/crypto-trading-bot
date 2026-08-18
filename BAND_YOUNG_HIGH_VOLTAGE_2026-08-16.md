@@ -656,3 +656,32 @@ venue whose fees are already zero, where `c` is pure slippage and has never
 been measured per book. Halving it doubles the ceiling *and* adds 0.08R per
 trade. **That is where a high-leverage program should start**, and it is worth
 building whether or not this book is ever minted.
+
+---
+
+## PRE-REGISTERED OOS TEST for the §"one durable lead" — the 🧘 Douglas ATR24 stop-distance floor (registered 18-Aug, before any qualifying data exists)
+
+The lead above ("floor ≈1.0%: in-search t peaks 2.217, half-fit OOS t=1.487")
+was found inside a ~701-cell search on tape through ~16-Aug and this document
+itself ruled it **a lead requiring a pre-registered out-of-sample test, never
+a setting to ship**. This section IS that registration, written while zero
+qualifying forward bars exist so the spec cannot be shaped by the answer:
+
+- **Spec, frozen**: floor = **1.00%** exactly (no re-fit, no sweep); applied
+  as `sl_frac = max(SL_ATR × atr, 0.010)` to the SHIPPED Douglas fade rule,
+  everything else untouched, $100 fixed clip, no leverage.
+- **Data**: Lighter 1h tape accrued **from 2026-08-17 00:00Z onward** (the
+  first bars outside the search window), same universe rule the book runs
+  (`resolve_universe`), replayed through the study's own harness at LAG-1.
+- **Run-on date**: **~17-Sep** (≥30 forward days), or earlier only if the
+  book's own live ledger reaches n≥30 first — in which case the ledger is
+  the record and outranks the replay (I14).
+- **Success bar, declared now**: the floored rule beats the shipped rule on
+  the forward window on BOTH total $ and per-trade mean, with the delta
+  positive in both halves of the forward window. Anything less = the lead
+  dies and is recorded dead. A near-miss does not earn a re-sweep — that
+  would be the 701-cell search reaching into the holdout.
+- **Owner**: this repo, the ~17-Sep pass. The book's own 30-day clock is
+  NOT touched by this registration (nothing ships today); if the test
+  passes, shipping the floor is a real sl change and pays Douglas's era
+  reset at whatever sample it then has, priced in that pass.

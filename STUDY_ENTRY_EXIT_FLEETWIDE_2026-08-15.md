@@ -29,6 +29,14 @@ corrected in place. **Fixed**: the walk starts at the first bar opening at/
 after entry; mutation-verified; the parliament's own tuner replay already
 used the honest convention. Calibration census: **1 of 8 directional books
 calibrates** (gillard); the other 7 get no recommendation of any kind.
+**[CORRECTED IN PLACE 18-Aug per I12, flagged by (pu):** pm-gillard was
+retired by the red-stop slate `(nf)` the same day this census was taken, so
+the census now reads **0 of 8 directional books calibrate** — the exit
+sweeper can currently recommend nothing for ANY directional book, and the
+~$97 stop pot named below has NO calibrated actuation path. Only the 🏛️
+albanese/turnbull pair calibrates today, and `(pu)` measured both as
+keep-the-shipped-exit. Acting on the stop family without a calibrating
+harness is exactly the unmeasured widening I19 bans.]
 
 ## The growth step shipped (X3, two referees) — 🙏 avo shadow's cap was binding
 - Cap-4 binding **39% of its era at 4/4** (occupancy reproduced exactly;
@@ -82,7 +90,9 @@ calibrates** (gillard); the other 7 get no recommendation of any kind.
 
 ## The bundling rule this study surfaces
 Any real sl/tp change on a book resets that book's 30-day era. The census
-names ~$97 of 0%-win stops across 10 books, but only ONE book calibrates —
+names ~$97 of 0%-win stops across 10 books, but only ONE book calibrates
+(**0 since 15-Aug — that book, gillard, was retired by `(nf)` the same day;
+corrected in place 18-Aug per I12**) —
 so the right sequence is: harness first (done: the look-ahead fix), per-book
 calibration second, and exit changes BUNDLED per book (one reset, not many),
 each through its own replay gate. Exit changes are not dripped.

@@ -115,18 +115,27 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   the above").** Ride to ~30-Aug; both widening levers stay refused on
   measurement ((it)). Revisit lands on the calendar with the era window; the
   S1 scale (jr) now sizes its NEW entries by claim in the meantime.
-  **[13-Aug (mf) — NEW EVIDENCE FOR THE ~30-Aug DECISION DAY, deliberately
-  NOT applied now (changing the exit mid-window corrupts the very sample the
-  decision reads):** the carry-cell grace study — this book's own gate +
-  exits replayed over 250d of the cell's coin population — measured the 1h
-  flip grace churning half the cell's profit away: grace 1h +$27.25/t=1.95
-  with h2 NEGATIVE and 192/231 exits paying the RT on sign wobbles; 6h
-  +$41.17/t=2.96; 24h +$50.12/t=3.52, monotone, robust ex-AVNT. Its own
-  ledger agrees in shape ((gq): sided `*_flip`s −$17.32 vs `decay_paid`
-  +$71.42). ★If the book RIDES ON at ~30-Aug, extend `funding_carry_bot.py`'s
-  `FLIP_GRACE_H` (a literal, 1.0) in the same act — 🏦 Rich Dad already took the 6h form at (mf), zero clock
-  cost, hours after its birth. `scripts/study_books_cohort_2026-08-13.py`
-  reproduces.]**
+  **[13-Aug (mf) evidence block — SUPERSEDED 18-Aug, corrected in place per
+  I12: the grace extension SHIPPED in `(px)` (FLIP_GRACE_H 1.0 → 6.0,
+  env-tunable `CARRY_FLIP_GRACE_H`), together with `CARRY_MIN_VOL` $2M → $1M
+  (2.3× cell occupancy over 34.9d: 5.73% → 13.42%, coins
+  KAITO/XMR/PAXG/ROBO/XRP/ENA). The "deliberately NOT applied now" rationale
+  died with the sample it protected — the class screen froze it 12-Aug and
+  the book held ZERO positions at ship, so every future close opens under
+  the new rule at a clean boundary. The (mf) numbers stand as the evidence:
+  grace 1h +$27.25/t=1.95 h2-NEGATIVE with 192/231 exits churning the RT;
+  6h +$41.17/t=2.96 both halves; 24h +$50.12/t=3.52 monotone.]**
+  **[18-Aug — WHAT REMAINS PARKED FOR THE ~30-Aug DAY: ONE half, not two.**
+  `STUDY_FUNDING_LIFECYCLE_2026-08-15.md` §4's **PERSIST 6h→12h**
+  (+0.161%/episode, t=1.80, both halves positive, peaks at P=12; referee
+  ruled NOT denominator shrinkage; consistent with 🧮 Hull's independent 24h
+  persistence) stays parked behind this docket call — deliberately NOT
+  ridden along with `(px)`, which chose the exit-and-floor pair and stopped
+  there. ★If the ~30-Aug call is ride-on, PERSIST 12h ships then, through
+  the replay gate; if retire, it dies at zero cost. Supply tripwire for the
+  decision day: carry's census `eligible` going positive under the NEW $1M
+  floor (the ≥20%/$2M count had been 0.00 for 3+ days pre-`(px)`; the $1M
+  cell historically reads occupied 13.42% of snapshots).]**
 - **⚖️ Counterweight — early revert. DECIDED-REVERTED 4-Aug (option A,
   operator: "full permission to go ahead with all advancements").** Shipped
   as the CODE DEFAULT K 8→5 + universe 60→30 (`lighter_funding_spread_bot.py`
