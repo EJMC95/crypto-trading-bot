@@ -76,6 +76,16 @@ WHAT IS DELIBERATELY ABSENT
   * No regime gate: at a 5-minute median hold a 4h EMA gate is horizon-
     mismatched and unmeasured (I19 — a widening OR a restriction is paid
     for in evidence). "Ride the uptrend" is the measured LONG side itself.
+  * The ghost's -5% DAILY-LOSS HALT is NOT simulated — declared, not an
+    oversight. Implementing it would mean the mirror stops entering when
+    the GHOST's virtual day is down 5%, i.e. exactly when the mirror's day
+    is UP 5% — capping the winning days the thesis exists to ride — and a
+    shadow halt is the (hl) trap besides (it suspends the scan, exits
+    included). The founding ledger EMBEDS the halt's selection (the
+    ghost's post-halt events on its worst days — the mirror's best — never
+    reached its ledger), so the founded sample is CONSERVATIVE relative to
+    forward behavior: forward takes strictly more of the thesis's best
+    days, not different trades.
   * No tuning lane (the Garrett choice): env-only config, single-policy
     (hm) clock by construction. Levers are a day-31 decision.
   * No brain mults, no allocation scale: the founding claim is the ghost's
@@ -225,32 +235,35 @@ def _price_pnl(pos, px):
 
 def resolve_universe(held):
     """The ghost's own universe resolution (its configured 16 + the scout up
-    to 40 at >= $0.5M — imported, one owner), then the (lk) crypto screen —
-    the one measured deviation — then every held coin ((hk): a coin leaving
-    the list keeps its exit, stop and clock). Screen count is returned so
-    the census can publish what the screen removed (I18)."""
-    base = ghost.resolve_universe(list(ghost.COINS), ghost.UNIVERSE_N,
-                                  ghost.UNIVERSE_MIN_VOL_M)
-    screened = 0
-    out = list(base)
-    if not ALLOW_NONCRYPTO and fleet_bus is not None:
-        try:
-            kept = fleet_bus.crypto_only(out)
-            # [] means "no opinion, keep your configured list" — the bus's
-            # own documented contract. An empty screen must never read as
-            # "trade nothing" ((hk)/(lk): fail-OPEN classification).
-            if kept:
-                screened = len(out) - len(kept)
-                out = kept
-        except Exception:  # noqa: BLE001
-            pass
+    to 40 at >= $0.5M — imported, one owner), plus every held coin ((hk): a
+    coin leaving the list keeps its exit, stop and clock).
+
+    THE SCAN IS THE GHOST'S, UNSCREENED — the (lk) crypto screen applies at
+    the ENTRY SITE, never here. The adaptive gate is a PERCENTILE of the
+    residuals seen this loop, so screening the scan would compute the gate
+    over a different distribution than the ghost's and select different
+    events than the ones the founding ledger negates (caught in the 18-Aug
+    win-review before the first close — the (hm) clock had not started).
+    Returns (scan_list, crypto_ok_set): entries outside crypto_ok are
+    refused and censused; [] from the classifier means "no opinion, refuse
+    nothing" — the bus's own documented contract ((hk)/(lk) fail-OPEN)."""
+    out = list(ghost.resolve_universe(list(ghost.COINS), ghost.UNIVERSE_N,
+                                      ghost.UNIVERSE_MIN_VOL_M))
     have = set(out)
     for c in held or ():
         s = str(c).strip()
         if s and s not in have:
             out.append(s)
             have.add(s)
-    return out, screened
+    crypto_ok = set(out)
+    if not ALLOW_NONCRYPTO and fleet_bus is not None:
+        try:
+            kept = fleet_bus.crypto_only(out)
+            if kept:
+                crypto_ok = set(kept)   # ENTRY eligibility only; exits on a
+        except Exception:  # noqa: BLE001  # held coin never consult this
+            pass
+    return out, crypto_ok
 
 
 def sample_block(recent):
@@ -459,14 +472,13 @@ def main():
         except Exception:  # noqa: BLE001
             ref = {}
 
-        universe, screened = resolve_universe(set(positions))
+        universe, crypto_ok = resolve_universe(set(positions))
         census = {"scanned": len(universe), "ref_blind": 0 if ref else 1,
-                  "noncrypto_screened": screened, "no_book": 0, "held": 0,
+                  "noncrypto": 0, "no_book": 0, "held": 0,
                   "events": 0, "below_gate": 0, "confirming": 0,
                   "embargoed": 0, "ghost_slip": 0, "my_slip": 0,
                   "capped": 0, "opened": 0}
         devs_this_loop = []
-        seen_this_loop = set()
 
         for coin in universe:
             try:
@@ -481,7 +493,6 @@ def main():
             if bv is not None and r:
                 dev_bps = (bv["mid"] / r - 1.0) * 1e4
                 devs_this_loop.append(dev_bps)
-                seen_this_loop.add(coin)
                 if abs(dev_bps) >= ghost.PRE_BPS:
                     census["events"] += 1
 
@@ -551,11 +562,15 @@ def main():
                     pend[coin] = 0
                     continue
             tradeable = abs(dev_bps) >= enter_bps_eff
+            # the ghost's own counter semantics, exactly: +1 on a tradeable
+            # loop, hard 0 on a quiet one, UNTOUCHED on a blind one, and NOT
+            # reset by a slip refusal (the ghost retried while the
+            # dislocation persisted). A stricter counter here is a mirror
+            # that misses events the ghost took.
+            pend[coin] = pend.get(coin, 0) + 1 if tradeable else 0
             if not tradeable:
                 census["below_gate"] += 1
-                pend[coin] = 0
                 continue
-            pend[coin] = pend.get(coin, 0) + 1
             if pend[coin] < ghost.CONFIRM_LOOPS:
                 census["confirming"] += 1
                 continue
@@ -570,10 +585,15 @@ def main():
             if g_slip is None or g_slip > ghost.MAX_ENTRY_SLIP_BPS:
                 census["ghost_slip"] += 1
                 continue
+            # the (lk) class screen, at the ENTRY SITE — the event is real
+            # (it fed the gate and the census); the mirror declines the
+            # class. Revert KELLY_ALLOW_NONCRYPTO=1.
+            if coin not in crypto_ok:
+                census["noncrypto"] += 1
+                continue
             pos = _open_mirror(positions, coin, dev_bps, bv, t0, r)
             if pos is None:
                 census["my_slip"] += 1
-                pend[coin] = 0
                 continue
             pend[coin] = 0
             census["opened"] += 1
@@ -583,17 +603,30 @@ def main():
                   f"the {'premium' if dev_bps > 0 else 'discount'} the ghost "
                   f"would fade")
 
-        # confirm counters live only for coins still visible ((hk) hygiene)
-        pend = {c: n for c, n in pend.items()
-                if c in seen_this_loop and n > 0}
+        # zeroed counters drop; a coin the loop could not SEE keeps its
+        # counter (the ghost's own behavior — a blind loop is not a quiet
+        # one). Age-capped so a delisted coin cannot hold a slot forever.
+        pend = {c: n for c, n in pend.items() if n > 0}
+        if len(pend) > 3 * ghost.UNIVERSE_N:
+            pend = {}
         noconv = {c: t for c, t in noconv.items()
                   if t0 - t < STATE_PRUNE_S}
 
         # the NEXT loop's adaptive gate, from every book seen THIS loop —
-        # the ghost's own recompute, its own function, its own constants.
+        # the ghost's own recompute, its own function, its own constants,
+        # over the ghost's own UNSCREENED scan (the gate's distribution is
+        # part of the founded policy). The observed distribution publishes
+        # beside the gate so a drifted percentile is falsifiable from the
+        # payload alone (I18), not just asserted.
         enter_bps_eff = ghost.adaptive_enter_bps(
             devs_this_loop, ghost.ENTER_PCT, ghost.EXIT_BPS,
             ghost.ENTER_FLOOR_MULT, ghost.ENTER_BPS, ghost.ENTER_MIN_N)
+        if devs_this_loop:
+            _a = sorted(abs(d) for d in devs_this_loop)
+            census["dev_n"] = len(_a)
+            census["dev_med_bps"] = round(_a[len(_a) // 2], 1)
+            census["dev_p98_bps"] = round(
+                _a[min(len(_a) - 1, int(0.98 * len(_a)))], 1)
 
         # ---- publish -------------------------------------------------------
         open_pnl = sum(_price_pnl(p, p.get("last_px")) for p in positions.values())
@@ -716,14 +749,23 @@ def _selftest():
     assert st["saved_ts"] == 5.0
     assert _standby_key("band-kelly-lshadow") == "band-kelly-lshadow:standby"
 
-    # 7) an empty class screen must never empty the universe — the bus's
-    #    own contract ([] = "no opinion, keep your configured list").
+    # 7) the scan is the GHOST'S, unscreened — the class screen lives at the
+    #    ENTRY (crypto_ok), because the adaptive gate's percentile is part
+    #    of the founded policy. And an empty classifier ("no opinion")
+    #    refuses nothing ((hk)/(lk) fail-OPEN).
     if fleet_bus is not None:
         _orig = fleet_bus.crypto_only
         try:
             fleet_bus.crypto_only = lambda s: []
-            uni, _scr = resolve_universe(set())
+            uni, ok = resolve_universe(set())
             assert uni, "empty screen emptied the universe — (hk) violated"
+            assert ok == set(uni), "no-opinion classifier must refuse nothing"
+            fleet_bus.crypto_only = lambda s: [x for x in s if x != "BTC"]
+            uni2, ok2 = resolve_universe(set())
+            assert "BTC" in uni2, (
+                "the SCAN must stay the ghost's own — screening it moves the "
+                "adaptive gate's distribution off the founded policy")
+            assert "BTC" not in ok2, "the screen must still bind at ENTRY"
         finally:
             fleet_bus.crypto_only = _orig
 
