@@ -57,6 +57,14 @@ SELFTEST_MODULES = [
     # Registered in the same commit that adds the tool, per this guard's own
     # rule — a --selftest nobody runs is the shape it exists to prevent.
     "scripts.session_commit",
+    # [2026-08-18 (qd)/I21] the WINNERS' DOCKET. SELFTEST_MODULES and
+    # deliberately NOT ENFORCED_AUDITS, per this file's own rule: its verdict
+    # reads the live ledger, which moves with every close and no code change.
+    # The --selftest is offline and pure (exact t-tail vs known values, BH on
+    # a fixture, the MIN_N luck floor, outcome-exit exclusion) — and
+    # tests/autonomy/test_winners_docket.py carries the mutation-verified
+    # structural pins (5 of 5 red).
+    "scripts.winners_docket",
     # [2026-07-28] breakout-quality study: --selftest is offline-green &
     # stdlib-only (verified `python -m scripts.analyze_breakout_quality
     # --selftest` on a bare interpreter); registering it here fixes the

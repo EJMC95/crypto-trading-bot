@@ -1,3 +1,93 @@
+## 2026-08-18 (qd) — THE WINNERS' DOCKET AND I21: losing had a referee, winning gets the SAME one — and its first run dissolved three fake winners before finding two real candidates
+
+*(Renumbered from (qa) at push time — origin's growth deep dive took (qa)/(qb).)*
+
+**Operator, 18-Aug: "Let's prove some winning then shall we?" → "How about
+that for the doctrine."** The fleet had a decision docket, BH-FDR discipline
+and five retirement classes for LOSERS, and no instrument that could ever say
+"this bucket is provably winning" — the museum-of-avoided-losses failure the
+offense tier's own preamble warns about. `scripts/winners_docket.py` is the
+mirror of the `(mr)` losers' docket: every (book, tag/side/neutral-exit)
+bucket, era-scoped through the GATE'S OWN `era_rows` (identity import, never
+a copy — (hj)), quarantine-filtered by construction (the ledger read is
+`fetch_paper_trades`), one-sided exact t p-values (incomplete-beta tail,
+selftest-pinned against known values), refereed by Benjamini-Hochberg at FDR
+0.05 across all tested buckets.
+
+**THE FIRST LIVE RUN IS THE WORKED EXAMPLE OF EVERY DEFENSE IT CARRIES:**
+* Three "winners" at t up to **75.5** — Farmer-shadow `take_profit`, taker
+  `tp`, georgia `roi` — dissolved on the I7 rule: **an exit family
+  conditioned on the price outcome is a winner BY CONSTRUCTION** (the fleet
+  already knew this about `short_take_pro`: "100% win BY CONSTRUCTION — not
+  itself evidence"); the losses those exits dodge live in the sibling stop
+  buckets, which `study_exit_attribution` owns. Neutral exits
+  (`hold`/`decay`/`flip`) stay admissible — the timer fires regardless of P&L.
+* 🙏 avo shadow entered the referee FOUR times (one tag = one side = one
+  exit = the whole book) until identical row-sets counted once.
+* The n≥10 floor — NOT BH — is what stops a consistent 3-close streak from
+  outranking evidence (I16); the selftest initially asserted BH would do it,
+  and BH correctly refused: a consistent tiny sample IS significant, which is
+  exactly why it must never be tested.
+
+**VERDICT: zero buckets survive the referee today** across 39 tested — and
+two are held ONLY by multiplicity, both now **PRE-REGISTERED for
+single-hypothesis follow-through from 18-Aug** (graded on closes AFTER
+registration, t≥2 on the fresh sample alone, never by re-mining the window
+that generated them):
+1. 🎫 taker shadow `exit:hold` — n=53, **t=2.65, +0.836%/trade**: trades
+   surviving to the timer WIN on the taker, the exact mirror of 💸 the
+   Farmer's `max_hold` LOSER family (t=−3.27, 12/30 on its own docket). The
+   same clock reads opposite signs on the two books — both now have
+   pre-registered follow-throughs.
+2. 🙏 avo shadow, book-level — n=12, t=2.31, +1.313%/trade — the operator's
+   live bet, testing itself.
+
+**Engraved as I21** (offense tier, CLAUDE.md): winning is proven the way
+losing is — symmetric refereed discovery, then pre-registered follow-through;
+a discovery is never a promotion (docket read-only, junior to the go-live
+gate, directional survivors owe the (hm) random null before anything acts).
+Registered in `SELFTEST_MODULES` (verdict reads the live ledger, so per the
+(pb) rule the SCAN stays out of local pytest);
+`tests/autonomy/test_winners_docket.py` carries the structural pins — **5 of
+5 mutations red**, after the round itself caught two harness defects (a
+`MIN_N - 1` fixture that TRACKED the mutation it guarded, pinned to literals;
+and the shared-pycache trap, purged per the standing note).
+## 2026-08-18 (qc) — I WROTE A FAKE TRADE INTO THE PRODUCTION LEDGER WITH PYTEST: any suite run in a study shell was a prod writer, and the book it hit is one kept alive for being positive
+
+*(Renumbered from (pz) at push time — a concurrent session's deploy-grant
+amendment took (pz) on origin; third collision today, the guard caught each.)*
+
+**Found while building the winners' docket** — the newest row in the ledger
+was 🏛️ pm-albanese `BTC/USD`, entry **100.01** (a fixture price), **+$1.27
+"tp" in 2.2 seconds**, `svc=None`, build `abcd69a1788f`, written minutes
+earlier. Not a trade: a test's close. **The writer was this session** — an
+earlier command exported `DATABASE_URL` for study work and then ran the full
+suite in the same shell, and `parliament/strategies.py` publishes through
+`bot_pnl_store` whenever that env is set. The suite was only ever "safe"
+because CI has no DATABASE_URL — the [[a-guard-has-two-regimes]] asymmetry,
+now measured from the other side: the LOCAL regime was the dangerous one.
+
+On a book the red-stop slate kept alive BECAUSE it was positive (+$1.83
+all-time), a fake +$1.27 would have been 70% of the headline. Exactly one row
+landed (swept: fixture-price and sub-minute scans across the whole ledger).
+
+**Closed at the class, not the instance:**
+* **The root conftest now strips `DATABASE_URL`/`DATABASE_PUBLIC_URL` at
+  import** — before pytest imports any test module, so no module-level env
+  read anywhere in the tree can see it; the local regime now EQUALS CI's
+  everywhere, permanently. Escape hatch `TESTS_ALLOW_DB=1` for a test that
+  genuinely needs a DB (none exists today).
+  `tests/autonomy/test_db_unreachable_in_tests.py` is the tripwire, and it
+  pins STRUCTURALLY that the strip sits in the ROOT conftest above pytest's
+  own import. 3 of 3 mutations red.
+* **The row is quarantined** (`LEDGER_QUARANTINE`, windowed to the day,
+  pinned so albanese's two REAL July BTC trades stay in the sample). It is
+  not a trade at all, so **deleting it outright is on the table and is the
+  operator's call**:
+
+      DELETE FROM paper_trades WHERE trade_id = 'pm-albanese-lshadow-BTC-1787050638';
+
+  Until then every grader is blind to it by construction.
 ## 2026-08-18 (qa) — THE GROWTH DEEP DIVE: 300 DAYS OF VENUE DATA SAY LIQUIDITY DROUGHT, NOT FUNDING DROUGHT — AND THE TWO CARRIED ADJUDICATIONS ARE RUN
 
 Operator: *"Dive deep on all the knowledge you have and we have and you can
@@ -183,7 +273,6 @@ services and relies on the `(pt)` auto-expansion for the Farmer's control twin
 — the exact route whose absence froze the judge yesterday. Verify by
 `extra.build`/`build_n` on all three rows + `arm_drift` silent + the judge's
 arms-matched line, in the payload.
-
 ## 2026-08-18 (py) — THE TIER SPLIT IS PRICED AND BOTH HALVES ARE REFUSED: the ceiling costs Garrett $20.53, and the Rich-Dad extension is one coin wearing a cell
 
 **Operator, 18-Aug: "Let's see if it works, think if needs anything else"** —

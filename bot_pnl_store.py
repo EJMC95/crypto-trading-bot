@@ -1422,7 +1422,7 @@ LEDGER_QUARANTINE = (
      "pre-(nm) frozen boot mark: entry 9.15316 vs the 03:00 bar's "
      "[9.53046, 9.74586] — below the hour's low, matches ~01:00; realised "
      "-3.31% against a 0.888% stop, 3.73x (nm)"),
-    # [2026-08-18 (pz)] NOT A TRADE AT ALL: a full-suite pytest run in a shell
+    # [2026-08-18 (qc)] NOT A TRADE AT ALL: a full-suite pytest run in a shell
     # carrying `export DATABASE_URL` let a parliament book test publish its
     # FIXTURE close through the real path (parliament/strategies.py publishes
     # whenever the env is set). Entry 100.01 is the fixture price; +$1.27 "tp"
@@ -1432,7 +1432,7 @@ LEDGER_QUARANTINE = (
     # operator call — until then every grader must not see it.
     ("BTC/USD", "pm-albanese", "2026-08-18", "2026-08-18",
      "fabricated by a test run with DATABASE_URL exported: fixture entry "
-     "100.01, +5.09% in 2.2s; not a trade (pz)"),
+     "100.01, +5.09% in 2.2s; not a trade (qc)"),
 )
 
 

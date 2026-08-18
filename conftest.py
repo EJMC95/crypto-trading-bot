@@ -8,7 +8,7 @@ import sys
 import time as _time
 import types
 
-# [2026-08-18 (pz)] A TEST RUN MUST NEVER REACH THE FLEET'S DATABASE — stripped
+# [2026-08-18 (qc)] A TEST RUN MUST NEVER REACH THE FLEET'S DATABASE — stripped
 # HERE, at root-conftest import, which pytest performs before importing any
 # test module, so no module-level `os.environ.get("DATABASE_URL")` read
 # anywhere in the tree can see it. Measured incident, self-inflicted: a session

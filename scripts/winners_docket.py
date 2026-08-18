@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """THE WINNERS' DOCKET — losing gets a refereed docket; winning gets this one.
 
-[2026-08-18 (qa)] Operator: "Let's prove some winning then shall we?" / "How
+[2026-08-18 (qd)] Operator: "Let's prove some winning then shall we?" / "How
 about that for the doctrine." The fleet's decision docket (golive_readiness,
 (ld)) surfaces books whose LOSING or undecidability is overdue for a call, and
 the (mr)/(nf) retirements ran Benjamini-Hochberg across the LOSERS. Nothing
@@ -31,7 +31,7 @@ WHAT IT IS NOT, stated so nobody stretches it:
 ONE-OWNER RULES, load-bearing: the era boundary is golive_readiness.era_rows
 (IMPORTED — a second copy would let the docket and the gate disagree about the
 same ledger, the (hj) class); the ledger read is bot_pnl_store.fetch_paper_trades
-(so LEDGER_QUARANTINE — including the (pv)/(pz) rows — is applied by
+(so LEDGER_QUARANTINE — including the (pv)/(qc) rows — is applied by
 construction); retired rows are excluded via cleanup_legacy_bots.LEGACY_BOTS
 (the same declaration the pruner runs).
 

@@ -297,7 +297,36 @@ Corollary, learned building the detector: publish the BAND, not just the floor
 excludes, and a detector that overstates is one the operator learns to ignore
 ((gl)). Unknown bounds stay UNKNOWN and are never counted as a finding.
   ENFORCED BY: `scripts/audit_book_overlap.py::report_supply`, `scripts/audit_book_overlap.py::admits`
+
+### I21 · WINNING IS PROVEN THE WAY LOSING IS — A SYMMETRIC REFEREED DOCKET, THEN PRE-REGISTERED FOLLOW-THROUGH
+The fleet built a decision docket, BH-FDR discipline and five retirement
+classes for its LOSERS and had NO instrument that could ever say "this bucket
+is winning, provably" — so doctrine could only grow in the don't-break
+direction, the museum-of-avoided-losses failure this tier's own preamble
+names. **Operator, 18-Aug: "Let's prove some winning then shall we?" / "How
+about that for the doctrine."** `scripts/winners_docket.py` is the mirror of
+the (mr) losers' docket: every (book, tag/side/neutral-exit) bucket over the
+book's own era-scoped, quarantine-filtered ledger, one-sided t p-values,
+Benjamini-Hochberg at FDR 0.05 across all tested buckets. Its first live run
+is the worked example of every defense it carries: three "winners" at t up to
+**75.5** dissolved on the I7 rule (a take-profit bucket is a winner BY
+CONSTRUCTION — outcome-conditioned exit families never reach the referee;
+`hold`/`decay`/`flip` do), a one-tag book entered the referee four times
+until identical row-sets counted once, and the n≥10 floor — not BH — is what
+stops a consistent 3-close streak from outranking evidence (I16). Verdict
+that day: **zero proven, two held ONLY by multiplicity** (🎫 taker
+`exit:hold` n=53 t=2.65 +0.836%/trade — the exact mirror of the Farmer's
+max_hold LOSER family at t=−3.27 — and 🙏 avo shadow book-level t=2.31), and
+those two are PRE-REGISTERED for single-hypothesis follow-through from
+18-Aug: graded on closes AFTER registration, t≥2 on the fresh sample alone,
+never by re-mining the window that generated them. **A discovery is not a
+promotion**: the docket is read-only, junior to the go-live gate, and a
+directional survivor still owes the (hm) random-entry null before anything
+ACTS on it.
+  ENFORCED BY: `scripts/winners_docket.py::bh_survivors`, `tests/autonomy/test_winners_docket.py::test_outcome_conditioned_exits_never_reach_the_referee`
 <!-- INVARIANTS:END -->
+
+
 
 ### Acknowledged recurrence — houses we keep re-entering, and why
 

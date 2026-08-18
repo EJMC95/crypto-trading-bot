@@ -1,4 +1,4 @@
-"""[(qa)/I21] The winners' docket — losing gets a refereed docket; winning
+"""[(qd)/I21] The winners' docket — losing gets a refereed docket; winning
 gets the SAME instrument, with the same defenses against fooling ourselves.
 
 Pins the four properties that make the docket honest rather than a
@@ -57,8 +57,12 @@ def test_identical_row_sets_count_once():
 
 
 def test_the_min_n_floor_stops_luck_before_the_statistics():
+    """LITERAL nine, not `MIN_N - 1` — a fixture derived from the constant
+    tracks any mutation of it (a 9-row bucket passed a floor lowered to 2 and
+    this test stayed green: measured, mutation M3, 18-Aug)."""
+    assert wd.MIN_N >= 10, "the luck floor is doctrine (I16), not a tunable"
     bk = wd.buckets_of({"bot-lucky": [_row(0.02, i, "long_hold")
-                                      for i in range(wd.MIN_N - 1)]})
+                                      for i in range(9)]})
     assert not bk
 
 

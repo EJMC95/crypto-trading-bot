@@ -1,4 +1,4 @@
-"""[(pz)] The suite must run in CI's regime EVERYWHERE: no DATABASE_URL.
+"""[(qc)] The suite must run in CI's regime EVERYWHERE: no DATABASE_URL.
 
 The incident: a full-suite run in a shell carrying `export DATABASE_URL`
 let a parliament book test publish a FABRICATED trade into the durable
