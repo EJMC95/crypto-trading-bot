@@ -191,7 +191,9 @@ right** — the `(po)` class, caught in the act:
   invalidates bytecode on `(mtime, size)`. M3 was a GENUINE hole — the window's
   upper edge was pinned only by assertions on pairs that are not in the table at
   all, so widening `15..15` to `15..17` changed nothing any test could see.
-  Both now covered; the size-preserving mutation is the one to reach for.## 2026-08-18 (pu) — "FIX ANYTHING THAT MAKES MORE MONEY": THE ANSWER IS NOTHING TODAY, AND THE REFUSALS ARE THE DELIVERABLE
+  Both now covered; the size-preserving mutation is the one to reach for.
+
+## 2026-08-18 (pu) — "FIX ANYTHING THAT MAKES MORE MONEY": THE ANSWER IS NOTHING TODAY, AND THE REFUSALS ARE THE DELIVERABLE
 
 Six measured lenses, 55 agents, three adversarial referees per proposal
 (turnover / calibration / reachability). **12 proposals survived refutation and
