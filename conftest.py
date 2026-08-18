@@ -8,6 +8,23 @@ import sys
 import time as _time
 import types
 
+# [2026-08-18 (pz)] A TEST RUN MUST NEVER REACH THE FLEET'S DATABASE — stripped
+# HERE, at root-conftest import, which pytest performs before importing any
+# test module, so no module-level `os.environ.get("DATABASE_URL")` read
+# anywhere in the tree can see it. Measured incident, self-inflicted: a session
+# ran the suite in a shell carrying `export DATABASE_URL` from study work, and
+# a parliament book test walked its real close path — `parliament/strategies.py`
+# publishes via bot_pnl_store whenever the env is set — writing a FABRICATED
+# trade into the durable ledger (pm-albanese BTC/USD, fixture entry 100.01,
+# +$1.27 "tp" in 2.2s, on a book kept alive BECAUSE it was positive; the row is
+# quarantined in LEDGER_QUARANTINE). The suite was only ever green in CI
+# because CI has no DATABASE_URL — this makes the local regime EQUAL to CI's.
+# A test that genuinely needs a live DB does not exist today; if one is ever
+# written, run it under TESTS_ALLOW_DB=1 and it owns the consequences.
+if os.environ.get("TESTS_ALLOW_DB", "").strip() != "1":
+    for _k in ("DATABASE_URL", "DATABASE_PUBLIC_URL"):
+        os.environ.pop(_k, None)
+
 import pytest
 
 ROOT = os.path.dirname(os.path.abspath(__file__))

@@ -834,6 +834,19 @@ class TestLedgerQuarantine:
             assert not s.is_quarantined(D, pair, "2026-08-17T12:00:00+00:00"), pair
             assert not s.is_quarantined(D, pair, "2026-08-14T23:59:59+00:00"), pair
 
+    def test_the_fabricated_albanese_row_is_withheld(self):
+        """[(pz)] Not a mispriced trade — not a trade: a pytest run with
+        DATABASE_URL exported published a parliament fixture close into the
+        durable ledger. The two REAL albanese BTC trades (27/28-Jul, real
+        prices, 16-20h holds) must stay in the sample."""
+        import bot_pnl_store as s
+        A = "pm-albanese-lshadow"
+        assert s.is_quarantined(A, "BTC/USD", "2026-08-18T10:57:21.029910+00:00")
+        assert not s.is_quarantined(A, "BTC/USD", "2026-07-27T22:58:19+00:00")
+        assert not s.is_quarantined(A, "BTC/USD", "2026-07-29T09:42:45+00:00")
+        # albanese's other pairs, same day, unaffected
+        assert not s.is_quarantined(A, "SKHYNIXUSD/USD", "2026-08-18T10:57:21+00:00")
+
     def test_the_GENUINE_20_jul_stops_are_kept(self):
         """The window is dated for a reason: the two 20-Jul BOT
         long-divergence stops had 47.9/87.2bps gaps — normal book behaviour,
