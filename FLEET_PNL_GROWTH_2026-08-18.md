@@ -58,10 +58,21 @@ Everything-goes-right 90 days: **~+$55–75**. The paths, quantified:
   rate)**. At today's live sizing (clip = equity/4 = $15.65 on $62.60) a
   pass is worth **~$0.10–0.13/day**. Funded to its existing $200 cap →
   ~$0.33–0.43/day; at $1k → ~$1.6–2.1/day (mean above ~$50 clips
-  UNMEASURED at that tier's slip — stated, not assumed). **The gate
-  validates; the deposit pays. The dollar lever is yours.**
-- **💸 Farmer**: earning ~$0/day and CORRECTLY so (fail-closed on empty
-  supply). The designed route to more is the judge queue — `slope-gate-off`
+  UNMEASURED at that tier's slip — stated, not assumed). Referee caveats,
+  carried: the grader's **cluster-robust t sits at exactly 2.00** (n_eff
+  8.2) — the t bar is knife-edge on that basis even as raw t holds 2.31;
+  the grader's own ETA reads 2026-10-06 at 0.37 closes/day; the live arm's
+  n=3 record (−$0.15 MTM) is evidentially empty, and the shadow→live
+  transfer is unmeasured until impl-shortfall has a paired sample. **The
+  gate validates; the deposit pays. The dollar lever is yours.**
+- **💸 Farmer**: earning ~$0/day and CORRECTLY so — refined post-referee
+  (I12): not "zero supply" but **thinned supply × marginal economics**. The
+  ≥$10M census oscillates (a fresher read had 4 of 8 books over the 5% gate,
+  all persistence-waiting; BTC intermittently above its measured 6.2%
+  breakeven), so the book's condition is edge-flatness at the resting
+  default — the persistence gate and the ~0.5bps-per-9h-hold arithmetic are
+  the binding pair, and an instantaneous `eligible 0` is its normal reading
+  (I7). The designed route to more is the judge queue — `slope-gate-off`
   (window restarted 18-Aug after `(pt)`, n=1/30) then `min-vol-1e5` /
   `min-vol-2e6`. Honest priors attached: the thin-tier prior weakened
   (`(pw)`: band +$14.83 → +$4.82 with h2 −$13.22 on the fresh window), so
@@ -78,6 +89,7 @@ Everything-goes-right 90 days: **~+$55–75**. The paths, quantified:
 | 🧘 Douglas phantom rows quarantined fleet-wide | `(pv)`, LEDGER_QUARANTINE | n=6/−$23.84 → n=4/+$2.64 in every grader |
 | Garrett cap + exits measured-refused; tier-split priced and refused | `(pw)`, `(py)` | cap 9 = −$7.07 vs cap 6 = +$4.82; split costs $20.53; Rich-Dad extension = KAITO 107% of total |
 | The carried `(kc)` `--refresh` adjudication RUN (owed since 5-Aug) | this pass | see §4 |
+| 🌾 carry census `next` scoped to class-admissible coins (it was promising SKHYNIXUSD, with a countdown, on a crypto-only book — I8) | this pass, funding_carry_bot.py + test pin (2 mutations red) | verified firing live: `next: SKHYNIXUSD / next_eta_h 3.75→2.71` |
 | The ~mid-Aug SPY/QQQ graduation re-run EXECUTED | this pass, REGIME_GATE doc | trigger fired (both LONG-window, dir=1); graded n=3 — decision milestone moves to self-grade n≥20 (~mid-Sep); wiring already live, 🙏 avo shadow already holds SPY |
 | Douglas ATR-floor lead: OOS test PRE-REGISTERED (floor 1.00% frozen, forward tape from 17-Aug, run ~17-Sep) | BAND_YOUNG doc | in-search t=2.217/OOS-half t=1.487 — a lead, "never a setting to ship" per its own study |
 | PERSIST 6h→12h staged for the ~30-Aug docket day; queue block corrected in place | OPERATOR_QUEUE | t=1.80 both halves, parked per its own study |
@@ -124,6 +136,16 @@ across a 6× window change — a quirk flagged for the next pass.)
 hold queue position, and Harris already refused modelled market-making
 without a fill simulator. **Answered by `(py)` before I could propose it**:
 the thin-tier delta-neutral harvest — one coin (KAITO, 107%) wearing a cell.
+
+### Referee-pass status (recorded so the §5 studies are not over-read)
+
+The adversarial referee wave completed on the capital/inventory/venue/decay
+lenses: **3 findings survived** (the avo path, the liquidity-drought reframe,
+the carry-census defect — now fixed), and most "refutations" were
+*stale-because-already-shipped* confirmations of this same day's work. The
+§5 outside-lens studies were **never refereed** (the final wave hit a session
+limit) — they are lens-proposed candidates, not refereed survivors, and any
+build on them starts with its own pre-registered study.
 
 ## 6 · REFUSALS RECORDED THIS PASS (I19 — each with its number)
 

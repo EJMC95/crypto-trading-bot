@@ -380,9 +380,17 @@ def scan_census(fund, positions, hot_since, t0, H, enter_apr,
             out["thin"] += 1
         elif (t0 - (hot_since or {}).get(c, t0)) < persist_h * 3600.0:
             out["waiting"] += 1
-            eta = persist_h - (t0 - (hot_since or {}).get(c, t0)) / 3600.0
-            if nxt is None or eta < nxt[1]:
-                nxt = (c, eta)
+            # [18-Aug (qc)] `next` may only promise a coin the class screen
+            # will ADMIT once its persistence completes. The screen sits
+            # AFTER this branch (deliberately last, (lk)), so without this
+            # check a crypto_only book advertised next=SKHYNIXUSD with a
+            # live countdown — a promise the gate order guarantees to break
+            # (I8: the operator misreads the coming refusal as a stall).
+            # The coin still COUNTS as waiting; only the promise is scoped.
+            if class_ok(c):
+                eta = persist_h - (t0 - (hot_since or {}).get(c, t0)) / 3600.0
+                if nxt is None or eta < nxt[1]:
+                    nxt = (c, eta)
         elif not class_ok(c):
             # [(lk)] LAST in the gate order on purpose: this bucket means
             # "hot, liquid, persistent — blocked by class ALONE", i.e. the

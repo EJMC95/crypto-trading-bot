@@ -1,3 +1,55 @@
+## 2026-08-18 (qe) — THE REFEREE WAVE LANDS: 3 SURVIVORS, ONE LIVE DEFECT FIXED — carry's census was promising a coin its own class screen refuses
+
+The `(qa)` growth dive's adversarial referee wave completed after the merge
+(48 of 66 agents; the final wave hit a session limit and is recorded as
+UNREFEREED, not as passed). Three findings survived all three referees; most
+"refutations" were *stale-because-already-shipped* confirmations of the same
+day's `(px)`/`(qa)` work — the referees, running post-merge, kept trying to
+propose what had landed hours earlier and correctly killed their own
+proposals against HEAD. Three acts follow:
+
+**1 · THE LIVE DEFECT, FIXED (I8, the (hn) implement-now row):** 🌾 carry's
+census picks `next` inside the `waiting` branch, which sits BEFORE the class
+screen (deliberately last, (lk)) — so a hot, liquid, mid-persistence
+NON-crypto coin becomes the row's promised next open. Verified firing live by
+the referee: `next: SKHYNIXUSD / next_eta_h 3.75 → 2.71` counting down on a
+`crypto_only` book — a promise the gate order guarantees to break, recreating
+one gate later exactly the misleading "stall" condition the census was built
+(2-Aug, 40 minutes) to end. Fix: `next` may only promise a class-admissible
+coin; the screened coin still COUNTS as `waiting` (the bucket contract is
+untouched — pinned by the partition test). New test
+`test_next_never_promises_a_coin_the_class_screen_will_refuse`, **2 mutations
+verified RED** (condition dropped; condition inverted), selftest green.
+Shadow-only surface; ships on the funding-carry auto-deploy path.
+
+**2 · TWO MEMO CORRECTIONS IN PLACE (I12, FLEET_PNL_GROWTH_2026-08-18.md):**
+(a) the 💸 Farmer is **thinned-supply × marginal-economics**, not
+zero-supply — a fresher payload read 4 of 8 ≥$10M books over the 5% gate
+(all persistence-waiting, BTC intermittently above its measured 6.2%
+breakeven), so an instantaneous `eligible 0` is the book's normal reading
+(I7) and the binding pair is the persistence gate + resting-default
+economics; (b) 🙏 avo's referee caveats engraved — the grader's
+**cluster-robust t is exactly 2.00 (n_eff 8.2)**, knife-edge on that basis
+even as raw t holds 2.31, grader ETA 2026-10-06, the live arm's n=3 record
+evidentially empty, shadow→live transfer unmeasured. Plus a referee-pass
+status note so the §5 outside-lens studies are read as lens-proposed
+candidates, never refereed survivors.
+
+**3 · THE JUDGE-PIPELINE CLAIM DIED CORRECTLY, recorded so it stays dead:**
+the lens's "eval window RESET / state lost / idle 21 days" was refuted on
+mechanism — xp-judge state persists byte-identical across deploys
+(Postgres-backed), the 01:45Z restart is the DESIGNED (bb) arm-drift
+recovery ("arms re-matched — RESTART THE CLOCK"; mixed-build closes are a
+structurally invalid paired comparison), and the static CANDIDATES queue was
+never empty. What survives of it: zero promotions ever, and deploy cadence
+taxes the window through the designed drift-hold — the `(pt)`/`(pz)`
+pair-expansion work is the standing mitigation. "Fixing" the window to
+survive arm drift would reintroduce the mixed-build bug — a step back
+wearing a correctness costume.
+
+Letter: written as (qc), renumbered to (qe) at push — a concurrent session's
+(qc)/(qd) landed mid-pass; fifth collision today, the guard caught each.
+
 ## 2026-08-18 (qd) — THE WINNERS' DOCKET AND I21: losing had a referee, winning gets the SAME one — and its first run dissolved three fake winners before finding two real candidates
 
 *(Renumbered from (qa) at push time — origin's growth deep dive took (qa)/(qb).)*

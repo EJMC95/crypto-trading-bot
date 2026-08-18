@@ -295,3 +295,24 @@ def test_the_degraded_census_carries_every_key_the_consumers_read():
     required = {"scanned", "held", "thin", "cold", "waiting", "noncrypto",
                 "eligible"}
     assert required <= fallback, f"degraded census missing {required - fallback}"
+
+
+def test_next_never_promises_a_coin_the_class_screen_will_refuse():
+    """[18-Aug (qc)] The live payload read `next: SKHYNIXUSD / next_eta_h
+    3.75` on a crypto_only book — the `waiting` branch picked `next` BEFORE
+    the class screen (which is deliberately LAST in gate order), so the row
+    promised an open the gate order guarantees to refuse (I8: the operator
+    misreads the coming refusal as a stall). `next` must be the soonest
+    ADMISSIBLE waiter; the screened coin still counts as `waiting`."""
+    # SKHYNIXUSD: hot, liquid, 2.25h into a 6h persistence -> eta 3.75h.
+    # KAITO: hot, liquid, crypto, only 1h in -> eta 5h (LATER than SKHYNIX).
+    fund = {"SKHYNIXUSD": _f(HOT, 30_100_000), "KAITO": _f(HOT, 3_011_700)}
+    hot = {"SKHYNIXUSD": T0 - 2.25 * 3600, "KAITO": T0 - 1.0 * 3600}
+    c = carry.scan_census(fund, {}, hot, T0, H, BAR)
+    assert c["waiting"] == 2, c            # the bucket contract is untouched
+    assert c["next"] == "KAITO", c         # the sooner NON-admissible coin lost
+    assert c["next_eta_h"] == pytest.approx(5.0, abs=0.01), c
+    # With ONLY the screened coin waiting there is no honest promise at all.
+    c2 = carry.scan_census({"SKHYNIXUSD": _f(HOT, 30_100_000)}, {},
+                           {"SKHYNIXUSD": T0 - 2.25 * 3600}, T0, H, BAR)
+    assert c2["waiting"] == 1 and "next" not in c2, c2
