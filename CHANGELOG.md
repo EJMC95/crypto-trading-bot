@@ -1,3 +1,33 @@
+## 2026-08-18 (pz) — THE DEPLOY GRANT WIDENS TO "ENHANCEMENT", AND THE THREE DEFERRED ROWS ARE BROUGHT TO HEAD UNDER IT
+
+**Operator, 18-Aug: "Full permission to finish on the whole suite, new rule is
+you can when it affects real money and it's an enhancement."** Engraved as the
+second amendment to the `(mm)` push-both-ways rule: the qualifying test for a
+real-money deploy widens from *"changes what the live book trades"* to *"is an
+enhancement"*. The mechanics survive because they are physics, not permission:
+the pair clock ((pt) — arms move together or the judge voids its window), the
+pre-dispatch halt check (a restart wipes memory-only halts), stamp readback
+(never the green run), and the un-amendable core (no discretionary trades, no
+gate bypass, judge sole-writer).
+
+**Executed the same hour — the backlog the old rule was correctly holding:**
+`audit_code_currency` read 14 rows CURRENT and 3 DEFERRED 5-behind
+(`trail-blazer-live`, `funding-farmer-shadow`, `tide-rider-lighter-live`), the
+pending commits being `(pv)`-`(py)`: the phantom-row quarantine wiring in
+`bot_pnl_store` (a grader enhancement the live rows' own publishes should
+carry), the `(pj)` `crypto_only` class-screen declaration for the Farmer pair
+(publish-only, waiting on exactly this ride since 17-Aug), and the `(px)`
+registry sync. Under the old rule none qualified — no trade changes — and
+that was recorded as correct; under the grant they are enhancements, shipped.
+
+Pre-dispatch checks, run not assumed: neither live row halted, Farmer flat
+(held: [] — a restart with zero open positions is the cheapest one there is),
+Avo's 4 positions durable-state-restored by design. Dispatch names BOTH live
+services and relies on the `(pt)` auto-expansion for the Farmer's control twin
+— the exact route whose absence froze the judge yesterday. Verify by
+`extra.build`/`build_n` on all three rows + `arm_drift` silent + the judge's
+arms-matched line, in the payload.
+
 ## 2026-08-18 (py) — THE TIER SPLIT IS PRICED AND BOTH HALVES ARE REFUSED: the ceiling costs Garrett $20.53, and the Rich-Dad extension is one coin wearing a cell
 
 **Operator, 18-Aug: "Let's see if it works, think if needs anything else"** —

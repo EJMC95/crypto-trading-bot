@@ -1622,6 +1622,24 @@ All new bots:
     (`audit_code_currency`: both DEFERRED by one commit touching no bot logic).
     **"Push both ways" is not "push more often"** — it removes a delay from
     measured wins; it does not lower the bar for what counts as one.
+  **[AMENDED 18-Aug (pz), operator: *"Full permission to finish on the whole
+  suite, new rule is you can when it affects real money and it's an
+  enhancement"*.] THE QUALIFYING TEST WIDENS FROM "changes what the live book
+  trades" TO "is an enhancement"** — a session may now deploy to the
+  real-money services any change that improves the fleet (a grader fix, a
+  published declaration, a guard, a registry sync), not only one that alters
+  a trade. What the grant does NOT waive, because these are mechanics rather
+  than permission: (1) **the pair clock** — the Farmer's arms move TOGETHER
+  or the judge voids its own window ((pt): one arm dispatched alone froze the
+  only designed path to more real money; the dispatch branch now auto-expands
+  the pair); (2) **the halt check** — a restart wipes memory-only halts, so
+  verify neither live row is halted before dispatching
+  ([[lighter-flatten-silent-halt-redeploy-incident]]); (3) **stamp readback**
+  — a deploy is verified by `extra.build`+`build_n` on the row, never by a
+  green run; (4) the un-amendable core above (no discretionary trades, no
+  gate bypass, judge sole-writer of `live.funding.*`) is untouched. A pure
+  refactor with no benefit still isn't an "enhancement" — the word in the
+  grant is the bar, and stating what the deploy carries remains required.
   **A correctness fix that changes which book gets real money IS a real-money
   benefit delivered** — it arrives as better evidence rather than a bigger
   position. Two corollaries learned the same day: a **refusal with evidence is a
