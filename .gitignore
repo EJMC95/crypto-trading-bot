@@ -66,3 +66,4 @@ __pycache__/
 # after a live DB password accumulated into it (see CHANGELOG cc).
 .claude/settings.local.json
 scripts/.books_cohort_cache/
+scripts/.band_kelly_cache/

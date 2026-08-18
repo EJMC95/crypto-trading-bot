@@ -58,6 +58,12 @@ STOPS = [
     # Counterweight's backtested book has none); the carry sleeve's guard
     # is the parent's bleed stop at 2% of a $80 clip, book-level trivial.
     ("lighter_band_barnes_bot", "BARNES_HARD_STOP"),
+    # [2026-08-18] 🪁 band-kelly — the mirror's own protective stop, 5%
+    # adverse on its side (the ghost's HARD_STOP constant, mirrored; the one
+    # declared deviation from pure ledger negation). INSIDE the 15% bar —
+    # declared at birth so the reconciliation is explicit, per this file's
+    # own header rule.
+    ("lighter_band_kelly_bot", "KELLY_HARD_STOP"),
 ]
 
 #: Stops KNOWINGLY wider than the go-live drawdown bar, each with the reason.

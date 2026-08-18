@@ -12,6 +12,37 @@ Recommended options are marked ★.
 
 ---
 
+## ⚡ WAITING ON YOU · 🪁 band-kelly (the Mirror book) — provision the service, then activation is one commit
+
+**Born 18-Aug on your ask** (*"does the exact opposite of all of the major
+losing sequences"*): `lighter_band_kelly_bot.py`, the measured mirror of
+retired 🧲 Snap Back (founding claim crypto n=65, +0.605%/trade, t=+5.71 —
+`STUDY_BAND_KELLY_2026-08-18.md`; brkfade and dipfade measured and REFUSED,
+on the record). Everything is wired pre-provision (row map, dashboard,
+tests, image); the deploy rule ships COMMENTED because since (hj) an
+unresolvable service name is a hard error. Two steps:
+
+**A ★ — provision (you, or any session with Railway access, ~2 min):**
+
+```bash
+railway add --service band-kelly-shadow
+railway variables --service band-kelly-shadow \
+  --set "RAILWAY_DOCKERFILE_PATH=Dockerfile.bandkelly" \
+  --set "VENUE=lighter_shadow" \
+  --set 'DATABASE_URL=${{Postgres.DATABASE_URL}}'   # REFERENCE form, never a literal ((kb))
+railway up --service band-kelly-shadow --detach
+```
+
+**B — activation commit (any session, after the row publishes):** verify
+`band-kelly-lshadow` on /pnl.json carries an `extra.build` stamp matching
+the local prediction (`build_compute` against the image's own COPY set —
+compare `build_n` too, (fd)), then uncomment the three-line decide rule in
+`railway-redeploy.yml` (search "band-kelly") and move `Dockerfile.bandkelly`
+from `MANUAL_IMAGES_OK` to `AUTO_IMAGES` in `audit_deploy_coverage.py` —
+the exact kiyosaki/(mk) path. Then this item leaves the queue.
+
+---
+
 ## ⚡ ~~WAITING ON YOU~~ · The BOOKS wave-2 birth — **EXECUTED 13/14-Aug under your "merge and continue" grant, verified by stamp readback 14-Aug 00:12Z: all four rows online on /pnl.json with `extra.build` byte-equal to prediction (🧘 `56d16a305cbb` · 📐 `ac6bf6582780` · 🧙 `7d51154ead89` · 🧮 `444962b8ab95`). PR #169 merged; provisioning took four runs ((ml) — the grep -q/pipefail class, twice) and surfaced a 14h-stale pnl-dashboard container that was hiding the rows; activation lands with PR #170. Item closes at the next daily review.**
 
 Reading docs: the four `BOOK_*_2026-08-13.md`; evidence:

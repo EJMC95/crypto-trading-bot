@@ -224,6 +224,10 @@ SELFTEST_MODULES = [
     "lighter_book_grimes_bot",
     "lighter_book_hull_bot",
     "lighter_book_schwager_bot",
+    # [2026-08-18] 🪁 band-kelly — registered the day it was born; offline
+    # (mirror inversion pinned as a property, ghost import identity, both
+    # exit ladders, empty-screen universe contract, publish/state builders).
+    "lighter_band_kelly_bot",
     "lighter_dislocation_bot",
     "lighter_family_bot",
     "lighter_funding_bot",

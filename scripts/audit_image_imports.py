@@ -90,7 +90,12 @@ BORN_DARK_OK = {
                   # env-only by design (the same Garrett choice), so the
                   # module would be a dead file in each image
                   "Dockerfile.douglas", "Dockerfile.grimes",
-                  "Dockerfile.schwager", "Dockerfile.hull")},
+                  "Dockerfile.schwager", "Dockerfile.hull",
+                  # [2026-08-18] 🪁 band-kelly — env-only by design (same
+                  # Garrett choice); the ghost module it imports
+                  # (lighter_dislocation_bot) also guard-imports
+                  # fleet_tuning, so one declaration covers both sites
+                  "Dockerfile.bandkelly")},
     # [2026-07-17 VENUE SWAP] market-context COPYs venues/ purely for
     # venues.symbol_map.from_lighter (the fleet<->Lighter symbol authority)
     # after moving off Hyperliquid. It is an INSTRUMENT-ONLY collector: it

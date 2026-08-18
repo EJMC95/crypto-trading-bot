@@ -77,6 +77,13 @@ on:
       - 'Dockerfile.schwager'
       - 'lighter_book_hull_bot.py'
       - 'Dockerfile.hull'
+      # [2026-08-18] 🪁 band-kelly — the MIRROR book (band-kelly-shadow).
+      # paths: entries land at BIRTH (harmless before the decide rule
+      # exists — the job runs and selects nothing); the decide rule below
+      # ships COMMENTED until the service is provisioned, because since
+      # (hj) an unresolvable service name is a hard ::error::.
+      - 'lighter_band_kelly_bot.py'
+      - 'Dockerfile.bandkelly'
       # [2026-07-30 (gm)] THIS WORKFLOW IS ITS OWN TRIGGER, for the six shadow
       # books only — plus the CARRY PAIR since (hu), same reasoning: its
       # routing was just corrected and a routing fix that cannot deploy itself
@@ -239,82 +246,18 @@ jobs:
             if echo "$changed" | grep -qE '^(pnl_dashboard\.py$|report_emailer\.py$|compile_market_data\.py$|bot_pnl_store\.py$|Dockerfile\.dashboard$|fleet_watchdog_svc\.py$)'; then
               svcs="${svcs:+$svcs,}pnl-dashboard"
             fi
-            # [2026-07-16] perps-regime-switch REMOVED: the service was
-            # decommissioned in the 12/13-Jul retirement (RETIRED_ROWS), so
-            # `railway up` returned "Service not found" x3 on every
-            # bot_pnl_store.py change — two red runs + failure emails on
-            # 16-Jul while every LIVING service deployed fine.
-            # funding-carry service
-            # [2026-07-30] fleet_tuning.py joined this image's COPY set when
-            # the carry book gained growth-rail levers. It must be in BOTH this
-            # grep and the `paths:` block above, or editing the lever registry
-            # would be a silent no-op for funding-carry — caught by
-            # audit_deploy_coverage.py before it shipped, which is the whole
-            # point of that guard.
-            # [2026-07-30 (gn) REVERTED — "deploy both" was WRONG, and the
-            # reason I gave for it was the wrong reason.]
-            # (gl) added `yield-harvester-shadow` beside `funding-carry` on the
-            # operator's call, on my argument that "neither carries a volume, so
-            # a redundant redeploy costs nothing". The volume was never the risk.
-            # BOTH SERVICES PUBLISH THE SAME `bot_pnl` ROW
-            # (`perps-funding-carry-lshadow`), so they are not redundant — they
-            # are two writers of one key, and the row becomes whoever published
-            # last. MEASURED within minutes of the catch-up dispatch: the row
-            # flipped from n=82 with `extra.caps` present to **n=71 with
-            # caps=None** and no build stamp, i.e. a publisher running code that
-            # predates (gd) stomped the good one. `funding_carry_bot.py` emits
-            # `caps` unconditionally every loop, so caps=None is proof the
-            # winning writer is not running HEAD.
-            # WHAT IS *NOT* DAMAGED, checked rather than assumed: the paper
-            # LEDGER is clean — 82 closes for this row, ZERO duplicate
-            # trade_ids. The go-live grader and the 30-day baseline read that
-            # ledger, so the EVIDENCE is intact; the casualty is the summary
-            # row (and `extra.caps`, which the evidence board reads to detect
-            # saturation).
-            # A deploy rule cannot fix this: both services are running
-            # regardless of what this workflow does, so one of them must be
-            # STOPPED in Railway — an operator action. Reverting here at least
-            # stops this repo from re-waking the duplicate on every push.
-            # [2026-07-31 (hu)] `yield-harvester-shadow` RE-ADDED, and this
-            # time on MEASUREMENT rather than on the argument (gn) rightly
-            # rejected. Read the (gn) paragraph above first — it is still
-            # correct about why (gl)'s reasoning was wrong.
-            #
-            # WHAT CHANGED. (ht) shipped `extra.svc` on every publish, so for
-            # the first time this repo can SEE which service writes a row.
-            # Measured minutes after the (ht) deploy, run 30598053371, which
-            # reported `OK: 'funding-carry' deployed`:
-            #   * SEVEN deployed services stamped themselves correctly
-            #     (counterweight-shadow, equities-regime-shadow,
-            #     family-lighter-shadow, freqtrade-bots, perp-sniper-shadow,
-            #     snap-back-shadow, tide-rider-lighter-shadow) — so the
-            #     mechanism works and its absence is signal, not noise.
-            #   * `funding-carry` published NOTHING, on any row.
-            #   * `perps-funding-carry-lshadow` kept publishing every ~90-170s
-            #     on build `fbb926402049` with NO svc — i.e. pre-(hp) code, on
-            #     a container the deploy did not reach. Twenty samples over ten
-            #     minutes: one state, never a flip.
-            # `yield-harvester-shadow` is the only other carry service, so it
-            # is the one running the book — and it is the one with no deploy
-            # rule, which is exactly why it still runs code predating both the
-            # (hp) sole-writer guard and the (ht) stamp.
-            #
-            # WHY "TWO WRITERS" NO LONGER BLOCKS THIS. (gn) reverted (gl)
-            # because deploying both made two writers of one key. That
-            # objection is spent: (hp) put `claim_writer` at the TOP of the
-            # carry loop, so if both containers do run, the second STANDS DOWN
-            # instead of pooling the ledger. Deploying the un-guarded service
-            # is now the only way to GIVE it that guard — leaving it out is
-            # what keeps the duplicate possible.
-            #
-            # NOT A GUESS about which service to keep: both are deployed, and
-            # the guard picks the winner at runtime. That is deliberately the
-            # opposite of (gl)'s error, which was naming a service from a
-            # dashboard row id. Stopping the loser stays an OPERATOR act.
-            # [2026-08-05 (jr) S1] fleet_bus.py joined this image's COPY set
-            # (the allocation-scale consumer) — in BOTH this grep and paths:,
-            # or editing the bus would be a silent no-op for funding-carry
-            # (the exact fleet_tuning precedent five lines up).
+            # [2026-07-16] perps-regime-switch REMOVED (retired 12/13-Jul;
+            # "Service not found" x3 on every bot_pnl_store.py change).
+            # funding-carry service — the full (gl)->(gn)->(ht)->(hu) two-writer
+            # saga lives in the CHANGELOG under those letters; the operative
+            # rules that came out of it:
+            #  * fleet_tuning.py [(30-Jul)] and fleet_bus.py [(jr) S1] are in
+            #    this image's COPY set — each must be in BOTH this grep and
+            #    `paths:` or a registry/bus edit is a silent no-op here.
+            #  * BOTH carry services deploy [(hu), measured via extra.svc]:
+            #    (hp)'s claim_writer stands the loser down at runtime, so
+            #    deploying the un-guarded one is the only way to GIVE it the
+            #    guard. Stopping the loser stays an OPERATOR act.
             if echo "$changed" | grep -qE '^(funding_carry_bot\.py$|Dockerfile\.funding$|bot_pnl_store\.py$|funding_basis\.py$|paper_broker\.py$|fleet_tuning\.py$|fleet_bus\.py$|venues/|requirements\.txt$|\.github/workflows/railway-redeploy\.yml$)'; then
               # TWO SEPARATE ASSIGNMENTS, deliberately — NOT
               # `...}funding-carry,yield-harvester-shadow`. audit_deploy_coverage
@@ -437,6 +380,11 @@ jobs:
             if echo "$changed" | grep -qE "^(lighter_book_hull_bot\.py$|Dockerfile\.hull$|$_shared)"; then
               svcs="${svcs:+$svcs,}book-hull-shadow"
             fi
+            # [2026-08-18] 🪁 band-kelly — COMMENTED pre-provision (see
+            # MANUAL_IMAGES_OK + OPERATOR_QUEUE for the activation runbook).
+            #if echo "$changed" | grep -qE "^(lighter_band_kelly_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.bandkelly$|$_shared)"; then
+            #  svcs="${svcs:+$svcs,}band-kelly-shadow"
+            #fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
             # trail-blazer-live = 💸 Funding Farmer — service names lie) are

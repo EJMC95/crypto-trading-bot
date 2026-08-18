@@ -1,3 +1,106 @@
+## 2026-08-18 (qf) — 🪁 BAND-KELLY, THE MIRROR BOOK: the fleet's measured losers become its signal, and two of the three inversions died in measurement first
+
+*(Renumbered from (qe) at push time — a concurrent session's referee-wave
+entry took (qe) on origin/main while this was built; the cross-branch
+letter guard caught it, fourth catch in two days.)*
+
+**Operator: "Make a bot that does the exact opposite of all of the major
+losing sequences and trends, flipping but also using every enhancement and
+knowledge we have to ride an uptrend - expansion is the premise. Being able
+to fly high and generate that free energy gliding down."**
+
+THE CONSTRUCTION. "Do the opposite of the losers" is a strategy only when
+the loser is MEASURED and the opposite is taken over the SAME windows the
+loser would have traded: enter when the ghost enters, hold the other side,
+exit when the ghost exits. At mark on a zero-fee venue the mirror's
+per-trade return is the EXACT negation of the ghost's — a loser ledger at
+t ≤ −2 is founding evidence at t ≥ +2. `scripts/study_band_kelly_2026-08-18.py`
+put every candidate family through four pre-declared legs (pooled-family
+|t| ≥ 2 and n ≥ 30, era-scoped, quarantined rows out, entry families pooled
+across ALL exits per I7; forward signal computable from code the repo
+already ships; supply unowned forward per I20; replay + random-short
+benchmark where a replay is possible), with the verdict logic written into
+the script header before any number existed. Full record:
+STUDY_BAND_KELLY_2026-08-18.md.
+
+WHAT SURVIVED — ONE family. **snapfade**: retired 🧲 Snap Back inverted.
+The ghost faded mid-vs-index dislocations and retired 4-Aug (jh) as the
+fleet's strongest measured loser; the mirror RIDES them — LONG the
+premium-rich books it shorted (+0.464%/t, t=+4.72 crypto — the "fly high"
+majority side), SHORT the discounts it bought (+0.816%/t, t=+3.77).
+Founding claim crypto-only: **n=65, +0.605%/trade, t=+5.71, both halves and
+both sides positive, cluster-robust t=+2.84 (n_eff=191, (kw)), ex-best-coin
+t=+5.08, win 82% (reported, never a bar — I15)**. Median hold 0.09h, where
+the tape's −32.9%/438d drift contributes ±0.0003%/hold — 861× below the
+mean, so the claim is alpha, not beta ((hm) in mirror form).
+
+WHAT DIED IN MEASUREMENT — and the refusals are deliverables per the
+standing only-growth rule:
+* **brkfade REFUSED — the (nt) calibration control killed it.** The harness
+  replayed the REAL retired class (`lighter_family_bot.MomoBreakout`, tide
+  gate included) over 578d × 17 coins, and the ghost family does NOT lose:
+  +$126.44, t=+0.90, top-3 = 103% of total (the Schwager tail shape). The
+  (mr)/(nf) retirements stand on their own ledgers, but the family's
+  inverse is a SHORT against a fat right tail: mirror-pure −$158.60 (worst
+  single trade −$52.98), every pre-declared stop cell negative, maxDD
+  22.9–23.6% vs the 15% bar, duration-matched random shorts beat every cell
+  (P=0.78–0.81). **Flipping a loser is only evidence when the loss itself
+  is established at the family level — a 21-close ledger's inverse is a
+  21-close bet.**
+* **dipfade REFUSED at the I16 floor** (n=13 < 30; the taker's vetoed dip
+  lens keeps accruing — day-31 candidate, declared).
+* **impulse-continuation's inversion is NOT re-taken**: the largest
+  measured loser (n=2919, t=−3.05) already has its minted mirror — 🧘
+  book-douglas (I20).
+* Corroboration noted, not shipped: pm-gillard's `long-disloc` mirror reads
+  t=+2.45 (n=74) — a second book's ledger independently agreeing that
+  dislocation-momentum beats dislocation-fading; forward-infeasible
+  (parliament internals).
+
+THE BOT (`lighter_band_kelly_bot.py`, row `band-kelly-lshadow`, service
+`band-kelly-shadow`, $1k shadow, ZERO keys; third of the musician cohort —
+Paul Kelly, from little things big things grow). The ghost is the retired
+module's OWN code: `lighter_dislocation_bot` imported for gate math and
+constants frozen at the (jh) retirement config — adaptive p98 gate floored
+60bps, 2-loop confirm, 30bps slip gate BOTH ways (the ghost's side decides
+whether the event exists, the mirror's whether it is tradeable), conv
+40bps, ghost-stop 5% (= the mirror's profit-side cover), max-hold 2h,
+non-convergence embargo mirrored. Full birth-parity kit: claim_writer at
+loop top + (ic) standby key, (gr) price telemetry with the residual at
+entry/exit in extra, snapshot_equity from day one (MTM_REQUIRED), census
+with named buckets (I18 — ref_blind/embargoed/ghost_slip/my_slip/capped are
+all distinct), svc/build stamps, `extra.roster` publishing the
+refused/waiting mirror families every loop so the premise stays falsifiable.
+Declared deviations, priced: crypto-only screen (CONCENTRATES the edge —
+ghost's crypto subset t=−5.71 vs −2.82 pooled; `KELLY_ALLOW_NONCRYPTO=1`
+reverts), $80 clips vs the ghost's $10 (%-invariant, slip refusals
+censused), own 5% protective stop (`KELLY_HARD_STOP`, the ghost's constant
+mirrored, registered in `test_stop_vs_gate.STOPS`, inside the 15% bar). NO
+regime gate — at 5-minute holds a 4h EMA gate is horizon-mismatched and
+unmeasured (I19); "ride the uptrend" IS the measured long side. Env-only,
+NO tuning lane, no brain mults, no allocation scale: single-policy (hm)
+clock, gradeable ~mid-Sep on ITS OWN ledger (I14 — the ghost's ledger ended
+4-Aug; the forward record is the falsification).
+
+PINNED (I3, mutations verified red): `tests/autonomy/test_band_kelly_mirror.py`
+— import identity + no-local-copy of the ghost's math, the inversion itself
+as a property, claim-before-first-position-write, standby-idles-never-exits,
+mirror_exit not nested under a fetch gate ((nm)), env-only structurally,
+refusals-stay-on-the-record. 5 pytest mutations + 7 selftest mutations red,
+with a passing positive control run FIRST — the first mutation pass "went
+red" from the scratch directory for the wrong reason (import failure, the
+(po) shape) and was redone with the control.
+
+WIRED (the full (jb)/(mk) checklist, pre-provision): `fleet_books.ROW_ENTRY`,
+dashboard VARIANT_ONLY/LABELS/DESCRIPTIONS/OVERTRADE_LIMIT,
+`Dockerfile.bandkelly` (COPY carries the ghost module; fleet_tuning declared
+in BORN_DARK_OK — the cohort idiom), SELFTEST_MODULES, MTM_REQUIRED,
+exit-telemetry PRICE_BOOKS, stop-vs-gate STOPS. Deploy rule ships COMMENTED
++ `MANUAL_IMAGES_OK` (pre-provision — since (hj) an unresolvable service
+name is a hard error); paths: entries land now, and the decide grep carries
+`lighter_dislocation_bot.py` so a ghost edit will redeploy the mirror.
+Activation runbook: OPERATOR_QUEUE.md (provision → stamp readback → move to
+AUTO_IMAGES + uncomment, the kiyosaki path).
 ## 2026-08-18 (qe) — THE REFEREE WAVE LANDS: 3 SURVIVORS, ONE LIVE DEFECT FIXED — carry's census was promising a coin its own class screen refuses
 
 The `(qa)` growth dive's adversarial referee wave completed after the merge

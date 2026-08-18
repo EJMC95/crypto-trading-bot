@@ -56,6 +56,10 @@ PRICE_BOOKS = [
     "lighter_book_douglas_bot",      # 🧘 The Zone
     "lighter_book_grimes_bot",       # 📐 The Technician
     "lighter_book_schwager_bot",     # 🧙 The Wizard
+    # [2026-08-18] 🪁 band-kelly — the mirror book: P&L is the price path
+    # (fills book-walked VWAPs), every close carries prices + side + the
+    # residual at entry/exit so the thesis stays auditable.
+    "lighter_band_kelly_bot",        # 🪁 the Mirror
 ]
 
 #: Books whose P&L is driven by FUNDING ACCRUAL -> a price sweep is the wrong
