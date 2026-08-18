@@ -1,3 +1,47 @@
+## 2026-08-18 (pw) — THE NEVER-EMPTY TIER'S DEPTH IS NEGATIVE: Garrett's cap widening measured and REFUSED, and the band's own edge has decayed on the trailing window
+
+**Operator, 18-Aug: "Find a path or a way to make it win and a growing PnL."**
+The loudest candidate on the board was the one `(pu)` had just refused
+FAIL-CLOSED on I7/`(hs)`: 🛢️ Garrett at 6/6 slots, ~23 eligible candidates
+CAPPED every loop, in the tier the 16-Aug occupancy study measured 100%-full
+(median 31 qualified coins) while three books share a cell that is empty ~70%
+of the time. "Capacity is allocated backwards" begged for the widening; a
+fail-closed refusal is not a measurement; this run bought the measurement.
+
+**Method + full tables: `STUDY_GARRETT_CAP_EXIT_2026-08-18.md`** — the
+founding study's own harness (`backtest_funding_lighter.run`, persistence-
+parity-fixed), the band's own 67-book universe, FRESH 30d window ending
+18-Aug, Garrett's real config (gate 0.05 TRUE, $30 clips), tier friction
+median 5.12 / p90 14.77 bps, decision rules pre-registered in the driver
+headers before results existed.
+
+**1 · THE CAP WIDENING IS REFUTED, not just refused.** cap 6 → +$4.82 (n=150);
+cap 9 → **−$7.07** (n=248); cap 12 → **−$9.95** (n=355). Per-trade flips
++0.032 → −0.028; the stop bucket scales −$26.67 → −$47.84 → −$65.95. Slots
+7–12 admit the tier's negative-expectancy depth, so the ~23 "turned away"
+candidates are trades the book is RIGHT to refuse. The I7 instinct
+(`(hs)`: saturation is not evidence) held under measurement at this book —
+and the census line that keeps printing `capped: 23` can now be read against
+a number instead of an itch.
+
+**2 · NO EXIT TUNING EITHER.** 16-cell stop×tp grid on the same tape,
+plateau-only pre-registered bar (E1–E5): the best cell (+$14.80) sits beside
+−$11.60 — a lone spike, exactly what E4 exists to kill — and **h2 is negative
+in 15 of 16 cells**. `(hl)`'s result reproduced: no exit change is available
+that is not window-fitting.
+
+**3 · THE CALIBRATION ROW IS THE FINDING THAT SURVIVES: the thin-tier edge
+has DECAYED.** The founding claim (+$14.83, both halves positive, robust at
+p90, window ending 5-Aug) reads **+$4.82, h2 −$13.22, p90 −$3.87** on the
+window ending 18-Aug. So 🛢️ Garrett's live −$4.70/19 is **consistent with its
+own replay** — a correctly-running book in a soft patch of its band, not a
+defect. Nothing to act on at n=19 (the era is 5 days old); what this buys is
+the armed expectation for the ~12-Sep grade: **band and book still negative
+together then ⇒ the question is I17 keep-or-retire, never a widening.**
+
+No code, no lever, no config change — two measured refusals and a decay
+finding, which per I19 and the `(pu)` precedent are the deliverable. Study
+doc + drivers committed; scratch tape cache stays in the session scratchpad.
 ## 2026-08-18 (pv) — `(nm)` RULED TWO ROWS "VOID" AND WIRED IT INTO NOTHING: the verdict lived in prose while every grader kept counting 97% of a book's record
 
 *(Renumbered from (pr) at push time — a concurrent session's Farmer halt-at-boot
