@@ -127,3 +127,30 @@ still ungraded:
 - The ~mid-Aug re-run of this study now doubles as the first
   LISTED-universe read: per-book cells against books that are actually
   tradable, per-tag brain grades accruing from the family ledger.
+
+---
+
+## THE ~mid-Aug GRADUATION RE-RUN — EXECUTED 18-Aug (the clause above is discharged)
+
+`scripts/study_per_asset_gate.py` re-run 18-Aug with SPY/QQQ now ABOVE the
+203-bar floor and both publishing `LONG-window, dir=1` on the live oracle
+(fresh payload, n_published 7 of 10; IWM/WTI/XCU still short-history, named).
+
+**The honest verdict: graduated in BAR COUNT, not yet in GRADED SAMPLE.**
+SPY and QQQ carry n=3 graded verdict-days each (2 days above the floor) —
+far under the 28-Jul review's n≥20/sym self-grade bar, so no wiring decision
+changes today. What the deep-history cells DO say, pooled where thin:
+- equity-single (n=138 graded days): the D5 damage cell (btc=1, own=0) reads
+  **−0.52pp d1 / −1.70pp d3** — BTC's gate admitting what the asset's own
+  gate refuses is measurably poor, which SUPPORTS the per-asset wiring
+  already shipped (steps 2+3, 30-Jul).
+- commodity (n=194): same direction on the (1,1) cell (−0.64/−3.25pp);
+  the (0,1) cell is n=2 — noise, not evidence.
+- equity-index: n=6 total. Nothing decidable.
+
+**Standing state**: the wiring is LIVE (`noncrypto_entry_blocked` at the
+entry site; SPY/QQQ in LONG-window means family books can now take the
+fleet's first second-regime longs on their own signals — 🙏 avo shadow
+already holds SPY). **The next milestone is the oracle's self-grade n≥20 on
+SPY/QQQ (~mid-Sep at 1 verdict-day/day)** — that, not bar count, is when the
+28-Jul review's decision bar is actually met. Nothing to re-run before then.
