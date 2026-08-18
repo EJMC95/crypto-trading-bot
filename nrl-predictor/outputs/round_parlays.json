@@ -1,23 +1,23 @@
 [
  {
   "name": "4-leg winners parlay",
-  "p_joint": 0.1125,
-  "fair_price": 8.89,
+  "p_joint": 0.1223,
+  "fair_price": 8.18,
   "legs": [
-   "Penrith Panthers to win",
+   "Sydney Roosters to win",
+   "Dolphins to win",
    "Cronulla-Sutherland Sharks to win",
-   "Wests Tigers to win",
-   "Newcastle Knights to win"
+   "Penrith Panthers to win"
   ]
  },
  {
   "name": "3-game win + tryscorer builder",
-  "p_joint": 0.0354,
-  "fair_price": 28.26,
+  "p_joint": 0.0397,
+  "fair_price": 25.21,
   "legs": [
-   "Penrith Panthers win & Thomas Jenkins try",
-   "Cronulla-Sutherland Sharks win & Ronaldo Mulitalo try",
-   "Wests Tigers win & Junior Tupou try"
+   "Sydney Roosters win & Mark Nawaqanitawase try",
+   "Dolphins win & Jack Bostock try",
+   "Cronulla-Sutherland Sharks win & Ronaldo Mulitalo try"
   ]
  }
 ]

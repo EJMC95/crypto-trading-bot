@@ -1,27 +1,28 @@
-# 🏉 Round 24 preview — model probabilities
+# 🏉 Round 25 preview — model probabilities
 
 _Blend = Elo+Poisson logistic stack (validated 2015–2025: Brier 0.2188 vs market 0.2075). Margins/totals from the tier-2 Monte Carlo. Market = de-vigged median across keyless book feeds (see src/ingest/odds_live.py). Paper only._
 
 | fixture | kickoff | blend P(home) | market P(home) | margin | total | call |
 |---|---|---|---|---|---|---|
-| Penrith Panthers v Sydney Roosters | Thu 13 Aug 19:50 | 61.2% | 61.9% | +4.2 | 47 | Penrith Panthers (61%, lean) |
-| Manly-Warringah Sea Eagles v Dolphins | Fri 14 Aug 18:00 | 47.1% | 29.1% | +1.2 | 48 | Dolphins (53%, coin flip) |
-| Canterbury-Bankstown Bulldogs v South Sydney Rabbitohs | Fri 14 Aug 20:00 | 55.8% | 58.8% | -0.7 | 46 | Canterbury-Bankstown Bulldogs (56%, coin flip) |
-| Cronulla-Sutherland Sharks v Canberra Raiders | Sat 15 Aug 15:00 | 70.5% | 72.5% | +3.6 | 47 | Cronulla-Sutherland Sharks (70%, strong) |
-| Parramatta Eels v North Queensland Cowboys | Sat 15 Aug 17:30 | 46.1% | 38.3% | +0.1 | 49 | North Queensland Cowboys (54%, coin flip) |
-| Brisbane Broncos v New Zealand Warriors | Sat 15 Aug 19:35 | 36.6% | 34.2% | -1.2 | 46 | New Zealand Warriors (63%, lean) |
-| Newcastle Knights v Gold Coast Titans | Sun 16 Aug 14:00 | 73.1% | 77.6% | +2.4 | 49 | Newcastle Knights (73%, strong) |
-| Wests Tigers v St George Illawarra Dragons | Sun 16 Aug 16:05 | 62.8% | 50.5% | +3.0 | 48 | Wests Tigers (63%, lean) |
+| Melbourne Storm v Penrith Panthers | Thu 20 Aug 19:50 | 39.7% | 31.8% | -2.5 | 47 | Penrith Panthers (60%, lean) |
+| Canberra Raiders v Brisbane Broncos | Fri 21 Aug 18:00 | 65.1% | 71.9% | +0.9 | 47 | Canberra Raiders (65%, lean) |
+| Dolphins v Parramatta Eels | Fri 21 Aug 20:00 | 79.8% | 76.2% | +5.3 | 50 | Dolphins (80%, strong) |
+| Newcastle Knights v Manly-Warringah Sea Eagles | Sat 22 Aug 15:00 | 54.1% | 66.0% | -1.6 | 48 | Newcastle Knights (54%, coin flip) |
+| South Sydney Rabbitohs v New Zealand Warriors | Sat 22 Aug 17:30 | 46.2% | 38.3% | -0.1 | 47 | New Zealand Warriors (54%, coin flip) |
+| St George Illawarra Dragons v Canterbury-Bankstown Bulldogs | Sat 22 Aug 19:35 | 39.5% | 36.0% | -1.6 | 45 | Canterbury-Bankstown Bulldogs (61%, lean) |
+| Gold Coast Titans v Cronulla-Sutherland Sharks | Sun 23 Aug 14:00 | 28.5% | 35.8% | -2.7 | 48 | Cronulla-Sutherland Sharks (72%, strong) |
+| Sydney Roosters v Wests Tigers | Sun 23 Aug 16:05 | 84.2% | 89.7% | +5.6 | 49 | Sydney Roosters (84%, strong) |
 
 **Value flags (model vs best available price, paper only):**
-- Manly-Warringah Sea Eagles in Manly-Warringah Sea Eagles v Dolphins: model edge +18.0% vs consensus, EV +60.2% at best price (4 books)
-- Parramatta Eels in Parramatta Eels v North Queensland Cowboys: model edge +7.8% vs consensus, EV +19.7% at best price (4 books)
-- Wests Tigers in Wests Tigers v St George Illawarra Dragons: model edge +12.3% vs consensus, EV +19.4% at best price (4 books)
-- Gold Coast Titans in Newcastle Knights v Gold Coast Titans: model edge +4.5% vs consensus, EV +14.2% at best price (4 books)
-- South Sydney Rabbitohs in Canterbury-Bankstown Bulldogs v South Sydney Rabbitohs: model edge +3.0% vs consensus, EV +5.2% at best price (4 books)
-- Canberra Raiders in Cronulla-Sutherland Sharks v Canberra Raiders: model edge +2.1% vs consensus, EV +3.3% at best price (4 books)
-- Brisbane Broncos in Brisbane Broncos v New Zealand Warriors: model edge +2.5% vs consensus, EV +2.5% at best price (4 books)
+- Wests Tigers in Sydney Roosters v Wests Tigers: model edge +5.5% vs consensus, EV +66.2% at best price (4 books)
+- Manly-Warringah Sea Eagles in Newcastle Knights v Manly-Warringah Sea Eagles: model edge +11.9% vs consensus, EV +32.1% at best price (4 books)
+- Brisbane Broncos in Canberra Raiders v Brisbane Broncos: model edge +6.8% vs consensus, EV +27.4% at best price (4 books)
+- Melbourne Storm in Melbourne Storm v Penrith Panthers: model edge +7.8% vs consensus, EV +21.0% at best price (4 books)
+- South Sydney Rabbitohs in South Sydney Rabbitohs v New Zealand Warriors: model edge +7.9% vs consensus, EV +15.5% at best price (4 books)
+- St George Illawarra Dragons in St George Illawarra Dragons v Canterbury-Bankstown Bulldogs: model edge +3.4% vs consensus, EV +8.6% at best price (4 books)
+- Cronulla-Sutherland Sharks in Gold Coast Titans v Cronulla-Sutherland Sharks: model edge +7.4% vs consensus, EV +7.3% at best price (4 books)
 - _Caveat: on a fresh model most 'edges' are model error, not market error — the paper ledger exists to measure which. No real money._
 
 **Model spread this round:** games where the tiers disagree by >10% are the ones to watch for team-list news — that disagreement is usually roster signal one model has and the other hasn't.
-- Manly-Warringah Sea Eagles v Dolphins: Elo 48% vs GBM 60%
+- Canberra Raiders v Brisbane Broncos: Elo 67% vs GBM 78%
+- Gold Coast Titans v Cronulla-Sutherland Sharks: Elo 33% vs GBM 43%
