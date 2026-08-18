@@ -84,6 +84,11 @@ on:
       # (hj) an unresolvable service name is a hard ::error::.
       - 'lighter_band_kelly_bot.py'
       - 'Dockerfile.bandkelly'
+      # the ghost module rides IN the band-kelly image (its gate math is
+      # imported, one owner) — removed from paths: when snap-back retired
+      # (5-Aug), re-added at kelly's activation routed to the MIRROR. The
+      # retired snap-back service itself stays route-less (an idler).
+      - 'lighter_dislocation_bot.py'
       # [2026-07-30 (gm)] THIS WORKFLOW IS ITS OWN TRIGGER, for the six shadow
       # books only — plus the CARRY PAIR since (hu), same reasoning: its
       # routing was just corrected and a routing fix that cannot deploy itself
@@ -380,11 +385,11 @@ jobs:
             if echo "$changed" | grep -qE "^(lighter_book_hull_bot\.py$|Dockerfile\.hull$|$_shared)"; then
               svcs="${svcs:+$svcs,}book-hull-shadow"
             fi
-            # [2026-08-18] 🪁 band-kelly — COMMENTED pre-provision (see
-            # MANUAL_IMAGES_OK + OPERATOR_QUEUE for the activation runbook).
-            #if echo "$changed" | grep -qE "^(lighter_band_kelly_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.bandkelly$|$_shared)"; then
-            #  svcs="${svcs:+$svcs,}band-kelly-shadow"
-            #fi
+            # [2026-08-18 ACTIVATED] 🪁 band-kelly, stamp-verified; the grep
+            # carries the ghost module (it is IN this image).
+            if echo "$changed" | grep -qE "^(lighter_band_kelly_bot\.py$|lighter_dislocation_bot\.py$|Dockerfile\.bandkelly$|$_shared)"; then
+              svcs="${svcs:+$svcs,}band-kelly-shadow"
+            fi
             # [2026-07-24 taker; 2026-07-25 Farmer] OPT-IN LIVE-BOT auto-deploy.
             # The two REAL-MONEY services (tide-rider-lighter-live = 🎫 Ticket Taker,
             # trail-blazer-live = 💸 Funding Farmer — service names lie) are
