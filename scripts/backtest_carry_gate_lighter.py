@@ -14,10 +14,12 @@ were selected FOR failure and could not decide this.
 
 METHOD: top-N liquid books (today's snapshot — SURVIVORSHIP: today's
 universe applied historically, declared not hidden), 150d of settled hourly
-funding each, the bot's OWN entry rule (|apr| >= gate held PERSIST_H=6h
-continuously, ranked by |apr|, MAX_POSITIONS=8, $300 notional) and OWN exit
-cascade (flip 1h grace, fee-payback decay, 336h max-hold, 2% bleed stop),
-constants imported from this repo's shipped values. Hedged carry: P&L =
+funding each, the bot's OWN entry rule — AS OF 21-Jul: |apr| >= gate held
+PERSIST_H=6h continuously, ranked by |apr|, MAX_POSITIONS=8, $300 notional —
+and OWN exit cascade (then: flip 1h grace, fee-payback decay, 336h max-hold,
+2% bleed stop). Those are this table's VINTAGE; the harness now IMPORTS
+MAX_POSITIONS/PERSIST_H/FLIP_GRACE_H from the bot (see the (he)/(qi) notes
+below), so a re-run measures the shipped book, not this one. Hedged carry: P&L =
 funding accrual - friction; no price leg (the hedge neutralizes it — that
 is the strategy's own claim, and the bot's own accounting).
 FRICTION IS THE BOT'S MODELLED 29bps ROUND TRIP, NOT MEASURED FILLS — the
@@ -67,17 +69,29 @@ NOTIONAL = 300.0
 # kept as the historical record of the decision that moved CARRY_ENTER_APR, with
 # its parameters now stated rather than assumed; a re-run at 12 is a different
 # measurement and should be recorded as one.
+# [2026-08-18 (qi)] PERSIST_H AND FLIP_GRACE_H WERE THE SAME (he) CLASS, TWO
+# LINES DOWN FROM ITS FIX. Both were retyped literals: the bot moved
+# FLIP_GRACE_H 1h->6h at (px) and PERSIST_H 6h->12h at (qi), and this harness
+# — the instrument that set CARRY_ENTER_APR, and the natural one for
+# validating or reverting either move — would have replayed a book the fleet
+# no longer runs, silently. Read from the bot like MAX_POSITIONS; the
+# fallbacks are the 21-Jul-era values the results table above was produced
+# at, and say so. (That table's vintage is therefore: MAX_POSITIONS=8,
+# PERSIST_H=6, FLIP_GRACE_H=1 — a re-run under today's bot is a different
+# measurement and should be recorded as one.)
 try:
     import sys as _sys
     _sys.path.insert(0, os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))))
-    from funding_carry_bot import MAX_POSITIONS  # noqa: F401
+    from funding_carry_bot import (MAX_POSITIONS, PERSIST_H,  # noqa: F401
+                                   FLIP_GRACE_H)
 except Exception:      # noqa: BLE001
     MAX_POSITIONS = 8
-    print("WARNING: could not read MAX_POSITIONS from funding_carry_bot — "
-          "using 8, which is the 21-Jul value and may no longer be shipped")
-PERSIST_H = 6.0
-FLIP_GRACE_H = 1.0
+    PERSIST_H = 6.0
+    FLIP_GRACE_H = 1.0
+    print("WARNING: could not read MAX_POSITIONS/PERSIST_H/FLIP_GRACE_H from "
+          "funding_carry_bot — using the 21-Jul values (8/6h/1h), which are "
+          "no longer what the bot ships")
 OPEN_COST = 0.00045 + 0.0010          # per side
 EXIT_APR_TRUE = 0.15 / 8              # 0.01875
 FEE_PAYBACK_MARGIN = 0.10
@@ -270,7 +284,7 @@ def _selftest():
     hot_only = run_gate({"HOT": hot}, 0.05)
     assert hot_only["net"] > 0 and hot_only["by_exit"].get("decay_paid", 0) \
         + hot_only["by_exit"].get("max_hold", 0) >= 1, hot_only
-    # persistence: a 3h spike never enters (PERSIST_H=6)
+    # persistence: a 3h spike never enters (PERSIST_H is read from the bot — 3h is under any value it has ever shipped)
     spike = tape(*([0.001] * 10 + [0.80] * 3 + [0.001] * 50))
     sp = run_gate({"SPIKE": spike}, 0.05)
     assert sp["closed"] == 0 and sp["open_marked"] == 0, sp

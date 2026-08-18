@@ -1,3 +1,127 @@
+## 2026-08-18 (qi) — THE OPERATOR-QUEUE SWEEP: the parked PERSIST half ships at carry's clean boundary, and the queue's stale rows are corrected in place
+
+*(Renumbered twice at push time — written as (qg), moved when the mutation
+harness took (qg) on origin, moved again when band-kelly's activation took
+(qh) mid-push; seventh and eighth catches for the cross-branch letter arm in
+two days.)*
+
+Operator: *"Fix and implement all operator queue items that make the fleet
+improve/make more profit and win rate."* The queue is the scope; this pass is
+the daily review its own maintenance rule calls for, plus the ONE substantive
+improvement item that was actually implementable today.
+
+**1 · 🌾 PERSIST 6h → 12h SHIPPED — the half `(px)` deliberately parked.**
+`STUDY_FUNDING_LIFECYCLE_2026-08-15.md` §4, the cell's own 205d episode walk:
+per-episode net MONOTONE INCREASING in entry persistence — P=1 −0.064%
+(enter-immediately −21.8%, t=−5.9) → P=6 +0.016% → **P=12 +0.161% (t=1.80,
+both halves positive, I16 lb 0.046)** → P=24 +0.269% (n=8 only); referee
+reproduced exactly, LAG-1 clean, ruled NOT denominator shrinkage (TOTAL net
+also peaks at P=12: +4.2% vs +1.5%); consistent with 🧮 Hull's independent
+24h persist on its own band. HYPOTHESIS-GRADE, stated: n=26, t below the 2.0
+bar. Why shipping it now is not the I17 behaviour the study feared: the
+operator's directive is the authority ((kd)/(hn) — a queue item with a banked
+measurement is a growth finding, implemented not filed), it went out at the
+SAME clean boundary `(px)` used this morning — the book held ZERO positions,
+census `eligible 0 / waiting 2` under the new $1M floor, so no mid-hold rule
+change and every future close opens under 12h — and the ~30-Aug
+keep-or-retire docket call is UNTOUCHED: no tuning half rides on it any more,
+and if that call is retire, this dies with the book at zero cost, exactly as
+the queue item priced it. **The supply tripwire had NOT fired at ship
+(eligible 0), recorded so the ~30-Aug day reads the supply story straight.**
+Restrict-direction; I19 price declared in the code comment (the 6h gate
+already consumes 81% of qualifying window-hours and misses 91% of windows —
+12h consumes more still; fewer, better episodes is the measured trade).
+Env-tunable `CARRY_PERSIST_H`; era unchanged (ordinary entry tuning per (hc),
+the ENTER_APR precedent); caps now PUBLISH `persist_h` beside `flip_grace_h`
+(the (lz)/(pf) unpublished-gate class — and the gate now DIFFERS from 🏦 Rich
+Dad's 6h on the shared cell, noted in `KNOWN_CELL_COLLISIONS`; the two books
+no longer take the same entry at the same instant). Pinned by
+`tests/autonomy/test_carry_persistence_gate.py` (default / env escape hatch /
+caps declaration by AST / the 12h bite through the census), **4 mutations
+verified RED through `(qg)`'s `scripts/mutate.py`** — baseline and restore
+green. The three census tests that reconstruct the 2-Aug and (qe) incidents
+now pin `persist_h=6.0` explicitly (the gate in force on their day), per that
+file's own H/BAR convention.
+
+**2 · THE QUEUE SWEEP — five closures verified against TODAY'S payload, not
+carried on old claims** (17 rows on /pnl.json, all fresh): wave-2 birth (all
+four book rows publishing), Avo live swap (`freqtrade-avo-maria-lighter`
+$62.46 via `tide-rider-lighter-live`, Taker LIVE row absent — no
+double-count), §0 pending deploys, §6 judge-unblock (both 💸 Farmer arms at
+equal build `ab7b8b378665` today), §7 red-stop slate (none of the retired
+rows present, 🎸 Barnes gone per (pm)). Corrected in place per I12: **🎸
+Barnesy's 4-Sep unfreeze items are MOOT** (book retired 17-Aug (pm); both
+fixes die with it, and the (mf) grace measurement lives on in carry/(px) and
+Rich Dad/(mf)); **S4 consensus-ensemble was stale since 4-Aug** — its own
+study (`STUDY_CONSENSUS_GATE_2026-08-04.md`) ruled REFUSAL WITH EVIDENCE (84
+cells; the fleet's gating signals are CONSTANTS on this tape) and (lp)
+re-confirmed 13-Aug (survivors −$8.02 vs unfiltered −$4.40), yet the bullet
+still said "measure before minting"; **Snap Back's "one act left"** was done
+5-Aug (service deleted, item 3.4); **§5 calendar**: SPY/QQQ graduation moved
+~mid-Sep per (qa)'s re-run, Barnesy off the calendar, Garrett/Rich Dad
+~12-Sep added with the declared cell-collision decision.
+
+**3 · WHAT THIS PASS DELIBERATELY DID NOT TAKE, so the next session does not
+re-litigate it:** the 🪁 band-kelly provisioning (⚡ item) is ACTIVELY OWNED
+by the session that birthed it — its one-shot provisioner merged as PR #181
+and its activation commit is already staged on `claude/opposite-trend-bot-cvkhc8`
+mid-pass; racing it risks a double-provision for zero gain (the I11 rule read
+in the other direction: their house, half-built, THEIR next brick). The
+remaining queue rows are operator-only acts (Railway deletions, the zombie
+alpaca decision, nrl-feed's project move) or PRE-REGISTERED DECISION DATES
+(⚖️ ~28-Aug, 🌾 ~30-Aug, the ~12-Sep cell call) — a directive to implement
+improvements does not pull forward a keep-or-retire decision, because those
+are not improvements, they are verdicts, and verdicts belong to their
+evidence windows.
+
+**4 · THE SAME-HOUR REFEREE WAVE (4 adversarial lenses over the commit),
+and what it changed before push.** Tests lens: CLEAN — all four pins
+independently re-mutation-verified, reload ordering and teardown probed both
+ways. Citations lens: 4 wrong letters, all fixed in place — the census
+next-promise incident is (qe) not (qc) (its own entry records the renumber);
+the min_vol/flip-grace entry is (px) not (pr), a stale letter the (px)
+commit itself wrote into `funding_carry_bot.py` and this pass inherited —
+all three code-comment sites corrected too ((pr) is the Farmer halt entry);
+the S4 reopen clause lives in the study's VERDICT block, not §8; the
+closing-line rule is FORWARD MOTION rule 4, not (hn). Correctness lens, three
+confirmed findings, each closed or declared: **F1 —
+`backtest_carry_gate_lighter.py` retyped `PERSIST_H=6.0`/`FLIP_GRACE_H=1.0`
+two lines under its own (he) retyped-constant postmortem**; both now IMPORT
+from the bot with 21-Jul-vintage fallbacks, and the header states the
+results table's vintage (selftest green under 12h). **F2 — the new
+`persist_h` caps key had zero consumers** (the registered-but-inert shape):
+`living_gates` now reads it, the collision report prints per-book persist
+(differential REACH on a shared cell), and `supply_in`'s docstring states
+that its 6.0 default is the historical CELL convention, not any book's
+reach — a carry-reach question must pass `--persist-h 12`. **F3 — the
+~30-Aug tripwire's 13.42% base rate was measured at 6h persist** and is no
+longer comparable to the live 12h census: the queue item now carries the
+re-basing instruction (recompute occupancy at `--persist-h 12` before
+reading a low `eligible` as venue drought). Declared, not fixed, in the
+code comment: **F4** — the §4 evidence predates the (px) $1M floor, so the
+12h transfer to the [$1M,$2M) tier is direction-only, unmeasured; **F5** —
+`restore_hot_since` runs at boot only, so a failover takeover's cold-clock
+entry blackout doubles from ≥6h to ≥12h (pre-existing shape, cost doubled
+here, a takeover-path re-restore is its own change). Queue-staleness lens:
+EIGHT more stale rows the first sweep missed, all corrected in place — S1's
+Farmer-shadow deferral (spent since (lx); arms verified equal today),
+the Farmer min_vol queue order ((ln) reversed it; ~11-Sep slot void via
+(pt)/(pz), the +$14.83 prior superseded by (pw)/(qa)), §6's 15-Aug window
+date (accrues from the 18-Aug alignment), Counterweight's docket numbers
+((qb): crypto +$5.94/n=94, post-screen n=23 +$0.95), item 3's service
+census (seven births since 5-Aug; barnes/schwager rows added as 3.8/3.9,
+schwager's still-active deploy rule named as the resurrect hazard), item
+1's 1-Aug funding-vs-directional frame ((nc) phantom accrual; 🙏 avo now
+the only above-bar book), and §5's Farmer-live/carry numbers ((qa)/(nc)).
+§6/§7's executed bodies are now actually removed — the first sweep's
+closure paragraph had claimed them closed while leaving them in the file,
+which is exactly the decay class this file audits.
+
+**Forward metric (FORWARD MOTION rule 4's closing line):** 🌾 carry — the fleet's
+best-evidenced book — now opens every future position under the measured-best
+persistence rule its own tape supports, at zero cost to its era or its docket
+date; and the operator queue is a current document again instead of a museum
+of executed items.
 ## 2026-08-18 (qh) — 🪁 BAND-KELLY IS ALIVE, STAMP-VERIFIED — and the birth reproduced the (ml) stale-reader class live, so that class finally gets its guard
 
 **Executed end-to-end under the operator's "Continue maverick!" grant** (the
@@ -64,7 +188,7 @@ so nobody hunts a "failed" deploy. Provisioner deleted; `MANUAL_IMAGES_OK`
 → `AUTO_IMAGES`; decide rule live (carrying the ghost module);
 OPERATOR_QUEUE item closed. Clock: fresh 30 days from first publish
 (18-Aug), ~2.8 crypto closes/day measured on the ghost's ledger →
-gradeable ~mid-Sep on its OWN ledger (I14).
+gradeable ~mid-Sep on its OWN ledger (I14).>>>>>>> 3ce869e (The operator-queue sweep: carry PERSIST 6h->12h ships at the clean boundary; the queue's stale rows corrected in place (qh))
 ## 2026-08-19 (qg) — `(qe)` FIXED THE FALSE PROMISE AND LEFT THE SILENCE: `waiting 3 / next none` still could not say whether ANY waiter is admissible — and the mutation round that verified the fix was itself void
 
 *(Renumbered from (qf) at push time — a concurrent session's 🪁 band-kelly

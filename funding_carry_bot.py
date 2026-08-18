@@ -119,7 +119,7 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # funding distribution has collapsed — a market condition, not a defect. This
 # removes a STRUCTURAL blind spot in the rail; it does not buy a trade today
 # and must not be reported as if it did.
-# [2026-08-18 (pr) CORRECTED IN PLACE per I12 — the "zero unlock" above was a
+# [2026-08-18 (px) — letter corrected from a stale (pr) at (qi); (pr) is the Farmer halt entry — CORRECTED IN PLACE per I12 — the "zero unlock" above was a
 # POINT-IN-TIME census (3-Aug's loop), and over the whole tape it does not
 # hold. Measured on 9,996 scout snapshots / 34.9 days through
 # audit_book_overlap.supply_in (the gate rule's one owner): cell occupancy
@@ -135,7 +135,7 @@ MAX_POSITIONS = int(os.environ.get("CARRY_MAX_POSITIONS", "12"))
 # unmeasured — irrelevant to this MODELLED shadow book's fills, real for any
 # future go-live, and the real-money floors ({xp,live}.funding.min_vol)
 # are untouched by this change.
-MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "1e6"))  # 24h $ turnover floor [2026-08-18 (pr): 2e6 -> 1e6]
+MIN_DAY_VOLUME = float(os.environ.get("CARRY_MIN_VOL", "1e6"))  # 24h $ turnover floor [2026-08-18 (px): 2e6 -> 1e6]
 
 # Funding thresholds, ANNUALIZED. These are denominated in THIS FILE'S ORIGINAL
 # HYPERLIQUID basis (hourly rate * 24 * 365) and are NOT the numbers either arm
@@ -166,8 +166,42 @@ DELIST_GIVEUP_H = float(os.environ.get("CARRY_DELIST_GIVEUP_H", "24"))
 #   * bleed stop                       (catastrophic guard on adverse holds)
 # Entries additionally require the rate to have stayed hot >= PERSIST_H — the
 # research-backed filter: persistent funding pays carries, spikes pay fees.
-PERSIST_H = 6.0            # hours a coin must hold >= ENTER_APR before entry
-# [2026-08-18 (pr)] FLIP GRACE 1h -> 6h, on the (mf) CARRY-CELL measurement
+# [2026-08-18 (qi)] PERSIST 6h -> 12h — the ONE half (px) deliberately parked,
+# shipped under the operator's queue directive ("implement all operator queue
+# items that make the fleet improve/make more profit and win rate"). Evidence:
+# STUDY_FUNDING_LIFECYCLE_2026-08-15.md §4 (E4), the cell's own 205d episode
+# walk — per-episode net is MONOTONE INCREASING in persistence: P=1 -0.064%
+# (enter-immediately LOSES -21.8%, t=-5.9) -> P=6 +0.016% -> P=12 +0.161%
+# (t=1.80, BOTH halves positive, I16 lower bound 0.046) -> P=24 +0.269% (n=8
+# only). Referee: reproduced exactly, LAG-1 clean, NOT denominator shrinkage
+# (TOTAL net also peaks at P=12: +4.2% vs P=6's +1.5%) — and it is consistent
+# with 🧮 Hull's independently measured 24h persist on its own band.
+# HYPOTHESIS-GRADE, stated plainly: n=26 episodes, t below the 2.0 bar. The
+# I19 price is declared: this is RESTRICT-direction (admits strictly fewer
+# entries), and the study's own supply census says the 6h gate already
+# consumes 81% of qualifying window-hours and misses 91% of windows outright
+# (median window 2h) — 12h consumes more still; fewer, better episodes is the
+# measured trade, not a free lunch. Shipped at the cleanest boundary this
+# book offers: ZERO open positions, census `eligible 0 / waiting 2` under the
+# new $1M floor, so no mid-hold rule change and every future close opens
+# under 12h. Ordinary entry tuning per (hc) — the era is unchanged, and the
+# ~30-Aug keep-or-retire docket call is UNTOUCHED (if that call is retire,
+# this dies with the book at zero cost, exactly as the queue item priced it).
+# TWO MORE COSTS, DECLARED (the same-hour referee wave, (qi)):
+# (1) TIER TRANSFER UNMEASURED — the §4 walk ran on the pre-(px) ≥$2M cell;
+#     the [$1M,$2M) tier (px) admitted three days later (ROBO/ENA/XRP, now
+#     the MAJORITY of the widened cell's occupancy) was not in its episode
+#     sample. Direction only there: P=1 loses everywhere it has ever been
+#     measured, and the thin-tier study found thin-tier funding RICHER per
+#     episode — but 12h-vs-6h on that tier is a hypothesis, not a number.
+# (2) FAILOVER BLACKOUT DOUBLED — `restore_hot_since` runs at BOOT only, so
+#     when the (hp) failover pair flips, the takeover container starts cold
+#     clocks and cannot enter until a fresh window persists the full gate:
+#     that blackout is now ≥12h instead of ≥6h, on a supply whose median
+#     window is 2h. Pre-existing shape, cost doubled here, named not fixed —
+#     a takeover-path re-restore is its own change with its own tests.
+PERSIST_H = float(os.environ.get("CARRY_PERSIST_H", "12.0"))  # hours a coin must hold >= ENTER_APR before entry [2026-08-18 (qi): 6.0 -> 12.0]
+# [2026-08-18 (px)] FLIP GRACE 1h -> 6h, on the (mf) CARRY-CELL measurement
 # (scripts/study_books_cohort_2026-08-13.py, this cell's OWN gate and coins,
 # 250d of settled fundings): grace 1h = +$27.25, t=1.95, h2 NEGATIVE, with
 # **192 of 231 exits churning the 30bps RT on sign wobbles**; 6h = +$41.17,
@@ -177,7 +211,10 @@ PERSIST_H = 6.0            # hours a coin must hold >= ENTER_APR before entry
 # flips. 6h over the 24h optimum for decidability (I17) — ~79% of the close
 # cadence at double the per-trade expectancy — and it mirrors PERSIST_H: six
 # hours of proof to buy, six to sell (the same choice 🏦 Rich Dad made on
-# this cell at (mf)). (mf) QUEUED this change to protect carry's mid-window
+# this cell at (mf)). [(qi) broke that mirror DELIBERATELY: entry persistence
+# moved to 12h on its own §4 measurement while this exit grace stays at its
+# own measured 6h — each side sits on its own evidence, and symmetry was
+# never the argument for either.] (mf) QUEUED this change to protect carry's mid-window
 # sample; that sample froze on 12-Aug ((pf): the class screen means it
 # CANNOT update), and the book held ZERO positions when this shipped, so
 # every future close is opened under the new rule — the cleanest policy
@@ -185,7 +222,7 @@ PERSIST_H = 6.0            # hours a coin must hold >= ENTER_APR before entry
 # "do not move from prose" pin is about ITS OWN uncalibrated replay ((he));
 # this move rides the (mf) harness instead, which the fleet already consumed
 # for Rich Dad. Ordinary exit tuning per (hc) — the era is unchanged.
-FLIP_GRACE_H = float(os.environ.get("CARRY_FLIP_GRACE_H", "6.0"))  # hours of adverse funding before a flip-close [2026-08-18 (pr): 1.0 -> 6.0]
+FLIP_GRACE_H = float(os.environ.get("CARRY_FLIP_GRACE_H", "6.0"))  # hours of adverse funding before a flip-close [2026-08-18 (px): 1.0 -> 6.0]
 FEE_PAYBACK_MARGIN = 0.10  # $ net (after ALL fees incl. close) for a decay-close
 BLEED_STOP_FRAC = 0.02     # close if net drops below -2% of notional
 
@@ -1053,9 +1090,15 @@ def main():
                                     "enter_apr": _enter_apr,
                                     "min_vol": MIN_DAY_VOLUME, "max_vol": None,
                                     "crypto_only": not ALLOW_NONCRYPTO,
-                                    # [(pr)] the exit gate publishes like the
+                                    # [(px)] the exit gate publishes like the
                                     # entry gate ((lz)/(pf) doctrine)
-                                    "flip_grace_h": FLIP_GRACE_H},
+                                    "flip_grace_h": FLIP_GRACE_H,
+                                    # [(qi)] the persistence gate too — an
+                                    # unpublished gate made the (lz)/(pf)
+                                    # collisions undetectable, and this one
+                                    # now DIFFERS from 🏦 Rich Dad's 6h on
+                                    # the shared cell
+                                    "persist_h": PERSIST_H},
                            # [2026-08-02] THE BOOK NAMES ITS OWN BINDING
                            # CONSTRAINT. `scan` answers "why did nothing
                            # open?" in one glance instead of an investigation

@@ -43,65 +43,45 @@ the exact kiyosaki/(mk) path. Then this item leaves the queue.
 
 ---
 
-## ⚡ ~~WAITING ON YOU~~ · The BOOKS wave-2 birth — **EXECUTED 13/14-Aug under your "merge and continue" grant, verified by stamp readback 14-Aug 00:12Z: all four rows online on /pnl.json with `extra.build` byte-equal to prediction (🧘 `56d16a305cbb` · 📐 `ac6bf6582780` · 🧙 `7d51154ead89` · 🧮 `444962b8ab95`). PR #169 merged; provisioning took four runs ((ml) — the grep -q/pipefail class, twice) and surfaced a 14h-stale pnl-dashboard container that was hiding the rows; activation lands with PR #170. Item closes at the next daily review.**
-
-Reading docs: the four `BOOK_*_2026-08-13.md`; evidence:
-`scripts/study_books_cohort_2026-08-13.py`; postmortems: (ml).
-
----
-
-## ⚡ ~~WAITING ON YOU~~ · Avo Maria live slot swap — **EXECUTED 13-Aug ~19:13 AEST, verified by stamp readback (`e49ba8fa7ed2`); retirement + live-roster sweep shipped the same evening ((ma) addendum). Item closes at the next daily review.**
-
-**Your decision, built end-to-end and inert on main.** 🙏 Avo Maria
-(SwingDip, imported from the family registry so the arms cannot drift) takes
-`tide-rider-lighter-live` — same service/keys/sub-account (~$62.80), clip =
-equity/4, rails sized to the balance. The self-halted live Taker keeps
-standing by until you run these. Full runbook + verification + rollback:
-`CUTOVER_AVO_LIVE_2026-08-13.md`. Evidence basis stated there honestly:
-shadow n≈10, +1.378%/trade, t=+1.68 — does NOT pass the gate; the go-live is
-your explicit act.
-
-```bash
-railway variables --service tide-rider-lighter-live --set "AVO_VENUE=lighter_live" --set "FREQTRADE_AVO_MARIA_MAX_NOTIONAL=63" --set "LIGHTER_MAX_DAILY_LOSS=6"
-```
-
-```bash
-gh workflow run 305025607 -f services="tide-rider-lighter-live"
-```
-
-Then say "done" in any session — it verifies by stamp readback and applies
-`CUTOVER_AVO_LIVE_2026-08-13.patch` (retires the Taker LIVE row so the fleet
-total does not double-count the sub-account; shadow arm untouched).
-
----
-
-## 0 · PENDING DEPLOYS — **NONE. Section closed 13-Aug by the daily review.**
-
-*Closed per this file's own maintenance rule ("an item leaves the day it is
-decided") and per 0c's own instruction ("the section can drop at the next daily
-review"). Verified 13-Aug 16:05 AEST by the rule this file sets for itself —
-stamp readback, not a green run: `audit_code_currency --depth 45` reads every
-stamped container **CURRENT at HEAD `5a4c9b8`**, except both 💸 Farmer arms,
-which are **DEFERRED** (8 commits, none marked for their marker-gated service —
-working as designed, not a finding). 0a/0b (6-Aug) and 0c (the (lj) live-Taker
-veto + (lk) class screens, 13-Aug) are all landed and stamp-verified; carry's
-`extra.scan.noncrypto` census bucket is publishing, so the (lk) screen is live
-in the payload. Nothing is waiting on anyone.*
+*Closed at the 18-Aug queue sweep, per this file's own maintenance rule and
+each item's "closes at the next daily review" clause — this sweep is that
+review, and each closure was RE-VERIFIED against the live payload today, not
+carried on the old claim: the BOOKS wave-2 birth (all four rows publishing
+fresh on /pnl.json, ages < 4 min), the Avo Maria live slot swap
+(`freqtrade-avo-maria-lighter` publishing at $62.46 via `tide-rider-lighter-live`;
+the Taker LIVE row absent — no double-count), §0 PENDING DEPLOYS (closed
+13-Aug), §6 the judge-unblock dispatch (both 💸 Farmer arms read equal build
+`ab7b8b378665` on today's payload — note §6's "window re-accrues from
+15-Aug" was itself superseded by the 18-Aug (pt) arm split + re-pair: the
+judge's clean window accrues from the 18-Aug alignment), and §7 the red-stop slate (17 rows on
+/pnl.json, none of the seven retired rows present, 🎸 Barnes gone too per
+(pm)). Decisions live in the changelog; history in git.*
 
 ---
 
 ## 1 · The "super bot" question — combining utilities
 
-Four routes, ranked by evidence. The fleet's measured reality (1-Aug,
+Four routes, ranked by evidence. ~~The fleet's measured reality (1-Aug,
 allocation organ): ALL measured claims live in the FUNDING class (3 books,
-+$72.89, n=297); DIRECTIONAL has zero claims in 867 closes.
++$72.89, n=297); DIRECTIONAL has zero claims in 867 closes.~~ **[18-Aug
+sweep, corrected in place per I12 — that 1-Aug frame is stale in both
+directions: (nc) found ≈$13 of carry's pooled accrual is phantom (every
+pooled all-time quote overstates, and its clean era reads −$15.45/n=10), and
+the fleet's only above-bar book today is a DIRECTIONAL one — 🙏 avo shadow
+(t=+2.31, on_track, the winners'-docket candidate, (qb)/(qd)). Read the
+allocation organ's live claims table, not this paragraph.]**
 
 - **S1 — DECIDED-SHIPPED 5-Aug (jr)** (operator: *"Proceed with all of the
   above"* / *"Full permission"*). `fleet_bus.allocation_scale` consumes the
   organ's `target_usd`, clamped [0.25, 4.0], NEW entries only, wired into
   🌾 carry + ⚖️ Counterweight (live via the auto-deploy path) and 💸 the
-  Farmer's SHADOW arm (**deferred behind the next marked Farmer deploy** —
-  bundle with the queued snapshot_equity push). Real money never reads it
+  Farmer's SHADOW arm ~~(deferred behind the next marked Farmer deploy)~~
+  **[18-Aug sweep, corrected in place per I12: that deferral is SPENT several
+  times over — (lx) 13-Aug measured the consumer already RUNNING on the
+  shadow arm, and marked Farmer deploys have since landed 15-Aug (§6 dispatch),
+  18-Aug ((pt) re-pair) and 18-Aug ((pz)); both arms read equal build
+  `ab7b8b378665` today. S1 is LIVE end-to-end, snapshot_equity bundle
+  included.]** Real money never reads it
   (AST-pinned); kill switch `FLEET_ALLOCATION_MODE=advisory` per service.
   The organ itself is unchanged, publish-only.
 - **S2 — BUILDING 5-Aug (operator: "yes build the super bot" — the pre-build
@@ -119,7 +99,11 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   header. Birth-complete parity shipped in one commit: claim_writer at loop
   top, funding-form exit telemetry, snapshot_equity from day one, barnes.*
   levers (registered + birth-frozen at the consumer), deploy route +
-  AUTO_IMAGES + ROW_ENTRY + dashboard row.
+  AUTO_IMAGES + ROW_ENTRY + dashboard row. **[18-Aug sweep: the S2
+  experiment ENDED — 🎸 retired 17-Aug (pm), the I17 call, zero independent
+  evidence on the carry cell; two of its three sleeves had already retired
+  ((ly), (nf)). The super-bot answer stands where S1 left it: capital
+  routing by measured claim, not a merged book.]**
 - **S3 — Directional consolidation: REFUSED, with evidence.** Merging the
   directional tail (Snap Back / gillard / abbott / intraday...) into one bot
   combines zero measured claims into one ungraded book with a fresh clock —
@@ -127,21 +111,31 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   already IS the multi-strategy self-evolving experiment; the honest version
   of this wish is promoting its best book through the standard gate.
 - **S4 — Consensus-ensemble book** (scout tickets × oracle regime × sentinel
-  events × brain mults gating one book's entries). Buildable, genuinely novel
-  — but it is a NEW thesis with no evidence yet, so it enters as a standard
-  shadow book behind S1/S2 in priority. Cheap first step instead: measure
-  retrospectively (replay: would consensus-gating have improved any existing
-  book's closes?) before minting anything.
+  events × brain mults gating one book's entries). ~~Cheap first step
+  instead: measure retrospectively before minting anything~~ **[18-Aug
+  sweep, corrected in place per I12: that first step was RUN — TWICE — and
+  the thesis is REFUTED. `STUDY_CONSENSUS_GATE_2026-08-04.md` graded 84
+  cells and ruled REFUSAL WITH EVIDENCE (the fleet's gating signals are
+  CONSTANTS on this tape — stress never fired in 6,090 samples, sentinel
+  risk-off 91.3%, oracle never LONG — so a consensus has no variance to
+  gate on); the 13-Aug (lp) re-measurement agreed (retrospective gates on
+  the taker's 42 era closes: survivors −$8.02 vs unfiltered −$4.40 — no
+  gate stack turns a negative signal supply positive). S4 is
+  CLOSED-REFUSED; the study's own §8 names what would reopen it (a second
+  regime, i.e. BTC dir=+1 ever observed). This bullet was stale since
+  4-Aug — the exact I12 decay class.]**
 
 ## 2 · Book decisions
 
 - **🧲 Snap Back — DECIDED-RETIRED 4-Aug (option A, operator: "full
   permission to go ahead with all advancements").** Shipped same day,
   changelog (jh): code guard idles the bot (`SNAPBACK_RETIRED_OVERRIDE=run`
-  to resurrect), row hidden + pruned, evidence engraved. The one act left is
+  to resurrect), row hidden + pruned, evidence engraved. ~~The one act left is
   YOURS and moved to item 3's Railway list: stop/delete the
-  `snap-back-shadow` service (remove its deploy-rule entries first) — the
-  code guard is the durable half either way.
+  `snap-back-shadow` service~~ **[18-Aug sweep, corrected in place per I12:
+  that act was DONE 5-Aug — item 3.4 records `snap-back-shadow` DELETED,
+  deploy-rule entries removed first. Nothing is left on this book; its
+  measured mirror lives on as 🪁 band-kelly's founding claim (qf).]**
 - **🌾 Carry — DECIDED-WAIT 5-Aug (option A, operator: "Proceed with all of
   the above").** Ride to ~30-Aug; both widening levers stay refused on
   measurement ((it)). Revisit lands on the calendar with the era window; the
@@ -167,6 +161,27 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   decision day: carry's census `eligible` going positive under the NEW $1M
   floor (the ≥20%/$2M count had been 0.00 for 3+ days pre-`(px)`; the $1M
   cell historically reads occupied 13.42% of snapshots).]**
+  **[(qi) TRIPWIRE RE-BASING — read this before reading `eligible` on the
+  decision day: the 13.42% base rate was measured at the 6h persistence
+  gate, and (qi) moved the live gate to 12h, which admits strictly fewer
+  windows (91% of qualifying windows die under 6h — most of what 13.42%
+  counted never survives to 12h). A low `eligible` under the 12h gate is
+  therefore NOT comparable to 13.42% and must not be read as "venue stall
+  persists". Recompute the base rate at the shipped gate first:
+  `python3 scripts/audit_book_overlap.py --gate 0.20 --floor 1e6
+  --persist-h 12` — and judge supply against THAT number.]**
+  **[18-Aug later (qi) — PERSIST 12h SHIPPED, under your queue directive
+  ("implement all operator queue items that make the fleet improve/make more
+  profit and win rate"), at the same clean boundary (px) used: the book held
+  ZERO positions and the census read `eligible 0 / waiting 2` under the $1M
+  floor at ship (the tripwire had NOT fired — recorded so the ~30-Aug day
+  reads the supply story straight). Env-tunable `CARRY_PERSIST_H`; ordinary
+  entry tuning per (hc), era unchanged; hypothesis-grade t=1.80 stated in
+  the code comment; pinned by tests/autonomy/test_carry_persistence_gate.py
+  (4 mutations red). WHAT REMAINS FOR ~30-Aug IS NOW ONLY THE DECISION
+  ITSELF: the keep-or-retire docket call — no tuning half rides on it any
+  more; if the call is retire, (qi) dies with the book at zero cost, exactly
+  as this item priced it.]**
 - **⚖️ Counterweight — early revert. DECIDED-REVERTED 4-Aug (option A,
   operator: "full permission to go ahead with all advancements").** Shipped
   as the CODE DEFAULT K 8→5 + universe 60→30 (`lighter_funding_spread_bot.py`
@@ -190,6 +205,11 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   sits in the population (ki)/(jg) already made unenterable.** That updates
   (jg)'s "+$4.80 on the trades it can still take" to +$5.90/65 with the
   post-revert week added. Options unchanged; the date stands.
+  **[18-Aug (qb) — the docket numbers refreshed again on today's class map:
+  crypto +$5.94/n=94 vs non-crypto −$36.48/n=21 (t=−2.86, the class drag is
+  119% of the era loss); trades under the CURRENT admission rule now read
+  n=23, +$0.95, 56.5% win — thin, mildly positive. Still weakly
+  KEEP-pointing; the ~28-Aug date stands untouched.]**
 - **🛢️ Garrett — DONE 13-Aug (lr): ALIVE AND PUBLISHING.** Provisioned by
   the dispatched workflow on your grant (repo's own RAILWAY_TOKEN), verified
   by the row itself: `band-garrett-lshadow` online, $1,000, svc
@@ -254,25 +274,17 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   with `extra.build` stamped.** 30-day clock starts at first publish —
   gradeable ~12-Sep by the standard gate. Env-only config (no tuning
   lane), so nothing here can drift while it accrues.
-- **🎸 Barnesy — harvest sleeves lack the (lk) class screen; frozen, so it is
-  YOUR call, not a code push.** `harvest_candidates` (carry + extreme
-  sleeves) takes non-crypto harvests (−$1.58 over 8 closes since birth);
-  only the xsect universe was screened at (ki). The (lk) fix is one line to
-  extend — but the book is BIRTH-FROZEN to 2026-09-04 for its single-policy
-  clock, and a universe change is a policy change in kind: shipping it now
-  resets a young clock to zero ((hm)/(kk)). ★ **A — apply at unfreeze
-  (4-Sep)**, the screen lands with the first post-freeze policy rev, clock
-  intact. **B — apply now**, eating the clock reset, if the non-crypto
-  harvest bleed grows enough to outweigh ~a week of accrued sample (it is
-  ~$0.2/day today). Nothing needed from you before 4-Sep unless B.
-  **[13-Aug (mf) — a SECOND item for the same 4-Sep unfreeze rev, so one
-  policy change carries both:** the carry-cell grace study measured the 1h
-  flip grace on the ≥20% cell churning half the profit away (1h +$27.25/
-  t=1.95 h2 negative → 6h +$41.17/t=2.96 → 24h +$50.12/t=3.52, monotone,
-  robust ex-AVNT). Its carry sleeve's own 8 closes are ALL `flip` exits at
-  0% win ((lv)). ★Extend `lighter_band_barnes_bot.py`'s `FLIP_GRACE_H` (a literal,
-  1.0) to 6h in the same unfreeze commit as the class screen — two measured fixes, one clock reset,
-  already spent.]**
+- **🎸 Barnesy — ~~harvest sleeves lack the (lk) class screen; frozen, so it
+  is YOUR call~~ MOOT, corrected in place per I12 at the 18-Aug sweep: the
+  BOOK WAS RETIRED 17-Aug (pm)** — the I17 call on the carry cell, your
+  decision, zero independent evidence (0 of 9 episodes were a coin 🌾 carry
+  was not already holding). Both 4-Sep unfreeze items below died with it:
+  the (lk) class-screen extension and the (mf) FLIP_GRACE_H 6h extension
+  have no consumer any more (`BARNES_RETIRED_OVERRIDE=run` resurrects the
+  book, and only then would either fix matter — apply both in that same
+  commit if it ever runs). The (mf) grace measurement itself was not lost:
+  🌾 carry ships it since (px) and 🏦 Rich Dad since (mf). Historical
+  options kept in git; this bullet leaves the queue with the sweep.
 - **📊 Index Rider — DECIDED-RETIRED 13-Aug (lo)** (operator: *"get rid of
   what's not working"* — the I17 call, made early on conclusive evidence:
   ZERO closes in 44 days and a measured rule rate of ~17.2 closes/yr against
@@ -292,9 +304,19 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   (option B alone turned out structurally inert — the judge's both-cage
   clamp invariant means an xp-only floor can never be exercised;
   mutation-pinned now), signatures in both registry notes, and
-  **`min-vol-1e5` filed FOURTH** (above the negative-prior enter-gate,
+  ~~**`min-vol-1e5` filed FOURTH** (above the negative-prior enter-gate,
   below the filed `min-vol-2e6`, whose ~11-Sep subset verdict de-risks the
-  wider read — measured here the $2–10M band is the WEAK half). Real money
+  wider read — measured here the $2–10M band is the WEAK half).~~ **[18-Aug
+  sweep, corrected in place per I12: the queue order was REVERSED 13-Aug
+  ((ln): min-vol-1e5 runs AHEAD of min-vol-2e6 — strongest direct prior
+  first), and the ~11-Sep slot date is void twice over — the judge's window
+  was voided 14→15-Aug ((mu)/the §6 dispatch) and again 18-Aug ((pt) arm
+  split; re-paired same day, (pz) then moved both arms to HEAD), so the
+  clean window accrues from the 18-Aug alignment and every downstream slot
+  slid. The +$14.83-vs-+$4.01 prior quoted above is also no longer the
+  current reading: (pw) measures the band's edge decayed on the trailing
+  window and (qa)'s (kc) refresh reads every Farmer gate row negative
+  full-window.]** Real money
   unchanged: the paired bar (judge sole writer) + fade-watch remain the
   only door. Full table: `STUDY_THIN_TIER_MIN_VOL_2026-08-05.md`.
 
@@ -321,6 +343,23 @@ allocation organ): ALL measured claims live in the FUNDING class (3 books,
   7. **[13-Aug (lo)]** `equities-regime-shadow` — 📊 Index Rider retired;
      the code guard idles it durably, so stopping/deleting the service is
      optional tidiness (~$2-5/mo).
+  8. **[18-Aug sweep]** `band-barnes-shadow` — 🎸 retired 17-Aug (pm); the
+     code guard idles it durably, so stop/delete is the same 3.7-shaped
+     optional tidiness.
+  9. **[18-Aug sweep]** `book-schwager-shadow` — 🧙 retired (po), service
+     already STOPPED 16-Aug; its auto-deploy rule is still ACTIVE in
+     `railway-redeploy.yml` (incl. `$_shared`), so any shared-module push
+     resurrects the stopped container — the code guard then idles it, cost
+     is one container ([[railway-autodeploy-resurrects-stopped-services]]).
+     If you want it GONE: say so and a session does the repo half first
+     (rule + grep + AUTO_IMAGES→MANUAL_IMAGES_OK, the 3.3 tide-rider
+     sequence), then you delete the service.
+  **[18-Aug sweep: the counts above are the 5-Aug census and stale — seven
+  services were born since ((jw) barnes, (lr) garrett, (ls) kiyosaki, (mk)
+  the wave-2 four), band-kelly is pending, and "every one load-bearing" no
+  longer holds (3.8/3.9 idle retired). No fresh `railway status` census is
+  recorded; the next operator sitting should recount. Note 2b and 5 list
+  the same four freqtrade corpse services twice.]**
   Do NOT touch: the failover pair (`funding-carry` + `yield-harvester-shadow`
   — now deliberate), both live services, the remaining live shadow services,
   `pnl-dashboard`, `market-context`, `Postgres`, `freqtrade-bots`.
@@ -435,45 +474,23 @@ SUPERSEDED by the grader's own later publishes: Farmer-live now reads
 negative), and every snapshot of the 14-Aug 24h history agrees. Its era edge
 is statistically zero while execution measures clean — the stall is EDGE,
 which no date can fix. It matures onto the decision docket at the 15-Aug
-publishes alongside carry and Barnesy.]** · carry window-floor 30-Aug (n=1
-in-era; the venue stall (I18) is the real blocker — **and (nc) 15-Aug: when
+publishes alongside carry and Barnesy — and (qa) 18-Aug adds: its t collapsed
+1.73→0.24 and it holds NOTHING today (eligible 0 / off_band 109); the (kc)
+refresh withdrew gate support in both directions, so its idleness is
+CORRECT.]** · carry window-floor 30-Aug (in-era n=10/−$15.45/t=−4.48 per
+(nc)/(qb); the venue stall (I18) is the real blocker — **and (nc) 15-Aug: when
 its keep-or-retire matures, read the pooled +$66 all-time as inflated ≈$13 by
 the stale-container phantom-accrual window (17–28-Jul rows, 2.5–6.7× over);
 the era sample is clean and reads −$15.45/n=10. The book's true story is
 weaker than its row suggests**). Human-decision dates stay
 hand-carried, correctly — a trajectory cannot derive a review date: item-18
-oracle grades + SPY/QQQ graduation ~mid-Aug · Farnham-Six keep-or-retire
+oracle grades + ~~SPY/QQQ graduation ~mid-Aug~~ **[(qa) 18-Aug: graduation
+re-run FIRED — graduated in bar count, NOT in graded sample (n=3 each vs the
+n≥20 bar); milestone moves to ~mid-Sep]** · Farnham-Six keep-or-retire
 verdicts ~28-29-Aug (⚖️ Counterweight's pre-registered criterion recomputed
 15-Aug: crypto-only in-era +$5.90/+0.307%/trade t=0.49 — still weakly
 KEEP-pointing; trades under the CURRENT admission rule n=15 read flat) ·
-Barnesy gradeable ~mid-Sep · Taker policy-clock ruling (chip queued will
-surface the evidence).
-
-## 7 · ~~15-Aug — THE RED-STOP SLATE~~ — **EXECUTED 15-Aug under "full permission to take control": merged to main (d6c5e8f, fast-forward, suite green) and PAYLOAD-VERIFIED 3 minutes later — 7 retired rows gone from /pnl.json, every green publishing, barnes census `xsect.retired: true`. Board moved 8g/9r → 8g/8f/3r; the three remaining reds each hold to their own pre-registered date. Item closes at the next daily review.**
-
-**The eight keep-or-retire asks open since 6-Aug, decided in one push at your
-instruction** (*"every decision I need to make ... one code push I can
-click"*). RETIRED (all reversible via override env, ledgers kept):
-pm-gillard/abbott/rudd/morrison · crypto-intraday-15m · crypto-swing-daily ·
-freqtrade-dad · 🎸 Barnes xsect sleeve (winds down to flat by its own
-rebalance). HELD with reasons: ⚖️ Counterweight (pre-registered ~28-Aug),
-🎯 sniper (screens landed, post-screen undecidable), mum/turnbull/albanese
-(green/positive). Full verdicts: CHANGELOG (nf). **Your click is the merge.**
-
-## 6 · ~~NEW 15-Aug — the judge-unblock dispatch~~ — **EXECUTED by the operator 15-Aug ~12:39Z (dispatched twice, harmless): both Farmer arms verified at equal build `daeb0319eb3d` one minute later. The ARMS-ON-DIFFERENT-CODE refusal is over; note the judge's clean window restarts at alignment (first post-alignment eval reads n=0/0 — the window must not straddle a code delta), so the candidate re-accrues its 7d/30-close sample from 15-Aug. Item closes at the next daily review.**
-
-**xp-judge has discarded every hourly eval since ~07:44Z 14-Aug** on "ARMS ON
-DIFFERENT CODE" while every paired-bar floor is met (n_live=32 ≥ 10,
-n_shadow=53 ≥ 30, candidate window 8.6d ≥ 7d). The fix is one dispatch that
-deploys BOTH Farmer arms from the same commit (the (hi) pairing exists for
-exactly this); the deploy content is behaviour-neutral for both arms and no
-halt was active when checked. This session's environment declined the
-live-deploy act at the permission layer, so it is prepared, not executed:
-
-```
-gh workflow run 305025607 -f services="trail-blazer-live,funding-farmer-shadow"
-```
-
-Verify by stamp readback on BOTH rows (equal `extra.build` ids), never by the
-green run. Every hour this waits is another judge eval discarded. Full
-context: CHANGELOG (mu).
+~~Barnesy gradeable ~mid-Sep~~ **[retired 17-Aug (pm) — off the calendar]**
+· 🛢️ Garrett + 🏦 Rich Dad gradeable ~12-Sep (with the declared carry-cell
+collision decision, `audit_book_overlap.KNOWN_CELL_COLLISIONS`, same day) ·
+Taker policy-clock ruling (chip queued will surface the evidence).
