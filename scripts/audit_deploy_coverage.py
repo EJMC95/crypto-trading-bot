@@ -1045,9 +1045,20 @@ def _selftest():
         f"{arm_pairing_orphans(_wf)}")
     _gone = arm_pairing_orphans(_wf.replace("funding-farmer-shadow", ""))
     assert len(_gone) == 1 and "NO deploy route" in _gone[0][2], _gone
+    # [2026-08-18 (pt)] The split fixture must now strip TWO pairings, not one.
+    # The dispatch branch gained its own `svcs=` line naming both arms (a
+    # dispatch that names the live arm appends its control arm), so removing
+    # only the push branch's adjacent pair no longer produces the split
+    # condition — `together` was still satisfied by the dispatch line and this
+    # negative fixture silently had nothing to detect.
+    _split_src = _wf.replace(
+        "trail-blazer-live,funding-farmer-shadow", "trail-blazer-live")
+    _split_src = "\n".join(
+        ln for ln in _split_src.splitlines()
+        if not ("svcs=" in ln and "funding-farmer-shadow" in ln
+                and "trail-blazer-live" in ln))
     _split = arm_pairing_orphans(
-        _wf.replace("trail-blazer-live,funding-farmer-shadow", "trail-blazer-live")
-        + "\n# funding-farmer-shadow mentioned but never appended\n")
+        _split_src + "\n# funding-farmer-shadow mentioned but never appended\n")
     assert len(_split) == 1 and "same decide branch" in _split[0][2], _split
     for _live, _ctrl in PAIRED_ARMS.items():
         assert _live != _ctrl and _ctrl, (_live, _ctrl)

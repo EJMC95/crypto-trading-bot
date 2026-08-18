@@ -1,3 +1,173 @@
+## 2026-08-18 (pu) — "FIX ANYTHING THAT MAKES MORE MONEY": THE ANSWER IS NOTHING TODAY, AND THE REFUSALS ARE THE DELIVERABLE
+
+Six measured lenses, 55 agents, three adversarial referees per proposal
+(turnover / calibration / reachability). **12 proposals survived refutation and
+NOT ONE has a quantifiable positive dollar figure.** Per I19 the refusals are
+the output — each is a widening someone would otherwise eventually ship
+unmeasured. The blocker the hunt found on the way is `(pt)`.
+
+**1 · THE BIGGEST POT HAS NO ACTUATION PATH — 0 of 8 directional books now
+calibrate.** `STUDY_ENTRY_EXIT_FLEETWIDE_2026-08-15` records the stop family at
+**−$128.05 (n=317, 12 books)**, the fleet's dominant loss mechanism, and says
+1 of 8 directional books calibrates the exit sweeper: **pm-gillard — retired by
+the red-stop slate the same day.** Confirmed in `cleanup_legacy_bots.LEGACY_BOTS`
+and `parliament.PM_RETIRED`. So the harness that could act on the largest
+recoverable sum can currently recommend nothing for any directional book, and
+proposing stop changes anyway is precisely the unmeasured widening I19 bans.
+**The study's census line is stale on this point and should be corrected in
+place (I12).**
+
+**2 · THE PARLIAMENT PAIR CALIBRATES AND SAYS KEEP.** 🏛️ albanese replays
++0.312%/trade against an actual +0.281% (gap +0.031pp, PASS) and **729 searched
+rules produce zero candidates** beating the shipped exit. 🏛️ turnbull calibrates
+(gap +0.085pp) and its "winner" is **grid-edge noise** — the sl optimum runs to
+the wall at every grid width (sl-axis spread 0.395pp vs a claimed edge of
+0.4845pp), which is the `(gx)` report-unbounded rule doing its job.
+**Caveat recorded, and it weakens both:** `CALIB_TOL_PP` is a fixed 0.25pp that
+reads no `n` and no SE — 0.35 SE for albanese, 0.78 SE for turnbull, whose
+baselines are statistically zero (t=+0.39, t=+0.07). "Reproducing" a zero
+baseline means landing near zero. A power-aware gate would turn both PASSes into
+honest WITHHELDs.
+
+**3 · NO REAL-MONEY SIZING CHANGE — there is no claim to size up against.**
+💸 the Farmer's in-era I16 lower bound is **exactly 0.000%** (n=66, mean
+−0.0398%/trade, t=−0.25). Across BOTH live books: **0 of 2 have a positive era
+lower bound.** Routing real capital by I16 today would be routing toward noise.
+The judge's own growth pair (`explore_k`, `conviction_hi`) is refused on the
+shadow arm's REALISED record — explore n=34, mean −0.1837%/trade, −$13.12, vs
+exploit n=70 at −0.0222% — the record outranking the replay (I14).
+
+**4 · THE TRAP NEXT DOOR TO A SUCCESS, and it is worth reading twice.** `(ne)`
+raised 🙏 avo SHADOW's cap 4→6 and that was right. The obvious follow-on —
+raise the LIVE Avo's `max_open` — is **backwards**: the live arm sizes its clip
+as `equity / max_open`, so raising the cap **SHRINKS** the real-money clip
+($15.67 today at 3/4 open). Same-named lever, opposite sign, real money.
+Refused. And avo shadow 6→8 is refused too: post-`(ne)` occupancy shows the
+constraint has moved OFF capacity.
+
+**5 · THE MOST SATURATED BOOK IN THE FLEET IS NOT A WIDENING.** 👩 mum shadow
+sits at **4/4 for 100.0% of its 32-day era**, refilling a freed slot within 30
+seconds 3 times out of 3 — stronger binding evidence than avo ever had. Refused
+anyway: its median hold is **25.1 days**, so the cap is not what limits its
+close rate, and a capacity step buys exposure rather than evidence. 🛢️ Garrett
+is at 6/6 and refused on I7/`(hs)` — a capacity widening must read P&L and fail
+CLOSED: −1.141%/trade, t=−1.05, horizon `unreachable`.
+
+**6 · WHAT WAS CHECKED AND FOUND HEALTHY** (recorded so nobody re-opens it):
+💸 Farmer live slippage **0.33bps over 39 orders**, 38 tx-hash-tier fills,
+`slip_streak 0` — well inside the ~2bps tripwire. ⚖️ Counterweight's 24h
+rebalance closes a leg only when its desired side CHANGED, so there is no
+per-cycle round trip to recover. 🎫 the Taker's 5-minute `tp` cluster is the
+already-quarantined `(hm)` BOT/USDC mark-basis episode (43 closes, one day,
+100% inside the existing window). `fleet_allocation`'s ledger fetch is **32%
+utilised** (2,581 rows against a limit of 8,000) — no silent truncation.
+
+**7 · THE ONE CELL I WOULD HAVE SHIPPED, AND WHY I DID NOT.** 💸 the Farmer's
+`max_hold` (72h) exit is the only exit family significant on the record, and
+both arms agree independently (pooled n=10, −$11.45, mean −2.704%/trade,
+t=−3.83; LIVE t=−2.78, SHADOW t=−2.71). **Refused at n=10** — and because a
+price-path sweep measures the wrong thing on a FUNDING book, which is why
+`FUNDING_BOOKS` exists ((kf)). Re-check when n≥30.
+
+**THE HONEST SUMMARY: the fleet has no measured edge to lean on today.** Its
+best-evidenced books are either supply-starved (🌾 carry: 0 eligible of 225),
+undecidable, or freshly born (🧮 Hull, whose founding claim survived
+re-measurement but whose binding bar is CLOSES at ~6/30d). The one book whose
+binding bar is `closes` rather than `t` is 🙏 avo shadow — the single place
+where more samples is the answer, and `(ne)` already took that step.
+
+## 2026-08-18 (pt) — I FROZE THE JUDGE MYSELF: A DISPATCH SHIPPED ONE ARM OF A MATCHED PAIR, AND BOTH GUARDS PRINTED OK
+
+Asked to find anything that makes more money, a six-lens measured hunt (55
+agents, 3 referees per proposal) returned **no shippable money-making win
+today** — and, in the process, found that the fleet's ONLY designed path to
+more real money was **blocked, by me, earlier the same day.**
+
+**WHAT I DID.** Deploying `(pr)` to the live Funding Farmer I ran
+
+    gh workflow run 305025607 -f services="trail-blazer-live"
+
+Before it, both Farmer arms were on `e981e11820fc`. After it: live
+`35562ac7b4de`, shadow still `e981e11820fc`. The experiment judge — the SOLE
+writer of `live.funding.*` — then held its candidate with its own words:
+
+    ARMS ON DIFFERENT CODE: live=35562ac7b4de shadow=e981e11820fc
+    — this window measures a code delta, not edge; no promotion can rest on it
+
+`slope-gate-off` sat at n_shadow 10/30, n_live 8/10, `xp_queue.candidates=[]`.
+The two arms are a MATCHED PAIR precisely so the judge can attribute a
+difference to EDGE rather than to code; `(hi)` joined their deploy clock on
+purpose, and I broke it with one flag.
+
+**WHY NOTHING CAUGHT IT — two guards, both green, both correct about their own
+question.**
+* `audit_deploy_coverage.arm_pairing_orphans` requires both service names to be
+  appended by ONE condition in the decide step. **They are — in the PUSH
+  branch.** The `workflow_dispatch` branch takes the operator's list VERBATIM
+  (`svcs="${DISPATCH_SVCS:-...}"`) and returns before that pairing is ever
+  reached. The guard inspects `svcs=` lines; a raw input assignment satisfies it.
+* `audit_code_currency` reported the shadow arm `DEFERRED 36 — none marked for
+  this marker-gated service, working as designed`, and exited **OK**. Right
+  about the ROW, wrong about the PAIR: **`DEFERRED` means "deliberately held
+  behind a marker gate", which is only true when BOTH arms are held.** One arm
+  current and the other not is drift, never design. A per-row verdict cannot
+  express a per-pair invariant — exactly the lesson `PAIRED_ARMS` already
+  records for the per-FILE question, one shelf down.
+
+**FIXED, three halves.**
+1. **Re-paired now**: `funding-farmer-shadow` deployed to HEAD; both arms read
+   `35562ac7b4de / build_n 16`. Zero real-money exposure (shadow container, zero
+   keys) and the live arm was not touched. The price is the judge discarding a
+   window it had already voided, and it GROWS with delay at ~5.5 shadow
+   closes/day — acting immediately was strictly cheaper than waiting.
+2. **The dispatch branch now expands the pair** — naming `trail-blazer-live`
+   appends `funding-farmer-shadow`. Pure-bash `case`, never a pipe into
+   `grep -q`: under `pipefail` an early-exiting consumer makes its producer's
+   status part of yours and INVERTS the match ((ml), which bit twice in one
+   hour). **The guard immediately caught my first attempt at this**: the
+   provenance comment pushed the decide step's `run:` scalar to 21,506 chars
+   against GitHub's 21,000 hard cap, which per `(ls)` fails the WHOLE workflow
+   at validation — zero jobs, nothing deploys. Trimmed to one line; headroom is
+   now 46 chars against the 20,500 budget, 546 against the real cap.
+3. **`audit_code_currency.arm_drift`** — the runtime half. It IMPORTS
+   `PAIRED_ARMS` rather than re-declaring it (a second copy of a rule is a
+   second rule, (hj)) and returns a FAILING verdict when one arm of a declared
+   pair is CURRENT and the other is not. Verified against the real feeds in both
+   directions: it fires on the pre-deploy snapshot and is SILENT on the
+   re-paired one. Both arms `DEFERRED` stays silent — that one is genuine
+   design, and firing on it would be the `(gl)` cry-wolf shape.
+
+**MUTATIONS: 4 on the detector + 1 on the workflow, all verified RED** —
+detector never fires; compare inverted; an absent arm treated as drift;
+`PAIRED_ARMS` re-declared locally; and the dispatch `case` deleted. Pinned by
+`tests/autonomy/test_arm_pairing_drift.py`.
+
+**AND THE MUTATION ROUND ITSELF LIED FIRST.** Three mutations read RED and then
+the RESTORED file still failed — the file was byte-identical to the backup and
+in-tree `__pycache__` was cleared. Cause: `sys.pycache_prefix` is set
+system-wide on this machine, so ALL bytecode lives **out of tree** under
+`~/Library/Caches/com.apple.python`, and one mutation (`==` → `!=`) was
+**byte-identical in length**, so with same-second mtime CPython's (mtime, size)
+invalidation never triggered and the module kept running the mutant. The
+memory note [[mutation-tests-lie-under-out-of-tree-pycache]] describes exactly
+this and I walked into it anyway. Every mutation in this entry was re-run under
+`PYTHONDONTWRITEBYTECODE=1` with each patch ASSERTING its target exists.
+
+**ONE MORE REPAIR, caused by the fix.** `audit_deploy_coverage`'s own negative
+fixture built its "split" case by removing the push branch's adjacent pair —
+but my dispatch line also names both arms on an `svcs=` line, so `together`
+stayed satisfied and **the fixture silently had nothing left to detect**. It now
+strips both pairings, and I verified it still detects a real split rather than
+merely passing.
+
+**THE HONEST BOTTOM LINE ON "MAKE MORE MONEY": this entry does not make money.**
+It removes a blocker I created on the channel that could. The hunt's substantive
+output is 32 declared refusals — see `(pu)` for the ones worth recording,
+including that the fleet's biggest loss pot (the stop family, −$128.05 over 317
+closes) currently has **zero calibrating books** to act through, `pm-gillard`
+having been retired by the red-stop slate the same day the study named it as
+the only one.
+
 ## 2026-08-18 (ps) — THE CALIBRATION GATE GRADED THE HARNESS AGAINST TRADES IT CANNOT REPLAY, AND THAT FALSE PASS GUARDED THE FLEET'S LARGEST STOP POT
 
 **The defect.** `study_exit_sweep.main()` built the calibration baseline from

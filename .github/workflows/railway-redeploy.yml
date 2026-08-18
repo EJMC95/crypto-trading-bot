@@ -213,6 +213,7 @@ jobs:
             # Manual dispatch can still deploy freqtrade-bots ON PURPOSE (e.g. when
             # we intentionally ship a strategy change and accept one paper-DB reset).
             svcs="${DISPATCH_SVCS:-freqtrade-bots,pnl-dashboard}"
+            case ",$svcs," in *,trail-blazer-live,*) case ",$svcs," in *,funding-farmer-shadow,*) :;; *) svcs="$svcs,funding-farmer-shadow";; esac;; esac
           else
             # Diff the WHOLE push (before..after), not just the last commit —
             # a multi-commit push ending in a docs commit was deploying nothing.

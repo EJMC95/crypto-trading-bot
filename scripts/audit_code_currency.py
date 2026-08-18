@@ -477,10 +477,67 @@ def audit(depth=40, rows=None, fail_closed=False, gha=False):
               f"NOT a pass: 'no answer' is the state this audit exists to "
               f"remove ((oc)).")
         return 1
+    drift = arm_drift(table)
+    if drift:
+        for live_svc, ctrl_svc, why in drift:
+            print(f"ARM-DRIFT  {why}")
+            if gha:
+                print(f"::error title=ARM-DRIFT {live_svc}::{why}")
+        print(f"\naudit_code_currency: {len(drift)} ARM PAIR(S) DRIFTED. "
+              f"Deploy the lagging arm — `gh workflow run 305025607 -f "
+              f"services=\"<arm>\"` — then verify by the extra.build readback. "
+              f"A dispatch naming one arm now appends its pair ((pt)), so this "
+              f"should only fire for a deploy that predates that fix.")
+        return 1
     print("audit_code_currency: OK — every stamped container is CURRENT, "
           "deliberately DEFERRED behind its marker gate, or behind only on "
           "shared modules.")
     return 0
+
+
+def arm_drift(table):
+    """[(live_row, ctrl_row, why)] where ONE arm of a declared pair is CURRENT
+    and the other is not. Pure over the verdict table.
+
+    [2026-08-18 (pt)] WHY THIS IS A FINDING AND `DEFERRED` IS NOT. The two
+    Funding Farmer arms are a MATCHED PAIR: the experiment judge refuses to
+    grade a window in which they ran different code ("this window measures a
+    code delta, not edge"), and that judge is the ONLY writer of
+    `live.funding.*` — the sole designed path from shadow evidence to real
+    money. Measured 18-Aug: a `workflow_dispatch` naming only
+    `trail-blazer-live` left live=35562ac7b4de vs shadow=e981e11820fc, the
+    judge held `slope-gate-off` at n_shadow 10/30, and **this audit printed OK**
+    — calling the shadow arm "DEFERRED ... working as designed".
+
+    It was right about the row and wrong about the PAIR, which is the whole
+    point: `DEFERRED` means "deliberately held behind a marker gate", and that
+    is only true when BOTH arms are held. One arm current and the other not is
+    drift, never design. A per-row verdict cannot express a per-pair invariant
+    (the same lesson `audit_deploy_coverage.PAIRED_ARMS` records for the
+    per-file question).
+
+    PAIRED_ARMS is IMPORTED, never re-declared — a second copy of a rule is a
+    second rule ((hj)).
+    """
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from audit_deploy_coverage import PAIRED_ARMS
+    except Exception:                      # noqa: BLE001 — dark import is not a pass
+        return [("?", "?", "PAIRED_ARMS unreadable — pairing NOT checked")]
+    by_svc = {r.get("svc"): r for r in table if r.get("svc")}
+    out = []
+    for live_svc, ctrl_svc in sorted(PAIRED_ARMS.items()):
+        a, b = by_svc.get(live_svc), by_svc.get(ctrl_svc)
+        if not a or not b:
+            continue                       # an arm absent from the feed says nothing
+        if a["verdict"] == b["verdict"]:
+            continue
+        out.append((live_svc, ctrl_svc,
+                    f"{live_svc} is {a['verdict']} while {ctrl_svc} is "
+                    f"{b['verdict']} — the arms ran different code, so the "
+                    f"judge cannot grade this window and no promotion to "
+                    f"live.funding.* can rest on it"))
+    return out
 
 
 def _write_step_summary(table, window):
