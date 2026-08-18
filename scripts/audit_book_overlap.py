@@ -204,9 +204,15 @@ KNOWN_CELL_COLLISIONS = {
         "band change: re-banding 🛢️ Garrett to free the tier was measured and "
         "REFUSED (pl) because 6 of 6 of its top-ranked candidates are >=20%, "
         "so the narrowing would strip the fleet's only slot-filling funding "
-        "book of its entire top of book. Do not stretch this line to cover a "
+        "book of its entire top of book. [(py) 18-Aug: PRICED on the band's "
+        "own 30d tape — the ceiling takes Garrett +$4.82 -> -$15.71 (a "
+        "$20.53 cost) and the tail ALONE is also negative under its "
+        "ladder, i.e. the full-band RANKING is the edge; the Rich-Dad "
+        "extension walk reads +$20.25 but KAITO is 107% of it — one "
+        "episode, not a cell edge. Both halves of the split are measured "
+        "REFUSED, not merely unpriced.] Do not stretch this line to cover a "
         "THIRD book: minting one here fails this guard, which is the point.",
-    # [2026-08-18 (pr)] 🌾 carry's floor moved $2M -> $1M (operator-directed
+    # [2026-08-18 (px)] 🌾 carry's floor moved $2M -> $1M (operator-directed
     # loosening, measured: cell occupancy 5.73% -> 13.42%, 3 -> 6 coins over
     # 34.9d). Its gate now overlaps 🛢️ Garrett's band on [$1M,$2M) x >=20%
     # TRUE — a POPULATED sliver (ROBO/ENA + KAITO's excursions) — so the
@@ -223,14 +229,14 @@ KNOWN_CELL_COLLISIONS = {
     # grouping the live supply produces.
     frozenset({"perps-funding-carry-lshadow", "book-kiyosaki-lshadow",
                "band-garrett-lshadow"}):
-        "THE CARRY CELL + THE THIN-TIER SLIVER ((pr) 18-Aug). 🌾 carry at "
+        "THE CARRY CELL + THE THIN-TIER SLIVER ((px) 18-Aug). 🌾 carry at "
         ">=20%/[>=$1M]/crypto now reaches into 🛢️ Garrett's published band "
         "[0.1M,2M) on a populated sliver, while still sharing the >=$2M cell "
         "with 🏦 Rich Dad — one transitive component, three books, two "
         "different declared overlaps (see the comment above this entry and "
         "the pair entry). Owner: OPERATOR, ~12-Sep.",
     frozenset({"perps-funding-carry-lshadow", "band-garrett-lshadow"}):
-        "(pr) fallback key: the carry/Garrett sliver alone, for tapes where "
+        "(px) fallback key: the carry/Garrett sliver alone, for tapes where "
         "the >=$2M Rich Dad intersection reads empty. Same declaration as "
         "the 3-book component above.",
 }

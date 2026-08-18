@@ -1,3 +1,46 @@
+## 2026-08-18 (py) — THE TIER SPLIT IS PRICED AND BOTH HALVES ARE REFUSED: the ceiling costs Garrett $20.53, and the Rich-Dad extension is one coin wearing a cell
+
+**Operator, 18-Aug: "Let's see if it works, think if needs anything else"** —
+on the 16-Aug split proposal (🛢️ Garrett → apr [5%,20%), 🏦 Rich Dad →
+[20%,∞) down to $0.1M). `(pl)` refused it UNPRICED — *"cannot argue the
+high-APR tail is load-bearing — and equally cannot argue it is not"* — and the
+`(pw)` band tape now exists, so this run bought the price. Method + tables +
+drivers: `STUDY_TIER_SPLIT_2026-08-18.md`. Rules pre-registered per half.
+
+**1 · GARRETT HALF: the ceiling takes +$4.82 → −$15.71 (−$20.53/30d), and the
+finding is structural.** The tail [20%,∞) ALONE is also negative (−$11.79)
+under Garrett's price ladder — so neither sub-band carries the edge; **the
+RANKING across the full band is the edge**, and narrowing a ranked selector
+degrades it from both ends. `(pl)`'s snapshot instinct (all 6 of the top 6
+are ≥20%) is confirmed with a replay dollar figure.
+
+**2 · RICH DAD HALF: passes the pre-registered letter and fails the standing
+concentration test.** The delta-neutral walk (hull_run shape, Rich Dad's own
+constants: 6h persist, 6h flip grace, decay_paid ×1.3, 336h, 0.219 bar,
+crypto-only, $80×6) reads +$20.25 / n=35 — **and KAITO alone is +$21.65,
+107% of the total**; the other 19 coins sum to −$1.40, and 28 of 35 exits are
+the churn exit. That is the (nu)/(oj) undecidable-by-tail shape at cell scale:
+one coin's episodes, not an edge. Recorded against myself: the pre-registered
+rule lacked a concentration arm and the house doctrine supplied it — a future
+pre-registration on any mean should carry a top-drop arm from birth.
+
+**3 · WHAT SHIPS: the price, engraved where the proposal would re-enter.**
+`audit_book_overlap.KNOWN_CELL_COLLISIONS` now carries the numbers inline
+beside `(pl)`'s refusal, so the split cannot be re-proposed unpriced. Also
+fixed in passing: the `(px)` carry-floor declaration comments cited
+**`(pr)`** — the Farmer halt entry, an unrelated letter — in three places
+(the `(lc)` wrong-pointer class; the letters audit only checks that a cited
+letter EXISTS). All three now cite `(px)`.
+
+**4 · THE KAITO FACT, placed.** Its thin-band ≥20% excursions sit BELOW 🌾
+carry's new $1M floor (`(px)`) and inside Garrett's band, where the ranked
+selector already takes them. The coin is covered; no book needs to move, and
+no gate needs to chase it.
+
+No lever, no config, no era. Two measured refusals; per I19 and the `(pu)`
+precedent the refusals are the deliverable — the split question is now closed
+with numbers on both halves instead of standing half-open as "the
+differentiation that would work".
 ## 2026-08-18 (px) — 🌾 CARRY GETS ITS SUPPLY BACK AND ITS MEASURED EXIT: min_vol $2M → $1M on the 34.9d ladder, flip grace 1h → 6h on the (mf) cell measurement — shipped together while the book is EMPTY, so the fresh sample has ONE policy
 
 **Operator, 18-Aug: "Whatever is money productive" → "Expand where necessary
