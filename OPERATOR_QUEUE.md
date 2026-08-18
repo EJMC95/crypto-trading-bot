@@ -12,7 +12,7 @@ Recommended options are marked ★.
 
 ---
 
-## ⚡ WAITING ON YOU · 🪁 band-kelly (the Mirror book) — provision the service, then activation is one commit
+## ⚡ ~~WAITING ON YOU~~ · 🪁 band-kelly — **EXECUTED 18-Aug ~22:16Z under your "Continue maverick" grant: PR #180/#181 merged, service provisioned by the one-shot dispatch (workflow deleted at activation per the (lr) rule), row verified by stamp readback (`5eea92e33277`/n=14 byte-equal to prediction). The readback surfaced and closed a second (ml) stale-reader instance (run 537). Activation + the pre-first-close fidelity pass land with the (qh) PR. Item closes at the next daily review.**
 
 **Born 18-Aug on your ask** (*"does the exact opposite of all of the major
 losing sequences"*): `lighter_band_kelly_bot.py`, the measured mirror of
